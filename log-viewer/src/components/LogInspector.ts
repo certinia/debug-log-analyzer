@@ -10,7 +10,7 @@ import {
   type DetailSource,
   eventBus,
 } from '../core/events/EventBus.js';
-import type { InspectorRevealEvent } from './inspectorReveal.js';
+import type { InspectorLocateEvent, InspectorRevealEvent } from './inspectorReveal.js';
 import { debounce } from '../core/utility/Util.js';
 import { getSettings, updateSetting } from '../features/settings/Settings.js';
 import { emptyTextFor } from './detailEmptyText.js';
@@ -52,6 +52,8 @@ export class LogInspector extends LitElement {
   // apart from the selection so the call stack keeps its anchor while Details
   // and the call tree follow the walk.
   private _activeFrames = new Map<DetailSource, number>();
+  // The source a locate mark was last sent to, while one is showing.
+  private _locatedSource: DetailSource | undefined;
   // The user's last open/closed choice, or null if they've never made one —
   // which is the only state that lets a selection auto-open the panel.
   @state()
@@ -108,6 +110,9 @@ export class LogInspector extends LitElement {
 
   updated(changed: PropertyValues): void {
     if (changed.has('activeTab')) {
+      // The tab the mark was for is no longer on screen, and the pointer left
+      // the row without the table noticing.
+      this._clearLocate();
       void this._rebuild();
     }
   }
@@ -146,6 +151,7 @@ export class LogInspector extends LitElement {
         @pane-toggle=${this._onPaneToggle}
         @pane-resize=${this._onPaneResize}
         @inspector-reveal=${this._onReveal}
+        @inspector-locate=${this._onLocate}
       >
         <slot slot="main" name="main"></slot>
       </dock-layout>
@@ -196,12 +202,45 @@ export class LogInspector extends LitElement {
     }
   };
 
+  /**
+   * A row is under the pointer: mark it in the active tab's view. Nothing is
+   * selected and no section changes, so this never rebuilds the panel.
+   */
+  private _onLocate = (e: InspectorLocateEvent): void => {
+    const source = this._activeSource;
+    if (!source) {
+      return;
+    }
+    this._locatedSource = e.detail.eventIndexes.length ? source : undefined;
+    eventBus.emit('inspector:locate', {
+      source,
+      eventIndexes: e.detail.eventIndexes,
+      sticky: e.detail.sticky,
+    });
+  };
+
+  /** Drops a mark left behind by a pointer that never left the row. Sticky, so a
+   *  picked row's mark goes with it. */
+  private _clearLocate(): void {
+    if (this._locatedSource) {
+      eventBus.emit('inspector:locate', {
+        source: this._locatedSource,
+        eventIndexes: [],
+        sticky: true,
+      });
+      this._locatedSource = undefined;
+    }
+  }
+
   private _onToggle(detail: { visible?: boolean }): void {
     this._setVisible(detail.visible ?? !this._visible);
   }
 
   /** Every open/close is the user's, so each one is remembered. */
   private _setVisible(visible: boolean): void {
+    if (!visible) {
+      this._clearLocate();
+    }
     this._visiblePref = visible;
     updateSetting('inspector.visible', visible);
   }

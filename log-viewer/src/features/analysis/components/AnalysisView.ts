@@ -14,6 +14,7 @@ import type { ApexLog } from 'apex-log-parser';
 import '../../../components/ContextMenu.js';
 import type { ContextMenu } from '../../../components/ContextMenu.js';
 import { eventBus } from '../../../core/events/EventBus.js';
+import { rowOccurrences } from '../../../components/locatedRow.js';
 import { SelectionEchoGuard } from '../../../core/events/SelectionEchoGuard.js';
 import { isVisible } from '../../../core/utility/Util.js';
 import { getSettings, updateSetting } from '../../settings/Settings.js';
@@ -645,6 +646,20 @@ export class AnalysisView extends LitElement {
             }
           : { kind: 'event', eventIndex: event.eventIndex },
       });
+    });
+
+    // Tell the inspector which calls the pointer is over, so it can mark the rows
+    // that stand for them; a bucket merges calls, so it names every occurrence.
+    // The other direction has nothing to land on here: a row is a method bucket,
+    // not one event, so the inspector's pointer marks no row in this grid.
+    this.analysisTable.on('rowMouseEnter', (_e, row) => {
+      eventBus.emit('detail:locate', {
+        source: 'analysis',
+        eventIndexes: rowOccurrences(row.getData() as BottomUpRow),
+      });
+    });
+    this.analysisTable.on('rowMouseLeave', () => {
+      eventBus.emit('detail:locate', { source: 'analysis', eventIndexes: [] });
     });
 
     await tableBuilt;

@@ -61,6 +61,25 @@ interface EventMap {
   // tab and only that view acts. Strictly outbound from the inspector, as
   // `detail:select` is strictly inbound to it; separate events stop an echo loop.
   'inspector:reveal': { source: DetailSource; eventIndex: number };
+
+  // A row in the inspector points at events — mark them in the tab the inspector
+  // is showing, so the user can see where they sit without the view moving:
+  // no scroll, no pan, and no selection beyond `inspector:reveal`'s. A grouped
+  // row names every occurrence it merges, and an empty list drops the mark.
+  // `sticky` is true when the row was picked, so the mark holds while the pointer
+  // is elsewhere, and false for the pointer itself.
+  'inspector:locate': {
+    source: DetailSource;
+    eventIndexes: readonly number[];
+    sticky: boolean;
+  };
+
+  // The other direction: a frame in the tab's own view is under the pointer, so
+  // the inspector marks the rows that stand for it — only where a row is already
+  // on screen. Nothing moves: no selection change, no scroll, no expand. A row
+  // that merges occurrences names them all, and the list is empty when the
+  // pointer leaves the frame.
+  'detail:locate': { source: DetailSource; eventIndexes: readonly number[] };
 }
 
 type EventCallback<K extends keyof EventMap> = (detail: EventMap[K]) => void;

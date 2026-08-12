@@ -60,9 +60,24 @@ import {
   resolveColumnView,
   toggleField,
 } from '../../../tabulator/ColumnViews.js';
+import {
+  LOCATED_ROW_CLASS,
+  LocatedRowMarker,
+  rowIndexStamper,
+  rowOccurrences,
+} from '../../../components/locatedRow.js';
+import { InspectorEmphasis } from '../../../components/inspectorEmphasis.js';
 import { createTimeOrderTable } from './TimeOrderTable.js';
 
 type ViewMode = 'time-order' | 'aggregated' | 'bottom-up';
+
+/** Time Order keys its rows by event index, so the inspector can mark them; the
+ *  grouped views key theirs by group, so they carry no index to mark. */
+const stampTimeOrderIndex = rowIndexStamper('id');
+const timeOrderRowFormatter = (row: RowComponent): void => {
+  categoryRowFormatter(row);
+  stampTimeOrderIndex(row);
+};
 
 const CALL_TREE_VIEW_MODES: ViewModeOption[] = [
   { value: 'time-order', label: 'Time Order' },
@@ -155,7 +170,11 @@ export class CalltreeView extends LitElement {
   /** Guards the programmatic select made on the inspector's behalf. */
   private _echoGuard = new SelectionEchoGuard();
   private _inspectorRevealUnsubscribe: (() => void) | null = null;
+  private _inspectorLocateUnsubscribe: (() => void) | null = null;
   private _selectionClearUnsubscribe: (() => void) | null = null;
+  private _locatedRow = new LocatedRowMarker();
+  /** Which of the inspector's reports the mark follows. */
+  private _emphasis = new InspectorEmphasis();
 
   constructor() {
     super();
@@ -168,12 +187,27 @@ export class CalltreeView extends LitElement {
       }
     });
 
-    // Escape (app-wide) deselects here; the table reports the clear itself.
+    // Mark the frames the inspector points at, while the Call Tree is the tab the
+    // inspector is showing. Only Time Order keys its rows by event, so the grouped
+    // views have nothing to mark and are left alone.
+    this._inspectorLocateUnsubscribe = eventBus.on('inspector:locate', (detail) => {
+      if (detail.source === 'calltree') {
+        this._locatedRow.mark(
+          this.calltreeTable?.element ?? null,
+          this._emphasis.report(detail.eventIndexes, detail.sticky),
+        );
+      }
+    });
+
+    // Escape (app-wide) deselects here; the table reports the clear itself. It
+    // also drops a mark held by a picked inspector row, which is no selection of
+    // this table's own.
     this._selectionClearUnsubscribe = eventBus.on('selection:clear', (detail) => {
       if (detail.source === 'calltree') {
         for (const table of this._tables) {
           table.deselectRow();
         }
+        this._locatedRow.mark(this.calltreeTable?.element ?? null, this._emphasis.pick([]));
       }
     });
     document.addEventListener(CALLTREE_GO_TO_ROW, this._goToRowEvt);
@@ -197,6 +231,8 @@ export class CalltreeView extends LitElement {
     document.removeEventListener('lv-find-close', this._findEvt);
     this._inspectorRevealUnsubscribe?.();
     this._inspectorRevealUnsubscribe = null;
+    this._inspectorLocateUnsubscribe?.();
+    this._inspectorLocateUnsubscribe = null;
     this._selectionClearUnsubscribe?.();
     this._selectionClearUnsubscribe = null;
     this._destroyCurrentTable();
@@ -286,6 +322,11 @@ export class CalltreeView extends LitElement {
         visibility: hidden;
         opacity: 0;
         pointer-events: none;
+      }
+
+      /* The frame under the pointer in the inspector. */
+      .tabulator-row.${unsafeCSS(LOCATED_ROW_CLASS)} {
+        background-color: var(--lana-row-hover-bg);
       }
     `,
     categoryColoringStyles,
@@ -557,6 +598,8 @@ export class CalltreeView extends LitElement {
   }
 
   private _destroyCurrentTable(): void {
+    // The marker holds row elements that go with the table.
+    this._locatedRow.clear();
     if (this.calltreeTable) {
       this.calltreeTable.destroy();
       this.calltreeTable = null;
@@ -1010,12 +1053,13 @@ export class CalltreeView extends LitElement {
         const mouseEvent = e as MouseEvent;
         this._showRowContextMenu(row, mouseEvent.clientX, mouseEvent.clientY);
       },
-      rowFormatter: categoryRowFormatter,
+      rowFormatter: timeOrderRowFormatter,
     });
     this.calltreeTable = table;
     await tableBuilt;
     this._initTableColumns(table);
     this._emitDetailSelection(table);
+    this._emitDetailLocate(table);
   }
 
   private async _renderAggregatedTree(
@@ -1048,6 +1092,7 @@ export class CalltreeView extends LitElement {
     await tableBuilt;
     this._initTableColumns(table);
     this._emitDetailSelection(table);
+    this._emitDetailLocate(table);
   }
 
   private async _renderBottomUpTree(container: HTMLDivElement, rootMethod: ApexLog): Promise<void> {
@@ -1079,6 +1124,7 @@ export class CalltreeView extends LitElement {
     await tableBuilt;
     this._initTableColumns(table);
     this._emitDetailSelection(table);
+    this._emitDetailLocate(table);
   }
 
   /**
@@ -1095,6 +1141,9 @@ export class CalltreeView extends LitElement {
         { originalData?: LogEvent; instances?: LogEvent[]; text?: string } | undefined;
       const event = data?.originalData;
       if (!event) {
+        // The selection went with it, and so does a mark a picked inspector row
+        // left here — it was never a selection of this table.
+        this._locatedRow.mark(this.calltreeTable?.element ?? null, this._emphasis.pick([]));
         eventBus.emit('detail:select', { source, selection: null });
         return;
       }
@@ -1109,6 +1158,23 @@ export class CalltreeView extends LitElement {
             }
           : { kind: 'event', eventIndex: event.eventIndex },
       });
+    });
+  }
+
+  /**
+   * Tell the inspector which frames the pointer is over, so it can mark the rows
+   * that stand for them. Nothing is picked and nothing moves. An
+   * Aggregated/Bottom-Up row merges many calls, so it names every occurrence.
+   */
+  private _emitDetailLocate(table: Tabulator, source: DetailSource = 'calltree'): void {
+    table.on('rowMouseEnter', (_e, row) => {
+      eventBus.emit('detail:locate', {
+        source,
+        eventIndexes: rowOccurrences(row.getData() as { originalData?: LogEvent }),
+      });
+    });
+    table.on('rowMouseLeave', () => {
+      eventBus.emit('detail:locate', { source, eventIndexes: [] });
     });
   }
 

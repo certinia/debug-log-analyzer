@@ -157,8 +157,9 @@ export async function buildDetailSections(
       title: 'Call tree',
       weight: 4,
       content: html`<call-tree-detail
-        eventIndex=${active}
-        .instances=${instances}
+        eventIndex=${anchorIndex}
+        .instances=${isAggregate ? selection.instances : null}
+        activeEventIndex=${active}
       ></call-tree-detail>`,
     },
   ];

@@ -27,6 +27,7 @@ import '../DatabaseView.js';
 interface FakeGrid extends HTMLElement {
   deselects: number;
   owns: number | null;
+  marked: readonly number[][];
 }
 
 /**
@@ -37,9 +38,13 @@ function fakeGrid(tag: string, owns: number | null = null): FakeGrid {
   const grid = document.createElement(tag) as FakeGrid;
   grid.deselects = 0;
   grid.owns = owns;
+  grid.marked = [];
   Object.assign(grid, {
     deselectRows: () => (grid.deselects += 1),
     selectByEventIndex: (eventIndex: number) => eventIndex === grid.owns,
+    markLocated: (eventIndexes: readonly number[]) => {
+      grid.marked = [...grid.marked, [...eventIndexes]];
+    },
   });
   return grid;
 }
@@ -114,5 +119,64 @@ describe('database-view selection', () => {
     eventBus.emit('selection:clear', { source: 'database' });
 
     expect([grids.dml.deselects, grids.soql.deselects, grids.sosl.deselects]).toEqual([1, 1, 1]);
+  });
+
+  describe('the pointer', () => {
+    let located: Array<{ source: DetailSource; eventIndexes: readonly number[] }>;
+    let offLocate: () => void;
+
+    beforeEach(() => {
+      located = [];
+      offLocate = eventBus.on('detail:locate', (d) => located.push(d));
+    });
+
+    afterEach(() => offLocate());
+
+    it('reports the row it is over, and nothing when it leaves', () => {
+      grids.soql.dispatchEvent(
+        new CustomEvent('grid-locate', { detail: { eventIndexes: [7] }, bubbles: true }),
+      );
+      grids.soql.dispatchEvent(
+        new CustomEvent('grid-locate', { detail: { eventIndexes: [] }, bubbles: true }),
+      );
+
+      expect(located).toEqual([
+        { source: 'database', eventIndexes: [7] },
+        { source: 'database', eventIndexes: [] },
+      ]);
+      // A mark is not a pick: no grid was selected or cleared.
+      expect([grids.dml.deselects, grids.soql.deselects, grids.sosl.deselects]).toEqual([0, 0, 0]);
+    });
+
+    it('offers the inspector mark to every grid, since one of them owns it', () => {
+      eventBus.emit('inspector:locate', { source: 'database', eventIndexes: [42], sticky: false });
+
+      expect([grids.dml.marked, grids.soql.marked, grids.sosl.marked]).toEqual([
+        [[42]],
+        [[42]],
+        [[42]],
+      ]);
+    });
+
+    it('ignores a mark meant for another tab', () => {
+      eventBus.emit('inspector:locate', { source: 'calltree', eventIndexes: [42], sticky: false });
+
+      expect(grids.soql.marked).toEqual([]);
+    });
+
+    it('holds a picked row mark once the pointer leaves', () => {
+      eventBus.emit('inspector:locate', { source: 'database', eventIndexes: [42], sticky: true });
+      eventBus.emit('inspector:locate', { source: 'database', eventIndexes: [7], sticky: false });
+      eventBus.emit('inspector:locate', { source: 'database', eventIndexes: [], sticky: false });
+
+      expect(grids.soql.marked).toEqual([[42], [7], [42]]);
+    });
+
+    it('drops a picked row mark on an app-wide clear', () => {
+      eventBus.emit('inspector:locate', { source: 'database', eventIndexes: [42], sticky: true });
+      eventBus.emit('selection:clear', { source: 'database' });
+
+      expect(grids.soql.marked).toEqual([[42], []]);
+    });
   });
 });

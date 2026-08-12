@@ -14,6 +14,8 @@ import { getCallerNamespace } from '../../../core/utility/CallerNamespace.js';
 import { goToRow } from '../../call-tree/navigation.js';
 import { isVisible } from '../../../core/utility/Util.js';
 import { getSettings, updateSetting } from '../../settings/Settings.js';
+import { LocatedRowMarker } from '../../../components/locatedRow.js';
+import { reportGridLocate, stampGridEventIndex } from './gridLocate.js';
 import { reportGridSelection } from './gridSelection.js';
 import { selectRowByEventIndex } from './revealRow.js';
 import {
@@ -106,6 +108,8 @@ export class DMLView extends LitElement {
   private contextMenu: ContextMenu | null = null;
   /** eventIndex of the row whose context menu is open. */
   private contextMenuEventIndex: number | null = null;
+  /** Marks the rows for the statements under the inspector's pointer. */
+  private _locatedRow = new LocatedRowMarker();
 
   @state()
   private callerNamespaces: string[] = [];
@@ -444,6 +448,14 @@ export class DMLView extends LitElement {
     return selectRowByEventIndex(this.dmlTable, eventIndex);
   }
 
+  /**
+   * Mark the rows for the statements under the inspector's pointer, or drop the
+   * mark with an empty list. Not a pick: nothing scrolls and nothing is selected.
+   */
+  markLocated(eventIndexes: readonly number[]): void {
+    this._locatedRow.mark(this.dmlTable?.element ?? null, eventIndexes);
+  }
+
   _exportToCSV() {
     this.dmlTable?.download('csv', 'dml.csv', { bom: true, delimiter: ',' });
   }
@@ -596,6 +608,7 @@ export class DMLView extends LitElement {
       groupStartOpen: false,
       groupToggleElement: false,
       selectableRows: 'highlight',
+      rowFormatter: stampGridEventIndex,
       columnDefaults: commonColumnDefaults,
       headerSortElement,
       columns: [
@@ -700,6 +713,11 @@ export class DMLView extends LitElement {
         data.dml ? data.eventIndex : undefined,
       );
     });
+
+    // Hovering a statement marks it in the inspector, without picking it.
+    reportGridLocate(this, this.dmlTable, (data: DMLRow) =>
+      data.dml ? data.eventIndex : undefined,
+    );
 
     this.dmlTable.on('rowContext', (e, row) => {
       this._showRowContextMenu(e as MouseEvent, row);

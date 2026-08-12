@@ -67,4 +67,11 @@ Right-click a row in the **Call stack** or **Call tree** for:
 
 Press `Escape` to clear the selection on the tab you're on; the inspector returns to its whole-log view.
 
-Clicking a row highlights the matching frame or row in the tab you're on, and never switches tab: the Timeline selects the frame and centers it when it's off screen, the Call Tree scrolls to it in **Time Order**, and the Database tab selects the statement. Rows in the Call tree's **Aggregated** and **Bottom-Up** views merge several occurrences, so there is no single frame to highlight. Arrow keys move between rows, and `CMD / CTRL + c` copies the table.
+Clicking a row highlights the matching frame or row in the tab you're on, and never switches tab: the Timeline selects the frame and centers it when it's off screen, the Call Tree scrolls to it in **Time Order**, and the Database tab selects the statement. Rows in the Call tree's **Aggregated** and **Bottom-Up** views merge several occurrences, so there is no single frame to select; clicking one marks every occurrence instead, and nothing moves. Arrow keys move between rows, and `CMD / CTRL + c` copies the table.
+
+Hovering works both ways and moves nothing — no selection, no scroll, no pan:
+
+- Hover an inspector row to pick out what it names in the tab you're on: the Timeline dims around the frame, and the Call Tree and Database tables mark the row. A row that merges several occurrences marks all of them.
+- Hover a frame, row or statement in the tab you're on to mark the inspector rows that name it, where they are already on screen. Analysis rows are method totals rather than single calls, so they mark nothing.
+
+What you clicked stays picked out as the pointer moves away, so you can read the Timeline or a table with it still marked. `Escape` clears it.

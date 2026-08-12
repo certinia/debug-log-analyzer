@@ -18,6 +18,8 @@ jest.mock('tabulator-tables', () => {
     redraw = jest.fn();
     destroy = jest.fn();
     on = jest.fn();
+    getSelectedRows = jest.fn(() => []);
+    selectRow = jest.fn();
     options: Record<string, unknown>;
     constructor(_element: HTMLElement, options: Record<string, unknown>) {
       this.options = options;
@@ -33,6 +35,9 @@ jest.mock('#vscode-elements/vscode-button.js', () => ({}));
 // it yields a tree or nothing, and when.
 jest.mock('../scopedCallTree.js', () => ({
   buildScopedCallTree: jest.fn(() => Promise.resolve(null)),
+  // Keep the real row readers: the hover test is about which rows name a frame.
+  revealableEventIndex: jest.requireActual('../scopedCallTree.js').revealableEventIndex,
+  locatableEventIndexes: jest.requireActual('../scopedCallTree.js').locatableEventIndexes,
 }));
 
 import { Tabulator } from 'tabulator-tables';
@@ -40,6 +45,7 @@ import { Tabulator } from 'tabulator-tables';
 import type { CallTreeDetail } from '../CallTreeDetail.js';
 import '../CallTreeDetail.js';
 import { buildScopedCallTree, type ScopedCallTree } from '../scopedCallTree.js';
+import { INSPECTOR_LOCATE_EVENT, type InspectorLocateEvent } from '../inspectorReveal.js';
 import type { ProgressParams } from '../../tabulator/format/ProgressMS.js';
 
 const build = jest.mocked(buildScopedCallTree);
@@ -49,9 +55,11 @@ interface StubTable {
     columns: Array<{ field: string; formatterParams: ProgressParams; width: number }>;
     placeholder: () => string;
   };
+  on: jest.Mock;
   setData: jest.Mock;
   redraw: jest.Mock;
   destroy: jest.Mock;
+  selectRow: jest.Mock;
 }
 
 /** The stub tables built so far, oldest first. */
@@ -155,6 +163,22 @@ describe('CallTreeDetail scoped build', () => {
     expect(table.setData).toHaveBeenCalledTimes(2);
   });
 
+  it('moves the mark without re-walking, since the anchor holds the scope', async () => {
+    build.mockImplementation((eventIndex) => Promise.resolve(tree(eventIndex * 1000)));
+    const el = await mount(5);
+    await frame(el);
+    const table = tables.instances[0]!;
+    build.mockClear();
+    table.setData.mockClear();
+
+    el.activeEventIndex = 9;
+    await frame(el);
+
+    expect(table.selectRow).toHaveBeenCalledWith([9]);
+    expect(build).not.toHaveBeenCalled();
+    expect(table.setData).not.toHaveBeenCalled();
+  });
+
   it('retargets the percentage denominator without touching the bar width', async () => {
     build.mockImplementation((eventIndex) => Promise.resolve(tree(eventIndex * 1000)));
     const el = await mount(5);
@@ -216,5 +240,25 @@ describe('CallTreeDetail scoped build', () => {
     // The epoch guard drops it — the denominator still describes what's shown.
     expect(tables.instances).toHaveLength(1);
     expect(totalColumn(tables.instances[0]!).formatterParams.totalValue).toBe(6000);
+  });
+  it('reports every occurrence the row under the pointer stands for', async () => {
+    build.mockImplementation((eventIndex) => Promise.resolve(tree(eventIndex * 1000)));
+    const el = await mount(5);
+    await frame(el);
+    const handler = (event: string) =>
+      tables.instances[0]!.on.mock.calls.find((call) => call[0] === event)?.[1] as
+        ((...args: unknown[]) => void) | undefined;
+
+    const seen: Array<readonly number[]> = [];
+    const located = (e: Event) => seen.push((e as InspectorLocateEvent).detail.eventIndexes);
+    document.addEventListener(INSPECTOR_LOCATE_EVENT, located);
+
+    handler('rowMouseEnter')?.({}, { getData: () => ({ id: 8, originalData: { eventIndex: 8 } }) });
+    handler('rowMouseLeave')?.({}, {});
+    // A grouped row cannot be revealed, but every occurrence it merges is marked.
+    handler('rowMouseEnter')?.({}, { getData: () => ({ id: -3, eventIndexes: [8, 12] }) });
+
+    document.removeEventListener(INSPECTOR_LOCATE_EVENT, located);
+    expect(seen).toEqual([[8], [], [8, 12]]);
   });
 });

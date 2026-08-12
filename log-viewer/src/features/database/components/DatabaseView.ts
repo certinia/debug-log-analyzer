@@ -14,6 +14,7 @@ import type {
 } from 'apex-log-parser';
 
 import { eventBus, type StatementType } from '../../../core/events/EventBus.js';
+import { InspectorEmphasis } from '../../../components/inspectorEmphasis.js';
 import { SelectionEchoGuard } from '../../../core/events/SelectionEchoGuard.js';
 import { isVisible } from '../../../core/utility/Util.js';
 import { soslRowsMetric } from '../limits.js';
@@ -30,6 +31,7 @@ import type { SOSLView } from './SOSLView.js';
 import './DMLView.js';
 import './DatabaseSection.js';
 import type { DatabaseMetric } from './DatabaseMetricCard.js';
+import type { GridLocateEvent } from './gridLocate.js';
 import type { GridSelectionEvent } from './gridSelection.js';
 import './GovernorSummary.js';
 import type { GaugeMetric } from './GovernorSummary.js';
@@ -81,10 +83,13 @@ export class DatabaseView extends LitElement {
   findMap = {};
 
   private _offInspectorReveal: (() => void) | null = null;
+  private _offInspectorLocate: (() => void) | null = null;
   private _offSelectionClear: (() => void) | null = null;
 
   /** Guards the selects this view makes on the inspector's behalf. */
   private _echoGuard = new SelectionEchoGuard();
+  /** Which of the inspector's reports the grids' mark follows. */
+  private _emphasis = new InspectorEmphasis();
 
   constructor() {
     super();
@@ -109,13 +114,30 @@ export class DatabaseView extends LitElement {
       });
     });
 
+    // Mark the statements the inspector points at, while the Database tab is the
+    // tab the inspector is showing. The eventIndex belongs to one grid, so the
+    // others simply find nothing to mark.
+    this._offInspectorLocate = eventBus.on('inspector:locate', (d) => {
+      if (d.source === 'database') {
+        this._markLocated(this._emphasis.report(d.eventIndexes, d.sticky));
+      }
+    });
+
     // Escape (app-wide) deselects here. Only one grid holds the selection, and
-    // its report of the clear reaches the inspector the same way a click does.
+    // its report of the clear reaches the inspector the same way a click does. It
+    // also drops a mark held by a picked inspector row, which is no selection of
+    // any grid's own.
     this._offSelectionClear = eventBus.on('selection:clear', (d) => {
       if (d.source === 'database') {
         this._views.forEach((view) => view?.deselectRows());
+        this._markLocated(this._emphasis.pick([]));
       }
     });
+  }
+
+  /** Offers the mark to every grid, since one of them owns the statement. */
+  private _markLocated(eventIndexes: readonly number[]): void {
+    this._views.forEach((view) => view?.markLocated(eventIndexes));
   }
 
   /**
@@ -130,6 +152,9 @@ export class DatabaseView extends LitElement {
     }
     const { type, eventIndex } = event.detail;
     if (eventIndex === null) {
+      // A mark a picked inspector row left here goes with the selection: it was
+      // never a selection of these grids.
+      this._markLocated(this._emphasis.pick([]));
       eventBus.emit('detail:select', { source: 'database', selection: null });
       return;
     }
@@ -153,6 +178,8 @@ export class DatabaseView extends LitElement {
     document.removeEventListener('lv-find', this._findHandler as EventListener);
     this._offInspectorReveal?.();
     this._offInspectorReveal = null;
+    this._offInspectorLocate?.();
+    this._offInspectorLocate = null;
     this._offSelectionClear?.();
     this._offSelectionClear = null;
   }
@@ -162,6 +189,13 @@ export class DatabaseView extends LitElement {
     // root and stop there, so grids added later are heard without rebinding.
     this.renderRoot.addEventListener('grid-selection', (event) =>
       this._onGridSelection(event as GridSelectionEvent),
+    );
+    // The same for the pointer, which marks rather than picks.
+    this.renderRoot.addEventListener('grid-locate', (event) =>
+      eventBus.emit('detail:locate', {
+        source: 'database',
+        eventIndexes: (event as GridLocateEvent).detail.eventIndexes,
+      }),
     );
   }
 
