@@ -29,7 +29,7 @@ It docks to the **right**, **left** or **bottom**, resizes by dragging its edge,
 - **Call tree** – The selection scoped within its own execution, switchable between **Time Order**, **Aggregated** and **Bottom-Up** (as in the Chrome DevTools performance panel). Totals are relative to the selection, so a DML that fires triggers shows the triggered work beneath it. This scoping is what makes it different from the [Call Tree](./calltree.mdx) tab, which always shows the whole log. Zero-duration rows — heap allocations, statements, variable assignments — are left out; read those on the [Call Tree](./calltree.mdx) tab.
 - **SOQL issues** – SOQL only: optimization tips describing the query's performance and how to improve it.
 
-Collapse any section by clicking its header, or drag the divider between two to resize them. It's one panel, so your layout follows you from tab to tab, and is restored next time.
+Collapse any section by clicking its header, or drag the divider between two to resize them; double-click a divider to restore the default sizes. It's one panel, so your layout follows you from tab to tab, and is restored next time.
 
 ### Nothing selected
 

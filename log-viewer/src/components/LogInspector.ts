@@ -18,7 +18,7 @@ import { buildDetailSections } from './detailSections.js';
 import { globalStyles } from '../styles/global.styles.js';
 import type { DockPosition } from './DetailDock.js';
 import './DockLayout.js';
-import type { PaneSection } from './PaneView.js';
+import type { PaneOrientation, PaneSection } from './PaneView.js';
 
 /**
  * The app-wide inspector. Lives at the app root (sibling of the tab strip,
@@ -291,9 +291,16 @@ export class LogInspector extends LitElement {
   };
 
   // `pane-resize` fires on pointer-up, so this write lands on interaction-end.
-  private _onPaneResize = (e: CustomEvent<{ sizes: Record<string, number> }>) => {
+  private _onPaneResize = (
+    e: CustomEvent<{ sizes: Record<string, number>; orientation: PaneOrientation }>,
+  ) => {
     this._userAdjusted = true;
-    this.paneSizes = { ...this.paneSizes, ...e.detail.sizes };
+    // Every size for the dragged axis arrives together, so that axis is
+    // replaced, not merged: a pane reset to its content's size has no entry to
+    // merge. The other axis' sizes are untouched.
+    const prefix = `${e.detail.orientation}:`;
+    const otherAxis = Object.entries(this.paneSizes).filter(([key]) => !key.startsWith(prefix));
+    this.paneSizes = { ...Object.fromEntries(otherAxis), ...e.detail.sizes };
     updateSetting('inspector.paneSizes', this.paneSizes);
   };
 
