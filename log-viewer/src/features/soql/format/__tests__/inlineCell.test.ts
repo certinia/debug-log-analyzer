@@ -27,4 +27,13 @@ describe('soqlInlineElement', () => {
     expect(el.className).toBe('soql-block soql-inline');
     expect(el.textContent).toBe('');
   });
+
+  it('keeps hostile query text as text rather than executable markup', () => {
+    const query = "SELECT '<img src=x onerror=alert(1)>' FROM Account";
+    const el = soqlInlineElement(query, 'soql');
+
+    expect(el.textContent).toBe(query);
+    expect(el.querySelector('img')).toBeNull();
+    expect(el.querySelector('[onerror]')).toBeNull();
+  });
 });

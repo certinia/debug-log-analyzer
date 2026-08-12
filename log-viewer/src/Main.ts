@@ -1,6 +1,7 @@
 /*
  * Copyright (c) 2020 Certinia Inc. All rights reserved.
  */
+import 'pixi.js/unsafe-eval';
 import { html, render } from 'lit';
 
 // Components adopt the --lana-* tokens themselves (styles/tokens.styles.ts); this

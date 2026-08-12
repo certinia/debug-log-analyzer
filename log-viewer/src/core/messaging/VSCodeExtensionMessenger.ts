@@ -7,8 +7,8 @@ export class VSCodeExtensionMessenger {
   private static listeners = new Map<string, ListenerType>();
 
   private constructor() {
-    VSCodeExtensionMessenger.listen((message: MessageEvent<VSCodeMessage<ListenerType>>) => {
-      const { requestId, payload, error } = message.data;
+    VSCodeExtensionMessenger.listen((event) => {
+      const { requestId, payload, error } = event.data;
 
       if (requestId && VSCodeExtensionMessenger.listeners.has(requestId)) {
         VSCodeExtensionMessenger.listeners.get(requestId)?.(payload, error);
@@ -83,9 +83,17 @@ export class VSCodeExtensionMessenger {
 
   /** Listens for extension messages; returns the function that removes the listener. */
   public static listen<T>(callback: (event: MessageEvent<VSCodeMessage<T>>) => void): () => void {
-    window.addEventListener('message', callback);
+    const listener = (event: MessageEvent<unknown>) => {
+      if (!isVSCodeMessage(event.data)) {
+        return;
+      }
+
+      callback(event as MessageEvent<VSCodeMessage<T>>);
+    };
+
+    window.addEventListener('message', listener);
     return () => {
-      window.removeEventListener('message', callback);
+      window.removeEventListener('message', listener);
     };
   }
 }
@@ -96,7 +104,7 @@ interface VSCodeAPI<T> {
   postMessage: (msg: T) => void;
 }
 
-interface VSCodeMessage<T> extends MessageEvent<T> {
+interface VSCodeMessage<T> {
   cmd: string;
   payload: T;
   requestId?: string;
@@ -104,5 +112,17 @@ interface VSCodeMessage<T> extends MessageEvent<T> {
 }
 
 type ListenerType = <T, K>(payload: T, error: K) => void;
+
+function isVSCodeMessage(value: unknown): value is VSCodeMessage<unknown> {
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) {
+    return false;
+  }
+
+  const message = value as Record<string, unknown>;
+  return (
+    typeof message.cmd === 'string' &&
+    (message.requestId === undefined || typeof message.requestId === 'string')
+  );
+}
 
 export const vscodeMessenger = VSCodeExtensionMessenger.getInstance();
