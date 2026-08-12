@@ -1,0 +1,38 @@
+name: Promote Pre-release to Stable
+
+on:
+  # Cron schedule intentionally disabled — promotion to stable is manual only.
+  # To enable scheduled promotion, restore the schedule trigger below:
+  #   schedule:
+  #     # Wednesdays at 06:00 UTC, before pre-release promotion.
+  #     - cron: '0 6 * * 3'
+  workflow_dispatch:
+    inputs:
+      dry-run:
+        description: 'Run in dry-run mode (no actual publishing or tagging)'
+        required: false
+        default: true
+        type: boolean
+
+permissions:
+  contents: write
+  packages: write
+  actions: read
+
+jobs:
+  promote:
+    uses: salesforcecli/github-workflows/.github/workflows/vscode-promote-stable.yml@ph/W-23832274-pnpm-stable-promotion
+    with:
+      extension-name: lana
+      vsix-name-pattern: 'lana-*.vsix'
+      exclude-web-vsix: 'true'
+      extensions-root: .
+      node-version: '24'
+      package-manager: pnpm
+      package-manager-version: '10'
+      cache-dependency-path: pnpm-lock.yaml
+      lockfile-path: pnpm-lock.yaml
+      install-command: pnpm run ci:install
+      required-checks: E2E
+      dry-run: ${{ inputs.dry-run && 'true' || 'false' }}
+    secrets: inherit

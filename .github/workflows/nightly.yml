@@ -1,0 +1,47 @@
+name: Nightly Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      dry-run:
+        description: 'Run in dry-run mode (no actual publishing)'
+        required: false
+        default: true
+        type: boolean
+  # schedule:
+  #   - cron: '0 4 * * *'
+
+concurrency:
+  group: nightly-${{ github.workflow }}-${{ github.ref_name }}
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+  packages: write
+  actions: read
+
+jobs:
+  nightly-release:
+    uses: salesforcecli/github-workflows/.github/workflows/vscode-publish-extensions.yml@ph/W-23832274-pnpm-stable-promotion
+    with:
+      branch: main
+      extensions: lana
+      registries: 'all'
+      pre-release: 'true'
+      nightly: true
+      version-bump: 'auto'
+      extensions-root: .
+      exclude-web-vsix: 'true'
+      node-version: '24'
+      package-manager: pnpm
+      package-manager-version: '10'
+      cache-dependency-path: pnpm-lock.yaml
+      install-command: pnpm run ci:install
+      package-command: cd lana && pnpm dlx @vscode/vsce package --target web --no-dependencies --out lana-$(node -p "require('./package.json').version").vsix
+      prerelease-package-command: cd lana && pnpm dlx @vscode/vsce package --pre-release --target web --no-dependencies --out lana-$(node -p "require('./package.json').version").vsix
+      web-package-command: cd lana && pnpm dlx @vscode/vsce package --target web --no-dependencies --out lana-web-$(node -p "require('./package.json').version").vsix
+      web-prerelease-package-command: cd lana && pnpm dlx @vscode/vsce package --pre-release --target web --no-dependencies --out lana-web-$(node -p "require('./package.json').version").vsix
+      artifact-glob: lana/*.vsix
+      publish-web-vsix: false
+      dry-run: ${{ inputs.dry-run && 'true' || 'false' }}
+    secrets: inherit

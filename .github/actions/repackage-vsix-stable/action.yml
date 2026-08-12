@@ -1,0 +1,52 @@
+name: Repackage VSIX for Stable
+description: Repackages a pre-release VSIX as a stable Lana build.
+
+inputs:
+  source-vsix-path:
+    description: Source pre-release VSIX.
+    required: true
+  prerelease-version:
+    description: Pre-release version, used for logging.
+    required: true
+  stable-version:
+    description: Stable version to stamp into the VSIX.
+    required: true
+  output-dir:
+    description: Output directory for the stable VSIX.
+    default: ./vsix-artifacts
+
+outputs:
+  vsix-path:
+    description: Path to the repackaged stable VSIX.
+    value: ${{ steps.repack.outputs.vsix-path }}
+
+runs:
+  using: composite
+  steps:
+    - name: Repackage VSIX with stable version
+      id: repack
+      shell: bash
+      env:
+        SOURCE_VSIX: ${{ inputs.source-vsix-path }}
+        STABLE_VERSION: ${{ inputs.stable-version }}
+        OUTPUT_DIR: ${{ inputs.output-dir }}
+      run: |
+        set -euo pipefail
+        [ -f "$SOURCE_VSIX" ] || { echo "Source VSIX not found: $SOURCE_VSIX"; exit 1; }
+
+        WORK_DIR=./vsix-repack
+        rm -rf "$WORK_DIR"
+        mkdir -p "$WORK_DIR" "$OUTPUT_DIR"
+        unzip -q "$SOURCE_VSIX" -d "$WORK_DIR"
+
+        PKG_JSON="$WORK_DIR/extension/package.json"
+        [ -f "$PKG_JSON" ] || { echo "extension/package.json not found in VSIX"; exit 1; }
+        node -e "const fs=require('fs'); const path='$PKG_JSON'; const pkg=JSON.parse(fs.readFileSync(path,'utf8')); pkg.version='$STABLE_VERSION'; delete pkg.preRelease; fs.writeFileSync(path, JSON.stringify(pkg, null, 2) + '\n');"
+
+        MANIFEST="$WORK_DIR/extension.vsixmanifest"
+        [ -f "$MANIFEST" ] || { echo "extension.vsixmanifest not found in VSIX"; exit 1; }
+        STABLE_VERSION="$STABLE_VERSION" node -e 'const fs=require("fs"); const path=process.argv[1]; const xml=fs.readFileSync(path,"utf8"); const updated=xml.replace(/(<Identity[^>]*\bVersion=")[^"]*(")/, `$1${process.env.STABLE_VERSION}$2`); if (updated === xml) throw new Error("VSIX manifest does not contain an Identity Version"); fs.writeFileSync(path, updated);' "$MANIFEST"
+
+        OUT_ABS="$(cd "$OUTPUT_DIR" && pwd)/lana-${STABLE_VERSION}.vsix"
+        (cd "$WORK_DIR" && zip -q -r "$OUT_ABS" .)
+        echo "vsix-path=$OUT_ABS" >> "$GITHUB_OUTPUT"

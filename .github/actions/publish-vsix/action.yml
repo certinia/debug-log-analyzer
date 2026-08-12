@@ -1,0 +1,42 @@
+name: Publish VSIX
+description: Publishes a VSIX to the selected public marketplace with dry-run support.
+
+inputs:
+  vsix-path:
+    description: Path to the VSIX file.
+    required: true
+  publish-tool:
+    description: 'Marketplace publisher: vsce or ovsx.'
+    required: true
+  pre-release:
+    description: Publish as a pre-release.
+    default: 'false'
+  dry-run:
+    description: Skip the live publish request.
+    default: 'false'
+
+runs:
+  using: composite
+  steps:
+    - name: Publish VSIX
+      shell: bash
+      env:
+        VSIX_PATH: ${{ inputs.vsix-path }}
+        PUBLISH_TOOL: ${{ inputs.publish-tool }}
+        PRE_RELEASE: ${{ inputs.pre-release }}
+        DRY_RUN: ${{ inputs.dry-run }}
+      run: |
+        set -euo pipefail
+        [ -f "$VSIX_PATH" ] || { echo "VSIX not found: $VSIX_PATH"; exit 1; }
+        case "$PUBLISH_TOOL" in vsce|ovsx) ;; *) echo "Unsupported publish tool: $PUBLISH_TOOL"; exit 1;; esac
+        [ "$DRY_RUN" = true ] && { echo "DRY RUN: Would publish $VSIX_PATH with $PUBLISH_TOOL"; exit 0; }
+
+        PRE_RELEASE_FLAG=''
+        [ "$PRE_RELEASE" = true ] && PRE_RELEASE_FLAG='--pre-release'
+        if [ "$PUBLISH_TOOL" = vsce ]; then
+          [ -n "${VSCE_PERSONAL_ACCESS_TOKEN:-}" ] || { echo 'VSCE_PERSONAL_ACCESS_TOKEN is required'; exit 1; }
+          VSCE_PAT="$VSCE_PERSONAL_ACCESS_TOKEN" npx @vscode/vsce publish --packagePath "$VSIX_PATH" --skip-duplicate $PRE_RELEASE_FLAG
+        else
+          [ -n "${OVSX_PAT:-}" ] || { echo 'OVSX_PAT is required'; exit 1; }
+          npx ovsx publish "$VSIX_PATH" -p "$OVSX_PAT" --skip-duplicate $PRE_RELEASE_FLAG
+        fi

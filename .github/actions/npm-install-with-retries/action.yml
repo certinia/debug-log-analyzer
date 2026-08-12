@@ -1,0 +1,18 @@
+name: pnpm-install-with-retries
+description: Installs workspace dependencies with retry support for promotion workflows.
+
+inputs:
+  ignore-scripts:
+    description: Skip lifecycle scripts during installation.
+    default: 'false'
+
+runs:
+  using: composite
+  steps:
+    - name: Enable pnpm
+      shell: bash
+      run: corepack enable
+    - name: Install dependencies
+      uses: salesforcecli/github-workflows/.github/actions/retry@main
+      with:
+        command: pnpm install --frozen-lockfile ${{ inputs.ignore-scripts == 'true' && '--ignore-scripts' || '' }}
