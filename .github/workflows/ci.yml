@@ -29,6 +29,8 @@ jobs:
           install-command: pnpm run ci:install
       - name: Lint Files
         run: pnpm run lint
+      - name: Verify distribution policy
+        run: pnpm run test:distribution-policy
 
   tests:
     # Split per jest project so they run on parallel runners and failures are isolated.
@@ -75,7 +77,7 @@ jobs:
       - name: Build VSCode Package
         run: |
           cd lana
-          vsce package --no-dependencies
+          vsce package --target web --no-dependencies
 
   e2e:
     name: E2E
