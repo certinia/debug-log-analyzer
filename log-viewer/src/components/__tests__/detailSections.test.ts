@@ -15,6 +15,8 @@ jest.mock('../GovernorTrends.js', () => ({}));
 jest.mock('../HotPath.js', () => ({}));
 jest.mock('../HotSpots.js', () => ({}));
 jest.mock('../LogOverview.js', () => ({}));
+jest.mock('../../features/database/components/DatabaseOverview.js', () => ({}));
+jest.mock('../../features/database/components/DatabaseTimeTree.js', () => ({}));
 
 const databaseCalls: { eventIndex: number; type: string; activeEventIndex?: number | null }[] = [];
 jest.mock('../../features/database/components/databaseSections.js', () => ({
@@ -137,10 +139,21 @@ describe('buildDetailSections', () => {
     expect(vitals.getAttribute('label')).toBe('');
   });
 
-  it('builds only the whole-log overview for the database with nothing selected', async () => {
+  it('adds the whole-log database figures for the database with nothing selected', async () => {
     const sections = await buildDetailSections('database', null);
-    expect(sections.map((s) => s.id)).toEqual(['overview']);
-    expect(sections[0]?.title).toBe('Log overview');
+    expect(sections.map((s) => s.id)).toEqual([
+      'overview',
+      'database-namespaces',
+      'database-time',
+      'database-concentration',
+    ]);
+    expect(sections[0]?.title).toBe('Overview');
+    // The call-path grid soaks up the leftover space; the rest keep their own.
+    expect(sections.find((s) => s.id === 'database-time')?.weight).toBe(4);
+    expect(sections.find((s) => s.id === 'database-time')?.fit ?? 'fill').toBe('fill');
+    expect(sections.filter((s) => s.id !== 'database-time').every((s) => s.fit === 'content')).toBe(
+      true,
+    );
   });
 
   it('adds the hot path and hot spots to the call tree when nothing is selected', async () => {
