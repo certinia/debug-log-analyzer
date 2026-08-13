@@ -1,0 +1,106 @@
+name: Publish Nightly to CBWeb
+
+on:
+  workflow_dispatch:
+    inputs:
+      release-tag:
+        description: 'Existing nightly GitHub release tag'
+        required: true
+        type: string
+      source-branch:
+        description: 'Branch containing the nightly version-bump commit'
+        required: true
+        type: string
+      dry-run:
+        description: 'Build and validate the web VSIX without publishing'
+        required: true
+        default: true
+        type: boolean
+
+permissions:
+  contents: read
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Validate nightly release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ inputs.release-tag }}
+          REPOSITORY: ${{ github.repository }}
+        run: |
+          if [[ ! "$RELEASE_TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+-nightly(\.[A-Za-z0-9._-]+)?\.[0-9]{8}$ ]]; then
+            echo "release-tag must be a nightly release tag"
+            exit 1
+          fi
+
+          if [ "$(gh release view "$RELEASE_TAG" --repo "$REPOSITORY" --json isPrerelease --jq .isPrerelease)" != "true" ]; then
+            echo "release-tag must identify a prerelease"
+            exit 1
+          fi
+
+      - name: Checkout released source
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ inputs.source-branch }}
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: '10'
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: '24'
+          cache: pnpm
+          cache-dependency-path: pnpm-lock.yaml
+
+      - name: Install dependencies
+        run: pnpm run ci:install
+
+      - name: Package and validate web VSIX
+        id: package
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ inputs.release-tag }}
+          REPOSITORY: ${{ github.repository }}
+        run: |
+          VERSION=$(node -p "require('./lana/package.json').version")
+          if ! gh release view "$RELEASE_TAG" --repo "$REPOSITORY" --json assets \
+            --jq '.assets[].name' | grep -Fxq "lana-${VERSION}.vsix"; then
+            echo "Release $RELEASE_TAG does not contain lana-${VERSION}.vsix from ${{ inputs.source-branch }}"
+            exit 1
+          fi
+
+          pnpm --dir lana dlx @vscode/vsce package --pre-release --target web --no-dependencies --out "lana-web-${VERSION}.vsix"
+
+          VSIX_FILE="lana/lana-web-${VERSION}.vsix"
+          if [ ! -f "$VSIX_FILE" ]; then
+            echo "Expected web VSIX was not created: $VSIX_FILE"
+            exit 1
+          fi
+
+          echo "vsix-file=$VSIX_FILE" >> "$GITHUB_OUTPUT"
+
+      - name: Publish web VSIX to CBWeb internal marketplace
+        if: inputs.dry-run == false
+        env:
+          MARKETPLACE_URL: ${{ vars.MARKETPLACE_URL }}
+          MARKETPLACE_DEPLOY_TOKEN: ${{ secrets.MARKETPLACE_DEPLOY_TOKEN }}
+          VSIX_FILE: ${{ steps.package.outputs.vsix-file }}
+        run: |
+          if [ -z "$MARKETPLACE_URL" ] || [ -z "$MARKETPLACE_DEPLOY_TOKEN" ]; then
+            echo "CBWeb marketplace credentials are required for live publishing"
+            exit 1
+          fi
+
+          curl --fail-with-body \
+            -X POST "${MARKETPLACE_URL}/api/internal/publish" \
+            -H "Authorization: Bearer ${MARKETPLACE_DEPLOY_TOKEN}" \
+            -F "vsix=@${VSIX_FILE}"
+
+      - name: Dry-run summary
+        if: inputs.dry-run
+        run: 'echo "DRY RUN: Would publish ${{ steps.package.outputs.vsix-file }} to CBWeb marketplace"'

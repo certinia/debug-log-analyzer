@@ -3,6 +3,7 @@ import fs from 'node:fs';
 const ci = fs.readFileSync('.github/workflows/ci.yml', 'utf8');
 const nightly = fs.readFileSync('.github/workflows/nightly.yml', 'utf8');
 const manualPublish = fs.readFileSync('.github/workflows/manual-publish.yml', 'utf8');
+const nightlyCbwebPublish = fs.readFileSync('.github/workflows/publish-nightly-cbweb.yml', 'utf8');
 const publish = fs.readFileSync('.github/workflows/publish.yml', 'utf8');
 const promotePrerelease = fs.readFileSync('.github/workflows/promote-prerelease.yml', 'utf8');
 const promoteStable = fs.readFileSync('.github/workflows/promote-stable.yml', 'utf8');
@@ -74,6 +75,28 @@ for (const requiredText of [
 ]) {
   if (!cbwebJob.includes(requiredText)) {
     throw new Error(`Expected the CBWeb publish job to include \`${requiredText}\`.`);
+  }
+}
+
+for (const requiredText of [
+  'name: Publish Nightly to CBWeb',
+  'release-tag:',
+  'source-branch:',
+  'default: true',
+  'ref: ${{ inputs.source-branch }}',
+  'release-tag must be a nightly release tag',
+  'release-tag must identify a prerelease',
+  'pnpm --dir lana dlx @vscode/vsce package --pre-release --target web --no-dependencies',
+  'MARKETPLACE_URL: ${{ vars.MARKETPLACE_URL }}',
+  'MARKETPLACE_DEPLOY_TOKEN: ${{ secrets.MARKETPLACE_DEPLOY_TOKEN }}',
+  'if: inputs.dry-run == false',
+  'if: inputs.dry-run',
+  'curl --fail-with-body',
+  '${MARKETPLACE_URL}/api/internal/publish',
+  '-F "vsix=@${VSIX_FILE}"',
+]) {
+  if (!nightlyCbwebPublish.includes(requiredText)) {
+    throw new Error(`Expected nightly CBWeb publish workflow to include \`${requiredText}\`.`);
   }
 }
 
