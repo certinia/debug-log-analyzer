@@ -38,7 +38,7 @@ jobs:
       nightly: true
       version-bump: 'auto'
       extensions-root: .
-      exclude-web-vsix: 'true'
+      exclude-web-vsix: 'false'
       node-version: '24'
       package-manager: pnpm
       package-manager-version: '10'
