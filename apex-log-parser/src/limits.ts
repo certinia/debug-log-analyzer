@@ -120,12 +120,11 @@ export function parseTotalLimit(body: string): RunningTotalObservation | null {
   if (comma === -1) {
     return null;
   }
-  const head = COUNT_LABEL_RE.exec(body.slice(0, comma).trim());
-  if (!head) {
-    return null;
-  }
-  const observation = used(LIMIT_LABELS.get(head[2]!), body.slice(comma + 1));
-  return observation ? { ...observation, delta: toInt(head[1]!) } : null;
+  // A head with no leading count still reports a usable total, so keep it with a zero delta.
+  const head = body.slice(0, comma).trim();
+  const counted = COUNT_LABEL_RE.exec(head);
+  const observation = used(LIMIT_LABELS.get(counted ? counted[2]! : head), body.slice(comma + 1));
+  return observation ? { ...observation, delta: counted ? toInt(counted[1]!) : 0 } : null;
 }
 
 /**
