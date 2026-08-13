@@ -22,11 +22,11 @@ on:
         type: choice
         options: [pre-release, stable]
       registries:
-        description: 'Public registries for the universal VSIX'
+        description: 'Publish targets; all includes CBWeb only when source-run-id is used'
         required: true
         default: all
         type: choice
-        options: [all, vsce, ovsx]
+        options: [all, vsce, ovsx, internal]
       target-stable-version:
         description: 'Optional stable version override; required for a stable artifact publish'
         required: false
