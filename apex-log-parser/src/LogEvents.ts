@@ -1733,20 +1733,28 @@ export function applyFlowDbResiduals(elements: LogEvent[]): void {
   let i = elements.length;
   while (i--) {
     const element = elements[i]!;
-    let deltas: Map<LimitMetricKey, number> | null = null;
+    let reports: Map<LimitMetricKey, FlowDbReport> | null = null;
     for (const child of element.children) {
       if (!(child instanceof FlowRunningTotalLimitUsageLine) || !child.limitUsage) {
         continue;
       }
-      const { metric, delta } = child.limitUsage;
-      deltas ??= new Map();
-      deltas.set(metric, (deltas.get(metric) ?? 0) + delta);
+      const { metric, used, delta } = child.limitUsage;
+      reports ??= new Map();
+      const report = reports.get(metric);
+      if (report) {
+        report.summed += delta;
+        report.after = used;
+      } else {
+        reports.set(metric, { summed: delta, before: used - delta, after: used });
+      }
     }
-    if (!deltas) {
+    if (!reports) {
       continue;
     }
-    for (const [metric, delta] of deltas) {
+    for (const [metric, report] of reports) {
       const counter = flowDbCounter(element, metric);
+      // A repeated or cumulative line would over-attribute, so the reported rise is the ceiling.
+      const delta = Math.min(report.summed, report.after - report.before);
       const residual = counter ? delta - counter.total : 0;
       if (!counter || residual <= 0) {
         continue;
@@ -1761,6 +1769,13 @@ export function applyFlowDbResiduals(elements: LogEvent[]): void {
       }
     }
   }
+}
+
+/** The running totals a flow element's limit-usage children report for one metric. */
+interface FlowDbReport {
+  summed: number;
+  before: number;
+  after: number;
 }
 
 function flowDbCounter(target: LogEvent, metric: LimitMetricKey): SelfTotal | null {

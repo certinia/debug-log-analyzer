@@ -162,6 +162,22 @@ describe('flow database attribution (via parse)', () => {
     expect(apexLog.soqlCount.total).toBe(snapshot?.limits.soqlQueries.used);
   });
 
+  it('clamps the summed deltas to the rise in the running total when a line repeats', () => {
+    const log =
+      '09:18:22.6 (100)|EXECUTION_STARTED\n' +
+      '09:18:22.6 (200)|FLOW_ELEMENT_BEGIN|abc-1|FlowRecordUpdate|Update_Account\n' +
+      '09:18:22.6 (210)|FLOW_ELEMENT_LIMIT_USAGE|1 DML statements, total 1 out of 150\n' +
+      '09:18:22.6 (220)|FLOW_ELEMENT_LIMIT_USAGE|1 DML statements, total 1 out of 150\n' +
+      '09:18:22.6 (230)|FLOW_ELEMENT_END|abc-1|FlowRecordUpdate|Update_Account\n' +
+      '09:19:13.82 (51595120059)|EXECUTION_FINISHED\n';
+    const apexLog = parse(log);
+    const element = flatten(apexLog).find((e) => e.type === 'FLOW_ELEMENT_BEGIN');
+
+    // The deltas sum to 2 but the total only rose by 1, so only 1 is attributed.
+    expect(element?.dmlCount.self).toBe(1);
+    expect(apexLog.dmlCount.total).toBe(1);
+  });
+
   it('attributes a nested element residual to the enclosing element before it is measured', () => {
     const log =
       '09:18:22.6 (100)|EXECUTION_STARTED\n' +
