@@ -18,7 +18,7 @@ jobs:
           lfs: true
           persist-credentials: false
       - name: Set up Node and install dependencies
-        uses: salesforcecli/github-workflows/.github/actions/setupNodeAndInstall@main
+        uses: salesforcecli/github-workflows/.github/actions/setupNodeAndInstall@ph/W-23832274-pnpm-stable-promotion
         with:
           node-version: '24'
           package-manager: pnpm
@@ -53,7 +53,7 @@ jobs:
           lfs: true
           persist-credentials: false
       - name: Set up Node and install dependencies
-        uses: salesforcecli/github-workflows/.github/actions/setupNodeAndInstall@main
+        uses: salesforcecli/github-workflows/.github/actions/setupNodeAndInstall@ph/W-23832274-pnpm-stable-promotion
         with:
           node-version: '24'
           package-manager: pnpm

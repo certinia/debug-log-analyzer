@@ -14,7 +14,7 @@ permissions:
 
 jobs:
   automerge:
-    uses: salesforcecli/github-workflows/.github/workflows/automerge.yml@main
+    uses: salesforcecli/github-workflows/.github/workflows/automerge.yml@ph/W-23832274-pnpm-stable-promotion
     with:
       mergeMethod: squash
       maxVersionBump: minor

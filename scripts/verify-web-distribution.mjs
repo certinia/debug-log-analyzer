@@ -2,6 +2,7 @@ import fs from 'node:fs';
 
 const ci = fs.readFileSync('.github/workflows/ci.yml', 'utf8');
 const nightly = fs.readFileSync('.github/workflows/nightly.yml', 'utf8');
+const manualPublish = fs.readFileSync('.github/workflows/manual-publish.yml', 'utf8');
 const publish = fs.readFileSync('.github/workflows/publish.yml', 'utf8');
 const promotePrerelease = fs.readFileSync('.github/workflows/promote-prerelease.yml', 'utf8');
 const promoteStable = fs.readFileSync('.github/workflows/promote-stable.yml', 'utf8');
@@ -140,15 +141,16 @@ if (!ci.includes('vsce package --target web --no-dependencies')) {
 
 for (const requiredText of [
   "#   - cron: '0 4 * * *'",
+  "branch:\n        description: 'Branch to release from'",
   'uses: salesforcecli/github-workflows/.github/workflows/vscode-publish-extensions.yml@ph/W-23832274-pnpm-stable-promotion',
   'extensions: lana',
   "pre-release: 'true'",
-  'branch: main',
+  'branch: ${{ inputs.branch || github.ref_name }}',
   'nightly: true',
   "version-bump: 'auto'",
   'extensions-root: .',
   'package-manager: pnpm',
-  "exclude-web-vsix: 'true'",
+  "exclude-web-vsix: 'false'",
   'publish-web-vsix: false',
   "dry-run: ${{ inputs.dry-run && 'true' || 'false' }}",
 ]) {
@@ -163,6 +165,31 @@ if (!nightly.includes('default: true')) {
 
 if (/^  schedule:/m.test(nightly)) {
   throw new Error('Nightly release schedule must remain disabled.');
+}
+
+for (const requiredText of [
+  'name: Manual Publish',
+  'version-tag:',
+  'source-run-id:',
+  'target-stable-version:',
+  'skip-quality-checks:',
+  'confirm-bypass:',
+  "default: pre-release",
+  "default: true",
+  'options: [all, vsce, ovsx, none]',
+  'use none for internal-only',
+  'publish-web-vsix:',
+  "publish-web-vsix: ${{ inputs.publish-web-vsix && 'true' || 'false' }}",
+  'uses: salesforcecli/github-workflows/.github/workflows/vscode-manual-publish.yml@ph/W-23832274-pnpm-stable-promotion',
+  'extension-name: lana',
+  "vsix-name-pattern: 'lana-*.vsix'",
+  'required-ci-checks: E2E',
+  'package-manager: pnpm',
+  'lockfile-path: pnpm-lock.yaml',
+]) {
+  if (!manualPublish.includes(requiredText)) {
+    throw new Error(`Expected manual publish workflow to include \`${requiredText}\`.`);
+  }
 }
 
 if (manifest.main !== 'dist/Main.js' || manifest.browser !== 'dist/web/Main.web.js') {
