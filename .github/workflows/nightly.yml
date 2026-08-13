@@ -3,6 +3,11 @@ name: Nightly Release
 on:
   workflow_dispatch:
     inputs:
+      branch:
+        description: 'Branch to release from'
+        required: false
+        default: main
+        type: string
       dry-run:
         description: 'Run in dry-run mode (no actual publishing)'
         required: false
@@ -12,7 +17,7 @@ on:
   #   - cron: '0 4 * * *'
 
 concurrency:
-  group: nightly-${{ github.workflow }}-${{ github.ref_name }}
+  group: nightly-${{ github.workflow }}-${{ inputs.branch || github.ref_name }}
   cancel-in-progress: false
 
 permissions:
@@ -24,7 +29,9 @@ jobs:
   nightly-release:
     uses: salesforcecli/github-workflows/.github/workflows/vscode-publish-extensions.yml@ph/W-23832274-pnpm-stable-promotion
     with:
-      branch: main
+      branch: ${{ inputs.branch || github.ref_name }}
+      # TODO(W-23832274): Switch to `changed` after a live nightly confirms the
+      # shared detector includes all Lana workspace and build inputs.
       extensions: lana
       registries: 'all'
       pre-release: 'true'

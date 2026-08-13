@@ -13,6 +13,6 @@ runs:
       shell: bash
       run: corepack enable
     - name: Install dependencies
-      uses: salesforcecli/github-workflows/.github/actions/retry@main
+      uses: salesforcecli/github-workflows/.github/actions/retry@ph/W-23832274-pnpm-stable-promotion
       with:
         command: pnpm install --frozen-lockfile ${{ inputs.ignore-scripts == 'true' && '--ignore-scripts' || '' }}

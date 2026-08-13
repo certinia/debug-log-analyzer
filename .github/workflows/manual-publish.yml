@@ -1,0 +1,81 @@
+name: Manual Publish
+
+# Publish from a nightly release or a specific CI artifact. The artifact path is
+# an auditable escape hatch for branch builds and requires an explicit bypass.
+on:
+  workflow_dispatch:
+    inputs:
+      version-tag:
+        description: 'Nightly GitHub release tag to publish from'
+        required: false
+        default: ''
+        type: string
+      source-run-id:
+        description: 'CI run ID whose VSIX artifact to publish; requires bypass confirmation'
+        required: false
+        default: ''
+        type: string
+      slot:
+        description: 'Marketplace slot to publish to'
+        required: true
+        default: pre-release
+        type: choice
+        options: [pre-release, stable]
+      registries:
+        description: 'Public registries for the universal VSIX'
+        required: true
+        default: all
+        type: choice
+        options: [all, vsce, ovsx]
+      target-stable-version:
+        description: 'Optional stable version override; required for a stable artifact publish'
+        required: false
+        default: ''
+        type: string
+      skip-quality-checks:
+        description: 'Skip CI quality checks; required for source-run-id'
+        required: false
+        default: 'false'
+        type: choice
+        options: ['false', 'true']
+      confirm-bypass:
+        description: 'Type BYPASS to confirm skipping CI quality checks'
+        required: false
+        default: ''
+        type: string
+      dry-run:
+        description: 'Build and validate artifacts without publishing, tagging, or committing'
+        required: true
+        default: true
+        type: boolean
+
+permissions:
+  contents: write
+  packages: write
+  actions: read
+
+jobs:
+  publish:
+    uses: salesforcecli/github-workflows/.github/workflows/vscode-manual-publish.yml@ph/W-23832274-pnpm-stable-promotion
+    with:
+      extension-name: lana
+      vsix-name-pattern: 'lana-*.vsix'
+      version-tag: ${{ inputs.version-tag }}
+      source-run-id: ${{ inputs.source-run-id }}
+      slot: ${{ inputs.slot }}
+      registries: ${{ inputs.registries }}
+      target-stable-version: ${{ inputs.target-stable-version }}
+      skip-quality-checks: ${{ inputs.skip-quality-checks }}
+      confirm-bypass: ${{ inputs.confirm-bypass }}
+      exclude-web-vsix: 'true'
+      extensions-root: .
+      vsix-artifact-name: vsix-packages
+      required-ci-checks: E2E
+      node-version: '24'
+      package-manager: pnpm
+      package-manager-version: '10'
+      cache-dependency-path: pnpm-lock.yaml
+      lockfile-path: pnpm-lock.yaml
+      install-command: pnpm run ci:install
+      dry-run: ${{ inputs.dry-run && 'true' || 'false' }}
+    secrets: inherit
