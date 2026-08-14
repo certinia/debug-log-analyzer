@@ -104,6 +104,12 @@ export interface Diagnostic {
   meta?: string;
   /** How many events raised this finding. */
   count: number;
+  /**
+   * How long the events behind the finding took, where the log times them. A
+   * count says how often something happened; this says whether it mattered. Left
+   * unset where the log measures nothing — a debug statement carries no duration.
+   */
+  timeNs?: number;
   /** The first event that raised it, or -1 when the finding is log-wide. */
   eventIndex: number;
   /**
@@ -112,11 +118,6 @@ export interface Diagnostic {
    * open any one of them in the grid.
    */
   evidence?: DiagnosticEvidence[];
-  /**
-   * How many lines are behind the finding, where {@link evidence} lists only the
-   * most repeated of them. The list says so itself, so the prose need not.
-   */
-  evidenceTotal?: number;
   /** The one thing behind the finding, when the log names one. */
   cause?: DiagnosticCause;
 }
@@ -134,12 +135,15 @@ export interface LogDiagnostics {
   queryPlansKnown: boolean;
   /** Distinct queries seen, and how many of them the linter parsed. */
   lintedQueries: { linted: number; distinct: number };
+  /** The whole log's duration, so a finding's {@link Diagnostic.timeNs} has a scale. */
+  logNs: number;
 }
 
 const EMPTY: LogDiagnostics = {
   diagnostics: [],
   queryPlansKnown: false,
   lintedQueries: { linted: 0, distinct: 0 },
+  logNs: 0,
 };
 
 /** A grouped set of events, keyed by whatever makes two of them the same finding. */
@@ -147,6 +151,11 @@ interface Group {
   count: number;
   eventIndex: number;
   events: LogEvent[];
+}
+
+/** How long a set of events took between them. */
+function totalTime(events: readonly LogEvent[]): number {
+  return events.reduce((sum, event) => sum + event.duration.total, 0);
 }
 
 function groupBy(events: LogEvent[], key: (event: LogEvent) => string | null): Map<string, Group> {
@@ -321,8 +330,8 @@ function limitDiagnostics(
       severity: breach ? 'Error' : 'Warning',
       tier: TIER.limit,
       summary: breach
-        ? `${label} limit exceeded.`
-        : `${label} is at ${Math.round(ratio * 100)}% of its limit.`,
+        ? `${label} limit exceeded`
+        : `${label} is at ${Math.round(ratio * 100)}% of its limit`,
       meta: known ? `${format(used)} / ${format(limit)}` : undefined,
       message: breach
         ? 'The governor stopped the transaction here.'
@@ -484,9 +493,10 @@ function repetitionDiagnostics(statements: LogEvent[], label: string): Diagnosti
     found.push({
       id: `repeat-line|${label}|${key}`,
       severity: 'Warning',
-      summary: `${group.count} ${label} statements from ${[frame, line].filter(Boolean).join(', ')}.`,
+      summary: `${group.count} ${label} statements from ${[frame, line].filter(Boolean).join(', ')}`,
       message: `Possible ${label} in a loop: it executed ${group.count} times from ${from}. Move it out of the loop and work on the whole collection at once.`,
       count: group.count,
+      timeNs: totalTime(group.events),
       eventIndex: group.eventIndex,
       evidence: oneLine(group.events[0]?.text, group.eventIndex, dialect),
     });
@@ -503,9 +513,10 @@ function repetitionDiagnostics(statements: LogEvent[], label: string): Diagnosti
     found.push({
       id: `repeat-text|${label}|${text}`,
       severity: 'Warning',
-      summary: `${group.count} identical ${label} statements, from ${sites.size} lines.`,
+      summary: `${group.count} identical ${label} statements, from ${sites.size} lines`,
       message: `The same statement ran ${group.count} times from ${sites.size} places. Run it once and pass the result around, or cache it for the transaction.`,
       count: group.count,
+      timeNs: totalTime(group.events),
       eventIndex: group.eventIndex,
       evidence: oneLine(text, group.eventIndex, dialect),
     });
@@ -516,8 +527,6 @@ function repetitionDiagnostics(statements: LogEvent[], label: string): Diagnosti
 
 /** Mean rows per statement at or below which a group is working one row at a time. */
 const ROW_AT_A_TIME_ROWS = 1.5;
-/** How many of a group's statements the finding lists. */
-const MAX_EVIDENCE = 5;
 
 /**
  * The values a query embeds in its own text: quoted strings, and numbers outside
@@ -536,6 +545,7 @@ interface ShapeGroup {
   object: string;
   count: number;
   rows: number;
+  timeNs: number;
   eventIndex: number;
   /** Each statement as written, with how often it ran and where it first ran. */
   texts: Map<string, DiagnosticEvidence & { count: number }>;
@@ -571,11 +581,19 @@ function rowAtATimeDiagnostics(queries: SOQLExecuteBeginLine[]): Diagnostic[] {
       if (!object) {
         continue;
       }
-      group = { object, count: 0, rows: 0, eventIndex: query.eventIndex, texts: new Map() };
+      group = {
+        object,
+        count: 0,
+        rows: 0,
+        timeNs: 0,
+        eventIndex: query.eventIndex,
+        texts: new Map(),
+      };
       groups.set(shape, group);
     }
     group.count++;
     group.rows += query.soqlRowCount.self;
+    group.timeNs += query.duration.total;
     const text = group.texts.get(query.text);
     if (text) {
       text.count++;
@@ -598,14 +616,15 @@ function rowAtATimeDiagnostics(queries: SOQLExecuteBeginLine[]): Diagnostic[] {
       continue;
     }
     const each = (rows / count).toFixed(1);
-    const listed = [...texts.values()].sort((a, b) => b.count - a.count).slice(0, MAX_EVIDENCE);
+    const listed = [...texts.values()].sort((a, b) => b.count - a.count);
     found.push({
       id: `row-at-a-time|${shape}`,
       severity: 'Warning',
-      summary: `${count} ${object} queries, one row at a time.`,
+      summary: `${count} ${object} queries, one row at a time`,
       meta: `${formatInteger(rows)} rows`,
       message: `The ${count} queries returned ${formatInteger(rows)} rows between them, ${each} each, written as ${texts.size} statements that differ only in the values built into them. Query once with an \`IN :ids\` filter and map the results by key.`,
       count,
+      timeNs: group.timeNs,
       eventIndex: group.eventIndex,
       evidence: listed.map(({ text, eventIndex, count: ran }) => ({
         text,
@@ -613,7 +632,6 @@ function rowAtATimeDiagnostics(queries: SOQLExecuteBeginLine[]): Diagnostic[] {
         count: ran,
         dialect: 'soql' as const,
       })),
-      evidenceTotal: texts.size,
     });
   }
   return found;
@@ -626,9 +644,12 @@ function queryPlanDiagnostics(queries: SOQLExecuteBeginLine[]): {
 } {
   const costs = new Map<
     string,
-    { count: number; eventIndex: number; worst: number; query: string }
+    { count: number; timeNs: number; eventIndex: number; worst: number; query: string }
   >();
-  const scans = new Map<string, { count: number; eventIndex: number; query: string }>();
+  const scans = new Map<
+    string,
+    { count: number; timeNs: number; eventIndex: number; query: string }
+  >();
   let explains = 0;
 
   // The plan lines are children of the query they explain, so the walk keeps the
@@ -642,6 +663,7 @@ function queryPlanDiagnostics(queries: SOQLExecuteBeginLine[]): {
         const seen = costs.get(sObject);
         if (seen) {
           seen.count++;
+          seen.timeNs += query.duration.total;
           if (explain.relativeCost > seen.worst) {
             seen.worst = explain.relativeCost;
             seen.query = query.text;
@@ -650,6 +672,7 @@ function queryPlanDiagnostics(queries: SOQLExecuteBeginLine[]): {
         } else {
           costs.set(sObject, {
             count: 1,
+            timeNs: query.duration.total,
             eventIndex: query.eventIndex,
             worst: explain.relativeCost,
             query: query.text,
@@ -660,8 +683,14 @@ function queryPlanDiagnostics(queries: SOQLExecuteBeginLine[]): {
         const seen = scans.get(sObject);
         if (seen) {
           seen.count++;
+          seen.timeNs += query.duration.total;
         } else {
-          scans.set(sObject, { count: 1, eventIndex: query.eventIndex, query: query.text });
+          scans.set(sObject, {
+            count: 1,
+            timeNs: query.duration.total,
+            eventIndex: query.eventIndex,
+            query: query.text,
+          });
         }
       }
     }
@@ -679,6 +708,7 @@ function queryPlanDiagnostics(queries: SOQLExecuteBeginLine[]): {
         message: rule.message,
         meta: sObject,
         count: group.count,
+        timeNs: group.timeNs,
         eventIndex: group.eventIndex,
         evidence: oneLine(group.query, group.eventIndex, 'soql'),
       };
@@ -692,6 +722,7 @@ function queryPlanDiagnostics(queries: SOQLExecuteBeginLine[]): {
         message: rule.message,
         meta: sObject,
         count: group.count,
+        timeNs: group.timeNs,
         eventIndex: group.eventIndex,
         evidence: oneLine(group.query, group.eventIndex, 'soql'),
       };
@@ -710,7 +741,7 @@ function debugDiagnostics(debugLines: LogEvent[]): Diagnostic[] {
     {
       id: 'debug-statements',
       severity: 'Info',
-      summary: `${debugLines.length} debug statements ran.`,
+      summary: `${debugLines.length} debug statements ran`,
       message:
         'Each statement builds its message and writes it, whether or not anyone reads the log. Remove the ones that are no longer needed, and keep the rest behind a lower log level.',
       count: debugLines.length,
@@ -754,9 +785,9 @@ async function soqlLintDiagnostics(queries: SOQLExecuteBeginLine[]): Promise<{
           summary: rule.summary,
           message: rule.message,
           count: group.count,
+          timeNs: totalTime(group.events),
           eventIndex: group.eventIndex,
           evidence: [line],
-          evidenceTotal: 1,
         });
         continue;
       }
@@ -764,10 +795,8 @@ async function soqlLintDiagnostics(queries: SOQLExecuteBeginLine[]): Promise<{
       // any one of them. Each query is listed, so the count reconciles with what
       // the reader can open. The queries arrive most-repeated first.
       seen.count += group.count;
-      seen.evidenceTotal = (seen.evidenceTotal ?? 0) + 1;
-      if ((seen.evidence?.length ?? 0) < MAX_EVIDENCE) {
-        seen.evidence?.push(line);
-      }
+      seen.timeNs = (seen.timeNs ?? 0) + totalTime(group.events);
+      seen.evidence?.push(line);
     }
   }
 
@@ -777,20 +806,74 @@ async function soqlLintDiagnostics(queries: SOQLExecuteBeginLine[]): Promise<{
   };
 }
 
+/** The findings for one log, kept so a selection re-scopes without re-analysing. */
+let cached: { log: ApexLog; result: Promise<LogDiagnostics> } | null = null;
+
 /**
  * Everything the log says about itself, as one ordered findings list.
  *
- * Every rule reads data the parser already produced, so the whole engine is one
- * pass over `eventsById` plus one antlr parse per distinct query. Nothing here
- * infers source-level structure — a log holds no loops and no source, so the
- * findings are what ran, how often, and what the platform said about it.
+ * Analysed once per log: the rules cost one pass over `eventsById` plus an antlr
+ * parse per distinct query, which is too much to repeat every time the selection
+ * changes. {@link scopeDiagnostics} narrows this result instead.
  */
-export async function computeLogDiagnostics(): Promise<LogDiagnostics> {
+export function computeLogDiagnostics(): Promise<LogDiagnostics> {
   const log = DatabaseAccess.instance()?.getApexLog();
   if (!log) {
-    return EMPTY;
+    return Promise.resolve(EMPTY);
   }
+  if (cached?.log !== log) {
+    cached = { log, result: analyse(log) };
+  }
+  return cached.result;
+}
 
+/**
+ * The findings that name one selection: those raised inside the given events or
+ * anywhere below them.
+ *
+ * A finding is in scope when its own event, or any line of its evidence, sits in
+ * the selection's subtree — a grouped finding spans call sites, so its first
+ * event alone would drop the rest. The counts and figures are the whole log's,
+ * since they say how far the problem reaches beyond what is selected.
+ */
+export function scopeDiagnostics(
+  result: LogDiagnostics,
+  instances: readonly number[],
+): LogDiagnostics {
+  const log = DatabaseAccess.instance()?.getApexLog();
+  const within = new Set(instances);
+  if (!log || !within.size) {
+    return { ...result, diagnostics: [] };
+  }
+  // `eventsById` is indexed by `eventIndex`, so ancestry is a parent walk.
+  const inScope = (eventIndex: number) => {
+    let node: LogEvent | null | undefined = log.eventsById[eventIndex];
+    while (node) {
+      if (within.has(node.eventIndex)) {
+        return true;
+      }
+      node = node.parent;
+    }
+    return false;
+  };
+  return {
+    ...result,
+    diagnostics: result.diagnostics.filter(
+      (diagnostic) =>
+        (diagnostic.eventIndex >= 0 && inScope(diagnostic.eventIndex)) ||
+        (diagnostic.evidence ?? []).some(
+          (line) => line.eventIndex >= 0 && inScope(line.eventIndex),
+        ),
+    ),
+  };
+}
+
+/**
+ * Nothing here infers source-level structure — a log holds no loops and no
+ * source, so the findings are what ran, how often, and what the platform said
+ * about it.
+ */
+async function analyse(log: ApexLog): Promise<LogDiagnostics> {
   const queries: SOQLExecuteBeginLine[] = [];
   const dml: DMLBeginLine[] = [];
   const debugLines: LogEvent[] = [];
@@ -851,5 +934,6 @@ export async function computeLogDiagnostics(): Promise<LogDiagnostics> {
     diagnostics: ranked,
     queryPlansKnown: plans.queryPlansKnown,
     lintedQueries: lint.lintedQueries,
+    logNs: log.duration.total,
   };
 }

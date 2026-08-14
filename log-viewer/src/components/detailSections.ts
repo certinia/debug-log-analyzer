@@ -156,7 +156,7 @@ export async function buildDetailSections(
   const instances = isAggregate && !following ? selection.instances : null;
   const label = isAggregate && !following ? selection.label : '';
 
-  return [
+  const sections: PaneSection[] = [
     {
       id: 'vitals',
       title: 'Details',
@@ -167,6 +167,20 @@ export async function buildDetailSections(
         label=${label}
       ></event-vitals>`,
     },
+  ];
+  if (source === 'analysis') {
+    // The same findings, asked of the selection: which of the log's problems name
+    // this method or anything it called.
+    sections.push({
+      id: 'findings',
+      title: 'Findings',
+      // The verdict on the selected row, so it reads beside the tree rather than
+      // being crowded down to its header by it.
+      weight: 3,
+      content: html`<log-diagnostics .instances=${instances ?? [active]}></log-diagnostics>`,
+    });
+  }
+  sections.push(
     {
       id: 'callstack',
       title: 'Call stack',
@@ -186,5 +200,6 @@ export async function buildDetailSections(
         activeEventIndex=${active}
       ></call-tree-detail>`,
     },
-  ];
+  );
+  return sections;
 }
