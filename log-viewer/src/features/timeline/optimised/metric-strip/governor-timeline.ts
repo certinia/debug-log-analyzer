@@ -15,10 +15,13 @@
  *
  * Two observation kinds:
  * - `delta`    — adds to `tracked` (and therefore to `displayed`); marks the metric delta-tracked.
- * - `absolute` — corrective. Sets the baseline to `max(reported, displayed)`. The `max` floor keeps
- *   monotonic counters from dipping when a subset-scoped report or fluctuating heap comes in low.
- *   For heap, `reported` is the authoritative cumulative "Maximum heap size" (a peak, often our only
- *   source since FINE logs emit no HEAP_ALLOCATE events).
+ * - `absolute` — corrective. A `cumulative` report is authoritative and sets the baseline outright;
+ *   a `scoped` one measures a single block, so it only ever raises the baseline. For heap, the
+ *   cumulative "Maximum heap size" is often our only source (FINE logs emit no HEAP_ALLOCATE events).
+ *
+ * A cumulative figure is also a ceiling. Counting can only fall short of what the governor charged —
+ * a truncated log drops events the report still counted — so `displayed` never passes the highest
+ * cumulative report for the same namespace and metric, and the strip agrees with those totals.
  *
  * At each observation timestamp a single combined point is emitted, summing the last-known
  * per-namespace values (carry-forward step merge). `tracked` is surfaced on the emitted value only
@@ -42,13 +45,19 @@ export interface LimitDeltaObservation {
   delta: number;
 }
 
-/** A cumulative "used" report that corrects the running total. Limit is resolved separately. */
+/** A reported "used" figure that corrects the running total. Limit is resolved separately. */
 export interface LimitAbsoluteObservation {
   kind: 'absolute';
   timestamp: number;
   namespace: string;
   metric: string;
   used: number;
+  /**
+   * Whether the figure is a whole-transaction cumulative total. Only those are authoritative:
+   * a point-in-time report is scoped to the block that emitted it, so it can read below the
+   * transaction total without contradicting it.
+   */
+  scope: 'cumulative' | 'scoped';
 }
 
 export type LimitObservation = LimitDeltaObservation | LimitAbsoluteObservation;
@@ -62,9 +71,12 @@ interface MetricState {
   trackedAtBaseline: number;
   /** Whether this metric ever received a delta observation. */
   sawDelta: boolean;
+  /** Highest cumulative figure the log itself reported, or `Infinity` when it reported none. */
+  cap: number;
 }
 
-const displayedOf = (s: MetricState): number => s.baseline + (s.tracked - s.trackedAtBaseline);
+const displayedOf = (s: MetricState): number =>
+  Math.min(s.baseline + (s.tracked - s.trackedAtBaseline), s.cap);
 
 /** Target max emitted points per metric per namespace (drives the delta-coalescing threshold). */
 const POINT_BUDGET = 500;
@@ -135,6 +147,27 @@ function coalesceDeltas(
 }
 
 /**
+ * The highest cumulative figure the log reported per namespace and metric. Counting can only ever
+ * fall short of it — a truncated log drops events the report still counted — so it caps `displayed`.
+ * Scoped reports are left out: they measure one block, not the transaction.
+ */
+function reportedCaps(observations: LimitObservation[]): Map<string, Map<string, number>> {
+  const caps = new Map<string, Map<string, number>>();
+  for (const obs of observations) {
+    if (obs.kind !== 'absolute' || obs.scope !== 'cumulative') {
+      continue;
+    }
+    let byMetric = caps.get(obs.namespace);
+    if (!byMetric) {
+      byMetric = new Map();
+      caps.set(obs.namespace, byMetric);
+    }
+    byMetric.set(obs.metric, Math.max(byMetric.get(obs.metric) ?? 0, obs.used));
+  }
+  return caps;
+}
+
+/**
  * Fold granular observations into a dense combined-namespace time series.
  *
  * @param observations - Delta and absolute observations, any order.
@@ -156,6 +189,8 @@ export function buildGovernorTimeSeries(
   // heap allocation on huge logs (bounds points to ~POINT_BUDGET per metric per namespace).
   const sorted = coalesceDeltas(sortByTime(observations), limits);
 
+  const caps = reportedCaps(sorted);
+
   // namespace -> metric -> state
   const state = new Map<string, Map<string, MetricState>>();
   const getState = (ns: string, metric: string): MetricState => {
@@ -166,7 +201,13 @@ export function buildGovernorTimeSeries(
     }
     let s = byMetric.get(metric);
     if (!s) {
-      s = { tracked: 0, baseline: 0, trackedAtBaseline: 0, sawDelta: false };
+      s = {
+        tracked: 0,
+        baseline: 0,
+        trackedAtBaseline: 0,
+        sawDelta: false,
+        cap: caps.get(ns)?.get(metric) ?? Infinity,
+      };
       byMetric.set(metric, s);
     }
     return s;
@@ -184,7 +225,9 @@ export function buildGovernorTimeSeries(
         s.tracked += obs.delta;
         s.sawDelta = true;
       } else {
-        s.baseline = Math.max(obs.used, displayedOf(s));
+        // A cumulative total is authoritative; a scoped report only ever raises the line, since
+        // it measures one block and may read below the transaction total.
+        s.baseline = obs.scope === 'cumulative' ? obs.used : Math.max(obs.used, displayedOf(s));
         s.trackedAtBaseline = s.tracked;
       }
       idx++;

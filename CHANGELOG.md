@@ -19,6 +19,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - **A selection** shows its details and governor metrics as `used / limit`, the call stack that led to it, and its own subtree in **Time Order**, **Aggregated** or **Bottom-Up**. Click a frame in the call stack to walk up it — the details and subtree follow, and the stack stays anchored to what you selected.
   - **Nothing selected** shows the whole log instead of an empty panel: a governor overview on every tab, time by category and governor trends on the Timeline, log-wide findings on Analysis, the hot path and hot spots on the Call Tree, and, on Database, which namespaces asked for and burned the database time, every call path that ends in a query, DML or search with total and self time, and how few statements hold the time. ([#61])
   - Every row is a link: click it to reveal the frame, row or statement behind it in the tab you're on. Hover works both ways without moving the view — hover a row to pick out what it names in the tab you're on, or hover there to mark the rows that name it, and what you click stays picked out until `Escape`. Right-click for copy actions.
+  - **Findings** list the statements behind them, most repeated first with how often each ran, and report one query built per record and run a row at a time.
   - Dock it left, right or bottom, drag to resize any section — double-click a divider to restore the defaults — and collapse the sections you don't need; the layout is remembered. `Escape` clears the selection and returns the whole-log view. ([#63])
 - 🗄️ **Database Analysis**: governor-limit visibility and SOSL usage. ([#162])
   - 📏 **Governor-limit overview**: SOQL, SOSL, DML and query/DML rows shown as `used / limit`, colored as they approach the limit.
@@ -37,6 +38,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 
 - ⬆️ **Requires VS Code 1.102 or newer**.
+- 📏 **Governor figures**: every whole-log readout — the overview gauges, the governor trends, the Database overview and the Analysis findings — reports a metric at its peak, the level the governor charges the transaction at. The Timeline governor strip still plots the log as recorded.
 - 📊 **Timeline**
   - **Governor limits strip**: tooltip rows keep a stable order and always show the `used / limit` value, so figures no longer jump around as you move the pointer. ([#827])
   - **Timeline zooming**: consistent, smooth zoom across platforms and input devices — a Windows mouse wheel no longer over-zooms in large jumps, fast scrolls stay bounded, and zooming in then back out returns to the same level.

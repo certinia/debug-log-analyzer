@@ -2,29 +2,54 @@
  * Copyright (c) 2026 Certinia Inc. All rights reserved.
  */
 import '#vscode-elements/vscode-icon.js';
-import { LitElement, css, html } from 'lit';
+import { LitElement, css, html, unsafeCSS } from 'lit';
 import { customElement, state } from 'lit/decorators.js';
 
 import { dispatchInspectorReveal } from '../../../components/inspectorReveal.js';
 import { eventBus } from '../../../core/events/EventBus.js';
+import { formatSOQLToTemplate } from '../../soql/format/formatter.js';
+import { soqlSyntaxStyles } from '../../soql/styles/soql-syntax.css.js';
 import { globalStyles } from '../../../styles/global.styles.js';
 import { bleedRowStyles } from '../../../styles/revealRow.styles.js';
 import { severityIcon, severityStyles } from '../../../styles/severity.styles.js';
 import {
   computeLogDiagnostics,
   type Diagnostic,
+  type DiagnosticEvidence,
   type LogDiagnostics,
 } from '../services/LogDiagnostics.js';
+
+/**
+ * Lines a listed query gets. A clause takes a line, so this is what decides how
+ * far down the query the render reaches: below four, `FROM` and `WHERE` give way
+ * to a `+N clauses` marker and the statement is no longer recognisable.
+ */
+const EVIDENCE_LINES = 4;
+
+/** Characters per line where the pane has no layout to measure. */
+const FALLBACK_COLUMNS = 60;
+
+const PROBE_TEXT = 'SELECT0123456789';
+
+const textWidth = document.createElement('canvas').getContext('2d');
+
+/** A character of the element's own font, so a wider dock shows more of a query. */
+function charWidthOf(element: HTMLElement): number {
+  if (!textWidth) {
+    return 0;
+  }
+  const style = getComputedStyle(element);
+  textWidth.font = `${style.fontSize} ${style.fontFamily}`;
+  return textWidth.measureText(PROBE_TEXT).width / PROBE_TEXT.length;
+}
 
 /**
  * The Analysis tab's whole-log findings: what the log says is slow or wrong, and
  * what to do about it. The list is the shape every comparable tool uses for this.
  *
- * Two absences are reported rather than hidden. A truncated log makes every
- * figure below it an undercount, so it heads the pane; and without FINEST
- * database logging there are no query plans, which says nothing about the
- * queries — so the pane says the verdicts are unknown instead of leaving them
- * looking clean.
+ * An absence is reported rather than hidden: without FINEST database logging
+ * there are no query plans, which says nothing about the queries — so the pane
+ * says the verdicts are unknown instead of leaving them looking clean.
  */
 @customElement('log-diagnostics')
 export class LogDiagnosticsView extends LitElement {
@@ -33,24 +58,53 @@ export class LogDiagnosticsView extends LitElement {
 
   private _offLogLoaded: (() => void) | null = null;
 
+  private _columns = FALLBACK_COLUMNS;
+
+  private _resize: ResizeObserver | null = null;
+
   override connectedCallback() {
     super.connectedCallback();
     void this._analyse();
     // The inspector paints before the first log is parsed, and it rebuilds only
     // on a tab change or a selection.
     this._offLogLoaded = eventBus.on('log:loaded', () => void this._analyse());
+    if (typeof ResizeObserver !== 'undefined') {
+      this._resize = new ResizeObserver(() => this._measure());
+      this._resize.observe(this);
+    }
   }
 
   override disconnectedCallback() {
     this._offLogLoaded?.();
     this._offLogLoaded = null;
+    this._resize?.disconnect();
+    this._resize = null;
     super.disconnectedCallback();
+  }
+
+  override updated() {
+    this._measure();
+  }
+
+  /** Fit the listed queries to the pane, from a line already on screen. */
+  private _measure(): void {
+    const line = this.shadowRoot?.querySelector<HTMLElement>('.evidence__text--code');
+    if (!line) {
+      return;
+    }
+    const charWidth = charWidthOf(line);
+    const columns = charWidth ? Math.floor(line.clientWidth / charWidth) : 0;
+    if (columns > 0 && columns !== this._columns) {
+      this._columns = columns;
+      this.requestUpdate();
+    }
   }
 
   static styles = [
     globalStyles,
     severityStyles,
     bleedRowStyles,
+    unsafeCSS(soqlSyntaxStyles),
     css`
       :host {
         display: block;
@@ -184,6 +238,31 @@ export class LogDiagnosticsView extends LitElement {
         overflow-wrap: anywhere;
       }
 
+      /* A clause per line, cut at the same count the budget renders, so a wrapped
+         clause cannot push the list apart. The whole statement is one click away. */
+      .evidence__text--code {
+        display: -webkit-box;
+        -webkit-box-orient: vertical;
+        -webkit-line-clamp: 4;
+        line-clamp: 4;
+        min-width: 0;
+        overflow: hidden;
+      }
+
+      /* How many lines the finding has, when it lists only the most repeated. */
+      .evidence__head {
+        margin: var(--lana-space-sm) 0 0;
+        color: var(--lana-fg-muted);
+        font-size: var(--lana-text-sm);
+      }
+
+      /* How many times this one line ran. */
+      .evidence__count {
+        flex: 0 0 auto;
+        color: var(--lana-fg-muted);
+        font-variant-numeric: tabular-nums;
+      }
+
       /* The evidence names one event, so it is the way back to that row. */
       .evidence--link {
         cursor: pointer;
@@ -213,10 +292,6 @@ export class LogDiagnosticsView extends LitElement {
         color: var(--lana-fg-muted);
         font-size: var(--lana-text-sm);
       }
-
-      .truncated {
-        color: var(--lana-severity-warning);
-      }
     `,
   ];
 
@@ -227,7 +302,7 @@ export class LogDiagnosticsView extends LitElement {
     }
 
     return html`
-      ${result.truncation ? html`<p class="note truncated">${result.truncation}</p>` : ''}
+      ${this._caveats(result).map((caveat) => html`<p class="note">${caveat}</p>`)}
       ${
         result.diagnostics.length
           ? result.diagnostics.map((diagnostic) => {
@@ -253,7 +328,6 @@ export class LogDiagnosticsView extends LitElement {
             })
           : html`<p class="note">No findings.</p>`
       }
-      ${this._caveats(result).map((caveat) => html`<p class="note">${caveat}</p>`)}
     `;
   }
 
@@ -270,24 +344,44 @@ export class LogDiagnosticsView extends LitElement {
   }
 
   /**
-   * The log line behind the finding. A log-wide finding names no single event, so
-   * that one is text only; every other one is the way back to its row in the grid.
+   * The log lines behind the finding — one for most, one per statement for a
+   * finding about a query written several ways. A line that names no single event
+   * is text only; every other one is the way back to its row in the grid.
    */
   private _evidence(diagnostic: Diagnostic) {
-    if (!diagnostic.evidence) {
-      return '';
-    }
-    const text = html`<span class="evidence__text">${diagnostic.evidence}</span>`;
-    if (diagnostic.eventIndex < 0) {
-      return html`<div class="evidence">${text}</div>`;
+    const evidence = diagnostic.evidence ?? [];
+    const total = diagnostic.evidenceTotal ?? 0;
+    return [
+      total > evidence.length
+        ? html`<p class="evidence__head">
+            ${evidence.length} of ${total} statements, most repeated first.
+          </p>`
+        : '',
+      ...evidence.map((line) => this._evidenceLine(line)),
+    ];
+  }
+
+  private _evidenceLine({ text, eventIndex, count, dialect }: DiagnosticEvidence) {
+    const body = dialect
+      ? html`<span class="evidence__text evidence__text--code soql-block"
+          >${formatSOQLToTemplate(text, {
+            mode: 'pretty',
+            dialect,
+            budget: { lines: EVIDENCE_LINES, columns: this._columns },
+          })}</span
+        >`
+      : html`<span class="evidence__text">${text}</span>`;
+    const ran = count && count > 1 ? html`<span class="evidence__count">${count}×</span>` : '';
+    if (eventIndex < 0) {
+      return html`<div class="evidence" title=${text}>${body}${ran}</div>`;
     }
     return html`<button
       class="evidence evidence--link"
       type="button"
-      title="Show this in the grid"
-      @click=${() => dispatchInspectorReveal(this, diagnostic.eventIndex)}
+      title=${text}
+      @click=${() => dispatchInspectorReveal(this, eventIndex)}
     >
-      ${text}
+      ${body}${ran}
       <vscode-icon class="evidence__go" name="arrow-right"></vscode-icon>
     </button>`;
   }
@@ -297,7 +391,7 @@ export class LogDiagnosticsView extends LitElement {
     const caveats: string[] = [];
     if (!result.queryPlansKnown) {
       caveats.push(
-        'This log holds no query plans, so how selective the queries are is unknown. Re-run with the Database log level at FINEST to see them.',
+        'To see query plan findings, re-run the log with the Database log level at FINEST.',
       );
     }
     const { linted, distinct } = result.lintedQueries;

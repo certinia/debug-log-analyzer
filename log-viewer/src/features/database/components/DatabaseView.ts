@@ -13,7 +13,9 @@ import type {
   SOSLExecuteBeginLine,
 } from 'apex-log-parser';
 
+import { limitTotals } from '../../../components/logOverviewMetrics.js';
 import { eventBus, type StatementType } from '../../../core/events/EventBus.js';
+import { apexLimitTimeSeries } from '../../timeline/optimised/apex-limit-series.js';
 import { InspectorEmphasis } from '../../../components/inspectorEmphasis.js';
 import { SelectionEchoGuard } from '../../../core/events/SelectionEchoGuard.js';
 import { isVisible } from '../../../core/utility/Util.js';
@@ -205,6 +207,9 @@ export class DatabaseView extends LitElement {
     }
   }
 
+  /** The shared whole-log totals, so a figure here matches every other surface. */
+  private _limits: Limits | undefined;
+
   private async _loadData(): Promise<void> {
     const root = this.timelineRoot;
     if (!root) {
@@ -218,6 +223,8 @@ export class DatabaseView extends LitElement {
     this.dmlLines = db.getDMLLines();
     this.soqlLines = db.getSOQLLines();
     this.soslLines = db.getSOSLLines();
+    // A full pass over every event: too costly to run from render().
+    this._limits = limitTotals(apexLimitTimeSeries(root));
     this.loaded = true;
     // Collapse types the transaction never touched (usually SOSL).
     this.collapsed = {
@@ -362,10 +369,6 @@ export class DatabaseView extends LitElement {
     this.collapsed = { ...this.collapsed, [kind]: !this.collapsed[kind] };
   }
 
-  private get _limits(): Limits | undefined {
-    return this.timelineRoot?.governorLimits;
-  }
-
   /** Cumulative limits are only present when the log recorded a usage snapshot. */
   private get _hasLimits(): boolean {
     return (this.timelineRoot?.governorLimits.snapshots.length ?? 0) > 0;
@@ -394,6 +397,11 @@ export class DatabaseView extends LitElement {
     return this._hasLimits ? value : null;
   }
 
+  /** Without a snapshot the limit is the platform default, which is a guess here, so hide it. */
+  private _limit(value: number): number {
+    return this._hasLimits ? value : 0;
+  }
+
   private _isEmpty(kind: SectionKind): boolean {
     const limits = this._limits;
     const consumed = limits ? SECTION_META[kind].statement(limits).used : 0;
@@ -410,7 +418,7 @@ export class DatabaseView extends LitElement {
         label: SECTION_META[kind].statementLabel,
         found: this._count(kind),
         used: this._used(statement.used),
-        limit: statement.limit,
+        limit: this._limit(statement.limit),
       },
     ];
     if (kind === 'sosl') {
@@ -428,7 +436,7 @@ export class DatabaseView extends LitElement {
         label: 'Rows',
         found: this._rows(kind),
         used: this._used(rows.used),
-        limit: rows.limit,
+        limit: this._limit(rows.limit),
       });
     }
     return metrics;
@@ -446,7 +454,12 @@ export class DatabaseView extends LitElement {
     const limits = this._limits;
     const gauges: GaugeMetric[] = [];
     const add = (label: string, found: number, metric: { used: number; limit: number }) => {
-      gauges.push({ label, found, used: this._used(metric.used), limit: metric.limit });
+      gauges.push({
+        label,
+        found,
+        used: this._used(metric.used),
+        limit: this._limit(metric.limit),
+      });
     };
     const z = { used: 0, limit: 0 };
     add('DML', this._count('dml'), limits?.dmlStatements ?? z);
