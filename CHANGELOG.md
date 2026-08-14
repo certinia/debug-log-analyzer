@@ -17,11 +17,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - The Timeline governor strip plots heap as it's allocated, so you can see where it spikes.
 - 🧭 **Inspector**: select anything — a timeline frame, a call tree or analysis row, a SOQL/DML/SOSL statement — and inspect it without leaving the tab you're on. ([#113])
   - **A selection** shows its details and governor metrics as `used / limit`, the call stack that led to it, and its own subtree in **Time Order**, **Aggregated** or **Bottom-Up**. Click a frame in the call stack to walk up it — the details and subtree follow, and the stack stays anchored to what you selected.
-  - **Nothing selected** shows the whole log instead of an empty panel: a governor overview on every tab, time by category and governor trends on the Timeline, log-wide findings on Analysis, and the hot path and hot spots on the Call Tree.
+  - **Nothing selected** shows the whole log instead of an empty panel: a governor overview on every tab, time by category and governor trends on the Timeline, log-wide findings on Analysis, the hot path and hot spots on the Call Tree, and, on Database, which namespaces asked for and burned the database time, every call path that ends in a query, DML or search with total and self time, and how few statements hold the time. ([#61])
   - Every row is a link: click it to reveal the frame, row or statement behind it in the tab you're on. Hover works both ways without moving the view — hover a row to pick out what it names in the tab you're on, or hover there to mark the rows that name it, and what you click stays picked out until `Escape`. Right-click for copy actions.
+  - **Findings** list the statements behind them, most repeated first with how often each ran, and report one query built per record and run a row at a time.
   - Dock it left, right or bottom, drag to resize any section — double-click a divider to restore the defaults — and collapse the sections you don't need; the layout is remembered. `Escape` clears the selection and returns the whole-log view. ([#63])
-- 🔁 **Row-at-a-time finding**: Analysis reports one query built per record and run a row at a time.
-- 🔍 **Finding evidence**: each Analysis finding lists the statements behind it, most repeated first, with how often each ran and how many there are in all; click one to open it in the grid.
 - 🗄️ **Database Analysis**: governor-limit visibility and SOSL usage. ([#162])
   - 📏 **Governor-limit overview**: SOQL, SOSL, DML and query/DML rows shown as `used / limit`, colored as they approach the limit.
   - 🧮 **Found vs Counted**: each section reconciles statements found in the log against the governor-counted total, flagging queries that didn't consume the limit (e.g. custom metadata, which is free unless it selects a long text area field or runs in a Flow).
@@ -68,6 +67,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - 🧭 **Inspector call stack**: cumulative limit and profiling frames appeared in the stack, so the path to a selection read wrong; the stack now excludes them, like the call tree already did.
 - 🐛 **Go to Code**: Match methods with namespace/`System`-qualified parameter types. ([#834])
 - 📐 **Timeline height**: the Flame Chart stopped short of the bottom of its panel, leaving a strip of empty space; it now fills the panel and follows the Inspector as you resize or re-dock it.
+- 🗄️ **Flow database usage**: SOQL and DML run by a Flow or Process Builder element went uncounted, because the log never reports it as a statement; the element's own usage is now counted and rolls up like any other. Needs `WORKFLOW` at `FINER` or above. ([#871])
 
 ## [1.20.1] 2026-07-23
 
@@ -558,6 +558,7 @@ Skipped due to adopting odd numbering for pre releases and even number for relea
 <!-- Unreleased -->
 
 [#873]: https://github.com/certinia/debug-log-analyzer/issues/873
+[#871]: https://github.com/certinia/debug-log-analyzer/issues/871
 [#834]: https://github.com/certinia/debug-log-analyzer/issues/834
 [#576]: https://github.com/certinia/debug-log-analyzer/issues/576
 [#832]: https://github.com/certinia/debug-log-analyzer/issues/832
@@ -568,6 +569,7 @@ Skipped due to adopting odd numbering for pre releases and even number for relea
 [#162]: https://github.com/certinia/debug-log-analyzer/issues/162
 [#113]: https://github.com/certinia/debug-log-analyzer/issues/113
 [#63]: https://github.com/certinia/debug-log-analyzer/issues/63
+[#61]: https://github.com/certinia/debug-log-analyzer/issues/61
 [#32]: https://github.com/certinia/debug-log-analyzer/issues/32
 
 <!-- v1.20.1 -->

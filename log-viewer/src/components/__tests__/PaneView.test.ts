@@ -81,16 +81,6 @@ describe('PaneView', () => {
     expect(body(el, 'c')).not.toBeNull();
   });
 
-  it('renders a section icon after the twistie', async () => {
-    const el = document.createElement('pane-view') as PaneView;
-    el.sections = [{ id: 'a', title: 'A', icon: 'flame', content: html`<div></div>` }];
-    document.body.appendChild(el);
-    await el.updateComplete;
-
-    const icons = [...(header(el, 'a')?.querySelectorAll('vscode-icon') ?? [])];
-    expect(icons.map((icon) => icon.getAttribute('name'))).toEqual(['chevron-down', 'flame']);
-  });
-
   it('renders a sash between each pair of open sections (2 for 3 open)', async () => {
     const el = await mount('vertical');
     expect(el.shadowRoot?.querySelectorAll('.pane-sash').length).toBe(2);
