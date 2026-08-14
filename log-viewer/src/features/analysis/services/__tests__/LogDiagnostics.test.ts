@@ -25,28 +25,46 @@ function event(fields: Partial<LogEvent>): LogEvent {
     lineNumber: null,
     children: [],
     duration: { self: 0, total: 0 },
+    soqlRowCount: { self: 0, total: 0 },
+    dmlRowCount: { self: 0, total: 0 },
     ...fields,
   } as LogEvent;
 }
 
-function apexLog(fields: Partial<ApexLog> & { namespaceLimits?: Limits }): ApexLog {
-  const { namespaceLimits, ...rest } = fields;
-  const governorLimits = {
+/**
+ * One cumulative snapshot per namespace, as a log reports `LIMIT_USAGE_FOR_NS`.
+ * The findings read the metric-strip series, which is built from these.
+ */
+function governorLimitsOf(namespaceLimits: Record<string, Limits>): GovernorLimits {
+  const byNamespace = new Map(Object.entries(namespaceLimits));
+  return {
     ...emptyLimits(),
-    byNamespace: new Map(namespaceLimits ? [['default', namespaceLimits]] : []),
-    snapshots: [],
+    byNamespace,
+    snapshots: [...byNamespace].map(([namespace, limits], index) => ({
+      timestamp: index + 1,
+      namespace,
+      limits,
+    })),
   } as GovernorLimits;
+}
+
+function apexLog(fields: Partial<ApexLog> & { namespaceLimits?: Record<string, Limits> }): ApexLog {
+  const { namespaceLimits, ...rest } = fields;
   // Same reason as `event`: only the fields the engine reads are supplied.
   return {
     eventsById: [],
+    children: [],
     exceptions: [],
     logIssues: [],
-    governorLimits,
+    governorLimits: governorLimitsOf(namespaceLimits ?? {}),
     ...rest,
   } as ApexLog;
 }
 
 const soql = (fields: Partial<LogEvent>) => event({ type: 'SOQL_EXECUTE_BEGIN', ...fields });
+
+const dml = (fields: Partial<LogEvent> & { sObjectType?: string }) =>
+  event({ type: 'DML_BEGIN', ...fields } as Partial<LogEvent>);
 
 describe('computeLogDiagnostics', () => {
   beforeEach(() => {
@@ -63,30 +81,65 @@ describe('computeLogDiagnostics', () => {
     const namespaceLimits = emptyLimits();
     namespaceLimits.cpuTime = { used: 10_000, limit: 10_000 };
     namespaceLimits.soqlQueries = { used: 85, limit: 100 };
-    log = apexLog({ namespaceLimits });
+    log = apexLog({ namespaceLimits: { default: namespaceLimits } });
 
     const { diagnostics } = await computeLogDiagnostics();
     expect(diagnostics.map((d) => [d.severity, d.summary, d.meta])).toEqual([
-      ['Error', 'CPU Time limit exceeded.', '10,000 ms / 10,000 ms'],
+      ['Warning', 'CPU Time is at 100% of its limit.', '10,000 ms / 10,000 ms'],
       ['Warning', 'SOQL is at 85% of its limit.', '85 / 100'],
     ]);
+  });
+
+  it('leaves every limit alone when the log reports no cumulative totals', async () => {
+    log = apexLog({
+      eventsById: Array.from({ length: 3 }, (_, index) =>
+        event({ type: 'METHOD_ENTRY', eventIndex: index, duration: { self: 9e9, total: 9e9 } }),
+      ),
+    });
+
+    const { diagnostics } = await computeLogDiagnostics();
+    expect(diagnostics.some((d) => d.id.startsWith('limit|'))).toBe(false);
   });
 
   it('leaves a metric below the near-limit share out', async () => {
     const namespaceLimits = emptyLimits();
     namespaceLimits.soqlQueries = { used: 40, limit: 100 };
-    log = apexLog({ namespaceLimits });
+    log = apexLog({ namespaceLimits: { default: namespaceLimits } });
 
     expect((await computeLogDiagnostics()).diagnostics).toEqual([]);
   });
 
-  it('leaves another namespace alone, because the log cannot say it has its own budget', async () => {
-    const namespaceLimits = emptyLimits();
-    namespaceLimits.cpuTime = { used: 9_000, limit: 10_000 };
-    log = apexLog({});
-    log.governorLimits.byNamespace = new Map([['pkg', namespaceLimits]]);
+  it('sums usage over every namespace, since a limit is shared unless a package is certified', async () => {
+    const forNamespace = (used: number) => {
+      const limits = emptyLimits();
+      limits.soqlQueries = { used, limit: 100 };
+      return limits;
+    };
+    log = apexLog({ namespaceLimits: { default: forNamespace(14), pkg: forNamespace(173) } });
 
-    expect((await computeLogDiagnostics()).diagnostics).toEqual([]);
+    const { diagnostics } = await computeLogDiagnostics();
+    // A summed share can pass 100% without a breach: a certified package has its
+    // own limits. Only the log saying the governor stopped it makes that an error.
+    expect(diagnostics.map((d) => [d.severity, d.summary, d.meta])).toEqual([
+      ['Warning', 'SOQL is at 187% of its limit.', '187 / 100'],
+    ]);
+  });
+
+  it('heads a severity band with the governor limit, whatever the counts below it', async () => {
+    const namespaceLimits = emptyLimits();
+    namespaceLimits.soqlQueries = { used: 85, limit: 100 };
+    log = apexLog({
+      namespaceLimits: { default: namespaceLimits },
+      eventsById: Array.from({ length: 6 }, (_, index) =>
+        soql({ eventIndex: index, lineNumber: 214, text: 'SELECT Id FROM Account WHERE Id = :id' }),
+      ),
+    });
+
+    const warnings = (await computeLogDiagnostics()).diagnostics.filter(
+      (d) => d.severity === 'Warning',
+    );
+    expect(warnings[0]?.id).toBe('limit|soqlQueries');
+    expect(warnings.some((d) => d.count > 1)).toBe(true);
   });
 
   it('groups a statement repeated from one line', async () => {
@@ -130,6 +183,223 @@ describe('computeLogDiagnostics', () => {
     expect(diagnostics.some((d) => d.id.startsWith('repeat-line|'))).toBe(false);
   });
 
+  it('leaves DML from several lines to the repeated-statement rule', async () => {
+    log = apexLog({
+      eventsById: Array.from({ length: 6 }, (_, index) =>
+        dml({
+          eventIndex: index,
+          lineNumber: 10 + index,
+          text: 'DML Op:Insert Type:Account',
+          sObjectType: 'Account',
+          dmlRowCount: { self: 1, total: 1 },
+        } as Partial<LogEvent>),
+      ),
+    });
+
+    const { diagnostics } = await computeLogDiagnostics();
+    // DML text is the operation and the object, so every repeat shares a text and
+    // that rule already groups them.
+    expect(diagnostics.map((d) => d.id)).toEqual(['repeat-text|DML|DML Op:Insert Type:Account']);
+  });
+
+  /** A query built as a string, so the record's id sits in its own text. */
+  const dynamicSoql = (index: number, object = 'Contact') =>
+    `SELECT Id FROM ${object} WHERE Id = '003a00000000${index}' LIMIT 1`;
+
+  it('reports one query built per record, run a row at a time', async () => {
+    log = apexLog({
+      eventsById: Array.from({ length: 5 }, (_, index) =>
+        soql({
+          eventIndex: index,
+          lineNumber: 40 + index,
+          text: dynamicSoql(index),
+          soqlRowCount: { self: 1, total: 1 },
+        } as Partial<LogEvent>),
+      ),
+    });
+
+    const found = (await computeLogDiagnostics()).diagnostics.find((d) =>
+      d.id.startsWith('row-at-a-time|'),
+    );
+    expect(found?.summary).toBe('5 Contact queries, one row at a time.');
+    expect(found?.message).toContain('IN :ids');
+    // Each statement is listed, so the reader can open any of them in the grid.
+    expect(found?.evidence).toHaveLength(5);
+  });
+
+  it('lists the five most repeated statements, with how many there are and how often each ran', async () => {
+    log = apexLog({
+      eventsById: Array.from({ length: 12 }, (_, index) =>
+        soql({
+          eventIndex: index,
+          lineNumber: 40,
+          // The first statement runs twice, so it heads the list.
+          text: dynamicSoql(index === 11 ? 0 : index),
+          soqlRowCount: { self: 1, total: 1 },
+        } as Partial<LogEvent>),
+      ),
+    });
+
+    const found = (await computeLogDiagnostics()).diagnostics.find((d) =>
+      d.id.startsWith('row-at-a-time|'),
+    );
+    expect(found?.count).toBe(12);
+    expect(found?.evidence).toHaveLength(5);
+    expect(found?.evidence?.[0]).toEqual({
+      text: dynamicSoql(0),
+      eventIndex: 0,
+      count: 2,
+      dialect: 'soql',
+    });
+    expect(found?.evidenceTotal).toBe(11);
+    expect(found?.message).toContain('11 statements');
+  });
+
+  it('stays quiet when no rows were counted: the evidence is absent, not one row', async () => {
+    log = apexLog({
+      eventsById: Array.from({ length: 5 }, (_, index) =>
+        soql({
+          eventIndex: index,
+          lineNumber: 40 + index,
+          text: dynamicSoql(index),
+          soqlRowCount: { self: 0, total: 0 },
+        } as Partial<LogEvent>),
+      ),
+    });
+
+    const { diagnostics } = await computeLogDiagnostics();
+    expect(diagnostics.some((d) => d.id.startsWith('row-at-a-time|'))).toBe(false);
+  });
+
+  it('keeps one query built per record quiet when each returns many rows', async () => {
+    log = apexLog({
+      eventsById: Array.from({ length: 6 }, (_, index) =>
+        soql({
+          eventIndex: index,
+          lineNumber: 10 + index,
+          text: `SELECT Id FROM Account WHERE Name = 'Acme ${index}'`,
+          soqlRowCount: { self: 200, total: 200 },
+        } as Partial<LogEvent>),
+      ),
+    });
+
+    const { diagnostics } = await computeLogDiagnostics();
+    expect(diagnostics.some((d) => d.id.startsWith('row-at-a-time|'))).toBe(false);
+  });
+
+  it('leaves a bulkified query to the repeated-statement rules', async () => {
+    log = apexLog({
+      eventsById: Array.from({ length: 6 }, (_, index) =>
+        soql({
+          eventIndex: index,
+          lineNumber: 42,
+          // A compiled bind logs as its name, so every call shares one text.
+          text: 'SELECT Id FROM Account WHERE Id IN :idSet',
+          soqlRowCount: { self: 200, total: 200 },
+        } as Partial<LogEvent>),
+      ),
+    });
+
+    const { diagnostics } = await computeLogDiagnostics();
+    expect(diagnostics.some((d) => d.id.startsWith('repeat-line|'))).toBe(true);
+    expect(diagnostics.some((d) => d.id.startsWith('row-at-a-time|'))).toBe(false);
+  });
+
+  it('leaves statements from one line to the per-line rule', async () => {
+    log = apexLog({
+      eventsById: Array.from({ length: 6 }, (_, index) =>
+        soql({
+          eventIndex: index,
+          lineNumber: 42,
+          text: 'SELECT Id FROM Account WHERE Id = :id LIMIT 1',
+          soqlRowCount: { self: 1, total: 1 },
+        } as Partial<LogEvent>),
+      ),
+    });
+
+    const { diagnostics } = await computeLogDiagnostics();
+    expect(diagnostics.some((d) => d.id.startsWith('repeat-line|'))).toBe(true);
+    expect(diagnostics.some((d) => d.id.startsWith('row-at-a-time|'))).toBe(false);
+  });
+
+  it('reports a loop on one line whose query text carries the record values', async () => {
+    log = apexLog({
+      eventsById: Array.from({ length: 6 }, (_, index) =>
+        soql({
+          eventIndex: index,
+          lineNumber: 42,
+          text: dynamicSoql(index, 'Account'),
+          soqlRowCount: { self: 1, total: 1 },
+        } as Partial<LogEvent>),
+      ),
+    });
+
+    const { diagnostics } = await computeLogDiagnostics();
+    // Every text differs, so neither repetition rule sees the loop.
+    expect(diagnostics.some((d) => d.id.startsWith('repeat-line|'))).toBe(false);
+    expect(diagnostics.some((d) => d.id.startsWith('repeat-text|'))).toBe(false);
+    expect(diagnostics.some((d) => d.id.startsWith('row-at-a-time|'))).toBe(true);
+  });
+
+  it('counts one line in two classes as two call sites', async () => {
+    const root = event({
+      type: 'EXECUTION_STARTED',
+      eventIndex: 0,
+      isParent: true,
+    } as Partial<LogEvent>);
+    const frames = ['Class.A.run()', 'Class.B.run()'].map((text, index) =>
+      event({
+        type: 'METHOD_ENTRY',
+        eventIndex: index + 1,
+        text,
+        isParent: true,
+        parent: root,
+      } as Partial<LogEvent>),
+    );
+    const statements = frames.flatMap((frame, klass) =>
+      Array.from({ length: 6 }, (_, run) =>
+        soql({
+          eventIndex: 10 + klass * 6 + run,
+          lineNumber: 42,
+          text: 'SELECT Id FROM Account WHERE Id = :id LIMIT 1',
+          parent: frame,
+          soqlRowCount: { self: 1, total: 1 },
+        } as Partial<LogEvent>),
+      ),
+    );
+    log = apexLog({ eventsById: [root, ...frames, ...statements] });
+
+    const { diagnostics } = await computeLogDiagnostics();
+    const repeats = diagnostics.filter((d) => d.id.startsWith('repeat-line|'));
+    // Line 42 in two classes is two loops, not one finding of twelve.
+    expect(repeats.map((d) => d.count)).toEqual([6, 6]);
+    // The frame names which of the two, where line 42 alone would not.
+    expect(repeats.map((d) => d.summary)).toEqual([
+      '6 SOQL statements from Class.A.run(), line 42.',
+      '6 SOQL statements from Class.B.run(), line 42.',
+    ]);
+    expect(repeats[0]?.message).toContain(
+      'Possible SOQL in a loop: it executed 6 times from Class.A.run().',
+    );
+  });
+
+  it('leaves one identical statement from several lines to the repeated-statement rule', async () => {
+    log = apexLog({
+      eventsById: Array.from({ length: 6 }, (_, index) =>
+        soql({
+          eventIndex: index,
+          lineNumber: 40 + index,
+          text: 'SELECT Id FROM Account WHERE Id = :id LIMIT 1',
+          soqlRowCount: { self: 1, total: 1 },
+        } as Partial<LogEvent>),
+      ),
+    });
+
+    const { diagnostics } = await computeLogDiagnostics();
+    expect(diagnostics.some((d) => d.id.startsWith('repeat-text|'))).toBe(true);
+    expect(diagnostics.some((d) => d.id.startsWith('row-at-a-time|'))).toBe(false);
+  });
+
   it('runs the SOQL rules once per distinct query and carries the count', async () => {
     log = apexLog({
       eventsById: Array.from({ length: 3 }, (_, index) =>
@@ -141,8 +411,31 @@ describe('computeLogDiagnostics', () => {
     const unbounded = diagnostics.find((d) => d.summary.startsWith('SOQL is unbounded'));
     expect(unbounded?.count).toBe(3);
     // The rule names a problem; the query it read is what ties it to the grid.
-    expect(unbounded?.evidence).toBe('SELECT Id FROM Account');
+    expect(unbounded?.evidence).toEqual([
+      { text: 'SELECT Id FROM Account', eventIndex: 0, count: 3, dialect: 'soql' },
+    ]);
     expect(lintedQueries).toEqual({ linted: 1, distinct: 1 });
+  });
+
+  it('lists every query a SOQL rule fired on, most repeated first', async () => {
+    // Three queries raise the same rule, each running a different number of times.
+    const texts = ['SELECT Id FROM Account', 'SELECT Id FROM Contact', 'SELECT Id FROM Lead'];
+    log = apexLog({
+      eventsById: texts.flatMap((text, index) =>
+        Array.from({ length: 3 - index }, (_, run) => soql({ eventIndex: index * 3 + run, text })),
+      ),
+    });
+
+    const { diagnostics } = await computeLogDiagnostics();
+    const unbounded = diagnostics.find((d) => d.summary.startsWith('SOQL is unbounded'));
+    // The count is executions across all three, so the list is what reconciles it.
+    expect(unbounded?.count).toBe(6);
+    expect(unbounded?.evidenceTotal).toBe(3);
+    expect(unbounded?.evidence?.map((e) => [e.text, e.count])).toEqual([
+      [texts[0], 3],
+      [texts[1], 2],
+      [texts[2], 1],
+    ]);
   });
 
   it('reads the query plan verdicts, and knows when there are none', async () => {
@@ -163,9 +456,9 @@ describe('computeLogDiagnostics', () => {
       ['Query is not selective.', 'Account'],
       ['Full table scan.', 'Account'],
     ]);
-    expect(diagnostics.map((d) => d.evidence)).toEqual([
-      'SELECT Id FROM Account LIMIT 1',
-      'SELECT Id FROM Account LIMIT 1',
+    expect(diagnostics.map((d) => d.evidence?.map((e) => e.text))).toEqual([
+      ['SELECT Id FROM Account LIMIT 1'],
+      ['SELECT Id FROM Account LIMIT 1'],
     ]);
     // The query is the row to reveal, not the plan line under it (eventIndex 1).
     expect(diagnostics.map((d) => d.eventIndex)).toEqual([0, 0]);
@@ -176,25 +469,40 @@ describe('computeLogDiagnostics', () => {
     expect((await computeLogDiagnostics()).queryPlansKnown).toBe(false);
   });
 
-  it('frames a truncated log rather than listing it as a finding', async () => {
+  it('heads the findings with a truncated log, ahead of the other issues', async () => {
     log = apexLog({
       logIssues: [
-        {
-          summary: 'Max-Size-reached',
-          description: 'The maximum log size has been reached. Part of the log has been truncated.',
-          type: 'skip',
-        },
         {
           summary: 'Unexpected-End',
           description: 'An entry event was found without a corresponding exit event',
           type: 'unexpected',
         },
+        {
+          summary: 'Max-Size-reached',
+          description: 'The maximum log size has been reached. Part of the log has been truncated.',
+          type: 'skip',
+        },
       ],
     });
 
-    const { diagnostics, truncation } = await computeLogDiagnostics();
-    expect(truncation).toContain('maximum log size');
-    expect(diagnostics.map((d) => d.summary)).toEqual(['Unexpected-End']);
+    const { diagnostics } = await computeLogDiagnostics();
+    expect(diagnostics.map((d) => d.summary)).toEqual(['Log truncated', 'Unexpected-End']);
+    expect(diagnostics[0]?.severity).toBe('Error');
+    expect(diagnostics[0]?.meta).toBeUndefined();
+    expect(diagnostics[0]?.message).toContain('may be undercounted');
+  });
+
+  it('sums the bytes the log said it skipped, over every skipped region', async () => {
+    const skipped = (bytes: string) => ({
+      summary: 'Skipped-Lines',
+      description: `*** Skipped ${bytes} bytes of detailed log. A section of the log has been skipped and the log has been truncated.`,
+      type: 'skip' as const,
+    });
+    log = apexLog({ logIssues: [skipped('1,000,000'), skipped('2,000,000')] });
+
+    const { diagnostics } = await computeLogDiagnostics();
+    expect(diagnostics[0]?.summary).toBe('Log truncated in 2 places');
+    expect(diagnostics[0]?.meta).toBe('3 MB');
   });
 
   it('groups exceptions by their text, counting the throws', async () => {
@@ -230,7 +538,7 @@ describe('computeLogDiagnostics', () => {
     expect(diagnostics).toHaveLength(1);
     expect(diagnostics[0]?.summary).toBe(message);
     expect(diagnostics[0]?.count).toBe(2);
-    expect(diagnostics[0]?.evidence).toBe('Class.A.run: line 31, column 1');
+    expect(diagnostics[0]?.evidence?.[0]?.text).toBe('Class.A.run: line 31, column 1');
   });
 
   it('marks an exception nothing caught', async () => {
@@ -254,7 +562,7 @@ describe('computeLogDiagnostics', () => {
     const namespaceLimits = emptyLimits();
     namespaceLimits.cpuTime = { used: 15_163, limit: 10_000 };
     log = apexLog({
-      namespaceLimits,
+      namespaceLimits: { default: namespaceLimits },
       exceptions: [
         event({ type: 'EXCEPTION_THROWN', eventIndex: 4, text: message }),
         event({
@@ -270,7 +578,7 @@ describe('computeLogDiagnostics', () => {
     expect(diagnostics[0]?.summary).toBe('CPU Time limit exceeded.');
     expect(diagnostics[0]?.meta).toBe('15,163 ms / 10,000 ms');
     expect(diagnostics[0]?.eventIndex).toBe(4);
-    expect(diagnostics[0]?.evidence).toBe('Class.A.run: line 31, column 1');
+    expect(diagnostics[0]?.evidence?.[0]?.text).toBe('Class.A.run: line 31, column 1');
   });
 
   it('still reports a limit exception when the log holds no cumulative totals', async () => {
@@ -294,7 +602,7 @@ describe('computeLogDiagnostics', () => {
     const namespaceLimits = emptyLimits();
     namespaceLimits.cpuTime = { used: 15_163, limit: 10_000 };
     log = apexLog({
-      namespaceLimits,
+      namespaceLimits: { default: namespaceLimits },
       eventsById: [
         event({ type: 'METHOD_ENTRY', text: 'Slow.run()', duration: { self: 9e9, total: 9e9 } }),
         event({ type: 'METHOD_ENTRY', text: 'Fast.run()', duration: { self: 1e9, total: 1e9 } }),
@@ -345,7 +653,7 @@ describe('computeLogDiagnostics', () => {
     const namespaceLimits = emptyLimits();
     namespaceLimits.cpuTime = { used: 9_000, limit: 10_000 };
     log = apexLog({
-      namespaceLimits,
+      namespaceLimits: { default: namespaceLimits },
       exceptions: [event({ text: 'System.QueryException: List has no rows' })],
       eventsById: Array.from({ length: 50 }, (_, index) =>
         event({ type: 'USER_DEBUG', eventIndex: index, text: 'DEBUG|hello' }),

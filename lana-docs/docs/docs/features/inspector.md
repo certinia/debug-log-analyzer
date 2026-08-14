@@ -41,7 +41,7 @@ With no selection the inspector shows the whole log. Every tab starts with a **L
 
 The **Analysis** tab adds:
 
-- **Findings** – what is slow or wrong in the log, and what to do about it. One pass over the log reports truncation (which makes every figure below it an undercount), governor breaches, exceptions, query-plan verdicts, SOQL optimization tips, statements repeated from one line — the usual sign of a query or DML in a loop — debug-statement cost, and the methods with the most self time. Query-plan verdicts need a `FINEST` log; without one the pane says the verdicts are unknown rather than reading clean. Each finding shows the code the log named with its figures; click it to reveal the row behind it in the Analysis grid.
+- **Findings** – what is slow or wrong in the log, and what to do about it. One pass over the log reports truncation, which heads the list because every figure below it may then be undercounted, governor usage at its peak against its limit — only where the log carries its cumulative totals, and an error only where the log says the governor stopped the transaction — exceptions, query-plan verdicts, SOQL optimization tips, statements repeated from one call site, one query built per record and run a row at a time — the usual sign of a query in a loop — debug-statement cost, and the methods with the most self time. Query-plan verdicts need a `FINEST` log; without one the pane says the verdicts are unknown rather than reading clean. Each finding lists the code the log named, most repeated first with how many times each ran and how many there are in all; click a statement to reveal the row behind it in the Analysis grid.
 
 The **Call Tree** tab adds:
 

@@ -20,6 +20,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - **Nothing selected** shows the whole log instead of an empty panel: a governor overview on every tab, time by category and governor trends on the Timeline, log-wide findings on Analysis, and the hot path and hot spots on the Call Tree.
   - Every row is a link: click it to reveal the frame, row or statement behind it in the tab you're on. Hover works both ways without moving the view — hover a row to pick out what it names in the tab you're on, or hover there to mark the rows that name it, and what you click stays picked out until `Escape`. Right-click for copy actions.
   - Dock it left, right or bottom, drag to resize any section — double-click a divider to restore the defaults — and collapse the sections you don't need; the layout is remembered. `Escape` clears the selection and returns the whole-log view. ([#63])
+- 🔁 **Row-at-a-time finding**: Analysis reports one query built per record and run a row at a time.
+- 🔍 **Finding evidence**: each Analysis finding lists the statements behind it, most repeated first, with how often each ran and how many there are in all; click one to open it in the grid.
 - 🗄️ **Database Analysis**: governor-limit visibility and SOSL usage. ([#162])
   - 📏 **Governor-limit overview**: SOQL, SOSL, DML and query/DML rows shown as `used / limit`, colored as they approach the limit.
   - 🧮 **Found vs Counted**: each section reconciles statements found in the log against the governor-counted total, flagging queries that didn't consume the limit (e.g. custom metadata, which is free unless it selects a long text area field or runs in a Flow).

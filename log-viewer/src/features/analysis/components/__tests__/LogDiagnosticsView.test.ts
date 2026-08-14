@@ -11,7 +11,6 @@ jest.mock('#vscode-elements/vscode-icon.js', () => ({}));
 
 let result: LogDiagnostics = {
   diagnostics: [],
-  truncation: null,
   queryPlansKnown: true,
   lintedQueries: { linted: 0, distinct: 0 },
 };
@@ -40,7 +39,6 @@ describe('log-diagnostics', () => {
     document.body.replaceChildren();
     result = {
       diagnostics: [],
-      truncation: null,
       queryPlansKnown: true,
       lintedQueries: { linted: 0, distinct: 0 },
     };
@@ -86,7 +84,7 @@ describe('log-diagnostics', () => {
         message: 'why',
         count: 2,
         eventIndex: 1,
-        evidence: 'Class.A.run: line 31, column 1',
+        evidence: [{ text: 'Class.A.run: line 31, column 1', eventIndex: 1 }],
       },
     ];
     const element = await view();
@@ -95,6 +93,59 @@ describe('log-diagnostics', () => {
       'System.LimitException: Apex CPU time limit exceeded',
     ]);
     expect(text(element, '.evidence')).toEqual(['Class.A.run: line 31, column 1']);
+  });
+
+  it('lists a line per statement when the finding names several', async () => {
+    result.diagnostics = [
+      {
+        id: 'a',
+        severity: 'Warning',
+        summary: '23 Contact queries, one row at a time.',
+        message: 'why',
+        count: 23,
+        eventIndex: 4,
+        evidence: [
+          { text: "SELECT Id FROM Contact WHERE Id = '003a'", eventIndex: 4 },
+          { text: "SELECT Id FROM Contact WHERE Id = '003b'", eventIndex: 9 },
+        ],
+      },
+    ];
+    const element = await view();
+    const seen: number[] = [];
+    element.addEventListener('inspector-reveal', (e) => {
+      seen.push((e as CustomEvent<{ eventIndex: number }>).detail.eventIndex);
+    });
+
+    // Each statement is its own way back into the grid.
+    expect(text(element, '.evidence')).toEqual([
+      "SELECT Id FROM Contact WHERE Id = '003a'",
+      "SELECT Id FROM Contact WHERE Id = '003b'",
+    ]);
+    element.shadowRoot!.querySelectorAll<HTMLButtonElement>('.evidence--link')[1]?.click();
+    expect(seen).toEqual([9]);
+  });
+
+  it('heads a listed set with how many there are, and counts each line', async () => {
+    result.diagnostics = [
+      {
+        id: 'a',
+        severity: 'Warning',
+        summary: '23 Contact queries, one row at a time.',
+        message: 'why',
+        count: 23,
+        eventIndex: 4,
+        evidence: [
+          { text: "SELECT Id FROM Contact WHERE Id = '003a'", eventIndex: 4, count: 3 },
+          { text: "SELECT Id FROM Contact WHERE Id = '003b'", eventIndex: 9, count: 1 },
+        ],
+        evidenceTotal: 11,
+      },
+    ];
+    const element = await view();
+
+    expect(text(element, '.evidence__head')).toEqual(['2 of 11 statements, most repeated first.']);
+    // One run is the norm here, so only a repeat is worth a figure.
+    expect(text(element, '.evidence__count')).toEqual(['3×']);
   });
 
   it('states the cause as figures, not as prose', async () => {
@@ -125,7 +176,7 @@ describe('log-diagnostics', () => {
         message: 'why',
         count: 1,
         eventIndex: 7,
-        evidence: 'SELECT Id FROM Account',
+        evidence: [{ text: 'SELECT Id FROM Account', eventIndex: 7 }],
       },
     ];
     const element = await view();
@@ -148,7 +199,7 @@ describe('log-diagnostics', () => {
         message: 'why',
         count: 1,
         eventIndex: -1,
-        evidence: 'System.debug',
+        evidence: [{ text: 'System.debug', eventIndex: -1 }],
       },
     ];
     const element = await view();
@@ -174,16 +225,10 @@ describe('log-diagnostics', () => {
     );
   });
 
-  it('heads the pane with the truncation note', async () => {
-    result.truncation = 'The maximum log size has been reached.';
-    const element = await view();
-    expect(text(element, '.truncated')).toEqual(['The maximum log size has been reached.']);
-  });
-
   it('reports absent query plans rather than leaving the queries looking clean', async () => {
     result.queryPlansKnown = false;
     const element = await view();
-    expect(text(element, '.note').join(' ')).toContain('no query plans');
+    expect(text(element, '.note').join(' ')).toContain('Database log level at FINEST');
   });
 
   it('reports how much of the log the SOQL rules covered when they were capped', async () => {
