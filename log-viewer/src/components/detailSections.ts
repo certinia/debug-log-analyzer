@@ -9,6 +9,8 @@ import type { PaneSection } from './PaneView.js';
 
 // web components
 import '../features/analysis/components/LogDiagnosticsView.js';
+import '../features/database/components/DatabaseOverview.js';
+import '../features/database/components/DatabaseTimeTree.js';
 import './CallStackDetail.js';
 import './CallTreeDetail.js';
 import './CategoryTimeBar.js';
@@ -25,8 +27,9 @@ import './LogOverview.js';
  * {@link buildDatabaseSections}.
  *
  * With nothing selected every source gets the whole-log analogue of what its tab
- * does: the shared **Log overview**, plus the sections that tab can answer at log
- * scope. Analysis adds **Findings**; the Timeline adds its charts and the
+ * does: the shared **Overview**, plus the sections that tab can answer at log
+ * scope. Analysis adds **Findings**; the Database tab adds its whole-log
+ * database figures; the Timeline adds its charts and the
  * whole-log call tree; the Call Tree adds the **Hot path** and **Hot spots** —
  * clickable routes into the tree it sits beside.
  *
@@ -50,8 +53,7 @@ export async function buildDetailSections(
     const sections: PaneSection[] = [
       {
         id: 'overview',
-        title: 'Log overview',
-        icon: 'pie-chart',
+        title: 'Overview',
         fit: 'content',
         content: html`<log-overview></log-overview>`,
       },
@@ -61,14 +63,12 @@ export async function buildDetailSections(
         {
           id: 'hot-path',
           title: 'Hot path',
-          icon: 'flame',
           fit: 'content',
           content: html`<hot-path></hot-path>`,
         },
         {
           id: 'hot-spots',
           title: 'Hot spots',
-          icon: 'dashboard',
           fit: 'content',
           content: html`<hot-spots></hot-spots>`,
         },
@@ -78,9 +78,35 @@ export async function buildDetailSections(
       sections.push({
         id: 'findings',
         title: 'Findings',
-        icon: 'checklist',
         content: html`<log-diagnostics></log-diagnostics>`,
       });
+    }
+    if (source === 'database') {
+      // The Database tab's whole-log analogue, widest question first: whose code
+      // holds the database time, which call paths reach it, and how few
+      // statements it comes down to.
+      sections.push(
+        {
+          id: 'database-namespaces',
+          title: 'Namespace duration',
+          fit: 'content',
+          content: html`<database-namespaces></database-namespaces>`,
+        },
+        {
+          // A grid sized to the pane it is in, so this section takes the space
+          // the sized-to-content ones leave.
+          id: 'database-time',
+          title: 'Call tree',
+          weight: 4,
+          content: html`<database-time></database-time>`,
+        },
+        {
+          id: 'database-concentration',
+          title: 'Database duration',
+          fit: 'content',
+          content: html`<database-concentration></database-concentration>`,
+        },
+      );
     }
     if (source === 'timeline') {
       // The Timeline's whole-log analogue: where the time went (by category and
@@ -89,14 +115,12 @@ export async function buildDetailSections(
         {
           id: 'category-time',
           title: 'Time by category',
-          icon: 'pie-chart',
           fit: 'content',
           content: html`<category-time-bar></category-time-bar>`,
         },
         {
           id: 'governor-trends',
           title: 'Governor usage over time',
-          icon: 'graph',
           fit: 'content',
           content: html`<governor-trends></governor-trends>`,
         },

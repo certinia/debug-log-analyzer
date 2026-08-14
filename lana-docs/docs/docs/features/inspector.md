@@ -20,39 +20,27 @@ hide_title: true
 
 Select anything — a Timeline frame, a Call Tree or Analysis row, a SOQL/DML/SOSL statement — and the inspector shows it in depth without you leaving the tab you're working in.
 
-It docks to the **right**, **left** or **bottom**, resizes by dragging its edge, and is toggled from the button in the header. It opens automatically on your first selection, then stays however you left it, including the next time you open a log. See [Settings](../settings.mdx#inspector).
+It docks to the **right**, **left** or **bottom**, resizes by dragging its edge, and is toggled from the button in the header. It opens on your first selection, then stays however you left it, including the next time you open a log. See [Settings](../settings.mdx#inspector).
 
 ### Sections
 
-- **Details** – The selection's type and timing, plus every governor metric it consumed as `used / limit` (SOQL, DML, SOSL, rows, heap net/gross/peak, throws). Zero-valued metrics are omitted, so what's left is what the statement actually did. SOQL and SOSL text is syntax highlighted with a copy button. For a SOQL statement it also reports **selectivity**, the **query plan** (leading operation, SObject type, indexed fields) and **cardinality**.
-- **Call stack** – The parent frames that led to the selection, outermost first, with total and self time as a percentage of the enclosing frame. Sortable.
-- **Call tree** – The selection scoped within its own execution, switchable between **Time Order**, **Aggregated** and **Bottom-Up** (as in the Chrome DevTools performance panel). Totals are relative to the selection, so a DML that fires triggers shows the triggered work beneath it. This scoping is what makes it different from the [Call Tree](./calltree.mdx) tab, which always shows the whole log. Zero-duration rows — heap allocations, statements, variable assignments — are left out; read those on the [Call Tree](./calltree.mdx) tab.
-- **SOQL issues** – SOQL only: optimization tips describing the query's performance and how to improve it.
+- **Details** – timing, plus every governor metric the selection consumed as `used / limit`. For SOQL also selectivity, query plan and cardinality, with the query text highlighted and copyable.
+- **Call stack** – the parent frames that led to the selection, outermost first, with total and self time.
+- **Call tree** – the selection's own execution in **Time Order**, **Aggregated** or **Bottom-Up**, scoped to the selection rather than the whole log like the [Call Tree](./calltree.mdx) tab.
+- **SOQL issues** – SOQL only: optimization tips for the query.
 
-Collapse any section by clicking its header, or drag the divider between two to resize them; double-click a divider to restore the default sizes. It's one panel, so your layout follows you from tab to tab, and is restored next time.
+Collapse a section by clicking its header, drag a divider to resize two of them, double-click a divider to restore the default sizes. It's one panel, so your layout follows you from tab to tab.
 
 ### Nothing selected
 
-With no selection the inspector shows the whole log. Every tab starts with a **Log overview** — the six governor metrics closest to their limit, each as `used / limit`, the same whole-transaction totals the timeline's metric strip shows. When the log has no `CUMULATIVE_LIMIT_USAGE` events the figures are estimated from the logged events instead, and a note says so. The **Timeline** tab adds:
+With nothing selected the inspector reads the whole log. Every tab opens with an **Overview** — the six governor metrics closest to their limit — then adds what its own tab can answer at log scope:
 
-- **Time by category** – the log's self time as one stacked bar, in the flame chart's own colours, with a legend. Self time, so the bar always totals the log.
-- **Governor usage over time** – small area charts of the metrics nearest their limits, drawn from the same data as the timeline's metric strip: `CUMULATIVE_LIMIT_USAGE` snapshots plus the log's own SOQL, DML and heap events. Without snapshots the figures are estimated. Hover a chart to read the value at any point in the log.
-- **Call tree** – every root event in the log, in the same three views as the scoped tree.
+- **Timeline** – time by category, governor usage over time, and the whole-log call tree.
+- **Call Tree** – the **hot path** the log spent its time in, and the **hot spots** with the most self time.
+- **Database** – **Namespace duration**: **Called from namespace** — the namespace that issued the statement — and, when they differ, **Ran in namespace**, the namespaces of whatever ran beneath it, such as a package trigger firing on your DML. **Call tree**: every call path that ends in a query, DML or search, with **Total Time** — the database time at or below the row — beside **Self Time**, the row's own code. A row with all total and no self is waiting on the database; the reverse is the Apex around it. **Database duration**: how few statements hold the time, with cost per row, how often each ran, and its duration split into self time and descendants, so a DML that is cheap in itself but fires seven seconds of triggers reads as one.
+- **Analysis** – **Findings**: what is slow or wrong in the log, and what to do about it.
 
-The **Analysis** tab adds:
-
-- **Findings** – what is slow or wrong in the log, and what to do about it. One pass over the log reports truncation (which makes every figure below it an undercount), governor breaches, exceptions, query-plan verdicts, SOQL optimization tips, statements repeated from one line — the usual sign of a query or DML in a loop — debug-statement cost, and the methods with the most self time. Query-plan verdicts need a `FINEST` log; without one the pane says the verdicts are unknown rather than reading clean. Each finding shows the code the log named with its figures; click it to reveal the row behind it in the Analysis grid.
-
-The **Call Tree** tab adds:
-
-- **Hot path** – the chain of calls the log spent most of its time in, entry point first. At each step, calls with the same signature count as one, so a method called 200 times shows once with a `200×` count. The path follows the biggest of these and stops where the time spreads out or a call's own work outweighs its children; every frame shows its time and share of the log. A truncated log heads the path with a warning, because timings below a cut-off call under-report.
-- **Hot spots** – the five signatures with the most self time across the whole log, each with its share of the log, plus its call count and average self time per call where it ran more than once. The average names the churn a self-time ranking hides: a cheap method called thousands of times.
-
-Rows in both sections carry a swatch in the flame chart's colour for their category, and a meter with two tones — solid for the time the call spent itself, faded for the time it spent in its children. A change of timeline theme repaints them.
-
-Every row in both sections is a link: click it to reveal that call in the tree (Time Order view).
-
-Select a row and the sections re-scope to it; deselect and the whole-log view returns.
+Every figure comes from the log itself, so a truncated log, a log without `Rows:` or one without `CUMULATIVE_LIMIT_USAGE` reports less rather than guessing, and says so. Ranked sections list their top eight and account for the rest in a final row. Select a row and every section re-scopes to it.
 
 ### Row actions
 

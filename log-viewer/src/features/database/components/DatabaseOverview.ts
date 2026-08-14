@@ -1,0 +1,441 @@
+/*
+ * Copyright (c) 2026 Certinia Inc. All rights reserved.
+ */
+import { LitElement, css, html, unsafeCSS, type TemplateResult } from 'lit';
+import { customElement } from 'lit/decorators.js';
+import { styleMap } from 'lit/directives/style-map.js';
+
+import { CategoryPaletteController } from '../../../components/categoryTime.js';
+import {
+  dispatchInspectorLocate,
+  dispatchInspectorReveal,
+} from '../../../components/inspectorReveal.js';
+import '../../../components/StackedTimeBar.js';
+import type { StackedSegment } from '../../../components/StackedTimeBar.js';
+import { LogLoadedController } from '../../../core/events/LogLoadedController.js';
+import { formatDuration, formatInteger } from '../../../core/utility/Util.js';
+import { globalStyles } from '../../../styles/global.styles.js';
+import { inspectorSectionStyles } from '../../../styles/inspectorSection.styles.js';
+import { revealRowStyles } from '../../../styles/revealRow.styles.js';
+import type { SoqlBudget } from '../../soql/format/budget.js';
+import { formatSOQLToTemplate } from '../../soql/format/formatter.js';
+import { soqlSyntaxStyles } from '../../soql/styles/soql-syntax.css.js';
+import {
+  concentration,
+  currentDatabaseOverview,
+  type DatabaseBreakdown,
+  type DatabaseOverview as Overview,
+  type DatabaseStatement,
+  NO_STATEMENTS,
+  type StatementKind,
+} from '../services/databaseOverview.js';
+
+/**
+ * How many rows a ranked section shows before it defers to the grids beside it.
+ * These sections are a springboard: the sortable, complete view is the tab.
+ */
+const MAX_ROWS = 8;
+
+/**
+ * The room a statement label has. Lines are clauses, not display lines: the row
+ * is one line whatever this holds, so the budget buys elisions — `+8 fields`,
+ * `… +2 conditions` — over a raw query cut off mid-word.
+ */
+const LABEL_BUDGET: SoqlBudget = { lines: 3, columns: 40 };
+
+/** The rows a ranked section shows, and the ones it leaves to the grids. */
+function topRows<T>(rows: readonly T[]): { shown: readonly T[]; rest: readonly T[] } {
+  return { shown: rows.slice(0, MAX_ROWS), rest: rows.slice(MAX_ROWS) };
+}
+
+/**
+ * A share. One decimal below 100 and none at exactly 100, so 99.9% is never
+ * rounded into a claim that something holds everything.
+ */
+function shareText(percent: number): string {
+  return percent >= 100 ? '100%' : `${percent.toFixed(1)}%`;
+}
+
+/**
+ * The three kinds in the flame chart's own colours. The parser categorises a
+ * search as SOQL, so SOSL has no hue of its own: it shows as a tint of the query
+ * hue, which keeps these graphics truthful against the chart.
+ */
+function kindColors(palette: CategoryPaletteController): Record<StatementKind, string> {
+  const soql = palette.colorFor('SOQL');
+  return {
+    SOQL: soql,
+    DML: palette.colorFor('DML'),
+    SOSL: `color-mix(in srgb, ${soql} 55%, transparent)`,
+  };
+}
+
+/**
+ * The namespace scale. Namespaces are names, not amounts, so they need telling
+ * apart and nothing more: a fixed colourblind-safe set (Okabe-Ito), literal
+ * because it is data and must not follow the host theme. A namespace's read and
+ * write split is on its own line instead, where it can be read exactly.
+ */
+const NAMESPACE_COLORS = [
+  '#0072b2',
+  '#d55e00',
+  '#009e73',
+  '#cc79a7',
+  '#e69f00',
+  '#56b4e9',
+  '#aa4499',
+  '#44aa99',
+] as const;
+
+const sectionStyles = [
+  globalStyles,
+  inspectorSectionStyles,
+  css`
+    .note {
+      padding: var(--lana-space-2xs) 0 0;
+    }
+  `,
+];
+
+/**
+ * Which statements own the database time. The grids sort by duration, but not by
+ * what makes a statement worth fixing: this ranks by self time, so a query
+ * inside a DML trigger is credited to itself and not to the DML, sums every time
+ * the log ran the same statement into one row, and gives each row the figures no
+ * grid holds — its cost per row it touched, how many times it ran, and how much
+ * of its duration is really the statements inside it.
+ *
+ * The meter is the statement's whole share of database time, solid up to its own
+ * self share, so a DML that is really a nested query reads as one at a glance.
+ */
+@customElement('database-concentration')
+export class DatabaseConcentration extends LitElement {
+  private readonly _palette = new CategoryPaletteController(this);
+  private readonly _logLoaded = new LogLoadedController(this);
+
+  static styles = [
+    ...sectionStyles,
+    revealRowStyles,
+    unsafeCSS(soqlSyntaxStyles),
+    css`
+      /* The sub line sheds parts by the dock's width, not the window's. */
+      :host {
+        container-type: inline-size;
+      }
+
+      /* Shed from the least telling: the database's share of the descendant time,
+         then the repeat count, then the cost per row. The share and the
+         self-against-descendants split are the row's point, so they always stay. */
+      @container (max-width: 22rem) {
+        .sub__database {
+          display: none;
+        }
+      }
+
+      @container (max-width: 19rem) {
+        .sub__repeats {
+          display: none;
+        }
+      }
+
+      @container (max-width: 16rem) {
+        .sub__rows {
+          display: none;
+        }
+      }
+
+      .headline {
+        margin: 0;
+        padding-bottom: var(--lana-space-xs);
+        font-size: var(--lana-text-sm);
+      }
+
+      .headline__figure {
+        color: var(--lana-fg);
+        font-family: var(--lana-font-mono);
+        font-variant-numeric: tabular-nums;
+      }
+
+      /* The tail: what every statement past the rows above holds, together. */
+      .tail {
+        display: flex;
+        gap: var(--lana-space-sm);
+        padding-top: var(--lana-space-2xs);
+        color: var(--lana-fg-muted);
+        font-size: var(--lana-text-sm);
+      }
+
+      .tail__value {
+        margin-left: auto;
+        font-family: var(--lana-font-mono);
+        font-variant-numeric: tabular-nums;
+      }
+    `,
+  ];
+
+  render() {
+    const overview = currentDatabaseOverview();
+    if (!overview?.ranked.length) {
+      return html`<p class="note">${NO_STATEMENTS}</p>`;
+    }
+    const { count, percent, total } = concentration(overview);
+    const { shown, rest } = topRows(overview.ranked);
+    const colors = kindColors(this._palette);
+    const databaseNs = overview.time.timeNs;
+    const shownNs = shown.reduce((running, statement) => running + statement.netNs, 0);
+
+    return html`
+      <p class="headline">
+        <span class="headline__figure">${formatInteger(count)}</span>
+        of
+        <span class="headline__figure">${formatInteger(total)}</span>
+        statement${total === 1 ? '' : 's'} ·
+        <span class="headline__figure">${shareText(percent)}</span>
+        of DB time ·
+        <span class="headline__figure">${shareText(overview.time.percentOfLog)}</span>
+        of log
+      </p>
+      ${shown.map((statement) => this._row(statement, databaseNs, colors))}
+      ${
+        rest.length > 0
+          ? html`<p class="tail">
+              <span>the other ${formatInteger(rest.length)} statements</span>
+              <span class="tail__value"
+                >${shareText(sharePercent(databaseNs - shownNs, databaseNs))}</span
+              >
+            </p>`
+          : ''
+      }
+    `;
+  }
+
+  private _row(
+    statement: DatabaseStatement,
+    databaseNs: number,
+    colors: Record<StatementKind, string>,
+  ) {
+    const own = sharePercent(statement.netNs, databaseNs);
+    return html`
+      <button
+        class="bleed-row reveal-row reveal-row--no-swatch"
+        type="button"
+        title=${rowTitle(statement)}
+        style=${styleMap({
+          '--row-hue': colors[statement.kind],
+          // Solid to the statement's self time, faded on to its total: the gap is
+          // its descendants.
+          '--self-pct': `${sharePercent(statement.selfNs, statement.timeNs).toFixed(1)}%`,
+        })}
+        @click=${() => dispatchInspectorReveal(this, statement.eventIndex)}
+        @pointerenter=${() => dispatchInspectorLocate(this, statement.eventIndexes)}
+        @pointerleave=${() => dispatchInspectorLocate(this, [])}
+      >
+        <span class="reveal-row__sr">${statement.kind}</span>
+        <span class="reveal-row__name" title=${statement.label}>${statementLabel(statement)}</span>
+        <span class="reveal-row__value reveal-row__value--primary"
+          >${formatDuration(statement.timeNs)}</span
+        >
+        <span class="reveal-row__sub">${subLine(statement, own)}</span>
+        <span class="reveal-row__meter"
+          ><span
+            class="reveal-row__meter-fill"
+            style=${styleMap({ width: `${sharePercent(statement.timeNs, databaseNs)}%` })}
+          ></span
+        ></span>
+      </button>
+    `;
+  }
+}
+
+/**
+ * Database time split across namespaces, as one bar per question with a row per
+ * namespace beneath it. Whose code holds the time — yours or a package's — is
+ * the thing to dig into; the grids hold one statement kind each, so none of them
+ * can be read across the three.
+ *
+ * Two bars, because a DML and the time it takes belong to different people. The
+ * first charges every statement to the namespace that issued it. The second
+ * charges whatever ran beneath it to its own namespace. A package whose trigger
+ * fires on your DML shows up only in the second, which is the finding. They are
+ * the same bar when nothing runs inside the statements, so the second is shown
+ * only when it says something new.
+ *
+ * Each namespace keeps one colour across both bars, and each row names its three
+ * kinds, so a namespace worth digging into says which grid to open.
+ */
+@customElement('database-namespaces')
+export class DatabaseNamespaces extends LitElement {
+  private readonly _logLoaded = new LogLoadedController(this);
+
+  static styles = [
+    ...sectionStyles,
+    css`
+      .bar + .bar {
+        padding-top: var(--lana-space-sm);
+      }
+
+      .bar__title {
+        padding-bottom: var(--lana-space-2xs);
+        font-size: var(--lana-text-sm);
+      }
+    `,
+  ];
+
+  render() {
+    const overview = currentDatabaseOverview();
+    if (!overview?.askedBy.length) {
+      return html`<p class="note">${NO_STATEMENTS}</p>`;
+    }
+    const colors = namespaceColors(overview);
+    const asked = this._bar('Called from namespace', overview.askedBy, colors);
+    // Identical bars would read as a finding where there is none.
+    if (sameSplit(overview.askedBy, overview.burnedIn)) {
+      return asked;
+    }
+    return html`${asked} ${this._bar('Ran in namespace', overview.burnedIn, colors)}`;
+  }
+
+  private _bar(title: string, namespaces: DatabaseBreakdown[], colors: Map<string, string>) {
+    const { shown, rest } = topRows(namespaces);
+    const segments: StackedSegment[] = shown.map((row) => ({
+      label: row.key,
+      timeNs: row.timeNs,
+      color: colors.get(row.key) ?? NAMESPACE_COLORS[0],
+      detail: kindSplit(row),
+    }));
+    // The tail is one segment, so the bar still totals the database time.
+    if (rest.length > 0) {
+      segments.push({
+        label: `${formatInteger(rest.length)} others`,
+        timeNs: rest.reduce((running, row) => running + row.timeNs, 0),
+        color: 'var(--lana-fg-muted)',
+      });
+    }
+
+    return html`
+      <div class="bar">
+        <p class="bar__title">${title}</p>
+        <stacked-time-bar legend legendRows label=${title} .segments=${segments}></stacked-time-bar>
+      </div>
+    `;
+  }
+}
+
+/** Whether two breakdowns hold the same namespaces for the same time. */
+function sameSplit(left: DatabaseBreakdown[], right: DatabaseBreakdown[]): boolean {
+  return (
+    left.length === right.length &&
+    left.every((row, index) => row.key === right[index]?.key && row.timeNs === right[index]?.timeNs)
+  );
+}
+
+/** `part` as a percentage of `whole`, or zero when there is no whole. */
+function sharePercent(part: number, whole: number): number {
+  return whole > 0 ? (part / whole) * 100 : 0;
+}
+
+/**
+ * The statement, highlighted and elided to fit one row. A DML names an operation
+ * and an object, so it has nothing to highlight.
+ */
+function statementLabel(statement: DatabaseStatement): TemplateResult | string {
+  if (statement.kind === 'DML') {
+    return statement.label;
+  }
+  return html`<span class="soql-block soql-inline"
+    >${formatSOQLToTemplate(statement.label, {
+      mode: 'pretty',
+      dialect: statement.kind === 'SOSL' ? 'sosl' : 'soql',
+      budget: LABEL_BUDGET,
+    })}</span
+  >`;
+}
+
+/**
+ * What the row's time is a share of, then the figures a grid row cannot give:
+ * how its duration splits into `self` and `desc` — the statement's own time
+ * against everything beneath it — what it cost per row it touched, which names a
+ * selectivity problem, how often it ran, which names a query in a loop, and how
+ * much of `desc` the database itself did.
+ *
+ * One line always, so the section stays scannable. Each part carries its own
+ * separator, so a narrow dock drops whole parts by container width instead of
+ * cutting a figure in half; the reveal title keeps the full reading.
+ */
+function subLine(statement: DatabaseStatement, ownPercent: number): TemplateResult {
+  const perRow = statement.rows > 0 ? statement.netNs / statement.rows / 1_000_000 : 0;
+  // Self is the total twice over when nothing ran inside the statement.
+  const descendantNs = statement.timeNs - statement.selfNs;
+  const databaseNs = statement.timeNs - statement.netNs;
+
+  return html`<span>${shareText(ownPercent)}</span>${
+      descendantNs > 0
+        ? html`<span class="sub__split">
+            · ${formatDuration(statement.selfNs)} self · ${formatDuration(descendantNs)} desc</span
+          >`
+        : ''
+    }<span class="sub__rows">
+      ·
+      ${
+        statement.rows > 0
+          ? `${perRow.toFixed(perRow < 1 ? 2 : 1)} ms/row`
+          : // The cost is real and the rows are not there: say so, rather than
+            // divide by a row the log never recorded.
+            'no rows'
+      }</span
+    >${
+      statement.repeats > 1
+        ? html`<span class="sub__repeats"> · ran ${formatInteger(statement.repeats)}×</span>`
+        : ''
+    }${
+      databaseNs > 0
+        ? html`<span class="sub__database"> · ${formatDuration(databaseNs)} db</span>`
+        : ''
+    }`;
+}
+
+/** The whole reading, for a row a narrow dock has shortened. */
+function rowTitle(statement: DatabaseStatement): string {
+  const databaseNs = statement.timeNs - statement.netNs;
+  const parts = ['Show this statement in the grid'];
+  if (databaseNs > 0) {
+    parts.push(`${formatDuration(databaseNs)} of the descendant time is database time`);
+  }
+  return parts.join(' · ');
+}
+
+/** `SOQL 1.2s · DML 340ms` — the kinds a namespace spent its time in. */
+function kindSplit(row: DatabaseBreakdown): string {
+  return (
+    [
+      ['SOQL', row.soqlTimeNs],
+      ['DML', row.dmlTimeNs],
+      ['SOSL', row.soslTimeNs],
+    ] as const
+  )
+    .filter(([, timeNs]) => timeNs > 0)
+    .map(([kind, timeNs]) => `${kind} ${formatDuration(timeNs)}`)
+    .join(' · ');
+}
+
+/**
+ * A colour per namespace, the same one on both bars, so a namespace that moves
+ * between them is followed by eye. Longest first, so the scale runs in the order
+ * the bars do.
+ */
+function namespaceColors(overview: Overview): Map<string, string> {
+  const colors = new Map<string, string>();
+  for (const { key } of [...overview.askedBy, ...overview.burnedIn]) {
+    if (!colors.has(key)) {
+      colors.set(key, NAMESPACE_COLORS[colors.size % NAMESPACE_COLORS.length]!);
+    }
+  }
+  return colors;
+}
+
+declare global {
+  interface HTMLElementTagNameMap {
+    'database-concentration': DatabaseConcentration;
+    'database-namespaces': DatabaseNamespaces;
+  }
+}
