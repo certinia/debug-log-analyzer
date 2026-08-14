@@ -117,11 +117,44 @@ describe('buildDetailSections', () => {
       instances: [11, 12, 13],
       label: 'MyClass.run()',
     });
-    expect(sections.map((s) => s.id)).toEqual(['vitals', 'callstack', 'calltree']);
+    expect(sections.map((s) => s.id)).toEqual(['vitals', 'findings', 'callstack', 'calltree']);
     expect(
       (rendered(sections, 'vitals', 'event-vitals') as HTMLElement & { instances: number[] | null })
         .instances,
     ).toEqual([11, 12, 13]);
+  });
+
+  it('asks the findings which of them name the selection', async () => {
+    const sections = await buildDetailSections('analysis', {
+      kind: 'aggregate',
+      instances: [11, 12, 13],
+      label: 'MyClass.run()',
+    });
+
+    const findings = rendered(sections, 'findings', 'log-diagnostics') as HTMLElement & {
+      instances: number[] | null;
+    };
+    expect(findings.instances).toEqual([11, 12, 13]);
+    // The verdict reads beside the tree rather than being crowded by it.
+    expect(sections.find((s) => s.id === 'findings')?.weight).toBe(3);
+  });
+
+  it('scopes the findings to the frame being followed, not the aggregate it left', async () => {
+    const sections = await buildDetailSections(
+      'analysis',
+      { kind: 'aggregate', instances: [11, 12, 13], label: 'MyClass.run()' },
+      8,
+    );
+
+    const findings = rendered(sections, 'findings', 'log-diagnostics') as HTMLElement & {
+      instances: number[] | null;
+    };
+    expect(findings.instances).toEqual([8]);
+  });
+
+  it('leaves the findings out for a selection from another tab', async () => {
+    const sections = await buildDetailSections('timeline', { kind: 'event', eventIndex: 4 });
+    expect(sections.map((s) => s.id)).toEqual(['vitals', 'callstack', 'calltree']);
   });
 
   it('drops the aggregate once a single frame in its stack is the one being followed', async () => {

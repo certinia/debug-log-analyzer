@@ -91,6 +91,12 @@ export class PaneView extends LitElement {
       }
       .pane-view[data-orientation='vertical'] {
         flex-direction: column;
+        /* Every open section keeps a readable height, so when they do not all fit
+           the stack scrolls rather than crowding one down to its header. */
+        overflow-y: auto;
+      }
+      .pane-view[data-orientation='vertical'] .pane[data-open] {
+        min-height: var(--lana-pane-min);
       }
       .pane-view[data-orientation='horizontal'] {
         flex-direction: row;
