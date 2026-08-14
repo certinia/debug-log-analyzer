@@ -454,7 +454,12 @@ export class DatabaseView extends LitElement {
     const limits = this._limits;
     const gauges: GaugeMetric[] = [];
     const add = (label: string, found: number, metric: { used: number; limit: number }) => {
-      gauges.push({ label, found, used: this._used(metric.used), limit: this._limit(metric.limit) });
+      gauges.push({
+        label,
+        found,
+        used: this._used(metric.used),
+        limit: this._limit(metric.limit),
+      });
     };
     const z = { used: 0, limit: 0 };
     add('DML', this._count('dml'), limits?.dmlStatements ?? z);
