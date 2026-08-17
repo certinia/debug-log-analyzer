@@ -183,7 +183,8 @@ for (const requiredText of [
   'uses: salesforcecli/github-workflows/.github/workflows/vscode-manual-publish.yml@ph/W-23832274-pnpm-stable-promotion',
   'extension-name: lana',
   "vsix-name-pattern: 'lana-*.vsix'",
-  'required-ci-checks: E2E',
+  'required-ci-checks: >-',
+  '["E2E / Web E2E", "E2E / Desktop E2E (macos-latest)", "E2E / Desktop E2E (windows-latest)"]',
   'package-manager: pnpm',
   'lockfile-path: pnpm-lock.yaml',
 ]) {

@@ -15,7 +15,6 @@ import type { Context } from '../Context.js';
 import { Item, Options, QuickPick } from '../display/QuickPick.js';
 import { QuickPickWorkspace } from '../display/QuickPickWorkspace.js';
 import {
-  fileOrFolderExists,
   getLogBody,
   listLogs,
   writeFile,
@@ -65,8 +64,18 @@ export class RetrieveLogFile {
       const logFileId = await RetrieveLogFile.getLogFile(logFiles);
       if (logFileId) {
         const logUri = this.getLogFileUri(Uri.parse(wsFolder.uri), logFileId);
-        const writeLogFile = this.writeLogFile(logUri, logFileId);
-        return LogView.createView(context, writeLogFile, logUri);
+        const logBody = await getLogBody(logFileId);
+
+        try {
+          await writeFile(logUri, logBody);
+        } catch (err: unknown) {
+          const msg = err instanceof Error ? err.message : String(err);
+          context.display.output(`Unable to cache retrieved log: ${msg}`, true);
+        }
+
+        // Webviews cannot always fetch workspace URIs in vscode.dev. Supplying the
+        // retrieved content directly keeps the analysis independent of that boundary.
+        return LogView.createView(context, undefined, logUri, logBody);
       }
     } finally {
       loadingPicker.dispose();
@@ -153,13 +162,5 @@ export class RetrieveLogFile {
     // Build .sfdx/tools/debug/logs/{fileId}.log relative to the workspace root.
     // Utils.joinPath works on both desktop (file://) and web (vscode-vfs://, memfs://).
     return Utils.joinPath(wsUri, '.sfdx', 'tools', 'debug', 'logs', `${fileId}.log`);
-  }
-
-  private static async writeLogFile(logUri: Uri, logId: string): Promise<void> {
-    const logExists = await fileOrFolderExists(logUri);
-    if (!logExists) {
-      const logBody = await getLogBody(logId);
-      await writeFile(logUri, logBody);
-    }
   }
 }

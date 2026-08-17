@@ -254,7 +254,7 @@ describe('RetrieveLogFile', () => {
       expect(logUri.toString()).toContain('selected-log-id.log');
     });
 
-    it('should skip download when log file already exists', async () => {
+    it('should retrieve the current log even when a cached file exists', async () => {
       mockPickOrReturn.mockResolvedValue(mockWorkspace);
       mockListLogs.mockResolvedValue([
         {
@@ -268,8 +268,9 @@ describe('RetrieveLogFile', () => {
         },
       ]);
       mockQuickPickPick.mockResolvedValue([{ logId: 'existing-log' }]);
-      // File already exists
       mockFileOrFolderExists.mockResolvedValue(true);
+      mockGetLogBody.mockResolvedValue('current log content');
+      mockWriteFile.mockResolvedValue(undefined);
       mockCreateView.mockResolvedValue({ panel: 'mock' });
 
       const mockContext = createMockContext();
@@ -278,9 +279,8 @@ describe('RetrieveLogFile', () => {
       const commandCallback = getCommandCallback();
       await commandCallback();
 
-      // getLogBody + writeFile should NOT be called since file exists
-      expect(mockGetLogBody).not.toHaveBeenCalled();
-      expect(mockWriteFile).not.toHaveBeenCalled();
+      expect(mockGetLogBody).toHaveBeenCalledWith('existing-log');
+      expect(mockWriteFile).toHaveBeenCalledWith(expect.anything(), 'current log content');
       expect(mockCreateView).toHaveBeenCalled();
     });
 
@@ -310,7 +310,6 @@ describe('RetrieveLogFile', () => {
       const commandCallback = getCommandCallback();
       await commandCallback();
 
-      // getLogBody + writeFile SHOULD be called since file doesn't exist
       expect(mockGetLogBody).toHaveBeenCalledWith('new-log');
       expect(mockWriteFile).toHaveBeenCalledWith(expect.anything(), 'fetched log content');
     });
@@ -734,8 +733,8 @@ describe('RetrieveLogFile', () => {
     });
   });
 
-  describe('writeLogFile', () => {
-    it('preserves the memfs URI through the deferred log write', async () => {
+  describe('retrieved log delivery', () => {
+    it('preserves the memfs URI while providing retrieved content to the webview', async () => {
       const workspaceUri = Uri.parse('memfs:/test/workspace');
       const testWs = new VSWorkspace({
         uri: workspaceUri,
@@ -766,14 +765,14 @@ describe('RetrieveLogFile', () => {
       const lastCall = mockRegisterCommand.mock.calls[mockRegisterCommand.mock.calls.length - 1];
       await lastCall[1]();
 
-      const [, writeLogFile, logUri] = mockCreateView.mock.calls[0];
-      await writeLogFile;
+      const [, beforeSendLog, logUri, logBody] = mockCreateView.mock.calls[0];
 
       expect(logUri).toEqual(
         Uri.parse('memfs:/test/workspace/.sfdx/tools/debug/logs/download-me.log'),
       );
-      expect(mockFileOrFolderExists).toHaveBeenCalledWith(logUri);
       expect(mockWriteFile).toHaveBeenCalledWith(logUri, 'fetched body');
+      expect(beforeSendLog).toBeUndefined();
+      expect(logBody).toBe('fetched body');
     });
 
     it('should call getLogBody + writeFile when file does not exist', async () => {
@@ -810,7 +809,7 @@ describe('RetrieveLogFile', () => {
       expect(mockWriteFile).toHaveBeenCalledWith(expect.anything(), 'fetched body');
     });
 
-    it('should NOT call getLogBody/writeFile when file exists', async () => {
+    it('retrieves and overwrites an existing cached log file', async () => {
       const testWs = new VSWorkspace({
         uri: Uri.parse('file:///test/ws'),
         name: 'test-ws',
@@ -830,6 +829,8 @@ describe('RetrieveLogFile', () => {
       ]);
       mockQuickPickPick.mockResolvedValue([{ logId: 'already-exists' }]);
       mockFileOrFolderExists.mockResolvedValue(true);
+      mockGetLogBody.mockResolvedValue('fresh log body');
+      mockWriteFile.mockResolvedValue(undefined);
       mockCreateView.mockResolvedValue({ panel: 'mock' });
 
       const mockContext = createMockContext();
@@ -838,8 +839,8 @@ describe('RetrieveLogFile', () => {
       const lastCall = mockRegisterCommand.mock.calls[mockRegisterCommand.mock.calls.length - 1];
       await lastCall[1]();
 
-      expect(mockGetLogBody).not.toHaveBeenCalled();
-      expect(mockWriteFile).not.toHaveBeenCalled();
+      expect(mockGetLogBody).toHaveBeenCalledWith('already-exists');
+      expect(mockWriteFile).toHaveBeenCalledWith(expect.anything(), 'fresh log body');
     });
   });
 });
