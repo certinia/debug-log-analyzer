@@ -32,7 +32,9 @@ It docks to the **right**, **left** or **bottom**, resizes by dragging its edge,
 
 Collapse a section by clicking its header, drag a divider to resize two of them, double-click a divider to restore the default sizes. It's one panel, so your layout follows you from tab to tab.
 
-### Nothing selected
+### Summary
+
+Press **Summary** in the panel's header to read the whole log without giving up your selection, and **Detail** to go back to it. The switch appears as soon as something is selected, and any new selection returns the panel to it.
 
 With nothing selected the inspector reads the whole log. Every tab opens with an **Overview** — the six governor metrics closest to their limit — then adds what its own tab can answer at log scope:
 

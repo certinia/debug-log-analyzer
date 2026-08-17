@@ -70,6 +70,7 @@ jest.mock('../detailSections.js', () => ({
 import { eventBus } from '../../core/events/EventBus.js';
 import type { LogInspector } from '../LogInspector.js';
 import type { PaneView } from '../PaneView.js';
+import type { ViewModeSwitch } from '../ViewModeSwitch.js';
 import '../LogInspector.js';
 import { dispatchInspectorLocate, dispatchInspectorReveal } from '../inspectorReveal.js';
 
@@ -141,6 +142,21 @@ function marker(el: LogInspector): string | null {
 /** The frame the sections follow, `-` while the anchor is what is shown. */
 function activeMarker(el: LogInspector): string | null {
   return paneView(el).shadowRoot?.querySelector('.active')?.textContent ?? null;
+}
+
+/** The scope switch is slotted into the dock, so it lives in the inspector's own root. */
+function scopeSwitch(el: LogInspector): ViewModeSwitch | null {
+  return el.shadowRoot?.querySelector<ViewModeSwitch>('view-mode-switch') ?? null;
+}
+
+function setScope(el: LogInspector, value: string): void {
+  const found = scopeSwitch(el);
+  if (!found) {
+    throw new Error('view-mode-switch not rendered');
+  }
+  found.dispatchEvent(
+    new CustomEvent('view-mode-change', { detail: { value }, bubbles: true, composed: true }),
+  );
 }
 
 describe('LogInspector', () => {
@@ -399,6 +415,67 @@ describe('LogInspector', () => {
 
     // marker() would throw here: the pane view unmounts with the selection.
     expect(emptyText(el)).toBe('Select a frame on the timeline to inspect it.');
+  });
+
+  it('offers the scope switch only once there is a selection to switch away from', async () => {
+    const el = await mount('timeline-tab');
+    expect(scopeSwitch(el)).toBeNull();
+
+    select('timeline', 1);
+    await flush(el);
+    expect(scopeSwitch(el)?.value).toBe('selection');
+
+    eventBus.emit('detail:select', { source: 'timeline', selection: null });
+    await flush(el);
+    expect(scopeSwitch(el)).toBeNull();
+  });
+
+  it('reads the whole log in log scope, and keeps the selection to come back to', async () => {
+    const el = await mount('timeline-tab');
+    select('timeline', 1);
+    await flush(el);
+    dispatchInspectorReveal(dockLayout(el), 5);
+    await flush(el);
+    expect([marker(el), activeMarker(el)]).toEqual(['1', '5']);
+
+    setScope(el, 'log');
+    await flush(el);
+    // marker() would throw: the selection's sections give way to the whole-log ones.
+    expect(emptyText(el)).toBe('Select a frame on the timeline to inspect it.');
+
+    setScope(el, 'selection');
+    await flush(el);
+    // The walked frame comes back with the anchor, so nothing is lost by looking away.
+    expect([marker(el), activeMarker(el)]).toEqual(['1', '5']);
+  });
+
+  it('does not follow a whole-log reveal, so the walk survives the scope switch', async () => {
+    const el = await mount('timeline-tab');
+    select('timeline', 1);
+    await flush(el);
+
+    setScope(el, 'log');
+    await flush(el);
+    dispatchInspectorReveal(dockLayout(el), 9);
+    await flush(el);
+
+    setScope(el, 'selection');
+    await flush(el);
+    expect([marker(el), activeMarker(el)]).toEqual(['1', '-']);
+  });
+
+  it('comes back to the selection when the tab reports a new pick', async () => {
+    const el = await mount('timeline-tab');
+    select('timeline', 1);
+    await flush(el);
+    setScope(el, 'log');
+    await flush(el);
+
+    select('timeline', 7);
+    await flush(el);
+
+    expect(scopeSwitch(el)?.value).toBe('selection');
+    expect(marker(el)).toBe('7');
   });
 
   it('drops a superseded rebuild: a stale build resolving late does not overwrite a newer one', async () => {
