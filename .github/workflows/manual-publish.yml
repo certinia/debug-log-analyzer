@@ -49,7 +49,7 @@ on:
         default: ''
         type: string
       dry-run:
-        description: 'Build and validate artifacts without publishing, tagging, or committing'
+        description: 'Validate selected release artifacts without publishing, tagging, or committing'
         required: true
         default: true
         type: boolean
@@ -76,7 +76,7 @@ jobs:
       exclude-web-vsix: 'true'
       extensions-root: .
       vsix-artifact-name: vsix-packages
-      required-ci-checks: E2E
+      required-ci-checks: E2E / Web E2E, E2E / Desktop E2E (macos-latest), E2E / Desktop E2E (windows-latest)
       node-version: '24'
       package-manager: pnpm
       package-manager-version: '10'

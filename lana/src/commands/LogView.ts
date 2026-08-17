@@ -186,7 +186,7 @@ export class LogView {
               if (destinationFile) {
                 writeFile(destinationFile, fileContent).then(undefined, (error) => {
                   const msg = error instanceof Error ? error.message : String(error);
-                  vscWindow.showErrorMessage(`Unable to save file: ${msg}`);
+                  context.display.showErrorMessage(`Unable to save file: ${msg}`);
                 });
               }
             }
@@ -202,7 +202,7 @@ export class LogView {
 
           case 'goToLogLine': {
             if (isTimestampPayload(payload) && logUri) {
-              RawLogNavigation.goToLineByTimestamp(logUri, payload.timestamp);
+              RawLogNavigation.goToLineByTimestamp(logUri, payload.timestamp, context.display);
             }
             break;
           }

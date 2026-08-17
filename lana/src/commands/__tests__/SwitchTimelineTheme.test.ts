@@ -414,7 +414,7 @@ describe('SwitchTimelineTheme', () => {
       SwitchTimelineTheme.apply(mockContext as unknown as import('../../Context.js').Context);
 
       expect(mockContext.display.output).toHaveBeenCalledWith(
-        "Registered command 'Lana: Timeline Theme'",
+        "Registered command 'Salesforce Apex Log Analyzer: Timeline Theme'",
       );
     });
   });
