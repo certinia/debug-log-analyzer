@@ -53,13 +53,13 @@ import {
   buildScopedCallTree,
   buildWholeLogCallTree,
   rowIdsByEvent,
-  type ScopedBuildOptions,
   type ScopedRow,
 } from '../scopedCallTree.js';
+import type { FrameBudgetOptions } from '../../core/utility/FrameBudget.js';
 
 /** These fixtures are small enough to never hit a slice deadline, so `yieldFrame`
  *  is only there to satisfy the contract. */
-const options: ScopedBuildOptions = { yieldFrame: () => Promise.resolve() };
+const options: FrameBudgetOptions = { yieldFrame: () => Promise.resolve() };
 
 function build(eventIndex: number, instances?: number[]) {
   return buildScopedCallTree(eventIndex, instances ?? null, options);
@@ -239,7 +239,7 @@ describe('buildScopedCallTree', () => {
     const OCCURRENCES = 500;
     const instances = loopOccurrences(OCCURRENCES);
     let yields = 0;
-    const sliced: ScopedBuildOptions = {
+    const sliced: FrameBudgetOptions = {
       yieldFrame: () => {
         yields += 1;
         return Promise.resolve();

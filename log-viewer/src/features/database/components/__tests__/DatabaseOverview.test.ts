@@ -15,7 +15,8 @@ import type {
   DatabaseStatement,
 } from '../../services/databaseOverview.js';
 
-const apexLog = {} as ApexLog;
+// The namespaces the fixtures use: the bars colour from the log's list, not their own order.
+const apexLog = { namespaces: ['pkg', 'trigPkg'] } as unknown as ApexLog;
 let overview: DatabaseOverview | null = null;
 
 // jsdom has no stylesheet for the icon element to adopt, so it is left unregistered.
@@ -387,7 +388,7 @@ describe('database-namespaces', () => {
   const bars = (element: Element) =>
     [...(element.shadowRoot?.querySelectorAll('stacked-time-bar') ?? [])] as StackedTimeBar[];
 
-  it('splits the bar by namespace, longest first, with a row per namespace', async () => {
+  it('splits the bar by namespace, longest first', async () => {
     overview = fullOverview();
     const chart = bar(await mount('database-namespaces'));
 
@@ -398,7 +399,6 @@ describe('database-namespaces', () => {
     // No `total`, so the bar is the split of database time itself.
     expect(chart.total).toBe(0);
     expect(chart.legend).toBe(true);
-    expect(chart.legendRows).toBe(true);
   });
 
   it('names the kinds a namespace spent its time in, zero kinds left out', async () => {

@@ -25,6 +25,7 @@ It docks to the **right**, **left** or **bottom**, resizes by dragging its edge,
 ### Sections
 
 - **Details** – timing, plus every governor metric the selection consumed as `used / limit`. For SOQL also selectivity, query plan and cardinality, with the query text highlighted and copyable.
+- **Self time by namespace** – Timeline only: the self time under the selection split by the namespace whose code ran it, so you can see whose package burned it.
 - **Findings** – Analysis only: which of the log's findings name the selected method or anything it called, so you can tell whether the row you picked is one of the log's problems.
 - **Call stack** – the parent frames that led to the selection, outermost first, with total and self time.
 - **Call tree** – the selection's own execution in **Time Order**, **Aggregated** or **Bottom-Up**, scoped to the selection rather than the whole log like the [Call Tree](./calltree.mdx) tab.
@@ -38,7 +39,7 @@ Press **Summary** in the panel's header to read the whole log without giving up 
 
 With nothing selected the inspector reads the whole log. Every tab opens with an **Overview** — the six governor metrics closest to their limit — then adds what its own tab can answer at log scope:
 
-- **Timeline** – time by category, governor usage over time, and the whole-log call tree.
+- **Timeline** – time by category, **self time by namespace**, governor usage over time, and the whole-log call tree.
 - **Call Tree** – the **hot path** the log spent its time in, and the **hot spots** with the most self time.
 - **Database** – **Namespace duration**: **Called from namespace** — the namespace that issued the statement — and, when they differ, **Ran in namespace**, the namespaces of whatever ran beneath it, such as a package trigger firing on your DML. **Call tree**: every call path that ends in a query, DML or search, with **Total Time** — the database time at or below the row — beside **Self Time**, the row's own code. A row with all total and no self is waiting on the database; the reverse is the Apex around it. **Database duration**: how few statements hold the time, with cost per row, how often each ran, and its duration split into self time and descendants, so a DML that is cheap in itself but fires seven seconds of triggers reads as one.
 - **Analysis** – **Findings**: what is slow or wrong in the log, and what to do about it, led by the findings by severity — press any number of them to hold the list to those. A finding whose events the log times also shows how long they took and what that is of the log. Each finding lists the statements behind it, most repeated first; click one to reveal its row in the grid.

@@ -27,7 +27,7 @@ import {
 import { deepFilter } from '../utils/DetailsFilter.js';
 import { expandCollapseAll } from '../utils/ExpandCollapse.js';
 import type { TimeOrderRow } from '../utils/TimeOrderTree.js';
-import { waitForNextFrame } from './TableShared.js';
+import { waitForNextFrame } from '../../../core/utility/FrameBudget.js';
 
 import { inMsRange, type FilterRange } from '../../../tabulator/filters/MinMax.js';
 

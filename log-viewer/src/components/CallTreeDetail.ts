@@ -21,8 +21,8 @@ import {
   clipboardCopyOptions,
   registerTableModules,
   virtualScrollOptions,
-  waitForNextFrame,
 } from '../features/call-tree/components/TableShared.js';
+import { waitForNextFrame, type FrameBudgetOptions } from '../core/utility/FrameBudget.js';
 import { makeSumSelfTimeAllVisible } from '../features/call-tree/utils/BottomCalcs.js';
 import { eventLabel } from '../features/call-tree/utils/eventText.js';
 import { soqlInlineElement } from '../features/soql/format/inlineCell.js';
@@ -43,7 +43,6 @@ import {
   locatableEventIndexes,
   revealableEventIndex,
   rowIdsByEvent,
-  type ScopedBuildOptions,
   type ScopedCallTree,
   type ScopedRow,
 } from './scopedCallTree.js';
@@ -393,7 +392,7 @@ export class CallTreeDetail extends LitElement {
    * the selection's first view. Returns an empty array when nothing is in scope,
    * and null when the build was abandoned because a newer selection arrived.
    */
-  private async _rows(mode: ViewMode, options: ScopedBuildOptions): Promise<ScopedRow[] | null> {
+  private async _rows(mode: ViewMode, options: FrameBudgetOptions): Promise<ScopedRow[] | null> {
     if (!this._scoped) {
       const scoped = this.wholeLog
         ? await buildWholeLogCallTree(options)

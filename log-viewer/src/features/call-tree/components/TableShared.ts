@@ -54,14 +54,6 @@ export const virtualScrollOptions = {
   anchoringPolicy: true,
 } satisfies Partial<Options>;
 
-/** Resolve after the next animation frame — lets a just-shown host lay out
- *  before Tabulator measures column widths. */
-export function waitForNextFrame(): Promise<void> {
-  return new Promise((resolve) => {
-    requestAnimationFrame(() => resolve());
-  });
-}
-
 /**
  * A right-aligned duration column rendered as a `progressFormatterMS` bar
  * (value + percent), fixed to `barWidth`, with a matching bottom-calc. Shared by
