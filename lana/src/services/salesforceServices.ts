@@ -43,19 +43,19 @@ export function getLogBody(logId: string): Promise<string> {
 /** Read a file as UTF-8 text (web-safe via vscode.workspace.fs). */
 export function readFile(uri: Uri | string): Promise<string> {
   const { FsService } = getServicesApi().services;
-  return getRuntime().runPromise(FsService.readFile(uri.toString()));
+  return getRuntime().runPromise(FsService.readFile(uri));
 }
 
 /** Write UTF-8 text to a file, creating parent directories if needed. */
 export function writeFile(uri: Uri | string, content: string): Promise<void> {
   const { FsService } = getServicesApi().services;
-  return getRuntime().runPromise(FsService.safeWriteFile(uri.toString(), content));
+  return getRuntime().runPromise(FsService.safeWriteFile(uri, content));
 }
 
 /** True if the file or folder exists. */
 export function fileOrFolderExists(uri: Uri | string): Promise<boolean> {
   const { FsService } = getServicesApi().services;
-  return getRuntime().runPromise(FsService.fileOrFolderExists(uri.toString()));
+  return getRuntime().runPromise(FsService.fileOrFolderExists(uri));
 }
 
 /** Find files matching a glob, honoring the active (desktop or web) filesystem. */

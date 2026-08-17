@@ -20,6 +20,7 @@ export class Display {
   }
 
   showErrorMessage(s: string, options: MessageOptions = {}): void {
+    this.output(s, true);
     window.showErrorMessage(s, options);
   }
 

@@ -136,7 +136,7 @@ describe('RetrieveLogFile', () => {
       RetrieveLogFile.apply(mockContext as unknown as import('../../Context.js').Context);
 
       expect(mockContext.display.output).toHaveBeenCalledWith(
-        "Registered command 'Lana: Retrieve Log'",
+        "Registered command 'Salesforce Apex Log Analyzer: Retrieve Log'",
       );
     });
   });
@@ -735,6 +735,47 @@ describe('RetrieveLogFile', () => {
   });
 
   describe('writeLogFile', () => {
+    it('preserves the memfs URI through the deferred log write', async () => {
+      const workspaceUri = Uri.parse('memfs:/test/workspace');
+      const testWs = new VSWorkspace({
+        uri: workspaceUri,
+        name: 'test-workspace',
+        index: 0,
+      });
+      mockPickOrReturn.mockResolvedValue(testWs);
+      mockListLogs.mockResolvedValue([
+        {
+          Id: 'download-me',
+          LogUser: { Name: 'User' },
+          Operation: 'Op',
+          LogLength: 1024,
+          DurationMilliseconds: 100,
+          StartTime: '2024-01-01T00:00:00.000Z',
+          Status: 'Success',
+        },
+      ]);
+      mockQuickPickPick.mockResolvedValue([{ logId: 'download-me' }]);
+      mockFileOrFolderExists.mockResolvedValue(false);
+      mockGetLogBody.mockResolvedValue('fetched body');
+      mockWriteFile.mockResolvedValue(undefined);
+      mockCreateView.mockResolvedValue({ panel: 'mock' });
+
+      const mockContext = createMockContext();
+      RetrieveLogFile.apply(mockContext as unknown as import('../../Context.js').Context);
+
+      const lastCall = mockRegisterCommand.mock.calls[mockRegisterCommand.mock.calls.length - 1];
+      await lastCall[1]();
+
+      const [, writeLogFile, logUri] = mockCreateView.mock.calls[0];
+      await writeLogFile;
+
+      expect(logUri).toEqual(
+        Uri.parse('memfs:/test/workspace/.sfdx/tools/debug/logs/download-me.log'),
+      );
+      expect(mockFileOrFolderExists).toHaveBeenCalledWith(logUri);
+      expect(mockWriteFile).toHaveBeenCalledWith(logUri, 'fetched body');
+    });
+
     it('should call getLogBody + writeFile when file does not exist', async () => {
       const testWs = new VSWorkspace({
         uri: Uri.parse('file:///test/ws'),

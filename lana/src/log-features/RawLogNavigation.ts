@@ -4,6 +4,7 @@
 import { Selection, commands, window, type Uri } from 'vscode';
 
 import { readFile } from '../services/salesforceServices.js';
+import type { Display } from '../display/Display.js';
 
 /**
  * Handles navigation within raw Apex log files.
@@ -17,7 +18,11 @@ export class RawLogNavigation {
    * @param logUri - URI of the log file (works on desktop file:// and web vscode-vfs://)
    * @param timestamp - Nanosecond timestamp to find (from log event)
    */
-  public static async goToLineByTimestamp(logUri: Uri, timestamp: number): Promise<void> {
+  public static async goToLineByTimestamp(
+    logUri: Uri,
+    timestamp: number,
+    display?: Display,
+  ): Promise<void> {
     try {
       // Read file (no normalization - avoids doubling memory for large files)
       const text = await readFile(logUri);
@@ -51,7 +56,12 @@ export class RawLogNavigation {
       });
     } catch (error) {
       const msg = error instanceof Error ? error.message : String(error);
-      window.showErrorMessage(`Unable to navigate to log line: ${msg}`);
+      const errorMessage = `Unable to navigate to log line: ${msg}`;
+      if (display) {
+        display.showErrorMessage(errorMessage);
+      } else {
+        window.showErrorMessage(errorMessage);
+      }
     }
   }
 }
