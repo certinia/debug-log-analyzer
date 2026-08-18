@@ -8,6 +8,7 @@ import type { ApexLog } from 'apex-log-parser';
 import type { LitElement } from 'lit';
 
 import type { StackedTimeBar } from '../../../../components/StackedTimeBar.js';
+import type { LogStore } from '../../../../core/log/LogStore.js';
 import type {
   DatabaseBreakdown,
   DatabaseCallNode,
@@ -30,14 +31,11 @@ jest.mock('tabulator-tables', () => ({
   Module: class {},
   Renderer: class {},
 }));
-jest.mock('../../services/Database.js', () => ({
-  DatabaseAccess: { instance: () => (overview ? { getApexLog: () => apexLog } : null) },
-}));
-// Only the log lookup is stubbed: `concentration` is a pure sum over the fixture,
+// Only the figures are stubbed: `concentration` is a pure sum over the fixture,
 // so the sections are tested against the same figures they ship with.
 jest.mock('../../services/databaseOverview.js', () => ({
   ...jest.requireActual('../../services/databaseOverview.js'),
-  currentDatabaseOverview: () => overview,
+  databaseOverview: () => overview,
 }));
 
 import { databaseTreeRows, ownCodeTotal, type DatabaseTreeRow } from '../DatabaseTimeTree.js';
@@ -195,6 +193,10 @@ async function mount<K extends keyof HTMLElementTagNameMap>(
   tag: K,
 ): Promise<HTMLElementTagNameMap[K] & LitElement> {
   const element = document.createElement(tag);
+  // No provider in the test, so the consumed store is assigned straight on.
+  (element as unknown as { logStore: LogStore }).logStore = {
+    log: apexLog,
+  } as unknown as LogStore;
   document.body.append(element);
   await (element as LitElement).updateComplete;
   return element as HTMLElementTagNameMap[K] & LitElement;

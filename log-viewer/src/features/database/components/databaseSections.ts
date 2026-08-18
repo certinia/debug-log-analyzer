@@ -22,7 +22,7 @@ export interface DetailSelection {
 
 /**
  * Build the details-panel sections for a selected DML/SOQL statement. The
- * components resolve their own data from `DatabaseAccess` by eventIndex; only
+ * components resolve their own data from the log store by eventIndex; only
  * the SOQL issue count is pre-resolved here so it can badge the section header.
  *
  * Details and the call tree follow the active frame; the call stack and the SOQL

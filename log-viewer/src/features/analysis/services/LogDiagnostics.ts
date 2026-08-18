@@ -12,7 +12,7 @@ import type {
 import { GOVERNOR_METRICS, limitTotals } from '../../../components/logOverviewMetrics.js';
 import { formatByteSize, formatDuration, formatInteger } from '../../../core/utility/Util.js';
 import { getEventKey } from '../../call-tree/utils/Aggregation.js';
-import { DatabaseAccess } from '../../database/services/Database.js';
+import { currentLogStore } from '../../../core/log/LogStore.js';
 import { deriveSoqlObject } from '../../database/services/sobjectClassification.js';
 import type { Dialect } from '../../soql/format/tokenize.js';
 import { apexLimitTimeSeries } from '../../timeline/optimised/apex-limit-series.js';
@@ -764,11 +764,11 @@ async function soqlLintDiagnostics(queries: SOQLExecuteBeginLine[]): Promise<{
     .slice(0, MAX_LINTED_QUERIES);
 
   const linter = new SOQLLinter();
-  const database = DatabaseAccess.instance();
+  const store = currentLogStore();
   const grouped = new Map<string, Diagnostic>();
 
   for (const [text, group] of distinct) {
-    const stack = database?.getStackByEventIndex(group.eventIndex).reverse() ?? [];
+    const stack = store?.stackByEventIndex(group.eventIndex).reverse() ?? [];
     for (const rule of await linter.lint(text, stack)) {
       const id = `soql|${rule.summary}`;
       const line = {
@@ -817,7 +817,7 @@ let cached: { log: ApexLog; result: Promise<LogDiagnostics> } | null = null;
  * changes. {@link scopeDiagnostics} narrows this result instead.
  */
 export function computeLogDiagnostics(): Promise<LogDiagnostics> {
-  const log = DatabaseAccess.instance()?.getApexLog();
+  const log = currentLogStore()?.log;
   if (!log) {
     return Promise.resolve(EMPTY);
   }
@@ -840,7 +840,7 @@ export function scopeDiagnostics(
   result: LogDiagnostics,
   instances: readonly number[],
 ): LogDiagnostics {
-  const log = DatabaseAccess.instance()?.getApexLog();
+  const log = currentLogStore()?.log;
   const within = new Set(instances);
   if (!log || !within.size) {
     return { ...result, diagnostics: [] };

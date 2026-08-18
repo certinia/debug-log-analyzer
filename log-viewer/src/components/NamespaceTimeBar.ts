@@ -1,13 +1,14 @@
 /*
  * Copyright (c) 2026 Certinia Inc. All rights reserved.
  */
+import { consume } from '@lit/context';
 import type { ApexLog, LogEvent } from 'apex-log-parser';
 import { LitElement, html, type PropertyValues } from 'lit';
 import { customElement, property, state } from 'lit/decorators.js';
 
-import { LogLoadedController } from '../core/events/LogLoadedController.js';
+import { logContext } from '../core/log/logContext.js';
+import type { LogStore } from '../core/log/LogStore.js';
 import { waitForNextFrame } from '../core/utility/FrameBudget.js';
-import { DatabaseAccess } from '../features/database/services/Database.js';
 import { globalStyles } from '../styles/global.styles.js';
 import { inspectorSectionStyles } from '../styles/inspectorSection.styles.js';
 import { segmentsWithTail } from './StackedTimeBar.js';
@@ -55,16 +56,14 @@ export class NamespaceTimeBar extends LitElement {
   @property({ attribute: false })
   instances: number[] | null = null;
 
+  /** The log on screen, from the app root. */
+  @consume({ context: logContext, subscribe: true })
+  @property({ attribute: false })
+  logStore: LogStore | null = null;
+
   /** The scope's slices, or null while the walk is still running. */
   @state()
   private _slices: NamespaceTime[] | null = null;
-
-  /** A new log invalidates the scope, so the next render walks again. */
-  private readonly _logLoaded = new LogLoadedController(this, () => {
-    this._scopeKey = UNRESOLVED;
-    this._slices = null;
-    this.requestUpdate();
-  });
 
   /** The scope `_slices` describes, so a render for any other reason does not
    *  walk again, and a new log or selection does. */
@@ -104,6 +103,14 @@ export class NamespaceTimeBar extends LitElement {
       label="Self time by namespace"
       .segments=${segments}
     ></stacked-time-bar>`;
+  }
+
+  protected willUpdate(changed: PropertyValues): void {
+    // A new log invalidates the scope, so the next render walks it again.
+    if (changed.has('logStore')) {
+      this._scopeKey = UNRESOLVED;
+      this._slices = null;
+    }
   }
 
   protected updated(changed: PropertyValues): void {
@@ -150,18 +157,18 @@ export class NamespaceTimeBar extends LitElement {
   }
 
   private _scope(): Scope | null {
-    const database = DatabaseAccess.instance();
-    const log = database?.getApexLog();
-    if (!database || !log) {
+    const store = this.logStore;
+    if (!store) {
       return null;
     }
+    const log = store.log;
     const instances = this.instances?.length ? this.instances : null;
     const indexes = instances ?? (this.eventIndex >= 0 ? [this.eventIndex] : null);
     if (!indexes) {
       return { log, key: log, roots: log.children };
     }
     const roots = indexes
-      .map((index) => database.getEventByIndex(index))
+      .map((index) => store.eventByIndex(index))
       .filter((event): event is LogEvent => event !== null);
     const [first] = roots;
     if (!first) {

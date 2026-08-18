@@ -7,16 +7,8 @@ import { beforeEach, describe, expect, it } from '@jest/globals';
 import type { ApexLog } from 'apex-log-parser';
 
 let apexLog: ApexLog | null = null;
-jest.mock('../../features/database/services/Database.js', () => ({
-  DatabaseAccess: {
-    instance: () =>
-      apexLog && {
-        getApexLog: () => apexLog,
-        getEventByIndex: (index: number) => eventByIndex(index),
-      },
-  },
-}));
 
+import type { LogStore } from '../../core/log/LogStore.js';
 import type { NamespaceTimeBar } from '../NamespaceTimeBar.js';
 import '../NamespaceTimeBar.js';
 import { NAMESPACE_COLORS } from '../namespaceTime.js';
@@ -28,7 +20,14 @@ const logOf = (children: FakeEvent[], namespaces: string[]) => {
 
 async function mount(props: Partial<Pick<NamespaceTimeBar, 'eventIndex' | 'instances'>> = {}) {
   const element = document.createElement('namespace-time-bar');
-  Object.assign(element, props);
+  // No provider in the test, so the consumed store is assigned straight on.
+  const store =
+    apexLog &&
+    ({
+      log: apexLog,
+      eventByIndex: (index: number) => eventByIndex(index),
+    } as unknown as LogStore);
+  Object.assign(element, { logStore: store }, props);
   document.body.append(element);
   // The first render only starts the walk; the result lands a task later.
   for (let settle = 0; settle < 5; settle++) {

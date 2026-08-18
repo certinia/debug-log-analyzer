@@ -8,10 +8,8 @@ import { emptyLimits } from '../../../../components/__tests__/limitsTestUtils.js
 
 let log: ApexLog | null = null;
 
-jest.mock('../../../database/services/Database.js', () => ({
-  DatabaseAccess: {
-    instance: () => (log ? { getApexLog: () => log, getStackByEventIndex: () => [] } : null),
-  },
+jest.mock('../../../../core/log/LogStore.js', () => ({
+  currentLogStore: () => (log ? { log, stackByEventIndex: () => [] } : null),
 }));
 
 import { computeLogDiagnostics, scopeDiagnostics } from '../LogDiagnostics.js';

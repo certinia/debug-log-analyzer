@@ -19,7 +19,6 @@ jest.mock('../SOQLView.js', () => ({}));
 jest.mock('../SOSLView.js', () => ({}));
 jest.mock('../GovernorSummary.js', () => ({}));
 jest.mock('../DatabaseSection.js', () => ({}));
-jest.mock('../../services/Database.js', () => ({ DatabaseAccess: {} }));
 
 import '../DatabaseView.js';
 

@@ -42,7 +42,7 @@ function switchEl(el: CallTreeDetail): Element {
 
 async function mount(): Promise<CallTreeDetail> {
   const el = document.createElement('call-tree-detail') as CallTreeDetail;
-  el.eventIndex = -1; // no DatabaseAccess in the test — no table is built
+  el.eventIndex = -1; // no log store in the test — no table is built
   document.body.appendChild(el);
   await el.updateComplete;
   return el;

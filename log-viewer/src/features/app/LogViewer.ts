@@ -5,17 +5,19 @@ import '#vscode-elements/vscode-icon.js';
 import '#vscode-elements/vscode-tab-header.js';
 import '#vscode-elements/vscode-tab-panel.js';
 import '#vscode-elements/vscode-tabs.js';
+import { provide } from '@lit/context';
 import type { VscTabsSelectEvent } from '@vscode-elements/elements/dist/vscode-tabs/vscode-tabs.js';
 import { LitElement, css, html } from 'lit';
 import { customElement, property, state } from 'lit/decorators.js';
 
 import { parse, type ApexLog } from 'apex-log-parser';
 import { TAB_TO_SOURCE, eventBus } from '../../core/events/EventBus.js';
+import { logContext } from '../../core/log/logContext.js';
+import { setCurrentLog, type LogStore } from '../../core/log/LogStore.js';
 import {
   VSCodeExtensionMessenger,
   vscodeMessenger,
 } from '../../core/messaging/VSCodeExtensionMessenger.js';
-import { DatabaseAccess } from '../database/services/Database.js';
 import type { LogIssue } from '../notifications/types.js';
 import { installEscapeDeselect } from './escapeDeselect.js';
 import { deriveLogIdentity, type LogIdentityData } from './logIdentity.js';
@@ -58,6 +60,11 @@ export class LogViewer extends LitElement {
   logIdentity: LogIdentityData | null = null;
   @property()
   timelineRoot: ApexLog | null = null;
+
+  /** The log every view reads. A new log is a new store, so consumers re-render. */
+  @provide({ context: logContext })
+  @state()
+  private _logStore: LogStore | null = null;
 
   @state()
   _selectedTab = 'timeline-tab';
@@ -257,11 +264,11 @@ export class LogViewer extends LitElement {
       throw err;
     }
 
-    // The event-lookup service backs the inspector on every tab, so it is
-    // created with the parsed log rather than by whichever tab loads first.
-    await DatabaseAccess.create(apexLog);
-    // After the service holds the log, never before: whole-log content reads it
-    // straight from there.
+    // Published before the views render, so every tab reads the same log
+    // whichever one loads first.
+    this._logStore = setCurrentLog(apexLog);
+    // After the store holds the log, never before: the views still on the event
+    // read it straight from there.
     eventBus.emit('log:loaded', {});
 
     this.logSize = apexLog.size;

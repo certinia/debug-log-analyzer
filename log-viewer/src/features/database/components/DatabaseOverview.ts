@@ -1,8 +1,9 @@
 /*
  * Copyright (c) 2026 Certinia Inc. All rights reserved.
  */
+import { consume } from '@lit/context';
 import { LitElement, css, html, unsafeCSS, type TemplateResult } from 'lit';
-import { customElement } from 'lit/decorators.js';
+import { customElement, property } from 'lit/decorators.js';
 import { styleMap } from 'lit/directives/style-map.js';
 
 import { CategoryPaletteController } from '../../../components/categoryTime.js';
@@ -13,7 +14,8 @@ import {
 import { logNamespacePalette } from '../../../components/namespaceTime.js';
 import '../../../components/StackedTimeBar.js';
 import { segmentsWithTail } from '../../../components/StackedTimeBar.js';
-import { LogLoadedController } from '../../../core/events/LogLoadedController.js';
+import { logContext } from '../../../core/log/logContext.js';
+import type { LogStore } from '../../../core/log/LogStore.js';
 import { formatDuration, formatInteger } from '../../../core/utility/Util.js';
 import { globalStyles } from '../../../styles/global.styles.js';
 import { inspectorSectionStyles } from '../../../styles/inspectorSection.styles.js';
@@ -21,10 +23,9 @@ import { revealRowStyles } from '../../../styles/revealRow.styles.js';
 import type { SoqlBudget } from '../../soql/format/budget.js';
 import { formatSOQLToTemplate } from '../../soql/format/formatter.js';
 import { soqlSyntaxStyles } from '../../soql/styles/soql-syntax.css.js';
-import { DatabaseAccess } from '../services/Database.js';
 import {
   concentration,
-  currentDatabaseOverview,
+  databaseOverview,
   type DatabaseBreakdown,
   type DatabaseStatement,
   NO_STATEMENTS,
@@ -95,7 +96,11 @@ const sectionStyles = [
 @customElement('database-concentration')
 export class DatabaseConcentration extends LitElement {
   private readonly _palette = new CategoryPaletteController(this);
-  private readonly _logLoaded = new LogLoadedController(this);
+
+  /** The log on screen, from the app root. */
+  @consume({ context: logContext, subscribe: true })
+  @property({ attribute: false })
+  logStore: LogStore | null = null;
 
   static styles = [
     ...sectionStyles,
@@ -158,7 +163,8 @@ export class DatabaseConcentration extends LitElement {
   ];
 
   render() {
-    const overview = currentDatabaseOverview();
+    const log = this.logStore?.log;
+    const overview = log ? databaseOverview(log) : null;
     if (!overview?.ranked.length) {
       return html`<p class="note">${NO_STATEMENTS}</p>`;
     }
@@ -249,7 +255,10 @@ export class DatabaseConcentration extends LitElement {
  */
 @customElement('database-namespaces')
 export class DatabaseNamespaces extends LitElement {
-  private readonly _logLoaded = new LogLoadedController(this);
+  /** The log on screen, from the app root. */
+  @consume({ context: logContext, subscribe: true })
+  @property({ attribute: false })
+  logStore: LogStore | null = null;
 
   static styles = [
     ...sectionStyles,
@@ -266,8 +275,8 @@ export class DatabaseNamespaces extends LitElement {
   ];
 
   render() {
-    const overview = currentDatabaseOverview();
-    const log = DatabaseAccess.instance()?.getApexLog();
+    const log = this.logStore?.log;
+    const overview = log ? databaseOverview(log) : null;
     if (!overview?.askedBy.length || !log) {
       return html`<p class="note">${NO_STATEMENTS}</p>`;
     }
