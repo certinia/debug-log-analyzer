@@ -13,8 +13,8 @@ export const CHECK_EVERY = 256;
 export interface FrameBudgetOptions {
   /** Hands the frame back between work slices. */
   yieldFrame: () => Promise<void>;
-  /** Polled after each yield; true abandons the build, which then returns null. */
-  cancelled?: () => boolean;
+  /** Aborting it abandons the build, which then returns null. */
+  signal?: AbortSignal;
 }
 
 /** Returns false once the build has been abandoned. */
@@ -37,6 +37,6 @@ export function frameBudget(options: FrameBudgetOptions): Tick {
     }
     await options.yieldFrame();
     deadline = performance.now() + SLICE_MS;
-    return !options.cancelled?.();
+    return !options.signal?.aborted;
   };
 }

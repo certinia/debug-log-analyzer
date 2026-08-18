@@ -155,6 +155,9 @@ export class DatabaseTime extends LitElement {
   /** eventIndex to the ids of the rows that name it, built on the first mark. */
   private _rowsByEvent: Map<number, number[]> | null = null;
 
+  /** The build in flight; a newer one aborts it, and so does a disconnect. */
+  private _building: AbortController | null = null;
+
   private readonly _logLoaded = new LogLoadedController(this, () => {
     void this._build();
   });
@@ -209,6 +212,7 @@ export class DatabaseTime extends LitElement {
     this._locateUnsubscribe = undefined;
     this._selectionClearUnsubscribe?.();
     this._selectionClearUnsubscribe = undefined;
+    this._building?.abort();
     // Rows go with the table, so the mark can't outlive them.
     this._locatedRow.clear();
     this._table?.destroy();
@@ -268,12 +272,14 @@ export class DatabaseTime extends LitElement {
 
   private async _build(): Promise<void> {
     const overview = currentDatabaseOverview();
+    this._building?.abort();
+    const { signal } = (this._building = new AbortController());
     // Wait for the host to lay out before Tabulator measures column widths —
     // building against a zero-width host makes the columns overlap.
     await this.updateComplete;
     await waitForNextFrame();
     const container = this._host();
-    if (!container || !this.isConnected) {
+    if (!container || signal.aborted) {
       return;
     }
 
