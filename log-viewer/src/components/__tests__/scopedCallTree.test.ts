@@ -40,13 +40,11 @@ soql.parent = m2;
 const byId = new Map<number, FakeEvent>([exec, m1, m2, soql].map((e) => [e.eventIndex, e]));
 
 let selectedIndex = 4;
-jest.mock('../../features/database/services/Database.js', () => ({
-  DatabaseAccess: {
-    instance: () => ({
-      getApexLog: () => root,
-      getEventByIndex: (i: number) => byId.get(i) ?? null,
-    }),
-  },
+jest.mock('../../core/log/LogStore.js', () => ({
+  currentLogStore: () => ({
+    log: root,
+    eventByIndex: (i: number) => byId.get(i) ?? null,
+  }),
 }));
 
 import {

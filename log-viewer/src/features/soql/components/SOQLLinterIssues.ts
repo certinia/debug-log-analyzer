@@ -6,7 +6,7 @@ import { LitElement, css, html, type PropertyValues } from 'lit';
 import { customElement, property, state } from 'lit/decorators.js';
 
 import type { SOQLExecuteBeginLine } from 'apex-log-parser';
-import { DatabaseAccess } from '../../database/services/Database.js';
+import { currentLogStore } from '../../../core/log/LogStore.js';
 import {
   QueryPlanCostRule,
   SEVERITY_TYPES,
@@ -30,9 +30,7 @@ function getIssuesFromSOQLLine(soqlLine: SOQLExecuteBeginLine | null): SOQLLinte
 /** Lint the SOQL at `eventIndex`, combining explain-line + linter rules, sorted by severity. */
 export async function computeSoqlIssues(eventIndex: number): Promise<SOQLLinterRule[]> {
   const stack =
-    eventIndex >= 0
-      ? (DatabaseAccess.instance()?.getStackByEventIndex(eventIndex).reverse() ?? [])
-      : [];
+    eventIndex >= 0 ? (currentLogStore()?.stackByEventIndex(eventIndex).reverse() ?? []) : [];
   const soqlLine = stack[0] as SOQLExecuteBeginLine | undefined;
   if (!soqlLine) {
     return [];

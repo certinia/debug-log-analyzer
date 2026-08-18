@@ -356,6 +356,54 @@ describe('log-diagnostics', () => {
     expect(text(element, '.title')).toEqual(['Stopped.', 'Slow.', 'Noted.']);
   });
 
+  it('releases a held severity when a new log brings new findings', async () => {
+    result.diagnostics = [
+      { id: 'a', severity: 'Error', summary: 'Stopped.', message: '', count: 1, eventIndex: 1 },
+      { id: 'b', severity: 'Info', summary: 'Noted.', message: '', count: 1, eventIndex: 2 },
+    ];
+    const element = await view();
+    element.shadowRoot!.querySelector<HTMLButtonElement>('.rollup__seg')!.click();
+    await element.updateComplete;
+    expect(text(element, '.title')).toEqual(['Stopped.']);
+
+    // The next log has nothing at that severity, and with one band left there is
+    // no roll-up to release it with, so the filter must not outlive the list.
+    result = { ...result, diagnostics: [result.diagnostics[1]!] };
+    eventBus.emit('log:loaded', {});
+    await element.updateComplete;
+    await element.updateComplete;
+    expect(text(element, '.title')).toEqual(['Noted.']);
+  });
+
+  it('opens the finding that was clicked when two share a summary', async () => {
+    // The SOQL linter's summaries are fixed strings, so one per sObject repeats.
+    result.diagnostics = [
+      {
+        id: 'plan-scan|Account',
+        severity: 'Warning',
+        summary: 'Full table scan.',
+        message: 'Account',
+        count: 1,
+        eventIndex: 1,
+      },
+      {
+        id: 'plan-scan|Contact',
+        severity: 'Warning',
+        summary: 'Full table scan.',
+        message: 'Contact',
+        count: 1,
+        eventIndex: 2,
+      },
+    ];
+    const element = await view();
+    const first = element.shadowRoot!.querySelector('details')!;
+    first.open = true;
+    first.dispatchEvent(new Event('toggle'));
+    await element.updateComplete;
+
+    expect(text(element, '.detail')).toEqual(['Account']);
+  });
+
   it('leaves the roll-up out when one severity is the whole list', async () => {
     result.diagnostics = [
       { id: 'a', severity: 'Info', summary: 'Noted.', message: '', count: 1, eventIndex: 1 },

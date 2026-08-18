@@ -3,8 +3,8 @@
  */
 import type { LogEvent } from 'apex-log-parser';
 
+import { currentLogStore } from '../core/log/LogStore.js';
 import { EXCLUDED_DETAIL_TYPES } from '../features/call-tree/utils/DetailsFilter.js';
-import { DatabaseAccess } from '../features/database/services/Database.js';
 import {
   CHECK_EVERY,
   frameBudget,
@@ -179,17 +179,17 @@ export async function buildScopedCallTree(
   instances: number[] | null | undefined,
   options: FrameBudgetOptions,
 ): Promise<ScopedCallTree | null> {
-  const db = DatabaseAccess.instance();
-  const apexLog = db?.getApexLog();
-  if (!db || !apexLog) {
+  const store = currentLogStore();
+  if (!store) {
     return null;
   }
+  const apexLog = store.log;
 
   // An aggregate selection scopes to every occurrence of the frame; a single
   // selection to just itself.
   const indexes = instances?.length ? instances : eventIndex >= 0 ? [eventIndex] : [];
   const selectedEvents = indexes
-    .map((i) => db.getEventByIndex(i))
+    .map((i) => store.eventByIndex(i))
     .filter((e): e is LogEvent => e !== null);
   if (!selectedEvents.length) {
     return null;
@@ -282,7 +282,7 @@ function lazyCallTree(
 export async function buildWholeLogCallTree(
   options: FrameBudgetOptions,
 ): Promise<ScopedCallTree | null> {
-  const apexLog = DatabaseAccess.instance()?.getApexLog();
+  const apexLog = currentLogStore()?.log;
   if (!apexLog) {
     return null;
   }

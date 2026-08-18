@@ -8,10 +8,8 @@ import { emptyLimits } from '../../../../components/__tests__/limitsTestUtils.js
 
 let log: ApexLog | null = null;
 
-jest.mock('../../../database/services/Database.js', () => ({
-  DatabaseAccess: {
-    instance: () => (log ? { getApexLog: () => log, getStackByEventIndex: () => [] } : null),
-  },
+jest.mock('../../../../core/log/LogStore.js', () => ({
+  currentLogStore: () => (log ? { log, stackByEventIndex: () => [] } : null),
 }));
 
 import { computeLogDiagnostics, scopeDiagnostics } from '../LogDiagnostics.js';
@@ -679,6 +677,27 @@ describe('computeLogDiagnostics', () => {
     const { diagnostics, logNs } = await computeLogDiagnostics();
     expect(logNs).toBe(1_000);
     expect(diagnostics.find((d) => d.id.startsWith('repeat-line|'))?.timeNs).toBe(300);
+  });
+
+  it('counts a statement inside another once, so a re-fired trigger is not doubled', async () => {
+    // A trigger that inserts again re-fires itself, so the nested DML's time is
+    // already inside the outer one's total.
+    const dmls = Array.from({ length: 5 }, (_, index) =>
+      dml({
+        eventIndex: index,
+        lineNumber: 10 + index,
+        text: 'DML Op:Insert Type:Account',
+        sObjectType: 'Account',
+        duration: { self: 60, total: 100 },
+      } as Partial<LogEvent>),
+    );
+    const [outer, nested] = dmls as [LogEvent, LogEvent];
+    Object.assign(nested, { parent: outer });
+    Object.assign(outer, { children: [nested], isParent: true });
+    log = apexLog({ duration: { self: 0, total: 1_000 }, eventsById: dmls });
+
+    const { diagnostics } = await computeLogDiagnostics();
+    expect(diagnostics.find((d) => d.id.startsWith('repeat-text|'))?.timeNs).toBe(400);
   });
 
   it('leaves a debug finding untimed, since the log measures no duration for one', async () => {

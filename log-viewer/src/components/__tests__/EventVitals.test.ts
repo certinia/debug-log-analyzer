@@ -6,7 +6,7 @@
 import { beforeAll, describe, expect, it } from '@jest/globals';
 import { parse } from 'apex-log-parser';
 
-import { DatabaseAccess } from '../../features/database/services/Database.js';
+import { logStoreFor, type LogStore } from '../../core/log/LogStore.js';
 
 // Avoid the heavy CodeBlock import chain (vscode-elements, soql formatter); the
 // field order is expressed by the `.label` spans, not the code preview.
@@ -41,22 +41,24 @@ function valueFor(el: EventVitals, label: string): string | undefined {
   return undefined;
 }
 
-async function mount(props: Partial<EventVitals>): Promise<EventVitals> {
+/** No provider in the test, so the consumed store is assigned straight on. */
+async function mount(store: LogStore, props: Partial<EventVitals>): Promise<EventVitals> {
   const el = document.createElement('event-vitals') as EventVitals;
-  Object.assign(el, props);
+  Object.assign(el, { logStore: store }, props);
   document.body.appendChild(el);
   await el.updateComplete;
   return el;
 }
 
 describe('EventVitals', () => {
+  let store: LogStore;
   let soqlIndex = -1;
   let dmlIndex = -1;
   let soslIndex = -1;
 
-  beforeAll(async () => {
+  beforeAll(() => {
     const apexLog = parse(log);
-    await DatabaseAccess.create(apexLog);
+    store = logStoreFor(apexLog);
     soqlIndex = apexLog.eventsById.find((e) => e.text === 'SELECT Id FROM Account')!.eventIndex;
     dmlIndex = apexLog.eventsById.find((e) => e.text?.startsWith('DML'))!.eventIndex;
     soslIndex = apexLog.eventsById.find((e) => e.text?.startsWith('SOSL'))!.eventIndex;
@@ -64,7 +66,7 @@ describe('EventVitals', () => {
   });
 
   it('leads with type and timing, then the metrics, plan and source', async () => {
-    const el = await mount({ eventIndex: soqlIndex, type: 'soql' });
+    const el = await mount(store, { eventIndex: soqlIndex, type: 'soql' });
     // No explain line at this log level, so the query-plan fields are omitted.
     expect(labels(el)).toEqual([
       'Type',
@@ -79,18 +81,18 @@ describe('EventVitals', () => {
 
   it('omits the caller namespace when it matches the namespace', async () => {
     // Nothing to learn from "default called default" — see the differing case below.
-    const el = await mount({ eventIndex: soqlIndex, type: 'soql' });
+    const el = await mount(store, { eventIndex: soqlIndex, type: 'soql' });
     expect(labels(el)).not.toContain('Caller namespace');
   });
 
   it('reports total and self time inline, to 3 decimal places', async () => {
-    const el = await mount({ eventIndex: soslIndex, type: 'sosl' });
+    const el = await mount(store, { eventIndex: soslIndex, type: 'sosl' });
     expect(valueFor(el, 'Time')).toMatch(/^-?\d+\.\d{3} ms \(self -?\d+\.\d{3} ms\)$/);
   });
 
   it('reports a metric once, as used / limit with a percentage', async () => {
     // SOSL rows are capped per query, so a single SOSL statement has a limit.
-    const el = await mount({ eventIndex: soslIndex, type: 'sosl' });
+    const el = await mount(store, { eventIndex: soslIndex, type: 'sosl' });
     expect(valueFor(el, 'SOSL Rows')).toBe('5 / 2,000 (0.25%)');
     // The limit is the denominator — never a second row repeating it.
     expect(labels(el).filter((l) => /limit/i.test(l))).toEqual([]);
@@ -98,14 +100,14 @@ describe('EventVitals', () => {
   });
 
   it('omits the limit when the metric has no transaction total', async () => {
-    const el = await mount({ eventIndex: dmlIndex, type: 'dml' });
+    const el = await mount(store, { eventIndex: dmlIndex, type: 'dml' });
     expect(valueFor(el, 'DML Rows')).toBe('2');
   });
 
   it("always shows the statement's own row count, even at zero", async () => {
     // The SOQL in this log reports Rows:3 on its END line; a statement's row
     // count is its headline number so it is never zero-suppressed.
-    const el = await mount({ eventIndex: soqlIndex, type: 'soql' });
+    const el = await mount(store, { eventIndex: soqlIndex, type: 'soql' });
     expect(labels(el)).toContain('SOQL Rows');
   });
 
@@ -113,21 +115,21 @@ describe('EventVitals', () => {
     // This log has no EXPLAIN line, so assert the naming contract via a log that
     // does: the plan row combines leading op/object/index, and the cardinalities
     // keep Salesforce's terms so it is clear whose rows they count.
-    const el = await mount({ eventIndex: soqlIndex, type: 'soql' });
+    const el = await mount(store, { eventIndex: soqlIndex, type: 'soql' });
     const shown = labels(el);
     expect(shown).not.toContain('Est. rows');
     expect(shown).not.toContain('Object rows');
   });
 
   it('omits fields with no value', async () => {
-    const el = await mount({ eventIndex: dmlIndex, type: 'dml' });
+    const el = await mount(store, { eventIndex: dmlIndex, type: 'dml' });
     // A DML statement allocates no heap and throws nothing in this log.
     expect(labels(el)).not.toContain('Heap net');
     expect(labels(el)).not.toContain('Throws');
   });
 
   it('sums across occurrences and reports Calls/Avg for an aggregate', async () => {
-    const el = await mount({ instances: [soqlIndex, soslIndex] });
+    const el = await mount(store, { instances: [soqlIndex, soslIndex] });
     const shown = labels(el);
     expect(shown).toContain('Calls');
     expect(shown).toContain('Avg');
@@ -135,13 +137,13 @@ describe('EventVitals', () => {
   });
 
   it('reports nothing when the event is unknown', async () => {
-    const el = await mount({ eventIndex: -1 });
+    const el = await mount(store, { eventIndex: -1 });
     expect(el.shadowRoot?.querySelector('.empty')).not.toBeNull();
   });
 });
 
-// Its own log (and so its own DatabaseAccess) because the caller's namespace has
-// to differ from the callee's, which the log above never does.
+// Its own log (and so its own store) because the caller's namespace has to
+// differ from the callee's, which the log above never does.
 describe('EventVitals across namespaces', () => {
   const crossNamespaceLog =
     '09:18:22.6 (100)|EXECUTION_STARTED\n' +
@@ -154,11 +156,11 @@ describe('EventVitals across namespaces', () => {
 
   it('shows the caller namespace when it differs', async () => {
     const apexLog = parse(crossNamespaceLog);
-    await DatabaseAccess.create(apexLog);
+    const store = logStoreFor(apexLog);
     // Packaged code entered from a trigger: whose code ran and who invoked it are
     // different answers, so both are reported.
     const pkg = apexLog.eventsById.find((e) => e.type === 'ENTERING_MANAGED_PKG')!;
-    const el = await mount({ eventIndex: pkg.eventIndex });
+    const el = await mount(store, { eventIndex: pkg.eventIndex });
     expect(valueFor(el, 'Namespace')).toBe('c2g');
     expect(labels(el)).toContain('Caller namespace');
     expect(valueFor(el, 'Caller namespace')).not.toBe('c2g');

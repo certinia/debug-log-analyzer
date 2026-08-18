@@ -9,6 +9,7 @@
   },
   "dependencies": {
     "@apexdevtools/apex-parser": "5.1.0",
+    "@lit/context": "^1.1.6",
     "@vscode-elements/elements": "^2.5.1",
     "@vscode/codicons": "^0.0.45",
     "antlr4": "4.13.2",

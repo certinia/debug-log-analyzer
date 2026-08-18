@@ -12,7 +12,8 @@ import type {
 import { GOVERNOR_METRICS, limitTotals } from '../../../components/logOverviewMetrics.js';
 import { formatByteSize, formatDuration, formatInteger } from '../../../core/utility/Util.js';
 import { getEventKey } from '../../call-tree/utils/Aggregation.js';
-import { DatabaseAccess } from '../../database/services/Database.js';
+import { currentLogStore } from '../../../core/log/LogStore.js';
+import { outermostEvents } from '../../../core/utility/EventTree.js';
 import { deriveSoqlObject } from '../../database/services/sobjectClassification.js';
 import type { Dialect } from '../../soql/format/tokenize.js';
 import { apexLimitTimeSeries } from '../../timeline/optimised/apex-limit-series.js';
@@ -153,9 +154,9 @@ interface Group {
   events: LogEvent[];
 }
 
-/** How long a set of events took between them. */
+/** How long a set of events took between them, an event inside another counted once. */
 function totalTime(events: readonly LogEvent[]): number {
-  return events.reduce((sum, event) => sum + event.duration.total, 0);
+  return outermostEvents(events).reduce((sum, event) => sum + event.duration.total, 0);
 }
 
 function groupBy(events: LogEvent[], key: (event: LogEvent) => string | null): Map<string, Group> {
@@ -514,7 +515,7 @@ function repetitionDiagnostics(statements: LogEvent[], label: string): Diagnosti
       id: `repeat-text|${label}|${text}`,
       severity: 'Warning',
       summary: `${group.count} identical ${label} statements, from ${sites.size} lines`,
-      message: `The same statement ran ${group.count} times from ${sites.size} places. Run it once and pass the result around, or cache it for the transaction.`,
+      message: `The same statement ran ${group.count} times from ${sites.size} places. Run it once and pass the result around, or work on the whole collection at once.`,
       count: group.count,
       timeNs: totalTime(group.events),
       eventIndex: group.eventIndex,
@@ -764,11 +765,11 @@ async function soqlLintDiagnostics(queries: SOQLExecuteBeginLine[]): Promise<{
     .slice(0, MAX_LINTED_QUERIES);
 
   const linter = new SOQLLinter();
-  const database = DatabaseAccess.instance();
+  const store = currentLogStore();
   const grouped = new Map<string, Diagnostic>();
 
   for (const [text, group] of distinct) {
-    const stack = database?.getStackByEventIndex(group.eventIndex).reverse() ?? [];
+    const stack = store?.stackByEventIndex(group.eventIndex).reverse() ?? [];
     for (const rule of await linter.lint(text, stack)) {
       const id = `soql|${rule.summary}`;
       const line = {
@@ -817,7 +818,7 @@ let cached: { log: ApexLog; result: Promise<LogDiagnostics> } | null = null;
  * changes. {@link scopeDiagnostics} narrows this result instead.
  */
 export function computeLogDiagnostics(): Promise<LogDiagnostics> {
-  const log = DatabaseAccess.instance()?.getApexLog();
+  const log = currentLogStore()?.log;
   if (!log) {
     return Promise.resolve(EMPTY);
   }
@@ -840,7 +841,7 @@ export function scopeDiagnostics(
   result: LogDiagnostics,
   instances: readonly number[],
 ): LogDiagnostics {
-  const log = DatabaseAccess.instance()?.getApexLog();
+  const log = currentLogStore()?.log;
   const within = new Set(instances);
   if (!log || !within.size) {
     return { ...result, diagnostics: [] };

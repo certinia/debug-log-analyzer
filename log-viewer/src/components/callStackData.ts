@@ -1,8 +1,8 @@
 /*
  * Copyright (c) 2025 Certinia Inc. All rights reserved.
  */
+import { currentLogStore } from '../core/log/LogStore.js';
 import { EXCLUDED_DETAIL_TYPES } from '../features/call-tree/utils/DetailsFilter.js';
-import { DatabaseAccess } from '../features/database/services/Database.js';
 
 export interface CallStackRow {
   eventIndex: number;
@@ -26,8 +26,7 @@ export function buildCallStackData(eventIndex: number): {
   rows: CallStackRow[];
   rootTotal: number;
 } {
-  const stack =
-    eventIndex >= 0 ? (DatabaseAccess.instance()?.getStackByEventIndex(eventIndex) ?? []) : [];
+  const stack = eventIndex >= 0 ? (currentLogStore()?.stackByEventIndex(eventIndex) ?? []) : [];
   const rows = stack
     .filter((entry) => !EXCLUDED_DETAIL_TYPES.has(entry.type ?? ''))
     .map((entry) => ({

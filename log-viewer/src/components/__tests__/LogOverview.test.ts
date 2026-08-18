@@ -6,16 +6,9 @@
 import type { GovernorLimits } from 'apex-log-parser';
 import { beforeEach, describe, expect, it } from '@jest/globals';
 
+import type { LogStore } from '../../core/log/LogStore.js';
 import type { HeatStripTimeSeries } from '../../features/timeline/types/flamechart.types.js';
 import { emptyLimits, seriesEvent, timeSeries } from './limitsTestUtils.js';
-
-// The log arrives after the first paint, which is the case this covers.
-let governorLimits: GovernorLimits | null = null;
-jest.mock('../../features/database/services/Database.js', () => ({
-  DatabaseAccess: {
-    instance: () => (governorLimits ? { getApexLog: () => ({ governorLimits }) } : null),
-  },
-}));
 
 // The metric strip's series, which the overview always reads its gauges from
 // so they match the timeline and the trend charts.
@@ -24,7 +17,7 @@ jest.mock('../../features/timeline/optimised/apex-limit-series.js', () => ({
   apexLimitTimeSeries: () => mockSeries,
 }));
 
-import { eventBus } from '../../core/events/EventBus.js';
+import type { LogOverview } from '../LogOverview.js';
 import '../LogOverview.js';
 
 const overview = async () => {
@@ -34,10 +27,15 @@ const overview = async () => {
   return element;
 };
 
+/** No provider in the test, so the consumed store is assigned straight on. */
+const loadLog = async (element: LogOverview, governorLimits: GovernorLimits) => {
+  element.logStore = { log: { governorLimits } } as unknown as LogStore;
+  await element.updateComplete;
+};
+
 describe('log-overview', () => {
   beforeEach(() => {
     document.body.replaceChildren();
-    governorLimits = null;
     mockSeries = timeSeries();
   });
 
@@ -55,14 +53,12 @@ describe('log-overview', () => {
   it('shows the series gauges without a note while the log holds snapshots', async () => {
     const element = await overview();
 
-    governorLimits = {
+    mockSeries = seriesWithSoql();
+    await loadLog(element, {
       ...emptyLimits(),
       byNamespace: new Map(),
       snapshots: [{ timestamp: 1_000, namespace: 'default', limits: emptyLimits() }],
-    } as GovernorLimits;
-    mockSeries = seriesWithSoql();
-    eventBus.emit('log:loaded', {});
-    await element.updateComplete;
+    } as GovernorLimits);
 
     expect(element.shadowRoot?.querySelector('governor-summary')).not.toBeNull();
     expect(element.shadowRoot?.querySelector('.note')).toBeNull();
@@ -71,10 +67,12 @@ describe('log-overview', () => {
   it('says the figures are estimated when cumulative limits are absent', async () => {
     const element = await overview();
 
-    governorLimits = { ...emptyLimits(), byNamespace: new Map(), snapshots: [] } as GovernorLimits;
     mockSeries = seriesWithSoql();
-    eventBus.emit('log:loaded', {});
-    await element.updateComplete;
+    await loadLog(element, {
+      ...emptyLimits(),
+      byNamespace: new Map(),
+      snapshots: [],
+    } as GovernorLimits);
 
     expect(element.shadowRoot?.querySelector('governor-summary')).not.toBeNull();
     expect(element.shadowRoot?.querySelector('.note')?.textContent).toContain('estimated');
@@ -83,9 +81,11 @@ describe('log-overview', () => {
   it('says the totals are unknown when the series itself is empty', async () => {
     const element = await overview();
 
-    governorLimits = { ...emptyLimits(), byNamespace: new Map(), snapshots: [] } as GovernorLimits;
-    eventBus.emit('log:loaded', {});
-    await element.updateComplete;
+    await loadLog(element, {
+      ...emptyLimits(),
+      byNamespace: new Map(),
+      snapshots: [],
+    } as GovernorLimits);
 
     expect(element.shadowRoot?.querySelector('governor-summary')).toBeNull();
     expect(element.shadowRoot?.querySelector('.note')?.textContent).toContain(
