@@ -615,6 +615,34 @@ describe('RetrieveLogFile', () => {
   });
 
   describe('safeCommand error handling', () => {
+    it('reports when Salesforce denies access to the selected log body', async () => {
+      mockListLogs.mockResolvedValue([
+        {
+          Id: 'denied-log',
+          LogUser: { Name: 'User' },
+          Operation: 'Op',
+          LogLength: 1024,
+          DurationMilliseconds: 100,
+          StartTime: '2024-01-01T00:00:00.000Z',
+          Status: 'Success',
+        },
+      ]);
+      mockQuickPickPick.mockResolvedValue([{ logId: 'denied-log' }]);
+      mockGetLogBody.mockResolvedValue('AccessDeniedAccess Denied');
+
+      const mockContext = createMockContext();
+      RetrieveLogFile.apply(mockContext as unknown as import('../../Context.js').Context);
+
+      const lastCall = mockRegisterCommand.mock.calls[mockRegisterCommand.mock.calls.length - 1];
+      await lastCall[1]();
+
+      expect(mockContext.display.showErrorMessage).toHaveBeenCalledWith(
+        'Error loading logfile: Salesforce denied access to the body of Apex log denied-log. ' +
+          'Verify that the authenticated user can access ApexLog records and their bodies.',
+      );
+      expect(mockCreateView).not.toHaveBeenCalled();
+    });
+
     it('should catch Error and display error message', async () => {
       const mockContext = createMockContext();
       RetrieveLogFile.apply(mockContext as unknown as import('../../Context.js').Context);

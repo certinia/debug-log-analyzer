@@ -65,6 +65,7 @@ export class RetrieveLogFile {
       if (logFileId) {
         const logUri = this.getLogFileUri(Uri.parse(wsFolder.uri), logFileId);
         const logBody = await getLogBody(logFileId);
+        RetrieveLogFile.assertRetrievedLog(logFileId, logBody);
 
         try {
           await writeFile(logUri, logBody);
@@ -162,5 +163,14 @@ export class RetrieveLogFile {
     // Build .sfdx/tools/debug/logs/{fileId}.log relative to the workspace root.
     // Utils.joinPath works on both desktop (file://) and web (vscode-vfs://, memfs://).
     return Utils.joinPath(wsUri, '.sfdx', 'tools', 'debug', 'logs', `${fileId}.log`);
+  }
+
+  private static assertRetrievedLog(logId: string, logBody: string): void {
+    if (/^accessdenied(?:access denied)?$/i.test(logBody.trim())) {
+      throw new Error(
+        `Salesforce denied access to the body of Apex log ${logId}. ` +
+          'Verify that the authenticated user can access ApexLog records and their bodies.',
+      );
+    }
   }
 }
