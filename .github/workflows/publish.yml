@@ -35,7 +35,7 @@ permissions:
 
 jobs:
   publish:
-    uses: salesforcecli/github-workflows/.github/workflows/vscode-publish-extensions.yml@ph/W-23832274-pnpm-stable-promotion
+    uses: salesforcecli/github-workflows/.github/workflows/vscode-publish-extensions.yml@main
     with:
       branch: ${{ github.ref_name }}
       extensions: lana

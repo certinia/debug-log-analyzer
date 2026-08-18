@@ -61,7 +61,7 @@ permissions:
 
 jobs:
   publish:
-    uses: salesforcecli/github-workflows/.github/workflows/vscode-manual-publish.yml@ph/W-23832274-pnpm-stable-promotion
+    uses: salesforcecli/github-workflows/.github/workflows/vscode-manual-publish.yml@main
     with:
       extension-name: lana
       vsix-name-pattern: 'lana-*.vsix'

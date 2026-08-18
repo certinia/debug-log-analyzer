@@ -21,7 +21,7 @@ permissions:
 
 jobs:
   promote:
-    uses: salesforcecli/github-workflows/.github/workflows/vscode-promote-stable.yml@ph/W-23832274-pnpm-stable-promotion
+    uses: salesforcecli/github-workflows/.github/workflows/vscode-promote-stable.yml@main
     with:
       extension-name: lana
       vsix-name-pattern: 'lana-*.vsix'
