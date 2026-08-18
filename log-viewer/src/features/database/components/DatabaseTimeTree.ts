@@ -37,8 +37,8 @@ import {
   headerSortElement,
   registerTableModules,
   virtualScrollOptions,
-  waitForNextFrame,
 } from '../../call-tree/components/TableShared.js';
+import { waitForNextFrame } from '../../../core/utility/FrameBudget.js';
 import { soqlInlineElement } from '../../soql/format/inlineCell.js';
 import { soqlSyntaxStyles } from '../../soql/styles/soql-syntax.css.js';
 import {

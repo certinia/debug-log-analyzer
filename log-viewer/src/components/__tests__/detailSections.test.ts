@@ -15,6 +15,7 @@ jest.mock('../GovernorTrends.js', () => ({}));
 jest.mock('../HotPath.js', () => ({}));
 jest.mock('../HotSpots.js', () => ({}));
 jest.mock('../LogOverview.js', () => ({}));
+jest.mock('../NamespaceTimeBar.js', () => ({}));
 jest.mock('../../features/database/components/DatabaseOverview.js', () => ({}));
 jest.mock('../../features/database/components/DatabaseTimeTree.js', () => ({}));
 
@@ -53,7 +54,12 @@ function rendered(sections: PaneSection[], id: string, tag: string): Element {
 describe('buildDetailSections', () => {
   it('builds the shared trio for a timeline frame', async () => {
     const sections = await buildDetailSections('timeline', { kind: 'event', eventIndex: 4 });
-    expect(sections.map((s) => s.id)).toEqual(['vitals', 'callstack', 'calltree']);
+    expect(sections.map((s) => s.id)).toEqual([
+      'vitals',
+      'namespace-time',
+      'callstack',
+      'calltree',
+    ]);
     // The call tree gets the most room, so it is the section worth reading.
     expect(sections.find((s) => s.id === 'calltree')?.weight).toBe(4);
     // The vitals are a fixed set of figures: they take their own height only.
@@ -154,6 +160,37 @@ describe('buildDetailSections', () => {
 
   it('leaves the findings out for a selection from another tab', async () => {
     const sections = await buildDetailSections('timeline', { kind: 'event', eventIndex: 4 });
+    expect(sections.map((s) => s.id)).toEqual([
+      'vitals',
+      'namespace-time',
+      'callstack',
+      'calltree',
+    ]);
+  });
+
+  it('re-scopes the namespace split to the frame being followed', async () => {
+    const sections = await buildDetailSections('timeline', { kind: 'event', eventIndex: 4 }, 2);
+
+    expect(
+      rendered(sections, 'namespace-time', 'namespace-time-bar').getAttribute('eventIndex'),
+    ).toBe('2');
+  });
+
+  it('scopes the namespace split to every occurrence of an aggregate', async () => {
+    const sections = await buildDetailSections('timeline', {
+      kind: 'aggregate',
+      instances: [11, 12, 13],
+      label: 'MyClass.run()',
+    });
+
+    const bar = rendered(sections, 'namespace-time', 'namespace-time-bar') as HTMLElement & {
+      instances: number[] | null;
+    };
+    expect(bar.instances).toEqual([11, 12, 13]);
+  });
+
+  it('leaves the namespace split out for a selection from another tab', async () => {
+    const sections = await buildDetailSections('calltree', { kind: 'event', eventIndex: 4 });
     expect(sections.map((s) => s.id)).toEqual(['vitals', 'callstack', 'calltree']);
   });
 
@@ -203,6 +240,7 @@ describe('buildDetailSections', () => {
     expect(sections.map((s) => s.id)).toEqual([
       'overview',
       'category-time',
+      'namespace-time',
       'governor-trends',
       'calltree',
     ]);
