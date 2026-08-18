@@ -13,6 +13,7 @@ import { GOVERNOR_METRICS, limitTotals } from '../../../components/logOverviewMe
 import { formatByteSize, formatDuration, formatInteger } from '../../../core/utility/Util.js';
 import { getEventKey } from '../../call-tree/utils/Aggregation.js';
 import { currentLogStore } from '../../../core/log/LogStore.js';
+import { outermostEvents } from '../../../core/utility/EventTree.js';
 import { deriveSoqlObject } from '../../database/services/sobjectClassification.js';
 import type { Dialect } from '../../soql/format/tokenize.js';
 import { apexLimitTimeSeries } from '../../timeline/optimised/apex-limit-series.js';
@@ -153,9 +154,9 @@ interface Group {
   events: LogEvent[];
 }
 
-/** How long a set of events took between them. */
+/** How long a set of events took between them, an event inside another counted once. */
 function totalTime(events: readonly LogEvent[]): number {
-  return events.reduce((sum, event) => sum + event.duration.total, 0);
+  return outermostEvents(events).reduce((sum, event) => sum + event.duration.total, 0);
 }
 
 function groupBy(events: LogEvent[], key: (event: LogEvent) => string | null): Map<string, Group> {

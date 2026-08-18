@@ -122,19 +122,17 @@ export class LogDiagnosticsView extends LitElement {
     // Keyed on the occurrences themselves: the host builds the array in its own
     // render, so its identity changes even when the selection has not.
     const scope = this.instances?.join(',') ?? '';
-    const moved = scope !== this._scope;
-    if (moved) {
-      // A new selection is a new list, so a severity held from the last one would
-      // hide findings the reader has not seen.
-      this._scope = scope;
-      this._filters = [];
-      this._open = new Set();
+    if (scope === this._scope && this._all === this._scoped) {
+      return;
     }
-    if (moved || this._all !== this._scoped) {
-      this._scoped = this._all;
-      this._result =
-        this._all && this.instances ? scopeDiagnostics(this._all, this.instances) : this._all;
-    }
+    // A new selection or a new log is a new list of findings, so a severity held
+    // from the last one would hide findings the reader has not seen.
+    this._scope = scope;
+    this._scoped = this._all;
+    this._filters = [];
+    this._open = new Set();
+    this._result =
+      this._all && this.instances ? scopeDiagnostics(this._all, this.instances) : this._all;
   }
 
   override updated() {
@@ -460,7 +458,8 @@ export class LogDiagnosticsView extends LitElement {
         shown.length
           ? shown.map((diagnostic) => {
               const severity = diagnostic.severity.toLowerCase();
-              const key = `${diagnostic.severity}:${diagnostic.summary}`;
+              // The id, not the summary: two sObjects share one linter summary.
+              const key = diagnostic.id;
               const open = this._open.has(key);
               return html`<details
                 ?open=${open}
