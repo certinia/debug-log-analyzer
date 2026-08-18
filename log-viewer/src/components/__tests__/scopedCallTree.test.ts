@@ -242,7 +242,6 @@ describe('buildScopedCallTree', () => {
         yields += 1;
         return Promise.resolve();
       },
-      cancelled: () => false,
     };
 
     // Every clock read lands past the slice deadline, so each check yields —
@@ -270,7 +269,7 @@ describe('buildScopedCallTree', () => {
       // The first yield is the first chance to notice; nothing is returned after it.
       const tree = await buildScopedCallTree(instances[0]!, instances, {
         yieldFrame: () => Promise.resolve(),
-        cancelled: () => true,
+        signal: AbortSignal.abort(),
       });
       expect(tree).toBeNull();
     } finally {
@@ -330,7 +329,7 @@ describe('buildWholeLogCallTree', () => {
     try {
       const tree = await buildWholeLogCallTree({
         yieldFrame: () => Promise.resolve(),
-        cancelled: () => true,
+        signal: AbortSignal.abort(),
       });
       expect(tree).toBeNull();
     } finally {

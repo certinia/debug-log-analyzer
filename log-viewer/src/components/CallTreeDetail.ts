@@ -156,8 +156,8 @@ export class CallTreeDetail extends LitElement {
   // computed once per selection and shared across the mode tables.
   private _scoped: ScopedCallTree | null = null;
 
-  // Guards against a slow view-switch resolving after a newer one.
-  private _switchEpoch = 0;
+  // The build in flight; a newer view-switch aborts it, and so does a disconnect.
+  private _switch: AbortController | null = null;
 
   /** True while a scoped build is in flight. Read by the tables' placeholder,
    *  which Tabulator re-evaluates every time it shows one. */
@@ -370,6 +370,7 @@ export class CallTreeDetail extends LitElement {
     this._locateUnsubscribe = undefined;
     this._selectionClearUnsubscribe?.();
     this._selectionClearUnsubscribe = undefined;
+    this._switch?.abort();
     this._destroyTables();
   }
 
@@ -397,7 +398,7 @@ export class CallTreeDetail extends LitElement {
       const scoped = this.wholeLog
         ? await buildWholeLogCallTree(options)
         : await buildScopedCallTree(this.eventIndex, this.instances, options);
-      if (options.cancelled?.()) {
+      if (options.signal?.aborted) {
         // Abandoned rather than empty — don't cache the null over a scope that
         // was never walked.
         return null;
@@ -418,23 +419,16 @@ export class CallTreeDetail extends LitElement {
     }
   }
 
-  /**
-   * True once `epoch`'s work should be thrown away: a newer switch replaced it,
-   * or the component was disconnected mid-wait (e.g. the pane collapsed) —
-   * building into detached DOM that disconnectedCallback already ran past would
-   * leak the Tabulator.
-   */
-  private _superseded(epoch: number): boolean {
-    return epoch !== this._switchEpoch || !this.isConnected;
-  }
-
   private async _showActive(): Promise<void> {
-    const epoch = ++this._switchEpoch;
+    // A newer switch, or a disconnect, aborts this one: building into detached
+    // DOM that disconnectedCallback already ran past would leak the Tabulator.
+    this._switch?.abort();
+    const { signal } = (this._switch = new AbortController());
     // Wait for the now-visible host to lay out before Tabulator measures column
     // widths — building against a hidden/zero-width host makes columns overlap.
     await this.updateComplete;
     await waitForNextFrame();
-    if (this._superseded(epoch)) {
+    if (signal.aborted) {
       return;
     }
 
@@ -455,11 +449,8 @@ export class CallTreeDetail extends LitElement {
       // selection they don't describe.
       void built.table.setData([]);
     }
-    const data = await this._rows(mode, {
-      yieldFrame: waitForNextFrame,
-      cancelled: () => this._superseded(epoch),
-    });
-    if (!data || this._superseded(epoch)) {
+    const data = await this._rows(mode, { yieldFrame: waitForNextFrame, signal });
+    if (!data || signal.aborted) {
       return;
     }
     this._pending = false;

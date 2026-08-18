@@ -69,8 +69,8 @@ export class NamespaceTimeBar extends LitElement {
    *  walk again, and a new log or selection does. */
   private _scopeKey: object | null | typeof UNRESOLVED = UNRESOLVED;
 
-  /** Bumped per walk; a walk whose epoch has moved on drops its result. */
-  private _walkEpoch = 0;
+  /** The walk in flight; a new scope aborts it, and so does a disconnect. */
+  private _walk: AbortController | null = null;
 
   /** The log's palette, so a namespace keeps its colour across scopes. Null until
    *  a scope resolves, which needs a log. */
@@ -105,6 +105,12 @@ export class NamespaceTimeBar extends LitElement {
     ></stacked-time-bar>`;
   }
 
+  disconnectedCallback(): void {
+    super.disconnectedCallback();
+    // Walking on into a detached host wastes frames and answers nobody.
+    this._walk?.abort();
+  }
+
   protected willUpdate(changed: PropertyValues): void {
     // A new log invalidates the scope, so the next render walks it again.
     if (changed.has('logStore')) {
@@ -129,7 +135,8 @@ export class NamespaceTimeBar extends LitElement {
       return;
     }
     this._scopeKey = scope?.key ?? null;
-    const epoch = ++this._walkEpoch;
+    this._walk?.abort();
+    const walk = (this._walk = new AbortController());
     if (!scope) {
       this._slices = [];
       return;
@@ -142,9 +149,9 @@ export class NamespaceTimeBar extends LitElement {
     }
     const slices = await scopedNamespaceSelfTimes(scope.key, scope.roots, {
       yieldFrame: waitForNextFrame,
-      cancelled: () => epoch !== this._walkEpoch || !this.isConnected,
+      signal: walk.signal,
     });
-    if (epoch !== this._walkEpoch) {
+    if (this._walk !== walk) {
       return;
     }
     if (slices) {
