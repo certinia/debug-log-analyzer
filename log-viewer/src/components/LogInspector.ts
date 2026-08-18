@@ -19,6 +19,16 @@ import { globalStyles } from '../styles/global.styles.js';
 import type { DockPosition } from './DetailDock.js';
 import './DockLayout.js';
 import type { PaneOrientation, PaneSection } from './PaneView.js';
+import './ViewModeSwitch.js';
+import type { ViewModeOption } from './ViewModeSwitch.js';
+
+/** What the panel is reading: the selected row, or the whole log. */
+type InspectorScope = 'selection' | 'log';
+
+const SCOPE_OPTIONS: readonly ViewModeOption[] = [
+  { value: 'selection', label: 'Detail' },
+  { value: 'log', label: 'Summary' },
+];
 
 /**
  * The app-wide inspector. Lives at the app root (sibling of the tab strip,
@@ -54,6 +64,10 @@ export class LogInspector extends LitElement {
   private _activeFrames = new Map<DetailSource, number>();
   // The source a locate mark was last sent to, while one is showing.
   private _locatedSource: DetailSource | undefined;
+  // Shared by every tab, like the layout is, but never persisted: it is reading
+  // state, and a remembered log scope would fight the next selection.
+  @state()
+  private _scope: InspectorScope = 'selection';
   // The user's last open/closed choice, or null if they've never made one —
   // which is the only state that lets a selection auto-open the panel.
   @state()
@@ -131,6 +145,11 @@ export class LogInspector extends LitElement {
         min-width: 0;
         min-height: 0;
       }
+      /* Slotted into the dock, so only a rule out here beats the switch's own
+         default height. */
+      view-mode-switch {
+        --filter-control-height: var(--filter-control-height-dense);
+      }
     `,
   ];
 
@@ -154,12 +173,40 @@ export class LogInspector extends LitElement {
         @inspector-locate=${this._onLocate}
       >
         <slot slot="main" name="main"></slot>
+        ${this._scopeSwitch()}
       </dock-layout>
     `;
   }
 
+  /** Only with a selection to switch away from: one live choice is noise. */
+  private _scopeSwitch() {
+    const source = this._activeSource;
+    if (!source || !this._selections.has(source)) {
+      return '';
+    }
+    return html`<view-mode-switch
+      slot="actions-start"
+      aria-label="Inspector scope"
+      title="Read what you selected, or this tab's summary of the whole log"
+      .options=${SCOPE_OPTIONS}
+      value=${this._scope}
+      @view-mode-change=${(e: CustomEvent<{ value: string }>) =>
+        this._setScope(e.detail.value as InspectorScope)}
+    ></view-mode-switch>`;
+  }
+
   private get _activeSource(): DetailSource | undefined {
     return TAB_TO_SOURCE[this.activeTab];
+  }
+
+  /** Log scope holds the tab's selection back rather than clearing it, so switching back restores it. */
+  private _scopedSelection(source: DetailSource): DetailSelection | null {
+    return this._scope === 'log' ? null : (this._selections.get(source) ?? null);
+  }
+
+  private _setScope(scope: InspectorScope): void {
+    this._scope = scope;
+    this._scheduleRebuild();
   }
 
   private _onSelect(detail: { source: DetailSource; selection: DetailSelection | null }): void {
@@ -167,6 +214,8 @@ export class LogInspector extends LitElement {
     this._activeFrames.delete(detail.source);
     if (detail.selection) {
       this._selections.set(detail.source, detail.selection);
+      // A new pick means "show me this", so the panel comes back to it.
+      this._scope = 'selection';
       // Only shows the panel while the user has never chosen for themselves,
       // which `_visible` decides.
       this._autoOpened = true;
@@ -196,7 +245,7 @@ export class LogInspector extends LitElement {
     eventBus.emit('inspector:reveal', { source, eventIndex: e.detail.eventIndex });
     // Without a selection the sections are the whole-log ones, which have no
     // frame to follow; the whole-log rows only reveal.
-    if (this._selections.has(source)) {
+    if (this._scopedSelection(source)) {
       this._activeFrames.set(source, e.detail.eventIndex);
       this._scheduleRebuild();
     }
@@ -260,7 +309,7 @@ export class LogInspector extends LitElement {
     const sections = source
       ? await buildDetailSections(
           source,
-          this._selections.get(source) ?? null,
+          this._scopedSelection(source),
           this._activeFrames.get(source) ?? null,
         )
       : [];

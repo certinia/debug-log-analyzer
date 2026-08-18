@@ -8,7 +8,7 @@ import {
   formatCallStack,
   formatEventDetails,
 } from '../features/call-tree/utils/eventText.js';
-import { DatabaseAccess } from '../features/database/services/Database.js';
+import { currentLogStore } from '../core/log/LogStore.js';
 import { ContextMenuBuilder } from './ContextMenuBuilder.js';
 import type { ContextMenuItem } from './ContextMenu.js';
 
@@ -32,8 +32,8 @@ export function runPanelRowAction(itemId: string, eventIndex: number): void {
     return;
   }
 
-  const db = DatabaseAccess.instance();
-  const event = db?.getEventByIndex(eventIndex);
+  const store = currentLogStore();
+  const event = store?.eventByIndex(eventIndex);
   if (!event) {
     return;
   }
@@ -43,7 +43,7 @@ export function runPanelRowAction(itemId: string, eventIndex: number): void {
       copyToClipboard(eventName(event));
       break;
     case 'copy-details':
-      copyToClipboard(formatEventDetails(event, db?.getApexLog()?.governorLimits));
+      copyToClipboard(formatEventDetails(event, store?.log.governorLimits));
       break;
     case 'copy-call-stack':
       copyToClipboard(formatCallStack(event));

@@ -15,6 +15,7 @@ jest.mock('../GovernorTrends.js', () => ({}));
 jest.mock('../HotPath.js', () => ({}));
 jest.mock('../HotSpots.js', () => ({}));
 jest.mock('../LogOverview.js', () => ({}));
+jest.mock('../NamespaceTimeBar.js', () => ({}));
 jest.mock('../../features/database/components/DatabaseOverview.js', () => ({}));
 jest.mock('../../features/database/components/DatabaseTimeTree.js', () => ({}));
 
@@ -53,7 +54,12 @@ function rendered(sections: PaneSection[], id: string, tag: string): Element {
 describe('buildDetailSections', () => {
   it('builds the shared trio for a timeline frame', async () => {
     const sections = await buildDetailSections('timeline', { kind: 'event', eventIndex: 4 });
-    expect(sections.map((s) => s.id)).toEqual(['vitals', 'callstack', 'calltree']);
+    expect(sections.map((s) => s.id)).toEqual([
+      'vitals',
+      'namespace-time',
+      'callstack',
+      'calltree',
+    ]);
     // The call tree gets the most room, so it is the section worth reading.
     expect(sections.find((s) => s.id === 'calltree')?.weight).toBe(4);
     // The vitals are a fixed set of figures: they take their own height only.
@@ -117,11 +123,75 @@ describe('buildDetailSections', () => {
       instances: [11, 12, 13],
       label: 'MyClass.run()',
     });
-    expect(sections.map((s) => s.id)).toEqual(['vitals', 'callstack', 'calltree']);
+    expect(sections.map((s) => s.id)).toEqual(['vitals', 'findings', 'callstack', 'calltree']);
     expect(
       (rendered(sections, 'vitals', 'event-vitals') as HTMLElement & { instances: number[] | null })
         .instances,
     ).toEqual([11, 12, 13]);
+  });
+
+  it('asks the findings which of them name the selection', async () => {
+    const sections = await buildDetailSections('analysis', {
+      kind: 'aggregate',
+      instances: [11, 12, 13],
+      label: 'MyClass.run()',
+    });
+
+    const findings = rendered(sections, 'findings', 'log-diagnostics') as HTMLElement & {
+      instances: number[] | null;
+    };
+    expect(findings.instances).toEqual([11, 12, 13]);
+    // The verdict reads beside the tree rather than being crowded by it.
+    expect(sections.find((s) => s.id === 'findings')?.weight).toBe(3);
+  });
+
+  it('scopes the findings to the frame being followed, not the aggregate it left', async () => {
+    const sections = await buildDetailSections(
+      'analysis',
+      { kind: 'aggregate', instances: [11, 12, 13], label: 'MyClass.run()' },
+      8,
+    );
+
+    const findings = rendered(sections, 'findings', 'log-diagnostics') as HTMLElement & {
+      instances: number[] | null;
+    };
+    expect(findings.instances).toEqual([8]);
+  });
+
+  it('leaves the findings out for a selection from another tab', async () => {
+    const sections = await buildDetailSections('timeline', { kind: 'event', eventIndex: 4 });
+    expect(sections.map((s) => s.id)).toEqual([
+      'vitals',
+      'namespace-time',
+      'callstack',
+      'calltree',
+    ]);
+  });
+
+  it('re-scopes the namespace split to the frame being followed', async () => {
+    const sections = await buildDetailSections('timeline', { kind: 'event', eventIndex: 4 }, 2);
+
+    expect(
+      rendered(sections, 'namespace-time', 'namespace-time-bar').getAttribute('eventIndex'),
+    ).toBe('2');
+  });
+
+  it('scopes the namespace split to every occurrence of an aggregate', async () => {
+    const sections = await buildDetailSections('timeline', {
+      kind: 'aggregate',
+      instances: [11, 12, 13],
+      label: 'MyClass.run()',
+    });
+
+    const bar = rendered(sections, 'namespace-time', 'namespace-time-bar') as HTMLElement & {
+      instances: number[] | null;
+    };
+    expect(bar.instances).toEqual([11, 12, 13]);
+  });
+
+  it('leaves the namespace split out for a selection from another tab', async () => {
+    const sections = await buildDetailSections('calltree', { kind: 'event', eventIndex: 4 });
+    expect(sections.map((s) => s.id)).toEqual(['vitals', 'callstack', 'calltree']);
   });
 
   it('drops the aggregate once a single frame in its stack is the one being followed', async () => {
@@ -170,6 +240,7 @@ describe('buildDetailSections', () => {
     expect(sections.map((s) => s.id)).toEqual([
       'overview',
       'category-time',
+      'namespace-time',
       'governor-trends',
       'calltree',
     ]);

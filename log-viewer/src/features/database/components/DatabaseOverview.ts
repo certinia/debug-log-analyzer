@@ -1,8 +1,9 @@
 /*
  * Copyright (c) 2026 Certinia Inc. All rights reserved.
  */
+import { consume } from '@lit/context';
 import { LitElement, css, html, unsafeCSS, type TemplateResult } from 'lit';
-import { customElement } from 'lit/decorators.js';
+import { customElement, property } from 'lit/decorators.js';
 import { styleMap } from 'lit/directives/style-map.js';
 
 import { CategoryPaletteController } from '../../../components/categoryTime.js';
@@ -10,9 +11,11 @@ import {
   dispatchInspectorLocate,
   dispatchInspectorReveal,
 } from '../../../components/inspectorReveal.js';
+import { logNamespacePalette } from '../../../components/namespaceTime.js';
 import '../../../components/StackedTimeBar.js';
-import type { StackedSegment } from '../../../components/StackedTimeBar.js';
-import { LogLoadedController } from '../../../core/events/LogLoadedController.js';
+import { segmentsWithTail } from '../../../components/StackedTimeBar.js';
+import { logContext } from '../../../core/log/logContext.js';
+import type { LogStore } from '../../../core/log/LogStore.js';
 import { formatDuration, formatInteger } from '../../../core/utility/Util.js';
 import { globalStyles } from '../../../styles/global.styles.js';
 import { inspectorSectionStyles } from '../../../styles/inspectorSection.styles.js';
@@ -22,9 +25,8 @@ import { formatSOQLToTemplate } from '../../soql/format/formatter.js';
 import { soqlSyntaxStyles } from '../../soql/styles/soql-syntax.css.js';
 import {
   concentration,
-  currentDatabaseOverview,
+  databaseOverview,
   type DatabaseBreakdown,
-  type DatabaseOverview as Overview,
   type DatabaseStatement,
   NO_STATEMENTS,
   type StatementKind,
@@ -70,23 +72,6 @@ function kindColors(palette: CategoryPaletteController): Record<StatementKind, s
   };
 }
 
-/**
- * The namespace scale. Namespaces are names, not amounts, so they need telling
- * apart and nothing more: a fixed colourblind-safe set (Okabe-Ito), literal
- * because it is data and must not follow the host theme. A namespace's read and
- * write split is on its own line instead, where it can be read exactly.
- */
-const NAMESPACE_COLORS = [
-  '#0072b2',
-  '#d55e00',
-  '#009e73',
-  '#cc79a7',
-  '#e69f00',
-  '#56b4e9',
-  '#aa4499',
-  '#44aa99',
-] as const;
-
 const sectionStyles = [
   globalStyles,
   inspectorSectionStyles,
@@ -111,7 +96,11 @@ const sectionStyles = [
 @customElement('database-concentration')
 export class DatabaseConcentration extends LitElement {
   private readonly _palette = new CategoryPaletteController(this);
-  private readonly _logLoaded = new LogLoadedController(this);
+
+  /** The log on screen, from the app root. */
+  @consume({ context: logContext, subscribe: true })
+  @property({ attribute: false })
+  logStore: LogStore | null = null;
 
   static styles = [
     ...sectionStyles,
@@ -174,7 +163,8 @@ export class DatabaseConcentration extends LitElement {
   ];
 
   render() {
-    const overview = currentDatabaseOverview();
+    const log = this.logStore?.log;
+    const overview = log ? databaseOverview(log) : null;
     if (!overview?.ranked.length) {
       return html`<p class="note">${NO_STATEMENTS}</p>`;
     }
@@ -248,8 +238,8 @@ export class DatabaseConcentration extends LitElement {
 }
 
 /**
- * Database time split across namespaces, as one bar per question with a row per
- * namespace beneath it. Whose code holds the time — yours or a package's — is
+ * Database time split across namespaces, as one bar per question. Whose code
+ * holds the time — yours or a package's — is
  * the thing to dig into; the grids hold one statement kind each, so none of them
  * can be read across the three.
  *
@@ -260,12 +250,15 @@ export class DatabaseConcentration extends LitElement {
  * the same bar when nothing runs inside the statements, so the second is shown
  * only when it says something new.
  *
- * Each namespace keeps one colour across both bars, and each row names its three
- * kinds, so a namespace worth digging into says which grid to open.
+ * Each namespace keeps one colour across both bars, and hovering one names its
+ * three kinds, so a namespace worth digging into says which grid to open.
  */
 @customElement('database-namespaces')
 export class DatabaseNamespaces extends LitElement {
-  private readonly _logLoaded = new LogLoadedController(this);
+  /** The log on screen, from the app root. */
+  @consume({ context: logContext, subscribe: true })
+  @property({ attribute: false })
+  logStore: LogStore | null = null;
 
   static styles = [
     ...sectionStyles,
@@ -282,40 +275,43 @@ export class DatabaseNamespaces extends LitElement {
   ];
 
   render() {
-    const overview = currentDatabaseOverview();
-    if (!overview?.askedBy.length) {
+    const log = this.logStore?.log;
+    const overview = log ? databaseOverview(log) : null;
+    if (!overview?.askedBy.length || !log) {
       return html`<p class="note">${NO_STATEMENTS}</p>`;
     }
-    const colors = namespaceColors(overview);
-    const asked = this._bar('Called from namespace', overview.askedBy, colors);
+    // The log's own palette, so a namespace that moves between the two bars is
+    // followed by eye and reads the same on the Timeline's bar.
+    const color = logNamespacePalette(log);
+    const asked = this._bar('Called from namespace', overview.askedBy, color);
     // Identical bars would read as a finding where there is none.
     if (sameSplit(overview.askedBy, overview.burnedIn)) {
       return asked;
     }
-    return html`${asked} ${this._bar('Ran in namespace', overview.burnedIn, colors)}`;
+    return html`${asked} ${this._bar('Ran in namespace', overview.burnedIn, color)}`;
   }
 
-  private _bar(title: string, namespaces: DatabaseBreakdown[], colors: Map<string, string>) {
-    const { shown, rest } = topRows(namespaces);
-    const segments: StackedSegment[] = shown.map((row) => ({
-      label: row.key,
-      timeNs: row.timeNs,
-      color: colors.get(row.key) ?? NAMESPACE_COLORS[0],
-      detail: kindSplit(row),
-    }));
-    // The tail is one segment, so the bar still totals the database time.
-    if (rest.length > 0) {
-      segments.push({
-        label: `${formatInteger(rest.length)} others`,
-        timeNs: rest.reduce((running, row) => running + row.timeNs, 0),
-        color: 'var(--lana-fg-muted)',
-      });
-    }
+  private _bar(
+    title: string,
+    namespaces: DatabaseBreakdown[],
+    color: (namespace: string) => string,
+  ) {
+    const segments = segmentsWithTail(
+      namespaces,
+      MAX_ROWS,
+      (row) => ({
+        label: row.key,
+        timeNs: row.timeNs,
+        color: color(row.key),
+        detail: kindSplit(row),
+      }),
+      (row) => row.timeNs,
+    );
 
     return html`
       <div class="bar">
         <p class="bar__title">${title}</p>
-        <stacked-time-bar legend legendRows label=${title} .segments=${segments}></stacked-time-bar>
+        <stacked-time-bar legend label=${title} .segments=${segments}></stacked-time-bar>
       </div>
     `;
   }
@@ -416,21 +412,6 @@ function kindSplit(row: DatabaseBreakdown): string {
     .filter(([, timeNs]) => timeNs > 0)
     .map(([kind, timeNs]) => `${kind} ${formatDuration(timeNs)}`)
     .join(' · ');
-}
-
-/**
- * A colour per namespace, the same one on both bars, so a namespace that moves
- * between them is followed by eye. Longest first, so the scale runs in the order
- * the bars do.
- */
-function namespaceColors(overview: Overview): Map<string, string> {
-  const colors = new Map<string, string>();
-  for (const { key } of [...overview.askedBy, ...overview.burnedIn]) {
-    if (!colors.has(key)) {
-      colors.set(key, NAMESPACE_COLORS[colors.size % NAMESPACE_COLORS.length]!);
-    }
-  }
-  return colors;
 }
 
 declare global {

@@ -40,26 +40,24 @@ soql.parent = m2;
 const byId = new Map<number, FakeEvent>([exec, m1, m2, soql].map((e) => [e.eventIndex, e]));
 
 let selectedIndex = 4;
-jest.mock('../../features/database/services/Database.js', () => ({
-  DatabaseAccess: {
-    instance: () => ({
-      getApexLog: () => root,
-      getEventByIndex: (i: number) => byId.get(i) ?? null,
-    }),
-  },
+jest.mock('../../core/log/LogStore.js', () => ({
+  currentLogStore: () => ({
+    log: root,
+    eventByIndex: (i: number) => byId.get(i) ?? null,
+  }),
 }));
 
 import {
   buildScopedCallTree,
   buildWholeLogCallTree,
   rowIdsByEvent,
-  type ScopedBuildOptions,
   type ScopedRow,
 } from '../scopedCallTree.js';
+import type { FrameBudgetOptions } from '../../core/utility/FrameBudget.js';
 
 /** These fixtures are small enough to never hit a slice deadline, so `yieldFrame`
  *  is only there to satisfy the contract. */
-const options: ScopedBuildOptions = { yieldFrame: () => Promise.resolve() };
+const options: FrameBudgetOptions = { yieldFrame: () => Promise.resolve() };
 
 function build(eventIndex: number, instances?: number[]) {
   return buildScopedCallTree(eventIndex, instances ?? null, options);
@@ -239,7 +237,7 @@ describe('buildScopedCallTree', () => {
     const OCCURRENCES = 500;
     const instances = loopOccurrences(OCCURRENCES);
     let yields = 0;
-    const sliced: ScopedBuildOptions = {
+    const sliced: FrameBudgetOptions = {
       yieldFrame: () => {
         yields += 1;
         return Promise.resolve();

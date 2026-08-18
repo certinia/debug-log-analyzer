@@ -1,7 +1,7 @@
 /*
  * Copyright (c) 2026 Certinia Inc. All rights reserved.
  */
-import { html } from 'lit';
+import { html, type TemplateResult } from 'lit';
 
 import type { DetailSelection, DetailSource } from '../core/events/EventBus.js';
 import { buildDatabaseSections } from '../features/database/components/databaseSections.js';
@@ -19,6 +19,7 @@ import './GovernorTrends.js';
 import './HotPath.js';
 import './HotSpots.js';
 import './LogOverview.js';
+import './NamespaceTimeBar.js';
 
 /**
  * Build the inspector's sections for a selection from any tab. Every source gets
@@ -118,6 +119,7 @@ export async function buildDetailSections(
           fit: 'content',
           content: html`<category-time-bar></category-time-bar>`,
         },
+        namespaceTimeSection(html`<namespace-time-bar></namespace-time-bar>`),
         {
           id: 'governor-trends',
           title: 'Governor usage over time',
@@ -156,7 +158,7 @@ export async function buildDetailSections(
   const instances = isAggregate && !following ? selection.instances : null;
   const label = isAggregate && !following ? selection.label : '';
 
-  return [
+  const sections: PaneSection[] = [
     {
       id: 'vitals',
       title: 'Details',
@@ -167,6 +169,32 @@ export async function buildDetailSections(
         label=${label}
       ></event-vitals>`,
     },
+  ];
+  if (source === 'timeline') {
+    // The same split, asked of the selection: whose package burned the time under
+    // the frame the user picked.
+    sections.push(
+      namespaceTimeSection(
+        html`<namespace-time-bar
+          eventIndex=${active}
+          .instances=${instances}
+        ></namespace-time-bar>`,
+      ),
+    );
+  }
+  if (source === 'analysis') {
+    // The same findings, asked of the selection: which of the log's problems name
+    // this method or anything it called.
+    sections.push({
+      id: 'findings',
+      title: 'Findings',
+      // The verdict on the selected row, so it reads beside the tree rather than
+      // being crowded down to its header by it.
+      weight: 3,
+      content: html`<log-diagnostics .instances=${instances ?? [active]}></log-diagnostics>`,
+    });
+  }
+  sections.push(
     {
       id: 'callstack',
       title: 'Call stack',
@@ -186,5 +214,12 @@ export async function buildDetailSections(
         activeEventIndex=${active}
       ></call-tree-detail>`,
     },
-  ];
+  );
+  return sections;
+}
+
+/** The Timeline's namespace split. One id and title for both scopes: collapse
+ *  state is keyed by section id, so a drift would split it. */
+function namespaceTimeSection(content: TemplateResult): PaneSection {
+  return { id: 'namespace-time', title: 'Self time by namespace', fit: 'content', content };
 }

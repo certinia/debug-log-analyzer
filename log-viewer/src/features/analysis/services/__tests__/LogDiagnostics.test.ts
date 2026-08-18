@@ -8,13 +8,11 @@ import { emptyLimits } from '../../../../components/__tests__/limitsTestUtils.js
 
 let log: ApexLog | null = null;
 
-jest.mock('../../../database/services/Database.js', () => ({
-  DatabaseAccess: {
-    instance: () => (log ? { getApexLog: () => log, getStackByEventIndex: () => [] } : null),
-  },
+jest.mock('../../../../core/log/LogStore.js', () => ({
+  currentLogStore: () => (log ? { log, stackByEventIndex: () => [] } : null),
 }));
 
-import { computeLogDiagnostics } from '../LogDiagnostics.js';
+import { computeLogDiagnostics, scopeDiagnostics } from '../LogDiagnostics.js';
 
 /** A parsed event, with only the fields the diagnostics read. */
 function event(fields: Partial<LogEvent>): LogEvent {
@@ -56,6 +54,7 @@ function apexLog(fields: Partial<ApexLog> & { namespaceLimits?: Record<string, L
     children: [],
     exceptions: [],
     logIssues: [],
+    duration: { self: 0, total: 0 },
     governorLimits: governorLimitsOf(namespaceLimits ?? {}),
     ...rest,
   } as ApexLog;
@@ -85,8 +84,8 @@ describe('computeLogDiagnostics', () => {
 
     const { diagnostics } = await computeLogDiagnostics();
     expect(diagnostics.map((d) => [d.severity, d.summary, d.meta])).toEqual([
-      ['Warning', 'CPU Time is at 100% of its limit.', '10,000 ms / 10,000 ms'],
-      ['Warning', 'SOQL is at 85% of its limit.', '85 / 100'],
+      ['Warning', 'CPU Time is at 100% of its limit', '10,000 ms / 10,000 ms'],
+      ['Warning', 'SOQL is at 85% of its limit', '85 / 100'],
     ]);
   });
 
@@ -121,7 +120,7 @@ describe('computeLogDiagnostics', () => {
     // A summed share can pass 100% without a breach: a certified package has its
     // own limits. Only the log saying the governor stopped it makes that an error.
     expect(diagnostics.map((d) => [d.severity, d.summary, d.meta])).toEqual([
-      ['Warning', 'SOQL is at 187% of its limit.', '187 / 100'],
+      ['Warning', 'SOQL is at 187% of its limit', '187 / 100'],
     ]);
   });
 
@@ -152,7 +151,7 @@ describe('computeLogDiagnostics', () => {
 
     const { diagnostics } = await computeLogDiagnostics();
     const repeat = diagnostics.find((d) => d.id.startsWith('repeat-line|'));
-    expect(repeat?.summary).toBe('6 SOQL statements from line 214.');
+    expect(repeat?.summary).toBe('6 SOQL statements from line 214');
     expect(repeat?.count).toBe(6);
     expect(repeat?.eventIndex).toBe(0);
   });
@@ -177,7 +176,7 @@ describe('computeLogDiagnostics', () => {
 
     const { diagnostics } = await computeLogDiagnostics();
     const repeat = diagnostics.find((d) => d.id.startsWith('repeat-text|'));
-    expect(repeat?.summary).toBe('6 identical SOQL statements, from 6 lines.');
+    expect(repeat?.summary).toBe('6 identical SOQL statements, from 6 lines');
     // Three from each of two lines would be under the per-line threshold, so the
     // per-line rule must stay quiet here.
     expect(diagnostics.some((d) => d.id.startsWith('repeat-line|'))).toBe(false);
@@ -221,13 +220,13 @@ describe('computeLogDiagnostics', () => {
     const found = (await computeLogDiagnostics()).diagnostics.find((d) =>
       d.id.startsWith('row-at-a-time|'),
     );
-    expect(found?.summary).toBe('5 Contact queries, one row at a time.');
+    expect(found?.summary).toBe('5 Contact queries, one row at a time');
     expect(found?.message).toContain('IN :ids');
     // Each statement is listed, so the reader can open any of them in the grid.
     expect(found?.evidence).toHaveLength(5);
   });
 
-  it('lists the five most repeated statements, with how many there are and how often each ran', async () => {
+  it('lists every statement, most repeated first, with how often each ran', async () => {
     log = apexLog({
       eventsById: Array.from({ length: 12 }, (_, index) =>
         soql({
@@ -244,14 +243,13 @@ describe('computeLogDiagnostics', () => {
       d.id.startsWith('row-at-a-time|'),
     );
     expect(found?.count).toBe(12);
-    expect(found?.evidence).toHaveLength(5);
+    expect(found?.evidence).toHaveLength(11);
     expect(found?.evidence?.[0]).toEqual({
       text: dynamicSoql(0),
       eventIndex: 0,
       count: 2,
       dialect: 'soql',
     });
-    expect(found?.evidenceTotal).toBe(11);
     expect(found?.message).toContain('11 statements');
   });
 
@@ -375,8 +373,8 @@ describe('computeLogDiagnostics', () => {
     expect(repeats.map((d) => d.count)).toEqual([6, 6]);
     // The frame names which of the two, where line 42 alone would not.
     expect(repeats.map((d) => d.summary)).toEqual([
-      '6 SOQL statements from Class.A.run(), line 42.',
-      '6 SOQL statements from Class.B.run(), line 42.',
+      '6 SOQL statements from Class.A.run(), line 42',
+      '6 SOQL statements from Class.B.run(), line 42',
     ]);
     expect(repeats[0]?.message).toContain(
       'Possible SOQL in a loop: it executed 6 times from Class.A.run().',
@@ -430,7 +428,6 @@ describe('computeLogDiagnostics', () => {
     const unbounded = diagnostics.find((d) => d.summary.startsWith('SOQL is unbounded'));
     // The count is executions across all three, so the list is what reconciles it.
     expect(unbounded?.count).toBe(6);
-    expect(unbounded?.evidenceTotal).toBe(3);
     expect(unbounded?.evidence?.map((e) => [e.text, e.count])).toEqual([
       [texts[0], 3],
       [texts[1], 2],
@@ -575,7 +572,7 @@ describe('computeLogDiagnostics', () => {
 
     const { diagnostics } = await computeLogDiagnostics();
     expect(diagnostics).toHaveLength(1);
-    expect(diagnostics[0]?.summary).toBe('CPU Time limit exceeded.');
+    expect(diagnostics[0]?.summary).toBe('CPU Time limit exceeded');
     expect(diagnostics[0]?.meta).toBe('15,163 ms / 10,000 ms');
     expect(diagnostics[0]?.eventIndex).toBe(4);
     expect(diagnostics[0]?.evidence?.[0]?.text).toBe('Class.A.run: line 31, column 1');
@@ -594,7 +591,7 @@ describe('computeLogDiagnostics', () => {
 
     const { diagnostics } = await computeLogDiagnostics();
     expect(diagnostics.map((d) => [d.summary, d.meta])).toEqual([
-      ['SOQL limit exceeded.', undefined],
+      ['SOQL limit exceeded', undefined],
     ]);
   });
 
@@ -645,7 +642,7 @@ describe('computeLogDiagnostics', () => {
 
     log = apexLog({ eventsById: Array.from({ length: 50 }, (_, i) => debugLine(i)) });
     const { diagnostics } = await computeLogDiagnostics();
-    expect(diagnostics[0]?.summary).toBe('50 debug statements ran.');
+    expect(diagnostics[0]?.summary).toBe('50 debug statements ran');
     expect(diagnostics[0]?.severity).toBe('Info');
   });
 
@@ -662,5 +659,99 @@ describe('computeLogDiagnostics', () => {
 
     const { diagnostics } = await computeLogDiagnostics();
     expect(diagnostics.map((d) => d.severity)).toEqual(['Error', 'Warning', 'Info']);
+  });
+
+  it('times a finding where the log times its events, and leaves the rest untimed', async () => {
+    log = apexLog({
+      duration: { self: 0, total: 1_000 },
+      eventsById: Array.from({ length: 6 }, (_, index) =>
+        soql({
+          eventIndex: index,
+          lineNumber: 214,
+          text: 'SELECT Id FROM Account WHERE Id = :id LIMIT 1',
+          duration: { self: 50, total: 50 },
+        }),
+      ),
+    });
+
+    const { diagnostics, logNs } = await computeLogDiagnostics();
+    expect(logNs).toBe(1_000);
+    expect(diagnostics.find((d) => d.id.startsWith('repeat-line|'))?.timeNs).toBe(300);
+  });
+
+  it('counts a statement inside another once, so a re-fired trigger is not doubled', async () => {
+    // A trigger that inserts again re-fires itself, so the nested DML's time is
+    // already inside the outer one's total.
+    const dmls = Array.from({ length: 5 }, (_, index) =>
+      dml({
+        eventIndex: index,
+        lineNumber: 10 + index,
+        text: 'DML Op:Insert Type:Account',
+        sObjectType: 'Account',
+        duration: { self: 60, total: 100 },
+      } as Partial<LogEvent>),
+    );
+    const [outer, nested] = dmls as [LogEvent, LogEvent];
+    Object.assign(nested, { parent: outer });
+    Object.assign(outer, { children: [nested], isParent: true });
+    log = apexLog({ duration: { self: 0, total: 1_000 }, eventsById: dmls });
+
+    const { diagnostics } = await computeLogDiagnostics();
+    expect(diagnostics.find((d) => d.id.startsWith('repeat-text|'))?.timeNs).toBe(400);
+  });
+
+  it('leaves a debug finding untimed, since the log measures no duration for one', async () => {
+    log = apexLog({
+      eventsById: Array.from({ length: 50 }, (_, index) =>
+        event({ type: 'USER_DEBUG', eventIndex: index, text: 'DEBUG|hello' }),
+      ),
+    });
+
+    const { diagnostics } = await computeLogDiagnostics();
+    expect(diagnostics[0]?.timeNs).toBeUndefined();
+  });
+});
+
+describe('scopeDiagnostics', () => {
+  /** Six repeated queries, all called from one method, plus one from elsewhere. */
+  async function repeatsUnderAMethod() {
+    const text = 'SELECT Id FROM Account WHERE Id = :id LIMIT 1';
+    const method = event({ type: 'METHOD_ENTRY', eventIndex: 0, text: 'Slow.run()' });
+    const queries = Array.from({ length: 6 }, (_, index) =>
+      soql({ eventIndex: index + 1, lineNumber: 214, text, parent: method }),
+    );
+    method.children = queries;
+    log = apexLog({ eventsById: [method, ...queries] });
+    return await computeLogDiagnostics();
+  }
+
+  beforeEach(() => {
+    log = null;
+  });
+
+  it('keeps a finding whose events are below the selection', async () => {
+    const result = await repeatsUnderAMethod();
+    expect(result.diagnostics.length).toBeGreaterThan(0);
+
+    const scoped = scopeDiagnostics(result, [0]);
+    expect(scoped.diagnostics).toEqual(result.diagnostics);
+  });
+
+  it('drops a finding the selection never reached', async () => {
+    const result = await repeatsUnderAMethod();
+    // A sibling frame: nothing the findings name is inside it.
+    expect(scopeDiagnostics(result, [42]).diagnostics).toEqual([]);
+  });
+
+  it('keeps the log figures, so a scoped share still reads against the whole log', async () => {
+    const result = await repeatsUnderAMethod();
+    const scoped = scopeDiagnostics(result, [0]);
+    expect(scoped.logNs).toBe(result.logNs);
+    expect(scoped.lintedQueries).toEqual(result.lintedQueries);
+  });
+
+  it('scopes to nothing when no occurrences are given', async () => {
+    const result = await repeatsUnderAMethod();
+    expect(scopeDiagnostics(result, []).diagnostics).toEqual([]);
   });
 });

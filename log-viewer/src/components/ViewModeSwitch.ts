@@ -26,6 +26,12 @@ export class ViewModeSwitch extends LitElement {
   @property()
   value = '';
 
+  // On the host, not the inner row, so the consumer's aria-label names the group.
+  connectedCallback(): void {
+    super.connectedCallback();
+    this.setAttribute('role', 'radiogroup');
+  }
+
   static styles = [
     globalStyles,
     css`
@@ -62,7 +68,7 @@ export class ViewModeSwitch extends LitElement {
   ];
 
   render() {
-    return html`<div class="switch" role="radiogroup">
+    return html`<div class="switch">
       ${this.options.map(
         (opt) =>
           html`<vscode-button

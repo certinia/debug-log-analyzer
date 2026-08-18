@@ -95,4 +95,17 @@ describe('stacked-time-bar', () => {
     expect(element.shadowRoot?.querySelector('.legend__item--active')).not.toBeNull();
     expect(element.shadowRoot?.querySelector('.tip')).toBeNull();
   });
+
+  it('reads out a detail from the legend, where the thinnest segments can be hit', async () => {
+    const element = await mount(
+      [{ ...SEGMENTS[0]!, detail: 'SOQL 200 ms' }, SEGMENTS[1]!],
+      0,
+      true,
+    );
+
+    element.shadowRoot?.querySelector('.legend__item')?.dispatchEvent(new Event('pointerenter'));
+    await element.updateComplete;
+
+    expect(element.shadowRoot?.querySelector('.tip')?.textContent).toContain('SOQL 200 ms');
+  });
 });

@@ -3,42 +3,18 @@
  */
 import type { LogEvent } from 'apex-log-parser';
 
+import { currentLogStore } from '../core/log/LogStore.js';
 import { EXCLUDED_DETAIL_TYPES } from '../features/call-tree/utils/DetailsFilter.js';
-import { DatabaseAccess } from '../features/database/services/Database.js';
+import {
+  CHECK_EVERY,
+  frameBudget,
+  type FrameBudgetOptions,
+  type Tick,
+} from '../core/utility/FrameBudget.js';
 
 /** Frame grouping key — same shape as the call-tree aggregation. */
 function frameKey(event: LogEvent): string {
   return `${event.type ?? ''}|${event.namespace}|${event.text}`;
-}
-
-/** Work slice before the frame is handed back (ms) — half a 60fps frame, so a
- *  build never takes more than half of any frame it runs in. */
-const SLICE_MS = 8;
-/** Items between deadline checks. Reading the clock per item costs more than
- *  the odd overrun it saves. */
-const CHECK_EVERY = 256;
-
-export interface ScopedBuildOptions {
-  /** Hands the frame back between work slices. */
-  yieldFrame: () => Promise<void>;
-  /** Polled after each yield; true abandons the build, which then returns null. */
-  cancelled?: () => boolean;
-}
-
-/** Returns false once the build has been abandoned. */
-type Tick = () => Promise<boolean>;
-
-/** A slice timer: cheap while the slice has time left, yields once it doesn't. */
-function frameBudget(options: ScopedBuildOptions): Tick {
-  let deadline = performance.now() + SLICE_MS;
-  return async () => {
-    if (performance.now() < deadline) {
-      return true;
-    }
-    await options.yieldFrame();
-    deadline = performance.now() + SLICE_MS;
-    return !options.cancelled?.();
-  };
 }
 
 /**
@@ -119,9 +95,9 @@ export interface ScopedCallTree {
   logTotal: number;
   /** The three views, built on first call and cached (only one is on screen).
    *  Each hands the frame back as it works, and returns null when abandoned. */
-  timeOrder(options: ScopedBuildOptions): Promise<ScopedRow[] | null>;
-  aggregated(options: ScopedBuildOptions): Promise<ScopedRow[] | null>;
-  bottomUp(options: ScopedBuildOptions): Promise<ScopedRow[] | null>;
+  timeOrder(options: FrameBudgetOptions): Promise<ScopedRow[] | null>;
+  aggregated(options: FrameBudgetOptions): Promise<ScopedRow[] | null>;
+  bottomUp(options: FrameBudgetOptions): Promise<ScopedRow[] | null>;
 }
 
 /**
@@ -201,19 +177,19 @@ async function realSubtree(event: LogEvent, tick: Tick): Promise<ScopedRow | nul
 export async function buildScopedCallTree(
   eventIndex: number,
   instances: number[] | null | undefined,
-  options: ScopedBuildOptions,
+  options: FrameBudgetOptions,
 ): Promise<ScopedCallTree | null> {
-  const db = DatabaseAccess.instance();
-  const apexLog = db?.getApexLog();
-  if (!db || !apexLog) {
+  const store = currentLogStore();
+  if (!store) {
     return null;
   }
+  const apexLog = store.log;
 
   // An aggregate selection scopes to every occurrence of the frame; a single
   // selection to just itself.
   const indexes = instances?.length ? instances : eventIndex >= 0 ? [eventIndex] : [];
   const selectedEvents = indexes
-    .map((i) => db.getEventByIndex(i))
+    .map((i) => store.eventByIndex(i))
     .filter((e): e is LogEvent => e !== null);
   if (!selectedEvents.length) {
     return null;
@@ -304,9 +280,9 @@ function lazyCallTree(
  * percentages of the whole log.
  */
 export async function buildWholeLogCallTree(
-  options: ScopedBuildOptions,
+  options: FrameBudgetOptions,
 ): Promise<ScopedCallTree | null> {
-  const apexLog = DatabaseAccess.instance()?.getApexLog();
+  const apexLog = currentLogStore()?.log;
   if (!apexLog) {
     return null;
   }
@@ -328,7 +304,7 @@ export async function buildWholeLogCallTree(
 /** Top-down aggregation: merge sibling frames sharing a key, summing metrics. */
 async function aggregate(
   rows: ScopedRow[],
-  options: ScopedBuildOptions,
+  options: FrameBudgetOptions,
 ): Promise<ScopedRow[] | null> {
   const tick = frameBudget(options);
   let idSeq = 0;
@@ -420,7 +396,7 @@ interface CallerChain {
  */
 async function buildBottomUp(
   rows: ScopedRow[],
-  options: ScopedBuildOptions,
+  options: FrameBudgetOptions,
 ): Promise<ScopedRow[] | null> {
   const tick = frameBudget(options);
   let idSeq = 0;

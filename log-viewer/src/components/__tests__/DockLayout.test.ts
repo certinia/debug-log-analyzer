@@ -109,6 +109,12 @@ describe('DockLayout resize', () => {
     expect(event?.detail).toBeNull();
   });
 
+  it('forwards the consumer control on to the dock', async () => {
+    const el = await mount('right');
+    const forwarded = el.shadowRoot?.querySelector('detail-dock > slot[name="actions-start"]');
+    expect(forwarded?.getAttribute('slot')).toBe('actions-start');
+  });
+
   it('reports nothing while the panel is hidden, since there is no handle', async () => {
     const el = await mount('right');
     el.visible = false;

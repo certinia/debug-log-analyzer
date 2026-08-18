@@ -6,7 +6,7 @@ import { customElement, property, state } from 'lit/decorators.js';
 import { classMap } from 'lit/directives/class-map.js';
 import { styleMap } from 'lit/directives/style-map.js';
 
-import { formatDuration } from '../core/utility/Util.js';
+import { formatDuration, formatInteger } from '../core/utility/Util.js';
 import { globalStyles } from '../styles/global.styles.js';
 
 /** One coloured length of a {@link StackedTimeBar}, measured in nanoseconds. */
@@ -14,8 +14,36 @@ export interface StackedSegment {
   label: string;
   timeNs: number;
   color: string;
-  /** What the segment is made of. A second line in `legendRows`, and in the tip. */
+  /** What the segment is made of. Shown in the tip. */
   detail?: string;
+}
+
+/**
+ * The first `max` rows as segments, with everything past them gathered into one
+ * muted tail, so a bar with more rows than it can colour still totals the whole.
+ *
+ * The tail reads its time through `timeOf`, so a row past `max` never pays for a
+ * segment that is thrown away.
+ */
+export function segmentsWithTail<T>(
+  rows: readonly T[],
+  max: number,
+  toSegment: (row: T) => StackedSegment,
+  timeOf: (row: T) => number,
+): StackedSegment[] {
+  const segments = rows.slice(0, max).map(toSegment);
+  if (rows.length > max) {
+    let tailNs = 0;
+    for (let index = max; index < rows.length; index++) {
+      tailNs += timeOf(rows[index]!); // in range: below rows.length
+    }
+    segments.push({
+      label: `${formatInteger(rows.length - max)} others`,
+      timeNs: tailNs,
+      color: 'var(--lana-fg-muted)',
+    });
+  }
+  return segments;
 }
 
 /**
@@ -42,16 +70,13 @@ export class StackedTimeBar extends LitElement {
   @property({ type: Boolean })
   legend = false;
 
-  /** One legend item per line, for a section too narrow to wrap them well. */
-  @property({ type: Boolean })
-  legendRows = false;
-
   /** Accessible name for the bar itself. */
   @property()
   label = '';
 
-  /** The segment under the pointer — over the bar or its legend item.
-   *  `onBar` gates the readout tip: only a bar hover shows it. */
+  /** The segment under the pointer — over the bar or its legend item. `onBar`
+   *  gates the readout tip: a legend hover only gets one for a `detail`, which
+   *  the legend item does not itself carry. */
   @state()
   private _hover: { label: string; onBar: boolean } | null = null;
 
@@ -101,42 +126,6 @@ export class StackedTimeBar extends LitElement {
         flex-wrap: wrap;
         gap: var(--lana-space-3xs) var(--lana-space-lg);
         padding-top: var(--lana-space-sm);
-      }
-
-      /* A row per item: the name runs left, the figures right, so they line up
-       down the column however many items there are. */
-      .legend--rows {
-        flex-direction: column;
-        flex-wrap: nowrap;
-        gap: var(--lana-space-3xs);
-      }
-
-      /* A grid, so a segment's detail can hold a line of its own under the name
-         while the name and the figures stay in their columns. */
-      .legend--rows .legend__item {
-        display: grid;
-        grid-template-columns: auto minmax(0, 1fr) auto;
-        min-width: 0;
-        column-gap: var(--lana-space-2xs);
-        row-gap: var(--lana-space-3xs);
-      }
-
-      .legend__detail {
-        grid-column: 2 / -1;
-        overflow: hidden;
-        text-overflow: ellipsis;
-        color: var(--lana-fg-muted);
-        font-family: var(--lana-font-mono);
-        font-variant-numeric: tabular-nums;
-      }
-
-      .legend--rows .legend__item > span:not([class]) {
-        overflow: hidden;
-        text-overflow: ellipsis;
-      }
-
-      .legend--rows .legend__value {
-        margin-left: auto;
       }
 
       .legend__item {
@@ -201,7 +190,11 @@ export class StackedTimeBar extends LitElement {
       return { ...segment, start, width };
     });
     const hover = this._hover;
-    const tipSlice = hover?.onBar ? laid.find((s) => s.label === hover.label) : undefined;
+    const hovered = hover ? laid.find((s) => s.label === hover.label) : undefined;
+    // A bar hover always gets the readout; a legend hover only when the segment
+    // has a detail, which the legend itself does not carry. Without that the
+    // detail of a sub-pixel segment could not be reached at all.
+    const tipSlice = hover?.onBar || hovered?.detail ? hovered : undefined;
     // The pointer where we have it, the segment's centre until the first move.
     const tipCenter = this._pointerPercent ?? (tipSlice ? tipSlice.start + tipSlice.width / 2 : 0);
 
@@ -263,7 +256,7 @@ export class StackedTimeBar extends LitElement {
   }
 
   private _legend(laid: StackedSegment[], denominator: number): TemplateResult {
-    return html`<div class=${classMap({ legend: true, 'legend--rows': this.legendRows })}>
+    return html`<div class="legend">
       ${laid.map(
         (segment) => html`
           <span
@@ -277,11 +270,6 @@ export class StackedTimeBar extends LitElement {
             <span class="legend__swatch" style=${styleMap({ background: segment.color })}></span>
             <span>${segment.label}</span>
             <span class="legend__value">${readout(segment.timeNs, denominator)}</span>
-            ${
-              segment.detail && this.legendRows
-                ? html`<span class="legend__detail">${segment.detail}</span>`
-                : ''
-            }
           </span>
         `,
       )}

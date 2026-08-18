@@ -106,6 +106,9 @@
     var(--vscode-editorInfo-foreground, #3794ff)
   );
 
+  /* Nothing wrong — the colour VS Code marks a passing test with. */
+  --lana-severity-ok: var(--vscode-testing-iconPassed, var(--vscode-charts-green, #73c991));
+
   /* Row hover, for lists whose rows can be opened or picked. */
   --lana-row-hover-bg: var(--vscode-list-hoverBackground, rgba(128, 128, 128, 0.12));
 
@@ -137,4 +140,8 @@
 
   /* Shared height for the inspector dock's action bar and pane section headers. */
   --lana-panel-header-height: var(--lana-space-xl);
+
+  /* Least a pane section shows before the stack scrolls instead: its header and a
+     few rows of body, so no section is squeezed down to its title by its siblings. */
+  --lana-pane-min: calc(var(--lana-panel-header-height) * 4);
 }

@@ -36,7 +36,7 @@ jest.mock('tabulator-tables', () => ({
   Renderer: class {},
 }));
 
-// No DatabaseAccess in the test, so the stack is empty.
+// No log store in the test, so the stack is empty.
 jest.mock('../callStackData.js', () => ({
   buildCallStackData: () => ({ rows: [], rootTotal: 0 }),
 }));
