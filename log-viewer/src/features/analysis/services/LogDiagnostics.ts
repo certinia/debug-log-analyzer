@@ -515,7 +515,7 @@ function repetitionDiagnostics(statements: LogEvent[], label: string): Diagnosti
       id: `repeat-text|${label}|${text}`,
       severity: 'Warning',
       summary: `${group.count} identical ${label} statements, from ${sites.size} lines`,
-      message: `The same statement ran ${group.count} times from ${sites.size} places. Run it once and pass the result around, or cache it for the transaction.`,
+      message: `The same statement ran ${group.count} times from ${sites.size} places. Run it once and pass the result around, or work on the whole collection at once.`,
       count: group.count,
       timeNs: totalTime(group.events),
       eventIndex: group.eventIndex,
