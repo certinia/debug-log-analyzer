@@ -9,9 +9,9 @@ import type { ApexLog } from 'apex-log-parser';
 let apexLog: ApexLog | null = null;
 
 import type { LogStore } from '../../core/log/LogStore.js';
-import type { NamespaceTimeBar } from '../NamespaceTimeBar.js';
+import { MAX_SEGMENTS, type NamespaceTimeBar } from '../NamespaceTimeBar.js';
 import '../NamespaceTimeBar.js';
-import { NAMESPACE_COLORS } from '../namespaceTime.js';
+import { logNamespacePalette } from '../namespacePalette.js';
 import { ev, eventByIndex, log, resetEvents, type FakeEvent } from './fixtures/logEvents.js';
 
 const logOf = (children: FakeEvent[], namespaces: string[]) => {
@@ -68,7 +68,7 @@ describe('namespace-time-bar', () => {
     expect(segments(element).map(({ label }) => label)).toEqual(['pkg', 'other']);
     // The log's palette, not the scope's order: `other` keeps its log colour even
     // though it is second here and third in the log.
-    expect(segments(element)[1]?.color).toBe(NAMESPACE_COLORS[2]);
+    expect(segments(element)[1]?.color).toBe(logNamespacePalette(apexLog!)('other'));
   });
 
   it('sums every occurrence of an aggregate, counting a nested one once', async () => {
@@ -81,8 +81,11 @@ describe('namespace-time-bar', () => {
     expect(segments(element)[0]).toMatchObject({ label: 'pkg', timeNs: 50 });
   });
 
-  it('gathers the namespaces past the palette into one tail segment', async () => {
-    const namespaces = NAMESPACE_COLORS.map((_, index) => `ns${index}`).concat('ns8', 'ns9');
+  it('gathers the namespaces past the cap into one tail segment', async () => {
+    const namespaces = Array.from({ length: MAX_SEGMENTS }, (_, index) => `ns${index}`).concat(
+      'nsA',
+      'nsB',
+    );
     // Descending self time, so the two smallest fall past the palette.
     logOf(
       namespaces.map((namespace, index) => ev(namespace, (namespaces.length - index) * 10)),
@@ -91,8 +94,8 @@ describe('namespace-time-bar', () => {
 
     const shown = segments(await mount());
 
-    expect(shown).toHaveLength(NAMESPACE_COLORS.length + 1);
-    // ns8 at 20 and ns9 at 10.
+    expect(shown).toHaveLength(MAX_SEGMENTS + 1);
+    // nsA at 20 and nsB at 10.
     expect(shown.at(-1)).toMatchObject({ label: '2 others', timeNs: 30 });
   });
 

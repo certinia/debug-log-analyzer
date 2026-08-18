@@ -4,12 +4,7 @@
 import { describe, expect, it } from '@jest/globals';
 
 import type { FrameBudgetOptions } from '../../core/utility/FrameBudget.js';
-import {
-  cachedNamespaceSelfTimes,
-  logNamespacePalette,
-  scopedNamespaceSelfTimes,
-  NAMESPACE_COLORS,
-} from '../namespaceTime.js';
+import { cachedNamespaceSelfTimes, scopedNamespaceSelfTimes } from '../namespaceTime.js';
 import { ev, log, roots, type FakeEvent } from './fixtures/logEvents.js';
 
 const options: FrameBudgetOptions = { yieldFrame: () => Promise.resolve() };
@@ -97,37 +92,5 @@ describe('scopedNamespaceSelfTimes', () => {
     expect(cachedNamespaceSelfTimes(apexLog)).toBeUndefined();
     const slices = await scopedNamespaceSelfTimes(apexLog, apexLog.children, options);
     expect(cachedNamespaceSelfTimes(apexLog)).toBe(slices);
-  });
-});
-
-describe('logNamespacePalette', () => {
-  it('colours the log in its own order, default first, whatever the scope asks in', () => {
-    const apexLog = log([], ['pkg', 'other']);
-    const color = logNamespacePalette(apexLog);
-
-    // A frame bar asking `other` first still gets the log's colour for it.
-    expect(color('other')).toBe(NAMESPACE_COLORS[2]);
-    expect(color('default')).toBe(NAMESPACE_COLORS[0]);
-    expect(color('pkg')).toBe(NAMESPACE_COLORS[1]);
-  });
-
-  it('memoises per log, so every bar shares one assignment', () => {
-    const apexLog = log([], ['pkg']);
-
-    expect(logNamespacePalette(apexLog)).toBe(logNamespacePalette(apexLog));
-  });
-
-  it('gives a namespace the log never named the next colour', () => {
-    const color = logNamespacePalette(log([], ['pkg']));
-
-    expect(color('late')).toBe(NAMESPACE_COLORS[2]);
-  });
-
-  it('wraps round the scale once it runs out', () => {
-    // `default` takes the first colour, so the log's own last namespace wraps.
-    const names = NAMESPACE_COLORS.map((_, index) => `ns${index}`);
-    const color = logNamespacePalette(log([], names));
-
-    expect(color(names.at(-1)!)).toBe(NAMESPACE_COLORS[0]);
   });
 });

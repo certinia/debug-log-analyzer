@@ -13,17 +13,16 @@ import { globalStyles } from '../styles/global.styles.js';
 import { inspectorSectionStyles } from '../styles/inspectorSection.styles.js';
 import { segmentsWithTail } from './StackedTimeBar.js';
 import './StackedTimeBar.js';
+import { logNamespacePalette } from './namespacePalette.js';
 import {
-  NAMESPACE_COLORS,
   cachedNamespaceSelfTimes,
-  logNamespacePalette,
   scopedNamespaceSelfTimes,
   type NamespaceTime,
 } from './namespaceTime.js';
 
-/** Namespaces are few, so the whole scale fits; the cap only guards a log that
- *  somehow holds more than the palette does. */
-const MAX_SEGMENTS = NAMESPACE_COLORS.length;
+/** A dock-width bar cannot show more segments wide enough to read or hover, so
+ *  the rest go to the tail however many colours there are. */
+export const MAX_SEGMENTS = 12;
 
 /** No scope resolved yet, so the first null scope still reads as a change. */
 const UNRESOLVED = Symbol('unresolved scope');
