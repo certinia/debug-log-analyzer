@@ -17,11 +17,10 @@ on:
     paths-ignore:
       - '**/*.md'
       - '**/*.txt'
+  # No paths-ignore here: CodeQL is a required check, so a docs-only pull request
+  # would never report it and could never merge.
   pull_request:
     branches: ['main']
-    paths-ignore:
-      - '**/*.md'
-      - '**/*.txt'
   schedule:
     - cron: '26 5 * * 3'
 
