@@ -50,11 +50,8 @@ export class TimelineFlameChart extends LitElement {
         background: var(--vscode-inputValidation-errorBackground, #ffebee);
         border: var(--lana-stroke) solid var(--vscode-inputValidation-errorBorder, #ef5350);
         border-radius: var(--lana-radius-sm);
-        color: var(
-          --vscode-inputValidation-errorForeground,
-          var(--vscode-errorForeground, #c62828)
-        );
-        font-family: monospace;
+        color: var(--vscode-inputValidation-errorForeground, var(--lana-severity-error));
+        font-family: var(--lana-font-mono);
         max-width: 80%;
         text-align: center;
       }
@@ -65,8 +62,8 @@ export class TimelineFlameChart extends LitElement {
         left: 50%;
         transform: translate(-50%, -50%);
         padding: var(--lana-space-lg);
-        color: var(--vscode-descriptionForeground, #999);
-        font-family: monospace;
+        color: var(--lana-fg-muted);
+        font-family: var(--lana-font-mono);
       }
     `,
   ];

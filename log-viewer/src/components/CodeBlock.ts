@@ -40,15 +40,15 @@ export class CodeBlock extends LitElement {
         position: relative;
         overflow: auto;
         padding: var(--lana-space-sm);
-        border: 1px solid var(--vscode-widget-border, transparent);
+        border: 1px solid var(--lana-surface-border);
         border-radius: var(--lana-radius-sm);
-        background-color: var(--vscode-textCodeBlock-background, var(--vscode-editor-background));
+        background-color: var(--lana-code-bg);
       }
 
       pre {
         margin: 0;
-        font-family: var(--vscode-editor-font-family, monospace);
-        font-size: var(--vscode-editor-font-size, 0.9em);
+        font-family: var(--lana-font-mono);
+        font-size: var(--lana-text-mono);
         white-space: pre-wrap;
         word-break: break-word;
       }
@@ -59,8 +59,8 @@ export class CodeBlock extends LitElement {
         right: var(--lana-space-2xs);
         opacity: 0;
         transition: opacity 0.1s ease;
-        color: var(--vscode-icon-foreground);
-        background-color: var(--vscode-textCodeBlock-background, var(--vscode-editor-background));
+        color: var(--lana-icon-fg);
+        background-color: var(--lana-code-bg);
       }
       .code-block:hover .copy,
       .code-block:focus-within .copy,

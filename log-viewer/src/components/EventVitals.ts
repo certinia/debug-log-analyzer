@@ -126,10 +126,10 @@ export class EventVitals extends LitElement {
         }
       }
       .label {
-        color: var(--vscode-descriptionForeground);
+        color: var(--lana-fg-muted);
       }
       .value {
-        font-family: var(--vscode-editor-font-family, monospace);
+        font-family: var(--lana-font-mono);
         font-variant-numeric: tabular-nums;
         overflow-wrap: anywhere;
       }
@@ -138,7 +138,7 @@ export class EventVitals extends LitElement {
          colour is the theme's own secondary token — not a lower alpha — because
          thinning contrast to de-emphasise costs legibility. */
       .qualifier {
-        color: var(--vscode-descriptionForeground);
+        color: var(--lana-fg-muted);
         font-size: 0.9em;
       }
       .pill {
@@ -147,7 +147,7 @@ export class EventVitals extends LitElement {
         border-radius: var(--lana-radius-sm);
         font-size: 0.85em;
         line-height: 1.4;
-        color: var(--vscode-editor-background);
+        color: var(--lana-editor-bg);
       }
       .pill--yes {
         background-color: var(--vscode-charts-green, #388a34);
@@ -156,7 +156,7 @@ export class EventVitals extends LitElement {
         background-color: var(--vscode-charts-red, #d13438);
       }
       .empty {
-        color: var(--vscode-descriptionForeground);
+        color: var(--lana-fg-muted);
       }
     `,
   ];

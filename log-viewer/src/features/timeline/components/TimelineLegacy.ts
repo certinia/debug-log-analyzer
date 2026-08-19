@@ -68,9 +68,9 @@ export class TimelineLegacy extends LitElement {
         padding: 5px;
         border-radius: var(--lana-radius-sm);
         border-left: 4px solid;
-        background-color: var(--vscode-editor-background);
-        color: var(--vscode-editor-foreground);
-        font-family: monospace;
+        background-color: var(--lana-editor-bg);
+        color: var(--lana-editor-fg);
+        font-family: var(--lana-font-mono);
         font-size: 0.92rem;
         pointer-events: none;
         transition: opacity 0.15s ease;
@@ -125,7 +125,7 @@ export class TimelineLegacy extends LitElement {
       }
 
       #timeline {
-        background-color: var(--vscode-editor-background);
+        background-color: var(--lana-editor-bg);
         z-index: 0;
         width: 100%;
         height: 100%;

@@ -58,7 +58,7 @@ export class DatagridFacetFilter extends LitElement {
         grid-column: 1;
         font-size: var(--filter-control-font-size);
         font-weight: 600;
-        color: var(--vscode-foreground);
+        color: var(--lana-fg);
         /* Nudge onto the first option row's baseline. */
         padding-top: 3px;
       }
@@ -80,8 +80,8 @@ export class DatagridFacetFilter extends LitElement {
 
       .facet-trigger__count {
         font-weight: 600;
-        color: var(--vscode-badge-foreground);
-        background-color: var(--vscode-badge-background);
+        color: var(--lana-badge-fg);
+        background-color: var(--lana-badge-bg);
         border-radius: 999px;
         padding: 0 5px;
         font-size: 10px;
@@ -94,7 +94,7 @@ export class DatagridFacetFilter extends LitElement {
       }
 
       .facet-trigger__chevron {
-        color: var(--vscode-descriptionForeground);
+        color: var(--lana-fg-muted);
       }
 
       .facet-popover {
@@ -136,7 +136,7 @@ export class DatagridFacetFilter extends LitElement {
 
       .facet-popover__empty {
         padding: 6px 8px;
-        color: var(--vscode-descriptionForeground);
+        color: var(--lana-fg-muted);
         font-size: 12px;
       }
 
@@ -151,7 +151,7 @@ export class DatagridFacetFilter extends LitElement {
         padding: 4px 8px;
         border: none;
         background: none;
-        color: var(--vscode-textLink-foreground);
+        color: var(--lana-link-fg);
         font: inherit;
         font-size: 12px;
         text-align: left;
@@ -164,7 +164,7 @@ export class DatagridFacetFilter extends LitElement {
       }
 
       .facet-popover__clear:hover {
-        color: var(--vscode-textLink-activeForeground);
+        color: var(--lana-link-fg-active);
       }
     `,
   ];

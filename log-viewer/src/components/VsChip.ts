@@ -25,24 +25,24 @@ export class VsChip extends LitElement {
         align-items: baseline;
         gap: 6px;
         padding: 2px 6px;
-        border: 1px solid var(--vscode-settings-dropdownBorder, #3c3c3c);
+        border: 1px solid var(--lana-control-border);
         border-radius: 4px;
-        background-color: var(--vscode-settings-dropdownBackground, #313131);
+        background-color: var(--lana-control-bg);
         white-space: nowrap;
-        font-family: var(--vscode-editor-font-family, monospace);
+        font-family: var(--lana-font-mono);
         font-weight: 600;
         font-size: 11px;
-        color: var(--vscode-foreground);
+        color: var(--lana-fg);
       }
 
       /* Small uppercase leading label; overrides the host's mono/value styling. */
       ::slotted([slot='lead']) {
-        font-family: var(--vscode-font-family);
+        font-family: var(--lana-font-ui);
         font-size: 10px;
         font-weight: 400;
         letter-spacing: 0.05em;
         text-transform: uppercase;
-        color: var(--vscode-descriptionForeground);
+        color: var(--lana-fg-muted);
       }
     `,
   ];

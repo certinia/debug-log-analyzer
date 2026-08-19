@@ -127,7 +127,7 @@ export class NavBar extends LitElement {
         /* VS Code's side-bar/panel title height, so this row reads as a title bar rather
            than as content pressed against the top edge (and the count badges have room). */
         min-height: 35px;
-        color: var(--vscode-editor-foreground);
+        color: var(--lana-editor-fg);
       }
 
       .navbar {
@@ -135,7 +135,7 @@ export class NavBar extends LitElement {
         /* Wide enough to read as a gap: the count badge overhangs its control by 3px. */
         gap: 16px;
         justify-content: space-between;
-        font-family: var(--vscode-font-family);
+        font-family: var(--lana-font-ui);
         align-items: center;
         min-width: 0;
       }
@@ -180,13 +180,13 @@ export class NavBar extends LitElement {
         padding: 4px 8px 2px;
         font-size: 11px;
         font-weight: 600;
-        color: var(--vscode-descriptionForeground);
+        color: var(--lana-fg-muted);
       }
 
       .menu-section__empty {
         padding: 2px 8px 4px;
         font-size: 12px;
-        color: var(--vscode-descriptionForeground);
+        color: var(--lana-fg-muted);
       }
     `,
   ];

@@ -20,12 +20,10 @@ export const globalStyles = [
       --filter-control-font-size: 11px;
       --filter-control-padding: 0 var(--lana-space-sm);
       --filter-control-radius: var(--lana-radius-sm);
-      --filter-control-border-color: var(--vscode-settings-dropdownBorder, #3c3c3c);
-      --filter-control-bg: var(--vscode-settings-dropdownBackground, #313131);
 
       /* Popover design tokens — facet/range/select/context-menu popovers all
        consume these so they render as one family. */
-      --filter-popover-bg: var(--vscode-menu-background, var(--vscode-editor-background));
+      --filter-popover-bg: var(--vscode-menu-background, var(--lana-editor-bg));
       --filter-popover-border-color: var(--vscode-menu-border, var(--lana-surface-border));
       --filter-popover-radius: var(--lana-radius-md);
       --filter-popover-shadow: var(--lana-shadow-popover);
@@ -38,18 +36,18 @@ export const globalStyles = [
     }
 
     a {
-      color: var(--vscode-textLink-foreground);
+      color: var(--lana-link-fg);
       text-decoration: none;
       cursor: pointer;
 
       &:hover {
-        color: var(--vscode-textLink-activeForeground);
+        color: var(--lana-link-fg-active);
         text-decoration: underline;
       }
 
       &:active {
         background: transparent;
-        color: var(--vscode-textLink-activeForeground);
+        color: var(--lana-link-fg-active);
         text-decoration: underline;
       }
     }
@@ -60,7 +58,7 @@ export const globalStyles = [
     }
 
     ::-webkit-scrollbar-corner {
-      background-color: var(--vscode-editor-background);
+      background-color: var(--lana-editor-bg);
     }
 
     ::-webkit-scrollbar-thumb {
@@ -104,10 +102,9 @@ export const globalStyles = [
       width: 16px;
       height: 16px;
       flex-shrink: 0;
-      border: var(--lana-stroke) solid
-        var(--vscode-checkbox-border, var(--vscode-settings-dropdownBorder, #6b6b6b));
+      border: var(--lana-stroke) solid var(--vscode-checkbox-border, var(--lana-control-border));
       border-radius: 3px;
-      background-color: var(--vscode-checkbox-background, #313131);
+      background-color: var(--vscode-checkbox-background, var(--lana-control-bg));
       cursor: pointer;
     }
 
@@ -128,7 +125,7 @@ export const globalStyles = [
     }
 
     .vs-checkbox:focus-visible {
-      outline: 1px solid var(--vscode-focusBorder);
+      outline: 1px solid var(--lana-focus-border);
       outline-offset: 1px;
     }
 
@@ -152,10 +149,10 @@ export const globalStyles = [
       align-items: center;
       gap: var(--lana-space-2xs);
       padding: var(--filter-control-padding);
-      border: var(--lana-stroke) solid var(--filter-control-border-color);
+      border: var(--lana-stroke) solid var(--lana-control-border);
       border-radius: var(--filter-control-radius);
-      background-color: var(--filter-control-bg);
-      color: var(--vscode-foreground);
+      background-color: var(--lana-control-bg);
+      color: var(--lana-fg);
       font: inherit;
       font-size: var(--filter-control-font-size);
       line-height: 1.4;
@@ -164,11 +161,11 @@ export const globalStyles = [
     }
 
     .filter-control:hover {
-      background-color: var(--vscode-list-hoverBackground);
+      background-color: var(--lana-row-hover-bg);
     }
 
     .filter-control:focus-visible {
-      outline: 1px solid var(--vscode-focusBorder);
+      outline: 1px solid var(--lana-focus-border);
       outline-offset: 1px;
     }
 
@@ -180,8 +177,8 @@ export const globalStyles = [
      value-carrying filter. */
     .pill-toggle[aria-pressed='true'] {
       background-color: var(--vscode-inputOption-activeBackground);
-      border-color: var(--vscode-inputOption-activeBorder, var(--vscode-focusBorder));
-      color: var(--vscode-inputOption-activeForeground, var(--vscode-foreground));
+      border-color: var(--vscode-inputOption-activeBorder, var(--lana-focus-border));
+      color: var(--vscode-inputOption-activeForeground, var(--lana-fg));
     }
 
     /* Value-filter controls (facet/range triggers with a value, single-select
@@ -189,8 +186,8 @@ export const globalStyles = [
      distinguishes "a filter is applied" from the binary toggle's ON state
      above, while still reading as accented against the plain pill. */
     .filter-control--active {
-      border-color: var(--vscode-inputOption-activeBorder, var(--vscode-focusBorder));
-      color: var(--vscode-inputOption-activeForeground, var(--vscode-foreground));
+      border-color: var(--vscode-inputOption-activeBorder, var(--lana-focus-border));
+      color: var(--vscode-inputOption-activeForeground, var(--lana-fg));
     }
 
     /* Shared base for every filter-bar popover (facet checklist, range inputs,
@@ -202,8 +199,8 @@ export const globalStyles = [
       border: var(--lana-stroke) solid var(--filter-popover-border-color);
       border-radius: var(--filter-popover-radius);
       box-shadow: var(--filter-popover-shadow);
-      color: var(--vscode-menu-foreground, var(--vscode-foreground));
-      font-family: var(--vscode-font-family);
+      color: var(--vscode-menu-foreground, var(--lana-fg));
+      font-family: var(--lana-font-ui);
     }
 
     .filter-popover-row {
@@ -214,7 +211,7 @@ export const globalStyles = [
     }
 
     .filter-popover-row:hover {
-      background-color: var(--vscode-list-hoverBackground);
+      background-color: var(--lana-row-hover-bg);
     }
   `,
 ];

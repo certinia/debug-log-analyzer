@@ -55,12 +55,12 @@ export class LogTitle extends LitElement {
       }
 
       a.title-item {
-        color: var(--vscode-editor-foreground);
+        color: var(--lana-editor-fg);
 
         &:hover,
         &:active {
-          background-color: var(--vscode-toolbar-hoverBackground, rgba(90, 93, 94, 0.31));
-          color: var(--vscode-editor-foreground);
+          background-color: var(--lana-toolbar-hover-bg);
+          color: var(--lana-editor-fg);
           text-decoration: none;
         }
       }

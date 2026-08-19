@@ -241,7 +241,7 @@ export class DatabaseView extends LitElement {
         display: flex;
         height: 100%;
         width: 100%;
-        background-color: var(--vscode-editor-background);
+        background-color: var(--lana-editor-bg);
       }
 
       .db-grids {
@@ -256,7 +256,7 @@ export class DatabaseView extends LitElement {
       }
 
       governor-summary {
-        border-bottom: var(--lana-stroke) solid var(--vscode-panel-border);
+        border-bottom: var(--lana-stroke) solid var(--lana-surface-border);
         /* Left inset matches the sections' content edge. */
         padding: var(--lana-space-sm) var(--lana-space-md) var(--lana-space-md)
           var(--lana-section-inset);
@@ -289,7 +289,7 @@ export class DatabaseView extends LitElement {
 
       .db-panel + .db-panel {
         margin-top: 16px;
-        border-top: 1px solid var(--vscode-panel-border);
+        border-top: 1px solid var(--lana-surface-border);
         padding-top: 8px;
       }
     `,
