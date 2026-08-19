@@ -49,14 +49,14 @@ export class FindWidget extends LitElement {
         max-width: 420px;
         border: 1px solid var(--vscode-contrastBorder);
         color: var(--vscode-editorWidget-foreground);
-        background: var(--vscode-editorWidget-background);
+        background: var(--lana-popover-bg);
         z-index: 1;
         display: flex;
-        border-bottom: 1px solid var(--vscode-widget-border);
+        border-bottom: 1px solid var(--lana-surface-border);
         border-bottom-left-radius: 4px;
         border-bottom-right-radius: 4px;
-        border-left: 1px solid var(--vscode-widget-border);
-        border-right: 1px solid var(--vscode-widget-border);
+        border-left: 1px solid var(--lana-surface-border);
+        border-right: 1px solid var(--lana-surface-border);
         box-sizing: border-box;
         margin-top: 3px;
         height: 33px;

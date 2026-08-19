@@ -206,7 +206,7 @@ export class LogDiagnosticsView extends LitElement {
       }
 
       .rollup__seg:focus-visible {
-        outline: var(--lana-stroke) solid var(--vscode-focusBorder);
+        outline: var(--lana-stroke) solid var(--lana-focus-border);
         outline-offset: var(--lana-stroke);
       }
 
@@ -343,7 +343,7 @@ export class LogDiagnosticsView extends LitElement {
       .cause__value {
         flex: 0 0 auto;
         margin-left: auto;
-        color: var(--vscode-foreground);
+        color: var(--lana-fg);
         font-family: var(--lana-font-mono);
         font-size: var(--lana-text-sm);
         font-variant-numeric: tabular-nums;
@@ -364,7 +364,7 @@ export class LogDiagnosticsView extends LitElement {
         border-radius: var(--lana-radius-sm);
         padding: var(--lana-space-2xs) var(--lana-space-xs);
         background-color: var(--lana-code-bg);
-        color: var(--vscode-foreground);
+        color: var(--lana-fg);
         font-family: var(--lana-font-mono);
         font-size: var(--lana-text-sm);
         text-align: left;
@@ -410,12 +410,12 @@ export class LogDiagnosticsView extends LitElement {
       }
 
       .evidence--link:hover {
-        border-color: var(--vscode-focusBorder);
+        border-color: var(--lana-focus-border);
         background-color: var(--lana-row-hover-bg);
       }
 
       .evidence--link:focus-visible {
-        outline: var(--lana-stroke) solid var(--vscode-focusBorder);
+        outline: var(--lana-stroke) solid var(--lana-focus-border);
         outline-offset: var(--lana-stroke);
       }
 
@@ -425,7 +425,7 @@ export class LogDiagnosticsView extends LitElement {
       }
 
       .evidence--link:hover .evidence__go {
-        color: var(--vscode-foreground);
+        color: var(--lana-fg);
       }
 
       .note {

@@ -139,14 +139,14 @@ export class PaneView extends LitElement {
         cursor: pointer;
       }
       .pane-header--button:hover {
-        background-color: var(--vscode-list-hoverBackground);
+        background-color: var(--lana-row-hover-bg);
       }
       .pane-header:focus-visible {
-        outline: 1px solid var(--vscode-focusBorder);
+        outline: 1px solid var(--lana-focus-border);
         outline-offset: -1px;
       }
       .pane-header vscode-icon {
-        color: var(--vscode-icon-foreground);
+        color: var(--lana-icon-fg);
         flex: 0 0 auto;
       }
       .pane-header__title {

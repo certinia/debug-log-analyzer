@@ -95,7 +95,7 @@ export class LogViewer extends LitElement {
       }
 
       vscode-tabs {
-        --vscode-panel-background: var(--vscode-editor-background);
+        --vscode-panel-background: var(--lana-editor-bg);
 
         display: flex;
         flex-direction: column;
@@ -124,7 +124,7 @@ export class LogViewer extends LitElement {
         display: flex;
         align-items: center;
         column-gap: 0.3em;
-        font-family: var(--vscode-font-family);
+        font-family: var(--lana-font-ui);
         font-size: var(--vscode-font-size, 13px);
         text-transform: none;
       }

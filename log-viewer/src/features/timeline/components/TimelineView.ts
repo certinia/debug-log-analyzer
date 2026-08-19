@@ -94,10 +94,9 @@ export class TimelineView extends LitElement {
     css`
       :host {
         /* Editor */
-        --tl-editor-background: var(--vscode-editor-background);
-        --tl-editor-foreground: var(--vscode-editor-foreground);
+        --tl-editor-foreground: var(--lana-editor-fg);
         --tl-cursor-foreground: var(--vscode-editorCursor-foreground, #fff);
-        --tl-focus-border: var(--vscode-focusBorder, #007fd4);
+        --tl-focus-border: var(--lana-focus-border);
         --tl-line-number-foreground: var(--vscode-editorLineNumber-foreground, #808080);
 
         /* Find/selection */
@@ -106,27 +105,18 @@ export class TimelineView extends LitElement {
         --tl-selection-highlight-border: var(--vscode-editor-selectionHighlightBorder, transparent);
 
         /* Widgets */
-        --tl-widget-background: var(--vscode-editorWidget-background, #252526);
-        --tl-widget-border: var(--vscode-editorWidget-border, #454545);
+        --tl-widget-background: var(--lana-popover-bg);
+        --tl-widget-border: var(--lana-surface-border);
         --tl-widget-foreground: var(--vscode-editorWidget-foreground, #cccccc);
 
         /* Hover/tooltip */
-        --tl-hover-background: var(
-          --vscode-editorHoverWidget-background,
-          var(--vscode-editorWidget-background, #252526)
-        );
-        --tl-hover-border: var(
-          --vscode-editorHoverWidget-border,
-          var(--vscode-editorWidget-border, #454545)
-        );
-        --tl-hover-foreground: var(
-          --vscode-editorHoverWidget-foreground,
-          var(--vscode-editorWidget-foreground, #cccccc)
-        );
+        --tl-hover-background: var(--lana-hover-bg);
+        --tl-hover-border: var(--lana-hover-border);
+        --tl-hover-foreground: var(--lana-hover-fg);
 
         /* Text */
-        --tl-description-foreground: var(--vscode-descriptionForeground, #999);
-        --tl-font-family: var(--vscode-font-family, sans-serif);
+        --tl-description-foreground: var(--lana-fg-muted);
+        --tl-font-family: var(--lana-font-ui);
 
         /* Buttons */
         --tl-button-secondary-background: var(--vscode-button-secondaryBackground, #3a3d41);
@@ -135,9 +125,6 @@ export class TimelineView extends LitElement {
           --vscode-button-secondaryHoverBackground,
           #45494e
         );
-
-        /* Toolbar */
-        --tl-toolbar-hover-background: var(--vscode-toolbar-hoverBackground);
 
         display: flex;
         flex-direction: column;

@@ -30,7 +30,7 @@ export const bleedRowStyles = css`
   }
 
   .bleed-row:focus-visible {
-    outline: var(--lana-stroke) solid var(--vscode-focusBorder);
+    outline: var(--lana-stroke) solid var(--lana-focus-border);
     outline-offset: calc(-1 * var(--lana-stroke));
   }
 `;

@@ -52,7 +52,7 @@ export class Timelinekey extends LitElement {
 
       /* The time is the data: mono like the header vitals, full foreground against the muted label. */
       .chip__time {
-        font-family: var(--vscode-editor-font-family, monospace);
+        font-family: var(--lana-font-mono);
         font-variant-numeric: tabular-nums;
         color: var(--lana-fg);
       }

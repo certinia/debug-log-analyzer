@@ -94,7 +94,7 @@ export class SOQLLinterIssues extends LitElement {
         margin: 2px 0 4px 20px;
       }
       .empty {
-        color: var(--vscode-descriptionForeground);
+        color: var(--lana-fg-muted);
       }
     `,
   ];

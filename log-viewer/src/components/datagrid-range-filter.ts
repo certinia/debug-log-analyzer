@@ -59,7 +59,7 @@ export class DatagridRangeFilter extends LitElement {
       .range-panel__label {
         grid-column: 1;
         font-size: var(--filter-control-font-size);
-        color: var(--vscode-foreground);
+        color: var(--lana-fg);
         white-space: nowrap;
       }
 
@@ -72,7 +72,7 @@ export class DatagridRangeFilter extends LitElement {
 
       .range-panel__unit {
         font-size: 11px;
-        color: var(--vscode-descriptionForeground);
+        color: var(--lana-fg-muted);
       }
 
       .range-trigger {
@@ -80,7 +80,7 @@ export class DatagridRangeFilter extends LitElement {
       }
 
       .range-trigger__chevron {
-        color: var(--vscode-descriptionForeground);
+        color: var(--lana-fg-muted);
       }
 
       .range-popover {
@@ -135,7 +135,7 @@ export class DatagridRangeFilter extends LitElement {
       }
 
       .range-popover__input:focus {
-        outline: 1px solid var(--vscode-focusBorder);
+        outline: 1px solid var(--lana-focus-border);
         outline-offset: -1px;
       }
 
@@ -144,14 +144,14 @@ export class DatagridRangeFilter extends LitElement {
         padding: 2px 0;
         border: none;
         background: none;
-        color: var(--vscode-textLink-foreground);
+        color: var(--lana-link-fg);
         font: inherit;
         font-size: 12px;
         cursor: pointer;
       }
 
       .range-popover__clear:hover {
-        color: var(--vscode-textLink-activeForeground);
+        color: var(--lana-link-fg-active);
       }
     `,
   ];

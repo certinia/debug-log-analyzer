@@ -78,19 +78,19 @@ export class DatabaseMetricCard extends LitElement {
         font-size: 0.72rem;
         letter-spacing: 0.06em;
         text-transform: uppercase;
-        color: var(--vscode-descriptionForeground);
+        color: var(--lana-fg-muted);
       }
 
       .stat__seen {
-        font-family: var(--vscode-editor-font-family, monospace);
+        font-family: var(--lana-font-mono);
         font-variant-numeric: tabular-nums;
       }
 
       .stat__used {
-        font-family: var(--vscode-editor-font-family, monospace);
+        font-family: var(--lana-font-mono);
         font-variant-numeric: tabular-nums;
         font-size: 0.8rem;
-        color: var(--vscode-descriptionForeground);
+        color: var(--lana-fg-muted);
       }
 
       .stat__used.na {
@@ -98,7 +98,7 @@ export class DatabaseMetricCard extends LitElement {
       }
 
       .stat__sep {
-        color: var(--vscode-descriptionForeground);
+        color: var(--lana-fg-muted);
       }
 
       .stat__track {
@@ -106,7 +106,7 @@ export class DatabaseMetricCard extends LitElement {
         width: 100%;
         height: 3px;
         border-radius: 2px;
-        background: var(--vscode-editorWidget-border, var(--vscode-panel-border));
+        background: var(--lana-surface-border);
         overflow: hidden;
       }
 
@@ -118,13 +118,13 @@ export class DatabaseMetricCard extends LitElement {
       }
 
       .stat__fill--safe {
-        background: var(--vscode-charts-green, #388a34);
+        background: var(--lana-severity-ok);
       }
       .stat__fill--warn {
-        background: var(--vscode-charts-yellow, var(--vscode-editorWarning-foreground));
+        background: var(--lana-severity-warning);
       }
       .stat__fill--danger {
-        background: var(--vscode-errorForeground, #f14c4c);
+        background: var(--lana-severity-error);
       }
 
       @media (prefers-reduced-motion: reduce) {

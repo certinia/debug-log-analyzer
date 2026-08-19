@@ -53,7 +53,7 @@ export class LogProblemsChip extends LitElement {
          color on its own :host, and a specified value beats an inherited one (outer-tree
          author styles do win over :host). */
       .problems--clean vscode-icon {
-        color: var(--vscode-descriptionForeground);
+        color: var(--lana-fg-muted);
       }
 
       .skeleton {

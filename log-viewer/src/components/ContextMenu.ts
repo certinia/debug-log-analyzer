@@ -110,7 +110,7 @@ export class ContextMenu extends LitElement {
       }
 
       .menu-item:hover:not(.disabled) {
-        background-color: var(--vscode-list-hoverBackground);
+        background-color: var(--lana-row-hover-bg);
       }
 
       .menu-item.disabled {

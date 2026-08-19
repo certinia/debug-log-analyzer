@@ -28,11 +28,28 @@ Webview UI. Applies when working under `log-viewer/`.
 
 ## UI appearance
 
-- **Use a `--lana-*` token for every color, radius, space, shadow and border width.** Write no new
-  literals, and replace the literals in the code you touch. Older files still hold literals; we
-  convert them file by file.
-- **Put a new token in `styles/tokens.css` as `var(--vscode-…, <literal>)`.** The literal is the
-  value a host outside VS Code gets, so one stylesheet can re-skin the app.
+- **Never write a raw literal for a color, radius, space, shadow or border width.** Use a
+  `--lana-*` token, or the `--vscode-*` var the value comes from. Replace the literals in the code
+  you touch; older files still hold them and we convert file by file.
+- **A `--lana-*` token when the value is more than one var, and the plain `--vscode-*` var when it
+  is not.** Give a value a token when any of these holds:
+  1. the role appears in three or more files;
+  2. VS Code has no var for it, so it is a scale or a role of ours (`--lana-space-*`,
+     `--lana-pane-min`);
+  3. the value is a chain, a `calc` or a `color-mix`, not a single var;
+  4. the var is absent in a VS Code we support, so a fallback is needed — `cornerRadius-*`,
+     `spacing-size*` and `strokeThickness` ship in no stable release.
+
+  Otherwise use the var directly. A token wrapping one already-semantic var used in one file
+  (`--vscode-editorCursor-foreground`) only adds a name to learn and a hop to trace.
+
+- **Put a new token in `styles/tokens.css` as `var(--vscode-…, <literal>)`.** The literal is what a
+  host outside VS Code falls back to, and what covers a var VS Code has yet to register.
+- **Never define or override a `--vscode-*` name.** An override is global to the webview, so
+  re-skinning one role changes every other consumer of that var, and shadowing a platform name
+  leaves no way to tell what the var means. A host outside VS Code supplies the whole `--vscode-*`
+  block once instead. The one exception is skinning a `vscode-elements` component, which reads its
+  own `--vscode-*` names: scope the override to that element, never to `:host` or `:root`.
 - **Data palettes stay literal.** The timeline categories (`timeline/themes/Themes.ts`) and the
   metric-strip tiers (`metric-strip/metric-strip-colors.ts`) show meaning, not chrome, so they do
   not follow the host theme.

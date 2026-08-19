@@ -122,7 +122,7 @@ export class GovernorTrends extends LitElement {
          the chart under the pointer. */
       .trend__value {
         display: block;
-        font-family: var(--vscode-editor-font-family, monospace);
+        font-family: var(--lana-font-mono);
         font-variant-numeric: tabular-nums;
         font-size: var(--lana-text-sm);
         white-space: nowrap;
@@ -138,17 +138,17 @@ export class GovernorTrends extends LitElement {
         display: block;
         width: 100%;
         height: 44px;
-        border-bottom: 1px solid var(--vscode-editorWidget-border, var(--vscode-panel-border));
+        border-bottom: 1px solid var(--lana-surface-border);
       }
 
       .trend--safe {
-        color: var(--vscode-charts-green, #388a34);
+        color: var(--lana-severity-ok);
       }
       .trend--warn {
-        color: var(--vscode-charts-yellow, var(--vscode-editorWarning-foreground));
+        color: var(--lana-severity-warning);
       }
       .trend--danger {
-        color: var(--vscode-errorForeground, #f14c4c);
+        color: var(--lana-severity-error);
       }
 
       .trend__area {

@@ -47,8 +47,8 @@ export class DetailDock extends LitElement {
         height: 100%;
         overflow: hidden;
         background-color: var(--vscode-sideBar-background);
-        color: var(--vscode-sideBar-foreground, var(--vscode-foreground));
-        font-family: var(--vscode-font-family);
+        color: var(--vscode-sideBar-foreground, var(--lana-fg));
+        font-family: var(--lana-font-ui);
         font-size: var(--vscode-font-size);
         /* Match the docked edge (the DockLayout gutter) so the panel reads as a
            deliberate region rather than blending into the tab header above. */
@@ -78,17 +78,14 @@ export class DetailDock extends LitElement {
 
       vscode-icon {
         flex: 0 0 auto;
-        color: var(--vscode-icon-foreground);
+        color: var(--lana-icon-fg);
         border-radius: var(--lana-radius-sm);
       }
       vscode-icon:hover {
-        background-color: var(--vscode-toolbar-hoverBackground);
+        background-color: var(--lana-toolbar-hover-bg);
       }
       vscode-icon:active {
-        background-color: var(
-          --vscode-toolbar-activeBackground,
-          var(--vscode-toolbar-hoverBackground)
-        );
+        background-color: var(--vscode-toolbar-activeBackground, var(--lana-toolbar-hover-bg));
       }
 
       pane-view {
@@ -99,7 +96,7 @@ export class DetailDock extends LitElement {
       .empty {
         flex: 1 1 auto;
         padding: var(--lana-space-md) var(--lana-space-lg);
-        color: var(--vscode-descriptionForeground);
+        color: var(--lana-fg-muted);
       }
     `,
   ];
