@@ -112,7 +112,7 @@ export class AnchoredPopover extends LitElement {
       .panel__head {
         padding: 2px 8px 6px;
         font-weight: 600;
-        font-size: 12px;
+        font-size: var(--lana-text-base);
         color: var(--lana-fg);
       }
 
@@ -121,7 +121,7 @@ export class AnchoredPopover extends LitElement {
         align-items: center;
         gap: 6px;
         padding: 8px;
-        font-size: 12px;
+        font-size: var(--lana-text-base);
         color: var(--lana-fg-muted);
       }
 

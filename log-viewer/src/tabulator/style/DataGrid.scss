@@ -12,6 +12,7 @@ $codicon-chevron-down: '\eab4';
 
 @mixin codicon-chevron {
   font-family: 'codicon';
+  // A glyph box, not text, so it is outside the type ramp.
   font-size: 14px;
   line-height: 16px;
 }
@@ -279,7 +280,7 @@ $codicon-chevron-down: '\eab4';
     color: var(--lana-hover-fg);
     overflow-wrap: anywhere;
     font-family: var(--lana-font-mono);
-    font-size: 0.92rem;
+    font-size: var(--lana-text-sm);
     font-variant-numeric: tabular-nums;
     padding: 5px;
     border-radius: var(--lana-radius-sm);

@@ -183,7 +183,7 @@ export class OverflowList extends LitElement {
       .panel__head {
         padding: 2px 10px 6px;
         font-weight: 600;
-        font-size: 12px;
+        font-size: var(--lana-text-base);
         color: var(--lana-fg);
       }
 

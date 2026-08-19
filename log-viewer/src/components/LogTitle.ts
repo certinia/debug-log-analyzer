@@ -45,7 +45,7 @@ export class LogTitle extends LitElement {
         background: transparent;
         border-radius: var(--lana-radius-sm);
         font-weight: var(--text-weight-semibold, 600);
-        font-size: 1.1rem;
+        font-size: var(--lana-text-lg);
         overflow: hidden;
         text-overflow: ellipsis;
         white-space: nowrap;

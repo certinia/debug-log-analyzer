@@ -50,6 +50,16 @@ Webview UI. Applies when working under `log-viewer/`.
   leaves no way to tell what the var means. A host outside VS Code supplies the whole `--vscode-*`
   block once instead. The one exception is skinning a `vscode-elements` component, which reads its
   own `--vscode-*` names: scope the override to that element, never to `:host` or `:root`.
+- **Never write a literal font size or family.** Take a step from the type ramp in
+  `styles/tokens.css` (`--lana-text-*`, with `--lana-text-mono` for editor-sized text and
+  `--lana-text-meta` for header metadata), and a family from `--lana-font-mono` or
+  `--lana-font-ui`.
+- **Mono is for text whose alignment carries meaning** — stacks, code, log text. Prose takes the UI
+  font.
+- **An all-caps run takes `--lana-text-caps` and `--lana-text-caps-tracking`.** Every glyph reaches
+  cap height, so caps read a size larger and step one down.
+- **Two exemptions.** A PIXI `fontSize` is a number and cannot read a var, and the codicon rule in
+  `DataGrid.scss` sizes a glyph box, not text.
 - **Data palettes stay literal.** The timeline categories (`timeline/themes/Themes.ts`) and the
   metric-strip tiers (`metric-strip/metric-strip-colors.ts`) show meaning, not chrome, so they do
   not follow the host theme.

@@ -71,7 +71,7 @@ export class DatabaseMetricCard extends LitElement {
         align-items: baseline;
         gap: 6px;
         white-space: nowrap;
-        font-size: 0.85rem;
+        font-size: var(--lana-text-sm);
       }
 
       .stat__label {
@@ -89,7 +89,7 @@ export class DatabaseMetricCard extends LitElement {
       .stat__used {
         font-family: var(--lana-font-mono);
         font-variant-numeric: tabular-nums;
-        font-size: 0.8rem;
+        font-size: var(--lana-text-xs);
         color: var(--lana-fg-muted);
       }
 

@@ -49,7 +49,7 @@ export const tooltipStyles = `${soqlSyntaxStyles}
         background-color: var(--tl-hover-background);
         color: var(--tl-hover-foreground);
         font-family: var(--lana-font-mono);
-        font-size: 0.92rem;
+        font-size: var(--lana-text-sm);
       }
 
       .tooltip-header {

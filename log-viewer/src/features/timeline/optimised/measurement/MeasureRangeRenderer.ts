@@ -120,11 +120,11 @@ export class MeasureRangeRenderer {
 
     // Duration text
     this.durationText = document.createElement('div');
-    this.durationText.style.cssText = 'font-size: 14px; font-weight: 600;';
+    this.durationText.style.cssText = 'font-size: var(--lana-text-lg); font-weight: 600;';
 
     // Range text
     this.rangeText = document.createElement('div');
-    this.rangeText.style.cssText = 'font-size: 11px; opacity: 0.8; margin-top: 2px;';
+    this.rangeText.style.cssText = 'font-size: var(--lana-text-sm); opacity: 0.8; margin-top: 2px;';
 
     textContainer.appendChild(this.durationText);
     textContainer.appendChild(this.rangeText);

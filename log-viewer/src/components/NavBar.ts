@@ -178,14 +178,14 @@ export class NavBar extends LitElement {
 
       .menu-section__label {
         padding: 4px 8px 2px;
-        font-size: 11px;
+        font-size: var(--lana-text-sm);
         font-weight: 600;
         color: var(--lana-fg-muted);
       }
 
       .menu-section__empty {
         padding: 2px 8px 4px;
-        font-size: 12px;
+        font-size: var(--lana-text-base);
         color: var(--lana-fg-muted);
       }
     `,

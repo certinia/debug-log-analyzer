@@ -75,7 +75,7 @@ export class DatabaseSection extends LitElement {
 
       .title {
         font-weight: 600;
-        font-size: 1.05rem;
+        font-size: var(--lana-text-lg);
         letter-spacing: 0.02em;
       }
 

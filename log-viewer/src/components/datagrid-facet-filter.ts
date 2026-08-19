@@ -137,7 +137,7 @@ export class DatagridFacetFilter extends LitElement {
       .facet-popover__empty {
         padding: 6px 8px;
         color: var(--lana-fg-muted);
-        font-size: 12px;
+        font-size: var(--lana-text-base);
       }
 
       .facet-popover__footer {
@@ -153,7 +153,7 @@ export class DatagridFacetFilter extends LitElement {
         background: none;
         color: var(--lana-link-fg);
         font: inherit;
-        font-size: 12px;
+        font-size: var(--lana-text-base);
         text-align: left;
         cursor: pointer;
         visibility: hidden;

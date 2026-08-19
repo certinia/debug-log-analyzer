@@ -39,7 +39,7 @@ export class FindWidget extends LitElement {
     globalStyles,
     css`
       :host {
-        font-size: 12px;
+        font-size: var(--lana-text-base);
       }
 
       .wrapper {
@@ -59,10 +59,9 @@ export class FindWidget extends LitElement {
         border-right: 1px solid var(--lana-surface-border);
         box-sizing: border-box;
         margin-top: 3px;
-        height: 33px;
-        line-height: 19px;
+        align-items: center;
         overflow: hidden;
-        padding: 3px 4px 0px 4px;
+        padding: 3px 4px;
         position: absolute;
         transform: translateY(calc(-100% - 10px));
         transition: transform 0.2s linear;
@@ -80,7 +79,6 @@ export class FindWidget extends LitElement {
 
       .find-input-box {
         width: 197px;
-        height: 25px;
         vertical-align: middle;
         box-sizing: border-box;
       }
@@ -96,7 +94,6 @@ export class FindWidget extends LitElement {
       .find-actions {
         display: flex;
         align-items: center;
-        height: 25px;
       }
 
       .find-button:focus-within {
@@ -116,10 +113,9 @@ export class FindWidget extends LitElement {
         box-sizing: border-box;
         display: flex;
         flex: initial;
-        height: 25px;
-        line-height: 23px;
+        align-items: center;
         margin: 0 0 0 3px;
-        padding: 2px 0 0 2px;
+        padding-left: 2px;
         text-align: center;
         vertical-align: middle;
       }

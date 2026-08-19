@@ -90,7 +90,7 @@ export class GovernorSummary extends LitElement {
       .gauge__value {
         font-family: var(--lana-font-mono);
         font-variant-numeric: tabular-nums;
-        font-size: 0.95rem;
+        font-size: var(--lana-text-base);
         white-space: nowrap;
       }
 
@@ -100,7 +100,7 @@ export class GovernorSummary extends LitElement {
       }
 
       .gauge__na {
-        font-size: 0.78rem;
+        font-size: var(--lana-text-xs);
         font-style: italic;
       }
 

@@ -125,7 +125,7 @@ export class ContextMenu extends LitElement {
       .shortcut {
         margin-left: 32px;
         opacity: 0.7;
-        font-size: 12px;
+        font-size: var(--lana-text-base);
       }
 
       .item-action {
