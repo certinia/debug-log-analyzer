@@ -80,7 +80,7 @@ for (const requiredText of [
 for (const requiredText of [
   'workflow_dispatch:',
   "#   - cron: '0 7 * * 3'",
-  'uses: salesforcecli/github-workflows/.github/workflows/vscode-promote-prerelease.yml@ph/W-23832274-pnpm-stable-promotion',
+  'uses: salesforcecli/github-workflows/.github/workflows/vscode-promote-prerelease.yml@main',
   "min-tag-age-days: ${{ inputs.min-tag-age-days || '7' }}",
   "vsix-name-pattern: 'lana-*.vsix'",
   "exclude-web-vsix: 'true'",
@@ -100,7 +100,7 @@ if (/^  schedule:/m.test(promotePrerelease)) {
 for (const requiredText of [
   'workflow_dispatch:',
   "#     - cron: '0 6 * * 3'",
-  'uses: salesforcecli/github-workflows/.github/workflows/vscode-promote-stable.yml@ph/W-23832274-pnpm-stable-promotion',
+  'uses: salesforcecli/github-workflows/.github/workflows/vscode-promote-stable.yml@main',
   'extension-name: lana',
   "vsix-name-pattern: 'lana-*.vsix'",
   "exclude-web-vsix: 'true'",
@@ -142,7 +142,7 @@ if (!ci.includes('vsce package --target web --no-dependencies')) {
 for (const requiredText of [
   "#   - cron: '0 4 * * *'",
   "branch:\n        description: 'Branch to release from'",
-  'uses: salesforcecli/github-workflows/.github/workflows/vscode-publish-extensions.yml@ph/W-23832274-pnpm-stable-promotion',
+  'uses: salesforcecli/github-workflows/.github/workflows/vscode-publish-extensions.yml@main',
   'extensions: lana',
   "pre-release: 'true'",
   'branch: ${{ inputs.branch || github.ref_name }}',
@@ -180,7 +180,7 @@ for (const requiredText of [
   'use none for internal-only',
   'publish-web-vsix:',
   "publish-web-vsix: ${{ inputs.publish-web-vsix && 'true' || 'false' }}",
-  'uses: salesforcecli/github-workflows/.github/workflows/vscode-manual-publish.yml@ph/W-23832274-pnpm-stable-promotion',
+  'uses: salesforcecli/github-workflows/.github/workflows/vscode-manual-publish.yml@main',
   'extension-name: lana',
   "vsix-name-pattern: 'lana-*.vsix'",
   'required-ci-checks: >-',
