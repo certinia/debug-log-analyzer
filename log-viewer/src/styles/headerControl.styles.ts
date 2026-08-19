@@ -23,11 +23,11 @@ export const headerControlStyles = css`
     width: 26px;
     height: 22px;
     border-radius: 4px;
-    color: var(--vscode-foreground);
+    color: var(--lana-fg);
   }
 
   .header-control:hover {
-    background-color: var(--vscode-toolbar-hoverBackground);
+    background-color: var(--lana-toolbar-hover-bg);
   }
 
   /* Bottom-right, like the activity bar's — and clear of the header's top edge, which

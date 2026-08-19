@@ -14,6 +14,8 @@ import { getCallerNamespace } from '../../../core/utility/CallerNamespace.js';
 import { goToRow } from '../../call-tree/navigation.js';
 import { isVisible } from '../../../core/utility/Util.js';
 import { getSettings, updateSetting } from '../../settings/Settings.js';
+import { LocatedRowMarker } from '../../../components/locatedRow.js';
+import { reportGridLocate, stampGridEventIndex } from './gridLocate.js';
 import { reportGridSelection } from './gridSelection.js';
 import { selectRowByEventIndex } from './revealRow.js';
 import { soqlInlineElement } from '../../soql/format/inlineCell.js';
@@ -107,6 +109,8 @@ export class SOSLView extends LitElement {
   private contextMenu: ContextMenu | null = null;
   /** eventIndex of the row whose context menu is open. */
   private contextMenuEventIndex: number | null = null;
+  /** Marks the rows for the statements under the inspector's pointer. */
+  private _locatedRow = new LocatedRowMarker();
 
   @state()
   private namespaces: string[] = [];
@@ -563,6 +567,7 @@ export class SOSLView extends LitElement {
       groupStartOpen: false,
       groupToggleElement: false,
       selectableRows: 'highlight',
+      rowFormatter: stampGridEventIndex,
       columnDefaults: commonColumnDefaults,
       headerSortElement,
       columns: [
@@ -657,6 +662,11 @@ export class SOSLView extends LitElement {
       );
     });
 
+    // Hovering a search marks it in the inspector, without picking it.
+    reportGridLocate(this, this.soslTable, (data: SOSLRow) =>
+      data.sosl ? data.eventIndex : undefined,
+    );
+
     this.soslTable.on('rowContext', (e, row) => {
       this._showRowContextMenu(e as MouseEvent, row);
     });
@@ -745,6 +755,14 @@ export class SOSLView extends LitElement {
    */
   selectByEventIndex(eventIndex: number): boolean {
     return selectRowByEventIndex(this.soslTable, eventIndex);
+  }
+
+  /**
+   * Mark the rows for the statements under the inspector's pointer, or drop the
+   * mark with an empty list. Not a pick: nothing scrolls and nothing is selected.
+   */
+  markLocated(eventIndexes: readonly number[]): void {
+    this._locatedRow.mark(this.soslTable?.element ?? null, eventIndexes);
   }
 
   downlodEncoder(defaultFileName: string) {

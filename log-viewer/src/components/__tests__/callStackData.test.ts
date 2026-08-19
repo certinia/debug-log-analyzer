@@ -26,8 +26,8 @@ const stack = [
 
 let currentStack: typeof stack | [] = stack;
 
-jest.mock('../../features/database/services/Database.js', () => ({
-  DatabaseAccess: { instance: () => ({ getStackByEventIndex: () => currentStack }) },
+jest.mock('../../core/log/LogStore.js', () => ({
+  currentLogStore: () => ({ stackByEventIndex: () => currentStack }),
 }));
 
 import { buildCallStackData } from '../callStackData.js';

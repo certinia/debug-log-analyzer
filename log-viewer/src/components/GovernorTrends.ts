@@ -1,16 +1,17 @@
 /*
  * Copyright (c) 2026 Certinia Inc. All rights reserved.
  */
+import { consume } from '@lit/context';
 import { LitElement, css, html, svg } from 'lit';
-import { customElement, state } from 'lit/decorators.js';
+import { customElement, property, state } from 'lit/decorators.js';
 
-import { LogLoadedController } from '../core/events/LogLoadedController.js';
+import { logContext } from '../core/log/logContext.js';
+import type { LogStore } from '../core/log/LogStore.js';
 import { formatDuration } from '../core/utility/Util.js';
 import {
   GOVERNOR_WARN_PERCENT,
   governorTier,
 } from '../features/database/components/GovernorSummary.js';
-import { DatabaseAccess } from '../features/database/services/Database.js';
 import { apexLimitTimeSeries } from '../features/timeline/optimised/apex-limit-series.js';
 import { globalStyles } from '../styles/global.styles.js';
 import { inspectorSectionStyles } from '../styles/inspectorSection.styles.js';
@@ -80,8 +81,10 @@ export class GovernorTrends extends LitElement {
   @state()
   private _hover: { label: string; point: TrendPoint } | null = null;
 
-  /** The charts have to follow the log itself. */
-  private readonly _logLoaded = new LogLoadedController(this);
+  /** The log on screen, from the app root. */
+  @consume({ context: logContext, subscribe: true })
+  @property({ attribute: false })
+  logStore: LogStore | null = null;
 
   static styles = [
     globalStyles,
@@ -134,17 +137,17 @@ export class GovernorTrends extends LitElement {
         display: block;
         width: 100%;
         height: 44px;
-        border-bottom: 1px solid var(--vscode-editorWidget-border, var(--vscode-panel-border));
+        border-bottom: 1px solid var(--lana-surface-border);
       }
 
       .trend--safe {
-        color: var(--vscode-charts-green, #388a34);
+        color: var(--lana-severity-ok);
       }
       .trend--warn {
-        color: var(--vscode-charts-yellow, var(--vscode-editorWarning-foreground));
+        color: var(--lana-severity-warning);
       }
       .trend--danger {
-        color: var(--vscode-errorForeground, #f14c4c);
+        color: var(--lana-severity-error);
       }
 
       .trend__area {
@@ -178,7 +181,7 @@ export class GovernorTrends extends LitElement {
   ];
 
   render() {
-    const apexLog = DatabaseAccess.instance()?.getApexLog();
+    const apexLog = this.logStore?.log;
     if (!apexLog) {
       return html`<p class="note">No log is loaded.</p>`;
     }

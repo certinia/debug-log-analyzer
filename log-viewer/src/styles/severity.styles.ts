@@ -28,4 +28,7 @@ export const severityStyles = css`
   .sev-info {
     color: var(--lana-severity-info);
   }
+  .sev-ok {
+    color: var(--lana-severity-ok);
+  }
 `;

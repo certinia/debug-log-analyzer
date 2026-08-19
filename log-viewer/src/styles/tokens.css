@@ -63,8 +63,12 @@
   /* Header metadata (size · duration · identity) — just under the title size. */
   --lana-text-meta: var(--lana-text-sm);
 
-  /* Monospace, for text whose alignment carries meaning: stacks, code. */
+  /* Monospace, for text whose alignment carries meaning: stacks, code. The host
+     sets the editor's own size, which is not always its UI size. */
   --lana-font-mono: var(--vscode-editor-font-family, monospace);
+  --lana-text-mono: var(--vscode-editor-font-size, 0.9em);
+
+  --lana-font-ui: var(--vscode-font-family, sans-serif);
 
   /* Surfaces — the same registered colors VS Code's own chrome is built from.
      `surface-border` is absent before the size-token registry (stable 1.128 ships
@@ -73,10 +77,11 @@
     --vscode-surface-border,
     var(--vscode-widget-border, var(--vscode-sideBar-border, transparent))
   );
-  --lana-header-bg: var(
-    --vscode-tab-activeBackground,
-    var(--vscode-editor-background, transparent)
-  );
+  --lana-header-bg: var(--vscode-tab-activeBackground, var(--lana-editor-bg));
+
+  /* The editor's own ground and text, where `fg` is the host's UI text. */
+  --lana-editor-bg: var(--vscode-editor-background, #1f1f1f);
+  --lana-editor-fg: var(--vscode-editor-foreground, #cccccc);
 
   /* Code surface — the fill VS Code gives inline code blocks in its own markdown. */
   --lana-code-bg: var(--vscode-textCodeBlock-background, rgba(128, 128, 128, 0.12));
@@ -87,6 +92,31 @@
 
   /* Floating surfaces — tooltips and popovers, matching VS Code's widget chrome. */
   --lana-popover-bg: var(--vscode-editorWidget-background, #252526);
+  /* Hover panels — VS Code gives these their own chrome, a shade off the widget set. */
+  --lana-hover-bg: var(--vscode-editorHoverWidget-background, var(--lana-popover-bg));
+  --lana-hover-fg: var(
+    --vscode-editorHoverWidget-foreground,
+    var(--vscode-editorWidget-foreground, #cccccc)
+  );
+  --lana-hover-border: var(
+    --vscode-editorHoverWidget-border,
+    var(--vscode-editorWidget-border, rgba(128, 128, 128, 0.35))
+  );
+
+  /* One ring app-wide, so focus never reads as a hover. */
+  --lana-focus-border: var(--vscode-focusBorder, #007fd4);
+
+  /* Icons that stand on their own, not beside the text they belong to. */
+  --lana-icon-fg: var(--vscode-icon-foreground, currentColor);
+
+  /* Hover for a toolbar action — a fill, where a list row gets `row-hover-bg`. */
+  --lana-toolbar-hover-bg: var(--vscode-toolbar-hoverBackground, rgba(90, 93, 94, 0.31));
+
+  --lana-link-fg: var(--vscode-textLink-foreground, #4daafc);
+  --lana-link-fg-active: var(--vscode-textLink-activeForeground, #4daafc);
+
+  --lana-control-border: var(--vscode-settings-dropdownBorder, #3c3c3c);
+  --lana-control-bg: var(--vscode-settings-dropdownBackground, #313131);
 
   --lana-shadow-popover: 0 4px 16px var(--vscode-widget-shadow, rgba(0, 0, 0, 0.36));
   --lana-shadow-overlay: 0 8px 24px var(--vscode-widget-shadow, rgba(0, 0, 0, 0.5));
@@ -108,6 +138,9 @@
     --vscode-problemsInfoIcon-foreground,
     var(--vscode-editorInfo-foreground, #3794ff)
   );
+
+  /* Nothing wrong — the colour VS Code marks a passing test with. */
+  --lana-severity-ok: var(--vscode-testing-iconPassed, var(--vscode-charts-green, #73c991));
 
   /* Row hover, for lists whose rows can be opened or picked. */
   --lana-row-hover-bg: var(--vscode-list-hoverBackground, rgba(128, 128, 128, 0.12));
@@ -140,4 +173,8 @@
 
   /* Shared height for the inspector dock's action bar and pane section headers. */
   --lana-panel-header-height: var(--lana-space-xl);
+
+  /* Least a pane section shows before the stack scrolls instead: its header and a
+     few rows of body, so no section is squeezed down to its title by its siblings. */
+  --lana-pane-min: calc(var(--lana-panel-header-height) * 4);
 }

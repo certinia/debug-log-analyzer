@@ -113,7 +113,7 @@ export class AnchoredPopover extends LitElement {
         padding: 2px 8px 6px;
         font-weight: 600;
         font-size: 12px;
-        color: var(--vscode-foreground);
+        color: var(--lana-fg);
       }
 
       .panel__empty {
@@ -122,7 +122,7 @@ export class AnchoredPopover extends LitElement {
         gap: 6px;
         padding: 8px;
         font-size: 12px;
-        color: var(--vscode-descriptionForeground);
+        color: var(--lana-fg-muted);
       }
 
       /* Hidden until the slot reports content, so the empty message shows instead. */

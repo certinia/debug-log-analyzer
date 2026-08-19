@@ -83,7 +83,7 @@ export class GovernorSummary extends LitElement {
         font-size: var(--lana-text-caps);
         letter-spacing: var(--lana-text-caps-tracking);
         text-transform: uppercase;
-        color: var(--vscode-descriptionForeground);
+        color: var(--lana-fg-muted);
         white-space: nowrap;
       }
 
@@ -96,7 +96,7 @@ export class GovernorSummary extends LitElement {
 
       .gauge__limit,
       .gauge__na {
-        color: var(--vscode-descriptionForeground);
+        color: var(--lana-fg-muted);
       }
 
       .gauge__na {
@@ -107,7 +107,7 @@ export class GovernorSummary extends LitElement {
       .gauge__track {
         height: 5px;
         border-radius: 3px;
-        background: var(--vscode-editorWidget-border, var(--vscode-panel-border));
+        background: var(--lana-surface-border);
         overflow: hidden;
       }
 
@@ -118,13 +118,13 @@ export class GovernorSummary extends LitElement {
       }
 
       .gauge__fill--safe {
-        background: var(--vscode-charts-green, #388a34);
+        background: var(--lana-severity-ok);
       }
       .gauge__fill--warn {
-        background: var(--vscode-charts-yellow, var(--vscode-editorWarning-foreground));
+        background: var(--lana-severity-warning);
       }
       .gauge__fill--danger {
-        background: var(--vscode-errorForeground, #f14c4c);
+        background: var(--lana-severity-error);
       }
 
       @media (prefers-reduced-motion: reduce) {

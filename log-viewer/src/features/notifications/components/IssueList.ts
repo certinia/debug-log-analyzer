@@ -75,7 +75,7 @@ export class IssueList extends LitElement {
       }
 
       .issue--action:hover {
-        background-color: var(--vscode-list-hoverBackground);
+        background-color: var(--lana-row-hover-bg);
       }
 
       .issue__body {
@@ -141,9 +141,9 @@ export class IssueList extends LitElement {
       /* Stack traces are code: keep their line breaks and their font, so each
          "at Class.method" frame reads as a frame, not one run-on paragraph. */
       .issue__message {
-        font-size: var(--vscode-editor-font-size);
+        font-size: var(--lana-text-mono);
         font-family: var(--lana-font-mono);
-        color: var(--vscode-descriptionForeground);
+        color: var(--lana-fg-muted);
         white-space: pre-wrap;
       }
 

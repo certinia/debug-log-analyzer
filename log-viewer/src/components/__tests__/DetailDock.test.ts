@@ -39,6 +39,19 @@ describe('DetailDock', () => {
     expect(el.shadowRoot?.querySelector('pane-view')).toBeNull();
   });
 
+  it('takes a consumer control into the action bar', async () => {
+    const el = await mount((e) => {
+      const control = document.createElement('span');
+      control.slot = 'actions-start';
+      control.textContent = 'scope';
+      e.appendChild(control);
+    });
+    const slot = el.shadowRoot?.querySelector<HTMLSlotElement>(
+      '.actions slot[name="actions-start"]',
+    );
+    expect(slot?.assignedElements().map((n) => n.textContent)).toEqual(['scope']);
+  });
+
   it('maps dock position to pane-view orientation', async () => {
     const right = await mount((e) => {
       e.sections = sections;

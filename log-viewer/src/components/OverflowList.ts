@@ -105,10 +105,10 @@ export class OverflowList extends LitElement {
         align-items: center;
         gap: 4px;
         padding: 2px 6px;
-        border: 1px solid var(--vscode-settings-dropdownBorder, #3c3c3c);
+        border: 1px solid var(--lana-control-border);
         border-radius: 4px;
-        background-color: var(--vscode-settings-dropdownBackground, #313131);
-        color: var(--vscode-foreground);
+        background-color: var(--lana-control-bg);
+        color: var(--lana-fg);
         font: inherit;
         font-size: var(--lana-text-base);
         line-height: 1;
@@ -119,11 +119,11 @@ export class OverflowList extends LitElement {
       }
 
       .overflow:hover {
-        background-color: var(--vscode-list-hoverBackground);
+        background-color: var(--lana-row-hover-bg);
       }
 
       .overflow:focus-visible {
-        outline: 1px solid var(--vscode-focusBorder);
+        outline: 1px solid var(--lana-focus-border);
         outline-offset: 1px;
       }
 
@@ -132,7 +132,7 @@ export class OverflowList extends LitElement {
       }
 
       .overflow__chevron {
-        color: var(--vscode-descriptionForeground);
+        color: var(--lana-fg-muted);
         transition: transform 120ms ease;
       }
 
@@ -168,8 +168,8 @@ export class OverflowList extends LitElement {
         border: var(--lana-stroke) solid var(--filter-popover-border-color);
         border-radius: var(--filter-popover-radius);
         box-shadow: var(--filter-popover-shadow);
-        color: var(--vscode-menu-foreground, var(--vscode-foreground));
-        font-family: var(--vscode-font-family);
+        color: var(--vscode-menu-foreground, var(--lana-fg));
+        font-family: var(--lana-font-ui);
       }
 
       .container.end .panel {
@@ -184,7 +184,7 @@ export class OverflowList extends LitElement {
         padding: 2px 10px 6px;
         font-weight: 600;
         font-size: 12px;
-        color: var(--vscode-foreground);
+        color: var(--lana-fg);
       }
 
       .menu-items {

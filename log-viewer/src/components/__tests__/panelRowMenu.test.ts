@@ -19,13 +19,11 @@ jest.mock('../../features/call-tree/navigation.js', () => ({
 jest.mock('../../core/utility/Clipboard.js', () => ({
   copyToClipboard: (text: string) => copied.push(text),
 }));
-jest.mock('../../features/database/services/Database.js', () => ({
-  DatabaseAccess: {
-    instance: () => ({
-      getEventByIndex: (i: number) => (i === 42 ? event : null),
-      getApexLog: () => ({ governorLimits: limits }),
-    }),
-  },
+jest.mock('../../core/log/LogStore.js', () => ({
+  currentLogStore: () => ({
+    eventByIndex: (i: number) => (i === 42 ? event : null),
+    log: { governorLimits: limits },
+  }),
 }));
 
 import { PANEL_ROW_MENU_ITEMS, runPanelRowAction } from '../panelRowMenu.js';

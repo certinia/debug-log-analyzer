@@ -13,11 +13,14 @@ import type {
   SOSLExecuteBeginLine,
 } from 'apex-log-parser';
 
+import { limitTotals } from '../../../components/logOverviewMetrics.js';
 import { eventBus, type StatementType } from '../../../core/events/EventBus.js';
+import { apexLimitTimeSeries } from '../../timeline/optimised/apex-limit-series.js';
+import { InspectorEmphasis } from '../../../components/inspectorEmphasis.js';
 import { SelectionEchoGuard } from '../../../core/events/SelectionEchoGuard.js';
 import { isVisible } from '../../../core/utility/Util.js';
 import { soslRowsMetric } from '../limits.js';
-import { DatabaseAccess } from '../services/Database.js';
+import { logStoreFor } from '../../../core/log/LogStore.js';
 
 // styles
 import { globalStyles } from '../../../styles/global.styles.js';
@@ -30,6 +33,7 @@ import type { SOSLView } from './SOSLView.js';
 import './DMLView.js';
 import './DatabaseSection.js';
 import type { DatabaseMetric } from './DatabaseMetricCard.js';
+import type { GridLocateEvent } from './gridLocate.js';
 import type { GridSelectionEvent } from './gridSelection.js';
 import './GovernorSummary.js';
 import type { GaugeMetric } from './GovernorSummary.js';
@@ -81,10 +85,13 @@ export class DatabaseView extends LitElement {
   findMap = {};
 
   private _offInspectorReveal: (() => void) | null = null;
+  private _offInspectorLocate: (() => void) | null = null;
   private _offSelectionClear: (() => void) | null = null;
 
   /** Guards the selects this view makes on the inspector's behalf. */
   private _echoGuard = new SelectionEchoGuard();
+  /** Which of the inspector's reports the grids' mark follows. */
+  private _emphasis = new InspectorEmphasis();
 
   constructor() {
     super();
@@ -109,13 +116,30 @@ export class DatabaseView extends LitElement {
       });
     });
 
+    // Mark the statements the inspector points at, while the Database tab is the
+    // tab the inspector is showing. The eventIndex belongs to one grid, so the
+    // others simply find nothing to mark.
+    this._offInspectorLocate = eventBus.on('inspector:locate', (d) => {
+      if (d.source === 'database') {
+        this._markLocated(this._emphasis.report(d.eventIndexes, d.sticky));
+      }
+    });
+
     // Escape (app-wide) deselects here. Only one grid holds the selection, and
-    // its report of the clear reaches the inspector the same way a click does.
+    // its report of the clear reaches the inspector the same way a click does. It
+    // also drops a mark held by a picked inspector row, which is no selection of
+    // any grid's own.
     this._offSelectionClear = eventBus.on('selection:clear', (d) => {
       if (d.source === 'database') {
         this._views.forEach((view) => view?.deselectRows());
+        this._markLocated(this._emphasis.pick([]));
       }
     });
+  }
+
+  /** Offers the mark to every grid, since one of them owns the statement. */
+  private _markLocated(eventIndexes: readonly number[]): void {
+    this._views.forEach((view) => view?.markLocated(eventIndexes));
   }
 
   /**
@@ -130,6 +154,9 @@ export class DatabaseView extends LitElement {
     }
     const { type, eventIndex } = event.detail;
     if (eventIndex === null) {
+      // A mark a picked inspector row left here goes with the selection: it was
+      // never a selection of these grids.
+      this._markLocated(this._emphasis.pick([]));
       eventBus.emit('detail:select', { source: 'database', selection: null });
       return;
     }
@@ -153,6 +180,8 @@ export class DatabaseView extends LitElement {
     document.removeEventListener('lv-find', this._findHandler as EventListener);
     this._offInspectorReveal?.();
     this._offInspectorReveal = null;
+    this._offInspectorLocate?.();
+    this._offInspectorLocate = null;
     this._offSelectionClear?.();
     this._offSelectionClear = null;
   }
@@ -163,6 +192,13 @@ export class DatabaseView extends LitElement {
     this.renderRoot.addEventListener('grid-selection', (event) =>
       this._onGridSelection(event as GridSelectionEvent),
     );
+    // The same for the pointer, which marks rather than picks.
+    this.renderRoot.addEventListener('grid-locate', (event) =>
+      eventBus.emit('detail:locate', {
+        source: 'database',
+        eventIndexes: (event as GridLocateEvent).detail.eventIndexes,
+      }),
+    );
   }
 
   updated(changed: PropertyValues): void {
@@ -170,6 +206,9 @@ export class DatabaseView extends LitElement {
       void this._loadData();
     }
   }
+
+  /** The shared whole-log totals, so a figure here matches every other surface. */
+  private _limits: Limits | undefined;
 
   private async _loadData(): Promise<void> {
     const root = this.timelineRoot;
@@ -180,10 +219,12 @@ export class DatabaseView extends LitElement {
     if (!visible || this.loaded) {
       return;
     }
-    const db = await DatabaseAccess.create(root);
-    this.dmlLines = db.getDMLLines();
-    this.soqlLines = db.getSOQLLines();
-    this.soslLines = db.getSOSLLines();
+    const store = logStoreFor(root);
+    this.dmlLines = store.dmlLines();
+    this.soqlLines = store.soqlLines();
+    this.soslLines = store.soslLines();
+    // A full pass over every event: too costly to run from render().
+    this._limits = limitTotals(apexLimitTimeSeries(root));
     this.loaded = true;
     // Collapse types the transaction never touched (usually SOSL).
     this.collapsed = {
@@ -200,7 +241,7 @@ export class DatabaseView extends LitElement {
         display: flex;
         height: 100%;
         width: 100%;
-        background-color: var(--vscode-editor-background);
+        background-color: var(--lana-editor-bg);
       }
 
       .db-grids {
@@ -215,7 +256,7 @@ export class DatabaseView extends LitElement {
       }
 
       governor-summary {
-        border-bottom: var(--lana-stroke) solid var(--vscode-panel-border);
+        border-bottom: var(--lana-stroke) solid var(--lana-surface-border);
         /* Left inset matches the sections' content edge. */
         padding: var(--lana-space-sm) var(--lana-space-md) var(--lana-space-md)
           var(--lana-section-inset);
@@ -248,7 +289,7 @@ export class DatabaseView extends LitElement {
 
       .db-panel + .db-panel {
         margin-top: 16px;
-        border-top: 1px solid var(--vscode-panel-border);
+        border-top: 1px solid var(--lana-surface-border);
         padding-top: 8px;
       }
     `,
@@ -328,10 +369,6 @@ export class DatabaseView extends LitElement {
     this.collapsed = { ...this.collapsed, [kind]: !this.collapsed[kind] };
   }
 
-  private get _limits(): Limits | undefined {
-    return this.timelineRoot?.governorLimits;
-  }
-
   /** Cumulative limits are only present when the log recorded a usage snapshot. */
   private get _hasLimits(): boolean {
     return (this.timelineRoot?.governorLimits.snapshots.length ?? 0) > 0;
@@ -360,6 +397,11 @@ export class DatabaseView extends LitElement {
     return this._hasLimits ? value : null;
   }
 
+  /** Without a snapshot the limit is the platform default, which is a guess here, so hide it. */
+  private _limit(value: number): number {
+    return this._hasLimits ? value : 0;
+  }
+
   private _isEmpty(kind: SectionKind): boolean {
     const limits = this._limits;
     const consumed = limits ? SECTION_META[kind].statement(limits).used : 0;
@@ -376,7 +418,7 @@ export class DatabaseView extends LitElement {
         label: SECTION_META[kind].statementLabel,
         found: this._count(kind),
         used: this._used(statement.used),
-        limit: statement.limit,
+        limit: this._limit(statement.limit),
       },
     ];
     if (kind === 'sosl') {
@@ -394,7 +436,7 @@ export class DatabaseView extends LitElement {
         label: 'Rows',
         found: this._rows(kind),
         used: this._used(rows.used),
-        limit: rows.limit,
+        limit: this._limit(rows.limit),
       });
     }
     return metrics;
@@ -412,7 +454,12 @@ export class DatabaseView extends LitElement {
     const limits = this._limits;
     const gauges: GaugeMetric[] = [];
     const add = (label: string, found: number, metric: { used: number; limit: number }) => {
-      gauges.push({ label, found, used: this._used(metric.used), limit: metric.limit });
+      gauges.push({
+        label,
+        found,
+        used: this._used(metric.used),
+        limit: this._limit(metric.limit),
+      });
     };
     const z = { used: 0, limit: 0 };
     add('DML', this._count('dml'), limits?.dmlStatements ?? z);

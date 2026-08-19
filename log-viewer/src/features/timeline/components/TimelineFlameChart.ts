@@ -50,10 +50,7 @@ export class TimelineFlameChart extends LitElement {
         background: var(--vscode-inputValidation-errorBackground, #ffebee);
         border: var(--lana-stroke) solid var(--vscode-inputValidation-errorBorder, #ef5350);
         border-radius: var(--lana-radius-sm);
-        color: var(
-          --vscode-inputValidation-errorForeground,
-          var(--vscode-errorForeground, #c62828)
-        );
+        color: var(--vscode-inputValidation-errorForeground, var(--lana-severity-error));
         max-width: 80%;
         text-align: center;
       }
@@ -64,7 +61,7 @@ export class TimelineFlameChart extends LitElement {
         left: 50%;
         transform: translate(-50%, -50%);
         padding: var(--lana-space-lg);
-        color: var(--vscode-descriptionForeground, #999);
+        color: var(--lana-fg-muted);
       }
     `,
   ];
@@ -96,6 +93,13 @@ export class TimelineFlameChart extends LitElement {
    */
   @property({ type: Number })
   navigateToEventIndex: number | undefined = undefined;
+
+  /**
+   * Show the hover/selection details panel. A property, not a setter, so the value
+   * survives a chart re-initialisation.
+   */
+  @property({ type: Boolean })
+  showTooltip = true;
 
   /**
    * Optional configuration options.
@@ -156,6 +160,12 @@ export class TimelineFlameChart extends LitElement {
       // preview sends one of these per keystroke.
       this.apexLogTimeline?.setTheme(this.themeName ?? '');
     }
+
+    // Independent of the branch above: `initializeTimeline` is async, so the flag is
+    // also applied when the timeline appears (see `initializeTimeline`).
+    if (changedProperties.has('showTooltip')) {
+      this.apexLogTimeline?.setTooltipEnabled(this.showTooltip);
+    }
   }
 
   /**
@@ -212,6 +222,7 @@ export class TimelineFlameChart extends LitElement {
         return;
       }
       this.apexLogTimeline = timeline;
+      timeline.setTooltipEnabled(this.showTooltip);
 
       // Navigate after initialization completes, preferring unique eventIndex.
       if (this.navigateToEventIndex !== undefined) {

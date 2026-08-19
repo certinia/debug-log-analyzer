@@ -1,7 +1,7 @@
 /*
  * Copyright (c) 2026 Certinia Inc. All rights reserved.
  */
-import { html } from 'lit';
+import { html, type TemplateResult } from 'lit';
 
 import type { DetailSelection, DetailSource } from '../core/events/EventBus.js';
 import { buildDatabaseSections } from '../features/database/components/databaseSections.js';
@@ -9,6 +9,8 @@ import type { PaneSection } from './PaneView.js';
 
 // web components
 import '../features/analysis/components/LogDiagnosticsView.js';
+import '../features/database/components/DatabaseOverview.js';
+import '../features/database/components/DatabaseTimeTree.js';
 import './CallStackDetail.js';
 import './CallTreeDetail.js';
 import './CategoryTimeBar.js';
@@ -17,6 +19,7 @@ import './GovernorTrends.js';
 import './HotPath.js';
 import './HotSpots.js';
 import './LogOverview.js';
+import './NamespaceTimeBar.js';
 
 /**
  * Build the inspector's sections for a selection from any tab. Every source gets
@@ -25,8 +28,9 @@ import './LogOverview.js';
  * {@link buildDatabaseSections}.
  *
  * With nothing selected every source gets the whole-log analogue of what its tab
- * does: the shared **Log overview**, plus the sections that tab can answer at log
- * scope. Analysis adds **Findings**; the Timeline adds its charts and the
+ * does: the shared **Overview**, plus the sections that tab can answer at log
+ * scope. Analysis adds **Findings**; the Database tab adds its whole-log
+ * database figures; the Timeline adds its charts and the
  * whole-log call tree; the Call Tree adds the **Hot path** and **Hot spots** —
  * clickable routes into the tree it sits beside.
  *
@@ -34,10 +38,15 @@ import './LogOverview.js';
  * range: an explicit row/frame `selection` always wins. A range or other
  * ambient scope only applies when `selection` is `null`, so it belongs inside
  * the `!selection` branch — never above it.
+ *
+ * `activeEventIndex` is the frame the user walked to inside the selection's own
+ * call stack. Details and the call tree follow it; the call stack stays anchored
+ * to `selection`, so walking down a stack never puts a frame out of reach.
  */
 export async function buildDetailSections(
   source: DetailSource,
   selection: DetailSelection | null,
+  activeEventIndex: number | null = null,
 ): Promise<PaneSection[]> {
   // Nothing selected: the whole log is the scope. `DetailDock`'s own empty
   // state still covers the moment before a tab id resolves.
@@ -45,8 +54,7 @@ export async function buildDetailSections(
     const sections: PaneSection[] = [
       {
         id: 'overview',
-        title: 'Log overview',
-        icon: 'pie-chart',
+        title: 'Overview',
         fit: 'content',
         content: html`<log-overview></log-overview>`,
       },
@@ -56,14 +64,12 @@ export async function buildDetailSections(
         {
           id: 'hot-path',
           title: 'Hot path',
-          icon: 'flame',
           fit: 'content',
           content: html`<hot-path></hot-path>`,
         },
         {
           id: 'hot-spots',
           title: 'Hot spots',
-          icon: 'dashboard',
           fit: 'content',
           content: html`<hot-spots></hot-spots>`,
         },
@@ -73,9 +79,35 @@ export async function buildDetailSections(
       sections.push({
         id: 'findings',
         title: 'Findings',
-        icon: 'checklist',
         content: html`<log-diagnostics></log-diagnostics>`,
       });
+    }
+    if (source === 'database') {
+      // The Database tab's whole-log analogue, widest question first: whose code
+      // holds the database time, which call paths reach it, and how few
+      // statements it comes down to.
+      sections.push(
+        {
+          id: 'database-namespaces',
+          title: 'Namespace duration',
+          fit: 'content',
+          content: html`<database-namespaces></database-namespaces>`,
+        },
+        {
+          // A grid sized to the pane it is in, so this section takes the space
+          // the sized-to-content ones leave.
+          id: 'database-time',
+          title: 'Call tree',
+          weight: 4,
+          content: html`<database-time></database-time>`,
+        },
+        {
+          id: 'database-concentration',
+          title: 'Database duration',
+          fit: 'content',
+          content: html`<database-concentration></database-concentration>`,
+        },
+      );
     }
     if (source === 'timeline') {
       // The Timeline's whole-log analogue: where the time went (by category and
@@ -84,14 +116,13 @@ export async function buildDetailSections(
         {
           id: 'category-time',
           title: 'Time by category',
-          icon: 'pie-chart',
           fit: 'content',
           content: html`<category-time-bar></category-time-bar>`,
         },
+        namespaceTimeSection(html`<namespace-time-bar></namespace-time-bar>`),
         {
           id: 'governor-trends',
           title: 'Governor usage over time',
-          icon: 'graph',
           fit: 'content',
           content: html`<governor-trends></governor-trends>`,
         },
@@ -110,40 +141,85 @@ export async function buildDetailSections(
 
   // The Database grids resolve statement-specific vitals and SOQL lint issues.
   if (source === 'database' && selection.kind === 'event' && selection.type) {
-    return buildDatabaseSections({ eventIndex: selection.eventIndex, type: selection.type });
+    return buildDatabaseSections({
+      eventIndex: selection.eventIndex,
+      type: selection.type,
+      activeEventIndex,
+    });
   }
 
   const isAggregate = selection.kind === 'aggregate';
   // An aggregate scopes to all its occurrences; a single frame to itself.
-  const eventIndex = isAggregate ? (selection.instances[0] ?? -1) : selection.eventIndex;
-  const instances = isAggregate ? selection.instances : null;
-  const label = isAggregate ? selection.label : '';
+  const anchorIndex = isAggregate ? (selection.instances[0] ?? -1) : selection.eventIndex;
+  const active = activeEventIndex ?? anchorIndex;
+  // One frame in the stack is being followed, so the aggregate no longer
+  // describes what Details and the call tree are showing.
+  const following = active !== anchorIndex;
+  const instances = isAggregate && !following ? selection.instances : null;
+  const label = isAggregate && !following ? selection.label : '';
 
-  return [
+  const sections: PaneSection[] = [
     {
       id: 'vitals',
       title: 'Details',
       fit: 'content',
       content: html`<event-vitals
-        eventIndex=${eventIndex}
+        eventIndex=${active}
         .instances=${instances}
         label=${label}
       ></event-vitals>`,
     },
+  ];
+  if (source === 'timeline') {
+    // The same split, asked of the selection: whose package burned the time under
+    // the frame the user picked.
+    sections.push(
+      namespaceTimeSection(
+        html`<namespace-time-bar
+          eventIndex=${active}
+          .instances=${instances}
+        ></namespace-time-bar>`,
+      ),
+    );
+  }
+  if (source === 'analysis') {
+    // The same findings, asked of the selection: which of the log's problems name
+    // this method or anything it called.
+    sections.push({
+      id: 'findings',
+      title: 'Findings',
+      // The verdict on the selected row, so it reads beside the tree rather than
+      // being crowded down to its header by it.
+      weight: 3,
+      content: html`<log-diagnostics .instances=${instances ?? [active]}></log-diagnostics>`,
+    });
+  }
+  sections.push(
     {
       id: 'callstack',
       title: 'Call stack',
       weight: 3,
-      content: html`<call-stack-detail eventIndex=${eventIndex}></call-stack-detail>`,
+      content: html`<call-stack-detail
+        eventIndex=${anchorIndex}
+        activeEventIndex=${active}
+      ></call-stack-detail>`,
     },
     {
       id: 'calltree',
       title: 'Call tree',
       weight: 4,
       content: html`<call-tree-detail
-        eventIndex=${eventIndex}
-        .instances=${instances}
+        eventIndex=${anchorIndex}
+        .instances=${isAggregate ? selection.instances : null}
+        activeEventIndex=${active}
       ></call-tree-detail>`,
     },
-  ];
+  );
+  return sections;
+}
+
+/** The Timeline's namespace split. One id and title for both scopes: collapse
+ *  state is keyed by section id, so a drift would split it. */
+function namespaceTimeSection(content: TemplateResult): PaneSection {
+  return { id: 'namespace-time', title: 'Self time by namespace', fit: 'content', content };
 }

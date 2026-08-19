@@ -7,7 +7,7 @@ import { customElement, property, query, state } from 'lit/decorators.js';
 
 import type { ApexLog, LogCategory } from 'apex-log-parser';
 import { VSCodeExtensionMessenger } from '../../../core/messaging/VSCodeExtensionMessenger.js';
-import { subscribeSettings, type LanaSettings } from '../../settings/Settings.js';
+import { subscribeSettings, updateSetting, type LanaSettings } from '../../settings/Settings.js';
 import { keyMap, setColors } from '../services/Timeline.js';
 
 import { DEFAULT_THEME_NAME, sameColors, type TimelineColors } from '../themes/Themes.js';
@@ -79,6 +79,9 @@ export class TimelineView extends LitElement {
   @state()
   private timeDisplayMode: TimeDisplayMode = 'elapsed';
 
+  @state()
+  private showTooltip = true;
+
   @query('timeline-flame-chart')
   private flameChartRef!: TimelineFlameChart;
 
@@ -91,10 +94,9 @@ export class TimelineView extends LitElement {
     css`
       :host {
         /* Editor */
-        --tl-editor-background: var(--vscode-editor-background);
-        --tl-editor-foreground: var(--vscode-editor-foreground);
+        --tl-editor-foreground: var(--lana-editor-fg);
         --tl-cursor-foreground: var(--vscode-editorCursor-foreground, #fff);
-        --tl-focus-border: var(--vscode-focusBorder, #007fd4);
+        --tl-focus-border: var(--lana-focus-border);
         --tl-line-number-foreground: var(--vscode-editorLineNumber-foreground, #808080);
 
         /* Find/selection */
@@ -103,27 +105,18 @@ export class TimelineView extends LitElement {
         --tl-selection-highlight-border: var(--vscode-editor-selectionHighlightBorder, transparent);
 
         /* Widgets */
-        --tl-widget-background: var(--vscode-editorWidget-background, #252526);
-        --tl-widget-border: var(--vscode-editorWidget-border, #454545);
+        --tl-widget-background: var(--lana-popover-bg);
+        --tl-widget-border: var(--lana-surface-border);
         --tl-widget-foreground: var(--vscode-editorWidget-foreground, #cccccc);
 
         /* Hover/tooltip */
-        --tl-hover-background: var(
-          --vscode-editorHoverWidget-background,
-          var(--vscode-editorWidget-background, #252526)
-        );
-        --tl-hover-border: var(
-          --vscode-editorHoverWidget-border,
-          var(--vscode-editorWidget-border, #454545)
-        );
-        --tl-hover-foreground: var(
-          --vscode-editorHoverWidget-foreground,
-          var(--vscode-editorWidget-foreground, #cccccc)
-        );
+        --tl-hover-background: var(--lana-hover-bg);
+        --tl-hover-border: var(--lana-hover-border);
+        --tl-hover-foreground: var(--lana-hover-fg);
 
         /* Text */
-        --tl-description-foreground: var(--vscode-descriptionForeground, #999);
-        --tl-font-family: var(--vscode-font-family, sans-serif);
+        --tl-description-foreground: var(--lana-fg-muted);
+        --tl-font-family: var(--lana-font-ui);
 
         /* Buttons */
         --tl-button-secondary-background: var(--vscode-button-secondaryBackground, #3a3d41);
@@ -132,9 +125,6 @@ export class TimelineView extends LitElement {
           --vscode-button-secondaryHoverBackground,
           #45494e
         );
-
-        /* Toolbar */
-        --tl-toolbar-hover-background: var(--vscode-toolbar-hoverBackground);
 
         display: flex;
         flex-direction: column;
@@ -209,6 +199,7 @@ export class TimelineView extends LitElement {
   private applyTimelineSettings(settings: LanaSettings) {
     const { timeline } = settings;
     this.useLegacyTimeline = timeline.legacy;
+    this.showTooltip = timeline.showTooltip;
 
     if (!this.useLegacyTimeline) {
       const themeName = timeline.activeTheme ?? DEFAULT_THEME_NAME;
@@ -256,7 +247,7 @@ export class TimelineView extends LitElement {
 
     const toolbar = html`<div class="timeline-toolbar">
       <timeline-key .timelineKeys="${this.timelineKeys}"></timeline-key>
-      ${this.renderTimeDisplayToggle()}
+      ${this.renderTimeDisplayToggle()} ${this.renderTooltipToggle()}
     </div>`;
 
     if (this.useLegacyTimeline) {
@@ -272,6 +263,7 @@ export class TimelineView extends LitElement {
         .themeName=${this.activeTheme}
         .navigateToEventIndex=${this.navigateToEventIndex}
         .navigateToTimestamp=${this.navigateToTimestamp}
+        .showTooltip=${this.showTooltip}
       ></timeline-flame-chart>`;
   }
 
@@ -289,6 +281,26 @@ export class TimelineView extends LitElement {
       title="${label}"
       @click=${() => this.toggleTimeDisplay()}
     ></vscode-toolbar-button>`;
+  }
+
+  /** The hover details switch. Legacy has its own tooltip, which this does not control. */
+  private renderTooltipToggle() {
+    if (this.useLegacyTimeline) {
+      return '';
+    }
+
+    const label = this.showTooltip ? 'Hide frame details on hover' : 'Show frame details on hover';
+    return html`<vscode-toolbar-button
+      icon="${this.showTooltip ? 'eye' : 'eye-closed'}"
+      label="${label}"
+      title="${label}"
+      @click=${() => this.toggleTooltip()}
+    ></vscode-toolbar-button>`;
+  }
+
+  private toggleTooltip(): void {
+    this.showTooltip = !this.showTooltip;
+    updateSetting('timeline.showTooltip', this.showTooltip);
   }
 
   private toggleTimeDisplay(): void {

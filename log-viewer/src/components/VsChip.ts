@@ -25,9 +25,9 @@ export class VsChip extends LitElement {
         align-items: baseline;
         gap: var(--lana-space-xs);
         padding: var(--lana-space-3xs) var(--lana-space-xs);
-        border: var(--lana-stroke) solid var(--vscode-settings-dropdownBorder, #3c3c3c);
+        border: var(--lana-stroke) solid var(--lana-control-border);
         border-radius: var(--lana-radius-sm);
-        background-color: var(--vscode-settings-dropdownBackground, #313131);
+        background-color: var(--lana-control-bg);
         white-space: nowrap;
         /* Label and value both mono, like the log text they name: the chips sit in
            a row, so one family keeps their heights and stems matched. */
@@ -37,14 +37,14 @@ export class VsChip extends LitElement {
            height: a step below the app's base size keeps the chip level with the
            mixed-case text beside it instead of towering over it. */
         font-size: var(--lana-text-xs);
-        color: var(--vscode-foreground);
+        color: var(--lana-fg);
       }
 
       /* The leading label names what the value belongs to, so it recedes — same
          size, lighter and dimmer. */
       ::slotted([slot='lead']) {
         font-weight: 400;
-        color: var(--vscode-descriptionForeground);
+        color: var(--lana-fg-muted);
       }
     `,
   ];

@@ -68,7 +68,7 @@ export const selectSizingStyles = css`
   .vs-panel-label {
     grid-column: 1;
     font-size: var(--filter-control-font-size);
-    color: var(--vscode-foreground);
+    color: var(--lana-fg);
     white-space: nowrap;
   }
 
@@ -118,9 +118,9 @@ export const selectSizingStyles = css`
      Current value is shown by the checkmark (.option-check), not a fill. */
   .option.active,
   .option.active:hover {
-    background-color: var(--vscode-list-hoverBackground);
-    color: var(--vscode-foreground);
-    outline-color: var(--vscode-list-hoverBackground);
+    background-color: var(--lana-row-hover-bg);
+    color: var(--lana-fg);
+    outline-color: var(--lana-row-hover-bg);
   }
 
   /* Same 16px marker column as the facet checklist's checkbox (.vs-checkbox), so
@@ -132,7 +132,7 @@ export const selectSizingStyles = css`
     flex-shrink: 0;
     width: 16px;
     height: 16px;
-    color: var(--vscode-foreground);
+    color: var(--lana-fg);
   }
 
   .option:not(.selected) .option-check {
@@ -152,7 +152,7 @@ export const selectSizingStyles = css`
   }
 
   :host(:not([dense])) .face:hover {
-    background-color: var(--vscode-toolbar-hoverBackground);
+    background-color: var(--lana-toolbar-hover-bg);
   }
 
   /* Combobox face: size to placeholder/value (like the select face's fit-content
@@ -168,11 +168,11 @@ export const selectSizingStyles = css`
   }
 
   .face-prefix {
-    color: var(--vscode-descriptionForeground);
+    color: var(--lana-fg-muted);
   }
 
   .face-value {
-    color: var(--vscode-foreground);
+    color: var(--lana-fg);
   }
 
   .face.active .face-value {
@@ -181,7 +181,7 @@ export const selectSizingStyles = css`
 
   /* Inactive placeholder is muted. */
   .face:not(.active) .face-value {
-    color: var(--vscode-descriptionForeground);
+    color: var(--lana-fg-muted);
   }
 
   .face-prefix + .face-value {

@@ -48,7 +48,7 @@ export const GOVERNOR_METRICS: ReadonlyArray<{ key: keyof Limits; label: string 
   { key: 'mobileApexPushCalls', label: 'Mobile Push Calls' },
 ];
 
-/** A metric's highest level across the series, for the non-monotonic metrics. */
+/** A metric's highest level across the series. */
 function peakUsed(series: HeatStripTimeSeries, key: keyof Limits): number {
   let peak = 0;
   for (const event of series.events) {
@@ -60,7 +60,7 @@ function peakUsed(series: HeatStripTimeSeries, key: keyof Limits): number {
   return peak;
 }
 
-/** A governor metric's level (final, or the peak for heap), ranked against its limit. */
+/** A governor metric's peak level, ranked against its limit. */
 export interface RankedLimitMetric {
   key: keyof Limits;
   label: string;
@@ -70,36 +70,55 @@ export interface RankedLimitMetric {
   ratio: number;
 }
 
+/** Memo of {@link limitTotals} per series: every surface asks for the same log. */
+const totalsCache = new WeakMap<HeatStripTimeSeries, Limits>();
+
 /**
- * The governor metrics closest to a limit, tightest first, capped at `max`,
- * read from the metric strip's time series — the same source the timeline and
- * the trend charts draw, so every surface shows one figure per metric. The
- * series is dense (every event carries every known metric forward), so the
- * last event holds each metric's final level. Heap is the one non-monotonic
- * metric — deallocations pull the line back down — so it reads its peak across
- * the series, matching the "Maximum heap size" governor. A metric with no
- * consumption is left out.
+ * Whole-log usage and limit for every governor metric, read from the metric
+ * strip's time series — the one source every governor surface shares, so a
+ * metric reads the same on the strip, the trend charts, the gauges, the
+ * Database overview and the Analysis findings.
+ *
+ * Every metric reads its **peak** across the series, not its final level. No
+ * metric is monotonic: heap falls on a deallocation, and the log's own
+ * cumulative reports can fall too (a later block reporting a lower total than
+ * an earlier one). A governor charges the transaction at its highest point, so
+ * the peak is what breached and what the reader must be told. The metric strip
+ * keeps drawing the series itself, dips included — it shows what the log says
+ * happened.
  *
  * These are whole-transaction totals: the series sums usage across
  * namespaces, so in a namespaced org a metric can pass 100% of a single
  * namespace's limit without a breach (#862) — accepted so every surface
  * matches the charts and the strip.
  */
-export function rankedLimitMetrics(series: HeatStripTimeSeries, max: number): RankedLimitMetric[] {
-  const final = series.events[series.events.length - 1]?.values;
-  if (!final) {
-    return [];
+export function limitTotals(series: HeatStripTimeSeries): Limits {
+  let totals = totalsCache.get(series);
+  if (totals) {
+    return totals;
   }
+  const final = series.events[series.events.length - 1]?.values;
+  totals = {} as Limits;
+  for (const { key } of GOVERNOR_METRICS) {
+    totals[key] = {
+      used: peakUsed(series, key),
+      limit: final?.get(key)?.limit ?? 0,
+    };
+  }
+  totalsCache.set(series, totals);
+  return totals;
+}
 
+/**
+ * The governor metrics closest to a limit, tightest first, capped at `max`,
+ * from {@link limitTotals}. A metric with no consumption, or no limit, is left
+ * out.
+ */
+export function rankedLimitMetrics(series: HeatStripTimeSeries, max: number): RankedLimitMetric[] {
+  const totals = limitTotals(series);
   return GOVERNOR_METRICS.flatMap<RankedLimitMetric>(({ key, label }) => {
-    const value = final.get(key);
-    if (!value || value.limit <= 0) {
-      return [];
-    }
-    const used = key === 'heapSize' ? peakUsed(series, key) : value.used;
-    return used > 0
-      ? [{ key, label, used, limit: value.limit, ratio: (used / value.limit) * 100 }]
-      : [];
+    const { used, limit } = totals[key];
+    return limit > 0 && used > 0 ? [{ key, label, used, limit, ratio: (used / limit) * 100 }] : [];
   })
     .sort((a, b) => b.ratio - a.ratio)
     .slice(0, max);

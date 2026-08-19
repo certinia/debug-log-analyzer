@@ -6,7 +6,7 @@ export const soqlSyntaxStyles = `
 .soql-block {
   display: inline;
   font-family: var(--lana-font-mono);
-  font-size: var(--vscode-editor-font-size, 0.9em);
+  font-size: var(--lana-text-mono);
   white-space: pre-wrap;
   word-break: break-word;
 }
@@ -40,5 +40,11 @@ export const soqlSyntaxStyles = `
 
 .soql-tok-punct {
   opacity: 0.65;
+}
+
+/* Stands in for text a budgeted render left out — quieter than the query itself. */
+.soql-tok-elision {
+  color: var(--lana-fg-muted);
+  font-style: italic;
 }
 `;

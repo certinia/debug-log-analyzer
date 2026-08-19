@@ -5,7 +5,7 @@
 
 // Row-hover colour is the only theme value also referenced by our own rules below, so it
 // stays a variable; every other tabulator theme value is inlined into the config map below.
-$rowHoverBackground: var(--vscode-list-hoverBackground);
+$rowHoverBackground: var(--lana-row-hover-bg);
 
 $codicon-chevron-right: '\eab6';
 $codicon-chevron-down: '\eab4';
@@ -32,46 +32,44 @@ $codicon-chevron-down: '\eab4';
   @include meta.load-css(
     'tabulator-tables/src/scss/tabulator',
     // resolved via sass loadPaths (node_modules)
+    // `header`/`footer`/`rowAltBackgroundColor` must stay Sass colour literals —
+    // tabulator.scss runs `color.adjust()` on those three, which no CSS var survives.
     $with: (
-        backgroundColor: var(--vscode-editor-background),
+        backgroundColor: var(--lana-editor-bg),
         borderColor: transparent,
-        textSize: var(--vscode-editor-font-size),
+        textSize: var(--lana-text-mono),
         // header
         headerBackgroundColor: transparent,
-        headerTextColor: var(--vscode-editor-foreground),
+        headerTextColor: var(--lana-editor-fg),
         headerBorderColor: transparent,
         headerSeparatorColor: transparent,
         headerMargin: 4px,
-        // column header sort arrows — upstream only ever uses these as plain colours
-        // (no color.adjust()), so CSS vars are safe here.
-        sortArrowHover: var(--vscode-icon-foreground, currentColor),
-        sortArrowActive: var(--vscode-icon-foreground, currentColor),
-        sortArrowInactive: var(--vscode-descriptionForeground, #999),
+        sortArrowHover: var(--lana-icon-fg),
+        sortArrowActive: var(--lana-icon-fg),
+        sortArrowInactive: var(--lana-fg-muted),
         // rows
-        rowBackgroundColor: var(--vscode-editor-background),
-        // Must stay a Sass colour literal — tabulator.scss runs color.adjust() on it
-        // for calc rows (so it can't be a CSS var).
+        rowBackgroundColor: var(--lana-editor-bg),
         rowAltBackgroundColor: transparent,
         rowBorderColor: transparent,
-        rowTextColor: var(--vscode-editor-foreground),
+        rowTextColor: var(--lana-editor-fg),
         rowHoverBackground: $rowHoverBackground,
         rowSelectedBackground: var(--vscode-list-activeSelectionBackground),
         rowSelectedBackgroundHover: var(--vscode-list-activeSelectionBackground),
-        editBoxColor: var(--vscode-focusBorder, #1d68cd),
-        errorColor: var(--vscode-errorForeground, #f14c4c),
+        editBoxColor: var(--lana-focus-border),
+        errorColor: var(--lana-severity-error),
         // footer
         footerBackgroundColor: transparent,
-        footerTextColor: var(--vscode-editor-foreground),
+        footerTextColor: var(--lana-editor-fg),
         footerBorderColor: transparent,
         footerSeparatorColor: transparent,
-        footerActiveColor: var(--vscode-textLink-activeForeground, #3794ff)
+        footerActiveColor: var(--lana-link-fg-active)
       )
   );
   @include meta.load-css('../format/Progress.css');
 
   .tabulator {
     .tabulator-header {
-      border-bottom: 1px solid var(--vscode-widget-border, var(--vscode-editorGroup-border));
+      border-bottom: 1px solid var(--lana-surface-border);
     }
 
     .tabulator-tableholder {
@@ -230,7 +228,7 @@ $codicon-chevron-down: '\eab4';
     .datagrid-code-text {
       font-family: var(--lana-font-mono);
       font-weight: var(--vscode-font-weight, normal);
-      font-size: var(--vscode-editor-font-size, 0.9em);
+      font-size: var(--lana-text-mono);
     }
 
     .tabulator-row.tabulator-selected {
@@ -256,15 +254,15 @@ $codicon-chevron-down: '\eab4';
     }
 
     .sort-by--bottom {
-      color: var(--vscode-icon-foreground, currentColor);
+      color: var(--lana-icon-fg);
       border-bottom: none;
-      border-top: 6px solid var(--vscode-icon-foreground, currentColor);
+      border-top: 6px solid var(--lana-icon-fg);
       border-left: 6px solid transparent;
       border-right: 6px solid transparent;
     }
     .sort-by--top {
-      color: var(--vscode-icon-foreground, currentColor);
-      border-bottom: 6px solid var(--vscode-icon-foreground, currentColor);
+      color: var(--lana-icon-fg);
+      border-bottom: 6px solid var(--lana-icon-fg);
       border-top: none;
       border-left: 6px solid transparent;
       border-right: 6px solid transparent;
@@ -277,8 +275,8 @@ $codicon-chevron-down: '\eab4';
 
   .tabulator-tooltip {
     // Match timeline tooltip styling for consistency
-    background: var(--vscode-editorHoverWidget-background, var(--vscode-editorWidget-background));
-    color: var(--vscode-editorHoverWidget-foreground, var(--vscode-editor-foreground));
+    background: var(--lana-hover-bg);
+    color: var(--lana-hover-fg);
     overflow-wrap: anywhere;
     font-family: var(--lana-font-mono);
     font-size: 0.92rem;
@@ -289,18 +287,18 @@ $codicon-chevron-down: '\eab4';
   }
 
   .tabulator-edit-list {
-    border-color: var(--vscode-focusBorder, default);
+    border-color: var(--lana-focus-border);
 
     .tabulator-edit-list-item {
-      color: var(--vscode-editor-foreground, 'white');
+      color: var(--lana-editor-fg);
       &.active {
         background-color: var(--vscode-list-activeSelectionBackground);
-        color: var(--vscode-editor-foreground, 'white');
+        color: var(--lana-editor-fg);
       }
 
       &:hover {
         background-color: var(--vscode-list-activeSelectionBackground);
-        color: var(--vscode-editor-foreground, 'white');
+        color: var(--lana-editor-fg);
       }
     }
   }

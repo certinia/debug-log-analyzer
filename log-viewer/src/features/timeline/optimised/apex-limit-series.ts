@@ -125,6 +125,7 @@ function buildApexLimitTimeSeries(apexLog: ApexLog): HeatStripTimeSeries {
         namespace: snapshot.namespace,
         metric,
         used: value.used,
+        scope: 'cumulative',
       });
       if (value.limit > 0) {
         metricLimits.set(metric, Math.max(metricLimits.get(metric) ?? 0, value.limit));
@@ -200,6 +201,8 @@ function buildApexLimitTimeSeries(apexLog: ApexLog): HeatStripTimeSeries {
             namespace,
             metric: usage.metric,
             used: usage.used,
+            // Each of these lines reports the block it closes, not the transaction.
+            scope: 'scoped',
           });
         }
         break;

@@ -1,198 +1,50 @@
 /*
  * Copyright (c) 2026 Certinia Inc. All rights reserved.
  */
-import { LitElement, css, html, svg } from 'lit';
-import { customElement, state } from 'lit/decorators.js';
-import { classMap } from 'lit/directives/class-map.js';
-import { styleMap } from 'lit/directives/style-map.js';
+import { consume } from '@lit/context';
+import { LitElement, html } from 'lit';
+import { customElement, property } from 'lit/decorators.js';
 
-import { LogLoadedController } from '../core/events/LogLoadedController.js';
-import { formatDuration } from '../core/utility/Util.js';
-import { DatabaseAccess } from '../features/database/services/Database.js';
+import { logContext } from '../core/log/logContext.js';
+import type { LogStore } from '../core/log/LogStore.js';
 import { globalStyles } from '../styles/global.styles.js';
 import { inspectorSectionStyles } from '../styles/inspectorSection.styles.js';
 import { CategoryPaletteController, categorySelfTimes } from './categoryTime.js';
+import './StackedTimeBar.js';
 
 /**
  * The whole log's self time split by category, as one stacked bar in the flame
  * chart's own palette — the Inspector's answer to Chrome DevTools' Summary
- * donut. Self time, so every nanosecond lands in exactly one slice and the bar
+ * donut. Self time, so every nanosecond lands in exactly one segment and the bar
  * always totals the log.
  */
 @customElement('category-time-bar')
 export class CategoryTimeBar extends LitElement {
-  /** The category under the pointer — over its slice or its legend item.
-   *  `onSlice` gates the bar's readout tip: only a slice hover shows it. */
-  @state()
-  private _hover: { category: string; onSlice: boolean } | null = null;
-
   private readonly _palette = new CategoryPaletteController(this);
 
-  /** The bar has to follow the log itself. */
-  private readonly _logLoaded = new LogLoadedController(this);
+  /** The log on screen, from the app root. */
+  @consume({ context: logContext, subscribe: true })
+  @property({ attribute: false })
+  logStore: LogStore | null = null;
 
-  static styles = [
-    globalStyles,
-    inspectorSectionStyles,
-    css`
-      .chart {
-        position: relative;
-      }
-
-      .bar {
-        display: block;
-        width: 100%;
-        height: 12px;
-        border-radius: var(--lana-radius-sm);
-      }
-
-      /* The slice readout. The legend carries the same figures, but a narrow
-         or scrolled panel can push it out of view, so the bar answers too.
-         Anchored to the hovered slice's centre — not the pointer — so it never
-         lags, and below the bar because above it the section title covers it. */
-      .tip {
-        position: absolute;
-        top: calc(100% + var(--lana-space-3xs));
-        pointer-events: none;
-        white-space: nowrap;
-        color: var(--lana-fg);
-        padding: var(--lana-space-3xs) var(--lana-space-xs);
-        background: var(--lana-popover-bg);
-        border: var(--lana-stroke) solid var(--lana-surface-border);
-        border-radius: var(--lana-radius-sm);
-        box-shadow: var(--lana-shadow-popover);
-      }
-
-      .legend {
-        display: flex;
-        flex-wrap: wrap;
-        gap: var(--lana-space-2xs) var(--lana-space-lg);
-        padding-top: var(--lana-space-sm);
-      }
-
-      .legend__item {
-        display: flex;
-        align-items: baseline;
-        gap: var(--lana-space-xs);
-        white-space: nowrap;
-      }
-
-      .legend__swatch {
-        width: 8px;
-        height: 8px;
-        border-radius: 2px;
-        align-self: center;
-        flex: none;
-      }
-
-      .legend__value {
-        font-family: var(--lana-font-mono);
-        font-variant-numeric: tabular-nums;
-        color: var(--lana-fg-muted);
-      }
-
-      /* Hovering a slice or a legend item singles its category out: the other
-         slices recede and the matching legend figures come up to full strength.
-         The legend side matters — the thinnest slices are too small to hit. */
-      .bar__slice {
-        transition: opacity 0.15s ease;
-      }
-
-      .bar__slice--dim {
-        opacity: 0.45;
-      }
-
-      .legend__item--active .legend__value {
-        color: var(--lana-fg);
-      }
-    `,
-  ];
+  static styles = [globalStyles, inspectorSectionStyles];
 
   render() {
-    const apexLog = DatabaseAccess.instance()?.getApexLog();
+    const apexLog = this.logStore?.log;
     const slices = apexLog ? categorySelfTimes(apexLog) : [];
-    const total = slices.reduce((sum, slice) => sum + slice.selfTime, 0);
-    if (!total) {
+    if (!slices.length) {
       return html`<p class="note">No categorised time was recorded in this log.</p>`;
     }
 
-    // Lay the slices out once; the tip and the rects share the geometry.
-    let x = 0;
-    const laid = slices.map((slice) => {
-      const start = x;
-      const width = (slice.selfTime / total) * 100;
-      x += width;
-      return { ...slice, start, width };
-    });
-    const hover = this._hover;
-    const tipSlice = hover?.onSlice ? laid.find((s) => s.category === hover.category) : undefined;
-    const tipCenter = tipSlice ? tipSlice.start + tipSlice.width / 2 : 0;
-
-    return html`
-      <div class="chart">
-        <svg
-          class="bar"
-          viewBox="0 0 100 4"
-          preserveAspectRatio="none"
-          role="img"
-          aria-label="Time by category"
-        >
-          ${laid.map(
-            (slice) => svg`<rect
-              class=${
-                hover !== null && hover.category !== slice.category
-                  ? 'bar__slice bar__slice--dim'
-                  : 'bar__slice'
-              }
-              x=${slice.start.toFixed(3)} y="0" width=${slice.width.toFixed(3)} height="4"
-              fill=${this._palette.colorFor(slice.category)}
-              @pointerenter=${() => (this._hover = { category: slice.category, onSlice: true })}
-              @pointerleave=${() => (this._hover = null)}
-            ></rect>`,
-          )}
-        </svg>
-        ${
-          tipSlice
-            ? html`<div
-                class="tip"
-                style=${styleMap(
-                  tipCenter <= 50
-                    ? { left: `${tipCenter.toFixed(1)}%` }
-                    : { right: `${(100 - tipCenter).toFixed(1)}%` },
-                )}
-              >
-                ${tipSlice.category} · ${this._readout(tipSlice.selfTime, total)}
-              </div>`
-            : ''
-        }
-      </div>
-      <div class="legend">
-        ${laid.map(
-          (slice) => html`
-            <span
-              class=${classMap({
-                legend__item: true,
-                'legend__item--active': hover?.category === slice.category,
-              })}
-              @pointerenter=${() => (this._hover = { category: slice.category, onSlice: false })}
-              @pointerleave=${() => (this._hover = null)}
-            >
-              <span
-                class="legend__swatch"
-                style=${styleMap({ background: this._palette.colorFor(slice.category) })}
-              ></span>
-              <span>${slice.category}</span>
-              <span class="legend__value"> ${this._readout(slice.selfTime, total)} </span>
-            </span>
-          `,
-        )}
-      </div>
-    `;
-  }
-
-  /** `duration · percent` — the tip and the legend show the same figures. */
-  private _readout(selfTime: number, total: number): string {
-    return `${formatDuration(selfTime)} · ${((selfTime / total) * 100).toFixed(1)}%`;
+    return html`<stacked-time-bar
+      legend
+      label="Time by category"
+      .segments=${slices.map((slice) => ({
+        label: slice.category,
+        timeNs: slice.selfTime,
+        color: this._palette.colorFor(slice.category),
+      }))}
+    ></stacked-time-bar>`;
   }
 }
 

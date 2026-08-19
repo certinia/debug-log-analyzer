@@ -30,7 +30,7 @@ export const bleedRowStyles = css`
   }
 
   .bleed-row:focus-visible {
-    outline: var(--lana-stroke) solid var(--vscode-focusBorder);
+    outline: var(--lana-stroke) solid var(--lana-focus-border);
     outline-offset: calc(-1 * var(--lana-stroke));
   }
 `;
@@ -40,6 +40,10 @@ export const bleedRowStyles = css`
  * screen: a category swatch and the code's name on the left, its figures held to
  * the right edge, an optional full-width sub line and magnitude meter beneath
  * them. Layout only — the markup pairs it with the bleed-row shell.
+ *
+ * The swatch is optional: a section whose rows carry none adds
+ * `.reveal-row--no-swatch`, or the name would take the swatch's fixed track and
+ * push the figures off the row.
  *
  * The row's category hue arrives as `--row-hue` and the self-time share of its
  * own bar as `--self-pct`, both set inline on the row, so these rules stay
@@ -57,6 +61,10 @@ export const revealRowStyles = [
       align-items: baseline;
       column-gap: var(--lana-space-sm);
       row-gap: var(--lana-space-3xs);
+    }
+
+    .reveal-row--no-swatch {
+      grid-template-columns: minmax(0, 1fr) auto;
     }
 
     /* Identity, never magnitude: the same hue the flame chart gives the category. */
@@ -88,8 +96,13 @@ export const revealRowStyles = [
       font-family: var(--lana-font-mono);
     }
 
+    /* A column of its own, wide enough for the longest reading and never wrapped,
+       so the figures line up down the section and the name is what truncates. */
     .reveal-row__value {
       justify-self: end;
+      min-width: 7ch;
+      white-space: nowrap;
+      text-align: right;
       color: var(--lana-fg-muted);
       font-family: var(--lana-font-mono);
       font-variant-numeric: tabular-nums;

@@ -1,11 +1,12 @@
 /*
  * Copyright (c) 2026 Certinia Inc. All rights reserved.
  */
+import { consume } from '@lit/context';
 import { LitElement, css, html } from 'lit';
-import { customElement } from 'lit/decorators.js';
+import { customElement, property } from 'lit/decorators.js';
 
-import { LogLoadedController } from '../core/events/LogLoadedController.js';
-import { DatabaseAccess } from '../features/database/services/Database.js';
+import { logContext } from '../core/log/logContext.js';
+import type { LogStore } from '../core/log/LogStore.js';
 import { apexLimitTimeSeries } from '../features/timeline/optimised/apex-limit-series.js';
 import { globalStyles } from '../styles/global.styles.js';
 import {
@@ -27,8 +28,10 @@ import '../features/database/components/GovernorSummary.js';
  */
 @customElement('log-overview')
 export class LogOverview extends LitElement {
-  /** The gauges have to follow the log itself. */
-  private readonly _logLoaded = new LogLoadedController(this);
+  /** The log on screen, from the app root. */
+  @consume({ context: logContext, subscribe: true })
+  @property({ attribute: false })
+  logStore: LogStore | null = null;
 
   static styles = [
     globalStyles,
@@ -50,7 +53,7 @@ export class LogOverview extends LitElement {
   ];
 
   render() {
-    const apexLog = DatabaseAccess.instance()?.getApexLog();
+    const apexLog = this.logStore?.log;
     const gauges = apexLog ? seriesGauges(apexLimitTimeSeries(apexLog)) : [];
     if (!apexLog || !gauges.length) {
       return html`<p class="note">${NO_CUMULATIVE_LIMITS_TEXT}</p>`;
