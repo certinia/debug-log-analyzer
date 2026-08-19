@@ -28,8 +28,12 @@ jest.mock('../../services/LogDiagnostics.js', () => ({
   },
 }));
 
-import { eventBus } from '../../../../core/events/EventBus.js';
+import type { LogStore } from '../../../../core/log/LogStore.js';
 import '../LogDiagnosticsView.js';
+
+const loadLog = (element: HTMLElementTagNameMap['log-diagnostics']) => {
+  element.logStore = { log: {} } as unknown as LogStore;
+};
 
 const view = async (scope?: { instances: number[] }) => {
   const element = document.createElement('log-diagnostics');
@@ -286,7 +290,7 @@ describe('log-diagnostics', () => {
         eventIndex: 1,
       },
     ];
-    eventBus.emit('log:loaded', {});
+    loadLog(element);
     await element.updateComplete;
     await element.updateComplete;
     expect(text(element, '.title')).toEqual(['Later finding.']);
@@ -369,7 +373,7 @@ describe('log-diagnostics', () => {
     // The next log has nothing at that severity, and with one band left there is
     // no roll-up to release it with, so the filter must not outlive the list.
     result = { ...result, diagnostics: [result.diagnostics[1]!] };
-    eventBus.emit('log:loaded', {});
+    loadLog(element);
     await element.updateComplete;
     await element.updateComplete;
     expect(text(element, '.title')).toEqual(['Noted.']);

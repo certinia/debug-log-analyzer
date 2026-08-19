@@ -3,7 +3,6 @@
  */
 import type { ApexLog, LogCategory, LogEvent } from 'apex-log-parser';
 
-import { currentLogStore } from '../../../core/log/LogStore.js';
 import { getEventKey } from './Aggregation.js';
 
 /** One frame on the hot path, entry point first. */
@@ -244,10 +243,4 @@ export function getExecutionHighlights(apexLog: ApexLog): ExecutionHighlights {
     highlightsCache.set(apexLog, highlights);
   }
   return highlights;
-}
-
-/** The highlights for the log on screen, or null before the first parse. */
-export function getCurrentExecutionHighlights(): ExecutionHighlights | null {
-  const apexLog = currentLogStore()?.log;
-  return apexLog ? getExecutionHighlights(apexLog) : null;
 }

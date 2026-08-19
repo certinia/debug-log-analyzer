@@ -2,11 +2,13 @@
  * Copyright (c) 2026 Certinia Inc. All rights reserved.
  */
 import '#vscode-elements/vscode-icon.js';
-import { LitElement, css, html, unsafeCSS } from 'lit';
+import { consume } from '@lit/context';
+import { LitElement, css, html, unsafeCSS, type PropertyValues } from 'lit';
 import { customElement, property, state } from 'lit/decorators.js';
 
 import { dispatchInspectorReveal } from '../../../components/inspectorReveal.js';
-import { eventBus } from '../../../core/events/EventBus.js';
+import { logContext } from '../../../core/log/logContext.js';
+import type { LogStore } from '../../../core/log/LogStore.js';
 import { formatDuration } from '../../../core/utility/Util.js';
 import { formatSOQLToTemplate } from '../../soql/format/formatter.js';
 import { SEVERITY_TYPES, type Severity } from '../../soql/services/SOQLLinter.js';
@@ -67,6 +69,11 @@ export class LogDiagnosticsView extends LitElement {
   @property({ attribute: false })
   instances: readonly number[] | null = null;
 
+  /** The log on screen, from the app root. */
+  @consume({ context: logContext, subscribe: true })
+  @property({ attribute: false })
+  logStore: LogStore | null = null;
+
   /** The whole log's findings, before any scoping. */
   @state()
   private _all: LogDiagnostics | null = null;
@@ -92,18 +99,12 @@ export class LogDiagnosticsView extends LitElement {
   /** The findings {@link _result} was scoped from. */
   private _scoped: LogDiagnostics | null = null;
 
-  private _offLogLoaded: (() => void) | null = null;
-
   private _columns = FALLBACK_COLUMNS;
 
   private _resize: ResizeObserver | null = null;
 
   override connectedCallback() {
     super.connectedCallback();
-    void this._analyse();
-    // The inspector paints before the first log is parsed, and it rebuilds only
-    // on a tab change or a selection.
-    this._offLogLoaded = eventBus.on('log:loaded', () => void this._analyse());
     if (typeof ResizeObserver !== 'undefined') {
       this._resize = new ResizeObserver(() => this._measure());
       this._resize.observe(this);
@@ -111,8 +112,6 @@ export class LogDiagnosticsView extends LitElement {
   }
 
   override disconnectedCallback() {
-    this._offLogLoaded?.();
-    this._offLogLoaded = null;
     this._resize?.disconnect();
     this._resize = null;
     super.disconnectedCallback();
@@ -135,7 +134,10 @@ export class LogDiagnosticsView extends LitElement {
       this._all && this.instances ? scopeDiagnostics(this._all, this.instances) : this._all;
   }
 
-  override updated() {
+  override updated(changed: PropertyValues) {
+    if (changed.has('logStore')) {
+      void this._analyse();
+    }
     this._measure();
   }
 

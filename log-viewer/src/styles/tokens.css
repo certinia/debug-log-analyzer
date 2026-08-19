@@ -63,11 +63,11 @@
   --lana-font-ui: var(--vscode-font-family, sans-serif);
 
   /* Surfaces — the same registered colors VS Code's own chrome is built from.
-     `surface-border` is absent before the size-token registry (stable 1.128 ships
-     none of the `--vscode-surface-*` set), so its fallback chain is load-bearing. */
+     `surface-border` ships in no stable VS Code and most themes set no `widget.border`,
+     so the chain has to reach a colour or every hairline drawn with it disappears. */
   --lana-surface-border: var(
     --vscode-surface-border,
-    var(--vscode-widget-border, var(--vscode-sideBar-border, transparent))
+    var(--vscode-widget-border, var(--vscode-panel-border, rgba(128, 128, 128, 0.35)))
   );
   --lana-header-bg: var(--vscode-tab-activeBackground, var(--lana-editor-bg));
 
