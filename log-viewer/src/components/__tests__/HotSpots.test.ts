@@ -5,11 +5,12 @@
  */
 import { beforeEach, describe, expect, it } from '@jest/globals';
 
+import type { LogStore } from '../../core/log/LogStore.js';
 import type { ExecutionHighlights } from '../../features/call-tree/utils/ExecutionHighlights.js';
 
 let highlights: ExecutionHighlights | null = null;
 jest.mock('../../features/call-tree/utils/ExecutionHighlights.js', () => ({
-  getCurrentExecutionHighlights: () => highlights,
+  getExecutionHighlights: () => highlights,
 }));
 
 import '../HotSpots.js';
@@ -32,6 +33,7 @@ const spotsOf = (): ExecutionHighlights => ({
 
 const hotSpots = async () => {
   const element = document.createElement('hot-spots');
+  element.logStore = { log: {} } as unknown as LogStore;
   document.body.append(element);
   await element.updateComplete;
   return element;

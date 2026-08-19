@@ -10,7 +10,6 @@ import {
 } from 'apex-log-parser';
 
 import { DEFAULT_NAMESPACE, getCallerNamespace } from '../../../core/utility/CallerNamespace.js';
-import { currentLogStore } from '../../../core/log/LogStore.js';
 
 /** The label for a DML statement whose SObject the log never names. */
 export const UNKNOWN_OBJECT = 'Unknown';
@@ -163,12 +162,6 @@ export interface DatabaseOverview {
 
 /** Memo per log: the tree never changes after parse, the sections re-render. */
 const cache = new WeakMap<ApexLog, DatabaseOverview>();
-
-/** The whole-log figures for the log on screen, or `null` before one resolves. */
-export function currentDatabaseOverview(): DatabaseOverview | null {
-  const apexLog = currentLogStore()?.log;
-  return apexLog ? databaseOverview(apexLog) : null;
-}
 
 /** {@link DatabaseOverview} for a parsed log, computed once. */
 export function databaseOverview(root: ApexLog): DatabaseOverview {

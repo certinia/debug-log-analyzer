@@ -32,12 +32,6 @@ export type DetailSelection =
   | { kind: 'aggregate'; instances: number[]; label: string };
 
 interface EventMap {
-  // A log finished parsing and the event-lookup service holds it. Whole-log
-  // content reads that service directly, so it needs telling once the data is
-  // there; the first paint happens before any log exists. No payload: a listener
-  // that needs the log asks the service for it, keeping one source of truth.
-  'log:loaded': Record<string, never>;
-
   // Supply eventIndex (preferred — unique) OR timestamp (fallback for raw-log entry where eventIndex isn't known).
 
   'timeline:navigate-to':

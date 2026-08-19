@@ -1,8 +1,9 @@
 /*
  * Copyright (c) 2026 Certinia Inc. All rights reserved.
  */
-import { LitElement, css, html, unsafeCSS } from 'lit';
-import { customElement } from 'lit/decorators.js';
+import { consume } from '@lit/context';
+import { LitElement, css, html, unsafeCSS, type PropertyValues } from 'lit';
+import { customElement, property } from 'lit/decorators.js';
 import {
   type CellComponent,
   type ColumnDefinition,
@@ -23,7 +24,8 @@ import {
 } from '../../../components/locatedRow.js';
 import { PANEL_ROW_MENU_ITEMS, runPanelRowAction } from '../../../components/panelRowMenu.js';
 import { eventBus } from '../../../core/events/EventBus.js';
-import { LogLoadedController } from '../../../core/events/LogLoadedController.js';
+import { logContext } from '../../../core/log/logContext.js';
+import type { LogStore } from '../../../core/log/LogStore.js';
 import { SelectionEchoGuard } from '../../../core/events/SelectionEchoGuard.js';
 import { formatDuration, formatInteger } from '../../../core/utility/Util.js';
 import { globalStyles } from '../../../styles/global.styles.js';
@@ -43,7 +45,7 @@ import { soqlInlineElement } from '../../soql/format/inlineCell.js';
 import { soqlSyntaxStyles } from '../../soql/styles/soql-syntax.css.js';
 import {
   type DatabaseCallNode,
-  currentDatabaseOverview,
+  databaseOverview,
   NO_STATEMENTS,
   type StatementKind,
 } from '../services/databaseOverview.js';
@@ -158,9 +160,10 @@ export class DatabaseTime extends LitElement {
   /** The build in flight; a newer one aborts it, and so does a disconnect. */
   private _building: AbortController | null = null;
 
-  private readonly _logLoaded = new LogLoadedController(this, () => {
-    void this._build();
-  });
+  /** The log on screen, from the app root. */
+  @consume({ context: logContext, subscribe: true })
+  @property({ attribute: false })
+  logStore: LogStore | null = null;
 
   static styles = [
     globalStyles,
@@ -222,7 +225,12 @@ export class DatabaseTime extends LitElement {
 
   firstUpdated(): void {
     this._contextMenu = this.renderRoot.querySelector('context-menu');
-    void this._build();
+  }
+
+  updated(changed: PropertyValues): void {
+    if (changed.has('logStore')) {
+      void this._build();
+    }
   }
 
   render() {
@@ -271,7 +279,8 @@ export class DatabaseTime extends LitElement {
   }
 
   private async _build(): Promise<void> {
-    const overview = currentDatabaseOverview();
+    const log = this.logStore?.log;
+    const overview = log && databaseOverview(log);
     this._building?.abort();
     const { signal } = (this._building = new AbortController());
     // Wait for the host to lay out before Tabulator measures column widths —
@@ -295,8 +304,7 @@ export class DatabaseTime extends LitElement {
       return;
     }
     if (!overview) {
-      // No log yet, so there is nothing to size a new table against; the load
-      // event builds it once the figures exist.
+      // No log yet, so there is nothing to size a new table against.
       return;
     }
 
