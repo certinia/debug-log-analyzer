@@ -56,7 +56,11 @@ const CHROMA_CAP = 0.17;
 /** How far a generated colour keeps from every hue in use while the wheel allows it.
  *  Hue is what the eye reads as identity — two colours one hue apart are the same
  *  colour lighter or darker, however far apart OKLab says they are — so this is met
- *  before {@link CLEARANCE} is weighed at all. */
+ *  before {@link CLEARANCE} is weighed at all.
+ *
+ *  The wheel holds this to twelve namespaces and narrows past it. Spreading hues
+ *  evenly instead would hold it further, but only the literals are colour-blind
+ *  safe: an even spread cannot be, since deuteranopia collapses red against green. */
 const MIN_HUE_GAP = 24;
 
 /** How far a generated colour keeps from every colour in use, once its hue is
