@@ -267,9 +267,6 @@ export class LogViewer extends LitElement {
     // Published before the views render, so every tab reads the same log
     // whichever one loads first.
     this._logStore = setCurrentLog(apexLog);
-    // After the store holds the log, never before: the views still on the event
-    // read it straight from there.
-    eventBus.emit('log:loaded', {});
 
     this.logSize = apexLog.size;
     this.timelineRoot = apexLog;

@@ -1,6 +1,7 @@
 /*
  * Copyright (c) 2026 Certinia Inc. All rights reserved.
  */
+import { consume } from '@lit/context';
 import type { LogEvent } from 'apex-log-parser';
 import { LitElement, css, html, unsafeCSS, type PropertyValues } from 'lit';
 import { customElement, property, state } from 'lit/decorators.js';
@@ -12,7 +13,8 @@ import {
 } from 'tabulator-tables';
 
 import { eventBus } from '../core/events/EventBus.js';
-import { LogLoadedController } from '../core/events/LogLoadedController.js';
+import { logContext } from '../core/log/logContext.js';
+import type { LogStore } from '../core/log/LogStore.js';
 import { formatDuration, formatInteger } from '../core/utility/Util.js';
 import {
   commonColumnDefaults,
@@ -186,16 +188,10 @@ export class CallTreeDetail extends LitElement {
     'bottom-up': null,
   };
 
-  // A whole-log tree can mount before the first parse finishes (the scoped
-  // tree cannot — a selection implies a parsed log), so rebuild when the log
-  // lands.
-  private readonly _logLoaded = new LogLoadedController(this, () => {
-    if (!this.wholeLog) {
-      return;
-    }
-    this._invalidateScope();
-    void this._showActive();
-  });
+  /** The log on screen, from the app root. */
+  @consume({ context: logContext, subscribe: true })
+  @property({ attribute: false })
+  logStore: LogStore | null = null;
 
   constructor() {
     super();
@@ -316,7 +312,11 @@ export class CallTreeDetail extends LitElement {
   ];
 
   updated(changed: PropertyValues) {
-    const scopeChanged = changed.has('eventIndex') || changed.has('instances');
+    // Only the whole-log tree can mount before a parse, so there a new log is a new scope.
+    const scopeChanged =
+      (changed.has('logStore') && this.wholeLog) ||
+      changed.has('eventIndex') ||
+      changed.has('instances');
     if (scopeChanged) {
       this._invalidateScope();
     }
