@@ -44,16 +44,24 @@
      gutter, plus the bar itself (`DatabaseSection`). */
   --lana-section-inset: calc(var(--lana-space-md) + 3px);
 
-  /* Type — one step down from the host's body size, for text that annotates
-     rather than states. */
-  --lana-text-sm: calc(var(--vscode-font-size, 13px) * 0.85);
+  /* Type — VS Code's own UI ramp, so the app follows the size registry rather
+     than a scale of our own: `bodyFontSize` 13px, `.small` 12px, `.xSmall` 11px.
+     (`--vscode-font-size` is not one of them: a webview gets it hardcoded at
+     13px, so it tracks nothing.) Dense data reads at `small`, so that is the
+     base. Only the last step has no registered size; it is derived and rounded
+     to a whole pixel, because text this small lands badly on a fraction. */
+  --lana-text-lg: var(--vscode-bodyFontSize, 13px);
+  --lana-text-base: var(--vscode-bodyFontSize-small, 12px);
+  --lana-text-sm: var(--vscode-bodyFontSize-xSmall, 11px);
+  --lana-text-xs: round(nearest, calc(var(--lana-text-base) * 0.84), 1px);
 
-  /* Half a step down — mixed-case secondary text; 12px at the host's default 13px.
-     (11px suits only uppercase micro-labels, whose caps height carries the size.) */
-  --lana-text-md: calc(var(--vscode-font-size, 13px) * 0.92);
+  /* Uppercase micro-labels, whose caps height carries the size: one step under
+     the body, let out with tracking so caps read as a label, not a shout. */
+  --lana-text-caps: var(--lana-text-sm);
+  --lana-text-caps-tracking: 0.06em;
 
   /* Header metadata (size · duration · identity) — just under the title size. */
-  --lana-text-meta: 0.9rem;
+  --lana-text-meta: var(--lana-text-sm);
 
   /* Monospace, for text whose alignment carries meaning: stacks, code. The host
      sets the editor's own size, which is not always its UI size. */

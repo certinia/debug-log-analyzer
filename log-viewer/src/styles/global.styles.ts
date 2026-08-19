@@ -17,7 +17,7 @@ export const globalStyles = [
       --filter-control-height: 22px;
       /* For a control in the inspector's action bar, which is shorter than a filter bar. */
       --filter-control-height-dense: 20px;
-      --filter-control-font-size: 11px;
+      --filter-control-font-size: var(--lana-text-base);
       --filter-control-padding: 0 var(--lana-space-sm);
       --filter-control-radius: var(--lana-radius-sm);
 
@@ -27,7 +27,7 @@ export const globalStyles = [
       --filter-popover-border-color: var(--vscode-menu-border, var(--lana-surface-border));
       --filter-popover-radius: var(--lana-radius-md);
       --filter-popover-shadow: var(--lana-shadow-popover);
-      --filter-popover-row-font-size: 12px;
+      --filter-popover-row-font-size: var(--lana-text-base);
       --filter-popover-row-padding: var(--lana-space-2xs) var(--lana-space-sm);
 
       /* Label column width shared by every filter's overflow-panel row (facet,
@@ -133,7 +133,7 @@ export const globalStyles = [
       display: inline-flex;
       align-items: center;
       gap: var(--lana-space-xs);
-      font-size: 11px;
+      font-size: var(--lana-text-base);
       cursor: pointer;
     }
 

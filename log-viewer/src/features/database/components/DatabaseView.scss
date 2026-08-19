@@ -8,7 +8,7 @@
 .db-group-row {
   display: flex;
   min-width: 0;
-  font-family: monospace;
+  font-family: var(--lana-font-mono);
 }
 .db-group-row__title {
   white-space: pre-wrap;

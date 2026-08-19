@@ -53,7 +53,6 @@ export class HotPath extends LitElement {
         padding: var(--lana-space-2xs) var(--lana-space-xs);
         background: var(--lana-callout-warning-bg);
         color: var(--lana-severity-warning);
-        font-size: var(--lana-text-sm);
         white-space: normal;
       }
 
@@ -68,7 +67,6 @@ export class HotPath extends LitElement {
       .more {
         padding: var(--lana-space-3xs) 0;
         color: var(--lana-fg-muted);
-        font-size: var(--lana-text-sm);
       }
     `,
   ];

@@ -71,7 +71,7 @@ export class TimelineLegacy extends LitElement {
         background-color: var(--lana-editor-bg);
         color: var(--lana-editor-fg);
         font-family: var(--lana-font-mono);
-        font-size: 0.92rem;
+        font-size: var(--lana-text-sm);
         pointer-events: none;
         transition: opacity 0.15s ease;
       }
@@ -103,7 +103,7 @@ export class TimelineLegacy extends LitElement {
         flex-shrink: 0;
         font-variant-numeric: tabular-nums;
         font-weight: 500;
-        font-family: monospace;
+        font-family: var(--lana-font-mono);
         opacity: 0.9;
         text-align: right;
         white-space: nowrap;

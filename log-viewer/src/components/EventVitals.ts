@@ -115,7 +115,7 @@ export class EventVitals extends LitElement {
         display: grid;
         grid-column: 1 / -1;
         grid-template-columns: subgrid;
-        row-gap: 2px;
+        row-gap: var(--lana-space-3xs);
       }
       @container (min-width: 240px) {
         .grid {
@@ -139,13 +139,13 @@ export class EventVitals extends LitElement {
          thinning contrast to de-emphasise costs legibility. */
       .qualifier {
         color: var(--lana-fg-muted);
-        font-size: 0.9em;
+        font-size: var(--lana-text-sm);
       }
       .pill {
         display: inline-block;
         padding: 0 var(--lana-space-sm);
         border-radius: var(--lana-radius-sm);
-        font-size: 0.85em;
+        font-size: var(--lana-text-xs);
         line-height: 1.4;
         color: var(--lana-editor-bg);
       }

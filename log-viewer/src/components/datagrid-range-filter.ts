@@ -71,7 +71,7 @@ export class DatagridRangeFilter extends LitElement {
       }
 
       .range-panel__unit {
-        font-size: 11px;
+        font-size: var(--lana-text-sm);
         color: var(--lana-fg-muted);
       }
 
@@ -120,7 +120,7 @@ export class DatagridRangeFilter extends LitElement {
         box-sizing: border-box;
         padding: 3px 6px;
         font: inherit;
-        font-size: 12px;
+        font-size: var(--lana-text-base);
         color: var(--vscode-settings-numberInputForeground);
         background-color: var(--vscode-settings-numberInputBackground);
         border: 1px solid var(--vscode-settings-numberInputBorder, transparent);
@@ -146,7 +146,7 @@ export class DatagridRangeFilter extends LitElement {
         background: none;
         color: var(--lana-link-fg);
         font: inherit;
-        font-size: 12px;
+        font-size: var(--lana-text-base);
         cursor: pointer;
       }
 

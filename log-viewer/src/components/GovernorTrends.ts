@@ -108,8 +108,8 @@ export class GovernorTrends extends LitElement {
 
       .trend__label {
         display: block;
-        font-size: 0.7rem;
-        letter-spacing: 0.06em;
+        font-size: var(--lana-text-caps);
+        letter-spacing: var(--lana-text-caps-tracking);
         text-transform: uppercase;
         color: var(--lana-fg-muted);
         white-space: nowrap;
@@ -124,7 +124,6 @@ export class GovernorTrends extends LitElement {
         display: block;
         font-family: var(--lana-font-mono);
         font-variant-numeric: tabular-nums;
-        font-size: var(--lana-text-sm);
         white-space: nowrap;
         overflow: hidden;
         text-overflow: ellipsis;

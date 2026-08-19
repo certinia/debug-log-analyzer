@@ -80,8 +80,8 @@ export class GovernorSummary extends LitElement {
       }
 
       .gauge__label {
-        font-size: 0.7rem;
-        letter-spacing: 0.06em;
+        font-size: var(--lana-text-caps);
+        letter-spacing: var(--lana-text-caps-tracking);
         text-transform: uppercase;
         color: var(--lana-fg-muted);
         white-space: nowrap;
@@ -90,7 +90,7 @@ export class GovernorSummary extends LitElement {
       .gauge__value {
         font-family: var(--lana-font-mono);
         font-variant-numeric: tabular-nums;
-        font-size: 0.95rem;
+        font-size: var(--lana-text-base);
         white-space: nowrap;
       }
 
@@ -100,7 +100,7 @@ export class GovernorSummary extends LitElement {
       }
 
       .gauge__na {
-        font-size: 0.78rem;
+        font-size: var(--lana-text-xs);
         font-style: italic;
       }
 

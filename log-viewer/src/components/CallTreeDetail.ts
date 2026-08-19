@@ -275,8 +275,8 @@ export class CallTreeDetail extends LitElement {
         display: flex;
         align-items: center;
         justify-content: space-between;
-        gap: 8px;
-        padding-bottom: 4px;
+        gap: var(--lana-space-sm);
+        padding-bottom: var(--lana-space-2xs);
         flex: 0 0 auto;
       }
       .tables {

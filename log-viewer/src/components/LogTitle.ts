@@ -30,11 +30,11 @@ export class LogTitle extends LitElement {
         display: inline-flex;
         align-items: center;
         /* Floor, not a nicety: without it the title shreds itself to nothing while the
-           header's controls keep their space, so nav-bar's collapse ladder never
-           engages. nav-bar reads this value back to budget the ladder. */
-        min-width: 16ch;
+           header's controls keep their space, so nav-bar's ladder never engages. */
+        min-width: 10ch;
         min-height: 1rem;
-        max-width: 60ch;
+        /* Capped by nav-bar, which budgets its ladder around the floor above. */
+        max-width: min(60ch, var(--title-max, 60ch));
         flex: 0 1 auto;
         overflow: hidden;
       }
@@ -45,7 +45,7 @@ export class LogTitle extends LitElement {
         background: transparent;
         border-radius: var(--lana-radius-sm);
         font-weight: var(--text-weight-semibold, 600);
-        font-size: 1.1rem;
+        font-size: var(--lana-text-lg);
         overflow: hidden;
         text-overflow: ellipsis;
         white-space: nowrap;
@@ -66,6 +66,11 @@ export class LogTitle extends LitElement {
       }
     `,
   ];
+
+  /** The floor nav-bar budgets its collapse ladder around, in px. */
+  get floorWidth(): number {
+    return parseFloat(getComputedStyle(this).minWidth) || 0;
+  }
 
   render() {
     if (!this.logName) {

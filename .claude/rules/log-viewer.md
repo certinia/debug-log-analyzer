@@ -35,6 +35,14 @@ Webview UI.
   and no consumer fallback can fire.
 - Never define or override a `--vscode-*` name — an override is global to the webview. Exception:
   skinning a `vscode-elements` component; scope it to that element, never `:host` or `:root`.
+- Write no literal font size or family. Take a step from the ramp in `styles/tokens.css`
+  (`--lana-text-*`, `--lana-text-mono` for editor-sized text, `--lana-text-meta` for header
+  metadata) and a family from `--lana-font-mono` or `--lana-font-ui`.
+- Mono is for text whose alignment carries meaning — stacks, code, log text. Prose takes the UI font.
+- An all-caps run takes `--lana-text-caps` and `--lana-text-caps-tracking`, one step down: every
+  glyph reaches cap height, so caps read a size larger.
+- Two type exemptions: a PIXI `fontSize` is a number and cannot read a var, and the codicon rule in
+  `DataGrid.scss` sizes a glyph box, not text.
 - Data palettes stay literal: they show meaning, not chrome (`timeline/themes/Themes.ts`,
   `metric-strip/metric-strip-colors.ts`).
 - A component naming a token must carry the tokens: `globalStyles`, or `tokenStyles`

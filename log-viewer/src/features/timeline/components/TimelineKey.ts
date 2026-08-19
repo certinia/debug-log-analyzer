@@ -38,7 +38,7 @@ export class Timelinekey extends LitElement {
         display: inline-flex;
         align-items: center;
         gap: var(--lana-space-2xs);
-        font-size: var(--lana-text-md);
+        font-size: var(--lana-text-base);
         color: var(--lana-fg-muted);
         white-space: nowrap;
       }
@@ -50,9 +50,9 @@ export class Timelinekey extends LitElement {
         flex: 0 0 auto;
       }
 
-      /* The time is the data: mono like the header vitals, full foreground against the muted label. */
+      /* The time is the data: full foreground against the muted label, and figure
+         widths that line up chip to chip without leaving the UI font. */
       .chip__time {
-        font-family: var(--lana-font-mono);
         font-variant-numeric: tabular-nums;
         color: var(--lana-fg);
       }

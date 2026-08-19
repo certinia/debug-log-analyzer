@@ -72,7 +72,7 @@ export class OverflowList extends LitElement {
       :host {
         display: block;
         min-width: 0;
-        font-size: 11px;
+        font-size: var(--lana-text-base);
       }
 
       .bar {
@@ -110,7 +110,7 @@ export class OverflowList extends LitElement {
         background-color: var(--lana-control-bg);
         color: var(--lana-fg);
         font: inherit;
-        font-size: 11px;
+        font-size: var(--lana-text-base);
         line-height: 1;
         white-space: nowrap;
         cursor: pointer;
@@ -183,7 +183,7 @@ export class OverflowList extends LitElement {
       .panel__head {
         padding: 2px 10px 6px;
         font-weight: 600;
-        font-size: 12px;
+        font-size: var(--lana-text-base);
         color: var(--lana-fg);
       }
 

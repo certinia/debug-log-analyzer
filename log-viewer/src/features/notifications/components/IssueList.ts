@@ -94,7 +94,7 @@ export class IssueList extends LitElement {
 
       .issue__summary {
         font-weight: 600;
-        font-size: 12px;
+        font-size: var(--lana-text-base);
         flex: 1 1 auto;
         min-width: 0;
       }
@@ -102,15 +102,16 @@ export class IssueList extends LitElement {
       /* The meta line under the summary: kind pill, then the moment in the log. Its own
          row rather than a trailing decoration so the summary's clamp keeps the full width,
          and so fatal/thrown pairs with identical summaries stay distinguishable at a
-         glance. The 16px line-height sizes the pill's box too, so a pill-less row is the
-         same height. */
+         glance. The line-height sizes the pill's box too, so a pill-less row is the same
+         height. */
       .issue__meta {
         display: flex;
         align-items: center;
         flex-wrap: wrap;
         gap: var(--lana-space-xs);
-        font-size: 11px;
-        line-height: 16px;
+        font-size: var(--lana-text-sm);
+        /* A length, not a ratio: the pill's smaller text would compute a shorter box. */
+        line-height: calc(var(--lana-text-sm) * 1.45);
         color: var(--lana-fg-muted);
       }
 
@@ -118,7 +119,7 @@ export class IssueList extends LitElement {
          the pill says what kind, so the summary can stay the raw message. */
       .issue__label {
         flex: 0 0 auto;
-        font-size: 10px;
+        font-size: var(--lana-text-xs);
         font-weight: 600;
         padding: 0 var(--lana-space-xs);
         border-radius: var(--lana-radius-sm);

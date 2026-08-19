@@ -48,7 +48,6 @@ export class LogOverview extends LitElement {
       .note {
         padding: var(--lana-space-sm) 0 0;
         color: var(--lana-fg-muted);
-        font-size: var(--lana-text-sm);
       }
     `,
   ];

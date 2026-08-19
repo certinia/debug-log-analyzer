@@ -94,7 +94,6 @@ export const revealRowStyles = [
       text-overflow: ellipsis;
       white-space: nowrap;
       font-family: var(--lana-font-mono);
-      font-size: var(--lana-text-sm);
     }
 
     /* A column of its own, wide enough for the longest reading and never wrapped,
@@ -106,7 +105,6 @@ export const revealRowStyles = [
       text-align: right;
       color: var(--lana-fg-muted);
       font-family: var(--lana-font-mono);
-      font-size: var(--lana-text-sm);
       font-variant-numeric: tabular-nums;
     }
 
@@ -123,7 +121,6 @@ export const revealRowStyles = [
       white-space: nowrap;
       color: var(--lana-fg-muted);
       font-family: var(--lana-font-mono);
-      font-size: var(--lana-text-sm);
       font-variant-numeric: tabular-nums;
     }
 
