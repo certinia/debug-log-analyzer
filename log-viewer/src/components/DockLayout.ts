@@ -20,7 +20,7 @@ const COLLAPSE_OVERSHOOT = 60;
  * out during the same gesture restores it. Persistence and selection stay with
  * the consuming view — this component only reports intent via events:
  * `dock-resize` (px), `dock-collapse`, plus `dock-position-change`/`dock-hide`
- * bubbled from the dock.
+ * bubbled from the dock. The `actions-start` slot is forwarded to the dock.
  */
 @customElement('dock-layout')
 export class DockLayout extends LitElement {
@@ -135,7 +135,9 @@ export class DockLayout extends LitElement {
                   .collapsed=${this.collapsed}
                   .paneSizes=${this.paneSizes}
                   dock=${this.dock}
-                ></detail-dock>
+                >
+                  <slot name="actions-start" slot="actions-start"></slot>
+                </detail-dock>
               `
             : ''
         }

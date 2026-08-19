@@ -24,7 +24,7 @@ import type {
   ViewportState,
 } from '../types/flamechart.types.js';
 import { TIMELINE_CONSTANTS, TimelineError, TimelineErrorCode } from '../types/flamechart.types.js';
-import type { SearchCursor, SearchOptions } from '../types/search.types.js';
+import type { MatchedEventInfo, SearchCursor, SearchOptions } from '../types/search.types.js';
 import type { NavigationMaps } from '../utils/tree-converter.js';
 
 import { MeshMarkerRenderer } from './markers/MeshMarkerRenderer.js';
@@ -184,6 +184,11 @@ export class FlameChart<E extends EventNode = EventNode> {
   private cachedVisibleRects: Map<string, PrecomputedRect[]> | null = null;
   private cachedBuckets: Map<string, import('../types/flamechart.types.js').PixelBucket[]> | null =
     null;
+
+  // The frames the inspector points at: they keep their colour while the rest of
+  // the chart is dimmed. Empty means no emphasis, so the chart draws normally.
+  private emphasisIds = new Set<string>();
+  private emphasisInfo: MatchedEventInfo[] = [];
 
   /**
    * Initialize the flamechart renderer.
@@ -532,6 +537,48 @@ export class FlameChart<E extends EventNode = EventNode> {
    */
   public getViewport(): ViewportState | null {
     return this.viewport ? this.viewport.getState() : null;
+  }
+
+  /**
+   * Depth of the row under a container-relative screen Y.
+   */
+  public containerYToDepth(containerY: number): number {
+    return this.viewport ? this.viewport.screenYToDepth(containerY - this.mainTimelineYOffset) : 0;
+  }
+
+  /**
+   * Container-relative screen Y of the top of the main timeline area.
+   */
+  public getChartTopY(): number {
+    return this.mainTimelineYOffset;
+  }
+
+  /**
+   * Visible screen rectangle of a frame, in container-relative coordinates.
+   *
+   * @param timestamp - Frame start time in nanoseconds
+   * @param duration - Frame duration in nanoseconds (0 for markers)
+   * @param depth - Depth the frame draws at
+   */
+  public getFrameRect(
+    timestamp: number,
+    duration: number,
+    depth: number,
+  ): { x: number; y: number; width: number; height: number } | null {
+    if (!this.viewport) {
+      return null;
+    }
+
+    const { zoom, offsetX, displayWidth } = this.viewport.getState();
+    const startX = Math.max(0, timestamp * zoom - offsetX);
+    const endX = Math.min(displayWidth, (timestamp + duration) * zoom - offsetX);
+
+    return {
+      x: startX,
+      y: this.viewport.depthToScreenY(depth + 1) + this.mainTimelineYOffset,
+      width: Math.max(0, endX - startX),
+      height: TIMELINE_CONSTANTS.EVENT_HEIGHT,
+    };
   }
 
   /**
@@ -1931,6 +1978,40 @@ export class FlameChart<E extends EventNode = EventNode> {
   }
 
   /**
+   * Point the chart at these frames: they keep their colour and everything else
+   * is dimmed, as a search does. Nothing is selected and the viewport never
+   * moves. An empty array drops the emphasis.
+   *
+   * Takes many frames because one inspector row can stand for many occurrences.
+   *
+   * @param eventNodes - EventNodes carrying an original reference to find
+   */
+  public locateByEventNodes(eventNodes: readonly EventNode[]): void {
+    const rectMap = this.rectangleManager?.getRectMap();
+    const ids = new Set<string>();
+    const info: MatchedEventInfo[] = [];
+    for (const node of eventNodes) {
+      const rect = node.original ? rectMap?.get(node.original as LogEvent) : undefined;
+      if (!rect) {
+        continue;
+      }
+      ids.add(rect.id);
+      info.push({
+        timestamp: rect.timeStart,
+        duration: rect.duration,
+        depth: rect.depth,
+        category: rect.category,
+      });
+    }
+    if (ids.size === this.emphasisIds.size && [...ids].every((id) => this.emphasisIds.has(id))) {
+      return;
+    }
+    this.emphasisIds = ids;
+    this.emphasisInfo = info;
+    this.requestRender();
+  }
+
+  /**
    * Clear the current frame or marker selection (a no-op when nothing is
    * selected). The selection-change callbacks fire with null.
    */
@@ -2206,6 +2287,17 @@ export class FlameChart<E extends EventNode = EventNode> {
       // Search mode: render with desaturation
       this.searchOrchestrator!.renderStyledEvents(searchContext);
       this.searchOrchestrator!.renderStyledLabels(searchContext);
+      this.batchRenderer?.clear();
+    } else if (this.emphasisIds.size && this.searchOrchestrator) {
+      // The inspector points at frames: same two tiers, driven by those frames
+      // rather than by search matches. A search outranks it — the user asked for
+      // that, and only one dim can be on screen.
+      this.searchOrchestrator.renderDimmedExcept(
+        searchContext,
+        this.emphasisIds,
+        this.emphasisInfo,
+      );
+      this.searchOrchestrator.renderLabelsDimmedExcept(searchContext, this.emphasisIds);
       this.batchRenderer?.clear();
     } else {
       // Normal mode: render with original colors

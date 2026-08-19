@@ -1,7 +1,7 @@
 /*
  * Copyright (c) 2022 Certinia Inc. All rights reserved.
  */
-import type { Stack } from '../../database/services/Database.js';
+import type { Stack } from '../../../core/log/LogStore.js';
 import type { SOQLTree } from './SOQLParser.js';
 import { SOQLParser } from './SOQLParser.js';
 

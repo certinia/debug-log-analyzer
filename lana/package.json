@@ -284,19 +284,26 @@
               }
             }
           },
+          "lana.timeline.showTooltip": {
+            "title": "Show frame details on hover",
+            "type": "boolean",
+            "default": true,
+            "markdownDescription": "Show a details panel when you hover or select a frame on the Timeline. The Inspector shows the same details for the selected frame. Default: `true`",
+            "order": 2
+          },
           "lana.timeline.legacy": {
             "title": "Use legacy Timeline",
             "type": "boolean",
             "default": false,
             "markdownDescription": "Temporary fallback to the legacy Timeline; will be removed in a future release. Default: `false`",
-            "order": 2
+            "order": 3
           },
           "lana.timeline.colors": {
             "type": "object",
             "title": "Timeline Event Colors",
             "markdownDescription": "Hex colors for each event type on the **legacy** Timeline (`#lana.timeline.legacy#`), which is being phased out. The current Timeline is themed via `#lana.timeline.activeTheme#` / `#lana.timeline.customThemes#`.",
             "additionalProperties": false,
-            "order": 3,
+            "order": 4,
             "default": {
               "Code Unit": "#88AE58",
               "Workflow": "#51A16E",

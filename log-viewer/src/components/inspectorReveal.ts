@@ -21,3 +21,33 @@ export function dispatchInspectorReveal(source: HTMLElement, eventIndex: number)
     }),
   );
 }
+
+/** Name of the DOM event an inspector section raises for the row under the pointer. */
+export const INSPECTOR_LOCATE_EVENT = 'inspector-locate';
+
+export type InspectorLocateEvent = CustomEvent<{
+  eventIndexes: readonly number[];
+  sticky: boolean;
+}>;
+
+/**
+ * Mark `eventIndexes` in the tab on screen, and nothing more - no selection, no
+ * scroll. A grouped row names every occurrence it merges; an empty list drops the
+ * mark. Routed like {@link dispatchInspectorReveal}, and for the same reason.
+ *
+ * @param sticky - True when the row was picked, so the mark holds once the
+ *   pointer leaves; false for the pointer itself.
+ */
+export function dispatchInspectorLocate(
+  source: HTMLElement,
+  eventIndexes: readonly number[],
+  sticky = false,
+): void {
+  source.dispatchEvent(
+    new CustomEvent(INSPECTOR_LOCATE_EVENT, {
+      detail: { eventIndexes, sticky },
+      bubbles: true,
+      composed: true,
+    }),
+  );
+}

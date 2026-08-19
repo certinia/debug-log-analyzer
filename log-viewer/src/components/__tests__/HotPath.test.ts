@@ -21,7 +21,9 @@ const framesFor = (count: number) =>
     text: `Frame${index}`,
     eventIndex: index,
     totalTime: 1_000 - index,
+    selfTime: (1_000 - index) / 2,
     count: 1,
+    category: 'Apex' as const,
   }));
 
 const pathOf = (frameCount: number): ExecutionHighlights => ({
@@ -57,6 +59,21 @@ describe('hot-path', () => {
     const focused = element.shadowRoot?.querySelectorAll('.reveal-row--focus');
     expect(focused).toHaveLength(1);
     expect(focused?.[0]?.textContent).toContain('Frame2');
+  });
+
+  it('colours each row by category and splits the meter at its self time', async () => {
+    highlights = pathOf(1);
+
+    const element = await hotPath();
+
+    const row = element.shadowRoot?.querySelector<HTMLElement>('.reveal-row');
+    expect(row?.style.getPropertyValue('--row-hue')).not.toBe('');
+    // Half the frame's total time is its own, so the solid head is half the bar.
+    expect(row?.style.getPropertyValue('--self-pct')).toBe('50%');
+    expect(row?.querySelector('.reveal-row__swatch')?.getAttribute('title')).toBe('Apex');
+    // The hue is decorative, so the category is named in text a reader can hear.
+    expect(row?.querySelector('.reveal-row__swatch')?.getAttribute('aria-hidden')).toBe('true');
+    expect(row?.querySelector('.reveal-row__sr')?.textContent).toBe('Apex');
   });
 
   it('keeps the terminus and collapses the middle of a longer path', async () => {

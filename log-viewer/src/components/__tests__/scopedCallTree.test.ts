@@ -40,25 +40,24 @@ soql.parent = m2;
 const byId = new Map<number, FakeEvent>([exec, m1, m2, soql].map((e) => [e.eventIndex, e]));
 
 let selectedIndex = 4;
-jest.mock('../../features/database/services/Database.js', () => ({
-  DatabaseAccess: {
-    instance: () => ({
-      getApexLog: () => root,
-      getEventByIndex: (i: number) => byId.get(i) ?? null,
-    }),
-  },
+jest.mock('../../core/log/LogStore.js', () => ({
+  currentLogStore: () => ({
+    log: root,
+    eventByIndex: (i: number) => byId.get(i) ?? null,
+  }),
 }));
 
 import {
   buildScopedCallTree,
   buildWholeLogCallTree,
-  type ScopedBuildOptions,
+  rowIdsByEvent,
   type ScopedRow,
 } from '../scopedCallTree.js';
+import type { FrameBudgetOptions } from '../../core/utility/FrameBudget.js';
 
 /** These fixtures are small enough to never hit a slice deadline, so `yieldFrame`
  *  is only there to satisfy the contract. */
-const options: ScopedBuildOptions = { yieldFrame: () => Promise.resolve() };
+const options: FrameBudgetOptions = { yieldFrame: () => Promise.resolve() };
 
 function build(eventIndex: number, instances?: number[]) {
   return buildScopedCallTree(eventIndex, instances ?? null, options);
@@ -212,16 +211,37 @@ describe('buildScopedCallTree', () => {
     expect(bottomUp?.duration.self).toBe(OCCURRENCES);
   });
 
+  it('a merged row names every occurrence behind it, so all of them can be marked', async () => {
+    const instances = loopOccurrences(3);
+    const tree = (await build(instances[0]!, instances))!;
+
+    const [aggregated] = (await tree.aggregated(options))!;
+    // The instances share one ancestor, so its group names that one frame; the
+    // group beneath it merges all three occurrences.
+    expect(aggregated?.eventIndexes).toEqual([300]);
+    expect(aggregated?._children?.[0]?.eventIndexes).toEqual(instances);
+
+    const [bottomUp] = (await tree.bottomUp(options))!;
+    expect(bottomUp?.eventIndexes).toEqual(instances);
+    // The caller stands for its own one frame, met once per occurrence beneath it.
+    expect(bottomUp?._children?.[0]?.eventIndexes).toEqual([300]);
+  });
+
+  it('a single-frame row carries no list — its one occurrence is the row itself', async () => {
+    const tree = (await build(4))!;
+    const [selected] = (await tree.timeOrder(options))!;
+    expect(selected?.eventIndexes).toBeNull();
+  });
+
   it('counts every occurrence even when the walk is sliced across frames', async () => {
     const OCCURRENCES = 500;
     const instances = loopOccurrences(OCCURRENCES);
     let yields = 0;
-    const sliced: ScopedBuildOptions = {
+    const sliced: FrameBudgetOptions = {
       yieldFrame: () => {
         yields += 1;
         return Promise.resolve();
       },
-      cancelled: () => false,
     };
 
     // Every clock read lands past the slice deadline, so each check yields —
@@ -249,7 +269,7 @@ describe('buildScopedCallTree', () => {
       // The first yield is the first chance to notice; nothing is returned after it.
       const tree = await buildScopedCallTree(instances[0]!, instances, {
         yieldFrame: () => Promise.resolve(),
-        cancelled: () => true,
+        signal: AbortSignal.abort(),
       });
       expect(tree).toBeNull();
     } finally {
@@ -309,11 +329,47 @@ describe('buildWholeLogCallTree', () => {
     try {
       const tree = await buildWholeLogCallTree({
         yieldFrame: () => Promise.resolve(),
-        cancelled: () => true,
+        signal: AbortSignal.abort(),
       });
       expect(tree).toBeNull();
     } finally {
       clock.mockRestore();
     }
+  });
+});
+
+describe('rowIdsByEvent', () => {
+  it('finds the merged rows a frame is named by, at every depth', async () => {
+    const instances = loopOccurrences(3);
+    const tree = (await build(instances[0]!, instances))!;
+    const rows = (await tree.aggregated(options))!;
+
+    const byEvent = rowIdsByEvent(rows);
+    const groupId = rows[0]!.id;
+    const occurrenceId = rows[0]!._children![0]!.id;
+
+    // The caller's own frame names the group above; each occurrence names the
+    // group that merges all three.
+    expect(byEvent.get(300)).toEqual([groupId]);
+    for (const eventIndex of instances) {
+      expect(byEvent.get(eventIndex)).toEqual([occurrenceId]);
+    }
+  });
+
+  it('names one frame in as many rows as stand for it', async () => {
+    const instances = loopOccurrences(2);
+    const tree = (await build(instances[0]!, instances))!;
+    const rows = (await tree.bottomUp(options))!;
+
+    // Bottom-Up puts the caller under the leaf it called, so frame 300 is named
+    // by that nested row as well as by any row of its own.
+    const callerRows = rowIdsByEvent(rows).get(300) ?? [];
+    expect(callerRows).toEqual(expect.arrayContaining([rows[0]!._children![0]!.id]));
+  });
+
+  it('leaves a frame no row names out of the lookup', async () => {
+    const tree = (await build(4))!;
+
+    expect(rowIdsByEvent((await tree.timeOrder(options))!).get(999)).toBeUndefined();
   });
 });

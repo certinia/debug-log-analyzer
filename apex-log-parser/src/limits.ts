@@ -27,6 +27,14 @@ export interface LimitObservation {
 }
 
 /**
+ * A running-total observation, e.g. "1 SOQL queries, total 1 out of 100". `delta` is the leading
+ * incremental count: how much the reporting event itself used since the last report.
+ */
+export interface RunningTotalObservation extends LimitObservation {
+  delta: number;
+}
+
+/**
  * Every known governor-limit label → metric key. Covers the cumulative block ("Number of …" /
  * "Maximum …"), the flow colon reports, and the flow running-total reports ("ms CPU time").
  * Labels not present here are not tracked governor limits (e.g. FIELDS_DESCRIBES).
@@ -76,6 +84,9 @@ const LIMIT_USAGE_CODES = new Map<string, LimitMetricKey>([
 /** Matches "<used> out of <limit>" or "<used>/<limit>". */
 const USED_OF_RE = /(\d+)\s*(?:out of|\/)\s*(\d+)/;
 
+/** Matches the "<count> <label>" head of a running-total line, e.g. "1 SOQL queries". */
+const COUNT_LABEL_RE = /^(\d+)\s+(.+)$/;
+
 function toInt(value: string): number {
   return parseInt(value, 10);
 }
@@ -102,18 +113,18 @@ export function parseLabelledLimit(body: string): LimitObservation | null {
 
 /**
  * Parse a running-total limit line, e.g. "1 SOQL queries, total 1 out of 100". Uses the reported
- * running total as `used`. Returns null for untracked labels.
+ * running total as `used` and the leading count as `delta`. Returns null for untracked labels.
  */
-export function parseTotalLimit(body: string): LimitObservation | null {
+export function parseTotalLimit(body: string): RunningTotalObservation | null {
   const comma = body.indexOf(',');
   if (comma === -1) {
     return null;
   }
-  const label = body
-    .slice(0, comma)
-    .replace(/^\d+\s+/, '')
-    .trim();
-  return used(LIMIT_LABELS.get(label), body.slice(comma + 1));
+  // A head with no leading count still reports a usable total, so keep it with a zero delta.
+  const head = body.slice(0, comma).trim();
+  const counted = COUNT_LABEL_RE.exec(head);
+  const observation = used(LIMIT_LABELS.get(counted ? counted[2]! : head), body.slice(comma + 1));
+  return observation ? { ...observation, delta: counted ? toInt(counted[1]!) : 0 } : null;
 }
 
 /**

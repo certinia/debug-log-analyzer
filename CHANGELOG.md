@@ -15,19 +15,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - **Peak** – highest live heap reached on the path; the number comparable to the heap governor limit.
   - Shown together in the **Memory** view (total + self); peak also appears in the **Governor Limits** view and feeds the Gov Avg/Peak columns. Method tooltips show net heap retained.
   - The Timeline governor strip plots heap as it's allocated, so you can see where it spikes.
-- 🧭 **Inspector**: select anything — a timeline frame, a call tree or analysis row, a SOQL/DML/SOSL statement and inspect it without leaving the tab you're on. ([#113])
-  - **Details**: type, timing, and every governor metric the selection consumed as `used / limit`.
-  - **Call stack**: the frames that led to the selection, with total and self time.
-  - **Call tree**: the selected frame's own subtree, switchable between **Time Order**, **Aggregated** and **Bottom-Up**. Times are relative to the selection, and zero-duration rows (heap allocations, statements, variable assignments) are left out — read those on the Call Tree tab.
-  - Click a row and the matching frame or row is highlighted in the tab you're on, without switching tab: the Timeline selects the frame and centers it when it's off screen, the Call Tree scrolls to it in **Time Order**, and the Database tab selects the statement.
-  - Dock it left, right or bottom, drag to resize, and collapse the sections you don't need — the layout is remembered.
-  - Right-click a row for **Show in Call Tree**, **Copy Name**, **Copy Details** or **Copy Call Stack**; `Cmd/Ctrl+C` copies the table.
-  - Press `Escape` to clear the selection on the tab you're on; the Inspector returns to its whole-log view. ([#63])
-  - **Log overview**: with nothing selected, the Inspector shows the whole log instead of sitting empty — the six governor metrics closest to their limit, each as `used / limit`, the same whole-transaction totals as the Timeline's metric strip. Without `CUMULATIVE_LIMIT_USAGE` events the figures are estimated from logged events, and a note says so.
-  - With nothing selected the **Timeline** tab also charts the whole log: **Time by category** (self time as one stacked bar in the flame chart's own colours, with a legend), **Governor usage over time** (small area charts of the metrics nearest their limits — hover for the value at any point), and the full **Call tree** in the same three views.
-  - With nothing selected the **Analysis** tab lists **Findings** — log-wide diagnostics built from what the log already holds: truncation, governor breaches, exceptions, query-plan verdicts, SOQL optimization tips grouped with a count, statements repeated from one line (the usual sign of a query or DML in a loop), debug-statement cost and the methods with the most self time. Click a finding to reveal the row behind it in the Analysis grid.
-  - With nothing selected the **Call Tree** tab shows the **Hot path** — the chain of calls the log spent most of its time in, with repeated calls counted as one frame (`200×`) — and the **Hot spots** — the five signatures with the most self time. Each row carries a meter showing its share of the log, and every row is a link: click it to reveal that call in the tree. A truncated log adds a warning that timings below the cut under-report.
-
+- 🧭 **Inspector**: select anything — a timeline frame, a call tree or analysis row, a SOQL/DML/SOSL statement — and inspect it without leaving the tab you're on. ([#113])
+  - **A selection** shows its details and governor metrics as `used / limit`, the call stack that led to it, and its own subtree in **Time Order**, **Aggregated** or **Bottom-Up**. Click a frame in the call stack to walk up it — the details and subtree follow, and the stack stays anchored to what you selected. On the Timeline it also splits the self time under the selection by the namespace whose code ran it.
+  - **Nothing selected** shows the whole log instead of an empty panel: a governor overview on every tab, time by category, self time by namespace and governor trends on the Timeline, log-wide findings on Analysis, the hot path and hot spots on the Call Tree, and, on Database, which namespaces asked for and burned the database time, every call path that ends in a query, DML or search with total and self time, and how few statements hold the time. ([#373])
+  - Every row is a link: click it to reveal the frame, row or statement behind it in the tab you're on. Hover works both ways without moving the view — hover a row to pick out what it names in the tab you're on, or hover there to mark the rows that name it, and what you click stays picked out until `Escape`. Right-click for copy actions.
+  - **Findings** list the statements behind them, most repeated first with how often each ran, and report one query built per record and run a row at a time. The severities head the list and filter it, any number at once, a finding the log times shows how long it took and what that is of the log, and selecting an Analysis row narrows the list to the findings that name that method or anything it called.
+  - **Detail | Summary** switches between what you picked and the tab's summary of the whole log, keeping the selection to come back to.
+  - Dock it left, right or bottom, drag to resize any section — double-click a divider to restore the defaults — and collapse the sections you don't need; the layout is remembered. `Escape` clears the selection and returns the whole-log view. ([#63])
 - 🗄️ **Database Analysis**: governor-limit visibility and SOSL usage. ([#162])
   - 📏 **Governor-limit overview**: SOQL, SOSL, DML and query/DML rows shown as `used / limit`, colored as they approach the limit.
   - 🧮 **Found vs Counted**: each section reconciles statements found in the log against the governor-counted total, flagging queries that didn't consume the limit (e.g. custom metadata, which is free unless it selects a long text area field or runs in a Flow).
@@ -45,10 +39,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 
 - ⬆️ **Requires VS Code 1.102 or newer**.
+- 📏 **Governor figures**: every whole-log readout — the overview gauges, the governor trends, the Database overview and the Analysis findings — reports a metric at its peak, the level the governor charges the transaction at. The Timeline governor strip still plots the log as recorded.
 - 📊 **Timeline**
   - **Governor limits strip**: tooltip rows keep a stable order and always show the `used / limit` value, so figures no longer jump around as you move the pointer. ([#827])
   - **Timeline zooming**: consistent, smooth zoom across platforms and input devices — a Windows mouse wheel no longer over-zooms in large jumps, fast scrolls stay bounded, and zooming in then back out returns to the same level.
   - **Truncation markers** now end where the log recovers, so trusted sections are no longer flagged. ([#828])
+  - **Frame details**: the hover panel now sits against the frame — above it, or below it when there is no room — and slides along the frame with the pointer. It fades in after a short pause and keeps one size, which grows with the window. A SOQL query is fitted to that size clause by clause, so the `WHERE` is always visible however long the field list is, and each clause says what it left out — `+35 fields`, `… +6 conditions`, `IN (… 200 ids)`. A footer row points to the inspector for the rest. The panel never takes the pointer, so you can hover and click the frames underneath it. Turn it off from the toolbar button or with `lana.timeline.showTooltip`.
   - **Legend**: moved from below the chart to the toolbar above it, restyled as colour-dot chips, and each chip now shows the log's self time in that category. Event tooltips name the category next to its colour swatch.
 - 🏷️ **Call Tree names**: rows no longer carry a raw `EVENT_TYPE:` prefix in front of text that already identifies them, so `WF_CRITERIA_BEGIN: WF_CRITERIA : ON_ALL_CHANGES` reads as `WF_CRITERIA : ON_ALL_CHANGES`. Frames whose text can't stand alone keep the type, and the ones that needed naming now say what they are — `(code unit)`, `(constructor)`, `(managed package)`, `(flow)`. A **Type** column is available in every view from the **Columns** menu if you want the raw types back.
 - 🗂️ **Call Tree + Database styling**: VS Code style tree icons, and rows indent under their group headings. ([#832]).
@@ -72,6 +68,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - 🧭 **Inspector call stack**: cumulative limit and profiling frames appeared in the stack, so the path to a selection read wrong; the stack now excludes them, like the call tree already did.
 - 🐛 **Go to Code**: Match methods with namespace/`System`-qualified parameter types. ([#834])
 - 📐 **Timeline height**: the Flame Chart stopped short of the bottom of its panel, leaving a strip of empty space; it now fills the panel and follows the Inspector as you resize or re-dock it.
+- 🗄️ **Flow database usage**: SOQL and DML run by a Flow or Process Builder element went uncounted, because the log never reports it as a statement; the element's own usage is now counted and rolls up like any other. Needs `WORKFLOW` at `FINER` or above. ([#871])
 
 ## [1.20.1] 2026-07-23
 
@@ -562,12 +559,14 @@ Skipped due to adopting odd numbering for pre releases and even number for relea
 <!-- Unreleased -->
 
 [#873]: https://github.com/certinia/debug-log-analyzer/issues/873
+[#871]: https://github.com/certinia/debug-log-analyzer/issues/871
 [#834]: https://github.com/certinia/debug-log-analyzer/issues/834
 [#576]: https://github.com/certinia/debug-log-analyzer/issues/576
 [#832]: https://github.com/certinia/debug-log-analyzer/issues/832
 [#848]: https://github.com/certinia/debug-log-analyzer/issues/848
 [#828]: https://github.com/certinia/debug-log-analyzer/issues/828
 [#827]: https://github.com/certinia/debug-log-analyzer/issues/827
+[#373]: https://github.com/certinia/debug-log-analyzer/issues/373
 [#298]: https://github.com/certinia/debug-log-analyzer/issues/298
 [#162]: https://github.com/certinia/debug-log-analyzer/issues/162
 [#113]: https://github.com/certinia/debug-log-analyzer/issues/113

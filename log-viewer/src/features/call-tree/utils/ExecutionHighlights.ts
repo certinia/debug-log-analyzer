@@ -1,9 +1,9 @@
 /*
  * Copyright (c) 2026 Certinia Inc. All rights reserved.
  */
-import type { ApexLog, LogEvent } from 'apex-log-parser';
+import type { ApexLog, LogCategory, LogEvent } from 'apex-log-parser';
 
-import { DatabaseAccess } from '../../database/services/Database.js';
+import { currentLogStore } from '../../../core/log/LogStore.js';
 import { getEventKey } from './Aggregation.js';
 
 /** One frame on the hot path, entry point first. */
@@ -13,8 +13,13 @@ export interface HotPathFrame {
   eventIndex: number;
   /** Total time summed across every merged sibling; its share of the log is `totalTime / totalTime(log)`. */
   totalTime: number;
+  /** Self time summed across the same instances — the part of `totalTime` this
+   *  frame spent itself, so `0 <= selfTime <= totalTime` always holds. */
+  selfTime: number;
   /** How many sibling instances the frame merges. */
   count: number;
+  /** The largest instance's category, so the row takes the flame chart's own colour. */
+  category: LogCategory;
 }
 
 /** One signature in the top-self-time list. */
@@ -24,8 +29,14 @@ export interface HotSpotRow {
   eventIndex: number;
   /** Self time summed across every instance of the signature. */
   selfTime: number;
+  /** Total time summed across the outermost instances, so recursion counts its
+   *  wall time once; never below `selfTime`, which untimed outer calls would
+   *  otherwise leave it. */
+  totalTime: number;
   /** How many instances the signature has, timed or not, so `selfTime / count` is the honest average. */
   count: number;
+  /** The worst instance's category, so the row takes the flame chart's own colour. */
+  category: LogCategory;
 }
 
 /** Where the log runs hottest, plus the caveat that would poison those figures. */
@@ -87,7 +98,11 @@ function computeHotPath(roots: LogEvent[]): HotPathFrame[] {
       text: worst.text,
       eventIndex: worst.eventIndex,
       totalTime: current.total,
+      // An instance reporting a negative self can drag the group's sum outside
+      // its total; the frame's own share of itself cannot sit outside it.
+      selfTime: Math.min(Math.max(current.self, 0), current.total),
       count: current.instances.length,
+      category: worst.category,
     });
     const next = largestGroup(childrenOf(current.instances));
     if (!next || next.total < HOT_PATH_FOLLOW_SHARE * current.total || current.self > next.total) {
@@ -147,12 +162,16 @@ function largestInstance(instances: LogEvent[]): LogEvent {
  * Aggregate self time by signature and count truncated regions in one flat
  * pass. Every instance counts, including the untimed ones, so the count divides
  * the self time honestly; signatures with no self time at all drop out at the
- * end. Truncation flags every unclosed frame in a cut-off chain, so only
- * top-most flagged events count as regions; `eventsById` is in time order, so
- * the first one seen is the first in the log.
+ * end. Total time counts the outermost instances only: recursion nests the same
+ * wall time inside itself, and `events` is in time order, so an instance that
+ * starts before the last counted one of its signature ended is inside it. The
+ * call-stack route `Aggregation.ts` and `RowGrouper.ts` take with a `Multiset`
+ * is not open to a flat pass, which never sees a frame close.
+ * Truncation flags every unclosed frame in a cut-off chain, so only top-most
+ * flagged events count as regions; the first one seen is the first in the log.
  */
 function scanEvents(events: LogEvent[]): Pick<ExecutionHighlights, 'hotSpots' | 'truncation'> {
-  const spots = new Map<string, HotSpotRow & { maxSelf: number }>();
+  const spots = new Map<string, { row: HotSpotRow; maxSelf: number; countedUntil: number }>();
   let regionCount = 0;
   let firstEventIndex = -1;
 
@@ -165,31 +184,48 @@ function scanEvents(events: LogEvent[]): Pick<ExecutionHighlights, 'hotSpots' | 
     }
     const self = event.duration.self;
     const timed = Math.max(self, 0);
+    const total = Math.max(event.duration.total, 0);
+    const end = event.exitStamp ?? event.timestamp;
     const key = getEventKey(event);
     const spot = spots.get(key);
     if (!spot) {
       spots.set(key, {
-        text: event.text,
-        eventIndex: event.eventIndex,
-        selfTime: timed,
-        count: 1,
+        row: {
+          text: event.text,
+          eventIndex: event.eventIndex,
+          selfTime: timed,
+          totalTime: total,
+          count: 1,
+          category: event.category,
+        },
         maxSelf: self,
+        countedUntil: end,
       });
     } else {
-      spot.selfTime += timed;
-      spot.count++;
+      spot.row.selfTime += timed;
+      if (event.timestamp >= spot.countedUntil) {
+        spot.row.totalTime += total;
+        spot.countedUntil = end;
+      }
+      spot.row.count++;
       if (self > spot.maxSelf) {
         spot.maxSelf = self;
-        spot.eventIndex = event.eventIndex;
+        spot.row.eventIndex = event.eventIndex;
+        spot.row.category = event.category;
       }
     }
   }
 
   const hotSpots = [...spots.values()]
-    .filter((spot) => spot.selfTime > 0)
+    .filter(({ row }) => row.selfTime > 0)
+    .map(({ row }) => row)
     .sort((a, b) => b.selfTime - a.selfTime)
-    .slice(0, HOT_SPOT_COUNT)
-    .map(({ text, eventIndex, selfTime, count }) => ({ text, eventIndex, selfTime, count }));
+    .slice(0, HOT_SPOT_COUNT);
+  for (const row of hotSpots) {
+    // Nothing timed the outermost instances of a signature whose nested ones
+    // were timed; the row still holds self time, so the total answers for both.
+    row.totalTime = Math.max(row.totalTime, row.selfTime);
+  }
 
   return {
     hotSpots,
@@ -212,6 +248,6 @@ export function getExecutionHighlights(apexLog: ApexLog): ExecutionHighlights {
 
 /** The highlights for the log on screen, or null before the first parse. */
 export function getCurrentExecutionHighlights(): ExecutionHighlights | null {
-  const apexLog = DatabaseAccess.instance()?.getApexLog();
+  const apexLog = currentLogStore()?.log;
   return apexLog ? getExecutionHighlights(apexLog) : null;
 }

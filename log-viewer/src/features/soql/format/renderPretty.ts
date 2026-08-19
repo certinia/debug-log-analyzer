@@ -1,36 +1,11 @@
 /*
  * Copyright (c) 2026 Certinia Inc. All rights reserved.
  */
-import { CLASS_BY_KIND, escapeHtml } from './renderInline.js';
+import { CLAUSE_KEYWORDS as MAJOR_CLAUSE, COND_JOIN, INDENT, isPunct } from './clauses.js';
 import type { Token } from './tokenize.js';
-
-const MAJOR_CLAUSE = new Set<string>([
-  'SELECT',
-  'FROM',
-  'WHERE',
-  'WITH',
-  'GROUP',
-  'HAVING',
-  'ORDER',
-  'LIMIT',
-  'OFFSET',
-  'FOR',
-  'FIND',
-  'RETURNING',
-  'USING',
-  'TYPEOF',
-]);
-
-const COND_JOIN = new Set<string>(['AND', 'OR']);
-
-const INDENT = '  ';
 
 function isKeyword(t: Token | undefined, name: string): boolean {
   return !!t && (t.kind === 'keyword' || t.kind === 'function') && t.text.toUpperCase() === name;
-}
-
-function isPunct(t: Token | undefined, ch: string): boolean {
-  return !!t && t.kind === 'punct' && t.text === ch;
 }
 
 /**
@@ -141,21 +116,8 @@ export function prettyChunks(tokens: Token[]): (Token | string)[] {
   return out;
 }
 
-export function renderPretty(tokens: Token[]): string {
-  let out = '';
-  for (const c of prettyChunks(tokens)) {
-    if (typeof c === 'string') {
-      out += c;
-      continue;
-    }
-    const cls = CLASS_BY_KIND[c.kind];
-    const escaped = escapeHtml(c.text);
-    out += cls ? `<span class="${cls}">${escaped}</span>` : escaped;
-  }
-  return out;
-}
-
-function needsSpaceBefore(prev: Token | undefined, cur: Token): boolean {
+/** True when a space belongs between two adjacent tokens on one line. */
+export function needsSpaceBefore(prev: Token | undefined, cur: Token): boolean {
   if (!prev) {
     return false;
   }

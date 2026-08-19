@@ -79,6 +79,11 @@
 
   /* Floating surfaces — tooltips and popovers, matching VS Code's widget chrome. */
   --lana-popover-bg: var(--vscode-editorWidget-background, #252526);
+  /* Divider inside a hover panel — the colour VS Code rules its own hover status bar with. */
+  --lana-hover-border: var(
+    --vscode-editorHoverWidget-border,
+    var(--vscode-editorWidget-border, rgba(128, 128, 128, 0.35))
+  );
 
   --lana-shadow-popover: 0 4px 16px var(--vscode-widget-shadow, rgba(0, 0, 0, 0.36));
   --lana-shadow-overlay: 0 8px 24px var(--vscode-widget-shadow, rgba(0, 0, 0, 0.5));
@@ -101,13 +106,14 @@
     var(--vscode-editorInfo-foreground, #3794ff)
   );
 
+  /* Nothing wrong — the colour VS Code marks a passing test with. */
+  --lana-severity-ok: var(--vscode-testing-iconPassed, var(--vscode-charts-green, #73c991));
+
   /* Row hover, for lists whose rows can be opened or picked. */
   --lana-row-hover-bg: var(--vscode-list-hoverBackground, rgba(128, 128, 128, 0.12));
 
-  /* Row meters — thin magnitude strips under list rows. Monochrome foreground
-     tints, so length is the only encoding and colour stays reserved for
-     governor tiers and severity. */
-  --lana-meter-track: color-mix(in srgb, var(--vscode-foreground, #cccccc) 10%, transparent);
+  /* Row meters — thin magnitude strips under list rows. A foreground tint, for
+     rows with no data hue of their own; length is always the magnitude. */
   --lana-meter-fill: color-mix(in srgb, var(--vscode-foreground, #cccccc) 55%, transparent);
 
   /* Warning callout — a tinted fill behind an actionable data-quality caveat. */
@@ -134,4 +140,8 @@
 
   /* Shared height for the inspector dock's action bar and pane section headers. */
   --lana-panel-header-height: var(--lana-space-xl);
+
+  /* Least a pane section shows before the stack scrolls instead: its header and a
+     few rows of body, so no section is squeezed down to its title by its siblings. */
+  --lana-pane-min: calc(var(--lana-panel-header-height) * 4);
 }

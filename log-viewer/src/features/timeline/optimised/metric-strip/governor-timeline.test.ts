@@ -33,7 +33,22 @@ const absolute = (
   metric: string,
   used: number,
   namespace = 'default',
-): LimitObservation => ({ kind: 'absolute', timestamp, namespace, metric, used });
+): LimitObservation => ({
+  kind: 'absolute',
+  timestamp,
+  namespace,
+  metric,
+  used,
+  scope: 'cumulative',
+});
+
+/** A point-in-time LIMIT_USAGE-style report: scoped to its block, so never authoritative. */
+const scoped = (
+  timestamp: number,
+  metric: string,
+  used: number,
+  namespace = 'default',
+): LimitObservation => ({ kind: 'absolute', timestamp, namespace, metric, used, scope: 'scoped' });
 
 const build = (observations: LimitObservation[]) =>
   buildGovernorTimeSeries(observations, METRICS, LIMITS);
@@ -73,14 +88,38 @@ describe('buildGovernorTimeSeries', () => {
     expect(corrected?.tracked).toBe(1);
   });
 
-  it('keeps a monotonic line from dipping when an absolute comes in low (max floor)', () => {
+  it('follows the reported figure down when we counted more than the governor charged', () => {
     const series = build([
       absolute(0, 'soqlQueries', 0),
       delta(10, 'soqlQueries', 5),
       absolute(20, 'soqlQueries', 2),
     ]);
-    expect(series.events[2]?.values.get('soqlQueries')?.used).toBe(5);
+    // The report is what the governor charged, so it wins over our count.
+    expect(series.events[2]?.values.get('soqlQueries')?.used).toBe(2);
     expect(series.events[2]?.values.get('soqlQueries')?.tracked).toBeUndefined();
+  });
+
+  it('never counts past the highest figure the log reported', () => {
+    const series = build([
+      absolute(0, 'soqlQueries', 3),
+      delta(10, 'soqlQueries', 1),
+      delta(20, 'soqlQueries', 1),
+    ]);
+    expect(series.events.map((e) => e.values.get('soqlQueries')?.used)).toEqual([3, 3, 3]);
+  });
+
+  it('keeps counting past a scoped report, which measures one block only', () => {
+    const series = build([
+      scoped(0, 'soqlQueries', 0),
+      delta(10, 'soqlQueries', 1),
+      delta(20, 'soqlQueries', 1),
+    ]);
+    expect(series.events.map((e) => e.values.get('soqlQueries')?.used)).toEqual([0, 1, 2]);
+  });
+
+  it('never lets a scoped report pull a counted line down', () => {
+    const series = build([delta(10, 'soqlQueries', 5), scoped(20, 'soqlQueries', 2)]);
+    expect(series.events[1]?.values.get('soqlQueries')?.used).toBe(5);
   });
 
   it('continues accumulating deltas after a corrective baseline', () => {
@@ -89,6 +128,7 @@ describe('buildGovernorTimeSeries', () => {
       delta(10, 'soqlQueries', 1),
       absolute(20, 'soqlQueries', 3),
       delta(30, 'soqlQueries', 1),
+      absolute(40, 'soqlQueries', 5),
     ]);
     expect(series.events[3]?.values.get('soqlQueries')?.used).toBe(4);
   });
@@ -146,10 +186,11 @@ describe('buildGovernorTimeSeries — heap reconciliation', () => {
       delta(10, 'heapSize', 50000),
       absolute(20, 'heapSize', 200000), // peak > tracked 50000: snaps up, then +30000
       delta(30, 'heapSize', 30000),
+      absolute(40, 'heapSize', 240000), // a later peak, so the +30000 has room to show
     ];
-    expect(heapUsed(obs)).toEqual([50000, 200000, 230000]);
+    expect(heapUsed(obs)).toEqual([50000, 200000, 230000, 240000]);
     // Our lower observed count is surfaced (grey) once cumulative-anchored.
-    expect(heapTracked(obs)).toEqual([undefined, 50000, 80000]);
+    expect(heapTracked(obs)).toEqual([undefined, 50000, 80000, 80000]);
   });
 
   it('steps to the cumulative with no divergence when there are no HEAP_ALLOCATE events (FINE log)', () => {

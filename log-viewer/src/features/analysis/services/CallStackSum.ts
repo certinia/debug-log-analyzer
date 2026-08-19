@@ -3,6 +3,7 @@
  */
 
 import type { LogEvent } from 'apex-log-parser';
+import { outermostEvents } from '../../../core/utility/EventTree.js';
 import type { Metric } from '../../analysis/services/RowGrouper.js';
 
 /**
@@ -17,32 +18,14 @@ export function sumTotalForRootEvents(
   eventGroups: Iterable<LogEvent[]>,
   valueOf: (node: LogEvent) => number,
 ): number {
-  const allNodes = new Set<LogEvent>();
+  return outermostEvents(flatten(eventGroups)).reduce((total, node) => total + valueOf(node), 0);
+}
+
+/** The groups as one stream, so nothing is copied into an array on the way. */
+function* flatten(eventGroups: Iterable<LogEvent[]>): Iterable<LogEvent> {
   for (const group of eventGroups) {
-    for (const node of group) {
-      allNodes.add(node);
-    }
+    yield* group;
   }
-
-  let total = 0;
-  for (const node of allNodes) {
-    let parent = node.parent;
-    let hasAncestor = false;
-
-    while (parent) {
-      if (allNodes.has(parent)) {
-        hasAncestor = true;
-        break;
-      }
-      parent = parent.parent;
-    }
-
-    if (!hasAncestor) {
-      total += valueOf(node);
-    }
-  }
-
-  return total;
 }
 
 /** {@link sumTotalForRootEvents} specialised to `duration.total` (the original behaviour). */

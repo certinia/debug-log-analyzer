@@ -7,15 +7,17 @@ import {
   type LogEvent,
   type SelfTotal,
 } from 'apex-log-parser';
+import { consume } from '@lit/context';
 import { LitElement, css, html, type TemplateResult } from 'lit';
 import { customElement, property } from 'lit/decorators.js';
 import { ifDefined } from 'lit/directives/if-defined.js';
 
+import { logContext } from '../core/log/logContext.js';
+import type { LogStore } from '../core/log/LogStore.js';
 import { DEFAULT_NAMESPACE, getCallerNamespace } from '../core/utility/CallerNamespace.js';
 import { formatMs } from '../core/utility/Duration.js';
 import { formatInteger } from '../core/utility/Util.js';
 import { SOSL_ROWS_PER_QUERY_LIMIT } from '../features/database/limits.js';
-import { DatabaseAccess } from '../features/database/services/Database.js';
 import { globalStyles } from '../styles/global.styles.js';
 
 // web components
@@ -87,6 +89,11 @@ export class EventVitals extends LitElement {
   @property({ type: String })
   type?: 'dml' | 'soql' | 'sosl';
 
+  /** The log on screen, from the app root. */
+  @consume({ context: logContext, subscribe: true })
+  @property({ attribute: false })
+  logStore: LogStore | null = null;
+
   static styles = [
     globalStyles,
     css`
@@ -155,13 +162,13 @@ export class EventVitals extends LitElement {
   ];
 
   render() {
-    const db = DatabaseAccess.instance();
-    if (!db) {
+    const store = this.logStore;
+    if (!store) {
       return html`<div class="empty">No details available.</div>`;
     }
 
     const events = (this.instances?.length ? this.instances : [this.eventIndex])
-      .map((i) => db.getEventByIndex(i))
+      .map((i) => store.eventByIndex(i))
       .filter((e): e is LogEvent => e !== null);
     const primary = events[0];
     if (!primary) {
@@ -247,7 +254,7 @@ export class EventVitals extends LitElement {
    * omitted; `self` only appears when it adds something.
    */
   private _metricRows(rows: TemplateResult[], events: LogEvent[]): void {
-    const limits = DatabaseAccess.instance()?.getApexLog()?.governorLimits;
+    const limits = this.logStore?.log.governorLimits;
     // Aggregates sum their occurrences, matching how the grids aggregate a row.
     const sum = (pick: (e: LogEvent) => SelfTotal, part: 'total' | 'self') =>
       events.reduce((acc, e) => acc + pick(e)[part], 0);

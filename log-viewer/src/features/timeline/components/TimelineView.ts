@@ -7,7 +7,7 @@ import { customElement, property, query, state } from 'lit/decorators.js';
 
 import type { ApexLog, LogCategory } from 'apex-log-parser';
 import { VSCodeExtensionMessenger } from '../../../core/messaging/VSCodeExtensionMessenger.js';
-import { subscribeSettings, type LanaSettings } from '../../settings/Settings.js';
+import { subscribeSettings, updateSetting, type LanaSettings } from '../../settings/Settings.js';
 import { keyMap, setColors } from '../services/Timeline.js';
 
 import { DEFAULT_THEME_NAME, sameColors, type TimelineColors } from '../themes/Themes.js';
@@ -78,6 +78,9 @@ export class TimelineView extends LitElement {
 
   @state()
   private timeDisplayMode: TimeDisplayMode = 'elapsed';
+
+  @state()
+  private showTooltip = true;
 
   @query('timeline-flame-chart')
   private flameChartRef!: TimelineFlameChart;
@@ -209,6 +212,7 @@ export class TimelineView extends LitElement {
   private applyTimelineSettings(settings: LanaSettings) {
     const { timeline } = settings;
     this.useLegacyTimeline = timeline.legacy;
+    this.showTooltip = timeline.showTooltip;
 
     if (!this.useLegacyTimeline) {
       const themeName = timeline.activeTheme ?? DEFAULT_THEME_NAME;
@@ -256,7 +260,7 @@ export class TimelineView extends LitElement {
 
     const toolbar = html`<div class="timeline-toolbar">
       <timeline-key .timelineKeys="${this.timelineKeys}"></timeline-key>
-      ${this.renderTimeDisplayToggle()}
+      ${this.renderTimeDisplayToggle()} ${this.renderTooltipToggle()}
     </div>`;
 
     if (this.useLegacyTimeline) {
@@ -272,6 +276,7 @@ export class TimelineView extends LitElement {
         .themeName=${this.activeTheme}
         .navigateToEventIndex=${this.navigateToEventIndex}
         .navigateToTimestamp=${this.navigateToTimestamp}
+        .showTooltip=${this.showTooltip}
       ></timeline-flame-chart>`;
   }
 
@@ -289,6 +294,26 @@ export class TimelineView extends LitElement {
       title="${label}"
       @click=${() => this.toggleTimeDisplay()}
     ></vscode-toolbar-button>`;
+  }
+
+  /** The hover details switch. Legacy has its own tooltip, which this does not control. */
+  private renderTooltipToggle() {
+    if (this.useLegacyTimeline) {
+      return '';
+    }
+
+    const label = this.showTooltip ? 'Hide frame details on hover' : 'Show frame details on hover';
+    return html`<vscode-toolbar-button
+      icon="${this.showTooltip ? 'eye' : 'eye-closed'}"
+      label="${label}"
+      title="${label}"
+      @click=${() => this.toggleTooltip()}
+    ></vscode-toolbar-button>`;
+  }
+
+  private toggleTooltip(): void {
+    this.showTooltip = !this.showTooltip;
+    updateSetting('timeline.showTooltip', this.showTooltip);
   }
 
   private toggleTimeDisplay(): void {

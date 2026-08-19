@@ -289,7 +289,7 @@ describe('PaneView', () => {
     expect(pane('b')?.getAttribute('style')).toContain('flex: 1 1 0');
   });
 
-  it('renders no sash beside a content pane', async () => {
+  it('renders a sash beside a content pane too', async () => {
     const el = document.createElement('pane-view') as PaneView;
     el.orientation = 'vertical';
     el.sections = [
@@ -300,11 +300,11 @@ describe('PaneView', () => {
     document.body.appendChild(el);
     await el.updateComplete;
 
-    // Only b↔c are both fill; a content pane's size is not the user's to drag.
-    expect(el.shadowRoot?.querySelectorAll('.pane-sash').length).toBe(1);
+    // a↔b and b↔c: a content pane holds the size it is dragged to.
+    expect(el.shadowRoot?.querySelectorAll('.pane-sash').length).toBe(2);
   });
 
-  it('ignores a stored size for a content pane when scaling the fill weights', async () => {
+  it('pins a content pane to its dragged size, and keeps it out of the fill scale', async () => {
     const el = document.createElement('pane-view') as PaneView;
     el.orientation = 'vertical';
     el.sections = [
@@ -312,15 +312,40 @@ describe('PaneView', () => {
       { id: 'b', title: 'B', content: html`<div>B</div>` },
       { id: 'c', title: 'C', content: html`<div>C</div>` },
     ];
-    // A stale size for the content pane (stored before it became content) must
-    // not skew the fill panes' shares.
     el.paneSizes = { 'vertical:a': 500, 'vertical:b': 300, 'vertical:c': 100 };
     document.body.appendChild(el);
     await el.updateComplete;
 
     const pane = (id: string) => el.shadowRoot?.querySelector(`.pane[data-id="${id}"]`);
-    expect(pane('a')?.getAttribute('style')).toContain('flex: 0 1 auto');
+    // A basis, not a weight: it never stretches, and it still shrinks to scroll.
+    expect(pane('a')?.getAttribute('style')).toContain('flex: 0 1 500px');
+    // The content pane's size is no part of the fill panes' shares.
     expect(pane('b')?.getAttribute('style')).toContain('flex: 1.5 1 0');
     expect(pane('c')?.getAttribute('style')).toContain('flex: 0.5 1 0');
+  });
+
+  it('hands a content pane back to its content on a double-click', async () => {
+    const el = document.createElement('pane-view') as PaneView;
+    el.orientation = 'vertical';
+    el.sections = [
+      { id: 'a', title: 'A', content: html`<div>A</div>`, fit: 'content' },
+      { id: 'b', title: 'B', content: html`<div>B</div>` },
+    ];
+    el.paneSizes = { 'vertical:a': 500 };
+    document.body.appendChild(el);
+    await el.updateComplete;
+
+    let detail: { sizes: Record<string, number>; orientation: string } | undefined;
+    el.addEventListener('pane-resize', (e) => {
+      detail = (e as CustomEvent<{ sizes: Record<string, number>; orientation: string }>).detail;
+    });
+    sash(el).dispatchEvent(new MouseEvent('dblclick', { bubbles: true }));
+    await el.updateComplete;
+
+    const pane = (id: string) => el.shadowRoot?.querySelector(`.pane[data-id="${id}"]`);
+    expect(pane('a')?.getAttribute('style')).toContain('flex: 0 1 auto');
+    // The size is gone rather than zeroed, so the consumer replaces the axis.
+    expect(detail?.sizes['vertical:a']).toBeUndefined();
+    expect(detail?.orientation).toBe('vertical');
   });
 });

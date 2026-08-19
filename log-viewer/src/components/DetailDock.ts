@@ -15,6 +15,9 @@ export type DockPosition = 'left' | 'right' | 'bottom';
  * Generic details viewlet: a slim action bar (dock left/bottom/right + close)
  * over a PaneView of caller-supplied sections. View-agnostic — the consuming
  * view builds the sections. No title text.
+ *
+ * The `actions-start` slot takes a consumer-owned control at the free end of
+ * the action bar, opposite the dock buttons.
  */
 @customElement('detail-dock')
 export class DetailDock extends LitElement {
@@ -62,7 +65,19 @@ export class DetailDock extends LitElement {
         padding: 0 var(--lana-space-2xs);
         border-bottom: var(--lana-stroke) solid var(--lana-panel-divider);
       }
+      slot[name='actions-start'] {
+        display: flex;
+        align-items: center;
+        min-width: 0;
+        margin-right: auto;
+        /* The dock narrows to 120px; the dock buttons keep their room. */
+        overflow: hidden;
+        /* With the bar's own inset, the same content edge as the section bodies below. */
+        padding-left: var(--lana-space-sm);
+      }
+
       vscode-icon {
+        flex: 0 0 auto;
         color: var(--vscode-icon-foreground);
         border-radius: var(--lana-radius-sm);
       }
@@ -92,6 +107,7 @@ export class DetailDock extends LitElement {
   render() {
     return html`
       <div class="actions">
+        <slot name="actions-start"></slot>
         <vscode-icon
           action-icon
           name="layout-sidebar-left"

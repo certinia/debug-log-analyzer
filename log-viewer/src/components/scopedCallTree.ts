@@ -3,42 +3,18 @@
  */
 import type { LogEvent } from 'apex-log-parser';
 
+import { currentLogStore } from '../core/log/LogStore.js';
 import { EXCLUDED_DETAIL_TYPES } from '../features/call-tree/utils/DetailsFilter.js';
-import { DatabaseAccess } from '../features/database/services/Database.js';
+import {
+  CHECK_EVERY,
+  frameBudget,
+  type FrameBudgetOptions,
+  type Tick,
+} from '../core/utility/FrameBudget.js';
 
 /** Frame grouping key — same shape as the call-tree aggregation. */
 function frameKey(event: LogEvent): string {
   return `${event.type ?? ''}|${event.namespace}|${event.text}`;
-}
-
-/** Work slice before the frame is handed back (ms) — half a 60fps frame, so a
- *  build never takes more than half of any frame it runs in. */
-const SLICE_MS = 8;
-/** Items between deadline checks. Reading the clock per item costs more than
- *  the odd overrun it saves. */
-const CHECK_EVERY = 256;
-
-export interface ScopedBuildOptions {
-  /** Hands the frame back between work slices. */
-  yieldFrame: () => Promise<void>;
-  /** Polled after each yield; true abandons the build, which then returns null. */
-  cancelled?: () => boolean;
-}
-
-/** Returns false once the build has been abandoned. */
-type Tick = () => Promise<boolean>;
-
-/** A slice timer: cheap while the slice has time left, yields once it doesn't. */
-function frameBudget(options: ScopedBuildOptions): Tick {
-  let deadline = performance.now() + SLICE_MS;
-  return async () => {
-    if (performance.now() < deadline) {
-      return true;
-    }
-    await options.yieldFrame();
-    deadline = performance.now() + SLICE_MS;
-    return !options.cancelled?.();
-  };
 }
 
 /**
@@ -53,6 +29,10 @@ export interface ScopedRow {
   type: string;
   duration: { total: number; self: number };
   callCount: number;
+  /** Every occurrence the row stands for, when it merges several. Null on a row
+   *  that is one frame, whose single occurrence is `originalData` — the whole-log
+   *  tree is all such rows, so a list each would cost one array per event. */
+  eventIndexes: number[] | null;
   _children: ScopedRow[] | null;
 }
 
@@ -66,6 +46,45 @@ export function revealableEventIndex(row: Partial<ScopedRow> | undefined): numbe
   return id !== undefined && id >= 0 && originalData ? originalData.eventIndex : null;
 }
 
+/**
+ * Every occurrence a scoped row stands for. A merged row can be pointed at even
+ * though it cannot be revealed: there is no one frame to jump to, but all of
+ * them can be marked at once.
+ */
+export function locatableEventIndexes(row: Partial<ScopedRow> | undefined): number[] {
+  if (row?.eventIndexes) {
+    return row.eventIndexes;
+  }
+  const single = revealableEventIndex(row);
+  return single === null ? [] : [single];
+}
+
+/**
+ * The rows of one view keyed by each occurrence they stand for, so a frame named
+ * elsewhere can be found in a view whose rows merge occurrences behind a
+ * synthetic id. One frame can name several rows — in bottom-up it appears once
+ * per caller chain it sits in.
+ */
+export function rowIdsByEvent(rows: readonly ScopedRow[]): Map<number, number[]> {
+  const byEvent = new Map<number, number[]>();
+  const stack = [...rows];
+  while (stack.length) {
+    const row = stack.pop()!;
+    for (const eventIndex of locatableEventIndexes(row)) {
+      const ids = byEvent.get(eventIndex);
+      if (ids) {
+        ids.push(row.id);
+      } else {
+        byEvent.set(eventIndex, [row.id]);
+      }
+    }
+    if (row._children) {
+      stack.push(...row._children);
+    }
+  }
+  return byEvent;
+}
+
 export interface ScopedCallTree {
   /** The selected node's total time (ns) — the % denominator for the bars. */
   rootTotal: number;
@@ -76,9 +95,9 @@ export interface ScopedCallTree {
   logTotal: number;
   /** The three views, built on first call and cached (only one is on screen).
    *  Each hands the frame back as it works, and returns null when abandoned. */
-  timeOrder(options: ScopedBuildOptions): Promise<ScopedRow[] | null>;
-  aggregated(options: ScopedBuildOptions): Promise<ScopedRow[] | null>;
-  bottomUp(options: ScopedBuildOptions): Promise<ScopedRow[] | null>;
+  timeOrder(options: FrameBudgetOptions): Promise<ScopedRow[] | null>;
+  aggregated(options: FrameBudgetOptions): Promise<ScopedRow[] | null>;
+  bottomUp(options: FrameBudgetOptions): Promise<ScopedRow[] | null>;
 }
 
 /**
@@ -110,6 +129,7 @@ async function realSubtree(event: LogEvent, tick: Tick): Promise<ScopedRow | nul
       type: current.type ?? '',
       duration: { total: current.duration.total, self: current.duration.self },
       callCount: 1,
+      eventIndexes: null,
       _children: null,
     };
     rows.push(row);
@@ -157,19 +177,19 @@ async function realSubtree(event: LogEvent, tick: Tick): Promise<ScopedRow | nul
 export async function buildScopedCallTree(
   eventIndex: number,
   instances: number[] | null | undefined,
-  options: ScopedBuildOptions,
+  options: FrameBudgetOptions,
 ): Promise<ScopedCallTree | null> {
-  const db = DatabaseAccess.instance();
-  const apexLog = db?.getApexLog();
-  if (!db || !apexLog) {
+  const store = currentLogStore();
+  if (!store) {
     return null;
   }
+  const apexLog = store.log;
 
   // An aggregate selection scopes to every occurrence of the frame; a single
   // selection to just itself.
   const indexes = instances?.length ? instances : eventIndex >= 0 ? [eventIndex] : [];
   const selectedEvents = indexes
-    .map((i) => db.getEventByIndex(i))
+    .map((i) => store.eventByIndex(i))
     .filter((e): e is LogEvent => e !== null);
   if (!selectedEvents.length) {
     return null;
@@ -202,6 +222,7 @@ export async function buildScopedCallTree(
         type: parent.type ?? '',
         duration: { total: selected.duration.total, self: 0 },
         callCount: 1,
+        eventIndexes: null,
         _children: [node],
       };
       parent = parent.parent;
@@ -259,9 +280,9 @@ function lazyCallTree(
  * percentages of the whole log.
  */
 export async function buildWholeLogCallTree(
-  options: ScopedBuildOptions,
+  options: FrameBudgetOptions,
 ): Promise<ScopedCallTree | null> {
-  const apexLog = DatabaseAccess.instance()?.getApexLog();
+  const apexLog = currentLogStore()?.log;
   if (!apexLog) {
     return null;
   }
@@ -283,7 +304,7 @@ export async function buildWholeLogCallTree(
 /** Top-down aggregation: merge sibling frames sharing a key, summing metrics. */
 async function aggregate(
   rows: ScopedRow[],
-  options: ScopedBuildOptions,
+  options: FrameBudgetOptions,
 ): Promise<ScopedRow[] | null> {
   const tick = frameBudget(options);
   let idSeq = 0;
@@ -294,6 +315,9 @@ async function aggregate(
   async function merge(input: ScopedRow[]): Promise<ScopedRow[] | null> {
     const groups = new Map<string, ScopedRow>();
     const order: string[] = [];
+    // The occurrences behind each group. A set, because the ancestors of the
+    // instances of one frame are the same frame, met once per instance.
+    const indexes = new Map<string, Set<number>>();
     for (let i = 0; i < input.length; i++) {
       if (i % CHECK_EVERY === 0 && !(await tick())) {
         return null;
@@ -309,14 +333,21 @@ async function aggregate(
           type: row.type,
           duration: { total: 0, self: 0 },
           callCount: 0,
+          eventIndexes: [],
           _children: [],
         };
         groups.set(key, group);
         order.push(key);
+        indexes.set(key, new Set());
       }
       group.duration.total += row.duration.total;
       group.duration.self += row.duration.self;
       group.callCount += row.callCount;
+      // Every merged occurrence, so pointing at the group points at all of them.
+      const seen = indexes.get(key)!;
+      for (const index of locatableEventIndexes(row)) {
+        seen.add(index);
+      }
       if (row._children) {
         (group._children as ScopedRow[]).push(...row._children);
       }
@@ -325,6 +356,7 @@ async function aggregate(
     const merged: ScopedRow[] = [];
     for (const key of order) {
       const group = groups.get(key)!;
+      group.eventIndexes = [...indexes.get(key)!];
       const kids = group._children as ScopedRow[];
       if (kids.length) {
         const mergedKids = await merge(kids);
@@ -345,6 +377,9 @@ async function aggregate(
 
 interface BottomUpNode extends ScopedRow {
   _map: Map<string, BottomUpNode>;
+  /** The occurrences behind the row. A set, because a caller is met once per
+   *  seed beneath it, and a hot caller has many. */
+  _indexes: Set<number>;
 }
 
 /** A row's ancestors, innermost first. Siblings share the whole tail, so the
@@ -361,7 +396,7 @@ interface CallerChain {
  */
 async function buildBottomUp(
   rows: ScopedRow[],
-  options: ScopedBuildOptions,
+  options: FrameBudgetOptions,
 ): Promise<ScopedRow[] | null> {
   const tick = frameBudget(options);
   let idSeq = 0;
@@ -381,8 +416,10 @@ async function buildBottomUp(
         type: src.type,
         duration: { total: 0, self: 0 },
         callCount: 0,
+        eventIndexes: [],
         _children: null,
         _map: new Map(),
+        _indexes: new Set(),
       };
       map.set(key, node);
       order?.push(node);
@@ -410,10 +447,16 @@ async function buildBottomUp(
       seed.duration.total += row.duration.self;
       seed.duration.self += row.duration.self;
       seed.callCount += 1;
+      for (const index of locatableEventIndexes(row)) {
+        seed._indexes.add(index);
+      }
       let map = seed._map;
       for (let link = callers; link; link = link.caller) {
         const node = ensure(map, null, link.row);
         node.duration.total += row.duration.self;
+        for (const index of locatableEventIndexes(link.row)) {
+          node._indexes.add(index);
+        }
         // Callers count the call they contributed too, matching the Call Tree
         // tab's bottom-up (every bucket in the chain accumulates); counting
         // only the seed left every caller row reading "Calls 0".
@@ -440,6 +483,8 @@ async function buildBottomUp(
     const node = everyNode[i]!;
     node._children = node._map.size ? [...node._map.values()] : null;
     node._map.clear(); // its entries live in `_children` now
+    node.eventIndexes = [...node._indexes];
+    node._indexes.clear(); // its entries live in `eventIndexes` now
   }
   return topOrder.sort((a, b) => b.duration.self - a.duration.self);
 }

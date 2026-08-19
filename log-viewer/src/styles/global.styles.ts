@@ -15,6 +15,8 @@ export const globalStyles = [
        off these so the bar is one visual family instead of N hand-tuned
        copies. */
       --filter-control-height: 22px;
+      /* For a control in the inspector's action bar, which is shorter than a filter bar. */
+      --filter-control-height-dense: 20px;
       --filter-control-font-size: 11px;
       --filter-control-padding: 0 var(--lana-space-sm);
       --filter-control-radius: var(--lana-radius-sm);

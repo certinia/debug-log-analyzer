@@ -14,7 +14,6 @@ import {
 } from 'tabulator-tables';
 
 import type { ApexLog, SOQLExecuteBeginLine } from 'apex-log-parser';
-import { SelectionEchoGuard } from '../../../core/events/SelectionEchoGuard.js';
 import { vscodeMessenger } from '../../../core/messaging/VSCodeExtensionMessenger.js';
 import { isVisible } from '../../../core/utility/Util.js';
 import { getCallerNamespace } from '../../../core/utility/CallerNamespace.js';
@@ -24,7 +23,9 @@ import { soqlGroupHeader } from '../../soql/format/groupHeader.js';
 import { soqlInlineElement } from '../../soql/format/inlineCell.js';
 import { soqlSyntaxStyles } from '../../soql/styles/soql-syntax.css.js';
 import { getSettings, updateSetting } from '../../settings/Settings.js';
-import { emitGridSelection } from './gridSelection.js';
+import { LocatedRowMarker } from '../../../components/locatedRow.js';
+import { reportGridLocate, stampGridEventIndex } from './gridLocate.js';
+import { reportGridSelection } from './gridSelection.js';
 import { selectRowByEventIndex } from './revealRow.js';
 import {
   applyColumnView,
@@ -103,8 +104,6 @@ export class SOQLView extends LitElement {
 
   soqlTable: Tabulator | null = null;
   holder: HTMLElement | null = null;
-  /** Guards the programmatic select made on the inspector's behalf. */
-  private _echoGuard = new SelectionEchoGuard();
   table: HTMLElement | null = null;
 
   @state()
@@ -116,6 +115,8 @@ export class SOQLView extends LitElement {
   private contextMenu: ContextMenu | null = null;
   /** eventIndex of the row whose context menu is open. */
   private contextMenuEventIndex: number | null = null;
+  /** Marks the rows for the statements under the inspector's pointer. */
+  private _locatedRow = new LocatedRowMarker();
 
   @state()
   private objects: string[] = [];
@@ -453,25 +454,24 @@ export class SOQLView extends LitElement {
     this.soqlTable?.copyToClipboard('all');
   }
 
-  /**
-   * Drops this grid's row highlight. Silent by default, for the clear that
-   * follows another grid being picked; `notify` leaves the grid's own
-   * selection-change path to report it, which is the user-driven (Escape) case.
-   */
-  deselectRows({ notify = false }: { notify?: boolean } = {}) {
-    if (notify) {
-      this.soqlTable?.deselectRow();
-      return;
-    }
-    this._echoGuard.run(() => this.soqlTable?.deselectRow());
+  /** Drops this grid's row highlight, reported upward like any other change. */
+  deselectRows() {
+    this.soqlTable?.deselectRow();
   }
 
   /**
-   * Select the row for `eventIndex`, without echoing `detail:select` back at the
-   * inspector that asked for it. Returns false when this grid has no such row.
+   * Select the row for `eventIndex`. Returns false when this grid has no such row.
    */
   selectByEventIndex(eventIndex: number): boolean {
-    return selectRowByEventIndex(this.soqlTable, this._echoGuard, eventIndex);
+    return selectRowByEventIndex(this.soqlTable, eventIndex);
+  }
+
+  /**
+   * Mark the rows for the statements under the inspector's pointer, or drop the
+   * mark with an empty list. Not a pick: nothing scrolls and nothing is selected.
+   */
+  markLocated(eventIndexes: readonly number[]): void {
+    this._locatedRow.mark(this.soqlTable?.element ?? null, eventIndexes);
   }
 
   _exportToCSV() {
@@ -633,6 +633,7 @@ export class SOQLView extends LitElement {
       groupStartOpen: false,
       groupToggleElement: false,
       selectableRows: 'highlight',
+      rowFormatter: stampGridEventIndex,
       columnDefaults: commonColumnDefaults,
       headerSortElement,
       columns: [
@@ -859,10 +860,15 @@ export class SOQLView extends LitElement {
     // navigation updates it too. RowKeyboardNavigation keeps a single row
     // selected across mouse and arrow-key navigation.
     this.soqlTable.on('rowSelectionChanged', (_data, rows) => {
-      emitGridSelection(this._echoGuard, 'soql', rows, (data: GridSOQLData) =>
+      reportGridSelection(this, 'soql', rows, (data: GridSOQLData) =>
         data.soql ? data.eventIndex : undefined,
       );
     });
+
+    // Hovering a query marks it in the inspector, without picking it.
+    reportGridLocate(this, this.soqlTable, (data: GridSOQLData) =>
+      data.soql ? data.eventIndex : undefined,
+    );
 
     this.soqlTable.on('rowContext', (e, row) => {
       this._showRowContextMenu(e as MouseEvent, row);

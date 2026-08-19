@@ -14,33 +14,58 @@ import {
 } from '../features/call-tree/components/TableShared.js';
 import { soqlInlineElement } from '../features/soql/format/inlineCell.js';
 import { soqlSyntaxStyles } from '../features/soql/styles/soql-syntax.css.js';
+import { eventBus } from '../core/events/EventBus.js';
+import { SelectionEchoGuard } from '../core/events/SelectionEchoGuard.js';
+import { LOCATED_ROW_CLASS, LocatedRowMarker, rowIndexStamper } from './locatedRow.js';
 import { globalStyles } from '../styles/global.styles.js';
 import { progressColumnWidth } from '../tabulator/format/measureWidth.js';
 import dataGridStyles from '../tabulator/style/DataGrid.scss';
 import { buildCallStackData, type CallStackRow } from './callStackData.js';
 import './ContextMenu.js';
 import type { ContextMenu } from './ContextMenu.js';
-import { dispatchInspectorReveal } from './inspectorReveal.js';
+import { dispatchInspectorLocate, dispatchInspectorReveal } from './inspectorReveal.js';
 import { PANEL_ROW_MENU_ITEMS, runPanelRowAction } from './panelRowMenu.js';
 
 /**
  * The lineage of parent frames that led to an event, outermost first, as a
  * small resizable table (Frame | Total | Self) that mirrors the Call Tree —
  * same `progressFormatterMS` bars (percent of the stack's root frame), column
- * headers, resizable columns. Clicking a frame jumps to it.
+ * headers, resizable columns.
+ *
+ * The list is anchored: `eventIndex` is the frame the stack was built for and
+ * never moves while the user walks it. Clicking a frame makes it the active one
+ * — the row the rest of the inspector follows — which the inspector feeds back
+ * as `activeEventIndex`, so no frame is lost on the way down.
  */
 @customElement('call-stack-detail')
 export class CallStackDetail extends LitElement {
+  /** The frame the stack was built for; the list stays anchored to it. */
   @property({ type: Number })
   eventIndex = -1;
 
+  /** The frame in the stack the inspector is following. */
+  @property({ type: Number })
+  activeEventIndex = -1;
+
   private _table: Tabulator | null = null;
+  /** Guards the select made to mark the active frame. */
+  private _echoGuard = new SelectionEchoGuard();
+  /** Marks the row for the frame under the pointer in the tab's own view. */
+  private _locatedRow = new LocatedRowMarker();
+  private _locateUnsubscribe?: () => void;
   private _contextMenu: ContextMenu | null = null;
   /** eventIndex of the row whose context menu is open. */
   private _menuEventIndex = -1;
 
   firstUpdated(): void {
     this._contextMenu = this.renderRoot.querySelector('context-menu');
+  }
+
+  connectedCallback(): void {
+    super.connectedCallback();
+    this._locateUnsubscribe = eventBus.on('detail:locate', ({ eventIndexes }) => {
+      this._locatedRow.mark(this._tableHost(), eventIndexes);
+    });
   }
 
   static styles = [
@@ -70,26 +95,47 @@ export class CallStackDetail extends LitElement {
         overflow: hidden;
         text-overflow: ellipsis;
       }
+      /* The frame under the pointer in the tab on screen. */
+      #call-stack-table .tabulator-row.${unsafeCSS(LOCATED_ROW_CLASS)} {
+        background-color: var(--lana-row-hover-bg);
+      }
     `,
   ];
 
   updated(changed: PropertyValues) {
     if (changed.has('eventIndex')) {
       this._rebuild();
+    } else if (changed.has('activeEventIndex')) {
+      // The anchor holds, so the rows are unchanged — only the mark moves.
+      this._markActive();
     }
   }
 
   disconnectedCallback(): void {
     super.disconnectedCallback();
+    this._locateUnsubscribe?.();
+    this._locateUnsubscribe = undefined;
+    this._locatedRow.clear();
     this._table?.destroy();
     this._table = null;
   }
 
+  private _tableHost(): HTMLElement | null {
+    return this.renderRoot?.querySelector<HTMLElement>('#call-stack-table') ?? null;
+  }
+
   private _rebuild() {
-    const container = this.renderRoot?.querySelector('#call-stack-table') as HTMLElement | null;
+    const container = this._tableHost();
     if (!container) {
       return;
     }
+    // The table about to be destroyed can't report the pointer leaving its rows,
+    // so any mark it asked for is dropped here.
+    if (this._table) {
+      dispatchInspectorLocate(this, []);
+    }
+    // Rows of the old table go with it, so the mark can't outlive them.
+    this._locatedRow.clear();
     // Percentages are relative to this stack's root frame, so totalValue changes
     // per selection — rebuild rather than setData to refresh the column params.
     this._table?.destroy();
@@ -108,6 +154,8 @@ export class CallStackDetail extends LitElement {
       // Arrow-key row navigation, matching the Call Tree tab.
       rowKeyboardNavigation: true,
       selectableRows: 'highlight',
+      // Lets the hover mark find a row by one DOM query.
+      rowFormatter: rowIndexStamper('eventIndex'),
       ...clipboardCopyOptions,
       headerSortElement,
       columnDefaults: commonColumnDefaults,
@@ -151,12 +199,46 @@ export class CallStackDetail extends LitElement {
     this._table.on('rowContext', (e, row) => {
       this._showRowMenu(e as MouseEvent, row);
     });
-    // Selecting a frame reveals it in the tab on screen; the inspector adds the
-    // source, since only it knows which tab that is.
+    // Selecting a frame makes it the active one and reveals it in the tab on
+    // screen; the inspector adds the source, since only it knows which tab that
+    // is. The mark this table sets itself is not a pick, so it is guarded.
     this._table.on('rowSelectionChanged', (_data, rows) => {
+      if (this._echoGuard.suppressed) {
+        return;
+      }
       const eventIndex = (rows[0]?.getData() as CallStackRow | undefined)?.eventIndex;
       if (eventIndex !== undefined) {
         dispatchInspectorReveal(this, eventIndex);
+      }
+    });
+    // Hovering a frame marks it in the tab on screen, so the user can see where
+    // it sits before deciding to pick it.
+    this._table.on('rowMouseEnter', (_e, row) => {
+      const eventIndex = (row.getData() as CallStackRow).eventIndex;
+      if (eventIndex !== undefined) {
+        dispatchInspectorLocate(this, [eventIndex]);
+      }
+    });
+    this._table.on('rowMouseLeave', () => {
+      dispatchInspectorLocate(this, []);
+    });
+    this._table.on('tableBuilt', () => {
+      this._markActive();
+    });
+  }
+
+  /** Marks the active frame in the list, without reporting it as a new pick. */
+  private _markActive(): void {
+    const table = this._table;
+    if (!table) {
+      return;
+    }
+    this._echoGuard.run(() => {
+      for (const selected of table.getSelectedRows()) {
+        selected.deselect();
+      }
+      if (this.activeEventIndex >= 0) {
+        table.selectRow([this.activeEventIndex]);
       }
     });
   }
