@@ -1,59 +1,11 @@
 /*
  * Copyright (c) 2026 Certinia Inc. All rights reserved.
  */
-import type { ApexLog, LogEvent } from 'apex-log-parser';
+import type { LogEvent } from 'apex-log-parser';
 
 import { DEFAULT_NAMESPACE } from '../core/utility/CallerNamespace.js';
 import { outermostEvents } from '../core/utility/EventTree.js';
 import { CHECK_EVERY, frameBudget, type FrameBudgetOptions } from '../core/utility/FrameBudget.js';
-
-export const NAMESPACE_COLORS = [
-  '#0072b2',
-  '#d55e00',
-  '#009e73',
-  '#cc79a7',
-  '#e69f00',
-  '#56b4e9',
-  '#aa4499',
-  '#44aa99',
-] as const;
-
-/** A colour per namespace in the order given, so the same list always reads the
- *  same way and a namespace on two bars keeps one colour. A namespace the list
- *  never named takes the next colour on first ask. */
-function namespacePalette(namespaces: Iterable<string>): (namespace: string) => string {
-  const colors = new Map<string, string>();
-  const color = (namespace: string): string => {
-    let assigned = colors.get(namespace);
-    if (!assigned) {
-      // Non-null: the modulo keeps the index inside the scale.
-      assigned = NAMESPACE_COLORS[colors.size % NAMESPACE_COLORS.length]!;
-      colors.set(namespace, assigned);
-    }
-    return assigned;
-  };
-  for (const namespace of namespaces) {
-    color(namespace);
-  }
-  return color;
-}
-
-const palettes = new WeakMap<ApexLog, (namespace: string) => string>();
-
-/**
- * The log's own colour per namespace. Every bar in every scope shares it, so a
- * namespace on the whole-log bar and on a frame's bar reads as one colour and the
- * colour carries meaning between sections. The log names its namespaces in a
- * fixed order; `default` is not one of them, so it is named first.
- */
-export function logNamespacePalette(log: ApexLog): (namespace: string) => string {
-  let palette = palettes.get(log);
-  if (!palette) {
-    palette = namespacePalette([DEFAULT_NAMESPACE, ...log.namespaces]);
-    palettes.set(log, palette);
-  }
-  return palette;
-}
 
 export interface NamespaceTime {
   namespace: string;

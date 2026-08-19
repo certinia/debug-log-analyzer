@@ -11,7 +11,7 @@ import {
   dispatchInspectorLocate,
   dispatchInspectorReveal,
 } from '../../../components/inspectorReveal.js';
-import { logNamespacePalette } from '../../../components/namespaceTime.js';
+import { logNamespacePalette } from '../../../components/namespacePalette.js';
 import '../../../components/StackedTimeBar.js';
 import { segmentsWithTail } from '../../../components/StackedTimeBar.js';
 import { logContext } from '../../../core/log/logContext.js';
