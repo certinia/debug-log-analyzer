@@ -24,7 +24,7 @@ permissions:
 
 jobs:
   promote:
-    uses: salesforcecli/github-workflows/.github/workflows/vscode-promote-prerelease.yml@ph/W-23832274-pnpm-stable-promotion
+    uses: salesforcecli/github-workflows/.github/workflows/vscode-promote-prerelease.yml@main
     with:
       min-tag-age-days: ${{ inputs.min-tag-age-days || '7' }}
       vsix-name-pattern: 'lana-*.vsix'

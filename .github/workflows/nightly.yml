@@ -27,7 +27,7 @@ permissions:
 
 jobs:
   nightly-release:
-    uses: salesforcecli/github-workflows/.github/workflows/vscode-publish-extensions.yml@ph/W-23832274-pnpm-stable-promotion
+    uses: salesforcecli/github-workflows/.github/workflows/vscode-publish-extensions.yml@main
     with:
       branch: ${{ inputs.branch || github.ref_name }}
       # TODO(W-23832274): Switch to `changed` after a live nightly confirms the
