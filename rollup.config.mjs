@@ -58,6 +58,37 @@ export default [
           },
         }),
       ),
+      // Copy runtime dependency files for salesforce bundle compatibility
+    ],
+  },
+  {
+    input: './lana/src/Main.web.ts',
+    output: {
+      format: 'cjs',
+      dir: './lana/out/web',
+      entryFileNames: 'Main.web.js',
+      chunkFileNames: 'lana-[name].js',
+      sourcemap: false,
+    },
+    external: ['vscode'],
+    plugins: [
+      nodeResolve({ browser: true, preferBuiltins: false }),
+      commonjs(),
+      json(),
+      nodePolyfills(),
+      swc(
+        defineRollupSwcOption({
+          include: /\.[mc]?[jt]sx?$/,
+          exclude: /node_modules/,
+          tsconfig: production ? './lana/tsconfig.json' : './lana/tsconfig-dev.json',
+          jsc: {
+            minify: {
+              compress: production ? { keep_classnames: true, keep_fnames: true } : false,
+              mangle: production ? { keep_classnames: true } : false,
+            },
+          },
+        }),
+      ),
     ],
   },
   {
