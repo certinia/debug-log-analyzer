@@ -29,8 +29,8 @@
     "profiling",
     "soql"
   ],
-  "type": "module",
   "main": "out/Main.js",
+  "browser": "out/web/Main.web.js",
   "icon": "./certinia-icon-color.png",
   "galleryBanner": {
     "color": "#000000",
@@ -55,9 +55,16 @@
   "extensionDependencies": [
     "salesforce.salesforcedx-vscode-services"
   ],
+  "capabilities": {
+    "virtualWorkspaces": true,
+    "untrustedWorkspaces": {
+      "supported": true
+    }
+  },
   "activationEvents": [
     "onLanguage:apexlog",
-    "onStartupFinished"
+    "onStartupFinished",
+    "onFileSystem:memfs"
   ],
   "contributes": {
     "commands": [
@@ -380,7 +387,8 @@
     ]
   },
   "scripts": {
-    "vscode:prepublish": "pnpm -w run build && pnpm -w run copy:package-docs"
+    "vscode:prepublish": "pnpm -w run build && pnpm -w run copy:package-docs",
+    "vscode:bundle": "pnpm -w run build"
   },
   "dependencies": {
     "@apexdevtools/apex-parser": "5.1.0",
