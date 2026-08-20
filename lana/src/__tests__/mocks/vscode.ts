@@ -12,6 +12,7 @@
 // a drift from `@types/vscode` surfaces as ONE error at the factory, not at
 // every call site.
 import type { EndOfLine, TextDocument } from 'vscode';
+import { URI, Utils } from 'vscode-uri';
 
 // Track subscriptions for cleanup
 const subscriptions: { dispose: jest.Mock }[] = [];
@@ -110,34 +111,11 @@ export const ViewColumn = {
 } as const;
 export type ViewColumn = (typeof ViewColumn)[keyof typeof ViewColumn];
 
-// Mock Uri class
+// Delegate URI semantics to vscode-uri so virtual URI tests match VS Code.
 export const Uri = {
-  file: jest.fn((path: string) => ({
-    scheme: 'file',
-    authority: '',
-    path,
-    fsPath: path,
-    query: '',
-    fragment: '',
-    with: jest.fn(),
-    toString: jest.fn(() => `file://${path}`),
-    toJSON: jest.fn(() => ({ scheme: 'file', path, fsPath: path })),
-  })),
-  parse: jest.fn((value: string) => ({
-    scheme: value.startsWith('file://') ? 'file' : 'unknown',
-    authority: '',
-    path: value.replace('file://', ''),
-    fsPath: value.replace('file://', ''),
-    query: '',
-    fragment: '',
-    with: jest.fn(),
-    toString: jest.fn(() => value),
-  })),
-  joinPath: jest.fn((base, ...pathSegments) => ({
-    ...base,
-    path: [base.path, ...pathSegments].join('/'),
-    fsPath: [base.fsPath, ...pathSegments].join('/'),
-  })),
+  file: (path: string) => URI.file(path),
+  parse: (value: string) => URI.parse(value),
+  joinPath: (base: URI, ...pathSegments: string[]) => Utils.joinPath(base, ...pathSegments),
 };
 
 // Mock RelativePattern (constructor used for glob searches)
@@ -300,6 +278,10 @@ export const workspace = {
   },
 };
 
+export const extensions = {
+  getExtension: jest.fn(),
+};
+
 // Mock window
 export const window = {
   showInformationMessage: jest.fn().mockResolvedValue(undefined),
@@ -342,6 +324,10 @@ export const window = {
     replace: jest.fn(),
   })),
   createWebviewPanel: jest.fn(),
+  tabGroups: {
+    activeTabGroup: { activeTab: undefined },
+    onDidChangeTabs: jest.fn(() => ({ dispose: jest.fn() })),
+  },
   activeTextEditor: undefined as unknown,
   visibleTextEditors: [],
   onDidChangeActiveTextEditor: jest.fn(() => ({ dispose: jest.fn() })),
@@ -558,6 +544,7 @@ export default {
   ThemeColor,
   ConfigurationTarget,
   workspace,
+  extensions,
   window,
   commands,
   languages,

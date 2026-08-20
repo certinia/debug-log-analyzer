@@ -1,7 +1,9 @@
 /*
  * Copyright (c) 2020 Certinia Inc. All rights reserved.
  */
-import { Selection, Uri, commands, window, workspace } from 'vscode';
+import { Selection, commands, window, type Uri } from 'vscode';
+
+import { readFile } from '../services/salesforceServices.js';
 
 /**
  * Handles navigation within raw Apex log files.
@@ -15,12 +17,10 @@ export class RawLogNavigation {
    * @param logPath - Path to the log file
    * @param timestamp - Nanosecond timestamp to find (from log event)
    */
-  public static async goToLineByTimestamp(logPath: string, timestamp: number): Promise<void> {
+  public static async goToLineByTimestamp(logUri: Uri, timestamp: number): Promise<void> {
     try {
-      const uri = Uri.file(logPath);
-
       // Read file (no normalization - avoids doubling memory for large files)
-      const text = new TextDecoder().decode(await workspace.fs.readFile(uri));
+      const text = await readFile(logUri);
 
       // Find the exact timestamp pattern: (nanoseconds)|
       const index = text.indexOf(`(${timestamp})|`);
@@ -45,7 +45,7 @@ export class RawLogNavigation {
       }
 
       // Open file with line selected (cursor ends up at end - VS Code limitation)
-      await commands.executeCommand('vscode.open', uri, {
+      await commands.executeCommand('vscode.open', logUri, {
         preview: false,
         selection: new Selection(lineNumber, 0, lineNumber, lineLength),
       });

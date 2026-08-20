@@ -1,13 +1,14 @@
 /*
  * Copyright (c) 2020 Certinia Inc. All rights reserved.
  */
-import { join } from 'path';
 import {
+  Uri,
   window,
   type QuickPick as VSCodeQuickPick,
   type QuickPickItem,
   type WebviewPanel,
 } from 'vscode';
+import { Utils } from 'vscode-uri';
 
 import { appName } from '../AppSettings.js';
 import type { Context } from '../Context.js';
@@ -56,14 +57,14 @@ export class RetrieveLogFile {
   }
 
   private static async command(context: Context): Promise<WebviewPanel | void> {
-    const workspacePath = await QuickPickWorkspace.pickOrReturn(context);
+    const workspace = await QuickPickWorkspace.pickOrReturn(context);
     const loadingPicker = RetrieveLogFile.showLoadingPicker();
     try {
       const logFiles = await listLogs();
       const logFileId = await RetrieveLogFile.getLogFile(logFiles);
       if (logFileId) {
-        const logFilePath = join(
-          workspacePath,
+        const logUri = Utils.joinPath(
+          Uri.parse(workspace.uri),
           '.sfdx',
           'tools',
           'debug',
@@ -73,12 +74,12 @@ export class RetrieveLogFile {
         const logData = await getLogBody(logFileId);
         this.assertRetrievedLog(logFileId, logData);
         try {
-          await writeFile(logFilePath, logData);
+          await writeFile(logUri, logData);
         } catch (error: unknown) {
           const message = error instanceof Error ? error.message : String(error);
           context.display.output(`Unable to cache retrieved log: ${message}`, true);
         }
-        return LogView.createView(context, undefined, logFilePath, logData);
+        return LogView.createView(context, undefined, logUri, logData);
       }
     } finally {
       loadingPicker.dispose();

@@ -1,12 +1,11 @@
 /*
  * Copyright (c) 2020 Certinia Inc. All rights reserved.
  */
-import { existsSync } from 'fs';
-import type { Uri } from 'vscode';
-import { window } from 'vscode';
+import { TabInputText, window, type Uri } from 'vscode';
 
 import { appName } from '../AppSettings.js';
 import type { Context } from '../Context.js';
+import { fileOrFolderExists } from '../services/salesforceServices.js';
 import { Command } from './Command.js';
 import { LogView } from './LogView.js';
 
@@ -33,12 +32,13 @@ export class ShowLogAnalysis {
   }
 
   private static async command(context: Context, uri: Uri): Promise<void> {
-    const filePath = uri?.fsPath || window?.activeTextEditor?.document.fileName || '';
-    const fileContent = !existsSync(filePath) ? window?.activeTextEditor?.document.getText() : '';
+    const activeTab = window.tabGroups.activeTabGroup.activeTab;
+    const logUri =
+      uri ||
+      window.activeTextEditor?.document.uri ||
+      (activeTab?.input instanceof TabInputText ? activeTab.input.uri : undefined);
 
-    if (filePath || fileContent) {
-      LogView.createView(context, Promise.resolve(), filePath, fileContent);
-    } else {
+    if (!logUri) {
       context.display.showErrorMessage(
         'No file selected or the file is too large. Try again using the file explorer or text editor command.',
       );
@@ -46,5 +46,10 @@ export class ShowLogAnalysis {
         'No file selected or the file is too large. Try again using the file explorer or text editor command.',
       );
     }
+
+    const fileContent = (await fileOrFolderExists(logUri))
+      ? undefined
+      : window.activeTextEditor?.document.getText();
+    await LogView.createView(context, Promise.resolve(), logUri, fileContent);
   }
 }

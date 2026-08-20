@@ -1,16 +1,14 @@
 /*
  * Copyright (c) 2020 Certinia Inc. All rights reserved.
  */
-import { createReadStream, existsSync } from 'fs';
-import { writeFile } from 'fs/promises';
-import { homedir } from 'os';
-import { basename, dirname, join, parse } from 'path';
 import { Uri, commands, window as vscWindow, workspace, type WebviewPanel } from 'vscode';
+import { Utils } from 'vscode-uri';
 
 import type { Context } from '../Context.js';
 import { OpenFileInPackage } from '../display/OpenFileInPackage.js';
 import { WebView } from '../display/WebView.js';
 import { RawLogNavigation } from '../log-features/RawLogNavigation.js';
+import { fileOrFolderExists, readFile, writeFile } from '../services/salesforceServices.js';
 import {
   PRIVATE_SECTIONS,
   getColumnOverrides,
@@ -32,7 +30,7 @@ interface WebViewLogFileRequest<T = unknown> {
 export class LogView {
   private static helpUrl = 'https://certinia.github.io/debug-log-analyzer/';
   private static currentPanel: WebviewPanel | undefined;
-  private static currentLogPath: string | undefined;
+  private static currentLogUri: Uri | undefined;
   private static pendingNavigationTimestamp: number | undefined;
 
   static getCurrentView() {
@@ -40,7 +38,11 @@ export class LogView {
   }
 
   static getLogPath() {
-    return LogView.currentLogPath;
+    return LogView.currentLogUri?.toString();
+  }
+
+  static getLogUri(): Uri | undefined {
+    return LogView.currentLogUri;
   }
 
   static setPendingNavigation(timestamp: number): void {
@@ -50,22 +52,24 @@ export class LogView {
   static async createView(
     context: Context,
     beforeSendLog?: Promise<void>,
-    logPath?: string,
+    logUri?: Uri,
     logData?: string,
   ): Promise<WebviewPanel> {
-    const panel = WebView.apply('logFile', `Log: ${logPath ? basename(logPath) : 'Untitled'}`, [
-      Uri.file(join(context.context.extensionPath, 'out')),
-      Uri.file(dirname(logPath || '')),
+    const logName = logUri ? Utils.basename(logUri) : 'Untitled';
+    const logDir = logUri ? Utils.dirname(logUri) : context.context.extensionUri;
+    const panel = WebView.apply('logFile', `Log: ${logName}`, [
+      Utils.joinPath(context.context.extensionUri, 'out'),
+      logDir,
     ]);
     this.currentPanel = panel;
-    this.currentLogPath = logPath;
+    this.currentLogUri = logUri;
 
-    const logViewerRoot = join(context.context.extensionPath, 'out');
-    const index = join(logViewerRoot, 'index.html');
-    const bundleUri = panel.webview.asWebviewUri(Uri.file(join(logViewerRoot, 'bundle.js')));
-    const codiconUri = panel.webview.asWebviewUri(Uri.file(join(logViewerRoot, 'codicon.css')));
+    const logViewerRoot = Utils.joinPath(context.context.extensionUri, 'out');
+    const index = Utils.joinPath(logViewerRoot, 'index.html');
+    const bundleUri = panel.webview.asWebviewUri(Utils.joinPath(logViewerRoot, 'bundle.js'));
+    const codiconUri = panel.webview.asWebviewUri(Utils.joinPath(logViewerRoot, 'codicon.css'));
     const indexSrc = await this.getFile(index);
-    panel.iconPath = Uri.file(join(logViewerRoot, 'certinia-icon-color.png'));
+    panel.iconPath = Utils.joinPath(logViewerRoot, 'certinia-icon-color.png');
     panel.webview.html = indexSrc
       .replace(/bundle\.js/gi, bundleUri.toString(true))
       .replace(/codicon\.css/gi, codiconUri.toString(true));
@@ -90,7 +94,7 @@ export class LogView {
       () => {
         configListener.dispose();
         this.currentPanel = undefined;
-        this.currentLogPath = undefined;
+        this.currentLogUri = undefined;
       },
       undefined,
       context.context.subscriptions,
@@ -98,27 +102,31 @@ export class LogView {
 
     panel.webview.onDidReceiveMessage(
       async (msg: WebViewLogFileRequest) => {
+        if (!isWebViewLogFileRequest(msg)) {
+          return;
+        }
         const { cmd, requestId, payload } = msg;
 
         switch (cmd) {
           case 'fetchLog': {
+            if (!requestId) {
+              break;
+            }
             await beforeSendLog;
-            LogView.sendLog(requestId, panel, context, logPath, logData);
+            await LogView.sendLog(requestId, panel, context, logUri, logData);
             break;
           }
 
           case 'openPath': {
-            const filePath = payload as string;
-            if (filePath) {
-              context.display.showFile(filePath);
+            if (logUri) {
+              context.display.showFile(logUri);
             }
             break;
           }
 
           case 'openType': {
-            const symbol = payload as string;
-            if (symbol) {
-              await OpenFileInPackage.openFileForSymbol(context, symbol);
+            if (typeof payload === 'string' && payload) {
+              await OpenFileInPackage.openFileForSymbol(context, payload);
             }
             break;
           }
@@ -148,8 +156,8 @@ export class LogView {
           }
 
           case 'updateConfig': {
-            const { section, value } = payload as { section: string; value: unknown };
-            if (section) {
+            if (isConfigUpdate(payload)) {
+              const { section, value } = payload;
               if ((PRIVATE_SECTIONS as readonly string[]).includes(section)) {
                 updatePrivateSection(context.context.globalState, section, value);
               } else {
@@ -160,20 +168,16 @@ export class LogView {
           }
 
           case 'saveFile': {
-            const { fileContent, options } = payload as {
-              fileContent: string;
-              options: { defaultFileName?: string };
-            };
-
-            if (fileContent && options?.defaultFileName) {
+            if (isSaveFileRequest(payload)) {
+              const { fileContent, options } = payload;
               const defaultWorkspace = (workspace.workspaceFolders || [])[0];
-              const defaultDir = defaultWorkspace?.uri.path || homedir();
+              const defaultDir = defaultWorkspace?.uri ?? context.context.extensionUri;
               const destinationFile = await vscWindow.showSaveDialog({
-                defaultUri: Uri.file(join(defaultDir, options.defaultFileName)),
+                defaultUri: Utils.joinPath(defaultDir, options.defaultFileName),
               });
 
               if (destinationFile) {
-                writeFile(destinationFile.fsPath, fileContent).catch((error) => {
+                writeFile(destinationFile, fileContent).catch((error) => {
                   const msg = error instanceof Error ? error.message : String(error);
                   vscWindow.showErrorMessage(`Unable to save file: ${msg}`);
                 });
@@ -183,17 +187,15 @@ export class LogView {
           }
 
           case 'showError': {
-            const { text } = payload as { text: string };
-            if (text) {
-              vscWindow.showErrorMessage(text);
+            if (isTextPayload(payload)) {
+              vscWindow.showErrorMessage(payload.text);
             }
             break;
           }
 
           case 'goToLogLine': {
-            const { timestamp } = payload as { timestamp: number };
-            if (timestamp && LogView.currentLogPath) {
-              RawLogNavigation.goToLineByTimestamp(LogView.currentLogPath, timestamp);
+            if (isTimestampPayload(payload) && logUri) {
+              await RawLogNavigation.goToLineByTimestamp(logUri, payload.timestamp);
             }
             break;
           }
@@ -226,36 +228,24 @@ export class LogView {
     return config;
   }
 
-  private static async getFile(filePath: string): Promise<string> {
-    let data = '';
-    return new Promise((resolve, reject) => {
-      createReadStream(filePath)
-        .on('error', (error) => {
-          reject(error);
-        })
-        .on('data', (row) => {
-          data += row;
-        })
-        .on('end', () => {
-          resolve(data);
-        });
-    });
+  private static async getFile(fileUri: Uri): Promise<string> {
+    return readFile(fileUri);
   }
 
-  private static sendLog(
+  private static async sendLog(
     requestId: string,
     panel: WebviewPanel,
     context: Context,
-    logFilePath?: string,
+    logUri?: Uri,
     logData?: string,
   ) {
-    if (!logData && !existsSync(logFilePath || '')) {
+    if (!logData && logUri && !(await fileOrFolderExists(logUri))) {
       context.display.showErrorMessage('Log file could not be found.', {
         modal: true,
       });
+      return;
     }
 
-    const filePath = parse(logFilePath || '');
     const navigateToTimestamp = LogView.pendingNavigationTimestamp;
     LogView.pendingNavigationTimestamp = undefined;
 
@@ -263,12 +253,72 @@ export class LogView {
       requestId,
       cmd: 'fetchLog',
       payload: {
-        logName: filePath.base,
-        logUri: logFilePath ? panel.webview.asWebviewUri(Uri.file(logFilePath)).toString(true) : '',
-        logPath: logFilePath,
+        logName: logUri ? Utils.basename(logUri) : '',
+        logUri: logUri ? panel.webview.asWebviewUri(logUri).toString(true) : '',
+        logPath: logUri?.toString(),
         logData: logData,
         navigateToTimestamp,
       },
     });
   }
+}
+
+function isWebViewLogFileRequest(value: unknown): value is WebViewLogFileRequest {
+  return (
+    typeof value === 'object' &&
+    value !== null &&
+    !Array.isArray(value) &&
+    typeof (value as Record<string, unknown>).cmd === 'string' &&
+    ((value as Record<string, unknown>).requestId === undefined ||
+      typeof (value as Record<string, unknown>).requestId === 'string')
+  );
+}
+
+function isConfigUpdate(value: unknown): value is { section: string; value: unknown } {
+  return (
+    typeof value === 'object' &&
+    value !== null &&
+    !Array.isArray(value) &&
+    typeof (value as Record<string, unknown>).section === 'string' &&
+    Boolean((value as Record<string, unknown>).section)
+  );
+}
+
+function isSaveFileRequest(
+  value: unknown,
+): value is { fileContent: string; options: { defaultFileName: string } } {
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) {
+    return false;
+  }
+  const payload = value as Record<string, unknown>;
+  const options = payload.options;
+  return (
+    typeof payload.fileContent === 'string' &&
+    Boolean(payload.fileContent) &&
+    typeof options === 'object' &&
+    options !== null &&
+    !Array.isArray(options) &&
+    typeof (options as Record<string, unknown>).defaultFileName === 'string' &&
+    Boolean((options as Record<string, unknown>).defaultFileName)
+  );
+}
+
+function isTextPayload(value: unknown): value is { text: string } {
+  return (
+    typeof value === 'object' &&
+    value !== null &&
+    !Array.isArray(value) &&
+    typeof (value as Record<string, unknown>).text === 'string' &&
+    Boolean((value as Record<string, unknown>).text)
+  );
+}
+
+function isTimestampPayload(value: unknown): value is { timestamp: number } {
+  return (
+    typeof value === 'object' &&
+    value !== null &&
+    !Array.isArray(value) &&
+    typeof (value as Record<string, unknown>).timestamp === 'number' &&
+    Number.isFinite((value as Record<string, unknown>).timestamp)
+  );
 }

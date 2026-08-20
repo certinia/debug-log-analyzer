@@ -66,7 +66,7 @@ const log = (id: string, startTime = '2024-01-01T00:00:00.000Z', durationMillise
 describe('RetrieveLogFile', () => {
   beforeEach(() => {
     jest.clearAllMocks();
-    mockPickWorkspace.mockResolvedValue('/test/workspace');
+    mockPickWorkspace.mockResolvedValue({ uri: 'file:///test/workspace' });
     mockListLogs.mockResolvedValue([]);
     mockPick.mockResolvedValue([]);
     mockGetLogBody.mockResolvedValue('log body');
@@ -105,13 +105,13 @@ describe('RetrieveLogFile', () => {
 
     expect(mockGetLogBody).toHaveBeenCalledWith('selected-log');
     expect(mockWriteFile).toHaveBeenCalledWith(
-      expect.stringContaining('selected-log.log'),
+      expect.objectContaining({ path: expect.stringContaining('selected-log.log') }),
       'log body',
     );
     expect(mockCreateView).toHaveBeenCalledWith(
       context,
       undefined,
-      expect.stringContaining('selected-log.log'),
+      expect.objectContaining({ path: expect.stringContaining('selected-log.log') }),
       'log body',
     );
   });

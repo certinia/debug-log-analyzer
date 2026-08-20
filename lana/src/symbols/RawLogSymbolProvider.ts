@@ -29,7 +29,7 @@ class RawLogSymbolProvider implements DocumentSymbolProvider {
     document: TextDocument,
     _token: CancellationToken,
   ): Promise<DocumentSymbol[]> {
-    const apexLog = await LogEventCache.getApexLog(document.uri.fsPath);
+    const apexLog = await LogEventCache.getApexLog(document.uri.toString());
 
     if (!apexLog) {
       return [];
@@ -89,7 +89,7 @@ class RawLogSymbolProvider implements DocumentSymbolProvider {
   }
 
   static apply(context: Context): void {
-    const docSelector = [{ scheme: 'file', language: 'apexlog' }];
+    const docSelector = [{ language: 'apexlog' }];
 
     context.context.subscriptions.push(
       languages.registerDocumentSymbolProvider(docSelector, new RawLogSymbolProvider()),
