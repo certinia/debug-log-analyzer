@@ -9,6 +9,7 @@ import type { PaneSection } from './PaneView.js';
 
 // web components
 import '../features/analysis/components/LogDiagnosticsView.js';
+import '../features/analysis/components/SelfTimeSpreadView.js';
 import '../features/database/components/DatabaseOverview.js';
 import '../features/database/components/DatabaseTimeTree.js';
 import './CallStackDetail.js';
@@ -29,7 +30,7 @@ import './NamespaceTimeBar.js';
  *
  * With nothing selected every source gets the whole-log analogue of what its tab
  * does: the shared **Overview**, plus the sections that tab can answer at log
- * scope. Analysis adds **Findings**; the Database tab adds its whole-log
+ * scope. Analysis adds **Findings** and the **Self time spread**; the Database tab adds its whole-log
  * database figures; the Timeline adds its charts and the
  * whole-log call tree; the Call Tree adds the **Hot path** and **Hot spots** —
  * clickable routes into the tree it sits beside.
@@ -76,11 +77,21 @@ export async function buildDetailSections(
       );
     }
     if (source === 'analysis') {
-      sections.push({
-        id: 'findings',
-        title: 'Findings',
-        content: html`<log-diagnostics></log-diagnostics>`,
-      });
+      sections.push(
+        {
+          id: 'findings',
+          title: 'Findings',
+          content: html`<log-diagnostics></log-diagnostics>`,
+        },
+        // The grid ranks by count and average; the spread gives the shape those
+        // averages hide, and how few signatures the log comes down to.
+        {
+          id: 'self-time-spread',
+          title: 'Self time spread',
+          fit: 'content',
+          content: html`<self-time-spread></self-time-spread>`,
+        },
+      );
     }
     if (source === 'database') {
       // The Database tab's whole-log analogue, widest question first: whose code

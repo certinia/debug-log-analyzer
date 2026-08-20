@@ -252,7 +252,7 @@ describe('buildDetailSections', () => {
 
   it('adds the findings section on Analysis, which is that tab at log scope', async () => {
     const sections = await buildDetailSections('analysis', null);
-    expect(sections.map((s) => s.id)).toEqual(['overview', 'findings']);
+    expect(sections.map((s) => s.id)).toEqual(['overview', 'findings', 'self-time-spread']);
     expect(sections[1]?.title).toBe('Findings');
   });
 });
