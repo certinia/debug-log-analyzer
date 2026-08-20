@@ -28,8 +28,7 @@ class RawLogFoldingProvider implements FoldingRangeProvider {
     document: TextDocument,
     _context: FoldingContext,
   ): Promise<FoldingRange[]> {
-    const filePath = document.uri.fsPath;
-    const apexLog = await LogEventCache.getApexLog(filePath);
+    const apexLog = await LogEventCache.getApexLog(document.uri.toString());
 
     if (!apexLog) {
       return [];
@@ -87,11 +86,11 @@ class RawLogFoldingProvider implements FoldingRangeProvider {
    * unrelated action forces a re-evaluation.
    */
   private warmAndSignal(document: TextDocument): void {
-    if (document.uri.scheme !== 'file' || !isApexLogContent(document)) {
+    if (!isApexLogContent(document)) {
       return;
     }
 
-    void LogEventCache.getApexLog(document.uri.fsPath).then((apexLog) => {
+    void LogEventCache.getApexLog(document.uri.toString()).then((apexLog) => {
       if (apexLog) {
         this.changeEmitter.fire();
       }
@@ -99,7 +98,7 @@ class RawLogFoldingProvider implements FoldingRangeProvider {
   }
 
   static apply(context: Context): void {
-    const docSelector = [{ scheme: 'file', language: 'apexlog' }];
+    const docSelector = [{ language: 'apexlog' }];
     const provider = new RawLogFoldingProvider();
 
     context.context.subscriptions.push(

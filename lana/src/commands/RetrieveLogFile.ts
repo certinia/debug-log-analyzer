@@ -1,7 +1,6 @@
 /*
  * Copyright (c) 2020 Certinia Inc. All rights reserved.
  */
-import { join } from 'path';
 import {
   window,
   workspace,
@@ -9,6 +8,7 @@ import {
   type QuickPickItem,
   type WebviewPanel,
 } from 'vscode';
+import { Utils } from 'vscode-uri';
 
 import { appName } from '../AppSettings.js';
 import type { Context } from '../Context.js';
@@ -56,8 +56,8 @@ export class RetrieveLogFile {
       return;
     }
 
-    const workspacePath = workspace.workspaceFolders?.[0]?.uri.fsPath;
-    if (!workspacePath) {
+    const workspaceFolder = workspace.workspaceFolders?.[0];
+    if (!workspaceFolder) {
       throw new Error('No workspace selected');
     }
     const loadingPicker = RetrieveLogFile.showLoadingPicker();
@@ -65,27 +65,27 @@ export class RetrieveLogFile {
       const logFiles = await salesforceServices.listLogs();
       const logFileId = await RetrieveLogFile.getLogFile(logFiles);
       if (logFileId) {
-        const logFilePath = join(
-          workspacePath,
+        const logUri = Utils.joinPath(
+          workspaceFolder.uri,
           '.sfdx',
           'tools',
           'debug',
           'logs',
           `${logFileId}.log`,
         );
-        if (await salesforceServices.fileOrFolderExists(logFilePath)) {
-          return LogView.createView(context, Promise.resolve(), logFilePath);
+        if (await salesforceServices.fileOrFolderExists(logUri)) {
+          return LogView.createView(context, Promise.resolve(), logUri);
         }
 
         const logData = await salesforceServices.getLogBody(logFileId);
         this.assertRetrievedLog(logFileId, logData);
         try {
-          await salesforceServices.writeFile(logFilePath, logData);
+          await salesforceServices.writeFile(logUri, logData);
         } catch (error: unknown) {
           const message = error instanceof Error ? error.message : String(error);
           context.display.output(`Unable to cache retrieved log: ${message}`, true);
         }
-        return LogView.createView(context, undefined, logFilePath, logData);
+        return LogView.createView(context, undefined, logUri, logData);
       }
     } finally {
       loadingPicker.dispose();

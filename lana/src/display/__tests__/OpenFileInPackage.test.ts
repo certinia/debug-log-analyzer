@@ -81,7 +81,7 @@ describe('OpenFileInPackage.openFileForSymbol', () => {
     const { context, workspaceManager, display } = createContext();
     workspaceManager.findSymbol.mockResolvedValue({
       status: 'found',
-      uri: { fsPath: '/ws/force-app/MyClass.cls' },
+      uri: { path: '/ws/force-app/MyClass.cls', fsPath: '/ws/force-app/MyClass.cls' },
     });
     mockGetMethodLine.mockReturnValue({ line: 12, character: 4, isExactMatch: true });
 
@@ -93,8 +93,8 @@ describe('OpenFileInPackage.openFileForSymbol', () => {
     );
     expect(display.showErrorMessage).not.toHaveBeenCalled();
     expect(display.showFile).toHaveBeenCalledTimes(1);
-    const [path, options] = display.showFile.mock.calls[0];
-    expect(path).toBe('/ws/force-app/MyClass.cls');
+    const [uri, options] = display.showFile.mock.calls[0];
+    expect(uri).toEqual(expect.objectContaining({ fsPath: '/ws/force-app/MyClass.cls' }));
     // line is converted to zero-indexed; character used as-is
     expect(options.selection.start).toEqual(expect.objectContaining({ line: 11, character: 4 }));
     expect(options.viewColumn).toBe(-1);
@@ -104,7 +104,7 @@ describe('OpenFileInPackage.openFileForSymbol', () => {
     const { context, workspaceManager, display } = createContext();
     workspaceManager.findSymbol.mockResolvedValue({
       status: 'found',
-      uri: { fsPath: '/ws/MyClass.cls' },
+      uri: { path: '/ws/MyClass.cls', fsPath: '/ws/MyClass.cls' },
     });
     mockGetMethodLine.mockReturnValue({ line: 3, isExactMatch: true });
 
@@ -118,7 +118,7 @@ describe('OpenFileInPackage.openFileForSymbol', () => {
     const { context, workspaceManager, display } = createContext();
     workspaceManager.findSymbol.mockResolvedValue({
       status: 'found',
-      uri: { fsPath: '/ws/force-app/MyClass.cls' },
+      uri: { path: '/ws/force-app/MyClass.cls', fsPath: '/ws/force-app/MyClass.cls' },
     });
     mockGetMethodLine.mockReturnValue({
       line: 1,

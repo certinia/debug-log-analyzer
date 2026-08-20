@@ -94,8 +94,7 @@
     "menus": {
       "commandPalette": [
         {
-          "command": "lana.showLogAnalysis",
-          "when": "resourceLangId == apexlog || lana.isApexLog"
+          "command": "lana.showLogAnalysis"
         }
       ],
       "editor/context": [
@@ -382,7 +381,8 @@
   },
   "dependencies": {
     "@apexdevtools/apex-parser": "5.1.0",
-    "effect": "^3.22.0"
+    "effect": "^3.22.0",
+    "vscode-uri": "^3.1.0"
   },
   "devDependencies": {
     "@salesforce/vscode-services": "^67.12.0",
