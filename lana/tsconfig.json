@@ -1,6 +1,6 @@
 {
   "compilerOptions": {
-    "lib": ["ES2022"],
+    "lib": ["ES2022", "DOM"],
     "esModuleInterop": true,
     "skipLibCheck": true,
     "target": "es2022",
@@ -16,7 +16,7 @@
     "moduleResolution": "Bundler",
     "module": "ESNext",
     "noEmit": true,
-    "types": ["jest"],
+    "types": ["jest", "node"],
 
     "composite": true,
     "declarationMap": true,
