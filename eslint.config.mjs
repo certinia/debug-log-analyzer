@@ -15,6 +15,8 @@ export default defineConfig(
     '**/out/',
     '**/coverage/',
     '**/.docusaurus/',
+    '**/.vscode-test-web/',
+    '**/playwright-report/',
     // only TypeScript is linted; without this, `eslint .` selects js/mjs/cjs
     // by default and scans them with no rules
     '**/*.js',
