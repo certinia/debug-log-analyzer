@@ -83,9 +83,14 @@ export async function buildDetailSections(
       });
     }
     if (source === 'database') {
-      // The Database tab's whole-log analogue, widest question first: whose code
-      // holds the database time, which call paths reach it, and how few
-      // statements it comes down to.
+      // The Database tab's whole-log analogue: whose code holds the database
+      // time, how few statements it comes down to, and which call paths reach it.
+      //
+      // The Row budget section is written and tested but held back while the tab
+      // is judged for length. To re-add it, restore the import of
+      // DatabaseRowBudget.js and this section, first in the list:
+      //   { id: 'database-rows', title: 'Row budget', fit: 'content',
+      //     content: html`<database-rows></database-rows>` },
       sections.push(
         {
           id: 'database-namespaces',
@@ -94,18 +99,18 @@ export async function buildDetailSections(
           content: html`<database-namespaces></database-namespaces>`,
         },
         {
+          id: 'database-concentration',
+          title: 'Database duration',
+          fit: 'content',
+          content: html`<database-concentration></database-concentration>`,
+        },
+        {
           // A grid sized to the pane it is in, so this section takes the space
           // the sized-to-content ones leave.
           id: 'database-time',
           title: 'Call tree',
           weight: 4,
           content: html`<database-time></database-time>`,
-        },
-        {
-          id: 'database-concentration',
-          title: 'Database duration',
-          fit: 'content',
-          content: html`<database-concentration></database-concentration>`,
         },
       );
     }

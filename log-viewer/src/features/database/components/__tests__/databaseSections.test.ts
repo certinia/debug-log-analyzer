@@ -38,9 +38,9 @@ function rendered(sections: PaneSection[], id: string, tag: string): Element {
 }
 
 describe('buildDatabaseSections', () => {
-  it('builds vitals + call stack + call tree + issues for a SOQL selection, badged by count', async () => {
+  it('builds vitals + call stack + issues + call tree for a SOQL selection, badged by count', async () => {
     const sections = await buildDatabaseSections({ eventIndex: 3, type: 'soql' });
-    expect(sections.map((s) => s.id)).toEqual(['vitals', 'callstack', 'calltree', 'issues']);
+    expect(sections.map((s) => s.id)).toEqual(['vitals', 'callstack', 'issues', 'calltree']);
     expect(sections.find((s) => s.id === 'issues')?.badge).toBe('2');
     // The smallest section.
     expect(sections.find((s) => s.id === 'issues')?.weight).toBe(1);

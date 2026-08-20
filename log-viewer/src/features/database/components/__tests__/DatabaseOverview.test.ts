@@ -65,10 +65,12 @@ const statements = (): DatabaseStatement[] => [
     eventIndexes: [11],
     kind: 'SOQL',
     label: 'SELECT Id FROM Account',
+    sObject: 'Account',
     timeNs: 150_000_000,
     netNs: 150_000_000,
     selfNs: 150_000_000,
     rows: 200,
+    maxRows: 200,
     repeats: 1,
   },
   {
@@ -76,10 +78,12 @@ const statements = (): DatabaseStatement[] => [
     eventIndexes: [22, 23, 24],
     kind: 'DML',
     label: 'Update Case',
+    sObject: 'Case',
     timeNs: 150_000_000,
     netNs: 100_000_000,
     selfNs: 30_000_000,
     rows: 40,
+    maxRows: 20,
     repeats: 3,
   },
   {
@@ -87,10 +91,12 @@ const statements = (): DatabaseStatement[] => [
     eventIndexes: [33],
     kind: 'SOQL',
     label: 'SELECT Name FROM Contact',
+    sObject: 'Contact',
     timeNs: 50_000_000,
     netNs: 50_000_000,
     selfNs: 50_000_000,
     rows: 100,
+    maxRows: 100,
     repeats: 1,
   },
 ];
@@ -337,10 +343,12 @@ describe('database-concentration', () => {
       eventIndexes: [index],
       kind: 'SOQL' as const,
       label: `SELECT Id FROM Object${index}`,
+      sObject: `Object${index}`,
       timeNs: 30_000_000,
       netNs: 30_000_000,
       selfNs: 30_000_000,
       rows: 0,
+      maxRows: 0,
       repeats: 1,
     }));
     overview = many;
@@ -394,7 +402,7 @@ describe('database-namespaces', () => {
     overview = fullOverview();
     const chart = bar(await mount('database-namespaces'));
 
-    expect(chart.segments.map((segment) => [segment.label, segment.timeNs])).toEqual([
+    expect(chart.segments.map((segment) => [segment.label, segment.value])).toEqual([
       ['pkg', 250_000_000],
       ['default', 50_000_000],
     ]);
@@ -478,7 +486,7 @@ describe('database-namespaces', () => {
     const chart = bar(await mount('database-namespaces'));
 
     expect(chart.segments).toHaveLength(9);
-    expect(chart.segments[8]).toMatchObject({ label: '2 others', timeNs: 30_000_000 });
+    expect(chart.segments[8]).toMatchObject({ label: '2 others', value: 30_000_000 });
   });
 
   it('says so when the log records no statements', async () => {

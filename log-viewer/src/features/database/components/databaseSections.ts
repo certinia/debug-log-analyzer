@@ -37,7 +37,7 @@ export async function buildDatabaseSections(selection: DetailSelection): Promise
 
   // The vitals are a fixed set of figures, so they take their own height; the
   // fill sections share the leftover space, the call tree getting the most,
-  // SOQL issues the least (but still open).
+  // SOQL issues the least (but still open). The call tree closes the panel.
   const sections: PaneSection[] = [
     {
       id: 'vitals',
@@ -57,12 +57,6 @@ export async function buildDatabaseSections(selection: DetailSelection): Promise
         activeEventIndex=${active}
       ></call-stack-detail>`,
     },
-    {
-      id: 'calltree',
-      title: 'Call tree',
-      weight: 4,
-      content: html`<call-tree-detail eventIndex=${active}></call-tree-detail>`,
-    },
   ];
 
   if (type === 'soql') {
@@ -75,6 +69,15 @@ export async function buildDatabaseSections(selection: DetailSelection): Promise
       content: html`<soql-issues unbounded .issues=${issues}></soql-issues>`,
     });
   }
+
+  // Last in every inspector view that has one, so the panel reads the same
+  // wherever the selection came from.
+  sections.push({
+    id: 'calltree',
+    title: 'Call tree',
+    weight: 4,
+    content: html`<call-tree-detail eventIndex=${active}></call-tree-detail>`,
+  });
 
   return sections;
 }

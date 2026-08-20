@@ -9,10 +9,10 @@ import { styleMap } from 'lit/directives/style-map.js';
 import { formatDuration, formatInteger } from '../core/utility/Util.js';
 import { globalStyles } from '../styles/global.styles.js';
 
-/** One coloured length of a {@link StackedTimeBar}, measured in nanoseconds. */
+/** One coloured length of a {@link StackedTimeBar}, in the bar's own unit. */
 export interface StackedSegment {
   label: string;
-  timeNs: number;
+  value: number;
   color: string;
   /** What the segment is made of. Shown in the tip. */
   detail?: string;
@@ -22,24 +22,24 @@ export interface StackedSegment {
  * The first `max` rows as segments, with everything past them gathered into one
  * muted tail, so a bar with more rows than it can colour still totals the whole.
  *
- * The tail reads its time through `timeOf`, so a row past `max` never pays for a
+ * The tail reads its size through `sizeOf`, so a row past `max` never pays for a
  * segment that is thrown away.
  */
 export function segmentsWithTail<T>(
   rows: readonly T[],
   max: number,
-  toSegment: (row: T) => StackedSegment,
-  timeOf: (row: T) => number,
+  toSegment: (row: T, index: number) => StackedSegment,
+  sizeOf: (row: T) => number,
 ): StackedSegment[] {
   const segments = rows.slice(0, max).map(toSegment);
   if (rows.length > max) {
-    let tailNs = 0;
+    let tail = 0;
     for (let index = max; index < rows.length; index++) {
-      tailNs += timeOf(rows[index]!); // in range: below rows.length
+      tail += sizeOf(rows[index]!); // in range: below rows.length
     }
     segments.push({
       label: `${formatInteger(rows.length - max)} others`,
-      timeNs: tailNs,
+      value: tail,
       color: 'var(--lana-fg-muted)',
     });
   }
@@ -47,12 +47,14 @@ export function segmentsWithTail<T>(
 }
 
 /**
- * Durations as one stacked bar: a segment per kind, in the flame chart's own
- * colours, with a hover readout and an optional legend.
+ * One quantity as a stacked bar: a segment per part, in the flame chart's own
+ * colours, with a hover readout and an optional legend. `format` says what the
+ * segments are — durations, or counts such as rows against a governor limit.
  *
  * `total` is the bar's denominator. Set it above the segments' sum and the
  * shortfall stays unfilled, so the bar shows a share of something larger — the
- * database against the whole log — rather than only a split of itself.
+ * database against the whole log — rather than only a split of itself. Below
+ * their sum the segments answer instead, and a mark shows where the total fell.
  *
  * Set `--stacked-bar-height` to size it; a row inside a list wants it thinner
  * than a section's own chart.
@@ -62,9 +64,13 @@ export class StackedTimeBar extends LitElement {
   @property({ attribute: false })
   segments: readonly StackedSegment[] = [];
 
-  /** Denominator (ns). Zero or below the segments' sum: the sum answers. */
+  /** Denominator, in the segments' unit. Zero or below their sum: the sum answers. */
   @property({ type: Number })
   total = 0;
+
+  /** How a figure reads. A count bar passes `formatInteger`. */
+  @property({ attribute: false })
+  format: (value: number) => string = formatDuration;
 
   /** Show the figures beneath the bar, one item per segment. */
   @property({ type: Boolean })
@@ -100,6 +106,16 @@ export class StackedTimeBar extends LitElement {
         height: var(--stacked-bar-height, 12px);
         border-radius: var(--lana-radius-sm);
         background: color-mix(in srgb, var(--lana-meter-fill) 22%, transparent);
+      }
+
+      /* Where the total fell once the segments passed it. A line rather than an
+       edge: the segments own the whole bar by then. */
+      .limit {
+        position: absolute;
+        pointer-events: none;
+        inset-block: 0;
+        width: var(--lana-stroke);
+        background: var(--lana-fg);
       }
 
       /* The readout. The legend carries the same figures, but a narrow or
@@ -175,7 +191,7 @@ export class StackedTimeBar extends LitElement {
   ];
 
   render() {
-    const sum = this.segments.reduce((running, segment) => running + segment.timeNs, 0);
+    const sum = this.segments.reduce((running, segment) => running + segment.value, 0);
     const denominator = Math.max(this.total, sum);
     if (denominator <= 0) {
       return html``;
@@ -185,10 +201,13 @@ export class StackedTimeBar extends LitElement {
     let x = 0;
     const laid = this.segments.map((segment) => {
       const start = x;
-      const width = (segment.timeNs / denominator) * 100;
+      const width = (segment.value / denominator) * 100;
       x += width;
       return { ...segment, start, width };
     });
+    // Only once the segments pass the total: inside it the unfilled remainder is
+    // already the mark.
+    const limitPercent = this.total > 0 && sum > this.total ? (this.total / sum) * 100 : null;
     const hover = this._hover;
     const hovered = hover ? laid.find((s) => s.label === hover.label) : undefined;
     // A bar hover always gets the readout; a legend hover only when the segment
@@ -224,6 +243,15 @@ export class StackedTimeBar extends LitElement {
           )}
         </svg>
         ${
+          limitPercent === null
+            ? ''
+            : html`<span
+                class="limit"
+                style=${styleMap({ left: `${limitPercent.toFixed(1)}%` })}
+                title=${`Limit ${this.format(this.total)}`}
+              ></span>`
+        }
+        ${
           tipSlice
             ? html`<div
                 class="tip"
@@ -234,7 +262,7 @@ export class StackedTimeBar extends LitElement {
                 )}
               >
                 ${tipSlice.label} ·
-                ${readout(tipSlice.timeNs, denominator)}${
+                ${readout(tipSlice.value, denominator, this.format)}${
                   tipSlice.detail ? ` · ${tipSlice.detail}` : ''
                 }
               </div>`
@@ -269,7 +297,7 @@ export class StackedTimeBar extends LitElement {
           >
             <span class="legend__swatch" style=${styleMap({ background: segment.color })}></span>
             <span>${segment.label}</span>
-            <span class="legend__value">${readout(segment.timeNs, denominator)}</span>
+            <span class="legend__value">${readout(segment.value, denominator, this.format)}</span>
           </span>
         `,
       )}
@@ -277,9 +305,9 @@ export class StackedTimeBar extends LitElement {
   }
 }
 
-/** `duration · percent` — the tip and the legend show the same figures. */
-function readout(timeNs: number, denominator: number): string {
-  return `${formatDuration(timeNs)} · ${((timeNs / denominator) * 100).toFixed(1)}%`;
+/** `figure · percent` — the tip and the legend show the same figures. */
+function readout(value: number, denominator: number, format: (value: number) => string): string {
+  return `${format(value)} · ${((value / denominator) * 100).toFixed(1)}%`;
 }
 
 declare global {
