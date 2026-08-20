@@ -8,7 +8,7 @@ import { styleMap } from 'lit/directives/style-map.js';
 
 import { logContext } from '../core/log/logContext.js';
 import type { LogStore } from '../core/log/LogStore.js';
-import { formatDuration } from '../core/utility/Util.js';
+import { formatDuration, sharePercent } from '../core/utility/Util.js';
 import {
   getExecutionHighlights,
   type HotSpotRow,
@@ -16,8 +16,9 @@ import {
 import { globalStyles } from '../styles/global.styles.js';
 import { inspectorSectionStyles } from '../styles/inspectorSection.styles.js';
 import { revealRowStyles } from '../styles/revealRow.styles.js';
-import { CategoryPaletteController, categorySwatch } from './categoryTime.js';
+import { CategoryPaletteController, categoryLabel } from './categoryTime.js';
 import { dispatchInspectorReveal } from './inspectorReveal.js';
+import { revealRowMeter, revealRowTitle } from './revealRowMeter.js';
 
 /**
  * The signatures with the most self time across the whole log — the ranked
@@ -47,39 +48,50 @@ export class HotSpots extends LitElement {
   }
 
   /**
-   * One signature: a swatch, the name and its self time, then the churn read
-   * beneath — calls, self time each, share of the log. The meter runs to the
-   * total share and its solid head is the self share the sub line names; one
-   * denominator, the log, across every row.
+   * One signature: the name and its self time, then the churn read
+   * beneath — calls, self time each, share of the log, and the time in the calls
+   * below it, which nothing else on the row gives in text. The meter runs to the
+   * total share and its solid head is the self share the sub line names, with a
+   * hover target per part; one denominator, the log, across every row.
    */
   private _spotRow(spot: HotSpotRow, logTotal: number) {
-    const share = logTotal > 0 ? (spot.selfTime / logTotal) * 100 : 0;
-    const meterShare = logTotal > 0 ? (spot.totalTime / logTotal) * 100 : 0;
-    const selfPct = spot.totalTime > 0 ? (spot.selfTime / spot.totalTime) * 100 : 0;
+    const share = sharePercent(spot.selfTime, logTotal);
+    const meterShare = sharePercent(spot.totalTime, logTotal);
+    const below = spot.totalTime - spot.selfTime;
+    const title = revealRowTitle(
+      spot,
+      below > 0 ? `${formatDuration(below)} in the calls below` : '',
+    );
     const churn =
       spot.count > 1
         ? `${spot.count}× · ${formatDuration(spot.selfTime / spot.count)} self avg · `
         : '';
+    const sub = `${churn}${share.toFixed(1)}% of log${below > 0 ? ` · ${formatDuration(below)} below` : ''}`;
     return html`
       <button
         class="bleed-row reveal-row"
         type="button"
-        title="Show the most expensive call in the tree"
+        title=${title}
         style=${styleMap({
           '--row-hue': this._palette.colorFor(spot.category),
-          '--self-pct': `${selfPct}%`,
+          '--self-pct': `${sharePercent(spot.selfTime, spot.totalTime)}%`,
         })}
         @click=${() => dispatchInspectorReveal(this, spot.eventIndex)}
       >
-        ${categorySwatch(spot.category)}
+        ${categoryLabel(spot.category)}
         <span class="reveal-row__name" title=${spot.text}>${spot.text}</span>
         <span class="reveal-row__value reveal-row__value--primary"
           >${formatDuration(spot.selfTime)}</span
         >
-        <span class="reveal-row__sub">${churn}${share.toFixed(1)}% of log</span>
-        <span class="reveal-row__meter"
-          ><span class="reveal-row__meter-fill" style="width: ${meterShare}%"></span
-        ></span>
+        <span class="reveal-row__sub">${sub}</span>
+        ${revealRowMeter(
+          meterShare,
+          [
+            { share, title: `self ${formatDuration(spot.selfTime)}` },
+            { share: meterShare - share, title: `${formatDuration(below)} in the calls below` },
+          ],
+          title,
+        )}
       </button>
     `;
   }

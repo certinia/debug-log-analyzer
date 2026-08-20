@@ -90,6 +90,11 @@ export function formatTimeRange(startTimeNs: number, endTimeNs: number): string 
   return `${formatDuration(startTimeNs)} → ${formatDuration(endTimeNs)}`;
 }
 
+/** `part` as a percentage of `whole`, or zero when there is no whole. */
+export function sharePercent(part: number, whole: number): number {
+  return whole > 0 ? (part / whole) * 100 : 0;
+}
+
 /** Integer → thousand-separated string (e.g. 1572864 → "1,572,864"), for heap/byte values. */
 export function formatInteger(value: number): string {
   return Math.round(value).toLocaleString();
