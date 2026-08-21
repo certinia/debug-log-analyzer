@@ -31,11 +31,18 @@ export type DetailSelection =
   | { kind: 'event'; eventIndex: number; type?: StatementType }
   | { kind: 'aggregate'; instances: number[]; label: string };
 
+export type TimelineNavigateMode = 'reveal' | 'seek';
+
 interface EventMap {
   // Supply eventIndex (preferred — unique) OR timestamp (fallback for raw-log entry where eventIndex isn't known).
+  // 'reveal' (the default) selects the frame and zooms to it. 'seek' comes from a
+  // whole-log reading: it zooms to a window of the log around the instant and
+  // selects nothing, so the inspector keeps that reading. Only an instant can be
+  // sought, so only the timestamp form carries the mode.
 
   'timeline:navigate-to':
-    { eventIndex: number; timestamp?: never } | { eventIndex?: never; timestamp: number };
+    | { eventIndex: number; timestamp?: never; mode?: never }
+    | { eventIndex?: never; timestamp: number; mode?: TimelineNavigateMode };
 
   // A tab's current selection changed — the inspector rebuilds its
   // content for this source. `selection: null` clears that source's selection.
