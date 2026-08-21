@@ -63,7 +63,7 @@ function shareText(percent: number): string {
  * search as SOQL, so SOSL has no hue of its own: it shows as a tint of the query
  * hue, which keeps these graphics truthful against the chart.
  */
-function kindColors(palette: CategoryPaletteController): Record<StatementKind, string> {
+export function kindColors(palette: CategoryPaletteController): Record<StatementKind, string> {
   const soql = palette.colorFor('SOQL');
   return {
     SOQL: soql,
@@ -134,7 +134,6 @@ export class DatabaseConcentration extends LitElement {
       }
 
       .headline {
-        margin: 0;
         padding-bottom: var(--lana-space-xs);
         font-size: var(--lana-text-sm);
       }
@@ -301,7 +300,7 @@ export class DatabaseNamespaces extends LitElement {
       MAX_ROWS,
       (row) => ({
         label: row.key,
-        timeNs: row.timeNs,
+        value: row.timeNs,
         color: color(row.key),
         detail: kindSplit(row),
       }),

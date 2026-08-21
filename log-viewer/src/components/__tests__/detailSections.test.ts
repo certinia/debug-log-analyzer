@@ -17,6 +17,7 @@ jest.mock('../HotSpots.js', () => ({}));
 jest.mock('../LogOverview.js', () => ({}));
 jest.mock('../NamespaceTimeBar.js', () => ({}));
 jest.mock('../../features/database/components/DatabaseOverview.js', () => ({}));
+jest.mock('../../features/database/components/DatabaseRowBudget.js', () => ({}));
 jest.mock('../../features/database/components/DatabaseTimeTree.js', () => ({}));
 
 const databaseCalls: { eventIndex: number; type: string; activeEventIndex?: number | null }[] = [];
@@ -214,8 +215,8 @@ describe('buildDetailSections', () => {
     expect(sections.map((s) => s.id)).toEqual([
       'overview',
       'database-namespaces',
-      'database-time',
       'database-concentration',
+      'database-time',
     ]);
     expect(sections[0]?.title).toBe('Overview');
     // The call-path grid soaks up the leftover space; the rest keep their own.

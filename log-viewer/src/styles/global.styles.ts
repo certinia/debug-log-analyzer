@@ -35,6 +35,12 @@ export const globalStyles = [
       --filter-panel-label-width: 6.5rem;
     }
 
+    /* A shadow root gets no document reset, so a paragraph carries the UA's 1em
+       block margin. Every section owns its own rhythm through padding. */
+    p {
+      margin-block: 0;
+    }
+
     a {
       color: var(--lana-link-fg);
       text-decoration: none;

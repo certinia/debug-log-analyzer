@@ -41,7 +41,7 @@ export class CategoryTimeBar extends LitElement {
       label="Time by category"
       .segments=${slices.map((slice) => ({
         label: slice.category,
-        timeNs: slice.selfTime,
+        value: slice.selfTime,
         color: this._palette.colorFor(slice.category),
       }))}
     ></stacked-time-bar>`;

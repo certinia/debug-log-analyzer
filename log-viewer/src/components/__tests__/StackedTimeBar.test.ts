@@ -9,8 +9,8 @@ import '../StackedTimeBar.js';
 import type { StackedSegment } from '../StackedTimeBar.js';
 
 const SEGMENTS: StackedSegment[] = [
-  { label: 'SOQL', timeNs: 200_000_000, color: 'red' },
-  { label: 'DML', timeNs: 100_000_000, color: 'blue' },
+  { label: 'SOQL', value: 200_000_000, color: 'red' },
+  { label: 'DML', value: 100_000_000, color: 'blue' },
 ];
 
 async function mount(segments: StackedSegment[], total = 0, legend = false) {
@@ -48,6 +48,17 @@ describe('stacked-time-bar', () => {
 
   it('ignores a total below the segments, since the sum is the only honest length', async () => {
     expect(widths(await mount(SEGMENTS, 1_000))).toEqual([66.667, 33.333]);
+  });
+
+  it('marks where the total fell once the segments passed it', async () => {
+    // 300ms against a 200ms total: the mark sits at two thirds of the bar.
+    const mark = (await mount(SEGMENTS, 200_000_000)).shadowRoot?.querySelector('.limit');
+
+    expect((mark as HTMLElement | null)?.style.left).toBe('66.7%');
+  });
+
+  it('needs no mark while the total still holds the segments', async () => {
+    expect((await mount(SEGMENTS, 1_000_000_000)).shadowRoot?.querySelector('.limit')).toBeNull();
   });
 
   it('reads out the hovered segment against the total', async () => {
