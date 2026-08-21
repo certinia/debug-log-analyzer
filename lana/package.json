@@ -52,6 +52,9 @@
   "categories": [
     "Other"
   ],
+  "extensionDependencies": [
+    "salesforce.salesforcedx-vscode-services"
+  ],
   "activationEvents": [
     "onLanguage:apexlog",
     "onStartupFinished"
@@ -94,8 +97,7 @@
     "menus": {
       "commandPalette": [
         {
-          "command": "lana.showLogAnalysis",
-          "when": "resourceLangId == apexlog || lana.isApexLog"
+          "command": "lana.showLogAnalysis"
         }
       ],
       "editor/context": [
@@ -382,8 +384,9 @@
   },
   "dependencies": {
     "@apexdevtools/apex-parser": "5.1.0",
-    "@salesforce/apex-node": "^9.0.0",
-    "@salesforce/core": "^9.1.0"
+    "@salesforce/vscode-services": "^67.12.0",
+    "effect": "^3.22.0",
+    "vscode-uri": "^3.1.0"
   },
   "devDependencies": {
     "@types/jest": "^30.0.0",

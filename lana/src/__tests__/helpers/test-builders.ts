@@ -179,6 +179,7 @@ export interface MockContext {
   context: MockExtensionContext;
   display: MockDisplay;
   workspaces: { uri: { fsPath: string }; name: string }[];
+  workspaceManager?: unknown;
 }
 
 /**
