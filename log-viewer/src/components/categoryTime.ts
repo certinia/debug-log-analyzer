@@ -23,14 +23,12 @@ export function categoryName(category: string): string {
 }
 
 /**
- * The category as a reveal row shows it: the colour chip `--row-hue` paints,
- * plus the same name in text a screen reader can hear, because the hue alone
- * carries no meaning. For a host that adopts `revealRowStyles`.
+ * The row's category in text a screen reader can hear: the row shows it as the
+ * meter's hue, which carries no meaning on its own. For a host that adopts
+ * `revealRowStyles`.
  */
-export function categorySwatch(category: string): TemplateResult {
-  const name = categoryName(category);
-  return html`<span class="reveal-row__swatch" title=${name} aria-hidden="true"></span>
-    <span class="reveal-row__sr">${name}</span>`;
+export function categoryLabel(category: string): TemplateResult {
+  return html`<span class="reveal-row__sr">${categoryName(category)}</span>`;
 }
 
 /** Neutral literal for {@link OTHER_CATEGORY} — no theme names it, and the

@@ -18,6 +18,8 @@ import '../HotSpots.js';
 const spotsOf = (): ExecutionHighlights => ({
   totalTime: 1_000_000_000,
   hotPath: [],
+  hotPathEnd: 'hot-spot',
+  hotPathBranches: [],
   hotSpots: [
     {
       text: 'MyClass.run()',
@@ -52,7 +54,7 @@ describe('hot-spots', () => {
 
     // 200 ms of self time over 4 calls is 50 ms each, a fifth of a 1 s log.
     expect(element.shadowRoot?.querySelector('.reveal-row__sub')?.textContent).toBe(
-      '4× · 50 ms self avg · 20.0% of log',
+      '4× · 50 ms self avg · 20.0% of log · 200 ms below',
     );
   });
 
@@ -65,17 +67,49 @@ describe('hot-spots', () => {
     expect(row?.style.getPropertyValue('--row-hue')).not.toBe('');
     // The bar runs to the 40% total share; half of it — the 20% self share — is solid.
     expect(row?.style.getPropertyValue('--self-pct')).toBe('50%');
-    expect(row?.querySelector('.reveal-row__swatch')?.getAttribute('title')).toBe('Apex');
     // The hue is decorative, so the category is named in text a reader can hear.
-    expect(row?.querySelector('.reveal-row__swatch')?.getAttribute('aria-hidden')).toBe('true');
+    expect(row?.querySelector('.reveal-row__swatch')).toBeNull();
     expect(row?.querySelector('.reveal-row__sr')?.textContent).toBe('Apex');
     expect(
       element.shadowRoot?.querySelector<HTMLElement>('.reveal-row__meter-fill')?.style.width,
     ).toBe('40%');
   });
 
+  it('names the two parts of the bar for the pointer', async () => {
+    highlights = spotsOf();
+
+    const element = await hotSpots();
+
+    const hits = [...element.shadowRoot!.querySelectorAll<HTMLElement>('.reveal-row__meter-hit')];
+    // The parts are shares of the log, so they add up to the bar's own length.
+    expect(hits.map((hit) => [hit.style.width, hit.title])).toEqual([
+      ['20%', 'self 200 ms'],
+      ['20%', '200 ms in the calls below'],
+    ]);
+  });
+
+  it('gives the whole split as the row title, where the bar has no part', async () => {
+    highlights = spotsOf();
+
+    const element = await hotSpots();
+
+    const split = '4 calls merged · total 400 ms · self 200 ms · 200 ms in the calls below';
+    expect(element.shadowRoot?.querySelector<HTMLElement>('.reveal-row')?.title).toBe(split);
+    // The band carries it too, so the space past the bar is a titled element.
+    expect(element.shadowRoot?.querySelector<HTMLElement>('.reveal-row__meter-hits')?.title).toBe(
+      split,
+    );
+  });
+
   it('notes a log with no timed calls', async () => {
-    highlights = { totalTime: 0, hotPath: [], hotSpots: [], truncation: null };
+    highlights = {
+      totalTime: 0,
+      hotPath: [],
+      hotPathEnd: 'hot-spot',
+      hotPathBranches: [],
+      hotSpots: [],
+      truncation: null,
+    };
 
     const element = await hotSpots();
 

@@ -37,13 +37,9 @@ export const bleedRowStyles = css`
 
 /**
  * A clickable line in an inspector section that reveals one event in the tab on
- * screen: a category swatch and the code's name on the left, its figures held to
- * the right edge, an optional full-width sub line and magnitude meter beneath
- * them. Layout only — the markup pairs it with the bleed-row shell.
- *
- * The swatch is optional: a section whose rows carry none adds
- * `.reveal-row--no-swatch`, or the name would take the swatch's fixed track and
- * push the figures off the row.
+ * screen: the code's name on the left, its figures held to the right edge, an
+ * optional full-width sub line and magnitude meter beneath them. Layout only —
+ * the markup pairs it with the bleed-row shell.
  *
  * The row's category hue arrives as `--row-hue` and the self-time share of its
  * own bar as `--self-pct`, both set inline on the row, so these rules stay
@@ -57,27 +53,13 @@ export const revealRowStyles = [
       --row-hue: var(--lana-meter-fill);
       --self-pct: 100%;
       display: grid;
-      grid-template-columns: auto minmax(0, 1fr) auto;
+      grid-template-columns: minmax(0, 1fr) auto;
       align-items: baseline;
       column-gap: var(--lana-space-sm);
       row-gap: var(--lana-space-3xs);
     }
 
-    .reveal-row--no-swatch {
-      grid-template-columns: minmax(0, 1fr) auto;
-    }
-
-    /* Identity, never magnitude: the same hue the flame chart gives the category. */
-    .reveal-row__swatch {
-      display: block;
-      align-self: center;
-      width: var(--lana-space-sm);
-      height: var(--lana-space-sm);
-      border-radius: var(--lana-radius-sm);
-      background: var(--row-hue);
-    }
-
-    /* The swatch's hue is decorative, so the category it stands for is spoken
+    /* The meter's hue is decorative, so the category it stands for is spoken
        here instead: hidden from view, part of the button's accessible name. */
     .reveal-row__sr {
       position: absolute;
@@ -124,14 +106,39 @@ export const revealRowStyles = [
       font-variant-numeric: tabular-nums;
     }
 
+    /* Holds the track and the hover targets over it, so a target can be taller
+       than the track without the track clipping it. */
+    .reveal-row__meter-wrap {
+      display: block;
+      grid-column: 1 / -1;
+      position: relative;
+    }
+
+    /* Transparent targets across the wrapper, each part sized as its share of
+       the log, so hovering the bar names the part under the pointer. */
+    .reveal-row__meter-hits {
+      display: flex;
+      position: absolute;
+      inset-inline: 0;
+      /* Grown past the track to a target a pointer can hit, no further than the
+         row's own padding, so it never covers the row below. */
+      inset-block: calc(-1 * var(--lana-space-3xs));
+    }
+
+    .reveal-row__meter-hit {
+      flex: 0 0 auto;
+    }
+
     /* Magnitude strip: length carries the share of the log, one denominator per
        section. The hue is identity only, over a track mixed from it so the track
        reads as this row's own in either theme. */
     .reveal-row__meter {
       display: block;
+      /* Spans the row on its own: a section may place the track straight in the
+         grid, without the hover targets the wrapper carries. */
       grid-column: 1 / -1;
       overflow: hidden;
-      height: var(--lana-space-3xs);
+      height: var(--lana-space-2xs);
       border-radius: var(--lana-radius-sm);
       background: color-mix(in srgb, var(--row-hue) 15%, transparent);
     }
