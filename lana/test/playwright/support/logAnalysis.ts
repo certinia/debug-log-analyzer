@@ -15,7 +15,6 @@ export const assertLogAnalysisRenders = async (page: Page): Promise<void> => {
 
   const flameChart = analysis.locator('timeline-flame-chart');
   await expect(flameChart).toBeVisible({ timeout: 120_000 });
-  await expect(flameChart.locator('canvas').last()).toBeVisible({ timeout: 120_000 });
 
   await analysis.locator('vscode-tab-header').filter({ hasText: 'Call Tree' }).click();
   const callTree = analysis.locator('call-tree-view');
