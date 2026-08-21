@@ -8,9 +8,7 @@ import {
 
 import { assertLogAnalysisRenders, openLogAnalysis } from '../support/logAnalysis';
 
-test('opens a sample log and renders its flame chart and call tree in VS Code Web', async ({
-  page,
-}) => {
+test('opens a sample log and renders its analysis in VS Code Web', async ({ page }) => {
   await waitForVSCodeWorkbench(page);
   await waitForWorkspaceReady(page);
   await closeWelcomeTabs(page);
