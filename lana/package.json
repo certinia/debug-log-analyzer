@@ -29,8 +29,8 @@
     "profiling",
     "soql"
   ],
-  "type": "module",
   "main": "out/Main.js",
+  "browser": "out/web/Main.web.js",
   "icon": "./certinia-icon-color.png",
   "galleryBanner": {
     "color": "#000000",
@@ -52,9 +52,19 @@
   "categories": [
     "Other"
   ],
+  "extensionDependencies": [
+    "salesforce.salesforcedx-vscode-services"
+  ],
+  "capabilities": {
+    "virtualWorkspaces": true,
+    "untrustedWorkspaces": {
+      "supported": true
+    }
+  },
   "activationEvents": [
     "onLanguage:apexlog",
-    "onStartupFinished"
+    "onStartupFinished",
+    "onFileSystem:memfs"
   ],
   "contributes": {
     "commands": [
@@ -94,8 +104,7 @@
     "menus": {
       "commandPalette": [
         {
-          "command": "lana.showLogAnalysis",
-          "when": "resourceLangId == apexlog || lana.isApexLog"
+          "command": "lana.showLogAnalysis"
         }
       ],
       "editor/context": [
@@ -378,12 +387,14 @@
     ]
   },
   "scripts": {
-    "vscode:prepublish": "pnpm -w run build && pnpm -w run copy:package-docs"
+    "vscode:prepublish": "pnpm -w run build && pnpm -w run copy:package-docs",
+    "vscode:bundle": "pnpm -w run build"
   },
   "dependencies": {
     "@apexdevtools/apex-parser": "5.1.0",
-    "@salesforce/apex-node": "^9.0.0",
-    "@salesforce/core": "^9.1.0"
+    "@salesforce/vscode-services": "^67.12.0",
+    "effect": "^3.22.0",
+    "vscode-uri": "^3.1.0"
   },
   "devDependencies": {
     "@types/jest": "^30.0.0",

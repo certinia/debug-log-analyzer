@@ -23,7 +23,7 @@ export class Display {
     window.showErrorMessage(s, options);
   }
 
-  showFile(path: string, options: TextDocumentShowOptions = {}): void {
-    commands.executeCommand('vscode.open', Uri.file(path.trim()), options);
+  showFile(uri: Uri | string, options: TextDocumentShowOptions = {}): void {
+    commands.executeCommand('vscode.open', typeof uri === 'string' ? Uri.parse(uri) : uri, options);
   }
 }

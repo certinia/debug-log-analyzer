@@ -2,7 +2,6 @@
  * Copyright (c) 2026 Certinia Inc. All rights reserved.
  */
 import { beforeEach, describe, expect, it } from '@jest/globals';
-
 import { workspace } from 'vscode';
 
 import {
@@ -12,18 +11,17 @@ import {
 } from '../../__tests__/helpers/test-builders.js';
 import { LogEventCache } from '../LogEventCache.js';
 
-// Mock fs/promises
-jest.mock('fs/promises', () => ({
-  readFile: jest.fn(),
-}));
-
 // Mock apex-log-parser
 jest.mock('apex-log-parser', () => ({
   parse: jest.fn(),
 }));
 
 import { parse } from 'apex-log-parser';
-import { readFile } from 'fs/promises';
+import { readFile } from '../../services/salesforceServices.js';
+
+jest.mock('../../services/salesforceServices.js', () => ({
+  readFile: jest.fn(),
+}));
 
 const mockReadFile = readFile as jest.Mock;
 const mockParse = parse as jest.Mock;
@@ -373,8 +371,8 @@ describe('LogEventCache', () => {
       await LogEventCache.getApexLog('/test/file.log');
 
       // Capture the callback
-      let closeCallback: ((doc: { languageId: string; uri: { fsPath: string } }) => void) | null =
-        null;
+      let closeCallback:
+        ((doc: { languageId: string; uri: { toString: () => string } }) => void) | null = null;
       (workspace.onDidCloseTextDocument as jest.Mock).mockImplementationOnce((cb) => {
         closeCallback = cb;
         return { dispose: jest.fn() };
@@ -386,7 +384,7 @@ describe('LogEventCache', () => {
       // Simulate closing an apexlog document
       closeCallback!({
         languageId: 'apexlog',
-        uri: { fsPath: '/test/file.log' },
+        uri: { toString: () => '/test/file.log' },
       });
 
       // @ts-expect-error - accessing private static for testing
@@ -401,8 +399,8 @@ describe('LogEventCache', () => {
       await LogEventCache.getApexLog('/test/file.log');
 
       // Capture the callback
-      let closeCallback: ((doc: { languageId: string; uri: { fsPath: string } }) => void) | null =
-        null;
+      let closeCallback:
+        ((doc: { languageId: string; uri: { toString: () => string } }) => void) | null = null;
       (workspace.onDidCloseTextDocument as jest.Mock).mockImplementationOnce((cb) => {
         closeCallback = cb;
         return { dispose: jest.fn() };
@@ -414,7 +412,7 @@ describe('LogEventCache', () => {
       // Simulate closing a non-apexlog document
       closeCallback!({
         languageId: 'javascript',
-        uri: { fsPath: '/test/file.log' },
+        uri: { toString: () => '/test/file.log' },
       });
 
       // @ts-expect-error - accessing private static for testing
