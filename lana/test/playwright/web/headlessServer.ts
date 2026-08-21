@@ -12,12 +12,7 @@ const SERVICES_EXTENSION_ID = 'salesforce.salesforcedx-vscode-services';
 const start = async (): Promise<void> => {
   const workspaceDir = await createLogWorkspace();
   const server = await open({
-    // The Services extension is loaded from the extension gallery. A normal
-    // browser blocks that cross-origin module fetch, so use the same local
-    // development browser setting as the Services extension's web launcher.
-    browserType: 'chromium',
-    browserOptions: ['--disable-web-security'],
-    devTools: true,
+    browserType: 'none',
     quality: 'stable',
     commit: process.env.PLAYWRIGHT_WEB_VSCODE_COMMIT,
     port: Number(process.env.PORT) || 3001,
