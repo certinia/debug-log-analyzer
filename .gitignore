@@ -9,3 +9,6 @@ build/
 out/
 coverage/
 *.tsbuildinfo
+/.vscode-test-web
+/lana/test-results
+/lana/playwright-report

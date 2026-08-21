@@ -142,7 +142,7 @@ describe('RawLogSymbolProvider', () => {
 
       expect(languages.registerDocumentSymbolProvider).toHaveBeenCalledTimes(1);
       expect(languages.registerDocumentSymbolProvider).toHaveBeenCalledWith(
-        [{ scheme: 'file', language: 'apexlog' }],
+        [{ language: 'apexlog' }],
         expect.any(RawLogSymbolProvider),
       );
     });

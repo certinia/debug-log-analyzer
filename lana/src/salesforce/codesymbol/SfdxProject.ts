@@ -1,8 +1,8 @@
 /*
  * Copyright (c) 2025 Certinia Inc. All rights reserved.
  */
-import path from 'path';
 import { RelativePattern, type Uri, workspace } from 'vscode';
+import { Utils } from 'vscode-uri';
 
 export interface PackageDirectory {
   readonly uri: Uri;
@@ -45,7 +45,9 @@ export class SfdxProject {
     const classIndex = new Map<string, Uri[]>();
     for (const uri of allUris) {
       // uri.path is always '/'-separated (unlike fsPath), so posix basename is safe everywhere
-      const className = path.posix.basename(uri.path, '.cls').toLowerCase();
+      const className = Utils.basename(uri)
+        .replace(/\.cls$/i, '')
+        .toLowerCase();
       const uris = classIndex.get(className);
       if (uris) {
         uris.push(uri);
