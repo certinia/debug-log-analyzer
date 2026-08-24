@@ -24,7 +24,7 @@ function chips(el: Timelinekey): HTMLElement[] {
 }
 
 describe('TimelineKey', () => {
-  it('renders one chip per entry, with dot color, label and data-category', async () => {
+  it('renders one chip per entry, with swatch color, label and data-category', async () => {
     const el = await mount([
       { label: 'Apex', fillColor: 'rgb(43, 143, 129)', selfTimeNs: 12_100_000_000 },
       { label: 'SOQL', fillColor: 'rgb(109, 76, 125)', selfTimeNs: 500_000 },
@@ -36,8 +36,7 @@ describe('TimelineKey', () => {
     const [apex] = rendered;
     expect(apex?.dataset['category']).toBe('Apex');
     expect(apex?.textContent).toContain('Apex');
-    const dot = apex?.querySelector<HTMLElement>('.chip__dot');
-    expect(dot?.style.backgroundColor).toBe('rgb(43, 143, 129)');
+    expect(apex?.querySelector('color-swatch')?.color).toBe('rgb(43, 143, 129)');
   });
 
   it('shows the compact self time when present', async () => {
@@ -54,7 +53,7 @@ describe('TimelineKey', () => {
     expect(chips(el)[0]?.querySelector('.chip__time')).toBeNull();
   });
 
-  it('keeps the chip itself unfilled — only the dot carries the category color', async () => {
+  it('keeps the chip itself unfilled — only the swatch carries the category color', async () => {
     const el = await mount([{ label: 'DML', fillColor: 'rgb(176, 104, 104)' }]);
 
     expect(chips(el)[0]?.getAttribute('style')).toBeNull();

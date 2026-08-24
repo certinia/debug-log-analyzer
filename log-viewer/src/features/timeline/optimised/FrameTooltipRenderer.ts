@@ -19,6 +19,9 @@ import { formatSOQL, type Dialect, type SoqlBudget } from '../../soql/format/for
 import type { TimelineMarker } from '../types/flamechart.types.js';
 import { formatNumber } from './rendering/tooltip-utils.js';
 
+// web components
+import '../../../components/ColorSwatch.js';
+
 /** Delay before a tooltip first appears, so sweeping across frames does not strobe. */
 const SHOW_DELAY_MS = 60;
 /** Grace period before hiding, so crossing the gap between adjacent frames does not blink. */
@@ -697,9 +700,8 @@ export class FrameTooltipRenderer {
       const categoryRow = document.createElement('div');
       categoryRow.className = 'tooltip-category';
 
-      const swatch = document.createElement('span');
-      swatch.className = 'tooltip-swatch';
-      swatch.style.backgroundColor = color;
+      const swatch = document.createElement('color-swatch');
+      swatch.color = color;
 
       const name = document.createElement('span');
       name.textContent = categoryName;

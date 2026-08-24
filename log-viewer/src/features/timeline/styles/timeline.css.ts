@@ -111,13 +111,6 @@ export const tooltipStyles = `${soqlSyntaxStyles}
         color: var(--tl-description-foreground, #999);
       }
 
-      .tooltip-swatch {
-        width: 8px;
-        height: 8px;
-        border-radius: var(--lana-radius-sm);
-        flex: 0 0 auto;
-      }
-
       .tooltip-row {
         display: flex;
         justify-content: space-between;

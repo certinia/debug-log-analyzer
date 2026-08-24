@@ -8,6 +8,7 @@ import { repeat } from 'lit/directives/repeat.js';
 import { formatDuration } from '../../../core/utility/Util.js';
 
 // web components
+import '../../../components/ColorSwatch.js';
 import '../../../components/OverflowList.js';
 
 // styles
@@ -43,13 +44,6 @@ export class Timelinekey extends LitElement {
         white-space: nowrap;
       }
 
-      .chip__dot {
-        width: 8px;
-        height: 8px;
-        border-radius: 50%;
-        flex: 0 0 auto;
-      }
-
       /* The time is the data: full foreground against the muted label, and figure
          widths that line up chip to chip without leaving the UI font. */
       .chip__time {
@@ -67,7 +61,7 @@ export class Timelinekey extends LitElement {
         (entry) =>
           // data-category is the seam for the interactivity follow-up (hover/click → highlight).
           html`<span class="chip" data-category="${entry.label}">
-            <span class="chip__dot" style="background-color: ${entry.fillColor}"></span>
+            <color-swatch color=${entry.fillColor} label=${entry.label}></color-swatch>
             <span>${entry.label}</span>
             ${
               entry.selfTimeNs !== undefined

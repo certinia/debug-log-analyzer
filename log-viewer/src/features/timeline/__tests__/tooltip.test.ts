@@ -404,16 +404,16 @@ describe('FrameTooltipRenderer', () => {
 
       showSettled(createEvent(0, 100, 'Event', 'Apex'), cursorAnchor(100, 100));
 
-      const swatch = container.querySelector('.tooltip-swatch') as HTMLElement;
+      const swatch = container.querySelector('color-swatch');
       expect(swatch).not.toBeNull();
-      expect(swatch.style.backgroundColor).toBe('rgb(136, 174, 88)');
-      expect(swatch.parentElement?.textContent).toContain('Apex');
+      expect(swatch?.color).toBe('#88ae58');
+      expect(swatch?.parentElement?.textContent).toContain('Apex');
     });
 
     it('should not display a category row for an uncategorised event', () => {
       showSettled(createEvent(0, 100, 'Event', ''), cursorAnchor(100, 100));
 
-      expect(container.querySelector('.tooltip-swatch')).toBeNull();
+      expect(container.querySelector('color-swatch')).toBeNull();
     });
 
     it('should display wall-clock time row when apexLog has startTime', () => {

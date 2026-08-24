@@ -9,6 +9,9 @@ import { styleMap } from 'lit/directives/style-map.js';
 import { formatDuration, formatInteger } from '../core/utility/Util.js';
 import { globalStyles } from '../styles/global.styles.js';
 
+// web components
+import './ColorSwatch.js';
+
 /** One coloured length of a {@link StackedTimeBar}, measured in nanoseconds. */
 export interface StackedSegment {
   label: string;
@@ -137,14 +140,6 @@ export class StackedTimeBar extends LitElement {
         color: var(--lana-fg);
       }
 
-      .legend__swatch {
-        width: 8px;
-        height: 8px;
-        border-radius: 2px;
-        align-self: center;
-        flex: none;
-      }
-
       .legend__value {
         font-family: var(--lana-font-mono);
         font-variant-numeric: tabular-nums;
@@ -267,7 +262,7 @@ export class StackedTimeBar extends LitElement {
             @pointerenter=${() => (this._hover = { label: segment.label, onBar: false })}
             @pointerleave=${() => (this._hover = null)}
           >
-            <span class="legend__swatch" style=${styleMap({ background: segment.color })}></span>
+            <color-swatch color=${segment.color}></color-swatch>
             <span>${segment.label}</span>
             <span class="legend__value">${readout(segment.timeNs, denominator)}</span>
           </span>
