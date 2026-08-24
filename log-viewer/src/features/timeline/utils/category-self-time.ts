@@ -4,7 +4,6 @@
 import { LOG_CATEGORY, type ApexLog, type LogCategory, type LogEvent } from 'apex-log-parser';
 
 import type { TimelineKeyEntry } from '../components/TimelineKey.js';
-import type { TimelineColors } from '../themes/Themes.js';
 
 /**
  * Sums self time (ns) per category across the whole event tree. Self time partitions
@@ -25,26 +24,30 @@ export function categorySelfTimes(root: ApexLog): Map<LogCategory, number> {
   return totals;
 }
 
-/** Legend order; labels double as the `LogCategory` keys used by `categorySelfTimes`. */
-const KEY_CATEGORIES: readonly { category: LogCategory; colorKey: keyof TimelineColors }[] = [
-  { category: LOG_CATEGORY.Apex, colorKey: 'apex' },
-  { category: LOG_CATEGORY.CodeUnit, colorKey: 'codeUnit' },
-  { category: LOG_CATEGORY.System, colorKey: 'system' },
-  { category: LOG_CATEGORY.Automation, colorKey: 'automation' },
-  { category: LOG_CATEGORY.DML, colorKey: 'dml' },
-  { category: LOG_CATEGORY.SOQL, colorKey: 'soql' },
-  { category: LOG_CATEGORY.Callout, colorKey: 'callout' },
+/** Legend order; the labels double as the `LogCategory` keys `categorySelfTimes` sums by. */
+const KEY_CATEGORIES: readonly LogCategory[] = [
+  LOG_CATEGORY.Apex,
+  LOG_CATEGORY.CodeUnit,
+  LOG_CATEGORY.System,
+  LOG_CATEGORY.Automation,
+  LOG_CATEGORY.DML,
+  LOG_CATEGORY.SOQL,
+  LOG_CATEGORY.Callout,
   //NOTE: add Validation back once the parser is updated to include validation events
 ];
 
-/** Builds the legend entries for a palette, attaching per-category self time when known. */
+/**
+ * Builds the legend entries, attaching per-category self time when known. The colour
+ * comes from the caller so the legend reads the same palette the chart drew with —
+ * `categoryPalette` answers for both the themes and the legacy colours.
+ */
 export function toTimelineKeys(
-  colors: TimelineColors,
+  color: (category: string) => string,
   selfTimes?: Map<LogCategory, number>,
 ): TimelineKeyEntry[] {
-  return KEY_CATEGORIES.map(({ category, colorKey }) => ({
+  return KEY_CATEGORIES.map((category) => ({
     label: category,
-    fillColor: colors[colorKey],
+    fillColor: color(category),
     // A category the log never used still reads 0 — an absent time means "unknown", not "none".
     selfTimeNs: selfTimes ? (selfTimes.get(category) ?? 0) : undefined,
   }));

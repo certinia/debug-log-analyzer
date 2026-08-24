@@ -4,7 +4,6 @@
 import { describe, expect, it } from '@jest/globals';
 import type { ApexLog, LogCategory, LogEvent } from 'apex-log-parser';
 
-import type { TimelineColors } from '../themes/Themes.js';
 import { categorySelfTimes, toTimelineKeys } from '../utils/category-self-time.js';
 
 function node(category: LogCategory, self: number, children: LogEvent[] = []): LogEvent {
@@ -64,19 +63,19 @@ describe('categorySelfTimes', () => {
 });
 
 describe('toTimelineKeys', () => {
-  const colors: TimelineColors = {
-    apex: '#a1',
-    codeUnit: '#a2',
-    system: '#a3',
-    automation: '#a4',
-    dml: '#a5',
-    soql: '#a6',
-    callout: '#a7',
-    validation: '#a8',
+  const palette: Record<string, string> = {
+    Apex: '#a1',
+    'Code Unit': '#a2',
+    System: '#a3',
+    Automation: '#a4',
+    DML: '#a5',
+    SOQL: '#a6',
+    Callout: '#a7',
   };
+  const color = (category: string) => palette[category] ?? '';
 
   it('builds the legend in category order with the palette colors', () => {
-    const keys = toTimelineKeys(colors);
+    const keys = toTimelineKeys(color);
 
     expect(keys.map((k) => k.label)).toEqual([
       'Apex',
@@ -97,14 +96,14 @@ describe('toTimelineKeys', () => {
       ['SOQL', 5],
     ]);
 
-    const keys = toTimelineKeys(colors, selfTimes);
+    const keys = toTimelineKeys(color, selfTimes);
 
     expect(keys.find((k) => k.label === 'Apex')?.selfTimeNs).toBe(15);
     expect(keys.find((k) => k.label === 'SOQL')?.selfTimeNs).toBe(5);
   });
 
   it('reads 0 for a category the log never used', () => {
-    const keys = toTimelineKeys(colors, new Map<LogCategory, number>([['Apex', 15]]));
+    const keys = toTimelineKeys(color, new Map<LogCategory, number>([['Apex', 15]]));
 
     expect(keys.find((k) => k.label === 'DML')?.selfTimeNs).toBe(0);
     expect(keys.find((k) => k.label === 'Callout')?.selfTimeNs).toBe(0);
