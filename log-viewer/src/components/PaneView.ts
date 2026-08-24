@@ -19,9 +19,10 @@ export interface PaneSection {
   weight?: number;
   /**
    * How the open pane takes space (default `'fill'`). A `'content'` pane sizes
-   * to its content and shrinks — scrolling inside — when space runs out, and it
-   * never stretches to soak up leftovers; dragging its sash pins it to a size
-   * instead, which a double-click hands back to the content.
+   * to its content and shrinks — scrolling inside — when space runs out, it
+   * never stretches to soak up leftovers, and it leaves the open fill panes a
+   * share of the space. Dragging its sash pins it to a size instead, which a
+   * double-click hands back to the content.
    * A `'fill'` pane shares the remaining space by weight.
    */
   fit?: 'content' | 'fill';
@@ -212,9 +213,10 @@ export class PaneView extends LitElement {
 
   render() {
     const weights = this._flexWeights();
+    const basis = this._fillBasis();
     const items: TemplateResult[] = [];
     this.sections.forEach((section, index) => {
-      items.push(this._renderPane(section, weights.get(section.id) ?? 1));
+      items.push(this._renderPane(section, weights.get(section.id) ?? 1, basis));
       const next = this.sections[index + 1];
       // A sash trades space between the two panes beside it, so it exists
       // wherever both neighbours are open. A content pane starts at its
@@ -258,18 +260,35 @@ export class PaneView extends LitElement {
     );
   }
 
-  private _renderPane(section: PaneSection, weight: number) {
+  /**
+   * A fill pane's flex basis: an equal share of the panel, so a stack of
+   * sized-to-content panes cannot squeeze it to `--lana-pane-min`. From a basis
+   * of zero it can only grow into free space, and once the content panes fill
+   * the panel there is none; from a share it shrinks alongside them instead, and
+   * keeps its natural size while the panel is roomy. Zero while every open pane
+   * fills, where a share each would take the whole panel and flatten the
+   * weights.
+   */
+  private _fillBasis(): string {
+    const open = this.sections.filter((section) => this._isOpen(section.id));
+    const content = open.filter((section) => !this._isFill(section)).length;
+    return this.orientation === 'vertical' && content > 0 ? `calc(100% / ${open.length})` : '0';
+  }
+
+  private _renderPane(section: PaneSection, weight: number, basis: string) {
     const open = this._isOpen(section.id);
     const collapsible = this._collapsible;
-    // An open content pane sizes to its content — or to the size it was dragged
-    // to — but stays shrinkable, so when space runs out it scrolls instead of
+    // An open content pane sizes to its content, or to the size it was dragged
+    // to, but stays shrinkable, so when space runs out it scrolls instead of
     // pushing the fill panes off screen.
     const dragged = this._weights[section.id];
     const style = !open
       ? 'flex: 0 0 auto'
       : this._isFill(section)
-        ? `flex: ${weight} 1 0`
-        : `flex: 0 1 ${dragged === undefined ? 'auto' : `${dragged}px`}`;
+        ? `flex: ${weight} 1 ${basis}`
+        : dragged !== undefined
+          ? `flex: 0 1 ${dragged}px`
+          : 'flex: 0 1 auto';
 
     return html`<div class="pane" data-id=${section.id} ?data-open=${open} style=${style}>
       <div
