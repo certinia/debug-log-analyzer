@@ -110,7 +110,6 @@ export interface Concentration {
   count: number;
   /** The share those statements hold, 0-100. */
   percent: number;
-  total: number;
 }
 
 /**
@@ -189,10 +188,9 @@ export function concentration(
   overview: DatabaseOverview,
   target = CONCENTRATION_SHARE,
 ): Concentration {
-  const total = overview.ranked.length;
   const databaseNs = overview.time.timeNs;
-  if (!total || databaseNs <= 0) {
-    return { count: 0, percent: 0, total };
+  if (!overview.ranked.length || databaseNs <= 0) {
+    return { count: 0, percent: 0 };
   }
   let held = 0;
   let count = 0;
@@ -203,7 +201,7 @@ export function concentration(
       break;
     }
   }
-  return { count, percent: (held / databaseNs) * 100, total };
+  return { count, percent: (held / databaseNs) * 100 };
 }
 
 /** The kind's own figures on {@link DatabaseTime}. */

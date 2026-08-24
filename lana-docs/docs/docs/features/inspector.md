@@ -25,7 +25,7 @@ It docks to the **right**, **left** or **bottom**, resizes by dragging its edge,
 ### Sections
 
 - **Details** – timing, plus every governor metric the selection consumed as `used / limit`. For SOQL also selectivity, query plan and cardinality, with the query text highlighted and copyable.
-- **Self time by namespace** – Timeline only: the self time under the selection split by the namespace whose code ran it, so you can see whose package burned it.
+- **Self time by namespace** – Timeline only: the self time under the selection split by the namespace whose code ran it, so you can see whose package burned it. Every namespace bar colours the six biggest and gathers the rest into one **others** segment, which names them on hover.
 - **Findings** – Analysis only: which of the log's findings name the selected method or anything it called, so you can tell whether the row you picked is one of the log's problems.
 - **Call stack** – the parent frames that led to the selection, outermost first, with total and self time.
 - **Call tree** – the selection's own execution in **Time Order**, **Aggregated** or **Bottom-Up**, scoped to the selection rather than the whole log like the [Call Tree](./calltree.mdx) tab.
@@ -45,7 +45,7 @@ With nothing selected the inspector reads the whole log. Every tab opens with an
 - **Analysis** – **Findings**: what is slow or wrong in the log, and what to do about it, led by the findings by severity — press any number of them to hold the list to those. A finding whose events the log times also shows how long they took and what that is of the log. Each finding lists the statements behind it, most repeated first; click one to reveal its row in the grid.
   **Self time spread**: how few signatures hold 80% of the log’s self time, then a histogram of per-call self time for each of the busiest repeated signatures, with the median and the 95th call marked. The grid gives an average, which reads the same whether every call is slow or one call is; the shape tells them apart. Move the pointer across a lane to read how many calls a bucket holds. A call the log made once has no shape, so the costliest of them are named under **Ran once**. Only calls the log timed count. Click any row to select its worst call.
 
-Every figure comes from the log itself, so a truncated log, a log without `Rows:` or one without `CUMULATIVE_LIMIT_USAGE` reports less rather than guessing, and says so. Ranked sections list their top eight and account for the rest in a final row. Select a row and every section re-scopes to it.
+Every figure comes from the log itself, so a truncated log, a log without `Rows:` or one without `CUMULATIVE_LIMIT_USAGE` reports less rather than guessing, and says so. Ranked sections list only the top few and account for the rest in a final row. Select a row and every section re-scopes to it.
 
 ### Row actions
 
