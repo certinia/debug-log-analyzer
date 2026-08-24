@@ -77,6 +77,7 @@ describe('computeExecutionHighlights hot path', () => {
     expect(hotPath[0]).toEqual({
       text: 'Root',
       eventIndex: root.eventIndex,
+      eventIndexes: [root.eventIndex],
       totalTime: 900,
       selfTime: 0,
       count: 1,
@@ -100,6 +101,7 @@ describe('computeExecutionHighlights hot path', () => {
       {
         text: 'Root',
         eventIndex: root.eventIndex,
+        eventIndexes: [root.eventIndex],
         totalTime: 1000,
         selfTime: 0,
         count: 1,
@@ -108,6 +110,8 @@ describe('computeExecutionHighlights hot path', () => {
       {
         text: 'Repeat',
         eventIndex: worst.eventIndex,
+        // Every instance the frame merges, so a hover marks all of them.
+        eventIndexes: [worst.eventIndex - 1, worst.eventIndex],
         totalTime: 600,
         selfTime: 0,
         count: 2,
@@ -180,6 +184,105 @@ describe('computeExecutionHighlights hot path', () => {
     expect(highlights.hotPath).toEqual([]);
     expect(highlights.hotSpots).toEqual([]);
     expect(highlights.truncation).toBeNull();
+  });
+});
+
+describe('computeExecutionHighlights hot path end', () => {
+  it('names a last frame that keeps its own time as the hot spot', () => {
+    const log = createLog(1000);
+    const root = createEvent({ text: 'Root', total: 1000 });
+    log.children.push(root);
+    const big = createEvent({ text: 'Big', total: 900, self: 800, parent: root });
+    createEvent({ text: 'Small', total: 100, parent: big });
+
+    const { hotPath, hotPathEnd, hotPathBranches } = computeExecutionHighlights(log);
+
+    expect(hotPath.map((frame) => frame.text)).toEqual(['Root', 'Big']);
+    expect(hotPathEnd).toBe('hot-spot');
+    // The frame does the work itself, so its children are no reading.
+    expect(hotPathBranches).toEqual([]);
+  });
+
+  it('hands back the branches where the time fans out instead', () => {
+    const log = createLog(1000);
+    const root = createEvent({ text: 'Root', total: 1000, self: 100 });
+    log.children.push(root);
+    // No child holds the follow share, and the frame kept a tenth of its own
+    // time, so the time fanned out here.
+    const alpha = createEvent({ text: 'Alpha', total: 380, parent: root });
+    createEvent({ text: 'Beta', total: 300, parent: root });
+    createEvent({ text: 'Gamma', total: 280, parent: root });
+    createEvent({ text: 'Tiny', total: 20, parent: root });
+
+    const { hotPath, hotPathEnd, hotPathBranches } = computeExecutionHighlights(log);
+
+    expect(hotPath.map((frame) => frame.text)).toEqual(['Root']);
+    expect(hotPathEnd).toBe('fan-out');
+    // Biggest first, and the child under a twentieth of the frame is noise.
+    expect(hotPathBranches.map((branch) => branch.text)).toEqual(['Alpha', 'Beta', 'Gamma']);
+    expect(hotPathBranches[0]).toEqual({
+      text: 'Alpha',
+      eventIndex: alpha.eventIndex,
+      eventIndexes: [alpha.eventIndex],
+      totalTime: 380,
+      selfTime: 0,
+      count: 1,
+      category: '',
+    });
+  });
+
+  it('names no fan-out where the frame has no branch worth a row', () => {
+    const log = createLog(1000);
+    const root = createEvent({ text: 'Root', total: 1000, self: 100 });
+    log.children.push(root);
+    // The frame kept a tenth of its own time, but its one child is noise, so
+    // there is nothing for a fan-out reading to point at.
+    createEvent({ text: 'Tiny', total: 20, parent: root });
+
+    const { hotPathEnd, hotPathBranches } = computeExecutionHighlights(log);
+
+    expect(hotPathEnd).toBe('hot-spot');
+    expect(hotPathBranches).toEqual([]);
+  });
+
+  it('merges same-signature branches, and points at the worst instance', () => {
+    const log = createLog(1000);
+    const root = createEvent({ text: 'Root', total: 1000, self: 100 });
+    log.children.push(root);
+    const first = createEvent({ text: 'Repeat', total: 100, parent: root });
+    createEvent({ text: 'Other', total: 300, parent: root });
+    const worst = createEvent({ text: 'Repeat', total: 200, parent: root });
+
+    const { hotPathEnd, hotPathBranches } = computeExecutionHighlights(log);
+
+    expect(hotPathEnd).toBe('fan-out');
+    expect(hotPathBranches).toEqual([
+      {
+        text: 'Repeat',
+        eventIndex: worst.eventIndex,
+        eventIndexes: [first.eventIndex, worst.eventIndex],
+        totalTime: 300,
+        selfTime: 0,
+        count: 2,
+        category: '',
+      },
+      {
+        text: 'Other',
+        eventIndex: first.eventIndex + 1,
+        eventIndexes: [first.eventIndex + 1],
+        totalTime: 300,
+        selfTime: 0,
+        count: 1,
+        category: '',
+      },
+    ]);
+  });
+
+  it('has no end to name in a log with no timed calls', () => {
+    const highlights = computeExecutionHighlights(createLog(0));
+
+    expect(highlights.hotPathEnd).toBe('hot-spot');
+    expect(highlights.hotPathBranches).toEqual([]);
   });
 });
 

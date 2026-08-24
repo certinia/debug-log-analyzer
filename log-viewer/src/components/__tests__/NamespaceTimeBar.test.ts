@@ -53,9 +53,9 @@ describe('namespace-time-bar', () => {
   it('splits the whole log by namespace, largest first', async () => {
     logOf([ev('default', 100, [ev('pkg', 500)])], ['pkg']);
 
-    expect(segments(await mount()).map(({ label, timeNs }) => ({ label, timeNs }))).toEqual([
-      { label: 'pkg', timeNs: 500 },
-      { label: 'default', timeNs: 100 },
+    expect(segments(await mount()).map(({ label, value }) => ({ label, value }))).toEqual([
+      { label: 'pkg', value: 500 },
+      { label: 'default', value: 100 },
     ]);
   });
 
@@ -78,7 +78,7 @@ describe('namespace-time-bar', () => {
 
     const element = await mount({ instances: [outer.eventIndex, inner.eventIndex] });
 
-    expect(segments(element)[0]).toMatchObject({ label: 'pkg', timeNs: 50 });
+    expect(segments(element)[0]).toMatchObject({ label: 'pkg', value: 50 });
   });
 
   it('gathers the namespaces past the cap into one tail segment', async () => {
@@ -96,7 +96,7 @@ describe('namespace-time-bar', () => {
 
     expect(shown).toHaveLength(MAX_SEGMENTS + 1);
     // nsA at 20 and nsB at 10.
-    expect(shown.at(-1)).toMatchObject({ label: '2 others', timeNs: 30 });
+    expect(shown.at(-1)).toMatchObject({ label: '2 others', value: 30 });
   });
 
   it('notes a scope with no recorded time', async () => {

@@ -16,7 +16,7 @@ import '../../../components/StackedTimeBar.js';
 import { segmentsWithTail } from '../../../components/StackedTimeBar.js';
 import { logContext } from '../../../core/log/logContext.js';
 import type { LogStore } from '../../../core/log/LogStore.js';
-import { formatDuration, formatInteger } from '../../../core/utility/Util.js';
+import { formatDuration, formatInteger, sharePercent } from '../../../core/utility/Util.js';
 import { globalStyles } from '../../../styles/global.styles.js';
 import { inspectorSectionStyles } from '../../../styles/inspectorSection.styles.js';
 import { revealRowStyles } from '../../../styles/revealRow.styles.js';
@@ -63,7 +63,7 @@ function shareText(percent: number): string {
  * search as SOQL, so SOSL has no hue of its own: it shows as a tint of the query
  * hue, which keeps these graphics truthful against the chart.
  */
-function kindColors(palette: CategoryPaletteController): Record<StatementKind, string> {
+export function kindColors(palette: CategoryPaletteController): Record<StatementKind, string> {
   const soql = palette.colorFor('SOQL');
   return {
     SOQL: soql,
@@ -134,7 +134,6 @@ export class DatabaseConcentration extends LitElement {
       }
 
       .headline {
-        margin: 0;
         padding-bottom: var(--lana-space-xs);
         font-size: var(--lana-text-sm);
       }
@@ -207,7 +206,7 @@ export class DatabaseConcentration extends LitElement {
     const own = sharePercent(statement.netNs, databaseNs);
     return html`
       <button
-        class="bleed-row reveal-row reveal-row--no-swatch"
+        class="bleed-row reveal-row"
         type="button"
         title=${rowTitle(statement)}
         style=${styleMap({
@@ -301,7 +300,7 @@ export class DatabaseNamespaces extends LitElement {
       MAX_ROWS,
       (row) => ({
         label: row.key,
-        timeNs: row.timeNs,
+        value: row.timeNs,
         color: color(row.key),
         detail: kindSplit(row),
       }),
@@ -323,11 +322,6 @@ function sameSplit(left: DatabaseBreakdown[], right: DatabaseBreakdown[]): boole
     left.length === right.length &&
     left.every((row, index) => row.key === right[index]?.key && row.timeNs === right[index]?.timeNs)
   );
-}
-
-/** `part` as a percentage of `whole`, or zero when there is no whole. */
-function sharePercent(part: number, whole: number): number {
-  return whole > 0 ? (part / whole) * 100 : 0;
 }
 
 /**

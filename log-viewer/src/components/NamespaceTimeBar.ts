@@ -91,7 +91,7 @@ export class NamespaceTimeBar extends LitElement {
       MAX_SEGMENTS,
       (slice) => ({
         label: slice.namespace,
-        timeNs: slice.selfTime,
+        value: slice.selfTime,
         color: color(slice.namespace),
       }),
       (slice) => slice.selfTime,

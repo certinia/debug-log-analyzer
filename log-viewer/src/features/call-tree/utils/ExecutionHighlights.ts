@@ -10,6 +10,8 @@ export interface HotPathFrame {
   text: string;
   /** The instance with the most total time, so a click lands on the worst one. */
   eventIndex: number;
+  /** Every merged instance, so a hover marks all of them, not just the worst. */
+  eventIndexes: number[];
   /** Total time summed across every merged sibling; its share of the log is `totalTime / totalTime(log)`. */
   totalTime: number;
   /** Self time summed across the same instances — the part of `totalTime` this
@@ -20,6 +22,9 @@ export interface HotPathFrame {
   /** The largest instance's category, so the row takes the flame chart's own colour. */
   category: LogCategory;
 }
+
+/** What the last hot path frame is: it does the work itself, or it only splits the time up. */
+export type HotPathEnd = 'hot-spot' | 'fan-out';
 
 /** One signature in the top-self-time list. */
 export interface HotSpotRow {
@@ -43,6 +48,11 @@ export interface ExecutionHighlights {
   /** The log's own total time, the denominator for every share shown. */
   totalTime: number;
   hotPath: HotPathFrame[];
+  /** What the last frame of the path is, which decides how the row reads. */
+  hotPathEnd: HotPathEnd;
+  /** The last frame's own children, biggest first; empty unless the path fans
+   *  out. A branch is a frame the path did not follow, so it reads the same. */
+  hotPathBranches: HotPathFrame[];
   hotSpots: HotSpotRow[];
   /** Calls the log's size cap cut off; their subtrees under-report every timing. */
   truncation: { regionCount: number; firstEventIndex: number } | null;
@@ -53,6 +63,16 @@ export interface ExecutionHighlights {
  * time; below it the time has spread out, and the last frame is the hot spot.
  */
 const HOT_PATH_FOLLOW_SHARE = 0.4;
+
+/**
+ * A last frame keeping this much of its own time does the work itself, so it is
+ * the hot spot; below it the frame only splits the time up, and its children are
+ * the reading. The stop reason does not decide this, the measured share does.
+ */
+const SELF_DOMINANT_SHARE = 0.5;
+
+/** A child under this share of the fanned-out frame is noise, not a branch. */
+const BRANCH_SHARE_FLOOR = 0.05;
 
 /** How many signatures the hot-spot list names. */
 const HOT_SPOT_COUNT = 5;
@@ -67,7 +87,7 @@ const HOT_SPOT_COUNT = 5;
 export function computeExecutionHighlights(apexLog: ApexLog): ExecutionHighlights {
   return {
     totalTime: apexLog.duration.total,
-    hotPath: computeHotPath(apexLog.children),
+    ...computeHotPath(apexLog.children),
     ...scanEvents(apexLog.eventsById),
   };
 }
@@ -86,30 +106,53 @@ interface FrameGroup {
  * siblings merge into one frame (a loop's 200 calls read as one line), the walk
  * follows the largest merged group, and it stops where the time spreads out —
  * either no child group holds the follow share, or the current frame's own self
- * time beats the largest child group, which makes this frame the hot spot.
+ * time beats the largest child group. Where the last frame keeps little of its
+ * own time it is no hot spot, so its children come back as the branches the time
+ * fanned out to.
  */
-function computeHotPath(roots: LogEvent[]): HotPathFrame[] {
-  const frames: HotPathFrame[] = [];
-  let current = largestGroup(roots);
+function computeHotPath(
+  roots: LogEvent[],
+): Pick<ExecutionHighlights, 'hotPath' | 'hotPathEnd' | 'hotPathBranches'> {
+  const hotPath: HotPathFrame[] = [];
+  let current = sortedGroups(roots)[0];
+  let children: FrameGroup[] = [];
   while (current && current.total > 0) {
-    const worst = largestInstance(current.instances);
-    frames.push({
-      text: worst.text,
-      eventIndex: worst.eventIndex,
-      totalTime: current.total,
-      // An instance reporting a negative self can drag the group's sum outside
-      // its total; the frame's own share of itself cannot sit outside it.
-      selfTime: Math.min(Math.max(current.self, 0), current.total),
-      count: current.instances.length,
-      category: worst.category,
-    });
-    const next = largestGroup(childrenOf(current.instances));
+    hotPath.push(frameOf(current));
+    children = sortedGroups(childrenOf(current.instances));
+    const next = children[0];
     if (!next || next.total < HOT_PATH_FOLLOW_SHARE * current.total || current.self > next.total) {
       break;
     }
     current = next;
   }
-  return frames;
+  const last = hotPath[hotPath.length - 1];
+  const branches =
+    last && last.selfTime < SELF_DOMINANT_SHARE * last.totalTime
+      ? children.filter((group) => group.total >= BRANCH_SHARE_FLOOR * last.totalTime).map(frameOf)
+      : [];
+  // A fan-out with no branch above the floor would point at rows that do not
+  // exist: the time stops at the frame after all, so it reads as the hot spot.
+  return {
+    hotPath,
+    hotPathEnd: branches.length > 0 ? 'fan-out' : 'hot-spot',
+    hotPathBranches: branches,
+  };
+}
+
+/** The frame the walk landed on, in the shape the rows read. */
+function frameOf(group: FrameGroup): HotPathFrame {
+  const worst = largestInstance(group.instances);
+  return {
+    text: worst.text,
+    eventIndex: worst.eventIndex,
+    eventIndexes: group.instances.map((instance) => instance.eventIndex),
+    totalTime: group.total,
+    // An instance reporting a negative self can drag the group's sum outside
+    // its total; the frame's own share of itself cannot sit outside it.
+    selfTime: Math.min(Math.max(group.self, 0), group.total),
+    count: group.instances.length,
+    category: worst.category,
+  };
 }
 
 /** Every child of every instance, without materialising a flattened array per level. */
@@ -119,8 +162,8 @@ function* childrenOf(parents: LogEvent[]): Generator<LogEvent> {
   }
 }
 
-/** Merge the events by signature and return the group holding the most total time. */
-function largestGroup(events: Iterable<LogEvent>): FrameGroup | null {
+/** Merge the events by signature, biggest total time first. */
+function sortedGroups(events: Iterable<LogEvent>): FrameGroup[] {
   const groups = new Map<string, FrameGroup>();
   for (const event of events) {
     const key = getEventKey(event);
@@ -137,13 +180,7 @@ function largestGroup(events: Iterable<LogEvent>): FrameGroup | null {
       });
     }
   }
-  let largest: FrameGroup | null = null;
-  for (const group of groups.values()) {
-    if (!largest || group.total > largest.total) {
-      largest = group;
-    }
-  }
-  return largest;
+  return [...groups.values()].sort((a, b) => b.total - a.total);
 }
 
 function largestInstance(instances: LogEvent[]): LogEvent {

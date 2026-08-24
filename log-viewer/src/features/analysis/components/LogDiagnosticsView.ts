@@ -311,7 +311,6 @@ export class LogDiagnosticsView extends LitElement {
       }
 
       .detail {
-        margin: 0;
         color: var(--lana-fg-muted);
       }
 

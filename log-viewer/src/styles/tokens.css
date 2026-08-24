@@ -169,8 +169,9 @@
   /* Primary text, for promoting muted text back to full strength. */
   --lana-fg: var(--vscode-foreground, #cccccc);
 
-  /* The hairline between panes, and around a docked one. */
-  --lana-panel-divider: var(--vscode-sideBar-border, transparent);
+  /* The hairline between panes, and around a docked one. Themes that set no
+     `sideBar.border` fall through to the app's own hairline, never to nothing. */
+  --lana-panel-divider: var(--vscode-sideBar-border, var(--lana-surface-border));
 
   /* Resize handles. `inset` pulls the handle over its neighbours so no gap shows,
      leaving the divider hairline as the only seam. */

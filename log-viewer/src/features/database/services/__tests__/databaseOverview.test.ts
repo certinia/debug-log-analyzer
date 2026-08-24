@@ -92,10 +92,12 @@ describe('databaseOverview statements', () => {
         eventIndexes: [expect.any(Number)],
         kind: 'SOQL',
         label: 'SELECT Name FROM Contact',
+        sObject: 'Contact',
         timeNs: 30_000_000,
         netNs: 30_000_000,
         selfNs: 30_000_000,
         rows: 90,
+        maxRows: 90,
         repeats: 1,
       },
       {
@@ -103,10 +105,12 @@ describe('databaseOverview statements', () => {
         eventIndexes: [expect.any(Number)],
         kind: 'DML',
         label: 'Insert Case',
+        sObject: 'Case',
         timeNs: 2_000_000,
         netNs: 2_000_000,
         selfNs: 2_000_000,
         rows: 3,
+        maxRows: 3,
         repeats: 1,
       },
       {
@@ -114,10 +118,12 @@ describe('databaseOverview statements', () => {
         eventIndexes: [expect.any(Number)],
         kind: 'SOQL',
         label: 'SELECT Id FROM Account',
+        sObject: 'Account',
         timeNs: 1_000_000,
         netNs: 1_000_000,
         selfNs: 1_000_000,
         rows: 5,
+        maxRows: 5,
         repeats: 1,
       },
     ]);
@@ -136,11 +142,27 @@ describe('databaseOverview statements', () => {
       ['SELECT Id FROM Account', 2, 4_000_000],
       ['Insert Case', 1, 3_000_000],
     ]);
-    // The rows of every occurrence, and the slowest one to reveal.
+    // The rows of every occurrence, the most one of them read, and the slowest
+    // one to reveal.
     expect(overview.ranked[0]).toMatchObject({
       rows: 5,
+      maxRows: 3,
       eventIndexes: [expect.any(Number), expect.any(Number)],
     });
+  });
+
+  it('names the SObject each statement touched, and none for a search', () => {
+    const overview = overviewOf(
+      soql(10_000_000, 12_000_000, 3, 'SELECT Id FROM Account') +
+        dml(13_000_000, 15_000_000, 'Insert', 'Case', 1) +
+        sosl(16_000_000, 19_000_000, 2),
+    );
+
+    expect(overview.ranked.map((statement) => [statement.kind, statement.sObject])).toEqual([
+      ['SOSL', null],
+      ['DML', 'Case'],
+      ['SOQL', 'Account'],
+    ]);
   });
 
   it('gives every statement its own event index, so a row can be revealed', () => {

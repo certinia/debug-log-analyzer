@@ -10,6 +10,7 @@ import {
 } from 'apex-log-parser';
 
 import { DEFAULT_NAMESPACE, getCallerNamespace } from '../../../core/utility/CallerNamespace.js';
+import { deriveSoqlObject } from './sobjectClassification.js';
 
 /** The label for a DML statement whose SObject the log never names. */
 export const UNKNOWN_OBJECT = 'Unknown';
@@ -56,6 +57,8 @@ export interface DatabaseStatement {
   kind: StatementKind;
   /** The query text, or the operation and SObject for DML. */
   label: string;
+  /** The SObject the statement reads or writes, or `null` where the log names none. */
+  sObject: string | null;
   /** Whole duration (ns) across every occurrence, nested statements included. */
   timeNs: number;
   /**
@@ -66,6 +69,8 @@ export interface DatabaseStatement {
   /** Self time (ns): the statement line's own, every descendant excluded. */
   selfNs: number;
   rows: number;
+  /** The most rows one occurrence read or wrote, for a search's per-query cap. */
+  maxRows: number;
   /** Times the log ran this statement. */
   repeats: number;
 }
@@ -333,6 +338,17 @@ function compute(root: ApexLog): DatabaseOverview {
   };
 }
 
+/** The SObject a statement touched, or `null` where the log names none. */
+function sobjectOf(event: LogEvent): string | null {
+  if (event instanceof SOQLExecuteBeginLine) {
+    return deriveSoqlObject(event);
+  }
+  if (event instanceof DMLBeginLine) {
+    return event.sObjectType ?? null;
+  }
+  return null;
+}
+
 /** Merge one occurrence into its statement, so a query in a loop is one row. */
 function addStatement(
   statements: Map<string, DatabaseStatement>,
@@ -343,6 +359,7 @@ function addStatement(
 ): void {
   const { kind, label, rowsRead, rowsWritten } = facts;
   const key = `${kind}:${label}`;
+  const occurrenceRows = rowsRead + rowsWritten;
   const statement = statements.get(key);
   if (!statement) {
     statements.set(key, {
@@ -350,10 +367,13 @@ function addStatement(
       eventIndexes: [event.eventIndex],
       kind,
       label,
+      // Derived here so a query in a loop parses its SObject once, not per run.
+      sObject: sobjectOf(event),
       timeNs,
       netNs,
       selfNs: event.duration.self,
-      rows: rowsRead + rowsWritten,
+      rows: occurrenceRows,
+      maxRows: occurrenceRows,
       repeats: 1,
     });
     return;
@@ -366,7 +386,8 @@ function addStatement(
   statement.timeNs += timeNs;
   statement.netNs += netNs;
   statement.selfNs += event.duration.self;
-  statement.rows += rowsRead + rowsWritten;
+  statement.rows += occurrenceRows;
+  statement.maxRows = Math.max(statement.maxRows, occurrenceRows);
   statement.repeats += 1;
 }
 

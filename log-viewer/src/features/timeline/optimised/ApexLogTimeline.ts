@@ -20,7 +20,7 @@
 import type { ApexLog, LogEvent } from 'apex-log-parser';
 import { ContextMenu } from '../../../components/ContextMenu.js';
 import { ContextMenuBuilder } from '../../../components/ContextMenuBuilder.js';
-import { eventBus } from '../../../core/events/EventBus.js';
+import { eventBus, type TimelineNavigateMode } from '../../../core/events/EventBus.js';
 import { SelectionEchoGuard } from '../../../core/events/SelectionEchoGuard.js';
 import { copyToClipboard } from '../../../core/utility/Clipboard.js';
 import { vscodeMessenger } from '../../../core/messaging/VSCodeExtensionMessenger.js';
@@ -43,6 +43,7 @@ import type { SearchCursor } from '../types/search.types.js';
 import { InspectorEmphasis } from '../../../components/inspectorEmphasis.js';
 import { isFrameOffscreen, toDetailSelection } from '../utils/detail-selection-sync.js';
 import { extractExceptionMarkers, extractMarkers } from '../utils/marker-utils.js';
+import { seekWindow } from '../utils/navigate-window.js';
 import { logEventToTreeAndRects } from '../utils/tree-converter.js';
 import { FlameChart } from './FlameChart.js';
 import { FrameTooltipRenderer, type TooltipAnchor } from './FrameTooltipRenderer.js';
@@ -207,7 +208,7 @@ export class ApexLogTimeline {
       if (detail.eventIndex !== undefined) {
         this.navigateToEventIndex(detail.eventIndex);
       } else {
-        this.navigateToTimestamp(detail.timestamp);
+        this.navigateToTimestamp(detail.timestamp, detail.mode);
       }
     });
 
@@ -308,33 +309,41 @@ export class ApexLogTimeline {
       return;
     }
 
-    const result = findEventByEventIndex(this.apexLog, eventIndex);
-    this._navigateToSearchResult(result);
+    this._reveal(findEventByEventIndex(this.apexLog, eventIndex));
   }
 
   /**
    * Navigate to a specific timestamp in the timeline.
    * Called via EventBus 'timeline:navigate-to' event from CalltreeView,
    * or directly from TimelineFlameChart after initialization.
-   * Centers the viewport AND selects the event for visual highlighting.
+   * 'reveal' selects the frame at the timestamp and zooms to it; 'seek' zooms to
+   * a window of the log around the instant and selects nothing.
    */
-  public navigateToTimestamp(timestamp: number): void {
+  public navigateToTimestamp(timestamp: number, mode: TimelineNavigateMode = 'reveal'): void {
     if (!this.events) {
       return;
     }
     // Find event by timestamp (binary search - events sorted by time)
     const result = findEventByTimestamp(this.events, timestamp);
-    this._navigateToSearchResult(result);
+    if (mode === 'reveal') {
+      this._reveal(result);
+      return;
+    }
+    // The frame only gives the depth to centre on; the window is the log's, and
+    // padding 0 keeps the width asked for.
+    const { start, width } = seekWindow(timestamp, this.apexLog?.duration.total ?? 0);
+    this.flamechart.getViewportManager()?.focusOnEvent(start, width, result?.depth ?? 0, 0);
+    this.flamechart.requestRender();
   }
 
-  private _navigateToSearchResult(result: { event: LogEvent; depth: number } | null): void {
+  private _reveal(result: { event: LogEvent; depth: number } | null): void {
     if (!result) {
       return;
     }
 
     this.flamechart.selectByEventNode(this.toEventNode(result));
-    const viewport = this.flamechart.getViewportManager();
-    viewport?.focusOnEvent(result.event.timestamp, result.event.duration.total, result.depth);
+    const { timestamp, duration } = result.event;
+    this.flamechart.getViewportManager()?.focusOnEvent(timestamp, duration.total, result.depth);
     this.flamechart.requestRender();
   }
 
