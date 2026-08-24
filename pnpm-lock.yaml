@@ -70,9 +70,6 @@ importers:
       '@vscode/test-web':
         specifier: ^0.0.81
         version: 0.0.81
-      '@vscode/vsce':
-        specifier: ^3.9.2
-        version: 3.9.2
       concurrently:
         specifier: ^10.0.4
         version: 10.0.4
@@ -149,6 +146,9 @@ importers:
       '@types/vscode':
         specifier: ~1.102.0
         version: 1.102.0
+      '@vscode/vsce':
+        specifier: ^3.9.2
+        version: 3.9.2
       typescript:
         specifier: npm:@typescript/typescript6@^6.0.2
         version: '@typescript/typescript6@6.0.2'

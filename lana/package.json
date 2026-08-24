@@ -388,6 +388,7 @@
     ]
   },
   "scripts": {
+    "build:vsix": "vsce package --no-dependencies",
     "vscode:prepublish": "pnpm -w run build && pnpm -w run copy:package-docs",
     "vscode:bundle": "pnpm -w run build"
   },
@@ -401,6 +402,7 @@
     "@types/jest": "^30.0.0",
     "@types/node": "~22.20.1",
     "@types/vscode": "~1.102.0",
+    "@vscode/vsce": "^3.9.2",
     "typescript": "npm:@typescript/typescript6@^6.0.2"
   }
 }
