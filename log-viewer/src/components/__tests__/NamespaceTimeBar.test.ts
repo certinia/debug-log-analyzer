@@ -9,7 +9,8 @@ import type { ApexLog } from 'apex-log-parser';
 let apexLog: ApexLog | null = null;
 
 import type { LogStore } from '../../core/log/LogStore.js';
-import { MAX_SEGMENTS, type NamespaceTimeBar } from '../NamespaceTimeBar.js';
+import type { NamespaceTimeBar } from '../NamespaceTimeBar.js';
+import { DEFAULT_MAX_SEGMENTS } from '../StackedTimeBar.js';
 import '../NamespaceTimeBar.js';
 import { logNamespacePalette } from '../namespacePalette.js';
 import { ev, eventByIndex, log, resetEvents, type FakeEvent } from './fixtures/logEvents.js';
@@ -82,10 +83,10 @@ describe('namespace-time-bar', () => {
   });
 
   it('gathers the namespaces past the cap into one tail segment', async () => {
-    const namespaces = Array.from({ length: MAX_SEGMENTS }, (_, index) => `ns${index}`).concat(
-      'nsA',
-      'nsB',
-    );
+    const namespaces = Array.from(
+      { length: DEFAULT_MAX_SEGMENTS },
+      (_, index) => `ns${index}`,
+    ).concat('nsA', 'nsB');
     // Descending self time, so the two smallest fall past the palette.
     logOf(
       namespaces.map((namespace, index) => ev(namespace, (namespaces.length - index) * 10)),
@@ -94,7 +95,7 @@ describe('namespace-time-bar', () => {
 
     const shown = segments(await mount());
 
-    expect(shown).toHaveLength(MAX_SEGMENTS + 1);
+    expect(shown).toHaveLength(DEFAULT_MAX_SEGMENTS + 1);
     // nsA at 20 and nsB at 10.
     expect(shown.at(-1)).toMatchObject({ label: '2 others', value: 30 });
   });

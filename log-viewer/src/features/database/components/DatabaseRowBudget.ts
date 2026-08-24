@@ -28,7 +28,7 @@ import {
 import { kindColors } from './DatabaseOverview.js';
 import { governorTier } from './GovernorSummary.js';
 
-/** SObjects a bar names before the rest become one tail segment. */
+/** More than a namespace bar: single-hue shades in a wide card, not a dock legend. */
 const MAX_OBJECTS = 8;
 
 const KIND_LABEL: Record<RowBudgetKind, string> = { SOQL: 'Query rows', DML: 'DML rows' };
@@ -197,14 +197,13 @@ function caveat(budgets: readonly RowBudget[]): string {
 function objectSegments(groups: readonly RowGroup[], hue: string): StackedSegment[] {
   return segmentsWithTail(
     groups,
-    MAX_OBJECTS,
     (group, index) => ({
       label: group.sObject,
       value: group.rows,
       color: shade(hue, index),
       detail: `${formatInteger(group.statements)} statement${group.statements === 1 ? '' : 's'}`,
     }),
-    (group) => group.rows,
+    MAX_OBJECTS,
   );
 }
 

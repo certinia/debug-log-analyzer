@@ -20,10 +20,6 @@ import {
   type NamespaceTime,
 } from './namespaceTime.js';
 
-/** A dock-width bar cannot show more segments wide enough to read or hover, so
- *  the rest go to the tail however many colours there are. */
-export const MAX_SEGMENTS = 12;
-
 /** No scope resolved yet, so the first null scope still reads as a change. */
 const UNRESOLVED = Symbol('unresolved scope');
 
@@ -86,16 +82,11 @@ export class NamespaceTimeBar extends LitElement {
     if (!slices.length || !color) {
       return html`<p class="note">No time was recorded here.</p>`;
     }
-    const segments = segmentsWithTail(
-      slices,
-      MAX_SEGMENTS,
-      (slice) => ({
-        label: slice.namespace,
-        value: slice.selfTime,
-        color: color(slice.namespace),
-      }),
-      (slice) => slice.selfTime,
-    );
+    const segments = segmentsWithTail(slices, (slice) => ({
+      label: slice.namespace,
+      value: slice.selfTime,
+      color: color(slice.namespace),
+    }));
 
     return html`<stacked-time-bar
       legend
