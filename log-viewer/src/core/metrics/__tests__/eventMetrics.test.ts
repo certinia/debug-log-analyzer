@@ -21,20 +21,18 @@ describe('usageParts', () => {
 
     expect(parts.primary).toBe('3 / 100');
     expect(parts.qualifiers).toEqual(['3.00%', 'self 1']);
-    expect(parts.fraction).toBe(0.03);
   });
 
-  // No denominator means no share of anything, so nothing to meter.
-  it('gives the count alone, and no fraction, where there is no limit', () => {
+  // No denominator means no share of anything, so nothing to qualify.
+  it('gives the count alone, and no percentage, where there is no limit', () => {
     const parts = usageParts(7, 0, String, null);
 
     expect(parts.primary).toBe('7');
     expect(parts.qualifiers).toEqual([]);
-    expect(parts.fraction).toBeNull();
   });
 
   it('reports a breach past the limit', () => {
-    expect(usageParts(120, 100, String, null).fraction).toBe(1.2);
+    expect(usageParts(120, 100, String, null).qualifiers).toEqual(['120.00%']);
   });
 });
 

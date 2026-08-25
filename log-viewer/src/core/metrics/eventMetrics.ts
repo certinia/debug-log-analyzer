@@ -62,20 +62,22 @@ export function formatBytes(bytes: number): string {
   return `${formatInteger(bytes)} bytes`;
 }
 
+/** A frame's own share of a reading, named the one way every view names it. */
+export function selfLabel(self: string): string {
+  return `self ${self}`;
+}
+
 /** A metric reading, split so a caller can lay the parts out however it likes. */
 export interface UsageParts {
   /** `used / limit`, or the count alone where there is no limit. */
   primary: string;
   /** The percentage and any self reading — secondary, in reading order. */
   qualifiers: string[];
-  /** Share of the limit as a fraction, or null where there is no limit. */
-  fraction: number | null;
 }
 
 /**
  * `used / limit` with its derived percentage and any self reading, so the primary
- * number reads first. Without a known limit there is no denominator, no percentage
- * and no meter.
+ * number reads first. Without a known limit there is no denominator and no percentage.
  */
 export function usageParts(
   total: number,
@@ -89,8 +91,7 @@ export function usageParts(
     // Percentage first: it qualifies the ratio immediately before it.
     qualifiers: [
       fraction !== null ? `${(fraction * 100).toFixed(2)}%` : null,
-      self && `self ${self}`,
+      self && selfLabel(self),
     ].filter((part): part is string => !!part),
-    fraction,
   };
 }
