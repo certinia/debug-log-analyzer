@@ -128,9 +128,6 @@ export class TimelineFlameChart extends LitElement {
   /** Bumped by every `cleanup()`, so an in-flight `init` can tell it was superseded. */
   private initEpoch = 0;
 
-  /** Ends an outstanding layout wait, so a teardown never leaves one pending for ever. */
-  private endLayoutWait: (() => void) | null = null;
-
   override connectedCallback(): void {
     super.connectedCallback();
     this.themeUnsubscribe ??= themeObserver.on(() => {
@@ -169,27 +166,6 @@ export class TimelineFlameChart extends LitElement {
     if (changedProperties.has('showTooltip')) {
       this.apexLogTimeline?.setTooltipEnabled(this.showTooltip);
     }
-  }
-
-  /** Settles once the container has a size to draw into, or when a teardown ends the wait. */
-  private waitForLayout(container: HTMLElement): Promise<void> {
-    if (hasSize(container)) {
-      return Promise.resolve();
-    }
-
-    return new Promise<void>((resolve) => {
-      const observer = new ResizeObserver(() => {
-        if (hasSize(container)) {
-          this.endLayoutWait?.();
-        }
-      });
-      this.endLayoutWait = () => {
-        observer.disconnect();
-        this.endLayoutWait = null;
-        resolve();
-      };
-      observer.observe(container);
-    });
   }
 
   /**
@@ -235,14 +211,6 @@ export class TimelineFlameChart extends LitElement {
       };
 
       const epoch = this.initEpoch;
-      // Height comes from a flex row that a `lana.timeline.legacy` toggle re-lays-out
-      // around the chart. Measuring before that settles reads 0, which `init` rejects
-      // outright — so wait for a size rather than report a container the user cannot see.
-      await this.waitForLayout(this.containerRef);
-      if (epoch !== this.initEpoch) {
-        return;
-      }
-
       const timeline = new ApexLogTimeline();
       await timeline.init(this.containerRef, this.apexLog, optionsWithTheme);
 
@@ -330,7 +298,6 @@ export class TimelineFlameChart extends LitElement {
   private cleanup(): void {
     // Supersede any in-flight `initializeTimeline`.
     this.initEpoch++;
-    this.endLayoutWait?.();
 
     // Destroy renderer
     if (this.apexLogTimeline) {
@@ -367,10 +334,4 @@ export class TimelineFlameChart extends LitElement {
       </div>
     `;
   }
-}
-
-/** A box the renderer can draw into: both axes measured, and neither of them zero. */
-function hasSize(element: HTMLElement): boolean {
-  const { width, height } = element.getBoundingClientRect();
-  return width > 0 && height > 0;
 }

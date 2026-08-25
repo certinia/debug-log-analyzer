@@ -70,6 +70,13 @@ import {
   METRIC_STRIP_GAP,
   MetricStripOrchestrator,
 } from './metric-strip/MetricStripOrchestrator.js';
+import { waitForNextFrame } from '../../../core/utility/FrameBudget.js';
+
+/**
+ * How long to let a container settle before giving up on it. Bounded, so a container that
+ * genuinely never gains a size reports the fault rather than hanging on a promise.
+ */
+const SIZE_WAIT_FRAMES = 60;
 
 export interface FlameChartCallbacks {
   onMouseMove?: (
@@ -248,14 +255,7 @@ export class FlameChart<E extends EventNode = EventNode> {
     // Store truncation markers for rendering
     this.markers.push(...markers);
 
-    // Get container dimensions for validation
-    const { width, height } = container.getBoundingClientRect();
-    if (width === 0 || height === 0) {
-      throw new TimelineError(
-        TimelineErrorCode.INVALID_CONTAINER,
-        'Container must have non-zero dimensions',
-      );
-    }
+    const { width, height } = await this.awaitContainerSize(container);
 
     // Create event index (use precomputed metrics if available)
     this.index = new TimelineEventIndex(
@@ -1025,6 +1025,28 @@ export class FlameChart<E extends EventNode = EventNode> {
     mainDiv.appendChild(this.app.canvas);
 
     return { mainTimelineHeight };
+  }
+
+  /**
+   * The container's size, waiting for a layout that has not settled. A hidden tab, a
+   * collapsed panel, or a flex row being re-laid-out around the chart all measure 0 before
+   * they settle, and none of those is a fault — but a container that never gains a size is,
+   * so the wait is bounded and still reports it.
+   */
+  private async awaitContainerSize(
+    container: HTMLElement,
+  ): Promise<{ width: number; height: number }> {
+    for (let frame = 0; frame < SIZE_WAIT_FRAMES; frame++) {
+      const { width, height } = container.getBoundingClientRect();
+      if (width > 0 && height > 0) {
+        return { width, height };
+      }
+      await waitForNextFrame();
+    }
+    throw new TimelineError(
+      TimelineErrorCode.INVALID_CONTAINER,
+      'Container must have non-zero dimensions',
+    );
   }
 
   private setupCoordinateSystem(): void {
