@@ -83,7 +83,7 @@ export class MetricStripTooltipRenderer extends BaseTooltipRenderer {
   private shownPoint: MetricStripDataPoint | null = null;
 
   constructor(htmlContainer: HTMLElement, options: MetricStripTooltipOptions = {}) {
-    super(htmlContainer, { mode: 'cursor-offset', offset: 8, padding: 4 });
+    super(htmlContainer, { mode: 'below-anchor', offset: 8, padding: 4 });
 
     this.colors = getMetricStripColors();
     this.title = options.title ?? 'Governor Limits';
@@ -137,8 +137,9 @@ export class MetricStripTooltipRenderer extends BaseTooltipRenderer {
 
     this.showElement();
 
-    // Position tooltip (Y is ignored, we always position below the strip)
-    this.positionTooltip(screenX, 0);
+    // The strip is the anchor: `below-anchor` keeps the panel clear of it, and batches the
+    // measurement into one frame rather than forcing a layout per pointer move.
+    this.positionTooltip(screenX, this.stripHeight);
   }
 
   // ============================================================================
@@ -153,34 +154,6 @@ export class MetricStripTooltipRenderer extends BaseTooltipRenderer {
     tooltip.className = 'metric-strip-tooltip';
     tooltip.style.minWidth = '200px';
     return tooltip;
-  }
-
-  /**
-   * Position tooltip below the metric strip.
-   * Overrides base positioning to always place tooltip below the strip,
-   * preventing it from covering the visualization or the mouse cursor.
-   */
-  protected override positionTooltip(screenX: number, _screenY: number): void {
-    const offset = this.positionOptions.offset ?? 8;
-    const padding = this.positionOptions.padding ?? 4;
-
-    // Use base class positioning logic pattern (calls cancelPendingPositioning internally)
-    // But we need direct positioning here, so call super pattern manually
-    const tooltipWidth = this.tooltipElement.offsetWidth;
-    const containerWidth = this.container.offsetWidth;
-
-    // X: position at cursor with flip if needed
-    let left = screenX + offset;
-    if (left + tooltipWidth > containerWidth) {
-      left = screenX - tooltipWidth - offset;
-    }
-    left = Math.max(padding, Math.min(containerWidth - tooltipWidth - padding, left));
-
-    // Y: always position below the strip
-    const top = this.stripHeight + offset;
-
-    this.tooltipElement.style.left = `${left}px`;
-    this.tooltipElement.style.top = `${top}px`;
   }
 
   // ============================================================================

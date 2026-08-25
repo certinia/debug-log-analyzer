@@ -49,6 +49,76 @@ describe('MetricStripTooltipRenderer', () => {
     document.body.removeChild(container);
   });
 
+  /** The panel element. */
+  function panel(): HTMLElement {
+    return container.querySelector('.metric-strip-tooltip') as HTMLElement;
+  }
+
+  /** jsdom lays nothing out, so the widths the placement maths reads have to be declared. */
+  function declareWidths(panelWidth: number, containerWidth: number): void {
+    Object.defineProperty(panel(), 'offsetWidth', { value: panelWidth, configurable: true });
+    Object.defineProperty(container, 'offsetWidth', { value: containerWidth, configurable: true });
+  }
+
+  /** Placement is batched into a frame, so it has to be let through. */
+  function flushFrame(): Promise<void> {
+    return new Promise((resolve) => requestAnimationFrame(() => resolve()));
+  }
+
+  /** One always-show metric, enough to get a row on the panel. */
+  const oneMetric = [metric('cpuTime', 'CPU Time', 0.9)];
+  const onePoint: MetricStripDataPoint = {
+    timestamp: 0,
+    values: new Map([['cpuTime', 0.5]]),
+    rawValues: new Map(),
+    tier3Max: 0,
+  };
+
+  describe('placement', () => {
+    it('sits a fixed offset below the strip, clear of what is being read', async () => {
+      renderer.show(100, 0, onePoint, oneMetric, 60);
+      declareWidths(200, 1000);
+      await flushFrame();
+
+      // stripHeight 60 + offset 8; never above, so the panel cannot cover the strip.
+      expect(panel().style.top).toBe('68px');
+      expect(panel().style.left).toBe('108px');
+    });
+
+    it('flips to the left of the cursor rather than overflow the container', async () => {
+      renderer.show(950, 0, onePoint, oneMetric, 60);
+      declareWidths(200, 1000);
+      await flushFrame();
+
+      // 950 + 8 + 200 overflows 1000, so the panel goes to the cursor's left.
+      expect(panel().style.left).toBe('742px');
+    });
+  });
+
+  // The classifier hands back the same point object across one time segment, so sweeping a
+  // segment must not rebuild: a mutation of the panel survives the second show.
+  it('re-positions without rebuilding when the reading has not changed', async () => {
+    renderer.show(100, 0, onePoint, oneMetric, 60);
+    panel().dataset['marked'] = 'yes';
+
+    renderer.show(140, 0, onePoint, oneMetric, 60);
+    declareWidths(200, 1000);
+    await flushFrame();
+
+    expect(panel().dataset['marked']).toBe('yes');
+    expect(panel().style.left).toBe('148px');
+  });
+
+  it('rebuilds when the reading changes', () => {
+    renderer.show(100, 0, onePoint, oneMetric, 60);
+    const first = panel().innerHTML;
+
+    const later: MetricStripDataPoint = { ...onePoint, values: new Map([['cpuTime', 0.9]]) };
+    renderer.show(100, 0, later, oneMetric, 60);
+
+    expect(panel().innerHTML).not.toBe(first);
+  });
+
   it('orders rows by global peak, independent of the value at the cursor', () => {
     // All three are always-show metrics, so membership is fixed and we isolate ordering.
     const metrics = [
