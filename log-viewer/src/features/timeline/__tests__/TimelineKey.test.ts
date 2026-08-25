@@ -44,6 +44,24 @@ describe('TimelineKey', () => {
     expect(apex?.querySelector('color-swatch')?.color).toBe('rgb(43, 143, 129)');
   });
 
+  // Comma, not space: `Code Unit` is one category that contains a space, so a
+  // space-joined list could not be split back apart.
+  it('lists every folded category, splittable on the comma', async () => {
+    const el = await mount([
+      {
+        label: 'Method',
+        fillColor: 'rgb(1, 2, 3)',
+        categories: ['Apex', 'Callout'],
+        selfTimeNs: 1_000,
+      },
+      { label: 'Code Unit', fillColor: 'rgb(4, 5, 6)', categories: ['Code Unit'] },
+    ]);
+
+    const [method, codeUnit] = chips(el);
+    expect(method?.dataset['category']?.split(',')).toEqual(['Apex', 'Callout']);
+    expect(codeUnit?.dataset['category']?.split(',')).toEqual(['Code Unit']);
+  });
+
   it('shows the compact self time when present', async () => {
     const el = await mount([
       {

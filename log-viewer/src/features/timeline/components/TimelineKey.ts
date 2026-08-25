@@ -67,7 +67,8 @@ export class Timelinekey extends LitElement {
         (entry) =>
           // The seam for the interactivity follow-up (hover/click → highlight): the
           // categories to match on, not the label, which names no category under legacy.
-          html`<span class="chip" data-category="${entry.categories.join(' ')}">
+          // Comma-joined, never space: `Code Unit` is one category with a space in it.
+          html`<span class="chip" data-category="${entry.categories.join(',')}">
             <color-swatch color=${entry.fillColor}></color-swatch>
             <span>${entry.label}</span>
             ${
