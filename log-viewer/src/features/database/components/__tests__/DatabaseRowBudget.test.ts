@@ -41,6 +41,11 @@ const full = (): RowBudgets => ({
       groups: [{ sObject: 'Case', rows: 300, statements: 1 }],
     },
   ],
+  objects: [
+    { sObject: 'Contact', rowsRead: 40_000, rowsWritten: 0, rows: 40_000 },
+    { sObject: 'Account', rowsRead: 5_000, rowsWritten: 0, rows: 5_000 },
+    { sObject: 'Case', rowsRead: 0, rowsWritten: 300, rows: 300 },
+  ],
   counts: [
     { label: 'SOQL', used: 62, limit: 100 },
     { label: 'DML', used: 14, limit: 150 },
@@ -79,6 +84,9 @@ const texts = (element: Element, selector: string) =>
 const bars = (element: Element) =>
   [...(element.shadowRoot?.querySelectorAll('stacked-time-bar') ?? [])] as StackedTimeBar[];
 
+const barOf = (element: Element, label: string) =>
+  bars(element).find((bar) => bar.getAttribute('label') === label);
+
 beforeEach(() => {
   document.body.replaceChildren();
   budgets = full();
@@ -97,7 +105,12 @@ describe('database-rows', () => {
   it('measures the bar against the limit, not against the rows it holds', async () => {
     const element = await mount();
 
-    expect(bars(element).map((bar) => [bar.format(1_000), bar.total])).toEqual([
+    expect(
+      ['Query rows', 'DML rows'].map((label) => {
+        const bar = barOf(element, label);
+        return [bar?.format(1_000), bar?.total];
+      }),
+    ).toEqual([
       ['1,000', 50_000],
       ['1,000', 10_000],
     ]);
@@ -184,6 +197,26 @@ describe('database-rows', () => {
       'Query rows 45,000 / 50,000',
       'DML rows 300 / 10,000',
     ]);
+  });
+
+  it('brings the two limits together per SObject, read beside written', async () => {
+    const objects = barOf(await mount(), 'Query and DML rows by SObject');
+
+    expect(
+      objects?.segments.map((segment) => [segment.label, segment.value, segment.detail]),
+    ).toEqual([
+      ['Contact', 40_000, '40,000 read · 0 written'],
+      ['Account', 5_000, '5,000 read · 0 written'],
+      ['Case', 300, '0 read · 300 written'],
+    ]);
+    // Rows against no one limit, so the bar measures itself.
+    expect(objects?.total).toBe(0);
+  });
+
+  it('leaves the SObject split out when the service brings nothing together', async () => {
+    budgets = { ...full(), objects: [] };
+
+    expect(texts(await mount(), '.objects__head')).toEqual([]);
   });
 
   it('says so when the log records no database statements', async () => {

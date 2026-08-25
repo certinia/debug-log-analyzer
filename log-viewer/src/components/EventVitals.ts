@@ -18,7 +18,9 @@ import {
 } from '../core/metrics/eventMetrics.js';
 import { DEFAULT_NAMESPACE, getCallerNamespace } from '../core/utility/CallerNamespace.js';
 import { formatMs } from '../core/utility/Duration.js';
+import { outermostEvents } from '../core/utility/EventTree.js';
 import { formatInteger } from '../core/utility/Util.js';
+import { sumDurationTotalForRootEvents } from '../features/analysis/services/CallStackSum.js';
 import { globalStyles } from '../styles/global.styles.js';
 
 // web components
@@ -150,13 +152,14 @@ export class EventVitals extends LitElement {
       this._row(rows, 'Calls', formatInteger(events.length));
     }
 
-    // Aggregates sum their occurrences; a single frame reports its own timing.
-    // Total and self read together, so they share one row.
-    const total = events.reduce((sum, e) => sum + e.duration.total, 0);
+    // A recursive frame's outer call already holds its inner calls, so a total
+    // counts the outermost occurrences only.
+    const total = sumDurationTotalForRootEvents([events]);
     const self = events.reduce((sum, e) => sum + e.duration.self, 0);
     this._row(rows, 'Time', html`${this._ms(total)}${qualifier(selfLabel(this._ms(self)))}`);
     if (isAggregate) {
-      this._row(rows, 'Avg', this._ms(total / events.length));
+      // Self time never nests, so it and the call count cover the same calls.
+      this._row(rows, 'Avg self', this._ms(self / events.length));
     }
 
     this._metricRows(rows, events);
@@ -224,21 +227,25 @@ export class EventVitals extends LitElement {
    */
   private _metricRows(rows: TemplateResult[], events: LogEvent[]): void {
     const limits = this.logStore?.log.governorLimits;
-    // Aggregates sum their occurrences, matching how the grids aggregate a row.
-    const sum = (pick: (e: LogEvent) => SelfTotal, part: 'total' | 'self') =>
-      events.reduce((acc, e) => acc + pick(e)[part], 0);
+    // A total nests and a self reading does not, so each sums the set that holds
+    // it once.
+    const outer = outermostEvents(events);
+    const sumTotal = (pick: (e: LogEvent) => SelfTotal) =>
+      outer.reduce((acc, e) => acc + pick(e).total, 0);
+    const sumSelf = (pick: (e: LogEvent) => SelfTotal) =>
+      events.reduce((acc, e) => acc + pick(e).self, 0);
 
     // A statement's own row count is its headline number, so it shows even at
     // zero ("returned nothing" is a result); other zero metrics stay hidden.
     const alwaysShow = this.type ? `${this.type.toUpperCase()} Rows` : '';
 
     for (const metric of EVENT_METRICS) {
-      const total = sum(metric.pick, 'total');
+      const total = sumTotal(metric.pick);
       if (!total && metric.label !== alwaysShow) {
         continue;
       }
       const limit = limits ? metric.limit(limits, this.type) : 0;
-      const self = metric.noSelf ? 0 : sum(metric.pick, 'self');
+      const self = metric.noSelf ? 0 : sumSelf(metric.pick);
       const format = metric.bytes ? formatBytes : formatInteger;
       this._row(
         rows,

@@ -211,6 +211,26 @@ describe('buildScopedCallTree', () => {
     expect(bottomUp?.duration.self).toBe(OCCURRENCES);
   });
 
+  it('an aggregate of nested occurrences counts each one once', async () => {
+    // A recursive frame: the outer call already holds the inner one, so taking
+    // both as roots would walk the inner call twice.
+    const outer = ev(400, 'METHOD_ENTRY', 'rec', { total: 10, self: 4 });
+    const inner = ev(401, 'METHOD_ENTRY', 'rec', { total: 6, self: 6 });
+    outer.parent = root;
+    outer.children = [inner];
+    inner.parent = outer;
+    byId.set(outer.eventIndex, outer);
+    byId.set(inner.eventIndex, inner);
+
+    const tree = (await build(outer.eventIndex, [outer.eventIndex, inner.eventIndex]))!;
+    // The outer call's 10, not 16.
+    expect(tree.rootTotal).toBe(10);
+
+    const [bottomUp] = (await tree.bottomUp(options))!;
+    expect(bottomUp?.callCount).toBe(2);
+    expect(bottomUp?.duration.self).toBe(10);
+  });
+
   it('a merged row names every occurrence behind it, so all of them can be marked', async () => {
     const instances = loopOccurrences(3);
     const tree = (await build(instances[0]!, instances))!;
