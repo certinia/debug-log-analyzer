@@ -1,6 +1,7 @@
 /*
  * Copyright (c) 2026 Certinia Inc. All rights reserved.
  */
+import type { StatementType } from '../metrics/eventMetrics.js';
 
 /**
  * Type-safe event bus for cross-component communication.
@@ -18,9 +19,6 @@ export const TAB_TO_SOURCE: Record<string, DetailSource> = {
   'analysis-tab': 'analysis',
   'database-tab': 'database',
 };
-
-/** Which of the database grids a selection came from. */
-import type { StatementType } from '../metrics/eventMetrics.js';
 
 export type { StatementType };
 

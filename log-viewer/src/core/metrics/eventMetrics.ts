@@ -3,11 +3,14 @@
  */
 import type { GovernorLimits, LogEvent, SelfTotal } from 'apex-log-parser';
 
-/** The statement a database metric belongs to. */
-export type StatementType = 'dml' | 'soql' | 'sosl';
 import { formatInteger } from '../utility/Util.js';
 
-/** Which statement a selection is, where that decides a metric's denominator. */
+/**
+ * The statement a database metric belongs to — which grid a selection came from, and
+ * which metric a per-statement denominator applies to.
+ */
+export type StatementType = 'dml' | 'soql' | 'sosl';
+
 /**
  * Maximum records returned by a *single* SOSL query. A per-query cap, not a cumulative
  * per-transaction total, so it is metered per row rather than summed against a total.
