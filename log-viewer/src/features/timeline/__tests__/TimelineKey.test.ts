@@ -26,8 +26,13 @@ function chips(el: Timelinekey): HTMLElement[] {
 describe('TimelineKey', () => {
   it('renders one chip per entry, with swatch color, label and data-category', async () => {
     const el = await mount([
-      { label: 'Apex', fillColor: 'rgb(43, 143, 129)', selfTimeNs: 12_100_000_000 },
-      { label: 'SOQL', fillColor: 'rgb(109, 76, 125)', selfTimeNs: 500_000 },
+      {
+        label: 'Apex',
+        fillColor: 'rgb(43, 143, 129)',
+        categories: ['Apex'],
+        selfTimeNs: 12_100_000_000,
+      },
+      { label: 'SOQL', fillColor: 'rgb(109, 76, 125)', categories: ['SOQL'], selfTimeNs: 500_000 },
     ]);
 
     const rendered = chips(el);
@@ -41,20 +46,27 @@ describe('TimelineKey', () => {
 
   it('shows the compact self time when present', async () => {
     const el = await mount([
-      { label: 'Apex', fillColor: 'rgb(0, 0, 0)', selfTimeNs: 12_100_000_000 },
+      {
+        label: 'Apex',
+        fillColor: 'rgb(0, 0, 0)',
+        categories: ['Apex'],
+        selfTimeNs: 12_100_000_000,
+      },
     ]);
 
     expect(chips(el)[0]?.querySelector('.chip__time')?.textContent).toBe('12.1s');
   });
 
   it('omits the time when self time is unknown', async () => {
-    const el = await mount([{ label: 'Method', fillColor: 'rgb(0, 0, 0)' }]);
+    const el = await mount([{ label: 'Method', fillColor: 'rgb(0, 0, 0)', categories: ['Apex'] }]);
 
     expect(chips(el)[0]?.querySelector('.chip__time')).toBeNull();
   });
 
   it('keeps the chip itself unfilled — only the swatch carries the category color', async () => {
-    const el = await mount([{ label: 'DML', fillColor: 'rgb(176, 104, 104)' }]);
+    const el = await mount([
+      { label: 'DML', fillColor: 'rgb(176, 104, 104)', categories: ['DML'] },
+    ]);
 
     expect(chips(el)[0]?.getAttribute('style')).toBeNull();
   });

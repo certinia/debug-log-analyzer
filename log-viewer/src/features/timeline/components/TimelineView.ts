@@ -329,6 +329,7 @@ export class TimelineView extends LitElement {
         timeline && { ...timeline, activeTheme: this.activeTheme ?? timeline.activeTheme },
       ),
       this.selfTimes,
+      timeline?.legacy,
     );
   }
 

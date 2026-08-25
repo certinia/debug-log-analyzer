@@ -1,6 +1,7 @@
 /*
  * Copyright (c) 2023 Certinia Inc. All rights reserved.
  */
+import type { LogCategory } from 'apex-log-parser';
 import { LitElement, css, html } from 'lit';
 import { customElement, property } from 'lit/decorators.js';
 import { repeat } from 'lit/directives/repeat.js';
@@ -14,11 +15,16 @@ import '../../../components/OverflowList.js';
 // styles
 import { globalStyles } from '../../../styles/global.styles.js';
 
-/** One legend chip: category color dot, label, and (when known) the log's self time in that category. */
+/** One legend chip: colour dot, label, and (when known) the log's self time under it. */
 export interface TimelineKeyEntry {
   label: string;
   fillColor: string;
-  /** Total self time (ns) spent in this category; omitted on the legacy timeline. */
+  /**
+   * The categories this chip stands for. Usually the one the label names, but the legacy
+   * chart folds several into a group, and its label is then no category at all.
+   */
+  categories: readonly LogCategory[];
+  /** Total self time (ns) summed over {@link categories}; omitted where no log is loaded. */
   selfTimeNs?: number;
 }
 
@@ -59,8 +65,9 @@ export class Timelinekey extends LitElement {
         this.timelineKeys,
         (entry) => entry.label,
         (entry) =>
-          // data-category is the seam for the interactivity follow-up (hover/click → highlight).
-          html`<span class="chip" data-category="${entry.label}">
+          // The seam for the interactivity follow-up (hover/click → highlight): the
+          // categories to match on, not the label, which names no category under legacy.
+          html`<span class="chip" data-category="${entry.categories.join(' ')}">
             <color-swatch color=${entry.fillColor} label=${entry.label}></color-swatch>
             <span>${entry.label}</span>
             ${

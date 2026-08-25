@@ -10,7 +10,7 @@ import {
 } from 'lit';
 
 import { subscribeSettings, type LanaSettings } from '../features/settings/Settings.js';
-import { LEGACY_CATEGORY_MAP } from '../features/timeline/services/Timeline.js';
+import { keyMap, LEGACY_CATEGORY_MAP } from '../features/timeline/services/Timeline.js';
 import { addCustomThemes, getTheme } from '../features/timeline/themes/ThemeSelector.js';
 import { CATEGORY_THEME_KEY, DEFAULT_THEME_NAME } from '../features/timeline/themes/Themes.js';
 
@@ -88,7 +88,9 @@ export function categoryPalette(
   if (timeline?.legacy) {
     return (category) => {
       const group = LEGACY_CATEGORY_MAP[category];
-      return group ? timeline.colors[group] : OTHER_COLOR;
+      // `setColors` skips a group the setting omits, leaving the chart on its built-in
+      // colour, so that default has to be readable here too.
+      return (group && (timeline.colors[group] || keyMap.get(group)?.fillColor)) || OTHER_COLOR;
     };
   }
   if (timeline) {
