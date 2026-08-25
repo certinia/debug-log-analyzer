@@ -81,9 +81,12 @@ export function categorySelfTimes(root: ApexLog): CategoryTime[] {
  * first), or the legacy per-group colours when the legacy timeline is on. With
  * no settings yet (standalone host, or before the first push) the default
  * theme answers.
+ * @param activeTheme - A previewed theme, which wins over the pushed one. Never
+ * persisted, so it can arrive before any settings do.
  */
 export function categoryPalette(
   timeline: LanaSettings['timeline'] | null,
+  activeTheme?: string | null,
 ): (category: string) => string {
   if (timeline?.legacy) {
     return (category) => {
@@ -96,7 +99,7 @@ export function categoryPalette(
   if (timeline) {
     addCustomThemes(timeline.customThemes);
   }
-  const colors = getTheme(timeline?.activeTheme ?? DEFAULT_THEME_NAME);
+  const colors = getTheme(activeTheme ?? timeline?.activeTheme ?? DEFAULT_THEME_NAME);
   return (category) => {
     const key = CATEGORY_THEME_KEY[category];
     return key ? colors[key] : OTHER_COLOR;

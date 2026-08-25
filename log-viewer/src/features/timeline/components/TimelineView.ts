@@ -325,9 +325,7 @@ export class TimelineView extends LitElement {
   private rebuildTimelineKeys(): void {
     const timeline = this.timelineSettings;
     this.timelineKeys = toTimelineKeys(
-      categoryPalette(
-        timeline && { ...timeline, activeTheme: this.activeTheme ?? timeline.activeTheme },
-      ),
+      categoryPalette(timeline, this.activeTheme),
       this.selfTimes,
       timeline?.legacy,
     );
