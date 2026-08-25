@@ -79,6 +79,9 @@ export class MetricStripTooltipRenderer extends BaseTooltipRenderer {
   /** Strip height for positioning tooltip below. */
   private stripHeight: number = 60;
 
+  /** The reading the panel holds, so sweeping one segment is not a rebuild. */
+  private shownPoint: MetricStripDataPoint | null = null;
+
   constructor(htmlContainer: HTMLElement, options: MetricStripTooltipOptions = {}) {
     super(htmlContainer, { mode: 'cursor-offset', offset: 8, padding: 4 });
 
@@ -114,17 +117,24 @@ export class MetricStripTooltipRenderer extends BaseTooltipRenderer {
       this.stripHeight = stripHeight;
     }
 
-    // Build tooltip content
-    const rows = this.buildTooltipRows(dataPoint, classifiedMetrics);
+    // The classifier allocates its points once per `processData` and hands back the same
+    // object for every pointer position inside one time segment, so identity tells a
+    // re-position from a new reading. A rebuild re-parses the panel and upgrades a swatch
+    // element per row, on a mousemove that is not throttled. `hide` leaves the markup in
+    // place, so the cache stays good across one.
+    if (dataPoint !== this.shownPoint) {
+      const rows = this.buildTooltipRows(dataPoint, classifiedMetrics);
 
-    if (rows.length === 0) {
-      this.hide();
-      return;
+      if (rows.length === 0) {
+        this.hide();
+        return;
+      }
+
+      const titleHtml = `<div style="font-weight:bold;margin-bottom:6px;color:${TOOLTIP_CSS.foreground};">${this.title}</div>`;
+      this.setContent(titleHtml + rows.join(''));
+      this.shownPoint = dataPoint;
     }
 
-    // Set content
-    const titleHtml = `<div style="font-weight:bold;margin-bottom:6px;color:${TOOLTIP_CSS.foreground};">${this.title}</div>`;
-    this.setContent(titleHtml + rows.join(''));
     this.showElement();
 
     // Position tooltip (Y is ignored, we always position below the strip)
