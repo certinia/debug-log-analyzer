@@ -109,6 +109,44 @@ describe('MetricStripTooltipRenderer', () => {
     expect(panel().style.left).toBe('148px');
   });
 
+  /** The row elements, title aside. */
+  function rows(): HTMLElement[] {
+    return [...panel().children].slice(1) as HTMLElement[];
+  }
+
+  describe('row elements', () => {
+    it('writes a new reading into the rows it already has', () => {
+      renderer.show(100, 0, onePoint, oneMetric, 60);
+      const [first] = rows();
+
+      const later: MetricStripDataPoint = { ...onePoint, values: new Map([['cpuTime', 0.9]]) };
+      renderer.show(100, 0, later, oneMetric, 60);
+
+      expect(rows()[0]).toBe(first);
+      expect(first?.textContent).toContain('90.0%');
+    });
+
+    it('hides the spares for a shorter reading rather than discarding them', () => {
+      const two = [metric('cpuTime', 'CPU Time', 0.9), metric('heapSize', 'Heap Size', 0.5)];
+      const twoPoint: MetricStripDataPoint = {
+        ...onePoint,
+        values: new Map([
+          ['cpuTime', 0.5],
+          ['heapSize', 0.5],
+        ]),
+      };
+
+      renderer.show(100, 0, twoPoint, two, 60);
+      expect(rows()).toHaveLength(2);
+
+      renderer.show(100, 0, onePoint, oneMetric, 60);
+
+      // Still two elements, one of them held back for the next longer reading.
+      expect(rows()).toHaveLength(2);
+      expect(rows().map((row) => row.style.display)).toEqual(['grid', 'none']);
+    });
+  });
+
   it('rebuilds when the reading changes', () => {
     renderer.show(100, 0, onePoint, oneMetric, 60);
     const first = panel().innerHTML;

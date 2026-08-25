@@ -69,6 +69,29 @@ export interface MetricStripTooltipOptions {
   title?: string;
 }
 
+/** One row's readings, with no DOM attached. */
+interface RowData {
+  color: string;
+  name: string;
+  /** 0-1, which decides both the figure and its colour. */
+  percent: number;
+  value: string;
+  /** The corrective count, where the log dropped events Salesforce still counted. */
+  ghost: string;
+  /** The "Other" summary reads quieter than the metrics it stands for. */
+  muted?: boolean;
+}
+
+/** The elements one row is written into, held so they are never rebuilt. */
+interface RowNodes {
+  root: HTMLElement;
+  swatch: HTMLElement;
+  name: HTMLElement;
+  percent: HTMLElement;
+  valueText: Text;
+  ghost: HTMLElement;
+}
+
 export class MetricStripTooltipRenderer extends BaseTooltipRenderer {
   /** Current color palette. */
   private colors: MetricStripColors;
@@ -81,6 +104,12 @@ export class MetricStripTooltipRenderer extends BaseTooltipRenderer {
 
   /** The reading the panel holds, so sweeping one segment is not a rebuild. */
   private shownPoint: MetricStripDataPoint | null = null;
+
+  /** Row elements, reused across readings and only ever grown. */
+  private readonly rowPool: RowNodes[] = [];
+
+  /** Set once the panel's title exists. */
+  private titleNode: HTMLElement | null = null;
 
   constructor(htmlContainer: HTMLElement, options: MetricStripTooltipOptions = {}) {
     super(htmlContainer, { mode: 'below-anchor', offset: 8, padding: 4 });
@@ -123,15 +152,14 @@ export class MetricStripTooltipRenderer extends BaseTooltipRenderer {
     // element per row, on a mousemove that is not throttled. `hide` leaves the markup in
     // place, so the cache stays good across one.
     if (dataPoint !== this.shownPoint) {
-      const rows = this.buildTooltipRows(dataPoint, classifiedMetrics);
+      const rows = this.selectRows(dataPoint, classifiedMetrics);
 
       if (rows.length === 0) {
         this.hide();
         return;
       }
 
-      const titleHtml = `<div style="font-weight:bold;margin-bottom:6px;color:${TOOLTIP_CSS.foreground};">${this.title}</div>`;
-      this.setContent(titleHtml + rows.join(''));
+      this.renderRows(rows);
       this.shownPoint = dataPoint;
     }
 
@@ -161,24 +189,21 @@ export class MetricStripTooltipRenderer extends BaseTooltipRenderer {
   // ============================================================================
 
   /**
-   * Build tooltip rows using unified filtering rules.
+   * Choose which metrics the panel shows, and in what order.
    *
    * Rules:
-   * 1. Always show important metrics (cpuTime, heapSize, dmlStatements, dmlRows, soqlQueries, queryRows)
-   *    - But only show zeros for these important metrics
-   * 2. Show top 3 by percentage (if not already in always-show list) - only if percent > 0
-   * 3. Show any metric ≥80%
-   * 4. Combine remaining metrics with value > 0 into "Other: X metrics" summary
-   * 5. Sort shown rows by each metric's global peak percentage (stable across the timeline),
-   *    so rows keep a fixed slot rather than reshuffling as the cursor moves
+   * 1. Always show important metrics (cpuTime, heapSize, dmlStatements, dmlRows, soqlQueries,
+   *    queryRows) — these show even at 0%
+   * 2. Show any metric >= 80%
+   * 3. Show the top 3 by percentage, if not already shown and above 0%
+   * 4. Combine the rest into an "Other (N)" summary
+   * 5. Order by each metric's global peak percentage, which is stable across the timeline, so
+   *    a row keeps its slot rather than reshuffling as the cursor moves
    */
-  private buildTooltipRows(
+  private selectRows(
     dataPoint: MetricStripDataPoint,
     classifiedMetrics: MetricStripClassifiedMetric[],
-  ): string[] {
-    const rows: string[] = [];
-
-    // Build list of all metrics with their current values
+  ): RowData[] {
     const allMetrics = classifiedMetrics
       .map((metric) => ({
         metric,
@@ -188,12 +213,11 @@ export class MetricStripTooltipRenderer extends BaseTooltipRenderer {
       }))
       .sort((a, b) => b.percent - a.percent);
 
-    // Determine which metrics to show based on unified rules
     const shownMetricIds = new Set<string>();
     const visibleMetrics: typeof allMetrics = [];
     const hiddenMetrics: typeof allMetrics = [];
 
-    // Pass 1: Add always-show metrics (important metrics shown even at 0%)
+    // Pass 1: the important metrics, shown even at 0%.
     for (const item of allMetrics) {
       if (item.isImportant) {
         visibleMetrics.push(item);
@@ -201,7 +225,7 @@ export class MetricStripTooltipRenderer extends BaseTooltipRenderer {
       }
     }
 
-    // Pass 2: Add metrics ≥80% (danger threshold)
+    // Pass 2: anything at the danger threshold.
     for (const item of allMetrics) {
       if (!shownMetricIds.has(item.metric.metricId) && item.percent >= DANGER_THRESHOLD) {
         visibleMetrics.push(item);
@@ -209,13 +233,12 @@ export class MetricStripTooltipRenderer extends BaseTooltipRenderer {
       }
     }
 
-    // Pass 3: Add top 3 by percentage (if not already shown) - only if percent > 0
+    // Pass 3: the top 3 by percentage, zeros excluded.
     let addedFromTop3 = 0;
     for (const item of allMetrics) {
       if (addedFromTop3 >= 3) {
         break;
       }
-      // Only add non-zero metrics to top 3
       if (!shownMetricIds.has(item.metric.metricId) && item.percent > 0) {
         visibleMetrics.push(item);
         shownMetricIds.add(item.metric.metricId);
@@ -223,63 +246,108 @@ export class MetricStripTooltipRenderer extends BaseTooltipRenderer {
       }
     }
 
-    // Collect ALL remaining metrics for "Other" summary (including zeros)
     for (const item of allMetrics) {
       if (!shownMetricIds.has(item.metric.metricId)) {
         hiddenMetrics.push(item);
       }
     }
 
-    // Sort visible metrics by each metric's global peak percentage (highest first).
-    // Using the peak (not the value at the cursor) keeps rows in a fixed slot as the cursor
-    // moves along the timeline, so the tooltip is stable and easy to scan/compare.
+    // The peak, not the value at the cursor: a row keeps its slot as the cursor moves, so the
+    // panel can be scanned and compared rather than re-read.
     visibleMetrics.sort((a, b) => b.metric.globalMaxPercent - a.metric.globalMaxPercent);
 
-    // Render visible metric rows
-    for (const { metric, percent, rawValue } of visibleMetrics) {
-      const percentStr = (percent * 100).toFixed(1).padStart(5);
-      const percentColor = getPercentColor(percent);
-      const lineColor = hexToCSS(metric.color);
-      // Always show the "out of" value, even at 0% / before the metric's first observation, so the
-      // limit (headroom) is always visible. Limit is fixed across the series; fall back to the
-      // classified metric's limit when there's no data point for it at this timestamp.
+    const rows: RowData[] = visibleMetrics.map(({ metric, percent, rawValue }) => {
+      // Always state the limit, even at 0% or before the metric's first observation, so the
+      // headroom is visible. The limit is fixed across the series, so the classified metric
+      // answers where this timestamp has no data point.
       const limit = rawValue?.limit ?? metric.limit;
-      const rawValueStr =
-        limit > 0 ? formatMetricValueWithParens(rawValue?.used ?? 0, limit, metric.unit) : '';
-      // Ghost text: only when the count we tracked from detailed events falls below the
-      // corrective cumulative total (the log dropped events Salesforce still counted).
-      const ghost =
-        rawValue && rawValue.tracked !== undefined && rawValue.tracked < rawValue.used
-          ? ` <span style="font-style:italic;opacity:0.65;">(${formatNumber(Math.round(rawValue.tracked))} seen)</span>`
-          : '';
+      return {
+        color: hexToCSS(metric.color),
+        name: metric.displayName,
+        percent,
+        value:
+          limit > 0 ? formatMetricValueWithParens(rawValue?.used ?? 0, limit, metric.unit) : '',
+        // Only where the count tracked from detailed events falls below the corrective
+        // cumulative total — the log dropped events Salesforce still counted.
+        ghost:
+          rawValue && rawValue.tracked !== undefined && rawValue.tracked < rawValue.used
+            ? ` (${formatNumber(Math.round(rawValue.tracked))} seen)`
+            : '',
+      };
+    });
 
-      rows.push(
-        `<div style="${ROW_STYLE}">` +
-          `<color-swatch color="${lineColor}"></color-swatch>` +
-          `<span style="color:${TOOLTIP_CSS.descriptionForeground}">${metric.displayName}</span>` +
-          `<span style="text-align:right;font-weight:500;color:${percentColor}">${percentStr}%</span>` +
-          `<span style="color:${TOOLTIP_CSS.descriptionForegroundMuted};">${rawValueStr}${ghost}</span>` +
-          `</div>`,
-      );
-    }
-
-    // Add "Other" summary if there are hidden metrics with data
     if (hiddenMetrics.length > 0) {
-      const maxHiddenPercent = Math.max(...hiddenMetrics.map((m) => m.percent));
-      const otherPercentStr = (maxHiddenPercent * 100).toFixed(1).padStart(5);
-      const otherPercentColor = getPercentColor(maxHiddenPercent);
-      const otherLineColor = hexToCSS(this.colors.tier3);
-
-      rows.push(
-        `<div style="${ROW_STYLE}opacity:0.7;">` +
-          `<color-swatch color="${otherLineColor}"></color-swatch>` +
-          `<span style="color:${TOOLTIP_CSS.descriptionForeground}">Other (${hiddenMetrics.length})</span>` +
-          `<span style="text-align:right;font-weight:500;color:${otherPercentColor}">${otherPercentStr}%</span>` +
-          `<span></span>` +
-          `</div>`,
-      );
+      const maxHiddenPercent = Math.max(...hiddenMetrics.map((item) => item.percent));
+      rows.push({
+        color: hexToCSS(this.colors.tier3),
+        name: `Other (${hiddenMetrics.length})`,
+        percent: maxHiddenPercent,
+        value: '',
+        ghost: '',
+        muted: true,
+      });
     }
 
     return rows;
+  }
+
+  /**
+   * Writes the readings into the row elements, growing the pool as needed and hiding the
+   * spares. Reused rather than reparsed: a rebuild would upgrade a swatch custom element per
+   * row, and the panel changes on every segment the pointer crosses.
+   */
+  private renderRows(rows: RowData[]): void {
+    if (!this.titleNode) {
+      const title = document.createElement('div');
+      title.style.cssText = `font-weight:bold;margin-bottom:6px;color:${TOOLTIP_CSS.foreground};`;
+      title.textContent = this.title;
+      this.tooltipElement.appendChild(title);
+      this.titleNode = title;
+    }
+
+    rows.forEach((data, index) => {
+      const pooled = this.rowPool[index];
+      const row = pooled ?? this.createRow();
+      if (!pooled) {
+        this.rowPool.push(row);
+        this.tooltipElement.appendChild(row.root);
+      }
+
+      row.swatch.setAttribute('color', data.color);
+      row.name.textContent = data.name;
+      row.percent.textContent = `${(data.percent * 100).toFixed(1).padStart(5)}%`;
+      row.percent.style.color = getPercentColor(data.percent);
+      row.valueText.data = data.value;
+      row.ghost.textContent = data.ghost;
+      row.root.style.opacity = data.muted ? '0.7' : '';
+      row.root.style.display = 'grid';
+    });
+
+    for (const spare of this.rowPool.slice(rows.length)) {
+      spare.root.style.display = 'none';
+    }
+  }
+
+  /** One row's elements, in the order the grid lays them out. */
+  private createRow(): RowNodes {
+    const root = document.createElement('div');
+    root.style.cssText = ROW_STYLE;
+
+    const swatch = document.createElement('color-swatch');
+    const name = document.createElement('span');
+    name.style.color = TOOLTIP_CSS.descriptionForeground;
+
+    const percent = document.createElement('span');
+    percent.style.cssText = 'text-align:right;font-weight:500;';
+
+    const value = document.createElement('span');
+    value.style.color = TOOLTIP_CSS.descriptionForegroundMuted;
+    const valueText = document.createTextNode('');
+    const ghost = document.createElement('span');
+    ghost.style.cssText = 'font-style:italic;opacity:0.65;';
+    value.append(valueText, ghost);
+
+    root.append(swatch, name, percent, value);
+    return { root, swatch, name, percent, valueText, ghost };
   }
 }
