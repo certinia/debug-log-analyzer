@@ -38,6 +38,11 @@ import { getMetricStripColors, type MetricStripColors } from './metric-strip-col
 // web components
 import '../../../../components/ColorSwatch.js';
 
+/** One metric row. The swatch track reads the same token the swatch sizes itself by. */
+const ROW_STYLE =
+  'display:grid;grid-template-columns:var(--lana-swatch-size) 120px 55px auto;' +
+  'gap:4px;align-items:center;margin:2px 0;';
+
 /**
  * Metrics that should always be shown in the tooltip regardless of their value.
  * These are the "important" metrics users care about most.
@@ -266,7 +271,7 @@ export class MetricStripTooltipRenderer extends BaseTooltipRenderer {
           : '';
 
       rows.push(
-        `<div style="display:grid;grid-template-columns:12px 120px 55px auto;gap:4px;align-items:center;margin:2px 0;">` +
+        `<div style="${ROW_STYLE}">` +
           `<color-swatch color="${lineColor}"></color-swatch>` +
           `<span style="color:${TOOLTIP_CSS.descriptionForeground}">${metric.displayName}</span>` +
           `<span style="text-align:right;font-weight:500;color:${percentColor}">${percentStr}%</span>` +
@@ -283,7 +288,7 @@ export class MetricStripTooltipRenderer extends BaseTooltipRenderer {
       const otherLineColor = hexToCSS(this.colors.tier3);
 
       rows.push(
-        `<div style="display:grid;grid-template-columns:12px 120px 55px auto;gap:4px;align-items:center;margin:2px 0;opacity:0.7;">` +
+        `<div style="${ROW_STYLE}opacity:0.7;">` +
           `<color-swatch color="${otherLineColor}"></color-swatch>` +
           `<span style="color:${TOOLTIP_CSS.descriptionForeground}">Other (${hiddenMetrics.length})</span>` +
           `<span style="text-align:right;font-weight:500;color:${otherPercentColor}">${otherPercentStr}%</span>` +

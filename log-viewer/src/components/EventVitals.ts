@@ -9,7 +9,13 @@ import { ifDefined } from 'lit/directives/if-defined.js';
 
 import { logContext } from '../core/log/logContext.js';
 import type { LogStore } from '../core/log/LogStore.js';
-import { EVENT_METRICS, formatBytes, HEAP_PEAK, usageParts } from '../core/metrics/eventMetrics.js';
+import {
+  EVENT_METRICS,
+  formatBytes,
+  HEAP_PEAK,
+  selfLabel,
+  usageParts,
+} from '../core/metrics/eventMetrics.js';
 import { DEFAULT_NAMESPACE, getCallerNamespace } from '../core/utility/CallerNamespace.js';
 import { formatMs } from '../core/utility/Duration.js';
 import { formatInteger } from '../core/utility/Util.js';
@@ -148,7 +154,7 @@ export class EventVitals extends LitElement {
     // Total and self read together, so they share one row.
     const total = events.reduce((sum, e) => sum + e.duration.total, 0);
     const self = events.reduce((sum, e) => sum + e.duration.self, 0);
-    this._row(rows, 'Time', html`${this._ms(total)}${qualifier(`self ${this._ms(self)}`)}`);
+    this._row(rows, 'Time', html`${this._ms(total)}${qualifier(selfLabel(this._ms(self)))}`);
     if (isAggregate) {
       this._row(rows, 'Avg', this._ms(total / events.length));
     }
@@ -232,7 +238,7 @@ export class EventVitals extends LitElement {
         continue;
       }
       const limit = limits ? metric.limit(limits, this.type) : 0;
-      const self = metric.hasSelf === false ? 0 : sum(metric.pick, 'self');
+      const self = metric.noSelf ? 0 : sum(metric.pick, 'self');
       const format = metric.bytes ? formatBytes : formatInteger;
       this._row(
         rows,

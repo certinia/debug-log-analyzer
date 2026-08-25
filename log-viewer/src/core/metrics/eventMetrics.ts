@@ -3,11 +3,16 @@
  */
 import type { GovernorLimits, LogEvent, SelfTotal } from 'apex-log-parser';
 
-import { SOSL_ROWS_PER_QUERY_LIMIT } from '../../features/database/limits.js';
+/** The statement a database metric belongs to. */
+export type StatementType = 'dml' | 'soql' | 'sosl';
 import { formatInteger } from '../utility/Util.js';
 
 /** Which statement a selection is, where that decides a metric's denominator. */
-export type StatementType = 'dml' | 'soql' | 'sosl';
+/**
+ * Maximum records returned by a *single* SOSL query. A per-query cap, not a cumulative
+ * per-transaction total, so it is metered per row rather than summed against a total.
+ */
+export const SOSL_ROWS_PER_QUERY_LIMIT = 2000;
 
 export interface EventMetric {
   label: string;
@@ -16,7 +21,7 @@ export interface EventMetric {
   limit: (limits: GovernorLimits, type?: StatementType) => number;
   bytes?: boolean;
   /** Throws only ever records on the leaf, so its self reading is meaningless. */
-  hasSelf?: boolean;
+  noSelf?: boolean;
 }
 
 /**
@@ -41,7 +46,7 @@ export const EVENT_METRICS: readonly EventMetric[] = [
     // only reads as a limit when a single SOSL statement is selected.
     limit: (_limits, type) => (type === 'sosl' ? SOSL_ROWS_PER_QUERY_LIMIT : 0),
   },
-  { label: 'Throws', pick: (e) => e.thrownCount, limit: () => 0, hasSelf: false },
+  { label: 'Throws', pick: (e) => e.thrownCount, limit: () => 0, noSelf: true },
   { label: 'Heap net', pick: (e) => e.heapAllocated, limit: () => 0, bytes: true },
   { label: 'Heap alloc', pick: (e) => e.heapGross, limit: () => 0, bytes: true },
 ];

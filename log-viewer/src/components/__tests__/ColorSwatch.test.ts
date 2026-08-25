@@ -8,7 +8,7 @@ import { describe, expect, it } from '@jest/globals';
 import type { ColorSwatch } from '../ColorSwatch.js';
 import '../ColorSwatch.js';
 
-async function mount(props: Partial<Pick<ColorSwatch, 'color' | 'label'>> = {}) {
+async function mount(props: Partial<Pick<ColorSwatch, 'color'>> = {}) {
   const element = document.createElement('color-swatch');
   Object.assign(element, props);
   document.body.appendChild(element);
@@ -23,25 +23,13 @@ describe('ColorSwatch', () => {
     expect(element.style.background).toBe('rgb(136, 174, 88)');
   });
 
-  it('leaves the row hue to answer when it has no colour of its own', async () => {
-    const element = await mount();
-
-    expect(element.style.background).toBe('');
-  });
-
-  it('drops back to the row hue when the colour is taken away', async () => {
+  it('repaints when the colour changes', async () => {
     const element = await mount({ color: '#88ae58' });
 
-    element.color = '';
+    element.color = '#6d4c7d';
     await element.updateComplete;
 
-    expect(element.style.background).toBe('');
-  });
-
-  it('names what the colour stands for on hover', async () => {
-    const element = await mount({ color: '#88ae58', label: 'Apex' });
-
-    expect(element.title).toBe('Apex');
+    expect(element.style.background).toBe('rgb(109, 76, 125)');
   });
 
   // The hue repeats something the row already says in text.

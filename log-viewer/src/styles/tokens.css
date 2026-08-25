@@ -40,9 +40,9 @@
 
   --lana-stroke: var(--vscode-strokeThickness, 1px);
 
-  /* The colour key every legend, reveal row and tooltip draws (`<color-swatch>`). Ours:
-     no VS Code var carries the role, and the chrome radius would round this size to a
-     circle. */
+  /* The colour key a legend or a tooltip row draws (`<color-swatch>`, and the track the
+     metric strip reserves for one). Ours: no VS Code var carries the role, and the chrome
+     radius would round this size to a circle. */
   --lana-swatch-size: var(--lana-space-sm);
   --lana-swatch-radius: 2px;
 

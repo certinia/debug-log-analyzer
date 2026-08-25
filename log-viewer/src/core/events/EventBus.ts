@@ -20,7 +20,9 @@ export const TAB_TO_SOURCE: Record<string, DetailSource> = {
 };
 
 /** Which of the database grids a selection came from. */
-export type StatementType = 'dml' | 'soql' | 'sosl';
+import type { StatementType } from '../metrics/eventMetrics.js';
+
+export type { StatementType };
 
 /**
  * A selection to inspect in the inspector. A single frame maps to one `eventIndex`;

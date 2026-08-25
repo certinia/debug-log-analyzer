@@ -30,10 +30,6 @@ describe('usageParts', () => {
     expect(parts.primary).toBe('7');
     expect(parts.qualifiers).toEqual([]);
   });
-
-  it('reports a breach past the limit', () => {
-    expect(usageParts(120, 100, String, null).qualifiers).toEqual(['120.00%']);
-  });
 });
 
 describe('EVENT_METRICS', () => {

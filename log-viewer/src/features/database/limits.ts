@@ -19,7 +19,10 @@ export const APEX_GOVERNOR_LIMITS_DOC =
  * not a cumulative per-transaction total — so it's metered per row in the SOSL
  * table, not summed against a transaction limit.
  */
-export const SOSL_ROWS_PER_QUERY_LIMIT = 2000;
+import { SOSL_ROWS_PER_QUERY_LIMIT } from '../../core/metrics/eventMetrics.js';
+
+// Re-exported so the Database tab's own consumers keep one import for its numbers.
+export { SOSL_ROWS_PER_QUERY_LIMIT };
 
 /** Derived SOSL-rows metric fields (label/found are supplied by the caller). */
 export interface SoslRowsMetric {

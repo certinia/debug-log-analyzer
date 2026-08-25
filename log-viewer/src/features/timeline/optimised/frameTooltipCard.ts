@@ -152,7 +152,7 @@ function metricRows(event: LogEvent, apexLog: ApexLog | null | undefined): CardR
         share !== null && !metric.bytes ? `${format(total)} of ${format(logTotal)}` : format(total),
       share,
       // Zero included: it is what says the work happened in a descendant, not here.
-      self: metric.hasSelf === false ? null : format(self),
+      self: metric.noSelf ? null : format(self),
     });
   }
 

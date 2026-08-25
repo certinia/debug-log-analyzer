@@ -68,7 +68,7 @@ export class Timelinekey extends LitElement {
           // The seam for the interactivity follow-up (hover/click → highlight): the
           // categories to match on, not the label, which names no category under legacy.
           html`<span class="chip" data-category="${entry.categories.join(' ')}">
-            <color-swatch color=${entry.fillColor} label=${entry.label}></color-swatch>
+            <color-swatch color=${entry.fillColor}></color-swatch>
             <span>${entry.label}</span>
             ${
               entry.selfTimeNs !== undefined
