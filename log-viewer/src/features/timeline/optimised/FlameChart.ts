@@ -12,6 +12,8 @@
 
 import type { LogEvent } from 'apex-log-parser';
 import * as PIXI from 'pixi.js';
+
+import { destroyTimelineApp } from './rendering/pixiApp.js';
 import type {
   EditorColors,
   EventNode,
@@ -516,7 +518,7 @@ export class FlameChart<E extends EventNode = EventNode> {
 
     // Destroy main app
     if (this.app) {
-      this.app.destroy(true, { children: true, texture: true });
+      destroyTimelineApp(this.app);
       this.app = null;
     }
 
