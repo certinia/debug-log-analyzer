@@ -497,11 +497,13 @@ export class FrameTooltipRenderer {
     if (card.identity?.length) {
       body.appendChild(element('div', 'tooltip-identity', card.identity.join(' · ')));
     }
+    const ruled = !!card.identity?.length;
     card.groups.forEach((group, index) => {
       const box = document.createElement('div');
-      // Only the first group carries the rule that parts what the frame is from what it
-      // measured. Sibling divs give CSS no "first group" selector to do it with.
-      box.className = index ? 'tooltip-group' : 'tooltip-group tooltip-group--ruled';
+      // The rule parts what the frame is from what it measured, so only the first group
+      // takes it, and only where there is an identity above it to part from — a marker
+      // card has none. Sibling divs give CSS no "first group" selector to do it with.
+      box.className = !index && ruled ? 'tooltip-group tooltip-group--ruled' : 'tooltip-group';
       group.forEach((row) => box.appendChild(rowElement(row)));
       body.appendChild(box);
     });

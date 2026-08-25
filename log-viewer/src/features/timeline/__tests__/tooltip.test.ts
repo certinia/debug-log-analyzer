@@ -23,6 +23,7 @@ import {
   type TooltipAnchor,
   type TooltipOptions,
 } from '../optimised/FrameTooltipRenderer.js';
+import type { TimelineMarker } from '../types/flamechart.types.js';
 
 /** Delay before the first tooltip appears; mirrors SHOW_DELAY_MS. */
 const SHOW_DELAY_MS = 60;
@@ -803,6 +804,32 @@ describe('FrameTooltipRenderer', () => {
 
       // Should show duration in seconds or milliseconds
       expect(tooltipEl().textContent).toMatch(/\d+\s*(s|ms)/);
+    });
+  });
+  describe('the group rule', () => {
+    it('rules the first group, parting the identity from the readings', () => {
+      showSettled(createEvent(0, 100), cursorAnchor(100, 100));
+
+      expect(tooltipEl().querySelectorAll('.tooltip-group--ruled')).toHaveLength(1);
+    });
+
+    // A marker card has no identity line, so the rule would part nothing.
+    it('leaves a marker card unruled, though it still groups', () => {
+      frameTooltipRenderer.showTruncation(
+        {
+          id: 'm1',
+          type: 'exception',
+          summary: 'System.NullPointerException',
+          startTime: 1_000_000,
+          endTime: 3_000_000,
+        } as TimelineMarker,
+        cursorAnchor(100, 100),
+      );
+      jest.advanceTimersByTime(SHOW_DELAY_MS);
+
+      const panel = tooltipEl();
+      expect(panel.querySelectorAll('.tooltip-group')).toHaveLength(1);
+      expect(panel.querySelectorAll('.tooltip-group--ruled')).toHaveLength(0);
     });
   });
 });
