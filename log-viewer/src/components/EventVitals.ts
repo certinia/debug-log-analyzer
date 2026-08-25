@@ -164,7 +164,8 @@ export class EventVitals extends LitElement {
     if (callerNamespace !== (primary.namespace || DEFAULT_NAMESPACE)) {
       this._row(rows, 'Caller namespace', callerNamespace);
     }
-    this._optional(rows, 'Line', primary.lineNumber);
+    // The call site, in the code that contains the frame — not where it is defined.
+    this._optional(rows, 'Called from', primary.lineNumber, (line) => `line ${line}`);
 
     return html`
       <code-block language=${this._language()} .code=${this.label || primary.text}></code-block>

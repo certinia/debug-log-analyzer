@@ -75,8 +75,15 @@ describe('EventVitals', () => {
       'SOQL Rows',
       'Selective',
       'Namespace',
-      'Line',
+      'Called from',
     ]);
+  });
+
+  /** The line is the call site in the containing code, not where the frame is defined. */
+  it('reads the line as where the call came from', async () => {
+    const el = await mount(store, { eventIndex: soqlIndex, type: 'soql' });
+
+    expect(valueFor(el, 'Called from')).toMatch(/^line \d+$/);
   });
 
   it('omits the caller namespace when it matches the namespace', async () => {
