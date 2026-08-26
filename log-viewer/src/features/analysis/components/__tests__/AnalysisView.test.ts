@@ -121,16 +121,18 @@ describe('analysis-view selection', () => {
     expect(seen).toEqual([
       {
         source: 'analysis',
+        view: 'callers',
         selection: {
           kind: 'aggregate',
           instances: rootRow.instances.map((event) => event.eventIndex),
-          label: 'A',
+          // The root row names the calls it counts, so nothing made them but it.
+          calledBy: undefined,
         },
       },
     ]);
   });
 
-  it('scopes a caller row to the calls it holds, not the caller frame', () => {
+  it('scopes a caller row to the calls it holds, and names the frame that made them', () => {
     const rootRow = findRow(roots, 'A');
     const throughB = findRow(rootRow._children ?? [], 'B');
     const throughBA = findRow(throughB._children ?? [], 'A');
@@ -142,15 +144,16 @@ describe('analysis-view selection', () => {
     const derived = rootRow.instances.filter((event) => event.parent?.text === 'B');
     expect(derived).toHaveLength(1);
     expect(seen.map((detail) => detail.selection)).toEqual([
+      // The calls are A's, made by B, whichever row named them.
       {
         kind: 'aggregate',
         instances: derived.map((event) => event.eventIndex),
-        label: 'B',
+        calledBy: 'B',
       },
       {
         kind: 'aggregate',
         instances: derived.map((event) => event.eventIndex),
-        label: 'A',
+        calledBy: 'B',
       },
     ]);
   });
@@ -161,6 +164,6 @@ describe('analysis-view selection', () => {
       [],
     );
 
-    expect(seen).toEqual([{ source: 'analysis', selection: null }]);
+    expect(seen).toEqual([{ source: 'analysis', selection: null, view: 'callers' }]);
   });
 });

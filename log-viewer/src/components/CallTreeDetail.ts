@@ -12,7 +12,7 @@ import {
   Tabulator,
 } from 'tabulator-tables';
 
-import { eventBus } from '../core/events/EventBus.js';
+import { eventBus, type DetailSource, type SelectionView } from '../core/events/EventBus.js';
 import { logContext } from '../core/log/logContext.js';
 import type { LogStore } from '../core/log/LogStore.js';
 import { formatDuration, formatInteger } from '../core/utility/Util.js';
@@ -49,29 +49,26 @@ import {
   type ScopedRow,
 } from './scopedCallTree.js';
 import './ViewModeSwitch.js';
-import type { ViewModeOption } from './ViewModeSwitch.js';
-
-// The switch options are the source of the union, so the guard below can't drift.
-const VIEW_MODES = [
-  { value: 'time-order', label: 'Time Order' },
-  { value: 'aggregated', label: 'Aggregated' },
-  { value: 'bottom-up', label: 'Bottom-Up' },
-] as const satisfies readonly ViewModeOption[];
-
-type ViewMode = (typeof VIEW_MODES)[number]['value'];
-
-function isViewMode(value: unknown): value is ViewMode {
-  return VIEW_MODES.some((option) => option.value === value);
-}
+import { VIEW_MODES, defaultViewMode, isViewMode, type ViewMode } from './callTreeViewModes.js';
 
 /**
- * The picked view mode, shared by every instance: the pane is torn down and
- * rebuilt on each collapse, tab hop and panel toggle, so without this the mode
- * would reset on every selection. Deliberately not persisted — a log opens on
- * Time Order, the mode that matches the Call Tree tab and the timeline, so an
- * aggregated view is always something you chose in this log, not last week.
+ * The mode picked per source tab, shared by every instance: the pane is torn
+ * down and rebuilt on each collapse, tab hop and panel toggle, so without this
+ * the pick would reset on every selection. Absent until the user picks, so the
+ * default applies until then. Keyed by the log, so a pick is something you made
+ * in this log and dies with it — never persisted, never carried to the next.
  */
-let sharedViewMode: ViewMode | undefined;
+const pickedViewMode = new WeakMap<LogStore, Map<DetailSource | undefined, ViewMode>>();
+
+/** The picks made in one log, created on the first pick. */
+function picksFor(store: LogStore): Map<DetailSource | undefined, ViewMode> {
+  let picks = pickedViewMode.get(store);
+  if (!picks) {
+    picks = new Map();
+    pickedViewMode.set(store, picks);
+  }
+  return picks;
+}
 
 /**
  * Compact dataTree name cell: tree indent + single-line (inline) SOQL/SOSL +
@@ -129,6 +126,15 @@ export class CallTreeDetail extends LitElement {
    *  nothing scoped or attributed. `eventIndex`/`instances` are then ignored. */
   @property({ type: Boolean })
   wholeLog = false;
+
+  /** The tab the selection came from, so a pick is remembered per tab. Absent on
+   *  the whole-log tree, which no tab selected. */
+  @property({ attribute: false })
+  source?: DetailSource;
+
+  /** The direction that tab is showing, where it shows a tree at all. */
+  @property({ attribute: false })
+  sourceView?: SelectionView;
 
   @state()
   private viewMode: ViewMode = 'time-order';
@@ -197,13 +203,11 @@ export class CallTreeDetail extends LitElement {
   @property({ attribute: false })
   logStore: LogStore | null = null;
 
-  constructor() {
-    super();
-    // Session UI state, so it's read here rather than threaded through the
-    // section builders.
-    if (sharedViewMode) {
-      this.viewMode = sharedViewMode;
-    }
+  willUpdate() {
+    // Idempotent: a pick is written to the map before the mode is set, so
+    // recomputing it here always lands on the same answer.
+    const picked = this.logStore && pickedViewMode.get(this.logStore)?.get(this.source);
+    this._applyViewMode(picked || defaultViewMode(this.sourceView, !!this.instances?.length));
   }
 
   firstUpdated(): void {
@@ -227,12 +231,13 @@ export class CallTreeDetail extends LitElement {
 
   /**
    * The ids of the rows that name `eventIndexes` in `mode`. Time Order keys its
-   * rows by event, so there the ids are the indexes themselves; a grouped row
-   * merges occurrences behind a synthetic id, so it is found by the occurrences
-   * it carries — and one frame can name several rows in Bottom-Up.
+   * rows by event, so there the ids are the indexes themselves — unless it merged
+   * a selection's occurrences, when its rows are grouped like the other views'. A
+   * grouped row merges occurrences behind a synthetic id, so it is found by the
+   * occurrences it carries — and one frame can name several rows in Bottom-Up.
    */
   private _rowIdsFor(mode: ViewMode, eventIndexes: readonly number[]): number[] {
-    if (mode === 'time-order' || !eventIndexes.length) {
+    if ((mode === 'time-order' && !this._scoped?.timeOrderMerged) || !eventIndexes.length) {
       return [...eventIndexes];
     }
     const byEvent = (this._rowsByEvent[mode] ??= rowIdsByEvent(
@@ -333,8 +338,8 @@ export class CallTreeDetail extends LitElement {
   }
 
   /**
-   * Marks the active frame, without reporting it as a new pick. Only Time Order
-   * keys its rows by event, so the grouped modes have nothing to mark.
+   * Marks the active frame, without reporting it as a new pick. Only rows keyed by
+   * event can be selected by index, so the grouped views have nothing to mark.
    */
   private _markActive(): void {
     const table = this._tables[this.viewMode]?.table;
@@ -345,7 +350,11 @@ export class CallTreeDetail extends LitElement {
       for (const selected of table.getSelectedRows()) {
         selected.deselect();
       }
-      if (this.viewMode === 'time-order' && this.activeEventIndex >= 0) {
+      if (
+        this.viewMode === 'time-order' &&
+        !this._scoped?.timeOrderMerged &&
+        this.activeEventIndex >= 0
+      ) {
         table.selectRow([this.activeEventIndex]);
       }
     });
@@ -496,6 +505,10 @@ export class CallTreeDetail extends LitElement {
       ...virtualScrollOptions,
       dataTree: true,
       dataTreeChildField: '_children',
+      // Open the callers above the selection so it is on screen, and leave what
+      // ran inside it closed.
+      dataTreeStartExpanded: (row: RowComponent) =>
+        (row.getData() as Partial<ScopedRow>).onPath === true,
       dataTreeChildColumnCalcs: false,
       dataTreeBranchElement: '<span/>',
       columnCalcs: 'table',
@@ -686,7 +699,16 @@ export class CallTreeDetail extends LitElement {
     if (!isViewMode(mode)) {
       return;
     }
-    sharedViewMode = mode;
+    if (this.logStore) {
+      picksFor(this.logStore).set(this.source, mode);
+    }
+    this._applyViewMode(mode);
+  }
+
+  private _applyViewMode(mode: ViewMode): void {
+    if (mode === this.viewMode) {
+      return;
+    }
     // The marked row belongs to the mode being left.
     this._locatedRow.clear();
     this.viewMode = mode;

@@ -42,7 +42,7 @@ import '../../../components/ContextMenu.js';
 import type { ContextMenu } from '../../../components/ContextMenu.js';
 import '../../../components/GridSkeleton.js';
 import '../../../components/ViewModeSwitch.js';
-import type { ViewModeOption } from '../../../components/ViewModeSwitch.js';
+import { VIEW_MODES, directionOf, type ViewMode } from '../../../components/callTreeViewModes.js';
 import '../../../components/datagrid-facet-filter.js';
 import '../../../components/datagrid-filter-bar.js';
 import '../../../components/datagrid-range-filter.js';
@@ -70,8 +70,6 @@ import {
 import { InspectorEmphasis } from '../../../components/inspectorEmphasis.js';
 import { createTimeOrderTable } from './TimeOrderTable.js';
 
-type ViewMode = 'time-order' | 'aggregated' | 'bottom-up';
-
 /** Time Order keys its rows by event index, so the inspector can mark them; the
  *  grouped views key theirs by group, so they carry no index to mark. */
 const stampTimeOrderIndex = rowIndexStamper('id');
@@ -79,12 +77,6 @@ const timeOrderRowFormatter = (row: RowComponent): void => {
   categoryRowFormatter(row);
   stampTimeOrderIndex(row);
 };
-
-const CALL_TREE_VIEW_MODES: ViewModeOption[] = [
-  { value: 'time-order', label: 'Time Order' },
-  { value: 'aggregated', label: 'Aggregated' },
-  { value: 'bottom-up', label: 'Bottom-Up' },
-];
 
 /** The Name column is always shown in the call-tree tables. */
 const ALWAYS_VISIBLE = ['text'];
@@ -344,7 +336,7 @@ export class CalltreeView extends LitElement {
             <view-mode-switch
               slot="global"
               aria-label="View mode"
-              .options=${CALL_TREE_VIEW_MODES}
+              .options=${VIEW_MODES}
               value=${this.viewMode}
               @view-mode-change=${(e: CustomEvent<{ value: string }>) =>
                 this._setViewMode(e.detail.value as ViewMode)}
@@ -1144,7 +1136,11 @@ export class CalltreeView extends LitElement {
         // left here — it was never a selection of this table.
         this._locatedRow.mark(this.calltreeTable?.element ?? null, this._emphasis.pick([]));
       }
-      eventBus.emit('detail:select', { source, selection });
+      eventBus.emit('detail:select', {
+        source,
+        selection,
+        view: directionOf(this.viewMode),
+      });
     });
   }
 

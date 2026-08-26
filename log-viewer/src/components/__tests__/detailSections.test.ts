@@ -32,6 +32,7 @@ jest.mock('../../features/database/components/databaseSections.js', () => ({
   },
 }));
 
+import type { CallTreeDetail } from '../CallTreeDetail.js';
 import { render, type TemplateResult } from 'lit';
 
 import { buildDetailSections } from '../detailSections.js';
@@ -122,7 +123,6 @@ describe('buildDetailSections', () => {
     const sections = await buildDetailSections('analysis', {
       kind: 'aggregate',
       instances: [11, 12, 13],
-      label: 'MyClass.run()',
     });
     expect(sections.map((s) => s.id)).toEqual(['vitals', 'findings', 'callstack', 'calltree']);
     expect(
@@ -135,7 +135,6 @@ describe('buildDetailSections', () => {
     const sections = await buildDetailSections('analysis', {
       kind: 'aggregate',
       instances: [11, 12, 13],
-      label: 'MyClass.run()',
     });
 
     const findings = rendered(sections, 'findings', 'log-diagnostics') as HTMLElement & {
@@ -149,7 +148,7 @@ describe('buildDetailSections', () => {
   it('scopes the findings to the frame being followed, not the aggregate it left', async () => {
     const sections = await buildDetailSections(
       'analysis',
-      { kind: 'aggregate', instances: [11, 12, 13], label: 'MyClass.run()' },
+      { kind: 'aggregate', instances: [11, 12, 13] },
       8,
     );
 
@@ -181,7 +180,6 @@ describe('buildDetailSections', () => {
     const sections = await buildDetailSections('timeline', {
       kind: 'aggregate',
       instances: [11, 12, 13],
-      label: 'MyClass.run()',
     });
 
     const bar = rendered(sections, 'namespace-time', 'namespace-time-bar') as HTMLElement & {
@@ -198,7 +196,7 @@ describe('buildDetailSections', () => {
   it('drops the aggregate once a single frame in its stack is the one being followed', async () => {
     const sections = await buildDetailSections(
       'analysis',
-      { kind: 'aggregate', instances: [11, 12, 13], label: 'MyClass.run()' },
+      { kind: 'aggregate', instances: [11, 12, 13] },
       8,
     );
 
@@ -207,7 +205,7 @@ describe('buildDetailSections', () => {
     };
     expect(vitals.getAttribute('eventIndex')).toBe('8');
     expect(vitals.instances).toBeNull();
-    expect(vitals.getAttribute('label')).toBe('');
+    expect(vitals.getAttribute('called-by')).toBe('');
   });
 
   it('adds the whole-log database figures for the database with nothing selected', async () => {
@@ -249,6 +247,9 @@ describe('buildDetailSections', () => {
     expect(sections.find((s) => s.id === 'calltree')?.weight).toBe(4);
     expect(sections.find((s) => s.id === 'calltree')?.fit ?? 'fill').toBe('fill');
     expect(sections.find((s) => s.id === 'governor-trends')?.fit).toBe('content');
+    // The tab draws the log top down, so the tree opens on where the time went.
+    const tree = rendered(sections, 'calltree', 'call-tree-detail') as CallTreeDetail;
+    expect(tree.sourceView).toBe('callees');
   });
 
   it('adds the findings section on Analysis, which is that tab at log scope', async () => {

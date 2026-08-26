@@ -8,6 +8,7 @@ interface FakeEvent {
   type: string;
   text: string;
   namespace: string;
+  isParent: boolean;
   duration: { total: number; self: number };
   parent: FakeEvent | null;
   children: FakeEvent[];
@@ -19,7 +20,17 @@ function ev(
   text: string,
   duration: { total: number; self: number },
 ): FakeEvent {
-  return { eventIndex, type, text, namespace: '', duration, parent: null, children: [] };
+  return {
+    eventIndex,
+    type,
+    text,
+    namespace: '',
+    // The parser only descends into parent lines, so every ancestor is one.
+    isParent: true,
+    duration,
+    parent: null,
+    children: [],
+  };
 }
 
 // exec → m1 → m2 → soql (200ms leaf), no branches.
@@ -44,6 +55,16 @@ jest.mock('../../core/log/LogStore.js', () => ({
   currentLogStore: () => ({
     log: root,
     eventByIndex: (i: number) => byId.get(i) ?? null,
+    // Mirrors LogStore.stackByEventIndex over the fixture's own index.
+    stackByEventIndex: (i: number) => {
+      const stack: FakeEvent[] = [];
+      for (let node = byId.get(i) ?? null; node && node !== root; node = node.parent) {
+        if (node.isParent) {
+          stack.push(node);
+        }
+      }
+      return stack.reverse();
+    },
   }),
 }));
 
@@ -90,22 +111,27 @@ describe('buildScopedCallTree', () => {
     expect(await build(-1)).toBeNull();
   });
 
-  it('time-order: the selection roots the tree, its callers left out', async () => {
+  it('time-order: the selection sits under its callers, rooted at the log', async () => {
     selectedIndex = 3;
     const tree = (await build(selectedIndex))!;
     expect(tree.rootTotal).toBe(500);
 
-    // m2 down, not exec → m1 → m2 down.
     const chain: ScopedRow[] = [];
     let node: ScopedRow | undefined = (await tree.timeOrder(options))![0];
     while (node) {
       chain.push(node);
       node = node._children?.[0];
     }
-    expect(chain.map((r) => r.text)).toEqual(['m2', 'SELECT Id FROM Account']);
-    // Every duration is the frame's own — nothing is attributed to a caller.
+    expect(chain.map((r) => r.text)).toEqual(['exec', 'm1', 'm2', 'SELECT Id FROM Account']);
+    // A caller holds the time that reached the selection through it, and none of
+    // it is its own work, so the tree reads 100% from the top down to m2.
     expect(chain[0]?.duration).toEqual({ total: 500, self: 0 });
-    expect(chain[1]?.duration).toEqual({ total: 200, self: 200 });
+    expect(chain[1]?.duration).toEqual({ total: 500, self: 0 });
+    // The selection and what ran inside it keep their real durations.
+    expect(chain[2]?.duration).toEqual({ total: 500, self: 0 });
+    expect(chain[3]?.duration).toEqual({ total: 200, self: 200 });
+    // The path opens itself, so the selection is on screen; its subtree does not.
+    expect(chain.map((r) => r.onPath)).toEqual([true, true, undefined, undefined]);
   });
 
   it('bottom-up: a selected leaf is the whole view, with nothing above it', async () => {
@@ -120,7 +146,8 @@ describe('buildScopedCallTree', () => {
 
   it('bottom-up: the hottest frame inside the selection heads the view', async () => {
     // m2 spends none of its time itself; the statement it holds spends all of it.
-    // So the statement heads the view and m2 reads as its caller.
+    // So the statement heads the view and m2 reads as its caller. exec and m1 lead
+    // to the selection but ran nothing inside it, so bottom-up leaves them out.
     const tree = (await build(3))!;
     const rows = (await tree.bottomUp(options))!;
 
@@ -179,10 +206,12 @@ describe('buildScopedCallTree', () => {
       return total;
     };
 
-    // m2 and the statement it holds.
+    // m2 and the statement it holds. The callers above the selection are routes
+    // to it rather than calls inside it, so they are not in the figure.
     expect(tree.calls).toBe(2);
-    expect(calls((await tree.timeOrder(options))!)).toBe(tree.calls);
-    expect(calls((await tree.aggregated(options))!)).toBe(tree.calls);
+    // Each caller still counts the one call of the selection it led to.
+    expect(calls((await tree.timeOrder(options))!)).toBe(tree.calls + 2);
+    expect(calls((await tree.aggregated(options))!)).toBe(tree.calls + 2);
     // Bottom-Up heads a row with a frame that spends time, and m2 spends none, so
     // its own rows fall short of the scope. Hence the total comes from the scope.
     expect((await tree.bottomUp(options))!.reduce((sum, row) => sum + row.callCount, 0)).toBe(1);
@@ -206,7 +235,19 @@ describe('buildScopedCallTree', () => {
       expect(node.callCount).toBe(1);
       node = node._children?.[0];
     }
-    expect(texts).toEqual(['m2', 'SELECT Id FROM Account']);
+    expect(texts).toEqual(['exec', 'm1', 'm2', 'SELECT Id FROM Account']);
+  });
+
+  it('merges one caller for every occurrence it made', async () => {
+    const instances = loopOccurrences(4);
+    const tree = (await build(instances[0]!, instances))!;
+
+    const roots = (await tree.timeOrder(options))!;
+    expect(roots.map((r) => r.text)).toEqual(['loop']);
+    // One row for the caller, holding all four calls and the time they took.
+    expect(roots[0]?.callCount).toBe(4);
+    expect(roots[0]?.duration).toEqual({ total: 4, self: 0 });
+    expect(tree.rootTotal).toBe(4);
   });
 
   it('builds each view only on first read, then caches it', async () => {
@@ -228,7 +269,8 @@ describe('buildScopedCallTree', () => {
     expect(tree.rootTotal).toBe(OCCURRENCES);
 
     // Every occurrence merges into a single aggregated row, counting every call.
-    const [aggregated] = (await tree.aggregated(options))!;
+    // It sits under the caller they share, which the test above measures.
+    const aggregated = (await tree.aggregated(options))![0]?._children?.[0];
     expect(aggregated?.callCount).toBe(OCCURRENCES);
     expect(aggregated?.duration.total).toBe(OCCURRENCES);
 
