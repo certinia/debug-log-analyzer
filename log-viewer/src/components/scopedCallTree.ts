@@ -634,14 +634,19 @@ async function buildBottomUp(
       seed.duration.total += attributed;
       seed.duration.self += row.duration.self;
       seed.callCount += 1;
-      for (const index of locatableEventIndexes(row)) {
+      const seedIndexes = locatableEventIndexes(row);
+      for (const index of seedIndexes) {
         seed._indexes.add(index);
       }
       let map = seed._map;
       for (let link = callers; link; link = link.caller) {
         const node = ensure(map, null, link.row, link.key);
         node.duration.total += attributed;
-        for (const index of locatableEventIndexes(link.row)) {
+        // A caller row stands for the calls it conducted, not for the caller
+        // frame, so it holds the same frames its time and count are taken from.
+        // That is what the grids send for their own caller rows, so the two sides
+        // point at the same calls.
+        for (const index of seedIndexes) {
           node._indexes.add(index);
         }
         // Callers count the call they contributed too, matching the Call Tree
