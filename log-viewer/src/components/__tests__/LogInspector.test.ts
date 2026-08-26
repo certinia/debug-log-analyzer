@@ -43,6 +43,7 @@ jest.mock('../detailSections.js', () => ({
     _source: string,
     selection: { eventIndex?: number } | null,
     activeEventIndex: number | null,
+    sourceView?: string,
   ) => {
     // The markers carry the anchor and the active frame through to the rendered
     // content, so a stale build resolving late is distinguishable from the one
@@ -53,7 +54,8 @@ jest.mock('../detailSections.js', () => ({
             id: 'vitals',
             title: 'Details',
             content: html`<div class="marker">${selection.eventIndex}</div>
-              <div class="active">${activeEventIndex ?? '-'}</div>`,
+              <div class="active">${activeEventIndex ?? '-'}</div>
+              <div class="view">${sourceView ?? '-'}</div>`,
           },
           { id: 'callstack', title: 'Call stack', content: html`<div>c</div>` },
         ]
@@ -67,7 +69,7 @@ jest.mock('../detailSections.js', () => ({
   },
 }));
 
-import { eventBus } from '../../core/events/EventBus.js';
+import { eventBus, type DetailSource } from '../../core/events/EventBus.js';
 import type { LogInspector } from '../LogInspector.js';
 import type { PaneView } from '../PaneView.js';
 import type { ViewModeSwitch } from '../ViewModeSwitch.js';
@@ -131,7 +133,7 @@ function emptyText(el: LogInspector): string | null {
   return dock?.textContent?.trim() ?? null;
 }
 
-function select(source: 'timeline' | 'database', eventIndex: number): void {
+function select(source: DetailSource, eventIndex: number): void {
   eventBus.emit('detail:select', { source, selection: { kind: 'event', eventIndex } });
 }
 
@@ -142,6 +144,11 @@ function marker(el: LogInspector): string | null {
 /** The frame the sections follow, `-` while the anchor is what is shown. */
 function activeMarker(el: LogInspector): string | null {
   return paneView(el).shadowRoot?.querySelector('.active')?.textContent ?? null;
+}
+
+/** The direction the tab reported, `-` while it has reported none. */
+function viewMarker(el: LogInspector): string | null {
+  return paneView(el).shadowRoot?.querySelector('.view')?.textContent ?? null;
 }
 
 /** The scope switch is slotted into the dock, so it lives in the inspector's own root. */
@@ -304,6 +311,33 @@ describe('LogInspector', () => {
     await flush(el);
 
     expect([marker(el), activeMarker(el)]).toEqual(['7', '-']);
+  });
+
+  it('follows the direction a tab turns to, leaving its selection alone', async () => {
+    const el = await mount('tree-tab');
+    select('calltree', 1);
+    await flush(el);
+    expect(viewMarker(el)).toBe('-');
+
+    eventBus.emit('detail:view', { source: 'calltree', view: 'callers' });
+    await flush(el);
+
+    expect([marker(el), viewMarker(el)]).toEqual(['1', 'callers']);
+  });
+
+  it('ignores a tab reporting the direction it already showed', async () => {
+    const el = await mount('tree-tab');
+    select('calltree', 1);
+    eventBus.emit('detail:view', { source: 'calltree', view: 'callees' });
+    await flush(el);
+    dispatchInspectorReveal(dockLayout(el), 5);
+    await flush(el);
+
+    eventBus.emit('detail:view', { source: 'calltree', view: 'callees' });
+    await flush(el);
+
+    // No rebuild, so the walk down the stack is still where it was.
+    expect(activeMarker(el)).toBe('5');
   });
 
   it('keeps each tab walking its own stack', async () => {

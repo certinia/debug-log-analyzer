@@ -90,6 +90,7 @@ export class LogInspector extends LitElement {
     super();
     this._unsubscribe.push(
       eventBus.on('detail:select', (d) => this._onSelect(d)),
+      eventBus.on('detail:view', (d) => this._onView(d)),
       eventBus.on('detail:toggle', (d) => this._onToggle(d)),
     );
     getSettings()
@@ -210,6 +211,16 @@ export class LogInspector extends LitElement {
 
   private _setScope(scope: InspectorScope): void {
     this._scope = scope;
+    this._scheduleRebuild();
+  }
+
+  /** A tab turned its own tree around, so what the inspector should answer with
+   *  changed even though the selection did not. */
+  private _onView(detail: { source: DetailSource; view: SelectionView }): void {
+    if (this._sourceViews.get(detail.source) === detail.view) {
+      return;
+    }
+    this._sourceViews.set(detail.source, detail.view);
     this._scheduleRebuild();
   }
 

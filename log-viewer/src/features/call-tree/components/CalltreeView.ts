@@ -597,6 +597,10 @@ export class CalltreeView extends LitElement {
     if (switchEpoch !== this.viewSwitchEpoch) {
       return;
     }
+
+    // The selection is untouched, but the direction this tab shows is not, and
+    // that is what the inspector opens on the other side of.
+    eventBus.emit('detail:view', { source: 'calltree', view: directionOf(this.viewMode) });
   }
 
   private _destroyCurrentTable(): void {
