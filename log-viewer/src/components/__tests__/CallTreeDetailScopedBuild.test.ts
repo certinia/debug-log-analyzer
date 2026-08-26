@@ -69,6 +69,7 @@ const tables = Tabulator as unknown as { instances: StubTable[] };
 function tree(rootTotal: number): ScopedCallTree {
   return {
     rootTotal,
+    calls: 1,
     logTotal: 5_000_000,
     timeOrder: () => Promise.resolve([]),
     aggregated: () => Promise.resolve([]),

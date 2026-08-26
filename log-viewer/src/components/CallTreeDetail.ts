@@ -154,6 +154,10 @@ export class CallTreeDetail extends LitElement {
     showPercentageText: true,
   };
 
+  /** The scope's own call count, read by the Calls total. Retargeted per
+   *  selection for the same reason `_barParams` is. */
+  private _scopeCalls = 0;
+
   // The scoped tree (all three representations) for the current eventIndex,
   // computed once per selection and shared across the mode tables.
   private _scoped: ScopedCallTree | null = null;
@@ -458,6 +462,7 @@ export class CallTreeDetail extends LitElement {
     // the formatters read rather than rebuilding the columns around a new total.
     const scoped = this._scoped;
     this._barParams.totalValue = scoped?.rootTotal ?? 0;
+    this._scopeCalls = scoped?.calls ?? 0;
 
     const slot = this._tables[mode];
     if (slot) {
@@ -607,7 +612,11 @@ export class CallTreeDetail extends LitElement {
         field: 'duration.total',
         barWidth,
         barParams,
-        bottomCalc: 'sum',
+        // Tabulator sums the top level only, which is the whole scope in the
+        // grouped modes and overlapping rows in Bottom-Up. The scope's own total
+        // answers in every mode, through `barParams`, which is retargeted per
+        // selection.
+        bottomCalc: () => barParams.totalValue,
         tooltip: (_e, cell: CellComponent) => formatDuration(cell.getValue()),
       }),
       createDurationBarColumn({
@@ -620,7 +629,8 @@ export class CallTreeDetail extends LitElement {
     ];
 
     // Time Order rows are single calls, so a count only makes sense once frames
-    // are grouped (aggregated / bottom-up).
+    // are grouped (aggregated / bottom-up). The column set is built once per mode
+    // and re-filled per selection, so it cannot depend on the selection.
     if (!isTimeOrder) {
       columns.push({
         title: 'Calls',
@@ -634,7 +644,9 @@ export class CallTreeDetail extends LitElement {
         widthShrink: 0,
         cssClass: 'number-cell',
         formatter: (cell: CellComponent) => formatInteger(cell.getValue()),
-        bottomCalc: 'sum',
+        // Aggregated counts a call at its own depth and Bottom-Up counts it in
+        // its leaf row, so neither top level holds them all. The scope does.
+        bottomCalc: () => this._scopeCalls,
       });
     }
 

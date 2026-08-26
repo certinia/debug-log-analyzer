@@ -149,7 +149,7 @@ export function getEventKey(event: LogEvent): string {
  * (e.g. CODE_UNIT_STARTED at the top level, METHOD_ENTRY for recursive calls).
  * Matches the approach used by the analysis view's RowGrouper.
  */
-function getStackKey(event: LogEvent): string {
+export function getStackKey(event: LogEvent): string {
   return `${event.namespace}|${event.text}`;
 }
 
