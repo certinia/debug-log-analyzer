@@ -32,6 +32,7 @@ jest.mock('../../features/database/components/databaseSections.js', () => ({
   },
 }));
 
+import type { CallTreeDetail } from '../CallTreeDetail.js';
 import { render, type TemplateResult } from 'lit';
 
 import { buildDetailSections } from '../detailSections.js';
@@ -246,6 +247,9 @@ describe('buildDetailSections', () => {
     expect(sections.find((s) => s.id === 'calltree')?.weight).toBe(4);
     expect(sections.find((s) => s.id === 'calltree')?.fit ?? 'fill').toBe('fill');
     expect(sections.find((s) => s.id === 'governor-trends')?.fit).toBe('content');
+    // The tab draws the log top down, so the tree opens on where the time went.
+    const tree = rendered(sections, 'calltree', 'call-tree-detail') as CallTreeDetail;
+    expect(tree.sourceView).toBe('callees');
   });
 
   it('adds the findings section on Analysis, which is that tab at log scope', async () => {

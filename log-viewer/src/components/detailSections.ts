@@ -149,7 +149,12 @@ export async function buildDetailSections(
           id: 'calltree',
           title: 'Call tree',
           weight: 4,
-          content: html`<call-tree-detail .wholeLog=${true}></call-tree-detail>`,
+          // The Timeline draws the whole log top down, so the tree answers with
+          // where its time went. Time Order would open on two collapsed roots.
+          content: html`<call-tree-detail
+            .wholeLog=${true}
+            .sourceView=${'callees' as const}
+          ></call-tree-detail>`,
         },
       );
     }
