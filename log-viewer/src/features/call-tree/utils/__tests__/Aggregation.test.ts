@@ -4,7 +4,9 @@
 import { beforeEach, describe, expect, it } from '@jest/globals';
 import type { LogEvent } from 'apex-log-parser';
 
-import { toAggregatedCallTree, toBottomUpTree } from '../Aggregation.js';
+import { outermostEvents } from '../../../../core/utility/EventTree.js';
+import { toAggregatedCallTree, toBottomUpTree, type BottomUpRow } from '../Aggregation.js';
+import { occurrencesThrough } from '../bottomUpOccurrences.js';
 
 type EventOptions = {
   text: string;
@@ -1011,6 +1013,78 @@ describe('toBottomUpTree', () => {
     };
 
     assertRowsDoNotExceedGlobalTotals(rows, globalRoot);
+  });
+});
+
+describe('bottom-up caller row scope', () => {
+  beforeEach(() => {
+    nextTimestamp = 1;
+  });
+
+  /** A -> B -> A on one branch, A -> C -> A on the other, so a caller bucket
+   *  reaches a strict subset of the root bucket's occurrences. */
+  function recursiveRoot(): LogEvent {
+    const root = createEvent({ text: 'LOG_ROOT', self: 0, total: 150, type: 'EXECUTION_STARTED' });
+    const outer1 = createEvent({ text: 'A', self: 10, total: 100, parent: root });
+    const b1 = createEvent({ text: 'B', self: 20, total: 90, parent: outer1 });
+    createEvent({ text: 'A', self: 70, total: 70, parent: b1 });
+    const outer2 = createEvent({ text: 'A', self: 5, total: 50, parent: root });
+    const c1 = createEvent({ text: 'C', self: 15, total: 45, parent: outer2 });
+    createEvent({ text: 'A', self: 30, total: 30, parent: c1 });
+    return root;
+  }
+
+  /** Every bucket with the chain that reaches it, root bucket key first. */
+  function bucketsWithPaths(
+    rows: BottomUpRow[],
+    parentPath: string[] = [],
+  ): Array<{ row: BottomUpRow; keyPath: string[] }> {
+    return rows.flatMap((row) => {
+      const keyPath = [...parentPath, row.key];
+      return [{ row, keyPath }, ...bucketsWithPaths(row._children ?? [], keyPath)];
+    });
+  }
+
+  function derivedFor(roots: BottomUpRow[], keyPath: string[]): LogEvent[] {
+    const root = roots.find((candidate) => candidate.key === keyPath[0]);
+    return occurrencesThrough(root?.instances ?? [], keyPath);
+  }
+
+  it('counts one call per occurrence the row derives', () => {
+    const roots = toBottomUpTree(recursiveRoot().children);
+
+    const buckets = bucketsWithPaths(roots);
+    expect(buckets.length).toBeGreaterThan(roots.length);
+    for (const { row, keyPath } of buckets) {
+      expect(derivedFor(roots, keyPath)).toHaveLength(row.callCount);
+    }
+  });
+
+  it('scopes a caller row to the calls made through it, not to every call', () => {
+    const roots = toBottomUpTree(recursiveRoot().children);
+
+    const recursive = findRowByText(roots, 'A');
+    const throughB = findRowByText(recursive._children ?? [], 'B');
+    expect(recursive.callCount).toBe(4);
+    expect(throughB.callCount).toBe(1);
+    expect(derivedFor(roots, [recursive.key, throughB.key])).toEqual([
+      recursive.instances.find((event) => event.parent?.text === 'B'),
+    ]);
+  });
+
+  it('agrees with the row totals the grid shows', () => {
+    const roots = toBottomUpTree(recursiveRoot().children);
+
+    for (const { row, keyPath } of bucketsWithPaths(roots)) {
+      const derived = derivedFor(roots, keyPath);
+      const totalTime = outermostEvents(derived).reduce(
+        (sum, event) => sum + event.duration.total,
+        0,
+      );
+      const selfTime = derived.reduce((sum, event) => sum + event.duration.self, 0);
+      expect(row.totalTime).toBeCloseTo(totalTime, 6);
+      expect(row.totalSelfTime).toBeCloseTo(selfTime, 6);
+    }
   });
 });
 

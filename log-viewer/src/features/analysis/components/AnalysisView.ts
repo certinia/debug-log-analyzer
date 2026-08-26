@@ -14,7 +14,7 @@ import type { ApexLog } from 'apex-log-parser';
 import '../../../components/ContextMenu.js';
 import type { ContextMenu } from '../../../components/ContextMenu.js';
 import { eventBus } from '../../../core/events/EventBus.js';
-import { rowOccurrences } from '../../../components/locatedRow.js';
+import { rowDetailSelection, rowOccurrences } from '../../../components/locatedRow.js';
 import { SelectionEchoGuard } from '../../../core/events/SelectionEchoGuard.js';
 import { isVisible } from '../../../core/utility/Util.js';
 import { getSettings, updateSetting } from '../../settings/Settings.js';
@@ -624,38 +624,25 @@ export class AnalysisView extends LitElement {
     });
 
     // Feed the inspector. Analysis rows merge many calls, so they
-    // scope to every occurrence of the method.
+    // scope to every call they count.
     this.analysisTable.on('rowSelectionChanged', (_data, rows) => {
       if (this._echoGuard.suppressed) {
         return;
       }
-      const data = rows[0]?.getData() as BottomUpRow | undefined;
-      const event = data?.originalData;
-      if (!event) {
-        eventBus.emit('detail:select', { source: 'analysis', selection: null });
-        return;
-      }
-      const occurrences = data.instances?.length ? data.instances : null;
       eventBus.emit('detail:select', {
         source: 'analysis',
-        selection: occurrences
-          ? {
-              kind: 'aggregate',
-              instances: occurrences.map((e) => e.eventIndex),
-              label: data.text ?? event.text,
-            }
-          : { kind: 'event', eventIndex: event.eventIndex },
+        selection: rowDetailSelection(rows[0]),
       });
     });
 
     // Tell the inspector which calls the pointer is over, so it can mark the rows
-    // that stand for them; a bucket merges calls, so it names every occurrence.
+    // that stand for them; a bucket merges calls, so it names every call it counts.
     // The other direction has nothing to land on here: a row is a method bucket,
     // not one event, so the inspector's pointer marks no row in this grid.
     this.analysisTable.on('rowMouseEnter', (_e, row) => {
       eventBus.emit('detail:locate', {
         source: 'analysis',
-        eventIndexes: rowOccurrences(row.getData() as BottomUpRow),
+        eventIndexes: rowOccurrences(row),
       });
     });
     this.analysisTable.on('rowMouseLeave', () => {

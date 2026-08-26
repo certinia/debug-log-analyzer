@@ -63,6 +63,7 @@ import {
 import {
   LOCATED_ROW_CLASS,
   LocatedRowMarker,
+  rowDetailSelection,
   rowIndexStamper,
   rowOccurrences,
 } from '../../../components/locatedRow.js';
@@ -1129,48 +1130,34 @@ export class CalltreeView extends LitElement {
 
   /**
    * Feed the inspector off row selection. A Time Order row is a
-   * single event; Aggregated/Bottom-Up rows merge many calls, so they scope to
-   * every occurrence (`instances`).
+   * single event; an Aggregated/Bottom-Up row merges many calls, so it scopes to
+   * every call it counts.
    */
   private _emitDetailSelection(table: Tabulator, source: DetailSource = 'calltree'): void {
     table.on('rowSelectionChanged', (_data, rows) => {
       if (this._echoGuard.suppressed) {
         return;
       }
-      const data = rows[0]?.getData() as
-        { originalData?: LogEvent; instances?: LogEvent[]; text?: string } | undefined;
-      const event = data?.originalData;
-      if (!event) {
+      const selection = rowDetailSelection(rows[0]);
+      if (!selection) {
         // The selection went with it, and so does a mark a picked inspector row
         // left here — it was never a selection of this table.
         this._locatedRow.mark(this.calltreeTable?.element ?? null, this._emphasis.pick([]));
-        eventBus.emit('detail:select', { source, selection: null });
-        return;
       }
-      const occurrences = data.instances?.length ? data.instances : null;
-      eventBus.emit('detail:select', {
-        source,
-        selection: occurrences
-          ? {
-              kind: 'aggregate',
-              instances: occurrences.map((e) => e.eventIndex),
-              label: data.text ?? event.text,
-            }
-          : { kind: 'event', eventIndex: event.eventIndex },
-      });
+      eventBus.emit('detail:select', { source, selection });
     });
   }
 
   /**
    * Tell the inspector which frames the pointer is over, so it can mark the rows
    * that stand for them. Nothing is picked and nothing moves. An
-   * Aggregated/Bottom-Up row merges many calls, so it names every occurrence.
+   * Aggregated/Bottom-Up row merges many calls, so it names every call it counts.
    */
   private _emitDetailLocate(table: Tabulator, source: DetailSource = 'calltree'): void {
     table.on('rowMouseEnter', (_e, row) => {
       eventBus.emit('detail:locate', {
         source,
-        eventIndexes: rowOccurrences(row.getData() as { originalData?: LogEvent }),
+        eventIndexes: rowOccurrences(row),
       });
     });
     table.on('rowMouseLeave', () => {
