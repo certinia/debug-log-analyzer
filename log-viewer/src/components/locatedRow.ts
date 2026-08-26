@@ -2,7 +2,11 @@
  * Copyright (c) 2026 Certinia Inc. All rights reserved.
  */
 
+import type { LogEvent } from 'apex-log-parser';
 import type { RowComponent } from 'tabulator-tables';
+
+import type { DetailSelection } from '../core/events/EventBus.js';
+import { occurrencesThrough } from '../features/call-tree/utils/bottomUpOccurrences.js';
 
 /** Class the marked row carries; each table styles it itself. */
 export const LOCATED_ROW_CLASS = 'located-row';
@@ -31,21 +35,89 @@ export function rowIndexStamper(indexField: string): (row: RowComponent) => void
   };
 }
 
-/** A row standing for one call, or for every occurrence of a merged one. */
-interface OccurrenceRow {
-  originalData?: { eventIndex: number };
-  instances?: { eventIndex: number }[];
+/** A row of a merged view: `key` is the bucket it stands for, `instances` the
+ *  occurrences it holds, which a bottom-up caller bucket has none of. */
+interface CallRow {
+  key?: string;
+  text?: string;
+  instances?: LogEvent[];
+  originalData?: LogEvent;
+}
+
+const rowCallData = (row: RowComponent): CallRow => row.getData() as CallRow;
+
+/** Derived calls, held per row: a pointer sweep re-enters rows, and the click
+ *  that follows a hover asks again. Both answers are cached, because deriving
+ *  them reads every occurrence the root bucket holds. */
+const derivedCalls = new WeakMap<CallRow, LogEvent[]>();
+const derivedIndexes = new WeakMap<CallRow, number[]>();
+
+const NO_CALLS: LogEvent[] = [];
+
+/**
+ * The calls a row stands for. A bottom-up caller row holds none of its own, so it
+ * is derived from its root bucket and the chain that reaches it.
+ */
+function rowCallOccurrences(row: RowComponent): LogEvent[] {
+  const data = rowCallData(row);
+  if (data.instances?.length) {
+    return data.instances;
+  }
+  if (data.key === undefined) {
+    return data.originalData ? [data.originalData] : NO_CALLS;
+  }
+  const cached = derivedCalls.get(data);
+  if (cached) {
+    return cached;
+  }
+
+  const chain = [data.key];
+  let root = data;
+  for (let parent = row.getTreeParent(); parent; parent = parent.getTreeParent()) {
+    root = rowCallData(parent);
+    if (root.key === undefined) {
+      derivedCalls.set(data, NO_CALLS);
+      return NO_CALLS;
+    }
+    chain.push(root.key);
+  }
+  // The tree parent is the callee, so the walk runs inwards; the path runs out.
+  const derived = occurrencesThrough(root.instances ?? [], chain.reverse());
+  derivedCalls.set(data, derived);
+  return derived;
+}
+
+/** The calls a row stands for, as the event indexes the mark works in. */
+export function rowOccurrences(row: RowComponent): number[] {
+  const data = rowCallData(row);
+  const cached = derivedIndexes.get(data);
+  if (cached) {
+    return cached;
+  }
+  const indexes = rowCallOccurrences(row).map((event) => event.eventIndex);
+  derivedIndexes.set(data, indexes);
+  return indexes;
 }
 
 /**
- * The events a row stands for: every occurrence of a merged row, the single call
- * of a plain one, and none for a row that holds no event.
+ * What a selected row tells the inspector: a merged row names every call it
+ * counts, a Time Order row the one call it is, and no row nothing.
  */
-export function rowOccurrences(data: OccurrenceRow | undefined): number[] {
-  if (data?.instances?.length) {
-    return data.instances.map((event) => event.eventIndex);
+export function rowDetailSelection(row: RowComponent | undefined): DetailSelection | null {
+  if (!row) {
+    return null;
   }
-  return data?.originalData ? [data.originalData.eventIndex] : [];
+  const data = rowCallData(row);
+  const event = data.originalData;
+  if (!event) {
+    return null;
+  }
+  if (data.key === undefined) {
+    return { kind: 'event', eventIndex: event.eventIndex };
+  }
+  // A bucket stands for its calls even where none derive: `originalData` is the
+  // caller frame, which is the mis-scoping this scoping exists to avoid.
+  return { kind: 'aggregate', instances: rowOccurrences(row), label: data.text ?? event.text };
 }
 
 /**
