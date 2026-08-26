@@ -19,6 +19,33 @@ Do not merge either PR unchanged.
 
 Most lifecycle, caching, URI, menu, race, and display fixes belong in Log Analyzer and can start immediately. Correct multi-root org selection, complete log listing, reliable published types, and eliminating the consumer-owned Effect runtime require Salesforce Services changes.
 
+## Remediation status
+
+Checkpoint: 2026-08-26, commit `5e70601e` on `ph/W-23939830-services-upstream`.
+
+| Area                                    | Status      | Result or next step                                                       |
+| --------------------------------------- | ----------- | ------------------------------------------------------------------------- |
+| PR 951 lazy Services activation         | Complete    | Retrieve Log initializes Services; local analysis activation does not.    |
+| PR 951 missing/incompatible Services UX | Complete    | Install/update action; unexpected activation failures preserved.          |
+| PR 951 runtime API validation           | Complete    | Checks Apex log, filesystem, and prebuilt-context exports.                |
+| PR 951 cached-log reuse                 | Complete    | Cache hit skips body retrieval and write.                                 |
+| PR 951 access-denied matching           | Complete    | Handles joined, spaced, repeated-space, case, and surrounding whitespace. |
+| PR 951 declaration dependency placement | Complete    | `@salesforce/vscode-services` moved to `devDependencies`.                 |
+| PR 951 activation bundle split          | Complete    | Salesforce bridge and Effect runtime emitted as lazy chunks.              |
+| Log Analyzer filesystem ownership       | Deferred    | Keep Salesforce `FsService` for now.                                      |
+| PR 951 workspace-scoped org retrieval   | Blocked     | Requires Services workspace/org targeting.                                |
+| PR 951 complete log listing             | Blocked     | Requires Services pagination or optional limit.                           |
+| PR 951 self-contained declarations      | Blocked     | Requires a corrected Services npm package.                                |
+| PR 951 shared runtime/Promise boundary  | Blocked     | Requires a Services export.                                               |
+| PR 952 remediation                      | Not started | Begin only after PR 951 review/branch update.                             |
+
+Verification at checkpoint:
+
+- `pnpm test:ci`: 139 suites, 1,845 tests passed.
+- `pnpm build`: passed, including typecheck and production bundles.
+- Changed files: ESLint, Prettier, and `git diff --check` passed.
+- Full `pnpm lint`: still obstructed because `eslint .` traverses generated `.vscode-test-web` sources despite the ignore entry.
+
 ## Dependency matrix
 
 `Requires Services` means the complete Log Analyzer fix depends on a new or corrected Salesforce Services release.
@@ -65,6 +92,8 @@ Local log analysis, parsing, decorations, navigation, and webview display must w
 
 ### 2. Own local file I/O
 
+Status: deferred. PR 951 continues to use Salesforce `FsService`.
+
 Use `vscode.workspace.fs` for Log Analyzer files:
 
 - read and decode text;
@@ -101,7 +130,7 @@ Never query workspace B's org and cache the result under workspace A.
 ### 5. Guard the Services boundary
 
 - Treat extension exports as `unknown` until validated.
-- Check `services`, `prebuiltServicesDependencies`, `ApexLogService.listLogs`, and `ApexLogService.getLogBody` before use.
+- Check `services`, `prebuiltServicesDependencies`, Apex log methods, and required `FsService` methods before use.
 - Show an actionable incompatible-version message.
 - Move the npm declaration package to `devDependencies`.
 - After corrected types are published, pin or constrain to the first compatible release.
@@ -252,16 +281,16 @@ Integration after a Services release:
 
 ## Acceptance criteria
 
-- Local log analysis works without Salesforce extensions active.
-- Retrieve Log offers actionable install/update errors.
-- Selected workspace controls both org and cache location.
-- More than 25 logs are reachable without an arbitrary cap.
-- Cached logs are not downloaded again.
-- 100 MB+ local logs are not fully read for detection.
-- Switching tabs cannot publish stale `lana.isApexLog` state.
-- URI-backed logs retain correct open/navigation behavior and readable titles.
-- Published Services declarations typecheck in an isolated consumer.
-- Log Analyzer does not bundle a second Effect runtime after the Services runtime API lands.
+- [x] PR 951 local log analysis activates without Salesforce extensions.
+- [x] Retrieve Log offers actionable install/update errors.
+- [ ] Selected workspace controls both org and cache location.
+- [ ] More than 25 logs are reachable without an arbitrary cap.
+- [x] Cached logs are not downloaded again.
+- [ ] 100 MB+ local logs are not fully read for detection.
+- [ ] Switching tabs cannot publish stale `lana.isApexLog` state.
+- [ ] URI-backed logs retain correct open/navigation behavior and readable titles.
+- [ ] Published Services declarations typecheck in an isolated consumer.
+- [ ] Log Analyzer does not bundle a second Effect runtime after the Services runtime API lands.
 
 ## Source references
 
