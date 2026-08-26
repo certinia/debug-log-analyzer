@@ -38,7 +38,7 @@ export class LogView {
   }
 
   static getLogPath() {
-    return LogView.currentLogUri?.toString();
+    return LogView.currentLogUri ? getLogDisplayPath(LogView.currentLogUri) : undefined;
   }
 
   static getLogUri(): Uri | undefined {
@@ -255,12 +255,19 @@ export class LogView {
       payload: {
         logName: logUri ? Utils.basename(logUri) : '',
         logUri: logUri ? panel.webview.asWebviewUri(logUri).toString(true) : '',
-        logPath: logUri?.toString(),
+        logPath: logUri ? getLogDisplayPath(logUri) : undefined,
         logData: logData,
         navigateToTimestamp,
       },
     });
   }
+}
+
+function getLogDisplayPath(logUri: Uri): string {
+  return (
+    workspace.asRelativePath(logUri, true) ||
+    (logUri.scheme === 'file' ? logUri.fsPath : logUri.path)
+  );
 }
 
 function isWebViewLogFileRequest(value: unknown): value is WebViewLogFileRequest {
