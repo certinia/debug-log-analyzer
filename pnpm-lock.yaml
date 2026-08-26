@@ -115,13 +115,13 @@ importers:
       '@apexdevtools/apex-parser':
         specifier: 5.1.0
         version: 5.1.0
-      '@salesforce/vscode-services':
-        specifier: ^67.12.0
-        version: 67.13.3(@effect/platform@0.96.3(effect@3.22.1))(@opentelemetry/resources@2.10.0(@opentelemetry/api@1.9.1))(@opentelemetry/semantic-conventions@1.43.0)(@types/node@22.20.1)
       effect:
         specifier: ^3.22.0
         version: 3.22.1
     devDependencies:
+      '@salesforce/vscode-services':
+        specifier: ^67.12.0
+        version: 67.13.3(@effect/platform@0.96.3(effect@3.22.1))(@opentelemetry/resources@2.10.0(@opentelemetry/api@1.9.1))(@opentelemetry/semantic-conventions@1.43.0)(@types/node@22.20.1)
       '@types/jest':
         specifier: ^30.0.0
         version: 30.0.0

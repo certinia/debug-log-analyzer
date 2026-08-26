@@ -6,7 +6,13 @@ import { commands, window } from 'vscode';
 import { createMockContext } from '../../__tests__/helpers/test-builders.js';
 import { QuickPick } from '../../display/QuickPick.js';
 import { QuickPickWorkspace } from '../../display/QuickPickWorkspace.js';
-import { getLogBody, listLogs, writeFile } from '../../services/salesforceServices.js';
+import {
+  ensureServicesAvailable,
+  fileOrFolderExists,
+  getLogBody,
+  listLogs,
+  writeFile,
+} from '../../services/salesforceServices.js';
 import { LogView } from '../LogView.js';
 import { RetrieveLogFile } from '../RetrieveLogFile.js';
 
@@ -39,6 +45,8 @@ jest.mock('../../display/QuickPick.js', () => ({
   },
 }));
 jest.mock('../../services/salesforceServices.js', () => ({
+  ensureServicesAvailable: jest.fn(),
+  fileOrFolderExists: jest.fn(),
   getLogBody: jest.fn(),
   listLogs: jest.fn(),
   writeFile: jest.fn(),
@@ -47,6 +55,8 @@ jest.mock('../LogView.js', () => ({ LogView: { createView: jest.fn() } }));
 
 const mockPickWorkspace = QuickPickWorkspace.pickOrReturn as jest.Mock;
 const mockPick = QuickPick.pick as jest.Mock;
+const mockEnsureServicesAvailable = ensureServicesAvailable as jest.Mock;
+const mockFileOrFolderExists = fileOrFolderExists as jest.Mock;
 const mockListLogs = listLogs as jest.Mock;
 const mockGetLogBody = getLogBody as jest.Mock;
 const mockWriteFile = writeFile as jest.Mock;
@@ -66,6 +76,8 @@ const log = (id: string, startTime = '2024-01-01T00:00:00.000Z', durationMillise
 describe('RetrieveLogFile', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    mockEnsureServicesAvailable.mockResolvedValue(true);
+    mockFileOrFolderExists.mockResolvedValue(false);
     mockPickWorkspace.mockResolvedValue('/test/workspace');
     mockListLogs.mockResolvedValue([]);
     mockPick.mockResolvedValue([]);
@@ -93,10 +105,11 @@ describe('RetrieveLogFile', () => {
     const context = createMockContext();
     RetrieveLogFile.apply(context as unknown as import('../../Context.js').Context);
     await command()();
+    expect(mockEnsureServicesAvailable).toHaveBeenCalledWith();
     expect(mockListLogs).toHaveBeenCalledWith();
   });
 
-  it('retrieves the selected body and opens it without requiring a local file', async () => {
+  it('retrieves and caches an uncached log', async () => {
     mockListLogs.mockResolvedValue([log('selected-log')]);
     mockPick.mockResolvedValue([{ logId: 'selected-log' }]);
     const context = createMockContext();
@@ -104,6 +117,9 @@ describe('RetrieveLogFile', () => {
     await command()();
 
     expect(mockGetLogBody).toHaveBeenCalledWith('selected-log');
+    expect(mockFileOrFolderExists).toHaveBeenCalledWith(
+      expect.stringContaining('selected-log.log'),
+    );
     expect(mockWriteFile).toHaveBeenCalledWith(
       expect.stringContaining('selected-log.log'),
       'log body',
@@ -114,6 +130,33 @@ describe('RetrieveLogFile', () => {
       expect.stringContaining('selected-log.log'),
       'log body',
     );
+  });
+
+  it('opens a cached log without downloading it again', async () => {
+    mockListLogs.mockResolvedValue([log('cached-log')]);
+    mockPick.mockResolvedValue([{ logId: 'cached-log' }]);
+    mockFileOrFolderExists.mockResolvedValue(true);
+    const context = createMockContext();
+    RetrieveLogFile.apply(context as unknown as import('../../Context.js').Context);
+    await command()();
+
+    expect(mockGetLogBody).not.toHaveBeenCalled();
+    expect(mockWriteFile).not.toHaveBeenCalled();
+    expect(mockCreateView).toHaveBeenCalledWith(
+      context,
+      expect.any(Promise),
+      expect.stringContaining('cached-log.log'),
+    );
+  });
+
+  it('stops before workspace selection when Salesforce Services is unavailable', async () => {
+    mockEnsureServicesAvailable.mockResolvedValue(false);
+    const context = createMockContext();
+    RetrieveLogFile.apply(context as unknown as import('../../Context.js').Context);
+    await command()();
+
+    expect(mockPickWorkspace).not.toHaveBeenCalled();
+    expect(mockListLogs).not.toHaveBeenCalled();
   });
 
   it('still opens a retrieved log when cache writing fails', async () => {
@@ -165,15 +208,18 @@ describe('RetrieveLogFile', () => {
     expect(description).toContain(expectedDuration);
   });
 
-  it('reports an access-denied log response', async () => {
-    mockListLogs.mockResolvedValue([log('denied')]);
-    mockPick.mockResolvedValue([{ logId: 'denied' }]);
-    mockGetLogBody.mockResolvedValue('AccessDenied');
-    const context = createMockContext();
-    RetrieveLogFile.apply(context as unknown as import('../../Context.js').Context);
-    await command()();
-    expect(context.display.showErrorMessage).toHaveBeenCalledWith(
-      expect.stringContaining('Salesforce denied access'),
-    );
-  });
+  it.each(['AccessDenied', 'Access denied', ' ACCESS   DENIED '])(
+    'reports an access-denied log response: %s',
+    async (response) => {
+      mockListLogs.mockResolvedValue([log('denied')]);
+      mockPick.mockResolvedValue([{ logId: 'denied' }]);
+      mockGetLogBody.mockResolvedValue(response);
+      const context = createMockContext();
+      RetrieveLogFile.apply(context as unknown as import('../../Context.js').Context);
+      await command()();
+      expect(context.display.showErrorMessage).toHaveBeenCalledWith(
+        expect.stringContaining('Salesforce denied access'),
+      );
+    },
+  );
 });

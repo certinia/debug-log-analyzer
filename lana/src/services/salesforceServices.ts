@@ -3,7 +3,9 @@
  */
 import type { Uri } from 'vscode';
 
-import { getRuntime, getServicesApi } from './servicesRuntime.js';
+import { ensureServicesAvailable, getRuntime, getServicesApi } from './servicesRuntime.js';
+
+export { ensureServicesAvailable };
 
 /* eslint-disable @typescript-eslint/naming-convention -- Salesforce API field names are case-sensitive. */
 export interface ApexLogListItem {

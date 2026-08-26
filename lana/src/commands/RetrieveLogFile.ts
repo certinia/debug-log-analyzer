@@ -13,12 +13,7 @@ import { appName } from '../AppSettings.js';
 import type { Context } from '../Context.js';
 import { Item, Options, QuickPick } from '../display/QuickPick.js';
 import { QuickPickWorkspace } from '../display/QuickPickWorkspace.js';
-import {
-  getLogBody,
-  listLogs,
-  writeFile,
-  type ApexLogListItem,
-} from '../services/salesforceServices.js';
+import type { ApexLogListItem } from '../services/salesforceServices.js';
 import { Command } from './Command.js';
 import { LogView } from './LogView.js';
 
@@ -56,10 +51,15 @@ export class RetrieveLogFile {
   }
 
   private static async command(context: Context): Promise<WebviewPanel | void> {
+    const salesforceServices = await import('../services/salesforceServices.js');
+    if (!(await salesforceServices.ensureServicesAvailable())) {
+      return;
+    }
+
     const workspacePath = await QuickPickWorkspace.pickOrReturn(context);
     const loadingPicker = RetrieveLogFile.showLoadingPicker();
     try {
-      const logFiles = await listLogs();
+      const logFiles = await salesforceServices.listLogs();
       const logFileId = await RetrieveLogFile.getLogFile(logFiles);
       if (logFileId) {
         const logFilePath = join(
@@ -70,10 +70,14 @@ export class RetrieveLogFile {
           'logs',
           `${logFileId}.log`,
         );
-        const logData = await getLogBody(logFileId);
+        if (await salesforceServices.fileOrFolderExists(logFilePath)) {
+          return LogView.createView(context, Promise.resolve(), logFilePath);
+        }
+
+        const logData = await salesforceServices.getLogBody(logFileId);
         this.assertRetrievedLog(logFileId, logData);
         try {
-          await writeFile(logFilePath, logData);
+          await salesforceServices.writeFile(logFilePath, logData);
         } catch (error: unknown) {
           const message = error instanceof Error ? error.message : String(error);
           context.display.output(`Unable to cache retrieved log: ${message}`, true);
@@ -162,7 +166,7 @@ export class RetrieveLogFile {
   }
 
   private static assertRetrievedLog(logId: string, logData: string): void {
-    if (/^accessdenied(?:access denied)?$/i.test(logData.trim())) {
+    if (/^access\s*denied$/i.test(logData.trim())) {
       throw new Error(
         `Salesforce denied access to the body of Apex log ${logId}. Verify that the authenticated user can access ApexLog records and their bodies.`,
       );
