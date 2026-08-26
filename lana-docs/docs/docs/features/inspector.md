@@ -28,7 +28,7 @@ It docks to the **right**, **left** or **bottom**, resizes by dragging its edge,
 - **Self time by namespace** – Timeline only: the self time under the selection split by the namespace whose code ran it, so you can see whose package burned it. Every namespace bar colours the six biggest and gathers the rest into one **others** segment, which names them on hover.
 - **Findings** – Analysis only: which of the log's findings name the selected method or anything it called, so you can tell whether the row you picked is one of the log's problems.
 - **Call stack** – the parent frames that led to the selection, outermost first, with total and self time.
-- **Call tree** – the selection's own execution in **Time Order**, **Aggregated** or **Bottom-Up**, scoped to the selection rather than the whole log like the [Call Tree](./calltree.mdx) tab.
+- **Call tree** – **Time Order** and **Aggregated** run from the log root through the selection's callers into what ran inside it; **Bottom-Up** ranks what ran inside it by self time. A caller holds only the time that reached the selection, so the tree reads 100% down to it and everything below is a share of it.
 - **SOQL issues** – SOQL only: optimization tips for the query.
 
 Collapse a section by clicking its header, drag a divider to resize two of them, double-click a divider to restore the default sizes. It's one panel, so your layout follows you from tab to tab.

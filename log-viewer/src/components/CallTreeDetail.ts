@@ -231,12 +231,13 @@ export class CallTreeDetail extends LitElement {
 
   /**
    * The ids of the rows that name `eventIndexes` in `mode`. Time Order keys its
-   * rows by event, so there the ids are the indexes themselves; a grouped row
-   * merges occurrences behind a synthetic id, so it is found by the occurrences
-   * it carries — and one frame can name several rows in Bottom-Up.
+   * rows by event, so there the ids are the indexes themselves — unless it merged
+   * a selection's occurrences, when its rows are grouped like the other views'. A
+   * grouped row merges occurrences behind a synthetic id, so it is found by the
+   * occurrences it carries — and one frame can name several rows in Bottom-Up.
    */
   private _rowIdsFor(mode: ViewMode, eventIndexes: readonly number[]): number[] {
-    if (mode === 'time-order' || !eventIndexes.length) {
+    if ((mode === 'time-order' && !this._scoped?.timeOrderMerged) || !eventIndexes.length) {
       return [...eventIndexes];
     }
     const byEvent = (this._rowsByEvent[mode] ??= rowIdsByEvent(
@@ -337,8 +338,8 @@ export class CallTreeDetail extends LitElement {
   }
 
   /**
-   * Marks the active frame, without reporting it as a new pick. Only Time Order
-   * keys its rows by event, so the grouped modes have nothing to mark.
+   * Marks the active frame, without reporting it as a new pick. Only rows keyed by
+   * event can be selected by index, so the grouped views have nothing to mark.
    */
   private _markActive(): void {
     const table = this._tables[this.viewMode]?.table;
@@ -349,7 +350,11 @@ export class CallTreeDetail extends LitElement {
       for (const selected of table.getSelectedRows()) {
         selected.deselect();
       }
-      if (this.viewMode === 'time-order' && this.activeEventIndex >= 0) {
+      if (
+        this.viewMode === 'time-order' &&
+        !this._scoped?.timeOrderMerged &&
+        this.activeEventIndex >= 0
+      ) {
         table.selectRow([this.activeEventIndex]);
       }
     });
@@ -500,6 +505,10 @@ export class CallTreeDetail extends LitElement {
       ...virtualScrollOptions,
       dataTree: true,
       dataTreeChildField: '_children',
+      // Open the callers above the selection so it is on screen, and leave what
+      // ran inside it closed.
+      dataTreeStartExpanded: (row: RowComponent) =>
+        (row.getData() as Partial<ScopedRow>).onPath === true,
       dataTreeChildColumnCalcs: false,
       dataTreeBranchElement: '<span/>',
       columnCalcs: 'table',

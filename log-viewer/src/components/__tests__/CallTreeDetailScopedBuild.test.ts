@@ -71,6 +71,7 @@ function tree(rootTotal: number): ScopedCallTree {
     rootTotal,
     calls: 1,
     logTotal: 5_000_000,
+    timeOrderMerged: false,
     timeOrder: () => Promise.resolve([]),
     aggregated: () => Promise.resolve([]),
     bottomUp: () => Promise.resolve([]),
