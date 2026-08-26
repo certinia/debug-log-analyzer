@@ -6,12 +6,13 @@ import { LitElement, css, html, type PropertyValues } from 'lit';
 import { customElement, property, query, state } from 'lit/decorators.js';
 
 import type { ApexLog, LogCategory } from 'apex-log-parser';
+import { categoryPalette } from '../../../components/categoryTime.js';
 import { VSCodeExtensionMessenger } from '../../../core/messaging/VSCodeExtensionMessenger.js';
 import { subscribeSettings, updateSetting, type LanaSettings } from '../../settings/Settings.js';
-import { keyMap, setColors } from '../services/Timeline.js';
+import { setColors } from '../services/Timeline.js';
 
 import { DEFAULT_THEME_NAME, sameColors, type TimelineColors } from '../themes/Themes.js';
-import { addCustomThemes, getTheme } from '../themes/ThemeSelector.js';
+import { addCustomThemes } from '../themes/ThemeSelector.js';
 
 import { categorySelfTimes, toTimelineKeys } from '../utils/category-self-time.js';
 import type { TimeDisplayMode } from '../types/flamechart.types.js';
@@ -59,6 +60,9 @@ export class TimelineView extends LitElement {
 
   /** Per-category self time for the loaded log; drives the legend durations. */
   private selfTimes?: Map<LogCategory, number>;
+
+  /** The timeline settings last pushed; the legend's palette is resolved from them. */
+  private timelineSettings: LanaSettings['timeline'] | null = null;
 
   @state()
   private useLegacyTimeline: boolean | null = null;
@@ -198,6 +202,7 @@ export class TimelineView extends LitElement {
 
   private applyTimelineSettings(settings: LanaSettings) {
     const { timeline } = settings;
+    this.timelineSettings = timeline;
     this.useLegacyTimeline = timeline.legacy;
     this.showTooltip = timeline.showTooltip;
 
@@ -209,15 +214,14 @@ export class TimelineView extends LitElement {
         this.appliedCustomThemes = customThemes;
         addCustomThemes(customThemes);
         this.setTheme(themeName);
-      } else {
-        // A legacy → modern toggle re-enters here with the theme unchanged, so the
-        // legend may still hold the legacy keyMap entries.
-        this.rebuildTimelineKeys();
+        return;
       }
     } else {
       setColors(timeline.colors);
-      this.timelineKeys = Array.from(keyMap.values());
     }
+    // A legacy toggle re-enters with the theme unchanged, so the legend is rebuilt
+    // either way: the palette it reads differs between the two chart renderers.
+    this.rebuildTimelineKeys();
   }
 
   /** True when the pushed custom themes match those already applied. */
@@ -313,14 +317,17 @@ export class TimelineView extends LitElement {
     this.rebuildTimelineKeys();
   }
 
-  /** Rebuilds the legend from the active palette + the log's per-category self times. */
+  /**
+   * Rebuilds the legend from the palette the chart drew with, plus the log's
+   * per-category self times. `activeTheme` overrides the pushed one, since a
+   * quick-pick preview is never persisted.
+   */
   private rebuildTimelineKeys(): void {
-    if (this.useLegacyTimeline) {
-      return; // legacy keys come from keyMap in applyTimelineSettings
-    }
+    const timeline = this.timelineSettings;
     this.timelineKeys = toTimelineKeys(
-      getTheme(this.activeTheme ?? DEFAULT_THEME_NAME),
+      categoryPalette(timeline, this.activeTheme),
       this.selfTimes,
+      timeline?.legacy,
     );
   }
 

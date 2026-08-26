@@ -22,6 +22,8 @@
  */
 
 import * as PIXI from 'pixi.js';
+
+import { destroyTimelineApp } from '../rendering/pixiApp.js';
 import type {
   HeatStripTimeSeries,
   TimelineMarker,
@@ -279,7 +281,7 @@ export class MetricStripOrchestrator {
     this.container = null;
 
     if (this.app) {
-      this.app.destroy(true, { children: true, texture: true });
+      destroyTimelineApp(this.app);
       this.app = null;
     }
 

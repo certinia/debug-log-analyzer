@@ -1,6 +1,7 @@
 /*
  * Copyright (c) 2026 Certinia Inc. All rights reserved.
  */
+import type { StatementType } from '../metrics/eventMetrics.js';
 
 /**
  * Type-safe event bus for cross-component communication.
@@ -19,8 +20,7 @@ export const TAB_TO_SOURCE: Record<string, DetailSource> = {
   'database-tab': 'database',
 };
 
-/** Which of the database grids a selection came from. */
-export type StatementType = 'dml' | 'soql' | 'sosl';
+export type { StatementType };
 
 /**
  * A selection to inspect in the inspector. A single frame maps to one `eventIndex`;
