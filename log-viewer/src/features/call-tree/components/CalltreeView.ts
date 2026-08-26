@@ -19,6 +19,7 @@ import { isVisible } from '../../../core/utility/Util.js';
 import { getSettings, updateSetting } from '../../settings/Settings.js';
 import { CALLTREE_GO_TO_ROW } from '../navigation.js';
 import type { AggregatedRow, BottomUpRow } from '../utils/Aggregation.js';
+import { findBucketRow } from '../utils/bucketRows.js';
 import {
   categoryColoringStyles,
   categoryRowFormatter,
@@ -192,6 +193,11 @@ export class CalltreeView extends LitElement {
     this._inspectorLocateUnsubscribe = eventBus.on('inspector:locate', (detail) => {
       if (detail.source === 'calltree') {
         this._markLocated(this._emphasis.report(detail.eventIndexes, detail.sticky));
+        if (detail.sticky && detail.eventIndexes.length) {
+          // A picked inspector row merges calls, so the mark shows all of them
+          // while the view moves to the first, as a pick of one frame does.
+          void this._revealEventIndex(detail.eventIndexes[0]!);
+        }
       }
     });
 
@@ -931,23 +937,45 @@ export class CalltreeView extends LitElement {
   }
 
   /**
-   * Select the row for `eventIndex` in place: no tab switch, no view-mode change
-   * and no focus steal, unlike {@link _goToRow}. Only Time Order has a row per
-   * event, so the grouped modes are left alone.
+   * Select the row for `eventIndex` in the view on screen, in place: no tab
+   * switch, no view-mode change and no focus steal, unlike {@link _goToRow}.
+   * Focus stays where the click was, which is the inspector.
    */
   private async _revealEventIndex(eventIndex: number): Promise<void> {
-    if (this.viewMode !== 'time-order' || !this.calltreeTable) {
+    const table = this._getActiveTable();
+    if (!table) {
       return;
     }
 
-    const treeRow = await this._findByEventIndex(this.calltreeTable.getRows(), eventIndex);
+    const treeRow = await this._findRowFor(table, eventIndex);
     if (!treeRow) {
       return;
     }
 
     await this._echoGuard.runAsync(() =>
       //@ts-expect-error This is a custom function added in by RowNavigation custom module
-      this.calltreeTable.goToRow(treeRow, { scrollIfVisible: false, focusRow: false }),
+      table.goToRow(treeRow, { scrollIfVisible: false, focusRow: false }),
+    );
+  }
+
+  /**
+   * The row holding `eventIndex` in the view on screen, with the path to it
+   * materialised. Time Order has a row per event; the grouped views find the
+   * bucket instead.
+   */
+  private async _findRowFor(table: Tabulator, eventIndex: number): Promise<RowComponent | null> {
+    if (this.viewMode === 'time-order') {
+      return this._findByEventIndex(table.getRows(), eventIndex);
+    }
+    if (!this.rootMethod) {
+      return null;
+    }
+    const found = findEventByEventIndex(this.rootMethod, eventIndex);
+    if (!found) {
+      return null;
+    }
+    return findBucketRow(table.getRows(), found.event, directionOf(this.viewMode), () =>
+      this._waitForTableRender(),
     );
   }
 
