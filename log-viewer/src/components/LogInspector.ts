@@ -8,6 +8,7 @@ import {
   TAB_TO_SOURCE,
   type DetailSelection,
   type DetailSource,
+  type SelectionView,
   eventBus,
 } from '../core/events/EventBus.js';
 import type { InspectorLocateEvent, InspectorRevealEvent } from './inspectorReveal.js';
@@ -62,6 +63,9 @@ export class LogInspector extends LitElement {
   // apart from the selection so the call stack keeps its anchor while Details
   // and the call tree follow the walk.
   private _activeFrames = new Map<DetailSource, number>();
+
+  /** The direction each tab is showing, so the inspector can open on the other. */
+  private _sourceViews = new Map<DetailSource, SelectionView | undefined>();
   // The source a locate mark was last sent to, while one is showing.
   private _locatedSource: DetailSource | undefined;
   // Shared by every tab, like the layout is, but never persisted: it is reading
@@ -209,9 +213,14 @@ export class LogInspector extends LitElement {
     this._scheduleRebuild();
   }
 
-  private _onSelect(detail: { source: DetailSource; selection: DetailSelection | null }): void {
+  private _onSelect(detail: {
+    source: DetailSource;
+    selection: DetailSelection | null;
+    view?: SelectionView;
+  }): void {
     // A pick in the tab itself is a new anchor, so any walk down the old stack ends.
     this._activeFrames.delete(detail.source);
+    this._sourceViews.set(detail.source, detail.view);
     if (detail.selection) {
       this._selections.set(detail.source, detail.selection);
       // A new pick means "show me this", so the panel comes back to it.
@@ -311,6 +320,7 @@ export class LogInspector extends LitElement {
           source,
           this._scopedSelection(source),
           this._activeFrames.get(source) ?? null,
+          this._sourceViews.get(source),
         )
       : [];
     // Drop a slow build that a newer selection already superseded.

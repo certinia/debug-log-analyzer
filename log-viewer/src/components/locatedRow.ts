@@ -51,8 +51,52 @@ const rowCallData = (row: RowComponent): CallRow => row.getData() as CallRow;
  *  them reads every occurrence the root bucket holds. */
 const derivedCalls = new WeakMap<CallRow, LogEvent[]>();
 const derivedIndexes = new WeakMap<CallRow, number[]>();
+const derivedChains = new WeakMap<CallRow, CallChain | null>();
 
 const NO_CALLS: LogEvent[] = [];
+
+/** Where a derived bottom-up row sits: the root bucket whose calls it stands
+ *  for, the keys from that root out to the row, and the row under the root —
+ *  the frame that made those calls. */
+interface CallChain {
+  root: CallRow;
+  keys: string[];
+  caller: CallRow;
+}
+
+/**
+ * A derived row's place in the bottom-up tree, or null where the walk leaves the
+ * merged rows and the row stands for nothing. Cached: the occurrences and the
+ * caller are both read off it.
+ */
+function rowCallChain(row: RowComponent, data: CallRow): CallChain | null {
+  const cached = derivedChains.get(data);
+  if (cached !== undefined) {
+    return cached;
+  }
+  const keys = [data.key!];
+  let node = data;
+  let caller = data;
+  for (let parent = row.getTreeParent(); parent; parent = parent.getTreeParent()) {
+    const parentData = rowCallData(parent);
+    if (parentData.key === undefined) {
+      derivedChains.set(data, null);
+      return null;
+    }
+    caller = node;
+    node = parentData;
+    keys.push(parentData.key);
+  }
+  // The tree parent is the callee, so the walk runs inwards; the path runs out.
+  const chain: CallChain = { root: node, keys: keys.reverse(), caller };
+  derivedChains.set(data, chain);
+  return chain;
+}
+
+/** True where the row holds no calls of its own, so its chain answers for it. */
+function isDerived(data: CallRow): boolean {
+  return !data.instances?.length && data.key !== undefined;
+}
 
 /**
  * The calls a row stands for. A bottom-up caller row holds none of its own, so it
@@ -70,19 +114,8 @@ function rowCallOccurrences(row: RowComponent): LogEvent[] {
   if (cached) {
     return cached;
   }
-
-  const chain = [data.key];
-  let root = data;
-  for (let parent = row.getTreeParent(); parent; parent = parent.getTreeParent()) {
-    root = rowCallData(parent);
-    if (root.key === undefined) {
-      derivedCalls.set(data, NO_CALLS);
-      return NO_CALLS;
-    }
-    chain.push(root.key);
-  }
-  // The tree parent is the callee, so the walk runs inwards; the path runs out.
-  const derived = occurrencesThrough(root.instances ?? [], chain.reverse());
+  const chain = rowCallChain(row, data);
+  const derived = chain ? occurrencesThrough(chain.root.instances ?? [], chain.keys) : NO_CALLS;
   derivedCalls.set(data, derived);
   return derived;
 }
@@ -117,7 +150,12 @@ export function rowDetailSelection(row: RowComponent | undefined): DetailSelecti
   }
   // A bucket stands for its calls even where none derive: `originalData` is the
   // caller frame, which is the mis-scoping this scoping exists to avoid.
-  return { kind: 'aggregate', instances: rowOccurrences(row), label: data.text ?? event.text };
+  const chain = isDerived(data) ? rowCallChain(row, data) : null;
+  return {
+    kind: 'aggregate',
+    instances: rowOccurrences(row),
+    calledBy: chain?.caller.text,
+  };
 }
 
 /**

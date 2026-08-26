@@ -3,7 +3,7 @@
  */
 import { html, type TemplateResult } from 'lit';
 
-import type { DetailSelection, DetailSource } from '../core/events/EventBus.js';
+import type { DetailSelection, DetailSource, SelectionView } from '../core/events/EventBus.js';
 import { buildDatabaseSections } from '../features/database/components/databaseSections.js';
 import type { PaneSection } from './PaneView.js';
 
@@ -48,6 +48,7 @@ export async function buildDetailSections(
   source: DetailSource,
   selection: DetailSelection | null,
   activeEventIndex: number | null = null,
+  sourceView?: SelectionView,
 ): Promise<PaneSection[]> {
   // Nothing selected: the whole log is the scope. `DetailDock`'s own empty
   // state still covers the moment before a tab id resolves.
@@ -172,7 +173,7 @@ export async function buildDetailSections(
   // describes what Details and the call tree are showing.
   const following = active !== anchorIndex;
   const instances = isAggregate && !following ? selection.instances : null;
-  const label = isAggregate && !following ? selection.label : '';
+  const calledBy = (isAggregate && !following && selection.calledBy) || '';
 
   const sections: PaneSection[] = [
     {
@@ -182,7 +183,7 @@ export async function buildDetailSections(
       content: html`<event-vitals
         eventIndex=${active}
         .instances=${instances}
-        label=${label}
+        called-by=${calledBy}
       ></event-vitals>`,
     },
   ];
@@ -228,6 +229,8 @@ export async function buildDetailSections(
         eventIndex=${anchorIndex}
         .instances=${isAggregate ? selection.instances : null}
         activeEventIndex=${active}
+        .source=${source}
+        .sourceView=${sourceView}
       ></call-tree-detail>`,
     },
   );

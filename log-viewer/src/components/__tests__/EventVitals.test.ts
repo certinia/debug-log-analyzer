@@ -65,6 +65,23 @@ describe('EventVitals', () => {
     expect(customElements.get('event-vitals')).toBeDefined();
   });
 
+  it('names the frame that made the calls it describes', async () => {
+    const el = await mount(store, {
+      eventIndex: soqlIndex,
+      instances: [soqlIndex],
+      calledBy: 'MyClass.caller()',
+    });
+
+    // The panel describes the calls, so the caller is a fact beside them.
+    expect(valueFor(el, 'Called by')).toBe('MyClass.caller()');
+  });
+
+  it('leaves the caller row out when the row named the calls it counts', async () => {
+    const el = await mount(store, { eventIndex: soqlIndex, instances: [soqlIndex] });
+
+    expect(labels(el)).not.toContain('Called by');
+  });
+
   it('leads with type and timing, then the metrics, plan and source', async () => {
     const el = await mount(store, { eventIndex: soqlIndex, type: 'soql' });
     // No explain line at this log level, so the query-plan fields are omitted.

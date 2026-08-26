@@ -53,6 +53,10 @@ interface ApexTimelineOptions extends TimelineOptions {
   themeName?: string | null;
 }
 
+/** The flame chart already draws the subtree top down, so the inspector answers
+ *  a selection with where its time went. */
+const TIMELINE_VIEW = 'callees' as const;
+
 export class ApexLogTimeline {
   private flamechart: FlameChart;
   private tooltipRenderer: FrameTooltipRenderer | null = null;
@@ -637,7 +641,7 @@ export class ApexLogTimeline {
       if (this.tooltipRenderer) {
         this.tooltipRenderer.hide();
       }
-      eventBus.emit('detail:select', { source: 'timeline', selection: null });
+      eventBus.emit('detail:select', { source: 'timeline', selection: null, view: TIMELINE_VIEW });
       return;
     }
 
@@ -647,7 +651,7 @@ export class ApexLogTimeline {
     const originalEvent = (eventNode as EventNode & { original?: LogEvent }).original;
     const selection = toDetailSelection(originalEvent?.eventIndex);
     if (selection) {
-      eventBus.emit('detail:select', { source: 'timeline', selection });
+      eventBus.emit('detail:select', { source: 'timeline', selection, view: TIMELINE_VIEW });
     }
   }
 
@@ -683,7 +687,7 @@ export class ApexLogTimeline {
       if (this.tooltipRenderer) {
         this.tooltipRenderer.hide();
       }
-      eventBus.emit('detail:select', { source: 'timeline', selection: null });
+      eventBus.emit('detail:select', { source: 'timeline', selection: null, view: TIMELINE_VIEW });
       return;
     }
 
@@ -692,7 +696,7 @@ export class ApexLogTimeline {
     // Markers only carry an eventIndex when they map to a log event.
     const selection = toDetailSelection(marker.eventIndex);
     if (selection) {
-      eventBus.emit('detail:select', { source: 'timeline', selection });
+      eventBus.emit('detail:select', { source: 'timeline', selection, view: TIMELINE_VIEW });
     }
   }
 

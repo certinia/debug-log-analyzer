@@ -122,7 +122,6 @@ describe('buildDetailSections', () => {
     const sections = await buildDetailSections('analysis', {
       kind: 'aggregate',
       instances: [11, 12, 13],
-      label: 'MyClass.run()',
     });
     expect(sections.map((s) => s.id)).toEqual(['vitals', 'findings', 'callstack', 'calltree']);
     expect(
@@ -135,7 +134,6 @@ describe('buildDetailSections', () => {
     const sections = await buildDetailSections('analysis', {
       kind: 'aggregate',
       instances: [11, 12, 13],
-      label: 'MyClass.run()',
     });
 
     const findings = rendered(sections, 'findings', 'log-diagnostics') as HTMLElement & {
@@ -149,7 +147,7 @@ describe('buildDetailSections', () => {
   it('scopes the findings to the frame being followed, not the aggregate it left', async () => {
     const sections = await buildDetailSections(
       'analysis',
-      { kind: 'aggregate', instances: [11, 12, 13], label: 'MyClass.run()' },
+      { kind: 'aggregate', instances: [11, 12, 13] },
       8,
     );
 
@@ -181,7 +179,6 @@ describe('buildDetailSections', () => {
     const sections = await buildDetailSections('timeline', {
       kind: 'aggregate',
       instances: [11, 12, 13],
-      label: 'MyClass.run()',
     });
 
     const bar = rendered(sections, 'namespace-time', 'namespace-time-bar') as HTMLElement & {
@@ -198,7 +195,7 @@ describe('buildDetailSections', () => {
   it('drops the aggregate once a single frame in its stack is the one being followed', async () => {
     const sections = await buildDetailSections(
       'analysis',
-      { kind: 'aggregate', instances: [11, 12, 13], label: 'MyClass.run()' },
+      { kind: 'aggregate', instances: [11, 12, 13] },
       8,
     );
 
@@ -207,7 +204,7 @@ describe('buildDetailSections', () => {
     };
     expect(vitals.getAttribute('eventIndex')).toBe('8');
     expect(vitals.instances).toBeNull();
-    expect(vitals.getAttribute('label')).toBe('');
+    expect(vitals.getAttribute('called-by')).toBe('');
   });
 
   it('adds the whole-log database figures for the database with nothing selected', async () => {

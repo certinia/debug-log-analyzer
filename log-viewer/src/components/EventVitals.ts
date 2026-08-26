@@ -51,9 +51,10 @@ export class EventVitals extends LitElement {
   @property({ attribute: false })
   instances: number[] | null = null;
 
-  /** Display label for an aggregate selection (the merged frame's name). */
-  @property({ type: String })
-  label = '';
+  /** The frame that made the calls the panel describes, where the selecting row
+   *  was not it. Empty where the row named the calls it counts. */
+  @property({ type: String, attribute: 'called-by' })
+  calledBy = '';
 
   /** Set for a Database-grid selection; adds the statement-specific rows. */
   @property({ type: String })
@@ -151,12 +152,22 @@ export class EventVitals extends LitElement {
     if (isAggregate) {
       this._row(rows, 'Calls', formatInteger(events.length));
     }
+    // The panel is titled by the calls it describes, so the frame that made them
+    // is a fact beside them rather than the title.
+    if (this.calledBy) {
+      this._row(rows, 'Called by', this.calledBy);
+    }
 
     // A recursive frame's outer call already holds its inner calls, so a total
     // counts the outermost occurrences only.
     const total = sumDurationTotalForRootEvents([events]);
     const self = events.reduce((sum, e) => sum + e.duration.self, 0);
-    this._row(rows, 'Time', html`${this._ms(total)}${qualifier(selfLabel(this._ms(self)))}`);
+    this._row(
+      rows,
+      'Time',
+      html`${this._ms(total)}${qualifier(selfLabel(this._ms(self)))}`,
+      'Total elapsed time, including nested calls of the same method',
+    );
     if (isAggregate) {
       // Self time never nests, so it and the call count cover the same calls.
       this._row(rows, 'Avg self', this._ms(self / events.length));
@@ -177,7 +188,7 @@ export class EventVitals extends LitElement {
     this._optional(rows, 'Called from', primary.lineNumber, (line) => `line ${line}`);
 
     return html`
-      <code-block language=${this._language()} .code=${this.label || primary.text}></code-block>
+      <code-block language=${this._language()} .code=${primary.text}></code-block>
       <div class="grid">${rows}</div>
     `;
   }

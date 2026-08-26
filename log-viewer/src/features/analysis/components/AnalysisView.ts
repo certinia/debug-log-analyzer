@@ -632,6 +632,9 @@ export class AnalysisView extends LitElement {
       eventBus.emit('detail:select', {
         source: 'analysis',
         selection: rowDetailSelection(rows[0]),
+        // The grid ranks methods by self time and expands to their callers, so
+        // the inspector opens on the forward view instead.
+        view: 'callers',
       });
     });
 
