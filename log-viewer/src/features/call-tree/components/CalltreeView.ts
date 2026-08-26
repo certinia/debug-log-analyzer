@@ -63,19 +63,26 @@ import {
 import {
   LOCATED_ROW_CLASS,
   LocatedRowMarker,
+  eventKeyPaths,
   rowDetailSelection,
   rowIndexStamper,
   rowOccurrences,
+  stampRowKeyPath,
 } from '../../../components/locatedRow.js';
 import { InspectorEmphasis } from '../../../components/inspectorEmphasis.js';
 import { createTimeOrderTable } from './TimeOrderTable.js';
 
-/** Time Order keys its rows by event index, so the inspector can mark them; the
- *  grouped views key theirs by group, so they carry no index to mark. */
+/** Time Order keys its rows by event index; the grouped views key theirs by the
+ *  path of buckets that reaches them, since one method holds a row under every
+ *  caller it has. Either way the inspector can mark them. */
 const stampTimeOrderIndex = rowIndexStamper('id');
 const timeOrderRowFormatter = (row: RowComponent): void => {
   categoryRowFormatter(row);
   stampTimeOrderIndex(row);
+};
+const groupedRowFormatter = (row: RowComponent): void => {
+  categoryRowFormatter(row);
+  stampRowKeyPath(row);
 };
 
 /** The Name column is always shown in the call-tree tables. */
@@ -181,14 +188,10 @@ export class CalltreeView extends LitElement {
     });
 
     // Mark the frames the inspector points at, while the Call Tree is the tab the
-    // inspector is showing. Only Time Order keys its rows by event, so the grouped
-    // views have nothing to mark and are left alone.
+    // inspector is showing.
     this._inspectorLocateUnsubscribe = eventBus.on('inspector:locate', (detail) => {
       if (detail.source === 'calltree') {
-        this._locatedRow.mark(
-          this.calltreeTable?.element ?? null,
-          this._emphasis.report(detail.eventIndexes, detail.sticky),
-        );
+        this._markLocated(this._emphasis.report(detail.eventIndexes, detail.sticky));
       }
     });
 
@@ -200,7 +203,7 @@ export class CalltreeView extends LitElement {
         for (const table of this._tables) {
           table.deselectRow();
         }
-        this._locatedRow.mark(this.calltreeTable?.element ?? null, this._emphasis.pick([]));
+        this._markLocated(this._emphasis.pick([]));
       }
     });
     document.addEventListener(CALLTREE_GO_TO_ROW, this._goToRowEvt);
@@ -819,6 +822,38 @@ export class CalltreeView extends LitElement {
     activeTable.restoreRedraw();
   }
 
+  /**
+   * Mark the rows of the view on screen for `eventIndexes`. Time Order stamps the
+   * event index itself; a grouped view stamps the bucket path, so a frame is
+   * translated into the paths of the rows it belongs to — one in Aggregated, one
+   * per caller depth in Bottom-Up.
+   */
+  private _markLocated(eventIndexes: readonly number[]): void {
+    const table = this._getActiveTable();
+    if (!table) {
+      this._locatedRow.clear();
+      return;
+    }
+    this._locatedRow.mark(table.element, this._locateIdsFor(eventIndexes));
+  }
+
+  private _locateIdsFor(eventIndexes: readonly number[]): readonly (number | string)[] {
+    if (this.viewMode === 'time-order' || !eventIndexes.length || !this.rootMethod) {
+      return eventIndexes;
+    }
+    const direction = directionOf(this.viewMode);
+    const paths = new Set<string>();
+    for (const eventIndex of eventIndexes) {
+      const found = findEventByEventIndex(this.rootMethod, eventIndex);
+      if (found) {
+        for (const path of eventKeyPaths(found.event, direction)) {
+          paths.add(path);
+        }
+      }
+    }
+    return [...paths];
+  }
+
   private _getActiveTable(): Tabulator | null {
     switch (this.viewMode) {
       case 'time-order':
@@ -1079,7 +1114,7 @@ export class CalltreeView extends LitElement {
           this._clearSearchHighlights();
         }
       },
-      rowFormatter: categoryRowFormatter,
+      rowFormatter: groupedRowFormatter,
     });
     this.aggregatedTreeTable = table;
     await tableBuilt;
@@ -1105,7 +1140,7 @@ export class CalltreeView extends LitElement {
             this._clearSearchHighlights();
           }
         },
-        rowFormatter: categoryRowFormatter,
+        rowFormatter: groupedRowFormatter,
       },
       {
         selectableRows: 'highlight',
@@ -1134,7 +1169,7 @@ export class CalltreeView extends LitElement {
       if (!selection) {
         // The selection went with it, and so does a mark a picked inspector row
         // left here — it was never a selection of this table.
-        this._locatedRow.mark(this.calltreeTable?.element ?? null, this._emphasis.pick([]));
+        this._markLocated(this._emphasis.pick([]));
       }
       eventBus.emit('detail:select', {
         source,

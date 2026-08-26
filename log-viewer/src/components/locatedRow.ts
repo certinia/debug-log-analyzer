@@ -5,7 +5,8 @@
 import type { LogEvent } from 'apex-log-parser';
 import type { RowComponent } from 'tabulator-tables';
 
-import type { DetailSelection } from '../core/events/EventBus.js';
+import type { DetailSelection, SelectionView } from '../core/events/EventBus.js';
+import { getEventKey } from '../features/call-tree/utils/Aggregation.js';
 import { occurrencesThrough } from '../features/call-tree/utils/bottomUpOccurrences.js';
 
 /** Class the marked row carries; each table styles it itself. */
@@ -15,7 +16,8 @@ export const LOCATED_ROW_CLASS = 'located-row';
 const ROW_INDEX_ATTRIBUTE = 'data-row-index';
 
 /**
- * Builds a Tabulator `rowFormatter` that stamps the row's index on its element.
+ * Builds a Tabulator `rowFormatter` that stamps what identifies the row in its
+ * own table: an event index where every row is one frame.
  *
  * The mark then finds a row with one DOM query. Asking Tabulator instead
  * (`getRows('visible')`) wraps every row in the table in a component, which the
@@ -23,6 +25,9 @@ const ROW_INDEX_ATTRIBUTE = 'data-row-index';
  *
  * The index is read from the data rather than `getIndex()`: Tabulator runs the
  * formatter for its calc rows too, and those carry no index.
+ *
+ * A view whose rows merge occurrences stamps {@link stampRowKeyPath} instead, as
+ * a bucket has no event of its own.
  *
  * @param indexField - the table's `index` option
  */
@@ -91,6 +96,79 @@ function rowCallChain(row: RowComponent, data: CallRow): CallChain | null {
   const chain: CallChain = { root: node, keys: keys.reverse(), caller };
   derivedChains.set(data, chain);
   return chain;
+}
+
+/** Joins a key path. A key holds arbitrary log text, so the separator is one
+ *  that text cannot carry: two different paths can never join to one string. */
+const KEY_PATH_SEPARATOR = '\u0001';
+
+const keyPaths = new WeakMap<CallRow, string>();
+
+/**
+ * What tells a merged row apart from a same-named row under a different parent:
+ * the bucket keys from its top-level ancestor out to the row itself. A single
+ * key does not, because a bucket map is allocated per parent, so one method holds
+ * a row under every caller it has.
+ *
+ * Undefined on a row that stands for one frame, which its event index identifies.
+ */
+export function rowKeyPath(row: RowComponent): string | undefined {
+  const data = rowCallData(row);
+  if (data.key === undefined) {
+    return undefined;
+  }
+  const cached = keyPaths.get(data);
+  if (cached !== undefined) {
+    return cached;
+  }
+  const keys = [data.key];
+  for (let parent = row.getTreeParent(); parent; parent = parent.getTreeParent()) {
+    const parentKey = rowCallData(parent).key;
+    if (parentKey === undefined) {
+      break;
+    }
+    keys.push(parentKey);
+  }
+  const path = keys.reverse().join(KEY_PATH_SEPARATOR);
+  keyPaths.set(data, path);
+  return path;
+}
+
+/** A `rowFormatter` for a view whose rows merge occurrences, stamping the key
+ *  path so the mark finds the row with the same one DOM query. */
+export function stampRowKeyPath(row: RowComponent): void {
+  const path = rowKeyPath(row);
+  if (path !== undefined) {
+    row.getElement()?.setAttribute(ROW_INDEX_ATTRIBUTE, path);
+  }
+}
+
+/**
+ * The key paths naming the rows a frame belongs to in a merged view.
+ *
+ * A top-down row sits at the frame's own depth, so one path names it. A
+ * bottom-up row is the frame plus however many of its callers the chain shows, so
+ * every prefix names a row the frame heads — which is why one frame marks several
+ * rows there.
+ *
+ * The log root is not a row in either view, so the walk stops below it.
+ */
+export function eventKeyPaths(event: LogEvent, direction: SelectionView): string[] {
+  const keys: string[] = [];
+  for (let node: LogEvent | null = event; node?.parent; node = node.parent) {
+    keys.push(getEventKey(node));
+  }
+  if (!keys.length) {
+    return [];
+  }
+  if (direction === 'callees') {
+    return [keys.reverse().join(KEY_PATH_SEPARATOR)];
+  }
+  const paths: string[] = [];
+  for (let depth = 1; depth <= keys.length; depth++) {
+    paths.push(keys.slice(0, depth).join(KEY_PATH_SEPARATOR));
+  }
+  return paths;
 }
 
 /** True where the row holds no calls of its own, so its chain answers for it. */
@@ -167,25 +245,26 @@ export function rowDetailSelection(row: RowComponent | undefined): DetailSelecti
  * scrolls, expands or re-sorts. Rows the table has not rendered have no element
  * to mark, so they are left alone.
  *
- * The table must use {@link rowIndexStamper} to build its `rowFormatter`.
+ * The table must stamp its rows: {@link rowIndexStamper} where a row is one
+ * frame, {@link stampRowKeyPath} where rows merge occurrences.
  */
 export class LocatedRowMarker {
   private elements: HTMLElement[] = [];
 
   /**
-   * Move the mark to the rows for `eventIndexes`, or drop it with an empty list.
-   * Only the rendered rows are read, so the cost follows the viewport rather than
-   * the table; callers still only call this when the target changes.
+   * Move the mark to the rows `ids` name, or drop it with an empty list. Only the
+   * rendered rows are read, so the cost follows the viewport rather than the
+   * table; callers still only call this when the target changes.
    *
    * @param host - Element the table is mounted in
-   * @param eventIndexes - Events to mark, empty to clear
+   * @param ids - What the table stamps for the rows to mark, empty to clear
    */
-  public mark(host: HTMLElement | null, eventIndexes: readonly number[]): void {
+  public mark(host: HTMLElement | null, ids: readonly (number | string)[]): void {
     this.clear();
-    if (!host || !eventIndexes.length) {
+    if (!host || !ids.length) {
       return;
     }
-    const wanted = new Set(eventIndexes.map(String));
+    const wanted = new Set(ids.map(String));
     for (const element of host.querySelectorAll<HTMLElement>(
       `.tabulator-row[${ROW_INDEX_ATTRIBUTE}]`,
     )) {

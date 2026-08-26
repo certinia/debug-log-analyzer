@@ -14,7 +14,16 @@ import type { ApexLog } from 'apex-log-parser';
 import '../../../components/ContextMenu.js';
 import type { ContextMenu } from '../../../components/ContextMenu.js';
 import { eventBus } from '../../../core/events/EventBus.js';
-import { rowDetailSelection, rowOccurrences } from '../../../components/locatedRow.js';
+import {
+  LOCATED_ROW_CLASS,
+  LocatedRowMarker,
+  eventKeyPaths,
+  rowDetailSelection,
+  rowOccurrences,
+  stampRowKeyPath,
+} from '../../../components/locatedRow.js';
+import { InspectorEmphasis } from '../../../components/inspectorEmphasis.js';
+import { findEventByEventIndex } from '../../../core/utility/EventSearch.js';
 import { SelectionEchoGuard } from '../../../core/events/SelectionEchoGuard.js';
 import { isVisible } from '../../../core/utility/Util.js';
 import { getSettings, updateSetting } from '../../settings/Settings.js';
@@ -64,6 +73,11 @@ export class AnalysisView extends LitElement {
         /* inset previously provided by the tab panel's padding */
         padding: 10px 6px;
         box-sizing: border-box;
+      }
+
+      /* The frame under the pointer in the inspector. */
+      .tabulator-row.${unsafeCSS(LOCATED_ROW_CLASS)} {
+        background-color: var(--lana-row-hover-bg);
       }
 
       .analysis-view {
@@ -145,6 +159,9 @@ export class AnalysisView extends LitElement {
   /** Guards the programmatic select made on the inspector's behalf. */
   private _echoGuard = new SelectionEchoGuard();
   private _inspectorRevealUnsubscribe: (() => void) | null = null;
+  private _inspectorLocateUnsubscribe: (() => void) | null = null;
+  private _locatedRow = new LocatedRowMarker();
+  private _emphasis = new InspectorEmphasis();
 
   constructor() {
     super();
@@ -156,14 +173,24 @@ export class AnalysisView extends LitElement {
         void this._revealEventIndex(detail.eventIndex);
       }
     });
+    // Mark the buckets the inspector points at. A row is a method bucket rather
+    // than one event, so a frame is translated into the paths of the rows it heads.
+    this._inspectorLocateUnsubscribe = eventBus.on('inspector:locate', (detail) => {
+      if (detail.source === 'analysis') {
+        this._markLocated(this._emphasis.report(detail.eventIndexes, detail.sticky));
+      }
+    });
     document.addEventListener('lv-find', this._findEvt);
     document.addEventListener('lv-find-match', this._findEvt);
     document.addEventListener('lv-find-close', this._findEvt);
 
-    // Escape (app-wide) deselects here; the table reports the clear itself.
+    // Escape (app-wide) deselects here; the table reports the clear itself. It
+    // also drops a mark held by a picked inspector row, which is no selection of
+    // this table's own.
     this._selectionClearUnsubscribe = eventBus.on('selection:clear', (detail) => {
       if (detail.source === 'analysis') {
         this.analysisTable?.deselectRow();
+        this._markLocated(this._emphasis.pick([]));
       }
     });
   }
@@ -184,6 +211,31 @@ export class AnalysisView extends LitElement {
     this._selectionClearUnsubscribe = null;
     this._inspectorRevealUnsubscribe?.();
     this._inspectorRevealUnsubscribe = null;
+    this._inspectorLocateUnsubscribe?.();
+    this._inspectorLocateUnsubscribe = null;
+    this._locatedRow.clear();
+  }
+
+  /**
+   * Mark the buckets that hold `eventIndexes`. The grid ranks methods and expands
+   * to their callers, so one frame heads a row at every caller depth it sits in.
+   */
+  private _markLocated(eventIndexes: readonly number[]): void {
+    const table = this.analysisTable;
+    if (!table || !eventIndexes.length || !this.timelineRoot) {
+      this._locatedRow.clear();
+      return;
+    }
+    const paths = new Set<string>();
+    for (const eventIndex of eventIndexes) {
+      const found = findEventByEventIndex(this.timelineRoot, eventIndex);
+      if (found) {
+        for (const path of eventKeyPaths(found.event, 'callers')) {
+          paths.add(path);
+        }
+      }
+    }
+    this._locatedRow.mark(table.element, [...paths]);
   }
 
   /**
@@ -598,7 +650,10 @@ export class AnalysisView extends LitElement {
             this._clearSearchHighlights();
           }
         },
-        rowFormatter: categoryRowFormatter,
+        rowFormatter: (row) => {
+          categoryRowFormatter(row);
+          stampRowKeyPath(row);
+        },
       },
       {
         placeholder: 'No Analysis Available',
@@ -640,8 +695,6 @@ export class AnalysisView extends LitElement {
 
     // Tell the inspector which calls the pointer is over, so it can mark the rows
     // that stand for them; a bucket merges calls, so it names every call it counts.
-    // The other direction has nothing to land on here: a row is a method bucket,
-    // not one event, so the inspector's pointer marks no row in this grid.
     this.analysisTable.on('rowMouseEnter', (_e, row) => {
       eventBus.emit('detail:locate', {
         source: 'analysis',
