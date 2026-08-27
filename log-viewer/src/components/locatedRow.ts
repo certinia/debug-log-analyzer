@@ -211,7 +211,6 @@ function rowCallOccurrences(row: RowComponent): LogEvent[] {
   return derived;
 }
 
-/** The calls a row stands for, as the event indexes the mark works in. */
 /**
  * The key paths that the frames `eventIndexes` name stand for, so a grid whose
  * rows merge occurrences can mark them.
@@ -238,6 +237,7 @@ export function keyPathsForEvents(
   return [...paths];
 }
 
+/** The calls a row stands for, as the event indexes the mark works in. */
 export function rowOccurrences(row: RowComponent): number[] {
   const data = rowCallData(row);
   const cached = derivedIndexes.get(data);
