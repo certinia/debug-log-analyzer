@@ -253,7 +253,9 @@ export class FlameChart<E extends EventNode = EventNode> {
     this.callbacks = callbacks;
 
     // Store truncation markers for rendering
-    this.markers.push(...markers);
+    for (const marker of markers) {
+      this.markers.push(marker);
+    }
 
     const { width, height } = await this.awaitContainerSize(container);
 
