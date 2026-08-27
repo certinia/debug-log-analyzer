@@ -38,15 +38,18 @@ jest.mock('../scopedCallTree.js', () => ({
   // Keep the real row readers: the hover test is about which rows name a frame.
   revealableEventIndex: jest.requireActual('../scopedCallTree.js').revealableEventIndex,
   locatableEventIndexes: jest.requireActual('../scopedCallTree.js').locatableEventIndexes,
+  rowIdsByEvent: jest.requireActual('../scopedCallTree.js').rowIdsByEvent,
 }));
 
 import { Tabulator } from 'tabulator-tables';
 
 import type { CallTreeDetail } from '../CallTreeDetail.js';
 import '../CallTreeDetail.js';
-import { buildScopedCallTree, type ScopedCallTree } from '../scopedCallTree.js';
+import { buildScopedCallTree, type ScopedCallTree, type ScopedRow } from '../scopedCallTree.js';
 import { INSPECTOR_LOCATE_EVENT, type InspectorLocateEvent } from '../inspectorReveal.js';
+import { eventBus } from '../../core/events/EventBus.js';
 import type { ProgressParams } from '../../tabulator/format/ProgressMS.js';
+import { LOCATED_ROW_CLASS } from '../locatedRow.js';
 
 const build = jest.mocked(buildScopedCallTree);
 
@@ -282,6 +285,38 @@ describe('CallTreeDetail scoped build', () => {
     expect(tables.instances).toHaveLength(1);
     expect(totalColumn(tables.instances[0]!).formatterParams.totalValue).toBe(6000);
   });
+  it('marks the rows a frame names once the merged view has its rows', async () => {
+    // A row that merges occurrences, so only the map from the rows can name it.
+    const merged = [{ id: -3, eventIndexes: [8, 12], _children: null }] as unknown as ScopedRow[];
+    const resolvers = deferBuilds();
+    const el = await mount(5, 'callees');
+    await frame(el);
+    const grid = el.shadowRoot!.querySelector('.table-host:not(.is-hidden) .grid')!;
+    const row = document.createElement('div');
+    row.classList.add('tabulator-row');
+    row.setAttribute('data-row-index', '-3');
+    grid.append(row);
+
+    // The pointer reports a frame while the walk is still running.
+    eventBus.emit('detail:locate', { source: 'timeline', eventIndexes: [8] });
+    expect(row.classList.contains(LOCATED_ROW_CLASS)).toBe(false);
+
+    resolvers[0]!({
+      ...tree(5000),
+      aggregated: () => Promise.resolve(merged),
+      bottomUp: () => Promise.resolve(merged),
+    });
+    await frame(el);
+    const tableBuilt = tables.instances[0]!.on.mock.calls.find(
+      (call) => call[0] === 'tableBuilt',
+    )?.[1] as (() => void) | undefined;
+
+    // The tree finished after the report, so the build marks what was reported.
+    tableBuilt?.();
+
+    expect(row.classList.contains(LOCATED_ROW_CLASS)).toBe(true);
+  });
+
   it('reports every occurrence the row under the pointer stands for', async () => {
     build.mockImplementation((eventIndex) => Promise.resolve(tree(eventIndex * 1000)));
     const el = await mount(5);
