@@ -360,8 +360,9 @@ describe('buildScopedCallTree', () => {
 
     const [bottomUp] = (await tree.bottomUp(options))!;
     expect(bottomUp?.eventIndexes).toEqual(instances);
-    // The caller stands for its own one frame, met once per occurrence beneath it.
-    expect(bottomUp?._children?.[0]?.eventIndexes).toEqual([300]);
+    // A caller row stands for the calls it conducted, which is what its time and
+    // its count are taken from, so it names those rather than its own frame.
+    expect(bottomUp?._children?.[0]?.eventIndexes).toEqual(instances);
   });
 
   it('a single-frame row carries no list — its one occurrence is the row itself', async () => {
@@ -495,14 +496,15 @@ describe('rowIdsByEvent', () => {
 
   it('names one frame in as many rows as stand for it', async () => {
     // Rebuilds the loop and its two calls; the loop itself is the selection.
-    loopOccurrences(2);
+    const instances = loopOccurrences(2);
     const tree = (await build(300))!;
     const rows = (await tree.bottomUp(options))!;
 
-    // Bottom-Up puts the caller under the leaf it called, so frame 300 is named
-    // by that nested row as well as by any row of its own.
-    const callerRows = rowIdsByEvent(rows).get(300) ?? [];
-    expect(callerRows).toEqual(expect.arrayContaining([rows[0]!._children![0]!.id]));
+    // Bottom-Up puts the caller under the leaf it called, and the caller row
+    // stands for the same calls, so one call names the leaf row and the caller
+    // row beneath it.
+    const named = rowIdsByEvent(rows).get(instances[0]!) ?? [];
+    expect(named).toEqual(expect.arrayContaining([rows[0]!.id, rows[0]!._children![0]!.id]));
   });
 
   it('leaves a frame no row names out of the lookup', async () => {

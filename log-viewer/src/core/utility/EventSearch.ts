@@ -60,6 +60,16 @@ export function findEventByTimestamp(
 }
 
 /**
+ * The event an index names, without its depth.
+ *
+ * {@link findEventByEventIndex} walks the whole ancestor chain to report a depth,
+ * which costs one walk per event: use this wherever the depth is not read.
+ */
+export function eventByEventIndex(apexLog: ApexLog, eventIndex: number): LogEvent | null {
+  return apexLog.eventsById[eventIndex] ?? null;
+}
+
+/**
  * Resolve an event directly by its parser-assigned eventIndex.
  * This is stable and unique within a single parse.
  */

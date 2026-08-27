@@ -38,15 +38,18 @@ jest.mock('../scopedCallTree.js', () => ({
   // Keep the real row readers: the hover test is about which rows name a frame.
   revealableEventIndex: jest.requireActual('../scopedCallTree.js').revealableEventIndex,
   locatableEventIndexes: jest.requireActual('../scopedCallTree.js').locatableEventIndexes,
+  rowIdsByEvent: jest.requireActual('../scopedCallTree.js').rowIdsByEvent,
 }));
 
 import { Tabulator } from 'tabulator-tables';
 
 import type { CallTreeDetail } from '../CallTreeDetail.js';
 import '../CallTreeDetail.js';
-import { buildScopedCallTree, type ScopedCallTree } from '../scopedCallTree.js';
+import { buildScopedCallTree, type ScopedCallTree, type ScopedRow } from '../scopedCallTree.js';
 import { INSPECTOR_LOCATE_EVENT, type InspectorLocateEvent } from '../inspectorReveal.js';
+import { eventBus } from '../../core/events/EventBus.js';
 import type { ProgressParams } from '../../tabulator/format/ProgressMS.js';
+import { LOCATED_ROW_CLASS } from '../locatedRow.js';
 
 const build = jest.mocked(buildScopedCallTree);
 
@@ -60,6 +63,7 @@ interface StubTable {
   redraw: jest.Mock;
   destroy: jest.Mock;
   selectRow: jest.Mock;
+  getSelectedRows: jest.Mock;
 }
 
 /** The stub tables built so far, oldest first. */
@@ -108,9 +112,13 @@ async function frame(el: CallTreeDetail): Promise<void> {
   await settle(el);
 }
 
-async function mount(eventIndex: number): Promise<CallTreeDetail> {
+async function mount(
+  eventIndex: number,
+  sourceView?: 'callers' | 'callees',
+): Promise<CallTreeDetail> {
   const el = document.createElement('call-tree-detail') as CallTreeDetail;
   el.eventIndex = eventIndex;
+  el.sourceView = sourceView;
   document.body.appendChild(el);
   await el.updateComplete;
   return el;
@@ -181,6 +189,40 @@ describe('CallTreeDetail scoped build', () => {
     expect(table.setData).not.toHaveBeenCalled();
   });
 
+  it('leaves the row alone when the mark is already on it', async () => {
+    build.mockImplementation((eventIndex) => Promise.resolve(tree(eventIndex * 1000)));
+    const el = await mount(5);
+    await frame(el);
+    const table = tables.instances[0]!;
+    const picked = { deselect: jest.fn(), getData: () => ({ id: 9 }) };
+    table.getSelectedRows.mockReturnValue([picked]);
+    table.selectRow.mockClear();
+
+    el.activeEventIndex = 9;
+    await frame(el);
+
+    // Re-selecting it would re-render the row, and tabulator's row re-render
+    // takes the table's focus with it.
+    expect(picked.deselect).not.toHaveBeenCalled();
+    expect(table.selectRow).not.toHaveBeenCalled();
+  });
+
+  it('keeps the picked row where a view merges occurrences', async () => {
+    build.mockImplementation((eventIndex) => Promise.resolve(tree(eventIndex * 1000)));
+    // A tab showing callees opens the inspector on bottom up, whose rows merge.
+    const el = await mount(5, 'callees');
+    await frame(el);
+    const table = tables.instances[0]!;
+    const picked = { deselect: jest.fn() };
+    table.getSelectedRows.mockReturnValue([picked]);
+
+    el.activeEventIndex = 9;
+    await frame(el);
+
+    expect(picked.deselect).not.toHaveBeenCalled();
+    expect(table.selectRow).not.toHaveBeenCalled();
+  });
+
   it('retargets the percentage denominator without touching the bar width', async () => {
     build.mockImplementation((eventIndex) => Promise.resolve(tree(eventIndex * 1000)));
     const el = await mount(5);
@@ -243,6 +285,38 @@ describe('CallTreeDetail scoped build', () => {
     expect(tables.instances).toHaveLength(1);
     expect(totalColumn(tables.instances[0]!).formatterParams.totalValue).toBe(6000);
   });
+  it('marks the rows a frame names once the merged view has its rows', async () => {
+    // A row that merges occurrences, so only the map from the rows can name it.
+    const merged = [{ id: -3, eventIndexes: [8, 12], _children: null }] as unknown as ScopedRow[];
+    const resolvers = deferBuilds();
+    const el = await mount(5, 'callees');
+    await frame(el);
+    const grid = el.shadowRoot!.querySelector('.table-host:not(.is-hidden) .grid')!;
+    const row = document.createElement('div');
+    row.classList.add('tabulator-row');
+    row.setAttribute('data-row-index', '-3');
+    grid.append(row);
+
+    // The pointer reports a frame while the walk is still running.
+    eventBus.emit('detail:locate', { source: 'timeline', eventIndexes: [8] });
+    expect(row.classList.contains(LOCATED_ROW_CLASS)).toBe(false);
+
+    resolvers[0]!({
+      ...tree(5000),
+      aggregated: () => Promise.resolve(merged),
+      bottomUp: () => Promise.resolve(merged),
+    });
+    await frame(el);
+    const tableBuilt = tables.instances[0]!.on.mock.calls.find(
+      (call) => call[0] === 'tableBuilt',
+    )?.[1] as (() => void) | undefined;
+
+    // The tree finished after the report, so the build marks what was reported.
+    tableBuilt?.();
+
+    expect(row.classList.contains(LOCATED_ROW_CLASS)).toBe(true);
+  });
+
   it('reports every occurrence the row under the pointer stands for', async () => {
     build.mockImplementation((eventIndex) => Promise.resolve(tree(eventIndex * 1000)));
     const el = await mount(5);

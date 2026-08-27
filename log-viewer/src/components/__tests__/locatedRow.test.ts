@@ -6,12 +6,44 @@
 import { describe, expect, it } from '@jest/globals';
 import type { RowComponent } from 'tabulator-tables';
 
-import { LOCATED_ROW_CLASS, LocatedRowMarker, rowIndexStamper } from '../locatedRow.js';
+import type { ApexLog, LogEvent } from 'apex-log-parser';
+
+import {
+  LOCATED_ROW_CLASS,
+  LocatedRowIds,
+  LocatedRowMarker,
+  eventKeyPaths,
+  rowIndexStamper,
+  rowKeyPath,
+  stampRowKeyPath,
+} from '../locatedRow.js';
 
 const stamp = rowIndexStamper('eventIndex');
 
-function rowComponent(element: HTMLElement, data: Record<string, unknown>): RowComponent {
-  return { getElement: () => element, getData: () => data } as unknown as RowComponent;
+function rowComponent(
+  element: HTMLElement,
+  data: Record<string, unknown>,
+  parent: RowComponent | false = false,
+): RowComponent {
+  return {
+    getElement: () => element,
+    getData: () => data,
+    getTreeParent: () => parent,
+  } as unknown as RowComponent;
+}
+
+/** A bucket row and its chain of parents, innermost last, as tabulator hands them
+ *  over: the tree parent of a bottom-up caller row is the frame it called. */
+function bucketRow(...keys: string[]): RowComponent {
+  let row: RowComponent | false = false;
+  for (const key of keys) {
+    row = rowComponent(document.createElement('div'), { key }, row);
+  }
+  return row as RowComponent;
+}
+
+function ev(text: string, parent: LogEvent | null): LogEvent {
+  return { type: 'METHOD_ENTRY', namespace: '', text, parent } as unknown as LogEvent;
 }
 
 /** A table host holding a rendered row element per index, as the stamp leaves them. */
@@ -30,6 +62,25 @@ function rowFor(container: HTMLElement, index: number): HTMLElement {
   return container.children[index] as HTMLElement;
 }
 
+describe('stampRowKeyPath', () => {
+  it('marks the row under one parent and not its namesake under another', () => {
+    const container = document.createElement('div');
+    const rows = [bucketRow('Trigger1', 'Util.log'), bucketRow('Trigger2', 'Util.log')];
+    for (const row of rows) {
+      const element = row.getElement();
+      element.classList.add('tabulator-row');
+      stampRowKeyPath(row);
+      container.append(element);
+    }
+    const marker = new LocatedRowMarker();
+
+    marker.mark(container, [rowKeyPath(rows[0]!)!]);
+
+    expect(rows[0]!.getElement().classList.contains(LOCATED_ROW_CLASS)).toBe(true);
+    expect(rows[1]!.getElement().classList.contains(LOCATED_ROW_CLASS)).toBe(false);
+  });
+});
+
 describe('rowIndexStamper', () => {
   it('leaves a row with no index alone, as a calc row is', () => {
     const element = document.createElement('div');
@@ -37,6 +88,56 @@ describe('rowIndexStamper', () => {
     stamp(rowComponent(element, { 'duration.total': 12 }));
 
     expect(element.attributes).toHaveLength(0);
+  });
+});
+
+describe('rowKeyPath', () => {
+  it('names a top-level row by its own key alone', () => {
+    expect(rowKeyPath(bucketRow('A'))).toBe('A');
+  });
+
+  it('tells two same-named rows apart by the parents that reach them', () => {
+    // One method holds a row under every caller it has, so the key alone cannot.
+    expect(rowKeyPath(bucketRow('Trigger1', 'Util.log'))).not.toBe(
+      rowKeyPath(bucketRow('Trigger2', 'Util.log')),
+    );
+  });
+
+  it('reads a deep row as the whole path, outermost first', () => {
+    const deep = rowKeyPath(bucketRow('A', 'B', 'C'));
+    expect(deep).toBe(rowKeyPath(bucketRow('A', 'B', 'C')));
+    expect(deep).not.toBe(rowKeyPath(bucketRow('A', 'B')));
+  });
+
+  it('leaves a row that stands for one frame unnamed, as its index names it', () => {
+    expect(rowKeyPath(rowComponent(document.createElement('div'), { id: 7 }))).toBeUndefined();
+  });
+});
+
+describe('eventKeyPaths', () => {
+  const root = ev('exec', null);
+  const outer = ev('outer', root);
+  const inner = ev('inner', outer);
+
+  it('names one row in a top-down view, at the depth the frame ran at', () => {
+    const paths = eventKeyPaths(inner, 'callees');
+
+    expect(paths).toHaveLength(1);
+    expect(paths[0]).toBe(rowKeyPath(bucketRow('METHOD_ENTRY||outer', 'METHOD_ENTRY||inner')));
+  });
+
+  it('names a row per caller depth in a bottom-up view', () => {
+    // The frame heads a row on its own, and one under each caller above it.
+    const paths = eventKeyPaths(inner, 'callers');
+
+    expect(paths).toEqual([
+      rowKeyPath(bucketRow('METHOD_ENTRY||inner')),
+      rowKeyPath(bucketRow('METHOD_ENTRY||inner', 'METHOD_ENTRY||outer')),
+    ]);
+  });
+
+  it('leaves the log root out, as it is a row in neither view', () => {
+    expect(eventKeyPaths(root, 'callers')).toEqual([]);
   });
 });
 
@@ -97,5 +198,39 @@ describe('LocatedRowMarker', () => {
     marker.mark(container, [7]);
 
     expect(rowFor(container, 0).classList.contains(LOCATED_ROW_CLASS)).toBe(false);
+  });
+});
+
+describe('LocatedRowIds', () => {
+  const root = ev('exec', null);
+  const outerFrame = ev('outer', root);
+  const frame = ev('inner', outerFrame);
+  const log = { eventsById: { 5: frame } } as unknown as ApexLog;
+
+  it('builds the paths of the rows the frames belong to', () => {
+    const ids = new LocatedRowIds().idsFor(log, [5], 'callers');
+
+    expect(ids).toEqual(eventKeyPaths(frame, 'callers'));
+  });
+
+  it('reuses what it built for the frames it was last asked about', () => {
+    // The view re-reports its picked frames whenever the pointer leaves a row.
+    const memo = new LocatedRowIds();
+    const picked = [5];
+
+    expect(memo.idsFor(log, picked, 'callers')).toBe(memo.idsFor(log, picked, 'callers'));
+  });
+
+  it('rebuilds for the same frames in the other direction', () => {
+    const memo = new LocatedRowIds();
+    const picked = [5];
+
+    expect(memo.idsFor(log, picked, 'callers')).not.toEqual(memo.idsFor(log, picked, 'callees'));
+  });
+
+  it('names the rows of a view keyed by event with the indexes themselves', () => {
+    const picked = [5];
+
+    expect(new LocatedRowIds().idsFor(log, picked, undefined)).toBe(picked);
   });
 });

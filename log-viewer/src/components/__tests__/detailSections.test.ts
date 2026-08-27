@@ -82,13 +82,27 @@ describe('buildDetailSections', () => {
 
   it('passes the frame walked to on to the database sections', async () => {
     databaseCalls.length = 0;
-    await buildDetailSections('database', { kind: 'event', eventIndex: 9, type: 'soql' }, 4);
+    await buildDetailSections(
+      'database',
+      { kind: 'event', eventIndex: 9, type: 'soql' },
+      {
+        kind: 'event',
+        eventIndex: 4,
+      },
+    );
 
     expect(databaseCalls).toEqual([{ eventIndex: 9, type: 'soql', activeEventIndex: 4 }]);
   });
 
   it('anchors the stack and the tree to the selection, while Details follows the active frame', async () => {
-    const sections = await buildDetailSections('timeline', { kind: 'event', eventIndex: 4 }, 2);
+    const sections = await buildDetailSections(
+      'timeline',
+      { kind: 'event', eventIndex: 4 },
+      {
+        kind: 'event',
+        eventIndex: 2,
+      },
+    );
 
     expect(rendered(sections, 'callstack', 'call-stack-detail').getAttribute('eventIndex')).toBe(
       '4',
@@ -149,7 +163,7 @@ describe('buildDetailSections', () => {
     const sections = await buildDetailSections(
       'analysis',
       { kind: 'aggregate', instances: [11, 12, 13] },
-      8,
+      { kind: 'event', eventIndex: 8 },
     );
 
     const findings = rendered(sections, 'findings', 'log-diagnostics') as HTMLElement & {
@@ -169,7 +183,14 @@ describe('buildDetailSections', () => {
   });
 
   it('re-scopes the namespace split to the frame being followed', async () => {
-    const sections = await buildDetailSections('timeline', { kind: 'event', eventIndex: 4 }, 2);
+    const sections = await buildDetailSections(
+      'timeline',
+      { kind: 'event', eventIndex: 4 },
+      {
+        kind: 'event',
+        eventIndex: 2,
+      },
+    );
 
     expect(
       rendered(sections, 'namespace-time', 'namespace-time-bar').getAttribute('eventIndex'),
@@ -197,7 +218,7 @@ describe('buildDetailSections', () => {
     const sections = await buildDetailSections(
       'analysis',
       { kind: 'aggregate', instances: [11, 12, 13] },
-      8,
+      { kind: 'event', eventIndex: 8 },
     );
 
     const vitals = rendered(sections, 'vitals', 'event-vitals') as HTMLElement & {
@@ -206,6 +227,21 @@ describe('buildDetailSections', () => {
     expect(vitals.getAttribute('eventIndex')).toBe('8');
     expect(vitals.instances).toBeNull();
     expect(vitals.getAttribute('called-by')).toBe('');
+  });
+
+  it('describes the calls a walked bucket counts, as a bucket picked in the tab is', async () => {
+    const sections = await buildDetailSections(
+      'analysis',
+      { kind: 'aggregate', instances: [11, 12, 13] },
+      { kind: 'aggregate', instances: [21, 22], calledBy: 'Trigger1' },
+    );
+
+    const vitals = rendered(sections, 'vitals', 'event-vitals') as HTMLElement & {
+      instances: number[] | null;
+    };
+    expect(vitals.instances).toEqual([21, 22]);
+    expect(vitals.getAttribute('eventIndex')).toBe('21');
+    expect(vitals.getAttribute('called-by')).toBe('Trigger1');
   });
 
   it('adds the whole-log database figures for the database with nothing selected', async () => {

@@ -9,6 +9,8 @@ import {
   type RowComponent,
 } from 'tabulator-tables';
 
+import { isCodeDrivenExpand, withCodeDrivenExpand } from './expandOrigin.js';
+
 // todo: make this generic and support opening grouped rows too then use on DB view.
 // todo: remove the '@ts-expect-error' + fix the types file
 
@@ -44,22 +46,23 @@ export class RowKeyboardNavigation extends Module {
   initialize() {
     this.setOption('selectableRows', 'highlight');
     this.localTable.on('dataTreeRowExpanded', (row, _level) => {
-      this.rowExpandedToggled(row, _level);
-    });
-    this.localTable.on('dataTreeRowCollapsed', (row, _level) => {
-      this.rowExpandedToggled(row, _level);
+      this.rowExpanded(row);
     });
     this.localTable.on('rowClick', (event, row) => {
       this.rowClick(event, row);
     });
   }
 
-  rowExpandedToggled(row: RowComponent, _level: number) {
-    const table = row.getTable();
-    const selectedRows = table.getSelectedRows();
-    if (!selectedRows.length) {
-      row.select();
+  /** The user's first expansion gives the keyboard a row to move from. */
+  rowExpanded(row: RowComponent) {
+    if (isCodeDrivenExpand() || this.localTable.getSelectedRows().length) {
+      return;
     }
+
+    row.select();
+    // The key bindings only fire while the holder itself holds focus.
+    this.tableHolder ??= this.localTable.element.querySelector('.tabulator-tableholder');
+    this.tableHolder?.focus({ preventScroll: true });
   }
 
   rowClick(event: UIEvent, row: RowComponent) {
@@ -152,7 +155,7 @@ export class RowKeyboardNavigation extends Module {
                 nextRow.getElement().scrollIntoView({ block: 'nearest' });
               }
             } else {
-              row.treeExpand();
+              withCodeDrivenExpand(() => row.treeExpand());
             }
           },
           collapseRow: function (e: KeyboardEvent) {

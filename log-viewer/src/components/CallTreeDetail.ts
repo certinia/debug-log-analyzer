@@ -33,11 +33,12 @@ import { soqlSyntaxStyles } from '../features/soql/styles/soql-syntax.css.js';
 import { globalStyles } from '../styles/global.styles.js';
 import { progressColumnWidth } from '../tabulator/format/measureWidth.js';
 import type { ProgressParams } from '../tabulator/format/ProgressMS.js';
+import { tableHolder } from '../tabulator/module/tableHolder.js';
 import dataGridStyles from '../tabulator/style/DataGrid.scss';
 import './ContextMenu.js';
 import type { ContextMenu } from './ContextMenu.js';
 import { dispatchInspectorLocate, dispatchInspectorReveal } from './inspectorReveal.js';
-import { LOCATED_ROW_CLASS, LocatedRowMarker, rowIndexStamper } from './locatedRow.js';
+import { LOCATED_ROW_CLASS, LocatedRowMarker, rowId, rowIndexStamper } from './locatedRow.js';
 import { PANEL_ROW_MENU_ITEMS, runPanelRowAction } from './panelRowMenu.js';
 import {
   buildScopedCallTree,
@@ -141,7 +142,13 @@ export class CallTreeDetail extends LitElement {
 
   /** A built table. `stale` means it holds a previous selection's rows, so it
    *  needs re-filling before it is shown again. */
-  private _tables: Record<ViewMode, { table: Tabulator; stale: boolean } | null> = {
+  private _tables: Record<
+    ViewMode,
+    /** `rows` is the data the table was filled with. Never read it back with
+     *  `getData()`: that runs Tabulator's accessors, which deep-clone the row
+     *  data, and our rows hold the parsed log. */
+    { table: Tabulator; stale: boolean; rows: ScopedRow[] } | null
+  > = {
     'time-order': null,
     aggregated: null,
     'bottom-up': null,
@@ -184,6 +191,9 @@ export class CallTreeDetail extends LitElement {
 
   /** Marks the row for the frame under the pointer in the tab's own view. */
   private _locatedRow = new LocatedRowMarker();
+  // The frames the tab on screen last reported under its pointer, so a table
+  // that finishes building after the report still marks them.
+  private _locatedEvents: readonly number[] = [];
   private _locateUnsubscribe?: () => void;
   private _selectionClearUnsubscribe?: () => void;
 
@@ -217,10 +227,8 @@ export class CallTreeDetail extends LitElement {
   connectedCallback(): void {
     super.connectedCallback();
     this._locateUnsubscribe = eventBus.on('detail:locate', ({ eventIndexes }) => {
-      this._locatedRow.mark(
-        this._tableHost(this.viewMode),
-        this._rowIdsFor(this.viewMode, eventIndexes),
-      );
+      this._locatedEvents = eventIndexes;
+      this._markLocated();
     });
     // Escape clears the selection of the tab on screen. A picked row here is no
     // selection of that view, so this table drops its own.
@@ -236,13 +244,24 @@ export class CallTreeDetail extends LitElement {
    * grouped row merges occurrences behind a synthetic id, so it is found by the
    * occurrences it carries — and one frame can name several rows in Bottom-Up.
    */
+  private _markLocated(): void {
+    this._locatedRow.mark(
+      this._tableHost(this.viewMode),
+      this._rowIdsFor(this.viewMode, this._locatedEvents),
+    );
+  }
+
   private _rowIdsFor(mode: ViewMode, eventIndexes: readonly number[]): number[] {
     if ((mode === 'time-order' && !this._scoped?.timeOrderMerged) || !eventIndexes.length) {
       return [...eventIndexes];
     }
-    const byEvent = (this._rowsByEvent[mode] ??= rowIdsByEvent(
-      (this._tables[mode]?.table.getData() ?? []) as ScopedRow[],
-    ));
+    const rows = this._tables[mode]?.rows ?? [];
+    if (!rows.length) {
+      // Still building. Caching the map now would hold an empty one for the life
+      // of the scope, since only a new scope clears it.
+      return [];
+    }
+    const byEvent = (this._rowsByEvent[mode] ??= rowIdsByEvent(rows));
     const ids = new Set<number>();
     for (const eventIndex of eventIndexes) {
       for (const id of byEvent.get(eventIndex) ?? []) {
@@ -338,26 +357,38 @@ export class CallTreeDetail extends LitElement {
   }
 
   /**
-   * Marks the active frame, without reporting it as a new pick. Only rows keyed by
-   * event can be selected by index, so the grouped views have nothing to mark.
+   * Marks the active frame, without reporting it as a new pick. Only rows keyed
+   * by event can be selected by index, so a view whose rows merge occurrences
+   * keeps the row the user picked: clearing it would take away the row the
+   * keyboard moves from.
    */
   private _markActive(): void {
     const table = this._tables[this.viewMode]?.table;
-    if (!table) {
+    if (!table || this.viewMode !== 'time-order' || this._scoped?.timeOrderMerged) {
       return;
     }
+    const selected = table.getSelectedRows();
+    // Already where it belongs, which is the usual case: the row the walk
+    // reports is the row the user just picked here. Selecting it again re-renders
+    // it, and tabulator's row re-render takes the table's focus with it.
+    if (selected.length === 1 && rowId(selected[0]) === this.activeEventIndex) {
+      return;
+    }
+    const holder = tableHolder(this._tableHost(this.viewMode));
+    const root = holder?.getRootNode();
+    const hadFocus = root instanceof ShadowRoot && root.activeElement === holder;
     this._echoGuard.run(() => {
-      for (const selected of table.getSelectedRows()) {
-        selected.deselect();
+      for (const row of selected) {
+        row.deselect();
       }
-      if (
-        this.viewMode === 'time-order' &&
-        !this._scoped?.timeOrderMerged &&
-        this.activeEventIndex >= 0
-      ) {
+      if (this.activeEventIndex >= 0) {
         table.selectRow([this.activeEventIndex]);
       }
     });
+    // The re-render above drops focus, so the keyboard keeps its place here.
+    if (hadFocus) {
+      holder?.focus({ preventScroll: true });
+    }
   }
 
   /**
@@ -460,6 +491,7 @@ export class CallTreeDetail extends LitElement {
       // Those rows belong to the previous selection and the build below spans
       // several frames — clear them rather than leave them standing under a
       // selection they don't describe.
+      built.rows = [];
       void built.table.setData([]);
     }
     const data = await this._rows(mode, { yieldFrame: waitForNextFrame, signal });
@@ -476,7 +508,12 @@ export class CallTreeDetail extends LitElement {
     const slot = this._tables[mode];
     if (slot) {
       slot.stale = false;
-      void slot.table.setData(data).then(() => this._markActive());
+      slot.rows = data;
+      this._rowsByEvent[mode] = null;
+      void slot.table.setData(data).then(() => {
+        this._markActive();
+        this._markLocated();
+      });
       return;
     }
     if (!scoped) {
@@ -556,7 +593,15 @@ export class CallTreeDetail extends LitElement {
       if (eventIndex !== null) {
         dispatchInspectorReveal(this, eventIndex);
       } else {
-        dispatchInspectorLocate(this, locatableEventIndexes(data), true);
+        // The same aggregate a merged row in the tab itself reports, so Details
+        // reads the same either way. Built from the row: a scoped row carries no
+        // key, which is what the tab's own rows are read through.
+        const instances = locatableEventIndexes(data);
+        dispatchInspectorLocate(this, instances, true, {
+          kind: 'aggregate',
+          instances,
+          calledBy: this.viewMode === 'bottom-up' ? callerOfRow(rows[0]) : undefined,
+        });
       }
     });
     // Hovering a row marks it in the tab on screen, so the user can see where it
@@ -570,8 +615,9 @@ export class CallTreeDetail extends LitElement {
     });
     table.on('tableBuilt', () => {
       this._markActive();
+      this._markLocated();
     });
-    this._tables[mode] = { table, stale: false };
+    this._tables[mode] = { table, stale: false, rows: data };
   }
 
   /** Row right-click menu: reveal in the Call Tree tab, or copy the frame. */
@@ -713,4 +759,22 @@ export class CallTreeDetail extends LitElement {
     this._locatedRow.clear();
     this.viewMode = mode;
   }
+}
+
+/**
+ * The frame that called a bottom-up row's own calls: the caller shown directly
+ * above the row's seed. A tree parent is the callee there, so the walk runs to
+ * the row one level below the top.
+ */
+function callerOfRow(row: RowComponent | undefined): string | undefined {
+  let node = row;
+  let parent = node?.getTreeParent();
+  if (!node || !parent) {
+    return undefined;
+  }
+  for (let above = parent.getTreeParent(); above; above = parent.getTreeParent()) {
+    node = parent;
+    parent = above;
+  }
+  return (node.getData() as Partial<ScopedRow>).text;
 }

@@ -67,6 +67,10 @@ interface EventMap {
     view?: SelectionView;
   };
 
+  // A tab changed the direction it shows, with its selection untouched. The
+  // inspector opens on the view a tab is not showing, so it has to be told.
+  'detail:view': { source: DetailSource; view: SelectionView };
+
   // App-level request to show/hide (or force a state on) the inspector.
   'detail:toggle': { visible?: boolean };
 
