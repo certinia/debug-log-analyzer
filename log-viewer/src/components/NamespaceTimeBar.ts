@@ -8,7 +8,6 @@ import { customElement, property, state } from 'lit/decorators.js';
 
 import { logContext } from '../core/log/logContext.js';
 import type { LogStore } from '../core/log/LogStore.js';
-import { waitForNextFrame } from '../core/utility/FrameBudget.js';
 import { globalStyles } from '../styles/global.styles.js';
 import { inspectorSectionStyles } from '../styles/inspectorSection.styles.js';
 import { segmentsWithTail } from './StackedTimeBar.js';
@@ -138,7 +137,6 @@ export class NamespaceTimeBar extends LitElement {
       return;
     }
     const slices = await scopedNamespaceSelfTimes(scope.key, scope.roots, {
-      yieldFrame: waitForNextFrame,
       signal: walk.signal,
     });
     if (this._walk !== walk) {

@@ -1130,7 +1130,7 @@ export class CalltreeView extends LitElement {
           this._clearSearchHighlights();
         }
       },
-      rowFormatter: groupedRowFormatter,
+      rowFormatter: groupedRowFormatter(rootMethod),
     });
     this.aggregatedTreeTable = table;
     await tableBuilt;
@@ -1156,7 +1156,7 @@ export class CalltreeView extends LitElement {
             this._clearSearchHighlights();
           }
         },
-        rowFormatter: groupedRowFormatter,
+        rowFormatter: groupedRowFormatter(rootMethod),
       },
       {
         selectableRows: 'highlight',

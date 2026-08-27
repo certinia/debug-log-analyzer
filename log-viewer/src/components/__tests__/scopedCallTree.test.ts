@@ -51,9 +51,14 @@ soql.parent = m2;
 const byId = new Map<number, FakeEvent>([exec, m1, m2, soql].map((e) => [e.eventIndex, e]));
 
 let selectedIndex = 4;
+const { KeyPathIds } = jest.requireActual<typeof import('../../core/log/keyPathIds.js')>(
+  '../../core/log/keyPathIds.js',
+);
+const paths = new KeyPathIds();
 jest.mock('../../core/log/LogStore.js', () => ({
   currentLogStore: () => ({
     log: root,
+    keyPathIds: () => paths,
     eventByIndex: (i: number) => byId.get(i) ?? null,
     // Mirrors LogStore.stackByEventIndex over the fixture's own index.
     stackByEventIndex: (i: number) => {
@@ -71,14 +76,15 @@ jest.mock('../../core/log/LogStore.js', () => ({
 import {
   buildScopedCallTree,
   buildWholeLogCallTree,
-  rowIdsByEvent,
+  locatableEventIndexes,
+  rowIdsByPath,
   type ScopedRow,
 } from '../scopedCallTree.js';
 import type { FrameBudgetOptions } from '../../core/utility/FrameBudget.js';
 
-/** These fixtures are small enough to never hit a slice deadline, so `yieldFrame`
+/** These fixtures are small enough to never hit a slice deadline, so `yieldSlice`
  *  is only there to satisfy the contract. */
-const options: FrameBudgetOptions = { yieldFrame: () => Promise.resolve() };
+const options: FrameBudgetOptions = { yieldSlice: () => Promise.resolve() };
 
 function build(eventIndex: number, instances?: number[]) {
   return buildScopedCallTree(eventIndex, instances ?? null, options);
@@ -362,7 +368,7 @@ describe('buildScopedCallTree', () => {
     expect(bottomUp?.eventIndexes).toEqual(instances);
     // A caller row stands for the calls it conducted, which is what its time and
     // its count are taken from, so it names those rather than its own frame.
-    expect(bottomUp?._children?.[0]?.eventIndexes).toEqual(instances);
+    expect(locatableEventIndexes(bottomUp?._children?.[0])).toEqual(instances);
   });
 
   it('a single-frame row carries no list — its one occurrence is the row itself', async () => {
@@ -376,7 +382,7 @@ describe('buildScopedCallTree', () => {
     const instances = loopOccurrences(OCCURRENCES);
     let yields = 0;
     const sliced: FrameBudgetOptions = {
-      yieldFrame: () => {
+      yieldSlice: () => {
         yields += 1;
         return Promise.resolve();
       },
@@ -406,7 +412,7 @@ describe('buildScopedCallTree', () => {
     try {
       // The first yield is the first chance to notice; nothing is returned after it.
       const tree = await buildScopedCallTree(instances[0]!, instances, {
-        yieldFrame: () => Promise.resolve(),
+        yieldSlice: () => Promise.resolve(),
         signal: AbortSignal.abort(),
       });
       expect(tree).toBeNull();
@@ -466,7 +472,7 @@ describe('buildWholeLogCallTree', () => {
     clock.mockImplementation(() => (time += 100));
     try {
       const tree = await buildWholeLogCallTree({
-        yieldFrame: () => Promise.resolve(),
+        yieldSlice: () => Promise.resolve(),
         signal: AbortSignal.abort(),
       });
       expect(tree).toBeNull();
@@ -476,40 +482,81 @@ describe('buildWholeLogCallTree', () => {
   });
 });
 
-describe('rowIdsByEvent', () => {
-  it('finds the merged rows a frame is named by, at every depth', async () => {
-    const instances = loopOccurrences(3);
-    const tree = (await build(300))!;
-    const rows = (await tree.aggregated(options))!;
+describe('holds', () => {
+  it('stands for the selection, what it called, and the callers above it', async () => {
+    const tree = (await build(3))!;
 
-    const byEvent = rowIdsByEvent(rows);
-    const groupId = rows[0]!.id;
-    const occurrenceId = rows[0]!._children![0]!.id;
+    // m2 is the selection, soql runs inside it, m1 and exec are rows above it.
+    expect(tree.holds!(3)).toBe(true);
+    expect(tree.holds!(4)).toBe(true);
+    expect(tree.holds!(2)).toBe(true);
+    expect(tree.holds!(1)).toBe(true);
+  });
 
-    // The selection names the row above; each occurrence names the group that
-    // merges all three.
-    expect(byEvent.get(300)).toEqual([groupId]);
-    for (const eventIndex of instances) {
-      expect(byEvent.get(eventIndex)).toEqual([occurrenceId]);
+  it('leaves out a frame at the same bucket path elsewhere in the log', async () => {
+    // A second call of the same method, which a loop or a trigger makes common:
+    // its rows would be named by the same path as the selection's.
+    const twin = ev(500, 'METHOD_ENTRY', 'm2', { total: 200, self: 0 });
+    const twinLeaf = ev(501, 'SOQL_EXECUTE_BEGIN', 'SELECT Id FROM Account', {
+      total: 200,
+      self: 200,
+    });
+    twin.parent = m1;
+    twinLeaf.parent = twin;
+    twin.children = [twinLeaf];
+    m1.children = [m2, twin];
+    byId.set(500, twin);
+    byId.set(501, twinLeaf);
+    try {
+      const tree = (await build(3))!;
+
+      expect(tree.holds!(501)).toBe(false);
+    } finally {
+      m1.children = [m2];
+      byId.delete(500);
+      byId.delete(501);
     }
   });
 
-  it('names one frame in as many rows as stand for it', async () => {
+  it('stands for every frame where it covers the whole log', async () => {
+    expect((await buildWholeLogCallTree(options))!.holds).toBeUndefined();
+  });
+});
+
+describe('rowIdsByPath', () => {
+  it('finds a merged row by the bucket path it stands for, at every depth', async () => {
+    loopOccurrences(3);
+    const tree = (await build(300))!;
+    const rows = (await tree.aggregated(options))!;
+    const group = rows[0]!;
+    const occurrences = group._children![0]!;
+
+    const byPath = rowIdsByPath(rows);
+
+    expect(byPath.get(group._pathId!)).toBe(group.id);
+    expect(byPath.get(occurrences._pathId!)).toBe(occurrences.id);
+  });
+
+  it('leaves a path no row stands for out of the lookup', async () => {
+    const tree = (await build(4))!;
+
+    expect(rowIdsByPath((await tree.timeOrder(options))!).get(99999)).toBeUndefined();
+  });
+});
+
+describe('bottom-up occurrences', () => {
+  it('derives a caller row from the top-level row, holding no calls itself', async () => {
     // Rebuilds the loop and its two calls; the loop itself is the selection.
     const instances = loopOccurrences(2);
     const tree = (await build(300))!;
     const rows = (await tree.bottomUp(options))!;
+    const seed = rows[0]!;
+    const caller = seed._children![0]!;
 
-    // Bottom-Up puts the caller under the leaf it called, and the caller row
-    // stands for the same calls, so one call names the leaf row and the caller
-    // row beneath it.
-    const named = rowIdsByEvent(rows).get(instances[0]!) ?? [];
-    expect(named).toEqual(expect.arrayContaining([rows[0]!.id, rows[0]!._children![0]!.id]));
-  });
-
-  it('leaves a frame no row names out of the lookup', async () => {
-    const tree = (await build(4))!;
-
-    expect(rowIdsByEvent((await tree.timeOrder(options))!).get(999)).toBeUndefined();
+    // The top-level row owns the occurrences; the caller row stands for the same
+    // calls, and reads them back through the chain that reached them.
+    expect(seed.eventIndexes).toEqual(instances);
+    expect(caller.eventIndexes).toBeNull();
+    expect(locatableEventIndexes(caller)).toEqual(instances);
   });
 });
