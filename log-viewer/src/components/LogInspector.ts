@@ -59,13 +59,11 @@ export class LogInspector extends LitElement {
 
   // Latest selection per source; the bar renders the active tab's entry.
   private _selections = new Map<DetailSource, DetailSelection>();
-  // The frame walked to inside that selection's call stack, per source. Held
-  // apart from the selection so the call stack keeps its anchor while Details
-  // and the call tree follow the walk.
-  private _activeFrames = new Map<DetailSource, number>();
-  // What a picked inspector row stands for, where it merges occurrences and so
-  // names no single frame to walk to. Details describes this instead.
-  private _activeBuckets = new Map<DetailSource, DetailSelection>();
+  // What the inspector has walked to inside that selection, per source: one
+  // frame, or the calls a picked row counts where its rows merge occurrences.
+  // Held apart from the selection so the call stack keeps its anchor while
+  // Details and the call tree follow the walk.
+  private _active = new Map<DetailSource, DetailSelection>();
 
   /** The direction each tab is showing, so the inspector can open on the other. */
   private _sourceViews = new Map<DetailSource, SelectionView | undefined>();
@@ -233,8 +231,7 @@ export class LogInspector extends LitElement {
     view?: SelectionView;
   }): void {
     // A pick in the tab itself is a new anchor, so any walk down the old stack ends.
-    this._activeFrames.delete(detail.source);
-    this._activeBuckets.delete(detail.source);
+    this._active.delete(detail.source);
     this._sourceViews.set(detail.source, detail.view);
     if (detail.selection) {
       this._selections.set(detail.source, detail.selection);
@@ -270,8 +267,7 @@ export class LogInspector extends LitElement {
     // Without a selection the sections are the whole-log ones, which have no
     // frame to follow; the whole-log rows only reveal.
     if (this._scopedSelection(source)) {
-      this._activeFrames.set(source, e.detail.eventIndex);
-      this._activeBuckets.delete(source);
+      this._active.set(source, { kind: 'event', eventIndex: e.detail.eventIndex });
       this._scheduleRebuild();
     }
   };
@@ -291,11 +287,20 @@ export class LogInspector extends LitElement {
       eventIndexes: e.detail.eventIndexes,
       sticky: e.detail.sticky,
     });
-    // A picked row that merges occurrences has no frame to walk to, so what it
-    // counts is what Details answers about.
-    if (e.detail.sticky && e.detail.selection && this._scopedSelection(source)) {
-      this._activeFrames.delete(source);
-      this._activeBuckets.set(source, e.detail.selection);
+    if (!e.detail.sticky || !this._scopedSelection(source)) {
+      return;
+    }
+    if (!e.detail.eventIndexes.length) {
+      // The pick is being dropped, which hands Details back to the tab's own
+      // selection.
+      if (this._active.delete(source)) {
+        this._scheduleRebuild();
+      }
+    } else if (e.detail.selection) {
+      // A picked row that merges occurrences has no frame to walk to, so what it
+      // counts is what Details answers about. A sticky mark with no such row
+      // leaves the walk where it is.
+      this._active.set(source, e.detail.selection);
       this._scheduleRebuild();
     }
   };
@@ -342,9 +347,8 @@ export class LogInspector extends LitElement {
       ? await buildDetailSections(
           source,
           this._scopedSelection(source),
-          this._activeFrames.get(source) ?? null,
+          this._active.get(source) ?? null,
           this._sourceViews.get(source),
-          this._activeBuckets.get(source) ?? null,
         )
       : [];
     // Drop a slow build that a newer selection already superseded.

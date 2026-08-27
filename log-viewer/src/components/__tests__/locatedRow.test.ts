@@ -6,10 +6,11 @@
 import { describe, expect, it } from '@jest/globals';
 import type { RowComponent } from 'tabulator-tables';
 
-import type { LogEvent } from 'apex-log-parser';
+import type { ApexLog, LogEvent } from 'apex-log-parser';
 
 import {
   LOCATED_ROW_CLASS,
+  LocatedRowIds,
   LocatedRowMarker,
   eventKeyPaths,
   rowIndexStamper,
@@ -197,5 +198,39 @@ describe('LocatedRowMarker', () => {
     marker.mark(container, [7]);
 
     expect(rowFor(container, 0).classList.contains(LOCATED_ROW_CLASS)).toBe(false);
+  });
+});
+
+describe('LocatedRowIds', () => {
+  const root = ev('exec', null);
+  const outerFrame = ev('outer', root);
+  const frame = ev('inner', outerFrame);
+  const log = { eventsById: { 5: frame } } as unknown as ApexLog;
+
+  it('builds the paths of the rows the frames belong to', () => {
+    const ids = new LocatedRowIds().idsFor(log, [5], 'callers');
+
+    expect(ids).toEqual(eventKeyPaths(frame, 'callers'));
+  });
+
+  it('reuses what it built for the frames it was last asked about', () => {
+    // The view re-reports its picked frames whenever the pointer leaves a row.
+    const memo = new LocatedRowIds();
+    const picked = [5];
+
+    expect(memo.idsFor(log, picked, 'callers')).toBe(memo.idsFor(log, picked, 'callers'));
+  });
+
+  it('rebuilds for the same frames in the other direction', () => {
+    const memo = new LocatedRowIds();
+    const picked = [5];
+
+    expect(memo.idsFor(log, picked, 'callers')).not.toEqual(memo.idsFor(log, picked, 'callees'));
+  });
+
+  it('names the rows of a view keyed by event with the indexes themselves', () => {
+    const picked = [5];
+
+    expect(new LocatedRowIds().idsFor(log, picked, undefined)).toBe(picked);
   });
 });

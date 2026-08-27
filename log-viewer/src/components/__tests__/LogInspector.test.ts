@@ -42,10 +42,11 @@ jest.mock('../detailSections.js', () => ({
   buildDetailSections: (
     _source: string,
     selection: { eventIndex?: number } | null,
-    activeEventIndex: number | null,
+    active: { kind: string; eventIndex?: number; instances?: number[] } | null,
     sourceView?: string,
-    activeBucket?: { instances: number[] } | null,
   ) => {
+    const walked = active?.kind === 'event' ? String(active.eventIndex) : '-';
+    const counted = active?.kind === 'aggregate' ? (active.instances?.join(',') ?? '-') : '-';
     // The markers carry the anchor and the active frame through to the rendered
     // content, so a stale build resolving late is distinguishable from the one
     // that supersedes it, and a walk is distinguishable from a new pick.
@@ -55,9 +56,9 @@ jest.mock('../detailSections.js', () => ({
             id: 'vitals',
             title: 'Details',
             content: html`<div class="marker">${selection.eventIndex}</div>
-              <div class="active">${activeEventIndex ?? '-'}</div>
+              <div class="active">${walked}</div>
               <div class="view">${sourceView ?? '-'}</div>
-              <div class="bucket">${activeBucket?.instances.join(',') ?? '-'}</div>`,
+              <div class="bucket">${counted}</div>`,
           },
           { id: 'callstack', title: 'Call stack', content: html`<div>c</div>` },
         ]
@@ -399,6 +400,34 @@ describe('LogInspector', () => {
 
     // The bucket answers instead of a walked frame, and the anchor is untouched.
     expect([marker(el), activeMarker(el), bucketMarker(el)]).toEqual(['1', '-', '5,9']);
+  });
+
+  it('leaves the walk alone for a sticky mark that names no picked row', async () => {
+    const el = await mount('timeline-tab');
+    select('timeline', 1);
+    dispatchInspectorReveal(dockLayout(el), 5);
+    await flush(el);
+
+    // A tree whose rows carry no aggregate marks stickily without picking one.
+    dispatchInspectorLocate(dockLayout(el), [7, 8], true);
+    await flush(el);
+
+    expect(activeMarker(el)).toBe('5');
+  });
+
+  it('drops the picked row when the pick itself is dropped', async () => {
+    const el = await mount('timeline-tab');
+    select('timeline', 1);
+    dispatchInspectorLocate(dockLayout(el), [5, 9], true, {
+      kind: 'aggregate',
+      instances: [5, 9],
+    });
+    await flush(el);
+
+    dispatchInspectorLocate(dockLayout(el), [], true);
+    await flush(el);
+
+    expect([marker(el), activeMarker(el), bucketMarker(el)]).toEqual(['1', '-', '-']);
   });
 
   it('drops the picked row once a single frame is walked to', async () => {

@@ -7,7 +7,7 @@ import type { RowComponent } from 'tabulator-tables';
 
 import type { SelectionView } from '../../../core/events/EventBus.js';
 import { withCodeDrivenExpand } from '../../../tabulator/module/expandOrigin.js';
-import { getEventKey } from './Aggregation.js';
+import { eventKeyChain, getEventKey } from './Aggregation.js';
 
 interface BucketRow {
   key?: string;
@@ -39,17 +39,12 @@ export async function findBucketRow(
     return rows.find((row) => bucketOf(row).key === key) ?? null;
   }
 
-  // The log root is not a row, so the path starts at the outermost frame below it.
-  const path: LogEvent[] = [];
-  for (let node: LogEvent | null = event; node?.parent; node = node.parent) {
-    path.push(node);
-  }
-  path.reverse();
+  const path = eventKeyChain(event).reverse();
 
   let currentRows = rows;
   let matched: RowComponent | null = null;
   for (let depth = 0; depth < path.length; depth++) {
-    const key = getEventKey(path[depth]!);
+    const key = path[depth]!;
     const next = currentRows.find((row) => bucketOf(row).key === key);
     if (!next) {
       break;

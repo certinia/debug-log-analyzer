@@ -7,7 +7,7 @@ import type { RowComponent } from 'tabulator-tables';
 
 import type { DetailSelection, SelectionView } from '../core/events/EventBus.js';
 import { eventByEventIndex } from '../core/utility/EventSearch.js';
-import { getEventKey } from '../features/call-tree/utils/Aggregation.js';
+import { eventKeyChain } from '../features/call-tree/utils/Aggregation.js';
 import { occurrencesThrough } from '../features/call-tree/utils/bottomUpOccurrences.js';
 
 /** Class the marked row carries; each table styles it itself. */
@@ -99,6 +99,18 @@ function rowCallChain(row: RowComponent, data: CallRow): CallChain | null {
   return chain;
 }
 
+/**
+ * A row's own index value, read from the data.
+ *
+ * Never `RowComponent.getIndex()`: that routes through Tabulator's accessor,
+ * which deep-clones the row data. Our rows hold the parsed log, so one call
+ * walks the whole event graph and blocks the UI for minutes.
+ */
+export function rowId(row: RowComponent | undefined): number | undefined {
+  const id = (row?.getData() as { id?: unknown } | undefined)?.id;
+  return typeof id === 'number' ? id : undefined;
+}
+
 /** Joins a key path. A key holds arbitrary log text, so the separator is one
  *  that text cannot carry: two different paths can never join to one string. */
 const KEY_PATH_SEPARATOR = '\u0001';
@@ -113,18 +125,6 @@ const keyPaths = new WeakMap<CallRow, string>();
  *
  * Undefined on a row that stands for one frame, which its event index identifies.
  */
-/**
- * A row's own index value, read from the data.
- *
- * Never `RowComponent.getIndex()`: that routes through Tabulator's accessor,
- * which deep-clones the row data. Our rows hold the parsed log, so one call
- * walks the whole event graph and blocks the UI for minutes.
- */
-export function rowId(row: RowComponent | undefined): number | undefined {
-  const id = (row?.getData() as { id?: unknown } | undefined)?.id;
-  return typeof id === 'number' ? id : undefined;
-}
-
 export function rowKeyPath(row: RowComponent): string | undefined {
   const data = rowCallData(row);
   if (data.key === undefined) {
@@ -167,19 +167,19 @@ export function stampRowKeyPath(row: RowComponent): void {
  * The log root is not a row in either view, so the walk stops below it.
  */
 export function eventKeyPaths(event: LogEvent, direction: SelectionView): string[] {
-  const keys: string[] = [];
-  for (let node: LogEvent | null = event; node?.parent; node = node.parent) {
-    keys.push(getEventKey(node));
-  }
+  const keys = eventKeyChain(event);
   if (!keys.length) {
     return [];
   }
   if (direction === 'callees') {
     return [keys.reverse().join(KEY_PATH_SEPARATOR)];
   }
+  // Each path extends the one before it, so the characters are copied once.
   const paths: string[] = [];
-  for (let depth = 1; depth <= keys.length; depth++) {
-    paths.push(keys.slice(0, depth).join(KEY_PATH_SEPARATOR));
+  let path = '';
+  for (const key of keys) {
+    path = path ? path + KEY_PATH_SEPARATOR + key : key;
+    paths.push(path);
   }
   return paths;
 }
@@ -219,7 +219,7 @@ function rowCallOccurrences(row: RowComponent): LogEvent[] {
  * frames, so there is no cheaper set to walk, and only the paths they produce
  * repeat.
  */
-export function keyPathsForEvents(
+function keyPathsForEvents(
   root: ApexLog,
   eventIndexes: readonly number[],
   direction: SelectionView,
@@ -273,6 +273,46 @@ export function rowDetailSelection(row: RowComponent | undefined): DetailSelecti
     instances: rowOccurrences(row),
     calledBy: chain?.caller.text,
   };
+}
+
+/**
+ * The ids that mark a view's rows for a list of frames, memoised on the list.
+ *
+ * A view re-reports its picked frames every time the pointer leaves an inspector
+ * row, and translating a wide pick into bucket paths costs far more than the mark
+ * it feeds.
+ */
+export class LocatedRowIds {
+  private lastRoot: ApexLog | null = null;
+  private lastEvents: readonly number[] | undefined;
+  private lastDirection: SelectionView | undefined;
+  private lastIds: readonly (number | string)[] = [];
+
+  /**
+   * @param direction - The view's own direction, or undefined where its rows are
+   * keyed by event and so are named by the indexes themselves.
+   */
+  public idsFor(
+    root: ApexLog | null,
+    eventIndexes: readonly number[],
+    direction: SelectionView | undefined,
+  ): readonly (number | string)[] {
+    if (!direction || !root || !eventIndexes.length) {
+      return eventIndexes;
+    }
+    if (
+      this.lastEvents === eventIndexes &&
+      this.lastDirection === direction &&
+      this.lastRoot === root
+    ) {
+      return this.lastIds;
+    }
+    this.lastRoot = root;
+    this.lastEvents = eventIndexes;
+    this.lastDirection = direction;
+    this.lastIds = keyPathsForEvents(root, eventIndexes, direction);
+    return this.lastIds;
+  }
 }
 
 /**

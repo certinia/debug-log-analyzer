@@ -16,14 +16,12 @@ import type { ContextMenu } from '../../../components/ContextMenu.js';
 import { eventBus } from '../../../core/events/EventBus.js';
 import {
   LOCATED_ROW_CLASS,
+  LocatedRowIds,
   LocatedRowMarker,
-  keyPathsForEvents,
   rowDetailSelection,
   rowOccurrences,
-  stampRowKeyPath,
 } from '../../../components/locatedRow.js';
 import { InspectorEmphasis } from '../../../components/inspectorEmphasis.js';
-import { findEventByEventIndex } from '../../../core/utility/EventSearch.js';
 import { SelectionEchoGuard } from '../../../core/events/SelectionEchoGuard.js';
 import { isVisible } from '../../../core/utility/Util.js';
 import { getSettings, updateSetting } from '../../settings/Settings.js';
@@ -40,7 +38,7 @@ import {
 import type { BottomUpRow } from '../../call-tree/utils/Aggregation.js';
 import {
   categoryColoringStyles,
-  categoryRowFormatter,
+  groupedRowFormatter,
   wireCategoryColoring,
 } from '../../call-tree/utils/CategoryColoring.js';
 import { expandCollapseAll } from '../../call-tree/utils/ExpandCollapse.js';
@@ -161,6 +159,7 @@ export class AnalysisView extends LitElement {
   private _inspectorRevealUnsubscribe: (() => void) | null = null;
   private _inspectorLocateUnsubscribe: (() => void) | null = null;
   private _locatedRow = new LocatedRowMarker();
+  private _locateIds = new LocatedRowIds();
   private _emphasis = new InspectorEmphasis();
 
   constructor() {
@@ -221,14 +220,9 @@ export class AnalysisView extends LitElement {
    * to their callers, so one frame heads a row at every caller depth it sits in.
    */
   private _markLocated(eventIndexes: readonly number[]): void {
-    const table = this.analysisTable;
-    if (!table || !eventIndexes.length || !this.timelineRoot) {
-      this._locatedRow.clear();
-      return;
-    }
     this._locatedRow.mark(
-      table.element,
-      keyPathsForEvents(this.timelineRoot, eventIndexes, 'callers'),
+      this.analysisTable?.element ?? null,
+      this._locateIds.idsFor(this.timelineRoot, eventIndexes, 'callers'),
     );
   }
 
@@ -644,10 +638,7 @@ export class AnalysisView extends LitElement {
             this._clearSearchHighlights();
           }
         },
-        rowFormatter: (row) => {
-          categoryRowFormatter(row);
-          stampRowKeyPath(row);
-        },
+        rowFormatter: groupedRowFormatter,
       },
       {
         placeholder: 'No Analysis Available',

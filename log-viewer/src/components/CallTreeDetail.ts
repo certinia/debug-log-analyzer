@@ -33,6 +33,7 @@ import { soqlSyntaxStyles } from '../features/soql/styles/soql-syntax.css.js';
 import { globalStyles } from '../styles/global.styles.js';
 import { progressColumnWidth } from '../tabulator/format/measureWidth.js';
 import type { ProgressParams } from '../tabulator/format/ProgressMS.js';
+import { tableHolder } from '../tabulator/module/tableHolder.js';
 import dataGridStyles from '../tabulator/style/DataGrid.scss';
 import './ContextMenu.js';
 import type { ContextMenu } from './ContextMenu.js';
@@ -352,14 +353,10 @@ export class CallTreeDetail extends LitElement {
     // Already where it belongs, which is the usual case: the row the walk
     // reports is the row the user just picked here. Selecting it again re-renders
     // it, and tabulator's row re-render takes the table's focus with it.
-    //
-    // `id` is read from the data, never `getIndex()`: that routes through
-    // Tabulator's accessor, which deep-clones the row data — and our rows hold
-    // the parsed log, so one call walks the whole graph.
     if (selected.length === 1 && rowId(selected[0]) === this.activeEventIndex) {
       return;
     }
-    const holder = this._tableHolder(this.viewMode);
+    const holder = tableHolder(this._tableHost(this.viewMode));
     const root = holder?.getRootNode();
     const hadFocus = root instanceof ShadowRoot && root.activeElement === holder;
     this._echoGuard.run(() => {
@@ -374,10 +371,6 @@ export class CallTreeDetail extends LitElement {
     if (hadFocus) {
       holder?.focus({ preventScroll: true });
     }
-  }
-
-  private _tableHolder(mode: ViewMode): HTMLElement | null {
-    return this._tableHost(mode)?.querySelector<HTMLElement>('.tabulator-tableholder') ?? null;
   }
 
   /**
