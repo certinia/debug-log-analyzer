@@ -1,10 +1,12 @@
 /*
  * Copyright (c) 2025 Certinia Inc. All rights reserved.
  */
+import type { ApexLog } from 'apex-log-parser';
 import { css } from 'lit';
 import type { RowComponent } from 'tabulator-tables';
 
-import { stampRowKeyPath } from '../../../components/locatedRow.js';
+import { rowPathStamper } from '../../../components/locatedRow.js';
+import { logStoreFor } from '../../../core/log/LogStore.js';
 import { VSCodeExtensionMessenger } from '../../../core/messaging/VSCodeExtensionMessenger.js';
 import { subscribeSettings, type LanaSettings } from '../../settings/Settings.js';
 import { CATEGORY_THEME_KEY, DEFAULT_THEME_NAME } from '../../timeline/themes/Themes.js';
@@ -43,11 +45,15 @@ export const categoryRowFormatter = (row: RowComponent): void => {
 };
 
 /** The `rowFormatter` for a view whose rows merge occurrences: the colour strip,
- *  plus the key path the inspector's mark finds the row by. */
-export const groupedRowFormatter = (row: RowComponent): void => {
-  categoryRowFormatter(row);
-  stampRowKeyPath(row);
-};
+ *  plus the path id the inspector's mark finds the row by. The ids are the log's,
+ *  so a row and the frames it holds reach the same one. */
+export function groupedRowFormatter(root: ApexLog): (row: RowComponent) => void {
+  const stamp = rowPathStamper(logStoreFor(root).keyPathIds());
+  return (row) => {
+    categoryRowFormatter(row);
+    stamp(row);
+  };
+}
 
 function applyCategoryTheme(host: HTMLElement, themeName: string): void {
   const theme = getTheme(themeName);

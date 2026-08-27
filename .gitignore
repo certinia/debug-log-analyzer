@@ -10,3 +10,4 @@ out/
 coverage/
 *.tsbuildinfo
 /.vscode-test-web
+scripts/measure/out/

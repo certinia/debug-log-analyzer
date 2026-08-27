@@ -6,6 +6,8 @@ import type { ApexLog, LogEvent } from 'apex-log-parser';
 import type { RowComponent } from 'tabulator-tables';
 
 import type { DetailSelection, SelectionView } from '../core/events/EventBus.js';
+import { logStoreFor } from '../core/log/LogStore.js';
+import type { KeyPathIds } from '../core/log/keyPathIds.js';
 import { eventByEventIndex } from '../core/utility/EventSearch.js';
 import { eventKeyChain } from '../features/call-tree/utils/Aggregation.js';
 import { occurrencesThrough } from '../features/call-tree/utils/bottomUpOccurrences.js';
@@ -27,7 +29,7 @@ const ROW_INDEX_ATTRIBUTE = 'data-row-index';
  * The index is read from the data rather than `getIndex()`: Tabulator runs the
  * formatter for its calc rows too, and those carry no index.
  *
- * A view whose rows merge occurrences stamps {@link stampRowKeyPath} instead, as
+ * A view whose rows merge occurrences stamps {@link rowPathStamper} instead, as
  * a bucket has no event of its own.
  *
  * @param indexField - the table's `index` option
@@ -111,26 +113,22 @@ export function rowId(row: RowComponent | undefined): number | undefined {
   return typeof id === 'number' ? id : undefined;
 }
 
-/** Joins a key path. A key holds arbitrary log text, so the separator is one
- *  that text cannot carry: two different paths can never join to one string. */
-const KEY_PATH_SEPARATOR = '\u0001';
-
-const keyPaths = new WeakMap<CallRow, string>();
+const pathIds = new WeakMap<CallRow, number>();
 
 /**
  * What tells a merged row apart from a same-named row under a different parent:
- * the bucket keys from its top-level ancestor out to the row itself. A single
- * key does not, because a bucket map is allocated per parent, so one method holds
- * a row under every caller it has.
+ * the bucket keys from its top-level ancestor out to the row itself, interned to
+ * one integer. A single key does not, because a bucket map is allocated per
+ * parent, so one method holds a row under every caller it has.
  *
  * Undefined on a row that stands for one frame, which its event index identifies.
  */
-export function rowKeyPath(row: RowComponent): string | undefined {
+export function rowPathId(row: RowComponent, ids: KeyPathIds): number | undefined {
   const data = rowCallData(row);
   if (data.key === undefined) {
     return undefined;
   }
-  const cached = keyPaths.get(data);
+  const cached = pathIds.get(data);
   if (cached !== undefined) {
     return cached;
   }
@@ -142,46 +140,38 @@ export function rowKeyPath(row: RowComponent): string | undefined {
     }
     keys.push(parentKey);
   }
-  const path = keys.reverse().join(KEY_PATH_SEPARATOR);
-  keyPaths.set(data, path);
-  return path;
+  const id = ids.pathOf(keys);
+  pathIds.set(data, id);
+  return id;
 }
 
-/** A `rowFormatter` for a view whose rows merge occurrences, stamping the key
- *  path so the mark finds the row with the same one DOM query. */
-export function stampRowKeyPath(row: RowComponent): void {
-  const path = rowKeyPath(row);
-  if (path !== undefined) {
-    row.getElement()?.setAttribute(ROW_INDEX_ATTRIBUTE, path);
-  }
+/** A `rowFormatter` for a view whose rows merge occurrences, stamping the path id
+ *  so the mark finds the row with the same one DOM query. */
+export function rowPathStamper(ids: KeyPathIds): (row: RowComponent) => void {
+  return (row) => {
+    const id = rowPathId(row, ids);
+    if (id !== undefined) {
+      row.getElement()?.setAttribute(ROW_INDEX_ATTRIBUTE, String(id));
+    }
+  };
 }
 
 /**
- * The key paths naming the rows a frame belongs to in a merged view.
+ * The path ids naming the rows a frame belongs to in a merged view.
  *
- * A top-down row sits at the frame's own depth, so one path names it. A
- * bottom-up row is the frame plus however many of its callers the chain shows, so
- * every prefix names a row the frame heads — which is why one frame marks several
- * rows there.
+ * A top-down row sits at the frame's own depth, so one id names it. A bottom-up
+ * row is the frame plus however many of its callers the chain shows, so every
+ * prefix names a row the frame heads — which is why one frame marks several rows
+ * there, and why each prefix is interned as it is reached.
  *
  * The log root is not a row in either view, so the walk stops below it.
  */
-export function eventKeyPaths(event: LogEvent, direction: SelectionView): string[] {
+export function eventPathIds(event: LogEvent, direction: SelectionView, ids: KeyPathIds): number[] {
   const keys = eventKeyChain(event);
   if (!keys.length) {
     return [];
   }
-  if (direction === 'callees') {
-    return [keys.reverse().join(KEY_PATH_SEPARATOR)];
-  }
-  // Each path extends the one before it, so the characters are copied once.
-  const paths: string[] = [];
-  let path = '';
-  for (const key of keys) {
-    path = path ? path + KEY_PATH_SEPARATOR + key : key;
-    paths.push(path);
-  }
-  return paths;
+  return direction === 'callees' ? [ids.pathOf(keys)] : ids.prefixesOf(keys);
 }
 
 /** True where the row holds no calls of its own, so its chain answers for it. */
@@ -212,29 +202,30 @@ function rowCallOccurrences(row: RowComponent): LogEvent[] {
 }
 
 /**
- * The key paths that the frames `eventIndexes` name stand for, so a grid whose
+ * The path ids that the frames `eventIndexes` name stand for, so a grid whose
  * rows merge occurrences can mark them.
  *
  * Every occurrence is walked: occurrences of one frame sit under distinct parent
  * frames, so there is no cheaper set to walk, and only the paths they produce
  * repeat.
  */
-function keyPathsForEvents(
+function pathIdsForEvents(
   root: ApexLog,
   eventIndexes: readonly number[],
   direction: SelectionView,
-): string[] {
-  const paths = new Set<string>();
+): number[] {
+  const ids = logStoreFor(root).keyPathIds();
+  const found = new Set<number>();
   for (const eventIndex of eventIndexes) {
     const event = eventByEventIndex(root, eventIndex);
     if (!event) {
       continue;
     }
-    for (const path of eventKeyPaths(event, direction)) {
-      paths.add(path);
+    for (const id of eventPathIds(event, direction, ids)) {
+      found.add(id);
     }
   }
-  return [...paths];
+  return [...found];
 }
 
 /** The calls a row stands for, as the event indexes the mark works in. */
@@ -286,19 +277,35 @@ export class LocatedRowIds {
   private lastRoot: ApexLog | null = null;
   private lastEvents: readonly number[] | undefined;
   private lastDirection: SelectionView | undefined;
-  private lastIds: readonly (number | string)[] = [];
+  private lastIds: readonly number[] = [];
 
   /**
    * @param direction - The view's own direction, or undefined where its rows are
    * keyed by event and so are named by the indexes themselves.
    */
   public idsFor(
+    root: ApexLog,
+    eventIndexes: readonly number[],
+    direction: SelectionView,
+  ): readonly number[];
+  public idsFor(
     root: ApexLog | null,
     eventIndexes: readonly number[],
     direction: SelectionView | undefined,
-  ): readonly (number | string)[] {
-    if (!direction || !root || !eventIndexes.length) {
+  ): readonly number[];
+  public idsFor(
+    root: ApexLog | null,
+    eventIndexes: readonly number[],
+    direction: SelectionView | undefined,
+  ): readonly number[] {
+    if (!direction) {
+      // The view's rows are keyed by event, so the indexes name them as they are.
       return eventIndexes;
+    }
+    if (!root || !eventIndexes.length) {
+      // A path id and an event index are both small integers, so passing the
+      // indexes on would mark whichever rows happened to share their numbers.
+      return [];
     }
     if (
       this.lastEvents === eventIndexes &&
@@ -310,7 +317,7 @@ export class LocatedRowIds {
     this.lastRoot = root;
     this.lastEvents = eventIndexes;
     this.lastDirection = direction;
-    this.lastIds = keyPathsForEvents(root, eventIndexes, direction);
+    this.lastIds = pathIdsForEvents(root, eventIndexes, direction);
     return this.lastIds;
   }
 }
@@ -325,7 +332,7 @@ export class LocatedRowIds {
  * to mark, so they are left alone.
  *
  * The table must stamp its rows: {@link rowIndexStamper} where a row is one
- * frame, {@link stampRowKeyPath} where rows merge occurrences.
+ * frame, {@link rowPathStamper} where rows merge occurrences.
  */
 export class LocatedRowMarker {
   private elements: HTMLElement[] = [];
