@@ -6,6 +6,7 @@ import type { LogEvent } from 'apex-log-parser';
 import type { RowComponent } from 'tabulator-tables';
 
 import type { SelectionView } from '../../../core/events/EventBus.js';
+import { withCodeDrivenExpand } from '../../../tabulator/module/expandOrigin.js';
 import { getEventKey } from './Aggregation.js';
 
 interface BucketRow {
@@ -57,11 +58,11 @@ export async function findBucketRow(
     if (depth === path.length - 1) {
       break;
     }
-    let children = matched.getTreeChildren() ?? [];
-    if (!children.length && bucketOf(matched)._children?.length && !matched.isTreeExpanded()) {
-      matched.treeExpand();
+    let children = next.getTreeChildren() ?? [];
+    if (!children.length && bucketOf(next)._children?.length && !next.isTreeExpanded()) {
+      withCodeDrivenExpand(() => next.treeExpand());
       await waitForRender();
-      children = matched.getTreeChildren() ?? [];
+      children = next.getTreeChildren() ?? [];
     }
     currentRows = children;
   }

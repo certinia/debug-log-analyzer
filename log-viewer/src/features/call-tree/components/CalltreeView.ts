@@ -31,6 +31,7 @@ import type { TimeOrderRow } from '../utils/TimeOrderTree.js';
 import { waitForNextFrame } from '../../../core/utility/FrameBudget.js';
 
 import { inMsRange, type FilterRange } from '../../../tabulator/filters/MinMax.js';
+import { withCodeDrivenExpand } from '../../../tabulator/module/expandOrigin.js';
 
 import dataGridStyles from '../../../tabulator/style/DataGrid.scss';
 
@@ -1404,7 +1405,8 @@ export class CalltreeView extends LitElement {
       let children = matchedRow.getTreeChildren() ?? [];
       const rowData = matchedRow.getData() as TimeOrderRow;
       if (!children.length && rowData._children?.length && !matchedRow.isTreeExpanded()) {
-        matchedRow.treeExpand();
+        const rowToExpand = matchedRow;
+        withCodeDrivenExpand(() => rowToExpand.treeExpand());
         await this._waitForTableRender();
         children = matchedRow.getTreeChildren() ?? [];
       }
