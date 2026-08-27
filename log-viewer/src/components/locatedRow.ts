@@ -2,10 +2,11 @@
  * Copyright (c) 2026 Certinia Inc. All rights reserved.
  */
 
-import type { LogEvent } from 'apex-log-parser';
+import type { ApexLog, LogEvent } from 'apex-log-parser';
 import type { RowComponent } from 'tabulator-tables';
 
 import type { DetailSelection, SelectionView } from '../core/events/EventBus.js';
+import { eventByEventIndex } from '../core/utility/EventSearch.js';
 import { getEventKey } from '../features/call-tree/utils/Aggregation.js';
 import { occurrencesThrough } from '../features/call-tree/utils/bottomUpOccurrences.js';
 
@@ -199,6 +200,32 @@ function rowCallOccurrences(row: RowComponent): LogEvent[] {
 }
 
 /** The calls a row stands for, as the event indexes the mark works in. */
+/**
+ * The key paths that the frames `eventIndexes` name stand for, so a grid whose
+ * rows merge occurrences can mark them.
+ *
+ * Every occurrence is walked: occurrences of one frame sit under distinct parent
+ * frames, so there is no cheaper set to walk, and only the paths they produce
+ * repeat.
+ */
+export function keyPathsForEvents(
+  root: ApexLog,
+  eventIndexes: readonly number[],
+  direction: SelectionView,
+): string[] {
+  const paths = new Set<string>();
+  for (const eventIndex of eventIndexes) {
+    const event = eventByEventIndex(root, eventIndex);
+    if (!event) {
+      continue;
+    }
+    for (const path of eventKeyPaths(event, direction)) {
+      paths.add(path);
+    }
+  }
+  return [...paths];
+}
+
 export function rowOccurrences(row: RowComponent): number[] {
   const data = rowCallData(row);
   const cached = derivedIndexes.get(data);

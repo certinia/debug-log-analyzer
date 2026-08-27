@@ -17,7 +17,7 @@ import { eventBus } from '../../../core/events/EventBus.js';
 import {
   LOCATED_ROW_CLASS,
   LocatedRowMarker,
-  eventKeyPaths,
+  keyPathsForEvents,
   rowDetailSelection,
   rowOccurrences,
   stampRowKeyPath,
@@ -226,16 +226,10 @@ export class AnalysisView extends LitElement {
       this._locatedRow.clear();
       return;
     }
-    const paths = new Set<string>();
-    for (const eventIndex of eventIndexes) {
-      const found = findEventByEventIndex(this.timelineRoot, eventIndex);
-      if (found) {
-        for (const path of eventKeyPaths(found.event, 'callers')) {
-          paths.add(path);
-        }
-      }
-    }
-    this._locatedRow.mark(table.element, [...paths]);
+    this._locatedRow.mark(
+      table.element,
+      keyPathsForEvents(this.timelineRoot, eventIndexes, 'callers'),
+    );
   }
 
   /**

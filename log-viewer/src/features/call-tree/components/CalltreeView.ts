@@ -65,7 +65,7 @@ import {
 import {
   LOCATED_ROW_CLASS,
   LocatedRowMarker,
-  eventKeyPaths,
+  keyPathsForEvents,
   rowDetailSelection,
   rowIndexStamper,
   rowOccurrences,
@@ -852,17 +852,7 @@ export class CalltreeView extends LitElement {
     if (this.viewMode === 'time-order' || !eventIndexes.length || !this.rootMethod) {
       return eventIndexes;
     }
-    const direction = directionOf(this.viewMode);
-    const paths = new Set<string>();
-    for (const eventIndex of eventIndexes) {
-      const found = findEventByEventIndex(this.rootMethod, eventIndex);
-      if (found) {
-        for (const path of eventKeyPaths(found.event, direction)) {
-          paths.add(path);
-        }
-      }
-    }
-    return [...paths];
+    return keyPathsForEvents(this.rootMethod, eventIndexes, directionOf(this.viewMode));
   }
 
   private _getActiveTable(): Tabulator | null {
