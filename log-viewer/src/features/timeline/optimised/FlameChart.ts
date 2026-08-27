@@ -252,7 +252,7 @@ export class FlameChart<E extends EventNode = EventNode> {
     this.options = options;
     this.callbacks = callbacks;
 
-    // Store truncation markers for rendering
+    // Pushed one at a time: a spread would overrun the argument limit.
     for (const marker of markers) {
       this.markers.push(marker);
     }
