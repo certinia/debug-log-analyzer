@@ -44,6 +44,7 @@ jest.mock('../detailSections.js', () => ({
     selection: { eventIndex?: number } | null,
     activeEventIndex: number | null,
     sourceView?: string,
+    activeBucket?: { instances: number[] } | null,
   ) => {
     // The markers carry the anchor and the active frame through to the rendered
     // content, so a stale build resolving late is distinguishable from the one
@@ -55,7 +56,8 @@ jest.mock('../detailSections.js', () => ({
             title: 'Details',
             content: html`<div class="marker">${selection.eventIndex}</div>
               <div class="active">${activeEventIndex ?? '-'}</div>
-              <div class="view">${sourceView ?? '-'}</div>`,
+              <div class="view">${sourceView ?? '-'}</div>
+              <div class="bucket">${activeBucket?.instances.join(',') ?? '-'}</div>`,
           },
           { id: 'callstack', title: 'Call stack', content: html`<div>c</div>` },
         ]
@@ -149,6 +151,11 @@ function activeMarker(el: LogInspector): string | null {
 /** The direction the tab reported, `-` while it has reported none. */
 function viewMarker(el: LogInspector): string | null {
   return paneView(el).shadowRoot?.querySelector('.view')?.textContent ?? null;
+}
+
+/** The calls a picked merged row counts, `-` while no such row is picked. */
+function bucketMarker(el: LogInspector): string | null {
+  return paneView(el).shadowRoot?.querySelector('.bucket')?.textContent ?? null;
 }
 
 /** The scope switch is slotted into the dock, so it lives in the inspector's own root. */
@@ -377,6 +384,36 @@ describe('LogInspector', () => {
     // A locate picks nothing, so neither the anchor nor the walk moves.
     await flush(el);
     expect([marker(el), activeMarker(el)]).toEqual(['1', '-']);
+  });
+
+  it('describes what a picked row counts when it names no single frame', async () => {
+    const el = await mount('timeline-tab');
+    select('timeline', 1);
+    await flush(el);
+
+    dispatchInspectorLocate(dockLayout(el), [5, 9], true, {
+      kind: 'aggregate',
+      instances: [5, 9],
+    });
+    await flush(el);
+
+    // The bucket answers instead of a walked frame, and the anchor is untouched.
+    expect([marker(el), activeMarker(el), bucketMarker(el)]).toEqual(['1', '-', '5,9']);
+  });
+
+  it('drops the picked row once a single frame is walked to', async () => {
+    const el = await mount('timeline-tab');
+    select('timeline', 1);
+    dispatchInspectorLocate(dockLayout(el), [5, 9], true, {
+      kind: 'aggregate',
+      instances: [5, 9],
+    });
+    await flush(el);
+
+    dispatchInspectorReveal(dockLayout(el), 5);
+    await flush(el);
+
+    expect([activeMarker(el), bucketMarker(el)]).toEqual(['5', '-']);
   });
 
   it('drops a mark the pointer never left when the tab changes', async () => {

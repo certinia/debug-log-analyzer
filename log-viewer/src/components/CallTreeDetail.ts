@@ -37,12 +37,7 @@ import dataGridStyles from '../tabulator/style/DataGrid.scss';
 import './ContextMenu.js';
 import type { ContextMenu } from './ContextMenu.js';
 import { dispatchInspectorLocate, dispatchInspectorReveal } from './inspectorReveal.js';
-import {
-  LOCATED_ROW_CLASS,
-  LocatedRowMarker,
-  rowId,
-  rowIndexStamper,
-} from './locatedRow.js';
+import { LOCATED_ROW_CLASS, LocatedRowMarker, rowId, rowIndexStamper } from './locatedRow.js';
 import { PANEL_ROW_MENU_ITEMS, runPanelRowAction } from './panelRowMenu.js';
 import {
   buildScopedCallTree,
@@ -581,7 +576,15 @@ export class CallTreeDetail extends LitElement {
       if (eventIndex !== null) {
         dispatchInspectorReveal(this, eventIndex);
       } else {
-        dispatchInspectorLocate(this, locatableEventIndexes(data), true);
+        // The same aggregate a merged row in the tab itself reports, so Details
+        // reads the same either way. Built from the row: a scoped row carries no
+        // key, which is what the tab's own rows are read through.
+        const instances = locatableEventIndexes(data);
+        dispatchInspectorLocate(this, instances, true, {
+          kind: 'aggregate',
+          instances,
+          calledBy: this.viewMode === 'bottom-up' ? callerOfRow(rows[0]) : undefined,
+        });
       }
     });
     // Hovering a row marks it in the tab on screen, so the user can see where it
@@ -738,4 +741,22 @@ export class CallTreeDetail extends LitElement {
     this._locatedRow.clear();
     this.viewMode = mode;
   }
+}
+
+/**
+ * The frame that called a bottom-up row's own calls: the caller shown directly
+ * above the row's seed. A tree parent is the callee there, so the walk runs to
+ * the row one level below the top.
+ */
+function callerOfRow(row: RowComponent | undefined): string | undefined {
+  let node = row;
+  let parent = node?.getTreeParent();
+  if (!node || !parent) {
+    return undefined;
+  }
+  for (let above = parent.getTreeParent(); above; above = parent.getTreeParent()) {
+    node = parent;
+    parent = above;
+  }
+  return (node.getData() as Partial<ScopedRow>).text;
 }

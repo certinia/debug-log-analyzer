@@ -43,12 +43,17 @@ import './NamespaceTimeBar.js';
  * `activeEventIndex` is the frame the user walked to inside the selection's own
  * call stack. Details and the call tree follow it; the call stack stays anchored
  * to `selection`, so walking down a stack never puts a frame out of reach.
+ *
+ * `activeBucket` is the same walk onto a row that merges occurrences, which names
+ * no single frame: Details describes the calls that row counts, exactly as it
+ * does for a merged row picked in the tab itself.
  */
 export async function buildDetailSections(
   source: DetailSource,
   selection: DetailSelection | null,
   activeEventIndex: number | null = null,
   sourceView?: SelectionView,
+  activeBucket: DetailSelection | null = null,
 ): Promise<PaneSection[]> {
   // Nothing selected: the whole log is the scope. `DetailDock`'s own empty
   // state still covers the moment before a tab id resolves.
@@ -173,12 +178,21 @@ export async function buildDetailSections(
   const isAggregate = selection.kind === 'aggregate';
   // An aggregate scopes to all its occurrences; a single frame to itself.
   const anchorIndex = isAggregate ? (selection.instances[0] ?? -1) : selection.eventIndex;
-  const active = activeEventIndex ?? anchorIndex;
+  // A walked bucket answers as its own aggregate, keyed on its first occurrence
+  // the way a bucket picked in the tab is.
+  const bucket = activeBucket?.kind === 'aggregate' ? activeBucket : null;
+  const active = bucket ? (bucket.instances[0] ?? anchorIndex) : (activeEventIndex ?? anchorIndex);
   // One frame in the stack is being followed, so the aggregate no longer
   // describes what Details and the call tree are showing.
   const following = active !== anchorIndex;
-  const instances = isAggregate && !following ? selection.instances : null;
-  const calledBy = (isAggregate && !following && selection.calledBy) || '';
+  const instances = bucket
+    ? bucket.instances
+    : isAggregate && !following
+      ? selection.instances
+      : null;
+  const calledBy = bucket
+    ? (bucket.calledBy ?? '')
+    : (isAggregate && !following && selection.calledBy) || '';
 
   const sections: PaneSection[] = [
     {

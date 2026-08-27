@@ -208,6 +208,23 @@ describe('buildDetailSections', () => {
     expect(vitals.getAttribute('called-by')).toBe('');
   });
 
+  it('describes the calls a walked bucket counts, as a bucket picked in the tab is', async () => {
+    const sections = await buildDetailSections(
+      'analysis',
+      { kind: 'aggregate', instances: [11, 12, 13] },
+      null,
+      undefined,
+      { kind: 'aggregate', instances: [21, 22], calledBy: 'Trigger1' },
+    );
+
+    const vitals = rendered(sections, 'vitals', 'event-vitals') as HTMLElement & {
+      instances: number[] | null;
+    };
+    expect(vitals.instances).toEqual([21, 22]);
+    expect(vitals.getAttribute('eventIndex')).toBe('21');
+    expect(vitals.getAttribute('called-by')).toBe('Trigger1');
+  });
+
   it('adds the whole-log database figures for the database with nothing selected', async () => {
     const sections = await buildDetailSections('database', null);
     expect(sections.map((s) => s.id)).toEqual([

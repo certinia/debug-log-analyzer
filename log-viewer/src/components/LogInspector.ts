@@ -63,6 +63,9 @@ export class LogInspector extends LitElement {
   // apart from the selection so the call stack keeps its anchor while Details
   // and the call tree follow the walk.
   private _activeFrames = new Map<DetailSource, number>();
+  // What a picked inspector row stands for, where it merges occurrences and so
+  // names no single frame to walk to. Details describes this instead.
+  private _activeBuckets = new Map<DetailSource, DetailSelection>();
 
   /** The direction each tab is showing, so the inspector can open on the other. */
   private _sourceViews = new Map<DetailSource, SelectionView | undefined>();
@@ -231,6 +234,7 @@ export class LogInspector extends LitElement {
   }): void {
     // A pick in the tab itself is a new anchor, so any walk down the old stack ends.
     this._activeFrames.delete(detail.source);
+    this._activeBuckets.delete(detail.source);
     this._sourceViews.set(detail.source, detail.view);
     if (detail.selection) {
       this._selections.set(detail.source, detail.selection);
@@ -267,6 +271,7 @@ export class LogInspector extends LitElement {
     // frame to follow; the whole-log rows only reveal.
     if (this._scopedSelection(source)) {
       this._activeFrames.set(source, e.detail.eventIndex);
+      this._activeBuckets.delete(source);
       this._scheduleRebuild();
     }
   };
@@ -286,6 +291,13 @@ export class LogInspector extends LitElement {
       eventIndexes: e.detail.eventIndexes,
       sticky: e.detail.sticky,
     });
+    // A picked row that merges occurrences has no frame to walk to, so what it
+    // counts is what Details answers about.
+    if (e.detail.sticky && e.detail.selection && this._scopedSelection(source)) {
+      this._activeFrames.delete(source);
+      this._activeBuckets.set(source, e.detail.selection);
+      this._scheduleRebuild();
+    }
   };
 
   /** Drops a mark left behind by a pointer that never left the row. Sticky, so a
@@ -332,6 +344,7 @@ export class LogInspector extends LitElement {
           this._scopedSelection(source),
           this._activeFrames.get(source) ?? null,
           this._sourceViews.get(source),
+          this._activeBuckets.get(source) ?? null,
         )
       : [];
     // Drop a slow build that a newer selection already superseded.
