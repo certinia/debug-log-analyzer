@@ -300,6 +300,10 @@ export const workspace = {
   },
 };
 
+export const extensions = {
+  getExtension: jest.fn(),
+};
+
 // Mock window
 export const window = {
   showInformationMessage: jest.fn().mockResolvedValue(undefined),
@@ -558,6 +562,7 @@ export default {
   ThemeColor,
   ConfigurationTarget,
   workspace,
+  extensions,
   window,
   commands,
   languages,
