@@ -34,6 +34,8 @@ class DebugLogItem extends Item {
 }
 
 export class RetrieveLogFile {
+  private static servicesDisposalRegistered = false;
+
   static apply(context: Context): void {
     new Command('retrieveLogFile', 'Log: Retrieve Apex Log And Show Analysis', () =>
       RetrieveLogFile.safeCommand(context),
@@ -54,6 +56,17 @@ export class RetrieveLogFile {
     const salesforceServices = await import('../services/salesforceServices.js');
     if (!(await salesforceServices.ensureServicesAvailable())) {
       return;
+    }
+
+    // Disposal is registered here, not in deactivate(), so shutdown never loads this chunk
+    // when the command was not used.
+    if (!RetrieveLogFile.servicesDisposalRegistered) {
+      RetrieveLogFile.servicesDisposalRegistered = true;
+      context.context.subscriptions.push({
+        dispose: () => {
+          salesforceServices.disposeServices().catch(() => {});
+        },
+      });
     }
 
     const workspacePath = workspace.workspaceFolders?.[0]?.uri.fsPath;
