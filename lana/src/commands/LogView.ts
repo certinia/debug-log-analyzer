@@ -49,7 +49,7 @@ export class LogView {
 
   static async createView(
     context: Context,
-    beforeSendLog?: Promise<void>,
+    beforeSendLog?: Promise<string | void>,
     logPath?: string,
     logData?: string,
   ): Promise<WebviewPanel> {
@@ -102,8 +102,14 @@ export class LogView {
 
         switch (cmd) {
           case 'fetchLog': {
-            await beforeSendLog;
-            LogView.sendLog(requestId, panel, context, logPath, logData);
+            try {
+              // A retrieve that resolves to a body could not be cached, so send it inline.
+              const retrievedLog = await beforeSendLog;
+              LogView.sendLog(requestId, panel, context, logPath, retrievedLog || logData);
+            } catch (err: unknown) {
+              const msg = err instanceof Error ? err.message : String(err);
+              context.display.showErrorMessage(`Error loading logfile: ${msg}`);
+            }
             break;
           }
 
@@ -249,10 +255,15 @@ export class LogView {
     logFilePath?: string,
     logData?: string,
   ) {
-    if (!logData && !existsSync(logFilePath || '')) {
-      context.display.showErrorMessage('Log file could not be found.', {
-        modal: true,
-      });
+    // Caching can fail, so only advertise a path the webview and navigation can read.
+    const cachedPath = logFilePath && existsSync(logFilePath) ? logFilePath : undefined;
+    if (!cachedPath) {
+      LogView.currentLogPath = undefined;
+      if (!logData) {
+        context.display.showErrorMessage('Log file could not be found.', {
+          modal: true,
+        });
+      }
     }
 
     const filePath = parse(logFilePath || '');
@@ -264,8 +275,8 @@ export class LogView {
       cmd: 'fetchLog',
       payload: {
         logName: filePath.base,
-        logUri: logFilePath ? panel.webview.asWebviewUri(Uri.file(logFilePath)).toString(true) : '',
-        logPath: logFilePath,
+        logUri: cachedPath ? panel.webview.asWebviewUri(Uri.file(cachedPath)).toString(true) : '',
+        logPath: cachedPath,
         logData: logData,
         navigateToTimestamp,
       },

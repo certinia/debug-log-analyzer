@@ -75,6 +75,11 @@ const log = (id: string, startTime = '2024-01-01T00:00:00.000Z', durationMillise
   Status: 'Success',
 });
 
+/** The deferred retrieve handed to LogView.createView as its beforeSendLog promise. */
+function retrieveLogPromise(): Promise<string | void> {
+  return mockCreateView.mock.calls[0]?.[1] as Promise<string | void>;
+}
+
 describe('RetrieveLogFile', () => {
   beforeEach(() => {
     jest.clearAllMocks();
@@ -120,17 +125,18 @@ describe('RetrieveLogFile', () => {
     RetrieveLogFile.apply(context as unknown as import('../../Context.js').Context);
     await command()();
 
+    expect(mockCreateView).toHaveBeenCalledWith(
+      context,
+      expect.any(Promise),
+      expect.stringContaining('selected-log.log'),
+    );
+    // A cached log is streamed from disk, so the body is never sent to the webview.
+    await expect(retrieveLogPromise()).resolves.toBeUndefined();
     expect(mockGetLogBody).toHaveBeenCalledWith('selected-log');
     expect(mockFileOrFolderExists).toHaveBeenCalledWith(
       expect.stringContaining('selected-log.log'),
     );
     expect(mockWriteFile).toHaveBeenCalledWith(
-      expect.stringContaining('selected-log.log'),
-      'log body',
-    );
-    expect(mockCreateView).toHaveBeenCalledWith(
-      context,
-      undefined,
       expect.stringContaining('selected-log.log'),
       'log body',
     );
@@ -186,14 +192,20 @@ describe('RetrieveLogFile', () => {
     expect(context.display.showErrorMessage).not.toHaveBeenCalled();
   });
 
-  it('still opens a retrieved log when cache writing fails', async () => {
+  it('sends the log body inline when cache writing fails', async () => {
     mockListLogs.mockResolvedValue([log('selected-log')]);
     mockPick.mockResolvedValue([{ logId: 'selected-log' }]);
     mockWriteFile.mockRejectedValue(new Error('read-only workspace'));
     const context = createMockContext();
     RetrieveLogFile.apply(context as unknown as import('../../Context.js').Context);
     await command()();
+
     expect(mockCreateView).toHaveBeenCalled();
+    await expect(retrieveLogPromise()).resolves.toBe('log body');
+    expect(context.display.output).toHaveBeenCalledWith(
+      expect.stringContaining('Unable to cache retrieved log'),
+      true,
+    );
   });
 
   it('sorts logs newest first before presenting them', async () => {
@@ -244,9 +256,7 @@ describe('RetrieveLogFile', () => {
       const context = createMockContext();
       RetrieveLogFile.apply(context as unknown as import('../../Context.js').Context);
       await command()();
-      expect(context.display.showErrorMessage).toHaveBeenCalledWith(
-        expect.stringContaining('Salesforce denied access'),
-      );
+      await expect(retrieveLogPromise()).rejects.toThrow('Salesforce denied access');
     },
   );
 });

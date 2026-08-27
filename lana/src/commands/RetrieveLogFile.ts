@@ -90,15 +90,20 @@ export class RetrieveLogFile {
           return LogView.createView(context, Promise.resolve(), logFilePath);
         }
 
-        const logData = await salesforceServices.getLogBody(logFileId);
-        this.assertRetrievedLog(logFileId, logData);
-        try {
-          await salesforceServices.writeFile(logFilePath, logData);
-        } catch (error: unknown) {
-          const message = error instanceof Error ? error.message : String(error);
-          context.display.output(`Unable to cache retrieved log: ${message}`, true);
-        }
-        return LogView.createView(context, undefined, logFilePath, logData);
+        // Open the panel first and retrieve behind it. The body only crosses the webview
+        // message channel when it could not be cached, so the webview streams it from disk.
+        const retrieveLog = (async (): Promise<string | void> => {
+          const logData = await salesforceServices.getLogBody(logFileId);
+          RetrieveLogFile.assertRetrievedLog(logFileId, logData);
+          try {
+            await salesforceServices.writeFile(logFilePath, logData);
+          } catch (error: unknown) {
+            const message = error instanceof Error ? error.message : String(error);
+            context.display.output(`Unable to cache retrieved log: ${message}`, true);
+            return logData;
+          }
+        })();
+        return LogView.createView(context, retrieveLog, logFilePath);
       }
     } finally {
       loadingPicker.dispose();
