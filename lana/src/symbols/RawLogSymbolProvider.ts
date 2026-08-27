@@ -81,7 +81,9 @@ class RawLogSymbolProvider implements DocumentSymbolProvider {
         symbols.push(symbol);
       } else {
         // No foldable range for this event; lift its descendants to this level.
-        symbols.push(...children);
+        for (const child of children) {
+          symbols.push(child);
+        }
       }
     }
 
