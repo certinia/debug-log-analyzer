@@ -4,6 +4,7 @@
 import { join } from 'path';
 import {
   window,
+  workspace,
   type QuickPick as VSCodeQuickPick,
   type QuickPickItem,
   type WebviewPanel,
@@ -12,7 +13,6 @@ import {
 import { appName } from '../AppSettings.js';
 import type { Context } from '../Context.js';
 import { Item, Options, QuickPick } from '../display/QuickPick.js';
-import { QuickPickWorkspace } from '../display/QuickPickWorkspace.js';
 import type { ApexLogListItem } from '../services/salesforceServices.js';
 import { Command } from './Command.js';
 import { LogView } from './LogView.js';
@@ -56,7 +56,10 @@ export class RetrieveLogFile {
       return;
     }
 
-    const workspacePath = await QuickPickWorkspace.pickOrReturn(context);
+    const workspacePath = workspace.workspaceFolders?.[0]?.uri.fsPath;
+    if (!workspacePath) {
+      throw new Error('No workspace selected');
+    }
     const loadingPicker = RetrieveLogFile.showLoadingPicker();
     try {
       const logFiles = await salesforceServices.listLogs();

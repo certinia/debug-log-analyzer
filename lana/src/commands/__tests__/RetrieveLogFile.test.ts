@@ -2,10 +2,9 @@
  * Copyright (c) 2026 Certinia Inc. All rights reserved.
  */
 import { beforeEach, describe, expect, it } from '@jest/globals';
-import { commands, window } from 'vscode';
+import { commands, Uri, window, workspace } from 'vscode';
 import { createMockContext } from '../../__tests__/helpers/test-builders.js';
 import { QuickPick } from '../../display/QuickPick.js';
-import { QuickPickWorkspace } from '../../display/QuickPickWorkspace.js';
 import {
   ensureServicesAvailable,
   fileOrFolderExists,
@@ -16,9 +15,6 @@ import {
 import { LogView } from '../LogView.js';
 import { RetrieveLogFile } from '../RetrieveLogFile.js';
 
-jest.mock('../../display/QuickPickWorkspace.js', () => ({
-  QuickPickWorkspace: { pickOrReturn: jest.fn() },
-}));
 jest.mock('../../display/QuickPick.js', () => ({
   QuickPick: { pick: jest.fn() },
   Item: class {
@@ -53,7 +49,6 @@ jest.mock('../../services/salesforceServices.js', () => ({
 }));
 jest.mock('../LogView.js', () => ({ LogView: { createView: jest.fn() } }));
 
-const mockPickWorkspace = QuickPickWorkspace.pickOrReturn as jest.Mock;
 const mockPick = QuickPick.pick as jest.Mock;
 const mockEnsureServicesAvailable = ensureServicesAvailable as jest.Mock;
 const mockFileOrFolderExists = fileOrFolderExists as jest.Mock;
@@ -62,6 +57,13 @@ const mockGetLogBody = getLogBody as jest.Mock;
 const mockWriteFile = writeFile as jest.Mock;
 const mockCreateView = LogView.createView as jest.Mock;
 const mockRegisterCommand = commands.registerCommand as jest.Mock;
+const mockWorkspace = workspace as unknown as {
+  workspaceFolders: Array<{
+    uri: ReturnType<typeof Uri.file>;
+    name: string;
+    index: number;
+  }>;
+};
 
 const log = (id: string, startTime = '2024-01-01T00:00:00.000Z', durationMilliseconds = 100) => ({
   Id: id,
@@ -78,7 +80,9 @@ describe('RetrieveLogFile', () => {
     jest.clearAllMocks();
     mockEnsureServicesAvailable.mockResolvedValue(true);
     mockFileOrFolderExists.mockResolvedValue(false);
-    mockPickWorkspace.mockResolvedValue('/test/workspace');
+    mockWorkspace.workspaceFolders = [
+      { uri: Uri.file('/test/workspace'), name: 'workspace', index: 0 },
+    ];
     mockListLogs.mockResolvedValue([]);
     mockPick.mockResolvedValue([]);
     mockGetLogBody.mockResolvedValue('log body');
@@ -132,6 +136,28 @@ describe('RetrieveLogFile', () => {
     );
   });
 
+  it('uses the first workspace selected by Salesforce Services for the cache', async () => {
+    mockWorkspace.workspaceFolders = [
+      { uri: Uri.file('/test/first-workspace'), name: 'first', index: 0 },
+      { uri: Uri.file('/test/second-workspace'), name: 'second', index: 1 },
+    ];
+    mockListLogs.mockResolvedValue([log('selected-log')]);
+    mockPick.mockResolvedValue([{ logId: 'selected-log' }]);
+    const context = createMockContext();
+    RetrieveLogFile.apply(context as unknown as import('../../Context.js').Context);
+
+    await command()();
+
+    expect(mockWriteFile).toHaveBeenCalledWith(
+      expect.stringContaining('/test/first-workspace'),
+      'log body',
+    );
+    expect(mockWriteFile).not.toHaveBeenCalledWith(
+      expect.stringContaining('/test/second-workspace'),
+      expect.anything(),
+    );
+  });
+
   it('opens a cached log without downloading it again', async () => {
     mockListLogs.mockResolvedValue([log('cached-log')]);
     mockPick.mockResolvedValue([{ logId: 'cached-log' }]);
@@ -149,14 +175,15 @@ describe('RetrieveLogFile', () => {
     );
   });
 
-  it('stops before workspace selection when Salesforce Services is unavailable', async () => {
+  it('stops before reading the workspace when Salesforce Services is unavailable', async () => {
     mockEnsureServicesAvailable.mockResolvedValue(false);
+    mockWorkspace.workspaceFolders = [];
     const context = createMockContext();
     RetrieveLogFile.apply(context as unknown as import('../../Context.js').Context);
     await command()();
 
-    expect(mockPickWorkspace).not.toHaveBeenCalled();
     expect(mockListLogs).not.toHaveBeenCalled();
+    expect(context.display.showErrorMessage).not.toHaveBeenCalled();
   });
 
   it('still opens a retrieved log when cache writing fails', async () => {
