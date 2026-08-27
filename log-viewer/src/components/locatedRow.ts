@@ -113,6 +113,18 @@ const keyPaths = new WeakMap<CallRow, string>();
  *
  * Undefined on a row that stands for one frame, which its event index identifies.
  */
+/**
+ * A row's own index value, read from the data.
+ *
+ * Never `RowComponent.getIndex()`: that routes through Tabulator's accessor,
+ * which deep-clones the row data. Our rows hold the parsed log, so one call
+ * walks the whole event graph and blocks the UI for minutes.
+ */
+export function rowId(row: RowComponent | undefined): number | undefined {
+  const id = (row?.getData() as { id?: unknown } | undefined)?.id;
+  return typeof id === 'number' ? id : undefined;
+}
+
 export function rowKeyPath(row: RowComponent): string | undefined {
   const data = rowCallData(row);
   if (data.key === undefined) {

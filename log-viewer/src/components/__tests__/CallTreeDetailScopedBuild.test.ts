@@ -60,6 +60,7 @@ interface StubTable {
   redraw: jest.Mock;
   destroy: jest.Mock;
   selectRow: jest.Mock;
+  getSelectedRows: jest.Mock;
 }
 
 /** The stub tables built so far, oldest first. */
@@ -108,9 +109,13 @@ async function frame(el: CallTreeDetail): Promise<void> {
   await settle(el);
 }
 
-async function mount(eventIndex: number): Promise<CallTreeDetail> {
+async function mount(
+  eventIndex: number,
+  sourceView?: 'callers' | 'callees',
+): Promise<CallTreeDetail> {
   const el = document.createElement('call-tree-detail') as CallTreeDetail;
   el.eventIndex = eventIndex;
+  el.sourceView = sourceView;
   document.body.appendChild(el);
   await el.updateComplete;
   return el;
@@ -179,6 +184,40 @@ describe('CallTreeDetail scoped build', () => {
     expect(table.selectRow).toHaveBeenCalledWith([9]);
     expect(build).not.toHaveBeenCalled();
     expect(table.setData).not.toHaveBeenCalled();
+  });
+
+  it('leaves the row alone when the mark is already on it', async () => {
+    build.mockImplementation((eventIndex) => Promise.resolve(tree(eventIndex * 1000)));
+    const el = await mount(5);
+    await frame(el);
+    const table = tables.instances[0]!;
+    const picked = { deselect: jest.fn(), getData: () => ({ id: 9 }) };
+    table.getSelectedRows.mockReturnValue([picked]);
+    table.selectRow.mockClear();
+
+    el.activeEventIndex = 9;
+    await frame(el);
+
+    // Re-selecting it would re-render the row, and tabulator's row re-render
+    // takes the table's focus with it.
+    expect(picked.deselect).not.toHaveBeenCalled();
+    expect(table.selectRow).not.toHaveBeenCalled();
+  });
+
+  it('keeps the picked row where a view merges occurrences', async () => {
+    build.mockImplementation((eventIndex) => Promise.resolve(tree(eventIndex * 1000)));
+    // A tab showing callees opens the inspector on bottom up, whose rows merge.
+    const el = await mount(5, 'callees');
+    await frame(el);
+    const table = tables.instances[0]!;
+    const picked = { deselect: jest.fn() };
+    table.getSelectedRows.mockReturnValue([picked]);
+
+    el.activeEventIndex = 9;
+    await frame(el);
+
+    expect(picked.deselect).not.toHaveBeenCalled();
+    expect(table.selectRow).not.toHaveBeenCalled();
   });
 
   it('retargets the percentage denominator without touching the bar width', async () => {

@@ -37,7 +37,12 @@ import dataGridStyles from '../tabulator/style/DataGrid.scss';
 import './ContextMenu.js';
 import type { ContextMenu } from './ContextMenu.js';
 import { dispatchInspectorLocate, dispatchInspectorReveal } from './inspectorReveal.js';
-import { LOCATED_ROW_CLASS, LocatedRowMarker, rowIndexStamper } from './locatedRow.js';
+import {
+  LOCATED_ROW_CLASS,
+  LocatedRowMarker,
+  rowId,
+  rowIndexStamper,
+} from './locatedRow.js';
 import { PANEL_ROW_MENU_ITEMS, runPanelRowAction } from './panelRowMenu.js';
 import {
   buildScopedCallTree,
@@ -338,26 +343,46 @@ export class CallTreeDetail extends LitElement {
   }
 
   /**
-   * Marks the active frame, without reporting it as a new pick. Only rows keyed by
-   * event can be selected by index, so the grouped views have nothing to mark.
+   * Marks the active frame, without reporting it as a new pick. Only rows keyed
+   * by event can be selected by index, so a view whose rows merge occurrences
+   * keeps the row the user picked: clearing it would take away the row the
+   * keyboard moves from.
    */
   private _markActive(): void {
     const table = this._tables[this.viewMode]?.table;
-    if (!table) {
+    if (!table || this.viewMode !== 'time-order' || this._scoped?.timeOrderMerged) {
       return;
     }
+    const selected = table.getSelectedRows();
+    // Already where it belongs, which is the usual case: the row the walk
+    // reports is the row the user just picked here. Selecting it again re-renders
+    // it, and tabulator's row re-render takes the table's focus with it.
+    //
+    // `id` is read from the data, never `getIndex()`: that routes through
+    // Tabulator's accessor, which deep-clones the row data — and our rows hold
+    // the parsed log, so one call walks the whole graph.
+    if (selected.length === 1 && rowId(selected[0]) === this.activeEventIndex) {
+      return;
+    }
+    const holder = this._tableHolder(this.viewMode);
+    const root = holder?.getRootNode();
+    const hadFocus = root instanceof ShadowRoot && root.activeElement === holder;
     this._echoGuard.run(() => {
-      for (const selected of table.getSelectedRows()) {
-        selected.deselect();
+      for (const row of selected) {
+        row.deselect();
       }
-      if (
-        this.viewMode === 'time-order' &&
-        !this._scoped?.timeOrderMerged &&
-        this.activeEventIndex >= 0
-      ) {
+      if (this.activeEventIndex >= 0) {
         table.selectRow([this.activeEventIndex]);
       }
     });
+    // The re-render above drops focus, so the keyboard keeps its place here.
+    if (hadFocus) {
+      holder?.focus({ preventScroll: true });
+    }
+  }
+
+  private _tableHolder(mode: ViewMode): HTMLElement | null {
+    return this._tableHost(mode)?.querySelector<HTMLElement>('.tabulator-tableholder') ?? null;
   }
 
   /**
