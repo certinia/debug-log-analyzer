@@ -14,7 +14,7 @@
     "@vscode/codicons": "^0.0.45",
     "antlr4": "4.13.2",
     "lit": "^3.3.3",
-    "pixi.js": "^8.19.0",
+    "pixi.js": "^8.20.0",
     "tabulator-tables": "^6.5.2"
   },
   "devDependencies": {
