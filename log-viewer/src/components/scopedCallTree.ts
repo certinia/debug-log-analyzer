@@ -279,8 +279,8 @@ async function subtreeRoots(
  * (time-order / aggregated / bottom-up) or null when nothing is selected.
  *
  * An aggregate selection scopes to every occurrence, and a frame can occur tens
- * of thousands of times, so the walk is sliced: it hands the frame back through
- * `options.yieldFrame` rather than blocking on the whole selection at once.
+ * of thousands of times, so the walk is sliced: it hands the thread back through
+ * `options.yieldSlice` rather than blocking on the whole selection at once.
  * Nothing is capped or sampled — every occurrence is counted, just not all in
  * one frame.
  */

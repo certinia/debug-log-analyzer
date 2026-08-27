@@ -494,7 +494,7 @@ export class CallTreeDetail extends LitElement {
       built.rows = [];
       void built.table.setData([]);
     }
-    const data = await this._rows(mode, { yieldFrame: waitForNextFrame, signal });
+    const data = await this._rows(mode, { signal });
     if (!data || signal.aborted) {
       return;
     }

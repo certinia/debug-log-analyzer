@@ -76,9 +76,9 @@ import {
 } from '../scopedCallTree.js';
 import type { FrameBudgetOptions } from '../../core/utility/FrameBudget.js';
 
-/** These fixtures are small enough to never hit a slice deadline, so `yieldFrame`
+/** These fixtures are small enough to never hit a slice deadline, so `yieldSlice`
  *  is only there to satisfy the contract. */
-const options: FrameBudgetOptions = { yieldFrame: () => Promise.resolve() };
+const options: FrameBudgetOptions = { yieldSlice: () => Promise.resolve() };
 
 function build(eventIndex: number, instances?: number[]) {
   return buildScopedCallTree(eventIndex, instances ?? null, options);
@@ -376,7 +376,7 @@ describe('buildScopedCallTree', () => {
     const instances = loopOccurrences(OCCURRENCES);
     let yields = 0;
     const sliced: FrameBudgetOptions = {
-      yieldFrame: () => {
+      yieldSlice: () => {
         yields += 1;
         return Promise.resolve();
       },
@@ -406,7 +406,7 @@ describe('buildScopedCallTree', () => {
     try {
       // The first yield is the first chance to notice; nothing is returned after it.
       const tree = await buildScopedCallTree(instances[0]!, instances, {
-        yieldFrame: () => Promise.resolve(),
+        yieldSlice: () => Promise.resolve(),
         signal: AbortSignal.abort(),
       });
       expect(tree).toBeNull();
@@ -466,7 +466,7 @@ describe('buildWholeLogCallTree', () => {
     clock.mockImplementation(() => (time += 100));
     try {
       const tree = await buildWholeLogCallTree({
-        yieldFrame: () => Promise.resolve(),
+        yieldSlice: () => Promise.resolve(),
         signal: AbortSignal.abort(),
       });
       expect(tree).toBeNull();
