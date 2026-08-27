@@ -142,7 +142,13 @@ export class CallTreeDetail extends LitElement {
 
   /** A built table. `stale` means it holds a previous selection's rows, so it
    *  needs re-filling before it is shown again. */
-  private _tables: Record<ViewMode, { table: Tabulator; stale: boolean } | null> = {
+  private _tables: Record<
+    ViewMode,
+    /** `rows` is the data the table was filled with. Never read it back with
+     *  `getData()`: that runs Tabulator's accessors, which deep-clone the row
+     *  data, and our rows hold the parsed log. */
+    { table: Tabulator; stale: boolean; rows: ScopedRow[] } | null
+  > = {
     'time-order': null,
     aggregated: null,
     'bottom-up': null,
@@ -185,6 +191,9 @@ export class CallTreeDetail extends LitElement {
 
   /** Marks the row for the frame under the pointer in the tab's own view. */
   private _locatedRow = new LocatedRowMarker();
+  // The frames the tab on screen last reported under its pointer, so a table
+  // that finishes building after the report still marks them.
+  private _locatedEvents: readonly number[] = [];
   private _locateUnsubscribe?: () => void;
   private _selectionClearUnsubscribe?: () => void;
 
@@ -218,10 +227,8 @@ export class CallTreeDetail extends LitElement {
   connectedCallback(): void {
     super.connectedCallback();
     this._locateUnsubscribe = eventBus.on('detail:locate', ({ eventIndexes }) => {
-      this._locatedRow.mark(
-        this._tableHost(this.viewMode),
-        this._rowIdsFor(this.viewMode, eventIndexes),
-      );
+      this._locatedEvents = eventIndexes;
+      this._markLocated();
     });
     // Escape clears the selection of the tab on screen. A picked row here is no
     // selection of that view, so this table drops its own.
@@ -237,13 +244,24 @@ export class CallTreeDetail extends LitElement {
    * grouped row merges occurrences behind a synthetic id, so it is found by the
    * occurrences it carries — and one frame can name several rows in Bottom-Up.
    */
+  private _markLocated(): void {
+    this._locatedRow.mark(
+      this._tableHost(this.viewMode),
+      this._rowIdsFor(this.viewMode, this._locatedEvents),
+    );
+  }
+
   private _rowIdsFor(mode: ViewMode, eventIndexes: readonly number[]): number[] {
     if ((mode === 'time-order' && !this._scoped?.timeOrderMerged) || !eventIndexes.length) {
       return [...eventIndexes];
     }
-    const byEvent = (this._rowsByEvent[mode] ??= rowIdsByEvent(
-      (this._tables[mode]?.table.getData() ?? []) as ScopedRow[],
-    ));
+    const rows = this._tables[mode]?.rows ?? [];
+    if (!rows.length) {
+      // Still building. Caching the map now would hold an empty one for the life
+      // of the scope, since only a new scope clears it.
+      return [];
+    }
+    const byEvent = (this._rowsByEvent[mode] ??= rowIdsByEvent(rows));
     const ids = new Set<number>();
     for (const eventIndex of eventIndexes) {
       for (const id of byEvent.get(eventIndex) ?? []) {
@@ -473,6 +491,7 @@ export class CallTreeDetail extends LitElement {
       // Those rows belong to the previous selection and the build below spans
       // several frames — clear them rather than leave them standing under a
       // selection they don't describe.
+      built.rows = [];
       void built.table.setData([]);
     }
     const data = await this._rows(mode, { yieldFrame: waitForNextFrame, signal });
@@ -489,7 +508,12 @@ export class CallTreeDetail extends LitElement {
     const slot = this._tables[mode];
     if (slot) {
       slot.stale = false;
-      void slot.table.setData(data).then(() => this._markActive());
+      slot.rows = data;
+      this._rowsByEvent[mode] = null;
+      void slot.table.setData(data).then(() => {
+        this._markActive();
+        this._markLocated();
+      });
       return;
     }
     if (!scoped) {
@@ -591,8 +615,9 @@ export class CallTreeDetail extends LitElement {
     });
     table.on('tableBuilt', () => {
       this._markActive();
+      this._markLocated();
     });
-    this._tables[mode] = { table, stale: false };
+    this._tables[mode] = { table, stale: false, rows: data };
   }
 
   /** Row right-click menu: reveal in the Call Tree tab, or copy the frame. */
