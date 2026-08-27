@@ -382,8 +382,8 @@
   },
   "dependencies": {
     "@apexdevtools/apex-parser": "5.1.0",
-    "@salesforce/apex-node": "^9.0.0",
-    "@salesforce/core": "^9.1.0"
+    "@salesforce/apex-node": "^9.0.4",
+    "@salesforce/core": "^9.1.4"
   },
   "devDependencies": {
     "@types/jest": "^30.0.0",
