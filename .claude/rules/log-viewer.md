@@ -15,6 +15,9 @@ Webview UI.
 
 - Parse + render: `<5MB` in `<1s`, `10MB` in `<3s`, `20MB+` in `<5s`. Benchmark on `sample-app/` logs.
 - Nothing synchronous over 50ms. Show progress over 100ms.
+- Be fast and never block.
+- Keep memory low, even at the cost of speed.
+- Weigh that trade in every change, and measure it.
 
 ## Theme
 

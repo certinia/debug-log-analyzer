@@ -10,6 +10,7 @@ import {
 } from 'tabulator-tables';
 
 import { isCodeDrivenExpand, withCodeDrivenExpand } from './expandOrigin.js';
+import { tableHolder } from './tableHolder.js';
 
 // todo: make this generic and support opening grouped rows too then use on DB view.
 // todo: remove the '@ts-expect-error' + fix the types file
@@ -35,7 +36,6 @@ export class RowKeyboardNavigation extends Module {
   static moduleExtensions = this.getModuleExtensions();
 
   private localTable: Tabulator;
-  private tableHolder: HTMLElement | null = null;
 
   constructor(table: Tabulator) {
     super(table);
@@ -61,8 +61,7 @@ export class RowKeyboardNavigation extends Module {
 
     row.select();
     // The key bindings only fire while the holder itself holds focus.
-    this.tableHolder ??= this.localTable.element.querySelector('.tabulator-tableholder');
-    this.tableHolder?.focus({ preventScroll: true });
+    tableHolder(this.localTable.element)?.focus({ preventScroll: true });
   }
 
   rowClick(event: UIEvent, row: RowComponent) {

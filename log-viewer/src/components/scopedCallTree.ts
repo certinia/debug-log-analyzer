@@ -83,7 +83,11 @@ export function rowIdsByEvent(rows: readonly ScopedRow[]): Map<number, number[]>
       }
     }
     if (row._children) {
-      stack.push(...row._children);
+      // Pushed one at a time: a spread (and `push.apply`) passes each element as
+      // an argument, and a wide level would overrun the argument limit.
+      for (const child of row._children) {
+        stack.push(child);
+      }
     }
   }
   return byEvent;
@@ -465,7 +469,10 @@ async function aggregate(
         seen.add(index);
       }
       if (row._children) {
-        (group._children as ScopedRow[]).push(...row._children);
+        const kids = group._children as ScopedRow[];
+        for (const child of row._children) {
+          kids.push(child);
+        }
       }
     }
 
