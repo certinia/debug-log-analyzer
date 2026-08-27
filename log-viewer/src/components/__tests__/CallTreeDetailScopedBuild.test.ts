@@ -38,7 +38,7 @@ jest.mock('../scopedCallTree.js', () => ({
   // Keep the real row readers: the hover test is about which rows name a frame.
   revealableEventIndex: jest.requireActual('../scopedCallTree.js').revealableEventIndex,
   locatableEventIndexes: jest.requireActual('../scopedCallTree.js').locatableEventIndexes,
-  rowIdsByEvent: jest.requireActual('../scopedCallTree.js').rowIdsByEvent,
+  rowIdsByPath: jest.requireActual('../scopedCallTree.js').rowIdsByPath,
 }));
 
 import { Tabulator } from 'tabulator-tables';
@@ -50,6 +50,10 @@ import { INSPECTOR_LOCATE_EVENT, type InspectorLocateEvent } from '../inspectorR
 import { eventBus } from '../../core/events/EventBus.js';
 import type { ProgressParams } from '../../tabulator/format/ProgressMS.js';
 import { LOCATED_ROW_CLASS } from '../locatedRow.js';
+import type { ApexLog } from 'apex-log-parser';
+
+import { logStoreFor, type LogStore } from '../../core/log/LogStore.js';
+import { ROOT_PATH_ID } from '../../core/log/keyPathIds.js';
 
 const build = jest.mocked(buildScopedCallTree);
 
@@ -286,10 +290,20 @@ describe('CallTreeDetail scoped build', () => {
     expect(totalColumn(tables.instances[0]!).formatterParams.totalValue).toBe(6000);
   });
   it('marks the rows a frame names once the merged view has its rows', async () => {
-    // A row that merges occurrences, so only the map from the rows can name it.
-    const merged = [{ id: -3, eventIndexes: [8, 12], _children: null }] as unknown as ScopedRow[];
+    // A merged row is named by the bucket path it stands for, so the frame the
+    // pointer reports has to be reachable through the log to be translated.
+    const event = { eventIndex: 8, type: 'METHOD_ENTRY', namespace: '', text: 'm' };
+    const log = { eventsById: [] as unknown[], children: [] };
+    log.eventsById[8] = { ...event, parent: log, children: [] };
+    const pathId = logStoreFor(log as unknown as ApexLog)
+      .keyPathIds()
+      .pathId(ROOT_PATH_ID, 'METHOD_ENTRY||m');
+    const merged = [
+      { id: -3, eventIndexes: [8, 12], _pathId: pathId, _children: null },
+    ] as unknown as ScopedRow[];
     const resolvers = deferBuilds();
     const el = await mount(5, 'callees');
+    el.logStore = { log } as unknown as LogStore;
     await frame(el);
     const grid = el.shadowRoot!.querySelector('.table-host:not(.is-hidden) .grid')!;
     const row = document.createElement('div');
@@ -314,6 +328,43 @@ describe('CallTreeDetail scoped build', () => {
     // The tree finished after the report, so the build marks what was reported.
     tableBuilt?.();
 
+    expect(row.classList.contains(LOCATED_ROW_CLASS)).toBe(true);
+  });
+
+  it('leaves a frame the scope does not hold unmarked, path or no path', async () => {
+    // The scoped views hold only the selection's own calls, but a merged row is
+    // named by its bucket path — which a second call of the same method
+    // elsewhere in the log shares.
+    const event = { eventIndex: 8, type: 'METHOD_ENTRY', namespace: '', text: 'm' };
+    const log = { eventsById: [] as unknown[], children: [] };
+    log.eventsById[8] = { ...event, parent: log, children: [] };
+    log.eventsById[12] = { ...event, eventIndex: 12, parent: log, children: [] };
+    const pathId = logStoreFor(log as unknown as ApexLog)
+      .keyPathIds()
+      .pathId(ROOT_PATH_ID, 'METHOD_ENTRY||m');
+    const merged = [
+      { id: -3, eventIndexes: [8], _pathId: pathId, _children: null },
+    ] as unknown as ScopedRow[];
+    build.mockResolvedValue({
+      ...tree(5000),
+      holds: (eventIndex: number) => eventIndex === 8,
+      aggregated: () => Promise.resolve(merged),
+      bottomUp: () => Promise.resolve(merged),
+    });
+    const el = await mount(5, 'callees');
+    el.logStore = { log } as unknown as LogStore;
+    await frame(el);
+    const grid = el.shadowRoot!.querySelector('.table-host:not(.is-hidden) .grid')!;
+    const row = document.createElement('div');
+    row.classList.add('tabulator-row');
+    row.setAttribute('data-row-index', '-3');
+    grid.append(row);
+
+    // Frame 12 sits at the same path as the row, but the scope never held it.
+    eventBus.emit('detail:locate', { source: 'timeline', eventIndexes: [12] });
+    expect(row.classList.contains(LOCATED_ROW_CLASS)).toBe(false);
+
+    eventBus.emit('detail:locate', { source: 'timeline', eventIndexes: [8] });
     expect(row.classList.contains(LOCATED_ROW_CLASS)).toBe(true);
   });
 

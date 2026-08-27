@@ -9,6 +9,8 @@ import {
   SOSLExecuteBeginLine,
 } from 'apex-log-parser';
 
+import { KeyPathIds } from './keyPathIds.js';
+
 export type Stack = LogEvent[];
 
 /**
@@ -22,6 +24,7 @@ export class LogStore {
   readonly log: ApexLog;
 
   private _statements: Statements | null = null;
+  private _keyPathIds: KeyPathIds | null = null;
 
   constructor(log: ApexLog) {
     this.log = log;
@@ -62,6 +65,12 @@ export class LogStore {
   /** Every SOSL statement in the log, in log order. */
   soslLines(): SOSLExecuteBeginLine[] {
     return this.statements().sosl;
+  }
+
+  /** The interned bucket paths of this log, shared by every view that marks a row
+   *  whose occurrences are merged. */
+  keyPathIds(): KeyPathIds {
+    return (this._keyPathIds ??= new KeyPathIds());
   }
 
   private statements(): Statements {

@@ -638,7 +638,7 @@ export class AnalysisView extends LitElement {
             this._clearSearchHighlights();
           }
         },
-        rowFormatter: groupedRowFormatter,
+        rowFormatter: groupedRowFormatter(rootMethod),
       },
       {
         placeholder: 'No Analysis Available',
