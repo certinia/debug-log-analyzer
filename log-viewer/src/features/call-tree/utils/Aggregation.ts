@@ -144,12 +144,24 @@ export function getEventKey(event: LogEvent): string {
 }
 
 /**
+ * The bucket keys from `event` out to its outermost frame, innermost first. The
+ * log root heads no row in any view, so the walk stops below it.
+ */
+export function eventKeyChain(event: LogEvent): string[] {
+  const keys: string[] = [];
+  for (let node: LogEvent | null = event; node?.parent; node = node.parent) {
+    keys.push(getEventKey(node));
+  }
+  return keys;
+}
+
+/**
  * Generates a key for call-stack tracking to detect recursive calls.
  * Excludes event type so the same method is recognised regardless of entry type
  * (e.g. CODE_UNIT_STARTED at the top level, METHOD_ENTRY for recursive calls).
  * Matches the approach used by the analysis view's RowGrouper.
  */
-function getStackKey(event: LogEvent): string {
+export function getStackKey(event: LogEvent): string {
   return `${event.namespace}|${event.text}`;
 }
 

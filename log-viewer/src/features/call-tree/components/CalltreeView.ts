@@ -14,14 +14,16 @@ import type { ApexLog, LogEvent } from 'apex-log-parser';
 import { eventBus, type DetailSource } from '../../../core/events/EventBus.js';
 import { SelectionEchoGuard } from '../../../core/events/SelectionEchoGuard.js';
 import { vscodeMessenger } from '../../../core/messaging/VSCodeExtensionMessenger.js';
-import { findEventByEventIndex } from '../../../core/utility/EventSearch.js';
+import { eventByEventIndex } from '../../../core/utility/EventSearch.js';
 import { isVisible } from '../../../core/utility/Util.js';
 import { getSettings, updateSetting } from '../../settings/Settings.js';
 import { CALLTREE_GO_TO_ROW } from '../navigation.js';
 import type { AggregatedRow, BottomUpRow } from '../utils/Aggregation.js';
+import { findBucketRow } from '../utils/bucketRows.js';
 import {
   categoryColoringStyles,
   categoryRowFormatter,
+  groupedRowFormatter,
   wireCategoryColoring,
 } from '../utils/CategoryColoring.js';
 import { deepFilter } from '../utils/DetailsFilter.js';
@@ -30,6 +32,7 @@ import type { TimeOrderRow } from '../utils/TimeOrderTree.js';
 import { waitForNextFrame } from '../../../core/utility/FrameBudget.js';
 
 import { inMsRange, type FilterRange } from '../../../tabulator/filters/MinMax.js';
+import { withCodeDrivenExpand } from '../../../tabulator/module/expandOrigin.js';
 
 import dataGridStyles from '../../../tabulator/style/DataGrid.scss';
 
@@ -42,7 +45,7 @@ import '../../../components/ContextMenu.js';
 import type { ContextMenu } from '../../../components/ContextMenu.js';
 import '../../../components/GridSkeleton.js';
 import '../../../components/ViewModeSwitch.js';
-import type { ViewModeOption } from '../../../components/ViewModeSwitch.js';
+import { VIEW_MODES, directionOf, type ViewMode } from '../../../components/callTreeViewModes.js';
 import '../../../components/datagrid-facet-filter.js';
 import '../../../components/datagrid-filter-bar.js';
 import '../../../components/datagrid-range-filter.js';
@@ -62,28 +65,23 @@ import {
 } from '../../../tabulator/ColumnViews.js';
 import {
   LOCATED_ROW_CLASS,
+  LocatedRowIds,
   LocatedRowMarker,
+  rowDetailSelection,
   rowIndexStamper,
   rowOccurrences,
 } from '../../../components/locatedRow.js';
 import { InspectorEmphasis } from '../../../components/inspectorEmphasis.js';
 import { createTimeOrderTable } from './TimeOrderTable.js';
 
-type ViewMode = 'time-order' | 'aggregated' | 'bottom-up';
-
-/** Time Order keys its rows by event index, so the inspector can mark them; the
- *  grouped views key theirs by group, so they carry no index to mark. */
+/** Time Order keys its rows by event index; the grouped views key theirs by the
+ *  path of buckets that reaches them, since one method holds a row under every
+ *  caller it has. Either way the inspector can mark them. */
 const stampTimeOrderIndex = rowIndexStamper('id');
 const timeOrderRowFormatter = (row: RowComponent): void => {
   categoryRowFormatter(row);
   stampTimeOrderIndex(row);
 };
-
-const CALL_TREE_VIEW_MODES: ViewModeOption[] = [
-  { value: 'time-order', label: 'Time Order' },
-  { value: 'aggregated', label: 'Aggregated' },
-  { value: 'bottom-up', label: 'Bottom-Up' },
-];
 
 /** The Name column is always shown in the call-tree tables. */
 const ALWAYS_VISIBLE = ['text'];
@@ -173,6 +171,7 @@ export class CalltreeView extends LitElement {
   private _inspectorLocateUnsubscribe: (() => void) | null = null;
   private _selectionClearUnsubscribe: (() => void) | null = null;
   private _locatedRow = new LocatedRowMarker();
+  private _locateIds = new LocatedRowIds();
   /** Which of the inspector's reports the mark follows. */
   private _emphasis = new InspectorEmphasis();
 
@@ -188,14 +187,19 @@ export class CalltreeView extends LitElement {
     });
 
     // Mark the frames the inspector points at, while the Call Tree is the tab the
-    // inspector is showing. Only Time Order keys its rows by event, so the grouped
-    // views have nothing to mark and are left alone.
+    // inspector is showing.
     this._inspectorLocateUnsubscribe = eventBus.on('inspector:locate', (detail) => {
       if (detail.source === 'calltree') {
-        this._locatedRow.mark(
-          this.calltreeTable?.element ?? null,
-          this._emphasis.report(detail.eventIndexes, detail.sticky),
-        );
+        const ids = this._emphasis.report(detail.eventIndexes, detail.sticky);
+        if (detail.sticky && detail.eventIndexes.length) {
+          // A picked inspector row merges calls, so the mark shows all of them
+          // while the view moves to the first, as a pick of one frame does. The
+          // reveal expands and scrolls, which re-renders the rows the mark lands
+          // on, so it goes on after.
+          void this._revealEventIndex(detail.eventIndexes[0]!).then(() => this._markLocated(ids));
+        } else {
+          this._markLocated(ids);
+        }
       }
     });
 
@@ -207,7 +211,7 @@ export class CalltreeView extends LitElement {
         for (const table of this._tables) {
           table.deselectRow();
         }
-        this._locatedRow.mark(this.calltreeTable?.element ?? null, this._emphasis.pick([]));
+        this._markLocated(this._emphasis.pick([]));
       }
     });
     document.addEventListener(CALLTREE_GO_TO_ROW, this._goToRowEvt);
@@ -343,7 +347,7 @@ export class CalltreeView extends LitElement {
             <view-mode-switch
               slot="global"
               aria-label="View mode"
-              .options=${CALL_TREE_VIEW_MODES}
+              .options=${VIEW_MODES}
               value=${this.viewMode}
               @view-mode-change=${(e: CustomEvent<{ value: string }>) =>
                 this._setViewMode(e.detail.value as ViewMode)}
@@ -595,6 +599,10 @@ export class CalltreeView extends LitElement {
     if (switchEpoch !== this.viewSwitchEpoch) {
       return;
     }
+
+    // The selection is untouched, but the direction this tab shows is not, and
+    // that is what the inspector opens on the other side of.
+    eventBus.emit('detail:view', { source: 'calltree', view: directionOf(this.viewMode) });
   }
 
   private _destroyCurrentTable(): void {
@@ -826,6 +834,20 @@ export class CalltreeView extends LitElement {
     activeTable.restoreRedraw();
   }
 
+  /**
+   * Mark the rows of the view on screen for `eventIndexes`. Time Order stamps the
+   * event index itself; a grouped view stamps the bucket path, so a frame is
+   * translated into the paths of the rows it belongs to — one in Aggregated, one
+   * per caller depth in Bottom-Up.
+   */
+  private _markLocated(eventIndexes: readonly number[]): void {
+    const direction = this.viewMode === 'time-order' ? undefined : directionOf(this.viewMode);
+    this._locatedRow.mark(
+      this._getActiveTable()?.element ?? null,
+      this._locateIds.idsFor(this.rootMethod, eventIndexes, direction),
+    );
+  }
+
   private _getActiveTable(): Tabulator | null {
     switch (this.viewMode) {
       case 'time-order':
@@ -880,8 +902,8 @@ export class CalltreeView extends LitElement {
     document.dispatchEvent(new CustomEvent('show-tab', { detail: { tabid: 'tree-tab' } }));
 
     if (this.viewMode !== 'time-order') {
-      this.viewMode = 'time-order';
-      await this.updateComplete;
+      // Through the switch, so the inspector hears the direction change too.
+      await this._setViewMode('time-order');
     }
 
     if (!this._callTreeTableWrapper) {
@@ -903,23 +925,45 @@ export class CalltreeView extends LitElement {
   }
 
   /**
-   * Select the row for `eventIndex` in place: no tab switch, no view-mode change
-   * and no focus steal, unlike {@link _goToRow}. Only Time Order has a row per
-   * event, so the grouped modes are left alone.
+   * Select the row for `eventIndex` in the view on screen, in place: no tab
+   * switch, no view-mode change and no focus steal, unlike {@link _goToRow}.
+   * Focus stays where the click was, which is the inspector.
    */
   private async _revealEventIndex(eventIndex: number): Promise<void> {
-    if (this.viewMode !== 'time-order' || !this.calltreeTable) {
+    const table = this._getActiveTable();
+    if (!table) {
       return;
     }
 
-    const treeRow = await this._findByEventIndex(this.calltreeTable.getRows(), eventIndex);
+    const treeRow = await this._findRowFor(table, eventIndex);
     if (!treeRow) {
       return;
     }
 
     await this._echoGuard.runAsync(() =>
       //@ts-expect-error This is a custom function added in by RowNavigation custom module
-      this.calltreeTable.goToRow(treeRow, { scrollIfVisible: false, focusRow: false }),
+      table.goToRow(treeRow, { scrollIfVisible: false, focusRow: false }),
+    );
+  }
+
+  /**
+   * The row holding `eventIndex` in the view on screen, with the path to it
+   * materialised. Time Order has a row per event; the grouped views find the
+   * bucket instead.
+   */
+  private async _findRowFor(table: Tabulator, eventIndex: number): Promise<RowComponent | null> {
+    if (this.viewMode === 'time-order') {
+      return this._findByEventIndex(table.getRows(), eventIndex);
+    }
+    if (!this.rootMethod) {
+      return null;
+    }
+    const event = eventByEventIndex(this.rootMethod, eventIndex);
+    if (!event) {
+      return null;
+    }
+    return findBucketRow(table.getRows(), event, directionOf(this.viewMode), () =>
+      this._waitForTableRender(),
     );
   }
 
@@ -1086,7 +1130,7 @@ export class CalltreeView extends LitElement {
           this._clearSearchHighlights();
         }
       },
-      rowFormatter: categoryRowFormatter,
+      rowFormatter: groupedRowFormatter,
     });
     this.aggregatedTreeTable = table;
     await tableBuilt;
@@ -1112,7 +1156,7 @@ export class CalltreeView extends LitElement {
             this._clearSearchHighlights();
           }
         },
-        rowFormatter: categoryRowFormatter,
+        rowFormatter: groupedRowFormatter,
       },
       {
         selectableRows: 'highlight',
@@ -1129,34 +1173,24 @@ export class CalltreeView extends LitElement {
 
   /**
    * Feed the inspector off row selection. A Time Order row is a
-   * single event; Aggregated/Bottom-Up rows merge many calls, so they scope to
-   * every occurrence (`instances`).
+   * single event; an Aggregated/Bottom-Up row merges many calls, so it scopes to
+   * every call it counts.
    */
   private _emitDetailSelection(table: Tabulator, source: DetailSource = 'calltree'): void {
     table.on('rowSelectionChanged', (_data, rows) => {
       if (this._echoGuard.suppressed) {
         return;
       }
-      const data = rows[0]?.getData() as
-        { originalData?: LogEvent; instances?: LogEvent[]; text?: string } | undefined;
-      const event = data?.originalData;
-      if (!event) {
+      const selection = rowDetailSelection(rows[0]);
+      if (!selection) {
         // The selection went with it, and so does a mark a picked inspector row
         // left here — it was never a selection of this table.
-        this._locatedRow.mark(this.calltreeTable?.element ?? null, this._emphasis.pick([]));
-        eventBus.emit('detail:select', { source, selection: null });
-        return;
+        this._markLocated(this._emphasis.pick([]));
       }
-      const occurrences = data.instances?.length ? data.instances : null;
       eventBus.emit('detail:select', {
         source,
-        selection: occurrences
-          ? {
-              kind: 'aggregate',
-              instances: occurrences.map((e) => e.eventIndex),
-              label: data.text ?? event.text,
-            }
-          : { kind: 'event', eventIndex: event.eventIndex },
+        selection,
+        view: directionOf(this.viewMode),
       });
     });
   }
@@ -1164,13 +1198,13 @@ export class CalltreeView extends LitElement {
   /**
    * Tell the inspector which frames the pointer is over, so it can mark the rows
    * that stand for them. Nothing is picked and nothing moves. An
-   * Aggregated/Bottom-Up row merges many calls, so it names every occurrence.
+   * Aggregated/Bottom-Up row merges many calls, so it names every call it counts.
    */
   private _emitDetailLocate(table: Tabulator, source: DetailSource = 'calltree'): void {
     table.on('rowMouseEnter', (_e, row) => {
       eventBus.emit('detail:locate', {
         source,
-        eventIndexes: rowOccurrences(row.getData() as { originalData?: LogEvent }),
+        eventIndexes: rowOccurrences(row),
       });
     });
     table.on('rowMouseLeave', () => {
@@ -1183,7 +1217,7 @@ export class CalltreeView extends LitElement {
   // redraw. A single rAF can race the virtual renderer and leave getTreeChildren
   // empty mid-descent.
   private _waitForTableRender(): Promise<void> {
-    const table = this.calltreeTable;
+    const table = this._getActiveTable();
     if (!table) {
       return waitForNextFrame();
     }
@@ -1307,12 +1341,12 @@ export class CalltreeView extends LitElement {
       return null;
     }
 
-    const result = findEventByEventIndex(this.rootMethod, eventIndex);
-    if (!result) {
+    const event = eventByEventIndex(this.rootMethod, eventIndex);
+    if (!event) {
       return null;
     }
 
-    return this._materializeRowPath(rows, result.event);
+    return this._materializeRowPath(rows, event);
   }
 
   private async _materializeRowPath(
@@ -1354,7 +1388,8 @@ export class CalltreeView extends LitElement {
       let children = matchedRow.getTreeChildren() ?? [];
       const rowData = matchedRow.getData() as TimeOrderRow;
       if (!children.length && rowData._children?.length && !matchedRow.isTreeExpanded()) {
-        matchedRow.treeExpand();
+        const rowToExpand = matchedRow;
+        withCodeDrivenExpand(() => rowToExpand.treeExpand());
         await this._waitForTableRender();
         children = matchedRow.getTreeChildren() ?? [];
       }

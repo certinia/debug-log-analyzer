@@ -21,6 +21,8 @@
  */
 
 import * as PIXI from 'pixi.js';
+
+import { destroyTimelineApp } from '../rendering/pixiApp.js';
 import type { TimelineMarker, ViewportState } from '../../types/flamechart.types.js';
 import { TIMELINE_CONSTANTS } from '../../types/flamechart.types.js';
 import type { RectangleCache } from '../RectangleCache.js';
@@ -254,7 +256,7 @@ export class MinimapOrchestrator {
     this.container = null;
 
     if (this.app) {
-      this.app.destroy(true, { children: true, texture: true });
+      destroyTimelineApp(this.app);
       this.app = null;
     }
 

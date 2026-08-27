@@ -3,8 +3,10 @@
  */
 import type { LogEvent } from 'apex-log-parser';
 
-import { currentLogStore } from '../core/log/LogStore.js';
+import { currentLogStore, type LogStore } from '../core/log/LogStore.js';
+import { outermostEvents } from '../core/utility/EventTree.js';
 import { EXCLUDED_DETAIL_TYPES } from '../features/call-tree/utils/DetailsFilter.js';
+import { getEventKey, getStackKey } from '../features/call-tree/utils/Aggregation.js';
 import {
   CHECK_EVERY,
   frameBudget,
@@ -12,15 +14,10 @@ import {
   type Tick,
 } from '../core/utility/FrameBudget.js';
 
-/** Frame grouping key — same shape as the call-tree aggregation. */
-function frameKey(event: LogEvent): string {
-  return `${event.type ?? ''}|${event.namespace}|${event.text}`;
-}
-
 /**
- * A row in the scoped call tree. `duration` is attributed to the selection (see
- * {@link buildScopedCallTree}); `originalData` is the real event (used by the
- * name formatter / navigation), so its own duration may differ.
+ * A row in the scoped call tree. `duration` is the frame's own, summed across
+ * the occurrences a merged row stands for; `originalData` is the first of them,
+ * used by the name formatter and navigation.
  */
 export interface ScopedRow {
   id: number;
@@ -33,6 +30,13 @@ export interface ScopedRow {
    *  that is one frame, whose single occurrence is `originalData` — the whole-log
    *  tree is all such rows, so a list each would cost one array per event. */
   eventIndexes: number[] | null;
+  /** True on a caller row: one of the frames above the selection, which the two
+   *  top-down views root at. Such a row is a route to the selection, not a call
+   *  inside it, so it holds the time that reached the selection rather than its
+   *  own total, its self time is 0, its `callCount` is the occurrences it led to,
+   *  and it is outside `ScopedCallTree.calls`. The tree opens these rows so the
+   *  selection is on screen, and leaves what ran inside it closed. */
+  onPath?: boolean;
   _children: ScopedRow[] | null;
 }
 
@@ -79,7 +83,11 @@ export function rowIdsByEvent(rows: readonly ScopedRow[]): Map<number, number[]>
       }
     }
     if (row._children) {
-      stack.push(...row._children);
+      // Pushed one at a time: a spread (and `push.apply`) passes each element as
+      // an argument, and a wide level would overrun the argument limit.
+      for (const child of row._children) {
+        stack.push(child);
+      }
     }
   }
   return byEvent;
@@ -88,16 +96,28 @@ export function rowIdsByEvent(rows: readonly ScopedRow[]): Map<number, number[]>
 export interface ScopedCallTree {
   /** The selected node's total time (ns) — the % denominator for the bars. */
   rootTotal: number;
+  /** Every call the scope holds, the selection's own included, counted once. The
+   *  callers above the selection are routes to it rather than calls inside it, so
+   *  they are not in the figure — see `ScopedRow.onPath`. */
+  calls: number;
   /** The whole log's total time (ns). It sizes the bar columns once for the log
-   *  instead of per selection, so the widths stay put as the selection changes.
-   *  An aggregate `rootTotal` sums nested occurrences, so it can read wider than
-   *  this; the column carries enough padding to absorb that. */
+   *  instead of per selection, so the widths stay put as the selection changes. */
   logTotal: number;
+  /** True where Time Order merges the occurrences of one frame, so its rows carry
+   *  synthetic ids like the grouped views rather than event indexes. */
+  timeOrderMerged: boolean;
   /** The three views, built on first call and cached (only one is on screen).
    *  Each hands the frame back as it works, and returns null when abandoned. */
   timeOrder(options: FrameBudgetOptions): Promise<ScopedRow[] | null>;
   aggregated(options: FrameBudgetOptions): Promise<ScopedRow[] | null>;
   bottomUp(options: FrameBudgetOptions): Promise<ScopedRow[] | null>;
+}
+
+/** A built subtree and the frames it kept, so the scope can be counted without a
+ *  second walk. */
+interface Subtree {
+  row: ScopedRow;
+  calls: number;
 }
 
 /**
@@ -110,7 +130,7 @@ export interface ScopedCallTree {
  * Iterative rather than recursive: subtree size is the second unbounded
  * dimension (the occurrence count is the first), and both have to be sliceable.
  */
-async function realSubtree(event: LogEvent, tick: Tick): Promise<ScopedRow | null> {
+async function realSubtree(event: LogEvent, tick: Tick): Promise<Subtree | null> {
   // Pre-order, so a node always precedes its descendants and the prune below
   // can walk it backwards to reach every child before its parent.
   const rows: ScopedRow[] = [];
@@ -139,6 +159,7 @@ async function realSubtree(event: LogEvent, tick: Tick): Promise<ScopedRow | nul
     }
   }
 
+  let calls = 1; // the selection itself
   for (let i = rows.length - 1; i >= 0; i--) {
     if (i % CHECK_EVERY === 0 && !(await tick())) {
       return null;
@@ -155,17 +176,106 @@ async function realSubtree(event: LogEvent, tick: Tick): Promise<ScopedRow | nul
     if (row.duration.total > 0 || row._children || EXCLUDED_DETAIL_TYPES.has(row.type)) {
       const parent = parents[i]!;
       (parent._children ??= []).push(row);
+      calls += 1;
     }
   }
-  return rows[0]!;
+  return { row: rows[0]!, calls };
 }
 
 /**
- * The call tree filtered to the selected statement: its ancestor path
- * (root→selected) + the selected node + its real subtree, with sibling branches
- * pruned. Ancestors are attributed to the selection (`total = selected.total`,
- * `self = 0`) so the selection's cost reads "all the way down"; the selected
- * node and its descendants keep their real durations. Returns the three views
+ * The selection with its callers above it: one branch per distinct path, joined
+ * where they share an ancestor.
+ *
+ * A caller row holds the selected time that reached the selection through it,
+ * not its own total, so the tree reads as the selection all the way down: 100%
+ * at the top, still 100% at the selection, and the rows below it are shares of
+ * it. Its self time is 0 — none of that time is the caller's own work — and its
+ * call count is the occurrences it led to.
+ *
+ * The log root is not a row, as it is not one in the whole-log tree either, so a
+ * selection at the top of the log has no path and stands as its own root.
+ */
+async function pathRoots(
+  selected: readonly LogEvent[],
+  subtrees: readonly ScopedRow[],
+  store: LogStore,
+  tick: Tick,
+): Promise<ScopedRow[] | null> {
+  const roots: ScopedRow[] = [];
+  // One event has one parent, so it sits at one place in the tree: a flat index
+  // is enough to join the paths where they meet.
+  const rowByEvent = new Map<number, ScopedRow>();
+
+  // Counted per node, not per occurrence: one occurrence costs a walk of its
+  // whole ancestor chain, so a deep stack would otherwise overrun the slice.
+  let steps = 0;
+  for (let i = 0; i < selected.length; i++) {
+    if (steps++ % CHECK_EVERY === 0 && !(await tick())) {
+      return null;
+    }
+    const event = selected[i]!;
+    const contributed = event.duration.total;
+
+    // Outermost first, and the selection itself last where it is a parent.
+    const ancestors = store.stackByEventIndex(event.eventIndex);
+    if (ancestors.at(-1) === event) {
+      ancestors.pop();
+    }
+
+    let into = roots;
+    for (const ancestor of ancestors) {
+      if (steps++ % CHECK_EVERY === 0 && !(await tick())) {
+        return null;
+      }
+      let row = rowByEvent.get(ancestor.eventIndex);
+      if (!row) {
+        row = {
+          id: ancestor.eventIndex,
+          originalData: ancestor,
+          text: ancestor.text,
+          type: ancestor.type ?? '',
+          duration: { total: 0, self: 0 },
+          callCount: 0,
+          eventIndexes: null,
+          onPath: true,
+          _children: [],
+        };
+        rowByEvent.set(ancestor.eventIndex, row);
+        into.push(row);
+      }
+      row.duration.total += contributed;
+      row.callCount += 1;
+      into = row._children as ScopedRow[];
+    }
+    into.push(subtrees[i]!);
+  }
+  return roots;
+}
+
+/** Each event's real subtree as a root row, with the frames they hold between
+ *  them; null when the walk is abandoned. */
+async function subtreeRoots(
+  events: readonly LogEvent[],
+  tick: Tick,
+): Promise<{ roots: ScopedRow[]; calls: number } | null> {
+  const roots: ScopedRow[] = [];
+  let calls = 0;
+  for (const event of events) {
+    const subtree = await realSubtree(event, tick);
+    if (!subtree) {
+      return null;
+    }
+    roots.push(subtree.row);
+    calls += subtree.calls;
+  }
+  return { roots, calls };
+}
+
+/**
+ * The call tree filtered to the selection. The two top-down views root at the
+ * log and keep only the paths that reach the selection, so how it was called is
+ * read with where its time went; bottom-up keeps the selection's subtree alone,
+ * as ranking leaves by self time is what it is for. Returns the three views
  * (time-order / aggregated / bottom-up) or null when nothing is selected.
  *
  * An aggregate selection scopes to every occurrence, and a frame can occur tens
@@ -188,9 +298,11 @@ export async function buildScopedCallTree(
   // An aggregate selection scopes to every occurrence of the frame; a single
   // selection to just itself.
   const indexes = instances?.length ? instances : eventIndex >= 0 ? [eventIndex] : [];
-  const selectedEvents = indexes
+  const resolved = indexes
     .map((i) => store.eventByIndex(i))
     .filter((e): e is LogEvent => e !== null);
+  // An occurrence inside another would otherwise be walked once per enclosing call.
+  const selectedEvents = outermostEvents(resolved);
   if (!selectedEvents.length) {
     return null;
   }
@@ -198,72 +310,72 @@ export async function buildScopedCallTree(
   // Percentages are relative to the whole selection (summed across occurrences).
   const rootTotal = selectedEvents.reduce((sum, e) => sum + e.duration.total, 0);
 
-  // Wrap each occurrence in its ancestor chain, innermost first, attributing that
-  // occurrence's total up its path with no self time. Aggregation then merges
-  // paths that share frames.
   const tick = frameBudget(options);
-  const roots: ScopedRow[] = [];
-  for (let i = 0; i < selectedEvents.length; i++) {
-    if (i % CHECK_EVERY === 0 && !(await tick())) {
-      return null;
-    }
-    const selected = selectedEvents[i]!;
-    const subtree = await realSubtree(selected, tick);
-    if (!subtree) {
-      return null;
-    }
-    let node = subtree;
-    let parent = selected.parent;
-    while (parent && parent !== apexLog) {
-      node = {
-        id: parent.eventIndex,
-        originalData: parent,
-        text: parent.text,
-        type: parent.type ?? '',
-        duration: { total: selected.duration.total, self: 0 },
-        callCount: 1,
-        eventIndexes: null,
-        _children: [node],
-      };
-      parent = parent.parent;
-    }
-    roots.push(node);
+  const scope = await subtreeRoots(selectedEvents, tick);
+  if (!scope) {
+    return null;
   }
 
-  // Many occurrences usually share ancestors, so merge the paths for a
-  // readable tree; a single occurrence keeps its exact chain.
-  return lazyCallTree(roots, rootTotal, apexLog.duration.total, roots.length > 1);
+  return lazyCallTree({
+    // Only the two top-down views read the callers, and bottom-up is what most
+    // selections open on, so the spine is built on first read like the views are.
+    topDown: (viewOptions) =>
+      pathRoots(selectedEvents, scope.roots, store, frameBudget(viewOptions)),
+    bottomUp: scope.roots,
+    rootTotal,
+    logTotal: apexLog.duration.total,
+    calls: scope.calls,
+    // Occurrences of one frame are the same call made again, so merge them into a
+    // single root; a single occurrence is already that.
+    mergeTimeOrder: scope.roots.length > 1,
+  });
+}
+
+/** What the three views are built from. */
+interface CallTreeInput {
+  /** The rows the two top-down views read: the selection under its callers. */
+  topDown(options: FrameBudgetOptions): Promise<ScopedRow[] | null>;
+  /** The rows bottom-up reads: the selection's own subtree, callers left out. */
+  bottomUp: ScopedRow[];
+  rootTotal: number;
+  logTotal: number;
+  calls: number;
+  /** Folds the occurrences of one frame into a single root (a scoped aggregate),
+   *  which makes Time Order the same answer as Aggregated. The whole-log tree and
+   *  a single occurrence keep their exact order. */
+  mergeTimeOrder: boolean;
 }
 
 /**
- * The three lazy views over a built set of roots. Only one view is on screen,
- * so each is built on first read and cached — aggregate()/buildBottomUp() are
- * full walks of every retained subtree. `mergeTimeOrder` folds occurrences that
- * share ancestors (a scoped aggregate); the whole-log tree and a single
- * occurrence keep their exact order.
+ * The three lazy views over a scope. Only one view is on screen, so each is
+ * built on first read and cached — aggregate()/buildBottomUp() are full walks of
+ * every retained subtree.
  */
-function lazyCallTree(
-  roots: ScopedRow[],
-  rootTotal: number,
-  logTotal: number,
-  mergeTimeOrder: boolean,
-): ScopedCallTree {
-  let timeOrderRows: ScopedRow[] | null = null;
+function lazyCallTree(input: CallTreeInput): ScopedCallTree {
+  const { rootTotal, calls, logTotal, mergeTimeOrder } = input;
+  let topDownRows: ScopedRow[] | null = null;
   let aggregatedRows: ScopedRow[] | null = null;
   let bottomUpRows: ScopedRow[] | null = null;
+  const topDown = async (options: FrameBudgetOptions) =>
+    (topDownRows ??= await input.topDown(options));
   return {
     rootTotal,
+    calls,
     logTotal,
+    timeOrderMerged: mergeTimeOrder,
     async timeOrder(viewOptions) {
-      timeOrderRows ??= mergeTimeOrder ? await aggregate(roots, viewOptions) : roots;
-      return timeOrderRows;
+      // Merged, the two views are the same walk, so they share one answer.
+      return mergeTimeOrder ? this.aggregated(viewOptions) : topDown(viewOptions);
     },
     async aggregated(viewOptions) {
-      aggregatedRows ??= await aggregate(roots, viewOptions);
+      if (!aggregatedRows) {
+        const rows = await topDown(viewOptions);
+        aggregatedRows = rows && (await aggregate(rows, viewOptions));
+      }
       return aggregatedRows;
     },
     async bottomUp(viewOptions) {
-      bottomUpRows ??= await buildBottomUp(roots, viewOptions);
+      bottomUpRows ??= await buildBottomUp(input.bottomUp, viewOptions);
       return bottomUpRows;
     },
   };
@@ -271,9 +383,8 @@ function lazyCallTree(
 
 /**
  * The whole log's call tree — every root event with its real subtree and real
- * durations, nothing clamped or attributed. The scoped builder cannot answer
- * this: it exists to model a selection, so it rewrites ancestor durations. Here
- * there is no selection and no ancestors, so every figure is the event's own.
+ * durations. The scoped builder cannot answer this: it starts at a selection,
+ * so it never reaches the roots above one.
  *
  * Same three views, same slicing, same zero-duration-detail pruning as the
  * scoped tree; `rootTotal` and `logTotal` are both the log's total, so bars are
@@ -288,17 +399,21 @@ export async function buildWholeLogCallTree(
   }
 
   const tick = frameBudget(options);
-  const roots: ScopedRow[] = [];
-  for (const event of apexLog.children) {
-    const subtree = await realSubtree(event, tick);
-    if (!subtree) {
-      return null;
-    }
-    roots.push(subtree);
+  const scope = await subtreeRoots(apexLog.children, tick);
+  if (!scope) {
+    return null;
   }
 
   // Already the log's own event order, with real durations — no merging.
-  return lazyCallTree(roots, apexLog.duration.total, apexLog.duration.total, false);
+  return lazyCallTree({
+    // Nothing is selected, so there is no path above anything.
+    topDown: () => Promise.resolve(scope.roots),
+    bottomUp: scope.roots,
+    rootTotal: apexLog.duration.total,
+    logTotal: apexLog.duration.total,
+    calls: scope.calls,
+    mergeTimeOrder: false,
+  });
 }
 
 /** Top-down aggregation: merge sibling frames sharing a key, summing metrics. */
@@ -315,15 +430,15 @@ async function aggregate(
   async function merge(input: ScopedRow[]): Promise<ScopedRow[] | null> {
     const groups = new Map<string, ScopedRow>();
     const order: string[] = [];
-    // The occurrences behind each group. A set, because the ancestors of the
-    // instances of one frame are the same frame, met once per instance.
+    // The occurrences behind each group — a set, so one frame cannot be listed
+    // twice.
     const indexes = new Map<string, Set<number>>();
     for (let i = 0; i < input.length; i++) {
       if (i % CHECK_EVERY === 0 && !(await tick())) {
         return null;
       }
       const row = input[i]!;
-      const key = frameKey(row.originalData);
+      const key = getEventKey(row.originalData);
       let group = groups.get(key);
       if (!group) {
         group = {
@@ -334,11 +449,16 @@ async function aggregate(
           duration: { total: 0, self: 0 },
           callCount: 0,
           eventIndexes: [],
+          onPath: row.onPath,
           _children: [],
         };
         groups.set(key, group);
         order.push(key);
         indexes.set(key, new Set());
+      }
+      if (!row.onPath) {
+        // A group holding one real call is not a route, so it stays closed.
+        group.onPath = undefined;
       }
       group.duration.total += row.duration.total;
       group.duration.self += row.duration.self;
@@ -349,7 +469,10 @@ async function aggregate(
         seen.add(index);
       }
       if (row._children) {
-        (group._children as ScopedRow[]).push(...row._children);
+        const kids = group._children as ScopedRow[];
+        for (const child of row._children) {
+          kids.push(child);
+        }
       }
     }
 
@@ -386,13 +509,37 @@ interface BottomUpNode extends ScopedRow {
  *  walk carries a link per node instead of a copy of the path. */
 interface CallerChain {
   row: ScopedRow;
+  key: string;
   caller: CallerChain | null;
 }
 
+/** A frame on the walk. Both visits share it, so each key is built once and the
+ *  time the frame keeps survives from the first visit to the second. */
+interface WalkEntry {
+  row: ScopedRow;
+  callers: CallerChain | null;
+  key: string;
+  stackKey: string;
+  leaving: boolean;
+  /** The frame's time, less every call of the same frame inside it. */
+  attributed: number;
+  /** The enclosing call of the same frame, restored on the way out. */
+  outer: WalkEntry | null;
+}
+
 /**
- * Bottom-up: each frame with self time seeds a top-level row (ranked by self),
- * and its callers nest beneath it up to the root — the reverse of the call
- * path, with the seed's self time attributed to every caller as `total`.
+ * Bottom-up: a seed frame heads a top-level row and its callers nest beneath it
+ * up to the root — the reverse of the call path, with the seed's time attributed
+ * to every caller as `total`.
+ *
+ * Every frame with self time seeds a row, ranked by self, so the view answers
+ * where the time went inside whatever the rows cover: the selection when they
+ * are scoped to one, else the whole log.
+ *
+ * A row's `total` is its frames' time with recursion counted once: a call of the
+ * same frame inside another comes off the outer call, so the two never both
+ * claim the time they share. This is the attribution the Call Tree tab's
+ * bottom-up uses, so the two agree on a recursive frame.
  */
 async function buildBottomUp(
   rows: ScopedRow[],
@@ -405,8 +552,12 @@ async function buildBottomUp(
   const topOrder: BottomUpNode[] = [];
   const everyNode: BottomUpNode[] = [];
 
-  const ensure = (map: Map<string, BottomUpNode>, order: BottomUpNode[] | null, src: ScopedRow) => {
-    const key = frameKey(src.originalData);
+  const ensure = (
+    map: Map<string, BottomUpNode>,
+    order: BottomUpNode[] | null,
+    src: ScopedRow,
+    key: string,
+  ) => {
     let node = map.get(key);
     if (!node) {
       node = {
@@ -428,33 +579,81 @@ async function buildBottomUp(
     return node;
   };
 
+  // The innermost call of each frame still open on the walk's current path. A
+  // frame's own time is only final once every call of it inside has come off, so
+  // a row is filled in on the way out rather than on the way in. Keyed as the
+  // Call Tree tab keys recursion, without the event type, so a code unit that
+  // recurses as a method entry is the same frame to both.
+  const open = new Map<string, WalkEntry | null>();
+
+  const entryFor = (row: ScopedRow, callers: CallerChain | null): WalkEntry => ({
+    row,
+    callers,
+    key: getEventKey(row.originalData),
+    stackKey: getStackKey(row.originalData),
+    leaving: false,
+    attributed: 0,
+    outer: null,
+  });
+
   // Iterative pre-order over every occurrence's subtree: both the occurrence
   // count and the subtree size grow, so one flat sliceable loop covers both.
-  const stack: Array<{ row: ScopedRow; callers: CallerChain | null }> = [];
+  const stack: WalkEntry[] = [];
   for (let i = rows.length - 1; i >= 0; i--) {
-    stack.push({ row: rows[i]!, callers: null });
+    stack.push(entryFor(rows[i]!, null));
   }
   let steps = 0;
   while (stack.length) {
     if (steps++ % CHECK_EVERY === 0 && !(await tick())) {
       return null;
     }
-    const { row, callers } = stack.pop()!;
+    const entry = stack.pop()!;
+    const { row, callers } = entry;
+    if (!entry.leaving) {
+      const outer = open.get(entry.stackKey) ?? null;
+      if (outer) {
+        // Inside a call of the same frame, so this call's time is already part
+        // of that one's.
+        outer.attributed -= row.duration.total;
+      }
+      entry.outer = outer;
+      entry.attributed = row.duration.total;
+      open.set(entry.stackKey, entry);
+      entry.leaving = true;
+      stack.push(entry);
+      if (row._children) {
+        // Shared by every child, so the ancestor path costs one link per node
+        // rather than a copy of the whole path.
+        const childCallers: CallerChain = { row, key: entry.key, caller: callers };
+        for (let i = row._children.length - 1; i >= 0; i--) {
+          stack.push(entryFor(row._children[i]!, childCallers));
+        }
+      }
+      continue;
+    }
+
+    open.set(entry.stackKey, entry.outer);
+    const attributed = entry.attributed;
     if (row.duration.self > 0) {
       // The seed row, then its callers up to the root. The chain is already in
       // that order, so it is walked in place rather than copied and reversed.
-      const seed = ensure(topMap, topOrder, row);
-      seed.duration.total += row.duration.self;
+      const seed = ensure(topMap, topOrder, row, entry.key);
+      seed.duration.total += attributed;
       seed.duration.self += row.duration.self;
       seed.callCount += 1;
-      for (const index of locatableEventIndexes(row)) {
+      const seedIndexes = locatableEventIndexes(row);
+      for (const index of seedIndexes) {
         seed._indexes.add(index);
       }
       let map = seed._map;
       for (let link = callers; link; link = link.caller) {
-        const node = ensure(map, null, link.row);
-        node.duration.total += row.duration.self;
-        for (const index of locatableEventIndexes(link.row)) {
+        const node = ensure(map, null, link.row, link.key);
+        node.duration.total += attributed;
+        // A caller row stands for the calls it conducted, not for the caller
+        // frame, so it holds the same frames its time and count are taken from.
+        // That is what the grids send for their own caller rows, so the two sides
+        // point at the same calls.
+        for (const index of seedIndexes) {
           node._indexes.add(index);
         }
         // Callers count the call they contributed too, matching the Call Tree
@@ -462,14 +661,6 @@ async function buildBottomUp(
         // only the seed left every caller row reading "Calls 0".
         node.callCount += 1;
         map = node._map;
-      }
-    }
-    if (row._children) {
-      // Shared by every child, so the ancestor path costs one link per node
-      // rather than a copy of the whole path.
-      const childCallers: CallerChain = { row, caller: callers };
-      for (let i = row._children.length - 1; i >= 0; i--) {
-        stack.push({ row: row._children[i]!, callers: childCallers });
       }
     }
   }

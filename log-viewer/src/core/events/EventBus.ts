@@ -1,6 +1,7 @@
 /*
  * Copyright (c) 2026 Certinia Inc. All rights reserved.
  */
+import type { StatementType } from '../metrics/eventMetrics.js';
 
 /**
  * Type-safe event bus for cross-component communication.
@@ -19,8 +20,7 @@ export const TAB_TO_SOURCE: Record<string, DetailSource> = {
   'database-tab': 'database',
 };
 
-/** Which of the database grids a selection came from. */
-export type StatementType = 'dml' | 'soql' | 'sosl';
+export type { StatementType };
 
 /**
  * A selection to inspect in the inspector. A single frame maps to one `eventIndex`;
@@ -29,9 +29,24 @@ export type StatementType = 'dml' | 'soql' | 'sosl';
  */
 export type DetailSelection =
   | { kind: 'event'; eventIndex: number; type?: StatementType }
-  | { kind: 'aggregate'; instances: number[]; label: string };
+  | {
+      kind: 'aggregate';
+      instances: number[];
+      /** The frame that made the calls, where the row naming them is not it: a
+       *  bottom-up caller row counts its callee's calls. Absent where the row
+       *  names the calls it counts. */
+      calledBy?: string;
+    };
 
 export type TimelineNavigateMode = 'reveal' | 'seek';
+
+/**
+ * The direction the tab that made a selection is showing: `callers` for a
+ * bottom-up tree, `callees` for a top-down one. The inspector opens on the other
+ * one, so the two sides never repeat each other. Absent where the tab shows no
+ * tree at all.
+ */
+export type SelectionView = 'callers' | 'callees';
 
 interface EventMap {
   // Supply eventIndex (preferred — unique) OR timestamp (fallback for raw-log entry where eventIndex isn't known).
@@ -46,7 +61,15 @@ interface EventMap {
 
   // A tab's current selection changed — the inspector rebuilds its
   // content for this source. `selection: null` clears that source's selection.
-  'detail:select': { source: DetailSource; selection: DetailSelection | null };
+  'detail:select': {
+    source: DetailSource;
+    selection: DetailSelection | null;
+    view?: SelectionView;
+  };
+
+  // A tab changed the direction it shows, with its selection untouched. The
+  // inspector opens on the view a tab is not showing, so it has to be told.
+  'detail:view': { source: DetailSource; view: SelectionView };
 
   // App-level request to show/hide (or force a state on) the inspector.
   'detail:toggle': { visible?: boolean };

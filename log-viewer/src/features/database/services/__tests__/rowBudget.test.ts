@@ -185,4 +185,61 @@ describe('rowBudgets', () => {
       { sObject: UNKNOWN_OBJECT, rows: 10, statements: 1 },
     ]);
   });
+
+  it('brings an SObject read and written together, biggest total first', () => {
+    overview = overviewOf([
+      statement({ rows: 100, maxRows: 100 }),
+      statement({ rows: 40, kind: 'DML', sObject: 'Account', repeats: 3 }),
+      statement({ rows: 60, maxRows: 60, sObject: 'Contact' }),
+    ]);
+
+    expect(rowBudgets(logWith(1)).objects).toEqual([
+      { sObject: 'Account', rowsRead: 100, rowsWritten: 40, rows: 140 },
+      { sObject: 'Contact', rowsRead: 60, rowsWritten: 0, rows: 60 },
+    ]);
+  });
+
+  it('leaves the split out while one limit holds every row, which is its own bar', () => {
+    overview = overviewOf([statement({ rows: 100, maxRows: 100 })]);
+
+    expect(rowBudgets(logWith(1)).objects).toEqual([]);
+  });
+
+  it('brings one SObject together when the two sides name it in a different case', () => {
+    overview = overviewOf([
+      statement({ rows: 100, maxRows: 100, sObject: 'account' }),
+      statement({ rows: 5, kind: 'DML', sObject: 'Account' }),
+    ]);
+
+    expect(rowBudgets(logWith(1)).objects).toEqual([
+      { sObject: 'account', rowsRead: 100, rowsWritten: 5, rows: 105 },
+    ]);
+  });
+
+  it('leaves the unknown label out of the split, a bucket of objects and not one', () => {
+    overview = overviewOf([
+      statement({ rows: 100, sObject: null }),
+      statement({ rows: 5, kind: 'DML', sObject: null }),
+      statement({ rows: 10, maxRows: 10 }),
+      statement({ rows: 2, kind: 'DML', sObject: 'Case' }),
+    ]);
+
+    expect(rowBudgets(logWith(1)).objects).toEqual([
+      { sObject: 'Account', rowsRead: 10, rowsWritten: 0, rows: 10 },
+      { sObject: 'Case', rowsRead: 0, rowsWritten: 2, rows: 2 },
+    ]);
+  });
+
+  it('leaves a search out of the SObject split, which holds rows against no total', () => {
+    overview = overviewOf([
+      statement({ rows: 30, maxRows: 30, kind: 'SOSL', sObject: 'Lead' }),
+      statement({ rows: 10, maxRows: 10 }),
+      statement({ rows: 5, kind: 'DML', sObject: 'Case' }),
+    ]);
+
+    expect(rowBudgets(logWith(1)).objects).toEqual([
+      { sObject: 'Account', rowsRead: 10, rowsWritten: 0, rows: 10 },
+      { sObject: 'Case', rowsRead: 0, rowsWritten: 5, rows: 5 },
+    ]);
+  });
 });
