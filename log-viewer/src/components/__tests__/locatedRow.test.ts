@@ -8,7 +8,7 @@ import type { RowComponent } from 'tabulator-tables';
 
 import type { ApexLog, LogEvent } from 'apex-log-parser';
 
-import { logStoreFor } from '../../core/log/LogStore.js';
+import { logStoreFor, type LogStore } from '../../core/log/LogStore.js';
 import { ROOT_PATH_ID, KeyPathIds } from '../../core/log/keyPathIds.js';
 import {
   LOCATED_ROW_CLASS,
@@ -127,13 +127,17 @@ describe('eventPathIds', () => {
   const root = ev('exec', null);
   const outer = ev('outer', root);
   const inner = ev('inner', outer);
+  let store: LogStore;
   let ids: KeyPathIds;
   beforeEach(() => {
-    ids = new KeyPathIds();
+    // A store per test, since each expects an empty table. The frames are not in
+    // this log's index, so the ids are minted rather than read from the cache.
+    store = logStoreFor({ eventsById: [] } as unknown as ApexLog);
+    ids = store.keyPathIds();
   });
 
   it('names one row in a top-down view, at the depth the frame ran at', () => {
-    const found = eventPathIds(inner, 'callees', ids);
+    const found = eventPathIds(inner, 'callees', store);
 
     expect(found).toHaveLength(1);
     expect(found[0]).toBe(rowPathId(bucketRow('METHOD_ENTRY||outer', 'METHOD_ENTRY||inner'), ids));
@@ -141,7 +145,7 @@ describe('eventPathIds', () => {
 
   it('names a row per caller depth in a bottom-up view', () => {
     // The frame heads a row on its own, and one under each caller above it.
-    const found = eventPathIds(inner, 'callers', ids);
+    const found = eventPathIds(inner, 'callers', store);
 
     expect(found).toEqual([
       rowPathId(bucketRow('METHOD_ENTRY||inner'), ids),
@@ -150,7 +154,7 @@ describe('eventPathIds', () => {
   });
 
   it('leaves the log root out, as it is a row in neither view', () => {
-    expect(eventPathIds(root, 'callers', ids)).toEqual([]);
+    expect(eventPathIds(root, 'callers', store)).toEqual([]);
   });
 });
 
@@ -224,7 +228,7 @@ describe('LocatedRowIds', () => {
     const found = new LocatedRowIds().idsFor(log, [5], 'callers');
 
     // The log's own table, so a row stamped from it reaches the same ids.
-    expect(found).toEqual(eventPathIds(frame, 'callers', logStoreFor(log).keyPathIds()));
+    expect(found).toEqual(eventPathIds(frame, 'callers', logStoreFor(log)));
   });
 
   it('reuses what it built for the frames it was last asked about', () => {

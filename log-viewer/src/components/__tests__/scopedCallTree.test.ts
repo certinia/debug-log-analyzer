@@ -3,6 +3,8 @@
  */
 import { describe, expect, it } from '@jest/globals';
 
+import type { LogEvent } from 'apex-log-parser';
+
 interface FakeEvent {
   eventIndex: number;
   type: string;
@@ -54,11 +56,16 @@ let selectedIndex = 4;
 const { KeyPathIds } = jest.requireActual<typeof import('../../core/log/keyPathIds.js')>(
   '../../core/log/keyPathIds.js',
 );
+const { getEventKey, getStackKey } = jest.requireActual<
+  typeof import('../../core/log/eventKeys.js')
+>('../../core/log/eventKeys.js');
 const paths = new KeyPathIds();
 jest.mock('../../core/log/LogStore.js', () => ({
   currentLogStore: () => ({
     log: root,
     keyPathIds: () => paths,
+    keyIdOf: (event: FakeEvent) => paths.keyId(getEventKey(event as unknown as LogEvent)),
+    stackIdOf: (event: FakeEvent) => paths.keyId(getStackKey(event as unknown as LogEvent)),
     eventByIndex: (i: number) => byId.get(i) ?? null,
     // Mirrors LogStore.stackByEventIndex over the fixture's own index.
     stackByEventIndex: (i: number) => {
