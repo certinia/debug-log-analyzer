@@ -24,11 +24,13 @@
 import * as PIXI from 'pixi.js';
 
 import { destroyTimelineApp } from '../rendering/pixiApp.js';
+import { formatTimeRange } from '../../../../core/utility/Util.js';
 import type {
   HeatStripTimeSeries,
   TimelineMarker,
   ViewportState,
 } from '../../types/flamechart.types.js';
+import { noDataSpanAt } from '../markers/MarkerProcessor.js';
 import { MeshAxisRenderer } from '../time-axis/MeshAxisRenderer.js';
 import { wheelZoomFactor } from '../ViewportUtils.js';
 import { MetricStripRenderer } from './MetricStripRenderer.js';
@@ -458,7 +460,7 @@ export class MetricStripOrchestrator {
 
     // Render the step chart with markers
     this.renderer.render(
-      data ?? { points: [], classifiedMetrics: [], globalMaxPercent: 0, hasData: false },
+      data ?? { points: [], classifiedMetrics: [], globalMaxPercent: 0, hasData: false, gaps: [] },
       context.viewportState,
       context.totalDuration,
       context.markers,
@@ -569,6 +571,10 @@ export class MetricStripOrchestrator {
       // Update tooltip - position below the metric strip
       const dataPoint = this.classifier.getDataPointAtTime(clampedTimeNs);
       if (dataPoint) {
+        const gap = noDataSpanAt(this.classifier.getData()?.gaps, clampedTimeNs);
+        this.tooltipRenderer?.setNoDataLabel(
+          gap ? `${gap.summary} · ${formatTimeRange(gap.startTime, gap.endTime)}` : null,
+        );
         this.tooltipRenderer?.show(
           this.mouseX,
           this.mouseY,

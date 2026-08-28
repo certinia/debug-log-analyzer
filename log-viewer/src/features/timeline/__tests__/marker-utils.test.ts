@@ -8,7 +8,8 @@
 
 import { describe, expect, it } from '@jest/globals';
 import type { ApexLog, LogEvent, LogIssue } from 'apex-log-parser';
-import { extractExceptionMarkers, extractMarkers } from '../utils/marker-utils.js';
+import type { TimelineMarker } from '../types/flamechart.types.js';
+import { extractExceptionMarkers, extractMarkers, noDataSpans } from '../utils/marker-utils.js';
 
 function logWith(overrides: Partial<ApexLog>): ApexLog {
   return { logIssues: [], exceptions: [], ...overrides } as unknown as ApexLog;
@@ -89,5 +90,46 @@ describe('extractExceptionMarkers', () => {
 
   it('returns an empty array when there are no exceptions', () => {
     expect(extractExceptionMarkers(logWith({ exceptions: [] }))).toEqual([]);
+  });
+});
+
+describe('noDataSpans', () => {
+  function marker(overrides: Partial<TimelineMarker>): TimelineMarker {
+    return {
+      id: 'm',
+      type: 'skip',
+      startTime: 0,
+      summary: 'Skipped-Lines',
+      ...overrides,
+    } as TimelineMarker;
+  }
+
+  it('reports a bounded skip as its own range, named by the marker', () => {
+    const spans = noDataSpans([
+      marker({ startTime: 100, endTime: 500, summary: 'Max-Size-reached' }),
+    ]);
+
+    expect(spans).toEqual([{ startTime: 100, endTime: 500, summary: 'Max-Size-reached' }]);
+  });
+
+  it('ignores a skip with no end, which is a moment and not a gap', () => {
+    expect(noDataSpans([marker({ startTime: 100 })])).toEqual([]);
+    expect(noDataSpans([marker({ startTime: 100, endTime: 100 })])).toEqual([]);
+  });
+
+  // An exception is a point in recorded time; the log kept running through it.
+  it('ignores markers that are not skips', () => {
+    const spans = noDataSpans([marker({ type: 'exception', startTime: 100, endTime: 500 })]);
+
+    expect(spans).toEqual([]);
+  });
+
+  it('sorts by start time, since the markers are not globally sorted', () => {
+    const spans = noDataSpans([
+      marker({ startTime: 800, endTime: 900 }),
+      marker({ startTime: 100, endTime: 500 }),
+    ]);
+
+    expect(spans.map((span) => span.startTime)).toEqual([100, 800]);
   });
 });
