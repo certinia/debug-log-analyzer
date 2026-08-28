@@ -66,8 +66,8 @@ function rowFor(container: HTMLElement, index: number): HTMLElement {
   return container.children[index] as HTMLElement;
 }
 
-/** A row entering an already-mounted table, which is what the renderer does with
- *  one scrolled back into view: in the DOM first, stamped as it initialises. */
+/** A row entering an already-mounted table, which is what the renderer does the
+ *  first time one is scrolled to: in the DOM first, stamped as it initialises. */
 function renderRow(container: HTMLElement, index: number): HTMLElement {
   const row = document.createElement('div');
   row.classList.add('tabulator-row');
@@ -162,7 +162,7 @@ describe('LocatedRowMarker', () => {
     expect(row.classList.contains(LOCATED_ROW_CLASS)).toBe(false);
   });
 
-  it('lights a row that arrives after the mark, as a scroll back brings one', () => {
+  it('lights a row that arrives after the mark, as scrolling to a new one does', () => {
     const container = host();
     new LocatedRowMarker().mark(container, [4]);
 
