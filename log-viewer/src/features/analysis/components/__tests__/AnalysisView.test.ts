@@ -11,7 +11,14 @@ import type { RowComponent, Tabulator } from 'tabulator-tables';
 // jest; this suite drives only the selection the view reports to the inspector.
 jest.mock('../../../call-tree/components/BottomUpTable.js', () => ({
   createBottomUpTable: () => ({
-    table: { on: (name: string, handler: unknown) => handlers.set(name, handler) },
+    table: {
+      on: (name: string, handler: unknown) => handlers.set(name, handler),
+      getRows: (...args: unknown[]) => {
+        stub.getRowsArgs.push(args);
+        return stub.rows;
+      },
+      goToRow: (row: RowComponent) => stub.revealed.push(row),
+    },
     // Left pending: the columns are applied on build, and none are set up here.
     tableBuilt: new Promise<Tabulator>(() => {}),
   }),
@@ -31,6 +38,8 @@ import { logStoreFor } from '../../../../core/log/LogStore.js';
 import { AnalysisView } from '../AnalysisView.js';
 
 const handlers = new Map<string, unknown>();
+/** The stub table's state, so a reveal's reads can be counted. */
+let stub: { rows: RowComponent[]; getRowsArgs: unknown[][]; revealed: RowComponent[] };
 
 /** The log's own index, which a reveal resolves its frame through, and which the
  *  fixture's event indexes count off. */
@@ -105,6 +114,7 @@ describe('analysis-view selection', () => {
   beforeEach(() => {
     byEventIndex = [];
     handlers.clear();
+    stub = { rows: [], getRowsArgs: [], revealed: [] };
     log = recursiveLog();
     roots = toBottomUpTree(log.children, logStoreFor(log).keyPathIds());
     view = new AnalysisView();
@@ -174,6 +184,20 @@ describe('analysis-view selection', () => {
         calledBy: 'A',
       },
     ]);
+  });
+
+  it('reveals a bucket by its key, reading no occurrence', async () => {
+    // The grid lists root buckets; a dataTree hands only those back.
+    stub.rows = roots.map((data) => rowComponent(data));
+
+    // Frame 2 is the log's own `B` call, which the `B` bucket heads.
+    eventBus.emit('inspector:reveal', { source: 'analysis', eventIndex: 2 });
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    expect(stub.revealed.map((row) => row.getData())).toEqual([findRow(roots, 'B')]);
+    // One read of the top-level rows, and never `getRows('active')`: listing the
+    // active rows, or reading a bucket's occurrences, walked the whole log.
+    expect(stub.getRowsArgs).toEqual([[]]);
   });
 
   it('clears the inspector when the selection goes', () => {

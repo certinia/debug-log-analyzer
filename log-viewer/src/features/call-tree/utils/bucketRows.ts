@@ -28,6 +28,11 @@ const bucketOf = (row: RowComponent): BucketRow => row.getData() as BucketRow;
  * @param rows - the view's top-level rows
  * @param waitForRender - resolves once an expanded row's children exist
  */
+export function findRootBucket(rows: RowComponent[], event: LogEvent): RowComponent | null {
+  const key = getEventKey(event);
+  return rows.find((row) => bucketOf(row).key === key) ?? null;
+}
+
 export async function findBucketRow(
   rows: RowComponent[],
   event: LogEvent,
@@ -35,8 +40,7 @@ export async function findBucketRow(
   waitForRender: () => Promise<void>,
 ): Promise<RowComponent | null> {
   if (direction === 'callers') {
-    const key = getEventKey(event);
-    return rows.find((row) => bucketOf(row).key === key) ?? null;
+    return findRootBucket(rows, event);
   }
 
   const path = eventKeyChain(event).reverse();

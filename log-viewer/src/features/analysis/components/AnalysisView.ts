@@ -23,6 +23,7 @@ import {
 } from '../../../components/locatedRow.js';
 import { InspectorEmphasis } from '../../../components/inspectorEmphasis.js';
 import { SelectionEchoGuard } from '../../../core/events/SelectionEchoGuard.js';
+import { eventByEventIndex } from '../../../core/utility/EventSearch.js';
 import { isVisible } from '../../../core/utility/Util.js';
 import { getSettings, updateSetting } from '../../settings/Settings.js';
 import { createBottomUpTable } from '../../call-tree/components/BottomUpTable.js';
@@ -36,6 +37,7 @@ import {
   toggleField,
 } from '../../../tabulator/ColumnViews.js';
 import type { BottomUpRow } from '../../call-tree/utils/Aggregation.js';
+import { findRootBucket } from '../../call-tree/utils/bucketRows.js';
 import {
   categoryColoringStyles,
   groupedRowFormatter,
@@ -233,24 +235,25 @@ export class AnalysisView extends LitElement {
    */
   private async _revealEventIndex(eventIndex: number): Promise<void> {
     const table = this.analysisTable;
-    // `instances` is populated on root buckets only, which is what the grid lists.
-    const match = table
-      ?.getRows()
-      .find((row) =>
-        (row.getData() as BottomUpRow).instances?.some((event) => event.eventIndex === eventIndex),
-      );
-    if (!table || !match) {
+    const root = this.timelineRoot;
+    if (!table || !root) {
+      return;
+    }
+    const event = eventByEventIndex(root, eventIndex);
+    if (!event) {
+      return;
+    }
+    // The grid is bottom-up, so the frame heads a top-level bucket its own key
+    // finds, without reading what any bucket holds.
+    const match = findRootBucket(table.getRows(), event);
+    if (!match) {
       return;
     }
 
     // Show Details keeps only rows with a duration, so the buckets for debug
     // lines, thrown exceptions and query plans are filtered out — exactly the
     // events a finding points at. Turn the filter off rather than reveal nothing.
-    const data = match.getData();
-    if (
-      !this.filterState.showDetails &&
-      !table.getRows('active').some((row) => row.getData() === data)
-    ) {
+    if (!this.filterState.showDetails && !this._showDetailsFilter(match.getData() as BottomUpRow)) {
       this._handleShowDetailsChange();
       await this.updateComplete;
     }
