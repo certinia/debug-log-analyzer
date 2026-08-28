@@ -4,6 +4,7 @@
 import type { ApexLog } from 'apex-log-parser';
 import { Tabulator } from 'tabulator-tables';
 
+import { logStoreFor } from '../../../core/log/LogStore.js';
 import { vscodeMessenger } from '../../../core/messaging/VSCodeExtensionMessenger.js';
 import { formatDuration } from '../../../core/utility/Util.js';
 import { TIME_WIDTH } from '../../../tabulator/ColumnWidths.js';
@@ -41,7 +42,11 @@ export function createAggregatedTable(
   const selfTimeBottomCalc = makeSumSelfTimeAllVisible(() => tableRef.current);
   const heapFooters = createSelfSumHeapFooters(() => tableRef.current);
 
-  const tableData = toAggregatedCallTree(rootMethod.children, rootMethod.governorLimits);
+  const tableData = toAggregatedCallTree(
+    rootMethod.children,
+    logStoreFor(rootMethod).keyPathIds(),
+    rootMethod.governorLimits,
+  );
 
   const table = new Tabulator(container, {
     data: tableData,

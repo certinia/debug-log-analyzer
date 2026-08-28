@@ -18,9 +18,14 @@ describe('KeyPathIds', () => {
     ids = new KeyPathIds(32);
   });
 
-  /** Interns a whole path, named outermost key first as a row reads. */
+  /** Interns a whole path, named outermost key first as a row reads, the way a
+   *  tree build composes one. */
   function pathFor(table: KeyPathIds, ...keys: string[]): number {
-    return table.pathOf([...keys].reverse());
+    let id = ROOT_PATH_ID;
+    for (const key of keys) {
+      id = table.step(id, table.keyId(key));
+    }
+    return id;
   }
 
   it('gives one id to the same path, however often it is asked for', () => {

@@ -638,7 +638,7 @@ export class AnalysisView extends LitElement {
             this._clearSearchHighlights();
           }
         },
-        rowFormatter: groupedRowFormatter(rootMethod),
+        rowFormatter: groupedRowFormatter,
       },
       {
         placeholder: 'No Analysis Available',
@@ -671,7 +671,7 @@ export class AnalysisView extends LitElement {
       }
       eventBus.emit('detail:select', {
         source: 'analysis',
-        selection: rowDetailSelection(rows[0]),
+        selection: rowDetailSelection(rows[0], this.timelineRoot),
         // The grid ranks methods by self time and expands to their callers, so
         // the inspector opens on the forward view instead.
         view: 'callers',
@@ -683,7 +683,7 @@ export class AnalysisView extends LitElement {
     this.analysisTable.on('rowMouseEnter', (_e, row) => {
       eventBus.emit('detail:locate', {
         source: 'analysis',
-        eventIndexes: rowOccurrences(row),
+        eventIndexes: rowOccurrences(row, this.timelineRoot),
       });
     });
     this.analysisTable.on('rowMouseLeave', () => {

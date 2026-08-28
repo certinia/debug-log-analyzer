@@ -7,9 +7,7 @@ import type { RowComponent } from 'tabulator-tables';
 
 import type { DetailSelection, SelectionView } from '../core/events/EventBus.js';
 import { logStoreFor } from '../core/log/LogStore.js';
-import type { KeyPathIds } from '../core/log/keyPathIds.js';
 import { eventByEventIndex } from '../core/utility/EventSearch.js';
-import { occurrencesThrough } from '../features/call-tree/utils/bottomUpOccurrences.js';
 
 /** Class the marked row carries; each table styles it itself. */
 export const LOCATED_ROW_CLASS = 'located-row';
@@ -28,8 +26,8 @@ const ROW_INDEX_ATTRIBUTE = 'data-row-index';
  * The index is read from the data rather than `getIndex()`: Tabulator runs the
  * formatter for its calc rows too, and those carry no index.
  *
- * A view whose rows merge occurrences stamps {@link rowPathStamper} instead, as
- * a bucket has no event of its own.
+ * A view whose rows merge occurrences stamps {@link stampRowPath} instead, as a
+ * bucket has no event of its own.
  *
  * @param indexField - the table's `index` option
  */
@@ -46,6 +44,8 @@ export function rowIndexStamper(indexField: string): (row: RowComponent) => void
  *  occurrences it holds, which a bottom-up caller bucket has none of. */
 interface CallRow {
   key?: string;
+  /** The interned bucket path the row's builder stamped on it. */
+  _pathId?: number;
   text?: string;
   instances?: LogEvent[];
   originalData?: LogEvent;
@@ -53,51 +53,28 @@ interface CallRow {
 
 const rowCallData = (row: RowComponent): CallRow => row.getData() as CallRow;
 
-/** Derived calls, held per row: a pointer sweep re-enters rows, and the click
- *  that follows a hover asks again. Both answers are cached, because deriving
- *  them reads every occurrence the root bucket holds. */
-const derivedCalls = new WeakMap<CallRow, LogEvent[]>();
+/** Held per row: a pointer sweep re-enters rows and the click that follows a
+ *  hover asks again, but deriving reads every occurrence the root bucket holds. */
 const derivedIndexes = new WeakMap<CallRow, number[]>();
-const derivedChains = new WeakMap<CallRow, CallChain | null>();
 
 const NO_CALLS: LogEvent[] = [];
 
-/** Where a derived bottom-up row sits: the root bucket whose calls it stands
- *  for, the keys from that root out to the row, and the row under the root —
- *  the frame that made those calls. */
-interface CallChain {
-  root: CallRow;
-  keys: string[];
-  caller: CallRow;
-}
-
 /**
- * A derived row's place in the bottom-up tree, or null where the walk leaves the
- * merged rows and the row stands for nothing. Cached: the occurrences and the
- * caller are both read off it.
+ * The root bucket a derived row reads its calls from, or null where the walk
+ * leaves the merged rows and the row stands for nothing.
  */
-function rowCallChain(row: RowComponent, data: CallRow): CallChain | null {
-  const cached = derivedChains.get(data);
-  if (cached !== undefined) {
-    return cached;
-  }
-  const keys = [data.key!];
+function rootBucketOf(row: RowComponent, data: CallRow): CallRow | null {
   let node = data;
-  let caller = data;
   for (let parent = row.getTreeParent(); parent; parent = parent.getTreeParent()) {
     const parentData = rowCallData(parent);
     if (parentData.key === undefined) {
-      derivedChains.set(data, null);
       return null;
     }
-    caller = node;
     node = parentData;
-    keys.push(parentData.key);
   }
-  // The tree parent is the callee, so the walk runs inwards; the path runs out.
-  const chain: CallChain = { root: node, keys: keys.reverse(), caller };
-  derivedChains.set(data, chain);
-  return chain;
+  // The tree parent is the callee, so the walk runs inwards, to the bucket that
+  // holds the calls.
+  return node;
 }
 
 /**
@@ -112,59 +89,32 @@ export function rowId(row: RowComponent | undefined): number | undefined {
   return typeof id === 'number' ? id : undefined;
 }
 
-const pathIds = new WeakMap<CallRow, number>();
-
 /**
  * What tells a merged row apart from a same-named row under a different parent:
- * the bucket keys from its top-level ancestor out to the row itself, interned to
- * one integer. A single key does not, because a bucket map is allocated per
- * parent, so one method holds a row under every caller it has.
+ * the bucket path its builder stamped on it. A single key does not, because a
+ * bucket map is allocated per parent, so one method holds a row under every
+ * caller it has.
  *
  * Undefined on a row that stands for one frame, which its event index identifies.
  */
-export function rowPathId(row: RowComponent, ids: KeyPathIds): number | undefined {
-  const data = rowCallData(row);
-  if (data.key === undefined) {
-    return undefined;
-  }
-  const cached = pathIds.get(data);
-  if (cached !== undefined) {
-    return cached;
-  }
-  const keys = [data.key];
-  for (let parent = row.getTreeParent(); parent; parent = parent.getTreeParent()) {
-    const parentKey = rowCallData(parent).key;
-    if (parentKey === undefined) {
-      break;
-    }
-    keys.push(parentKey);
-  }
-  const id = ids.pathOf(keys);
-  pathIds.set(data, id);
-  return id;
+export function rowPathId(row: RowComponent): number | undefined {
+  return rowCallData(row)._pathId;
 }
 
 /** A `rowFormatter` for a view whose rows merge occurrences, stamping the path id
  *  so the mark finds the row with the same one DOM query. */
-export function rowPathStamper(ids: KeyPathIds): (row: RowComponent) => void {
-  return (row) => {
-    const id = rowPathId(row, ids);
-    if (id !== undefined) {
-      row.getElement()?.setAttribute(ROW_INDEX_ATTRIBUTE, String(id));
-    }
-  };
-}
-
-/** True where the row holds no calls of its own, so its chain answers for it. */
-function isDerived(data: CallRow): boolean {
-  return !data.instances?.length && data.key !== undefined;
+export function stampRowPath(row: RowComponent): void {
+  const id = rowPathId(row);
+  if (id !== undefined) {
+    row.getElement()?.setAttribute(ROW_INDEX_ATTRIBUTE, String(id));
+  }
 }
 
 /**
  * The calls a row stands for. A bottom-up caller row holds none of its own, so it
  * is derived from its root bucket and the chain that reaches it.
  */
-function rowCallOccurrences(row: RowComponent): LogEvent[] {
+function rowCallOccurrences(row: RowComponent, root: ApexLog | null): LogEvent[] {
   const data = rowCallData(row);
   if (data.instances?.length) {
     return data.instances;
@@ -172,14 +122,26 @@ function rowCallOccurrences(row: RowComponent): LogEvent[] {
   if (data.key === undefined) {
     return data.originalData ? [data.originalData] : NO_CALLS;
   }
-  const cached = derivedCalls.get(data);
-  if (cached) {
-    return cached;
+  return deriveCalls(row, data, root);
+}
+
+/**
+ * The root bucket's calls whose own chain runs through the row.
+ *
+ * The table is the log's that built the rows: a path id is minted per log, so
+ * another log's table would answer about a path of its own.
+ */
+function deriveCalls(row: RowComponent, data: CallRow, root: ApexLog | null): LogEvent[] {
+  const pathId = data._pathId;
+  if (pathId === undefined || !root) {
+    return NO_CALLS;
   }
-  const chain = rowCallChain(row, data);
-  const derived = chain ? occurrencesThrough(chain.root.instances ?? [], chain.keys) : NO_CALLS;
-  derivedCalls.set(data, derived);
-  return derived;
+  const paths = logStoreFor(root).keyPathIds();
+  const instances = rootBucketOf(row, data)?.instances;
+  if (!instances?.length) {
+    return NO_CALLS;
+  }
+  return instances.filter((event) => paths.chainReaches(event, pathId));
 }
 
 /**
@@ -206,23 +168,34 @@ function pathIdsForEvents(
   return [...found];
 }
 
-/** The calls a row stands for, as the event indexes the mark works in. */
-export function rowOccurrences(row: RowComponent): number[] {
+/** The calls a row stands for, as the event indexes the mark works in.
+ *
+ * @param root - the log the row was built from, which its path id belongs to */
+export function rowOccurrences(row: RowComponent, root: ApexLog | null): number[] {
   const data = rowCallData(row);
   const cached = derivedIndexes.get(data);
   if (cached) {
     return cached;
   }
-  const indexes = rowCallOccurrences(row).map((event) => event.eventIndex);
-  derivedIndexes.set(data, indexes);
+  const indexes = rowCallOccurrences(row, root).map((event) => event.eventIndex);
+  if (indexes.length) {
+    // Not kept where nothing derived: the calls are read through the log on
+    // screen, so an answer of none can be that log not being set yet.
+    derivedIndexes.set(data, indexes);
+  }
   return indexes;
 }
 
 /**
  * What a selected row tells the inspector: a merged row names every call it
  * counts, a Time Order row the one call it is, and no row nothing.
+ *
+ * @param root - the log the row was built from, which its path id belongs to
  */
-export function rowDetailSelection(row: RowComponent | undefined): DetailSelection | null {
+export function rowDetailSelection(
+  row: RowComponent | undefined,
+  root: ApexLog | null,
+): DetailSelection | null {
   if (!row) {
     return null;
   }
@@ -234,13 +207,14 @@ export function rowDetailSelection(row: RowComponent | undefined): DetailSelecti
   if (data.key === undefined) {
     return { kind: 'event', eventIndex: event.eventIndex };
   }
-  // A bucket stands for its calls even where none derive: `originalData` is the
-  // caller frame, which is the mis-scoping this scoping exists to avoid.
-  const chain = isDerived(data) ? rowCallChain(row, data) : null;
+  // The row itself is what reached the calls, at whatever depth it sits: a
+  // deeper row narrows the same calls to the ones its own chain conducted, so
+  // naming a fixed frame would read the same at every depth. A root bucket holds
+  // its own calls, so nothing reached them but it.
   return {
     kind: 'aggregate',
-    instances: rowOccurrences(row),
-    calledBy: chain?.caller.text,
+    instances: rowOccurrences(row, root),
+    calledBy: data.instances?.length ? undefined : data.text,
   };
 }
 
@@ -310,7 +284,7 @@ export class LocatedRowIds {
  * to mark, so they are left alone.
  *
  * The table must stamp its rows: {@link rowIndexStamper} where a row is one
- * frame, {@link rowPathStamper} where rows merge occurrences.
+ * frame, {@link stampRowPath} where rows merge occurrences.
  */
 export class LocatedRowMarker {
   private elements: HTMLElement[] = [];

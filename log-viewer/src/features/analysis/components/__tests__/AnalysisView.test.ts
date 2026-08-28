@@ -27,15 +27,18 @@ import {
   type DetailSource,
 } from '../../../../core/events/EventBus.js';
 import { toBottomUpTree, type BottomUpRow } from '../../../call-tree/utils/Aggregation.js';
+import { logStoreFor } from '../../../../core/log/LogStore.js';
 import { AnalysisView } from '../AnalysisView.js';
 
 const handlers = new Map<string, unknown>();
 
-let nextEventIndex = 0;
+/** The log's own index, which a reveal resolves its frame through, and which the
+ *  fixture's event indexes count off. */
+let byEventIndex: LogEvent[] = [];
 
 function frame(text: string, self: number, total: number, parent: LogEvent | null): LogEvent {
   const event = {
-    eventIndex: nextEventIndex++,
+    eventIndex: byEventIndex.length,
     type: 'METHOD_ENTRY',
     namespace: 'default',
     text,
@@ -54,18 +57,27 @@ function frame(text: string, self: number, total: number, parent: LogEvent | nul
     heapPeak: 0,
   } as unknown as LogEvent;
   parent?.children.push(event);
+  byEventIndex.push(event);
   return event;
 }
 
-/** A -> B -> A on one branch, A -> C -> A on the other. */
-function recursiveRoots(): LogEvent[] {
-  const outer1 = frame('A', 10, 100, null);
+/**
+ * A -> B -> A on one branch, A -> C -> A on the other, under a log root as the
+ * parser leaves it: a bottom-up chain runs out to the root and stops there, so a
+ * top-level frame with no parent above it would name no row for its own callees.
+ *
+ * A derived row's calls come from the log's own key table, so the view must read
+ * the log the rows were built from.
+ */
+function recursiveLog(): ApexLog {
+  const root = frame('LOG_ROOT', 0, 150, null);
+  const outer1 = frame('A', 10, 100, root);
   const b1 = frame('B', 20, 90, outer1);
   frame('A', 70, 70, b1);
-  const outer2 = frame('A', 5, 50, null);
+  const outer2 = frame('A', 5, 50, root);
   const c1 = frame('C', 15, 45, outer2);
   frame('A', 30, 30, c1);
-  return [outer1, outer2];
+  return Object.assign(root, { eventsById: byEventIndex }) as unknown as ApexLog;
 }
 
 function rowComponent(data: BottomUpRow, treeParent?: RowComponent): RowComponent {
@@ -85,19 +97,24 @@ function findRow(rows: BottomUpRow[], text: string): BottomUpRow {
 
 describe('analysis-view selection', () => {
   let view: AnalysisView;
+  let log: ApexLog;
   let roots: BottomUpRow[];
   let seen: Array<{ source: DetailSource; selection: DetailSelection | null }>;
   let off: () => void;
 
   beforeEach(() => {
-    nextEventIndex = 0;
+    byEventIndex = [];
     handlers.clear();
-    roots = toBottomUpTree(recursiveRoots());
+    log = recursiveLog();
+    roots = toBottomUpTree(log.children, logStoreFor(log).keyPathIds());
     view = new AnalysisView();
+    // The app hands the log down as a property, and a row's calls are read
+    // through the table that built it.
+    view.timelineRoot = log;
     // The table mounts in a wrapper the view finds in its render root; it has
     // none until it is updated, so stand one in.
     view.tableContainer = document.createElement('div');
-    void view._renderAnalysis({} as ApexLog);
+    void view._renderAnalysis(log);
     seen = [];
     off = eventBus.on('detail:select', (detail) => seen.push(detail));
   });
@@ -132,7 +149,7 @@ describe('analysis-view selection', () => {
     ]);
   });
 
-  it('scopes a caller row to the calls it holds, and names the frame that made them', () => {
+  it('scopes a caller row to the calls it holds, and names the row they were reached through', () => {
     const rootRow = findRow(roots, 'A');
     const throughB = findRow(rootRow._children ?? [], 'B');
     const throughBA = findRow(throughB._children ?? [], 'A');
@@ -144,7 +161,8 @@ describe('analysis-view selection', () => {
     const derived = rootRow.instances.filter((event) => event.parent?.text === 'B');
     expect(derived).toHaveLength(1);
     expect(seen.map((detail) => detail.selection)).toEqual([
-      // The calls are A's, made by B, whichever row named them.
+      // Both rows hold the same one call, so the row is what tells them apart:
+      // reached through B, then through the A above B.
       {
         kind: 'aggregate',
         instances: derived.map((event) => event.eventIndex),
@@ -153,7 +171,7 @@ describe('analysis-view selection', () => {
       {
         kind: 'aggregate',
         instances: derived.map((event) => event.eventIndex),
-        calledBy: 'B',
+        calledBy: 'A',
       },
     ]);
   });

@@ -3,20 +3,20 @@
  *
  * @jest-environment jsdom
  */
-import { beforeEach, describe, expect, it } from '@jest/globals';
+import { describe, expect, it } from '@jest/globals';
 import type { RowComponent } from 'tabulator-tables';
 
 import type { ApexLog, LogEvent } from 'apex-log-parser';
 
 import { logStoreFor } from '../../core/log/LogStore.js';
-import { KeyPathIds } from '../../core/log/keyPathIds.js';
+import { KeyPathIds, ROOT_PATH_ID } from '../../core/log/keyPathIds.js';
 import {
   LOCATED_ROW_CLASS,
   LocatedRowIds,
   LocatedRowMarker,
   rowIndexStamper,
   rowPathId,
-  rowPathStamper,
+  stampRowPath,
 } from '../locatedRow.js';
 
 const stamp = rowIndexStamper('eventIndex');
@@ -33,14 +33,17 @@ function rowComponent(
   } as unknown as RowComponent;
 }
 
-/** A bucket row and its chain of parents, innermost last, as tabulator hands them
- *  over: the tree parent of a bottom-up caller row is the frame it called. */
-function bucketRow(...keys: string[]): RowComponent {
-  let row: RowComponent | false = false;
+/** A bucket row as its builder leaves it: the key it merges, and the path that
+ *  tells it from a same-named row under another caller. */
+function bucketRow(ids: KeyPathIds, ...keys: string[]): RowComponent {
+  let pathId = ROOT_PATH_ID;
   for (const key of keys) {
-    row = rowComponent(document.createElement('div'), { key }, row);
+    pathId = ids.step(pathId, ids.keyId(key));
   }
-  return row as RowComponent;
+  return rowComponent(document.createElement('div'), {
+    key: keys[keys.length - 1],
+    _pathId: pathId,
+  });
 }
 
 function ev(text: string, parent: LogEvent | null): LogEvent {
@@ -63,21 +66,20 @@ function rowFor(container: HTMLElement, index: number): HTMLElement {
   return container.children[index] as HTMLElement;
 }
 
-describe('rowPathStamper', () => {
+describe('stampRowPath', () => {
   it('marks the row under one parent and not its namesake under another', () => {
     const ids = new KeyPathIds(0);
-    const stampPath = rowPathStamper(ids);
     const container = document.createElement('div');
-    const rows = [bucketRow('Trigger1', 'Util.log'), bucketRow('Trigger2', 'Util.log')];
+    const rows = [bucketRow(ids, 'Trigger1', 'Util.log'), bucketRow(ids, 'Trigger2', 'Util.log')];
     for (const row of rows) {
       const element = row.getElement();
       element.classList.add('tabulator-row');
-      stampPath(row);
+      stampRowPath(row);
       container.append(element);
     }
     const marker = new LocatedRowMarker();
 
-    marker.mark(container, [rowPathId(rows[0]!, ids)!]);
+    marker.mark(container, [rowPathId(rows[0]!)!]);
 
     expect(rows[0]!.getElement().classList.contains(LOCATED_ROW_CLASS)).toBe(true);
     expect(rows[1]!.getElement().classList.contains(LOCATED_ROW_CLASS)).toBe(false);
@@ -95,30 +97,8 @@ describe('rowIndexStamper', () => {
 });
 
 describe('rowPathId', () => {
-  let ids: KeyPathIds;
-  beforeEach(() => {
-    ids = new KeyPathIds(0);
-  });
-
-  it('names a top-level row by its own key alone', () => {
-    expect(rowPathId(bucketRow('A'), ids)).toBe(ids.pathOf(['A']));
-  });
-
-  it('tells two same-named rows apart by the parents that reach them', () => {
-    // One method holds a row under every caller it has, so the key alone cannot.
-    expect(rowPathId(bucketRow('Trigger1', 'Util.log'), ids)).not.toBe(
-      rowPathId(bucketRow('Trigger2', 'Util.log'), ids),
-    );
-  });
-
-  it('gives one id to the whole path, so two rows on it agree', () => {
-    const deep = rowPathId(bucketRow('A', 'B', 'C'), ids);
-    expect(deep).toBe(rowPathId(bucketRow('A', 'B', 'C'), ids));
-    expect(deep).not.toBe(rowPathId(bucketRow('A', 'B'), ids));
-  });
-
   it('leaves a row that stands for one frame unnamed, as its index names it', () => {
-    expect(rowPathId(rowComponent(document.createElement('div'), { id: 7 }), ids)).toBeUndefined();
+    expect(rowPathId(rowComponent(document.createElement('div'), { id: 7 }))).toBeUndefined();
   });
 });
 

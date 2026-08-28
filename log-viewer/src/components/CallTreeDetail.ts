@@ -797,20 +797,11 @@ export class CallTreeDetail extends LitElement {
   }
 }
 
-/**
- * The frame that called a bottom-up row's own calls: the caller shown directly
- * above the row's seed. A tree parent is the callee there, so the walk runs to
- * the row one level below the top.
- */
+/** What a picked bottom-up row's calls were reached through: the row's own frame,
+ *  or nothing on a top-level row, which names its own calls. */
 function callerOfRow(row: RowComponent | undefined): string | undefined {
-  let node = row;
-  let parent = node?.getTreeParent();
-  if (!node || !parent) {
+  if (!row?.getTreeParent()) {
     return undefined;
   }
-  for (let above = parent.getTreeParent(); above; above = parent.getTreeParent()) {
-    node = parent;
-    parent = above;
-  }
-  return (node.getData() as Partial<ScopedRow>).text;
+  return (row.getData() as Partial<ScopedRow>).text;
 }
