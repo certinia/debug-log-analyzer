@@ -15,6 +15,54 @@ export const LOCATED_ROW_CLASS = 'located-row';
 /** Attribute holding a row's index, so the mark can find its element. */
 const ROW_INDEX_ATTRIBUTE = 'data-row-index';
 
+/** Nothing wanted, shared so a cleared table costs no allocation. */
+const NOTHING_WANTED: ReadonlySet<string> = new Set();
+
+/**
+ * The stamped ids each marked table wants lit.
+ *
+ * Held per host rather than on the marker so a row can light itself as it enters
+ * the DOM. The renderer de-initialises a row scrolled out of view and builds it
+ * again on the way back, which drops the class the sweep put on it, so a mark
+ * held only as a list of elements is lost the moment the user scrolls.
+ */
+const wantedByHost = new WeakMap<HTMLElement, ReadonlySet<string>>();
+
+/** Applies `wanted` to the rows a table has rendered. */
+function sweep(host: HTMLElement, wanted: ReadonlySet<string>): void {
+  for (const element of host.querySelectorAll<HTMLElement>(
+    `.tabulator-row[${ROW_INDEX_ATTRIBUTE}]`,
+  )) {
+    const id = element.getAttribute(ROW_INDEX_ATTRIBUTE)!;
+    element.classList.toggle(LOCATED_ROW_CLASS, wanted.has(id));
+  }
+}
+
+/**
+ * Stamps what identifies `row` in its table, and lights it where the mark wants
+ * that id.
+ *
+ * The walk up is short, a row sitting a handful of nodes below its table, and it
+ * is what lets the mark be a property of the table rather than of the elements
+ * that happened to be rendered when it was set. A row in a table nothing has
+ * marked is left as it is.
+ */
+function stamp(row: RowComponent, id: number | string): void {
+  const element = row.getElement();
+  if (!element) {
+    return;
+  }
+  const stamped = String(id);
+  element.setAttribute(ROW_INDEX_ATTRIBUTE, stamped);
+  for (let node: HTMLElement | null = element; node; node = node.parentElement) {
+    const wanted = wantedByHost.get(node);
+    if (wanted) {
+      element.classList.toggle(LOCATED_ROW_CLASS, wanted.has(stamped));
+      return;
+    }
+  }
+}
+
 /**
  * Builds a Tabulator `rowFormatter` that stamps what identifies the row in its
  * own table: an event index where every row is one frame.
@@ -35,7 +83,7 @@ export function rowIndexStamper(indexField: string): (row: RowComponent) => void
   return (row) => {
     const index = (row.getData() as Record<string, unknown>)[indexField];
     if (typeof index === 'number' || typeof index === 'string') {
-      row.getElement()?.setAttribute(ROW_INDEX_ATTRIBUTE, String(index));
+      stamp(row, index);
     }
   };
 }
@@ -106,7 +154,7 @@ export function rowPathId(row: RowComponent): number | undefined {
 export function stampRowPath(row: RowComponent): void {
   const id = rowPathId(row);
   if (id !== undefined) {
-    row.getElement()?.setAttribute(ROW_INDEX_ATTRIBUTE, String(id));
+    stamp(row, id);
   }
 }
 
@@ -280,44 +328,40 @@ export class LocatedRowIds {
  * a mark can land on several rows at once.
  *
  * The mark is not a selection: it only styles the row elements, so nothing
- * scrolls, expands or re-sorts. Rows the table has not rendered have no element
- * to mark, so they are left alone.
+ * scrolls, expands or re-sorts. It belongs to the table rather than to the rows
+ * rendered when it was set, so a row scrolled back into view lights itself.
  *
  * The table must stamp its rows: {@link rowIndexStamper} where a row is one
  * frame, {@link stampRowPath} where rows merge occurrences.
  */
 export class LocatedRowMarker {
-  private elements: HTMLElement[] = [];
+  private host: HTMLElement | null = null;
 
   /**
    * Move the mark to the rows `ids` name, or drop it with an empty list. Only the
-   * rendered rows are read, so the cost follows the viewport rather than the
+   * rendered rows are swept, so the cost follows the viewport rather than the
    * table; callers still only call this when the target changes.
    *
    * @param host - Element the table is mounted in
    * @param ids - What the table stamps for the rows to mark, empty to clear
    */
   public mark(host: HTMLElement | null, ids: readonly (number | string)[]): void {
-    this.clear();
-    if (!host || !ids.length) {
+    if (this.host && this.host !== host) {
+      // A view that switches tables would leave the one it left marked.
+      wantedByHost.delete(this.host);
+      sweep(this.host, NOTHING_WANTED);
+    }
+    this.host = host;
+    if (!host) {
       return;
     }
-    const wanted = new Set(ids.map(String));
-    for (const element of host.querySelectorAll<HTMLElement>(
-      `.tabulator-row[${ROW_INDEX_ATTRIBUTE}]`,
-    )) {
-      if (wanted.has(element.getAttribute(ROW_INDEX_ATTRIBUTE)!)) {
-        element.classList.add(LOCATED_ROW_CLASS);
-        this.elements.push(element);
-      }
-    }
+    const wanted = ids.length ? new Set(ids.map(String)) : NOTHING_WANTED;
+    wantedByHost.set(host, wanted);
+    sweep(host, wanted);
   }
 
   /** Drop the mark, if one is set. */
   public clear(): void {
-    for (const element of this.elements) {
-      element.classList.remove(LOCATED_ROW_CLASS);
-    }
-    this.elements = [];
+    this.mark(this.host, []);
   }
 }

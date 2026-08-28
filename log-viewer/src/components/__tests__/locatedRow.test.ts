@@ -66,6 +66,16 @@ function rowFor(container: HTMLElement, index: number): HTMLElement {
   return container.children[index] as HTMLElement;
 }
 
+/** A row entering an already-mounted table, which is what the renderer does with
+ *  one scrolled back into view: in the DOM first, stamped as it initialises. */
+function renderRow(container: HTMLElement, index: number): HTMLElement {
+  const row = document.createElement('div');
+  row.classList.add('tabulator-row');
+  container.append(row);
+  stamp(rowComponent(row, { eventIndex: index }));
+  return row;
+}
+
 describe('stampRowPath', () => {
   it('marks the row under one parent and not its namesake under another', () => {
     const ids = new KeyPathIds(0);
@@ -150,6 +160,47 @@ describe('LocatedRowMarker', () => {
     marker.mark(container, [1]);
     marker.mark(null, [1]);
     expect(row.classList.contains(LOCATED_ROW_CLASS)).toBe(false);
+  });
+
+  it('lights a row that arrives after the mark, as a scroll back brings one', () => {
+    const container = host();
+    new LocatedRowMarker().mark(container, [4]);
+
+    // The sweep found no rows, so this is the row lighting itself.
+    expect(renderRow(container, 4).classList.contains(LOCATED_ROW_CLASS)).toBe(true);
+    expect(renderRow(container, 5).classList.contains(LOCATED_ROW_CLASS)).toBe(false);
+  });
+
+  it('un-lights a row the renderer hands back with the class still on it', () => {
+    const container = host();
+    const marker = new LocatedRowMarker();
+    marker.mark(container, [4]);
+    const row = renderRow(container, 4);
+
+    marker.mark(container, [5]);
+    // Re-used rather than rebuilt, so it arrives carrying the old mark.
+    row.classList.add(LOCATED_ROW_CLASS);
+    stamp(rowComponent(row, { eventIndex: 4 }));
+
+    expect(row.classList.contains(LOCATED_ROW_CLASS)).toBe(false);
+  });
+
+  it('leaves a row alone where nothing has marked its table', () => {
+    const row = renderRow(document.createElement('div'), 4);
+
+    expect(row.classList.contains(LOCATED_ROW_CLASS)).toBe(false);
+  });
+
+  it('stops lighting rows of a table the mark has left', () => {
+    const first = host();
+    const second = host();
+    const marker = new LocatedRowMarker();
+
+    marker.mark(first, [4]);
+    marker.mark(second, [4]);
+
+    expect(renderRow(first, 4).classList.contains(LOCATED_ROW_CLASS)).toBe(false);
+    expect(renderRow(second, 4).classList.contains(LOCATED_ROW_CLASS)).toBe(true);
   });
 
   it('leaves a row the table has not rendered alone', () => {

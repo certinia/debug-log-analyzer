@@ -8,6 +8,9 @@ import type { InspectorEmphasis } from './inspectorEmphasis.js';
  * A view's answer to the inspector pointing at frames: mark what the report
  * names, and where a picked row merges occurrences, move to the first of them.
  *
+ * The mark goes on before the move, and the move needs no answer: a row the move
+ * renders lights itself from the mark the table now holds.
+ *
  * @param source - the tab this view is, so a report for another is left alone
  * @param revealFirstOccurrence - omitted where jumping to one of several merged
  *   occurrences would be arbitrary, which is why the Database grids and the
@@ -24,23 +27,12 @@ export function inspectorLocateHandler(
     if (detail.source !== source) {
       return;
     }
-    const marked = emphasis.report(detail.eventIndexes, detail.sticky);
-    if (!revealFirstOccurrence || !detail.sticky || !detail.eventIndexes.length) {
-      mark(marked);
-      return;
+    mark(emphasis.report(detail.eventIndexes, detail.sticky));
+    if (revealFirstOccurrence && detail.sticky && detail.eventIndexes.length) {
+      revealFirstOccurrence(detail.eventIndexes[0]!).catch(() => {
+        // The view could not move, and reports that itself. The mark is already
+        // on: it says where the frames are, moved to or not.
+      });
     }
-    // Moving re-renders the rows a mark sits on, so the mark goes on after it.
-    void (async () => {
-      try {
-        await revealFirstOccurrence(detail.eventIndexes[0]!);
-      } catch {
-        // The move failed, and the view reports that itself. The mark still has
-        // to go on: it says where the frames are, moved to or not.
-      }
-      // Read again rather than re-applying the report that started the move: a
-      // report arriving while it ran has already replaced that one, and the
-      // re-render stripped whatever mark it had put on.
-      mark(emphasis.current());
-    })();
   };
 }
