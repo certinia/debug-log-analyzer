@@ -118,6 +118,9 @@ export class ApexLogTimeline {
     // - TimelineEventIndex.calculateMaxDepth
     // - TimelineEventIndex.calculateTotalDuration
     // - RectangleCache.flattenEvents
+    // `exitStamp`, not `executionEndTime`: a trailing zero-duration event, such as the
+    // FATAL_ERROR closing a truncated log, still ends the log.
+    const logEndTime = this.apexLog.exitStamp;
     const {
       treeNodes,
       maps,
@@ -127,7 +130,7 @@ export class ApexLogTimeline {
       maxDepth,
       totalDuration,
       preSorted,
-    } = logEventToTreeAndRects(this.events, categories);
+    } = logEventToTreeAndRects(this.events, categories, logEndTime);
 
     // Initialize FlameChart with Apex-specific callbacks and precomputed data
     await this.flamechart.init(

@@ -70,6 +70,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - 🐛 **Go to Code**: Match methods with namespace/`System`-qualified parameter types. ([#834])
 - 📐 **Timeline height**: the Flame Chart stopped short of the bottom of its panel, leaving a strip of empty space; it now fills the panel and follows the Inspector as you resize or re-dock it.
 - 🗄️ **Flow database usage**: SOQL and DML run by a Flow or Process Builder element went uncounted, because the log never reports it as a statement; the element's own usage is now counted and rolls up like any other. Needs `WORKFLOW` at `FINER` or above. ([#871])
+- 📏 **Timeline length**: the chart stopped at the last frame the log recorded, so it drew shorter than the log's own duration — 10.8s of a 27.1s log where the size cap cut the log off. The chart now spans the whole log, and the truncation marker shades the part the log never recorded. ([#828])
 
 ## [1.20.1] 2026-07-23
 
