@@ -66,6 +66,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - 🎨 **Timeline theme switch**: parts of the Timeline did not update on theme switch until the log view was reopened; they now do.
 - 📊 **Database usage bars** (Row Count, Time Taken): the usage bar was hidden whenever the rounded percentage was 0% (the common case for small row counts against large governor limits), so it rarely appeared; it now fills relative to the grid's own column total rather than a governor limit, shows on grouped summary rows, and Time Taken (ms) now shows a bar too. ([#873])
 - 🎨 **Theme colours**: some colours did not update on theme switch; they now do.
+- ⌨️ **Call Tree keyboard**: clicking a row's expand arrow dropped keyboard focus, so the arrow keys scrolled the table instead of moving through it; focus now returns after every expand and collapse.
+- 🧭 **Call Tree navigation**: jumping to a row in the Aggregated or Bottom-Up view could stop on one of its callers and need a second try, because the walk read a row's children before they had rendered; it now waits for the render.
 - 🧭 **Inspector call stack**: cumulative limit and profiling frames appeared in the stack, so the path to a selection read wrong; the stack now excludes them, like the call tree already did.
 - 🐛 **Go to Code**: Match methods with namespace/`System`-qualified parameter types. ([#834])
 - 📐 **Timeline height**: the Flame Chart stopped short of the bottom of its panel, leaving a strip of empty space; it now fills the panel and follows the Inspector as you resize or re-dock it.
