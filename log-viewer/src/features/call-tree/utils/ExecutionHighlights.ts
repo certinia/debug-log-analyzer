@@ -3,7 +3,7 @@
  */
 import type { ApexLog, LogCategory, LogEvent } from 'apex-log-parser';
 
-import { getEventKey } from './Aggregation.js';
+import { getEventKey } from '../../../core/log/eventKeys.js';
 
 /** One frame on the hot path, entry point first. */
 export interface HotPathFrame {

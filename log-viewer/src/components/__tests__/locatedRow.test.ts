@@ -3,19 +3,21 @@
  *
  * @jest-environment jsdom
  */
-import { describe, expect, it } from '@jest/globals';
+import { beforeEach, describe, expect, it } from '@jest/globals';
 import type { RowComponent } from 'tabulator-tables';
 
 import type { ApexLog, LogEvent } from 'apex-log-parser';
 
+import { logStoreFor, type LogStore } from '../../core/log/LogStore.js';
+import { ROOT_PATH_ID, KeyPathIds } from '../../core/log/keyPathIds.js';
 import {
   LOCATED_ROW_CLASS,
   LocatedRowIds,
   LocatedRowMarker,
-  eventKeyPaths,
+  eventPathIds,
   rowIndexStamper,
-  rowKeyPath,
-  stampRowKeyPath,
+  rowPathId,
+  rowPathStamper,
 } from '../locatedRow.js';
 
 const stamp = rowIndexStamper('eventIndex');
@@ -62,19 +64,21 @@ function rowFor(container: HTMLElement, index: number): HTMLElement {
   return container.children[index] as HTMLElement;
 }
 
-describe('stampRowKeyPath', () => {
+describe('rowPathStamper', () => {
   it('marks the row under one parent and not its namesake under another', () => {
+    const ids = new KeyPathIds();
+    const stampPath = rowPathStamper(ids);
     const container = document.createElement('div');
     const rows = [bucketRow('Trigger1', 'Util.log'), bucketRow('Trigger2', 'Util.log')];
     for (const row of rows) {
       const element = row.getElement();
       element.classList.add('tabulator-row');
-      stampRowKeyPath(row);
+      stampPath(row);
       container.append(element);
     }
     const marker = new LocatedRowMarker();
 
-    marker.mark(container, [rowKeyPath(rows[0]!)!]);
+    marker.mark(container, [rowPathId(rows[0]!, ids)!]);
 
     expect(rows[0]!.getElement().classList.contains(LOCATED_ROW_CLASS)).toBe(true);
     expect(rows[1]!.getElement().classList.contains(LOCATED_ROW_CLASS)).toBe(false);
@@ -91,53 +95,66 @@ describe('rowIndexStamper', () => {
   });
 });
 
-describe('rowKeyPath', () => {
+describe('rowPathId', () => {
+  let ids: KeyPathIds;
+  beforeEach(() => {
+    ids = new KeyPathIds();
+  });
+
   it('names a top-level row by its own key alone', () => {
-    expect(rowKeyPath(bucketRow('A'))).toBe('A');
+    expect(rowPathId(bucketRow('A'), ids)).toBe(ids.pathId(ROOT_PATH_ID, 'A'));
   });
 
   it('tells two same-named rows apart by the parents that reach them', () => {
     // One method holds a row under every caller it has, so the key alone cannot.
-    expect(rowKeyPath(bucketRow('Trigger1', 'Util.log'))).not.toBe(
-      rowKeyPath(bucketRow('Trigger2', 'Util.log')),
+    expect(rowPathId(bucketRow('Trigger1', 'Util.log'), ids)).not.toBe(
+      rowPathId(bucketRow('Trigger2', 'Util.log'), ids),
     );
   });
 
-  it('reads a deep row as the whole path, outermost first', () => {
-    const deep = rowKeyPath(bucketRow('A', 'B', 'C'));
-    expect(deep).toBe(rowKeyPath(bucketRow('A', 'B', 'C')));
-    expect(deep).not.toBe(rowKeyPath(bucketRow('A', 'B')));
+  it('gives one id to the whole path, so two rows on it agree', () => {
+    const deep = rowPathId(bucketRow('A', 'B', 'C'), ids);
+    expect(deep).toBe(rowPathId(bucketRow('A', 'B', 'C'), ids));
+    expect(deep).not.toBe(rowPathId(bucketRow('A', 'B'), ids));
   });
 
   it('leaves a row that stands for one frame unnamed, as its index names it', () => {
-    expect(rowKeyPath(rowComponent(document.createElement('div'), { id: 7 }))).toBeUndefined();
+    expect(rowPathId(rowComponent(document.createElement('div'), { id: 7 }), ids)).toBeUndefined();
   });
 });
 
-describe('eventKeyPaths', () => {
+describe('eventPathIds', () => {
   const root = ev('exec', null);
   const outer = ev('outer', root);
   const inner = ev('inner', outer);
+  let store: LogStore;
+  let ids: KeyPathIds;
+  beforeEach(() => {
+    // A store per test, since each expects an empty table. The frames are not in
+    // this log's index, so the ids are minted rather than read from the cache.
+    store = logStoreFor({ eventsById: [] } as unknown as ApexLog);
+    ids = store.keyPathIds();
+  });
 
   it('names one row in a top-down view, at the depth the frame ran at', () => {
-    const paths = eventKeyPaths(inner, 'callees');
+    const found = eventPathIds(inner, 'callees', store);
 
-    expect(paths).toHaveLength(1);
-    expect(paths[0]).toBe(rowKeyPath(bucketRow('METHOD_ENTRY||outer', 'METHOD_ENTRY||inner')));
+    expect(found).toHaveLength(1);
+    expect(found[0]).toBe(rowPathId(bucketRow('METHOD_ENTRY||outer', 'METHOD_ENTRY||inner'), ids));
   });
 
   it('names a row per caller depth in a bottom-up view', () => {
     // The frame heads a row on its own, and one under each caller above it.
-    const paths = eventKeyPaths(inner, 'callers');
+    const found = eventPathIds(inner, 'callers', store);
 
-    expect(paths).toEqual([
-      rowKeyPath(bucketRow('METHOD_ENTRY||inner')),
-      rowKeyPath(bucketRow('METHOD_ENTRY||inner', 'METHOD_ENTRY||outer')),
+    expect(found).toEqual([
+      rowPathId(bucketRow('METHOD_ENTRY||inner'), ids),
+      rowPathId(bucketRow('METHOD_ENTRY||inner', 'METHOD_ENTRY||outer'), ids),
     ]);
   });
 
   it('leaves the log root out, as it is a row in neither view', () => {
-    expect(eventKeyPaths(root, 'callers')).toEqual([]);
+    expect(eventPathIds(root, 'callers', store)).toEqual([]);
   });
 });
 
@@ -208,9 +225,10 @@ describe('LocatedRowIds', () => {
   const log = { eventsById: { 5: frame } } as unknown as ApexLog;
 
   it('builds the paths of the rows the frames belong to', () => {
-    const ids = new LocatedRowIds().idsFor(log, [5], 'callers');
+    const found = new LocatedRowIds().idsFor(log, [5], 'callers');
 
-    expect(ids).toEqual(eventKeyPaths(frame, 'callers'));
+    // The log's own table, so a row stamped from it reaches the same ids.
+    expect(found).toEqual(eventPathIds(frame, 'callers', logStoreFor(log)));
   });
 
   it('reuses what it built for the frames it was last asked about', () => {

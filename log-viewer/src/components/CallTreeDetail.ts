@@ -38,14 +38,20 @@ import dataGridStyles from '../tabulator/style/DataGrid.scss';
 import './ContextMenu.js';
 import type { ContextMenu } from './ContextMenu.js';
 import { dispatchInspectorLocate, dispatchInspectorReveal } from './inspectorReveal.js';
-import { LOCATED_ROW_CLASS, LocatedRowMarker, rowId, rowIndexStamper } from './locatedRow.js';
+import {
+  LOCATED_ROW_CLASS,
+  LocatedRowIds,
+  LocatedRowMarker,
+  rowId,
+  rowIndexStamper,
+} from './locatedRow.js';
 import { PANEL_ROW_MENU_ITEMS, runPanelRowAction } from './panelRowMenu.js';
 import {
   buildScopedCallTree,
   buildWholeLogCallTree,
   locatableEventIndexes,
   revealableEventIndex,
-  rowIdsByEvent,
+  rowIdsByPath,
   type ScopedCallTree,
   type ScopedRow,
 } from './scopedCallTree.js';
@@ -191,6 +197,13 @@ export class CallTreeDetail extends LitElement {
 
   /** Marks the row for the frame under the pointer in the tab's own view. */
   private _locatedRow = new LocatedRowMarker();
+  /** Translates the reported frames into bucket paths, memoised on the report:
+   *  the tab re-reports the same list every time the pointer leaves a row. */
+  private _locateIds = new LocatedRowIds();
+  // The last report and the frames of it this scope stands for, so the filter
+  // runs once per report rather than once per pointer move.
+  private _reported: readonly number[] = [];
+  private _reportedInScope: readonly number[] = [];
   // The frames the tab on screen last reported under its pointer, so a table
   // that finishes building after the report still marks them.
   private _locatedEvents: readonly number[] = [];
@@ -198,11 +211,11 @@ export class CallTreeDetail extends LitElement {
   private _selectionClearUnsubscribe?: () => void;
 
   /**
-   * eventIndex to the ids of the rows that name it, per grouped mode. Built on
-   * the first mark of a scope, since only a pointer in the tab's own view needs
-   * it, and dropped with the rows it describes.
+   * Bucket path to the ids of the rows that stand for it, per grouped mode. Built
+   * on the first mark of a scope, since only a pointer in the tab's own view
+   * needs it, and dropped with the rows it describes.
    */
-  private _rowsByEvent: Record<ViewMode, Map<number, number[]> | null> = {
+  private _rowsByPath: Record<ViewMode, Map<number, number> | null> = {
     'time-order': null,
     aggregated: null,
     'bottom-up': null,
@@ -242,7 +255,7 @@ export class CallTreeDetail extends LitElement {
    * rows by event, so there the ids are the indexes themselves — unless it merged
    * a selection's occurrences, when its rows are grouped like the other views'. A
    * grouped row merges occurrences behind a synthetic id, so it is found by the
-   * occurrences it carries — and one frame can name several rows in Bottom-Up.
+   * bucket path it stands for.
    */
   private _markLocated(): void {
     this._locatedRow.mark(
@@ -251,9 +264,9 @@ export class CallTreeDetail extends LitElement {
     );
   }
 
-  private _rowIdsFor(mode: ViewMode, eventIndexes: readonly number[]): number[] {
+  private _rowIdsFor(mode: ViewMode, eventIndexes: readonly number[]): readonly number[] {
     if ((mode === 'time-order' && !this._scoped?.timeOrderMerged) || !eventIndexes.length) {
-      return [...eventIndexes];
+      return eventIndexes;
     }
     const rows = this._tables[mode]?.rows ?? [];
     if (!rows.length) {
@@ -261,14 +274,37 @@ export class CallTreeDetail extends LitElement {
       // of the scope, since only a new scope clears it.
       return [];
     }
-    const byEvent = (this._rowsByEvent[mode] ??= rowIdsByEvent(rows));
-    const ids = new Set<number>();
-    for (const eventIndex of eventIndexes) {
-      for (const id of byEvent.get(eventIndex) ?? []) {
-        ids.add(id);
+    const byPath = (this._rowsByPath[mode] ??= rowIdsByPath(rows));
+    const pathIds = this._locateIds.idsFor(
+      this.logStore?.log ?? null,
+      this._inScope(eventIndexes),
+      mode === 'bottom-up' ? 'callers' : 'callees',
+    );
+    const ids: number[] = [];
+    for (const pathId of pathIds) {
+      const id = byPath.get(pathId);
+      if (id !== undefined) {
+        ids.push(id);
       }
     }
-    return [...ids];
+    return ids;
+  }
+
+  /**
+   * The reported frames this scope stands for. A merged row is named by its
+   * bucket path, so without this a frame at the same path elsewhere in the log
+   * would mark a row that holds a different call.
+   */
+  private _inScope(eventIndexes: readonly number[]): readonly number[] {
+    const holds = this._scoped?.holds;
+    if (!holds) {
+      return eventIndexes;
+    }
+    if (this._reported !== eventIndexes) {
+      this._reported = eventIndexes;
+      this._reportedInScope = eventIndexes.filter(holds);
+    }
+    return this._reportedInScope;
   }
 
   /**
@@ -404,7 +440,7 @@ export class CallTreeDetail extends LitElement {
       if (slot) {
         slot.stale = true;
       }
-      this._rowsByEvent[mode] = null;
+      this._rowsByPath[mode] = null;
     }
   }
 
@@ -428,7 +464,7 @@ export class CallTreeDetail extends LitElement {
     for (const mode of Object.keys(this._tables) as ViewMode[]) {
       this._tables[mode]?.table.destroy();
       this._tables[mode] = null;
-      this._rowsByEvent[mode] = null;
+      this._rowsByPath[mode] = null;
     }
   }
 
@@ -494,7 +530,7 @@ export class CallTreeDetail extends LitElement {
       built.rows = [];
       void built.table.setData([]);
     }
-    const data = await this._rows(mode, { yieldFrame: waitForNextFrame, signal });
+    const data = await this._rows(mode, { signal });
     if (!data || signal.aborted) {
       return;
     }
@@ -509,7 +545,7 @@ export class CallTreeDetail extends LitElement {
     if (slot) {
       slot.stale = false;
       slot.rows = data;
-      this._rowsByEvent[mode] = null;
+      this._rowsByPath[mode] = null;
       void slot.table.setData(data).then(() => {
         this._markActive();
         this._markLocated();

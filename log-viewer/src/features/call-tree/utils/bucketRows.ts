@@ -7,7 +7,8 @@ import type { RowComponent } from 'tabulator-tables';
 
 import type { SelectionView } from '../../../core/events/EventBus.js';
 import { withCodeDrivenExpand } from '../../../tabulator/module/expandOrigin.js';
-import { eventKeyChain, getEventKey } from './Aggregation.js';
+import { getEventKey } from '../../../core/log/eventKeys.js';
+import { eventKeyChain } from './Aggregation.js';
 
 interface BucketRow {
   key?: string;
