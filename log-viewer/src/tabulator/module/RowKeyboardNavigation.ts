@@ -45,30 +45,43 @@ export class RowKeyboardNavigation extends Module {
 
   initialize() {
     this.setOption('selectableRows', 'highlight');
-    const toggled = (row: RowComponent) => {
-      this.rowToggled(row);
-    };
-    this.localTable.on('dataTreeRowExpanded', toggled);
-    this.localTable.on('dataTreeRowCollapsed', toggled);
+    this.localTable.on('dataTreeRowExpanded', (row: RowComponent) => {
+      this.rowExpanded(row);
+    });
+    this.localTable.on('dataTreeRowCollapsed', () => {
+      this.rowCollapsed();
+    });
     this.localTable.on('rowClick', (event, row) => {
       this.rowClick(event, row);
     });
   }
 
-  /**
-   * Hands focus back to the table body after the user works the tree control.
-   * The control is not focusable, so the click drops focus, and the key bindings
-   * only fire while the body holds it: without this the arrows scroll the table
-   * instead of moving down it.
-   */
-  rowToggled(row: RowComponent) {
+  /** The user's first expansion gives the keyboard a row to move from. */
+  rowExpanded(row: RowComponent) {
     if (isCodeDrivenExpand()) {
       return;
     }
     if (!this.localTable.getSelectedRows().length) {
-      // The user's first toggle gives the keyboard a row to move from.
       row.select();
     }
+    this.takeFocusBack();
+  }
+
+  /** A collapse hands focus back and nothing else: selecting the row the user
+   *  just closed would re-scope the inspector to it. */
+  rowCollapsed() {
+    if (!isCodeDrivenExpand()) {
+      this.takeFocusBack();
+    }
+  }
+
+  /**
+   * Tabulator gives the tree control its own `tabIndex`, so working it moves
+   * focus onto the control. The key bindings only answer while the table body is
+   * the event target, so without this the arrows scroll the table instead of
+   * moving down it.
+   */
+  private takeFocusBack(): void {
     tableHolder(this.localTable.element)?.focus({ preventScroll: true });
   }
 

@@ -65,12 +65,22 @@ describe('RowKeyboardNavigation', () => {
     expect(holder.focus).toHaveBeenCalled();
   });
 
-  it('takes focus back after a collapse too', () => {
-    const { holder, collapse } = setup([{ select: jest.fn() } as unknown as RowComponent]);
+  it('takes focus back after a collapse, without selecting the closed row', () => {
+    const { row, holder, collapse } = setup();
 
     collapse();
 
     expect(holder.focus).toHaveBeenCalled();
+    // Selecting it would re-scope the inspector to the row just closed.
+    expect(row.select).not.toHaveBeenCalled();
+  });
+
+  it('ignores a collapse the code drove', () => {
+    const { holder, collapse } = setup();
+
+    withCodeDrivenExpand(collapse);
+
+    expect(holder.focus).not.toHaveBeenCalled();
   });
 
   it('ignores an expansion the code drove', () => {
