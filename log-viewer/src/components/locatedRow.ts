@@ -22,9 +22,9 @@ const NOTHING_WANTED: ReadonlySet<string> = new Set();
  * The stamped ids each marked table wants lit.
  *
  * Held per host rather than on the marker so a row can light itself as it enters
- * the DOM. The renderer de-initialises a row scrolled out of view and builds it
- * again on the way back, which drops the class the sweep put on it, so a mark
- * held only as a list of elements is lost the moment the user scrolls.
+ * the DOM. Tabulator builds a row's element on its first render, so a sweep of
+ * what is rendered cannot reach a row that has never been on screen: one below
+ * the viewport, or a tree child built after the mark was set.
  */
 const wantedByHost = new WeakMap<HTMLElement, ReadonlySet<string>>();
 
