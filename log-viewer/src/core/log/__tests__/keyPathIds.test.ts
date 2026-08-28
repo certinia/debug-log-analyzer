@@ -74,11 +74,21 @@ describe('KeyPathIds', () => {
       expect(ids.keyIdOf(second)).toBe(ids.keyIdOf(first));
     });
 
-    it('keys a frame no slot of its own covers', () => {
-      // Built rather than parsed, so it sits outside the log's own index.
-      const loose = ev(9999, 'made up', null);
+    it('keys a frame no slot of its own covers, without one standing in for another', () => {
+      // Built rather than parsed, so neither carries an index at all. Keeping one
+      // under an index-less write lands it on the memo as an ordinary property,
+      // which the next such frame then reads back as its own.
+      const loose = { type: 'METHOD_ENTRY', namespace: '', text: 'made up' } as unknown as LogEvent;
+      const other = {
+        type: 'METHOD_ENTRY',
+        namespace: '',
+        text: 'and another',
+      } as unknown as LogEvent;
 
       expect(ids.keyIdOf(loose)).toBe(ids.keyIdOf(loose));
+      expect(ids.keyIdOf(other)).not.toBe(ids.keyIdOf(loose));
+      // And one whose index is past the end of the log's own array.
+      expect(ids.keyIdOf(ev(9999, 'past the end', null))).not.toBe(ids.keyIdOf(loose));
     });
   });
 

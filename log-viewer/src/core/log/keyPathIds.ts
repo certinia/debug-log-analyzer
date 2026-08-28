@@ -53,14 +53,20 @@ export class KeyPathIds {
    */
   public keyIdOf(event: LogEvent): number {
     const at = event.eventIndex;
-    const cached = this.keyOfEvent[at] ?? 0;
-    if (cached) {
-      return cached - 1;
+    // A frame the log's own index has no slot for is keyed but not kept. A frame
+    // built rather than parsed has no index at all, and that writes an ordinary
+    // property on the typed array, which every other such frame reads as its own.
+    const slotted = at >= 0 && at < this.keyOfEvent.length;
+    if (slotted) {
+      const cached = this.keyOfEvent[at]!;
+      if (cached) {
+        return cached - 1;
+      }
     }
     const id = this.keyId(getEventKey(event));
-    // Ignored where the log's own index has no such slot, which only costs the
-    // key being built again.
-    this.keyOfEvent[at] = id + 1;
+    if (slotted) {
+      this.keyOfEvent[at] = id + 1;
+    }
     return id;
   }
 
