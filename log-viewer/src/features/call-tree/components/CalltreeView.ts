@@ -1216,13 +1216,28 @@ export class CalltreeView extends LitElement {
   // in the DOM), with a two-frame fallback in case the expand triggers no
   // redraw. A single rAF can race the virtual renderer and leave getTreeChildren
   // empty mid-descent.
+  // A pending-render flag is no use here: Tabulator dispatches `renderStarted`
+  // and `renderComplete` in one synchronous call, so the flag always reads false
+  // by the time this is awaited.
   private _waitForTableRender(): Promise<void> {
     const table = this._getActiveTable();
     if (!table) {
       return waitForNextFrame();
     }
-    //@ts-expect-error This is a custom function added in by RowNavigation custom module
-    return table.waitForRenderComplete() as Promise<void>;
+
+    return new Promise<void>((resolve) => {
+      let settled = false;
+      const finish = () => {
+        if (settled) {
+          return;
+        }
+        settled = true;
+        table.off('renderComplete', finish);
+        resolve();
+      };
+      table.on('renderComplete', finish);
+      requestAnimationFrame(() => requestAnimationFrame(finish));
+    });
   }
 
   private _resetFindWidget() {
