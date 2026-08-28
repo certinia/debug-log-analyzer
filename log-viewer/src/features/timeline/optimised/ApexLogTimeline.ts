@@ -41,6 +41,7 @@ import {
 } from '../types/flamechart.types.js';
 import type { SearchCursor } from '../types/search.types.js';
 import { InspectorEmphasis } from '../../../components/inspectorEmphasis.js';
+import { inspectorLocateHandler } from '../../../components/inspectorLocate.js';
 import { isFrameOffscreen, toDetailSelection } from '../utils/detail-selection-sync.js';
 import { extractExceptionMarkers, extractMarkers } from '../utils/marker-utils.js';
 import { seekWindow } from '../utils/navigate-window.js';
@@ -226,11 +227,12 @@ export class ApexLogTimeline {
 
     // Dim the chart around the frames the inspector points at, while the timeline
     // is the tab the inspector is showing.
-    this.inspectorLocateUnsubscribe = eventBus.on('inspector:locate', (detail) => {
-      if (detail.source === 'timeline') {
-        this.applyEmphasis(this.emphasis.report(detail.eventIndexes, detail.sticky));
-      }
-    });
+    this.inspectorLocateUnsubscribe = eventBus.on(
+      'inspector:locate',
+      inspectorLocateHandler('timeline', this.emphasis, (eventIndexes) =>
+        this.applyEmphasis(eventIndexes),
+      ),
+    );
 
     // Escape (app-wide) deselects here; the chart reports the clear itself.
     // The flame chart's own Escape (container focused) consumes the key first.

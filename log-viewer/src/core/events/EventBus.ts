@@ -109,6 +109,10 @@ interface EventMap {
   'detail:locate': { source: DetailSource; eventIndexes: readonly number[] };
 }
 
+/** One event's payload, for code that answers an event it is handed rather than
+ *  one it names itself. The map stays where each payload is described. */
+export type EventDetail<K extends keyof EventMap> = EventMap[K];
+
 type EventCallback<K extends keyof EventMap> = (detail: EventMap[K]) => void;
 
 class EventBusImpl {
