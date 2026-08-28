@@ -72,6 +72,7 @@ import {
   rowOccurrences,
 } from '../../../components/locatedRow.js';
 import { InspectorEmphasis } from '../../../components/inspectorEmphasis.js';
+import { inspectorLocateHandler } from '../../../components/inspectorLocate.js';
 import { createTimeOrderTable } from './TimeOrderTable.js';
 
 /** Time Order keys its rows by event index; the grouped views key theirs by the
@@ -187,21 +188,17 @@ export class CalltreeView extends LitElement {
     });
 
     // Mark the frames the inspector points at, while the Call Tree is the tab the
-    // inspector is showing.
-    this._inspectorLocateUnsubscribe = eventBus.on('inspector:locate', (detail) => {
-      if (detail.source === 'calltree') {
-        const ids = this._emphasis.report(detail.eventIndexes, detail.sticky);
-        if (detail.sticky && detail.eventIndexes.length) {
-          // A picked inspector row merges calls, so the mark shows all of them
-          // while the view moves to the first, as a pick of one frame does. The
-          // reveal expands and scrolls, which re-renders the rows the mark lands
-          // on, so it goes on after.
-          void this._revealEventIndex(detail.eventIndexes[0]!).then(() => this._markLocated(ids));
-        } else {
-          this._markLocated(ids);
-        }
-      }
-    });
+    // inspector is showing. A picked row merges calls, so the mark shows all of
+    // them while the view moves to the first, as a pick of one frame does.
+    this._inspectorLocateUnsubscribe = eventBus.on(
+      'inspector:locate',
+      inspectorLocateHandler(
+        'calltree',
+        this._emphasis,
+        (eventIndexes) => this._markLocated(eventIndexes),
+        (eventIndex) => this._revealEventIndex(eventIndex),
+      ),
+    );
 
     // Escape (app-wide) deselects here; the table reports the clear itself. It
     // also drops a mark held by a picked inspector row, which is no selection of

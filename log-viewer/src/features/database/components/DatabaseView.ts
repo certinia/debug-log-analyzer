@@ -17,6 +17,7 @@ import { limitTotals } from '../../../components/logOverviewMetrics.js';
 import { eventBus, type StatementType } from '../../../core/events/EventBus.js';
 import { apexLimitTimeSeries } from '../../timeline/optimised/apex-limit-series.js';
 import { InspectorEmphasis } from '../../../components/inspectorEmphasis.js';
+import { inspectorLocateHandler } from '../../../components/inspectorLocate.js';
 import { SelectionEchoGuard } from '../../../core/events/SelectionEchoGuard.js';
 import { isVisible } from '../../../core/utility/Util.js';
 import { soslRowsMetric } from '../limits.js';
@@ -119,11 +120,12 @@ export class DatabaseView extends LitElement {
     // Mark the statements the inspector points at, while the Database tab is the
     // tab the inspector is showing. The eventIndex belongs to one grid, so the
     // others simply find nothing to mark.
-    this._offInspectorLocate = eventBus.on('inspector:locate', (d) => {
-      if (d.source === 'database') {
-        this._markLocated(this._emphasis.report(d.eventIndexes, d.sticky));
-      }
-    });
+    this._offInspectorLocate = eventBus.on(
+      'inspector:locate',
+      inspectorLocateHandler('database', this._emphasis, (eventIndexes) =>
+        this._markLocated(eventIndexes),
+      ),
+    );
 
     // Escape (app-wide) deselects here. Only one grid holds the selection, and
     // its report of the clear reaches the inspector the same way a click does. It

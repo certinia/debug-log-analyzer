@@ -22,6 +22,7 @@ import {
   rowOccurrences,
 } from '../../../components/locatedRow.js';
 import { InspectorEmphasis } from '../../../components/inspectorEmphasis.js';
+import { inspectorLocateHandler } from '../../../components/inspectorLocate.js';
 import { SelectionEchoGuard } from '../../../core/events/SelectionEchoGuard.js';
 import { eventByEventIndex } from '../../../core/utility/EventSearch.js';
 import { isVisible } from '../../../core/utility/Util.js';
@@ -163,9 +164,6 @@ export class AnalysisView extends LitElement {
   private _locatedRow = new LocatedRowMarker();
   private _locateIds = new LocatedRowIds();
   private _emphasis = new InspectorEmphasis();
-  /** Counts the locate reports, so a mark held back by a reveal is dropped once
-   *  a later report has replaced it. */
-  private _locateReport = 0;
 
   constructor() {
     super();
@@ -179,27 +177,15 @@ export class AnalysisView extends LitElement {
     });
     // Mark the buckets the inspector points at. A row is a method bucket rather
     // than one event, so a frame is translated into the paths of the rows it heads.
-    this._inspectorLocateUnsubscribe = eventBus.on('inspector:locate', (detail) => {
-      if (detail.source !== 'analysis') {
-        return;
-      }
-      const ids = this._emphasis.report(detail.eventIndexes, detail.sticky);
-      if (detail.sticky && detail.eventIndexes.length) {
-        // A picked row moves the grid to the bucket it names, as one picked in
-        // the Call Tree does. The reveal re-renders the rows the mark lands on,
-        // so the mark goes on after, and only while it is still the last report:
-        // dropping the pick clears the mark while the reveal is still in flight.
-        const reported = ++this._locateReport;
-        void this._revealEventIndex(detail.eventIndexes[0]!).then(() => {
-          if (reported === this._locateReport) {
-            this._markLocated(ids);
-          }
-        });
-      } else {
-        this._locateReport++;
-        this._markLocated(ids);
-      }
-    });
+    this._inspectorLocateUnsubscribe = eventBus.on(
+      'inspector:locate',
+      inspectorLocateHandler(
+        'analysis',
+        this._emphasis,
+        (eventIndexes) => this._markLocated(eventIndexes),
+        (eventIndex) => this._revealEventIndex(eventIndex),
+      ),
+    );
     document.addEventListener('lv-find', this._findEvt);
     document.addEventListener('lv-find-match', this._findEvt);
     document.addEventListener('lv-find-close', this._findEvt);
