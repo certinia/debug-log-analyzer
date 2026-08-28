@@ -11,7 +11,7 @@ import type {
 
 import { GOVERNOR_METRICS, limitTotals } from '../../../components/logOverviewMetrics.js';
 import { formatByteSize, formatDuration, formatInteger } from '../../../core/utility/Util.js';
-import { getEventKey } from '../../call-tree/utils/Aggregation.js';
+import { getEventKey } from '../../../core/log/eventKeys.js';
 import { currentLogStore } from '../../../core/log/LogStore.js';
 import { outermostEvents } from '../../../core/utility/EventTree.js';
 import { deriveSoqlObject } from '../../database/services/sobjectClassification.js';

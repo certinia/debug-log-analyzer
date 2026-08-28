@@ -4,7 +4,7 @@
 import { describe, expect, it } from '@jest/globals';
 import type { LogEvent } from 'apex-log-parser';
 
-import { getEventKey as keyOf } from '../Aggregation.js';
+import { getEventKey as keyOf } from '../../../../core/log/eventKeys.js';
 import { occurrencesThrough } from '../bottomUpOccurrences.js';
 
 let nextEventIndex = 0;
