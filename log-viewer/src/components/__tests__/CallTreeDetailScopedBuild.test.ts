@@ -53,7 +53,6 @@ import { LOCATED_ROW_CLASS } from '../locatedRow.js';
 import type { ApexLog } from 'apex-log-parser';
 
 import { logStoreFor, type LogStore } from '../../core/log/LogStore.js';
-import { ROOT_PATH_ID } from '../../core/log/keyPathIds.js';
 
 const build = jest.mocked(buildScopedCallTree);
 
@@ -297,7 +296,7 @@ describe('CallTreeDetail scoped build', () => {
     log.eventsById[8] = { ...event, parent: log, children: [] };
     const pathId = logStoreFor(log as unknown as ApexLog)
       .keyPathIds()
-      .pathId(ROOT_PATH_ID, 'METHOD_ENTRY||m');
+      .pathOf(['METHOD_ENTRY||m']);
     const merged = [
       { id: -3, eventIndexes: [8, 12], _pathId: pathId, _children: null },
     ] as unknown as ScopedRow[];
@@ -341,7 +340,7 @@ describe('CallTreeDetail scoped build', () => {
     log.eventsById[12] = { ...event, eventIndex: 12, parent: log, children: [] };
     const pathId = logStoreFor(log as unknown as ApexLog)
       .keyPathIds()
-      .pathId(ROOT_PATH_ID, 'METHOD_ENTRY||m');
+      .pathOf(['METHOD_ENTRY||m']);
     const merged = [
       { id: -3, eventIndexes: [8], _pathId: pathId, _children: null },
     ] as unknown as ScopedRow[];

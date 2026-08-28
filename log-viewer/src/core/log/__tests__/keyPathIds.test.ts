@@ -3,12 +3,19 @@
  */
 import { beforeEach, describe, expect, it } from '@jest/globals';
 
+import type { LogEvent } from 'apex-log-parser';
+
 import { KeyPathIds, ROOT_PATH_ID } from '../keyPathIds.js';
+
+/** A frame at `eventIndex`, of the type and text a bucket key is built from. */
+function ev(eventIndex: number, text: string, parent: LogEvent | null, type = 'METHOD_ENTRY') {
+  return { eventIndex, type, namespace: '', text, parent } as unknown as LogEvent;
+}
 
 describe('KeyPathIds', () => {
   let ids: KeyPathIds;
   beforeEach(() => {
-    ids = new KeyPathIds();
+    ids = new KeyPathIds(32);
   });
 
   /** Interns a whole path, named outermost key first as a row reads. */
@@ -28,15 +35,6 @@ describe('KeyPathIds', () => {
 
   it('tells a path apart from the prefix it extends', () => {
     expect(pathFor(ids, 'A', 'B')).not.toBe(pathFor(ids, 'A'));
-  });
-
-  it('names the two directions apart, since a row means each in one view only', () => {
-    const chain = ['leaf', 'caller'];
-
-    // Top-down names the whole chain; bottom-up names the leaf, then the leaf
-    // under its caller.
-    expect(ids.prefixesOf(chain)).toEqual([pathFor(ids, 'leaf'), expect.any(Number)]);
-    expect(ids.prefixesOf(chain)[1]).not.toBe(ids.pathOf(chain));
   });
 
   it('reads a path back, outermost first', () => {
@@ -59,10 +57,74 @@ describe('KeyPathIds', () => {
   });
 
   it('mints on its own, so an id from one log means nothing to another', () => {
-    const other = new KeyPathIds();
+    const other = new KeyPathIds(32);
 
     expect(pathFor(other, 'Z')).toBe(pathFor(ids, 'A'));
     expect(other.keysOf(pathFor(other, 'Z'))).toEqual(['Z']);
     expect(ids.keysOf(pathFor(ids, 'A'))).toEqual(['A']);
+  });
+
+  describe('keyIdOf', () => {
+    it('keeps one id per signature, not one per frame', () => {
+      const first = ev(1, 'Util.log', null);
+      const second = ev(2, 'Util.log', null);
+
+      expect(ids.keyIdOf(first)).toBe(ids.keyIdOf(first));
+      // Same type, namespace and text is the same bucket.
+      expect(ids.keyIdOf(second)).toBe(ids.keyIdOf(first));
+    });
+
+    it('keys a frame no slot of its own covers', () => {
+      // Built rather than parsed, so it sits outside the log's own index.
+      const loose = ev(9999, 'made up', null);
+
+      expect(ids.keyIdOf(loose)).toBe(ids.keyIdOf(loose));
+    });
+  });
+
+  describe('stackIdOf', () => {
+    it('reads through the entry type, which a bucket key does not', () => {
+      const unit = ev(1, 'Thing.run()', null, 'CODE_UNIT_STARTED');
+      const method = ev(2, 'Thing.run()', null, 'METHOD_ENTRY');
+
+      // A method that recurses as a code unit is one frame to the stack.
+      expect(ids.stackIdOf(unit)).toBe(ids.stackIdOf(method));
+      expect(ids.keyIdOf(unit)).not.toBe(ids.keyIdOf(method));
+    });
+
+    it('tells two frames apart', () => {
+      expect(ids.stackIdOf(ev(1, 'one', null))).not.toBe(ids.stackIdOf(ev(2, 'two', null)));
+    });
+  });
+
+  describe('pathIdsOf', () => {
+    const root = ev(1, 'exec', null);
+    const outer = ev(2, 'outer', root);
+    const inner = ev(3, 'inner', outer);
+
+    /** The ids the walk adds, in the order it adds them. */
+    function found(event: LogEvent, direction: 'callers' | 'callees'): number[] {
+      const into = new Set<number>();
+      ids.pathIdsOf(event, direction, into);
+      return [...into];
+    }
+
+    it('names one row in a top-down view, at the depth the frame ran at', () => {
+      expect(found(inner, 'callees')).toEqual([
+        pathFor(ids, 'METHOD_ENTRY||outer', 'METHOD_ENTRY||inner'),
+      ]);
+    });
+
+    it('names a row per caller depth in a bottom-up view', () => {
+      // The frame heads a row on its own, and one under each caller above it.
+      expect(found(inner, 'callers')).toEqual([
+        pathFor(ids, 'METHOD_ENTRY||inner'),
+        pathFor(ids, 'METHOD_ENTRY||inner', 'METHOD_ENTRY||outer'),
+      ]);
+    });
+
+    it('leaves the log root out, as it heads a row in neither view', () => {
+      expect(found(root, 'callers')).toEqual([]);
+    });
   });
 });

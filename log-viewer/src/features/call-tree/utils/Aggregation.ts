@@ -135,18 +135,6 @@ export interface BottomUpRow {
 }
 
 /**
- * The bucket keys from `event` out to its outermost frame, innermost first. The
- * log root heads no row in any view, so the walk stops below it.
- */
-export function eventKeyChain(event: LogEvent): string[] {
-  const keys: string[] = [];
-  for (let node: LogEvent | null = event; node?.parent; node = node.parent) {
-    keys.push(getEventKey(node));
-  }
-  return keys;
-}
-
-/**
  * Creates an aggregated call tree where all calls to the same function signature
  * are merged together, with aggregated metrics.
  * Uses Multiset call-stack tracking to prevent double-counting of recursive calls.

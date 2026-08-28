@@ -9,7 +9,6 @@ import {
   SOSLExecuteBeginLine,
 } from 'apex-log-parser';
 
-import { getEventKey, getStackKey } from './eventKeys.js';
 import { KeyPathIds } from './keyPathIds.js';
 
 export type Stack = LogEvent[];
@@ -26,8 +25,6 @@ export class LogStore {
 
   private _statements: Statements | null = null;
   private _keyPathIds: KeyPathIds | null = null;
-  private _keyIds: Int32Array | null = null;
-  private _stackIds: Int32Array | null = null;
 
   constructor(log: ApexLog) {
     this.log = log;
@@ -70,62 +67,17 @@ export class LogStore {
     return this.statements().sosl;
   }
 
-  /** The interned bucket paths of this log, shared by every view that marks a row
-   *  whose occurrences are merged. */
+  /** The interned keys and bucket paths of this log, shared by every view that
+   *  marks a row whose occurrences are merged. */
   keyPathIds(): KeyPathIds {
-    return (this._keyPathIds ??= new KeyPathIds());
-  }
-
-  /**
-   * The event's interned bucket key, kept per event.
-   *
-   * A mark walks the caller chain of every occurrence a pick names, and those
-   * occurrences share their ancestors, so building the key string per frame was
-   * most of what a mark cost.
-   */
-  keyIdOf(event: LogEvent): number {
-    const cache = (this._keyIds ??= idCache(this.log));
-    const at = event.eventIndex;
-    if (at >= 0 && at < cache.length) {
-      let id = cache[at]!;
-      if (id < 0) {
-        id = this.keyPathIds().keyId(getEventKey(event));
-        cache[at] = id;
-      }
-      return id;
-    }
-    // An event the log's own index does not cover, so there is no slot to keep.
-    return this.keyPathIds().keyId(getEventKey(event));
-  }
-
-  /**
-   * The event's interned stack key, which tells a recursive call from a fresh
-   * one. Interned in the same table as {@link keyIdOf}, since the two vocabularies
-   * are never compared with each other.
-   */
-  stackIdOf(event: LogEvent): number {
-    const cache = (this._stackIds ??= idCache(this.log));
-    const at = event.eventIndex;
-    if (at >= 0 && at < cache.length) {
-      let id = cache[at]!;
-      if (id < 0) {
-        id = this.keyPathIds().keyId(getStackKey(event));
-        cache[at] = id;
-      }
-      return id;
-    }
-    // An event the log's own index does not cover, so there is no slot to keep.
-    return this.keyPathIds().keyId(getStackKey(event));
+    // No index means no slot to keep a key in, which costs only the key being
+    // built again.
+    return (this._keyPathIds ??= new KeyPathIds(this.log.eventsById?.length ?? 0));
   }
 
   private statements(): Statements {
     return (this._statements ??= collectStatements(this.log));
   }
-}
-
-/** One slot per event, -1 until the event is asked about. */
-function idCache(log: ApexLog): Int32Array {
-  return new Int32Array(log.eventsById.length).fill(-1);
 }
 
 interface Statements {
