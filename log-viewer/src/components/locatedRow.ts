@@ -6,8 +6,8 @@ import type { ApexLog, LogEvent } from 'apex-log-parser';
 import type { RowComponent } from 'tabulator-tables';
 
 import type { DetailSelection, SelectionView } from '../core/events/EventBus.js';
-import { logStoreFor, type LogStore } from '../core/log/LogStore.js';
-import { ROOT_PATH_ID, type KeyPathIds } from '../core/log/keyPathIds.js';
+import { logStoreFor } from '../core/log/LogStore.js';
+import type { KeyPathIds } from '../core/log/keyPathIds.js';
 import { eventByEventIndex } from '../core/utility/EventSearch.js';
 import { occurrencesThrough } from '../features/call-tree/utils/bottomUpOccurrences.js';
 
@@ -155,43 +155,6 @@ export function rowPathStamper(ids: KeyPathIds): (row: RowComponent) => void {
   };
 }
 
-/**
- * The path ids naming the rows a frame belongs to in a merged view.
- *
- * A top-down row sits at the frame's own depth, so one id names it. A bottom-up
- * row is the frame plus however many of its callers the chain shows, so every
- * prefix names a row the frame heads — which is why one frame marks several rows
- * there, and why each prefix is interned as it is reached.
- *
- * The log root is not a row in either view, so the walk stops below it.
- */
-export function eventPathIds(event: LogEvent, direction: SelectionView, store: LogStore): number[] {
-  if (!event.parent) {
-    return [];
-  }
-  const paths = store.keyPathIds();
-  if (direction === 'callers') {
-    // The parent walk is already innermost first, which is the order the ids are
-    // composed in, so the chain needs no array of its own.
-    const prefixes: number[] = [];
-    let id = ROOT_PATH_ID;
-    for (let node: LogEvent | null = event; node?.parent; node = node.parent) {
-      id = paths.step(id, store.keyIdOf(node));
-      prefixes.push(id);
-    }
-    return prefixes;
-  }
-  const chain: number[] = [];
-  for (let node: LogEvent | null = event; node?.parent; node = node.parent) {
-    chain.push(store.keyIdOf(node));
-  }
-  let id = ROOT_PATH_ID;
-  for (let depth = chain.length - 1; depth >= 0; depth--) {
-    id = paths.step(id, chain[depth]!);
-  }
-  return [id];
-}
-
 /** True where the row holds no calls of its own, so its chain answers for it. */
 function isDerived(data: CallRow): boolean {
   return !data.instances?.length && data.key !== undefined;
@@ -232,15 +195,12 @@ function pathIdsForEvents(
   eventIndexes: readonly number[],
   direction: SelectionView,
 ): number[] {
-  const store = logStoreFor(root);
+  const paths = logStoreFor(root).keyPathIds();
   const found = new Set<number>();
   for (const eventIndex of eventIndexes) {
     const event = eventByEventIndex(root, eventIndex);
-    if (!event) {
-      continue;
-    }
-    for (const id of eventPathIds(event, direction, store)) {
-      found.add(id);
+    if (event) {
+      paths.pathIdsOf(event, direction, found);
     }
   }
   return [...found];

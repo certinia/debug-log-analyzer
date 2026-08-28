@@ -1,9 +1,7 @@
 /*
  * Copyright (c) 2026 Certinia Inc. All rights reserved.
  */
-import { describe, expect, it } from '@jest/globals';
-
-import type { LogEvent } from 'apex-log-parser';
+import { beforeEach, describe, expect, it } from '@jest/globals';
 
 interface FakeEvent {
   eventIndex: number;
@@ -56,16 +54,14 @@ let selectedIndex = 4;
 const { KeyPathIds } = jest.requireActual<typeof import('../../core/log/keyPathIds.js')>(
   '../../core/log/keyPathIds.js',
 );
-const { getEventKey, getStackKey } = jest.requireActual<
-  typeof import('../../core/log/eventKeys.js')
->('../../core/log/eventKeys.js');
-const paths = new KeyPathIds();
+// One table per log in production. The fixtures below reuse event indexes for
+// different frames, so each test gets its own rather than one frame's key being
+// read back for another.
+let paths = new KeyPathIds(1024);
 jest.mock('../../core/log/LogStore.js', () => ({
   currentLogStore: () => ({
     log: root,
     keyPathIds: () => paths,
-    keyIdOf: (event: FakeEvent) => paths.keyId(getEventKey(event as unknown as LogEvent)),
-    stackIdOf: (event: FakeEvent) => paths.keyId(getStackKey(event as unknown as LogEvent)),
     eventByIndex: (i: number) => byId.get(i) ?? null,
     // Mirrors LogStore.stackByEventIndex over the fixture's own index.
     stackByEventIndex: (i: number) => {
@@ -92,6 +88,10 @@ import type { FrameBudgetOptions } from '../../core/utility/FrameBudget.js';
 /** These fixtures are small enough to never hit a slice deadline, so `yieldSlice`
  *  is only there to satisfy the contract. */
 const options: FrameBudgetOptions = { yieldSlice: () => Promise.resolve() };
+
+beforeEach(() => {
+  paths = new KeyPathIds(1024);
+});
 
 function build(eventIndex: number, instances?: number[]) {
   return buildScopedCallTree(eventIndex, instances ?? null, options);
