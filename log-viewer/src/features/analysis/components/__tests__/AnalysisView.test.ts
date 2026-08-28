@@ -200,6 +200,25 @@ describe('analysis-view selection', () => {
     expect(stub.getRowsArgs).toEqual([[]]);
   });
 
+  it('moves to the bucket a picked inspector row names', async () => {
+    stub.rows = roots.map((data) => rowComponent(data));
+
+    eventBus.emit('inspector:locate', { source: 'analysis', eventIndexes: [2], sticky: true });
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    // A hover only marks; a pick moves the grid, as it does in every other view.
+    expect(stub.revealed.map((row) => row.getData())).toEqual([findRow(roots, 'B')]);
+  });
+
+  it('only marks for a row under the pointer', async () => {
+    stub.rows = roots.map((data) => rowComponent(data));
+
+    eventBus.emit('inspector:locate', { source: 'analysis', eventIndexes: [2], sticky: false });
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    expect(stub.revealed).toEqual([]);
+  });
+
   it('clears the inspector when the selection goes', () => {
     (handlers.get('rowSelectionChanged') as (data: unknown, rows: RowComponent[]) => void)(
       null,

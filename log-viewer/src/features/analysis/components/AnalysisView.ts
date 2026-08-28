@@ -177,8 +177,17 @@ export class AnalysisView extends LitElement {
     // Mark the buckets the inspector points at. A row is a method bucket rather
     // than one event, so a frame is translated into the paths of the rows it heads.
     this._inspectorLocateUnsubscribe = eventBus.on('inspector:locate', (detail) => {
-      if (detail.source === 'analysis') {
-        this._markLocated(this._emphasis.report(detail.eventIndexes, detail.sticky));
+      if (detail.source !== 'analysis') {
+        return;
+      }
+      const ids = this._emphasis.report(detail.eventIndexes, detail.sticky);
+      if (detail.sticky && detail.eventIndexes.length) {
+        // A picked row moves the grid to the bucket it names, as one picked in
+        // the Call Tree does. The reveal re-renders the rows the mark lands on,
+        // so the mark goes on after.
+        void this._revealEventIndex(detail.eventIndexes[0]!).then(() => this._markLocated(ids));
+      } else {
+        this._markLocated(ids);
       }
     });
     document.addEventListener('lv-find', this._findEvt);
