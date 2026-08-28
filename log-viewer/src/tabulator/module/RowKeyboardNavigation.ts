@@ -45,22 +45,30 @@ export class RowKeyboardNavigation extends Module {
 
   initialize() {
     this.setOption('selectableRows', 'highlight');
-    this.localTable.on('dataTreeRowExpanded', (row, _level) => {
-      this.rowExpanded(row);
-    });
+    const toggled = (row: RowComponent) => {
+      this.rowToggled(row);
+    };
+    this.localTable.on('dataTreeRowExpanded', toggled);
+    this.localTable.on('dataTreeRowCollapsed', toggled);
     this.localTable.on('rowClick', (event, row) => {
       this.rowClick(event, row);
     });
   }
 
-  /** The user's first expansion gives the keyboard a row to move from. */
-  rowExpanded(row: RowComponent) {
-    if (isCodeDrivenExpand() || this.localTable.getSelectedRows().length) {
+  /**
+   * Hands focus back to the table body after the user works the tree control.
+   * The control is not focusable, so the click drops focus, and the key bindings
+   * only fire while the body holds it: without this the arrows scroll the table
+   * instead of moving down it.
+   */
+  rowToggled(row: RowComponent) {
+    if (isCodeDrivenExpand()) {
       return;
     }
-
-    row.select();
-    // The key bindings only fire while the holder itself holds focus.
+    if (!this.localTable.getSelectedRows().length) {
+      // The user's first toggle gives the keyboard a row to move from.
+      row.select();
+    }
     tableHolder(this.localTable.element)?.focus({ preventScroll: true });
   }
 
@@ -185,7 +193,9 @@ export class RowKeyboardNavigation extends Module {
                 prevRow.getElement().scrollIntoView({ block: 'nearest' });
               }
             } else {
-              row.treeCollapse();
+              // Declared like `expandRow`'s: the collapse is the code's, so it
+              // must not read as the user reaching for the tree control.
+              withCodeDrivenExpand(() => row.treeCollapse());
             }
           },
         },
