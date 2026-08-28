@@ -16,6 +16,9 @@ export class RowNavigation extends Module {
     super(table);
     // @ts-expect-error registerTableFunction() needs adding to tabulator types
     this.registerTableFunction('goToRow', this.goToRow.bind(this));
+    // The pending-render state lives here, so anything that has to see a render
+    // land waits through this rather than racing a frame count against it.
+    this.registerTableFunction('waitForRenderComplete', this._waitForRenderComplete.bind(this));
   }
 
   initialize(): void {

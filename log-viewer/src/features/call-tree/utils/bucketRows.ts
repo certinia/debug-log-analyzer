@@ -58,8 +58,12 @@ export async function findBucketRow(
       break;
     }
     let children = next.getTreeChildren() ?? [];
-    if (!children.length && bucketOf(next)._children?.length && !next.isTreeExpanded()) {
-      withCodeDrivenExpand(() => next.treeExpand());
+    if (!children.length && bucketOf(next)._children?.length) {
+      if (!next.isTreeExpanded()) {
+        withCodeDrivenExpand(() => next.treeExpand());
+      }
+      // An open row can still be waiting on the renderer, and reading through
+      // without waiting landed the descent on this row rather than the target.
       await waitForRender();
       children = next.getTreeChildren() ?? [];
     }

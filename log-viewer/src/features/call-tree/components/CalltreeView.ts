@@ -1221,20 +1221,8 @@ export class CalltreeView extends LitElement {
     if (!table) {
       return waitForNextFrame();
     }
-
-    return new Promise<void>((resolve) => {
-      let settled = false;
-      const finish = () => {
-        if (settled) {
-          return;
-        }
-        settled = true;
-        table.off('renderComplete', finish);
-        resolve();
-      };
-      table.on('renderComplete', finish);
-      requestAnimationFrame(() => requestAnimationFrame(finish));
-    });
+    //@ts-expect-error This is a custom function added in by RowNavigation custom module
+    return table.waitForRenderComplete() as Promise<void>;
   }
 
   private _resetFindWidget() {
