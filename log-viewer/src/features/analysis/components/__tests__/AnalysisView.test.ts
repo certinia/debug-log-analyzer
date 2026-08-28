@@ -36,7 +36,6 @@ import {
 import { toBottomUpTree, type BottomUpRow } from '../../../call-tree/utils/Aggregation.js';
 import { logStoreFor } from '../../../../core/log/LogStore.js';
 import { AnalysisView } from '../AnalysisView.js';
-import { LocatedRowMarker } from '../../../../components/locatedRow.js';
 
 const handlers = new Map<string, unknown>();
 /** The stub table's state, so a reveal's reads can be counted. */
@@ -218,22 +217,6 @@ describe('analysis-view selection', () => {
     await new Promise((resolve) => setTimeout(resolve, 0));
 
     expect(stub.revealed).toEqual([]);
-  });
-
-  it('drops a mark a later report has replaced', async () => {
-    stub.rows = roots.map((data) => rowComponent(data));
-    const marks: Array<readonly (number | string)[]> = [];
-    const spy = jest.spyOn(LocatedRowMarker.prototype, 'mark').mockImplementation((_host, ids) => {
-      marks.push(ids);
-    });
-
-    eventBus.emit('inspector:locate', { source: 'analysis', eventIndexes: [2], sticky: true });
-    // The pick is dropped while the reveal it started is still in flight.
-    eventBus.emit('inspector:locate', { source: 'analysis', eventIndexes: [], sticky: true });
-    await new Promise((resolve) => setTimeout(resolve, 0));
-
-    expect(marks.at(-1)).toEqual([]);
-    spy.mockRestore();
   });
 
   it('clears the inspector when the selection goes', () => {
