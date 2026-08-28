@@ -38,21 +38,23 @@ jest.mock('../scopedCallTree.js', () => ({
   // Keep the real row readers: the hover test is about which rows name a frame.
   revealableEventIndex: jest.requireActual('../scopedCallTree.js').revealableEventIndex,
   locatableEventIndexes: jest.requireActual('../scopedCallTree.js').locatableEventIndexes,
+  frameEventIndexes: jest.requireActual('../scopedCallTree.js').frameEventIndexes,
   rowIdsByPath: jest.requireActual('../scopedCallTree.js').rowIdsByPath,
 }));
 
-import { Tabulator } from 'tabulator-tables';
+import { Tabulator, type RowComponent } from 'tabulator-tables';
 
 import type { CallTreeDetail } from '../CallTreeDetail.js';
 import '../CallTreeDetail.js';
 import { buildScopedCallTree, type ScopedCallTree, type ScopedRow } from '../scopedCallTree.js';
 import { INSPECTOR_LOCATE_EVENT, type InspectorLocateEvent } from '../inspectorReveal.js';
-import { eventBus } from '../../core/events/EventBus.js';
+import { eventBus, type DetailSelection } from '../../core/events/EventBus.js';
 import type { ProgressParams } from '../../tabulator/format/ProgressMS.js';
 import { LOCATED_ROW_CLASS } from '../locatedRow.js';
 import type { ApexLog } from 'apex-log-parser';
 
 import { logStoreFor, type LogStore } from '../../core/log/LogStore.js';
+import { ROOT_PATH_ID } from '../../core/log/keyPathIds.js';
 
 const build = jest.mocked(buildScopedCallTree);
 
@@ -294,9 +296,8 @@ describe('CallTreeDetail scoped build', () => {
     const event = { eventIndex: 8, type: 'METHOD_ENTRY', namespace: '', text: 'm' };
     const log = { eventsById: [] as unknown[], children: [] };
     log.eventsById[8] = { ...event, parent: log, children: [] };
-    const pathId = logStoreFor(log as unknown as ApexLog)
-      .keyPathIds()
-      .pathOf(['METHOD_ENTRY||m']);
+    const paths = logStoreFor(log as unknown as ApexLog).keyPathIds();
+    const pathId = paths.step(ROOT_PATH_ID, paths.keyId('METHOD_ENTRY||m'));
     const merged = [
       { id: -3, eventIndexes: [8, 12], _pathId: pathId, _children: null },
     ] as unknown as ScopedRow[];
@@ -338,9 +339,8 @@ describe('CallTreeDetail scoped build', () => {
     const log = { eventsById: [] as unknown[], children: [] };
     log.eventsById[8] = { ...event, parent: log, children: [] };
     log.eventsById[12] = { ...event, eventIndex: 12, parent: log, children: [] };
-    const pathId = logStoreFor(log as unknown as ApexLog)
-      .keyPathIds()
-      .pathOf(['METHOD_ENTRY||m']);
+    const paths = logStoreFor(log as unknown as ApexLog).keyPathIds();
+    const pathId = paths.step(ROOT_PATH_ID, paths.keyId('METHOD_ENTRY||m'));
     const merged = [
       { id: -3, eventIndexes: [8], _pathId: pathId, _children: null },
     ] as unknown as ScopedRow[];
@@ -365,6 +365,34 @@ describe('CallTreeDetail scoped build', () => {
 
     eventBus.emit('detail:locate', { source: 'timeline', eventIndexes: [8] });
     expect(row.classList.contains(LOCATED_ROW_CLASS)).toBe(true);
+  });
+
+  it('names the picked bottom-up row, so one caller depth reads apart from the next', async () => {
+    build.mockImplementation((eventIndex) => Promise.resolve(tree(eventIndex * 1000)));
+    const el = await mount(5, 'callees');
+    await frame(el);
+    const pick = tables.instances[0]!.on.mock.calls.find(
+      (call) => call[0] === 'rowSelectionChanged',
+    )?.[1] as ((...args: unknown[]) => void) | undefined;
+
+    const seen: Array<DetailSelection | null | undefined> = [];
+    const located = (e: Event) => seen.push((e as InspectorLocateEvent).detail.selection);
+    document.addEventListener(INSPECTOR_LOCATE_EVENT, located);
+
+    // A seed row and the two caller depths above it, which hold the same call.
+    const fakeRow = (data: unknown, parent?: unknown) =>
+      ({ getData: () => data, getTreeParent: () => parent ?? false }) as unknown as RowComponent;
+    const seed = fakeRow({ id: -1, text: 'seed', eventIndexes: [8] });
+    const depth2 = fakeRow({ id: -2, text: 'B', eventIndexes: [8] }, seed);
+    pick?.(null, [seed]);
+    pick?.(null, [depth2]);
+    pick?.(null, [fakeRow({ id: -3, text: 'A', eventIndexes: [8] }, depth2)]);
+
+    document.removeEventListener(INSPECTOR_LOCATE_EVENT, located);
+    // The seed names its own calls; each caller depth names itself.
+    expect(
+      seen.map((selection) => (selection?.kind === 'aggregate' ? selection.calledBy : null)),
+    ).toEqual([undefined, 'B', 'A']);
   });
 
   it('reports every occurrence the row under the pointer stands for', async () => {

@@ -4,6 +4,7 @@
 import type { ApexLog, LogEvent } from 'apex-log-parser';
 import { Tabulator, type Options } from 'tabulator-tables';
 
+import { logStoreFor } from '../../../core/log/LogStore.js';
 import { vscodeMessenger } from '../../../core/messaging/VSCodeExtensionMessenger.js';
 import { formatDuration } from '../../../core/utility/Util.js';
 import { TIME_WIDTH } from '../../../tabulator/ColumnWidths.js';
@@ -115,7 +116,11 @@ export function createBottomUpTable(
       }
     : {};
 
-  const tableData = toBottomUpTree(rootMethod.children, rootMethod.governorLimits);
+  const tableData = toBottomUpTree(
+    rootMethod.children,
+    logStoreFor(rootMethod).keyPathIds(),
+    rootMethod.governorLimits,
+  );
 
   const tabulatorOptions = {
     data: tableData,

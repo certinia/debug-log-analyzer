@@ -45,6 +45,8 @@ export interface ScopedRow {
    *  calls its chain conducted, so it derives them from the top-level row rather
    *  than holding a copy of the list. */
   _seed?: OccurrenceSeed;
+  /** The frames the row itself stands for, once derived. */
+  _frameIndexes?: number[];
   _children: ScopedRow[] | null;
 }
 
@@ -104,6 +106,46 @@ export function locatableEventIndexes(row: Partial<ScopedRow> | undefined): numb
   }
   const single = revealableEventIndex(row);
   return single === null ? [] : [single];
+}
+
+/**
+ * The frames a scoped row stands for, which is what a highlight elsewhere points
+ * at: the flame chart dims to them, and the call tree selects one.
+ *
+ * A bottom-up caller row is one of the frames above a call, so it stands for the
+ * callers at its own depth rather than the calls they conducted, and stepping
+ * down the callers walks the highlight up the stack.
+ *
+ * {@link locatableEventIndexes} stays the calls the row counts, which is what its
+ * totals describe.
+ */
+export function frameEventIndexes(row: Partial<ScopedRow> | undefined): number[] {
+  if (row?._frameIndexes) {
+    return row._frameIndexes;
+  }
+  const conducted = locatableEventIndexes(row);
+  const seed = row?._seed;
+  const store = currentLogStore();
+  if (!seed || !store) {
+    return conducted;
+  }
+  // `_seed` is only ever set alongside `_pathId`.
+  const levels = seed.paths.depthOf(row._pathId!) - 1;
+  if (levels <= 0) {
+    return conducted;
+  }
+  // Thousands of calls sit under a handful of callers.
+  const own = new Set<number>();
+  for (const index of conducted) {
+    let frame = store.eventByIndex(index);
+    for (let up = levels; up > 0 && frame; up--) {
+      frame = frame.parent;
+    }
+    if (frame) {
+      own.add(frame.eventIndex);
+    }
+  }
+  return (row._frameIndexes = [...own]);
 }
 
 /**

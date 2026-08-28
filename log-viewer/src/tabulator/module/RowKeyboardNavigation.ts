@@ -45,8 +45,11 @@ export class RowKeyboardNavigation extends Module {
 
   initialize() {
     this.setOption('selectableRows', 'highlight');
-    this.localTable.on('dataTreeRowExpanded', (row, _level) => {
+    this.localTable.on('dataTreeRowExpanded', (row: RowComponent) => {
       this.rowExpanded(row);
+    });
+    this.localTable.on('dataTreeRowCollapsed', () => {
+      this.rowCollapsed();
     });
     this.localTable.on('rowClick', (event, row) => {
       this.rowClick(event, row);
@@ -55,12 +58,30 @@ export class RowKeyboardNavigation extends Module {
 
   /** The user's first expansion gives the keyboard a row to move from. */
   rowExpanded(row: RowComponent) {
-    if (isCodeDrivenExpand() || this.localTable.getSelectedRows().length) {
+    if (isCodeDrivenExpand()) {
       return;
     }
+    if (!this.localTable.getSelectedRows().length) {
+      row.select();
+    }
+    this.takeFocusBack();
+  }
 
-    row.select();
-    // The key bindings only fire while the holder itself holds focus.
+  /** A collapse hands focus back and nothing else: selecting the row the user
+   *  just closed would re-scope the inspector to it. */
+  rowCollapsed() {
+    if (!isCodeDrivenExpand()) {
+      this.takeFocusBack();
+    }
+  }
+
+  /**
+   * Tabulator gives the tree control its own `tabIndex`, so working it moves
+   * focus onto the control. The key bindings only answer while the table body is
+   * the event target, so without this the arrows scroll the table instead of
+   * moving down it.
+   */
+  private takeFocusBack(): void {
     tableHolder(this.localTable.element)?.focus({ preventScroll: true });
   }
 
@@ -185,7 +206,9 @@ export class RowKeyboardNavigation extends Module {
                 prevRow.getElement().scrollIntoView({ block: 'nearest' });
               }
             } else {
-              row.treeCollapse();
+              // Declared like `expandRow`'s: the collapse is the code's, so it
+              // must not read as the user reaching for the tree control.
+              withCodeDrivenExpand(() => row.treeCollapse());
             }
           },
         },

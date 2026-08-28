@@ -1130,7 +1130,7 @@ export class CalltreeView extends LitElement {
           this._clearSearchHighlights();
         }
       },
-      rowFormatter: groupedRowFormatter(rootMethod),
+      rowFormatter: groupedRowFormatter,
     });
     this.aggregatedTreeTable = table;
     await tableBuilt;
@@ -1156,7 +1156,7 @@ export class CalltreeView extends LitElement {
             this._clearSearchHighlights();
           }
         },
-        rowFormatter: groupedRowFormatter(rootMethod),
+        rowFormatter: groupedRowFormatter,
       },
       {
         selectableRows: 'highlight',
@@ -1181,7 +1181,7 @@ export class CalltreeView extends LitElement {
       if (this._echoGuard.suppressed) {
         return;
       }
-      const selection = rowDetailSelection(rows[0]);
+      const selection = rowDetailSelection(rows[0], this.rootMethod);
       if (!selection) {
         // The selection went with it, and so does a mark a picked inspector row
         // left here — it was never a selection of this table.
@@ -1204,7 +1204,7 @@ export class CalltreeView extends LitElement {
     table.on('rowMouseEnter', (_e, row) => {
       eventBus.emit('detail:locate', {
         source,
-        eventIndexes: rowOccurrences(row),
+        eventIndexes: rowOccurrences(row, this.rootMethod),
       });
     });
     table.on('rowMouseLeave', () => {
@@ -1216,6 +1216,9 @@ export class CalltreeView extends LitElement {
   // in the DOM), with a two-frame fallback in case the expand triggers no
   // redraw. A single rAF can race the virtual renderer and leave getTreeChildren
   // empty mid-descent.
+  // A pending-render flag is no use here: Tabulator dispatches `renderStarted`
+  // and `renderComplete` in one synchronous call, so the flag always reads false
+  // by the time this is awaited.
   private _waitForTableRender(): Promise<void> {
     const table = this._getActiveTable();
     if (!table) {

@@ -9,9 +9,6 @@ import { getEventKey, getStackKey } from './eventKeys.js';
 /** The path every chain starts from, which no row stands for. */
 export const ROOT_PATH_ID = 0;
 
-/** One frame's chain, reused: the walk never yields, so one is enough. */
-const chain: number[] = [];
-
 /**
  * The interned keys and bucket paths of one log.
  *
@@ -22,9 +19,9 @@ const chain: number[] = [];
  * than by the calls, and makes matching an integer test.
  *
  * One invariant holds it together: a row's id is the interned chain of the
- * frames the row holds. {@link pathIdsOf} and {@link pathOf} are the two ways to
- * reach one, so the two chain directions stay separate spaces here rather than
- * in every caller.
+ * frames the row holds. {@link pathIdsOf} names the rows a frame belongs to and
+ * {@link chainReaches} asks whether a frame's chain runs through one, so the two
+ * chain directions stay separate spaces here rather than in every caller.
  *
  * One table per log, held by `LogStore`: an id means nothing to another log.
  */
@@ -42,6 +39,9 @@ export class KeyPathIds {
   private children: Array<Map<number, number> | undefined> = [new Map()];
   private parents: number[] = [ROOT_PATH_ID];
   private keyOf: number[] = [-1];
+  /** One frame's chain, reused: {@link pathIdsOf} never yields, so one is enough.
+   *  Per table rather than per module, so two logs cannot share the buffer. */
+  private chain: number[] = [];
 
   constructor(eventCount: number) {
     this.keyOfEvent = new Int32Array(eventCount);
@@ -53,14 +53,20 @@ export class KeyPathIds {
    */
   public keyIdOf(event: LogEvent): number {
     const at = event.eventIndex;
-    const cached = this.keyOfEvent[at] ?? 0;
-    if (cached) {
-      return cached - 1;
+    // A frame the log's own index has no slot for is keyed but not kept. A frame
+    // built rather than parsed has no index at all, and that writes an ordinary
+    // property on the typed array, which every other such frame reads as its own.
+    const slotted = at >= 0 && at < this.keyOfEvent.length;
+    if (slotted) {
+      const cached = this.keyOfEvent[at]!;
+      if (cached) {
+        return cached - 1;
+      }
     }
     const id = this.keyId(getEventKey(event));
-    // Ignored where the log's own index has no such slot, which only costs the
-    // key being built again.
-    this.keyOfEvent[at] = id + 1;
+    if (slotted) {
+      this.keyOfEvent[at] = id + 1;
+    }
     return id;
   }
 
@@ -68,8 +74,7 @@ export class KeyPathIds {
    * The event's interned stack key, which tells a recursive call from a fresh
    * one. Its own space: a stack key is never a step in a path.
    */
-  public stackIdOf(event: LogEvent): number {
-    const keyId = this.keyIdOf(event);
+  public stackIdOf(event: LogEvent, keyId = this.keyIdOf(event)): number {
     let id = this.stackOfKey[keyId];
     if (id === undefined) {
       const key = getStackKey(event);
@@ -104,6 +109,7 @@ export class KeyPathIds {
       }
       return;
     }
+    const chain = this.chain;
     chain.length = 0;
     for (let node: LogEvent | null = event; node?.parent; node = node.parent) {
       chain.push(this.keyIdOf(node));
@@ -116,17 +122,27 @@ export class KeyPathIds {
   }
 
   /**
-   * The id for a whole chain, outermost key first: what names a top-down row, and
-   * what a row built from key strings is stamped with.
+   * True where the frame's own chain of callers runs through `pathId`: what tells
+   * the calls a bottom-up caller row holds from the rest of its bucket's.
    *
-   * @param keys - the chain innermost first, as a row's own parent walk gives it
+   * Reads without minting, unlike {@link step}: a query that grew the table would
+   * leave a node behind for every frame it was asked about. Ids only rise as a
+   * chain deepens, so the walk stops once it passes the depth asked about.
    */
-  public pathOf(keys: readonly string[]): number {
+  public chainReaches(event: LogEvent, pathId: number): boolean {
     let id = ROOT_PATH_ID;
-    for (let depth = keys.length - 1; depth >= 0; depth--) {
-      id = this.step(id, this.keyId(keys[depth]!));
+    for (let node: LogEvent | null = event; node?.parent; node = node.parent) {
+      const next = this.children[id]?.get(this.keyIdOf(node));
+      if (next === undefined || next > pathId) {
+        // Never minted, so no row stands for it; or past the row's own depth.
+        return false;
+      }
+      id = next;
+      if (id === pathId) {
+        return true;
+      }
     }
-    return id;
+    return false;
   }
 
   /**
@@ -163,6 +179,11 @@ export class KeyPathIds {
     return id;
   }
 
+  /** The key an id was minted for, for a row that shows the key it merges. */
+  public keyText(keyId: number): string {
+    return this.keys[keyId]!;
+  }
+
   /**
    * True where `path` runs through `pathId`: the same path, or one that extends
    * it. An id is minted per parent and key, so running through a path is being
@@ -177,6 +198,16 @@ export class KeyPathIds {
       id = this.parents[id]!;
     }
     return id === pathId;
+  }
+
+  /** How many keys `pathId` stands for: the depth of the row it names, 0 at the
+   *  root. */
+  public depthOf(pathId: number): number {
+    let depth = 0;
+    for (let id = pathId; id > ROOT_PATH_ID; id = this.parents[id]!) {
+      depth++;
+    }
+    return depth;
   }
 
   /**
