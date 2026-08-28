@@ -41,7 +41,7 @@ import {
 } from '../types/flamechart.types.js';
 import type { SearchCursor } from '../types/search.types.js';
 import { InspectorEmphasis } from '../../../components/inspectorEmphasis.js';
-import { inspectorLocateHandler } from '../../../components/inspectorLocate.js';
+import { wireInspectorTab } from '../../../components/inspectorTab.js';
 import { isFrameOffscreen, toDetailSelection } from '../utils/detail-selection-sync.js';
 import { extractExceptionMarkers, extractMarkers } from '../utils/marker-utils.js';
 import { seekWindow } from '../utils/navigate-window.js';
@@ -70,9 +70,7 @@ export class ApexLogTimeline {
   private selectedEventForContextMenu: EventNode | null = null;
   private selectedMarkerForContextMenu: TimelineMarker | null = null;
   private eventBusUnsubscribe: (() => void) | null = null;
-  private inspectorRevealUnsubscribe: (() => void) | null = null;
-  private inspectorLocateUnsubscribe: (() => void) | null = null;
-  private selectionClearUnsubscribe: (() => void) | null = null;
+  private inspectorUnsubscribe: (() => void) | null = null;
   /** Guards the programmatic select made on the inspector's behalf. */
   private echoGuard = new SelectionEchoGuard();
   /** Frame last reported to the inspector as under the pointer. */
@@ -217,32 +215,14 @@ export class ApexLogTimeline {
       }
     });
 
-    // Reveal an inspector row in the flame chart, but only while the timeline is
-    // the tab the inspector is showing.
-    this.inspectorRevealUnsubscribe = eventBus.on('inspector:reveal', (detail) => {
-      if (detail.source === 'timeline') {
-        this.selectFrameByEventIndex(detail.eventIndex);
-      }
-    });
-
-    // Dim the chart around the frames the inspector points at, while the timeline
-    // is the tab the inspector is showing.
-    this.inspectorLocateUnsubscribe = eventBus.on(
-      'inspector:locate',
-      inspectorLocateHandler('timeline', this.emphasis, (eventIndexes) =>
-        this.applyEmphasis(eventIndexes),
-      ),
-    );
-
-    // Escape (app-wide) deselects here; the chart reports the clear itself.
-    // The flame chart's own Escape (container focused) consumes the key first.
-    this.selectionClearUnsubscribe = eventBus.on('selection:clear', (detail) => {
-      if (detail.source === 'timeline') {
+    this.inspectorUnsubscribe = wireInspectorTab('timeline', this.emphasis, {
+      mark: (eventIndexes) => this.applyEmphasis(eventIndexes),
+      reveal: (eventIndex) => this.selectFrameByEventIndex(eventIndex),
+      clear: () => {
+        // The chart reports the clear itself. Its own Escape, with the container
+        // focused, consumes the key before this.
         this.flamechart.clearSelection();
-        // A picked inspector row is no selection of the chart, and the clear
-        // above is silent when there was nothing selected, so drop the dim here.
-        this.pickEmphasis(undefined);
-      }
+      },
     });
   }
 
@@ -400,17 +380,9 @@ export class ApexLogTimeline {
       this.eventBusUnsubscribe();
       this.eventBusUnsubscribe = null;
     }
-    if (this.inspectorRevealUnsubscribe) {
-      this.inspectorRevealUnsubscribe();
-      this.inspectorRevealUnsubscribe = null;
-    }
-    if (this.inspectorLocateUnsubscribe) {
-      this.inspectorLocateUnsubscribe();
-      this.inspectorLocateUnsubscribe = null;
-    }
-    if (this.selectionClearUnsubscribe) {
-      this.selectionClearUnsubscribe();
-      this.selectionClearUnsubscribe = null;
+    if (this.inspectorUnsubscribe) {
+      this.inspectorUnsubscribe();
+      this.inspectorUnsubscribe = null;
     }
 
     this.flamechart.destroy();

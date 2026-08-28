@@ -113,6 +113,17 @@ interface EventMap {
  *  one it names itself. The map stays where each payload is described. */
 export type EventDetail<K extends keyof EventMap> = EventMap[K];
 
+/**
+ * The events that name the tab they are for.
+ *
+ * Naming a tab is not the same as being for one tab only: the inspector records
+ * every tab's `detail:select` and `detail:view`, so filtering those by source
+ * would lose the tab it is not showing. `onSource` is for a tab's own view.
+ */
+type SourcedEvent = {
+  [K in keyof EventMap]: EventMap[K] extends { source: DetailSource } ? K : never;
+}[keyof EventMap];
+
 type EventCallback<K extends keyof EventMap> = (detail: EventMap[K]) => void;
 
 class EventBusImpl {
@@ -128,6 +139,23 @@ class EventBusImpl {
     return () => {
       this.listeners.get(event)?.delete(callback as EventCallback<keyof EventMap>);
     };
+  }
+
+  /**
+   * Subscribes to an event only where it names `source`: the whole contract of a
+   * view that answers for one tab. Every such event reaches every view, so the
+   * filter belongs to the bus rather than to each view.
+   */
+  onSource<K extends SourcedEvent>(
+    event: K,
+    source: DetailSource,
+    callback: EventCallback<K>,
+  ): () => void {
+    return this.on(event, (detail) => {
+      if (detail.source === source) {
+        callback(detail);
+      }
+    });
   }
 
   emit<K extends keyof EventMap>(event: K, detail: EventMap[K]): void {
