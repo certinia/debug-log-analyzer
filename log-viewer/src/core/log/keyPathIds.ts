@@ -200,6 +200,16 @@ export class KeyPathIds {
     return id === pathId;
   }
 
+  /** How many keys `pathId` stands for: the depth of the row it names, 0 at the
+   *  root. */
+  public depthOf(pathId: number): number {
+    let depth = 0;
+    for (let id = pathId; id > ROOT_PATH_ID; id = this.parents[id]!) {
+      depth++;
+    }
+    return depth;
+  }
+
   /**
    * The keys `pathId` stands for, outermost first. For reading a stamped id back
    * while debugging: nothing on a hot path calls it.

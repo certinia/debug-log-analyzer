@@ -79,6 +79,7 @@ jest.mock('../../core/log/LogStore.js', () => ({
 import {
   buildScopedCallTree,
   buildWholeLogCallTree,
+  frameEventIndexes,
   locatableEventIndexes,
   rowIdsByPath,
   type ScopedRow,
@@ -548,6 +549,37 @@ describe('rowIdsByPath', () => {
     const tree = (await build(4))!;
 
     expect(rowIdsByPath((await tree.timeOrder(options))!).get(99999)).toBeUndefined();
+  });
+});
+
+describe('frameEventIndexes', () => {
+  it("names the callers at the row's own depth, not the calls they conducted", async () => {
+    // exec -> m1 -> m2 -> soql, so the bottom-up seed is the statement and each
+    // row under it is one frame further up the same stack.
+    const rows = (await (await build(1))!.bottomUp(options))!;
+    const seed = rows[0]!;
+    const m2Row = seed._children![0]!;
+    const m1Row = m2Row._children![0]!;
+
+    expect(frameEventIndexes(seed)).toEqual([soql.eventIndex]);
+    expect(frameEventIndexes(m2Row)).toEqual([m2.eventIndex]);
+    expect(frameEventIndexes(m1Row)).toEqual([m1.eventIndex]);
+  });
+
+  it('names one caller frame however many calls it made', async () => {
+    const instances = loopOccurrences(2);
+    const rows = (await (await build(300))!.bottomUp(options))!;
+    const caller = rows[0]!._children![0]!;
+
+    // The row counts both calls, and is the single frame that made them.
+    expect(locatableEventIndexes(caller)).toEqual(instances);
+    expect(frameEventIndexes(caller)).toEqual([300]);
+  });
+
+  it('names the one frame of a row that merges nothing', () => {
+    const row = { id: 1, originalData: soql } as unknown as Partial<ScopedRow>;
+
+    expect(frameEventIndexes(row)).toEqual([soql.eventIndex]);
   });
 });
 

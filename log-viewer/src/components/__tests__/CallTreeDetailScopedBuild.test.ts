@@ -38,6 +38,7 @@ jest.mock('../scopedCallTree.js', () => ({
   // Keep the real row readers: the hover test is about which rows name a frame.
   revealableEventIndex: jest.requireActual('../scopedCallTree.js').revealableEventIndex,
   locatableEventIndexes: jest.requireActual('../scopedCallTree.js').locatableEventIndexes,
+  frameEventIndexes: jest.requireActual('../scopedCallTree.js').frameEventIndexes,
   rowIdsByPath: jest.requireActual('../scopedCallTree.js').rowIdsByPath,
 }));
 

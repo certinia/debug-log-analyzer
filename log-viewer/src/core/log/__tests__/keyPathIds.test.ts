@@ -61,6 +61,11 @@ describe('KeyPathIds', () => {
     expect(ids.reaches(inner, pathFor(ids, 'Z'))).toBe(false);
   });
 
+  it('reads back how many keys a path stands for, and none for the empty one', () => {
+    expect(ids.depthOf(pathFor(ids, 'A', 'B', 'C'))).toBe(3);
+    expect(ids.depthOf(ROOT_PATH_ID)).toBe(0);
+  });
+
   it('mints on its own, so an id from one log means nothing to another', () => {
     const other = new KeyPathIds(32);
 
