@@ -381,7 +381,7 @@
     "vscode:prepublish": "pnpm -w run build && pnpm -w run copy:package-docs"
   },
   "dependencies": {
-    "@apexdevtools/apex-parser": "5.1.0",
+    "@apexdevtools/apex-parser": "5.2.0",
     "effect": "^3.22.0"
   },
   "devDependencies": {
