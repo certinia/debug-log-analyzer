@@ -66,7 +66,7 @@ The metric strip supports collapsed (heat-style) and expanded (step chart) views
 | ---------------------------------- | ------------------------------ | ------------ |
 | `query(viewport)`                  | Viewport culling for rendering | O(k log n)   |
 | `queryEventsInRegion(time, depth)` | Hit testing, spatial lookups   | O(log n + k) |
-| `getAllFramesSorted()`             | Minimap skyline, once per log  | O(n log n)   |
+| `takeFramesSorted()`               | Minimap skyline, once per log  | O(n log n)   |
 
 ### Access Pattern
 
@@ -76,7 +76,7 @@ const events = rectangleCache.queryEventsInRegion(timeStart, timeEnd, depthStart
 
 // Direct tree access (for specialized queries)
 const tree = rectangleCache.getSegmentTree();
-const frames = tree.getAllFramesSorted();
+const frames = tree.takeFramesSorted();
 ```
 
 ### Why Not TimelineEventIndex?

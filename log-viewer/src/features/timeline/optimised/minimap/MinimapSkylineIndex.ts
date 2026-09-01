@@ -244,7 +244,7 @@ export class MinimapSkylineIndex {
 /**
  * Order frames that start together by depth, shallowest first.
  *
- * `getAllFramesSorted` sorts by `timeStart` alone, so the order at an equal start
+ * `takeFramesSorted` sorts by `timeStart` alone, so the order at an equal start
  * is whatever the tree happened to build. The sweep needs the parent pushed
  * before its child, or the child is on the stack first and the parent is dropped
  * as an overlap - losing a frame that may span the whole log.

@@ -8,7 +8,7 @@ import { MinimapSkylineIndex } from '../minimap/MinimapSkylineIndex.js';
 import type { SkylineFrame } from '../TemporalSegmentTree.js';
 
 function frame(category: string, timeStart: number, timeEnd: number, depth: number): SkylineFrame {
-  return { category, timeStart, timeEnd, depth, selfDuration: timeEnd - timeStart };
+  return { category, timeStart, timeEnd, depth };
 }
 
 /** The index as a readable list of `[start, end, depth, category]`. */

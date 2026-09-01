@@ -15,7 +15,6 @@
 import type { ApexLog } from 'apex-log-parser';
 
 import { MinimapDensityQuery } from '../../log-viewer/src/features/timeline/optimised/minimap/MinimapDensityQuery.js';
-import { MinimapSkylineIndex } from '../../log-viewer/src/features/timeline/optimised/minimap/MinimapSkylineIndex.js';
 import { RectangleCache } from '../../log-viewer/src/features/timeline/optimised/RectangleCache.js';
 import { BUCKET_CONSTANTS } from '../../log-viewer/src/features/timeline/types/flamechart.types.js';
 import { logEventToTreeAndRects } from '../../log-viewer/src/features/timeline/utils/tree-converter.js';
@@ -38,17 +37,18 @@ export async function measureMinimap(log: ApexLog, digest: boolean): Promise<voi
   const precomputed = logEventToTreeAndRects(log.children, categories, log.exitStamp);
   const cache = new RectangleCache(log.children, categories, precomputed);
 
-  const build = (): MinimapDensityQuery =>
-    new MinimapDensityQuery(
-      cache.getSegmentTree(),
-      precomputed.totalDuration,
-      precomputed.maxDepth,
-    );
+  // One query for every width: the tree hands its frames over once, and the one
+  // width it caches makes each new width a miss anyway.
+  const query = new MinimapDensityQuery(
+    cache.getSegmentTree(),
+    precomputed.totalDuration,
+    precomputed.maxDepth,
+  );
 
   if (digest) {
     console.log('width,bucket,eventCount,maxDepth,dominantCategory');
     for (const width of DIGEST_WIDTHS) {
-      const { buckets } = build().query(width);
+      const { buckets } = query.query(width);
       for (let b = 0; b < buckets.length; b++) {
         const bucket = buckets[b]!;
         console.log(
@@ -65,26 +65,16 @@ export async function measureMinimap(log: ApexLog, digest: boolean): Promise<voi
   }
   console.log(`${frames} frames, maxDepth ${precomputed.maxDepth}`);
 
-  // The width-independent half: built once per log, so a resize walks it instead
-  // of rebuilding. Violations say how well-nested the log really is.
-  const skyline = await time('skyline index', () => {
-    const tree = cache.getSegmentTree();
-    return new MinimapSkylineIndex(
-      tree.getAllFramesSorted(),
-      precomputed.totalDuration,
-      precomputed.maxDepth,
-    );
-  });
-  const bytes = skyline.segmentCount * 11 + frames * 16;
+  // Heap with the tree's frame objects still held, against heap once the skyline
+  // has taken them: the first query is where the trade happens.
+  const heldWithFrames = heapMb();
+  await time(`cold query(${COLD_WIDTH})`, () => query.query(COLD_WIDTH));
+  const skyline = query.skyline!;
   console.log(
     `  ${skyline.segmentCount} segments (${(skyline.segmentCount / frames).toFixed(2)}/frame), ` +
-      `${Math.round(bytes / 1048576)}MB, ${skyline.violations} violations`,
+      `${skyline.violations} violations`,
   );
-
-  // Apart from the drag: the first query also pays the segment tree's deferred
-  // frame sort, and a resize never repeats it.
-  const query = build();
-  await time(`cold query(${COLD_WIDTH})`, () => query.query(COLD_WIDTH));
+  console.log(`  heap ${heldWithFrames}MB with frames -> ${heapMb()}MB with the skyline`);
 
   const drag: number[] = [];
   for (let width = DRAG_FROM; width <= DRAG_TO; width++) {

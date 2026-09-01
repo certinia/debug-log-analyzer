@@ -117,6 +117,11 @@ export class MinimapDensityQuery {
   /** The log seen from above, built on the first query and never rebuilt. */
   private index: MinimapSkylineIndex | null = null;
 
+  /** The skyline being walked, once a query has built it. */
+  public get skyline(): MinimapSkylineIndex | null {
+    return this.index;
+  }
+
   /** Scratch for the walk, one slot per category id. Sized with the index. */
   private weights = new Float64Array(0);
   private accumulated = new Float64Array(0);
@@ -180,7 +185,7 @@ export class MinimapDensityQuery {
       return { buckets: [], globalMaxDepth: this.globalMaxDepth };
     }
 
-    const skyline = this.skyline();
+    const skyline = this.ensureSkyline();
     const { segmentCount, segmentStarts, segmentDepths, segmentCategories, categoryNames } =
       skyline;
     const accumulated = this.accumulated;
@@ -302,11 +307,11 @@ export class MinimapDensityQuery {
    * Not in the constructor: the tree sorts its frames on first use, and the
    * timeline defers that cost off its own init.
    */
-  private skyline(): MinimapSkylineIndex {
+  private ensureSkyline(): MinimapSkylineIndex {
     let index = this.index;
     if (!index) {
       index = new MinimapSkylineIndex(
-        this.segmentTree.getAllFramesSorted(),
+        this.segmentTree.takeFramesSorted(),
         this.totalDuration,
         this.globalMaxDepth,
       );

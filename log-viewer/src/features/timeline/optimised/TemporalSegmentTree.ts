@@ -62,7 +62,6 @@ export interface SkylineFrame {
   timeEnd: number;
   depth: number;
   category: string;
-  selfDuration: number;
 }
 
 /**
@@ -90,16 +89,10 @@ export class TemporalSegmentTree {
   private maxDepth = 0;
 
   /**
-   * Unsorted frames collected during tree construction.
-   * Sorting is deferred to first getAllFramesSorted() call.
+   * Frames collected during construction, sorted and handed over by
+   * takeFramesSorted(). Null once taken, so none of this outlives the skyline.
    */
   private unsortedFrames: SkylineFrame[] | null = null;
-
-  /**
-   * Cached sorted frames for minimap density computation.
-   * Lazily sorted on first access to defer ~25ms sort cost to minimap render.
-   */
-  private cachedSortedFrames: SkylineFrame[] | null = null;
 
   /**
    * Build segment trees from pre-computed rectangles.
@@ -237,23 +230,26 @@ export class TemporalSegmentTree {
   }
 
   /**
-   * Get all frames sorted by timeStart for minimap density computation.
-   * Frames are collected during tree construction but sorting is deferred
-   * to first access to avoid blocking init when minimap isn't immediately visible.
+   * Hand over every frame, sorted by timeStart, for the minimap skyline.
    *
-   * Performance: Lazy sorting defers ~25ms cost to first minimap render,
-   * reducing init time when minimap isn't immediately needed.
+   * Single use: the frames go to the caller and the tree keeps nothing. One
+   * object per event is the largest thing the tree holds, and the skyline
+   * reduces them to typed arrays, so holding both would be the log twice over.
+   * A second call returns nothing.
    *
-   * @returns Array of SkylineFrame sorted by timeStart
+   * Sorting happens here rather than during construction, so a log whose
+   * minimap is never drawn never pays for it.
+   *
+   * @returns Frames sorted by timeStart, or empty when already taken
    */
-  public getAllFramesSorted(): SkylineFrame[] {
-    // Lazy sort on first access
-    if (!this.cachedSortedFrames && this.unsortedFrames) {
-      this.cachedSortedFrames = this.unsortedFrames;
-      this.cachedSortedFrames.sort((a, b) => a.timeStart - b.timeStart);
-      this.unsortedFrames = null; // Release reference
+  public takeFramesSorted(): SkylineFrame[] {
+    const frames = this.unsortedFrames;
+    if (!frames) {
+      return [];
     }
-    return this.cachedSortedFrames ?? [];
+    this.unsortedFrames = null;
+    frames.sort((a, b) => a.timeStart - b.timeStart);
+    return frames;
   }
 
   /**
@@ -326,7 +322,7 @@ export class TemporalSegmentTree {
    * PERF optimizations:
    * - Uses pre-grouped rectsByDepth when available (~12ms saved)
    * - Collects frames for minimap during iteration (avoids O(N) traversal)
-   * - Defers frame sorting to first getAllFramesSorted() call (~25ms saved)
+   * - Defers frame sorting to takeFramesSorted() (~25ms saved)
    *
    * @param rectsByCategory - Rectangles grouped by category
    * @param preGroupedByDepth - Optional pre-grouped by depth from unified conversion
@@ -354,7 +350,6 @@ export class TemporalSegmentTree {
             timeEnd: rect.timeEnd,
             depth: rect.depth,
             category: rect.category,
-            selfDuration: rect.selfDuration,
           });
         }
       }
@@ -372,13 +367,12 @@ export class TemporalSegmentTree {
           depthRects.push(rect);
           this.maxDepth = Math.max(this.maxDepth, rect.depth);
 
-          // Collect frame directly (eliminates recursive tree traversal in getAllFramesSorted)
+          // Collect frame directly (eliminates a recursive traversal when taken)
           allFrames.push({
             timeStart: rect.timeStart,
             timeEnd: rect.timeEnd,
             depth: rect.depth,
             category: rect.category,
-            selfDuration: rect.selfDuration,
           });
         }
       }
@@ -392,7 +386,7 @@ export class TemporalSegmentTree {
       }
     }
 
-    // PERF: Defer sorting to first getAllFramesSorted() call (~25ms saved at init)
+    // PERF: Defer sorting to takeFramesSorted() (~25ms saved at init)
     this.unsortedFrames = allFrames;
   }
 
