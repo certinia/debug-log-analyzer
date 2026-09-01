@@ -128,14 +128,6 @@ export class KeyPathIds {
   }
 
   /**
-   * True where the frame's own chain of callers runs through `pathId`: what tells
-   * the calls a bottom-up caller row holds from the rest of its bucket's.
-   */
-  public chainReaches(event: LogEvent, pathId: number): boolean {
-    return this.chainNodeAt(event, pathId) !== null;
-  }
-
-  /**
    * The frame in the chain that `pathId` names, or null where the chain does not
    * run through it: the caller a bottom-up row is, at the depth the row sits at.
    *
@@ -216,6 +208,11 @@ export class KeyPathIds {
       id = this.parents[id]!;
     }
     return id === pathId;
+  }
+
+  /** The path `pathId` extends, {@link ROOT_PATH_ID} for a row of its own depth. */
+  public parentOf(pathId: number): number {
+    return this.parents[pathId]!;
   }
 
   /** How many keys `pathId` stands for: the depth of the row it names, 0 at the

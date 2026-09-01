@@ -74,11 +74,10 @@ describe('KeyPathIds', () => {
       expect(ids.chainNodeAt(inner, callerRow)).toBe(outer);
     });
 
-    it('answers for a path the chain misses with nothing, as reaches says false', () => {
+    it('answers for a path the chain misses with nothing', () => {
       const elsewhere = pathFor(ids, 'METHOD_ENTRY||Z');
 
       expect(ids.chainNodeAt(inner, elsewhere)).toBeNull();
-      expect(ids.chainReaches(inner, elsewhere)).toBe(false);
     });
   });
 

@@ -6,7 +6,7 @@ import type { ApexLog, LogEvent } from 'apex-log-parser';
 import type { RowComponent } from 'tabulator-tables';
 
 import type { DetailSelection, SelectionView } from '../core/events/EventBus.js';
-import type { KeyPathIds } from '../core/log/keyPathIds.js';
+import { ROOT_PATH_ID } from '../core/log/keyPathIds.js';
 import { logStoreFor } from '../core/log/LogStore.js';
 import { eventByEventIndex } from '../core/utility/EventSearch.js';
 
@@ -140,7 +140,6 @@ const rowCallData = (row: RowComponent): CallRow => row.getData() as CallRow;
 const derivedIndexes = new WeakMap<CallRow, number[]>();
 
 const NO_CALLS: LogEvent[] = [];
-const NO_FRAMES: number[] = [];
 
 /**
  * The root bucket a derived row reads its calls from, or null where the walk
@@ -205,26 +204,61 @@ function rowCallOccurrences(row: RowComponent, root: ApexLog | null): LogEvent[]
   if (data.key === undefined) {
     return data.originalData ? [data.originalData] : NO_CALLS;
   }
-  return deriveCalls(row, data, root);
+  return derivedRowOf(row, data, root).calls;
 }
 
+/** What a derived row's bucket answers: the calls whose chain runs through the
+ *  row, and the frames the row is at its own depth. */
+interface DerivedRow {
+  calls: LogEvent[];
+  frames: number[];
+}
+
+const NOTHING_DERIVED: DerivedRow = { calls: NO_CALLS, frames: [] };
+
+/** Held per row: a pointer sweep re-enters rows and the click that follows a
+ *  hover asks again, but deriving reads every occurrence the root bucket holds. */
+const derivedRows = new WeakMap<CallRow, DerivedRow>();
+
 /**
- * The root bucket's calls whose own chain runs through the row.
+ * The root bucket's calls whose own chain runs through the row, and the frames
+ * the row stands for.
+ *
+ * One walk per occurrence answers both: the walk that decides whether a chain
+ * reaches the row stands on the row's own frame when it does.
  *
  * The table is the log's that built the rows: a path id is minted per log, so
  * another log's table would answer about a path of its own.
  */
-function deriveCalls(row: RowComponent, data: CallRow, root: ApexLog | null): LogEvent[] {
+function derivedRowOf(row: RowComponent, data: CallRow, root: ApexLog | null): DerivedRow {
+  const cached = derivedRows.get(data);
+  if (cached) {
+    return cached;
+  }
   const pathId = data._pathId;
   if (pathId === undefined || !root) {
-    return NO_CALLS;
+    return NOTHING_DERIVED;
   }
   const paths = logStoreFor(root).keyPathIds();
   const instances = rootBucketOf(row, data)?.instances;
   if (!instances?.length) {
-    return NO_CALLS;
+    return NOTHING_DERIVED;
   }
-  return instances.filter((event) => paths.chainReaches(event, pathId));
+  const calls: LogEvent[] = [];
+  const own = new Set<number>();
+  for (const event of instances) {
+    const node = paths.chainNodeAt(event, pathId);
+    if (node) {
+      calls.push(event);
+      own.add(node.eventIndex);
+    }
+  }
+  const derived = { calls, frames: [...own] };
+  if (calls.length) {
+    // Not kept where nothing derived, for the reason `rowOccurrences` gives.
+    derivedRows.set(data, derived);
+  }
+  return derived;
 }
 
 /**
@@ -279,10 +313,6 @@ export function rowOccurrences(row: RowComponent, root: ApexLog | null): number[
   return indexes;
 }
 
-/** Held per row, for the same reason {@link derivedIndexes} is. Only a caller
- *  row ever climbs, so only a caller row's answer is in here. */
-const derivedCallerFrames = new WeakMap<CallRow, number[]>();
-
 /**
  * The frames a row is, which is what the inspector marks it by.
  *
@@ -302,53 +332,15 @@ export function rowFrames(
   direction: SelectionView,
 ): number[] {
   const data = rowCallData(row);
-  const store = direction === 'callers' && root ? logStoreFor(root) : null;
-  if (!store) {
+  const pathId = data._pathId;
+  if (direction !== 'callers' || !root || pathId === undefined) {
     return rowOccurrences(row, root);
   }
-  const cached = derivedCallerFrames.get(data);
-  if (cached) {
-    return cached;
-  }
-  const paths = store.keyPathIds();
-  const pathId = data._pathId;
-  if (pathId === undefined || paths.depthOf(pathId) <= 1) {
+  if (logStoreFor(root).keyPathIds().parentOf(pathId) === ROOT_PATH_ID) {
     // A row at the depth of its own calls stands for them.
     return rowOccurrences(row, root);
   }
-  const frames = callerFramesOf(row, data, pathId, paths);
-  if (frames.length) {
-    // Not kept where nothing climbed, for the reason `rowOccurrences` gives.
-    derivedCallerFrames.set(data, frames);
-  }
-  return frames;
-}
-
-/**
- * The frames a caller row is: the node each of its bucket's chains passes through
- * at the row's own depth.
- *
- * One walk per occurrence answers both questions the row asks, since the walk
- * that decides whether a chain reaches the row stands on that node when it does.
- */
-function callerFramesOf(
-  row: RowComponent,
-  data: CallRow,
-  pathId: number,
-  paths: KeyPathIds,
-): number[] {
-  const instances = rootBucketOf(row, data)?.instances;
-  if (!instances?.length) {
-    return NO_FRAMES;
-  }
-  const own = new Set<number>();
-  for (const event of instances) {
-    const node = paths.chainNodeAt(event, pathId);
-    if (node) {
-      own.add(node.eventIndex);
-    }
-  }
-  return [...own];
+  return derivedRowOf(row, data, root).frames;
 }
 
 /**
