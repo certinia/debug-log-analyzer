@@ -29,8 +29,9 @@
     "profiling",
     "soql"
   ],
+  "type": "module",
   "main": "out/Main.js",
-  "browser": "out/web/Main.web.js",
+  "browser": "out/web/Main.web.cjs",
   "icon": "./certinia-icon-color.png",
   "galleryBanner": {
     "color": "#000000",

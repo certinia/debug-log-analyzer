@@ -40,7 +40,7 @@ export default defineConfig([
     output: {
       format: 'cjs',
       dir: './lana/out/web',
-      entryFileNames: 'Main.web.js',
+      entryFileNames: 'Main.web.cjs',
       chunkFileNames: 'lana-[name].js',
       sourcemap: false,
       keepNames: true,
