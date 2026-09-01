@@ -71,13 +71,14 @@ export const globalStyles = [
       background-color: var(--vscode-scrollbarSlider-background);
     }
 
+    /* findMatch is the match you are on; findMatchHighlight is the rest. */
     ::highlight(find-match) {
-      color: var(--vscode-editor-findMatchForeground);
+      color: var(--vscode-editor-findMatchHighlightForeground);
       background-color: var(--vscode-editor-findMatchHighlightBackground, yellow);
     }
 
     ::highlight(current-find-match) {
-      color: var(--vscode-editor-findMatchHighlightForeground);
+      color: var(--vscode-editor-findMatchForeground);
       background-color: var(--vscode-editor-findMatchBackground, #8b8000);
     }
 

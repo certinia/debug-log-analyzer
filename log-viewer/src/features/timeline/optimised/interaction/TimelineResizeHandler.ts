@@ -19,7 +19,6 @@ export class TimelineResizeHandler {
   private containerRef: HTMLElement;
   private renderer: IResizable | null = null;
 
-  private resizeDebounceFrameId: number | null = null;
   private lastResizeWidth: number;
   private lastResizeHeight: number;
 
@@ -60,31 +59,22 @@ export class TimelineResizeHandler {
         return; // Skip if unchanged (covers initial callback case)
       }
 
-      // Update dimensions before debounce to prevent rapid duplicate checks
       this.lastResizeWidth = roundedWidth;
       this.lastResizeHeight = roundedHeight;
 
-      // Debounce actual resize handling to prevent flickering
-      if (this.resizeDebounceFrameId !== null) {
-        cancelAnimationFrame(this.resizeDebounceFrameId);
-      }
-
-      this.resizeDebounceFrameId = requestAnimationFrame(() => {
-        this.renderer?.resize(roundedWidth, roundedHeight);
-        this.resizeDebounceFrameId = null;
-      });
+      // Straight through, with no frame in between. Observer callbacks are delivered after
+      // this frame's animation callbacks, so a resize deferred to the next frame sizes the
+      // canvas to a box the drag has already left: one frame behind on every step of a drag,
+      // which reads as the chart sliding off the bottom edge until the drag stops.
+      // Nothing inside the observed element can change that element's height, so this cannot
+      // start an observer loop.
+      this.renderer?.resize(roundedWidth, roundedHeight);
     });
 
     this.resizeObserver.observe(this.containerRef);
   }
 
   public destroy(): void {
-    // Clear any pending resize frame request
-    if (this.resizeDebounceFrameId !== null) {
-      cancelAnimationFrame(this.resizeDebounceFrameId);
-      this.resizeDebounceFrameId = null;
-    }
-
     // Disconnect resize observer
     if (this.resizeObserver) {
       this.resizeObserver.disconnect();

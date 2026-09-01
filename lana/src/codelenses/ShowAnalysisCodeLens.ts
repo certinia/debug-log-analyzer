@@ -28,11 +28,7 @@ class ShowAnalysisCodeLens implements CodeLensProvider {
   }
 
   static apply(context: Context): void {
-    const docSelector = [
-      { scheme: 'file', language: 'apexlog' },
-      { scheme: 'file', pattern: '**/*.log' },
-      { scheme: 'file', pattern: '**/*.txt' },
-    ];
+    const docSelector = [{ language: 'apexlog' }, { pattern: '**/*.log' }, { pattern: '**/*.txt' }];
 
     const codeLensProviderDisposable = languages.registerCodeLensProvider(
       docSelector,
