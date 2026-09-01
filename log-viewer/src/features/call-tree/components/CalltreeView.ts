@@ -33,6 +33,7 @@ import { waitForNextFrame } from '../../../core/utility/FrameBudget.js';
 
 import { inMsRange, type FilterRange } from '../../../tabulator/filters/MinMax.js';
 import { withCodeDrivenExpand } from '../../../tabulator/module/expandOrigin.js';
+import { onTableReshaped } from '../../../tabulator/module/tableReshape.js';
 
 import dataGridStyles from '../../../tabulator/style/DataGrid.scss';
 
@@ -597,6 +598,9 @@ export class CalltreeView extends LitElement {
   _handleBottomUpGroupBy(event: Event) {
     const target = event.target as HTMLInputElement;
     this.bottomUpGroupBy = target.value;
+    // Grouping renumbers the matches both ways round, and `dataGrouped` reports
+    // only the way that leaves the table grouped.
+    this._dropSearch();
     const fieldName =
       target.value === 'Caller Namespace' ? 'callerNamespace' : target.value.toLowerCase();
     if (this.bottomUpTreeTable) {
@@ -760,11 +764,8 @@ export class CalltreeView extends LitElement {
       return;
     }
 
-    this.debugOnlyFilterCache.clear();
-    this.typeFilterCache.clear();
-    this.namespaceFilterCache.clear();
-    this.totalTimeFilterCache.clear();
-    this.selfTimeFilterCache.clear();
+    this._dropSearch();
+    this._clearFilterCaches();
 
     const filtersToAdd = [];
 
@@ -1048,19 +1049,6 @@ export class CalltreeView extends LitElement {
 
     const { table, tableBuilt } = createTimeOrderTable(callTreeTableContainer, rootMethod, {
       showDetailsFilter: this._showDetailsFilter,
-      onFilterCacheClear: () => {
-        this.debugOnlyFilterCache.clear();
-        this.typeFilterCache.clear();
-        this.namespaceFilterCache.clear();
-        this.totalTimeFilterCache.clear();
-        this.selfTimeFilterCache.clear();
-      },
-      onRenderStarted: () => {
-        if (!this.blockClearHighlights && this.totalMatches > 0) {
-          this._resetFindWidget();
-          this._clearSearchHighlights();
-        }
-      },
       onContextMenu: (e, row) => {
         if (window.getSelection()?.type === 'Range') {
           return;
@@ -1072,6 +1060,7 @@ export class CalltreeView extends LitElement {
       rowFormatter: timeOrderRowFormatter,
     });
     this.calltreeTable = table;
+    this._watchTable(table, true);
     await tableBuilt;
     this._initTableColumns(table);
     this._emitDetailSelection(table);
@@ -1089,22 +1078,10 @@ export class CalltreeView extends LitElement {
 
     const { table, tableBuilt } = createAggregatedTable(container, rootMethod, {
       showDetailsFilter: this._showDetailsFilter,
-      onFilterCacheClear: () => {
-        this.debugOnlyFilterCache.clear();
-        this.typeFilterCache.clear();
-        this.namespaceFilterCache.clear();
-        this.totalTimeFilterCache.clear();
-        this.selfTimeFilterCache.clear();
-      },
-      onRenderStarted: () => {
-        if (!this.blockClearHighlights && this.totalMatches > 0) {
-          this._resetFindWidget();
-          this._clearSearchHighlights();
-        }
-      },
       rowFormatter: groupedRowFormatter,
     });
     this.aggregatedTreeTable = table;
+    this._watchTable(table, true);
     await tableBuilt;
     this._initTableColumns(table);
     this._emitDetailSelection(table);
@@ -1122,12 +1099,6 @@ export class CalltreeView extends LitElement {
       rootMethod,
       {
         showDetailsFilter: this._showDetailsFilter,
-        onRenderStarted: () => {
-          if (!this.blockClearHighlights && this.totalMatches > 0) {
-            this._resetFindWidget();
-            this._clearSearchHighlights();
-          }
-        },
         rowFormatter: groupedRowFormatter,
       },
       {
@@ -1137,6 +1108,7 @@ export class CalltreeView extends LitElement {
       },
     );
     this.bottomUpTreeTable = table;
+    this._watchTable(table, false);
     await tableBuilt;
     this._initTableColumns(table);
     this._emitDetailSelection(table);
@@ -1217,6 +1189,41 @@ export class CalltreeView extends LitElement {
 
   private _resetFindWidget() {
     document.dispatchEvent(new CustomEvent('lv-find-results', { detail: { totalMatches: 0 } }));
+  }
+
+  /** Drop the search where its match numbering no longer describes the table. */
+  private _dropSearch() {
+    if (!this.blockClearHighlights && this.totalMatches > 0) {
+      this._resetFindWidget();
+      this._clearSearchHighlights();
+    }
+  }
+
+  /**
+   * Watch `table` for what a view has to answer per render.
+   *
+   * The filter caches are cleared once per render rather than on `dataFiltered`:
+   * row ids are unique within a build, so a cached `deepFilter` result stays
+   * valid across the cascaded filter passes Tabulator runs for each expanded
+   * subtree, which would otherwise fire `dataFiltered` several times per user
+   * action and defeat the cache.
+   *
+   * @param clearsFilterCaches - Bottom Up reads the caches but has never cleared
+   * them per render, so it keeps that behaviour here.
+   */
+  private _watchTable(table: Tabulator, clearsFilterCaches: boolean) {
+    onTableReshaped(table, () => this._dropSearch());
+    if (clearsFilterCaches) {
+      table.on('renderStarted', () => this._clearFilterCaches());
+    }
+  }
+
+  private _clearFilterCaches() {
+    this.debugOnlyFilterCache.clear();
+    this.typeFilterCache.clear();
+    this.namespaceFilterCache.clear();
+    this.totalTimeFilterCache.clear();
+    this.selfTimeFilterCache.clear();
   }
 
   private _clearSearchHighlights() {
