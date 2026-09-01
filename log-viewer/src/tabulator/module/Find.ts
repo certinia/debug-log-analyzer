@@ -28,6 +28,9 @@ export class Find extends Module {
   _currentMatchIndex = 0;
   _matchIndexes: { [key: number]: RowComponent } = {};
   _highlightFrame: number | null = null;
+  /** The fields the last search covered, which the highlights follow so the two
+   *  describe the same matches. */
+  _searchedFields: Set<string> = new Set();
 
   // Headless formatter execution: single detached element (never in the document)
   // and a per-row-field text cache keyed by the stable row-data object reference.
@@ -140,6 +143,7 @@ export class Find extends Module {
       // columnManager.getRealColumns() is internal — returns columnsByIndex, same order as getCells()
       const internalCols: Array<{
         field: string;
+        visible: boolean;
         getComponent: () => ColumnComponent;
         getFieldValue: (data: object) => unknown;
         modules?: {
@@ -153,6 +157,13 @@ export class Find extends Module {
           };
         };
       }> = this.table.columnManager?.getRealColumns?.() ?? [];
+
+      // columnsByIndex holds every column, shown or not: a hidden column's match
+      // cannot be seen, so counting it gives a total the user cannot reach and a
+      // number the highlights cannot line up with.
+      this._searchedFields = new Set(
+        internalCols.filter((col) => col.field && col.visible).map((col) => col.field),
+      );
 
       const len = flattenedRows.length;
       for (let i = 0; i < len; i++) {
@@ -172,7 +183,7 @@ export class Find extends Module {
 
         for (const col of internalCols) {
           const field = col.field;
-          if (!field) {
+          if (!field || !this._searchedFields.has(field)) {
             continue;
           }
 
@@ -278,6 +289,10 @@ export class Find extends Module {
 
       let matchIdx = 0;
       row.getCells().forEach((cell) => {
+        if (!this._searchedFields.has(cell.getField())) {
+          return;
+        }
+
         const elem = cell.getElement();
         // Build a flat text-node map so we can create Ranges that span across
         // adjacent elements (e.g. two <span>s whose text forms a single match).

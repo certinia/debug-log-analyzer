@@ -92,3 +92,58 @@ describe('Find highlights on the rows a render attaches', () => {
     expect(listened).toEqual([]);
   });
 });
+
+/** A one-row table whose columns hold `value`, some of them hidden. */
+function findOver(columns: Array<{ field: string; visible: boolean; value: string }>) {
+  const rowData = {};
+  const rows = [{ getData: () => rowData }];
+  const table = {
+    on: () => {},
+    getGroups: () => [],
+    getRows: () => rows,
+    modules: {},
+    options: {},
+    columnManager: {
+      // Tabulator indexes every column here, shown or not.
+      getRealColumns: () =>
+        columns.map((column) => ({
+          field: column.field,
+          visible: column.visible,
+          getComponent: () => ({}),
+          getFieldValue: () => column.value,
+        })),
+    },
+  };
+  const find = new Find(table as never);
+  // CSS.highlights does not exist in jsdom, and the count is what is under test.
+  find._applyHighlights = () => {};
+  return find;
+}
+
+describe('Find counts what the table is showing', () => {
+  const search = { text: 'default', count: 1, options: { matchCase: false } };
+
+  it('leaves a hidden column out of the count', async () => {
+    const find = findOver([
+      { field: 'text', visible: true, value: 'Account default' },
+      { field: 'namespace', visible: false, value: 'default' },
+    ]);
+
+    const result = await find._find(search);
+
+    // A match nobody can see is a total the user cannot reach, and a number the
+    // highlights cannot line up with.
+    expect(result.totalMatches).toBe(1);
+  });
+
+  it('counts the same column once it is shown', async () => {
+    const find = findOver([
+      { field: 'text', visible: true, value: 'Account default' },
+      { field: 'namespace', visible: true, value: 'default' },
+    ]);
+
+    const result = await find._find(search);
+
+    expect(result.totalMatches).toBe(2);
+  });
+});
