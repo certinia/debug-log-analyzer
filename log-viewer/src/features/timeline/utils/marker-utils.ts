@@ -9,7 +9,7 @@
  */
 
 import type { ApexLog } from 'apex-log-parser';
-import type { TimelineMarker } from '../types/flamechart.types.js';
+import type { NoDataSpan, TimelineMarker } from '../types/flamechart.types.js';
 import { isMarkerType, markerTypeForIssue } from '../types/flamechart.types.js';
 
 /**
@@ -105,6 +105,34 @@ export function extractExceptionMarkers(log: ApexLog): TimelineMarker[] {
   }
 
   return markers;
+}
+
+/**
+ * The spans the log recorded nothing in, earliest first.
+ *
+ * A `skip` marker with an end time is the log saying it stopped between two instants —
+ * the size cap, or lines dropped mid-log. Anything measured, such as the governor strip,
+ * has no reading in that span and must not carry its last one across it. Markers without
+ * an end time are moments, not spans, so they report no gap.
+ *
+ * @param markers - Markers extracted from the log
+ * @returns Spans sorted by start time
+ */
+export function noDataSpans(markers: TimelineMarker[]): NoDataSpan[] {
+  const spans: NoDataSpan[] = [];
+  for (const marker of markers) {
+    if (marker.type !== 'skip' || marker.endTime === undefined) {
+      continue;
+    }
+    if (marker.endTime > marker.startTime) {
+      spans.push({
+        startTime: marker.startTime,
+        endTime: marker.endTime,
+        summary: marker.summary,
+      });
+    }
+  }
+  return spans.sort((a, b) => a.startTime - b.startTime);
 }
 
 /**

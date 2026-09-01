@@ -43,7 +43,7 @@ import type { SearchCursor } from '../types/search.types.js';
 import { InspectorEmphasis } from '../../../components/inspectorEmphasis.js';
 import { wireInspectorTab } from '../../../components/inspectorTab.js';
 import { isFrameOffscreen, toDetailSelection } from '../utils/detail-selection-sync.js';
-import { extractExceptionMarkers, extractMarkers } from '../utils/marker-utils.js';
+import { extractExceptionMarkers, extractMarkers, noDataSpans } from '../utils/marker-utils.js';
 import { seekWindow } from '../utils/navigate-window.js';
 import { logEventToTreeAndRects } from '../utils/tree-converter.js';
 import { FlameChart } from './FlameChart.js';
@@ -117,6 +117,9 @@ export class ApexLogTimeline {
     // - TimelineEventIndex.calculateMaxDepth
     // - TimelineEventIndex.calculateTotalDuration
     // - RectangleCache.flattenEvents
+    // `exitStamp`, not `executionEndTime`: a trailing zero-duration event, such as the
+    // FATAL_ERROR closing a truncated log, still ends the log.
+    const logEndTime = this.apexLog.exitStamp;
     const {
       treeNodes,
       maps,
@@ -126,7 +129,7 @@ export class ApexLogTimeline {
       maxDepth,
       totalDuration,
       preSorted,
-    } = logEventToTreeAndRects(this.events, categories);
+    } = logEventToTreeAndRects(this.events, categories, logEndTime);
 
     // Initialize FlameChart with Apex-specific callbacks and precomputed data
     await this.flamechart.init(
@@ -203,7 +206,7 @@ export class ApexLogTimeline {
     // memoised per log and shared with the inspector's governor trend charts.
     const heatStripSeries = apexLimitTimeSeries(this.apexLog);
     this.flamechart.setHeatStripTimeSeries(
-      heatStripSeries.events.length > 0 ? heatStripSeries : null,
+      heatStripSeries.events.length > 0 ? { ...heatStripSeries, gaps: noDataSpans(markers) } : null,
     );
 
     // Subscribe to EventBus for timeline navigation requests (from CalltreeView and raw-log entry).

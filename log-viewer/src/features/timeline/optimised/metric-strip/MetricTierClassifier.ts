@@ -76,6 +76,7 @@ export class MetricTierClassifier {
         classifiedMetrics: [],
         globalMaxPercent: 0,
         hasData: false,
+        gaps: timeSeries.gaps ?? [],
       };
       return this.processedData;
     }
@@ -101,6 +102,7 @@ export class MetricTierClassifier {
       classifiedMetrics,
       globalMaxPercent,
       hasData: points.length > 0,
+      gaps: timeSeries.gaps ?? [],
     };
 
     return this.processedData;
