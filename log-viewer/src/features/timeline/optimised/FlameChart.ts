@@ -187,6 +187,9 @@ export class FlameChart<E extends EventNode = EventNode> {
   // Used to convert canvas-relative coordinates to container-relative for tooltip positioning
   private mainTimelineYOffset = 0;
 
+  /** The minimap height the last applied resize used, so a resize can tell nothing moved. */
+  private appliedMinimapHeight: number | null = null;
+
   // Cached culled rectangles (reused when viewport unchanged - Phase 3 optimization)
   // INVARIANT: These caches are invalidated when renderDirty.culling is set to true.
   // Any code that changes viewport state must call invalidateAll() or set culling dirty flag.
@@ -425,11 +428,7 @@ export class FlameChart<E extends EventNode = EventNode> {
    * Clean up resources and remove event listeners.
    */
   public destroy(): void {
-    // Stop render loop
-    if (this.renderLoopId !== null) {
-      cancelAnimationFrame(this.renderLoopId);
-      this.renderLoopId = null;
-    }
+    this.cancelScheduledRender();
 
     // Clean up interaction handler
     if (this.interactionHandler) {
@@ -723,19 +722,58 @@ export class FlameChart<E extends EventNode = EventNode> {
   private scheduleRender(): void {
     if (this.renderLoopId === null) {
       this.renderLoopId = requestAnimationFrame(() => {
-        if (this.state && this.state.needsRender) {
-          this.render();
-          this.state.needsRender = false;
-
-          // Setup ResizeObserver after first render to avoid double render on init.
-          // By this point, layout is finalized and ResizeObserver baseline matches rendered state.
-          if (this.resizeHandler && !this.resizeObserverActive) {
-            this.resizeHandler.setupResizeObserver();
-            this.resizeObserverActive = true;
-          }
-        }
+        // Cleared before the render, not after: a listener that asks for a render from inside
+        // one then books the next frame rather than having its request swallowed by this one.
         this.renderLoopId = null;
+
+        if (this.state?.needsRender) {
+          this.flushRender();
+        }
       });
+    }
+  }
+
+  /** Drop a render booked for the next frame. */
+  private cancelScheduledRender(): void {
+    if (this.renderLoopId !== null) {
+      cancelAnimationFrame(this.renderLoopId);
+      this.renderLoopId = null;
+    }
+  }
+
+  /**
+   * Draw everything in this frame, rather than booking the next one.
+   *
+   * For a caller that has already changed what is on screen and cannot leave the frame to
+   * composite the result — a resize wipes each canvas as it sizes it. `invalidateAll` covers
+   * whatever a dropped render was waiting for.
+   */
+  private renderNow(): void {
+    this.cancelScheduledRender();
+    this.invalidateAll();
+    this.flushRender();
+
+    // A frame was dropped to draw in this one. If the chart could not draw after all, that
+    // dropped frame is still owed.
+    if (this.state?.needsRender) {
+      this.scheduleRender();
+    }
+  }
+
+  /**
+   * Draw, then settle the loop: nothing is left pending and nothing renders twice.
+   *
+   * The one place a render is followed through, whether the frame loop asked for it or a
+   * caller drew straight away.
+   */
+  private flushRender(): void {
+    this.render();
+
+    // Setup ResizeObserver after first render to avoid double render on init.
+    // By this point, layout is finalized and ResizeObserver baseline matches rendered state.
+    if (this.resizeHandler && !this.resizeObserverActive) {
+      this.resizeHandler.setupResizeObserver();
+      this.resizeObserverActive = true;
     }
   }
 
@@ -743,13 +781,13 @@ export class FlameChart<E extends EventNode = EventNode> {
    * Handle window resize.
    * Calculates main timeline height by subtracting visible component heights.
    */
-  public resize(newWidth: number, newHeight: number): void {
+  public resize(newWidth: number, newHeight: number): boolean {
     if (!this.app || !this.viewport || !this.container || !this.index) {
-      return;
+      return false;
     }
 
     if (newWidth <= 0 || newHeight <= 0) {
-      return;
+      return false;
     }
 
     const oldState = this.viewport.getState();
@@ -776,8 +814,21 @@ export class FlameChart<E extends EventNode = EventNode> {
     const mainTimelineHeight = newHeight - totalOverheadHeight;
 
     if (mainTimelineHeight <= 0) {
-      return; // Invalid state, skip resize
+      return false; // Invalid state, skip resize
     }
+
+    // Nothing moved, so no canvas is about to be wiped and a render already booked still
+    // stands. Load reaches here with the geometry init already set. The minimap is checked
+    // too: its height is a tenth of the container's, so it can move on its own while the main
+    // timeline keeps the height it had.
+    if (
+      newWidth === oldWidth &&
+      mainTimelineHeight === oldState.displayHeight &&
+      minimapHeight === this.appliedMinimapHeight
+    ) {
+      return false;
+    }
+    this.appliedMinimapHeight = minimapHeight;
 
     // Update offset for converting canvas-relative to container-relative coordinates
     this.mainTimelineYOffset = totalOverheadHeight;
@@ -811,7 +862,10 @@ export class FlameChart<E extends EventNode = EventNode> {
     // Update viewport with main timeline dimensions only
     this.viewport.setStateForResize(newWidth, mainTimelineHeight, newZoom, newOffsetX, newOffsetY);
 
-    this.requestRender();
+    // Each `renderer.resize` above wiped its canvas, so a scheduled render would leave this
+    // frame to composite three blank ones.
+    this.renderNow();
+    return true;
   }
 
   /**
@@ -958,6 +1012,9 @@ export class FlameChart<E extends EventNode = EventNode> {
     // Metric strip starts collapsed, so use collapsed height for initial layout
     const minimapHeight = calculateMinimapHeight(height);
     const metricStripHeight = METRIC_STRIP_COLLAPSED_HEIGHT;
+
+    // This is the applied geometry, so a resize to the same size has nothing to do.
+    this.appliedMinimapHeight = minimapHeight;
 
     // Create wrapper container with flexbox layout
     this.wrapper = document.createElement('div');
@@ -1469,9 +1526,14 @@ export class FlameChart<E extends EventNode = EventNode> {
         }
         // Trigger full layout recalculation to resize main timeline
         // The container size doesn't change, but internal flexbox layout does
-        if (this.container) {
-          const { width, height } = this.container.getBoundingClientRect();
-          this.resize(width, height);
+        if (!this.container) {
+          return;
+        }
+        const { width, height } = this.container.getBoundingClientRect();
+        if (!this.resize(width, height)) {
+          // The strip resized its own canvas before asking, so it is blank until something
+          // draws. A resize that could not run leaves that to us.
+          this.requestRender();
         }
       },
     });
@@ -2191,6 +2253,10 @@ export class FlameChart<E extends EventNode = EventNode> {
     if (!this.canRender()) {
       return;
     }
+
+    // Committed to drawing, so the request is served. A render that bailed above leaves the
+    // request standing, for a later frame to honour.
+    this.state!.needsRender = false;
 
     const viewportState = this.viewport!.getState();
     this.state!.viewport = viewportState;
