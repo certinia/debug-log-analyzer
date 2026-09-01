@@ -22,7 +22,7 @@ import {
   rowOccurrences,
 } from '../../../components/locatedRow.js';
 import { InspectorEmphasis } from '../../../components/inspectorEmphasis.js';
-import { inspectorLocateHandler } from '../../../components/inspectorLocate.js';
+import { wireInspectorTab } from '../../../components/inspectorTab.js';
 import { SelectionEchoGuard } from '../../../core/events/SelectionEchoGuard.js';
 import { eventByEventIndex } from '../../../core/utility/EventSearch.js';
 import { isVisible } from '../../../core/utility/Util.js';
@@ -155,12 +155,10 @@ export class AnalysisView extends LitElement {
 
   /** Releases the category-colouring settings subscription; set while connected. */
   private _categoryColoringOff: (() => void) | null = null;
-  private _selectionClearUnsubscribe: (() => void) | null = null;
 
   /** Guards the programmatic select made on the inspector's behalf. */
   private _echoGuard = new SelectionEchoGuard();
-  private _inspectorRevealUnsubscribe: (() => void) | null = null;
-  private _inspectorLocateUnsubscribe: (() => void) | null = null;
+  private _inspectorUnsubscribe: (() => void) | null = null;
   private _locatedRow = new LocatedRowMarker();
   private _locateIds = new LocatedRowIds();
   private _emphasis = new InspectorEmphasis();
@@ -168,37 +166,22 @@ export class AnalysisView extends LitElement {
   constructor() {
     super();
 
-    // An inspector finding names one event; the grid holds it in the bucket for
-    // its method, so that bucket is what gets revealed.
-    this._inspectorRevealUnsubscribe = eventBus.on('inspector:reveal', (detail) => {
-      if (detail.source === 'analysis') {
-        void this._revealEventIndex(detail.eventIndex);
-      }
+    this._inspectorUnsubscribe = wireInspectorTab('analysis', this._emphasis, {
+      // A row is a method bucket rather than one event, so a frame is translated
+      // into the paths of the rows it heads.
+      mark: (eventIndexes) => this._markLocated(eventIndexes),
+      // An inspector finding names one event; the grid holds it in the bucket for
+      // its method, so that bucket is what gets revealed.
+      reveal: (eventIndex) => this._revealEventIndex(eventIndex),
+      clear: () => {
+        // The table reports the clear itself, which is what reaches the inspector.
+        this.analysisTable?.deselectRow();
+      },
+      movesToMergedPick: true,
     });
-    // Mark the buckets the inspector points at. A row is a method bucket rather
-    // than one event, so a frame is translated into the paths of the rows it heads.
-    this._inspectorLocateUnsubscribe = eventBus.on(
-      'inspector:locate',
-      inspectorLocateHandler(
-        'analysis',
-        this._emphasis,
-        (eventIndexes) => this._markLocated(eventIndexes),
-        (eventIndex) => this._revealEventIndex(eventIndex),
-      ),
-    );
     document.addEventListener('lv-find', this._findEvt);
     document.addEventListener('lv-find-match', this._findEvt);
     document.addEventListener('lv-find-close', this._findEvt);
-
-    // Escape (app-wide) deselects here; the table reports the clear itself. It
-    // also drops a mark held by a picked inspector row, which is no selection of
-    // this table's own.
-    this._selectionClearUnsubscribe = eventBus.on('selection:clear', (detail) => {
-      if (detail.source === 'analysis') {
-        this.analysisTable?.deselectRow();
-        this._markLocated(this._emphasis.pick([]));
-      }
-    });
   }
 
   override connectedCallback(): void {
@@ -213,12 +196,8 @@ export class AnalysisView extends LitElement {
     document.removeEventListener('lv-find', this._findEvt);
     document.removeEventListener('lv-find-match', this._findEvt);
     document.removeEventListener('lv-find-close', this._findEvt);
-    this._selectionClearUnsubscribe?.();
-    this._selectionClearUnsubscribe = null;
-    this._inspectorRevealUnsubscribe?.();
-    this._inspectorRevealUnsubscribe = null;
-    this._inspectorLocateUnsubscribe?.();
-    this._inspectorLocateUnsubscribe = null;
+    this._inspectorUnsubscribe?.();
+    this._inspectorUnsubscribe = null;
     this._locatedRow.clear();
   }
 
