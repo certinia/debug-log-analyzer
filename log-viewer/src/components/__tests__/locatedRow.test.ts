@@ -185,6 +185,21 @@ describe('LocatedRowMarker', () => {
     expect(row.classList.contains(LOCATED_ROW_CLASS)).toBe(false);
   });
 
+  it('un-lights a row the renderer had detached when the mark moved', () => {
+    // The formatter does not run again for a row the renderer only re-attaches,
+    // so a class left on a detached element comes back with it.
+    const container = host();
+    const marker = new LocatedRowMarker();
+    marker.mark(container, [4]);
+    const row = renderRow(container, 4);
+
+    row.remove();
+    marker.mark(container, [5]);
+    container.append(row);
+
+    expect(row.classList.contains(LOCATED_ROW_CLASS)).toBe(false);
+  });
+
   it('leaves a row alone where nothing has marked its table', () => {
     const row = renderRow(document.createElement('div'), 4);
 

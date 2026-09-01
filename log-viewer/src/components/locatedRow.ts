@@ -28,13 +28,42 @@ const NOTHING_WANTED: ReadonlySet<string> = new Set();
  */
 const wantedByHost = new WeakMap<HTMLElement, ReadonlySet<string>>();
 
-/** Applies `wanted` to the rows a table has rendered. */
+/**
+ * What each table's mark has lit.
+ *
+ * A sweep can only reach the rows a table has attached, and the renderer keeps
+ * the element of a row scrolled out of view without running the formatter again
+ * when it comes back. So an element lit while on screen has to be remembered to
+ * be un-lit, or the old mark returns with it.
+ */
+const litByHost = new WeakMap<HTMLElement, Set<HTMLElement>>();
+
+/** Lights `element`, and remembers it as `host`'s until the mark moves. */
+function light(host: HTMLElement, element: HTMLElement): void {
+  element.classList.add(LOCATED_ROW_CLASS);
+  (litByHost.get(host) ?? litByHost.set(host, new Set()).get(host)!).add(element);
+}
+
+/** Drops `host`'s mark from every element it lit, attached or not. */
+function unlight(host: HTMLElement): void {
+  const lit = litByHost.get(host);
+  if (!lit) {
+    return;
+  }
+  for (const element of lit) {
+    element.classList.remove(LOCATED_ROW_CLASS);
+  }
+  lit.clear();
+}
+
+/** Lights the rows a table has rendered that `wanted` names. */
 function sweep(host: HTMLElement, wanted: ReadonlySet<string>): void {
   for (const element of host.querySelectorAll<HTMLElement>(
     `.tabulator-row[${ROW_INDEX_ATTRIBUTE}]`,
   )) {
-    const id = element.getAttribute(ROW_INDEX_ATTRIBUTE)!;
-    element.classList.toggle(LOCATED_ROW_CLASS, wanted.has(id));
+    if (wanted.has(element.getAttribute(ROW_INDEX_ATTRIBUTE)!)) {
+      light(host, element);
+    }
   }
 }
 
@@ -57,7 +86,11 @@ function stamp(row: RowComponent, id: number | string): void {
   for (let node: HTMLElement | null = element; node; node = node.parentElement) {
     const wanted = wantedByHost.get(node);
     if (wanted) {
-      element.classList.toggle(LOCATED_ROW_CLASS, wanted.has(stamped));
+      if (wanted.has(stamped)) {
+        light(node, element);
+      } else {
+        element.classList.remove(LOCATED_ROW_CLASS);
+      }
       return;
     }
   }
@@ -349,12 +382,13 @@ export class LocatedRowMarker {
     if (this.host && this.host !== host) {
       // A view that switches tables would leave the one it left marked.
       wantedByHost.delete(this.host);
-      sweep(this.host, NOTHING_WANTED);
+      unlight(this.host);
     }
     this.host = host;
     if (!host) {
       return;
     }
+    unlight(host);
     const wanted = ids.length ? new Set(ids.map(String)) : NOTHING_WANTED;
     wantedByHost.set(host, wanted);
     sweep(host, wanted);
