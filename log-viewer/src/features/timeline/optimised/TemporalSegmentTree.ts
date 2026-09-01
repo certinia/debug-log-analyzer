@@ -15,7 +15,6 @@
  * Key capabilities:
  * - Viewport culling: query() returns visible rectangles and buckets
  * - Spatial queries: queryEventsInRegion() for hit testing (O(log n + k))
- * - Density stats: queryBucketStats() for minimap visualization (O(log n))
  *
  * Key concepts:
  * - Leaf nodes represent individual events
@@ -313,124 +312,6 @@ export class TemporalSegmentTree {
     if (node.children) {
       for (const child of node.children) {
         this.collectEventsFromNode(child, queryStart, queryEnd, results);
-      }
-    }
-  }
-
-  /**
-   * Stats returned from queryBucketStats for minimap density computation.
-   */
-  public queryBucketStats(
-    timeStart: number,
-    timeEnd: number,
-  ): {
-    maxDepth: number;
-    eventCount: number;
-    selfDurationSum: number;
-    categoryWeights: Map<string, { weightedTime: number; maxDepth: number }>;
-    frames: SkylineFrame[];
-  } {
-    let maxDepth = 0;
-    let eventCount = 0;
-    let selfDurationSum = 0;
-    const categoryWeights = new Map<string, { weightedTime: number; maxDepth: number }>();
-    const frames: SkylineFrame[] = [];
-
-    // Query each depth level
-    for (const [depth, tree] of this.treesByDepth) {
-      this.aggregateStatsFromNode(
-        tree,
-        timeStart,
-        timeEnd,
-        depth,
-        categoryWeights,
-        frames,
-        (d, count, selfDur) => {
-          if (d > maxDepth) {
-            maxDepth = d;
-          }
-          eventCount += count;
-          selfDurationSum += selfDur;
-        },
-      );
-    }
-
-    return { maxDepth, eventCount, selfDurationSum, categoryWeights, frames };
-  }
-
-  /**
-   * Aggregate stats from a tree node for minimap density computation.
-   * Collects frame references for skyline computation.
-   */
-  private aggregateStatsFromNode(
-    node: SegmentNode,
-    queryStart: number,
-    queryEnd: number,
-    depth: number,
-    categoryWeights: Map<string, { weightedTime: number; maxDepth: number }>,
-    frames: SkylineFrame[],
-    onStats: (depth: number, count: number, selfDuration: number) => void,
-  ): void {
-    // Early exit: no overlap
-    if (node.timeEnd <= queryStart || node.timeStart >= queryEnd) {
-      return;
-    }
-
-    // Leaf node: aggregate its stats
-    if (node.isLeaf && node.rectRef) {
-      const rect = node.rectRef;
-
-      // Calculate visible time within query range
-      const overlapStart = Math.max(rect.timeStart, queryStart);
-      const overlapEnd = Math.min(rect.timeEnd, queryEnd);
-      const visibleTime = overlapEnd - overlapStart;
-
-      // Calculate overlap ratio for proportional self-duration attribution
-      const rectDuration = rect.timeEnd - rect.timeStart;
-      const overlapRatio = rectDuration > 0 ? visibleTime / rectDuration : 0;
-      const proportionalSelfDuration = rect.selfDuration * overlapRatio;
-
-      // Depth² weighting for category dominance (still used for fallback stats)
-      const depthWeight = (depth + 1) * (depth + 1);
-      const weightedTime = proportionalSelfDuration * depthWeight;
-
-      // Update category weights
-      const category = rect.category;
-      const existing = categoryWeights.get(category);
-      if (existing) {
-        existing.weightedTime += weightedTime;
-        if (depth > existing.maxDepth) {
-          existing.maxDepth = depth;
-        }
-      } else {
-        categoryWeights.set(category, { weightedTime, maxDepth: depth });
-      }
-
-      // Collect frame for density computation
-      frames.push({
-        timeStart: rect.timeStart,
-        timeEnd: rect.timeEnd,
-        depth,
-        category,
-        selfDuration: rect.selfDuration,
-      });
-
-      onStats(depth, 1, proportionalSelfDuration);
-      return;
-    }
-
-    // Branch node: recurse into children
-    if (node.children) {
-      for (const child of node.children) {
-        this.aggregateStatsFromNode(
-          child,
-          queryStart,
-          queryEnd,
-          depth,
-          categoryWeights,
-          frames,
-          onStats,
-        );
       }
     }
   }
