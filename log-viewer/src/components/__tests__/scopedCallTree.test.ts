@@ -58,22 +58,30 @@ const { KeyPathIds } = jest.requireActual<typeof import('../../core/log/keyPathI
 // different frames, so each test gets its own rather than one frame's key being
 // read back for another.
 let paths = new KeyPathIds(1024);
+const { LogStore } = jest.requireActual<typeof import('../../core/log/LogStore.js')>(
+  '../../core/log/LogStore.js',
+);
 jest.mock('../../core/log/LogStore.js', () => ({
-  currentLogStore: () => ({
-    log: root,
-    keyPathIds: () => paths,
-    eventByIndex: (i: number) => byId.get(i) ?? null,
-    // Mirrors LogStore.stackByEventIndex over the fixture's own index.
-    stackByEventIndex: (i: number) => {
-      const stack: FakeEvent[] = [];
-      for (let node = byId.get(i) ?? null; node && node !== root; node = node.parent) {
-        if (node.isParent) {
-          stack.push(node);
+  currentLogStore: () => {
+    const store = {
+      log: root,
+      keyPathIds: () => paths,
+      eventByIndex: (i: number) => byId.get(i) ?? null,
+      // Mirrors LogStore.stackByEventIndex over the fixture's own index.
+      stackByEventIndex: (i: number) => {
+        const stack: FakeEvent[] = [];
+        for (let node = byId.get(i) ?? null; node && node !== root; node = node.parent) {
+          if (node.isParent) {
+            stack.push(node);
+          }
         }
-      }
-      return stack.reverse();
-    },
-  }),
+        return stack.reverse();
+      },
+    };
+    // The real climb, so what it answers about the fixture is under test rather
+    // than a second copy of it. It reads only `eventByIndex`.
+    return { ...store, framesAbove: LogStore.prototype.framesAbove.bind(store) };
+  },
 }));
 
 import {

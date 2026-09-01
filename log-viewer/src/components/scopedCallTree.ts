@@ -134,18 +134,7 @@ export function frameEventIndexes(row: Partial<ScopedRow> | undefined): number[]
   if (levels <= 0) {
     return conducted;
   }
-  // Thousands of calls sit under a handful of callers.
-  const own = new Set<number>();
-  for (const index of conducted) {
-    let frame = store.eventByIndex(index);
-    for (let up = levels; up > 0 && frame; up--) {
-      frame = frame.parent;
-    }
-    if (frame) {
-      own.add(frame.eventIndex);
-    }
-  }
-  return (row._frameIndexes = [...own]);
+  return (row._frameIndexes = store.framesAbove(conducted, levels));
 }
 
 /**

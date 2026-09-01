@@ -28,13 +28,42 @@ const NOTHING_WANTED: ReadonlySet<string> = new Set();
  */
 const wantedByHost = new WeakMap<HTMLElement, ReadonlySet<string>>();
 
-/** Applies `wanted` to the rows a table has rendered. */
+/**
+ * What each table's mark has lit.
+ *
+ * A sweep can only reach the rows a table has attached, and the renderer keeps
+ * the element of a row scrolled out of view without running the formatter again
+ * when it comes back. So an element lit while on screen has to be remembered to
+ * be un-lit, or the old mark returns with it.
+ */
+const litByHost = new WeakMap<HTMLElement, Set<HTMLElement>>();
+
+/** Lights `element`, and remembers it as `host`'s until the mark moves. */
+function light(host: HTMLElement, element: HTMLElement): void {
+  element.classList.add(LOCATED_ROW_CLASS);
+  (litByHost.get(host) ?? litByHost.set(host, new Set()).get(host)!).add(element);
+}
+
+/** Drops `host`'s mark from every element it lit, attached or not. */
+function unlight(host: HTMLElement): void {
+  const lit = litByHost.get(host);
+  if (!lit) {
+    return;
+  }
+  for (const element of lit) {
+    element.classList.remove(LOCATED_ROW_CLASS);
+  }
+  lit.clear();
+}
+
+/** Lights the rows a table has rendered that `wanted` names. */
 function sweep(host: HTMLElement, wanted: ReadonlySet<string>): void {
   for (const element of host.querySelectorAll<HTMLElement>(
     `.tabulator-row[${ROW_INDEX_ATTRIBUTE}]`,
   )) {
-    const id = element.getAttribute(ROW_INDEX_ATTRIBUTE)!;
-    element.classList.toggle(LOCATED_ROW_CLASS, wanted.has(id));
+    if (wanted.has(element.getAttribute(ROW_INDEX_ATTRIBUTE)!)) {
+      light(host, element);
+    }
   }
 }
 
@@ -57,7 +86,11 @@ function stamp(row: RowComponent, id: number | string): void {
   for (let node: HTMLElement | null = element; node; node = node.parentElement) {
     const wanted = wantedByHost.get(node);
     if (wanted) {
-      element.classList.toggle(LOCATED_ROW_CLASS, wanted.has(stamped));
+      if (wanted.has(stamped)) {
+        light(node, element);
+      } else {
+        element.classList.remove(LOCATED_ROW_CLASS);
+      }
       return;
     }
   }
@@ -234,6 +267,50 @@ export function rowOccurrences(row: RowComponent, root: ApexLog | null): number[
   return indexes;
 }
 
+/** Held per row, for the same reason {@link derivedIndexes} is. Only a caller
+ *  row ever climbs, so only a caller row's answer is in here. */
+const derivedCallerFrames = new WeakMap<CallRow, number[]>();
+
+/**
+ * The frames a row is, which is what the inspector marks it by.
+ *
+ * A bottom-up caller row is one of the frames above a call, so it stands for the
+ * callers at its own depth rather than the calls they conducted. A top-down row
+ * sits at its own frames' depth, so there the two are the same, and so is a row
+ * that is one call.
+ *
+ * {@link rowOccurrences} stays the calls the row counts, which is what its
+ * totals describe.
+ *
+ * @param direction - the way the row's own table reads the tree
+ */
+export function rowFrames(
+  row: RowComponent,
+  root: ApexLog | null,
+  direction: SelectionView,
+): number[] {
+  const data = rowCallData(row);
+  const store = direction === 'callers' && root ? logStoreFor(root) : null;
+  if (!store) {
+    return rowOccurrences(row, root);
+  }
+  const cached = derivedCallerFrames.get(data);
+  if (cached) {
+    return cached;
+  }
+  const levels = data._pathId === undefined ? 0 : store.keyPathIds().depthOf(data._pathId) - 1;
+  const conducted = rowOccurrences(row, root);
+  if (levels <= 0) {
+    return conducted;
+  }
+  const frames = store.framesAbove(conducted, levels);
+  if (frames.length) {
+    // Not kept where nothing climbed, for the reason `rowOccurrences` gives.
+    derivedCallerFrames.set(data, frames);
+  }
+  return frames;
+}
+
 /**
  * What a selected row tells the inspector: a merged row names every call it
  * counts, a Time Order row the one call it is, and no row nothing.
@@ -349,12 +426,13 @@ export class LocatedRowMarker {
     if (this.host && this.host !== host) {
       // A view that switches tables would leave the one it left marked.
       wantedByHost.delete(this.host);
-      sweep(this.host, NOTHING_WANTED);
+      unlight(this.host);
     }
     this.host = host;
     if (!host) {
       return;
     }
+    unlight(host);
     const wanted = ids.length ? new Set(ids.map(String)) : NOTHING_WANTED;
     wantedByHost.set(host, wanted);
     sweep(host, wanted);

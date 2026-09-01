@@ -14,6 +14,7 @@ import {
   LOCATED_ROW_CLASS,
   LocatedRowIds,
   LocatedRowMarker,
+  rowFrames,
   rowIndexStamper,
   rowPathId,
   stampRowPath,
@@ -46,8 +47,8 @@ function bucketRow(ids: KeyPathIds, ...keys: string[]): RowComponent {
   });
 }
 
-function ev(text: string, parent: LogEvent | null): LogEvent {
-  return { type: 'METHOD_ENTRY', namespace: '', text, parent } as unknown as LogEvent;
+function ev(text: string, parent: LogEvent | null, eventIndex?: number): LogEvent {
+  return { type: 'METHOD_ENTRY', namespace: '', text, parent, eventIndex } as unknown as LogEvent;
 }
 
 /** A table host holding a rendered row element per index, as the stamp leaves them. */
@@ -185,6 +186,21 @@ describe('LocatedRowMarker', () => {
     expect(row.classList.contains(LOCATED_ROW_CLASS)).toBe(false);
   });
 
+  it('un-lights a row the renderer had detached when the mark moved', () => {
+    // The formatter does not run again for a row the renderer only re-attaches,
+    // so a class left on a detached element comes back with it.
+    const container = host();
+    const marker = new LocatedRowMarker();
+    marker.mark(container, [4]);
+    const row = renderRow(container, 4);
+
+    row.remove();
+    marker.mark(container, [5]);
+    container.append(row);
+
+    expect(row.classList.contains(LOCATED_ROW_CLASS)).toBe(false);
+  });
+
   it('leaves a row alone where nothing has marked its table', () => {
     const row = renderRow(document.createElement('div'), 4);
 
@@ -210,6 +226,58 @@ describe('LocatedRowMarker', () => {
     marker.mark(container, [7]);
 
     expect(rowFor(container, 0).classList.contains(LOCATED_ROW_CLASS)).toBe(false);
+  });
+});
+
+describe('rowFrames', () => {
+  /** exec -> m1 -> soql, with the indexes the log answers about. */
+  function log() {
+    const exec = ev('exec', null, 1);
+    const m1 = ev('m1', exec, 3);
+    const soql = ev('soql', m1, 5);
+    return {
+      soql,
+      apexLog: { eventsById: { 1: exec, 3: m1, 5: soql } } as unknown as ApexLog,
+    };
+  }
+
+  /** The bucket for `soql` and the caller row under it, as a bottom-up grid
+   *  leaves them: the bucket holds the occurrences, the caller row derives its. */
+  function rows(apexLog: ApexLog, soql: LogEvent) {
+    const paths = logStoreFor(apexLog).keyPathIds();
+    const bucketPath = paths.step(ROOT_PATH_ID, paths.keyIdOf(soql));
+    const bucket = rowComponent(document.createElement('div'), {
+      key: 'soql',
+      _pathId: bucketPath,
+      instances: [soql],
+    });
+    const caller = rowComponent(
+      document.createElement('div'),
+      { key: 'm1', _pathId: paths.step(bucketPath, paths.keyIdOf(soql.parent!)) },
+      bucket,
+    );
+    return { bucket, caller };
+  }
+
+  it('names the caller a bottom-up row is, not the calls it counts', () => {
+    const { apexLog, soql } = log();
+    const { caller } = rows(apexLog, soql);
+
+    expect(rowFrames(caller, apexLog, 'callers')).toEqual([3]);
+  });
+
+  it('leaves a top-down row as the calls it counts, since it sits at their depth', () => {
+    const { apexLog, soql } = log();
+    const { caller } = rows(apexLog, soql);
+
+    expect(rowFrames(caller, apexLog, 'callees')).toEqual([5]);
+  });
+
+  it('names its own occurrences for the row a bottom-up tree is seeded from', () => {
+    const { apexLog, soql } = log();
+    const { bucket } = rows(apexLog, soql);
+
+    expect(rowFrames(bucket, apexLog, 'callers')).toEqual([5]);
   });
 });
 

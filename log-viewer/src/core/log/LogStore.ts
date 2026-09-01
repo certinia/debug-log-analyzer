@@ -36,6 +36,32 @@ export class LogStore {
   }
 
   /**
+   * The distinct frames `levels` parents above each of `eventIndexes`: what a
+   * merged row standing for its callers is, since a row at path depth D sits
+   * D - 1 hops above the calls it counts.
+   *
+   * How far the dedupe folds is the log's business. A call in a loop has one
+   * caller; a call made once per record has one caller each, so the answer can
+   * be as long as what was asked about.
+   *
+   * @param levels - hops to climb, at least one: the caller guards the rest so
+   *   it can hand back the calls it already holds rather than a copy
+   */
+  framesAbove(eventIndexes: readonly number[], levels: number): number[] {
+    const own = new Set<number>();
+    for (const index of eventIndexes) {
+      let frame = this.eventByIndex(index);
+      for (let up = levels; up > 0 && frame; up--) {
+        frame = frame.parent;
+      }
+      if (frame) {
+        own.add(frame.eventIndex);
+      }
+    }
+    return [...own];
+  }
+
+  /**
    * The parent frames from the log's root down to `eventIndex`, the event itself
    * last. Empty if the log has no such event.
    */

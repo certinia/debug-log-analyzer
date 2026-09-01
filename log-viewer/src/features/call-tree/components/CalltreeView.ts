@@ -69,7 +69,7 @@ import {
   LocatedRowMarker,
   rowDetailSelection,
   rowIndexStamper,
-  rowOccurrences,
+  rowFrames,
 } from '../../../components/locatedRow.js';
 import { InspectorEmphasis } from '../../../components/inspectorEmphasis.js';
 import { wireInspectorTab } from '../../../components/inspectorTab.js';
@@ -1169,14 +1169,17 @@ export class CalltreeView extends LitElement {
 
   /**
    * Tell the inspector which frames the pointer is over, so it can mark the rows
-   * that stand for them. Nothing is picked and nothing moves. An
-   * Aggregated/Bottom-Up row merges many calls, so it names every call it counts.
+   * that stand for them. Nothing is picked and nothing moves.
+   *
+   * The direction is read as the pointer arrives: which way the table reads is
+   * what decides whether a merged row names its own frames or the calls they
+   * conducted.
    */
   private _emitDetailLocate(table: Tabulator, source: DetailSource = 'calltree'): void {
     table.on('rowMouseEnter', (_e, row) => {
       eventBus.emit('detail:locate', {
         source,
-        eventIndexes: rowOccurrences(row, this.rootMethod),
+        eventIndexes: rowFrames(row, this.rootMethod, directionOf(this.viewMode)),
       });
     });
     table.on('rowMouseLeave', () => {
