@@ -25,7 +25,7 @@ class RawLogHoverProvider implements HoverProvider {
     }
 
     const timestamp = parseInt(match[1], 10);
-    return this.buildHover(document.uri.fsPath, timestamp);
+    return this.buildHover(document.uri.toString(), timestamp);
   }
 
   private async buildHover(filePath: string, timestamp: number): Promise<Hover> {
@@ -51,7 +51,7 @@ class RawLogHoverProvider implements HoverProvider {
   }
 
   static apply(context: Context): void {
-    const docSelector = [{ scheme: 'file', language: 'apexlog' }];
+    const docSelector = [{ language: 'apexlog' }];
 
     const hoverProviderDisposable = languages.registerHoverProvider(
       docSelector,
