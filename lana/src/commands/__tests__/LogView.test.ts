@@ -6,16 +6,10 @@ import { describe, expect, it } from '@jest/globals';
 import { createMockContext } from '../../__tests__/helpers/test-builders.js';
 import { Uri, workspace } from '../../__tests__/mocks/vscode.js';
 import { WebView } from '../../display/WebView.js';
-import { readFile } from '../../services/salesforceServices.js';
 import { LogView } from '../LogView.js';
 
 jest.mock('../../display/WebView.js', () => ({
   WebView: { apply: jest.fn() },
-}));
-jest.mock('../../services/salesforceServices.js', () => ({
-  fileOrFolderExists: jest.fn(),
-  readFile: jest.fn(),
-  writeFile: jest.fn(),
 }));
 jest.mock('../../workspace/AppConfig.js', () => ({
   PRIVATE_SECTIONS: [],
@@ -38,7 +32,10 @@ jest.mock('../../workspace/AppConfig.js', () => ({
 }));
 
 const mockApplyWebView = WebView.apply as jest.Mock;
-const mockReadFile = readFile as jest.Mock;
+// The file-I/O layer is deliberately not mocked out: createView reads its own
+// bundled index.html, and mocking that module away is what hid it reading
+// through a service that throws unless another extension has initialised it.
+const mockReadFile = workspace.fs.readFile as unknown as jest.Mock;
 
 describe('LogView', () => {
   it('uses a display path in the payload and the captured URI for open actions', async () => {
@@ -59,7 +56,9 @@ describe('LogView', () => {
       },
     };
     mockApplyWebView.mockReturnValue(panel as unknown as import('vscode').WebviewPanel);
-    mockReadFile.mockResolvedValue('<script src="bundle.js"></script><link href="codicon.css">');
+    mockReadFile.mockResolvedValue(
+      new TextEncoder().encode('<script src="bundle.js"></script><link href="codicon.css">'),
+    );
     workspace.asRelativePath.mockReturnValue('workspace/logs/virtual.log');
     const context = createMockContext();
     const logUri = Uri.parse('memfs:/repository/logs/virtual.log');
@@ -70,6 +69,12 @@ describe('LogView', () => {
       logUri,
       'log body',
     );
+    // createView must resolve and rewrite the bundled index.html. It read that
+    // file through a service needing another extension's initialisation, so it
+    // rejected before the webview had any content.
+    expect(panel.webview.html).toContain('webview:/test/extension/out/bundle.js');
+    expect(panel.webview.html).not.toContain('src="bundle.js"');
+
     await receiveMessage?.({ cmd: 'fetchLog', requestId: 'request-1' });
 
     expect(postMessage).toHaveBeenCalledWith({

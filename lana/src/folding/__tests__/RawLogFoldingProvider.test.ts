@@ -366,7 +366,9 @@ describe('RawLogFoldingProvider', () => {
       openHandler(doc);
       await flush();
 
-      expect(mockGetApexLog).toHaveBeenCalledWith('file:///test/file.log');
+      expect(mockGetApexLog).toHaveBeenCalledWith(
+        expect.objectContaining({ scheme: 'file', path: '/test/file.log' }),
+      );
       expect(fired).toHaveBeenCalledTimes(1);
     });
 
@@ -380,7 +382,9 @@ describe('RawLogFoldingProvider', () => {
       activeEditorHandler({ document: doc });
       await flush();
 
-      expect(mockGetApexLog).toHaveBeenCalledWith('file:///test/file.log');
+      expect(mockGetApexLog).toHaveBeenCalledWith(
+        expect.objectContaining({ scheme: 'file', path: '/test/file.log' }),
+      );
       expect(fired).toHaveBeenCalledTimes(1);
     });
 
@@ -407,7 +411,9 @@ describe('RawLogFoldingProvider', () => {
       openHandler(doc);
       await flush();
 
-      expect(mockGetApexLog).toHaveBeenCalledWith('file:///test/file.log');
+      expect(mockGetApexLog).toHaveBeenCalledWith(
+        expect.objectContaining({ scheme: 'file', path: '/test/file.log' }),
+      );
       expect(fired).not.toHaveBeenCalled();
     });
   });

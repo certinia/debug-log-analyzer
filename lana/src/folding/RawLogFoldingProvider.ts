@@ -28,7 +28,7 @@ class RawLogFoldingProvider implements FoldingRangeProvider {
     document: TextDocument,
     _context: FoldingContext,
   ): Promise<FoldingRange[]> {
-    const apexLog = await LogEventCache.getApexLog(document.uri.toString());
+    const apexLog = await LogEventCache.getApexLog(document.uri);
 
     if (!apexLog) {
       return [];
@@ -90,7 +90,7 @@ class RawLogFoldingProvider implements FoldingRangeProvider {
       return;
     }
 
-    void LogEventCache.getApexLog(document.uri.toString()).then((apexLog) => {
+    void LogEventCache.getApexLog(document.uri).then((apexLog) => {
       if (apexLog) {
         this.changeEmitter.fire();
       }
