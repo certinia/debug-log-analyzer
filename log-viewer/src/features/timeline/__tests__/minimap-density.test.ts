@@ -152,6 +152,24 @@ describe('MinimapDensityQuery', () => {
     });
   });
 
+  describe('the one width held', () => {
+    const rects = [createRect('Method', 0, 1000, 0), createRect('DML', 300, 400, 1)];
+
+    it('recomputes only when the width changes', () => {
+      const query = buildQuery(rects, 1000, 1);
+
+      const first = query.query(10);
+      expect(query.query(10)).toBe(first);
+
+      // A different width is a different picture, so it cannot answer from the one held.
+      const wider = query.query(11);
+      expect(wider).not.toBe(first);
+
+      // Only one is held, so the first width has to be computed again.
+      expect(query.query(10)).not.toBe(first);
+    });
+  });
+
   describe('edge cases', () => {
     it('should handle single frame spanning all buckets', () => {
       const rects = [createRect('Method', 0, 1000, 0)];

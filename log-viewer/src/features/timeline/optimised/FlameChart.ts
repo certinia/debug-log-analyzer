@@ -901,7 +901,7 @@ export class FlameChart<E extends EventNode = EventNode> {
     this.state.batchColorsCache = this.buildBatchColorsCache(this.state.batches);
 
     // Invalidate minimap static content to re-render with new colors
-    this.minimapOrchestrator?.invalidateCache();
+    this.minimapOrchestrator?.invalidateColors();
 
     // Request re-render
     this.requestRender();

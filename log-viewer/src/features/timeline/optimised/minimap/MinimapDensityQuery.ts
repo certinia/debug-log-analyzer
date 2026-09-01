@@ -120,6 +120,10 @@ export class MinimapDensityQuery {
    * One width at a time: every caller asks for the width on screen, and a density holds a
    * bucket per pixel of it, so keeping the widths a drag passed through would cost more memory
    * than the recompute it saves.
+   *
+   * Nothing invalidates it, and nothing needs to: a new width misses on its own, a height
+   * change leaves the entry as true as it was, a theme change cannot alter a category name,
+   * and new data means a new query object.
    */
   private cachedBucketCount: number | null = null;
   private cachedDensity: MinimapDensityData | null = null;
@@ -159,17 +163,6 @@ export class MinimapDensityQuery {
     this.cachedBucketCount = bucketCount;
     this.cachedDensity = density;
     return density;
-  }
-
-  /**
-   * Invalidate cache (call when timeline data changes).
-   *
-   * A resize needs no call: the cache is keyed by width, so a new width misses on its own and
-   * a height change leaves the entry as true as it was.
-   */
-  public invalidateCache(): void {
-    this.cachedBucketCount = null;
-    this.cachedDensity = null;
   }
 
   // ============================================================================

@@ -332,11 +332,12 @@ export class MinimapOrchestrator {
   }
 
   /**
-   * Invalidate the density cache.
-   * Call when timeline data changes.
+   * Redraw the static content after a theme change.
+   *
+   * The density is not touched: it carries category names, and the renderer resolves a
+   * colour from them at draw time.
    */
-  public invalidateCache(): void {
-    this.densityQuery?.invalidateCache();
+  public invalidateColors(): void {
     this.renderer?.invalidateStatic();
   }
 
