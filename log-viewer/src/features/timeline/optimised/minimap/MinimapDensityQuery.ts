@@ -43,12 +43,6 @@ import type { SkylineFrame, TemporalSegmentTree } from '../TemporalSegmentTree.j
  * Single density bucket for minimap visualization.
  */
 export interface MinimapDensityBucket {
-  /** Bucket start time in nanoseconds. */
-  timeStart: number;
-
-  /** Bucket end time in nanoseconds. */
-  timeEnd: number;
-
   /** Highest depth at this time range (for height calculation). */
   maxDepth: number;
 
@@ -57,26 +51,20 @@ export interface MinimapDensityBucket {
 
   /** Dominant category for color resolution. */
   dominantCategory: string;
-
-  /** Sum of self-durations for events in this bucket (for sparkline). */
-  selfDurationSum: number;
 }
 
 /**
  * Complete density data for minimap rendering.
+ *
+ * A bucket carries no time range: the renderer takes a bar's X from the bucket's
+ * index, so the times were derivable and unread.
  */
 export interface MinimapDensityData {
-  /** Array of density buckets (one per minimap pixel approximately). */
+  /** One bucket per pixel of the minimap's width. */
   buckets: MinimapDensityBucket[];
 
   /** Global maximum depth across entire timeline. */
   globalMaxDepth: number;
-
-  /** Global maximum event count in any bucket (for opacity normalization). */
-  maxEventCount: number;
-
-  /** Total duration of timeline in nanoseconds. */
-  totalDuration: number;
 }
 
 /**
@@ -229,19 +217,13 @@ export class MinimapDensityQuery {
    */
   private computeDensity(bucketCount: number): MinimapDensityData {
     if (bucketCount <= 0 || this.totalDuration <= 0) {
-      return {
-        buckets: [],
-        globalMaxDepth: this.globalMaxDepth,
-        maxEventCount: 0,
-        totalDuration: this.totalDuration,
-      };
+      return { buckets: [], globalMaxDepth: this.globalMaxDepth };
     }
 
     // Pre-allocate bucket aggregation arrays
     const bucketTimeWidth = this.totalDuration / bucketCount;
     const maxDepths = new Uint16Array(bucketCount);
     const eventCounts = new Uint32Array(bucketCount);
-    const selfDurationSums = new Float64Array(bucketCount);
 
     // Collect frames per bucket for skyline computation
     const framesPerBucket: SkylineFrame[][] = new Array(bucketCount);
@@ -259,9 +241,6 @@ export class MinimapDensityQuery {
         // Clamp to valid bucket range
         const firstBucket = Math.max(0, startBucket);
         const lastBucket = Math.min(bucketCount - 1, endBucket);
-
-        // Pre-calculate rect duration for overlap ratio
-        const rectDuration = rect.timeEnd - rect.timeStart;
 
         // Create frame for skyline computation
         const frame: SkylineFrame = {
@@ -282,58 +261,30 @@ export class MinimapDensityQuery {
           // Increment event count
           eventCounts[b]!++;
 
-          // Calculate overlap ratio for proportional self-duration attribution (for sparkline)
-          const bucketStart = b * bucketTimeWidth;
-          const bucketEnd = (b + 1) * bucketTimeWidth;
-          const overlapStart = Math.max(rect.timeStart, bucketStart);
-          const overlapEnd = Math.min(rect.timeEnd, bucketEnd);
-          const visibleTime = overlapEnd - overlapStart;
-          const overlapRatio = rectDuration > 0 ? visibleTime / rectDuration : 0;
-          const proportionalSelfDuration = rect.selfDuration * overlapRatio;
-          selfDurationSums[b]! += proportionalSelfDuration;
-
           // Collect frame for skyline computation
           framesPerBucket[b]!.push(frame);
         }
       }
     }
 
-    // Build output buckets and find max event count
-    let maxEventCount = 0;
     const buckets: MinimapDensityBucket[] = new Array(bucketCount);
 
     for (let i = 0; i < bucketCount; i++) {
-      const eventCount = eventCounts[i]!;
-      if (eventCount > maxEventCount) {
-        maxEventCount = eventCount;
-      }
-
-      const bucketStart = i * bucketTimeWidth;
-      const bucketEnd = (i + 1) * bucketTimeWidth;
-
       // Resolve dominant category using skyline (on-top time) algorithm
       const dominantCategory = this.resolveCategoryFromSkyline(
         framesPerBucket[i]!,
-        bucketStart,
-        bucketEnd,
+        i * bucketTimeWidth,
+        (i + 1) * bucketTimeWidth,
       );
 
       buckets[i] = {
-        timeStart: bucketStart,
-        timeEnd: bucketEnd,
         maxDepth: maxDepths[i]!,
-        eventCount,
+        eventCount: eventCounts[i]!,
         dominantCategory,
-        selfDurationSum: selfDurationSums[i]!,
       };
     }
 
-    return {
-      buckets,
-      globalMaxDepth: this.globalMaxDepth,
-      maxEventCount,
-      totalDuration: this.totalDuration,
-    };
+    return { buckets, globalMaxDepth: this.globalMaxDepth };
   }
 
   /**
@@ -351,12 +302,7 @@ export class MinimapDensityQuery {
    */
   private computeDensitySlidingWindow(bucketCount: number): MinimapDensityData {
     if (bucketCount <= 0 || this.totalDuration <= 0 || !this.segmentTree) {
-      return {
-        buckets: [],
-        globalMaxDepth: this.globalMaxDepth,
-        maxEventCount: 0,
-        totalDuration: this.totalDuration,
-      };
+      return { buckets: [], globalMaxDepth: this.globalMaxDepth };
     }
 
     const frames = this.segmentTree.getAllFramesSorted();
@@ -365,7 +311,6 @@ export class MinimapDensityQuery {
     // Pre-allocate bucket arrays
     const maxDepths = new Uint16Array(bucketCount);
     const eventCounts = new Uint32Array(bucketCount);
-    const selfDurationSums = new Float64Array(bucketCount);
 
     // Collect frames per bucket for skyline computation
     const framesPerBucket: SkylineFrame[][] = new Array(bucketCount);
@@ -373,13 +318,10 @@ export class MinimapDensityQuery {
       framesPerBucket[i] = [];
     }
 
-    // Single pass: compute maxDepth, eventCount, selfDurationSums, and collect frames
+    // Single pass: compute maxDepth, eventCount, and collect frames
     for (const frame of frames) {
       const startBucket = Math.max(0, Math.floor(frame.timeStart / bucketTimeWidth));
       const endBucket = Math.min(bucketCount - 1, Math.floor(frame.timeEnd / bucketTimeWidth));
-
-      // Pre-calculate frame duration for overlap ratio
-      const frameDuration = frame.timeEnd - frame.timeStart;
 
       for (let b = startBucket; b <= endBucket; b++) {
         // Update maxDepth
@@ -390,16 +332,6 @@ export class MinimapDensityQuery {
         // Increment event count
         eventCounts[b]!++;
 
-        // Calculate overlap ratio for proportional self-duration attribution (for sparkline)
-        const bucketStart = b * bucketTimeWidth;
-        const bucketEnd = (b + 1) * bucketTimeWidth;
-        const overlapStart = Math.max(frame.timeStart, bucketStart);
-        const overlapEnd = Math.min(frame.timeEnd, bucketEnd);
-        const visibleTime = overlapEnd - overlapStart;
-        const overlapRatio = frameDuration > 0 ? visibleTime / frameDuration : 0;
-        const proportionalSelfDuration = frame.selfDuration * overlapRatio;
-        selfDurationSums[b]! += proportionalSelfDuration;
-
         // Collect frame for skyline computation
         framesPerBucket[b]!.push(frame);
       }
@@ -407,40 +339,23 @@ export class MinimapDensityQuery {
 
     // Build output buckets
     const buckets: MinimapDensityBucket[] = new Array(bucketCount);
-    let maxEventCount = 0;
 
     for (let i = 0; i < bucketCount; i++) {
-      const eventCount = eventCounts[i]!;
-      if (eventCount > maxEventCount) {
-        maxEventCount = eventCount;
-      }
-
-      const bucketStart = i * bucketTimeWidth;
-      const bucketEnd = (i + 1) * bucketTimeWidth;
-
       // Resolve dominant category using skyline (on-top time) algorithm
       const dominantCategory = this.resolveCategoryFromSkyline(
         framesPerBucket[i]!,
-        bucketStart,
-        bucketEnd,
+        i * bucketTimeWidth,
+        (i + 1) * bucketTimeWidth,
       );
 
       buckets[i] = {
-        timeStart: bucketStart,
-        timeEnd: bucketEnd,
         maxDepth: maxDepths[i]!,
-        eventCount,
+        eventCount: eventCounts[i]!,
         dominantCategory,
-        selfDurationSum: selfDurationSums[i]!,
       };
     }
 
-    return {
-      buckets,
-      globalMaxDepth: this.globalMaxDepth,
-      maxEventCount,
-      totalDuration: this.totalDuration,
-    };
+    return { buckets, globalMaxDepth: this.globalMaxDepth };
   }
 
   // ============================================================================
