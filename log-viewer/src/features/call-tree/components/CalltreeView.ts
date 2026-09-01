@@ -69,9 +69,10 @@ import {
   LocatedRowMarker,
   rowDetailSelection,
   rowIndexStamper,
-  rowOccurrences,
+  rowFrames,
 } from '../../../components/locatedRow.js';
 import { InspectorEmphasis } from '../../../components/inspectorEmphasis.js';
+import { wireInspectorTab } from '../../../components/inspectorTab.js';
 import { createTimeOrderTable } from './TimeOrderTable.js';
 
 /** Time Order keys its rows by event index; the grouped views key theirs by the
@@ -167,9 +168,7 @@ export class CalltreeView extends LitElement {
 
   /** Guards the programmatic select made on the inspector's behalf. */
   private _echoGuard = new SelectionEchoGuard();
-  private _inspectorRevealUnsubscribe: (() => void) | null = null;
-  private _inspectorLocateUnsubscribe: (() => void) | null = null;
-  private _selectionClearUnsubscribe: (() => void) | null = null;
+  private _inspectorUnsubscribe: (() => void) | null = null;
   private _locatedRow = new LocatedRowMarker();
   private _locateIds = new LocatedRowIds();
   /** Which of the inspector's reports the mark follows. */
@@ -178,41 +177,18 @@ export class CalltreeView extends LitElement {
   constructor() {
     super();
 
-    // Reveal an inspector row here, but only while the Call Tree is the tab the
-    // inspector is showing.
-    this._inspectorRevealUnsubscribe = eventBus.on('inspector:reveal', (detail) => {
-      if (detail.source === 'calltree') {
-        void this._revealEventIndex(detail.eventIndex);
-      }
-    });
-
-    // Mark the frames the inspector points at, while the Call Tree is the tab the
-    // inspector is showing.
-    this._inspectorLocateUnsubscribe = eventBus.on('inspector:locate', (detail) => {
-      if (detail.source === 'calltree') {
-        const ids = this._emphasis.report(detail.eventIndexes, detail.sticky);
-        if (detail.sticky && detail.eventIndexes.length) {
-          // A picked inspector row merges calls, so the mark shows all of them
-          // while the view moves to the first, as a pick of one frame does. The
-          // reveal expands and scrolls, which re-renders the rows the mark lands
-          // on, so it goes on after.
-          void this._revealEventIndex(detail.eventIndexes[0]!).then(() => this._markLocated(ids));
-        } else {
-          this._markLocated(ids);
-        }
-      }
-    });
-
-    // Escape (app-wide) deselects here; the table reports the clear itself. It
-    // also drops a mark held by a picked inspector row, which is no selection of
-    // this table's own.
-    this._selectionClearUnsubscribe = eventBus.on('selection:clear', (detail) => {
-      if (detail.source === 'calltree') {
+    this._inspectorUnsubscribe = wireInspectorTab('calltree', this._emphasis, {
+      mark: (eventIndexes) => this._markLocated(eventIndexes),
+      reveal: (eventIndex) => this._revealEventIndex(eventIndex),
+      clear: () => {
+        // The table reports the clear itself, which is what reaches the inspector.
         for (const table of this._tables) {
           table.deselectRow();
         }
-        this._markLocated(this._emphasis.pick([]));
-      }
+      },
+      // A picked row merges calls, so the mark shows all of them while the view
+      // moves to the first, as a pick of one frame does.
+      movesToMergedPick: true,
     });
     document.addEventListener(CALLTREE_GO_TO_ROW, this._goToRowEvt);
     document.addEventListener('lv-find', this._findEvt);
@@ -233,12 +209,8 @@ export class CalltreeView extends LitElement {
     document.removeEventListener('lv-find', this._findEvt);
     document.removeEventListener('lv-find-match', this._findEvt);
     document.removeEventListener('lv-find-close', this._findEvt);
-    this._inspectorRevealUnsubscribe?.();
-    this._inspectorRevealUnsubscribe = null;
-    this._inspectorLocateUnsubscribe?.();
-    this._inspectorLocateUnsubscribe = null;
-    this._selectionClearUnsubscribe?.();
-    this._selectionClearUnsubscribe = null;
+    this._inspectorUnsubscribe?.();
+    this._inspectorUnsubscribe = null;
     this._destroyCurrentTable();
   }
 
@@ -1130,7 +1102,7 @@ export class CalltreeView extends LitElement {
           this._clearSearchHighlights();
         }
       },
-      rowFormatter: groupedRowFormatter(rootMethod),
+      rowFormatter: groupedRowFormatter,
     });
     this.aggregatedTreeTable = table;
     await tableBuilt;
@@ -1156,7 +1128,7 @@ export class CalltreeView extends LitElement {
             this._clearSearchHighlights();
           }
         },
-        rowFormatter: groupedRowFormatter(rootMethod),
+        rowFormatter: groupedRowFormatter,
       },
       {
         selectableRows: 'highlight',
@@ -1181,7 +1153,7 @@ export class CalltreeView extends LitElement {
       if (this._echoGuard.suppressed) {
         return;
       }
-      const selection = rowDetailSelection(rows[0]);
+      const selection = rowDetailSelection(rows[0], this.rootMethod);
       if (!selection) {
         // The selection went with it, and so does a mark a picked inspector row
         // left here — it was never a selection of this table.
@@ -1197,14 +1169,17 @@ export class CalltreeView extends LitElement {
 
   /**
    * Tell the inspector which frames the pointer is over, so it can mark the rows
-   * that stand for them. Nothing is picked and nothing moves. An
-   * Aggregated/Bottom-Up row merges many calls, so it names every call it counts.
+   * that stand for them. Nothing is picked and nothing moves.
+   *
+   * The direction is read as the pointer arrives: which way the table reads is
+   * what decides whether a merged row names its own frames or the calls they
+   * conducted.
    */
   private _emitDetailLocate(table: Tabulator, source: DetailSource = 'calltree'): void {
     table.on('rowMouseEnter', (_e, row) => {
       eventBus.emit('detail:locate', {
         source,
-        eventIndexes: rowOccurrences(row),
+        eventIndexes: rowFrames(row, this.rootMethod, directionOf(this.viewMode)),
       });
     });
     table.on('rowMouseLeave', () => {
@@ -1216,6 +1191,9 @@ export class CalltreeView extends LitElement {
   // in the DOM), with a two-frame fallback in case the expand triggers no
   // redraw. A single rAF can race the virtual renderer and leave getTreeChildren
   // empty mid-descent.
+  // A pending-render flag is no use here: Tabulator dispatches `renderStarted`
+  // and `renderComplete` in one synchronous call, so the flag always reads false
+  // by the time this is awaited.
   private _waitForTableRender(): Promise<void> {
     const table = this._getActiveTable();
     if (!table) {

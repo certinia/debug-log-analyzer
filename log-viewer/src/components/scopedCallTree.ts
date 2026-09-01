@@ -45,6 +45,8 @@ export interface ScopedRow {
    *  calls its chain conducted, so it derives them from the top-level row rather
    *  than holding a copy of the list. */
   _seed?: OccurrenceSeed;
+  /** The frames the row itself stands for, once derived. */
+  _frameIndexes?: number[];
   _children: ScopedRow[] | null;
 }
 
@@ -104,6 +106,35 @@ export function locatableEventIndexes(row: Partial<ScopedRow> | undefined): numb
   }
   const single = revealableEventIndex(row);
   return single === null ? [] : [single];
+}
+
+/**
+ * The frames a scoped row stands for, which is what a highlight elsewhere points
+ * at: the flame chart dims to them, and the call tree selects one.
+ *
+ * A bottom-up caller row is one of the frames above a call, so it stands for the
+ * callers at its own depth rather than the calls they conducted, and stepping
+ * down the callers walks the highlight up the stack.
+ *
+ * {@link locatableEventIndexes} stays the calls the row counts, which is what its
+ * totals describe.
+ */
+export function frameEventIndexes(row: Partial<ScopedRow> | undefined): number[] {
+  if (row?._frameIndexes) {
+    return row._frameIndexes;
+  }
+  const conducted = locatableEventIndexes(row);
+  const seed = row?._seed;
+  const store = currentLogStore();
+  if (!seed || !store) {
+    return conducted;
+  }
+  // `_seed` is only ever set alongside `_pathId`.
+  const levels = seed.paths.depthOf(row._pathId!) - 1;
+  if (levels <= 0) {
+    return conducted;
+  }
+  return (row._frameIndexes = store.framesAbove(conducted, levels));
 }
 
 /**
@@ -522,20 +553,19 @@ async function aggregate(
   // The recursion follows the call depth, which is shallow; each level's input
   // is the wide dimension, so that is where the slicing goes.
   async function merge(input: ScopedRow[], parentPathId: number): Promise<ScopedRow[] | null> {
-    const groups = new Map<number, ScopedRow>();
-    const order: number[] = [];
-    // The occurrences behind each group — a set, so one frame cannot be listed
-    // twice.
-    const indexes = new Map<number, Set<number>>();
+    // The occurrences behind each group are a set, so one frame cannot be listed
+    // twice; `groups` keeps its own insertion order, so it is also the output
+    // order.
+    const groups = new Map<number, { row: ScopedRow; seen: Set<number> }>();
     for (let i = 0; i < input.length; i++) {
       if (i % CHECK_EVERY === 0 && !(await tick())) {
         return null;
       }
       const row = input[i]!;
-      const key = store.keyIdOf(row.originalData);
-      let group = groups.get(key);
-      if (!group) {
-        group = {
+      const key = paths.keyIdOf(row.originalData);
+      let held = groups.get(key);
+      if (!held) {
+        const group: ScopedRow = {
           id: nextId(),
           originalData: row.originalData,
           text: row.text,
@@ -547,10 +577,10 @@ async function aggregate(
           _pathId: paths.step(parentPathId, key),
           _children: [],
         };
-        groups.set(key, group);
-        order.push(key);
-        indexes.set(key, new Set());
+        held = { row: group, seen: new Set() };
+        groups.set(key, held);
       }
+      const group = held.row;
       if (!row.onPath) {
         // A group holding one real call is not a route, so it stays closed.
         group.onPath = undefined;
@@ -559,9 +589,8 @@ async function aggregate(
       group.duration.self += row.duration.self;
       group.callCount += row.callCount;
       // Every merged occurrence, so pointing at the group points at all of them.
-      const seen = indexes.get(key)!;
       for (const index of locatableEventIndexes(row)) {
-        seen.add(index);
+        held.seen.add(index);
       }
       if (row._children) {
         const kids = group._children as ScopedRow[];
@@ -572,9 +601,8 @@ async function aggregate(
     }
 
     const merged: ScopedRow[] = [];
-    for (const key of order) {
-      const group = groups.get(key)!;
-      group.eventIndexes = [...indexes.get(key)!];
+    for (const { row: group, seen } of groups.values()) {
+      group.eventIndexes = [...seen];
       const kids = group._children as ScopedRow[];
       if (kids.length) {
         const mergedKids = await merge(kids, group._pathId!);
@@ -687,8 +715,8 @@ async function buildBottomUp(
   const entryFor = (row: ScopedRow, callers: WalkEntry | null): WalkEntry => ({
     row,
     callers,
-    keyId: store.keyIdOf(row.originalData),
-    stackId: store.stackIdOf(row.originalData),
+    keyId: paths.keyIdOf(row.originalData),
+    stackId: paths.stackIdOf(row.originalData),
     leaving: false,
     attributed: 0,
     outer: null,
@@ -749,16 +777,16 @@ async function buildBottomUp(
       }
       // Each occurrence is tagged with the chain that reached it, which is how a
       // caller row picks out the ones it stands for.
-      const store = seed._seed;
+      const occurrences = seed._seed;
       const held = row.eventIndexes;
       if (held) {
         for (let i = 0; i < held.length; i++) {
-          store.eventIndexes.push(held[i]!);
-          store.chains.push(pathId);
+          occurrences.eventIndexes.push(held[i]!);
+          occurrences.chains.push(pathId);
         }
       } else {
-        store.eventIndexes.push(row.originalData.eventIndex);
-        store.chains.push(pathId);
+        occurrences.eventIndexes.push(row.originalData.eventIndex);
+        occurrences.chains.push(pathId);
       }
     }
   }

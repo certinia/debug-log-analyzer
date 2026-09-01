@@ -66,10 +66,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - 🎨 **Timeline theme switch**: parts of the Timeline did not update on theme switch until the log view was reopened; they now do.
 - 📊 **Database usage bars** (Row Count, Time Taken): the usage bar was hidden whenever the rounded percentage was 0% (the common case for small row counts against large governor limits), so it rarely appeared; it now fills relative to the grid's own column total rather than a governor limit, shows on grouped summary rows, and Time Taken (ms) now shows a bar too. ([#873])
 - 🎨 **Theme colours**: some colours did not update on theme switch; they now do.
+- ⌨️ **Call Tree keyboard**: clicking a row's expand arrow dropped keyboard focus, so the arrow keys scrolled the table instead of moving through it; focus now returns after every expand and collapse.
+- 🧭 **Call Tree navigation**: jumping to a row in the Aggregated or Bottom-Up view could stop on one of its callers and need a second try, because the walk read a row's children before they had rendered; it now waits for the render.
 - 🧭 **Inspector call stack**: cumulative limit and profiling frames appeared in the stack, so the path to a selection read wrong; the stack now excludes them, like the call tree already did.
 - 🐛 **Go to Code**: Match methods with namespace/`System`-qualified parameter types. ([#834])
 - 📐 **Timeline height**: the Flame Chart stopped short of the bottom of its panel, leaving a strip of empty space; it now fills the panel and follows the Inspector as you resize or re-dock it.
 - 🗄️ **Flow database usage**: SOQL and DML run by a Flow or Process Builder element went uncounted, because the log never reports it as a statement; the element's own usage is now counted and rolls up like any other. Needs `WORKFLOW` at `FINER` or above. ([#871])
+- 📏 **Timeline length**: the chart stopped at the last frame the log recorded, so it drew shorter than the log's own duration — 10.8s of a 27.1s log where the size cap cut the log off. The chart now spans the whole log, and the truncation marker shades the part the log never recorded. ([#828])
+- 🧭 **Hot spots**: the log itself topped the Inspector's hot spots, and the Analysis findings, whenever time went unrecorded — the gap between frames lands on the log, which is a container and not code. It is now left out of both.
+- 📊 **Governor limits strip**: where a log records nothing — it hit the maximum size, or lines were skipped — the strip drew its last reading across the gap as though it had been measured. The area fills, the over-100% band and the collapsed traffic light now leave the gap blank, the step line holds its last level, and the tooltip names the reason and the range, such as `Max-Size-reached · 10.8s → 27.1s`. Truncation shading also ends with its marker instead of running on to the next one. ([#828])
 
 ## [1.20.1] 2026-07-23
 

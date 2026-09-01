@@ -19,10 +19,12 @@ import {
   LocatedRowIds,
   LocatedRowMarker,
   rowDetailSelection,
-  rowOccurrences,
+  rowFrames,
 } from '../../../components/locatedRow.js';
 import { InspectorEmphasis } from '../../../components/inspectorEmphasis.js';
+import { wireInspectorTab } from '../../../components/inspectorTab.js';
 import { SelectionEchoGuard } from '../../../core/events/SelectionEchoGuard.js';
+import { eventByEventIndex } from '../../../core/utility/EventSearch.js';
 import { isVisible } from '../../../core/utility/Util.js';
 import { getSettings, updateSetting } from '../../settings/Settings.js';
 import { createBottomUpTable } from '../../call-tree/components/BottomUpTable.js';
@@ -36,6 +38,7 @@ import {
   toggleField,
 } from '../../../tabulator/ColumnViews.js';
 import type { BottomUpRow } from '../../call-tree/utils/Aggregation.js';
+import { findRootBucket } from '../../call-tree/utils/bucketRows.js';
 import {
   categoryColoringStyles,
   groupedRowFormatter,
@@ -152,12 +155,10 @@ export class AnalysisView extends LitElement {
 
   /** Releases the category-colouring settings subscription; set while connected. */
   private _categoryColoringOff: (() => void) | null = null;
-  private _selectionClearUnsubscribe: (() => void) | null = null;
 
   /** Guards the programmatic select made on the inspector's behalf. */
   private _echoGuard = new SelectionEchoGuard();
-  private _inspectorRevealUnsubscribe: (() => void) | null = null;
-  private _inspectorLocateUnsubscribe: (() => void) | null = null;
+  private _inspectorUnsubscribe: (() => void) | null = null;
   private _locatedRow = new LocatedRowMarker();
   private _locateIds = new LocatedRowIds();
   private _emphasis = new InspectorEmphasis();
@@ -165,33 +166,22 @@ export class AnalysisView extends LitElement {
   constructor() {
     super();
 
-    // An inspector finding names one event; the grid holds it in the bucket for
-    // its method, so that bucket is what gets revealed.
-    this._inspectorRevealUnsubscribe = eventBus.on('inspector:reveal', (detail) => {
-      if (detail.source === 'analysis') {
-        void this._revealEventIndex(detail.eventIndex);
-      }
-    });
-    // Mark the buckets the inspector points at. A row is a method bucket rather
-    // than one event, so a frame is translated into the paths of the rows it heads.
-    this._inspectorLocateUnsubscribe = eventBus.on('inspector:locate', (detail) => {
-      if (detail.source === 'analysis') {
-        this._markLocated(this._emphasis.report(detail.eventIndexes, detail.sticky));
-      }
+    this._inspectorUnsubscribe = wireInspectorTab('analysis', this._emphasis, {
+      // A row is a method bucket rather than one event, so a frame is translated
+      // into the paths of the rows it heads.
+      mark: (eventIndexes) => this._markLocated(eventIndexes),
+      // An inspector finding names one event; the grid holds it in the bucket for
+      // its method, so that bucket is what gets revealed.
+      reveal: (eventIndex) => this._revealEventIndex(eventIndex),
+      clear: () => {
+        // The table reports the clear itself, which is what reaches the inspector.
+        this.analysisTable?.deselectRow();
+      },
+      movesToMergedPick: true,
     });
     document.addEventListener('lv-find', this._findEvt);
     document.addEventListener('lv-find-match', this._findEvt);
     document.addEventListener('lv-find-close', this._findEvt);
-
-    // Escape (app-wide) deselects here; the table reports the clear itself. It
-    // also drops a mark held by a picked inspector row, which is no selection of
-    // this table's own.
-    this._selectionClearUnsubscribe = eventBus.on('selection:clear', (detail) => {
-      if (detail.source === 'analysis') {
-        this.analysisTable?.deselectRow();
-        this._markLocated(this._emphasis.pick([]));
-      }
-    });
   }
 
   override connectedCallback(): void {
@@ -206,12 +196,8 @@ export class AnalysisView extends LitElement {
     document.removeEventListener('lv-find', this._findEvt);
     document.removeEventListener('lv-find-match', this._findEvt);
     document.removeEventListener('lv-find-close', this._findEvt);
-    this._selectionClearUnsubscribe?.();
-    this._selectionClearUnsubscribe = null;
-    this._inspectorRevealUnsubscribe?.();
-    this._inspectorRevealUnsubscribe = null;
-    this._inspectorLocateUnsubscribe?.();
-    this._inspectorLocateUnsubscribe = null;
+    this._inspectorUnsubscribe?.();
+    this._inspectorUnsubscribe = null;
     this._locatedRow.clear();
   }
 
@@ -233,24 +219,25 @@ export class AnalysisView extends LitElement {
    */
   private async _revealEventIndex(eventIndex: number): Promise<void> {
     const table = this.analysisTable;
-    // `instances` is populated on root buckets only, which is what the grid lists.
-    const match = table
-      ?.getRows()
-      .find((row) =>
-        (row.getData() as BottomUpRow).instances?.some((event) => event.eventIndex === eventIndex),
-      );
-    if (!table || !match) {
+    const root = this.timelineRoot;
+    if (!table || !root) {
+      return;
+    }
+    const event = eventByEventIndex(root, eventIndex);
+    if (!event) {
+      return;
+    }
+    // The grid is bottom-up, so the frame heads a top-level bucket its own key
+    // finds, without reading what any bucket holds.
+    const match = findRootBucket(table.getRows(), event);
+    if (!match) {
       return;
     }
 
     // Show Details keeps only rows with a duration, so the buckets for debug
     // lines, thrown exceptions and query plans are filtered out — exactly the
     // events a finding points at. Turn the filter off rather than reveal nothing.
-    const data = match.getData();
-    if (
-      !this.filterState.showDetails &&
-      !table.getRows('active').some((row) => row.getData() === data)
-    ) {
+    if (!this.filterState.showDetails && !this._showDetailsFilter(match.getData() as BottomUpRow)) {
       this._handleShowDetailsChange();
       await this.updateComplete;
     }
@@ -638,7 +625,7 @@ export class AnalysisView extends LitElement {
             this._clearSearchHighlights();
           }
         },
-        rowFormatter: groupedRowFormatter(rootMethod),
+        rowFormatter: groupedRowFormatter,
       },
       {
         placeholder: 'No Analysis Available',
@@ -671,19 +658,20 @@ export class AnalysisView extends LitElement {
       }
       eventBus.emit('detail:select', {
         source: 'analysis',
-        selection: rowDetailSelection(rows[0]),
+        selection: rowDetailSelection(rows[0], this.timelineRoot),
         // The grid ranks methods by self time and expands to their callers, so
         // the inspector opens on the forward view instead.
         view: 'callers',
       });
     });
 
-    // Tell the inspector which calls the pointer is over, so it can mark the rows
-    // that stand for them; a bucket merges calls, so it names every call it counts.
+    // Tell the inspector which frames the pointer is over, so it can mark the
+    // rows that stand for them. A row under a bucket is one of its callers, so it
+    // names that caller rather than the calls it conducted.
     this.analysisTable.on('rowMouseEnter', (_e, row) => {
       eventBus.emit('detail:locate', {
         source: 'analysis',
-        eventIndexes: rowOccurrences(row),
+        eventIndexes: rowFrames(row, this.timelineRoot, 'callers'),
       });
     });
     this.analysisTable.on('rowMouseLeave', () => {
