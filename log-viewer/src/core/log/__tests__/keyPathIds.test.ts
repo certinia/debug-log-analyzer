@@ -138,34 +138,47 @@ describe('KeyPathIds', () => {
     });
   });
 
-  describe('pathIdsOf', () => {
+  describe('pathIdOf', () => {
     const root = ev(1, 'exec', null);
     const outer = ev(2, 'outer', root);
     const inner = ev(3, 'inner', outer);
 
-    /** The ids the walk adds, in the order it adds them. */
-    function found(event: LogEvent, direction: 'callers' | 'callees'): number[] {
-      const into = new Set<number>();
-      ids.pathIdsOf(event, direction, into);
-      return [...into];
+    it('names one row in a top-down view, at the depth the frame ran at', () => {
+      expect(ids.pathIdOf(inner)).toBe(pathFor(ids, 'METHOD_ENTRY||outer', 'METHOD_ENTRY||inner'));
+    });
+
+    it('leaves the log root out, as it heads no row', () => {
+      expect(ids.pathIdOf(root)).toBeUndefined();
+    });
+  });
+
+  describe('pathsEndingIn', () => {
+    /** The ids a key heads, over the paths the table has been asked for. */
+    function found(...keys: string[]): number[] {
+      return ids.pathsEndingIn(new Set(keys.map((key) => ids.keyId(key))));
     }
 
-    it('names one row in a top-down view, at the depth the frame ran at', () => {
-      expect(found(inner, 'callees')).toEqual([
-        pathFor(ids, 'METHOD_ENTRY||outer', 'METHOD_ENTRY||inner'),
-      ]);
+    it('names the rows a frame is, and not the rows of the callers above it', () => {
+      const own = pathFor(ids, 'A');
+      const elsewhere = pathFor(ids, 'B', 'A');
+      // A row for the caller of A, which stands for that caller and not for A.
+      pathFor(ids, 'A', 'C');
+
+      expect(found('A').sort()).toEqual([own, elsewhere].sort());
     });
 
-    it('names a row per caller depth in a bottom-up view', () => {
-      // The frame heads a row on its own, and one under each caller above it.
-      expect(found(inner, 'callers')).toEqual([
-        pathFor(ids, 'METHOD_ENTRY||inner'),
-        pathFor(ids, 'METHOD_ENTRY||inner', 'METHOD_ENTRY||outer'),
-      ]);
+    it('answers for several frames at once, which one pointed-at row can name', () => {
+      const a = pathFor(ids, 'A');
+      const b = pathFor(ids, 'B');
+
+      expect(found('A', 'B').sort()).toEqual([a, b].sort());
     });
 
-    it('leaves the log root out, as it heads a row in neither view', () => {
-      expect(found(root, 'callers')).toEqual([]);
+    it('leaves the empty path out, since no row stands for it, and asks nothing of no keys', () => {
+      pathFor(ids, 'A');
+
+      expect(found()).toEqual([]);
+      expect(found('Z')).toEqual([]);
     });
   });
 });

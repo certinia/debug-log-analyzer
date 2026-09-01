@@ -231,9 +231,9 @@ function deriveCalls(row: RowComponent, data: CallRow, root: ApexLog | null): Lo
  * The path ids that the frames `eventIndexes` name stand for, so a grid whose
  * rows merge occurrences can mark them.
  *
- * Every occurrence is walked: occurrences of one frame sit under distinct parent
- * frames, so there is no cheaper set to walk, and only the paths they produce
- * repeat.
+ * A bottom-up row is the frame at its own depth, so a frame stands for the rows
+ * its own key heads, wherever they sit; the chain above it holds its callers'
+ * rows. A top-down row sits on the frame's own chain, so one id names it.
  */
 function pathIdsForEvents(
   root: ApexLog,
@@ -241,11 +241,21 @@ function pathIdsForEvents(
   direction: SelectionView,
 ): number[] {
   const paths = logStoreFor(root).keyPathIds();
-  const found = new Set<number>();
+  const events: LogEvent[] = [];
   for (const eventIndex of eventIndexes) {
     const event = eventByEventIndex(root, eventIndex);
     if (event) {
-      paths.pathIdsOf(event, direction, found);
+      events.push(event);
+    }
+  }
+  if (direction === 'callers') {
+    return paths.pathsEndingIn(new Set(events.map((event) => paths.keyIdOf(event))));
+  }
+  const found = new Set<number>();
+  for (const event of events) {
+    const pathId = paths.pathIdOf(event);
+    if (pathId !== undefined) {
+      found.add(pathId);
     }
   }
   return [...found];

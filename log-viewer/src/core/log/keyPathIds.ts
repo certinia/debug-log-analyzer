@@ -3,7 +3,6 @@
  */
 import type { LogEvent } from 'apex-log-parser';
 
-import type { SelectionView } from '../events/EventBus.js';
 import { getEventKey, getStackKey } from './eventKeys.js';
 
 /** The path every chain starts from, which no row stands for. */
@@ -19,9 +18,9 @@ export const ROOT_PATH_ID = 0;
  * than by the calls, and makes matching an integer test.
  *
  * One invariant holds it together: a row's id is the interned chain of the
- * frames the row holds. {@link pathIdsOf} names the rows a frame belongs to and
- * {@link chainReaches} asks whether a frame's chain runs through one, so the two
- * chain directions stay separate spaces here rather than in every caller.
+ * frames the row holds. {@link pathIdOf} and {@link pathsEndingIn} name the rows
+ * a frame stands for, one direction each, and {@link chainNodeAt} reads a row's
+ * own frame back out of a chain.
  *
  * One table per log, held by `LogStore`: an id means nothing to another log.
  */
@@ -39,7 +38,10 @@ export class KeyPathIds {
   private children: Array<Map<number, number> | undefined> = [new Map()];
   private parents: number[] = [ROOT_PATH_ID];
   private keyOf: number[] = [-1];
-  /** One frame's chain, reused: {@link pathIdsOf} never yields, so one is enough.
+  /** The paths each key heads, which is how a frame finds the rows it stands
+   *  for. Filled as paths are minted, so the answer costs what it holds. */
+  private pathsByKey: number[][] = [];
+  /** One frame's chain, reused: {@link pathIdOf} never yields, so one is enough.
    *  Per table rather than per module, so two logs cannot share the buffer. */
   private chain: number[] = [];
 
@@ -86,28 +88,12 @@ export class KeyPathIds {
   }
 
   /**
-   * The ids naming the rows a frame belongs to in a merged view, added to `into`.
-   *
-   * A top-down row sits at the frame's own depth, so one id names it. A
-   * bottom-up row is the frame plus however many of its callers the chain shows,
-   * so every prefix names a row the frame heads — which is why one frame marks
-   * several rows there.
-   *
-   * The log root heads no row in either view, so the walk stops below it.
+   * The id naming the row a frame sits in, top-down, or undefined for the log
+   * root, which heads no row.
    */
-  public pathIdsOf(event: LogEvent, direction: SelectionView, into: Set<number>): void {
+  public pathIdOf(event: LogEvent): number | undefined {
     if (!event.parent) {
-      return;
-    }
-    if (direction === 'callers') {
-      // The parent walk is already innermost first, which is the order these ids
-      // compose in, so nothing is collected on the way.
-      let id = ROOT_PATH_ID;
-      for (let node: LogEvent | null = event; node?.parent; node = node.parent) {
-        id = this.step(id, this.keyIdOf(node));
-        into.add(id);
-      }
-      return;
+      return undefined;
     }
     const chain = this.chain;
     chain.length = 0;
@@ -118,7 +104,27 @@ export class KeyPathIds {
     for (let depth = chain.length - 1; depth >= 0; depth--) {
       id = this.step(id, chain[depth]!);
     }
-    into.add(id);
+    return id;
+  }
+
+  /**
+   * The paths whose own key is one of `keyIds`: the rows that stand for those
+   * frames in a bottom-up view, wherever they sit.
+   *
+   * A bottom-up row is the frame at its own depth, so a frame heads the bucket
+   * for it and any caller row for it under another bucket. The chains above it
+   * are other frames' rows, which is why they are not here.
+   */
+  public pathsEndingIn(keyIds: ReadonlySet<number>): number[] {
+    const found: number[] = [];
+    for (const keyId of keyIds) {
+      // A path holds one key, so no path is reached twice.
+      const paths = this.pathsByKey[keyId];
+      if (paths) {
+        found.push(...paths);
+      }
+    }
+    return found;
   }
 
   /**
@@ -175,6 +181,7 @@ export class KeyPathIds {
       this.children.push(undefined);
       this.parents.push(parentPathId);
       this.keyOf.push(keyId);
+      (this.pathsByKey[keyId] ??= []).push(id);
     }
     return id;
   }
