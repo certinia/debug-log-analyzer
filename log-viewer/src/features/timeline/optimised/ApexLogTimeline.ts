@@ -250,6 +250,10 @@ export class ApexLogTimeline {
       return;
     }
 
+    // The inspector asked for this frame, so its mark is what dims the rest. Set after the
+    // run: the select inside it clears the mark, as any chart select does.
+    this.pickEmphasis(eventIndex);
+
     const bounds = this.flamechart.getViewportManager()?.getBounds();
     if (
       bounds &&
@@ -281,13 +285,14 @@ export class ApexLogTimeline {
     this.flamechart.locateByEventNodes(nodes);
   }
 
-  /**
-   * The frame the emphasis rests on between pointer moves: the selected one, or
-   * none once the selection is cleared. Markers that map to no log event, and
-   * frames the parser gave no index, count as none.
-   */
-  private pickEmphasis(eventIndex: number | undefined): void {
-    this.applyEmphasis(this.emphasis.pick(eventIndex === undefined ? [] : [eventIndex]));
+  /** Rest the emphasis on one frame, until something else picks or clears it. */
+  private pickEmphasis(eventIndex: number): void {
+    this.applyEmphasis(this.emphasis.pick([eventIndex]));
+  }
+
+  /** Drop the resting emphasis, so nothing dims. */
+  private clearEmphasis(): void {
+    this.applyEmphasis(this.emphasis.pick([]));
   }
 
   /**
@@ -589,7 +594,7 @@ export class ApexLogTimeline {
     // A click on empty space drops a mark left by a picked inspector row, which
     // the chart's own clear says nothing about when it held no selection.
     if (!eventNode && !marker) {
-      this.pickEmphasis(undefined);
+      this.clearEmphasis();
     }
 
     // Frame and marker clicks are handled by FlameChart's selection system
@@ -603,11 +608,10 @@ export class ApexLogTimeline {
    * Use J key for explicit "jump to call tree" action.
    */
   private handleSelect(eventNode: EventNode | null): void {
-    // The emphasis follows every select, including the one made on the
-    // inspector's behalf — the guard holds back the echo, not the dim.
-    const selected = (eventNode as (EventNode & { original?: LogEvent }) | null)?.original
-      ?.eventIndex;
-    this.pickEmphasis(selected);
+    // A select says what to look at, so nothing dims and any mark a picked inspector row
+    // left behind is dropped. Chrome dims for a search, never for a select. The inspector
+    // re-marks its own frame after the select it asked for.
+    this.clearEmphasis();
 
     if (this.echoGuard.suppressed) {
       return;
@@ -657,7 +661,7 @@ export class ApexLogTimeline {
    * Handle marker selection change from FlameChart.
    */
   private handleMarkerSelect(marker: TimelineMarker | null): void {
-    this.pickEmphasis(marker?.eventIndex);
+    this.clearEmphasis();
 
     if (!marker) {
       // Marker selection cleared - hide tooltip

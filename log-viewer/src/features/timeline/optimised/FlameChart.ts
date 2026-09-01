@@ -13,6 +13,8 @@
 import type { LogEvent } from 'apex-log-parser';
 import * as PIXI from 'pixi.js';
 
+import { HoverTracker } from './interaction/HoverTracker.js';
+import { HoverHighlightRenderer } from './rendering/HoverHighlightRenderer.js';
 import { destroyTimelineApp } from './rendering/pixiApp.js';
 import type {
   EditorColors,
@@ -148,6 +150,9 @@ export class FlameChart<E extends EventNode = EventNode> {
 
   // Text label renderer (used in normal mode, shared with search orchestrator)
   private textLabelRenderer: TextLabelRenderer | null = null;
+
+  private hoverHighlightRenderer: HoverHighlightRenderer | null = null;
+  private readonly hoverTracker = new HoverTracker();
 
   private worldContainer: PIXI.Container | null = null;
   private axisContainer: PIXI.Container | null = null;
@@ -443,6 +448,11 @@ export class FlameChart<E extends EventNode = EventNode> {
       this.keyboardHandler = null;
     }
 
+    if (this.hoverHighlightRenderer) {
+      this.hoverHighlightRenderer.destroy();
+      this.hoverHighlightRenderer = null;
+    }
+
     // Clean up selection orchestrator
     if (this.selectionOrchestrator) {
       this.selectionOrchestrator.destroy();
@@ -723,9 +733,12 @@ export class FlameChart<E extends EventNode = EventNode> {
   private scheduleRender(): void {
     if (this.renderLoopId === null) {
       this.renderLoopId = requestAnimationFrame(() => {
-        if (this.state && this.state.needsRender) {
+        // Cleared before the render, not after: a listener that asks for a render from inside
+        // one then books the next frame rather than having its request swallowed by this one.
+        this.renderLoopId = null;
+
+        if (this.state?.needsRender) {
           this.render();
-          this.state.needsRender = false;
 
           // Setup ResizeObserver after first render to avoid double render on init.
           // By this point, layout is finalized and ResizeObserver baseline matches rendered state.
@@ -734,7 +747,6 @@ export class FlameChart<E extends EventNode = EventNode> {
             this.resizeObserverActive = true;
           }
         }
-        this.renderLoopId = null;
       });
     }
   }
@@ -862,6 +874,7 @@ export class FlameChart<E extends EventNode = EventNode> {
     this.cursorLineRenderer?.setColor(colors.cursorForeground);
     this.searchOrchestrator?.setHighlightColor(colors.findMatchBackground);
     this.selectionOrchestrator?.setHighlightColor(colors.findMatchBackground);
+    this.hoverHighlightRenderer?.setColor(colors.editorForeground);
     this.measurementOrchestrator?.setColors(
       colors.selectionBackground,
       // Same fallback the orchestrator applies at init: many themes leave
@@ -1077,6 +1090,11 @@ export class FlameChart<E extends EventNode = EventNode> {
     this.worldContainer.scale.set(1, -1);
     stage.addChild(this.worldContainer);
 
+    this.hoverHighlightRenderer = new HoverHighlightRenderer(
+      this.worldContainer,
+      this.options.editorColors?.editorForeground,
+    );
+
     this.uiContainer = new PIXI.Container();
     this.uiContainer.position.set(0, 0);
     this.uiContainer.scale.set(1, 1);
@@ -1099,13 +1117,19 @@ export class FlameChart<E extends EventNode = EventNode> {
       },
       {
         onViewportChange: () => {
-          this.requestRender();
-          if (this.callbacks.onViewportChange && this.viewport) {
-            this.callbacks.onViewportChange(this.viewport.getState());
-          }
+          this.notifyViewportChange();
         },
         onMouseMove: (x: number, y: number) => {
           this.handleMouseMove(x, y);
+        },
+        onPointerPosition: (x: number, y: number, panning: boolean) => {
+          // A drag reports no mouse move, so this is the only fresh position during one.
+          this.hoverTracker.setPointer(x, y);
+          if (panning) {
+            // A drag held against a pan limit moves no frames, so nothing else would ask.
+            this.hoverTracker.invalidateHit();
+            this.requestHoverRender();
+          }
         },
         onClick: (x: number, y: number, modifiers?: ModifierKeys) => {
           this.handleClick(x, y, modifiers);
@@ -1114,6 +1138,8 @@ export class FlameChart<E extends EventNode = EventNode> {
           this.handleDoubleClick(x, y);
         },
         onMouseLeave: () => {
+          this.hoverTracker.clearPointer();
+          this.requestHoverRender();
           // Notify callback that mouse left (clears tooltip)
           if (this.callbacks.onMouseMove) {
             this.callbacks.onMouseMove(0, 0, null, null);
@@ -1632,6 +1658,11 @@ export class FlameChart<E extends EventNode = EventNode> {
       maxDepth,
     );
 
+    // A marker takes the pointer, so no frame is washed under it.
+    if (this.hoverTracker.setHovered(eventNode && !marker ? { node: eventNode, depth } : null)) {
+      this.requestHoverRender();
+    }
+
     // Update cursor style based on hit test
     if (this.interactionHandler) {
       this.interactionHandler.updateCursor(eventNode !== null || marker !== null);
@@ -1913,6 +1944,16 @@ export class FlameChart<E extends EventNode = EventNode> {
   // RENDER INVALIDATION (Phase 3 optimization)
   // ============================================================================
 
+  /** Request a wash-only render: one phase, for a pointer that crossed into a new frame. */
+  private requestHoverRender(): void {
+    if (!this.state) {
+      return;
+    }
+    this.state.renderDirty.overlays = true;
+    this.state.needsRender = true;
+    this.scheduleRender();
+  }
+
   /**
    * Invalidate all render phases (full render needed).
    * Used when viewport changes (zoom, pan).
@@ -2192,6 +2233,10 @@ export class FlameChart<E extends EventNode = EventNode> {
       return;
     }
 
+    // Committed to drawing, so the request is served. Anything asked for from here on is a
+    // fresh request, and books its own frame.
+    this.state!.needsRender = false;
+
     const viewportState = this.viewport!.getState();
     this.state!.viewport = viewportState;
     const dirty = this.state!.renderDirty;
@@ -2222,10 +2267,32 @@ export class FlameChart<E extends EventNode = EventNode> {
       this.hitDetector?.setVisibleRects(visibleRects);
       this.hitDetector?.setBuckets(buckets);
       dirty.culling = false;
+
+      // The frames just moved, so the last answer about what the pointer is over has expired.
+      // Deriving it here covers every viewport write - pan, zoom, resize - with one rule.
+      this.hoverTracker.invalidateHit();
     } else {
       // Reuse cached culling results
       visibleRects = this.cachedVisibleRects;
       buckets = this.cachedBuckets;
+    }
+
+    // Ask again now the hit test is fresh, and before the phases that draw: the wash and the
+    // tooltip then follow the pointer in this frame rather than the next. A measure or area
+    // zoom drag owns the pointer and draws its own overlay, so it is left alone until it ends
+    // - the hit stays marked stale, and is asked for on the first render after that.
+    if (this.interactionHandler?.isPointerDragging()) {
+      // A drag is moving the view, not pointing at a frame, so nothing is hovered. The hit
+      // stays marked stale, and the first render after the drag washes what it settled on.
+      if (this.hoverTracker.setHovered(null)) {
+        dirty.overlays = true;
+        this.callbacks.onMouseMove?.(0, 0, null, null);
+      }
+    } else {
+      const stale = this.hoverTracker.takeStaleHit();
+      if (stale) {
+        this.handleMouseMove(stale.x, stale.y);
+      }
     }
 
     // Phase 3: Render events and labels (search mode vs normal mode)
@@ -2356,6 +2423,8 @@ export class FlameChart<E extends EventNode = EventNode> {
    * Render overlays (measurement, cursor line).
    */
   private renderOverlays(viewportState: ViewportState): void {
+    this.hoverHighlightRenderer?.render(viewportState, this.hoverTracker.getHovered());
+
     // Measurement and area zoom overlays
     this.measurementOrchestrator?.render({ viewportState });
 
