@@ -3,134 +3,78 @@
  */
 
 /**
- * Times the call tree builds and the inspector's row mark on a real log.
+ * Times the paths that have to hold up on a large log.
  *
- * The whole path is free of the DOM, so it runs under Node: a browser cannot
- * profile a 100MB log without its own parse blocking the tools.
+ * They are free of the DOM and of PixiJS, so they run under Node: a browser
+ * cannot profile a 100MB log without its own parse blocking the tools.
  *
- *   pnpm measure <path to a log>
+ *   pnpm measure                      every area, on the committed sample log
+ *   pnpm measure minimap              one area
+ *   pnpm measure --log <path>         another log
+ *   pnpm measure minimap --digest     CSV of what the minimap would draw
  *
- * Heap figures need `--expose-gc`, which the `measure` script passes. No log is
- * committed: the path is always an argument.
+ * One area per feature that has a performance budget, and one number each for
+ * what a user waits on. Heap figures need `--expose-gc`, which the `measure`
+ * script passes.
  */
 import { readFileSync } from 'node:fs';
 
-import { parse } from 'apex-log-parser';
+import { type ApexLog, parse } from 'apex-log-parser';
 
-import { LocatedRowIds } from '../../log-viewer/src/components/locatedRow.js';
-import {
-  buildWholeLogCallTree,
-  rowIdsByPath,
-  type ScopedRow,
-} from '../../log-viewer/src/components/scopedCallTree.js';
-import { LogStore, setCurrentLog } from '../../log-viewer/src/core/log/LogStore.js';
-import {
-  toAggregatedCallTree,
-  toBottomUpTree,
-} from '../../log-viewer/src/features/call-tree/utils/Aggregation.js';
+import { measureCallTree } from './call-tree.js';
+import { time } from './harness.js';
+import { measureMinimap } from './minimap.js';
 
-const gc = globalThis.gc as (() => void) | undefined;
+/** The one log every measurement runs over, so the numbers compare across branches. */
+const SAMPLE_LOG = 'sample-app/debug-logs/sample-log.log';
 
-/** Heap after a collection, so a figure is what the step retained, not its litter. */
-function heapMb(): number {
-  gc?.();
-  return Math.round(process.memoryUsage().heapUsed / 1048576);
-}
+type AreaRun = (log: ApexLog, digest: boolean) => Promise<void>;
 
-const now = (): number => Number(process.hrtime.bigint() / 1000000n);
-// The builds slice themselves against this; resolving at once measures the work
-// rather than the frames it would hand back on screen.
-const yieldSlice = () => Promise.resolve();
+const AREAS: Record<string, AreaRun> = {
+  'call-tree': measureCallTree,
+  minimap: measureMinimap,
+};
 
-function report(label: string, ms: number, before: number): void {
-  console.log(`${label.padEnd(32)} ${String(ms).padStart(7)}ms  heap ${before} -> ${heapMb()}MB`);
-}
+/** Areas that can print a digest. Anything else would corrupt the CSV with timings. */
+const DIGESTABLE = ['minimap'];
 
-async function time<T>(label: string, body: () => T | Promise<T>): Promise<T> {
-  const before = heapMb();
-  const start = now();
-  const out = await body();
-  report(label, now() - start, before);
-  return out;
-}
+const argv = process.argv.slice(2);
+const digest = argv.includes('--digest');
 
-interface Shape {
-  nodes: number;
-  /** Event indexes the rows store between them: what a row per occurrence costs.
-   *  A row that derives its own stores none. */
-  indexes: number;
-  fattest: ScopedRow | null;
-}
-
-function shapeOf(rows: readonly ScopedRow[]): Shape {
-  const shape: Shape = { nodes: 0, indexes: 0, fattest: null };
-  const stack = [...rows];
-  while (stack.length) {
-    const row = stack.pop()!;
-    shape.nodes += 1;
-    const held = row.eventIndexes?.length ?? 0;
-    shape.indexes += held;
-    if (held > (shape.fattest?.eventIndexes?.length ?? 0)) {
-      shape.fattest = row;
-    }
-    if (row._children) {
-      for (const child of row._children) {
-        stack.push(child);
-      }
-    }
-  }
-  return shape;
-}
-
-const logPath = process.argv[2];
+const logAt = argv.indexOf('--log');
+const logPath = logAt === -1 ? SAMPLE_LOG : argv[logAt + 1];
 if (!logPath) {
-  console.error('usage: pnpm measure <path to a log>');
+  console.error('usage: pnpm measure [area...] [--log <path>] [--digest]');
   process.exit(1);
 }
 
-const text = await time('read file', () => readFileSync(logPath, 'utf8'));
-console.log(`log ${Math.round(text.length / 1048576)}MB, ${text.split('\n').length} lines\n`);
-
-const log = await time('parse', () => parse(text));
-setCurrentLog(log);
-
-const scoped = await time('buildWholeLogCallTree', () => buildWholeLogCallTree({ yieldSlice }));
-if (!scoped) {
-  throw new Error('nothing in scope');
+const known = Object.keys(AREAS).join(', ');
+// `logAt === -1` would make the path index 0 and swallow the first area name.
+const pathAt = logAt === -1 ? -1 : logAt + 1;
+const named = argv.filter((arg, at) => !arg.startsWith('--') && at !== pathAt);
+for (const name of named) {
+  if (!(name in AREAS)) {
+    console.error(`unknown area "${name}". Known: ${known}`);
+    process.exit(1);
+  }
 }
 
-const bottomUp = (await time('inspector bottomUp() rows', () => scoped.bottomUp({ yieldSlice })))!;
-const aggregated = (await time('inspector aggregated() rows', () =>
-  scoped.aggregated({ yieldSlice }),
-))!;
-const timeOrder = (await time('inspector timeOrder() rows', () =>
-  scoped.timeOrder({ yieldSlice }),
-))!;
+const areas = named.length ? named : digest ? DIGESTABLE : Object.keys(AREAS);
+const undigestable = digest ? areas.filter((name) => !DIGESTABLE.includes(name)) : [];
+if (undigestable.length) {
+  console.error(`no digest for: ${undigestable.join(', ')}. Digestable: ${DIGESTABLE.join(', ')}`);
+  process.exit(1);
+}
 
-const shape = shapeOf(bottomUp);
-const counts = ({ nodes, indexes }: Shape) => `${nodes} nodes, ${indexes} indexes held`;
-console.log(`bottom-up   ${counts(shape)}`);
-console.log(`aggregated  ${counts(shapeOf(aggregated))}`);
-console.log(`time-order  ${counts(shapeOf(timeOrder))}\n`);
+const text = readFileSync(logPath, 'utf8');
+if (!digest) {
+  console.log(`log ${Math.round(text.length / 1048576)}MB, ${text.split('\n').length} lines\n`);
+}
+const log = digest ? parse(text) : await time('parse', () => parse(text));
 
-const byPathBottomUp = await time('rowIdsByPath bottom-up', () => rowIdsByPath(bottomUp));
-const byPathAggregated = await time('rowIdsByPath aggregated', () => rowIdsByPath(aggregated));
-console.log(`map entries: bottom-up ${byPathBottomUp.size}, aggregated ${byPathAggregated.size}`);
-
-// The mark, on the worst row there is: the frames a picked bucket counts,
-// translated into the ids of every row they name.
-const picked = shape.fattest?.eventIndexes ?? [];
-console.log(`\nfattest row: ${picked.length} occurrences of "${shape.fattest?.text ?? ''}"`);
-const ids = new LocatedRowIds();
-await time('mark callers (first)', () => ids.idsFor(log, picked, 'callers'));
-await time('mark callers (same pick)', () => ids.idsFor(log, picked, 'callers'));
-await time('mark callees', () => new LocatedRowIds().idsFor(log, picked, 'callees'));
-
-// The Call Tree tab's own grouped builds, for comparison with the inspector's.
-console.log('');
-// A store of its own, so the inspector's builds above have not warmed the key
-// table. Only the first build below is cold; the second reads what the first
-// interned, as it does on screen where every view shares one table.
-const gridPaths = new LogStore(log).keyPathIds();
-await time('grid toAggregatedCallTree', () => toAggregatedCallTree(log.children, gridPaths));
-await time('grid toBottomUpTree', () => toBottomUpTree(log.children, gridPaths));
+for (const area of areas) {
+  if (!digest) {
+    console.log(`\n--- ${area} ---`);
+  }
+  await AREAS[area]!(log, digest);
+}
