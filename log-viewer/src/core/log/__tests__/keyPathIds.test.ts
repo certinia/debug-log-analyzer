@@ -61,6 +61,27 @@ describe('KeyPathIds', () => {
     expect(ids.reaches(inner, pathFor(ids, 'Z'))).toBe(false);
   });
 
+  describe('chainNodeAt', () => {
+    const root = ev(1, 'exec', null);
+    const outer = ev(2, 'outer', root);
+    const inner = ev(3, 'inner', outer);
+
+    it('names the frame the row sits at, which is what a caller row stands for', () => {
+      const leafRow = pathFor(ids, 'METHOD_ENTRY||inner');
+      const callerRow = pathFor(ids, 'METHOD_ENTRY||inner', 'METHOD_ENTRY||outer');
+
+      expect(ids.chainNodeAt(inner, leafRow)).toBe(inner);
+      expect(ids.chainNodeAt(inner, callerRow)).toBe(outer);
+    });
+
+    it('answers for a path the chain misses with nothing, as reaches says false', () => {
+      const elsewhere = pathFor(ids, 'METHOD_ENTRY||Z');
+
+      expect(ids.chainNodeAt(inner, elsewhere)).toBeNull();
+      expect(ids.chainReaches(inner, elsewhere)).toBe(false);
+    });
+  });
+
   it('reads back how many keys a path stands for, and none for the empty one', () => {
     expect(ids.depthOf(pathFor(ids, 'A', 'B', 'C'))).toBe(3);
     expect(ids.depthOf(ROOT_PATH_ID)).toBe(0);

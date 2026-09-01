@@ -6,6 +6,7 @@ import type { ApexLog, LogEvent } from 'apex-log-parser';
 import type { RowComponent } from 'tabulator-tables';
 
 import type { DetailSelection, SelectionView } from '../core/events/EventBus.js';
+import type { KeyPathIds } from '../core/log/keyPathIds.js';
 import { logStoreFor } from '../core/log/LogStore.js';
 import { eventByEventIndex } from '../core/utility/EventSearch.js';
 
@@ -139,6 +140,7 @@ const rowCallData = (row: RowComponent): CallRow => row.getData() as CallRow;
 const derivedIndexes = new WeakMap<CallRow, number[]>();
 
 const NO_CALLS: LogEvent[] = [];
+const NO_FRAMES: number[] = [];
 
 /**
  * The root bucket a derived row reads its calls from, or null where the walk
@@ -298,17 +300,45 @@ export function rowFrames(
   if (cached) {
     return cached;
   }
-  const levels = data._pathId === undefined ? 0 : store.keyPathIds().depthOf(data._pathId) - 1;
-  const conducted = rowOccurrences(row, root);
-  if (levels <= 0) {
-    return conducted;
+  const paths = store.keyPathIds();
+  const pathId = data._pathId;
+  if (pathId === undefined || paths.depthOf(pathId) <= 1) {
+    // A row at the depth of its own calls stands for them.
+    return rowOccurrences(row, root);
   }
-  const frames = store.framesAbove(conducted, levels);
+  const frames = callerFramesOf(row, data, pathId, paths);
   if (frames.length) {
     // Not kept where nothing climbed, for the reason `rowOccurrences` gives.
     derivedCallerFrames.set(data, frames);
   }
   return frames;
+}
+
+/**
+ * The frames a caller row is: the node each of its bucket's chains passes through
+ * at the row's own depth.
+ *
+ * One walk per occurrence answers both questions the row asks, since the walk
+ * that decides whether a chain reaches the row stands on that node when it does.
+ */
+function callerFramesOf(
+  row: RowComponent,
+  data: CallRow,
+  pathId: number,
+  paths: KeyPathIds,
+): number[] {
+  const instances = rootBucketOf(row, data)?.instances;
+  if (!instances?.length) {
+    return NO_FRAMES;
+  }
+  const own = new Set<number>();
+  for (const event of instances) {
+    const node = paths.chainNodeAt(event, pathId);
+    if (node) {
+      own.add(node.eventIndex);
+    }
+  }
+  return [...own];
 }
 
 /**

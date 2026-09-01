@@ -124,25 +124,36 @@ export class KeyPathIds {
   /**
    * True where the frame's own chain of callers runs through `pathId`: what tells
    * the calls a bottom-up caller row holds from the rest of its bucket's.
+   */
+  public chainReaches(event: LogEvent, pathId: number): boolean {
+    return this.chainNodeAt(event, pathId) !== null;
+  }
+
+  /**
+   * The frame in the chain that `pathId` names, or null where the chain does not
+   * run through it: the caller a bottom-up row is, at the depth the row sits at.
+   *
+   * The walk that decides membership stands on that frame when it gets there, so
+   * a caller row's frames come out of it rather than out of a second climb.
    *
    * Reads without minting, unlike {@link step}: a query that grew the table would
    * leave a node behind for every frame it was asked about. Ids only rise as a
    * chain deepens, so the walk stops once it passes the depth asked about.
    */
-  public chainReaches(event: LogEvent, pathId: number): boolean {
+  public chainNodeAt(event: LogEvent, pathId: number): LogEvent | null {
     let id = ROOT_PATH_ID;
     for (let node: LogEvent | null = event; node?.parent; node = node.parent) {
       const next = this.children[id]?.get(this.keyIdOf(node));
       if (next === undefined || next > pathId) {
         // Never minted, so no row stands for it; or past the row's own depth.
-        return false;
+        return null;
       }
       id = next;
       if (id === pathId) {
-        return true;
+        return node;
       }
     }
-    return false;
+    return null;
   }
 
   /**
