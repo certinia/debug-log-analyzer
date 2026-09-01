@@ -15,6 +15,7 @@
 import type { ApexLog } from 'apex-log-parser';
 
 import { MinimapDensityQuery } from '../../log-viewer/src/features/timeline/optimised/minimap/MinimapDensityQuery.js';
+import { MinimapSkylineIndex } from '../../log-viewer/src/features/timeline/optimised/minimap/MinimapSkylineIndex.js';
 import { RectangleCache } from '../../log-viewer/src/features/timeline/optimised/RectangleCache.js';
 import { BUCKET_CONSTANTS } from '../../log-viewer/src/features/timeline/types/flamechart.types.js';
 import { logEventToTreeAndRects } from '../../log-viewer/src/features/timeline/utils/tree-converter.js';
@@ -63,6 +64,22 @@ export async function measureMinimap(log: ApexLog, digest: boolean): Promise<voi
     frames += rects.length;
   }
   console.log(`${frames} frames, maxDepth ${precomputed.maxDepth}`);
+
+  // The width-independent half: built once per log, so a resize walks it instead
+  // of rebuilding. Violations say how well-nested the log really is.
+  const skyline = await time('skyline index', () => {
+    const tree = cache.getSegmentTree();
+    return new MinimapSkylineIndex(
+      tree.getAllFramesSorted(),
+      precomputed.totalDuration,
+      precomputed.maxDepth,
+    );
+  });
+  const bytes = skyline.segmentCount * 11 + frames * 16;
+  console.log(
+    `  ${skyline.segmentCount} segments (${(skyline.segmentCount / frames).toFixed(2)}/frame), ` +
+      `${Math.round(bytes / 1048576)}MB, ${skyline.violations} violations`,
+  );
 
   // Apart from the drag: the first query also pays the segment tree's deferred
   // frame sort, and a resize never repeats it.
