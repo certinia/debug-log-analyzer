@@ -75,6 +75,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - 📏 **Timeline length**: the chart stopped at the last frame the log recorded, so it drew shorter than the log's own duration — 10.8s of a 27.1s log where the size cap cut the log off. The chart now spans the whole log, and the truncation marker shades the part the log never recorded. ([#828])
 - 🧭 **Hot spots**: the log itself topped the Inspector's hot spots, and the Analysis findings, whenever time went unrecorded — the gap between frames lands on the log, which is a container and not code. It is now left out of both.
 - 📊 **Governor limits strip**: where a log records nothing — it hit the maximum size, or lines were skipped — the strip drew its last reading across the gap as though it had been measured. The area fills, the over-100% band and the collapsed traffic light now leave the gap blank, the step line holds its last level, and the tooltip names the reason and the range, such as `Max-Size-reached · 10.8s → 27.1s`. Truncation shading also ends with its marker instead of running on to the next one. ([#828])
+- 🖱️ **Governor limits strip**: the strip is 15px tall when collapsed, so reading across it lost the tooltip on the smallest vertical wobble. The hover now holds until the pointer is clear of the strip. Hovering the chevron blanks the tooltip only over the arrow, not across the whole 20px column, and the pointer reads as a crosshair over the data, where a click centres and the wheel zooms.
 
 ## [1.20.1] 2026-07-23
 

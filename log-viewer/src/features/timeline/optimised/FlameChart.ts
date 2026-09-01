@@ -179,6 +179,7 @@ export class FlameChart<E extends EventNode = EventNode> {
   private metricStripOrchestrator: MetricStripOrchestrator | null = null;
   private metricStripDiv: HTMLElement | null = null; // HTML container for metric strip canvas
   private metricStripGapDiv: HTMLElement | null = null; // Gap element below metric strip
+  private minimapGapDiv: HTMLElement | null = null; // Gap element above metric strip
 
   // Cursor line renderer for main timeline (bidirectional cursor mirroring)
   private cursorLineRenderer: CursorLineRenderer | null = null;
@@ -970,6 +971,7 @@ export class FlameChart<E extends EventNode = EventNode> {
 
     // Gap element between minimap and metric strip
     const minimapGapDiv = document.createElement('div');
+    this.minimapGapDiv = minimapGapDiv;
     minimapGapDiv.style.cssText = `height:${MINIMAP_GAP}px;width:100%;flex-shrink:0;background:transparent`;
 
     // Metric strip container (fixed height)
@@ -1281,7 +1283,7 @@ export class FlameChart<E extends EventNode = EventNode> {
       onMinimapResetZoom: () => this.resetZoom(),
 
       // Metric strip keyboard callbacks (delegated to viewport via animation)
-      isInMetricStripArea: () => this.metricStripOrchestrator?.isMouseInMetricStripArea() ?? false,
+      isInMetricStripArea: () => this.metricStripOrchestrator?.holdsHover() ?? false,
       onMetricStripPanViewport: (delta) => this.handleAnimatedPanViewport(delta),
       onMetricStripPanDepth: (delta) => this.handleAnimatedPanDepth(delta),
       onMetricStripZoom: (dir) => this.handleAnimatedZoom(dir),
@@ -1477,10 +1479,12 @@ export class FlameChart<E extends EventNode = EventNode> {
     });
 
     // Initialize the orchestrator
+    // The gaps either side are the strip's hover band, so it hears the pointer there too.
     await this.metricStripOrchestrator.init(
       this.metricStripDiv,
       displayWidth,
       this.index.totalDuration,
+      [this.minimapGapDiv, this.metricStripGapDiv],
     );
 
     // Focus container on metric strip mousedown for keyboard support
@@ -2398,7 +2402,7 @@ export class FlameChart<E extends EventNode = EventNode> {
     }
 
     // Get cursor time from metric strip or minimap (for bidirectional sync)
-    const cursorTimeNs = this.metricStripOrchestrator.isMouseInMetricStripArea()
+    const cursorTimeNs = this.metricStripOrchestrator.holdsHover()
       ? this.metricStripOrchestrator.getCursorTimeNs()
       : (this.minimapOrchestrator?.getCursorTimeNs() ?? null);
 
