@@ -36,7 +36,8 @@
  */
 
 import type { BucketCategoryPriority } from '../../types/flamechart.types.js';
-import type { SkylineFrame, TemporalSegmentTree } from '../TemporalSegmentTree.js';
+import type { TemporalSegmentTree } from '../TemporalSegmentTree.js';
+import { MinimapSkylineIndex } from './MinimapSkylineIndex.js';
 
 /**
  * Single density bucket for minimap visualization.
@@ -86,26 +87,11 @@ const CATEGORY_WEIGHTS: Partial<Record<BucketCategoryPriority, number>> = {
   Validation: 0.8,
 };
 
-/**
- * Event type for skyline sweep-line algorithm.
- * 0 = frame start (enter), 1 = frame end (exit)
- */
-const SkylineEventType = {
-  Enter: 0,
-  Exit: 1,
-} as const;
+/** Segment category id 0: no frame on top. */
+const GAP_CATEGORY = 0;
 
-type SkylineEventType = (typeof SkylineEventType)[keyof typeof SkylineEventType];
-
-/**
- * Skyline event for sweep-line algorithm.
- * Reused via object pool to avoid allocations.
- */
-interface SkylineEvent {
-  time: number;
-  type: SkylineEventType;
-  frame: SkylineFrame;
-}
+/** What a bucket with nothing on top reports, as the old sweep's default did. */
+const DEFAULT_CATEGORY = 'Apex';
 
 export class MinimapDensityQuery {
   /** Global maximum depth across timeline. */
@@ -127,6 +113,14 @@ export class MinimapDensityQuery {
    */
   private cachedBucketCount: number | null = null;
   private cachedDensity: MinimapDensityData | null = null;
+
+  /** The log seen from above, built on the first query and never rebuilt. */
+  private index: MinimapSkylineIndex | null = null;
+
+  /** Scratch for the walk, one slot per category id. Sized with the index. */
+  private weights = new Float64Array(0);
+  private accumulated = new Float64Array(0);
+  private onTopOrder = new Int32Array(0);
 
   /** The frames every density is computed from. */
   private segmentTree: TemporalSegmentTree;
@@ -170,9 +164,13 @@ export class MinimapDensityQuery {
   // ============================================================================
 
   /**
-   * Compute density data from the tree's frames, sorted by start.
-   * Uses skyline (on-top time) algorithm for category resolution:
-   * At each moment, the deepest frame is "on top" and its category accumulates time.
+   * Compute density data by walking the skyline against the buckets.
+   *
+   * Both are ordered by time, so one pass over each: per bucket, every segment
+   * overlapping it adds its own length to that category's total, and the deepest
+   * segment gives the bar its height. A segment reaching past the bucket's end is
+   * left for the next bucket, so each is visited once plus once per boundary it
+   * crosses. Nothing is allocated per bucket.
    *
    * @param bucketCount - Number of output buckets
    * @returns MinimapDensityData
@@ -182,193 +180,147 @@ export class MinimapDensityQuery {
       return { buckets: [], globalMaxDepth: this.globalMaxDepth };
     }
 
-    const frames = this.segmentTree.getAllFramesSorted();
+    const skyline = this.skyline();
+    const { segmentCount, segmentStarts, segmentDepths, segmentCategories, categoryNames } =
+      skyline;
+    const accumulated = this.accumulated;
+    const onTopOrder = this.onTopOrder;
+    const weights = this.weights;
+
     const bucketTimeWidth = this.totalDuration / bucketCount;
-
-    // Pre-allocate bucket arrays
-    const maxDepths = new Uint16Array(bucketCount);
-    const eventCounts = new Uint32Array(bucketCount);
-
-    // Collect frames per bucket for skyline computation
-    const framesPerBucket: SkylineFrame[][] = new Array(bucketCount);
-    for (let i = 0; i < bucketCount; i++) {
-      framesPerBucket[i] = [];
-    }
-
-    // Single pass: compute maxDepth, eventCount, and collect frames
-    for (const frame of frames) {
-      const startBucket = Math.max(0, Math.floor(frame.timeStart / bucketTimeWidth));
-      const endBucket = Math.min(bucketCount - 1, Math.floor(frame.timeEnd / bucketTimeWidth));
-
-      for (let b = startBucket; b <= endBucket; b++) {
-        // Update maxDepth
-        if (frame.depth > maxDepths[b]!) {
-          maxDepths[b] = frame.depth;
-        }
-
-        // Increment event count
-        eventCounts[b]!++;
-
-        // Collect frame for skyline computation
-        framesPerBucket[b]!.push(frame);
-      }
-    }
-
-    // Build output buckets
+    const eventCounts = this.countFrames(skyline, bucketCount, bucketTimeWidth);
     const buckets: MinimapDensityBucket[] = new Array(bucketCount);
 
+    let segment = 0;
     for (let i = 0; i < bucketCount; i++) {
-      // Resolve dominant category using skyline (on-top time) algorithm
-      const dominantCategory = this.resolveCategoryFromSkyline(
-        framesPerBucket[i]!,
-        i * bucketTimeWidth,
-        (i + 1) * bucketTimeWidth,
-      );
+      const bucketStart = i * bucketTimeWidth;
+      const bucketEnd = (i + 1) * bucketTimeWidth;
+
+      // Only fires where a segment ends exactly on the boundary.
+      while (segment < segmentCount && segmentStarts[segment + 1]! <= bucketStart) {
+        segment++;
+      }
+
+      // The segments tile, so the segment holding `bucketStart` starts at or before
+      // it: this is the left-hand partial, with no clamp needed.
+      let from = bucketStart;
+      let maxDepth = 0;
+      let ordered = 0;
+
+      while (segment < segmentCount && segmentStarts[segment]! < bucketEnd) {
+        const segmentEnd = segmentStarts[segment + 1]!;
+        const to = segmentEnd < bucketEnd ? segmentEnd : bucketEnd;
+        const category = segmentCategories[segment]!;
+
+        if (category !== GAP_CATEGORY && to > from) {
+          // First on top wins a tie, which is the order the old sweep's map held.
+          if (accumulated[category] === 0) {
+            onTopOrder[ordered++] = category;
+          }
+          accumulated[category]! += to - from;
+          const depth = segmentDepths[segment]!;
+          if (depth > maxDepth) {
+            maxDepth = depth;
+          }
+        }
+
+        if (segmentEnd >= bucketEnd) {
+          break; // Straddles the end: the next bucket starts on this same segment.
+        }
+        from = segmentEnd;
+        segment++;
+      }
+
+      let winner = GAP_CATEGORY;
+      let best = -1;
+      for (let at = 0; at < ordered; at++) {
+        const category = onTopOrder[at]!;
+        const score = accumulated[category]! * weights[category]!;
+        if (score > best) {
+          best = score;
+          winner = category;
+        }
+        accumulated[category] = 0;
+      }
 
       buckets[i] = {
-        maxDepth: maxDepths[i]!,
+        maxDepth,
         eventCount: eventCounts[i]!,
-        dominantCategory,
+        dominantCategory: winner === GAP_CATEGORY ? DEFAULT_CATEGORY : categoryNames[winner]!,
       };
     }
 
     return { buckets, globalMaxDepth: this.globalMaxDepth };
   }
 
-  // ============================================================================
-  // SKYLINE ALGORITHM: On-Top Time Category Resolution
-  // ============================================================================
+  /**
+   * Count the frames overlapping each bucket, by difference array.
+   *
+   * A frame adds one to the bucket it starts in and takes one back after the
+   * bucket it ends in, so a running total gives every bucket its count in one
+   * pass. The bucket arithmetic is the old loop's, including that a frame ending
+   * exactly on a boundary counts in the bucket after it: this feeds the bar's
+   * opacity, which stays as it was.
+   */
+  private countFrames(
+    skyline: MinimapSkylineIndex,
+    bucketCount: number,
+    bucketTimeWidth: number,
+  ): Uint32Array {
+    const { frameStarts, frameEnds } = skyline;
+    const deltas = new Int32Array(bucketCount + 1);
+    const lastBucket = bucketCount - 1;
+
+    for (let i = 0; i < frameStarts.length; i++) {
+      let first = Math.floor(frameStarts[i]! / bucketTimeWidth);
+      if (first < 0) {
+        first = 0;
+      }
+      let last = Math.floor(frameEnds[i]! / bucketTimeWidth);
+      if (last > lastBucket) {
+        last = lastBucket;
+      }
+      if (last < first) {
+        continue;
+      }
+      deltas[first]!++;
+      deltas[last + 1]!--;
+    }
+
+    const counts = new Uint32Array(bucketCount);
+    let running = 0;
+    for (let b = 0; b < bucketCount; b++) {
+      running += deltas[b]!;
+      counts[b] = running;
+    }
+    return counts;
+  }
 
   /**
-   * Compute dominant category using skyline (on-top time) algorithm.
+   * The skyline, built on the first query.
    *
-   * At each moment within the bucket, the deepest frame is "on top" (visible).
-   * This correctly handles the case where a parent frame's self-duration is
-   * concentrated at the edges (parts not covered by children), not evenly
-   * distributed across the frame's time range.
-   *
-   * Algorithm: Sweep-line with depth tracking
-   * 1. Create enter/exit events for each frame
-   * 2. Sort events by time
-   * 3. Sweep through, tracking which frame is deepest at each moment
-   * 4. Accumulate on-top time per category
-   * 5. Apply CATEGORY_WEIGHTS to determine winner
-   *
-   * PERF: Uses Set for O(1) add/remove instead of indexOf+splice (O(k²) → O(k)).
-   * PERF: Tracks max depth incrementally to avoid rescanning on every frame exit.
-   *
-   * @param frames - Frames overlapping this bucket
-   * @param bucketStart - Bucket start time
-   * @param bucketEnd - Bucket end time
-   * @returns Dominant category for this bucket
+   * Not in the constructor: the tree sorts its frames on first use, and the
+   * timeline defers that cost off its own init.
    */
-  private resolveCategoryFromSkyline(
-    frames: SkylineFrame[],
-    bucketStart: number,
-    bucketEnd: number,
-  ): string {
-    // Fast path: no frames
-    if (frames.length === 0) {
-      return 'Apex';
-    }
+  private skyline(): MinimapSkylineIndex {
+    let index = this.index;
+    if (!index) {
+      index = new MinimapSkylineIndex(
+        this.segmentTree.getAllFramesSorted(),
+        this.totalDuration,
+        this.globalMaxDepth,
+      );
+      this.index = index;
 
-    // Fast path: single frame
-    if (frames.length === 1) {
-      return frames[0]!.category;
-    }
-
-    // Fast path: all same category - no need to compute skyline
-    const firstCategory = frames[0]!.category;
-    let allSameCategory = true;
-    for (let i = 1; i < frames.length; i++) {
-      if (frames[i]!.category !== firstCategory) {
-        allSameCategory = false;
-        break;
+      // One weight per category id, so the argmax needs no string lookup.
+      const names = index.categoryNames;
+      this.weights = new Float64Array(names.length);
+      for (let id = 1; id < names.length; id++) {
+        this.weights[id] = CATEGORY_WEIGHTS[names[id] as BucketCategoryPriority] ?? 1.0;
       }
+      this.accumulated = new Float64Array(names.length);
+      this.onTopOrder = new Int32Array(names.length);
     }
-    if (allSameCategory) {
-      return firstCategory;
-    }
-
-    // Build sweep-line events
-    const events: SkylineEvent[] = [];
-    for (const frame of frames) {
-      // Clamp frame to bucket bounds
-      const clampedStart = Math.max(frame.timeStart, bucketStart);
-      const clampedEnd = Math.min(frame.timeEnd, bucketEnd);
-
-      if (clampedStart < clampedEnd) {
-        events.push({ time: clampedStart, type: SkylineEventType.Enter, frame });
-        events.push({ time: clampedEnd, type: SkylineEventType.Exit, frame });
-      }
-    }
-
-    // Sort events by time, exits before enters at same time
-    events.sort((a, b) => {
-      if (a.time !== b.time) {
-        return a.time - b.time;
-      }
-      // Process exits before enters at the same time
-      return a.type - b.type;
-    });
-
-    // Sweep through events tracking on-top time per category
-    // PERF: Use Set for O(1) add/remove instead of array indexOf+splice
-    const onTopTime = new Map<string, number>();
-    const activeFrames = new Set<SkylineFrame>();
-    let currentMaxDepth = -1;
-    let currentDeepestFrame: SkylineFrame | null = null;
-    let lastTime = bucketStart;
-
-    for (const event of events) {
-      const currentTime = event.time;
-
-      // Accumulate on-top time for the deepest frame since lastTime
-      if (currentDeepestFrame && currentTime > lastTime) {
-        const duration = currentTime - lastTime;
-        const existing = onTopTime.get(currentDeepestFrame.category) ?? 0;
-        onTopTime.set(currentDeepestFrame.category, existing + duration);
-      }
-
-      lastTime = currentTime;
-
-      // Update active frames
-      if (event.type === SkylineEventType.Enter) {
-        activeFrames.add(event.frame);
-        // Update max depth tracking if this frame is deeper
-        if (event.frame.depth > currentMaxDepth) {
-          currentMaxDepth = event.frame.depth;
-          currentDeepestFrame = event.frame;
-        }
-      } else {
-        activeFrames.delete(event.frame); // O(1) instead of O(k)
-        // Only recompute max if we removed the deepest frame
-        if (event.frame === currentDeepestFrame) {
-          currentMaxDepth = -1;
-          currentDeepestFrame = null;
-          for (const f of activeFrames) {
-            if (f.depth > currentMaxDepth) {
-              currentMaxDepth = f.depth;
-              currentDeepestFrame = f;
-            }
-          }
-        }
-      }
-    }
-
-    // Apply category weights and find winner
-    let winningCategory = 'Apex';
-    let winningScore = -1;
-
-    for (const [category, time] of onTopTime) {
-      const weight = CATEGORY_WEIGHTS[category as BucketCategoryPriority] ?? 1.0;
-      const score = time * weight;
-      if (score > winningScore) {
-        winningScore = score;
-        winningCategory = category;
-      }
-    }
-
-    return winningCategory;
+    return index;
   }
 }
