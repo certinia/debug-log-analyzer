@@ -16,9 +16,14 @@ describe('wireInspectorTab', () => {
   });
 
   /** A Call Tree-like view: it records what it marked, moved to and cleared. */
-  function wire(movesToMergedPick = true, reveal?: (eventIndex: number) => Promise<void>) {
+  function wire(
+    movesToMergedPick = true,
+    reveal?: (eventIndex: number, signal: AbortSignal) => Promise<void>,
+  ) {
     const marks: Array<readonly number[]> = [];
     const revealed: number[] = [];
+    /** The signal each move was given, so a test can read which were abandoned. */
+    const signals: AbortSignal[] = [];
     /** Marks and moves in the order they arrived, which the two lists cannot show. */
     const order: string[] = [];
     let clears = 0;
@@ -27,10 +32,11 @@ describe('wireInspectorTab', () => {
         marks.push(eventIndexes);
         order.push('mark');
       },
-      reveal: (eventIndex) => {
+      reveal: (eventIndex, signal) => {
         order.push('move');
+        signals.push(signal);
         if (reveal) {
-          return reveal(eventIndex);
+          return reveal(eventIndex, signal);
         }
         revealed.push(eventIndex);
       },
@@ -39,7 +45,7 @@ describe('wireInspectorTab', () => {
       },
       movesToMergedPick,
     });
-    return { marks, revealed, order, clears: () => clears };
+    return { marks, revealed, order, signals, clears: () => clears };
   }
 
   it('leaves an event for another tab alone', () => {
@@ -119,6 +125,28 @@ describe('wireInspectorTab', () => {
     await new Promise((resolve) => setTimeout(resolve, 0));
 
     expect(view.marks).toEqual([[4]]);
+  });
+
+  it('abandons a move the next one replaces, and keeps both marks', () => {
+    const view = wire();
+
+    eventBus.emit('inspector:reveal', { source: 'calltree', eventIndex: 4 });
+    eventBus.emit('inspector:locate', { source: 'calltree', eventIndexes: [9], sticky: true });
+
+    // The pointer crossing rows asks for a move per row, and the one it stops on
+    // is the one that scrolls.
+    expect(view.signals.map((signal) => signal.aborted)).toEqual([true, false]);
+    expect(view.marks).toEqual([[9]]);
+  });
+
+  it('abandons the move in flight when the view goes away', () => {
+    const view = wire();
+
+    eventBus.emit('inspector:reveal', { source: 'calltree', eventIndex: 4 });
+    off?.();
+    off = null;
+
+    expect(view.signals[0]?.aborted).toBe(true);
   });
 
   it('stops answering once unsubscribed', () => {

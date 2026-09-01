@@ -12,8 +12,11 @@ export interface InspectorTabSync {
   /**
    * Move to one frame. A rejection is the view's own to report: it says the view
    * cannot reach the frame, and the mark still says where the frame is.
+   *
+   * @param signal - aborted once a later move has replaced this one. A view that
+   * waits on anything checks it before it scrolls.
    */
-  reveal: (eventIndex: number) => void | Promise<void>;
+  reveal: (eventIndex: number, signal: AbortSignal) => void | Promise<void>;
 
   /** Drop the view's own selection, for the app-wide Escape. */
   clear: () => void;
@@ -40,9 +43,15 @@ export function wireInspectorTab(
   emphasis: InspectorEmphasis,
   sync: InspectorTabSync,
 ): () => void {
+  let moving: AbortController | null = null;
   const move = (eventIndex: number): void => {
+    // A move waits on a render, and a pointer crossing rows asks for several, so
+    // the last one asked for is the one that scrolls. Only the move is abandoned:
+    // the mark of the move that is dropped went on before it.
+    moving?.abort();
+    moving = new AbortController();
     // The view reports its own failure; the mark stands either way.
-    void Promise.resolve(sync.reveal(eventIndex)).catch(() => {});
+    void Promise.resolve(sync.reveal(eventIndex, moving.signal)).catch(() => {});
   };
 
   const offs = [
@@ -66,6 +75,8 @@ export function wireInspectorTab(
   ];
 
   return () => {
+    moving?.abort();
+    moving = null;
     for (const off of offs) {
       off();
     }
