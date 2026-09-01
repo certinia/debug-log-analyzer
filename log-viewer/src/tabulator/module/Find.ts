@@ -27,6 +27,7 @@ export class Find extends Module {
   _cachedRegex: RegExp | null = null;
   _currentMatchIndex = 0;
   _matchIndexes: { [key: number]: RowComponent } = {};
+  _highlightFrame: number | null = null;
 
   // Headless formatter execution: single detached element (never in the document)
   // and a per-row-field text cache keyed by the stable row-data object reference.
@@ -61,39 +62,33 @@ export class Find extends Module {
     });
 
     this.table.on('renderComplete', () => {
-      if (this._findArgs?.text) {
-        this._applyHighlights();
-      }
+      this._scheduleHighlights();
     });
 
-    // Virtual scroll doesn't fire renderComplete, so listen for scroll events
-    // to apply highlights to newly visible rows. Debounced to avoid blocking
-    // the main thread during fast scrolling, plus scrollend for instant final update.
-    const holder = this.table.element.querySelector('.tabulator-tableholder');
-    if (holder) {
-      let rafId: number | null = null;
-      holder.addEventListener('scroll', () => {
-        if (!this._findArgs?.text) {
-          return;
-        }
-        if (rafId === null) {
-          rafId = requestAnimationFrame(() => {
-            rafId = null;
-            this._applyHighlights();
-          });
-        }
-      });
+    // A row arrives with no highlight in it, and renderComplete does not report
+    // every arrival. A scroll brings rows in without one, on our renderer and on
+    // Tabulator's own.
+    this.table.on('scrollVertical', () => {
+      this._scheduleHighlights();
+    });
 
-      holder.addEventListener('scrollend', () => {
-        if (rafId !== null) {
-          cancelAnimationFrame(rafId);
-          rafId = null;
-        }
-        if (this._findArgs?.text) {
-          this._applyHighlights();
-        }
-      });
+    // And a sort or a filter brings rows in without a scroll. Ours alone reports
+    // this, so a grid on Tabulator's renderer is covered by the scroll above.
+    this.subscribe('render-virtual-attach', () => {
+      this._scheduleHighlights();
+    });
+  }
+
+  /** Re-apply once for the frame: a render can attach twice and complete once,
+   *  and the rebuild reads every cell on screen. */
+  _scheduleHighlights() {
+    if (this._highlightFrame !== null || !this._findArgs?.text) {
+      return;
     }
+    this._highlightFrame = requestAnimationFrame(() => {
+      this._highlightFrame = null;
+      this._applyHighlights();
+    });
   }
 
   async _find(findArgs: FindArgs) {
@@ -232,6 +227,12 @@ export class Find extends Module {
   }
 
   _applyHighlights() {
+    if (this._highlightFrame !== null) {
+      // Whatever asked for this frame is being answered now.
+      cancelAnimationFrame(this._highlightFrame);
+      this._highlightFrame = null;
+    }
+
     // Lazy-init static Highlights
     if (!Find._findHighlight) {
       Find._findHighlight = new Highlight();
@@ -268,6 +269,12 @@ export class Find extends Module {
       }
 
       const data = row.getData();
+      // A row the search visited and found nothing in cannot hold a match, so
+      // none of its cells are worth a text walk. A row built since the search
+      // ran has no list at all, and is walked.
+      if (data.highlightIndexes?.length === 0) {
+        continue;
+      }
 
       let matchIdx = 0;
       row.getCells().forEach((cell) => {
