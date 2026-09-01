@@ -2,7 +2,7 @@
  * Copyright (c) 2026 Certinia Inc. All rights reserved.
  */
 import { beforeEach, describe, expect, it } from '@jest/globals';
-import { workspace } from 'vscode';
+import { Uri, workspace } from 'vscode';
 
 import {
   createMockApexLog,
@@ -17,13 +17,12 @@ jest.mock('apex-log-parser', () => ({
 }));
 
 import { parse } from 'apex-log-parser';
-import { readFile } from '../../services/salesforceServices.js';
 
-jest.mock('../../services/salesforceServices.js', () => ({
-  readFile: jest.fn(),
-}));
-
-const mockReadFile = readFile as jest.Mock;
+// The file-I/O layer is deliberately not mocked out. Stubbing the whole module is
+// what let getApexLog read through a service that throws until another extension
+// initialises it, with the failure swallowed by its own catch.
+const mockReadFile = workspace.fs.readFile as jest.Mock;
+const readsText = (text: string) => new TextEncoder().encode(text);
 const mockParse = parse as jest.Mock;
 
 describe('LogEventCache', () => {
@@ -37,16 +36,16 @@ describe('LogEventCache', () => {
     describe('cache behavior', () => {
       it('should return cached ApexLog on subsequent calls', async () => {
         const mockApexLog = createMockApexLog({ size: 1000 });
-        mockReadFile.mockResolvedValueOnce('log content');
+        mockReadFile.mockResolvedValueOnce(readsText('log content'));
         mockParse.mockReturnValueOnce(mockApexLog);
 
         // First call - should read and parse
-        const result1 = await LogEventCache.getApexLog('/test/file.log');
+        const result1 = await LogEventCache.getApexLog(Uri.file('/test/file.log'));
         expect(result1).toBe(mockApexLog);
         expect(mockReadFile).toHaveBeenCalledTimes(1);
 
         // Second call - should return cached
-        const result2 = await LogEventCache.getApexLog('/test/file.log');
+        const result2 = await LogEventCache.getApexLog(Uri.file('/test/file.log'));
         expect(result2).toBe(mockApexLog);
         expect(mockReadFile).toHaveBeenCalledTimes(1); // Still 1
       });
@@ -55,28 +54,30 @@ describe('LogEventCache', () => {
         const log1 = createMockApexLog({ size: 100 });
         const log2 = createMockApexLog({ size: 200 });
 
-        mockReadFile.mockResolvedValueOnce('content1').mockResolvedValueOnce('content2');
+        mockReadFile
+          .mockResolvedValueOnce(readsText('content1'))
+          .mockResolvedValueOnce(readsText('content2'));
         mockParse.mockReturnValueOnce(log1).mockReturnValueOnce(log2);
 
-        await LogEventCache.getApexLog('/test/file1.log');
-        await LogEventCache.getApexLog('/test/file2.log');
+        await LogEventCache.getApexLog(Uri.file('/test/file1.log'));
+        await LogEventCache.getApexLog(Uri.file('/test/file2.log'));
 
         // Access file1 again - should move to end
-        await LogEventCache.getApexLog('/test/file1.log');
+        await LogEventCache.getApexLog(Uri.file('/test/file1.log'));
 
         // @ts-expect-error - accessing private static for testing
         const keys = Array.from(LogEventCache.cache.keys());
-        expect(keys).toEqual(['/test/file2.log', '/test/file1.log']);
+        expect(keys).toEqual(['file:///test/file2.log', 'file:///test/file1.log']);
       });
 
       it('should evict oldest entry when cache reaches MAX_CACHE_SIZE', async () => {
         // Create 11 logs to trigger eviction (MAX_CACHE_SIZE is 10)
         for (let i = 0; i < 11; i++) {
           const mockLog = createMockApexLog({ size: i * 100 });
-          mockReadFile.mockResolvedValueOnce(`content${i}`);
+          mockReadFile.mockResolvedValueOnce(readsText(`content${i}`));
           mockParse.mockReturnValueOnce(mockLog);
 
-          await LogEventCache.getApexLog(`/test/file${i}.log`);
+          await LogEventCache.getApexLog(Uri.file(`/test/file${i}.log`));
         }
 
         // @ts-expect-error - accessing private static for testing
@@ -85,30 +86,30 @@ describe('LogEventCache', () => {
 
         // First file should be evicted
         // @ts-expect-error - accessing private static for testing
-        const hasFirst = LogEventCache.cache.has('/test/file0.log');
+        const hasFirst = LogEventCache.cache.has('file:///test/file0.log');
         expect(hasFirst).toBe(false);
 
         // Last file should exist
         // @ts-expect-error - accessing private static for testing
-        const hasLast = LogEventCache.cache.has('/test/file10.log');
+        const hasLast = LogEventCache.cache.has('file:///test/file10.log');
         expect(hasLast).toBe(true);
       });
 
       it('should return null when file read fails', async () => {
         mockReadFile.mockRejectedValueOnce(new Error('File not found'));
 
-        const result = await LogEventCache.getApexLog('/test/nonexistent.log');
+        const result = await LogEventCache.getApexLog(Uri.file('/test/nonexistent.log'));
 
         expect(result).toBeNull();
       });
 
       it('should return null when parse fails', async () => {
-        mockReadFile.mockResolvedValueOnce('invalid content');
+        mockReadFile.mockResolvedValueOnce(readsText('invalid content'));
         mockParse.mockImplementationOnce(() => {
           throw new Error('Parse error');
         });
 
-        const result = await LogEventCache.getApexLog('/test/invalid.log');
+        const result = await LogEventCache.getApexLog(Uri.file('/test/invalid.log'));
 
         expect(result).toBeNull();
       });
@@ -314,41 +315,43 @@ describe('LogEventCache', () => {
   describe('clearCache', () => {
     it('should remove specific entry from cache', async () => {
       const mockApexLog = createMockApexLog();
-      mockReadFile.mockResolvedValueOnce('content');
+      mockReadFile.mockResolvedValueOnce(readsText('content'));
       mockParse.mockReturnValueOnce(mockApexLog);
 
-      await LogEventCache.getApexLog('/test/file.log');
+      await LogEventCache.getApexLog(Uri.file('/test/file.log'));
 
       // @ts-expect-error - accessing private static for testing
-      expect(LogEventCache.cache.has('/test/file.log')).toBe(true);
+      expect(LogEventCache.cache.has('file:///test/file.log')).toBe(true);
 
-      LogEventCache.clearCache('/test/file.log');
+      LogEventCache.clearCache('file:///test/file.log');
 
       // @ts-expect-error - accessing private static for testing
-      expect(LogEventCache.cache.has('/test/file.log')).toBe(false);
+      expect(LogEventCache.cache.has('file:///test/file.log')).toBe(false);
     });
 
     it('should not affect other cached entries', async () => {
       const log1 = createMockApexLog({ size: 100 });
       const log2 = createMockApexLog({ size: 200 });
 
-      mockReadFile.mockResolvedValueOnce('content1').mockResolvedValueOnce('content2');
+      mockReadFile
+        .mockResolvedValueOnce(readsText('content1'))
+        .mockResolvedValueOnce(readsText('content2'));
       mockParse.mockReturnValueOnce(log1).mockReturnValueOnce(log2);
 
-      await LogEventCache.getApexLog('/test/file1.log');
-      await LogEventCache.getApexLog('/test/file2.log');
+      await LogEventCache.getApexLog(Uri.file('/test/file1.log'));
+      await LogEventCache.getApexLog(Uri.file('/test/file2.log'));
 
-      LogEventCache.clearCache('/test/file1.log');
+      LogEventCache.clearCache('file:///test/file1.log');
 
       // @ts-expect-error - accessing private static for testing
-      expect(LogEventCache.cache.has('/test/file1.log')).toBe(false);
+      expect(LogEventCache.cache.has('file:///test/file1.log')).toBe(false);
       // @ts-expect-error - accessing private static for testing
-      expect(LogEventCache.cache.has('/test/file2.log')).toBe(true);
+      expect(LogEventCache.cache.has('file:///test/file2.log')).toBe(true);
     });
 
     it('should handle clearing non-existent entry gracefully', () => {
       expect(() => {
-        LogEventCache.clearCache('/test/nonexistent.log');
+        LogEventCache.clearCache('file:///test/nonexistent.log');
       }).not.toThrow();
     });
   });
@@ -366,9 +369,9 @@ describe('LogEventCache', () => {
     it('should clear cache when apexlog document is closed', async () => {
       // Setup cache
       const mockApexLog = createMockApexLog();
-      mockReadFile.mockResolvedValueOnce('content');
+      mockReadFile.mockResolvedValueOnce(readsText('content'));
       mockParse.mockReturnValueOnce(mockApexLog);
-      await LogEventCache.getApexLog('/test/file.log');
+      await LogEventCache.getApexLog(Uri.file('/test/file.log'));
 
       // Capture the callback
       let closeCallback:
@@ -384,19 +387,19 @@ describe('LogEventCache', () => {
       // Simulate closing an apexlog document
       closeCallback!({
         languageId: 'apexlog',
-        uri: { toString: () => '/test/file.log' },
+        uri: { toString: () => 'file:///test/file.log' },
       });
 
       // @ts-expect-error - accessing private static for testing
-      expect(LogEventCache.cache.has('/test/file.log')).toBe(false);
+      expect(LogEventCache.cache.has('file:///test/file.log')).toBe(false);
     });
 
     it('should not clear cache when non-apexlog document is closed', async () => {
       // Setup cache
       const mockApexLog = createMockApexLog();
-      mockReadFile.mockResolvedValueOnce('content');
+      mockReadFile.mockResolvedValueOnce(readsText('content'));
       mockParse.mockReturnValueOnce(mockApexLog);
-      await LogEventCache.getApexLog('/test/file.log');
+      await LogEventCache.getApexLog(Uri.file('/test/file.log'));
 
       // Capture the callback
       let closeCallback:
@@ -412,11 +415,11 @@ describe('LogEventCache', () => {
       // Simulate closing a non-apexlog document
       closeCallback!({
         languageId: 'javascript',
-        uri: { toString: () => '/test/file.log' },
+        uri: { toString: () => 'file:///test/file.log' },
       });
 
       // @ts-expect-error - accessing private static for testing
-      expect(LogEventCache.cache.has('/test/file.log')).toBe(true);
+      expect(LogEventCache.cache.has('file:///test/file.log')).toBe(true);
     });
   });
 });

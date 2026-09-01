@@ -8,7 +8,7 @@ import type { Context } from '../Context.js';
 import { OpenFileInPackage } from '../display/OpenFileInPackage.js';
 import { WebView } from '../display/WebView.js';
 import { RawLogNavigation } from '../log-features/RawLogNavigation.js';
-import { fileOrFolderExists, readFile, writeFile } from '../services/salesforceServices.js';
+import { fileOrFolderExists, readFileText, writeFileText } from '../fs/workspaceFs.js';
 import {
   PRIVATE_SECTIONS,
   getColumnOverrides,
@@ -177,7 +177,7 @@ export class LogView {
               });
 
               if (destinationFile) {
-                writeFile(destinationFile, fileContent).catch((error) => {
+                writeFileText(destinationFile, fileContent).catch((error) => {
                   const msg = error instanceof Error ? error.message : String(error);
                   vscWindow.showErrorMessage(`Unable to save file: ${msg}`);
                 });
@@ -229,7 +229,7 @@ export class LogView {
   }
 
   private static async getFile(fileUri: Uri): Promise<string> {
-    return readFile(fileUri);
+    return readFileText(fileUri);
   }
 
   private static async sendLog(

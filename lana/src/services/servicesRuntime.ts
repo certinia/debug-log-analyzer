@@ -88,7 +88,6 @@ export function isSalesforceServicesApi(value: unknown): value is SalesforceVSCo
     isObject(dependencies) &&
     typeof getProperty(apexLogService, 'listLogs') === 'function' &&
     typeof getProperty(apexLogService, 'getLogBody') === 'function' &&
-    typeof getProperty(fsService, 'readFile') === 'function' &&
     typeof getProperty(fsService, 'safeWriteFile') === 'function' &&
     typeof getProperty(fsService, 'fileOrFolderExists') === 'function'
   );

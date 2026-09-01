@@ -90,7 +90,7 @@ export class RawLogLineDecoration {
     const timestamp = parseInt(match[1], 10);
     const filePath = document.uri.toString();
 
-    const apexLog = await LogEventCache.getApexLog(filePath);
+    const apexLog = await LogEventCache.getApexLog(document.uri);
     if (!apexLog) {
       this.clearDecorations(editor);
       return;

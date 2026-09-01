@@ -29,7 +29,7 @@ class RawLogSymbolProvider implements DocumentSymbolProvider {
     document: TextDocument,
     _token: CancellationToken,
   ): Promise<DocumentSymbol[]> {
-    const apexLog = await LogEventCache.getApexLog(document.uri.toString());
+    const apexLog = await LogEventCache.getApexLog(document.uri);
 
     if (!apexLog) {
       return [];
