@@ -217,12 +217,10 @@ export class MinimapOrchestrator {
     // Initialize minimap manager (state and coordinate transforms)
     this.minimapViewport = new MinimapViewport(index.totalDuration, index.maxDepth, width, height);
 
-    // Initialize density query (leverages segment tree for O(B x log N) performance)
     this.densityQuery = new MinimapDensityQuery(
-      rectangleManager.getRectsByCategory(),
+      rectangleManager.getSegmentTree(),
       index.totalDuration,
       index.maxDepth,
-      rectangleManager.getSegmentTree(),
     );
 
     // Create minimap container on stage

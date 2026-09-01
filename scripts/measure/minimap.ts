@@ -39,10 +39,9 @@ export async function measureMinimap(log: ApexLog, digest: boolean): Promise<voi
 
   const build = (): MinimapDensityQuery =>
     new MinimapDensityQuery(
-      cache.getRectsByCategory(),
+      cache.getSegmentTree(),
       precomputed.totalDuration,
       precomputed.maxDepth,
-      cache.getSegmentTree(),
     );
 
   if (digest) {

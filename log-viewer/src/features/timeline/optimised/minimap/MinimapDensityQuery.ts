@@ -36,7 +36,6 @@
  */
 
 import type { BucketCategoryPriority } from '../../types/flamechart.types.js';
-import type { PrecomputedRect } from '../RectangleCache.js';
 import type { SkylineFrame, TemporalSegmentTree } from '../TemporalSegmentTree.js';
 
 /**
@@ -109,9 +108,6 @@ interface SkylineEvent {
 }
 
 export class MinimapDensityQuery {
-  /** All rectangles grouped by category from RectangleCache. */
-  private rectsByCategory: Map<string, PrecomputedRect[]>;
-
   /** Global maximum depth across timeline. */
   private globalMaxDepth: number;
 
@@ -128,19 +124,13 @@ export class MinimapDensityQuery {
   private cachedBucketCount: number | null = null;
   private cachedDensity: MinimapDensityData | null = null;
 
-  /** Optional segment tree for O(B×log N) density computation. */
-  private segmentTree: TemporalSegmentTree | null = null;
+  /** The frames every density is computed from. */
+  private segmentTree: TemporalSegmentTree;
 
-  constructor(
-    rectsByCategory: Map<string, PrecomputedRect[]>,
-    totalDuration: number,
-    maxDepth: number,
-    segmentTree?: TemporalSegmentTree,
-  ) {
-    this.rectsByCategory = rectsByCategory;
+  constructor(segmentTree: TemporalSegmentTree, totalDuration: number, maxDepth: number) {
+    this.segmentTree = segmentTree;
     this.totalDuration = totalDuration;
     this.globalMaxDepth = maxDepth;
-    this.segmentTree = segmentTree ?? null;
   }
 
   /**
@@ -157,7 +147,7 @@ export class MinimapDensityQuery {
     // A fractional/NaN count crashes the Array/typed-array constructors below
     // with "Invalid array length" (the `<= 0` guards do not catch it), which
     // aborts timeline init and leaves interaction handlers unwired. Normalise
-    // here, the single entry point feeding both compute paths and the cache.
+    // here, the single entry point feeding both the compute and the cache.
     bucketCount = Number.isFinite(bucketCount) ? Math.floor(bucketCount) : 0;
 
     // Fast path: exact match in cache
@@ -165,11 +155,7 @@ export class MinimapDensityQuery {
       return this.cachedDensity;
     }
 
-    // Compute at exact bucket count using sliding window algorithm if tree available
-    const density = this.segmentTree
-      ? this.computeDensitySlidingWindow(bucketCount)
-      : this.computeDensity(bucketCount);
-
+    const density = this.computeDensity(bucketCount);
     this.cachedBucketCount = bucketCount;
     this.cachedDensity = density;
     return density;
@@ -186,29 +172,12 @@ export class MinimapDensityQuery {
     this.cachedDensity = null;
   }
 
-  /**
-   * Update underlying data (call when timeline changes).
-   */
-  public setData(
-    rectsByCategory: Map<string, PrecomputedRect[]>,
-    totalDuration: number,
-    maxDepth: number,
-    segmentTree?: TemporalSegmentTree,
-  ): void {
-    this.rectsByCategory = rectsByCategory;
-    this.totalDuration = totalDuration;
-    this.globalMaxDepth = maxDepth;
-    this.segmentTree = segmentTree ?? null;
-    this.invalidateCache();
-  }
-
   // ============================================================================
   // PRIVATE: DENSITY COMPUTATION
   // ============================================================================
 
   /**
-   * Compute density data by aggregating rectangles into buckets.
-   * Fallback when segment tree is not available.
+   * Compute density data from the tree's frames, sorted by start.
    * Uses skyline (on-top time) algorithm for category resolution:
    * At each moment, the deepest frame is "on top" and its category accumulates time.
    *
@@ -217,91 +186,6 @@ export class MinimapDensityQuery {
    */
   private computeDensity(bucketCount: number): MinimapDensityData {
     if (bucketCount <= 0 || this.totalDuration <= 0) {
-      return { buckets: [], globalMaxDepth: this.globalMaxDepth };
-    }
-
-    // Pre-allocate bucket aggregation arrays
-    const bucketTimeWidth = this.totalDuration / bucketCount;
-    const maxDepths = new Uint16Array(bucketCount);
-    const eventCounts = new Uint32Array(bucketCount);
-
-    // Collect frames per bucket for skyline computation
-    const framesPerBucket: SkylineFrame[][] = new Array(bucketCount);
-    for (let i = 0; i < bucketCount; i++) {
-      framesPerBucket[i] = [];
-    }
-
-    // Single pass through all rectangles
-    for (const rects of this.rectsByCategory.values()) {
-      for (const rect of rects) {
-        // Determine which bucket(s) this rect overlaps
-        const startBucket = Math.floor(rect.timeStart / bucketTimeWidth);
-        const endBucket = Math.floor(rect.timeEnd / bucketTimeWidth);
-
-        // Clamp to valid bucket range
-        const firstBucket = Math.max(0, startBucket);
-        const lastBucket = Math.min(bucketCount - 1, endBucket);
-
-        // Create frame for skyline computation
-        const frame: SkylineFrame = {
-          timeStart: rect.timeStart,
-          timeEnd: rect.timeEnd,
-          depth: rect.depth,
-          category: rect.category,
-          selfDuration: rect.selfDuration,
-        };
-
-        // Aggregate into each overlapping bucket
-        for (let b = firstBucket; b <= lastBucket; b++) {
-          // Update max depth
-          if (rect.depth > maxDepths[b]!) {
-            maxDepths[b] = rect.depth;
-          }
-
-          // Increment event count
-          eventCounts[b]!++;
-
-          // Collect frame for skyline computation
-          framesPerBucket[b]!.push(frame);
-        }
-      }
-    }
-
-    const buckets: MinimapDensityBucket[] = new Array(bucketCount);
-
-    for (let i = 0; i < bucketCount; i++) {
-      // Resolve dominant category using skyline (on-top time) algorithm
-      const dominantCategory = this.resolveCategoryFromSkyline(
-        framesPerBucket[i]!,
-        i * bucketTimeWidth,
-        (i + 1) * bucketTimeWidth,
-      );
-
-      buckets[i] = {
-        maxDepth: maxDepths[i]!,
-        eventCount: eventCounts[i]!,
-        dominantCategory,
-      };
-    }
-
-    return { buckets, globalMaxDepth: this.globalMaxDepth };
-  }
-
-  /**
-   * Compute density data using sliding window algorithm on pre-sorted frames.
-   * Uses skyline (on-top time) algorithm for category resolution:
-   * At each moment, the deepest frame is "on top" and its category accumulates time.
-   *
-   * Performance improvement over computeDensityFromTree():
-   * - Previous: O(B × D × log N) tree queries per bucket = ~90ms
-   * - New: O(N) single pass + O(B × k) skyline computation = ~10-20ms
-   *   (where k = avg frames per bucket, much smaller than N)
-   *
-   * @param bucketCount - Number of output buckets
-   * @returns MinimapDensityData
-   */
-  private computeDensitySlidingWindow(bucketCount: number): MinimapDensityData {
-    if (bucketCount <= 0 || this.totalDuration <= 0 || !this.segmentTree) {
       return { buckets: [], globalMaxDepth: this.globalMaxDepth };
     }
 
