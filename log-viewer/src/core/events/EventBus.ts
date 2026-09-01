@@ -102,10 +102,11 @@ interface EventMap {
   };
 
   // The other direction: a frame in the tab's own view is under the pointer, so
-  // the inspector marks the rows that stand for it — only where a row is already
-  // on screen. Nothing moves: no selection change, no scroll, no expand. A row
-  // that merges occurrences names them all, and the list is empty when the
-  // pointer leaves the frame.
+  // the inspector marks the rows that stand for it, only where a row is already
+  // on screen. Nothing moves: no selection change, no scroll, no expand. The
+  // list is the frames the row stands for, as `inspector:locate` is, so a
+  // bottom-up caller row names the callers at its own depth rather than the
+  // calls they conducted. It is empty when the pointer leaves the frame.
   'detail:locate': { source: DetailSource; eventIndexes: readonly number[] };
 }
 

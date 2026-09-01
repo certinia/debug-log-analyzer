@@ -267,6 +267,50 @@ export function rowOccurrences(row: RowComponent, root: ApexLog | null): number[
   return indexes;
 }
 
+/** Held per row, for the same reason {@link derivedIndexes} is. Only a caller
+ *  row ever climbs, so only a caller row's answer is in here. */
+const derivedCallerFrames = new WeakMap<CallRow, number[]>();
+
+/**
+ * The frames a row is, which is what the inspector marks it by.
+ *
+ * A bottom-up caller row is one of the frames above a call, so it stands for the
+ * callers at its own depth rather than the calls they conducted. A top-down row
+ * sits at its own frames' depth, so there the two are the same, and so is a row
+ * that is one call.
+ *
+ * {@link rowOccurrences} stays the calls the row counts, which is what its
+ * totals describe.
+ *
+ * @param direction - the way the row's own table reads the tree
+ */
+export function rowFrames(
+  row: RowComponent,
+  root: ApexLog | null,
+  direction: SelectionView,
+): number[] {
+  const data = rowCallData(row);
+  const store = direction === 'callers' && root ? logStoreFor(root) : null;
+  if (!store) {
+    return rowOccurrences(row, root);
+  }
+  const cached = derivedCallerFrames.get(data);
+  if (cached) {
+    return cached;
+  }
+  const levels = data._pathId === undefined ? 0 : store.keyPathIds().depthOf(data._pathId) - 1;
+  const conducted = rowOccurrences(row, root);
+  if (levels <= 0) {
+    return conducted;
+  }
+  const frames = store.framesAbove(conducted, levels);
+  if (frames.length) {
+    // Not kept where nothing climbed, for the reason `rowOccurrences` gives.
+    derivedCallerFrames.set(data, frames);
+  }
+  return frames;
+}
+
 /**
  * What a selected row tells the inspector: a merged row names every call it
  * counts, a Time Order row the one call it is, and no row nothing.

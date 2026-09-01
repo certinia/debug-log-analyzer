@@ -19,7 +19,7 @@ import {
   LocatedRowIds,
   LocatedRowMarker,
   rowDetailSelection,
-  rowOccurrences,
+  rowFrames,
 } from '../../../components/locatedRow.js';
 import { InspectorEmphasis } from '../../../components/inspectorEmphasis.js';
 import { wireInspectorTab } from '../../../components/inspectorTab.js';
@@ -665,12 +665,13 @@ export class AnalysisView extends LitElement {
       });
     });
 
-    // Tell the inspector which calls the pointer is over, so it can mark the rows
-    // that stand for them; a bucket merges calls, so it names every call it counts.
+    // Tell the inspector which frames the pointer is over, so it can mark the
+    // rows that stand for them. A row under a bucket is one of its callers, so it
+    // names that caller rather than the calls it conducted.
     this.analysisTable.on('rowMouseEnter', (_e, row) => {
       eventBus.emit('detail:locate', {
         source: 'analysis',
-        eventIndexes: rowOccurrences(row, this.timelineRoot),
+        eventIndexes: rowFrames(row, this.timelineRoot, 'callers'),
       });
     });
     this.analysisTable.on('rowMouseLeave', () => {
