@@ -46,6 +46,8 @@ import {
 } from '../../call-tree/utils/CategoryColoring.js';
 import { expandCollapseAll } from '../../call-tree/utils/ExpandCollapse.js';
 
+import { onTableReshaped } from '../../../tabulator/module/tableReshape.js';
+
 import dataGridStyles from '../../../tabulator/style/DataGrid.scss';
 
 // styles
@@ -501,6 +503,9 @@ export class AnalysisView extends LitElement {
 
   _groupBy(event: Event) {
     const target = event.target as HTMLInputElement;
+    // Grouping renumbers the matches both ways round, and `dataGrouped` reports
+    // only the way that leaves the table grouped.
+    this._dropSearch();
     const fieldName =
       target.value === 'Caller Namespace' ? 'callerNamespace' : target.value.toLowerCase();
     if (this.analysisTable) {
@@ -520,6 +525,7 @@ export class AnalysisView extends LitElement {
     if (!table) {
       return;
     }
+    this._dropSearch();
     table.blockRedraw();
     table.clearFilter(false);
     if (!this.filterState.showDetails) {
@@ -613,18 +619,6 @@ export class AnalysisView extends LitElement {
       rootMethod,
       {
         showDetailsFilter: this._showDetailsFilter,
-        onFilterCacheClear: () => {
-          if (!this.blockClearHighlights && this.totalMatches > 0) {
-            this._resetFindWidget();
-            this._clearSearchHighlights();
-          }
-        },
-        onRenderStarted: () => {
-          if (!this.blockClearHighlights && this.totalMatches > 0) {
-            this._resetFindWidget();
-            this._clearSearchHighlights();
-          }
-        },
         rowFormatter: groupedRowFormatter,
       },
       {
@@ -636,19 +630,7 @@ export class AnalysisView extends LitElement {
     );
     this.analysisTable = table;
 
-    this.analysisTable.on('dataSorted', () => {
-      if (!this.blockClearHighlights && this.totalMatches > 0) {
-        this._resetFindWidget();
-        this._clearSearchHighlights();
-      }
-    });
-
-    this.analysisTable.on('dataGrouped', () => {
-      if (!this.blockClearHighlights && this.totalMatches > 0) {
-        this._resetFindWidget();
-        this._clearSearchHighlights();
-      }
-    });
+    onTableReshaped(this.analysisTable, () => this._dropSearch());
 
     // Feed the inspector. Analysis rows merge many calls, so they
     // scope to every call they count.
@@ -684,6 +666,14 @@ export class AnalysisView extends LitElement {
 
   _resetFindWidget() {
     document.dispatchEvent(new CustomEvent('lv-find-results', { detail: { totalMatches: 0 } }));
+  }
+
+  /** Drop the search where its match numbering no longer describes the table. */
+  _dropSearch() {
+    if (!this.blockClearHighlights && this.totalMatches > 0) {
+      this._resetFindWidget();
+      this._clearSearchHighlights();
+    }
   }
 
   _clearSearchHighlights() {

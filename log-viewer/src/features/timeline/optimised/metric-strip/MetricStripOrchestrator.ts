@@ -115,7 +115,7 @@ export interface MetricStripOrchestratorCallbacks {
    *
    * @param newHeight - New height in pixels
    */
-  onHeightChange?: (newHeight: number) => void;
+  onHeightChange: (newHeight: number) => void;
 }
 
 /**
@@ -428,9 +428,9 @@ export class MetricStripOrchestrator {
     this.renderer?.setHeight(newHeight);
     this.renderer?.setCollapsed(this.isCollapsed);
 
-    // Notify FlameChart to recalculate layout
-    this.callbacks.onHeightChange?.(newHeight);
-    this.callbacks.requestRender();
+    // The host sizes the container for the new height and draws as part of that, so asking it
+    // to draw again would be a second full render for one click.
+    this.callbacks.onHeightChange(newHeight);
   }
 
   /**

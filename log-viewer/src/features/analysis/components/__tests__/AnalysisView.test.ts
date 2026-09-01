@@ -18,6 +18,12 @@ jest.mock('../../../call-tree/components/BottomUpTable.js', () => ({
         return stub.rows;
       },
       goToRow: (row: RowComponent) => stub.revealed.push(row),
+      clearFindHighlights: () => {},
+      blockRedraw: () => {},
+      restoreRedraw: () => {},
+      clearFilter: () => {},
+      addFilter: () => {},
+      setSortedGroupBy: () => {},
     },
     // Left pending: the columns are applied on build, and none are set up here.
     tableBuilt: new Promise<Tabulator>(() => {}),
@@ -104,6 +110,23 @@ function findRow(rows: BottomUpRow[], text: string): BottomUpRow {
   return row;
 }
 
+/**
+ * A view with its table rendered against `log`.
+ *
+ * The app hands the log down as a property, and a row's calls are read through
+ * the table that built it. The table mounts in a wrapper the view finds in its
+ * render root, which it has none of until it is updated, so one is stood in.
+ */
+function mountView(log: ApexLog): AnalysisView {
+  handlers.clear();
+  stub = { rows: [], getRowsArgs: [], revealed: [] };
+  const view = new AnalysisView();
+  view.timelineRoot = log;
+  view.tableContainer = document.createElement('div');
+  void view._renderAnalysis(log);
+  return view;
+}
+
 describe('analysis-view selection', () => {
   let view: AnalysisView;
   let log: ApexLog;
@@ -113,18 +136,9 @@ describe('analysis-view selection', () => {
 
   beforeEach(() => {
     byEventIndex = [];
-    handlers.clear();
-    stub = { rows: [], getRowsArgs: [], revealed: [] };
     log = recursiveLog();
     roots = toBottomUpTree(log.children, logStoreFor(log).keyPathIds());
-    view = new AnalysisView();
-    // The app hands the log down as a property, and a row's calls are read
-    // through the table that built it.
-    view.timelineRoot = log;
-    // The table mounts in a wrapper the view finds in its render root; it has
-    // none until it is updated, so stand one in.
-    view.tableContainer = document.createElement('div');
-    void view._renderAnalysis(log);
+    view = mountView(log);
     seen = [];
     off = eventBus.on('detail:select', (detail) => seen.push(detail));
   });
@@ -226,5 +240,65 @@ describe('analysis-view selection', () => {
     );
 
     expect(seen).toEqual([{ source: 'analysis', selection: null, view: 'callers' }]);
+  });
+});
+
+describe('analysis-view search lifetime', () => {
+  let view: AnalysisView;
+
+  beforeEach(() => {
+    byEventIndex = [];
+    view = mountView(recursiveLog());
+    // What a finished search leaves behind: matches, and nothing of its own in
+    // flight to guard against.
+    view.totalMatches = 3;
+    view.blockClearHighlights = false;
+  });
+
+  afterEach(() => {
+    view.disconnectedCallback();
+  });
+
+  /** What Tabulator reports, which an expand repeats with the sort in force. */
+  function sorted(dir: string): void {
+    (handlers.get('dataSorting') as (sorters: unknown[]) => void)([{ field: 'selfTime', dir }]);
+  }
+
+  it('drops the search where a sort renumbers the matches', () => {
+    sorted('desc');
+
+    expect(view.totalMatches).toBe(0);
+  });
+
+  it('drops the search where a column goes off show, which it counted over', () => {
+    (handlers.get('columnVisibilityChanged') as () => void)();
+
+    expect(view.totalMatches).toBe(0);
+  });
+
+  it('drops the search where grouping is turned off, which reports no grouping', () => {
+    // Tabulator's dataGrouped fires only while the table stays grouped, so this
+    // is the way round it never reports.
+    view._groupBy({ target: { value: 'None' } } as unknown as Event);
+
+    expect(view.totalMatches).toBe(0);
+  });
+
+  it('keeps the search where an expand orders the children it opened', () => {
+    sorted('desc');
+    view.totalMatches = 3;
+
+    // Expanding sorts each opened subtree through the same call, so the event
+    // arrives again with the sort the table already had.
+    sorted('desc');
+    sorted('desc');
+
+    expect(view.totalMatches).toBe(3);
+  });
+
+  it('drops the search where a filter changes which rows there are', () => {
+    view._handleShowDetailsChange();
+
+    expect(view.totalMatches).toBe(0);
   });
 });
