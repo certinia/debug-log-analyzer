@@ -66,7 +66,9 @@ export default [
       format: 'cjs',
       dir: './lana/out/web',
       entryFileNames: 'Main.web.cjs',
-      chunkFileNames: 'lana-[name].js',
+      // The web extension host resolves only require('vscode'), so a split
+      // bundle cannot load its own chunks.
+      inlineDynamicImports: true,
       sourcemap: false,
     },
     external: ['vscode'],
