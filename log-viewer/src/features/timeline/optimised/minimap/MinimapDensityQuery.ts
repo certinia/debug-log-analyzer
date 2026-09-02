@@ -20,9 +20,9 @@
  * The skyline itself does not depend on the width, so it is built once per log
  * (`MinimapSkylineIndex`) and every width walks it.
  *
- * Building it is ~73ms on a 95MB log, on the first minimap draw. That is over the
- * 50ms synchronous budget in `.claude/rules/log-viewer.md`, and moving it off the
- * paint path is still to do.
+ * Building it is ~73ms on a 95MB log, on the first minimap draw, which is over the
+ * 50ms synchronous budget in `.claude/rules/log-viewer.md`. Accepted: it is paid
+ * once per log, against the ~100ms it used to cost on every pixel of a width drag.
  */
 
 import type { BucketCategoryPriority } from '../../types/flamechart.types.js';
