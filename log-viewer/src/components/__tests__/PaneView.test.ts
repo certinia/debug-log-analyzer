@@ -50,6 +50,10 @@ function sash(el: PaneView): HTMLElement {
   return found as HTMLElement;
 }
 
+function paneStyle(el: PaneView, id: string): string {
+  return el.shadowRoot?.querySelector(`.pane[data-id="${id}"]`)?.getAttribute('style') ?? '';
+}
+
 // jsdom has no PointerEvent; the handlers only read the coordinate and pointerId.
 function pointer(type: string, clientY: number): Event {
   return Object.assign(new MouseEvent(type, { clientY, bubbles: true, cancelable: true }), {
@@ -286,7 +290,7 @@ describe('PaneView', () => {
 
     const pane = (id: string) => el.shadowRoot?.querySelector(`.pane[data-id="${id}"]`);
     expect(pane('a')?.getAttribute('style')).toContain('flex: 0 1 auto');
-    expect(pane('b')?.getAttribute('style')).toContain('flex: 1 1 0');
+    expect(pane('b')?.getAttribute('style')).toContain('flex: 1 1 calc(100% / 2)');
   });
 
   it('renders a sash beside a content pane too', async () => {
@@ -319,9 +323,9 @@ describe('PaneView', () => {
     const pane = (id: string) => el.shadowRoot?.querySelector(`.pane[data-id="${id}"]`);
     // A basis, not a weight: it never stretches, and it still shrinks to scroll.
     expect(pane('a')?.getAttribute('style')).toContain('flex: 0 1 500px');
-    // The content pane's size is no part of the fill panes' shares.
-    expect(pane('b')?.getAttribute('style')).toContain('flex: 1.5 1 0');
-    expect(pane('c')?.getAttribute('style')).toContain('flex: 0.5 1 0');
+    // The content pane's size is no part of the fill panes' weights.
+    expect(pane('b')?.getAttribute('style')).toContain('flex: 1.5 1 calc(100% / 3)');
+    expect(pane('c')?.getAttribute('style')).toContain('flex: 0.5 1 calc(100% / 3)');
   });
 
   it('hands a content pane back to its content on a double-click', async () => {
@@ -347,5 +351,60 @@ describe('PaneView', () => {
     // The size is gone rather than zeroed, so the consumer replaces the axis.
     expect(detail?.sizes['vertical:a']).toBeUndefined();
     expect(detail?.orientation).toBe('vertical');
+  });
+
+  describe('fill pane share', () => {
+    const mixed: PaneSection[] = [
+      { id: 'a', title: 'A', content: html`<div>A</div>`, fit: 'content' },
+      { id: 'b', title: 'B', content: html`<div>B</div>`, fit: 'content' },
+      { id: 'c', title: 'C', content: html`<div>C</div>` },
+    ];
+
+    async function mountMixed(
+      orientation: PaneOrientation,
+      props: Partial<PaneView> = {},
+    ): Promise<PaneView> {
+      const el = document.createElement('pane-view') as PaneView;
+      Object.assign(el, { orientation, sections: mixed }, props);
+      document.body.appendChild(el);
+      await el.updateComplete;
+      return el;
+    }
+
+    it('gives the fill pane a share to shrink from, and leaves the content panes alone', async () => {
+      const el = await mountMixed('vertical');
+
+      // Three open panes, so the fill pane starts from a third and grows.
+      expect(paneStyle(el, 'c')).toContain('flex: 1 1 calc(100% / 3)');
+      expect(paneStyle(el, 'a')).toContain('flex: 0 1 auto');
+      expect(paneStyle(el, 'b')).toContain('flex: 0 1 auto');
+    });
+
+    it('widens the share as sections collapse', async () => {
+      const el = await mountMixed('vertical', { collapsed: { b: true } });
+
+      expect(paneStyle(el, 'c')).toContain('flex: 1 1 calc(100% / 2)');
+    });
+
+    it('shares by weight alone once no content pane is open', async () => {
+      const el = await mountMixed('vertical', { collapsed: { a: true, b: true } });
+
+      // One section read on its own gets the whole panel either way, and with
+      // several fill panes a share each would flatten their weights.
+      expect(paneStyle(el, 'c')).toContain('flex: 1 1 0');
+    });
+
+    it('leaves a dragged content pane at the size it was given', async () => {
+      const el = await mountMixed('vertical', { paneSizes: { 'vertical:a': 500 } });
+
+      expect(paneStyle(el, 'a')).toContain('flex: 0 1 500px');
+      expect(paneStyle(el, 'c')).toContain('flex: 1 1 calc(100% / 3)');
+    });
+
+    it('shares nothing side by side, where the axis is the width', async () => {
+      const el = await mountMixed('horizontal');
+
+      expect(paneStyle(el, 'c')).toContain('flex: 1 1 0');
+    });
   });
 });

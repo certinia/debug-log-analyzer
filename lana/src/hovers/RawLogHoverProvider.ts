@@ -9,6 +9,7 @@ import {
   type Position,
   type ProviderResult,
   type TextDocument,
+  type Uri,
 } from 'vscode';
 
 import { LogEventCache } from '../cache/LogEventCache.js';
@@ -25,14 +26,15 @@ class RawLogHoverProvider implements HoverProvider {
     }
 
     const timestamp = parseInt(match[1], 10);
-    return this.buildHover(document.uri.toString(), timestamp);
+    return this.buildHover(document.uri, timestamp);
   }
 
-  private async buildHover(filePath: string, timestamp: number): Promise<Hover> {
-    const args = encodeURIComponent(JSON.stringify({ timestamp, filePath }));
+  private async buildHover(uri: Uri, timestamp: number): Promise<Hover> {
+    // A command URI argument must be JSON, so the URI travels as a string here.
+    const args = encodeURIComponent(JSON.stringify({ timestamp, filePath: uri.toString() }));
     const commandUri = `command:lana.showInLogAnalysis?${args}`;
 
-    const apexLog = await LogEventCache.getApexLog(filePath);
+    const apexLog = await LogEventCache.getApexLog(uri);
     const result = apexLog ? LogEventCache.findEventByTimestamp(apexLog, timestamp) : null;
 
     const metricParts = result ? buildMetricParts(result.event) : [];

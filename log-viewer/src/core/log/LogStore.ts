@@ -9,6 +9,8 @@ import {
   SOSLExecuteBeginLine,
 } from 'apex-log-parser';
 
+import { KeyPathIds } from './keyPathIds.js';
+
 export type Stack = LogEvent[];
 
 /**
@@ -22,6 +24,7 @@ export class LogStore {
   readonly log: ApexLog;
 
   private _statements: Statements | null = null;
+  private _keyPathIds: KeyPathIds | null = null;
 
   constructor(log: ApexLog) {
     this.log = log;
@@ -30,6 +33,32 @@ export class LogStore {
   /** The parser event for an eventIndex, or null if the log has no such event. */
   eventByIndex(eventIndex: number): LogEvent | null {
     return this.log.eventsById[eventIndex] ?? null;
+  }
+
+  /**
+   * The distinct frames `levels` parents above each of `eventIndexes`: what a
+   * merged row standing for its callers is, since a row at path depth D sits
+   * D - 1 hops above the calls it counts.
+   *
+   * How far the dedupe folds is the log's business. A call in a loop has one
+   * caller; a call made once per record has one caller each, so the answer can
+   * be as long as what was asked about.
+   *
+   * @param levels - hops to climb, at least one: the caller guards the rest so
+   *   it can hand back the calls it already holds rather than a copy
+   */
+  framesAbove(eventIndexes: readonly number[], levels: number): number[] {
+    const own = new Set<number>();
+    for (const index of eventIndexes) {
+      let frame = this.eventByIndex(index);
+      for (let up = levels; up > 0 && frame; up--) {
+        frame = frame.parent;
+      }
+      if (frame) {
+        own.add(frame.eventIndex);
+      }
+    }
+    return [...own];
   }
 
   /**
@@ -62,6 +91,14 @@ export class LogStore {
   /** Every SOSL statement in the log, in log order. */
   soslLines(): SOSLExecuteBeginLine[] {
     return this.statements().sosl;
+  }
+
+  /** The interned keys and bucket paths of this log, shared by every view that
+   *  marks a row whose occurrences are merged. */
+  keyPathIds(): KeyPathIds {
+    // No index means no slot to keep a key in, which costs only the key being
+    // built again.
+    return (this._keyPathIds ??= new KeyPathIds(this.log.eventsById?.length ?? 0));
   }
 
   private statements(): Statements {

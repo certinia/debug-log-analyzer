@@ -42,8 +42,11 @@ jest.mock('../detailSections.js', () => ({
   buildDetailSections: (
     _source: string,
     selection: { eventIndex?: number } | null,
-    activeEventIndex: number | null,
+    active: { kind: string; eventIndex?: number; instances?: number[] } | null,
+    sourceView?: string,
   ) => {
+    const walked = active?.kind === 'event' ? String(active.eventIndex) : '-';
+    const counted = active?.kind === 'aggregate' ? (active.instances?.join(',') ?? '-') : '-';
     // The markers carry the anchor and the active frame through to the rendered
     // content, so a stale build resolving late is distinguishable from the one
     // that supersedes it, and a walk is distinguishable from a new pick.
@@ -53,7 +56,9 @@ jest.mock('../detailSections.js', () => ({
             id: 'vitals',
             title: 'Details',
             content: html`<div class="marker">${selection.eventIndex}</div>
-              <div class="active">${activeEventIndex ?? '-'}</div>`,
+              <div class="active">${walked}</div>
+              <div class="view">${sourceView ?? '-'}</div>
+              <div class="bucket">${counted}</div>`,
           },
           { id: 'callstack', title: 'Call stack', content: html`<div>c</div>` },
         ]
@@ -67,7 +72,7 @@ jest.mock('../detailSections.js', () => ({
   },
 }));
 
-import { eventBus } from '../../core/events/EventBus.js';
+import { eventBus, type DetailSource } from '../../core/events/EventBus.js';
 import type { LogInspector } from '../LogInspector.js';
 import type { PaneView } from '../PaneView.js';
 import type { ViewModeSwitch } from '../ViewModeSwitch.js';
@@ -131,7 +136,7 @@ function emptyText(el: LogInspector): string | null {
   return dock?.textContent?.trim() ?? null;
 }
 
-function select(source: 'timeline' | 'database', eventIndex: number): void {
+function select(source: DetailSource, eventIndex: number): void {
   eventBus.emit('detail:select', { source, selection: { kind: 'event', eventIndex } });
 }
 
@@ -142,6 +147,16 @@ function marker(el: LogInspector): string | null {
 /** The frame the sections follow, `-` while the anchor is what is shown. */
 function activeMarker(el: LogInspector): string | null {
   return paneView(el).shadowRoot?.querySelector('.active')?.textContent ?? null;
+}
+
+/** The direction the tab reported, `-` while it has reported none. */
+function viewMarker(el: LogInspector): string | null {
+  return paneView(el).shadowRoot?.querySelector('.view')?.textContent ?? null;
+}
+
+/** The calls a picked merged row counts, `-` while no such row is picked. */
+function bucketMarker(el: LogInspector): string | null {
+  return paneView(el).shadowRoot?.querySelector('.bucket')?.textContent ?? null;
 }
 
 /** The scope switch is slotted into the dock, so it lives in the inspector's own root. */
@@ -306,6 +321,33 @@ describe('LogInspector', () => {
     expect([marker(el), activeMarker(el)]).toEqual(['7', '-']);
   });
 
+  it('follows the direction a tab turns to, leaving its selection alone', async () => {
+    const el = await mount('tree-tab');
+    select('calltree', 1);
+    await flush(el);
+    expect(viewMarker(el)).toBe('-');
+
+    eventBus.emit('detail:view', { source: 'calltree', view: 'callers' });
+    await flush(el);
+
+    expect([marker(el), viewMarker(el)]).toEqual(['1', 'callers']);
+  });
+
+  it('ignores a tab reporting the direction it already showed', async () => {
+    const el = await mount('tree-tab');
+    select('calltree', 1);
+    eventBus.emit('detail:view', { source: 'calltree', view: 'callees' });
+    await flush(el);
+    dispatchInspectorReveal(dockLayout(el), 5);
+    await flush(el);
+
+    eventBus.emit('detail:view', { source: 'calltree', view: 'callees' });
+    await flush(el);
+
+    // No rebuild, so the walk down the stack is still where it was.
+    expect(activeMarker(el)).toBe('5');
+  });
+
   it('keeps each tab walking its own stack', async () => {
     const el = await mount('timeline-tab');
     select('timeline', 1);
@@ -343,6 +385,64 @@ describe('LogInspector', () => {
     // A locate picks nothing, so neither the anchor nor the walk moves.
     await flush(el);
     expect([marker(el), activeMarker(el)]).toEqual(['1', '-']);
+  });
+
+  it('describes what a picked row counts when it names no single frame', async () => {
+    const el = await mount('timeline-tab');
+    select('timeline', 1);
+    await flush(el);
+
+    dispatchInspectorLocate(dockLayout(el), [5, 9], true, {
+      kind: 'aggregate',
+      instances: [5, 9],
+    });
+    await flush(el);
+
+    // The bucket answers instead of a walked frame, and the anchor is untouched.
+    expect([marker(el), activeMarker(el), bucketMarker(el)]).toEqual(['1', '-', '5,9']);
+  });
+
+  it('leaves the walk alone for a sticky mark that names no picked row', async () => {
+    const el = await mount('timeline-tab');
+    select('timeline', 1);
+    dispatchInspectorReveal(dockLayout(el), 5);
+    await flush(el);
+
+    // A tree whose rows carry no aggregate marks stickily without picking one.
+    dispatchInspectorLocate(dockLayout(el), [7, 8], true);
+    await flush(el);
+
+    expect(activeMarker(el)).toBe('5');
+  });
+
+  it('drops the picked row when the pick itself is dropped', async () => {
+    const el = await mount('timeline-tab');
+    select('timeline', 1);
+    dispatchInspectorLocate(dockLayout(el), [5, 9], true, {
+      kind: 'aggregate',
+      instances: [5, 9],
+    });
+    await flush(el);
+
+    dispatchInspectorLocate(dockLayout(el), [], true);
+    await flush(el);
+
+    expect([marker(el), activeMarker(el), bucketMarker(el)]).toEqual(['1', '-', '-']);
+  });
+
+  it('drops the picked row once a single frame is walked to', async () => {
+    const el = await mount('timeline-tab');
+    select('timeline', 1);
+    dispatchInspectorLocate(dockLayout(el), [5, 9], true, {
+      kind: 'aggregate',
+      instances: [5, 9],
+    });
+    await flush(el);
+
+    dispatchInspectorReveal(dockLayout(el), 5);
+    await flush(el);
+
+    expect([activeMarker(el), bucketMarker(el)]).toEqual(['5', '-']);
   });
 
   it('drops a mark the pointer never left when the tab changes', async () => {

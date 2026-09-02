@@ -11,7 +11,7 @@ import type {
 
 import { GOVERNOR_METRICS, limitTotals } from '../../../components/logOverviewMetrics.js';
 import { formatByteSize, formatDuration, formatInteger } from '../../../core/utility/Util.js';
-import { getEventKey } from '../../call-tree/utils/Aggregation.js';
+import { getEventKey } from '../../../core/log/eventKeys.js';
 import { currentLogStore } from '../../../core/log/LogStore.js';
 import { outermostEvents } from '../../../core/utility/EventTree.js';
 import { deriveSoqlObject } from '../../database/services/sobjectClassification.js';
@@ -881,6 +881,10 @@ async function analyse(log: ApexLog): Promise<LogDiagnostics> {
   const selfTime = new Map<string, number>();
   let totalSelf = 0;
   for (const event of log.eventsById) {
+    // The log itself holds the gap time, and no call stands for it.
+    if (event === log) {
+      continue;
+    }
     switch (event.type) {
       case 'SOQL_EXECUTE_BEGIN':
         queries.push(event as SOQLExecuteBeginLine);

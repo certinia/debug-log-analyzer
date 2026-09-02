@@ -32,6 +32,7 @@ jest.mock('../../features/database/components/databaseSections.js', () => ({
   },
 }));
 
+import type { CallTreeDetail } from '../CallTreeDetail.js';
 import { render, type TemplateResult } from 'lit';
 
 import { buildDetailSections } from '../detailSections.js';
@@ -81,13 +82,27 @@ describe('buildDetailSections', () => {
 
   it('passes the frame walked to on to the database sections', async () => {
     databaseCalls.length = 0;
-    await buildDetailSections('database', { kind: 'event', eventIndex: 9, type: 'soql' }, 4);
+    await buildDetailSections(
+      'database',
+      { kind: 'event', eventIndex: 9, type: 'soql' },
+      {
+        kind: 'event',
+        eventIndex: 4,
+      },
+    );
 
     expect(databaseCalls).toEqual([{ eventIndex: 9, type: 'soql', activeEventIndex: 4 }]);
   });
 
   it('anchors the stack and the tree to the selection, while Details follows the active frame', async () => {
-    const sections = await buildDetailSections('timeline', { kind: 'event', eventIndex: 4 }, 2);
+    const sections = await buildDetailSections(
+      'timeline',
+      { kind: 'event', eventIndex: 4 },
+      {
+        kind: 'event',
+        eventIndex: 2,
+      },
+    );
 
     expect(rendered(sections, 'callstack', 'call-stack-detail').getAttribute('eventIndex')).toBe(
       '4',
@@ -122,7 +137,6 @@ describe('buildDetailSections', () => {
     const sections = await buildDetailSections('analysis', {
       kind: 'aggregate',
       instances: [11, 12, 13],
-      label: 'MyClass.run()',
     });
     expect(sections.map((s) => s.id)).toEqual(['vitals', 'findings', 'callstack', 'calltree']);
     expect(
@@ -135,7 +149,6 @@ describe('buildDetailSections', () => {
     const sections = await buildDetailSections('analysis', {
       kind: 'aggregate',
       instances: [11, 12, 13],
-      label: 'MyClass.run()',
     });
 
     const findings = rendered(sections, 'findings', 'log-diagnostics') as HTMLElement & {
@@ -149,8 +162,8 @@ describe('buildDetailSections', () => {
   it('scopes the findings to the frame being followed, not the aggregate it left', async () => {
     const sections = await buildDetailSections(
       'analysis',
-      { kind: 'aggregate', instances: [11, 12, 13], label: 'MyClass.run()' },
-      8,
+      { kind: 'aggregate', instances: [11, 12, 13] },
+      { kind: 'event', eventIndex: 8 },
     );
 
     const findings = rendered(sections, 'findings', 'log-diagnostics') as HTMLElement & {
@@ -170,7 +183,14 @@ describe('buildDetailSections', () => {
   });
 
   it('re-scopes the namespace split to the frame being followed', async () => {
-    const sections = await buildDetailSections('timeline', { kind: 'event', eventIndex: 4 }, 2);
+    const sections = await buildDetailSections(
+      'timeline',
+      { kind: 'event', eventIndex: 4 },
+      {
+        kind: 'event',
+        eventIndex: 2,
+      },
+    );
 
     expect(
       rendered(sections, 'namespace-time', 'namespace-time-bar').getAttribute('eventIndex'),
@@ -181,7 +201,6 @@ describe('buildDetailSections', () => {
     const sections = await buildDetailSections('timeline', {
       kind: 'aggregate',
       instances: [11, 12, 13],
-      label: 'MyClass.run()',
     });
 
     const bar = rendered(sections, 'namespace-time', 'namespace-time-bar') as HTMLElement & {
@@ -198,8 +217,8 @@ describe('buildDetailSections', () => {
   it('drops the aggregate once a single frame in its stack is the one being followed', async () => {
     const sections = await buildDetailSections(
       'analysis',
-      { kind: 'aggregate', instances: [11, 12, 13], label: 'MyClass.run()' },
-      8,
+      { kind: 'aggregate', instances: [11, 12, 13] },
+      { kind: 'event', eventIndex: 8 },
     );
 
     const vitals = rendered(sections, 'vitals', 'event-vitals') as HTMLElement & {
@@ -207,7 +226,22 @@ describe('buildDetailSections', () => {
     };
     expect(vitals.getAttribute('eventIndex')).toBe('8');
     expect(vitals.instances).toBeNull();
-    expect(vitals.getAttribute('label')).toBe('');
+    expect(vitals.getAttribute('called-by')).toBe('');
+  });
+
+  it('describes the calls a walked bucket counts, as a bucket picked in the tab is', async () => {
+    const sections = await buildDetailSections(
+      'analysis',
+      { kind: 'aggregate', instances: [11, 12, 13] },
+      { kind: 'aggregate', instances: [21, 22], calledBy: 'Trigger1' },
+    );
+
+    const vitals = rendered(sections, 'vitals', 'event-vitals') as HTMLElement & {
+      instances: number[] | null;
+    };
+    expect(vitals.instances).toEqual([21, 22]);
+    expect(vitals.getAttribute('eventIndex')).toBe('21');
+    expect(vitals.getAttribute('called-by')).toBe('Trigger1');
   });
 
   it('adds the whole-log database figures for the database with nothing selected', async () => {
@@ -249,6 +283,9 @@ describe('buildDetailSections', () => {
     expect(sections.find((s) => s.id === 'calltree')?.weight).toBe(4);
     expect(sections.find((s) => s.id === 'calltree')?.fit ?? 'fill').toBe('fill');
     expect(sections.find((s) => s.id === 'governor-trends')?.fit).toBe('content');
+    // The tab draws the log top down, so the tree opens on where the time went.
+    const tree = rendered(sections, 'calltree', 'call-tree-detail') as CallTreeDetail;
+    expect(tree.sourceView).toBe('callees');
   });
 
   it('adds the findings section on Analysis, which is that tab at log scope', async () => {

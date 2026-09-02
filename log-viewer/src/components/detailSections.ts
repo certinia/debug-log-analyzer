@@ -3,7 +3,7 @@
  */
 import { html, type TemplateResult } from 'lit';
 
-import type { DetailSelection, DetailSource } from '../core/events/EventBus.js';
+import type { DetailSelection, DetailSource, SelectionView } from '../core/events/EventBus.js';
 import { buildDatabaseSections } from '../features/database/components/databaseSections.js';
 import type { PaneSection } from './PaneView.js';
 
@@ -40,14 +40,16 @@ import './NamespaceTimeBar.js';
  * ambient scope only applies when `selection` is `null`, so it belongs inside
  * the `!selection` branch — never above it.
  *
- * `activeEventIndex` is the frame the user walked to inside the selection's own
- * call stack. Details and the call tree follow it; the call stack stays anchored
- * to `selection`, so walking down a stack never puts a frame out of reach.
+ * `active` is what the user walked to inside the selection's own call stack:
+ * one frame, or the calls a row counts where the view's rows merge occurrences.
+ * Details and the call tree follow it; the call stack stays anchored to
+ * `selection`, so walking down a stack never puts a frame out of reach.
  */
 export async function buildDetailSections(
   source: DetailSource,
   selection: DetailSelection | null,
-  activeEventIndex: number | null = null,
+  active: DetailSelection | null = null,
+  sourceView?: SelectionView,
 ): Promise<PaneSection[]> {
   // Nothing selected: the whole log is the scope. `DetailDock`'s own empty
   // state still covers the moment before a tab id resolves.
@@ -148,7 +150,12 @@ export async function buildDetailSections(
           id: 'calltree',
           title: 'Call tree',
           weight: 4,
-          content: html`<call-tree-detail .wholeLog=${true}></call-tree-detail>`,
+          // The Timeline draws the whole log top down, so the tree answers with
+          // where its time went. Time Order would open on two collapsed roots.
+          content: html`<call-tree-detail
+            .wholeLog=${true}
+            .sourceView=${'callees' as const}
+          ></call-tree-detail>`,
         },
       );
     }
@@ -160,19 +167,29 @@ export async function buildDetailSections(
     return buildDatabaseSections({
       eventIndex: selection.eventIndex,
       type: selection.type,
-      activeEventIndex,
+      activeEventIndex: active?.kind === 'event' ? active.eventIndex : null,
     });
   }
 
   const isAggregate = selection.kind === 'aggregate';
   // An aggregate scopes to all its occurrences; a single frame to itself.
   const anchorIndex = isAggregate ? (selection.instances[0] ?? -1) : selection.eventIndex;
-  const active = activeEventIndex ?? anchorIndex;
-  // One frame in the stack is being followed, so the aggregate no longer
-  // describes what Details and the call tree are showing.
-  const following = active !== anchorIndex;
-  const instances = isAggregate && !following ? selection.instances : null;
-  const label = isAggregate && !following ? selection.label : '';
+  // A walked row that merges occurrences answers as its own aggregate, keyed on
+  // its first occurrence the way a bucket picked in the tab is.
+  const activeIndex =
+    active?.kind === 'aggregate'
+      ? (active.instances[0] ?? anchorIndex)
+      : (active?.eventIndex ?? anchorIndex);
+  // The aggregate Details describes, or none once the walk follows one frame
+  // inside it: the aggregate no longer describes what is shown.
+  const shown =
+    active?.kind === 'aggregate'
+      ? active
+      : isAggregate && activeIndex === anchorIndex
+        ? selection
+        : null;
+  const instances = shown?.instances ?? null;
+  const calledBy = shown?.calledBy ?? '';
 
   const sections: PaneSection[] = [
     {
@@ -180,9 +197,9 @@ export async function buildDetailSections(
       title: 'Details',
       fit: 'content',
       content: html`<event-vitals
-        eventIndex=${active}
+        eventIndex=${activeIndex}
         .instances=${instances}
-        label=${label}
+        called-by=${calledBy}
       ></event-vitals>`,
     },
   ];
@@ -192,7 +209,7 @@ export async function buildDetailSections(
     sections.push(
       namespaceTimeSection(
         html`<namespace-time-bar
-          eventIndex=${active}
+          eventIndex=${activeIndex}
           .instances=${instances}
         ></namespace-time-bar>`,
       ),
@@ -207,7 +224,7 @@ export async function buildDetailSections(
       // The verdict on the selected row, so it reads beside the tree rather than
       // being crowded down to its header by it.
       weight: 3,
-      content: html`<log-diagnostics .instances=${instances ?? [active]}></log-diagnostics>`,
+      content: html`<log-diagnostics .instances=${instances ?? [activeIndex]}></log-diagnostics>`,
     });
   }
   sections.push(
@@ -217,7 +234,7 @@ export async function buildDetailSections(
       weight: 3,
       content: html`<call-stack-detail
         eventIndex=${anchorIndex}
-        activeEventIndex=${active}
+        activeEventIndex=${activeIndex}
       ></call-stack-detail>`,
     },
     {
@@ -227,7 +244,9 @@ export async function buildDetailSections(
       content: html`<call-tree-detail
         eventIndex=${anchorIndex}
         .instances=${isAggregate ? selection.instances : null}
-        activeEventIndex=${active}
+        activeEventIndex=${activeIndex}
+        .source=${source}
+        .sourceView=${sourceView}
       ></call-tree-detail>`,
     },
   );

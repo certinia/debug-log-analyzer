@@ -10,5 +10,6 @@ out/
 coverage/
 *.tsbuildinfo
 /.vscode-test-web
+scripts/measure/out/
 /lana/test-results
 /lana/playwright-report

@@ -20,6 +20,7 @@ import { inspectorSectionStyles } from '../../../styles/inspectorSection.styles.
 import { NO_STATEMENTS } from '../services/databaseOverview.js';
 import {
   rowBudgets,
+  type ObjectRows,
   type RowBudget,
   type RowBudgetKind,
   type RowCount,
@@ -28,8 +29,10 @@ import {
 import { kindColors } from './DatabaseOverview.js';
 import { governorTier } from './GovernorSummary.js';
 
-/** SObjects a bar names before the rest become one tail segment. */
+/** More than a namespace bar: shades in a wide card, not a dock legend. */
 const MAX_OBJECTS = 8;
+
+const OBJECTS_LABEL = 'Query and DML rows by SObject';
 
 const KIND_LABEL: Record<RowBudgetKind, string> = { SOQL: 'Query rows', DML: 'DML rows' };
 
@@ -63,12 +66,16 @@ export class DatabaseRowBudget extends LitElement {
         padding-top: var(--lana-space-sm);
       }
 
+      .budget__head,
+      .objects__head {
+        padding-bottom: var(--lana-space-2xs);
+        font-size: var(--lana-text-sm);
+      }
+
       .budget__head {
         display: flex;
         align-items: baseline;
         gap: var(--lana-space-sm);
-        padding-bottom: var(--lana-space-2xs);
-        font-size: var(--lana-text-sm);
       }
 
       .budget__figure {
@@ -114,6 +121,7 @@ export class DatabaseRowBudget extends LitElement {
     const shown = budgets.budgets.filter((budget) => (budget.used ?? budget.observed) > 0);
     return html`
       ${shown.map((budget) => this._budget(budget, colors[budget.kind]))}
+      ${budgets.objects.length > 0 ? this._objects(budgets.objects, colors) : ''}
       ${
         shown.some(overLimit)
           ? html`<p class="note">
@@ -132,6 +140,37 @@ export class DatabaseRowBudget extends LitElement {
           : ''
       }
       ${budgets.hasLimits ? '' : html`<p class="note">${caveat(budgets.budgets)}</p>`}
+    `;
+  }
+
+  /**
+   * Every SObject once, read beside written. The two limits are separate bars, so
+   * an object on both sides is only whole here, and its hue says which way it leans.
+   */
+  private _objects(
+    objects: readonly ObjectRows[],
+    colors: Record<RowBudgetKind, string>,
+  ): TemplateResult {
+    const segments = segmentsWithTail(
+      objects,
+      (object, index) => ({
+        label: object.sObject,
+        value: object.rows,
+        color: shade(colors[object.rowsWritten > object.rowsRead ? 'DML' : 'SOQL'], index),
+        detail: `${formatInteger(object.rowsRead)} read · ${formatInteger(object.rowsWritten)} written`,
+      }),
+      MAX_OBJECTS,
+    );
+    return html`
+      <div class="budget">
+        <p class="objects__head">${OBJECTS_LABEL}</p>
+        <stacked-time-bar
+          .format=${formatInteger}
+          label=${OBJECTS_LABEL}
+          legend
+          .segments=${segments}
+        ></stacked-time-bar>
+      </div>
     `;
   }
 
@@ -197,14 +236,13 @@ function caveat(budgets: readonly RowBudget[]): string {
 function objectSegments(groups: readonly RowGroup[], hue: string): StackedSegment[] {
   return segmentsWithTail(
     groups,
-    MAX_OBJECTS,
     (group, index) => ({
       label: group.sObject,
       value: group.rows,
       color: shade(hue, index),
       detail: `${formatInteger(group.statements)} statement${group.statements === 1 ? '' : 's'}`,
     }),
-    (group) => group.rows,
+    MAX_OBJECTS,
   );
 }
 

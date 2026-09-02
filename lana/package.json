@@ -52,9 +52,6 @@
   "categories": [
     "Other"
   ],
-  "extensionDependencies": [
-    "salesforce.salesforcedx-vscode-services"
-  ],
   "capabilities": {
     "virtualWorkspaces": true,
     "untrustedWorkspaces": {
@@ -104,7 +101,8 @@
     "menus": {
       "commandPalette": [
         {
-          "command": "lana.showLogAnalysis"
+          "command": "lana.showLogAnalysis",
+          "when": "resourceLangId == apexlog || lana.isApexLog"
         }
       ],
       "editor/context": [
@@ -392,11 +390,11 @@
   },
   "dependencies": {
     "@apexdevtools/apex-parser": "5.1.0",
-    "@salesforce/vscode-services": "^67.12.0",
     "effect": "^3.22.0",
     "vscode-uri": "^3.1.0"
   },
   "devDependencies": {
+    "@salesforce/vscode-services": "^67.12.0",
     "@types/jest": "^30.0.0",
     "@types/node": "~22.20.1",
     "@types/vscode": "~1.102.0",

@@ -4,6 +4,7 @@
 import { css } from 'lit';
 import type { RowComponent } from 'tabulator-tables';
 
+import { stampRowPath } from '../../../components/locatedRow.js';
 import { VSCodeExtensionMessenger } from '../../../core/messaging/VSCodeExtensionMessenger.js';
 import { subscribeSettings, type LanaSettings } from '../../settings/Settings.js';
 import { CATEGORY_THEME_KEY, DEFAULT_THEME_NAME } from '../../timeline/themes/Themes.js';
@@ -39,6 +40,13 @@ export const categoryRowFormatter = (row: RowComponent): void => {
   if (themeKey) {
     row.getElement().style.setProperty('--row-cat-color', `var(--ct-color-${themeKey})`);
   }
+};
+
+/** The `rowFormatter` for a view whose rows merge occurrences: the colour strip,
+ *  plus the path id the inspector's mark finds the row by. */
+export const groupedRowFormatter = (row: RowComponent): void => {
+  categoryRowFormatter(row);
+  stampRowPath(row);
 };
 
 function applyCategoryTheme(host: HTMLElement, themeName: string): void {

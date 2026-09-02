@@ -36,6 +36,15 @@ export interface RowBudget {
   groups: RowGroup[];
 }
 
+/** One SObject's rows, read beside written, across every statement that touched it. */
+export interface ObjectRows {
+  sObject: string;
+  rowsRead: number;
+  rowsWritten: number;
+  /** The two sides summed: the length the segment is drawn at. */
+  rows: number;
+}
+
 /** A statement count against its own limit, for the counts line. */
 export interface RowCount {
   label: string;
@@ -46,6 +55,8 @@ export interface RowCount {
 /** Everything the Row budget section reads. */
 export interface RowBudgets {
   budgets: RowBudget[];
+  /** Every SObject once, read beside written, biggest first. Empty unless both limits hold rows. */
+  objects: ObjectRows[];
   counts: RowCount[];
   /** The most rows one SOSL query returned, against its per-query cap. */
   worstSearch: { rows: number; limit: number } | null;
@@ -95,6 +106,8 @@ function build(log: ApexLog): RowBudgets {
       budgetOf('SOQL', soql, limits.queryRows, hasLimits ? limits.queryRows.used : null),
       budgetOf('DML', dml, limits.dmlRows, hasLimits ? limits.dmlRows.used : null),
     ],
+    // With one limit holding every row the roll-up says nothing the budget does not.
+    objects: soql.size > 0 && dml.size > 0 ? objectRows(soql, dml) : [],
     counts: [
       count('SOQL', limits.soqlQueries, overview.time.soql.statements, hasLimits),
       count('DML', limits.dmlStatements, overview.time.dml.statements, hasLimits),
@@ -116,6 +129,36 @@ function addRows(groups: Map<string, RowGroup>, statement: DatabaseStatement): v
   } else {
     groups.set(sObject, { sObject, rows: statement.rows, statements: statement.repeats });
   }
+}
+
+/**
+ * The two budgets rolled up per SObject. An object both read and written appears
+ * in each, and only here do its two halves meet. The two sides name the object
+ * from separate sources, so they can disagree on case; the unknown label is a
+ * bucket of objects, not one object, so it holds no roll-up.
+ */
+function objectRows(soql: Map<string, RowGroup>, dml: Map<string, RowGroup>): ObjectRows[] {
+  const merged = new Map<string, ObjectRows>();
+  const addSide = (groups: Map<string, RowGroup>, side: 'rowsRead' | 'rowsWritten'): void => {
+    for (const group of groups.values()) {
+      if (group.sObject === UNKNOWN_OBJECT) {
+        continue;
+      }
+      const key = group.sObject.toLowerCase();
+      const object = merged.get(key) ?? {
+        sObject: group.sObject,
+        rowsRead: 0,
+        rowsWritten: 0,
+        rows: 0,
+      };
+      object[side] += group.rows;
+      object.rows += group.rows;
+      merged.set(key, object);
+    }
+  };
+  addSide(soql, 'rowsRead');
+  addSide(dml, 'rowsWritten');
+  return [...merged.values()].sort((a, b) => b.rows - a.rows);
 }
 
 /** The governor's count where the log holds one, else what the tree showed. */

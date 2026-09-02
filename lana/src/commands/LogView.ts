@@ -8,7 +8,7 @@ import type { Context } from '../Context.js';
 import { OpenFileInPackage } from '../display/OpenFileInPackage.js';
 import { WebView } from '../display/WebView.js';
 import { RawLogNavigation } from '../log-features/RawLogNavigation.js';
-import { fileOrFolderExists, readFile, writeFile } from '../services/salesforceServices.js';
+import { fileOrFolderExists, readFileText, writeFileText } from '../fs/workspaceFs.js';
 import {
   PRIVATE_SECTIONS,
   getColumnOverrides,
@@ -38,7 +38,7 @@ export class LogView {
   }
 
   static getLogPath() {
-    return LogView.currentLogUri?.toString();
+    return LogView.currentLogUri ? getLogDisplayPath(LogView.currentLogUri) : undefined;
   }
 
   static getLogUri(): Uri | undefined {
@@ -51,7 +51,7 @@ export class LogView {
 
   static async createView(
     context: Context,
-    beforeSendLog?: Promise<void>,
+    beforeSendLog?: Promise<string | void>,
     logUri?: Uri,
     logData?: string,
   ): Promise<WebviewPanel> {
@@ -112,8 +112,14 @@ export class LogView {
             if (!requestId) {
               break;
             }
-            await beforeSendLog;
-            await LogView.sendLog(requestId, panel, context, logUri, logData);
+            try {
+              // A retrieve that resolves to a body could not be cached, so send it inline.
+              const retrievedLog = await beforeSendLog;
+              await LogView.sendLog(requestId, panel, context, logUri, retrievedLog || logData);
+            } catch (err: unknown) {
+              const errorMessage = err instanceof Error ? err.message : String(err);
+              context.display.showErrorMessage(`Error loading logfile: ${errorMessage}`);
+            }
             break;
           }
 
@@ -177,7 +183,7 @@ export class LogView {
               });
 
               if (destinationFile) {
-                writeFile(destinationFile, fileContent).catch((error) => {
+                writeFileText(destinationFile, fileContent).catch((error) => {
                   const msg = error instanceof Error ? error.message : String(error);
                   vscWindow.showErrorMessage(`Unable to save file: ${msg}`);
                 });
@@ -229,7 +235,7 @@ export class LogView {
   }
 
   private static async getFile(fileUri: Uri): Promise<string> {
-    return readFile(fileUri);
+    return readFileText(fileUri);
   }
 
   private static async sendLog(
@@ -239,11 +245,16 @@ export class LogView {
     logUri?: Uri,
     logData?: string,
   ) {
-    if (!logData && logUri && !(await fileOrFolderExists(logUri))) {
-      context.display.showErrorMessage('Log file could not be found.', {
-        modal: true,
-      });
-      return;
+    // Caching can fail, so only advertise a URI the webview and navigation can read.
+    const cachedUri = logUri && (await fileOrFolderExists(logUri)) ? logUri : undefined;
+    if (!cachedUri) {
+      LogView.currentLogUri = undefined;
+      if (!logData) {
+        context.display.showErrorMessage('Log file could not be found.', {
+          modal: true,
+        });
+        return;
+      }
     }
 
     const navigateToTimestamp = LogView.pendingNavigationTimestamp;
@@ -254,13 +265,20 @@ export class LogView {
       cmd: 'fetchLog',
       payload: {
         logName: logUri ? Utils.basename(logUri) : '',
-        logUri: logUri ? panel.webview.asWebviewUri(logUri).toString(true) : '',
-        logPath: logUri?.toString(),
+        logUri: cachedUri ? panel.webview.asWebviewUri(cachedUri).toString(true) : '',
+        logPath: cachedUri ? getLogDisplayPath(cachedUri) : undefined,
         logData: logData,
         navigateToTimestamp,
       },
     });
   }
+}
+
+function getLogDisplayPath(logUri: Uri): string {
+  return (
+    workspace.asRelativePath(logUri, true) ||
+    (logUri.scheme === 'file' ? logUri.fsPath : logUri.path)
+  );
 }
 
 function isWebViewLogFileRequest(value: unknown): value is WebViewLogFileRequest {

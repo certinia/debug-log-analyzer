@@ -3,7 +3,7 @@
  */
 import type { ApexLog, LogCategory, LogEvent } from 'apex-log-parser';
 
-import { getEventKey } from '../../call-tree/utils/Aggregation.js';
+import { getEventKey } from '../../../core/log/eventKeys.js';
 
 /** Signatures the spread draws a histogram for, the most self time first. */
 const LANE_COUNT = 5;

@@ -277,7 +277,7 @@ describe('database-concentration', () => {
     const shown = texts(await mount('database-concentration'), '.headline');
 
     // 150ms then 100ms of self time in 300ms crosses 75%.
-    expect(shown).toEqual(['2 of 3 statements · 83.3% of DB time · 30.0% of log']);
+    expect(shown).toEqual(['2 statements hold 83.3% of DB time · 30.0% of log']);
   });
 
   it('gives each row its total, its share, its cost per row and its repeats', async () => {
@@ -354,8 +354,8 @@ describe('database-concentration', () => {
     overview = many;
     const element = await mount('database-concentration');
 
-    expect(texts(element, '.reveal-row')).toHaveLength(8);
-    expect(texts(element, '.tail')[0]).toBe('the other 2 statements 20.0%');
+    expect(texts(element, '.reveal-row')).toHaveLength(5);
+    expect(texts(element, '.tail')[0]).toBe('the other 5 statements 50.0%');
   });
 
   it('renders a query as highlighted SOQL, and a DML as its own text', async () => {
@@ -470,7 +470,7 @@ describe('database-namespaces', () => {
     expect(shown[1]?.segments.map((segment) => segment.label)).toEqual(['pkg', 'trigPkg']);
   });
 
-  it('collapses the namespaces past the eighth into one segment', async () => {
+  it('gathers the namespaces past the sixth into one tail that carries them', async () => {
     const many = fullOverview();
     many.askedBy = Array.from({ length: 10 }, (_ignored, index) => ({
       key: `ns${index}`,
@@ -485,8 +485,11 @@ describe('database-namespaces', () => {
     overview = many;
     const chart = bar(await mount('database-namespaces'));
 
-    expect(chart.segments).toHaveLength(9);
-    expect(chart.segments[8]).toMatchObject({ label: '2 others', value: 30_000_000 });
+    expect(chart.segments).toHaveLength(7);
+    const tail = chart.segments[6]!;
+    expect(tail.label).toBe('4 others');
+    expect(tail.value).toBe(100_000_000);
+    expect(tail.parts?.map((part) => part.label)).toEqual(['ns6', 'ns7', 'ns8', 'ns9']);
   });
 
   it('says so when the log records no statements', async () => {

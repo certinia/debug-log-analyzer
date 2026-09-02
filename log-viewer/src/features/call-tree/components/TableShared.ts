@@ -23,8 +23,6 @@ import { makeSumFieldAllVisible } from '../utils/BottomCalcs.js';
 import { governorCostBreakdown, type GovernorCostRow } from '../utils/GovernorCost.js';
 
 export interface TableCallbacks {
-  onFilterCacheClear?: () => void;
-  onRenderStarted: () => void;
   rowFormatter?: (row: RowComponent) => void;
 }
 

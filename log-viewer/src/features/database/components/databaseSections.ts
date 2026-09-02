@@ -76,7 +76,10 @@ export async function buildDatabaseSections(selection: DetailSelection): Promise
     id: 'calltree',
     title: 'Call tree',
     weight: 4,
-    content: html`<call-tree-detail eventIndex=${active}></call-tree-detail>`,
+    content: html`<call-tree-detail
+      eventIndex=${active}
+      .source=${'database' as const}
+    ></call-tree-detail>`,
   });
 
   return sections;

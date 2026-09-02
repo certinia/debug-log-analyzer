@@ -3,7 +3,7 @@
  */
 import { Selection, commands, window, type Uri } from 'vscode';
 
-import { readFile } from '../services/salesforceServices.js';
+import { readFileText } from '../fs/workspaceFs.js';
 
 /**
  * Handles navigation within raw Apex log files.
@@ -20,7 +20,7 @@ export class RawLogNavigation {
   public static async goToLineByTimestamp(logUri: Uri, timestamp: number): Promise<void> {
     try {
       // Read file (no normalization - avoids doubling memory for large files)
-      const text = await readFile(logUri);
+      const text = await readFileText(logUri);
 
       // Find the exact timestamp pattern: (nanoseconds)|
       const index = text.indexOf(`(${timestamp})|`);

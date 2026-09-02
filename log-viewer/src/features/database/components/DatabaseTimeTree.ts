@@ -156,6 +156,9 @@ export class DatabaseTime extends LitElement {
 
   /** eventIndex to the ids of the rows that name it, built on the first mark. */
   private _rowsByEvent: Map<number, number[]> | null = null;
+  /** The rows the table was filled with. Never read them back with `getData()`:
+   *  that runs Tabulator's accessors, which deep-clone every row. */
+  private _rows: readonly DatabaseTreeRow[] = [];
 
   /** The build in flight; a newer one aborts it, and so does a disconnect. */
   private _building: AbortController | null = null;
@@ -221,6 +224,7 @@ export class DatabaseTime extends LitElement {
     this._table?.destroy();
     this._table = null;
     this._rowsByEvent = null;
+    this._rows = [];
   }
 
   firstUpdated(): void {
@@ -249,12 +253,10 @@ export class DatabaseTime extends LitElement {
 
   /** The ids of the rows that name `eventIndexes`; one frame names several. */
   private _rowIdsFor(eventIndexes: readonly number[]): number[] {
-    if (!eventIndexes.length || !this._table) {
+    if (!eventIndexes.length || !this._rows.length) {
       return [];
     }
-    const byEvent = (this._rowsByEvent ??= rowIdsByEventIndex(
-      this._table.getData() as DatabaseTreeRow[],
-    ));
+    const byEvent = (this._rowsByEvent ??= rowIdsByEventIndex(this._rows));
     const ids = new Set<number>();
     for (const eventIndex of eventIndexes) {
       for (const id of byEvent.get(eventIndex) ?? []) {
@@ -298,6 +300,7 @@ export class DatabaseTime extends LitElement {
     this._timeBarParams.totalValue = overview?.time.timeNs ?? 0;
     this._selfBarParams.totalValue = this._ownCodeTotalNs;
     this._rowsByEvent = null;
+    this._rows = rows;
 
     if (this._table) {
       void this._table.setData(rows);
