@@ -43,17 +43,21 @@ function siblingAction(pick: (row: RowComponent) => RowComponent | false) {
     const row = table.getSelectedRows()[0];
     const target = row && pick(row);
     if (row && target) {
-      moveSelection(table, row, target);
+      moveSelection(row, target);
     }
   };
 }
 
-/** Move the selection from one row to another, and keep it in view. */
-function moveSelection(table: Tabulator, from: RowComponent, to: RowComponent): void {
-  table.blockRedraw();
+/**
+ * Move the selection from one row to another, and keep it in view.
+ *
+ * No redraw block around it, here or on a click: selecting a row only sets a
+ * class, while restoring a blocked redraw re-aligns and re-renders every column
+ * header.
+ */
+function moveSelection(from: RowComponent, to: RowComponent): void {
   from.deselect();
   to.select();
-  table.restoreRedraw();
   to.getElement().scrollIntoView({ block: 'nearest' });
 }
 
@@ -131,12 +135,10 @@ export class RowKeyboardNavigation extends Module {
     if (type === 'Range') {
       return;
     }
-    this.localTable.blockRedraw();
     for (const row of this.localTable.getSelectedRows()) {
       row.deselect();
     }
     row.toggleSelect();
-    this.localTable.restoreRedraw();
   }
 
   private static getModuleExtensions() {
@@ -156,7 +158,7 @@ export class RowKeyboardNavigation extends Module {
             if (row.isTreeExpanded()) {
               const nextRow = row.getNextRow();
               if (nextRow && nextRow.getTreeParent() === row) {
-                moveSelection(table, row, nextRow);
+                moveSelection(row, nextRow);
               }
             } else {
               // Declared as the code's own, so the expand does not read as the
@@ -175,7 +177,7 @@ export class RowKeyboardNavigation extends Module {
             if (!row.isTreeExpanded()) {
               const parentRow = row.getTreeParent();
               if (parentRow) {
-                moveSelection(table, row, parentRow);
+                moveSelection(row, parentRow);
               }
             } else {
               // The code's own, as `expandRow`'s is.

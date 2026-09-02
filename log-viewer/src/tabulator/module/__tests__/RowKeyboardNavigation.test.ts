@@ -131,8 +131,6 @@ describe('RowKeyboardNavigation key bindings', () => {
       options: { rowKeyboardNavigation: rowNav, dataTree },
       element: { querySelector: () => body },
       getSelectedRows: () => [current],
-      blockRedraw: () => {},
-      restoreRedraw: () => {},
     };
     const scope = { table } as unknown as never;
     const press = (action: keyof typeof actions, target: unknown = body) => {
