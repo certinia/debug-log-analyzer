@@ -86,24 +86,6 @@ describe('TemporalSegmentTree', () => {
     'Validation',
   ]);
 
-  describe('takeFramesSorted', () => {
-    it('hands over one frame per rectangle, sorted by start, and only once', () => {
-      const events = [
-        createEvent(0, 200, 'Apex', [createEvent(50, 50, 'SOQL')]),
-        createEvent(300, 100, 'Apex'),
-      ];
-      const manager = new RectangleCache(events, categories);
-      const tree = manager.getSegmentTree();
-
-      const frames = tree.takeFramesSorted();
-      expect(frames.map((frame) => frame.timeStart)).toEqual([0, 50, 300]);
-
-      // The frames belong to the caller now. Holding them here as well would be
-      // the log twice over, so the tree keeps nothing.
-      expect(tree.takeFramesSorted()).toEqual([]);
-    });
-  });
-
   describe('tree building', () => {
     it('should build tree from rectangles', () => {
       const events = [

@@ -900,8 +900,7 @@ export class FlameChart<E extends EventNode = EventNode> {
     // Rebuild batch colors cache (used by bucket color resolution)
     this.state.batchColorsCache = this.buildBatchColorsCache(this.state.batches);
 
-    // Invalidate minimap static content to re-render with new colors
-    this.minimapOrchestrator?.invalidateColors();
+    this.minimapOrchestrator?.invalidateStatic();
 
     // Request re-render
     this.requestRender();

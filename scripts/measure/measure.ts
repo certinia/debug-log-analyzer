@@ -18,63 +18,82 @@
  * script passes.
  */
 import { readFileSync } from 'node:fs';
+import { parseArgs } from 'node:util';
 
 import { type ApexLog, parse } from 'apex-log-parser';
 
 import { measureCallTree } from './call-tree.js';
-import { time } from './harness.js';
-import { measureMinimap } from './minimap.js';
+import { die, time } from './harness.js';
+import { digestMinimap, measureMinimap } from './minimap.js';
 
 /** The one log every measurement runs over, so the numbers compare across branches. */
 const SAMPLE_LOG = 'sample-app/debug-logs/sample-log.log';
 
-type AreaRun = (log: ApexLog, digest: boolean) => Promise<void>;
+const USAGE = 'usage: pnpm measure [area...] [--log <path>] [--digest]';
 
-const AREAS: Record<string, AreaRun> = {
-  'call-tree': measureCallTree,
-  minimap: measureMinimap,
-};
-
-/** Areas that can print a digest. Anything else would corrupt the CSV with timings. */
-const DIGESTABLE = ['minimap'];
-
-const argv = process.argv.slice(2);
-const digest = argv.includes('--digest');
-
-const logAt = argv.indexOf('--log');
-const logPath = logAt === -1 ? SAMPLE_LOG : argv[logAt + 1];
-if (!logPath) {
-  console.error('usage: pnpm measure [area...] [--log <path>] [--digest]');
-  process.exit(1);
+interface Area {
+  run(log: ApexLog): Promise<void>;
+  /** Prints a CSV of what the area would draw. Absent where timings are all there is. */
+  digest?(log: ApexLog): void;
 }
 
-const known = Object.keys(AREAS).join(', ');
-// `logAt === -1` would make the path index 0 and swallow the first area name.
-const pathAt = logAt === -1 ? -1 : logAt + 1;
-const named = argv.filter((arg, at) => !arg.startsWith('--') && at !== pathAt);
-for (const name of named) {
-  if (!(name in AREAS)) {
-    console.error(`unknown area "${name}". Known: ${known}`);
-    process.exit(1);
+const AREAS: Record<string, Area> = {
+  'call-tree': { run: measureCallTree },
+  minimap: { run: measureMinimap, digest: digestMinimap },
+};
+
+const args = (() => {
+  try {
+    return parseArgs({
+      args: process.argv.slice(2),
+      options: { log: { type: 'string' }, digest: { type: 'boolean', default: false } },
+      allowPositionals: true,
+    });
+  } catch (error) {
+    die(`${(error as Error).message}\n${USAGE}`);
+  }
+})();
+
+const digest = args.values.digest === true;
+const logPath = args.values.log ?? SAMPLE_LOG;
+
+// Named areas, or every area that can answer. A digest of timings would corrupt the CSV.
+const names = args.positionals.length
+  ? args.positionals
+  : Object.keys(AREAS).filter((name) => !digest || AREAS[name]!.digest);
+
+for (const name of names) {
+  const area = AREAS[name];
+  if (!area) {
+    die(`unknown area "${name}". Known: ${Object.keys(AREAS).join(', ')}\n${USAGE}`);
+  }
+  if (digest && !area.digest) {
+    die(`no digest for: ${name}\n${USAGE}`);
   }
 }
 
-const areas = named.length ? named : digest ? DIGESTABLE : Object.keys(AREAS);
-const undigestable = digest ? areas.filter((name) => !DIGESTABLE.includes(name)) : [];
-if (undigestable.length) {
-  console.error(`no digest for: ${undigestable.join(', ')}. Digestable: ${DIGESTABLE.join(', ')}`);
-  process.exit(1);
+// Each digest prints its own CSV header, so two into one stdout is not a CSV.
+if (digest && names.length > 1) {
+  die(`name one area to digest: ${names.join(', ')}\n${USAGE}`);
 }
 
-const text = readFileSync(logPath, 'utf8');
+let text: string;
+try {
+  text = readFileSync(logPath, 'utf8');
+} catch (error) {
+  die(`${(error as Error).message}\n${USAGE}`);
+}
 if (!digest) {
   console.log(`log ${Math.round(text.length / 1048576)}MB, ${text.split('\n').length} lines\n`);
 }
 const log = digest ? parse(text) : await time('parse', () => parse(text));
 
-for (const area of areas) {
-  if (!digest) {
-    console.log(`\n--- ${area} ---`);
+for (const name of names) {
+  const area = AREAS[name]!;
+  if (digest && area.digest) {
+    area.digest(log);
+    continue;
   }
-  await AREAS[area]!(log, digest);
+  console.log(`\n--- ${name} ---`);
+  await area.run(log);
 }

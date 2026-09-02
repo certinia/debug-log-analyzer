@@ -4,8 +4,7 @@
 
 import { describe, expect, it } from '@jest/globals';
 
-import { MinimapSkylineIndex } from '../minimap/MinimapSkylineIndex.js';
-import type { SkylineFrame } from '../TemporalSegmentTree.js';
+import { MinimapSkylineIndex, type SkylineFrame } from '../minimap/MinimapSkylineIndex.js';
 
 function frame(category: string, timeStart: number, timeEnd: number, depth: number): SkylineFrame {
   return { category, timeStart, timeEnd, depth };
@@ -19,15 +18,15 @@ function segments(index: MinimapSkylineIndex): [number, number, number, string][
       index.segmentStarts[i]!,
       index.segmentStarts[i + 1]!,
       index.segmentDepths[i]!,
-      index.categoryOf(i),
+      index.categoryNames[index.segmentCategories[i]!]!,
     ]);
   }
   return out;
 }
 
-function build(frames: SkylineFrame[], totalDuration = 1000, maxDepth = 4): MinimapSkylineIndex {
-  const sorted = [...frames].sort((a, b) => a.timeStart - b.timeStart);
-  return new MinimapSkylineIndex(sorted, totalDuration, maxDepth);
+function build(frames: SkylineFrame[], totalDuration = 1000): MinimapSkylineIndex {
+  // One group, in whatever order the test wrote it: the index orders its own input.
+  return new MinimapSkylineIndex([frames], totalDuration);
 }
 
 describe('MinimapSkylineIndex', () => {
@@ -85,8 +84,8 @@ describe('MinimapSkylineIndex', () => {
   });
 
   it('keeps a parent that starts at the same time as its child', () => {
-    // The tree can hand these over in either order; the parent must still be on
-    // top after the child ends, or a frame spanning the log is lost.
+    // The parent must still be on top after the child ends, or a frame spanning
+    // the whole log is lost.
     const index = build([frame('Method', 0, 1000, 0), frame('SOQL', 0, 100, 1)], 1000);
 
     expect(segments(index)).toEqual([
@@ -109,10 +108,9 @@ describe('MinimapSkylineIndex', () => {
     expect(index.violations).toBe(1);
   });
 
-  it('keeps the deepest of two frames that overlap at the same depth', () => {
+  it('keeps the first of two frames that overlap at the same depth', () => {
     const index = build([frame('Method', 0, 100, 0), frame('SOQL', 50, 150, 0)], 150);
 
-    // The second cannot be on top of the first, so the first holds the stretch.
     expect(segments(index)).toEqual([
       [0, 100, 0, 'Method'],
       [100, 150, 0, ''],
@@ -134,11 +132,12 @@ describe('MinimapSkylineIndex', () => {
     expect(index.categoryNames.slice(1).sort()).toEqual(['DML', 'Method']);
   });
 
-  it('holds every frame bound, in the order it swept them', () => {
+  it('counts a frame in every bucket it spans', () => {
     const index = build([frame('Method', 0, 1000, 0), frame('DML', 300, 400, 1)]);
 
-    expect(Array.from(index.frameStarts)).toEqual([0, 300]);
-    expect(Array.from(index.frameEnds)).toEqual([1000, 400]);
+    // Ten buckets of 100. The child adds a second count over 300-400, and a
+    // frame ending on a boundary counts in the bucket after it.
+    expect(Array.from(index.countFrames(10, 100))).toEqual([1, 1, 1, 2, 2, 1, 1, 1, 1, 1]);
   });
 
   it('handles a log with no frames', () => {

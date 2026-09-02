@@ -18,12 +18,24 @@
  * `[segmentStarts[i], segmentStarts[i + 1])`, and a stretch with no frame
  * running is a segment of its own with category id 0. So a walk needs no bounds
  * test beyond the segment count, and no segment-end array.
+ *
+ * It also keeps every frame's bounds, which is what `countFrames` needs: both are
+ * the same width-independent, once-per-log projection of the log.
  */
 
-import type { SkylineFrame } from '../TemporalSegmentTree.js';
+/**
+ * What the sweep reads off a frame. `PrecomputedRect` satisfies it, so the minimap
+ * builds straight from the rectangles rather than from objects made for it.
+ */
+export interface SkylineFrame {
+  timeStart: number;
+  timeEnd: number;
+  depth: number;
+  category: string;
+}
 
 /** Category id 0 means no frame is on top, so a zeroed buffer is never wrong. */
-const GAP_CATEGORY = 0;
+export const GAP_CATEGORY = 0;
 
 /** Ids are held in a Uint8Array, and id 0 is the gap. */
 const MAX_CATEGORIES = 255;
@@ -31,17 +43,46 @@ const MAX_CATEGORIES = 255;
 /** Depths are held in a Uint16Array. Real logs reach ~30. */
 const MAX_DEPTH = 65535;
 
-/** Where the sweep writes. Null on the counting pass. */
-interface SkylineBuffers {
+/** What the sweep produces: the segments, and how many of them are real. */
+interface Swept {
   starts: Float64Array;
   depths: Uint16Array;
   categories: Uint8Array;
+  segments: number;
+  violations: number;
+}
+
+/**
+ * Every frame in one array, in the order the sweep needs: by start, then by depth
+ * so a parent precedes the child that starts with it. Get that order wrong and the
+ * sweep drops the parent as an overlap, losing a frame that may span the whole log.
+ *
+ * A new array of references, so the caller's own arrays are never reordered. Cheap
+ * because each group arrives time-ordered, so this merges a handful of runs rather
+ * than sorting from scratch: 12ms for 431k frames, against 43ms for the same frames
+ * in the conversion's own order.
+ */
+function ordered(groups: readonly (readonly SkylineFrame[])[]): SkylineFrame[] {
+  let total = 0;
+  for (const group of groups) {
+    total += group.length;
+  }
+
+  // Pre-sized and filled by index. Growing by push costs 1.6ms and 1.5MB of copies
+  // at 431k frames, and `push(...group)` overflows the stack on a group that size.
+  const frames: SkylineFrame[] = new Array(total);
+  let at = 0;
+  for (const group of groups) {
+    for (const frame of group) {
+      frames[at++] = frame;
+    }
+  }
+
+  frames.sort((a, b) => a.timeStart - b.timeStart || a.depth - b.depth);
+  return frames;
 }
 
 export class MinimapSkylineIndex {
-  /** Number of segments. `segmentStarts` holds one more, to close the last. */
-  public readonly segmentCount: number;
-
   /** Segment boundaries, ascending. Length `segmentCount + 1`. */
   public readonly segmentStarts: Float64Array;
 
@@ -54,56 +95,101 @@ export class MinimapSkylineIndex {
   /** Category name per id, appended to as the sweep meets them. Index 0 is the gap. */
   public readonly categoryNames: string[] = [''];
 
-  /** Frame bounds as parallel arrays, for counting frames per bucket. */
-  public readonly frameStarts: Float64Array;
-  public readonly frameEnds: Float64Array;
-
   /**
-   * Frames the sweep had to contain: one that outlived its parent, one that
-   * overlapped a frame at the same or a shallower depth, or one with no
-   * duration. Zero on a well-formed log; asserted by the tests.
+   * Frames the sweep contained or dropped: one that outlived its parent, one
+   * that overlapped a frame at the same or a shallower depth, or one with no
+   * duration. Zero on a well-formed log; asserted by the tests, and printed by
+   * `pnpm measure minimap` as a tripwire on real logs.
    */
   public readonly violations: number;
+
+  /**
+   * Frame bounds as parallel arrays, for `countFrames`.
+   *
+   * A copy of numbers the rectangles already hold, so this looks like 6.6MB to
+   * reclaim. It is not: `countFrames` runs on every width change, and reading the
+   * scattered rectangles instead measures 10-15ms a call against 1ms, which would
+   * put a resize step inside the frame budget.
+   */
+  private readonly frameStarts: Float64Array;
+  private readonly frameEnds: Float64Array;
 
   private readonly categoryIds = new Map<string, number>();
 
   /**
-   * @param frames - Every frame, ascending by `timeStart`. Reordered in place at equal starts.
+   * @param groups - Frames in groups, each ascending by `timeStart`.
    * @param totalDuration - The log's end timestamp, which the last segment reaches.
-   * @param maxDepth - Deepest frame in the log, which bounds the sweep's stack.
    */
-  constructor(frames: SkylineFrame[], totalDuration: number, maxDepth: number) {
-    orderEqualStartsByDepth(frames);
-
+  constructor(groups: readonly (readonly SkylineFrame[])[], totalDuration: number) {
+    const frames = ordered(groups);
     const count = frames.length;
     this.frameStarts = new Float64Array(count);
     this.frameEnds = new Float64Array(count);
+    let deepest = 0;
     for (let i = 0; i < count; i++) {
       const frame = frames[i]!;
       this.frameStarts[i] = frame.timeStart;
       this.frameEnds[i] = frame.timeEnd;
+      if (frame.depth > deepest) {
+        deepest = frame.depth;
+      }
     }
 
-    // Swept twice, counting then writing, so the arrays are allocated at exactly
-    // the size needed. Growing by doubling would peak about half again as large,
-    // and this module trades speed for memory.
-    const counted = this.sweep(frames, totalDuration, maxDepth, null);
-    this.segmentCount = counted.segments;
-    this.violations = counted.violations;
+    // Depth strictly increases up the stack, so it can hold no more entries than
+    // there are depths. Taken from the frames rather than passed in, so the sweep
+    // cannot overflow on a caller's stale figure.
+    const swept = this.sweep(frames, totalDuration, Math.min(deepest, MAX_DEPTH) + 2);
+    this.violations = swept.violations;
 
-    this.segmentStarts = new Float64Array(counted.segments + 1);
-    this.segmentDepths = new Uint16Array(counted.segments);
-    this.segmentCategories = new Uint8Array(counted.segments);
-    this.sweep(frames, totalDuration, maxDepth, {
-      starts: this.segmentStarts,
-      depths: this.segmentDepths,
-      categories: this.segmentCategories,
-    });
+    this.segmentStarts = swept.starts.subarray(0, swept.segments + 1);
+    this.segmentDepths = swept.depths.subarray(0, swept.segments);
+    this.segmentCategories = swept.categories.subarray(0, swept.segments);
   }
 
-  /** The category a segment's id names, or the empty string for a gap. */
-  public categoryOf(segment: number): string {
-    return this.categoryNames[this.segmentCategories[segment]!]!;
+  /** Number of segments. `segmentStarts` holds one more, to close the last. */
+  public get segmentCount(): number {
+    return this.segmentDepths.length;
+  }
+
+  /**
+   * Count the frames overlapping each bucket, by difference array.
+   *
+   * A frame adds one to the bucket it starts in and takes one back after the
+   * bucket it ends in, so a running total gives every bucket its count in one
+   * pass.
+   *
+   * A frame ending exactly on a boundary counts in the bucket after it, as the
+   * per-bucket collect this replaced did. The segment walk does not, so such a
+   * bucket reports a count at depth 0 and draws no bar.
+   */
+  public countFrames(bucketCount: number, bucketTimeWidth: number): Uint32Array {
+    const { frameStarts, frameEnds } = this;
+    const deltas = new Int32Array(bucketCount + 1);
+    const lastBucket = bucketCount - 1;
+
+    for (let i = 0; i < frameStarts.length; i++) {
+      let first = Math.floor(frameStarts[i]! / bucketTimeWidth);
+      if (first < 0) {
+        first = 0;
+      }
+      let last = Math.floor(frameEnds[i]! / bucketTimeWidth);
+      if (last > lastBucket) {
+        last = lastBucket;
+      }
+      if (last < first) {
+        continue;
+      }
+      deltas[first]!++;
+      deltas[last + 1]!--;
+    }
+
+    const counts = new Uint32Array(bucketCount);
+    let running = 0;
+    for (let b = 0; b < bucketCount; b++) {
+      running += deltas[b]!;
+      counts[b] = running;
+    }
+    return counts;
   }
 
   /**
@@ -113,17 +199,20 @@ export class MinimapSkylineIndex {
    * sweep drains every frame that has ended before pushing the next, which is
    * what makes a frame's own end instant belong to whatever follows it.
    *
-   * @param buffers - Where to write, or null to only count.
+   * @param capacity - Stack depth the frames can reach.
    */
-  private sweep(
-    frames: readonly SkylineFrame[],
-    totalDuration: number,
-    maxDepth: number,
-    buffers: SkylineBuffers | null,
-  ): { segments: number; violations: number } {
-    // Depth strictly increases up the stack, so it can hold no more entries than
-    // there are depths.
-    const capacity = Math.max(1, maxDepth + 2);
+  private sweep(frames: readonly SkylineFrame[], totalDuration: number, capacity: number): Swept {
+    // At most two segments a frame - the stretch before it, and its own end - plus
+    // the trailing gap and the closer. Swept once into that bound and trimmed to a
+    // view, rather than swept twice to size exactly: measured slack over four real
+    // logs is 14 to 2,709 bytes, because a frame emits exactly two segments unless
+    // a same-category sibling at its own depth abuts it to the nanosecond. Copying
+    // into exact arrays would peak 9MB higher to reclaim that.
+    const bound = 2 * frames.length + 2;
+    const starts = new Float64Array(bound);
+    const depths = new Uint16Array(bound);
+    const categories = new Uint8Array(bound);
+
     const stackEnd = new Float64Array(capacity);
     const stackDepth = new Uint16Array(capacity);
     const stackCategory = new Uint8Array(capacity);
@@ -145,26 +234,31 @@ export class MinimapSkylineIndex {
         emittedTo = to;
         return;
       }
-      if (buffers) {
-        buffers.starts[segments] = emittedTo;
-        buffers.depths[segments] = depth;
-        buffers.categories[segments] = category;
-      }
+      starts[segments] = emittedTo;
+      depths[segments] = depth;
+      categories[segments] = category;
       segments++;
       emittedTo = to;
       lastDepth = depth;
       lastCategory = category;
     };
 
-    for (const frame of frames) {
-      const start = frame.timeStart;
-
-      // Retire what has ended. `<=` because a frame is not on top at its own end.
-      while (stackTop > 0 && stackEnd[stackTop - 1]! <= start) {
+    /** Retire what has ended by `until`. `<=` because a frame is not on top at its own end. */
+    const drainTo = (until: number): void => {
+      while (stackTop > 0 && stackEnd[stackTop - 1]! <= until) {
         const at = stackTop - 1;
         emit(stackEnd[at]!, stackDepth[at]!, stackCategory[at]!);
         stackTop--;
       }
+    };
+
+    for (const frame of frames) {
+      const start = frame.timeStart;
+      // Clamped here, not on the store: the stack's strict-increase invariant and
+      // its capacity are both in clamped units, so comparing raw depths could push
+      // two equal-after-clamp frames and run past the end.
+      const depth = frame.depth > MAX_DEPTH ? MAX_DEPTH : frame.depth;
+      drainTo(start);
 
       // The stretch before this frame belongs to whatever encloses it, or to a gap.
       if (start > emittedTo) {
@@ -183,11 +277,7 @@ export class MinimapSkylineIndex {
 
       // A frame no deeper than the one it overlaps cannot be on top of it. Today's
       // sweep gives that frame the same outcome, by keeping the deepest.
-      if (stackTop > 0 && frame.depth <= stackDepth[stackTop - 1]!) {
-        violations++;
-        continue;
-      }
-      if (stackTop === capacity) {
+      if (stackTop > 0 && depth <= stackDepth[stackTop - 1]!) {
         violations++;
         continue;
       }
@@ -201,25 +291,19 @@ export class MinimapSkylineIndex {
       }
 
       stackEnd[stackTop] = end;
-      stackDepth[stackTop] = frame.depth > MAX_DEPTH ? MAX_DEPTH : frame.depth;
+      stackDepth[stackTop] = depth;
       stackCategory[stackTop] = this.idFor(frame.category);
       stackTop++;
     }
 
-    while (stackTop > 0) {
-      const at = stackTop - 1;
-      emit(stackEnd[at]!, stackDepth[at]!, stackCategory[at]!);
-      stackTop--;
-    }
+    drainTo(Infinity);
 
     // The stretch after the last frame is a gap of its own. Closing the last real
     // segment on it instead would credit that time to the frame's category.
     emit(totalDuration, 0, GAP_CATEGORY);
 
-    if (buffers) {
-      buffers.starts[segments] = emittedTo;
-    }
-    return { segments, violations };
+    starts[segments] = emittedTo;
+    return { starts, depths, categories, segments, violations };
   }
 
   /**
@@ -238,32 +322,5 @@ export class MinimapSkylineIndex {
     this.categoryNames.push(category);
     this.categoryIds.set(category, id);
     return id;
-  }
-}
-
-/**
- * Order frames that start together by depth, shallowest first.
- *
- * `takeFramesSorted` sorts by `timeStart` alone, so the order at an equal start
- * is whatever the tree happened to build. The sweep needs the parent pushed
- * before its child, or the child is on the stack first and the parent is dropped
- * as an overlap - losing a frame that may span the whole log.
- *
- * Ties are rare, so this is a scan that almost never sorts anything.
- */
-function orderEqualStartsByDepth(frames: SkylineFrame[]): void {
-  const count = frames.length;
-  let runStart = 0;
-  for (let i = 1; i <= count; i++) {
-    if (i < count && frames[i]!.timeStart === frames[runStart]!.timeStart) {
-      continue;
-    }
-    if (i - runStart > 1) {
-      const run = frames.slice(runStart, i).sort((a, b) => a.depth - b.depth);
-      for (let at = 0; at < run.length; at++) {
-        frames[runStart + at] = run[at]!;
-      }
-    }
-    runStart = i;
   }
 }

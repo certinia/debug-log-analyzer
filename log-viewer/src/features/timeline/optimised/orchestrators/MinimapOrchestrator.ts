@@ -180,7 +180,7 @@ export class MinimapOrchestrator {
    * @param width - Canvas width
    * @param height - Full container height (minimap height calculated from this)
    * @param index - Timeline event index for duration/depth info
-   * @param rectangleManager - For density query and segment tree
+   * @param rectangleManager - Supplies the rectangles the density query walks
    * @param viewport - Main timeline viewport (for reading state only)
    */
   public async init(
@@ -218,7 +218,7 @@ export class MinimapOrchestrator {
     this.minimapViewport = new MinimapViewport(index.totalDuration, index.maxDepth, width, height);
 
     this.densityQuery = new MinimapDensityQuery(
-      rectangleManager.getSegmentTree(),
+      [...rectangleManager.getRectsByCategory().values()],
       index.totalDuration,
       index.maxDepth,
     );
@@ -282,9 +282,7 @@ export class MinimapOrchestrator {
 
     // No density invalidation here: it is keyed by width (see MinimapDensityQuery).
 
-    if (this.renderer) {
-      this.renderer.invalidateStatic();
-    }
+    this.invalidateStatic();
   }
 
   // ============================================================================
@@ -337,7 +335,7 @@ export class MinimapOrchestrator {
    * The density is not touched: it carries category names, and the renderer resolves a
    * colour from them at draw time.
    */
-  public invalidateColors(): void {
+  public invalidateStatic(): void {
     this.renderer?.invalidateStatic();
   }
 

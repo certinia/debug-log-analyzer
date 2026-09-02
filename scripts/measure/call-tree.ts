@@ -18,7 +18,7 @@ import {
   toAggregatedCallTree,
   toBottomUpTree,
 } from '../../log-viewer/src/features/call-tree/utils/Aggregation.js';
-import { time } from './harness.js';
+import { line, time } from './harness.js';
 
 // The builds slice themselves against this; resolving at once measures the work
 // rather than the frames it would hand back on screen.
@@ -72,9 +72,9 @@ export async function measureCallTree(log: ApexLog): Promise<void> {
 
   const shape = shapeOf(bottomUp);
   const counts = ({ nodes, indexes }: Shape) => `${nodes} nodes, ${indexes} indexes held`;
-  console.log(`bottom-up   ${counts(shape)}`);
-  console.log(`aggregated  ${counts(shapeOf(aggregated))}`);
-  console.log(`time-order  ${counts(shapeOf(timeOrder))}\n`);
+  line('bottom-up', counts(shape));
+  line('aggregated', counts(shapeOf(aggregated)));
+  line('time-order', `${counts(shapeOf(timeOrder))}\n`);
 
   const byPathBottomUp = await time('rowIdsByPath bottom-up', () => rowIdsByPath(bottomUp));
   const byPathAggregated = await time('rowIdsByPath aggregated', () => rowIdsByPath(aggregated));

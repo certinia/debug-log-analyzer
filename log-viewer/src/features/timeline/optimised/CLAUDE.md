@@ -66,18 +66,14 @@ The metric strip supports collapsed (heat-style) and expanded (step chart) views
 | ---------------------------------- | ------------------------------ | ------------ |
 | `query(viewport)`                  | Viewport culling for rendering | O(k log n)   |
 | `queryEventsInRegion(time, depth)` | Hit testing, spatial lookups   | O(log n + k) |
-| `takeFramesSorted()`               | Minimap skyline, once per log  | O(n log n)   |
 
 ### Access Pattern
 
 ```typescript
-// Via RectangleCache (preferred)
 const events = rectangleCache.queryEventsInRegion(timeStart, timeEnd, depthStart, depthEnd);
-
-// Direct tree access (for specialized queries)
-const tree = rectangleCache.getSegmentTree();
-const frames = tree.takeFramesSorted();
 ```
+
+`RectangleCache` fronts the tree; nothing reaches past it.
 
 ### Why Not TimelineEventIndex?
 
@@ -155,9 +151,9 @@ This ensures the minimap's viewport lens correctly shows which depth range is vi
 
 The minimap colours each pixel column by the category on top longest in it — the log seen from above.
 
-- `MinimapSkylineIndex` holds that as typed segments, built once per log from the frames the tree
-  hands over with `takeFramesSorted()`. Which frame is on top does not depend on the minimap's
-  width, so it is never rebuilt or invalidated.
+- `MinimapSkylineIndex` holds that as typed segments, built on the first minimap draw straight from
+  `RectangleCache`'s rectangles. Which frame is on top does not depend on the minimap's width, so it
+  is never rebuilt or invalidated.
 - `MinimapDensityQuery` walks those segments against the buckets, one bucket per pixel of the
   display width, and holds the one width it last computed. Nothing invalidates that either: a new
   width misses on its own, and a theme change cannot alter a category name.
