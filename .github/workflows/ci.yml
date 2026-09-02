@@ -79,21 +79,21 @@ jobs:
       - name: Tests
         run: pnpm run test:e2e:web
       - name: Upload Playwright HTML report
-        if: always()
+        if: failure()
         uses: actions/upload-artifact@v4
         with:
           name: playwright-report-web
           path: lana/playwright-report/web
           if-no-files-found: ignore
-          retention-days: 14
+          retention-days: 7
       - name: Upload Playwright test results
-        if: always()
+        if: failure()
         uses: actions/upload-artifact@v4
         with:
           name: playwright-test-results-web
           path: lana/test-results/web
           if-no-files-found: ignore
-          retention-days: 14
+          retention-days: 7
 
   build:
     name: Verify VSCode Package Build
