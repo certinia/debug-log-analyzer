@@ -345,13 +345,17 @@ describe('LocatedRowIds', () => {
   const frame = ev('inner', outerFrame);
   const log = { eventsById: { 5: frame } } as unknown as ApexLog;
 
-  it('builds the paths of the rows the frames belong to', () => {
-    const found = new LocatedRowIds().idsFor(log, [5], 'callers');
+  it('builds the paths of the rows the frames stand for', () => {
+    const paths = logStoreFor(log).keyPathIds();
+    // The row the frame is, and a row for it under another bucket.
+    const own = paths.step(ROOT_PATH_ID, paths.keyIdOf(frame));
+    const under = paths.step(paths.step(ROOT_PATH_ID, paths.keyId('other')), paths.keyIdOf(frame));
+    // The row of the caller above it, which stands for the caller.
+    paths.step(own, paths.keyIdOf(outerFrame));
 
-    // The log's own table, so a row stamped from it reaches the same ids.
-    const expected = new Set<number>();
-    logStoreFor(log).keyPathIds().pathIdsOf(frame, 'callers', expected);
-    expect(found).toEqual([...expected]);
+    expect(new LocatedRowIds().idsFor(log, [5], 'callers').slice().sort()).toEqual(
+      [own, under].sort(),
+    );
   });
 
   it('reuses what it built for the frames it was last asked about', () => {

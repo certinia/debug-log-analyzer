@@ -51,7 +51,7 @@ export class LogView {
 
   static async createView(
     context: Context,
-    beforeSendLog?: Promise<void>,
+    beforeSendLog?: Promise<string | void>,
     logUri?: Uri,
     logData?: string,
   ): Promise<WebviewPanel> {
@@ -112,8 +112,14 @@ export class LogView {
             if (!requestId) {
               break;
             }
-            await beforeSendLog;
-            await LogView.sendLog(requestId, panel, context, logUri, logData);
+            try {
+              // A retrieve that resolves to a body could not be cached, so send it inline.
+              const retrievedLog = await beforeSendLog;
+              await LogView.sendLog(requestId, panel, context, logUri, retrievedLog || logData);
+            } catch (err: unknown) {
+              const errorMessage = err instanceof Error ? err.message : String(err);
+              context.display.showErrorMessage(`Error loading logfile: ${errorMessage}`);
+            }
             break;
           }
 
@@ -239,11 +245,16 @@ export class LogView {
     logUri?: Uri,
     logData?: string,
   ) {
-    if (!logData && logUri && !(await fileOrFolderExists(logUri))) {
-      context.display.showErrorMessage('Log file could not be found.', {
-        modal: true,
-      });
-      return;
+    // Caching can fail, so only advertise a URI the webview and navigation can read.
+    const cachedUri = logUri && (await fileOrFolderExists(logUri)) ? logUri : undefined;
+    if (!cachedUri) {
+      LogView.currentLogUri = undefined;
+      if (!logData) {
+        context.display.showErrorMessage('Log file could not be found.', {
+          modal: true,
+        });
+        return;
+      }
     }
 
     const navigateToTimestamp = LogView.pendingNavigationTimestamp;
@@ -254,8 +265,8 @@ export class LogView {
       cmd: 'fetchLog',
       payload: {
         logName: logUri ? Utils.basename(logUri) : '',
-        logUri: logUri ? panel.webview.asWebviewUri(logUri).toString(true) : '',
-        logPath: logUri ? getLogDisplayPath(logUri) : undefined,
+        logUri: cachedUri ? panel.webview.asWebviewUri(cachedUri).toString(true) : '',
+        logPath: cachedUri ? getLogDisplayPath(cachedUri) : undefined,
         logData: logData,
         navigateToTimestamp,
       },

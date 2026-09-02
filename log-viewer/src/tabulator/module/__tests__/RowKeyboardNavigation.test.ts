@@ -92,3 +92,128 @@ describe('RowKeyboardNavigation', () => {
     expect(holder.focus).not.toHaveBeenCalled();
   });
 });
+
+describe('RowKeyboardNavigation key bindings', () => {
+  const actions = RowKeyboardNavigation.moduleExtensions.keybindings.actions;
+
+  /** A table of three rows with the middle one selected, as a key finds it. */
+  function keyed({
+    rowNav = true,
+    dataTree = false,
+    expanded = false,
+  }: { rowNav?: boolean; dataTree?: boolean; expanded?: boolean } = {}) {
+    const rowOf = (name: string) => {
+      const scrollIntoView = jest.fn();
+      return {
+        name,
+        scrollIntoView,
+        select: jest.fn(),
+        deselect: jest.fn(),
+        getElement: () => ({ scrollIntoView }),
+      };
+    };
+    const previous = rowOf('previous');
+    const next = rowOf('next');
+    const parent = rowOf('parent');
+    const current = {
+      ...rowOf('current'),
+      getPrevRow: () => previous,
+      getNextRow: () => next,
+      getTreeParent: () => parent,
+      isTreeExpanded: () => expanded,
+      treeExpand: jest.fn(),
+      treeCollapse: jest.fn(),
+    };
+    // The child of the selected row, which an expanded row steps into.
+    Object.assign(next, { getTreeParent: () => current });
+    const body = {};
+    const table = {
+      options: { rowKeyboardNavigation: rowNav, dataTree },
+      element: { querySelector: () => body },
+      getSelectedRows: () => [current],
+    };
+    const scope = { table } as unknown as never;
+    const press = (action: keyof typeof actions, target: unknown = body) => {
+      const event = { target, preventDefault: jest.fn() } as unknown as KeyboardEvent;
+      actions[action].call(scope, event);
+      return event;
+    };
+    return { previous, next, parent, current, body, press };
+  }
+
+  it('moves the selection down and keeps the row it lands on in view', () => {
+    const { current, next, press } = keyed();
+
+    const event = press('nextRow');
+
+    expect(next.select).toHaveBeenCalled();
+    expect(current.deselect).toHaveBeenCalled();
+    expect(next.scrollIntoView).toHaveBeenCalled();
+    expect(event.preventDefault).toHaveBeenCalled();
+  });
+
+  it('moves the selection up the same way', () => {
+    const { previous, press } = keyed();
+
+    press('previousRow');
+
+    expect(previous.select).toHaveBeenCalled();
+    expect(previous.scrollIntoView).toHaveBeenCalled();
+  });
+
+  it('takes no key where the table did not ask for row navigation', () => {
+    const { next, press } = keyed({ rowNav: false });
+
+    const event = press('nextRow');
+
+    expect(next.select).not.toHaveBeenCalled();
+    expect(event.preventDefault).not.toHaveBeenCalled();
+  });
+
+  it('leaves a key from the tree control alone, which belongs to another row', () => {
+    // The control carries its own tabIndex, so it can hold focus while a row
+    // elsewhere is the selected one.
+    const { current, next, press } = keyed({ dataTree: true });
+
+    const event = press('nextRow', { control: true });
+    press('expandRow', { control: true });
+
+    expect(next.select).not.toHaveBeenCalled();
+    expect(current.treeExpand).not.toHaveBeenCalled();
+    expect(event.preventDefault).not.toHaveBeenCalled();
+  });
+
+  it('opens a closed tree row, and leaves a flat table alone', () => {
+    const tree = keyed({ dataTree: true });
+    tree.press('expandRow');
+    expect(tree.current.treeExpand).toHaveBeenCalled();
+
+    const flat = keyed();
+    flat.press('expandRow');
+    expect(flat.current.treeExpand).not.toHaveBeenCalled();
+  });
+
+  it('steps into the first child of a row already open', () => {
+    const { next, press } = keyed({ dataTree: true, expanded: true });
+
+    press('expandRow');
+
+    expect(next.select).toHaveBeenCalled();
+  });
+
+  it('steps out to the parent of a closed row', () => {
+    const { parent, press } = keyed({ dataTree: true });
+
+    press('collapseRow');
+
+    expect(parent.select).toHaveBeenCalled();
+  });
+
+  it('closes a row that is open, as the code rather than the user', () => {
+    const { current, press } = keyed({ dataTree: true, expanded: true });
+
+    press('collapseRow');
+
+    expect(current.treeCollapse).toHaveBeenCalled();
+  });
+});

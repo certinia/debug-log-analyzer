@@ -1062,7 +1062,7 @@ describe('bottom-up caller row scope', () => {
   /** The root bucket's calls whose own chain of callers runs through the row,
    *  which is what the grid counts the row's totals from. */
   function derivedFor(paths: KeyPathIds, root: BottomUpRow, row: BottomUpRow): LogEvent[] {
-    return root.instances.filter((event) => paths.chainReaches(event, row._pathId));
+    return root.instances.filter((event) => paths.chainNodeAt(event, row._pathId) !== null);
   }
 
   it('counts one call per occurrence the row derives', () => {

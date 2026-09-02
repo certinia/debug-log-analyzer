@@ -58,7 +58,6 @@ export default [
           },
         }),
       ),
-      // Copy runtime dependency files for salesforce bundle compatibility
     ],
   },
   {

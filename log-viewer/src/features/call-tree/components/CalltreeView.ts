@@ -180,7 +180,7 @@ export class CalltreeView extends LitElement {
 
     this._inspectorUnsubscribe = wireInspectorTab('calltree', this._emphasis, {
       mark: (eventIndexes) => this._markLocated(eventIndexes),
-      reveal: (eventIndex) => this._revealEventIndex(eventIndex),
+      reveal: (eventIndex, signal) => this._revealEventIndex(eventIndex, signal),
       clear: () => {
         // The table reports the clear itself, which is what reaches the inspector.
         for (const table of this._tables) {
@@ -902,14 +902,14 @@ export class CalltreeView extends LitElement {
    * switch, no view-mode change and no focus steal, unlike {@link _goToRow}.
    * Focus stays where the click was, which is the inspector.
    */
-  private async _revealEventIndex(eventIndex: number): Promise<void> {
+  private async _revealEventIndex(eventIndex: number, signal: AbortSignal): Promise<void> {
     const table = this._getActiveTable();
     if (!table) {
       return;
     }
 
     const treeRow = await this._findRowFor(table, eventIndex);
-    if (!treeRow) {
+    if (!treeRow || signal.aborted) {
       return;
     }
 
