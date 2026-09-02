@@ -61,6 +61,36 @@ export default [
     ],
   },
   {
+    input: './lana/src/Main.web.ts',
+    output: {
+      format: 'cjs',
+      dir: './lana/out/web',
+      entryFileNames: 'Main.web.js',
+      chunkFileNames: 'lana-[name].js',
+      sourcemap: false,
+    },
+    external: ['vscode'],
+    plugins: [
+      nodeResolve({ browser: true, preferBuiltins: false }),
+      commonjs(),
+      json(),
+      nodePolyfills(),
+      swc(
+        defineRollupSwcOption({
+          include: /\.[mc]?[jt]sx?$/,
+          exclude: /node_modules/,
+          tsconfig: production ? './lana/tsconfig.json' : './lana/tsconfig-dev.json',
+          jsc: {
+            minify: {
+              compress: production ? { keep_classnames: true, keep_fnames: true } : false,
+              mangle: production ? { keep_classnames: true } : false,
+            },
+          },
+        }),
+      ),
+    ],
+  },
+  {
     input: { bundle: './log-viewer/src/Main.ts' },
     // @vscode-elements ships tsc output with the inline `(this && this.__decorate)` helper.
     // Declaring a top-level `this` for those files stops rollup's THIS_IS_UNDEFINED warning; use
