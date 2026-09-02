@@ -177,9 +177,13 @@ export class LogView {
             if (isSaveFileRequest(payload)) {
               const { fileContent, options } = payload;
               const defaultWorkspace = (workspace.workspaceFolders || [])[0];
-              const defaultDir = defaultWorkspace?.uri ?? context.context.extensionUri;
               const destinationFile = await vscWindow.showSaveDialog({
-                defaultUri: Utils.joinPath(defaultDir, options.defaultFileName),
+                // With no workspace folder, let VS Code pick its own last-used location:
+                // the extension's install directory is wrong, and os.homedir() is a web
+                // polyfill that reports '/'.
+                defaultUri: defaultWorkspace
+                  ? Utils.joinPath(defaultWorkspace.uri, options.defaultFileName)
+                  : undefined,
               });
 
               if (destinationFile) {
