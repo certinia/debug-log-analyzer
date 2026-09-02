@@ -3,8 +3,21 @@
  */
 import { describe, expect, it } from '@jest/globals';
 
+import { createMockContext } from '../../__tests__/helpers/test-builders.js';
 import { createMockTextDocument } from '../../__tests__/mocks/vscode.js';
-import { isApexLogContent } from '../ApexLogLanguageDetector.js';
+import {
+  TabInputText,
+  Uri,
+  commands,
+  languages,
+  window,
+  workspace,
+} from '../../__tests__/mocks/vscode.js';
+import {
+  ApexLogLanguageDetector,
+  isApexLogContent,
+  isApexLogFile,
+} from '../ApexLogLanguageDetector.js';
 
 describe('isApexLogContent', () => {
   it('should detect standard log with settings header on line 1', () => {
@@ -92,5 +105,100 @@ describe('isApexLogContent', () => {
     });
 
     expect(isApexLogContent(doc)).toBe(false);
+  });
+});
+
+describe('isApexLogFile', () => {
+  it('decodes only the first 4 KB returned by the filesystem provider', async () => {
+    const prefix = 'not an Apex log'.padEnd(4096, ' ');
+    workspace.fs.readFile.mockResolvedValue(
+      new TextEncoder().encode(`${prefix}09:45:31.888 (1000)|EXECUTION_STARTED`),
+    );
+    const uri = Uri.file('/logs/large.log');
+
+    await expect(isApexLogFile(uri)).resolves.toBe(false);
+
+    expect(workspace.fs.readFile).toHaveBeenCalledWith(uri);
+  });
+
+  it('uses the registered filesystem provider for an arbitrary URI scheme', async () => {
+    workspace.fs.readFile.mockResolvedValue(
+      new TextEncoder().encode('09:45:31.888 (1000)|EXECUTION_STARTED'),
+    );
+    const uri = Uri.parse('git:/repository/logs/virtual.log');
+
+    await expect(isApexLogFile(uri)).resolves.toBe(true);
+
+    expect(workspace.fs.readFile).toHaveBeenCalledWith(uri);
+  });
+});
+
+describe('ApexLogLanguageDetector', () => {
+  it.each(['log', 'txt'])('detects .%s Apex logs from arbitrary URI schemes', (extension) => {
+    const doc = createMockTextDocument({
+      languageId: 'plaintext',
+      lines: ['09:45:31.888 (1000)|EXECUTION_STARTED'],
+    });
+    Object.defineProperty(doc, 'uri', {
+      value: Uri.parse(`git:/repository/logs/virtual.${extension}`),
+    });
+    workspace.textDocuments = [doc];
+
+    ApexLogLanguageDetector.apply(
+      createMockContext() as unknown as import('../../Context.js').Context,
+    );
+
+    expect(languages.setTextDocumentLanguage).toHaveBeenCalledWith(doc, 'apexlog');
+  });
+
+  it('retains the existing extension prefilter', () => {
+    const doc = createMockTextDocument({
+      languageId: 'plaintext',
+      lines: ['09:45:31.888 (1000)|EXECUTION_STARTED'],
+    });
+    Object.defineProperty(doc, 'uri', { value: Uri.parse('git:/repository/logs/virtual.json') });
+    workspace.textDocuments = [doc];
+
+    ApexLogLanguageDetector.apply(
+      createMockContext() as unknown as import('../../Context.js').Context,
+    );
+
+    expect(languages.setTextDocumentLanguage).not.toHaveBeenCalled();
+  });
+
+  it('does not publish a stale async result after the active tab changes', async () => {
+    let resolveSlowRead: ((bytes: Uint8Array) => void) | undefined;
+    const slowRead = new Promise<Uint8Array>((resolve) => {
+      resolveSlowRead = resolve;
+    });
+    const slowUri = Uri.parse('memfs:/logs/slow.log');
+    const fastUri = Uri.parse('memfs:/logs/fast.log');
+    workspace.fs.readFile.mockImplementation((uri: { path: string }) =>
+      uri.path === slowUri.path
+        ? slowRead
+        : Promise.resolve(new TextEncoder().encode('not an Apex log')),
+    );
+
+    let notifyTabsChanged: (() => void) | undefined;
+    window.tabGroups.onDidChangeTabs.mockImplementation((listener: (event: unknown) => void) => {
+      notifyTabsChanged = () => listener({});
+      return { dispose: jest.fn() };
+    });
+    window.tabGroups.activeTabGroup.activeTab = { input: new TabInputText(slowUri) };
+
+    ApexLogLanguageDetector.apply(
+      createMockContext() as unknown as import('../../Context.js').Context,
+    );
+    window.tabGroups.activeTabGroup.activeTab = { input: new TabInputText(fastUri) };
+    notifyTabsChanged?.();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    expect(commands.executeCommand).toHaveBeenLastCalledWith('setContext', 'lana.isApexLog', false);
+
+    resolveSlowRead?.(new TextEncoder().encode('09:45:31.888 (1000)|EXECUTION_STARTED'));
+    await slowRead;
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    expect(commands.executeCommand).not.toHaveBeenCalledWith('setContext', 'lana.isApexLog', true);
   });
 });

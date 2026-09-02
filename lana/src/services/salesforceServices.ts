@@ -32,11 +32,6 @@ export function getLogBody(logId: string): Promise<string> {
   return getRuntime().runPromise(ApexLogService.getLogBody(logId));
 }
 
-export function readFile(uri: Uri | string): Promise<string> {
-  const { FsService } = getServicesApi().services;
-  return getRuntime().runPromise(FsService.readFile(uri));
-}
-
 export function writeFile(uri: Uri | string, content: string): Promise<void> {
   const { FsService } = getServicesApi().services;
   return getRuntime().runPromise(FsService.safeWriteFile(uri, content));

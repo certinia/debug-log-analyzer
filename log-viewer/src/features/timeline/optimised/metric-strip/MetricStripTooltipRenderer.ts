@@ -111,6 +111,15 @@ export class MetricStripTooltipRenderer extends BaseTooltipRenderer {
   /** Set once the panel's title exists. */
   private titleNode: HTMLElement | null = null;
 
+  /** Set once the no-data note exists; hidden while the cursor is over recorded time. */
+  private noDataNode: HTMLElement | null = null;
+
+  /** The note asked for. */
+  private noDataLabel: string | null = null;
+
+  /** The note on the panel, so an unchanged one is never touched again. */
+  private noDataShown: string | null = null;
+
   constructor(htmlContainer: HTMLElement, options: MetricStripTooltipOptions = {}) {
     super(htmlContainer, { mode: 'below-anchor', offset: 8, padding: 4 });
 
@@ -123,6 +132,17 @@ export class MetricStripTooltipRenderer extends BaseTooltipRenderer {
    */
   public setTheme(_isDark: boolean): void {
     // No-op: metric strip uses universal colors
+  }
+
+  /**
+   * Note that the log recorded nothing here, so the rows are the last reading it has.
+   *
+   * Applied by the next `show`, which is what appends the panel's title.
+   *
+   * @param label - Short note to show, or null while the reading is the one at the cursor
+   */
+  public setNoDataLabel(label: string | null): void {
+    this.noDataLabel = label;
   }
 
   /**
@@ -162,6 +182,10 @@ export class MetricStripTooltipRenderer extends BaseTooltipRenderer {
       this.renderRows(rows);
       this.shownPoint = dataPoint;
     }
+
+    // After the rebuild, which appends the title: the note is the panel's last line. One
+    // reading covers a whole unrecorded span, so the note changes while the rows do not.
+    this.renderNoDataNote();
 
     this.showElement();
 
@@ -310,7 +334,8 @@ export class MetricStripTooltipRenderer extends BaseTooltipRenderer {
       const row = pooled ?? this.createRow();
       if (!pooled) {
         this.rowPool.push(row);
-        this.tooltipElement.appendChild(row.root);
+        // Before the note, which is the panel's last line; `null` appends.
+        this.tooltipElement.insertBefore(row.root, this.noDataNode);
       }
 
       row.swatch.setAttribute('color', data.color);
@@ -326,6 +351,34 @@ export class MetricStripTooltipRenderer extends BaseTooltipRenderer {
     for (const spare of this.rowPool.slice(rows.length)) {
       spare.root.style.display = 'none';
     }
+  }
+
+  /** Writes the no-data note. Reads nothing back from the DOM: this runs per pointer move. */
+  private renderNoDataNote(): void {
+    const label = this.noDataLabel;
+    if (label === this.noDataShown) {
+      return;
+    }
+    this.noDataShown = label;
+
+    if (!label) {
+      if (this.noDataNode) {
+        this.noDataNode.style.display = 'none';
+        // Cleared too: a hidden node still reads out of the panel's text.
+        this.noDataNode.textContent = '';
+      }
+      return;
+    }
+
+    let node = this.noDataNode;
+    if (!node) {
+      node = document.createElement('div');
+      node.style.cssText = `margin-top:6px;font-style:italic;color:${TOOLTIP_CSS.descriptionForegroundMuted};`;
+      this.tooltipElement.appendChild(node);
+      this.noDataNode = node;
+    }
+    node.textContent = label;
+    node.style.display = 'block';
   }
 
   /** One row's elements, in the order the grid lays them out. */

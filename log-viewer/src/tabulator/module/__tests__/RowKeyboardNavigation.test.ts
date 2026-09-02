@@ -36,7 +36,8 @@ function setup(selected: RowComponent[] = []) {
 
   const row = { select: jest.fn() } as unknown as RowComponent;
   const expand = () => handlers['dataTreeRowExpanded']?.forEach((fn) => fn(row, 0));
-  return { handlers, holder, row, expand };
+  const collapse = () => handlers['dataTreeRowCollapsed']?.forEach((fn) => fn(row, 0));
+  return { handlers, holder, row, expand, collapse };
 }
 
 describe('RowKeyboardNavigation', () => {
@@ -53,20 +54,33 @@ describe('RowKeyboardNavigation', () => {
     expect(holder.focus).toHaveBeenCalled();
   });
 
-  it('leaves an existing selection where it is', () => {
+  it('leaves an existing selection where it is, and still takes focus back', () => {
     const selected = { select: jest.fn() } as unknown as RowComponent;
     const { row, holder, expand } = setup([selected]);
 
     expand();
 
     expect(row.select).not.toHaveBeenCalled();
-    expect(holder.focus).not.toHaveBeenCalled();
+    // The tree control drops focus, so the arrows would scroll the table.
+    expect(holder.focus).toHaveBeenCalled();
   });
 
-  it('does not answer a collapse at all', () => {
-    const { handlers } = setup();
+  it('takes focus back after a collapse, without selecting the closed row', () => {
+    const { row, holder, collapse } = setup();
 
-    expect(handlers['dataTreeRowCollapsed']).toBeUndefined();
+    collapse();
+
+    expect(holder.focus).toHaveBeenCalled();
+    // Selecting it would re-scope the inspector to the row just closed.
+    expect(row.select).not.toHaveBeenCalled();
+  });
+
+  it('ignores a collapse the code drove', () => {
+    const { holder, collapse } = setup();
+
+    withCodeDrivenExpand(collapse);
+
+    expect(holder.focus).not.toHaveBeenCalled();
   });
 
   it('ignores an expansion the code drove', () => {

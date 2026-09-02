@@ -131,14 +131,14 @@ export class MinimapDensityQuery {
   private totalDuration: number;
 
   /**
-   * Simple cache for exact bucket count.
-   * Key: bucket count
-   * Value: computed density data
+   * The one density held, and the bucket count it was computed for.
    *
-   * Invalidated when data changes. No multi-resolution downscaling needed
-   * since we compute at exact bucket count with O(B × log N) complexity.
+   * One width at a time: every caller asks for the width on screen, and a density holds a
+   * bucket per pixel of it, so keeping the widths a drag passed through would cost more memory
+   * than the recompute it saves.
    */
-  private densityCache: Map<number, MinimapDensityData> = new Map();
+  private cachedBucketCount: number | null = null;
+  private cachedDensity: MinimapDensityData | null = null;
 
   /** Optional segment tree for O(B×log N) density computation. */
   private segmentTree: TemporalSegmentTree | null = null;
@@ -173,9 +173,8 @@ export class MinimapDensityQuery {
     bucketCount = Number.isFinite(bucketCount) ? Math.floor(bucketCount) : 0;
 
     // Fast path: exact match in cache
-    const cached = this.densityCache.get(bucketCount);
-    if (cached) {
-      return cached;
+    if (this.cachedDensity !== null && this.cachedBucketCount === bucketCount) {
+      return this.cachedDensity;
     }
 
     // Compute at exact bucket count using sliding window algorithm if tree available
@@ -183,15 +182,20 @@ export class MinimapDensityQuery {
       ? this.computeDensitySlidingWindow(bucketCount)
       : this.computeDensity(bucketCount);
 
-    this.densityCache.set(bucketCount, density);
+    this.cachedBucketCount = bucketCount;
+    this.cachedDensity = density;
     return density;
   }
 
   /**
    * Invalidate cache (call when timeline data changes).
+   *
+   * A resize needs no call: the cache is keyed by width, so a new width misses on its own and
+   * a height change leaves the entry as true as it was.
    */
   public invalidateCache(): void {
-    this.densityCache.clear();
+    this.cachedBucketCount = null;
+    this.cachedDensity = null;
   }
 
   /**

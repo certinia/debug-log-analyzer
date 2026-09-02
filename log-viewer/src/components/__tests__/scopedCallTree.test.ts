@@ -1,7 +1,7 @@
 /*
  * Copyright (c) 2026 Certinia Inc. All rights reserved.
  */
-import { describe, expect, it } from '@jest/globals';
+import { beforeEach, describe, expect, it } from '@jest/globals';
 
 interface FakeEvent {
   eventIndex: number;
@@ -54,28 +54,40 @@ let selectedIndex = 4;
 const { KeyPathIds } = jest.requireActual<typeof import('../../core/log/keyPathIds.js')>(
   '../../core/log/keyPathIds.js',
 );
-const paths = new KeyPathIds();
+// One table per log in production. The fixtures below reuse event indexes for
+// different frames, so each test gets its own rather than one frame's key being
+// read back for another.
+let paths = new KeyPathIds(1024);
+const { LogStore } = jest.requireActual<typeof import('../../core/log/LogStore.js')>(
+  '../../core/log/LogStore.js',
+);
 jest.mock('../../core/log/LogStore.js', () => ({
-  currentLogStore: () => ({
-    log: root,
-    keyPathIds: () => paths,
-    eventByIndex: (i: number) => byId.get(i) ?? null,
-    // Mirrors LogStore.stackByEventIndex over the fixture's own index.
-    stackByEventIndex: (i: number) => {
-      const stack: FakeEvent[] = [];
-      for (let node = byId.get(i) ?? null; node && node !== root; node = node.parent) {
-        if (node.isParent) {
-          stack.push(node);
+  currentLogStore: () => {
+    const store = {
+      log: root,
+      keyPathIds: () => paths,
+      eventByIndex: (i: number) => byId.get(i) ?? null,
+      // Mirrors LogStore.stackByEventIndex over the fixture's own index.
+      stackByEventIndex: (i: number) => {
+        const stack: FakeEvent[] = [];
+        for (let node = byId.get(i) ?? null; node && node !== root; node = node.parent) {
+          if (node.isParent) {
+            stack.push(node);
+          }
         }
-      }
-      return stack.reverse();
-    },
-  }),
+        return stack.reverse();
+      },
+    };
+    // The real climb, so what it answers about the fixture is under test rather
+    // than a second copy of it. It reads only `eventByIndex`.
+    return { ...store, framesAbove: LogStore.prototype.framesAbove.bind(store) };
+  },
 }));
 
 import {
   buildScopedCallTree,
   buildWholeLogCallTree,
+  frameEventIndexes,
   locatableEventIndexes,
   rowIdsByPath,
   type ScopedRow,
@@ -85,6 +97,10 @@ import type { FrameBudgetOptions } from '../../core/utility/FrameBudget.js';
 /** These fixtures are small enough to never hit a slice deadline, so `yieldSlice`
  *  is only there to satisfy the contract. */
 const options: FrameBudgetOptions = { yieldSlice: () => Promise.resolve() };
+
+beforeEach(() => {
+  paths = new KeyPathIds(1024);
+});
 
 function build(eventIndex: number, instances?: number[]) {
   return buildScopedCallTree(eventIndex, instances ?? null, options);
@@ -541,6 +557,37 @@ describe('rowIdsByPath', () => {
     const tree = (await build(4))!;
 
     expect(rowIdsByPath((await tree.timeOrder(options))!).get(99999)).toBeUndefined();
+  });
+});
+
+describe('frameEventIndexes', () => {
+  it("names the callers at the row's own depth, not the calls they conducted", async () => {
+    // exec -> m1 -> m2 -> soql, so the bottom-up seed is the statement and each
+    // row under it is one frame further up the same stack.
+    const rows = (await (await build(1))!.bottomUp(options))!;
+    const seed = rows[0]!;
+    const m2Row = seed._children![0]!;
+    const m1Row = m2Row._children![0]!;
+
+    expect(frameEventIndexes(seed)).toEqual([soql.eventIndex]);
+    expect(frameEventIndexes(m2Row)).toEqual([m2.eventIndex]);
+    expect(frameEventIndexes(m1Row)).toEqual([m1.eventIndex]);
+  });
+
+  it('names one caller frame however many calls it made', async () => {
+    const instances = loopOccurrences(2);
+    const rows = (await (await build(300))!.bottomUp(options))!;
+    const caller = rows[0]!._children![0]!;
+
+    // The row counts both calls, and is the single frame that made them.
+    expect(locatableEventIndexes(caller)).toEqual(instances);
+    expect(frameEventIndexes(caller)).toEqual([300]);
+  });
+
+  it('names the one frame of a row that merges nothing', () => {
+    const row = { id: 1, originalData: soql } as unknown as Partial<ScopedRow>;
+
+    expect(frameEventIndexes(row)).toEqual([soql.eventIndex]);
   });
 });
 

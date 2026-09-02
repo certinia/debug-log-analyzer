@@ -1,9 +1,6 @@
 /*
  * Copyright (c) 2026 Certinia Inc. All rights reserved.
  */
-import { closeSync, openSync, readSync } from 'node:fs';
-import { extname } from 'node:path';
-
 import {
   TabInputText,
   commands,
@@ -13,6 +10,7 @@ import {
   type TextDocument,
   type Uri,
 } from 'vscode';
+import { Utils } from 'vscode-uri';
 
 import type { Context } from '../Context.js';
 
@@ -21,6 +19,8 @@ const EXECUTION_STARTED = /^\d{2}:\d{2}:\d{2}\.\d{1,} \(\d+\)\|EXECUTION_STARTED
 const USER_INFO = /^\d{2}:\d{2}:\d{2}\.\d{1,} \(\d+\)\|USER_INFO\|/;
 const DETECT_EXTENSIONS = new Set(['.log', '.txt']);
 const MAX_LINES_TO_CHECK = 100;
+const MAX_BYTES_TO_READ = 4096;
+let contextUpdateGeneration = 0;
 
 export function isApexLogContent(doc: TextDocument): boolean {
   if (doc.lineCount === 0) {
@@ -38,18 +38,9 @@ export function isApexLogContent(doc: TextDocument): boolean {
   return false;
 }
 
-function isApexLogFile(fsPath: string): boolean {
-  let fd: number;
+export async function isApexLogFile(uri: Uri): Promise<boolean> {
   try {
-    fd = openSync(fsPath, 'r');
-  } catch {
-    return false;
-  }
-
-  try {
-    const buf = Buffer.alloc(4096);
-    const bytesRead = readSync(fd, buf, 0, 4096, 0);
-    const text = buf.toString('utf8', 0, bytesRead);
+    const text = await readFilePrefix(uri);
     const lines = text.split(/\r?\n/);
 
     const linesToCheck = Math.min(MAX_LINES_TO_CHECK, lines.length);
@@ -60,13 +51,18 @@ function isApexLogFile(fsPath: string): boolean {
       }
     }
     return false;
-  } finally {
-    closeSync(fd);
+  } catch {
+    return false;
   }
 }
 
+async function readFilePrefix(uri: Uri): Promise<string> {
+  const bytes = await workspace.fs.readFile(uri);
+  return new TextDecoder().decode(bytes.subarray(0, MAX_BYTES_TO_READ));
+}
+
 function hasDetectExtension(uri: Uri): boolean {
-  return DETECT_EXTENSIONS.has(extname(uri.fsPath).toLowerCase());
+  return DETECT_EXTENSIONS.has(Utils.extname(uri).toLowerCase());
 }
 
 function getActiveTabUri(): Uri | undefined {
@@ -78,8 +74,9 @@ function getActiveTabUri(): Uri | undefined {
 }
 
 function updateContextKey(): void {
+  const generation = ++contextUpdateGeneration;
   const editor = window.activeTextEditor;
-  if (editor && editor.document.uri.scheme === 'file') {
+  if (editor) {
     const doc = editor.document;
     if (hasDetectExtension(doc.uri)) {
       const detected = isApexLogContent(doc);
@@ -92,9 +89,19 @@ function updateContextKey(): void {
 
   // Fallback to tab API for large files where activeTextEditor is undefined
   const tabUri = getActiveTabUri();
-  if (tabUri && tabUri.scheme === 'file' && hasDetectExtension(tabUri)) {
-    const detected = isApexLogFile(tabUri.fsPath);
-    commands.executeCommand('setContext', 'lana.isApexLog', detected);
+  if (tabUri && hasDetectExtension(tabUri)) {
+    const tabKey = tabUri.toString();
+    void isApexLogFile(tabUri).then((detected) => {
+      const activeTabUri = getActiveTabUri();
+      if (
+        generation !== contextUpdateGeneration ||
+        window.activeTextEditor ||
+        activeTabUri?.toString() !== tabKey
+      ) {
+        return;
+      }
+      commands.executeCommand('setContext', 'lana.isApexLog', detected);
+    });
     return;
   }
 
@@ -132,7 +139,7 @@ export class ApexLogLanguageDetector {
 }
 
 function detectAndSetLanguage(doc: TextDocument): void {
-  if (doc.languageId === 'apexlog' || doc.uri.scheme !== 'file') {
+  if (doc.languageId === 'apexlog') {
     return;
   }
 

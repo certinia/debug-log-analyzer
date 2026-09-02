@@ -23,7 +23,7 @@ import {
   rowIdsByPath,
   type ScopedRow,
 } from '../../log-viewer/src/components/scopedCallTree.js';
-import { setCurrentLog } from '../../log-viewer/src/core/log/LogStore.js';
+import { LogStore, setCurrentLog } from '../../log-viewer/src/core/log/LogStore.js';
 import {
   toAggregatedCallTree,
   toBottomUpTree,
@@ -128,5 +128,9 @@ await time('mark callees', () => new LocatedRowIds().idsFor(log, picked, 'callee
 
 // The Call Tree tab's own grouped builds, for comparison with the inspector's.
 console.log('');
-await time('grid toAggregatedCallTree', () => toAggregatedCallTree(log.children));
-await time('grid toBottomUpTree', () => toBottomUpTree(log.children));
+// A store of its own, so the inspector's builds above have not warmed the key
+// table. Only the first build below is cold; the second reads what the first
+// interned, as it does on screen where every view shares one table.
+const gridPaths = new LogStore(log).keyPathIds();
+await time('grid toAggregatedCallTree', () => toAggregatedCallTree(log.children, gridPaths));
+await time('grid toBottomUpTree', () => toBottomUpTree(log.children, gridPaths));

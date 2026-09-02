@@ -33,6 +33,7 @@ import { waitForNextFrame } from '../../../core/utility/FrameBudget.js';
 
 import { inMsRange, type FilterRange } from '../../../tabulator/filters/MinMax.js';
 import { withCodeDrivenExpand } from '../../../tabulator/module/expandOrigin.js';
+import { onTableReshaped } from '../../../tabulator/module/tableReshape.js';
 
 import dataGridStyles from '../../../tabulator/style/DataGrid.scss';
 
@@ -69,9 +70,10 @@ import {
   LocatedRowMarker,
   rowDetailSelection,
   rowIndexStamper,
-  rowOccurrences,
+  rowFrames,
 } from '../../../components/locatedRow.js';
 import { InspectorEmphasis } from '../../../components/inspectorEmphasis.js';
+import { wireInspectorTab } from '../../../components/inspectorTab.js';
 import { createTimeOrderTable } from './TimeOrderTable.js';
 
 /** Time Order keys its rows by event index; the grouped views key theirs by the
@@ -167,9 +169,7 @@ export class CalltreeView extends LitElement {
 
   /** Guards the programmatic select made on the inspector's behalf. */
   private _echoGuard = new SelectionEchoGuard();
-  private _inspectorRevealUnsubscribe: (() => void) | null = null;
-  private _inspectorLocateUnsubscribe: (() => void) | null = null;
-  private _selectionClearUnsubscribe: (() => void) | null = null;
+  private _inspectorUnsubscribe: (() => void) | null = null;
   private _locatedRow = new LocatedRowMarker();
   private _locateIds = new LocatedRowIds();
   /** Which of the inspector's reports the mark follows. */
@@ -178,41 +178,18 @@ export class CalltreeView extends LitElement {
   constructor() {
     super();
 
-    // Reveal an inspector row here, but only while the Call Tree is the tab the
-    // inspector is showing.
-    this._inspectorRevealUnsubscribe = eventBus.on('inspector:reveal', (detail) => {
-      if (detail.source === 'calltree') {
-        void this._revealEventIndex(detail.eventIndex);
-      }
-    });
-
-    // Mark the frames the inspector points at, while the Call Tree is the tab the
-    // inspector is showing.
-    this._inspectorLocateUnsubscribe = eventBus.on('inspector:locate', (detail) => {
-      if (detail.source === 'calltree') {
-        const ids = this._emphasis.report(detail.eventIndexes, detail.sticky);
-        if (detail.sticky && detail.eventIndexes.length) {
-          // A picked inspector row merges calls, so the mark shows all of them
-          // while the view moves to the first, as a pick of one frame does. The
-          // reveal expands and scrolls, which re-renders the rows the mark lands
-          // on, so it goes on after.
-          void this._revealEventIndex(detail.eventIndexes[0]!).then(() => this._markLocated(ids));
-        } else {
-          this._markLocated(ids);
-        }
-      }
-    });
-
-    // Escape (app-wide) deselects here; the table reports the clear itself. It
-    // also drops a mark held by a picked inspector row, which is no selection of
-    // this table's own.
-    this._selectionClearUnsubscribe = eventBus.on('selection:clear', (detail) => {
-      if (detail.source === 'calltree') {
+    this._inspectorUnsubscribe = wireInspectorTab('calltree', this._emphasis, {
+      mark: (eventIndexes) => this._markLocated(eventIndexes),
+      reveal: (eventIndex, signal) => this._revealEventIndex(eventIndex, signal),
+      clear: () => {
+        // The table reports the clear itself, which is what reaches the inspector.
         for (const table of this._tables) {
           table.deselectRow();
         }
-        this._markLocated(this._emphasis.pick([]));
-      }
+      },
+      // A picked row merges calls, so the mark shows all of them while the view
+      // moves to the first, as a pick of one frame does.
+      movesToMergedPick: true,
     });
     document.addEventListener(CALLTREE_GO_TO_ROW, this._goToRowEvt);
     document.addEventListener('lv-find', this._findEvt);
@@ -233,12 +210,8 @@ export class CalltreeView extends LitElement {
     document.removeEventListener('lv-find', this._findEvt);
     document.removeEventListener('lv-find-match', this._findEvt);
     document.removeEventListener('lv-find-close', this._findEvt);
-    this._inspectorRevealUnsubscribe?.();
-    this._inspectorRevealUnsubscribe = null;
-    this._inspectorLocateUnsubscribe?.();
-    this._inspectorLocateUnsubscribe = null;
-    this._selectionClearUnsubscribe?.();
-    this._selectionClearUnsubscribe = null;
+    this._inspectorUnsubscribe?.();
+    this._inspectorUnsubscribe = null;
     this._destroyCurrentTable();
   }
 
@@ -625,6 +598,9 @@ export class CalltreeView extends LitElement {
   _handleBottomUpGroupBy(event: Event) {
     const target = event.target as HTMLInputElement;
     this.bottomUpGroupBy = target.value;
+    // Grouping renumbers the matches both ways round, and `dataGrouped` reports
+    // only the way that leaves the table grouped.
+    this._dropSearch();
     const fieldName =
       target.value === 'Caller Namespace' ? 'callerNamespace' : target.value.toLowerCase();
     if (this.bottomUpTreeTable) {
@@ -788,11 +764,8 @@ export class CalltreeView extends LitElement {
       return;
     }
 
-    this.debugOnlyFilterCache.clear();
-    this.typeFilterCache.clear();
-    this.namespaceFilterCache.clear();
-    this.totalTimeFilterCache.clear();
-    this.selfTimeFilterCache.clear();
+    this._dropSearch();
+    this._clearFilterCaches();
 
     const filtersToAdd = [];
 
@@ -929,14 +902,14 @@ export class CalltreeView extends LitElement {
    * switch, no view-mode change and no focus steal, unlike {@link _goToRow}.
    * Focus stays where the click was, which is the inspector.
    */
-  private async _revealEventIndex(eventIndex: number): Promise<void> {
+  private async _revealEventIndex(eventIndex: number, signal: AbortSignal): Promise<void> {
     const table = this._getActiveTable();
     if (!table) {
       return;
     }
 
     const treeRow = await this._findRowFor(table, eventIndex);
-    if (!treeRow) {
+    if (!treeRow || signal.aborted) {
       return;
     }
 
@@ -1076,19 +1049,6 @@ export class CalltreeView extends LitElement {
 
     const { table, tableBuilt } = createTimeOrderTable(callTreeTableContainer, rootMethod, {
       showDetailsFilter: this._showDetailsFilter,
-      onFilterCacheClear: () => {
-        this.debugOnlyFilterCache.clear();
-        this.typeFilterCache.clear();
-        this.namespaceFilterCache.clear();
-        this.totalTimeFilterCache.clear();
-        this.selfTimeFilterCache.clear();
-      },
-      onRenderStarted: () => {
-        if (!this.blockClearHighlights && this.totalMatches > 0) {
-          this._resetFindWidget();
-          this._clearSearchHighlights();
-        }
-      },
       onContextMenu: (e, row) => {
         if (window.getSelection()?.type === 'Range') {
           return;
@@ -1100,6 +1060,7 @@ export class CalltreeView extends LitElement {
       rowFormatter: timeOrderRowFormatter,
     });
     this.calltreeTable = table;
+    this._watchTable(table, true);
     await tableBuilt;
     this._initTableColumns(table);
     this._emitDetailSelection(table);
@@ -1117,22 +1078,10 @@ export class CalltreeView extends LitElement {
 
     const { table, tableBuilt } = createAggregatedTable(container, rootMethod, {
       showDetailsFilter: this._showDetailsFilter,
-      onFilterCacheClear: () => {
-        this.debugOnlyFilterCache.clear();
-        this.typeFilterCache.clear();
-        this.namespaceFilterCache.clear();
-        this.totalTimeFilterCache.clear();
-        this.selfTimeFilterCache.clear();
-      },
-      onRenderStarted: () => {
-        if (!this.blockClearHighlights && this.totalMatches > 0) {
-          this._resetFindWidget();
-          this._clearSearchHighlights();
-        }
-      },
-      rowFormatter: groupedRowFormatter(rootMethod),
+      rowFormatter: groupedRowFormatter,
     });
     this.aggregatedTreeTable = table;
+    this._watchTable(table, true);
     await tableBuilt;
     this._initTableColumns(table);
     this._emitDetailSelection(table);
@@ -1150,13 +1099,7 @@ export class CalltreeView extends LitElement {
       rootMethod,
       {
         showDetailsFilter: this._showDetailsFilter,
-        onRenderStarted: () => {
-          if (!this.blockClearHighlights && this.totalMatches > 0) {
-            this._resetFindWidget();
-            this._clearSearchHighlights();
-          }
-        },
-        rowFormatter: groupedRowFormatter(rootMethod),
+        rowFormatter: groupedRowFormatter,
       },
       {
         selectableRows: 'highlight',
@@ -1165,6 +1108,7 @@ export class CalltreeView extends LitElement {
       },
     );
     this.bottomUpTreeTable = table;
+    this._watchTable(table, false);
     await tableBuilt;
     this._initTableColumns(table);
     this._emitDetailSelection(table);
@@ -1181,7 +1125,7 @@ export class CalltreeView extends LitElement {
       if (this._echoGuard.suppressed) {
         return;
       }
-      const selection = rowDetailSelection(rows[0]);
+      const selection = rowDetailSelection(rows[0], this.rootMethod);
       if (!selection) {
         // The selection went with it, and so does a mark a picked inspector row
         // left here — it was never a selection of this table.
@@ -1197,14 +1141,17 @@ export class CalltreeView extends LitElement {
 
   /**
    * Tell the inspector which frames the pointer is over, so it can mark the rows
-   * that stand for them. Nothing is picked and nothing moves. An
-   * Aggregated/Bottom-Up row merges many calls, so it names every call it counts.
+   * that stand for them. Nothing is picked and nothing moves.
+   *
+   * The direction is read as the pointer arrives: which way the table reads is
+   * what decides whether a merged row names its own frames or the calls they
+   * conducted.
    */
   private _emitDetailLocate(table: Tabulator, source: DetailSource = 'calltree'): void {
     table.on('rowMouseEnter', (_e, row) => {
       eventBus.emit('detail:locate', {
         source,
-        eventIndexes: rowOccurrences(row),
+        eventIndexes: rowFrames(row, this.rootMethod, directionOf(this.viewMode)),
       });
     });
     table.on('rowMouseLeave', () => {
@@ -1216,6 +1163,9 @@ export class CalltreeView extends LitElement {
   // in the DOM), with a two-frame fallback in case the expand triggers no
   // redraw. A single rAF can race the virtual renderer and leave getTreeChildren
   // empty mid-descent.
+  // A pending-render flag is no use here: Tabulator dispatches `renderStarted`
+  // and `renderComplete` in one synchronous call, so the flag always reads false
+  // by the time this is awaited.
   private _waitForTableRender(): Promise<void> {
     const table = this._getActiveTable();
     if (!table) {
@@ -1239,6 +1189,41 @@ export class CalltreeView extends LitElement {
 
   private _resetFindWidget() {
     document.dispatchEvent(new CustomEvent('lv-find-results', { detail: { totalMatches: 0 } }));
+  }
+
+  /** Drop the search where its match numbering no longer describes the table. */
+  private _dropSearch() {
+    if (!this.blockClearHighlights && this.totalMatches > 0) {
+      this._resetFindWidget();
+      this._clearSearchHighlights();
+    }
+  }
+
+  /**
+   * Watch `table` for what a view has to answer per render.
+   *
+   * The filter caches are cleared once per render rather than on `dataFiltered`:
+   * row ids are unique within a build, so a cached `deepFilter` result stays
+   * valid across the cascaded filter passes Tabulator runs for each expanded
+   * subtree, which would otherwise fire `dataFiltered` several times per user
+   * action and defeat the cache.
+   *
+   * @param clearsFilterCaches - Bottom Up reads the caches but has never cleared
+   * them per render, so it keeps that behaviour here.
+   */
+  private _watchTable(table: Tabulator, clearsFilterCaches: boolean) {
+    onTableReshaped(table, () => this._dropSearch());
+    if (clearsFilterCaches) {
+      table.on('renderStarted', () => this._clearFilterCaches());
+    }
+  }
+
+  private _clearFilterCaches() {
+    this.debugOnlyFilterCache.clear();
+    this.typeFilterCache.clear();
+    this.namespaceFilterCache.clear();
+    this.totalTimeFilterCache.clear();
+    this.selfTimeFilterCache.clear();
   }
 
   private _clearSearchHighlights() {

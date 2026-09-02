@@ -128,16 +128,16 @@ describe('RetrieveLogFile', () => {
     expect(mockCreateView).toHaveBeenCalledWith(
       context,
       expect.any(Promise),
-      expect.stringContaining('selected-log.log'),
+      expect.objectContaining({ path: expect.stringContaining('selected-log.log') }),
     );
     // A cached log is streamed from disk, so the body is never sent to the webview.
     await expect(retrieveLogPromise()).resolves.toBeUndefined();
     expect(mockGetLogBody).toHaveBeenCalledWith('selected-log');
     expect(mockFileOrFolderExists).toHaveBeenCalledWith(
-      expect.stringContaining('selected-log.log'),
+      expect.objectContaining({ path: expect.stringContaining('selected-log.log') }),
     );
     expect(mockWriteFile).toHaveBeenCalledWith(
-      expect.stringContaining('selected-log.log'),
+      expect.objectContaining({ path: expect.stringContaining('selected-log.log') }),
       'log body',
     );
   });
@@ -155,11 +155,11 @@ describe('RetrieveLogFile', () => {
     await command()();
 
     expect(mockWriteFile).toHaveBeenCalledWith(
-      expect.stringContaining('/test/first-workspace'),
+      expect.objectContaining({ path: expect.stringContaining('/test/first-workspace') }),
       'log body',
     );
     expect(mockWriteFile).not.toHaveBeenCalledWith(
-      expect.stringContaining('/test/second-workspace'),
+      expect.objectContaining({ path: expect.stringContaining('/test/second-workspace') }),
       expect.anything(),
     );
   });
@@ -177,7 +177,7 @@ describe('RetrieveLogFile', () => {
     expect(mockCreateView).toHaveBeenCalledWith(
       context,
       expect.any(Promise),
-      expect.stringContaining('cached-log.log'),
+      expect.objectContaining({ path: expect.stringContaining('cached-log.log') }),
     );
   });
 

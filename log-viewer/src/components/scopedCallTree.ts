@@ -7,7 +7,6 @@ import { currentLogStore, type LogStore } from '../core/log/LogStore.js';
 import { ROOT_PATH_ID, type KeyPathIds } from '../core/log/keyPathIds.js';
 import { outermostEvents } from '../core/utility/EventTree.js';
 import { EXCLUDED_DETAIL_TYPES } from '../features/call-tree/utils/DetailsFilter.js';
-import { getEventKey, getStackKey } from '../features/call-tree/utils/Aggregation.js';
 import {
   CHECK_EVERY,
   frameBudget,
@@ -46,6 +45,8 @@ export interface ScopedRow {
    *  calls its chain conducted, so it derives them from the top-level row rather
    *  than holding a copy of the list. */
   _seed?: OccurrenceSeed;
+  /** The frames the row itself stands for, once derived. */
+  _frameIndexes?: number[];
   _children: ScopedRow[] | null;
 }
 
@@ -105,6 +106,35 @@ export function locatableEventIndexes(row: Partial<ScopedRow> | undefined): numb
   }
   const single = revealableEventIndex(row);
   return single === null ? [] : [single];
+}
+
+/**
+ * The frames a scoped row stands for, which is what a highlight elsewhere points
+ * at: the flame chart dims to them, and the call tree selects one.
+ *
+ * A bottom-up caller row is one of the frames above a call, so it stands for the
+ * callers at its own depth rather than the calls they conducted, and stepping
+ * down the callers walks the highlight up the stack.
+ *
+ * {@link locatableEventIndexes} stays the calls the row counts, which is what its
+ * totals describe.
+ */
+export function frameEventIndexes(row: Partial<ScopedRow> | undefined): number[] {
+  if (row?._frameIndexes) {
+    return row._frameIndexes;
+  }
+  const conducted = locatableEventIndexes(row);
+  const seed = row?._seed;
+  const store = currentLogStore();
+  if (!seed || !store) {
+    return conducted;
+  }
+  // `_seed` is only ever set alongside `_pathId`.
+  const levels = seed.paths.depthOf(row._pathId!) - 1;
+  if (levels <= 0) {
+    return conducted;
+  }
+  return (row._frameIndexes = store.framesAbove(conducted, levels));
 }
 
 /**
@@ -396,7 +426,7 @@ export async function buildScopedCallTree(
     rootTotal,
     logTotal: apexLog.duration.total,
     calls: scope.calls,
-    paths: store.keyPathIds(),
+    store,
     // Occurrences of one frame are the same call made again, so merge them into a
     // single root; a single occurrence is already that.
     mergeTimeOrder: scope.roots.length > 1,
@@ -426,8 +456,8 @@ interface CallTreeInput {
   rootTotal: number;
   logTotal: number;
   calls: number;
-  /** The log's interned bucket paths, which the merged views name their rows by. */
-  paths: KeyPathIds;
+  /** The log, which the merged views take their interned keys and paths from. */
+  store: LogStore;
   /** {@link ScopedCallTree.holds}, absent where the tree stands for the whole log. */
   holds?: (eventIndex: number) => boolean;
   /** Folds the occurrences of one frame into a single root (a scoped aggregate),
@@ -442,7 +472,7 @@ interface CallTreeInput {
  * every retained subtree.
  */
 function lazyCallTree(input: CallTreeInput): ScopedCallTree {
-  const { rootTotal, calls, logTotal, mergeTimeOrder, paths, holds } = input;
+  const { rootTotal, calls, logTotal, mergeTimeOrder, store, holds } = input;
   let topDownRows: ScopedRow[] | null = null;
   let aggregatedRows: ScopedRow[] | null = null;
   let bottomUpRows: ScopedRow[] | null = null;
@@ -461,12 +491,12 @@ function lazyCallTree(input: CallTreeInput): ScopedCallTree {
     async aggregated(viewOptions) {
       if (!aggregatedRows) {
         const rows = await topDown(viewOptions);
-        aggregatedRows = rows && (await aggregate(rows, paths, viewOptions));
+        aggregatedRows = rows && (await aggregate(rows, store, viewOptions));
       }
       return aggregatedRows;
     },
     async bottomUp(viewOptions) {
-      bottomUpRows ??= await buildBottomUp(input.bottomUp, paths, viewOptions);
+      bottomUpRows ??= await buildBottomUp(input.bottomUp, store, viewOptions);
       return bottomUpRows;
     },
   };
@@ -504,7 +534,7 @@ export async function buildWholeLogCallTree(
     rootTotal: apexLog.duration.total,
     logTotal: apexLog.duration.total,
     calls: scope.calls,
-    paths: store.keyPathIds(),
+    store,
     mergeTimeOrder: false,
   });
 }
@@ -512,9 +542,10 @@ export async function buildWholeLogCallTree(
 /** Top-down aggregation: merge sibling frames sharing a key, summing metrics. */
 async function aggregate(
   rows: ScopedRow[],
-  paths: KeyPathIds,
+  store: LogStore,
   options: FrameBudgetOptions,
 ): Promise<ScopedRow[] | null> {
+  const paths = store.keyPathIds();
   const tick = frameBudget(options);
   let idSeq = 0;
   const nextId = () => (idSeq -= 1);
@@ -522,20 +553,19 @@ async function aggregate(
   // The recursion follows the call depth, which is shallow; each level's input
   // is the wide dimension, so that is where the slicing goes.
   async function merge(input: ScopedRow[], parentPathId: number): Promise<ScopedRow[] | null> {
-    const groups = new Map<string, ScopedRow>();
-    const order: string[] = [];
-    // The occurrences behind each group — a set, so one frame cannot be listed
-    // twice.
-    const indexes = new Map<string, Set<number>>();
+    // The occurrences behind each group are a set, so one frame cannot be listed
+    // twice; `groups` keeps its own insertion order, so it is also the output
+    // order.
+    const groups = new Map<number, { row: ScopedRow; seen: Set<number> }>();
     for (let i = 0; i < input.length; i++) {
       if (i % CHECK_EVERY === 0 && !(await tick())) {
         return null;
       }
       const row = input[i]!;
-      const key = getEventKey(row.originalData);
-      let group = groups.get(key);
-      if (!group) {
-        group = {
+      const key = paths.keyIdOf(row.originalData);
+      let held = groups.get(key);
+      if (!held) {
+        const group: ScopedRow = {
           id: nextId(),
           originalData: row.originalData,
           text: row.text,
@@ -544,13 +574,13 @@ async function aggregate(
           callCount: 0,
           eventIndexes: [],
           onPath: row.onPath,
-          _pathId: paths.pathId(parentPathId, key),
+          _pathId: paths.step(parentPathId, key),
           _children: [],
         };
-        groups.set(key, group);
-        order.push(key);
-        indexes.set(key, new Set());
+        held = { row: group, seen: new Set() };
+        groups.set(key, held);
       }
+      const group = held.row;
       if (!row.onPath) {
         // A group holding one real call is not a route, so it stays closed.
         group.onPath = undefined;
@@ -559,9 +589,8 @@ async function aggregate(
       group.duration.self += row.duration.self;
       group.callCount += row.callCount;
       // Every merged occurrence, so pointing at the group points at all of them.
-      const seen = indexes.get(key)!;
       for (const index of locatableEventIndexes(row)) {
-        seen.add(index);
+        held.seen.add(index);
       }
       if (row._children) {
         const kids = group._children as ScopedRow[];
@@ -572,9 +601,8 @@ async function aggregate(
     }
 
     const merged: ScopedRow[] = [];
-    for (const key of order) {
-      const group = groups.get(key)!;
-      group.eventIndexes = [...indexes.get(key)!];
+    for (const { row: group, seen } of groups.values()) {
+      group.eventIndexes = [...seen];
       const kids = group._children as ScopedRow[];
       if (kids.length) {
         const mergedKids = await merge(kids, group._pathId!);
@@ -606,9 +634,10 @@ interface WalkEntry {
   row: ScopedRow;
   callers: WalkEntry | null;
   /** The frame's bucket key, interned: a chain link is stepped by id, and the
-   *  key of a hot frame is built once rather than once per caller it has. */
+   *  key is built once for the log rather than once per visit. */
   keyId: number;
-  stackKey: string;
+  /** The frame's stack key, interned: the walk only ever compares it. */
+  stackId: number;
   leaving: boolean;
   /** The frame's time, less every call of the same frame inside it. */
   attributed: number;
@@ -632,9 +661,10 @@ interface WalkEntry {
  */
 async function buildBottomUp(
   rows: ScopedRow[],
-  paths: KeyPathIds,
+  store: LogStore,
   options: FrameBudgetOptions,
 ): Promise<ScopedRow[] | null> {
+  const paths = store.keyPathIds();
   const tick = frameBudget(options);
   let idSeq = 0;
   const nextId = () => (idSeq -= 1);
@@ -680,13 +710,13 @@ async function buildBottomUp(
   // a row is filled in on the way out rather than on the way in. Keyed as the
   // Call Tree tab keys recursion, without the event type, so a code unit that
   // recurses as a method entry is the same frame to both.
-  const open = new Map<string, WalkEntry | null>();
+  const open = new Map<number, WalkEntry | null>();
 
   const entryFor = (row: ScopedRow, callers: WalkEntry | null): WalkEntry => ({
     row,
     callers,
-    keyId: paths.keyId(getEventKey(row.originalData)),
-    stackKey: getStackKey(row.originalData),
+    keyId: paths.keyIdOf(row.originalData),
+    stackId: paths.stackIdOf(row.originalData),
     leaving: false,
     attributed: 0,
     outer: null,
@@ -706,7 +736,7 @@ async function buildBottomUp(
     const entry = stack.pop()!;
     const { row, callers } = entry;
     if (!entry.leaving) {
-      const outer = open.get(entry.stackKey) ?? null;
+      const outer = open.get(entry.stackId) ?? null;
       if (outer) {
         // Inside a call of the same frame, so this call's time is already part
         // of that one's.
@@ -714,7 +744,7 @@ async function buildBottomUp(
       }
       entry.outer = outer;
       entry.attributed = row.duration.total;
-      open.set(entry.stackKey, entry);
+      open.set(entry.stackId, entry);
       entry.leaving = true;
       stack.push(entry);
       if (row._children) {
@@ -725,7 +755,7 @@ async function buildBottomUp(
       continue;
     }
 
-    open.set(entry.stackKey, entry.outer);
+    open.set(entry.stackId, entry.outer);
     const attributed = entry.attributed;
     if (row.duration.self > 0) {
       // The seed row, then its callers up to the root. The chain is already in
@@ -747,16 +777,16 @@ async function buildBottomUp(
       }
       // Each occurrence is tagged with the chain that reached it, which is how a
       // caller row picks out the ones it stands for.
-      const store = seed._seed;
+      const occurrences = seed._seed;
       const held = row.eventIndexes;
       if (held) {
         for (let i = 0; i < held.length; i++) {
-          store.eventIndexes.push(held[i]!);
-          store.chains.push(pathId);
+          occurrences.eventIndexes.push(held[i]!);
+          occurrences.chains.push(pathId);
         }
       } else {
-        store.eventIndexes.push(row.originalData.eventIndex);
-        store.chains.push(pathId);
+        occurrences.eventIndexes.push(row.originalData.eventIndex);
+        occurrences.chains.push(pathId);
       }
     }
   }

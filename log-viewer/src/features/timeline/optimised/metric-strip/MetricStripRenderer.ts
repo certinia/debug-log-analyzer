@@ -31,10 +31,24 @@ import { Graphics } from 'pixi.js';
 import type {
   MetricStripDataPoint,
   MetricStripProcessedData,
+  NoDataSpan,
   TimelineMarker,
   ViewportState,
 } from '../../types/flamechart.types.js';
-import { MARKER_ALPHA, MARKER_COLORS } from '../../types/flamechart.types.js';
+import {
+  MARKER_ALPHA,
+  MARKER_BUCKET_PX,
+  MARKER_COLORS,
+  MARKER_GAP_PX,
+  MARKER_MIN_WIDTH_PX,
+} from '../../types/flamechart.types.js';
+import {
+  layoutMarkerRects,
+  markerDuration,
+  noDataSpanAt,
+  sortMarkersByTimeAndSeverity,
+  type MarkerLayoutItem,
+} from '../markers/MarkerProcessor.js';
 import {
   BREACH_AREA_OPACITY,
   DANGER_ZONE_OPACITY,
@@ -47,6 +61,7 @@ import {
   METRIC_STRIP_Y_MAX_PERCENT,
   type MetricStripColors,
 } from './metric-strip-colors.js';
+import { chevronBox } from './strip-pointer.js';
 
 // Re-export toggle width for use by orchestrator
 export { METRIC_STRIP_TOGGLE_WIDTH };
@@ -54,13 +69,6 @@ export { METRIC_STRIP_TOGGLE_WIDTH };
 // ============================================================================
 // CONSTANTS
 // ============================================================================
-
-/** Toggle icon left padding in pixels */
-const TOGGLE_ICON_PADDING_X = 6;
-/** Toggle icon top padding in pixels */
-const TOGGLE_ICON_PADDING_Y = 2.5;
-/** Toggle icon size in pixels */
-const TOGGLE_ICON_SIZE = 5;
 
 /** Limit line dash length in pixels */
 const LIMIT_LINE_DASH = 8;
@@ -116,6 +124,9 @@ export class MetricStripRenderer {
 
   /** Effective Y-max for dynamic scaling. */
   private effectiveYMax = METRIC_STRIP_Y_MAX_PERCENT;
+
+  /** Spans the log recorded nothing in; nothing measured is drawn inside one. */
+  private noDataSpans: NoDataSpan[] = [];
 
   /** Whether the metric strip is in collapsed mode. */
   private isCollapsed = false;
@@ -174,6 +185,33 @@ export class MetricStripRenderer {
     this.effectiveYMax = yMax;
   }
 
+  /** Whether the log recorded nothing at this instant. */
+  private isNoData(timeNs: number): boolean {
+    return noDataSpanAt(this.noDataSpans, timeNs) !== undefined;
+  }
+
+  /**
+   * Where a point's segment ends, or `null` when the point sits in a gap.
+   *
+   * A segment stops at the next point, at the range's end, or at the next gap — whichever
+   * comes first — so nothing measured is drawn across time the log did not record.
+   */
+  private recordedSegmentEnd(timeNs: number, nextTimeNs: number): number | null {
+    if (this.noDataSpans.length === 0) {
+      return nextTimeNs;
+    }
+    let end = nextTimeNs;
+    for (const span of this.noDataSpans) {
+      if (timeNs >= span.startTime && timeNs < span.endTime) {
+        return null;
+      }
+      if (span.startTime > timeNs && span.startTime < end) {
+        end = span.startTime;
+      }
+    }
+    return end;
+  }
+
   /**
    * Set the collapsed state.
    */
@@ -225,12 +263,15 @@ export class MetricStripRenderer {
     // Clear all graphics
     this.clear();
 
+    // The gaps ride on the processed data, so the strip has one source for them.
+    this.noDataSpans = data.gaps;
+
     const { displayWidth } = viewportState;
     const height = this.height;
 
     // Always render markers (background layer) - visible in both collapsed and expanded modes
     if (markers && markers.length > 0) {
-      this.renderMarkers(markers, viewportState, totalDuration);
+      this.renderMarkers(markers, viewportState);
     }
 
     // Note: Time grid lines are now rendered by MeshAxisRenderer in MetricStripOrchestrator
@@ -243,7 +284,9 @@ export class MetricStripRenderer {
       return;
     }
 
-    // Render expanded view layers (back to front)
+    // Render expanded view layers (back to front). The fills and the breach band leave the
+    // unrecorded spans blank: a fill reads as measured volume and the band is a verdict. The
+    // step line carries its last reading across, because a governor total cannot fall.
     this.renderDangerZone(displayWidth, height);
     this.renderAreaFills(data, viewportState, totalDuration, height);
     this.renderStepChartLines(data, viewportState, totalDuration, height);
@@ -260,17 +303,19 @@ export class MetricStripRenderer {
     const g = this.toggleGraphics;
     const iconColor = this.isToggleHovered ? this.toggleIconHoverColor : this.toggleIconColor;
 
+    const box = chevronBox(this.isCollapsed);
+
     if (this.isCollapsed) {
       // ▶ (right-pointing triangle)
-      g.moveTo(TOGGLE_ICON_PADDING_X, TOGGLE_ICON_PADDING_Y);
-      g.lineTo(TOGGLE_ICON_PADDING_X + TOGGLE_ICON_SIZE, TOGGLE_ICON_PADDING_Y + TOGGLE_ICON_SIZE);
-      g.lineTo(TOGGLE_ICON_PADDING_X, TOGGLE_ICON_PADDING_Y + TOGGLE_ICON_SIZE * 2);
+      g.moveTo(box.x, box.y);
+      g.lineTo(box.x + box.width, box.y + box.height / 2);
+      g.lineTo(box.x, box.y + box.height);
       g.closePath();
     } else {
       // ▼ (down-pointing triangle)
-      g.moveTo(TOGGLE_ICON_PADDING_X, TOGGLE_ICON_PADDING_Y);
-      g.lineTo(TOGGLE_ICON_PADDING_X + TOGGLE_ICON_SIZE * 2, TOGGLE_ICON_PADDING_Y);
-      g.lineTo(TOGGLE_ICON_PADDING_X + TOGGLE_ICON_SIZE, TOGGLE_ICON_PADDING_Y + TOGGLE_ICON_SIZE);
+      g.moveTo(box.x, box.y);
+      g.lineTo(box.x + box.width, box.y);
+      g.lineTo(box.x + box.width / 2, box.y + box.height);
       g.closePath();
     }
     g.fill({ color: iconColor, alpha: 1.0 });
@@ -342,7 +387,8 @@ export class MetricStripRenderer {
       let color = 0;
       let alpha = 0;
 
-      if (cachedResult) {
+      // A traffic light is a verdict, so the strip draws none over unrecorded time.
+      if (cachedResult && !this.isNoData(bucketStartTime)) {
         const maxPercent = this.getMaxPercentAtPoint(cachedResult.point);
         const colorInfo = getTrafficLightColor(maxPercent);
         color = colorInfo.color;
@@ -395,42 +441,40 @@ export class MetricStripRenderer {
 
   /**
    * Render marker backgrounds as vertical colored bands.
-   * Follows the same pattern as minimap marker rendering.
+   *
+   * Shares the chart's and minimap's layout, so a point marker such as an exception keeps a
+   * visible hairline and a dense cluster collapses to one line.
    */
-  private renderMarkers(
-    markers: TimelineMarker[],
-    viewportState: ViewportState,
-    totalDuration: number,
-  ): void {
+  private renderMarkers(markers: TimelineMarker[], viewportState: ViewportState): void {
     const { zoom, offsetX, displayWidth } = viewportState;
     const g = this.markerGraphics;
 
-    const gap = 1;
-    const halfGap = gap / 2;
-
-    for (let i = 0; i < markers.length; i++) {
-      const marker = markers[i]!;
-      const startX = marker.startTime * zoom - offsetX;
-      const endTime = markers[i + 1]?.startTime ?? totalDuration;
-      const endX = endTime * zoom - offsetX;
-
-      // Viewport culling
-      if (endX < 0 || startX > displayWidth) {
-        continue;
-      }
-
+    // Sorted by start time, which is start-X order too, as the layout requires.
+    const items: MarkerLayoutItem[] = [];
+    for (const marker of sortMarkersByTimeAndSeverity(markers)) {
       const color = MARKER_COLORS[marker.type];
       if (color === undefined) {
         continue;
       }
 
-      const gappedStartX = Math.max(0, startX + halfGap);
-      const gappedEndX = Math.min(displayWidth, endX - halfGap);
-      const gappedWidth = gappedEndX - gappedStartX;
+      const startX = marker.startTime * zoom - offsetX;
+      // A bounded marker shades its own range; an unbounded one is a point, as the chart
+      // and minimap draw it. Running on to the next marker shaded sections that recovered.
+      const exactWidth = markerDuration(marker) * zoom;
+      if (startX + exactWidth < 0 || startX > displayWidth) {
+        continue;
+      }
 
-      if (gappedWidth > 0) {
-        g.rect(gappedStartX, 0, gappedWidth, this.height);
-        g.fill({ color, alpha: MARKER_ALPHA });
+      items.push({ screenStartX: startX, exactWidth, color, alpha: MARKER_ALPHA });
+    }
+
+    const rects = layoutMarkerRects(items, MARKER_MIN_WIDTH_PX, MARKER_GAP_PX, MARKER_BUCKET_PX);
+    for (const rect of rects) {
+      const x = Math.max(0, rect.x);
+      const width = Math.min(displayWidth, rect.x + rect.width) - x;
+      if (width > 0) {
+        g.rect(x, 0, width, this.height);
+        g.fill({ color: rect.color, alpha: rect.alpha });
       }
     }
   }
@@ -520,8 +564,16 @@ export class MetricStripRenderer {
 
     for (let i = 0; i < points.length; i++) {
       const point = points[i]!;
-      const segmentEnd = points[i + 1]?.timestamp ?? totalDuration;
+      const nextTime = points[i + 1]?.timestamp ?? totalDuration;
+      const segmentEnd = this.recordedSegmentEnd(point.timestamp, nextTime);
 
+      // A gap ends the run: one shape spanning it would ramp straight across the
+      // unrecorded time, which reads as measured volume.
+      if (segmentEnd === null) {
+        this.fillArea(g, pathPoints, baseY, color, alpha);
+        pathPoints.length = 0;
+        continue;
+      }
       if (segmentEnd < visibleStartTime) {
         continue;
       }
@@ -540,18 +592,34 @@ export class MetricStripRenderer {
 
       pathPoints.push({ x: Math.max(0, x1), y });
       pathPoints.push({ x: Math.min(displayWidth, x2), y });
+
+      // A gap cut the segment short, so the run ends here even though no reading fell in it.
+      if (segmentEnd < nextTime) {
+        this.fillArea(g, pathPoints, baseY, color, alpha);
+        pathPoints.length = 0;
+      }
     }
 
+    this.fillArea(g, pathPoints, baseY, color, alpha);
+  }
+
+  /** Close one run of the area fill back to the baseline and paint it. */
+  private fillArea(
+    g: Graphics,
+    pathPoints: Array<{ x: number; y: number }>,
+    baseY: number,
+    color: number,
+    alpha: number,
+  ): void {
     if (pathPoints.length < 2) {
       return;
     }
-
-    pathPoints.push({ x: pathPoints[pathPoints.length - 1]!.x, y: baseY });
 
     g.moveTo(pathPoints[0]!.x, pathPoints[0]!.y);
     for (let i = 1; i < pathPoints.length; i++) {
       g.lineTo(pathPoints[i]!.x, pathPoints[i]!.y);
     }
+    g.lineTo(pathPoints[pathPoints.length - 1]!.x, baseY);
     g.closePath();
     g.fill({ color, alpha });
   }
@@ -695,8 +763,14 @@ export class MetricStripRenderer {
 
     for (let i = 0; i < data.points.length; i++) {
       const point = data.points[i]!;
-      const segmentEnd = data.points[i + 1]?.timestamp ?? totalDuration;
+      const segmentEnd = this.recordedSegmentEnd(
+        point.timestamp,
+        data.points[i + 1]?.timestamp ?? totalDuration,
+      );
 
+      if (segmentEnd === null) {
+        continue;
+      }
       if (segmentEnd < visibleStartTime) {
         continue;
       }

@@ -312,7 +312,7 @@ describe('RawLogFoldingProvider', () => {
 
       expect(languages.registerFoldingRangeProvider).toHaveBeenCalledTimes(1);
       expect(languages.registerFoldingRangeProvider).toHaveBeenCalledWith(
-        [{ scheme: 'file', language: 'apexlog' }],
+        [{ language: 'apexlog' }],
         expect.any(RawLogFoldingProvider),
       );
     });
@@ -354,7 +354,7 @@ describe('RawLogFoldingProvider', () => {
       return { registeredProvider, openHandler, activeEditorHandler };
     }
 
-    const flush = () => new Promise((resolve) => setImmediate(resolve));
+    const flush = () => new Promise<void>((resolve) => queueMicrotask(resolve));
 
     it('warms the cache and fires onDidChangeFoldingRanges when an apex log opens', async () => {
       const { registeredProvider, openHandler } = applyAndCapture();
@@ -366,7 +366,9 @@ describe('RawLogFoldingProvider', () => {
       openHandler(doc);
       await flush();
 
-      expect(mockGetApexLog).toHaveBeenCalledWith('/test/file.log');
+      expect(mockGetApexLog).toHaveBeenCalledWith(
+        expect.objectContaining({ scheme: 'file', path: '/test/file.log' }),
+      );
       expect(fired).toHaveBeenCalledTimes(1);
     });
 
@@ -380,7 +382,9 @@ describe('RawLogFoldingProvider', () => {
       activeEditorHandler({ document: doc });
       await flush();
 
-      expect(mockGetApexLog).toHaveBeenCalledWith('/test/file.log');
+      expect(mockGetApexLog).toHaveBeenCalledWith(
+        expect.objectContaining({ scheme: 'file', path: '/test/file.log' }),
+      );
       expect(fired).toHaveBeenCalledTimes(1);
     });
 
@@ -407,7 +411,9 @@ describe('RawLogFoldingProvider', () => {
       openHandler(doc);
       await flush();
 
-      expect(mockGetApexLog).toHaveBeenCalledWith('/test/file.log');
+      expect(mockGetApexLog).toHaveBeenCalledWith(
+        expect.objectContaining({ scheme: 'file', path: '/test/file.log' }),
+      );
       expect(fired).not.toHaveBeenCalled();
     });
   });
