@@ -282,9 +282,7 @@ export class MinimapOrchestrator {
       this.minimapViewport.resize(newWidth, newHeight);
     }
 
-    if (this.densityQuery) {
-      this.densityQuery.invalidateCache();
-    }
+    // No density invalidation here: it is keyed by width (see MinimapDensityQuery).
 
     if (this.renderer) {
       this.renderer.invalidateStatic();

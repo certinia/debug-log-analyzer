@@ -114,6 +114,12 @@ export interface EventNode {
   original?: unknown;
 }
 
+/** The frame under the pointer, and the row it is on. */
+export interface HoveredFrame {
+  node: EventNode;
+  depth: number;
+}
+
 /**
  * Tree node wrapper for hierarchical event structures.
  * Enables generic tree traversal without assuming specific

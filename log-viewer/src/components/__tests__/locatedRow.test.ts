@@ -51,20 +51,40 @@ function ev(text: string, parent: LogEvent | null, eventIndex?: number): LogEven
   return { type: 'METHOD_ENTRY', namespace: '', text, parent, eventIndex } as unknown as LogEvent;
 }
 
-/** A table host holding a rendered row element per index, as the stamp leaves them. */
+/** A table host holding a rendered row element per index, as the stamp leaves
+ *  them, inside the holder and spacer element Tabulator mounts. */
 function host(...indexes: number[]): HTMLElement {
   const element = document.createElement('div');
+  const holder = document.createElement('div');
+  holder.classList.add('tabulator-tableholder');
+  const spacers = document.createElement('div');
+  spacers.classList.add('tabulator-table');
+  // The renderer always writes both spacers, so start where a rendered table is.
+  spacers.style.paddingTop = '0px';
+  spacers.style.paddingBottom = '0px';
+  holder.append(spacers);
+  element.append(holder);
   for (const index of indexes) {
     const row = document.createElement('div');
     row.classList.add('tabulator-row');
     stamp(rowComponent(row, { eventIndex: index }));
-    element.append(row);
+    spacers.append(row);
   }
   return element;
 }
 
+/**
+ * Re-attaches a row the renderer had detached, which is what a scroll or a sort
+ * does with a row it has already built. Awaits the observer, which reports after
+ * the arrival.
+ */
+async function reattach(container: HTMLElement, row: HTMLElement): Promise<void> {
+  container.querySelector('.tabulator-table')!.append(row);
+  await new Promise((resolve) => setTimeout(resolve, 0));
+}
+
 function rowFor(container: HTMLElement, index: number): HTMLElement {
-  return container.children[index] as HTMLElement;
+  return container.querySelectorAll<HTMLElement>('.tabulator-row')[index]!;
 }
 
 /** A row entering an already-mounted table, which is what the renderer does the
@@ -72,7 +92,7 @@ function rowFor(container: HTMLElement, index: number): HTMLElement {
 function renderRow(container: HTMLElement, index: number): HTMLElement {
   const row = document.createElement('div');
   row.classList.add('tabulator-row');
-  container.append(row);
+  container.querySelector('.tabulator-table')!.append(row);
   stamp(rowComponent(row, { eventIndex: index }));
   return row;
 }
@@ -196,13 +216,51 @@ describe('LocatedRowMarker', () => {
 
     row.remove();
     marker.mark(container, [5]);
-    container.append(row);
+    container.querySelector('.tabulator-table')!.append(row);
 
     expect(row.classList.contains(LOCATED_ROW_CLASS)).toBe(false);
   });
 
+  it('marks a row the renderer had detached before the mark named it', async () => {
+    // Rendered once, so it will not be stamped again, then scrolled out of view:
+    // the renderer keeps the element and detaches it.
+    const container = host();
+    const row = renderRow(container, 4);
+    row.remove();
+
+    // Only now does the mark name it, so neither half can reach it.
+    const marker = new LocatedRowMarker();
+    marker.mark(container, [4]);
+    expect(row.classList.contains(LOCATED_ROW_CLASS)).toBe(false);
+
+    // Coming back is what re-reads the mark, whatever moved the window: this
+    // holds for a sort at the top of a table, which writes no spacer at all.
+    await reattach(container, row);
+
+    expect(row.classList.contains(LOCATED_ROW_CLASS)).toBe(true);
+  });
+
+  it('keeps watching a table rebuilt into the same container', async () => {
+    // Several views destroy the table and build another in the same element, so
+    // a watch held against the old one would go quiet for good.
+    const container = host();
+    const marker = new LocatedRowMarker();
+    marker.mark(container, [4]);
+    container.querySelector('.tabulator-tableholder')!.remove();
+    const rebuilt = host(4);
+    container.append(rebuilt.querySelector('.tabulator-tableholder')!);
+
+    marker.mark(container, [4]);
+    const row = renderRow(container, 9);
+    row.remove();
+    marker.mark(container, [9]);
+    await reattach(container, row);
+
+    expect(row.classList.contains(LOCATED_ROW_CLASS)).toBe(true);
+  });
+
   it('leaves a row alone where nothing has marked its table', () => {
-    const row = renderRow(document.createElement('div'), 4);
+    const row = renderRow(host(), 4);
 
     expect(row.classList.contains(LOCATED_ROW_CLASS)).toBe(false);
   });

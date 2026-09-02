@@ -61,6 +61,7 @@ import {
   METRIC_STRIP_Y_MAX_PERCENT,
   type MetricStripColors,
 } from './metric-strip-colors.js';
+import { chevronBox } from './strip-pointer.js';
 
 // Re-export toggle width for use by orchestrator
 export { METRIC_STRIP_TOGGLE_WIDTH };
@@ -68,13 +69,6 @@ export { METRIC_STRIP_TOGGLE_WIDTH };
 // ============================================================================
 // CONSTANTS
 // ============================================================================
-
-/** Toggle icon left padding in pixels */
-const TOGGLE_ICON_PADDING_X = 6;
-/** Toggle icon top padding in pixels */
-const TOGGLE_ICON_PADDING_Y = 2.5;
-/** Toggle icon size in pixels */
-const TOGGLE_ICON_SIZE = 5;
 
 /** Limit line dash length in pixels */
 const LIMIT_LINE_DASH = 8;
@@ -309,17 +303,19 @@ export class MetricStripRenderer {
     const g = this.toggleGraphics;
     const iconColor = this.isToggleHovered ? this.toggleIconHoverColor : this.toggleIconColor;
 
+    const box = chevronBox(this.isCollapsed);
+
     if (this.isCollapsed) {
       // ▶ (right-pointing triangle)
-      g.moveTo(TOGGLE_ICON_PADDING_X, TOGGLE_ICON_PADDING_Y);
-      g.lineTo(TOGGLE_ICON_PADDING_X + TOGGLE_ICON_SIZE, TOGGLE_ICON_PADDING_Y + TOGGLE_ICON_SIZE);
-      g.lineTo(TOGGLE_ICON_PADDING_X, TOGGLE_ICON_PADDING_Y + TOGGLE_ICON_SIZE * 2);
+      g.moveTo(box.x, box.y);
+      g.lineTo(box.x + box.width, box.y + box.height / 2);
+      g.lineTo(box.x, box.y + box.height);
       g.closePath();
     } else {
       // ▼ (down-pointing triangle)
-      g.moveTo(TOGGLE_ICON_PADDING_X, TOGGLE_ICON_PADDING_Y);
-      g.lineTo(TOGGLE_ICON_PADDING_X + TOGGLE_ICON_SIZE * 2, TOGGLE_ICON_PADDING_Y);
-      g.lineTo(TOGGLE_ICON_PADDING_X + TOGGLE_ICON_SIZE, TOGGLE_ICON_PADDING_Y + TOGGLE_ICON_SIZE);
+      g.moveTo(box.x, box.y);
+      g.lineTo(box.x + box.width, box.y);
+      g.lineTo(box.x + box.width / 2, box.y + box.height);
       g.closePath();
     }
     g.fill({ color: iconColor, alpha: 1.0 });

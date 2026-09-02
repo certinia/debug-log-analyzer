@@ -57,6 +57,53 @@ function unlight(host: HTMLElement): void {
   lit.clear();
 }
 
+/**
+ * The row-holding element each marked table is watched through.
+ *
+ * Held per host so a table rebuilt into the same container is watched again: the
+ * element belongs to the Tabulator instance, not to the container, and several
+ * views destroy and rebuild a table in place.
+ */
+const watchedByHost = new WeakMap<HTMLElement, { rows: Element; observer: MutationObserver }>();
+
+/**
+ * Sweeps `host` again whenever rows enter its table, so a row coming back into
+ * view carries the mark as it stands.
+ *
+ * The renderer re-attaches a row it has already built without running the
+ * formatter again, so a row detached before the mark named it is out of reach of
+ * both halves: the sweep could not see it and the stamp will not run for it. That
+ * happens on a scroll and equally on a structural render, which fires no scroll
+ * event at all.
+ *
+ * Watched is the arrival itself, which is a child of the row-holding element and
+ * so cannot be missed. A signal read from the renderer's own bookkeeping can be:
+ * a scroll fires no event on a sort, and the virtual spacers are written with the
+ * value they already hold whenever the window does not move, which reports
+ * nothing at all.
+ */
+function watchRenders(host: HTMLElement): void {
+  const watching = watchedByHost.get(host);
+  const rows = host.querySelector('.tabulator-table');
+  if (watching?.rows === rows) {
+    return;
+  }
+  watching?.observer.disconnect();
+  if (!rows) {
+    watchedByHost.delete(host);
+    return;
+  }
+  const observer = new MutationObserver(() => {
+    const wanted = wantedByHost.get(host);
+    if (wanted?.size) {
+      // Only ever touches a class, so it cannot report itself back here.
+      sweep(host, wanted);
+    }
+  });
+  observer.observe(rows, { childList: true });
+  watchedByHost.set(host, { rows, observer });
+}
+
 /** Lights the rows a table has rendered that `wanted` names. */
 function sweep(host: HTMLElement, wanted: ReadonlySet<string>): void {
   for (const element of host.querySelectorAll<HTMLElement>(
@@ -468,6 +515,9 @@ export class LocatedRowMarker {
     const wanted = ids.length ? new Set(ids.map(String)) : NOTHING_WANTED;
     wantedByHost.set(host, wanted);
     sweep(host, wanted);
+    if (wanted.size) {
+      watchRenders(host);
+    }
   }
 
   /** Drop the mark, if one is set. */

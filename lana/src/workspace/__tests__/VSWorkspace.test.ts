@@ -24,9 +24,9 @@ describe('VSWorkspace', () => {
     vsWorkspace = new VSWorkspace(mockWorkspaceFolder);
   });
 
-  describe('path', () => {
-    it('should return workspace folder path', () => {
-      expect(vsWorkspace.path()).toBe('/workspace');
+  describe('uri', () => {
+    it('should expose the workspace folder URI', () => {
+      expect(vsWorkspace.workspaceFolder.uri.fsPath).toBe('/workspace');
     });
   });
 
