@@ -13,9 +13,49 @@ import { isCodeDrivenExpand, withCodeDrivenExpand } from './expandOrigin.js';
 import { tableHolder } from './tableHolder.js';
 
 // todo: make this generic and support opening grouped rows too then use on DB view.
-// todo: remove the '@ts-expect-error' + fix the types file
 
 const rowNavOptionName = 'rowKeyboardNavigation' as const;
+
+/**
+ * The table a key is for, or null where the key is not this module's to answer.
+ *
+ * Only from the body, which is what holds the selection the keys move. Tabulator
+ * binds them on the table's root, and the tree control has a `tabIndex` of its
+ * own, so a key can arrive from a control belonging to a row other than the
+ * selected one.
+ */
+function keyedTable(module: Module, e: KeyboardEvent): Tabulator | null {
+  const table = module.table;
+  if (!table.options[rowNavOptionName]) {
+    return null;
+  }
+  return e.target === tableHolder(table.element) ? table : null;
+}
+
+/** A binding that moves the selection one row, whichever way `pick` steps. */
+function siblingAction(pick: (row: RowComponent) => RowComponent | false) {
+  return function (this: Module, e: KeyboardEvent) {
+    const table = keyedTable(this, e);
+    if (!table) {
+      return;
+    }
+    e.preventDefault();
+    const row = table.getSelectedRows()[0];
+    const target = row && pick(row);
+    if (row && target) {
+      moveSelection(table, row, target);
+    }
+  };
+}
+
+/** Move the selection from one row to another, and keep it in view. */
+function moveSelection(table: Tabulator, from: RowComponent, to: RowComponent): void {
+  table.blockRedraw();
+  from.deselect();
+  to.select();
+  table.restoreRedraw();
+  to.getElement().scrollIntoView({ block: 'nearest' });
+}
 
 declare module 'tabulator-tables' {
   interface Options {
@@ -25,11 +65,13 @@ declare module 'tabulator-tables' {
 }
 
 /**
- * Enable RowNavigation by importing the class and calling
- * Tabulator.registerModule(RowNavigation); before the first instantiation of the table.
- * To disable RowNavigation set rowNavigation to false in table options.
- * To disbale individual key binings set previousRow, nextRow,expandRow, collapseRow to false
- * in keybings e.g  keybindings: { previousRow: false },
+ * Arrow-key travel over a table's rows: up and down move the selection, right
+ * and left open and close a tree row, and step into and out of it.
+ *
+ * Register the module before the first table is built, and set
+ * `rowKeyboardNavigation` on the tables that want it. A single binding is
+ * dropped through Tabulator's own `keybindings` option, e.g.
+ * `keybindings: { previousRow: false }`.
  */
 export class RowKeyboardNavigation extends Module {
   static moduleName = 'rowKeyboardNavigation';
@@ -76,10 +118,9 @@ export class RowKeyboardNavigation extends Module {
   }
 
   /**
-   * Tabulator gives the tree control its own `tabIndex`, so working it moves
-   * focus onto the control. The key bindings only answer while the table body is
-   * the event target, so without this the arrows scroll the table instead of
-   * moving down it.
+   * Working the tree control leaves focus on the control, which the next render
+   * can take away with the row. Focus is put back on the body, which the table
+   * keeps, so the keys keep arriving.
    */
   private takeFocusBack(): void {
     tableHolder(this.localTable.element)?.focus({ preventScroll: true });
@@ -102,112 +143,42 @@ export class RowKeyboardNavigation extends Module {
     return {
       keybindings: {
         actions: {
-          previousRow: function (e: KeyboardEvent) {
-            // @ts-expect-error see types todo
-            if (!this.options(rowNavOptionName)) {
-              return;
-            }
-            const targetElem = e.target as HTMLElement;
-            if (!targetElem.classList.contains('tabulator-tableholder')) {
-              return;
-            }
-            e.preventDefault();
-            // @ts-expect-error this.table exists
-            const table = this.table as Tabulator;
-            const row = table.getSelectedRows()[0];
-            const previousRow = row?.getPrevRow();
-            if (row && previousRow) {
-              table.blockRedraw();
-              row.deselect();
-              previousRow.select();
-              table.restoreRedraw();
-              previousRow.getElement().scrollIntoView({ block: 'nearest' });
-            }
-          },
-          nextRow: function (e: KeyboardEvent) {
-            // @ts-expect-error see types todo
-            if (!this.options(rowNavOptionName)) {
-              return;
-            }
-
-            const targetElem = e.target as HTMLElement;
-            if (!targetElem.classList.contains('tabulator-tableholder')) {
-              return;
-            }
-            e.preventDefault();
-            // @ts-expect-error this.table exists
-            const table = this.table as Tabulator;
-            const row = table.getSelectedRows()[0];
-            const nextRow = row?.getNextRow();
-            if (row && nextRow) {
-              table.blockRedraw();
-              row.deselect();
-              nextRow.select();
-              table.restoreRedraw();
-              nextRow.getElement().scrollIntoView({ block: 'nearest' });
-            }
-          },
-          expandRow: function (e: KeyboardEvent) {
-            // @ts-expect-error see types todo
-            if (!this.options(rowNavOptionName)) {
-              return;
-            }
-
-            const targetElem = e.target as HTMLElement;
-            if (!targetElem.classList.contains('tabulator-tableholder')) {
-              return;
-            }
-            // @ts-expect-error this.table exists
-            const table = this.table as Tabulator;
-            const row = table.getSelectedRows()[0];
-            if (!row || !table.options.dataTree) {
+          previousRow: siblingAction((row) => row.getPrevRow()),
+          nextRow: siblingAction((row) => row.getNextRow()),
+          expandRow: function (this: Module, e: KeyboardEvent) {
+            const table = keyedTable(this, e);
+            const row = table?.getSelectedRows()[0];
+            if (!table || !row || !table.options.dataTree) {
               return;
             }
             e.preventDefault();
 
             if (row.isTreeExpanded()) {
-              const nextRow = row?.getNextRow();
+              const nextRow = row.getNextRow();
               if (nextRow && nextRow.getTreeParent() === row) {
-                table.blockRedraw();
-                row.deselect();
-                nextRow.select();
-                table.restoreRedraw();
-                nextRow.getElement().scrollIntoView({ block: 'nearest' });
+                moveSelection(table, row, nextRow);
               }
             } else {
+              // Declared as the code's own, so the expand does not read as the
+              // user reaching for the tree control.
               withCodeDrivenExpand(() => row.treeExpand());
             }
           },
-          collapseRow: function (e: KeyboardEvent) {
-            // @ts-expect-error see types todo
-            if (!this.options(rowNavOptionName)) {
-              return;
-            }
-
-            const targetElem = e.target as HTMLElement;
-            if (!targetElem.classList.contains('tabulator-tableholder')) {
-              return;
-            }
-            // @ts-expect-error this.table exists
-            const table = this.table as Tabulator;
-            const row = table.getSelectedRows()[0];
-            if (!row || !table.options.dataTree) {
+          collapseRow: function (this: Module, e: KeyboardEvent) {
+            const table = keyedTable(this, e);
+            const row = table?.getSelectedRows()[0];
+            if (!table || !row || !table.options.dataTree) {
               return;
             }
             e.preventDefault();
 
             if (!row.isTreeExpanded()) {
-              const prevRow = row?.getTreeParent();
-              if (prevRow) {
-                table.blockRedraw();
-                row.deselect();
-                prevRow.select();
-                table.restoreRedraw();
-                prevRow.getElement().scrollIntoView({ block: 'nearest' });
+              const parentRow = row.getTreeParent();
+              if (parentRow) {
+                moveSelection(table, row, parentRow);
               }
             } else {
-              // Declared like `expandRow`'s: the collapse is the code's, so it
-              // must not read as the user reaching for the tree control.
+              // The code's own, as `expandRow`'s is.
               withCodeDrivenExpand(() => row.treeCollapse());
             }
           },
