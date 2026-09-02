@@ -34,6 +34,8 @@ class DebugLogItem extends Item {
 }
 
 export class RetrieveLogFile {
+  private static servicesDisposalRegistered = false;
+
   static apply(context: Context): void {
     new Command('retrieveLogFile', 'Log: Retrieve Apex Log And Show Analysis', () =>
       RetrieveLogFile.safeCommand(context),
@@ -54,6 +56,17 @@ export class RetrieveLogFile {
     const salesforceServices = await import('../services/salesforceServices.js');
     if (!(await salesforceServices.ensureServicesAvailable())) {
       return;
+    }
+
+    // Disposal is registered here, not in deactivate(), so shutdown never loads this chunk
+    // when the command was not used.
+    if (!RetrieveLogFile.servicesDisposalRegistered) {
+      RetrieveLogFile.servicesDisposalRegistered = true;
+      context.context.subscriptions.push({
+        dispose: () => {
+          salesforceServices.disposeServices().catch(() => {});
+        },
+      });
     }
 
     const workspaceFolder = workspace.workspaceFolders?.[0];
@@ -77,15 +90,20 @@ export class RetrieveLogFile {
           return LogView.createView(context, Promise.resolve(), logUri);
         }
 
-        const logData = await salesforceServices.getLogBody(logFileId);
-        this.assertRetrievedLog(logFileId, logData);
-        try {
-          await salesforceServices.writeFile(logUri, logData);
-        } catch (error: unknown) {
-          const message = error instanceof Error ? error.message : String(error);
-          context.display.output(`Unable to cache retrieved log: ${message}`, true);
-        }
-        return LogView.createView(context, undefined, logUri, logData);
+        // Open the panel first and retrieve behind it. The body only crosses the webview
+        // message channel when it could not be cached, so the webview streams it from disk.
+        const retrieveLog = (async (): Promise<string | void> => {
+          const logData = await salesforceServices.getLogBody(logFileId);
+          RetrieveLogFile.assertRetrievedLog(logFileId, logData);
+          try {
+            await salesforceServices.writeFile(logUri, logData);
+          } catch (error: unknown) {
+            const message = error instanceof Error ? error.message : String(error);
+            context.display.output(`Unable to cache retrieved log: ${message}`, true);
+            return logData;
+          }
+        })();
+        return LogView.createView(context, retrieveLog, logUri);
       }
     } finally {
       loadingPicker.dispose();
