@@ -21,6 +21,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Every row is a link: click it to reveal the frame, row or statement behind it in the tab you're on. Hover works both ways without moving the view — hover a row to pick out what it names in the tab you're on, or hover there to mark the rows that name it, and what you click stays picked out until `Escape`. Click a point on a governor usage chart to move the Timeline to that instant and zoom in on it. Right-click for copy actions.
   - **Findings** list the statements behind them, most repeated first with how often each ran, and report one query built per record and run a row at a time. The severities head the list and filter it, any number at once, a finding the log times shows how long it took and what that is of the log, and selecting an Analysis row narrows the list to the findings that name that method or anything it called.
   - **Detail | Summary** switches between what you picked and the tab's summary of the whole log, keeping the selection to come back to.
+  - **A timeline range** narrows the Timeline summary to the stretch of log the chart shows, and returns to the whole log when you zoom out. CPU and heap stay whole-log, since the log only reports them in total. ([#875])
   - Dock it left, right or bottom, drag to resize any section — double-click a divider to restore the defaults — and collapse the sections you don't need; the layout is remembered. `Escape` clears the selection and returns the whole-log view. ([#63])
 - 🗄️ **Database Analysis**: governor-limit visibility and SOSL usage. ([#162])
   - 📏 **Governor-limit overview**: SOQL, SOSL, DML and query/DML rows shown as `used / limit`, colored as they approach the limit.
@@ -578,6 +579,7 @@ Skipped due to adopting odd numbering for pre releases and even number for relea
 [#373]: https://github.com/certinia/debug-log-analyzer/issues/373
 [#298]: https://github.com/certinia/debug-log-analyzer/issues/298
 [#162]: https://github.com/certinia/debug-log-analyzer/issues/162
+[#875]: https://github.com/certinia/debug-log-analyzer/issues/875
 [#113]: https://github.com/certinia/debug-log-analyzer/issues/113
 [#63]: https://github.com/certinia/debug-log-analyzer/issues/63
 [#32]: https://github.com/certinia/debug-log-analyzer/issues/32

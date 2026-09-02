@@ -4,6 +4,7 @@
 import { html, type TemplateResult } from 'lit';
 
 import type { DetailSelection, DetailSource, SelectionView } from '../core/events/EventBus.js';
+import type { TimeWindow } from '../core/log/rangeScope.js';
 import { buildDatabaseSections } from '../features/database/components/databaseSections.js';
 import type { PaneSection } from './PaneView.js';
 
@@ -40,6 +41,10 @@ import './NamespaceTimeBar.js';
  * ambient scope only applies when `selection` is `null`, so it belongs inside
  * the `!selection` branch — never above it.
  *
+ * `window` is the stretch of log the Timeline is showing, or null for all of it.
+ * Only the whole-log call tree reads it, to say that it alone is not narrowed;
+ * every other section follows the window itself.
+ *
  * `active` is what the user walked to inside the selection's own call stack:
  * one frame, or the calls a row counts where the view's rows merge occurrences.
  * Details and the call tree follow it; the call stack stays anchored to
@@ -50,6 +55,7 @@ export async function buildDetailSections(
   selection: DetailSelection | null,
   active: DetailSelection | null = null,
   sourceView?: SelectionView,
+  window: TimeWindow | null = null,
 ): Promise<PaneSection[]> {
   // Nothing selected: the whole log is the scope. `DetailDock`'s own empty
   // state still covers the moment before a tab id resolves.
@@ -128,6 +134,9 @@ export async function buildDetailSections(
       );
     }
     if (source === 'timeline') {
+      // The four sections below read the window themselves; this one does not,
+      // so it says so rather than contradicting them in silence.
+      const scoped = window !== null;
       // The Timeline's whole-log analogue: where the time went (by category and
       // by frame) and how governor consumption built up across the log.
       sections.push(
@@ -148,7 +157,7 @@ export async function buildDetailSections(
           // The same id as the selection's tree, deliberately: collapse state is
           // keyed by section id, so the pane treats them as one "Call tree".
           id: 'calltree',
-          title: 'Call tree',
+          title: scoped ? 'Call tree · whole log' : 'Call tree',
           weight: 4,
           // The Timeline draws the whole log top down, so the tree answers with
           // where its time went. Time Order would open on two collapsed roots.

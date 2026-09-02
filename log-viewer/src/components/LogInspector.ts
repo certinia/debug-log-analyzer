@@ -1,6 +1,7 @@
 /*
  * Copyright (c) 2026 Certinia Inc. All rights reserved.
  */
+import { consume } from '@lit/context';
 import { LitElement, css, html, type PropertyValues } from 'lit';
 import { customElement, property, state } from 'lit/decorators.js';
 
@@ -11,6 +12,9 @@ import {
   type SelectionView,
   eventBus,
 } from '../core/events/EventBus.js';
+import { logContext } from '../core/log/logContext.js';
+import type { LogStore } from '../core/log/LogStore.js';
+import { RangeScopeController, type TimeWindow } from '../core/log/rangeScope.js';
 import type { InspectorLocateEvent, InspectorRevealEvent } from './inspectorReveal.js';
 import { debounce } from '../core/utility/Util.js';
 import { getSettings, updateSetting } from '../features/settings/Settings.js';
@@ -30,6 +34,20 @@ const SCOPE_OPTIONS: readonly ViewModeOption[] = [
   { value: 'selection', label: 'Detail' },
   { value: 'log', label: 'Summary' },
 ];
+
+/**
+ * The window the summary is reading, as elapsed times, so it reads against the
+ * timeline's own axis. The times say the scope on their own, so nothing labels
+ * them further.
+ */
+function windowLabel(window: TimeWindow, logStart: number): string {
+  // Enough decimals to keep the two ends apart: a seek window is 2% of the log
+  // and a deep zoom a few milliseconds, where "0.30s to 0.30s" says nothing.
+  const width = Math.max(window.end - window.start, 1) / 1_000_000_000;
+  const decimals = Math.min(6, Math.max(2, 2 - Math.floor(Math.log10(width))));
+  const seconds = (at: number) => ((at - logStart) / 1_000_000_000).toFixed(decimals);
+  return `${seconds(window.start)}s to ${seconds(window.end)}s`;
+}
 
 /**
  * The app-wide inspector. Lives at the app root (sibling of the tab strip,
@@ -134,12 +152,37 @@ export class LogInspector extends LitElement {
       // the row without the table noticing.
       this._clearLocate();
       void this._rebuild();
+      return;
+    }
+    // A window appearing or going changes which sections are shown; a viewport
+    // moving inside one does not, because each section reads the window itself.
+    if ((this._range.window !== null) !== this._builtWithWindow) {
+      this._scheduleRebuild();
     }
   }
+
+  /** The log on screen, so a window's times read as elapsed. */
+  @consume({ context: logContext, subscribe: true })
+  @property({ attribute: false })
+  logStore: LogStore | null = null;
+
+  private readonly _range = new RangeScopeController(this);
+
+  /** Whether the last build had a window. Only its appearing or going changes
+   *  what the sections are, so a moving viewport rebuilds nothing. */
+  private _builtWithWindow = false;
 
   static styles = [
     globalStyles,
     css`
+      .scope-window {
+        font-family: var(--lana-font-mono);
+        font-variant-numeric: tabular-nums;
+        font-size: var(--lana-text-meta);
+        color: var(--lana-fg-muted);
+        white-space: nowrap;
+      }
+
       :host {
         display: flex;
         flex: 1 1 auto;
@@ -184,21 +227,40 @@ export class LogInspector extends LitElement {
     `;
   }
 
-  /** Only with a selection to switch away from: one live choice is noise. */
+  /**
+   * Only with a selection to switch away from: one live choice is noise. With no
+   * selection the window still has to be named, so the times stand alone.
+   */
   private _scopeSwitch() {
     const source = this._activeSource;
+    const label = this._windowLabel();
     if (!source || !this._selections.has(source)) {
-      return '';
+      return label ? html`<span slot="actions-start" class="scope-window">${label}</span>` : '';
     }
+    // The summary reads the window when there is one, so its own label says so.
+    const options = label
+      ? SCOPE_OPTIONS.map((option) => (option.value === 'log' ? { ...option, label } : option))
+      : SCOPE_OPTIONS;
     return html`<view-mode-switch
       slot="actions-start"
       aria-label="Inspector scope"
       title="Read what you selected, or this tab's summary of the whole log"
-      .options=${SCOPE_OPTIONS}
+      .options=${options}
       value=${this._scope}
       @view-mode-change=${(e: CustomEvent<{ value: string }>) =>
         this._setScope(e.detail.value as InspectorScope)}
     ></view-mode-switch>`;
+  }
+
+  /** The window's times, or null where the summary reads the whole log. Only the
+   *  Timeline scopes to a window, so only its own tab names one. */
+  private _windowLabel(): string | null {
+    const window = this._range.window;
+    const log = this.logStore?.log;
+    if (!window || !log || this._activeSource !== 'timeline') {
+      return null;
+    }
+    return windowLabel(window, log.timestamp);
   }
 
   private get _activeSource(): DetailSource | undefined {
@@ -342,6 +404,7 @@ export class LogInspector extends LitElement {
 
   private async _rebuild(): Promise<void> {
     const epoch = ++this._rebuildEpoch;
+    this._builtWithWindow = this._range.window !== null;
     const source = this._activeSource;
     const sections = source
       ? await buildDetailSections(
@@ -349,6 +412,7 @@ export class LogInspector extends LitElement {
           this._scopedSelection(source),
           this._active.get(source) ?? null,
           this._sourceViews.get(source),
+          this._range.window,
         )
       : [];
     // Drop a slow build that a newer selection already superseded.
