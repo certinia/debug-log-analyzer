@@ -1,1 +1,4 @@
 *.log filter=lfs diff=lfs merge=lfs -text
+
+# e2e fixture: small enough to keep in git, and LFS pointers are not Apex logs
+lana/test/playwright/fixtures/*.log -filter diff merge text
