@@ -123,8 +123,7 @@ pnpm install
 2. Package the extension:
 
 ```zsh
-cd lana
-vsce package --no-dependencies
+pnpm --filter lana run build:vsix
 ```
 
 This command will create a `.vsix` file that you can distribute or install locally.
