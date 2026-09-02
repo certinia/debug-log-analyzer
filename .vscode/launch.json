@@ -6,9 +6,6 @@
   "version": "0.2.0",
   "configurations": [
     {
-      // The "lana-dev" profile holds only the Salesforce services extension, so
-      // the dev host loads it and Lana alone. Set it up once per machine with:
-      // code --profile lana-dev --install-extension salesforce.salesforcedx-vscode-services
       "name": "Run Extension",
       "type": "extensionHost",
       "request": "launch",
