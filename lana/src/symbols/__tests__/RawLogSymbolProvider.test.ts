@@ -10,7 +10,12 @@ import {
   createMockContext,
   createMockLogEvent,
 } from '../../__tests__/helpers/test-builders.js';
-import { createMockTextDocument } from '../../__tests__/mocks/vscode.js';
+import {
+  TabInputText,
+  Uri,
+  createMockTextDocument,
+  setOpenTabs,
+} from '../../__tests__/mocks/vscode.js';
 import { LogEventCache } from '../../cache/LogEventCache.js';
 import { RawLogSymbolProvider } from '../RawLogSymbolProvider.js';
 
@@ -28,6 +33,8 @@ describe('RawLogSymbolProvider', () => {
   beforeEach(() => {
     provider = new RawLogSymbolProvider();
     mockGetApexLog.mockReset();
+    // The provider only works for a document the user has open as a text tab.
+    setOpenTabs(new TabInputText(Uri.file('/test/file.log')));
   });
 
   describe('provideDocumentSymbols', () => {

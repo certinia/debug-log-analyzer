@@ -16,6 +16,7 @@ import type { LogEvent } from 'apex-log-parser';
 
 import type { Context } from '../Context.js';
 import { LogEventCache } from '../cache/LogEventCache.js';
+import { isOpenAsTextTab } from '../editor/TabState.js';
 import { formatDuration, TIMESTAMP_REGEX } from '../log-utils.js';
 
 /**
@@ -29,6 +30,10 @@ class RawLogSymbolProvider implements DocumentSymbolProvider {
     document: TextDocument,
     _token: CancellationToken,
   ): Promise<DocumentSymbol[]> {
+    if (!isOpenAsTextTab(document.uri)) {
+      return [];
+    }
+
     const apexLog = await LogEventCache.getApexLog(document.uri);
 
     if (!apexLog) {

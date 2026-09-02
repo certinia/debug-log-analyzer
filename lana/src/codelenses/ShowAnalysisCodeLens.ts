@@ -1,6 +1,7 @@
 import { CodeLens, Range, languages, type CodeLensProvider, type TextDocument } from 'vscode';
 
 import type { Context } from '../Context.js';
+import { isOpenAsTextTab } from '../editor/TabState.js';
 import { ShowLogAnalysis } from '../commands/ShowLogAnalysis.js';
 import { isApexLogContent } from '../language/ApexLogLanguageDetector.js';
 
@@ -12,7 +13,7 @@ class ShowAnalysisCodeLens implements CodeLensProvider {
   }
 
   async provideCodeLenses(document: TextDocument): Promise<CodeLens[]> {
-    if (!isApexLogContent(document)) {
+    if (!isOpenAsTextTab(document.uri) || !isApexLogContent(document)) {
       return [];
     }
 
