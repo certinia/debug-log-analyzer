@@ -118,6 +118,9 @@ importers:
       effect:
         specifier: ^3.22.0
         version: 3.22.1
+      vscode-uri:
+        specifier: ^3.1.0
+        version: 3.1.0
     devDependencies:
       '@salesforce/vscode-services':
         specifier: ^67.12.0

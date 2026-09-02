@@ -86,12 +86,15 @@ interface EventMap {
   // `detail:select` is strictly inbound to it; separate events stop an echo loop.
   'inspector:reveal': { source: DetailSource; eventIndex: number };
 
-  // A row in the inspector points at events — mark them in the tab the inspector
-  // is showing, so the user can see where they sit without the view moving:
-  // no scroll, no pan, and no selection beyond `inspector:reveal`'s. A grouped
-  // row names every occurrence it merges, and an empty list drops the mark.
+  // A row in the inspector points at events: mark them in the tab the inspector
+  // is showing. The list is the frames the row stands for, so a bottom-up caller
+  // row names the callers at its own depth rather than the calls they conducted,
+  // and an empty list drops the mark.
   // `sticky` is true when the row was picked, so the mark holds while the pointer
-  // is elsewhere, and false for the pointer itself.
+  // is elsewhere, and false for the pointer itself. A hover moves nothing at all.
+  // A pick also reveals its first frame in the views that have a row for one, so
+  // the Call Tree and Analysis grids scroll and select, while the Database grids
+  // and the flame chart only mark.
   'inspector:locate': {
     source: DetailSource;
     eventIndexes: readonly number[];
@@ -99,12 +102,28 @@ interface EventMap {
   };
 
   // The other direction: a frame in the tab's own view is under the pointer, so
-  // the inspector marks the rows that stand for it — only where a row is already
-  // on screen. Nothing moves: no selection change, no scroll, no expand. A row
-  // that merges occurrences names them all, and the list is empty when the
-  // pointer leaves the frame.
+  // the inspector marks the rows that stand for it, only where a row is already
+  // on screen. Nothing moves: no selection change, no scroll, no expand. The
+  // list is the frames the row stands for, as `inspector:locate` is, so a
+  // bottom-up caller row names the callers at its own depth rather than the
+  // calls they conducted. It is empty when the pointer leaves the frame.
   'detail:locate': { source: DetailSource; eventIndexes: readonly number[] };
 }
+
+/** One event's payload, for code that answers an event it is handed rather than
+ *  one it names itself. The map stays where each payload is described. */
+export type EventDetail<K extends keyof EventMap> = EventMap[K];
+
+/**
+ * The events that name the tab they are for.
+ *
+ * Naming a tab is not the same as being for one tab only: the inspector records
+ * every tab's `detail:select` and `detail:view`, so filtering those by source
+ * would lose the tab it is not showing. `onSource` is for a tab's own view.
+ */
+type SourcedEvent = {
+  [K in keyof EventMap]: EventMap[K] extends { source: DetailSource } ? K : never;
+}[keyof EventMap];
 
 type EventCallback<K extends keyof EventMap> = (detail: EventMap[K]) => void;
 
@@ -121,6 +140,23 @@ class EventBusImpl {
     return () => {
       this.listeners.get(event)?.delete(callback as EventCallback<keyof EventMap>);
     };
+  }
+
+  /**
+   * Subscribes to an event only where it names `source`: the whole contract of a
+   * view that answers for one tab. Every such event reaches every view, so the
+   * filter belongs to the bus rather than to each view.
+   */
+  onSource<K extends SourcedEvent>(
+    event: K,
+    source: DetailSource,
+    callback: EventCallback<K>,
+  ): () => void {
+    return this.on(event, (detail) => {
+      if (detail.source === source) {
+        callback(detail);
+      }
+    });
   }
 
   emit<K extends keyof EventMap>(event: K, detail: EventMap[K]): void {

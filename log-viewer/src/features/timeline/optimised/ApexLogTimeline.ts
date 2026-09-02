@@ -41,6 +41,7 @@ import {
 } from '../types/flamechart.types.js';
 import type { SearchCursor } from '../types/search.types.js';
 import { InspectorEmphasis } from '../../../components/inspectorEmphasis.js';
+import { wireInspectorTab } from '../../../components/inspectorTab.js';
 import { isFrameOffscreen, toDetailSelection } from '../utils/detail-selection-sync.js';
 import { extractExceptionMarkers, extractMarkers, noDataSpans } from '../utils/marker-utils.js';
 import { seekWindow } from '../utils/navigate-window.js';
@@ -69,9 +70,7 @@ export class ApexLogTimeline {
   private selectedEventForContextMenu: EventNode | null = null;
   private selectedMarkerForContextMenu: TimelineMarker | null = null;
   private eventBusUnsubscribe: (() => void) | null = null;
-  private inspectorRevealUnsubscribe: (() => void) | null = null;
-  private inspectorLocateUnsubscribe: (() => void) | null = null;
-  private selectionClearUnsubscribe: (() => void) | null = null;
+  private inspectorUnsubscribe: (() => void) | null = null;
   /** Guards the programmatic select made on the inspector's behalf. */
   private echoGuard = new SelectionEchoGuard();
   /** Frame last reported to the inspector as under the pointer. */
@@ -219,31 +218,14 @@ export class ApexLogTimeline {
       }
     });
 
-    // Reveal an inspector row in the flame chart, but only while the timeline is
-    // the tab the inspector is showing.
-    this.inspectorRevealUnsubscribe = eventBus.on('inspector:reveal', (detail) => {
-      if (detail.source === 'timeline') {
-        this.selectFrameByEventIndex(detail.eventIndex);
-      }
-    });
-
-    // Dim the chart around the frames the inspector points at, while the timeline
-    // is the tab the inspector is showing.
-    this.inspectorLocateUnsubscribe = eventBus.on('inspector:locate', (detail) => {
-      if (detail.source === 'timeline') {
-        this.applyEmphasis(this.emphasis.report(detail.eventIndexes, detail.sticky));
-      }
-    });
-
-    // Escape (app-wide) deselects here; the chart reports the clear itself.
-    // The flame chart's own Escape (container focused) consumes the key first.
-    this.selectionClearUnsubscribe = eventBus.on('selection:clear', (detail) => {
-      if (detail.source === 'timeline') {
+    this.inspectorUnsubscribe = wireInspectorTab('timeline', this.emphasis, {
+      mark: (eventIndexes) => this.applyEmphasis(eventIndexes),
+      reveal: (eventIndex) => this.selectFrameByEventIndex(eventIndex),
+      clear: () => {
+        // The chart reports the clear itself. Its own Escape, with the container
+        // focused, consumes the key before this.
         this.flamechart.clearSelection();
-        // A picked inspector row is no selection of the chart, and the clear
-        // above is silent when there was nothing selected, so drop the dim here.
-        this.pickEmphasis(undefined);
-      }
+      },
     });
   }
 
@@ -267,6 +249,10 @@ export class ApexLogTimeline {
     if (!selected) {
       return;
     }
+
+    // The inspector asked for this frame, so its mark is what dims the rest. Set after the
+    // run: the select inside it clears the mark, as any chart select does.
+    this.pickEmphasis(eventIndex);
 
     const bounds = this.flamechart.getViewportManager()?.getBounds();
     if (
@@ -299,13 +285,14 @@ export class ApexLogTimeline {
     this.flamechart.locateByEventNodes(nodes);
   }
 
-  /**
-   * The frame the emphasis rests on between pointer moves: the selected one, or
-   * none once the selection is cleared. Markers that map to no log event, and
-   * frames the parser gave no index, count as none.
-   */
-  private pickEmphasis(eventIndex: number | undefined): void {
-    this.applyEmphasis(this.emphasis.pick(eventIndex === undefined ? [] : [eventIndex]));
+  /** Rest the emphasis on one frame, until something else picks or clears it. */
+  private pickEmphasis(eventIndex: number): void {
+    this.applyEmphasis(this.emphasis.pick([eventIndex]));
+  }
+
+  /** Drop the resting emphasis, so nothing dims. */
+  private clearEmphasis(): void {
+    this.applyEmphasis(this.emphasis.pick([]));
   }
 
   /**
@@ -401,17 +388,9 @@ export class ApexLogTimeline {
       this.eventBusUnsubscribe();
       this.eventBusUnsubscribe = null;
     }
-    if (this.inspectorRevealUnsubscribe) {
-      this.inspectorRevealUnsubscribe();
-      this.inspectorRevealUnsubscribe = null;
-    }
-    if (this.inspectorLocateUnsubscribe) {
-      this.inspectorLocateUnsubscribe();
-      this.inspectorLocateUnsubscribe = null;
-    }
-    if (this.selectionClearUnsubscribe) {
-      this.selectionClearUnsubscribe();
-      this.selectionClearUnsubscribe = null;
+    if (this.inspectorUnsubscribe) {
+      this.inspectorUnsubscribe();
+      this.inspectorUnsubscribe = null;
     }
 
     this.flamechart.destroy();
@@ -615,7 +594,7 @@ export class ApexLogTimeline {
     // A click on empty space drops a mark left by a picked inspector row, which
     // the chart's own clear says nothing about when it held no selection.
     if (!eventNode && !marker) {
-      this.pickEmphasis(undefined);
+      this.clearEmphasis();
     }
 
     // Frame and marker clicks are handled by FlameChart's selection system
@@ -629,11 +608,10 @@ export class ApexLogTimeline {
    * Use J key for explicit "jump to call tree" action.
    */
   private handleSelect(eventNode: EventNode | null): void {
-    // The emphasis follows every select, including the one made on the
-    // inspector's behalf — the guard holds back the echo, not the dim.
-    const selected = (eventNode as (EventNode & { original?: LogEvent }) | null)?.original
-      ?.eventIndex;
-    this.pickEmphasis(selected);
+    // A select says what to look at, so nothing dims and any mark a picked inspector row
+    // left behind is dropped. Chrome dims for a search, never for a select. The inspector
+    // re-marks its own frame after the select it asked for.
+    this.clearEmphasis();
 
     if (this.echoGuard.suppressed) {
       return;
@@ -683,7 +661,7 @@ export class ApexLogTimeline {
    * Handle marker selection change from FlameChart.
    */
   private handleMarkerSelect(marker: TimelineMarker | null): void {
-    this.pickEmphasis(marker?.eventIndex);
+    this.clearEmphasis();
 
     if (!marker) {
       // Marker selection cleared - hide tooltip

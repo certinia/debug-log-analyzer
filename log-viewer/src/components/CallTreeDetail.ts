@@ -49,6 +49,7 @@ import { PANEL_ROW_MENU_ITEMS, runPanelRowAction } from './panelRowMenu.js';
 import {
   buildScopedCallTree,
   buildWholeLogCallTree,
+  frameEventIndexes,
   locatableEventIndexes,
   revealableEventIndex,
   rowIdsByPath,
@@ -618,8 +619,8 @@ export class CallTreeDetail extends LitElement {
     // Selecting a real frame reveals it in the tab on screen. Aggregated and
     // bottom-up rows merge occurrences behind a synthetic negative id, so
     // revealing one would misname which occurrence was clicked; the pick marks
-    // every occurrence instead, and holds until it is dropped — as the Chrome
-    // DevTools performance panel keeps a selected group's instances lit.
+    // every frame the row stands for instead, and holds until it is dropped, as
+    // the Chrome DevTools performance panel keeps a selected group's frames lit.
     table.on('rowSelectionChanged', (_data, rows) => {
       if (this._echoGuard.suppressed) {
         return;
@@ -633,7 +634,7 @@ export class CallTreeDetail extends LitElement {
         // reads the same either way. Built from the row: a scoped row carries no
         // key, which is what the tab's own rows are read through.
         const instances = locatableEventIndexes(data);
-        dispatchInspectorLocate(this, instances, true, {
+        dispatchInspectorLocate(this, frameEventIndexes(data), true, {
           kind: 'aggregate',
           instances,
           calledBy: this.viewMode === 'bottom-up' ? callerOfRow(rows[0]) : undefined,
@@ -642,9 +643,9 @@ export class CallTreeDetail extends LitElement {
     });
     // Hovering a row marks it in the tab on screen, so the user can see where it
     // sits before deciding to pick it. A grouped row cannot be revealed - there is
-    // no one frame to jump to - but every occurrence it merges can be marked.
+    // no one frame to jump to - but every frame it stands for can be marked.
     table.on('rowMouseEnter', (_e, row) => {
-      dispatchInspectorLocate(this, locatableEventIndexes(row.getData() as Partial<ScopedRow>));
+      dispatchInspectorLocate(this, frameEventIndexes(row.getData() as Partial<ScopedRow>));
     });
     table.on('rowMouseLeave', () => {
       dispatchInspectorLocate(this, []);
@@ -797,20 +798,11 @@ export class CallTreeDetail extends LitElement {
   }
 }
 
-/**
- * The frame that called a bottom-up row's own calls: the caller shown directly
- * above the row's seed. A tree parent is the callee there, so the walk runs to
- * the row one level below the top.
- */
+/** What a picked bottom-up row's calls were reached through: the row's own frame,
+ *  or nothing on a top-level row, which names its own calls. */
 function callerOfRow(row: RowComponent | undefined): string | undefined {
-  let node = row;
-  let parent = node?.getTreeParent();
-  if (!node || !parent) {
+  if (!row?.getTreeParent()) {
     return undefined;
   }
-  for (let above = parent.getTreeParent(); above; above = parent.getTreeParent()) {
-    node = parent;
-    parent = above;
-  }
-  return (node.getData() as Partial<ScopedRow>).text;
+  return (row.getData() as Partial<ScopedRow>).text;
 }
