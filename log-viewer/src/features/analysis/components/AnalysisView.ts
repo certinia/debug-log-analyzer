@@ -174,7 +174,7 @@ export class AnalysisView extends LitElement {
       mark: (eventIndexes) => this._markLocated(eventIndexes),
       // An inspector finding names one event; the grid holds it in the bucket for
       // its method, so that bucket is what gets revealed.
-      reveal: (eventIndex) => this._revealEventIndex(eventIndex),
+      reveal: (eventIndex, signal) => this._revealEventIndex(eventIndex, signal),
       clear: () => {
         // The table reports the clear itself, which is what reaches the inspector.
         this.analysisTable?.deselectRow();
@@ -219,7 +219,7 @@ export class AnalysisView extends LitElement {
    * inspector keeps the findings it was clicked in rather than being rebuilt around
    * the row it just asked for.
    */
-  private async _revealEventIndex(eventIndex: number): Promise<void> {
+  private async _revealEventIndex(eventIndex: number, signal: AbortSignal): Promise<void> {
     const table = this.analysisTable;
     const root = this.timelineRoot;
     if (!table || !root) {
@@ -242,6 +242,10 @@ export class AnalysisView extends LitElement {
     if (!this.filterState.showDetails && !this._showDetailsFilter(match.getData() as BottomUpRow)) {
       this._handleShowDetailsChange();
       await this.updateComplete;
+    }
+
+    if (signal.aborted) {
+      return;
     }
 
     await this._echoGuard.runAsync(() =>
