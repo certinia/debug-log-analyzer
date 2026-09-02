@@ -47,6 +47,7 @@ import {
 import { expandCollapseAll } from '../../call-tree/utils/ExpandCollapse.js';
 
 import { onTableReshaped } from '../../../tabulator/module/tableReshape.js';
+import { tableHolder } from '../../../tabulator/module/tableHolder.js';
 
 import dataGridStyles from '../../../tabulator/style/DataGrid.scss';
 
@@ -553,7 +554,7 @@ export class AnalysisView extends LitElement {
     }
     table.blockRedraw();
     expandCollapseAll(table.getRows(), expand);
-    table.element?.querySelector<HTMLElement>('.tabulator-tableholder')?.focus();
+    tableHolder(table.element)?.focus();
     table.restoreRedraw();
   }
 

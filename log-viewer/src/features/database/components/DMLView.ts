@@ -35,6 +35,7 @@ import {
 
 // Tabulator custom modules, imports + styles
 import NumberAccessor from '../../../tabulator/dataaccessor/Number.js';
+import { tableHolder } from '../../../tabulator/module/tableHolder.js';
 import { inCountRange, inMsRange, type FilterRange } from '../../../tabulator/filters/MinMax.js';
 import { progressFormatter } from '../../../tabulator/format/Progress.js';
 import { progressFormatterMS } from '../../../tabulator/format/ProgressMS.js';
@@ -724,8 +725,7 @@ export class DMLView extends LitElement {
     });
 
     this.dmlTable.on('tableBuilt', () => {
-      const holder = this._getTableHolder();
-      holder.style.overflowAnchor = 'none';
+      this._getTableHolder()?.style.setProperty('overflow-anchor', 'none');
       //@ts-expect-error This is a custom function added in the GroupSort custom module
       this.dmlTable?.setSortedGroupBy('dml');
       if (this.dmlTable) {
@@ -739,6 +739,9 @@ export class DMLView extends LitElement {
 
     this.dmlTable.on('renderComplete', () => {
       const holder = this._getTableHolder();
+      if (!holder) {
+        return;
+      }
       const table = this._getTable();
       holder.style.minHeight = Math.min(holder.clientHeight, table.clientHeight) + 'px';
     });
@@ -794,7 +797,7 @@ export class DMLView extends LitElement {
   }
 
   _getTableHolder() {
-    this.holder = this.dmlTable?.element.querySelector('.tabulator-tableholder') as HTMLElement;
+    this.holder ??= tableHolder(this.dmlTable?.element);
     return this.holder;
   }
 
