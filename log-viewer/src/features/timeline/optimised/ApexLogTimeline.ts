@@ -254,7 +254,7 @@ export class ApexLogTimeline {
     // run: the select inside it clears the mark, as any chart select does.
     this.pickEmphasis(eventIndex);
 
-    const bounds = this.flamechart.getViewportManager()?.getBounds();
+    const bounds = this.flamechart.getViewportBounds();
     if (
       bounds &&
       isFrameOffscreen(bounds, result.event.timestamp, result.event.duration.total, result.depth)
