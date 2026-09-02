@@ -12,6 +12,10 @@
 
 import type { LogEvent } from 'apex-log-parser';
 import * as PIXI from 'pixi.js';
+
+import { HoverTracker } from './interaction/HoverTracker.js';
+import { HoverHighlightRenderer } from './rendering/HoverHighlightRenderer.js';
+import { destroyTimelineApp } from './rendering/pixiApp.js';
 import type {
   EditorColors,
   EventNode,
@@ -68,6 +72,13 @@ import {
   METRIC_STRIP_GAP,
   MetricStripOrchestrator,
 } from './metric-strip/MetricStripOrchestrator.js';
+import { waitForNextFrame } from '../../../core/utility/FrameBudget.js';
+
+/**
+ * How long to let a container settle before giving up on it. Bounded, so a container that
+ * genuinely never gains a size reports the fault rather than hanging on a promise.
+ */
+const SIZE_WAIT_FRAMES = 60;
 
 export interface FlameChartCallbacks {
   onMouseMove?: (
@@ -140,6 +151,9 @@ export class FlameChart<E extends EventNode = EventNode> {
   // Text label renderer (used in normal mode, shared with search orchestrator)
   private textLabelRenderer: TextLabelRenderer | null = null;
 
+  private hoverHighlightRenderer: HoverHighlightRenderer | null = null;
+  private readonly hoverTracker = new HoverTracker();
+
   private worldContainer: PIXI.Container | null = null;
   private axisContainer: PIXI.Container | null = null;
   private markerContainer: PIXI.Container | null = null;
@@ -170,6 +184,7 @@ export class FlameChart<E extends EventNode = EventNode> {
   private metricStripOrchestrator: MetricStripOrchestrator | null = null;
   private metricStripDiv: HTMLElement | null = null; // HTML container for metric strip canvas
   private metricStripGapDiv: HTMLElement | null = null; // Gap element below metric strip
+  private minimapGapDiv: HTMLElement | null = null; // Gap element above metric strip
 
   // Cursor line renderer for main timeline (bidirectional cursor mirroring)
   private cursorLineRenderer: CursorLineRenderer | null = null;
@@ -177,6 +192,9 @@ export class FlameChart<E extends EventNode = EventNode> {
   // Vertical offset from container top to main timeline canvas (minimap + metric strip + gaps)
   // Used to convert canvas-relative coordinates to container-relative for tooltip positioning
   private mainTimelineYOffset = 0;
+
+  /** The minimap height the last applied resize used, so a resize can tell nothing moved. */
+  private appliedMinimapHeight: number | null = null;
 
   // Cached culled rectangles (reused when viewport unchanged - Phase 3 optimization)
   // INVARIANT: These caches are invalidated when renderDirty.culling is set to true.
@@ -243,17 +261,12 @@ export class FlameChart<E extends EventNode = EventNode> {
     this.options = options;
     this.callbacks = callbacks;
 
-    // Store truncation markers for rendering
-    this.markers.push(...markers);
-
-    // Get container dimensions for validation
-    const { width, height } = container.getBoundingClientRect();
-    if (width === 0 || height === 0) {
-      throw new TimelineError(
-        TimelineErrorCode.INVALID_CONTAINER,
-        'Container must have non-zero dimensions',
-      );
+    // Pushed one at a time: a spread would overrun the argument limit.
+    for (const marker of markers) {
+      this.markers.push(marker);
     }
+
+    const { width, height } = await this.awaitContainerSize(container);
 
     // Create event index (use precomputed metrics if available)
     this.index = new TimelineEventIndex(
@@ -421,11 +434,7 @@ export class FlameChart<E extends EventNode = EventNode> {
    * Clean up resources and remove event listeners.
    */
   public destroy(): void {
-    // Stop render loop
-    if (this.renderLoopId !== null) {
-      cancelAnimationFrame(this.renderLoopId);
-      this.renderLoopId = null;
-    }
+    this.cancelScheduledRender();
 
     // Clean up interaction handler
     if (this.interactionHandler) {
@@ -437,6 +446,11 @@ export class FlameChart<E extends EventNode = EventNode> {
     if (this.keyboardHandler) {
       this.keyboardHandler.destroy();
       this.keyboardHandler = null;
+    }
+
+    if (this.hoverHighlightRenderer) {
+      this.hoverHighlightRenderer.destroy();
+      this.hoverHighlightRenderer = null;
     }
 
     // Clean up selection orchestrator
@@ -516,7 +530,7 @@ export class FlameChart<E extends EventNode = EventNode> {
 
     // Destroy main app
     if (this.app) {
-      this.app.destroy(true, { children: true, texture: true });
+      destroyTimelineApp(this.app);
       this.app = null;
     }
 
@@ -719,19 +733,58 @@ export class FlameChart<E extends EventNode = EventNode> {
   private scheduleRender(): void {
     if (this.renderLoopId === null) {
       this.renderLoopId = requestAnimationFrame(() => {
-        if (this.state && this.state.needsRender) {
-          this.render();
-          this.state.needsRender = false;
-
-          // Setup ResizeObserver after first render to avoid double render on init.
-          // By this point, layout is finalized and ResizeObserver baseline matches rendered state.
-          if (this.resizeHandler && !this.resizeObserverActive) {
-            this.resizeHandler.setupResizeObserver();
-            this.resizeObserverActive = true;
-          }
-        }
+        // Cleared before the render, not after: a listener that asks for a render from inside
+        // one then books the next frame rather than having its request swallowed by this one.
         this.renderLoopId = null;
+
+        if (this.state?.needsRender) {
+          this.flushRender();
+        }
       });
+    }
+  }
+
+  /** Drop a render booked for the next frame. */
+  private cancelScheduledRender(): void {
+    if (this.renderLoopId !== null) {
+      cancelAnimationFrame(this.renderLoopId);
+      this.renderLoopId = null;
+    }
+  }
+
+  /**
+   * Draw everything in this frame, rather than booking the next one.
+   *
+   * For a caller that has already changed what is on screen and cannot leave the frame to
+   * composite the result — a resize wipes each canvas as it sizes it. `invalidateAll` covers
+   * whatever a dropped render was waiting for.
+   */
+  private renderNow(): void {
+    this.cancelScheduledRender();
+    this.invalidateAll();
+    this.flushRender();
+
+    // A frame was dropped to draw in this one. If the chart could not draw after all, that
+    // dropped frame is still owed.
+    if (this.state?.needsRender) {
+      this.scheduleRender();
+    }
+  }
+
+  /**
+   * Draw, then settle the loop: nothing is left pending and nothing renders twice.
+   *
+   * The one place a render is followed through, whether the frame loop asked for it or a
+   * caller drew straight away.
+   */
+  private flushRender(): void {
+    this.render();
+
+    // Setup ResizeObserver after first render to avoid double render on init.
+    // By this point, layout is finalized and ResizeObserver baseline matches rendered state.
+    if (this.resizeHandler && !this.resizeObserverActive) {
+      this.resizeHandler.setupResizeObserver();
+      this.resizeObserverActive = true;
     }
   }
 
@@ -739,13 +792,13 @@ export class FlameChart<E extends EventNode = EventNode> {
    * Handle window resize.
    * Calculates main timeline height by subtracting visible component heights.
    */
-  public resize(newWidth: number, newHeight: number): void {
+  public resize(newWidth: number, newHeight: number): boolean {
     if (!this.app || !this.viewport || !this.container || !this.index) {
-      return;
+      return false;
     }
 
     if (newWidth <= 0 || newHeight <= 0) {
-      return;
+      return false;
     }
 
     const oldState = this.viewport.getState();
@@ -772,8 +825,21 @@ export class FlameChart<E extends EventNode = EventNode> {
     const mainTimelineHeight = newHeight - totalOverheadHeight;
 
     if (mainTimelineHeight <= 0) {
-      return; // Invalid state, skip resize
+      return false; // Invalid state, skip resize
     }
+
+    // Nothing moved, so no canvas is about to be wiped and a render already booked still
+    // stands. Load reaches here with the geometry init already set. The minimap is checked
+    // too: its height is a tenth of the container's, so it can move on its own while the main
+    // timeline keeps the height it had.
+    if (
+      newWidth === oldWidth &&
+      mainTimelineHeight === oldState.displayHeight &&
+      minimapHeight === this.appliedMinimapHeight
+    ) {
+      return false;
+    }
+    this.appliedMinimapHeight = minimapHeight;
 
     // Update offset for converting canvas-relative to container-relative coordinates
     this.mainTimelineYOffset = totalOverheadHeight;
@@ -807,7 +873,10 @@ export class FlameChart<E extends EventNode = EventNode> {
     // Update viewport with main timeline dimensions only
     this.viewport.setStateForResize(newWidth, mainTimelineHeight, newZoom, newOffsetX, newOffsetY);
 
-    this.requestRender();
+    // Each `renderer.resize` above wiped its canvas, so a scheduled render would leave this
+    // frame to composite three blank ones.
+    this.renderNow();
+    return true;
   }
 
   /**
@@ -858,6 +927,7 @@ export class FlameChart<E extends EventNode = EventNode> {
     this.cursorLineRenderer?.setColor(colors.cursorForeground);
     this.searchOrchestrator?.setHighlightColor(colors.findMatchBackground);
     this.selectionOrchestrator?.setHighlightColor(colors.findMatchBackground);
+    this.hoverHighlightRenderer?.setColor(colors.editorForeground);
     this.measurementOrchestrator?.setColors(
       colors.selectionBackground,
       // Same fallback the orchestrator applies at init: many themes leave
@@ -955,6 +1025,9 @@ export class FlameChart<E extends EventNode = EventNode> {
     const minimapHeight = calculateMinimapHeight(height);
     const metricStripHeight = METRIC_STRIP_COLLAPSED_HEIGHT;
 
+    // This is the applied geometry, so a resize to the same size has nothing to do.
+    this.appliedMinimapHeight = minimapHeight;
+
     // Create wrapper container with flexbox layout
     this.wrapper = document.createElement('div');
     this.wrapper.style.cssText = 'display:flex;flex-direction:column;width:100%;height:100%';
@@ -966,6 +1039,7 @@ export class FlameChart<E extends EventNode = EventNode> {
 
     // Gap element between minimap and metric strip
     const minimapGapDiv = document.createElement('div');
+    this.minimapGapDiv = minimapGapDiv;
     minimapGapDiv.style.cssText = `height:${MINIMAP_GAP}px;width:100%;flex-shrink:0;background:transparent`;
 
     // Metric strip container (fixed height)
@@ -1025,6 +1099,28 @@ export class FlameChart<E extends EventNode = EventNode> {
     return { mainTimelineHeight };
   }
 
+  /**
+   * The container's size, waiting for a layout that has not settled. A hidden tab, a
+   * collapsed panel, or a flex row being re-laid-out around the chart all measure 0 before
+   * they settle, and none of those is a fault — but a container that never gains a size is,
+   * so the wait is bounded and still reports it.
+   */
+  private async awaitContainerSize(
+    container: HTMLElement,
+  ): Promise<{ width: number; height: number }> {
+    for (let frame = 0; frame < SIZE_WAIT_FRAMES; frame++) {
+      const { width, height } = container.getBoundingClientRect();
+      if (width > 0 && height > 0) {
+        return { width, height };
+      }
+      await waitForNextFrame();
+    }
+    throw new TimelineError(
+      TimelineErrorCode.INVALID_CONTAINER,
+      'Container must have non-zero dimensions',
+    );
+  }
+
   private setupCoordinateSystem(): void {
     if (!this.app) {
       return;
@@ -1051,6 +1147,11 @@ export class FlameChart<E extends EventNode = EventNode> {
     this.worldContainer.scale.set(1, -1);
     stage.addChild(this.worldContainer);
 
+    this.hoverHighlightRenderer = new HoverHighlightRenderer(
+      this.worldContainer,
+      this.options.editorColors?.editorForeground,
+    );
+
     this.uiContainer = new PIXI.Container();
     this.uiContainer.position.set(0, 0);
     this.uiContainer.scale.set(1, 1);
@@ -1073,13 +1174,19 @@ export class FlameChart<E extends EventNode = EventNode> {
       },
       {
         onViewportChange: () => {
-          this.requestRender();
-          if (this.callbacks.onViewportChange && this.viewport) {
-            this.callbacks.onViewportChange(this.viewport.getState());
-          }
+          this.notifyViewportChange();
         },
         onMouseMove: (x: number, y: number) => {
           this.handleMouseMove(x, y);
+        },
+        onPointerPosition: (x: number, y: number, panning: boolean) => {
+          // A drag reports no mouse move, so this is the only fresh position during one.
+          this.hoverTracker.setPointer(x, y);
+          if (panning) {
+            // A drag held against a pan limit moves no frames, so nothing else would ask.
+            this.hoverTracker.invalidateHit();
+            this.requestHoverRender();
+          }
         },
         onClick: (x: number, y: number, modifiers?: ModifierKeys) => {
           this.handleClick(x, y, modifiers);
@@ -1088,6 +1195,8 @@ export class FlameChart<E extends EventNode = EventNode> {
           this.handleDoubleClick(x, y);
         },
         onMouseLeave: () => {
+          this.hoverTracker.clearPointer();
+          this.requestHoverRender();
           // Notify callback that mouse left (clears tooltip)
           if (this.callbacks.onMouseMove) {
             this.callbacks.onMouseMove(0, 0, null, null);
@@ -1255,7 +1364,7 @@ export class FlameChart<E extends EventNode = EventNode> {
       onMinimapResetZoom: () => this.resetZoom(),
 
       // Metric strip keyboard callbacks (delegated to viewport via animation)
-      isInMetricStripArea: () => this.metricStripOrchestrator?.isMouseInMetricStripArea() ?? false,
+      isInMetricStripArea: () => this.metricStripOrchestrator?.holdsHover() ?? false,
       onMetricStripPanViewport: (delta) => this.handleAnimatedPanViewport(delta),
       onMetricStripPanDepth: (delta) => this.handleAnimatedPanDepth(delta),
       onMetricStripZoom: (dir) => this.handleAnimatedZoom(dir),
@@ -1443,18 +1552,25 @@ export class FlameChart<E extends EventNode = EventNode> {
         }
         // Trigger full layout recalculation to resize main timeline
         // The container size doesn't change, but internal flexbox layout does
-        if (this.container) {
-          const { width, height } = this.container.getBoundingClientRect();
-          this.resize(width, height);
+        if (!this.container) {
+          return;
+        }
+        const { width, height } = this.container.getBoundingClientRect();
+        if (!this.resize(width, height)) {
+          // The strip resized its own canvas before asking, so it is blank until something
+          // draws. A resize that could not run leaves that to us.
+          this.requestRender();
         }
       },
     });
 
     // Initialize the orchestrator
+    // The gaps either side are the strip's hover band, so it hears the pointer there too.
     await this.metricStripOrchestrator.init(
       this.metricStripDiv,
       displayWidth,
       this.index.totalDuration,
+      [this.minimapGapDiv, this.metricStripGapDiv],
     );
 
     // Focus container on metric strip mousedown for keyboard support
@@ -1605,6 +1721,11 @@ export class FlameChart<E extends EventNode = EventNode> {
       viewportState,
       maxDepth,
     );
+
+    // A marker takes the pointer, so no frame is washed under it.
+    if (this.hoverTracker.setHovered(eventNode && !marker ? { node: eventNode, depth } : null)) {
+      this.requestHoverRender();
+    }
 
     // Update cursor style based on hit test
     if (this.interactionHandler) {
@@ -1887,6 +2008,16 @@ export class FlameChart<E extends EventNode = EventNode> {
   // RENDER INVALIDATION (Phase 3 optimization)
   // ============================================================================
 
+  /** Request a wash-only render: one phase, for a pointer that crossed into a new frame. */
+  private requestHoverRender(): void {
+    if (!this.state) {
+      return;
+    }
+    this.state.renderDirty.overlays = true;
+    this.state.needsRender = true;
+    this.scheduleRender();
+  }
+
   /**
    * Invalidate all render phases (full render needed).
    * Used when viewport changes (zoom, pan).
@@ -2166,6 +2297,10 @@ export class FlameChart<E extends EventNode = EventNode> {
       return;
     }
 
+    // Committed to drawing, so the request is served. A render that bailed above leaves the
+    // request standing, for a later frame to honour.
+    this.state!.needsRender = false;
+
     const viewportState = this.viewport!.getState();
     this.state!.viewport = viewportState;
     const dirty = this.state!.renderDirty;
@@ -2196,10 +2331,32 @@ export class FlameChart<E extends EventNode = EventNode> {
       this.hitDetector?.setVisibleRects(visibleRects);
       this.hitDetector?.setBuckets(buckets);
       dirty.culling = false;
+
+      // The frames just moved, so the last answer about what the pointer is over has expired.
+      // Deriving it here covers every viewport write - pan, zoom, resize - with one rule.
+      this.hoverTracker.invalidateHit();
     } else {
       // Reuse cached culling results
       visibleRects = this.cachedVisibleRects;
       buckets = this.cachedBuckets;
+    }
+
+    // Ask again now the hit test is fresh, and before the phases that draw: the wash and the
+    // tooltip then follow the pointer in this frame rather than the next. A measure or area
+    // zoom drag owns the pointer and draws its own overlay, so it is left alone until it ends
+    // - the hit stays marked stale, and is asked for on the first render after that.
+    if (this.interactionHandler?.isPointerDragging()) {
+      // A drag is moving the view, not pointing at a frame, so nothing is hovered. The hit
+      // stays marked stale, and the first render after the drag washes what it settled on.
+      if (this.hoverTracker.setHovered(null)) {
+        dirty.overlays = true;
+        this.callbacks.onMouseMove?.(0, 0, null, null);
+      }
+    } else {
+      const stale = this.hoverTracker.takeStaleHit();
+      if (stale) {
+        this.handleMouseMove(stale.x, stale.y);
+      }
     }
 
     // Phase 3: Render events and labels (search mode vs normal mode)
@@ -2330,6 +2487,8 @@ export class FlameChart<E extends EventNode = EventNode> {
    * Render overlays (measurement, cursor line).
    */
   private renderOverlays(viewportState: ViewportState): void {
+    this.hoverHighlightRenderer?.render(viewportState, this.hoverTracker.getHovered());
+
     // Measurement and area zoom overlays
     this.measurementOrchestrator?.render({ viewportState });
 
@@ -2372,7 +2531,7 @@ export class FlameChart<E extends EventNode = EventNode> {
     }
 
     // Get cursor time from metric strip or minimap (for bidirectional sync)
-    const cursorTimeNs = this.metricStripOrchestrator.isMouseInMetricStripArea()
+    const cursorTimeNs = this.metricStripOrchestrator.holdsHover()
       ? this.metricStripOrchestrator.getCursorTimeNs()
       : (this.minimapOrchestrator?.getCursorTimeNs() ?? null);
 

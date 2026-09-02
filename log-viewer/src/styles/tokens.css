@@ -40,6 +40,12 @@
 
   --lana-stroke: var(--vscode-strokeThickness, 1px);
 
+  /* The colour key a legend or a tooltip row draws (`<color-swatch>`, and the track the
+     metric strip reserves for one). Ours: no VS Code var carries the role, and the chrome
+     radius would round this size to a circle. */
+  --lana-swatch-size: var(--lana-space-sm);
+  --lana-swatch-radius: 2px;
+
   /* Left inset for content that lines up past a section's accent bar: the
      gutter, plus the bar itself (`DatabaseSection`). */
   --lana-section-inset: calc(var(--lana-space-md) + 3px);

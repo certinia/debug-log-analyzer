@@ -36,7 +36,7 @@ import {
  * How many rows a ranked section shows before it defers to the grids beside it.
  * These sections are a springboard: the sortable, complete view is the tab.
  */
-const MAX_ROWS = 8;
+const MAX_ROWS = 5;
 
 /**
  * The room a statement label has. Lines are clauses, not display lines: the row
@@ -167,7 +167,7 @@ export class DatabaseConcentration extends LitElement {
     if (!overview?.ranked.length) {
       return html`<p class="note">${NO_STATEMENTS}</p>`;
     }
-    const { count, percent, total } = concentration(overview);
+    const { count, percent } = concentration(overview);
     const { shown, rest } = topRows(overview.ranked);
     const colors = kindColors(this._palette);
     const databaseNs = overview.time.timeNs;
@@ -176,9 +176,7 @@ export class DatabaseConcentration extends LitElement {
     return html`
       <p class="headline">
         <span class="headline__figure">${formatInteger(count)}</span>
-        of
-        <span class="headline__figure">${formatInteger(total)}</span>
-        statement${total === 1 ? '' : 's'} ·
+        ${count === 1 ? 'statement holds' : 'statements hold'}
         <span class="headline__figure">${shareText(percent)}</span>
         of DB time ·
         <span class="headline__figure">${shareText(overview.time.percentOfLog)}</span>
@@ -188,7 +186,13 @@ export class DatabaseConcentration extends LitElement {
       ${
         rest.length > 0
           ? html`<p class="tail">
-              <span>the other ${formatInteger(rest.length)} statements</span>
+              <span
+                >${
+                  rest.length === 1
+                    ? 'the other statement'
+                    : `the other ${formatInteger(rest.length)} statements`
+                }</span
+              >
               <span class="tail__value"
                 >${shareText(sharePercent(databaseNs - shownNs, databaseNs))}</span
               >
@@ -295,17 +299,12 @@ export class DatabaseNamespaces extends LitElement {
     namespaces: DatabaseBreakdown[],
     color: (namespace: string) => string,
   ) {
-    const segments = segmentsWithTail(
-      namespaces,
-      MAX_ROWS,
-      (row) => ({
-        label: row.key,
-        value: row.timeNs,
-        color: color(row.key),
-        detail: kindSplit(row),
-      }),
-      (row) => row.timeNs,
-    );
+    const segments = segmentsWithTail(namespaces, (row) => ({
+      label: row.key,
+      value: row.timeNs,
+      color: color(row.key),
+      detail: kindSplit(row),
+    }));
 
     return html`
       <div class="bar">

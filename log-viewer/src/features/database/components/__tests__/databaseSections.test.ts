@@ -20,6 +20,7 @@ jest.mock('../../../soql/components/SOQLLinterIssues.js', () => ({
 import { render, type TemplateResult } from 'lit';
 
 import type { PaneSection } from '../../../../components/PaneView.js';
+import type { CallTreeDetail } from '../../../../components/CallTreeDetail.js';
 import { buildDatabaseSections } from '../databaseSections.js';
 
 /**
@@ -83,5 +84,12 @@ describe('buildDatabaseSections', () => {
     // An ancestor method is not a statement, so it has no statement type.
     expect(vitals.hasAttribute('type')).toBe(false);
     expect(rendered(sections, 'calltree', 'call-tree-detail').getAttribute('eventIndex')).toBe('1');
+  });
+
+  it('names the tab on the call tree, so its view mode is its own', async () => {
+    const sections = await buildDatabaseSections({ eventIndex: 3, type: 'soql' });
+
+    const tree = rendered(sections, 'calltree', 'call-tree-detail') as CallTreeDetail;
+    expect(tree.source).toBe('database');
   });
 });

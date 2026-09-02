@@ -7,7 +7,7 @@ import type { FrameBudgetOptions } from '../../core/utility/FrameBudget.js';
 import { cachedNamespaceSelfTimes, scopedNamespaceSelfTimes } from '../namespaceTime.js';
 import { ev, log, roots, type FakeEvent } from './fixtures/logEvents.js';
 
-const options: FrameBudgetOptions = { yieldFrame: () => Promise.resolve() };
+const options: FrameBudgetOptions = { yieldSlice: () => Promise.resolve() };
 // A fresh scope per call, so each case walks rather than answering from the memo.
 const selfTimes = (events: FakeEvent[]) => scopedNamespaceSelfTimes({}, roots(events), options);
 

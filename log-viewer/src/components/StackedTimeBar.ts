@@ -1,13 +1,16 @@
 /*
  * Copyright (c) 2026 Certinia Inc. All rights reserved.
  */
-import { LitElement, css, html, svg, type TemplateResult } from 'lit';
+import { LitElement, css, html, svg, type PropertyValues, type TemplateResult } from 'lit';
 import { customElement, property, state } from 'lit/decorators.js';
 import { classMap } from 'lit/directives/class-map.js';
 import { styleMap } from 'lit/directives/style-map.js';
 
 import { formatDuration, formatInteger } from '../core/utility/Util.js';
 import { globalStyles } from '../styles/global.styles.js';
+
+// web components
+import './ColorSwatch.js';
 
 /** One coloured length of a {@link StackedTimeBar}, in the bar's own unit. */
 export interface StackedSegment {
@@ -16,34 +19,43 @@ export interface StackedSegment {
   color: string;
   /** What the segment is made of. Shown in the tip. */
   detail?: string;
+  /** The segments this one stands for. A tail lists them in its tip. */
+  parts?: readonly StackedSegment[];
 }
 
+/** How many of a tail's parts its tip names before it counts the rest. */
+const TIP_PARTS = 5;
+
 /**
- * The first `max` rows as segments, with everything past them gathered into one
- * muted tail, so a bar with more rows than it can colour still totals the whole.
- *
- * The tail reads its size through `sizeOf`, so a row past `max` never pays for a
- * segment that is thrown away.
+ * How many segments a bar colours before the rest go to its tail. Six reads as
+ * two rows of legend in a narrow dock, and a narrower segment is too thin to hit.
+ */
+export const DEFAULT_MAX_SEGMENTS = 6;
+
+/**
+ * Every row as a segment, with those past `max` gathered into one muted tail, so
+ * a bar with more rows than it can colour still totals the whole. The tail
+ * carries the segments it stands for, which its tip names.
  */
 export function segmentsWithTail<T>(
   rows: readonly T[],
-  max: number,
   toSegment: (row: T, index: number) => StackedSegment,
-  sizeOf: (row: T) => number,
+  max: number = DEFAULT_MAX_SEGMENTS,
 ): StackedSegment[] {
-  const segments = rows.slice(0, max).map(toSegment);
-  if (rows.length > max) {
-    let tail = 0;
-    for (let index = max; index < rows.length; index++) {
-      tail += sizeOf(rows[index]!); // in range: below rows.length
-    }
-    segments.push({
-      label: `${formatInteger(rows.length - max)} others`,
-      value: tail,
-      color: 'var(--lana-fg-muted)',
-    });
+  const segments = rows.map(toSegment);
+  if (segments.length <= max) {
+    return segments;
   }
-  return segments;
+  const rest = segments.slice(max);
+  return [
+    ...segments.slice(0, max),
+    {
+      label: `${formatInteger(rest.length)} others`,
+      value: rest.reduce((running, segment) => running + segment.value, 0),
+      color: 'var(--lana-fg-muted)',
+      parts: rest,
+    },
+  ];
 }
 
 /**
@@ -91,6 +103,9 @@ export class StackedTimeBar extends LitElement {
   @state()
   private _pointerPercent: number | null = null;
 
+  /** Lit drops the tip element with the hover, which takes its open state too. */
+  private _tipShown = false;
+
   static styles = [
     globalStyles,
     css`
@@ -118,16 +133,35 @@ export class StackedTimeBar extends LitElement {
         background: var(--lana-fg);
       }
 
-      /* The readout. The legend carries the same figures, but a narrow or
-       scrolled panel can push it out of view, so the bar answers too. It follows
-       the pointer along the bar, and sits below it because above it the section
-       title covers it. */
-      .tip {
+      /* What the tip points at: the pointer's place on the bar, given a box the
+       top-layer tip can anchor to. */
+      .tip-anchor {
         position: absolute;
-        top: calc(100% + var(--lana-space-3xs));
-        z-index: 1;
         pointer-events: none;
-        white-space: nowrap;
+        inset-block: 0;
+        width: var(--lana-stroke);
+        anchor-name: --stacked-bar-tip;
+      }
+
+      /* The readout. The legend carries the same figures, but a narrow or
+       scrolled panel can push it out of view, so the bar answers too. In the top
+       layer, so no pane clips or covers it. */
+      .tip {
+        position: fixed;
+        position-anchor: --stacked-bar-tip;
+        /* Out from the pointer, flipping rather than leaving the window. */
+        position-area: block-end span-inline-end;
+        position-try-fallbacks:
+          flip-block,
+          flip-inline,
+          flip-block flip-inline;
+        /* Rather than strand at stale coordinates once the bar scrolls away. */
+        position-visibility: anchors-visible;
+        inset: auto;
+        margin-block: var(--lana-space-2xs);
+        pointer-events: none;
+        width: max-content;
+        max-width: min(40ch, 90vw);
         font-size: var(--lana-text-sm);
         color: var(--lana-fg);
         padding: var(--lana-space-3xs) var(--lana-space-xs);
@@ -153,18 +187,25 @@ export class StackedTimeBar extends LitElement {
         color: var(--lana-fg);
       }
 
-      .legend__swatch {
-        width: 8px;
-        height: 8px;
-        border-radius: 2px;
-        align-self: center;
-        flex: none;
-      }
-
-      .legend__value {
+      .legend__value,
+      .tip__part-value {
         font-family: var(--lana-font-mono);
         font-variant-numeric: tabular-nums;
         color: var(--lana-fg-muted);
+      }
+
+      /* What a tail stands for, one name a line under its own readout. */
+      .tip__parts {
+        display: grid;
+        grid-template-columns: 1fr auto;
+        gap: 0 var(--lana-space-sm);
+        padding-top: var(--lana-space-3xs);
+        color: var(--lana-fg-muted);
+      }
+
+      /* The count of what the tip had no room to name spans both columns. */
+      .tip__parts-rest {
+        grid-column: 1 / -1;
       }
 
       /* Hovering a segment or a legend item singles it out: the others recede and
@@ -213,7 +254,7 @@ export class StackedTimeBar extends LitElement {
     // A bar hover always gets the readout; a legend hover only when the segment
     // has a detail, which the legend itself does not carry. Without that the
     // detail of a sub-pixel segment could not be reached at all.
-    const tipSlice = hover?.onBar || hovered?.detail ? hovered : undefined;
+    const tipSlice = hover?.onBar || hovered?.detail || hovered?.parts ? hovered : undefined;
     // The pointer where we have it, the segment's centre until the first move.
     const tipCenter = this._pointerPercent ?? (tipSlice ? tipSlice.start + tipSlice.width / 2 : 0);
 
@@ -226,7 +267,7 @@ export class StackedTimeBar extends LitElement {
           role="img"
           aria-label=${this.label}
           @pointermove=${this._trackPointer}
-          @pointerleave=${() => (this._pointerPercent = null)}
+          @pointerleave=${this._clearHover}
         >
           ${laid.map(
             (segment) => svg`<rect
@@ -253,25 +294,63 @@ export class StackedTimeBar extends LitElement {
         }
         ${
           tipSlice
-            ? html`<div
-                class="tip"
-                style=${styleMap(
-                  tipCenter <= 50
-                    ? { left: `${tipCenter.toFixed(1)}%` }
-                    : { right: `${(100 - tipCenter).toFixed(1)}%` },
-                )}
-              >
-                ${tipSlice.label} ·
-                ${readout(tipSlice.value, denominator, this.format)}${
-                  tipSlice.detail ? ` · ${tipSlice.detail}` : ''
-                }
-              </div>`
+            ? html`<span
+                  class="tip-anchor"
+                  style=${styleMap({ left: `${tipCenter.toFixed(1)}%` })}
+                ></span>
+                <div class="tip" popover="manual">
+                  ${tipSlice.label} ·
+                  ${readout(tipSlice.value, denominator, this.format)}${
+                    tipSlice.detail ? ` · ${tipSlice.detail}` : ''
+                  }
+                  ${tipSlice.parts ? this._parts(tipSlice.parts, denominator) : ''}
+                </div>`
             : ''
         }
       </div>
       ${this.legend ? this._legend(laid, denominator) : ''}
     `;
   }
+
+  /** The names a tail stands for, biggest first, then a count for any past the list. */
+  private _parts(parts: readonly StackedSegment[], denominator: number): TemplateResult {
+    const rest = parts.length - TIP_PARTS;
+    return html`<span class="tip__parts">
+      ${parts
+        .slice(0, TIP_PARTS)
+        .map(
+          (part) =>
+            html`<span>${part.label}</span>
+              <span class="tip__part-value"
+                >${readout(part.value, denominator, this.format)}</span
+              >`,
+        )}
+      ${rest > 0 ? html`<span class="tip__parts-rest">+${formatInteger(rest)} more</span>` : ''}
+    </span>`;
+  }
+
+  /** A tip in the top layer would outlive the segments it read, so it goes with them. */
+  protected willUpdate(changed: PropertyValues<this>): void {
+    if (changed.has('segments')) {
+      this._clearHover();
+    }
+  }
+
+  /** The tip only reaches the top layer, past every pane's clipping, once shown. */
+  protected updated(): void {
+    const tip = this.renderRoot.querySelector<HTMLElement>('.tip');
+    if (!tip) {
+      this._tipShown = false;
+    } else if (!this._tipShown && typeof tip.showPopover === 'function') {
+      tip.showPopover();
+      this._tipShown = true;
+    }
+  }
+
+  private _clearHover = () => {
+    this._hover = null;
+    this._pointerPercent = null;
+  };
 
   private _trackPointer(event: PointerEvent) {
     const bar = event.currentTarget as SVGElement;
@@ -295,7 +374,7 @@ export class StackedTimeBar extends LitElement {
             @pointerenter=${() => (this._hover = { label: segment.label, onBar: false })}
             @pointerleave=${() => (this._hover = null)}
           >
-            <span class="legend__swatch" style=${styleMap({ background: segment.color })}></span>
+            <color-swatch color=${segment.color}></color-swatch>
             <span>${segment.label}</span>
             <span class="legend__value">${readout(segment.value, denominator, this.format)}</span>
           </span>

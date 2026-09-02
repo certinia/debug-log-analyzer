@@ -8,7 +8,6 @@ import { customElement, property, state } from 'lit/decorators.js';
 
 import { logContext } from '../core/log/logContext.js';
 import type { LogStore } from '../core/log/LogStore.js';
-import { waitForNextFrame } from '../core/utility/FrameBudget.js';
 import { globalStyles } from '../styles/global.styles.js';
 import { inspectorSectionStyles } from '../styles/inspectorSection.styles.js';
 import { segmentsWithTail } from './StackedTimeBar.js';
@@ -19,10 +18,6 @@ import {
   scopedNamespaceSelfTimes,
   type NamespaceTime,
 } from './namespaceTime.js';
-
-/** A dock-width bar cannot show more segments wide enough to read or hover, so
- *  the rest go to the tail however many colours there are. */
-export const MAX_SEGMENTS = 12;
 
 /** No scope resolved yet, so the first null scope still reads as a change. */
 const UNRESOLVED = Symbol('unresolved scope');
@@ -86,16 +81,11 @@ export class NamespaceTimeBar extends LitElement {
     if (!slices.length || !color) {
       return html`<p class="note">No time was recorded here.</p>`;
     }
-    const segments = segmentsWithTail(
-      slices,
-      MAX_SEGMENTS,
-      (slice) => ({
-        label: slice.namespace,
-        value: slice.selfTime,
-        color: color(slice.namespace),
-      }),
-      (slice) => slice.selfTime,
-    );
+    const segments = segmentsWithTail(slices, (slice) => ({
+      label: slice.namespace,
+      value: slice.selfTime,
+      color: color(slice.namespace),
+    }));
 
     return html`<stacked-time-bar
       legend
@@ -147,7 +137,6 @@ export class NamespaceTimeBar extends LitElement {
       return;
     }
     const slices = await scopedNamespaceSelfTimes(scope.key, scope.roots, {
-      yieldFrame: waitForNextFrame,
       signal: walk.signal,
     });
     if (this._walk !== walk) {

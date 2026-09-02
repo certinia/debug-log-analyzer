@@ -26,7 +26,9 @@ export type TooltipPositionMode =
   /** Position at cursor with offset, flip if needed */
   | 'cursor-offset'
   /** Center on X, position above Y but flip below if not enough room above */
-  | 'adaptive';
+  | 'adaptive'
+  /** Cursor X with flip; a fixed offset below the anchor's Y, never flipping up */
+  | 'below-anchor';
 
 /**
  * Options for tooltip positioning.
@@ -190,6 +192,15 @@ export abstract class BaseTooltipRenderer {
           // Clamp to container bounds
           top = Math.min(containerHeight - tooltipHeight - padding, top);
         }
+      } else if (mode === 'below-anchor') {
+        // The anchor is a band the panel must not cover — the metric strip — so Y is fixed
+        // below it and never flips up over the thing being read.
+        left = screenX + offset;
+        if (left + tooltipWidth > containerWidth) {
+          left = screenX - tooltipWidth - offset;
+        }
+        left = Math.max(padding, Math.min(containerWidth - tooltipWidth - padding, left));
+        top = screenY + offset;
       } else {
         // Cursor offset mode: position to the right and below, flip if needed
         left = screenX + offset;

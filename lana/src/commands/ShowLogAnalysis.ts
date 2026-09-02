@@ -5,7 +5,7 @@ import { TabInputText, window, type Uri } from 'vscode';
 
 import { appName } from '../AppSettings.js';
 import type { Context } from '../Context.js';
-import { fileOrFolderExists } from '../services/salesforceServices.js';
+import { fileOrFolderExists } from '../fs/workspaceFs.js';
 import { Command } from './Command.js';
 import { LogView } from './LogView.js';
 

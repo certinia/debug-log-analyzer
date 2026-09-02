@@ -65,6 +65,23 @@ describe('EventVitals', () => {
     expect(customElements.get('event-vitals')).toBeDefined();
   });
 
+  it('names the frame that made the calls it describes', async () => {
+    const el = await mount(store, {
+      eventIndex: soqlIndex,
+      instances: [soqlIndex],
+      calledBy: 'MyClass.caller()',
+    });
+
+    // The panel describes the calls, so the caller is a fact beside them.
+    expect(valueFor(el, 'Called by')).toBe('MyClass.caller()');
+  });
+
+  it('leaves the caller row out when the row named the calls it counts', async () => {
+    const el = await mount(store, { eventIndex: soqlIndex, instances: [soqlIndex] });
+
+    expect(labels(el)).not.toContain('Called by');
+  });
+
   it('leads with type and timing, then the metrics, plan and source', async () => {
     const el = await mount(store, { eventIndex: soqlIndex, type: 'soql' });
     // No explain line at this log level, so the query-plan fields are omitted.
@@ -75,8 +92,15 @@ describe('EventVitals', () => {
       'SOQL Rows',
       'Selective',
       'Namespace',
-      'Line',
+      'Called from',
     ]);
+  });
+
+  /** The line is the call site in the containing code, not where the frame is defined. */
+  it('reads the line as where the call came from', async () => {
+    const el = await mount(store, { eventIndex: soqlIndex, type: 'soql' });
+
+    expect(valueFor(el, 'Called from')).toMatch(/^line \d+$/);
   });
 
   it('omits the caller namespace when it matches the namespace', async () => {
@@ -128,11 +152,11 @@ describe('EventVitals', () => {
     expect(labels(el)).not.toContain('Throws');
   });
 
-  it('sums across occurrences and reports Calls/Avg for an aggregate', async () => {
+  it('sums across occurrences and reports Calls/Avg self for an aggregate', async () => {
     const el = await mount(store, { instances: [soqlIndex, soslIndex] });
     const shown = labels(el);
     expect(shown).toContain('Calls');
-    expect(shown).toContain('Avg');
+    expect(shown).toContain('Avg self');
     expect(valueFor(el, 'Calls')).toBe('2');
   });
 
@@ -164,5 +188,32 @@ describe('EventVitals across namespaces', () => {
     expect(valueFor(el, 'Namespace')).toBe('c2g');
     expect(labels(el)).toContain('Caller namespace');
     expect(valueFor(el, 'Caller namespace')).not.toBe('c2g');
+  });
+});
+
+// Its own log: a method that calls itself, so a total and a self reading no
+// longer sum over the same set of calls.
+describe('EventVitals over a recursive frame', () => {
+  const recursiveLog =
+    '09:18:22.6 (0)|EXECUTION_STARTED\n' +
+    '09:18:22.6 (1000000)|CODE_UNIT_STARTED|[EXTERNAL]|066d0000002m8ij|apex://pkg.Entry\n' +
+    '09:18:22.6 (2000000)|METHOD_ENTRY|[1]|01p000000000001|Rec.walk()\n' +
+    '09:18:22.6 (3000000)|METHOD_ENTRY|[1]|01p000000000001|Rec.walk()\n' +
+    '09:18:22.6 (4000000)|METHOD_EXIT|[1]|01p000000000001|Rec.walk()\n' +
+    '09:18:22.6 (6000000)|METHOD_EXIT|[1]|01p000000000001|Rec.walk()\n' +
+    '09:18:22.6 (7000000)|CODE_UNIT_FINISHED|apex://pkg.Entry\n' +
+    '09:18:22.6 (8000000)|EXECUTION_FINISHED\n';
+
+  it('totals the outermost calls, and averages the self time of every call', async () => {
+    const apexLog = parse(recursiveLog);
+    const store = logStoreFor(apexLog);
+    const calls = apexLog.eventsById.filter((e) => e.type === 'METHOD_ENTRY');
+    const el = await mount(store, { instances: calls.map((e) => e.eventIndex) });
+
+    expect(valueFor(el, 'Calls')).toBe('2');
+    // The outer call is 4ms and holds the 1ms inner call, so summing both totals
+    // would read 5ms.
+    expect(valueFor(el, 'Time')).toBe('4.000 ms (self 4.000 ms)');
+    expect(valueFor(el, 'Avg self')).toBe('2.000 ms');
   });
 });

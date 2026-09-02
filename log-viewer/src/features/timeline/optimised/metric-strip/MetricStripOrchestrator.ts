@@ -22,16 +22,21 @@
  */
 
 import * as PIXI from 'pixi.js';
+
+import { destroyTimelineApp } from '../rendering/pixiApp.js';
+import { formatTimeRange } from '../../../../core/utility/Util.js';
 import type {
   HeatStripTimeSeries,
   TimelineMarker,
   ViewportState,
 } from '../../types/flamechart.types.js';
+import { noDataSpanAt } from '../markers/MarkerProcessor.js';
 import { MeshAxisRenderer } from '../time-axis/MeshAxisRenderer.js';
 import { wheelZoomFactor } from '../ViewportUtils.js';
 import { MetricStripRenderer } from './MetricStripRenderer.js';
 import { MetricStripTooltipRenderer } from './MetricStripTooltipRenderer.js';
 import { MetricTierClassifier } from './MetricTierClassifier.js';
+import { isOverChevron } from './strip-pointer.js';
 import {
   getMetricStripColors,
   METRIC_STRIP_COLLAPSED_HEIGHT,
@@ -110,7 +115,7 @@ export interface MetricStripOrchestratorCallbacks {
    *
    * @param newHeight - New height in pixels
    */
-  onHeightChange?: (newHeight: number) => void;
+  onHeightChange: (newHeight: number) => void;
 }
 
 /**
@@ -152,9 +157,10 @@ export class MetricStripOrchestrator {
   // STATE
   // ============================================================================
   private cursorTimeNs: number | null = null;
-  private isMouseInMetricStrip = false;
-  private mouseX = 0;
-  private mouseY = 0;
+  /** Whether the strip holds the pointer, its gaps included. */
+  private isHoverEngaged = false;
+  /** The boxes the pointer is heard in: the strip, and the gap either side of it. */
+  private pointerTargets: HTMLElement[] = [];
   private totalDuration = 0;
   private callbacks: MetricStripOrchestratorCallbacks;
   /** Last viewport state received during render (for wheel handler). */
@@ -176,11 +182,13 @@ export class MetricStripOrchestrator {
    * @param metricStripDiv - HTML element to render metric strip into
    * @param width - Canvas width
    * @param totalDuration - Total timeline duration in nanoseconds
+   * @param gapDivs - The gap boxes either side of the strip that its hover survives into
    */
   public async init(
     metricStripDiv: HTMLElement,
     width: number,
     totalDuration: number,
+    gapDivs: (HTMLElement | null)[] = [],
   ): Promise<void> {
     this.htmlContainer = metricStripDiv;
     this.totalDuration = totalDuration;
@@ -236,6 +244,10 @@ export class MetricStripOrchestrator {
     // Initialize tooltip renderer
     this.tooltipRenderer = new MetricStripTooltipRenderer(metricStripDiv);
 
+    this.pointerTargets = [metricStripDiv, ...gapDivs].filter(
+      (div): div is HTMLElement => div !== null,
+    );
+
     // Setup interaction handler
     this.setupInteractionHandler();
   }
@@ -247,13 +259,16 @@ export class MetricStripOrchestrator {
     // Remove event listeners
     if (this.app?.canvas) {
       const canvas = this.app.canvas as HTMLCanvasElement;
-      canvas.removeEventListener('mouseenter', this.handleMouseEnter);
-      canvas.removeEventListener('mouseleave', this.handleMouseLeave);
-      canvas.removeEventListener('mousemove', this.handleMouseMove);
       canvas.removeEventListener('click', this.handleClick);
       canvas.removeEventListener('wheel', this.handleWheel);
       canvas.removeEventListener('dblclick', this.handleDoubleClick);
     }
+
+    for (const target of this.pointerTargets) {
+      target.removeEventListener('mousemove', this.handleMouseMove);
+      target.removeEventListener('mouseleave', this.handleTargetLeave);
+    }
+    this.pointerTargets = [];
 
     if (this.tooltipRenderer) {
       this.tooltipRenderer.destroy();
@@ -279,7 +294,7 @@ export class MetricStripOrchestrator {
     this.container = null;
 
     if (this.app) {
-      this.app.destroy(true, { children: true, texture: true });
+      destroyTimelineApp(this.app);
       this.app = null;
     }
 
@@ -362,10 +377,13 @@ export class MetricStripOrchestrator {
   }
 
   /**
-   * Check if mouse is currently in the metric strip area.
+   * Whether the strip holds the pointer's hover, its gaps included.
+   *
+   * A hidden strip holds nothing: it can be hidden without a pointer move, so no mouse leave
+   * is guaranteed to have released it.
    */
-  public isMouseInMetricStripArea(): boolean {
-    return this.isMouseInMetricStrip;
+  public holdsHover(): boolean {
+    return this.isHoverEngaged && this.getIsVisible();
   }
 
   /**
@@ -410,9 +428,9 @@ export class MetricStripOrchestrator {
     this.renderer?.setHeight(newHeight);
     this.renderer?.setCollapsed(this.isCollapsed);
 
-    // Notify FlameChart to recalculate layout
-    this.callbacks.onHeightChange?.(newHeight);
-    this.callbacks.requestRender();
+    // The host sizes the container for the new height and draws as part of that, so asking it
+    // to draw again would be a second full render for one click.
+    this.callbacks.onHeightChange(newHeight);
   }
 
   /**
@@ -456,7 +474,7 @@ export class MetricStripOrchestrator {
 
     // Render the step chart with markers
     this.renderer.render(
-      data ?? { points: [], classifiedMetrics: [], globalMaxPercent: 0, hasData: false },
+      data ?? { points: [], classifiedMetrics: [], globalMaxPercent: 0, hasData: false, gaps: [] },
       context.viewportState,
       context.totalDuration,
       context.markers,
@@ -516,46 +534,93 @@ export class MetricStripOrchestrator {
 
     const canvas = this.app.canvas as HTMLCanvasElement;
 
-    canvas.addEventListener('mouseenter', this.handleMouseEnter);
-    canvas.addEventListener('mouseleave', this.handleMouseLeave);
-    canvas.addEventListener('mousemove', this.handleMouseMove);
     canvas.addEventListener('click', this.handleClick);
     canvas.addEventListener('wheel', this.handleWheel, { passive: false });
     canvas.addEventListener('dblclick', this.handleDoubleClick);
+
+    // Moves come from the strip and the gaps either side, so the hover survives leaving a
+    // 15px canvas without hearing every move over the chart.
+    for (const target of this.pointerTargets) {
+      target.addEventListener('mousemove', this.handleMouseMove);
+      target.addEventListener('mouseleave', this.handleTargetLeave);
+    }
   }
 
-  private handleMouseEnter = (): void => {
-    this.isMouseInMetricStrip = true;
+  /**
+   * Leaving one box is not leaving the band: the strip and its gaps are separate elements,
+   * so crossing between them fires a leave the hover has to survive.
+   */
+  private handleTargetLeave = (event: MouseEvent): void => {
+    const to = event.relatedTarget;
+    if (to instanceof Node && this.pointerTargets.some((target) => target.contains(to))) {
+      return;
+    }
+    this.releaseHover();
   };
 
-  private handleMouseLeave = (): void => {
-    this.isMouseInMetricStrip = false;
+  /**
+   * Show one cursor across every box the hover reaches.
+   *
+   * The gaps hold the hover as much as the strip does, so a cursor set on the canvas alone
+   * reverts to an arrow the moment the pointer strays into one.
+   */
+  private setPointerCursor(cursor: string): void {
+    for (const target of this.pointerTargets) {
+      target.style.cursor = cursor;
+    }
+    if (this.app?.canvas) {
+      (this.app.canvas as HTMLCanvasElement).style.cursor = cursor;
+    }
+  }
+
+  /** Give up the hover: no cursor line, no tooltip, no crosshair. */
+  private releaseHover(): void {
+    if (!this.isHoverEngaged) {
+      return;
+    }
+    this.isHoverEngaged = false;
     this.cursorTimeNs = null;
     this.callbacks.onCursorMove(null);
     this.tooltipRenderer?.hide();
+    this.renderer?.setToggleHovered(false);
+    this.setPointerCursor('');
     this.callbacks.requestCursorRender();
-  };
+  }
 
   private handleMouseMove = (event: MouseEvent): void => {
     if (!this.app?.canvas || !this.classifier || !this.lastViewportState) {
       return;
     }
 
-    const canvas = this.app.canvas as HTMLCanvasElement;
-    const rect = canvas.getBoundingClientRect();
-    this.mouseX = event.clientX - rect.left;
-    this.mouseY = event.clientY - rect.top;
+    if (!this.getIsVisible()) {
+      return;
+    }
 
-    // Check if hovering over toggle area
-    const isOverToggle = this.mouseX < METRIC_STRIP_TOGGLE_WIDTH;
+    // The hover starts on the strip and survives into the gap either side. Each of the three
+    // boxes has its own listener, so the box that heard the move is the whole test.
+    const onStrip = event.currentTarget === this.htmlContainer;
+    if (!onStrip && !this.isHoverEngaged) {
+      return;
+    }
+    this.isHoverEngaged = true;
+
+    // The gaps share the strip's left edge and the canvas fills it, so X needs no rect.
+    const offsetX = event.offsetX;
+
+    // The arrow, for the tooltip and the glyph highlight. The column around it stays a
+    // forgiving click target, so the cursor follows the column, not the arrow.
+    const isOverToggle = onStrip && isOverChevron(offsetX, event.offsetY, this.isCollapsed);
     this.renderer?.setToggleHovered(isOverToggle);
 
-    // Update cursor style
-    canvas.style.cursor = isOverToggle ? 'pointer' : 'default';
+    // Crosshair over the data: a click centres it and the wheel zooms it. The toggle column
+    // does neither, so it reads as a pointer over its whole width.
+    this.setPointerCursor(offsetX < METRIC_STRIP_TOGGLE_WIDTH ? 'pointer' : 'crosshair');
 
     // Update cursor position using stored viewport state
-    const timeNs = (this.mouseX + this.lastViewportState.offsetX) / this.lastViewportState.zoom;
-    const clampedTimeNs = Math.max(0, Math.min(this.totalDuration, timeNs));
+    const clampedTimeNs = this.screenXToTime(offsetX);
+    if (clampedTimeNs === null) {
+      return;
+    }
 
     this.cursorTimeNs = clampedTimeNs;
     this.callbacks.onCursorMove(clampedTimeNs);
@@ -567,9 +632,13 @@ export class MetricStripOrchestrator {
       // Update tooltip - position below the metric strip
       const dataPoint = this.classifier.getDataPointAtTime(clampedTimeNs);
       if (dataPoint) {
+        const gap = noDataSpanAt(this.classifier.getData()?.gaps, clampedTimeNs);
+        this.tooltipRenderer?.setNoDataLabel(
+          gap ? `${gap.summary} · ${formatTimeRange(gap.startTime, gap.endTime)}` : null,
+        );
         this.tooltipRenderer?.show(
-          this.mouseX,
-          this.mouseY,
+          offsetX,
+          event.offsetY,
           dataPoint.point,
           this.classifier.getClassifiedMetrics(),
           this.getHeight(),
@@ -587,18 +656,15 @@ export class MetricStripOrchestrator {
       return;
     }
 
-    const canvas = this.app.canvas as HTMLCanvasElement;
-    const rect = canvas.getBoundingClientRect();
-    const clickX = event.clientX - rect.left;
-
     // Click on toggle area (left edge) or Shift+click anywhere toggles collapsed state
-    if (clickX < METRIC_STRIP_TOGGLE_WIDTH || event.shiftKey) {
+    if (event.offsetX < METRIC_STRIP_TOGGLE_WIDTH || event.shiftKey) {
       this.toggleCollapsed();
       return;
     }
 
     // Process pan immediately using stored viewport state
-    const clickTimeNs = (clickX + this.lastViewportState.offsetX) / this.lastViewportState.zoom;
+    const clickTimeNs =
+      (event.offsetX + this.lastViewportState.offsetX) / this.lastViewportState.zoom;
 
     // Keep current zoom level, just center on clicked time
     const visibleDuration = this.lastViewportState.displayWidth / this.lastViewportState.zoom;
@@ -631,12 +697,8 @@ export class MetricStripOrchestrator {
       return;
     }
 
-    const canvas = this.app.canvas as HTMLCanvasElement;
-    const rect = canvas.getBoundingClientRect();
-    const clickX = event.clientX - rect.left;
-
     // Ignore double-clicks on toggle area (left edge)
-    if (clickX < METRIC_STRIP_TOGGLE_WIDTH) {
+    if (event.offsetX < METRIC_STRIP_TOGGLE_WIDTH) {
       return;
     }
 

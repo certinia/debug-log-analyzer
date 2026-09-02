@@ -29,7 +29,7 @@ class RawLogSymbolProvider implements DocumentSymbolProvider {
     document: TextDocument,
     _token: CancellationToken,
   ): Promise<DocumentSymbol[]> {
-    const apexLog = await LogEventCache.getApexLog(document.uri.toString());
+    const apexLog = await LogEventCache.getApexLog(document.uri);
 
     if (!apexLog) {
       return [];
@@ -81,7 +81,10 @@ class RawLogSymbolProvider implements DocumentSymbolProvider {
         symbols.push(symbol);
       } else {
         // No foldable range for this event; lift its descendants to this level.
-        symbols.push(...children);
+        // Pushed one at a time: a spread would overrun the argument limit.
+        for (const child of children) {
+          symbols.push(child);
+        }
       }
     }
 

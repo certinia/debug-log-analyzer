@@ -114,6 +114,12 @@ export interface EventNode {
   original?: unknown;
 }
 
+/** The frame under the pointer, and the row it is on. */
+export interface HoveredFrame {
+  node: EventNode;
+  depth: number;
+}
+
 /**
  * Tree node wrapper for hierarchical event structures.
  * Enables generic tree traversal without assuming specific
@@ -873,6 +879,16 @@ export interface HeatStripTimeSeries {
   metrics: Map<string, HeatStripMetric>;
   /** Time series events ordered by timestamp */
   events: HeatStripEvent[];
+  /** Spans the log recorded nothing in, so no reading is carried across them */
+  gaps?: NoDataSpan[];
+}
+
+/** A span the log recorded nothing in, named by the marker that reports it. */
+export interface NoDataSpan {
+  startTime: number;
+  endTime: number;
+  /** The marker's own summary, so a reader is told the reason, not just the gap. */
+  summary: string;
 }
 
 /**
@@ -959,6 +975,8 @@ export interface MetricStripProcessedData {
   globalMaxPercent: number;
   /** Whether there's any data to render */
   hasData: boolean;
+  /** Spans the log recorded nothing in, carried through from the series */
+  gaps: NoDataSpan[];
 }
 
 /**

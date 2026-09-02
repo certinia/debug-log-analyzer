@@ -76,16 +76,16 @@ describe('stacked-time-bar', () => {
   it('follows the pointer along the bar', async () => {
     const element = await mount(SEGMENTS);
     const bar = element.shadowRoot?.querySelector('svg') as SVGElement;
-    // jsdom lays nothing out, so the bar is given a width to measure against.
-    bar.getBoundingClientRect = () => ({ left: 100, width: 200 }) as DOMRect;
+    // jsdom lays nothing out, so the bar is given a box to measure against.
+    bar.getBoundingClientRect = () => ({ left: 100, width: 200, top: 0, bottom: 10 }) as DOMRect;
 
     element.shadowRoot?.querySelector('rect')?.dispatchEvent(new Event('pointerenter'));
     // jsdom has no PointerEvent, and only clientX is read.
     bar.dispatchEvent(Object.assign(new Event('pointermove'), { clientX: 130 }));
     await element.updateComplete;
 
-    // 30px into 200px: the tip sits at 15%, not the segment's 33% centre.
-    expect(element.shadowRoot?.querySelector('.tip')?.getAttribute('style')).toContain(
+    // 30px into 200px: the tip anchors at 15%, not the segment's 33% centre.
+    expect(element.shadowRoot?.querySelector('.tip-anchor')?.getAttribute('style')).toContain(
       'left:15.0%',
     );
   });
@@ -118,5 +118,68 @@ describe('stacked-time-bar', () => {
     await element.updateComplete;
 
     expect(element.shadowRoot?.querySelector('.tip')?.textContent).toContain('SOQL 200 ms');
+  });
+
+  it('names what a tail stands for when it is hovered', async () => {
+    const element = await mount(
+      [
+        SEGMENTS[0]!,
+        {
+          label: '2 others',
+          value: 100_000_000,
+          color: 'grey',
+          parts: [
+            { label: 'pkgA', value: 60_000_000, color: 'grey' },
+            { label: 'pkgB', value: 40_000_000, color: 'grey' },
+          ],
+        },
+      ],
+      0,
+      true,
+    );
+
+    const items = element.shadowRoot?.querySelectorAll('.legend__item') ?? [];
+    items[1]?.dispatchEvent(new Event('pointerenter'));
+    await element.updateComplete;
+
+    const tip = element.shadowRoot?.querySelector('.tip')?.textContent ?? '';
+    expect(tip).toContain('2 others');
+    expect(tip).toContain('pkgA');
+    expect(tip).toContain('pkgB');
+  });
+
+  it('counts the parts a tip has no room to name', async () => {
+    const parts = Array.from({ length: 7 }, (_, index) => ({
+      label: `pkg${index}`,
+      value: 10_000_000,
+      color: 'grey',
+    }));
+    const element = await mount(
+      [SEGMENTS[0]!, { label: '7 others', value: 70_000_000, color: 'grey', parts }],
+      0,
+      true,
+    );
+
+    const items = element.shadowRoot?.querySelectorAll('.legend__item') ?? [];
+    items[1]?.dispatchEvent(new Event('pointerenter'));
+    await element.updateComplete;
+
+    const tip = element.shadowRoot?.querySelector('.tip')?.textContent ?? '';
+    expect(tip).toContain('pkg4');
+    expect(tip).not.toContain('pkg5');
+    expect(tip).toContain('+2 more');
+  });
+
+  it('drops the tip when the segments change under it', async () => {
+    const element = await mount(SEGMENTS, 1_000_000_000);
+    element.shadowRoot?.querySelector('rect')?.dispatchEvent(new Event('pointerenter'));
+    await element.updateComplete;
+    expect(element.shadowRoot?.querySelector('.tip')).not.toBeNull();
+
+    // A re-scoped section: the hovered segment is gone, and pointerleave never fires.
+    element.segments = [{ label: 'SOSL', value: 50_000_000, color: 'green' }];
+    await element.updateComplete;
+
+    expect(element.shadowRoot?.querySelector('.tip')).toBeNull();
   });
 });

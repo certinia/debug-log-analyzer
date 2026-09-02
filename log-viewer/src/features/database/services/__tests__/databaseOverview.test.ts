@@ -336,7 +336,7 @@ describe('concentration', () => {
         dml(47_000_000, 52_000_000, 'Insert', 'Case', 1),
     );
 
-    expect(concentration(overview)).toEqual({ count: 1, percent: 75, total: 3 });
+    expect(concentration(overview)).toEqual({ count: 1, percent: 75 });
   });
 
   it('walks on when no single statement dominates', () => {
@@ -345,7 +345,7 @@ describe('concentration', () => {
         soql(21_000_000, 31_000_000, 1, 'SELECT Id FROM Contact'),
     );
 
-    expect(concentration(overview)).toEqual({ count: 2, percent: 100, total: 2 });
+    expect(concentration(overview)).toEqual({ count: 2, percent: 100 });
   });
 
   it('takes a target of its own', () => {
@@ -358,7 +358,7 @@ describe('concentration', () => {
   });
 
   it('reports nothing held for a log with no statements', () => {
-    expect(concentration(overviewOf(''))).toEqual({ count: 0, percent: 0, total: 0 });
+    expect(concentration(overviewOf(''))).toEqual({ count: 0, percent: 0 });
   });
 });
 

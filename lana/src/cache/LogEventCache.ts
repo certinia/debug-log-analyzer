@@ -1,12 +1,12 @@
 /*
  * Copyright (c) 2026 Certinia Inc. All rights reserved.
  */
-import { workspace } from 'vscode';
+import { workspace, type Uri } from 'vscode';
 
 import { parse, type ApexLog, type LogEvent } from 'apex-log-parser';
 
 import type { Context } from '../Context.js';
-import { readFile } from '../services/salesforceServices.js';
+import { readFileText } from '../fs/workspaceFs.js';
 
 export interface EventSearchResult {
   event: LogEvent;
@@ -17,17 +17,18 @@ export class LogEventCache {
   private static readonly MAX_CACHE_SIZE = 10;
   private static cache = new Map<string, ApexLog>();
 
-  static async getApexLog(uriString: string): Promise<ApexLog | null> {
-    const cached = LogEventCache.cache.get(uriString);
+  static async getApexLog(uri: Uri): Promise<ApexLog | null> {
+    const key = uri.toString();
+    const cached = LogEventCache.cache.get(key);
     if (cached) {
       // Move to end (most recently used)
-      LogEventCache.cache.delete(uriString);
-      LogEventCache.cache.set(uriString, cached);
+      LogEventCache.cache.delete(key);
+      LogEventCache.cache.set(key, cached);
       return cached;
     }
 
     try {
-      const content = await readFile(uriString);
+      const content = await readFileText(uri);
       const apexLog = parse(content);
 
       // Evict oldest if at capacity
@@ -38,7 +39,7 @@ export class LogEventCache {
         }
       }
 
-      LogEventCache.cache.set(uriString, apexLog);
+      LogEventCache.cache.set(key, apexLog);
       return apexLog;
     } catch {
       return null;

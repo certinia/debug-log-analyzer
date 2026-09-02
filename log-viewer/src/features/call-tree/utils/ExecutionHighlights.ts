@@ -3,7 +3,7 @@
  */
 import type { ApexLog, LogCategory, LogEvent } from 'apex-log-parser';
 
-import { getEventKey } from './Aggregation.js';
+import { getEventKey } from '../../../core/log/eventKeys.js';
 
 /** One frame on the hot path, entry point first. */
 export interface HotPathFrame {
@@ -88,7 +88,7 @@ export function computeExecutionHighlights(apexLog: ApexLog): ExecutionHighlight
   return {
     totalTime: apexLog.duration.total,
     ...computeHotPath(apexLog.children),
-    ...scanEvents(apexLog.eventsById),
+    ...scanEvents(apexLog),
   };
 }
 
@@ -199,19 +199,23 @@ function largestInstance(instances: LogEvent[]): LogEvent {
  * pass. Every instance counts, including the untimed ones, so the count divides
  * the self time honestly; signatures with no self time at all drop out at the
  * end. Total time counts the outermost instances only: recursion nests the same
- * wall time inside itself, and `events` is in time order, so an instance that
+ * wall time inside itself, and `eventsById` is in time order, so an instance that
  * starts before the last counted one of its signature ended is inside it. The
  * call-stack route `Aggregation.ts` and `RowGrouper.ts` take with a `Multiset`
  * is not open to a flat pass, which never sees a frame close.
  * Truncation flags every unclosed frame in a cut-off chain, so only top-most
  * flagged events count as regions; the first one seen is the first in the log.
  */
-function scanEvents(events: LogEvent[]): Pick<ExecutionHighlights, 'hotSpots' | 'truncation'> {
+function scanEvents(apexLog: ApexLog): Pick<ExecutionHighlights, 'hotSpots' | 'truncation'> {
   const spots = new Map<string, { row: HotSpotRow; maxSelf: number; countedUntil: number }>();
   let regionCount = 0;
   let firstEventIndex = -1;
 
-  for (const event of events) {
+  for (const event of apexLog.eventsById) {
+    // The log itself holds the gap time, and no call stands for it.
+    if (event === apexLog) {
+      continue;
+    }
     if (event.isTruncated && !event.parent?.isTruncated) {
       regionCount++;
       if (firstEventIndex < 0) {

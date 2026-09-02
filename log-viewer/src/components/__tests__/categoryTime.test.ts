@@ -107,6 +107,15 @@ describe('categoryPalette', () => {
     expect(color('Automation')).toBe('#444444'); // Workflow
   });
 
+  // The quick pick is never persisted, so its theme can arrive before any settings do.
+  it('follows a previewed theme with no settings pushed yet', () => {
+    const previewed = '50 Shades of Green Bright';
+    const color = categoryPalette(null, previewed);
+
+    expect(color('SOQL')).toBe(getTheme(previewed).soql);
+    expect(color('SOQL')).not.toBe(getTheme(DEFAULT_THEME_NAME).soql);
+  });
+
   it('falls back to the default theme with no settings, and grey for Other', () => {
     const color = categoryPalette(null);
 

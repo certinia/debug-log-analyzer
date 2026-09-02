@@ -10,14 +10,10 @@
  */
 
 import type { ApexLog, LogEvent } from 'apex-log-parser';
-import {
-  computeWallClockMs,
-  formatDuration,
-  formatWallClockTime,
-} from '../../../core/utility/Util.js';
+import { selfLabel } from '../../../core/metrics/eventMetrics.js';
 import { formatSOQL, type Dialect, type SoqlBudget } from '../../soql/format/formatter.js';
-import type { TimelineMarker } from '../types/flamechart.types.js';
-import { formatNumber } from './rendering/tooltip-utils.js';
+import { markerColorCss, type TimelineMarker } from '../types/flamechart.types.js';
+import { frameCard, markerCard, type CardRow, type TooltipCard } from './frameTooltipCard.js';
 
 /** Delay before a tooltip first appears, so sweeping across frames does not strobe. */
 const SHOW_DELAY_MS = 60;
@@ -29,6 +25,8 @@ const ANCHOR_GAP = 3;
 const SOQL_FORMAT_MAX_CHARS = 2000;
 /** Single-line fallback length for queries too large to pretty-print. */
 const SOQL_INLINE_MAX_CHARS = 160;
+/** Plain descriptions clamp to three lines, so no card can read more than this. */
+const PLAIN_TEXT_MAX_CHARS = 512;
 /** Share of the panel's height a query may take. The rest holds the metric rows and the footer. */
 const QUERY_HEIGHT_SHARE = 0.45;
 const MIN_QUERY_LINES = 4;
@@ -68,7 +66,7 @@ type PendingTooltip =
 
 /** A built description block, plus the footer that says what was cut. */
 interface DescriptionBlock {
-  node: HTMLDivElement;
+  node: HTMLElement;
   more: string | null;
 }
 
@@ -350,11 +348,10 @@ export class FrameTooltipRenderer {
       return;
     }
 
-    while (this.tooltipElement.firstChild) {
-      this.tooltipElement.removeChild(this.tooltipElement.firstChild);
-    }
     if (content) {
-      this.tooltipElement.appendChild(content);
+      this.tooltipElement.replaceChildren(content);
+    } else {
+      this.tooltipElement.replaceChildren();
     }
 
     this.tooltipElement.dataset.visible = 'true';
@@ -366,214 +363,43 @@ export class FrameTooltipRenderer {
     this.anchorTooltip(anchor);
   }
 
-  /**
-   * Generate tooltip content for truncation marker.
-   */
+  /** The card for a truncation or exception marker. */
   private generateTruncationTooltipContent(marker: TimelineMarker): HTMLDivElement | null {
-    const rows: { label: string; value: string }[] = [];
-    const color = this.getTruncationColor(marker.type);
-    return this.createTooltip(marker.summary, marker.metadata, rows, color);
-  }
-
-  /**
-   * Get human-readable label for truncation type.
-   */
-  private getTruncationTypeLabel(type: string): string {
-    switch (type) {
-      case 'error':
-        return 'Error';
-      case 'skip':
-        return 'Skipped Lines';
-      case 'unexpected':
-        return 'Unexpected Truncation';
-      default:
-        return type;
-    }
-  }
-
-  /**
-   * Format nanoseconds as milliseconds for display.
-   */
-  private formatNanoseconds(ns: number): string {
-    const ms = ns / 1_000_000;
-    return `${ms.toFixed(2)}ms`;
-  }
-
-  /**
-   * T017: Get CSS color string for truncation type tooltip borders.
-   * Converts PixiJS numeric colors (0xRRGGBB) to CSS hex strings (#RRGGBB).
-   */
-  private getTruncationColor(type: string): string {
-    // Map marker types to CSS colors matching MARKER_COLORS
-    switch (type) {
-      case 'exception':
-        return '#e5484d'; // saturated red - discrete failure
-      case 'error':
-        return '#ff808033'; // rgba(255, 128, 128, 0.2)
-      case 'skip':
-        return '#1e80ff33'; // rgba(30, 128, 255, 0.2)
-      case 'unexpected':
-        return '#8080ff33'; // rgba(128, 128, 255, 0.2)
-      default:
-        return '#999999'; // Gray fallback
-    }
+    return this.createTooltip(markerCard(marker, markerColorCss(marker.type)), {
+      node: descriptionNode(marker.metadata ?? ''),
+      more: null,
+    });
   }
 
   private generateTooltipContent(event: LogEvent): HTMLDivElement | null {
-    if (event?.isParent) {
-      const rows = [];
-      if (event.type) {
-        rows.push({ label: 'type:', value: event.type.toString() });
-      }
-
-      if (event.exitStamp) {
-        if (event.duration.total) {
-          let val = formatDuration(event.duration.total);
-          if (event.cpuType === 'free') {
-            val += ' (free)';
-          } else if (event.duration.self) {
-            val += ` (self ${formatDuration(event.duration.self)})`;
-          }
-
-          rows.push({ label: 'total:', value: val });
-        }
-
-        // Wall-clock time row (only if startTime is available)
-        const apexLog = this.options.apexLog;
-        if (apexLog?.startTime !== null && apexLog?.timestamp !== undefined) {
-          const startWallClock = computeWallClockMs(
-            apexLog.startTime,
-            apexLog.timestamp,
-            event.timestamp,
-          );
-          let timeVal = formatWallClockTime(startWallClock);
-          if (event.exitStamp) {
-            const endWallClock = computeWallClockMs(
-              apexLog.startTime,
-              apexLog.timestamp,
-              event.exitStamp,
-            );
-            timeVal += ` → ${formatWallClockTime(endWallClock)}`;
-          }
-          rows.push({ label: 'time:', value: timeVal });
-        }
-
-        const govLimits = this.options.apexLog?.governorLimits;
-        if (event.dmlCount.total) {
-          rows.push({
-            label: 'DML:',
-            value: this.formatLimit(
-              event.dmlCount.total,
-              event.dmlCount.self,
-              govLimits?.dmlStatements.limit,
-            ),
-          });
-        }
-
-        if (event.dmlRowCount.total) {
-          rows.push({
-            label: 'DML rows:',
-            value: this.formatLimit(
-              event.dmlRowCount.total,
-              event.dmlRowCount.self,
-              govLimits?.dmlRows.limit,
-            ),
-          });
-        }
-
-        if (event.soqlCount.total) {
-          rows.push({
-            label: 'SOQL:',
-            value: this.formatLimit(
-              event.soqlCount.total,
-              event.soqlCount.self,
-              govLimits?.soqlQueries.limit,
-            ),
-          });
-        }
-
-        if (event.soqlRowCount.total) {
-          rows.push({
-            label: 'SOQL rows:',
-            value: this.formatLimit(
-              event.soqlRowCount.total,
-              event.soqlRowCount.self,
-              govLimits?.queryRows.limit,
-            ),
-          });
-        }
-
-        if (event.soslCount.total) {
-          rows.push({
-            label: 'SOSL:',
-            value: this.formatLimit(
-              event.soslCount.total,
-              event.soslCount.self,
-              govLimits?.soslQueries.limit,
-            ),
-          });
-        }
-
-        if (event.soslRowCount.total) {
-          rows.push({
-            label: 'SOSL rows:',
-            value: this.formatLimit(
-              event.soslRowCount.total,
-              event.soslRowCount.self,
-              govLimits?.soslQueries.limit,
-            ),
-          });
-        }
-
-        if (event.thrownCount.total) {
-          // No `self`: on a method (the only hoverable frame) self is always 0 because the
-          // throw is a child leaf, so it would only ever read "(self 0)".
-          rows.push({ label: 'Throws:', value: `${event.thrownCount.total}` });
-        }
-
-        if (event.heapAllocated.total || event.heapAllocated.self) {
-          // Net heap retained (alloc − free): total for the subtree, self for this method's
-          // own body. ~0 net (allocated then freed) shows no row. Gross/peak live in the grid.
-          rows.push({
-            label: 'heap:',
-            value: `${formatNumber(event.heapAllocated.total)} bytes (self ${formatNumber(
-              event.heapAllocated.self,
-            )})`,
-          });
-        }
-      }
-
-      const descriptionText = event.text + (event.suffix ?? '');
-      return this.createTooltip(
-        '',
-        descriptionText,
-        rows,
-        this.options.categoryColors[event.category] || '',
-        this.getDescription(event, descriptionText),
-        event.category,
-        true,
-      );
+    if (!event?.isParent) {
+      return null;
     }
-
-    return null;
+    return this.createTooltip(
+      frameCard(event, this.options.categoryColors[event.category] ?? '', this.options.apexLog),
+      this.getDescription(event),
+    );
   }
 
   /**
    * Build (or reuse) the description block for an event. Queries are pretty-printed and clamped;
-   * anything else falls back to the plain text the caller already has.
+   * anything else reads as the frame's own text.
+   *
+   * The text is joined only where it is used: a cache hit needs none of it, and a query can run
+   * to kilobytes.
    */
-  private getDescription(event: LogEvent, text: string): DescriptionBlock | undefined {
+  private getDescription(event: LogEvent): DescriptionBlock {
     const isSosl = event.type === 'SOSL_EXECUTE_BEGIN';
     if (event.type !== 'SOQL_EXECUTE_BEGIN' && !isSosl) {
-      return undefined;
+      return { node: descriptionNode(event.text + (event.suffix ?? '')), more: null };
     }
 
     let block = this.descriptionCache.get(event);
     if (!block) {
-      block = this.buildQueryPreview(text, isSosl ? 'sosl' : 'soql');
+      block = this.buildQueryPreview(event.text + (event.suffix ?? ''), isSosl ? 'sosl' : 'soql');
       this.descriptionCache.set(event, block);
     }
-    return { node: block.node.cloneNode(true) as HTMLDivElement, more: block.more };
+    return { node: block.node.cloneNode(true) as HTMLElement, more: block.more };
   }
 
   /**
@@ -582,7 +408,7 @@ export class FrameTooltipRenderer {
    */
   private buildQueryPreview(text: string, dialect: Dialect): DescriptionBlock {
     const node = document.createElement('div');
-    node.className = 'tooltip-header soql-block';
+    node.className = 'tooltip-description soql-block';
 
     // Pretty-printing a multi-kilobyte query on every hover is too slow to be worth it, and the
     // result is clamped away anyway.
@@ -624,7 +450,7 @@ export class FrameTooltipRenderer {
     body.style.visibility = 'hidden';
 
     const line = document.createElement('div');
-    line.className = 'tooltip-header soql-block';
+    line.className = 'tooltip-description soql-block';
 
     const probe = document.createElement('span');
     probe.style.whiteSpace = 'pre';
@@ -654,98 +480,42 @@ export class FrameTooltipRenderer {
     };
   }
 
-  private formatLimit(val: number, self: number, total = 0) {
-    const outOf = total > 0 ? `/${total}` : '';
-    return `${val}${outOf} (self ${self})`;
-  }
-
-  private createTooltip(
-    title: string,
-    description = '',
-    rows: { label: string; value: string }[],
-    color: string,
-    descriptionBlock?: DescriptionBlock,
-    /** Category label for the swatch row; `color` fills the swatch. */
-    categoryName?: string,
-    /** True when a click selects the frame, which the inspector then shows in full. */
-    inspectable = false,
-  ) {
-    const tooltipBody = document.createElement('div');
-    tooltipBody.className = 'timeline-tooltip';
-
-    if (color) {
-      tooltipBody.style.borderColor = color;
+  /** Renders a {@link TooltipCard}, with the description block the caller built. */
+  private createTooltip(card: TooltipCard, description: DescriptionBlock): HTMLDivElement {
+    const body = document.createElement('div');
+    body.className = 'timeline-tooltip';
+    if (card.rail) {
+      body.style.borderColor = card.rail;
     }
 
-    if (title) {
-      const header = document.createElement('div');
-      header.className = 'tooltip-header';
-      header.textContent = title;
-      tooltipBody.appendChild(header);
+    if (card.title) {
+      body.appendChild(element('div', 'tooltip-title', card.title));
     }
-
-    if (descriptionBlock) {
-      tooltipBody.appendChild(descriptionBlock.node);
-    } else {
-      const descriptionDiv = document.createElement('div');
-      descriptionDiv.className = 'tooltip-header';
-      descriptionDiv.textContent = description;
-      tooltipBody.appendChild(descriptionDiv);
+    if (description.node.firstChild) {
+      body.appendChild(description.node);
     }
-
-    if (categoryName && color) {
-      const categoryRow = document.createElement('div');
-      categoryRow.className = 'tooltip-category';
-
-      const swatch = document.createElement('span');
-      swatch.className = 'tooltip-swatch';
-      swatch.style.backgroundColor = color;
-
-      const name = document.createElement('span');
-      name.textContent = categoryName;
-
-      categoryRow.appendChild(swatch);
-      categoryRow.appendChild(name);
-      tooltipBody.appendChild(categoryRow);
+    if (card.identity?.length) {
+      body.appendChild(element('div', 'tooltip-identity', card.identity.join(' · ')));
     }
-
-    rows.forEach(({ label, value }) => {
-      const row = document.createElement('div');
-      row.className = 'tooltip-row';
-
-      const labelDiv = document.createElement('div');
-      labelDiv.className = 'tooltip-label';
-      labelDiv.textContent = label;
-
-      const valueDiv = document.createElement('div');
-      valueDiv.className = 'tooltip-value';
-      valueDiv.textContent = value;
-
-      row.appendChild(labelDiv);
-      row.appendChild(valueDiv);
-      tooltipBody.appendChild(row);
+    const ruled = !!card.identity?.length;
+    card.groups.forEach((group, index) => {
+      const box = document.createElement('div');
+      // The rule parts what the frame is from what it measured, so only the first group
+      // takes it, and only where there is an identity above it to part from — a marker
+      // card has none. Sibling divs give CSS no "first group" selector to do it with.
+      box.className = !index && ruled ? 'tooltip-group tooltip-group--ruled' : 'tooltip-group';
+      group.forEach((row) => box.appendChild(rowElement(row)));
+      body.appendChild(box);
     });
 
-    if (inspectable) {
-      // One fixed row at the foot, so what was cut and where to see it in full always read in
-      // the same place instead of interrupting the description.
-      const status = document.createElement('div');
-      status.className = 'tooltip-status';
-
-      const info = document.createElement('span');
-      info.className = 'tooltip-status-info';
-      info.textContent = descriptionBlock?.more ?? '';
-
-      const action = document.createElement('span');
-      action.className = 'tooltip-status-action';
-      action.textContent = 'Click to view in Inspector';
-
-      status.appendChild(info);
-      status.appendChild(action);
-      tooltipBody.appendChild(status);
+    // Only what was left out, and only when something was: a footer that always says
+    // the same thing is a row spent on every card to tell you what one click teaches.
+    const cut = [description.more, card.hidden ? `+${card.hidden} more` : null].filter(Boolean);
+    if (cut.length) {
+      body.appendChild(element('div', 'tooltip-status', cut.join(' · ')));
     }
 
-    return tooltipBody;
+    return body;
   }
 
   /**
@@ -838,4 +608,44 @@ export class FrameTooltipRenderer {
     this.currentAnchor = null;
     this.descriptionCache = new WeakMap();
   }
+}
+
+/** A classed element with text, the shape every row in the card takes. */
+function element(tag: string, className: string, text: string): HTMLElement {
+  const node = document.createElement(tag);
+  node.className = className;
+  node.textContent = text;
+  return node;
+}
+
+/** A plain-text description, cut to what the stylesheet's clamp can show. */
+function descriptionNode(text: string): HTMLElement {
+  return element('div', 'tooltip-description', text.slice(0, PLAIN_TEXT_MAX_CHARS));
+}
+
+/**
+ * One row of the card: what it is, the reading against the log's own figure, and the
+ * frame's own figure. All text — a hover card is read as text, and a bar here has no
+ * room for the track and axis that would let it be read as a quantity rather than as
+ * a highlighted row.
+ *
+ * The figure columns hold a floor on every row and on every card, so they keep their
+ * place as the pointer moves from frame to frame.
+ */
+function rowElement(row: CardRow): HTMLElement {
+  const line = document.createElement('div');
+  line.className = 'tooltip-row';
+  if (row.wide) {
+    line.classList.add('tooltip-row--wide');
+  }
+  if (row.lead) {
+    line.classList.add('tooltip-row--lead');
+  }
+
+  line.appendChild(element('span', 'tooltip-label', row.label));
+  line.appendChild(element('span', 'tooltip-value', row.value));
+  if (!row.wide) {
+    line.appendChild(element('span', 'tooltip-self', row.self ? selfLabel(row.self) : ''));
+  }
+  return line;
 }

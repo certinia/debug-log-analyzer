@@ -16,9 +16,14 @@
  * - The on/off switch
  */
 import { afterEach, beforeEach, describe, expect, it, jest } from '@jest/globals';
-import type { LogEvent } from 'apex-log-parser';
+import type { ApexLog, LogEvent } from 'apex-log-parser';
 
-import { FrameTooltipRenderer, type TooltipAnchor } from '../optimised/FrameTooltipRenderer.js';
+import {
+  FrameTooltipRenderer,
+  type TooltipAnchor,
+  type TooltipOptions,
+} from '../optimised/FrameTooltipRenderer.js';
+import type { TimelineMarker } from '../types/flamechart.types.js';
 
 /** Delay before the first tooltip appears; mirrors SHOW_DELAY_MS. */
 const SHOW_DELAY_MS = 60;
@@ -60,7 +65,40 @@ describe('FrameTooltipRenderer', () => {
       soslRowCount: { total: 0, self: 0 },
       thrownCount: { total: 0, self: 0 },
       heapAllocated: { total: 0, self: 0 },
+      heapGross: { total: 0, self: 0 },
+      heapPeak: 0,
+      namespace: '',
     } as unknown as LogEvent;
+  }
+
+  /** A log for the branch shares to divide by. */
+  function logOf(over: Record<string, unknown> = {}): ApexLog {
+    return {
+      startTime: null,
+      timestamp: 0,
+      duration: { total: 15_000_000, self: 0 },
+      soqlCount: { total: 0, self: 0 },
+      soqlRowCount: { total: 0, self: 0 },
+      dmlCount: { total: 0, self: 0 },
+      dmlRowCount: { total: 0, self: 0 },
+      soslCount: { total: 0, self: 0 },
+      soslRowCount: { total: 0, self: 0 },
+      thrownCount: { total: 0, self: 0 },
+      heapAllocated: { total: 0, self: 0 },
+      heapGross: { total: 0, self: 0 },
+      heapPeak: 0,
+      ...over,
+    } as unknown as ApexLog;
+  }
+
+  /** Replaces the renderer, so a test can state only the option it cares about. */
+  function rebuild(options: Partial<TooltipOptions> = {}): void {
+    frameTooltipRenderer.destroy();
+    frameTooltipRenderer = new FrameTooltipRenderer(container, {
+      categoryColors: {},
+      cursorOffset: 10,
+      ...options,
+    });
   }
 
   /** An anchor with no frame rect, so the tooltip falls back to cursor placement. */
@@ -75,6 +113,27 @@ describe('FrameTooltipRenderer', () => {
     cursorX = rect.x,
   ): TooltipAnchor {
     return { rect, chartTopY, cursorX, cursorY: rect.y };
+  }
+
+  /** The reading in the row with this label, or undefined when there is no such row. */
+  function rowValue(label: string): string | undefined {
+    return row(label)?.querySelector('.tooltip-value')?.textContent ?? undefined;
+  }
+
+  /** The frame's own reading in the row with this label. */
+  function rowSelf(label: string): string | undefined {
+    return row(label)?.querySelector('.tooltip-self')?.textContent ?? undefined;
+  }
+
+  function row(label: string): Element | undefined {
+    return [...container.querySelectorAll('.tooltip-row')].find(
+      (candidate) => candidate.querySelector('.tooltip-label')?.textContent === label,
+    );
+  }
+
+  /** The `·`-joined identity line. */
+  function identity(): string | undefined {
+    return container.querySelector('.tooltip-identity')?.textContent ?? undefined;
   }
 
   function tooltipEl(): HTMLElement {
@@ -297,29 +356,12 @@ describe('FrameTooltipRenderer', () => {
       expect(tooltipEl().textContent).toContain('SOQL query execution');
     });
 
-    it('should display duration in milliseconds', () => {
-      // Duration: 1,500,000 ns = 1.5ms
-      showSettled(createEvent(0, 1_500_000), cursorAnchor(100, 100));
-
-      // Duration is formatted by formatDuration helper
-      expect(tooltipEl().textContent).toContain('ms');
-    });
-
-    it('should display self duration', () => {
-      // Self duration: 50% of total = 750,000 ns = 0.75ms
-      showSettled(createEvent(0, 1_500_000), cursorAnchor(100, 100));
-
-      expect(tooltipEl().textContent).toContain('self');
-      expect(tooltipEl().textContent).toContain('0.75');
-    });
-
-    it('should display total duration', () => {
-      // Timestamp: 2,000,000 ns = 2.000ms, duration: 100,000 ns = 0.1ms
+    it("should lead with the duration and the frame's own share of it", () => {
+      // Timestamp: 2,000,000 ns = 2.000ms, duration: 100,000 ns = 0.1ms, self 50%.
       showSettled(createEvent(2_000_000, 100_000), cursorAnchor(100, 100));
 
-      expect(tooltipEl().textContent).toContain('total');
-      // Check for some duration value (format may vary)
-      expect(tooltipEl().textContent).toContain('ms');
+      expect(rowValue('Time')).toBe('0.1 ms');
+      expect(rowSelf('Time')).toBe('self 0.05 ms');
     });
 
     it('should display a Throws row with the total (no self) when exceptions were thrown', () => {
@@ -328,8 +370,7 @@ describe('FrameTooltipRenderer', () => {
 
       showSettled(event, cursorAnchor(100, 100));
 
-      expect(tooltipEl().textContent).toContain('Throws:');
-      expect(tooltipEl().textContent).toContain('3');
+      expect(rowValue('Throws')).toBe('3');
       // self is intentionally omitted for throws (always 0 on a method).
       expect(tooltipEl().textContent).not.toContain('self 1');
     });
@@ -340,18 +381,47 @@ describe('FrameTooltipRenderer', () => {
 
       showSettled(event, cursorAnchor(100, 100));
 
-      expect(tooltipEl().textContent).not.toContain('Throws:');
+      expect(rowValue('Throws')).toBeUndefined();
     });
 
-    it('should display a lowercase net heap row as total (self N), thousand-separated', () => {
+    /**
+     * The card measures a branch against the log, never against a governor limit: a
+     * denominator here would be the transaction's fact rather than the frame's, and it
+     * would read as governor pressure when it is not.
+     */
+    it("should read the branch against the log's own figure, not a governor limit", () => {
+      rebuild({ apexLog: logOf({ soslRowCount: { total: 1000, self: 1000 } }) });
+      const event = createEvent(0, 1_500_000, 'SOSL_EXECUTE_BEGIN');
+      event.soslRowCount = { total: 500, self: 500 };
+
+      showSettled(event, cursorAnchor(100, 100));
+
+      expect(rowValue('SOSL Rows')).toBe('500 of 1,000');
+      expect(rowSelf('SOSL Rows')).toBe('self 500');
+    });
+
+    /** Spelled on every row: with no header line the figure has to name itself. */
+    it('should name the self reading on every row', () => {
+      const event = createEvent(0, 1_500_000);
+      event.soqlCount = { total: 3, self: 1 };
+      event.dmlCount = { total: 2, self: 0 };
+
+      showSettled(event, cursorAnchor(100, 100));
+
+      expect(rowSelf('SOQL')).toBe('self 1');
+      expect(rowSelf('DML')).toBe('self 0');
+    });
+
+    it("should read net heap compactly, with the method's own share", () => {
       const event = createEvent(0, 1_500_000);
       event.heapAllocated = { self: 1_572_864, total: 4_000_000 };
 
       showSettled(event, cursorAnchor(100, 100));
 
-      expect(tooltipEl().textContent).toContain('heap:');
-      // Net subtree total (with the byte unit) and the method's own net in parens.
-      expect(tooltipEl().textContent).toContain('4,000,000 bytes (self 1,572,864)');
+      // Net subtree total and the method's own net. The card is width-bound, so bytes
+      // read compactly here where the inspector separates thousands.
+      expect(rowValue('Heap net')).toBe('4 MB');
+      expect(rowSelf('Heap net')).toBe('self 1.6 MB');
     });
 
     it('should not display a heap row when net heap is 0 (allocated then freed)', () => {
@@ -360,7 +430,7 @@ describe('FrameTooltipRenderer', () => {
 
       showSettled(event, cursorAnchor(100, 100));
 
-      expect(tooltipEl().textContent).not.toContain('heap:');
+      expect(rowValue('Heap net')).toBeUndefined();
     });
 
     it('should display custom event text', () => {
@@ -395,74 +465,58 @@ describe('FrameTooltipRenderer', () => {
       expect(tooltipEl().querySelector('script')).toBeNull();
     });
 
-    it('should display a category row with a swatch in the category color', () => {
-      frameTooltipRenderer.destroy();
-      frameTooltipRenderer = new FrameTooltipRenderer(container, {
-        categoryColors: { Apex: '#88ae58' },
-        cursorOffset: 10,
-      });
+    it('should name the category on the identity line and paint the rail with it', () => {
+      rebuild({ categoryColors: { Apex: '#88ae58' } });
 
       showSettled(createEvent(0, 100, 'Event', 'Apex'), cursorAnchor(100, 100));
 
-      const swatch = container.querySelector('.tooltip-swatch') as HTMLElement;
-      expect(swatch).not.toBeNull();
-      expect(swatch.style.backgroundColor).toBe('rgb(136, 174, 88)');
-      expect(swatch.parentElement?.textContent).toContain('Apex');
+      expect(identity()).toBe('Apex · Event · from line 42');
+      const body = container.querySelector<HTMLElement>('.timeline-tooltip');
+      expect(body?.style.borderColor).toBe('rgb(136, 174, 88)');
     });
 
-    it('should not display a category row for an uncategorised event', () => {
+    it('should leave the category off the identity line for an uncategorised event', () => {
       showSettled(createEvent(0, 100, 'Event', ''), cursorAnchor(100, 100));
 
-      expect(container.querySelector('.tooltip-swatch')).toBeNull();
+      expect(identity()).toBe('Event · from line 42');
+    });
+
+    it('should name the namespace only where it is not the default', () => {
+      const event = createEvent(0, 100, 'Event', 'Apex');
+      event.namespace = 'acme';
+
+      showSettled(event, cursorAnchor(100, 100));
+
+      expect(identity()).toBe('Apex · Event · acme · from line 42');
     });
 
     it('should display wall-clock time row when apexLog has startTime', () => {
-      frameTooltipRenderer.destroy();
-      const mockApexLog = {
-        startTime: 37764600, // 10:29:24.600
-        timestamp: 6329577, // first event nanosecond offset
-        governorLimits: {
-          dmlStatements: { limit: 150 },
-          dmlRows: { limit: 10000 },
-          soqlQueries: { limit: 100 },
-          queryRows: { limit: 50000 },
-          soslQueries: { limit: 20 },
-        },
-      };
-
-      frameTooltipRenderer = new FrameTooltipRenderer(container, {
-        categoryColors: {},
-        cursorOffset: 10,
-        apexLog: mockApexLog as never,
-      });
+      // 10:29:24.600 at the first event, whose nanosecond offset is 6329577.
+      rebuild({ apexLog: logOf({ startTime: 37_764_600, timestamp: 6_329_577 }) });
 
       // Event at timestamp 6329577ns with duration 1,000,000ns
       showSettled(createEvent(6329577, 1_000_000), cursorAnchor(100, 100));
 
-      expect(tooltipEl().textContent).toContain('time:');
-      expect(tooltipEl().textContent).toContain('10:29:24.600');
-      // End time should be ~1ms later
-      expect(tooltipEl().textContent).toContain('10:29:24.601');
-      expect(tooltipEl().textContent).toContain('→');
+      expect(rowValue('Wall clock')).toBe('10:29:24.600 → 10:29:24.601');
+      // A clock range is wider than the figure columns, so a row inside them would run
+      // off the panel's edge.
+      const clock = row('Wall clock');
+      expect(clock?.classList.contains('tooltip-row--wide')).toBe(true);
+      expect(clock?.querySelector('.tooltip-self')).toBeNull();
     });
 
     it('should not display wall-clock time row when apexLog has no startTime', () => {
-      frameTooltipRenderer.destroy();
-      frameTooltipRenderer = new FrameTooltipRenderer(container, {
-        categoryColors: {},
-        cursorOffset: 10,
-        apexLog: { startTime: null, timestamp: 0 } as never,
-      });
+      rebuild({ apexLog: logOf() });
 
       showSettled(createEvent(0, 1_000_000), cursorAnchor(100, 100));
 
-      expect(tooltipEl().textContent).not.toContain('time:');
+      expect(rowValue('Wall clock')).toBeUndefined();
     });
 
     it('should not display wall-clock time row when no apexLog', () => {
       showSettled(createEvent(0, 1_000_000), cursorAnchor(100, 100));
 
-      expect(tooltipEl().textContent).not.toContain('time:');
+      expect(rowValue('Wall clock')).toBeUndefined();
     });
   });
 
@@ -485,7 +539,7 @@ describe('FrameTooltipRenderer', () => {
     it('should fit a long query to the budget and count the conditions it left out', () => {
       showSettled(soqlEvent(longQuery(40)), cursorAnchor(100, 100));
 
-      const preview = container.querySelector('.tooltip-header.soql-block') as HTMLElement;
+      const preview = container.querySelector('.tooltip-description.soql-block') as HTMLElement;
       expect(preview).not.toBeNull();
 
       const lines = preview.textContent?.split('\n') ?? [];
@@ -498,9 +552,10 @@ describe('FrameTooltipRenderer', () => {
     it('should leave a query that fits on one line whole', () => {
       showSettled(soqlEvent('SELECT Id FROM Account'), cursorAnchor(100, 100));
 
-      const preview = container.querySelector('.tooltip-header.soql-block') as HTMLElement;
+      const preview = container.querySelector('.tooltip-description.soql-block') as HTMLElement;
       expect(preview.textContent).toBe('SELECT Id FROM Account');
-      expect(container.querySelector('.tooltip-status-info')?.textContent).toBe('');
+      // Nothing was cut, so the card says nothing at its foot.
+      expect(container.querySelector('.tooltip-status')).toBeNull();
     });
 
     it('should keep the WHERE clause however long the field list is', () => {
@@ -510,7 +565,7 @@ describe('FrameTooltipRenderer', () => {
         cursorAnchor(100, 100),
       );
 
-      const preview = container.querySelector('.tooltip-header.soql-block') as HTMLElement;
+      const preview = container.querySelector('.tooltip-description.soql-block') as HTMLElement;
       const lines = preview.textContent?.split('\n') ?? [];
       expect(lines[0]).toMatch(/^SELECT .*\+\d+ fields$/);
       expect(lines).toContain(`WHERE Name = 'x'`);
@@ -521,26 +576,20 @@ describe('FrameTooltipRenderer', () => {
 
       showSettled(soqlEvent(huge), cursorAnchor(100, 100));
 
-      const preview = container.querySelector('.tooltip-header.soql-block') as HTMLElement;
+      const preview = container.querySelector('.tooltip-description.soql-block') as HTMLElement;
       expect(preview.classList.contains('is-clamped')).toBe(true);
       expect(preview.textContent).not.toContain('\n');
       expect(preview.textContent?.length).toBe(160);
 
-      const info = container.querySelector('.tooltip-status-info') as HTMLElement;
-      expect(info.textContent).toBe('query too large to format');
-    });
-
-    it('should point at the inspector for the full detail', () => {
-      showSettled(soqlEvent(longQuery(40)), cursorAnchor(100, 100));
-
-      const action = container.querySelector('.tooltip-status-action') as HTMLElement;
-      expect(action.textContent).toBe('Click to view in Inspector');
+      expect(container.querySelector('.tooltip-status')?.textContent).toBe(
+        'query too large to format',
+      );
     });
 
     it('should highlight the query with soql token classes', () => {
       showSettled(soqlEvent('SELECT Id FROM Account'), cursorAnchor(100, 100));
 
-      const preview = container.querySelector('.tooltip-header.soql-block') as HTMLElement;
+      const preview = container.querySelector('.tooltip-description.soql-block') as HTMLElement;
       expect(preview.querySelector('span[class^="soql-tok"]')).not.toBeNull();
     });
 
@@ -554,7 +603,7 @@ describe('FrameTooltipRenderer', () => {
       event.text = 'SELECT Name FROM Contact';
       showSettled(event, cursorAnchor(100, 100));
 
-      const preview = container.querySelector('.tooltip-header.soql-block') as HTMLElement;
+      const preview = container.querySelector('.tooltip-description.soql-block') as HTMLElement;
       expect(preview.textContent).toContain('Account');
     });
   });
@@ -666,11 +715,7 @@ describe('FrameTooltipRenderer', () => {
     });
 
     it('should use a custom cursor offset', () => {
-      frameTooltipRenderer.destroy();
-      frameTooltipRenderer = new FrameTooltipRenderer(container, {
-        categoryColors: {},
-        cursorOffset: 20,
-      });
+      rebuild({ cursorOffset: 20 });
       sizeTooltip(200, 100);
 
       showSettled(createEvent(0, 100), cursorAnchor(100, 100));
@@ -735,21 +780,10 @@ describe('FrameTooltipRenderer', () => {
   describe('edge cases', () => {
     it('should handle event with minimal data', () => {
       const event = {
-        timestamp: 0,
-        category: 'Apex',
-        children: [],
         isParent: true,
+        timestamp: 0,
         text: 'Minimal event',
-        duration: { total: 100, self: 100 },
-        exitStamp: 100,
-        dmlCount: { total: 0, self: 0 },
-        dmlRowCount: { total: 0, self: 0 },
-        soqlCount: { total: 0, self: 0 },
-        soqlRowCount: { total: 0, self: 0 },
-        soslCount: { total: 0, self: 0 },
-        soslRowCount: { total: 0, self: 0 },
-        thrownCount: { total: 0, self: 0 },
-        heapAllocated: { total: 0, self: 0 },
+        duration: { total: 0, self: 0 },
       } as unknown as LogEvent;
 
       showSettled(event, cursorAnchor(100, 100));
@@ -770,6 +804,32 @@ describe('FrameTooltipRenderer', () => {
 
       // Should show duration in seconds or milliseconds
       expect(tooltipEl().textContent).toMatch(/\d+\s*(s|ms)/);
+    });
+  });
+  describe('the group rule', () => {
+    it('rules the first group, parting the identity from the readings', () => {
+      showSettled(createEvent(0, 100), cursorAnchor(100, 100));
+
+      expect(tooltipEl().querySelectorAll('.tooltip-group--ruled')).toHaveLength(1);
+    });
+
+    // A marker card has no identity line, so the rule would part nothing.
+    it('leaves a marker card unruled, though it still groups', () => {
+      frameTooltipRenderer.showTruncation(
+        {
+          id: 'm1',
+          type: 'exception',
+          summary: 'System.NullPointerException',
+          startTime: 1_000_000,
+          endTime: 3_000_000,
+        } as TimelineMarker,
+        cursorAnchor(100, 100),
+      );
+      jest.advanceTimersByTime(SHOW_DELAY_MS);
+
+      const panel = tooltipEl();
+      expect(panel.querySelectorAll('.tooltip-group')).toHaveLength(1);
+      expect(panel.querySelectorAll('.tooltip-group--ruled')).toHaveLength(0);
     });
   });
 });

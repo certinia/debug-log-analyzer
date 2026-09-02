@@ -4,7 +4,14 @@
 import { beforeEach, describe, expect, it } from '@jest/globals';
 import type { LogEvent } from 'apex-log-parser';
 
-import { toAggregatedCallTree, toBottomUpTree } from '../Aggregation.js';
+import { outermostEvents } from '../../../../core/utility/EventTree.js';
+import {
+  toAggregatedCallTree,
+  toBottomUpTree,
+  type AggregatedRow,
+  type BottomUpRow,
+} from '../Aggregation.js';
+import { KeyPathIds } from '../../../../core/log/keyPathIds.js';
 
 type EventOptions = {
   text: string;
@@ -74,6 +81,15 @@ function createEvent(options: EventOptions): LogEvent {
   }
 
   return event;
+}
+
+/** A table per build: the fixtures below reuse event indexes for different
+ *  frames, so one frame's key must not be read back for another. */
+function bottomUpOf(children: LogEvent[]): BottomUpRow[] {
+  return toBottomUpTree(children, new KeyPathIds(2048));
+}
+function aggregatedOf(children: LogEvent[]): AggregatedRow[] {
+  return toAggregatedCallTree(children, new KeyPathIds(2048));
 }
 
 function findRowByText<T extends { text: string }>(rows: T[], text: string): T {
@@ -240,7 +256,7 @@ describe('toBottomUpTree', () => {
       thrown: 2,
     });
 
-    const rows = toBottomUpTree(root.children);
+    const rows = bottomUpOf(root.children);
     const childRow = findRowByText(rows, 'Child');
     expect(childRow).toMatchObject({
       totalSelfTime: 30,
@@ -313,7 +329,7 @@ describe('toBottomUpTree', () => {
     });
     createEvent({ text: 'WrappedLeaf', self: 40, total: 40, parent: zeroSelfWrapper });
 
-    const rows = toBottomUpTree(root.children);
+    const rows = bottomUpOf(root.children);
 
     expect(rows.some((row) => row.text === 'ZeroSelfWrapper')).toBe(true);
     expect(rows.some((row) => row.text === 'WrappedLeaf')).toBe(true);
@@ -375,7 +391,7 @@ describe('toBottomUpTree', () => {
       thrown: 3,
     });
 
-    const rows = toBottomUpTree(root.children);
+    const rows = bottomUpOf(root.children);
     const hotMethod = findRowByText(rows, 'HotMethod');
 
     expect(hotMethod.callCount).toBe(2);
@@ -402,7 +418,7 @@ describe('toBottomUpTree', () => {
     createEvent({ text: 'MyMethod', self: 10, total: 10, parent: root, type: 'CODE_UNIT_STARTED' });
     createEvent({ text: 'MyMethod', self: 15, total: 15, parent: root, type: 'METHOD_ENTRY' });
 
-    const rows = toBottomUpTree(root.children);
+    const rows = bottomUpOf(root.children);
 
     const myMethodRows = rows.filter((r) => r.text === 'MyMethod');
     expect(myMethodRows).toHaveLength(2);
@@ -439,7 +455,7 @@ describe('toBottomUpTree', () => {
     });
     createEvent({ text: 'Leaf', self: 7, total: 7, parent: parentB });
 
-    const rows = toBottomUpTree(root.children);
+    const rows = bottomUpOf(root.children);
 
     const leafRow = findRowByText(rows, 'Leaf');
     const callerRows = leafRow._children ?? [];
@@ -466,7 +482,7 @@ describe('toBottomUpTree', () => {
     const rec2 = createEvent({ text: 'Search', self: 50, total: 800, parent: rec1 });
     createEvent({ text: 'Search', self: 50, total: 700, parent: rec2 });
 
-    const rows = toBottomUpTree(root.children);
+    const rows = bottomUpOf(root.children);
 
     const searchRow = rows.find((r) => r.text === 'Search');
     if (!searchRow) {
@@ -485,7 +501,7 @@ describe('toBottomUpTree', () => {
     const rec2 = createEvent({ text: 'Search', self: 50, total: 800, parent: rec1 });
     createEvent({ text: 'Search', self: 50, total: 700, parent: rec2 });
 
-    const rows = toBottomUpTree(root.children);
+    const rows = bottomUpOf(root.children);
 
     const searchRow = rows.find((r) => r.text === 'Search');
     if (!searchRow) {
@@ -509,7 +525,7 @@ describe('toBottomUpTree', () => {
     const rec2 = createEvent({ text: 'Search', self: 50, total: 800, parent: rec1 });
     createEvent({ text: 'Search', self: 50, total: 700, parent: rec2 });
 
-    const rows = toBottomUpTree(root.children);
+    const rows = bottomUpOf(root.children);
 
     const searchRow = findRowByText(rows, 'Search');
     const callerRows = searchRow._children ?? [];
@@ -536,7 +552,7 @@ describe('toBottomUpTree', () => {
     const rec2 = createEvent({ text: 'Search', self: 30, total: 600, parent: rec1 });
     createEvent({ text: 'Search', self: 20, total: 300, parent: rec2 });
 
-    const rows = toBottomUpTree(root.children);
+    const rows = bottomUpOf(root.children);
     const rootSearchRow = findRowByText(rows, 'Search');
     const firstRecursiveCaller = findRowByText(rootSearchRow._children ?? [], 'Search');
     const secondRecursiveCaller = findRowByText(firstRecursiveCaller._children ?? [], 'Search');
@@ -599,7 +615,7 @@ describe('toBottomUpTree', () => {
       thrown: 1,
     });
 
-    const rows = toBottomUpTree(root.children);
+    const rows = bottomUpOf(root.children);
 
     const searchRow = rows.find((r) => r.text === 'Search');
     if (!searchRow) {
@@ -648,7 +664,7 @@ describe('toBottomUpTree', () => {
     const search2 = createEvent({ text: 'buildNode', self: 11, total: 300, parent: search1 });
     createEvent({ text: 'buildNode', self: 9, total: 120, parent: search2 });
 
-    const rows = toBottomUpTree(root.children);
+    const rows = bottomUpOf(root.children);
 
     assertTotalIsAtLeastSelf(rows);
     const buildNodeRows = rows.filter((row) => row.text === 'buildNode');
@@ -676,7 +692,7 @@ describe('toBottomUpTree', () => {
     createEvent({ text: 'search', self: 7, total: 140, parent: recursive, type: 'METHOD_ENTRY' });
     createEvent({ text: 'helper', self: 20, total: 20, parent: topLevel, type: 'METHOD_ENTRY' });
 
-    const rows = toBottomUpTree(root.children);
+    const rows = bottomUpOf(root.children);
 
     const uniqueKeys = new Set(rows.map((row) => row.key));
     expect(uniqueKeys.size).toBe(rows.length);
@@ -697,7 +713,7 @@ describe('toBottomUpTree', () => {
     createEvent({ text: 'C', self: 25, total: 25, parent: b });
     createEvent({ text: 'D', self: 40, total: 40, parent: root });
 
-    const rows = toBottomUpTree(root.children);
+    const rows = bottomUpOf(root.children);
     const rootSelfBudget = rows.reduce((sum, row) => sum + row.totalSelfTime, 0);
     const traceSelfBudget = sumTraceSelfTime(root.children);
 
@@ -711,7 +727,7 @@ describe('toBottomUpTree', () => {
     const r2 = createEvent({ text: 'recursive', self: 8, total: 25, parent: r1 });
     createEvent({ text: 'recursive', self: 17, total: 17, parent: r2 });
 
-    const rows = toBottomUpTree(root.children);
+    const rows = bottomUpOf(root.children);
 
     const recursive = findRowByText(rows, 'recursive');
     expect(recursive.totalSelfTime).toBe(35);
@@ -742,7 +758,7 @@ describe('toBottomUpTree', () => {
     createEvent({ text: 'sub other', self: 6, total: 6, parent: other });
     createEvent({ text: 'sub other', self: 9, total: 9, parent: other });
 
-    const rows = toBottomUpTree(root.children);
+    const rows = bottomUpOf(root.children);
 
     const subOther = findRowByText(rows, 'sub other');
     expect(subOther).toMatchObject({ totalSelfTime: 15, totalTime: 15, callCount: 2 });
@@ -777,7 +793,7 @@ describe('toBottomUpTree', () => {
     // Sibling Search directly under Outer
     createEvent({ text: 'Search', self: 30, total: 30, parent: outer });
 
-    const rows = toBottomUpTree(root.children);
+    const rows = bottomUpOf(root.children);
 
     const search = findRowByText(rows, 'Search');
     expect(search).toMatchObject({ totalSelfTime: 290, totalTime: 840 });
@@ -875,7 +891,7 @@ describe('toBottomUpTree', () => {
       soqlRowTotal: 5,
     });
 
-    const rows = toBottomUpTree(root.children);
+    const rows = bottomUpOf(root.children);
     assertPartitionInvariant(rows);
 
     const search = findRowByText(rows, 'Search');
@@ -893,7 +909,7 @@ describe('toBottomUpTree', () => {
     const callerC = createEvent({ text: 'CallerC', self: 12, total: 90, parent: root });
     createEvent({ text: 'MethodB', self: 30, total: 70, parent: callerC });
 
-    const rows = toBottomUpTree(root.children);
+    const rows = bottomUpOf(root.children);
     const methodB = findRowByText(rows, 'MethodB');
     const callers = methodB._children ?? [];
 
@@ -915,7 +931,7 @@ describe('toBottomUpTree', () => {
       thrown: 1,
     });
 
-    const rows = toBottomUpTree(root.children);
+    const rows = bottomUpOf(root.children);
     const limitOnly = findRowByText(rows, 'LimitOnly');
     expect(limitOnly.callCount).toBe(1);
     expect(limitOnly.dmlCount.self).toBe(1);
@@ -928,7 +944,7 @@ describe('toBottomUpTree', () => {
     createEvent({ text: 'Alpha', self: 20, total: 20, parent: root });
     createEvent({ text: 'Beta', self: 20, total: 20, parent: root });
 
-    const rows = toBottomUpTree(root.children);
+    const rows = bottomUpOf(root.children);
     expect(rows.map((row) => row.text)).toEqual(['Zulu', 'Alpha', 'Beta']);
   });
 
@@ -998,7 +1014,7 @@ describe('toBottomUpTree', () => {
       thrown: 1,
     });
 
-    const rows = toBottomUpTree(root.children) as PartitionRow[];
+    const rows = bottomUpOf(root.children) as PartitionRow[];
     const globalRoot: PartitionRow = {
       text: outer.text,
       totalTime: outer.duration.total,
@@ -1011,6 +1027,82 @@ describe('toBottomUpTree', () => {
     };
 
     assertRowsDoNotExceedGlobalTotals(rows, globalRoot);
+  });
+});
+
+describe('bottom-up caller row scope', () => {
+  beforeEach(() => {
+    nextTimestamp = 1;
+  });
+
+  /** A -> B -> A on one branch, A -> C -> A on the other, so a caller bucket
+   *  reaches a strict subset of the root bucket's occurrences. */
+  function recursiveRoot(): LogEvent {
+    const root = createEvent({ text: 'LOG_ROOT', self: 0, total: 150, type: 'EXECUTION_STARTED' });
+    const outer1 = createEvent({ text: 'A', self: 10, total: 100, parent: root });
+    const b1 = createEvent({ text: 'B', self: 20, total: 90, parent: outer1 });
+    createEvent({ text: 'A', self: 70, total: 70, parent: b1 });
+    const outer2 = createEvent({ text: 'A', self: 5, total: 50, parent: root });
+    const c1 = createEvent({ text: 'C', self: 15, total: 45, parent: outer2 });
+    createEvent({ text: 'A', self: 30, total: 30, parent: c1 });
+    return root;
+  }
+
+  /** Every bucket with the root bucket that holds the calls it derives from. */
+  function bucketsWithRoots(
+    rows: BottomUpRow[],
+    root?: BottomUpRow,
+  ): Array<{ row: BottomUpRow; root: BottomUpRow }> {
+    return rows.flatMap((row) => {
+      const held = root ?? row;
+      return [{ row, root: held }, ...bucketsWithRoots(row._children ?? [], held)];
+    });
+  }
+
+  /** The root bucket's calls whose own chain of callers runs through the row,
+   *  which is what the grid counts the row's totals from. */
+  function derivedFor(paths: KeyPathIds, root: BottomUpRow, row: BottomUpRow): LogEvent[] {
+    return root.instances.filter((event) => paths.chainNodeAt(event, row._pathId) !== null);
+  }
+
+  it('counts one call per occurrence the row derives', () => {
+    const paths = new KeyPathIds(2048);
+    const roots = toBottomUpTree(recursiveRoot().children, paths);
+
+    const buckets = bucketsWithRoots(roots);
+    expect(buckets.length).toBeGreaterThan(roots.length);
+    for (const { row, root } of buckets) {
+      expect(derivedFor(paths, root, row)).toHaveLength(row.callCount);
+    }
+  });
+
+  it('scopes a caller row to the calls made through it, not to every call', () => {
+    const paths = new KeyPathIds(2048);
+    const roots = toBottomUpTree(recursiveRoot().children, paths);
+
+    const recursive = findRowByText(roots, 'A');
+    const throughB = findRowByText(recursive._children ?? [], 'B');
+    expect(recursive.callCount).toBe(4);
+    expect(throughB.callCount).toBe(1);
+    expect(derivedFor(paths, recursive, throughB)).toEqual([
+      recursive.instances.find((event) => event.parent?.text === 'B'),
+    ]);
+  });
+
+  it('agrees with the row totals the grid shows', () => {
+    const paths = new KeyPathIds(2048);
+    const roots = toBottomUpTree(recursiveRoot().children, paths);
+
+    for (const { row, root } of bucketsWithRoots(roots)) {
+      const derived = derivedFor(paths, root, row);
+      const totalTime = outermostEvents(derived).reduce(
+        (sum, event) => sum + event.duration.total,
+        0,
+      );
+      const selfTime = derived.reduce((sum, event) => sum + event.duration.self, 0);
+      expect(row.totalTime).toBeCloseTo(totalTime, 6);
+      expect(row.totalSelfTime).toBeCloseTo(selfTime, 6);
+    }
   });
 });
 
@@ -1030,7 +1122,7 @@ describe('toAggregatedCallTree', () => {
       soqlTotal: 2,
     });
 
-    const rows = toAggregatedCallTree(root.children);
+    const rows = aggregatedOf(root.children);
     const limitOnly = findRowByText(rows, 'LimitOnly');
     expect(limitOnly.callCount).toBe(1);
     expect(limitOnly.soqlCount.self).toBe(2);
@@ -1046,7 +1138,7 @@ describe('_hasDetailsDeep precomputation', () => {
     const root = createEvent({ text: 'LOG_ROOT', self: 0, total: 0, type: 'EXECUTION_STARTED' });
     createEvent({ text: 'NoTime', self: 0, total: 0, parent: root });
 
-    const rows = toAggregatedCallTree(root.children);
+    const rows = aggregatedOf(root.children);
     const noTime = findRowByText(rows, 'NoTime');
     expect(noTime._hasDetailsDeep).toBe(false);
   });
@@ -1061,7 +1153,7 @@ describe('_hasDetailsDeep precomputation', () => {
       type: 'CUMULATIVE_LIMIT_USAGE',
     });
 
-    const rows = toAggregatedCallTree(root.children);
+    const rows = aggregatedOf(root.children);
     const limit = findRowByText(rows, 'LimitUsage');
     expect(limit._hasDetailsDeep).toBe(true);
   });
@@ -1071,7 +1163,7 @@ describe('_hasDetailsDeep precomputation', () => {
     const parent = createEvent({ text: 'ZeroParent', self: 0, total: 0, parent: root });
     createEvent({ text: 'BusyChild', self: 5, total: 5, parent });
 
-    const rows = toAggregatedCallTree(root.children);
+    const rows = aggregatedOf(root.children);
     const zeroParent = findRowByText(rows, 'ZeroParent');
     expect(zeroParent.totalTime).toBe(0);
     expect(zeroParent._hasDetailsDeep).toBe(true);
@@ -1082,7 +1174,7 @@ describe('_hasDetailsDeep precomputation', () => {
     const parent = createEvent({ text: 'ZeroParent', self: 0, total: 0, parent: root });
     createEvent({ text: 'ZeroChild', self: 0, total: 0, parent });
 
-    const rows = toAggregatedCallTree(root.children);
+    const rows = aggregatedOf(root.children);
     const zeroParent = findRowByText(rows, 'ZeroParent');
     expect(zeroParent._hasDetailsDeep).toBe(false);
   });
@@ -1092,7 +1184,7 @@ describe('_hasDetailsDeep precomputation', () => {
     const caller = createEvent({ text: 'Caller', self: 0, total: 5, parent: root });
     createEvent({ text: 'Callee', self: 5, total: 5, parent: caller });
 
-    const rows = toBottomUpTree(root.children);
+    const rows = bottomUpOf(root.children);
     const callee = findRowByText(rows, 'Callee');
     expect(callee._hasDetailsDeep).toBe(true);
     // Caller appears as a child of Callee in bottom-up
@@ -1110,7 +1202,7 @@ describe('_hasDetailsDeep precomputation', () => {
       type: 'LIMIT_USAGE_FOR_NS',
     });
 
-    const rows = toBottomUpTree(root.children);
+    const rows = bottomUpOf(root.children);
     const limit = findRowByText(rows, 'LimitUsage');
     expect(limit._hasDetailsDeep).toBe(true);
   });
@@ -1141,7 +1233,7 @@ describe('SOSL rollup', () => {
       soslRowTotal: 5,
     });
 
-    const rows = toAggregatedCallTree(root.children);
+    const rows = aggregatedOf(root.children);
     const searchRow = findRowByText(rows, 'Search');
     expect(searchRow.soslCount.total).toBe(2);
     expect(searchRow.soslRowCount.total).toBe(15);
@@ -1161,7 +1253,7 @@ describe('SOSL rollup', () => {
       soslRowTotal: 7,
     });
 
-    const rows = toBottomUpTree(root.children);
+    const rows = bottomUpOf(root.children);
     const callee = findRowByText(rows, 'Callee');
     expect(callee.soslCount.self).toBe(1);
     expect(callee.soslRowCount.total).toBe(7);
