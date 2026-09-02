@@ -59,7 +59,7 @@ export async function buildDetailSections(
         id: 'overview',
         title: 'Overview',
         fit: 'content',
-        content: html`<log-overview></log-overview>`,
+        content: html`<log-overview .wholeLog=${source !== 'timeline'}></log-overview>`,
       },
     ];
     if (source === 'calltree') {

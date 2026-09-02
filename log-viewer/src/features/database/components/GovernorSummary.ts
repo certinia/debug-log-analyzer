@@ -23,6 +23,9 @@ export interface GaugeMetric {
    * gauge.
    */
   format?: (value: number) => string;
+  /** Set where the figure is the transaction's while its neighbours are a
+   *  window's, so no gauge lies about the scope it reports. */
+  wholeLog?: boolean;
 }
 
 /** Consumption percentage where a gauge or trend turns from safe to warn. */
@@ -95,10 +98,12 @@ export class GovernorSummary extends LitElement {
       }
 
       .gauge__limit,
+      .gauge__scope,
       .gauge__na {
         color: var(--lana-fg-muted);
       }
 
+      .gauge__scope,
       .gauge__na {
         font-size: var(--lana-text-xs);
         font-style: italic;
@@ -165,7 +170,9 @@ export class GovernorSummary extends LitElement {
     >
       <span class="gauge__label">${metric.label}</span>
       <span class="gauge__value"
-        >${format(metric.used)} <span class="gauge__limit">/ ${format(metric.limit)}</span></span
+        >${format(metric.used)}
+        <span class="gauge__limit">/ ${format(metric.limit)}</span>
+        ${metric.wholeLog ? html`<span class="gauge__scope">whole log</span>` : ''}</span
       >
       <div class="gauge__track">
         <div
