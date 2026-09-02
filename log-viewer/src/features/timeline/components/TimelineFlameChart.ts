@@ -13,10 +13,13 @@ import { css, html, LitElement, type PropertyValues, unsafeCSS } from 'lit';
 import { customElement, property, query, state } from 'lit/decorators.js';
 
 import type { ApexLog } from 'apex-log-parser';
+import { setRange, windowFor } from '../../../core/log/rangeScope.js';
+import { debounce } from '../../../core/utility/Util.js';
 import { themeObserver } from '../../../core/theme/ThemeObserver.js';
 import { ApexLogTimeline } from '../optimised/ApexLogTimeline.js';
 import { parseColorToHex } from '../optimised/rendering/ColorUtils.js';
-import type { EditorColors, TimelineOptions } from '../types/flamechart.types.js';
+import { calculateViewportBounds } from '../optimised/ViewportUtils.js';
+import type { EditorColors, TimelineOptions, ViewportState } from '../types/flamechart.types.js';
 import { TimelineError } from '../types/flamechart.types.js';
 
 import { tokenStyles } from '../../../styles/tokens.styles.js';
@@ -208,6 +211,10 @@ export class TimelineFlameChart extends LitElement {
         ...this.options,
         themeName: this.themeName,
         editorColors: this.extractEditorColors(),
+        onViewportChange: (viewport: ViewportState) => {
+          this.options.onViewportChange?.(viewport);
+          this._publishRange(viewport, this.initEpoch);
+        },
       };
 
       const epoch = this.initEpoch;
@@ -293,11 +300,31 @@ export class TimelineFlameChart extends LitElement {
   // ============================================================================
 
   /**
+   * Records the stretch of log on screen, for the inspector's sections. The
+   * chart owns the viewport, so it also decides when one is wide enough to be
+   * the whole log.
+   *
+   * Coalesced to one publish per frame: a drag reports a viewport per input
+   * event, and a frame can only show one of them.
+   */
+  private readonly _publishRange = debounce((viewport: ViewportState, epoch: number) => {
+    // A frame queued before the chart was torn down must not put the window back.
+    if (epoch !== this.initEpoch) {
+      return;
+    }
+    const { timeStart, timeEnd } = calculateViewportBounds(viewport);
+    const logStart = this.apexLog?.timestamp ?? 0;
+    setRange(windowFor(timeStart, timeEnd, logStart, this.apexLog?.exitStamp ?? logStart));
+  });
+
+  /**
    * Clean up renderer and observers.
    */
   private cleanup(): void {
     // Supersede any in-flight `initializeTimeline`.
     this.initEpoch++;
+    // No chart, no window: the sections read the whole log again.
+    setRange(null);
 
     // Destroy renderer
     if (this.apexLogTimeline) {
