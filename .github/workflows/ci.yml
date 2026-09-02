@@ -81,3 +81,16 @@ jobs:
         run: |
           cd lana
           vsce package --no-dependencies
+
+  gate:
+    # The single required status check: the ruleset never needs updating when jobs change.
+    name: CI Gate
+    needs: [verify_files, tests, build]
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check job results
+        if: contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled') || contains(needs.*.result, 'skipped')
+        run: |
+          echo "A required job did not succeed."
+          exit 1
