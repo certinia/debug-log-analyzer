@@ -2160,6 +2160,27 @@ export class FlameChart<E extends EventNode = EventNode> {
   }
 
   /**
+   * Zoom and pan to fit `duration` from `timestamp`, at `depth`.
+   *
+   * The way in for a caller outside the chart: moving the viewport through
+   * {@link getViewportManager} instead changes it without reporting it, and the
+   * inspector reads the stretch of log the chart says it is showing.
+   *
+   * @param timestamp - Start of the stretch to fit, in nanoseconds
+   * @param duration - Length of that stretch, in nanoseconds
+   * @param depth - Call-tree depth to centre on
+   * @param padding - Share of the width to leave either side; 0 fits exactly
+   */
+  public focusOn(timestamp: number, duration: number, depth: number, padding?: number): void {
+    if (!this.viewport) {
+      return;
+    }
+
+    this.viewport.focusOnEvent(timestamp, duration, depth, padding);
+    this.notifyViewportChange();
+  }
+
+  /**
    * Reset viewport to show entire timeline.
    * Cancels any active animations.
    */
