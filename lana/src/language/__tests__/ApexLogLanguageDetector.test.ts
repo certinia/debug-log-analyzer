@@ -13,11 +13,7 @@ import {
   window,
   workspace,
 } from '../../__tests__/mocks/vscode.js';
-import {
-  ApexLogLanguageDetector,
-  isApexLogContent,
-  isApexLogFile,
-} from '../ApexLogLanguageDetector.js';
+import { ApexLogLanguageDetector, isApexLogContent } from '../ApexLogLanguageDetector.js';
 
 describe('isApexLogContent', () => {
   it('should detect standard log with settings header on line 1', () => {
@@ -108,31 +104,6 @@ describe('isApexLogContent', () => {
   });
 });
 
-describe('isApexLogFile', () => {
-  it('decodes only the first 4 KB returned by the filesystem provider', async () => {
-    const prefix = 'not an Apex log'.padEnd(4096, ' ');
-    workspace.fs.readFile.mockResolvedValue(
-      new TextEncoder().encode(`${prefix}09:45:31.888 (1000)|EXECUTION_STARTED`),
-    );
-    const uri = Uri.file('/logs/large.log');
-
-    await expect(isApexLogFile(uri)).resolves.toBe(false);
-
-    expect(workspace.fs.readFile).toHaveBeenCalledWith(uri);
-  });
-
-  it('uses the registered filesystem provider for an arbitrary URI scheme', async () => {
-    workspace.fs.readFile.mockResolvedValue(
-      new TextEncoder().encode('09:45:31.888 (1000)|EXECUTION_STARTED'),
-    );
-    const uri = Uri.parse('git:/repository/logs/virtual.log');
-
-    await expect(isApexLogFile(uri)).resolves.toBe(true);
-
-    expect(workspace.fs.readFile).toHaveBeenCalledWith(uri);
-  });
-});
-
 describe('ApexLogLanguageDetector', () => {
   it.each(['log', 'txt'])('detects .%s Apex logs from arbitrary URI schemes', (extension) => {
     const doc = createMockTextDocument({
@@ -166,39 +137,49 @@ describe('ApexLogLanguageDetector', () => {
     expect(languages.setTextDocumentLanguage).not.toHaveBeenCalled();
   });
 
-  it('does not publish a stale async result after the active tab changes', async () => {
-    let resolveSlowRead: ((bytes: Uint8Array) => void) | undefined;
-    const slowRead = new Promise<Uint8Array>((resolve) => {
-      resolveSlowRead = resolve;
-    });
-    const slowUri = Uri.parse('memfs:/logs/slow.log');
-    const fastUri = Uri.parse('memfs:/logs/fast.log');
-    workspace.fs.readFile.mockImplementation((uri: { path: string }) =>
-      uri.path === slowUri.path
-        ? slowRead
-        : Promise.resolve(new TextEncoder().encode('not an Apex log')),
-    );
-
-    let notifyTabsChanged: (() => void) | undefined;
-    window.tabGroups.onDidChangeTabs.mockImplementation((listener: (event: unknown) => void) => {
-      notifyTabsChanged = () => listener({});
-      return { dispose: jest.fn() };
-    });
-    window.tabGroups.activeTabGroup.activeTab = { input: new TabInputText(slowUri) };
+  it('sets the key from the extension alone when there is no text document', () => {
+    window.tabGroups.activeTabGroup.activeTab = {
+      input: new TabInputText(Uri.parse('memfs:/logs/huge.log')),
+    };
 
     ApexLogLanguageDetector.apply(
       createMockContext() as unknown as import('../../Context.js').Context,
     );
-    window.tabGroups.activeTabGroup.activeTab = { input: new TabInputText(fastUri) };
-    notifyTabsChanged?.();
-    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    expect(commands.executeCommand).toHaveBeenLastCalledWith('setContext', 'lana.isApexLog', true);
+  });
+
+  it('never reads the file when there is no text document', () => {
+    window.tabGroups.activeTabGroup.activeTab = {
+      input: new TabInputText(Uri.parse('memfs:/logs/huge.log')),
+    };
+
+    ApexLogLanguageDetector.apply(
+      createMockContext() as unknown as import('../../Context.js').Context,
+    );
+
+    expect(workspace.fs.readFile).not.toHaveBeenCalled();
+  });
+
+  it('clears the key for a non-log extension in the tab fallback', () => {
+    window.tabGroups.activeTabGroup.activeTab = {
+      input: new TabInputText(Uri.parse('memfs:/notes.json')),
+    };
+
+    ApexLogLanguageDetector.apply(
+      createMockContext() as unknown as import('../../Context.js').Context,
+    );
 
     expect(commands.executeCommand).toHaveBeenLastCalledWith('setContext', 'lana.isApexLog', false);
+  });
 
-    resolveSlowRead?.(new TextEncoder().encode('09:45:31.888 (1000)|EXECUTION_STARTED'));
-    await slowRead;
-    await new Promise((resolve) => setTimeout(resolve, 0));
+  it('clears the key when the active tab is not a text tab', () => {
+    window.tabGroups.activeTabGroup.activeTab = { input: {} };
 
-    expect(commands.executeCommand).not.toHaveBeenCalledWith('setContext', 'lana.isApexLog', true);
+    ApexLogLanguageDetector.apply(
+      createMockContext() as unknown as import('../../Context.js').Context,
+    );
+
+    expect(commands.executeCommand).toHaveBeenLastCalledWith('setContext', 'lana.isApexLog', false);
   });
 });

@@ -13,6 +13,7 @@ import {
 } from 'vscode';
 
 import { LogEventCache } from '../cache/LogEventCache.js';
+import { isOpenAsTextTab } from '../editor/TabState.js';
 import type { Context } from '../Context.js';
 import { buildMetricParts, TIMESTAMP_REGEX } from '../log-utils.js';
 
@@ -22,6 +23,10 @@ class RawLogHoverProvider implements HoverProvider {
     const match = line.text.match(TIMESTAMP_REGEX);
 
     if (!match?.[1]) {
+      return null;
+    }
+
+    if (!isOpenAsTextTab(document.uri)) {
       return null;
     }
 

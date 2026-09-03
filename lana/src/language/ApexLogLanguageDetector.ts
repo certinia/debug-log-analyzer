@@ -19,8 +19,6 @@ const EXECUTION_STARTED = /^\d{2}:\d{2}:\d{2}\.\d{1,} \(\d+\)\|EXECUTION_STARTED
 const USER_INFO = /^\d{2}:\d{2}:\d{2}\.\d{1,} \(\d+\)\|USER_INFO\|/;
 const DETECT_EXTENSIONS = new Set(['.log', '.txt']);
 const MAX_LINES_TO_CHECK = 100;
-const MAX_BYTES_TO_READ = 4096;
-let contextUpdateGeneration = 0;
 
 export function isApexLogContent(doc: TextDocument): boolean {
   if (doc.lineCount === 0) {
@@ -38,29 +36,6 @@ export function isApexLogContent(doc: TextDocument): boolean {
   return false;
 }
 
-export async function isApexLogFile(uri: Uri): Promise<boolean> {
-  try {
-    const text = await readFilePrefix(uri);
-    const lines = text.split(/\r?\n/);
-
-    const linesToCheck = Math.min(MAX_LINES_TO_CHECK, lines.length);
-    for (let i = 0; i < linesToCheck; i++) {
-      const line = lines[i] ?? '';
-      if (APEXLOG_HEADER.test(line) || EXECUTION_STARTED.test(line) || USER_INFO.test(line)) {
-        return true;
-      }
-    }
-    return false;
-  } catch {
-    return false;
-  }
-}
-
-async function readFilePrefix(uri: Uri): Promise<string> {
-  const bytes = await workspace.fs.readFile(uri);
-  return new TextDecoder().decode(bytes.subarray(0, MAX_BYTES_TO_READ));
-}
-
 function hasDetectExtension(uri: Uri): boolean {
   return DETECT_EXTENSIONS.has(Utils.extname(uri).toLowerCase());
 }
@@ -74,38 +49,20 @@ function getActiveTabUri(): Uri | undefined {
 }
 
 function updateContextKey(): void {
-  const generation = ++contextUpdateGeneration;
   const editor = window.activeTextEditor;
   if (editor) {
     const doc = editor.document;
-    if (hasDetectExtension(doc.uri)) {
-      const detected = isApexLogContent(doc);
-      commands.executeCommand('setContext', 'lana.isApexLog', detected);
-      return;
-    }
-    commands.executeCommand('setContext', 'lana.isApexLog', false);
+    const detected = hasDetectExtension(doc.uri) && isApexLogContent(doc);
+    commands.executeCommand('setContext', 'lana.isApexLog', detected);
     return;
   }
 
-  // Fallback to tab API for large files where activeTextEditor is undefined
+  // No text document, so the only way here is a file VS Code refused to open as one.
+  // Sniffing it means pulling the whole file through workspace.fs, which has no ranged
+  // read: a full read and allocation on every tab event, over an RPC in the web host.
+  // Trust the extension instead and accept offering the command on a large non-Apex file.
   const tabUri = getActiveTabUri();
-  if (tabUri && hasDetectExtension(tabUri)) {
-    const tabKey = tabUri.toString();
-    void isApexLogFile(tabUri).then((detected) => {
-      const activeTabUri = getActiveTabUri();
-      if (
-        generation !== contextUpdateGeneration ||
-        window.activeTextEditor ||
-        activeTabUri?.toString() !== tabKey
-      ) {
-        return;
-      }
-      commands.executeCommand('setContext', 'lana.isApexLog', detected);
-    });
-    return;
-  }
-
-  commands.executeCommand('setContext', 'lana.isApexLog', false);
+  commands.executeCommand('setContext', 'lana.isApexLog', !!tabUri && hasDetectExtension(tabUri));
 }
 
 export class ApexLogLanguageDetector {
