@@ -16,7 +16,7 @@ import type { LogEvent } from 'apex-log-parser';
 
 import type { Context } from '../Context.js';
 import { LogEventCache } from '../cache/LogEventCache.js';
-import { isShownOnlyAsDiff } from '../editor/TabState.js';
+import { tabPresence } from '../editor/TabState.js';
 import { formatDuration, TIMESTAMP_REGEX } from '../log-utils.js';
 
 /**
@@ -30,7 +30,10 @@ class RawLogSymbolProvider implements DocumentSymbolProvider {
     document: TextDocument,
     _token: CancellationToken,
   ): Promise<DocumentSymbol[]> {
-    if (isShownOnlyAsDiff(document.uri)) {
+    // Only a confirmed diff is skipped: VS Code asks for symbols once and has no
+    // change event to ask again, so answering "none" to a request that beat the
+    // tab model would empty the Outline for the life of the editor.
+    if (tabPresence(document.uri) === 'diffOnly') {
       return [];
     }
 

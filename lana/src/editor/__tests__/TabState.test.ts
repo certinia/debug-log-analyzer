@@ -10,7 +10,7 @@ import {
   setOpenTabs,
   window,
 } from '../../__tests__/mocks/vscode.js';
-import { isOpenAsTextTab, isShownOnlyAsDiff } from '../TabState.js';
+import { isOpenAsTextTab, tabPresence } from '../TabState.js';
 
 describe('isOpenAsTextTab', () => {
   it('is true for a URI open as a plain text tab', () => {
@@ -65,32 +65,30 @@ describe('isOpenAsTextTab', () => {
   });
 });
 
-describe('isShownOnlyAsDiff', () => {
-  it('is true for a URI shown only as a diff side', () => {
+describe('tabPresence', () => {
+  it("is 'diffOnly' for a URI shown only as a diff side", () => {
     const original = Uri.parse('git:/repo/run.log');
     const modified = Uri.file('/repo/run.log');
     setOpenTabs(new TabInputTextDiff(original, modified));
 
-    expect(isShownOnlyAsDiff(original)).toBe(true);
-    expect(isShownOnlyAsDiff(modified)).toBe(true);
+    expect(tabPresence(original)).toBe('diffOnly');
+    expect(tabPresence(modified)).toBe('diffOnly');
   });
 
-  it('is false when the same URI is also open in a normal tab', () => {
+  it("is 'text' when the same URI is also open in a normal tab", () => {
     const uri = Uri.file('/repo/run.log');
     setOpenTabs(new TabInputTextDiff(Uri.parse('git:/repo/run.log'), uri), new TabInputText(uri));
 
-    expect(isShownOnlyAsDiff(uri)).toBe(false);
+    expect(tabPresence(uri)).toBe('text');
   });
 
-  // The reason this predicate exists: a symbol request can beat the tab model,
-  // and DocumentSymbolProvider has no change event to recover with.
-  it('is false when no tabs are open yet', () => {
-    expect(isShownOnlyAsDiff(Uri.file('/logs/run.log'))).toBe(false);
+  it("is 'unknown' when the tab model has not caught up yet", () => {
+    expect(tabPresence(Uri.file('/logs/run.log'))).toBe('unknown');
   });
 
-  it('is false for tab kinds it does not recognise', () => {
+  it("is 'unknown' for tab kinds it does not recognise", () => {
     setOpenTabs({});
 
-    expect(isShownOnlyAsDiff(Uri.file('/logs/run.log'))).toBe(false);
+    expect(tabPresence(Uri.file('/logs/run.log'))).toBe('unknown');
   });
 });
