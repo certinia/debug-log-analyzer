@@ -23,8 +23,9 @@ Always use pnpm.
 - `pnpm lint` — type + lint check
 - `pnpm prettier-format` — auto-format
 
-**Dev host** — launch with `code-insiders --profile lana-dev --extensionDevelopmentPath=$PWD/lana`,
-use the CLI of the launched editor, `code-insiders` or `code`
+**Dev host** — launch with
+`code-insiders --profile lana-dev $PWD/sample-app --extensionDevelopmentPath=$PWD/lana`, use the
+CLI of the launched editor, `code-insiders` or `code`
 
 **Compilers** — `typecheck` = native TS7 (`tsc`); `typecheck:tsc6` = classic 6.0 (`tsc6`).
 Keep the `@typescript/typescript6` alias + `tsc6`: `typescript-eslint` and Docusaurus need
