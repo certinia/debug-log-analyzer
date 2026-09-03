@@ -54,10 +54,7 @@
     "Other"
   ],
   "capabilities": {
-    "virtualWorkspaces": true,
-    "untrustedWorkspaces": {
-      "supported": true
-    }
+    "virtualWorkspaces": true
   },
   "activationEvents": [
     "onLanguage:apexlog",

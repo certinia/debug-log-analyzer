@@ -196,13 +196,6 @@ export class LogView {
             break;
           }
 
-          case 'showError': {
-            if (isTextPayload(payload)) {
-              vscWindow.showErrorMessage(payload.text);
-            }
-            break;
-          }
-
           case 'goToLogLine': {
             if (isTimestampPayload(payload) && logUri) {
               await RawLogNavigation.goToLineByTimestamp(logUri, payload.timestamp);
@@ -322,16 +315,6 @@ function isSaveFileRequest(
     !Array.isArray(options) &&
     typeof (options as Record<string, unknown>).defaultFileName === 'string' &&
     Boolean((options as Record<string, unknown>).defaultFileName)
-  );
-}
-
-function isTextPayload(value: unknown): value is { text: string } {
-  return (
-    typeof value === 'object' &&
-    value !== null &&
-    !Array.isArray(value) &&
-    typeof (value as Record<string, unknown>).text === 'string' &&
-    Boolean((value as Record<string, unknown>).text)
   );
 }
 
