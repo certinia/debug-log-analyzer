@@ -24,16 +24,10 @@ jobs:
         with:
           node-version: '24'
           cache: 'pnpm'
-      - name: Install vsce + ovsx
-        run: |
-          pnpm add --global @vscode/vsce
-          pnpm add --global ovsx
       - name: Dependencies
         run: pnpm run ci:install
       - name: Build extension
-        run: |
-          cd lana
-          vsce package --no-dependencies
+        run: pnpm --filter lana run build:vsix
       - name: Publish to VS Code Marketplace + Open VSX Registry
         # Secrets and the release tag are passed via env (not interpolated into the
         # shell) to avoid leaking tokens in the process list and shell injection.
@@ -44,11 +38,11 @@ jobs:
         run: |
           cd lana
           echo "Verify vsce token has not expired"
-          vsce verify-pat
+          pnpm exec vsce verify-pat
           echo "Verify ovsx token has not expired"
-          ovsx verify-pat
+          pnpm dlx ovsx@1.1.1 verify-pat
 
           echo "Publish to vsce"
-          vsce publish --packagePath "lana-${TAG}.vsix" --no-dependencies
+          pnpm exec vsce publish --packagePath "lana-${TAG}.vsix" --no-dependencies
           echo "Publish to ovsx"
-          ovsx publish "lana-${TAG}.vsix" --no-dependencies
+          pnpm dlx ovsx@1.1.1 publish "lana-${TAG}.vsix" --no-dependencies

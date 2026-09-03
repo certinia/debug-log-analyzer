@@ -110,14 +110,10 @@ jobs:
         with:
           node-version: '24'
           cache: 'pnpm'
-      - name: Install vsce
-        run: pnpm add --global @vscode/vsce
       - name: Install Dependencies
         run: pnpm run ci:install
       - name: Build VSCode Package
-        run: |
-          cd lana
-          vsce package --no-dependencies
+        run: pnpm --filter lana run build:vsix
 
   gate:
     # The single required status check: the ruleset never needs updating when jobs change.

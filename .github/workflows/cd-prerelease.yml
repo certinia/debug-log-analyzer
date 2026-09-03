@@ -71,10 +71,6 @@ jobs:
         with:
           node-version: '24'
           cache: 'pnpm'
-      - name: Install vsce + ovsx
-        run: |
-          pnpm add --global @vscode/vsce
-          pnpm add --global ovsx
       - name: Dependencies
         run: pnpm run ci:install
       - name: update pre-release version
@@ -82,9 +78,7 @@ jobs:
           echo "Updating pre-release version"
           pnpm run bump-prerelease;
       - name: Package the extension
-        run: |
-          cd lana
-          vsce package --pre-release --no-dependencies
+        run: pnpm --filter lana exec vsce package --pre-release --no-dependencies
       - name: Publish to VS Code Marketplace + Open VSX Registry
         # Tokens via env (not -p) so they don't appear in the process list.
         env:
@@ -93,22 +87,22 @@ jobs:
         run: |
           cd lana
           echo "Verify vsce token has not expired"
-          vsce verify-pat
+          pnpm exec vsce verify-pat
 
           echo "
           Verify ovsx token has not expired"
-          ovsx verify-pat
+          pnpm dlx ovsx@1.1.1 verify-pat
 
           versionNum=$(jq -r '.version' package.json)
           pkgPath="lana-${versionNum}.vsix"
 
           echo "Publish to vsce
           vsix name: $pkgPath"
-          vsce publish --packagePath "${pkgPath}" --no-dependencies --pre-release --skip-duplicate
+          pnpm exec vsce publish --packagePath "${pkgPath}" --no-dependencies --pre-release --skip-duplicate
 
           echo "
           Publish to ovsx"
-          ovsx publish "${pkgPath}" --no-dependencies --pre-release --skip-duplicate
+          pnpm dlx ovsx@1.1.1 publish "${pkgPath}" --no-dependencies --pre-release --skip-duplicate
       - name: Update pre-release tag
         run: |
           echo "Updating pre release tag"
