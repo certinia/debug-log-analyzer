@@ -34,6 +34,7 @@ import { waitForNextFrame } from '../../../core/utility/FrameBudget.js';
 import { inMsRange, type FilterRange } from '../../../tabulator/filters/MinMax.js';
 import { withCodeDrivenExpand } from '../../../tabulator/module/expandOrigin.js';
 import { onTableReshaped } from '../../../tabulator/module/tableReshape.js';
+import { tableHolder } from '../../../tabulator/module/tableHolder.js';
 
 import dataGridStyles from '../../../tabulator/style/DataGrid.scss';
 
@@ -839,7 +840,7 @@ export class CalltreeView extends LitElement {
     }
     table.blockRedraw();
     expandCollapseAll(table.getRows(), true);
-    table.element?.querySelector<HTMLElement>('.tabulator-tableholder')?.focus();
+    tableHolder(table.element)?.focus();
     table.restoreRedraw();
   }
 
@@ -850,7 +851,7 @@ export class CalltreeView extends LitElement {
     }
     table.blockRedraw();
     expandCollapseAll(table.getRows(), false);
-    table.element?.querySelector<HTMLElement>('.tabulator-tableholder')?.focus();
+    tableHolder(table.element)?.focus();
     table.restoreRedraw();
   }
 
