@@ -1,7 +1,7 @@
 /*
  * Copyright (c) 2026 Certinia Inc. All rights reserved.
  */
-import { TabInputText, window, type Uri } from 'vscode';
+import { TabInputText, TabInputTextDiff, window, type Uri } from 'vscode';
 
 /**
  * True when `uri` is open as a plain text tab.
@@ -27,4 +27,36 @@ export function isOpenAsTextTab(uri: Uri): boolean {
     }
   }
   return false;
+}
+
+/**
+ * True only when `uri` is shown as a diff side and nowhere else.
+ *
+ * The weaker form of {@link isOpenAsTextTab}, for providers VS Code asks once
+ * and never asks again. A symbol request can arrive before the tab model lists
+ * the tab, and DocumentSymbolProvider has no change event to recover with, so
+ * the strict check would leave the Outline empty for the life of the editor.
+ * Answering "not a diff" while the model catches up costs at most one parse of
+ * a log the user did open.
+ */
+export function isShownOnlyAsDiff(uri: Uri): boolean {
+  const key = uri.toString();
+  let seenAsDiff = false;
+
+  for (const group of window.tabGroups.all) {
+    for (const tab of group.tabs) {
+      const input = tab.input;
+      if (input instanceof TabInputText && input.uri.toString() === key) {
+        return false;
+      }
+      if (
+        input instanceof TabInputTextDiff &&
+        (input.original.toString() === key || input.modified.toString() === key)
+      ) {
+        seenAsDiff = true;
+      }
+    }
+  }
+
+  return seenAsDiff;
 }
