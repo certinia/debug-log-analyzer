@@ -10,7 +10,7 @@ import {
   setOpenTabs,
   window,
 } from '../../__tests__/mocks/vscode.js';
-import { isOpenAsTextTab, tabPresence } from '../TabState.js';
+import { isOpenAsTextTab } from '../TabState.js';
 
 describe('isOpenAsTextTab', () => {
   it('is true for a URI open as a plain text tab', () => {
@@ -62,33 +62,5 @@ describe('isOpenAsTextTab', () => {
 
   it('is false when no tabs are open', () => {
     expect(isOpenAsTextTab(Uri.file('/logs/run.log'))).toBe(false);
-  });
-});
-
-describe('tabPresence', () => {
-  it("is 'diffOnly' for a URI shown only as a diff side", () => {
-    const original = Uri.parse('git:/repo/run.log');
-    const modified = Uri.file('/repo/run.log');
-    setOpenTabs(new TabInputTextDiff(original, modified));
-
-    expect(tabPresence(original)).toBe('diffOnly');
-    expect(tabPresence(modified)).toBe('diffOnly');
-  });
-
-  it("is 'text' when the same URI is also open in a normal tab", () => {
-    const uri = Uri.file('/repo/run.log');
-    setOpenTabs(new TabInputTextDiff(Uri.parse('git:/repo/run.log'), uri), new TabInputText(uri));
-
-    expect(tabPresence(uri)).toBe('text');
-  });
-
-  it("is 'unknown' when the tab model has not caught up yet", () => {
-    expect(tabPresence(Uri.file('/logs/run.log'))).toBe('unknown');
-  });
-
-  it("is 'unknown' for tab kinds it does not recognise", () => {
-    setOpenTabs({});
-
-    expect(tabPresence(Uri.file('/logs/run.log'))).toBe('unknown');
   });
 });
