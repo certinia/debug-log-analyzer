@@ -60,6 +60,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - **Help & documentation** and **Report an issue** move into a `•••` menu, which also holds the values and controls the header drops as the window narrows.
 - ♻️ Replace `webview-ui-toolkit` with [vscode-elements](https://github.com/vscode-elements/elements) for all UI controls. ([#576]).
 - ⚡ **Go to Code**: Faster in large projects — ~6× to ~10× faster ([#834]).
+- ⚡ **Timeline minimap**: ~25× faster and uses less memory.
 
 ### Fixed
 

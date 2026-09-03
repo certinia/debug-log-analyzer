@@ -45,7 +45,7 @@
     "watch": "rm -rf lana/out && rollup -w -c rollup.config.mjs",
     "watch:fast": "rolldown -w -c rolldown.config.ts",
     "copy:package-docs": "node ./scripts/copy-package-docs.mjs",
-    "typecheck": "tsc -b",
+    "typecheck": "tsc -b && tsc -p scripts/tsconfig.json",
     "typecheck:tsc6": "tsc6 -b",
     "measure": "rolldown -c scripts/measure/rolldown.config.ts && node --expose-gc --max-old-space-size=12288 scripts/measure/out/measure.mjs",
     "lint": "concurrently -r -g 'eslint . --cache --cache-location node_modules/.cache/eslint/' 'prettier --cache **/*.{ts,css,md,mdx,scss} --check --experimental-cli' 'pnpm run typecheck'",
