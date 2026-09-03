@@ -71,8 +71,6 @@ jobs:
         with:
           node-version: '24'
           cache: 'pnpm'
-      - name: Install ovsx
-        run: pnpm add --global ovsx
       - name: Dependencies
         run: pnpm run ci:install
       - name: update pre-release version
@@ -93,7 +91,7 @@ jobs:
 
           echo "
           Verify ovsx token has not expired"
-          ovsx verify-pat
+          pnpm dlx ovsx@1.1.1 verify-pat
 
           versionNum=$(jq -r '.version' package.json)
           pkgPath="lana-${versionNum}.vsix"
@@ -104,7 +102,7 @@ jobs:
 
           echo "
           Publish to ovsx"
-          ovsx publish "${pkgPath}" --no-dependencies --pre-release --skip-duplicate
+          pnpm dlx ovsx@1.1.1 publish "${pkgPath}" --no-dependencies --pre-release --skip-duplicate
       - name: Update pre-release tag
         run: |
           echo "Updating pre release tag"

@@ -24,8 +24,6 @@ jobs:
         with:
           node-version: '24'
           cache: 'pnpm'
-      - name: Install ovsx
-        run: pnpm add --global ovsx
       - name: Dependencies
         run: pnpm run ci:install
       - name: Build extension
@@ -42,9 +40,9 @@ jobs:
           echo "Verify vsce token has not expired"
           pnpm exec vsce verify-pat
           echo "Verify ovsx token has not expired"
-          ovsx verify-pat
+          pnpm dlx ovsx@1.1.1 verify-pat
 
           echo "Publish to vsce"
           pnpm exec vsce publish --packagePath "lana-${TAG}.vsix" --no-dependencies
           echo "Publish to ovsx"
-          ovsx publish "lana-${TAG}.vsix" --no-dependencies
+          pnpm dlx ovsx@1.1.1 publish "lana-${TAG}.vsix" --no-dependencies
