@@ -674,3 +674,93 @@ describe('VariablesDetail properties', () => {
     expect(property?.querySelector('.chevron-gap')).not.toBeNull();
   });
 });
+
+// A local holding an object reads `{}`, because the log could not serialise it.
+// Its fields are lines of their own, and the badge is what says so.
+describe('VariablesDetail object fields', () => {
+  const BUILT =
+    '09:18:22.6 (1000)|METHOD_ENTRY|[1]|01p|ns.Outer.run()\n' +
+    '09:18:22.6 (1010)|CONSTRUCTOR_ENTRY|[9]|01p|<init>()|ns.Holder\n' +
+    '09:18:22.6 (1020)|VARIABLE_SCOPE_BEGIN|[1]|this|ns.Holder|true|false\n' +
+    '09:18:22.6 (1030)|VARIABLE_ASSIGNMENT|[1]|this|{}|0xaaa\n' +
+    '09:18:22.6 (1040)|VARIABLE_ASSIGNMENT|[2]|this.sObj|"Account"|0xaaa\n' +
+    '09:18:22.6 (1050)|CONSTRUCTOR_EXIT|[9]|01p|<init>()|ns.Holder\n' +
+    '09:18:22.6 (1060)|VARIABLE_SCOPE_BEGIN|[10]|holder|ns.Holder|true|false\n' +
+    '09:18:22.6 (1070)|VARIABLE_ASSIGNMENT|[10]|holder|{}|0xaaa\n' +
+    '09:18:22.6 (1080)|VARIABLE_SCOPE_BEGIN|[11]|plain|ns.Other|true|false\n' +
+    '09:18:22.6 (1090)|VARIABLE_ASSIGNMENT|[11]|plain|{}|0xzzz\n' +
+    '09:18:22.6 (1100)|METHOD_EXIT|[1]|ns.Outer.run()\n';
+
+  it('counts the fields beside a value the log wrote as {}', async () => {
+    const store = logOf(BUILT);
+
+    const el = await mount(store, { eventIndex: indexOf(store, 'ns.Outer.run()') });
+    const holder = rowNamed(el, 'holder');
+
+    expect(holder?.querySelector('.count')?.textContent?.trim()).toBe('1');
+    expect(holder?.getAttribute('aria-expanded')).toBe('false');
+  });
+
+  // `{}` beside a count of one reads as empty, so the row shows what it opens on.
+  it('previews the recorded fields on the closed row', async () => {
+    const store = logOf(BUILT);
+
+    const el = await mount(store, { eventIndex: indexOf(store, 'ns.Outer.run()') });
+    const holder = rowNamed(el, 'holder');
+
+    expect(holder?.querySelector('.value')?.textContent).toContain('sObj: "Account"');
+  });
+
+  // The log wrote no value for the whole object and still recorded its parts. A
+  // row that shows those parts must not also claim the log holds nothing.
+  it('shows the recorded parts rather than "no value recorded"', async () => {
+    const store = logOf(
+      '09:18:22.6 (1000)|METHOD_ENTRY|[1]|01p|ns.Outer.run()\n' +
+        '09:18:22.6 (1010)|VARIABLE_ASSIGNMENT|[2]|this.rows|5|0xbbb\n' +
+        '09:18:22.6 (1020)|VARIABLE_SCOPE_BEGIN|[3]|big|ns.Big|true|false\n' +
+        '09:18:22.6 (1030)|VARIABLE_ASSIGNMENT|[3]|big|0xbbb\n' +
+        '09:18:22.6 (1040)|METHOD_EXIT|[1]|ns.Outer.run()\n',
+    );
+
+    const el = await mount(store, { eventIndex: indexOf(store, 'ns.Outer.run()') });
+    const big = rowNamed(el, 'big');
+
+    expect(big?.querySelector('.missing')).toBeNull();
+    expect(big?.querySelector('.value')?.textContent).toContain('rows: 5');
+    expect(big?.querySelector('.count')?.textContent?.trim()).toBe('1');
+  });
+
+  // A cycle leaves a row that cannot open, so a count on it would promise rows
+  // the tree will not give.
+  it('leaves the count off a row that cannot open', async () => {
+    const store = logOf(
+      '09:18:22.6 (1000)|METHOD_ENTRY|[1]|01p|ns.Loop.run()\n' +
+        '09:18:22.6 (1010)|VARIABLE_ASSIGNMENT|[2]|this.me|0xddd|0xddd\n' +
+        '09:18:22.6 (1020)|VARIABLE_SCOPE_BEGIN|[3]|holder|ns.Loop|true|false\n' +
+        '09:18:22.6 (1030)|VARIABLE_ASSIGNMENT|[3]|holder|{}|0xddd\n' +
+        '09:18:22.6 (1040)|METHOD_EXIT|[1]|ns.Loop.run()\n',
+    );
+    const el = await mount(store, { eventIndex: indexOf(store, 'ns.Loop.run()') });
+
+    // The field names the object it belongs to, so it may be read but not opened.
+    treeRows(el)
+      .find((row) => row.dataset.id === 'local/holder')
+      ?.click();
+    await el.updateComplete;
+    const me = treeRows(el).find((row) => row.dataset.id === 'local/holder/me');
+
+    expect(me).toBeDefined();
+    expect(me?.getAttribute('aria-expanded')).toBeNull();
+    expect(me?.querySelector('.count')).toBeNull();
+  });
+
+  it('offers nothing to open where the log recorded no fields', async () => {
+    const store = logOf(BUILT);
+
+    const el = await mount(store, { eventIndex: indexOf(store, 'ns.Outer.run()') });
+    const plain = rowNamed(el, 'plain');
+
+    expect(plain?.querySelector('.count')).toBeNull();
+    expect(plain?.getAttribute('aria-expanded')).toBeNull();
+  });
+});

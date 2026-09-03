@@ -14,6 +14,7 @@ import {
   bareAddress,
   bareAddressOf,
   classOf,
+  isFieldName,
   isStaticName,
   parseVariableScope,
   nestedAddressesOf,
@@ -45,7 +46,6 @@ import {
 const ASSIGNMENT = 'VARIABLE_ASSIGNMENT';
 const SCOPE_BEGIN = 'VARIABLE_SCOPE_BEGIN';
 const CONSTRUCTOR_ENTRY = 'CONSTRUCTOR_ENTRY';
-const FIELD_PREFIX = 'this.';
 
 /**
  * Writes held per static name before the oldest is dropped, so a static
@@ -62,6 +62,14 @@ const MAX_WRITES_PER_STATIC = 10_000;
 /** Distinct static names held. A codebase compiles a bounded number of static
  *  fields, so this only bites a pathological log. */
 const MAX_STATIC_NAMES = 50_000;
+
+/** Writes held per field of an object, dropping the oldest, as
+ *  {@link MAX_WRITES_PER_STATIC} does for a static. Per field, not per object:
+ *  one field written in a long loop must not evict the rest of the object. */
+const MAX_WRITES_PER_FIELD = 2_000;
+
+/** Distinct objects whose fields are held. */
+const MAX_FIELD_OWNERS = 100_000;
 
 /** One variable, as it stood at the frame. */
 export interface VariableRow {
@@ -158,24 +166,30 @@ export function recordsVariables(log: ApexLog): boolean {
  *   object.
  *   A `this.field` line is no such witness: its reported address is the object
  *   the field belongs to, not the value the line wrote.
+ * - **An object's fields.** That same owner address groups the writes to one
+ *   object's fields, wherever they were made. A frame's own stack cannot see a
+ *   constructor that has already returned; the index can.
  */
 export class VariableIndex {
   /** The log recorded at least one write, so an empty answer means an empty
    *  scope rather than a log that records nothing. */
   readonly sawAnyWrite: boolean;
-  /** A static name went unrecorded past {@link MAX_STATIC_NAMES}. */
+  /** A name or an object went unrecorded past its cap, so an answer may be
+   *  missing something the log did record. */
   readonly capped: boolean;
 
   private readonly _writes: Map<string, LogEvent[]>;
   private readonly _declared: Map<string, Declared>;
   private readonly _byAddress: Map<string, LogEvent[]>;
   private readonly _classes: Map<string, ClassAt[]>;
+  private readonly _fieldsByOwner: Map<string, Map<string, LogEvent[]>>;
 
   private constructor(
     writes: Map<string, LogEvent[]>,
     declared: Map<string, Declared>,
     byAddress: Map<string, LogEvent[]>,
     classes: Map<string, ClassAt[]>,
+    fieldsByOwner: Map<string, Map<string, LogEvent[]>>,
     sawAnyWrite: boolean,
     capped: boolean,
   ) {
@@ -183,6 +197,7 @@ export class VariableIndex {
     this._declared = declared;
     this._byAddress = byAddress;
     this._classes = classes;
+    this._fieldsByOwner = fieldsByOwner;
     this.sawAnyWrite = sawAnyWrite;
     this.capped = capped;
   }
@@ -204,8 +219,10 @@ export class VariableIndex {
     // redeclared on every call, so a frame with no declaration of its own would
     // otherwise borrow whichever class was declared last, anywhere in the log.
     const thisClassOf = new Map<LogEvent, string>();
+    // Owner address to that object's fields, each name to its own writes.
+    const fieldsByOwner = new Map<string, Map<string, LogEvent[]>>();
     let sawAnyWrite = false;
-    let cappedNames = false;
+    let dropped = false;
 
     await eachEvent(log, tick, (event) => {
       if (event.type === ASSIGNMENT) {
@@ -216,7 +233,22 @@ export class VariableIndex {
           if (writes.has(name) || writes.size < MAX_STATIC_NAMES) {
             pushCapped(writes, name, event, MAX_WRITES_PER_STATIC);
           } else {
-            cappedNames = true;
+            dropped = true;
+          }
+        }
+        // The trailing address on a field write is the object the field belongs
+        // to, so it gathers that object's fields however far apart they were set.
+        const owner = name && isFieldName(name) ? reportedAddressOf(event.logLine) : null;
+        if (owner && name) {
+          let held = fieldsByOwner.get(owner);
+          if (!held && fieldsByOwner.size < MAX_FIELD_OWNERS) {
+            held = new Map();
+            fieldsByOwner.set(owner, held);
+          }
+          if (held) {
+            pushCapped(held, name, event, MAX_WRITES_PER_FIELD);
+          } else {
+            dropped = true;
           }
         }
         if (name === 'this') {
@@ -273,7 +305,7 @@ export class VariableIndex {
         // usually carries two or more different values, and indexing it would
         // answer about an object with one of its fields.
         const name = variableNameOf(event.logLine);
-        if (!name || name.startsWith(FIELD_PREFIX)) {
+        if (!name || isFieldName(name)) {
           return;
         }
         const address = reportedAddressOf(event.logLine);
@@ -284,11 +316,25 @@ export class VariableIndex {
       });
     }
 
-    // The walk pops what it pushed, so a key's writes come back out of order.
+    // Every read below searches by eventIndex, so every list has to be in it.
+    const byIndex = (left: LogEvent, right: LogEvent): number => left.eventIndex - right.eventIndex;
     for (const found of [...writes.values(), ...byAddress.values()]) {
-      found.sort((left, right) => left.eventIndex - right.eventIndex);
+      found.sort(byIndex);
     }
-    return new VariableIndex(writes, declared, byAddress, classes, sawAnyWrite, cappedNames);
+    for (const fields of fieldsByOwner.values()) {
+      for (const found of fields.values()) {
+        found.sort(byIndex);
+      }
+    }
+    return new VariableIndex(
+      writes,
+      declared,
+      byAddress,
+      classes,
+      fieldsByOwner,
+      sawAnyWrite,
+      dropped,
+    );
   }
 
   /**
@@ -352,13 +398,91 @@ export class VariableIndex {
    * the log records the implementation only on that object's own frame.
    */
   classAt(address: string, cut: number): string | null {
+    return this._runAt(address, cut)?.run.className ?? null;
+  }
+
+  /** The class run covering `cut`, and how many objects the log saw at this
+   *  address before it. One reader of the runs, so the class a row names and the
+   *  fields it opens on cannot disagree about which object lived here. */
+  private _runAt(address: string, cut: number): { run: ClassAt; before: number } | null {
     const seen = this._classes.get(address);
     if (!seen) {
       return null;
     }
     const after = firstIndexWhere(seen.length, (index) => seen[index]!.at > cut);
-    return after ? (seen[after - 1]?.className ?? null) : null;
+    return after ? { run: seen[after - 1]!, before: after - 1 } : null;
   }
+
+  /**
+   * The fields the log recorded for the object at `address`, as the frame stood.
+   *
+   * This is what lets a value the log wrote as `{}` open: the object's own line
+   * carries no contents, but the writes to its fields are lines of their own.
+   */
+  fieldsAt(address: string, cut: number): VariableRow[] {
+    return fieldRowsOf(this.fieldWritesAt(address, cut));
+  }
+
+  /** {@link fieldsAt} as the writes behind it, for a caller merging them with
+   *  writes of its own. */
+  fieldWritesAt(address: string, cut: number): Map<string, LogEvent> {
+    const found = new Map<string, LogEvent>();
+    const held = this._fieldsByOwner.get(address);
+    if (!held) {
+      return found;
+    }
+    const from = this._objectFrom(address, cut);
+    for (const [name, writes] of held) {
+      const last = lastAtOrBefore(writes, cut);
+      // Before this object's own history: the field belonged to the object that
+      // used this address before it.
+      if (last && last.eventIndex >= from) {
+        found.set(name, last);
+      }
+    }
+    return found;
+  }
+
+  /**
+   * Where this object's own history starts, for an address the log has seen hold
+   * more than one object.
+   *
+   * Zero where it has not: a field write can precede the `this` write that names
+   * the class, so bounding every object at its own run would drop it.
+   */
+  private _objectFrom(address: string, cut: number): number {
+    const found = this._runAt(address, cut);
+    return found && found.before > 0 ? found.run.at : 0;
+  }
+
+  /**
+   * The lookups a reader needs at one point in the log, bound to that point.
+   *
+   * An object's fields are read for every row that shows it, and every row is
+   * built again whenever anything opens, so a read is held rather than repeated.
+   */
+  viewAt(cut: number): IndexView {
+    const fields = new Map<string, readonly VariableRow[]>();
+    return {
+      resolve: (address) => this.addressState(address, cut),
+      classOf: (address) => this.classAt(address, cut),
+      fields: (address) => {
+        let held = fields.get(address);
+        if (!held) {
+          held = this.fieldsAt(address, cut);
+          fields.set(address, held);
+        }
+        return held;
+      },
+    };
+  }
+}
+
+/** What a reader asks the log about an address, bound to one point in it. */
+export interface IndexView {
+  resolve(address: string): AddressState;
+  classOf(address: string): string | null;
+  fields(address: string): readonly VariableRow[];
 }
 
 /**
@@ -408,12 +532,27 @@ export function frameVariablesFor(
     }
   }
 
-  const fields: VariableRow[] = [];
-  // Every name here is `this.field`, so its line reports the owner, not the
-  // field's own value.
-  for (const [name, write] of fieldWrites(stack, scope, own, thisType, cut)) {
-    fields.push(rowFor(shortName(name), write, undefined, null));
+  // Two sources, one rule: the latest write to a field wins. The index finds
+  // every write against the frame's object wherever it was made, so a field a
+  // returned constructor set is in scope here; the stack walk finds the writes
+  // whose line reported no address, which the index never sees.
+  //
+  // Every field of the object, not only the ones the frame's own class wrote: a
+  // base method reads fields a base constructor set, and the log names no class
+  // hierarchy to tell an inherited field from a subclass's own. So a base frame
+  // can list a field only the subclass declares. Filtering by the writing
+  // frame's class would lose the inherited case, which is the common one.
+  const object = thisAddressOf(own.writes);
+  const found = fieldWrites(stack, scope, own, thisType, cut);
+  if (object && index) {
+    for (const [name, write] of index.fieldWritesAt(object, cut)) {
+      const held = found.get(name);
+      if (!held || held.eventIndex < write.eventIndex) {
+        found.set(name, write);
+      }
+    }
   }
+  const fields = fieldRowsOf(found);
 
   return {
     frameLabel: scope.text,
@@ -421,7 +560,7 @@ export function frameVariablesFor(
     thisType,
     locals: locals.sort(byName),
     thisRow,
-    fields: fields.sort(byName),
+    fields,
     statics: index?.at(cut) ?? [],
     truncated: stack.some((entry) => entry.isTruncated) || selected.isTruncated,
   };
@@ -508,19 +647,40 @@ function scanFrame(frame: LogEvent, cut: number): FrameScan {
  *  never read: a frame can hold hundreds of thousands of children, so the rest
  *  is thrown away. */
 function thisWritesOf(frame: LogEvent, cut: number): Map<string, LogEvent> {
-  const writes = new Map<string, LogEvent>();
-  const children = frame.children;
-  for (let at = firstIndexWhere(children.length, (i) => children[i]!.eventIndex > cut); at--;) {
-    const child = children[at]!;
-    if (child.type !== ASSIGNMENT) {
-      continue;
-    }
-    const name = variableNameOf(child.logLine);
-    if (name && (name === 'this' || name.startsWith(FIELD_PREFIX)) && !writes.has(name)) {
-      writes.set(name, child);
+  return lastWritesByName(frame.children, cut, (name) => name === 'this' || isFieldName(name));
+}
+
+/**
+ * The last write to each name at or before `cut`, from events in eventIndex
+ * order.
+ *
+ * Backwards from the cut, so the first write seen for a name is the last one
+ * made.
+ */
+function lastWritesByName(
+  events: readonly LogEvent[],
+  cut: number,
+  keep: (name: string) => boolean,
+): Map<string, LogEvent> {
+  const found = new Map<string, LogEvent>();
+  for (let at = firstIndexWhere(events.length, (i) => events[i]!.eventIndex > cut); at--;) {
+    const event = events[at]!;
+    const name = event.type === ASSIGNMENT ? variableNameOf(event.logLine) : null;
+    if (name && keep(name) && !found.has(name)) {
+      found.set(name, event);
     }
   }
-  return writes;
+  return found;
+}
+
+/** Field writes as their rows, sorted, carrying the `objectAddress` a field row
+ *  must always have: its line reports the owner, never its own value. */
+function fieldRowsOf(writes: ReadonlyMap<string, LogEvent>): VariableRow[] {
+  const rows: VariableRow[] = [];
+  for (const [name, write] of writes) {
+    rows.push(rowFor(shortName(name), write, undefined, null));
+  }
+  return rows.sort(byName);
 }
 
 /**
@@ -587,7 +747,7 @@ function fieldWrites(
       continue;
     }
     for (const [name, write] of writes) {
-      if (!name.startsWith(FIELD_PREFIX)) {
+      if (!isFieldName(name)) {
         continue;
       }
       const held = found.get(name);
@@ -608,7 +768,7 @@ function fieldWrites(
  */
 function thisAddressOf(writes: ReadonlyMap<string, LogEvent>): string | null {
   for (const [name, write] of writes) {
-    if (name === 'this' || name.startsWith(FIELD_PREFIX)) {
+    if (name === 'this' || isFieldName(name)) {
       const address = reportedAddressOf(write.logLine);
       if (address) {
         return address;
@@ -672,7 +832,9 @@ interface NamedAt {
  *   class only for an object constructed outside the log.
  *
  * An address is reused once its object is collected, hence runs rather than one
- * class per address.
+ * class per address. A construction past the last run is always a new object,
+ * even of the same class: merging those two runs would let a collected object's
+ * fields read as the new one's.
  */
 function keepClass(
   classes: Map<string, ClassAt[]>,
@@ -688,10 +850,6 @@ function keepClass(
   }
   const last = seen[seen.length - 1]!;
   if (named.at <= last.until || !named.constructed) {
-    return;
-  }
-  if (last.className === className) {
-    last.until = Math.max(last.until, named.until);
     return;
   }
   seen.push(run);

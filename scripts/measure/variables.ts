@@ -38,9 +38,16 @@ export async function measureVariables(log: ApexLog): Promise<void> {
   const frames = log.eventsById.filter((event) => event.isParent);
   const step = Math.max(1, Math.floor(frames.length / SAMPLED_FRAMES));
   const sampled = frames.filter((_, at) => at % step === 0).slice(0, SAMPLED_FRAMES);
+  // The addresses come from the snapshots this times, so the sampled frames are
+  // read once rather than again for the fields below.
+  const objects = new Set<string>();
   await time(`${sampled.length} frame snapshots`, () => {
     for (const frame of sampled) {
-      frameVariablesFor(store, frame.eventIndex, index);
+      for (const row of frameVariablesFor(store, frame.eventIndex, index)?.locals ?? []) {
+        if (row.objectAddress) {
+          objects.add(row.objectAddress);
+        }
+      }
     }
   });
 
@@ -59,4 +66,12 @@ export async function measureVariables(log: ApexLog): Promise<void> {
       `${shape?.locals.length ?? 0} locals, ${shape?.fields.length ?? 0} fields`,
   );
   await time('worst frame snapshot', () => frameVariablesFor(store, worst.eventIndex, index));
+
+  // Opening an object row reads that object's fields back, so this is what a row
+  // costs once the scope is on screen.
+  await time(`fieldsAt on ${objects.size} objects`, () => {
+    for (const address of objects) {
+      index.fieldsAt(address, Number.MAX_SAFE_INTEGER);
+    }
+  });
 }

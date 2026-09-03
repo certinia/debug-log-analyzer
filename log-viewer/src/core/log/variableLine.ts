@@ -195,9 +195,17 @@ export function shortName(name: string): string {
   return lastDot > 0 ? name.slice(lastDot + 1) : name;
 }
 
+const FIELD_PREFIX = 'this.';
+
 /** True for a name the log qualified with its class, which every static is. */
 export function isStaticName(name: string): boolean {
-  return name.includes('.') && !name.startsWith('this.');
+  return name.includes('.') && !isFieldName(name);
+}
+
+/** True for a field of the object a frame runs on. Its line reports that
+ *  object's address, never the field's own value. */
+export function isFieldName(name: string): boolean {
+  return name.startsWith(FIELD_PREFIX);
 }
 
 /** The character after the nth pipe, or -1 where the line has fewer. */
