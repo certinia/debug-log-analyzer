@@ -21,7 +21,7 @@
     "@types/jest": "^30.0.0",
     "@types/tabulator-tables": "^6.3.6",
     "lightningcss": "^1.33.0",
-    "sass": "^1.102.0",
+    "sass": "^1.103.1",
     "typescript": "npm:@typescript/typescript6@^6.0.2"
   }
 }
