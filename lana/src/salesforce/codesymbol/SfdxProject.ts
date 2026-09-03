@@ -44,7 +44,6 @@ export class SfdxProject {
     // resolved, so a rejected findFiles never leaves an empty-but-valid cache.
     const classIndex = new Map<string, Uri[]>();
     for (const uri of allUris) {
-      // uri.path is always '/'-separated (unlike fsPath), so posix basename is safe everywhere
       const className = Utils.basename(uri)
         .replace(/\.cls$/i, '')
         .toLowerCase();
