@@ -152,7 +152,7 @@ export class GovernorTrends extends LitElement {
         display: block;
         width: 100%;
         border: 0;
-        border-bottom: 1px solid var(--lana-surface-border);
+        border-bottom: var(--lana-stroke) solid var(--lana-surface-border);
         padding: 0;
         background: none;
         color: inherit;
@@ -166,8 +166,8 @@ export class GovernorTrends extends LitElement {
       }
 
       .trend__chart:focus-visible {
-        outline: var(--lana-stroke) solid var(--lana-focus-border);
-        outline-offset: calc(-1 * var(--lana-stroke));
+        outline: var(--lana-focus-ring);
+        outline-offset: var(--lana-focus-inset);
       }
 
       .trend--safe {
