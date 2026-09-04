@@ -11,6 +11,7 @@ import {
   recordsVariables,
   variableIndexFor,
   type FrameVariables,
+  type IndexView,
   type VariableIndex,
 } from '../core/log/frameVariables.js';
 import { logContext } from '../core/log/logContext.js';
@@ -84,6 +85,10 @@ export class VariablesDetail extends LitElement {
    *  of hundreds of thousands of lines costs tens of ms, and opening a row must
    *  not pay that again. */
   private _frame: FrameVariables | null = null;
+
+  /** The index bound to this frame's cut, which holds what it reads: every row
+   *  is built again whenever anything opens. */
+  private _view: IndexView | null = null;
 
   /** Set when a key moved the tab stop, so `updated` moves focus with it. */
   private _takeFocus = false;
@@ -258,6 +263,7 @@ export class VariablesDetail extends LitElement {
         !aggregate && this.logStore && this._index
           ? frameVariablesFor(this.logStore, this.eventIndex, this._index)
           : null;
+      this._view = this._frame && this._index ? this._index.viewAt(this._frame.cut) : null;
     }
     // A key press moves the tab stop and nothing else, so the rows it walks are
     // rebuilt only when the scope or what is open changes.
@@ -270,15 +276,10 @@ export class VariablesDetail extends LitElement {
    *  open. Scanning a value is the cost here, so it is paid once. */
   private _rebuild(): void {
     const frame = this._frame;
-    const index = this._index;
+    const view = this._view;
     this._rows =
-      frame && index
-        ? toTreeRows(
-            frame,
-            (id, byDefault) => this._disclosure.get(id) ?? byDefault,
-            (address) => index.addressState(address, frame.cut),
-            (address) => index.classAt(address, frame.cut),
-          )
+      frame && view
+        ? toTreeRows(frame, (id, byDefault) => this._disclosure.get(id) ?? byDefault, view)
         : [];
     this._at = new Map(this._rows.map((row, at) => [row.id, at]));
   }
@@ -345,7 +346,7 @@ export class VariablesDetail extends LitElement {
           ? note('The log is truncated here, so a write may be unrecorded rather than absent.')
           : ''
       }
-      ${index.capped ? note('Too many static assignments to hold them all, so some are missing.') : ''}
+      ${index.capped ? note('Too many assignments to hold them all, so some values are missing.') : ''}
       <div class="tree" role="tree" aria-label="Variables in scope" @keydown=${this._onKeyDown}>
         ${this._rows.map((row) => this._render(row, row.id === focused))}
       </div>
@@ -412,7 +413,7 @@ export class VariablesDetail extends LitElement {
             <span class="key">${row.key === null ? '·' : `${row.key}:`}</span>
             ${this._value(row, null)}
           </span>
-          ${chipFor(row.value)}`;
+          ${partCount(row)}${chipFor(row.value)}`;
       case 'text':
         return html`<code-block language="plain" code=${row.raw}></code-block>`;
       case 'note':
@@ -430,7 +431,7 @@ export class VariablesDetail extends LitElement {
             : html`<span class="missing">not assigned</span>`
         }
       </span>
-      ${chipFor(row.value)}${typeColumn(variable.declaredType)}`;
+      ${partCount(row)}${chipFor(row.value)}${typeColumn(variable.declaredType)}`;
   }
 
   /**
@@ -469,12 +470,15 @@ export class VariablesDetail extends LitElement {
     }
     // Left out where it matches the declared type: the type column says it.
     const className = row.className && row.className !== declaredType ? row.className : null;
+    // An object the log wrote as `{}` previews the parts it opens on, or the row
+    // would read as empty while holding eight fields.
+    const shows = row.assembled ?? row.value;
     return html`<span
       class="value"
-      title=${`${className ? `${className} ` : ''}${previewOf(row.value, RAW_CLAMP_CHARS)}`}
+      title=${`${className ? `${className} ` : ''}${previewOf(shows, RAW_CLAMP_CHARS)}`}
       >${
         className ? html`<span class="cls">${lastSegment(className)}</span> ` : ''
-      }${previewOf(row.value)}</span
+      }${previewOf(shows)}</span
     >`;
   }
 
@@ -488,7 +492,9 @@ export class VariablesDetail extends LitElement {
    * holds it is named.
    */
   private _missing(row: Valued): Missing | null {
-    if (row.address === null || row.resolved) {
+    // The log wrote no value for the whole object and still recorded its parts,
+    // which are what the row shows: saying it holds nothing would be false.
+    if (row.address === null || row.resolved || row.assembled) {
       return null;
     }
     if (row.laterAt === null) {
@@ -640,6 +646,22 @@ interface Missing {
 /** The declared type, in its own column, where the log gave one. */
 function typeColumn(declaredType: string | null): TemplateResult | string {
   return declaredType ? html`<span class="type" title=${declaredType}>${declaredType}</span>` : '';
+}
+
+/** How many parts the row opens into, on every row that opens into parts, as a
+ *  group row already carries. */
+function partCount(row: Shown & { expandable: boolean }): TemplateResult | string {
+  // A cycle, or the depth bound, leaves a row that cannot open: a count would
+  // promise rows the tree will not give.
+  if (!row.expandable || !row.parts.length) {
+    return '';
+  }
+  // Assembled from writes of their own, or written on this line: the reader is
+  // owed the difference, since only the first can be as this frame stood.
+  const title = row.assembled
+    ? 'Fields the log recorded for this object, with any keys its own value held.'
+    : 'Properties the log wrote for this value.';
+  return html`<span class="count" title=${title}>${row.parts.length}</span>`;
 }
 
 /** A qualified class as its own name: the row has no width for the namespace,

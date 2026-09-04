@@ -224,6 +224,27 @@ function valued(text: string): Pick<ValueEntry, 'text' | 'address'> {
   return { text, address: bareAddress(inner) };
 }
 
+/**
+ * A container assembled from writes of their own, for an object the log wrote as
+ * `{}` and described in lines of its own.
+ *
+ * Read the same way a parsed container is, so an entry names the address its
+ * text names. Truncation is the caller's to state: the object was never
+ * serialised, so its own line cut nothing short.
+ */
+export function assembledContainer(
+  parts: readonly { key: string | null; text: string }[],
+  truncated: boolean,
+): VariableValue {
+  return {
+    kind: 'container',
+    brackets: '{}',
+    entries: parts.map((part) => ({ key: part.key, ...valued(part.text) })),
+    truncated,
+    fromString: false,
+  };
+}
+
 /** Splits on the commas that separate entries: not those inside a string, and
  *  not those inside a nested value. */
 function splitTopLevel(body: string): string[] {

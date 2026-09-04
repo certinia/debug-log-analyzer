@@ -726,3 +726,199 @@ describe('VariableIndex nested addresses', () => {
     expect(index.addressState('0xaaa', Number.MAX_SAFE_INTEGER).text).toBe('{"n":2}');
   });
 });
+
+// A `this.field` line names the object the field belongs to, so an object's
+// fields are indexed by that address wherever they were written. This is what
+// lets a value the log wrote as `{}` show its parts.
+describe('VariableIndex object fields', () => {
+  const BUILT =
+    '09:18:22.6 (1000)|METHOD_ENTRY|[70]|01p|ns.Caller.run()\n' +
+    '09:18:22.6 (1010)|CONSTRUCTOR_ENTRY|[62]|01p|<init>()|ns.Selector\n' +
+    '09:18:22.6 (1020)|VARIABLE_SCOPE_BEGIN|[1]|this|ns.Selector|true|false\n' +
+    '09:18:22.6 (1030)|VARIABLE_ASSIGNMENT|[1]|this|{}|0xaaa\n' +
+    '09:18:22.6 (1040)|VARIABLE_ASSIGNMENT|[2]|this.sObj|"Account"|0xaaa\n' +
+    '09:18:22.6 (1050)|VARIABLE_ASSIGNMENT|[3]|this.rows|5|0xaaa\n' +
+    '09:18:22.6 (1060)|CONSTRUCTOR_EXIT|[62]|01p|<init>()|ns.Selector\n' +
+    '09:18:22.6 (1070)|VARIABLE_SCOPE_BEGIN|[71]|selector|ns.Selector|true|false\n' +
+    '09:18:22.6 (1080)|VARIABLE_ASSIGNMENT|[71]|selector|{}|0xaaa\n' +
+    '09:18:22.6 (1090)|METHOD_EXIT|[70]|ns.Caller.run()\n';
+
+  it('answers with the fields the log recorded for an object', async () => {
+    const { log } = storeOf(BUILT);
+    const index = await variableIndexFor(log);
+
+    expect(index.fieldsAt('0xaaa', Number.MAX_SAFE_INTEGER)).toMatchObject([
+      { name: 'rows', value: '5' },
+      { name: 'sObj', value: '"Account"' },
+    ]);
+    expect(index.fieldsAt('0xaaa', Number.MAX_SAFE_INTEGER)).toHaveLength(2);
+  });
+
+  it('holds nothing for an object whose fields the log never wrote', async () => {
+    const { log } = storeOf(BUILT);
+    const index = await variableIndexFor(log);
+
+    expect(index.fieldsAt('0xbbb', Number.MAX_SAFE_INTEGER)).toEqual([]);
+  });
+
+  // A field is its own write with its own place in the log, so it reads as the
+  // frame stood rather than as the object ended up.
+  it('answers as the frame stood, not as the object ended up', async () => {
+    const { log, store } = storeOf(
+      BUILT +
+        '09:18:22.6 (2000)|METHOD_ENTRY|[80]|01p|ns.Caller.later()\n' +
+        '09:18:22.6 (2010)|VARIABLE_ASSIGNMENT|[81]|this.rows|9|0xaaa\n' +
+        '09:18:22.6 (2020)|METHOD_EXIT|[80]|ns.Caller.later()\n',
+    );
+    const index = await variableIndexFor(log);
+
+    const first = frameVariablesFor(store, indexOf(log, 'ns.Caller.run()'), index)!;
+    const later = frameVariablesFor(store, indexOf(log, 'ns.Caller.later()'), index)!;
+
+    expect(index.fieldsAt('0xaaa', first.cut)).toMatchObject([{ name: 'rows', value: '5' }, {}]);
+    expect(index.fieldsAt('0xaaa', later.cut)).toMatchObject([{ name: 'rows', value: '9' }, {}]);
+  });
+
+  // The frame's own stack cannot see a constructor that has already returned,
+  // and most of an object's fields are set there.
+  it('gives a frame the fields its returned constructor set', async () => {
+    const { log, store } = storeOf(
+      '09:18:22.6 (1000)|CONSTRUCTOR_ENTRY|[62]|01p|<init>()|ns.Selector\n' +
+        '09:18:22.6 (1010)|VARIABLE_SCOPE_BEGIN|[1]|this|ns.Selector|true|false\n' +
+        '09:18:22.6 (1020)|VARIABLE_ASSIGNMENT|[1]|this|{}|0xaaa\n' +
+        '09:18:22.6 (1030)|VARIABLE_ASSIGNMENT|[2]|this.sObj|"Account"|0xaaa\n' +
+        '09:18:22.6 (1040)|CONSTRUCTOR_EXIT|[62]|01p|<init>()|ns.Selector\n' +
+        '09:18:22.6 (1050)|METHOD_ENTRY|[70]|01p|ns.Selector.query()\n' +
+        '09:18:22.6 (1060)|VARIABLE_SCOPE_BEGIN|[71]|this|ns.Selector|true|false\n' +
+        '09:18:22.6 (1070)|VARIABLE_ASSIGNMENT|[71]|this|{}|0xaaa\n' +
+        '09:18:22.6 (1080)|VARIABLE_ASSIGNMENT|[72]|found|7\n' +
+        '09:18:22.6 (1090)|METHOD_EXIT|[70]|ns.Selector.query()\n',
+    );
+    const index = await variableIndexFor(log);
+
+    const frame = frameVariablesFor(store, indexOf(log, 'ns.Selector.query()'), index);
+
+    expect(frame?.fields.map((row) => row.name)).toEqual(['sObj']);
+  });
+
+  // An address is reused once its object is collected, so the fields of the
+  // object that lived there before are not this one's.
+  it('leaves out the fields of an earlier object at the same address', async () => {
+    const { log, store } = storeOf(
+      '09:18:22.6 (1000)|CONSTRUCTOR_ENTRY|[1]|01p|<init>()|ns.First\n' +
+        '09:18:22.6 (1010)|VARIABLE_SCOPE_BEGIN|[1]|this|ns.First|true|false\n' +
+        '09:18:22.6 (1020)|VARIABLE_ASSIGNMENT|[1]|this|{}|0xbbb\n' +
+        '09:18:22.6 (1030)|VARIABLE_ASSIGNMENT|[2]|this.one|1|0xbbb\n' +
+        '09:18:22.6 (1040)|CONSTRUCTOR_EXIT|[1]|01p|<init>()|ns.First\n' +
+        '09:18:22.6 (1050)|CONSTRUCTOR_ENTRY|[9]|01p|<init>()|ns.Second\n' +
+        '09:18:22.6 (1060)|VARIABLE_SCOPE_BEGIN|[9]|this|ns.Second|true|false\n' +
+        '09:18:22.6 (1070)|VARIABLE_ASSIGNMENT|[9]|this|{}|0xbbb\n' +
+        '09:18:22.6 (1080)|VARIABLE_ASSIGNMENT|[10]|this.two|2|0xbbb\n' +
+        '09:18:22.6 (1090)|CONSTRUCTOR_EXIT|[9]|01p|<init>()|ns.Second\n' +
+        '09:18:22.6 (1100)|METHOD_ENTRY|[20]|01p|ns.Second.go()\n' +
+        '09:18:22.6 (1110)|VARIABLE_SCOPE_BEGIN|[20]|this|ns.Second|true|false\n' +
+        '09:18:22.6 (1120)|VARIABLE_ASSIGNMENT|[20]|this|{}|0xbbb\n' +
+        '09:18:22.6 (1130)|METHOD_EXIT|[20]|ns.Second.go()\n',
+    );
+    const index = await variableIndexFor(log);
+
+    const frame = frameVariablesFor(store, indexOf(log, 'ns.Second.go()'), index)!;
+
+    expect(index.fieldsAt('0xbbb', frame.cut).map((row) => row.name)).toEqual(['two']);
+  });
+
+  // The index only sees a field write whose line reported an address, so the
+  // frame's own writes are merged in rather than replaced.
+  it('keeps a field write whose line reported no address', async () => {
+    const { log, store } = storeOf(
+      '09:18:22.6 (1000)|METHOD_ENTRY|[70]|01p|ns.Selector.query()\n' +
+        '09:18:22.6 (1010)|VARIABLE_SCOPE_BEGIN|[71]|this|ns.Selector|true|false\n' +
+        '09:18:22.6 (1020)|VARIABLE_ASSIGNMENT|[71]|this|{}|0xaaa\n' +
+        '09:18:22.6 (1030)|VARIABLE_ASSIGNMENT|[72]|this.sObj|"Account"|0xaaa\n' +
+        '09:18:22.6 (1040)|VARIABLE_ASSIGNMENT|[73]|this.plain|"no address"\n' +
+        '09:18:22.6 (1050)|METHOD_EXIT|[70]|ns.Selector.query()\n',
+    );
+    const index = await variableIndexFor(log);
+
+    const frame = frameVariablesFor(store, indexOf(log, 'ns.Selector.query()'), index);
+
+    expect(frame?.fields.map((row) => row.name)).toEqual(['plain', 'sObj']);
+  });
+
+  // Every row that shows an object reads its fields, and every row is built
+  // again whenever anything opens, so the read is held.
+  it("holds an object's fields for the point it was asked about", async () => {
+    const { log } = storeOf(BUILT);
+    const index = await variableIndexFor(log);
+
+    const view = index.viewAt(Number.MAX_SAFE_INTEGER);
+
+    expect(view.fields('0xaaa')).toBe(view.fields('0xaaa'));
+    expect(view.fields('0xaaa')).toHaveLength(2);
+  });
+
+  // Two objects of ONE class at a reused address are still two objects. The
+  // runs are what tells them apart, so they must not merge on the class name.
+  it('leaves out the fields of an earlier object of the same class', async () => {
+    const twice = (line: number, field: string) =>
+      `09:18:22.6 (${1000 + line * 10})|CONSTRUCTOR_ENTRY|[${line}]|01p|<init>()|ns.Item\n` +
+      `09:18:22.6 (${1001 + line * 10})|VARIABLE_SCOPE_BEGIN|[${line}]|this|ns.Item|true|false\n` +
+      `09:18:22.6 (${1002 + line * 10})|VARIABLE_ASSIGNMENT|[${line}]|this|{}|0xbbb\n` +
+      `09:18:22.6 (${1003 + line * 10})|VARIABLE_ASSIGNMENT|[${line}]|this.${field}|1|0xbbb\n` +
+      `09:18:22.6 (${1004 + line * 10})|CONSTRUCTOR_EXIT|[${line}]|01p|<init>()|ns.Item\n`;
+    const { log, store } = storeOf(
+      twice(1, 'first') +
+        twice(5, 'second') +
+        '09:18:22.6 (1100)|METHOD_ENTRY|[20]|01p|ns.Item.go()\n' +
+        '09:18:22.6 (1110)|VARIABLE_SCOPE_BEGIN|[20]|this|ns.Item|true|false\n' +
+        '09:18:22.6 (1120)|VARIABLE_ASSIGNMENT|[20]|this|{}|0xbbb\n' +
+        '09:18:22.6 (1130)|METHOD_EXIT|[20]|ns.Item.go()\n',
+    );
+    const index = await variableIndexFor(log);
+
+    const frame = frameVariablesFor(store, indexOf(log, 'ns.Item.go()'), index)!;
+
+    expect(index.fieldsAt('0xbbb', frame.cut).map((row) => row.name)).toEqual(['second']);
+  });
+
+  // Each field holds its own writes, so a field assigned once early survives a
+  // field assigned four thousand times.
+  it('keeps a field written once beside a field written past the cap', async () => {
+    let body =
+      '09:18:22.6 (1000)|METHOD_ENTRY|[1]|01p|ns.Loop.run()\n' +
+      '09:18:22.6 (1010)|VARIABLE_SCOPE_BEGIN|[1]|this|ns.Loop|true|false\n' +
+      '09:18:22.6 (1020)|VARIABLE_ASSIGNMENT|[1]|this|{}|0xccc\n' +
+      '09:18:22.6 (1030)|VARIABLE_ASSIGNMENT|[2]|this.keep|"important"|0xccc\n';
+    for (let at = 1; at <= 4_100; at++) {
+      body += `09:18:22.6 (${2000 + at})|VARIABLE_ASSIGNMENT|[3]|this.n|${at}|0xccc\n`;
+    }
+    body += '09:18:22.6 (7000)|METHOD_EXIT|[1]|ns.Loop.run()\n';
+    const { log } = storeOf(body);
+    const index = await variableIndexFor(log);
+
+    expect(index.fieldsAt('0xccc', Number.MAX_SAFE_INTEGER)).toMatchObject([
+      { name: 'keep', value: '"important"' },
+      { name: 'n', value: '4100' },
+    ]);
+  });
+
+  // Past the per-object cap the oldest writes are dropped, so a late frame still
+  // reads the true last value rather than a stale early one.
+  it('keeps the newest field writes when an object is written past the cap', async () => {
+    let body =
+      '09:18:22.6 (1000)|METHOD_ENTRY|[1]|01p|ns.Loop.run()\n' +
+      '09:18:22.6 (1010)|VARIABLE_SCOPE_BEGIN|[1]|this|ns.Loop|true|false\n' +
+      '09:18:22.6 (1020)|VARIABLE_ASSIGNMENT|[1]|this|{}|0xccc\n';
+    for (let at = 1; at <= 4_100; at++) {
+      body += `09:18:22.6 (${2000 + at})|VARIABLE_ASSIGNMENT|[2]|this.n|${at}|0xccc\n`;
+    }
+    body += '09:18:22.6 (7000)|METHOD_EXIT|[1]|ns.Loop.run()\n';
+    const { log } = storeOf(body);
+    const index = await variableIndexFor(log);
+
+    expect(index.fieldsAt('0xccc', Number.MAX_SAFE_INTEGER)).toMatchObject([
+      { name: 'n', value: '4100' },
+    ]);
+    expect(index.capped).toBe(false);
+  });
+});

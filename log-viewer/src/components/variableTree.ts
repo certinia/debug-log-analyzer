@@ -3,14 +3,16 @@
  */
 import {
   NOT_RECORDED,
-  type AddressState,
   type FrameVariables,
+  type IndexView,
   type VariableRow,
 } from '../core/log/frameVariables.js';
 import {
+  assembledContainer,
   clampRaw,
   isExpandable,
   parseVariableValue,
+  type ValueEntry,
   type VariableValue,
 } from '../core/log/variableValue.js';
 
@@ -58,13 +60,25 @@ export interface Shown {
   /** The class of the object shown, where the log names it. More telling than
    *  the declared type, which is often only an interface. */
   className: string | null;
+  /** The object this row shows, however its line named it: its own address, or
+   *  the address the line reported for it. What its fields are indexed by. */
+  objectAddress: string | null;
+  /** What the row opens into, in that order. One list, so the preview, the
+   *  count and the rows below cannot disagree. */
+  parts: readonly Part[];
+  /** What a closed row previews, where the object's parts reached the log as
+   *  writes of their own rather than on its own line. Null where its own text is
+   *  all there is. */
+  assembled: VariableValue | null;
 }
 
-/** What the log holds for an address, as the frame stood. */
-export type Resolver = (address: string) => AddressState;
+/** One part of a value: a field the log recorded for the object, or a key the
+ *  value's own text held. `at` is its place in that text, for a stable id. */
+export type Part = { field: VariableRow } | { entry: ValueEntry; at: number };
 
-/** The class of the object at an address, where the log names it. */
-export type ClassOf = (address: string) => string | null;
+/** What the tree asks the log about an address. Every lookup is optional: a
+ *  caller with no index still gets its rows, with nothing resolved. */
+export type Lookups = Partial<IndexView>;
 
 /** A row that shows a value of its own, as well as holding others. */
 export type GroupSelf = Shown & { declaredType: string | null };
@@ -93,37 +107,86 @@ export type VariableTreeRow = Common &
     | { kind: 'note'; text: string }
   );
 
-/** The value a row shows: an address resolves to the object it names. */
-export function shownValue(row: VariableRow, resolve: Resolver, classOf: ClassOf): Shown {
+/** The value a row shows: an address resolves to the object it names.
+ *
+ *  `fields` overrides what the log holds for the object, for a caller that has
+ *  already gathered them: the `this` group's fields merge the index with the
+ *  frame's own writes, and its preview must be the list it opens on. */
+function shownValue(row: VariableRow, lookups: Lookups, fields?: readonly VariableRow[]): Shown {
   // The value's own address where it has one, else the address the line
   // reported for it. A field write reports its owner and so carries neither.
-  return shown(row.value, row.address, row.address ?? row.objectAddress, resolve, classOf);
+  return shown(row.value, row.address, row.address ?? row.objectAddress, lookups, fields);
 }
 
 /**
  * One value, as shown: the object an address names where the log holds it, else
  * the row's own text.
  *
- * `classAddress` differs from `address` only for a value the log serialised in
- * place: it has no address to resolve, but the line still named the object.
+ * `objectAddress` differs from `address` only for a value the log serialised in
+ * place: it has no address to resolve, but the line still named the object, and
+ * that is what its class and its fields are indexed by.
  */
 function shown(
   text: string,
   address: string | null,
-  classAddress: string | null,
-  resolve: Resolver,
-  classOf: ClassOf,
+  objectAddress: string | null,
+  lookups: Lookups,
+  given?: readonly VariableRow[],
 ): Shown {
-  const state = address ? resolve(address) : NOT_RECORDED;
+  const state = (address ? lookups.resolve?.(address) : null) ?? NOT_RECORDED;
   const raw = state.text ?? text;
+  const value = parseVariableValue(raw);
+  const fields = given ?? (objectAddress ? (lookups.fields?.(objectAddress) ?? []) : []);
+  const parts = partsOf(fields, value);
   return {
-    value: parseVariableValue(raw),
+    value,
     raw,
     address,
     resolved: state.text !== null,
     laterAt: state.laterAt,
-    className: classAddress ? classOf(classAddress) : null,
+    className: (objectAddress && lookups.classOf?.(objectAddress)) || null,
+    objectAddress,
+    parts,
+    // Only where a part came from a write of its own: a value the log
+    // serialised in place previews as the log wrote it.
+    assembled: fields.length ? assembledOf(parts, value) : null,
   };
+}
+
+/**
+ * What a value opens into, in that order: the fields the log recorded for the
+ * object, then the keys the value's own text held that no field covers.
+ *
+ * A recorded field wins because it is its own write, at or before this frame,
+ * where a serialised key is only as the object stood when that line was written.
+ * One list, read by the preview, the count and the rows alike.
+ */
+function partsOf(fields: readonly VariableRow[], value: VariableValue): Part[] {
+  const named = new Set(fields.map((field) => field.name));
+  const parts: Part[] = fields.map((field) => ({ field }));
+  const held = value.kind === 'container' ? value.entries : [];
+  held.forEach((entry, at) => {
+    if (entry.key === null || !named.has(entry.key)) {
+      parts.push({ entry, at });
+    }
+  });
+  return parts;
+}
+
+/** {@link partsOf} as one value, for the row that holds them closed: the log
+ *  wrote `{}` for an object it could not serialise, and a row showing only that
+ *  reads as empty while holding eight fields. */
+function assembledOf(parts: readonly Part[], value: VariableValue): VariableValue {
+  return assembledContainer(
+    parts.map((part) =>
+      'field' in part
+        ? { key: part.field.name, text: part.field.value }
+        : { key: part.entry.key, text: part.entry.text },
+    ),
+    // The object's own line serialised nothing, so only a surviving serialised
+    // part can be short of what the log held.
+    value.kind === 'container' && value.truncated && parts.some((part) => 'entry' in part),
+  );
 }
 
 /**
@@ -135,8 +198,7 @@ function shown(
 export function toTreeRows(
   frame: FrameVariables,
   isOpen: (id: string, openByDefault: boolean) => boolean,
-  resolve: Resolver = () => NOT_RECORDED,
-  classOf: ClassOf = () => null,
+  lookups: Lookups = {},
 ): VariableTreeRow[] {
   const rows: VariableTreeRow[] = [];
 
@@ -144,20 +206,23 @@ export function toTreeRows(
     rows.push({ kind: 'note', id, depth, expandable: false, open: false, text });
   };
 
-  /** The rows an open value contributes: one per property, or its raw text. */
-  const children = (
+  /** The rows an open value contributes: the parts it holds, or its raw text. */
+  function children(
     parentId: string,
     depth: number,
     holder: Shown,
     seen: ReadonlySet<string>,
-  ): void => {
-    const { value, raw } = holder;
-    if (value.kind === 'container' && value.entries.length) {
+  ): void {
+    const { value, raw, parts } = holder;
+    if (parts.length) {
       let repeats = 0;
       const keys = new Set<string>();
-      value.entries.forEach((entry, at) => {
-        const id = `${parentId}/${at}`;
-        const { address } = entry;
+      for (const part of parts) {
+        if ('field' in part) {
+          variable(parentId, depth, part.field, seen);
+          continue;
+        }
+        const { entry, at } = part;
         if (entry.key !== null) {
           if (keys.has(entry.key)) {
             repeats++;
@@ -165,16 +230,12 @@ export function toTreeRows(
             keys.add(entry.key);
           }
         }
-        // One already open above this row: opening it again would be a cycle.
-        const cycle = address !== null && seen.has(address);
-        const held = shown(entry.text, address, address, resolve, classOf);
-        const expandable = !cycle && depth < MAX_DEPTH && isExpandable(held.value);
-        const open = expandable && isOpen(id, false);
-        rows.push({ kind: 'entry', id, depth, expandable, open, key: entry.key, ...held });
-        if (open) {
-          children(id, depth + 1, held, withAddress(seen, held.resolved ? held.address : null));
+        const id = `${parentId}/${at}`;
+        const held = shown(entry.text, entry.address, entry.address, lookups);
+        if (pushValue({ kind: 'entry', key: entry.key }, id, depth, held, seen)) {
+          children(id, depth + 1, held, withAddress(seen, held.objectAddress));
         }
-      });
+      }
       if (repeats) {
         note(
           `${parentId}/repeats`,
@@ -182,7 +243,7 @@ export function toTreeRows(
           `${repeats} keys repeat, kept in the order the log wrote them.`,
         );
       }
-      if (value.truncated) {
+      if (value.kind === 'container' && value.truncated) {
         note(`${parentId}/cut`, depth, 'The log cut this collection short.');
       }
       return;
@@ -199,20 +260,51 @@ export function toTreeRows(
     if (clamped) {
       note(`${parentId}/clamped`, depth, `Shown to the first ${text.length} characters.`);
     }
-  };
+  }
 
-  const variables = (parentId: string, depth: number, of: readonly VariableRow[]): void => {
+  function variables(
+    parentId: string,
+    depth: number,
+    of: readonly VariableRow[],
+    seen: ReadonlySet<string>,
+  ): void {
     for (const row of of) {
-      const id = `${parentId}/${row.name}`;
-      const held = shownValue(row, resolve, classOf);
-      const expandable = isExpandable(held.value);
-      const open = expandable && isOpen(id, false);
-      rows.push({ kind: 'variable', id, depth, expandable, open, row, ...held });
-      if (open) {
-        children(id, depth + 1, held, withAddress(new Set(), held.resolved ? held.address : null));
-      }
+      variable(parentId, depth, row, seen);
     }
-  };
+  }
+
+  function variable(
+    parentId: string,
+    depth: number,
+    row: VariableRow,
+    seen: ReadonlySet<string>,
+  ): void {
+    const id = `${parentId}/${row.name}`;
+    const held = shownValue(row, lookups);
+    if (pushValue({ kind: 'variable', row }, id, depth, held, seen)) {
+      children(id, depth + 1, held, withAddress(seen, held.objectAddress));
+    }
+  }
+
+  /** Pushes a row that shows a value, and says whether its children follow.
+   *
+   *  One rule for what may open: the value holds parts, or its text is too long
+   *  to read in a row. An object already open above this row would be a cycle,
+   *  and `MAX_DEPTH` stops a long chain. */
+  function pushValue(
+    of: { kind: 'variable'; row: VariableRow } | { kind: 'entry'; key: string | null },
+    id: string,
+    depth: number,
+    held: Shown,
+    seen: ReadonlySet<string>,
+  ): boolean {
+    const cycle = held.objectAddress !== null && seen.has(held.objectAddress);
+    const expandable =
+      !cycle && depth < MAX_DEPTH && (held.parts.length > 0 || isExpandable(held.value));
+    const open = expandable && isOpen(id, false);
+    rows.push({ ...of, id, depth, expandable, open, ...held });
+    return open;
+  }
 
   const group = (head: GroupHead, kids: (depth: number) => void): void => {
     const { id, expandable = true, openByDefault = false, of = null, self = null } = head;
@@ -233,7 +325,7 @@ export function toTreeRows(
     },
     (depth) => {
       if (frame.locals.length) {
-        variables('local', depth, frame.locals);
+        variables('local', depth, frame.locals, new Set());
       } else {
         note('local/none', depth, 'The log records no locals for this frame.');
       }
@@ -244,7 +336,7 @@ export function toTreeRows(
   // own value when closed, its fields when open. A class with no fields has
   // nothing to open, which is the honest reading of a stateless class.
   if (frame.thisRow || frame.fields.length) {
-    const self = frame.thisRow ? shownValue(frame.thisRow, resolve, classOf) : null;
+    const self = frame.thisRow ? shownValue(frame.thisRow, lookups, frame.fields) : null;
     group(
       {
         id: 'this',
@@ -253,7 +345,9 @@ export function toTreeRows(
         expandable: frame.fields.length > 0,
         self: self && { ...self, declaredType: frame.thisRow?.declaredType ?? frame.thisType },
       },
-      (depth) => variables('this', depth, frame.fields),
+      // The frame's own object, so a field pointing back at it cannot reopen it.
+      (depth) =>
+        variables('this', depth, frame.fields, withAddress(new Set(), self?.objectAddress ?? null)),
     );
   }
 
@@ -275,7 +369,7 @@ export function toTreeRows(
           count: entry.rows.length,
         });
         if (open) {
-          variables(id, 2, entry.rows);
+          variables(id, 2, entry.rows, new Set());
         }
       }
     });
