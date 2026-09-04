@@ -132,8 +132,8 @@ export const globalStyles = [
     }
 
     .vs-checkbox:focus-visible {
-      outline: 1px solid var(--lana-focus-border);
-      outline-offset: 1px;
+      outline: var(--lana-focus-ring);
+      outline-offset: var(--lana-focus-offset);
     }
 
     .vs-checkbox-label {
@@ -172,8 +172,8 @@ export const globalStyles = [
     }
 
     .filter-control:focus-visible {
-      outline: 1px solid var(--lana-focus-border);
-      outline-offset: 1px;
+      outline: var(--lana-focus-ring);
+      outline-offset: var(--lana-focus-offset);
     }
 
     /* Toggle-button counterpart to the facet/range trigger pills — same

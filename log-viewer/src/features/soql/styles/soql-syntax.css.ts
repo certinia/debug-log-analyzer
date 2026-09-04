@@ -6,7 +6,6 @@ export const soqlSyntaxStyles = `
 .soql-block {
   display: inline;
   font-family: var(--lana-font-mono);
-  font-size: var(--lana-text-mono);
   white-space: pre-wrap;
   word-break: break-word;
 }

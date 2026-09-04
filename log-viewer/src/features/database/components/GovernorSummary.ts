@@ -87,10 +87,10 @@ export class GovernorSummary extends LitElement {
         white-space: nowrap;
       }
 
+      /* No size of its own: the figure reads at whatever surface holds it. */
       .gauge__value {
         font-family: var(--lana-font-mono);
         font-variant-numeric: tabular-nums;
-        font-size: var(--lana-text-base);
         white-space: nowrap;
       }
 
@@ -106,14 +106,14 @@ export class GovernorSummary extends LitElement {
 
       .gauge__track {
         height: 5px;
-        border-radius: 3px;
+        border-radius: var(--lana-radius-pill);
         background: var(--lana-surface-border);
         overflow: hidden;
       }
 
       .gauge__fill {
         height: 100%;
-        border-radius: 3px;
+        border-radius: var(--lana-radius-pill);
         transition: width 150ms ease;
       }
 

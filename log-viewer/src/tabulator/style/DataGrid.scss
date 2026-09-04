@@ -38,7 +38,10 @@ $codicon-chevron-down: '\eab4';
     $with: (
         backgroundColor: var(--lana-editor-bg),
         borderColor: transparent,
-        textSize: var(--lana-text-mono),
+        // The root must name a size: a grid is a list, not an editor, so it
+        // takes the app's step, never `editor.fontSize`. Tabulator also adds
+        // this to a margin for its header min-height, which no var() survives.
+        textSize: var(--lana-text-base),
         // header
         headerBackgroundColor: transparent,
         headerTextColor: var(--lana-editor-fg),
@@ -229,7 +232,6 @@ $codicon-chevron-down: '\eab4';
     .datagrid-code-text {
       font-family: var(--lana-font-mono);
       font-weight: var(--vscode-font-weight, normal);
-      font-size: var(--lana-text-mono);
     }
 
     .tabulator-row.tabulator-selected {
