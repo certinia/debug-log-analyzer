@@ -145,7 +145,6 @@ export class VariablesDetail extends LitElement {
         overflow: hidden;
         color: var(--lana-fg-muted);
         font-family: var(--lana-font-mono);
-        font-size: var(--lana-text-sm);
         text-overflow: ellipsis;
         white-space: nowrap;
       }
@@ -182,7 +181,6 @@ export class VariablesDetail extends LitElement {
       .missing {
         flex: 0 0 auto;
         color: var(--lana-fg-muted);
-        font-size: var(--lana-text-sm);
         font-style: italic;
       }
 
@@ -204,7 +202,6 @@ export class VariablesDetail extends LitElement {
         flex: 0 0 auto;
         color: var(--lana-fg-muted);
         font-family: var(--lana-font-mono);
-        font-size: var(--lana-text-sm);
       }
 
       .count {
@@ -214,7 +211,6 @@ export class VariablesDetail extends LitElement {
         padding: 0 var(--lana-space-2xs);
         background-color: var(--lana-badge-bg);
         color: var(--lana-badge-fg);
-        font-size: var(--lana-text-sm);
         font-variant-numeric: tabular-nums;
         text-align: center;
       }
@@ -226,7 +222,6 @@ export class VariablesDetail extends LitElement {
         border-radius: var(--lana-radius-md);
         padding: 0 var(--lana-space-2xs);
         color: var(--lana-fg-muted);
-        font-size: var(--lana-text-sm);
       }
 
       .row.is-note {

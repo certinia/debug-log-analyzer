@@ -15,6 +15,11 @@ export const soqlSyntaxStyles = `
   white-space: nowrap;
 }
 
+/* In a grid the query is one cell among others, so it reads as grid text. */
+.tabulator .soql-block {
+  font-size: var(--lana-text-grid);
+}
+
 .soql-tok-keyword {
   color: var(--vscode-debugTokenExpression-name, inherit);
   font-weight: 700;

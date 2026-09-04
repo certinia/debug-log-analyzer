@@ -38,7 +38,7 @@ $codicon-chevron-down: '\eab4';
     $with: (
         backgroundColor: var(--lana-editor-bg),
         borderColor: transparent,
-        textSize: var(--lana-text-mono),
+        textSize: var(--lana-text-grid),
         // header
         headerBackgroundColor: transparent,
         headerTextColor: var(--lana-editor-fg),
@@ -229,7 +229,7 @@ $codicon-chevron-down: '\eab4';
     .datagrid-code-text {
       font-family: var(--lana-font-mono);
       font-weight: var(--vscode-font-weight, normal);
-      font-size: var(--lana-text-mono);
+      font-size: var(--lana-text-grid);
     }
 
     .tabulator-row.tabulator-selected {

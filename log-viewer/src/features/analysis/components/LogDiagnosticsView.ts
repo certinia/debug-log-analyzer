@@ -189,7 +189,6 @@ export class LogDiagnosticsView extends LitElement {
         padding: var(--lana-space-3xs) var(--lana-space-2xs);
         background-color: transparent;
         color: var(--lana-fg-muted);
-        font-size: var(--lana-text-sm);
         font-variant-numeric: tabular-nums;
         cursor: pointer;
         transition:
@@ -216,7 +215,6 @@ export class LogDiagnosticsView extends LitElement {
          the findings the log times carry one. */
       .share {
         color: var(--lana-fg-muted);
-        font-size: var(--lana-text-sm);
         font-variant-numeric: tabular-nums;
         white-space: nowrap;
       }
@@ -228,7 +226,6 @@ export class LogDiagnosticsView extends LitElement {
         gap: var(--lana-space-xs);
         padding: var(--lana-space-sm) var(--lana-space-2xs);
         color: var(--lana-fg-muted);
-        font-size: var(--lana-text-sm);
       }
 
       /* One finding is one row, with the detail behind a disclosure: the chevron and
@@ -286,7 +283,6 @@ export class LogDiagnosticsView extends LitElement {
       .meta {
         color: var(--lana-fg-muted);
         font-family: var(--lana-font-mono);
-        font-size: var(--lana-text-sm);
         font-variant-numeric: tabular-nums;
       }
 
@@ -297,7 +293,6 @@ export class LogDiagnosticsView extends LitElement {
         padding: 0 var(--lana-space-2xs);
         background-color: var(--lana-badge-bg);
         color: var(--lana-badge-fg);
-        font-size: var(--lana-text-sm);
         font-variant-numeric: tabular-nums;
         text-align: center;
       }
@@ -328,14 +323,12 @@ export class LogDiagnosticsView extends LitElement {
       .cause__label {
         flex: 0 0 auto;
         color: var(--lana-fg-muted);
-        font-size: var(--lana-text-sm);
       }
 
       .cause__name {
         flex: 1 1 auto;
         min-width: 0;
         font-family: var(--lana-font-mono);
-        font-size: var(--lana-text-sm);
         overflow: hidden;
         text-overflow: ellipsis;
         white-space: nowrap;
@@ -346,7 +339,6 @@ export class LogDiagnosticsView extends LitElement {
         margin-left: auto;
         color: var(--lana-fg);
         font-family: var(--lana-font-mono);
-        font-size: var(--lana-text-sm);
         font-variant-numeric: tabular-nums;
         font-weight: 600;
       }
@@ -367,7 +359,6 @@ export class LogDiagnosticsView extends LitElement {
         background-color: var(--lana-code-bg);
         color: var(--lana-fg);
         font-family: var(--lana-font-mono);
-        font-size: var(--lana-text-sm);
         text-align: left;
       }
 
@@ -395,7 +386,6 @@ export class LogDiagnosticsView extends LitElement {
       .evidence__head {
         margin: var(--lana-space-sm) 0 0;
         color: var(--lana-fg-muted);
-        font-size: var(--lana-text-sm);
       }
 
       /* How many times this one line ran. */
@@ -432,7 +422,6 @@ export class LogDiagnosticsView extends LitElement {
       .note {
         padding: var(--lana-space-sm) var(--lana-space-2xs);
         color: var(--lana-fg-muted);
-        font-size: var(--lana-text-sm);
       }
     `,
   ];

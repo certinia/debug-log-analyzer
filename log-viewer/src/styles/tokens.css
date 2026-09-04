@@ -53,8 +53,8 @@
   /* Type — VS Code's own UI ramp, so the app follows the size registry rather
      than a scale of our own: `bodyFontSize` 13px, `.small` 12px, `.xSmall` 11px.
      (`--vscode-font-size` is not one of them: a webview gets it hardcoded at
-     13px, so it tracks nothing.) Dense data reads at `small`, so that is the
-     base. Only the last step has no registered size; it is derived and rounded
+     13px, so it tracks nothing.) The chrome and the grids read at `small`, so
+     that is the base. Only the last step has no registered size; it is derived and rounded
      to a whole pixel, because text this small lands badly on a fraction. */
   --lana-text-lg: var(--vscode-bodyFontSize, 13px);
   --lana-text-base: var(--vscode-bodyFontSize-small, 12px);
@@ -62,15 +62,23 @@
   --lana-text-xs: round(nearest, calc(var(--lana-text-base) * 0.84), 1px);
 
   /* Uppercase micro-labels, whose caps height carries the size: one step under
-     the body, let out with tracking so caps read as a label, not a shout. */
+     the app base, let out with tracking so caps read as a label, not a shout.
+     A token declared on every component's `:host` cannot be stepped down for a
+     subtree, so in the Inspector caps sits level with the body. */
   --lana-text-caps: var(--lana-text-sm);
   --lana-text-caps-tracking: 0.06em;
 
   /* Header metadata (size · duration · identity) — just under the title size. */
   --lana-text-meta: var(--lana-text-sm);
 
-  /* Monospace, for text whose alignment carries meaning: stacks, code. The host
-     sets the editor's own size, which is not always its UI size. */
+  /* Roles, so a surface names what it is rather than a step. The panel body is
+     the Inspector's content, under the chrome around it. A grid is a list, not
+     an editor, so its text is UI-sized. */
+  --lana-text-panel-body: var(--lana-text-sm);
+  --lana-text-grid: var(--lana-text-base);
+
+  /* Monospace, for code the reader also edits: code blocks and query spans.
+     The host sets the editor's own size, which is not always its UI size. */
   --lana-font-mono: var(--vscode-editor-font-family, monospace);
   --lana-text-mono: var(--vscode-editor-font-size, 0.9em);
 

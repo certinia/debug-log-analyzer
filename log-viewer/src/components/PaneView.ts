@@ -159,15 +159,15 @@ export class PaneView extends LitElement {
         flex: 0 0 auto;
       }
 
-      /* The body owns the panel's content edge and its base text size, so every
-         section reads at one scale and only steps away from it deliberately. */
+      /* The body owns the panel's content edge and its text size; a section
+         inherits both and steps away only deliberately. */
       .pane-body {
         flex: 1 1 auto;
         min-height: 0;
         min-width: 0;
         overflow: auto;
         padding: var(--lana-space-2xs) var(--lana-space-md) var(--lana-space-sm);
-        font-size: var(--lana-text-base);
+        font-size: var(--lana-text-panel-body);
       }
 
       .pane-sash {

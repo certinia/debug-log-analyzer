@@ -162,7 +162,6 @@ export class StackedTimeBar extends LitElement {
         pointer-events: none;
         width: max-content;
         max-width: min(40ch, 90vw);
-        font-size: var(--lana-text-sm);
         color: var(--lana-fg);
         padding: var(--lana-space-3xs) var(--lana-space-xs);
         background: var(--lana-popover-bg);
@@ -183,7 +182,6 @@ export class StackedTimeBar extends LitElement {
         align-items: baseline;
         gap: var(--lana-space-2xs);
         white-space: nowrap;
-        font-size: var(--lana-text-sm);
         color: var(--lana-fg);
       }
 

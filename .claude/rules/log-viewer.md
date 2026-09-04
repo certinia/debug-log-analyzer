@@ -38,9 +38,11 @@ Webview UI.
   and no consumer fallback can fire.
 - Never define or override a `--vscode-*` name — an override is global to the webview. Exception:
   skinning a `vscode-elements` component; scope it to that element, never `:host` or `:root`.
-- Write no literal font size or family. Take a step from the ramp in `styles/tokens.css`
-  (`--lana-text-*`, `--lana-text-mono` for editor-sized text, `--lana-text-meta` for header
-  metadata) and a family from `--lana-font-mono` or `--lana-font-ui`.
+- Write no literal font size or family. Name a role where one fits: `--lana-text-grid` for grid
+  text, `--lana-text-panel-body` for Inspector content, `--lana-text-meta` for header metadata,
+  `--lana-text-mono` for code the reader also edits. Otherwise take a step from the ramp in
+  `styles/tokens.css`. Families come from `--lana-font-mono` or `--lana-font-ui`.
+- The pane body owns the Inspector's text size. A section inherits it and never restates it.
 - Mono is for text whose alignment carries meaning — stacks, code, log text. Prose takes the UI font.
 - An all-caps run takes `--lana-text-caps` and `--lana-text-caps-tracking`, one step down: every
   glyph reaches cap height, so caps read a size larger.

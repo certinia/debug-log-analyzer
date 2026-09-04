@@ -59,7 +59,6 @@ export class DatabaseRowBudget extends LitElement {
     css`
       .note {
         padding: var(--lana-space-2xs) 0 0;
-        font-size: var(--lana-text-sm);
       }
 
       .budget + .budget {
@@ -69,7 +68,6 @@ export class DatabaseRowBudget extends LitElement {
       .budget__head,
       .objects__head {
         padding-bottom: var(--lana-space-2xs);
-        font-size: var(--lana-text-sm);
       }
 
       .budget__head {
@@ -101,7 +99,6 @@ export class DatabaseRowBudget extends LitElement {
         gap: var(--lana-space-3xs) var(--lana-space-lg);
         padding-top: var(--lana-space-sm);
         color: var(--lana-fg-muted);
-        font-size: var(--lana-text-sm);
       }
 
       .counts__value {

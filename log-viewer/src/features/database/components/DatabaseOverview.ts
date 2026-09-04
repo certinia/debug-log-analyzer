@@ -135,7 +135,6 @@ export class DatabaseConcentration extends LitElement {
 
       .headline {
         padding-bottom: var(--lana-space-xs);
-        font-size: var(--lana-text-sm);
       }
 
       .headline__figure {
@@ -150,7 +149,6 @@ export class DatabaseConcentration extends LitElement {
         gap: var(--lana-space-sm);
         padding-top: var(--lana-space-2xs);
         color: var(--lana-fg-muted);
-        font-size: var(--lana-text-sm);
       }
 
       .tail__value {
@@ -272,7 +270,6 @@ export class DatabaseNamespaces extends LitElement {
 
       .bar__title {
         padding-bottom: var(--lana-space-2xs);
-        font-size: var(--lana-text-sm);
       }
     `,
   ];

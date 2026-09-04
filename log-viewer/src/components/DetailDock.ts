@@ -97,6 +97,7 @@ export class DetailDock extends LitElement {
         flex: 1 1 auto;
         padding: var(--lana-space-md) var(--lana-space-lg);
         color: var(--lana-fg-muted);
+        font-size: var(--lana-text-panel-body);
       }
     `,
   ];

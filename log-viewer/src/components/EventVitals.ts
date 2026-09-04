@@ -105,12 +105,11 @@ export class EventVitals extends LitElement {
         overflow-wrap: anywhere;
       }
       /* Secondary readings (a percentage, a self time, a query cost) sit in
-         brackets one step down in size so the primary number still leads. The
-         colour is the theme's own secondary token — not a lower alpha — because
-         thinning contrast to de-emphasise costs legibility. */
+         brackets, demoted by colour: the theme's own secondary token, not a
+         lower alpha, because thinning contrast to de-emphasise costs
+         legibility. */
       .qualifier {
         color: var(--lana-fg-muted);
-        font-size: var(--lana-text-sm);
       }
       .pill {
         display: inline-block;
