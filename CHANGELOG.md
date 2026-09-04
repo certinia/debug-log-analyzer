@@ -9,12 +9,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- 🧭 **Inspector**: select a timeline frame, a table row or a statement to see its details, governor usage, call stack and subtree — or select nothing for a whole-log overview. Dock it left, right or bottom. ([#113] [#373] [#63])
+- 🧭 **Inspector**: select a timeline frame, a table row or a statement to see its details, governor usage, call stack and subtree - or select nothing for a whole-log overview. Dock it left, right or bottom. ([#113] [#373] [#63])
 - 🔬 **Variables**: see the **Local** and **Static** variables in scope at the frame you selected, each holding the value it had at that point; an object opens into its fields. Needs Apex Code at **FINEST**. ([#373])
-- 🧠 **Heap analysis**: every method and call path reports heap three ways — **Net** (retained), **Gross** (allocated) and **Peak** (highest live) — so allocate-then-free churn no longer looks like a leak. ([#32])
+- 🧠 **Heap analysis**: every method and call path reports heap three ways - **Net** (retained), **Gross** (allocated) and **Peak** (highest live) - so allocate-then-free churn no longer looks like a leak. ([#32])
 - 🗄️ **Database governor limits**: SOQL, SOSL, DML and row counts show as `used / limit`, flagging queries that did not consume the limit, plus a dedicated SOSL table. ([#162])
 - 🔴 **Timeline exception markers**: exceptions show as red lines, with a Throws count in method tooltips. ([#828])
-- 🧰 **Filter bar**: Call Tree and Database filters sit in one toolbar — filter by namespace, object or caller namespace, or by a row count or time range. ([#873])
+- 🧰 **Filter bar**: Call Tree and Database filters sit in one toolbar - filter by namespace, object or caller namespace, or by a row count or time range. ([#873])
 - 🗂️ **Choose your columns** in Call Tree, Analysis and Database: switch between presets, show or hide any column, and your choice is remembered. ([#298])
 - 🏷️ **New columns**: Object on SOQL and DML, SOSL Count and Rows, Avg Self Time, a Self variant of every governor metric, and a SOQL Query Plan view. ([#298])
 - 🪪 **Header**: shows the entry point, user and start time, with more detail on hover.
@@ -23,34 +23,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - ⬆️ **Requires VS Code 1.102 or newer**.
 - 📏 **Governor figures**: the Inspector overview and the Database tab report each metric at its peak, the level the governor charges the transaction at. The Timeline strip still plots the log as recorded.
-- ⚡ **Timeline minimap** is ~25× faster and uses less memory.
 - 🎨 **Header bar**: Log problems and Notifications are redesigned cards that name the problem and its time and jump to the Call Tree; Help and Report an issue move into a `•••` menu.
 - 🎨 **Timeline legend**: moved into the toolbar as colour chips, each showing the log's self time in that category.
 - 📊 **Timeline frame details**: the hover panel sits against the frame, follows the pointer, never blocks clicks, and fits long SOQL so the `WHERE` stays visible. Turn it off with `lana.timeline.showTooltip`.
-- 🔍 **Timeline zooming**: smooth and consistent on every platform — a Windows mouse wheel no longer over-zooms, and zooming back out returns you to where you started.
+- 🔍 **Timeline zooming**: smooth and consistent on every platform - a Windows mouse wheel no longer over-zooms, and zooming back out returns you to where you started.
 - ✂️ **Truncation markers** end where the log recovers, so sound sections are no longer flagged. ([#828])
+- ⚡ **Timeline minimap** is ~25× faster and uses less memory.
 - 📈 **Governor strip tooltips** keep a stable row order and always show `used / limit`, so figures no longer jump as you move the pointer. ([#827])
 - ⚡ **Go to Code** is 6× to 10× faster in large projects. ([#834])
-- 🏷️ **Call Tree names** drop the redundant `EVENT_TYPE:` prefix and say what a frame is — `(code unit)`, `(flow)`. Add the **Type** column back from the **Columns** menu.
+- 🏷️ **Call Tree names** drop the redundant `EVENT_TYPE:` prefix and say what a frame is - `(code unit)`, `(flow)`. Add the **Type** column back from the **Columns** menu.
 - 🧱 **Table styling**: VS Code tree icons, rows indented under their group headings, a crisper header separator, columns sized to fit so nothing clips, and one consistent look across every table. ([#832] [#873])
 - 🎛️ **Dropdowns** are searchable and compact, and carry the field and value together (e.g. `Group: Namespace`). ([#848])
 - 💅 **UI** More closely matches VS Code styling in several areas. ([#576])
 
 ### Fixed
 
-- 📏 **Timeline length**: the chart stopped at the last recorded frame instead of spanning the log — 10.8s of a 27.1s log — and now shades the part the log never recorded. ([#828])
+- 📏 **Timeline length**: the chart stopped at the last recorded frame instead of spanning the log - 10.8s of a 27.1s log - and now shades the part the log never recorded. ([#828])
 - 📊 **Governor limits strip**: where the log recorded nothing, the strip drew its last reading across the gap as though it had been measured; the gap is now blank, and the tooltip names the reason and range. ([#828])
-- 🗄️ **Flow database usage**: SOQL and DML run by a Flow or Process Builder element are now counted. Needs `WORKFLOW` at `FINER` or above. ([#871])
-- 🧭 **Hot spots**: unrecorded time made the log itself top the Inspector's hot spots and the Analysis findings; it is now left out of both.
-- 🎯 **Timeline highlight**: clicking a frame greyed out the rest of the chart, which reads as a filter; a click now selects and leaves every other frame in its own colour.
-- 🧭 **Call Tree navigation**: jumping to a row in the Aggregated or Bottom-Up view could stop on one of its callers and need a second try.
-- ⌨️ **Call Tree keyboard**: clicking a row's expand arrow dropped keyboard focus, so the arrow keys scrolled the table instead of moving through it.
+- 🗄️ **Flow database usage**: SOQL and DML run by a Flow or Process Builder element are now counted. Needs `WORKFLOW` at `FINER` or above. ([#871]).
 - ⚡ **Timeline resize**: the Flame Chart flashed and trailed a frame behind as you dragged the window or the panel edge.
 - 🖱️ **Governor limits strip**: reading across the 15px collapsed strip lost the tooltip on the smallest wobble; the hover now holds until the pointer is clear of it.
-- 📊 **Database usage bars**: Row Count and Time Taken bars appear for small row counts and on grouped rows. ([#873])
 - 🐛 **Go to Code** matches methods with namespace or `System` qualified parameter types. ([#834])
 - 🎨 **Theme switch**: Timeline and view colours update straight away instead of needing the log reopened.
-- 📐 **Timeline height**: the Flame Chart fills its panel instead of stopping short of the bottom.
 
 ## [1.20.1] 2026-07-23
 
