@@ -103,10 +103,10 @@ export class OverflowList extends LitElement {
       .overflow {
         display: inline-flex;
         align-items: center;
-        gap: 4px;
-        padding: 2px 6px;
-        border: 1px solid var(--lana-control-border);
-        border-radius: 4px;
+        gap: var(--lana-space-2xs);
+        padding: var(--lana-space-3xs) var(--lana-space-xs);
+        border: var(--lana-stroke) solid var(--lana-control-border);
+        border-radius: var(--lana-radius-sm);
         background-color: var(--lana-control-bg);
         color: var(--lana-fg);
         font: inherit;
@@ -123,8 +123,8 @@ export class OverflowList extends LitElement {
       }
 
       .overflow:focus-visible {
-        outline: 1px solid var(--lana-focus-border);
-        outline-offset: 1px;
+        outline: var(--lana-focus-ring);
+        outline-offset: var(--lana-focus-offset);
       }
 
       .overflow__count {

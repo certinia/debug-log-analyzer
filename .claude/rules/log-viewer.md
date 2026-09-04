@@ -39,8 +39,9 @@ Webview UI.
 - Never define or override a `--vscode-*` name — an override is global to the webview. Exception:
   skinning a `vscode-elements` component; scope it to that element, never `:host` or `:root`.
 - Write no literal font size or family. Take a step from the ramp in `styles/tokens.css`
-  (`--lana-text-*`, `--lana-text-mono` for editor-sized text, `--lana-text-meta` for header
-  metadata) and a family from `--lana-font-mono` or `--lana-font-ui`.
+  (`--lana-text-*`, `--lana-text-meta` for header metadata) and a family from `--lana-font-mono` or
+  `--lana-font-ui`. Code-shaped text takes no size of its own: it inherits the surface that holds
+  it, so nothing in the webview follows the reader's `editor.fontSize`.
 - Mono is for text whose alignment carries meaning — stacks, code, log text. Prose takes the UI font.
 - An all-caps run takes `--lana-text-caps` and `--lana-text-caps-tracking`, one step down: every
   glyph reaches cap height, so caps read a size larger.

@@ -142,7 +142,6 @@ export class IssueList extends LitElement {
       /* Stack traces are code: keep their line breaks and their font, so each
          "at Class.method" frame reads as a frame, not one run-on paragraph. */
       .issue__message {
-        font-size: var(--lana-text-mono);
         font-family: var(--lana-font-mono);
         color: var(--lana-fg-muted);
         white-space: pre-wrap;
