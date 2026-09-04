@@ -1,7 +1,13 @@
 /*
  * Copyright (c) 2020 Certinia Inc. All rights reserved.
  */
-import { Uri, commands, window, type MessageOptions, type TextDocumentShowOptions } from 'vscode';
+import {
+  commands,
+  window,
+  type MessageOptions,
+  type TextDocumentShowOptions,
+  type Uri,
+} from 'vscode';
 
 import { appName } from '../AppSettings.js';
 
@@ -23,7 +29,7 @@ export class Display {
     window.showErrorMessage(s, options);
   }
 
-  showFile(path: string, options: TextDocumentShowOptions = {}): void {
-    commands.executeCommand('vscode.open', Uri.file(path.trim()), options);
+  showFile(uri: Uri, options: TextDocumentShowOptions = {}): void {
+    commands.executeCommand('vscode.open', uri, options);
   }
 }

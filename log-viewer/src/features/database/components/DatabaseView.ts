@@ -17,6 +17,7 @@ import { limitTotals } from '../../../components/logOverviewMetrics.js';
 import { eventBus, type StatementType } from '../../../core/events/EventBus.js';
 import { apexLimitTimeSeries } from '../../timeline/optimised/apex-limit-series.js';
 import { InspectorEmphasis } from '../../../components/inspectorEmphasis.js';
+import { wireInspectorTab } from '../../../components/inspectorTab.js';
 import { SelectionEchoGuard } from '../../../core/events/SelectionEchoGuard.js';
 import { isVisible } from '../../../core/utility/Util.js';
 import { soslRowsMetric } from '../limits.js';
@@ -84,9 +85,7 @@ export class DatabaseView extends LitElement {
   };
   findMap = {};
 
-  private _offInspectorReveal: (() => void) | null = null;
-  private _offInspectorLocate: (() => void) | null = null;
-  private _offSelectionClear: (() => void) | null = null;
+  private _offInspector: (() => void) | null = null;
 
   /** Guards the selects this view makes on the inspector's behalf. */
   private _echoGuard = new SelectionEchoGuard();
@@ -100,40 +99,24 @@ export class DatabaseView extends LitElement {
     document.addEventListener('lv-find-match', this._findHandler as EventListener);
     document.addEventListener('lv-find', this._findHandler as EventListener);
 
-    // Reveal an inspector row here, but only while the Database tab is the tab
-    // the inspector is showing. The eventIndex belongs to exactly one grid, so
-    // each is offered it in turn until one owns it.
-    this._offInspectorReveal = eventBus.on('inspector:reveal', (d) => {
-      if (d.source !== 'database') {
-        return;
-      }
-      const views = this._views;
-      this._echoGuard.run(() => {
-        const owner = views.find((view) => view?.selectByEventIndex(d.eventIndex));
-        if (owner) {
-          views.filter((view) => view !== owner).forEach((view) => view?.deselectRows());
-        }
-      });
-    });
-
-    // Mark the statements the inspector points at, while the Database tab is the
-    // tab the inspector is showing. The eventIndex belongs to one grid, so the
-    // others simply find nothing to mark.
-    this._offInspectorLocate = eventBus.on('inspector:locate', (d) => {
-      if (d.source === 'database') {
-        this._markLocated(this._emphasis.report(d.eventIndexes, d.sticky));
-      }
-    });
-
-    // Escape (app-wide) deselects here. Only one grid holds the selection, and
-    // its report of the clear reaches the inspector the same way a click does. It
-    // also drops a mark held by a picked inspector row, which is no selection of
-    // any grid's own.
-    this._offSelectionClear = eventBus.on('selection:clear', (d) => {
-      if (d.source === 'database') {
+    this._offInspector = wireInspectorTab('database', this._emphasis, {
+      mark: (eventIndexes) => this._markLocated(eventIndexes),
+      // The eventIndex belongs to exactly one grid, so each is offered it in turn
+      // until one owns it.
+      reveal: (eventIndex) => {
+        const views = this._views;
+        this._echoGuard.run(() => {
+          const owner = views.find((view) => view?.selectByEventIndex(eventIndex));
+          if (owner) {
+            views.filter((view) => view !== owner).forEach((view) => view?.deselectRows());
+          }
+        });
+      },
+      clear: () => {
+        // Only one grid holds the selection, and its report of the clear reaches
+        // the inspector the same way a click does.
         this._views.forEach((view) => view?.deselectRows());
-        this._markLocated(this._emphasis.pick([]));
-      }
+      },
     });
   }
 
@@ -178,12 +161,8 @@ export class DatabaseView extends LitElement {
     document.removeEventListener('db-find-results', this._findResults as EventListener);
     document.removeEventListener('lv-find-match', this._findHandler as EventListener);
     document.removeEventListener('lv-find', this._findHandler as EventListener);
-    this._offInspectorReveal?.();
-    this._offInspectorReveal = null;
-    this._offInspectorLocate?.();
-    this._offInspectorLocate = null;
-    this._offSelectionClear?.();
-    this._offSelectionClear = null;
+    this._offInspector?.();
+    this._offInspector = null;
   }
 
   firstUpdated(): void {

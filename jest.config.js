@@ -18,7 +18,11 @@ const defaultConfig = {
       },
     ],
   },
-  testPathIgnorePatterns: ['<rootDir>/node_modules/', '<rootDir>/out/'],
+  testPathIgnorePatterns: [
+    '<rootDir>/node_modules/',
+    '<rootDir>/out/',
+    '<rootDir>/test/playwright/',
+  ],
   testMatch: ['**/?(*.)+(spec|test).ts'],
   extensionsToTreatAsEsm: ['.ts', '.tsx'],
 };

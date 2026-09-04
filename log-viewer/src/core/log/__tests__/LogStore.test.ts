@@ -63,33 +63,6 @@ describe('LogStore', () => {
     expect(stack[stack.length - 1]?.text).toBe('ns.ClassTwo.second()');
   });
 
-  it('gives a frame one interned key, and tells the two vocabularies apart', () => {
-    const log =
-      '09:18:22.6 (6574780)|EXECUTION_STARTED\n' +
-      '09:18:22.6 (6586704)|CODE_UNIT_STARTED|[EXTERNAL]|066d0000002m8ij|ns.Thing.run()\n' +
-      '09:19:13.82 (51592737891)|CODE_UNIT_FINISHED|ns.Thing.run()\n' +
-      '09:19:13.82 (51595120059)|EXECUTION_FINISHED\n';
-
-    const apexLog = parse(log);
-    const store = logStoreFor(apexLog);
-    const unit = apexLog.eventsById.find((event) => event.text === 'ns.Thing.run()')!;
-
-    // Asked twice, kept once — the mark reads the same frame per occurrence.
-    expect(store.keyIdOf(unit)).toBe(store.keyIdOf(unit));
-    // The bucket key carries the event type and the stack key does not, so a
-    // frame's two ids are not the same id.
-    expect(store.stackIdOf(unit)).not.toBe(store.keyIdOf(unit));
-  });
-
-  it('keys a frame the log index does not cover', () => {
-    const apexLog = parse('09:18:22.6 (6574780)|EXECUTION_STARTED\n');
-    const store = logStoreFor(apexLog);
-    // Built rather than parsed, so it has no slot in the log's own index.
-    const loose = { type: 'METHOD_ENTRY', namespace: '', text: 'made up', eventIndex: 9999 };
-
-    expect(store.keyIdOf(loose as never)).toBe(store.keyIdOf(loose as never));
-  });
-
   it('gives one log one store, whichever view asks', () => {
     const log =
       '09:18:22.6 (6574780)|EXECUTION_STARTED\n' + '09:18:22.6 (7400000)|EXECUTION_FINISHED\n';

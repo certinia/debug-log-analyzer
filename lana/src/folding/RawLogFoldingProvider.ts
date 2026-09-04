@@ -17,6 +17,7 @@ import type { LogEvent } from 'apex-log-parser';
 
 import type { Context } from '../Context.js';
 import { LogEventCache } from '../cache/LogEventCache.js';
+import { isOpenAsTextTab } from '../editor/TabState.js';
 import { isApexLogContent } from '../language/ApexLogLanguageDetector.js';
 import { TIMESTAMP_REGEX } from '../log-utils.js';
 
@@ -28,8 +29,11 @@ class RawLogFoldingProvider implements FoldingRangeProvider {
     document: TextDocument,
     _context: FoldingContext,
   ): Promise<FoldingRange[]> {
-    const filePath = document.uri.fsPath;
-    const apexLog = await LogEventCache.getApexLog(filePath);
+    if (!isOpenAsTextTab(document.uri)) {
+      return [];
+    }
+
+    const apexLog = await LogEventCache.getApexLog(document.uri);
 
     if (!apexLog) {
       return [];
@@ -87,11 +91,11 @@ class RawLogFoldingProvider implements FoldingRangeProvider {
    * unrelated action forces a re-evaluation.
    */
   private warmAndSignal(document: TextDocument): void {
-    if (document.uri.scheme !== 'file' || !isApexLogContent(document)) {
+    if (!isOpenAsTextTab(document.uri) || !isApexLogContent(document)) {
       return;
     }
 
-    void LogEventCache.getApexLog(document.uri.fsPath).then((apexLog) => {
+    void LogEventCache.getApexLog(document.uri).then((apexLog) => {
       if (apexLog) {
         this.changeEmitter.fire();
       }
@@ -99,17 +103,23 @@ class RawLogFoldingProvider implements FoldingRangeProvider {
   }
 
   static apply(context: Context): void {
-    const docSelector = [{ scheme: 'file', language: 'apexlog' }];
+    const docSelector = [{ language: 'apexlog' }];
     const provider = new RawLogFoldingProvider();
 
     context.context.subscriptions.push(
       provider.changeEmitter,
       languages.registerFoldingRangeProvider(docSelector, provider),
-      workspace.onDidOpenTextDocument((doc) => {
-        provider.warmAndSignal(doc);
+      // Not onDidOpenTextDocument: it fires before the tab model is updated, so the
+      // gate would reject a legitimate open. A tab change is also the repair path —
+      // a folding request that lost the race is re-requested by the next fire().
+      window.tabGroups.onDidChangeTabs(() => {
+        const editor = window.activeTextEditor;
+        if (editor) {
+          provider.warmAndSignal(editor.document);
+        }
       }),
       // Reopening a closed editor often re-attaches the retained document model
-      // without re-firing onDidOpenTextDocument, so also signal on editor activation.
+      // without re-firing the tab change, so also signal on editor activation.
       window.onDidChangeActiveTextEditor((editor) => {
         if (editor) {
           provider.warmAndSignal(editor.document);

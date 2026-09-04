@@ -228,4 +228,55 @@ describe('MetricStripTooltipRenderer', () => {
     expect(cpuEarly).toBeLessThan(soqlEarly);
     expect(cpuLate).toBeLessThan(soqlLate);
   });
+
+  describe('no data note', () => {
+    it('says nothing while the reading is the one at the cursor', () => {
+      renderer.setNoDataLabel(null);
+      renderer.show(100, 0, onePoint, oneMetric, 60);
+
+      expect(panel().textContent).not.toContain('Max-Size-reached');
+    });
+
+    it('sits under the rows', () => {
+      renderer.setNoDataLabel('Max-Size-reached · 10.8s → 27.1s');
+      renderer.show(100, 0, onePoint, oneMetric, 60);
+
+      const children = [...panel().children] as HTMLElement[];
+      expect(children[children.length - 1]!.textContent).toBe('Max-Size-reached · 10.8s → 27.1s');
+    });
+
+    // One reading covers the whole unrecorded region, so the note has to appear and clear
+    // without the data point changing, which is what skips the panel rebuild.
+    it('appears and clears on the same reading', () => {
+      renderer.show(100, 0, onePoint, oneMetric, 60);
+      expect(panel().textContent).not.toContain('Max-Size-reached');
+
+      renderer.setNoDataLabel('Max-Size-reached · 10.8s → 27.1s');
+      renderer.show(140, 0, onePoint, oneMetric, 60);
+      expect(panel().textContent).toContain('Max-Size-reached · 10.8s → 27.1s');
+
+      renderer.setNoDataLabel(null);
+      renderer.show(180, 0, onePoint, oneMetric, 60);
+      expect(panel().textContent).not.toContain('Max-Size-reached');
+    });
+
+    // The note is written once and never re-appended, so a later reading that grows the
+    // row pool has to insert its rows above it rather than under it.
+    it('stays last when a later reading adds a row', () => {
+      renderer.setNoDataLabel('Max-Size-reached · 10.8s → 27.1s');
+      renderer.show(100, 0, onePoint, oneMetric, 60);
+
+      const two = [metric('cpuTime', 'CPU Time', 0.9), metric('heapSize', 'Heap Size', 0.5)];
+      const twoPoint: MetricStripDataPoint = {
+        ...onePoint,
+        values: new Map([
+          ['cpuTime', 0.5],
+          ['heapSize', 0.5],
+        ]),
+      };
+      renderer.show(100, 0, twoPoint, two, 60);
+
+      expect(panel().lastElementChild?.textContent).toBe('Max-Size-reached · 10.8s → 27.1s');
+    });
+  });
 });

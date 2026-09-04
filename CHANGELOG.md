@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - 🧭 **Inspector**: select a timeline frame, a table row or a statement to see its details, governor usage, call stack and subtree — or select nothing for a whole-log overview. Dock it left, right or bottom. ([#113] [#373] [#63])
+- 🔬 **Variables**: see the **Local** and **Static** variables in scope at the frame you selected, each holding the value it had at that point; an object opens into its fields. Needs Apex Code at **FINEST**. ([#373])
 - 🧠 **Heap analysis**: every method and call path reports heap three ways — **Net** (retained), **Gross** (allocated) and **Peak** (highest live) — so allocate-then-free churn no longer looks like a leak. ([#32])
 - 🗄️ **Database governor limits**: SOQL, SOSL, DML and row counts show as `used / limit`, flagging queries that did not consume the limit, plus a dedicated SOSL table. ([#162])
 - 🔴 **Timeline exception markers**: exceptions show as red lines, with a Throws count in method tooltips. ([#828])
@@ -22,6 +23,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - ⬆️ **Requires VS Code 1.102 or newer**.
 - 📏 **Governor figures**: the Inspector overview and the Database tab report each metric at its peak, the level the governor charges the transaction at. The Timeline strip still plots the log as recorded.
+- ⚡ **Timeline minimap** is ~25× faster and uses less memory.
 - 🎨 **Header bar**: Log problems and Notifications are redesigned cards that name the problem and its time and jump to the Call Tree; Help and Report an issue move into a `•••` menu.
 - 🎨 **Timeline legend**: moved into the toolbar as colour chips, each showing the log's self time in that category.
 - 📊 **Timeline frame details**: the hover panel sits against the frame, follows the pointer, never blocks clicks, and fits long SOQL so the `WHERE` stays visible. Turn it off with `lana.timeline.showTooltip`.
@@ -36,11 +38,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
-- 📊 **Database usage bars**: Row Count and Time Taken bars appear for small row counts and on grouped rows. ([#873])
+- 📏 **Timeline length**: the chart stopped at the last recorded frame instead of spanning the log — 10.8s of a 27.1s log — and now shades the part the log never recorded. ([#828])
+- 📊 **Governor limits strip**: where the log recorded nothing, the strip drew its last reading across the gap as though it had been measured; the gap is now blank, and the tooltip names the reason and range. ([#828])
 - 🗄️ **Flow database usage**: SOQL and DML run by a Flow or Process Builder element are now counted. Needs `WORKFLOW` at `FINER` or above. ([#871])
+- 🧭 **Hot spots**: unrecorded time made the log itself top the Inspector's hot spots and the Analysis findings; it is now left out of both.
+- 🎯 **Timeline highlight**: clicking a frame greyed out the rest of the chart, which reads as a filter; a click now selects and leaves every other frame in its own colour.
+- 🧭 **Call Tree navigation**: jumping to a row in the Aggregated or Bottom-Up view could stop on one of its callers and need a second try.
+- ⌨️ **Call Tree keyboard**: clicking a row's expand arrow dropped keyboard focus, so the arrow keys scrolled the table instead of moving through it.
+- ⚡ **Timeline resize**: the Flame Chart flashed and trailed a frame behind as you dragged the window or the panel edge.
+- 🖱️ **Governor limits strip**: reading across the 15px collapsed strip lost the tooltip on the smallest wobble; the hover now holds until the pointer is clear of it.
+- 📊 **Database usage bars**: Row Count and Time Taken bars appear for small row counts and on grouped rows. ([#873])
+- 🐛 **Go to Code** matches methods with namespace or `System` qualified parameter types. ([#834])
 - 🎨 **Theme switch**: Timeline and view colours update straight away instead of needing the log reopened.
 - 📐 **Timeline height**: the Flame Chart fills its panel instead of stopping short of the bottom.
-- 🐛 **Go to Code** matches methods with namespace or `System` qualified parameter types. ([#834])
 
 ## [1.20.1] 2026-07-23
 

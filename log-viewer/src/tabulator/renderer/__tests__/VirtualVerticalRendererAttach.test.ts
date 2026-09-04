@@ -277,6 +277,58 @@ describe('VirtualVerticalRenderer render-virtual-fill dispatch (stock contract)'
   });
 });
 
+describe('VirtualVerticalRenderer render-virtual-attach dispatch', () => {
+  interface AttachDispatchInternals extends AttachRendererInternals {
+    table: { rowManager: { element: { scrollTop: number } }; eventBus: { dispatch: jest.Mock } };
+    _renderWindow: () => void;
+  }
+
+  function makeDispatchSetup(rowCount: number): {
+    rr: AttachDispatchInternals;
+    rows: AttachRowStub[];
+    attachCalls: () => number;
+    fillCalls: () => number;
+  } {
+    const { r, rows } = makeAttachSetup(rowCount);
+    const rr = r as AttachDispatchInternals;
+    const dispatched = jest.fn();
+    rr.table.eventBus.dispatch = dispatched;
+    const calls = (event: string) => () =>
+      dispatched.mock.calls.filter((c) => c[0] === event).length;
+    return {
+      rr,
+      rows,
+      attachCalls: calls('render-virtual-attach'),
+      fillCalls: calls('render-virtual-fill'),
+    };
+  }
+
+  it('dispatches once per attach, and not for a range that attached nothing', () => {
+    const { rr, rows, attachCalls } = makeDispatchSetup(4);
+    rr._attachRanges(rows, [[0, 3]], 0);
+    expect(attachCalls()).toBe(1);
+
+    rr._attachRanges(rows, [], 0);
+    expect(attachCalls()).toBe(1);
+  });
+
+  it('reports a scroll tick that fill deliberately skips', () => {
+    const { rr, attachCalls, fillCalls } = makeDispatchSetup(200);
+    rr._renderWindow();
+    const filled = fillCalls();
+    const attached = attachCalls();
+
+    // Incremental scroll: rows enter the window, but the window is not
+    // replaced, so the stock fill contract stays silent.
+    rr.table.rowManager.element.scrollTop = 60;
+    rr.inScrollDrivenRender = true;
+    rr._renderWindow();
+
+    expect(fillCalls()).toBe(filled);
+    expect(attachCalls()).toBe(attached + 1);
+  });
+});
+
 describe('VirtualVerticalRenderer PseudoRow (group row) tolerance', () => {
   it('attaches PseudoRow-shaped rows without measuring or throwing', () => {
     const { r, rows, tableElement } = makeAttachSetup(5);

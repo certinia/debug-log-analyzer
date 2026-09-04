@@ -44,6 +44,14 @@ export interface InteractionCallbacks {
   /** Called when mouse position changes over timeline. */
   onMouseMove?: (x: number, y: number) => void;
 
+  /**
+   * Called for every move over the timeline, a drag included.
+   *
+   * `onMouseMove` is held back while dragging, so what the pointer is over cannot be worked
+   * out from it. This reports the position alone, and whether a pan drag is in progress.
+   */
+  onPointerPosition?: (x: number, y: number, panning: boolean) => void;
+
   /** Called when mouse clicks on timeline. */
   onClick?: (x: number, y: number, modifiers?: ModifierKeys) => void;
 
@@ -354,6 +362,16 @@ export class TimelineInteractionHandler {
     return this.activeMode !== null && this.activeMode.isActive;
   }
 
+  /**
+   * Whether a drag owns the pointer: a pan, or a measure, area zoom or resize.
+   *
+   * A drag moves the view or draws its own overlay, and reports no mouse move while it runs, so
+   * the pointer is not pointing at content and nothing should react to what it is over.
+   */
+  public isPointerDragging(): boolean {
+    return this.isDragging || this.isDragModeActive();
+  }
+
   // ============================================================================
   // EVENT LISTENER SETUP
   // ============================================================================
@@ -657,6 +675,8 @@ export class TimelineInteractionHandler {
     const rect = this.canvas.getBoundingClientRect();
     const screenX = event.clientX - rect.left;
     const screenY = event.clientY - rect.top;
+
+    this.callbacks.onPointerPosition?.(screenX, screenY, this.isDragging);
 
     // Handle active drag mode (measure, area zoom, or resize)
     if (this.isDragModeActive()) {

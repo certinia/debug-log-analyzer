@@ -23,6 +23,10 @@ Always use pnpm.
 - `pnpm lint` — type + lint check
 - `pnpm prettier-format` — auto-format
 
+**Dev host** — launch with
+`code-insiders --profile lana-dev $PWD/sample-app --extensionDevelopmentPath=$PWD/lana`, use the
+CLI of the launched editor, `code-insiders` or `code`
+
 **Compilers** — `typecheck` = native TS7 (`tsc`); `typecheck:tsc6` = classic 6.0 (`tsc6`).
 Keep the `@typescript/typescript6` alias + `tsc6`: `typescript-eslint` and Docusaurus need
 the TS ≤6.0 API (lands in TS 7.1). Don't remove until typescript-eslint supports TS7.
@@ -34,7 +38,9 @@ the TS ≤6.0 API (lands in TS 7.1). Don't remove until typescript-eslint suppor
 - **Performance** — handle large logs (50MB+, 500k+ lines) without blocking the UI.
 - **UX** — discoverable, accessible, actionable errors.
 - **Testing** — features and bug fixes ship with tests; CI blocks failures.
-- **Comments** — only what the code cannot say, one short line, and only where needed.
+- **Comments** — only the non-obvious: a why, a gotcha, an invariant. One terse line.
+  Never restate code or narrate an edit — in doubt, no comment. JSDoc exported
+  functions, not private helpers.
 
 ## Critical boundary
 
