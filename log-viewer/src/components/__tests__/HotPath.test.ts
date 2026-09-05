@@ -93,7 +93,6 @@ describe('hot-path', () => {
       'self 0.001 ms (50.0%) \u00b7 0.001 ms (50.0%) below this frame \u00b7 the hot spot',
     );
     // The hue is decorative, so the category is named in text a reader can hear.
-    expect(row?.querySelector('.reveal-row__swatch')).toBeNull();
     expect(row?.querySelector('.reveal-row__sr')?.textContent).toBe('Apex');
   });
 

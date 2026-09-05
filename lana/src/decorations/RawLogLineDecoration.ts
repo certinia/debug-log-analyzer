@@ -15,6 +15,7 @@ import type { LogEvent } from 'apex-log-parser';
 
 import type { Context } from '../Context.js';
 import { LogEventCache } from '../cache/LogEventCache.js';
+import { isOpenAsTextTab } from '../editor/TabState.js';
 import { isApexLogContent } from '../language/ApexLogLanguageDetector.js';
 import { buildMetricParts, formatDuration, TIMESTAMP_REGEX } from '../log-utils.js';
 
@@ -89,6 +90,11 @@ export class RawLogLineDecoration {
 
     const timestamp = parseInt(match[1], 10);
     const filePath = document.uri.toString();
+
+    if (!isOpenAsTextTab(document.uri)) {
+      this.clearDecorations(editor);
+      return;
+    }
 
     const apexLog = await LogEventCache.getApexLog(document.uri);
     if (!apexLog) {

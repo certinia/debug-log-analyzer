@@ -1,12 +1,13 @@
 ---
 id: inspector
 title: Inspector
-description: Inspect any selected Salesforce Apex log frame or statement in a dockable side bar - vitals, governor metrics, call stack, a scoped call tree and SOQL optimization tips, available from the Timeline, Call Tree, Analysis and Database tabs.
+description: Inspect any selected Salesforce Apex log frame or statement in a dockable side bar - vitals, governor metrics, variables in scope, call stack, a scoped call tree and SOQL optimization tips, available from the Timeline, Call Tree, Analysis and Database tabs.
 keywords:
   [
     apex log detail panel,
     salesforce debug log inspector,
     apex call stack viewer,
+    apex variables in scope,
     scoped call tree,
     soql optimization tips,
     apex log analyzer,
@@ -25,6 +26,7 @@ It docks to the **right**, **left** or **bottom**, resizes by dragging its edge,
 ### Sections
 
 - **Details** – timing, plus every governor metric the selection consumed as `used / limit`. For SOQL also selectivity, query plan and cardinality, with the query text highlighted and copyable.
+- **Variables** – what Apex could reach from the frame: its **Local** variables, `this` and its fields, and the **Static** variables assigned by that point, grouped by class. Every value reads as it stood at the frame, and a name the log declared but never wrote reads `not assigned`. An object opens into the fields the log recorded for it, wherever they were set, and a field that is itself an object opens again. Every row that opens previews what is inside it with a count beside it, and the hover says whether those parts were written on one line or assembled from writes of their own. An object the log recorded nothing for reads `{}` with nothing to open. Where the log wrote an address instead of a value, the object at that address is shown, or `no value recorded` where the log never wrote one. A statement owns no variables of its own, so it answers from the Apex frame that ran it. Needs the log captured with Apex Code at **FINEST**.
 - **Self time by namespace** – Timeline only: the self time under the selection split by the namespace whose code ran it, so you can see whose package burned it. Every namespace bar colours the six biggest and gathers the rest into one **others** segment, which names them on hover.
 - **Findings** – Analysis only: which of the log's findings name the selected method or anything it called, so you can tell whether the row you picked is one of the log's problems.
 - **Call stack** – the parent frames that led to the selection, outermost first, with total and self time.

@@ -82,7 +82,7 @@ export class DatagridFacetFilter extends LitElement {
         font-weight: 600;
         color: var(--lana-badge-fg);
         background-color: var(--lana-badge-bg);
-        border-radius: 999px;
+        border-radius: var(--lana-radius-pill);
         padding: 0 5px;
         font-size: var(--lana-text-xs);
         line-height: 1.5;

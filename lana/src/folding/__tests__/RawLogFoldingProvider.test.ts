@@ -10,7 +10,12 @@ import {
   createMockContext,
   createMockLogEvent,
 } from '../../__tests__/helpers/test-builders.js';
-import { createMockTextDocument } from '../../__tests__/mocks/vscode.js';
+import {
+  TabInputText,
+  Uri,
+  createMockTextDocument,
+  setOpenTabs,
+} from '../../__tests__/mocks/vscode.js';
 import { LogEventCache } from '../../cache/LogEventCache.js';
 import { RawLogFoldingProvider } from '../RawLogFoldingProvider.js';
 
@@ -29,6 +34,8 @@ describe('RawLogFoldingProvider', () => {
   beforeEach(() => {
     provider = new RawLogFoldingProvider();
     mockGetApexLog.mockReset();
+    // The provider only works for a document the user has open as a text tab.
+    setOpenTabs(new TabInputText(Uri.file('/test/file.log')));
   });
 
   describe('provideFoldingRanges', () => {
@@ -317,12 +324,15 @@ describe('RawLogFoldingProvider', () => {
       );
     });
 
-    it('should register an onDidOpenTextDocument listener', () => {
+    it('warms on tab changes, not on document open', () => {
       const mockContext = createMockContext();
 
       RawLogFoldingProvider.apply(mockContext as unknown as import('../../Context.js').Context);
 
-      expect(workspace.onDidOpenTextDocument).toHaveBeenCalledTimes(1);
+      // onDidOpenTextDocument fires before the tab model updates, so isOpenAsTextTab
+      // would reject a legitimate open.
+      expect(window.tabGroups.onDidChangeTabs).toHaveBeenCalledTimes(1);
+      expect(workspace.onDidOpenTextDocument).not.toHaveBeenCalled();
     });
 
     it('should add disposables to context subscriptions', () => {
@@ -330,7 +340,7 @@ describe('RawLogFoldingProvider', () => {
 
       RawLogFoldingProvider.apply(mockContext as unknown as import('../../Context.js').Context);
 
-      // emitter + folding provider registration + open listener + active-editor listener
+      // emitter + folding provider registration + tab listener + active-editor listener
       expect(mockContext.context.subscriptions.length).toBe(4);
     });
   });
@@ -345,11 +355,17 @@ describe('RawLogFoldingProvider', () => {
 
       const registeredProvider = (languages.registerFoldingRangeProvider as jest.Mock).mock
         .calls[0]?.[1] as RawLogFoldingProvider;
-      const openHandler = (workspace.onDidOpenTextDocument as jest.Mock).mock.calls[0]?.[0] as (
-        doc: unknown,
+      const tabsHandler = (window.tabGroups.onDidChangeTabs as jest.Mock).mock.calls[0]?.[0] as (
+        event: unknown,
       ) => void;
       const activeEditorHandler = (window.onDidChangeActiveTextEditor as jest.Mock).mock
         .calls[0]?.[0] as (editor: unknown) => void;
+
+      // The tab handler reads the active editor rather than taking a document.
+      const openHandler = (doc: unknown) => {
+        window.activeTextEditor = { document: doc } as typeof window.activeTextEditor;
+        tabsHandler({});
+      };
 
       return { registeredProvider, openHandler, activeEditorHandler };
     }

@@ -157,7 +157,7 @@ export class SelfTimeSpreadView extends LitElement {
   private _row(row: SingleRow, title: string, value: number, extras: TemplateResult | '') {
     return html`
       <button
-        class="bleed-row reveal-row reveal-row--no-swatch"
+        class="bleed-row reveal-row"
         type="button"
         title=${title}
         style=${styleMap({ '--row-hue': this._palette.colorFor(row.category) })}

@@ -83,10 +83,6 @@ describe('self-time-spread', () => {
     );
     // The hue is decorative, so the category is named in text a reader can hear.
     expect(text(element, '.reveal-row__sr')).toBe('Apex');
-    // No swatch, so the name must take the flexible track and truncate there.
-    expect(element.shadowRoot?.querySelector('.reveal-row')?.classList).toContain(
-      'reveal-row--no-swatch',
-    );
   });
 
   it('draws a bin per bucket at the height the lane worked out', async () => {

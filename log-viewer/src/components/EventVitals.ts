@@ -112,19 +112,24 @@ export class EventVitals extends LitElement {
         color: var(--lana-fg-muted);
         font-size: var(--lana-text-sm);
       }
+      /* One hue carries the verdict through the text, a tinted ground and its
+         edge, as SelfTimeSpreadView tints a row from its own hue property.
+         Every variant sets the hue. */
       .pill {
         display: inline-block;
-        padding: 0 var(--lana-space-sm);
-        border-radius: var(--lana-radius-sm);
+        padding: 0 var(--lana-space-2xs);
+        border: var(--lana-stroke) solid color-mix(in srgb, var(--pill-hue) 30%, transparent);
+        border-radius: var(--lana-radius-md);
+        background-color: color-mix(in srgb, var(--pill-hue) 12%, transparent);
+        color: var(--pill-hue);
         font-size: var(--lana-text-xs);
         line-height: 1.4;
-        color: var(--lana-editor-bg);
       }
       .pill--yes {
-        background-color: var(--vscode-charts-green, #388a34);
+        --pill-hue: var(--lana-severity-ok);
       }
       .pill--no {
-        background-color: var(--vscode-charts-red, #d13438);
+        --pill-hue: var(--lana-severity-warning);
       }
       .empty {
         color: var(--lana-fg-muted);

@@ -58,6 +58,7 @@ describe('buildDetailSections', () => {
     const sections = await buildDetailSections('timeline', { kind: 'event', eventIndex: 4 });
     expect(sections.map((s) => s.id)).toEqual([
       'vitals',
+      'variables',
       'namespace-time',
       'callstack',
       'calltree',
@@ -130,7 +131,7 @@ describe('buildDetailSections', () => {
     const sections = await buildDetailSections('database', { kind: 'event', eventIndex: 9 });
 
     expect(databaseCalls).toEqual([]);
-    expect(sections.map((s) => s.id)).toEqual(['vitals', 'callstack', 'calltree']);
+    expect(sections.map((s) => s.id)).toEqual(['vitals', 'variables', 'callstack', 'calltree']);
   });
 
   it('scopes an aggregate selection to its first occurrence', async () => {
@@ -138,7 +139,13 @@ describe('buildDetailSections', () => {
       kind: 'aggregate',
       instances: [11, 12, 13],
     });
-    expect(sections.map((s) => s.id)).toEqual(['vitals', 'findings', 'callstack', 'calltree']);
+    expect(sections.map((s) => s.id)).toEqual([
+      'vitals',
+      'variables',
+      'findings',
+      'callstack',
+      'calltree',
+    ]);
     expect(
       (rendered(sections, 'vitals', 'event-vitals') as HTMLElement & { instances: number[] | null })
         .instances,
@@ -176,6 +183,7 @@ describe('buildDetailSections', () => {
     const sections = await buildDetailSections('timeline', { kind: 'event', eventIndex: 4 });
     expect(sections.map((s) => s.id)).toEqual([
       'vitals',
+      'variables',
       'namespace-time',
       'callstack',
       'calltree',
@@ -211,7 +219,7 @@ describe('buildDetailSections', () => {
 
   it('leaves the namespace split out for a selection from another tab', async () => {
     const sections = await buildDetailSections('calltree', { kind: 'event', eventIndex: 4 });
-    expect(sections.map((s) => s.id)).toEqual(['vitals', 'callstack', 'calltree']);
+    expect(sections.map((s) => s.id)).toEqual(['vitals', 'variables', 'callstack', 'calltree']);
   });
 
   it('drops the aggregate once a single frame in its stack is the one being followed', async () => {

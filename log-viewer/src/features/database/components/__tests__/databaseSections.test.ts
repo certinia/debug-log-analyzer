@@ -41,7 +41,13 @@ function rendered(sections: PaneSection[], id: string, tag: string): Element {
 describe('buildDatabaseSections', () => {
   it('builds vitals + call stack + issues + call tree for a SOQL selection, badged by count', async () => {
     const sections = await buildDatabaseSections({ eventIndex: 3, type: 'soql' });
-    expect(sections.map((s) => s.id)).toEqual(['vitals', 'callstack', 'issues', 'calltree']);
+    expect(sections.map((s) => s.id)).toEqual([
+      'vitals',
+      'variables',
+      'callstack',
+      'issues',
+      'calltree',
+    ]);
     expect(sections.find((s) => s.id === 'issues')?.badge).toBe('2');
     // The smallest section.
     expect(sections.find((s) => s.id === 'issues')?.weight).toBe(1);
@@ -51,12 +57,12 @@ describe('buildDatabaseSections', () => {
 
   it('omits the SOQL issues section for a DML selection', async () => {
     const sections = await buildDatabaseSections({ eventIndex: 5, type: 'dml' });
-    expect(sections.map((s) => s.id)).toEqual(['vitals', 'callstack', 'calltree']);
+    expect(sections.map((s) => s.id)).toEqual(['vitals', 'variables', 'callstack', 'calltree']);
   });
 
   it('builds vitals + call stack + call tree (no issues) for a SOSL selection', async () => {
     const sections = await buildDatabaseSections({ eventIndex: 7, type: 'sosl' });
-    expect(sections.map((s) => s.id)).toEqual(['vitals', 'callstack', 'calltree']);
+    expect(sections.map((s) => s.id)).toEqual(['vitals', 'variables', 'callstack', 'calltree']);
   });
 
   it('anchors the call stack and the SOQL issues to the statement the user picked', async () => {

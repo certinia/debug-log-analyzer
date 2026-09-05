@@ -28,6 +28,9 @@
   /* Radius — VS Code's cornerRadius registry. */
   --lana-radius-sm: var(--vscode-cornerRadius-small, 4px);
   --lana-radius-md: var(--vscode-cornerRadius-medium, 6px);
+  /* Round the ends whatever the height, for a bar or a count. A corner radius
+     cannot say this: it un-rounds as soon as a host sets a smaller step. */
+  --lana-radius-pill: 999px;
 
   /* Space — a t-shirt scale, so a step can be re-sized without renaming it. */
   --lana-space-3xs: var(--vscode-spacing-size20, 2px);
@@ -69,10 +72,11 @@
   /* Header metadata (size · duration · identity) — just under the title size. */
   --lana-text-meta: var(--lana-text-sm);
 
-  /* Monospace, for text whose alignment carries meaning: stacks, code. The host
-     sets the editor's own size, which is not always its UI size. */
+  /* Monospace, for text whose alignment carries meaning: stacks, code. The
+     family is the editor's; the size never is. Code-shaped text inherits the
+     surface that holds it, so a grid cell, a snippet and a stack trace all read
+     at the size of the panel around them. */
   --lana-font-mono: var(--vscode-editor-font-family, monospace);
-  --lana-text-mono: var(--vscode-editor-font-size, 0.9em);
 
   --lana-font-ui: var(--vscode-font-family, sans-serif);
 
@@ -109,8 +113,13 @@
     var(--vscode-editorWidget-border, rgba(128, 128, 128, 0.35))
   );
 
-  /* One ring app-wide, so focus never reads as a hover. */
+  /* One ring app-wide, so focus never reads as a hover. `focus-inset` is for a
+     full-bleed row or input, whose ring would otherwise be clipped; a control
+     with room around it offsets by `--lana-stroke` instead. */
   --lana-focus-border: var(--vscode-focusBorder, #007fd4);
+  --lana-focus-ring: var(--lana-stroke) solid var(--lana-focus-border);
+  --lana-focus-offset: var(--lana-stroke);
+  --lana-focus-inset: calc(-1 * var(--lana-stroke));
 
   /* Icons that stand on their own, not beside the text they belong to. */
   --lana-icon-fg: var(--vscode-icon-foreground, currentColor);

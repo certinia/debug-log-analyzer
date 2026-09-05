@@ -5,17 +5,15 @@
 /**
  * Unit tests for MinimapDensityQuery
  *
- * Tests category resolution for minimap coloring, ensuring:
- * - Long-spanning parent frames are not skipped during frame collection
- * - Skyline (on-top time) algorithm correctly identifies dominant category
- * - Both fallback and segment tree paths produce consistent results
+ * Tests category resolution for minimap coloring: that a long-spanning parent
+ * holds every bucket its children do not, and that the skyline's on-top time
+ * picks the dominant category.
  */
 import { describe, expect, it } from '@jest/globals';
 import type { LogEvent } from 'apex-log-parser';
 
 import { MinimapDensityQuery } from '../optimised/minimap/MinimapDensityQuery.js';
 import type { PrecomputedRect } from '../optimised/RectangleCache.js';
-import { TemporalSegmentTree } from '../optimised/TemporalSegmentTree.js';
 
 /**
  * Helper to create a mock PrecomputedRect.
@@ -25,7 +23,6 @@ function createRect(
   timeStart: number,
   timeEnd: number,
   depth: number,
-  selfDuration?: number,
 ): PrecomputedRect {
   const duration = timeEnd - timeStart;
   return {
@@ -34,7 +31,7 @@ function createRect(
     timeEnd,
     depth,
     duration,
-    selfDuration: selfDuration ?? duration,
+    selfDuration: duration,
     category,
     x: 0,
     y: 0,
@@ -44,32 +41,26 @@ function createRect(
   };
 }
 
-/**
- * Build rectsByCategory from a flat list of rects.
- */
-function buildRectsByCategory(rects: PrecomputedRect[]): Map<string, PrecomputedRect[]> {
-  const map = new Map<string, PrecomputedRect[]>();
+function buildQuery(rects: PrecomputedRect[], totalDuration: number): MinimapDensityQuery {
+  const rectsByCategory = new Map<string, PrecomputedRect[]>();
   for (const rect of rects) {
-    let arr = map.get(rect.category);
-    if (!arr) {
-      arr = [];
-      map.set(rect.category, arr);
+    let grouped = rectsByCategory.get(rect.category);
+    if (!grouped) {
+      grouped = [];
+      rectsByCategory.set(rect.category, grouped);
     }
-    arr.push(rect);
+    grouped.push(rect);
   }
-  return map;
+  // maxDepth only reaches MinimapDensityData.globalMaxDepth; the sweep derives its own.
+  return new MinimapDensityQuery([...rectsByCategory.values()], totalDuration, 0);
 }
 
 describe('MinimapDensityQuery', () => {
   describe('category resolution with long-spanning parent frames', () => {
     /**
-     * Regression test: A long parent Method frame spanning many buckets
-     * with a short DML child in the middle.
-     *
-     * The parent Method frame must be included in all overlapping buckets
-     * for correct skyline computation. If frames are collected via binary
-     * search on timeEnd (with timeStart-sorted data), long-spanning parent
-     * frames can be skipped, causing incorrect coloring.
+     * Regression test: a long parent Method frame spanning many buckets, with a
+     * short DML child in the middle. The parent must hold every bucket the child
+     * does not.
      *
      * Layout:
      *   depth 0: |-------- Method (0-1000) --------|
@@ -78,35 +69,14 @@ describe('MinimapDensityQuery', () => {
      * Expected: Buckets outside DML range should be Method (green).
      *           Bucket covering DML range should be DML (brown) due to weight.
      */
-    const rects = [
-      createRect('Method', 0, 1000, 0, 600), // parent, selfDuration excludes DML child time
-      createRect('DML', 300, 400, 1, 100),
-    ];
+    const rects = [createRect('Method', 0, 1000, 0), createRect('DML', 300, 400, 1)];
 
-    it('should show Method in buckets outside DML range (fallback path)', () => {
-      const rectsByCategory = buildRectsByCategory(rects);
-      const query = new MinimapDensityQuery(rectsByCategory, 1000, 1);
-
+    it('should show Method in buckets outside DML range', () => {
       // 10 buckets: each covers 100ns
       // Bucket 0 [0-100]: only Method → Method
       // Bucket 3 [300-400]: Method + DML → DML wins (2.5x weight)
       // Bucket 9 [900-1000]: only Method → Method
-      const result = query.query(10);
-
-      expect(result.buckets[0]!.dominantCategory).toBe('Method');
-      expect(result.buckets[1]!.dominantCategory).toBe('Method');
-      expect(result.buckets[9]!.dominantCategory).toBe('Method');
-
-      // DML bucket: DML at depth 1 is deeper, with 2.5x weight
-      expect(result.buckets[3]!.dominantCategory).toBe('DML');
-    });
-
-    it('should show Method in buckets outside DML range (segment tree path)', () => {
-      const rectsByCategory = buildRectsByCategory(rects);
-      const segmentTree = new TemporalSegmentTree(rectsByCategory);
-      const query = new MinimapDensityQuery(rectsByCategory, 1000, 1, segmentTree);
-
-      const result = query.query(10);
+      const result = buildQuery(rects, 1000).query(10);
 
       // These buckets must be Method - the parent frame spans all of them
       expect(result.buckets[0]!.dominantCategory).toBe('Method');
@@ -114,25 +84,17 @@ describe('MinimapDensityQuery', () => {
       expect(result.buckets[5]!.dominantCategory).toBe('Method');
       expect(result.buckets[9]!.dominantCategory).toBe('Method');
 
-      // DML bucket
+      // DML bucket: DML at depth 1 is deeper, with 2.5x weight
       expect(result.buckets[3]!.dominantCategory).toBe('DML');
     });
 
-    it('should produce consistent results between fallback and segment tree paths', () => {
-      const rectsByCategory = buildRectsByCategory(rects);
-      const segmentTree = new TemporalSegmentTree(rectsByCategory);
+    it('counts every frame in each bucket it spans', () => {
+      const result = buildQuery(rects, 1000).query(10);
 
-      const fallbackQuery = new MinimapDensityQuery(rectsByCategory, 1000, 1);
-      const treeQuery = new MinimapDensityQuery(rectsByCategory, 1000, 1, segmentTree);
-
-      const fallbackResult = fallbackQuery.query(10);
-      const treeResult = treeQuery.query(10);
-
-      for (let i = 0; i < 10; i++) {
-        expect(treeResult.buckets[i]!.dominantCategory).toBe(
-          fallbackResult.buckets[i]!.dominantCategory,
-        );
-      }
+      // The parent alone outside the child's range, both where they overlap.
+      expect(result.buckets[0]!.eventCount).toBe(1);
+      expect(result.buckets[3]!.eventCount).toBe(2);
+      expect(result.buckets[9]!.eventCount).toBe(1);
     });
   });
 
@@ -143,22 +105,18 @@ describe('MinimapDensityQuery', () => {
      *   depth 1: |-------- Method (0-1000) ------------|
      *   depth 2:       |-- SOQL (200-300) --|  |-- DML (600-700) --|
      *
-     * This tests that parent frames at multiple depths are all correctly
-     * collected even when short children exist between them.
+     * Parent frames at several depths must all hold their own buckets, even with
+     * short children between them.
      */
     it('should resolve Method where no SOQL/DML children exist', () => {
       const rects = [
-        createRect('Code Unit', 0, 1000, 0, 0), // code unit has 0 self duration (all children)
-        createRect('Method', 0, 1000, 1, 800), // method covers most of the time
-        createRect('SOQL', 200, 300, 2, 100),
-        createRect('DML', 600, 700, 2, 100),
+        createRect('Code Unit', 0, 1000, 0),
+        createRect('Method', 0, 1000, 1),
+        createRect('SOQL', 200, 300, 2),
+        createRect('DML', 600, 700, 2),
       ];
 
-      const rectsByCategory = buildRectsByCategory(rects);
-      const segmentTree = new TemporalSegmentTree(rectsByCategory);
-      const query = new MinimapDensityQuery(rectsByCategory, 1000, 2, segmentTree);
-
-      const result = query.query(10);
+      const result = buildQuery(rects, 1000).query(10);
 
       // Bucket 0 [0-100]: Code Unit + Method → Method wins (deeper)
       expect(result.buckets[0]!.dominantCategory).toBe('Method');
@@ -174,14 +132,25 @@ describe('MinimapDensityQuery', () => {
     });
   });
 
+  it('recomputes only when the width changes', () => {
+    const rects = [createRect('Method', 0, 1000, 0), createRect('DML', 300, 400, 1)];
+    const query = buildQuery(rects, 1000);
+
+    const first = query.query(10);
+    expect(query.query(10)).toBe(first);
+
+    // A different width is a different picture, so it cannot answer from the one held.
+    const wider = query.query(11);
+    expect(wider).not.toBe(first);
+
+    // Only one is held, so the first width has to be computed again.
+    expect(query.query(10)).not.toBe(first);
+  });
+
   describe('edge cases', () => {
     it('should handle single frame spanning all buckets', () => {
       const rects = [createRect('Method', 0, 1000, 0)];
-      const rectsByCategory = buildRectsByCategory(rects);
-      const segmentTree = new TemporalSegmentTree(rectsByCategory);
-      const query = new MinimapDensityQuery(rectsByCategory, 1000, 0, segmentTree);
-
-      const result = query.query(5);
+      const result = buildQuery(rects, 1000).query(5);
 
       for (const bucket of result.buckets) {
         expect(bucket.dominantCategory).toBe('Method');
@@ -189,10 +158,7 @@ describe('MinimapDensityQuery', () => {
     });
 
     it('should handle empty timeline', () => {
-      const rectsByCategory = new Map<string, PrecomputedRect[]>();
-      const query = new MinimapDensityQuery(rectsByCategory, 0, 0);
-
-      const result = query.query(10);
+      const result = buildQuery([], 0).query(10);
       expect(result.buckets).toHaveLength(0);
     });
   });
@@ -203,29 +169,22 @@ describe('MinimapDensityQuery', () => {
     // "Invalid array length" and aborted timeline init.
     const rects = [createRect('Method', 0, 1000, 0)];
 
-    it('floors a fractional bucket count instead of throwing (segment tree path)', () => {
-      const rectsByCategory = buildRectsByCategory(rects);
-      const segmentTree = new TemporalSegmentTree(rectsByCategory);
-      const query = new MinimapDensityQuery(rectsByCategory, 1000, 0, segmentTree);
-
-      const fractional = query.query(10.6);
-      const floored = query.query(10);
+    it('floors a fractional bucket count to the integer count', () => {
+      // Two queries, not one: 10.6 and 10 floor to the same width, so a single
+      // query would answer the second call from its cache and compare an object
+      // with itself.
+      const fractional = buildQuery(rects, 1000).query(10.6);
+      const floored = buildQuery(rects, 1000).query(10);
 
       expect(fractional.buckets).toHaveLength(10);
       expect(fractional.buckets).toEqual(floored.buckets);
-    });
 
-    it('floors a fractional bucket count instead of throwing (fallback path)', () => {
-      const rectsByCategory = buildRectsByCategory(rects);
-      const query = new MinimapDensityQuery(rectsByCategory, 1000, 0);
-
-      expect(() => query.query(1536.6667)).not.toThrow();
-      expect(query.query(1536.6667).buckets).toHaveLength(1536);
+      // A real 150% DPI width.
+      expect(buildQuery(rects, 1000).query(1536.6667).buckets).toHaveLength(1536);
     });
 
     it('treats a non-finite bucket count as empty instead of throwing', () => {
-      const rectsByCategory = buildRectsByCategory(rects);
-      const query = new MinimapDensityQuery(rectsByCategory, 1000, 0);
+      const query = buildQuery(rects, 1000);
 
       expect(() => query.query(Number.NaN)).not.toThrow();
       expect(query.query(Number.NaN).buckets).toHaveLength(0);

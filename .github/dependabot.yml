@@ -12,10 +12,6 @@ updates:
     # majors are deliberately left out of the minor/patch groups so each one still
     # arrives as its own PR - they need reading and are reverted individually
     groups:
-      # exception: @salesforce/apex-node majors require the matching
-      # @salesforce/core major, so these move in lockstep incl. majors
-      salesforce:
-        patterns: ['@salesforce/*']
       production-dependencies:
         dependency-type: 'production'
         update-types: ['minor', 'patch']

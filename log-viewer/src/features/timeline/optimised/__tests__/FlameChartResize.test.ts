@@ -50,6 +50,7 @@ function stubbedChart(displayHeight = 300): {
   };
   // The geometry init applied: 364 container - 60 minimap - 4 gap = the 300 below.
   internals['appliedMinimapHeight'] = 60;
+  internals['appliedOverheadHeight'] = 64;
   internals['state'] = {
     viewport: null,
     needsRender: false,
@@ -116,6 +117,29 @@ describe('FlameChart.resize', () => {
 
     expect(chart.resize(400, 605)).toBe(true);
     expect(appRender).toHaveBeenCalled();
+  });
+
+  // The metric strip appearing adds 15 + 4 to the overhead, so a container that grows by the
+  // same 19px leaves the main timeline height alone. The minimap is clamped at 60 across both,
+  // so every value the guard used to compare was unchanged while the overhead moved by 19.
+  it('draws when the overhead moved but the main timeline height did not', () => {
+    const { chart, appRender } = stubbedChart();
+    const internals = chart as unknown as Record<string, unknown>;
+    internals['metricStripOrchestrator'] = {
+      getIsVisible: () => true,
+      getHeight: () => 15,
+      resize: jest.fn(),
+      holdsHover: () => false,
+      getCursorTimeNs: () => null,
+      render: jest.fn(),
+    };
+    jest.spyOn(window, 'requestAnimationFrame').mockReturnValue(1);
+
+    // 383 - 60 - 4 - 15 - 4 = the 300 the viewport already reports, at the same width.
+    expect(chart.resize(400, 383)).toBe(true);
+    expect(appRender).toHaveBeenCalled();
+    // Stale at 64, every hit test and tooltip would sit 19px out.
+    expect(internals['mainTimelineYOffset']).toBe(83);
   });
 
   // The metric strip resizes its own canvas before asking the host to relayout, so a resize

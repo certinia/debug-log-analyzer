@@ -22,6 +22,7 @@ import './HotPath.js';
 import './HotSpots.js';
 import './LogOverview.js';
 import './NamespaceTimeBar.js';
+import './VariablesDetail.js';
 
 /**
  * Build the inspector's sections for a selection from any tab. Every source gets
@@ -210,6 +211,17 @@ export async function buildDetailSections(
         .instances=${instances}
         called-by=${calledBy}
       ></event-vitals>`,
+    },
+    // What Apex could see from the frame. Always present, so it can say which
+    // log level would fill it rather than leaving the reader to guess.
+    {
+      id: 'variables',
+      title: 'Variables',
+      fit: 'content',
+      content: html`<variables-detail
+        eventIndex=${activeIndex}
+        .instances=${instances}
+      ></variables-detail>`,
     },
   ];
   if (source === 'timeline') {

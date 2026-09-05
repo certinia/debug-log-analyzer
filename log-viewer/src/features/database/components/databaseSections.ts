@@ -11,6 +11,7 @@ import { computeSoqlIssues } from '../../soql/components/SOQLLinterIssues.js';
 import '../../../components/CallStackDetail.js';
 import '../../../components/CallTreeDetail.js';
 import '../../../components/EventVitals.js';
+import '../../../components/VariablesDetail.js';
 import '../../soql/components/SOQLLinterIssues.js';
 
 export interface DetailSelection {
@@ -47,6 +48,14 @@ export async function buildDatabaseSections(selection: DetailSelection): Promise
         eventIndex=${active}
         type=${ifDefined(activeType)}
       ></event-vitals>`,
+    },
+    // What Apex could see from the frame. A statement owns no locals of its own,
+    // so the section answers from the Apex frame that issued it.
+    {
+      id: 'variables',
+      title: 'Variables',
+      fit: 'content',
+      content: html`<variables-detail eventIndex=${active}></variables-detail>`,
     },
     {
       id: 'callstack',

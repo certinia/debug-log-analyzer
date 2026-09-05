@@ -197,6 +197,12 @@ export class FlameChart<E extends EventNode = EventNode> {
   /** The minimap height the last applied resize used, so a resize can tell nothing moved. */
   private appliedMinimapHeight: number | null = null;
 
+  /**
+   * Overhead the last applied layout sat under, so a change inside it is not hidden
+   * by the main timeline height staying the same.
+   */
+  private appliedOverheadHeight: number | null = null;
+
   // Cached culled rectangles (reused when viewport unchanged - Phase 3 optimization)
   // INVARIANT: These caches are invalidated when renderDirty.culling is set to true.
   // Any code that changes viewport state must call invalidateAll() or set culling dirty flag.
@@ -837,14 +843,22 @@ export class FlameChart<E extends EventNode = EventNode> {
     // stands. Load reaches here with the geometry init already set. The minimap is checked
     // too: its height is a tenth of the container's, so it can move on its own while the main
     // timeline keeps the height it had.
+    //
+    // The overhead is checked for itself, not through `mainTimelineHeight`: that is the
+    // container less the overhead, so the metric strip appearing while the container grows by
+    // the same 19px leaves it unchanged, and the minimap's height is clamped over most of the
+    // range. Skipping there left `mainTimelineYOffset` short and put every hit test and
+    // tooltip out by the strip's height.
     if (
       newWidth === oldWidth &&
       mainTimelineHeight === oldState.displayHeight &&
-      minimapHeight === this.appliedMinimapHeight
+      minimapHeight === this.appliedMinimapHeight &&
+      totalOverheadHeight === this.appliedOverheadHeight
     ) {
       return false;
     }
     this.appliedMinimapHeight = minimapHeight;
+    this.appliedOverheadHeight = totalOverheadHeight;
 
     // Update offset for converting canvas-relative to container-relative coordinates
     this.mainTimelineYOffset = totalOverheadHeight;
@@ -905,8 +919,7 @@ export class FlameChart<E extends EventNode = EventNode> {
     // Rebuild batch colors cache (used by bucket color resolution)
     this.state.batchColorsCache = this.buildBatchColorsCache(this.state.batches);
 
-    // Invalidate minimap static content to re-render with new colors
-    this.minimapOrchestrator?.invalidateCache();
+    this.minimapOrchestrator?.invalidateStatic();
 
     // Request re-render
     this.requestRender();
@@ -1032,6 +1045,7 @@ export class FlameChart<E extends EventNode = EventNode> {
 
     // This is the applied geometry, so a resize to the same size has nothing to do.
     this.appliedMinimapHeight = minimapHeight;
+    this.appliedOverheadHeight = minimapHeight + MINIMAP_GAP + metricStripHeight + METRIC_STRIP_GAP;
 
     // Create wrapper container with flexbox layout
     this.wrapper = document.createElement('div');

@@ -130,7 +130,7 @@ export class PaneView extends LitElement {
         letter-spacing: var(--lana-text-caps-tracking);
         color: var(--vscode-sideBarSectionHeader-foreground);
         background-color: var(--vscode-sideBarSectionHeader-background);
-        border-top: 1px solid var(--vscode-sideBarSectionHeader-border, transparent);
+        border-top: var(--lana-stroke) solid var(--vscode-sideBarSectionHeader-border, transparent);
         user-select: none;
         white-space: nowrap;
         overflow: hidden;
@@ -143,8 +143,8 @@ export class PaneView extends LitElement {
         background-color: var(--lana-row-hover-bg);
       }
       .pane-header:focus-visible {
-        outline: 1px solid var(--lana-focus-border);
-        outline-offset: -1px;
+        outline: var(--lana-focus-ring);
+        outline-offset: var(--lana-focus-inset);
       }
       .pane-header vscode-icon {
         color: var(--lana-icon-fg);

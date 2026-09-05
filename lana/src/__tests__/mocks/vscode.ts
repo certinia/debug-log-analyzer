@@ -126,6 +126,16 @@ export class TabInputText {
   }
 }
 
+export class TabInputTextDiff {
+  readonly original: ReturnType<typeof Uri.parse>;
+  readonly modified: ReturnType<typeof Uri.parse>;
+
+  constructor(original: ReturnType<typeof Uri.parse>, modified: ReturnType<typeof Uri.parse>) {
+    this.original = original;
+    this.modified = modified;
+  }
+}
+
 // Mock RelativePattern (constructor used for glob searches)
 export const RelativePattern = jest.fn();
 
@@ -334,6 +344,7 @@ export const window = {
   createWebviewPanel: jest.fn(),
   tabGroups: {
     activeTabGroup: { activeTab: undefined as { input: unknown } | undefined },
+    all: [] as { tabs: { input: unknown }[] }[],
     onDidChangeTabs: jest.fn((_listener: (event: unknown) => unknown) => ({
       dispose: jest.fn(),
     })),
@@ -540,6 +551,12 @@ export const resetMocks = (): void => {
   window.activeTextEditor = undefined;
   window.visibleTextEditors = [];
   window.tabGroups.activeTabGroup.activeTab = undefined;
+  window.tabGroups.all = [];
+};
+
+/** Arranges open tabs for isOpenAsTextTab; one group is enough for most tests. */
+export const setOpenTabs = (...inputs: unknown[]): void => {
+  window.tabGroups.all = [{ tabs: inputs.map((input) => ({ input })) }];
 };
 
 // Export as default for module replacement
@@ -550,6 +567,7 @@ export default {
   ViewColumn,
   Uri,
   TabInputText,
+  TabInputTextDiff,
   RelativePattern,
   FoldingRange,
   FoldingRangeKind,

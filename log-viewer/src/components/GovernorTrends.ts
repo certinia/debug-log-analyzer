@@ -2,7 +2,7 @@
  * Copyright (c) 2026 Certinia Inc. All rights reserved.
  */
 import { consume } from '@lit/context';
-import { LitElement, css, html, svg } from 'lit';
+import { LitElement, css, html, svg, type PropertyValues } from 'lit';
 import { customElement, property, state } from 'lit/decorators.js';
 
 import { eventBus } from '../core/events/EventBus.js';
@@ -25,6 +25,17 @@ import {
   type TrendSeries,
 } from './governorTrendData.js';
 import { NO_CUMULATIVE_LIMITS_TEXT } from './logOverviewMetrics.js';
+
+/** A placed cursor: the sample, and the chart it belongs to. */
+interface Cursor {
+  label: string;
+  point: TrendPoint;
+}
+
+/** The cursor's sample, when it is this chart's. */
+function pointOn(cursor: Cursor | null, series: TrendSeries): TrendPoint | null {
+  return cursor?.label === series.label ? cursor.point : null;
+}
 
 /** Chart-space size; the SVG stretches to fill its row. */
 const VIEW_W = 100;
@@ -89,11 +100,15 @@ function trendGeometry(series: TrendSeries, logTotal: number): TrendGeometry {
  */
 @customElement('governor-trends')
 export class GovernorTrends extends LitElement {
-  /** The sample under the pointer or the arrow keys, on the one chart that holds
-   *  it. `from` says which placed it: a pointer leaving takes its own cursor
-   *  with it, never one the keys placed. */
+  /** The sample under the pointer, on the chart it is over. Cleared when the
+   *  pointer leaves, so it never outlives the hover that made it. */
   @state()
-  private _cursor: { label: string; point: TrendPoint; from: 'pointer' | 'key' } | null = null;
+  private _hover: Cursor | null = null;
+
+  /** Where the arrow keys left the cursor. Held apart from the hover because a
+   *  pointer crossing any chart would otherwise erase a stepped position. */
+  @state()
+  private _keyed: Cursor | null = null;
 
   /** The log on screen, from the app root. */
   @consume({ context: logContext, subscribe: true })
@@ -155,7 +170,7 @@ export class GovernorTrends extends LitElement {
         display: block;
         width: 100%;
         border: 0;
-        border-bottom: 1px solid var(--lana-surface-border);
+        border-bottom: var(--lana-stroke) solid var(--lana-surface-border);
         padding: 0;
         background: none;
         color: inherit;
@@ -169,8 +184,8 @@ export class GovernorTrends extends LitElement {
       }
 
       .trend__chart:focus-visible {
-        outline: var(--lana-stroke) solid var(--lana-focus-border);
-        outline-offset: calc(-1 * var(--lana-stroke));
+        outline: var(--lana-focus-ring);
+        outline-offset: var(--lana-focus-inset);
       }
 
       .trend--safe {
@@ -284,20 +299,53 @@ export class GovernorTrends extends LitElement {
     </div>`;
   }
 
-  private _onPointerMove(event: PointerEvent, series: TrendSeries, logTotal: number): void {
-    const point = this._pointFrom(event, series, logTotal);
-    this._cursor = point ? { label: series.label, point, from: 'pointer' } : null;
-  }
-
-  private _onPointerLeave(): void {
-    if (this._cursor?.from === 'pointer') {
-      this._cursor = null;
+  /** A cursor belongs to the log that placed it; metric labels repeat. */
+  protected willUpdate(changed: PropertyValues<this>): void {
+    if (changed.has('logStore')) {
+      this._hover = null;
+      this._keyed = null;
     }
   }
 
+  private _onPointerMove(event: PointerEvent, series: TrendSeries, logTotal: number): void {
+    const point = this._pointFrom(event, series, logTotal);
+    this._hover = point ? { label: series.label, point } : null;
+  }
+
+  /** Puts the cursor where the keys left it. A resting pointer would otherwise
+   *  answer every step from the same sample, so the keys take this chart from
+   *  it; moving the pointer takes it back. */
+  private _hold(series: TrendSeries, point: TrendPoint | null | undefined): TrendPoint | null {
+    if (!point) {
+      return null;
+    }
+    this._keyed = { label: series.label, point };
+    if (this._hover?.label === series.label) {
+      this._hover = null;
+    }
+    return point;
+  }
+
+  /**
+   * What an activation moves to: the sample given, else this chart's cursor,
+   * else the last sample, since consumption never falls inside a transaction
+   * and that is where the metric stands highest.
+   */
+  private _target(series: TrendSeries, placed: TrendPoint | null): TrendPoint | null {
+    return placed ?? this._cursorFor(series) ?? series.points.at(-1) ?? null;
+  }
+
+  private _onPointerLeave(): void {
+    this._hover = null;
+  }
+
   private _onClick(event: PointerEvent, series: TrendSeries, logTotal: number): void {
-    // Where the pointer is wins: the cursor may sit where the arrow keys left it.
-    const point = this._pointFrom(event, series, logTotal) ?? this._cursorFor(series);
+    // Where the pointer is wins, but a click carrying no coordinates (assistive
+    // tech, or `click()`) reports x 0, which would seek the log's start.
+    const placed = event.detail === 0 ? null : this._pointFrom(event, series, logTotal);
+    // No cursor is kept: the pointer is still on the chart and holds its own,
+    // and a second chart reading at once says two things at the same time.
+    const point = this._target(series, placed);
     if (point) {
       this._seek(point.t);
     }
@@ -311,28 +359,33 @@ export class GovernorTrends extends LitElement {
   private _onKeyDown(event: KeyboardEvent, series: TrendSeries, logTotal: number): void {
     const step =
       event.key === 'ArrowRight' ? KEY_STEP : event.key === 'ArrowLeft' ? -KEY_STEP : undefined;
+    const activates = event.key === 'Enter' || event.key === ' ';
+    if (step === undefined && !activates) {
+      return;
+    }
+    event.preventDefault();
     if (step !== undefined) {
       const from = this._cursorFor(series)?.t ?? 0;
       const t = Math.min(Math.max(from + step * logTotal, 0), logTotal);
-      const point = pointAt(series.points, t);
-      if (point) {
-        this._cursor = { label: series.label, point, from: 'key' };
-      }
-      event.preventDefault();
+      this._hold(series, pointAt(series.points, t));
       return;
     }
-    if (event.key === 'Enter' || event.key === ' ') {
-      const point = this._cursorFor(series) ?? series.points.at(-1);
-      if (point) {
-        this._seek(point.t);
-      }
-      event.preventDefault();
+    // Arrows repeat, so holding one scrubs the cursor. An activation must not:
+    // it would re-zoom the flame chart on every repeat.
+    if (event.repeat) {
+      return;
+    }
+    // The cursor stays where this landed, so the arrows carry on from it.
+    const point = this._hold(series, this._target(series, null));
+    if (point) {
+      this._seek(point.t);
     }
   }
 
-  /** The cursor, when this chart is the one holding it. */
+  /** This chart's cursor: the pointer's while it is over the chart, else the
+   *  keys'. */
   private _cursorFor(series: TrendSeries): TrendPoint | null {
-    return this._cursor?.label === series.label ? this._cursor.point : null;
+    return pointOn(this._hover, series) ?? pointOn(this._keyed, series);
   }
 
   /** The series' value at the pointer, in the log's own time. */

@@ -10,7 +10,14 @@ import {
   createMockContext,
   createMockLogEvent,
 } from '../../__tests__/helpers/test-builders.js';
-import { createMockTextDocument } from '../../__tests__/mocks/vscode.js';
+import {
+  TabInputText,
+  TabInputTextDiff,
+  Uri,
+  createMockTextDocument,
+  setOpenTabs,
+  window,
+} from '../../__tests__/mocks/vscode.js';
 import { LogEventCache } from '../../cache/LogEventCache.js';
 import { RawLogSymbolProvider } from '../RawLogSymbolProvider.js';
 
@@ -21,6 +28,7 @@ jest.mock('../../cache/LogEventCache.js', () => ({
 }));
 
 const mockGetApexLog = LogEventCache.getApexLog as jest.Mock;
+const APEX_LOG_LINE = '09:45:31.888 (1000)|EXECUTION_STARTED';
 
 describe('RawLogSymbolProvider', () => {
   let provider: RawLogSymbolProvider;
@@ -28,6 +36,8 @@ describe('RawLogSymbolProvider', () => {
   beforeEach(() => {
     provider = new RawLogSymbolProvider();
     mockGetApexLog.mockReset();
+    // The provider only works for a document the user has open as a text tab.
+    setOpenTabs(new TabInputText(Uri.file('/test/file.log')));
   });
 
   describe('provideDocumentSymbols', () => {
@@ -132,19 +142,87 @@ describe('RawLogSymbolProvider', () => {
 
       expect(symbols).toEqual([]);
     });
+
+    it('returns no symbols when the tab model does not list the document', async () => {
+      setOpenTabs();
+      const doc = createMockTextDocument({ lines: [APEX_LOG_LINE], uri: '/test/file.log' });
+
+      expect(await provider.provideDocumentSymbols(doc, {} as never)).toEqual([]);
+      expect(mockGetApexLog).not.toHaveBeenCalled();
+    });
+
+    it('returns no symbols for a URI shown as a diff side', async () => {
+      const uri = Uri.file('/test/file.log');
+      setOpenTabs(new TabInputTextDiff(Uri.parse('git:/test/file.log'), uri));
+      const doc = createMockTextDocument({ lines: [APEX_LOG_LINE], uri: '/test/file.log' });
+
+      expect(await provider.provideDocumentSymbols(doc, {} as never)).toEqual([]);
+      expect(mockGetApexLog).not.toHaveBeenCalled();
+    });
   });
 
   describe('apply', () => {
-    it('registers a document symbol provider for apexlog', () => {
+    const applyProvider = () => {
       const mockContext = createMockContext();
-
       RawLogSymbolProvider.apply(mockContext as unknown as import('../../Context.js').Context);
+      return (languages.registerDocumentSymbolProvider as jest.Mock).mock.calls[0]?.[1] as
+        RawLogSymbolProvider | undefined;
+    };
+
+    const fireTabChange = () => {
+      const handler = (window.tabGroups.onDidChangeTabs as jest.Mock).mock.calls[0]?.[0] as (
+        event: unknown,
+      ) => void;
+      handler(undefined);
+    };
+
+    it('registers a document symbol provider for apexlog', () => {
+      applyProvider();
 
       expect(languages.registerDocumentSymbolProvider).toHaveBeenCalledTimes(1);
       expect(languages.registerDocumentSymbolProvider).toHaveBeenCalledWith(
         [{ language: 'apexlog' }],
         expect.any(RawLogSymbolProvider),
       );
+    });
+
+    it('asks VS Code again once the tab model lists a log it had rejected', async () => {
+      const doc = createMockTextDocument({ lines: [APEX_LOG_LINE], uri: '/test/file.log' });
+      setOpenTabs();
+      const registered = applyProvider();
+
+      await registered?.provideDocumentSymbols(doc, {} as never);
+
+      setOpenTabs(new TabInputText(Uri.file('/test/file.log')));
+      window.activeTextEditor = { document: doc };
+      fireTabChange();
+
+      expect(languages.registerDocumentSymbolProvider).toHaveBeenCalledTimes(2);
+    });
+
+    it('does not re-register for a log that is still only a diff side', async () => {
+      const uri = Uri.file('/test/file.log');
+      const doc = createMockTextDocument({ lines: [APEX_LOG_LINE], uri: '/test/file.log' });
+      setOpenTabs();
+      const registered = applyProvider();
+
+      await registered?.provideDocumentSymbols(doc, {} as never);
+
+      setOpenTabs(new TabInputTextDiff(Uri.parse('git:/test/file.log'), uri));
+      window.activeTextEditor = { document: doc };
+      fireTabChange();
+
+      expect(languages.registerDocumentSymbolProvider).toHaveBeenCalledTimes(1);
+    });
+
+    it('does not re-register when no request was rejected', () => {
+      const doc = createMockTextDocument({ lines: [APEX_LOG_LINE], uri: '/test/file.log' });
+      applyProvider();
+
+      window.activeTextEditor = { document: doc };
+      fireTabChange();
+
+      expect(languages.registerDocumentSymbolProvider).toHaveBeenCalledTimes(1);
     });
   });
 });

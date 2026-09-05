@@ -208,8 +208,8 @@ export class LogDiagnosticsView extends LitElement {
       }
 
       .rollup__seg:focus-visible {
-        outline: var(--lana-stroke) solid var(--lana-focus-border);
-        outline-offset: var(--lana-stroke);
+        outline: var(--lana-focus-ring);
+        outline-offset: var(--lana-focus-offset);
       }
 
       /* How long the finding's own events took, and what that is of the log. Only
@@ -416,8 +416,8 @@ export class LogDiagnosticsView extends LitElement {
       }
 
       .evidence--link:focus-visible {
-        outline: var(--lana-stroke) solid var(--lana-focus-border);
-        outline-offset: var(--lana-stroke);
+        outline: var(--lana-focus-ring);
+        outline-offset: var(--lana-focus-offset);
       }
 
       .evidence__go {
