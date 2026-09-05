@@ -26,8 +26,8 @@ const stack = [
 
 let currentStack: typeof stack | [] = stack;
 
-jest.mock('../../features/database/services/Database.js', () => ({
-  DatabaseAccess: { instance: () => ({ getStackByEventIndex: () => currentStack }) },
+jest.mock('../../core/log/LogStore.js', () => ({
+  currentLogStore: () => ({ stackByEventIndex: () => currentStack }),
 }));
 
 import { buildCallStackData } from '../callStackData.js';
@@ -52,6 +52,22 @@ describe('buildCallStackData', () => {
     const { rows, rootTotal } = buildCallStackData(-1);
     expect(rows).toEqual([]);
     expect(rootTotal).toBe(0);
+  });
+
+  it('drops detail frames, keeping call frames only', () => {
+    currentStack = [
+      {
+        eventIndex: 7,
+        type: 'CUMULATIVE_LIMIT_USAGE',
+        text: 'LIMIT_USAGE_FOR_NS',
+        duration: { total: 900_000, self: 0 },
+      },
+      ...stack,
+    ];
+    const { rows, rootTotal } = buildCallStackData(3);
+    expect(rows.map((r) => r.eventIndex)).toEqual([1, 2, 3]);
+    // The denominator follows the outermost frame still shown.
+    expect(rootTotal).toBe(41_200_000);
   });
 
   it('handles an empty stack', () => {

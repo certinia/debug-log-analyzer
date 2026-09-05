@@ -15,8 +15,6 @@ import { computeVisibleCount } from './overflowFit.js';
 
 /** Space reserved for the overflow toggle once the row can't fit every item (px). */
 const OVERFLOW_RESERVE = 56;
-/** Gap between items, in px — the source of truth for both the `.items` CSS gap and the fit math. */
-const ITEMS_GAP = 6;
 /** Shared by the toggle's `popovertarget`/`aria-controls` and the panel's `id` — must match. */
 const PANEL_ID = 'overflow-list-panel';
 
@@ -53,6 +51,10 @@ export class OverflowList extends LitElement {
   @property({ attribute: 'icon' })
   icon = 'chevron-down';
 
+  /** Gap between inline items (px) — drives both the row layout and the fit math. */
+  @property({ type: Number })
+  gap = 6;
+
   /** How many items fit inline; the rest are moved into the popover menu. */
   @state()
   private visibleCount = Number.POSITIVE_INFINITY;
@@ -70,7 +72,7 @@ export class OverflowList extends LitElement {
       :host {
         display: block;
         min-width: 0;
-        font-size: 11px;
+        font-size: var(--lana-text-base);
       }
 
       .bar {
@@ -85,7 +87,6 @@ export class OverflowList extends LitElement {
         display: flex;
         flex-wrap: nowrap;
         align-items: center;
-        gap: ${ITEMS_GAP}px;
         min-width: 0;
         overflow: hidden;
         flex: 1 1 auto;
@@ -102,14 +103,14 @@ export class OverflowList extends LitElement {
       .overflow {
         display: inline-flex;
         align-items: center;
-        gap: 4px;
-        padding: 2px 6px;
-        border: 1px solid var(--vscode-settings-dropdownBorder, #3c3c3c);
-        border-radius: 4px;
-        background-color: var(--vscode-settings-dropdownBackground, #313131);
-        color: var(--vscode-foreground);
+        gap: var(--lana-space-2xs);
+        padding: var(--lana-space-3xs) var(--lana-space-xs);
+        border: var(--lana-stroke) solid var(--lana-control-border);
+        border-radius: var(--lana-radius-sm);
+        background-color: var(--lana-control-bg);
+        color: var(--lana-fg);
         font: inherit;
-        font-size: 11px;
+        font-size: var(--lana-text-base);
         line-height: 1;
         white-space: nowrap;
         cursor: pointer;
@@ -118,12 +119,12 @@ export class OverflowList extends LitElement {
       }
 
       .overflow:hover {
-        background-color: var(--vscode-list-hoverBackground);
+        background-color: var(--lana-row-hover-bg);
       }
 
       .overflow:focus-visible {
-        outline: 1px solid var(--vscode-focusBorder);
-        outline-offset: 1px;
+        outline: var(--lana-focus-ring);
+        outline-offset: var(--lana-focus-offset);
       }
 
       .overflow__count {
@@ -131,7 +132,7 @@ export class OverflowList extends LitElement {
       }
 
       .overflow__chevron {
-        color: var(--vscode-descriptionForeground);
+        color: var(--lana-fg-muted);
         transition: transform 120ms ease;
       }
 
@@ -167,8 +168,8 @@ export class OverflowList extends LitElement {
         border: var(--lana-stroke) solid var(--filter-popover-border-color);
         border-radius: var(--filter-popover-radius);
         box-shadow: var(--filter-popover-shadow);
-        color: var(--vscode-menu-foreground, var(--vscode-foreground));
-        font-family: var(--vscode-font-family);
+        color: var(--vscode-menu-foreground, var(--lana-fg));
+        font-family: var(--lana-font-ui);
       }
 
       .container.end .panel {
@@ -182,8 +183,8 @@ export class OverflowList extends LitElement {
       .panel__head {
         padding: 2px 10px 6px;
         font-weight: 600;
-        font-size: 12px;
-        color: var(--vscode-foreground);
+        font-size: var(--lana-text-base);
+        color: var(--lana-fg);
       }
 
       .menu-items {
@@ -279,7 +280,7 @@ export class OverflowList extends LitElement {
     }
     if (!this.itemWidths) {
       this._measure();
-    } else if (changed.has('collapseFrom') || changed.has('minVisible')) {
+    } else if (changed.has('collapseFrom') || changed.has('minVisible') || changed.has('gap')) {
       this._recompute(this.lastWidth);
     }
   }
@@ -315,7 +316,7 @@ export class OverflowList extends LitElement {
     }
     // Fit the visible run from the appropriate end (reverse for start-collapse).
     const ordered = this.collapseFrom === 'start' ? [...widths].reverse() : widths;
-    const fit = computeVisibleCount(ordered, avail, ITEMS_GAP, OVERFLOW_RESERVE);
+    const fit = computeVisibleCount(ordered, avail, this.gap, OVERFLOW_RESERVE);
     this.visibleCount = Math.max(fit, Math.min(this.minVisible, widths.length));
     this._applyOverflow();
   }
@@ -363,7 +364,7 @@ export class OverflowList extends LitElement {
     return html`<div class="container ${this.collapseFrom}">
       <div class="bar">
         ${fromStart ? toggle : ''}
-        <div class="items"><slot></slot></div>
+        <div class="items" style="gap: ${this.gap}px"><slot></slot></div>
         ${fromStart ? '' : toggle}
       </div>
       ${

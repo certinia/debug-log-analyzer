@@ -23,8 +23,6 @@ import { makeSumFieldAllVisible } from '../utils/BottomCalcs.js';
 import { governorCostBreakdown, type GovernorCostRow } from '../utils/GovernorCost.js';
 
 export interface TableCallbacks {
-  onFilterCacheClear?: () => void;
-  onRenderStarted: () => void;
   rowFormatter?: (row: RowComponent) => void;
 }
 
@@ -53,14 +51,6 @@ export const virtualScrollOptions = {
   renderVertical: VirtualVerticalRenderer,
   anchoringPolicy: true,
 } satisfies Partial<Options>;
-
-/** Resolve after the next animation frame — lets a just-shown host lay out
- *  before Tabulator measures column widths. */
-export function waitForNextFrame(): Promise<void> {
-  return new Promise((resolve) => {
-    requestAnimationFrame(() => resolve());
-  });
-}
 
 /**
  * A right-aligned duration column rendered as a `progressFormatterMS` bar

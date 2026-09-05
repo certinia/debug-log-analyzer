@@ -6,6 +6,7 @@ import { customElement, property } from 'lit/decorators.js';
 
 import type { ApexLog } from 'apex-log-parser';
 import type { LogIssue } from '../notifications/types.js';
+import type { LogIdentityData } from './logIdentity.js';
 
 // web components
 import '../../components/LogLevels.js';
@@ -33,6 +34,8 @@ export class AppHeader extends LitElement {
   logProblems: readonly LogIssue[] | null = null;
   @property({ attribute: false })
   notifications: readonly LogIssue[] = [];
+  @property({ attribute: false })
+  logIdentity: LogIdentityData | null = null;
   @property()
   timelineRoot: ApexLog | null = null;
 
@@ -61,6 +64,7 @@ export class AppHeader extends LitElement {
         .logDuration=${this.logDuration}
         .logProblems=${this.logProblems}
         .notifications=${this.notifications}
+        .logIdentity=${this.logIdentity}
       ></nav-bar>
       <log-levels .logSettings=${this.timelineRoot?.debugLevels}></log-levels>
       <find-widget></find-widget>

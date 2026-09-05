@@ -1,7 +1,7 @@
 /*
  * Copyright (c) 2022 Certinia Inc. All rights reserved.
  */
-import type { Stack } from '../../database/services/Database.js';
+import type { Stack } from '../../../core/log/LogStore.js';
 import type { SOQLTree } from './SOQLParser.js';
 import { SOQLParser } from './SOQLParser.js';
 
@@ -40,6 +40,28 @@ export interface SOQLLinterRule {
 
   // returns true if the rule applies e.g SOQL does not have a where clause
   test?(soqlTree: SOQLTree, stack: Stack): boolean;
+}
+
+/**
+ * The platform optimiser's verdict on a query, from a plan line rather than from
+ * a parse — so these are constructed, not registered with {@link SOQLLinter}.
+ * They live here so one wording serves every view that reports a plan.
+ */
+export class QueryPlanCostRule implements SOQLLinterRule {
+  summary = 'Query is not selective.';
+  severity: Severity = 'Error';
+  message: string;
+
+  constructor(relativeCost: number) {
+    this.message = `The query optimiser gave the query a relative cost of ${relativeCost}. A cost above 1 means no index could be used. Filter on an indexed field, and keep the filter selective enough for the index to be worth using.`;
+  }
+}
+
+export class TableScanRule implements SOQLLinterRule {
+  summary = 'Full table scan.';
+  severity: Severity = 'Warning';
+  message =
+    'The optimiser read every record of the object because no filter matched an index. Add a filter on an indexed field.';
 }
 
 class UnboundedSOQLRule implements SOQLLinterRule {
@@ -122,9 +144,9 @@ class NegativeFilterOperatorRule implements SOQLLinterRule {
 }
 
 class OrderByWithoutLimitRule implements SOQLLinterRule {
-  summary = 'Avoid ORDER BY unless the result set needs to be ordered, it can increase query time.';
+  summary = 'ORDER BY without a LIMIT.';
   message =
-    "An ORDER BY clause doesn't have anything to do with selectivity. Selectivity is determined by available indexes that align with filter conditions (WHERE clause) and record visibility (sharing rules, etc.). Once the optimizer determines which rows to return, it applies the ORDER BY logic to sort the records in the return set. However an ORDER BY and LIMIT can sometimes be optimizable.";
+    'Sorting costs time and does nothing for selectivity, which comes from indexes on the WHERE clause. Drop the ORDER BY unless the caller needs the order, or add a LIMIT, since ORDER BY with a LIMIT can be optimised.';
   severity: Severity = 'Info';
 
   test(soqlTree: SOQLTree, _stack: Stack): boolean {

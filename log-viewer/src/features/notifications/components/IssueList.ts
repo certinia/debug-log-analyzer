@@ -5,6 +5,7 @@ import '#vscode-elements/vscode-icon.js';
 import { LitElement, css, html, type PropertyValues, type TemplateResult } from 'lit';
 import { customElement, property, state } from 'lit/decorators.js';
 
+import { formatDuration } from '../../../core/utility/Util.js';
 import { markerColorCss } from '../../timeline/types/flamechart.types.js';
 import { SEVERITY_META, sortBySeverity, type LogIssue } from '../types.js';
 
@@ -74,7 +75,7 @@ export class IssueList extends LitElement {
       }
 
       .issue--action:hover {
-        background-color: var(--vscode-list-hoverBackground);
+        background-color: var(--lana-row-hover-bg);
       }
 
       .issue__body {
@@ -93,9 +94,38 @@ export class IssueList extends LitElement {
 
       .issue__summary {
         font-weight: 600;
-        font-size: 12px;
+        font-size: var(--lana-text-base);
         flex: 1 1 auto;
         min-width: 0;
+      }
+
+      /* The meta line under the summary: kind pill, then the moment in the log. Its own
+         row rather than a trailing decoration so the summary's clamp keeps the full width,
+         and so fatal/thrown pairs with identical summaries stay distinguishable at a
+         glance. The line-height sizes the pill's box too, so a pill-less row is the same
+         height. */
+      .issue__meta {
+        display: flex;
+        align-items: center;
+        flex-wrap: wrap;
+        gap: var(--lana-space-xs);
+        font-size: var(--lana-text-sm);
+        /* A length, not a ratio: the pill's smaller text would compute a shorter box. */
+        line-height: calc(var(--lana-text-sm) * 1.45);
+        color: var(--lana-fg-muted);
+      }
+
+      /* Kind pill (e.g. "Fatal error" vs "Exception") — the severity glyph says how bad,
+         the pill says what kind, so the summary can stay the raw message. */
+      .issue__label {
+        flex: 0 0 auto;
+        font-size: var(--lana-text-xs);
+        font-weight: 600;
+        padding: 0 var(--lana-space-xs);
+        border-radius: var(--lana-radius-sm);
+        color: var(--lana-badge-fg);
+        background-color: var(--lana-badge-bg);
+        white-space: nowrap;
       }
 
       /* Most summaries are a short label, but a FATAL ERROR carries the whole exception:
@@ -112,9 +142,8 @@ export class IssueList extends LitElement {
       /* Stack traces are code: keep their line breaks and their font, so each
          "at Class.method" frame reads as a frame, not one run-on paragraph. */
       .issue__message {
-        font-size: var(--vscode-editor-font-size);
-        font-family: var(--vscode-editor-font-family);
-        color: var(--vscode-descriptionForeground);
+        font-family: var(--lana-font-mono);
+        color: var(--lana-fg-muted);
         white-space: pre-wrap;
       }
 
@@ -219,7 +248,11 @@ export class IssueList extends LitElement {
 
   private _card(issue: LogIssue, index: number): TemplateResult {
     const action = issue.action;
-    const label = action ? `${issue.summary} — ${action.label}` : issue.summary;
+    // One composition for meta, title and aria, so the three can never drift apart.
+    const time = issue.timestamp !== null ? formatDuration(issue.timestamp) : null;
+    const meta = [issue.label, time].filter(Boolean);
+    const head = meta.length ? `${issue.summary} (${meta.join(', ')})` : issue.summary;
+    const label = action ? `${head} — ${action.label}` : head;
 
     // The card is a group, not a button: its message can itself be a button, and a control
     // inside a control is neither valid ARIA nor navigable. Pointer clicks still activate the
@@ -258,6 +291,16 @@ export class IssueList extends LitElement {
               : ''
           }
         </div>
+        ${
+          meta.length
+            ? // No issue__clamp/data-index here: _measure() must only ever see messages.
+              html`<div class="issue__meta">
+                ${issue.label ? html`<span class="issue__label">${issue.label}</span>` : ''}
+                ${issue.label && time ? html`<span>·</span>` : ''}
+                ${time ? html`<span>${time}</span>` : ''}
+              </div>`
+            : ''
+        }
         ${this._message(issue, index)}
       </div>
     </div>`;

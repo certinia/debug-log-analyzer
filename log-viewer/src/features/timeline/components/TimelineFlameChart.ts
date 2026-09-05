@@ -50,11 +50,7 @@ export class TimelineFlameChart extends LitElement {
         background: var(--vscode-inputValidation-errorBackground, #ffebee);
         border: var(--lana-stroke) solid var(--vscode-inputValidation-errorBorder, #ef5350);
         border-radius: var(--lana-radius-sm);
-        color: var(
-          --vscode-inputValidation-errorForeground,
-          var(--vscode-errorForeground, #c62828)
-        );
-        font-family: monospace;
+        color: var(--vscode-inputValidation-errorForeground, var(--lana-severity-error));
         max-width: 80%;
         text-align: center;
       }
@@ -65,8 +61,7 @@ export class TimelineFlameChart extends LitElement {
         left: 50%;
         transform: translate(-50%, -50%);
         padding: var(--lana-space-lg);
-        color: var(--vscode-descriptionForeground, #999);
-        font-family: monospace;
+        color: var(--lana-fg-muted);
       }
     `,
   ];
@@ -100,6 +95,13 @@ export class TimelineFlameChart extends LitElement {
   navigateToEventIndex: number | undefined = undefined;
 
   /**
+   * Show the hover/selection details panel. A property, not a setter, so the value
+   * survives a chart re-initialisation.
+   */
+  @property({ type: Boolean })
+  showTooltip = true;
+
+  /**
    * Optional configuration options.
    */
   @state()
@@ -123,6 +125,9 @@ export class TimelineFlameChart extends LitElement {
   /** Unsubscribe for the appearance subscription; set while connected. */
   private themeUnsubscribe: (() => void) | null = null;
 
+  /** Bumped by every `cleanup()`, so an in-flight `init` can tell it was superseded. */
+  private initEpoch = 0;
+
   override connectedCallback(): void {
     super.connectedCallback();
     this.themeUnsubscribe ??= themeObserver.on(() => {
@@ -133,6 +138,9 @@ export class TimelineFlameChart extends LitElement {
   override disconnectedCallback(): void {
     this.themeUnsubscribe?.();
     this.themeUnsubscribe = null;
+    // A `lana.timeline.legacy` toggle swaps this element out while the panel is
+    // open, so the Pixi app has to go with it or its WebGL context leaks.
+    this.cleanup();
     super.disconnectedCallback();
   }
 
@@ -151,6 +159,12 @@ export class TimelineFlameChart extends LitElement {
       // category palette moved, so the CSS reads stay untouched — a quick-pick
       // preview sends one of these per keystroke.
       this.apexLogTimeline?.setTheme(this.themeName ?? '');
+    }
+
+    // Independent of the branch above: `initializeTimeline` is async, so the flag is
+    // also applied when the timeline appears (see `initializeTimeline`).
+    if (changedProperties.has('showTooltip')) {
+      this.apexLogTimeline?.setTooltipEnabled(this.showTooltip);
     }
   }
 
@@ -196,14 +210,25 @@ export class TimelineFlameChart extends LitElement {
         editorColors: this.extractEditorColors(),
       };
 
-      this.apexLogTimeline = new ApexLogTimeline();
-      await this.apexLogTimeline.init(this.containerRef, this.apexLog, optionsWithTheme);
+      const epoch = this.initEpoch;
+      const timeline = new ApexLogTimeline();
+      await timeline.init(this.containerRef, this.apexLog, optionsWithTheme);
+
+      // `init` is async, so a second re-init (or a disconnect) can land while it
+      // runs. The later one owns the container — drop this Pixi app instead of
+      // leaking it over the top.
+      if (epoch !== this.initEpoch) {
+        timeline.destroy();
+        return;
+      }
+      this.apexLogTimeline = timeline;
+      timeline.setTooltipEnabled(this.showTooltip);
 
       // Navigate after initialization completes, preferring unique eventIndex.
       if (this.navigateToEventIndex !== undefined) {
-        this.apexLogTimeline.navigateToEventIndex(this.navigateToEventIndex);
+        timeline.navigateToEventIndex(this.navigateToEventIndex);
       } else if (this.navigateToTimestamp !== undefined) {
-        this.apexLogTimeline.navigateToTimestamp(this.navigateToTimestamp);
+        timeline.navigateToTimestamp(this.navigateToTimestamp);
       }
     } catch (error) {
       this.handleError(error);
@@ -271,6 +296,9 @@ export class TimelineFlameChart extends LitElement {
    * Clean up renderer and observers.
    */
   private cleanup(): void {
+    // Supersede any in-flight `initializeTimeline`.
+    this.initEpoch++;
+
     // Destroy renderer
     if (this.apexLogTimeline) {
       this.apexLogTimeline.destroy();

@@ -143,9 +143,9 @@ export class AreaZoomRenderer {
     // Update label content - duration, time range, and instruction
     this.labelElement.innerHTML = `
       <div style="text-align: center;">
-        <div style="font-size: 14px; font-weight: 600;">${durationStr}</div>
-        <div style="font-size: 11px; opacity: 0.8; margin-top: 2px;">${startStr} → ${endStr}</div>
-        <div style="font-size: 10px; opacity: 0.6; margin-top: 4px;">Release to zoom</div>
+        <div style="font-size: var(--lana-text-lg); font-weight: 600;">${durationStr}</div>
+        <div style="font-size: var(--lana-text-sm); opacity: 0.8; margin-top: 2px;">${startStr} → ${endStr}</div>
+        <div style="font-size: var(--lana-text-xs); opacity: 0.6; margin-top: 4px;">Release to zoom</div>
       </div>
     `;
 

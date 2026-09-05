@@ -1,9 +1,14 @@
 @use '../../../tabulator/style/DataGrid';
 
+/* The statement under the pointer in the inspector (LOCATED_ROW_CLASS). */
+.tabulator-row.located-row {
+  background-color: var(--lana-row-hover-bg);
+}
+
 .db-group-row {
   display: flex;
   min-width: 0;
-  font-family: monospace;
+  font-family: var(--lana-font-mono);
 }
 .db-group-row__title {
   white-space: pre-wrap;

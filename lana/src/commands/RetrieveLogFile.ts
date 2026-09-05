@@ -1,22 +1,19 @@
 /*
  * Copyright (c) 2020 Certinia Inc. All rights reserved.
  */
-import type { LogRecord } from '@salesforce/apex-node';
-import { existsSync } from 'fs';
-import { join, parse } from 'path';
 import {
   window,
+  workspace,
   type QuickPick as VSCodeQuickPick,
   type QuickPickItem,
   type WebviewPanel,
 } from 'vscode';
+import { Utils } from 'vscode-uri';
 
 import { appName } from '../AppSettings.js';
 import type { Context } from '../Context.js';
 import { Item, Options, QuickPick } from '../display/QuickPick.js';
-import { QuickPickWorkspace } from '../display/QuickPickWorkspace.js';
-import { GetLogFile } from '../salesforce/logs/GetLogFile.js';
-import { GetLogFiles } from '../salesforce/logs/GetLogFiles.js';
+import type { ApexLogListItem } from '../services/salesforceServices.js';
 import { Command } from './Command.js';
 import { LogView } from './LogView.js';
 
@@ -37,6 +34,8 @@ class DebugLogItem extends Item {
 }
 
 export class RetrieveLogFile {
+  private static servicesDisposalRegistered = false;
+
   static apply(context: Context): void {
     new Command('retrieveLogFile', 'Log: Retrieve Apex Log And Show Analysis', () =>
       RetrieveLogFile.safeCommand(context),
@@ -54,15 +53,57 @@ export class RetrieveLogFile {
   }
 
   private static async command(context: Context): Promise<WebviewPanel | void> {
-    const ws = await QuickPickWorkspace.pickOrReturn(context);
+    const salesforceServices = await import('../services/salesforceServices.js');
+    if (!(await salesforceServices.ensureServicesAvailable())) {
+      return;
+    }
+
+    // Disposal is registered here, not in deactivate(), so shutdown never loads this chunk
+    // when the command was not used.
+    if (!RetrieveLogFile.servicesDisposalRegistered) {
+      RetrieveLogFile.servicesDisposalRegistered = true;
+      context.context.subscriptions.push({
+        dispose: () => {
+          salesforceServices.disposeServices().catch(() => {});
+        },
+      });
+    }
+
+    const workspaceFolder = workspace.workspaceFolders?.[0];
+    if (!workspaceFolder) {
+      throw new Error('No workspace selected');
+    }
     const loadingPicker = RetrieveLogFile.showLoadingPicker();
     try {
-      const logFiles = await GetLogFiles.apply(ws);
+      const logFiles = await salesforceServices.listLogs();
       const logFileId = await RetrieveLogFile.getLogFile(logFiles);
       if (logFileId) {
-        const logFilePath = this.getLogFilePath(ws, logFileId);
-        const writeLogFile = this.writeLogFile(ws, logFilePath);
-        return LogView.createView(context, writeLogFile, logFilePath);
+        const logUri = Utils.joinPath(
+          workspaceFolder.uri,
+          '.sfdx',
+          'tools',
+          'debug',
+          'logs',
+          `${logFileId}.log`,
+        );
+        if (await salesforceServices.fileOrFolderExists(logUri)) {
+          return LogView.createView(context, Promise.resolve(), logUri);
+        }
+
+        // Open the panel first and retrieve behind it. The body only crosses the webview
+        // message channel when it could not be cached, so the webview streams it from disk.
+        const retrieveLog = (async (): Promise<string | void> => {
+          const logData = await salesforceServices.getLogBody(logFileId);
+          RetrieveLogFile.assertRetrievedLog(logFileId, logData);
+          try {
+            await salesforceServices.writeFile(logUri, logData);
+          } catch (error: unknown) {
+            const message = error instanceof Error ? error.message : String(error);
+            context.display.output(`Unable to cache retrieved log: ${message}`, true);
+            return logData;
+          }
+        })();
+        return LogView.createView(context, retrieveLog, logUri);
       }
     } finally {
       loadingPicker.dispose();
@@ -78,7 +119,7 @@ export class RetrieveLogFile {
     return qp;
   }
 
-  private static async getLogFile(files: LogRecord[]): Promise<string | null> {
+  private static async getLogFile(files: ApexLogListItem[]): Promise<string | null> {
     const items = files
       .sort((a, b) => {
         const aDate = Date.parse(a.StartTime);
@@ -86,8 +127,8 @@ export class RetrieveLogFile {
         return bDate - aDate;
       })
       .map((r) => {
-        const name = `${r.LogUser.Name} - ${r.Operation}`;
-        const description = `${(r.LogLength / 1024).toFixed(2)} KB ${this.formatDuration(r.DurationMilliseconds)}`;
+        const name = `${r.LogUser?.Name ?? 'Unknown user'} - ${r.Operation ?? 'Unknown operation'}`;
+        const description = `${(r.LogLength / 1024).toFixed(2)} KB ${this.formatDuration(r.DurationMilliseconds ?? 0)}`;
         const detail = `${new Date(r.StartTime).toLocaleString()} - ${r.Status} - ${r.Id}`;
         return new DebugLogItem(name, description, detail, r.Id);
       });
@@ -145,17 +186,11 @@ export class RetrieveLogFile {
     return Math.round(value * precision) / precision;
   }
 
-  private static getLogFilePath(ws: string, fileId: string): string {
-    const logDirectory = join(ws, '.sfdx', 'tools', 'debug', 'logs');
-    const logFilePath = join(logDirectory, `${fileId}.log`);
-    return logFilePath;
-  }
-
-  private static async writeLogFile(ws: string, logPath: string) {
-    const logExists = existsSync(logPath);
-    if (!logExists) {
-      const logfilePath = parse(logPath);
-      await GetLogFile.apply(ws, logfilePath.dir, logfilePath.name);
+  private static assertRetrievedLog(logId: string, logData: string): void {
+    if (/^access\s*denied$/i.test(logData.trim())) {
+      throw new Error(
+        `Salesforce denied access to the body of Apex log ${logId}. Verify that the authenticated user can access ApexLog records and their bodies.`,
+      );
     }
   }
 }

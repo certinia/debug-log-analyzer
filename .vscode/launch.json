@@ -9,7 +9,11 @@
       "name": "Run Extension",
       "type": "extensionHost",
       "request": "launch",
-      "args": ["--extensionDevelopmentPath=${workspaceFolder}/lana", "--disable-extensions"],
+      "args": [
+        "--profile=lana-dev",
+        "${workspaceFolder}/sample-app",
+        "--extensionDevelopmentPath=${workspaceFolder}/lana"
+      ],
       "outFiles": ["${workspaceFolder}/lana/out/**/*.js"],
       "localRoot": "${workspaceFolder}/lana"
     },
@@ -21,8 +25,9 @@
       "type": "extensionHost",
       "request": "launch",
       "args": [
-        "--extensionDevelopmentPath=${workspaceFolder}/${input:worktree}/lana",
-        "--disable-extensions"
+        "--profile=lana-dev",
+        "${workspaceFolder}/${input:worktree}/sample-app",
+        "--extensionDevelopmentPath=${workspaceFolder}/${input:worktree}/lana"
       ],
       "outFiles": ["${workspaceFolder}/${input:worktree}/lana/out/**/*.js"],
       "localRoot": "${workspaceFolder}/${input:worktree}/lana"
@@ -32,6 +37,7 @@
       "type": "extensionHost",
       "request": "launch",
       "args": [
+        "--profile=lana-dev",
         "--extensionDevelopmentPath=${workspaceFolder}",
         "--extensionTestsPath=${workspaceFolder}/lana/out/test/suite/index"
       ],

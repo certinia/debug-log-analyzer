@@ -21,6 +21,8 @@
  */
 
 import * as PIXI from 'pixi.js';
+
+import { destroyTimelineApp } from '../rendering/pixiApp.js';
 import type { TimelineMarker, ViewportState } from '../../types/flamechart.types.js';
 import { TIMELINE_CONSTANTS } from '../../types/flamechart.types.js';
 import type { RectangleCache } from '../RectangleCache.js';
@@ -178,7 +180,7 @@ export class MinimapOrchestrator {
    * @param width - Canvas width
    * @param height - Full container height (minimap height calculated from this)
    * @param index - Timeline event index for duration/depth info
-   * @param rectangleManager - For density query and segment tree
+   * @param rectangleManager - Supplies the rectangles the density query walks
    * @param viewport - Main timeline viewport (for reading state only)
    */
   public async init(
@@ -215,12 +217,10 @@ export class MinimapOrchestrator {
     // Initialize minimap manager (state and coordinate transforms)
     this.minimapViewport = new MinimapViewport(index.totalDuration, index.maxDepth, width, height);
 
-    // Initialize density query (leverages segment tree for O(B x log N) performance)
     this.densityQuery = new MinimapDensityQuery(
-      rectangleManager.getRectsByCategory(),
+      [...rectangleManager.getRectsByCategory().values()],
       index.totalDuration,
       index.maxDepth,
-      rectangleManager.getSegmentTree(),
     );
 
     // Create minimap container on stage
@@ -254,7 +254,7 @@ export class MinimapOrchestrator {
     this.container = null;
 
     if (this.app) {
-      this.app.destroy(true, { children: true, texture: true });
+      destroyTimelineApp(this.app);
       this.app = null;
     }
 
@@ -280,13 +280,9 @@ export class MinimapOrchestrator {
       this.minimapViewport.resize(newWidth, newHeight);
     }
 
-    if (this.densityQuery) {
-      this.densityQuery.invalidateCache();
-    }
+    // No density invalidation here: it is keyed by width (see MinimapDensityQuery).
 
-    if (this.renderer) {
-      this.renderer.invalidateStatic();
-    }
+    this.invalidateStatic();
   }
 
   // ============================================================================
@@ -334,11 +330,12 @@ export class MinimapOrchestrator {
   }
 
   /**
-   * Invalidate the density cache.
-   * Call when timeline data changes.
+   * Redraw the static content after a theme change.
+   *
+   * The density is not touched: it carries category names, and the renderer resolves a
+   * colour from them at draw time.
    */
-  public invalidateCache(): void {
-    this.densityQuery?.invalidateCache();
+  public invalidateStatic(): void {
     this.renderer?.invalidateStatic();
   }
 

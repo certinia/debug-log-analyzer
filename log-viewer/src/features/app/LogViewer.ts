@@ -5,18 +5,22 @@ import '#vscode-elements/vscode-icon.js';
 import '#vscode-elements/vscode-tab-header.js';
 import '#vscode-elements/vscode-tab-panel.js';
 import '#vscode-elements/vscode-tabs.js';
+import { provide } from '@lit/context';
 import type { VscTabsSelectEvent } from '@vscode-elements/elements/dist/vscode-tabs/vscode-tabs.js';
 import { LitElement, css, html } from 'lit';
 import { customElement, property, state } from 'lit/decorators.js';
 
 import { parse, type ApexLog } from 'apex-log-parser';
-import { eventBus } from '../../core/events/EventBus.js';
+import { TAB_TO_SOURCE, eventBus } from '../../core/events/EventBus.js';
+import { logContext } from '../../core/log/logContext.js';
+import { setCurrentLog, type LogStore } from '../../core/log/LogStore.js';
 import {
   VSCodeExtensionMessenger,
   vscodeMessenger,
 } from '../../core/messaging/VSCodeExtensionMessenger.js';
-import { DatabaseAccess } from '../database/services/Database.js';
 import type { LogIssue } from '../notifications/types.js';
+import { installEscapeDeselect } from './escapeDeselect.js';
+import { deriveLogIdentity, type LogIdentityData } from './logIdentity.js';
 import { toLogIssue } from './logIssues.js';
 import { parserIssuesToNotifications } from './parserNotifications.js';
 
@@ -51,8 +55,16 @@ export class LogViewer extends LitElement {
   /** Notifications about the tool — today, parser diagnostics. */
   @property({ attribute: false })
   notifications: readonly LogIssue[] = [];
+  /** Transaction identity for the header. `null` until the first log is parsed. */
+  @property({ attribute: false })
+  logIdentity: LogIdentityData | null = null;
   @property()
   timelineRoot: ApexLog | null = null;
+
+  /** The log every view reads. A new log is a new store, so consumers re-render. */
+  @provide({ context: logContext })
+  @state()
+  private _logStore: LogStore | null = null;
 
   @state()
   _selectedTab = 'timeline-tab';
@@ -83,7 +95,7 @@ export class LogViewer extends LitElement {
       }
 
       vscode-tabs {
-        --vscode-panel-background: var(--vscode-editor-background);
+        --vscode-panel-background: var(--lana-editor-bg);
 
         display: flex;
         flex-direction: column;
@@ -112,8 +124,8 @@ export class LogViewer extends LitElement {
         display: flex;
         align-items: center;
         column-gap: 0.3em;
-        font-family: var(--vscode-font-family);
-        font-size: var(--vscode-font-size, 13px);
+        font-family: var(--lana-font-ui);
+        font-size: var(--lana-text-lg);
         text-transform: none;
       }
     `,
@@ -128,6 +140,9 @@ export class LogViewer extends LitElement {
     document.addEventListener('show-tab', (e: Event) => {
       this._showTabEvent(e);
     });
+
+    // Escape, when nothing else claims it, deselects on the active tab.
+    installEscapeDeselect(() => TAB_TO_SOURCE[this._selectedTab]);
 
     // Listen for navigation messages from the extension
     VSCodeExtensionMessenger.listen<NavigateToTimelinePayload>((event) => {
@@ -148,6 +163,7 @@ export class LogViewer extends LitElement {
         .logDuration=${this.logDuration}
         .logProblems=${this.logProblems}
         .notifications=${this.notifications}
+        .logIdentity=${this.logIdentity}
         .timelineRoot=${this.timelineRoot}
       ></app-header>
 
@@ -238,15 +254,26 @@ export class LogViewer extends LitElement {
       this.logProblems = [read.error];
     }
 
-    const apexLog = parse(logData);
+    let apexLog: ApexLog;
+    try {
+      apexLog = parse(logData);
+    } catch (err) {
+      // Resolve the identity even when parsing throws, or the header's identity
+      // skeletons would pulse forever with nothing left to fill them.
+      this.logIdentity = { entryPoint: null, user: null, startTime: null };
+      throw err;
+    }
 
-    // The event-lookup service backs the inspector on every tab, so it is
-    // created with the parsed log rather than by whichever tab loads first.
-    await DatabaseAccess.create(apexLog);
+    // Published before the views render, so every tab reads the same log
+    // whichever one loads first.
+    this._logStore = setCurrentLog(apexLog);
 
     this.logSize = apexLog.size;
     this.timelineRoot = apexLog;
     this.logDuration = apexLog.duration.total;
+    // Raw text is needed for the user: USER_INFO precedes EXECUTION_STARTED, so the
+    // parser never sees it. See deriveLogIdentity.
+    this.logIdentity = deriveLogIdentity(apexLog, logData);
 
     // Rebuilt per load, never appended to: both surfaces describe *this* log, so a
     // previous log's problems must not carry over.
@@ -298,6 +325,7 @@ export class LogViewer extends LitElement {
         summary: 'Could not read log',
         message: msg,
         severity: 'error',
+        label: null,
         action: null,
         category: null,
         timestamp: null,

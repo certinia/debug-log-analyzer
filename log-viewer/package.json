@@ -8,19 +8,20 @@
     "#vscode-elements/*.js": "@vscode-elements/elements/dist/*/index.js"
   },
   "dependencies": {
-    "@apexdevtools/apex-parser": "5.1.0",
+    "@apexdevtools/apex-parser": "5.2.0",
+    "@lit/context": "^1.1.6",
     "@vscode-elements/elements": "^2.5.1",
     "@vscode/codicons": "^0.0.45",
     "antlr4": "4.13.2",
     "lit": "^3.3.3",
-    "pixi.js": "^8.19.0",
+    "pixi.js": "^8.20.1",
     "tabulator-tables": "^6.5.2"
   },
   "devDependencies": {
     "@types/jest": "^30.0.0",
     "@types/tabulator-tables": "^6.3.6",
     "lightningcss": "^1.33.0",
-    "sass": "^1.102.0",
+    "sass": "^1.103.1",
     "typescript": "npm:@typescript/typescript6@^6.0.2"
   }
 }

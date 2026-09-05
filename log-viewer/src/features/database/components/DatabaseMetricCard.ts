@@ -71,26 +71,26 @@ export class DatabaseMetricCard extends LitElement {
         align-items: baseline;
         gap: 6px;
         white-space: nowrap;
-        font-size: 0.85rem;
+        font-size: var(--lana-text-sm);
       }
 
       .stat__label {
-        font-size: 0.72rem;
-        letter-spacing: 0.06em;
+        font-size: var(--lana-text-caps);
+        letter-spacing: var(--lana-text-caps-tracking);
         text-transform: uppercase;
-        color: var(--vscode-descriptionForeground);
+        color: var(--lana-fg-muted);
       }
 
       .stat__seen {
-        font-family: var(--vscode-editor-font-family, monospace);
+        font-family: var(--lana-font-mono);
         font-variant-numeric: tabular-nums;
       }
 
       .stat__used {
-        font-family: var(--vscode-editor-font-family, monospace);
+        font-family: var(--lana-font-mono);
         font-variant-numeric: tabular-nums;
-        font-size: 0.8rem;
-        color: var(--vscode-descriptionForeground);
+        font-size: var(--lana-text-xs);
+        color: var(--lana-fg-muted);
       }
 
       .stat__used.na {
@@ -98,33 +98,33 @@ export class DatabaseMetricCard extends LitElement {
       }
 
       .stat__sep {
-        color: var(--vscode-descriptionForeground);
+        color: var(--lana-fg-muted);
       }
 
       .stat__track {
         display: block;
         width: 100%;
         height: 3px;
-        border-radius: 2px;
-        background: var(--vscode-editorWidget-border, var(--vscode-panel-border));
+        border-radius: var(--lana-radius-pill);
+        background: var(--lana-surface-border);
         overflow: hidden;
       }
 
       .stat__fill {
         display: block;
         height: 100%;
-        border-radius: 2px;
+        border-radius: var(--lana-radius-pill);
         transition: width 150ms ease;
       }
 
       .stat__fill--safe {
-        background: var(--vscode-charts-green, #388a34);
+        background: var(--lana-severity-ok);
       }
       .stat__fill--warn {
-        background: var(--vscode-charts-yellow, var(--vscode-editorWarning-foreground));
+        background: var(--lana-severity-warning);
       }
       .stat__fill--danger {
-        background: var(--vscode-errorForeground, #f14c4c);
+        background: var(--lana-severity-error);
       }
 
       @media (prefers-reduced-motion: reduce) {

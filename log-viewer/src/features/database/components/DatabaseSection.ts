@@ -54,7 +54,7 @@ export class DatabaseSection extends LitElement {
       }
 
       .header:hover {
-        background: var(--vscode-list-hoverBackground);
+        background: var(--lana-row-hover-bg);
       }
 
       .title-group {
@@ -65,7 +65,7 @@ export class DatabaseSection extends LitElement {
 
       .chevron {
         flex: 0 0 auto;
-        color: var(--vscode-descriptionForeground);
+        color: var(--lana-fg-muted);
         transition: transform 150ms ease;
       }
 
@@ -75,7 +75,7 @@ export class DatabaseSection extends LitElement {
 
       .title {
         font-weight: 600;
-        font-size: 1.05rem;
+        font-size: var(--lana-text-lg);
         letter-spacing: 0.02em;
       }
 

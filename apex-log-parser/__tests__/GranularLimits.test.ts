@@ -46,6 +46,7 @@ describe('granular limit parsing (via parse)', () => {
     '09:18:22.6 (300)|LIMIT_USAGE|[89]|SOQL|1|100\n' +
     '09:18:22.6 (350)|LIMIT_USAGE|[89]|FIELDS_DESCRIBES|1|100\n' +
     '09:18:22.6 (400)|FLOW_BULK_ELEMENT_LIMIT_USAGE|1 SOQL queries, total 5 out of 100\n' +
+    '09:18:22.6 (410)|FLOW_BULK_ELEMENT_LIMIT_USAGE|SOQL queries, total 6 out of 100\n' +
     '09:18:22.6 (420)|FLOW_ELEMENT_LIMIT_USAGE|2 ms CPU time, total 10 out of 15000\n' +
     '09:18:22.6 (450)|FLOW_INTERVIEW_FINISHED_LIMIT_USAGE|DML statements: 3 out of 150\n' +
     CUMULATIVE_BLOCK +
@@ -66,16 +67,27 @@ describe('granular limit parsing (via parse)', () => {
     expect(describes?.limitUsage).toBeNull();
   });
 
-  it('parses flow running-total reports (uses the total as used)', () => {
+  it('parses flow running-total reports (uses the total as used, the leading count as delta)', () => {
     expect(byType('FLOW_BULK_ELEMENT_LIMIT_USAGE')[0]?.limitUsage).toEqual({
       metric: 'soqlQueries',
       used: 5,
       limit: 100,
+      delta: 1,
     });
     expect(byType('FLOW_ELEMENT_LIMIT_USAGE')[0]?.limitUsage).toEqual({
       metric: 'cpuTime',
       used: 10,
       limit: 15000,
+      delta: 2,
+    });
+  });
+
+  it('keeps a running-total report whose head has no leading count, with a zero delta', () => {
+    expect(byType('FLOW_BULK_ELEMENT_LIMIT_USAGE')[1]?.limitUsage).toEqual({
+      metric: 'soqlQueries',
+      used: 6,
+      limit: 100,
+      delta: 0,
     });
   });
 

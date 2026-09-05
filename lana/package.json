@@ -31,6 +31,7 @@
   ],
   "type": "module",
   "main": "out/Main.js",
+  "browser": "out/web/Main.web.cjs",
   "icon": "./certinia-icon-color.png",
   "galleryBanner": {
     "color": "#000000",
@@ -47,14 +48,18 @@
     "url": "https://github.com/certinia/debug-log-analyzer.git"
   },
   "engines": {
-    "vscode": "^1.100.0"
+    "vscode": "^1.102.0"
   },
   "categories": [
     "Other"
   ],
+  "capabilities": {
+    "virtualWorkspaces": true
+  },
   "activationEvents": [
     "onLanguage:apexlog",
-    "onStartupFinished"
+    "onStartupFinished",
+    "onFileSystem:memfs"
   ],
   "contributes": {
     "commands": [
@@ -279,19 +284,26 @@
               }
             }
           },
+          "lana.timeline.showTooltip": {
+            "title": "Show frame details on hover",
+            "type": "boolean",
+            "default": true,
+            "markdownDescription": "Show a details panel when you hover or select a frame on the Timeline. The Inspector shows the same details for the selected frame. Default: `true`",
+            "order": 2
+          },
           "lana.timeline.legacy": {
             "title": "Use legacy Timeline",
             "type": "boolean",
             "default": false,
             "markdownDescription": "Temporary fallback to the legacy Timeline; will be removed in a future release. Default: `false`",
-            "order": 2
+            "order": 3
           },
           "lana.timeline.colors": {
             "type": "object",
             "title": "Timeline Event Colors",
             "markdownDescription": "Hex colors for each event type on the **legacy** Timeline (`#lana.timeline.legacy#`), which is being phased out. The current Timeline is themed via `#lana.timeline.activeTheme#` / `#lana.timeline.customThemes#`.",
             "additionalProperties": false,
-            "order": 3,
+            "order": 4,
             "default": {
               "Code Unit": "#88AE58",
               "Workflow": "#51A16E",
@@ -371,18 +383,21 @@
     ]
   },
   "scripts": {
-    "vscode:prepublish": "pnpm -w run build && pnpm -w run copy:package-docs"
+    "build:vsix": "vsce package --no-dependencies",
+    "vscode:prepublish": "pnpm -w run build && pnpm -w run copy:package-docs",
+    "vscode:bundle": "pnpm -w run build"
   },
   "dependencies": {
-    "@apexdevtools/apex-ls": "^6.0.2",
-    "@apexdevtools/apex-parser": "5.1.0",
-    "@salesforce/apex-node": "^8.4.39",
-    "@salesforce/core": "^8.32.6"
+    "@apexdevtools/apex-parser": "5.2.0",
+    "effect": "^3.22.0",
+    "vscode-uri": "^3.2.0"
   },
   "devDependencies": {
+    "@salesforce/vscode-services": "^67.15.0",
     "@types/jest": "^30.0.0",
-    "@types/node": "~22.16.5",
-    "@types/vscode": "~1.100.0",
+    "@types/node": "~22.20.1",
+    "@types/vscode": "~1.102.0",
+    "@vscode/vsce": "^3.9.2",
     "typescript": "npm:@typescript/typescript6@^6.0.2"
   }
 }

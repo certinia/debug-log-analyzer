@@ -186,8 +186,8 @@ export class RectangleCache {
   }
 
   /**
-   * Get spatial index of rectangles by category.
-   * Used for search functionality and segment tree construction.
+   * Get the rectangles, grouped by category and each ascending by timeStart.
+   * Read by the legacy culler and by the minimap, which sweeps them for its skyline.
    *
    * @returns Map of category to rectangles
    */
@@ -213,16 +213,6 @@ export class RectangleCache {
     depthEnd: number,
   ): LogEvent[] {
     return this.segmentTree.queryEventsInRegion(timeStart, timeEnd, depthStart, depthEnd);
-  }
-
-  /**
-   * Get the underlying segment tree for direct queries.
-   * Used by MinimapDensityQuery for O(B×log N) density computation.
-   *
-   * @returns The TemporalSegmentTree instance
-   */
-  public getSegmentTree(): TemporalSegmentTree {
-    return this.segmentTree;
   }
 
   // ============================================================================

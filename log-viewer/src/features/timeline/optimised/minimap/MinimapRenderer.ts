@@ -261,8 +261,8 @@ export class MinimapRenderer {
       background: var(--tl-widget-background, #252526);
       border: 1px solid var(--tl-widget-border, #454545);
       color: #e3e3e3;
-      font-family: monospace;
-      font-size: 10px;
+      font-family: var(--lana-font-mono);
+      font-size: var(--lana-text-xs);
       font-weight: lighter;
       pointer-events: none;
       z-index: 100;

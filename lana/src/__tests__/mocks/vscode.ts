@@ -12,6 +12,7 @@
 // a drift from `@types/vscode` surfaces as ONE error at the factory, not at
 // every call site.
 import type { EndOfLine, TextDocument } from 'vscode';
+import { URI, Utils } from 'vscode-uri';
 
 // Track subscriptions for cleanup
 const subscriptions: { dispose: jest.Mock }[] = [];
@@ -89,35 +90,54 @@ export class Range {
   }
 }
 
-// Mock Uri class
+// Mock Selection class (a Range anchored between two positions)
+export class Selection extends Range {
+  readonly anchor: Position;
+  readonly active: Position;
+
+  constructor(anchor: Position, active: Position) {
+    super(anchor, active);
+    this.anchor = anchor;
+    this.active = active;
+  }
+}
+
+// Mock ViewColumn enum (members used by the extension)
+export const ViewColumn = {
+  Active: -1,
+  Beside: -2,
+  One: 1,
+  Two: 2,
+} as const;
+export type ViewColumn = (typeof ViewColumn)[keyof typeof ViewColumn];
+
+// Delegate URI semantics to vscode-uri so virtual URI tests match VS Code.
 export const Uri = {
-  file: jest.fn((path: string) => ({
-    scheme: 'file',
-    authority: '',
-    path,
-    fsPath: path,
-    query: '',
-    fragment: '',
-    with: jest.fn(),
-    toString: jest.fn(() => `file://${path}`),
-    toJSON: jest.fn(() => ({ scheme: 'file', path, fsPath: path })),
-  })),
-  parse: jest.fn((value: string) => ({
-    scheme: value.startsWith('file://') ? 'file' : 'unknown',
-    authority: '',
-    path: value.replace('file://', ''),
-    fsPath: value.replace('file://', ''),
-    query: '',
-    fragment: '',
-    with: jest.fn(),
-    toString: jest.fn(() => value),
-  })),
-  joinPath: jest.fn((base, ...pathSegments) => ({
-    ...base,
-    path: [base.path, ...pathSegments].join('/'),
-    fsPath: [base.fsPath, ...pathSegments].join('/'),
-  })),
+  file: (path: string) => URI.file(path),
+  parse: (value: string) => URI.parse(value),
+  joinPath: (base: URI, ...pathSegments: string[]) => Utils.joinPath(base, ...pathSegments),
 };
+
+export class TabInputText {
+  readonly uri: ReturnType<typeof Uri.parse>;
+
+  constructor(uri: ReturnType<typeof Uri.parse>) {
+    this.uri = uri;
+  }
+}
+
+export class TabInputTextDiff {
+  readonly original: ReturnType<typeof Uri.parse>;
+  readonly modified: ReturnType<typeof Uri.parse>;
+
+  constructor(original: ReturnType<typeof Uri.parse>, modified: ReturnType<typeof Uri.parse>) {
+    this.original = original;
+    this.modified = modified;
+  }
+}
+
+// Mock RelativePattern (constructor used for glob searches)
+export const RelativePattern = jest.fn();
 
 // Mock FoldingRange class
 export class FoldingRange {
@@ -260,6 +280,10 @@ export const workspace = {
   onDidChangeTextDocument: jest.fn(() => ({ dispose: jest.fn() })),
   onDidSaveTextDocument: jest.fn(() => ({ dispose: jest.fn() })),
   openTextDocument: jest.fn(),
+  findFiles: jest.fn(),
+  asRelativePath: jest.fn((uri: { fsPath: string } | string) =>
+    typeof uri === 'string' ? uri : uri.fsPath,
+  ),
   fs: {
     readFile: jest.fn(),
     writeFile: jest.fn(),
@@ -270,6 +294,10 @@ export const workspace = {
     rename: jest.fn(),
     copy: jest.fn(),
   },
+};
+
+export const extensions = {
+  getExtension: jest.fn(),
 };
 
 // Mock window
@@ -314,6 +342,13 @@ export const window = {
     replace: jest.fn(),
   })),
   createWebviewPanel: jest.fn(),
+  tabGroups: {
+    activeTabGroup: { activeTab: undefined as { input: unknown } | undefined },
+    all: [] as { tabs: { input: unknown }[] }[],
+    onDidChangeTabs: jest.fn((_listener: (event: unknown) => unknown) => ({
+      dispose: jest.fn(),
+    })),
+  },
   activeTextEditor: undefined as unknown,
   visibleTextEditors: [],
   onDidChangeActiveTextEditor: jest.fn(() => ({ dispose: jest.fn() })),
@@ -340,6 +375,7 @@ export const commands = {
 
 // Mock languages
 export const languages = {
+  setTextDocumentLanguage: jest.fn().mockResolvedValue(undefined),
   registerFoldingRangeProvider: jest.fn((_selector, _provider) => {
     const disposable = { dispose: jest.fn() };
     subscriptions.push(disposable);
@@ -509,17 +545,30 @@ export const resetMocks = (): void => {
 
   // Reset workspace folders
   workspace.workspaceFolders = [];
+  workspace.textDocuments = [];
 
   // Reset active editor
   window.activeTextEditor = undefined;
   window.visibleTextEditors = [];
+  window.tabGroups.activeTabGroup.activeTab = undefined;
+  window.tabGroups.all = [];
+};
+
+/** Arranges open tabs for isOpenAsTextTab; one group is enough for most tests. */
+export const setOpenTabs = (...inputs: unknown[]): void => {
+  window.tabGroups.all = [{ tabs: inputs.map((input) => ({ input })) }];
 };
 
 // Export as default for module replacement
 export default {
   Position,
   Range,
+  Selection,
+  ViewColumn,
   Uri,
+  TabInputText,
+  TabInputTextDiff,
+  RelativePattern,
   FoldingRange,
   FoldingRangeKind,
   Hover,
@@ -527,6 +576,7 @@ export default {
   ThemeColor,
   ConfigurationTarget,
   workspace,
+  extensions,
   window,
   commands,
   languages,

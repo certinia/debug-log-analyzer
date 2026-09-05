@@ -71,6 +71,24 @@ const DEFAULT_LIMITS = new Map<string, number>([
   ['mobileApexPushCalls', 10],
 ]);
 
+/** Memo of {@link buildApexLimitTimeSeries} per log: the walk visits the full event
+ *  tree, and the series feeds two surfaces — the metric strip and the inspector's
+ *  governor trend charts — which must chart the same figures. */
+const seriesCache = new WeakMap<ApexLog, HeatStripTimeSeries>();
+
+/**
+ * The log's governor-limit time series, built once per log (see
+ * {@link buildApexLimitTimeSeries}) and shared by every consumer.
+ */
+export function apexLimitTimeSeries(apexLog: ApexLog): HeatStripTimeSeries {
+  let series = seriesCache.get(apexLog);
+  if (!series) {
+    series = buildApexLimitTimeSeries(apexLog);
+    seriesCache.set(apexLog, series);
+  }
+  return series;
+}
+
 /**
  * Build the dense governor-limit time series for the metric strip.
  *
@@ -80,13 +98,10 @@ const DEFAULT_LIMITS = new Map<string, number>([
  * `LIMIT_USAGE` / flow `*_LIMIT_USAGE` reports) add intermediate data points so the line
  * rises as usage happens rather than only at code-unit boundaries.
  *
- * @param apexLog - Parsed log providing cumulative snapshots and authoritative limits.
- * @param events - Top-level log events; the full tree is walked for granular deltas.
+ * @param apexLog - Parsed log providing cumulative snapshots, authoritative limits and the
+ * event tree, which is walked in full for granular deltas.
  */
-export function buildApexLimitTimeSeries(
-  apexLog: ApexLog,
-  events: LogEvent[],
-): HeatStripTimeSeries {
+function buildApexLimitTimeSeries(apexLog: ApexLog): HeatStripTimeSeries {
   const metrics = new Map<string, HeatStripMetric>();
   for (const [key, metric] of APEX_METRICS) {
     metrics.set(key, metric);
@@ -110,6 +125,7 @@ export function buildApexLimitTimeSeries(
         namespace: snapshot.namespace,
         metric,
         used: value.used,
+        scope: 'cumulative',
       });
       if (value.limit > 0) {
         metricLimits.set(metric, Math.max(metricLimits.get(metric) ?? 0, value.limit));
@@ -129,10 +145,10 @@ export function buildApexLimitTimeSeries(
   };
 
   // Detailed events — granular deltas and finer-grained absolute reports. Walk the FULL tree:
-  // events holds only top-level nodes, but SOQL/DML/heap events live deep in the call tree.
-  // Iterative DFS avoids stack overflow on large logs. Counts are read from the parser's per-event
-  // counters, each from its canonical owner event to avoid double-counting.
-  const stack: LogEvent[] = [...events];
+  // apexLog.children holds only top-level nodes, but SOQL/DML/heap events live deep in the call
+  // tree. Iterative DFS avoids stack overflow on large logs. Counts are read from the parser's
+  // per-event counters, each from its canonical owner event to avoid double-counting.
+  const stack: LogEvent[] = [...apexLog.children];
   while (stack.length > 0) {
     const event = stack.pop()!;
     const children = event.children;
@@ -185,6 +201,8 @@ export function buildApexLimitTimeSeries(
             namespace,
             metric: usage.metric,
             used: usage.used,
+            // Each of these lines reports the block it closes, not the transaction.
+            scope: 'scoped',
           });
         }
         break;

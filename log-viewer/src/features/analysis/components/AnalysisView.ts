@@ -14,6 +14,17 @@ import type { ApexLog } from 'apex-log-parser';
 import '../../../components/ContextMenu.js';
 import type { ContextMenu } from '../../../components/ContextMenu.js';
 import { eventBus } from '../../../core/events/EventBus.js';
+import {
+  LOCATED_ROW_CLASS,
+  LocatedRowIds,
+  LocatedRowMarker,
+  rowDetailSelection,
+  rowFrames,
+} from '../../../components/locatedRow.js';
+import { InspectorEmphasis } from '../../../components/inspectorEmphasis.js';
+import { wireInspectorTab } from '../../../components/inspectorTab.js';
+import { SelectionEchoGuard } from '../../../core/events/SelectionEchoGuard.js';
+import { eventByEventIndex } from '../../../core/utility/EventSearch.js';
 import { isVisible } from '../../../core/utility/Util.js';
 import { getSettings, updateSetting } from '../../settings/Settings.js';
 import { createBottomUpTable } from '../../call-tree/components/BottomUpTable.js';
@@ -27,12 +38,16 @@ import {
   toggleField,
 } from '../../../tabulator/ColumnViews.js';
 import type { BottomUpRow } from '../../call-tree/utils/Aggregation.js';
+import { findRootBucket } from '../../call-tree/utils/bucketRows.js';
 import {
   categoryColoringStyles,
-  categoryRowFormatter,
+  groupedRowFormatter,
   wireCategoryColoring,
 } from '../../call-tree/utils/CategoryColoring.js';
 import { expandCollapseAll } from '../../call-tree/utils/ExpandCollapse.js';
+
+import { onTableReshaped } from '../../../tabulator/module/tableReshape.js';
+import { tableHolder } from '../../../tabulator/module/tableHolder.js';
 
 import dataGridStyles from '../../../tabulator/style/DataGrid.scss';
 
@@ -62,6 +77,11 @@ export class AnalysisView extends LitElement {
         /* inset previously provided by the tab panel's padding */
         padding: 10px 6px;
         box-sizing: border-box;
+      }
+
+      /* The frame under the pointer in the inspector. */
+      .tabulator-row.${unsafeCSS(LOCATED_ROW_CLASS)} {
+        background-color: var(--lana-row-hover-bg);
       }
 
       .analysis-view {
@@ -139,9 +159,29 @@ export class AnalysisView extends LitElement {
   /** Releases the category-colouring settings subscription; set while connected. */
   private _categoryColoringOff: (() => void) | null = null;
 
+  /** Guards the programmatic select made on the inspector's behalf. */
+  private _echoGuard = new SelectionEchoGuard();
+  private _inspectorUnsubscribe: (() => void) | null = null;
+  private _locatedRow = new LocatedRowMarker();
+  private _locateIds = new LocatedRowIds();
+  private _emphasis = new InspectorEmphasis();
+
   constructor() {
     super();
 
+    this._inspectorUnsubscribe = wireInspectorTab('analysis', this._emphasis, {
+      // A row is a method bucket rather than one event, so a frame is translated
+      // into the paths of the rows it heads.
+      mark: (eventIndexes) => this._markLocated(eventIndexes),
+      // An inspector finding names one event; the grid holds it in the bucket for
+      // its method, so that bucket is what gets revealed.
+      reveal: (eventIndex, signal) => this._revealEventIndex(eventIndex, signal),
+      clear: () => {
+        // The table reports the clear itself, which is what reaches the inspector.
+        this.analysisTable?.deselectRow();
+      },
+      movesToMergedPick: true,
+    });
     document.addEventListener('lv-find', this._findEvt);
     document.addEventListener('lv-find-match', this._findEvt);
     document.addEventListener('lv-find-close', this._findEvt);
@@ -159,6 +199,60 @@ export class AnalysisView extends LitElement {
     document.removeEventListener('lv-find', this._findEvt);
     document.removeEventListener('lv-find-match', this._findEvt);
     document.removeEventListener('lv-find-close', this._findEvt);
+    this._inspectorUnsubscribe?.();
+    this._inspectorUnsubscribe = null;
+    this._locatedRow.clear();
+  }
+
+  /**
+   * Mark the buckets that hold `eventIndexes`. The grid ranks methods and expands
+   * to their callers, so one frame heads a row at every caller depth it sits in.
+   */
+  private _markLocated(eventIndexes: readonly number[]): void {
+    this._locatedRow.mark(
+      this.analysisTable?.element ?? null,
+      this._locateIds.idsFor(this.timelineRoot, eventIndexes, 'callers'),
+    );
+  }
+
+  /**
+   * Select the bucket holding `eventIndex` and scroll it into view. Guarded, so the
+   * inspector keeps the findings it was clicked in rather than being rebuilt around
+   * the row it just asked for.
+   */
+  private async _revealEventIndex(eventIndex: number, signal: AbortSignal): Promise<void> {
+    const table = this.analysisTable;
+    const root = this.timelineRoot;
+    if (!table || !root) {
+      return;
+    }
+    const event = eventByEventIndex(root, eventIndex);
+    if (!event) {
+      return;
+    }
+    // The grid is bottom-up, so the frame heads a top-level bucket its own key
+    // finds, without reading what any bucket holds.
+    const match = findRootBucket(table.getRows(), event);
+    if (!match) {
+      return;
+    }
+
+    // Show Details keeps only rows with a duration, so the buckets for debug
+    // lines, thrown exceptions and query plans are filtered out — exactly the
+    // events a finding points at. Turn the filter off rather than reveal nothing.
+    if (!this.filterState.showDetails && !this._showDetailsFilter(match.getData() as BottomUpRow)) {
+      this._handleShowDetailsChange();
+      await this.updateComplete;
+    }
+
+    if (signal.aborted) {
+      return;
+    }
+
+    await this._echoGuard.runAsync(() =>
+      //@ts-expect-error This is a custom function added in by RowNavigation custom module
+      table.goToRow(match, { scrollIfVisible: false, focusRow: false }),
+    );
   }
 
   firstUpdated(): void {
@@ -414,6 +508,9 @@ export class AnalysisView extends LitElement {
 
   _groupBy(event: Event) {
     const target = event.target as HTMLInputElement;
+    // Grouping renumbers the matches both ways round, and `dataGrouped` reports
+    // only the way that leaves the table grouped.
+    this._dropSearch();
     const fieldName =
       target.value === 'Caller Namespace' ? 'callerNamespace' : target.value.toLowerCase();
     if (this.analysisTable) {
@@ -433,6 +530,7 @@ export class AnalysisView extends LitElement {
     if (!table) {
       return;
     }
+    this._dropSearch();
     table.blockRedraw();
     table.clearFilter(false);
     if (!this.filterState.showDetails) {
@@ -456,7 +554,7 @@ export class AnalysisView extends LitElement {
     }
     table.blockRedraw();
     expandCollapseAll(table.getRows(), expand);
-    table.element?.querySelector<HTMLElement>('.tabulator-tableholder')?.focus();
+    tableHolder(table.element)?.focus();
     table.restoreRedraw();
   }
 
@@ -526,19 +624,7 @@ export class AnalysisView extends LitElement {
       rootMethod,
       {
         showDetailsFilter: this._showDetailsFilter,
-        onFilterCacheClear: () => {
-          if (!this.blockClearHighlights && this.totalMatches > 0) {
-            this._resetFindWidget();
-            this._clearSearchHighlights();
-          }
-        },
-        onRenderStarted: () => {
-          if (!this.blockClearHighlights && this.totalMatches > 0) {
-            this._resetFindWidget();
-            this._clearSearchHighlights();
-          }
-        },
-        rowFormatter: categoryRowFormatter,
+        rowFormatter: groupedRowFormatter,
       },
       {
         placeholder: 'No Analysis Available',
@@ -549,43 +635,34 @@ export class AnalysisView extends LitElement {
     );
     this.analysisTable = table;
 
-    this.analysisTable.on('dataSorted', () => {
-      if (!this.blockClearHighlights && this.totalMatches > 0) {
-        this._resetFindWidget();
-        this._clearSearchHighlights();
-      }
-    });
-
-    this.analysisTable.on('dataGrouped', () => {
-      if (!this.blockClearHighlights && this.totalMatches > 0) {
-        this._resetFindWidget();
-        this._clearSearchHighlights();
-      }
-    });
+    onTableReshaped(this.analysisTable, () => this._dropSearch());
 
     // Feed the inspector. Analysis rows merge many calls, so they
-    // scope to every occurrence of the method.
-    // No `inspector:reveal` subscription here on purpose: analysis rows are
-    // aggregates keyed by type|namespace|text, so an eventIndex only resolves
-    // back to the whole bucket - which is already the selected row.
+    // scope to every call they count.
     this.analysisTable.on('rowSelectionChanged', (_data, rows) => {
-      const data = rows[0]?.getData() as BottomUpRow | undefined;
-      const event = data?.originalData;
-      if (!event) {
-        eventBus.emit('detail:select', { source: 'analysis', selection: null });
+      if (this._echoGuard.suppressed) {
         return;
       }
-      const occurrences = data.instances?.length ? data.instances : null;
       eventBus.emit('detail:select', {
         source: 'analysis',
-        selection: occurrences
-          ? {
-              kind: 'aggregate',
-              instances: occurrences.map((e) => e.eventIndex),
-              label: data.text ?? event.text,
-            }
-          : { kind: 'event', eventIndex: event.eventIndex },
+        selection: rowDetailSelection(rows[0], this.timelineRoot),
+        // The grid ranks methods by self time and expands to their callers, so
+        // the inspector opens on the forward view instead.
+        view: 'callers',
       });
+    });
+
+    // Tell the inspector which frames the pointer is over, so it can mark the
+    // rows that stand for them. A row under a bucket is one of its callers, so it
+    // names that caller rather than the calls it conducted.
+    this.analysisTable.on('rowMouseEnter', (_e, row) => {
+      eventBus.emit('detail:locate', {
+        source: 'analysis',
+        eventIndexes: rowFrames(row, this.timelineRoot, 'callers'),
+      });
+    });
+    this.analysisTable.on('rowMouseLeave', () => {
+      eventBus.emit('detail:locate', { source: 'analysis', eventIndexes: [] });
     });
 
     await tableBuilt;
@@ -594,6 +671,14 @@ export class AnalysisView extends LitElement {
 
   _resetFindWidget() {
     document.dispatchEvent(new CustomEvent('lv-find-results', { detail: { totalMatches: 0 } }));
+  }
+
+  /** Drop the search where its match numbering no longer describes the table. */
+  _dropSearch() {
+    if (!this.blockClearHighlights && this.totalMatches > 0) {
+      this._resetFindWidget();
+      this._clearSearchHighlights();
+    }
   }
 
   _clearSearchHighlights() {

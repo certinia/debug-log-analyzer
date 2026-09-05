@@ -9,13 +9,14 @@ import { customElement, property, state } from 'lit/decorators.js';
 import { Tabulator, type GroupComponent, type RowComponent } from 'tabulator-tables';
 
 import type { ApexLog, SOSLExecuteBeginLine } from 'apex-log-parser';
-import { SelectionEchoGuard } from '../../../core/events/SelectionEchoGuard.js';
 import { vscodeMessenger } from '../../../core/messaging/VSCodeExtensionMessenger.js';
 import { getCallerNamespace } from '../../../core/utility/CallerNamespace.js';
 import { goToRow } from '../../call-tree/navigation.js';
 import { isVisible } from '../../../core/utility/Util.js';
 import { getSettings, updateSetting } from '../../settings/Settings.js';
-import { emitGridSelection } from './gridSelection.js';
+import { LocatedRowMarker } from '../../../components/locatedRow.js';
+import { reportGridLocate, stampGridEventIndex } from './gridLocate.js';
+import { reportGridSelection } from './gridSelection.js';
 import { selectRowByEventIndex } from './revealRow.js';
 import { soqlInlineElement } from '../../soql/format/inlineCell.js';
 import { soqlSyntaxStyles } from '../../soql/styles/soql-syntax.css.js';
@@ -36,6 +37,7 @@ import {
 
 // Tabulator custom modules, imports + styles
 import NumberAccessor from '../../../tabulator/dataaccessor/Number.js';
+import { tableHolder } from '../../../tabulator/module/tableHolder.js';
 import { inCountRange, inMsRange, type FilterRange } from '../../../tabulator/filters/MinMax.js';
 import { progressFormatter } from '../../../tabulator/format/Progress.js';
 import { progressFormatterMS } from '../../../tabulator/format/ProgressMS.js';
@@ -89,8 +91,6 @@ export class SOSLView extends LitElement {
 
   soslTable: Tabulator | null = null;
   holder: HTMLElement | null = null;
-  /** Guards the programmatic select made on the inspector's behalf. */
-  private _echoGuard = new SelectionEchoGuard();
   table: HTMLElement | null = null;
   findArgs: { text: string; count: number; options: { matchCase: boolean } } = {
     text: '',
@@ -110,6 +110,8 @@ export class SOSLView extends LitElement {
   private contextMenu: ContextMenu | null = null;
   /** eventIndex of the row whose context menu is open. */
   private contextMenuEventIndex: number | null = null;
+  /** Marks the rows for the statements under the inspector's pointer. */
+  private _locatedRow = new LocatedRowMarker();
 
   @state()
   private namespaces: string[] = [];
@@ -566,6 +568,7 @@ export class SOSLView extends LitElement {
       groupStartOpen: false,
       groupToggleElement: false,
       selectableRows: 'highlight',
+      rowFormatter: stampGridEventIndex,
       columnDefaults: commonColumnDefaults,
       headerSortElement,
       columns: [
@@ -655,18 +658,22 @@ export class SOSLView extends LitElement {
     // Drive the detail panel off selection (not click) so keyboard row
     // navigation updates it too, matching the SOQL/DML grids.
     this.soslTable.on('rowSelectionChanged', (_data, rows) => {
-      emitGridSelection(this._echoGuard, 'sosl', rows, (data: SOSLRow) =>
+      reportGridSelection(this, 'sosl', rows, (data: SOSLRow) =>
         data.sosl ? data.eventIndex : undefined,
       );
     });
+
+    // Hovering a search marks it in the inspector, without picking it.
+    reportGridLocate(this, this.soslTable, (data: SOSLRow) =>
+      data.sosl ? data.eventIndex : undefined,
+    );
 
     this.soslTable.on('rowContext', (e, row) => {
       this._showRowContextMenu(e as MouseEvent, row);
     });
 
     this.soslTable.on('tableBuilt', () => {
-      const holder = this._getTableHolder();
-      holder.style.overflowAnchor = 'none';
+      this._getTableHolder()?.style.setProperty('overflow-anchor', 'none');
       //@ts-expect-error This is a custom function added in the GroupSort custom module
       this.soslTable?.setSortedGroupBy('sosl');
       if (this.soslTable) {
@@ -679,6 +686,9 @@ export class SOSLView extends LitElement {
 
     this.soslTable.on('renderComplete', () => {
       const holder = this._getTableHolder();
+      if (!holder) {
+        return;
+      }
       const table = this._getTable();
       holder.style.minHeight = Math.min(holder.clientHeight, table.clientHeight) + 'px';
     });
@@ -734,21 +744,28 @@ export class SOSLView extends LitElement {
   }
 
   _getTableHolder() {
-    this.holder = this.soslTable?.element.querySelector('.tabulator-tableholder') as HTMLElement;
+    this.holder ??= tableHolder(this.soslTable?.element);
     return this.holder;
   }
 
-  /** Clears this grid because another one was picked, so it emits nothing. */
+  /** Drops this grid's row highlight, reported upward like any other change. */
   deselectRows() {
-    this._echoGuard.run(() => this.soslTable?.deselectRow());
+    this.soslTable?.deselectRow();
   }
 
   /**
-   * Select the row for `eventIndex`, without echoing `detail:select` back at the
-   * inspector that asked for it. Returns false when this grid has no such row.
+   * Select the row for `eventIndex`. Returns false when this grid has no such row.
    */
   selectByEventIndex(eventIndex: number): boolean {
-    return selectRowByEventIndex(this.soslTable, this._echoGuard, eventIndex);
+    return selectRowByEventIndex(this.soslTable, eventIndex);
+  }
+
+  /**
+   * Mark the rows for the statements under the inspector's pointer, or drop the
+   * mark with an empty list. Not a pick: nothing scrolls and nothing is selected.
+   */
+  markLocated(eventIndexes: readonly number[]): void {
+    this._locatedRow.mark(this.soslTable?.element ?? null, eventIndexes);
   }
 
   downlodEncoder(defaultFileName: string) {

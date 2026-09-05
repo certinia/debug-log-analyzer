@@ -110,7 +110,7 @@ export class ContextMenu extends LitElement {
       }
 
       .menu-item:hover:not(.disabled) {
-        background-color: var(--vscode-list-hoverBackground);
+        background-color: var(--lana-row-hover-bg);
       }
 
       .menu-item.disabled {
@@ -125,7 +125,7 @@ export class ContextMenu extends LitElement {
       .shortcut {
         margin-left: 32px;
         opacity: 0.7;
-        font-size: 12px;
+        font-size: var(--lana-text-base);
       }
 
       .item-action {

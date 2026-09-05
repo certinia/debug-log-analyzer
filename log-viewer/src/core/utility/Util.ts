@@ -90,9 +90,30 @@ export function formatTimeRange(startTimeNs: number, endTimeNs: number): string 
   return `${formatDuration(startTimeNs)} → ${formatDuration(endTimeNs)}`;
 }
 
+/** `part` as a percentage of `whole`, or zero when there is no whole. */
+export function sharePercent(part: number, whole: number): number {
+  return whole > 0 ? (part / whole) * 100 : 0;
+}
+
 /** Integer → thousand-separated string (e.g. 1572864 → "1,572,864"), for heap/byte values. */
 export function formatInteger(value: number): string {
   return Math.round(value).toLocaleString();
+}
+
+/**
+ * Byte count → compact string (e.g. 5400000 → "5.4 MB"), for places too narrow
+ * for the full figure. Decimal units, because the platform states the heap limit
+ * as 6 MB for 6,000,000 bytes.
+ */
+export function formatByteSize(bytes: number): string {
+  const magnitude = Math.abs(bytes);
+  if (magnitude >= 1_000_000) {
+    return `${(bytes / 1_000_000).toLocaleString(undefined, { maximumFractionDigits: 1 })} MB`;
+  }
+  if (magnitude >= 1_000) {
+    return `${(bytes / 1_000).toLocaleString(undefined, { maximumFractionDigits: 1 })} KB`;
+  }
+  return `${formatInteger(bytes)} bytes`;
 }
 
 /**

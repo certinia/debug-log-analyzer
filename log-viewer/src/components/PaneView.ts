@@ -17,6 +17,15 @@ export interface PaneSection {
   badge?: string;
   /** Default flex-grow weight when open, seeded on first render (default 1). */
   weight?: number;
+  /**
+   * How the open pane takes space (default `'fill'`). A `'content'` pane sizes
+   * to its content and shrinks — scrolling inside — when space runs out, it
+   * never stretches to soak up leftovers, and it leaves the open fill panes a
+   * share of the space. Dragging its sash pins it to a size instead, which a
+   * double-click hands back to the content.
+   * A `'fill'` pane shares the remaining space by weight.
+   */
+  fit?: 'content' | 'fill';
 }
 
 export type PaneOrientation = 'vertical' | 'horizontal';
@@ -83,6 +92,12 @@ export class PaneView extends LitElement {
       }
       .pane-view[data-orientation='vertical'] {
         flex-direction: column;
+        /* Every open section keeps a readable height, so when they do not all fit
+           the stack scrolls rather than crowding one down to its header. */
+        overflow-y: auto;
+      }
+      .pane-view[data-orientation='vertical'] .pane[data-open] {
+        min-height: var(--lana-pane-min);
       }
       .pane-view[data-orientation='horizontal'] {
         flex-direction: row;
@@ -109,13 +124,13 @@ export class PaneView extends LitElement {
         flex: 0 0 var(--lana-panel-header-height);
         height: var(--lana-panel-header-height);
         padding: 0 var(--lana-space-md) 0 var(--lana-space-2xs);
-        font-size: 11px;
+        font-size: var(--lana-text-caps);
         font-weight: 600;
         text-transform: uppercase;
-        letter-spacing: 0.04em;
+        letter-spacing: var(--lana-text-caps-tracking);
         color: var(--vscode-sideBarSectionHeader-foreground);
         background-color: var(--vscode-sideBarSectionHeader-background);
-        border-top: 1px solid var(--vscode-sideBarSectionHeader-border, transparent);
+        border-top: var(--lana-stroke) solid var(--vscode-sideBarSectionHeader-border, transparent);
         user-select: none;
         white-space: nowrap;
         overflow: hidden;
@@ -125,14 +140,14 @@ export class PaneView extends LitElement {
         cursor: pointer;
       }
       .pane-header--button:hover {
-        background-color: var(--vscode-list-hoverBackground);
+        background-color: var(--lana-row-hover-bg);
       }
       .pane-header:focus-visible {
-        outline: 1px solid var(--vscode-focusBorder);
-        outline-offset: -1px;
+        outline: var(--lana-focus-ring);
+        outline-offset: var(--lana-focus-inset);
       }
       .pane-header vscode-icon {
-        color: var(--vscode-icon-foreground);
+        color: var(--lana-icon-fg);
         flex: 0 0 auto;
       }
       .pane-header__title {
@@ -144,12 +159,15 @@ export class PaneView extends LitElement {
         flex: 0 0 auto;
       }
 
+      /* The body owns the panel's content edge and its base text size, so every
+         section reads at one scale and only steps away from it deliberately. */
       .pane-body {
         flex: 1 1 auto;
         min-height: 0;
         min-width: 0;
         overflow: auto;
         padding: var(--lana-space-2xs) var(--lana-space-md) var(--lana-space-sm);
+        font-size: var(--lana-text-base);
       }
 
       .pane-sash {
@@ -195,10 +213,14 @@ export class PaneView extends LitElement {
 
   render() {
     const weights = this._flexWeights();
+    const basis = this._fillBasis();
     const items: TemplateResult[] = [];
     this.sections.forEach((section, index) => {
-      items.push(this._renderPane(section, weights.get(section.id) ?? 1));
+      items.push(this._renderPane(section, weights.get(section.id) ?? 1, basis));
       const next = this.sections[index + 1];
+      // A sash trades space between the two panes beside it, so it exists
+      // wherever both neighbours are open. A content pane starts at its
+      // content's size and then holds the size it is dragged to.
       if (next && this._isOpen(section.id) && this._isOpen(next.id)) {
         items.push(this._renderSash(section.id, next.id));
       }
@@ -215,7 +237,9 @@ export class PaneView extends LitElement {
    * collapsed during it — as a sliver beside its pixel-sized siblings.
    */
   private _flexWeights(): Map<string, number> {
-    const open = this.sections.filter((section) => this._isOpen(section.id));
+    const open = this.sections.filter(
+      (section) => this._isOpen(section.id) && this._isFill(section),
+    );
     let storedPx = 0;
     let storedUnits = 0;
     for (const section of open) {
@@ -236,10 +260,35 @@ export class PaneView extends LitElement {
     );
   }
 
-  private _renderPane(section: PaneSection, weight: number) {
+  /**
+   * A fill pane's flex basis: an equal share of the panel, so a stack of
+   * sized-to-content panes cannot squeeze it to `--lana-pane-min`. From a basis
+   * of zero it can only grow into free space, and once the content panes fill
+   * the panel there is none; from a share it shrinks alongside them instead, and
+   * keeps its natural size while the panel is roomy. Zero while every open pane
+   * fills, where a share each would take the whole panel and flatten the
+   * weights.
+   */
+  private _fillBasis(): string {
+    const open = this.sections.filter((section) => this._isOpen(section.id));
+    const content = open.filter((section) => !this._isFill(section)).length;
+    return this.orientation === 'vertical' && content > 0 ? `calc(100% / ${open.length})` : '0';
+  }
+
+  private _renderPane(section: PaneSection, weight: number, basis: string) {
     const open = this._isOpen(section.id);
     const collapsible = this._collapsible;
-    const style = open ? `flex: ${weight} 1 0` : 'flex: 0 0 auto';
+    // An open content pane sizes to its content, or to the size it was dragged
+    // to, but stays shrinkable, so when space runs out it scrolls instead of
+    // pushing the fill panes off screen.
+    const dragged = this._weights[section.id];
+    const style = !open
+      ? 'flex: 0 0 auto'
+      : this._isFill(section)
+        ? `flex: ${weight} 1 ${basis}`
+        : dragged !== undefined
+          ? `flex: 0 1 ${dragged}px`
+          : 'flex: 0 1 auto';
 
     return html`<div class="pane" data-id=${section.id} ?data-open=${open} style=${style}>
       <div
@@ -276,6 +325,10 @@ export class PaneView extends LitElement {
 
   private _isOpen(id: string) {
     return this._collapsible ? !this.collapsed[id] : true;
+  }
+
+  private _isFill(section: PaneSection) {
+    return (section.fit ?? 'fill') === 'fill';
   }
 
   private _toggle(id: string) {
@@ -387,21 +440,44 @@ export class PaneView extends LitElement {
     return true;
   }
 
+  /**
+   * Back to each pane's default: a content pane returns to its content's size,
+   * and a pair of fill panes splits the space between them evenly.
+   */
   private _resetSash(aId: string, bId: string) {
-    const total =
-      (this._weights[aId] ?? this._paneSize(aId)) + (this._weights[bId] ?? this._paneSize(bId));
-    this._weights = { ...this._weights, [aId]: total / 2, [bId]: total / 2 };
+    const weights = { ...this._weights };
+    const dragged = [aId, bId].filter((id) => this._isContent(id));
+    if (dragged.length) {
+      for (const id of dragged) {
+        delete weights[id];
+      }
+    } else {
+      const total = (weights[aId] ?? this._paneSize(aId)) + (weights[bId] ?? this._paneSize(bId));
+      weights[aId] = total / 2;
+      weights[bId] = total / 2;
+    }
+    this._weights = weights;
     this._emitResize();
+  }
+
+  private _isContent(id: string): boolean {
+    const section = this.sections.find((candidate) => candidate.id === id);
+    return !!section && !this._isFill(section);
   }
 
   /** Fires on interaction-end only, so the consumer's write isn't per-frame. */
   private _emitResize() {
-    // Only this axis' keys, so merging keeps the other orientation's sizes.
+    // Every size this axis holds, named by it, so the consumer can replace the
+    // axis: a pane reset to its content's size has no entry left to merge.
     const sizes = Object.fromEntries(
       Object.entries(this._weights).map(([id, size]) => [`${this.orientation}:${id}`, size]),
     );
     this.dispatchEvent(
-      new CustomEvent('pane-resize', { detail: { sizes }, bubbles: true, composed: true }),
+      new CustomEvent('pane-resize', {
+        detail: { sizes, orientation: this.orientation },
+        bubbles: true,
+        composed: true,
+      }),
     );
   }
 }

@@ -3,6 +3,9 @@
  */
 import type { Tabulator } from 'tabulator-tables';
 import { Module, type RowComponent } from 'tabulator-tables';
+
+import { withCodeDrivenExpand } from './expandOrigin.js';
+import { tableHolder } from './tableHolder.js';
 type GoToRowOptions = { scrollIfVisible: boolean; focusRow: boolean };
 export class RowNavigation extends Module {
   static moduleName = 'rowNavigation';
@@ -41,7 +44,7 @@ export class RowNavigation extends Module {
     const { focusRow } = opts;
 
     const table = this.table;
-    this.tableHolder ??= table.element.querySelector('.tabulator-tableholder') as HTMLElement;
+    this.tableHolder ??= tableHolder(table.element);
 
     table.blockRedraw();
 
@@ -50,7 +53,7 @@ export class RowNavigation extends Module {
       grp.show();
     }
 
-    const rowsToExpand = [];
+    const rowsToExpand: RowComponent[] = [];
     //@ts-expect-error This is private to tabulator, but we have no other choice atm.
     let parent = row._getSelf().modules.dataTree ? row.getTreeParent() : false;
     while (parent) {
@@ -60,9 +63,11 @@ export class RowNavigation extends Module {
       parent = parent.getTreeParent();
     }
 
-    for (const row of rowsToExpand) {
-      row.treeExpand();
-    }
+    withCodeDrivenExpand(() => {
+      for (const row of rowsToExpand) {
+        row.treeExpand();
+      }
+    });
 
     for (const row of table.getSelectedRows()) {
       row.deselect();
@@ -72,7 +77,7 @@ export class RowNavigation extends Module {
     table.restoreRedraw();
 
     if (focusRow) {
-      this.tableHolder.focus();
+      this.tableHolder?.focus();
     }
 
     await this._waitForRenderComplete();

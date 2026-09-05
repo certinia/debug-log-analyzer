@@ -4,6 +4,7 @@
 import type { ApexLog } from 'apex-log-parser';
 import { Tabulator } from 'tabulator-tables';
 
+import { logStoreFor } from '../../../core/log/LogStore.js';
 import { vscodeMessenger } from '../../../core/messaging/VSCodeExtensionMessenger.js';
 import { formatDuration } from '../../../core/utility/Util.js';
 import { TIME_WIDTH } from '../../../tabulator/ColumnWidths.js';
@@ -41,7 +42,11 @@ export function createAggregatedTable(
   const selfTimeBottomCalc = makeSumSelfTimeAllVisible(() => tableRef.current);
   const heapFooters = createSelfSumHeapFooters(() => tableRef.current);
 
-  const tableData = toAggregatedCallTree(rootMethod.children, rootMethod.governorLimits);
+  const tableData = toAggregatedCallTree(
+    rootMethod.children,
+    logStoreFor(rootMethod).keyPathIds(),
+    rootMethod.governorLimits,
+  );
 
   const table = new Tabulator(container, {
     data: tableData,
@@ -176,19 +181,6 @@ export function createAggregatedTable(
     ],
   });
   tableRef.current = table;
-
-  // The host's filter caches (search/type/debug/namespace/duration) are cleared once per
-  // render via `renderStarted` — see CalltreeView's `onFilterCacheClear`. Row ids produced
-  // by `toAggregatedCallTree` are globally unique within a build (per-build monotonic
-  // counter), so cached `deepFilter` results stay valid across the cascaded
-  // `filter.filter()` passes Tabulator runs for each expanded subtree —
-  // `getChildren` → `filter.filter(config.children)` would otherwise fire `dataFiltered`
-  // multiple times per user action, defeating the cache. If row ids ever lose their
-  // uniqueness guarantee this must move back to `dataFiltered`.
-  table.on('renderStarted', () => {
-    callbacks.onFilterCacheClear?.();
-    callbacks.onRenderStarted();
-  });
 
   const tableBuilt = new Promise<void>((resolve) => {
     table.on('tableBuilt', () => {

@@ -114,6 +114,12 @@ export interface EventNode {
   original?: unknown;
 }
 
+/** The frame under the pointer, and the row it is on. */
+export interface HoveredFrame {
+  node: EventNode;
+  depth: number;
+}
+
 /**
  * Tree node wrapper for hierarchical event structures.
  * Enables generic tree traversal without assuming specific
@@ -637,11 +643,11 @@ export function markerColorCss(type: MarkerType): string {
 /**
  * The marker a parsed log issue is drawn as, so a DOM renderer can match its band.
  *
- * `'error'` maps to `'exception'`: `extractMarkers` drops `'error'` logIssues and the same
+ * `'error'` and `'fatal'` map to `'exception'`: `extractMarkers` drops both and the same
  * failure is drawn from `log.exceptions`, so the exception hue is what's actually on screen.
  */
 export function markerTypeForIssue(issueType: LogIssue['type']): MarkerType {
-  return issueType === 'error' ? 'exception' : issueType;
+  return issueType === 'error' || issueType === 'fatal' ? 'exception' : issueType;
 }
 
 /**
@@ -873,6 +879,16 @@ export interface HeatStripTimeSeries {
   metrics: Map<string, HeatStripMetric>;
   /** Time series events ordered by timestamp */
   events: HeatStripEvent[];
+  /** Spans the log recorded nothing in, so no reading is carried across them */
+  gaps?: NoDataSpan[];
+}
+
+/** A span the log recorded nothing in, named by the marker that reports it. */
+export interface NoDataSpan {
+  startTime: number;
+  endTime: number;
+  /** The marker's own summary, so a reader is told the reason, not just the gap. */
+  summary: string;
 }
 
 /**
@@ -959,6 +975,8 @@ export interface MetricStripProcessedData {
   globalMaxPercent: number;
   /** Whether there's any data to render */
   hasData: boolean;
+  /** Spans the log recorded nothing in, carried through from the series */
+  gaps: NoDataSpan[];
 }
 
 /**

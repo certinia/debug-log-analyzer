@@ -23,11 +23,11 @@ export const headerControlStyles = css`
     width: 26px;
     height: 22px;
     border-radius: 4px;
-    color: var(--vscode-foreground);
+    color: var(--lana-fg);
   }
 
   .header-control:hover {
-    background-color: var(--vscode-toolbar-hoverBackground);
+    background-color: var(--lana-toolbar-hover-bg);
   }
 
   /* Bottom-right, like the activity bar's — and clear of the header's top edge, which
@@ -37,15 +37,16 @@ export const headerControlStyles = css`
     bottom: -2px;
     right: -3px;
     box-sizing: border-box;
-    min-width: 12px;
-    height: 12px;
-    padding: 0 2px;
-    border-radius: 16px;
+    /* Sized in em, so the badge grows with its own count rather than clipping it. */
+    min-width: 1.2em;
+    height: 1.2em;
+    padding: 0 0.2em;
+    border-radius: 1em;
     background-color: var(--vscode-activityBarBadge-background);
     color: var(--vscode-activityBarBadge-foreground);
-    font-size: 9px;
+    font-size: var(--lana-text-xs);
     font-weight: 600;
-    line-height: 12px;
+    line-height: 1.2;
     text-align: center;
     font-variant-numeric: tabular-nums;
     pointer-events: none;

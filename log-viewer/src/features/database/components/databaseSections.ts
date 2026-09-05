@@ -2,6 +2,7 @@
  * Copyright (c) 2025 Certinia Inc. All rights reserved.
  */
 import { html } from 'lit';
+import { ifDefined } from 'lit/directives/if-defined.js';
 
 import type { PaneSection } from '../../../components/PaneView.js';
 import { computeSoqlIssues } from '../../soql/components/SOQLLinterIssues.js';
@@ -10,41 +11,60 @@ import { computeSoqlIssues } from '../../soql/components/SOQLLinterIssues.js';
 import '../../../components/CallStackDetail.js';
 import '../../../components/CallTreeDetail.js';
 import '../../../components/EventVitals.js';
+import '../../../components/VariablesDetail.js';
 import '../../soql/components/SOQLLinterIssues.js';
 
 export interface DetailSelection {
   eventIndex: number;
   type: 'dml' | 'soql' | 'sosl';
+  /** The frame walked to in the statement's call stack, if it is not the statement. */
+  activeEventIndex?: number | null;
 }
 
 /**
  * Build the details-panel sections for a selected DML/SOQL statement. The
- * components resolve their own data from `DatabaseAccess` by eventIndex; only
+ * components resolve their own data from the log store by eventIndex; only
  * the SOQL issue count is pre-resolved here so it can badge the section header.
+ *
+ * Details and the call tree follow the active frame; the call stack and the SOQL
+ * issues stay anchored to the statement the user picked.
  */
 export async function buildDatabaseSections(selection: DetailSelection): Promise<PaneSection[]> {
   const { eventIndex, type } = selection;
+  const active = selection.activeEventIndex ?? eventIndex;
+  // An ancestor method is not a statement, so the statement-shaped vitals do
+  // not apply to it.
+  const activeType = active === eventIndex ? type : undefined;
 
-  // Each section opens at its own default height (leftover-space share); the
-  // call tree gets the most, SOQL issues the least (but still open).
+  // The vitals are a fixed set of figures, so they take their own height; the
+  // fill sections share the leftover space, the call tree getting the most,
+  // SOQL issues the least (but still open). The call tree closes the panel.
   const sections: PaneSection[] = [
     {
       id: 'vitals',
       title: 'Details',
-      weight: 3,
-      content: html`<event-vitals eventIndex=${eventIndex} type=${type}></event-vitals>`,
+      fit: 'content',
+      content: html`<event-vitals
+        eventIndex=${active}
+        type=${ifDefined(activeType)}
+      ></event-vitals>`,
+    },
+    // What Apex could see from the frame. A statement owns no locals of its own,
+    // so the section answers from the Apex frame that issued it.
+    {
+      id: 'variables',
+      title: 'Variables',
+      fit: 'content',
+      content: html`<variables-detail eventIndex=${active}></variables-detail>`,
     },
     {
       id: 'callstack',
       title: 'Call stack',
       weight: 3,
-      content: html`<call-stack-detail eventIndex=${eventIndex}></call-stack-detail>`,
-    },
-    {
-      id: 'calltree',
-      title: 'Call tree',
-      weight: 4,
-      content: html`<call-tree-detail eventIndex=${eventIndex}></call-tree-detail>`,
+      content: html`<call-stack-detail
+        eventIndex=${eventIndex}
+        activeEventIndex=${active}
+      ></call-stack-detail>`,
     },
   ];
 
@@ -58,6 +78,18 @@ export async function buildDatabaseSections(selection: DetailSelection): Promise
       content: html`<soql-issues unbounded .issues=${issues}></soql-issues>`,
     });
   }
+
+  // Last in every inspector view that has one, so the panel reads the same
+  // wherever the selection came from.
+  sections.push({
+    id: 'calltree',
+    title: 'Call tree',
+    weight: 4,
+    content: html`<call-tree-detail
+      eventIndex=${active}
+      .source=${'database' as const}
+    ></call-tree-detail>`,
+  });
 
   return sections;
 }

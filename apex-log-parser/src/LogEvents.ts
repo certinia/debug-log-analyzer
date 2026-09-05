@@ -16,7 +16,7 @@ import type {
   SelfTotal,
 } from './types.js';
 import { DEBUG_CATEGORY, LOG_CATEGORY, LOG_LEVEL } from './types.js';
-import type { LimitObservation } from './limits.js';
+import type { LimitMetricKey, LimitObservation, RunningTotalObservation } from './limits.js';
 import { parseCodedLimit, parseLabelledLimit, parseTotalLimit } from './limits.js';
 
 /**
@@ -1710,12 +1710,98 @@ export class FlowCreateInterviewErrorLine extends LogEvent {
   }
 }
 
+/**
+ * Attribute the database usage a flow element's FLOW_*_LIMIT_USAGE children report (SOQL/DML/rows
+ * only - CPU and heap are not counters) onto the element that ran it. The log emits no
+ * SOQL_EXECUTE_BEGIN or DML_BEGIN for a flow element's own database work, so the reported count is
+ * the only record of it.
+ *
+ * That count is the rise in the transaction's governor counter across the element, so it also
+ * covers any statement the element's subtree logged for itself. Only the residual - the part no
+ * logged statement accounts for - is attributed, which keeps the totals at or below what the log
+ * reports. Where a subtree statement did not consume the limit (custom metadata SOQL, for example)
+ * the residual understates it, because the log never says which statements were free.
+ *
+ * `self` sits on the element rather than the reporting child, unlike the statement lines, so the
+ * element is credited for the work it did itself.
+ *
+ * Runs after `aggregateTotals`, so each element's `total` already covers its subtree and the
+ * residual has to be added to every ancestor here. Elements are visited innermost first, so a
+ * nested element's residual is part of its parent's total before the parent is measured.
+ */
+export function applyFlowDbResiduals(elements: LogEvent[]): void {
+  let i = elements.length;
+  while (i--) {
+    const element = elements[i]!;
+    let reports: Map<LimitMetricKey, FlowDbReport> | null = null;
+    for (const child of element.children) {
+      if (!(child instanceof FlowRunningTotalLimitUsageLine) || !child.limitUsage) {
+        continue;
+      }
+      const { metric, used, delta } = child.limitUsage;
+      reports ??= new Map();
+      const report = reports.get(metric);
+      if (report) {
+        report.summed += delta;
+        report.after = used;
+      } else {
+        reports.set(metric, { summed: delta, before: used - delta, after: used });
+      }
+    }
+    if (!reports) {
+      continue;
+    }
+    for (const [metric, report] of reports) {
+      const counter = flowDbCounter(element, metric);
+      // A repeated or cumulative line would over-attribute, so the reported rise is the ceiling.
+      const delta = Math.min(report.summed, report.after - report.before);
+      const residual = counter ? delta - counter.total : 0;
+      if (!counter || residual <= 0) {
+        continue;
+      }
+      counter.self += residual;
+      counter.total += residual;
+      for (let ancestor = element.parent; ancestor; ancestor = ancestor.parent) {
+        const ancestorCounter = flowDbCounter(ancestor, metric);
+        if (ancestorCounter) {
+          ancestorCounter.total += residual;
+        }
+      }
+    }
+  }
+}
+
+/** The running totals a flow element's limit-usage children report for one metric. */
+interface FlowDbReport {
+  summed: number;
+  before: number;
+  after: number;
+}
+
+function flowDbCounter(target: LogEvent, metric: LimitMetricKey): SelfTotal | null {
+  switch (metric) {
+    case 'soqlQueries':
+      return target.soqlCount;
+    case 'queryRows':
+      return target.soqlRowCount;
+    case 'soslQueries':
+      return target.soslCount;
+    case 'dmlStatements':
+      return target.dmlCount;
+    case 'dmlRows':
+      return target.dmlRowCount;
+    default:
+      return null;
+  }
+}
+
 export class FlowElementBeginLine extends DurationLogEvent {
   debugCategory = DEBUG_CATEGORY.Workflow;
   debugLevel = LOG_LEVEL.Fine;
   constructor(parser: ApexLogParser, parts: string[]) {
     super(parser, parts, ['FLOW_ELEMENT_END'], LOG_CATEGORY.Automation, 'custom');
     this.text = parts[3] + ' ' + parts[4];
+    parser.flowDbElements.push(this);
   }
 }
 
@@ -1821,17 +1907,23 @@ export class FlowElementFaultLine extends LogEvent {
   }
 }
 
-export class FlowElementLimitUsageLine extends LogEvent {
+/**
+ * A flow limit-usage line reporting a running total, e.g. "1 SOQL queries, total 1 out of 100".
+ * The enclosing flow element reads the delta from these children - see `applyFlowDbResiduals`.
+ */
+class FlowRunningTotalLimitUsageLine extends LogEvent {
   debugCategory = DEBUG_CATEGORY.Workflow;
   debugLevel = LOG_LEVEL.Finer;
   /** Governor-limit observation. Example: "2 ms CPU time, total 10 out of 15000". */
-  limitUsage: LimitObservation | null = null;
+  limitUsage: RunningTotalObservation | null;
   constructor(parser: ApexLogParser, parts: string[]) {
     super(parser, parts);
-    this.text = `${parts[2]}`;
+    this.text = parts[2] ?? '';
     this.limitUsage = parseTotalLimit(this.text);
   }
 }
+
+export class FlowElementLimitUsageLine extends FlowRunningTotalLimitUsageLine {}
 
 export class FlowInterviewFinishedLimitUsageLine extends LogEvent {
   debugCategory = DEBUG_CATEGORY.Workflow;
@@ -1896,6 +1988,7 @@ export class FlowBulkElementBeginLine extends DurationLogEvent {
   constructor(parser: ApexLogParser, parts: string[]) {
     super(parser, parts, ['FLOW_BULK_ELEMENT_END'], LOG_CATEGORY.Automation, 'custom');
     this.text = `${parts[2]} - ${parts[3]}`;
+    parser.flowDbElements.push(this);
   }
 }
 
@@ -1917,17 +2010,7 @@ export class FlowBulkElementNotSupportedLine extends LogEvent {
   }
 }
 
-export class FlowBulkElementLimitUsageLine extends LogEvent {
-  debugCategory = DEBUG_CATEGORY.Workflow;
-  debugLevel = LOG_LEVEL.Finer;
-  /** Governor-limit observation. Example: "1 SOQL queries, total 1 out of 100". */
-  limitUsage: LimitObservation | null = null;
-  constructor(parser: ApexLogParser, parts: string[]) {
-    super(parser, parts);
-    this.text = parts[2] || '';
-    this.limitUsage = parseTotalLimit(this.text);
-  }
-}
+export class FlowBulkElementLimitUsageLine extends FlowRunningTotalLimitUsageLine {}
 
 export class PNInvalidAppLine extends LogEvent {
   debugLevel = LOG_LEVEL.Error;
@@ -2382,6 +2465,21 @@ export class WFSpoolActionBeginLine extends LogEvent {
   }
 }
 
+/**
+ * Splits issue text into a summary (the full first line — presentation truncation
+ * is the consumer's job) and a description (the remainder, e.g. a stack trace).
+ */
+function splitIssueText(text: string): { summary: string; description: string } {
+  const newLineIndex = text.indexOf('\n');
+  if (newLineIndex === -1) {
+    return { summary: text.trim(), description: '' };
+  }
+  return {
+    summary: text.slice(0, newLineIndex).trim(),
+    description: text.slice(newLineIndex + 1).trim(),
+  };
+}
+
 export class ExceptionThrownLine extends LogEvent {
   debugLevel = LOG_LEVEL.Info;
   debugCategory = DEBUG_CATEGORY.ApexCode;
@@ -2398,12 +2496,8 @@ export class ExceptionThrownLine extends LogEvent {
 
   onAfter(parser: ApexLogParser, _next?: LogEvent): void {
     if (this.text.indexOf('System.LimitException') >= 0) {
-      const isMultiLine = this.text.indexOf('\n');
-      const len = isMultiLine < 0 ? 99 : isMultiLine;
-      const truncateText = this.text.length > len;
-      const summary = this.text.slice(0, len + 1) + (truncateText ? '…' : '');
-      const message = truncateText ? this.text : '';
-      parser.addLogIssue(this.timestamp, this.eventIndex, summary, message, 'error');
+      const { summary, description } = splitIssueText(this.text);
+      parser.addLogIssue(this.timestamp, this.eventIndex, summary, description, 'error');
     }
   }
 }
@@ -2421,16 +2515,8 @@ export class FatalErrorLine extends LogEvent {
   }
 
   onAfter(parser: ApexLogParser, _next?: LogEvent): void {
-    const newLineIndex = this.text.indexOf('\n');
-    const summary = newLineIndex > -1 ? this.text.slice(0, newLineIndex + 1) : this.text;
-    const detailText = summary.length !== this.text.length ? this.text : '';
-    parser.addLogIssue(
-      this.timestamp,
-      this.eventIndex,
-      'FATAL ERROR! cause=' + summary,
-      detailText,
-      'error',
-    );
+    const { summary, description } = splitIssueText(this.text);
+    parser.addLogIssue(this.timestamp, this.eventIndex, summary, description, 'fatal');
   }
 }
 

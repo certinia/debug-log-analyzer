@@ -5,56 +5,61 @@ paths:
 
 # log-viewer rules
 
-Webview UI. Applies when working under `log-viewer/`.
+Webview UI.
 
 ## Boundary
 
-- MUST NOT import `vscode` or anything from `lana/`.
-- Communicate with the extension via message passing only.
+- Never import `vscode` or anything from `lana/`. Message passing only.
 
-## Performance budgets
+## Performance
 
-- Parse + render: `<5MB` → `<1s`, `10MB` → `<3s`, `20MB+` → `<5s`.
-- No synchronous operations >50ms blocking the extension host.
-- Operations >100ms show a progress indicator.
-- Benchmark against large logs from `sample-app/`.
+- Parse + render: `<5MB` in `<1s`, `10MB` in `<3s`, `20MB+` in `<5s`. Benchmark on `sample-app/` logs.
+- Nothing synchronous over 50ms. Show progress over 100ms.
+- Be fast and never block.
+- Keep memory low, even at the cost of speed.
+- Weigh that trade in every change, and measure it.
 
-## Theme changes
+## Theme
 
-- The panel keeps its context and is never re-created, so a theme switch has to be observed at
-  runtime. HTML re-themes itself through `--vscode-*`; anything drawn on a canvas does not.
-  Canvas code reads its colours through `themeObserver.on(…)` and repaints, and must never
-  re-initialise the renderer to do it.
+- The panel is never re-created, so a theme switch is observed at runtime. HTML re-themes through
+  `--vscode-*`; canvas does not — read colours via `themeObserver.on(…)` and repaint, never
+  re-initialise the renderer.
+- Check every change in a light and a dark theme.
 
-## UI appearance
+## Appearance
 
-- **Use a `--lana-*` token for every color, radius, space, shadow and border width.** Write no new
-  literals, and replace the literals in the code you touch. Older files still hold literals; we
-  convert them file by file.
-- **Put a new token in `styles/tokens.css` as `var(--vscode-…, <literal>)`.** The literal is the
-  value a host outside VS Code gets, so one stylesheet can re-skin the app.
-- **Data palettes stay literal.** The timeline categories (`timeline/themes/Themes.ts`) and the
-  metric-strip tiers (`metric-strip/metric-strip-colors.ts`) show meaning, not chrome, so they do
-  not follow the host theme.
-- **A component that names a token must also carry the tokens.** `globalStyles` carries them, so
-  `static styles = [globalStyles, …]` is enough. Without `globalStyles`, add `tokenStyles`
-  (`styles/tokens.styles.ts`). The document copy, which the build injects, styles only the popups
-  that tabulator puts in `document.body`.
-- **Check each UI change in a light theme and in a dark theme.**
+- Write no literal colour, radius, space, shadow or border width. Use a `--lana-*` token, or the
+  `--vscode-*` var the value comes from, and convert the literals in the code you touch.
+- Make it a token when the role is in three or more files, is ours (`--lana-space-*`,
+  `--lana-pane-min`), is a chain, `calc` or `color-mix`, or the var ships in no stable VS Code
+  (`cornerRadius-*`, `spacing-size*`, `strokeThickness`). Otherwise use the var directly.
+- New tokens go in `styles/tokens.css` as `var(--vscode-…, <literal>)`; the literal is what a host
+  outside VS Code gets. Never end a chain in `transparent` — the value is then defined but invisible,
+  and no consumer fallback can fire.
+- Never define or override a `--vscode-*` name — an override is global to the webview. Exception:
+  skinning a `vscode-elements` component; scope it to that element, never `:host` or `:root`.
+- Write no literal font size or family. Take a step from the ramp in `styles/tokens.css`
+  (`--lana-text-*`, `--lana-text-meta` for header metadata) and a family from `--lana-font-mono` or
+  `--lana-font-ui`. Code-shaped text takes no size of its own: it inherits the surface that holds
+  it, so nothing in the webview follows the reader's `editor.fontSize`.
+- Mono is for text whose alignment carries meaning — stacks, code, log text. Prose takes the UI font.
+- An all-caps run takes `--lana-text-caps` and `--lana-text-caps-tracking`, one step down: every
+  glyph reaches cap height, so caps read a size larger.
+- Two type exemptions: a PIXI `fontSize` is a number and cannot read a var, and the codicon rule in
+  `DataGrid.scss` sizes a glyph box, not text.
+- Data palettes stay literal: they show meaning, not chrome (`timeline/themes/Themes.ts`,
+  `metric-strip/metric-strip-colors.ts`).
+- A component naming a token must carry the tokens: `globalStyles`, or `tokenStyles`
+  (`styles/tokens.styles.ts`) without it. The document copy styles only tabulator's body popups.
 
 ## Key paths
 
-- Parser: `apex-log-parser/src/` — shared package, so changes affect `lana/` too.
-- Extension boundary: `log-viewer/src/core/messaging/VSCodeExtensionMessenger.ts`
-- Timeline: `log-viewer/src/features/timeline/`. The pixi.js flame chart lives in `optimised/` —
-  read its `AGENTS.md` first.
-- Theme observer: `log-viewer/src/core/theme/ThemeObserver.ts`
-- Grid layer: `log-viewer/src/tabulator/` — wraps a patched vendored tabulator; don't edit the
-  vendor file.
-- Shared lit components: `log-viewer/src/components/`
-- Tokens: `log-viewer/src/styles/tokens.css`
+`features/timeline/` (the pixi.js chart is `optimised/`, which carries its own `AGENTS.md`) ·
+`core/messaging/VSCodeExtensionMessenger.ts` · `core/theme/ThemeObserver.ts` · `styles/tokens.css` ·
+`components/` · `tabulator/`
+
+The parser is the `apex-log-parser` package, so a change there reaches `lana/` too.
 
 ## Testing
 
-- Features and bug fixes include tests.
-- Breaking changes to log parsing cover both old and new formats.
+- Features and fixes ship with tests. Parser format changes cover the old and the new format.

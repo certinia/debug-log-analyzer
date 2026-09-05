@@ -1,21 +1,26 @@
 /*
  * Copyright (c) 2026 Certinia Inc. All rights reserved.
  */
-import {
-  SOQLExecuteBeginLine,
-  type GovernorLimits,
-  type LogEvent,
-  type SelfTotal,
-} from 'apex-log-parser';
+import { SOQLExecuteBeginLine, type LogEvent, type SelfTotal } from 'apex-log-parser';
+import { consume } from '@lit/context';
 import { LitElement, css, html, type TemplateResult } from 'lit';
 import { customElement, property } from 'lit/decorators.js';
 import { ifDefined } from 'lit/directives/if-defined.js';
 
+import { logContext } from '../core/log/logContext.js';
+import type { LogStore } from '../core/log/LogStore.js';
+import {
+  EVENT_METRICS,
+  formatBytes,
+  HEAP_PEAK,
+  selfLabel,
+  usageParts,
+} from '../core/metrics/eventMetrics.js';
 import { DEFAULT_NAMESPACE, getCallerNamespace } from '../core/utility/CallerNamespace.js';
 import { formatMs } from '../core/utility/Duration.js';
+import { outermostEvents } from '../core/utility/EventTree.js';
 import { formatInteger } from '../core/utility/Util.js';
-import { SOSL_ROWS_PER_QUERY_LIMIT } from '../features/database/limits.js';
-import { DatabaseAccess } from '../features/database/services/Database.js';
+import { sumDurationTotalForRootEvents } from '../features/analysis/services/CallStackSum.js';
 import { globalStyles } from '../styles/global.styles.js';
 
 // web components
@@ -29,39 +34,6 @@ const MS_PRECISION = 3;
 const CARDINALITY_DOC =
   'The estimated number of records that the leading operation type would return \u2014 for example, the number of records returned if using an index table.';
 const SOBJECT_CARDINALITY_DOC = 'The approximate record count for the queried object.';
-
-interface Metric {
-  label: string;
-  pick: (event: LogEvent) => SelfTotal;
-  /** The transaction limit this metric accumulates against; 0 when it has none. */
-  limit: (limits: GovernorLimits, type?: 'dml' | 'soql' | 'sosl') => number;
-  bytes?: boolean;
-  /** Throws only ever records on the leaf, so its self reading is meaningless. */
-  hasSelf?: boolean;
-}
-
-/**
- * Every governor-tracked metric a frame reports, most important first. The
- * `limit` is the row's denominator, so a metric is shown once — never as both a
- * count and a separate "limit" row.
- */
-const METRICS: Metric[] = [
-  { label: 'SOQL', pick: (e) => e.soqlCount, limit: (l) => l.soqlQueries.limit },
-  { label: 'SOQL Rows', pick: (e) => e.soqlRowCount, limit: (l) => l.queryRows.limit },
-  { label: 'DML', pick: (e) => e.dmlCount, limit: (l) => l.dmlStatements.limit },
-  { label: 'DML Rows', pick: (e) => e.dmlRowCount, limit: (l) => l.dmlRows.limit },
-  { label: 'SOSL', pick: (e) => e.soslCount, limit: (l) => l.soslQueries.limit },
-  {
-    label: 'SOSL Rows',
-    pick: (e) => e.soslRowCount,
-    // SOSL rows have no transaction total — the 2,000 cap is per query, so it
-    // only reads as a limit when a single SOSL statement is selected.
-    limit: (_limits, type) => (type === 'sosl' ? SOSL_ROWS_PER_QUERY_LIMIT : 0),
-  },
-  { label: 'Throws', pick: (e) => e.thrownCount, limit: () => 0, hasSelf: false },
-  { label: 'Heap net', pick: (e) => e.heapAllocated, limit: () => 0, bytes: true },
-  { label: 'Heap alloc', pick: (e) => e.heapGross, limit: () => 0, bytes: true },
-];
 
 /**
  * The details readout for a selection, on every tab. Shows the frame's text
@@ -79,13 +51,19 @@ export class EventVitals extends LitElement {
   @property({ attribute: false })
   instances: number[] | null = null;
 
-  /** Display label for an aggregate selection (the merged frame's name). */
-  @property({ type: String })
-  label = '';
+  /** The frame that made the calls the panel describes, where the selecting row
+   *  was not it. Empty where the row named the calls it counts. */
+  @property({ type: String, attribute: 'called-by' })
+  calledBy = '';
 
   /** Set for a Database-grid selection; adds the statement-specific rows. */
   @property({ type: String })
   type?: 'dml' | 'soql' | 'sosl';
+
+  /** The log on screen, from the app root. */
+  @consume({ context: logContext, subscribe: true })
+  @property({ attribute: false })
+  logStore: LogStore | null = null;
 
   static styles = [
     globalStyles,
@@ -108,7 +86,7 @@ export class EventVitals extends LitElement {
         display: grid;
         grid-column: 1 / -1;
         grid-template-columns: subgrid;
-        row-gap: 2px;
+        row-gap: var(--lana-space-3xs);
       }
       @container (min-width: 240px) {
         .grid {
@@ -119,10 +97,10 @@ export class EventVitals extends LitElement {
         }
       }
       .label {
-        color: var(--vscode-descriptionForeground);
+        color: var(--lana-fg-muted);
       }
       .value {
-        font-family: var(--vscode-editor-font-family, monospace);
+        font-family: var(--lana-font-mono);
         font-variant-numeric: tabular-nums;
         overflow-wrap: anywhere;
       }
@@ -131,37 +109,42 @@ export class EventVitals extends LitElement {
          colour is the theme's own secondary token — not a lower alpha — because
          thinning contrast to de-emphasise costs legibility. */
       .qualifier {
-        color: var(--vscode-descriptionForeground);
-        font-size: 0.9em;
+        color: var(--lana-fg-muted);
+        font-size: var(--lana-text-sm);
       }
+      /* One hue carries the verdict through the text, a tinted ground and its
+         edge, as SelfTimeSpreadView tints a row from its own hue property.
+         Every variant sets the hue. */
       .pill {
         display: inline-block;
-        padding: 0 var(--lana-space-sm);
-        border-radius: var(--lana-radius-sm);
-        font-size: 0.85em;
+        padding: 0 var(--lana-space-2xs);
+        border: var(--lana-stroke) solid color-mix(in srgb, var(--pill-hue) 30%, transparent);
+        border-radius: var(--lana-radius-md);
+        background-color: color-mix(in srgb, var(--pill-hue) 12%, transparent);
+        color: var(--pill-hue);
+        font-size: var(--lana-text-xs);
         line-height: 1.4;
-        color: var(--vscode-editor-background);
       }
       .pill--yes {
-        background-color: var(--vscode-charts-green, #388a34);
+        --pill-hue: var(--lana-severity-ok);
       }
       .pill--no {
-        background-color: var(--vscode-charts-red, #d13438);
+        --pill-hue: var(--lana-severity-warning);
       }
       .empty {
-        color: var(--vscode-descriptionForeground);
+        color: var(--lana-fg-muted);
       }
     `,
   ];
 
   render() {
-    const db = DatabaseAccess.instance();
-    if (!db) {
+    const store = this.logStore;
+    if (!store) {
       return html`<div class="empty">No details available.</div>`;
     }
 
     const events = (this.instances?.length ? this.instances : [this.eventIndex])
-      .map((i) => db.getEventByIndex(i))
+      .map((i) => store.eventByIndex(i))
       .filter((e): e is LogEvent => e !== null);
     const primary = events[0];
     if (!primary) {
@@ -174,14 +157,25 @@ export class EventVitals extends LitElement {
     if (isAggregate) {
       this._row(rows, 'Calls', formatInteger(events.length));
     }
+    // The panel is titled by the calls it describes, so the frame that made them
+    // is a fact beside them rather than the title.
+    if (this.calledBy) {
+      this._row(rows, 'Called by', this.calledBy);
+    }
 
-    // Aggregates sum their occurrences; a single frame reports its own timing.
-    // Total and self read together, so they share one row.
-    const total = events.reduce((sum, e) => sum + e.duration.total, 0);
+    // A recursive frame's outer call already holds its inner calls, so a total
+    // counts the outermost occurrences only.
+    const total = sumDurationTotalForRootEvents([events]);
     const self = events.reduce((sum, e) => sum + e.duration.self, 0);
-    this._row(rows, 'Time', html`${this._ms(total)}${qualifier(`self ${this._ms(self)}`)}`);
+    this._row(
+      rows,
+      'Time',
+      html`${this._ms(total)}${qualifier(selfLabel(this._ms(self)))}`,
+      'Total elapsed time, including nested calls of the same method',
+    );
     if (isAggregate) {
-      this._row(rows, 'Avg', this._ms(total / events.length));
+      // Self time never nests, so it and the call count cover the same calls.
+      this._row(rows, 'Avg self', this._ms(self / events.length));
     }
 
     this._metricRows(rows, events);
@@ -195,10 +189,11 @@ export class EventVitals extends LitElement {
     if (callerNamespace !== (primary.namespace || DEFAULT_NAMESPACE)) {
       this._row(rows, 'Caller namespace', callerNamespace);
     }
-    this._optional(rows, 'Line', primary.lineNumber);
+    // The call site, in the code that contains the frame — not where it is defined.
+    this._optional(rows, 'Called from', primary.lineNumber, (line) => `line ${line}`);
 
     return html`
-      <code-block language=${this._language()} .code=${this.label || primary.text}></code-block>
+      <code-block language=${this._language()} .code=${primary.text}></code-block>
       <div class="grid">${rows}</div>
     `;
   }
@@ -247,22 +242,26 @@ export class EventVitals extends LitElement {
    * omitted; `self` only appears when it adds something.
    */
   private _metricRows(rows: TemplateResult[], events: LogEvent[]): void {
-    const limits = DatabaseAccess.instance()?.getApexLog()?.governorLimits;
-    // Aggregates sum their occurrences, matching how the grids aggregate a row.
-    const sum = (pick: (e: LogEvent) => SelfTotal, part: 'total' | 'self') =>
-      events.reduce((acc, e) => acc + pick(e)[part], 0);
+    const limits = this.logStore?.log.governorLimits;
+    // A total nests and a self reading does not, so each sums the set that holds
+    // it once.
+    const outer = outermostEvents(events);
+    const sumTotal = (pick: (e: LogEvent) => SelfTotal) =>
+      outer.reduce((acc, e) => acc + pick(e).total, 0);
+    const sumSelf = (pick: (e: LogEvent) => SelfTotal) =>
+      events.reduce((acc, e) => acc + pick(e).self, 0);
 
     // A statement's own row count is its headline number, so it shows even at
     // zero ("returned nothing" is a result); other zero metrics stay hidden.
     const alwaysShow = this.type ? `${this.type.toUpperCase()} Rows` : '';
 
-    for (const metric of METRICS) {
-      const total = sum(metric.pick, 'total');
+    for (const metric of EVENT_METRICS) {
+      const total = sumTotal(metric.pick);
       if (!total && metric.label !== alwaysShow) {
         continue;
       }
       const limit = limits ? metric.limit(limits, this.type) : 0;
-      const self = metric.hasSelf === false ? 0 : sum(metric.pick, 'self');
+      const self = metric.noSelf ? 0 : sumSelf(metric.pick);
       const format = metric.bytes ? formatBytes : formatInteger;
       this._row(
         rows,
@@ -271,10 +270,13 @@ export class EventVitals extends LitElement {
       );
     }
 
-    // Heap peak is the limit-comparable heap figure and has no self component.
-    const heapPeak = events.reduce((max, e) => Math.max(max, e.heapPeak), 0);
+    const heapPeak = events.reduce((max, e) => Math.max(max, HEAP_PEAK.pick(e)), 0);
     if (heapPeak) {
-      this._row(rows, 'Heap peak', usage(heapPeak, limits?.heapSize.limit ?? 0, formatBytes, null));
+      this._row(
+        rows,
+        HEAP_PEAK.label,
+        usage(heapPeak, limits ? HEAP_PEAK.limit(limits) : 0, formatBytes, null),
+      );
     }
   }
 
@@ -320,11 +322,6 @@ export class EventVitals extends LitElement {
   }
 }
 
-/** Heap values are byte counts; a signed net value keeps its sign. */
-function formatBytes(bytes: number): string {
-  return `${formatInteger(bytes)} bytes`;
-}
-
 /**
  * Secondary readings for a value, in a single bracketed group one step down in
  * size — never several adjacent brackets, which collide as `) (`. The leading
@@ -335,21 +332,15 @@ function qualifier(...parts: Array<string | false | null | undefined>): Template
   return shown.length ? html` <span class="qualifier">(${shown.join(', ')})</span>` : '';
 }
 
-/**
- * `used / limit` followed by its derived percentage and any self reading, so the
- * primary number reads first. Without a known limit there is no denominator and
- * no percentage.
- */
+/** {@link usageParts} as the row renders it. */
 function usage(
   total: number,
   limit: number,
   format: (value: number) => string,
   self: string | null,
 ): TemplateResult {
-  const primary = limit > 0 ? `${format(total)} / ${format(limit)}` : format(total);
-  // Percentage first: it qualifies the ratio immediately before it.
-  const percent = limit > 0 ? `${((total / limit) * 100).toFixed(2)}%` : null;
-  return html`${primary}${qualifier(percent, self && `self ${self}`)}`;
+  const { primary, qualifiers } = usageParts(total, limit, format, self);
+  return html`${primary}${qualifier(...qualifiers)}`;
 }
 
 declare global {

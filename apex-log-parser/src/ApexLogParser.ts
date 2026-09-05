@@ -2,12 +2,20 @@
  * Copyright (c) 2020 Certinia Inc. All rights reserved.
  */
 
-import { ApexLog, type LogEvent } from './LogEvents.js';
+import { ApexLog, applyFlowDbResiduals, type LogEvent } from './LogEvents.js';
 import { getLogEventClass } from './LogLineMapping.js';
 import type { GovernorLimits, IssueType, Limits, LogEventType, LogIssue } from './types.js';
 
 const typePattern = /^[A-Z_]*$/,
   settingsPattern = /^\d+\.\d+\sAPEX_CODE,\w+;APEX_PROFILING,.+$/m;
+
+/**
+ * Identity of a log issue for dedupe. Keyed on type + summary so a FATAL_ERROR and an
+ * EXCEPTION_THROWN with the same first line both survive.
+ */
+function issueKey(type: IssueType, summary: string): string {
+  return type + ':' + summary;
+}
 
 /**
  * Takes string input of a log and returns the ApexLog class, which represents a log tree
@@ -57,6 +65,12 @@ export class ApexLogParser {
     byNamespace: new Map<string, Limits>(),
     snapshots: [],
   };
+
+  /**
+   * Flow elements that may report their own database usage, in log order. Their usage is attributed
+   * once the tree is aggregated - see {@link applyFlowDbResiduals}.
+   */
+  readonly flowDbElements: LogEvent[] = [];
 
   /**
    * Takes string input of a log and returns the ApexLog class, which represents a log tree
@@ -279,6 +293,7 @@ export class ApexLogParser {
     rootMethod.setTimes();
     this.mergeManagedPackageEvents(rootMethod);
     this.aggregateTotals([rootMethod]);
+    applyFlowDbResiduals(this.flowDbElements);
     return rootMethod;
   }
 
@@ -572,8 +587,9 @@ export class ApexLogParser {
     description: string,
     type: IssueType,
   ) {
-    if (!this.reasons.has(summary)) {
-      this.reasons.add(summary);
+    const key = issueKey(type, summary);
+    if (!this.reasons.has(key)) {
+      this.reasons.add(key);
       this.logIssues.push({
         startTime: startTime,
         eventIndex: eventIndex,
@@ -593,13 +609,12 @@ export class ApexLogParser {
     description: string,
     type: IssueType,
   ) {
-    const elem = this.logIssues.findIndex((item) => {
-      return item.summary === summary;
-    });
+    const key = issueKey(type, summary);
+    const elem = this.logIssues.findIndex((item) => issueKey(item.type, item.summary) === key);
     if (elem > -1) {
       this.logIssues.splice(elem, 1);
     }
-    this.reasons.delete(summary);
+    this.reasons.delete(key);
 
     this.addLogIssue(startTime, eventIndex, summary, description, type);
   }

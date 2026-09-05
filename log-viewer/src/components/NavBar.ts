@@ -2,12 +2,14 @@
  * Copyright (c) 2023 Certinia Inc. All rights reserved.
  */
 import '#vscode-elements/vscode-toolbar-button.js';
-import { LitElement, css, html, type PropertyValues, type TemplateResult } from 'lit';
+import { LitElement, css, html, nothing, type PropertyValues, type TemplateResult } from 'lit';
 import { customElement, property, state } from 'lit/decorators.js';
 
 import { eventBus } from '../core/events/EventBus.js';
 import { formatDuration } from '../core/utility/Util.js';
+import type { LogIdentityData } from '../features/app/logIdentity.js';
 import type { LogIssue } from '../features/notifications/types.js';
+import type { LogTitle } from './LogTitle.js';
 import { computeVisibleCount } from './overflowFit.js';
 
 // styles
@@ -20,18 +22,43 @@ import '../features/notifications/components/NotificationCentre.js';
 import './Divider.js';
 import './DotSeparator.js';
 import './HeaderMenu.js';
+import './LogIdentity.js';
 import './LogMeta.js';
 import './LogProblemsChip.js';
 import './LogTitle.js';
 
 /**
- * What the header sheds as it narrows, in the order it *keeps* them: log meta goes
- * first (passive info, and its values survive in the title's tooltip), then the bell
- * (tool-level, usually empty), then the Inspector toggle (also on the command palette,
- * and the docked panel is visible either way), and log problems last — the only signal
- * that can invalidate the whole analysis. Everything shed reappears inside `•••`.
+ * The identity chunks in keep order (the last sheds first), each tied to its
+ * `LogIdentityData` field, its menu label and its label cap.
  */
-const CHUNKS = ['problems', 'inspector', 'bell', 'meta'] as const;
+const IDENTITY_CHUNKS = [
+  { chunk: 'entry', field: 'entryPoint', label: 'Entry point', cap: '24ch', skeletonWidth: '12ch' },
+  { chunk: 'user', field: 'user', label: 'User', cap: '16ch', skeletonWidth: '8ch' },
+  { chunk: 'time', field: 'startTime', label: 'Started', cap: '', skeletonWidth: '8ch' },
+] as const satisfies readonly {
+  chunk: string;
+  field: keyof LogIdentityData;
+  label: string;
+  cap: string;
+  skeletonWidth: string;
+}[];
+
+/**
+ * What the header sheds as it narrows, in the order it *keeps* them: the transaction
+ * identity goes first, one item at a time from the right — time, then user, then entry
+ * point (losing "when" before "who" before "what") — then log meta (all passive info),
+ * then the bell (tool-level, usually empty), then the Inspector toggle (also on the
+ * command palette, and the docked panel is visible either way), and log problems last —
+ * the only signal that can invalidate the whole analysis. Everything shed reappears
+ * inside `•••`.
+ */
+const CHUNKS = [
+  'problems',
+  'inspector',
+  'bell',
+  'meta',
+  ...IDENTITY_CHUNKS.map(({ chunk }) => chunk),
+] as const;
 type Chunk = (typeof CHUNKS)[number];
 
 /**
@@ -42,10 +69,18 @@ type Chunk = (typeof CHUNKS)[number];
 const CHUNK_GAP = 6;
 
 /**
- * Used until `log-title` has been laid out and its real floor can be read. `16ch` in the
+ * Used until `log-title` has been laid out and its floor can be read. `10ch` in the
  * default font; measured rather than trusted, so the two can't drift.
  */
-const TITLE_FLOOR_FALLBACK = 140;
+const TITLE_FLOOR_FALLBACK = 88;
+
+/** One shed value in the `•••` menu: the header's own compact text. */
+interface DetailRow {
+  label: string;
+  value: string;
+  /** The full value, when it says more than `value` does. */
+  detail?: string;
+}
 
 @customElement('nav-bar')
 export class NavBar extends LitElement {
@@ -69,6 +104,10 @@ export class NavBar extends LitElement {
   @property({ attribute: false })
   notifications: readonly LogIssue[] = [];
 
+  /** Transaction identity (entry point · user · start time). `null` while parsing. */
+  @property({ attribute: false })
+  logIdentity: LogIdentityData | null = null;
+
   /** How many leading `CHUNKS` stay in the header; the rest are in the `•••` menu. */
   @state()
   private _visible: number = CHUNKS.length;
@@ -82,6 +121,7 @@ export class NavBar extends LitElement {
   private _menuWidth = 0;
   private _hostWidth = 0;
   private _titleFloor = TITLE_FLOOR_FALLBACK;
+  private _titleEl: LogTitle | null = null;
   private _resizeObserver: ResizeObserver | null = null;
 
   static styles = [
@@ -95,7 +135,7 @@ export class NavBar extends LitElement {
         /* VS Code's side-bar/panel title height, so this row reads as a title bar rather
            than as content pressed against the top edge (and the count badges have room). */
         min-height: 35px;
-        color: var(--vscode-editor-foreground);
+        color: var(--lana-editor-fg);
       }
 
       .navbar {
@@ -103,7 +143,7 @@ export class NavBar extends LitElement {
         /* Wide enough to read as a gap: the count badge overhangs its control by 3px. */
         gap: 16px;
         justify-content: space-between;
-        font-family: var(--vscode-font-family);
+        font-family: var(--lana-font-ui);
         align-items: center;
         min-width: 0;
       }
@@ -146,15 +186,34 @@ export class NavBar extends LitElement {
 
       .menu-section__label {
         padding: 4px 8px 2px;
-        font-size: 11px;
+        font-size: var(--lana-text-sm);
         font-weight: 600;
-        color: var(--vscode-descriptionForeground);
+        color: var(--lana-fg-muted);
       }
 
       .menu-section__empty {
         padding: 2px 8px 4px;
-        font-size: 12px;
-        color: var(--vscode-descriptionForeground);
+        font-size: var(--lana-text-base);
+        color: var(--lana-fg-muted);
+      }
+
+      .menu-details {
+        display: grid;
+        grid-template-columns: auto 1fr;
+        gap: var(--lana-space-3xs) var(--lana-space-sm);
+        margin: 0;
+        padding: var(--filter-popover-row-padding);
+        font-size: var(--filter-popover-row-font-size);
+      }
+
+      .menu-details dt {
+        color: var(--lana-fg-muted);
+      }
+
+      .menu-details dd {
+        margin: 0;
+        font-variant-numeric: tabular-nums;
+        overflow-wrap: anywhere;
       }
     `,
   ];
@@ -189,7 +248,8 @@ export class NavBar extends LitElement {
       changed.has('logSize') ||
       changed.has('logDuration') ||
       changed.has('logProblems') ||
-      changed.has('notifications')
+      changed.has('notifications') ||
+      changed.has('logIdentity')
     ) {
       this._widths.clear();
       this._visible = CHUNKS.length;
@@ -209,7 +269,7 @@ export class NavBar extends LitElement {
       Chunk,
       boolean
     >;
-    const collapsed = this._collapsedSections(show);
+    const collapsed = this._collapsedSections(show, sizeText, elapsedText);
 
     return html`
       <div class="navbar">
@@ -217,7 +277,13 @@ export class NavBar extends LitElement {
           <log-title
             logName="${this.logName}"
             logPath="${this.logPath}"
-            details="${[sizeText, elapsedText].filter(Boolean).join(' • ')}"
+            details="${[
+              sizeText,
+              elapsedText,
+              ...IDENTITY_CHUNKS.map(({ field }) => this.logIdentity?.[field]?.detail),
+            ]
+              .filter(Boolean)
+              .join(' • ')}"
           ></log-title>
           ${
             show.meta
@@ -227,6 +293,18 @@ export class NavBar extends LitElement {
                 </div>`
               : ''
           }
+          ${IDENTITY_CHUNKS.map(({ chunk, field, cap, skeletonWidth }) =>
+            show[chunk] && this._chunkActive(chunk)
+              ? html`<div class="chunk chunk--${chunk}">
+                  <dot-separator></dot-separator>
+                  <log-identity
+                    .item=${this.logIdentity?.[field] ?? null}
+                    cap=${cap}
+                    skeletonWidth=${skeletonWidth}
+                  ></log-identity>
+                </div>`
+              : '',
+          )}
           ${
             show.problems
               ? html`<div class="chunk chunk--problems">
@@ -285,16 +363,36 @@ export class NavBar extends LitElement {
     }
 
     this._measure();
-    const widths = CHUNKS.map((chunk) => this._widths.get(chunk) ?? 0);
+    // An inactive chunk renders nothing: it costs the ladder no width, and its zero
+    // width is legitimate rather than "not measured yet".
+    const active = CHUNKS.map((chunk) => this._chunkActive(chunk));
+    const widths = CHUNKS.map((chunk, i) => (active[i] ? (this._widths.get(chunk) ?? 0) : 0));
     // Nothing measured yet (first paint, or the webview is hidden) — leave the layout be.
-    if (widths.some((width) => width === 0)) {
+    if (widths.some((width, i) => width === 0 && active[i])) {
       return;
     }
+
+    // The cap counts every active chunk, inline or in the menu, so a shed can never hand
+    // the title its width back. Written to the element rather than held as state: it moves
+    // with every resize pixel, and a re-render per pixel would rebuild the whole header.
+    const total = widths.reduce((sum, width) => sum + width, 0);
+    const cap = Math.max(0, this._hostWidth - this._menuWidth - total);
+    this._titleEl?.style.setProperty('--title-max', `${cap}px`);
 
     const avail = this._hostWidth - this._titleFloor - this._menuWidth;
     // `_fit` also runs from `updated`, so this must settle: an unchanged stage is not a
     // change, so lit schedules nothing and the loop stops.
     this._visible = computeVisibleCount(widths, avail, 0, 0);
+  }
+
+  /**
+   * Whether a chunk currently has anything to show. The identity chunks are the only
+   * optional ones: each stays active while the log parses (skeleton) and goes inactive
+   * when the parsed log carries no value for it (e.g. a cropped log with no USER_INFO).
+   */
+  private _chunkActive(chunk: Chunk): boolean {
+    const field = IDENTITY_CHUNKS.find((identity) => identity.chunk === chunk)?.field;
+    return !field || this.logIdentity === null || Boolean(this.logIdentity[field]);
   }
 
   private _measure(): void {
@@ -315,10 +413,9 @@ export class NavBar extends LitElement {
       this._menuWidth = menuWidth + CHUNK_GAP;
     }
 
-    // The floor belongs to log-title's stylesheet; read it rather than restate it in px
-    // here, where a font change or a `ch` tweak would silently desync the ladder.
-    const title = root.querySelector('log-title');
-    const floor = title ? parseFloat(getComputedStyle(title).minWidth) : NaN;
+    this._titleEl ??= root.querySelector<LogTitle>('log-title');
+    // Re-read every pass: the floor is a `ch` value, so it settles as the font loads.
+    const floor = this._titleEl?.floorWidth ?? 0;
     if (floor > 0) {
       this._titleFloor = floor;
     }
@@ -328,9 +425,27 @@ export class NavBar extends LitElement {
    * Collapsed controls go into the menu as content, not as their own popover triggers:
    * a trigger inside an open popover means nesting native popovers and clicking twice.
    */
-  private _collapsedSections(show: Record<Chunk, boolean>): TemplateResult[] {
+  private _collapsedSections(
+    show: Record<Chunk, boolean>,
+    sizeText: string,
+    elapsedText: string,
+  ): TemplateResult[] {
     const sections: TemplateResult[] = [];
 
+    const details = this._detailRows(show, sizeText, elapsedText);
+    if (details.length) {
+      sections.push(
+        html`<div class="menu-section">
+          <div class="menu-section__label">Log details</div>
+          <dl class="menu-details">
+            ${details.map(
+              ({ label, value, detail }) =>
+                html`<dt>${label}</dt> <dd title=${detail ?? nothing}>${value}</dd>`,
+            )}
+          </dl>
+        </div>`,
+      );
+    }
     if (!show.bell) {
       sections.push(
         this._issueSection('Notifications', this.notifications, 'Log parsed with no issues'),
@@ -351,6 +466,37 @@ export class NavBar extends LitElement {
     }
 
     return sections;
+  }
+
+  /**
+   * The passive values the header has shed, in reading order. Same compact text as the
+   * header, so a shed changes where a value sits and not how it reads.
+   */
+  private _detailRows(
+    show: Record<Chunk, boolean>,
+    sizeText: string,
+    elapsedText: string,
+  ): DetailRow[] {
+    const rows: DetailRow[] = [];
+
+    if (!show.meta) {
+      if (sizeText) {
+        rows.push({ label: 'Size', value: sizeText });
+      }
+      if (elapsedText) {
+        rows.push({ label: 'Duration', value: elapsedText });
+      }
+    }
+    for (const { chunk, field, label } of IDENTITY_CHUNKS) {
+      const item = this.logIdentity?.[field];
+      if (!show[chunk] && item) {
+        // No tooltip when it only repeats the row: a hover has to add something.
+        const detail = item.detail === item.label ? undefined : item.detail;
+        rows.push({ label, value: item.label, detail });
+      }
+    }
+
+    return rows;
   }
 
   private _issueSection(

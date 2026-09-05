@@ -3,8 +3,8 @@
  */
 
 import type { GovernorLimits, LogEvent, SelfTotal } from 'apex-log-parser';
+import { ROOT_PATH_ID, type KeyPathIds } from '../../../core/log/keyPathIds.js';
 import { getCallerNamespace } from '../../../core/utility/CallerNamespace.js';
-import { Multiset } from '../../../core/utility/Multiset.js';
 import { computeHasDetailsDeep } from './DetailsFilter.js';
 import { setGovernorCost } from './GovernorCost.js';
 
@@ -17,6 +17,8 @@ export interface AggregatedRow {
   id: number;
   /** Unique grouping key for this function signature */
   key: string;
+  /** The interned bucket path that names this row, which the mark matches on. */
+  _pathId: number;
   /** Display name */
   text: string;
   /** Package namespace */
@@ -79,6 +81,8 @@ export interface BottomUpRow {
   /** Internal interned int id matching {@link key}; used for fast child-bucket
    *  lookup during the trie build. Not consumed externally. */
   _keyId: number;
+  /** The interned bucket path that names this row, which the mark matches on. */
+  _pathId: number;
   /** Display name */
   text: string;
   /** Package namespace */
@@ -134,32 +138,13 @@ export interface BottomUpRow {
 }
 
 /**
- * Generates a unique key for grouping events by signature.
- * Includes event type so different entry types (e.g. CODE_UNIT_STARTED vs METHOD_ENTRY)
- * are displayed as separate rows. Field order (type|namespace|text) is the shared
- * canonical bucket-key shape used by aggregated, bottom-up, and analysis views.
- */
-export function getEventKey(event: LogEvent): string {
-  return `${event.type ?? ''}|${event.namespace}|${event.text}`;
-}
-
-/**
- * Generates a key for call-stack tracking to detect recursive calls.
- * Excludes event type so the same method is recognised regardless of entry type
- * (e.g. CODE_UNIT_STARTED at the top level, METHOD_ENTRY for recursive calls).
- * Matches the approach used by the analysis view's RowGrouper.
- */
-function getStackKey(event: LogEvent): string {
-  return `${event.namespace}|${event.text}`;
-}
-
-/**
  * Creates an aggregated call tree where all calls to the same function signature
- * are merged together, with aggregated metrics.
- * Uses Multiset call-stack tracking to prevent double-counting of recursive calls.
+ * are merged together, with aggregated metrics. A recursive call adds no total
+ * time of its own: the frame open above it already holds the time they share.
  */
 export function toAggregatedCallTree(
   rootChildren: LogEvent[],
+  paths: KeyPathIds,
   governorLimits?: GovernorLimits,
 ): AggregatedRow[] {
   if (rootChildren.length === 0) {
@@ -171,39 +156,51 @@ export function toAggregatedCallTree(
   let next = 0;
   const idFor = (): number => ++next;
 
-  // Group root-level events by signature with call stack tracking
-  const rootMap = new Map<string, AggregatedRow>();
-  const keyStack = new Multiset<string>();
+  // Group root-level events by signature with call stack tracking. Keyed by the
+  // log's interned ids: a bucket key is hashed once for the log rather than once
+  // per event, and the ids are the ones a mark matches rows on.
+  const rootMap = new Map<number, AggregatedRow>();
 
   for (const event of rootChildren) {
     // Process every event so callCount/DML/SOQL/exception counts roll up even
     // when the event has no timing contribution.
-    const key = getEventKey(event);
-    let row = rootMap.get(key);
+    const keyId = paths.keyIdOf(event);
+    let row = rootMap.get(keyId);
 
     if (!row) {
-      row = createEmptyAggregatedRow(key, event, idFor);
-      rootMap.set(key, row);
+      row = createEmptyAggregatedRow(
+        paths.keyText(keyId),
+        paths.step(ROOT_PATH_ID, keyId),
+        event,
+        idFor,
+      );
+      rootMap.set(keyId, row);
     }
 
-    const stackKey = getStackKey(event);
-    addEventToAggregatedRowWithStack(row, event, stackKey, keyStack);
+    // Nothing is open above a root child, so no call of one is recursive here.
+    addEventToAggregatedRow(row, event, paths.stackIdOf(event, keyId), NO_STACK);
   }
 
   // Recursively aggregate children for each row
   for (const row of rootMap.values()) {
-    const firstInstance = row.instances[0];
-    const stackKey = firstInstance ? getStackKey(firstInstance) : row.key;
-    row._children = aggregateChildrenRecursive(row.instances, stackKey, idFor, governorLimits);
-    calculateAverages(row);
-    if (governorLimits) {
-      setGovernorCost(row, governorLimits);
-    }
-    row._hasDetailsDeep = computeHasDetailsDeep(row, row.totalTime, row.originalData.type);
+    row._children = aggregateChildrenRecursive(row, paths, idFor, governorLimits);
+    finaliseAggregatedRow(row, governorLimits);
   }
 
   // Sort by total time descending
   return Array.from(rootMap.values()).sort((a, b) => b.totalTime - a.totalTime);
+}
+
+/** No frame open above the level, so nothing in it can be a recursive call. */
+const NO_STACK = -1;
+
+/** Averages, governor cost and the Show Details roll-up, once `_children` is set. */
+function finaliseAggregatedRow(row: AggregatedRow, governorLimits?: GovernorLimits): void {
+  calculateAverages(row);
+  if (governorLimits) {
+    setGovernorCost(row, governorLimits);
+  }
+  row._hasDetailsDeep = computeHasDetailsDeep(row, row.totalTime, row.originalData.type);
 }
 
 /**
@@ -211,28 +208,32 @@ export function toAggregatedCallTree(
  * Tracks the parent key to detect recursive calls within the same aggregation context.
  */
 function aggregateChildrenRecursive(
-  instances: LogEvent[],
-  parentStackKey: string,
+  parent: AggregatedRow,
+  paths: KeyPathIds,
   idFor: () => number,
   governorLimits?: GovernorLimits,
 ): AggregatedRow[] | null {
-  const childMap = new Map<string, AggregatedRow>();
-  // Create a new stack for each aggregation level, starting with the parent stack key
-  const keyStack = new Multiset<string>();
-  keyStack.add(parentStackKey);
+  const childMap = new Map<number, AggregatedRow>();
+  // The parent's frame is open over every call in it, so a call of that same
+  // frame inside is recursive. `originalData` is the bucket's own first call.
+  const parentStackId = paths.stackIdOf(parent.originalData);
 
-  for (const instance of instances) {
+  for (const instance of parent.instances) {
     for (const child of instance.children) {
-      const key = getEventKey(child);
-      let row = childMap.get(key);
+      const keyId = paths.keyIdOf(child);
+      let row = childMap.get(keyId);
 
       if (!row) {
-        row = createEmptyAggregatedRow(key, child, idFor);
-        childMap.set(key, row);
+        row = createEmptyAggregatedRow(
+          paths.keyText(keyId),
+          paths.step(parent._pathId, keyId),
+          child,
+          idFor,
+        );
+        childMap.set(keyId, row);
       }
 
-      const stackKey = getStackKey(child);
-      addEventToAggregatedRowWithStack(row, child, stackKey, keyStack);
+      addEventToAggregatedRow(row, child, paths.stackIdOf(child, keyId), parentStackId);
     }
   }
 
@@ -242,37 +243,28 @@ function aggregateChildrenRecursive(
 
   // Recursively aggregate children using stack key for recursion tracking
   for (const row of childMap.values()) {
-    const firstInstance = row.instances[0];
-    const stackKey = firstInstance ? getStackKey(firstInstance) : row.key;
-    row._children = aggregateChildrenRecursive(row.instances, stackKey, idFor, governorLimits);
-    calculateAverages(row);
-    if (governorLimits) {
-      setGovernorCost(row, governorLimits);
-    }
-    row._hasDetailsDeep = computeHasDetailsDeep(row, row.totalTime, row.originalData.type);
+    row._children = aggregateChildrenRecursive(row, paths, idFor, governorLimits);
+    finaliseAggregatedRow(row, governorLimits);
   }
 
   // Sort by total time descending
   return Array.from(childMap.values()).sort((a, b) => b.totalTime - a.totalTime);
 }
 
-/**
- * Adds an event to an aggregated row, using call stack tracking to prevent
- * double-counting of totalTime for recursive calls.
- */
-function addEventToAggregatedRowWithStack(
+/** Adds an event to an aggregated row, leaving `totalTime` alone where the call
+ *  is recursive: the frame open above this level already holds that time. */
+function addEventToAggregatedRow(
   row: AggregatedRow,
   event: LogEvent,
-  stackKey: string,
-  keyStack: Multiset<string>,
+  stackId: number,
+  openStackId: number,
 ): void {
   row.callCount++;
   row.totalSelfTime += event.duration.self; // Always add self time
 
-  // Only add totalTime if this method is not already on the stack (avoids recursive double-counting)
-  // Uses stackKey (text+namespace, no type) so CODE_UNIT_STARTED and METHOD_ENTRY for the same
-  // method are recognised as the same function in the call stack.
-  if (!keyStack.has(stackKey)) {
+  // The stack id reads through the entry type, so CODE_UNIT_STARTED and
+  // METHOD_ENTRY for the same method are one frame on the call stack.
+  if (stackId !== openStackId) {
     row.totalTime += event.duration.total;
   }
 
@@ -335,7 +327,7 @@ function addEventToAggregatedRowWithStack(
  */
 type FrameContext = {
   frame: LogEvent;
-  stackKey: string;
+  stackId: number;
   prior: FrameContext | undefined;
   // Attribution accumulator — initialised to the frame's own totals and
   // decremented as same-name descendants are entered. Final when the frame
@@ -362,7 +354,8 @@ type DfsEntry = {
  * Single iterative DFS that fuses attribution computation with trie insertion.
  *
  * Pre-order on entering N:
- *   - Intern N's event key to an int id; push onto the chain stack.
+ *   - Take N's interned bucket key id from the log's table; push it onto the
+ *     chain stack.
  *   - Look up `prior` same-name ancestor; build N's `FrameContext` initialised
  *     to N's own totals; decrement `prior.totalTime`/… by N's totals (the
  *     deepest-active-frame attribution rule).
@@ -372,23 +365,22 @@ type DfsEntry = {
  *     chain stack from top (= N) down to depth 0. The chain is the live DFS
  *     ancestor path, so no `frame.parent` walk and no per-step Map lookup is
  *     needed. Bucket-key comparisons are int equality on `_keyId`.
- *   - Restore `activeByName[stackKey]` from `ctx.prior`.
+ *   - Restore `activeByStack[stackId]` from `ctx.prior`.
  *
  * Zero-delta guards on the DML/SOQL/row/thrown accumulators avoid the no-op
  * `bucket.x += 0` writes that dominate logs without heavy DB work.
  */
 export function toBottomUpTree(
   rootChildren: LogEvent[],
+  paths: KeyPathIds,
   governorLimits?: GovernorLimits,
 ): BottomUpRow[] {
   if (rootChildren.length === 0) {
     return [];
   }
 
-  const intern = new Map<string, number>();
-  const idToKey: string[] = [];
   const rootBuckets = new Map<number, BottomUpRow>();
-  const activeByName = new Map<string, FrameContext>();
+  const activeByStack = new Map<number, FrameContext>();
   const dfs: DfsEntry[] = [];
   const chainIds: number[] = [];
 
@@ -398,20 +390,14 @@ export function toBottomUpTree(
   const idFor = (): number => ++next;
 
   const enter = (node: LogEvent): void => {
-    const eventKey = getEventKey(node);
-    let id = intern.get(eventKey);
-    if (id === undefined) {
-      id = intern.size;
-      intern.set(eventKey, id);
-      idToKey.push(eventKey);
-    }
-    chainIds.push(id);
+    const keyId = paths.keyIdOf(node);
+    chainIds.push(keyId);
 
-    const stackKey = getStackKey(node);
-    const prior = activeByName.get(stackKey);
+    const stackId = paths.stackIdOf(node, keyId);
+    const prior = activeByStack.get(stackId);
     const ctx: FrameContext = {
       frame: node,
-      stackKey,
+      stackId,
       prior,
       totalTime: node.duration.total,
       dmlTotal: node.dmlCount.total,
@@ -437,7 +423,7 @@ export function toBottomUpTree(
       prior.heapTotal -= node.heapAllocated.total;
       prior.heapGrossTotal -= node.heapGross.total;
     }
-    activeByName.set(stackKey, ctx);
+    activeByStack.set(stackId, ctx);
     dfs.push({ node, childIdx: 0, ctx });
   };
 
@@ -539,7 +525,8 @@ export function toBottomUpTree(
     const rootId = chainIds[top]!;
     let bucket = rootBuckets.get(rootId);
     if (!bucket) {
-      bucket = createEmptyBottomUpRow(idToKey[rootId]!, rootId, node, idFor);
+      const pathId = paths.step(ROOT_PATH_ID, rootId);
+      bucket = createEmptyBottomUpRow(paths.keyText(rootId), rootId, pathId, node, idFor);
       rootBuckets.set(rootId, bucket);
     }
     accumulate(bucket);
@@ -554,7 +541,14 @@ export function toBottomUpTree(
       const existingChildren = parentBucket._children ?? [];
       let childBucket = existingChildren.find((c) => c._keyId === ancestorId);
       if (!childBucket) {
-        childBucket = createEmptyBottomUpRow(idToKey[ancestorId]!, ancestorId, ancestor, idFor);
+        const pathId = paths.step(parentBucket._pathId, ancestorId);
+        childBucket = createEmptyBottomUpRow(
+          paths.keyText(ancestorId),
+          ancestorId,
+          pathId,
+          ancestor,
+          idFor,
+        );
         existingChildren.push(childBucket);
         parentBucket._children = existingChildren;
       }
@@ -563,9 +557,9 @@ export function toBottomUpTree(
     }
 
     if (ctx.prior) {
-      activeByName.set(ctx.stackKey, ctx.prior);
+      activeByStack.set(ctx.stackId, ctx.prior);
     } else {
-      activeByName.delete(ctx.stackKey);
+      activeByStack.delete(ctx.stackId);
     }
     chainIds.pop();
     dfs.pop();
@@ -632,12 +626,14 @@ function sortBuckets(rows: BottomUpRow[]): void {
 
 function createEmptyAggregatedRow(
   key: string,
+  pathId: number,
   event: LogEvent,
   idFor: () => number,
 ): AggregatedRow {
   return {
     id: idFor(),
     key,
+    _pathId: pathId,
     text: event.text,
     namespace: event.namespace,
     callerNamespace: getCallerNamespace(event),
@@ -668,6 +664,7 @@ function createEmptyAggregatedRow(
 function createEmptyBottomUpRow(
   key: string,
   keyId: number,
+  pathId: number,
   event: LogEvent,
   idFor: () => number,
 ): BottomUpRow {
@@ -675,6 +672,7 @@ function createEmptyBottomUpRow(
     id: idFor(),
     key,
     _keyId: keyId,
+    _pathId: pathId,
     text: event.text,
     namespace: event.namespace,
     callerNamespace: getCallerNamespace(event),

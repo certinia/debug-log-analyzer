@@ -60,8 +60,8 @@ export function createTimelineLabel(className: string): HTMLDivElement {
     background: var(--tl-widget-background, #252526);
     border: 1px solid var(--tl-widget-border, #454545);
     color: var(--tl-widget-foreground, #cccccc);
-    font-family: var(--tl-font-family, sans-serif);
-    font-size: 12px;
+    font-family: var(--tl-font-family, var(--lana-font-ui));
+    font-size: var(--lana-text-base);
     pointer-events: none;
     z-index: 100;
     box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
