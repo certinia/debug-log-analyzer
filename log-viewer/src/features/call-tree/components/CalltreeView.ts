@@ -66,7 +66,6 @@ import {
   toggleField,
 } from '../../../tabulator/ColumnViews.js';
 import {
-  LOCATED_ROW_CLASS,
   LocatedRowIds,
   LocatedRowMarker,
   rowDetailSelection,
@@ -300,11 +299,6 @@ export class CalltreeView extends LitElement {
         visibility: hidden;
         opacity: 0;
         pointer-events: none;
-      }
-
-      /* The frame under the pointer in the inspector. */
-      .tabulator-row.${unsafeCSS(LOCATED_ROW_CLASS)} {
-        background-color: var(--lana-row-hover-bg);
       }
     `,
     categoryColoringStyles,

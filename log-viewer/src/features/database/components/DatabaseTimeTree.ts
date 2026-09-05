@@ -17,11 +17,7 @@ import {
   dispatchInspectorLocate,
   dispatchInspectorReveal,
 } from '../../../components/inspectorReveal.js';
-import {
-  LOCATED_ROW_CLASS,
-  LocatedRowMarker,
-  rowIndexStamper,
-} from '../../../components/locatedRow.js';
+import { LocatedRowMarker, rowIndexStamper } from '../../../components/locatedRow.js';
 import { PANEL_ROW_MENU_ITEMS, runPanelRowAction } from '../../../components/panelRowMenu.js';
 import { eventBus } from '../../../core/events/EventBus.js';
 import { logContext } from '../../../core/log/logContext.js';
@@ -192,10 +188,6 @@ export class DatabaseTime extends LitElement {
         white-space: nowrap;
         overflow: hidden;
         text-overflow: ellipsis;
-      }
-      /* The statement under the pointer in the grid beside. */
-      .tabulator-row.${unsafeCSS(LOCATED_ROW_CLASS)} {
-        background-color: var(--lana-row-hover-bg);
       }
     `,
   ];

@@ -15,7 +15,6 @@ import '../../../components/ContextMenu.js';
 import type { ContextMenu } from '../../../components/ContextMenu.js';
 import { eventBus } from '../../../core/events/EventBus.js';
 import {
-  LOCATED_ROW_CLASS,
   LocatedRowIds,
   LocatedRowMarker,
   rowDetailSelection,
@@ -77,11 +76,6 @@ export class AnalysisView extends LitElement {
         /* inset previously provided by the tab panel's padding */
         padding: 10px 6px;
         box-sizing: border-box;
-      }
-
-      /* The frame under the pointer in the inspector. */
-      .tabulator-row.${unsafeCSS(LOCATED_ROW_CLASS)} {
-        background-color: var(--lana-row-hover-bg);
       }
 
       .analysis-view {
