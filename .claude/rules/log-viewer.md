@@ -54,7 +54,11 @@ Webview UI.
 
 ## Key paths
 
-`features/timeline/` · `core/log-parser/` · `core/theme/ThemeObserver.ts` · `styles/tokens.css`
+`features/timeline/` (the pixi.js chart is `optimised/`, which carries its own `AGENTS.md`) ·
+`core/messaging/VSCodeExtensionMessenger.ts` · `core/theme/ThemeObserver.ts` · `styles/tokens.css` ·
+`components/` · `tabulator/`
+
+The parser is the `apex-log-parser` package, so a change there reaches `lana/` too.
 
 ## Testing
 
