@@ -344,19 +344,27 @@ export class KeyboardHandler {
         return true;
     }
 
-    // Jump to start/end (Home/End)
+    // Jump to start/end (Home/End). Each fires once: the lens lands on a fixed
+    // end of the log, so a repeat only re-renders it there.
     switch (event.key) {
       case 'Home':
-        this.callbacks.onMinimapJumpStart?.();
+        if (!event.repeat) {
+          this.callbacks.onMinimapJumpStart?.();
+        }
         return true;
       case 'End':
-        this.callbacks.onMinimapJumpEnd?.();
+        if (!event.repeat) {
+          this.callbacks.onMinimapJumpEnd?.();
+        }
         return true;
     }
 
-    // Reset zoom (0/Escape)
+    // Reset zoom (0/Escape). Fires once: the viewport is already reset, so a
+    // repeat only re-renders.
     if (key === '0' || event.key === 'Escape') {
-      this.callbacks.onMinimapResetZoom?.();
+      if (!event.repeat) {
+        this.callbacks.onMinimapResetZoom?.();
+      }
       return true;
     }
 
@@ -436,19 +444,27 @@ export class KeyboardHandler {
         return true;
     }
 
-    // Jump to start/end (Home/End)
+    // Jump to start/end (Home/End). Each fires once: the strip lands on a fixed
+    // end of the log, so a repeat only re-renders it there.
     switch (event.key) {
       case 'Home':
-        this.callbacks.onMetricStripJumpStart?.();
+        if (!event.repeat) {
+          this.callbacks.onMetricStripJumpStart?.();
+        }
         return true;
       case 'End':
-        this.callbacks.onMetricStripJumpEnd?.();
+        if (!event.repeat) {
+          this.callbacks.onMetricStripJumpEnd?.();
+        }
         return true;
     }
 
-    // Reset zoom (0/Escape)
+    // Reset zoom (0/Escape). Fires once: the viewport is already reset, so a
+    // repeat only re-renders.
     if (key === '0' || event.key === 'Escape') {
-      this.callbacks.onMetricStripResetZoom?.();
+      if (!event.repeat) {
+        this.callbacks.onMetricStripResetZoom?.();
+      }
       return true;
     }
 
