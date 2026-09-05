@@ -575,12 +575,17 @@ export class VariablesDetail extends LitElement {
         break;
       case 'Enter':
       case ' ':
-        if (row.expandable) {
+        // Fires once: a repeat would flap the row open and shut. The arrows open
+        // and close in one direction each, so they carry on repeating.
+        if (row.expandable && !event.repeat) {
           this._toggle(row.id, !row.open);
         }
         break;
       case '*':
-        this._openAll(row.depth);
+        // Fires once: every row at this depth is open after the first press.
+        if (!event.repeat) {
+          this._openAll(row.depth);
+        }
         break;
       default:
         return;
