@@ -10,7 +10,8 @@ import { ROOT_PATH_ID } from '../core/log/keyPathIds.js';
 import { logStoreFor } from '../core/log/LogStore.js';
 import { eventByEventIndex } from '../core/utility/EventSearch.js';
 
-/** Class the marked row carries; each table styles it itself. */
+/** Class the marked row carries. Styled once, in `tabulator/style/DataGrid.scss`,
+ *  which spells the name out: rename it here and the mark stops painting. */
 export const LOCATED_ROW_CLASS = 'located-row';
 
 /** Attribute holding a row's index, so the mark can find its element. */
