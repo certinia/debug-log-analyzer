@@ -268,6 +268,20 @@ describe('KeyboardHandler', () => {
 
       expect(event.defaultPrevented).toBe(true);
     });
+
+    it('should not call onResetZoom on a key repeat', () => {
+      dispatchKeyEvent('keydown', 'Home');
+      dispatchKeyEvent('keydown', 'Home', { repeat: true });
+      dispatchKeyEvent('keydown', '0', { repeat: true });
+
+      expect(callbacks.onResetZoom).toHaveBeenCalledTimes(1);
+    });
+
+    it('should still prevent default on a repeated Home key', () => {
+      const event = dispatchKeyEvent('keydown', 'Home', { repeat: true });
+
+      expect(event.defaultPrevented).toBe(true);
+    });
   });
 
   describe('escape key', () => {
@@ -492,6 +506,20 @@ describe('KeyboardHandler', () => {
 
       expect(event.defaultPrevented).toBe(true);
     });
+
+    it('should not call onJumpToCallTree on a key repeat', () => {
+      dispatchKeyEvent('keydown', 'j');
+      dispatchKeyEvent('keydown', 'j', { repeat: true });
+      dispatchKeyEvent('keydown', 'j', { repeat: true });
+
+      expect(callbacks.onJumpToCallTree).toHaveBeenCalledTimes(1);
+    });
+
+    it('should still prevent default on a repeated J key', () => {
+      const event = dispatchKeyEvent('keydown', 'j', { repeat: true });
+
+      expect(event.defaultPrevented).toBe(true);
+    });
   });
 
   describe('focus keys (Enter / Z)', () => {
@@ -541,6 +569,20 @@ describe('KeyboardHandler', () => {
       expect(enterEvent.defaultPrevented).toBe(true);
       expect(zEvent.defaultPrevented).toBe(true);
     });
+
+    it('should not call onFocus on a key repeat', () => {
+      dispatchKeyEvent('keydown', 'Enter');
+      dispatchKeyEvent('keydown', 'Enter', { repeat: true });
+      dispatchKeyEvent('keydown', 'z', { repeat: true });
+
+      expect(callbacks.onFocus).toHaveBeenCalledTimes(1);
+    });
+
+    it('should still prevent default on a repeated Enter', () => {
+      const event = dispatchKeyEvent('keydown', 'Enter', { repeat: true });
+
+      expect(event.defaultPrevented).toBe(true);
+    });
   });
 
   describe('Copy (Ctrl/Cmd+C)', () => {
@@ -578,6 +620,31 @@ describe('KeyboardHandler', () => {
       const event = dispatchKeyEvent('keydown', 'c', { ctrlKey: true });
 
       expect(event.defaultPrevented).toBe(true);
+    });
+
+    it('should not call onCopy on a key repeat', () => {
+      dispatchKeyEvent('keydown', 'c', { ctrlKey: true });
+      dispatchKeyEvent('keydown', 'c', { ctrlKey: true, repeat: true });
+
+      expect(callbacks.onCopy).toHaveBeenCalledTimes(1);
+    });
+
+    it('should still prevent default on a repeated Ctrl/Cmd+C', () => {
+      const event = dispatchKeyEvent('keydown', 'c', { ctrlKey: true, repeat: true });
+
+      expect(event.defaultPrevented).toBe(true);
+    });
+  });
+
+  describe('key repeat on continuous controls', () => {
+    it('should pan and zoom on every repeat, so holding a key scrubs', () => {
+      dispatchKeyEvent('keydown', 'ArrowLeft', { repeat: true });
+      dispatchKeyEvent('keydown', 'a', { repeat: true });
+      dispatchKeyEvent('keydown', 'w', { repeat: true });
+      dispatchKeyEvent('keydown', 's', { repeat: true });
+
+      expect(callbacks.onPan).toHaveBeenCalledTimes(2);
+      expect(callbacks.onZoom).toHaveBeenCalledTimes(2);
     });
   });
 

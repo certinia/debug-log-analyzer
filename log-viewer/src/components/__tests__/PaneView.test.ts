@@ -111,6 +111,34 @@ describe('PaneView', () => {
     expect(body(el, 'a')).toBeNull();
   });
 
+  it('ignores a held Enter, so the pane does not flap', async () => {
+    const el = await mount('vertical');
+    const h = header(el, 'a');
+    let toggles = 0;
+    el.addEventListener('pane-toggle', () => toggles++);
+
+    h?.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+    h?.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true, repeat: true }));
+    h?.dispatchEvent(new KeyboardEvent('keydown', { key: ' ', bubbles: true, repeat: true }));
+    await el.updateComplete;
+
+    expect(toggles).toBe(1);
+    expect(body(el, 'a')).toBeNull();
+  });
+
+  it('keeps a repeated Space from scrolling the stack', async () => {
+    const el = await mount('vertical');
+    const event = new KeyboardEvent('keydown', {
+      key: ' ',
+      bubbles: true,
+      cancelable: true,
+      repeat: true,
+    });
+    header(el, 'a')?.dispatchEvent(event);
+
+    expect(event.defaultPrevented).toBe(true);
+  });
+
   it('does not collapse in horizontal mode and keeps all panes open', async () => {
     const el = await mount('horizontal');
     // No twistie, headers are not buttons.

@@ -345,8 +345,12 @@ export class PaneView extends LitElement {
 
   private _onHeaderKey(e: KeyboardEvent, id: string) {
     if (e.key === 'Enter' || e.key === ' ') {
+      // Consumed on a repeat too, so Space never scrolls the stack.
       e.preventDefault();
-      this._toggle(id);
+      // Fires once: a repeat would flap the pane, and each toggle persists a setting.
+      if (!e.repeat) {
+        this._toggle(id);
+      }
     }
   }
 

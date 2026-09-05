@@ -633,7 +633,10 @@ export class KeyboardHandler {
     switch (event.key) {
       case 'Home':
       case '0':
-        this.callbacks.onResetZoom?.();
+        // Fires once: the viewport is already reset, so a repeat only re-renders.
+        if (!event.repeat) {
+          this.callbacks.onResetZoom?.();
+        }
         return true;
       default:
         return false;
@@ -664,7 +667,10 @@ export class KeyboardHandler {
     }
 
     if (event.key === 'j' || event.key === 'J') {
-      this.callbacks.onJumpToCallTree?.();
+      // Fires once: a repeat would rebuild the call tree at the repeat rate.
+      if (!event.repeat) {
+        this.callbacks.onJumpToCallTree?.();
+      }
       return true;
     }
     return false;
@@ -681,7 +687,10 @@ export class KeyboardHandler {
     }
 
     if (event.key === 'Enter' || event.key === 'z' || event.key === 'Z') {
-      this.callbacks.onFocus?.();
+      // Fires once: a repeat would re-zoom to the same frame at the repeat rate.
+      if (!event.repeat) {
+        this.callbacks.onFocus?.();
+      }
       return true;
     }
     return false;
@@ -699,7 +708,10 @@ export class KeyboardHandler {
     }
 
     if (event.key === 'c' || event.key === 'C') {
-      this.callbacks.onCopy?.();
+      // Fires once: a repeat would rewrite the clipboard on every press.
+      if (!event.repeat) {
+        this.callbacks.onCopy?.();
+      }
       return true;
     }
     return false;
