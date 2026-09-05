@@ -9,6 +9,7 @@ import type { ApexLog } from 'apex-log-parser';
 let apexLog: ApexLog | null = null;
 
 import type { LogStore } from '../../core/log/LogStore.js';
+import { setRange } from '../../core/log/rangeScope.js';
 import type { NamespaceTimeBar } from '../NamespaceTimeBar.js';
 import { DEFAULT_MAX_SEGMENTS } from '../StackedTimeBar.js';
 import '../NamespaceTimeBar.js';
@@ -49,6 +50,7 @@ describe('namespace-time-bar', () => {
     document.body.replaceChildren();
     resetEvents();
     apexLog = null;
+    setRange(null);
   });
 
   it('splits the whole log by namespace, largest first', async () => {
@@ -122,5 +124,47 @@ describe('namespace-time-bar', () => {
     const element = await mount();
 
     expect(element.shadowRoot?.querySelector('.note')?.textContent).toContain('No time');
+  });
+});
+
+describe('namespace-time-bar with a timeline window', () => {
+  beforeEach(() => {
+    document.body.replaceChildren();
+    resetEvents();
+    apexLog = null;
+    setRange(null);
+  });
+
+  afterEach(() => {
+    setRange(null);
+  });
+
+  // A picked frame is answered as itself, wherever the timeline is looking: the
+  // window here holds a nanosecond, so its own figures could not be these.
+  it('answers for the picked frame, not the window', async () => {
+    logOf([ev('default', 100, [ev('pkg', 500)])], ['pkg']);
+    setRange({ start: 0, end: 1 });
+
+    // Children register first, so the outer `default` frame is index 1.
+    const element = await mount({ eventIndex: 1 });
+
+    expect(segments(element).map((segment) => segment.label)).toEqual(['pkg', 'default']);
+    expect(segments(element).map((segment) => segment.value)).toEqual([500, 100]);
+  });
+
+  // The bar took its palette from the whole-log walk, which a window skips, so
+  // mounting into a window left it with no colours and an empty note.
+  it('answers for a window it mounts into', async () => {
+    logOf([ev('default', 100, [ev('pkg', 500)])], ['pkg']);
+    // `default` owns 0 to 100, `pkg` 100 to 600.
+    setRange({ start: 0, end: 350 });
+
+    const element = await mount();
+    const bars = segments(element);
+
+    expect(bars.map((segment) => segment.label)).toEqual(['pkg', 'default']);
+    expect(bars[0]?.value).toBeCloseTo(250, 3);
+    expect(bars[1]?.value).toBeCloseTo(100, 3);
+    expect(bars[0]?.color).toBe(logNamespacePalette(apexLog!)('pkg'));
   });
 });

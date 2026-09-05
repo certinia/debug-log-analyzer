@@ -26,6 +26,7 @@ import { measureCallTree } from './call-tree.js';
 import { die, time } from './harness.js';
 import { digestMinimap, measureMinimap } from './minimap.js';
 import { measureVariables } from './variables.js';
+import { measureWindow } from './window.js';
 
 /** The one log every measurement runs over, so the numbers compare across branches. */
 const SAMPLE_LOG = 'sample-app/debug-logs/sample-log.log';
@@ -42,6 +43,7 @@ const AREAS: Record<string, Area> = {
   'call-tree': { run: measureCallTree },
   minimap: { run: measureMinimap, digest: digestMinimap },
   variables: { run: measureVariables },
+  window: { run: measureWindow },
 };
 
 const args = (() => {

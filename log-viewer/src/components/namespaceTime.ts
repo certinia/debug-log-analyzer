@@ -38,6 +38,11 @@ async function namespaceSelfTimes(
       stack.push(child);
     }
   }
+  return toNamespaceTimes(totals);
+}
+
+/** Self time per namespace, ranked for display: empty buckets go, largest first. */
+export function toNamespaceTimes(totals: ReadonlyMap<string, number>): NamespaceTime[] {
   return [...totals]
     .filter(([, selfTime]) => selfTime > 0)
     .map(([namespace, selfTime]) => ({ namespace, selfTime }))

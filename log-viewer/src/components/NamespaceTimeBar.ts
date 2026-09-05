@@ -7,6 +7,7 @@ import { LitElement, html, type PropertyValues } from 'lit';
 import { customElement, property, state } from 'lit/decorators.js';
 
 import { logContext } from '../core/log/logContext.js';
+import { WindowStatsController } from '../core/log/windowStats.js';
 import type { LogStore } from '../core/log/LogStore.js';
 import { globalStyles } from '../styles/global.styles.js';
 import { inspectorSectionStyles } from '../styles/inspectorSection.styles.js';
@@ -16,6 +17,7 @@ import { logNamespacePalette } from './namespacePalette.js';
 import {
   cachedNamespaceSelfTimes,
   scopedNamespaceSelfTimes,
+  toNamespaceTimes,
   type NamespaceTime,
 } from './namespaceTime.js';
 
@@ -35,7 +37,8 @@ interface Scope {
  * namespace.
  *
  * Whole log with no `eventIndex`, otherwise the selected frame and everything
- * below it, so the same section answers "and inside this method?".
+ * below it, so the same section answers "and inside this method?". Narrowed
+ * again to the window the Timeline is showing, when it shows part of the log.
  *
  * One namespace still gets its bar: that a scope mixes no packages is an answer,
  * and the full bar with its figure says it.
@@ -66,21 +69,26 @@ export class NamespaceTimeBar extends LitElement {
   /** The walk in flight; a new scope aborts it, and so does a disconnect. */
   private _walk: AbortController | null = null;
 
-  /** The log's palette, so a namespace keeps its colour across scopes. Null until
-   *  a scope resolves, which needs a log. */
-  private _color: ((namespace: string) => string) | null = null;
+  private readonly _window = new WindowStatsController(this, () => this.logStore?.log ?? null);
 
   static styles = [globalStyles, inspectorSectionStyles];
 
   render() {
-    const slices = this._slices;
+    let slices = this._slices;
+    if (this._windowScoped()) {
+      const windowed = this._window.stats;
+      slices = windowed ? toNamespaceTimes(windowed.selfByNamespace) : null;
+    }
     if (!slices) {
       return html`<p class="note">Adding up the self time…</p>`;
     }
-    const color = this._color;
-    if (!slices.length || !color) {
+    // The palette is the log's, so it stands whatever the scope is: the window
+    // answers without the scope walk that used to resolve it.
+    const log = this.logStore?.log;
+    if (!slices.length || !log) {
       return html`<p class="note">No time was recorded here.</p>`;
     }
+    const color = logNamespacePalette(log);
     const segments = segmentsWithTail(slices, (slice) => ({
       label: slice.namespace,
       value: slice.selfTime,
@@ -109,6 +117,11 @@ export class NamespaceTimeBar extends LitElement {
   }
 
   protected updated(changed: PropertyValues): void {
+    // The window answers on its own, so a whole-log walk now would be thrown
+    // away. It waits until the window clears or a selection takes over.
+    if (this._windowScoped()) {
+      return;
+    }
     // Resolving a scope maps every instance index, so only a changed selection —
     // or a scope we have yet to resolve — earns the walk.
     if (changed.has('eventIndex') || changed.has('instances') || this._scopeKey === UNRESOLVED) {
@@ -130,7 +143,6 @@ export class NamespaceTimeBar extends LitElement {
       this._slices = [];
       return;
     }
-    this._color = logNamespacePalette(scope.log);
     // A scope walked before answers now, so a re-selection shows no placeholder.
     this._slices = cachedNamespaceSelfTimes(scope.key) ?? null;
     if (this._slices) {
@@ -149,6 +161,17 @@ export class NamespaceTimeBar extends LitElement {
       // key, so a later render walks it again instead of waiting on a dead walk.
       this._scopeKey = UNRESOLVED;
     }
+  }
+
+  /** True where the section answers for a picked frame or aggregate. */
+  private _selected(): boolean {
+    return this.eventIndex >= 0 || !!this.instances?.length;
+  }
+
+  /** True where the window is the scope. A selection wins over it: a picked
+   *  frame is answered as itself, wherever the timeline is looking. */
+  private _windowScoped(): boolean {
+    return !this._selected() && this._window.window !== null;
   }
 
   private _scope(): Scope | null {

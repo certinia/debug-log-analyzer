@@ -61,18 +61,25 @@ export function categorySelfTimes(root: ApexLog): CategoryTime[] {
   while (stack.length) {
     const event = stack.pop()!; // non-empty: the loop condition just checked
 
-    const category = categoryName(event.category);
-    totals.set(category, (totals.get(category) ?? 0) + event.duration.self);
+    totals.set(event.category, (totals.get(event.category) ?? 0) + event.duration.self);
     for (const child of event.children) {
       stack.push(child);
     }
   }
-  const slices = [...totals]
-    .filter(([, selfTime]) => selfTime > 0)
-    .map(([category, selfTime]) => ({ category, selfTime }))
-    .sort((a, b) => b.selfTime - a.selfTime);
+  const slices = toCategoryTimes(totals);
   selfTimesCache.set(root, slices);
   return slices;
+}
+
+/**
+ * Self time per raw category, named and ranked for display: empty buckets go,
+ * an uncategorised event lands in {@link OTHER_CATEGORY}, largest first.
+ */
+export function toCategoryTimes(totals: ReadonlyMap<string, number>): CategoryTime[] {
+  return [...totals]
+    .filter(([, selfTime]) => selfTime > 0)
+    .map(([category, selfTime]) => ({ category: categoryName(category), selfTime }))
+    .sort((a, b) => b.selfTime - a.selfTime);
 }
 
 /**

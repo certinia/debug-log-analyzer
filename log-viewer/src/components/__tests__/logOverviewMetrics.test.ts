@@ -3,6 +3,7 @@
  */
 import { describe, expect, it } from '@jest/globals';
 
+import type { WindowCounts } from '../../core/log/windowStats.js';
 import { GOVERNOR_METRICS, limitTotals, seriesGauges } from '../logOverviewMetrics.js';
 import { emptyLimits, seriesEvent, timeSeries } from './limitsTestUtils.js';
 
@@ -108,5 +109,81 @@ describe('seriesGauges', () => {
 
   it('returns nothing for a series without events', () => {
     expect(seriesGauges(timeSeries([]))).toEqual([]);
+  });
+});
+
+describe('seriesGauges for a window', () => {
+  const none = {
+    soqlCount: 0,
+    soqlRowCount: 0,
+    dmlCount: 0,
+    dmlRowCount: 0,
+    soslCount: 0,
+  };
+
+  /** The log reports these statements one by one, so they are windowable. */
+  const reported = { ...none, soqlCount: 9, dmlCount: 4 };
+  const windowOf = (counts: WindowCounts, logCounts: WindowCounts = reported) => ({
+    counts,
+    logCounts,
+  });
+
+  const series = () =>
+    timeSeries([
+      seriesEvent(1_000, {
+        cpuTime: { used: 15_163, limit: 10_000 },
+        soqlQueries: { used: 9, limit: 100 },
+        dmlStatements: { used: 4, limit: 150 },
+        heapSize: { used: 219_591, limit: 6_000_000 },
+      }),
+    ]);
+
+  // Rows must not appear, vanish or reorder as the viewport moves.
+  it('shows the same metrics in the same order as the whole log', () => {
+    const whole = seriesGauges(series()).map((gauge) => gauge.label);
+
+    expect(seriesGauges(series(), windowOf(none)).map((gauge) => gauge.label)).toEqual(whole);
+  });
+
+  it('reads a metric the window did not use as zero, not as missing', () => {
+    const gauges = seriesGauges(series(), windowOf(none));
+
+    expect(gauges.find((gauge) => gauge.label === 'SOQL')).toMatchObject({
+      used: 0,
+      found: 0,
+      limit: 100,
+    });
+  });
+
+  it('reads what the window ran', () => {
+    const gauges = seriesGauges(series(), windowOf({ ...none, soqlCount: 6, dmlCount: 2 }));
+
+    expect(gauges.find((gauge) => gauge.label === 'SOQL')).toMatchObject({ used: 6, limit: 100 });
+    expect(gauges.find((gauge) => gauge.label === 'DML')).toMatchObject({ used: 2, limit: 150 });
+  });
+
+  // Both are cumulative readings the log reports only in total.
+  it('keeps CPU time and heap whole-log, and says so', () => {
+    const gauges = seriesGauges(series(), windowOf(none));
+
+    expect(gauges.find((gauge) => gauge.label === 'CPU Time')).toMatchObject({
+      used: 15_163,
+      limit: 10_000,
+      wholeLog: true,
+    });
+    expect(gauges.find((gauge) => gauge.label === 'Heap Size')).toMatchObject({ wholeLog: true });
+    expect(gauges.find((gauge) => gauge.label === 'SOQL')?.wholeLog).toBeUndefined();
+  });
+
+  // The whole-log figure then came from the cumulative block, which no window
+  // can cut. Reading 0 would say no statements ran.
+  it('keeps a counter the log never reported one by one whole-log', () => {
+    const gauges = seriesGauges(series(), windowOf(none, none));
+
+    expect(gauges.find((gauge) => gauge.label === 'SOQL')).toMatchObject({
+      used: 9,
+      limit: 100,
+      wholeLog: true,
+    });
   });
 });

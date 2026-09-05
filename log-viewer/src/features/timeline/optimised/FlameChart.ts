@@ -25,6 +25,7 @@ import type {
   TimelineOptions,
   TimelineState,
   TreeNode,
+  ViewportBounds,
   ViewportState,
 } from '../types/flamechart.types.js';
 import { TIMELINE_CONSTANTS, TimelineError, TimelineErrorCode } from '../types/flamechart.types.js';
@@ -679,10 +680,14 @@ export class FlameChart<E extends EventNode = EventNode> {
   }
 
   /**
-   * Get viewport manager instance.
+   * The stretch of log and the depths on screen, or null before the chart has a
+   * viewport.
+   *
+   * A read, not the viewport itself: moving the viewport has to report where it
+   * landed, and only the chart can do that (see {@link focusOn}).
    */
-  public getViewportManager(): TimelineViewport | null {
-    return this.viewport;
+  public getViewportBounds(): ViewportBounds | null {
+    return this.viewport?.getBounds() ?? null;
   }
 
   /**
@@ -2171,6 +2176,27 @@ export class FlameChart<E extends EventNode = EventNode> {
    */
   public centerOnSelectedFrame(): void {
     this.selectionOrchestrator?.centerOnSelectedFrame();
+  }
+
+  /**
+   * Zoom and pan to fit `duration` from `timestamp`, at `depth`.
+   *
+   * The only way a caller outside the chart moves the viewport, so that every
+   * move is reported: the inspector reads the stretch of log the chart says it
+   * is showing.
+   *
+   * @param timestamp - Start of the stretch to fit, in nanoseconds
+   * @param duration - Length of that stretch, in nanoseconds
+   * @param depth - Call-tree depth to centre on
+   * @param padding - Share of the width to leave either side; 0 fits exactly
+   */
+  public focusOn(timestamp: number, duration: number, depth: number, padding?: number): void {
+    if (!this.viewport) {
+      return;
+    }
+
+    this.viewport.focusOnEvent(timestamp, duration, depth, padding);
+    this.notifyViewportChange();
   }
 
   /**
