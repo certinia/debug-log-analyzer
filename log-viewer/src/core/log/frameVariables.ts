@@ -614,6 +614,100 @@ interface FrameScan {
   sawAny: boolean;
 }
 
+/** One variable line of a frame, with what it names read once. */
+interface FrameLine {
+  event: LogEvent;
+  /** The name the line names: the variable written, or the scope declared. Null
+   *  where the line parses none. */
+  name: string | null;
+  /** The local declaration the line made, or null where it wrote a value or
+   *  declared a static, which is in scope everywhere and lives in the index. */
+  declared: Declared | null;
+}
+
+/**
+ * A frame's own variable lines, in eventIndex order, held per frame.
+ *
+ * Every read back through a frame parses the same names, and a caller frame is
+ * read again for every call an aggregate compares: 4,000 calls under one method
+ * re-parsed its lines 4,000 times. Held rather than re-read, and only for the
+ * frames something actually asked about.
+ */
+const frameLines = new WeakMap<LogEvent, FrameLine[]>();
+
+function frameLinesOf(frame: LogEvent): FrameLine[] {
+  const held = frameLines.get(frame);
+  if (held) {
+    return held;
+  }
+  const lines: FrameLine[] = [];
+  for (const child of frame.children) {
+    if (child.type === ASSIGNMENT) {
+      lines.push({ event: child, name: variableNameOf(child.logLine), declared: null });
+    } else if (child.type === SCOPE_BEGIN) {
+      const scope = parseVariableScope(child.logLine);
+      lines.push({
+        event: child,
+        name: scope?.name ?? null,
+        declared:
+          scope && !scope.isStatic
+            ? { declaredType: scope.declaredType, eventIndex: child.eventIndex }
+            : null,
+      });
+    }
+  }
+  frameLines.set(frame, lines);
+  return lines;
+}
+
+/** Where a backwards read of `lines` starts to answer at `cut`. */
+function linesBefore(lines: readonly { event: LogEvent }[], cut: number): number {
+  return firstIndexWhere(lines.length, (at) => lines[at]!.event.eventIndex > cut);
+}
+
+/** One write to the object a frame runs on. */
+interface ObjectWrite {
+  name: string;
+  event: LogEvent;
+}
+
+/**
+ * A frame's writes to its own object, in eventIndex order, held per frame.
+ *
+ * Held apart from {@link frameLinesOf} because a caller frame answers only for
+ * its object: a frame holding a hundred thousand locals holds a handful of
+ * these, and reading it back over the locals is the whole cost of a caller.
+ */
+const objectWrites = new WeakMap<LogEvent, ObjectWrite[]>();
+
+function objectWritesOf(frame: LogEvent): ObjectWrite[] {
+  const held = objectWrites.get(frame);
+  if (held) {
+    return held;
+  }
+  const found: ObjectWrite[] = [];
+  for (const { event, name } of frameLinesOf(frame)) {
+    if (event.type === ASSIGNMENT && name && (name === 'this' || isFieldName(name))) {
+      found.push({ name, event });
+    }
+  }
+  objectWrites.set(frame, found);
+  return found;
+}
+
+/** The class from a frame's own name, held per frame: an aggregate asks it of
+ *  every frame on the stack, for every call it compares. */
+const frameClasses = new WeakMap<LogEvent, string | null>();
+
+function frameClassOf(frame: LogEvent): string | null {
+  let held = frameClasses.get(frame);
+  if (held === undefined) {
+    held = classFromFrame(frame.text);
+    frameClasses.set(frame, held);
+  }
+  return held;
+}
+
 /**
  * Reads one frame's own lines back from `cut`.
  *
@@ -624,30 +718,23 @@ interface FrameScan {
 function scanFrame(frame: LogEvent, cut: number): FrameScan {
   const writes = new Map<string, LogEvent>();
   const declared = new Map<string, Declared>();
-  let sawAny = false;
-  const children = frame.children;
-  for (let at = firstIndexWhere(children.length, (i) => children[i]!.eventIndex > cut); at--;) {
-    const child = children[at]!;
-    if (child.type === ASSIGNMENT || child.type === SCOPE_BEGIN) {
-      sawAny = true;
-    }
-    if (child.type === ASSIGNMENT) {
-      const name = variableNameOf(child.logLine);
-      if (name && !writes.has(name)) {
-        writes.set(name, child);
+  const lines = frameLinesOf(frame);
+  const from = linesBefore(lines, cut);
+  for (let at = from; at--;) {
+    const line = lines[at]!;
+    if (line.event.type === ASSIGNMENT) {
+      if (line.name && !writes.has(line.name)) {
+        writes.set(line.name, line.event);
       }
-    } else if (child.type === SCOPE_BEGIN) {
-      const scope = parseVariableScope(child.logLine);
-      // Only a local: a static is in scope everywhere, so the index holds it.
-      if (scope && !scope.isStatic) {
-        declared.set(scope.name, {
-          declaredType: scope.declaredType,
-          eventIndex: child.eventIndex,
-        });
-      }
+    } else if (line.declared && line.name) {
+      // Backwards, so the earliest declaration is the one left standing: the
+      // point from which the name is in scope.
+      declared.set(line.name, line.declared);
     }
   }
-  return { writes, declared, sawAny };
+  // A line of its own before the cut, whatever it said, so the frame owns a
+  // scope even where every line was a static the index answers for.
+  return { writes, declared, sawAny: from > 0 };
 }
 
 /** Only the writes that answer for the object a frame runs on.
@@ -656,26 +743,11 @@ function scanFrame(frame: LogEvent, cut: number): FrameScan {
  *  never read: a frame can hold hundreds of thousands of children, so the rest
  *  is thrown away. */
 function thisWritesOf(frame: LogEvent, cut: number): Map<string, LogEvent> {
-  return lastWritesByName(frame.children, cut, (name) => name === 'this' || isFieldName(name));
-}
-
-/**
- * The last write to each name at or before `cut`, from events in eventIndex
- * order.
- *
- * Backwards from the cut, so the first write seen for a name is the last one
- * made.
- */
-function lastWritesByName(
-  events: readonly LogEvent[],
-  cut: number,
-  keep: (name: string) => boolean,
-): Map<string, LogEvent> {
   const found = new Map<string, LogEvent>();
-  for (let at = firstIndexWhere(events.length, (i) => events[i]!.eventIndex > cut); at--;) {
-    const event = events[at]!;
-    const name = event.type === ASSIGNMENT ? variableNameOf(event.logLine) : null;
-    if (name && keep(name) && !found.has(name)) {
+  const writes = objectWritesOf(frame);
+  for (let at = linesBefore(writes, cut); at--;) {
+    const { event, name } = writes[at]!;
+    if (!found.has(name)) {
       found.set(name, event);
     }
   }
@@ -747,7 +819,7 @@ function fieldWrites(
   const found = new Map<string, LogEvent>();
   const mine = thisAddressOf(own.writes);
   for (const entry of stack) {
-    if (classFromFrame(entry.text) !== thisType) {
+    if (frameClassOf(entry) !== thisType) {
       continue;
     }
     const writes = entry === frame ? own.writes : thisWritesOf(entry, cut);
