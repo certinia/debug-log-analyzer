@@ -9,7 +9,8 @@ import {
   type FrameVariables,
   type VariableRow,
 } from '../../core/log/frameVariables.js';
-import { parentOf, toTreeRows, type VariableTreeRow } from '../variableTree.js';
+import type { AggregateVariables, VariableSpread } from '../../core/log/aggregateVariables.js';
+import { parentOf, toSpreadRows, toTreeRows, type VariableTreeRow } from '../variableTree.js';
 
 function row(name: string, value: string, over: Partial<VariableRow> = {}): VariableRow {
   return {
@@ -422,5 +423,114 @@ describe('recorded fields', () => {
     );
 
     expect(rows.find((r) => r.id === 'this/me')?.expandable).toBe(false);
+  });
+});
+
+describe('toSpreadRows', () => {
+  function spread(name: string, values: [string, number][], over: Partial<VariableSpread> = {}) {
+    return {
+      name,
+      declaredType: null,
+      values: values.map(([text, calls], at) => ({ text, address: null, calls, at: 100 + at })),
+      calls: values.reduce((sum, [, calls]) => sum + calls, 0),
+      unassigned: 0,
+      capped: false,
+      ...over,
+    } satisfies VariableSpread;
+  }
+
+  const aggregate: AggregateVariables = {
+    frames: 340,
+    locals: [
+      spread('accountId', [
+        ['"001A"', 200],
+        ['"001B"', 140],
+      ]),
+      spread('retry', [
+        ['false', 328],
+        ['true', 12],
+      ]),
+      spread('batchSize', [['200', 340]]),
+    ],
+    thisType: 'ns.Svc',
+    objects: 1,
+    fields: [spread('cache', [['{}', 340]])],
+    truncated: false,
+  };
+
+  const closed = (_id: string, byDefault: boolean): boolean => byDefault;
+  const openAll = (): boolean => true;
+
+  it('opens Local and leaves this closed, one row per name', () => {
+    const rows = toSpreadRows(aggregate, closed);
+
+    expect(rows.filter((r) => r.kind === 'group').map((r) => [r.id, r.open, r.count])).toEqual([
+      ['local', true, 3],
+      ['this', false, 1],
+    ]);
+    expect(rows.filter((r) => r.kind === 'spread').map((r) => r.id)).toEqual([
+      'local/accountId',
+      'local/retry',
+      'local/batchSize',
+    ]);
+  });
+
+  // The data layer ranks them; the rows must not re-order what it decided.
+  it('keeps the order the comparison put the names in', () => {
+    const rows = toSpreadRows(aggregate, closed);
+
+    expect(rows.filter((r) => r.kind === 'spread').map((r) => r.row.name)).toEqual([
+      'accountId',
+      'retry',
+      'batchSize',
+    ]);
+  });
+
+  it('opens a name the calls disagreed on into its distinct values', () => {
+    const rows = toSpreadRows(aggregate, openAll);
+
+    const values = rows.filter((r) => r.kind === 'spread-value' && r.id.startsWith('local/retry/'));
+    expect(values.map((r) => [r.id, r.kind === 'spread-value' && r.held.calls])).toEqual([
+      ['local/retry/0', 328],
+      ['local/retry/1', 12],
+    ]);
+    // Every value is a way into a call, never a further object to open.
+    expect(values.every((r) => !r.expandable)).toBe(true);
+  });
+
+  // A constant reads exactly as it does for a single frame.
+  it('shows a name every call agreed on as its one value, with nothing to open', () => {
+    const rows = toSpreadRows(aggregate, openAll);
+
+    const held = rows.find((r) => r.id === 'local/batchSize');
+    expect(held?.expandable).toBe(false);
+    expect(held?.kind === 'spread' && held.shown?.raw).toBe('200');
+  });
+
+  it('names the class and the objects the calls ran on', () => {
+    const rows = toSpreadRows({ ...aggregate, objects: 4 }, closed);
+
+    const group = rows.find((r) => r.kind === 'group' && r.id === 'this');
+    expect(group?.kind === 'group' && group.of).toBe('ns.Svc, 4 objects');
+  });
+
+  it('names the class alone where every call ran on one object', () => {
+    const group = toSpreadRows(aggregate, closed).find(
+      (r) => r.kind === 'group' && r.id === 'this',
+    );
+
+    expect(group?.kind === 'group' && group.of).toBe('ns.Svc');
+  });
+
+  it('says the calls hold no locals rather than showing an empty group', () => {
+    const rows = toSpreadRows({ ...aggregate, locals: [] }, closed);
+
+    expect(rows.find((r) => r.id === 'local/none')?.kind).toBe('note');
+  });
+
+  it('leaves out the this group where no call wrote a field', () => {
+    const rows = toSpreadRows({ ...aggregate, fields: [] }, closed);
+
+    expect(rows.some((r) => r.id === 'this')).toBe(false);
   });
 });

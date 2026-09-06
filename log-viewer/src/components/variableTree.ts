@@ -1,6 +1,11 @@
 /*
  * Copyright (c) 2026 Certinia Inc. All rights reserved.
  */
+import type {
+  AggregateVariables,
+  SpreadValue,
+  VariableSpread,
+} from '../core/log/aggregateVariables.js';
 import {
   NOT_RECORDED,
   type FrameVariables,
@@ -103,6 +108,8 @@ export type VariableTreeRow = Common &
     | { kind: 'class'; className: string; count: number }
     | ({ kind: 'variable'; row: VariableRow } & Shown)
     | ({ kind: 'entry'; key: string | null } & Shown)
+    | { kind: 'spread'; row: VariableSpread; shown: Shown | null }
+    | ({ kind: 'spread-value'; held: SpreadValue; of: number } & Shown)
     | { kind: 'text'; raw: string }
     | { kind: 'note'; text: string }
   );
@@ -376,6 +383,110 @@ export function toTreeRows(
   }
 
   return rows;
+}
+
+/**
+ * Every row a merged row's comparison shows, in order, given which ids are open.
+ *
+ * The same row model as {@link toTreeRows}, so one renderer and one keyboard
+ * tree serve both scopes. A name with one value renders through the same
+ * {@link Shown} path a single frame's does, so a constant reads identically.
+ *
+ * No lookups: an address is not resolved here. Each call read at its own point
+ * in the log, so there is no one cut to resolve against, and the value's own
+ * text is what tells two calls apart.
+ */
+export function toSpreadRows(
+  aggregate: AggregateVariables,
+  isOpen: (id: string, openByDefault: boolean) => boolean,
+): VariableTreeRow[] {
+  const rows: VariableTreeRow[] = [];
+
+  function spread(parentId: string, depth: number, row: VariableSpread): void {
+    const id = `${parentId}/${row.name}`;
+    const only = row.values.length === 1 ? row.values[0] : null;
+    const expandable = row.values.length > 1;
+    const open = expandable && isOpen(id, false);
+    rows.push({
+      kind: 'spread',
+      row,
+      shown: only ? shown(only.text, only.address, only.address, {}) : null,
+      id,
+      depth,
+      expandable,
+      open,
+    });
+    if (!open) {
+      return;
+    }
+    row.values.forEach((value, at) => {
+      rows.push({
+        kind: 'spread-value',
+        held: value,
+        of: row.calls,
+        id: `${id}/${at}`,
+        depth: depth + 1,
+        expandable: false,
+        open: false,
+        ...shown(value.text, value.address, value.address, {}),
+      });
+    });
+  }
+
+  const group = (head: GroupHead, kids: (depth: number) => void): void => {
+    const { id, expandable = true, openByDefault = false, of = null } = head;
+    const open = expandable && isOpen(id, openByDefault);
+    rows.push({ ...head, kind: 'group', depth: 0, expandable, open, of, self: null });
+    if (open) {
+      kids(1);
+    }
+  };
+
+  group(
+    { id: 'local', name: 'Local', count: aggregate.locals.length, openByDefault: true },
+    (depth) => {
+      if (!aggregate.locals.length) {
+        rows.push({
+          kind: 'note',
+          id: 'local/none',
+          depth,
+          expandable: false,
+          open: false,
+          text: 'The log records no locals for these calls.',
+        });
+        return;
+      }
+      for (const row of aggregate.locals) {
+        spread('local', depth, row);
+      }
+    },
+  );
+
+  if (aggregate.fields.length) {
+    group(
+      {
+        id: 'this',
+        name: 'this',
+        // The calls need not have run on one object, and which they ran on is
+        // part of the reading, so the head says it rather than implying one.
+        of: objectsLabel(aggregate),
+        count: aggregate.fields.length,
+      },
+      (depth) => {
+        for (const row of aggregate.fields) {
+          spread('this', depth, row);
+        }
+      },
+    );
+  }
+
+  return rows;
+}
+
+/** Whose class the fields belong to, and how many objects held them. */
+function objectsLabel(aggregate: AggregateVariables): string | null {
+  const objects = aggregate.objects > 1 ? `${aggregate.objects} objects` : null;
+  return [aggregate.thisType, objects].filter(Boolean).join(', ') || null;
 }
 
 /** The addresses open above a row, so the same object cannot open inside itself. */

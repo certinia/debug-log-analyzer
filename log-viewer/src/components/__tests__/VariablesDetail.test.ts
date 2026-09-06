@@ -162,17 +162,6 @@ describe('VariablesDetail empty states', () => {
     // The statics are still visible from it, so this frame reports them.
     expect(groupNames(el)).toContain('Static');
   });
-
-  it('asks for one call when the selection counts many', async () => {
-    const store = logOf(FRAME);
-
-    const el = await mount(store, {
-      eventIndex: indexOf(store, 'ns.Outer.run()'),
-      frames: [1, 2, 3],
-    });
-
-    expect(notes(el)).toEqual(['Pick one call to see its variables.']);
-  });
 });
 
 function treeRows(el: VariablesDetail): HTMLElement[] {
@@ -762,5 +751,110 @@ describe('VariablesDetail object fields', () => {
 
     expect(plain?.querySelector('.count')).toBeNull();
     expect(plain?.getAttribute('aria-expanded')).toBeNull();
+  });
+});
+
+// A merged row has no single frame, so the section compares its calls: which
+// name varied is the reading the grids beside it do not carry.
+describe('VariablesDetail comparing a merged row', () => {
+  /** One call of `ns.Svc.run()`, writing `retry` and the constant `batchSize`. */
+  function call(at: number, retry: string): string {
+    const t = (offset: number): string => `09:18:22.6 (${at + offset})`;
+    return (
+      `${t(0)}|METHOD_ENTRY|[1]|01p|ns.Svc.run()\n` +
+      `${t(10)}|VARIABLE_SCOPE_BEGIN|[2]|retry|Boolean|true|false\n` +
+      `${t(20)}|VARIABLE_ASSIGNMENT|[2]|retry|${retry}\n` +
+      `${t(30)}|VARIABLE_ASSIGNMENT|[3]|batchSize|200\n` +
+      `${t(40)}|METHOD_EXIT|[1]|ns.Svc.run()\n`
+    );
+  }
+
+  const CALLS = call(1000, 'true') + call(2000, 'false') + call(3000, 'false');
+
+  /** Every frame whose text is `text`: a METHOD_EXIT carries the entry's text. */
+  function framesOf(store: LogStore, text: string): number[] {
+    return store.log.eventsById
+      .filter((event) => event.isParent && event.text === text)
+      .map((event) => event.eventIndex);
+  }
+
+  /** The comparison on screen, once its walk has answered. */
+  async function compared(body = CALLS): Promise<VariablesDetail> {
+    const store = logOf(body);
+    const frames = framesOf(store, 'ns.Svc.run()');
+    const el = await mount(store, { eventIndex: frames[0]!, frames });
+    // The comparison is a walk of its own, after the index it reads through.
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    await el.updateComplete;
+    return el;
+  }
+
+  it('lists every name the calls held, varying ones first', async () => {
+    const el = await compared();
+
+    expect(rowNames(el)).toEqual(['retry', 'batchSize']);
+  });
+
+  it('opens a name the calls disagreed on into its values and their counts', async () => {
+    const el = await compared();
+    rowNamed(el, 'retry')?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    await el.updateComplete;
+
+    expect(rowText(el)).toContain('false');
+    expect(rowText(el)).toContain('true');
+  });
+
+  it('shows a name every call agreed on as its one value', async () => {
+    const el = await compared();
+
+    expect(rowNamed(el, 'batchSize')?.textContent).toContain('200');
+    expect(rowNamed(el, 'batchSize')?.getAttribute('aria-expanded')).toBeNull();
+  });
+
+  // The only route from a merged row to one call, which nothing else gives.
+  it('reveals the call that held a value when the value is picked', async () => {
+    const el = await compared();
+    const revealed: number[] = [];
+    el.addEventListener('inspector-reveal', (event) => {
+      revealed.push((event as CustomEvent<{ eventIndex: number }>).detail.eventIndex);
+    });
+    rowNamed(el, 'retry')?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    await el.updateComplete;
+
+    const values = treeRows(el).filter((row) => row.dataset.id?.startsWith('local/retry/'));
+    values[0]?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+
+    // The second and third calls both wrote `false`, so the first of them answers.
+    expect(revealed).toEqual([framesOf(el.logStore!, 'ns.Svc.run()')[1]]);
+  });
+
+  it('reveals the one call behind a name every call agreed on', async () => {
+    const el = await compared();
+    const revealed: number[] = [];
+    el.addEventListener('inspector-reveal', (event) => {
+      revealed.push((event as CustomEvent<{ eventIndex: number }>).detail.eventIndex);
+    });
+
+    rowNamed(el, 'batchSize')?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+
+    expect(revealed).toEqual([framesOf(el.logStore!, 'ns.Svc.run()')[0]]);
+  });
+
+  // A static moves for reasons the row does not own, so leaving them out is a
+  // decision the reader is owed.
+  it('says the statics are not compared', async () => {
+    const el = await compared();
+
+    expect(notes(el)).toContain(
+      'Statics are not compared: a static lives for the whole transaction, so it moves for reasons this row does not own.',
+    );
+  });
+
+  it('does not say the statics are not compared for a single frame', async () => {
+    const store = logOf(FRAME);
+
+    const el = await mount(store, { eventIndex: indexOf(store, 'ns.Outer.run()') });
+
+    expect(notes(el).join(' ')).not.toContain('Statics are not compared');
   });
 });
