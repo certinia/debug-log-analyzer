@@ -485,6 +485,14 @@ export interface IndexView {
   fields(address: string): readonly VariableRow[];
 }
 
+/** What a caller wants left out of a read. */
+export interface FrameReadOptions {
+  /** False to leave the statics unread. {@link VariableIndex.at} walks every
+   *  static class the log holds, which is the bulk of a read, so a caller that
+   *  does not compare statics must not pay for them. */
+  statics?: boolean;
+}
+
 /**
  * What is in scope at `eventIndex`, or null where the log has no such event or
  * it sits in no frame.
@@ -495,6 +503,7 @@ export function frameVariablesFor(
   store: LogStore,
   eventIndex: number,
   index: VariableIndex | null,
+  options: FrameReadOptions = {},
 ): FrameVariables | null {
   const selected = store.eventByIndex(eventIndex);
   const stack = store.stackByEventIndex(eventIndex);
@@ -561,7 +570,7 @@ export function frameVariablesFor(
     locals: locals.sort(byName),
     thisRow,
     fields,
-    statics: index?.at(cut) ?? [],
+    statics: options.statics === false ? [] : (index?.at(cut) ?? []),
     truncated: stack.some((entry) => entry.isTruncated) || selected.isTruncated,
   };
 }

@@ -186,6 +186,20 @@ describe('VariableIndex', () => {
     '09:18:22.6 (1400)|METHOD_EXIT|[5]|ns.Inner.step()\n' +
     '09:18:22.6 (1700)|METHOD_EXIT|[1]|ns.Outer.run()\n';
 
+  // Reading them walks every static class the log holds, which is the bulk of a
+  // read; a caller that does not compare statics must not pay for it.
+  it('leaves the statics unread where the caller asked it to', async () => {
+    const { log, store } = storeOf(STATICS);
+    const statics = await variableIndexFor(log);
+    const at = indexOf(log, 'ns.Outer.run()');
+
+    const frame = frameVariablesFor(store, at, statics, { statics: false });
+
+    expect(frame?.statics).toEqual([]);
+    // Everything else the frame holds is untouched.
+    expect(frame?.locals).toEqual(frameVariablesFor(store, at, statics)?.locals);
+  });
+
   it('groups statics by their class, both sorted', async () => {
     const { log, store } = storeOf(STATICS);
     const statics = await variableIndexFor(log);
