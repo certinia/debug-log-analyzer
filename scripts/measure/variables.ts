@@ -3,10 +3,12 @@
  */
 
 /**
- * Times the Variables section: one log-wide walk, then a frame snapshot.
+ * Times the Variables section: one log-wide walk, a frame snapshot, then the
+ * busiest merged row's comparison.
  */
-import type { ApexLog } from 'apex-log-parser';
+import type { ApexLog, LogEvent } from 'apex-log-parser';
 
+import { aggregateVariablesFor } from '../../log-viewer/src/core/log/aggregateVariables.js';
 import {
   frameVariablesFor,
   variableIndexFor,
@@ -74,4 +76,45 @@ export async function measureVariables(log: ApexLog): Promise<void> {
       index.fieldsAt(address, Number.MAX_SAFE_INTEGER);
     }
   });
+
+  // A merged row is answered by comparing its calls, so the worst row there is
+  // sets what the section costs on a selection the reader will actually make.
+  const busiest = busiestSignature(frames);
+  if (!busiest.length) {
+    return;
+  }
+  line('busiest signature', `${busiest[0]!.text} — ${busiest.length.toLocaleString()} calls`);
+  const compared = busiest.map((frame) => frame.eventIndex);
+  const spread = await time(`aggregate over ${compared.length.toLocaleString()} calls`, () =>
+    aggregateVariablesFor(store, compared, index, { yieldSlice }),
+  );
+  line(
+    'spread',
+    `${spread?.locals.length ?? 0} locals, ${spread?.fields.length ?? 0} fields, ` +
+      `${spread?.locals.filter((row) => row.values.length > 1).length ?? 0} varied`,
+  );
+  await time('aggregate (again)', () =>
+    aggregateVariablesFor(store, compared, index, { yieldSlice }),
+  );
+}
+
+/** The frames of the signature the log holds most calls of: the merged row whose
+ *  comparison costs the most. */
+function busiestSignature(frames: readonly LogEvent[]): LogEvent[] {
+  const byText = new Map<string, LogEvent[]>();
+  for (const frame of frames) {
+    const held = byText.get(frame.text);
+    if (held) {
+      held.push(frame);
+    } else {
+      byText.set(frame.text, [frame]);
+    }
+  }
+  let busiest: LogEvent[] = [];
+  for (const held of byText.values()) {
+    if (held.length > busiest.length) {
+      busiest = held;
+    }
+  }
+  return busiest;
 }
