@@ -14,6 +14,7 @@ import {
   LOCATED_ROW_CLASS,
   LocatedRowIds,
   LocatedRowMarker,
+  rowDetailSelection,
   rowFrames,
   rowIndexStamper,
   rowPathId,
@@ -336,6 +337,76 @@ describe('rowFrames', () => {
     const { bucket } = rows(apexLog, soql);
 
     expect(rowFrames(bucket, apexLog, 'callers')).toEqual([5]);
+  });
+});
+
+describe('rowDetailSelection', () => {
+  /** exec -> m1 -> soql, with the bucket and caller rows a bottom-up grid
+   *  leaves: the bucket holds the occurrences, the caller row derives its own. */
+  function rows() {
+    const exec = ev('exec', null, 1);
+    const m1 = ev('m1', exec, 3);
+    const soql = ev('soql', m1, 5);
+    const apexLog = { eventsById: { 1: exec, 3: m1, 5: soql } } as unknown as ApexLog;
+    const paths = logStoreFor(apexLog).keyPathIds();
+    const bucketPath = paths.step(ROOT_PATH_ID, paths.keyIdOf(soql));
+    const bucket = rowComponent(document.createElement('div'), {
+      key: 'soql',
+      _pathId: bucketPath,
+      instances: [soql],
+      originalData: soql,
+      text: 'soql',
+    });
+    const caller = rowComponent(
+      document.createElement('div'),
+      {
+        key: 'm1',
+        _pathId: paths.step(bucketPath, paths.keyIdOf(m1)),
+        originalData: soql,
+        text: 'm1',
+      },
+      bucket,
+    );
+    return { apexLog, bucket, caller };
+  }
+
+  // Its locals are the caller's, a level above the calls its totals count.
+  it('names the frames a bottom-up caller row is, beside the calls it counts', () => {
+    const { apexLog, caller } = rows();
+
+    expect(rowDetailSelection(caller, apexLog, 'callers')).toEqual({
+      kind: 'aggregate',
+      instances: [5],
+      frames: [3],
+      calledBy: 'm1',
+    });
+  });
+
+  it("leaves the frames off a root bucket, which stands at its calls' depth", () => {
+    const { apexLog, bucket } = rows();
+
+    expect(rowDetailSelection(bucket, apexLog, 'callers')).toEqual({
+      kind: 'aggregate',
+      instances: [5],
+      frames: undefined,
+      calledBy: undefined,
+    });
+  });
+
+  it("leaves the frames off a top-down row, which sits at its calls' depth", () => {
+    const { apexLog, caller } = rows();
+
+    expect(rowDetailSelection(caller, apexLog, 'callees')).toMatchObject({
+      instances: [5],
+      frames: undefined,
+    });
+  });
+
+  it('names the one call a Time Order row is', () => {
+    const soql = ev('soql', null, 5);
+    const row = rowComponent(document.createElement('div'), { originalData: soql });
+
+    expect(rowDetailSelection(row, null, 'callees')).toEqual({ kind: 'event', eventIndex: 5 });
   });
 });
 

@@ -124,7 +124,7 @@ describe('VariablesDetail skips the frame read for an aggregate', () => {
     const store = logOf(FRAME);
     const el = await mount(store, {
       eventIndex: indexOf(store, 'ns.Outer.run()'),
-      instances: [indexOf(store, 'ns.Outer.run()'), indexOf(store, 'ns.Outer.run()')],
+      frames: [indexOf(store, 'ns.Outer.run()'), indexOf(store, 'ns.Outer.run()')],
     });
 
     expect((el as unknown as { _frame: unknown })._frame).toBeNull();
@@ -168,7 +168,7 @@ describe('VariablesDetail empty states', () => {
 
     const el = await mount(store, {
       eventIndex: indexOf(store, 'ns.Outer.run()'),
-      instances: [1, 2, 3],
+      frames: [1, 2, 3],
     });
 
     expect(notes(el)).toEqual(['Pick one call to see its variables.']);

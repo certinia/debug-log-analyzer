@@ -634,9 +634,13 @@ export class CallTreeDetail extends LitElement {
         // reads the same either way. Built from the row: a scoped row carries no
         // key, which is what the tab's own rows are read through.
         const instances = locatableEventIndexes(data);
-        dispatchInspectorLocate(this, frameEventIndexes(data), true, {
+        const frames = frameEventIndexes(data);
+        dispatchInspectorLocate(this, frames, true, {
           kind: 'aggregate',
           instances,
+          // Only where the row is not at its calls' own depth, as
+          // `rowDetailSelection` does it for the tab's own rows.
+          frames: frames === instances ? undefined : frames,
           calledBy: this.viewMode === 'bottom-up' ? callerOfRow(rows[0]) : undefined,
         });
       }

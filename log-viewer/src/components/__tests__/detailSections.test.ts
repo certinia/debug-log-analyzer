@@ -152,6 +152,39 @@ describe('buildDetailSections', () => {
     ).toEqual([11, 12, 13]);
   });
 
+  // A bottom-up caller row counts its callee's calls, so reading variables from
+  // those would show the called method's scope under a row that names the caller.
+  it('gives Variables the frames the row is, not the calls it counts', async () => {
+    const sections = await buildDetailSections('analysis', {
+      kind: 'aggregate',
+      instances: [11, 12, 13],
+      frames: [4, 5, 6],
+    });
+
+    expect(
+      (
+        rendered(sections, 'variables', 'variables-detail') as HTMLElement & {
+          frames: number[] | null;
+        }
+      ).frames,
+    ).toEqual([4, 5, 6]);
+  });
+
+  it('gives Variables the calls themselves where the row sits at their depth', async () => {
+    const sections = await buildDetailSections('analysis', {
+      kind: 'aggregate',
+      instances: [11, 12, 13],
+    });
+
+    expect(
+      (
+        rendered(sections, 'variables', 'variables-detail') as HTMLElement & {
+          frames: number[] | null;
+        }
+      ).frames,
+    ).toEqual([11, 12, 13]);
+  });
+
   it('asks the findings which of them name the selection', async () => {
     const sections = await buildDetailSections('analysis', {
       kind: 'aggregate',

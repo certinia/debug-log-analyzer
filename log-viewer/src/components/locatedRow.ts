@@ -395,10 +395,12 @@ export function rowFrames(
  * counts, a Time Order row the one call it is, and no row nothing.
  *
  * @param root - the log the row was built from, which its path id belongs to
+ * @param direction - the way the row's own table reads the tree
  */
 export function rowDetailSelection(
   row: RowComponent | undefined,
   root: ApexLog | null,
+  direction: SelectionView,
 ): DetailSelection | null {
   if (!row) {
     return null;
@@ -415,9 +417,14 @@ export function rowDetailSelection(
   // deeper row narrows the same calls to the ones its own chain conducted, so
   // naming a fixed frame would read the same at every depth. A root bucket holds
   // its own calls, so nothing reached them but it.
+  const instances = rowOccurrences(row, root);
+  const frames = rowFrames(row, root, direction);
   return {
     kind: 'aggregate',
-    instances: rowOccurrences(row, root),
+    instances,
+    // Only where the row is not at its calls' own depth: {@link rowFrames}
+    // hands the memoised occurrences straight back where it is.
+    frames: frames === instances ? undefined : frames,
     calledBy: data.instances?.length ? undefined : data.text,
   };
 }

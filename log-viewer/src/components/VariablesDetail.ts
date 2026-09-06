@@ -44,10 +44,10 @@ export class VariablesDetail extends LitElement {
   @property({ type: Number })
   eventIndex = -1;
 
-  /** Occurrence eventIndexes when the selection is an aggregate row. One frame
-   *  holds one set of variables, so an aggregate has none to show. */
+  /** The frames a merged row is, where the selection is one: the scope every
+   *  call it counts held. Null for a single frame, which `eventIndex` names. */
   @property({ attribute: false })
-  instances: number[] | null = null;
+  frames: number[] | null = null;
 
   /** The log on screen, from the app root. */
   @consume({ context: logContext, subscribe: true })
@@ -251,14 +251,14 @@ export class VariablesDetail extends LitElement {
     // re-read the log.
     const reselected =
       changed.has('eventIndex') ||
-      changed.has('instances') ||
+      changed.has('frames') ||
       changed.has('logStore') ||
       changed.has('_index');
     if (reselected) {
       // An aggregate answers with none of these: reading the frame back through
       // it costs tens of ms on a huge frame, and render() would throw it away
       // unread.
-      const aggregate = (this.instances?.length ?? 0) > 1;
+      const aggregate = (this.frames?.length ?? 0) > 1;
       this._frame =
         !aggregate && this.logStore && this._index
           ? frameVariablesFor(this.logStore, this.eventIndex, this._index)
@@ -310,7 +310,7 @@ export class VariablesDetail extends LitElement {
     }
     // An aggregate row counts calls from many frames, and each held its own
     // variables. Naming one of them would be a guess.
-    if (this.instances && this.instances.length > 1) {
+    if (this.frames && this.frames.length > 1) {
       return note('Pick one call to see its variables.');
     }
     if (!recordsVariables(log)) {

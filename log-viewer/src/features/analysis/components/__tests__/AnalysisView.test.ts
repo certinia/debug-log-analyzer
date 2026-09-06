@@ -186,15 +186,18 @@ describe('analysis-view selection', () => {
     expect(derived).toHaveLength(1);
     expect(seen.map((detail) => detail.selection)).toEqual([
       // Both rows hold the same one call, so the row is what tells them apart:
-      // reached through B, then through the A above B.
+      // reached through B, then through the A above B. `frames` is the caller
+      // each row is, a level up from the call its totals count.
       {
         kind: 'aggregate',
         instances: derived.map((event) => event.eventIndex),
+        frames: [2],
         calledBy: 'B',
       },
       {
         kind: 'aggregate',
         instances: derived.map((event) => event.eventIndex),
+        frames: [1],
         calledBy: 'A',
       },
     ]);
