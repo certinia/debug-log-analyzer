@@ -20,7 +20,7 @@ export function severityIcon(severity: Severity): string {
 /**
  * Colours for `class="sev-<severity>"`, where the severity is lower case. For a
  * mark only: an icon, a border, a tint, a bar fill, where 3:1 applies. Text
- * keeps the theme foreground, since these hues are tuned for a glyph and a
+ * reads as the text around it, since these hues are tuned for a glyph and a
  * light theme can read one at 2:1 as a word.
  */
 export const severityStyles = css`

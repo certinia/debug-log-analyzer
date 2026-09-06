@@ -157,10 +157,14 @@ describe('database-rows', () => {
     expect(marks(element)).toEqual(['warning', null]);
   });
 
-  it('marks a breached limit as an error', async () => {
+  it('marks a breached limit as an error, and says what the mark means', async () => {
     budgets = withBudgets({ used: 60_000, observed: 60_000 });
+    const element = await mount();
 
-    expect(marks(await mount())[0]).toBe('error');
+    expect(marks(element)[0]).toBe('error');
+    expect(
+      element.shadowRoot?.querySelector('.budget__figure vscode-icon')?.getAttribute('title'),
+    ).toBe('Past the row limit');
   });
 
   it('counts the statements of every kind against its own limit', async () => {

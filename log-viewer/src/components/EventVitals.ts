@@ -114,14 +114,13 @@ export class EventVitals extends LitElement {
       }
       /* One hue carries the verdict through a tinted ground and its edge, as
          SelfTimeSpreadView tints a row from its own hue property. Every variant
-         sets the hue; the word takes the theme's foreground. */
+         sets the hue; the word reads as the text around it. */
       .pill {
         display: inline-block;
         padding: 0 var(--lana-space-2xs);
         border: var(--lana-stroke) solid color-mix(in srgb, var(--pill-hue) 30%, transparent);
         border-radius: var(--lana-radius-md);
         background-color: color-mix(in srgb, var(--pill-hue) 12%, transparent);
-        color: var(--lana-fg);
         font-size: var(--lana-text-xs);
         line-height: 1.4;
       }

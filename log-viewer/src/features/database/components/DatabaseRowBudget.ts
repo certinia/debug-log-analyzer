@@ -216,13 +216,25 @@ export class DatabaseRowBudget extends LitElement {
   }
 }
 
+/** What a marked tier says, and the severity that carries it. */
+const TIER_MARK = {
+  warn: { severity: 'warning', title: 'Near the row limit' },
+  danger: { severity: 'error', title: 'Past the row limit' },
+} as const;
+
 /** The tier as a mark, so a figure over its limit says so without colouring its text. */
 function tierMark(tier: ReturnType<typeof governorTier>): TemplateResult | string {
   if (tier === 'safe') {
     return '';
   }
-  const severity = tier === 'danger' ? 'error' : 'warning';
-  return html`<vscode-icon class="sev-${severity}" name=${severityIcon(severity)}></vscode-icon>`;
+  const { severity, title } = TIER_MARK[tier];
+  // Sized to the figure: the stock 16px glyph grows the line it sits in.
+  return html`<vscode-icon
+    class="sev-${severity}"
+    name=${severityIcon(severity)}
+    size="12"
+    title=${title}
+  ></vscode-icon>`;
 }
 
 /** Whether the segments passed the limit, which is when the bar marks it. */
