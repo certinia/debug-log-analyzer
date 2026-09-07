@@ -431,7 +431,13 @@ describe('toSpreadRows', () => {
     return {
       name,
       declaredType: null,
-      values: values.map(([text, calls], at) => ({ text, address: null, calls, at: 100 + at })),
+      values: values.map(([text, calls], index) => ({
+        text,
+        address: null,
+        calls,
+        at: [100 + index],
+        runs: 1,
+      })),
       calls: values.reduce((sum, [, calls]) => sum + calls, 0),
       unassigned: 0,
       capped: false,

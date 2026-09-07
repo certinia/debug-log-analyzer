@@ -811,33 +811,82 @@ describe('VariablesDetail comparing a merged row', () => {
     expect(rowNamed(el, 'batchSize')?.getAttribute('aria-expanded')).toBeNull();
   });
 
-  // The only route from a merged row to one call, which nothing else gives.
-  it('reveals the call that held a value when the value is picked', async () => {
-    const el = await compared();
-    const revealed: number[] = [];
-    el.addEventListener('inspector-reveal', (event) => {
-      revealed.push((event as CustomEvent<{ eventIndex: number }>).detail.eventIndex);
+  /** Every locate the section raised, in order. */
+  function locates(el: VariablesDetail): { eventIndexes: readonly number[]; sticky: boolean }[] {
+    const seen: { eventIndexes: readonly number[]; sticky: boolean }[] = [];
+    el.addEventListener('inspector-locate', (event) => {
+      const { eventIndexes, sticky } = (
+        event as CustomEvent<{ eventIndexes: readonly number[]; sticky: boolean }>
+      ).detail;
+      seen.push({ eventIndexes, sticky });
     });
-    rowNamed(el, 'retry')?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    return seen;
+  }
+
+  /** The value rows of an opened name. */
+  async function valuesOf(el: VariablesDetail, name: string): Promise<HTMLElement[]> {
+    rowNamed(el, name)?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
     await el.updateComplete;
+    return treeRows(el).filter((row) => row.dataset.id?.startsWith(`local/${name}/`));
+  }
 
-    const values = treeRows(el).filter((row) => row.dataset.id?.startsWith('local/retry/'));
-    values[0]?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
-
-    // The second and third calls both wrote `false`, so the first of them answers.
-    expect(revealed).toEqual([framesOf(el.logStore!, 'ns.Svc.run()')[1]]);
-  });
-
-  it('reveals the one call behind a name every call agreed on', async () => {
+  // Every other section answers a merged row with aggregated figures, so
+  // dropping onto one of its calls would throw away the reading.
+  it('never re-scopes the panel to one call', async () => {
     const el = await compared();
     const revealed: number[] = [];
     el.addEventListener('inspector-reveal', (event) => {
       revealed.push((event as CustomEvent<{ eventIndex: number }>).detail.eventIndex);
     });
+    const values = await valuesOf(el, 'retry');
 
+    values[0]?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
     rowNamed(el, 'batchSize')?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
 
-    expect(revealed).toEqual([framesOf(el.logStore!, 'ns.Svc.run()')[0]]);
+    expect(revealed).toEqual([]);
+  });
+
+  it('marks the calls that held a value while the pointer is over it', async () => {
+    const el = await compared();
+    const values = await valuesOf(el, 'retry');
+    const seen = locates(el);
+    const calls = framesOf(el.logStore!, 'ns.Svc.run()');
+
+    values[0]?.dispatchEvent(new MouseEvent('mouseenter', { bubbles: true }));
+    values[0]?.dispatchEvent(new MouseEvent('mouseleave', { bubbles: true }));
+
+    // `false` was the second and third calls; leaving hands the mark back.
+    expect(seen).toEqual([
+      { eventIndexes: [calls[1], calls[2]], sticky: false },
+      { eventIndexes: [], sticky: false },
+    ]);
+  });
+
+  it('holds the mark once a value is picked', async () => {
+    const el = await compared();
+    const values = await valuesOf(el, 'retry');
+    const seen = locates(el);
+    const calls = framesOf(el.logStore!, 'ns.Svc.run()');
+
+    values[1]?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+
+    // `true` was the first call. Sticky, and no selection rides with it.
+    expect(seen).toEqual([{ eventIndexes: [calls[0]], sticky: true }]);
+  });
+
+  // Counts alone mislead: an unbroken run is a state the calls were in.
+  it('says whether a value was one run or came and went', async () => {
+    const el = await compared();
+    const values = await valuesOf(el, 'retry');
+
+    expect(values[0]?.textContent).toContain('one run');
+  });
+
+  it('counts the runs of a value the calls returned to', async () => {
+    const el = await compared(call(1000, 'true') + call(2000, 'false') + call(3000, 'true'));
+    const values = await valuesOf(el, 'retry');
+
+    expect(values[0]?.textContent).toContain('2 runs');
   });
 
   // A static moves for reasons the row does not own, so leaving them out is a

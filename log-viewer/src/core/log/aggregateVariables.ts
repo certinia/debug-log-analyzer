@@ -18,22 +18,39 @@ import type { LogStore } from './LogStore.js';
  * history as this row's spread.
  */
 
-/** Distinct values held per name before the rest go uncounted.
+/**
+ * Distinct values held per name before the rest go uncounted.
  *
- *  Past it the screen reads "over 100 values", never a distinct count the walk
- *  did not finish. A hundred is already more than a reader can take in, and it
- *  bounds what a 500k-line log can hold here. */
-export const MAX_VALUES_PER_NAME = 100;
+ * This is an interrogation tool, so every value a name held is listed: a name
+ * with one value per call is exactly the reading that says it is an input. The
+ * cap is only a bound on a pathological selection, since the section renders
+ * every row it lists. Past it the screen says some are not listed, never a
+ * distinct count the walk did not finish.
+ */
+export const MAX_VALUES_PER_NAME = 1_000;
 
-/** One value a name held, and where to find a call that held it. */
+/**
+ * Calls held per value, for the mark.
+ *
+ * A mark on more frames than this shows the reader nothing further, and the
+ * lists partition the calls, so this only stops one value of a two-valued name
+ * from holding the whole selection.
+ */
+const MAX_MARKED_PER_VALUE = 200;
+
+/** One value a name held, and which calls held it. */
 export interface SpreadValue {
   /** The log's own text, as it wrote it. */
   text: string;
   address: string | null;
   /** How many of the read calls held it. */
   calls: number;
-  /** One call that held it, so the reader can go there. */
-  at: number;
+  /** The calls that held it, in the order the selection lists them, for the
+   *  mark. Short of {@link calls} once {@link MAX_MARKED_PER_VALUE} bites. */
+  at: number[];
+  /** Runs of consecutive calls that held it. One run is a phase the calls
+   *  passed through; more is a value that came and went. */
+  runs: number;
 }
 
 /** One name, across the calls the row counts. */
@@ -64,11 +81,18 @@ export interface AggregateVariables {
   truncated: boolean;
 }
 
+/** One value while it is still being gathered, with where its last call sat so
+ *  a break in the run can be seen. */
+interface GatheredValue extends SpreadValue {
+  /** Which call held it last, as an ordinal into the calls read. */
+  previous: number;
+}
+
 /** A spread while it is still being gathered, values keyed by their identity. */
 interface Gathering {
   name: string;
   declaredType: string | null;
-  byValue: Map<string, SpreadValue>;
+  byValue: Map<string, GatheredValue>;
   calls: number;
   unassigned: number;
   capped: boolean;
@@ -107,14 +131,14 @@ async function compareFrames(
     if (!frame) {
       continue;
     }
-    read++;
     truncated ||= frame.truncated;
     for (const row of frame.locals) {
-      hold(locals, row, eventIndex);
+      hold(locals, row, eventIndex, read);
     }
     for (const row of frame.fields) {
-      hold(fields, row, eventIndex);
+      hold(fields, row, eventIndex, read);
     }
+    read++;
     if (frame.thisType) {
       classes.add(frame.thisType);
     }
@@ -135,8 +159,14 @@ async function compareFrames(
   };
 }
 
-/** Adds one call's reading of a name to what the walk holds for it. */
-function hold(into: Map<string, Gathering>, row: VariableRow, at: number): void {
+/**
+ * Adds one call's reading of a name to what the walk holds for it.
+ *
+ * @param at - the call's eventIndex, for the mark
+ * @param ordinal - which call it is among those read, so a value's runs can be
+ *   counted without holding the whole sequence
+ */
+function hold(into: Map<string, Gathering>, row: VariableRow, at: number, ordinal: number): void {
   let held = into.get(row.name);
   if (!held) {
     held = {
@@ -162,8 +192,23 @@ function hold(into: Map<string, Gathering>, row: VariableRow, at: number): void 
   const seen = held.byValue.get(identity);
   if (seen) {
     seen.calls++;
+    // A call that does not follow the last one starts a run of its own.
+    if (ordinal !== seen.previous + 1) {
+      seen.runs++;
+    }
+    seen.previous = ordinal;
+    if (seen.at.length < MAX_MARKED_PER_VALUE) {
+      seen.at.push(at);
+    }
   } else if (held.byValue.size < MAX_VALUES_PER_NAME) {
-    held.byValue.set(identity, { text: row.value, address: row.address, calls: 1, at });
+    held.byValue.set(identity, {
+      text: row.value,
+      address: row.address,
+      calls: 1,
+      at: [at],
+      runs: 1,
+      previous: ordinal,
+    });
   } else {
     held.capped = true;
   }
@@ -181,7 +226,10 @@ function spreadsOf(held: ReadonlyMap<string, Gathering>): VariableSpread[] {
     .map((entry) => ({
       name: entry.name,
       declaredType: entry.declaredType,
-      values: [...entry.byValue.values()].sort((left, right) => right.calls - left.calls),
+      values: [...entry.byValue.values()]
+        .sort((left, right) => right.calls - left.calls)
+        // `previous` was the walk's own bookkeeping, never a reading.
+        .map(({ previous: _previous, ...value }) => value),
       calls: entry.calls,
       unassigned: entry.unassigned,
       capped: entry.capped,

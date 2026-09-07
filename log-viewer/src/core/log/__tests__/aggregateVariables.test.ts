@@ -4,7 +4,11 @@
 import { describe, expect, it, jest } from '@jest/globals';
 import { type ApexLog, parse } from 'apex-log-parser';
 
-import { aggregateVariablesFor, cachedAggregateVariables } from '../aggregateVariables.js';
+import {
+  aggregateVariablesFor,
+  cachedAggregateVariables,
+  MAX_VALUES_PER_NAME,
+} from '../aggregateVariables.js';
 import { variableIndexFor } from '../frameVariables.js';
 import { logStoreFor, type LogStore } from '../LogStore.js';
 
@@ -91,12 +95,46 @@ describe('aggregateVariablesFor', () => {
     ]);
   });
 
-  it('names one call that held a value, so the reader can go there', async () => {
+  // The mark is what a value row points at, so it names every call, not one.
+  it('names the calls that held a value', async () => {
     const { log, spread } = await compare(CALLS);
+    const calls = indexesOf(log, 'ns.Svc.run()');
 
-    const accountId = spread?.locals.find((row) => row.name === 'accountId');
-    const held = accountId?.values.find((value) => value.text === '"001B"');
-    expect(held?.at).toBe(indexesOf(log, 'ns.Svc.run()')[1]);
+    const retry = spread?.locals.find((row) => row.name === 'retry');
+    expect(retry?.values.find((value) => value.text === 'false')?.at).toEqual([calls[1], calls[2]]);
+    expect(retry?.values.find((value) => value.text === 'true')?.at).toEqual([calls[0]]);
+  });
+
+  // Counts alone mislead: an unbroken run is a state the calls were in, where
+  // the same count scattered is a value that came and went.
+  it('counts the runs of consecutive calls that held each value', async () => {
+    const { spread } = await compare(CALLS);
+    const back = await compare(
+      call(1000, 'true', '001A') + call(2000, 'false', '001B') + call(3000, 'true', '001C'),
+    );
+
+    expect(
+      spread?.locals.find((row) => row.name === 'retry')?.values.map((value) => value.runs),
+    ).toEqual([1, 1]);
+    // `true` was held by the first and last call, with `false` between them.
+    expect(
+      back.spread?.locals.find((row) => row.name === 'retry')?.values.map((value) => value.runs),
+    ).toEqual([2, 1]);
+  });
+
+  it('stops naming calls for the mark past its own cap', async () => {
+    let body = '';
+    for (let at = 0; at < 210; at++) {
+      body += call(1000 + at * 100, 'true', '001A');
+    }
+
+    const { spread } = await compare(body);
+
+    const retry = spread?.locals.find((row) => row.name === 'retry');
+    // Every call held it, and the mark holds the first 200 of them.
+    expect(retry?.values[0]?.calls).toBe(210);
+    expect(retry?.values[0]?.at).toHaveLength(200);
+    expect(retry?.values[0]?.runs).toBe(1);
   });
 
   // In scope at its default, with no value the log recorded.
@@ -117,18 +155,20 @@ describe('aggregateVariablesFor', () => {
     expect(held?.values.map((value) => value.text)).toEqual(['7']);
   });
 
+  // Every value is listed, since a value per call is the reading that says a
+  // name is an input; the cap only bounds a pathological selection.
   it('stops holding values past the cap and says it did', async () => {
     let body = '';
-    for (let at = 0; at < 120; at++) {
+    for (let at = 0; at < MAX_VALUES_PER_NAME + 20; at++) {
       body += call(1000 + at * 100, 'true', `001${at}`);
     }
 
     const { spread } = await compare(body);
 
     const accountId = spread?.locals.find((row) => row.name === 'accountId');
-    expect(accountId?.values).toHaveLength(100);
+    expect(accountId?.values).toHaveLength(MAX_VALUES_PER_NAME);
     expect(accountId?.capped).toBe(true);
-    expect(accountId?.calls).toBe(120);
+    expect(accountId?.calls).toBe(MAX_VALUES_PER_NAME + 20);
     // Under the cap, so its count is the whole truth.
     expect(spread?.locals.find((row) => row.name === 'retry')?.capped).toBe(false);
   });

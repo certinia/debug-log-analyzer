@@ -11,6 +11,7 @@ import {
   cachedAggregateVariables,
   MAX_VALUES_PER_NAME,
   type AggregateVariables,
+  type SpreadValue,
 } from '../core/log/aggregateVariables.js';
 import {
   frameVariablesFor,
@@ -26,7 +27,7 @@ import { previewOf, RAW_CLAMP_CHARS, type VariableValue } from '../core/log/vari
 import { globalStyles } from '../styles/global.styles.js';
 import { inspectorSectionStyles } from '../styles/inspectorSection.styles.js';
 import { bleedRowStyles } from '../styles/revealRow.styles.js';
-import { dispatchInspectorReveal } from './inspectorReveal.js';
+import { dispatchInspectorLocate } from './inspectorReveal.js';
 import {
   parentOf,
   toSpreadRows,
@@ -507,6 +508,8 @@ export class VariablesDetail extends LitElement {
       aria-expanded=${row.expandable ? String(row.open) : nothing}
       tabindex=${isNote ? nothing : focused ? 0 : -1}
       @click=${() => this._pick(row)}
+      @mouseenter=${() => this._hover(row, true)}
+      @mouseleave=${() => this._hover(row, false)}
     >
       ${row.expandable ? CHEVRON : html`<span class="chevron-gap"></span>`}${this._body(row)}
     </div>`;
@@ -533,7 +536,10 @@ export class VariablesDetail extends LitElement {
         return this._spreadRow(row);
       case 'spread-value':
         return html`<span class="lead">${this._value(row, null)}</span>
-          <span class="count" title=${CALLS_HELD(row.of)}>${row.held.calls}</span>`;
+          ${runsChip(row.held)}
+          <span class="count" title=${`${CALLS_HELD(row.held.calls)} of ${CALLS_HELD(row.of)}`}
+            >${row.held.calls}</span
+          >`;
       case 'entry':
         return html`<span class="lead">
             <span class="key">${row.key === null ? '·' : `${row.key}:`}</span>
@@ -678,15 +684,24 @@ export class VariablesDetail extends LitElement {
       return;
     }
     this._focused = row.id;
-    // Every value a comparison lists is a way into the call that held it, which
-    // is the only route from a merged row to one frame.
-    const held = revealFor(row);
-    if (held !== null) {
-      dispatchInspectorReveal(this, held);
+    // A picked value holds its mark while the pointer is elsewhere. No
+    // selection rides with it, so the panel keeps comparing: every other
+    // section answers a merged row with aggregated figures, and dropping onto
+    // one of its calls would throw away the reading the reader came for.
+    if (row.kind === 'spread-value') {
+      dispatchInspectorLocate(this, row.held.at, true);
       return;
     }
     if (row.expandable) {
       this._toggle(row.id, !row.open);
+    }
+  }
+
+  /** The calls a value row stands for, marked in the tab while the pointer is
+   *  over it. Nothing is selected and no section changes. */
+  private _hover(row: VariableTreeRow, over: boolean): void {
+    if (row.kind === 'spread-value') {
+      dispatchInspectorLocate(this, over ? row.held.at : []);
     }
   }
 
@@ -812,13 +827,25 @@ interface Missing {
   why: string;
 }
 
-/** The call that a picked row of a comparison stands for, or null where the row
- *  is not one: a name the calls disagreed on opens instead. */
-function revealFor(row: VariableTreeRow): number | null {
-  if (row.kind === 'spread-value') {
-    return row.held.at;
+/**
+ * Whether a value was a phase the calls passed through or one that came and
+ * went.
+ *
+ * Counts alone mislead: 328 of 340 calls reads as noise, and if those 328 are
+ * one unbroken run it is a state the calls were in. One call is trivially one
+ * run, so it says nothing.
+ */
+function runsChip(value: SpreadValue): TemplateResult | string {
+  if (value.calls < 2) {
+    return '';
   }
-  return row.kind === 'spread' && row.shown ? (row.row.values[0]?.at ?? null) : null;
+  return value.runs === 1
+    ? html`<span class="chip" title="Consecutive calls, so this was a phase rather than noise"
+        >one run</span
+      >`
+    : html`<span class="chip" title="Runs of consecutive calls that held it"
+        >${value.runs} runs</span
+      >`;
 }
 
 const CALLS_HELD = (calls: number): string =>
