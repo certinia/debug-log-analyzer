@@ -166,6 +166,7 @@ describe('analysis-view selection', () => {
         selection: {
           kind: 'aggregate',
           instances: rootRow.instances.map((event) => event.eventIndex),
+          frames: rootRow.instances.map((event) => event.eventIndex),
           // The root row names the calls it counts, so nothing made them but it.
           calledBy: undefined,
         },

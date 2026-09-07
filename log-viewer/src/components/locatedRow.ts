@@ -417,14 +417,10 @@ export function rowDetailSelection(
   // deeper row narrows the same calls to the ones its own chain conducted, so
   // naming a fixed frame would read the same at every depth. A root bucket holds
   // its own calls, so nothing reached them but it.
-  const instances = rowOccurrences(row, root);
-  const frames = rowFrames(row, root, direction);
   return {
     kind: 'aggregate',
-    instances,
-    // Only where the row is not at its calls' own depth: {@link rowFrames}
-    // hands the memoised occurrences straight back where it is.
-    frames: frames === instances ? undefined : frames,
+    instances: rowOccurrences(row, root),
+    frames: rowFrames(row, root, direction),
     calledBy: data.instances?.length ? undefined : data.text,
   };
 }

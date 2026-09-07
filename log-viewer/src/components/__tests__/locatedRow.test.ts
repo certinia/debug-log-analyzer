@@ -382,23 +382,23 @@ describe('rowDetailSelection', () => {
     });
   });
 
-  it("leaves the frames off a root bucket, which stands at its calls' depth", () => {
+  it('gives a root bucket its own calls, as it stands at their depth', () => {
     const { apexLog, bucket } = rows();
 
     expect(rowDetailSelection(bucket, apexLog, 'callers')).toEqual({
       kind: 'aggregate',
       instances: [5],
-      frames: undefined,
+      frames: [5],
       calledBy: undefined,
     });
   });
 
-  it("leaves the frames off a top-down row, which sits at its calls' depth", () => {
+  it('gives a top-down row its own calls, as it sits at their depth', () => {
     const { apexLog, caller } = rows();
 
     expect(rowDetailSelection(caller, apexLog, 'callees')).toMatchObject({
       instances: [5],
-      frames: undefined,
+      frames: [5],
     });
   });
 

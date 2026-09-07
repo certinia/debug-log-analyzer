@@ -32,10 +32,10 @@ export type DetailSelection =
   | {
       kind: 'aggregate';
       instances: number[];
-      /** The frames the row *is*, where those are not the calls it counts: a
-       *  bottom-up caller row counts its callee's calls, so its own scope lives
-       *  a level up. Absent where the row names the calls it counts. */
-      frames?: number[];
+      /** The frames the row *is*, which is the scope it holds: a bottom-up
+       *  caller row counts its callee's calls, so its own scope lives a level
+       *  up. Equal to {@link instances} where the row sits at its calls' depth. */
+      frames: number[];
       /** The frame that made the calls, where the row naming them is not it: a
        *  bottom-up caller row counts its callee's calls. Absent where the row
        *  names the calls it counts. */

@@ -138,6 +138,7 @@ describe('buildDetailSections', () => {
     const sections = await buildDetailSections('analysis', {
       kind: 'aggregate',
       instances: [11, 12, 13],
+      frames: [11, 12, 13],
     });
     expect(sections.map((s) => s.id)).toEqual([
       'vitals',
@@ -174,6 +175,7 @@ describe('buildDetailSections', () => {
     const sections = await buildDetailSections('analysis', {
       kind: 'aggregate',
       instances: [11, 12, 13],
+      frames: [11, 12, 13],
     });
 
     expect(
@@ -189,6 +191,7 @@ describe('buildDetailSections', () => {
     const sections = await buildDetailSections('analysis', {
       kind: 'aggregate',
       instances: [11, 12, 13],
+      frames: [11, 12, 13],
     });
 
     const findings = rendered(sections, 'findings', 'log-diagnostics') as HTMLElement & {
@@ -202,7 +205,7 @@ describe('buildDetailSections', () => {
   it('scopes the findings to the frame being followed, not the aggregate it left', async () => {
     const sections = await buildDetailSections(
       'analysis',
-      { kind: 'aggregate', instances: [11, 12, 13] },
+      { kind: 'aggregate', instances: [11, 12, 13], frames: [11, 12, 13] },
       { kind: 'event', eventIndex: 8 },
     );
 
@@ -242,6 +245,7 @@ describe('buildDetailSections', () => {
     const sections = await buildDetailSections('timeline', {
       kind: 'aggregate',
       instances: [11, 12, 13],
+      frames: [11, 12, 13],
     });
 
     const bar = rendered(sections, 'namespace-time', 'namespace-time-bar') as HTMLElement & {
@@ -258,7 +262,7 @@ describe('buildDetailSections', () => {
   it('drops the aggregate once a single frame in its stack is the one being followed', async () => {
     const sections = await buildDetailSections(
       'analysis',
-      { kind: 'aggregate', instances: [11, 12, 13] },
+      { kind: 'aggregate', instances: [11, 12, 13], frames: [11, 12, 13] },
       { kind: 'event', eventIndex: 8 },
     );
 
@@ -273,8 +277,8 @@ describe('buildDetailSections', () => {
   it('describes the calls a walked bucket counts, as a bucket picked in the tab is', async () => {
     const sections = await buildDetailSections(
       'analysis',
-      { kind: 'aggregate', instances: [11, 12, 13] },
-      { kind: 'aggregate', instances: [21, 22], calledBy: 'Trigger1' },
+      { kind: 'aggregate', instances: [11, 12, 13], frames: [11, 12, 13] },
+      { kind: 'aggregate', instances: [21, 22], frames: [21, 22], calledBy: 'Trigger1' },
     );
 
     const vitals = rendered(sections, 'vitals', 'event-vitals') as HTMLElement & {
