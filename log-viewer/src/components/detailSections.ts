@@ -221,7 +221,7 @@ export async function buildDetailSections(
       title: 'Variables',
       // No natural size — a frame has none or hundreds — so it takes a share of
       // the panel and scrolls, rather than a slot that could crowd the grids.
-      weight: 2,
+      weight: 3,
       content: html`<variables-detail
         eventIndex=${activeIndex}
         .instances=${instances}

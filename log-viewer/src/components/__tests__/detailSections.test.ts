@@ -69,7 +69,7 @@ describe('buildDetailSections', () => {
     // does not resize the stack under the reader.
     expect(sections.find((s) => s.id === 'vitals')?.height).toBe('md');
     // The variables have no natural size, so they take a share and scroll.
-    expect(sections.find((s) => s.id === 'variables')?.weight).toBe(2);
+    expect(sections.find((s) => s.id === 'variables')?.weight).toBe(3);
     // Asked of a frame it empties while the figures are added up, so it keeps a
     // steady height rather than flickering on every step.
     expect(sections.find((s) => s.id === 'namespace-time')?.height).toBe('sm');

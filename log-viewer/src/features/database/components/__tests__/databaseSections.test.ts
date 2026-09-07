@@ -60,7 +60,7 @@ describe('buildDatabaseSections', () => {
     // The statement's figures take a steady height rather than resizing the
     // stack from one statement to the next; the variables take a share.
     expect(sections.find((s) => s.id === 'vitals')?.height).toBe('md');
-    expect(sections.find((s) => s.id === 'variables')?.weight).toBe(2);
+    expect(sections.find((s) => s.id === 'variables')?.weight).toBe(3);
   });
 
   it('skips the lint for a hidden issues section, but still offers it', async () => {

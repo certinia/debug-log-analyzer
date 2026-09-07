@@ -212,7 +212,7 @@
   );
   --lana-pane-md: clamp(
     calc(var(--lana-panel-header-height) * 6),
-    34%,
+    24%,
     calc(var(--lana-panel-header-height) * 12)
   );
 }

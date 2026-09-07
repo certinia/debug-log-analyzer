@@ -39,10 +39,10 @@ export async function buildDatabaseSections(
   // not apply to it.
   const activeType = active === eventIndex ? type : undefined;
 
-  // The vitals and the variables take a steady height, so stepping from one
-  // statement to the next does not resize the stack; the fill sections share the
-  // leftover space, the call tree getting the most, SOQL issues the least (but
-  // still open). The call tree closes the panel.
+  // The vitals take a steady height, so stepping from one statement to the next
+  // does not resize the stack; the fill sections share the leftover space, the
+  // call tree getting the most, SOQL issues the least (but still open). The
+  // call tree closes the panel.
   const sections: PaneSection[] = [
     {
       id: 'vitals',
@@ -60,7 +60,7 @@ export async function buildDatabaseSections(
       title: 'Variables',
       // No natural size — a frame has none or hundreds — so it takes a share of
       // the panel and scrolls, rather than a slot that could crowd the grids.
-      weight: 2,
+      weight: 3,
       content: html`<variables-detail eventIndex=${active}></variables-detail>`,
     },
     {
