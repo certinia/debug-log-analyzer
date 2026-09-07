@@ -9,6 +9,7 @@
 import type { ApexLog, LogEvent } from 'apex-log-parser';
 
 import { aggregateVariablesFor } from '../../log-viewer/src/core/log/aggregateVariables.js';
+import { getEventKey } from '../../log-viewer/src/core/log/eventKeys.js';
 import {
   frameVariablesFor,
   variableIndexFor,
@@ -61,11 +62,21 @@ export async function measureVariables(log: ApexLog): Promise<void> {
   if (!worst) {
     return;
   }
+  line('worst frame', `${worst.children.length.toLocaleString()} children`);
+
+  // Timed before anything else reads the frame, so this is a first ask. Only the
+  // lines before the cut answer, so selecting the first line inside the frame
+  // must not cost what reading the whole frame does.
+  const firstLine = worst.children[0];
+  if (firstLine) {
+    await time('worst frame, first line', () =>
+      frameVariablesFor(store, firstLine.eventIndex, index),
+    );
+  }
   const shape = frameVariablesFor(store, worst.eventIndex, index);
   line(
-    'worst frame',
-    `${worst.children.length.toLocaleString()} children, ` +
-      `${shape?.locals.length ?? 0} locals, ${shape?.fields.length ?? 0} fields`,
+    'worst frame scope',
+    `${shape?.locals.length ?? 0} locals, ${shape?.fields.length ?? 0} fields`,
   );
   await time('worst frame snapshot', () => frameVariablesFor(store, worst.eventIndex, index));
 
@@ -99,19 +110,23 @@ export async function measureVariables(log: ApexLog): Promise<void> {
 }
 
 /** The frames of the signature the log holds most calls of: the merged row whose
- *  comparison costs the most. */
+ *  comparison costs the most.
+ *
+ *  Keyed by {@link getEventKey}, which is what the grids bucket by, so the row
+ *  this times is one a reader can actually select. */
 function busiestSignature(frames: readonly LogEvent[]): LogEvent[] {
-  const byText = new Map<string, LogEvent[]>();
+  const byKey = new Map<string, LogEvent[]>();
   for (const frame of frames) {
-    const held = byText.get(frame.text);
+    const key = getEventKey(frame);
+    const held = byKey.get(key);
     if (held) {
       held.push(frame);
     } else {
-      byText.set(frame.text, [frame]);
+      byKey.set(key, [frame]);
     }
   }
   let busiest: LogEvent[] = [];
-  for (const held of byText.values()) {
+  for (const held of byKey.values()) {
     if (held.length > busiest.length) {
       busiest = held;
     }
