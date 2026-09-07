@@ -21,11 +21,13 @@ export interface PaneSection {
   /** Default flex-grow weight when open, seeded on first render (default 1). */
   weight?: number;
   /**
-   * How the open pane takes space (default `'fill'`). A `'content'` pane sizes
-   * to its content and shrinks — scrolling inside — when space runs out, it
-   * never stretches to soak up leftovers, and it leaves the open fill panes a
-   * share of the space. Dragging its sash gives it whatever room the drag asks
-   * for; a double-click hands it back to its content.
+   * How the open pane takes space (default `'fill'`). A `'content'` pane asks
+   * for its content and never for more, so it does not stretch to soak up
+   * leftovers — but it asks for no more than an equal share of the panel
+   * either, growing back towards its content only as far as the room the other
+   * sections leave and scrolling inside beyond that. So no one section can take
+   * the panel and hold every other one at its floor. Dragging its sash gives it
+   * whatever room the drag asks for; a double-click hands it back.
    * A `'fill'` pane shares the remaining space by weight.
    *
    * Only for content that does not change with what the consumer is showing.
@@ -161,25 +163,39 @@ export class PaneView extends LitElement {
       .pane {
         flex: 0 0 auto;
       }
-      /* Open and sized by its content: it never stretches to soak up leftovers,
-         and it shrinks — scrolling inside — when the space runs out. */
+      /* Open: it shrinks — scrolling inside — when the space runs out. Each
+         sizing mode below sets its own basis. */
       .pane[data-open] {
         flex-shrink: 1;
-        flex-basis: var(--pane-size, auto);
       }
       .pane[data-open][data-sizing='fill'] {
         flex-grow: var(--pane-grow, 1);
         flex-basis: var(--pane-size, 0);
       }
-      /* From a basis of zero a fill pane can only grow into free space, and a
-         stack of sized-to-content panes leaves none — it would sit at the floor.
-         A share each shrinks alongside them instead. Only a content pane earns
-         this: a tier is a bounded slot, and a share here would over-subscribe
-         the panel, where flexbox shrinks by basis alone and flattens the
-         weights. */
-      .pane-view[data-content] .pane[data-open][data-sizing='fill'] {
+      /* An equal share as the basis, so the panes shrink alongside each other
+         rather than by size. From a basis of zero a fill pane can only grow
+         into free space, and a stack of sized-to-content panes leaves none — it
+         would sit at the floor; a content pane sized to its content is the one
+         holding it there, because flexbox shrinks by basis and the biggest
+         keeps the most. A tier is exempt: a bounded slot already, and a share
+         here would over-subscribe the panel and flatten the weights. */
+      .pane-view[data-content] .pane[data-open][data-sizing='fill'],
+      .pane[data-open][data-sizing='content'] {
         flex-basis: var(--pane-size, calc(100% / var(--pane-count)));
       }
+      /* A content pane is then a weight-1 fill pane capped at its content: it
+         never stretches past what it has to show, and scrolls when the share is
+         all it gets. */
+      .pane[data-open][data-sizing='content'] {
+        flex-grow: 1;
+      }
+      .pane-view[data-orientation='vertical'] .pane[data-open][data-sizing='content'] {
+        max-height: var(--pane-size, max-content);
+      }
+      .pane-view[data-orientation='horizontal'] .pane[data-open][data-sizing='content'] {
+        max-width: var(--pane-size, max-content);
+      }
+
       /* A steady height, so walking the selection does not resize the stack.
          Only a vertical stack is given a tier, so no rule here re-checks it. */
       .pane[data-open][data-tier='sm'] {
