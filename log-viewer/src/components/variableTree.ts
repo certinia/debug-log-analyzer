@@ -196,22 +196,65 @@ function assembledOf(parts: readonly Part[], value: VariableValue): VariableValu
   );
 }
 
+/** A row that shows a value, before the disclosure state it is pushed with. */
+type ValueRow =
+  | { kind: 'variable'; row: VariableRow }
+  | { kind: 'entry'; key: string | null }
+  | { kind: 'spread-value'; held: SpreadValue; of: number };
+
 /**
- * Every row the section shows, in order, given which ids are open.
+ * The half both builders share: what a value contributes once it is open.
  *
- * `isOpen` decides a group's default too, so the caller owns the policy: Local
- * opens, the rest do not.
+ * One emitter, so a value opens the same way at either scope. A spread's value
+ * is an object as much as a frame's local is, and the reader who can open one
+ * expects to open the other.
+ *
+ * `lookups` rides on each call rather than being captured: a frame reads every
+ * value at one point in the log, where a comparison reads each value at the
+ * point the first call to hold it stood.
  */
-export function toTreeRows(
-  frame: FrameVariables,
-  isOpen: (id: string, openByDefault: boolean) => boolean,
-  lookups: Lookups = {},
-): VariableTreeRow[] {
+function rowEmitter(isOpen: (id: string, openByDefault: boolean) => boolean) {
   const rows: VariableTreeRow[] = [];
 
   const note = (id: string, depth: number, text: string): void => {
     rows.push({ kind: 'note', id, depth, expandable: false, open: false, text });
   };
+
+  const group = (head: GroupHead, kids: (depth: number) => void): void => {
+    const { id, expandable = true, openByDefault = false, of = null, self = null } = head;
+    const open = expandable && isOpen(id, openByDefault);
+    rows.push({ ...head, kind: 'group', depth: 0, expandable, open, of, self });
+    if (open) {
+      kids(1);
+    }
+  };
+
+  /**
+   * One rule for what may open: the value holds parts, or its text is too long
+   * to read in a row. An object already open above this row would be a cycle,
+   * and `MAX_DEPTH` stops a long chain.
+   */
+  function opens(depth: number, held: Shown, seen: ReadonlySet<string>): boolean {
+    const cycle = held.objectAddress !== null && seen.has(held.objectAddress);
+    return !cycle && depth < MAX_DEPTH && (held.parts.length > 0 || isExpandable(held.value));
+  }
+
+  /** A row that shows a value, and everything inside it while it is open. */
+  function value(
+    of: ValueRow,
+    id: string,
+    depth: number,
+    held: Shown,
+    seen: ReadonlySet<string>,
+    lookups: Lookups,
+  ): void {
+    const expandable = opens(depth, held, seen);
+    const open = expandable && isOpen(id, false);
+    rows.push({ ...of, id, depth, expandable, open, ...held });
+    if (open) {
+      children(id, depth + 1, held, withAddress(seen, held.objectAddress), lookups);
+    }
+  }
 
   /** The rows an open value contributes: the parts it holds, or its raw text. */
   function children(
@@ -219,14 +262,15 @@ export function toTreeRows(
     depth: number,
     holder: Shown,
     seen: ReadonlySet<string>,
+    lookups: Lookups,
   ): void {
-    const { value, raw, parts } = holder;
+    const { value: held, raw, parts } = holder;
     if (parts.length) {
       let repeats = 0;
       const keys = new Set<string>();
       for (const part of parts) {
         if ('field' in part) {
-          variable(parentId, depth, part.field, seen);
+          variable(parentId, depth, part.field, seen, lookups);
           continue;
         }
         const { entry, at } = part;
@@ -238,10 +282,14 @@ export function toTreeRows(
           }
         }
         const id = `${parentId}/${at}`;
-        const held = shown(entry.text, entry.address, entry.address, lookups);
-        if (pushValue({ kind: 'entry', key: entry.key }, id, depth, held, seen)) {
-          children(id, depth + 1, held, withAddress(seen, held.objectAddress));
-        }
+        value(
+          { kind: 'entry', key: entry.key },
+          id,
+          depth,
+          shown(entry.text, entry.address, entry.address, lookups),
+          seen,
+          lookups,
+        );
       }
       if (repeats) {
         note(
@@ -250,7 +298,7 @@ export function toTreeRows(
           `${repeats} keys repeat, kept in the order the log wrote them.`,
         );
       }
-      if (value.kind === 'container' && value.truncated) {
+      if (held.kind === 'container' && held.truncated) {
         note(`${parentId}/cut`, depth, 'The log cut this collection short.');
       }
       return;
@@ -269,58 +317,50 @@ export function toTreeRows(
     }
   }
 
-  function variables(
-    parentId: string,
-    depth: number,
-    of: readonly VariableRow[],
-    seen: ReadonlySet<string>,
-  ): void {
-    for (const row of of) {
-      variable(parentId, depth, row, seen);
-    }
-  }
-
   function variable(
     parentId: string,
     depth: number,
     row: VariableRow,
     seen: ReadonlySet<string>,
+    lookups: Lookups,
   ): void {
-    const id = `${parentId}/${row.name}`;
-    const held = shownValue(row, lookups);
-    if (pushValue({ kind: 'variable', row }, id, depth, held, seen)) {
-      children(id, depth + 1, held, withAddress(seen, held.objectAddress));
-    }
+    value(
+      { kind: 'variable', row },
+      `${parentId}/${row.name}`,
+      depth,
+      shownValue(row, lookups),
+      seen,
+      lookups,
+    );
   }
 
-  /** Pushes a row that shows a value, and says whether its children follow.
-   *
-   *  One rule for what may open: the value holds parts, or its text is too long
-   *  to read in a row. An object already open above this row would be a cycle,
-   *  and `MAX_DEPTH` stops a long chain. */
-  function pushValue(
-    of: { kind: 'variable'; row: VariableRow } | { kind: 'entry'; key: string | null },
-    id: string,
+  function variables(
+    parentId: string,
     depth: number,
-    held: Shown,
+    of: readonly VariableRow[],
     seen: ReadonlySet<string>,
-  ): boolean {
-    const cycle = held.objectAddress !== null && seen.has(held.objectAddress);
-    const expandable =
-      !cycle && depth < MAX_DEPTH && (held.parts.length > 0 || isExpandable(held.value));
-    const open = expandable && isOpen(id, false);
-    rows.push({ ...of, id, depth, expandable, open, ...held });
-    return open;
+    lookups: Lookups,
+  ): void {
+    for (const row of of) {
+      variable(parentId, depth, row, seen, lookups);
+    }
   }
 
-  const group = (head: GroupHead, kids: (depth: number) => void): void => {
-    const { id, expandable = true, openByDefault = false, of = null, self = null } = head;
-    const open = expandable && isOpen(id, openByDefault);
-    rows.push({ ...head, kind: 'group', depth: 0, expandable, open, of, self });
-    if (open) {
-      kids(1);
-    }
-  };
+  return { rows, note, group, opens, value, children, variables };
+}
+
+/**
+ * Every row the section shows, in order, given which ids are open.
+ *
+ * `isOpen` decides a group's default too, so the caller owns the policy: Local
+ * opens, the rest do not.
+ */
+export function toTreeRows(
+  frame: FrameVariables,
+  isOpen: (id: string, openByDefault: boolean) => boolean,
+  lookups: Lookups = {},
+): VariableTreeRow[] {
+  const { rows, note, group, variables } = rowEmitter(isOpen);
 
   group(
     {
@@ -332,7 +372,7 @@ export function toTreeRows(
     },
     (depth) => {
       if (frame.locals.length) {
-        variables('local', depth, frame.locals, new Set());
+        variables('local', depth, frame.locals, new Set(), lookups);
       } else {
         note('local/none', depth, 'The log records no locals for this frame.');
       }
@@ -354,7 +394,13 @@ export function toTreeRows(
       },
       // The frame's own object, so a field pointing back at it cannot reopen it.
       (depth) =>
-        variables('this', depth, frame.fields, withAddress(new Set(), self?.objectAddress ?? null)),
+        variables(
+          'this',
+          depth,
+          frame.fields,
+          withAddress(new Set(), self?.objectAddress ?? null),
+          lookups,
+        ),
     );
   }
 
@@ -376,7 +422,7 @@ export function toTreeRows(
           count: entry.rows.length,
         });
         if (open) {
-          variables(id, 2, entry.rows, new Set());
+          variables(id, 2, entry.rows, new Set(), lookups);
         }
       }
     });
@@ -388,72 +434,55 @@ export function toTreeRows(
 /**
  * Every row a merged row's comparison shows, in order, given which ids are open.
  *
- * The same row model as {@link toTreeRows}, so one renderer and one keyboard
- * tree serve both scopes. A name with one value renders through the same
- * {@link Shown} path a single frame's does, so a constant reads identically.
+ * The same row model and the same emitter as {@link toTreeRows}, so one
+ * renderer and one keyboard tree serve both scopes, and a value that is an
+ * object opens into its fields here as it does for one frame.
  *
- * No lookups: an address is not resolved here. Each call read at its own point
- * in the log, so there is no one cut to resolve against, and the value's own
- * text is what tells two calls apart.
+ * @param lookupsAt - the log bound to the point a value's first call read at.
+ *   Each call read at its own point, so an object is shown as that one call
+ *   recorded it; the section says so.
  */
 export function toSpreadRows(
   aggregate: AggregateVariables,
   isOpen: (id: string, openByDefault: boolean) => boolean,
+  lookupsAt: (cut: number) => Lookups = () => ({}),
 ): VariableTreeRow[] {
-  const rows: VariableTreeRow[] = [];
+  const { rows, note, group, opens, value, children } = rowEmitter(isOpen);
 
   function spread(parentId: string, depth: number, row: VariableSpread): void {
     const id = `${parentId}/${row.name}`;
+    // One value every call held, so the row *is* that value: it reads and opens
+    // exactly as a single frame's row does.
     const only = row.values.length === 1 ? row.values[0] : null;
-    const expandable = row.values.length > 1;
+    const held = only ? shownOf(only, lookupsAt) : null;
+    const seen: ReadonlySet<string> = new Set();
+    const expandable = held ? opens(depth, held, seen) : row.values.length > 1;
     const open = expandable && isOpen(id, false);
-    rows.push({
-      kind: 'spread',
-      row,
-      shown: only ? shown(only.text, only.address, only.address, {}) : null,
-      id,
-      depth,
-      expandable,
-      open,
-    });
+    rows.push({ kind: 'spread', row, shown: held, id, depth, expandable, open });
     if (!open) {
       return;
     }
-    row.values.forEach((value, at) => {
-      rows.push({
-        kind: 'spread-value',
-        held: value,
-        of: row.calls,
-        id: `${id}/${at}`,
-        depth: depth + 1,
-        expandable: false,
-        open: false,
-        ...shown(value.text, value.address, value.address, {}),
-      });
+    if (only && held) {
+      children(id, depth + 1, held, withAddress(seen, held.objectAddress), lookupsAt(only.cut));
+      return;
+    }
+    row.values.forEach((entry, at) => {
+      value(
+        { kind: 'spread-value', held: entry, of: row.calls },
+        `${id}/${at}`,
+        depth + 1,
+        shownOf(entry, lookupsAt),
+        seen,
+        lookupsAt(entry.cut),
+      );
     });
   }
-
-  const group = (head: GroupHead, kids: (depth: number) => void): void => {
-    const { id, expandable = true, openByDefault = false, of = null } = head;
-    const open = expandable && isOpen(id, openByDefault);
-    rows.push({ ...head, kind: 'group', depth: 0, expandable, open, of, self: null });
-    if (open) {
-      kids(1);
-    }
-  };
 
   group(
     { id: 'local', name: 'Local', count: aggregate.locals.length, openByDefault: true },
     (depth) => {
       if (!aggregate.locals.length) {
-        rows.push({
-          kind: 'note',
-          id: 'local/none',
-          depth,
-          expandable: false,
-          open: false,
-          text: 'The log records no locals for these calls.',
-        });
+        note('local/none', depth, 'The log records no locals for these calls.');
         return;
       }
       for (const row of aggregate.locals) {
@@ -481,6 +510,11 @@ export function toSpreadRows(
   }
 
   return rows;
+}
+
+/** One compared value as shown, read at the point its first call stood. */
+function shownOf(value: SpreadValue, lookupsAt: (cut: number) => Lookups): Shown {
+  return shown(value.text, value.address, value.address, lookupsAt(value.cut));
 }
 
 /** Whose class the fields belong to, and how many objects held them. */

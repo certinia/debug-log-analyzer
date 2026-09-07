@@ -32,6 +32,7 @@ import {
   parentOf,
   toSpreadRows,
   toTreeRows,
+  type Lookups,
   type Shown,
   type VariableTreeRow,
 } from './variableTree.js';
@@ -119,6 +120,11 @@ export class VariablesDetail extends LitElement {
   /** The index bound to this frame's cut, which holds what it reads: every row
    *  is built again whenever anything opens. */
   private _view: IndexView | null = null;
+
+  /** One index view per cut a compared value was read at. A comparison reads
+   *  each value at its own point, and every row is built again whenever
+   *  anything opens, so the views are held rather than remade. */
+  private _views = new Map<number, Lookups>();
 
   /** Set when a key moved the tab stop, so `updated` moves focus with it. */
   private _takeFocus = false;
@@ -299,6 +305,7 @@ export class VariablesDetail extends LitElement {
           ? frameVariablesFor(this.logStore, this.eventIndex, this._index)
           : null;
       this._view = this._frame && this._index ? this._index.viewAt(this._frame.cut) : null;
+      this._views.clear();
     }
     // A key press moves the tab stop and nothing else, so the rows it walks are
     // rebuilt only when the scope or what is open changes.
@@ -318,7 +325,7 @@ export class VariablesDetail extends LitElement {
     // has yet to answer must show its placeholder, not the last row's spread.
     this._rows = this._isAggregate
       ? this._spread
-        ? toSpreadRows(this._spread, isOpen)
+        ? toSpreadRows(this._spread, isOpen, (cut) => this._viewAt(cut))
         : []
       : frame && view
         ? toTreeRows(frame, isOpen, view)
@@ -330,6 +337,16 @@ export class VariablesDetail extends LitElement {
     super.disconnectedCallback();
     // Comparing on into a detached host wastes frames and answers nobody.
     this._walk?.abort();
+  }
+
+  /** The log bound to one point in it, held per point. */
+  private _viewAt(cut: number): Lookups {
+    let held = this._views.get(cut);
+    if (!held) {
+      held = this._index?.viewAt(cut) ?? {};
+      this._views.set(cut, held);
+    }
+    return held;
   }
 
   override updated(changed: PropertyValues): void {
@@ -415,6 +432,7 @@ export class VariablesDetail extends LitElement {
       }
       ${index.capped ? note(HELD_NOTE) : ''}
       ${capped ? note(`Over ${MAX_VALUES_PER_NAME} values, so some are not listed.`) : ''}
+      ${this._rows.some((row) => 'resolved' in row && row.resolved) ? note(RESOLVED_NOTE) : ''}
       ${note(STATICS_NOTE)}
     `);
   }
@@ -690,7 +708,6 @@ export class VariablesDetail extends LitElement {
     // one of its calls would throw away the reading the reader came for.
     if (row.kind === 'spread-value') {
       dispatchInspectorLocate(this, row.held.at, true);
-      return;
     }
     if (row.expandable) {
       this._toggle(row.id, !row.open);
@@ -881,6 +898,11 @@ function lastSegment(className: string): string {
 /** The index dropped writes past a cap, so an answer may be short of what the
  *  log recorded. Shared: it is the same fact at either scope. */
 const HELD_NOTE = 'Too many assignments to hold them all, so some values are missing.';
+
+/** A comparison reads each value at the point its first call stood, so an
+ *  object it opens is that one call's reading. */
+const RESOLVED_NOTE =
+  'An object is shown as the first call that held it recorded it, so another call may have held a different one.';
 
 /** Why a merged row's comparison stops at the locals and the fields. */
 const STATICS_NOTE =

@@ -51,6 +51,10 @@ export interface SpreadValue {
   /** Runs of consecutive calls that held it. One run is a phase the calls
    *  passed through; more is a value that came and went. */
   runs: number;
+  /** The point the first call that held it read at, so an address can be
+   *  resolved and an object opened. Each call read at its own point, so this is
+   *  the one call the object is shown as. */
+  cut: number;
 }
 
 /** One name, across the calls the row counts. */
@@ -133,10 +137,10 @@ async function compareFrames(
     }
     truncated ||= frame.truncated;
     for (const row of frame.locals) {
-      hold(locals, row, eventIndex, read);
+      hold(locals, row, eventIndex, read, frame.cut);
     }
     for (const row of frame.fields) {
-      hold(fields, row, eventIndex, read);
+      hold(fields, row, eventIndex, read, frame.cut);
     }
     read++;
     if (frame.thisType) {
@@ -165,8 +169,16 @@ async function compareFrames(
  * @param at - the call's eventIndex, for the mark
  * @param ordinal - which call it is among those read, so a value's runs can be
  *   counted without holding the whole sequence
+ * @param cut - the point that call read at, kept for the first call to hold a
+ *   value so its object can be opened
  */
-function hold(into: Map<string, Gathering>, row: VariableRow, at: number, ordinal: number): void {
+function hold(
+  into: Map<string, Gathering>,
+  row: VariableRow,
+  at: number,
+  ordinal: number,
+  cut: number,
+): void {
   let held = into.get(row.name);
   if (!held) {
     held = {
@@ -207,6 +219,7 @@ function hold(into: Map<string, Gathering>, row: VariableRow, at: number, ordina
       calls: 1,
       at: [at],
       runs: 1,
+      cut,
       previous: ordinal,
     });
   } else {

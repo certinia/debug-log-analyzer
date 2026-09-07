@@ -889,6 +889,28 @@ describe('VariablesDetail comparing a merged row', () => {
     expect(values[0]?.textContent).toContain('2 runs');
   });
 
+  // The panel stays on the comparison, so a value has to open where it stands.
+  it('opens a value that is an object into its fields', async () => {
+    const held = (at: number, name: string): string => {
+      const t = (offset: number): string => `09:18:22.6 (${at + offset})`;
+      return (
+        `${t(0)}|METHOD_ENTRY|[1]|01p|ns.Svc.run()\n` +
+        `${t(10)}|VARIABLE_ASSIGNMENT|[2]|opts|{"name":"${name}","rows":5}\n` +
+        `${t(20)}|METHOD_EXIT|[1]|ns.Svc.run()\n`
+      );
+    };
+    const el = await compared(held(1000, 'A') + held(2000, 'B'));
+
+    const values = await valuesOf(el, 'opts');
+    expect(values[0]?.getAttribute('aria-expanded')).toBe('false');
+
+    values[0]?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    await el.updateComplete;
+
+    expect(rowText(el)).toContain('name');
+    expect(rowText(el)).toContain('rows');
+  });
+
   // A static moves for reasons the row does not own, so leaving them out is a
   // decision the reader is owed.
   it('says the statics are not compared', async () => {

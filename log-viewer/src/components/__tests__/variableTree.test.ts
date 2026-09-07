@@ -437,6 +437,7 @@ describe('toSpreadRows', () => {
         calls,
         at: [100 + index],
         runs: 1,
+        cut: 100 + index,
       })),
       calls: values.reduce((sum, [, calls]) => sum + calls, 0),
       unassigned: 0,
@@ -526,6 +527,61 @@ describe('toSpreadRows', () => {
     );
 
     expect(group?.kind === 'group' && group.of).toBe('ns.Svc');
+  });
+
+  // The plan deferred this while a value drilled to a call; the panel now stays
+  // on the comparison, so a value has to open where it stands.
+  it('opens a value the log serialised in place, with no lookups at all', () => {
+    const rows = toSpreadRows(
+      { ...aggregate, locals: [spread('held', [['{"a":1,"b":2}', 340]])] },
+      openAll,
+    );
+
+    expect(rows.find((r) => r.id === 'local/held')?.expandable).toBe(true);
+    expect(rows.filter((r) => r.kind === 'entry').map((r) => r.id)).toEqual([
+      'local/held/0',
+      'local/held/1',
+    ]);
+  });
+
+  it('opens one of many values into its own properties', () => {
+    const rows = toSpreadRows(
+      {
+        ...aggregate,
+        locals: [
+          spread('held', [
+            ['{"a":1}', 200],
+            ['{"b":2}', 140],
+          ]),
+        ],
+      },
+      openAll,
+    );
+
+    expect(rows.find((r) => r.id === 'local/held/0')?.expandable).toBe(true);
+    expect(rows.map((r) => r.id)).toContain('local/held/0/0');
+  });
+
+  // Each call read at its own point, so a value resolves against the first call
+  // that held it.
+  it("reads an address as the object the value's own call recorded", () => {
+    const held = spread('ref', [['0xabc', 340]]);
+    held.values[0]!.address = '0xabc';
+    held.values[0]!.cut = 42;
+    const asked: number[] = [];
+
+    const rows = toSpreadRows({ ...aggregate, locals: [held] }, openAll, (cut) => {
+      asked.push(cut);
+      return {
+        resolve: (address) =>
+          address === '0xabc' && cut === 42 ? { text: '{"n":1}', laterAt: null } : NOT_RECORDED,
+      };
+    });
+
+    const row = rows.find((r) => r.id === 'local/ref');
+    expect(row?.kind === 'spread' && row.shown?.raw).toBe('{"n":1}');
+    expect(row?.expandable).toBe(true);
+    expect(asked).toContain(42);
   });
 
   it('says the calls hold no locals rather than showing an empty group', () => {
