@@ -282,6 +282,33 @@ describe('LogInspector', () => {
     expect(paneView(el).sections.map((section) => section.id)).toEqual(['callstack', 'vitals']);
   });
 
+  it('keeps a section this selection never built in the order it stores', async () => {
+    // Arranged while a SOQL statement was selected, so the store names a
+    // section the timeline's list does not build.
+    settings.inspector = inspectorSettings({
+      sectionOrder: { 'timeline:detail': ['issues', 'vitals', 'callstack'] },
+    });
+    const el = await mount('timeline-tab');
+    select('timeline', 1);
+    await flush(el);
+
+    paneView(el).dispatchEvent(
+      new CustomEvent('pane-reorder', {
+        detail: { ids: ['callstack', 'vitals'] },
+        bubbles: true,
+        composed: true,
+      }),
+    );
+    await settle(el);
+
+    expect(written).toEqual([
+      {
+        section: 'inspector.sectionOrder',
+        value: { 'timeline:detail': ['issues', 'callstack', 'vitals'] },
+      },
+    ]);
+  });
+
   it('hides a section from the menu, and stops building it', async () => {
     const el = await mount('timeline-tab');
     select('timeline', 1);

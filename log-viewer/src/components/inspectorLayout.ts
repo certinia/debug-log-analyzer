@@ -45,16 +45,26 @@ export function withoutScope<T>(store: Record<string, T>, key: string): Record<s
 
 /**
  * The sections in the order the user arranged them. An id the order does not
- * name — a section added since they last arranged this list — keeps its place
- * from the builder, after the ones they did arrange.
+ * name keeps its place from the builder, behind the named section it follows
+ * there.
+ *
+ * Not the end of the stack: the list under one key varies with the selection —
+ * `issues` is built for a SOQL statement and not for a DML one — so an unnamed
+ * id means "this list did not have it when they arranged it" as often as it
+ * means "added since". Ranking it last put SOQL issues below the call tree for
+ * anyone who had reordered while a DML row was selected.
  */
 export function orderSections(sections: PaneSection[], order?: string[]): PaneSection[] {
   if (!order?.length) {
     return sections;
   }
-  const ranks = new Map(order.map((id, index) => [id, index]));
-  const rank = (section: PaneSection) => ranks.get(section.id) ?? order.length;
-  return [...sections].sort((a, b) => rank(a) - rank(b));
+  const named = new Set(order);
+  return weave(
+    sections,
+    (section) => section.id,
+    order,
+    (id) => named.has(id),
+  );
 }
 
 /** The section ids this list hides. */
@@ -76,18 +86,76 @@ export function mergeOrder(
   hidden: ReadonlySet<string>,
   visibleOrder: string[],
 ): string[] {
-  const trailing = new Map<string, string[]>();
+  return weave(
+    ids,
+    (id) => id,
+    visibleOrder,
+    (id) => !hidden.has(id),
+    (id) => id,
+  );
+}
+
+/**
+ * The order to store after a reorder: `arranged` as the user left it, with an
+ * id the store already knew that this build did not produce kept behind the id
+ * it followed there.
+ *
+ * The list under one key varies with the selection - `issues` is built for a
+ * SOQL statement and not for a DML one - so a reorder made under one selection
+ * would otherwise drop what the user arranged under another, for good.
+ */
+export function keepUnbuilt(stored: string[], arranged: string[]): string[] {
+  const built = new Set(arranged);
+  return weave(
+    stored,
+    (id) => id,
+    arranged,
+    (id) => built.has(id),
+    (id) => id,
+  );
+}
+
+/**
+ * `items` in the sequence `order` names, each named item followed by the items
+ * `anchored` left off that sequence which travel behind it — the one placement
+ * rule {@link orderSections} and {@link mergeOrder} are inverses about.
+ *
+ * An unanchored item above every anchored one has no predecessor, so it leads.
+ * An id `order` names that `items` does not hold is skipped, unless `orphan`
+ * says what to put there: a list of ids can stand for itself, where a list of
+ * sections cannot conjure a pane it was never given.
+ */
+function weave<T>(
+  items: T[],
+  idOf: (item: T) => string,
+  order: string[],
+  anchored: (id: string) => boolean,
+  orphan?: (id: string) => T,
+): T[] {
+  const anchors = new Map<string, T>();
+  const trailing = new Map<string, T[]>();
   let previous = '';
-  for (const id of ids) {
-    if (hidden.has(id)) {
-      trailing.set(previous, [...(trailing.get(previous) ?? []), id]);
-    } else {
+  for (const item of items) {
+    const id = idOf(item);
+    if (anchored(id)) {
+      anchors.set(id, item);
       previous = id;
+    } else {
+      const group = trailing.get(previous);
+      if (group) {
+        group.push(item);
+      } else {
+        trailing.set(previous, [item]);
+      }
     }
   }
-  // A hidden section above every visible one has no predecessor, so it leads.
-  return [
-    ...(trailing.get('') ?? []),
-    ...visibleOrder.flatMap((id) => [id, ...(trailing.get(id) ?? [])]),
-  ];
+  const woven = [...(trailing.get('') ?? [])];
+  for (const id of order) {
+    const anchor = anchors.get(id) ?? orphan?.(id);
+    if (anchor !== undefined) {
+      woven.push(anchor);
+    }
+    woven.push(...(trailing.get(id) ?? []));
+  }
+  return woven;
 }

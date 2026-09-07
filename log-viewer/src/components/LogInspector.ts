@@ -18,6 +18,7 @@ import { emptyTextFor } from './detailEmptyText.js';
 import { buildDetailSections } from './detailSections.js';
 import {
   hiddenIds,
+  keepUnbuilt,
   layoutKey,
   mergeOrder,
   orderSections,
@@ -483,7 +484,10 @@ export class LogInspector extends LitElement {
   private _onPaneReorder = (e: CustomEvent<{ ids: string[] }>) => {
     this._userAdjusted = true;
     const ids = this._layout.ordered.map((section) => section.id);
-    const order = mergeOrder(ids, this._layout.hidden, e.detail.ids);
+    const arranged = mergeOrder(ids, this._layout.hidden, e.detail.ids);
+    // What this build never produced is off screen like a hidden section, not
+    // gone: a reorder under a DML row must not drop where they put SOQL issues.
+    const order = keepUnbuilt(this.sectionOrder[this._layout.key] ?? [], arranged);
     this.sectionOrder = { ...this.sectionOrder, [this._layout.key]: order };
     updateSetting('inspector.sectionOrder', this.sectionOrder);
     this._applyLayout();

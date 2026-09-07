@@ -7,6 +7,7 @@ import { html } from 'lit';
 import type { PaneSection } from '../PaneView.js';
 import {
   hiddenIds,
+  keepUnbuilt,
   layoutKey,
   mergeOrder,
   orderSections,
@@ -93,18 +94,39 @@ describe('orderSections', () => {
     expect(idsOf(built)).toEqual(['vitals', 'variables', 'callstack', 'calltree']);
   });
 
-  it('keeps a section the order never named after the ones it did', () => {
-    // `variables` arrived after this list was last arranged.
+  it('keeps a section the order never named behind the one it follows', () => {
+    // `variables` arrived after this list was last arranged, and follows
+    // `vitals` in the builder's list.
     const order = ['calltree', 'vitals', 'callstack'];
-    expect(idsOf(orderSections(built, order))).toEqual([...order, 'variables']);
-  });
-
-  it('keeps several unnamed sections in builder order', () => {
-    expect(idsOf(orderSections(built, ['calltree']))).toEqual([
+    expect(idsOf(orderSections(built, order))).toEqual([
       'calltree',
       'vitals',
       'variables',
       'callstack',
+    ]);
+  });
+
+  it('leads with an unnamed section the order names nothing before', () => {
+    expect(idsOf(orderSections(built, ['calltree']))).toEqual([
+      'vitals',
+      'variables',
+      'callstack',
+      'calltree',
+    ]);
+  });
+
+  it('places a section the arranged list did not have where the builder puts it', () => {
+    // Reordered while a DML row was selected, so the order never named
+    // `issues` — which the builder puts after `callstack` for a SOQL one.
+    const soql = sectionsOf('vitals', 'variables', 'callstack', 'issues', 'calltree');
+    const order = ['calltree', 'vitals', 'variables', 'callstack'];
+
+    expect(idsOf(orderSections(soql, order))).toEqual([
+      'calltree',
+      'vitals',
+      'variables',
+      'callstack',
+      'issues',
     ]);
   });
 
@@ -172,5 +194,48 @@ describe('mergeOrder', () => {
       'variables',
       'issues',
     ]);
+  });
+});
+
+describe('keepUnbuilt', () => {
+  it('is the arranged order when the store knew nothing more', () => {
+    expect(keepUnbuilt(['vitals', 'callstack'], ['callstack', 'vitals'])).toEqual([
+      'callstack',
+      'vitals',
+    ]);
+  });
+
+  it('keeps an id this build never produced behind the one it followed', () => {
+    // Arranged under a SOQL statement, reordered under a DML one, which builds
+    // no `issues` section at all.
+    const stored = ['vitals', 'variables', 'callstack', 'issues', 'calltree'];
+
+    expect(keepUnbuilt(stored, ['calltree', 'vitals', 'variables', 'callstack'])).toEqual([
+      'calltree',
+      'vitals',
+      'variables',
+      'callstack',
+      'issues',
+    ]);
+  });
+
+  it('leads with an unbuilt id the store put above everything', () => {
+    // They dragged SOQL issues to the top; a reorder under a DML row must not
+    // cost them that.
+    const stored = ['issues', 'vitals', 'callstack'];
+
+    expect(keepUnbuilt(stored, ['callstack', 'vitals'])).toEqual(['issues', 'callstack', 'vitals']);
+  });
+
+  it('takes a section the store never named', () => {
+    expect(keepUnbuilt(['vitals', 'callstack'], ['callstack', 'variables', 'vitals'])).toEqual([
+      'callstack',
+      'variables',
+      'vitals',
+    ]);
+  });
+
+  it('is the arranged order when nothing is stored yet', () => {
+    expect(keepUnbuilt([], ['callstack', 'vitals'])).toEqual(['callstack', 'vitals']);
   });
 });
