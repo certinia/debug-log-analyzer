@@ -68,8 +68,11 @@ describe('aggregateVariablesFor', () => {
   it('reads every call and groups its locals by name', async () => {
     const { spread } = await compare(CALLS);
 
-    expect(spread?.frames).toBe(3);
-    expect(spread?.locals.map((row) => row.name)).toEqual(['accountId', 'retry', 'batchSize']);
+    expect(spread?.locals.map((row) => [row.name, row.calls])).toEqual([
+      ['accountId', 3],
+      ['retry', 3],
+      ['batchSize', 3],
+    ]);
   });
 
   it('counts the calls that held each distinct value, most calls first', async () => {
@@ -186,10 +189,9 @@ describe('aggregateVariablesFor', () => {
 
     const { spread } = await compare(recursive);
 
-    expect(spread?.frames).toBe(2);
-    expect(
-      spread?.locals.find((row) => row.name === 'depth')?.values.map((value) => value.text),
-    ).toEqual(['1', '2']);
+    const depth = spread?.locals.find((row) => row.name === 'depth');
+    expect(depth?.calls).toBe(2);
+    expect(depth?.values.map((value) => value.text)).toEqual(['1', '2']);
   });
 
   it('returns null for an abandoned walk, and never memoises it', async () => {
@@ -254,7 +256,8 @@ describe('aggregateVariablesFor on this', () => {
 
     const spread = await aggregateVariablesFor(store, frames, index, { yieldSlice });
 
-    expect(spread?.frames).toBe(2);
+    // Both frames were read: the second one's local is the only one that holds it.
+    expect(spread?.locals.find((row) => row.name === 'count')?.calls).toBe(1);
     expect(spread?.thisType).toBeNull();
   });
 });

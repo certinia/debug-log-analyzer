@@ -6,6 +6,7 @@
 import { describe, expect, it } from '@jest/globals';
 import { parse } from 'apex-log-parser';
 
+import { MAX_MARKED_PER_VALUE } from '../../core/log/aggregateVariables.js';
 import { logStoreFor, type LogStore } from '../../core/log/LogStore.js';
 
 // Avoid the heavy CodeBlock import chain (vscode-elements, soql formatter). The
@@ -14,7 +15,7 @@ jest.mock('../CodeBlock.js', () => ({}));
 // The chevron is a vscode-icon, and its connectedCallback throws under jsdom.
 jest.mock('#vscode-elements/vscode-icon.js', () => ({}));
 
-import type { VariablesDetail } from '../VariablesDetail.js';
+import { STATICS_NOTE, type VariablesDetail } from '../VariablesDetail.js';
 import '../VariablesDetail.js';
 
 const FINEST = '64.0 APEX_CODE,FINEST;APEX_PROFILING,NONE;DB,NONE\n';
@@ -852,8 +853,8 @@ describe('VariablesDetail comparing a merged row', () => {
     const seen = locates(el);
     const calls = framesOf(el.logStore!, 'ns.Svc.run()');
 
-    values[0]?.dispatchEvent(new MouseEvent('mouseenter', { bubbles: true }));
-    values[0]?.dispatchEvent(new MouseEvent('mouseleave', { bubbles: true }));
+    values[0]?.dispatchEvent(new MouseEvent('pointerenter', { bubbles: true }));
+    values[0]?.dispatchEvent(new MouseEvent('pointerleave', { bubbles: true }));
 
     // `false` was the second and third calls; leaving hands the mark back.
     expect(seen).toEqual([
@@ -872,6 +873,44 @@ describe('VariablesDetail comparing a merged row', () => {
 
     // `true` was the first call. Sticky, and no selection rides with it.
     expect(seen).toEqual([{ eventIndexes: [calls[0]], sticky: true }]);
+  });
+
+  // A value is often a scalar with nothing to open, so a keyboard that only
+  // toggled could never reach the mark at all.
+  it('marks the calls that held a value from the keyboard', async () => {
+    const el = await compared();
+    await valuesOf(el, 'retry');
+    const seen = locates(el);
+    const calls = framesOf(el.logStore!, 'ns.Svc.run()');
+
+    // Opening `retry` left the tab stop on it, so one step down lands on its
+    // first value.
+    tree(el).dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true }));
+    await el.updateComplete;
+    tree(el).dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+    await el.updateComplete;
+
+    // `false` was the second and third calls, and it leads on count.
+    expect(seen).toEqual([{ eventIndexes: [calls[1], calls[2]], sticky: true }]);
+  });
+
+  // Every other cap in this section says so; a mark that stops short while the
+  // count beside it says thousands would read as a bug in the mark.
+  it('says a value holds more calls than its mark names', async () => {
+    const many = Array.from({ length: MAX_MARKED_PER_VALUE + 5 }, (_, at) =>
+      call(1000 + at * 100, 'true'),
+    ).join('');
+    const el = await compared(many);
+
+    expect(notes(el)).toContain(
+      `A value held by over ${MAX_MARKED_PER_VALUE} calls marks that many of them.`,
+    );
+  });
+
+  it('says nothing of the kind where every call is marked', async () => {
+    const el = await compared();
+
+    expect(notes(el).join(' ')).not.toContain('marks that many');
   });
 
   // Counts alone mislead: an unbroken run is a state the calls were in.
@@ -916,9 +955,7 @@ describe('VariablesDetail comparing a merged row', () => {
   it('says the statics are not compared', async () => {
     const el = await compared();
 
-    expect(notes(el)).toContain(
-      'Statics are not compared: a static lives for the whole transaction, so it moves for reasons this row does not own.',
-    );
+    expect(notes(el)).toContain(STATICS_NOTE);
   });
 
   it('does not say the statics are not compared for a single frame', async () => {
@@ -926,6 +963,36 @@ describe('VariablesDetail comparing a merged row', () => {
 
     const el = await mount(store, { eventIndex: indexOf(store, 'ns.Outer.run()') });
 
-    expect(notes(el).join(' ')).not.toContain('Statics are not compared');
+    expect(notes(el)).not.toContain(STATICS_NOTE);
+  });
+
+  // A row's frames are its own scope; its calls are a level below it. A bottom-up
+  // caller row that ran once comes down to one frame, and reading the calls it
+  // counts would show the called method's scope under the caller's name.
+  it('reads its own frame where a merged row comes down to one', async () => {
+    const store = logOf(
+      '09:18:22.6 (1000)|METHOD_ENTRY|[1]|01p|ns.Outer.run()\n' +
+        '09:18:22.6 (1010)|VARIABLE_ASSIGNMENT|[2]|outerLocal|"here"\n' +
+        '09:18:22.6 (1020)|METHOD_ENTRY|[3]|01p|ns.Svc.query()\n' +
+        '09:18:22.6 (1030)|VARIABLE_ASSIGNMENT|[4]|inner|1\n' +
+        '09:18:22.6 (1040)|METHOD_EXIT|[3]|ns.Svc.query()\n' +
+        '09:18:22.6 (1050)|METHOD_ENTRY|[3]|01p|ns.Svc.query()\n' +
+        '09:18:22.6 (1060)|VARIABLE_ASSIGNMENT|[4]|inner|2\n' +
+        '09:18:22.6 (1070)|METHOD_EXIT|[3]|ns.Svc.query()\n' +
+        '09:18:22.6 (1080)|METHOD_EXIT|[1]|ns.Outer.run()\n',
+    );
+    const calls = store.log.eventsById
+      .filter((event) => event.isParent && event.text === 'ns.Svc.query()')
+      .map((event) => event.eventIndex);
+
+    // What a bottom-up caller row hands over: the calls it counts, and the one
+    // frame that made them.
+    const el = await mount(store, {
+      eventIndex: calls[0]!,
+      frames: [indexOf(store, 'ns.Outer.run()')],
+    });
+
+    expect(rowNames(el)).toContain('outerLocal');
+    expect(rowNames(el)).not.toContain('inner');
   });
 });

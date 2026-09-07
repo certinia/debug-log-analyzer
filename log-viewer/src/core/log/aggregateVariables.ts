@@ -36,13 +36,21 @@ export const MAX_VALUES_PER_NAME = 1_000;
  * lists partition the calls, so this only stops one value of a two-valued name
  * from holding the whole selection.
  */
-const MAX_MARKED_PER_VALUE = 200;
+export const MAX_MARKED_PER_VALUE = 200;
+
+/** What a compared frame is read with, allocated once: a wide selection reads
+ *  tens of thousands of frames. Statics are not compared, and the rows are
+ *  grouped by name here, so the per-frame sort is thrown away. */
+const AS_READ = { statics: false, sorted: false } as const;
 
 /** One value a name held, and which calls held it. */
 export interface SpreadValue {
   /** The log's own text, as it wrote it. */
   text: string;
   address: string | null;
+  /** The address of the object the value *is*, where the log named one beside
+   *  the text. What opens the value into the fields the index recorded for it. */
+  objectAddress: string | null;
   /** How many of the read calls held it. */
   calls: number;
   /** The calls that held it, in the order the selection lists them, for the
@@ -72,8 +80,6 @@ export interface VariableSpread {
 }
 
 export interface AggregateVariables {
-  /** Frames read. */
-  frames: number;
   locals: VariableSpread[];
   /** The class owning the fields, where every call agreed on one. */
   thisType: string | null;
@@ -83,23 +89,24 @@ export interface AggregateVariables {
   /** A frame read ran past the end of a truncated log, so a missing write may be
    *  unrecorded rather than absent. */
   truncated: boolean;
+  /** Some name held more distinct values than the cap, so a spread is not all of
+   *  what the calls held. Read here rather than rescanned per render. */
+  capped: boolean;
 }
 
-/** One value while it is still being gathered, with where its last call sat so
- *  a break in the run can be seen. */
-interface GatheredValue extends SpreadValue {
+/** One value while it is still being gathered, beside where its last call sat
+ *  so a break in the run can be seen. */
+interface GatheredValue {
+  value: SpreadValue;
   /** Which call held it last, as an ordinal into the calls read. */
   previous: number;
 }
 
-/** A spread while it is still being gathered, values keyed by their identity. */
+/** A spread while it is still being gathered: the row it will ship, with the
+ *  values keyed by identity until they can be ordered. */
 interface Gathering {
-  name: string;
-  declaredType: string | null;
+  row: VariableSpread;
   byValue: Map<string, GatheredValue>;
-  calls: number;
-  unassigned: number;
-  capped: boolean;
 }
 
 /**
@@ -120,6 +127,7 @@ async function compareFrames(
   const classes = new Set<string>();
   let read = 0;
   let truncated = false;
+  let capped = false;
 
   // Every frame, with no `outermostEvents` dedupe — deliberately, and unlike
   // every other multi-frame read here. A recursive frame's nested call is its
@@ -131,7 +139,7 @@ async function compareFrames(
     if (!(await tick())) {
       return null;
     }
-    const frame = frameVariablesFor(store, eventIndex, index, { statics: false });
+    const frame = frameVariablesFor(store, eventIndex, index, AS_READ);
     if (!frame) {
       continue;
     }
@@ -151,8 +159,10 @@ async function compareFrames(
     }
   }
 
+  for (const held of [...locals.values(), ...fields.values()]) {
+    capped ||= held.row.capped;
+  }
   return {
-    frames: read,
     locals: spreadsOf(locals),
     // Only where every call agreed: two classes under one row means the reading
     // is not one class's.
@@ -160,6 +170,7 @@ async function compareFrames(
     objects: objects.size,
     fields: spreadsOf(fields),
     truncated,
+    capped,
   };
 }
 
@@ -182,20 +193,25 @@ function hold(
   let held = into.get(row.name);
   if (!held) {
     held = {
-      name: row.name,
-      declaredType: row.declaredType,
+      row: {
+        name: row.name,
+        declaredType: null,
+        values: [],
+        calls: 0,
+        unassigned: 0,
+        capped: false,
+      },
       byValue: new Map(),
-      calls: 0,
-      unassigned: 0,
-      capped: false,
     };
     into.set(row.name, held);
   }
-  held.calls++;
-  held.declaredType ??= row.declaredType;
+  const spread = held.row;
+  spread.calls++;
+  // The first call to declare it names the type; a later one repeats it.
+  spread.declaredType ??= row.declaredType;
   if (!row.assigned) {
     // In scope at its default, with no value the log recorded.
-    held.unassigned++;
+    spread.unassigned++;
     return;
   }
   // The log's own text is the identity: two calls that named the same address
@@ -203,27 +219,31 @@ function hold(
   const identity = row.value || row.address || '';
   const seen = held.byValue.get(identity);
   if (seen) {
-    seen.calls++;
+    const value = seen.value;
+    value.calls++;
     // A call that does not follow the last one starts a run of its own.
     if (ordinal !== seen.previous + 1) {
-      seen.runs++;
+      value.runs++;
     }
     seen.previous = ordinal;
-    if (seen.at.length < MAX_MARKED_PER_VALUE) {
-      seen.at.push(at);
+    if (value.at.length < MAX_MARKED_PER_VALUE) {
+      value.at.push(at);
     }
   } else if (held.byValue.size < MAX_VALUES_PER_NAME) {
     held.byValue.set(identity, {
-      text: row.value,
-      address: row.address,
-      calls: 1,
-      at: [at],
-      runs: 1,
-      cut,
+      value: {
+        text: row.value,
+        address: row.address,
+        objectAddress: row.objectAddress,
+        calls: 1,
+        at: [at],
+        runs: 1,
+        cut,
+      },
       previous: ordinal,
     });
   } else {
-    held.capped = true;
+    spread.capped = true;
   }
 }
 
@@ -235,22 +255,18 @@ function hold(
  * and never wrote.
  */
 function spreadsOf(held: ReadonlyMap<string, Gathering>): VariableSpread[] {
-  return [...held.values()]
-    .map((entry) => ({
-      name: entry.name,
-      declaredType: entry.declaredType,
-      values: [...entry.byValue.values()]
-        .sort((left, right) => right.calls - left.calls)
-        // `previous` was the walk's own bookkeeping, never a reading.
-        .map(({ previous: _previous, ...value }) => value),
-      calls: entry.calls,
-      unassigned: entry.unassigned,
-      capped: entry.capped,
-    }))
-    .sort(
-      (left, right) =>
-        right.values.length - left.values.length || left.name.localeCompare(right.name),
-    );
+  const spreads: VariableSpread[] = [];
+  for (const { row, byValue } of held.values()) {
+    for (const { value } of byValue.values()) {
+      row.values.push(value);
+    }
+    row.values.sort((left, right) => right.calls - left.calls);
+    spreads.push(row);
+  }
+  return spreads.sort(
+    (left, right) =>
+      right.values.length - left.values.length || left.name.localeCompare(right.name),
+  );
 }
 
 /** Memo of the walk: the log never changes after parse, so each row's frames are

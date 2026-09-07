@@ -434,6 +434,7 @@ describe('toSpreadRows', () => {
       values: values.map(([text, calls], index) => ({
         text,
         address: null,
+        objectAddress: null,
         calls,
         at: [100 + index],
         runs: 1,
@@ -447,7 +448,6 @@ describe('toSpreadRows', () => {
   }
 
   const aggregate: AggregateVariables = {
-    frames: 340,
     locals: [
       spread('accountId', [
         ['"001A"', 200],
@@ -463,6 +463,7 @@ describe('toSpreadRows', () => {
     objects: 1,
     fields: [spread('cache', [['{}', 340]])],
     truncated: false,
+    capped: false,
   };
 
   const closed = (_id: string, byDefault: boolean): boolean => byDefault;
@@ -475,10 +476,15 @@ describe('toSpreadRows', () => {
       ['local', true, 3],
       ['this', false, 1],
     ]);
-    expect(rows.filter((r) => r.kind === 'spread').map((r) => r.id)).toEqual([
-      'local/accountId',
-      'local/retry',
-      'local/batchSize',
+    // A name the calls disagreed on holds its values; one they agreed on is the value.
+    expect(
+      rows
+        .filter((r) => r.kind === 'spread' || r.kind === 'spread-many')
+        .map((r) => [r.id, r.kind]),
+    ).toEqual([
+      ['local/accountId', 'spread-many'],
+      ['local/retry', 'spread-many'],
+      ['local/batchSize', 'spread'],
     ]);
   });
 
@@ -486,11 +492,11 @@ describe('toSpreadRows', () => {
   it('keeps the order the comparison put the names in', () => {
     const rows = toSpreadRows(aggregate, closed);
 
-    expect(rows.filter((r) => r.kind === 'spread').map((r) => r.row.name)).toEqual([
-      'accountId',
-      'retry',
-      'batchSize',
-    ]);
+    expect(
+      rows
+        .filter((r) => r.kind === 'spread' || r.kind === 'spread-many')
+        .map((r) => (r.kind === 'spread' || r.kind === 'spread-many' ? r.row.name : '')),
+    ).toEqual(['accountId', 'retry', 'batchSize']);
   });
 
   it('opens a name the calls disagreed on into its distinct values', () => {
@@ -511,7 +517,7 @@ describe('toSpreadRows', () => {
 
     const held = rows.find((r) => r.id === 'local/batchSize');
     expect(held?.expandable).toBe(false);
-    expect(held?.kind === 'spread' && held.shown?.raw).toBe('200');
+    expect(held?.kind === 'spread' && held.raw).toBe('200');
   });
 
   it('names the class and the objects the calls ran on', () => {
@@ -579,9 +585,27 @@ describe('toSpreadRows', () => {
     });
 
     const row = rows.find((r) => r.id === 'local/ref');
-    expect(row?.kind === 'spread' && row.shown?.raw).toBe('{"n":1}');
+    expect(row?.kind === 'spread' && row.raw).toBe('{"n":1}');
     expect(row?.expandable).toBe(true);
     expect(asked).toContain(42);
+  });
+
+  // The log names the object beside a serialised value as well as in place of
+  // one, and the fields it recorded elsewhere are what opens it.
+  it("opens a serialised value into the index's fields for its object", () => {
+    const held = spread('opts', [['{"name":"A"}', 340]]);
+    held.values[0]!.objectAddress = '0xf00';
+    held.values[0]!.cut = 7;
+
+    const rows = toSpreadRows({ ...aggregate, locals: [held] }, openAll, (cut) => ({
+      fields: (address) => (address === '0xf00' && cut === 7 ? [row('tries', '3')] : []),
+      classOf: (address) => (address === '0xf00' ? 'ns.Options' : null),
+    }));
+
+    const opts = rows.find((r) => r.id === 'local/opts');
+    expect(opts?.expandable).toBe(true);
+    expect(opts?.kind === 'spread' && opts.className).toBe('ns.Options');
+    expect(rows.some((r) => r.id === 'local/opts/tries')).toBe(true);
   });
 
   it('says the calls hold no locals rather than showing an empty group', () => {
