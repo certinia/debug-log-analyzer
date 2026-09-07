@@ -122,11 +122,12 @@ export const COLUMN_OVERRIDE_SECTIONS = [
 ] as const;
 
 /**
- * The Database column-view presets persist privately in globalState (they are
- * not registered `lana.*` settings). `callTree.columnView` stays a public
- * setting.
+ * The column-view presets are the view a table was last left in — remembered UI
+ * state, not a preference — so they persist privately in globalState rather than
+ * as registered `lana.*` settings.
  */
 export const COLUMN_VIEW_SECTIONS = [
+  'callTree.columnView',
   'database.soql.columnView',
   'database.dml.columnView',
   'database.sosl.columnView',

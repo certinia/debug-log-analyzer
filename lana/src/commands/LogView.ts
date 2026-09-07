@@ -224,6 +224,7 @@ export class LogView {
     config.database.dml.columnOverrides = overrides['database.dml.columnOverrides'] ?? {};
     config.database.sosl.columnOverrides = overrides['database.sosl.columnOverrides'] ?? {};
     const columnViews = getColumnViews(context.context.globalState);
+    config.callTree.columnView = columnViews['callTree.columnView'] ?? 'General';
     config.database.soql.columnView = columnViews['database.soql.columnView'] ?? 'General';
     config.database.dml.columnView = columnViews['database.dml.columnView'] ?? 'General';
     config.database.sosl.columnView = columnViews['database.sosl.columnView'] ?? 'General';
