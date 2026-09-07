@@ -173,6 +173,42 @@ describe('frameVariablesFor', () => {
 
     expect(frameVariablesFor(store, 99_999, null)).toBeNull();
   });
+
+  // A frame asked about once is scanned straight from its children, bounded at
+  // the cut; a frame asked about twice is read into a memo. Both must answer the
+  // same, or looking at a row a second time would change it.
+  it('answers the same however many times a frame has been read', () => {
+    const { log, store } = storeOf(
+      '09:18:22.6 (1000)|METHOD_ENTRY|[1]|01p|ns.Svc.run()\n' +
+        '09:18:22.6 (1010)|VARIABLE_SCOPE_BEGIN|[2]|tries|Integer|true|false\n' +
+        '09:18:22.6 (1020)|VARIABLE_ASSIGNMENT|[2]|tries|1\n' +
+        '09:18:22.6 (1030)|VARIABLE_ASSIGNMENT|[3]|this.name|"A"|0xaaa\n' +
+        '09:18:22.6 (1040)|VARIABLE_ASSIGNMENT|[2]|tries|2\n' +
+        '09:18:22.6 (1050)|METHOD_EXIT|[1]|ns.Svc.run()\n',
+    );
+    const at = (text: string): number => {
+      const found = log.eventsById.find((event) => event.logLine?.includes(text));
+      if (!found) {
+        throw new Error(`no line holding ${text}`);
+      }
+      return found.eventIndex;
+    };
+    const read = (eventIndex: number): string =>
+      JSON.stringify(frameVariablesFor(store, eventIndex, null));
+
+    const early = at('this.name');
+    const first = read(early);
+    // The whole frame, which is what earns the memo.
+    read(at('ns.Svc.run()'));
+    const again = read(early);
+
+    // As it stood at that line: the first write, and the field beside it.
+    expect(JSON.parse(first).locals).toEqual([
+      expect.objectContaining({ name: 'tries', value: '1' }),
+    ]);
+    expect(JSON.parse(first).fields).toEqual([expect.objectContaining({ name: 'name' })]);
+    expect(again).toBe(first);
+  });
 });
 
 describe('VariableIndex', () => {
