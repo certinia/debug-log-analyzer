@@ -47,10 +47,12 @@ export type LanaSettings = {
   inspector: {
     position: 'left' | 'right' | 'bottom';
     size: number;
-    /** Collapsed sections, keyed by section id — shared by every tab. */
+    /** Collapsed sections, keyed `<source>:<scope>:<section id>`. */
     collapsed: Record<string, boolean>;
-    /** Pane sizes (px, used as flex weights), keyed `<orientation>:<section id>`. */
-    paneSizes: Record<string, number>;
+    /** The order the user arranged each list in, keyed `<source>:<scope>`. */
+    sectionOrder: Record<string, string[]>;
+    /** The sections a list hides, keyed like `collapsed`. */
+    hiddenSections: Record<string, boolean>;
     /** Last open/closed state; `null` means never toggled, so it may auto-open. */
     visible: boolean | null;
   };

@@ -49,7 +49,8 @@ export interface Config {
     size: number;
     // The rest is private globalState (see INSPECTOR_STATE_SECTIONS), not settings.
     collapsed: Record<string, boolean>;
-    paneSizes: Record<string, number>;
+    sectionOrder: Record<string, string[]>;
+    hiddenSections: Record<string, boolean>;
     visible: boolean | null;
   };
 }
@@ -134,14 +135,16 @@ export const COLUMN_VIEW_SECTIONS = [
 ] as const;
 
 /**
- * The inspector's layout state (which sections are collapsed, their sizes, the
- * call tree's view mode, whether the panel is open) is remembered UI state
+ * The inspector's layout state (which sections are collapsed, which it hides,
+ * the order they are in, whether the panel is open) is remembered UI state
  * rather than a preference, so it persists in globalState. Dock position and
- * size stay public `lana.inspector.*` settings.
+ * size stay public `lana.inspector.*` settings. Section sizes are remembered
+ * nowhere: a section takes the space its content and the panel allow.
  */
 export const INSPECTOR_STATE_SECTIONS = [
   'inspector.collapsed',
-  'inspector.paneSizes',
+  'inspector.sectionOrder',
+  'inspector.hiddenSections',
   'inspector.visible',
 ] as const;
 
@@ -153,12 +156,16 @@ export const PRIVATE_SECTIONS = [
 ] as const;
 
 type ColumnOverrides = Record<string, string[]>;
-type InspectorState = Pick<Config['inspector'], 'collapsed' | 'paneSizes' | 'visible'>;
+type InspectorState = Pick<
+  Config['inspector'],
+  'collapsed' | 'sectionOrder' | 'hiddenSections' | 'visible'
+>;
 
 export function getInspectorState(globalState: Memento): InspectorState {
   return {
     collapsed: globalState.get<Record<string, boolean>>('inspector.collapsed', {}),
-    paneSizes: globalState.get<Record<string, number>>('inspector.paneSizes', {}),
+    sectionOrder: globalState.get<Record<string, string[]>>('inspector.sectionOrder', {}),
+    hiddenSections: globalState.get<Record<string, boolean>>('inspector.hiddenSections', {}),
     visible: globalState.get<boolean | null>('inspector.visible', null),
   };
 }

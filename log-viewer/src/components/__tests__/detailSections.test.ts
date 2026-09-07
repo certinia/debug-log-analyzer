@@ -65,8 +65,14 @@ describe('buildDetailSections', () => {
     ]);
     // The call tree gets the most room, so it is the section worth reading.
     expect(sections.find((s) => s.id === 'calltree')?.weight).toBe(4);
-    // The vitals are a fixed set of figures: they take their own height only.
-    expect(sections.find((s) => s.id === 'vitals')?.fit).toBe('content');
+    // The figures about the frame take a steady height, so walking the selection
+    // does not resize the stack under the reader.
+    expect(sections.find((s) => s.id === 'vitals')?.height).toBe('md');
+    // The variables have no natural size, so they take a share and scroll.
+    expect(sections.find((s) => s.id === 'variables')?.weight).toBe(2);
+    // Asked of a frame it empties while the figures are added up, so it keeps a
+    // steady height rather than flickering on every step.
+    expect(sections.find((s) => s.id === 'namespace-time')?.height).toBe('sm');
   });
 
   it('delegates a database statement to the richer database sections', async () => {
@@ -291,6 +297,10 @@ describe('buildDetailSections', () => {
     expect(sections.find((s) => s.id === 'calltree')?.weight).toBe(4);
     expect(sections.find((s) => s.id === 'calltree')?.fit ?? 'fill').toBe('fill');
     expect(sections.find((s) => s.id === 'governor-trends')?.fit).toBe('content');
+    // Worked out once for the whole log, so this one is snug rather than steady:
+    // the same section takes a height only when it answers about a frame.
+    expect(sections.find((s) => s.id === 'namespace-time')?.fit).toBe('content');
+    expect(sections.find((s) => s.id === 'namespace-time')?.height).toBeUndefined();
     // The tab draws the log top down, so the tree opens on where the time went.
     const tree = rendered(sections, 'calltree', 'call-tree-detail') as CallTreeDetail;
     expect(tree.sourceView).toBe('callees');

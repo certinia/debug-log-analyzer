@@ -33,7 +33,11 @@ It docks to the **right**, **left** or **bottom**, resizes by dragging its edge,
 - **Call tree** – **Time Order** and **Aggregated** run from the log root through the selection's callers into what ran inside it; **Bottom-Up** ranks what ran inside it by self time. A caller holds only the time that reached the selection, so the tree reads 100% down to it and everything below is a share of it.
 - **SOQL issues** – SOQL only: optimization tips for the query.
 
-Collapse a section by clicking its header, drag a divider to resize two of them, double-click a divider to restore the default sizes. It's one panel, so your layout follows you from tab to tab.
+Collapse a section by clicking its header. Drag a header to reorder the stack, or press `Alt+Up` / `Alt+Down` on it. Right-click a header to choose which sections show, or to reset the list. Each list keeps its own choices — every tab, and **Detail** apart from **Summary** — because one section answers a different question in each.
+
+Sections that read the whole log size themselves to their content and the room there is. The ones that answer about a selection do not: **Details** and **Self time by namespace** keep a steady height, and **Variables**, **Call stack**, **Call tree** and **Findings** share what is left. Every one of those is a share of the panel, so docking wider or taller gives each section more room. So stepping from one frame to the next never resizes the stack — a section with more to say scrolls inside instead.
+
+Drag a divider to resize: the sections on the other side give up room in turn, each down to the same small minimum, and the divider follows the pointer until they are all there. Double-click a divider to hand back the sizes of the two sections beside it, or use **Reset Sections** for the whole stack. Sizes are not remembered: a size set for one log is the wrong one for the next.
 
 ### Summary
 
