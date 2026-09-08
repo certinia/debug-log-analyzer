@@ -192,9 +192,21 @@ function tabStop(el: VariablesDetail): string | null {
   return el.shadowRoot?.querySelector('[tabindex="0"]')?.getAttribute('data-id') ?? null;
 }
 
-async function press(el: VariablesDetail, key: string): Promise<void> {
-  tree(el).dispatchEvent(new KeyboardEvent('keydown', { key, bubbles: true }));
+/** Returns the event, so a caller can read back whether the tree consumed it. */
+async function press(
+  el: VariablesDetail,
+  key: string,
+  options: Partial<KeyboardEventInit> = {},
+): Promise<KeyboardEvent> {
+  const event = new KeyboardEvent('keydown', {
+    key,
+    bubbles: true,
+    cancelable: true,
+    ...options,
+  });
+  tree(el).dispatchEvent(event);
   await el.updateComplete;
+  return event;
 }
 
 describe('VariablesDetail groups', () => {
@@ -565,6 +577,54 @@ describe('VariablesDetail keyboard', () => {
     await press(el, 'Enter');
 
     expect(treeRows(el)[0]?.getAttribute('aria-expanded')).toBe('false');
+  });
+});
+
+describe('VariablesDetail keyboard, key repeat', () => {
+  it('holds a row where a held Enter left it, rather than flapping', async () => {
+    const store = logOf(FRAME);
+    const el = await mount(store, { eventIndex: indexOf(store, 'ns.Outer.run()') });
+
+    await press(el, 'Enter');
+    await press(el, 'Enter', { repeat: true });
+    const afterEnter = treeRows(el)[0]?.getAttribute('aria-expanded');
+    await press(el, ' ', { repeat: true });
+
+    expect(afterEnter).toBe('false');
+    expect(treeRows(el)[0]?.getAttribute('aria-expanded')).toBe('false');
+  });
+
+  it('leaves a group closed that a held star would re-open', async () => {
+    const store = logOf(FRAME);
+    const el = await mount(store, { eventIndex: indexOf(store, 'ns.Outer.run()') });
+    const local = () => treeRows(el).find((row) => row.dataset.id === 'local');
+
+    // Local starts open, and holds the tab stop, so Enter closes it.
+    await press(el, 'Enter');
+    await press(el, '*', { repeat: true });
+
+    expect(local()?.getAttribute('aria-expanded')).toBe('false');
+  });
+
+  it('keeps the key consumed on a suppressed repeat', async () => {
+    const store = logOf(FRAME);
+    const el = await mount(store, { eventIndex: indexOf(store, 'ns.Outer.run()') });
+
+    const event = await press(el, 'Enter', { repeat: true });
+
+    expect(event.defaultPrevented).toBe(true);
+  });
+
+  it('walks on every repeat, so holding an arrow scrubs', async () => {
+    const store = logOf(FRAME);
+    const el = await mount(store, { eventIndex: indexOf(store, 'ns.Outer.run()') });
+
+    await press(el, 'ArrowDown');
+    const second = tabStop(el);
+    await press(el, 'ArrowDown', { repeat: true });
+
+    expect(second).not.toBe('local');
+    expect(tabStop(el)).not.toBe(second);
   });
 });
 
