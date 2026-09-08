@@ -38,13 +38,7 @@ import dataGridStyles from '../tabulator/style/DataGrid.scss';
 import './ContextMenu.js';
 import type { ContextMenu } from './ContextMenu.js';
 import { dispatchInspectorLocate, dispatchInspectorReveal } from './inspectorReveal.js';
-import {
-  LOCATED_ROW_CLASS,
-  LocatedRowIds,
-  LocatedRowMarker,
-  rowId,
-  rowIndexStamper,
-} from './locatedRow.js';
+import { LocatedRowIds, LocatedRowMarker, rowId, rowIndexStamper } from './locatedRow.js';
 import { PANEL_ROW_MENU_ITEMS, runPanelRowAction } from './panelRowMenu.js';
 import {
   buildScopedCallTree,
@@ -368,10 +362,6 @@ export class CallTreeDetail extends LitElement {
         white-space: nowrap;
         overflow: hidden;
         text-overflow: ellipsis;
-      }
-      /* The frame under the pointer in the tab on screen. */
-      .table-host .tabulator-row.${unsafeCSS(LOCATED_ROW_CLASS)} {
-        background-color: var(--lana-row-hover-bg);
       }
     `,
   ];
