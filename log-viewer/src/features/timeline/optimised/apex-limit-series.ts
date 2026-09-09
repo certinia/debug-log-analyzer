@@ -50,27 +50,6 @@ const APEX_METRICS: Map<keyof Limits, HeatStripMetric> = new Map([
   ],
 ]);
 
-/**
- * Standard synchronous Apex governor limits, used as a fallback so a metric can render from
- * granular usage alone when the log has no cumulative limit event. Any limit reported by the log
- * (LIMIT_USAGE_FOR_NS / LIMIT_USAGE / flow) overrides these.
- */
-const DEFAULT_LIMITS = new Map<string, number>([
-  ['soqlQueries', 100],
-  ['queryRows', 50000],
-  ['soslQueries', 20],
-  ['dmlStatements', 150],
-  ['publishImmediateDml', 150],
-  ['dmlRows', 10000],
-  ['cpuTime', 10000],
-  ['heapSize', 6000000],
-  ['callouts', 100],
-  ['emailInvocations', 10],
-  ['futureCalls', 50],
-  ['queueableJobsAddedToQueue', 50],
-  ['mobileApexPushCalls', 10],
-]);
-
 /** Memo of {@link buildApexLimitTimeSeries} per log: the walk visits the full event
  *  tree, and the series feeds two surfaces — the metric strip and the inspector's
  *  governor trend charts — which must chart the same figures. */
@@ -98,7 +77,7 @@ export function apexLimitTimeSeries(apexLog: ApexLog): HeatStripTimeSeries {
  * `LIMIT_USAGE` / flow `*_LIMIT_USAGE` reports) add intermediate data points so the line
  * rises as usage happens rather than only at code-unit boundaries.
  *
- * @param apexLog - Parsed log providing cumulative snapshots, authoritative limits and the
+ * @param apexLog - Parsed log providing cumulative snapshots, the limits they report and the
  * event tree, which is walked in full for granular deltas.
  */
 function buildApexLimitTimeSeries(apexLog: ApexLog): HeatStripTimeSeries {
@@ -109,9 +88,11 @@ function buildApexLimitTimeSeries(apexLog: ApexLog): HeatStripTimeSeries {
 
   const observations: GranularObservation[] = [];
 
-  // Authoritative limit per metric = max limit reported by any cumulative snapshot, else the
-  // default. Fixed for the whole series so the "out of" total never flips (e.g. heap 6MB→12MB).
-  const metricLimits = new Map<string, number>(DEFAULT_LIMITS);
+  // The log is the only source of a limit: the highest one any cumulative snapshot reported, fixed
+  // for the whole series so the "out of" total never flips (a log can report both the synchronous
+  // and the asynchronous ceiling). A metric no snapshot named keeps limit 0 — its consumers scale it
+  // by its own peak rather than measure it against a number the log never gave.
+  const metricLimits = new Map<string, number>();
 
   // Cumulative snapshots — authoritative multi-metric correctives (transaction usage).
   for (const snapshot of apexLog.governorLimits.snapshots) {

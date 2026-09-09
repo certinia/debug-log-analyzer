@@ -21,6 +21,9 @@ const LIMITS = new Map<string, number>([
   ['heapSize', 6000000],
 ]);
 
+/** The fold targets ~500 points per metric per namespace; allow the rounding slack. */
+const POINT_BUDGET_CEILING = 520;
+
 const delta = (
   timestamp: number,
   metric: string,
@@ -67,13 +70,27 @@ describe('buildGovernorTimeSeries', () => {
     );
   });
 
-  it('does not emit a metric with no limit in the map', () => {
+  // The log is the only source of a limit, so a metric it never gave one for still belongs on the
+  // series — carrying limit 0, which its consumers read as "scale me by my own peak".
+  it('emits a metric the log reported no limit for, with limit 0', () => {
     const series = buildGovernorTimeSeries(
-      [delta(10, 'soqlQueries', 1)],
+      [delta(10, 'soqlQueries', 1), delta(20, 'soqlQueries', 1)],
       METRICS,
       new Map(), // no limits
     );
-    expect(series.events).toEqual([]);
+
+    expect(series.events.map((e) => e.values.get('soqlQueries')?.used)).toEqual([1, 2]);
+    expect(series.events.every((e) => e.values.get('soqlQueries')?.limit === 0)).toBe(true);
+  });
+
+  // Without a limit to size the coalescing threshold from, the metric's own total magnitude does
+  // it, so a high-frequency metric stays bounded instead of emitting a point per event.
+  it('bounds points from the observed magnitude when the log reported no limit', () => {
+    const heapDeltas = Array.from({ length: 4000 }, (_, i) => delta(i + 1, 'heapSize', 1000));
+    const series = buildGovernorTimeSeries(heapDeltas, METRICS, new Map());
+
+    expect(series.events.length).toBeLessThanOrEqual(POINT_BUDGET_CEILING);
+    expect(series.events[series.events.length - 1]?.values.get('heapSize')?.used).toBe(4_000_000);
   });
 
   it('corrects up to the cumulative snapshot and records the tracked divergence', () => {
