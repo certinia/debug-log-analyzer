@@ -73,7 +73,7 @@ import {
   rowFrames,
 } from '../../../components/locatedRow.js';
 import { InspectorEmphasis } from '../../../components/inspectorEmphasis.js';
-import { wireInspectorTab } from '../../../components/inspectorTab.js';
+import { revealFirstOf, wireInspectorTab } from '../../../components/inspectorTab.js';
 import { createTimeOrderTable } from './TimeOrderTable.js';
 
 /** Time Order keys its rows by event index; the grouped views key theirs by the
@@ -188,8 +188,10 @@ export class CalltreeView extends LitElement {
         }
       },
       // A picked row merges calls, so the mark shows all of them while the view
-      // moves to the first, as a pick of one frame does.
-      movesToMergedPick: true,
+      // moves to the first of them.
+      revealMerged: revealFirstOf((eventIndex, signal) =>
+        this._revealEventIndex(eventIndex, signal),
+      ),
     });
     document.addEventListener(CALLTREE_GO_TO_ROW, this._goToRowEvt);
     document.addEventListener('lv-find', this._findEvt);

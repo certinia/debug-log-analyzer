@@ -24,7 +24,6 @@ import type {
   EventNode,
   TimelineMarker,
   TreeNode,
-  ViewportPanAxes,
   ViewportState,
 } from '../../types/flamechart.types.js';
 import type { NavigationMaps } from '../../utils/tree-converter.js';
@@ -69,14 +68,12 @@ export interface SelectionOrchestratorCallbacks {
    * @param timestamp - Event start time in nanoseconds
    * @param duration - Event duration in nanoseconds
    * @param depth - Event depth in tree
-   * @param axes - Axes to center on; left out, only an off-screen frame moves the view
    * @returns Target offset { x, y } for animation
    */
   onCenterOnFrame: (
     timestamp: number,
     duration: number,
     depth: number,
-    axes?: ViewportPanAxes,
   ) => { x: number; y: number } | null;
 
   /**
@@ -432,10 +429,8 @@ export class SelectionOrchestrator<E extends EventNode = EventNode> {
   /**
    * Center viewport on the currently selected frame.
    * Uses smooth animation when navigating to off-screen frames.
-   *
-   * @param axes - Axes to center on; left out, only an off-screen frame moves the view
    */
-  public centerOnSelectedFrame(axes?: ViewportPanAxes): void {
+  public centerOnSelectedFrame(): void {
     const selectedNode = this.selectionNavigator?.getSelected();
     if (!selectedNode || !this.viewport) {
       return;
@@ -445,12 +440,7 @@ export class SelectionOrchestrator<E extends EventNode = EventNode> {
     const depth = selectedNode.depth ?? 0;
 
     // Request target offset calculation via callback
-    const targetOffset = this.callbacks.onCenterOnFrame(
-      event.timestamp,
-      event.duration,
-      depth,
-      axes,
-    );
+    const targetOffset = this.callbacks.onCenterOnFrame(event.timestamp, event.duration, depth);
 
     if (!targetOffset) {
       return;

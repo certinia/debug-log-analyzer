@@ -24,7 +24,11 @@ import { eventBus, type TimelineNavigateMode } from '../../../core/events/EventB
 import { SelectionEchoGuard } from '../../../core/events/SelectionEchoGuard.js';
 import { copyToClipboard } from '../../../core/utility/Clipboard.js';
 import { vscodeMessenger } from '../../../core/messaging/VSCodeExtensionMessenger.js';
-import { findEventByEventIndex, findEventByTimestamp } from '../../../core/utility/EventSearch.js';
+import {
+  findEventByEventIndex,
+  findEventByTimestamp,
+  type EventSearchResult,
+} from '../../../core/utility/EventSearch.js';
 import { goToRow } from '../../call-tree/navigation.js';
 import { formatCallStack, formatEventDetails } from '../../call-tree/utils/eventText.js';
 import { getTheme } from '../themes/ThemeSelector.js';
@@ -42,7 +46,11 @@ import {
 import type { SearchCursor } from '../types/search.types.js';
 import { InspectorEmphasis } from '../../../components/inspectorEmphasis.js';
 import { wireInspectorTab } from '../../../components/inspectorTab.js';
-import { revealPanAxes, toDetailSelection } from '../utils/detail-selection-sync.js';
+import {
+  revealTarget,
+  toDetailSelection,
+  type FramePlacement,
+} from '../utils/detail-selection-sync.js';
 import { extractExceptionMarkers, extractMarkers, noDataSpans } from '../utils/marker-utils.js';
 import { seekWindow } from '../utils/navigate-window.js';
 import { logEventToTreeAndRects } from '../utils/tree-converter.js';
@@ -57,6 +65,15 @@ interface ApexTimelineOptions extends TimelineOptions {
 /** The flame chart already draws the subtree top down, so the inspector answers
  *  a selection with where its time went. */
 const TIMELINE_VIEW = 'callees' as const;
+
+/** Where a found event sits, as the reveal policy reads it. */
+function placementOf(result: EventSearchResult): FramePlacement {
+  return {
+    timestamp: result.event.timestamp,
+    duration: result.event.duration.total,
+    depth: result.depth,
+  };
+}
 
 export class ApexLogTimeline {
   private flamechart: FlameChart;
@@ -221,6 +238,7 @@ export class ApexLogTimeline {
     this.inspectorUnsubscribe = wireInspectorTab('timeline', this.emphasis, {
       mark: (eventIndexes) => this.applyEmphasis(eventIndexes),
       reveal: (eventIndex) => this.selectFrameByEventIndex(eventIndex),
+      revealMerged: (eventIndexes) => this.panToNearestFrame(eventIndexes),
       clear: () => {
         // The chart reports the clear itself. Its own Escape, with the container
         // focused, consumes the key before this.
@@ -254,19 +272,37 @@ export class ApexLogTimeline {
     // run: the select inside it clears the mark, as any chart select does.
     this.pickEmphasis(eventIndex);
 
+    this.bringIntoView([placementOf(result)]);
+  }
+
+  /**
+   * Bring one of a merged row's frames into view, the one nearest what is on
+   * screen. Selects nothing: the row names no single frame, so its mark on all
+   * of them is what locates them.
+   */
+  private panToNearestFrame(eventIndexes: readonly number[]): void {
+    this.bringIntoView(this.resolveEvents(eventIndexes).map(placementOf));
+  }
+
+  /**
+   * Pan to whichever of `frames` the view should show, and only when it shows
+   * none of them already. Never zooms - a full focus would be too disruptive.
+   */
+  private bringIntoView(frames: readonly FramePlacement[]): void {
     const bounds = this.flamechart.getViewportManager()?.getBounds();
-    if (!bounds) {
-      return;
+    const target = bounds ? revealTarget(bounds, frames) : null;
+    if (target) {
+      const { timestamp, duration, depth } = target.frame;
+      this.flamechart.panToFrame(timestamp, duration, depth, target.axes);
     }
-    const axes = revealPanAxes(
-      bounds,
-      result.event.timestamp,
-      result.event.duration.total,
-      result.depth,
-    );
-    if (axes.time || axes.depth) {
-      this.flamechart.centerOnSelectedFrame(axes);
-    }
+  }
+
+  /** The events `eventIndexes` name, with their depths, skipping any the log lost. */
+  private resolveEvents(eventIndexes: readonly number[]): EventSearchResult[] {
+    const apexLog = this.apexLog;
+    return apexLog
+      ? eventIndexes.flatMap((eventIndex) => findEventByEventIndex(apexLog, eventIndex) ?? [])
+      : [];
   }
 
   /**
@@ -275,20 +311,9 @@ export class ApexLogTimeline {
    * it merges, so all of them light at once. Never selects, never pans.
    */
   private applyEmphasis(eventIndexes: readonly number[]): void {
-    const apexLog = this.apexLog;
-    if (!eventIndexes.length || !apexLog) {
-      this.flamechart.locateByEventNodes([]);
-      return;
-    }
-
-    const nodes: EventNode[] = [];
-    for (const eventIndex of eventIndexes) {
-      const result = findEventByEventIndex(apexLog, eventIndex);
-      if (result) {
-        nodes.push(this.toEventNode(result));
-      }
-    }
-    this.flamechart.locateByEventNodes(nodes);
+    this.flamechart.locateByEventNodes(
+      this.resolveEvents(eventIndexes).map((result) => this.toEventNode(result)),
+    );
   }
 
   /** Rest the emphasis on one frame, until something else picks or clears it. */

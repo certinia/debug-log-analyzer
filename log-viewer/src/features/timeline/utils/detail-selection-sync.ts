@@ -17,10 +17,12 @@ export function toDetailSelection(eventIndex: number | undefined): DetailSelecti
 
 /**
  * Which axes a reveal should centre the frame on, given what the view already
- * shows. A frame wider than the view keeps its place: it covers the screen
- * either way, so centring its midpoint would only lose the reader's bearings.
+ * shows. A frame spanning the view from edge to edge keeps its place: it fills
+ * the screen either way, so centring its midpoint would only lose the reader's
+ * bearings. One merely wider than the view still moves, or a frame showing a
+ * sliver at the edge would never be brought in.
  */
-export function revealPanAxes(
+function revealPanAxes(
   bounds: ViewportBounds,
   timestamp: number,
   duration: number,
@@ -28,11 +30,53 @@ export function revealPanAxes(
 ): ViewportPanAxes {
   const frameEnd = timestamp + duration;
   const fullyVisible = timestamp >= bounds.timeStart && frameEnd <= bounds.timeEnd;
-  const fits = duration <= bounds.timeEnd - bounds.timeStart;
-  const overlaps = frameEnd >= bounds.timeStart && timestamp <= bounds.timeEnd;
+  const fillsTheView = timestamp <= bounds.timeStart && frameEnd >= bounds.timeEnd;
 
   return {
-    time: !fullyVisible && (fits || !overlaps),
+    time: !fullyVisible && !fillsTheView,
     depth: depth < bounds.depthStart || depth > bounds.depthEnd,
   };
+}
+
+/** Where a frame sits, as the reveal policy reads it. */
+export interface FramePlacement {
+  timestamp: number;
+  duration: number;
+  depth: number;
+}
+
+/** The frame to bring into view, and the axes to centre it on. */
+export interface RevealTarget {
+  frame: FramePlacement;
+  axes: ViewportPanAxes;
+}
+
+/**
+ * Which frame a reveal should bring into view - of several, the one nearest the
+ * middle of what is on screen - or null when one of them is already there. A row
+ * that merges occurrences names no single frame, so the view moves without
+ * selecting: the mark on every occurrence is what says where they all are.
+ */
+export function revealTarget(
+  bounds: ViewportBounds,
+  frames: readonly FramePlacement[],
+): RevealTarget | null {
+  const middle = (bounds.timeStart + bounds.timeEnd) / 2;
+  let nearest: RevealTarget | null = null;
+  let shortest = Infinity;
+
+  for (const frame of frames) {
+    const axes = revealPanAxes(bounds, frame.timestamp, frame.duration, frame.depth);
+    if (!axes.time && !axes.depth) {
+      return null;
+    }
+
+    const distance = Math.abs(frame.timestamp + frame.duration / 2 - middle);
+    if (distance < shortest) {
+      shortest = distance;
+      nearest = { frame, axes };
+    }
+  }
+
+  return nearest;
 }
