@@ -636,6 +636,79 @@ describe('KeyboardHandler', () => {
     });
   });
 
+  describe('minimap commands (pointer over the minimap)', () => {
+    beforeEach(() => {
+      (callbacks.isInMinimapArea as jest.Mock).mockReturnValue(true);
+    });
+
+    it('should call each command once on a held key', () => {
+      dispatchKeyEvent('keydown', 'Home');
+      dispatchKeyEvent('keydown', 'Home', { repeat: true });
+      dispatchKeyEvent('keydown', 'End');
+      dispatchKeyEvent('keydown', 'End', { repeat: true });
+      // 0 and Escape are the same command, so a repeat of either is suppressed.
+      dispatchKeyEvent('keydown', '0');
+      dispatchKeyEvent('keydown', 'Escape', { repeat: true });
+
+      expect(callbacks.onMinimapJumpStart).toHaveBeenCalledTimes(1);
+      expect(callbacks.onMinimapJumpEnd).toHaveBeenCalledTimes(1);
+      expect(callbacks.onMinimapResetZoom).toHaveBeenCalledTimes(1);
+    });
+
+    // End is this area's alone: the main timeline ignores it, so a repeat that
+    // reported nothing prevented would mean the area handler never saw it.
+    it('should still prevent default on a repeated command', () => {
+      const event = dispatchKeyEvent('keydown', 'End', { repeat: true });
+
+      expect(event.defaultPrevented).toBe(true);
+    });
+
+    it('should pan and zoom the lens on every repeat', () => {
+      dispatchKeyEvent('keydown', 'ArrowLeft', { repeat: true });
+      dispatchKeyEvent('keydown', 'ArrowRight', { repeat: true });
+      dispatchKeyEvent('keydown', 'w', { repeat: true });
+
+      expect(callbacks.onMinimapPanViewport).toHaveBeenCalledTimes(2);
+      expect(callbacks.onMinimapZoom).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  describe('metric strip commands (pointer over the strip)', () => {
+    beforeEach(() => {
+      (callbacks.isInMetricStripArea as jest.Mock).mockReturnValue(true);
+    });
+
+    it('should call each command once on a held key', () => {
+      dispatchKeyEvent('keydown', 'Home');
+      dispatchKeyEvent('keydown', 'Home', { repeat: true });
+      dispatchKeyEvent('keydown', 'End');
+      dispatchKeyEvent('keydown', 'End', { repeat: true });
+      dispatchKeyEvent('keydown', '0');
+      dispatchKeyEvent('keydown', 'Escape', { repeat: true });
+
+      expect(callbacks.onMetricStripJumpStart).toHaveBeenCalledTimes(1);
+      expect(callbacks.onMetricStripJumpEnd).toHaveBeenCalledTimes(1);
+      expect(callbacks.onMetricStripResetZoom).toHaveBeenCalledTimes(1);
+    });
+
+    // End is this area's alone: the main timeline ignores it, so a repeat that
+    // reported nothing prevented would mean the area handler never saw it.
+    it('should still prevent default on a repeated command', () => {
+      const event = dispatchKeyEvent('keydown', 'End', { repeat: true });
+
+      expect(event.defaultPrevented).toBe(true);
+    });
+
+    it('should pan and zoom the strip on every repeat', () => {
+      dispatchKeyEvent('keydown', 'ArrowLeft', { repeat: true });
+      dispatchKeyEvent('keydown', 'ArrowRight', { repeat: true });
+      dispatchKeyEvent('keydown', 'w', { repeat: true });
+
+      expect(callbacks.onMetricStripPanViewport).toHaveBeenCalledTimes(2);
+      expect(callbacks.onMetricStripZoom).toHaveBeenCalledTimes(1);
+    });
+  });
+
   describe('key repeat on continuous controls', () => {
     it('should pan and zoom on every repeat, so holding a key scrubs', () => {
       dispatchKeyEvent('keydown', 'ArrowLeft', { repeat: true });

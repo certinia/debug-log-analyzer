@@ -818,10 +818,16 @@ export class VariablesDetail extends LitElement {
         // What a click does: mark the calls that held the value, and open the
         // row where it opens. A value is often a scalar with nothing to open,
         // so toggling alone leaves the mark out of a keyboard's reach.
-        this._pick(row);
+        // Fires once: a repeat would flap an expandable row open and shut.
+        if (!event.repeat) {
+          this._pick(row);
+        }
         break;
       case '*':
-        this._openAll(row.depth);
+        // Fires once: every row at this depth is open after the first press.
+        if (!event.repeat) {
+          this._openAll(row.depth);
+        }
         break;
       default:
         return;
