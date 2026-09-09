@@ -37,7 +37,7 @@ Collapse a section by clicking its header. Drag a header to reorder the stack, o
 
 Sections that read the whole log size themselves to their content, and to no more than an equal share of the panel — they grow back towards their content only as far as the other sections leave room, and scroll inside past that, so no one section can crowd the rest down to its minimum. The ones that answer about a selection do not: **Details** and **Self time by namespace** keep a steady height, and **Variables**, **Call stack**, **Call tree** and **Findings** share what is left. Every one of those is a share of the panel, so docking wider or taller gives each section more room. So stepping from one frame to the next never resizes the stack — a section with more to say scrolls inside instead.
 
-Drag a divider to resize: the sections on the other side give up room in turn, each down to the same small minimum, and the divider follows the pointer until they are all there. Double-click a divider to hand back the sizes of the two sections beside it, or use **Reset Sections** for the whole stack. Sizes are not remembered: a size set for one log is the wrong one for the next.
+Drag a divider to resize: the sections on the other side give up room in turn, each down to the same small minimum, and the divider follows the pointer until they are all there. A drag sets the size of every section, so the stack holds where you left it. Double-click a divider to hand back the sizes of the two sections beside it, or use **Reset Sections** for the whole stack. Sizes are not remembered: a size set for one log is the wrong one for the next.
 
 ### Summary
 

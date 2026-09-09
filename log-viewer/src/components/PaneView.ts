@@ -27,7 +27,7 @@ export interface PaneSection {
    * either, growing back towards its content only as far as the room the other
    * sections leave and scrolling inside beyond that. So no one section can take
    * the panel and hold every other one at its floor. Dragging its sash gives it
-   * whatever room the drag asks for; a double-click hands it back.
+   * whatever room the drag asks for.
    * A `'fill'` pane shares the remaining space by weight.
    *
    * Only for content that does not change with what the consumer is showing.
@@ -66,6 +66,9 @@ interface SashPane {
  * sections on one side of it and takes it from the other, nearest first: each
  * gives up room down to `--lana-pane-min` and then the next one does, so the
  * sash keeps following the pointer until the whole giving side is at its floor.
+ * A drag fixes the size of every open section, not only the two it moved:
+ * `layoutEpoch` is what hands the whole stack back, and a double-click on a
+ * sash re-splits the pair beside it.
  * Horizontal mode lays the sections side by side with resize-only sashes.
  *
  * Dragging a header — or `Alt+Arrow` on a focused one — reorders the stack. The
@@ -89,8 +92,8 @@ export class PaneView extends LitElement {
   @property({ type: Number })
   layoutEpoch = 0;
 
-  // Sizes a drag has given the panes it named (px), keyed by section id. The
-  // panel keeps them while it is open and never persists them: sections size
+  // Sizes a drag has given the panes (px), keyed by section id. The panel keeps
+  // them while it is open and never persists them: sections size
   // themselves from their content and the space there is, and a layout dragged
   // for one log is the wrong one for the next.
   @state()
@@ -116,7 +119,7 @@ export class PaneView extends LitElement {
     measured: Record<string, number>;
     start: number;
     /** The last delta applied, so a move that changes nothing renders nothing. */
-    delta?: number;
+    delta: number;
     /** The dragged sizes as the gesture found them, so a cancel puts them back. */
     weights: Record<string, number>;
   } | null = null;
@@ -346,6 +349,23 @@ export class PaneView extends LitElement {
     if (changed.has('orientation') || changed.has('layoutEpoch')) {
       this._weights = {};
     }
+    // A section that opens after a drag has no size of its own, and the panes
+    // holding pixels leave it no share to take — it would come up at its floor.
+    // So the stack goes back to sizing itself.
+    if (this._mixesSizes()) {
+      this._weights = {};
+    }
+  }
+
+  /**
+   * Whether some open section holds a dragged size while another has none. The
+   * two cannot be mixed: a size is taken out of the panel before the panes that
+   * share it are given anything.
+   */
+  private _mixesSizes(): boolean {
+    const open = this.sections.filter((section) => this._isOpen(section.id));
+    const sized = open.filter((section) => this._weights[section.id] !== undefined).length;
+    return sized > 0 && sized < open.length;
   }
 
   updated(): void {
@@ -730,6 +750,7 @@ export class PaneView extends LitElement {
       slackBelow: this._slack(below),
       measured: Object.fromEntries(panes.map((pane) => [pane.id, pane.size])),
       start: this._pointerPos(e),
+      delta: 0,
       weights: { ...this._weights },
     };
     sash.addEventListener('pointermove', this._onSashMove);
@@ -755,35 +776,18 @@ export class PaneView extends LitElement {
     }
     sash.delta = delta;
 
-    // Every open pane holds its measured size for the length of the gesture, so
-    // the bases add up to the panel and flexbox has nothing to shrink. Leave one
-    // sizing itself and its basis is its content — larger than it renders at once
-    // the panel is over-subscribed — so the whole stack would shrink and the
-    // boundary would lag the pointer. `_settleSash` lets the untouched ones go.
+    // Every open pane holds its measured size, through the gesture and after it,
+    // so the bases add up to the panel and flexbox has nothing to shrink. Leave
+    // one sizing itself and its basis is its content — larger than it renders at
+    // once the panel is over-subscribed — so the whole stack would shrink and the
+    // boundary would lag the pointer. Hand one back at the end and the room it
+    // holds becomes room the sized panes grow into, shrinking a section the drag
+    // never named. A double-click or `layoutEpoch` is what hands sizes back.
     const weights = { ...sash.weights, ...sash.measured };
     this._distribute(sash.above, delta, weights);
     this._distribute(sash.below, -delta, weights);
     this._weights = weights;
   };
-
-  /**
-   * Hands every pane the drag never moved back to sizing itself. Only the ones
-   * it did keep a size, so a content section elsewhere in the stack goes on
-   * fitting its content and a tier goes back to its token.
-   */
-  private _settleSash(): void {
-    const sash = this._sash;
-    if (!sash) {
-      return;
-    }
-    const weights = { ...this._weights };
-    for (const pane of [...sash.above, ...sash.below]) {
-      if (weights[pane.id] === pane.size && sash.weights[pane.id] === undefined) {
-        delete weights[pane.id];
-      }
-    }
-    this._weights = weights;
-  }
 
   private _slack(side: SashPane[]): number {
     return side.reduce((room, pane) => room + pane.size - pane.min, 0);
@@ -809,7 +813,11 @@ export class PaneView extends LitElement {
   // another element capturing): either way the gesture is over, or a later move
   // would resize with no button held.
   private _endSash = (e: PointerEvent) => {
-    this._settleSash();
+    // A gesture that ends where it began is not a drag: the sections it held for
+    // the drag go back to sizing themselves.
+    if (this._sash?.delta === 0) {
+      this._weights = this._sash.weights;
+    }
     this._teardownSash(e.currentTarget as HTMLElement, e.pointerId);
   };
 

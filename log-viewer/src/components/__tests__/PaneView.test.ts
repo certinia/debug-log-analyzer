@@ -304,7 +304,7 @@ describe('PaneView', () => {
     expect(sizing(el, 'b')).toBe('fill 0.8 80px');
   });
 
-  it('holds every pane at its measured size for the length of the drag', async () => {
+  it('holds every pane at its measured size, through the drag and after it', async () => {
     const el = await mountSections([
       { id: 'a', title: 'A', content: html`<div>A</div>`, fit: 'content' },
       { id: 'b', title: 'B', content: html`<div>B</div>` },
@@ -324,11 +324,12 @@ describe('PaneView', () => {
     handle.dispatchEvent(pointer('pointerup', 120));
     await el.updateComplete;
 
-    // The drag never moved it, so it goes back to fitting its content.
-    expect(sizing(el, 'a')).toBe('content');
+    // And keeps it: handing a pane back to sizing itself frees the room it holds
+    // to the panes the drag sized, which shrinks a section nobody dragged.
+    expect(sizing(el, 'a')).toBe('content 100px');
   });
 
-  it('leaves the panes away from the sash alone, so a content pane still fits its content', async () => {
+  it('leaves the panes away from the sash at the size they had', async () => {
     const el = await mountSections([
       { id: 'a', title: 'A', content: html`<div>A</div>`, fit: 'content' },
       { id: 'b', title: 'B', content: html`<div>B</div>` },
@@ -338,25 +339,54 @@ describe('PaneView', () => {
     // The b-c sash, so the drag never names the content pane above it.
     await drag(el, sash(el, 1));
 
-    expect(sizing(el, 'a')).toBe('content');
+    expect(sizing(el, 'a')).toBe('content 100px');
     expect(sizing(el, 'b')).toBe('fill 1.2 120px');
     expect(sizing(el, 'c')).toBe('fill 0.8 80px');
   });
 
-  it('rescales the dragged pair onto the weight scale of a pane with no size', async () => {
+  it('rescales the dragged sizes onto the unit scale the weights use', async () => {
     const el = await mountSections([
       { id: 'a', title: 'A', content: html`<div>A</div>`, weight: 3 },
       { id: 'b', title: 'B', content: html`<div>B</div>` },
       { id: 'c', title: 'C', content: html`<div>C</div>` },
     ]);
 
-    // Only b and c were dragged; a must keep its weight rather than become a
-    // sliver beside their pixel sizes.
     await drag(el, sash(el, 1));
 
-    expect(sizing(el, 'a')).toBe('fill 3');
-    expect(sizing(el, 'b')).toBe('fill 1.2 120px');
-    expect(sizing(el, 'c')).toBe('fill 0.8 80px');
+    // Every open pane holds a size, so the sizes decide how free space splits;
+    // the weights are the scale those sizes land on.
+    expect(sizing(el, 'a')).toBe('fill 1.6666666666666667 100px');
+    expect(sizing(el, 'b')).toBe('fill 2 120px');
+    expect(sizing(el, 'c')).toBe('fill 1.3333333333333333 80px');
+  });
+
+  it('leaves no size behind for a drag that ends where it began', async () => {
+    const el = await mount('vertical');
+    const handle = sash(el);
+    handle.dispatchEvent(pointer('pointerdown', 100));
+    handle.dispatchEvent(pointer('pointermove', 140));
+    handle.dispatchEvent(pointer('pointermove', 100));
+    handle.dispatchEvent(pointer('pointerup', 100));
+    await el.updateComplete;
+
+    // Nothing moved on screen, so nothing is pinned: the sections go on sizing
+    // themselves.
+    expect(sizing(el, 'a')).toBe('fill 1');
+    expect(sizing(el, 'b')).toBe('fill 1');
+  });
+
+  it('hands the stack back when a section opens with no size of its own', async () => {
+    const el = await mount('vertical');
+    await drag(el, sash(el));
+    expect(sizing(el, 'a')).toBe('fill 1.2 120px');
+
+    el.sections = [...sections, { id: 'd', title: 'D', content: html`<div>D</div>` }];
+    await el.updateComplete;
+
+    // The newcomer has no size, and the sized panes leave it no share: it would
+    // open at its floor, so every section shares the panel again.
+    expect(sizing(el, 'a')).toBe('fill 1');
+    expect(sizing(el, 'd')).toBe('fill 1');
   });
 
   it('leaves the sizes alone for a sash click that never moved', async () => {
@@ -438,10 +468,10 @@ describe('PaneView', () => {
 
     // A basis, not a weight: it never stretches, and it still shrinks to scroll.
     expect(sizing(el, 'a')).toBe('content 120px');
-    // The content pane's size is no part of the fill panes' weights: b was
-    // dragged so it holds its own size, and c still shares the panel.
-    expect(sizing(el, 'b')).toBe('fill 1 80px');
-    expect(sizing(el, 'c')).toBe('fill 1');
+    // The content pane's size is no part of the fill panes' weights, so b and c
+    // split what is left between the two of them.
+    expect(sizing(el, 'b')).toBe('fill 0.888888888888889 80px');
+    expect(sizing(el, 'c')).toBe('fill 1.1111111111111112 100px');
     expect(share(el)).toBe('3');
   });
 
@@ -565,15 +595,19 @@ describe('PaneView', () => {
       { id: 'a', title: 'A', content: html`<div>A</div>` },
       { id: 'b', title: 'B', content: html`<div>B</div>` },
       { id: 'c', title: 'C', content: html`<div>C</div>` },
+      { id: 'd', title: 'D', content: html`<div>D</div>` },
     ]);
 
-    // Each pane is 100 here. Dragging the lower sash to the top makes c as large
+    // Each pane is 100 here. Dragging the b-c sash to the top makes c as large
     // as the stack allows: b gives up its room first, then a.
     await drag(el, sash(el, 1), -1000);
 
     expect(sizing(el, 'b')).toBe('fill 0 0px');
     expect(sizing(el, 'a')).toBe('fill 0 0px');
     expect(sizing(el, 'c')).toBe('fill 3 300px');
+    // d is past the far end of the drag, and keeps its size: the room the
+    // cascade moved never comes out of a section the reader did not drag.
+    expect(sizing(el, 'd')).toBe('fill 1 100px');
   });
 
   it('shrinks the pane below, then the one below that, out to the bottom', async () => {
@@ -644,7 +678,7 @@ describe('PaneView', () => {
 
       expect(sizing(el, 'a')).toBe('content 120px');
       expect(sizing(el, 'b')).toBe('content 80px');
-      expect(sizing(el, 'c')).toBe('fill 1');
+      expect(sizing(el, 'c')).toBe('fill 1 100px');
       expect(share(el)).toBe('3');
     });
 
