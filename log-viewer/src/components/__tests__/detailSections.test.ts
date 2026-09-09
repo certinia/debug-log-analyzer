@@ -65,8 +65,14 @@ describe('buildDetailSections', () => {
     ]);
     // The call tree gets the most room, so it is the section worth reading.
     expect(sections.find((s) => s.id === 'calltree')?.weight).toBe(4);
-    // The vitals are a fixed set of figures: they take their own height only.
-    expect(sections.find((s) => s.id === 'vitals')?.fit).toBe('content');
+    // The figures about the frame take a steady height, so walking the selection
+    // does not resize the stack under the reader.
+    expect(sections.find((s) => s.id === 'vitals')?.height).toBe('md');
+    // The variables have no natural size, so they take a share and scroll.
+    expect(sections.find((s) => s.id === 'variables')?.weight).toBe(3);
+    // Asked of a frame it empties while the figures are added up, so it keeps a
+    // steady height rather than flickering on every step.
+    expect(sections.find((s) => s.id === 'namespace-time')?.height).toBe('sm');
   });
 
   it('delegates a database statement to the richer database sections', async () => {
@@ -138,6 +144,7 @@ describe('buildDetailSections', () => {
     const sections = await buildDetailSections('analysis', {
       kind: 'aggregate',
       instances: [11, 12, 13],
+      frames: [11, 12, 13],
     });
     expect(sections.map((s) => s.id)).toEqual([
       'vitals',
@@ -152,10 +159,45 @@ describe('buildDetailSections', () => {
     ).toEqual([11, 12, 13]);
   });
 
+  // A bottom-up caller row counts its callee's calls, so reading variables from
+  // those would show the called method's scope under a row that names the caller.
+  it('gives Variables the frames the row is, not the calls it counts', async () => {
+    const sections = await buildDetailSections('analysis', {
+      kind: 'aggregate',
+      instances: [11, 12, 13],
+      frames: [4, 5, 6],
+    });
+
+    expect(
+      (
+        rendered(sections, 'variables', 'variables-detail') as HTMLElement & {
+          frames: number[] | null;
+        }
+      ).frames,
+    ).toEqual([4, 5, 6]);
+  });
+
+  it('gives Variables the calls themselves where the row sits at their depth', async () => {
+    const sections = await buildDetailSections('analysis', {
+      kind: 'aggregate',
+      instances: [11, 12, 13],
+      frames: [11, 12, 13],
+    });
+
+    expect(
+      (
+        rendered(sections, 'variables', 'variables-detail') as HTMLElement & {
+          frames: number[] | null;
+        }
+      ).frames,
+    ).toEqual([11, 12, 13]);
+  });
+
   it('asks the findings which of them name the selection', async () => {
     const sections = await buildDetailSections('analysis', {
       kind: 'aggregate',
       instances: [11, 12, 13],
+      frames: [11, 12, 13],
     });
 
     const findings = rendered(sections, 'findings', 'log-diagnostics') as HTMLElement & {
@@ -169,7 +211,7 @@ describe('buildDetailSections', () => {
   it('scopes the findings to the frame being followed, not the aggregate it left', async () => {
     const sections = await buildDetailSections(
       'analysis',
-      { kind: 'aggregate', instances: [11, 12, 13] },
+      { kind: 'aggregate', instances: [11, 12, 13], frames: [11, 12, 13] },
       { kind: 'event', eventIndex: 8 },
     );
 
@@ -209,6 +251,7 @@ describe('buildDetailSections', () => {
     const sections = await buildDetailSections('timeline', {
       kind: 'aggregate',
       instances: [11, 12, 13],
+      frames: [11, 12, 13],
     });
 
     const bar = rendered(sections, 'namespace-time', 'namespace-time-bar') as HTMLElement & {
@@ -225,7 +268,7 @@ describe('buildDetailSections', () => {
   it('drops the aggregate once a single frame in its stack is the one being followed', async () => {
     const sections = await buildDetailSections(
       'analysis',
-      { kind: 'aggregate', instances: [11, 12, 13] },
+      { kind: 'aggregate', instances: [11, 12, 13], frames: [11, 12, 13] },
       { kind: 'event', eventIndex: 8 },
     );
 
@@ -240,8 +283,8 @@ describe('buildDetailSections', () => {
   it('describes the calls a walked bucket counts, as a bucket picked in the tab is', async () => {
     const sections = await buildDetailSections(
       'analysis',
-      { kind: 'aggregate', instances: [11, 12, 13] },
-      { kind: 'aggregate', instances: [21, 22], calledBy: 'Trigger1' },
+      { kind: 'aggregate', instances: [11, 12, 13], frames: [11, 12, 13] },
+      { kind: 'aggregate', instances: [21, 22], frames: [21, 22], calledBy: 'Trigger1' },
     );
 
     const vitals = rendered(sections, 'vitals', 'event-vitals') as HTMLElement & {
@@ -291,6 +334,10 @@ describe('buildDetailSections', () => {
     expect(sections.find((s) => s.id === 'calltree')?.weight).toBe(4);
     expect(sections.find((s) => s.id === 'calltree')?.fit ?? 'fill').toBe('fill');
     expect(sections.find((s) => s.id === 'governor-trends')?.fit).toBe('content');
+    // Worked out once for the whole log, so this one is snug rather than steady:
+    // the same section takes a height only when it answers about a frame.
+    expect(sections.find((s) => s.id === 'namespace-time')?.fit).toBe('content');
+    expect(sections.find((s) => s.id === 'namespace-time')?.height).toBeUndefined();
     // The tab draws the log top down, so the tree opens on where the time went.
     const tree = rendered(sections, 'calltree', 'call-tree-detail') as CallTreeDetail;
     expect(tree.sourceView).toBe('callees');

@@ -5,11 +5,12 @@ import { consume } from '@lit/context';
 import { LitElement, css, html, type TemplateResult } from 'lit';
 import { customElement, property } from 'lit/decorators.js';
 
+import '#vscode-elements/vscode-icon.js';
 import { CategoryPaletteController } from '../../../components/categoryTime.js';
 import {
-  ESTIMATED_LIMITS_TEXT,
-  NO_CUMULATIVE_LIMITS_TEXT,
-} from '../../../components/logOverviewMetrics.js';
+  NO_GOVERNOR_USAGE_TEXT,
+  NO_REPORTED_LIMITS_TEXT,
+} from '../../../components/governorCopy.js';
 import '../../../components/StackedTimeBar.js';
 import { segmentsWithTail, type StackedSegment } from '../../../components/StackedTimeBar.js';
 import { logContext } from '../../../core/log/logContext.js';
@@ -17,6 +18,7 @@ import type { LogStore } from '../../../core/log/LogStore.js';
 import { formatInteger } from '../../../core/utility/Util.js';
 import { globalStyles } from '../../../styles/global.styles.js';
 import { inspectorSectionStyles } from '../../../styles/inspectorSection.styles.js';
+import { severityIcon, severityStyles } from '../../../styles/severity.styles.js';
 import { NO_STATEMENTS } from '../services/databaseOverview.js';
 import {
   rowBudgets,
@@ -56,6 +58,7 @@ export class DatabaseRowBudget extends LitElement {
   static styles = [
     globalStyles,
     inspectorSectionStyles,
+    severityStyles,
     css`
       .note {
         padding: var(--lana-space-2xs) 0 0;
@@ -85,14 +88,8 @@ export class DatabaseRowBudget extends LitElement {
         font-variant-numeric: tabular-nums;
       }
 
-      .budget__figure--safe {
-        color: var(--lana-fg);
-      }
-      .budget__figure--warn {
-        color: var(--lana-severity-warning);
-      }
-      .budget__figure--danger {
-        color: var(--lana-severity-error);
+      .budget__figure vscode-icon {
+        margin-right: var(--lana-space-2xs);
       }
 
       .counts {
@@ -186,6 +183,7 @@ export class DatabaseRowBudget extends LitElement {
   private _budget(budget: RowBudget, hue: string): TemplateResult {
     const shown = budget.used ?? budget.observed;
     const percent = budget.limit > 0 ? (shown / budget.limit) * 100 : 0;
+    const tier = governorTier(percent);
     const against = budget.limit > 0 ? ` / ${formatInteger(budget.limit)}` : '';
     const segments = objectSegments(budget.groups, hue);
     // What the governor counted and no statement holds. Never negative: the
@@ -204,9 +202,7 @@ export class DatabaseRowBudget extends LitElement {
       <div class="budget">
         <p class="budget__head">
           <span>${KIND_LABEL[budget.kind]}</span>
-          <span class="budget__figure budget__figure--${governorTier(percent)}"
-            >${formatInteger(shown)}${against}</span
-          >
+          <span class="budget__figure">${tierMark(tier)}${formatInteger(shown)}${against}</span>
         </p>
         <stacked-time-bar
           .format=${formatInteger}
@@ -220,6 +216,27 @@ export class DatabaseRowBudget extends LitElement {
   }
 }
 
+/** What a marked tier says, and the severity that carries it. */
+const TIER_MARK = {
+  warn: { severity: 'warning', title: 'Near the row limit' },
+  danger: { severity: 'error', title: 'Past the row limit' },
+} as const;
+
+/** The tier as a mark, so a figure over its limit says so without colouring its text. */
+function tierMark(tier: ReturnType<typeof governorTier>): TemplateResult | string {
+  if (tier === 'safe') {
+    return '';
+  }
+  const { severity, title } = TIER_MARK[tier];
+  // Sized to the figure: the stock 16px glyph grows the line it sits in.
+  return html`<vscode-icon
+    class="sev-${severity}"
+    name=${severityIcon(severity)}
+    size="12"
+    title=${title}
+  ></vscode-icon>`;
+}
+
 /** Whether the segments passed the limit, which is when the bar marks it. */
 function overLimit(budget: RowBudget): boolean {
   return budget.limit > 0 && Math.max(budget.observed, budget.used ?? 0) > budget.limit;
@@ -228,8 +245,8 @@ function overLimit(budget: RowBudget): boolean {
 /** Why the figures are what the log itself showed. */
 function caveat(budgets: readonly RowBudget[]): string {
   return budgets.some((budget) => budget.observed > 0)
-    ? ESTIMATED_LIMITS_TEXT
-    : NO_CUMULATIVE_LIMITS_TEXT;
+    ? NO_REPORTED_LIMITS_TEXT
+    : NO_GOVERNOR_USAGE_TEXT;
 }
 
 /** The objects as segments of one hue, stepped for identity only. */

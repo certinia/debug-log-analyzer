@@ -19,6 +19,7 @@ import {
 import { globalStyles } from '../styles/global.styles.js';
 import { inspectorSectionStyles } from '../styles/inspectorSection.styles.js';
 import { revealRowStyles } from '../styles/revealRow.styles.js';
+import { severityStyles } from '../styles/severity.styles.js';
 import { CategoryPaletteController, categoryLabel } from './categoryTime.js';
 import { dispatchInspectorLocate, dispatchInspectorReveal } from './inspectorReveal.js';
 import { revealRowMeter, revealRowTitle } from './revealRowMeter.js';
@@ -58,6 +59,7 @@ export class HotPath extends LitElement {
     globalStyles,
     inspectorSectionStyles,
     revealRowStyles,
+    severityStyles,
     css`
       /* An actionable data-quality caveat, tinted so it reads apart from the rows. */
       .caveat-row {
@@ -66,7 +68,6 @@ export class HotPath extends LitElement {
         margin-bottom: var(--lana-space-2xs);
         padding: var(--lana-space-2xs) var(--lana-space-xs);
         background: var(--lana-callout-warning-bg);
-        color: var(--lana-severity-warning);
         white-space: normal;
       }
 
@@ -74,6 +75,7 @@ export class HotPath extends LitElement {
         background: var(--lana-callout-warning-bg-hover);
       }
 
+      /* The icon carries the warning, not the sentence. */
       .caveat-row vscode-icon {
         flex: 0 0 auto;
       }
@@ -243,7 +245,7 @@ export class HotPath extends LitElement {
       title="Show the first truncated call in the tree"
       @click=${() => dispatchInspectorReveal(this, truncation.firstEventIndex)}
     >
-      <vscode-icon name="warning"></vscode-icon>
+      <vscode-icon class="sev-warning" name="warning"></vscode-icon>
       <span>${text}</span>
     </button>`;
   }

@@ -16,7 +16,7 @@ import { soqlInlineElement } from '../features/soql/format/inlineCell.js';
 import { soqlSyntaxStyles } from '../features/soql/styles/soql-syntax.css.js';
 import { eventBus } from '../core/events/EventBus.js';
 import { SelectionEchoGuard } from '../core/events/SelectionEchoGuard.js';
-import { LOCATED_ROW_CLASS, LocatedRowMarker, rowIndexStamper } from './locatedRow.js';
+import { LocatedRowMarker, rowIndexStamper } from './locatedRow.js';
 import { globalStyles } from '../styles/global.styles.js';
 import { progressColumnWidth } from '../tabulator/format/measureWidth.js';
 import dataGridStyles from '../tabulator/style/DataGrid.scss';
@@ -94,10 +94,6 @@ export class CallStackDetail extends LitElement {
         white-space: nowrap;
         overflow: hidden;
         text-overflow: ellipsis;
-      }
-      /* The frame under the pointer in the tab on screen. */
-      #call-stack-table .tabulator-row.${unsafeCSS(LOCATED_ROW_CLASS)} {
-        background-color: var(--lana-row-hover-bg);
       }
     `,
   ];

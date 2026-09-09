@@ -112,16 +112,15 @@ export class EventVitals extends LitElement {
         color: var(--lana-fg-muted);
         font-size: var(--lana-text-sm);
       }
-      /* One hue carries the verdict through the text, a tinted ground and its
-         edge, as SelfTimeSpreadView tints a row from its own hue property.
-         Every variant sets the hue. */
+      /* One hue carries the verdict through a tinted ground and its edge, as
+         SelfTimeSpreadView tints a row from its own hue property. Every variant
+         sets the hue; the word reads as the text around it. */
       .pill {
         display: inline-block;
         padding: 0 var(--lana-space-2xs);
         border: var(--lana-stroke) solid color-mix(in srgb, var(--pill-hue) 30%, transparent);
         border-radius: var(--lana-radius-md);
         background-color: color-mix(in srgb, var(--pill-hue) 12%, transparent);
-        color: var(--pill-hue);
         font-size: var(--lana-text-xs);
         line-height: 1.4;
       }
@@ -236,13 +235,14 @@ export class EventVitals extends LitElement {
 
   /**
    * One row per metric the grids expose as columns, so hiding a column never
-   * hides the data. Each reads `used / limit (self: n) pct%` — the denominator
-   * *is* the governor limit, so usage and limit are never reported twice.
-   * Metrics with no transaction limit show the count alone. Zero rows are
-   * omitted; `self` only appears when it adds something.
+   * hides the data. Each reads `used of the log's total (share, limit share, self)` — the
+   * denominator is what the transaction consumed, the question a selection is asked, so the row
+   * reads on every log whether or not one reported limits. A reported limit follows as a
+   * qualifier. Zero rows are omitted; `self` only appears when it adds something.
    */
   private _metricRows(rows: TemplateResult[], events: LogEvent[]): void {
-    const limits = this.logStore?.log.governorLimits;
+    const apexLog = this.logStore?.log;
+    const limits = apexLog?.governorLimits;
     // A total nests and a self reading does not, so each sums the set that holds
     // it once.
     const outer = outermostEvents(events);
@@ -266,7 +266,13 @@ export class EventVitals extends LitElement {
       this._row(
         rows,
         metric.label,
-        usage(total, limit, format, self > 0 && self !== total ? format(self) : null),
+        usage(
+          total,
+          apexLog ? metric.pick(apexLog).total : 0,
+          limit,
+          format,
+          self > 0 && self !== total ? format(self) : null,
+        ),
       );
     }
 
@@ -275,7 +281,13 @@ export class EventVitals extends LitElement {
       this._row(
         rows,
         HEAP_PEAK.label,
-        usage(heapPeak, limits ? HEAP_PEAK.limit(limits) : 0, formatBytes, null),
+        usage(
+          heapPeak,
+          apexLog ? HEAP_PEAK.pick(apexLog) : 0,
+          limits ? HEAP_PEAK.limit(limits) : 0,
+          formatBytes,
+          null,
+        ),
       );
     }
   }
@@ -335,11 +347,12 @@ function qualifier(...parts: Array<string | false | null | undefined>): Template
 /** {@link usageParts} as the row renders it. */
 function usage(
   total: number,
+  logTotal: number,
   limit: number,
   format: (value: number) => string,
   self: string | null,
 ): TemplateResult {
-  const { primary, qualifiers } = usageParts(total, limit, format, self);
+  const { primary, qualifiers } = usageParts(total, logTotal, limit, format, self);
   return html`${primary}${qualifier(...qualifiers)}`;
 }
 

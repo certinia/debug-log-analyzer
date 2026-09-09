@@ -32,12 +32,16 @@ Every limit reported by the log is tracked: SOQL queries and query rows, SOSL qu
 | Which call path is responsible?            | The [Call Tree](./calltree.mdx#column-views) **Governor Limits** column view (average + tightest peak) |
 | What did this one statement cost?          | The [inspector](./inspector.md)'s **Details** section                                                  |
 
+Two denominators answer two questions, and the wording says which is in play. A `/` and "of limit" measure headroom against a limit the log reported. An "of" and "of log" measure contribution — a path's share of what the transaction consumed — which the Call Tree's governor columns and the inspector's Details use, so they read the same on every log.
+
 ### Found vs counted
 
 The Database tab reconciles the statements found in the log against the governor-counted total. When those disagree, the difference is usually work that doesn't consume the limit — custom metadata SOQL, for example, is free unless it selects a long text area field or runs inside a Flow. Seeing both numbers means you can trust the gap instead of wondering which one is wrong.
 
 :::note
-Some logs contain no `CUMULATIVE_LIMIT_USAGE` block at all. Where the log never reports a total, no limit is shown rather than a guessed one.
+The log is the only source of a limit. Salesforce's own maximum varies by context — asynchronous Apex gets 60,000 ms of CPU against a synchronous transaction's 10,000, and other entry points differ again — so where the log reports no limit, none is shown rather than a guessed one. No debug level guarantees a limit block: complete logs at `APEX_PROFILING` `FINE` and `INFO` alike can carry none.
+
+Figures still show without one. Gauges read as levels with no bar, the Timeline strip and the inspector's trend charts scale each metric to its own peak with no 80% band or 100% line, and the governor cost columns read `—`.
 :::
 
 ### Flow and Process Builder usage
@@ -70,3 +74,5 @@ Because a path can consume several limits at once, the Call Tree and Analysis ta
 - **Gov Peak %** – the single tightest governor on that path. Hidden by default; the tooltip names which limit is the peak.
 
 Sorting by **Gov Peak** is the fastest way to find the call path that is closest to breaching something, regardless of _which_ limit it is.
+
+These two are where headroom is answered, so they are the columns measured against the limits. The DML, SOQL, SOSL and row columns beside them answer contribution instead: each bar is that path's share of what the whole transaction consumed, so it is comparable with the time bars in the same row and reads the same whether or not the log reported a limit. The limit still names itself in each cell's tooltip. Where the log reported none, **Gov Avg %** and **Gov Peak %** read `—` and sort last.

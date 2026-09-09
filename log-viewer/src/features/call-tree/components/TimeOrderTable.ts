@@ -97,7 +97,7 @@ export function createTimeOrderTable(
       },
       ...createNamespaceColumns(),
       createTypeColumn(),
-      ...createGovernorMetricColumns(governorLimits, heapFooters),
+      ...createGovernorMetricColumns(rootMethod, heapFooters),
       // Time columns sit at the far right of every call-tree table.
       {
         title: 'Total Time (ms)',

@@ -1,7 +1,7 @@
 /*
  * Copyright (c) 2025 Certinia Inc. All rights reserved.
  */
-import type { GovernorLimits } from 'apex-log-parser';
+import type { ApexLog, GovernorLimits } from 'apex-log-parser';
 import {
   Tabulator,
   type ColumnDefinition,
@@ -9,9 +9,13 @@ import {
   type RowComponent,
 } from 'tabulator-tables';
 
-import { formatInteger } from '../../../core/utility/Util.js';
+import { NO_REPORTED_LIMITS_TEXT } from '../../../components/governorCopy.js';
+import { formatInteger, sharePercent } from '../../../core/utility/Util.js';
 import { NAMESPACE_WIDTH } from '../../../tabulator/ColumnWidths.js';
-import { progressFormatter } from '../../../tabulator/format/Progress.js';
+import {
+  progressFormatter,
+  type ProgressParams as ProgressBarParams,
+} from '../../../tabulator/format/Progress.js';
 import { type ProgressParams, progressFormatterMS } from '../../../tabulator/format/ProgressMS.js';
 import { AnchoringPolicy } from '../../../tabulator/module/AnchoringPolicy.js';
 import * as CommonModules from '../../../tabulator/module/CommonModules.js';
@@ -179,41 +183,95 @@ export function createCountColumn(opts: {
 }
 
 /**
+ * Renders a utilisation percentage, or an em dash where the log reported no limits to measure
+ * against — an unknown utilisation is not 0%, and an empty bar would read as one.
+ */
+function utilisationFormatter(
+  cell: Parameters<typeof progressFormatter>[0],
+  params: ProgressBarParams,
+  onRendered: Parameters<typeof progressFormatter>[2],
+): string | HTMLElement {
+  return cell.getValue() === null ? '—' : progressFormatter(cell, params, onRendered);
+}
+
+/**
+ * Highest utilisation in the table, or null where no row has one. Tabulator's own `'max'` coerces
+ * with `Number()`, so a table of nulls would foot a confident `0%`.
+ */
+function maxUtilisation(values: (number | null)[]): number | null {
+  let highest: number | null = null;
+  for (const value of values) {
+    if (typeof value === 'number' && (highest === null || value > highest)) {
+      highest = value;
+    }
+  }
+  return highest;
+}
+
+/**
+ * A utilisation percentage column: the bar, its footer, and the `—`-for-null contract that both
+ * halves have to agree on. Carried in one place so a new utilisation column cannot be wired with
+ * Tabulator's own `'max'`, which would foot `0%` where nothing is measurable.
+ */
+function createUtilisationColumn(opts: {
+  title: string;
+  field: string;
+  width: number;
+  visible?: boolean;
+  tooltip: ColumnDefinition['tooltip'];
+}): ColumnDefinition {
+  const formatterParams = { precision: 0, totalValue: 100, showPercentageText: false };
+  return {
+    title: opts.title,
+    field: opts.field,
+    visible: opts.visible,
+    sorter: 'number',
+    // Unknown utilisation sorts below every known one rather than reading as the safest path.
+    sorterParams: { alignEmptyValues: 'bottom' },
+    cssClass: 'number-cell',
+    width: opts.width,
+    minWidth: opts.width,
+    hozAlign: 'right',
+    headerHozAlign: 'right',
+    formatter: utilisationFormatter,
+    formatterParams,
+    bottomCalc: maxUtilisation,
+    bottomCalcFormatter: utilisationFormatter,
+    bottomCalcFormatterParams: formatterParams,
+    tooltip: opts.tooltip,
+  };
+}
+
+/**
  * The shared "Gov Avg %" column — the average governor consumption across all
  * governors on a call path (see {@link governorCost}), rendered as a progress
  * bar. Reused across all call-tree/analysis tables. `governorCost` is populated
- * during tree build; the tooltip breaks the average down per metric.
+ * during tree build; the tooltip breaks the average down per metric. This column and Gov Peak %
+ * are where headroom is answered, so they stay measured against the limits and read `—` without
+ * them.
  */
 export function createGovernorCostColumn(governorLimits: GovernorLimits): ColumnDefinition {
-  const formatterParams = { precision: 0, totalValue: 100, showPercentageText: false };
-  return {
+  return createUtilisationColumn({
     title: 'Gov Avg %',
     field: 'governorCost',
-    sorter: 'number',
-    cssClass: 'number-cell',
     width: 71,
-    minWidth: 71,
-    hozAlign: 'right',
-    headerHozAlign: 'right',
-    formatter: progressFormatter,
-    formatterParams,
-    bottomCalc: 'max',
-    bottomCalcFormatter: progressFormatter,
-    bottomCalcFormatterParams: formatterParams,
     tooltip(_event, cell) {
-      const total = (cell.getValue() ?? 0) as number;
+      const value = cell.getValue() as number | null;
+      if (value === null) {
+        return NO_REPORTED_LIMITS_TEXT;
+      }
       const breakdown = governorCostBreakdown(cell.getData() as GovernorCostRow, governorLimits);
       if (!breakdown.length) {
-        return `${total.toFixed(1)}%`;
+        return `${value.toFixed(1)}%`;
       }
       const rows = breakdown.map((m) => {
         const used = m.label === 'Heap' ? formatInteger(m.used) : `${m.used}`;
         const limit = m.label === 'Heap' ? formatInteger(m.limit) : `${m.limit}`;
         return `${m.label} ${used}/${limit} (${m.percent.toFixed(1)}%)`;
       });
-      return `${total.toFixed(1)}% — average utilisation across all governors<br>${rows.join('<br>')}`;
+      return `${value.toFixed(1)}% — average utilisation across all governors<br>${rows.join('<br>')}`;
     },
-  };
+  });
 }
 
 /**
@@ -223,24 +281,16 @@ export function createGovernorCostColumn(governorLimits: GovernorLimits): Column
  * user toggle). The tooltip names which governor is the peak.
  */
 export function createGovernorPeakColumn(governorLimits: GovernorLimits): ColumnDefinition {
-  const formatterParams = { precision: 0, totalValue: 100, showPercentageText: false };
-  return {
+  return createUtilisationColumn({
     title: 'Gov Peak %',
     field: 'governorCostMax',
-    visible: false,
-    sorter: 'number',
-    cssClass: 'number-cell',
     width: 78,
-    minWidth: 78,
-    hozAlign: 'right',
-    headerHozAlign: 'right',
-    formatter: progressFormatter,
-    formatterParams,
-    bottomCalc: 'max',
-    bottomCalcFormatter: progressFormatter,
-    bottomCalcFormatterParams: formatterParams,
+    visible: false,
     tooltip(_event, cell) {
-      const peak = (cell.getValue() ?? 0) as number;
+      const peak = cell.getValue() as number | null;
+      if (peak === null) {
+        return NO_REPORTED_LIMITS_TEXT;
+      }
       const [top] = governorCostBreakdown(cell.getData() as GovernorCostRow, governorLimits);
       if (!top) {
         return `${peak.toFixed(1)}%`;
@@ -249,17 +299,22 @@ export function createGovernorPeakColumn(governorLimits: GovernorLimits): Column
       const limit = top.label === 'Heap' ? formatInteger(top.limit) : `${top.limit}`;
       return `Tightest single governor: ${top.label} ${used}/${limit} (${peak.toFixed(1)}%)`;
     },
-  };
+  });
 }
 
 /**
  * A governor-metric column (DML/SOQL/SOSL counts & rows) rendered as a bar
- * relative to its governor `limit`. Shared by all call-tree/analysis tables so
- * the Total and Self variants stay consistent. Pass `visible: false` for the
- * Self variants, which are hidden until a view or the user shows them.
+ * relative to what the transaction consumed, matching the time columns beside it. Shared by all
+ * call-tree/analysis tables so the Total and Self variants stay consistent. Pass `visible: false`
+ * for the Self variants, which are hidden until a view or the user shows them.
  *
- * The default 70px is what a two-line "… Count" header needs; the values never
- * exceed their governor limit, so they're far narrower. Row columns pass a
+ * The bar answers contribution — which path spent the metric — so its denominator is the log's own
+ * total, not the limit: against a limit a path holding 3 of the transaction's 12 queries draws 3%,
+ * invisible beside a 25% time bar. It also means the column reads the same on every log, since a
+ * limit the log never reported cannot scale a bar. Headroom is answered once, by Gov Avg %/Gov
+ * Peak %, and the limit still names itself in the tooltip.
+ *
+ * The default 70px is what a two-line "… Count" header needs. Row columns pass a
  * smaller `width` because "Rows" is a shorter word than "Count". Self titles say
  * `self`, not `(self)`, so the extra word wraps rather than costing 30-40px of
  * width.
@@ -267,13 +322,16 @@ export function createGovernorPeakColumn(governorLimits: GovernorLimits): Column
 export function createGovernorColumn(opts: {
   title: string;
   field: string;
+  /** What the whole transaction consumed of this metric — the bar's denominator. */
+  total: number;
+  /** The limit the log reported, for the tooltip only; 0 where it reported none. */
   limit: number;
   width?: number;
   minWidth?: number;
   visible?: boolean;
 }): ColumnDefinition {
-  const { title, field, limit, width = 70, minWidth = COUNT_MIN_WIDTH, visible } = opts;
-  const formatterParams = { precision: 0, totalValue: limit, showPercentageText: false };
+  const { title, field, total, limit, width = 70, minWidth = COUNT_MIN_WIDTH, visible } = opts;
+  const formatterParams = { precision: 0, totalValue: total, showPercentageText: false };
   return {
     title,
     field,
@@ -290,8 +348,14 @@ export function createGovernorColumn(opts: {
     bottomCalcFormatter: progressFormatter,
     bottomCalcFormatterParams: formatterParams,
     tooltip(_event, cell) {
-      const value = cell.getValue();
-      return value + (limit > 0 ? '/' + limit : '');
+      const value = (cell.getValue() ?? 0) as number;
+      const share =
+        total > 0
+          ? `${formatInteger(value)} of ${formatInteger(total)} (${sharePercent(value, total).toFixed(1)}% of log)`
+          : formatInteger(value);
+      return limit > 0
+        ? `${share} · ${sharePercent(value, limit).toFixed(1)}% of the ${formatInteger(limit)} limit`
+        : share;
     },
   };
 }
@@ -329,40 +393,47 @@ export function createSelfSumHeapFooters(getTable: () => Tabulator | undefined):
 }
 
 export function createGovernorMetricColumns(
-  governorLimits: GovernorLimits,
+  rootMethod: ApexLog,
   heapFooters: HeapFooterCalcs,
 ): ColumnDefinition[] {
+  const governorLimits = rootMethod.governorLimits;
   return [
     createGovernorColumn({
       title: 'DML Count',
       field: 'dmlCount.total',
+      total: rootMethod.dmlCount.total,
       limit: governorLimits.dmlStatements.limit,
     }),
     createGovernorColumn({
       title: 'DML Count self',
       field: 'dmlCount.self',
+      total: rootMethod.dmlCount.total,
       limit: governorLimits.dmlStatements.limit,
       visible: false,
     }),
     createGovernorColumn({
       title: 'SOQL Count',
       field: 'soqlCount.total',
+      total: rootMethod.soqlCount.total,
       limit: governorLimits.soqlQueries.limit,
     }),
     createGovernorColumn({
       title: 'SOQL Count self',
       field: 'soqlCount.self',
+      total: rootMethod.soqlCount.total,
       limit: governorLimits.soqlQueries.limit,
       visible: false,
     }),
     createGovernorColumn({
       title: 'SOSL Count',
       field: 'soslCount.total',
+      total: rootMethod.soslCount.total,
       limit: governorLimits.soslQueries.limit,
     }),
     createGovernorColumn({
       title: 'SOSL Count self',
       field: 'soslCount.self',
+      total: rootMethod.soslCount.total,
       limit: governorLimits.soslQueries.limit,
       visible: false,
     }),
@@ -371,12 +442,14 @@ export function createGovernorMetricColumns(
     createGovernorColumn({
       title: 'DML Rows',
       field: 'dmlRowCount.total',
+      total: rootMethod.dmlRowCount.total,
       limit: governorLimits.dmlRows.limit,
       width: ROWS_WIDTH,
     }),
     createGovernorColumn({
       title: 'DML Rows self',
       field: 'dmlRowCount.self',
+      total: rootMethod.dmlRowCount.total,
       limit: governorLimits.dmlRows.limit,
       width: ROWS_WIDTH,
       visible: false,
@@ -384,12 +457,14 @@ export function createGovernorMetricColumns(
     createGovernorColumn({
       title: 'SOQL Rows',
       field: 'soqlRowCount.total',
+      total: rootMethod.soqlRowCount.total,
       limit: governorLimits.queryRows.limit,
       width: ROWS_WIDTH,
     }),
     createGovernorColumn({
       title: 'SOQL Rows self',
       field: 'soqlRowCount.self',
+      total: rootMethod.soqlRowCount.total,
       limit: governorLimits.queryRows.limit,
       width: ROWS_WIDTH,
       visible: false,

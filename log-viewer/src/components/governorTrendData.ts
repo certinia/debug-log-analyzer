@@ -1,7 +1,7 @@
 /*
  * Copyright (c) 2026 Certinia Inc. All rights reserved.
  */
-import { formatByteSize, formatInteger } from '../core/utility/Util.js';
+import { formatByteSize, formatInteger, sharePercent } from '../core/utility/Util.js';
 import type { HeatStripTimeSeries } from '../features/timeline/types/flamechart.types.js';
 import { rankedLimitMetrics } from './logOverviewMetrics.js';
 
@@ -14,7 +14,7 @@ const MAX_TRENDS = 4;
 export interface TrendPoint {
   /** Nanoseconds since the start of the log. */
   t: number;
-  /** Percentage of the limit consumed at this instant. */
+  /** Percentage of the series' denominator reached at this instant. */
   ratio: number;
   /** Raw consumption at this instant, for the hover readout. */
   used: number;
@@ -26,8 +26,12 @@ export interface TrendSeries {
   points: TrendPoint[];
   /** Final consumption (the peak for heap), for the value column and the tier colour. */
   used: number;
+  /** The limit the log reported, or 0 where it reported none. */
   limit: number;
-  /** used/limit as a percentage — the series' rank. */
+  /**
+   * used/limit as a percentage — the series' rank. 0 with no reported limit, where the shape is a
+   * share of the metric's own peak and a ratio says nothing about proximity to anything.
+   */
   finalRatio: number;
   format: (value: number) => string;
 }
@@ -50,6 +54,10 @@ const seriesCache = new WeakMap<HeatStripTimeSeries, TrendSeries[]>();
  * observation is enough to draw. A leading zero point anchors every series at
  * the start of the log. A metric whose final consumption is zero is left out:
  * a flat line at zero says nothing the gauges do not.
+ *
+ * Where the log reported no limit the metric's own peak is the denominator, so the shape still
+ * draws; `limit` then stays 0, which is how the chart knows to drop the 80% guide and the tier
+ * colour.
  */
 export function governorTrendSeries(series: HeatStripTimeSeries): TrendSeries[] {
   const cached = seriesCache.get(series);
@@ -58,23 +66,33 @@ export function governorTrendSeries(series: HeatStripTimeSeries): TrendSeries[] 
   }
 
   const ranked = rankedLimitMetrics(series, MAX_TRENDS).map<TrendSeries>(
-    ({ key, label, used, limit, ratio }) => ({
-      label,
-      // A zero point anchors the series at the start of the log.
-      points: [
-        { t: 0, ratio: 0, used: 0 },
-        ...series.events.flatMap<TrendPoint>((event) => {
-          const value = event.values.get(key);
-          return value
-            ? [{ t: event.timestamp, ratio: (value.used / value.limit) * 100, used: value.used }]
-            : [];
-        }),
-      ],
-      used,
-      limit,
-      finalRatio: ratio,
-      format: key === 'heapSize' ? formatByteSize : formatInteger,
-    }),
+    ({ key, label, used, limit, ratio }) => {
+      // `used` is already the metric's peak, so it is the denominator where no limit was reported.
+      const scale = limit > 0 ? limit : used;
+      return {
+        label,
+        // A zero point anchors the series at the start of the log.
+        points: [
+          { t: 0, ratio: 0, used: 0 },
+          ...series.events.flatMap<TrendPoint>((event) => {
+            const value = event.values.get(key);
+            return value
+              ? [
+                  {
+                    t: event.timestamp,
+                    ratio: sharePercent(value.used, scale),
+                    used: value.used,
+                  },
+                ]
+              : [];
+          }),
+        ],
+        used,
+        limit,
+        finalRatio: ratio,
+        format: key === 'heapSize' ? formatByteSize : formatInteger,
+      };
+    },
   );
   seriesCache.set(series, ranked);
   return ranked;

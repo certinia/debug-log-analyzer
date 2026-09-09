@@ -23,6 +23,7 @@
 
 import type {
   HeatStripTimeSeries,
+  MetricDenominator,
   MetricStripClassifiedMetric,
   MetricStripDataPoint,
   MetricStripProcessedData,
@@ -42,6 +43,27 @@ const TIER_1_COUNT = 3;
  * Threshold for auto-promotion to Tier 2 (80%).
  */
 const TIER_2_THRESHOLD = METRIC_STRIP_THRESHOLDS.dangerStart;
+
+/** What a strip with nothing to draw reads, shared so a new field is added once. */
+export const EMPTY_METRIC_STRIP_DATA: MetricStripProcessedData = {
+  points: [],
+  classifiedMetrics: [],
+  globalMaxPercent: 0,
+  hasData: false,
+  scaledToPeak: false,
+  gaps: [],
+};
+
+/**
+ * A metric's denominator from its resolved scale. A scale of 0 is a metric the log reported no
+ * limit for in a log that reported some: it is off the series, not measurable against anything.
+ */
+function denominatorOf(scale: number, reportedLimit: boolean): MetricDenominator {
+  if (scale <= 0) {
+    return { kind: 'none' };
+  }
+  return reportedLimit ? { kind: 'limit', value: scale } : { kind: 'peak', value: scale };
+}
 
 /** Cached lookup result for getDataPointAtTime optimization. */
 interface CachedLookup {
@@ -71,37 +93,35 @@ export class MetricTierClassifier {
     this.lookupCache = null;
 
     if (timeSeries.events.length === 0) {
-      this.processedData = {
-        points: [],
-        classifiedMetrics: [],
-        globalMaxPercent: 0,
-        hasData: false,
-        gaps: timeSeries.gaps ?? [],
-      };
+      this.processedData = { ...EMPTY_METRIC_STRIP_DATA, gaps: timeSeries.gaps ?? [] };
       return this.processedData;
     }
 
     // Step 1: Aggregate events by timestamp (sum used values across namespaces)
     const aggregatedByTime = this.aggregateByTimestamp(timeSeries);
 
-    // Step 2: Calculate global max percentage and authoritative limit for each metric
-    const { maxPercents, limits } = this.calculateMetricMaxPercents(aggregatedByTime, timeSeries);
+    // Step 2: Resolve each metric's denominator, then its global max share of it
+    const { scales, limits, peaks, scaledToPeak } = this.metricScales(aggregatedByTime);
+    const maxPercents = this.metricMaxPercents(timeSeries, scales, peaks);
 
     // Step 3: Classify metrics into tiers
-    const classifiedMetrics = this.classifyMetrics(maxPercents, limits, timeSeries);
+    const classifiedMetrics = this.classifyMetrics(
+      maxPercents,
+      scales,
+      limits,
+      timeSeries,
+      scaledToPeak,
+    );
 
     // Step 4: Build data points with tier classification
-    const { points, globalMaxPercent } = this.buildDataPoints(
-      aggregatedByTime,
-      classifiedMetrics,
-      timeSeries,
-    );
+    const points = this.buildDataPoints(aggregatedByTime, classifiedMetrics, scales);
 
     this.processedData = {
       points,
       classifiedMetrics,
-      globalMaxPercent,
+      globalMaxPercent: Math.max(0, ...maxPercents.values()),
       hasData: points.length > 0,
+      scaledToPeak,
       gaps: timeSeries.gaps ?? [],
     };
 
@@ -261,49 +281,80 @@ export class MetricTierClassifier {
   }
 
   /**
-   * Calculate the global maximum percentage and authoritative limit for each metric.
-   * The limit is fixed across the series, so the largest one seen is captured for display.
+   * The denominator every percentage on the strip divides by, per metric.
+   *
+   * Normally a metric's own reported limit — fixed across the series, so the largest one seen wins.
+   * When the log reported no limit for any metric, the metric's own peak level stands in so the
+   * series still has a shape to draw; `scaledToPeak` then tells the renderer to drop the 80% band,
+   * the 100% line, the breach fill and the traffic lights, none of which mean anything against a
+   * peak. A log that reports *some* limits keeps the old behaviour: a metric with none is left at
+   * scale 0 and dropped, rather than drawn against a different kind of denominator to its
+   * neighbours.
    */
-  private calculateMetricMaxPercents(
+  private metricScales(
     aggregatedByTime: Map<number, Map<string, { used: number; limit: number; tracked?: number }>>,
-    timeSeries: HeatStripTimeSeries,
-  ): { maxPercents: Map<string, number>; limits: Map<string, number> } {
-    const maxPercents = new Map<string, number>();
+  ): {
+    scales: Map<string, number>;
+    limits: Map<string, number>;
+    peaks: Map<string, number>;
+    scaledToPeak: boolean;
+  } {
     const limits = new Map<string, number>();
+    const peaks = new Map<string, number>();
 
-    // Initialize all metrics with 0
-    for (const metricId of timeSeries.metrics.keys()) {
-      maxPercents.set(metricId, 0);
-      limits.set(metricId, 0);
-    }
-
-    // Find max percentage (and capture the limit) for each metric
     for (const timestampData of aggregatedByTime.values()) {
       for (const [metricId, value] of timestampData) {
-        if (value.limit > 0) {
-          const percent = value.used / value.limit;
-          const currentMax = maxPercents.get(metricId) ?? 0;
-          if (percent > currentMax) {
-            maxPercents.set(metricId, percent);
-          }
-          if (value.limit > (limits.get(metricId) ?? 0)) {
-            limits.set(metricId, value.limit);
-          }
+        if (value.limit > (limits.get(metricId) ?? 0)) {
+          limits.set(metricId, value.limit);
+        }
+        if (value.used > (peaks.get(metricId) ?? 0)) {
+          peaks.set(metricId, value.used);
         }
       }
     }
 
-    return { maxPercents, limits };
+    let anyLimit = false;
+    for (const limit of limits.values()) {
+      if (limit > 0) {
+        anyLimit = true;
+        break;
+      }
+    }
+    return { scales: anyLimit ? limits : peaks, limits, peaks, scaledToPeak: !anyLimit };
+  }
+
+  /**
+   * Each metric's highest share of its denominator across the series — its rank for tiering. A
+   * scale is fixed for the whole series, so the highest share is the metric's peak over it and
+   * needs no second walk of the timestamps.
+   */
+  private metricMaxPercents(
+    timeSeries: HeatStripTimeSeries,
+    scales: Map<string, number>,
+    peaks: Map<string, number>,
+  ): Map<string, number> {
+    const maxPercents = new Map<string, number>();
+    for (const metricId of timeSeries.metrics.keys()) {
+      const scale = scales.get(metricId) ?? 0;
+      maxPercents.set(metricId, scale > 0 ? (peaks.get(metricId) ?? 0) / scale : 0);
+    }
+    return maxPercents;
   }
 
   /**
    * Classify metrics into tiers based on their global max percentages.
    * Colors are assigned by rank within each tier, not by metric type.
+   *
+   * Peak-scaled, every metric that moved reaches exactly 100% of its own peak, so the percentage
+   * ranks nothing: reading order stands in, as it does for the gauges, and nothing is promoted for
+   * passing 80% of itself.
    */
   private classifyMetrics(
     metricMaxPercents: Map<string, number>,
-    metricLimits: Map<string, number>,
+    scales: Map<string, number>,
+    limits: Map<string, number>,
     timeSeries: HeatStripTimeSeries,
+    scaledToPeak: boolean,
   ): MetricStripClassifiedMetric[] {
     // Create array of metrics with their max percents for sorting
     const metricsWithMax: Array<{
@@ -311,7 +362,7 @@ export class MetricTierClassifier {
       displayName: string;
       priority: number;
       maxPercent: number;
-      limit: number;
+      denominator: MetricDenominator;
       unit: string;
     }> = [];
 
@@ -322,13 +373,14 @@ export class MetricTierClassifier {
         displayName: metricDef?.displayName ?? metricId,
         priority: metricDef?.priority ?? 999,
         maxPercent,
-        limit: metricLimits.get(metricId) ?? 0,
+        denominator: denominatorOf(scales.get(metricId) ?? 0, (limits.get(metricId) ?? 0) > 0),
         unit: metricDef?.unit ?? '',
       });
     }
 
-    // Sort by max percent descending
-    metricsWithMax.sort((a, b) => b.maxPercent - a.maxPercent);
+    metricsWithMax.sort((a, b) =>
+      scaledToPeak ? a.priority - b.priority : b.maxPercent - a.maxPercent,
+    );
 
     // Classify into tiers and track rank within each tier
     const classified: MetricStripClassifiedMetric[] = [];
@@ -346,8 +398,8 @@ export class MetricTierClassifier {
         // Top 3 metrics are always Tier 1
         tier = 1;
         rankInTier = tier1Rank++;
-      } else if (metric.maxPercent >= TIER_2_THRESHOLD) {
-        // Metrics that exceed 80% are Tier 2
+      } else if (!scaledToPeak && metric.maxPercent >= TIER_2_THRESHOLD) {
+        // Metrics that exceed 80% of a reported limit are Tier 2
         tier = 2;
         rankInTier = tier2Rank++;
       } else {
@@ -361,7 +413,7 @@ export class MetricTierClassifier {
         displayName: metric.displayName,
         tier,
         globalMaxPercent: metric.maxPercent,
-        limit: metric.limit,
+        denominator: metric.denominator,
         color: getRankBasedColor(tier, rankInTier),
         priority: metric.priority,
         unit: metric.unit,
@@ -377,8 +429,8 @@ export class MetricTierClassifier {
   private buildDataPoints(
     aggregatedByTime: Map<number, Map<string, { used: number; limit: number; tracked?: number }>>,
     classifiedMetrics: MetricStripClassifiedMetric[],
-    _timeSeries: HeatStripTimeSeries,
-  ): { points: MetricStripDataPoint[]; globalMaxPercent: number } {
+    scales: Map<string, number>,
+  ): MetricStripDataPoint[] {
     // Create lookup for tier by metric ID
     const metricTiers = new Map<string, 1 | 2 | 3>();
     for (const metric of classifiedMetrics) {
@@ -386,7 +438,6 @@ export class MetricTierClassifier {
     }
 
     const points: MetricStripDataPoint[] = [];
-    let globalMaxPercent = 0;
 
     // Sort timestamps
     const timestamps = Array.from(aggregatedByTime.keys()).sort((a, b) => a - b);
@@ -398,15 +449,11 @@ export class MetricTierClassifier {
       let tier3Max = 0;
 
       for (const [metricId, value] of timestampData) {
-        if (value.limit > 0) {
-          const percent = value.used / value.limit;
+        const scale = scales.get(metricId) ?? 0;
+        if (scale > 0) {
+          const percent = value.used / scale;
           values.set(metricId, percent);
           rawValues.set(metricId, { used: value.used, limit: value.limit, tracked: value.tracked });
-
-          // Track global max
-          if (percent > globalMaxPercent) {
-            globalMaxPercent = percent;
-          }
 
           // Track Tier 3 max for aggregation
           const tier = metricTiers.get(metricId);
@@ -424,6 +471,6 @@ export class MetricTierClassifier {
       });
     }
 
-    return { points, globalMaxPercent };
+    return points;
   }
 }

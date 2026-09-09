@@ -2,7 +2,7 @@
  * Copyright (c) 2026 Certinia Inc. All rights reserved.
  */
 import { LitElement, css, html, type PropertyValues } from 'lit';
-import { customElement, property, state } from 'lit/decorators.js';
+import { customElement, property, query, state } from 'lit/decorators.js';
 
 import {
   TAB_TO_SOURCE,
@@ -16,10 +16,23 @@ import { debounce } from '../core/utility/Util.js';
 import { getSettings, updateSetting } from '../features/settings/Settings.js';
 import { emptyTextFor } from './detailEmptyText.js';
 import { buildDetailSections } from './detailSections.js';
+import {
+  hiddenIds,
+  keepUnbuilt,
+  layoutKey,
+  mergeOrder,
+  orderSections,
+  scopedKey,
+  scopedRecord,
+  withoutScope,
+} from './inspectorLayout.js';
+import { RESET_SECTIONS_ID, buildSectionMenuItems, sectionIdFor } from './sectionMenu.js';
 import { globalStyles } from '../styles/global.styles.js';
+import './ContextMenu.js';
+import type { ContextMenu } from './ContextMenu.js';
 import type { DockPosition } from './DetailDock.js';
 import './DockLayout.js';
-import type { PaneOrientation, PaneSection } from './PaneView.js';
+import type { PaneSection } from './PaneView.js';
 import './ViewModeSwitch.js';
 import type { ViewModeOption } from './ViewModeSwitch.js';
 
@@ -36,7 +49,13 @@ const SCOPE_OPTIONS: readonly ViewModeOption[] = [
  * via a forwarded `main` slot) so it crosscuts every tab. It follows the active
  * tab: each source's latest selection is remembered, and it shows the active
  * tab's selection. Persists dock position/size (public settings) plus its
- * open/closed state, section collapse and pane sizes (private globalState).
+ * open/closed state and its section layout (private globalState).
+ *
+ * Collapse, order and which sections show are remembered per section list — per
+ * tab and per scope, see {@link layoutKey} — because one id means different
+ * content in two lists. Section sizes are remembered nowhere: a section takes
+ * the space its content and the panel allow, and a size dragged for one log is
+ * the wrong one for the next.
  */
 @customElement('log-inspector')
 export class LogInspector extends LitElement {
@@ -51,11 +70,37 @@ export class LogInspector extends LitElement {
   @state()
   private panelSize = 500;
 
-  // Keyed by section id and shared by every tab — one panel, one layout.
+  // Keyed `<source>:<scope>:<section id>`, so the same section keeps its own
+  // state in each list it appears in.
   @state()
   private collapsedSections: Record<string, boolean> = {};
+  // The order the user arranged each list in, keyed `<source>:<scope>`.
   @state()
-  private paneSizes: Record<string, number> = {};
+  private sectionOrder: Record<string, string[]> = {};
+  // The sections a list is set to hide, keyed like the collapse record.
+  @state()
+  private hiddenSections: Record<string, boolean> = {};
+  // Bumped by a reset, which hands the panes' sizes back to automatic.
+  @state()
+  private _layoutEpoch = 0;
+
+  // What the builder produced for the list on screen. Kept in its own order,
+  // because that is what a reset goes back to.
+  private _builtSections: PaneSection[] = [];
+  // Everything else about that list, derived together in `_applyLayout` so the
+  // four can never disagree: which list it is, every section of it in the order
+  // the user arranged (hidden ones included, so the header menu can offer them
+  // back), the ones it hides, and its collapse record by plain section id, which
+  // is what `<pane-view>` takes.
+  private _layout: {
+    key: string;
+    ordered: PaneSection[];
+    hidden: ReadonlySet<string>;
+    collapsed: Record<string, boolean>;
+  } = { key: '', ordered: [], hidden: new Set(), collapsed: {} };
+
+  @query('context-menu')
+  private _menu?: ContextMenu;
 
   // Latest selection per source; the bar renders the active tab's entry.
   private _selections = new Map<DetailSource, DetailSelection>();
@@ -107,7 +152,11 @@ export class LogInspector extends LitElement {
           this.dock = panel.position;
           this.panelSize = panel.size;
           this.collapsedSections = panel.collapsed ?? {};
-          this.paneSizes = panel.paneSizes ?? {};
+          this.sectionOrder = panel.sectionOrder ?? {};
+          this.hiddenSections = panel.hiddenSections ?? {};
+          // A hidden section's build skips work, so the list is rebuilt rather
+          // than filtered.
+          void this._rebuild();
         }
       })
       .catch(() => {
@@ -166,21 +215,23 @@ export class LogInspector extends LitElement {
         .size=${this.panelSize}
         ?visible=${this._visible}
         .sections=${this.sections}
-        .collapsed=${this.collapsedSections}
-        .paneSizes=${this.paneSizes}
+        .collapsed=${this._layout.collapsed}
+        .layoutEpoch=${this._layoutEpoch}
         emptyText=${emptyTextFor(this._activeSource)}
         @dock-position-change=${this._onDockPositionChange}
         @dock-resize=${this._onDockResize}
         @dock-hide=${this._hidePanel}
         @dock-collapse=${this._hidePanel}
         @pane-toggle=${this._onPaneToggle}
-        @pane-resize=${this._onPaneResize}
+        @pane-reorder=${this._onPaneReorder}
+        @pane-menu=${this._onPaneMenu}
         @inspector-reveal=${this._onReveal}
         @inspector-locate=${this._onLocate}
       >
         <slot slot="main" name="main"></slot>
         ${this._scopeSwitch()}
       </dock-layout>
+      <context-menu @menu-select=${this._onSectionMenuSelect}></context-menu>
     `;
   }
 
@@ -343,17 +394,64 @@ export class LogInspector extends LitElement {
   private async _rebuild(): Promise<void> {
     const epoch = ++this._rebuildEpoch;
     const source = this._activeSource;
+    const selection = source ? this._scopedSelection(source) : null;
+    const key = source ? layoutKey(source, selection ? 'detail' : 'summary') : '';
+    // What this build skips. Read before the await, which is why `_applyLayout`
+    // reads the store again rather than trusting it.
+    const hidden = hiddenIds(this.hiddenSections, key);
     const sections = source
       ? await buildDetailSections(
           source,
-          this._scopedSelection(source),
+          selection,
           this._active.get(source) ?? null,
           this._sourceViews.get(source),
+          hidden,
         )
       : [];
     // Drop a slow build that a newer selection already superseded.
     if (epoch === this._rebuildEpoch) {
-      this.sections = sections;
+      this._builtSections = sections;
+      this._applyLayout(key);
+    }
+  }
+
+  /**
+   * The built sections in this list's own order, and only the ones it shows.
+   * Reads the stored set itself rather than taking one: a build's set is a
+   * snapshot from before it awaited, and the user can hide a section while it
+   * runs.
+   */
+  private _applyLayout(key = this._layout.key): void {
+    const ordered = orderSections(this._builtSections, this.sectionOrder[key]);
+    let hidden = hiddenIds(this.hiddenSections, key);
+    // A stored set that hides every section — a list whose sections have changed
+    // since — would leave no header to right-click, and that menu is the only way
+    // back. Forgetting it is the way out, so the store agrees with the screen.
+    if (ordered.length && ordered.every((section) => hidden.has(section.id))) {
+      this.hiddenSections = withoutScope(this.hiddenSections, key);
+      updateSetting('inspector.hiddenSections', this.hiddenSections);
+      hidden = new Set();
+      // They were built as hidden, so the work their build skipped is missing —
+      // a badge, or anything else the section resolves up front.
+      void this._rebuild();
+    }
+    this._layout = {
+      key,
+      ordered,
+      hidden,
+      collapsed: scopedRecord(this.collapsedSections, key),
+    };
+    this.sections = ordered.filter((section) => !hidden.has(section.id));
+  }
+
+  /** After a change to what this list shows: only a section coming back needs
+   *  the work its build skipped. Settles before it resolves, so a caller can
+   *  read the layout it produced. */
+  private async _relayout(needsBuild: boolean): Promise<void> {
+    if (needsBuild) {
+      await this._rebuild();
+    } else {
+      this._applyLayout();
     }
   }
 
@@ -373,23 +471,89 @@ export class LogInspector extends LitElement {
 
   private _onPaneToggle = (e: CustomEvent<{ collapsed: Record<string, boolean> }>) => {
     this._userAdjusted = true;
-    this.collapsedSections = { ...this.collapsedSections, ...e.detail.collapsed };
+    // The pane names sections by id; the panel remembers them per list.
+    const scoped = Object.entries(e.detail.collapsed).map(([id, value]) => [
+      scopedKey(this._layout.key, id),
+      value,
+    ]);
+    this.collapsedSections = { ...this.collapsedSections, ...Object.fromEntries(scoped) };
+    this._layout = { ...this._layout, collapsed: e.detail.collapsed };
     updateSetting('inspector.collapsed', this.collapsedSections);
   };
 
-  // `pane-resize` fires on pointer-up, so this write lands on interaction-end.
-  private _onPaneResize = (
-    e: CustomEvent<{ sizes: Record<string, number>; orientation: PaneOrientation }>,
-  ) => {
+  private _onPaneReorder = (e: CustomEvent<{ ids: string[] }>) => {
     this._userAdjusted = true;
-    // Every size for the dragged axis arrives together, so that axis is
-    // replaced, not merged: a pane reset to its content's size has no entry to
-    // merge. The other axis' sizes are untouched.
-    const prefix = `${e.detail.orientation}:`;
-    const otherAxis = Object.entries(this.paneSizes).filter(([key]) => !key.startsWith(prefix));
-    this.paneSizes = { ...Object.fromEntries(otherAxis), ...e.detail.sizes };
-    updateSetting('inspector.paneSizes', this.paneSizes);
+    const ids = this._layout.ordered.map((section) => section.id);
+    const arranged = mergeOrder(ids, this._layout.hidden, e.detail.ids);
+    // What this build never produced is off screen like a hidden section, not
+    // gone: a reorder under a DML row must not drop where they put SOQL issues.
+    const order = keepUnbuilt(this.sectionOrder[this._layout.key] ?? [], arranged);
+    this.sectionOrder = { ...this.sectionOrder, [this._layout.key]: order };
+    updateSetting('inspector.sectionOrder', this.sectionOrder);
+    this._applyLayout();
   };
+
+  /** Offers every section of the list, hidden ones included, so any can come back. */
+  private _onPaneMenu = (e: CustomEvent<{ x: number; y: number }>) => {
+    this._menu?.show(this._sectionMenuItems(), e.detail.x, e.detail.y);
+  };
+
+  /** The menu stays open through a toggle, so its ticks are refreshed in place. */
+  private _refreshSectionMenu(): void {
+    if (this._menu?.isVisible()) {
+      this._menu.items = this._sectionMenuItems();
+    }
+  }
+
+  private _sectionMenuItems() {
+    return buildSectionMenuItems(this._layout.ordered, this._layout.hidden);
+  }
+
+  private _onSectionMenuSelect = (e: CustomEvent<{ itemId: string }>) => {
+    if (e.detail.itemId === RESET_SECTIONS_ID) {
+      this._resetSections();
+      return;
+    }
+    const id = sectionIdFor(e.detail.itemId);
+    if (id) {
+      void this._toggleSection(id);
+    }
+  };
+
+  private async _toggleSection(id: string): Promise<void> {
+    this._userAdjusted = true;
+    const key = scopedKey(this._layout.key, id);
+    const hidden = { ...this.hiddenSections };
+    const bringingBack = !!hidden[key];
+    if (bringingBack) {
+      delete hidden[key];
+    } else {
+      hidden[key] = true;
+    }
+    this.hiddenSections = hidden;
+    updateSetting('inspector.hiddenSections', this.hiddenSections);
+    // Re-ticked from the layout the toggle produced, so a slow rebuild cannot
+    // leave a row showing the state before the click.
+    await this._relayout(bringingBack);
+    this._refreshSectionMenu();
+  }
+
+  /**
+   * This list back to its defaults: the order it is built in, every section
+   * showing, and the panes' sizes automatic again. Collapse is left alone — it is
+   * a live reading choice, and one click undoes it.
+   */
+  private _resetSections(): void {
+    this._userAdjusted = true;
+    const { [this._layout.key]: _cleared, ...order } = this.sectionOrder;
+    this.sectionOrder = order;
+    const hadHidden = this._layout.hidden.size > 0;
+    this.hiddenSections = withoutScope(this.hiddenSections, this._layout.key);
+    updateSetting('inspector.sectionOrder', this.sectionOrder);
+    updateSetting('inspector.hiddenSections', this.hiddenSections);
+    this._layoutEpoch++;
+    void this._relayout(hadHidden);
+  }
 
   private _hidePanel = () => {
     this._setVisible(false);

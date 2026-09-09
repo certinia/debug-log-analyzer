@@ -38,13 +38,7 @@ import dataGridStyles from '../tabulator/style/DataGrid.scss';
 import './ContextMenu.js';
 import type { ContextMenu } from './ContextMenu.js';
 import { dispatchInspectorLocate, dispatchInspectorReveal } from './inspectorReveal.js';
-import {
-  LOCATED_ROW_CLASS,
-  LocatedRowIds,
-  LocatedRowMarker,
-  rowId,
-  rowIndexStamper,
-} from './locatedRow.js';
+import { LocatedRowIds, LocatedRowMarker, rowId, rowIndexStamper } from './locatedRow.js';
 import { PANEL_ROW_MENU_ITEMS, runPanelRowAction } from './panelRowMenu.js';
 import {
   buildScopedCallTree,
@@ -369,10 +363,6 @@ export class CallTreeDetail extends LitElement {
         overflow: hidden;
         text-overflow: ellipsis;
       }
-      /* The frame under the pointer in the tab on screen. */
-      .table-host .tabulator-row.${unsafeCSS(LOCATED_ROW_CLASS)} {
-        background-color: var(--lana-row-hover-bg);
-      }
     `,
   ];
 
@@ -633,10 +623,11 @@ export class CallTreeDetail extends LitElement {
         // The same aggregate a merged row in the tab itself reports, so Details
         // reads the same either way. Built from the row: a scoped row carries no
         // key, which is what the tab's own rows are read through.
-        const instances = locatableEventIndexes(data);
-        dispatchInspectorLocate(this, frameEventIndexes(data), true, {
+        const frames = frameEventIndexes(data);
+        dispatchInspectorLocate(this, frames, true, {
           kind: 'aggregate',
-          instances,
+          instances: locatableEventIndexes(data),
+          frames,
           calledBy: this.viewMode === 'bottom-up' ? callerOfRow(rows[0]) : undefined,
         });
       }

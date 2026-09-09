@@ -37,8 +37,8 @@ function row(overrides: Partial<Record<string, number>> = {}): GovernorCostRow {
     heapAllocated: st(overrides.heapNet ?? 0),
     heapGross: st(overrides.heapGross ?? 0),
     heapPeak: overrides.heap ?? 0,
-    governorCost: 0,
-    governorCostMax: 0,
+    governorCost: null,
+    governorCostMax: null,
   };
 }
 
@@ -107,6 +107,31 @@ describe('governorCostMax', () => {
 
   it('is 0 when nothing is consumed', () => {
     expect(governorCostMax(row(), limits())).toBe(0);
+  });
+});
+
+describe('a log that reported no limits', () => {
+  const noLimits = limits({
+    soqlQueries: 0,
+    dmlStatements: 0,
+    soslQueries: 0,
+    queryRows: 0,
+    dmlRows: 0,
+    heapSize: 0,
+  });
+
+  // An unknown utilisation is not 0%: reading it as one would say the path is clear of limits
+  // nobody knows. The column renders the null as an em dash.
+  it('has no average utilisation to report', () => {
+    expect(governorCost(row({ soql: 50, heap: 3_000_000 }), noLimits)).toBeNull();
+  });
+
+  it('has no tightest governor to name', () => {
+    expect(governorCostMax(row({ soql: 50, heap: 3_000_000 }), noLimits)).toBeNull();
+  });
+
+  it('breaks nothing down', () => {
+    expect(governorCostBreakdown(row({ soql: 50 }), noLimits)).toEqual([]);
   });
 });
 

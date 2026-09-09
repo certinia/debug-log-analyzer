@@ -38,13 +38,18 @@ jest.mock('../../features/settings/Settings.js', () => ({
 // every other test leaves it false and gets an immediately-resolved build.
 let deferSections = false;
 const pendingSections: Array<() => void> = [];
+// What each build was told to hide, so skipped work is provable and not just
+// filtered away afterwards.
+const builtHiding: string[][] = [];
 jest.mock('../detailSections.js', () => ({
   buildDetailSections: (
     _source: string,
     selection: { eventIndex?: number } | null,
     active: { kind: string; eventIndex?: number; instances?: number[] } | null,
     sourceView?: string,
+    hidden: ReadonlySet<string> = new Set(),
   ) => {
+    builtHiding.push([...hidden]);
     const walked = active?.kind === 'event' ? String(active.eventIndex) : '-';
     const counted = active?.kind === 'aggregate' ? (active.instances?.join(',') ?? '-') : '-';
     // The markers carry the anchor and the active frame through to the rendered
@@ -63,6 +68,8 @@ jest.mock('../detailSections.js', () => ({
           { id: 'callstack', title: 'Call stack', content: html`<div>c</div>` },
         ]
       : [];
+    // The real builder returns a hidden section too, so the header menu can
+    // still offer it; the panel leaves out what it does not show.
     if (!deferSections) {
       return Promise.resolve(sections);
     }
@@ -78,6 +85,8 @@ import type { PaneView } from '../PaneView.js';
 import type { ViewModeSwitch } from '../ViewModeSwitch.js';
 import '../LogInspector.js';
 import { dispatchInspectorLocate, dispatchInspectorReveal } from '../inspectorReveal.js';
+import type { ContextMenu } from '../ContextMenu.js';
+import { RESET_SECTIONS_ID } from '../sectionMenu.js';
 
 /**
  * Settles the async section build and the render chain through the nested
@@ -94,6 +103,11 @@ async function settle(el: LogInspector): Promise<void> {
 async function flush(el: LogInspector): Promise<void> {
   await new Promise((resolve) => requestAnimationFrame(resolve));
   await settle(el);
+}
+
+/** The stored panel, open and docked right, plus whatever the test is about. */
+function inspectorSettings(overrides: Record<string, unknown> = {}): Record<string, unknown> {
+  return { position: 'right', size: 400, collapsed: {}, visible: true, ...overrides };
 }
 
 async function mount(activeTab: string): Promise<LogInspector> {
@@ -140,6 +154,31 @@ function select(source: DetailSource, eventIndex: number): void {
   eventBus.emit('detail:select', { source, selection: { kind: 'event', eventIndex } });
 }
 
+/** The menu the inspector owns; the pane only reports the right-click. */
+function sectionMenu(el: LogInspector): ContextMenu {
+  const found = el.shadowRoot?.querySelector<ContextMenu>('context-menu');
+  if (!found) {
+    throw new Error('context-menu not rendered');
+  }
+  return found;
+}
+
+function openSectionMenu(el: LogInspector, id = 'vitals'): void {
+  paneView(el).dispatchEvent(
+    new CustomEvent('pane-menu', { detail: { id, x: 10, y: 20 }, bubbles: true, composed: true }),
+  );
+}
+
+function pickMenuItem(el: LogInspector, itemId: string): void {
+  sectionMenu(el).dispatchEvent(
+    new CustomEvent('menu-select', { detail: { itemId }, bubbles: true, composed: true }),
+  );
+}
+
+function sectionIds(el: LogInspector): string[] {
+  return paneView(el).sections.map((section) => section.id);
+}
+
 function marker(el: LogInspector): string | null {
   return paneView(el).shadowRoot?.querySelector('.marker')?.textContent ?? null;
 }
@@ -182,29 +221,26 @@ describe('LogInspector', () => {
     releaseSettings = null;
     deferSections = false;
     pendingSections.length = 0;
+    builtHiding.length = 0;
     document.body.replaceChildren();
   });
 
-  it('applies the persisted collapse, and keeps it when the tab changes', async () => {
-    settings.inspector = {
-      position: 'right',
-      size: 400,
-      collapsed: { callstack: true },
-      paneSizes: {},
-      visible: true,
-    };
+  it('applies the persisted collapse to the list it was made in', async () => {
+    settings.inspector = inspectorSettings({
+      collapsed: { 'database:detail:callstack': true },
+    });
     const el = await mount('database-tab');
     select('database', 3);
     await flush(el);
 
     expect(paneView(el).collapsed).toEqual({ callstack: true });
 
-    // One panel, one layout: a section's collapse follows it across tabs.
+    // One id means different content in two lists, so the collapse stays in its own.
     el.activeTab = 'timeline-tab';
     select('timeline', 9);
     await flush(el);
 
-    expect(paneView(el).collapsed).toEqual({ callstack: true });
+    expect(paneView(el).collapsed).toEqual({});
   });
 
   it('persists a collapse', async () => {
@@ -220,7 +256,255 @@ describe('LogInspector', () => {
       }),
     );
 
-    expect(written).toEqual([{ section: 'inspector.collapsed', value: { callstack: true } }]);
+    expect(written).toEqual([
+      { section: 'inspector.collapsed', value: { 'timeline:detail:callstack': true } },
+    ]);
+  });
+
+  it('persists a reorder, and applies it to the list on screen', async () => {
+    const el = await mount('timeline-tab');
+    select('timeline', 1);
+    await flush(el);
+    expect(paneView(el).sections.map((section) => section.id)).toEqual(['vitals', 'callstack']);
+
+    paneView(el).dispatchEvent(
+      new CustomEvent('pane-reorder', {
+        detail: { ids: ['callstack', 'vitals'] },
+        bubbles: true,
+        composed: true,
+      }),
+    );
+    await settle(el);
+
+    expect(written).toEqual([
+      { section: 'inspector.sectionOrder', value: { 'timeline:detail': ['callstack', 'vitals'] } },
+    ]);
+    expect(paneView(el).sections.map((section) => section.id)).toEqual(['callstack', 'vitals']);
+  });
+
+  it('keeps a section this selection never built in the order it stores', async () => {
+    // Arranged while a SOQL statement was selected, so the store names a
+    // section the timeline's list does not build.
+    settings.inspector = inspectorSettings({
+      sectionOrder: { 'timeline:detail': ['issues', 'vitals', 'callstack'] },
+    });
+    const el = await mount('timeline-tab');
+    select('timeline', 1);
+    await flush(el);
+
+    paneView(el).dispatchEvent(
+      new CustomEvent('pane-reorder', {
+        detail: { ids: ['callstack', 'vitals'] },
+        bubbles: true,
+        composed: true,
+      }),
+    );
+    await settle(el);
+
+    expect(written).toEqual([
+      {
+        section: 'inspector.sectionOrder',
+        value: { 'timeline:detail': ['issues', 'callstack', 'vitals'] },
+      },
+    ]);
+  });
+
+  it('hides a section from the menu, and stops building it', async () => {
+    const el = await mount('timeline-tab');
+    select('timeline', 1);
+    await flush(el);
+    expect(sectionIds(el)).toEqual(['vitals', 'callstack']);
+
+    openSectionMenu(el);
+    pickMenuItem(el, 'section:callstack');
+    await flush(el);
+
+    expect(written).toEqual([
+      { section: 'inspector.hiddenSections', value: { 'timeline:detail:callstack': true } },
+    ]);
+    expect(sectionIds(el)).toEqual(['vitals']);
+
+    // Hiding only drops it from the list; every build from here is told to skip
+    // it, so its content is never built again.
+    select('timeline', 2);
+    await flush(el);
+    expect(builtHiding.at(-1)).toEqual(['callstack']);
+  });
+
+  it('offers a hidden section back, and hides it in that list only', async () => {
+    settings.inspector = inspectorSettings({
+      hiddenSections: { 'timeline:detail:callstack': true },
+    });
+    const el = await mount('timeline-tab');
+    select('timeline', 1);
+    await flush(el);
+    expect(sectionIds(el)).toEqual(['vitals']);
+
+    // Another list keeps the section.
+    el.activeTab = 'database-tab';
+    select('database', 2);
+    await flush(el);
+    expect(sectionIds(el)).toEqual(['vitals', 'callstack']);
+
+    // The menu still offers the hidden one, so it can come back.
+    el.activeTab = 'timeline-tab';
+    await flush(el);
+    openSectionMenu(el);
+    expect(sectionMenu(el).items.map((item) => [item.id, item.checked])).toEqual([
+      [RESET_SECTIONS_ID, undefined],
+      ['section-sep', undefined],
+      ['section:vitals', true],
+      ['section:callstack', false],
+    ]);
+
+    pickMenuItem(el, 'section:callstack');
+    await flush(el);
+    expect(sectionIds(el)).toEqual(['vitals', 'callstack']);
+    expect(written.at(-1)).toEqual({ section: 'inspector.hiddenSections', value: {} });
+  });
+
+  it('shows every section again when the stored set would hide them all', async () => {
+    settings.inspector = inspectorSettings({
+      // A list whose sections have changed since: the panel must not end up with
+      // no header to right-click, since that menu is the only way back.
+      hiddenSections: {
+        'timeline:detail:vitals': true,
+        'timeline:detail:callstack': true,
+      },
+    });
+    const el = await mount('timeline-tab');
+    select('timeline', 1);
+    await flush(el);
+
+    expect(sectionIds(el)).toEqual(['vitals', 'callstack']);
+    openSectionMenu(el);
+    expect(sectionMenu(el).items.filter((item) => item.checked === false)).toEqual([]);
+  });
+
+  it('keeps a section hidden when the toggle lands mid-build', async () => {
+    const el = await mount('timeline-tab');
+    select('timeline', 1);
+    await flush(el);
+
+    // A build is in flight, holding the set it was told to skip from before it
+    // awaited; the toggle must not be undone when that build lands.
+    deferSections = true;
+    select('timeline', 2);
+    await new Promise((resolve) => requestAnimationFrame(resolve));
+    openSectionMenu(el);
+    pickMenuItem(el, 'section:callstack');
+    await settle(el);
+    expect(sectionIds(el)).toEqual(['vitals']);
+
+    pendingSections[0]!();
+    await settle(el);
+
+    expect(sectionIds(el)).toEqual(['vitals']);
+  });
+
+  it('re-ticks the menu from the layout a slow rebuild produced', async () => {
+    settings.inspector = inspectorSettings({
+      hiddenSections: { 'timeline:detail:callstack': true },
+    });
+    const el = await mount('timeline-tab');
+    select('timeline', 1);
+    await flush(el);
+    openSectionMenu(el);
+
+    // Bringing it back rebuilds, because its build skipped work. The row must
+    // read from that rebuild, not from the state before the click.
+    deferSections = true;
+    pickMenuItem(el, 'section:callstack');
+    await settle(el);
+    pendingSections[0]!();
+    await settle(el);
+
+    expect(
+      sectionMenu(el)
+        .items.filter((item) => item.id.startsWith('section:'))
+        .map((item) => [item.id, item.checked]),
+    ).toEqual([
+      ['section:vitals', true],
+      ['section:callstack', true],
+    ]);
+  });
+
+  it('rebuilds the sections it un-hides when the stored set hid them all', async () => {
+    settings.inspector = inspectorSettings({
+      hiddenSections: {
+        'timeline:detail:vitals': true,
+        'timeline:detail:callstack': true,
+      },
+    });
+    const el = await mount('timeline-tab');
+    select('timeline', 1);
+    await flush(el);
+
+    // Their first build was told to skip them, so what it left out has to be
+    // built again rather than shown empty.
+    expect(sectionIds(el)).toEqual(['vitals', 'callstack']);
+    expect(builtHiding.at(-1)).toEqual([]);
+  });
+
+  it('resets a list that only has an order, back to the order it is built in', async () => {
+    settings.inspector = inspectorSettings({
+      sectionOrder: { 'timeline:detail': ['callstack', 'vitals'] },
+    });
+    const el = await mount('timeline-tab');
+    select('timeline', 1);
+    await flush(el);
+    expect(sectionIds(el)).toEqual(['callstack', 'vitals']);
+
+    openSectionMenu(el, 'callstack');
+    pickMenuItem(el, RESET_SECTIONS_ID);
+    await flush(el);
+
+    // Nothing was hidden, so nothing needs rebuilding — the built order still
+    // has to come back.
+    expect(sectionIds(el)).toEqual(['vitals', 'callstack']);
+    expect(paneView(el).layoutEpoch).toBe(1);
+  });
+
+  it('resets this list only: built order, every section back, sizes automatic', async () => {
+    settings.inspector = inspectorSettings({
+      sectionOrder: { 'timeline:detail': ['callstack', 'vitals'] },
+      hiddenSections: {
+        'timeline:detail:vitals': true,
+        'analysis:detail:callstack': true,
+      },
+    });
+    const el = await mount('timeline-tab');
+    select('timeline', 1);
+    await flush(el);
+    expect(sectionIds(el)).toEqual(['callstack']);
+
+    openSectionMenu(el, 'callstack');
+    pickMenuItem(el, RESET_SECTIONS_ID);
+    await flush(el);
+
+    expect(sectionIds(el)).toEqual(['vitals', 'callstack']);
+    expect(written).toEqual([
+      { section: 'inspector.sectionOrder', value: {} },
+      // The Analysis list's own choice is untouched.
+      { section: 'inspector.hiddenSections', value: { 'analysis:detail:callstack': true } },
+    ]);
+    // The panes' dragged sizes go with it.
+    expect(paneView(el).layoutEpoch).toBe(1);
+  });
+
+  it('applies a persisted order to its own list only', async () => {
+    settings.inspector = inspectorSettings({
+      sectionOrder: { 'timeline:detail': ['callstack', 'vitals'] },
+    });
+    const el = await mount('timeline-tab');
+    select('timeline', 1);
+    await flush(el);
+    expect(paneView(el).sections.map((section) => section.id)).toEqual(['callstack', 'vitals']);
+
+    el.activeTab = 'database-tab';
+    select('database', 2);
+    await flush(el);
+    expect(paneView(el).sections.map((section) => section.id)).toEqual(['vitals', 'callstack']);
   });
 
   it('auto-opens on the first selection only while the user has never chosen', async () => {
@@ -231,13 +515,9 @@ describe('LogInspector', () => {
   });
 
   it('stays closed when the user closed it before, and remembers each choice', async () => {
-    settings.inspector = {
-      position: 'right',
-      size: 400,
-      collapsed: {},
-      paneSizes: {},
+    settings.inspector = inspectorSettings({
       visible: false,
-    };
+    });
     const el = await mount('timeline-tab');
     select('timeline', 1);
     await el.updateComplete;
@@ -250,13 +530,10 @@ describe('LogInspector', () => {
   });
 
   it('keeps what the user did while the settings load was still in flight', async () => {
-    settings.inspector = {
-      position: 'right',
-      size: 400,
-      collapsed: { callstack: true },
-      paneSizes: {},
+    settings.inspector = inspectorSettings({
+      collapsed: { 'timeline:detail:callstack': true },
       visible: false,
-    };
+    });
     deferSettings = true;
     const el = document.createElement('log-inspector') as LogInspector;
     el.activeTab = 'timeline-tab';
@@ -395,6 +672,7 @@ describe('LogInspector', () => {
     dispatchInspectorLocate(dockLayout(el), [5, 9], true, {
       kind: 'aggregate',
       instances: [5, 9],
+      frames: [5, 9],
     });
     await flush(el);
 
@@ -421,6 +699,7 @@ describe('LogInspector', () => {
     dispatchInspectorLocate(dockLayout(el), [5, 9], true, {
       kind: 'aggregate',
       instances: [5, 9],
+      frames: [5, 9],
     });
     await flush(el);
 
@@ -436,6 +715,7 @@ describe('LogInspector', () => {
     dispatchInspectorLocate(dockLayout(el), [5, 9], true, {
       kind: 'aggregate',
       instances: [5, 9],
+      frames: [5, 9],
     });
     await flush(el);
 
@@ -474,13 +754,7 @@ describe('LogInspector', () => {
   });
 
   it('shows a source-specific empty state, and updates it as the active tab changes', async () => {
-    settings.inspector = {
-      position: 'right',
-      size: 400,
-      collapsed: {},
-      paneSizes: {},
-      visible: true,
-    };
+    settings.inspector = inspectorSettings();
     const el = await mount('timeline-tab');
     expect(emptyText(el)).toBe('Select a frame on the timeline to inspect it.');
 
@@ -498,13 +772,7 @@ describe('LogInspector', () => {
   });
 
   it('returns to the whole-log empty state when a null selection clears the source', async () => {
-    settings.inspector = {
-      position: 'right',
-      size: 400,
-      collapsed: {},
-      paneSizes: {},
-      visible: true,
-    };
+    settings.inspector = inspectorSettings();
     const el = await mount('timeline-tab');
     select('timeline', 1);
     await flush(el);

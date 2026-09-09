@@ -45,12 +45,17 @@ import './VariablesDetail.js';
  * one frame, or the calls a row counts where the view's rows merge occurrences.
  * Details and the call tree follow it; the call stack stays anchored to
  * `selection`, so walking down a stack never puts a frame out of reach.
+ *
+ * `hidden` names the sections this list is set to hide, so a builder can skip
+ * work nobody will see. They are still returned: the header menu offers them
+ * back, and the panel leaves out what it does not show.
  */
 export async function buildDetailSections(
   source: DetailSource,
   selection: DetailSelection | null,
   active: DetailSelection | null = null,
   sourceView?: SelectionView,
+  hidden: ReadonlySet<string> = new Set(),
 ): Promise<PaneSection[]> {
   // Nothing selected: the whole log is the scope. `DetailDock`'s own empty
   // state still covers the moment before a tab id resolves.
@@ -138,7 +143,7 @@ export async function buildDetailSections(
           fit: 'content',
           content: html`<category-time-bar></category-time-bar>`,
         },
-        namespaceTimeSection(html`<namespace-time-bar></namespace-time-bar>`),
+        namespaceTimeSection(html`<namespace-time-bar></namespace-time-bar>`, { fit: 'content' }),
         {
           id: 'governor-trends',
           title: 'Governor usage over time',
@@ -146,8 +151,9 @@ export async function buildDetailSections(
           content: html`<governor-trends></governor-trends>`,
         },
         {
-          // The same id as the selection's tree, deliberately: collapse state is
-          // keyed by section id, so the pane treats them as one "Call tree".
+          // The same id as the selection's tree: it is the one "Call tree"
+          // section, asked at whole-log scope. Collapse and order are remembered
+          // per list, so the two scopes still keep their own.
           id: 'calltree',
           title: 'Call tree',
           weight: 4,
@@ -165,11 +171,14 @@ export async function buildDetailSections(
 
   // The Database grids resolve statement-specific vitals and SOQL lint issues.
   if (source === 'database' && selection.kind === 'event' && selection.type) {
-    return buildDatabaseSections({
-      eventIndex: selection.eventIndex,
-      type: selection.type,
-      activeEventIndex: active?.kind === 'event' ? active.eventIndex : null,
-    });
+    return buildDatabaseSections(
+      {
+        eventIndex: selection.eventIndex,
+        type: selection.type,
+        activeEventIndex: active?.kind === 'event' ? active.eventIndex : null,
+      },
+      hidden,
+    );
   }
 
   const isAggregate = selection.kind === 'aggregate';
@@ -190,13 +199,18 @@ export async function buildDetailSections(
         ? selection
         : null;
   const instances = shown?.instances ?? null;
+  // The frames the row is, which is the scope Variables compares: a bottom-up
+  // caller row counts its callee's calls, so its locals live a level up.
+  const scopeFrames = shown?.frames ?? null;
   const calledBy = shown?.calledBy ?? '';
 
   const sections: PaneSection[] = [
     {
       id: 'vitals',
       title: 'Details',
-      fit: 'content',
+      // A steady height: what this section says changes with every frame the
+      // reader steps to, and sizing to it would move the whole stack each time.
+      height: 'md',
       content: html`<event-vitals
         eventIndex=${activeIndex}
         .instances=${instances}
@@ -208,10 +222,12 @@ export async function buildDetailSections(
     {
       id: 'variables',
       title: 'Variables',
-      fit: 'content',
+      // No natural size — a frame has none or hundreds — so it takes a share of
+      // the panel and scrolls, rather than a slot that could crowd the grids.
+      weight: 3,
       content: html`<variables-detail
         eventIndex=${activeIndex}
-        .instances=${instances}
+        .frames=${scopeFrames}
       ></variables-detail>`,
     },
   ];
@@ -224,6 +240,7 @@ export async function buildDetailSections(
           eventIndex=${activeIndex}
           .instances=${instances}
         ></namespace-time-bar>`,
+        { height: 'sm' },
       ),
     );
   }
@@ -265,8 +282,18 @@ export async function buildDetailSections(
   return sections;
 }
 
-/** The Timeline's namespace split. One id and title for both scopes: collapse
- *  state is keyed by section id, so a drift would split it. */
-function namespaceTimeSection(content: TemplateResult): PaneSection {
-  return { id: 'namespace-time', title: 'Self time by namespace', fit: 'content', content };
+/**
+ * The Timeline's namespace split. One id and title for both scopes: it is the
+ * same section, asked of the whole log or of a selection.
+ *
+ * A bar and a legend line per namespace, so it draws little and varies by a
+ * line. Asked of the whole log it is worked out once, so it sizes to that;
+ * asked of a selection it empties to one line of prose while each frame's
+ * figures are added up, and a content-sized pane would flicker on every step.
+ */
+function namespaceTimeSection(
+  content: TemplateResult,
+  sizing: Pick<PaneSection, 'fit' | 'height'>,
+): PaneSection {
+  return { id: 'namespace-time', title: 'Self time by namespace', ...sizing, content };
 }

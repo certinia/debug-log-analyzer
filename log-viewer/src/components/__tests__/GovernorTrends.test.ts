@@ -253,4 +253,46 @@ describe('governor-trends', () => {
 
     expect(chartOf(element).tagName).toBe('BUTTON');
   });
+
+  describe('a metric the log reported no limit for', () => {
+    beforeEach(() => {
+      series = [{ ...trend(), limit: 0, finalRatio: 0 }];
+    });
+
+    // The whole-log figure is the peak, so a denominator would read "90 of 90".
+    it('names no denominator until the cursor names a moment', async () => {
+      const element = await mount();
+
+      expect(element.shadowRoot?.querySelector('.trend__limit')?.textContent?.trim()).toBe('');
+    });
+
+    it('reads the sample under the cursor against the log\'s own peak, spelled "of"', async () => {
+      const element = await mount();
+
+      chartOf(element).dispatchEvent(new MouseEvent('pointermove', { clientX: 40 }));
+      await element.updateComplete;
+
+      expect(element.shadowRoot?.querySelector('.trend__limit')?.textContent?.trim()).toBe('of 90');
+    });
+
+    it('drops the 80% guide and the severity colour', async () => {
+      const element = await mount();
+
+      expect(element.shadowRoot?.querySelector('.trend__guide')).toBeNull();
+      expect(element.shadowRoot?.querySelector('.trend--level')).not.toBeNull();
+      expect(element.shadowRoot?.querySelector('.trend--danger')).toBeNull();
+    });
+
+    it('still draws the shape', async () => {
+      const element = await mount();
+
+      expect(element.shadowRoot?.querySelector('.trend__line')?.getAttribute('d')).toBeTruthy();
+    });
+
+    it('names the peak rather than a share of a limit', async () => {
+      const element = await mount();
+
+      expect(chartOf(element).getAttribute('aria-label')).toContain('no limit reported');
+    });
+  });
 });

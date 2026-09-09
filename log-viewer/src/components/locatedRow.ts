@@ -10,7 +10,8 @@ import { ROOT_PATH_ID } from '../core/log/keyPathIds.js';
 import { logStoreFor } from '../core/log/LogStore.js';
 import { eventByEventIndex } from '../core/utility/EventSearch.js';
 
-/** Class the marked row carries; each table styles it itself. */
+/** Class the marked row carries. Styled once, in `tabulator/style/DataGrid.scss`,
+ *  which spells the name out: rename it here and the mark stops painting. */
 export const LOCATED_ROW_CLASS = 'located-row';
 
 /** Attribute holding a row's index, so the mark can find its element. */
@@ -395,10 +396,12 @@ export function rowFrames(
  * counts, a Time Order row the one call it is, and no row nothing.
  *
  * @param root - the log the row was built from, which its path id belongs to
+ * @param direction - the way the row's own table reads the tree
  */
 export function rowDetailSelection(
   row: RowComponent | undefined,
   root: ApexLog | null,
+  direction: SelectionView,
 ): DetailSelection | null {
   if (!row) {
     return null;
@@ -418,6 +421,7 @@ export function rowDetailSelection(
   return {
     kind: 'aggregate',
     instances: rowOccurrences(row, root),
+    frames: rowFrames(row, root, direction),
     calledBy: data.instances?.length ? undefined : data.text,
   };
 }

@@ -18,6 +18,7 @@ let budgets: RowBudgets;
 jest.mock('../../services/rowBudget.js', () => ({
   rowBudgets: () => budgets,
 }));
+jest.mock('#vscode-elements/vscode-icon.js', () => ({}));
 
 import '../DatabaseRowBudget.js';
 
@@ -81,6 +82,12 @@ const texts = (element: Element, selector: string) =>
     (node.textContent ?? '').replace(/\s+/g, ' ').trim(),
   );
 
+/** The glyph each figure carries, in order, `null` where the tier is safe. */
+const marks = (element: Element) =>
+  [...(element.shadowRoot?.querySelectorAll('.budget__figure') ?? [])].map(
+    (figure) => figure.querySelector('vscode-icon')?.getAttribute('name') ?? null,
+  );
+
 const bars = (element: Element) =>
   [...(element.shadowRoot?.querySelectorAll('stacked-time-bar') ?? [])] as StackedTimeBar[];
 
@@ -142,12 +149,22 @@ describe('database-rows', () => {
     ]);
   });
 
-  it('warns as a limit is approached, and alarms once it is near breach', async () => {
+  it('warns as a limit is approached, marking the tier with a glyph', async () => {
     const element = await mount();
 
     // 90% of the query rows, 4% of the DML rows.
-    expect(texts(element, '.budget__figure--warn')).toEqual(['45,000 / 50,000']);
-    expect(texts(element, '.budget__figure--safe')).toEqual(['400 / 10,000']);
+    expect(texts(element, '.budget__figure')).toEqual(['45,000 / 50,000', '400 / 10,000']);
+    expect(marks(element)).toEqual(['warning', null]);
+  });
+
+  it('marks a breached limit as an error, and says what the mark means', async () => {
+    budgets = withBudgets({ used: 60_000, observed: 60_000 });
+    const element = await mount();
+
+    expect(marks(element)[0]).toBe('error');
+    expect(
+      element.shadowRoot?.querySelector('.budget__figure vscode-icon')?.getAttribute('title'),
+    ).toBe('Past the row limit');
   });
 
   it('counts the statements of every kind against its own limit', async () => {
@@ -184,10 +201,10 @@ describe('database-rows', () => {
     expect(texts(await mount(), '.note')).toEqual(['Worst search 1,800 of 2,000 rows per query.']);
   });
 
-  it('says the figures are observed when the log captured no cumulative limits', async () => {
+  it('says no limits were reported when the log reported none', async () => {
     budgets = { ...full(), hasLimits: false };
 
-    expect(texts(await mount(), '.note').at(-1)).toContain('CUMULATIVE_LIMIT_USAGE');
+    expect(texts(await mount(), '.note').at(-1)).toContain('no governor limits');
   });
 
   it('shows the rows the statements held when the log captured no governor peak', async () => {

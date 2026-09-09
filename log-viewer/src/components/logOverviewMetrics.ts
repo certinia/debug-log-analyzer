@@ -3,27 +3,12 @@
  */
 import type { Limits } from 'apex-log-parser';
 
-import { formatByteSize } from '../core/utility/Util.js';
+import { formatByteSize, formatInteger, sharePercent } from '../core/utility/Util.js';
 import type { GaugeMetric } from '../features/database/components/GovernorSummary.js';
 import type { HeatStripTimeSeries } from '../features/timeline/types/flamechart.types.js';
 
 /** How many gauges the strip shows before it stops being at-a-glance. */
 const MAX_GAUGES = 6;
-
-/**
- * Why governor figures are missing, and the likely fix. Shared by every
- * surface that needs the cumulative snapshots (`LogOverview`,
- * `GovernorTrends`) so they all give the same reason. The parser samples the
- * snapshots from CUMULATIVE_LIMIT_USAGE events, which the Apex Profiling
- * debug category emits at INFO and above — though some INFO logs still lack
- * them, so the copy hedges.
- */
-export const NO_CUMULATIVE_LIMITS_TEXT =
-  'This log has no CUMULATIVE_LIMIT_USAGE events, so governor totals are unknown. This can happen when the Apex Profiling debug level is below INFO.';
-
-/** Short caveat under figures that were estimated without cumulative snapshots. */
-export const ESTIMATED_LIMITS_TEXT =
-  'No CUMULATIVE_LIMIT_USAGE events in the log; figures are estimated from logged events. An Apex Profiling debug level of INFO or higher usually includes them.';
 
 /**
  * Every governor-tracked metric, with the label the inspector shows for it. A
@@ -110,24 +95,97 @@ export function limitTotals(series: HeatStripTimeSeries): Limits {
 }
 
 /**
- * The governor metrics closest to a limit, tightest first, capped at `max`,
- * from {@link limitTotals}. A metric with no consumption, or no limit, is left
- * out.
+ * The governor metrics worth showing, capped at `max`, from {@link limitTotals}. A metric with no
+ * consumption is left out.
+ *
+ * Tightest first where the log reported limits. Where it reported none there is nothing to rank by
+ * — an absolute count cannot say which metric is nearest breaking, and ordering by size would read
+ * as if it could — so every ratio is 0 and the stable sort leaves {@link GOVERNOR_METRICS} reading
+ * order standing, which keeps every row in a predictable slot.
  */
 export function rankedLimitMetrics(series: HeatStripTimeSeries, max: number): RankedLimitMetric[] {
   const totals = limitTotals(series);
   return GOVERNOR_METRICS.flatMap<RankedLimitMetric>(({ key, label }) => {
     const { used, limit } = totals[key];
-    return limit > 0 && used > 0 ? [{ key, label, used, limit, ratio: (used / limit) * 100 }] : [];
+    return used > 0 ? [{ key, label, used, limit, ratio: sharePercent(used, limit) }] : [];
   })
     .sort((a, b) => b.ratio - a.ratio)
     .slice(0, max);
 }
 
+/** Fewest points that read as a shape rather than a couple of dots. */
+const MIN_SPARK_POINTS = 5;
+
+/** Most points worth plotting across a gauge-width sparkline. */
+const MAX_SPARK_POINTS = 20;
+
+/** Memo of {@link metricSparkline}: the gauges re-render on every selection. */
+const sparkCache = new WeakMap<HeatStripTimeSeries, Map<keyof Limits, readonly number[]>>();
+
+/** Each bucket's lowest and highest reading, in the order they occurred. */
+function bucketExtremes(levels: readonly number[]): readonly number[] {
+  if (levels.length <= MAX_SPARK_POINTS) {
+    return [...levels];
+  }
+  const buckets = Math.floor(MAX_SPARK_POINTS / 2);
+  const spark: number[] = [];
+  for (let bucket = 0; bucket < buckets; bucket++) {
+    const start = Math.floor((bucket * levels.length) / buckets);
+    const end = Math.floor(((bucket + 1) * levels.length) / buckets);
+    let lowAt = start;
+    let highAt = start;
+    for (let i = start + 1; i < end; i++) {
+      if (levels[i]! < levels[lowAt]!) {
+        lowAt = i;
+      } else if (levels[i]! > levels[highAt]!) {
+        highAt = i;
+      }
+    }
+    // Chronological, so a rise reads as a rise: whichever extreme came first goes first.
+    const [first, second] = lowAt <= highAt ? [lowAt, highAt] : [highAt, lowAt];
+    spark.push(levels[first]!);
+    if (second !== first) {
+      spark.push(levels[second]!);
+    }
+  }
+  return spark;
+}
+
 /**
- * The whole-log gauges closest to a limit, capped at {@link MAX_GAUGES}.
- * Without cumulative snapshots the totals are estimates, and the caller shows
- * {@link ESTIMATED_LIMITS_TEXT} alongside them.
+ * A metric's level over the log, oldest first, for a gauge that has no limit to fill a bar
+ * against. Empty below {@link MIN_SPARK_POINTS} readings — too few to read as a shape.
+ *
+ * Reduced by taking each bucket's lowest and highest reading, in the order they occurred: an
+ * even-interval sample would step over the one allocation that spiked, and the peak is both the
+ * point of the shape and the figure printed beside it.
+ */
+export function metricSparkline(series: HeatStripTimeSeries, key: keyof Limits): readonly number[] {
+  let byKey = sparkCache.get(series);
+  if (!byKey) {
+    byKey = new Map();
+    sparkCache.set(series, byKey);
+  }
+  const cached = byKey.get(key);
+  if (cached) {
+    return cached;
+  }
+
+  const levels: number[] = [];
+  for (const event of series.events) {
+    const value = event.values.get(key);
+    if (value) {
+      levels.push(value.used);
+    }
+  }
+
+  const spark = levels.length < MIN_SPARK_POINTS ? [] : bucketExtremes(levels);
+  byKey.set(key, spark);
+  return spark;
+}
+
+/**
+ * The whole-log gauges, capped at {@link MAX_GAUGES}. A gauge with no reported limit has no bar to
+ * fill, so it carries a sparkline of its own level instead.
  */
 export function seriesGauges(series: HeatStripTimeSeries): GaugeMetric[] {
   return rankedLimitMetrics(series, MAX_GAUGES).map(({ key, label, used, limit }) => ({
@@ -135,6 +193,7 @@ export function seriesGauges(series: HeatStripTimeSeries): GaugeMetric[] {
     found: used,
     used,
     limit,
-    ...(key === 'heapSize' ? { format: formatByteSize } : {}),
+    spark: limit > 0 ? undefined : metricSparkline(series, key),
+    format: key === 'heapSize' ? formatByteSize : formatInteger,
   }));
 }

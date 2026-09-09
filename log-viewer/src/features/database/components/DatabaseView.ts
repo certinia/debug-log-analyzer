@@ -19,7 +19,7 @@ import { apexLimitTimeSeries } from '../../timeline/optimised/apex-limit-series.
 import { InspectorEmphasis } from '../../../components/inspectorEmphasis.js';
 import { wireInspectorTab } from '../../../components/inspectorTab.js';
 import { SelectionEchoGuard } from '../../../core/events/SelectionEchoGuard.js';
-import { isVisible } from '../../../core/utility/Util.js';
+import { formatInteger, isVisible } from '../../../core/utility/Util.js';
 import { soslRowsMetric } from '../limits.js';
 import { logStoreFor } from '../../../core/log/LogStore.js';
 
@@ -438,6 +438,7 @@ export class DatabaseView extends LitElement {
         found,
         used: this._used(metric.used),
         limit: this._limit(metric.limit),
+        format: formatInteger,
       });
     };
     const z = { used: 0, limit: 0 };

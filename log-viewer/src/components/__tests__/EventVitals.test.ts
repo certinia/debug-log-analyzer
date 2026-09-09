@@ -114,16 +114,16 @@ describe('EventVitals', () => {
     expect(valueFor(el, 'Time')).toMatch(/^-?\d+\.\d{3} ms \(self -?\d+\.\d{3} ms\)$/);
   });
 
-  it('reports a metric once, as used / limit with a percentage', async () => {
-    // SOSL rows are capped per query, so a single SOSL statement has a limit.
+  // SOSL rows are capped per query, so a single SOSL statement has a limit to qualify with.
+  it('reports a metric once, against the log with the limit as a qualifier', async () => {
     const el = await mount(store, { eventIndex: soslIndex, type: 'sosl' });
-    expect(valueFor(el, 'SOSL Rows')).toBe('5 / 2,000 (0.25%)');
-    // The limit is the denominator — never a second row repeating it.
+    expect(valueFor(el, 'SOSL Rows')).toBe('5 (0.25% of the 2,000 limit)');
+    // The limit qualifies the reading — never a second row repeating it.
     expect(labels(el).filter((l) => /limit/i.test(l))).toEqual([]);
     expect(new Set(labels(el)).size).toBe(labels(el).length);
   });
 
-  it('omits the limit when the metric has no transaction total', async () => {
+  it('gives the count alone where the selection is all the log consumed', async () => {
     const el = await mount(store, { eventIndex: dmlIndex, type: 'dml' });
     expect(valueFor(el, 'DML Rows')).toBe('2');
   });
@@ -143,6 +143,35 @@ describe('EventVitals', () => {
     const shown = labels(el);
     expect(shown).not.toContain('Est. rows');
     expect(shown).not.toContain('Object rows');
+  });
+
+  it('gives the selectivity verdict a chip, which the tier colours', async () => {
+    // The log above records no query plan, so the verdict needs one of its own.
+    const explained = parse(
+      '09:18:22.6 (6574780)|EXECUTION_STARTED\n' +
+        '17:33:36.2 (1672655920)|SOQL_EXECUTE_BEGIN|[198]|Aggregations:0|SELECT Id FROM Account\n' +
+        '17:33:36.2 (1672700000)|SOQL_EXECUTE_EXPLAIN|[198]|Index on Account : [Id], cardinality: 1, sobjectCardinality: 1, relativeCost 0.65\n' +
+        '17:33:36.2 (1680000000)|SOQL_EXECUTE_BEGIN|[199]|Aggregations:0|SELECT Id FROM Contact\n' +
+        '17:33:36.2 (1680100000)|SOQL_EXECUTE_EXPLAIN|[199]|TableScan on Contact : [], cardinality: 9, sobjectCardinality: 9, relativeCost 2.5\n' +
+        '09:18:22.6 (7400000)|EXECUTION_FINISHED\n',
+    );
+    const explainStore = logStoreFor(explained);
+    const indexOf = (query: string) =>
+      explained.eventsById.find((e) => e.text === query)!.eventIndex;
+
+    const selective = await mount(explainStore, {
+      eventIndex: indexOf('SELECT Id FROM Account'),
+      type: 'soql',
+    });
+    const notSelective = await mount(explainStore, {
+      eventIndex: indexOf('SELECT Id FROM Contact'),
+      type: 'soql',
+    });
+
+    expect(
+      [selective, notSelective].map((el) => el.shadowRoot?.querySelector('.pill')?.className),
+    ).toEqual(['pill pill--yes', 'pill pill--no']);
+    expect(notSelective.shadowRoot?.querySelector('.pill')?.textContent).toBe('Not selective');
   });
 
   it('omits fields with no value', async () => {

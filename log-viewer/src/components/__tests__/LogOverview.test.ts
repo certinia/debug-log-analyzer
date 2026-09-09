@@ -39,57 +39,45 @@ describe('log-overview', () => {
     mockSeries = timeSeries();
   });
 
-  it('says the totals are unknown while no log holds cumulative limits', async () => {
+  const noLog = { ...emptyLimits(), byNamespace: new Map(), snapshots: [] } as GovernorLimits;
+
+  const seriesWithSoql = (limit: number): HeatStripTimeSeries =>
+    timeSeries([seriesEvent(1_000, { soqlQueries: { used: 40, limit } })]);
+
+  it('says no log is loaded, not that a log recorded nothing', async () => {
     const element = await overview();
-    expect(element.shadowRoot?.querySelector('.note')?.textContent).toContain(
-      'CUMULATIVE_LIMIT_USAGE',
-    );
+    expect(element.shadowRoot?.querySelector('.note')?.textContent).toContain('No log is loaded');
     expect(element.shadowRoot?.querySelector('governor-summary')).toBeNull();
   });
 
-  const seriesWithSoql = (): HeatStripTimeSeries =>
-    timeSeries([seriesEvent(1_000, { soqlQueries: { used: 40, limit: 100 } })]);
-
-  it('shows the series gauges without a note while the log holds snapshots', async () => {
+  it('shows the gauges without a note while the log reports a limit', async () => {
     const element = await overview();
 
-    mockSeries = seriesWithSoql();
-    await loadLog(element, {
-      ...emptyLimits(),
-      byNamespace: new Map(),
-      snapshots: [{ timestamp: 1_000, namespace: 'default', limits: emptyLimits() }],
-    } as GovernorLimits);
+    mockSeries = seriesWithSoql(100);
+    await loadLog(element, noLog);
 
     expect(element.shadowRoot?.querySelector('governor-summary')).not.toBeNull();
     expect(element.shadowRoot?.querySelector('.note')).toBeNull();
   });
 
-  it('says the figures are estimated when cumulative limits are absent', async () => {
+  // Figures still show where the log reported no limit; the gauge says so on hover, so the strip
+  // carries no note of its own.
+  it('shows the gauges with no note when the log reported no limits', async () => {
     const element = await overview();
 
-    mockSeries = seriesWithSoql();
-    await loadLog(element, {
-      ...emptyLimits(),
-      byNamespace: new Map(),
-      snapshots: [],
-    } as GovernorLimits);
+    mockSeries = seriesWithSoql(0);
+    await loadLog(element, noLog);
 
     expect(element.shadowRoot?.querySelector('governor-summary')).not.toBeNull();
-    expect(element.shadowRoot?.querySelector('.note')?.textContent).toContain('estimated');
+    expect(element.shadowRoot?.querySelector('.note')).toBeNull();
   });
 
-  it('says the totals are unknown when the series itself is empty', async () => {
+  it('says nothing was recorded when the series itself is empty', async () => {
     const element = await overview();
 
-    await loadLog(element, {
-      ...emptyLimits(),
-      byNamespace: new Map(),
-      snapshots: [],
-    } as GovernorLimits);
+    await loadLog(element, noLog);
 
     expect(element.shadowRoot?.querySelector('governor-summary')).toBeNull();
-    expect(element.shadowRoot?.querySelector('.note')?.textContent).toContain(
-      'CUMULATIVE_LIMIT_USAGE',
-    );
+    expect(element.shadowRoot?.querySelector('.note')?.textContent).toContain('no governor usage');
   });
 });
