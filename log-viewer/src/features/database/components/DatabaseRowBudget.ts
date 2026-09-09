@@ -6,10 +6,7 @@ import { LitElement, css, html, type TemplateResult } from 'lit';
 import { customElement, property } from 'lit/decorators.js';
 
 import { CategoryPaletteController } from '../../../components/categoryTime.js';
-import {
-  NO_GOVERNOR_USAGE_TEXT,
-  NO_REPORTED_LIMITS_TEXT,
-} from '../../../components/logOverviewMetrics.js';
+import { NO_GOVERNOR_USAGE_TEXT } from '../../../components/logOverviewMetrics.js';
 import '../../../components/StackedTimeBar.js';
 import { segmentsWithTail, type StackedSegment } from '../../../components/StackedTimeBar.js';
 import { logContext } from '../../../core/log/logContext.js';
@@ -27,7 +24,7 @@ import {
   type RowGroup,
 } from '../services/rowBudget.js';
 import { kindColors } from './DatabaseOverview.js';
-import { governorTier } from './GovernorSummary.js';
+import { governorTier, NO_REPORTED_LIMITS_TEXT } from './GovernorSummary.js';
 
 /** More than a namespace bar: shades in a wide card, not a dock legend. */
 const MAX_OBJECTS = 8;

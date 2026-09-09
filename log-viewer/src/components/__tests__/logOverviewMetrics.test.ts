@@ -5,7 +5,6 @@ import { describe, expect, it } from '@jest/globals';
 
 import {
   GOVERNOR_METRICS,
-  hasReportedLimits,
   limitTotals,
   metricSparkline,
   seriesGauges,
@@ -148,27 +147,6 @@ describe('seriesGauges', () => {
 
       expect(gauges[0]?.spark).toBeUndefined();
     });
-  });
-});
-
-describe('hasReportedLimits', () => {
-  it('is true when any metric carries a limit from the log', () => {
-    expect(
-      hasReportedLimits(
-        timeSeries([
-          seriesEvent(1_000, {
-            soqlQueries: { used: 3, limit: 0 },
-            cpuTime: { used: 20, limit: 10_000 },
-          }),
-        ]),
-      ),
-    ).toBe(true);
-  });
-
-  it('is false when the log reported none', () => {
-    expect(
-      hasReportedLimits(timeSeries([seriesEvent(1_000, { soqlQueries: { used: 3, limit: 0 } })])),
-    ).toBe(false);
   });
 });
 

@@ -9,12 +9,7 @@ import { logContext } from '../core/log/logContext.js';
 import type { LogStore } from '../core/log/LogStore.js';
 import { apexLimitTimeSeries } from '../features/timeline/optimised/apex-limit-series.js';
 import { globalStyles } from '../styles/global.styles.js';
-import {
-  hasReportedLimits,
-  NO_GOVERNOR_USAGE_TEXT,
-  NO_REPORTED_LIMITS_TEXT,
-  seriesGauges,
-} from './logOverviewMetrics.js';
+import { NO_GOVERNOR_USAGE_TEXT, seriesGauges } from './logOverviewMetrics.js';
 
 // web components
 import '../features/database/components/GovernorSummary.js';
@@ -61,9 +56,8 @@ export class LogOverview extends LitElement {
       return html`<p class="note">${NO_GOVERNOR_USAGE_TEXT}</p>`;
     }
 
-    // Every gauge here is a level; only a limit the log itself reported turns one into a share.
-    return html`<governor-summary .metrics=${gauges}></governor-summary>
-      ${hasReportedLimits(series) ? '' : html`<p class="note">${NO_REPORTED_LIMITS_TEXT}</p>`}`;
+    // A gauge with no reported limit says so on hover, so the strip needs no note beneath it.
+    return html`<governor-summary .metrics=${gauges}></governor-summary>`;
   }
 }
 

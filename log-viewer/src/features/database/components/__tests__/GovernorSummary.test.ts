@@ -5,6 +5,7 @@
  */
 import { beforeEach, describe, expect, it } from '@jest/globals';
 
+import { NO_REPORTED_LIMITS_TEXT } from '../GovernorSummary.js';
 import type { GaugeMetric, GovernorSummary } from '../GovernorSummary.js';
 import '../GovernorSummary.js';
 
@@ -44,6 +45,16 @@ describe('governor-summary', () => {
       expect(gauge?.getAttribute('role')).toBeNull();
       expect(gauge?.querySelector('.gauge__track')).toBeNull();
       expect(gauge?.textContent).toContain('12');
+    });
+
+    // The missing denominator says there is no limit; the hover says why, so the host needs no
+    // note under the strip.
+    it('says why it has no bar, on hover', async () => {
+      const element = await strip([spark]);
+
+      expect(element.shadowRoot?.querySelector('.gauge')?.getAttribute('title')).toBe(
+        NO_REPORTED_LIMITS_TEXT,
+      );
     });
 
     it('draws the level scaled to its own peak, described rather than metered', async () => {

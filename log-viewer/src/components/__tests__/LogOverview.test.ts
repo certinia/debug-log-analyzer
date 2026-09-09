@@ -61,14 +61,16 @@ describe('log-overview', () => {
   });
 
   // The log, not a snapshot count, decides: figures still show, but nothing is a share of a limit.
-  it('says no limits were reported when the log reported none', async () => {
+  // Figures still show where the log reported no limit; the gauge says so on hover, so the strip
+  // carries no note of its own.
+  it('shows the gauges with no note when the log reported no limits', async () => {
     const element = await overview();
 
     mockSeries = seriesWithSoql(0);
     await loadLog(element, noLog);
 
     expect(element.shadowRoot?.querySelector('governor-summary')).not.toBeNull();
-    expect(element.shadowRoot?.querySelector('.note')?.textContent).toContain('no governor limits');
+    expect(element.shadowRoot?.querySelector('.note')).toBeNull();
   });
 
   it('says nothing was recorded when the series itself is empty', async () => {

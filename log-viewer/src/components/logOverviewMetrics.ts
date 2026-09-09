@@ -17,14 +17,6 @@ const MAX_GAUGES = 6;
 export const NO_GOVERNOR_USAGE_TEXT = 'This log records no governor usage.';
 
 /**
- * Shown where figures exist but the log reported no limits to measure them against. Deliberately
- * silent on how to get them: a debug level is no guarantee, and complete logs at Apex Profiling
- * FINE and INFO alike carry no limit block.
- */
-export const NO_REPORTED_LIMITS_TEXT =
-  'This log reports no governor limits, so each figure is a level, not a share of one.';
-
-/**
  * Every governor-tracked metric, with the label the inspector shows for it. A
  * local list rather than the timeline adapter's `APEX_METRICS`, which is
  * internal to that feature. The gauges and the governor trend charts read it
@@ -180,8 +172,7 @@ export function metricSparkline(series: HeatStripTimeSeries, key: keyof Limits):
 
 /**
  * The whole-log gauges, capped at {@link MAX_GAUGES}. A gauge with no reported limit has no bar to
- * fill, so it carries a sparkline of its own level instead and the caller shows
- * {@link NO_REPORTED_LIMITS_TEXT} alongside.
+ * fill, so it carries a sparkline of its own level instead.
  */
 export function seriesGauges(series: HeatStripTimeSeries): GaugeMetric[] {
   return rankedLimitMetrics(series, MAX_GAUGES).map(({ key, label, used, limit }) => ({
@@ -192,10 +183,4 @@ export function seriesGauges(series: HeatStripTimeSeries): GaugeMetric[] {
     ...(limit > 0 ? {} : { spark: metricSparkline(series, key) }),
     ...(key === 'heapSize' ? { format: formatByteSize } : {}),
   }));
-}
-
-/** Whether the log reported a limit for any metric it recorded usage for. */
-export function hasReportedLimits(series: HeatStripTimeSeries): boolean {
-  const totals = limitTotals(series);
-  return GOVERNOR_METRICS.some(({ key }) => totals[key].limit > 0);
 }

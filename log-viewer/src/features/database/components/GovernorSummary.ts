@@ -31,6 +31,13 @@ export interface GaugeMetric {
   spark?: readonly number[];
 }
 
+/**
+ * Why a gauge carries no bar. On hover, not on a line of its own: the missing denominator already
+ * says it, and a note under the strip costs a row in a narrow panel. It answers the one question
+ * the figures cannot — whether the limits are missing or the reading is broken.
+ */
+export const NO_REPORTED_LIMITS_TEXT = 'The log reports no governor limits.';
+
 /** Consumption percentage where a gauge or trend turns from safe to warn. */
 export const GOVERNOR_WARN_PERCENT = 80;
 
@@ -165,7 +172,7 @@ export class GovernorSummary extends LitElement {
       // No limit, so no meter: a bar against the level's own peak would sit full and read as a
       // breach. The sparkline carries the shape instead, and takes a description rather than the
       // `aria-valuemax` a meter needs.
-      return html`<div class="gauge ${muted ? 'muted' : ''}">
+      return html`<div class="gauge ${muted ? 'muted' : ''}" title=${NO_REPORTED_LIMITS_TEXT}>
         <span class="gauge__label">${metric.label}</span>
         <span class="gauge__value"
           >${format(metric.found)} <span class="gauge__na">seen</span></span
