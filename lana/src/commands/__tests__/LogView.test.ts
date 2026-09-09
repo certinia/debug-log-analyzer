@@ -36,6 +36,19 @@ const mockApplyWebView = WebView.apply as jest.Mock;
 const mockReadFile = workspace.fs.readFile as unknown as jest.Mock;
 
 describe('LogView', () => {
+  function createPanel() {
+    return {
+      iconPath: undefined,
+      onDidDispose: jest.fn(() => ({ dispose: jest.fn() })),
+      webview: {
+        asWebviewUri: jest.fn((uri: { path: string }) => Uri.parse(`webview:${uri.path}`)),
+        html: '',
+        onDidReceiveMessage: jest.fn(() => ({ dispose: jest.fn() })),
+        postMessage: jest.fn(),
+      },
+    };
+  }
+
   afterEach(() => {
     setEmbeddedLogViewerAssets(undefined);
   });
@@ -101,16 +114,7 @@ describe('LogView', () => {
   });
 
   it('loads the packaged template when embedded browser assets are not configured', async () => {
-    const panel = {
-      iconPath: undefined,
-      onDidDispose: jest.fn(() => ({ dispose: jest.fn() })),
-      webview: {
-        asWebviewUri: jest.fn((uri: { path: string }) => Uri.parse(`webview:${uri.path}`)),
-        html: '',
-        onDidReceiveMessage: jest.fn(() => ({ dispose: jest.fn() })),
-        postMessage: jest.fn(),
-      },
-    };
+    const panel = createPanel();
     mockApplyWebView.mockReturnValue(panel as unknown as import('vscode').WebviewPanel);
     mockReadFile.mockResolvedValue(
       new TextEncoder().encode('<script src="bundle.js"></script><link href="codicon.css">'),
@@ -121,5 +125,15 @@ describe('LogView', () => {
     expect(mockReadFile).toHaveBeenCalledWith(Uri.parse('file:///test/extension/out/index.html'));
     expect(panel.webview.html).toContain('webview:/test/extension/out/bundle.js');
     expect(panel.webview.html).not.toContain('src="bundle.js"');
+  });
+
+  it('names the file it could not read when the packaged template is missing', async () => {
+    const panel = createPanel();
+    mockApplyWebView.mockReturnValue(panel as unknown as import('vscode').WebviewPanel);
+    mockReadFile.mockRejectedValue(new Error('ENOENT'));
+
+    await expect(
+      LogView.createView(createMockContext() as unknown as import('../../Context.js').Context),
+    ).rejects.toThrow('Could not read the log viewer at /test/extension/out/index.html: ENOENT');
   });
 });

@@ -4,6 +4,7 @@
 import {
   window,
   workspace,
+  type Disposable,
   type QuickPick as VSCodeQuickPick,
   type QuickPickItem,
   type WebviewPanel,
@@ -32,6 +33,8 @@ class DebugLogItem extends Item {
     this.logId = logId;
   }
 }
+
+const LIST_LOGS_TIMEOUT_MS = 60_000;
 
 export class RetrieveLogFile {
   private static servicesDisposalRegistered = false;
@@ -75,7 +78,13 @@ export class RetrieveLogFile {
     }
     const loadingPicker = RetrieveLogFile.showLoadingPicker();
     try {
-      const logFiles = await salesforceServices.listLogs();
+      const logFiles = await RetrieveLogFile.whileLoading(
+        loadingPicker,
+        salesforceServices.listLogs(),
+      );
+      if (logFiles === undefined) {
+        return;
+      }
       const logFileId = await RetrieveLogFile.getLogFile(logFiles);
       if (logFileId) {
         const logUri = Utils.joinPath(
@@ -117,6 +126,29 @@ export class RetrieveLogFile {
     qp.enabled = false;
     qp.show();
     return qp;
+  }
+
+  private static whileLoading<T>(
+    picker: VSCodeQuickPick<QuickPickItem>,
+    work: Promise<T>,
+  ): Promise<T | undefined> {
+    let hidden: Disposable | undefined;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const interrupted = new Promise<undefined>((resolve, reject) => {
+      hidden = picker.onDidHide(() => resolve(undefined));
+      timer = setTimeout(() => {
+        reject(
+          new Error(
+            `Salesforce did not list the logs within ${LIST_LOGS_TIMEOUT_MS / 1000} seconds. Check the org connection and try again.`,
+          ),
+        );
+      }, LIST_LOGS_TIMEOUT_MS);
+    });
+
+    return Promise.race([work, interrupted]).finally(() => {
+      hidden?.dispose();
+      clearTimeout(timer);
+    });
   }
 
   private static async getLogFile(files: ApexLogListItem[]): Promise<string | null> {

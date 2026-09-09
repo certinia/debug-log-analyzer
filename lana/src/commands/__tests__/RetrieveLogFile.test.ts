@@ -1,7 +1,7 @@
 /*
  * Copyright (c) 2026 Certinia Inc. All rights reserved.
  */
-import { beforeEach, describe, expect, it } from '@jest/globals';
+import { afterEach, beforeEach, describe, expect, it } from '@jest/globals';
 import { commands, Uri, window, workspace } from 'vscode';
 import { createMockContext } from '../../__tests__/helpers/test-builders.js';
 import { QuickPick } from '../../display/QuickPick.js';
@@ -92,17 +92,65 @@ describe('RetrieveLogFile', () => {
     mockPick.mockResolvedValue([]);
     mockGetLogBody.mockResolvedValue('log body');
     mockWriteFile.mockResolvedValue(undefined);
-    (window.createQuickPick as jest.Mock).mockReturnValue({
-      busy: false,
-      enabled: true,
-      placeholder: '',
-      show: jest.fn(),
-      dispose: jest.fn(),
-    });
+    dismissPicker = () => undefined;
+    picker = makePicker();
+    (window.createQuickPick as jest.Mock).mockReturnValue(picker);
   });
+
+  afterEach(() => {
+    jest.useRealTimers();
+  });
+
+  const makePicker = () => ({
+    busy: false,
+    enabled: true,
+    placeholder: '',
+    show: jest.fn(),
+    dispose: jest.fn(),
+    onDidHide: jest.fn((listener: () => void) => {
+      dismissPicker = listener;
+      return { dispose: jest.fn() };
+    }),
+  });
+
+  let picker: ReturnType<typeof makePicker>;
+  let dismissPicker: () => void;
+
+  const settle = () => new Promise((resolve) => setImmediate(resolve));
 
   const command = (): (() => Promise<unknown>) =>
     mockRegisterCommand.mock.calls[mockRegisterCommand.mock.calls.length - 1]?.[1];
+
+  it('closes the loading picker and reports nothing when the user dismisses it', async () => {
+    mockListLogs.mockReturnValue(new Promise(() => {}));
+    const context = createMockContext();
+    RetrieveLogFile.apply(context as unknown as import('../../Context.js').Context);
+
+    const running = command()();
+    await settle();
+    dismissPicker();
+    await running;
+
+    expect(picker.dispose).toHaveBeenCalled();
+    expect(context.display.showErrorMessage).not.toHaveBeenCalled();
+    expect(mockPick).not.toHaveBeenCalled();
+  });
+
+  it('closes the loading picker and says so when Salesforce never lists the logs', async () => {
+    mockListLogs.mockReturnValue(new Promise(() => {}));
+    const context = createMockContext();
+    RetrieveLogFile.apply(context as unknown as import('../../Context.js').Context);
+
+    jest.useFakeTimers();
+    const running = command()();
+    await jest.advanceTimersByTimeAsync(60_000);
+    await running;
+
+    expect(picker.dispose).toHaveBeenCalled();
+    expect(context.display.showErrorMessage).toHaveBeenCalledWith(
+      expect.stringContaining('did not list the logs within 60 seconds'),
+    );
+  });
 
   it('registers the command', () => {
     const context = createMockContext();

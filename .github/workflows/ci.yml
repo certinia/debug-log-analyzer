@@ -118,7 +118,7 @@ jobs:
   gate:
     # The single required status check: the ruleset never needs updating when jobs change.
     name: CI Gate
-    needs: [verify_files, tests, build]
+    needs: [verify_files, tests, e2e, build]
     if: always()
     runs-on: ubuntu-latest
     steps:
