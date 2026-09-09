@@ -23,7 +23,7 @@ import {
   type TrendPoint,
   type TrendSeries,
 } from './governorTrendData.js';
-import { NO_CUMULATIVE_LIMITS_TEXT } from './logOverviewMetrics.js';
+import { NO_GOVERNOR_USAGE_TEXT } from './logOverviewMetrics.js';
 
 /** Chart-space size; the SVG stretches to fill its row. */
 const VIEW_W = 100;
@@ -180,6 +180,11 @@ export class GovernorTrends extends LitElement {
         color: var(--lana-severity-error);
       }
 
+      /* No reported limit, so no severity: the shape is a level, drawn in the muted foreground. */
+      .trend--level {
+        color: var(--lana-fg-muted);
+      }
+
       .trend__area {
         fill: currentColor;
         opacity: 0.25;
@@ -217,11 +222,9 @@ export class GovernorTrends extends LitElement {
     }
     const series = governorTrendSeries(apexLimitTimeSeries(apexLog));
     if (!series.length) {
-      return html`<p class="note">${NO_CUMULATIVE_LIMITS_TEXT}</p>`;
+      return html`<p class="note">${NO_GOVERNOR_USAGE_TEXT}</p>`;
     }
 
-    // With no cumulative snapshots the series draws from granular events and
-    // the default limits — the Log overview above carries the estimated note.
     const logTotal = apexLog.duration.total;
     return html`<div class="trends">${series.map((s) => this._renderTrend(s, logTotal))}</div>`;
   }
@@ -231,21 +234,34 @@ export class GovernorTrends extends LitElement {
     const cursor = this._cursorFor(series);
     const cursorX = cursor ? x(cursor.t).toFixed(2) : null;
 
-    return html`<div class="trend trend--${governorTier(series.finalRatio)}">
+    // No reported limit: the denominator is the metric's own peak, so the figure is spelled "of"
+    // rather than "/", and the guide and the tier colour — both distances from a cap — come off.
+    const metered = series.limit > 0;
+
+    return html`<div class="trend trend--${metered ? governorTier(series.finalRatio) : 'level'}">
       <div class="trend__head">
         <span class="trend__label">${series.label}</span>
         <span class="trend__value" aria-live="polite"
           >${cursor ? html`${formatDuration(cursor.t)} · ` : ''}${series.format(
             cursor ? cursor.used : series.used,
-          )} <span class="trend__limit">/ ${series.format(series.limit)}</span></span
+          )}
+          <span class="trend__limit"
+            >${
+              metered
+                ? html`/ ${series.format(series.limit)}`
+                : html`of ${series.format(series.used)}`
+            }</span
+          ></span
         >
       </div>
       <button
         class="trend__chart"
         type="button"
-        aria-label="${series.label}: ${Math.round(
-          series.finalRatio,
-        )}% of the limit used. Move the timeline to a point in the log."
+        aria-label="${series.label}: ${
+          metered
+            ? `${Math.round(series.finalRatio)}% of the limit used`
+            : `peak ${series.format(series.used)}, no limit reported`
+        }. Move the timeline to a point in the log."
         @pointermove=${(event: PointerEvent) => this._onPointerMove(event, series, logTotal)}
         @pointerleave=${() => this._onPointerLeave()}
         @click=${(event: PointerEvent) => this._onClick(event, series, logTotal)}
@@ -260,7 +276,11 @@ export class GovernorTrends extends LitElement {
           ${svg`
             <path class="trend__area" d=${area}></path>
             <path class="trend__line" d=${line}></path>
-            <line class="trend__guide" x1="0" y1=${guideY} x2=${VIEW_W} y2=${guideY}></line>
+            ${
+              metered
+                ? svg`<line class="trend__guide" x1="0" y1=${guideY} x2=${VIEW_W} y2=${guideY}></line>`
+                : ''
+            }
             ${cursorX === null ? '' : svg`<line class="trend__cursor" x1=${cursorX} y1="0" x2=${cursorX} y2=${VIEW_H}></line>`}
           `}
         </svg>
