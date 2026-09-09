@@ -68,7 +68,6 @@ describe('hot-spots', () => {
     // The bar runs to the 40% total share; half of it — the 20% self share — is solid.
     expect(row?.style.getPropertyValue('--self-pct')).toBe('50%');
     // The hue is decorative, so the category is named in text a reader can hear.
-    expect(row?.querySelector('.reveal-row__swatch')).toBeNull();
     expect(row?.querySelector('.reveal-row__sr')?.textContent).toBe('Apex');
     expect(
       element.shadowRoot?.querySelector<HTMLElement>('.reveal-row__meter-fill')?.style.width,

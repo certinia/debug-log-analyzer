@@ -7,8 +7,7 @@ import type { RowComponent } from 'tabulator-tables';
 
 import type { SelectionView } from '../../../core/events/EventBus.js';
 import { withCodeDrivenExpand } from '../../../tabulator/module/expandOrigin.js';
-import { getEventKey } from '../../../core/log/eventKeys.js';
-import { eventKeyChain } from './Aggregation.js';
+import { eventKeyChain, getEventKey } from '../../../core/log/eventKeys.js';
 
 interface BucketRow {
   key?: string;
@@ -29,6 +28,11 @@ const bucketOf = (row: RowComponent): BucketRow => row.getData() as BucketRow;
  * @param rows - the view's top-level rows
  * @param waitForRender - resolves once an expanded row's children exist
  */
+export function findRootBucket(rows: RowComponent[], event: LogEvent): RowComponent | null {
+  const key = getEventKey(event);
+  return rows.find((row) => bucketOf(row).key === key) ?? null;
+}
+
 export async function findBucketRow(
   rows: RowComponent[],
   event: LogEvent,
@@ -36,8 +40,7 @@ export async function findBucketRow(
   waitForRender: () => Promise<void>,
 ): Promise<RowComponent | null> {
   if (direction === 'callers') {
-    const key = getEventKey(event);
-    return rows.find((row) => bucketOf(row).key === key) ?? null;
+    return findRootBucket(rows, event);
   }
 
   const path = eventKeyChain(event).reverse();
@@ -55,8 +58,12 @@ export async function findBucketRow(
       break;
     }
     let children = next.getTreeChildren() ?? [];
-    if (!children.length && bucketOf(next)._children?.length && !next.isTreeExpanded()) {
-      withCodeDrivenExpand(() => next.treeExpand());
+    if (!children.length && bucketOf(next)._children?.length) {
+      if (!next.isTreeExpanded()) {
+        withCodeDrivenExpand(() => next.treeExpand());
+      }
+      // An open row can still be waiting on the renderer, and reading through
+      // without waiting landed the descent on this row rather than the target.
       await waitForRender();
       children = next.getTreeChildren() ?? [];
     }

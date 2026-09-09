@@ -143,18 +143,6 @@ export function createTimeOrderTable(
   });
   tableRef.current = table;
 
-  // The host's filter caches (search/type/debug/namespace/duration) are cleared once per
-  // render via `renderStarted` — see CalltreeView's `onFilterCacheClear`. Row ids produced
-  // by `toTimeOrderTree` are globally unique within a build (per-build monotonic counter),
-  // so cached `deepFilter` results stay valid across the cascaded `filter.filter()` passes
-  // Tabulator runs for each expanded subtree — `getChildren` → `filter.filter(config.children)`
-  // would otherwise fire `dataFiltered` multiple times per user action, defeating the cache.
-  // If row ids ever lose their uniqueness guarantee this must move back to `dataFiltered`.
-  table.on('renderStarted', () => {
-    callbacks.onFilterCacheClear?.();
-    callbacks.onRenderStarted();
-  });
-
   table.on('rowContext', (e: UIEvent, row: RowComponent) => {
     callbacks.onContextMenu(e, row);
   });

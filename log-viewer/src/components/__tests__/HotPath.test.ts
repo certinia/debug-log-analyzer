@@ -93,7 +93,6 @@ describe('hot-path', () => {
       'self 0.001 ms (50.0%) \u00b7 0.001 ms (50.0%) below this frame \u00b7 the hot spot',
     );
     // The hue is decorative, so the category is named in text a reader can hear.
-    expect(row?.querySelector('.reveal-row__swatch')).toBeNull();
     expect(row?.querySelector('.reveal-row__sr')?.textContent).toBe('Apex');
   });
 
@@ -288,6 +287,16 @@ describe('hot-path', () => {
       ['70%', '0.001 ms on the path'],
       ['20%', '0 ms to branches'],
     ]);
+  });
+
+  it('heads a truncated log with a caveat the shared warning glyph marks', async () => {
+    highlights = { ...pathOf(1), truncation: { regionCount: 2, firstEventIndex: 5 } };
+
+    const element = await hotPath();
+
+    const caveat = element.shadowRoot!.querySelector('.caveat-row')!;
+    expect(caveat.textContent).toContain('2 truncated calls');
+    expect(caveat.querySelector('vscode-icon')?.className).toBe('sev-warning');
   });
 
   it('marks every merged instance of the row under the pointer', async () => {

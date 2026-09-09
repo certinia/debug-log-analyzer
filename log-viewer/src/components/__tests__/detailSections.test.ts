@@ -58,6 +58,7 @@ describe('buildDetailSections', () => {
     const sections = await buildDetailSections('timeline', { kind: 'event', eventIndex: 4 });
     expect(sections.map((s) => s.id)).toEqual([
       'vitals',
+      'variables',
       'namespace-time',
       'callstack',
       'calltree',
@@ -130,18 +131,59 @@ describe('buildDetailSections', () => {
     const sections = await buildDetailSections('database', { kind: 'event', eventIndex: 9 });
 
     expect(databaseCalls).toEqual([]);
-    expect(sections.map((s) => s.id)).toEqual(['vitals', 'callstack', 'calltree']);
+    expect(sections.map((s) => s.id)).toEqual(['vitals', 'variables', 'callstack', 'calltree']);
   });
 
   it('scopes an aggregate selection to its first occurrence', async () => {
     const sections = await buildDetailSections('analysis', {
       kind: 'aggregate',
       instances: [11, 12, 13],
+      frames: [11, 12, 13],
     });
-    expect(sections.map((s) => s.id)).toEqual(['vitals', 'findings', 'callstack', 'calltree']);
+    expect(sections.map((s) => s.id)).toEqual([
+      'vitals',
+      'variables',
+      'findings',
+      'callstack',
+      'calltree',
+    ]);
     expect(
       (rendered(sections, 'vitals', 'event-vitals') as HTMLElement & { instances: number[] | null })
         .instances,
+    ).toEqual([11, 12, 13]);
+  });
+
+  // A bottom-up caller row counts its callee's calls, so reading variables from
+  // those would show the called method's scope under a row that names the caller.
+  it('gives Variables the frames the row is, not the calls it counts', async () => {
+    const sections = await buildDetailSections('analysis', {
+      kind: 'aggregate',
+      instances: [11, 12, 13],
+      frames: [4, 5, 6],
+    });
+
+    expect(
+      (
+        rendered(sections, 'variables', 'variables-detail') as HTMLElement & {
+          frames: number[] | null;
+        }
+      ).frames,
+    ).toEqual([4, 5, 6]);
+  });
+
+  it('gives Variables the calls themselves where the row sits at their depth', async () => {
+    const sections = await buildDetailSections('analysis', {
+      kind: 'aggregate',
+      instances: [11, 12, 13],
+      frames: [11, 12, 13],
+    });
+
+    expect(
+      (
+        rendered(sections, 'variables', 'variables-detail') as HTMLElement & {
+          frames: number[] | null;
+        }
+      ).frames,
     ).toEqual([11, 12, 13]);
   });
 
@@ -149,6 +191,7 @@ describe('buildDetailSections', () => {
     const sections = await buildDetailSections('analysis', {
       kind: 'aggregate',
       instances: [11, 12, 13],
+      frames: [11, 12, 13],
     });
 
     const findings = rendered(sections, 'findings', 'log-diagnostics') as HTMLElement & {
@@ -162,7 +205,7 @@ describe('buildDetailSections', () => {
   it('scopes the findings to the frame being followed, not the aggregate it left', async () => {
     const sections = await buildDetailSections(
       'analysis',
-      { kind: 'aggregate', instances: [11, 12, 13] },
+      { kind: 'aggregate', instances: [11, 12, 13], frames: [11, 12, 13] },
       { kind: 'event', eventIndex: 8 },
     );
 
@@ -176,6 +219,7 @@ describe('buildDetailSections', () => {
     const sections = await buildDetailSections('timeline', { kind: 'event', eventIndex: 4 });
     expect(sections.map((s) => s.id)).toEqual([
       'vitals',
+      'variables',
       'namespace-time',
       'callstack',
       'calltree',
@@ -201,6 +245,7 @@ describe('buildDetailSections', () => {
     const sections = await buildDetailSections('timeline', {
       kind: 'aggregate',
       instances: [11, 12, 13],
+      frames: [11, 12, 13],
     });
 
     const bar = rendered(sections, 'namespace-time', 'namespace-time-bar') as HTMLElement & {
@@ -211,13 +256,13 @@ describe('buildDetailSections', () => {
 
   it('leaves the namespace split out for a selection from another tab', async () => {
     const sections = await buildDetailSections('calltree', { kind: 'event', eventIndex: 4 });
-    expect(sections.map((s) => s.id)).toEqual(['vitals', 'callstack', 'calltree']);
+    expect(sections.map((s) => s.id)).toEqual(['vitals', 'variables', 'callstack', 'calltree']);
   });
 
   it('drops the aggregate once a single frame in its stack is the one being followed', async () => {
     const sections = await buildDetailSections(
       'analysis',
-      { kind: 'aggregate', instances: [11, 12, 13] },
+      { kind: 'aggregate', instances: [11, 12, 13], frames: [11, 12, 13] },
       { kind: 'event', eventIndex: 8 },
     );
 
@@ -232,8 +277,8 @@ describe('buildDetailSections', () => {
   it('describes the calls a walked bucket counts, as a bucket picked in the tab is', async () => {
     const sections = await buildDetailSections(
       'analysis',
-      { kind: 'aggregate', instances: [11, 12, 13] },
-      { kind: 'aggregate', instances: [21, 22], calledBy: 'Trigger1' },
+      { kind: 'aggregate', instances: [11, 12, 13], frames: [11, 12, 13] },
+      { kind: 'aggregate', instances: [21, 22], frames: [21, 22], calledBy: 'Trigger1' },
     );
 
     const vitals = rendered(sections, 'vitals', 'event-vitals') as HTMLElement & {

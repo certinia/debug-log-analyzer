@@ -105,7 +105,7 @@ export class DatabaseMetricCard extends LitElement {
         display: block;
         width: 100%;
         height: 3px;
-        border-radius: 2px;
+        border-radius: var(--lana-radius-pill);
         background: var(--lana-surface-border);
         overflow: hidden;
       }
@@ -113,7 +113,7 @@ export class DatabaseMetricCard extends LitElement {
       .stat__fill {
         display: block;
         height: 100%;
-        border-radius: 2px;
+        border-radius: var(--lana-radius-pill);
         transition: width 150ms ease;
       }
 

@@ -87,6 +87,7 @@ interface RendererBase {
   styleRow: (row: RowInternals, index: number) => void;
   // CoreFeature.dispatch → table.eventBus (internal event chain). Stock
   // fires 'render-virtual-fill' after every fill; GroupRows depends on it.
+  // Ours adds 'render-virtual-attach', after every attach.
   dispatch: (event: string) => void;
 }
 
@@ -1229,6 +1230,11 @@ export class VirtualVerticalRenderer extends Renderer {
         this._setHeight(entry.index, h, entry.row.data);
       }
     }
+
+    // Ours: rows are in the table. What decorates rendered rows needs this and
+    // not 'render-virtual-fill', which an incremental scroll tick skips, nor a
+    // scroll event, which a sort or a filter never fires.
+    self.dispatch('render-virtual-attach');
   }
 
   private _detachAllRendered(): void {

@@ -1,4 +1,9 @@
 {
   "files": [],
-  "references": [{ "path": "./apex-log-parser" }, { "path": "./log-viewer" }, { "path": "./lana" }]
+  "references": [
+    { "path": "./apex-log-parser" },
+    { "path": "./log-viewer" },
+    { "path": "./lana" },
+    { "path": "./lana/test/playwright" }
+  ]
 }

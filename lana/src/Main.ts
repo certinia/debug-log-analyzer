@@ -12,8 +12,6 @@ export function activate(extensionContext: ExtensionContext) {
   context = new Context(extensionContext, new Display());
 }
 
-export async function deactivate() {
+export function deactivate() {
   context = null;
-  const { disposeServices } = await import('./services/servicesRuntime.js');
-  await disposeServices();
 }

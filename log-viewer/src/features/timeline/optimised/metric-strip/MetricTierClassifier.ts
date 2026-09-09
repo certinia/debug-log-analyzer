@@ -51,6 +51,7 @@ export const EMPTY_METRIC_STRIP_DATA: MetricStripProcessedData = {
   globalMaxPercent: 0,
   hasData: false,
   scaledToPeak: false,
+  gaps: [],
 };
 
 /**
@@ -92,7 +93,7 @@ export class MetricTierClassifier {
     this.lookupCache = null;
 
     if (timeSeries.events.length === 0) {
-      this.processedData = EMPTY_METRIC_STRIP_DATA;
+      this.processedData = { ...EMPTY_METRIC_STRIP_DATA, gaps: timeSeries.gaps ?? [] };
       return this.processedData;
     }
 
@@ -121,6 +122,7 @@ export class MetricTierClassifier {
       globalMaxPercent: Math.max(0, ...maxPercents.values()),
       hasData: points.length > 0,
       scaledToPeak,
+      gaps: timeSeries.gaps ?? [],
     };
 
     return this.processedData;

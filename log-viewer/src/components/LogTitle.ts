@@ -85,6 +85,6 @@ export class LogTitle extends LitElement {
   }
 
   _goToLog() {
-    vscodeMessenger.send<string>('openPath', this.logPath);
+    vscodeMessenger.send('openPath');
   }
 }

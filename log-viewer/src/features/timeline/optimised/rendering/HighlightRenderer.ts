@@ -28,6 +28,46 @@ export interface HighlightColors {
 export const MIN_HIGHLIGHT_WIDTH = 6;
 
 /**
+ * Wash a frame: one fill over the frame's own gapped bounds.
+ *
+ * A frame thinner than {@link MIN_HIGHLIGHT_WIDTH} widens to it, centred on the frame, so a
+ * sub-pixel frame can still be seen.
+ *
+ * @param graphics - PixiJS Graphics to draw to
+ * @param timestamp - Event start time in nanoseconds
+ * @param duration - Event duration in nanoseconds
+ * @param depth - Event depth (0-indexed)
+ * @param viewport - Current viewport state
+ * @param color - Wash color (0xRRGGBB)
+ * @param alpha - Wash alpha
+ */
+export function renderWash(
+  graphics: PIXI.Graphics,
+  timestamp: number,
+  duration: number,
+  depth: number,
+  viewport: ViewportState,
+  color: number,
+  alpha: number,
+): void {
+  const screenX = timestamp * viewport.zoom;
+  const screenWidth = duration * viewport.zoom;
+
+  // Must match rectangle rendering in EventBatchRenderer: x + halfGap, width - gap.
+  const halfGap = TIMELINE_CONSTANTS.RECT_GAP / 2;
+  const y = depth * TIMELINE_CONSTANTS.EVENT_HEIGHT + halfGap;
+  const height = TIMELINE_CONSTANTS.EVENT_HEIGHT - TIMELINE_CONSTANTS.RECT_GAP;
+
+  if (screenWidth < MIN_HIGHLIGHT_WIDTH) {
+    const centeredX = screenX + screenWidth / 2 - MIN_HIGHLIGHT_WIDTH / 2;
+    graphics.rect(centeredX, y, MIN_HIGHLIGHT_WIDTH, height);
+  } else {
+    graphics.rect(screenX + halfGap, y, screenWidth - TIMELINE_CONSTANTS.RECT_GAP, height);
+  }
+  graphics.fill({ color, alpha });
+}
+
+/**
  * Render a highlight rectangle with true alpha transparency.
  * Creates a "yellow glass" tint effect where the frame color shows through.
  *
@@ -52,53 +92,38 @@ export function renderHighlight(
   viewport: ViewportState,
   colors: HighlightColors,
 ): void {
-  // Calculate screen position from event data and current viewport
-  const screenX = timestamp * viewport.zoom;
   const screenWidth = duration * viewport.zoom;
-  const screenY = depth * TIMELINE_CONSTANTS.EVENT_HEIGHT;
-  const screenHeight = TIMELINE_CONSTANTS.EVENT_HEIGHT;
+  const isNarrow = screenWidth < MIN_HIGHLIGHT_WIDTH;
 
-  // Pre-calculate gap values (must match rectangle rendering in EventBatchRenderer)
-  const halfGap = TIMELINE_CONSTANTS.RECT_GAP / 2;
-  const gappedHeight = screenHeight - TIMELINE_CONSTANTS.RECT_GAP;
+  renderWash(
+    graphics,
+    timestamp,
+    duration,
+    depth,
+    viewport,
+    colors.sourceColor,
+    isNarrow ? 0.6 : 0.3,
+  );
 
-  // Calculate event center point (always accurate regardless of zoom)
-  const eventCenterX = screenX + screenWidth / 2;
-
-  // Enforce minimum visible size for highlight
-  const visibleWidth = Math.max(screenWidth, MIN_HIGHLIGHT_WIDTH);
-
-  // Center the minimum-size highlight on the actual event position
-  const centeredX = eventCenterX - visibleWidth / 2;
-
-  // Calculate gapped dimensions to match rectangle rendering exactly
-  // Rectangle renderer uses: x + halfGap, y + halfGap, width - gap, height - gap
-  const gappedWidth = Math.max(2, screenWidth - TIMELINE_CONSTANTS.RECT_GAP);
-  const rectX = screenX + halfGap;
-  const rectY = screenY + halfGap;
-
-  if (screenWidth < MIN_HIGHLIGHT_WIDTH) {
-    // Small event: use minimum width, centered on event, more opaque for visibility
-    graphics.rect(centeredX, rectY, visibleWidth, gappedHeight);
-    graphics.fill({ color: colors.sourceColor, alpha: 0.6 });
-  } else {
-    // Normal event: overlay + border
-    // Overlay fill with true alpha transparency (frame color shows through)
-    // Uses gapped bounds to match rectangle rendering exactly
-    graphics.rect(rectX, rectY, gappedWidth, gappedHeight);
-    graphics.fill({ color: colors.sourceColor, alpha: 0.3 });
-
-    // Border at FULL bounds (before gap adjustment) so stroke extends outside
-    // Canvas strokes are center-aligned: half inside, half outside the path
-    // With 2px stroke at full bounds, the border extends 1px outside the rectangle
-    // This matches Chrome DevTools selection highlight behavior
-    graphics.rect(screenX, screenY, screenWidth, screenHeight);
-    graphics.stroke({
-      width: 2,
-      color: colors.sourceColor,
-      alpha: 0.9,
-    });
+  if (isNarrow) {
+    return;
   }
+
+  // Border at FULL bounds (before gap adjustment) so stroke extends outside
+  // Canvas strokes are center-aligned: half inside, half outside the path
+  // With 2px stroke at full bounds, the border extends 1px outside the rectangle
+  // This matches Chrome DevTools selection highlight behavior
+  graphics.rect(
+    timestamp * viewport.zoom,
+    depth * TIMELINE_CONSTANTS.EVENT_HEIGHT,
+    screenWidth,
+    TIMELINE_CONSTANTS.EVENT_HEIGHT,
+  );
+  graphics.stroke({
+    width: 2,
+    color: colors.sourceColor,
+    alpha: 0.9,
+  });
 }
 
 /**

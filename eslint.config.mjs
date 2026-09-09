@@ -3,6 +3,9 @@ import { defineConfig, globalIgnores } from 'eslint/config';
 import prettierConfig from 'eslint-config-prettier/flat';
 import tseslint from 'typescript-eslint';
 
+const NO_NODE_BUILTINS =
+  'lana also runs in the VS Code web extension host, where the bundler stubs these to empty modules and the failure only shows at runtime. Use the vscode API or vscode-uri Utils.';
+
 export default defineConfig(
   globalIgnores([
     // agent worktrees/scratch: nested repo copies that would otherwise be
@@ -15,6 +18,8 @@ export default defineConfig(
     '**/out/',
     '**/coverage/',
     '**/.docusaurus/',
+    '**/.vscode-test-web/',
+    '**/playwright-report/',
     // only TypeScript is linted; without this, `eslint .` selects js/mjs/cjs
     // by default and scans them with no rules
     '**/*.js',
@@ -94,6 +99,34 @@ export default defineConfig(
       '@typescript-eslint/no-import-type-side-effects': 'error',
       curly: 'warn',
       eqeqeq: 'warn',
+    },
+  },
+  {
+    files: ['lana/src/**/*.ts'],
+    ignores: [
+      'lana/src/commands/RetrieveLogFile.ts',
+      'lana/src/commands/__tests__/RetrieveLogFile.test.ts',
+      'lana/src/services/**',
+    ],
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        {
+          // Bare names only: a `patterns` glob would also catch our own lana/src/fs/.
+          paths: ['fs', 'fs/promises', 'os', 'path', 'crypto', 'child_process'].map((name) => ({
+            name,
+            message: NO_NODE_BUILTINS,
+          })),
+          patterns: [
+            { group: ['node:*'], message: NO_NODE_BUILTINS },
+            {
+              group: ['**/services/salesforceServices*'],
+              message:
+                'Salesforce Services is for org operations and throws until ensureServicesAvailable() has run. Use lana/src/fs/workspaceFs.ts for file I/O.',
+            },
+          ],
+        },
+      ],
     },
   },
 );

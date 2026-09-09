@@ -15,7 +15,6 @@
  * Key capabilities:
  * - Viewport culling: query() returns visible rectangles and buckets
  * - Spatial queries: queryEventsInRegion() for hit testing (O(log n + k))
- * - Density stats: queryBucketStats() for minimap visualization (O(log n))
  *
  * Key concepts:
  * - Leaf nodes represent individual events
@@ -23,7 +22,6 @@
  * - Query traversal stops at nodes where nodeSpan <= threshold (2px / zoom)
  * - Pre-computed category stats enable instant bucket color resolution
  *
- * Memory usage: ~175MB for 500k events (tree + original rectangles)
  * Build time: O(n log n) for sorting + O(n) for tree construction
  * Query time: O(k log n) where k = number of visible nodes
  */
@@ -55,18 +53,6 @@ const PRIORITY_MAP = new Map<string, number>(
 );
 
 /**
- * Frame data for minimap density computation.
- * Pre-sorted by timeStart for efficient sliding window algorithms.
- */
-export interface SkylineFrame {
-  timeStart: number;
-  timeEnd: number;
-  depth: number;
-  category: string;
-  selfDuration: number;
-}
-
-/**
  * TemporalSegmentTree
  *
  * Manages separate trees per depth level for efficient viewport culling.
@@ -83,24 +69,30 @@ type AggregationBucket = {
   dominantCategory: string; // Resolved after all nodes aggregated
 };
 
+/** Group rectangles by depth, for a caller that has not already done it. */
+function groupByDepth(
+  rectsByCategory: Map<string, PrecomputedRect[]>,
+): Map<number, PrecomputedRect[]> {
+  const rectsByDepth = new Map<number, PrecomputedRect[]>();
+  for (const rects of rectsByCategory.values()) {
+    for (const rect of rects) {
+      let depthRects = rectsByDepth.get(rect.depth);
+      if (!depthRects) {
+        depthRects = [];
+        rectsByDepth.set(rect.depth, depthRects);
+      }
+      depthRects.push(rect);
+    }
+  }
+  return rectsByDepth;
+}
+
 export class TemporalSegmentTree {
   /** Tree root per depth level: Map<depth, rootNode> */
   private treesByDepth: Map<number, SegmentNode> = new Map();
 
   /** Maximum depth in the tree */
   private maxDepth = 0;
-
-  /**
-   * Unsorted frames collected during tree construction.
-   * Sorting is deferred to first getAllFramesSorted() call.
-   */
-  private unsortedFrames: SkylineFrame[] | null = null;
-
-  /**
-   * Cached sorted frames for minimap density computation.
-   * Lazily sorted on first access to defer ~25ms sort cost to minimap render.
-   */
-  private cachedSortedFrames: SkylineFrame[] | null = null;
 
   /**
    * Build segment trees from pre-computed rectangles.
@@ -238,26 +230,6 @@ export class TemporalSegmentTree {
   }
 
   /**
-   * Get all frames sorted by timeStart for minimap density computation.
-   * Frames are collected during tree construction but sorting is deferred
-   * to first access to avoid blocking init when minimap isn't immediately visible.
-   *
-   * Performance: Lazy sorting defers ~25ms cost to first minimap render,
-   * reducing init time when minimap isn't immediately needed.
-   *
-   * @returns Array of SkylineFrame sorted by timeStart
-   */
-  public getAllFramesSorted(): SkylineFrame[] {
-    // Lazy sort on first access
-    if (!this.cachedSortedFrames && this.unsortedFrames) {
-      this.cachedSortedFrames = this.unsortedFrames;
-      this.cachedSortedFrames.sort((a, b) => a.timeStart - b.timeStart);
-      this.unsortedFrames = null; // Release reference
-    }
-    return this.cachedSortedFrames ?? [];
-  }
-
-  /**
    * Query events within a specific time and depth region.
    * Used for hit testing when bucket eventRefs are empty.
    * O(log n + k) complexity where k = events in region.
@@ -317,124 +289,6 @@ export class TemporalSegmentTree {
     }
   }
 
-  /**
-   * Stats returned from queryBucketStats for minimap density computation.
-   */
-  public queryBucketStats(
-    timeStart: number,
-    timeEnd: number,
-  ): {
-    maxDepth: number;
-    eventCount: number;
-    selfDurationSum: number;
-    categoryWeights: Map<string, { weightedTime: number; maxDepth: number }>;
-    frames: SkylineFrame[];
-  } {
-    let maxDepth = 0;
-    let eventCount = 0;
-    let selfDurationSum = 0;
-    const categoryWeights = new Map<string, { weightedTime: number; maxDepth: number }>();
-    const frames: SkylineFrame[] = [];
-
-    // Query each depth level
-    for (const [depth, tree] of this.treesByDepth) {
-      this.aggregateStatsFromNode(
-        tree,
-        timeStart,
-        timeEnd,
-        depth,
-        categoryWeights,
-        frames,
-        (d, count, selfDur) => {
-          if (d > maxDepth) {
-            maxDepth = d;
-          }
-          eventCount += count;
-          selfDurationSum += selfDur;
-        },
-      );
-    }
-
-    return { maxDepth, eventCount, selfDurationSum, categoryWeights, frames };
-  }
-
-  /**
-   * Aggregate stats from a tree node for minimap density computation.
-   * Collects frame references for skyline computation.
-   */
-  private aggregateStatsFromNode(
-    node: SegmentNode,
-    queryStart: number,
-    queryEnd: number,
-    depth: number,
-    categoryWeights: Map<string, { weightedTime: number; maxDepth: number }>,
-    frames: SkylineFrame[],
-    onStats: (depth: number, count: number, selfDuration: number) => void,
-  ): void {
-    // Early exit: no overlap
-    if (node.timeEnd <= queryStart || node.timeStart >= queryEnd) {
-      return;
-    }
-
-    // Leaf node: aggregate its stats
-    if (node.isLeaf && node.rectRef) {
-      const rect = node.rectRef;
-
-      // Calculate visible time within query range
-      const overlapStart = Math.max(rect.timeStart, queryStart);
-      const overlapEnd = Math.min(rect.timeEnd, queryEnd);
-      const visibleTime = overlapEnd - overlapStart;
-
-      // Calculate overlap ratio for proportional self-duration attribution
-      const rectDuration = rect.timeEnd - rect.timeStart;
-      const overlapRatio = rectDuration > 0 ? visibleTime / rectDuration : 0;
-      const proportionalSelfDuration = rect.selfDuration * overlapRatio;
-
-      // Depth² weighting for category dominance (still used for fallback stats)
-      const depthWeight = (depth + 1) * (depth + 1);
-      const weightedTime = proportionalSelfDuration * depthWeight;
-
-      // Update category weights
-      const category = rect.category;
-      const existing = categoryWeights.get(category);
-      if (existing) {
-        existing.weightedTime += weightedTime;
-        if (depth > existing.maxDepth) {
-          existing.maxDepth = depth;
-        }
-      } else {
-        categoryWeights.set(category, { weightedTime, maxDepth: depth });
-      }
-
-      // Collect frame for density computation
-      frames.push({
-        timeStart: rect.timeStart,
-        timeEnd: rect.timeEnd,
-        depth,
-        category,
-        selfDuration: rect.selfDuration,
-      });
-
-      onStats(depth, 1, proportionalSelfDuration);
-      return;
-    }
-
-    // Branch node: recurse into children
-    if (node.children) {
-      for (const child of node.children) {
-        this.aggregateStatsFromNode(
-          child,
-          queryStart,
-          queryEnd,
-          depth,
-          categoryWeights,
-          frames,
-          onStats,
-        );
-      }
-    }
-  }
-
   // ==========================================================================
   // TREE BUILDING
   // ==========================================================================
@@ -442,10 +296,7 @@ export class TemporalSegmentTree {
   /**
    * Build segment trees for all depth levels.
    *
-   * PERF optimizations:
-   * - Uses pre-grouped rectsByDepth when available (~12ms saved)
-   * - Collects frames for minimap during iteration (avoids O(N) traversal)
-   * - Defers frame sorting to first getAllFramesSorted() call (~25ms saved)
+   * Uses pre-grouped rectsByDepth when available (~12ms saved).
    *
    * @param rectsByCategory - Rectangles grouped by category
    * @param preGroupedByDepth - Optional pre-grouped by depth from unified conversion
@@ -454,65 +305,17 @@ export class TemporalSegmentTree {
     rectsByCategory: Map<string, PrecomputedRect[]>,
     preGroupedByDepth?: Map<number, PrecomputedRect[]>,
   ): void {
-    // Collect frames during iteration (avoids separate tree traversal later)
-    const allFrames: SkylineFrame[] = [];
+    const rectsByDepth = preGroupedByDepth ?? groupByDepth(rectsByCategory);
 
-    // Use pre-grouped rectsByDepth if available, otherwise group from category map
-    let rectsByDepth: Map<number, PrecomputedRect[]>;
-
-    if (preGroupedByDepth) {
-      // PERF: Use pre-grouped data (~12ms saved by skipping grouping iteration)
-      rectsByDepth = preGroupedByDepth;
-
-      // Still need to collect frames and track maxDepth
-      for (const [depth, rects] of rectsByDepth) {
-        this.maxDepth = Math.max(this.maxDepth, depth);
-        for (const rect of rects) {
-          allFrames.push({
-            timeStart: rect.timeStart,
-            timeEnd: rect.timeEnd,
-            depth: rect.depth,
-            category: rect.category,
-            selfDuration: rect.selfDuration,
-          });
-        }
-      }
-    } else {
-      // Fallback: Group all rectangles by depth
-      rectsByDepth = new Map<number, PrecomputedRect[]>();
-
-      for (const rects of rectsByCategory.values()) {
-        for (const rect of rects) {
-          let depthRects = rectsByDepth.get(rect.depth);
-          if (!depthRects) {
-            depthRects = [];
-            rectsByDepth.set(rect.depth, depthRects);
-          }
-          depthRects.push(rect);
-          this.maxDepth = Math.max(this.maxDepth, rect.depth);
-
-          // Collect frame directly (eliminates recursive tree traversal in getAllFramesSorted)
-          allFrames.push({
-            timeStart: rect.timeStart,
-            timeEnd: rect.timeEnd,
-            depth: rect.depth,
-            category: rect.category,
-            selfDuration: rect.selfDuration,
-          });
-        }
-      }
-    }
-
-    // Build tree for each depth
     for (const [depth, rects] of rectsByDepth) {
+      if (depth > this.maxDepth) {
+        this.maxDepth = depth;
+      }
       const tree = this.buildTreeForDepth(rects, depth);
       if (tree) {
         this.treesByDepth.set(depth, tree);
       }
     }
-
-    // PERF: Defer sorting to first getAllFramesSorted() call (~25ms saved at init)
-    this.unsortedFrames = allFrames;
   }
 
   /**

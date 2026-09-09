@@ -48,7 +48,6 @@ export class CodeBlock extends LitElement {
       pre {
         margin: 0;
         font-family: var(--lana-font-mono);
-        font-size: var(--lana-text-mono);
         white-space: pre-wrap;
         word-break: break-word;
       }

@@ -1,7 +1,7 @@
 /*
  * Copyright (c) 2025 Certinia Inc. All rights reserved.
  */
-import { window } from 'vscode';
+import { Uri, window } from 'vscode';
 
 import type { Context } from '../Context.js';
 import { Command } from './Command.js';
@@ -30,21 +30,21 @@ export class ShowInLogAnalysis {
     }
 
     const panel = LogView.getCurrentView();
-    const logPath = LogView.getLogPath();
+    const currentLogUri = LogView.getLogUri();
 
     // If panel doesn't exist, open the log analysis view first
     if (!panel) {
       const activeEditor = window.activeTextEditor;
-      const logFilePath = filePath ?? activeEditor?.document.uri.fsPath;
+      const logUri = filePath ? Uri.parse(filePath) : activeEditor?.document.uri;
 
-      if (!logFilePath) {
+      if (!logUri) {
         context.display.showInformationMessage('No active Apex log file.');
         return;
       }
 
       // Set pending navigation so it's sent after log is parsed
       LogView.setPendingNavigation(timestamp);
-      await LogView.createView(context, Promise.resolve(), logFilePath);
+      await LogView.createView(context, Promise.resolve(), logUri);
       return; // Navigation will happen via fetchLog payload
     } else {
       // Panel exists - reveal it first
@@ -52,10 +52,14 @@ export class ShowInLogAnalysis {
 
       // Verify we're navigating to the same log
       const activeEditor = window.activeTextEditor;
-      if (logPath && activeEditor && activeEditor.document.uri.fsPath !== logPath) {
+      if (
+        currentLogUri &&
+        activeEditor &&
+        activeEditor.document.uri.toString() !== currentLogUri.toString()
+      ) {
         // Different log file is active, open the active one
         LogView.setPendingNavigation(timestamp);
-        await LogView.createView(context, Promise.resolve(), activeEditor.document.uri.fsPath);
+        await LogView.createView(context, Promise.resolve(), activeEditor.document.uri);
         return; // Navigation will happen via fetchLog payload
       }
     }

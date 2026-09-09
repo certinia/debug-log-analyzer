@@ -21,6 +21,7 @@ import './HotPath.js';
 import './HotSpots.js';
 import './LogOverview.js';
 import './NamespaceTimeBar.js';
+import './VariablesDetail.js';
 
 /**
  * Build the inspector's sections for a selection from any tab. Every source gets
@@ -189,6 +190,9 @@ export async function buildDetailSections(
         ? selection
         : null;
   const instances = shown?.instances ?? null;
+  // The frames the row is, which is the scope Variables compares: a bottom-up
+  // caller row counts its callee's calls, so its locals live a level up.
+  const scopeFrames = shown?.frames ?? null;
   const calledBy = shown?.calledBy ?? '';
 
   const sections: PaneSection[] = [
@@ -201,6 +205,17 @@ export async function buildDetailSections(
         .instances=${instances}
         called-by=${calledBy}
       ></event-vitals>`,
+    },
+    // What Apex could see from the frame. Always present, so it can say which
+    // log level would fill it rather than leaving the reader to guess.
+    {
+      id: 'variables',
+      title: 'Variables',
+      fit: 'content',
+      content: html`<variables-detail
+        eventIndex=${activeIndex}
+        .frames=${scopeFrames}
+      ></variables-detail>`,
     },
   ];
   if (source === 'timeline') {

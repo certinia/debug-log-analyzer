@@ -395,6 +395,7 @@ describe('LogInspector', () => {
     dispatchInspectorLocate(dockLayout(el), [5, 9], true, {
       kind: 'aggregate',
       instances: [5, 9],
+      frames: [5, 9],
     });
     await flush(el);
 
@@ -421,6 +422,7 @@ describe('LogInspector', () => {
     dispatchInspectorLocate(dockLayout(el), [5, 9], true, {
       kind: 'aggregate',
       instances: [5, 9],
+      frames: [5, 9],
     });
     await flush(el);
 
@@ -436,6 +438,7 @@ describe('LogInspector', () => {
     dispatchInspectorLocate(dockLayout(el), [5, 9], true, {
       kind: 'aggregate',
       instances: [5, 9],
+      frames: [5, 9],
     });
     await flush(el);
 

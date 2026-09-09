@@ -123,8 +123,8 @@ export class DatagridRangeFilter extends LitElement {
         font-size: var(--lana-text-base);
         color: var(--vscode-settings-numberInputForeground);
         background-color: var(--vscode-settings-numberInputBackground);
-        border: 1px solid var(--vscode-settings-numberInputBorder, transparent);
-        border-radius: 4px;
+        border: var(--lana-stroke) solid var(--vscode-settings-numberInputBorder, transparent);
+        border-radius: var(--lana-radius-sm);
         appearance: textfield;
       }
 
@@ -135,8 +135,8 @@ export class DatagridRangeFilter extends LitElement {
       }
 
       .range-popover__input:focus {
-        outline: 1px solid var(--lana-focus-border);
-        outline-offset: -1px;
+        outline: var(--lana-focus-ring);
+        outline-offset: var(--lana-focus-inset);
       }
 
       .range-popover__clear {

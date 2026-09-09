@@ -2,6 +2,7 @@
  * Copyright (c) 2026 Certinia Inc. All rights reserved.
  */
 import { Module, type RowComponent, type Tabulator } from 'tabulator-tables';
+import { tableHolder } from './tableHolder.js';
 
 const anchoringPolicyOption = 'anchoringPolicy' as const;
 
@@ -69,7 +70,7 @@ export class AnchoringPolicy extends Module {
   initialize() {
     // @ts-expect-error not in types
     if (this.options(anchoringPolicyOption)) {
-      this.tableHolder = this.table.element.querySelector('.tabulator-tableholder');
+      this.tableHolder = tableHolder(this.table.element);
       this.table.on('renderStarted', () => this._captureAnchor());
       this.table.on('renderComplete', () => this._genericRestore());
       this.table.on('dataTreeRowExpanded', (row: RowComponent) => this._preciseRestore(row));

@@ -5,6 +5,7 @@ import { describe, expect, it } from '@jest/globals';
 
 import {
   layoutMarkerRects,
+  noDataSpanAt,
   markerDuration,
   type MarkerLayoutItem,
 } from '../markers/MarkerProcessor.js';
@@ -91,5 +92,29 @@ describe('layoutMarkerRects', () => {
       expect(rects).toHaveLength(2);
       expect(rects[1]!.x).toBe(51);
     });
+  });
+});
+
+describe('noDataSpanAt', () => {
+  const spans = [
+    { startTime: 100, endTime: 500, summary: 'Skipped-Lines' },
+    { startTime: 800, endTime: 900, summary: 'Max-Size-reached' },
+  ];
+
+  it('names the span covering the instant', () => {
+    expect(noDataSpanAt(spans, 300)?.summary).toBe('Skipped-Lines');
+    expect(noDataSpanAt(spans, 850)?.summary).toBe('Max-Size-reached');
+  });
+
+  // Half-open: the span ends the moment the log resumes, so its end is recorded time.
+  it('covers its start but not its end', () => {
+    expect(noDataSpanAt(spans, 100)?.summary).toBe('Skipped-Lines');
+    expect(noDataSpanAt(spans, 500)).toBeUndefined();
+  });
+
+  it('reports nothing between spans, or with no spans at all', () => {
+    expect(noDataSpanAt(spans, 600)).toBeUndefined();
+    expect(noDataSpanAt([], 300)).toBeUndefined();
+    expect(noDataSpanAt(undefined, 300)).toBeUndefined();
   });
 });

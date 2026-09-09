@@ -1,9 +1,6 @@
 /*
  * Copyright (c) 2026 Certinia Inc. All rights reserved.
  */
-import { closeSync, openSync, readSync } from 'node:fs';
-import { extname } from 'node:path';
-
 import {
   TabInputText,
   commands,
@@ -13,6 +10,7 @@ import {
   type TextDocument,
   type Uri,
 } from 'vscode';
+import { Utils } from 'vscode-uri';
 
 import type { Context } from '../Context.js';
 
@@ -38,35 +36,8 @@ export function isApexLogContent(doc: TextDocument): boolean {
   return false;
 }
 
-function isApexLogFile(fsPath: string): boolean {
-  let fd: number;
-  try {
-    fd = openSync(fsPath, 'r');
-  } catch {
-    return false;
-  }
-
-  try {
-    const buf = Buffer.alloc(4096);
-    const bytesRead = readSync(fd, buf, 0, 4096, 0);
-    const text = buf.toString('utf8', 0, bytesRead);
-    const lines = text.split(/\r?\n/);
-
-    const linesToCheck = Math.min(MAX_LINES_TO_CHECK, lines.length);
-    for (let i = 0; i < linesToCheck; i++) {
-      const line = lines[i] ?? '';
-      if (APEXLOG_HEADER.test(line) || EXECUTION_STARTED.test(line) || USER_INFO.test(line)) {
-        return true;
-      }
-    }
-    return false;
-  } finally {
-    closeSync(fd);
-  }
-}
-
 function hasDetectExtension(uri: Uri): boolean {
-  return DETECT_EXTENSIONS.has(extname(uri.fsPath).toLowerCase());
+  return DETECT_EXTENSIONS.has(Utils.extname(uri).toLowerCase());
 }
 
 function getActiveTabUri(): Uri | undefined {
@@ -79,26 +50,19 @@ function getActiveTabUri(): Uri | undefined {
 
 function updateContextKey(): void {
   const editor = window.activeTextEditor;
-  if (editor && editor.document.uri.scheme === 'file') {
+  if (editor) {
     const doc = editor.document;
-    if (hasDetectExtension(doc.uri)) {
-      const detected = isApexLogContent(doc);
-      commands.executeCommand('setContext', 'lana.isApexLog', detected);
-      return;
-    }
-    commands.executeCommand('setContext', 'lana.isApexLog', false);
-    return;
-  }
-
-  // Fallback to tab API for large files where activeTextEditor is undefined
-  const tabUri = getActiveTabUri();
-  if (tabUri && tabUri.scheme === 'file' && hasDetectExtension(tabUri)) {
-    const detected = isApexLogFile(tabUri.fsPath);
+    const detected = hasDetectExtension(doc.uri) && isApexLogContent(doc);
     commands.executeCommand('setContext', 'lana.isApexLog', detected);
     return;
   }
 
-  commands.executeCommand('setContext', 'lana.isApexLog', false);
+  // No text document, so the only way here is a file VS Code refused to open as one.
+  // Sniffing it means pulling the whole file through workspace.fs, which has no ranged
+  // read: a full read and allocation on every tab event, over an RPC in the web host.
+  // Trust the extension instead and accept offering the command on a large non-Apex file.
+  const tabUri = getActiveTabUri();
+  commands.executeCommand('setContext', 'lana.isApexLog', !!tabUri && hasDetectExtension(tabUri));
 }
 
 export class ApexLogLanguageDetector {
@@ -132,7 +96,7 @@ export class ApexLogLanguageDetector {
 }
 
 function detectAndSetLanguage(doc: TextDocument): void {
-  if (doc.languageId === 'apexlog' || doc.uri.scheme !== 'file') {
+  if (doc.languageId === 'apexlog') {
     return;
   }
 

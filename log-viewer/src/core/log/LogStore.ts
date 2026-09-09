@@ -9,7 +9,6 @@ import {
   SOSLExecuteBeginLine,
 } from 'apex-log-parser';
 
-import { getEventKey, getStackKey } from './eventKeys.js';
 import { KeyPathIds } from './keyPathIds.js';
 
 export type Stack = LogEvent[];
@@ -26,8 +25,6 @@ export class LogStore {
 
   private _statements: Statements | null = null;
   private _keyPathIds: KeyPathIds | null = null;
-  private _keyIds: Int32Array | null = null;
-  private _stackIds: Int32Array | null = null;
 
   constructor(log: ApexLog) {
     this.log = log;
@@ -36,6 +33,32 @@ export class LogStore {
   /** The parser event for an eventIndex, or null if the log has no such event. */
   eventByIndex(eventIndex: number): LogEvent | null {
     return this.log.eventsById[eventIndex] ?? null;
+  }
+
+  /**
+   * The distinct frames `levels` parents above each of `eventIndexes`: what a
+   * merged row standing for its callers is, since a row at path depth D sits
+   * D - 1 hops above the calls it counts.
+   *
+   * How far the dedupe folds is the log's business. A call in a loop has one
+   * caller; a call made once per record has one caller each, so the answer can
+   * be as long as what was asked about.
+   *
+   * @param levels - hops to climb, at least one: the caller guards the rest so
+   *   it can hand back the calls it already holds rather than a copy
+   */
+  framesAbove(eventIndexes: readonly number[], levels: number): number[] {
+    const own = new Set<number>();
+    for (const index of eventIndexes) {
+      let frame = this.eventByIndex(index);
+      for (let up = levels; up > 0 && frame; up--) {
+        frame = frame.parent;
+      }
+      if (frame) {
+        own.add(frame.eventIndex);
+      }
+    }
+    return [...own];
   }
 
   /**
@@ -70,62 +93,17 @@ export class LogStore {
     return this.statements().sosl;
   }
 
-  /** The interned bucket paths of this log, shared by every view that marks a row
-   *  whose occurrences are merged. */
+  /** The interned keys and bucket paths of this log, shared by every view that
+   *  marks a row whose occurrences are merged. */
   keyPathIds(): KeyPathIds {
-    return (this._keyPathIds ??= new KeyPathIds());
-  }
-
-  /**
-   * The event's interned bucket key, kept per event.
-   *
-   * A mark walks the caller chain of every occurrence a pick names, and those
-   * occurrences share their ancestors, so building the key string per frame was
-   * most of what a mark cost.
-   */
-  keyIdOf(event: LogEvent): number {
-    const cache = (this._keyIds ??= idCache(this.log));
-    const at = event.eventIndex;
-    if (at >= 0 && at < cache.length) {
-      let id = cache[at]!;
-      if (id < 0) {
-        id = this.keyPathIds().keyId(getEventKey(event));
-        cache[at] = id;
-      }
-      return id;
-    }
-    // An event the log's own index does not cover, so there is no slot to keep.
-    return this.keyPathIds().keyId(getEventKey(event));
-  }
-
-  /**
-   * The event's interned stack key, which tells a recursive call from a fresh
-   * one. Interned in the same table as {@link keyIdOf}, since the two vocabularies
-   * are never compared with each other.
-   */
-  stackIdOf(event: LogEvent): number {
-    const cache = (this._stackIds ??= idCache(this.log));
-    const at = event.eventIndex;
-    if (at >= 0 && at < cache.length) {
-      let id = cache[at]!;
-      if (id < 0) {
-        id = this.keyPathIds().keyId(getStackKey(event));
-        cache[at] = id;
-      }
-      return id;
-    }
-    // An event the log's own index does not cover, so there is no slot to keep.
-    return this.keyPathIds().keyId(getStackKey(event));
+    // No index means no slot to keep a key in, which costs only the key being
+    // built again.
+    return (this._keyPathIds ??= new KeyPathIds(this.log.eventsById?.length ?? 0));
   }
 
   private statements(): Statements {
     return (this._statements ??= collectStatements(this.log));
   }
-}
-
-/** One slot per event, -1 until the event is asked about. */
-function idCache(log: ApexLog): Int32Array {
-  return new Int32Array(log.eventsById.length).fill(-1);
 }
 
 interface Statements {

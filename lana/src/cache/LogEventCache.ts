@@ -1,12 +1,12 @@
 /*
  * Copyright (c) 2026 Certinia Inc. All rights reserved.
  */
-import { readFile } from 'fs/promises';
-import { workspace } from 'vscode';
+import { workspace, type Uri } from 'vscode';
 
 import { parse, type ApexLog, type LogEvent } from 'apex-log-parser';
 
 import type { Context } from '../Context.js';
+import { readFileText } from '../fs/workspaceFs.js';
 
 export interface EventSearchResult {
   event: LogEvent;
@@ -17,17 +17,18 @@ export class LogEventCache {
   private static readonly MAX_CACHE_SIZE = 10;
   private static cache = new Map<string, ApexLog>();
 
-  static async getApexLog(filePath: string): Promise<ApexLog | null> {
-    const cached = LogEventCache.cache.get(filePath);
+  static async getApexLog(uri: Uri): Promise<ApexLog | null> {
+    const key = uri.toString();
+    const cached = LogEventCache.cache.get(key);
     if (cached) {
       // Move to end (most recently used)
-      LogEventCache.cache.delete(filePath);
-      LogEventCache.cache.set(filePath, cached);
+      LogEventCache.cache.delete(key);
+      LogEventCache.cache.set(key, cached);
       return cached;
     }
 
     try {
-      const content = await readFile(filePath, 'utf-8');
+      const content = await readFileText(uri);
       const apexLog = parse(content);
 
       // Evict oldest if at capacity
@@ -38,7 +39,7 @@ export class LogEventCache {
         }
       }
 
-      LogEventCache.cache.set(filePath, apexLog);
+      LogEventCache.cache.set(key, apexLog);
       return apexLog;
     } catch {
       return null;
@@ -49,15 +50,15 @@ export class LogEventCache {
     return LogEventCache.searchEvents(apexLog.children, timestamp, 0);
   }
 
-  static clearCache(filePath: string): void {
-    LogEventCache.cache.delete(filePath);
+  static clearCache(uriString: string): void {
+    LogEventCache.cache.delete(uriString);
   }
 
   static apply(context: Context): void {
     context.context.subscriptions.push(
       workspace.onDidCloseTextDocument((doc) => {
         if (doc.languageId === 'apexlog') {
-          LogEventCache.clearCache(doc.uri.fsPath);
+          LogEventCache.clearCache(doc.uri.toString());
         }
       }),
     );

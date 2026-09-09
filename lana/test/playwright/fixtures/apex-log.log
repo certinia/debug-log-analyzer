@@ -1,0 +1,28 @@
+64.0 APEX_CODE,FINE;APEX_PROFILING,FINE;CALLOUT,FINEST;DATA_ACCESS,INFO;DB,FINEST;NBA,FINE;SYSTEM,FINE;VALIDATION,INFO;VISUALFORCE,FINE;WAVE,FINE;WORKFLOW,FINE
+Execute Anonymous: AccountService.createAccountsAndContacts();
+10:29:24.6 (6297619)|USER_INFO|[EXTERNAL]|005Ea00000R6orz|first-last@example.com|(GMT-07:00) Pacific Daylight Time (America/Los_Angeles)|GMT-07:00
+10:29:24.6 (6329577)|EXECUTION_STARTED
+10:29:24.6 (6337821)|CODE_UNIT_STARTED|[EXTERNAL]|execute_anonymous_apex
+10:29:24.6 (6957638)|SYSTEM_MODE_ENTER|false
+10:29:24.6 (84434204)|METHOD_ENTRY|[5]|01pEa00000CgcGT|AccountService.AccountService()
+10:29:24.6 (84539933)|SYSTEM_METHOD_ENTRY|[7]|com.salesforce.api.interop.apex.bcl.DateMethods.newInstance(Integer, Integer, Integer)
+10:29:24.6 (84645761)|SYSTEM_METHOD_EXIT|[7]|com.salesforce.api.interop.apex.bcl.DateMethods.newInstance(Integer, Integer, Integer)
+10:29:24.6 (84669076)|METHOD_EXIT|[5]|AccountService
+10:29:24.6 (84707278)|METHOD_ENTRY|[1]|01pEa00000CgcGT|AccountService.createAccountsAndContacts()
+10:29:24.6 (84756747)|METHOD_ENTRY|[11]|01pEa00000CgcGT|AccountService.getRevenue()
+10:29:24.6 (84822141)|SYSTEM_METHOD_ENTRY|[120]|com.salesforce.api.interop.apex.bcl.DateMethods.today()
+10:29:24.6 (84859046)|SYSTEM_METHOD_EXIT|[120]|com.salesforce.api.interop.apex.bcl.DateMethods.today()
+10:29:24.6 (84869926)|METHOD_ENTRY|[120]|01pEa00000CgcGT|AccountService.getDayValue(Date)
+10:29:24.6 (84890620)|SYSTEM_METHOD_ENTRY|[142]|com.salesforce.api.interop.apex.bcl.DateMethods.daysBetween(Date)
+10:29:24.6 (84904980)|SYSTEM_METHOD_EXIT|[142]|com.salesforce.api.interop.apex.bcl.DateMethods.daysBetween(Date)
+10:29:24.6 (84949994)|SYSTEM_METHOD_ENTRY|[1]|Math.Math()
+10:29:24.6 (84998791)|SYSTEM_METHOD_EXIT|[1]|Math
+10:29:24.6 (85010745)|METHOD_ENTRY|[143]||System.Math.mod(Integer, Integer)
+10:29:24.6 (86075910)|METHOD_EXIT|[143]||System.Math.mod(Integer, Integer)
+10:29:24.6 (86151658)|METHOD_EXIT|[120]|01pEa00000CgcGT|AccountService.getDayValue(Date)
+10:29:24.6 (86198738)|SYSTEM_METHOD_ENTRY|[120]|Decimal.multiply(Decimal)
+10:29:24.6 (86225666)|SYSTEM_METHOD_EXIT|[120]|Decimal.multiply(Decimal)
+10:29:24.6 (86232986)|METHOD_EXIT|[11]|01pEa00000CgcGT|AccountService.getRevenue()
+10:29:24.6 (86300000)|METHOD_EXIT|[1]|01pEa00000CgcGT|AccountService.createAccountsAndContacts()
+10:29:24.6 (86400000)|CODE_UNIT_FINISHED|execute_anonymous_apex
+10:29:24.6 (86500000)|EXECUTION_FINISHED

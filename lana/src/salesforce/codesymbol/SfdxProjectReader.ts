@@ -2,6 +2,7 @@
  * Copyright (c) 2025 Certinia Inc. All rights reserved.
  */
 import { RelativePattern, Uri, workspace, type WorkspaceFolder } from 'vscode';
+
 import { SfdxProject } from './SfdxProject.js';
 
 interface RawPackageDirectory {
@@ -45,7 +46,7 @@ export async function getProjects(workspaceFolder: WorkspaceFolder): Promise<Sfd
       );
     } catch (error) {
       // eslint-disable-next-line no-console
-      console.warn(`Failed to parse sfdx-project.json at ${uri.fsPath}:`, error);
+      console.warn(`Failed to parse sfdx-project.json at ${uri.toString()}:`, error);
     }
   }
 

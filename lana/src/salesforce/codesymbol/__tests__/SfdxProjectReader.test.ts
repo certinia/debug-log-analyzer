@@ -1,13 +1,15 @@
 /*
  * Copyright (c) 2025 Certinia Inc. All rights reserved.
  */
-import { posix } from 'path';
 import { RelativePattern, Uri, workspace, type WorkspaceFolder } from 'vscode';
 import { getProjects } from '../SfdxProjectReader';
 
 jest.mock('vscode');
 
 const fileUri = (path: string): Uri => ({ path, fsPath: path }) as Uri;
+
+const joinPath = (base: string, ...segments: string[]): string =>
+  [base, ...segments].join('/').replace(/\/[^/]+\/\.\.\//g, '/');
 
 /** Mock the workspace scan so each project file resolves to its own contents, in order. */
 function mockProjectFiles(files: { uri: Uri; contents: string }[]): void {
@@ -30,7 +32,7 @@ describe('getProjects', () => {
     jest.clearAllMocks();
     // Mirror the real Uri.joinPath: join segments and normalize '..'
     (Uri.joinPath as jest.Mock).mockImplementation((base: Uri, ...segments: string[]) =>
-      fileUri(posix.join(base.path, ...segments)),
+      fileUri(joinPath(base.path, ...segments)),
     );
   });
 

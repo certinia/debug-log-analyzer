@@ -24,7 +24,6 @@ const mockInitServices = initServices as jest.Mock;
 describe('Main', () => {
   beforeEach(() => {
     jest.clearAllMocks();
-    mockDisposeServices.mockResolvedValue(undefined);
   });
 
   it('activates without initializing Salesforce Services', () => {
@@ -37,9 +36,9 @@ describe('Main', () => {
     expect(mockInitServices).not.toHaveBeenCalled();
   });
 
-  it('disposes Salesforce Services during deactivation', async () => {
-    await deactivate();
+  it('deactivates without loading the Salesforce Services chunk', () => {
+    deactivate();
 
-    expect(mockDisposeServices).toHaveBeenCalledWith();
+    expect(mockDisposeServices).not.toHaveBeenCalled();
   });
 });

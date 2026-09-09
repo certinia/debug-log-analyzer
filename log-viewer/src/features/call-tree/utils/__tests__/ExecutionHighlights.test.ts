@@ -6,7 +6,8 @@ import { describe, expect, it } from '@jest/globals';
 import type { ApexLog, LogEvent } from 'apex-log-parser';
 import { computeExecutionHighlights, getExecutionHighlights } from '../ExecutionHighlights.js';
 
-let nextEventIndex = 0;
+// The parser takes 0 for the log itself, so real events start at 1.
+let nextEventIndex = 1;
 let nextStamp = 0;
 
 /**
@@ -47,12 +48,20 @@ function createEvent(
   return event;
 }
 
-function createLog(total: number): ApexLog {
-  return {
-    duration: { self: 0, total },
+/**
+ * The pseudo-root, holding the log's gap time as its own self time. It registers
+ * itself as `eventsById[0]` exactly as the parser does, so the pass has to skip it.
+ */
+function createLog(total: number, self = 0): ApexLog {
+  const log = {
+    text: 'LOG_ROOT',
+    eventIndex: 0,
+    duration: { self, total },
     children: [],
     eventsById: [],
   } as unknown as ApexLog;
+  log.eventsById.push(log as unknown as LogEvent);
+  return log;
 }
 
 /** Register tree events on the flat lookup, the way the parser does. */
@@ -429,6 +438,17 @@ describe('computeExecutionHighlights hot spots', () => {
     const { hotSpots } = computeExecutionHighlights(log);
 
     expect(hotSpots).toEqual([]);
+  });
+
+  it('never names the log itself, whatever gap time it holds', () => {
+    // A truncated log leaves most of its time unaccounted, so the pseudo-root
+    // outweighs every real call. It is a container, not code.
+    const log = createLog(1000, 900);
+    index(log, createEvent({ text: 'Work', self: 100, total: 100 }));
+
+    const { hotSpots } = computeExecutionHighlights(log);
+
+    expect(hotSpots.map((row) => row.text)).toEqual(['Work']);
   });
 });
 

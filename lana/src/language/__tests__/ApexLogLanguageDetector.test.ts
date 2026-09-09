@@ -3,8 +3,17 @@
  */
 import { describe, expect, it } from '@jest/globals';
 
+import { createMockContext } from '../../__tests__/helpers/test-builders.js';
 import { createMockTextDocument } from '../../__tests__/mocks/vscode.js';
-import { isApexLogContent } from '../ApexLogLanguageDetector.js';
+import {
+  TabInputText,
+  Uri,
+  commands,
+  languages,
+  window,
+  workspace,
+} from '../../__tests__/mocks/vscode.js';
+import { ApexLogLanguageDetector, isApexLogContent } from '../ApexLogLanguageDetector.js';
 
 describe('isApexLogContent', () => {
   it('should detect standard log with settings header on line 1', () => {
@@ -92,5 +101,85 @@ describe('isApexLogContent', () => {
     });
 
     expect(isApexLogContent(doc)).toBe(false);
+  });
+});
+
+describe('ApexLogLanguageDetector', () => {
+  it.each(['log', 'txt'])('detects .%s Apex logs from arbitrary URI schemes', (extension) => {
+    const doc = createMockTextDocument({
+      languageId: 'plaintext',
+      lines: ['09:45:31.888 (1000)|EXECUTION_STARTED'],
+    });
+    Object.defineProperty(doc, 'uri', {
+      value: Uri.parse(`git:/repository/logs/virtual.${extension}`),
+    });
+    workspace.textDocuments = [doc];
+
+    ApexLogLanguageDetector.apply(
+      createMockContext() as unknown as import('../../Context.js').Context,
+    );
+
+    expect(languages.setTextDocumentLanguage).toHaveBeenCalledWith(doc, 'apexlog');
+  });
+
+  it('retains the existing extension prefilter', () => {
+    const doc = createMockTextDocument({
+      languageId: 'plaintext',
+      lines: ['09:45:31.888 (1000)|EXECUTION_STARTED'],
+    });
+    Object.defineProperty(doc, 'uri', { value: Uri.parse('git:/repository/logs/virtual.json') });
+    workspace.textDocuments = [doc];
+
+    ApexLogLanguageDetector.apply(
+      createMockContext() as unknown as import('../../Context.js').Context,
+    );
+
+    expect(languages.setTextDocumentLanguage).not.toHaveBeenCalled();
+  });
+
+  it('sets the key from the extension alone when there is no text document', () => {
+    window.tabGroups.activeTabGroup.activeTab = {
+      input: new TabInputText(Uri.parse('memfs:/logs/huge.log')),
+    };
+
+    ApexLogLanguageDetector.apply(
+      createMockContext() as unknown as import('../../Context.js').Context,
+    );
+
+    expect(commands.executeCommand).toHaveBeenLastCalledWith('setContext', 'lana.isApexLog', true);
+  });
+
+  it('never reads the file when there is no text document', () => {
+    window.tabGroups.activeTabGroup.activeTab = {
+      input: new TabInputText(Uri.parse('memfs:/logs/huge.log')),
+    };
+
+    ApexLogLanguageDetector.apply(
+      createMockContext() as unknown as import('../../Context.js').Context,
+    );
+
+    expect(workspace.fs.readFile).not.toHaveBeenCalled();
+  });
+
+  it('clears the key for a non-log extension in the tab fallback', () => {
+    window.tabGroups.activeTabGroup.activeTab = {
+      input: new TabInputText(Uri.parse('memfs:/notes.json')),
+    };
+
+    ApexLogLanguageDetector.apply(
+      createMockContext() as unknown as import('../../Context.js').Context,
+    );
+
+    expect(commands.executeCommand).toHaveBeenLastCalledWith('setContext', 'lana.isApexLog', false);
+  });
+
+  it('clears the key when the active tab is not a text tab', () => {
+    window.tabGroups.activeTabGroup.activeTab = { input: {} };
+
+    ApexLogLanguageDetector.apply(
+      createMockContext() as unknown as import('../../Context.js').Context,
+    );
+
+    expect(commands.executeCommand).toHaveBeenLastCalledWith('setContext', 'lana.isApexLog', false);
   });
 });

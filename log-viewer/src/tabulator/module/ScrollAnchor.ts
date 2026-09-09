@@ -2,6 +2,7 @@
  * Copyright (c) 2024 Certinia Inc. All rights reserved.
  */
 import { Module, type RowComponent, type Tabulator } from 'tabulator-tables';
+import { tableHolder } from './tableHolder.js';
 
 const scrollAnchorOption = 'scrollAnchor' as const;
 
@@ -63,7 +64,7 @@ export class ScrollAnchor extends Module {
   initialize() {
     // @ts-expect-error not in types
     if (this.options(scrollAnchorOption)) {
-      this.tableHolder = this.table.element.querySelector('.tabulator-tableholder');
+      this.tableHolder = tableHolder(this.table.element);
 
       this.table.on('dataTreeRowExpanded', () => this._onTreeToggle());
       this.table.on('dataTreeRowCollapsed', () => this._onTreeToggle());

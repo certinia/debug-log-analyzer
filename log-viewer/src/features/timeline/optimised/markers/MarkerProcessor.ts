@@ -10,7 +10,7 @@
  * used by both MeshMarkerRenderer and TimelineMarkerRenderer.
  */
 
-import type { TimelineMarker } from '../../types/flamechart.types.js';
+import type { NoDataSpan, TimelineMarker } from '../../types/flamechart.types.js';
 import { SEVERITY_RANK } from '../../types/flamechart.types.js';
 
 /**
@@ -53,6 +53,30 @@ export interface MarkerLayoutItem {
  */
 export function markerDuration(marker: Pick<TimelineMarker, 'startTime' | 'endTime'>): number {
   return (marker.endTime ?? marker.startTime) - marker.startTime;
+}
+
+/**
+ * The span covering `timeNs`, or `undefined` when the log recorded that instant.
+ *
+ * Half-open: a span ends the moment the log resumes. This is the one place the rule is
+ * stated, so the strip's fills, its traffic light and its tooltip all agree.
+ *
+ * @param spans - Spans sorted by start time, as `noDataSpans` returns them
+ * @param timeNs - The instant to test
+ */
+export function noDataSpanAt(
+  spans: readonly NoDataSpan[] | undefined,
+  timeNs: number,
+): NoDataSpan | undefined {
+  if (!spans) {
+    return undefined;
+  }
+  for (const span of spans) {
+    if (timeNs >= span.startTime && timeNs < span.endTime) {
+      return span;
+    }
+  }
+  return undefined;
 }
 
 /** A resolved rectangle to draw. */

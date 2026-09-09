@@ -19,6 +19,9 @@ interface FakeRow {
   expanded: boolean;
   /** Set once the row is asked to expand, so a test can prove it was. */
   expandedByWalk?: boolean;
+  /** Reads of the children that come back empty before the rest do, as they do
+   *  while the renderer is still building them. */
+  emptyReads?: number;
 }
 
 function row(text: string, ...children: FakeRow[]): FakeRow {
@@ -31,7 +34,13 @@ function asRows(rows: FakeRow[]): RowComponent[] {
     (data) =>
       ({
         getData: () => ({ key: data.key, _children: data.children }),
-        getTreeChildren: () => (data.expanded ? asRows(data.children) : []),
+        getTreeChildren: () => {
+          if (data.emptyReads) {
+            data.emptyReads -= 1;
+            return [];
+          }
+          return data.expanded ? asRows(data.children) : [];
+        },
         isTreeExpanded: () => data.expanded,
         treeExpand: () => {
           data.expanded = true;
@@ -92,6 +101,18 @@ describe('findBucketRow', () => {
       const found = await findBucketRow(asRows(rows), target, 'callees', settled);
 
       expect(found && (found.getData() as { key: string }).key).toBe(key('exec'));
+    });
+
+    it('waits again where an open row has not built its children yet', async () => {
+      // Open already, so nothing expands it: without a second read the descent
+      // would land on this row and the pick would need a second click.
+      const mid = row('a', row('target'));
+      mid.expanded = true;
+      mid.emptyReads = 1;
+
+      const found = await findBucketRow(asRows([row('exec', mid)]), target, 'callees', settled);
+
+      expect(found && (found.getData() as { key: string }).key).toBe(key('target'));
     });
 
     it('finds nothing where the outermost frame has no row', async () => {

@@ -159,6 +159,7 @@ export function createMockApexLog(overrides: PartialApexLog = {}): ApexLog {
 export interface MockDisplay {
   output: jest.Mock;
   showErrorMessage: jest.Mock;
+  showFile: jest.Mock;
   showInformationMessage: jest.Mock;
   showWarningMessage: jest.Mock;
 }
@@ -167,6 +168,7 @@ export function createMockDisplay(): MockDisplay {
   return {
     output: jest.fn(),
     showErrorMessage: jest.fn(),
+    showFile: jest.fn(),
     showInformationMessage: jest.fn(),
     showWarningMessage: jest.fn(),
   };
@@ -179,6 +181,7 @@ export interface MockContext {
   context: MockExtensionContext;
   display: MockDisplay;
   workspaces: { uri: { fsPath: string }; name: string }[];
+  workspaceManager?: unknown;
 }
 
 /**

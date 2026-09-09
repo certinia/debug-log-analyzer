@@ -14,9 +14,11 @@ export class VSWorkspace {
     this.workspaceFolder = workspaceFolder;
   }
 
-  path(): string {
-    return this.workspaceFolder.uri.fsPath;
+  /** URI string for desktop and virtual web workspaces. */
+  get uri(): string {
+    return this.workspaceFolder.uri.toString();
   }
+
   name(): string {
     return this.workspaceFolder.name;
   }

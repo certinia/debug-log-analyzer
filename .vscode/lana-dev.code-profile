@@ -1,0 +1,4 @@
+{
+  "name": "lana-dev",
+  "extensions": "[{\"identifier\":{\"id\":\"salesforce.salesforcedx-vscode-services\"}}]"
+}

@@ -236,6 +236,9 @@ export class TimelineEventIndex {
 
   /**
    * Calculate total timeline duration.
+   *
+   * Fallback for callers with no precomputed range: it is not floored at the log's end,
+   * so a truncated log stops at its last frame.
    */
   private calculateTotalDuration(events: LogEvent[]): number {
     if (events.length === 0) {

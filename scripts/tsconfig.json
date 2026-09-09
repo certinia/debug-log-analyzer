@@ -1,0 +1,14 @@
+{
+  "extends": "../log-viewer/tsconfig.json",
+  "compilerOptions": {
+    "lib": ["ES2023", "dom", "DOM.Iterable"],
+    "types": ["node"],
+    "composite": false,
+    "declarationMap": false,
+    "noEmit": true,
+    "paths": {
+      "apex-log-parser": ["../apex-log-parser/src/index.ts"]
+    }
+  },
+  "include": ["measure/**/*.ts"]
+}

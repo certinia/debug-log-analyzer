@@ -190,7 +190,7 @@ export interface UnifiedConversionResult {
   rectMap: Map<LogEvent, PrecomputedRect>;
   /** Maximum depth in tree (tracked during traversal) */
   maxDepth: number;
-  /** Total duration in nanoseconds (tracked during traversal) */
+  /** The range's end timestamp, not a duration: the later of the last frame and the log's end */
   totalDuration: number;
   /** Whether rectsByCategory arrays are pre-sorted by timeStart (skip sorting in RectangleCache) */
   preSorted: boolean;
@@ -227,11 +227,13 @@ interface ConversionWorkItem {
  *
  * @param events - Array of LogEvent objects
  * @param categories - Set of valid categories for rectangle indexing
+ * @param logEndTime - The log's own end timestamp, which floors `totalDuration`.
  * @returns UnifiedConversionResult with all data structures
  */
 export function logEventToTreeAndRects(
   events: LogEvent[],
   categories: Set<string>,
+  logEndTime: number,
 ): UnifiedConversionResult {
   const maps: NavigationMaps = {
     originalMap: new Map(),
@@ -256,7 +258,7 @@ export function logEventToTreeAndRects(
 
   // Metrics tracked during traversal
   let maxDepth = 0;
-  let totalDuration = 0;
+  let totalDuration = logEndTime;
 
   // Root result array
   const rootResult: TreeNode<EventNode & { original: LogEvent }>[] = [];

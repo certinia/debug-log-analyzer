@@ -71,13 +71,14 @@ export const globalStyles = [
       background-color: var(--vscode-scrollbarSlider-background);
     }
 
+    /* findMatch is the match you are on; findMatchHighlight is the rest. */
     ::highlight(find-match) {
-      color: var(--vscode-editor-findMatchForeground);
+      color: var(--vscode-editor-findMatchHighlightForeground);
       background-color: var(--vscode-editor-findMatchHighlightBackground, yellow);
     }
 
     ::highlight(current-find-match) {
-      color: var(--vscode-editor-findMatchHighlightForeground);
+      color: var(--vscode-editor-findMatchForeground);
       background-color: var(--vscode-editor-findMatchBackground, #8b8000);
     }
 
@@ -131,8 +132,8 @@ export const globalStyles = [
     }
 
     .vs-checkbox:focus-visible {
-      outline: 1px solid var(--lana-focus-border);
-      outline-offset: 1px;
+      outline: var(--lana-focus-ring);
+      outline-offset: var(--lana-focus-offset);
     }
 
     .vs-checkbox-label {
@@ -171,8 +172,8 @@ export const globalStyles = [
     }
 
     .filter-control:focus-visible {
-      outline: 1px solid var(--lana-focus-border);
-      outline-offset: 1px;
+      outline: var(--lana-focus-ring);
+      outline-offset: var(--lana-focus-offset);
     }
 
     /* Toggle-button counterpart to the facet/range trigger pills — same
