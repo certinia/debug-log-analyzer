@@ -273,18 +273,13 @@ interface Breach {
  * breach is one row.
  *
  * Figures come from {@link limitTotals}, so a metric reads the same here as on
- * every other governor surface. Those figures sum usage over every namespace and,
- * without a cumulative snapshot, measure it against the synchronous defaults — so
- * a ratio alone never reads as a breach. Only a `LimitException` says the governor
+ * every other governor surface. Those figures sum usage over every namespace, so a
+ * ratio alone never reads as a breach. Only a `LimitException` says the governor
  * stopped the transaction.
- *
- * @param reported - Whether the log carries a cumulative limit snapshot. Without
- *   one the limits are assumed, and a ratio over an assumed limit says nothing.
  */
 function limitDiagnostics(
   totals: Limits,
   limitExceptions: LogEvent[],
-  reported: boolean,
   hotSpot: HotSpot | null,
 ): Diagnostic[] {
   const breaches = new Map<keyof Limits, Breach>();
@@ -310,10 +305,11 @@ function limitDiagnostics(
   for (const { key, label } of GOVERNOR_METRICS) {
     const breach = breaches.get(key);
     const { used, limit } = totals[key];
-    // A metric with no usage, or no limit reported, has no figures to show.
+    // A metric with no usage, or no limit reported, has no figures to show — and with no limit
+    // it has no ratio either, so it can never read as near one.
     const known = used > 0 && limit > 0;
     const ratio = known ? used / limit : 0;
-    if (!breach && (!reported || ratio < NEAR_LIMIT_RATIO)) {
+    if (!breach && ratio < NEAR_LIMIT_RATIO) {
       continue;
     }
 
@@ -913,7 +909,6 @@ async function analyse(log: ApexLog): Promise<LogDiagnostics> {
     ...limitDiagnostics(
       limitTotals(apexLimitTimeSeries(log)),
       limitExceptions,
-      log.governorLimits.snapshots.length > 0,
       hotSpot(selfTime, totalSelf),
     ),
     ...logIssueDiagnostics(log),

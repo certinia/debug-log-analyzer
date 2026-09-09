@@ -143,8 +143,18 @@ describe('governor-trends', () => {
       series = [{ ...trend(), limit: 0, finalRatio: 0 }];
     });
 
-    it('reads the value against the log\'s own peak, spelled "of"', async () => {
+    // The whole-log figure is the peak, so a denominator would read "90 of 90".
+    it('names no denominator until the cursor names a moment', async () => {
       const element = await mount();
+
+      expect(element.shadowRoot?.querySelector('.trend__limit')?.textContent?.trim()).toBe('');
+    });
+
+    it('reads the sample under the cursor against the log\'s own peak, spelled "of"', async () => {
+      const element = await mount();
+
+      chartOf(element).dispatchEvent(new MouseEvent('pointermove', { clientX: 40 }));
+      await element.updateComplete;
 
       expect(element.shadowRoot?.querySelector('.trend__limit')?.textContent?.trim()).toBe('of 90');
     });

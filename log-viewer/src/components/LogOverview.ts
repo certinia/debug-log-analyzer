@@ -9,7 +9,8 @@ import { logContext } from '../core/log/logContext.js';
 import type { LogStore } from '../core/log/LogStore.js';
 import { apexLimitTimeSeries } from '../features/timeline/optimised/apex-limit-series.js';
 import { globalStyles } from '../styles/global.styles.js';
-import { NO_GOVERNOR_USAGE_TEXT, seriesGauges } from './logOverviewMetrics.js';
+import { NO_GOVERNOR_USAGE_TEXT, NO_LOG_TEXT } from './governorCopy.js';
+import { seriesGauges } from './logOverviewMetrics.js';
 
 // web components
 import '../features/database/components/GovernorSummary.js';
@@ -50,9 +51,11 @@ export class LogOverview extends LitElement {
 
   render() {
     const apexLog = this.logStore?.log;
-    const series = apexLog ? apexLimitTimeSeries(apexLog) : null;
-    const gauges = series ? seriesGauges(series) : [];
-    if (!series || !gauges.length) {
+    if (!apexLog) {
+      return html`<p class="note">${NO_LOG_TEXT}</p>`;
+    }
+    const gauges = seriesGauges(apexLimitTimeSeries(apexLog));
+    if (!gauges.length) {
       return html`<p class="note">${NO_GOVERNOR_USAGE_TEXT}</p>`;
     }
 

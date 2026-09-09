@@ -23,7 +23,7 @@ import {
   type TrendPoint,
   type TrendSeries,
 } from './governorTrendData.js';
-import { NO_GOVERNOR_USAGE_TEXT } from './logOverviewMetrics.js';
+import { NO_GOVERNOR_USAGE_TEXT, NO_LOG_TEXT } from './governorCopy.js';
 
 /** Chart-space size; the SVG stretches to fill its row. */
 const VIEW_W = 100;
@@ -53,7 +53,10 @@ function trendGeometry(series: TrendSeries, logTotal: number): TrendGeometry {
     return cached;
   }
 
-  const maxRatio = Math.max(100, ...series.points.map((p) => p.ratio));
+  // At least 100%, so a safe line reads as safe. The highest point is already on the series: the
+  // ratio peaks at `finalRatio` where a limit was reported, and at exactly 100% where the
+  // denominator is the metric's own peak.
+  const maxRatio = Math.max(100, series.limit > 0 ? series.finalRatio : 100);
   const x = (t: number) => (logTotal > 0 ? (t / logTotal) * VIEW_W : 0);
   const y = (ratio: number) => VIEW_H - (ratio / maxRatio) * VIEW_H;
 
@@ -159,10 +162,13 @@ export class GovernorTrends extends LitElement {
         cursor: pointer;
       }
 
+      /* Overflow visible: a peak-scaled series tops out at exactly 100%, putting the vertex on
+         y=0, where half the non-scaling stroke would fall outside the viewBox and be clipped. */
       .trend__plot {
         display: block;
         width: 100%;
         height: 44px;
+        overflow: visible;
       }
 
       .trend__chart:focus-visible {
@@ -218,7 +224,7 @@ export class GovernorTrends extends LitElement {
   render() {
     const apexLog = this.logStore?.log;
     if (!apexLog) {
-      return html`<p class="note">No log is loaded.</p>`;
+      return html`<p class="note">${NO_LOG_TEXT}</p>`;
     }
     const series = governorTrendSeries(apexLimitTimeSeries(apexLog));
     if (!series.length) {
@@ -238,20 +244,22 @@ export class GovernorTrends extends LitElement {
     // rather than "/", and the guide and the tier colour — both distances from a cap — come off.
     const metered = series.limit > 0;
 
+    // Only once a cursor names a moment: the whole-log figure *is* the peak, so with no cursor the
+    // denominator would restate the value beside it. Cursor presence, not the value — gating on the
+    // value would drop the suffix across the flat tail and change the readout's width mid-scrub.
+    const denominator = metered
+      ? `/ ${series.format(series.limit)}`
+      : cursor
+        ? `of ${series.format(series.used)}`
+        : '';
+
     return html`<div class="trend trend--${metered ? governorTier(series.finalRatio) : 'level'}">
       <div class="trend__head">
         <span class="trend__label">${series.label}</span>
         <span class="trend__value" aria-live="polite"
           >${cursor ? html`${formatDuration(cursor.t)} · ` : ''}${series.format(
             cursor ? cursor.used : series.used,
-          )}
-          <span class="trend__limit"
-            >${
-              metered
-                ? html`/ ${series.format(series.limit)}`
-                : html`of ${series.format(series.used)}`
-            }</span
-          ></span
+          )} <span class="trend__limit">${denominator}</span></span
         >
       </div>
       <button

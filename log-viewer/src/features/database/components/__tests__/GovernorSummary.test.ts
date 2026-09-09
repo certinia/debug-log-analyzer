@@ -5,7 +5,8 @@
  */
 import { beforeEach, describe, expect, it } from '@jest/globals';
 
-import { NO_REPORTED_LIMITS_TEXT } from '../GovernorSummary.js';
+import { NO_LIMIT_FOR_METRIC_TEXT } from '../../../../components/governorCopy.js';
+import { formatInteger } from '../../../../core/utility/Util.js';
 import type { GaugeMetric, GovernorSummary } from '../GovernorSummary.js';
 import '../GovernorSummary.js';
 
@@ -24,7 +25,9 @@ describe('governor-summary', () => {
 
   describe('a limit the log reported', () => {
     it('meters the value against it', async () => {
-      const element = await strip([{ label: 'SOQL', found: 40, used: 40, limit: 100 }]);
+      const element = await strip([
+        { label: 'SOQL', found: 40, used: 40, limit: 100, format: formatInteger },
+      ]);
       const gauge = element.shadowRoot?.querySelector('.gauge');
 
       expect(gauge?.getAttribute('role')).toBe('meter');
@@ -35,7 +38,14 @@ describe('governor-summary', () => {
   });
 
   describe('no limit reported', () => {
-    const spark: GaugeMetric = { label: 'SOQL', found: 12, used: 12, limit: 0, spark: [3, 6, 12] };
+    const spark: GaugeMetric = {
+      label: 'SOQL',
+      found: 12,
+      used: 12,
+      limit: 0,
+      spark: [3, 6, 12],
+      format: formatInteger,
+    };
 
     // A bar against the level's own peak would sit full, which is how the strip says "breached".
     it('draws no bar and claims no meter', async () => {
@@ -53,7 +63,7 @@ describe('governor-summary', () => {
       const element = await strip([spark]);
 
       expect(element.shadowRoot?.querySelector('.gauge')?.getAttribute('title')).toBe(
-        NO_REPORTED_LIMITS_TEXT,
+        NO_LIMIT_FOR_METRIC_TEXT,
       );
     });
 
@@ -69,7 +79,9 @@ describe('governor-summary', () => {
     });
 
     it('draws nothing where the host passed no readings', async () => {
-      const element = await strip([{ label: 'SOQL', found: 12, used: 12, limit: 0 }]);
+      const element = await strip([
+        { label: 'SOQL', found: 12, used: 12, limit: 0, format: formatInteger },
+      ]);
 
       expect(element.shadowRoot?.querySelector('.gauge__spark')).toBeNull();
     });

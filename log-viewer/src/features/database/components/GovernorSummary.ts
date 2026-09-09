@@ -4,9 +4,8 @@
 import { LitElement, css, html, nothing } from 'lit';
 import { customElement, property } from 'lit/decorators.js';
 
+import { NO_LIMIT_FOR_METRIC_TEXT } from '../../../components/governorCopy.js';
 import { globalStyles } from '../../../styles/global.styles.js';
-
-const integer = new Intl.NumberFormat(undefined, { maximumFractionDigits: 0 });
 
 /** One at-a-glance governor gauge for the overview strip. */
 export interface GaugeMetric {
@@ -18,25 +17,17 @@ export interface GaugeMetric {
   /** Governor limit (0 when none applies). */
   limit: number;
   /**
-   * How to write the numbers. Defaults to a thousand-separated integer; a byte
-   * metric passes a compact one, since `5,400,000 / 6,000,000` is wider than a
-   * gauge.
+   * How to write every number this gauge shows. Required, so a new figure on the gauge cannot be
+   * printed raw: a byte metric passes a compact formatter, since `5,400,000 / 6,000,000` is wider
+   * than a gauge.
    */
-  format?: (value: number) => string;
+  format: (value: number) => string;
   /**
-   * The metric's level over the log, oldest first, for a gauge with no limit to fill a bar
-   * against. Drawn where the track sits, scaled to its own peak. The host passes none where there
-   * are too few readings to read as a shape.
+   * The metric's level over the log, oldest first, drawn where the track sits when there is no
+   * limit to fill a bar against. Empty where there are too few readings to read as a shape.
    */
   spark?: readonly number[];
 }
-
-/**
- * Why a gauge carries no bar. On hover, not on a line of its own: the missing denominator already
- * says it, and a note under the strip costs a row in a narrow panel. It answers the one question
- * the figures cannot — whether the limits are missing or the reading is broken.
- */
-export const NO_REPORTED_LIMITS_TEXT = 'The log reports no governor limits.';
 
 /** Consumption percentage where a gauge or trend turns from safe to warn. */
 export const GOVERNOR_WARN_PERCENT = 80;
@@ -118,11 +109,13 @@ export class GovernorSummary extends LitElement {
       }
 
       /* The height a bar would have taken plus a little, so a row grows by a few pixels rather
-         than turning into a chart strip. */
+         than turning into a chart strip. Overflow visible: the peak vertex sits on y=0, so half
+         the non-scaling stroke falls outside the viewBox and would be clipped. */
       .gauge__spark {
         display: block;
         width: 100%;
         height: 10px;
+        overflow: visible;
         color: var(--lana-fg-muted);
       }
 
@@ -166,13 +159,12 @@ export class GovernorSummary extends LitElement {
 
   private _renderGauge(metric: GaugeMetric) {
     const muted = metric.found === 0 && (metric.used ?? 0) === 0;
-    const format = metric.format ?? integer.format;
+    const { format } = metric;
 
     if (metric.used === null || metric.limit <= 0) {
       // No limit, so no meter: a bar against the level's own peak would sit full and read as a
-      // breach. The sparkline carries the shape instead, and takes a description rather than the
-      // `aria-valuemax` a meter needs.
-      return html`<div class="gauge ${muted ? 'muted' : ''}" title=${NO_REPORTED_LIMITS_TEXT}>
+      // breach, and a sparkline has no `aria-valuemax` to give.
+      return html`<div class="gauge ${muted ? 'muted' : ''}" title=${NO_LIMIT_FOR_METRIC_TEXT}>
         <span class="gauge__label">${metric.label}</span>
         <span class="gauge__value"
           >${format(metric.found)} <span class="gauge__na">seen</span></span
@@ -204,11 +196,8 @@ export class GovernorSummary extends LitElement {
 
   /** The level over the log, scaled to its own peak. Nothing to draw without a peak. */
   private _renderSpark(metric: GaugeMetric) {
-    const spark = metric.spark;
-    if (!spark?.length) {
-      return nothing;
-    }
-    const peak = Math.max(...spark);
+    const spark = metric.spark ?? [];
+    const peak = spark.reduce((highest, level) => (level > highest ? level : highest), 0);
     if (peak <= 0) {
       return nothing;
     }
@@ -226,7 +215,7 @@ export class GovernorSummary extends LitElement {
       viewBox="0 0 100 10"
       preserveAspectRatio="none"
       role="img"
-      aria-label="${metric.label} over the log, highest point ${peak}"
+      aria-label="${metric.label} over the log, highest point ${metric.format(peak)}"
     >
       <polyline
         points="${points}"

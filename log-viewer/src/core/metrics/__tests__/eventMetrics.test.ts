@@ -38,6 +38,23 @@ describe('usageParts', () => {
     expect(parts.primary).toBe('7');
     expect(parts.qualifiers).toEqual([]);
   });
+
+  // Only the whole-log reading drops the denominator: a reading past the log's own total is an
+  // anomaly, and a bare number would hide it.
+  it('keeps the denominator where the selection reads past the log total', () => {
+    const parts = usageParts(15, 12, 0, String, null);
+
+    expect(parts.primary).toBe('15 of 12');
+    expect(parts.qualifiers).toEqual(['125.00% of log']);
+  });
+
+  // Heap is signed: a selection that frees more than it allocates gave the transaction heap back.
+  it('keeps a net-negative reading signed', () => {
+    const parts = usageParts(-5, 300, 0, String, null);
+
+    expect(parts.primary).toBe('-5 of 300');
+    expect(parts.qualifiers).toEqual(['-1.67% of log']);
+  });
 });
 
 describe('EVENT_METRICS', () => {

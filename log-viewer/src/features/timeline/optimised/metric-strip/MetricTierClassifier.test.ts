@@ -43,7 +43,7 @@ describe('MetricTierClassifier', () => {
 
       expect(data.scaledToPeak).toBe(false);
       expect(data.points.map((p) => p.values.get('soqlQueries'))).toEqual([0.25, 0.5]);
-      expect(data.classifiedMetrics[0]?.limit).toBe(100);
+      expect(data.classifiedMetrics[0]?.denominator).toEqual({ kind: 'limit', value: 100 });
     });
 
     // A metric the block never named has a different kind of denominator to its neighbours, so it
@@ -87,15 +87,26 @@ describe('MetricTierClassifier', () => {
       expect(data.points.map((p) => p.values.get('queryRows'))).toEqual([0.25, 1]);
     });
 
-    it('carries the peak, and no limit, on each classified metric', () => {
+    it("carries each metric's own peak as its denominator", () => {
       const byId = new Map(
         new MetricTierClassifier()
           .processData(noLimits)
           .classifiedMetrics.map((m) => [m.metricId, m]),
       );
 
-      expect(byId.get('soqlQueries')).toMatchObject({ limit: 0, peak: 12 });
-      expect(byId.get('queryRows')).toMatchObject({ limit: 0, peak: 1200 });
+      expect(byId.get('soqlQueries')?.denominator).toEqual({ kind: 'peak', value: 12 });
+      expect(byId.get('queryRows')?.denominator).toEqual({ kind: 'peak', value: 1200 });
+    });
+
+    // Every metric that moved reaches exactly 100% of its own peak, so the percentage ranks
+    // nothing and reading order (priority) decides which are drawn as primaries.
+    it('tiers by reading order, and promotes nothing for passing 80% of itself', () => {
+      const data = new MetricTierClassifier().processData(noLimits);
+      const byId = new Map(data.classifiedMetrics.map((m) => [m.metricId, m]));
+
+      expect(byId.get('soqlQueries')?.tier).toBe(1);
+      expect(byId.get('queryRows')?.tier).toBe(1);
+      expect(data.classifiedMetrics.some((m) => m.tier === 2)).toBe(false);
     });
 
     // Peak-scaling puts every metric at exactly 100% at its own peak, so the default 110% ceiling

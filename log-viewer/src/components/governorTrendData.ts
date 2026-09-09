@@ -1,7 +1,7 @@
 /*
  * Copyright (c) 2026 Certinia Inc. All rights reserved.
  */
-import { formatByteSize, formatInteger } from '../core/utility/Util.js';
+import { formatByteSize, formatInteger, sharePercent } from '../core/utility/Util.js';
 import type { HeatStripTimeSeries } from '../features/timeline/types/flamechart.types.js';
 import { rankedLimitMetrics } from './logOverviewMetrics.js';
 
@@ -80,7 +80,7 @@ export function governorTrendSeries(series: HeatStripTimeSeries): TrendSeries[] 
               ? [
                   {
                     t: event.timestamp,
-                    ratio: scale > 0 ? (value.used / scale) * 100 : 0,
+                    ratio: sharePercent(value.used, scale),
                     used: value.used,
                   },
                 ]

@@ -116,46 +116,36 @@ export function hexToCSS(hex: number): string {
   return `#${hex.toString(16).padStart(6, '0')}`;
 }
 
+/** How a reading names its denominator: `/` for a reported limit, `of` for the log's own peak. */
+export type UsageSeparator = '/' | 'of';
+
 /**
- * Format metric value with used/limit and optional unit.
+ * Format a reading against its denominator and an optional unit.
  *
  * @param used - Used value
- * @param limit - Limit value
+ * @param denominator - Reported limit, or the metric's own peak in the log
  * @param unit - Optional unit string (e.g., "ms", "bytes")
- * @returns Formatted string (e.g., "250 / 500 ms")
+ * @param separator - `/` reads as a cap the transaction was measured against, so a peak takes `of`
+ * @returns Formatted string (e.g., "250 / 500 ms", "770 of 1,240")
  */
-export function formatMetricValue(used: number, limit: number, unit?: string): string {
+export function formatMetricValue(
+  used: number,
+  denominator: number,
+  unit?: string,
+  separator: UsageSeparator = '/',
+): string {
   const usedStr = formatNumber(Math.round(used));
-  const limitStr = formatNumber(Math.round(limit));
-  if (unit) {
-    return `${usedStr} / ${limitStr} ${unit}`;
-  }
-  return `${usedStr} / ${limitStr}`;
+  const denominatorStr = formatNumber(Math.round(denominator));
+  const reading = `${usedStr} ${separator} ${denominatorStr}`;
+  return unit ? `${reading} ${unit}` : reading;
 }
 
-/**
- * Format metric value with parentheses.
- *
- * @param used - Used value
- * @param limit - Limit value
- * @param unit - Optional unit string
- * @returns Formatted string with parentheses (e.g., "(250 / 500 ms)")
- */
-export function formatMetricValueWithParens(used: number, limit: number, unit?: string): string {
-  return `(${formatMetricValue(used, limit, unit)})`;
-}
-
-/**
- * Format a reading against the log's own peak rather than a limit. Spelled "of", not "/", so the
- * denominator cannot be taken for a cap the transaction was measured against.
- *
- * @param used - Used value
- * @param peak - Highest level the metric reached in the log
- * @param unit - Optional unit string
- * @returns Formatted string with parentheses (e.g., "(770 of 1,240)")
- */
-export function formatMetricPeakShareWithParens(used: number, peak: number, unit?: string): string {
-  const usedStr = formatNumber(Math.round(used));
-  const peakStr = formatNumber(Math.round(peak));
-  return unit ? `(${usedStr} of ${peakStr} ${unit})` : `(${usedStr} of ${peakStr})`;
+/** {@link formatMetricValue} in parentheses (e.g., "(250 / 500 ms)"). */
+export function formatMetricValueWithParens(
+  used: number,
+  denominator: number,
+  unit?: string,
+  separator?: UsageSeparator,
+): string {
+  return `(${formatMetricValue(used, denominator, unit, separator)})`;
 }

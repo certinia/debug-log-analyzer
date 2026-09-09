@@ -33,7 +33,7 @@ import { MeshAxisRenderer } from '../time-axis/MeshAxisRenderer.js';
 import { wheelZoomFactor } from '../ViewportUtils.js';
 import { MetricStripRenderer } from './MetricStripRenderer.js';
 import { MetricStripTooltipRenderer } from './MetricStripTooltipRenderer.js';
-import { MetricTierClassifier } from './MetricTierClassifier.js';
+import { EMPTY_METRIC_STRIP_DATA, MetricTierClassifier } from './MetricTierClassifier.js';
 import {
   getMetricStripColors,
   METRIC_STRIP_COLLAPSED_HEIGHT,
@@ -458,13 +458,7 @@ export class MetricStripOrchestrator {
 
     // Render the step chart with markers
     this.renderer.render(
-      data ?? {
-        points: [],
-        classifiedMetrics: [],
-        globalMaxPercent: 0,
-        hasData: false,
-        scaledToPeak: false,
-      },
+      data ?? EMPTY_METRIC_STRIP_DATA,
       context.viewportState,
       context.totalDuration,
       context.markers,
@@ -476,6 +470,7 @@ export class MetricStripOrchestrator {
         context.viewportState,
         (timeNs) => this.classifier?.getDataPointAtTime(timeNs) ?? null,
         context.totalDuration,
+        data.scaledToPeak,
       );
     }
 

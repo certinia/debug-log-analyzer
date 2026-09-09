@@ -22,12 +22,12 @@
  */
 
 import type {
+  MetricDenominator,
   MetricStripClassifiedMetric,
   MetricStripDataPoint,
 } from '../../types/flamechart.types.js';
 import { BaseTooltipRenderer } from '../rendering/BaseTooltipRenderer.js';
 import {
-  formatMetricPeakShareWithParens,
   formatMetricValueWithParens,
   formatNumber,
   getPercentColor,
@@ -74,15 +74,22 @@ export interface MetricStripTooltipOptions {
 interface RowData {
   color: string;
   name: string;
-  /** 0-1, which decides both the figure and its colour. */
+  /** 0-1, the figure the row leads with. */
   percent: number;
+  /** The percentage's colour. A share of a peak takes no severity colour — there is no cap. */
+  percentColor: string;
   value: string;
   /** The corrective count, where the log dropped events Salesforce still counted. */
   ghost: string;
-  /** Share of the metric's own peak, not of a limit — so the figure takes no severity colour. */
-  unscaled?: boolean;
   /** The "Other" summary reads quieter than the metrics it stands for. */
   muted?: boolean;
+}
+
+/** A share of a peak has no cap to be near, so it takes the panel's own foreground. */
+function percentColorFor(denominator: MetricDenominator, percent: number): string {
+  return denominator.kind === 'limit'
+    ? getPercentColor(percent)
+    : TOOLTIP_CSS.descriptionForeground;
 }
 
 /** The elements one row is written into, held so they are never rebuilt. */
@@ -208,6 +215,9 @@ export class MetricStripTooltipRenderer extends BaseTooltipRenderer {
     classifiedMetrics: MetricStripClassifiedMetric[],
   ): RowData[] {
     const allMetrics = classifiedMetrics
+      // A metric the log gave no denominator for is off the series: a row would read 0.0% for
+      // something that was consumed, which is worse than no row at all.
+      .filter((metric) => metric.denominator.kind !== 'none')
       .map((metric) => ({
         metric,
         percent: dataPoint.values.get(metric.metricId) ?? 0,
@@ -228,9 +238,14 @@ export class MetricStripTooltipRenderer extends BaseTooltipRenderer {
       }
     }
 
-    // Pass 2: anything at the danger threshold.
+    // Pass 2: anything at the danger threshold. Only against a reported limit — 80% of a metric's
+    // own peak says nothing about proximity to anything.
     for (const item of allMetrics) {
-      if (!shownMetricIds.has(item.metric.metricId) && item.percent >= DANGER_THRESHOLD) {
+      if (
+        !shownMetricIds.has(item.metric.metricId) &&
+        item.metric.denominator.kind === 'limit' &&
+        item.percent >= DANGER_THRESHOLD
+      ) {
         visibleMetrics.push(item);
         shownMetricIds.add(item.metric.metricId);
       }
@@ -259,27 +274,25 @@ export class MetricStripTooltipRenderer extends BaseTooltipRenderer {
     // panel can be scanned and compared rather than re-read.
     visibleMetrics.sort((a, b) => b.metric.globalMaxPercent - a.metric.globalMaxPercent);
 
-    // With no limit anywhere in the log every figure is a share of that metric's own peak, so no
-    // row carries a severity colour.
-    const scaledToPeak = classifiedMetrics.every((metric) => metric.limit <= 0);
-
     const rows: RowData[] = visibleMetrics.map(({ metric, percent, rawValue }) => {
-      // Always state the limit, even at 0% or before the metric's first observation, so the
-      // headroom is visible. The limit is fixed across the series, so the classified metric
-      // answers where this timestamp has no data point.
-      const limit = rawValue?.limit ?? metric.limit;
+      // The denominator is fixed across the series, so it reads even at 0% or before the metric's
+      // first observation — where this timestamp has no data point at all.
+      const { denominator } = metric;
       const used = rawValue?.used ?? 0;
       return {
         color: hexToCSS(metric.color),
         name: metric.displayName,
         percent,
-        unscaled: scaledToPeak,
+        percentColor: percentColorFor(denominator, percent),
         value:
-          limit > 0
-            ? formatMetricValueWithParens(used, limit, metric.unit)
-            : metric.peak > 0
-              ? formatMetricPeakShareWithParens(used, metric.peak, metric.unit)
-              : '',
+          denominator.kind === 'none'
+            ? ''
+            : formatMetricValueWithParens(
+                used,
+                denominator.value,
+                metric.unit,
+                denominator.kind === 'limit' ? '/' : 'of',
+              ),
         // Only where the count tracked from detailed events falls below the corrective
         // cumulative total — the log dropped events Salesforce still counted.
         ghost:
@@ -291,13 +304,18 @@ export class MetricStripTooltipRenderer extends BaseTooltipRenderer {
 
     if (hiddenMetrics.length > 0) {
       const maxHiddenPercent = Math.max(...hiddenMetrics.map((item) => item.percent));
+      // The summary stands for a set, so it takes a severity colour only where every metric it
+      // stands for has a cap to be near.
+      const metered = hiddenMetrics.every((item) => item.metric.denominator.kind === 'limit');
       rows.push({
         color: hexToCSS(this.colors.tier3),
         name: `Other (${hiddenMetrics.length})`,
         percent: maxHiddenPercent,
+        percentColor: metered
+          ? getPercentColor(maxHiddenPercent)
+          : TOOLTIP_CSS.descriptionForeground,
         value: '',
         ghost: '',
-        unscaled: scaledToPeak,
         muted: true,
       });
     }
@@ -330,9 +348,7 @@ export class MetricStripTooltipRenderer extends BaseTooltipRenderer {
       row.swatch.setAttribute('color', data.color);
       row.name.textContent = data.name;
       row.percent.textContent = `${(data.percent * 100).toFixed(1).padStart(5)}%`;
-      row.percent.style.color = data.unscaled
-        ? TOOLTIP_CSS.descriptionForeground
-        : getPercentColor(data.percent);
+      row.percent.style.color = data.percentColor;
       row.valueText.data = data.value;
       row.ghost.textContent = data.ghost;
       row.root.style.opacity = data.muted ? '0.7' : '';

@@ -3,18 +3,12 @@
  */
 import type { Limits } from 'apex-log-parser';
 
-import { formatByteSize } from '../core/utility/Util.js';
+import { formatByteSize, formatInteger, sharePercent } from '../core/utility/Util.js';
 import type { GaugeMetric } from '../features/database/components/GovernorSummary.js';
 import type { HeatStripTimeSeries } from '../features/timeline/types/flamechart.types.js';
 
 /** How many gauges the strip shows before it stops being at-a-glance. */
 const MAX_GAUGES = 6;
-
-/**
- * Shown where the log records no governor usage at all, so there is nothing to read. Shared by
- * `LogOverview`, `GovernorTrends` and `DatabaseRowBudget` so they give the same reason.
- */
-export const NO_GOVERNOR_USAGE_TEXT = 'This log records no governor usage.';
 
 /**
  * Every governor-tracked metric, with the label the inspector shows for it. A
@@ -106,21 +100,17 @@ export function limitTotals(series: HeatStripTimeSeries): Limits {
  *
  * Tightest first where the log reported limits. Where it reported none there is nothing to rank by
  * — an absolute count cannot say which metric is nearest breaking, and ordering by size would read
- * as if it could — so {@link GOVERNOR_METRICS} reading order stands in and every row keeps a
- * predictable slot.
+ * as if it could — so every ratio is 0 and the stable sort leaves {@link GOVERNOR_METRICS} reading
+ * order standing, which keeps every row in a predictable slot.
  */
 export function rankedLimitMetrics(series: HeatStripTimeSeries, max: number): RankedLimitMetric[] {
   const totals = limitTotals(series);
-  const consumed = GOVERNOR_METRICS.flatMap<RankedLimitMetric>(({ key, label }) => {
+  return GOVERNOR_METRICS.flatMap<RankedLimitMetric>(({ key, label }) => {
     const { used, limit } = totals[key];
-    return used > 0
-      ? [{ key, label, used, limit, ratio: limit > 0 ? (used / limit) * 100 : 0 }]
-      : [];
-  });
-  const ranked = consumed.some((metric) => metric.limit > 0)
-    ? consumed.sort((a, b) => b.ratio - a.ratio)
-    : consumed;
-  return ranked.slice(0, max);
+    return used > 0 ? [{ key, label, used, limit, ratio: sharePercent(used, limit) }] : [];
+  })
+    .sort((a, b) => b.ratio - a.ratio)
+    .slice(0, max);
 }
 
 /** Fewest points that read as a shape rather than a couple of dots. */
@@ -132,10 +122,42 @@ const MAX_SPARK_POINTS = 20;
 /** Memo of {@link metricSparkline}: the gauges re-render on every selection. */
 const sparkCache = new WeakMap<HeatStripTimeSeries, Map<keyof Limits, readonly number[]>>();
 
+/** Each bucket's lowest and highest reading, in the order they occurred. */
+function bucketExtremes(levels: readonly number[]): readonly number[] {
+  if (levels.length <= MAX_SPARK_POINTS) {
+    return [...levels];
+  }
+  const buckets = Math.floor(MAX_SPARK_POINTS / 2);
+  const spark: number[] = [];
+  for (let bucket = 0; bucket < buckets; bucket++) {
+    const start = Math.floor((bucket * levels.length) / buckets);
+    const end = Math.floor(((bucket + 1) * levels.length) / buckets);
+    let lowAt = start;
+    let highAt = start;
+    for (let i = start + 1; i < end; i++) {
+      if (levels[i]! < levels[lowAt]!) {
+        lowAt = i;
+      } else if (levels[i]! > levels[highAt]!) {
+        highAt = i;
+      }
+    }
+    // Chronological, so a rise reads as a rise: whichever extreme came first goes first.
+    const [first, second] = lowAt <= highAt ? [lowAt, highAt] : [highAt, lowAt];
+    spark.push(levels[first]!);
+    if (second !== first) {
+      spark.push(levels[second]!);
+    }
+  }
+  return spark;
+}
+
 /**
  * A metric's level over the log, oldest first, for a gauge that has no limit to fill a bar
- * against. Sampled at even intervals rather than reduced to peaks, so a dip stays visible. Empty
- * below {@link MIN_SPARK_POINTS} readings — too few to read as a shape.
+ * against. Empty below {@link MIN_SPARK_POINTS} readings — too few to read as a shape.
+ *
+ * Reduced by taking each bucket's lowest and highest reading, in the order they occurred: an
+ * even-interval sample would step over the one allocation that spiked, and the peak is both the
+ * point of the shape and the figure printed beside it.
  */
 export function metricSparkline(series: HeatStripTimeSeries, key: keyof Limits): readonly number[] {
   let byKey = sparkCache.get(series);
@@ -156,16 +178,7 @@ export function metricSparkline(series: HeatStripTimeSeries, key: keyof Limits):
     }
   }
 
-  let spark: readonly number[] = [];
-  if (levels.length >= MIN_SPARK_POINTS) {
-    spark =
-      levels.length <= MAX_SPARK_POINTS
-        ? levels
-        : Array.from(
-            { length: MAX_SPARK_POINTS },
-            (_, i) => levels[Math.round((i * (levels.length - 1)) / (MAX_SPARK_POINTS - 1))]!,
-          );
-  }
+  const spark = levels.length < MIN_SPARK_POINTS ? [] : bucketExtremes(levels);
   byKey.set(key, spark);
   return spark;
 }
@@ -180,7 +193,7 @@ export function seriesGauges(series: HeatStripTimeSeries): GaugeMetric[] {
     found: used,
     used,
     limit,
-    ...(limit > 0 ? {} : { spark: metricSparkline(series, key) }),
-    ...(key === 'heapSize' ? { format: formatByteSize } : {}),
+    spark: limit > 0 ? undefined : metricSparkline(series, key),
+    format: key === 'heapSize' ? formatByteSize : formatInteger,
   }));
 }

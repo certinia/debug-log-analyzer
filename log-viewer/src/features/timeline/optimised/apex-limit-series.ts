@@ -88,11 +88,16 @@ function buildApexLimitTimeSeries(apexLog: ApexLog): HeatStripTimeSeries {
 
   const observations: GranularObservation[] = [];
 
-  // The log is the only source of a limit: the highest one any cumulative snapshot reported, fixed
-  // for the whole series so the "out of" total never flips (a log can report both the synchronous
-  // and the asynchronous ceiling). A metric no snapshot named keeps limit 0 — its consumers scale it
-  // by its own peak rather than measure it against a number the log never gave.
+  // The log is the only source of a limit: the highest one it reported anywhere, fixed for the
+  // whole series so the "out of" total never flips (a log can report both the synchronous and the
+  // asynchronous ceiling). A metric the log never named keeps limit 0 — its consumers scale it by
+  // its own peak rather than measure it against a number the log never gave.
   const metricLimits = new Map<string, number>();
+  const reportLimit = (metric: keyof Limits, limit: number): void => {
+    if (limit > 0) {
+      metricLimits.set(metric, Math.max(metricLimits.get(metric) ?? 0, limit));
+    }
+  };
 
   // Cumulative snapshots — authoritative multi-metric correctives (transaction usage).
   for (const snapshot of apexLog.governorLimits.snapshots) {
@@ -108,9 +113,7 @@ function buildApexLimitTimeSeries(apexLog: ApexLog): HeatStripTimeSeries {
         used: value.used,
         scope: 'cumulative',
       });
-      if (value.limit > 0) {
-        metricLimits.set(metric, Math.max(metricLimits.get(metric) ?? 0, value.limit));
-      }
+      reportLimit(metric, value.limit);
     }
   }
 
@@ -176,6 +179,9 @@ function buildApexLimitTimeSeries(apexLog: ApexLog): HeatStripTimeSeries {
         // Flow CPU time is flow-scoped with a different limit (15000 vs the 10000 apex limit),
         // so skip it here — CPU stays sourced from LIMIT_USAGE_FOR_NS to keep percentages consistent.
         if (usage && !(event.type !== 'LIMIT_USAGE' && usage.metric === 'cpuTime')) {
+          // These lines report a block's usage, but the limit they name is the transaction's, and
+          // some logs carry them with no cumulative block at all.
+          reportLimit(usage.metric, usage.limit);
           observations.push({
             kind: 'absolute',
             timestamp,

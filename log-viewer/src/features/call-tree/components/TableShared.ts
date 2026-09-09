@@ -9,7 +9,8 @@ import {
   type RowComponent,
 } from 'tabulator-tables';
 
-import { formatInteger } from '../../../core/utility/Util.js';
+import { NO_REPORTED_LIMITS_TEXT } from '../../../components/governorCopy.js';
+import { formatInteger, sharePercent } from '../../../core/utility/Util.js';
 import { NAMESPACE_WIDTH } from '../../../tabulator/ColumnWidths.js';
 import {
   progressFormatter,
@@ -196,6 +197,54 @@ function utilisationFormatter(
 }
 
 /**
+ * Highest utilisation in the table, or null where no row has one. Tabulator's own `'max'` coerces
+ * with `Number()`, so a table of nulls would foot a confident `0%`.
+ */
+function maxUtilisation(values: (number | null)[]): number | null {
+  let highest: number | null = null;
+  for (const value of values) {
+    if (typeof value === 'number' && (highest === null || value > highest)) {
+      highest = value;
+    }
+  }
+  return highest;
+}
+
+/**
+ * A utilisation percentage column: the bar, its footer, and the `—`-for-null contract that both
+ * halves have to agree on. Carried in one place so a new utilisation column cannot be wired with
+ * Tabulator's own `'max'`, which would foot `0%` where nothing is measurable.
+ */
+function createUtilisationColumn(opts: {
+  title: string;
+  field: string;
+  width: number;
+  visible?: boolean;
+  tooltip: ColumnDefinition['tooltip'];
+}): ColumnDefinition {
+  const formatterParams = { precision: 0, totalValue: 100, showPercentageText: false };
+  return {
+    title: opts.title,
+    field: opts.field,
+    visible: opts.visible,
+    sorter: 'number',
+    // Unknown utilisation sorts below every known one rather than reading as the safest path.
+    sorterParams: { alignEmptyValues: 'bottom' },
+    cssClass: 'number-cell',
+    width: opts.width,
+    minWidth: opts.width,
+    hozAlign: 'right',
+    headerHozAlign: 'right',
+    formatter: utilisationFormatter,
+    formatterParams,
+    bottomCalc: maxUtilisation,
+    bottomCalcFormatter: utilisationFormatter,
+    bottomCalcFormatterParams: formatterParams,
+    tooltip: opts.tooltip,
+  };
+}
+
+/**
  * The shared "Gov Avg %" column — the average governor consumption across all
  * governors on a call path (see {@link governorCost}), rendered as a progress
  * bar. Reused across all call-tree/analysis tables. `governorCost` is populated
@@ -204,27 +253,14 @@ function utilisationFormatter(
  * them.
  */
 export function createGovernorCostColumn(governorLimits: GovernorLimits): ColumnDefinition {
-  const formatterParams = { precision: 0, totalValue: 100, showPercentageText: false };
-  return {
+  return createUtilisationColumn({
     title: 'Gov Avg %',
     field: 'governorCost',
-    sorter: 'number',
-    // Unknown utilisation sorts below every known one rather than reading as the safest path.
-    sorterParams: { alignEmptyValues: 'bottom' },
-    cssClass: 'number-cell',
     width: 71,
-    minWidth: 71,
-    hozAlign: 'right',
-    headerHozAlign: 'right',
-    formatter: utilisationFormatter,
-    formatterParams,
-    bottomCalc: 'max',
-    bottomCalcFormatter: utilisationFormatter,
-    bottomCalcFormatterParams: formatterParams,
     tooltip(_event, cell) {
       const value = cell.getValue() as number | null;
       if (value === null) {
-        return 'This log reports no governor limits.';
+        return NO_REPORTED_LIMITS_TEXT;
       }
       const breakdown = governorCostBreakdown(cell.getData() as GovernorCostRow, governorLimits);
       if (!breakdown.length) {
@@ -237,7 +273,7 @@ export function createGovernorCostColumn(governorLimits: GovernorLimits): Column
       });
       return `${value.toFixed(1)}% — average utilisation across all governors<br>${rows.join('<br>')}`;
     },
-  };
+  });
 }
 
 /**
@@ -247,27 +283,15 @@ export function createGovernorCostColumn(governorLimits: GovernorLimits): Column
  * user toggle). The tooltip names which governor is the peak.
  */
 export function createGovernorPeakColumn(governorLimits: GovernorLimits): ColumnDefinition {
-  const formatterParams = { precision: 0, totalValue: 100, showPercentageText: false };
-  return {
+  return createUtilisationColumn({
     title: 'Gov Peak %',
     field: 'governorCostMax',
-    visible: false,
-    sorter: 'number',
-    sorterParams: { alignEmptyValues: 'bottom' },
-    cssClass: 'number-cell',
     width: 78,
-    minWidth: 78,
-    hozAlign: 'right',
-    headerHozAlign: 'right',
-    formatter: utilisationFormatter,
-    formatterParams,
-    bottomCalc: 'max',
-    bottomCalcFormatter: utilisationFormatter,
-    bottomCalcFormatterParams: formatterParams,
+    visible: false,
     tooltip(_event, cell) {
       const peak = cell.getValue() as number | null;
       if (peak === null) {
-        return 'This log reports no governor limits.';
+        return NO_REPORTED_LIMITS_TEXT;
       }
       const [top] = governorCostBreakdown(cell.getData() as GovernorCostRow, governorLimits);
       if (!top) {
@@ -277,7 +301,7 @@ export function createGovernorPeakColumn(governorLimits: GovernorLimits): Column
       const limit = top.label === 'Heap' ? formatInteger(top.limit) : `${top.limit}`;
       return `Tightest single governor: ${top.label} ${used}/${limit} (${peak.toFixed(1)}%)`;
     },
-  };
+  });
 }
 
 /**
@@ -329,10 +353,10 @@ export function createGovernorColumn(opts: {
       const value = (cell.getValue() ?? 0) as number;
       const share =
         total > 0
-          ? `${formatInteger(value)} of ${formatInteger(total)} (${((value / total) * 100).toFixed(1)}% of log)`
+          ? `${formatInteger(value)} of ${formatInteger(total)} (${sharePercent(value, total).toFixed(1)}% of log)`
           : formatInteger(value);
       return limit > 0
-        ? `${share} · ${((value / limit) * 100).toFixed(1)}% of the ${formatInteger(limit)} limit`
+        ? `${share} · ${sharePercent(value, limit).toFixed(1)}% of the ${formatInteger(limit)} limit`
         : share;
     },
   };

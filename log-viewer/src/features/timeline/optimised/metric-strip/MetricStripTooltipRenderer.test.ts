@@ -8,6 +8,7 @@
 
 import { afterEach, beforeEach, describe, expect, it } from '@jest/globals';
 import type {
+  MetricDenominator,
   MetricStripClassifiedMetric,
   MetricStripDataPoint,
 } from '../../types/flamechart.types.js';
@@ -15,22 +16,20 @@ import { PERCENT_COLORS } from '../rendering/tooltip-utils.js';
 import { MetricStripTooltipRenderer } from './MetricStripTooltipRenderer.js';
 
 /**
- * Build a classified metric. Only metricId/displayName/globalMaxPercent/limit/peak matter here.
+ * Build a classified metric. Only metricId/displayName/globalMaxPercent/denominator matter here.
  */
 function metric(
   metricId: string,
   displayName: string,
   globalMaxPercent: number,
-  limit = 100,
-  peak = 0,
+  denominator: MetricDenominator = { kind: 'limit', value: 100 },
 ): MetricStripClassifiedMetric {
   return {
     metricId,
     displayName,
     tier: 1,
     globalMaxPercent,
-    limit,
-    peak,
+    denominator,
     color: 0xffffff,
     priority: 0,
     unit: '',
@@ -190,7 +189,7 @@ describe('MetricStripTooltipRenderer', () => {
 
   it('always shows the (used / limit) value, even at 0% with no data point for the metric', () => {
     // cpuTime has a limit but no entry in rawValues (not observed yet at this timestamp).
-    const metrics = [metric('cpuTime', 'CPU Time', 0, 10000)];
+    const metrics = [metric('cpuTime', 'CPU Time', 0, { kind: 'limit', value: 10_000 })];
     const dataPoint: MetricStripDataPoint = {
       timestamp: 0,
       values: new Map([['cpuTime', 0]]),
@@ -205,8 +204,8 @@ describe('MetricStripTooltipRenderer', () => {
   });
 
   describe('a log that reported no limits', () => {
-    // limit 0, peak 1,240: the reading is a share of the log's own peak, not of a cap.
-    const metrics = [metric('queryRows', 'Query Rows', 1, 0, 1240)];
+    // Peak 1,240: the reading is a share of the log's own peak, not of a cap.
+    const metrics = [metric('queryRows', 'Query Rows', 1, { kind: 'peak', value: 1240 })];
     const dataPoint: MetricStripDataPoint = {
       timestamp: 0,
       values: new Map([['queryRows', 0.62]]),

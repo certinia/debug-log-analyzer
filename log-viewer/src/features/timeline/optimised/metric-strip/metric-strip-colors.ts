@@ -224,6 +224,19 @@ export function getTrafficLightColor(percent: number): TrafficLightColor {
 }
 
 /**
+ * The steps {@link getDensityColor} answers with. Quantised and pre-allocated: the collapsed strip
+ * merges adjacent buckets into one rect per repeated colour, so a continuous alpha would give it a
+ * rect per data point, and it asks per bucket on every frame.
+ */
+const DENSITY_STEPS: readonly TrafficLightColor[] = [
+  { color: 0x000000, alpha: 0 },
+  ...Array.from({ length: 8 }, (_, step) => ({
+    color: METRIC_STRIP_COLORS.gridLine,
+    alpha: 0.12 + ((step + 1) / 8) * 0.38,
+  })),
+];
+
+/**
  * Density colour for the collapsed strip when the log reported no limits. Severity is unknowable
  * without a cap, so this carries level only: one neutral grey, opacity rising with the share of the
  * log's own peak. Never a traffic light — an amber or red bucket would assert a proximity we cannot
@@ -233,9 +246,8 @@ export function getTrafficLightColor(percent: number): TrafficLightColor {
  */
 export function getDensityColor(fraction: number): TrafficLightColor {
   const clamped = Math.max(0, Math.min(1, fraction));
-  return clamped <= 0
-    ? { color: 0x000000, alpha: 0 }
-    : { color: METRIC_STRIP_COLORS.gridLine, alpha: 0.12 + clamped * 0.38 };
+  // Ceiling, so any level at all draws: rounding would leave the lowest shares invisible.
+  return DENSITY_STEPS[Math.ceil(clamped * 8)]!;
 }
 
 /**

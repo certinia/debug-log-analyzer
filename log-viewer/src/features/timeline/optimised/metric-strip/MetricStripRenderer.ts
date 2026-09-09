@@ -118,13 +118,6 @@ export class MetricStripRenderer {
   /** Effective Y-max for dynamic scaling. */
   private effectiveYMax = METRIC_STRIP_Y_MAX_PERCENT;
 
-  /**
-   * Whether the percentages are shares of each metric's own peak rather than of a reported limit.
-   * Latched from the data every frame in {@link render}, which runs before
-   * {@link renderCollapsedWithData} and is the only caller that sees the processed data.
-   */
-  private scaledToPeak = false;
-
   /** Whether the metric strip is in collapsed mode. */
   private isCollapsed = false;
 
@@ -235,7 +228,6 @@ export class MetricStripRenderer {
 
     const { displayWidth } = viewportState;
     const height = this.height;
-    this.scaledToPeak = data.scaledToPeak;
 
     // Always render markers (background layer) - visible in both collapsed and expanded modes
     if (markers && markers.length > 0) {
@@ -298,9 +290,15 @@ export class MetricStripRenderer {
     viewportState: ViewportState,
     getDataPointAtTime: (timeNs: number) => DataPointResult | null,
     totalDuration: number,
+    scaledToPeak: boolean,
   ): void {
     if (this.isCollapsed) {
-      this.renderCollapsedHeatStrips(viewportState, getDataPointAtTime, totalDuration);
+      this.renderCollapsedHeatStrips(
+        viewportState,
+        getDataPointAtTime,
+        totalDuration,
+        scaledToPeak,
+      );
     }
   }
 
@@ -316,6 +314,7 @@ export class MetricStripRenderer {
     viewportState: ViewportState,
     getDataPointAtTime: (timeNs: number) => DataPointResult | null,
     totalDuration: number,
+    scaledToPeak: boolean,
   ): void {
     const { zoom, offsetX, displayWidth } = viewportState;
     const height = this.height;
@@ -358,7 +357,7 @@ export class MetricStripRenderer {
 
       if (cachedResult) {
         const maxPercent = this.getMaxPercentAtPoint(cachedResult.point);
-        const colorInfo = this.scaledToPeak
+        const colorInfo = scaledToPeak
           ? getDensityColor(maxPercent)
           : getTrafficLightColor(maxPercent);
         color = colorInfo.color;

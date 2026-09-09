@@ -902,6 +902,14 @@ export type HeatStripTimeSeriesMetric = HeatStripMetric;
  * Classified metric for metric strip tier system.
  * Metrics are classified into tiers based on their global max percentage.
  */
+/**
+ * What a metric's percentages are measured against. `peak` is the metric's own highest level,
+ * standing in where the log reported no limit; `none` is a metric the log reported no limit for in
+ * a log that reported some, which is off the series and cannot be read at all.
+ */
+export type MetricDenominator =
+  { kind: 'limit'; value: number } | { kind: 'peak'; value: number } | { kind: 'none' };
+
 export interface MetricStripClassifiedMetric {
   /** Unique metric identifier (e.g., 'cpuTime', 'soqlQueries') */
   metricId: string;
@@ -911,10 +919,8 @@ export interface MetricStripClassifiedMetric {
   tier: 1 | 2 | 3;
   /** Maximum percentage reached across all timestamps (0-1+) */
   globalMaxPercent: number;
-  /** Authoritative limit for this metric ("out of" total), fixed across the series. 0 if unknown. */
-  limit: number;
-  /** Highest level this metric reached across the series — the denominator when `limit` is 0. */
-  peak: number;
+  /** What this metric's percentages divide by, resolved once for the whole series. */
+  denominator: MetricDenominator;
   /** Line color for this metric (hex number 0xRRGGBB) */
   color: number;
   /** Priority for ordering (lower = higher priority, shown first) */

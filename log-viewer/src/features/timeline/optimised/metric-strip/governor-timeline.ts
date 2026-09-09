@@ -90,22 +90,38 @@ function sortByTime(observations: LimitObservation[]): LimitObservation[] {
 }
 
 /**
- * The scale each metric's coalescing threshold is sized from: its reported limit, or — where the log
- * reported none — the total magnitude it moved, which bounds the points the same way.
+ * The coalescing threshold per metric, sized from its reported limit or — where the log reported
+ * none — the highest level it ever held.
+ *
+ * The running net, not the sum of the magnitudes: heap allocates and frees far more than it holds,
+ * and sizing from that churn would set a threshold the curve never crosses, leaving a metric with a
+ * handful of points instead of a shape. Observations must be time-sorted.
  */
-function coalescingScales(
+function coalescingThresholds(
   sorted: LimitObservation[],
   limits: Map<string, number>,
 ): Map<string, number> {
   const scales = new Map<string, number>(limits);
-  const magnitudes = new Map<string, number>();
+  // One entry per unlimited metric, mutated in place: this walks every heap allocation in the log.
+  const levels = new Map<string, { running: number; peak: number }>();
   for (const obs of sorted) {
-    if (obs.kind === 'delta' && (scales.get(obs.metric) ?? 0) <= 0) {
-      magnitudes.set(obs.metric, (magnitudes.get(obs.metric) ?? 0) + Math.abs(obs.delta));
+    if (obs.kind === 'delta' && (limits.get(obs.metric) ?? 0) <= 0) {
+      let level = levels.get(obs.metric);
+      if (!level) {
+        level = { running: 0, peak: 0 };
+        levels.set(obs.metric, level);
+      }
+      level.running += obs.delta;
+      const held = Math.abs(level.running);
+      if (held > level.peak) {
+        level.peak = held;
+        scales.set(obs.metric, held);
+      }
     }
   }
-  for (const [metric, magnitude] of magnitudes) {
-    scales.set(metric, magnitude);
+
+  for (const [metric, scale] of scales) {
+    scales.set(metric, Math.max(1, Math.floor(scale / POINT_BUDGET)));
   }
   return scales;
 }
@@ -121,7 +137,7 @@ function coalesceDeltas(
   sorted: LimitObservation[],
   limits: Map<string, number>,
 ): LimitObservation[] {
-  const scales = coalescingScales(sorted, limits);
+  const thresholds = coalescingThresholds(sorted, limits);
   const out: LimitObservation[] = [];
   // namespace -> metric -> accumulated delta + latest timestamp
   const pending = new Map<string, Map<string, { sum: number; ts: number }>>();
@@ -138,7 +154,7 @@ function coalesceDeltas(
 
   for (const obs of sorted) {
     if (obs.kind === 'delta') {
-      const threshold = Math.max(1, Math.floor((scales.get(obs.metric) ?? 0) / POINT_BUDGET));
+      const threshold = thresholds.get(obs.metric) ?? 1;
       let byMetric = pending.get(obs.namespace);
       if (!byMetric) {
         byMetric = new Map();

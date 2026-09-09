@@ -3,7 +3,7 @@
  */
 import type { GovernorLimits, LogEvent, SelfTotal } from 'apex-log-parser';
 
-import { formatInteger } from '../utility/Util.js';
+import { formatInteger, sharePercent } from '../utility/Util.js';
 
 /**
  * The statement a database metric belongs to — which grid a selection came from, and
@@ -88,8 +88,10 @@ export interface UsageParts {
  *
  * The primary number answers the question a per-selection reading is asked — how much of the
  * transaction's own consumption this is — so it is spelled "of", never "/", and reads on every log
- * whether or not one reported limits. A reading of the whole log carries no denominator: its share
- * of itself is 100%. A limit the log reported follows as a qualifier, and only then.
+ * whether or not one reported limits. A whole-log reading carries no denominator — its share of
+ * itself is 100% — and neither does a log total of zero or less, which a signed metric like net
+ * heap can reach. A selection reading *past* the log's own total does keep one, rather than hiding
+ * the anomaly behind a bare number. A limit the log reported follows as a qualifier.
  *
  * @param total - This selection's consumption.
  * @param logTotal - The transaction's consumption of the same metric.
@@ -104,12 +106,12 @@ export function usageParts(
   format: (value: number) => string,
   self: string | null,
 ): UsageParts {
-  const contributes = logTotal > total;
+  const noDenominator = logTotal <= 0 || logTotal === total;
   return {
-    primary: contributes ? `${format(total)} of ${format(logTotal)}` : format(total),
+    primary: noDenominator ? format(total) : `${format(total)} of ${format(logTotal)}`,
     qualifiers: [
-      contributes ? `${((total / logTotal) * 100).toFixed(2)}% of log` : null,
-      limit > 0 ? `${((total / limit) * 100).toFixed(2)}% of the ${format(limit)} limit` : null,
+      noDenominator ? null : `${sharePercent(total, logTotal).toFixed(2)}% of log`,
+      limit > 0 ? `${sharePercent(total, limit).toFixed(2)}% of the ${format(limit)} limit` : null,
       self && selfLabel(self),
     ].filter((part): part is string => !!part),
   };

@@ -44,9 +44,9 @@ describe('log-overview', () => {
   const seriesWithSoql = (limit: number): HeatStripTimeSeries =>
     timeSeries([seriesEvent(1_000, { soqlQueries: { used: 40, limit } })]);
 
-  it('says nothing was recorded while no log is loaded', async () => {
+  it('says no log is loaded, not that a log recorded nothing', async () => {
     const element = await overview();
-    expect(element.shadowRoot?.querySelector('.note')?.textContent).toContain('no governor usage');
+    expect(element.shadowRoot?.querySelector('.note')?.textContent).toContain('No log is loaded');
     expect(element.shadowRoot?.querySelector('governor-summary')).toBeNull();
   });
 
@@ -60,7 +60,6 @@ describe('log-overview', () => {
     expect(element.shadowRoot?.querySelector('.note')).toBeNull();
   });
 
-  // The log, not a snapshot count, decides: figures still show, but nothing is a share of a limit.
   // Figures still show where the log reported no limit; the gauge says so on hover, so the strip
   // carries no note of its own.
   it('shows the gauges with no note when the log reported no limits', async () => {

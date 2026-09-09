@@ -66,7 +66,7 @@ describe('seriesGauges', () => {
       ]),
     );
 
-    expect(gauges).toEqual([{ label: 'SOQL', found: 70, used: 70, limit: 100 }]);
+    expect(gauges).toMatchObject([{ label: 'SOQL', found: 70, used: 70, limit: 100 }]);
   });
 
   it('ranks by percentage, drops zero usage, and caps at six', () => {
@@ -139,14 +139,14 @@ describe('seriesGauges', () => {
       expect(soql).toMatchObject({ label: 'SOQL', used: 12, limit: 0 });
       expect(soql?.spark).toEqual(levels);
     });
+  });
 
-    it('carries no sparkline where the log reported a limit', () => {
-      const gauges = seriesGauges(
-        timeSeries([seriesEvent(1_000, { soqlQueries: { used: 70, limit: 100 } })]),
-      );
+  it('carries no sparkline where the log reported a limit', () => {
+    const gauges = seriesGauges(
+      timeSeries([seriesEvent(1_000, { soqlQueries: { used: 70, limit: 100 } })]),
+    );
 
-      expect(gauges[0]?.spark).toBeUndefined();
-    });
+    expect(gauges[0]?.spark).toBeUndefined();
   });
 });
 
@@ -164,14 +164,22 @@ describe('metricSparkline', () => {
     expect(metricSparkline(of(levels), 'soqlQueries')).toEqual(levels);
   });
 
-  // Sampled at even intervals, not reduced to peaks, so a dip survives the downsample.
-  it('samples a long series down to twenty readings, first and last kept', () => {
+  // Bucket extremes, so both the spike and the dip survive the downsample.
+  it('reduces a long series to twenty readings, first and last kept', () => {
     const levels = Array.from({ length: 500 }, (_, i) => (i === 250 ? 0 : i));
     const spark = metricSparkline(of(levels), 'soqlQueries');
 
     expect(spark).toHaveLength(20);
     expect(spark[0]).toBe(0);
     expect(spark[spark.length - 1]).toBe(499);
+  });
+
+  // An even-interval sample stepped over the one reading that spiked — the whole point of the
+  // shape, and the figure printed beside it.
+  it('keeps a spike that falls between the sample intervals', () => {
+    const levels = Array.from({ length: 500 }, (_, i) => (i === 137 ? 9_999 : 1));
+
+    expect(metricSparkline(of(levels), 'soqlQueries')).toContain(9_999);
   });
 
   it('answers the same array for the same series and metric', () => {
