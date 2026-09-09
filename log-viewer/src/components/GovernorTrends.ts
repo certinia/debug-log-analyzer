@@ -170,7 +170,6 @@ export class GovernorTrends extends LitElement {
         border-bottom: var(--lana-stroke) solid var(--lana-surface-border);
         padding: 0;
         background: none;
-        color: inherit;
         cursor: pointer;
       }
 
@@ -246,7 +245,7 @@ export class GovernorTrends extends LitElement {
     const cursor = this._cursorFor(series);
     const cursorX = cursor ? x(cursor.t).toFixed(2) : null;
 
-    return html`<div class="trend trend--${governorTier(series.finalRatio)}">
+    return html`<div class="trend">
       <div class="trend__head">
         <span class="trend__label">${series.label}</span>
         <span class="trend__value" aria-live="polite"
@@ -256,7 +255,7 @@ export class GovernorTrends extends LitElement {
         >
       </div>
       <button
-        class="trend__chart"
+        class="trend__chart trend--${governorTier(series.finalRatio)}"
         type="button"
         aria-label="${series.label}: ${Math.round(
           series.finalRatio,

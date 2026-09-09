@@ -199,6 +199,9 @@ export async function buildDetailSections(
         ? selection
         : null;
   const instances = shown?.instances ?? null;
+  // The frames the row is, which is the scope Variables compares: a bottom-up
+  // caller row counts its callee's calls, so its locals live a level up.
+  const scopeFrames = shown?.frames ?? null;
   const calledBy = shown?.calledBy ?? '';
 
   const sections: PaneSection[] = [
@@ -224,7 +227,7 @@ export async function buildDetailSections(
       weight: 3,
       content: html`<variables-detail
         eventIndex=${activeIndex}
-        .instances=${instances}
+        .frames=${scopeFrames}
       ></variables-detail>`,
     },
   ];
