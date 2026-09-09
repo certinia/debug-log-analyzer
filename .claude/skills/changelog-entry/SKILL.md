@@ -25,7 +25,9 @@ files moved belong in the issue and the pull request.
 [#86]: https://github.com/owner/repo/issues/86
 ```
 
-- **One sentence, no sub-bullets.** No semicolon joining two facts. Two wrapped lines is the ceiling.
+- **One sentence.** No semicolon joining two facts. Two wrapped lines is the ceiling.
+- **Sub-bullets only where one feature has distinct parts** — three at most, each naming one
+  capability the reader can use. Never a tour of how it was built.
 - **Present tense.** "Add", "Reduce", "Refuse" — not "Added", "Reduced".
 - **Breaking entries first** in their section, prefixed `**Breaking:**`.
 - **Then most impactful first.** The entry that changes the most readers' day leads its
@@ -45,7 +47,8 @@ The reader upgrades the package; they did not write it. Name the outcome they ca
 - **No internal jargon.** No module, class, library or algorithm names. If the reader cannot find
   the word in the product, cut it.
 - **A fix names the symptom, not the cause.**
-- **A big feature gets one headline entry**, not a tour of every facet. Detail belongs in the docs.
+- **A big feature gets one headline entry**, with up to three sub-bullets for its distinct
+  parts — not a tour of every facet. Detail belongs in the docs.
 
 ## What earns an entry
 
@@ -65,16 +68,16 @@ No issue fits? File one, then reference it.
 
 ## Wrong, then right
 
-| Wrong                                                                                                         | Right                                                           |
-| ------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------- |
-| `- Removed destructiveHint from three tools, since the spec says it is meaningless when readOnlyHint is true` | no entry — the user sees no difference                          |
-| `- Replaced ten per-category properties with one z.partialRecord, cutting ~844 to ~428 tokens`                | fold the result into the one user-facing entry                  |
-| `- Reduced the cost by 31% ([#87](https://.../87))`                                                           | `- Reduce the cost by 31% ([#87])`, plus a reference definition |
-| `- Refactor CSV parsing to process dataset arrays asynchronously`                                             | `- Fix the freeze on a large CSV export`                        |
-| `- Replace webview-ui-toolkit with vscode-elements`                                                           | `- Match the host's controls more closely`                      |
-| a feature with six nested sub-bullets                                                                         | one headline sentence, plus a docs link                         |
-| `- Improve search performance`                                                                                | `- Search a 100MB log 10× faster`                               |
-| `- Optimise the parser`                                                                                       | `- Cut parse time on a large log by 31%`                        |
+| Wrong                                                                                                         | Right                                                                    |
+| ------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------ |
+| `- Removed destructiveHint from three tools, since the spec says it is meaningless when readOnlyHint is true` | no entry — the user sees no difference                                   |
+| `- Replaced ten per-category properties with one z.partialRecord, cutting ~844 to ~428 tokens`                | fold the result into the one user-facing entry                           |
+| `- Reduced the cost by 31% ([#87](https://.../87))`                                                           | `- Reduce the cost by 31% ([#87])`, plus a reference definition          |
+| `- Refactor CSV parsing to process dataset arrays asynchronously`                                             | `- Fix the freeze on a large CSV export`                                 |
+| `- Replace webview-ui-toolkit with vscode-elements`                                                           | `- Match the host's controls more closely`                               |
+| a feature with six nested sub-bullets                                                                         | a headline sentence, then three sub-bullets at most, one capability each |
+| `- Improve search performance`                                                                                | `- Search a 100MB log 10× faster`                                        |
+| `- Optimise the parser`                                                                                       | `- Cut parse time on a large log by 31%`                                 |
 
 ## Trim a section nobody will read
 
@@ -83,7 +86,8 @@ anything, and merging is most of the win.
 
 1. Find the bounds: `grep -n '^## \[' CHANGELOG.md`.
 2. Read the whole section before changing a word.
-3. Draft the replacement in one pass. Fold every sub-bullet into its headline, or drop it.
+3. Draft the replacement in one pass. Keep three sub-bullets at most under a headline; fold the
+   rest in, or drop them.
 4. Merge entries that name the same surface or the same fix. Three styling entries are one entry.
 5. Drop what the reader cannot see, by the rules above.
 6. Re-order each section by impact. A trimmed section in the old order still buries the lead.
