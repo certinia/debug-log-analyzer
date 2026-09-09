@@ -1120,7 +1120,7 @@ export class CalltreeView extends LitElement {
       if (this._echoGuard.suppressed) {
         return;
       }
-      const selection = rowDetailSelection(rows[0], this.rootMethod);
+      const selection = rowDetailSelection(rows[0], this.rootMethod, directionOf(this.viewMode));
       if (!selection) {
         // The selection went with it, and so does a mark a picked inspector row
         // left here — it was never a selection of this table.

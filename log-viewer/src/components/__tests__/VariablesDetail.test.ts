@@ -6,6 +6,7 @@
 import { describe, expect, it } from '@jest/globals';
 import { parse } from 'apex-log-parser';
 
+import { MAX_MARKED_PER_VALUE } from '../../core/log/aggregateVariables.js';
 import { logStoreFor, type LogStore } from '../../core/log/LogStore.js';
 
 // Avoid the heavy CodeBlock import chain (vscode-elements, soql formatter). The
@@ -14,7 +15,7 @@ jest.mock('../CodeBlock.js', () => ({}));
 // The chevron is a vscode-icon, and its connectedCallback throws under jsdom.
 jest.mock('#vscode-elements/vscode-icon.js', () => ({}));
 
-import type { VariablesDetail } from '../VariablesDetail.js';
+import { STATICS_NOTE, type VariablesDetail } from '../VariablesDetail.js';
 import '../VariablesDetail.js';
 
 const FINEST = '64.0 APEX_CODE,FINEST;APEX_PROFILING,NONE;DB,NONE\n';
@@ -124,7 +125,7 @@ describe('VariablesDetail skips the frame read for an aggregate', () => {
     const store = logOf(FRAME);
     const el = await mount(store, {
       eventIndex: indexOf(store, 'ns.Outer.run()'),
-      instances: [indexOf(store, 'ns.Outer.run()'), indexOf(store, 'ns.Outer.run()')],
+      frames: [indexOf(store, 'ns.Outer.run()'), indexOf(store, 'ns.Outer.run()')],
     });
 
     expect((el as unknown as { _frame: unknown })._frame).toBeNull();
@@ -161,17 +162,6 @@ describe('VariablesDetail empty states', () => {
 
     // The statics are still visible from it, so this frame reports them.
     expect(groupNames(el)).toContain('Static');
-  });
-
-  it('asks for one call when the selection counts many', async () => {
-    const store = logOf(FRAME);
-
-    const el = await mount(store, {
-      eventIndex: indexOf(store, 'ns.Outer.run()'),
-      instances: [1, 2, 3],
-    });
-
-    expect(notes(el)).toEqual(['Pick one call to see its variables.']);
   });
 });
 
@@ -822,5 +812,247 @@ describe('VariablesDetail object fields', () => {
 
     expect(plain?.querySelector('.count')).toBeNull();
     expect(plain?.getAttribute('aria-expanded')).toBeNull();
+  });
+});
+
+// A merged row has no single frame, so the section compares its calls: which
+// name varied is the reading the grids beside it do not carry.
+describe('VariablesDetail comparing a merged row', () => {
+  /** One call of `ns.Svc.run()`, writing `retry` and the constant `batchSize`. */
+  function call(at: number, retry: string): string {
+    const t = (offset: number): string => `09:18:22.6 (${at + offset})`;
+    return (
+      `${t(0)}|METHOD_ENTRY|[1]|01p|ns.Svc.run()\n` +
+      `${t(10)}|VARIABLE_SCOPE_BEGIN|[2]|retry|Boolean|true|false\n` +
+      `${t(20)}|VARIABLE_ASSIGNMENT|[2]|retry|${retry}\n` +
+      `${t(30)}|VARIABLE_ASSIGNMENT|[3]|batchSize|200\n` +
+      `${t(40)}|METHOD_EXIT|[1]|ns.Svc.run()\n`
+    );
+  }
+
+  const CALLS = call(1000, 'true') + call(2000, 'false') + call(3000, 'false');
+
+  /** Every frame whose text is `text`: a METHOD_EXIT carries the entry's text. */
+  function framesOf(store: LogStore, text: string): number[] {
+    return store.log.eventsById
+      .filter((event) => event.isParent && event.text === text)
+      .map((event) => event.eventIndex);
+  }
+
+  /** The comparison on screen, once its walk has answered. */
+  async function compared(body = CALLS): Promise<VariablesDetail> {
+    const store = logOf(body);
+    const frames = framesOf(store, 'ns.Svc.run()');
+    const el = await mount(store, { eventIndex: frames[0]!, frames });
+    // The comparison is a walk of its own, after the index it reads through.
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    await el.updateComplete;
+    return el;
+  }
+
+  it('lists every name the calls held, varying ones first', async () => {
+    const el = await compared();
+
+    expect(rowNames(el)).toEqual(['retry', 'batchSize']);
+  });
+
+  it('opens a name the calls disagreed on into its values and their counts', async () => {
+    const el = await compared();
+    rowNamed(el, 'retry')?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    await el.updateComplete;
+
+    expect(rowText(el)).toContain('false');
+    expect(rowText(el)).toContain('true');
+  });
+
+  it('shows a name every call agreed on as its one value', async () => {
+    const el = await compared();
+
+    expect(rowNamed(el, 'batchSize')?.textContent).toContain('200');
+    expect(rowNamed(el, 'batchSize')?.getAttribute('aria-expanded')).toBeNull();
+  });
+
+  /** Every locate the section raised, in order. */
+  function locates(el: VariablesDetail): { eventIndexes: readonly number[]; sticky: boolean }[] {
+    const seen: { eventIndexes: readonly number[]; sticky: boolean }[] = [];
+    el.addEventListener('inspector-locate', (event) => {
+      const { eventIndexes, sticky } = (
+        event as CustomEvent<{ eventIndexes: readonly number[]; sticky: boolean }>
+      ).detail;
+      seen.push({ eventIndexes, sticky });
+    });
+    return seen;
+  }
+
+  /** The value rows of an opened name. */
+  async function valuesOf(el: VariablesDetail, name: string): Promise<HTMLElement[]> {
+    rowNamed(el, name)?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    await el.updateComplete;
+    return treeRows(el).filter((row) => row.dataset.id?.startsWith(`local/${name}/`));
+  }
+
+  // Every other section answers a merged row with aggregated figures, so
+  // dropping onto one of its calls would throw away the reading.
+  it('never re-scopes the panel to one call', async () => {
+    const el = await compared();
+    const revealed: number[] = [];
+    el.addEventListener('inspector-reveal', (event) => {
+      revealed.push((event as CustomEvent<{ eventIndex: number }>).detail.eventIndex);
+    });
+    const values = await valuesOf(el, 'retry');
+
+    values[0]?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    rowNamed(el, 'batchSize')?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+
+    expect(revealed).toEqual([]);
+  });
+
+  it('marks the calls that held a value while the pointer is over it', async () => {
+    const el = await compared();
+    const values = await valuesOf(el, 'retry');
+    const seen = locates(el);
+    const calls = framesOf(el.logStore!, 'ns.Svc.run()');
+
+    values[0]?.dispatchEvent(new MouseEvent('pointerenter', { bubbles: true }));
+    values[0]?.dispatchEvent(new MouseEvent('pointerleave', { bubbles: true }));
+
+    // `false` was the second and third calls; leaving hands the mark back.
+    expect(seen).toEqual([
+      { eventIndexes: [calls[1], calls[2]], sticky: false },
+      { eventIndexes: [], sticky: false },
+    ]);
+  });
+
+  it('holds the mark once a value is picked', async () => {
+    const el = await compared();
+    const values = await valuesOf(el, 'retry');
+    const seen = locates(el);
+    const calls = framesOf(el.logStore!, 'ns.Svc.run()');
+
+    values[1]?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+
+    // `true` was the first call. Sticky, and no selection rides with it.
+    expect(seen).toEqual([{ eventIndexes: [calls[0]], sticky: true }]);
+  });
+
+  // A value is often a scalar with nothing to open, so a keyboard that only
+  // toggled could never reach the mark at all.
+  it('marks the calls that held a value from the keyboard', async () => {
+    const el = await compared();
+    await valuesOf(el, 'retry');
+    const seen = locates(el);
+    const calls = framesOf(el.logStore!, 'ns.Svc.run()');
+
+    // Opening `retry` left the tab stop on it, so one step down lands on its
+    // first value.
+    tree(el).dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true }));
+    await el.updateComplete;
+    tree(el).dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+    await el.updateComplete;
+
+    // `false` was the second and third calls, and it leads on count.
+    expect(seen).toEqual([{ eventIndexes: [calls[1], calls[2]], sticky: true }]);
+  });
+
+  // Every other cap in this section says so; a mark that stops short while the
+  // count beside it says thousands would read as a bug in the mark.
+  it('says a value holds more calls than its mark names', async () => {
+    const many = Array.from({ length: MAX_MARKED_PER_VALUE + 5 }, (_, at) =>
+      call(1000 + at * 100, 'true'),
+    ).join('');
+    const el = await compared(many);
+
+    expect(notes(el)).toContain(
+      `A value held by over ${MAX_MARKED_PER_VALUE} calls marks that many of them.`,
+    );
+  });
+
+  it('says nothing of the kind where every call is marked', async () => {
+    const el = await compared();
+
+    expect(notes(el).join(' ')).not.toContain('marks that many');
+  });
+
+  // Counts alone mislead: an unbroken run is a state the calls were in.
+  it('says whether a value was one run or came and went', async () => {
+    const el = await compared();
+    const values = await valuesOf(el, 'retry');
+
+    expect(values[0]?.textContent).toContain('one run');
+  });
+
+  it('counts the runs of a value the calls returned to', async () => {
+    const el = await compared(call(1000, 'true') + call(2000, 'false') + call(3000, 'true'));
+    const values = await valuesOf(el, 'retry');
+
+    expect(values[0]?.textContent).toContain('2 runs');
+  });
+
+  // The panel stays on the comparison, so a value has to open where it stands.
+  it('opens a value that is an object into its fields', async () => {
+    const held = (at: number, name: string): string => {
+      const t = (offset: number): string => `09:18:22.6 (${at + offset})`;
+      return (
+        `${t(0)}|METHOD_ENTRY|[1]|01p|ns.Svc.run()\n` +
+        `${t(10)}|VARIABLE_ASSIGNMENT|[2]|opts|{"name":"${name}","rows":5}\n` +
+        `${t(20)}|METHOD_EXIT|[1]|ns.Svc.run()\n`
+      );
+    };
+    const el = await compared(held(1000, 'A') + held(2000, 'B'));
+
+    const values = await valuesOf(el, 'opts');
+    expect(values[0]?.getAttribute('aria-expanded')).toBe('false');
+
+    values[0]?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    await el.updateComplete;
+
+    expect(rowText(el)).toContain('name');
+    expect(rowText(el)).toContain('rows');
+  });
+
+  // A static moves for reasons the row does not own, so leaving them out is a
+  // decision the reader is owed.
+  it('says the statics are not compared', async () => {
+    const el = await compared();
+
+    expect(notes(el)).toContain(STATICS_NOTE);
+  });
+
+  it('does not say the statics are not compared for a single frame', async () => {
+    const store = logOf(FRAME);
+
+    const el = await mount(store, { eventIndex: indexOf(store, 'ns.Outer.run()') });
+
+    expect(notes(el)).not.toContain(STATICS_NOTE);
+  });
+
+  // A row's frames are its own scope; its calls are a level below it. A bottom-up
+  // caller row that ran once comes down to one frame, and reading the calls it
+  // counts would show the called method's scope under the caller's name.
+  it('reads its own frame where a merged row comes down to one', async () => {
+    const store = logOf(
+      '09:18:22.6 (1000)|METHOD_ENTRY|[1]|01p|ns.Outer.run()\n' +
+        '09:18:22.6 (1010)|VARIABLE_ASSIGNMENT|[2]|outerLocal|"here"\n' +
+        '09:18:22.6 (1020)|METHOD_ENTRY|[3]|01p|ns.Svc.query()\n' +
+        '09:18:22.6 (1030)|VARIABLE_ASSIGNMENT|[4]|inner|1\n' +
+        '09:18:22.6 (1040)|METHOD_EXIT|[3]|ns.Svc.query()\n' +
+        '09:18:22.6 (1050)|METHOD_ENTRY|[3]|01p|ns.Svc.query()\n' +
+        '09:18:22.6 (1060)|VARIABLE_ASSIGNMENT|[4]|inner|2\n' +
+        '09:18:22.6 (1070)|METHOD_EXIT|[3]|ns.Svc.query()\n' +
+        '09:18:22.6 (1080)|METHOD_EXIT|[1]|ns.Outer.run()\n',
+    );
+    const calls = store.log.eventsById
+      .filter((event) => event.isParent && event.text === 'ns.Svc.query()')
+      .map((event) => event.eventIndex);
+
+    // What a bottom-up caller row hands over: the calls it counts, and the one
+    // frame that made them.
+    const el = await mount(store, {
+      eventIndex: calls[0]!,
+      frames: [indexOf(store, 'ns.Outer.run()')],
+    });
+
+    expect(rowNames(el)).toContain('outerLocal');
+    expect(rowNames(el)).not.toContain('inner');
   });
 });

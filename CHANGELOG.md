@@ -10,7 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - 🧭 **Inspector**: select a timeline frame, a table row or a statement to see its details, governor usage, call stack and subtree - or select nothing for a whole-log overview. Dock it left, right or bottom. ([#113] [#373] [#63])
-- 🔬 **Variables**: see the **Local** and **Static** variables in scope at the frame you selected, each holding the value it had at that point; an object opens into its fields. Needs Apex Code at **FINEST**. ([#373])
+- 🔬 **Variables**: see the **Local** and **Static** variables in scope at the frame you selected, each holding the value it had at that point; an object opens into its fields. Pick a merged row and it compares its calls instead — which names varied and every value they held, with how many calls held each; hover a value to light those calls in the timeline and grids. Needs Apex Code at **FINEST**. ([#373])
 - 🧠 **Heap analysis**: every method and call path reports heap three ways - **Net** (retained), **Gross** (allocated) and **Peak** (highest live) - so allocate-then-free churn no longer looks like a leak. ([#32])
 - 🗄️ **Database governor limits**: SOQL, SOSL, DML and row counts show as `used / limit`, flagging queries that did not consume the limit, plus a dedicated SOSL table. ([#162])
 - 🔴 **Timeline exception markers**: exceptions show as red lines, with a Throws count in method tooltips. ([#828])
