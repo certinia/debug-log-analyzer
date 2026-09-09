@@ -77,7 +77,6 @@ describe('LogView', () => {
     expect(panel.webview.html).toContain(
       '<script type="module">const replacementToken = "$&"; globalThis.viewerLoaded = true;',
     );
-    // vscode-icon only finds the codicons when they stay a <link> it can read an href from.
     const codiconHref = /<link[^>]*\bid="vscode-codicon-stylesheet"[^>]*\bhref="([^"]+)"/.exec(
       panel.webview.html,
     )?.[1];

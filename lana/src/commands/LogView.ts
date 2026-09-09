@@ -251,8 +251,6 @@ export class LogView {
     return assets.html
       .replace(
         /<link\b(?=[^>]*\bid="vscode-codicon-stylesheet")[^>]*>/i,
-        // vscode-icon re-links this by its href inside every icon's shadow root, so it
-        // must stay a <link>: an inline <style> leaves each glyph blank.
         () => `<link rel="stylesheet" id="vscode-codicon-stylesheet" href="${codiconHref}" />`,
       )
       .replace(
