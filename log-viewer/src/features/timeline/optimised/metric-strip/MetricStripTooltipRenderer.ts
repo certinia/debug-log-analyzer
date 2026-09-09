@@ -27,6 +27,7 @@ import type {
 } from '../../types/flamechart.types.js';
 import { BaseTooltipRenderer } from '../rendering/BaseTooltipRenderer.js';
 import {
+  formatMetricPeakShareWithParens,
   formatMetricValueWithParens,
   formatNumber,
   getPercentColor,
@@ -78,6 +79,8 @@ interface RowData {
   value: string;
   /** The corrective count, where the log dropped events Salesforce still counted. */
   ghost: string;
+  /** Share of the metric's own peak, not of a limit — so the figure takes no severity colour. */
+  unscaled?: boolean;
   /** The "Other" summary reads quieter than the metrics it stands for. */
   muted?: boolean;
 }
@@ -256,17 +259,27 @@ export class MetricStripTooltipRenderer extends BaseTooltipRenderer {
     // panel can be scanned and compared rather than re-read.
     visibleMetrics.sort((a, b) => b.metric.globalMaxPercent - a.metric.globalMaxPercent);
 
+    // With no limit anywhere in the log every figure is a share of that metric's own peak, so no
+    // row carries a severity colour.
+    const scaledToPeak = classifiedMetrics.every((metric) => metric.limit <= 0);
+
     const rows: RowData[] = visibleMetrics.map(({ metric, percent, rawValue }) => {
       // Always state the limit, even at 0% or before the metric's first observation, so the
       // headroom is visible. The limit is fixed across the series, so the classified metric
       // answers where this timestamp has no data point.
       const limit = rawValue?.limit ?? metric.limit;
+      const used = rawValue?.used ?? 0;
       return {
         color: hexToCSS(metric.color),
         name: metric.displayName,
         percent,
+        unscaled: scaledToPeak,
         value:
-          limit > 0 ? formatMetricValueWithParens(rawValue?.used ?? 0, limit, metric.unit) : '',
+          limit > 0
+            ? formatMetricValueWithParens(used, limit, metric.unit)
+            : metric.peak > 0
+              ? formatMetricPeakShareWithParens(used, metric.peak, metric.unit)
+              : '',
         // Only where the count tracked from detailed events falls below the corrective
         // cumulative total — the log dropped events Salesforce still counted.
         ghost:
@@ -284,6 +297,7 @@ export class MetricStripTooltipRenderer extends BaseTooltipRenderer {
         percent: maxHiddenPercent,
         value: '',
         ghost: '',
+        unscaled: scaledToPeak,
         muted: true,
       });
     }
@@ -316,7 +330,9 @@ export class MetricStripTooltipRenderer extends BaseTooltipRenderer {
       row.swatch.setAttribute('color', data.color);
       row.name.textContent = data.name;
       row.percent.textContent = `${(data.percent * 100).toFixed(1).padStart(5)}%`;
-      row.percent.style.color = getPercentColor(data.percent);
+      row.percent.style.color = data.unscaled
+        ? TOOLTIP_CSS.descriptionForeground
+        : getPercentColor(data.percent);
       row.valueText.data = data.value;
       row.ghost.textContent = data.ghost;
       row.root.style.opacity = data.muted ? '0.7' : '';

@@ -841,7 +841,7 @@ export interface HeatStripMetric {
 export interface HeatStripMetricValue {
   /** Current usage value (corrected: last cumulative baseline + granular deltas since). */
   used: number;
-  /** Maximum allowed value (limit) */
+  /** The limit the log reported for this metric; 0 when the log reported none. */
   limit: number;
   /**
    * Increment-only total from detailed events, set only for delta-tracked metrics and only
@@ -913,6 +913,8 @@ export interface MetricStripClassifiedMetric {
   globalMaxPercent: number;
   /** Authoritative limit for this metric ("out of" total), fixed across the series. 0 if unknown. */
   limit: number;
+  /** Highest level this metric reached across the series — the denominator when `limit` is 0. */
+  peak: number;
   /** Line color for this metric (hex number 0xRRGGBB) */
   color: number;
   /** Priority for ordering (lower = higher priority, shown first) */
@@ -927,7 +929,7 @@ export interface MetricStripClassifiedMetric {
 export interface MetricStripRawValue {
   /** Current usage value (corrected line value). */
   used: number;
-  /** Maximum allowed value (limit) */
+  /** The limit the log reported for this metric; 0 when the log reported none. */
   limit: number;
   /** Increment-only tracked total, present only when it diverges below `used`. See HeatStripMetricValue.tracked. */
   tracked?: number;
@@ -959,6 +961,12 @@ export interface MetricStripProcessedData {
   globalMaxPercent: number;
   /** Whether there's any data to render */
   hasData: boolean;
+  /**
+   * True when the log reported no limit for any metric, so every percentage is a share of that
+   * metric's own peak rather than of a cap. The 80% band, the 100% line, the breach fill and the
+   * traffic-light colours mean nothing against a peak, so the renderer drops them.
+   */
+  scaledToPeak: boolean;
 }
 
 /**

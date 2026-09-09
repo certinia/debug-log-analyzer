@@ -458,7 +458,13 @@ export class MetricStripOrchestrator {
 
     // Render the step chart with markers
     this.renderer.render(
-      data ?? { points: [], classifiedMetrics: [], globalMaxPercent: 0, hasData: false },
+      data ?? {
+        points: [],
+        classifiedMetrics: [],
+        globalMaxPercent: 0,
+        hasData: false,
+        scaledToPeak: false,
+      },
       context.viewportState,
       context.totalDuration,
       context.markers,

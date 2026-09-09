@@ -224,6 +224,21 @@ export function getTrafficLightColor(percent: number): TrafficLightColor {
 }
 
 /**
+ * Density colour for the collapsed strip when the log reported no limits. Severity is unknowable
+ * without a cap, so this carries level only: one neutral grey, opacity rising with the share of the
+ * log's own peak. Never a traffic light — an amber or red bucket would assert a proximity we cannot
+ * measure.
+ *
+ * @param fraction - Share of the metric's own peak (0-1)
+ */
+export function getDensityColor(fraction: number): TrafficLightColor {
+  const clamped = Math.max(0, Math.min(1, fraction));
+  return clamped <= 0
+    ? { color: 0x000000, alpha: 0 }
+    : { color: METRIC_STRIP_COLORS.gridLine, alpha: 0.12 + clamped * 0.38 };
+}
+
+/**
  * Default metric color mapping for Apex governor limits.
  * Maps metric IDs to their assigned colors.
  * @deprecated Use getRankBasedColor() for rank-based coloring instead

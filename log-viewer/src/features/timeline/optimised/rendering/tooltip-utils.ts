@@ -144,3 +144,18 @@ export function formatMetricValue(used: number, limit: number, unit?: string): s
 export function formatMetricValueWithParens(used: number, limit: number, unit?: string): string {
   return `(${formatMetricValue(used, limit, unit)})`;
 }
+
+/**
+ * Format a reading against the log's own peak rather than a limit. Spelled "of", not "/", so the
+ * denominator cannot be taken for a cap the transaction was measured against.
+ *
+ * @param used - Used value
+ * @param peak - Highest level the metric reached in the log
+ * @param unit - Optional unit string
+ * @returns Formatted string with parentheses (e.g., "(770 of 1,240)")
+ */
+export function formatMetricPeakShareWithParens(used: number, peak: number, unit?: string): string {
+  const usedStr = formatNumber(Math.round(used));
+  const peakStr = formatNumber(Math.round(peak));
+  return unit ? `(${usedStr} of ${peakStr} ${unit})` : `(${usedStr} of ${peakStr})`;
+}

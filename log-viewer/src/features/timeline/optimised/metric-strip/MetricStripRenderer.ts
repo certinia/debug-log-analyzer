@@ -39,6 +39,7 @@ import {
   BREACH_AREA_OPACITY,
   DANGER_ZONE_OPACITY,
   getMetricStripColors,
+  getDensityColor,
   getTrafficLightColor,
   METRIC_STRIP_HEIGHT,
   METRIC_STRIP_LINE_WIDTHS,
@@ -116,6 +117,13 @@ export class MetricStripRenderer {
 
   /** Effective Y-max for dynamic scaling. */
   private effectiveYMax = METRIC_STRIP_Y_MAX_PERCENT;
+
+  /**
+   * Whether the percentages are shares of each metric's own peak rather than of a reported limit.
+   * Latched from the data every frame in {@link render}, which runs before
+   * {@link renderCollapsedWithData} and is the only caller that sees the processed data.
+   */
+  private scaledToPeak = false;
 
   /** Whether the metric strip is in collapsed mode. */
   private isCollapsed = false;
@@ -227,6 +235,7 @@ export class MetricStripRenderer {
 
     const { displayWidth } = viewportState;
     const height = this.height;
+    this.scaledToPeak = data.scaledToPeak;
 
     // Always render markers (background layer) - visible in both collapsed and expanded modes
     if (markers && markers.length > 0) {
@@ -243,12 +252,17 @@ export class MetricStripRenderer {
       return;
     }
 
-    // Render expanded view layers (back to front)
-    this.renderDangerZone(displayWidth, height);
+    // Render expanded view layers (back to front). The band, the 100% line and the breach fill all
+    // mark a distance from a cap, so they are drawn only where the log reported one.
+    if (!data.scaledToPeak) {
+      this.renderDangerZone(displayWidth, height);
+    }
     this.renderAreaFills(data, viewportState, totalDuration, height);
     this.renderStepChartLines(data, viewportState, totalDuration, height);
-    this.renderLimitLine(displayWidth, height);
-    this.renderBreachAreas(data, viewportState, totalDuration, height);
+    if (!data.scaledToPeak) {
+      this.renderLimitLine(displayWidth, height);
+      this.renderBreachAreas(data, viewportState, totalDuration, height);
+    }
   }
 
   /**
@@ -344,7 +358,9 @@ export class MetricStripRenderer {
 
       if (cachedResult) {
         const maxPercent = this.getMaxPercentAtPoint(cachedResult.point);
-        const colorInfo = getTrafficLightColor(maxPercent);
+        const colorInfo = this.scaledToPeak
+          ? getDensityColor(maxPercent)
+          : getTrafficLightColor(maxPercent);
         color = colorInfo.color;
         alpha = colorInfo.alpha;
       }
