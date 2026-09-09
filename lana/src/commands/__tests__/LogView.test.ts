@@ -112,4 +112,56 @@ describe('LogView', () => {
     expect(panel.webview.html).toContain('webview:/test/extension/out/bundle.js');
     expect(panel.webview.html).not.toContain('src="bundle.js"');
   });
+
+  it('fetches the template where workspace.fs has no provider for it', async () => {
+    const panel = {
+      iconPath: undefined,
+      onDidDispose: jest.fn(() => ({ dispose: jest.fn() })),
+      webview: {
+        asWebviewUri: jest.fn((uri: { path: string }) => Uri.parse(`webview:${uri.path}`)),
+        html: '',
+        onDidReceiveMessage: jest.fn(() => ({ dispose: jest.fn() })),
+        postMessage: jest.fn(),
+      },
+    };
+    mockApplyWebView.mockReturnValue(panel as unknown as import('vscode').WebviewPanel);
+    const fetchMock = jest.fn().mockResolvedValue({
+      ok: true,
+      text: () => Promise.resolve('<script type="module" src="bundle.js"></script>'),
+    });
+    globalThis.fetch = fetchMock as unknown as typeof fetch;
+    const context = createMockContext();
+    context.context.extensionUri = Uri.parse('http://localhost:3001/static/devextensions');
+
+    await LogView.createView(context as unknown as import('../../Context.js').Context);
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      'http://localhost:3001/static/devextensions/out/index.html',
+      expect.objectContaining({ signal: expect.anything() }),
+    );
+    expect(mockReadFile).not.toHaveBeenCalled();
+    expect(panel.webview.html).toContain('webview:/static/devextensions/out/bundle.js');
+  });
+
+  it('reports the status when the template cannot be fetched', async () => {
+    mockApplyWebView.mockReturnValue({
+      iconPath: undefined,
+      onDidDispose: jest.fn(() => ({ dispose: jest.fn() })),
+      webview: {
+        asWebviewUri: jest.fn((uri: { path: string }) => Uri.parse(`webview:${uri.path}`)),
+        html: '',
+        onDidReceiveMessage: jest.fn(() => ({ dispose: jest.fn() })),
+        postMessage: jest.fn(),
+      },
+    } as unknown as import('vscode').WebviewPanel);
+    globalThis.fetch = jest
+      .fn()
+      .mockResolvedValue({ ok: false, status: 404 }) as unknown as typeof fetch;
+    const context = createMockContext();
+    context.context.extensionUri = Uri.parse('http://localhost:3001/static/devextensions');
+
+    await expect(
+      LogView.createView(context as unknown as import('../../Context.js').Context),
+    ).rejects.toThrow('Could not read the log viewer at');
+  });
 });

@@ -35,7 +35,7 @@ export default defineConfig([
     external: ['vscode'],
   },
   {
-    input: { Main: './lana/src/Main.web.ts' },
+    input: { Main: './lana/src/Main.ts' },
     output: {
       format: 'cjs',
       dir: './lana/out/web',
