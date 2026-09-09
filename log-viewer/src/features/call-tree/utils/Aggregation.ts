@@ -54,10 +54,10 @@ export interface AggregatedRow {
   heapGross: SelfTotal;
   /** Peak live heap (bytes) reached across this row's calls — the limit-comparable value */
   heapPeak: number;
-  /** Average governor consumption across all reported governors (0–100%). */
-  governorCost: number;
+  /** Average governor consumption across all reported governors (0–100%); null if none. */
+  governorCost: number | null;
   /** The single tightest governor consumed on this path (0–100+%). */
-  governorCostMax: number;
+  governorCostMax: number | null;
   /** Aggregated children (callees grouped by signature) */
   _children?: AggregatedRow[] | null;
   /** References to original events for drill-down */
@@ -116,10 +116,10 @@ export interface BottomUpRow {
   heapGross: SelfTotal;
   /** Peak live heap (bytes) reached across this row's calls — the limit-comparable value */
   heapPeak: number;
-  /** Average governor consumption across all reported governors (0–100%). */
-  governorCost: number;
+  /** Average governor consumption across all reported governors (0–100%); null if none. */
+  governorCost: number | null;
   /** The single tightest governor consumed on this path (0–100+%). */
-  governorCostMax: number;
+  governorCostMax: number | null;
   /** Callers (parent functions) as children - lazy loaded */
   _children?: BottomUpRow[] | null;
   /**
