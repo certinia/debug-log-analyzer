@@ -478,6 +478,27 @@ describe('TimelineViewport', () => {
     });
   });
 
+  describe('centerOnEvent', () => {
+    beforeEach(() => {
+      viewport.setZoom(0.01);
+      viewport.setPan(2000, 0);
+    });
+
+    it('should center an event that is off screen', () => {
+      viewport.centerOnEvent(400_000, 1_000, 0);
+
+      const state = viewport.getState();
+      const eventMidpointX = (400_000 + 1_000 / 2) * state.zoom;
+      expect(state.offsetX + DISPLAY_WIDTH / 2).toBeCloseTo(eventMidpointX, 5);
+    });
+
+    it('should hold an event that is on screen', () => {
+      viewport.centerOnEvent(250_000, 1_000, 0);
+
+      expect(viewport.getState().offsetX).toBe(2000);
+    });
+  });
+
   describe('centerOffsetFor', () => {
     beforeEach(() => {
       viewport.setZoom(0.01);
