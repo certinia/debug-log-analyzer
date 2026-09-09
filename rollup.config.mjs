@@ -11,11 +11,22 @@ import nodePolyfills from 'rollup-plugin-polyfill-node';
 import { defineRollupSwcOption, swc } from 'rollup-plugin-swc3';
 
 import css from './scripts/rollup-plugin-css.mjs';
+import text from './scripts/rollup-plugin-text.mjs';
 
 // Resolve the codicons dist dir via Node resolution so it works regardless of
 // pnpm hoisting (avoids a hard-coded node_modules path).
 const nodeRequire = createRequire(import.meta.url);
 const codiconsDist = path.dirname(nodeRequire.resolve('@vscode/codicons/dist/codicon.css'));
+const embeddedLogViewerPath = path.resolve('lana/build/log-viewer-embedded.js');
+const webExtensionAssets = {
+  'virtual:lana-log-viewer-html': { path: path.resolve('log-viewer/index.html') },
+  'virtual:lana-log-viewer-script': { path: embeddedLogViewerPath },
+  'virtual:lana-codicon-css': { path: path.join(codiconsDist, 'codicon.css') },
+  'virtual:lana-codicon-font': {
+    path: path.join(codiconsDist, 'codicon.ttf'),
+    encoding: 'base64',
+  },
+};
 
 const production = process.env.NODE_ENV === 'production';
 export default [
@@ -61,6 +72,38 @@ export default [
     ],
   },
   {
+    input: { 'log-viewer-embedded': './log-viewer/src/Main.ts' },
+    moduleContext: (id) =>
+      id.includes('/@vscode-elements/elements/') ? 'globalThis' : undefined,
+    output: {
+      format: 'es',
+      dir: './lana/build',
+      entryFileNames: 'log-viewer-embedded.js',
+      inlineDynamicImports: true,
+      sourcemap: false,
+    },
+    plugins: [
+      nodeResolve({ browser: true, preferBuiltins: false }),
+      commonjs(),
+      nodePolyfills(),
+      swc(
+        defineRollupSwcOption({
+          include: /\.[mc]?[jt]sx?$/,
+          exclude: /node_modules/,
+          tsconfig: production ? './log-viewer/tsconfig.json' : './log-viewer/tsconfig-dev.json',
+          jsc: {
+            transform: { useDefineForClassFields: false },
+            minify: {
+              compress: production,
+              mangle: production ? { keep_classnames: true } : false,
+            },
+          },
+        }),
+      ),
+      css({ minify: production }),
+    ],
+  },
+  {
     input: './lana/src/Main.web.ts',
     output: {
       format: 'cjs',
@@ -77,6 +120,7 @@ export default [
       commonjs(),
       json(),
       nodePolyfills(),
+      text({ sources: webExtensionAssets }),
       swc(
         defineRollupSwcOption({
           include: /\.[mc]?[jt]sx?$/,

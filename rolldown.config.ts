@@ -11,11 +11,22 @@ import nodePolyfills from '@rolldown/plugin-node-polyfills';
 import copy from 'rollup-plugin-copy';
 
 import css from './scripts/rollup-plugin-css.mjs';
+import text from './scripts/rollup-plugin-text.mjs';
 
 // Resolve the codicons dist dir via Node resolution so it works regardless of
 // pnpm hoisting (avoids a hard-coded node_modules path).
 const nodeRequire = createRequire(import.meta.url);
 const codiconsDist = path.dirname(nodeRequire.resolve('@vscode/codicons/dist/codicon.css'));
+const embeddedLogViewerPath = path.resolve('lana/build/log-viewer-embedded.js');
+const webExtensionAssets = {
+  'virtual:lana-log-viewer-html': { path: path.resolve('log-viewer/index.html') },
+  'virtual:lana-log-viewer-script': { path: embeddedLogViewerPath },
+  'virtual:lana-codicon-css': { path: path.join(codiconsDist, 'codicon.css') },
+  'virtual:lana-codicon-font': {
+    path: path.join(codiconsDist, 'codicon.ttf'),
+    encoding: 'base64' as const,
+  },
+};
 
 const production = process.env.NODE_ENV === 'production';
 export default defineConfig([
@@ -36,6 +47,26 @@ export default defineConfig([
     external: ['vscode'],
   },
   {
+    input: { 'log-viewer-embedded': './log-viewer/src/Main.ts' },
+    output: {
+      format: 'esm',
+      dir: './lana/build',
+      entryFileNames: 'log-viewer-embedded.js',
+      cleanDir: true,
+      codeSplitting: false,
+      sourcemap: false,
+      keepNames: true,
+      minify: production,
+    },
+    platform: 'browser',
+    moduleTypes: {
+      '.css': 'js',
+      '.scss': 'js',
+    },
+    tsconfig: production ? './log-viewer/tsconfig.json' : './log-viewer/tsconfig-dev.json',
+    plugins: [nodePolyfills(), css({ minify: production })],
+  },
+  {
     input: { Main: './lana/src/Main.web.ts' },
     output: {
       format: 'cjs',
@@ -51,7 +82,7 @@ export default defineConfig([
     tsconfig: production ? './lana/tsconfig.json' : './lana/tsconfig-dev.json',
     platform: 'browser',
     external: ['vscode'],
-    plugins: [nodePolyfills()],
+    plugins: [nodePolyfills(), text({ sources: webExtensionAssets })],
   },
   {
     input: { bundle: './log-viewer/src/Main.ts' },
