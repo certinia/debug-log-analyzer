@@ -77,28 +77,39 @@ export function selfLabel(self: string): string {
 
 /** A metric reading, split so a caller can lay the parts out however it likes. */
 export interface UsageParts {
-  /** `used / limit`, or the count alone where there is no limit. */
+  /** `used of the log's total`, or the count alone where the reading is the whole log. */
   primary: string;
-  /** The percentage and any self reading — secondary, in reading order. */
+  /** The shares, the limit reading and any self reading — secondary, in reading order. */
   qualifiers: string[];
 }
 
 /**
- * `used / limit` with its derived percentage and any self reading, so the primary
- * number reads first. Without a known limit there is no denominator and no percentage.
+ * A reading against what the transaction consumed, with any limit as a qualifier.
+ *
+ * The primary number answers the question a per-selection reading is asked — how much of the
+ * transaction's own consumption this is — so it is spelled "of", never "/", and reads on every log
+ * whether or not one reported limits. A reading of the whole log carries no denominator: its share
+ * of itself is 100%. A limit the log reported follows as a qualifier, and only then.
+ *
+ * @param total - This selection's consumption.
+ * @param logTotal - The transaction's consumption of the same metric.
+ * @param limit - The limit the log reported, or 0 where it reported none.
+ * @param format - How to write each number.
+ * @param self - The selection's own share, already formatted, or null where it adds nothing.
  */
 export function usageParts(
   total: number,
+  logTotal: number,
   limit: number,
   format: (value: number) => string,
   self: string | null,
 ): UsageParts {
-  const fraction = limit > 0 ? total / limit : null;
+  const contributes = logTotal > total;
   return {
-    primary: limit > 0 ? `${format(total)} / ${format(limit)}` : format(total),
-    // Percentage first: it qualifies the ratio immediately before it.
+    primary: contributes ? `${format(total)} of ${format(logTotal)}` : format(total),
     qualifiers: [
-      fraction !== null ? `${(fraction * 100).toFixed(2)}%` : null,
+      contributes ? `${((total / logTotal) * 100).toFixed(2)}% of log` : null,
+      limit > 0 ? `${((total / limit) * 100).toFixed(2)}% of the ${format(limit)} limit` : null,
       self && selfLabel(self),
     ].filter((part): part is string => !!part),
   };

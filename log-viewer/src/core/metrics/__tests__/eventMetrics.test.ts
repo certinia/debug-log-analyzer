@@ -16,16 +16,24 @@ const limits = {
 } as unknown as GovernorLimits;
 
 describe('usageParts', () => {
-  it('reads used / limit with the percentage and the self reading', () => {
-    const parts = usageParts(3, 100, String, '1');
+  it("reads the selection against the log's own total, with the limit as a qualifier", () => {
+    const parts = usageParts(3, 12, 100, String, '1');
 
-    expect(parts.primary).toBe('3 / 100');
-    expect(parts.qualifiers).toEqual(['3.00%', 'self 1']);
+    expect(parts.primary).toBe('3 of 12');
+    expect(parts.qualifiers).toEqual(['25.00% of log', '3.00% of the 100 limit', 'self 1']);
   });
 
-  // No denominator means no share of anything, so nothing to qualify.
-  it('gives the count alone, and no percentage, where there is no limit', () => {
-    const parts = usageParts(7, 0, String, null);
+  // The log reported no limit, so there is no share of one to give.
+  it('keeps the contribution and drops the limit where none was reported', () => {
+    const parts = usageParts(3, 12, 0, String, null);
+
+    expect(parts.primary).toBe('3 of 12');
+    expect(parts.qualifiers).toEqual(['25.00% of log']);
+  });
+
+  // A whole-log reading's share of itself is 100%, which says nothing.
+  it('carries no denominator when the selection is the whole log', () => {
+    const parts = usageParts(7, 7, 0, String, null);
 
     expect(parts.primary).toBe('7');
     expect(parts.qualifiers).toEqual([]);

@@ -183,7 +183,7 @@ export function createBottomUpTable(
       ...createNamespaceColumns(),
       createTypeColumn({ visible: true }),
       createCountColumn({ title: 'Calls', field: 'callCount', width: 70 }),
-      ...createGovernorMetricColumns(rootMethod.governorLimits, heapFooters),
+      ...createGovernorMetricColumns(rootMethod, heapFooters),
       // Time columns sit at the far right of every call-tree table.
       {
         title: 'Total Time (ms)',

@@ -114,16 +114,16 @@ describe('EventVitals', () => {
     expect(valueFor(el, 'Time')).toMatch(/^-?\d+\.\d{3} ms \(self -?\d+\.\d{3} ms\)$/);
   });
 
-  it('reports a metric once, as used / limit with a percentage', async () => {
-    // SOSL rows are capped per query, so a single SOSL statement has a limit.
+  // SOSL rows are capped per query, so a single SOSL statement has a limit to qualify with.
+  it('reports a metric once, against the log with the limit as a qualifier', async () => {
     const el = await mount(store, { eventIndex: soslIndex, type: 'sosl' });
-    expect(valueFor(el, 'SOSL Rows')).toBe('5 / 2,000 (0.25%)');
-    // The limit is the denominator — never a second row repeating it.
+    expect(valueFor(el, 'SOSL Rows')).toBe('5 (0.25% of the 2,000 limit)');
+    // The limit qualifies the reading — never a second row repeating it.
     expect(labels(el).filter((l) => /limit/i.test(l))).toEqual([]);
     expect(new Set(labels(el)).size).toBe(labels(el).length);
   });
 
-  it('omits the limit when the metric has no transaction total', async () => {
+  it('gives the count alone where the selection is all the log consumed', async () => {
     const el = await mount(store, { eventIndex: dmlIndex, type: 'dml' });
     expect(valueFor(el, 'DML Rows')).toBe('2');
   });
