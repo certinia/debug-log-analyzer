@@ -42,7 +42,7 @@ import {
 import type { SearchCursor } from '../types/search.types.js';
 import { InspectorEmphasis } from '../../../components/inspectorEmphasis.js';
 import { wireInspectorTab } from '../../../components/inspectorTab.js';
-import { isFrameOffscreen, toDetailSelection } from '../utils/detail-selection-sync.js';
+import { revealPanAxes, toDetailSelection } from '../utils/detail-selection-sync.js';
 import { extractExceptionMarkers, extractMarkers, noDataSpans } from '../utils/marker-utils.js';
 import { seekWindow } from '../utils/navigate-window.js';
 import { logEventToTreeAndRects } from '../utils/tree-converter.js';
@@ -230,8 +230,8 @@ export class ApexLogTimeline {
   }
 
   /**
-   * Select the frame for `eventIndex` and pan to it when it is off-screen.
-   * Passive sync, so it never zooms - a full focus would be too disruptive.
+   * Select the frame for `eventIndex` and centre the view on it. Passive sync,
+   * so it never zooms - a full focus would be too disruptive.
    */
   private selectFrameByEventIndex(eventIndex: number): void {
     if (!this.apexLog) {
@@ -255,11 +255,17 @@ export class ApexLogTimeline {
     this.pickEmphasis(eventIndex);
 
     const bounds = this.flamechart.getViewportManager()?.getBounds();
-    if (
-      bounds &&
-      isFrameOffscreen(bounds, result.event.timestamp, result.event.duration.total, result.depth)
-    ) {
-      this.flamechart.centerOnSelectedFrame();
+    if (!bounds) {
+      return;
+    }
+    const axes = revealPanAxes(
+      bounds,
+      result.event.timestamp,
+      result.event.duration.total,
+      result.depth,
+    );
+    if (axes.time || axes.depth) {
+      this.flamechart.centerOnSelectedFrame(axes);
     }
   }
 

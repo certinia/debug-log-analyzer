@@ -4,7 +4,7 @@
 import { describe, expect, it } from '@jest/globals';
 
 import { TimelineViewport } from '../optimised/TimelineViewport.js';
-import { isFrameOffscreen, toDetailSelection } from '../utils/detail-selection-sync.js';
+import { revealPanAxes, toDetailSelection } from '../utils/detail-selection-sync.js';
 
 describe('toDetailSelection', () => {
   it('builds an event selection from an eventIndex', () => {
@@ -20,23 +20,41 @@ describe('toDetailSelection', () => {
   });
 });
 
-describe('isFrameOffscreen', () => {
+describe('revealPanAxes', () => {
+  // 1000px over a 1,000,000ns log, zoomed to 100,000ns starting at 200,000.
   const viewport = new TimelineViewport(1000, 600, 1_000_000, 10);
+  viewport.setZoom(0.01);
+  viewport.setPan(2000, 0);
   const bounds = viewport.getBounds();
 
-  it('reports a frame inside both ranges as on screen', () => {
-    expect(isFrameOffscreen(bounds, bounds.timeStart, 1_000, bounds.depthStart)).toBe(false);
+  it('leaves a frame that is wholly in view where it is', () => {
+    expect(revealPanAxes(bounds, 250_000, 1_000, bounds.depthStart)).toEqual({
+      time: false,
+      depth: false,
+    });
   });
 
-  it('reports a frame after the visible time range as off screen', () => {
-    expect(isFrameOffscreen(bounds, bounds.timeEnd + 1_000, 1_000, bounds.depthStart)).toBe(true);
+  it('centres a frame clipped by the edge of the view', () => {
+    expect(revealPanAxes(bounds, 299_000, 5_000, bounds.depthStart).time).toBe(true);
   });
 
-  it('reports a frame before the visible time range as off screen', () => {
-    expect(isFrameOffscreen(bounds, bounds.timeStart - 5_000, 1_000, bounds.depthStart)).toBe(true);
+  it('centres a frame that is off screen', () => {
+    expect(revealPanAxes(bounds, 400_000, 1_000, bounds.depthStart).time).toBe(true);
   });
 
-  it('reports a frame below the visible depth range as off screen', () => {
-    expect(isFrameOffscreen(bounds, bounds.timeStart, 1_000, bounds.depthEnd + 1)).toBe(true);
+  // It covers the screen either way, so a move would only lose the reader's bearings.
+  it('leaves a frame wider than the view where it is', () => {
+    expect(revealPanAxes(bounds, 100_000, 500_000, bounds.depthStart).time).toBe(false);
+  });
+
+  it('centres a frame wider than the view that it does not reach', () => {
+    expect(revealPanAxes(bounds, 400_000, 500_000, bounds.depthStart).time).toBe(true);
+  });
+
+  it('centres the depth on its own when only the depth is off screen', () => {
+    expect(revealPanAxes(bounds, 250_000, 1_000, bounds.depthEnd + 1)).toEqual({
+      time: false,
+      depth: true,
+    });
   });
 });

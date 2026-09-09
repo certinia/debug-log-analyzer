@@ -8,22 +8,31 @@
  * flame chart instance.
  */
 import type { DetailSelection } from '../../../core/events/EventBus.js';
-import type { ViewportBounds } from '../types/flamechart.types.js';
+import type { ViewportBounds, ViewportPanAxes } from '../types/flamechart.types.js';
 
 /** The `detail:select` payload for a frame, or null when it carries no eventIndex. */
 export function toDetailSelection(eventIndex: number | undefined): DetailSelection | null {
   return eventIndex === undefined ? null : { kind: 'event', eventIndex };
 }
 
-/** True when the frame falls outside the viewport in time or in depth. */
-export function isFrameOffscreen(
+/**
+ * Which axes a reveal should centre the frame on, given what the view already
+ * shows. A frame wider than the view keeps its place: it covers the screen
+ * either way, so centring its midpoint would only lose the reader's bearings.
+ */
+export function revealPanAxes(
   bounds: ViewportBounds,
   timestamp: number,
   duration: number,
   depth: number,
-): boolean {
+): ViewportPanAxes {
   const frameEnd = timestamp + duration;
-  const inTimeRange = frameEnd >= bounds.timeStart && timestamp <= bounds.timeEnd;
-  const inDepthRange = depth >= bounds.depthStart && depth <= bounds.depthEnd;
-  return !(inTimeRange && inDepthRange);
+  const fullyVisible = timestamp >= bounds.timeStart && frameEnd <= bounds.timeEnd;
+  const fits = duration <= bounds.timeEnd - bounds.timeStart;
+  const overlaps = frameEnd >= bounds.timeStart && timestamp <= bounds.timeEnd;
+
+  return {
+    time: !fullyVisible && (fits || !overlaps),
+    depth: depth < bounds.depthStart || depth > bounds.depthEnd,
+  };
 }

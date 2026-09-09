@@ -25,6 +25,7 @@ import type {
   TimelineOptions,
   TimelineState,
   TreeNode,
+  ViewportPanAxes,
   ViewportState,
 } from '../types/flamechart.types.js';
 import { TIMELINE_CONSTANTS, TimelineError, TimelineErrorCode } from '../types/flamechart.types.js';
@@ -1612,11 +1613,18 @@ export class FlameChart<E extends EventNode = EventNode> {
       onMarkerSelectionChange: (marker: TimelineMarker | null) => {
         this.callbacks.onMarkerSelect?.(marker);
       },
-      onCenterOnFrame: (timestamp: number, duration: number, depth: number) => {
+      onCenterOnFrame: (
+        timestamp: number,
+        duration: number,
+        depth: number,
+        axes?: ViewportPanAxes,
+      ) => {
         if (!this.viewport) {
           return null;
         }
-        return this.viewport.calculateCenterOffset(timestamp, duration, depth);
+        return axes
+          ? this.viewport.centerOffsetFor(timestamp, duration, depth, axes)
+          : this.viewport.calculateCenterOffset(timestamp, duration, depth);
       },
       onCenterOnMarker: (startTime: number, duration: number, depth: number) => {
         if (!this.viewport) {
@@ -2166,11 +2174,13 @@ export class FlameChart<E extends EventNode = EventNode> {
 
   /**
    * Pan (without changing zoom) so the currently selected frame is visible.
-   * Animated, and a no-op if the frame is already in view - use this for the
-   * passive selection sync, where a full zoom-to-fit would be too disruptive.
+   * Animated, and a no-op when the view already sits at the target - use this
+   * for the passive selection sync, where a zoom-to-fit would be too disruptive.
+   *
+   * @param axes - Axes to centre on; left out, only an off-screen frame moves the view
    */
-  public centerOnSelectedFrame(): void {
-    this.selectionOrchestrator?.centerOnSelectedFrame();
+  public centerOnSelectedFrame(axes?: ViewportPanAxes): void {
+    this.selectionOrchestrator?.centerOnSelectedFrame(axes);
   }
 
   /**
