@@ -241,15 +241,19 @@ export class LogView {
     assets: NonNullable<ReturnType<typeof getEmbeddedLogViewerAssets>>,
   ): string {
     const fontData = `data:font/ttf;base64,${assets.codiconFont}`;
-    const codiconCss = assets.codiconCss
-      .replace(/url\((['"]?)\.\/codicon\.ttf[^)]*\)/i, `url("${fontData}")`)
-      .replace(/<\/style/gi, '<\\/style');
+    const codiconCss = assets.codiconCss.replace(
+      /url\(['"]?\.\/codicon\.ttf[^)]*\)/i,
+      `url("${fontData}")`,
+    );
+    const codiconHref = `data:text/css;charset=utf-8,${encodeURIComponent(codiconCss)}`;
     const script = assets.script.replace(/<\/script/gi, '<\\/script');
 
     return assets.html
       .replace(
         /<link\b(?=[^>]*\bid="vscode-codicon-stylesheet")[^>]*>/i,
-        () => `<style id="vscode-codicon-stylesheet">${codiconCss}</style>`,
+        // vscode-icon re-links this by its href inside every icon's shadow root, so it
+        // must stay a <link>: an inline <style> leaves each glyph blank.
+        () => `<link rel="stylesheet" id="vscode-codicon-stylesheet" href="${codiconHref}" />`,
       )
       .replace(
         /<script\b(?=[^>]*\bsrc="bundle\.js")[^>]*><\/script>/i,
