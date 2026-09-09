@@ -11,19 +11,18 @@ import type { HeatStripTimeSeries } from '../features/timeline/types/flamechart.
 const MAX_GAUGES = 6;
 
 /**
- * Why governor figures are missing, and the likely fix. Shared by every
- * surface that needs the cumulative snapshots (`LogOverview`,
- * `GovernorTrends`) so they all give the same reason. The parser samples the
- * snapshots from CUMULATIVE_LIMIT_USAGE events, which the Apex Profiling
- * debug category emits at INFO and above — though some INFO logs still lack
- * them, so the copy hedges.
+ * Shown where the log records no governor usage at all, so there is nothing to read. Shared by
+ * `LogOverview`, `GovernorTrends` and `DatabaseRowBudget` so they give the same reason.
  */
-export const NO_CUMULATIVE_LIMITS_TEXT =
-  'This log has no CUMULATIVE_LIMIT_USAGE events, so governor totals are unknown. This can happen when the Apex Profiling debug level is below INFO.';
+export const NO_GOVERNOR_USAGE_TEXT = 'This log records no governor usage.';
 
-/** Short caveat under figures that were estimated without cumulative snapshots. */
-export const ESTIMATED_LIMITS_TEXT =
-  'No CUMULATIVE_LIMIT_USAGE events in the log; figures are estimated from logged events. An Apex Profiling debug level of INFO or higher usually includes them.';
+/**
+ * Shown where figures exist but the log reported no limits to measure them against. Deliberately
+ * silent on how to get them: a debug level is no guarantee, and complete logs at Apex Profiling
+ * FINE and INFO alike carry no limit block.
+ */
+export const NO_REPORTED_LIMITS_TEXT =
+  'This log reports no governor limits, so each figure is a level, not a share of one.';
 
 /**
  * Every governor-tracked metric, with the label the inspector shows for it. A
@@ -110,24 +109,79 @@ export function limitTotals(series: HeatStripTimeSeries): Limits {
 }
 
 /**
- * The governor metrics closest to a limit, tightest first, capped at `max`,
- * from {@link limitTotals}. A metric with no consumption, or no limit, is left
- * out.
+ * The governor metrics worth showing, capped at `max`, from {@link limitTotals}. A metric with no
+ * consumption is left out.
+ *
+ * Tightest first where the log reported limits. Where it reported none there is nothing to rank by
+ * — an absolute count cannot say which metric is nearest breaking, and ordering by size would read
+ * as if it could — so {@link GOVERNOR_METRICS} reading order stands in and every row keeps a
+ * predictable slot.
  */
 export function rankedLimitMetrics(series: HeatStripTimeSeries, max: number): RankedLimitMetric[] {
   const totals = limitTotals(series);
-  return GOVERNOR_METRICS.flatMap<RankedLimitMetric>(({ key, label }) => {
+  const consumed = GOVERNOR_METRICS.flatMap<RankedLimitMetric>(({ key, label }) => {
     const { used, limit } = totals[key];
-    return limit > 0 && used > 0 ? [{ key, label, used, limit, ratio: (used / limit) * 100 }] : [];
-  })
-    .sort((a, b) => b.ratio - a.ratio)
-    .slice(0, max);
+    return used > 0
+      ? [{ key, label, used, limit, ratio: limit > 0 ? (used / limit) * 100 : 0 }]
+      : [];
+  });
+  const ranked = consumed.some((metric) => metric.limit > 0)
+    ? consumed.sort((a, b) => b.ratio - a.ratio)
+    : consumed;
+  return ranked.slice(0, max);
+}
+
+/** Fewest points that read as a shape rather than a couple of dots. */
+const MIN_SPARK_POINTS = 5;
+
+/** Most points worth plotting across a gauge-width sparkline. */
+const MAX_SPARK_POINTS = 20;
+
+/** Memo of {@link metricSparkline}: the gauges re-render on every selection. */
+const sparkCache = new WeakMap<HeatStripTimeSeries, Map<keyof Limits, readonly number[]>>();
+
+/**
+ * A metric's level over the log, oldest first, for a gauge that has no limit to fill a bar
+ * against. Sampled at even intervals rather than reduced to peaks, so a dip stays visible. Empty
+ * below {@link MIN_SPARK_POINTS} readings — too few to read as a shape.
+ */
+export function metricSparkline(series: HeatStripTimeSeries, key: keyof Limits): readonly number[] {
+  let byKey = sparkCache.get(series);
+  if (!byKey) {
+    byKey = new Map();
+    sparkCache.set(series, byKey);
+  }
+  const cached = byKey.get(key);
+  if (cached) {
+    return cached;
+  }
+
+  const levels: number[] = [];
+  for (const event of series.events) {
+    const value = event.values.get(key);
+    if (value) {
+      levels.push(value.used);
+    }
+  }
+
+  let spark: readonly number[] = [];
+  if (levels.length >= MIN_SPARK_POINTS) {
+    spark =
+      levels.length <= MAX_SPARK_POINTS
+        ? levels
+        : Array.from(
+            { length: MAX_SPARK_POINTS },
+            (_, i) => levels[Math.round((i * (levels.length - 1)) / (MAX_SPARK_POINTS - 1))]!,
+          );
+  }
+  byKey.set(key, spark);
+  return spark;
 }
 
 /**
- * The whole-log gauges closest to a limit, capped at {@link MAX_GAUGES}.
- * Without cumulative snapshots the totals are estimates, and the caller shows
- * {@link ESTIMATED_LIMITS_TEXT} alongside them.
+ * The whole-log gauges, capped at {@link MAX_GAUGES}. A gauge with no reported limit has no bar to
+ * fill, so it carries a sparkline of its own level instead and the caller shows
+ * {@link NO_REPORTED_LIMITS_TEXT} alongside.
  */
 export function seriesGauges(series: HeatStripTimeSeries): GaugeMetric[] {
   return rankedLimitMetrics(series, MAX_GAUGES).map(({ key, label, used, limit }) => ({
@@ -135,6 +189,13 @@ export function seriesGauges(series: HeatStripTimeSeries): GaugeMetric[] {
     found: used,
     used,
     limit,
+    ...(limit > 0 ? {} : { spark: metricSparkline(series, key) }),
     ...(key === 'heapSize' ? { format: formatByteSize } : {}),
   }));
+}
+
+/** Whether the log reported a limit for any metric it recorded usage for. */
+export function hasReportedLimits(series: HeatStripTimeSeries): boolean {
+  const totals = limitTotals(series);
+  return GOVERNOR_METRICS.some(({ key }) => totals[key].limit > 0);
 }

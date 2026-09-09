@@ -184,10 +184,10 @@ describe('database-rows', () => {
     expect(texts(await mount(), '.note')).toEqual(['Worst search 1,800 of 2,000 rows per query.']);
   });
 
-  it('says the figures are observed when the log captured no cumulative limits', async () => {
+  it('says no limits were reported when the log reported none', async () => {
     budgets = { ...full(), hasLimits: false };
 
-    expect(texts(await mount(), '.note').at(-1)).toContain('CUMULATIVE_LIMIT_USAGE');
+    expect(texts(await mount(), '.note').at(-1)).toContain('no governor limits');
   });
 
   it('shows the rows the statements held when the log captured no governor peak', async () => {

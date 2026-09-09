@@ -23,6 +23,12 @@ export interface GaugeMetric {
    * gauge.
    */
   format?: (value: number) => string;
+  /**
+   * The metric's level over the log, oldest first, for a gauge with no limit to fill a bar
+   * against. Drawn where the track sits, scaled to its own peak. The host passes none where there
+   * are too few readings to read as a shape.
+   */
+  spark?: readonly number[];
 }
 
 /** Consumption percentage where a gauge or trend turns from safe to warn. */
@@ -104,6 +110,15 @@ export class GovernorSummary extends LitElement {
         font-style: italic;
       }
 
+      /* The height a bar would have taken plus a little, so a row grows by a few pixels rather
+         than turning into a chart strip. */
+      .gauge__spark {
+        display: block;
+        width: 100%;
+        height: 10px;
+        color: var(--lana-fg-muted);
+      }
+
       .gauge__track {
         height: 5px;
         border-radius: 3px;
@@ -147,11 +162,15 @@ export class GovernorSummary extends LitElement {
     const format = metric.format ?? integer.format;
 
     if (metric.used === null || metric.limit <= 0) {
+      // No limit, so no meter: a bar against the level's own peak would sit full and read as a
+      // breach. The sparkline carries the shape instead, and takes a description rather than the
+      // `aria-valuemax` a meter needs.
       return html`<div class="gauge ${muted ? 'muted' : ''}">
         <span class="gauge__label">${metric.label}</span>
         <span class="gauge__value"
           >${format(metric.found)} <span class="gauge__na">seen</span></span
         >
+        ${this._renderSpark(metric)}
       </div>`;
     }
 
@@ -174,5 +193,41 @@ export class GovernorSummary extends LitElement {
         ></div>
       </div>
     </div>`;
+  }
+
+  /** The level over the log, scaled to its own peak. Nothing to draw without a peak. */
+  private _renderSpark(metric: GaugeMetric) {
+    const spark = metric.spark;
+    if (!spark?.length) {
+      return nothing;
+    }
+    const peak = Math.max(...spark);
+    if (peak <= 0) {
+      return nothing;
+    }
+
+    // A 0-100 x 0-10 box stretched to the gauge's width, so the path needs no pixel measurements.
+    const points = spark
+      .map((level, i) => {
+        const x = spark.length > 1 ? (i / (spark.length - 1)) * 100 : 0;
+        return `${x.toFixed(2)},${(10 - (level / peak) * 10).toFixed(2)}`;
+      })
+      .join(' ');
+
+    return html`<svg
+      class="gauge__spark"
+      viewBox="0 0 100 10"
+      preserveAspectRatio="none"
+      role="img"
+      aria-label="${metric.label} over the log, highest point ${peak}"
+    >
+      <polyline
+        points="${points}"
+        fill="none"
+        stroke="currentColor"
+        stroke-width="1"
+        vector-effect="non-scaling-stroke"
+      />
+    </svg>`;
   }
 }

@@ -10,8 +10,9 @@ import type { LogStore } from '../core/log/LogStore.js';
 import { apexLimitTimeSeries } from '../features/timeline/optimised/apex-limit-series.js';
 import { globalStyles } from '../styles/global.styles.js';
 import {
-  ESTIMATED_LIMITS_TEXT,
-  NO_CUMULATIVE_LIMITS_TEXT,
+  hasReportedLimits,
+  NO_GOVERNOR_USAGE_TEXT,
+  NO_REPORTED_LIMITS_TEXT,
   seriesGauges,
 } from './logOverviewMetrics.js';
 
@@ -54,16 +55,15 @@ export class LogOverview extends LitElement {
 
   render() {
     const apexLog = this.logStore?.log;
-    const gauges = apexLog ? seriesGauges(apexLimitTimeSeries(apexLog)) : [];
-    if (!apexLog || !gauges.length) {
-      return html`<p class="note">${NO_CUMULATIVE_LIMITS_TEXT}</p>`;
+    const series = apexLog ? apexLimitTimeSeries(apexLog) : null;
+    const gauges = series ? seriesGauges(series) : [];
+    if (!series || !gauges.length) {
+      return html`<p class="note">${NO_GOVERNOR_USAGE_TEXT}</p>`;
     }
 
-    // Snapshots correct the series where they exist; without any, the figures
-    // are estimated from granular events — say so.
-    const estimated = apexLog.governorLimits.snapshots.length === 0;
+    // Every gauge here is a level; only a limit the log itself reported turns one into a share.
     return html`<governor-summary .metrics=${gauges}></governor-summary>
-      ${estimated ? html`<p class="note">${ESTIMATED_LIMITS_TEXT}</p>` : ''}`;
+      ${hasReportedLimits(series) ? '' : html`<p class="note">${NO_REPORTED_LIMITS_TEXT}</p>`}`;
   }
 }
 

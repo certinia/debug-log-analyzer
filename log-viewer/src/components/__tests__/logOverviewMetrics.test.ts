@@ -3,7 +3,13 @@
  */
 import { describe, expect, it } from '@jest/globals';
 
-import { GOVERNOR_METRICS, limitTotals, seriesGauges } from '../logOverviewMetrics.js';
+import {
+  GOVERNOR_METRICS,
+  hasReportedLimits,
+  limitTotals,
+  metricSparkline,
+  seriesGauges,
+} from '../logOverviewMetrics.js';
 import { emptyLimits, seriesEvent, timeSeries } from './limitsTestUtils.js';
 
 describe('limitTotals', () => {
@@ -64,7 +70,7 @@ describe('seriesGauges', () => {
     expect(gauges).toEqual([{ label: 'SOQL', found: 70, used: 70, limit: 100 }]);
   });
 
-  it('ranks by percentage, drops zero usage or limit, and caps at six', () => {
+  it('ranks by percentage, drops zero usage, and caps at six', () => {
     const gauges = seriesGauges(
       timeSeries([
         seriesEvent(1_000, {
@@ -108,5 +114,90 @@ describe('seriesGauges', () => {
 
   it('returns nothing for a series without events', () => {
     expect(seriesGauges(timeSeries([]))).toEqual([]);
+  });
+
+  describe('a log that reported no limits', () => {
+    const levels = [3, 5, 5, 9, 12];
+    const noLimitSeries = () =>
+      timeSeries(
+        levels.map((used, i) =>
+          seriesEvent((i + 1) * 1_000, {
+            soqlQueries: { used, limit: 0 },
+            dmlStatements: { used: used * 2, limit: 0 },
+          }),
+        ),
+      );
+
+    // Nothing to rank by, so reading order stands in rather than ordering by raw size, which
+    // would read as a ranking it cannot be.
+    it('keeps the metrics in reading order', () => {
+      expect(seriesGauges(noLimitSeries()).map((gauge) => gauge.label)).toEqual(['SOQL', 'DML']);
+    });
+
+    it('carries a sparkline instead of a bar', () => {
+      const [soql] = seriesGauges(noLimitSeries());
+
+      expect(soql).toMatchObject({ label: 'SOQL', used: 12, limit: 0 });
+      expect(soql?.spark).toEqual(levels);
+    });
+
+    it('carries no sparkline where the log reported a limit', () => {
+      const gauges = seriesGauges(
+        timeSeries([seriesEvent(1_000, { soqlQueries: { used: 70, limit: 100 } })]),
+      );
+
+      expect(gauges[0]?.spark).toBeUndefined();
+    });
+  });
+});
+
+describe('hasReportedLimits', () => {
+  it('is true when any metric carries a limit from the log', () => {
+    expect(
+      hasReportedLimits(
+        timeSeries([
+          seriesEvent(1_000, {
+            soqlQueries: { used: 3, limit: 0 },
+            cpuTime: { used: 20, limit: 10_000 },
+          }),
+        ]),
+      ),
+    ).toBe(true);
+  });
+
+  it('is false when the log reported none', () => {
+    expect(
+      hasReportedLimits(timeSeries([seriesEvent(1_000, { soqlQueries: { used: 3, limit: 0 } })])),
+    ).toBe(false);
+  });
+});
+
+describe('metricSparkline', () => {
+  const of = (levels: number[]) =>
+    timeSeries(levels.map((used, i) => seriesEvent(i + 1, { soqlQueries: { used, limit: 0 } })));
+
+  // Four readings are dots, not a shape, so the gauge is left with its figure alone.
+  it('draws nothing below five readings', () => {
+    expect(metricSparkline(of([1, 2, 3, 4]), 'soqlQueries')).toEqual([]);
+  });
+
+  it('keeps every reading up to twenty', () => {
+    const levels = [1, 2, 3, 4, 5, 6];
+    expect(metricSparkline(of(levels), 'soqlQueries')).toEqual(levels);
+  });
+
+  // Sampled at even intervals, not reduced to peaks, so a dip survives the downsample.
+  it('samples a long series down to twenty readings, first and last kept', () => {
+    const levels = Array.from({ length: 500 }, (_, i) => (i === 250 ? 0 : i));
+    const spark = metricSparkline(of(levels), 'soqlQueries');
+
+    expect(spark).toHaveLength(20);
+    expect(spark[0]).toBe(0);
+    expect(spark[spark.length - 1]).toBe(499);
+  });
+
+  it('answers the same array for the same series and metric', () => {
+    const series = of([1, 2, 3, 4, 5]);
+    expect(metricSparkline(series, 'soqlQueries')).toBe(metricSparkline(series, 'soqlQueries'));
   });
 });
