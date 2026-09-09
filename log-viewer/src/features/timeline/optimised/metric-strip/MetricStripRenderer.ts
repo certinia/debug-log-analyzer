@@ -53,6 +53,7 @@ import {
   BREACH_AREA_OPACITY,
   DANGER_ZONE_OPACITY,
   getMetricStripColors,
+  getDensityColor,
   getTrafficLightColor,
   METRIC_STRIP_HEIGHT,
   METRIC_STRIP_LINE_WIDTHS,
@@ -287,11 +288,18 @@ export class MetricStripRenderer {
     // Render expanded view layers (back to front). The fills and the breach band leave the
     // unrecorded spans blank: a fill reads as measured volume and the band is a verdict. The
     // step line carries its last reading across, because a governor total cannot fall.
-    this.renderDangerZone(displayWidth, height);
+    //
+    // The band, the 100% line and the breach fill all mark a distance from a cap, so they are
+    // drawn only where the log reported one.
+    if (!data.scaledToPeak) {
+      this.renderDangerZone(displayWidth, height);
+    }
     this.renderAreaFills(data, viewportState, totalDuration, height);
     this.renderStepChartLines(data, viewportState, totalDuration, height);
-    this.renderLimitLine(displayWidth, height);
-    this.renderBreachAreas(data, viewportState, totalDuration, height);
+    if (!data.scaledToPeak) {
+      this.renderLimitLine(displayWidth, height);
+      this.renderBreachAreas(data, viewportState, totalDuration, height);
+    }
   }
 
   /**
@@ -329,9 +337,15 @@ export class MetricStripRenderer {
     viewportState: ViewportState,
     getDataPointAtTime: (timeNs: number) => DataPointResult | null,
     totalDuration: number,
+    scaledToPeak: boolean,
   ): void {
     if (this.isCollapsed) {
-      this.renderCollapsedHeatStrips(viewportState, getDataPointAtTime, totalDuration);
+      this.renderCollapsedHeatStrips(
+        viewportState,
+        getDataPointAtTime,
+        totalDuration,
+        scaledToPeak,
+      );
     }
   }
 
@@ -347,6 +361,7 @@ export class MetricStripRenderer {
     viewportState: ViewportState,
     getDataPointAtTime: (timeNs: number) => DataPointResult | null,
     totalDuration: number,
+    scaledToPeak: boolean,
   ): void {
     const { zoom, offsetX, displayWidth } = viewportState;
     const height = this.height;
@@ -390,7 +405,9 @@ export class MetricStripRenderer {
       // A traffic light is a verdict, so the strip draws none over unrecorded time.
       if (cachedResult && !this.isNoData(bucketStartTime)) {
         const maxPercent = this.getMaxPercentAtPoint(cachedResult.point);
-        const colorInfo = getTrafficLightColor(maxPercent);
+        const colorInfo = scaledToPeak
+          ? getDensityColor(maxPercent)
+          : getTrafficLightColor(maxPercent);
         color = colorInfo.color;
         alpha = colorInfo.alpha;
       }

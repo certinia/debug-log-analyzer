@@ -8,9 +8,9 @@ import { customElement, property } from 'lit/decorators.js';
 import '#vscode-elements/vscode-icon.js';
 import { CategoryPaletteController } from '../../../components/categoryTime.js';
 import {
-  ESTIMATED_LIMITS_TEXT,
-  NO_CUMULATIVE_LIMITS_TEXT,
-} from '../../../components/logOverviewMetrics.js';
+  NO_GOVERNOR_USAGE_TEXT,
+  NO_REPORTED_LIMITS_TEXT,
+} from '../../../components/governorCopy.js';
 import '../../../components/StackedTimeBar.js';
 import { segmentsWithTail, type StackedSegment } from '../../../components/StackedTimeBar.js';
 import { logContext } from '../../../core/log/logContext.js';
@@ -245,8 +245,8 @@ function overLimit(budget: RowBudget): boolean {
 /** Why the figures are what the log itself showed. */
 function caveat(budgets: readonly RowBudget[]): string {
   return budgets.some((budget) => budget.observed > 0)
-    ? ESTIMATED_LIMITS_TEXT
-    : NO_CUMULATIVE_LIMITS_TEXT;
+    ? NO_REPORTED_LIMITS_TEXT
+    : NO_GOVERNOR_USAGE_TEXT;
 }
 
 /** The objects as segments of one hue, stepped for identity only. */

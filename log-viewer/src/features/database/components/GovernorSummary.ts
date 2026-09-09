@@ -4,9 +4,8 @@
 import { LitElement, css, html, nothing } from 'lit';
 import { customElement, property } from 'lit/decorators.js';
 
+import { NO_LIMIT_FOR_METRIC_TEXT } from '../../../components/governorCopy.js';
 import { globalStyles } from '../../../styles/global.styles.js';
-
-const integer = new Intl.NumberFormat(undefined, { maximumFractionDigits: 0 });
 
 /** One at-a-glance governor gauge for the overview strip. */
 export interface GaugeMetric {
@@ -18,11 +17,16 @@ export interface GaugeMetric {
   /** Governor limit (0 when none applies). */
   limit: number;
   /**
-   * How to write the numbers. Defaults to a thousand-separated integer; a byte
-   * metric passes a compact one, since `5,400,000 / 6,000,000` is wider than a
-   * gauge.
+   * How to write every number this gauge shows. Required, so a new figure on the gauge cannot be
+   * printed raw: a byte metric passes a compact formatter, since `5,400,000 / 6,000,000` is wider
+   * than a gauge.
    */
-  format?: (value: number) => string;
+  format: (value: number) => string;
+  /**
+   * The metric's level over the log, oldest first, drawn where the track sits when there is no
+   * limit to fill a bar against. Empty where there are too few readings to read as a shape.
+   */
+  spark?: readonly number[];
 }
 
 /** Consumption percentage where a gauge or trend turns from safe to warn. */
@@ -104,6 +108,17 @@ export class GovernorSummary extends LitElement {
         font-style: italic;
       }
 
+      /* The height a bar would have taken plus a little, so a row grows by a few pixels rather
+         than turning into a chart strip. Overflow visible: the peak vertex sits on y=0, so half
+         the non-scaling stroke falls outside the viewBox and would be clipped. */
+      .gauge__spark {
+        display: block;
+        width: 100%;
+        height: 10px;
+        overflow: visible;
+        color: var(--lana-fg-muted);
+      }
+
       .gauge__track {
         height: 5px;
         border-radius: var(--lana-radius-pill);
@@ -144,14 +159,17 @@ export class GovernorSummary extends LitElement {
 
   private _renderGauge(metric: GaugeMetric) {
     const muted = metric.found === 0 && (metric.used ?? 0) === 0;
-    const format = metric.format ?? integer.format;
+    const { format } = metric;
 
     if (metric.used === null || metric.limit <= 0) {
-      return html`<div class="gauge ${muted ? 'muted' : ''}">
+      // No limit, so no meter: a bar against the level's own peak would sit full and read as a
+      // breach, and a sparkline has no `aria-valuemax` to give.
+      return html`<div class="gauge ${muted ? 'muted' : ''}" title=${NO_LIMIT_FOR_METRIC_TEXT}>
         <span class="gauge__label">${metric.label}</span>
         <span class="gauge__value"
           >${format(metric.found)} <span class="gauge__na">seen</span></span
         >
+        ${this._renderSpark(metric)}
       </div>`;
     }
 
@@ -174,5 +192,38 @@ export class GovernorSummary extends LitElement {
         ></div>
       </div>
     </div>`;
+  }
+
+  /** The level over the log, scaled to its own peak. Nothing to draw without a peak. */
+  private _renderSpark(metric: GaugeMetric) {
+    const spark = metric.spark ?? [];
+    const peak = spark.reduce((highest, level) => (level > highest ? level : highest), 0);
+    if (peak <= 0) {
+      return nothing;
+    }
+
+    // A 0-100 x 0-10 box stretched to the gauge's width, so the path needs no pixel measurements.
+    const points = spark
+      .map((level, i) => {
+        const x = spark.length > 1 ? (i / (spark.length - 1)) * 100 : 0;
+        return `${x.toFixed(2)},${(10 - (level / peak) * 10).toFixed(2)}`;
+      })
+      .join(' ');
+
+    return html`<svg
+      class="gauge__spark"
+      viewBox="0 0 100 10"
+      preserveAspectRatio="none"
+      role="img"
+      aria-label="${metric.label} over the log, highest point ${metric.format(peak)}"
+    >
+      <polyline
+        points="${points}"
+        fill="none"
+        stroke="currentColor"
+        stroke-width="1"
+        vector-effect="non-scaling-stroke"
+      />
+    </svg>`;
   }
 }

@@ -116,31 +116,36 @@ export function hexToCSS(hex: number): string {
   return `#${hex.toString(16).padStart(6, '0')}`;
 }
 
-/**
- * Format metric value with used/limit and optional unit.
- *
- * @param used - Used value
- * @param limit - Limit value
- * @param unit - Optional unit string (e.g., "ms", "bytes")
- * @returns Formatted string (e.g., "250 / 500 ms")
- */
-export function formatMetricValue(used: number, limit: number, unit?: string): string {
-  const usedStr = formatNumber(Math.round(used));
-  const limitStr = formatNumber(Math.round(limit));
-  if (unit) {
-    return `${usedStr} / ${limitStr} ${unit}`;
-  }
-  return `${usedStr} / ${limitStr}`;
-}
+/** How a reading names its denominator: `/` for a reported limit, `of` for the log's own peak. */
+export type UsageSeparator = '/' | 'of';
 
 /**
- * Format metric value with parentheses.
+ * Format a reading against its denominator and an optional unit.
  *
  * @param used - Used value
- * @param limit - Limit value
- * @param unit - Optional unit string
- * @returns Formatted string with parentheses (e.g., "(250 / 500 ms)")
+ * @param denominator - Reported limit, or the metric's own peak in the log
+ * @param unit - Optional unit string (e.g., "ms", "bytes")
+ * @param separator - `/` reads as a cap the transaction was measured against, so a peak takes `of`
+ * @returns Formatted string (e.g., "250 / 500 ms", "770 of 1,240")
  */
-export function formatMetricValueWithParens(used: number, limit: number, unit?: string): string {
-  return `(${formatMetricValue(used, limit, unit)})`;
+export function formatMetricValue(
+  used: number,
+  denominator: number,
+  unit?: string,
+  separator: UsageSeparator = '/',
+): string {
+  const usedStr = formatNumber(Math.round(used));
+  const denominatorStr = formatNumber(Math.round(denominator));
+  const reading = `${usedStr} ${separator} ${denominatorStr}`;
+  return unit ? `${reading} ${unit}` : reading;
+}
+
+/** {@link formatMetricValue} in parentheses (e.g., "(250 / 500 ms)"). */
+export function formatMetricValueWithParens(
+  used: number,
+  denominator: number,
+  unit?: string,
+  separator?: UsageSeparator,
+): string {
+  return `(${formatMetricValue(used, denominator, unit, separator)})`;
 }

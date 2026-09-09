@@ -847,7 +847,7 @@ export interface HeatStripMetric {
 export interface HeatStripMetricValue {
   /** Current usage value (corrected: last cumulative baseline + granular deltas since). */
   used: number;
-  /** Maximum allowed value (limit) */
+  /** The limit the log reported for this metric; 0 when the log reported none. */
   limit: number;
   /**
    * Increment-only total from detailed events, set only for delta-tracked metrics and only
@@ -918,6 +918,14 @@ export type HeatStripTimeSeriesMetric = HeatStripMetric;
  * Classified metric for metric strip tier system.
  * Metrics are classified into tiers based on their global max percentage.
  */
+/**
+ * What a metric's percentages are measured against. `peak` is the metric's own highest level,
+ * standing in where the log reported no limit; `none` is a metric the log reported no limit for in
+ * a log that reported some, which is off the series and cannot be read at all.
+ */
+export type MetricDenominator =
+  { kind: 'limit'; value: number } | { kind: 'peak'; value: number } | { kind: 'none' };
+
 export interface MetricStripClassifiedMetric {
   /** Unique metric identifier (e.g., 'cpuTime', 'soqlQueries') */
   metricId: string;
@@ -927,8 +935,8 @@ export interface MetricStripClassifiedMetric {
   tier: 1 | 2 | 3;
   /** Maximum percentage reached across all timestamps (0-1+) */
   globalMaxPercent: number;
-  /** Authoritative limit for this metric ("out of" total), fixed across the series. 0 if unknown. */
-  limit: number;
+  /** What this metric's percentages divide by, resolved once for the whole series. */
+  denominator: MetricDenominator;
   /** Line color for this metric (hex number 0xRRGGBB) */
   color: number;
   /** Priority for ordering (lower = higher priority, shown first) */
@@ -943,7 +951,7 @@ export interface MetricStripClassifiedMetric {
 export interface MetricStripRawValue {
   /** Current usage value (corrected line value). */
   used: number;
-  /** Maximum allowed value (limit) */
+  /** The limit the log reported for this metric; 0 when the log reported none. */
   limit: number;
   /** Increment-only tracked total, present only when it diverges below `used`. See HeatStripMetricValue.tracked. */
   tracked?: number;
@@ -975,6 +983,12 @@ export interface MetricStripProcessedData {
   globalMaxPercent: number;
   /** Whether there's any data to render */
   hasData: boolean;
+  /**
+   * True when the log reported no limit for any metric, so every percentage is a share of that
+   * metric's own peak rather than of a cap. The 80% band, the 100% line, the breach fill and the
+   * traffic-light colours mean nothing against a peak, so the renderer drops them.
+   */
+  scaledToPeak: boolean;
   /** Spans the log recorded nothing in, carried through from the series */
   gaps: NoDataSpan[];
 }

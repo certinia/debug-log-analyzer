@@ -271,6 +271,10 @@ Click the chevron icon (◀/▼) in the top-left corner or `Shift+Click` anywher
 - **100% Limit Line**: Red dashed line at the limit threshold
 - **Breach Areas**: Purple shading for values above 100%
 
+#### Where the log reports no limits
+
+A percentage needs a limit, and the log is the only source of one. Where it reports none, each metric is scaled to its own highest point instead, so the shape of usage over time still reads. The band, the 100% line, the breach shading and the traffic-light colours all mark a distance from a limit, so they come off; the collapsed strip shades by level in a single neutral grey, and the tooltip reads `770 of 1,240` rather than `770 / 1,240`.
+
 ### Mouse Interactions
 
 | Action          | Mouse                          | Result                            |

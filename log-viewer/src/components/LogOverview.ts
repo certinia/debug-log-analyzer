@@ -9,11 +9,8 @@ import { logContext } from '../core/log/logContext.js';
 import type { LogStore } from '../core/log/LogStore.js';
 import { apexLimitTimeSeries } from '../features/timeline/optimised/apex-limit-series.js';
 import { globalStyles } from '../styles/global.styles.js';
-import {
-  ESTIMATED_LIMITS_TEXT,
-  NO_CUMULATIVE_LIMITS_TEXT,
-  seriesGauges,
-} from './logOverviewMetrics.js';
+import { NO_GOVERNOR_USAGE_TEXT, NO_LOG_TEXT } from './governorCopy.js';
+import { seriesGauges } from './logOverviewMetrics.js';
 
 // web components
 import '../features/database/components/GovernorSummary.js';
@@ -54,16 +51,16 @@ export class LogOverview extends LitElement {
 
   render() {
     const apexLog = this.logStore?.log;
-    const gauges = apexLog ? seriesGauges(apexLimitTimeSeries(apexLog)) : [];
-    if (!apexLog || !gauges.length) {
-      return html`<p class="note">${NO_CUMULATIVE_LIMITS_TEXT}</p>`;
+    if (!apexLog) {
+      return html`<p class="note">${NO_LOG_TEXT}</p>`;
+    }
+    const gauges = seriesGauges(apexLimitTimeSeries(apexLog));
+    if (!gauges.length) {
+      return html`<p class="note">${NO_GOVERNOR_USAGE_TEXT}</p>`;
     }
 
-    // Snapshots correct the series where they exist; without any, the figures
-    // are estimated from granular events — say so.
-    const estimated = apexLog.governorLimits.snapshots.length === 0;
-    return html`<governor-summary .metrics=${gauges}></governor-summary>
-      ${estimated ? html`<p class="note">${ESTIMATED_LIMITS_TEXT}</p>` : ''}`;
+    // A gauge with no reported limit says so on hover, so the strip needs no note beneath it.
+    return html`<governor-summary .metrics=${gauges}></governor-summary>`;
   }
 }
 

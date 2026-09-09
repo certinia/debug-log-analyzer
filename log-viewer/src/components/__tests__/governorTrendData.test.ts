@@ -42,6 +42,24 @@ describe('governorTrendSeries', () => {
     ]);
   });
 
+  // No limit to divide by, so the metric's own peak stands in: the shape still draws, and `limit`
+  // stays 0, which is how the chart knows to drop the guide and the tier colour.
+  it("charts against the metric's own peak when the log reported no limit", () => {
+    const series = governorTrendSeries(
+      timeSeries([
+        seriesEvent(1_000, { queryRows: { used: 300, limit: 0 } }),
+        seriesEvent(2_000, { queryRows: { used: 1_200, limit: 0 } }),
+      ]),
+    );
+
+    expect(series[0]).toMatchObject({ label: 'Query Rows', used: 1_200, limit: 0, finalRatio: 0 });
+    expect(series[0]?.points).toEqual([
+      { t: 0, ratio: 0, used: 0 },
+      { t: 1_000, ratio: 25, used: 300 },
+      { t: 2_000, ratio: 100, used: 1_200 },
+    ]);
+  });
+
   it('leaves out a metric whose final consumption is zero', () => {
     const series = governorTrendSeries(
       timeSeries([
