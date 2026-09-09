@@ -53,9 +53,7 @@ communicate via message passing only.
   `refactor:`, `perf:`, `test:`). Don't auto-commit.
 - Branches: `feat-*` for features, `bug-*` for defects.
 - Releases follow SemVer; update CHANGELOG; breaking changes need a migration guide.
-- CHANGELOG entries: one or two lines, no sub-bullets. Say what the user gets, not how it
-  was built. Order each section by impact, most impactful first. A perf entry states its
-  multiple or percentage. House style: `- <emoji> **Label**: <what the user gets> ([#issue])`.
+- CHANGELOG entries: see the `changelog-entry` skill in `.claude/skills/`.
 - Never reference Anthropic or Claude in commit messages, PRs, etc.
 
 ## Rules manifest
