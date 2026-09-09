@@ -7,7 +7,9 @@ import { workspace } from 'vscode';
 
 import {
   COLUMN_OVERRIDE_SECTIONS,
+  COLUMN_VIEW_SECTIONS,
   getColumnOverrides,
+  getColumnViews,
   getConfig,
   sameConfig,
   updateColumnOverride,
@@ -110,6 +112,19 @@ describe('AppConfig column overrides', () => {
       expect(overrides['database.soql.columnOverrides']).toEqual({});
       expect(overrides['database.dml.columnOverrides']).toEqual({});
       expect(globalState.get).toHaveBeenCalledTimes(COLUMN_OVERRIDE_SECTIONS.length);
+    });
+  });
+
+  describe('getColumnViews', () => {
+    it('reads every view preset from globalState, defaulting to General', () => {
+      const globalState = mockMemento({ 'callTree.columnView': 'Memory' });
+
+      const views = getColumnViews(globalState);
+
+      // The Call Tree's view is remembered UI state, not a `lana.*` setting.
+      expect(views['callTree.columnView']).toBe('Memory');
+      expect(views['database.soql.columnView']).toBe('General');
+      expect(globalState.get).toHaveBeenCalledTimes(COLUMN_VIEW_SECTIONS.length);
     });
   });
 

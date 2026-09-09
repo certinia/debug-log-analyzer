@@ -43,8 +43,8 @@ export class DockLayout extends LitElement {
   @property({ attribute: false })
   collapsed: Record<string, boolean> = {};
 
-  @property({ attribute: false })
-  paneSizes: Record<string, number> = {};
+  @property({ type: Number })
+  layoutEpoch = 0;
 
   // Live drag state (transient); when set, overrides `size` while dragging.
   @state()
@@ -133,7 +133,7 @@ export class DockLayout extends LitElement {
                   .sections=${this.sections}
                   .emptyText=${this.emptyText}
                   .collapsed=${this.collapsed}
-                  .paneSizes=${this.paneSizes}
+                  .layoutEpoch=${this.layoutEpoch}
                   dock=${this.dock}
                 >
                   <slot name="actions-start" slot="actions-start"></slot>

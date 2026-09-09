@@ -29,21 +29,25 @@ export interface DetailSelection {
  * Details and the call tree follow the active frame; the call stack and the SOQL
  * issues stay anchored to the statement the user picked.
  */
-export async function buildDatabaseSections(selection: DetailSelection): Promise<PaneSection[]> {
+export async function buildDatabaseSections(
+  selection: DetailSelection,
+  hidden: ReadonlySet<string> = new Set(),
+): Promise<PaneSection[]> {
   const { eventIndex, type } = selection;
   const active = selection.activeEventIndex ?? eventIndex;
   // An ancestor method is not a statement, so the statement-shaped vitals do
   // not apply to it.
   const activeType = active === eventIndex ? type : undefined;
 
-  // The vitals are a fixed set of figures, so they take their own height; the
-  // fill sections share the leftover space, the call tree getting the most,
-  // SOQL issues the least (but still open). The call tree closes the panel.
+  // The vitals take a steady height, so stepping from one statement to the next
+  // does not resize the stack; the fill sections share the leftover space, the
+  // call tree getting the most, SOQL issues the least (but still open). The
+  // call tree closes the panel.
   const sections: PaneSection[] = [
     {
       id: 'vitals',
       title: 'Details',
-      fit: 'content',
+      height: 'md',
       content: html`<event-vitals
         eventIndex=${active}
         type=${ifDefined(activeType)}
@@ -54,7 +58,9 @@ export async function buildDatabaseSections(selection: DetailSelection): Promise
     {
       id: 'variables',
       title: 'Variables',
-      fit: 'content',
+      // No natural size — a frame has none or hundreds — so it takes a share of
+      // the panel and scrolls, rather than a slot that could crowd the grids.
+      weight: 3,
       content: html`<variables-detail eventIndex=${active}></variables-detail>`,
     },
     {
@@ -69,7 +75,9 @@ export async function buildDatabaseSections(selection: DetailSelection): Promise
   ];
 
   if (type === 'soql') {
-    const issues = await computeSoqlIssues(eventIndex);
+    // Hidden, and the badge is a count nobody sees: the lint is worth skipping,
+    // but the section still has to be offered in the header menu.
+    const issues = hidden.has('issues') ? [] : await computeSoqlIssues(eventIndex);
     sections.push({
       id: 'issues',
       title: 'SOQL issues',
