@@ -379,7 +379,7 @@
     "vscode-uri": "^3.2.0"
   },
   "devDependencies": {
-    "@salesforce/vscode-services": "^67.15.0",
+    "@salesforce/vscode-services": "^67.17.2",
     "@types/jest": "^30.0.0",
     "@types/node": "~22.20.1",
     "@types/vscode": "~1.102.0",
