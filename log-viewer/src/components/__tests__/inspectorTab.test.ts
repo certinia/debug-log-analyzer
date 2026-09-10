@@ -5,7 +5,7 @@ import { afterEach, describe, expect, it } from '@jest/globals';
 
 import { eventBus } from '../../core/events/EventBus.js';
 import { InspectorEmphasis } from '../inspectorEmphasis.js';
-import { wireInspectorTab } from '../inspectorTab.js';
+import { revealFirstOf, wireInspectorTab } from '../inspectorTab.js';
 
 describe('wireInspectorTab', () => {
   let off: (() => void) | null = null;
@@ -27,23 +27,25 @@ describe('wireInspectorTab', () => {
     /** Marks and moves in the order they arrived, which the two lists cannot show. */
     const order: string[] = [];
     let clears = 0;
+    const moveTo = (eventIndex: number, signal: AbortSignal): void | Promise<void> => {
+      order.push('move');
+      signals.push(signal);
+      if (reveal) {
+        return reveal(eventIndex, signal);
+      }
+      revealed.push(eventIndex);
+    };
     off = wireInspectorTab('calltree', new InspectorEmphasis(), {
       mark: (eventIndexes) => {
         marks.push(eventIndexes);
         order.push('mark');
       },
-      reveal: (eventIndex, signal) => {
-        order.push('move');
-        signals.push(signal);
-        if (reveal) {
-          return reveal(eventIndex, signal);
-        }
-        revealed.push(eventIndex);
-      },
+      reveal: moveTo,
       clear: () => {
         clears++;
       },
-      movesToMergedPick,
+      // As the tables do it, through the helper they ship with.
+      revealMerged: movesToMergedPick ? revealFirstOf(moveTo) : undefined,
     });
     return { marks, revealed, order, signals, clears: () => clears };
   }

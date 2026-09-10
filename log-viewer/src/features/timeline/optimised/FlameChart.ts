@@ -25,6 +25,7 @@ import type {
   TimelineOptions,
   TimelineState,
   TreeNode,
+  ViewportPanAxes,
   ViewportState,
 } from '../types/flamechart.types.js';
 import { TIMELINE_CONSTANTS, TimelineError, TimelineErrorCode } from '../types/flamechart.types.js';
@@ -79,6 +80,9 @@ import { waitForNextFrame } from '../../../core/utility/FrameBudget.js';
  * genuinely never gains a size reports the fault rather than hanging on a promise.
  */
 const SIZE_WAIT_FRAMES = 60;
+
+/** How long a pan to a frame takes, matching the moves the selection sync animates. */
+const PAN_ANIMATION_MS = 300;
 
 export interface FlameChartCallbacks {
   onMouseMove?: (
@@ -1645,12 +1649,7 @@ export class FlameChart<E extends EventNode = EventNode> {
         this.callbacks.onMarkerNavigate?.(marker, screenX, screenY);
       },
       onAnimateToPosition: (targetX: number, targetY: number, durationMs: number) => {
-        if (!this.viewport || !this.viewportAnimator) {
-          return;
-        }
-        this.viewportAnimator.animate(this.viewport, targetX, targetY, durationMs, () =>
-          this.notifyViewportChange(),
-        );
+        this.animateViewportTo(targetX, targetY, durationMs);
       },
       requestRender: () => {
         // Selection change only needs highlights + overlays (Phase 3 optimization)
@@ -2165,12 +2164,38 @@ export class FlameChart<E extends EventNode = EventNode> {
   }
 
   /**
-   * Pan (without changing zoom) so the currently selected frame is visible.
-   * Animated, and a no-op if the frame is already in view - use this for the
-   * passive selection sync, where a full zoom-to-fit would be too disruptive.
+   * Pan (without changing zoom) to put a frame in the middle of the view, on the
+   * axes asked for. Selects nothing, so a caller standing for several frames can
+   * bring one into view without naming it as the selection.
+   *
+   * @param timestamp - Frame start time in nanoseconds
+   * @param duration - Frame duration in nanoseconds
+   * @param depth - Frame depth in the call tree
+   * @param axes - Axes to centre on
    */
-  public centerOnSelectedFrame(): void {
-    this.selectionOrchestrator?.centerOnSelectedFrame();
+  public panToFrame(
+    timestamp: number,
+    duration: number,
+    depth: number,
+    axes: ViewportPanAxes,
+  ): void {
+    if (!this.viewport) {
+      return;
+    }
+
+    const target = this.viewport.centerOffsetFor(timestamp, duration, depth, axes);
+    this.animateViewportTo(target.x, target.y, PAN_ANIMATION_MS);
+  }
+
+  /** Animate the view to an offset, abandoning whatever move was in flight. */
+  private animateViewportTo(targetX: number, targetY: number, durationMs: number): void {
+    if (!this.viewport || !this.viewportAnimator) {
+      return;
+    }
+
+    this.viewportAnimator.animate(this.viewport, targetX, targetY, durationMs, () =>
+      this.notifyViewportChange(),
+    );
   }
 
   /**
