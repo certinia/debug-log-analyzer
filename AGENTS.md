@@ -106,8 +106,8 @@ communicate via message passing only.
 
 Area-specific rules load on demand (Claude Code, scoped by path):
 
-- `.claude/rules/log-viewer.md` — webview/UI: boundary, performance budgets, `--lana-*` appearance
-  tokens, key paths.
+- `.claude/rules/log-viewer.md` — webview/UI: boundary, performance budgets, lit component
+  rules, `--lana-*` appearance tokens, key paths.
 - `.claude/rules/lana.md` — VS Code extension: UX, command paths.
 
 Some modules also carry their own `AGENTS.md`. Read it before you change that module.

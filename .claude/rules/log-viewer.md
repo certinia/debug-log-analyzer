@@ -19,6 +19,21 @@ Webview UI.
 - Keep memory low, even at the cost of speed.
 - Weigh that trade in every change, and measure it.
 
+## Components
+
+Lit. Public API is `@property`, internal state is `@state`, styles are `static styles`.
+
+- Behaviour that needs setup and teardown — a `window` or `document` listener, a `ResizeObserver`,
+  a media query, a timer — goes in a reactive controller. Do not copy a
+  `connectedCallback`/`disconnectedCallback` pair between components.
+  `components/categoryTime.ts` is the example.
+- An object or array `@property` takes a `hasChanged`. Without one, a new reference renders again
+  for the same data.
+- A switch between two complex subtrees takes `cache()`, so the tab you return to keeps its DOM.
+- An event is `composed` only when it must leave the component. A grid event bubbles in one shadow
+  root and is heard on `renderRoot`; `show-tab` and `lv-find*` are app-wide and go through
+  `document`. `composed` on the first kind leaks an internal event.
+
 ## Theme
 
 - The panel is never re-created, so a theme switch is observed at runtime. HTML re-themes through
