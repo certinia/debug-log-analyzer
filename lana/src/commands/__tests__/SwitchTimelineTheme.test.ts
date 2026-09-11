@@ -320,6 +320,24 @@ describe('SwitchTimelineTheme', () => {
 
       expect(mockQuickPick.hide).toHaveBeenCalled();
     });
+
+    it('reports a failure to save the chosen theme', async () => {
+      mockUpdateConfig.mockRejectedValue(new Error('settings are read-only'));
+      const mockContext = createMockContext();
+      const command = SwitchTimelineTheme.getCommand(
+        mockContext as unknown as import('../../Context.js').Context,
+      );
+
+      await command.run({} as never);
+
+      onDidChangeActiveCallback([{ label: 'Nord' }]);
+      await onDidAcceptCallback();
+
+      expect(mockContext.display.showErrorMessage).toHaveBeenCalledWith(
+        'Error changing timeline theme: settings are read-only',
+      );
+      expect(mockQuickPick.hide).toHaveBeenCalled();
+    });
   });
 
   describe('theme revert', () => {

@@ -12,27 +12,21 @@ import { LogView } from './LogView.js';
 
 export class SwitchTimelineTheme {
   static getCommand(context: Context): Command {
-    return new Command('switchTimelineTheme', 'Log: Timeline Theme', (uri: Uri) =>
-      SwitchTimelineTheme.safeCommand(context, uri),
+    return new Command(
+      'switchTimelineTheme',
+      'Log: Timeline Theme',
+      context,
+      'Error changing timeline theme',
+      (uri: Uri) => SwitchTimelineTheme.command(context, uri),
     );
   }
 
   static apply(context: Context): void {
-    SwitchTimelineTheme.getCommand(context).register(context);
+    SwitchTimelineTheme.getCommand(context).register();
     context.display.output(`Registered command '${appName}: Timeline Theme'`);
   }
 
-  private static async safeCommand(context: Context, uri: Uri): Promise<void> {
-    try {
-      return SwitchTimelineTheme.command(context, uri);
-    } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : String(err);
-      context.display.showErrorMessage(`Error changing timeline theme: ${msg}`);
-      return Promise.resolve();
-    }
-  }
-
-  private static async command(_context: Context, _uri: Uri): Promise<void> {
+  private static async command(context: Context, _uri: Uri): Promise<void> {
     const config = getConfig();
 
     const items = THEMES.map((label) => ({
@@ -72,7 +66,12 @@ export class SwitchTimelineTheme {
       if (selectedTheme) {
         // Update the active theme in user settings on confirm
         activeTheme = selectedTheme;
-        await updateConfig('timeline.activeTheme', selectedTheme);
+        try {
+          await updateConfig('timeline.activeTheme', selectedTheme);
+        } catch (error: unknown) {
+          const message = error instanceof Error ? error.message : String(error);
+          context.display.showErrorMessage(`Error changing timeline theme: ${message}`);
+        }
         pick.hide();
       }
     });

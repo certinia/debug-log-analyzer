@@ -74,7 +74,14 @@ export class LogView {
       const bundleUri = panel.webview.asWebviewUri(Utils.joinPath(logViewerRoot, 'bundle.js'));
       const codiconUri = panel.webview.asWebviewUri(Utils.joinPath(logViewerRoot, 'codicon.css'));
       const index = Utils.joinPath(logViewerRoot, 'index.html');
-      panel.webview.html = (await readFileText(index))
+      const template = await readFileText(index).catch((error: unknown) => {
+        const message = error instanceof Error ? error.message : String(error);
+        const shown = index.scheme === 'file' ? index.fsPath : index.toString(true);
+        throw new Error(`Could not read the log viewer at ${shown}: ${message}`, {
+          cause: error,
+        });
+      });
+      panel.webview.html = template
         .replace(/bundle\.js/gi, bundleUri.toString(true))
         .replace(/codicon\.css/gi, codiconUri.toString(true));
     }
