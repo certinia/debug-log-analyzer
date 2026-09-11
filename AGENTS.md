@@ -38,9 +38,11 @@ the TS ≤6.0 API (lands in TS 7.1). Don't remove until typescript-eslint suppor
 - **Performance** — handle large logs (50MB+, 500k+ lines) without blocking the UI.
 - **UX** — discoverable, accessible, actionable errors.
 - **Testing** — features and bug fixes ship with tests; CI blocks failures.
-- **Comments** — only the non-obvious: a why, a gotcha, an invariant. One terse line.
-  Never restate code or narrate an edit — in doubt, no comment. JSDoc exported
-  functions, not private helpers.
+- **Comments** — default to none. The bar: without this line a competent reader would make
+  a wrong change. That means an outside constraint, or a deliberate choice that reads as a
+  mistake. Not a why the code already shows, not a summary, not a signpost, never a test or
+  a name restated. One line. JSDoc on exported API only. A comment you had to think up to
+  justify is one to delete.
 
 ## Critical boundary
 
