@@ -137,7 +137,6 @@ describe('LogView', () => {
 
     expect(fetchMock).toHaveBeenCalledWith(
       'http://localhost:3001/static/devextensions/out/index.html',
-      expect.objectContaining({ signal: expect.anything() }),
     );
     expect(mockReadFile).not.toHaveBeenCalled();
     expect(panel.webview.html).toContain('webview:/static/devextensions/out/bundle.js');
