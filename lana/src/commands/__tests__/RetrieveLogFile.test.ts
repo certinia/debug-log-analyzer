@@ -130,6 +130,22 @@ describe('RetrieveLogFile', () => {
     );
   });
 
+  it('cancels the log list when the user dismisses the picker', async () => {
+    mockListLogs.mockReturnValue(new Promise(() => {}));
+    const context = createMockContext();
+    RetrieveLogFile.apply(context as unknown as import('../../Context.js').Context);
+
+    const running = command()();
+    await settle();
+    const signal = mockListLogs.mock.calls[0]?.[0] as AbortSignal;
+    expect(signal.aborted).toBe(false);
+
+    dismissPicker();
+    await running;
+
+    expect(signal.aborted).toBe(true);
+  });
+
   it('closes the loading picker and reports nothing when the user dismisses it', async () => {
     mockListLogs.mockReturnValue(new Promise(() => {}));
     const context = createMockContext();
@@ -156,7 +172,7 @@ describe('RetrieveLogFile', () => {
     RetrieveLogFile.apply(context as unknown as import('../../Context.js').Context);
     await command()();
     expect(mockEnsureServicesAvailable).toHaveBeenCalledWith();
-    expect(mockListLogs).toHaveBeenCalledWith();
+    expect(mockListLogs).toHaveBeenCalledWith(expect.any(AbortSignal));
   });
 
   it('retrieves and caches an uncached log', async () => {

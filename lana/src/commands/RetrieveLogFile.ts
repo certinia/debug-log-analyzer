@@ -76,9 +76,8 @@ export class RetrieveLogFile {
     }
     const loadingPicker = RetrieveLogFile.showLoadingPicker();
     try {
-      const logFiles = await RetrieveLogFile.whileLoading(
-        loadingPicker,
-        salesforceServices.listLogs(),
+      const logFiles = await RetrieveLogFile.whileLoading(loadingPicker, (signal) =>
+        salesforceServices.listLogs(signal),
       );
       if (logFiles === undefined) {
         return;
@@ -126,16 +125,21 @@ export class RetrieveLogFile {
     return qp;
   }
 
+  /** Dismissal cancels the work, so an org that never answers leaves nothing running behind. */
   private static whileLoading<T>(
     picker: VSCodeQuickPick<QuickPickItem>,
-    work: Promise<T>,
+    work: (signal: AbortSignal) => Promise<T>,
   ): Promise<T | undefined> {
+    const cancellation = new AbortController();
     let hidden: Disposable | undefined;
     const dismissed = new Promise<undefined>((resolve) => {
-      hidden = picker.onDidHide(() => resolve(undefined));
+      hidden = picker.onDidHide(() => {
+        cancellation.abort();
+        resolve(undefined);
+      });
     });
 
-    return Promise.race([work, dismissed]).finally(() => hidden?.dispose());
+    return Promise.race([work(cancellation.signal), dismissed]).finally(() => hidden?.dispose());
   }
 
   private static async getLogFile(files: ApexLogListItem[]): Promise<string | null> {
