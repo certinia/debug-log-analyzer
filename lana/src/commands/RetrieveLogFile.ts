@@ -38,19 +38,14 @@ export class RetrieveLogFile {
   private static servicesDisposalRegistered = false;
 
   static apply(context: Context): void {
-    new Command('retrieveLogFile', 'Log: Retrieve Apex Log And Show Analysis', () =>
-      RetrieveLogFile.safeCommand(context),
-    ).register(context);
+    new Command(
+      'retrieveLogFile',
+      'Log: Retrieve Apex Log And Show Analysis',
+      context,
+      'Error loading logfile',
+      () => RetrieveLogFile.command(context),
+    ).register();
     context.display.output(`Registered command '${appName}: Retrieve Log'`);
-  }
-
-  private static async safeCommand(context: Context): Promise<WebviewPanel | void> {
-    try {
-      return await RetrieveLogFile.command(context);
-    } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : String(err);
-      context.display.showErrorMessage(`Error loading logfile: ${msg}`);
-    }
   }
 
   private static async command(context: Context): Promise<WebviewPanel | void> {
