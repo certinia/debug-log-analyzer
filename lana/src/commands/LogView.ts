@@ -5,7 +5,6 @@ import { Uri, commands, window as vscWindow, workspace, type WebviewPanel } from
 import { Utils } from 'vscode-uri';
 
 import type { Context } from '../Context.js';
-import { getEmbeddedLogViewerAssets } from '../display/LogViewerAssets.js';
 import { OpenFileInPackage } from '../display/OpenFileInPackage.js';
 import { WebView } from '../display/WebView.js';
 import { RawLogNavigation } from '../log-features/RawLogNavigation.js';
@@ -67,17 +66,11 @@ export class LogView {
 
     const logViewerRoot = Utils.joinPath(context.context.extensionUri, 'out');
     panel.iconPath = Utils.joinPath(logViewerRoot, 'certinia-icon-color.png');
-    const embeddedAssets = getEmbeddedLogViewerAssets();
-    if (embeddedAssets) {
-      panel.webview.html = LogView.embedAssets(embeddedAssets);
-    } else {
-      const bundleUri = panel.webview.asWebviewUri(Utils.joinPath(logViewerRoot, 'bundle.js'));
-      const codiconUri = panel.webview.asWebviewUri(Utils.joinPath(logViewerRoot, 'codicon.css'));
-      const index = Utils.joinPath(logViewerRoot, 'index.html');
-      panel.webview.html = (await readFileText(index))
-        .replace(/bundle\.js/gi, bundleUri.toString(true))
-        .replace(/codicon\.css/gi, codiconUri.toString(true));
-    }
+    const bundleUri = panel.webview.asWebviewUri(Utils.joinPath(logViewerRoot, 'bundle.js'));
+    const codiconUri = panel.webview.asWebviewUri(Utils.joinPath(logViewerRoot, 'codicon.css'));
+    panel.webview.html = (await LogView.readViewerTemplate(logViewerRoot))
+      .replace(/bundle\.js/gi, bundleUri.toString(true))
+      .replace(/codicon\.css/gi, codiconUri.toString(true));
 
     // The panel keeps its context when hidden, so it is never re-created: settings
     // edits have to be pushed to it. Only push when the resolved payload actually
@@ -237,24 +230,20 @@ export class LogView {
     return config;
   }
 
-  private static embedAssets(
-    assets: NonNullable<ReturnType<typeof getEmbeddedLogViewerAssets>>,
-  ): string {
-    const fontData = `data:font/ttf;base64,${assets.codiconFont}`;
-    const codiconCss = assets.codiconCss
-      .replace(/url\((['"]?)\.\/codicon\.ttf[^)]*\)/i, `url("${fontData}")`)
-      .replace(/<\/style/gi, '<\\/style');
-    const script = assets.script.replace(/<\/script/gi, '<\\/script');
+  /** The web extension host has no `file:` provider, so the template is fetched there. */
+  private static async readViewerTemplate(logViewerRoot: Uri): Promise<string> {
+    const index = Utils.joinPath(logViewerRoot, 'index.html');
+    if (index.scheme === 'file') {
+      return readFileText(index);
+    }
 
-    return assets.html
-      .replace(
-        /<link\b(?=[^>]*\bid="vscode-codicon-stylesheet")[^>]*>/i,
-        () => `<style id="vscode-codicon-stylesheet">${codiconCss}</style>`,
-      )
-      .replace(
-        /<script\b(?=[^>]*\bsrc="bundle\.js")[^>]*><\/script>/i,
-        () => `<script type="module">${script}</script>`,
+    const response = await fetch(index.toString(true));
+    if (!response.ok) {
+      throw new Error(
+        `Could not read the log viewer at ${index.toString(true)}: ${response.status}`,
       );
+    }
+    return response.text();
   }
 
   private static async sendLog(
