@@ -23,7 +23,7 @@ export class ShowLogAnalysis {
 
   private static async safeCommand(context: Context, uri: Uri): Promise<void> {
     try {
-      return ShowLogAnalysis.command(context, uri);
+      return await ShowLogAnalysis.command(context, uri);
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err);
       context.display.showErrorMessage(`Error showing logfile: ${msg}`);

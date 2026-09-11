@@ -4,6 +4,7 @@
 import {
   window,
   workspace,
+  type Disposable,
   type QuickPick as VSCodeQuickPick,
   type QuickPickItem,
   type WebviewPanel,
@@ -75,7 +76,12 @@ export class RetrieveLogFile {
     }
     const loadingPicker = RetrieveLogFile.showLoadingPicker();
     try {
-      const logFiles = await salesforceServices.listLogs();
+      const logFiles = await RetrieveLogFile.whileLoading(loadingPicker, (signal) =>
+        salesforceServices.listLogs(signal),
+      );
+      if (logFiles === undefined) {
+        return;
+      }
       const logFileId = await RetrieveLogFile.getLogFile(logFiles);
       if (logFileId) {
         const logUri = Utils.joinPath(
@@ -117,6 +123,23 @@ export class RetrieveLogFile {
     qp.enabled = false;
     qp.show();
     return qp;
+  }
+
+  /** Dismissal cancels the work, so an org that never answers leaves nothing running behind. */
+  private static whileLoading<T>(
+    picker: VSCodeQuickPick<QuickPickItem>,
+    work: (signal: AbortSignal) => Promise<T>,
+  ): Promise<T | undefined> {
+    const cancellation = new AbortController();
+    let hidden: Disposable | undefined;
+    const dismissed = new Promise<undefined>((resolve) => {
+      hidden = picker.onDidHide(() => {
+        cancellation.abort();
+        resolve(undefined);
+      });
+    });
+
+    return Promise.race([work(cancellation.signal), dismissed]).finally(() => hidden?.dispose());
   }
 
   private static async getLogFile(files: ApexLogListItem[]): Promise<string | null> {

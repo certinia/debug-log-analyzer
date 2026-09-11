@@ -92,17 +92,74 @@ describe('RetrieveLogFile', () => {
     mockPick.mockResolvedValue([]);
     mockGetLogBody.mockResolvedValue('log body');
     mockWriteFile.mockResolvedValue(undefined);
-    (window.createQuickPick as jest.Mock).mockReturnValue({
-      busy: false,
-      enabled: true,
-      placeholder: '',
-      show: jest.fn(),
-      dispose: jest.fn(),
-    });
+    dismissPicker = () => undefined;
+    picker = makePicker();
+    (window.createQuickPick as jest.Mock).mockReturnValue(picker);
   });
+
+  const makePicker = () => ({
+    busy: false,
+    enabled: true,
+    placeholder: '',
+    show: jest.fn(),
+    dispose: jest.fn(),
+    onDidHide: jest.fn((listener: () => void) => {
+      dismissPicker = listener;
+      return { dispose: jest.fn() };
+    }),
+  });
+
+  let picker: ReturnType<typeof makePicker>;
+  let dismissPicker: () => void;
+
+  const settle = () => new Promise((resolve) => setImmediate(resolve));
 
   const command = (): (() => Promise<unknown>) =>
     mockRegisterCommand.mock.calls[mockRegisterCommand.mock.calls.length - 1]?.[1];
+
+  it('closes the loading picker and says so when Salesforce cannot list the logs', async () => {
+    mockListLogs.mockRejectedValue(new Error('no org connection'));
+    const context = createMockContext();
+    RetrieveLogFile.apply(context as unknown as import('../../Context.js').Context);
+
+    await command()();
+
+    expect(picker.dispose).toHaveBeenCalled();
+    expect(context.display.showErrorMessage).toHaveBeenCalledWith(
+      'Error loading logfile: no org connection',
+    );
+  });
+
+  it('cancels the log list when the user dismisses the picker', async () => {
+    mockListLogs.mockReturnValue(new Promise(() => {}));
+    const context = createMockContext();
+    RetrieveLogFile.apply(context as unknown as import('../../Context.js').Context);
+
+    const running = command()();
+    await settle();
+    const signal = mockListLogs.mock.calls[0]?.[0] as AbortSignal;
+    expect(signal.aborted).toBe(false);
+
+    dismissPicker();
+    await running;
+
+    expect(signal.aborted).toBe(true);
+  });
+
+  it('closes the loading picker and reports nothing when the user dismisses it', async () => {
+    mockListLogs.mockReturnValue(new Promise(() => {}));
+    const context = createMockContext();
+    RetrieveLogFile.apply(context as unknown as import('../../Context.js').Context);
+
+    const running = command()();
+    await settle();
+    dismissPicker();
+    await running;
+
+    expect(picker.dispose).toHaveBeenCalled();
+    expect(context.display.showErrorMessage).not.toHaveBeenCalled();
+    expect(mockPick).not.toHaveBeenCalled();
+  });
 
   it('registers the command', () => {
     const context = createMockContext();
@@ -115,7 +172,7 @@ describe('RetrieveLogFile', () => {
     RetrieveLogFile.apply(context as unknown as import('../../Context.js').Context);
     await command()();
     expect(mockEnsureServicesAvailable).toHaveBeenCalledWith();
-    expect(mockListLogs).toHaveBeenCalledWith();
+    expect(mockListLogs).toHaveBeenCalledWith(expect.any(AbortSignal));
   });
 
   it('retrieves and caches an uncached log', async () => {
