@@ -6,7 +6,9 @@ import { workspace, type Uri } from 'vscode';
 import { parse, type ApexLog, type LogEvent } from 'apex-log-parser';
 
 import type { Context } from '../Context.js';
+import type { Display } from '../display/Display.js';
 import { readFileText } from '../fs/workspaceFs.js';
+import { tryCatchAsync } from '../tryCatch.js';
 
 export interface EventSearchResult {
   event: LogEvent;
@@ -16,6 +18,7 @@ export interface EventSearchResult {
 export class LogEventCache {
   private static readonly MAX_CACHE_SIZE = 10;
   private static cache = new Map<string, ApexLog>();
+  private static display: Display | null = null;
 
   static async getApexLog(uri: Uri): Promise<ApexLog | null> {
     const key = uri.toString();
@@ -27,23 +30,23 @@ export class LogEventCache {
       return cached;
     }
 
-    try {
-      const content = await readFileText(uri);
-      const apexLog = parse(content);
-
-      // Evict oldest if at capacity
-      if (LogEventCache.cache.size >= LogEventCache.MAX_CACHE_SIZE) {
-        const oldest = LogEventCache.cache.keys().next().value;
-        if (oldest) {
-          LogEventCache.cache.delete(oldest);
-        }
-      }
-
-      LogEventCache.cache.set(key, apexLog);
-      return apexLog;
-    } catch {
+    const [apexLog, error] = await tryCatchAsync(async () => parse(await readFileText(uri)));
+    if (error) {
+      // Folding, symbols and decorations each call this as the user types, so a toast would spam.
+      LogEventCache.display?.output(`Could not read ${key}: ${error.message}`);
       return null;
     }
+
+    // Evict oldest if at capacity
+    if (LogEventCache.cache.size >= LogEventCache.MAX_CACHE_SIZE) {
+      const oldest = LogEventCache.cache.keys().next().value;
+      if (oldest) {
+        LogEventCache.cache.delete(oldest);
+      }
+    }
+
+    LogEventCache.cache.set(key, apexLog);
+    return apexLog;
   }
 
   static findEventByTimestamp(apexLog: ApexLog, timestamp: number): EventSearchResult | null {
@@ -55,6 +58,8 @@ export class LogEventCache {
   }
 
   static apply(context: Context): void {
+    LogEventCache.display = context.display;
+
     context.context.subscriptions.push(
       workspace.onDidCloseTextDocument((doc) => {
         if (doc.languageId === 'apexlog') {

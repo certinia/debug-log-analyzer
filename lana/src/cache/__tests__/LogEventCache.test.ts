@@ -113,6 +113,18 @@ describe('LogEventCache', () => {
 
         expect(result).toBeNull();
       });
+
+      it('should report why the log could not be read', async () => {
+        const context = createMockContext();
+        LogEventCache.apply(context as never);
+        mockReadFile.mockRejectedValueOnce(new Error('File not found'));
+
+        await LogEventCache.getApexLog(Uri.file('/test/nonexistent.log'));
+
+        expect(context.display.output).toHaveBeenCalledWith(
+          'Could not read file:///test/nonexistent.log: File not found',
+        );
+      });
     });
   });
 
