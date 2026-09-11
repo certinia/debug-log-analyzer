@@ -27,9 +27,6 @@ const validApi = () => ({
       safeWriteFile: jest.fn(),
       fileOrFolderExists: jest.fn(),
     },
-    ConfigService: {
-      getTargetOrg: jest.fn(),
-    },
   },
 });
 

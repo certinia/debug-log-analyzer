@@ -84,14 +84,12 @@ export function isSalesforceServicesApi(value: unknown): value is SalesforceVSCo
   const dependencies = getProperty(services, 'prebuiltServicesDependencies');
   const apexLogService = getProperty(services, 'ApexLogService');
   const fsService = getProperty(services, 'FsService');
-  const configService = getProperty(services, 'ConfigService');
   return (
     isObject(dependencies) &&
     typeof getProperty(apexLogService, 'listLogs') === 'function' &&
     typeof getProperty(apexLogService, 'getLogBody') === 'function' &&
     typeof getProperty(fsService, 'safeWriteFile') === 'function' &&
-    typeof getProperty(fsService, 'fileOrFolderExists') === 'function' &&
-    typeof getProperty(configService, 'getTargetOrg') === 'function'
+    typeof getProperty(fsService, 'fileOrFolderExists') === 'function'
   );
 }
 

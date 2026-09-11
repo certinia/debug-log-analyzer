@@ -74,13 +74,6 @@ export class RetrieveLogFile {
     if (!workspaceFolder) {
       throw new Error('No workspace selected');
     }
-
-    // Without a target org the connection never resolves, so the picker would spin for good.
-    if (!(await salesforceServices.getTargetOrg())) {
-      throw new Error(
-        'No target org is set. Authorize an org and set it as the target, then try again.',
-      );
-    }
     const loadingPicker = RetrieveLogFile.showLoadingPicker();
     try {
       const logFiles = await RetrieveLogFile.whileLoading(loadingPicker, (signal) =>
