@@ -9,7 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- 🧭 **Inspector**: select a timeline frame, a table row or a statement to see its details, governor usage, call stack and subtree - or select nothing for a whole-log overview. Dock it left, right or bottom, and each tab keeps its own arrangement. ([#113] [#373] [#63])
+- 🧭 **Inspector**: select a timeline frame, a table row or a statement to see its details, governor usage, call stack and subtree - or select nothing for a whole-log overview. Dock it left, right or bottom, and each tab keeps its own arrangement. ([#113] [#405] [#373] [#63])
   - **Reorder**: drag a section header, or press `Alt+Up` / `Alt+Down`.
   - **Choose sections**: right-click a header to tick sections on and off, or reset the list.
   - **Resize**: drag a divider; double-click one to restore the default sizes.
@@ -547,6 +547,7 @@ Skipped due to adopting odd numbering for pre releases and even number for relea
 [#848]: https://github.com/certinia/debug-log-analyzer/issues/848
 [#828]: https://github.com/certinia/debug-log-analyzer/issues/828
 [#827]: https://github.com/certinia/debug-log-analyzer/issues/827
+[#405]: https://github.com/certinia/debug-log-analyzer/issues/405
 [#373]: https://github.com/certinia/debug-log-analyzer/issues/373
 [#298]: https://github.com/certinia/debug-log-analyzer/issues/298
 [#162]: https://github.com/certinia/debug-log-analyzer/issues/162
