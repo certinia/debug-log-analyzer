@@ -21,8 +21,6 @@ import {
   type Config,
 } from '../workspace/AppConfig.js';
 
-const VIEWER_TEMPLATE_TIMEOUT_MS = 10_000;
-
 interface WebViewLogFileRequest<T = unknown> {
   requestId: string;
   cmd: string;
@@ -239,9 +237,7 @@ export class LogView {
       return readFileText(index);
     }
 
-    const response = await fetch(index.toString(true), {
-      signal: AbortSignal.timeout(VIEWER_TEMPLATE_TIMEOUT_MS),
-    });
+    const response = await fetch(index.toString(true));
     if (!response.ok) {
       throw new Error(
         `Could not read the log viewer at ${index.toString(true)}: ${response.status}`,
