@@ -30,6 +30,11 @@ export function listLogs(
   return getRuntime().runPromise(ApexLogService.listLogs(limit), { signal });
 }
 
+export function getTargetOrg(): Promise<string | undefined> {
+  const { ConfigService } = getServicesApi().services;
+  return getRuntime().runPromise(ConfigService.getTargetOrg());
+}
+
 export function getLogBody(logId: string): Promise<string> {
   const { ApexLogService } = getServicesApi().services;
   return getRuntime().runPromise(ApexLogService.getLogBody(logId));

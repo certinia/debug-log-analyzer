@@ -9,6 +9,7 @@ import {
   ensureServicesAvailable,
   fileOrFolderExists,
   getLogBody,
+  getTargetOrg,
   listLogs,
   writeFile,
 } from '../../services/salesforceServices.js';
@@ -44,6 +45,7 @@ jest.mock('../../services/salesforceServices.js', () => ({
   ensureServicesAvailable: jest.fn(),
   fileOrFolderExists: jest.fn(),
   getLogBody: jest.fn(),
+  getTargetOrg: jest.fn(),
   listLogs: jest.fn(),
   writeFile: jest.fn(),
 }));
@@ -54,6 +56,7 @@ const mockEnsureServicesAvailable = ensureServicesAvailable as jest.Mock;
 const mockFileOrFolderExists = fileOrFolderExists as jest.Mock;
 const mockListLogs = listLogs as jest.Mock;
 const mockGetLogBody = getLogBody as jest.Mock;
+const mockGetTargetOrg = getTargetOrg as jest.Mock;
 const mockWriteFile = writeFile as jest.Mock;
 const mockCreateView = LogView.createView as jest.Mock;
 const mockRegisterCommand = commands.registerCommand as jest.Mock;
@@ -84,6 +87,7 @@ describe('RetrieveLogFile', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     mockEnsureServicesAvailable.mockResolvedValue(true);
+    mockGetTargetOrg.mockResolvedValue('test@example.com');
     mockFileOrFolderExists.mockResolvedValue(false);
     mockWorkspace.workspaceFolders = [
       { uri: Uri.file('/test/workspace'), name: 'workspace', index: 0 },
@@ -127,6 +131,19 @@ describe('RetrieveLogFile', () => {
     expect(picker.dispose).toHaveBeenCalled();
     expect(context.display.showErrorMessage).toHaveBeenCalledWith(
       'Error loading logfile: no org connection',
+    );
+  });
+
+  it('says so when no target org is set, instead of spinning for good', async () => {
+    mockGetTargetOrg.mockResolvedValue(undefined);
+    const context = createMockContext();
+    RetrieveLogFile.apply(context as unknown as import('../../Context.js').Context);
+
+    await command()();
+
+    expect(mockListLogs).not.toHaveBeenCalled();
+    expect(context.display.showErrorMessage).toHaveBeenCalledWith(
+      'Error loading logfile: No target org is set. Authorize an org and set it as the target, then try again.',
     );
   });
 
