@@ -44,7 +44,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 
 - 🚨 **Command failures**: Show Apex Log Analysis and Timeline Theme report what went wrong instead of doing nothing at all.
-- ⏳ **Retrieve log**: the loading picker closes on Escape and gives up after 60 seconds, instead of staying busy for good when the org never answers.
+- ⏳ **Retrieve log**: the loading picker closes on Escape, and says what went wrong when the org refuses, instead of staying busy with nothing to show.
 - 📏 **Timeline length**: the chart stopped at the last recorded frame instead of spanning the log - 10.8s of a 27.1s log - and now shades the part the log never recorded. ([#828])
 - 📊 **Governor limits strip**: where the log recorded nothing, the strip drew its last reading across the gap as though it had been measured; the gap is now blank, and the tooltip names the reason and range. ([#828])
 - 🗄️ **Flow database usage**: SOQL and DML run by a Flow or Process Builder element are now counted. Needs `WORKFLOW` at `FINER` or above. ([#871]).

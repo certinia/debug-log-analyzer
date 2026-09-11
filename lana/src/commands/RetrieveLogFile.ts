@@ -34,8 +34,6 @@ class DebugLogItem extends Item {
   }
 }
 
-const LIST_LOGS_TIMEOUT_MS = 60_000;
-
 export class RetrieveLogFile {
   private static servicesDisposalRegistered = false;
 
@@ -133,22 +131,11 @@ export class RetrieveLogFile {
     work: Promise<T>,
   ): Promise<T | undefined> {
     let hidden: Disposable | undefined;
-    let timer: ReturnType<typeof setTimeout> | undefined;
-    const interrupted = new Promise<undefined>((resolve, reject) => {
+    const dismissed = new Promise<undefined>((resolve) => {
       hidden = picker.onDidHide(() => resolve(undefined));
-      timer = setTimeout(() => {
-        reject(
-          new Error(
-            `Salesforce did not list the logs within ${LIST_LOGS_TIMEOUT_MS / 1000} seconds. Check the org connection and try again.`,
-          ),
-        );
-      }, LIST_LOGS_TIMEOUT_MS);
     });
 
-    return Promise.race([work, interrupted]).finally(() => {
-      hidden?.dispose();
-      clearTimeout(timer);
-    });
+    return Promise.race([work, dismissed]).finally(() => hidden?.dispose());
   }
 
   private static async getLogFile(files: ApexLogListItem[]): Promise<string | null> {

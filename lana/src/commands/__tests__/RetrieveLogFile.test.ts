@@ -1,7 +1,7 @@
 /*
  * Copyright (c) 2026 Certinia Inc. All rights reserved.
  */
-import { afterEach, beforeEach, describe, expect, it } from '@jest/globals';
+import { beforeEach, describe, expect, it } from '@jest/globals';
 import { commands, Uri, window, workspace } from 'vscode';
 import { createMockContext } from '../../__tests__/helpers/test-builders.js';
 import { QuickPick } from '../../display/QuickPick.js';
@@ -97,10 +97,6 @@ describe('RetrieveLogFile', () => {
     (window.createQuickPick as jest.Mock).mockReturnValue(picker);
   });
 
-  afterEach(() => {
-    jest.useRealTimers();
-  });
-
   const makePicker = () => ({
     busy: false,
     enabled: true,
@@ -121,6 +117,19 @@ describe('RetrieveLogFile', () => {
   const command = (): (() => Promise<unknown>) =>
     mockRegisterCommand.mock.calls[mockRegisterCommand.mock.calls.length - 1]?.[1];
 
+  it('closes the loading picker and says so when Salesforce cannot list the logs', async () => {
+    mockListLogs.mockRejectedValue(new Error('no org connection'));
+    const context = createMockContext();
+    RetrieveLogFile.apply(context as unknown as import('../../Context.js').Context);
+
+    await command()();
+
+    expect(picker.dispose).toHaveBeenCalled();
+    expect(context.display.showErrorMessage).toHaveBeenCalledWith(
+      'Error loading logfile: no org connection',
+    );
+  });
+
   it('closes the loading picker and reports nothing when the user dismisses it', async () => {
     mockListLogs.mockReturnValue(new Promise(() => {}));
     const context = createMockContext();
@@ -134,22 +143,6 @@ describe('RetrieveLogFile', () => {
     expect(picker.dispose).toHaveBeenCalled();
     expect(context.display.showErrorMessage).not.toHaveBeenCalled();
     expect(mockPick).not.toHaveBeenCalled();
-  });
-
-  it('closes the loading picker and says so when Salesforce never lists the logs', async () => {
-    mockListLogs.mockReturnValue(new Promise(() => {}));
-    const context = createMockContext();
-    RetrieveLogFile.apply(context as unknown as import('../../Context.js').Context);
-
-    jest.useFakeTimers();
-    const running = command()();
-    await jest.advanceTimersByTimeAsync(60_000);
-    await running;
-
-    expect(picker.dispose).toHaveBeenCalled();
-    expect(context.display.showErrorMessage).toHaveBeenCalledWith(
-      expect.stringContaining('did not list the logs within 60 seconds'),
-    );
   });
 
   it('registers the command', () => {
