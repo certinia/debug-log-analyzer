@@ -11,24 +11,18 @@ import { LogView } from './LogView.js';
 
 export class ShowLogAnalysis {
   static getCommand(context: Context): Command {
-    return new Command('showLogAnalysis', 'Log: Show Apex Log Analysis', (uri: Uri) =>
-      ShowLogAnalysis.safeCommand(context, uri),
+    return new Command(
+      'showLogAnalysis',
+      'Log: Show Apex Log Analysis',
+      context,
+      'Error showing logfile',
+      (uri: Uri) => ShowLogAnalysis.command(context, uri),
     );
   }
 
   static apply(context: Context): void {
-    ShowLogAnalysis.getCommand(context).register(context);
+    ShowLogAnalysis.getCommand(context).register();
     context.display.output(`Registered command '${appName}: Show Log'`);
-  }
-
-  private static async safeCommand(context: Context, uri: Uri): Promise<void> {
-    try {
-      return await ShowLogAnalysis.command(context, uri);
-    } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : String(err);
-      context.display.showErrorMessage(`Error showing logfile: ${msg}`);
-      return Promise.resolve();
-    }
   }
 
   private static async command(context: Context, uri: Uri): Promise<void> {

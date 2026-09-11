@@ -12,24 +12,18 @@ import { LogView } from './LogView.js';
 
 export class SwitchTimelineTheme {
   static getCommand(context: Context): Command {
-    return new Command('switchTimelineTheme', 'Log: Timeline Theme', (uri: Uri) =>
-      SwitchTimelineTheme.safeCommand(context, uri),
+    return new Command(
+      'switchTimelineTheme',
+      'Log: Timeline Theme',
+      context,
+      'Error changing timeline theme',
+      (uri: Uri) => SwitchTimelineTheme.command(context, uri),
     );
   }
 
   static apply(context: Context): void {
-    SwitchTimelineTheme.getCommand(context).register(context);
+    SwitchTimelineTheme.getCommand(context).register();
     context.display.output(`Registered command '${appName}: Timeline Theme'`);
-  }
-
-  private static async safeCommand(context: Context, uri: Uri): Promise<void> {
-    try {
-      return await SwitchTimelineTheme.command(context, uri);
-    } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : String(err);
-      context.display.showErrorMessage(`Error changing timeline theme: ${msg}`);
-      return Promise.resolve();
-    }
   }
 
   private static async command(context: Context, _uri: Uri): Promise<void> {
