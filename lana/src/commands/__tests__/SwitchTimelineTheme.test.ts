@@ -3,7 +3,7 @@
  */
 import { beforeEach, describe, expect, it } from '@jest/globals';
 
-import { window } from 'vscode';
+import { Uri, window } from 'vscode';
 
 import { createMockContext } from '../../__tests__/helpers/test-builders.js';
 import { SwitchTimelineTheme } from '../SwitchTimelineTheme.js';
@@ -96,6 +96,22 @@ describe('SwitchTimelineTheme', () => {
       );
 
       expect(command.title).toBe('Log: Timeline Theme');
+    });
+
+    it('reports a failure to change the theme rather than failing silently', async () => {
+      mockGetConfig.mockImplementation(() => {
+        throw new Error('config unavailable');
+      });
+      const mockContext = createMockContext();
+      const command = SwitchTimelineTheme.getCommand(
+        mockContext as unknown as import('../../Context.js').Context,
+      );
+
+      await expect(command.run(Uri.parse('memfs:/logs/a.log'))).resolves.toBeUndefined();
+
+      expect(mockContext.display.showErrorMessage).toHaveBeenCalledWith(
+        'Error changing timeline theme: config unavailable',
+      );
     });
   });
 
