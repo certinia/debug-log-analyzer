@@ -22,11 +22,28 @@ export interface InspectorTabSync {
   clear: () => void;
 
   /**
-   * True where a picked row that merges occurrences also moves, to the first of
-   * them. Omitted where choosing one of several would be arbitrary, which is why
-   * the Database grids and the flame chart only mark.
+   * Move for a picked row that merges occurrences. The view chooses which of them
+   * it moves to, because only it knows what "nearest" means in its own layout: a
+   * table takes the first, the flame chart the one nearest the view. Omitted where
+   * no move helps, which is why the Database grids only mark.
+   *
+   * @param signal - as {@link reveal}.
    */
-  movesToMergedPick?: boolean;
+  revealMerged?: (eventIndexes: readonly number[], signal: AbortSignal) => void | Promise<void>;
+}
+
+/**
+ * The merged-pick move for a view whose rows are ordered rather than placed: it
+ * moves to the first occurrence, as a pick of one frame does. The flame chart
+ * supplies its own, because on a time axis "first" is not what the reader wants.
+ */
+export function revealFirstOf(
+  reveal: InspectorTabSync['reveal'],
+): NonNullable<InspectorTabSync['revealMerged']> {
+  return (eventIndexes, signal) => {
+    const first = eventIndexes[0];
+    return first === undefined ? undefined : reveal(first, signal);
+  };
 }
 
 /**
@@ -44,25 +61,26 @@ export function wireInspectorTab(
   sync: InspectorTabSync,
 ): () => void {
   let moving: AbortController | null = null;
-  const move = (eventIndex: number): void => {
+  const move = (run: (signal: AbortSignal) => void | Promise<void>): void => {
     // A move waits on a render, and a pointer crossing rows asks for several, so
     // the last one asked for is the one that scrolls. Only the move is abandoned:
     // the mark of the move that is dropped went on before it.
     moving?.abort();
     moving = new AbortController();
     // The view reports its own failure; the mark stands either way.
-    void Promise.resolve(sync.reveal(eventIndex, moving.signal)).catch(() => {});
+    void Promise.resolve(run(moving.signal)).catch(() => {});
   };
 
   const offs = [
     eventBus.onSource('inspector:reveal', source, (detail) => {
-      move(detail.eventIndex);
+      move((signal) => sync.reveal(detail.eventIndex, signal));
     }),
 
     eventBus.onSource('inspector:locate', source, (detail) => {
       sync.mark(emphasis.report(detail.eventIndexes, detail.sticky));
-      if (sync.movesToMergedPick && detail.sticky && detail.eventIndexes.length) {
-        move(detail.eventIndexes[0]!);
+      const revealMerged = sync.revealMerged;
+      if (revealMerged && detail.sticky && detail.eventIndexes.length) {
+        move((signal) => revealMerged(detail.eventIndexes, signal));
       }
     }),
 

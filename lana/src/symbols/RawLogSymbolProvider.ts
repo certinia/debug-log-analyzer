@@ -18,7 +18,7 @@ import {
 import type { LogEvent } from 'apex-log-parser';
 
 import type { Context } from '../Context.js';
-import { LogEventCache } from '../cache/LogEventCache.js';
+import { LogEventCache, type LogReporter } from '../cache/LogEventCache.js';
 import { isOpenAsTextTab } from '../editor/TabState.js';
 import { isApexLogContent } from '../language/ApexLogLanguageDetector.js';
 import { formatDuration, TIMESTAMP_REGEX } from '../log-utils.js';
@@ -32,6 +32,11 @@ import { formatDuration, TIMESTAMP_REGEX } from '../log-utils.js';
 class RawLogSymbolProvider implements DocumentSymbolProvider {
   private registration: Disposable | undefined;
   private lostTabModelRace = false;
+  private readonly reporter: LogReporter;
+
+  constructor(reporter: LogReporter) {
+    this.reporter = reporter;
+  }
 
   async provideDocumentSymbols(
     document: TextDocument,
@@ -42,7 +47,7 @@ class RawLogSymbolProvider implements DocumentSymbolProvider {
       return [];
     }
 
-    const apexLog = await LogEventCache.getApexLog(document.uri);
+    const apexLog = await LogEventCache.getApexLog(document.uri, this.reporter);
 
     if (!apexLog) {
       return [];
@@ -118,7 +123,7 @@ class RawLogSymbolProvider implements DocumentSymbolProvider {
 
   static apply(context: Context): void {
     const docSelector = [{ language: 'apexlog' }];
-    const provider = new RawLogSymbolProvider();
+    const provider = new RawLogSymbolProvider(context.display);
     provider.reregister(docSelector);
 
     // Only retry for a log now sitting in a text tab, so a rejected diff side does

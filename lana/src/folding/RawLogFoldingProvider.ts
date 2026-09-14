@@ -16,7 +16,7 @@ import {
 import type { LogEvent } from 'apex-log-parser';
 
 import type { Context } from '../Context.js';
-import { LogEventCache } from '../cache/LogEventCache.js';
+import { LogEventCache, type LogReporter } from '../cache/LogEventCache.js';
 import { isOpenAsTextTab } from '../editor/TabState.js';
 import { isApexLogContent } from '../language/ApexLogLanguageDetector.js';
 import { TIMESTAMP_REGEX } from '../log-utils.js';
@@ -24,6 +24,11 @@ import { TIMESTAMP_REGEX } from '../log-utils.js';
 class RawLogFoldingProvider implements FoldingRangeProvider {
   private readonly changeEmitter = new EventEmitter<void>();
   readonly onDidChangeFoldingRanges = this.changeEmitter.event;
+  private readonly reporter: LogReporter;
+
+  constructor(reporter: LogReporter) {
+    this.reporter = reporter;
+  }
 
   async provideFoldingRanges(
     document: TextDocument,
@@ -33,7 +38,7 @@ class RawLogFoldingProvider implements FoldingRangeProvider {
       return [];
     }
 
-    const apexLog = await LogEventCache.getApexLog(document.uri);
+    const apexLog = await LogEventCache.getApexLog(document.uri, this.reporter);
 
     if (!apexLog) {
       return [];
@@ -95,7 +100,7 @@ class RawLogFoldingProvider implements FoldingRangeProvider {
       return;
     }
 
-    void LogEventCache.getApexLog(document.uri).then((apexLog) => {
+    void LogEventCache.getApexLog(document.uri, this.reporter).then((apexLog) => {
       if (apexLog) {
         this.changeEmitter.fire();
       }
@@ -104,7 +109,7 @@ class RawLogFoldingProvider implements FoldingRangeProvider {
 
   static apply(context: Context): void {
     const docSelector = [{ language: 'apexlog' }];
-    const provider = new RawLogFoldingProvider();
+    const provider = new RawLogFoldingProvider(context.display);
 
     context.context.subscriptions.push(
       provider.changeEmitter,

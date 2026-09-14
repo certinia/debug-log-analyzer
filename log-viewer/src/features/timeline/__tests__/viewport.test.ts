@@ -477,4 +477,80 @@ describe('TimelineViewport', () => {
       expect(state.zoom).toBeCloseTo(minZoom, 5);
     });
   });
+
+  describe('centerOnEvent', () => {
+    beforeEach(() => {
+      viewport.setZoom(0.01);
+      viewport.setPan(2000, 0);
+    });
+
+    it('should center an event that is off screen', () => {
+      viewport.centerOnEvent(400_000, 1_000, 0);
+
+      const state = viewport.getState();
+      const eventMidpointX = (400_000 + 1_000 / 2) * state.zoom;
+      expect(state.offsetX + DISPLAY_WIDTH / 2).toBeCloseTo(eventMidpointX, 5);
+    });
+
+    it('should hold an event that is on screen', () => {
+      viewport.centerOnEvent(250_000, 1_000, 0);
+
+      expect(viewport.getState().offsetX).toBe(2000);
+    });
+  });
+
+  describe('centerOffsetFor', () => {
+    beforeEach(() => {
+      viewport.setZoom(0.01);
+      viewport.setPan(2000, -100);
+    });
+
+    it('should center the time axis on the event midpoint', () => {
+      const state = viewport.getState();
+      const target = viewport.centerOffsetFor(250_000, 10_000, 3, { time: true, depth: false });
+
+      const eventMidpointX = (250_000 + 10_000 / 2) * state.zoom;
+      expect(target.x + DISPLAY_WIDTH / 2).toBeCloseTo(eventMidpointX, 5);
+    });
+
+    it('should hold an axis it was not asked to center', () => {
+      const state = viewport.getState();
+      const target = viewport.centerOffsetFor(250_000, 10_000, 3, { time: true, depth: false });
+
+      expect(target.y).toBe(state.offsetY);
+    });
+
+    it('should center the depth axis on the event depth', () => {
+      // Deep enough that the depth axis can scroll at all.
+      const deep = new TimelineViewport(DISPLAY_WIDTH, DISPLAY_HEIGHT, TOTAL_DURATION, 200);
+      const target = deep.centerOffsetFor(250_000, 10_000, 60, { time: false, depth: true });
+
+      const eventY = 60 * TIMELINE_CONSTANTS.EVENT_HEIGHT;
+      expect(-target.y + DISPLAY_HEIGHT / 2).toBeCloseTo(eventY, 5);
+    });
+
+    it('should center on an event on screen, unlike calculateCenterOffset', () => {
+      const onScreen = viewport.centerOffsetFor(250_000, 1_000, 3, { time: true, depth: false });
+      const gated = viewport.calculateCenterOffset(250_000, 1_000, 3);
+
+      expect(onScreen.x).not.toBe(gated.x);
+      expect(gated.x).toBe(viewport.getState().offsetX);
+    });
+
+    it('should clamp a target at the start of the log', () => {
+      const target = viewport.centerOffsetFor(0, 1_000, 3, { time: true, depth: false });
+
+      expect(target.x).toBe(0);
+    });
+
+    it('should clamp a target at the end of the log', () => {
+      const state = viewport.getState();
+      const target = viewport.centerOffsetFor(TOTAL_DURATION, 1_000, 3, {
+        time: true,
+        depth: false,
+      });
+
+      expect(target.x).toBeCloseTo(state.zoom * TOTAL_DURATION - DISPLAY_WIDTH, 5);
+    });
+  });
 });
