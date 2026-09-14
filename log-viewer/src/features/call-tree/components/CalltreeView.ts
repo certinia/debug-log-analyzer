@@ -182,9 +182,9 @@ export class CalltreeView extends LitElement {
     'lv-find-close': (e) => void this._find(e),
   });
 
-  constructor() {
-    super();
-
+  override connectedCallback(): void {
+    super.connectedCallback();
+    this._categoryColoringOff = wireCategoryColoring(this);
     this._inspectorUnsubscribe = wireInspectorTab('calltree', this._emphasis, {
       mark: (eventIndexes) => this._markLocated(eventIndexes),
       reveal: (eventIndex, signal) => this._revealEventIndex(eventIndex, signal),
@@ -200,11 +200,6 @@ export class CalltreeView extends LitElement {
         this._revealEventIndex(eventIndex, signal),
       ),
     });
-  }
-
-  override connectedCallback(): void {
-    super.connectedCallback();
-    this._categoryColoringOff = wireCategoryColoring(this);
   }
 
   disconnectedCallback(): void {

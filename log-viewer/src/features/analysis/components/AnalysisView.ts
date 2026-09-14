@@ -168,9 +168,9 @@ export class AnalysisView extends LitElement {
     'lv-find-close': (e) => void this._find(e),
   });
 
-  constructor() {
-    super();
-
+  override connectedCallback(): void {
+    super.connectedCallback();
+    this._categoryColoringOff = wireCategoryColoring(this);
     this._inspectorUnsubscribe = wireInspectorTab('analysis', this._emphasis, {
       // A row is a method bucket rather than one event, so a frame is translated
       // into the paths of the rows it heads.
@@ -187,11 +187,6 @@ export class AnalysisView extends LitElement {
         this._revealEventIndex(eventIndex, signal),
       ),
     });
-  }
-
-  override connectedCallback(): void {
-    super.connectedCallback();
-    this._categoryColoringOff = wireCategoryColoring(this);
   }
 
   disconnectedCallback(): void {

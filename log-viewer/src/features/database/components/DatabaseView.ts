@@ -100,9 +100,8 @@ export class DatabaseView extends LitElement {
     'db-find-results': (e) => this._findResults(e),
   });
 
-  constructor() {
-    super();
-
+  override connectedCallback(): void {
+    super.connectedCallback();
     this._offInspector = wireInspectorTab('database', this._emphasis, {
       mark: (eventIndexes) => this._markLocated(eventIndexes),
       // The eventIndex belongs to exactly one grid, so each is offered it in turn
