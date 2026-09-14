@@ -179,3 +179,43 @@ describe('database-view selection', () => {
     });
   });
 });
+
+describe('database-view find bus', () => {
+  let view: HTMLElement & { updateComplete: Promise<unknown> };
+
+  beforeEach(async () => {
+    document.body.replaceChildren();
+    view = document.createElement('database-view') as typeof view;
+    document.body.append(view);
+    await view.updateComplete;
+  });
+
+  afterEach(() => {
+    document.body.replaceChildren();
+  });
+
+  /** The roll-up DatabaseView sends back to the find widget. */
+  function totalsAfter(section: string, totalMatches: number): number[] {
+    const seen: number[] = [];
+    const probe = (e: Event) =>
+      void seen.push((e as CustomEvent<{ totalMatches: number }>).detail.totalMatches);
+    document.addEventListener('lv-find-results', probe);
+    document.dispatchEvent(
+      new CustomEvent('db-find-results', { detail: { totalMatches, type: section } }),
+    );
+    document.removeEventListener('lv-find-results', probe);
+    return seen;
+  }
+
+  it('rolls a grid count up to the find widget', () => {
+    expect(totalsAfter('soql', 2)).toEqual([2]);
+  });
+
+  it('keeps rolling up after a detach and re-attach', async () => {
+    view.remove();
+    document.body.append(view);
+    await view.updateComplete;
+
+    expect(totalsAfter('soql', 2)).toEqual([2]);
+  });
+});

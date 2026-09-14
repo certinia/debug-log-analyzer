@@ -14,7 +14,9 @@ import type {
 } from 'apex-log-parser';
 
 import { limitTotals } from '../../../components/logOverviewMetrics.js';
+import { DomListenerController } from '../../../core/events/DomListenerController.js';
 import { eventBus, type StatementType } from '../../../core/events/EventBus.js';
+import type { DbFindResultsEventDetail, FindEventMap } from '../../find/findEvents.js';
 import { apexLimitTimeSeries } from '../../timeline/optimised/apex-limit-series.js';
 import { InspectorEmphasis } from '../../../components/inspectorEmphasis.js';
 import { wireInspectorTab } from '../../../components/inspectorTab.js';
@@ -92,12 +94,14 @@ export class DatabaseView extends LitElement {
   /** Which of the inspector's reports the grids' mark follows. */
   private _emphasis = new InspectorEmphasis();
 
+  private readonly _findBus = new DomListenerController<FindEventMap>(this, document, {
+    'lv-find': (e) => this._find(e.detail.count),
+    'lv-find-match': (e) => this._find(e.detail.count),
+    'db-find-results': (e) => this._findResults(e),
+  });
+
   constructor() {
     super();
-
-    document.addEventListener('db-find-results', this._findResults as EventListener);
-    document.addEventListener('lv-find-match', this._findHandler as EventListener);
-    document.addEventListener('lv-find', this._findHandler as EventListener);
 
     this._offInspector = wireInspectorTab('database', this._emphasis, {
       mark: (eventIndexes) => this._markLocated(eventIndexes),
@@ -158,9 +162,6 @@ export class DatabaseView extends LitElement {
 
   disconnectedCallback(): void {
     super.disconnectedCallback();
-    document.removeEventListener('db-find-results', this._findResults as EventListener);
-    document.removeEventListener('lv-find-match', this._findHandler as EventListener);
-    document.removeEventListener('lv-find', this._findHandler as EventListener);
     this._offInspector?.();
     this._offInspector = null;
   }
@@ -450,14 +451,7 @@ export class DatabaseView extends LitElement {
     return gauges;
   }
 
-  _findHandler = (
-    e: CustomEvent<{ text: string; count: number; options: { matchCase: boolean } }>,
-  ) => {
-    this._find(e.detail);
-  };
-
-  _find = (arg: { count: number }) => {
-    const matchIndex = arg.count;
+  _find(matchIndex: number) {
     if (matchIndex <= this.dmlMatches) {
       this.dmlHighlightIndex = matchIndex;
       this.soqlHighlightIndex = 0;
@@ -471,9 +465,9 @@ export class DatabaseView extends LitElement {
       this.dmlHighlightIndex = 0;
       this.soqlHighlightIndex = 0;
     }
-  };
+  }
 
-  _findResults = (e: CustomEvent<{ totalMatches: number; type: SectionKind }>) => {
+  _findResults(e: CustomEvent<DbFindResultsEventDetail>) {
     if (e.detail.type === 'dml') {
       this.dmlMatches = e.detail.totalMatches;
     } else if (e.detail.type === 'soql') {
@@ -482,14 +476,14 @@ export class DatabaseView extends LitElement {
       this.soslMatches = e.detail.totalMatches;
     }
 
-    this._find({ count: 1 });
+    this._find(1);
 
     document.dispatchEvent(
       new CustomEvent('lv-find-results', {
         detail: { totalMatches: this.dmlMatches + this.soqlMatches + this.soslMatches },
       }),
     );
-  };
+  }
 }
 
 interface SectionSpec {

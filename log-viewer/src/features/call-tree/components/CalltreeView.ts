@@ -11,13 +11,15 @@ import { repeat } from 'lit/directives/repeat.js';
 import type { RowComponent, Tabulator } from 'tabulator-tables';
 
 import type { ApexLog, LogEvent } from 'apex-log-parser';
+import { DomListenerController } from '../../../core/events/DomListenerController.js';
 import { eventBus, type DetailSource } from '../../../core/events/EventBus.js';
+import type { FindEventDetail, FindEventMap } from '../../find/findEvents.js';
 import { SelectionEchoGuard } from '../../../core/events/SelectionEchoGuard.js';
 import { vscodeMessenger } from '../../../core/messaging/VSCodeExtensionMessenger.js';
 import { eventByEventIndex } from '../../../core/utility/EventSearch.js';
 import { isVisible } from '../../../core/utility/Util.js';
 import { getSettings, updateSetting } from '../../settings/Settings.js';
-import { CALLTREE_GO_TO_ROW } from '../navigation.js';
+import { CALLTREE_GO_TO_ROW, type CalltreeNavigationEventMap } from '../navigation.js';
 import type { AggregatedRow, BottomUpRow } from '../utils/Aggregation.js';
 import { findBucketRow } from '../utils/bucketRows.js';
 import {
@@ -163,10 +165,6 @@ export class CalltreeView extends LitElement {
     return (this.tableContainer = this.renderRoot?.querySelector('#call-tree-table') ?? null);
   }
 
-  private _goToRowEvt = ((e: CustomEvent<{ eventIndex: number }>) => {
-    this._goToRow(e.detail.eventIndex);
-  }) as EventListener;
-
   /** Guards the programmatic select made on the inspector's behalf. */
   private _echoGuard = new SelectionEchoGuard();
   private _inspectorUnsubscribe: (() => void) | null = null;
@@ -174,6 +172,15 @@ export class CalltreeView extends LitElement {
   private _locateIds = new LocatedRowIds();
   /** Which of the inspector's reports the mark follows. */
   private _emphasis = new InspectorEmphasis();
+
+  private readonly _documentBus = new DomListenerController<
+    FindEventMap & CalltreeNavigationEventMap
+  >(this, document, {
+    [CALLTREE_GO_TO_ROW]: (e) => void this._goToRow(e.detail.eventIndex),
+    'lv-find': (e) => void this._find(e),
+    'lv-find-match': (e) => void this._find(e),
+    'lv-find-close': (e) => void this._find(e),
+  });
 
   constructor() {
     super();
@@ -193,10 +200,6 @@ export class CalltreeView extends LitElement {
         this._revealEventIndex(eventIndex, signal),
       ),
     });
-    document.addEventListener(CALLTREE_GO_TO_ROW, this._goToRowEvt);
-    document.addEventListener('lv-find', this._findEvt);
-    document.addEventListener('lv-find-match', this._findEvt);
-    document.addEventListener('lv-find-close', this._findEvt);
   }
 
   override connectedCallback(): void {
@@ -208,10 +211,6 @@ export class CalltreeView extends LitElement {
     super.disconnectedCallback();
     this._categoryColoringOff?.();
     this._categoryColoringOff = null;
-    document.removeEventListener(CALLTREE_GO_TO_ROW, this._goToRowEvt);
-    document.removeEventListener('lv-find', this._findEvt);
-    document.removeEventListener('lv-find-match', this._findEvt);
-    document.removeEventListener('lv-find-close', this._findEvt);
     this._inspectorUnsubscribe?.();
     this._inspectorUnsubscribe = null;
     this._destroyCurrentTable();
@@ -477,10 +476,6 @@ export class CalltreeView extends LitElement {
       </div>
     `;
   }
-
-  _findEvt = ((event: FindEvt) => {
-    this._find(event);
-  }) as EventListener;
 
   _getAllTypes(data: LogEvent[]): string[] {
     const flattened = this._flatten(data);
@@ -937,7 +932,7 @@ export class CalltreeView extends LitElement {
     );
   }
 
-  async _find(e: CustomEvent<{ text: string; count: number; options: { matchCase: boolean } }>) {
+  async _find(e: CustomEvent<FindEventDetail>) {
     const activeTable = this._getActiveTable();
     const isTableVisible = !!activeTable?.element?.clientHeight;
     if (!isTableVisible && !this.totalMatches) {
@@ -1392,5 +1387,3 @@ export class CalltreeView extends LitElement {
     return indexByEventIndex;
   }
 }
-
-type FindEvt = CustomEvent<{ text: string; count: number; options: { matchCase: boolean } }>;
