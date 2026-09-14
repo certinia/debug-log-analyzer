@@ -118,7 +118,8 @@ export class RetrieveLogFile {
 
   private static showLoadingPicker(): VSCodeQuickPick<QuickPickItem> {
     const qp = window.createQuickPick();
-    qp.placeholder = 'Select a logfile';
+    // An org that never answers leaves this busy for good, so name the way out.
+    qp.placeholder = 'Loading logs. Press Escape to cancel.';
     qp.busy = true;
     qp.enabled = false;
     qp.show();
