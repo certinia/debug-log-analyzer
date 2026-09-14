@@ -39,9 +39,6 @@ export class ShowLogAnalysis {
       (activeTab?.input instanceof TabInputText ? activeTab.input.uri : undefined);
 
     if (!logUri) {
-      context.display.showErrorMessage(
-        'No file selected or the file is too large. Try again using the file explorer or text editor command.',
-      );
       throw new Error(
         'No file selected or the file is too large. Try again using the file explorer or text editor command.',
       );
