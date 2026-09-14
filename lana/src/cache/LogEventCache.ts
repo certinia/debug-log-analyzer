@@ -6,9 +6,13 @@ import { workspace, type Uri } from 'vscode';
 import { parse, type ApexLog, type LogEvent } from 'apex-log-parser';
 
 import type { Context } from '../Context.js';
-import type { Display } from '../display/Display.js';
 import { readFileText } from '../fs/workspaceFs.js';
 import { tryCatchAsync } from '../tryCatch.js';
+
+/** The sink an unreadable log is reported to. `Display` satisfies it. */
+export interface LogReporter {
+  output(message: string, showChannel?: boolean): void;
+}
 
 export interface EventSearchResult {
   event: LogEvent;
@@ -17,10 +21,10 @@ export interface EventSearchResult {
 
 export class LogEventCache {
   private static readonly MAX_CACHE_SIZE = 10;
-  private static cache = new Map<string, ApexLog>();
-  private static display: Display | null = null;
+  private static readonly cache = new Map<string, ApexLog>();
+  private static readonly reported = new Set<string>();
 
-  static async getApexLog(uri: Uri): Promise<ApexLog | null> {
+  static async getApexLog(uri: Uri, reporter: LogReporter): Promise<ApexLog | null> {
     const key = uri.toString();
     const cached = LogEventCache.cache.get(key);
     if (cached) {
@@ -32,8 +36,12 @@ export class LogEventCache {
 
     const [apexLog, error] = await tryCatchAsync(async () => parse(await readFileText(uri)));
     if (error) {
-      // Folding, symbols and decorations each call this as the user types, so a toast would spam.
-      LogEventCache.display?.output(`Could not read ${key}: ${error.message}`);
+      // Folding, symbols and decorations each retry this as the user types, and a failure is
+      // never cached, so report a given log once until it closes.
+      if (!LogEventCache.reported.has(key)) {
+        LogEventCache.reported.add(key);
+        reporter.output(`Could not read ${key}: ${error.message}`, true);
+      }
       return null;
     }
 
@@ -55,16 +63,15 @@ export class LogEventCache {
 
   static clearCache(uriString: string): void {
     LogEventCache.cache.delete(uriString);
+    LogEventCache.reported.delete(uriString);
   }
 
   static apply(context: Context): void {
-    LogEventCache.display = context.display;
-
     context.context.subscriptions.push(
+      // Not gated on languageId: the decoration provider sniffs content, so it reaches
+      // logs saved under any extension, and those would never clear.
       workspace.onDidCloseTextDocument((doc) => {
-        if (doc.languageId === 'apexlog') {
-          LogEventCache.clearCache(doc.uri.toString());
-        }
+        LogEventCache.clearCache(doc.uri.toString());
       }),
     );
   }

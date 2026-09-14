@@ -14,24 +14,10 @@ function toError(thrown: unknown): Error {
   return thrown instanceof Error ? thrown : new Error(String(thrown), { cause: thrown });
 }
 
-/** Runs `fn`, returning its value or the error it threw. */
-export function tryCatch<T>(fn: () => T): Result<T> {
+/** Runs `fn`, returning what it resolves to, or the error it threw or rejected with. */
+export async function tryCatchAsync<T>(fn: () => Promise<T>): Promise<Result<T>> {
   try {
-    return [fn(), null];
-  } catch (thrown) {
-    return [null, toError(thrown)];
-  }
-}
-
-/**
- * Awaits a promise, returning its value or the error it rejected with. Pass a
- * function to also catch a synchronous throw while the promise is being created.
- */
-export async function tryCatchAsync<T>(
-  promiseOrFn: Promise<T> | (() => Promise<T>),
-): Promise<Result<T>> {
-  try {
-    return [await (typeof promiseOrFn === 'function' ? promiseOrFn() : promiseOrFn), null];
+    return [await fn(), null];
   } catch (thrown) {
     return [null, toError(thrown)];
   }
