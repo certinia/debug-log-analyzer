@@ -23,7 +23,7 @@ export class ShowLogAnalysis {
 
   private static async safeCommand(context: Context, uri: Uri): Promise<void> {
     try {
-      return ShowLogAnalysis.command(context, uri);
+      return await ShowLogAnalysis.command(context, uri);
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err);
       context.display.showErrorMessage(`Error showing logfile: ${msg}`);
@@ -39,9 +39,6 @@ export class ShowLogAnalysis {
       (activeTab?.input instanceof TabInputText ? activeTab.input.uri : undefined);
 
     if (!logUri) {
-      context.display.showErrorMessage(
-        'No file selected or the file is too large. Try again using the file explorer or text editor command.',
-      );
       throw new Error(
         'No file selected or the file is too large. Try again using the file explorer or text editor command.',
       );
