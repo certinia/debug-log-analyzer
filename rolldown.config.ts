@@ -35,7 +35,9 @@ export default defineConfig([
     output: {
       format: 'esm',
       dir: './lana/out',
-      cleanDir: true,
+      // Not cleanDir: a watch rebuild of this config alone would delete the viewer
+      // bundle and codicons that later configs write into the same directory.
+      cleanDir: false,
       chunkFileNames: 'lana-[name].js',
       sourcemap: false,
       keepNames: true,
