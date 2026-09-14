@@ -4,6 +4,7 @@
 import { commands } from 'vscode';
 
 import type { Context } from '../Context.js';
+import { tryCatchAsync } from '../tryCatch.js';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type CommandHandler = (...args: any[]) => unknown;
@@ -35,13 +36,12 @@ export class Command {
   }
 
   run = async (...args: unknown[]): Promise<unknown> => {
-    try {
-      return await this.handler(...args);
-    } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : String(err);
-      this.context.display.showErrorMessage(`${this.errorPrefix}: ${message}`);
+    const [result, error] = await tryCatchAsync(async () => this.handler(...args));
+    if (error) {
+      this.context.display.showErrorMessage(`${this.errorPrefix}: ${error.message}`);
       return undefined;
     }
+    return result;
   };
 
   register(): Command {
