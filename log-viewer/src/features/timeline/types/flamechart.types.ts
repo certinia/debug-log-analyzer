@@ -68,6 +68,18 @@ export interface ViewportBounds {
 }
 
 /**
+ * Which axes a viewport move should centre. An axis left out keeps its current
+ * offset, so a caller can pan in time without disturbing the depth on screen.
+ */
+export interface ViewportPanAxes {
+  /** Centre horizontally, on the frame's midpoint. */
+  time: boolean;
+
+  /** Centre vertically, on the frame's depth. */
+  depth: boolean;
+}
+
+/**
  * Modifier keys state from mouse/keyboard events.
  * Used for Cmd/Ctrl+Click navigation.
  */

@@ -21,7 +21,7 @@ import {
   rowFrames,
 } from '../../../components/locatedRow.js';
 import { InspectorEmphasis } from '../../../components/inspectorEmphasis.js';
-import { wireInspectorTab } from '../../../components/inspectorTab.js';
+import { revealFirstOf, wireInspectorTab } from '../../../components/inspectorTab.js';
 import { SelectionEchoGuard } from '../../../core/events/SelectionEchoGuard.js';
 import { eventByEventIndex } from '../../../core/utility/EventSearch.js';
 import { isVisible } from '../../../core/utility/Util.js';
@@ -174,7 +174,10 @@ export class AnalysisView extends LitElement {
         // The table reports the clear itself, which is what reaches the inspector.
         this.analysisTable?.deselectRow();
       },
-      movesToMergedPick: true,
+      // A row buckets calls, so a merged pick moves to the first of them.
+      revealMerged: revealFirstOf((eventIndex, signal) =>
+        this._revealEventIndex(eventIndex, signal),
+      ),
     });
     document.addEventListener('lv-find', this._findEvt);
     document.addEventListener('lv-find-match', this._findEvt);
