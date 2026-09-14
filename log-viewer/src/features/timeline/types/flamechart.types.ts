@@ -796,43 +796,6 @@ export interface SearchMatch {
   matchType: 'type' | 'text';
 }
 
-/**
- * Search behavior options.
- */
-export interface SearchOptions {
-  /** Case-sensitive matching. */
-  matchCase: boolean;
-}
-
-/**
- * Payload for find/search CustomEvents (lv-find, lv-find-match, lv-find-close).
- * Standardized communication between FindWidget and Timeline components.
- */
-export interface FindEventDetail {
-  /** Search query text. */
-  text: string;
-
-  /**
-   * Match index for navigation (1-based).
-   * - For lv-find: Always 1 (start at first match)
-   * - For lv-find-match: Current match number (1 to totalMatches)
-   * - For lv-find-close: Always 0 (no active match)
-   */
-  count: number;
-
-  /** Search options. */
-  options: SearchOptions;
-}
-
-/**
- * Payload for find results CustomEvent (lv-find-results).
- * Timeline dispatches this after search completes.
- */
-export interface FindResultsEventDetail {
-  /** Total number of matches found. */
-  totalMatches: number;
-}
-
 // ============================================================================
 // HEAT STRIP VISUALIZATION TYPES
 // ============================================================================
