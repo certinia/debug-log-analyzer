@@ -352,6 +352,7 @@ export const window = {
   activeTextEditor: undefined as unknown,
   visibleTextEditors: [],
   onDidChangeActiveTextEditor: jest.fn(() => ({ dispose: jest.fn() })),
+  onDidChangeTextEditorSelection: jest.fn(() => ({ dispose: jest.fn() })),
   onDidChangeVisibleTextEditors: jest.fn(() => ({ dispose: jest.fn() })),
   showTextDocument: jest.fn(),
   createTextEditorDecorationType: jest.fn(() => ({
