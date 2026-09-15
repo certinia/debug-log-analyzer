@@ -90,13 +90,8 @@ describe('LogView', () => {
     expect(panel.webview.html).toContain(
       '<script type="module">const replacementToken = "$&"; globalThis.viewerLoaded = true;',
     );
-    const codiconHref = /<link[^>]*\bid="vscode-codicon-stylesheet"[^>]*\bhref="([^"]+)"/.exec(
-      panel.webview.html,
-    )?.[1];
-    expect(codiconHref).toMatch(/^data:text\/css;charset=utf-8,/);
-    const codiconCss = decodeURIComponent(codiconHref!.slice(codiconHref!.indexOf(',') + 1));
-    expect(codiconCss).toContain('/* $& */');
-    expect(codiconCss).toContain('data:font/ttf;base64,Zm9udA==');
+    expect(panel.webview.html).toContain('/* $& */');
+    expect(panel.webview.html).toContain('data:font/ttf;base64,Zm9udA==');
     expect(mockReadFile).not.toHaveBeenCalled();
 
     await receiveMessage?.({ cmd: 'fetchLog', requestId: 'request-1' });

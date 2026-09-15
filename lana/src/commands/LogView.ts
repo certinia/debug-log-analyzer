@@ -248,17 +248,15 @@ export class LogView {
     assets: NonNullable<ReturnType<typeof getEmbeddedLogViewerAssets>>,
   ): string {
     const fontData = `data:font/ttf;base64,${assets.codiconFont}`;
-    const codiconCss = assets.codiconCss.replace(
-      /url\(['"]?\.\/codicon\.ttf[^)]*\)/i,
-      `url("${fontData}")`,
-    );
-    const codiconHref = `data:text/css;charset=utf-8,${encodeURIComponent(codiconCss)}`;
+    const codiconCss = assets.codiconCss
+      .replace(/url\((['"]?)\.\/codicon\.ttf[^)]*\)/i, `url("${fontData}")`)
+      .replace(/<\/style/gi, '<\\/style');
     const script = assets.script.replace(/<\/script/gi, '<\\/script');
 
     return assets.html
       .replace(
         /<link\b(?=[^>]*\bid="vscode-codicon-stylesheet")[^>]*>/i,
-        () => `<link rel="stylesheet" id="vscode-codicon-stylesheet" href="${codiconHref}" />`,
+        () => `<style id="vscode-codicon-stylesheet">${codiconCss}</style>`,
       )
       .replace(
         /<script\b(?=[^>]*\bsrc="bundle\.js")[^>]*><\/script>/i,
