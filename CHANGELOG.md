@@ -21,6 +21,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - 🗂️ **Choose your columns** in Call Tree, Analysis and Database: switch between presets, show or hide any column, and your choice is remembered. ([#298])
 - 🏷️ **New columns**: Object on SOQL and DML, SOSL Count and Rows, Avg Self Time, a Self variant of every governor metric, and a SOQL Query Plan view. ([#298])
 - 🪪 **Header**: shows the entry point, user and start time, with more detail on hover.
+- 🌐 **VS Code for the Web**: open and analyse logs in vscode.dev, github.dev and Salesforce Web Console.
 
 ### Changed
 
