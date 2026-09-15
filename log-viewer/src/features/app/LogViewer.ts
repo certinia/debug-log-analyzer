@@ -133,8 +133,8 @@ export class LogViewer extends LitElement {
 
   constructor() {
     super();
-    vscodeMessenger.request<LogDataEvent>('fetchLog').then((msg) => {
-      this._handleLogFetch(msg);
+    void vscodeMessenger.request<LogDataEvent>('fetchLog').then((msg) => {
+      void this._handleLogFetch(msg);
     });
 
     document.addEventListener('show-tab', (e: Event) => {

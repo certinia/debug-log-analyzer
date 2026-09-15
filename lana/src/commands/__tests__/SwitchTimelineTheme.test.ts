@@ -41,7 +41,7 @@ describe('SwitchTimelineTheme', () => {
     onDidHide: jest.Mock;
   };
 
-  let onDidAcceptCallback: () => void;
+  let onDidAcceptCallback: () => Promise<void>;
   let onDidHideCallback: () => void;
   let onDidChangeActiveCallback: (items: Array<{ label: string }>) => void;
 
@@ -317,7 +317,7 @@ describe('SwitchTimelineTheme', () => {
       // Navigate to a theme
       onDidChangeActiveCallback([{ label: 'Nord' }]);
       // Accept selection
-      onDidAcceptCallback();
+      await onDidAcceptCallback();
 
       expect(mockUpdateConfig).toHaveBeenCalledWith('timeline.activeTheme', 'Nord');
     });
@@ -424,7 +424,7 @@ describe('SwitchTimelineTheme', () => {
       // Navigate to same theme
       onDidChangeActiveCallback([{ label: '50 Shades of Green' }]);
       // Accept and hide
-      onDidAcceptCallback();
+      await onDidAcceptCallback();
       mockWebview.postMessage.mockClear();
       onDidHideCallback();
 

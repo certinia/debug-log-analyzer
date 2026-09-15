@@ -34,6 +34,17 @@ export default defineConfig(
     // candidates from nested repo copies (e.g. .claude agent worktrees)
     languageOptions: {
       parserOptions: {
+        projectService: {
+          // Neither is in a tsconfig: apex-log-parser builds only src, and a bundler
+          // config belongs to no project. Without this the parser reports them as errors.
+          allowDefaultProject: [
+            'rolldown.config.ts',
+            'apex-log-parser/__tests__/ApexLogParser.test.ts',
+            'apex-log-parser/__tests__/EventMetadata.test.ts',
+            'apex-log-parser/__tests__/FlowDatabaseAttribution.test.ts',
+            'apex-log-parser/__tests__/GranularLimits.test.ts',
+          ],
+        },
         tsconfigRootDir: import.meta.dirname,
         // AGENTS.md keeps `typescript` aliased to @typescript/typescript6 because
         // typescript-eslint needs the TS <=6.0 API. Fail the lint run if a bump
@@ -44,6 +55,14 @@ export default defineConfig(
 
     rules: {
       'no-console': 'warn',
+      // Type-aware promise rules only. recommendedTypeChecked in full reports 720 errors,
+      // most of them no-unsafe-* and unbound-method against untyped libraries and test mocks.
+      // require-await is left off: `async () => syncCall()` is how Command.ts turns a
+      // synchronous throw into a rejection its boundary can catch.
+      '@typescript-eslint/await-thenable': 'error',
+      '@typescript-eslint/no-floating-promises': 'error',
+      '@typescript-eslint/no-misused-promises': 'error',
+      '@typescript-eslint/prefer-promise-reject-errors': 'error',
       '@typescript-eslint/naming-convention': [
         'warn',
         // options replace the rule's defaults, so the base selectors are restated

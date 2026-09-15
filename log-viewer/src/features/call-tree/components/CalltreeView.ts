@@ -164,7 +164,7 @@ export class CalltreeView extends LitElement {
   }
 
   private _goToRowEvt = ((e: CustomEvent<{ eventIndex: number }>) => {
-    this._goToRow(e.detail.eventIndex);
+    void this._goToRow(e.detail.eventIndex);
   }) as EventListener;
 
   /** Guards the programmatic select made on the inspector's behalf. */
@@ -479,7 +479,7 @@ export class CalltreeView extends LitElement {
   }
 
   _findEvt = ((event: FindEvt) => {
-    this._find(event);
+    void this._find(event);
   }) as EventListener;
 
   _getAllTypes(data: LogEvent[]): string[] {
@@ -857,7 +857,7 @@ export class CalltreeView extends LitElement {
     }
 
     this.rootMethod = this.timelineRoot;
-    isVisible(this).then((isVisible) => {
+    void isVisible(this).then((isVisible) => {
       this.isVisible = isVisible;
       if (this.rootMethod && this._callTreeTableWrapper) {
         void this._renderCallTree(this._callTreeTableWrapper, this.rootMethod);
@@ -1308,7 +1308,7 @@ export class CalltreeView extends LitElement {
         break;
 
       case 'copy-name':
-        navigator.clipboard.writeText(rowData.text);
+        void navigator.clipboard.writeText(rowData.text);
         break;
     }
 
