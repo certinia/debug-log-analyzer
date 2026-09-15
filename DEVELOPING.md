@@ -94,6 +94,22 @@ Once you’ve built the extension or run the watcher, you can run it inside a lo
 
    If you're using the **watch** mode (see below), refresh the extension host view by pressing CMD/CTRL + R or clicking the restart icon.
 
+### In VS Code Web
+
+The desktop extension host runs the desktop build only. To run the web build in a real web host:
+
+```zsh
+pnpm serve:web
+```
+
+Open `http://localhost:3001` (set `PORT` to change it). `pnpm test:e2e:web` runs the end-to-end
+tests against the same host.
+
+Commands that need a Salesforce org also need the Salesforce Services extension. The server serves
+your local copy of it, because a `localhost` page cannot fetch one from the marketplace CDN.
+Install the Salesforce Extension Pack in VS Code, or point `LANA_SERVICES_EXTENSION_PATH` at an
+unpacked copy. Without either, the log viewer still works but org commands do not.
+
 ## 🧪 Testing Your Changes
 
 Make sure your changes don’t break anything. If you’re working on a feature or bug fix that requires tests, be sure to add or update the relevant tests.
