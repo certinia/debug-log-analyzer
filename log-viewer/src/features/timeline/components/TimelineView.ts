@@ -173,7 +173,7 @@ export class TimelineView extends LitElement {
     `,
   ];
 
-  async connectedCallback() {
+  override connectedCallback() {
     super.connectedCallback();
 
     this.themePreviewUnsubscribe ??= VSCodeExtensionMessenger.listen<{ activeTheme: string }>(

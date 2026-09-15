@@ -609,7 +609,7 @@ export class ApexLogTimeline {
     if (eventNode && (modifiers?.metaKey || modifiers?.ctrlKey)) {
       const originalEvent = (eventNode as EventNode & { original?: LogEvent }).original;
       if (originalEvent?.eventIndex !== undefined) {
-        goToRow({ eventIndex: originalEvent.eventIndex });
+        void goToRow({ eventIndex: originalEvent.eventIndex });
       }
       return;
     }
@@ -617,7 +617,7 @@ export class ApexLogTimeline {
     // Cmd/Ctrl+Click on a marker navigates directly to call tree
     if (marker && (modifiers?.metaKey || modifiers?.ctrlKey)) {
       if (marker.eventIndex !== undefined) {
-        goToRow({ eventIndex: marker.eventIndex });
+        void goToRow({ eventIndex: marker.eventIndex });
       }
       return;
     }
@@ -674,7 +674,7 @@ export class ApexLogTimeline {
   private handleJumpToCallTree(eventNode: EventNode): void {
     const originalEvent = (eventNode as EventNode & { original?: LogEvent }).original;
     if (originalEvent?.eventIndex !== undefined) {
-      goToRow({ eventIndex: originalEvent.eventIndex });
+      void goToRow({ eventIndex: originalEvent.eventIndex });
     }
   }
 
@@ -684,7 +684,7 @@ export class ApexLogTimeline {
    */
   private handleJumpToCallTreeForMarker(marker: TimelineMarker): void {
     if (marker.eventIndex !== undefined) {
-      goToRow({ eventIndex: marker.eventIndex });
+      void goToRow({ eventIndex: marker.eventIndex });
     }
   }
 

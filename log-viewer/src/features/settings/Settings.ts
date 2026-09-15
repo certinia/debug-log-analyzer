@@ -100,7 +100,7 @@ export function subscribeSettings(callback: (settings: LanaSettings) => void): (
     // One request however many subscribers; later ones reuse the same reply.
     // No extension host to ask (standalone browser): the UI keeps its defaults.
     seedRequest ??= getSettings().catch(() => null);
-    seedRequest.then((settings) => {
+    void seedRequest.then((settings) => {
       // A push can land before the reply; it is then the newer value, so the
       // reply is dropped rather than applied over it.
       if (settings && !latest && subscribers.size) {

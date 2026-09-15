@@ -152,7 +152,7 @@ export class SOSLView extends LitElement {
     }
 
     if (changedProperties.has('highlightIndex')) {
-      this._highlightMatches(this.highlightIndex);
+      void this._highlightMatches(this.highlightIndex);
     }
   }
 
@@ -426,7 +426,7 @@ export class SOSLView extends LitElement {
   }
 
   _findEvt = ((event: FindEvt) => {
-    this._find(event);
+    void this._find(event);
   }) as EventListener;
 
   _soslGroupBy(event: Event) {
@@ -448,7 +448,7 @@ export class SOSLView extends LitElement {
       return;
     }
 
-    isVisible(this).then((isVisible) => {
+    void isVisible(this).then((isVisible) => {
       const tableWrapper = this._soslTableWrapper;
       if (tableWrapper && this.timelineRoot && isVisible) {
         Tabulator.registerModule(Object.values(CommonModules));

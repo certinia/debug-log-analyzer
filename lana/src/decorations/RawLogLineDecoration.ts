@@ -69,7 +69,7 @@ export class RawLogLineDecoration {
     }
 
     this.debounceTimeout = setTimeout(() => {
-      this.updateDecoration(event.textEditor);
+      void this.updateDecoration(event.textEditor);
     }, 100);
   }
 

@@ -25,13 +25,13 @@ describe('listLogs', () => {
   it('forwards the abort signal to the runtime so a dismissal really cancels', () => {
     const signal = new AbortController().signal;
 
-    listLogs(signal);
+    void listLogs(signal);
 
     expect(mockRunPromise).toHaveBeenCalledWith(expect.anything(), { signal });
   });
 
   it('asks for the record limit', () => {
-    listLogs(undefined, 50);
+    void listLogs(undefined, 50);
 
     expect(mockListLogs).toHaveBeenCalledWith(50);
   });
@@ -39,7 +39,7 @@ describe('listLogs', () => {
 
 describe('getLogBody', () => {
   it('runs without a signal', () => {
-    getLogBody('07L000000000001');
+    void getLogBody('07L000000000001');
 
     expect(mockRunPromise).toHaveBeenCalledWith(expect.anything());
   });

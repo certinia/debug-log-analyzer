@@ -906,13 +906,13 @@ function onClickCanvas(): void {
     const depth = getDepth(lastMouseY);
     const targetEvent = findByPosition(timelineRoot.children, 0, lastMouseX, depth, false);
     if (targetEvent?.eventIndex !== undefined) {
-      goToRow({ eventIndex: targetEvent.eventIndex });
+      void goToRow({ eventIndex: targetEvent.eventIndex });
       return;
     }
 
     const marker = findLogIssue(lastMouseX);
     if (marker?.eventIndex !== undefined) {
-      goToRow({ eventIndex: marker.eventIndex });
+      void goToRow({ eventIndex: marker.eventIndex });
     }
   }
 }
