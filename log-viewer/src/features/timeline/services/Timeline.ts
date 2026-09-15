@@ -1057,7 +1057,14 @@ function _findOnTimeline(
   state.requestRedraw();
 }
 
+/** Releases what the last {@link init} attached outside the element. */
+let disposeTimeline: (() => void) | null = null;
+
 function onInitTimeline(): void {
+  // A `lana.timeline.legacy` toggle swaps this element out and back while the
+  // panel lives, so drop the previous element's wiring before taking its place.
+  disposeTimeline?.();
+
   tooltip = document.createElement('div');
   tooltip.id = 'timeline-tooltip';
   container.appendChild(tooltip);
@@ -1073,10 +1080,29 @@ function onInitTimeline(): void {
     canvas.addEventListener('click', onClickCanvas);
   }
 
-  new ResizeObserver(resize).observe(container);
+  const resizeObserver = new ResizeObserver(resize);
+  resizeObserver.observe(container);
   container.addEventListener('mousemove', onMouseMove);
 
   document.addEventListener('lv-find', _findOnTimeline as EventListener);
   document.addEventListener('lv-find-match', _findOnTimeline as EventListener);
   document.addEventListener('lv-find-close', _findOnTimeline as EventListener);
+
+  const element = container;
+  disposeTimeline = () => {
+    resizeObserver.disconnect();
+    element.removeEventListener('mousemove', onMouseMove);
+    document.removeEventListener('lv-find', _findOnTimeline as EventListener);
+    document.removeEventListener('lv-find-match', _findOnTimeline as EventListener);
+    document.removeEventListener('lv-find-close', _findOnTimeline as EventListener);
+    disposeTimeline = null;
+  };
+}
+
+/**
+ * Release the listeners {@link init} put on `document`, which outlive the element
+ * the legacy timeline draws into. Call from the host's `disconnectedCallback`.
+ */
+export function dispose(): void {
+  disposeTimeline?.();
 }
