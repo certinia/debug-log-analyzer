@@ -61,13 +61,15 @@ Inspector shows Details, Self time by namespace, Call stack and Call tree; open 
 Find closed. Pointer off both panes before Enter, so nothing is dimmed or hovered."
 
   "calltree.png|full|Call Tree tab, Time Order view, expanded 3 or 4 levels, scrolled to the top.
-Select a row with real timings and DML/SOQL/Rows values.
-Inspector shows Details, Call stack and Call tree; open all three.
+Nothing selected - press Escape - so the inspector reads the whole log.
+Shows the Overview, the Hot path and the Hot spots; open all three.
 Pointer off both panes before Enter."
 
   "analysis.png|full|Analysis tab, grouped by method, sorted by Self Time descending, scrolled to the top.
-Select a method the log has findings for, so the inspector's Findings section has content.
-Open Findings and Details.
+Nothing selected - press Escape - so the inspector reads the whole log.
+Shows the Overview, Findings and Self time spread; open all three.
+Findings is a fill section until the fit fix lands, so drag its lower divider up
+until the gap under its last row is gone.
 Pointer off both panes before Enter."
 
   "database.png|full|Database tab, SOQL section expanded so rows, timings and selectivity show.
@@ -76,10 +78,11 @@ and cardinality, and SOQL issues has tips.
 Open Details and SOQL issues.
 Pointer off both panes before Enter."
 
-  "inspector.png|full|The whole-log view the four tab shots cannot show: nothing selected.
-Timeline tab, press Escape to clear the selection, inspector docked right.
-Shows the Overview of the six governor metrics closest to their limit, time by category,
-self time by namespace and the governor usage charts.
+  "inspector.png|full|Call Tree tab, the fullest single panel, and the counterpart to calltree.png
+being the whole-log view.
+Select a row deep enough to have a real call stack, e.g. a RecursiveSearcher.search row.
+Shows Details, Call stack and Call tree; open all three, Call tree in Time Order
+expanded 2 or 3 levels.
 Pointer off both panes before Enter."
 
   "governor-heap.png|full|Call Tree tab, Memory view, showing Net, Gross and Peak with their self variants.
