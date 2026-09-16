@@ -34,6 +34,7 @@ import {
   createDurationBarColumn,
   headerSortElement,
   registerTableModules,
+  textTooltip,
   virtualScrollOptions,
 } from '../../call-tree/components/TableShared.js';
 import { waitForNextFrame } from '../../../core/utility/FrameBudget.js';
@@ -393,6 +394,7 @@ export class DatabaseTime extends LitElement {
         // Name absorbs the slack and truncates first; the numeric columns hold a
         // fixed content width.
         formatter: nameFormatter,
+        tooltip: (_e, cell: CellComponent) => textTooltip(cell.getValue() as string),
         cssClass: 'datagrid-code-text truncate',
         sorter: 'string',
         widthGrow: 1,
