@@ -52,33 +52,42 @@ CROP_W=800  # crops ship at this width, 2x their 400px display size
 # Every step is here because the shot is reproduced from scratch each release
 # and "which tab, what selected" is not recoverable from the old image.
 SHOTS=(
+  # The inspector stays docked right for the four tab shots, at about a third of
+  # the width. Each tab answers with different sections, so the four are not the
+  # same picture - keep the dock width identical across them.
   "timeline.png|full|Timeline tab, zoomed out to the whole log (double-click the minimap to reset).
-Nothing selected, inspector closed, Find closed.
-Move the pointer off the chart before you press Enter, so no hover card is caught."
+Select a mid-log frame deep enough to have a real call stack, e.g. a RecursiveSearcher.search frame.
+Inspector shows Details, Self time by namespace, Call stack and Call tree; open all four.
+Find closed. Pointer off both panes before Enter, so nothing is dimmed or hovered."
 
-  "calltree.png|full|Call Tree tab, Time Order view.
-Expand 3 or 4 levels, so signatures, timings and the DML/SOQL/Rows columns all have values.
-Scrolled to the top. Nothing selected, inspector closed."
+  "calltree.png|full|Call Tree tab, Time Order view, expanded 3 or 4 levels, scrolled to the top.
+Select a row with real timings and DML/SOQL/Rows values.
+Inspector shows Details, Call stack and Call tree; open all three.
+Pointer off both panes before Enter."
 
-  "analysis.png|full|Analysis tab, grouped by method, sorted by Self Time descending.
-Scrolled to the top so the most expensive methods lead.
-Nothing selected, inspector closed."
+  "analysis.png|full|Analysis tab, grouped by method, sorted by Self Time descending, scrolled to the top.
+Select a method the log has findings for, so the inspector's Findings section has content.
+Open Findings and Details.
+Pointer off both panes before Enter."
 
   "database.png|full|Database tab, SOQL section expanded so rows, timings and selectivity show.
-DML and SOSL sections visible below it.
-Nothing selected, inspector closed."
+Select a SOQL statement whose query is non-trivial, so Details carries selectivity, query plan
+and cardinality, and SOQL issues has tips.
+Open Details and SOQL issues.
+Pointer off both panes before Enter."
 
-  "inspector.png|full|Timeline tab, inspector docked right at about a third of the width.
-Select a mid-log frame deep enough to have a real call stack, e.g. a RecursiveSearcher.search frame.
-All four sections open: Details, Self time by namespace, Call stack, Call tree.
-Call tree in Time Order, expanded 2 or 3 levels.
-Pointer away from both panes before Enter, so nothing is dimmed or marked."
+  "inspector.png|full|The whole-log view the four tab shots cannot show: nothing selected.
+Timeline tab, press Escape to clear the selection, inspector docked right.
+Shows the Overview of the six governor metrics closest to their limit, time by category,
+self time by namespace and the governor usage charts.
+Pointer off both panes before Enter."
 
   "governor-heap.png|full|Call Tree tab, Memory view, showing Net, Gross and Peak with their self variants.
 Sorted by Peak descending and expanded 3 or 4 levels, so a real spike is on screen.
-Inspector closed."
+Inspector closed, so the columns get the full width."
 
   "calltree-time-order.png|full|Call Tree tab, Time Order. First of three shots stitched side by side.
+Inspector closed, so the three tree views get the full width.
 Expand 3 levels. Keep the scroll position and column widths identical across all three."
 
   "calltree-aggregated.png|full|Same tree, Aggregated view. Change only the view."
