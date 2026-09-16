@@ -69,8 +69,6 @@ Pointer off both panes before Enter."
   "analysis.png|full|Analysis tab, grouped by method, sorted by Self Time descending, scrolled to the top.
 Nothing selected - press Escape - so the inspector reads the whole log.
 Shows the Overview, Findings and Self time spread; open all three.
-Findings is a fill section until the fit fix lands, so drag its lower divider up
-until the gap under its last row is gone.
 Pointer off both panes before Enter."
 
   "database.png|full|Database tab, SOQL section expanded so rows, timings and selectivity show.
@@ -86,9 +84,16 @@ neither appears in any whole-log view.
 Open Details, Call stack, Call tree and SOQL issues.
 Pointer off both panes before Enter."
 
-  "governor-heap.png|full|Call Tree tab, Memory view, showing Net, Gross and Peak with their self variants.
-Sorted by Peak descending and expanded 3 or 4 levels, so a real spike is on screen.
-Inspector closed, so the columns get the full width."
+  # governor-heap.png is not in this list. Net, gross and peak are built from
+  # HEAP_ALLOCATE, which needs APEX_PROFILING at FINEST; sample-log.log is FINE
+  # and carries none, so the Memory view would shoot empty columns. Capture it
+  # against a log that has them:
+  #
+  #   LOG=/path/to/heap.log ./scripts/capture-screenshots.sh --no-build
+  #
+  # then add the entry back:
+  #   "governor-heap.png|full|Call Tree tab, Memory view, Net, Gross and Peak with their self
+  #    variants. Sorted by Peak descending, expanded 3 or 4 levels. Inspector closed."
 
   "calltree-time-order.png|full|Call Tree tab, Time Order. First of three shots stitched side by side.
 Inspector closed, so the three tree views get the full width.
