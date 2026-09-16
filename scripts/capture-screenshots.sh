@@ -47,21 +47,56 @@ TOP_CROP=${TOP_CROP:-35}
 FULL_W=1920 # full views ship at this width
 CROP_W=800  # crops ship at this width, 2x their 400px display size
 
-# name | full or crop | what to set up
+# name | full or crop | what to set up, one step per line
+#
+# Every step is here because the shot is reproduced from scratch each release
+# and "which tab, what selected" is not recoverable from the old image.
 SHOTS=(
-  "timeline.png|full|Timeline tab, whole log, nothing selected"
-  "calltree.png|full|Call Tree tab, Time Order"
-  "analysis.png|full|Analysis tab"
-  "database.png|full|Database tab"
-  "inspector.png|full|Inspector docked right, sections expanded, call tree expanded"
-  "governor-heap.png|full|Memory view showing net, gross and peak"
-  "calltree-time-order.png|full|Call Tree, Time Order (stitched into calltree-combined)"
-  "calltree-aggregated.png|full|Call Tree, Aggregated"
-  "calltree-bottom-up.png|full|Call Tree, Bottom-Up"
-  "timeline-tooltip.png|crop|Hover a frame - drag round the details panel"
-  "timeline-gov-strip.png|crop|Governor strip expanded with a tooltip - drag round the strip and the timeline above it"
-  "timeline-find.png|crop|Find open on the Timeline - drag round the find bar and a match"
-  "calltree-soql-format.png|crop|A formatted SOQL cell - drag round the row"
+  "timeline.png|full|Timeline tab, zoomed out to the whole log (double-click the minimap to reset).
+Nothing selected, inspector closed, Find closed.
+Move the pointer off the chart before you press Enter, so no hover card is caught."
+
+  "calltree.png|full|Call Tree tab, Time Order view.
+Expand 3 or 4 levels, so signatures, timings and the DML/SOQL/Rows columns all have values.
+Scrolled to the top. Nothing selected, inspector closed."
+
+  "analysis.png|full|Analysis tab, grouped by method, sorted by Self Time descending.
+Scrolled to the top so the most expensive methods lead.
+Nothing selected, inspector closed."
+
+  "database.png|full|Database tab, SOQL section expanded so rows, timings and selectivity show.
+DML and SOSL sections visible below it.
+Nothing selected, inspector closed."
+
+  "inspector.png|full|Timeline tab, inspector docked right at about a third of the width.
+Select a mid-log frame deep enough to have a real call stack, e.g. a RecursiveSearcher.search frame.
+All four sections open: Details, Self time by namespace, Call stack, Call tree.
+Call tree in Time Order, expanded 2 or 3 levels.
+Pointer away from both panes before Enter, so nothing is dimmed or marked."
+
+  "governor-heap.png|full|Call Tree tab, Memory view, showing Net, Gross and Peak with their self variants.
+Sorted by Peak descending and expanded 3 or 4 levels, so a real spike is on screen.
+Inspector closed."
+
+  "calltree-time-order.png|full|Call Tree tab, Time Order. First of three shots stitched side by side.
+Expand 3 levels. Keep the scroll position and column widths identical across all three."
+
+  "calltree-aggregated.png|full|Same tree, Aggregated view. Change only the view."
+
+  "calltree-bottom-up.png|full|Same tree, Bottom-Up view. Change only the view."
+
+  "timeline-tooltip.png|crop|Timeline tab. Hover a SOQL frame, so the card shows a fitted query with its WHERE.
+Let the card fade in fully.
+Drag round the card plus a little of the frame under it."
+
+  "timeline-gov-strip.png|crop|Timeline tab, governor strip expanded, hovering a point so the tooltip lists used / limit.
+Drag round the strip, its tooltip, and the bottom of the flame chart above it."
+
+  "timeline-find.png|crop|Timeline tab. CMD+F, search a term with several matches, step to one.
+Drag round the find bar and the highlighted match."
+
+  "calltree-soql-format.png|crop|Call Tree tab. Find a row whose SOQL is long enough to be formatted.
+Drag round that one row, full width."
 )
 
 command -v magick >/dev/null || { echo "needs ImageMagick: brew install imagemagick" >&2; exit 1; }
@@ -153,8 +188,11 @@ echo "capturing ${W}x${H} at ${X},${Y}"
 echo "open the log with 'Log: Show Apex Log Analysis' before the first shot."
 
 for shot in "${SHOTS[@]}"; do
-  IFS='|' read -r name mode setup <<<"$shot"
-  printf '\n%s\n  %s\n  Enter to capture, s to skip: ' "$name" "$setup"
+  IFS='|' read -r -d '' name mode setup <<<"$shot" || true
+  setup=${setup%$'\n'} # the here-string's own newline
+  printf '\n%s\n' "$name"
+  printf '%s\n' "$setup" | sed 's/^/  /'
+  printf '  Enter to capture, s to skip: '
   read -r key </dev/tty
   [ "$key" = "s" ] && continue
 
