@@ -66,8 +66,8 @@ import {
   rowIndexStamper,
   rowFrames,
 } from '../../../components/locatedRow.js';
-import { InspectorEmphasis } from '../../../components/inspectorEmphasis.js';
-import { revealFirstOf, wireInspectorTab } from '../../../components/inspectorTab.js';
+import { InspectorTabController } from '../../../components/InspectorTabController.js';
+import { revealFirstOf } from '../../../components/inspectorTab.js';
 import { createTimeOrderTable } from './TimeOrderTable.js';
 
 /** Time Order keys its rows by event index; the grouped views key theirs by the
@@ -176,11 +176,9 @@ export class CalltreeView extends LitElement {
 
   /** Guards the programmatic select made on the inspector's behalf. */
   private _echoGuard = new SelectionEchoGuard();
-  private _inspectorUnsubscribe: (() => void) | null = null;
+
   private _locatedRow = new LocatedRowMarker();
   private _locateIds = new LocatedRowIds();
-  /** Which of the inspector's reports the mark follows. */
-  private _emphasis = new InspectorEmphasis();
 
   private readonly _documentBus = new DomListenerController<
     FindEventMap & CalltreeNavigationEventMap
@@ -191,24 +189,23 @@ export class CalltreeView extends LitElement {
     'lv-find-close': (e) => void this._find(e),
   });
 
+  private readonly _inspector = new InspectorTabController(this, 'calltree', {
+    mark: (eventIndexes) => this._markLocated(eventIndexes),
+    reveal: (eventIndex, signal) => this._revealEventIndex(eventIndex, signal),
+    clear: () => {
+      // The table reports the clear itself, which is what reaches the inspector.
+      for (const table of this._tables) {
+        table.deselectRow();
+      }
+    },
+    // A picked row merges calls, so the mark shows all of them while the view
+    // moves to the first of them.
+    revealMerged: revealFirstOf((eventIndex, signal) => this._revealEventIndex(eventIndex, signal)),
+  });
+
   override connectedCallback(): void {
     super.connectedCallback();
     this._categoryColoringOff = wireCategoryColoring(this);
-    this._inspectorUnsubscribe = wireInspectorTab('calltree', this._emphasis, {
-      mark: (eventIndexes) => this._markLocated(eventIndexes),
-      reveal: (eventIndex, signal) => this._revealEventIndex(eventIndex, signal),
-      clear: () => {
-        // The table reports the clear itself, which is what reaches the inspector.
-        for (const table of this._tables) {
-          table.deselectRow();
-        }
-      },
-      // A picked row merges calls, so the mark shows all of them while the view
-      // moves to the first of them.
-      revealMerged: revealFirstOf((eventIndex, signal) =>
-        this._revealEventIndex(eventIndex, signal),
-      ),
-    });
 
     // A detach destroyed the tables, and `updated` builds only for the log's
     // arrival. With a log already in hand this is a re-attach, and the build's
@@ -224,8 +221,6 @@ export class CalltreeView extends LitElement {
     this._visibilityWait = null;
     this._categoryColoringOff?.();
     this._categoryColoringOff = null;
-    this._inspectorUnsubscribe?.();
-    this._inspectorUnsubscribe = null;
     this._destroyCurrentTable();
   }
 
@@ -1088,7 +1083,7 @@ export class CalltreeView extends LitElement {
       if (!selection) {
         // The selection went with it, and so does a mark a picked inspector row
         // left here — it was never a selection of this table.
-        this._markLocated(this._emphasis.pick([]));
+        this._inspector.dropPick();
       }
       eventBus.emit('detail:select', {
         source,

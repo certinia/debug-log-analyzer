@@ -2,7 +2,6 @@
  * Copyright (c) 2026 Certinia Inc. All rights reserved.
  */
 import { beforeEach, describe, expect, it } from '@jest/globals';
-import type { ReactiveController, ReactiveControllerHost } from 'lit';
 import type { Tabulator } from 'tabulator-tables';
 
 // The controller reads and writes settings through the extension host, which this
@@ -17,6 +16,7 @@ jest.mock('../../features/settings/Settings.js', () => ({
 
 import { ColumnSettingsController } from '../ColumnSettingsController.js';
 import { getVisibleFields, type ColumnView } from '../../tabulator/ColumnViews.js';
+import { FakeHost } from './controllerHostStub.js';
 
 /** What the extension host would answer with. */
 let stored: object = {};
@@ -65,34 +65,6 @@ function fakeTable(laidOut = true): Tabulator {
     redraw: () => {},
     element: { clientHeight: laidOut ? 100 : 0 },
   } as unknown as Tabulator;
-}
-
-/** The least a `ReactiveController` needs of its host. */
-class FakeHost implements ReactiveControllerHost {
-  readonly controllers: ReactiveController[] = [];
-  updates = 0;
-
-  addController(controller: ReactiveController): void {
-    this.controllers.push(controller);
-  }
-  removeController(): void {}
-  requestUpdate(): void {
-    this.updates++;
-  }
-  get updateComplete(): Promise<boolean> {
-    return Promise.resolve(true);
-  }
-
-  connect(): void {
-    for (const controller of this.controllers) {
-      controller.hostConnected?.();
-    }
-  }
-  disconnect(): void {
-    for (const controller of this.controllers) {
-      controller.hostDisconnected?.();
-    }
-  }
 }
 
 /** A connected controller over `table`, with settings already read. */

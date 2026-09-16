@@ -22,8 +22,8 @@ import {
   rowDetailSelection,
   rowFrames,
 } from '../../../components/locatedRow.js';
-import { InspectorEmphasis } from '../../../components/inspectorEmphasis.js';
-import { revealFirstOf, wireInspectorTab } from '../../../components/inspectorTab.js';
+import { InspectorTabController } from '../../../components/InspectorTabController.js';
+import { revealFirstOf } from '../../../components/inspectorTab.js';
 import { SelectionEchoGuard } from '../../../core/events/SelectionEchoGuard.js';
 import { eventByEventIndex } from '../../../core/utility/EventSearch.js';
 import { isVisible } from '../../../core/utility/Util.js';
@@ -150,10 +150,9 @@ export class AnalysisView extends LitElement {
 
   /** Guards the programmatic select made on the inspector's behalf. */
   private _echoGuard = new SelectionEchoGuard();
-  private _inspectorUnsubscribe: (() => void) | null = null;
+
   private _locatedRow = new LocatedRowMarker();
   private _locateIds = new LocatedRowIds();
-  private _emphasis = new InspectorEmphasis();
 
   private readonly _findBus = new DomListenerController<FindEventMap>(this, document, {
     'lv-find': (e) => void this._find(e),
@@ -161,33 +160,30 @@ export class AnalysisView extends LitElement {
     'lv-find-close': (e) => void this._find(e),
   });
 
+  private readonly _inspector = new InspectorTabController(this, 'analysis', {
+    // A row is a method bucket rather than one event, so a frame is translated
+    // into the paths of the rows it heads.
+    mark: (eventIndexes) => this._markLocated(eventIndexes),
+    // An inspector finding names one event; the grid holds it in the bucket for
+    // its method, so that bucket is what gets revealed.
+    reveal: (eventIndex, signal) => this._revealEventIndex(eventIndex, signal),
+    clear: () => {
+      // The table reports the clear itself, which is what reaches the inspector.
+      this.analysisTable?.deselectRow();
+    },
+    // A row buckets calls, so a merged pick moves to the first of them.
+    revealMerged: revealFirstOf((eventIndex, signal) => this._revealEventIndex(eventIndex, signal)),
+  });
+
   override connectedCallback(): void {
     super.connectedCallback();
     this._categoryColoringOff = wireCategoryColoring(this);
-    this._inspectorUnsubscribe = wireInspectorTab('analysis', this._emphasis, {
-      // A row is a method bucket rather than one event, so a frame is translated
-      // into the paths of the rows it heads.
-      mark: (eventIndexes) => this._markLocated(eventIndexes),
-      // An inspector finding names one event; the grid holds it in the bucket for
-      // its method, so that bucket is what gets revealed.
-      reveal: (eventIndex, signal) => this._revealEventIndex(eventIndex, signal),
-      clear: () => {
-        // The table reports the clear itself, which is what reaches the inspector.
-        this.analysisTable?.deselectRow();
-      },
-      // A row buckets calls, so a merged pick moves to the first of them.
-      revealMerged: revealFirstOf((eventIndex, signal) =>
-        this._revealEventIndex(eventIndex, signal),
-      ),
-    });
   }
 
   disconnectedCallback(): void {
     super.disconnectedCallback();
     this._categoryColoringOff?.();
     this._categoryColoringOff = null;
-    this._inspectorUnsubscribe?.();
-    this._inspectorUnsubscribe = null;
     this._locatedRow.clear();
   }
 
