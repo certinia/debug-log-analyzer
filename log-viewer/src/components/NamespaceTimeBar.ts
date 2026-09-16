@@ -9,6 +9,7 @@ import { customElement, property, state } from 'lit/decorators.js';
 import { logContext } from '../core/log/logContext.js';
 import type { LogStore } from '../core/log/LogStore.js';
 import { globalStyles } from '../styles/global.styles.js';
+import './SectionSkeleton.js';
 import { inspectorSectionStyles } from '../styles/inspectorSection.styles.js';
 import { segmentsWithTail } from './StackedTimeBar.js';
 import './StackedTimeBar.js';
@@ -75,7 +76,10 @@ export class NamespaceTimeBar extends LitElement {
   render() {
     const slices = this._slices;
     if (!slices) {
-      return html`<p class="note">Adding up the self time…</p>`;
+      return html`<section-skeleton
+        shape="bar"
+        fallback="Adding up the self time…"
+      ></section-skeleton>`;
     }
     const color = this._color;
     if (!slices.length || !color) {

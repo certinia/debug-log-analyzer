@@ -15,6 +15,7 @@ jest.mock('../../services/SelfTimeSpread.js', () => ({
 }));
 
 import '../SelfTimeSpreadView.js';
+import { settledNote } from '../../../../components/__tests__/sectionTestUtils.js';
 
 // Durations are nanoseconds, so the readings are set far enough apart to format apart.
 const rowOf = (overrides: Partial<SelfTimeSpread['lanes'][number]> = {}) => ({
@@ -58,7 +59,7 @@ describe('self-time-spread', () => {
   it('says the log timed nothing when it has no reading', async () => {
     const element = await view();
 
-    expect(text(element, '.note')).toBe('The log has no timed calls.');
+    expect(await settledNote(element)).toBe('The log has no timed calls.');
   });
 
   it('heads the lanes with how few signatures hold the self time', async () => {

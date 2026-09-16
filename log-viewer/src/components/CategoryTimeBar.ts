@@ -8,6 +8,7 @@ import { customElement, property } from 'lit/decorators.js';
 import { logContext } from '../core/log/logContext.js';
 import type { LogStore } from '../core/log/LogStore.js';
 import { globalStyles } from '../styles/global.styles.js';
+import './SectionSkeleton.js';
 import { inspectorSectionStyles } from '../styles/inspectorSection.styles.js';
 import { CategoryPaletteController, categorySelfTimes } from './categoryTime.js';
 import './StackedTimeBar.js';
@@ -33,7 +34,10 @@ export class CategoryTimeBar extends LitElement {
     const apexLog = this.logStore?.log;
     const slices = apexLog ? categorySelfTimes(apexLog) : [];
     if (!slices.length) {
-      return html`<p class="note">No categorised time was recorded in this log.</p>`;
+      return html`<section-skeleton
+        shape="bar"
+        fallback="No categorised time was recorded in this log."
+      ></section-skeleton>`;
     }
 
     return html`<stacked-time-bar

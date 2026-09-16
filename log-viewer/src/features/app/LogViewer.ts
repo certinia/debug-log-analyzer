@@ -13,6 +13,7 @@ import { customElement, property, state } from 'lit/decorators.js';
 import { parse, type ApexLog } from 'apex-log-parser';
 import { TAB_TO_SOURCE, eventBus } from '../../core/events/EventBus.js';
 import { logContext } from '../../core/log/logContext.js';
+import { logStatusContext, type LogStatus } from '../../core/log/logStatus.js';
 import { setCurrentLog, type LogStore } from '../../core/log/LogStore.js';
 import {
   VSCodeExtensionMessenger,
@@ -65,6 +66,10 @@ export class LogViewer extends LitElement {
   @provide({ context: logContext })
   @state()
   private _logStore: LogStore | null = null;
+
+  @provide({ context: logStatusContext })
+  @state()
+  private _logStatus: LogStatus = 'parsing';
 
   @state()
   _selectedTab = 'timeline-tab';
@@ -133,9 +138,15 @@ export class LogViewer extends LitElement {
 
   constructor() {
     super();
-    void vscodeMessenger.request<LogDataEvent>('fetchLog').then((msg) => {
-      void this._handleLogFetch(msg);
-    });
+    void vscodeMessenger
+      .request<LogDataEvent>('fetchLog')
+      .then((msg) => this._handleLogFetch(msg))
+      .catch((err: unknown) => {
+        // The only other end to the wait is a parsed log, so without this a
+        // request that never answers leaves every skeleton pulsing for good.
+        this._logStatus = 'failed';
+        throw err;
+      });
 
     document.addEventListener('show-tab', (e: Event) => {
       this._showTabEvent(e);
@@ -261,12 +272,14 @@ export class LogViewer extends LitElement {
       // Resolve the identity even when parsing throws, or the header's identity
       // skeletons would pulse forever with nothing left to fill them.
       this.logIdentity = { entryPoint: null, user: null, startTime: null };
+      this._logStatus = 'failed';
       throw err;
     }
 
     // Published before the views render, so every tab reads the same log
     // whichever one loads first.
     this._logStore = setCurrentLog(apexLog);
+    this._logStatus = 'ready';
 
     this.logSize = apexLog.size;
     this.timelineRoot = apexLog;

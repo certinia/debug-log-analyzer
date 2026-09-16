@@ -17,6 +17,8 @@ import {
   type HotPathFrame,
 } from '../features/call-tree/utils/ExecutionHighlights.js';
 import { globalStyles } from '../styles/global.styles.js';
+import { NO_TIMED_CALLS_TEXT } from './governorCopy.js';
+import './SectionSkeleton.js';
 import { inspectorSectionStyles } from '../styles/inspectorSection.styles.js';
 import { revealRowStyles } from '../styles/revealRow.styles.js';
 import { severityStyles } from '../styles/severity.styles.js';
@@ -98,7 +100,10 @@ export class HotPath extends LitElement {
     const log = this.logStore?.log;
     const highlights = log && getExecutionHighlights(log);
     if (!highlights || !highlights.hotPath.length) {
-      return html`<p class="note">The log has no timed calls.</p>`;
+      return html`<section-skeleton
+        shape="rows"
+        fallback=${NO_TIMED_CALLS_TEXT}
+      ></section-skeleton>`;
     }
 
     // The last frame is the one the path exists to name, so a long path keeps it

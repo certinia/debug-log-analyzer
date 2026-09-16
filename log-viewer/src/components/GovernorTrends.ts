@@ -23,7 +23,8 @@ import {
   type TrendPoint,
   type TrendSeries,
 } from './governorTrendData.js';
-import { NO_GOVERNOR_USAGE_TEXT, NO_LOG_TEXT } from './governorCopy.js';
+import { NO_GOVERNOR_USAGE_TEXT } from './governorCopy.js';
+import './SectionSkeleton.js';
 
 /** A placed cursor: the sample, and the chart it belongs to. */
 interface Cursor {
@@ -238,7 +239,7 @@ export class GovernorTrends extends LitElement {
   render() {
     const apexLog = this.logStore?.log;
     if (!apexLog) {
-      return html`<p class="note">${NO_LOG_TEXT}</p>`;
+      return html`<section-skeleton shape="chart"></section-skeleton>`;
     }
     const series = governorTrendSeries(apexLimitTimeSeries(apexLog));
     if (!series.length) {

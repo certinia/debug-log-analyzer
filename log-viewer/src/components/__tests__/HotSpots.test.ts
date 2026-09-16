@@ -14,6 +14,7 @@ jest.mock('../../features/call-tree/utils/ExecutionHighlights.js', () => ({
 }));
 
 import '../HotSpots.js';
+import { settledNote } from './sectionTestUtils.js';
 
 const spotsOf = (): ExecutionHighlights => ({
   totalTime: 1_000_000_000,
@@ -112,6 +113,6 @@ describe('hot-spots', () => {
 
     const element = await hotSpots();
 
-    expect(element.shadowRoot?.querySelector('.note')?.textContent).toContain('no timed calls');
+    expect(await settledNote(element)).toContain('no timed calls');
   });
 });

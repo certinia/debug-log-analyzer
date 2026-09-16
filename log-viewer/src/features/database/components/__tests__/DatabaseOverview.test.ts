@@ -40,6 +40,7 @@ jest.mock('../../services/databaseOverview.js', () => ({
 
 import { databaseTreeRows, ownCodeTotal, type DatabaseTreeRow } from '../DatabaseTimeTree.js';
 import '../DatabaseOverview.js';
+import { settledNote } from '../../../../components/__tests__/sectionTestUtils.js';
 
 const emptyOverview = (): DatabaseOverview => ({
   time: {
@@ -213,8 +214,6 @@ const texts = (element: Element, selector: string) =>
     (node.textContent ?? '').replace(/\s+/g, ' ').trim(),
   );
 
-const note = (element: Element) => element.shadowRoot?.querySelector('.note')?.textContent ?? '';
-
 describe('databaseTreeRows', () => {
   /** Every row, in the order the grid holds them. */
   const flatten = (rows: readonly DatabaseTreeRow[]): DatabaseTreeRow[] =>
@@ -383,7 +382,9 @@ describe('database-concentration', () => {
 
   it('says so when the log records no statements', async () => {
     overview = emptyOverview();
-    expect(note(await mount('database-concentration'))).toContain('no database statements');
+    expect(await settledNote(await mount('database-concentration'))).toContain(
+      'no database statements',
+    );
   });
 });
 
@@ -494,6 +495,8 @@ describe('database-namespaces', () => {
 
   it('says so when the log records no statements', async () => {
     overview = emptyOverview();
-    expect(note(await mount('database-namespaces'))).toContain('no database statements');
+    expect(await settledNote(await mount('database-namespaces'))).toContain(
+      'no database statements',
+    );
   });
 });
