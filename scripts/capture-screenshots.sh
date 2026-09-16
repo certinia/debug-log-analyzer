@@ -52,12 +52,13 @@ CROP_W=800  # crops ship at this width, 2x their 400px display size
 # Every step is here because the shot is reproduced from scratch each release
 # and "which tab, what selected" is not recoverable from the old image.
 SHOTS=(
-  # The inspector stays docked right for the four tab shots, at about a third of
-  # the width. Each tab answers with different sections, so the four are not the
-  # same picture - keep the dock width identical across them.
+  # The four tab shots all read the whole log, with the inspector docked right at
+  # about a third of the width. That is the state a log opens in, and each tab
+  # answers it differently, so the four are four stories rather than one told
+  # four times. Keep the dock width identical across them.
   "timeline.png|full|Timeline tab, zoomed out to the whole log (double-click the minimap to reset).
-Select a mid-log frame deep enough to have a real call stack, e.g. a RecursiveSearcher.search frame.
-Inspector shows Details, Self time by namespace, Call stack and Call tree; open all four.
+Nothing selected - press Escape - so the inspector reads the whole log.
+Shows the Overview, time by category, Self time by namespace and the governor usage charts.
 Find closed. Pointer off both panes before Enter, so nothing is dimmed or hovered."
 
   "calltree.png|full|Call Tree tab, Time Order view, expanded 3 or 4 levels, scrolled to the top.
@@ -73,16 +74,16 @@ until the gap under its last row is gone.
 Pointer off both panes before Enter."
 
   "database.png|full|Database tab, SOQL section expanded so rows, timings and selectivity show.
-Select a SOQL statement whose query is non-trivial, so Details carries selectivity, query plan
-and cardinality, and SOQL issues has tips.
-Open Details and SOQL issues.
+Nothing selected - press Escape - so the inspector reads the whole log.
+Shows the Overview, Namespace duration, Database duration and the call tree of paths
+that end in a query; open them all.
 Pointer off both panes before Enter."
 
-  "inspector.png|full|Call Tree tab, the fullest single panel, and the counterpart to calltree.png
-being the whole-log view.
-Select a row deep enough to have a real call stack, e.g. a RecursiveSearcher.search row.
-Shows Details, Call stack and Call tree; open all three, Call tree in Time Order
-expanded 2 or 3 levels.
+  "inspector.png|full|The one shot with a selection, so the panel is shown answering about one thing.
+Database tab, select a SOQL statement whose query is non-trivial.
+Details then carries selectivity, query plan and cardinality, and SOQL issues has tips -
+neither appears in any whole-log view.
+Open Details, Call stack, Call tree and SOQL issues.
 Pointer off both panes before Enter."
 
   "governor-heap.png|full|Call Tree tab, Memory view, showing Net, Gross and Peak with their self variants.
