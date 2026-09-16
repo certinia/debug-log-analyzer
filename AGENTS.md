@@ -98,8 +98,9 @@ communicate via message passing only.
 - Conventional commits (`feat:`, `fix:`, `build:`, `chore:`, `ci:`, `docs:`, `style:`,
   `refactor:`, `perf:`, `test:`). Don't auto-commit.
 - Branches: `feat-*` for features, `bug-*` for defects.
-- Releases follow SemVer; update CHANGELOG; breaking changes need a migration guide.
-- CHANGELOG entries: see the `changelog-entry` skill in `.claude/skills/`.
+- Releases follow SemVer; breaking changes need a migration guide.
+- A user-visible change updates CHANGELOG. A refactor, a test or the mechanism behind a fix
+  does not. See the `changelog-entry` skill in `.claude/skills/`.
 - Never reference Anthropic or Claude in commit messages, PRs, etc.
 
 ## Rules manifest

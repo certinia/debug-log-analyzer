@@ -69,6 +69,10 @@ it, it gets no entry: a refactor, a renamed internal helper, a test, the mechani
 Give the result, not the method. A number earns its place when the size **is** the result; how it
 was measured does not.
 
+**Name only a symptom you reproduced.** If you cannot say how you saw it — the steps, and the wrong
+value on screen — you have the mechanism, not the result, and it gets no entry. A leaked listener, a
+count held in the wrong place and a stale cache are all mechanisms until someone watches one misbehave.
+
 **A performance entry always carries its number** — a multiple or a percentage, and what it is of.
 "Faster" on its own is not an entry, because the reader cannot tell whether to care.
 
