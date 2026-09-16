@@ -50,6 +50,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - 🖱️ **Governor limits strip**: reading across the 15px collapsed strip lost the tooltip on the smallest wobble; the hover now holds until the pointer is clear of it.
 - 🐛 **Go to Code** matches methods with namespace or `System` qualified parameter types. ([#834])
 - 🎨 **Theme switch**: Timeline and view colours update straight away instead of needing the log reopened.
+- 🔎 **Timeline search**: switching to the legacy timeline and back left the old chart answering searches too, so each switch added another set of stale results.
 
 ## [1.20.1] 2026-07-23
 
