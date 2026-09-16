@@ -1,20 +1,46 @@
 #!/usr/bin/env bash
 #
-# Capture the release screenshots from a real VS Code window.
+# Capture the release screenshots from this branch's build.
 #
-#   ./scripts/capture-screenshots.sh [outdir] [app name]
+#   ./scripts/capture-screenshots.sh [outdir]
 #
-# You drive VS Code; the script owns window size, naming, scaling, colour space
-# and metadata. It stops before each shot: set the view up, return here, press
-# Enter. Press s to skip one.
+# It builds the extension, opens sample-app in an Extension Development Host
+# against a throwaway user-data-dir, then stops before each shot: set the view
+# up, come back, press Enter. Press s to skip one.
+#
+# The throwaway profile is what makes a release reproducible - same theme, same
+# font size, no sidebar, status bar or personal state, nothing identifying in
+# frame - and it guarantees the images show the branch you are releasing rather
+# than whatever build happened to be open.
+#
+#   --no-build   skip the build and reuse lana/out
+#   --keep       leave the host running afterwards
 #
 # GIFs (preview, timeline-minimap) are recorded by hand - not handled here.
 set -euo pipefail
 
-OUT=${1:-lana/assets/1_22}
-APP=${2:-Code - Insiders} # "Code" for the stable build
+BUILD=1
+KEEP=0
+OUT=""
+for arg in "$@"; do
+  case $arg in
+    --no-build) BUILD=0 ;;
+    --keep) KEEP=1 ;;
+    *) OUT=$arg ;;
+  esac
+done
+OUT=${OUT:-lana/assets/1_22}
+
+REPO=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
+EDITOR_CLI=${EDITOR_CLI:-code-insiders}
+APP=${APP:-Code - Insiders} # the process name of $EDITOR_CLI
+LOG=${LOG:-$REPO/sample-app/debug-logs/sample-log.log}
 WINDOW_W=1920
 WINDOW_H=1080
+# The window is all editor once the profile hides the rest, so only the title
+# bar is left to drop. Measure it from the first shot and set TOP_CROP if the
+# framing is off.
+TOP_CROP=${TOP_CROP:-35}
 FULL_W=1920 # full views ship at this width
 CROP_W=800  # crops ship at this width, 2x their 400px display size
 
@@ -36,37 +62,86 @@ SHOTS=(
 )
 
 command -v magick >/dev/null || { echo "needs ImageMagick: brew install imagemagick" >&2; exit 1; }
+command -v "$EDITOR_CLI" >/dev/null || { echo "no $EDITOR_CLI on PATH - set EDITOR_CLI" >&2; exit 1; }
+[ -f "$LOG" ] || { echo "no log at $LOG - set LOG" >&2; exit 1; }
 mkdir -p "$OUT"
 tmp=$(mktemp -d)
-trap 'rm -rf "$tmp"' EXIT
+# --keep leaves the temp dir alone: the running host still reads its profile.
+trap '[ "$KEEP" -eq 1 ] || rm -rf "$tmp"' EXIT
 
-# Everything goes through System Events. A plain `tell application "Code" to
-# activate` hangs until the AppleEvent times out, because Electron never answers
-# it, and the window list stays empty until the app is focused.
+if [ "$BUILD" -eq 1 ]; then
+  [ -d "$REPO/node_modules" ] || { echo "no node_modules - run pnpm install first" >&2; exit 1; }
+  echo "building $(git -C "$REPO" rev-parse --abbrev-ref HEAD) ..."
+  (cd "$REPO" && pnpm build)
+fi
+[ -d "$REPO/lana/out" ] || { echo "nothing built at lana/out" >&2; exit 1; }
+
+# A fresh profile every run, so the chrome is identical release to release and
+# no recent file, org name or account is ever in frame.
+profile=$tmp/profile
+mkdir -p "$profile/User"
+cat >"$profile/User/settings.json" <<'JSON'
+{
+  "workbench.colorTheme": "Default Dark Modern",
+  "workbench.startupEditor": "none",
+  "workbench.statusBar.visible": false,
+  "workbench.activityBar.location": "hidden",
+  "workbench.editor.showTabs": "multiple",
+  "window.commandCenter": false,
+  "window.menuBarVisibility": "hidden",
+  "editor.fontSize": 13,
+  "telemetry.telemetryLevel": "off",
+  "update.mode": "none",
+  "extensions.autoCheckUpdates": false,
+  "git.openRepositoryInParentFolders": "never"
+}
+JSON
+
+echo "opening the extension host ..."
+"$EDITOR_CLI" --new-window \
+  --user-data-dir "$profile" \
+  --extensions-dir "$tmp/extensions" \
+  --extensionDevelopmentPath="$REPO/lana" \
+  "$REPO/sample-app" "$LOG" >/dev/null 2>&1
+
+# System Events only. `tell application "Code" to activate` never returns:
+# Electron does not answer the AppleEvent, and the window list stays empty
+# until the app is focused.
 focus() {
-  osascript -e "tell application \"System Events\" to set frontmost of process \"$APP\" to true"
+  osascript -e "tell application \"System Events\" to set frontmost of process \"$APP\" to true" >/dev/null
+}
+host_window() {
+  osascript -e "tell application \"System Events\" to tell process \"$APP\"
+    repeat with w in windows
+      if name of w contains \"sample-app\" then return name of w
+    end repeat
+    return \"\"
+  end tell" 2>/dev/null
 }
 
-focus || { echo "no process named \"$APP\" - pass the app name as the second argument" >&2; exit 1; }
-sleep 1
-windows=$(osascript -e "tell application \"System Events\" to tell process \"$APP\" to return count of windows")
-[ "${windows:-0}" -gt 0 ] || {
-  echo "\"$APP\" has no open window. Open the log you are capturing, then run this again." >&2
-  exit 1
-}
+for _ in $(seq 30); do
+  sleep 1
+  focus || continue
+  [ -n "$(host_window)" ] && break
+done
+[ -n "$(host_window)" ] || { echo "the host window never appeared" >&2; exit 1; }
 
-# Size the window once, then read back where it actually landed: the menu bar
-# means the position asked for is not the position given.
+# Size it, then read back where it landed: the menu bar means the position
+# asked for is not the position given.
 osascript -e "tell application \"System Events\" to tell process \"$APP\"
-  set size of window 1 to {$WINDOW_W, $WINDOW_H}
-  set position of window 1 to {0, 0}
+  set w to first window whose name contains \"sample-app\"
+  set size of w to {$WINDOW_W, $WINDOW_H}
+  set position of w to {0, 0}
 end tell" >/dev/null
 read -r X Y W H < <(
-  osascript -e "tell application \"System Events\" to tell process \"$APP\" to get {position, size} of window 1" |
+  osascript -e "tell application \"System Events\" to tell process \"$APP\" to get {position, size} of (first window whose name contains \"sample-app\")" |
     tr -d ' ' | tr ',' ' '
 )
-echo "window: ${W}x${H} at ${X},${Y}"
+Y=$((Y + TOP_CROP))
+H=$((H - TOP_CROP))
+echo "capturing ${W}x${H} at ${X},${Y}"
 [ "$W" -eq "$WINDOW_W" ] || echo "warning: window is ${W} wide, not ${WINDOW_W} - the display may be too small"
+echo "open the log with 'Log: Show Apex Log Analysis' before the first shot."
 
 for shot in "${SHOTS[@]}"; do
   IFS='|' read -r name mode setup <<<"$shot"
@@ -87,9 +162,8 @@ for shot in "${SHOTS[@]}"; do
   fi
 
   # -resize down from the Retina grab, -colorspace so a P3 display does not
-  # ship oversaturated, -strip so no EXIF or profile reaches the repo.
-  # A Retina grab comes back at 2x, which downscales sharp. A 1x grab means the
-  # display is not Retina - the shot is usable but softer.
+  # ship oversaturated, -strip so no EXIF or profile reaches the repo. A 1x grab
+  # means the display is not Retina - usable, but softer.
   raw=$(magick identify -format '%wx%h' "$tmp/raw.png")
   magick "$tmp/raw.png" -resize "${target}x" -colorspace sRGB -strip "$OUT/$name"
   rm -f "$tmp/raw.png"
@@ -113,3 +187,5 @@ for f in "$OUT"/*.png "$OUT"/*.gif "$OUT"/vscode/*; do
   [ -n "$profiles" ] && { echo "  $f carries: $profiles"; found=1; }
 done
 [ "$found" -eq 0 ] && echo "  clean" || echo "  run: magick mogrify -colorspace sRGB -strip <file>"
+
+[ "$KEEP" -eq 1 ] && echo && echo "host left running on $tmp - delete it when you close the window."
