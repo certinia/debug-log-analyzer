@@ -35,6 +35,8 @@ REPO=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
 EDITOR_CLI=${EDITOR_CLI:-code-insiders}
 APP=${APP:-Code - Insiders} # the process name of $EDITOR_CLI
 LOG=${LOG:-$REPO/sample-app/debug-logs/sample-log.log}
+# What the host window title carries, so a raise never hits your other windows.
+WINDOW_MATCH=${WINDOW_MATCH:-sample-app}
 WINDOW_W=1920
 WINDOW_H=1080
 # The window is all editor once the profile hides the rest, so only the title
@@ -107,34 +109,47 @@ echo "opening the extension host ..."
 # System Events only. `tell application "Code" to activate` never returns:
 # Electron does not answer the AppleEvent, and the window list stays empty
 # until the app is focused.
+#
+# AXRaise picks out the host window first. Raising the application instead
+# brings forward whichever window it last had - another of your editor windows,
+# and if that one sits on another Space, macOS drags you to that Space.
 focus() {
-  osascript -e "tell application \"System Events\" to set frontmost of process \"$APP\" to true" >/dev/null
+  osascript >/dev/null 2>&1 <<APPLESCRIPT
+tell application "System Events" to tell process "$APP"
+  try
+    perform action "AXRaise" of (first window whose name contains "$WINDOW_MATCH")
+  end try
+  set frontmost to true
+end tell
+APPLESCRIPT
 }
 host_window() {
-  osascript -e "tell application \"System Events\" to tell process \"$APP\"
+  osascript >/dev/null 2>&1 -e "tell application \"System Events\" to tell process \"$APP\"
     repeat with w in windows
-      if name of w contains \"sample-app\" then return name of w
+      if name of w contains \"$WINDOW_MATCH\" then return name of w
     end repeat
-    return \"\"
-  end tell" 2>/dev/null
+    error \"none\"
+  end tell"
 }
 
+# Poll without focusing: the window does not exist yet, so a focus here would
+# raise one of your other editor windows.
 for _ in $(seq 30); do
   sleep 1
-  focus || continue
-  [ -n "$(host_window)" ] && break
+  host_window && break
 done
-[ -n "$(host_window)" ] || { echo "the host window never appeared" >&2; exit 1; }
+host_window || { echo "the host window never appeared" >&2; exit 1; }
+focus
 
 # Size it, then read back where it landed: the menu bar means the position
 # asked for is not the position given.
 osascript -e "tell application \"System Events\" to tell process \"$APP\"
-  set w to first window whose name contains \"sample-app\"
+  set w to first window whose name contains \"$WINDOW_MATCH\"
   set size of w to {$WINDOW_W, $WINDOW_H}
   set position of w to {0, 0}
 end tell" >/dev/null
 read -r X Y W H < <(
-  osascript -e "tell application \"System Events\" to tell process \"$APP\" to get {position, size} of (first window whose name contains \"sample-app\")" |
+  osascript -e "tell application \"System Events\" to tell process \"$APP\" to get {position, size} of (first window whose name contains \"$WINDOW_MATCH\")" |
     tr -d ' ' | tr ',' ' '
 )
 Y=$((Y + TOP_CROP))
