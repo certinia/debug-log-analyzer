@@ -114,6 +114,18 @@ if [ "$BUILD" -eq 1 ]; then
 fi
 [ -d "$REPO/lana/out" ] || { echo "nothing built at lana/out" >&2; exit 1; }
 
+# Workspace settings, so the chrome is the same every release without touching
+# the profile you share with other windows. sample-app/.vscode is gitignored.
+mkdir -p "$REPO/sample-app/.vscode"
+cat >"$REPO/sample-app/.vscode/settings.json" <<'JSON'
+{
+  "workbench.activityBar.location": "hidden",
+  "workbench.statusBar.visible": false,
+  "workbench.editor.showTabs": "multiple",
+  "breadcrumbs.enabled": false
+}
+JSON
+
 echo "opening the extension host ..."
 "$EDITOR_CLI" --new-window \
   --profile "$PROFILE" \
@@ -185,7 +197,10 @@ Y=$((Y + TOP_CROP))
 H=$((H - TOP_CROP))
 echo "capturing ${W}x${H} at ${X},${Y}"
 [ "$W" -eq "$WINDOW_W" ] || echo "warning: window is ${W} wide, not ${WINDOW_W} - the display may be too small"
-echo "open the log with 'Log: Show Apex Log Analysis' before the first shot."
+echo "The activity bar, status bar and breadcrumbs are off for this workspace."
+echo "Press CMD+B if the side bar is open - that one is UI state, not a setting,"
+echo "so VS Code remembers it for sample-app from now on."
+echo "Then open the log with 'Log: Show Apex Log Analysis'."
 
 for shot in "${SHOTS[@]}"; do
   IFS='|' read -r -d '' name mode setup <<<"$shot" || true
