@@ -168,7 +168,7 @@ export class SOQLView extends LitElement {
     }
 
     if (changedProperties.has('highlightIndex')) {
-      this._highlightMatches(this.highlightIndex);
+      void this._highlightMatches(this.highlightIndex);
     }
   }
 
@@ -488,7 +488,7 @@ export class SOQLView extends LitElement {
       return;
     }
 
-    isVisible(this).then((isVisible) => {
+    void isVisible(this).then((isVisible) => {
       const tableWrapper = this._soqlTableWrapper;
       if (tableWrapper && this.timelineRoot && isVisible) {
         Tabulator.registerModule(Object.values(CommonModules));

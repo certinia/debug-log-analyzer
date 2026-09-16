@@ -3,7 +3,7 @@
  */
 import { beforeEach, describe, expect, it } from '@jest/globals';
 
-import { window } from 'vscode';
+import { Uri, window } from 'vscode';
 
 import { createMockContext } from '../../__tests__/helpers/test-builders.js';
 import { SwitchTimelineTheme } from '../SwitchTimelineTheme.js';
@@ -41,7 +41,7 @@ describe('SwitchTimelineTheme', () => {
     onDidHide: jest.Mock;
   };
 
-  let onDidAcceptCallback: () => void;
+  let onDidAcceptCallback: () => Promise<void>;
   let onDidHideCallback: () => void;
   let onDidChangeActiveCallback: (items: Array<{ label: string }>) => void;
 
@@ -96,6 +96,22 @@ describe('SwitchTimelineTheme', () => {
       );
 
       expect(command.title).toBe('Log: Timeline Theme');
+    });
+
+    it('reports a failure to change the theme rather than failing silently', async () => {
+      mockGetConfig.mockImplementation(() => {
+        throw new Error('config unavailable');
+      });
+      const mockContext = createMockContext();
+      const command = SwitchTimelineTheme.getCommand(
+        mockContext as unknown as import('../../Context.js').Context,
+      );
+
+      await expect(command.run(Uri.parse('memfs:/logs/a.log'))).resolves.toBeUndefined();
+
+      expect(mockContext.display.showErrorMessage).toHaveBeenCalledWith(
+        'Error changing timeline theme: config unavailable',
+      );
     });
   });
 
@@ -301,7 +317,7 @@ describe('SwitchTimelineTheme', () => {
       // Navigate to a theme
       onDidChangeActiveCallback([{ label: 'Nord' }]);
       // Accept selection
-      onDidAcceptCallback();
+      await onDidAcceptCallback();
 
       expect(mockUpdateConfig).toHaveBeenCalledWith('timeline.activeTheme', 'Nord');
     });
@@ -318,6 +334,24 @@ describe('SwitchTimelineTheme', () => {
       // Need to await since onDidAccept is async
       await onDidAcceptCallback();
 
+      expect(mockQuickPick.hide).toHaveBeenCalled();
+    });
+
+    it('reports a failure to save the chosen theme', async () => {
+      mockUpdateConfig.mockRejectedValue(new Error('settings are read-only'));
+      const mockContext = createMockContext();
+      const command = SwitchTimelineTheme.getCommand(
+        mockContext as unknown as import('../../Context.js').Context,
+      );
+
+      await command.run({} as never);
+
+      onDidChangeActiveCallback([{ label: 'Nord' }]);
+      await onDidAcceptCallback();
+
+      expect(mockContext.display.showErrorMessage).toHaveBeenCalledWith(
+        'Error changing timeline theme: settings are read-only',
+      );
       expect(mockQuickPick.hide).toHaveBeenCalled();
     });
   });
@@ -390,7 +424,7 @@ describe('SwitchTimelineTheme', () => {
       // Navigate to same theme
       onDidChangeActiveCallback([{ label: '50 Shades of Green' }]);
       // Accept and hide
-      onDidAcceptCallback();
+      await onDidAcceptCallback();
       mockWebview.postMessage.mockClear();
       onDidHideCallback();
 

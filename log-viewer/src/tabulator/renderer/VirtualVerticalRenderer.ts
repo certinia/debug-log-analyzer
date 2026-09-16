@@ -705,7 +705,7 @@ export class VirtualVerticalRenderer extends Renderer {
     return new Promise((resolve, reject) => {
       const idx = this._indexOfRow(row);
       if (idx < 0) {
-        reject('Scroll Error - Row not visible');
+        reject(new Error('Scroll Error - Row not visible'));
         return;
       }
 

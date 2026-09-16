@@ -14,7 +14,7 @@ import {
 import type { LogEvent } from 'apex-log-parser';
 
 import type { Context } from '../Context.js';
-import { LogEventCache } from '../cache/LogEventCache.js';
+import { LogEventCache, type LogReporter } from '../cache/LogEventCache.js';
 import { isOpenAsTextTab } from '../editor/TabState.js';
 import { isApexLogContent } from '../language/ApexLogLanguageDetector.js';
 import { buildMetricParts, formatDuration, TIMESTAMP_REGEX } from '../log-utils.js';
@@ -30,10 +30,12 @@ const cursorLineDecorationType = window.createTextEditorDecorationType({
 export class RawLogLineDecoration {
   private static instance: RawLogLineDecoration | null = null;
   private context: ExtensionContext;
+  private readonly reporter: LogReporter;
   private debounceTimeout: ReturnType<typeof setTimeout> | null = null;
 
-  private constructor(context: ExtensionContext) {
+  private constructor(context: ExtensionContext, reporter: LogReporter) {
     this.context = context;
+    this.reporter = reporter;
   }
 
   static apply(context: Context): void {
@@ -41,7 +43,7 @@ export class RawLogLineDecoration {
       return;
     }
 
-    RawLogLineDecoration.instance = new RawLogLineDecoration(context.context);
+    RawLogLineDecoration.instance = new RawLogLineDecoration(context.context, context.display);
     RawLogLineDecoration.instance.register();
   }
 
@@ -67,7 +69,7 @@ export class RawLogLineDecoration {
     }
 
     this.debounceTimeout = setTimeout(() => {
-      this.updateDecoration(event.textEditor);
+      void this.updateDecoration(event.textEditor);
     }, 100);
   }
 
@@ -96,7 +98,7 @@ export class RawLogLineDecoration {
       return;
     }
 
-    const apexLog = await LogEventCache.getApexLog(document.uri);
+    const apexLog = await LogEventCache.getApexLog(document.uri, this.reporter);
     if (!apexLog) {
       this.clearDecorations(editor);
       return;

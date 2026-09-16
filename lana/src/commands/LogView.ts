@@ -74,7 +74,14 @@ export class LogView {
       const bundleUri = panel.webview.asWebviewUri(Utils.joinPath(logViewerRoot, 'bundle.js'));
       const codiconUri = panel.webview.asWebviewUri(Utils.joinPath(logViewerRoot, 'codicon.css'));
       const index = Utils.joinPath(logViewerRoot, 'index.html');
-      panel.webview.html = (await readFileText(index))
+      const template = await readFileText(index).catch((error: unknown) => {
+        const message = error instanceof Error ? error.message : String(error);
+        const shown = index.scheme === 'file' ? index.fsPath : index.toString(true);
+        throw new Error(`Could not read the log viewer at ${shown}: ${message}`, {
+          cause: error,
+        });
+      });
+      panel.webview.html = template
         .replace(/bundle\.js/gi, bundleUri.toString(true))
         .replace(/codicon\.css/gi, codiconUri.toString(true));
     }
@@ -241,15 +248,17 @@ export class LogView {
     assets: NonNullable<ReturnType<typeof getEmbeddedLogViewerAssets>>,
   ): string {
     const fontData = `data:font/ttf;base64,${assets.codiconFont}`;
-    const codiconCss = assets.codiconCss
-      .replace(/url\((['"]?)\.\/codicon\.ttf[^)]*\)/i, `url("${fontData}")`)
-      .replace(/<\/style/gi, '<\\/style');
+    const codiconCss = assets.codiconCss.replace(
+      /url\(['"]?\.\/codicon\.ttf[^)]*\)/i,
+      `url("${fontData}")`,
+    );
+    const codiconHref = `data:text/css;charset=utf-8,${encodeURIComponent(codiconCss)}`;
     const script = assets.script.replace(/<\/script/gi, '<\\/script');
 
     return assets.html
       .replace(
         /<link\b(?=[^>]*\bid="vscode-codicon-stylesheet")[^>]*>/i,
-        () => `<style id="vscode-codicon-stylesheet">${codiconCss}</style>`,
+        () => `<link rel="stylesheet" id="vscode-codicon-stylesheet" href="${codiconHref}" />`,
       )
       .replace(
         /<script\b(?=[^>]*\bsrc="bundle\.js")[^>]*><\/script>/i,

@@ -36,6 +36,19 @@ const mockApplyWebView = WebView.apply as jest.Mock;
 const mockReadFile = workspace.fs.readFile as unknown as jest.Mock;
 
 describe('LogView', () => {
+  function createPanel() {
+    return {
+      iconPath: undefined,
+      onDidDispose: jest.fn(() => ({ dispose: jest.fn() })),
+      webview: {
+        asWebviewUri: jest.fn((uri: { path: string }) => Uri.parse(`webview:${uri.path}`)),
+        html: '',
+        onDidReceiveMessage: jest.fn(() => ({ dispose: jest.fn() })),
+        postMessage: jest.fn(),
+      },
+    };
+  }
+
   afterEach(() => {
     setEmbeddedLogViewerAssets(undefined);
   });
@@ -77,8 +90,13 @@ describe('LogView', () => {
     expect(panel.webview.html).toContain(
       '<script type="module">const replacementToken = "$&"; globalThis.viewerLoaded = true;',
     );
-    expect(panel.webview.html).toContain('/* $& */');
-    expect(panel.webview.html).toContain('data:font/ttf;base64,Zm9udA==');
+    const codiconHref = /<link[^>]*\bid="vscode-codicon-stylesheet"[^>]*\bhref="([^"]+)"/.exec(
+      panel.webview.html,
+    )?.[1];
+    expect(codiconHref).toMatch(/^data:text\/css;charset=utf-8,/);
+    const codiconCss = decodeURIComponent(codiconHref!.slice(codiconHref!.indexOf(',') + 1));
+    expect(codiconCss).toContain('/* $& */');
+    expect(codiconCss).toContain('data:font/ttf;base64,Zm9udA==');
     expect(mockReadFile).not.toHaveBeenCalled();
 
     await receiveMessage?.({ cmd: 'fetchLog', requestId: 'request-1' });
@@ -101,16 +119,7 @@ describe('LogView', () => {
   });
 
   it('loads the packaged template when embedded browser assets are not configured', async () => {
-    const panel = {
-      iconPath: undefined,
-      onDidDispose: jest.fn(() => ({ dispose: jest.fn() })),
-      webview: {
-        asWebviewUri: jest.fn((uri: { path: string }) => Uri.parse(`webview:${uri.path}`)),
-        html: '',
-        onDidReceiveMessage: jest.fn(() => ({ dispose: jest.fn() })),
-        postMessage: jest.fn(),
-      },
-    };
+    const panel = createPanel();
     mockApplyWebView.mockReturnValue(panel as unknown as import('vscode').WebviewPanel);
     mockReadFile.mockResolvedValue(
       new TextEncoder().encode('<script src="bundle.js"></script><link href="codicon.css">'),
@@ -121,5 +130,15 @@ describe('LogView', () => {
     expect(mockReadFile).toHaveBeenCalledWith(Uri.parse('file:///test/extension/out/index.html'));
     expect(panel.webview.html).toContain('webview:/test/extension/out/bundle.js');
     expect(panel.webview.html).not.toContain('src="bundle.js"');
+  });
+
+  it('names the file it could not read when the packaged template is missing', async () => {
+    const panel = createPanel();
+    mockApplyWebView.mockReturnValue(panel as unknown as import('vscode').WebviewPanel);
+    mockReadFile.mockRejectedValue(new Error('ENOENT'));
+
+    await expect(
+      LogView.createView(createMockContext() as unknown as import('../../Context.js').Context),
+    ).rejects.toThrow('Could not read the log viewer at /test/extension/out/index.html: ENOENT');
   });
 });

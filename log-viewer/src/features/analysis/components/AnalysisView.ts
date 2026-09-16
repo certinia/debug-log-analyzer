@@ -553,9 +553,9 @@ export class AnalysisView extends LitElement {
       return;
     }
 
-    isVisible(this).then((isVisible) => {
+    void isVisible(this).then((isVisible) => {
       if (this.timelineRoot && isVisible) {
-        this._renderAnalysis(this.timelineRoot);
+        void this._renderAnalysis(this.timelineRoot);
       }
     });
   }

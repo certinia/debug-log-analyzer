@@ -152,7 +152,7 @@ export class TimelineFlameChart extends LitElement {
       (changedProperties.has('apexLog') || changedProperties.has('options')) &&
       this.containerRef
     ) {
-      this.initializeTimeline();
+      void this.initializeTimeline();
     } else if (changedProperties.has('themeName')) {
       // `else`: opening a log lands both properties in one update, and
       // `initializeTimeline` already reads the current appearance. Only the

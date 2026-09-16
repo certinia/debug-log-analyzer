@@ -877,7 +877,7 @@ export class CalltreeView extends LitElement {
     this.rootMethod = this.timelineRoot;
     this._visibilityWait?.abort();
     this._visibilityWait = new AbortController();
-    isVisible(this, undefined, this._visibilityWait.signal).then((visible) => {
+    void isVisible(this, undefined, this._visibilityWait.signal).then((visible) => {
       this.isVisible = visible;
       // An abort cannot catch a wait that has already resolved, so the build
       // asks whether the view is still here.
@@ -1350,7 +1350,7 @@ export class CalltreeView extends LitElement {
         break;
 
       case 'copy-name':
-        navigator.clipboard.writeText(rowData.text);
+        void navigator.clipboard.writeText(rowData.text);
         break;
     }
 
