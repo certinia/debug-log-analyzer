@@ -40,6 +40,21 @@ mkdir -p "$OUT"
 tmp=$(mktemp -d)
 trap 'rm -rf "$tmp"' EXIT
 
+# Everything goes through System Events. A plain `tell application "Code" to
+# activate` hangs until the AppleEvent times out, because Electron never answers
+# it, and the window list stays empty until the app is focused.
+focus() {
+  osascript -e "tell application \"System Events\" to set frontmost of process \"$APP\" to true"
+}
+
+focus || { echo "no process named \"$APP\" - pass the app name as the second argument" >&2; exit 1; }
+sleep 1
+windows=$(osascript -e "tell application \"System Events\" to tell process \"$APP\" to return count of windows")
+[ "${windows:-0}" -gt 0 ] || {
+  echo "\"$APP\" has no open window. Open the log you are capturing, then run this again." >&2
+  exit 1
+}
+
 # Size the window once, then read back where it actually landed: the menu bar
 # means the position asked for is not the position given.
 osascript -e "tell application \"System Events\" to tell process \"$APP\"
@@ -60,7 +75,7 @@ for shot in "${SHOTS[@]}"; do
   [ "$key" = "s" ] && continue
 
   if [ "$mode" = full ]; then
-    osascript -e "tell application \"$APP\" to activate"
+    focus
     sleep 1 # let the window come forward and any hover state settle
     screencapture -x -R"$X,$Y,$W,$H" "$tmp/raw.png"
     target=$FULL_W
