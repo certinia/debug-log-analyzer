@@ -194,6 +194,8 @@ export async function isVisible(
     const observer = new IntersectionObserver((entries, observerInstance) => {
       for (const entry of entries) {
         if (entry.isIntersecting) {
+          // The signal outlives this call, so the listener goes with the wait.
+          signal?.removeEventListener('abort', release);
           resolve(true);
           observerInstance.disconnect();
           return;
@@ -201,14 +203,11 @@ export async function isVisible(
       }
     }, options);
 
-    signal?.addEventListener(
-      'abort',
-      () => {
-        observer.disconnect();
-        resolve(false);
-      },
-      { once: true },
-    );
+    const release = (): void => {
+      observer.disconnect();
+      resolve(false);
+    };
+    signal?.addEventListener('abort', release, { once: true });
 
     observer.observe(element);
   });
