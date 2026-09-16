@@ -4,14 +4,13 @@
 #
 #   ./scripts/capture-screenshots.sh [outdir]
 #
-# It builds the extension, opens sample-app in an Extension Development Host
-# against a throwaway user-data-dir, then stops before each shot: set the view
-# up, come back, press Enter. Press s to skip one.
+# It builds the extension, opens sample-app in an Extension Development Host on
+# the lana-dev profile, then stops before each shot: set the view up, come back,
+# press Enter. Press s to skip one.
 #
-# The throwaway profile is what makes a release reproducible - same theme, same
-# font size, no sidebar, status bar or personal state, nothing identifying in
-# frame - and it guarantees the images show the branch you are releasing rather
-# than whatever build happened to be open.
+# Building and opening the host here is what ties the images to the branch being
+# released, rather than to whatever build happened to be open. The profile is
+# yours, so the shots carry your layout - check nothing identifying is in frame.
 #
 #   --no-build   skip the build and reuse lana/out
 #   --keep       leave the host running afterwards
@@ -35,7 +34,9 @@ REPO=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
 EDITOR_CLI=${EDITOR_CLI:-code-insiders}
 APP=${APP:-Code - Insiders} # the process name of $EDITOR_CLI
 LOG=${LOG:-$REPO/sample-app/debug-logs/sample-log.log}
+PROFILE=${PROFILE:-lana-dev} # the dev-host profile from AGENTS.md, so the shots carry your layout
 # What the host window title carries, so a raise never hits your other windows.
+# The script lists every open title when nothing matches.
 WINDOW_MATCH=${WINDOW_MATCH:-sample-app}
 WINDOW_W=1920
 WINDOW_H=1080
@@ -78,31 +79,9 @@ if [ "$BUILD" -eq 1 ]; then
 fi
 [ -d "$REPO/lana/out" ] || { echo "nothing built at lana/out" >&2; exit 1; }
 
-# A fresh profile every run, so the chrome is identical release to release and
-# no recent file, org name or account is ever in frame.
-profile=$tmp/profile
-mkdir -p "$profile/User"
-cat >"$profile/User/settings.json" <<'JSON'
-{
-  "workbench.colorTheme": "Default Dark Modern",
-  "workbench.startupEditor": "none",
-  "workbench.statusBar.visible": false,
-  "workbench.activityBar.location": "hidden",
-  "workbench.editor.showTabs": "multiple",
-  "window.commandCenter": false,
-  "window.menuBarVisibility": "hidden",
-  "editor.fontSize": 13,
-  "telemetry.telemetryLevel": "off",
-  "update.mode": "none",
-  "extensions.autoCheckUpdates": false,
-  "git.openRepositoryInParentFolders": "never"
-}
-JSON
-
 echo "opening the extension host ..."
 "$EDITOR_CLI" --new-window \
-  --user-data-dir "$profile" \
-  --extensions-dir "$tmp/extensions" \
+  --profile "$PROFILE" \
   --extensionDevelopmentPath="$REPO/lana" \
   "$REPO/sample-app" "$LOG" >/dev/null 2>&1
 
@@ -123,22 +102,37 @@ tell application "System Events" to tell process "$APP"
 end tell
 APPLESCRIPT
 }
+# The window list reads as empty until the app is focused, so finding the host
+# needs this first. Safe while the host is starting: a new window is the app's
+# front window, so no older one is pulled forward.
+focus_app() {
+  osascript >/dev/null 2>&1 -e "tell application \"System Events\" to set frontmost of process \"$APP\" to true"
+}
 host_window() {
-  osascript >/dev/null 2>&1 -e "tell application \"System Events\" to tell process \"$APP\"
+  osascript 2>/dev/null -e "tell application \"System Events\" to tell process \"$APP\"
     repeat with w in windows
       if name of w contains \"$WINDOW_MATCH\" then return name of w
     end repeat
     error \"none\"
   end tell"
 }
+all_windows() {
+  osascript 2>/dev/null -e "tell application \"System Events\" to tell process \"$APP\" to return name of windows"
+}
 
-# Poll without focusing: the window does not exist yet, so a focus here would
-# raise one of your other editor windows.
 for _ in $(seq 30); do
   sleep 1
-  host_window && break
+  focus_app
+  host_window >/dev/null && break
 done
-host_window || { echo "the host window never appeared" >&2; exit 1; }
+host_window >/dev/null || {
+  echo "no window matching \"$WINDOW_MATCH\". These are open:" >&2
+  focus_app
+  all_windows | tr ',' '\n' | sed 's/^ */  /' >&2
+  echo "Pick a distinctive part of the host's title and re-run with WINDOW_MATCH=..." >&2
+  exit 1
+}
+echo "host window: $(host_window)"
 focus
 
 # Size it, then read back where it landed: the menu bar means the position
