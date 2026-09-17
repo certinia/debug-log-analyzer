@@ -88,6 +88,21 @@ export function createDurationBarColumn(opts: {
   };
 }
 
+/**
+ * A tooltip that shows `text` and nothing else. Tabulator writes a string
+ * tooltip with `innerHTML`, which eats the generics in an Apex signature —
+ * `run(List<Contact>)` hovers as `run(List)` — and would run markup the log
+ * carries. Empty text answers `''`, which Tabulator reads as no tooltip.
+ */
+export function textTooltip(text: string): HTMLElement | '' {
+  if (!text) {
+    return '';
+  }
+  const el = document.createElement('div');
+  el.textContent = text;
+  return el;
+}
+
 export function headerSortElement(_column: unknown, dir: string): string {
   switch (dir) {
     case 'asc':
