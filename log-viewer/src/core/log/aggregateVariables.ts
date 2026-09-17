@@ -269,21 +269,33 @@ function spreadsOf(held: ReadonlyMap<string, Gathering>): VariableSpread[] {
   );
 }
 
-/** Memo of the walk: the log never changes after parse, so each row's frames are
- *  compared once. Keyed by the frames array, which stays the same object while
- *  the selection does. */
-const compared = new WeakMap<object, AggregateVariables>();
+/** Keyed by the log as well as the frames: a selection outlives the log it was
+ *  made in, and the same frames then name other calls. */
+const compared = new WeakMap<object, WeakMap<object, AggregateVariables>>();
 
-/** The memoised comparison for `frames`, or undefined if it has never been
- *  walked. Lets a caller render an already-walked selection without showing a
- *  placeholder first. */
-export function cachedAggregateVariables(frames: object): AggregateVariables | undefined {
-  return compared.get(frames);
+function comparedIn(log: object): WeakMap<object, AggregateVariables> {
+  const held = compared.get(log);
+  if (held) {
+    return held;
+  }
+  const made = new WeakMap<object, AggregateVariables>();
+  compared.set(log, made);
+  return made;
+}
+
+/** The memoised comparison for `frames` in `store`'s log, or undefined if it has
+ *  never been walked. Lets a caller render an already-walked selection without
+ *  showing a placeholder first. */
+export function cachedAggregateVariables(
+  store: LogStore,
+  frames: object,
+): AggregateVariables | undefined {
+  return compared.get(store.log)?.get(frames);
 }
 
 /**
- * {@link compareFrames} memoised on the `frames` array's identity. An abandoned
- * walk is not memoised.
+ * {@link compareFrames} memoised on the log and the `frames` array's identity. An
+ * abandoned walk is not memoised.
  */
 export async function aggregateVariablesFor(
   store: LogStore,
@@ -291,13 +303,13 @@ export async function aggregateVariablesFor(
   index: VariableIndex | null,
   options: FrameBudgetOptions,
 ): Promise<AggregateVariables | null> {
-  const held = compared.get(frames);
+  const held = cachedAggregateVariables(store, frames);
   if (held) {
     return held;
   }
   const spread = await compareFrames(store, frames, index, options);
   if (spread) {
-    compared.set(frames, spread);
+    comparedIn(store.log).set(frames, spread);
   }
   return spread;
 }

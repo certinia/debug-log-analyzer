@@ -357,7 +357,8 @@ export class VariablesDetail extends LitElement {
   /** A comparison already walked, so a re-selection shows no placeholder. */
   private _held(): AggregateVariables | null {
     const frames = this._compareKey();
-    return frames ? (cachedAggregateVariables(frames) ?? null) : null;
+    const store = this.logStore;
+    return frames && store ? (cachedAggregateVariables(store, frames) ?? null) : null;
   }
 
   /** The rows on screen, and where each one sits, from the scope and what is
