@@ -345,7 +345,38 @@ export class DatabaseView extends LitElement {
   }
 
   private _toggle(kind: SectionKind) {
-    this.collapsed = { ...this.collapsed, [kind]: !this.collapsed[kind] };
+    const collapsing = !this.collapsed[kind];
+    this.collapsed = { ...this.collapsed, [kind]: collapsing };
+    if (collapsing) {
+      this._dropMatches(kind);
+    }
+  }
+
+  /**
+   * A collapsed section takes its grid with it, so the matches that grid reported
+   * can no longer be reached: drop them, and report the total the widget can.
+   */
+  private _dropMatches(kind: SectionKind): void {
+    if (kind === 'dml') {
+      this.dmlMatches = 0;
+      this.dmlHighlightIndex = 0;
+    } else if (kind === 'soql') {
+      this.soqlMatches = 0;
+      this.soqlHighlightIndex = 0;
+    } else {
+      this.soslMatches = 0;
+      this.soslHighlightIndex = 0;
+    }
+    this._reportTotal();
+  }
+
+  /** The three grids' matches read as one count in the find widget. */
+  private _reportTotal(): void {
+    document.dispatchEvent(
+      new CustomEvent('lv-find-results', {
+        detail: { totalMatches: this.dmlMatches + this.soqlMatches + this.soslMatches },
+      }),
+    );
   }
 
   /** Cumulative limits are only present when the log recorded a usage snapshot. */
@@ -483,12 +514,7 @@ export class DatabaseView extends LitElement {
     }
 
     this._find({ count: 1 });
-
-    document.dispatchEvent(
-      new CustomEvent('lv-find-results', {
-        detail: { totalMatches: this.dmlMatches + this.soqlMatches + this.soslMatches },
-      }),
-    );
+    this._reportTotal();
   };
 }
 
