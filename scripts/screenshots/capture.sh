@@ -144,7 +144,7 @@ Open Details, Call stack, Call tree and SOQL issues.
 Pointer off both panes before Enter."
 
   # --- Editor, not the webview ---
-  "vscode/show-analysis-lens.webp|crop|350|Open sample-log.log in the editor, so the Show Apex Log Analysis lens sits above line 1.
+  "vscode/show-analysis-lens.png|crop|350|Open sample-log.log in the editor, so the Show Apex Log Analysis lens sits above line 1.
 Drag round the lens and the first line of the log under it."
 
   "vscode/settings-custom-themes.png|crop|300|Open settings.json and define two themes under lana.timeline.customThemes, so the color chips show in the gutter.
@@ -389,8 +389,9 @@ STRIP
 echo
 echo "metadata"
 stripped=0
-for f in "$OUT"/*.png "$OUT"/*.gif "$OUT"/vscode/*; do
-  [ -e "$f" ] || continue
+# The same walk compress.sh makes, so the two passes never disagree about what
+# is in the folder. A glob would need every subdirectory spelled out.
+while IFS= read -r f; do
   # [0] as above: without it this walks every frame of an animation.
   [ -n "$(magick identify -format '%[profiles]' "$f[0]" 2>/dev/null)" ] || continue
   stripped=1
@@ -399,10 +400,19 @@ for f in "$OUT"/*.png "$OUT"/*.gif "$OUT"/vscode/*; do
   else
     echo "  ${f#"$OUT"/} still carries metadata - strip it by hand: exiftool -all= $f"
   fi
-done
+done < <(
+  find "$OUT" -type f \( -name '*.png' -o -name '*.gif' -o -name '*.jpg' \
+    -o -name '*.jpeg' -o -name '*.svg' -o -name '*.webp' \) | sort
+)
 if [ "$stripped" -eq 0 ]; then
   echo "  clean"
 fi
+
+# After the strip, never before: optipng keeps the ancillary chunks it is given,
+# so a shot compressed first would carry its metadata into the repo compressed.
+echo
+echo "compress"
+"$(dirname "${BASH_SOURCE[0]}")/compress.sh" "$OUT"
 
 echo
 echo "record by hand"

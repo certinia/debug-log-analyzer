@@ -46,6 +46,10 @@ ffmpeg -nostdin -v error -y -r "$in_rate" -i "$SRC" -map_metadata -1 -vf \
   "crop=iw:ih-${TOP_CROP}:0:${TOP_CROP},fps=${FPS},scale=${WIDTH}:-1:flags=lanczos,split[s0][s1];[s0]palettegen=max_colors=${COLORS}:stats_mode=diff[p];[s1][p]paletteuse=dither=bayer:bayer_scale=5:diff_mode=rectangle" \
   "$OUT"
 
+# Before the size is read, so what is reported is what lands in the repo.
+echo "compress"
+"$(dirname "${BASH_SOURCE[0]}")/compress.sh" "$OUT"
+
 size=$(du -h "$OUT" | cut -f1 | tr -d ' ')
 out_frames=$(magick identify "$OUT" | wc -l | tr -d ' ')
 echo "-> $OUT  $(magick identify "$OUT" | head -1 | awk '{print $3}') ${size}, ${out_frames} frames, $(python3 -c "print(f'{$out_frames/$FPS:.1f}')")s"
