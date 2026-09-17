@@ -11,7 +11,12 @@ import { logStatusContext, type LogStatus } from '../../../core/log/logStatus.js
 import type { ApexLog, LogCategory } from 'apex-log-parser';
 import { categoryPalette } from '../../../components/categoryTime.js';
 import { VSCodeExtensionMessenger } from '../../../core/messaging/VSCodeExtensionMessenger.js';
-import { subscribeSettings, updateSetting, type LanaSettings } from '../../settings/Settings.js';
+import {
+  settingsSettled,
+  subscribeSettings,
+  updateSetting,
+  type LanaSettings,
+} from '../../settings/Settings.js';
 import { setColors } from '../services/Timeline.js';
 
 import { DEFAULT_THEME_NAME, sameColors, type TimelineColors } from '../themes/Themes.js';
@@ -196,6 +201,12 @@ export class TimelineView extends LitElement {
     // chart through this subscription.
     this.settingsUnsubscribe ??= subscribeSettings((settings) => {
       this.applyTimelineSettings(settings);
+    });
+
+    void settingsSettled().then(() => {
+      // Still unset means nothing came to fill it, so take the setting's own default
+      // rather than leave the tab shimmering for the life of the panel.
+      this.useLegacyTimeline ??= false;
     });
   }
 

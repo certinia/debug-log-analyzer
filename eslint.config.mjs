@@ -121,6 +121,19 @@ export default defineConfig(
     },
   },
   {
+    files: ['log-viewer/src/**/*.ts'],
+    rules: {
+      'no-restricted-syntax': [
+        'error',
+        {
+          selector: "Property[key.name='tooltip'][value.value=true]",
+          message:
+            'Tabulator writes a string tooltip with innerHTML, so log text is read as markup. Use textCellTooltip from features/call-tree/components/TableShared.ts.',
+        },
+      ],
+    },
+  },
+  {
     files: ['lana/src/**/*.ts'],
     ignores: [
       'lana/src/commands/RetrieveLogFile.ts',

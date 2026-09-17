@@ -9,6 +9,7 @@ import {
   commonColumnDefaults,
   createDurationBarColumn,
   headerSortElement,
+  textCellTooltip,
   clipboardCopyOptions,
   registerTableModules,
 } from '../features/call-tree/components/TableShared.js';
@@ -167,7 +168,7 @@ export class CallStackDetail extends LitElement {
           widthShrink: 1,
           minWidth: 140,
           cssClass: 'datagrid-code-text truncate',
-          tooltip: true,
+          tooltip: textCellTooltip,
           formatter: frameFormatter,
           bottomCalc: () => 'Total',
         },

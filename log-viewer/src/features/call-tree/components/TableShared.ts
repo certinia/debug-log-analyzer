@@ -103,6 +103,10 @@ export function textTooltip(text: string): HTMLElement | '' {
   return el;
 }
 
+/** Hover showing the cell's own value, for any column holding text the log supplied. */
+export const textCellTooltip: ColumnDefinition['tooltip'] = (_e, cell) =>
+  textTooltip(String(cell.getValue() ?? ''));
+
 export function headerSortElement(_column: unknown, dir: string): string {
   switch (dir) {
     case 'asc':
@@ -168,7 +172,7 @@ export function createTypeColumn(opts: { visible?: boolean } = {}): ColumnDefini
     headerSortStartingDir: 'asc',
     sorter: 'string',
     width: 150,
-    tooltip: true,
+    tooltip: textCellTooltip,
     visible: opts.visible ?? false,
   };
 }

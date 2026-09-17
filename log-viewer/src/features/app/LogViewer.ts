@@ -40,6 +40,13 @@ interface NavigateToTimelinePayload {
 // index <-> id for the string-id based 'show-tab' events used app-wide.
 const TAB_IDS = ['timeline-tab', 'tree-tab', 'analysis-tab', 'database-tab'];
 
+/** Every placeholder is `aria-hidden`, so this is the only telling. */
+const LOAD_ANNOUNCEMENT: Record<LogStatus, string> = {
+  parsing: 'Loading log',
+  ready: 'Log loaded',
+  failed: 'The log could not be loaded',
+};
+
 @customElement('log-viewer')
 export class LogViewer extends LitElement {
   @property({ type: String })
@@ -82,6 +89,10 @@ export class LogViewer extends LitElement {
 
   @state()
   private _navigateToTimestamp: number | undefined = undefined;
+
+  /** A live region is read when its text changes, not when it arrives holding some. */
+  @state()
+  private _announced = false;
 
   static styles = [
     globalStyles,
@@ -165,7 +176,11 @@ export class LogViewer extends LitElement {
   }
 
   render() {
-    return html`<app-header
+    return html`<div class="sr-only" role="status" aria-live="polite">
+        ${this._announced ? LOAD_ANNOUNCEMENT[this._logStatus] : ''}
+      </div>
+
+      <app-header
         .logName=${this.logName}
         .logPath=${this.logPath}
         .logSize=${this.logSize}
@@ -213,6 +228,11 @@ export class LogViewer extends LitElement {
             <database-view .timelineRoot="${this.timelineRoot}"></database-view>
           </vscode-tab-panel> </vscode-tabs
       ></log-inspector>`;
+  }
+
+  protected override firstUpdated(): void {
+    // Fills the region a pass after it exists, so the parsing state is a change.
+    this._announced = true;
   }
 
   _onTabSelect(e: VscTabsSelectEvent) {

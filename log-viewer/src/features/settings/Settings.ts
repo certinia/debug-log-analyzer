@@ -78,6 +78,22 @@ function publish(settings: LanaSettings): void {
 }
 
 /**
+ * Settles when the first read of the settings does, whether or not it produced any. A
+ * surface that waits on a setting can then fall back to its default instead of waiting
+ * for the life of the panel.
+ */
+export function settingsSettled(): Promise<unknown> {
+  if (latest) {
+    return Promise.resolve();
+  }
+  // The cache is cleared by the last subscriber leaving, so with none it would hold a
+  // read that is never taken again and outlive the settings it holds.
+  return subscribers.size
+    ? (seedRequest ??= getSettings().catch(() => null))
+    : getSettings().catch(() => null);
+}
+
+/**
  * Delivers the current settings, then every later edit, and returns the
  * unsubscribe function. The panel keeps its context when hidden and is never
  * re-created, so the push is the only way live edits (theme colors) reach the UI —

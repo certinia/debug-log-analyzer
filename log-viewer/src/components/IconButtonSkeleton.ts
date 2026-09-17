@@ -31,6 +31,13 @@ export class IconButton extends LitElement {
     `,
   ];
 
+  override connectedCallback(): void {
+    super.connectedCallback();
+    // Decoration standing in for content: a reader is told the log is loading once,
+    // by the app's own live region.
+    this.setAttribute('aria-hidden', 'true');
+  }
+
   render() {
     if (this.logStatus !== 'parsing') {
       return nothing;
