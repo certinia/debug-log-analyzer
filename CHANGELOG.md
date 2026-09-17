@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Removed
+
+- 🪓 **Breaking**: the legacy Timeline and all its settings are dropped.
+
+## [Unreleased]
+
 ### Added
 
 - 🧭 **Inspector**: select a timeline frame, a table row or a statement to see its details, governor usage, call stack and subtree - or select nothing for a whole-log overview. Dock it left, right or bottom, and each tab keeps its own arrangement. ([#113] [#405] [#373] [#63])

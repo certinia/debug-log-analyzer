@@ -24,50 +24,32 @@ function chips(el: Timelinekey): HTMLElement[] {
 }
 
 describe('TimelineKey', () => {
-  it('renders one chip per entry, with swatch color, label and data-category', async () => {
+  it('renders one chip per entry, with swatch color, category and data-category', async () => {
     const el = await mount([
       {
-        label: 'Apex',
+        category: 'Apex',
         fillColor: 'rgb(43, 143, 129)',
-        categories: ['Apex'],
         selfTimeNs: 12_100_000_000,
       },
-      { label: 'SOQL', fillColor: 'rgb(109, 76, 125)', categories: ['SOQL'], selfTimeNs: 500_000 },
+      { category: 'Code Unit', fillColor: 'rgb(109, 76, 125)', selfTimeNs: 500_000 },
     ]);
 
     const rendered = chips(el);
     expect(rendered).toHaveLength(2);
 
-    const [apex] = rendered;
+    const [apex, codeUnit] = rendered;
     expect(apex?.dataset['category']).toBe('Apex');
     expect(apex?.textContent).toContain('Apex');
     expect(apex?.querySelector('color-swatch')?.color).toBe('rgb(43, 143, 129)');
-  });
-
-  // Comma, not space: `Code Unit` is one category that contains a space, so a
-  // space-joined list could not be split back apart.
-  it('lists every folded category, splittable on the comma', async () => {
-    const el = await mount([
-      {
-        label: 'Method',
-        fillColor: 'rgb(1, 2, 3)',
-        categories: ['Apex', 'Callout'],
-        selfTimeNs: 1_000,
-      },
-      { label: 'Code Unit', fillColor: 'rgb(4, 5, 6)', categories: ['Code Unit'] },
-    ]);
-
-    const [method, codeUnit] = chips(el);
-    expect(method?.dataset['category']?.split(',')).toEqual(['Apex', 'Callout']);
-    expect(codeUnit?.dataset['category']?.split(',')).toEqual(['Code Unit']);
+    // `Code Unit` holds a space, so the attribute must carry the category verbatim.
+    expect(codeUnit?.dataset['category']).toBe('Code Unit');
   });
 
   it('shows the compact self time when present', async () => {
     const el = await mount([
       {
-        label: 'Apex',
+        category: 'Apex',
         fillColor: 'rgb(0, 0, 0)',
-        categories: ['Apex'],
         selfTimeNs: 12_100_000_000,
       },
     ]);
@@ -76,15 +58,13 @@ describe('TimelineKey', () => {
   });
 
   it('omits the time when self time is unknown', async () => {
-    const el = await mount([{ label: 'Method', fillColor: 'rgb(0, 0, 0)', categories: ['Apex'] }]);
+    const el = await mount([{ category: 'Apex', fillColor: 'rgb(0, 0, 0)' }]);
 
     expect(chips(el)[0]?.querySelector('.chip__time')).toBeNull();
   });
 
   it('keeps the chip itself unfilled — only the swatch carries the category color', async () => {
-    const el = await mount([
-      { label: 'DML', fillColor: 'rgb(176, 104, 104)', categories: ['DML'] },
-    ]);
+    const el = await mount([{ category: 'DML', fillColor: 'rgb(176, 104, 104)' }]);
 
     expect(chips(el)[0]?.getAttribute('style')).toBeNull();
   });

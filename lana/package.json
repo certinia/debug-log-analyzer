@@ -276,66 +276,6 @@
             "default": true,
             "markdownDescription": "Show a details panel when you hover or select a frame on the Timeline. The Inspector shows the same details for the selected frame. Default: `true`",
             "order": 2
-          },
-          "lana.timeline.legacy": {
-            "title": "Use legacy Timeline",
-            "type": "boolean",
-            "default": false,
-            "markdownDescription": "Temporary fallback to the legacy Timeline; will be removed in a future release. Default: `false`",
-            "order": 3
-          },
-          "lana.timeline.colors": {
-            "type": "object",
-            "title": "Timeline Event Colors",
-            "markdownDescription": "Hex colors for each event type on the **legacy** Timeline (`#lana.timeline.legacy#`), which is being phased out. The current Timeline is themed via `#lana.timeline.activeTheme#` / `#lana.timeline.customThemes#`.",
-            "additionalProperties": false,
-            "order": 4,
-            "default": {
-              "Code Unit": "#88AE58",
-              "Workflow": "#51A16E",
-              "Method": "#2B8F81",
-              "DML": "#B06868",
-              "SOQL": "#6D4C7D",
-              "System Method": "#8D6E63"
-            },
-            "properties": {
-              "Code Unit": {
-                "type": "string",
-                "default": "#88AE58",
-                "description": "Hex color for Code Unit timeline events.",
-                "format": "color-hex"
-              },
-              "Workflow": {
-                "type": "string",
-                "default": "#51A16E",
-                "description": "Hex color for Workflow timeline events.",
-                "format": "color-hex"
-              },
-              "Method": {
-                "type": "string",
-                "default": "#2B8F81",
-                "description": "Hex color for Method timeline events.",
-                "format": "color-hex"
-              },
-              "DML": {
-                "type": "string",
-                "default": "#B06868",
-                "description": "Hex color for DML timeline events.",
-                "format": "color-hex"
-              },
-              "SOQL": {
-                "type": "string",
-                "default": "#6D4C7D",
-                "description": "Hex color for SOQL timeline events.",
-                "format": "color-hex"
-              },
-              "System Method": {
-                "type": "string",
-                "default": "#8D6E63",
-                "description": "Hex color for System Method timeline events.",
-                "format": "color-hex"
-              }
-            }
           }
         }
       },
