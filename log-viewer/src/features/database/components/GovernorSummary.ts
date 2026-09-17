@@ -109,7 +109,7 @@ export class GovernorSummary extends LitElement {
         color: var(--lana-severity-ok);
       }
       .gauge__value--warn {
-        color: var(--lana-severity-warning);
+        color: var(--lana-chart-warning);
       }
       .gauge__value--danger {
         color: var(--lana-severity-error);
@@ -148,7 +148,7 @@ export class GovernorSummary extends LitElement {
         background: var(--lana-severity-ok);
       }
       .gauge__fill--warn {
-        background: var(--lana-severity-warning);
+        background: var(--lana-chart-warning);
       }
       .gauge__fill--danger {
         background: var(--lana-severity-error);

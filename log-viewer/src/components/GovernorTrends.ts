@@ -195,7 +195,7 @@ export class GovernorTrends extends LitElement {
         color: var(--lana-severity-ok);
       }
       .trend--warn {
-        color: var(--lana-severity-warning);
+        color: var(--lana-chart-warning);
       }
       .trend--danger {
         color: var(--lana-severity-error);
