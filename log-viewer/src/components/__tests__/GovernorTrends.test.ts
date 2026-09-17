@@ -295,4 +295,30 @@ describe('governor-trends', () => {
       expect(chartOf(element).getAttribute('aria-label')).toContain('no limit reported');
     });
   });
+
+  describe('the figure carries its tier', () => {
+    const tierOf = async (finalRatio: number, limit = 100) => {
+      series = [{ ...trend(), finalRatio, limit }];
+      const element = await mount();
+      const classes = element.shadowRoot?.querySelector('.trend__value')?.classList ?? [];
+      return [...classes].find((name) => name.startsWith('trend--')) ?? null;
+    };
+
+    it('reads safe below the warn threshold', async () => {
+      expect(await tierOf(79)).toBe('trend--safe');
+    });
+
+    it('warns from the threshold', async () => {
+      expect(await tierOf(80)).toBe('trend--warn');
+    });
+
+    it('reads danger at the limit', async () => {
+      expect(await tierOf(100)).toBe('trend--danger');
+    });
+
+    // No limit, so no tier to report against.
+    it('takes none where the log reported no limit', async () => {
+      expect(await tierOf(90, 0)).toBeNull();
+    });
+  });
 });

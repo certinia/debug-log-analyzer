@@ -271,7 +271,9 @@ export class GovernorTrends extends LitElement {
     return html`<div class="trend">
       <div class="trend__head">
         <span class="trend__label">${series.label}</span>
-        <span class="trend__value" aria-live="polite"
+        <span
+          class="trend__value ${metered ? `trend--${governorTier(series.finalRatio)}` : ''}"
+          aria-live="polite"
           >${cursor ? html`${formatDuration(cursor.t)} · ` : ''}${series.format(
             cursor ? cursor.used : series.used,
           )} <span class="trend__limit">${denominator}</span></span
