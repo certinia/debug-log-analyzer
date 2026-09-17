@@ -2,7 +2,8 @@
  * Copyright (c) 2026 Certinia Inc. All rights reserved.
  */
 
-import type { GovernorLimits, LogEvent, SelfTotal } from 'apex-log-parser';
+import type { LogEvent } from '@apexdevtools/apex-log-parser';
+import type { GovernorLimits, SelfTotal } from '@apexdevtools/apex-log-parser/types';
 import { ROOT_PATH_ID, type KeyPathIds } from '../../../core/log/keyPathIds.js';
 import { getCallerNamespace } from '../../../core/utility/CallerNamespace.js';
 import { computeHasDetailsDeep } from './DetailsFilter.js';

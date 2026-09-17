@@ -3,7 +3,7 @@
  */
 import { beforeEach, describe, expect, it } from '@jest/globals';
 
-import type { LogEvent } from 'apex-log-parser';
+import type { LogEvent } from '@apexdevtools/apex-log-parser';
 
 import { KeyPathIds, ROOT_PATH_ID } from '../keyPathIds.js';
 

@@ -12,7 +12,7 @@
 import { css, html, LitElement, type PropertyValues, unsafeCSS } from 'lit';
 import { customElement, property, query, state } from 'lit/decorators.js';
 
-import type { ApexLog } from 'apex-log-parser';
+import type { ApexLog } from '@apexdevtools/apex-log-parser';
 import { themeObserver } from '../../../core/theme/ThemeObserver.js';
 import { ApexLogTimeline } from '../optimised/ApexLogTimeline.js';
 import { parseColorToHex } from '../optimised/rendering/ColorUtils.js';

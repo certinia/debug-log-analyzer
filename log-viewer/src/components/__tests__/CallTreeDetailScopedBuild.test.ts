@@ -51,7 +51,7 @@ import { INSPECTOR_LOCATE_EVENT, type InspectorLocateEvent } from '../inspectorR
 import { eventBus, type DetailSelection } from '../../core/events/EventBus.js';
 import type { ProgressParams } from '../../tabulator/format/ProgressMS.js';
 import { LOCATED_ROW_CLASS } from '../locatedRow.js';
-import type { ApexLog } from 'apex-log-parser';
+import type { ApexLog } from '@apexdevtools/apex-log-parser';
 
 import { logStoreFor, type LogStore } from '../../core/log/LogStore.js';
 import { ROOT_PATH_ID } from '../../core/log/keyPathIds.js';

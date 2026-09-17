@@ -20,7 +20,7 @@ log-parser types. Keep any file that imports them out of `metric-strip/`, which 
 import type { EventNode, LogEvent } from '../types/flamechart.types.js';
 
 // BAD: Direct import from log-parser (violates boundary)
-import type { LogEvent } from 'apex-log-parser';
+import type { LogEvent } from '@apexdevtools/apex-log-parser';
 ```
 
 ### API Boundary

@@ -1,7 +1,7 @@
 /*
  * Copyright (c) 2026 Certinia Inc. All rights reserved.
  */
-import type { LogEvent } from 'apex-log-parser';
+import type { LogEvent } from '@apexdevtools/apex-log-parser';
 
 /** What an empty/unset namespace normalizes to, here and in every comparison against a namespace. */
 export const DEFAULT_NAMESPACE = 'default';

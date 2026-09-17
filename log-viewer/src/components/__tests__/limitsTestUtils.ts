@@ -1,7 +1,7 @@
 /*
  * Copyright (c) 2026 Certinia Inc. All rights reserved.
  */
-import type { Limits } from 'apex-log-parser';
+import type { GovernorLimits, LimitValue, Limits } from '@apexdevtools/apex-log-parser/types';
 
 import type {
   HeatStripEvent,
@@ -24,19 +24,41 @@ export const timeSeries = (events: HeatStripEvent[] = []): HeatStripTimeSeries =
   events,
 });
 
+/** One metric's usage, carrying the share the parser would have derived. */
+export const limitValue = (used: number, limit: number): LimitValue => ({
+  used,
+  limit,
+  percentUsed: limit > 0 ? (used / limit) * 100 : null,
+});
+
 /** Every governor metric at zero, for a test to set only the ones it cares about. */
 export const emptyLimits = (): Limits => ({
-  soqlQueries: { used: 0, limit: 0 },
-  soslQueries: { used: 0, limit: 0 },
-  queryRows: { used: 0, limit: 0 },
-  dmlStatements: { used: 0, limit: 0 },
-  publishImmediateDml: { used: 0, limit: 0 },
-  dmlRows: { used: 0, limit: 0 },
-  cpuTime: { used: 0, limit: 0 },
-  heapSize: { used: 0, limit: 0 },
-  callouts: { used: 0, limit: 0 },
-  emailInvocations: { used: 0, limit: 0 },
-  futureCalls: { used: 0, limit: 0 },
-  queueableJobsAddedToQueue: { used: 0, limit: 0 },
-  mobileApexPushCalls: { used: 0, limit: 0 },
+  soqlQueries: limitValue(0, 0),
+  soslQueries: limitValue(0, 0),
+  queryRows: limitValue(0, 0),
+  dmlStatements: limitValue(0, 0),
+  publishImmediateDml: limitValue(0, 0),
+  dmlRows: limitValue(0, 0),
+  cpuTime: limitValue(0, 0),
+  heapSize: limitValue(0, 0),
+  callouts: limitValue(0, 0),
+  emailInvocations: limitValue(0, 0),
+  futureCalls: limitValue(0, 0),
+  queueableJobsAddedToQueue: limitValue(0, 0),
+  mobileApexPushCalls: limitValue(0, 0),
 });
+
+/**
+ * A log's governor usage, with the metrics a test names and every other at zero. `final` and `peak`
+ * hold the same figures: a test that reads a ceiling wants them identical, and they differ only in
+ * `used`.
+ */
+export const governorLimits = (values: Partial<Limits> = {}): GovernorLimits => ({
+  snapshots: [],
+  final: { ...emptyLimits(), ...values },
+  peak: { ...emptyLimits(), ...values },
+  byNamespace: new Map(),
+});
+
+/** A log that reported no governor usage at all. */
+export const emptyGovernorLimits = (): GovernorLimits => governorLimits();

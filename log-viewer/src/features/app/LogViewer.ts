@@ -10,7 +10,7 @@ import type { VscTabsSelectEvent } from '@vscode-elements/elements/dist/vscode-t
 import { LitElement, css, html } from 'lit';
 import { customElement, property, state } from 'lit/decorators.js';
 
-import { parse, type ApexLog } from 'apex-log-parser';
+import { parse, type ApexLog } from '@apexdevtools/apex-log-parser';
 import { TAB_TO_SOURCE, eventBus } from '../../core/events/EventBus.js';
 import { logContext } from '../../core/log/logContext.js';
 import { logStatusContext, type LogStatus } from '../../core/log/logStatus.js';

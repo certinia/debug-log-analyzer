@@ -2,7 +2,8 @@
  * Copyright (c) 2020 Certinia Inc. All rights reserved.
  */
 //TODO:Refactor - usage should look more like `new TimeLine(timelineContainer, {tooltip:true}:Config)`;
-import type { ApexLog, LogEvent, LogIssue } from 'apex-log-parser';
+import type { ApexLog, LogEvent } from '@apexdevtools/apex-log-parser';
+import type { LogIssue } from '@apexdevtools/apex-log-parser/types';
 import { debounce, formatDuration } from '../../../core/utility/Util.js';
 import { goToRow } from '../../call-tree/navigation.js';
 
@@ -685,7 +686,7 @@ function findTimelineTooltip(
           value: formatLimit(
             target.dmlCount.total,
             target.dmlCount.self,
-            govLimits.dmlStatements.limit,
+            govLimits.final.dmlStatements.limit,
           ),
         });
       }
@@ -696,7 +697,7 @@ function findTimelineTooltip(
           value: formatLimit(
             target.dmlRowCount.total,
             target.dmlRowCount.self,
-            govLimits.dmlRows.limit,
+            govLimits.final.dmlRows.limit,
           ),
         });
       }
@@ -707,7 +708,7 @@ function findTimelineTooltip(
           value: formatLimit(
             target.soqlCount.total,
             target.soqlCount.self,
-            govLimits.soqlQueries.limit,
+            govLimits.final.soqlQueries.limit,
           ),
         });
       }
@@ -718,7 +719,7 @@ function findTimelineTooltip(
           value: formatLimit(
             target.soqlRowCount.total,
             target.soqlRowCount.self,
-            govLimits.queryRows.limit,
+            govLimits.final.queryRows.limit,
           ),
         });
       }
@@ -729,7 +730,7 @@ function findTimelineTooltip(
           value: formatLimit(
             target.soslCount.total,
             target.soslCount.self,
-            govLimits.soslQueries.limit,
+            govLimits.final.soslQueries.limit,
           ),
         });
       }
@@ -740,7 +741,7 @@ function findTimelineTooltip(
           value: formatLimit(
             target.soslRowCount.total,
             target.soslRowCount.self,
-            govLimits.soslQueries.limit,
+            govLimits.final.soslQueries.limit,
           ),
         });
       }

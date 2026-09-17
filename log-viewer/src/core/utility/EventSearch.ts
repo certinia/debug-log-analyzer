@@ -2,7 +2,7 @@
  * Copyright (c) 2024 Certinia Inc. All rights reserved.
  */
 
-import type { ApexLog, LogEvent } from 'apex-log-parser';
+import type { ApexLog, LogEvent } from '@apexdevtools/apex-log-parser';
 
 export interface EventSearchResult {
   event: LogEvent;

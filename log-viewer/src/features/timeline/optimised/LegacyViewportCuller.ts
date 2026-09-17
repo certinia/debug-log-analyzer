@@ -13,7 +13,7 @@
  * For production use, prefer TemporalSegmentTree which provides O(log n) culling.
  */
 
-import type { LogEvent } from 'apex-log-parser';
+import type { LogEvent } from '@apexdevtools/apex-log-parser';
 import type {
   CategoryAggregation,
   CategoryStats,

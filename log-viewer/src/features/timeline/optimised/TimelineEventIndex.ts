@@ -9,7 +9,7 @@
  * Uses hierarchical binary search with depth-first traversal.
  */
 
-import type { LogEvent } from 'apex-log-parser';
+import type { LogEvent } from '@apexdevtools/apex-log-parser';
 import type { ViewportBounds, ViewportState } from '../types/flamechart.types.js';
 
 /**

@@ -9,7 +9,7 @@
  * drag is a fresh bucket count and a guaranteed cache miss. The drag sweep is
  * the number a resize actually pays.
  */
-import type { ApexLog } from 'apex-log-parser';
+import type { ApexLog } from '@apexdevtools/apex-log-parser';
 
 import { MinimapDensityQuery } from '../../log-viewer/src/features/timeline/optimised/minimap/MinimapDensityQuery.js';
 import { RectangleCache } from '../../log-viewer/src/features/timeline/optimised/RectangleCache.js';

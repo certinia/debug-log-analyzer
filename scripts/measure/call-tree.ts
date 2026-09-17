@@ -5,7 +5,7 @@
 /**
  * Times the call tree builds and the inspector's row mark.
  */
-import type { ApexLog } from 'apex-log-parser';
+import type { ApexLog } from '@apexdevtools/apex-log-parser';
 
 import { LocatedRowIds } from '../../log-viewer/src/components/locatedRow.js';
 import {

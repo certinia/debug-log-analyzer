@@ -1,7 +1,7 @@
 /*
  * Copyright (c) 2026 Certinia Inc. All rights reserved.
  */
-import type { Limits } from 'apex-log-parser';
+import type { Limits } from '@apexdevtools/apex-log-parser/types';
 
 import { formatByteSize, formatInteger, sharePercent } from '../core/utility/Util.js';
 import type { GaugeMetric } from '../features/database/components/GovernorSummary.js';
@@ -85,10 +85,10 @@ export function limitTotals(series: HeatStripTimeSeries): Limits {
   const final = series.events[series.events.length - 1]?.values;
   totals = {} as Limits;
   for (const { key } of GOVERNOR_METRICS) {
-    totals[key] = {
-      used: peakUsed(series, key),
-      limit: final?.get(key)?.limit ?? 0,
-    };
+    const used = peakUsed(series, key);
+    const limit = final?.get(key)?.limit ?? 0;
+    // Null, not 0, where the log reported no ceiling: a share of nothing is unknown, not none.
+    totals[key] = { used, limit, percentUsed: limit > 0 ? (used / limit) * 100 : null };
   }
   totalsCache.set(series, totals);
   return totals;

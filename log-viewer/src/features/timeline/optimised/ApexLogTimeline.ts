@@ -17,7 +17,7 @@
  * LogEvent should only be referenced here in ApexLogTimeline to convert to generic EventNode for FlameChart and not in FlameChart or its dependencies.
  */
 
-import type { ApexLog, LogEvent } from 'apex-log-parser';
+import type { ApexLog, LogEvent } from '@apexdevtools/apex-log-parser';
 import { ContextMenu } from '../../../components/ContextMenu.js';
 import { ContextMenuBuilder } from '../../../components/ContextMenuBuilder.js';
 import { eventBus, type TimelineNavigateMode } from '../../../core/events/EventBus.js';

@@ -2,7 +2,9 @@
  * Copyright (c) 2026 Certinia Inc. All rights reserved.
  */
 import { describe, expect, it } from '@jest/globals';
-import type { GovernorLimits } from 'apex-log-parser';
+import type { GovernorLimits } from '@apexdevtools/apex-log-parser/types';
+
+import { governorLimits, limitValue } from '../../../../components/__tests__/limitsTestUtils.js';
 
 import {
   governorCost,
@@ -12,15 +14,15 @@ import {
 } from '../GovernorCost.js';
 
 function limits(overrides: Record<string, number> = {}): GovernorLimits {
-  const metric = (limit: number) => ({ used: 0, limit });
-  return {
+  const metric = (limit: number) => limitValue(0, limit);
+  return governorLimits({
     soqlQueries: metric(overrides.soqlQueries ?? 100),
     dmlStatements: metric(overrides.dmlStatements ?? 150),
     soslQueries: metric(overrides.soslQueries ?? 20),
     queryRows: metric(overrides.queryRows ?? 50000),
     dmlRows: metric(overrides.dmlRows ?? 10000),
     heapSize: metric(overrides.heapSize ?? 6000000),
-  } as unknown as GovernorLimits;
+  });
 }
 
 function row(overrides: Partial<Record<string, number>> = {}): GovernorCostRow {

@@ -1,7 +1,7 @@
 /*
  * Copyright (c) 2023 Certinia Inc. All rights reserved.
  */
-import type { LogCategory } from 'apex-log-parser';
+import type { LogCategory } from '@apexdevtools/apex-log-parser/types';
 import { LitElement, css, html } from 'lit';
 import { customElement, property } from 'lit/decorators.js';
 import { repeat } from 'lit/directives/repeat.js';

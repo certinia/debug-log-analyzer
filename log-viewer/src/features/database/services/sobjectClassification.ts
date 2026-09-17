@@ -1,7 +1,7 @@
 /*
  * Copyright (c) 2026 Certinia Inc. All rights reserved.
  */
-import type { SOQLExecuteBeginLine } from 'apex-log-parser';
+import type { SOQLExecuteBeginLine } from '@apexdevtools/apex-log-parser';
 
 /**
  * Derives the queried SObject name for the Database SOQL view. (An earlier

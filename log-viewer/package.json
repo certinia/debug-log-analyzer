@@ -8,6 +8,7 @@
     "#vscode-elements/*.js": "@vscode-elements/elements/dist/*/index.js"
   },
   "dependencies": {
+    "@apexdevtools/apex-log-parser": "0.1.1",
     "@apexdevtools/apex-parser": "5.2.0",
     "@lit/context": "^1.1.6",
     "@vscode-elements/elements": "^2.5.1",

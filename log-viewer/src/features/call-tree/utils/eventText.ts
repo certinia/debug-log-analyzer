@@ -1,7 +1,8 @@
 /*
  * Copyright (c) 2026 Certinia Inc. All rights reserved.
  */
-import type { GovernorLimits, LogEvent } from 'apex-log-parser';
+import type { LogEvent } from '@apexdevtools/apex-log-parser';
+import type { GovernorLimits } from '@apexdevtools/apex-log-parser/types';
 
 import { formatDuration } from '../../../core/utility/Util.js';
 import { SOSL_ROWS_PER_QUERY_LIMIT } from '../../database/limits.js';
@@ -57,11 +58,11 @@ export function formatEventDetails(event: LogEvent, limits?: GovernorLimits): st
   }
 
   const metrics: [string, { total: number; self: number }, number | undefined][] = [
-    ['DML', event.dmlCount, limits?.dmlStatements.limit],
-    ['DML Rows', event.dmlRowCount, limits?.dmlRows.limit],
-    ['SOQL', event.soqlCount, limits?.soqlQueries.limit],
-    ['SOQL Rows', event.soqlRowCount, limits?.queryRows.limit],
-    ['SOSL', event.soslCount, limits?.soslQueries.limit],
+    ['DML', event.dmlCount, limits?.final.dmlStatements.limit],
+    ['DML Rows', event.dmlRowCount, limits?.final.dmlRows.limit],
+    ['SOQL', event.soqlCount, limits?.final.soqlQueries.limit],
+    ['SOQL Rows', event.soqlRowCount, limits?.final.queryRows.limit],
+    ['SOSL', event.soslCount, limits?.final.soslQueries.limit],
     // SOSL rows have no cumulative transaction limit — only a per-query cap,
     // so it is a meaningful denominator for a SOSL statement and nothing else.
     [
