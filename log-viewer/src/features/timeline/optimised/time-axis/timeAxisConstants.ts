@@ -5,8 +5,8 @@
 /**
  * Shared constants and utilities for time-axis rendering.
  *
- * Consolidates duplicated logic from MeshAxisRenderer, ClockTimeAxisRenderer,
- * ElapsedTimeAxisRenderer, and TimeGridCalculator.
+ * Consolidates duplicated logic from MeshAxisRenderer, ClockTimeAxisRenderer and
+ * ElapsedTimeAxisRenderer.
  */
 
 /**
