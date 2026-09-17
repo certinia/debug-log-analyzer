@@ -15,12 +15,6 @@
 export const NS_PER_MS = 1_000_000;
 
 /**
- * Label positioning offsets in pixels.
- */
-export const LABEL_OFFSET_X = 3;
-export const LABEL_OFFSET_Y = 5;
-
-/**
  * 1-2-5 sequence intervals in milliseconds for tick selection.
  * Covers from 1 microsecond (0.001 ms) to 10 seconds.
  */

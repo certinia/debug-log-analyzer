@@ -136,14 +136,6 @@ export const globalStyles = [
       outline-offset: var(--lana-focus-offset);
     }
 
-    .vs-checkbox-label {
-      display: inline-flex;
-      align-items: center;
-      gap: var(--lana-space-xs);
-      font-size: var(--lana-text-base);
-      cursor: pointer;
-    }
-
     /* Shared base for every compact filter-bar control (facet/range trigger
      pills, toggle pills, dense VsSelect face) — one place for the
      height/padding/border/radius/hover/focus so they're never re-tuned

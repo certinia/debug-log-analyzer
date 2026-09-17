@@ -509,9 +509,8 @@ export class MinimapRenderer {
     const { buckets, globalMaxDepth } = densityData;
 
     // Axis is at TOP - chart area is below it
-    // When heat strip has data, chart ends above the heat strip track
     const axisHeight = this.axisRenderer.getHeight();
-    const chartBottom = manager.getChartBottom();
+    const chartBottom = manager.getHeight();
     const chartHeight = chartBottom - axisHeight;
 
     if (globalMaxDepth === 0 || buckets.length === 0 || chartHeight <= 0) {
@@ -593,10 +592,9 @@ export class MinimapRenderer {
     _minimapHeight: number,
   ): void {
     // Axis is at TOP - chart area is below it
-    // When heat strip has data, chart ends above the heat strip track
     const axisHeight = this.axisRenderer.getHeight();
     const chartTop = axisHeight;
-    const chartBottom = manager.getChartBottom();
+    const chartBottom = manager.getHeight();
     const chartHeight = chartBottom - chartTop;
 
     // Build layout items in minimap-X space. A bounded marker shades its exact range; an
@@ -637,10 +635,9 @@ export class MinimapRenderer {
     const state = manager.getState();
 
     // Axis is at TOP - chart area is below it
-    // When heat strip has data, curtain ends above the heat strip (it's separate)
     const axisHeight = this.axisRenderer.getHeight();
     const chartTop = axisHeight;
-    const chartBottom = manager.getChartBottom();
+    const chartBottom = manager.getHeight();
     const chartHeight = chartBottom - chartTop;
 
     // Calculate lens X bounds (time)
@@ -702,10 +699,9 @@ export class MinimapRenderer {
     _minimapHeight: number,
   ): void {
     // Axis is at TOP - chart area is below it
-    // When heat strip has data, lens ends above the heat strip (it's separate)
     const axisHeight = this.axisRenderer.getHeight();
     const chartTop = axisHeight;
-    const chartBottom = manager.getChartBottom();
+    const chartBottom = manager.getHeight();
 
     // Calculate lens bounds
     const lensX1 = manager.timeToMinimapX(selection.startTime);

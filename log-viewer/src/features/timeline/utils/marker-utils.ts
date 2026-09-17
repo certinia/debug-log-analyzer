@@ -134,26 +134,3 @@ export function noDataSpans(markers: TimelineMarker[]): NoDataSpan[] {
   }
   return spans.sort((a, b) => a.startTime - b.startTime);
 }
-
-/**
- * Validates a single  marker.
- * Used for runtime validation and testing.
- *
- * @param marker - Marker to validate
- * @returns True if marker is valid, false otherwise
- */
-export function validateMarker(marker: TimelineMarker): boolean {
-  if (!marker.id) {
-    return false;
-  }
-
-  if (!isMarkerType(marker.type)) {
-    return false;
-  }
-
-  if (marker.startTime < 0) {
-    return false;
-  }
-
-  return true;
-}

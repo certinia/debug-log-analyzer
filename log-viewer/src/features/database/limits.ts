@@ -1,19 +1,17 @@
 /*
  * Copyright (c) 2026 Certinia Inc. All rights reserved.
- */
-import { SOSL_ROWS_PER_QUERY_LIMIT } from '../../core/metrics/eventMetrics.js';
-
-/**
+ *
  * Canonical reference for the numbers used across the Database tab. Check here
  * when a limit looks wrong or Salesforce changes one.
  *
  * Per-transaction limits (tracked in CUMULATIVE_LIMIT_USAGE): SOQL queries 100,
  * SOSL queries 20, SOQL query rows 50,000, DML statements 150, DML rows 10,000.
  * Per-query limit (NOT a transaction total): a single SOSL query returns at most
- * 2,000 rows — see {@link SOSL_ROWS_PER_QUERY_LIMIT}.
+ * 2,000 rows — see SOSL_ROWS_PER_QUERY_LIMIT.
+ *
+ * https://developer.salesforce.com/docs/atlas.en-us.apexcode.meta/apexcode/apex_gov_limits.htm
  */
-export const APEX_GOVERNOR_LIMITS_DOC =
-  'https://developer.salesforce.com/docs/atlas.en-us.apexcode.meta/apexcode/apex_gov_limits.htm';
+import { SOSL_ROWS_PER_QUERY_LIMIT } from '../../core/metrics/eventMetrics.js';
 
 // Re-exported so the Database tab's own consumers keep one import for its numbers.
 export { SOSL_ROWS_PER_QUERY_LIMIT };
