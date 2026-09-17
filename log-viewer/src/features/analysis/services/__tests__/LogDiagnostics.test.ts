@@ -6,8 +6,8 @@ import type { GovernorLimits, Limits } from '@apexdevtools/apex-log-parser/types
 import { beforeEach, describe, expect, it } from '@jest/globals';
 
 import {
-  emptyGovernorLimits,
   emptyLimits,
+  governorLimits,
   limitValue,
 } from '../../../../components/__tests__/limitsTestUtils.js';
 
@@ -41,7 +41,7 @@ function event(fields: Partial<LogEvent>): LogEvent {
 function governorLimitsOf(namespaceLimits: Record<string, Limits>): GovernorLimits {
   const entries = Object.entries(namespaceLimits);
   return {
-    ...emptyGovernorLimits(),
+    ...governorLimits(),
     byNamespace: new Map(
       entries.map(([namespace, limits]) => [namespace, { final: limits, peak: limits }]),
     ),
@@ -50,7 +50,7 @@ function governorLimitsOf(namespaceLimits: Record<string, Limits>): GovernorLimi
       namespace,
       limits,
     })),
-  } as GovernorLimits;
+  };
 }
 
 function apexLog(fields: Partial<ApexLog> & { namespaceLimits?: Record<string, Limits> }): ApexLog {

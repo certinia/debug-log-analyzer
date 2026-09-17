@@ -1,12 +1,15 @@
 /*
  * Copyright (c) 2026 Certinia Inc. All rights reserved.
  */
-import type { GovernorLimits, LimitValue, Limits } from '@apexdevtools/apex-log-parser/types';
+import type { GovernorLimits, Limits } from '@apexdevtools/apex-log-parser/types';
 
 import type {
   HeatStripEvent,
   HeatStripTimeSeries,
 } from '../../features/timeline/types/flamechart.types.js';
+import { limitValue } from '../logOverviewMetrics.js';
+
+export { limitValue };
 
 /** One dense-series event holding only the metrics a test cares about. */
 export const seriesEvent = (
@@ -22,13 +25,6 @@ export const seriesEvent = (
 export const timeSeries = (events: HeatStripEvent[] = []): HeatStripTimeSeries => ({
   metrics: new Map(),
   events,
-});
-
-/** One metric's usage, carrying the share the parser would have derived. */
-export const limitValue = (used: number, limit: number): LimitValue => ({
-  used,
-  limit,
-  percentUsed: limit > 0 ? (used / limit) * 100 : null,
 });
 
 /** Every governor metric at zero, for a test to set only the ones it cares about. */
@@ -49,16 +45,16 @@ export const emptyLimits = (): Limits => ({
 });
 
 /**
- * A log's governor usage, with the metrics a test names and every other at zero. `final` and `peak`
- * hold the same figures: a test that reads a ceiling wants them identical, and they differ only in
- * `used`.
+ * A log's governor usage, with the metrics a test names and every other at zero. `peak` defaults to
+ * the same figures as `final` — the parser derives both from the same snapshots, so they differ
+ * only in `used`, and a test reading a ceiling wants them identical.
  */
-export const governorLimits = (values: Partial<Limits> = {}): GovernorLimits => ({
+export const governorLimits = (
+  final: Partial<Limits> = {},
+  peak: Partial<Limits> = final,
+): GovernorLimits => ({
   snapshots: [],
-  final: { ...emptyLimits(), ...values },
-  peak: { ...emptyLimits(), ...values },
+  final: { ...emptyLimits(), ...final },
+  peak: { ...emptyLimits(), ...peak },
   byNamespace: new Map(),
 });
-
-/** A log that reported no governor usage at all. */
-export const emptyGovernorLimits = (): GovernorLimits => governorLimits();

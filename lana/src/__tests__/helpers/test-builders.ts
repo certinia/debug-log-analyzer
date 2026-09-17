@@ -89,10 +89,6 @@ type PartialApexLog = Partial<{
   duration: { self: number; total: number };
 }>;
 
-/**
- * Creates a mock ApexLog with sensible defaults.
- * Useful for testing components that work with parsed log data.
- */
 /** Every governor metric at zero. `lana` reads none of them; the shape is what `ApexLog` states. */
 function emptyLimits(): Limits {
   const zero = (): LimitValue => ({ used: 0, limit: 0, percentUsed: null });
@@ -113,6 +109,10 @@ function emptyLimits(): Limits {
   };
 }
 
+/**
+ * Creates a mock ApexLog with sensible defaults.
+ * Useful for testing components that work with parsed log data.
+ */
 export function createMockApexLog(overrides: PartialApexLog = {}): ApexLog {
   const base = {
     logParser: {} as unknown,

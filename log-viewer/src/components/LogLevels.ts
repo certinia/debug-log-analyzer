@@ -17,6 +17,21 @@ import { globalStyles } from '../styles/global.styles.js';
 import { logStatusContext, type LogStatus } from '../core/log/logStatus.js';
 import { skeletonStyles } from '../styles/skeleton.styles.js';
 
+/** The token the log's settings line names each category by; `DebugLevels` keys them in camelCase. */
+const LOG_TOKEN: Record<keyof DebugLevels, string> = {
+  apexCode: 'APEX_CODE',
+  apexProfiling: 'APEX_PROFILING',
+  callout: 'CALLOUT',
+  dataAccess: 'DATA_ACCESS',
+  database: 'DB',
+  nba: 'NBA',
+  system: 'SYSTEM',
+  validation: 'VALIDATION',
+  visualforce: 'VISUALFORCE',
+  wave: 'WAVE',
+  workflow: 'WORKFLOW',
+};
+
 /**
  * Read-only display of the log's captured debug levels in the app header: one chip per
  * category (`CATEGORY LEVEL`), styled as a VS Code dropdown face. A thin adapter — the
@@ -33,21 +48,6 @@ import { skeletonStyles } from '../styles/skeleton.styles.js';
  *      `log-levels-change`, and have views subscribe to hide events above the threshold.
  * `<overflow-list>` measures whatever it's given, so overflow + alignment are unaffected.
  */
-/** The token the log's settings line names each category by; `DebugLevels` keys them in camelCase. */
-const LOG_TOKEN: Record<keyof DebugLevels, string> = {
-  apexCode: 'APEX_CODE',
-  apexProfiling: 'APEX_PROFILING',
-  callout: 'CALLOUT',
-  dataAccess: 'DATA_ACCESS',
-  database: 'DB',
-  nba: 'NBA',
-  system: 'SYSTEM',
-  validation: 'VALIDATION',
-  visualforce: 'VISUALFORCE',
-  wave: 'WAVE',
-  workflow: 'WORKFLOW',
-};
-
 @customElement('log-levels')
 export class LogLevels extends LitElement {
   @consume({ context: logStatusContext, subscribe: true })

@@ -8,7 +8,7 @@ import { beforeEach, describe, expect, it } from '@jest/globals';
 
 import type { LogStore } from '../../core/log/LogStore.js';
 import type { HeatStripTimeSeries } from '../../features/timeline/types/flamechart.types.js';
-import { emptyGovernorLimits, seriesEvent, timeSeries } from './limitsTestUtils.js';
+import { governorLimits, seriesEvent, timeSeries } from './limitsTestUtils.js';
 
 // The metric strip's series, which the overview always reads its gauges from
 // so they match the timeline and the trend charts.
@@ -39,7 +39,7 @@ describe('log-overview', () => {
     mockSeries = timeSeries();
   });
 
-  const noLog = emptyGovernorLimits();
+  const noLog = governorLimits();
 
   const seriesWithSoql = (limit: number): HeatStripTimeSeries =>
     timeSeries([seriesEvent(1_000, { soqlQueries: { used: 40, limit } })]);

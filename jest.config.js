@@ -31,6 +31,7 @@ const defaultConfig = {
     '<rootDir>/out/',
     '<rootDir>/test/playwright/',
   ],
+  setupFilesAfterEnv: ['<rootDir>/src/__tests__/setup.ts'],
   testMatch: ['**/?(*.)+(spec|test).ts'],
   extensionsToTreatAsEsm: ['.ts', '.tsx'],
 };
@@ -42,7 +43,6 @@ export default {
       ...defaultConfig,
       displayName: 'log-viewer',
       rootDir: '<rootDir>/log-viewer',
-      setupFilesAfterEnv: ['<rootDir>/src/__tests__/setup.ts'],
       moduleNameMapper: {
         ...defaultConfig.moduleNameMapper,
         // Stylesheet imports have no transform here; the `.js` rule above runs first, so the
@@ -58,7 +58,6 @@ export default {
       ...defaultConfig,
       displayName: 'lana',
       rootDir: '<rootDir>/lana',
-      setupFilesAfterEnv: ['<rootDir>/src/__tests__/setup.ts'],
       moduleNameMapper: {
         ...defaultConfig.moduleNameMapper,
         '^vscode$': '<rootDir>/src/__tests__/mocks/vscode.ts',
