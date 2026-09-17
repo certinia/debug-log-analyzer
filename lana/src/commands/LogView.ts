@@ -56,6 +56,14 @@ export class LogView {
     logUri?: Uri,
     logData?: string,
   ): Promise<WebviewPanel> {
+    // Only the fetchLog handler awaits this, and the panel can close before the
+    // webview ever asks, so the rejection needs an owner here. Written to the
+    // channel rather than swallowed: the ask that would have shown it may never
+    // come. That handler still sees it and reports it if it does.
+    beforeSendLog?.catch((error: unknown) => {
+      const message = error instanceof Error ? error.message : String(error);
+      context.display.output(`Could not retrieve the log: ${message}`);
+    });
     const logName = logUri ? Utils.basename(logUri) : 'Untitled';
     const logDir = logUri ? Utils.dirname(logUri) : context.context.extensionUri;
     const panel = WebView.apply('logFile', `Log: ${logName}`, [

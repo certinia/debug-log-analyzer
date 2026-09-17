@@ -132,6 +132,32 @@ describe('LogView', () => {
     expect(panel.webview.html).not.toContain('src="bundle.js"');
   });
 
+  it('owns the rejection of a body the webview never asks for', async () => {
+    const panel = createPanel();
+    mockApplyWebView.mockReturnValue(panel as unknown as import('vscode').WebviewPanel);
+    mockReadFile.mockResolvedValue(new TextEncoder().encode('<html></html>'));
+    const unhandled: unknown[] = [];
+    const record = (reason: unknown): void => {
+      unhandled.push(reason);
+    };
+    process.on('unhandledRejection', record);
+    try {
+      const context = createMockContext();
+      const failed = Promise.reject(new Error('org unreachable'));
+      await LogView.createView(context as unknown as import('../../Context.js').Context, failed);
+      // No fetchLog is posted, so nothing here awaits the body.
+      await new Promise((resolve) => setImmediate(resolve));
+      expect(unhandled).toEqual([]);
+      expect(context.display.output).toHaveBeenCalledWith(
+        'Could not retrieve the log: org unreachable',
+      );
+      // Still a rejection for the fetchLog handler to report if it does ask.
+      await expect(failed).rejects.toThrow('org unreachable');
+    } finally {
+      process.off('unhandledRejection', record);
+    }
+  });
+
   it('names the file it could not read when the packaged template is missing', async () => {
     const panel = createPanel();
     mockApplyWebView.mockReturnValue(panel as unknown as import('vscode').WebviewPanel);
