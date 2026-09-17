@@ -48,7 +48,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - 📊 **Governor limits strip**: where the log recorded nothing, the strip drew its last reading across the gap as though it had been measured; the gap is now blank, and the tooltip names the reason and range. ([#828])
 - 🗄️ **Flow database usage**: SOQL and DML run by a Flow or Process Builder element are now counted. Needs `WORKFLOW` at `FINER` or above. ([#871]).
 - ⚡ **Timeline resize**: the Flame Chart flashed and trailed a frame behind as you dragged the window or the panel edge.
-- 🪟 **Timeline sharpness**: the Flame Chart, governor strip and minimap blurred after a display-scaling change or a move to a monitor with a different scale factor, until the log was reopened.
 - 🖱️ **Governor limits strip**: reading across the 15px collapsed strip lost the tooltip on the smallest wobble; the hover now holds until the pointer is clear of it.
 - 🐛 **Go to Code** matches methods with namespace or `System` qualified parameter types. ([#834])
 - 🎨 **Theme switch**: Timeline and view colours update straight away instead of needing the log reopened.
