@@ -209,7 +209,7 @@ describe('aggregateVariablesFor', () => {
       });
 
       expect(spread).toBeNull();
-      expect(cachedAggregateVariables(frames)).toBeUndefined();
+      expect(cachedAggregateVariables(store, frames)).toBeUndefined();
     } finally {
       clock.mockRestore();
     }
@@ -218,8 +218,20 @@ describe('aggregateVariablesFor', () => {
   it('answers a walked selection from the memo, so nothing walks twice', async () => {
     const { store, index, frames, spread } = await compare(CALLS);
 
-    expect(cachedAggregateVariables(frames)).toBe(spread);
+    expect(cachedAggregateVariables(store, frames)).toBe(spread);
     expect(await aggregateVariablesFor(store, frames, index, { yieldSlice })).toBe(spread);
+  });
+
+  // The panel keeps its selection across loads, so the same frames array is asked
+  // of the next log, where those indexes are other calls.
+  it('does not answer one log from a walk of another', async () => {
+    const { frames, spread } = await compare(CALLS);
+    const next = await compare(CALLS);
+
+    expect(cachedAggregateVariables(next.store, frames)).toBeUndefined();
+    const walked = await aggregateVariablesFor(next.store, frames, next.index, { yieldSlice });
+    // A spread prints as the whole comparison, so compare identity as a boolean.
+    expect(walked === spread).toBe(false);
   });
 });
 
