@@ -6,7 +6,11 @@ import { customElement, property, query } from 'lit/decorators.js';
 
 import type { ApexLog } from 'apex-log-parser';
 import { themeObserver } from '../../../core/theme/ThemeObserver.js';
-import { init as timelineInit, refreshThemeColors } from '../services/Timeline.js';
+import {
+  dispose as timelineDispose,
+  init as timelineInit,
+  refreshThemeColors,
+} from '../services/Timeline.js';
 
 // styles
 import { globalStyles } from '../../../styles/global.styles.js';
@@ -37,6 +41,7 @@ export class TimelineLegacy extends LitElement {
   override disconnectedCallback(): void {
     this.themeUnsubscribe?.();
     this.themeUnsubscribe = null;
+    timelineDispose();
     super.disconnectedCallback();
   }
 
