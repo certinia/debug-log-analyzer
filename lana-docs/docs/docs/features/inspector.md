@@ -13,7 +13,7 @@ keywords:
     apex log analyzer,
     salesforce developer tools,
   ]
-image: https://raw.githubusercontent.com/certinia/debug-log-analyzer/main/lana/assets/1_22/database.png
+image: https://raw.githubusercontent.com/certinia/debug-log-analyzer/main/lana/assets/1_22/inspector.png
 hide_title: true
 ---
 
@@ -22,6 +22,8 @@ hide_title: true
 Select anything - a Timeline frame, a Call Tree or Analysis row, a SOQL/DML/SOSL statement - and the inspector shows it in depth without you leaving the tab you're working in.
 
 It docks to the **right**, **left** or **bottom**, resizes by dragging its edge, and is toggled from the button in the header. It opens on your first selection, then stays however you left it, including the next time you open a log. See [Settings](../settings.mdx#inspector).
+
+![The inspector docked to the right of the Database tab, showing the selected SOQL statement's details, call stack and scoped call tree.](https://raw.githubusercontent.com/certinia/debug-log-analyzer/main/lana/assets/1_22/inspector.png)
 
 ### Sections
 

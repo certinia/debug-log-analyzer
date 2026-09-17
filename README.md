@@ -137,6 +137,8 @@ Select anything - a timeline frame, a call tree or analysis row, a SOQL/DML/SOSL
 - **Dock it where you want** - Left, right or bottom; drag to resize, collapse the sections you don't need. Your layout is remembered.
 - **Right-click a row** for **Show in Call Tree**, **Copy Name**, **Copy Details** or **Copy Call Stack**; `Cmd/Ctrl+C` copies the table.
 
+![Inspector](https://raw.githubusercontent.com/certinia/debug-log-analyzer/main/lana/assets/1_22/inspector.png)
+
 ## 🧠 Apex Analysis
 
 See which methods are the slowest, most frequent. or expensive.
