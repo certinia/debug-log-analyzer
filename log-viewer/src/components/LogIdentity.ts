@@ -1,8 +1,11 @@
 /*
  * Copyright (c) 2026 Certinia Inc. All rights reserved.
  */
-import { LitElement, css, html } from 'lit';
+import { LitElement, css, html, nothing } from 'lit';
+import { consume } from '@lit/context';
 import { customElement, property } from 'lit/decorators.js';
+
+import { logStatusContext, type LogStatus } from '../core/log/logStatus.js';
 
 import type { LogIdentityItem } from '../features/app/logIdentity.js';
 import { globalStyles } from '../styles/global.styles.js';
@@ -17,6 +20,10 @@ import { skeletonStyles } from '../styles/skeleton.styles.js';
  */
 @customElement('log-identity')
 export class LogIdentity extends LitElement {
+  @consume({ context: logStatusContext, subscribe: true })
+  @property({ attribute: false })
+  logStatus: LogStatus = 'parsing';
+
   @property({ attribute: false })
   item: LogIdentityItem | null = null;
 
@@ -48,7 +55,9 @@ export class LogIdentity extends LitElement {
 
   render() {
     if (this.item === null) {
-      return html`<span class="item skeleton" style="width: ${this.skeletonWidth};"></span>`;
+      return this.logStatus === 'parsing'
+        ? html`<span class="item skeleton" style="width: ${this.skeletonWidth};"></span>`
+        : nothing;
     }
     return html`<span
       class="item"

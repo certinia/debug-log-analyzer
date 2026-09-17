@@ -50,6 +50,7 @@ import {
   type ScopedCallTree,
   type ScopedRow,
 } from './scopedCallTree.js';
+import './GridSkeleton.js';
 import './ViewModeSwitch.js';
 import { VIEW_MODES, defaultViewMode, isViewMode, type ViewMode } from './callTreeViewModes.js';
 
@@ -752,6 +753,7 @@ export class CallTreeDetail extends LitElement {
         ></view-mode-switch>
       </div>
       <div class="tables">
+        ${this.logStore ? '' : html`<grid-skeleton></grid-skeleton>`}
         <div class="table-host ${this.viewMode === 'time-order' ? '' : 'is-hidden'}">
           <div id="time-order-tree" class="grid"></div>
         </div>

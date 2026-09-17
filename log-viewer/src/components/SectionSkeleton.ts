@@ -85,19 +85,14 @@ export class SectionSkeleton extends LitElement {
     if (this.logStatus === 'ready') {
       return html`<p class="note">${this.fallback}</p>`;
     }
-    // Decoration standing in for content, so there is nothing here to read out.
-    return html`<div
-      class="bars shape-${this.shape}"
-      role="status"
-      aria-busy="true"
-      aria-label="Loading"
-    >
+    // Decoration, not content: ten sections mount together and a live region
+    // each would announce "Loading" ten times.
+    return html`<div class="bars shape-${this.shape}" aria-hidden="true">
       ${(SHAPE_ROWS[this.shape] ?? SHAPE_ROWS.rows).map(
         (widths) =>
           html`<div class="row">
             ${widths.map(
-              (width) =>
-                html`<div class="skeleton bar" style="width: ${width}%" aria-hidden="true"></div>`,
+              (width) => html`<div class="skeleton bar" style="width: ${width}%"></div>`,
             )}
           </div>`,
       )}

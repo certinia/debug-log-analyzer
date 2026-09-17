@@ -6,6 +6,7 @@ import { afterEach, describe, expect, it } from '@jest/globals';
 import { createMockContext } from '../../__tests__/helpers/test-builders.js';
 import { Uri, workspace } from '../../__tests__/mocks/vscode.js';
 import { setEmbeddedLogViewerAssets } from '../../display/LogViewerAssets.js';
+import { getConfig } from '../../workspace/AppConfig.js';
 import { WebView } from '../../display/WebView.js';
 import { LogView } from '../LogView.js';
 
@@ -52,6 +53,41 @@ describe('LogView', () => {
   afterEach(() => {
     setEmbeddedLogViewerAssets(undefined);
   });
+
+  async function createViewWithListener() {
+    let receiveMessage: ((message: unknown) => Promise<void>) | undefined;
+    const postMessage = jest.fn().mockResolvedValue(true);
+    const panel = {
+      iconPath: undefined,
+      onDidDispose: jest.fn(() => ({ dispose: jest.fn() })),
+      reveal: jest.fn(),
+      webview: {
+        asWebviewUri: jest.fn((uri: { path: string }) => Uri.parse(`webview:${uri.path}`)),
+        html: '',
+        onDidReceiveMessage: jest.fn((listener: (message: unknown) => Promise<void>) => {
+          receiveMessage = listener;
+          return { dispose: jest.fn() };
+        }),
+        postMessage,
+      },
+    };
+    mockApplyWebView.mockReturnValue(panel as unknown as import('vscode').WebviewPanel);
+    setEmbeddedLogViewerAssets({
+      html: '<link id="vscode-codicon-stylesheet" href="codicon.css" /><script type="module" src="bundle.js"></script>',
+      script: '',
+      codiconCss: '',
+      codiconFont: '',
+    });
+
+    await LogView.createView(
+      createMockContext() as unknown as import('../../Context.js').Context,
+      Promise.resolve(),
+      Uri.parse('memfs:/repository/logs/virtual.log'),
+      'log body',
+    );
+
+    return { postMessage, receive: (message: unknown) => receiveMessage!(message) };
+  }
 
   it('uses a display path in the payload and the captured URI for open actions', async () => {
     let receiveMessage: ((message: unknown) => Promise<void>) | undefined;
@@ -140,5 +176,30 @@ describe('LogView', () => {
     await expect(
       LogView.createView(createMockContext() as unknown as import('../../Context.js').Context),
     ).rejects.toThrow('Could not read the log viewer at /test/extension/out/index.html: ENOENT');
+  });
+
+  it('answers a request whose case throws, so the webview stops waiting', async () => {
+    const { receive, postMessage } = await createViewWithListener();
+
+    (getConfig as jest.Mock).mockImplementationOnce(() => {
+      throw new Error('settings unavailable');
+    });
+    await receive({ cmd: 'getConfig', requestId: 'request-2' });
+
+    expect(postMessage).toHaveBeenCalledWith({
+      requestId: 'request-2',
+      error: 'settings unavailable',
+    });
+  });
+
+  it('answers a request it does not recognise, rather than leaving it pending', async () => {
+    const { receive, postMessage } = await createViewWithListener();
+
+    await receive({ cmd: 'notACommand', requestId: 'request-3' });
+
+    expect(postMessage).toHaveBeenCalledWith({
+      requestId: 'request-3',
+      error: 'Unknown request: notACommand',
+    });
   });
 });

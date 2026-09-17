@@ -2,8 +2,11 @@
  * Copyright (c) 2023 Certinia Inc. All rights reserved.
  */
 import '#vscode-elements/vscode-toolbar-button.js';
-import { LitElement, css, html, type PropertyValues } from 'lit';
+import { consume } from '@lit/context';
+import { LitElement, css, html, nothing, type PropertyValues } from 'lit';
 import { customElement, property, query, state } from 'lit/decorators.js';
+
+import { logStatusContext, type LogStatus } from '../../../core/log/logStatus.js';
 
 import type { ApexLog, LogCategory } from 'apex-log-parser';
 import { categoryPalette } from '../../../components/categoryTime.js';
@@ -43,6 +46,10 @@ interface ThemeSettings {
 
 @customElement('timeline-view')
 export class TimelineView extends LitElement {
+  @consume({ context: logStatusContext, subscribe: true })
+  @property({ attribute: false })
+  logStatus: LogStatus = 'parsing';
+
   @property()
   timelineRoot: ApexLog | null = null;
 
@@ -245,7 +252,11 @@ export class TimelineView extends LitElement {
   }
 
   render() {
-    if (!this.timelineRoot || this.useLegacyTimeline === null) {
+    if (!this.timelineRoot) {
+      // The settings wait below is separate, so it keeps the skeleton either way.
+      return this.logStatus === 'parsing' ? html`<timeline-skeleton></timeline-skeleton>` : nothing;
+    }
+    if (this.useLegacyTimeline === null) {
       return html`<timeline-skeleton></timeline-skeleton>`;
     }
 
