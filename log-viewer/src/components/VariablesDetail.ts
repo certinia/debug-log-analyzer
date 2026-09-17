@@ -310,6 +310,16 @@ export class VariablesDetail extends LitElement {
   }
 
   override willUpdate(changed: PropertyValues): void {
+    // Here, not in `updated`: that runs after this pass has already resolved the
+    // new log's frame, and its rows, through the last log's index.
+    if (changed.has('logStore')) {
+      this._index = null;
+      this._readError = false;
+      this._disclosure = new Map();
+      this._focused = null;
+      this._spreadKey = undefined;
+      this._spread = null;
+    }
     // Only what the selection is made of, so a disclosure or a key does not
     // re-read the log.
     const reselected =
@@ -391,12 +401,6 @@ export class VariablesDetail extends LitElement {
 
   override updated(changed: PropertyValues): void {
     if (changed.has('logStore')) {
-      this._index = null;
-      this._readError = false;
-      this._disclosure = new Map();
-      this._focused = null;
-      this._spreadKey = undefined;
-      this._spread = null;
       void this._read();
     }
     // Comparing reads every call, so only a changed selection - or one we have
