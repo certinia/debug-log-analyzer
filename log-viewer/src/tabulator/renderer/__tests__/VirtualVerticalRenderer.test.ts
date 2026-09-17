@@ -730,7 +730,7 @@ describe('VirtualVerticalRenderer.scrollToRowPosition', () => {
   it('rejects when the row is not in displayRows', () => {
     const { r } = makePositionRenderer();
     const stranger = makeRowStub(999);
-    return expect(r.scrollToRowPosition(stranger, 'top', true)).rejects.toBe(
+    return expect(r.scrollToRowPosition(stranger, 'top', true)).rejects.toThrow(
       'Scroll Error - Row not visible',
     );
   });

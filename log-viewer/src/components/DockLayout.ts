@@ -28,7 +28,7 @@ export class DockLayout extends LitElement {
   dock: DockPosition = 'right';
 
   @property({ type: Number })
-  size = 500;
+  size = 560;
 
   @property({ type: Boolean })
   visible = false;

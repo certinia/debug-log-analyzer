@@ -128,6 +128,28 @@ function loopOccurrences(count: number): number[] {
   return instances;
 }
 
+/** Every row's type, whole tree. */
+function types(rows: readonly ScopedRow[]): string[] {
+  return rows.flatMap((row) => [row.type, ...types(row._children ?? [])]);
+}
+
+/** A limit block under m2, with the limit line it holds. Undone by the caller. */
+function limitBlockUnderM2(): () => void {
+  const block = ev(400, 'CUMULATIVE_LIMIT_USAGE', 'LIMIT_USAGE', { total: 3, self: 3 });
+  const line = ev(401, 'LIMIT_USAGE_FOR_NS', '(default)', { total: 0, self: 0 });
+  block.parent = m2;
+  block.children = [line];
+  line.parent = block;
+  m2.children.push(block);
+  byId.set(block.eventIndex, block);
+  byId.set(line.eventIndex, line);
+  return () => {
+    m2.children.pop();
+    byId.delete(block.eventIndex);
+    byId.delete(line.eventIndex);
+  };
+}
+
 describe('buildScopedCallTree', () => {
   it('returns null when nothing is selected', async () => {
     expect(await build(-1)).toBeNull();
@@ -496,6 +518,21 @@ describe('buildWholeLogCallTree', () => {
       clock.mockRestore();
     }
   });
+  it('leaves out a profiling block the log left at the top level', async () => {
+    const profiling = ev(500, 'CUMULATIVE_PROFILING_BEGIN', 'profiling', { total: 2, self: 2 });
+    profiling.parent = root;
+    root.children.push(profiling);
+    byId.set(profiling.eventIndex, profiling);
+    try {
+      // It follows EXECUTION_FINISHED, so it is a root rather than a descendant.
+      const rows = (await (await buildWholeLogCallTree(options))!.timeOrder(options))!;
+
+      expect(types(rows)).not.toContain('CUMULATIVE_PROFILING_BEGIN');
+    } finally {
+      root.children.pop();
+      byId.delete(profiling.eventIndex);
+    }
+  });
 });
 
 describe('holds', () => {
@@ -605,5 +642,36 @@ describe('bottom-up occurrences', () => {
     expect(seed.eventIndexes).toEqual(instances);
     expect(caller.eventIndexes).toBeNull();
     expect(locatableEventIndexes(caller)).toEqual(instances);
+  });
+  it('leaves the limit blocks out of every view', async () => {
+    const undo = limitBlockUnderM2();
+    try {
+      const tree = (await build(3))!;
+      // They report governor figures, not time, and the Overview and the governor
+      // trends already carry them.
+      for (const rows of [
+        (await tree.timeOrder(options))!,
+        (await tree.aggregated(options))!,
+        (await tree.bottomUp(options))!,
+      ]) {
+        expect(types(rows)).not.toContain('CUMULATIVE_LIMIT_USAGE');
+        expect(types(rows)).not.toContain('LIMIT_USAGE_FOR_NS');
+      }
+    } finally {
+      undo();
+    }
+  });
+
+  it('still answers for a limit block the user selected', async () => {
+    const undo = limitBlockUnderM2();
+    try {
+      const rows = (await (await build(400))!.bottomUp(options))!;
+
+      // The selection is kept whatever it is; only the limit line under it goes.
+      expect(rows.map((r) => r.text)).toEqual(['LIMIT_USAGE']);
+      expect(rows[0]?._children).toBeNull();
+    } finally {
+      undo();
+    }
   });
 });

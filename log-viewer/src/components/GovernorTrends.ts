@@ -23,7 +23,8 @@ import {
   type TrendPoint,
   type TrendSeries,
 } from './governorTrendData.js';
-import { NO_GOVERNOR_USAGE_TEXT, NO_LOG_TEXT } from './governorCopy.js';
+import { NO_GOVERNOR_USAGE_TEXT } from './governorCopy.js';
+import './SectionSkeleton.js';
 
 /** A placed cursor: the sample, and the chart it belongs to. */
 interface Cursor {
@@ -194,7 +195,7 @@ export class GovernorTrends extends LitElement {
         color: var(--lana-severity-ok);
       }
       .trend--warn {
-        color: var(--lana-severity-warning);
+        color: var(--lana-chart-warning);
       }
       .trend--danger {
         color: var(--lana-severity-error);
@@ -238,7 +239,7 @@ export class GovernorTrends extends LitElement {
   render() {
     const apexLog = this.logStore?.log;
     if (!apexLog) {
-      return html`<p class="note">${NO_LOG_TEXT}</p>`;
+      return html`<section-skeleton shape="chart"></section-skeleton>`;
     }
     const series = governorTrendSeries(apexLimitTimeSeries(apexLog));
     if (!series.length) {
@@ -270,7 +271,9 @@ export class GovernorTrends extends LitElement {
     return html`<div class="trend">
       <div class="trend__head">
         <span class="trend__label">${series.label}</span>
-        <span class="trend__value" aria-live="polite"
+        <span
+          class="trend__value ${metered ? `trend--${governorTier(series.finalRatio)}` : ''}"
+          aria-live="polite"
           >${cursor ? html`${formatDuration(cursor.t)} · ` : ''}${series.format(
             cursor ? cursor.used : series.used,
           )} <span class="trend__limit">${denominator}</span></span

@@ -1,5 +1,8 @@
-import { LitElement, css, html } from 'lit';
-import { customElement } from 'lit/decorators.js';
+import { consume } from '@lit/context';
+import { LitElement, css, html, nothing } from 'lit';
+import { customElement, property } from 'lit/decorators.js';
+
+import { logStatusContext, type LogStatus } from '../core/log/logStatus.js';
 
 // styles
 import { globalStyles } from '../styles/global.styles.js';
@@ -7,6 +10,10 @@ import { skeletonStyles } from '../styles/skeleton.styles.js';
 
 @customElement('grid-skeleton')
 export class GridSkeleton extends LitElement {
+  @consume({ context: logStatusContext, subscribe: true })
+  @property({ attribute: false })
+  logStatus: LogStatus = 'parsing';
+
   static styles = [
     globalStyles,
     skeletonStyles,
@@ -36,6 +43,9 @@ export class GridSkeleton extends LitElement {
   ];
 
   render() {
+    if (this.logStatus !== 'parsing') {
+      return nothing;
+    }
     return html`<div class="skeleton-wrapper">
       <div class="skeleton-inline" style="width: 100%; height: 1rem;"></div>
       <div class="skeleton-inline" style="width: 100%; bottom: 4rem;">

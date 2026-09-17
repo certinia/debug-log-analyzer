@@ -14,6 +14,7 @@ import { formatSOQLToTemplate } from '../../soql/format/formatter.js';
 import { SEVERITY_TYPES, type Severity } from '../../soql/services/SOQLLinter.js';
 import { soqlSyntaxStyles } from '../../soql/styles/soql-syntax.css.js';
 import { globalStyles } from '../../../styles/global.styles.js';
+import '../../../components/SectionSkeleton.js';
 import { bleedRowStyles } from '../../../styles/revealRow.styles.js';
 import { severityIcon, severityStyles } from '../../../styles/severity.styles.js';
 import {
@@ -440,7 +441,7 @@ export class LogDiagnosticsView extends LitElement {
   render() {
     const result = this._result;
     if (!result) {
-      return html`<p class="note">Analysing the log…</p>`;
+      return html`<section-skeleton shape="rows" fallback="Analysing the log…"></section-skeleton>`;
     }
     const scoped = this.instances !== null;
     const filters = this._filters;

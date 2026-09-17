@@ -23,6 +23,7 @@ describe('tryCatchAsync', () => {
   });
 
   it('wraps a non-Error throw, keeping the original as the cause', async () => {
+    // eslint-disable-next-line @typescript-eslint/prefer-promise-reject-errors -- the point of the test
     const [value, error] = await tryCatchAsync(() => Promise.reject('a string'));
 
     expect(value).toBeNull();

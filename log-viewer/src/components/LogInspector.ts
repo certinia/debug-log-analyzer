@@ -1,6 +1,7 @@
 /*
  * Copyright (c) 2026 Certinia Inc. All rights reserved.
  */
+import { consume } from '@lit/context';
 import { LitElement, css, html, type PropertyValues } from 'lit';
 import { customElement, property, query, state } from 'lit/decorators.js';
 
@@ -12,6 +13,8 @@ import {
   eventBus,
 } from '../core/events/EventBus.js';
 import type { InspectorLocateEvent, InspectorRevealEvent } from './inspectorReveal.js';
+import { logContext } from '../core/log/logContext.js';
+import type { LogStore } from '../core/log/LogStore.js';
 import { debounce } from '../core/utility/Util.js';
 import { getSettings, updateSetting } from '../features/settings/Settings.js';
 import { emptyTextFor } from './detailEmptyText.js';
@@ -63,12 +66,17 @@ export class LogInspector extends LitElement {
   @property({ type: String })
   activeTab = '';
 
+  /** The log on screen, from the app root. */
+  @consume({ context: logContext, subscribe: true })
+  @property({ attribute: false })
+  logStore: LogStore | null = null;
+
   @state()
   private sections: PaneSection[] = [];
   @state()
   private dock: DockPosition = 'right';
   @state()
-  private panelSize = 500;
+  private panelSize = 560;
 
   // Keyed `<source>:<scope>:<section id>`, so the same section keeps its own
   // state in each list it appears in.
@@ -177,8 +185,20 @@ export class LogInspector extends LitElement {
     this._unsubscribe = [];
   }
 
+  willUpdate(changed: PropertyValues): void {
+    // Each of these names frames of the log it was made in, and nothing else
+    // drops them: the panel is retained when hidden, so it outlives the log.
+    // Here rather than in `updated`, so this pass already builds from nothing.
+    if (changed.has('logStore') && changed.get('logStore')) {
+      this._selections.clear();
+      this._active.clear();
+      this._sourceViews.clear();
+      this._locatedSource = undefined;
+    }
+  }
+
   updated(changed: PropertyValues): void {
-    if (changed.has('activeTab')) {
+    if (changed.has('activeTab') || changed.has('logStore')) {
       // The tab the mark was for is no longer on screen, and the pointer left
       // the row without the table noticing.
       this._clearLocate();

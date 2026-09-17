@@ -15,6 +15,20 @@ jest.mock('../CodeBlock.js', () => ({}));
 // The chevron is a vscode-icon, and its connectedCallback throws under jsdom.
 jest.mock('#vscode-elements/vscode-icon.js', () => ({}));
 
+const frameReads: { store: unknown; index: unknown }[] = [];
+jest.mock('../../core/log/frameVariables.js', () => {
+  const actual = jest.requireActual<typeof import('../../core/log/frameVariables.js')>(
+    '../../core/log/frameVariables.js',
+  );
+  return {
+    ...actual,
+    frameVariablesFor: (...args: Parameters<typeof actual.frameVariablesFor>) => {
+      frameReads.push({ store: args[0], index: args[2] });
+      return actual.frameVariablesFor(...args);
+    },
+  };
+});
+
 import { STATICS_NOTE, type VariablesDetail } from '../VariablesDetail.js';
 import '../VariablesDetail.js';
 
@@ -98,6 +112,26 @@ function groupNames(el: VariablesDetail): string[] {
     (node) => node.textContent?.trim() ?? '',
   );
 }
+
+describe('VariablesDetail swapping logs', () => {
+  // The wrong read is discarded before it paints, so only the read itself shows it.
+  it('does not read the new log through the index of the last one', async () => {
+    const first = logOf(FRAME);
+    const el = await mount(first, { eventIndex: indexOf(first, 'ns.Outer.run()') });
+    expect(rowNames(el)).toContain('total');
+    const firstIndex = frameReads.find((read) => read.store === first)?.index;
+    expect(firstIndex).toBeDefined();
+
+    const second = logOf(FRAME);
+    el.logStore = second;
+    el.eventIndex = indexOf(second, 'ns.Outer.run()');
+    await el.updateComplete;
+
+    expect(frameReads.some((read) => read.store === second && read.index === firstIndex)).toBe(
+      false,
+    );
+  });
+});
 
 // A throw during the whole-log walk must not leave the section reading forever
 // with no error and no way to retry.

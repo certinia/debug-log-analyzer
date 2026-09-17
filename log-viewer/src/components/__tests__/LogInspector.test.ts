@@ -80,6 +80,7 @@ jest.mock('../detailSections.js', () => ({
 }));
 
 import { eventBus, type DetailSource } from '../../core/events/EventBus.js';
+import type { LogStore } from '../../core/log/LogStore.js';
 import type { LogInspector } from '../LogInspector.js';
 import type { PaneView } from '../PaneView.js';
 import type { ViewModeSwitch } from '../ViewModeSwitch.js';
@@ -116,6 +117,12 @@ async function mount(activeTab: string): Promise<LogInspector> {
   document.body.appendChild(el);
   await flush(el);
   return el;
+}
+
+/** A log arriving from the app root. Only its identity matters here. */
+async function loadLog(el: LogInspector): Promise<void> {
+  el.logStore = {} as LogStore;
+  await flush(el);
 }
 
 function paneView(el: LogInspector): PaneView {
@@ -869,5 +876,27 @@ describe('LogInspector', () => {
     await settle(el);
     // The epoch guard drops the stale result — it must not clobber the newer one.
     expect(marker(el)).toBe('2');
+  });
+
+  it("drops every tab's selection when another log is loaded", async () => {
+    const el = await mount('timeline-tab');
+    await loadLog(el);
+    select('database', 3);
+    select('timeline', 7);
+    await flush(el);
+
+    expect(marker(el)).toBe('7');
+
+    await loadLog(el);
+
+    // An eventIndex names frames of the log it was picked in, so the panel comes
+    // back to its empty state rather than describing the new log through it.
+    expect(emptyText(el)).not.toBeNull();
+
+    // The tab the reader was not on when the log changed has dropped its own too.
+    el.activeTab = 'database-tab';
+    await flush(el);
+
+    expect(emptyText(el)).not.toBeNull();
   });
 });

@@ -500,7 +500,7 @@ export class AnalysisView extends LitElement {
   }
 
   _findEvt = ((event: FindEvt) => {
-    this._find(event);
+    void this._find(event);
   }) as EventListener;
 
   _groupBy(event: Event) {
@@ -560,9 +560,9 @@ export class AnalysisView extends LitElement {
       return;
     }
 
-    isVisible(this).then((isVisible) => {
+    void isVisible(this).then((isVisible) => {
       if (this.timelineRoot && isVisible) {
-        this._renderAnalysis(this.timelineRoot);
+        void this._renderAnalysis(this.timelineRoot);
       }
     });
   }

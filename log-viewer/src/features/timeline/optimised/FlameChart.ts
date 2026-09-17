@@ -20,6 +20,7 @@ import type {
   EditorColors,
   EventNode,
   HeatStripTimeSeries,
+  HoverCause,
   ModifierKeys,
   TimelineMarker,
   TimelineOptions,
@@ -85,11 +86,13 @@ const SIZE_WAIT_FRAMES = 60;
 const PAN_ANIMATION_MS = 300;
 
 export interface FlameChartCallbacks {
+  /** Called with what the pointer is over, and with what changed that. */
   onMouseMove?: (
     screenX: number,
     screenY: number,
     eventNode: EventNode | null,
     marker: TimelineMarker | null,
+    cause: HoverCause,
   ) => void;
   onClick?: (
     screenX: number,
@@ -1217,7 +1220,7 @@ export class FlameChart<E extends EventNode = EventNode> {
           this.requestHoverRender();
           // Notify callback that mouse left (clears tooltip)
           if (this.callbacks.onMouseMove) {
-            this.callbacks.onMouseMove(0, 0, null, null);
+            this.callbacks.onMouseMove(0, 0, null, null, 'pointer');
           }
         },
         onDragStart: () => {
@@ -1718,7 +1721,7 @@ export class FlameChart<E extends EventNode = EventNode> {
     );
   }
 
-  private handleMouseMove(screenX: number, screenY: number): void {
+  private handleMouseMove(screenX: number, screenY: number, cause: HoverCause = 'pointer'): void {
     if (!this.viewport || !this.index || !this.hitDetector) {
       return;
     }
@@ -1751,7 +1754,13 @@ export class FlameChart<E extends EventNode = EventNode> {
     // Notify callback with container-relative coordinates
     // (screenY is canvas-relative, add minimap offset for container-relative positioning)
     if (this.callbacks.onMouseMove) {
-      this.callbacks.onMouseMove(screenX, screenY + this.mainTimelineYOffset, eventNode, marker);
+      this.callbacks.onMouseMove(
+        screenX,
+        screenY + this.mainTimelineYOffset,
+        eventNode,
+        marker,
+        cause,
+      );
     }
   }
 
@@ -2389,12 +2398,12 @@ export class FlameChart<E extends EventNode = EventNode> {
       // stays marked stale, and the first render after the drag washes what it settled on.
       if (this.hoverTracker.setHovered(null)) {
         dirty.overlays = true;
-        this.callbacks.onMouseMove?.(0, 0, null, null);
+        this.callbacks.onMouseMove?.(0, 0, null, null, 'pointer');
       }
     } else {
       const stale = this.hoverTracker.takeStaleHit();
       if (stale) {
-        this.handleMouseMove(stale.x, stale.y);
+        this.handleMouseMove(stale.x, stale.y, 'frames');
       }
     }
 

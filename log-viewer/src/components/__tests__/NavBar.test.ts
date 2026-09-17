@@ -232,6 +232,7 @@ describe('NavBar collapse ladder', () => {
     const el = await mount();
     el.logSize = 1_500_000;
     el.logDuration = 250_000_000;
+    el.logStatus = 'ready';
     el.logIdentity = {
       entryPoint: { label: 'MyController.doIt', detail: 'apex://MyController/doIt' },
       user: { label: 'sam', detail: 'sam@example.com' },
@@ -277,6 +278,7 @@ describe('NavBar collapse ladder', () => {
 
   it('gives a folded row no hover when the full value reads the same', async () => {
     const el = await mount();
+    el.logStatus = 'ready';
     el.logIdentity = {
       entryPoint: null,
       user: { label: 'sam', detail: 'sam' },
@@ -310,6 +312,7 @@ describe('NavBar collapse ladder', () => {
 
   it('skips an identity item the log does not have, without freezing the ladder', async () => {
     const el = await mount();
+    el.logStatus = 'ready';
     el.logIdentity = {
       entryPoint: { label: 'Anonymous Apex', detail: 'execute_anonymous_apex' },
       user: null,
@@ -338,6 +341,7 @@ describe('NavBar collapse ladder', () => {
 
   it('folds the identity details into the title tooltip', async () => {
     const el = await mount();
+    el.logStatus = 'ready';
     el.logIdentity = {
       entryPoint: { label: 'Anonymous Apex', detail: 'execute_anonymous_apex' },
       user: { label: 'tina.owen', detail: 'tina.owen@example.com' },

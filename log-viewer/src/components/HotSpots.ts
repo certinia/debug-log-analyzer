@@ -14,6 +14,8 @@ import {
   type HotSpotRow,
 } from '../features/call-tree/utils/ExecutionHighlights.js';
 import { globalStyles } from '../styles/global.styles.js';
+import { NO_TIMED_CALLS_TEXT } from './governorCopy.js';
+import './SectionSkeleton.js';
 import { inspectorSectionStyles } from '../styles/inspectorSection.styles.js';
 import { revealRowStyles } from '../styles/revealRow.styles.js';
 import { CategoryPaletteController, categoryLabel } from './categoryTime.js';
@@ -41,7 +43,10 @@ export class HotSpots extends LitElement {
     const log = this.logStore?.log;
     const highlights = log && getExecutionHighlights(log);
     if (!highlights || !highlights.hotSpots.length) {
-      return html`<p class="note">The log has no timed calls.</p>`;
+      return html`<section-skeleton
+        shape="rows"
+        fallback=${NO_TIMED_CALLS_TEXT}
+      ></section-skeleton>`;
     }
 
     return html`${highlights.hotSpots.map((spot) => this._spotRow(spot, highlights.totalTime))}`;

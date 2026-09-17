@@ -86,4 +86,31 @@ describe('governor-summary', () => {
       expect(element.shadowRoot?.querySelector('.gauge__spark')).toBeNull();
     });
   });
+
+  describe('the figure carries its tier', () => {
+    const tierOf = async (used: number, limit: number) => {
+      const element = await strip([
+        { label: 'SOQL', found: used, used, limit, format: formatInteger },
+      ]);
+      const classes = element.shadowRoot?.querySelector('.gauge__value')?.classList ?? [];
+      return [...classes].find((name) => name.startsWith('gauge__value--')) ?? null;
+    };
+
+    it('reads safe below the warn threshold', async () => {
+      expect(await tierOf(79, 100)).toBe('gauge__value--safe');
+    });
+
+    it('warns from the threshold', async () => {
+      expect(await tierOf(80, 100)).toBe('gauge__value--warn');
+    });
+
+    it('reads danger at the limit', async () => {
+      expect(await tierOf(100, 100)).toBe('gauge__value--danger');
+    });
+
+    // No limit, so no tier to report against.
+    it('takes none where the log reported no limit', async () => {
+      expect(await tierOf(12, 0)).toBeNull();
+    });
+  });
 });
