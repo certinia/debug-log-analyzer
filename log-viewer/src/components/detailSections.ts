@@ -89,6 +89,7 @@ export async function buildDetailSections(
         {
           id: 'findings',
           title: 'Findings',
+          fit: 'content',
           content: html`<log-diagnostics></log-diagnostics>`,
         },
         // The grid ranks by count and average; the spread gives the shape those
