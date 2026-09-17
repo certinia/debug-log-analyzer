@@ -220,5 +220,15 @@ export const globalStyles = [
     .filter-popover-row:hover {
       background-color: var(--lana-row-hover-bg);
     }
+
+    /* Off-screen, not hidden: a display:none region is never announced. */
+    .sr-only {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      overflow: hidden;
+      clip-path: inset(50%);
+      white-space: nowrap;
+    }
   `,
 ];

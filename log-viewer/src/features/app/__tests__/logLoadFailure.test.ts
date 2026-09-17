@@ -57,4 +57,36 @@ describe('a log that could not be read', () => {
 
     expect(statusOf(el)).toBe('ready');
   });
+
+  it('paints the region empty, so its first text is a change a reader is told about', async () => {
+    const el = document.createElement('log-viewer') as LogViewer;
+    document.body.appendChild(el);
+    // `performUpdate` is protected; rendering synchronously is what shows the first paint.
+    (el as unknown as { performUpdate: () => void }).performUpdate();
+
+    expect(el.shadowRoot?.querySelector('[role="status"]')?.textContent?.trim()).toBe('');
+  });
+
+  it('announces the load, since every placeholder is hidden from a reader', async () => {
+    const el = await mount();
+
+    const region = el.shadowRoot?.querySelector('[role="status"]');
+    expect(region?.getAttribute('aria-live')).toBe('polite');
+    expect(region?.textContent?.trim()).toBe('Loading log');
+
+    await el._handleLogFetch({ logData: MINIMAL_LOG });
+    await el.updateComplete;
+    expect(el.shadowRoot?.querySelector('[role="status"]')?.textContent?.trim()).toBe('Log loaded');
+  });
+
+  it('announces a load that failed, which is otherwise silent', async () => {
+    const el = await mount();
+
+    await el._handleLogFetch({ logUri: 'memfs:/gone.log' });
+    await el.updateComplete;
+
+    expect(el.shadowRoot?.querySelector('[role="status"]')?.textContent?.trim()).toBe(
+      'The log could not be loaded',
+    );
+  });
 });
