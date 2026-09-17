@@ -5,7 +5,7 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [1.22.0] 2026-09-18
+## [1.22.0] - 2026-09-18
 
 ### Added
 
@@ -53,13 +53,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - 🐛 **Go to Code** matches methods with namespace or `System` qualified parameter types. ([#834])
 - 🎨 **Theme switch**: Timeline and view colours update straight away instead of needing the log reopened.
 
-## [1.20.1] 2026-07-23
+## [1.20.1] - 2026-07-23
 
 ### Fixed
 
 - 🪟 **Timeline on Windows**: fixed the Flame Chart failing to load due to fractional display scaling (125% / 150% / 175%) - zoom, pan and keyboard navigation all appeared unresponsive ([#863]).
 
-## [1.20.0] 2026-06-18
+## [1.20.0] - 2026-06-18
 
 ### Added
 
@@ -151,13 +151,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - 🎯 **Number Precision**: Total and Self Time column precision changed to 2 decimal places for improved readability. ([#671])
 - 🎨 **Navigation Bar**: Redesigned to better match VS Code’s look and feel. ([#694])
 
-## [1.18.1] 2025-07-09
+## [1.18.1] - 2025-07-09
 
 ### Fixed
 
 - Remove assests from the published extension
 
-## [1.18.0] 2025-07-09
+## [1.18.0] - 2025-07-09
 
 ### Added
 
