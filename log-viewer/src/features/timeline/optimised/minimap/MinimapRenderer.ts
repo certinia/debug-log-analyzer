@@ -425,16 +425,17 @@ export class MinimapRenderer {
     // If we have a renderer, cache to texture
     if (this.renderer && displayWidth > 0 && minimapHeight > 0) {
       // Create or resize texture
+      // Create texture at device pixel ratio for crisp rendering
+      const resolution = this.renderer.resolution;
       if (
         !this.staticTexture ||
         this.staticTexture.width !== displayWidth ||
-        this.staticTexture.height !== minimapHeight
+        this.staticTexture.height !== minimapHeight ||
+        this.staticTexture.source.resolution !== resolution
       ) {
         if (this.staticTexture) {
           this.staticTexture.destroy(true);
         }
-        // Create texture at device pixel ratio for crisp rendering
-        const resolution = this.renderer.resolution;
         this.staticTexture = PIXI.RenderTexture.create({
           width: displayWidth,
           height: minimapHeight,

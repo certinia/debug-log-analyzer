@@ -22,6 +22,24 @@ export class TimelineResizeHandler {
   private lastResizeWidth: number;
   private lastResizeHeight: number;
 
+  private dprQuery: MediaQueryList | null = null;
+
+  private readonly onDevicePixelRatioChange = (): void => {
+    this.watchDevicePixelRatio();
+
+    // A zoom step moves the ratio and the box together, and this runs before the observer's
+    // callback. Replaying the old size would paint a box the zoom has left, then paint again.
+    const { width, height } = this.containerRef.getBoundingClientRect();
+    this.lastResizeWidth = Math.round(width);
+    this.lastResizeHeight = Math.round(height);
+
+    if (this.lastResizeWidth <= 0 || this.lastResizeHeight <= 0) {
+      return;
+    }
+
+    this.renderer?.resize(this.lastResizeWidth, this.lastResizeHeight);
+  };
+
   /**
    * @param containerRef - The container element to observe for resize
    * @param renderer - The resizable component to notify on resize
@@ -72,6 +90,15 @@ export class TimelineResizeHandler {
     });
 
     this.resizeObserver.observe(this.containerRef);
+    this.watchDevicePixelRatio();
+  }
+
+  private watchDevicePixelRatio(): void {
+    // No event reports a ratio change, and a query only matches the ratio it was made at, so it
+    // is re-made each time it stops matching.
+    this.dprQuery =
+      globalThis.matchMedia?.(`(resolution: ${window.devicePixelRatio || 1}dppx)`) ?? null;
+    this.dprQuery?.addEventListener('change', this.onDevicePixelRatioChange, { once: true });
   }
 
   public destroy(): void {
@@ -80,5 +107,8 @@ export class TimelineResizeHandler {
       this.resizeObserver.disconnect();
       this.resizeObserver = null;
     }
+
+    this.dprQuery?.removeEventListener('change', this.onDevicePixelRatioChange);
+    this.dprQuery = null;
   }
 }
