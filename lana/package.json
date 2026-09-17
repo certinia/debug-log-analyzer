@@ -360,8 +360,8 @@
           "lana.inspector.size": {
             "title": "Size",
             "type": "number",
-            "default": 500,
-            "markdownDescription": "The docked inspector's width (or height when docked to the bottom), in pixels. Default: `500`",
+            "default": 560,
+            "markdownDescription": "The docked inspector's width (or height when docked to the bottom), in pixels. Default: `560`",
             "order": 1
           }
         }

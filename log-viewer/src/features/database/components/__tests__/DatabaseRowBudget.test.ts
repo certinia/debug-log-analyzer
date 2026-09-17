@@ -21,6 +21,7 @@ jest.mock('../../services/rowBudget.js', () => ({
 jest.mock('#vscode-elements/vscode-icon.js', () => ({}));
 
 import '../DatabaseRowBudget.js';
+import { settledNote } from '../../../../components/__tests__/sectionTestUtils.js';
 
 const full = (): RowBudgets => ({
   budgets: [
@@ -239,6 +240,6 @@ describe('database-rows', () => {
   it('says so when the log records no database statements', async () => {
     budgets = { ...full(), statements: 0 };
 
-    expect(texts(await mount(), '.note')).toEqual(['The log records no database statements.']);
+    expect(await settledNote(await mount())).toBe('The log records no database statements.');
   });
 });

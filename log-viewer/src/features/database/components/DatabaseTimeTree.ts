@@ -18,6 +18,7 @@ import {
   dispatchInspectorReveal,
 } from '../../../components/inspectorReveal.js';
 import { LocatedRowMarker, rowIndexStamper } from '../../../components/locatedRow.js';
+import '../../../components/GridSkeleton.js';
 import { PANEL_ROW_MENU_ITEMS, runPanelRowAction } from '../../../components/panelRowMenu.js';
 import { eventBus } from '../../../core/events/EventBus.js';
 import { logContext } from '../../../core/log/logContext.js';
@@ -232,6 +233,7 @@ export class DatabaseTime extends LitElement {
 
   render() {
     return html`
+      ${this.logStore ? '' : html`<grid-skeleton></grid-skeleton>`}
       <div class="grid"></div>
       <context-menu
         @menu-select=${(e: CustomEvent<{ itemId: string }>) =>

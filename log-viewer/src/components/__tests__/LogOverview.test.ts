@@ -44,9 +44,11 @@ describe('log-overview', () => {
   const seriesWithSoql = (limit: number): HeatStripTimeSeries =>
     timeSeries([seriesEvent(1_000, { soqlQueries: { used: 40, limit } })]);
 
-  it('says no log is loaded, not that a log recorded nothing', async () => {
+  it('waits on the log rather than naming one that has not arrived', async () => {
     const element = await overview();
-    expect(element.shadowRoot?.querySelector('.note')?.textContent).toContain('No log is loaded');
+
+    // Which sentence a skeleton settles on is SectionSkeleton's own business.
+    expect(element.shadowRoot?.querySelector('section-skeleton')).not.toBeNull();
     expect(element.shadowRoot?.querySelector('governor-summary')).toBeNull();
   });
 

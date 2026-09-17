@@ -76,7 +76,7 @@ export class LogInspector extends LitElement {
   @state()
   private dock: DockPosition = 'right';
   @state()
-  private panelSize = 500;
+  private panelSize = 560;
 
   // Keyed `<source>:<scope>:<section id>`, so the same section keeps its own
   // state in each list it appears in.

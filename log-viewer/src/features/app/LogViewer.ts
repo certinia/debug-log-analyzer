@@ -13,6 +13,7 @@ import { customElement, property, state } from 'lit/decorators.js';
 import { parse, type ApexLog } from 'apex-log-parser';
 import { TAB_TO_SOURCE, eventBus } from '../../core/events/EventBus.js';
 import { logContext } from '../../core/log/logContext.js';
+import { logStatusContext, type LogStatus } from '../../core/log/logStatus.js';
 import { setCurrentLog, type LogStore } from '../../core/log/LogStore.js';
 import {
   VSCodeExtensionMessenger,
@@ -65,6 +66,10 @@ export class LogViewer extends LitElement {
   @provide({ context: logContext })
   @state()
   private _logStore: LogStore | null = null;
+
+  @provide({ context: logStatusContext })
+  @state()
+  private _logStatus: LogStatus = 'parsing';
 
   @state()
   _selectedTab = 'timeline-tab';
@@ -133,9 +138,13 @@ export class LogViewer extends LitElement {
 
   constructor() {
     super();
-    void vscodeMessenger.request<LogDataEvent>('fetchLog').then((msg) => {
-      void this._handleLogFetch(msg);
-    });
+    void vscodeMessenger
+      .request<LogDataEvent>('fetchLog')
+      .then((msg) => this._handleLogFetch(msg))
+      .catch((err: unknown) => {
+        this._failLoad(loadFailure('Could not load log', err));
+        throw err;
+      });
 
     document.addEventListener('show-tab', (e: Event) => {
       this._showTabEvent(e);
@@ -248,25 +257,20 @@ export class LogViewer extends LitElement {
       : await this._readLog(logUri || '');
     const logData = read.logData;
 
-    // Published before parsing, so a throw further down can't discard the only
-    // explanation the user would get. `logProblems` stays null while parsing otherwise.
+    // `parse('')` succeeds, so without this a log that could not be read reports
+    // itself as an empty one and every section prints its own "nothing here" line.
     if (read.error) {
-      this.logProblems = [read.error];
+      this._failLoad(read.error);
+      return;
     }
 
-    let apexLog: ApexLog;
-    try {
-      apexLog = parse(logData);
-    } catch (err) {
-      // Resolve the identity even when parsing throws, or the header's identity
-      // skeletons would pulse forever with nothing left to fill them.
-      this.logIdentity = { entryPoint: null, user: null, startTime: null };
-      throw err;
-    }
+    // A throw here rejects `_handleLogFetch`, which the constructor's `catch` publishes.
+    const apexLog = parse(logData);
 
     // Published before the views render, so every tab reads the same log
     // whichever one loads first.
     this._logStore = setCurrentLog(apexLog);
+    this._logStatus = 'ready';
 
     this.logSize = apexLog.size;
     this.timelineRoot = apexLog;
@@ -275,9 +279,9 @@ export class LogViewer extends LitElement {
     // parser never sees it. See deriveLogIdentity.
     this.logIdentity = deriveLogIdentity(apexLog, logData);
 
-    // Rebuilt per load, never appended to: both surfaces describe *this* log, so a
-    // previous log's problems must not carry over.
-    this.logProblems = [...(read.error ? [read.error] : []), ...apexLog.logIssues.map(toLogIssue)];
+    // Rebuilt per load, never appended to: it describes *this* log, so a previous
+    // log's problems must not carry over.
+    this.logProblems = apexLog.logIssues.map(toLogIssue);
 
     this.notifications = parserIssuesToNotifications(apexLog.parsingErrors);
 
@@ -289,12 +293,19 @@ export class LogViewer extends LitElement {
     }
   }
 
+  private _failLoad(problem: LogIssue) {
+    // Every placeholder stops on `failed`, so with no problem card the window
+    // empties silently.
+    this._logStatus = 'failed';
+    this.logProblems = [...(this.logProblems ?? []), problem];
+  }
+
   /**
    * Reads the log, returning the failure as a {@link LogIssue} rather than publishing it —
    * the caller owns `logProblems` so it can rebuild the list for each load.
    */
   async _readLog(logUri: string): Promise<{ logData: string; error: LogIssue | null }> {
-    let msg;
+    let cause: unknown;
     if (logUri) {
       try {
         const response = await fetch(logUri);
@@ -313,25 +324,26 @@ export class LogViewer extends LitElement {
         }
         return { logData: chunks.join(''), error: null };
       } catch (err: unknown) {
-        msg = (err instanceof Error ? err.message : String(err)) ?? '';
+        cause = err;
       }
     } else {
-      msg = 'Invalid Log Path';
+      cause = 'Invalid Log Path';
     }
 
-    return {
-      logData: '',
-      error: {
-        summary: 'Could not read log',
-        message: msg,
-        severity: 'error',
-        label: null,
-        action: null,
-        category: null,
-        timestamp: null,
-      },
-    };
+    return { logData: '', error: loadFailure('Could not read log', cause) };
   }
+}
+
+function loadFailure(summary: string, err: unknown): LogIssue {
+  return {
+    summary,
+    message: err instanceof Error ? err.message : String(err),
+    severity: 'error',
+    label: null,
+    action: null,
+    category: null,
+    timestamp: null,
+  };
 }
 
 interface LogDataEvent {
