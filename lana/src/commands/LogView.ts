@@ -5,7 +5,6 @@ import { Uri, commands, window as vscWindow, workspace, type WebviewPanel } from
 import { Utils } from 'vscode-uri';
 
 import type { Context } from '../Context.js';
-import { getEmbeddedLogViewerAssets } from '../display/LogViewerAssets.js';
 import { OpenFileInPackage } from '../display/OpenFileInPackage.js';
 import { WebView } from '../display/WebView.js';
 import { RawLogNavigation } from '../log-features/RawLogNavigation.js';
@@ -89,24 +88,19 @@ export class LogView {
 
     const logViewerRoot = Utils.joinPath(context.context.extensionUri, 'out');
     panel.iconPath = Utils.joinPath(logViewerRoot, 'certinia-icon-color.png');
-    const embeddedAssets = getEmbeddedLogViewerAssets();
-    if (embeddedAssets) {
-      panel.webview.html = LogView.embedAssets(embeddedAssets);
-    } else {
-      const bundleUri = panel.webview.asWebviewUri(Utils.joinPath(logViewerRoot, 'bundle.js'));
-      const codiconUri = panel.webview.asWebviewUri(Utils.joinPath(logViewerRoot, 'codicon.css'));
-      const index = Utils.joinPath(logViewerRoot, 'index.html');
-      const template = await readFileText(index).catch((error: unknown) => {
-        const message = error instanceof Error ? error.message : String(error);
-        const shown = index.scheme === 'file' ? index.fsPath : index.toString(true);
-        throw new Error(`Could not read the log viewer at ${shown}: ${message}`, {
-          cause: error,
-        });
+    const bundleUri = panel.webview.asWebviewUri(Utils.joinPath(logViewerRoot, 'bundle.js'));
+    const codiconUri = panel.webview.asWebviewUri(Utils.joinPath(logViewerRoot, 'codicon.css'));
+    const index = Utils.joinPath(logViewerRoot, 'index.html');
+    const template = await readFileText(index).catch((error: unknown) => {
+      const message = error instanceof Error ? error.message : String(error);
+      const shown = index.scheme === 'file' ? index.fsPath : index.toString(true);
+      throw new Error(`Could not read the log viewer at ${shown}: ${message}`, {
+        cause: error,
       });
-      panel.webview.html = template
-        .replace(/bundle\.js/gi, bundleUri.toString(true))
-        .replace(/codicon\.css/gi, codiconUri.toString(true));
-    }
+    });
+    panel.webview.html = template
+      .replace(/bundle\.js/gi, bundleUri.toString(true))
+      .replace(/codicon\.css/gi, codiconUri.toString(true));
 
     // The panel keeps its context when hidden, so it is never re-created: settings
     // edits have to be pushed to it. Only push when the resolved payload actually
@@ -278,28 +272,6 @@ export class LogView {
     config.database.sosl.columnView = columnViews['database.sosl.columnView'] ?? 'General';
     Object.assign(config.inspector, getInspectorState(context.context.globalState));
     return config;
-  }
-
-  private static embedAssets(
-    assets: NonNullable<ReturnType<typeof getEmbeddedLogViewerAssets>>,
-  ): string {
-    const fontData = `data:font/ttf;base64,${assets.codiconFont}`;
-    const codiconCss = assets.codiconCss.replace(
-      /url\(['"]?\.\/codicon\.ttf[^)]*\)/i,
-      `url("${fontData}")`,
-    );
-    const codiconHref = `data:text/css;charset=utf-8,${encodeURIComponent(codiconCss)}`;
-    const script = assets.script.replace(/<\/script/gi, '<\\/script');
-
-    return assets.html
-      .replace(
-        /<link\b(?=[^>]*\bid="vscode-codicon-stylesheet")[^>]*>/i,
-        () => `<link rel="stylesheet" id="vscode-codicon-stylesheet" href="${codiconHref}" />`,
-      )
-      .replace(
-        /<script\b(?=[^>]*\bsrc="bundle\.js")[^>]*><\/script>/i,
-        () => `<script type="module">${script}</script>`,
-      );
   }
 
   /** Settles a pending request. A command with no `requestId` expects no reply. */

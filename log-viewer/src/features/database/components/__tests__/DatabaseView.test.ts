@@ -179,3 +179,52 @@ describe('database-view selection', () => {
     });
   });
 });
+
+describe('database-view find totals', () => {
+  let view: HTMLElement & { updateComplete: Promise<unknown> };
+
+  beforeEach(async () => {
+    document.body.replaceChildren();
+    view = document.createElement('database-view') as typeof view;
+    document.body.append(view);
+    await view.updateComplete;
+  });
+
+  afterEach(() => {
+    document.body.replaceChildren();
+  });
+
+  /** The totals DatabaseView rolls up to the find widget while `run` happens. */
+  function rollUps(run: () => void): number[] {
+    const seen: number[] = [];
+    const probe = (e: Event) =>
+      void seen.push((e as CustomEvent<{ totalMatches: number }>).detail.totalMatches);
+    document.addEventListener('lv-find-results', probe);
+    run();
+    document.removeEventListener('lv-find-results', probe);
+    return seen;
+  }
+
+  const report = (type: StatementType, totalMatches: number) =>
+    document.dispatchEvent(new CustomEvent('db-find-results', { detail: { totalMatches, type } }));
+
+  /** Sections render in view order: DML, SOQL, SOSL. */
+  const collapse = (index: number) =>
+    view.shadowRoot
+      ?.querySelectorAll('database-section')
+      [index]?.dispatchEvent(new CustomEvent('section-toggle'));
+
+  it('rolls a grid count up to the find widget', () => {
+    expect(rollUps(() => report('soql', 3))).toEqual([3]);
+  });
+
+  it('drops a section count when the section collapses', async () => {
+    report('soql', 3);
+
+    // Collapsing removes the grid, so its matches can no longer be reached.
+    const totals = rollUps(() => collapse(1));
+    await view.updateComplete;
+
+    expect(totals).toEqual([0]);
+  });
+});

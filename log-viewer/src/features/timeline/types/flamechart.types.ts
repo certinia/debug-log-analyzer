@@ -132,6 +132,9 @@ export interface HoveredFrame {
   depth: number;
 }
 
+/** What changed the hover: the reader's pointer, or the frames moving under a still one. */
+export type HoverCause = 'pointer' | 'frames';
+
 /**
  * Tree node wrapper for hierarchical event structures.
  * Enables generic tree traversal without assuming specific
