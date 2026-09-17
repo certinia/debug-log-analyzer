@@ -782,24 +782,6 @@ export const SEVERITY_RANK: Record<MarkerType, number> = {
 // ============================================================================
 
 /**
- * Represents a single event that matches search criteria.
- * Cache structure to avoid re-searching during navigation.
- */
-export interface SearchMatch {
-  /** Reference to the matching LogEvent. */
-  event: LogEvent;
-
-  /** Pre-computed rendering rectangle for this event. */
-  rect: PrecomputedRect;
-
-  /** Depth of event in call tree (0-indexed). */
-  depth: number;
-
-  /** Which field contained the match ('type' or 'text'). */
-  matchType: 'type' | 'text';
-}
-
-/**
  * Search behavior options.
  */
 export interface SearchOptions {
@@ -906,25 +888,6 @@ export interface NoDataSpan {
   summary: string;
 }
 
-/**
- * Snapshot of a single metric at a point in time for tooltip display.
- * Includes pre-computed percentage for convenience.
- */
-export interface HeatStripMetricSnapshot {
-  /** Current usage value */
-  used: number;
-  /** Maximum allowed value (limit) */
-  limit: number;
-  /** Pre-computed percentage (used/limit) */
-  percent: number;
-}
-
-/**
- * Metric definition for heat strip tooltip display.
- * Alias for HeatStripMetric for semantic clarity.
- */
-export type HeatStripTimeSeriesMetric = HeatStripMetric;
-
 // ============================================================================
 // METRIC STRIP VISUALIZATION TYPES
 // ============================================================================
@@ -1008,27 +971,6 @@ export interface MetricStripProcessedData {
   gaps: NoDataSpan[];
 }
 
-/**
- * Metric strip time series input data (generic format).
- * This is the same structure as HeatStripTimeSeries - reused for metric strip.
- */
-export type MetricStripTimeSeries = HeatStripTimeSeries;
-
-// ============================================================================
-// BACKWARDS COMPATIBILITY ALIASES (deprecated, use MetricStrip* instead)
-// ============================================================================
-
-/** @deprecated Use MetricStripClassifiedMetric instead */
-export type SwimlaneClassifiedMetric = MetricStripClassifiedMetric;
-/** @deprecated Use MetricStripRawValue instead */
-export type SwimlaneRawValue = MetricStripRawValue;
-/** @deprecated Use MetricStripDataPoint instead */
-export type SwimlaneDataPoint = MetricStripDataPoint;
-/** @deprecated Use MetricStripProcessedData instead */
-export type SwimlaneProcessedData = MetricStripProcessedData;
-/** @deprecated Use MetricStripTimeSeries instead */
-export type SwimlaneTimeSeries = MetricStripTimeSeries;
-
 // ============================================================================
 // TEMPORAL SEGMENT TREE TYPES
 // ============================================================================
@@ -1086,19 +1028,6 @@ export interface SegmentNode {
 
   /** Call stack depth (0-indexed) */
   depth: number;
-}
-
-/**
- * Result from segment tree query.
- * Same shape as CulledRenderData for easy integration.
- */
-export interface SegmentTreeQueryResult {
-  /** Events > threshold screen width - render as rectangles */
-  visibleRects: Map<string, PrecomputedRect[]>;
-  /** Aggregated nodes for events <= threshold - render as buckets, keyed by category */
-  buckets: Map<string, PixelBucket[]>;
-  /** Render statistics */
-  stats: RenderStats;
 }
 
 /**

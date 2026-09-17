@@ -118,24 +118,6 @@ export interface MinimapRenderContext {
   cursorTimeNs: number | null;
 }
 
-/**
- * Keyboard handler callbacks for minimap-specific shortcuts.
- */
-export interface MinimapKeyboardCallbacks {
-  /** Pan viewport lens horizontally by time delta */
-  onPanViewport: (deltaTimeNs: number) => void;
-  /** Pan depth vertically by pixel delta */
-  onPanDepth: (deltaY: number) => void;
-  /** Zoom selection in or out */
-  onZoom: (direction: 'in' | 'out') => void;
-  /** Jump to timeline start */
-  onJumpStart: () => void;
-  /** Jump to timeline end */
-  onJumpEnd: () => void;
-  /** Reset zoom to fit entire timeline */
-  onResetZoom: () => void;
-}
-
 export class MinimapOrchestrator {
   // ============================================================================
   // PIXI RESOURCES

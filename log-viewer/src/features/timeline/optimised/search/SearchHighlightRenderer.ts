@@ -134,7 +134,7 @@ export class SearchHighlightRenderer {
 
   /**
    * Calculate culling bounds from viewport state.
-   * Same logic as EventBatchRenderer for consistency.
+   * Same logic as SelectionHighlightRenderer.calculateBounds for consistency.
    *
    * @param viewport - Viewport state
    * @returns Culling bounds in timeline coordinates
@@ -157,7 +157,7 @@ export class SearchHighlightRenderer {
 
   /**
    * Check if rectangle is visible within culling bounds.
-   * Uses same culling logic as EventBatchRenderer.
+   * Uses same culling logic as SelectionHighlightRenderer.isVisible.
    *
    * @param match - Search match to test
    * @param rect - Rectangle to test
@@ -179,7 +179,7 @@ export class SearchHighlightRenderer {
       return false;
     }
     // Always show current match highlight regardless of rect size
-    // (don't check rect.width > 0 because EventBatchRenderer might cull small rects)
+    // (don't check rect.width > 0 because MeshRectangleRenderer might cull small rects)
     return true;
   }
 }

@@ -131,18 +131,9 @@ export function calculateMinimapHeight(canvasHeight: number): number {
   return Math.max(MINIMAP_MIN_HEIGHT, Math.min(MINIMAP_MAX_HEIGHT, percentHeight));
 }
 
-/**
- * Legacy constant for backwards compatibility.
- * @deprecated Use calculateMinimapHeight() instead for dynamic sizing.
- */
-export const MINIMAP_HEIGHT = 80;
-
 export class MinimapViewport {
   private state: MinimapState;
   private selection: MinimapSelection;
-
-  /** Height reservation for heat strip at bottom of minimap (0 if no heat strip data). */
-  private heatStripReservation = 0;
 
   constructor(
     totalDuration: number,
@@ -202,32 +193,10 @@ export class MinimapViewport {
   }
 
   /**
-   * Set the heat strip height reservation.
-   * @deprecated Heat strip moved to MetricStripOrchestrator. Always returns 0.
-   *
-   * @param _height - Height in pixels (ignored, always 0)
-   */
-  public setHeatStripReservation(_height: number): void {
-    // Heat strip moved to MetricStripOrchestrator - reservation always 0
-    this.heatStripReservation = 0;
-  }
-
-  /**
-   * Get the bottom Y coordinate of the usable chart area.
-   * When heat strip has data, this is above the heat strip track.
-   * When no heat strip data, this is the full minimap height.
-   *
-   * @returns Y coordinate of chart area bottom
-   */
-  public getChartBottom(): number {
-    return this.state.height - this.heatStripReservation;
-  }
-
-  /**
-   * Get minimap chart area height (excludes axis and heat strip reservation).
+   * Get minimap chart area height (excludes the axis).
    */
   public getChartHeight(): number {
-    return this.getChartBottom() - AXIS_HEIGHT;
+    return this.getHeight() - AXIS_HEIGHT;
   }
 
   // ============================================================================
@@ -271,13 +240,13 @@ export class MinimapViewport {
    * - maxDepth (deepest frames) maps to TOP of chart area (just below axis)
    *
    * The axis is at TOP of minimap (Y=0 to Y=AXIS_HEIGHT).
-   * The chart area is from Y=AXIS_HEIGHT to Y=chartBottom (accounts for heat strip).
+   * The chart area is from Y=AXIS_HEIGHT to Y=chartBottom.
    *
    * @param depth - Depth value (0-based)
    * @returns Y coordinate in minimap pixels
    */
   public depthToMinimapY(depth: number): number {
-    const chartBottom = this.getChartBottom();
+    const chartBottom = this.getHeight();
     const chartHeight = chartBottom - AXIS_HEIGHT;
     if (this.state.maxDepth <= 0) {
       return chartBottom; // Return bottom of chart area if no depth info
@@ -292,7 +261,7 @@ export class MinimapViewport {
    * Inverse of depthToMinimapY - accounts for inverted Y-axis mapping.
    *
    * Axis area: Y=0 to Y=AXIS_HEIGHT (at TOP).
-   * Chart area: Y=AXIS_HEIGHT (top of chart) to Y=chartBottom (accounts for heat strip).
+   * Chart area: Y=AXIS_HEIGHT (top of chart) to Y=chartBottom.
    * - Y=AXIS_HEIGHT → maxDepth (deepest)
    * - Y=chartBottom → depth 0 (root)
    *
@@ -300,7 +269,7 @@ export class MinimapViewport {
    * @returns Depth value (0-based)
    */
   public minimapYToDepth(y: number): number {
-    const chartBottom = this.getChartBottom();
+    const chartBottom = this.getHeight();
     const chartHeight = chartBottom - AXIS_HEIGHT;
     if (chartHeight <= 0) {
       return 0;
@@ -558,7 +527,7 @@ export class MinimapViewport {
 
     // Get lens Y bounds (inverted: depthEnd is top, depthStart is bottom)
     const chartTop = AXIS_HEIGHT;
-    const chartBottom = this.getChartBottom();
+    const chartBottom = this.getHeight();
     const lensY1 = Math.max(chartTop, this.depthToMinimapY(this.selection.depthEnd)); // Top of lens
     const lensY2 = Math.min(chartBottom, this.depthToMinimapY(this.selection.depthStart)); // Bottom of lens
 

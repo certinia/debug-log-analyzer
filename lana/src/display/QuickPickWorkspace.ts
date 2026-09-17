@@ -8,6 +8,11 @@ import type { Context } from '../Context.js';
 import { VSWorkspace } from '../workspace/VSWorkspace.js';
 import { Item, Options, QuickPick } from './QuickPick.js';
 
+/**
+ * Kept on purpose with no caller. `RetrieveLogFile` and `LogView` take
+ * `workspaceFolders[0]`, so a multi-root workspace never gets a choice. This is the
+ * logic that gives it one — call it from those two sites to reinstate the prompt.
+ */
 export class QuickPickWorkspace {
   static async pickOrReturn(context: Context): Promise<VSWorkspace> {
     const workspaceFolders = context.workspaceManager.workspaceFolders;
