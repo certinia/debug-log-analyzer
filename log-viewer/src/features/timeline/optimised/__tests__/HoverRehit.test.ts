@@ -79,6 +79,25 @@ describe('the hover wash after the frames move', () => {
     expect(hoverRender.mock.calls[0]?.[1]).toEqual({ node: HIT_NODE, depth: 0 });
   });
 
+  // The reader never moved the pointer, so what the re-hit found is reported as the frames'
+  // doing. A panel put on a frame by find or by the keyboard reads that and stays put.
+  it('reports a re-hit as the frames moving, not as a pointer move', () => {
+    const { chart } = stubbedChart();
+    const internals = chart as unknown as Record<string, unknown>;
+    const onMouseMove = jest.fn();
+    internals['callbacks'] = { onMouseMove };
+    const tracker = internals['hoverTracker'] as {
+      setPointer: (x: number, y: number) => void;
+      invalidateHit: () => void;
+    };
+    tracker.setPointer(40, 10);
+    tracker.invalidateHit();
+
+    (internals['render'] as () => void).call(chart);
+
+    expect(onMouseMove).toHaveBeenCalledWith(40, expect.any(Number), HIT_NODE, null, 'frames');
+  });
+
   // A drag moves the view or draws its own overlay. Washing a frame the pointer never chose,
   // and a tooltip churning through frames as they slide past, are both noise.
   it('washes nothing while a drag owns the pointer, and asks once it ends', () => {
@@ -106,7 +125,7 @@ describe('the hover wash after the frames move', () => {
     // Cleared, not frozen: a wash left behind would slide away with the frame under it.
     expect(hoverRender).toHaveBeenCalledWith(expect.anything(), null);
     // And the tooltip goes with it.
-    expect(onMouseMove).toHaveBeenCalledWith(0, 0, null, null);
+    expect(onMouseMove).toHaveBeenCalledWith(0, 0, null, null, 'pointer');
 
     // The hit stayed marked stale, so the first render after the drag picks it up.
     dragging = false;

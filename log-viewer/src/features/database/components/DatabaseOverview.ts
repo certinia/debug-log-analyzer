@@ -18,6 +18,7 @@ import { logContext } from '../../../core/log/logContext.js';
 import type { LogStore } from '../../../core/log/LogStore.js';
 import { formatDuration, formatInteger, sharePercent } from '../../../core/utility/Util.js';
 import { globalStyles } from '../../../styles/global.styles.js';
+import '../../../components/SectionSkeleton.js';
 import { inspectorSectionStyles } from '../../../styles/inspectorSection.styles.js';
 import { revealRowStyles } from '../../../styles/revealRow.styles.js';
 import type { SoqlBudget } from '../../soql/format/budget.js';
@@ -165,7 +166,7 @@ export class DatabaseConcentration extends LitElement {
     const log = this.logStore?.log;
     const overview = log ? databaseOverview(log) : null;
     if (!overview?.ranked.length) {
-      return html`<p class="note">${NO_STATEMENTS}</p>`;
+      return html`<section-skeleton shape="rows" fallback=${NO_STATEMENTS}></section-skeleton>`;
     }
     const { count, percent } = concentration(overview);
     const { shown, rest } = topRows(overview.ranked);
@@ -281,7 +282,7 @@ export class DatabaseNamespaces extends LitElement {
     const log = this.logStore?.log;
     const overview = log ? databaseOverview(log) : null;
     if (!overview?.askedBy.length || !log) {
-      return html`<p class="note">${NO_STATEMENTS}</p>`;
+      return html`<section-skeleton shape="rows" fallback=${NO_STATEMENTS}></section-skeleton>`;
     }
     // The log's own palette, so a namespace that moves between the two bars is
     // followed by eye and reads the same on the Timeline's bar.

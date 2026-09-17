@@ -18,6 +18,7 @@ import {
   dispatchInspectorReveal,
 } from '../../../components/inspectorReveal.js';
 import { LocatedRowMarker, rowIndexStamper } from '../../../components/locatedRow.js';
+import '../../../components/GridSkeleton.js';
 import { PANEL_ROW_MENU_ITEMS, runPanelRowAction } from '../../../components/panelRowMenu.js';
 import { eventBus } from '../../../core/events/EventBus.js';
 import { logContext } from '../../../core/log/logContext.js';
@@ -34,6 +35,7 @@ import {
   createDurationBarColumn,
   headerSortElement,
   registerTableModules,
+  textCellTooltip,
   virtualScrollOptions,
 } from '../../call-tree/components/TableShared.js';
 import { waitForNextFrame } from '../../../core/utility/FrameBudget.js';
@@ -231,6 +233,7 @@ export class DatabaseTime extends LitElement {
 
   render() {
     return html`
+      ${this.logStore ? '' : html`<grid-skeleton></grid-skeleton>`}
       <div class="grid"></div>
       <context-menu
         @menu-select=${(e: CustomEvent<{ itemId: string }>) =>
@@ -393,6 +396,7 @@ export class DatabaseTime extends LitElement {
         // Name absorbs the slack and truncates first; the numeric columns hold a
         // fixed content width.
         formatter: nameFormatter,
+        tooltip: textCellTooltip,
         cssClass: 'datagrid-code-text truncate',
         sorter: 'string',
         widthGrow: 1,

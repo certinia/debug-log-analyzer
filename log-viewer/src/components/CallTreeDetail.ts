@@ -22,6 +22,7 @@ import {
   headerSortElement,
   clipboardCopyOptions,
   registerTableModules,
+  textTooltip,
   virtualScrollOptions,
 } from '../features/call-tree/components/TableShared.js';
 import { waitForNextFrame, type FrameBudgetOptions } from '../core/utility/FrameBudget.js';
@@ -50,6 +51,7 @@ import {
   type ScopedCallTree,
   type ScopedRow,
 } from './scopedCallTree.js';
+import './GridSkeleton.js';
 import './ViewModeSwitch.js';
 import { VIEW_MODES, defaultViewMode, isViewMode, type ViewMode } from './callTreeViewModes.js';
 
@@ -687,6 +689,12 @@ export class CallTreeDetail extends LitElement {
         // columns hold a fixed content width. Below Name's minWidth the table
         // scrolls horizontally.
         formatter: compactNameFormatter,
+        // Not `tooltip: true`: that answers with the raw `text` field, not the
+        // label the formatter renders.
+        tooltip: (_e, cell: CellComponent) => {
+          const { originalData } = cell.getData() as { originalData?: LogEvent };
+          return textTooltip(originalData ? eventLabel(originalData) : (cell.getValue() as string));
+        },
         cssClass: 'datagrid-code-text truncate',
         sorter: 'string',
         widthGrow: 1,
@@ -752,6 +760,7 @@ export class CallTreeDetail extends LitElement {
         ></view-mode-switch>
       </div>
       <div class="tables">
+        ${this.logStore ? '' : html`<grid-skeleton></grid-skeleton>`}
         <div class="table-host ${this.viewMode === 'time-order' ? '' : 'is-hidden'}">
           <div id="time-order-tree" class="grid"></div>
         </div>

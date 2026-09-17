@@ -2,10 +2,12 @@
  * Copyright (c) 2023 Certinia Inc. All rights reserved.
  */
 import '#vscode-elements/vscode-toolbar-button.js';
+import { consume } from '@lit/context';
 import { LitElement, css, html, nothing, type PropertyValues, type TemplateResult } from 'lit';
 import { customElement, property, state } from 'lit/decorators.js';
 
 import { eventBus } from '../core/events/EventBus.js';
+import { logStatusContext, type LogStatus } from '../core/log/logStatus.js';
 import { formatDuration } from '../core/utility/Util.js';
 import type { LogIdentityData } from '../features/app/logIdentity.js';
 import type { LogIssue } from '../features/notifications/types.js';
@@ -89,6 +91,10 @@ export class NavBar extends LitElement {
 
   @property()
   logPath = '';
+
+  @consume({ context: logStatusContext, subscribe: true })
+  @property({ attribute: false })
+  logStatus: LogStatus = 'parsing';
 
   @property()
   logSize: number | null = null;
@@ -249,7 +255,8 @@ export class NavBar extends LitElement {
       changed.has('logDuration') ||
       changed.has('logProblems') ||
       changed.has('notifications') ||
-      changed.has('logIdentity')
+      changed.has('logIdentity') ||
+      changed.has('logStatus')
     ) {
       this._widths.clear();
       this._visible = CHUNKS.length;
@@ -286,7 +293,7 @@ export class NavBar extends LitElement {
               .join(' • ')}"
           ></log-title>
           ${
-            show.meta
+            show.meta && this._chunkActive('meta')
               ? html`<div class="chunk chunk--meta">
                   <dot-separator></dot-separator>
                   <log-meta logFileSize="${sizeText}" logDuration="${elapsedText}"></log-meta>
@@ -386,13 +393,23 @@ export class NavBar extends LitElement {
   }
 
   /**
-   * Whether a chunk currently has anything to show. The identity chunks are the only
-   * optional ones: each stays active while the log parses (skeleton) and goes inactive
-   * when the parsed log carries no value for it (e.g. a cropped log with no USER_INFO).
+   * Whether a chunk currently has anything to show. Meta and the identity chunks are the
+   * optional ones: each stays active while the log is on its way (skeleton) and goes
+   * inactive when the log carries no value for it — a crop with no USER_INFO, or a load
+   * that failed and will fill none of them. Inactive rather than empty, because the chunk
+   * renders its own leading separator.
    */
   private _chunkActive(chunk: Chunk): boolean {
+    if (this.logStatus === 'parsing') {
+      return true;
+    }
+    if (chunk === 'meta') {
+      // The formatted values, not the raw ones: a zero size still reads as `0 MB`,
+      // which is what log-meta is handed and shows.
+      return Boolean(this._toSize(this.logSize) || this._formatDuration(this.logDuration));
+    }
     const field = IDENTITY_CHUNKS.find((identity) => identity.chunk === chunk)?.field;
-    return !field || this.logIdentity === null || Boolean(this.logIdentity[field]);
+    return !field || Boolean(this.logIdentity?.[field]);
   }
 
   private _measure(): void {

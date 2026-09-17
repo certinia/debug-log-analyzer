@@ -160,8 +160,8 @@ describe('SearchHighlightRenderer', () => {
       expect(mockGraphics.rect).toHaveBeenCalled();
       expect(mockGraphics.fill).toHaveBeenCalled();
 
-      // Should have called rect twice (once for fill, once for stroke)
-      expect(mockGraphics.rect).toHaveBeenCalledTimes(2);
+      // Three rects: the wash, the halo outside the border, and the border
+      expect(mockGraphics.rect).toHaveBeenCalledTimes(3);
     });
 
     it('should render for small rectangles', () => {

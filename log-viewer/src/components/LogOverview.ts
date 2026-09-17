@@ -9,11 +9,12 @@ import { logContext } from '../core/log/logContext.js';
 import type { LogStore } from '../core/log/LogStore.js';
 import { apexLimitTimeSeries } from '../features/timeline/optimised/apex-limit-series.js';
 import { globalStyles } from '../styles/global.styles.js';
-import { NO_GOVERNOR_USAGE_TEXT, NO_LOG_TEXT } from './governorCopy.js';
+import { NO_GOVERNOR_USAGE_TEXT } from './governorCopy.js';
 import { seriesGauges } from './logOverviewMetrics.js';
 
 // web components
 import '../features/database/components/GovernorSummary.js';
+import './SectionSkeleton.js';
 
 /**
  * The inspector's whole-log section, shown while nothing is selected: the
@@ -52,7 +53,7 @@ export class LogOverview extends LitElement {
   render() {
     const apexLog = this.logStore?.log;
     if (!apexLog) {
-      return html`<p class="note">${NO_LOG_TEXT}</p>`;
+      return html`<section-skeleton shape="gauges"></section-skeleton>`;
     }
     const gauges = seriesGauges(apexLimitTimeSeries(apexLog));
     if (!gauges.length) {
