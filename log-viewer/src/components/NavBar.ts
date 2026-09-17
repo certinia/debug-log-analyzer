@@ -293,7 +293,7 @@ export class NavBar extends LitElement {
               .join(' • ')}"
           ></log-title>
           ${
-            show.meta
+            show.meta && this._chunkActive('meta')
               ? html`<div class="chunk chunk--meta">
                   <dot-separator></dot-separator>
                   <log-meta logFileSize="${sizeText}" logDuration="${elapsedText}"></log-meta>
@@ -393,15 +393,20 @@ export class NavBar extends LitElement {
   }
 
   /**
-   * Whether a chunk currently has anything to show. The identity chunks are the only
+   * Whether a chunk currently has anything to show. Meta and the identity chunks are the
    * optional ones: each stays active while the log is on its way (skeleton) and goes
    * inactive when the log carries no value for it — a crop with no USER_INFO, or a load
-   * that failed and will fill none of them. Inactive rather than empty, because the
-   * chunk renders its own leading separator.
+   * that failed and will fill none of them. Inactive rather than empty, because the chunk
+   * renders its own leading separator.
    */
   private _chunkActive(chunk: Chunk): boolean {
     if (this.logStatus === 'parsing') {
       return true;
+    }
+    if (chunk === 'meta') {
+      // The formatted values, not the raw ones: a zero size still reads as `0 MB`,
+      // which is what log-meta is handed and shows.
+      return Boolean(this._toSize(this.logSize) || this._formatDuration(this.logDuration));
     }
     const field = IDENTITY_CHUNKS.find((identity) => identity.chunk === chunk)?.field;
     return !field || Boolean(this.logIdentity?.[field]);

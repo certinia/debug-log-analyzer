@@ -279,6 +279,8 @@ describe('NavBar collapse ladder', () => {
   it('gives a folded row no hover when the full value reads the same', async () => {
     const el = await mount();
     el.logStatus = 'ready';
+    el.logSize = 1024;
+    el.logDuration = 1_000_000;
     el.logIdentity = {
       entryPoint: null,
       user: { label: 'sam', detail: 'sam' },
@@ -310,9 +312,29 @@ describe('NavBar collapse ladder', () => {
     expect(el.shadowRoot?.querySelector('header-menu')).not.toBeNull();
   });
 
+  it('drops a chunk the failed load will never fill, separator and all', async () => {
+    const el = await mount();
+    el.logStatus = 'failed';
+    await el.updateComplete;
+
+    expect(inlineChunks(el)).toEqual(['problems', 'inspector', 'bell']);
+  });
+
+  it('keeps log meta for a log that measured zero, which still reads as a value', async () => {
+    const el = await mount();
+    el.logStatus = 'ready';
+    el.logSize = 0;
+    el.logDuration = 0;
+    await el.updateComplete;
+
+    expect(inlineChunks(el)).toContain('meta');
+  });
+
   it('skips an identity item the log does not have, without freezing the ladder', async () => {
     const el = await mount();
     el.logStatus = 'ready';
+    el.logSize = 1024;
+    el.logDuration = 1_000_000;
     el.logIdentity = {
       entryPoint: { label: 'Anonymous Apex', detail: 'execute_anonymous_apex' },
       user: null,
