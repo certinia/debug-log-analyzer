@@ -129,18 +129,18 @@ Inspector docked right again, nothing selected - press Escape.
 Shows the Overview, Findings and Self time spread; open all three.
 Pointer off both panes before Enter."
 
+  "inspector.png|crop|600|The one shot with a selection, so the panel is shown answering about one thing,
+and the only one of the panel alone. Same Analysis tab, now select a method row the log
+has a finding for. Findings then names it, which no other tab's panel can do, and Details,
+Call stack and the scoped Call tree all read that row. Open those four.
+Collapse Variables: sample-log.log is APEX_CODE FINE, so it has only its needs-FINEST note.
+Scroll the panel to the top so Details is whole, then drag round the panel alone."
+
   # --- Database tab ---
   "database.png|full|900|Database tab, SOQL section expanded so rows, timings and selectivity show.
 Nothing selected - press Escape - so the inspector reads the whole log.
 Shows the Overview, Namespace duration, Database duration and the call tree of paths
 that end in a query; open them all.
-Pointer off both panes before Enter."
-
-  "inspector.png|full|900|The one shot with a selection, so the panel is shown answering about one thing.
-Same Database tab, now select a SOQL statement whose query is non-trivial.
-Details then carries selectivity, query plan and cardinality, and SOQL issues has tips -
-neither appears in any whole-log view.
-Open Details, Call stack, Call tree and SOQL issues.
 Pointer off both panes before Enter."
 
   # --- Editor, not the webview ---
