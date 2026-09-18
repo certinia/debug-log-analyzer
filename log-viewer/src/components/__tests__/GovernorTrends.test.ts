@@ -8,6 +8,7 @@ import type { LitElement } from 'lit';
 
 import { eventBus } from '../../core/events/EventBus.js';
 import type { LogStore } from '../../core/log/LogStore.js';
+import type { NoDataSpan } from '../../features/timeline/types/flamechart.types.js';
 import type { TrendSeries } from '../governorTrendData.js';
 
 // The charts are driven from one stub series, so the seek is the only logic
@@ -25,7 +26,7 @@ import '../GovernorTrends.js';
 
 const LOG_NS = 1_000;
 
-const trend = (label = 'SOQL queries'): TrendSeries => ({
+const trend = (label = 'SOQL queries', gaps: NoDataSpan[] = []): TrendSeries => ({
   label,
   points: [
     { t: 0, ratio: 0, used: 0 },
@@ -36,9 +37,13 @@ const trend = (label = 'SOQL queries'): TrendSeries => ({
   limit: 100,
   finalRatio: 90,
   format: String,
+  gaps,
 });
 
-const aLog = () => ({ log: { duration: { total: LOG_NS } } }) as unknown as LogStore;
+// The Timeline draws 0 to `exitStamp`, so the charts measure by that. `duration.total` starts at
+// the first event instead, and is set apart here so a chart cannot pass on the wrong one.
+const aLog = () =>
+  ({ log: { exitStamp: LOG_NS, duration: { total: LOG_NS - 200 } } }) as unknown as LogStore;
 
 async function mount(): Promise<LitElement> {
   const element = document.createElement('governor-trends');
@@ -83,6 +88,32 @@ beforeEach(() => {
 });
 
 describe('governor-trends', () => {
+  const pathOf = (element: LitElement, selector: string) =>
+    element.shadowRoot?.querySelector(selector)?.getAttribute('d') ?? '';
+
+  it('steps at each reading instead of climbing between two of them', async () => {
+    const element = await mount();
+
+    // Flat from one reading to the next, then straight up at the reading itself, and the last
+    // level held out to the end of the log.
+    expect(pathOf(element, '.trend__line')).toBe(
+      'M0.00 30.00 L40.00 30.00 L40.00 18.00 L80.00 18.00 L80.00 3.00 L100 3.00',
+    );
+    // Nothing unrecorded, so the fill under it is one shape.
+    expect(pathOf(element, '.trend__area').match(/M/g)).toHaveLength(1);
+  });
+
+  it('leaves the spans the log recorded nothing in unfilled', async () => {
+    series = [trend('SOQL queries', [{ startTime: 500, endTime: 700, summary: 'skipped' }])];
+
+    const element = await mount();
+
+    // One shape up to the gap, one from where the log resumed. The line carries across it: a
+    // governor total cannot fall.
+    expect(pathOf(element, '.trend__area').match(/M/g)).toHaveLength(2);
+    expect(pathOf(element, '.trend__line').match(/M/g)).toHaveLength(1);
+  });
+
   it('moves the timeline to the instant clicked on a chart', async () => {
     const element = await mount();
 
