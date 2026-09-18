@@ -1,6 +1,7 @@
 {
   "name": "lana-ws",
   "private": true,
+  "packageManager": "pnpm@11.26.0",
   "devDependencies": {
     "@eslint/js": "^10.0.1",
     "@playwright/test": "^1.60.0",

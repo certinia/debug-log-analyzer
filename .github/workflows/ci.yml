@@ -10,6 +10,11 @@ on:
 permissions:
   contents: read
 
+# ci:install is the only install; `pnpm run` must not start another one without
+# --ignore-scripts.
+env:
+  PNPM_CONFIG_VERIFY_DEPS_BEFORE_RUN: false
+
 jobs:
   verify_files:
     name: Verify Files
@@ -18,14 +23,11 @@ jobs:
       - uses: actions/checkout@v7
         with:
           persist-credentials: false
-      - uses: pnpm/action-setup@v6.1.0
+      - uses: pnpm/setup@v2
         with:
-          version: 10
-      - name: Set up Node
-        uses: actions/setup-node@v7
-        with:
-          node-version: '24'
-          cache: 'pnpm'
+          runtime: node@24
+          cache: true
+          install: false
       - name: Install Packages
         run: pnpm run ci:install
       - name: Lint Files
@@ -44,14 +46,11 @@ jobs:
       - uses: actions/checkout@v7
         with:
           persist-credentials: false
-      - uses: pnpm/action-setup@v6.1.0
+      - uses: pnpm/setup@v2
         with:
-          version: 10
-      - name: Set up Node
-        uses: actions/setup-node@v7
-        with:
-          node-version: '24'
-          cache: 'pnpm'
+          runtime: node@24
+          cache: true
+          install: false
       - name: Install Packages
         run: pnpm run ci:install
       - name: Tests
@@ -64,14 +63,11 @@ jobs:
       - uses: actions/checkout@v7
         with:
           persist-credentials: false
-      - uses: pnpm/action-setup@v6.1.0
+      - uses: pnpm/setup@v2
         with:
-          version: 10
-      - name: Set up Node
-        uses: actions/setup-node@v7
-        with:
-          node-version: '24'
-          cache: 'pnpm'
+          runtime: node@24
+          cache: true
+          install: false
       - name: Install Packages
         run: pnpm run ci:install
       - name: Install Chromium
@@ -102,14 +98,11 @@ jobs:
       - uses: actions/checkout@v7
         with:
           persist-credentials: false
-      - uses: pnpm/action-setup@v6.1.0
+      - uses: pnpm/setup@v2
         with:
-          version: 10
-      - name: Set up Node
-        uses: actions/setup-node@v7
-        with:
-          node-version: '24'
-          cache: 'pnpm'
+          runtime: node@24
+          cache: true
+          install: false
       - name: Install Dependencies
         run: pnpm run ci:install
       - name: Build VSCode Package

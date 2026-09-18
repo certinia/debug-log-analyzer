@@ -18,7 +18,7 @@ VS Code extension for analyzing Salesforce debug logs with interactive visualiza
 
 ## Commands
 
-Always use pnpm.
+Always use pnpm v12, pinned in `package.json#packageManager`.
 
 - `pnpm watch` — dev build with hot reload
 - `pnpm build` — production build
