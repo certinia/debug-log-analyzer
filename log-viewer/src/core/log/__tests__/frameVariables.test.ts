@@ -2,7 +2,8 @@
  * Copyright (c) 2026 Certinia Inc. All rights reserved.
  */
 import { describe, expect, it } from '@jest/globals';
-import { type ApexLog, parse } from 'apex-log-parser';
+
+import { SETTINGS, indexOf, storeOf } from '../../../__tests__/helpers/apexLog.js';
 
 import {
   apexCodeLevel,
@@ -10,35 +11,6 @@ import {
   recordsVariables,
   variableIndexFor,
 } from '../frameVariables.js';
-import { logStoreFor, type LogStore } from '../LogStore.js';
-
-const SETTINGS = '64.0 APEX_CODE,FINEST;APEX_PROFILING,NONE;DB,NONE\n';
-
-/** Wraps `body` in the header and footer the parser needs to build a tree. */
-function logOf(body: string, settings = SETTINGS): string {
-  return (
-    settings +
-    '09:18:22.6 (100)|EXECUTION_STARTED\n' +
-    '09:18:22.6 (200)|CODE_UNIT_STARTED|[EXTERNAL]|066d0000002m8ij|apex://pkg.Entry\n' +
-    body +
-    '09:18:22.6 (900000)|CODE_UNIT_FINISHED|apex://pkg.Entry\n' +
-    '09:18:22.6 (901000)|EXECUTION_FINISHED\n'
-  );
-}
-
-function storeOf(body: string, settings = SETTINGS): { log: ApexLog; store: LogStore } {
-  const log = parse(logOf(body, settings));
-  return { log, store: logStoreFor(log) };
-}
-
-/** The eventIndex of the frame or event whose log text is `text`. */
-function indexOf(log: ApexLog, text: string): number {
-  const found = log.eventsById.find((event) => event.text === text);
-  if (!found) {
-    throw new Error(`no event with text ${text}`);
-  }
-  return found.eventIndex;
-}
 
 const OUTER =
   '09:18:22.6 (1000)|METHOD_ENTRY|[1]|01p|ns.Outer.run()\n' +
@@ -52,12 +24,14 @@ const OUTER =
 
 describe('apexCodeLevel', () => {
   it('reads the level the log was captured at', () => {
-    expect(apexCodeLevel(storeOf('').log)).toBe('FINEST');
-    expect(recordsVariables(storeOf('').log)).toBe(true);
+    const { log } = storeOf('', SETTINGS.finest);
+
+    expect(apexCodeLevel(log)).toBe('FINEST');
+    expect(recordsVariables(log)).toBe(true);
   });
 
   it('tells a level that records no variables from one that does', () => {
-    const { log } = storeOf('', '64.0 APEX_CODE,FINE;APEX_PROFILING,NONE;DB,NONE\n');
+    const { log } = storeOf('', SETTINGS.fine);
 
     expect(apexCodeLevel(log)).toBe('FINE');
     expect(recordsVariables(log)).toBe(false);
@@ -107,14 +81,13 @@ describe('frameVariablesFor', () => {
     // The inner call sits between the two writes to `total`.
     const atInner = frameVariablesFor(store, indexOf(log, 'ns.Inner.step()'), null);
     const outerIndex = indexOf(log, 'ns.Outer.run()');
-    const inner = log.eventsById.find((event) => event.text === 'ns.Inner.step()')!;
     const fromParent = frameVariablesFor(store, outerIndex, null);
 
     // Asked of the inner frame, the answer is the inner frame's own scope.
     expect(atInner?.frameLabel).toBe('ns.Inner.step()');
     // Asked of the outer frame, both of its writes are in.
     expect(fromParent?.locals[0]?.value).toBe('2');
-    expect(inner.eventIndex).toBeGreaterThan(outerIndex);
+    expect(indexOf(log, 'ns.Inner.step()')).toBeGreaterThan(outerIndex);
   });
 
   it('splits instance fields out of the locals', () => {
