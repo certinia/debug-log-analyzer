@@ -814,6 +814,9 @@ export class FlameChart<E extends EventNode = EventNode> {
       return false;
     }
 
+    // Read once, so the three renderers below cannot land on different ratios.
+    const resolution = window.devicePixelRatio || 1;
+
     const oldState = this.viewport.getState();
     const oldWidth = oldState.displayWidth;
 
@@ -855,7 +858,8 @@ export class FlameChart<E extends EventNode = EventNode> {
       newWidth === oldWidth &&
       mainTimelineHeight === oldState.displayHeight &&
       minimapHeight === this.appliedMinimapHeight &&
-      totalOverheadHeight === this.appliedOverheadHeight
+      totalOverheadHeight === this.appliedOverheadHeight &&
+      resolution === this.app.renderer.resolution
     ) {
       return false;
     }
@@ -872,12 +876,12 @@ export class FlameChart<E extends EventNode = EventNode> {
 
     // Resize minimap orchestrator
     if (this.minimapOrchestrator) {
-      this.minimapOrchestrator.resize(newWidth, newHeight);
+      this.minimapOrchestrator.resize(newWidth, newHeight, resolution);
     }
 
     // Resize metric strip orchestrator
     if (this.metricStripOrchestrator) {
-      this.metricStripOrchestrator.resize(newWidth);
+      this.metricStripOrchestrator.resize(newWidth, resolution);
     }
 
     // Update orchestrators with new offset
@@ -885,7 +889,7 @@ export class FlameChart<E extends EventNode = EventNode> {
     this.searchOrchestrator?.setMainTimelineYOffset(this.mainTimelineYOffset);
 
     // Resize main timeline app
-    this.app.renderer.resize(newWidth, mainTimelineHeight);
+    this.app.renderer.resize(newWidth, mainTimelineHeight, resolution);
 
     const newZoom = newWidth / visibleTimeRange;
     const newOffsetX = visibleTimeStart * newZoom;

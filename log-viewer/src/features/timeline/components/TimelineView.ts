@@ -17,7 +17,6 @@ import {
   updateSetting,
   type LanaSettings,
 } from '../../settings/Settings.js';
-import { setColors } from '../services/Timeline.js';
 
 import { DEFAULT_THEME_NAME, sameColors, type TimelineColors } from '../themes/Themes.js';
 import { addCustomThemes } from '../themes/ThemeSelector.js';
@@ -33,7 +32,6 @@ import { globalStyles } from '../../../styles/global.styles.js';
 // web components
 import './TimelineFlameChart.js';
 import './TimelineKey.js';
-import './TimelineLegacy.js';
 import './TimelineSkeleton.js';
 
 interface ThemeSettings {
@@ -77,7 +75,7 @@ export class TimelineView extends LitElement {
   private timelineSettings: LanaSettings['timeline'] | null = null;
 
   @state()
-  private useLegacyTimeline: boolean | null = null;
+  private settingsReady = false;
 
   /** Unsubscribe for the settings subscription; set while connected. */
   private settingsUnsubscribe: (() => void) | null = null;
@@ -177,7 +175,6 @@ export class TimelineView extends LitElement {
          min-height lets the chart shrink below its content, which a flex item does
          not do by default. */
       timeline-flame-chart,
-      timeline-legacy,
       timeline-skeleton {
         flex: 1 1 0;
         min-height: 0;
@@ -204,9 +201,9 @@ export class TimelineView extends LitElement {
     });
 
     void settingsSettled().then(() => {
-      // Still unset means nothing came to fill it, so take the setting's own default
-      // rather than leave the tab shimmering for the life of the panel.
-      this.useLegacyTimeline ??= false;
+      // Nothing came to fill them, so draw with the defaults rather than leave the tab
+      // shimmering for the life of the panel.
+      this.settingsReady = true;
     });
   }
 
@@ -221,25 +218,19 @@ export class TimelineView extends LitElement {
   private applyTimelineSettings(settings: LanaSettings) {
     const { timeline } = settings;
     this.timelineSettings = timeline;
-    this.useLegacyTimeline = timeline.legacy;
+    this.settingsReady = true;
     this.showTooltip = timeline.showTooltip;
 
-    if (!this.useLegacyTimeline) {
-      const themeName = timeline.activeTheme ?? DEFAULT_THEME_NAME;
-      const customThemes = this.toTheme(timeline.customThemes);
-      if (themeName !== this.appliedThemeName || !this.sameCustomThemes(customThemes)) {
-        this.appliedThemeName = themeName;
-        this.appliedCustomThemes = customThemes;
-        addCustomThemes(customThemes);
-        this.setTheme(themeName);
-        return;
-      }
+    const themeName = timeline.activeTheme ?? DEFAULT_THEME_NAME;
+    const customThemes = this.toTheme(timeline.customThemes);
+    if (themeName !== this.appliedThemeName || !this.sameCustomThemes(customThemes)) {
+      this.appliedThemeName = themeName;
+      this.appliedCustomThemes = customThemes;
+      addCustomThemes(customThemes);
+      this.setTheme(themeName); // rebuilds the legend itself
     } else {
-      setColors(timeline.colors);
+      this.rebuildTimelineKeys();
     }
-    // A legacy toggle re-enters with the theme unchanged, so the legend is rebuilt
-    // either way: the palette it reads differs between the two chart renderers.
-    this.rebuildTimelineKeys();
   }
 
   /** True when the pushed custom themes match those already applied. */
@@ -267,7 +258,7 @@ export class TimelineView extends LitElement {
       // The settings wait below is separate, so it keeps the skeleton either way.
       return this.logStatus === 'parsing' ? html`<timeline-skeleton></timeline-skeleton>` : nothing;
     }
-    if (this.useLegacyTimeline === null) {
+    if (!this.settingsReady) {
       return html`<timeline-skeleton></timeline-skeleton>`;
     }
 
@@ -276,13 +267,6 @@ export class TimelineView extends LitElement {
       ${this.renderTimeDisplayToggle()} ${this.renderTooltipToggle()}
     </div>`;
 
-    if (this.useLegacyTimeline) {
-      return html`${toolbar}
-        <timeline-legacy
-          .apexLog=${this.timelineRoot}
-          .themeName=${this.activeTheme}
-        ></timeline-legacy>`;
-    }
     return html`${toolbar}
       <timeline-flame-chart
         .apexLog=${this.timelineRoot}
@@ -293,9 +277,9 @@ export class TimelineView extends LitElement {
       ></timeline-flame-chart>`;
   }
 
-  /** The elapsed/wall-clock switch. Legacy has no such mode, nor do logs without a start time. */
+  /** The elapsed/wall-clock switch. A log with no start time has no wall clock to show. */
   private renderTimeDisplayToggle() {
-    if (this.useLegacyTimeline || this.timelineRoot?.startTime === null) {
+    if (this.timelineRoot?.startTime === null) {
       return '';
     }
 
@@ -309,12 +293,7 @@ export class TimelineView extends LitElement {
     ></vscode-toolbar-button>`;
   }
 
-  /** The hover details switch. Legacy has its own tooltip, which this does not control. */
   private renderTooltipToggle() {
-    if (this.useLegacyTimeline) {
-      return '';
-    }
-
     const label = this.showTooltip ? 'Hide frame details on hover' : 'Show frame details on hover';
     return html`<vscode-toolbar-button
       icon="${this.showTooltip ? 'eye' : 'eye-closed'}"
@@ -346,11 +325,7 @@ export class TimelineView extends LitElement {
    */
   private rebuildTimelineKeys(): void {
     const timeline = this.timelineSettings;
-    this.timelineKeys = toTimelineKeys(
-      categoryPalette(timeline, this.activeTheme),
-      this.selfTimes,
-      timeline?.legacy,
-    );
+    this.timelineKeys = toTimelineKeys(categoryPalette(timeline, this.activeTheme), this.selfTimes);
   }
 
   private toTheme(themeSettings: ThemeSettings): { [key: string]: TimelineColors } {

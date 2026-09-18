@@ -11,13 +11,15 @@ import { repeat } from 'lit/directives/repeat.js';
 import type { RowComponent, Tabulator } from 'tabulator-tables';
 
 import type { ApexLog, LogEvent } from 'apex-log-parser';
+import { DomListenerController } from '../../../core/events/DomListenerController.js';
 import { eventBus, type DetailSource } from '../../../core/events/EventBus.js';
+import type { FindEventDetail, FindEventMap } from '../../find/findEvents.js';
 import { SelectionEchoGuard } from '../../../core/events/SelectionEchoGuard.js';
 import { vscodeMessenger } from '../../../core/messaging/VSCodeExtensionMessenger.js';
 import { eventByEventIndex } from '../../../core/utility/EventSearch.js';
 import { isVisible } from '../../../core/utility/Util.js';
 import { getSettings, updateSetting } from '../../settings/Settings.js';
-import { CALLTREE_GO_TO_ROW } from '../navigation.js';
+import { CALLTREE_GO_TO_ROW, type CalltreeNavigationEventMap } from '../navigation.js';
 import type { AggregatedRow, BottomUpRow } from '../utils/Aggregation.js';
 import { findBucketRow } from '../utils/bucketRows.js';
 import {
@@ -87,6 +89,19 @@ const timeOrderRowFormatter = (row: RowComponent): void => {
 
 /** The Name column is always shown in the call-tree tables. */
 const ALWAYS_VISIBLE = ['text'];
+
+/** The row field a Bottom Up group-by picker value groups on; empty for None. */
+function groupByField(value: string): string {
+  const field = value === 'Caller Namespace' ? 'callerNamespace' : value.toLowerCase();
+  return field === 'none' ? '' : field;
+}
+
+/** Where each view builds its table. */
+const CONTAINER_IDS: Record<ViewMode, string> = {
+  'time-order': '#call-tree-table',
+  aggregated: '#aggregated-tree-table',
+  'bottom-up': '#bottom-up-tree-table',
+};
 
 const DEBUG_VALUE_TYPES: ReadonlySet<string> = new Set([
   'USER_DEBUG',
@@ -158,14 +173,12 @@ export class CalltreeView extends LitElement {
   private viewSwitchEpoch = 0;
   /** Releases the category-colouring settings subscription; set while connected. */
   private _categoryColoringOff: (() => void) | null = null;
+  /** Drops a pending wait for the view to come on screen, once per attach. */
+  private _visibilityWait: AbortController | null = null;
 
   get _callTreeTableWrapper(): HTMLDivElement | null {
     return (this.tableContainer = this.renderRoot?.querySelector('#call-tree-table') ?? null);
   }
-
-  private _goToRowEvt = ((e: CustomEvent<{ eventIndex: number }>) => {
-    void this._goToRow(e.detail.eventIndex);
-  }) as EventListener;
 
   /** Guards the programmatic select made on the inspector's behalf. */
   private _echoGuard = new SelectionEchoGuard();
@@ -175,9 +188,18 @@ export class CalltreeView extends LitElement {
   /** Which of the inspector's reports the mark follows. */
   private _emphasis = new InspectorEmphasis();
 
-  constructor() {
-    super();
+  private readonly _documentBus = new DomListenerController<
+    FindEventMap & CalltreeNavigationEventMap
+  >(this, document, {
+    [CALLTREE_GO_TO_ROW]: (e) => void this._goToRow(e.detail.eventIndex),
+    'lv-find': (e) => void this._find(e),
+    'lv-find-match': (e) => void this._find(e),
+    'lv-find-close': (e) => void this._find(e),
+  });
 
+  override connectedCallback(): void {
+    super.connectedCallback();
+    this._categoryColoringOff = wireCategoryColoring(this);
     this._inspectorUnsubscribe = wireInspectorTab('calltree', this._emphasis, {
       mark: (eventIndexes) => this._markLocated(eventIndexes),
       reveal: (eventIndex, signal) => this._revealEventIndex(eventIndex, signal),
@@ -193,25 +215,21 @@ export class CalltreeView extends LitElement {
         this._revealEventIndex(eventIndex, signal),
       ),
     });
-    document.addEventListener(CALLTREE_GO_TO_ROW, this._goToRowEvt);
-    document.addEventListener('lv-find', this._findEvt);
-    document.addEventListener('lv-find-match', this._findEvt);
-    document.addEventListener('lv-find-close', this._findEvt);
-  }
 
-  override connectedCallback(): void {
-    super.connectedCallback();
-    this._categoryColoringOff = wireCategoryColoring(this);
+    // A detach destroyed the tables, and `updated` builds only for the log's
+    // arrival. With a log already in hand this is a re-attach, and the build's
+    // own guard decides whether there is anything to do.
+    if (this.rootMethod) {
+      this._appendTableWhenVisible();
+    }
   }
 
   disconnectedCallback(): void {
     super.disconnectedCallback();
+    this._visibilityWait?.abort();
+    this._visibilityWait = null;
     this._categoryColoringOff?.();
     this._categoryColoringOff = null;
-    document.removeEventListener(CALLTREE_GO_TO_ROW, this._goToRowEvt);
-    document.removeEventListener('lv-find', this._findEvt);
-    document.removeEventListener('lv-find-match', this._findEvt);
-    document.removeEventListener('lv-find-close', this._findEvt);
     this._inspectorUnsubscribe?.();
     this._inspectorUnsubscribe = null;
     this._destroyCurrentTable();
@@ -478,10 +496,6 @@ export class CalltreeView extends LitElement {
     `;
   }
 
-  _findEvt = ((event: FindEvt) => {
-    void this._find(event);
-  }) as EventListener;
-
   _getAllTypes(data: LogEvent[]): string[] {
     const flattened = this._flatten(data);
     const types = new Set<string>();
@@ -546,25 +560,7 @@ export class CalltreeView extends LitElement {
       return;
     }
 
-    if (this.viewMode === 'time-order') {
-      const container = this.renderRoot?.querySelector<HTMLDivElement>('#call-tree-table');
-      if (container) {
-        await this._renderCallTree(container, this.rootMethod);
-        this._updateFiltering();
-      }
-    } else if (this.viewMode === 'aggregated') {
-      const container = this.renderRoot?.querySelector<HTMLDivElement>('#aggregated-tree-table');
-      if (container) {
-        await this._renderAggregatedTree(container, this.rootMethod);
-        this._updateFiltering();
-      }
-    } else if (this.viewMode === 'bottom-up') {
-      const container = this.renderRoot?.querySelector<HTMLDivElement>('#bottom-up-tree-table');
-      if (container) {
-        await this._renderBottomUpTree(container, this.rootMethod);
-        this._updateFiltering();
-      }
-    }
+    await this._renderActiveView();
 
     if (switchEpoch !== this.viewSwitchEpoch) {
       return;
@@ -573,6 +569,30 @@ export class CalltreeView extends LitElement {
     // The selection is untouched, but the direction this tab shows is not, and
     // that is what the inspector opens on the other side of.
     eventBus.emit('detail:view', { source: 'calltree', view: directionOf(this.viewMode) });
+  }
+
+  /** Build the table for the view on show, if it has none. */
+  private async _renderActiveView(): Promise<void> {
+    const rootMethod = this.rootMethod;
+    const container = this.renderRoot?.querySelector<HTMLDivElement>(CONTAINER_IDS[this.viewMode]);
+    if (!rootMethod || !container) {
+      return;
+    }
+
+    switch (this.viewMode) {
+      case 'time-order':
+        await this._renderCallTree(container, rootMethod);
+        break;
+      case 'aggregated':
+        await this._renderAggregatedTree(container, rootMethod);
+        break;
+      case 'bottom-up':
+        await this._renderBottomUpTree(container, rootMethod);
+        break;
+    }
+    // A fresh table carries none of the filters on show, so every build applies
+    // them — a re-attach rebuilds under the filters the user left in force.
+    this._updateFiltering();
   }
 
   private _destroyCurrentTable(): void {
@@ -598,11 +618,9 @@ export class CalltreeView extends LitElement {
     // Grouping renumbers the matches both ways round, and `dataGrouped` reports
     // only the way that leaves the table grouped.
     this._dropSearch();
-    const fieldName =
-      target.value === 'Caller Namespace' ? 'callerNamespace' : target.value.toLowerCase();
     if (this.bottomUpTreeTable) {
       // @ts-expect-error setSortedGroupBy is added by the GroupSort custom module
-      this.bottomUpTreeTable.setSortedGroupBy(fieldName !== 'none' ? fieldName : '');
+      this.bottomUpTreeTable.setSortedGroupBy(groupByField(target.value));
     }
   }
 
@@ -852,15 +870,19 @@ export class CalltreeView extends LitElement {
   }
 
   _appendTableWhenVisible() {
-    if (this.calltreeTable) {
+    if (this._getActiveTable()) {
       return;
     }
 
     this.rootMethod = this.timelineRoot;
-    void isVisible(this).then((isVisible) => {
-      this.isVisible = isVisible;
-      if (this.rootMethod && this._callTreeTableWrapper) {
-        void this._renderCallTree(this._callTreeTableWrapper, this.rootMethod);
+    this._visibilityWait?.abort();
+    this._visibilityWait = new AbortController();
+    void isVisible(this, undefined, this._visibilityWait.signal).then((visible) => {
+      this.isVisible = visible;
+      // An abort cannot catch a wait that has already resolved, so the build
+      // asks whether the view is still here.
+      if (visible && this.isConnected) {
+        void this._renderActiveView();
       }
     });
   }
@@ -937,7 +959,7 @@ export class CalltreeView extends LitElement {
     );
   }
 
-  async _find(e: CustomEvent<{ text: string; count: number; options: { matchCase: boolean } }>) {
+  async _find(e: CustomEvent<FindEventDetail>) {
     const activeTable = this._getActiveTable();
     const isTableVisible = !!activeTable?.element?.clientHeight;
     if (!isTableVisible && !this.totalMatches) {
@@ -1059,6 +1081,11 @@ export class CalltreeView extends LitElement {
     this.calltreeTable = table;
     this._watchTable(table, true);
     await tableBuilt;
+    if (this.calltreeTable !== table) {
+      // A detach destroyed this build mid-flight, and a later one owns the
+      // container now.
+      return;
+    }
     this._initTableColumns(table);
     this._emitDetailSelection(table);
     this._emitDetailLocate(table);
@@ -1080,6 +1107,11 @@ export class CalltreeView extends LitElement {
     this.aggregatedTreeTable = table;
     this._watchTable(table, true);
     await tableBuilt;
+    if (this.aggregatedTreeTable !== table) {
+      // A detach destroyed this build mid-flight, and a later one owns the
+      // container now.
+      return;
+    }
     this._initTableColumns(table);
     this._emitDetailSelection(table);
     this._emitDetailLocate(table);
@@ -1107,7 +1139,17 @@ export class CalltreeView extends LitElement {
     this.bottomUpTreeTable = table;
     this._watchTable(table, false);
     await tableBuilt;
+    if (this.bottomUpTreeTable !== table) {
+      // A detach destroyed this build mid-flight, and a later one owns the
+      // container now.
+      return;
+    }
     this._initTableColumns(table);
+    const groupBy = groupByField(this.bottomUpGroupBy);
+    if (groupBy) {
+      // @ts-expect-error setSortedGroupBy is added by the GroupSort custom module
+      table.setSortedGroupBy(groupBy);
+    }
     this._emitDetailSelection(table);
     this._emitDetailLocate(table);
   }
@@ -1392,5 +1434,3 @@ export class CalltreeView extends LitElement {
     return indexByEventIndex;
   }
 }
-
-type FindEvt = CustomEvent<{ text: string; count: number; options: { matchCase: boolean } }>;

@@ -13,7 +13,9 @@ import type { RowComponent, Tabulator } from 'tabulator-tables';
 import type { ApexLog } from 'apex-log-parser';
 import '../../../components/ContextMenu.js';
 import type { ContextMenu } from '../../../components/ContextMenu.js';
+import { DomListenerController } from '../../../core/events/DomListenerController.js';
 import { eventBus } from '../../../core/events/EventBus.js';
+import type { FindEventDetail, FindEventMap } from '../../find/findEvents.js';
 import {
   LocatedRowIds,
   LocatedRowMarker,
@@ -160,9 +162,15 @@ export class AnalysisView extends LitElement {
   private _locateIds = new LocatedRowIds();
   private _emphasis = new InspectorEmphasis();
 
-  constructor() {
-    super();
+  private readonly _findBus = new DomListenerController<FindEventMap>(this, document, {
+    'lv-find': (e) => void this._find(e),
+    'lv-find-match': (e) => void this._find(e),
+    'lv-find-close': (e) => void this._find(e),
+  });
 
+  override connectedCallback(): void {
+    super.connectedCallback();
+    this._categoryColoringOff = wireCategoryColoring(this);
     this._inspectorUnsubscribe = wireInspectorTab('analysis', this._emphasis, {
       // A row is a method bucket rather than one event, so a frame is translated
       // into the paths of the rows it heads.
@@ -179,23 +187,12 @@ export class AnalysisView extends LitElement {
         this._revealEventIndex(eventIndex, signal),
       ),
     });
-    document.addEventListener('lv-find', this._findEvt);
-    document.addEventListener('lv-find-match', this._findEvt);
-    document.addEventListener('lv-find-close', this._findEvt);
-  }
-
-  override connectedCallback(): void {
-    super.connectedCallback();
-    this._categoryColoringOff = wireCategoryColoring(this);
   }
 
   disconnectedCallback(): void {
     super.disconnectedCallback();
     this._categoryColoringOff?.();
     this._categoryColoringOff = null;
-    document.removeEventListener('lv-find', this._findEvt);
-    document.removeEventListener('lv-find-match', this._findEvt);
-    document.removeEventListener('lv-find-close', this._findEvt);
     this._inspectorUnsubscribe?.();
     this._inspectorUnsubscribe = null;
     this._locatedRow.clear();
@@ -499,10 +496,6 @@ export class AnalysisView extends LitElement {
     return (this.tableContainer ??= this.renderRoot?.querySelector('#analysis-table'));
   }
 
-  _findEvt = ((event: FindEvt) => {
-    void this._find(event);
-  }) as EventListener;
-
   _groupBy(event: Event) {
     const target = event.target as HTMLInputElement;
     // Grouping renumbers the matches both ways round, and `dataGrouped` reports
@@ -567,7 +560,7 @@ export class AnalysisView extends LitElement {
     });
   }
 
-  async _find(e: CustomEvent<{ text: string; count: number; options: { matchCase: boolean } }>) {
+  async _find(e: CustomEvent<FindEventDetail>) {
     const isTableVisible = !!this.analysisTable?.element?.clientHeight;
     if (!isTableVisible && !this.totalMatches) {
       return;
@@ -687,5 +680,3 @@ export class AnalysisView extends LitElement {
     this.totalMatches = 0;
   }
 }
-
-type FindEvt = CustomEvent<{ text: string; count: number; options: { matchCase: boolean } }>;
