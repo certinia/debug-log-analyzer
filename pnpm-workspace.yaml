@@ -5,8 +5,6 @@ packages:
 
 # Moved out of .npmrc: pnpm 11+ reads only registry/auth keys from there.
 autoInstallPeers: true
-# rollup plugins (commonjs + node resolve) do not play nice without this.
-shamefullyHoist: true
 
 # Dependency build scripts, all deliberately declined - nothing here needs them.
 # Chromium is installed by `playwright install`; the rest ship prebuilt platform

@@ -14,7 +14,8 @@
  * `document.body` (light DOM) when no `popupContainer` is set, so those popups are only styled
  * by the document-level <style>, not by the shadow-root `unsafeCSS` copy.
  *
- * SCSS resolves bare `node_modules` specifiers (e.g. `tabulator-tables/...`) via `loadPaths`.
+ * SCSS resolves bare `node_modules` specifiers (e.g. `tabulator-tables/...`) via `loadPaths`,
+ * searched from the importing stylesheet up to the repo root, the way Node resolves a module.
  */
 import { readFile } from 'node:fs/promises';
 import path from 'node:path';
@@ -24,7 +25,16 @@ import { transform as lightningTransform } from 'lightningcss';
 import { compileStringAsync } from 'sass';
 
 const FILTER = /\.(scss|css)$/;
-const nodeModules = path.resolve('node_modules');
+const PROJECT_ROOT = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
+
+// A workspace package's dependency sits in the root node_modules only while pnpm hoists.
+function loadPathsFor(file) {
+  const dirs = [];
+  for (let dir = path.dirname(file); dir.startsWith(PROJECT_ROOT); dir = path.dirname(dir)) {
+    dirs.push(path.join(dir, 'node_modules'));
+  }
+  return dirs;
+}
 
 const STYLE_INJECT =
   'function __inject(css){' +
@@ -50,7 +60,7 @@ export default function css({ minify = false } = {}) {
         const result = await compileStringAsync(source, {
           syntax: 'scss',
           url: pathToFileURL(id),
-          loadPaths: [nodeModules],
+          loadPaths: loadPathsFor(id),
           style: 'expanded',
         });
         cssText = result.css;
