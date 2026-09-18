@@ -6,20 +6,16 @@ settings:
 
 overrides:
   '@babel/plugin-transform-modules-systemjs@>=7.12.0 <=7.29.3': '>=7.29.4'
-  '@xmldom/xmldom@<0.8.12': '>=0.8.12'
   '@xmldom/xmldom@<0.8.13': '>=0.8.13'
   brace-expansion@<1.1.13: '>=1.1.13'
-  fast-uri@<=3.1.0: '>=3.1.1'
   fast-uri@<=3.1.1: '>=3.1.2'
   follow-redirects@<=1.15.11: '>=1.16.0'
   lodash@<=4.17.23: '>=4.18.0'
-  lodash@>=4.0.0 <=4.17.23: '>=4.18.0'
   path-to-regexp@<0.1.13: '>=0.1.13'
   picomatch@<2.3.2: '>=2.3.2'
   serialize-javascript@<=7.0.2: '>=7.0.3'
   serialize-javascript@>=5.0.0 <7.0.5: '>=7.0.5'
   undici@>=7.0.0 <7.24.0: '>=7.24.0'
-  undici@>=7.17.0 <7.24.0: '>=7.24.0'
   uuid@<11.1.1: '>=11.1.1'
   webpack-dev-server@<=5.2.3: '>=5.2.4'
   ws@>=8.0.0 <8.20.1: '>=8.20.1'
@@ -31,6 +27,9 @@ importers:
       '@eslint/js':
         specifier: ^10.0.1
         version: 10.0.1(eslint@10.9.1(jiti@1.21.7)(supports-color@10.2.2))
+      '@jest/globals':
+        specifier: ^30.4.1
+        version: 30.4.1(supports-color@10.2.2)
       '@playwright/test':
         specifier: ^1.60.0
         version: 1.62.1
@@ -67,6 +66,12 @@ importers:
       '@types/jest':
         specifier: ^30.0.0
         version: 30.0.0
+      '@types/node':
+        specifier: ~22.20.1
+        version: 22.20.1
+      '@vscode/codicons':
+        specifier: ^0.0.45
+        version: 0.0.45
       '@vscode/test-web':
         specifier: ^0.0.81
         version: 0.0.81(supports-color@10.2.2)
@@ -88,6 +93,9 @@ importers:
       jest-environment-jsdom:
         specifier: ^30.4.1
         version: 30.4.1(supports-color@10.2.2)
+      lightningcss:
+        specifier: ^1.33.0
+        version: 1.33.0
       lint-staged:
         specifier: ^17.4.1
         version: 17.4.1
@@ -109,6 +117,9 @@ importers:
       rollup-plugin-swc3:
         specifier: ^0.12.1
         version: 0.12.1(@swc/core@1.16.1(@swc/helpers@0.5.23))(rollup@4.63.0)
+      sass:
+        specifier: ^1.103.1
+        version: 1.103.1
       tsx:
         specifier: ^4.21.0
         version: 4.23.12
@@ -149,6 +160,9 @@ importers:
       '@vscode/vsce':
         specifier: ^3.9.2
         version: 3.9.2(supports-color@10.2.2)
+      tslib:
+        specifier: ^2.8.1
+        version: 2.8.1
       typescript:
         specifier: npm:@typescript/typescript6@^6.0.2
         version: '@typescript/typescript6@6.0.2'
@@ -235,6 +249,9 @@ importers:
       sass:
         specifier: ^1.103.1
         version: 1.103.1
+      tslib:
+        specifier: ^2.8.1
+        version: 2.8.1
       typescript:
         specifier: npm:@typescript/typescript6@^6.0.2
         version: '@typescript/typescript6@6.0.2'
