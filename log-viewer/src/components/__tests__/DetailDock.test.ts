@@ -6,6 +6,7 @@
 import { beforeAll, describe, expect, it } from '@jest/globals';
 import { html } from 'lit';
 
+import { mountElement } from '../../__tests__/helpers/mount.js';
 import type { DetailDock } from '../DetailDock.js';
 import '../DetailDock.js';
 import type { PaneSection } from '../PaneView.js';
@@ -15,13 +16,8 @@ const sections: PaneSection[] = [
   { id: 'b', title: 'B', content: html`<div>b</div>` },
 ];
 
-async function mount(configure: (el: DetailDock) => void): Promise<DetailDock> {
-  const el = document.createElement('detail-dock') as DetailDock;
-  configure(el);
-  document.body.appendChild(el);
-  await el.updateComplete;
-  return el;
-}
+const mount = (configure: (el: DetailDock) => void): Promise<DetailDock> =>
+  mountElement<DetailDock>('detail-dock', configure);
 
 describe('DetailDock', () => {
   beforeAll(() => {

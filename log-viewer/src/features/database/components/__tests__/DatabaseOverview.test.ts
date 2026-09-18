@@ -5,8 +5,8 @@
  */
 import { beforeEach, describe, expect, it } from '@jest/globals';
 import type { ApexLog } from 'apex-log-parser';
-import type { LitElement } from 'lit';
 
+import { mountElement } from '../../../../__tests__/helpers/mount.js';
 import type { StackedTimeBar } from '../../../../components/StackedTimeBar.js';
 import type { LogStore } from '../../../../core/log/LogStore.js';
 import type {
@@ -194,18 +194,12 @@ const namespaceSplit = (): DatabaseBreakdown[] => [
   },
 ];
 
-async function mount<K extends keyof HTMLElementTagNameMap>(
-  tag: K,
-): Promise<HTMLElementTagNameMap[K] & LitElement> {
-  const element = document.createElement(tag);
+const mount = <K extends 'database-concentration' | 'database-namespaces'>(tag: K) =>
   // No provider in the test, so the consumed store is assigned straight on.
-  (element as unknown as { logStore: LogStore }).logStore = {
-    log: apexLog,
-  } as unknown as LogStore;
-  document.body.append(element);
-  await (element as LitElement).updateComplete;
-  return element as HTMLElementTagNameMap[K] & LitElement;
-}
+  // Both elements hold a `logStore`, which a generic tag cannot prove on its own.
+  mountElement<HTMLElementTagNameMap[K]>(tag, {
+    logStore: { log: apexLog } as unknown as LogStore,
+  } as Partial<HTMLElementTagNameMap[K]>);
 
 const texts = (element: Element, selector: string) =>
   [...(element.shadowRoot?.querySelectorAll(selector) ?? [])].map((node) =>

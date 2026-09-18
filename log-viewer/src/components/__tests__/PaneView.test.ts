@@ -6,6 +6,7 @@
 import { beforeAll, describe, expect, it } from '@jest/globals';
 import { html } from 'lit';
 
+import { mountElement } from '../../__tests__/helpers/mount.js';
 import type { PaneOrientation, PaneSection, PaneView } from '../PaneView.js';
 import '../PaneView.js';
 
@@ -19,16 +20,15 @@ const sections: PaneSection[] = [
  * Collapse is controlled: the consumer owns the record and feeds it back. Mount
  * with that loop wired, the way the inspector does.
  */
-async function mountSections(
+const mountSections = (
   paneSections: PaneSection[],
   props: Partial<PaneView> = {},
-): Promise<PaneView> {
-  const el = document.createElement('pane-view') as PaneView;
-  Object.assign(el, { orientation: 'vertical', sections: paneSections }, props);
-  document.body.appendChild(el);
-  await el.updateComplete;
-  return el;
-}
+): Promise<PaneView> =>
+  mountElement<PaneView>('pane-view', {
+    orientation: 'vertical',
+    sections: paneSections,
+    ...props,
+  });
 
 /** With the collapse loop wired, the way the inspector owns the record. */
 async function mount(orientation: PaneOrientation): Promise<PaneView> {

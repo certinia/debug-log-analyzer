@@ -5,23 +5,17 @@
  */
 import { beforeEach, describe, expect, it } from '@jest/globals';
 
+import { mountElement } from '../../__tests__/helpers/mount.js';
 import '../StackedTimeBar.js';
-import type { StackedSegment } from '../StackedTimeBar.js';
+import type { StackedSegment, StackedTimeBar } from '../StackedTimeBar.js';
 
 const SEGMENTS: StackedSegment[] = [
   { label: 'SOQL', value: 200_000_000, color: 'red' },
   { label: 'DML', value: 100_000_000, color: 'blue' },
 ];
 
-async function mount(segments: StackedSegment[], total = 0, legend = false) {
-  const element = document.createElement('stacked-time-bar');
-  element.segments = segments;
-  element.total = total;
-  element.legend = legend;
-  document.body.append(element);
-  await element.updateComplete;
-  return element;
-}
+const mount = (segments: StackedSegment[], total = 0, legend = false) =>
+  mountElement<StackedTimeBar>('stacked-time-bar', { segments, total, legend });
 
 const widths = (element: Element) =>
   [...(element.shadowRoot?.querySelectorAll('rect') ?? [])].map((rect) =>

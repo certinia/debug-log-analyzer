@@ -5,8 +5,8 @@
  */
 import { beforeEach, describe, expect, it } from '@jest/globals';
 import type { ApexLog } from 'apex-log-parser';
-import type { LitElement } from 'lit';
 
+import { mountElement } from '../../../../__tests__/helpers/mount.js';
 import type { StackedTimeBar } from '../../../../components/StackedTimeBar.js';
 import type { LogStore } from '../../../../core/log/LogStore.js';
 import type { RowBudget, RowBudgets } from '../../services/rowBudget.js';
@@ -19,6 +19,7 @@ jest.mock('../../services/rowBudget.js', () => ({
   rowBudgets: () => budgets,
 }));
 
+import type { DatabaseRowBudget } from '../DatabaseRowBudget.js';
 import '../DatabaseRowBudget.js';
 import { settledNote } from '../../../../components/__tests__/sectionTestUtils.js';
 
@@ -66,16 +67,11 @@ const withBudgets = (...changes: Partial<RowBudget>[]): RowBudgets => {
   };
 };
 
-async function mount(): Promise<LitElement> {
-  const element = document.createElement('database-rows');
+const mount = (): Promise<DatabaseRowBudget> =>
   // No provider in the test, so the consumed store is assigned straight on.
-  (element as unknown as { logStore: LogStore }).logStore = {
-    log: apexLog,
-  } as unknown as LogStore;
-  document.body.append(element);
-  await element.updateComplete;
-  return element;
-}
+  mountElement<DatabaseRowBudget>('database-rows', {
+    logStore: { log: apexLog } as unknown as LogStore,
+  });
 
 const texts = (element: Element, selector: string) =>
   [...(element.shadowRoot?.querySelectorAll(selector) ?? [])].map((node) =>

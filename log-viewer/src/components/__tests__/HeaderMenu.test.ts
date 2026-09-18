@@ -5,22 +5,16 @@
  */
 import { describe, expect, it } from '@jest/globals';
 
+import { mountElement } from '../../__tests__/helpers/mount.js';
 import type { HeaderMenu } from '../HeaderMenu.js';
 import '../HeaderMenu.js';
 
-async function mount(
+const mount = (
   marker: boolean,
   collapsed = '',
   collapsedCount = collapsed ? 1 : 0,
-): Promise<HeaderMenu> {
-  const el = document.createElement('header-menu') as HeaderMenu;
-  el.marker = marker;
-  el.collapsedCount = collapsedCount;
-  el.innerHTML = collapsed;
-  document.body.appendChild(el);
-  await el.updateComplete;
-  return el;
-}
+): Promise<HeaderMenu> =>
+  mountElement<HeaderMenu>('header-menu', { marker, collapsedCount, innerHTML: collapsed });
 
 function rowLabels(el: HeaderMenu): string[] {
   return Array.from(el.shadowRoot?.querySelectorAll('.filter-popover-row') ?? []).map(

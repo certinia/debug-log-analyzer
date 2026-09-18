@@ -13,6 +13,7 @@ jest.mock('../../../core/messaging/VSCodeExtensionMessenger.js', () => ({
   VSCodeExtensionMessenger: { listen: jest.fn(() => () => {}) },
 }));
 
+import { mountElement } from '../../../__tests__/helpers/mount.js';
 import type { LogViewer } from '../LogViewer.js';
 import '../LogViewer.js';
 
@@ -27,12 +28,7 @@ const MINIMAL_LOG = [
   '12:00:00.1 (100)|EXECUTION_FINISHED',
 ].join('\n');
 
-async function mount(): Promise<LogViewer> {
-  const el = document.createElement('log-viewer') as LogViewer;
-  document.body.appendChild(el);
-  await el.updateComplete;
-  return el;
-}
+const mount = (): Promise<LogViewer> => mountElement<LogViewer>('log-viewer');
 
 describe('a log that could not be read', () => {
   it('reports a failed load rather than an empty log', async () => {

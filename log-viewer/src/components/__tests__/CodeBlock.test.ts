@@ -5,16 +5,12 @@
  */
 import { beforeAll, describe, expect, it } from '@jest/globals';
 
+import { mountElement } from '../../__tests__/helpers/mount.js';
 import type { CodeBlock } from '../CodeBlock.js';
 import '../CodeBlock.js';
 
-async function mount(configure: (el: CodeBlock) => void): Promise<CodeBlock> {
-  const el = document.createElement('code-block') as CodeBlock;
-  configure(el);
-  document.body.appendChild(el);
-  await el.updateComplete;
-  return el;
-}
+const mount = (configure: (el: CodeBlock) => void): Promise<CodeBlock> =>
+  mountElement<CodeBlock>('code-block', configure);
 
 describe('CodeBlock', () => {
   beforeAll(() => {

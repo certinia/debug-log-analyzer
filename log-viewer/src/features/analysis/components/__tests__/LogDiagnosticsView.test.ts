@@ -5,6 +5,7 @@
  */
 import { beforeEach, describe, expect, it } from '@jest/globals';
 
+import { mountElement } from '../../../../__tests__/helpers/mount.js';
 import type { LogDiagnostics } from '../../services/LogDiagnostics.js';
 
 let result: LogDiagnostics = {
@@ -34,12 +35,10 @@ const loadLog = (element: HTMLElementTagNameMap['log-diagnostics']) => {
 };
 
 const view = async (scope?: { instances: number[] }) => {
-  const element = document.createElement('log-diagnostics');
-  if (scope) {
-    element.instances = scope.instances;
-  }
-  document.body.append(element);
-  await element.updateComplete;
+  const element = await mountElement<HTMLElementTagNameMap['log-diagnostics']>(
+    'log-diagnostics',
+    scope ? { instances: scope.instances } : {},
+  );
   // One more turn: the findings arrive from an async call in connectedCallback.
   await element.updateComplete;
   return element;

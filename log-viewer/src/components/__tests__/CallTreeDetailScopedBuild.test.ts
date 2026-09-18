@@ -42,6 +42,7 @@ jest.mock('../scopedCallTree.js', () => ({
 
 import { Tabulator, type RowComponent } from 'tabulator-tables';
 
+import { mountElement } from '../../__tests__/helpers/mount.js';
 import type { CallTreeDetail } from '../CallTreeDetail.js';
 import '../CallTreeDetail.js';
 import { buildScopedCallTree, type ScopedCallTree, type ScopedRow } from '../scopedCallTree.js';
@@ -115,17 +116,8 @@ async function frame(el: CallTreeDetail): Promise<void> {
   await settle(el);
 }
 
-async function mount(
-  eventIndex: number,
-  sourceView?: 'callers' | 'callees',
-): Promise<CallTreeDetail> {
-  const el = document.createElement('call-tree-detail') as CallTreeDetail;
-  el.eventIndex = eventIndex;
-  el.sourceView = sourceView;
-  document.body.appendChild(el);
-  await el.updateComplete;
-  return el;
-}
+const mount = (eventIndex: number, sourceView?: 'callers' | 'callees'): Promise<CallTreeDetail> =>
+  mountElement<CallTreeDetail>('call-tree-detail', { eventIndex, sourceView });
 
 describe('CallTreeDetail scoped build', () => {
   beforeEach(() => {

@@ -5,6 +5,7 @@
  */
 import { afterEach, beforeAll, describe, expect, it } from '@jest/globals';
 
+import { mountElement } from '../../../__tests__/helpers/mount.js';
 import type { IssueAction, IssueSeverity, LogIssue } from '../types.js';
 
 import type { IssueList } from '../components/IssueList.js';
@@ -27,13 +28,8 @@ function issue(
   };
 }
 
-async function mount(issues: readonly LogIssue[]): Promise<IssueList> {
-  const el = document.createElement('issue-list') as IssueList;
-  el.issues = issues;
-  document.body.appendChild(el);
-  await el.updateComplete;
-  return el;
-}
+const mount = (issues: readonly LogIssue[]): Promise<IssueList> =>
+  mountElement<IssueList>('issue-list', { issues });
 
 function cards(el: IssueList): HTMLElement[] {
   return Array.from(el.shadowRoot?.querySelectorAll<HTMLElement>('.issue') ?? []);

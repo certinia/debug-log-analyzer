@@ -6,6 +6,7 @@
 import type { GovernorLimits } from 'apex-log-parser';
 import { beforeEach, describe, expect, it } from '@jest/globals';
 
+import { mountElement } from '../../__tests__/helpers/mount.js';
 import type { LogStore } from '../../core/log/LogStore.js';
 import type { HeatStripTimeSeries } from '../../features/timeline/types/flamechart.types.js';
 import { emptyLimits, seriesEvent, timeSeries } from './limitsTestUtils.js';
@@ -20,12 +21,7 @@ jest.mock('../../features/timeline/optimised/apex-limit-series.js', () => ({
 import type { LogOverview } from '../LogOverview.js';
 import '../LogOverview.js';
 
-const overview = async () => {
-  const element = document.createElement('log-overview');
-  document.body.append(element);
-  await element.updateComplete;
-  return element;
-};
+const overview = () => mountElement<LogOverview>('log-overview');
 
 /** No provider in the test, so the consumed store is assigned straight on. */
 const loadLog = async (element: LogOverview, governorLimits: GovernorLimits) => {

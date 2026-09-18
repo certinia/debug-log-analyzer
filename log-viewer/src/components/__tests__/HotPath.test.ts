@@ -5,6 +5,7 @@
  */
 import { beforeEach, describe, expect, it } from '@jest/globals';
 
+import { mountElement } from '../../__tests__/helpers/mount.js';
 import type { LogStore } from '../../core/log/LogStore.js';
 import type { ExecutionHighlights } from '../../features/call-tree/utils/ExecutionHighlights.js';
 
@@ -35,13 +36,10 @@ const pathOf = (frameCount: number): ExecutionHighlights => ({
   truncation: null,
 });
 
-const hotPath = async () => {
-  const element = document.createElement('hot-path');
-  element.logStore = { log: {} } as unknown as LogStore;
-  document.body.append(element);
-  await element.updateComplete;
-  return element;
-};
+const hotPath = () =>
+  mountElement<HTMLElementTagNameMap['hot-path']>('hot-path', {
+    logStore: { log: {} } as unknown as LogStore,
+  });
 
 const rowNames = (element: Element) =>
   [...element.shadowRoot!.querySelectorAll('.reveal-row__name')].map((name) => name.textContent);

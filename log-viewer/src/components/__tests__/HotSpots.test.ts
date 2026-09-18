@@ -5,6 +5,7 @@
  */
 import { beforeEach, describe, expect, it } from '@jest/globals';
 
+import { mountElement } from '../../__tests__/helpers/mount.js';
 import type { LogStore } from '../../core/log/LogStore.js';
 import type { ExecutionHighlights } from '../../features/call-tree/utils/ExecutionHighlights.js';
 
@@ -34,13 +35,10 @@ const spotsOf = (): ExecutionHighlights => ({
   truncation: null,
 });
 
-const hotSpots = async () => {
-  const element = document.createElement('hot-spots');
-  element.logStore = { log: {} } as unknown as LogStore;
-  document.body.append(element);
-  await element.updateComplete;
-  return element;
-};
+const hotSpots = () =>
+  mountElement<HTMLElementTagNameMap['hot-spots']>('hot-spots', {
+    logStore: { log: {} } as unknown as LogStore,
+  });
 
 describe('hot-spots', () => {
   beforeEach(() => {

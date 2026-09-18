@@ -6,6 +6,7 @@
 import { describe, expect, it } from '@jest/globals';
 import { parse } from 'apex-log-parser';
 
+import { mountElement } from '../../__tests__/helpers/mount.js';
 import { MAX_MARKED_PER_VALUE } from '../../core/log/aggregateVariables.js';
 import { logStoreFor, type LogStore } from '../../core/log/LogStore.js';
 
@@ -65,10 +66,10 @@ function indexOf(store: LogStore, text: string): number {
 
 /** No provider in the test, so the consumed store is assigned straight on. */
 async function mount(store: LogStore, props: Partial<VariablesDetail>): Promise<VariablesDetail> {
-  const el = document.createElement('variables-detail') as VariablesDetail;
-  Object.assign(el, { logStore: store }, props);
-  document.body.appendChild(el);
-  await el.updateComplete;
+  const el = await mountElement<VariablesDetail>('variables-detail', {
+    logStore: store,
+    ...props,
+  });
   // The statics index is built on the first ask, so the first paint is a note.
   await el.updateComplete;
   await new Promise((resolve) => setTimeout(resolve, 0));

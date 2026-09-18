@@ -5,6 +5,7 @@
  */
 import { describe, expect, it, beforeAll } from '@jest/globals';
 
+import { mountElement } from '../../__tests__/helpers/mount.js';
 import type { DockLayout } from '../DockLayout.js';
 import '../DockLayout.js';
 
@@ -22,15 +23,8 @@ beforeAll(() => {
   Object.defineProperty(HTMLElement.prototype, 'clientHeight', { value: 800, configurable: true });
 });
 
-async function mount(dock: 'left' | 'right' | 'bottom', size = 500): Promise<DockLayout> {
-  const el = document.createElement('dock-layout') as DockLayout;
-  el.dock = dock;
-  el.size = size;
-  el.visible = true;
-  document.body.appendChild(el);
-  await el.updateComplete;
-  return el;
-}
+const mount = (dock: 'left' | 'right' | 'bottom', size = 500): Promise<DockLayout> =>
+  mountElement<DockLayout>('dock-layout', { dock, size, visible: true });
 
 function gutter(el: DockLayout): HTMLElement {
   const found = el.shadowRoot?.querySelector('.gutter');

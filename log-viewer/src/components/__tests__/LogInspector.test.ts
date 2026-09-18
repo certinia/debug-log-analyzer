@@ -76,6 +76,7 @@ jest.mock('../detailSections.js', () => ({
   },
 }));
 
+import { mountElement } from '../../__tests__/helpers/mount.js';
 import { eventBus, type DetailSource } from '../../core/events/EventBus.js';
 import type { LogStore } from '../../core/log/LogStore.js';
 import type { LogInspector } from '../LogInspector.js';
@@ -109,9 +110,7 @@ function inspectorSettings(overrides: Record<string, unknown> = {}): Record<stri
 }
 
 async function mount(activeTab: string): Promise<LogInspector> {
-  const el = document.createElement('log-inspector') as LogInspector;
-  el.activeTab = activeTab;
-  document.body.appendChild(el);
+  const el = await mountElement<LogInspector>('log-inspector', { activeTab });
   await flush(el);
   return el;
 }
