@@ -1,8 +1,8 @@
 {
   "name": "lana",
   "displayName": "Apex Log Analyzer",
-  "version": "1.20.1",
-  "description": "Salesforce Apex Debug Log Analyzer: Blazing-fast VS Code extension for Salesforce. Visualize and debug Apex logs with interactive flame charts, dynamic call trees, and detailed SOQL/DML breakdowns. Identify performance bottlenecks, gain deep transaction insights and optimize slow Apex.",
+  "version": "1.22.0",
+  "description": "Salesforce Apex Debug Log Analyzer: Fast VS Code extension for Salesforce developers. Visualize and debug Apex logs with interactive flame charts, dynamic call trees, and detailed SOQL/DML breakdowns. Identify performance bottlenecks, gain deep transaction insights and optimize slow Apex.",
   "keywords": [
     "analysis",
     "apex",
@@ -282,12 +282,14 @@
             "type": "boolean",
             "default": false,
             "markdownDescription": "Temporary fallback to the legacy Timeline; will be removed in a future release. Default: `false`",
+            "markdownDeprecationMessage": "Deprecated: the legacy Timeline will be removed in the next release. Use the current Timeline, themed via `#lana.timeline.activeTheme#`.",
             "order": 3
           },
           "lana.timeline.colors": {
             "type": "object",
             "title": "Timeline Event Colors",
             "markdownDescription": "Hex colors for each event type on the **legacy** Timeline (`#lana.timeline.legacy#`), which is being phased out. The current Timeline is themed via `#lana.timeline.activeTheme#` / `#lana.timeline.customThemes#`.",
+            "markdownDeprecationMessage": "Deprecated: applies only to the legacy Timeline (`#lana.timeline.legacy#`), which will be removed in the next release. Use `#lana.timeline.activeTheme#` / `#lana.timeline.customThemes#`.",
             "additionalProperties": false,
             "order": 4,
             "default": {

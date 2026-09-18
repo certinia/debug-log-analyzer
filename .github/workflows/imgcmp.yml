@@ -11,6 +11,8 @@ jobs:
       contents: write
       pull-requests: write
     steps:
+      # scripts/screenshots/compress.sh mirrors this version's optimizer flags,
+      # so that a release ships images CI cannot shrink. Bump it with this pin.
       - uses: 9sako6/imgcmp@96250a4f33dd989ab6cd28096e854309e3c17227 # v2.0.4
         with:
           token: ${{ secrets.GITHUB_TOKEN }}

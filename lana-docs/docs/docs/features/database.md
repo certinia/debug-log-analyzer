@@ -16,7 +16,7 @@ keywords:
     salesforce developer tools,
     salesfroce query optimization,
   ]
-image: https://raw.githubusercontent.com/certinia/debug-log-analyzer/main/lana/assets/1_20/database.png
+image: https://raw.githubusercontent.com/certinia/debug-log-analyzer/main/lana/assets/1_22/database.png
 hide_title: true
 ---
 
@@ -24,15 +24,15 @@ hide_title: true
 
 Database insights help Salesforce developers analyze DML, SOQL and SOSL operations, assess query selectivity, performance, and aggregations, and optimize Apex code using advanced sorting, grouping, filtering, call stack tracing, and CSV export tools.
 
-![Database view screenshot displaying DML, SOQL and SOSL operations with row counts, execution times, selectivity indicators, and aggregation details for Salesforce log analysis.](https://raw.githubusercontent.com/certinia/debug-log-analyzer/main/lana/assets/1_20/database.png)
+![Database view screenshot displaying DML, SOQL and SOSL operations with row counts, execution times, selectivity indicators, and aggregation details for Salesforce log analysis.](https://raw.githubusercontent.com/certinia/debug-log-analyzer/main/lana/assets/1_22/database.png)
 
 The tab has separate **DML**, **SOQL** and **SOSL** sections
 
 ### Governor limits
 
-- **Overview strip** — SOQL, SOSL, DML and query/DML rows as `used / limit`, coloured as they near the limit.
-- **Tracked vs consumed** — per section, statements seen in the log vs the number Salesforce counted (`CUMULATIVE_LIMIT_USAGE`). A gap is usually custom metadata (`__mdt`), which is free unless the query selects a long text area field or runs in a Flow.
-- **SOSL rows** — metered per query against the 2,000-rows-per-query cap.
+- **Overview strip** - SOQL, SOSL, DML and query/DML rows as `used / limit`, coloured as they near the limit.
+- **Tracked vs consumed** - per section, statements seen in the log vs the number Salesforce counted (`CUMULATIVE_LIMIT_USAGE`). A gap is usually custom metadata (`__mdt`), which is free unless the query selects a long text area field or runs in a Flow.
+- **SOSL rows** - metered per query against the 2,000-rows-per-query cap.
 
 > Consumed figures need the Apex Profiling log category. Without it, sections show the tracked count and mark the limit _n/a_.
 
@@ -48,8 +48,8 @@ If the grouping is removed the sorting applies the same but across all rows inst
 
 ### Filtering
 
-1. **Namespace**, **Object** or **Caller Namespace** — pick one or more values to keep.
-1. **Row Count** and **Time Taken** — set a _min–max_ range.
+1. **Namespace**, **Object** or **Caller Namespace** - pick one or more values to keep.
+1. **Row Count** and **Time Taken** - set a _min-max_ range.
 
 ### Column Views
 
@@ -61,11 +61,11 @@ By default rows are grouped by the SOQL/ DML text, grouping can be removed and t
 
 SOQL and DML can be grouped by **Object** (the queried/target SObject), **Namespace**, or **Caller Namespace**, as well as the statement text. SOSL can be grouped by Namespace or Caller Namespace.
 
-**Caller Namespace** is the namespace of the direct caller that issued the statement — handy for seeing which package's code is responsible, even when the time is attributed to the default namespace.
+**Caller Namespace** is the namespace of the direct caller that issued the statement, handy for seeing which package's code is responsible, even when the time is attributed to the default namespace.
 
 ### Inspect a statement
 
-Selecting a SOQL, DML or SOSL row opens the [inspector](./inspector.md), which shows that statement's vitals and governor metrics, the call stack that led to it, a call tree scoped to it, and — for SOQL — its optimization tips.
+Selecting a SOQL, DML or SOSL row opens the [inspector](./inspector.md), which shows that statement's vitals and governor metrics, the call stack that led to it, a call tree scoped to it, and - for SOQL - its optimization tips.
 
 ### Show in Call Tree
 
