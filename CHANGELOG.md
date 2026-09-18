@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.22.1] - 2026-09-18
+
+### Fixed
+
+- 📈 **Governor usage over time**: the Inspector's charts drew a line between readings, which was misleading; they now step, on the same timescale and with the same blank unrecorded spans as the governor limits strip.
+
 ## [1.22.0] - 2026-09-18
 
 ### Added

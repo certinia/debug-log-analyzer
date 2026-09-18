@@ -12,6 +12,9 @@ import type { ApexLog } from 'apex-log-parser';
 import type { NoDataSpan, TimelineMarker } from '../types/flamechart.types.js';
 import { isMarkerType, markerTypeForIssue } from '../types/flamechart.types.js';
 
+/** Memo per log: the timeline draws these, and the governor series reads its gaps from them. */
+const markerCache = new WeakMap<ApexLog, TimelineMarker[]>();
+
 /**
  * Extracts markers from ApexLog.logIssues array.
  *
@@ -30,6 +33,10 @@ import { isMarkerType, markerTypeForIssue } from '../types/flamechart.types.js';
 export function extractMarkers(log: ApexLog): TimelineMarker[] {
   if (!log.logIssues || log.logIssues.length === 0) {
     return [];
+  }
+  const cached = markerCache.get(log);
+  if (cached) {
+    return cached;
   }
 
   const markers: TimelineMarker[] = [];
@@ -68,6 +75,7 @@ export function extractMarkers(log: ApexLog): TimelineMarker[] {
   // Sort by startTime for efficient end time resolution later
   markers.sort((a, b) => a.startTime - b.startTime);
 
+  markerCache.set(log, markers);
   return markers;
 }
 

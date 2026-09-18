@@ -129,18 +129,17 @@ Inspector docked right again, nothing selected - press Escape.
 Shows the Overview, Findings and Self time spread; open all three.
 Pointer off both panes before Enter."
 
+  "inspector.png|crop|600|The only shot of the panel alone, so the sections read at full size.
+Same Analysis tab, still nothing selected. Overview, Findings and Self time spread, all open,
+scrolled to the top - Findings and Self time spread are the Analysis tab's own, and no
+whole-window shot shows them large enough to read.
+Drag round the panel alone, its full height, at least 600px across."
+
   # --- Database tab ---
   "database.png|full|900|Database tab, SOQL section expanded so rows, timings and selectivity show.
 Nothing selected - press Escape - so the inspector reads the whole log.
 Shows the Overview, Namespace duration, Database duration and the call tree of paths
 that end in a query; open them all.
-Pointer off both panes before Enter."
-
-  "inspector.png|full|900|The one shot with a selection, so the panel is shown answering about one thing.
-Same Database tab, now select a SOQL statement whose query is non-trivial.
-Details then carries selectivity, query plan and cardinality, and SOQL issues has tips -
-neither appears in any whole-log view.
-Open Details, Call stack, Call tree and SOQL issues.
 Pointer off both panes before Enter."
 
   # --- Editor, not the webview ---

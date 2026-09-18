@@ -23,7 +23,7 @@ Select anything - a Timeline frame, a Call Tree or Analysis row, a SOQL/DML/SOSL
 
 It docks to the **right**, **left** or **bottom**, resizes by dragging its edge, and is toggled from the button in the header. It opens on your first selection, then stays however you left it, including the next time you open a log. See [Settings](../settings.mdx#inspector).
 
-![The inspector docked to the right of the Database tab, showing the selected SOQL statement's details, call stack and scoped call tree.](https://raw.githubusercontent.com/certinia/debug-log-analyzer/main/lana/assets/1_22/inspector.png)
+![The inspector on the Analysis tab reading the whole log: the governor metrics nearest a limit, the log's findings, and how few signatures hold its self time.](https://raw.githubusercontent.com/certinia/debug-log-analyzer/main/lana/assets/1_22/inspector.png)
 
 ### Sections
 

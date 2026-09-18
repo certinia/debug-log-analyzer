@@ -52,7 +52,7 @@ import {
   toDetailSelection,
   type FramePlacement,
 } from '../utils/detail-selection-sync.js';
-import { extractExceptionMarkers, extractMarkers, noDataSpans } from '../utils/marker-utils.js';
+import { extractExceptionMarkers, extractMarkers } from '../utils/marker-utils.js';
 import { seekWindow } from '../utils/navigate-window.js';
 import { logEventToTreeAndRects } from '../utils/tree-converter.js';
 import { FlameChart } from './FlameChart.js';
@@ -226,7 +226,7 @@ export class ApexLogTimeline {
     // memoised per log and shared with the inspector's governor trend charts.
     const heatStripSeries = apexLimitTimeSeries(this.apexLog);
     this.flamechart.setHeatStripTimeSeries(
-      heatStripSeries.events.length > 0 ? { ...heatStripSeries, gaps: noDataSpans(markers) } : null,
+      heatStripSeries.events.length > 0 ? heatStripSeries : null,
     );
 
     // Subscribe to EventBus for timeline navigation requests (from CalltreeView and raw-log entry).
