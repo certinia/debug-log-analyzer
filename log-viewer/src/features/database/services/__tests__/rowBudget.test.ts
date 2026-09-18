@@ -2,9 +2,10 @@
  * Copyright (c) 2026 Certinia Inc. All rights reserved.
  */
 import { beforeEach, describe, expect, it } from '@jest/globals';
-import type { ApexLog, Limits } from 'apex-log-parser';
+import type { ApexLog } from '@apexdevtools/apex-log-parser';
+import type { Limits } from '@apexdevtools/apex-log-parser/types';
 
-import { emptyLimits } from '../../../../components/__tests__/limitsTestUtils.js';
+import { emptyLimits, limitValue } from '../../../../components/__tests__/limitsTestUtils.js';
 
 import {
   UNKNOWN_OBJECT,
@@ -69,11 +70,11 @@ const logWith = (snapshots: number) =>
 
 const defaultPeaks = (): Limits => ({
   ...emptyLimits(),
-  soqlQueries: { used: 2, limit: 100 },
-  queryRows: { used: 300, limit: 50_000 },
-  dmlStatements: { used: 1, limit: 150 },
-  dmlRows: { used: 40, limit: 10_000 },
-  soslQueries: { used: 1, limit: 20 },
+  soqlQueries: limitValue(2, 100),
+  queryRows: limitValue(300, 50_000),
+  dmlStatements: limitValue(1, 150),
+  dmlRows: limitValue(40, 10_000),
+  soslQueries: limitValue(1, 20),
 });
 
 beforeEach(() => {

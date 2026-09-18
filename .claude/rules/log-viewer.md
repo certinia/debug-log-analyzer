@@ -73,7 +73,7 @@ Lit. Public API is `@property`, internal state is `@state`, styles are `static s
 `core/messaging/VSCodeExtensionMessenger.ts` · `core/theme/ThemeObserver.ts` · `styles/tokens.css` ·
 `components/` · `tabulator/`
 
-The parser is the `apex-log-parser` package, so a change there reaches `lana/` too.
+The parser is the `@apexdevtools/apex-log-parser` package, so a version bump reaches `lana/` too.
 
 ## Testing
 

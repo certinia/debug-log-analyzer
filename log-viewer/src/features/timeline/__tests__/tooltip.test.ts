@@ -16,7 +16,7 @@
  * - The on/off switch
  */
 import { afterEach, beforeEach, describe, expect, it, jest } from '@jest/globals';
-import type { ApexLog, LogEvent } from 'apex-log-parser';
+import type { ApexLog, LogEvent } from '@apexdevtools/apex-log-parser';
 
 import {
   FrameTooltipRenderer,

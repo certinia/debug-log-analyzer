@@ -18,7 +18,7 @@
  * reading cannot be taken for consumption of a cap.
  */
 
-import type { ApexLog, LogEvent } from 'apex-log-parser';
+import type { ApexLog, LogEvent } from '@apexdevtools/apex-log-parser';
 
 import { EVENT_METRICS, HEAP_PEAK } from '../../../core/metrics/eventMetrics.js';
 import { DEFAULT_NAMESPACE } from '../../../core/utility/CallerNamespace.js';

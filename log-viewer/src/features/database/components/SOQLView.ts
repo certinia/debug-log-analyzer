@@ -13,7 +13,7 @@ import {
   type RowComponent,
 } from 'tabulator-tables';
 
-import type { ApexLog, SOQLExecuteBeginLine } from 'apex-log-parser';
+import type { ApexLog, SOQLExecuteBeginLine } from '@apexdevtools/apex-log-parser';
 import { vscodeMessenger } from '../../../core/messaging/VSCodeExtensionMessenger.js';
 import { isVisible } from '../../../core/utility/Util.js';
 import { getCallerNamespace } from '../../../core/utility/CallerNamespace.js';

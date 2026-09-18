@@ -8,7 +8,8 @@ import { customElement, property, query, state } from 'lit/decorators.js';
 
 import { logStatusContext, type LogStatus } from '../../../core/log/logStatus.js';
 
-import type { ApexLog, LogCategory } from 'apex-log-parser';
+import type { ApexLog } from '@apexdevtools/apex-log-parser';
+import type { LogCategory } from '@apexdevtools/apex-log-parser/types';
 import { categoryPalette } from '../../../components/categoryTime.js';
 import { VSCodeExtensionMessenger } from '../../../core/messaging/VSCodeExtensionMessenger.js';
 import {

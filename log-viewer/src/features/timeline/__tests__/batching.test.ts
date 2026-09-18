@@ -12,7 +12,8 @@
  * - Hierarchical rectangle collection
  */
 import { afterEach, beforeEach, describe, expect, it } from '@jest/globals';
-import type { LogCategory, LogEvent } from 'apex-log-parser';
+import type { LogEvent } from '@apexdevtools/apex-log-parser';
+import type { LogCategory } from '@apexdevtools/apex-log-parser/types';
 import * as PIXI from 'pixi.js';
 
 import type { BatchColorInfo } from '../optimised/BucketColorResolver.js';

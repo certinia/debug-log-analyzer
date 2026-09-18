@@ -1,7 +1,7 @@
 /*
  * Copyright (c) 2026 Certinia Inc. All rights reserved.
  */
-import type { Limits } from 'apex-log-parser';
+import type { LimitValue, Limits } from '@apexdevtools/apex-log-parser/types';
 
 import { formatByteSize, formatInteger, sharePercent } from '../core/utility/Util.js';
 import type { GaugeMetric } from '../features/database/components/GovernorSummary.js';
@@ -9,6 +9,14 @@ import type { HeatStripTimeSeries } from '../features/timeline/types/flamechart.
 
 /** How many gauges the strip shows before it stops being at-a-glance. */
 const MAX_GAUGES = 6;
+
+/**
+ * One metric's usage, stated the way the parser states its own. `percentUsed` is null, not 0,
+ * where the log reported no ceiling: a share of nothing is unknown, not none.
+ */
+export function limitValue(used: number, limit: number): LimitValue {
+  return { used, limit, percentUsed: limit > 0 ? (used / limit) * 100 : null };
+}
 
 /**
  * Every governor-tracked metric, with the label the inspector shows for it. A
@@ -85,10 +93,7 @@ export function limitTotals(series: HeatStripTimeSeries): Limits {
   const final = series.events[series.events.length - 1]?.values;
   totals = {} as Limits;
   for (const { key } of GOVERNOR_METRICS) {
-    totals[key] = {
-      used: peakUsed(series, key),
-      limit: final?.get(key)?.limit ?? 0,
-    };
+    totals[key] = limitValue(peakUsed(series, key), final?.get(key)?.limit ?? 0);
   }
   totalsCache.set(series, totals);
   return totals;

@@ -10,9 +10,10 @@ VS Code extension for analyzing Salesforce debug logs with interactive visualiza
 
 - `lana/` — VS Code extension (TypeScript)
 - `log-viewer/` — webview UI (TypeScript; lit / html / css)
-- `apex-log-parser/` — shared log parser, no `vscode` and no DOM. Both `lana/` and
-  `log-viewer/` import it by the bare `apex-log-parser` specifier: a `tsconfig` project
-  reference plus a jest project, deliberately outside `pnpm-workspace.yaml`.
+- The log parser is the `@apexdevtools/apex-log-parser` package, released from
+  [apex-dev-tools/apex-log-parser](https://github.com/apex-dev-tools/apex-log-parser). Both
+  `lana/` and `log-viewer/` depend on it. Runtime lives on the root export, types and consts on
+  the `/types` subpath.
 - `lana-docs/` — Docusaurus documentation
 - `sample-app/` — sample Salesforce app with test logs
 
@@ -25,7 +26,7 @@ Always use pnpm.
 - `pnpm test` — run tests (before committing)
 - `pnpm lint` — eslint + `prettier --check` + `tsc -b`, run concurrently. The single
   pre-commit gate, so `typecheck` on top of it is wasted.
-- `pnpm exec jest --selectProjects <apex-log-parser|log-viewer|lana>` — scoped tests,
+- `pnpm exec jest --selectProjects <log-viewer|lana>` — scoped tests,
   matching what CI runs per runner.
 - `pnpm prettier-format` — auto-format
 

@@ -9,7 +9,7 @@
  * Handles tooltip positioning, content generation, and visibility.
  */
 
-import type { ApexLog, LogEvent } from 'apex-log-parser';
+import type { ApexLog, LogEvent } from '@apexdevtools/apex-log-parser';
 import { selfLabel } from '../../../core/metrics/eventMetrics.js';
 import { formatSOQL, type Dialect, type SoqlBudget } from '../../soql/format/formatter.js';
 import { markerColorCss, type TimelineMarker } from '../types/flamechart.types.js';

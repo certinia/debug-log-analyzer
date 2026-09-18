@@ -2,7 +2,7 @@
  * Copyright (c) 2024 Certinia Inc. All rights reserved.
  */
 
-import type { LogEvent } from 'apex-log-parser';
+import type { LogEvent } from '@apexdevtools/apex-log-parser';
 import { outermostEvents } from '../../../core/utility/EventTree.js';
 import type { Metric } from '../../analysis/services/RowGrouper.js';
 

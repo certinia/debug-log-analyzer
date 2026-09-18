@@ -3,7 +3,7 @@
  */
 import { workspace, type Uri } from 'vscode';
 
-import { parse, type ApexLog, type LogEvent } from 'apex-log-parser';
+import { parse, type ApexLog, type LogEvent } from '@apexdevtools/apex-log-parser';
 
 import type { Context } from '../Context.js';
 import { readFileText } from '../fs/workspaceFs.js';

@@ -8,7 +8,7 @@
  */
 
 import { describe, expect, it } from '@jest/globals';
-import type { LogEvent } from 'apex-log-parser';
+import type { LogEvent } from '@apexdevtools/apex-log-parser';
 import { logEventToTreeAndRects } from '../utils/tree-converter.js';
 
 /** A root frame spanning `start` to `end`; equal stamps give it no duration. */

@@ -2,7 +2,8 @@
  * Copyright (c) 2026 Certinia Inc. All rights reserved.
  */
 import { describe, expect, it } from '@jest/globals';
-import type { ApexLog, LogCategory, LogEvent } from 'apex-log-parser';
+import type { ApexLog, LogEvent } from '@apexdevtools/apex-log-parser';
+import type { LogCategory } from '@apexdevtools/apex-log-parser/types';
 
 import { categorySelfTimes, toTimelineKeys } from '../utils/category-self-time.js';
 

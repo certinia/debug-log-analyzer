@@ -39,7 +39,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        project: [apex-log-parser, log-viewer, lana]
+        project: [log-viewer, lana]
     steps:
       - uses: actions/checkout@v7
         with:

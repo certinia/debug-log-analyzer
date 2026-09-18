@@ -1,7 +1,7 @@
 /*
  * Copyright (c) 2026 Certinia Inc. All rights reserved.
  */
-import type { GovernorLimits, SelfTotal } from 'apex-log-parser';
+import type { GovernorLimits, SelfTotal } from '@apexdevtools/apex-log-parser/types';
 
 /**
  * The governor usage a node reports — all that's needed to *derive* cost. Both
@@ -68,12 +68,12 @@ interface CostMetric {
  * so it is the value comparable to the heap limit per path.
  */
 const COST_METRICS: CostMetric[] = [
-  { label: 'SOQL', used: (r) => r.soqlCount.total, limit: (l) => l.soqlQueries.limit },
-  { label: 'DML', used: (r) => r.dmlCount.total, limit: (l) => l.dmlStatements.limit },
-  { label: 'SOSL', used: (r) => r.soslCount.total, limit: (l) => l.soslQueries.limit },
-  { label: 'SOQL Rows', used: (r) => r.soqlRowCount.total, limit: (l) => l.queryRows.limit },
-  { label: 'DML Rows', used: (r) => r.dmlRowCount.total, limit: (l) => l.dmlRows.limit },
-  { label: 'Heap', used: (r) => r.heapPeak, limit: (l) => l.heapSize.limit },
+  { label: 'SOQL', used: (r) => r.soqlCount.total, limit: (l) => l.final.soqlQueries.limit },
+  { label: 'DML', used: (r) => r.dmlCount.total, limit: (l) => l.final.dmlStatements.limit },
+  { label: 'SOSL', used: (r) => r.soslCount.total, limit: (l) => l.final.soslQueries.limit },
+  { label: 'SOQL Rows', used: (r) => r.soqlRowCount.total, limit: (l) => l.final.queryRows.limit },
+  { label: 'DML Rows', used: (r) => r.dmlRowCount.total, limit: (l) => l.final.dmlRows.limit },
+  { label: 'Heap', used: (r) => r.heapPeak, limit: (l) => l.peak.heapSize.limit },
 ];
 
 /**

@@ -1,10 +1,15 @@
 /*
  * Copyright (c) 2026 Certinia Inc. All rights reserved.
  */
-import type { ApexLog, GovernorLimits, LogEvent, Limits } from 'apex-log-parser';
+import type { ApexLog, LogEvent } from '@apexdevtools/apex-log-parser';
+import type { GovernorLimits, Limits } from '@apexdevtools/apex-log-parser/types';
 import { beforeEach, describe, expect, it } from '@jest/globals';
 
-import { emptyLimits } from '../../../../components/__tests__/limitsTestUtils.js';
+import {
+  emptyLimits,
+  governorLimits,
+  limitValue,
+} from '../../../../components/__tests__/limitsTestUtils.js';
 
 let log: ApexLog | null = null;
 
@@ -34,16 +39,18 @@ function event(fields: Partial<LogEvent>): LogEvent {
  * The findings read the metric-strip series, which is built from these.
  */
 function governorLimitsOf(namespaceLimits: Record<string, Limits>): GovernorLimits {
-  const byNamespace = new Map(Object.entries(namespaceLimits));
+  const entries = Object.entries(namespaceLimits);
   return {
-    ...emptyLimits(),
-    byNamespace,
-    snapshots: [...byNamespace].map(([namespace, limits], index) => ({
+    ...governorLimits(),
+    byNamespace: new Map(
+      entries.map(([namespace, limits]) => [namespace, { final: limits, peak: limits }]),
+    ),
+    snapshots: entries.map(([namespace, limits], index) => ({
       timestamp: index + 1,
       namespace,
       limits,
     })),
-  } as GovernorLimits;
+  };
 }
 
 function apexLog(fields: Partial<ApexLog> & { namespaceLimits?: Record<string, Limits> }): ApexLog {
@@ -78,8 +85,8 @@ describe('computeLogDiagnostics', () => {
 
   it('reports a governor limit that is reached, and one that is near', async () => {
     const namespaceLimits = emptyLimits();
-    namespaceLimits.cpuTime = { used: 10_000, limit: 10_000 };
-    namespaceLimits.soqlQueries = { used: 85, limit: 100 };
+    namespaceLimits.cpuTime = limitValue(10_000, 10_000);
+    namespaceLimits.soqlQueries = limitValue(85, 100);
     log = apexLog({ namespaceLimits: { default: namespaceLimits } });
 
     const { diagnostics } = await computeLogDiagnostics();
@@ -102,7 +109,7 @@ describe('computeLogDiagnostics', () => {
 
   it('leaves a metric below the near-limit share out', async () => {
     const namespaceLimits = emptyLimits();
-    namespaceLimits.soqlQueries = { used: 40, limit: 100 };
+    namespaceLimits.soqlQueries = limitValue(40, 100);
     log = apexLog({ namespaceLimits: { default: namespaceLimits } });
 
     expect((await computeLogDiagnostics()).diagnostics).toEqual([]);
@@ -111,7 +118,7 @@ describe('computeLogDiagnostics', () => {
   it('sums usage over every namespace, since a limit is shared unless a package is certified', async () => {
     const forNamespace = (used: number) => {
       const limits = emptyLimits();
-      limits.soqlQueries = { used, limit: 100 };
+      limits.soqlQueries = limitValue(used, 100);
       return limits;
     };
     log = apexLog({ namespaceLimits: { default: forNamespace(14), pkg: forNamespace(173) } });
@@ -126,7 +133,7 @@ describe('computeLogDiagnostics', () => {
 
   it('heads a severity band with the governor limit, whatever the counts below it', async () => {
     const namespaceLimits = emptyLimits();
-    namespaceLimits.soqlQueries = { used: 85, limit: 100 };
+    namespaceLimits.soqlQueries = limitValue(85, 100);
     log = apexLog({
       namespaceLimits: { default: namespaceLimits },
       eventsById: Array.from({ length: 6 }, (_, index) =>
@@ -557,7 +564,7 @@ describe('computeLogDiagnostics', () => {
   it('reports a limit exception as the governor breach it is, not as an exception', async () => {
     const message = 'System.LimitException: Apex CPU time limit exceeded';
     const namespaceLimits = emptyLimits();
-    namespaceLimits.cpuTime = { used: 15_163, limit: 10_000 };
+    namespaceLimits.cpuTime = limitValue(15_163, 10_000);
     log = apexLog({
       namespaceLimits: { default: namespaceLimits },
       exceptions: [
@@ -597,7 +604,7 @@ describe('computeLogDiagnostics', () => {
 
   it('names the method most of the self time went into, beside the CPU breach', async () => {
     const namespaceLimits = emptyLimits();
-    namespaceLimits.cpuTime = { used: 15_163, limit: 10_000 };
+    namespaceLimits.cpuTime = limitValue(15_163, 10_000);
     log = apexLog({
       namespaceLimits: { default: namespaceLimits },
       eventsById: [
@@ -648,7 +655,7 @@ describe('computeLogDiagnostics', () => {
 
   it('orders findings by severity, then by how often they happened', async () => {
     const namespaceLimits = emptyLimits();
-    namespaceLimits.cpuTime = { used: 9_000, limit: 10_000 };
+    namespaceLimits.cpuTime = limitValue(9_000, 10_000);
     log = apexLog({
       namespaceLimits: { default: namespaceLimits },
       exceptions: [event({ text: 'System.QueryException: List has no rows' })],

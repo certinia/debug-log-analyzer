@@ -1,7 +1,8 @@
 /*
  * Copyright (c) 2026 Certinia Inc. All rights reserved.
  */
-import { LOG_CATEGORY, type ApexLog, type LogCategory, type LogEvent } from 'apex-log-parser';
+import type { ApexLog, LogEvent } from '@apexdevtools/apex-log-parser';
+import { LOG_CATEGORY, type LogCategory } from '@apexdevtools/apex-log-parser/types';
 
 import type { TimelineKeyEntry } from '../components/TimelineKey.js';
 import type { LegacyTimelineGroup } from '../services/Timeline.js';

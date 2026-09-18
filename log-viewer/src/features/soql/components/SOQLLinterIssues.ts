@@ -5,7 +5,7 @@ import '#vscode-elements/vscode-icon.js';
 import { LitElement, css, html, type PropertyValues } from 'lit';
 import { customElement, property, state } from 'lit/decorators.js';
 
-import type { SOQLExecuteBeginLine } from 'apex-log-parser';
+import type { SOQLExecuteBeginLine } from '@apexdevtools/apex-log-parser';
 import { currentLogStore } from '../../../core/log/LogStore.js';
 import {
   QueryPlanCostRule,

@@ -10,7 +10,7 @@
  * picks the dominant category.
  */
 import { describe, expect, it } from '@jest/globals';
-import type { LogEvent } from 'apex-log-parser';
+import type { LogEvent } from '@apexdevtools/apex-log-parser';
 
 import { MinimapDensityQuery } from '../optimised/minimap/MinimapDensityQuery.js';
 import type { PrecomputedRect } from '../optimised/RectangleCache.js';

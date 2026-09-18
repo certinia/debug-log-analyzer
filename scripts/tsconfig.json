@@ -5,10 +5,7 @@
     "types": ["node"],
     "composite": false,
     "declarationMap": false,
-    "noEmit": true,
-    "paths": {
-      "apex-log-parser": ["../apex-log-parser/src/index.ts"]
-    }
+    "noEmit": true
   },
   "include": ["measure/**/*.ts"]
 }

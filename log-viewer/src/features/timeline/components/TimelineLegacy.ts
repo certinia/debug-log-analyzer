@@ -4,7 +4,7 @@
 import { LitElement, css, html, type PropertyValues } from 'lit';
 import { customElement, property, query } from 'lit/decorators.js';
 
-import type { ApexLog } from 'apex-log-parser';
+import type { ApexLog } from '@apexdevtools/apex-log-parser';
 import { themeObserver } from '../../../core/theme/ThemeObserver.js';
 import {
   dispose as timelineDispose,

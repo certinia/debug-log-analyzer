@@ -8,10 +8,10 @@ import { customElement, property, state } from 'lit/decorators.js';
 import type {
   ApexLog,
   DMLBeginLine,
-  Limits,
   SOQLExecuteBeginLine,
   SOSLExecuteBeginLine,
-} from 'apex-log-parser';
+} from '@apexdevtools/apex-log-parser';
+import type { Limits } from '@apexdevtools/apex-log-parser/types';
 
 import { limitTotals } from '../../../components/logOverviewMetrics.js';
 import { eventBus, type StatementType } from '../../../core/events/EventBus.js';

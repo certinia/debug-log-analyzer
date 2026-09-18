@@ -1,7 +1,7 @@
 /*
  * Copyright (c) 2026 Certinia Inc. All rights reserved.
  */
-import type { LogIssue as ParsedLogIssue } from 'apex-log-parser';
+import type { LogIssue as ParsedLogIssue } from '@apexdevtools/apex-log-parser/types';
 
 import { goToCallTreeAction } from '../call-tree/navigation.js';
 import type { IssueSeverity, LogIssue } from '../notifications/types.js';

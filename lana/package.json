@@ -376,6 +376,7 @@
     "vscode:bundle": "pnpm -w run build"
   },
   "dependencies": {
+    "@apexdevtools/apex-log-parser": "0.1.1",
     "@apexdevtools/apex-parser": "5.2.0",
     "effect": "^3.22.0",
     "vscode-uri": "^3.2.0"

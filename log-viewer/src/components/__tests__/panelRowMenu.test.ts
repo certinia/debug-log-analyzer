@@ -4,7 +4,10 @@
  * @jest-environment jsdom
  */
 import { describe, expect, it, beforeEach } from '@jest/globals';
-import type { GovernorLimits, LogEvent } from 'apex-log-parser';
+import type { LogEvent } from '@apexdevtools/apex-log-parser';
+import type { GovernorLimits } from '@apexdevtools/apex-log-parser/types';
+
+import { governorLimits, limitValue } from './limitsTestUtils.js';
 
 const revealed: number[] = [];
 const copied: string[] = [];
@@ -76,14 +79,13 @@ describe('runPanelRowAction', () => {
   });
 
   it('copies details with the governor limits the log reported', () => {
-    // The parser always populates every pool, so mirror that shape.
-    limits = {
-      dmlStatements: { used: 0, limit: 150 },
-      dmlRows: { used: 0, limit: 10000 },
-      soqlQueries: { used: 1, limit: 100 },
-      queryRows: { used: 0, limit: 50000 },
-      soslQueries: { used: 0, limit: 20 },
-    } as unknown as GovernorLimits;
+    limits = governorLimits({
+      dmlStatements: limitValue(0, 150),
+      dmlRows: limitValue(0, 10000),
+      soqlQueries: limitValue(1, 100),
+      queryRows: limitValue(0, 50000),
+      soslQueries: limitValue(0, 20),
+    });
     event = makeEvent({ soqlCount: { self: 1, total: 1 } } as Partial<LogEvent>);
 
     runPanelRowAction('copy-details', 42);

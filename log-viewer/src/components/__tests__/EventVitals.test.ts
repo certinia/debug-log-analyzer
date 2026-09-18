@@ -4,7 +4,7 @@
  * @jest-environment jsdom
  */
 import { beforeAll, describe, expect, it } from '@jest/globals';
-import { parse } from 'apex-log-parser';
+import { parse } from '@apexdevtools/apex-log-parser';
 
 import { logStoreFor, type LogStore } from '../../core/log/LogStore.js';
 

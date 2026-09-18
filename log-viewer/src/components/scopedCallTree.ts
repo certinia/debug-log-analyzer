@@ -1,7 +1,7 @@
 /*
  * Copyright (c) 2026 Certinia Inc. All rights reserved.
  */
-import type { LogEvent } from 'apex-log-parser';
+import type { LogEvent } from '@apexdevtools/apex-log-parser';
 
 import { currentLogStore, type LogStore } from '../core/log/LogStore.js';
 import { ROOT_PATH_ID, type KeyPathIds } from '../core/log/keyPathIds.js';

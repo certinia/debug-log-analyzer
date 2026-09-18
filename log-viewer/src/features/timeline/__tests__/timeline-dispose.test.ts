@@ -5,7 +5,7 @@
  * Copyright (c) 2026 Certinia Inc. All rights reserved.
  */
 import { afterEach, beforeEach, describe, expect, it, jest } from '@jest/globals';
-import type { ApexLog } from 'apex-log-parser';
+import type { ApexLog } from '@apexdevtools/apex-log-parser';
 
 import { dispose, init } from '../services/Timeline.js';
 

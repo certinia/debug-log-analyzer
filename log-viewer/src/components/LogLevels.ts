@@ -6,7 +6,7 @@ import { LitElement, css, html, nothing } from 'lit';
 import { customElement, property } from 'lit/decorators.js';
 import { repeat } from 'lit/directives/repeat.js';
 
-import type { DebugLevel } from 'apex-log-parser';
+import type { DebugLevels, LogLevel } from '@apexdevtools/apex-log-parser/types';
 
 // web components
 import './OverflowList.js';
@@ -16,6 +16,21 @@ import './VsChip.js';
 import { globalStyles } from '../styles/global.styles.js';
 import { logStatusContext, type LogStatus } from '../core/log/logStatus.js';
 import { skeletonStyles } from '../styles/skeleton.styles.js';
+
+/** The token the log's settings line names each category by; `DebugLevels` keys them in camelCase. */
+const LOG_TOKEN: Record<keyof DebugLevels, string> = {
+  apexCode: 'APEX_CODE',
+  apexProfiling: 'APEX_PROFILING',
+  callout: 'CALLOUT',
+  dataAccess: 'DATA_ACCESS',
+  database: 'DB',
+  nba: 'NBA',
+  system: 'SYSTEM',
+  validation: 'VALIDATION',
+  visualforce: 'VISUALFORCE',
+  wave: 'WAVE',
+  workflow: 'WORKFLOW',
+};
 
 /**
  * Read-only display of the log's captured debug levels in the app header: one chip per
@@ -40,7 +55,7 @@ export class LogLevels extends LitElement {
   logStatus: LogStatus = 'parsing';
 
   @property()
-  logSettings: DebugLevel[] | null = null;
+  logSettings: DebugLevels | null = null;
 
   static styles = [
     globalStyles,
@@ -82,9 +97,10 @@ export class LogLevels extends LitElement {
 
     return html`<overflow-list menu-heading="Log levels">
       ${repeat(
-        this.logSettings,
-        (s) => s.logCategory,
-        (s) => html`<vs-chip><span slot="lead">${s.logCategory}</span>${s.logLevel}</vs-chip>`,
+        Object.entries(this.logSettings) as [keyof DebugLevels, LogLevel][],
+        ([category]) => category,
+        ([category, level]) =>
+          html`<vs-chip><span slot="lead">${LOG_TOKEN[category]}</span>${level}</vs-chip>`,
       )}
     </overflow-list>`;
   }

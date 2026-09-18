@@ -1,7 +1,8 @@
 /*
  * Copyright (c) 2025 Certinia Inc. All rights reserved.
  */
-import type { ApexLog, GovernorLimits } from 'apex-log-parser';
+import type { ApexLog } from '@apexdevtools/apex-log-parser';
+import type { GovernorLimits } from '@apexdevtools/apex-log-parser/types';
 import {
   Tabulator,
   type ColumnDefinition,
@@ -421,39 +422,39 @@ export function createGovernorMetricColumns(
       title: 'DML Count',
       field: 'dmlCount.total',
       total: rootMethod.dmlCount.total,
-      limit: governorLimits.dmlStatements.limit,
+      limit: governorLimits.final.dmlStatements.limit,
     }),
     createGovernorColumn({
       title: 'DML Count self',
       field: 'dmlCount.self',
       total: rootMethod.dmlCount.total,
-      limit: governorLimits.dmlStatements.limit,
+      limit: governorLimits.final.dmlStatements.limit,
       visible: false,
     }),
     createGovernorColumn({
       title: 'SOQL Count',
       field: 'soqlCount.total',
       total: rootMethod.soqlCount.total,
-      limit: governorLimits.soqlQueries.limit,
+      limit: governorLimits.final.soqlQueries.limit,
     }),
     createGovernorColumn({
       title: 'SOQL Count self',
       field: 'soqlCount.self',
       total: rootMethod.soqlCount.total,
-      limit: governorLimits.soqlQueries.limit,
+      limit: governorLimits.final.soqlQueries.limit,
       visible: false,
     }),
     createGovernorColumn({
       title: 'SOSL Count',
       field: 'soslCount.total',
       total: rootMethod.soslCount.total,
-      limit: governorLimits.soslQueries.limit,
+      limit: governorLimits.final.soslQueries.limit,
     }),
     createGovernorColumn({
       title: 'SOSL Count self',
       field: 'soslCount.self',
       total: rootMethod.soslCount.total,
-      limit: governorLimits.soslQueries.limit,
+      limit: governorLimits.final.soslQueries.limit,
       visible: false,
     }),
     // 77 is the narrowest width that doesn't clip "Throws"; 60 did.
@@ -462,14 +463,14 @@ export function createGovernorMetricColumns(
       title: 'DML Rows',
       field: 'dmlRowCount.total',
       total: rootMethod.dmlRowCount.total,
-      limit: governorLimits.dmlRows.limit,
+      limit: governorLimits.final.dmlRows.limit,
       width: ROWS_WIDTH,
     }),
     createGovernorColumn({
       title: 'DML Rows self',
       field: 'dmlRowCount.self',
       total: rootMethod.dmlRowCount.total,
-      limit: governorLimits.dmlRows.limit,
+      limit: governorLimits.final.dmlRows.limit,
       width: ROWS_WIDTH,
       visible: false,
     }),
@@ -477,14 +478,14 @@ export function createGovernorMetricColumns(
       title: 'SOQL Rows',
       field: 'soqlRowCount.total',
       total: rootMethod.soqlRowCount.total,
-      limit: governorLimits.queryRows.limit,
+      limit: governorLimits.final.queryRows.limit,
       width: ROWS_WIDTH,
     }),
     createGovernorColumn({
       title: 'SOQL Rows self',
       field: 'soqlRowCount.self',
       total: rootMethod.soqlRowCount.total,
-      limit: governorLimits.queryRows.limit,
+      limit: governorLimits.final.queryRows.limit,
       width: ROWS_WIDTH,
       visible: false,
     }),
