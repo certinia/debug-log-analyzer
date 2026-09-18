@@ -77,7 +77,7 @@ describe('toTimelineKeys', () => {
   it('builds the legend in category order with the palette colors', () => {
     const keys = toTimelineKeys(color);
 
-    expect(keys.map((k) => k.label)).toEqual([
+    expect(keys.map((k) => k.category)).toEqual([
       'Apex',
       'Code Unit',
       'System',
@@ -98,52 +98,14 @@ describe('toTimelineKeys', () => {
 
     const keys = toTimelineKeys(color, selfTimes);
 
-    expect(keys.find((k) => k.label === 'Apex')?.selfTimeNs).toBe(15);
-    expect(keys.find((k) => k.label === 'SOQL')?.selfTimeNs).toBe(5);
+    expect(keys.find((k) => k.category === 'Apex')?.selfTimeNs).toBe(15);
+    expect(keys.find((k) => k.category === 'SOQL')?.selfTimeNs).toBe(5);
   });
 
   it('reads 0 for a category the log never used', () => {
     const keys = toTimelineKeys(color, new Map<LogCategory, number>([['Apex', 15]]));
 
-    expect(keys.find((k) => k.label === 'DML')?.selfTimeNs).toBe(0);
-    expect(keys.find((k) => k.label === 'Callout')?.selfTimeNs).toBe(0);
-  });
-
-  describe('the legacy chart', () => {
-    /** Its key names 6 groups, not the 7 categories, and draws them in this order. */
-    it('names the groups the legacy chart draws', () => {
-      expect(toTimelineKeys(color, undefined, true).map((k) => k.label)).toEqual([
-        'Method',
-        'Code Unit',
-        'System Method',
-        'Workflow',
-        'DML',
-        'SOQL',
-      ]);
-    });
-
-    /**
-     * Apex and Callout are both `Method` there. Left unfolded the legend showed two
-     * chips of one colour, naming neither of them what the chart's own key says.
-     * Validation folds into System Method the same way, once the parser reports it.
-     */
-    it('folds the categories that share one group, and sums their self time', () => {
-      const keys = toTimelineKeys(
-        color,
-        new Map<LogCategory, number>([
-          ['Apex', 15],
-          ['Callout', 5],
-          ['System', 3],
-          ['Validation', 4],
-        ]),
-        true,
-      );
-
-      const method = keys.find((k) => k.label === 'Method');
-      expect(method?.selfTimeNs).toBe(20);
-      expect(method?.fillColor).toBe('#a1');
-      expect(method?.categories).toEqual(['Apex', 'Callout']);
-      expect(keys.find((k) => k.label === 'System Method')?.selfTimeNs).toBe(7);
-    });
+    expect(keys.find((k) => k.category === 'DML')?.selfTimeNs).toBe(0);
+    expect(keys.find((k) => k.category === 'Callout')?.selfTimeNs).toBe(0);
   });
 });

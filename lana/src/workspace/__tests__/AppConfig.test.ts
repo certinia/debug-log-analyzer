@@ -76,7 +76,7 @@ describe('getConfig', () => {
 describe('sameConfig', () => {
   const base = (): Config =>
     ({
-      timeline: { activeTheme: 'Dark', legacy: false, customThemes: { Custom: {} } },
+      timeline: { activeTheme: 'Dark', customThemes: { Custom: {} } },
       callTree: { columnView: 'General', columnOverrides: { Time: ['a', 'b'] } },
     }) as unknown as Config;
 
