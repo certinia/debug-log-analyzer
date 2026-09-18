@@ -1,10 +1,11 @@
-//totod: event types
-
 import '#vscode-elements/vscode-textfield.js';
 import '#vscode-elements/vscode-toolbar-button.js';
 import type { VscodeTextfield } from '#vscode-elements/vscode-textfield.js';
 import { LitElement, css, html } from 'lit';
 import { customElement, state } from 'lit/decorators.js';
+
+import { DomListenerController } from '../../../core/events/DomListenerController.js';
+import type { FindEventMap, FindResultsEventDetail } from '../findEvents.js';
 
 // styles
 import { globalStyles } from '../../../styles/global.styles.js';
@@ -22,18 +23,13 @@ export class FindWidget extends LitElement {
   lastMatch: string | null = null;
   nextMatchDirection = true; // Remembers last direction: true=next, false=previous
 
-  constructor() {
-    super();
-    window.addEventListener('keydown', (e: KeyboardEvent) => {
-      this._keyPress(e);
-    });
+  private readonly _findBus = new DomListenerController<FindEventMap>(this, document, {
+    'lv-find-results': (e) => this._updateCounts(e),
+  });
 
-    document.addEventListener('lv-find-results', ((
-      e: CustomEvent<{ totalMatches: number; count?: number }>,
-    ) => {
-      this._updateCounts(e);
-    }) as EventListener);
-  }
+  private readonly _keyBus = new DomListenerController<WindowEventMap>(this, window, {
+    keydown: (e) => this._keyPress(e),
+  });
 
   static styles = [
     globalStyles,
@@ -241,9 +237,10 @@ export class FindWidget extends LitElement {
     return this.shadowRoot?.querySelector<VscodeTextfield>('.find-input-box');
   }
 
-  _updateCounts(e: { detail: { totalMatches: number; count?: number } }) {
+  _updateCounts(e: CustomEvent<FindResultsEventDetail>) {
     this.totalMatches = e.detail.totalMatches;
-    this.currentMatch = e.detail.count ?? 1;
+    // A view reports totals, never a position, so a fresh count starts at the first match.
+    this.currentMatch = 1;
   }
 
   _resetCounts() {

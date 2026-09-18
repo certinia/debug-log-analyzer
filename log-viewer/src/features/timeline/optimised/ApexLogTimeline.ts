@@ -29,6 +29,7 @@ import {
   findEventByTimestamp,
   type EventSearchResult,
 } from '../../../core/utility/EventSearch.js';
+import type { FindEventDetail, FindResultsEventDetail } from '../../find/findEvents.js';
 import { goToRow } from '../../call-tree/navigation.js';
 import { formatCallStack, formatEventDetails } from '../../call-tree/utils/eventText.js';
 import { getTheme } from '../themes/ThemeSelector.js';
@@ -36,8 +37,6 @@ import {
   BUCKET_CONSTANTS,
   type EditorColors,
   type EventNode,
-  type FindEventDetail,
-  type FindResultsEventDetail,
   type HoverCause,
   type ModifierKeys,
   type TimelineMarker,

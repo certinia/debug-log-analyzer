@@ -1,9 +1,9 @@
 /*
  * Copyright (c) 2020 Certinia Inc. All rights reserved.
  */
-import { describe, expect, it } from '@jest/globals';
+import { beforeEach, describe, expect, it } from '@jest/globals';
 
-import { computeWallClockMs, formatByteSize, formatWallClockTime } from '../Util.js';
+import { computeWallClockMs, formatByteSize, formatWallClockTime, isVisible } from '../Util.js';
 
 describe('formatWallClockTime', () => {
   it('should format midnight as 00:00:00.000', () => {
@@ -78,5 +78,43 @@ describe('formatByteSize', () => {
     expect(formatByteSize(940)).toBe('940 bytes');
     // A net heap figure can be negative; the sign survives.
     expect(formatByteSize(-1_500_000)).toBe('-1.5 MB');
+  });
+});
+
+describe('isVisible', () => {
+  /** Observers standing, so a release can be counted. */
+  let observing = 0;
+
+  /** Reports nothing, so only the abort can settle the wait. */
+  class NeverIntersects {
+    observe(): void {
+      observing++;
+    }
+    disconnect(): void {
+      observing--;
+    }
+  }
+
+  beforeEach(() => {
+    observing = 0;
+    globalThis.IntersectionObserver = NeverIntersects as unknown as typeof IntersectionObserver;
+  });
+
+  it('releases its observer where the wait is aborted', async () => {
+    const controller = new AbortController();
+    const waiting = isVisible({} as HTMLElement, undefined, controller.signal);
+
+    controller.abort();
+
+    await expect(waiting).resolves.toBe(false);
+    expect(observing).toBe(0);
+  });
+
+  it('observes nothing for a signal that aborted first', async () => {
+    const controller = new AbortController();
+    controller.abort();
+
+    await expect(isVisible({} as HTMLElement, undefined, controller.signal)).resolves.toBe(false);
+    expect(observing).toBe(0);
   });
 });

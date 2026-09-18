@@ -17,6 +17,8 @@ import type { ApexLog, SOQLExecuteBeginLine } from 'apex-log-parser';
 import { vscodeMessenger } from '../../../core/messaging/VSCodeExtensionMessenger.js';
 import { isVisible } from '../../../core/utility/Util.js';
 import { getCallerNamespace } from '../../../core/utility/CallerNamespace.js';
+import { DomListenerController } from '../../../core/events/DomListenerController.js';
+import type { FindEventDetail, FindEventMap } from '../../find/findEvents.js';
 import { goToRow } from '../../call-tree/navigation.js';
 import { deriveSoqlObject } from '../services/sobjectClassification.js';
 import { soqlGroupHeader } from '../../soql/format/groupHeader.js';
@@ -145,18 +147,10 @@ export class SOQLView extends LitElement {
     return this.renderRoot?.querySelector('#db-soql-table');
   }
 
-  constructor() {
-    super();
-
-    document.addEventListener('lv-find', this._findEvt);
-    document.addEventListener('lv-find-close', this._findEvt);
-  }
-
-  disconnectedCallback(): void {
-    super.disconnectedCallback();
-    document.removeEventListener('lv-find', this._findEvt);
-    document.removeEventListener('lv-find-close', this._findEvt);
-  }
+  private readonly _findBus = new DomListenerController<FindEventMap>(this, document, {
+    'lv-find': (e) => void this._find(e),
+    'lv-find-close': (e) => void this._find(e),
+  });
 
   firstUpdated(): void {
     this.contextMenu = this.renderRoot.querySelector('context-menu');
@@ -483,10 +477,6 @@ export class SOQLView extends LitElement {
     this.soqlTable?.download('csv', 'soql.csv', { bom: true, delimiter: ',' });
   }
 
-  _findEvt = ((event: FindEvt) => {
-    void this._find(event);
-  }) as EventListener;
-
   _soqlGroupBy(event: Event) {
     if (!this.soqlTable) {
       return;
@@ -537,7 +527,7 @@ export class SOQLView extends LitElement {
     this.oldIndex = highlightIndex;
   }
 
-  async _find(e: CustomEvent<{ text: string; count: number; options: { matchCase: boolean } }>) {
+  async _find(e: CustomEvent<FindEventDetail>) {
     const isTableVisible = !!this.soqlTable?.element?.clientHeight;
     if (!isTableVisible && !this.totalMatches) {
       return;
@@ -999,5 +989,3 @@ interface GridSOQLData {
   fields?: string | null;
   eventIndex?: number;
 }
-
-type FindEvt = CustomEvent<{ text: string; count: number; options: { matchCase: boolean } }>;

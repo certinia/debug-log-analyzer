@@ -11,6 +11,8 @@ import { Tabulator, type GroupComponent, type RowComponent } from 'tabulator-tab
 import type { ApexLog, DMLBeginLine } from 'apex-log-parser';
 import { vscodeMessenger } from '../../../core/messaging/VSCodeExtensionMessenger.js';
 import { getCallerNamespace } from '../../../core/utility/CallerNamespace.js';
+import { DomListenerController } from '../../../core/events/DomListenerController.js';
+import type { FindEventDetail, FindEventMap } from '../../find/findEvents.js';
 import { goToRow } from '../../call-tree/navigation.js';
 import { isVisible } from '../../../core/utility/Util.js';
 import { getSettings, updateSetting } from '../../settings/Settings.js';
@@ -125,18 +127,10 @@ export class DMLView extends LitElement {
   private rowCountRange: FilterRange = { start: null, end: null };
   private timeTakenRange: FilterRange = { start: null, end: null };
 
-  constructor() {
-    super();
-
-    document.addEventListener('lv-find', this._findEvt);
-    document.addEventListener('lv-find-close', this._findEvt);
-  }
-
-  disconnectedCallback(): void {
-    super.disconnectedCallback();
-    document.removeEventListener('lv-find', this._findEvt);
-    document.removeEventListener('lv-find-close', this._findEvt);
-  }
+  private readonly _findBus = new DomListenerController<FindEventMap>(this, document, {
+    'lv-find': (e) => void this._find(e),
+    'lv-find-close': (e) => void this._find(e),
+  });
 
   firstUpdated(): void {
     this.contextMenu = this.renderRoot.querySelector('context-menu');
@@ -465,10 +459,6 @@ export class DMLView extends LitElement {
     this.dmlTable?.download('csv', 'dml.csv', { bom: true, delimiter: ',' });
   }
 
-  _findEvt = ((event: FindEvt) => {
-    void this._find(event);
-  }) as EventListener;
-
   _dmlGroupBy(event: Event) {
     if (!this.dmlTable) {
       return;
@@ -523,7 +513,7 @@ export class DMLView extends LitElement {
     this.oldIndex = highlightIndex;
   }
 
-  async _find(e: CustomEvent<{ text: string; count: number; options: { matchCase: boolean } }>) {
+  async _find(e: CustomEvent<FindEventDetail>) {
     const isTableVisible = !!this.dmlTable?.element?.clientHeight;
     if (!isTableVisible && !this.totalMatches) {
       return;
@@ -840,5 +830,3 @@ interface DMLRow {
   timeTaken?: number;
   eventIndex?: number;
 }
-
-type FindEvt = CustomEvent<{ text: string; count: number; options: { matchCase: boolean } }>;

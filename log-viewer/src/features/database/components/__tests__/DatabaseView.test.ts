@@ -218,6 +218,14 @@ describe('database-view find totals', () => {
     expect(rollUps(() => report('soql', 3))).toEqual([3]);
   });
 
+  it('keeps rolling up after a detach and re-attach', async () => {
+    view.remove();
+    document.body.append(view);
+    await view.updateComplete;
+
+    expect(rollUps(() => report('soql', 3))).toEqual([3]);
+  });
+
   it('drops a section count when the section collapses', async () => {
     report('soql', 3);
 
