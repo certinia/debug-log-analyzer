@@ -18,7 +18,6 @@ import { SelectionEchoGuard } from '../../../core/events/SelectionEchoGuard.js';
 import { vscodeMessenger } from '../../../core/messaging/VSCodeExtensionMessenger.js';
 import { eventByEventIndex } from '../../../core/utility/EventSearch.js';
 import { isVisible } from '../../../core/utility/Util.js';
-import { getSettings, updateSetting } from '../../settings/Settings.js';
 import { CALLTREE_GO_TO_ROW, type CalltreeNavigationEventMap } from '../navigation.js';
 import type { AggregatedRow, BottomUpRow } from '../utils/Aggregation.js';
 import { findBucketRow } from '../utils/bucketRows.js';
@@ -58,15 +57,8 @@ import '../../../components/OverflowList.js';
 // Table creation functions
 import { createAggregatedTable } from './AggregatedTable.js';
 import { createBottomUpTable } from './BottomUpTable.js';
-import {
-  applyColumnView,
-  buildColumnMenuItems,
-  CALL_TREE_VIEWS,
-  getColumnView,
-  getTableFields,
-  resolveColumnView,
-  toggleField,
-} from '../../../tabulator/ColumnViews.js';
+import { ColumnSettingsController } from '../../../components/ColumnSettingsController.js';
+import { CALL_TREE_VIEWS } from '../../../tabulator/ColumnViews.js';
 import {
   LocatedRowIds,
   LocatedRowMarker,
@@ -74,8 +66,8 @@ import {
   rowIndexStamper,
   rowFrames,
 } from '../../../components/locatedRow.js';
-import { InspectorEmphasis } from '../../../components/inspectorEmphasis.js';
-import { revealFirstOf, wireInspectorTab } from '../../../components/inspectorTab.js';
+import { InspectorTabController } from '../../../components/InspectorTabController.js';
+import { revealFirstOf } from '../../../components/inspectorTab.js';
 import { createTimeOrderTable } from './TimeOrderTable.js';
 
 /** Time Order keys its rows by event index; the grouped views key theirs by the
@@ -159,12 +151,14 @@ export class CalltreeView extends LitElement {
   tableContainer: HTMLDivElement | null = null;
   rootMethod: ApexLog | null = null;
 
-  @state()
-  columnView = 'General';
-
-  /** Per-view column overrides (view id → visible fields); empty until edited. */
-  @state()
-  private columnOverrides: Record<string, string[]> = {};
+  private readonly _columns = new ColumnSettingsController(this, {
+    section: 'callTree',
+    read: (settings) => settings.callTree,
+    views: CALL_TREE_VIEWS,
+    alwaysVisible: ALWAYS_VISIBLE,
+    // All three, so a mode the user has not switched back to is already right.
+    tables: () => this._tables,
+  });
 
   private contextMenu: ContextMenu | null = null;
   private contextMenuRow: TimeOrderRow | null = null;
@@ -182,11 +176,9 @@ export class CalltreeView extends LitElement {
 
   /** Guards the programmatic select made on the inspector's behalf. */
   private _echoGuard = new SelectionEchoGuard();
-  private _inspectorUnsubscribe: (() => void) | null = null;
+
   private _locatedRow = new LocatedRowMarker();
   private _locateIds = new LocatedRowIds();
-  /** Which of the inspector's reports the mark follows. */
-  private _emphasis = new InspectorEmphasis();
 
   private readonly _documentBus = new DomListenerController<
     FindEventMap & CalltreeNavigationEventMap
@@ -197,24 +189,23 @@ export class CalltreeView extends LitElement {
     'lv-find-close': (e) => void this._find(e),
   });
 
+  private readonly _inspector = new InspectorTabController(this, 'calltree', {
+    mark: (eventIndexes) => this._markLocated(eventIndexes),
+    reveal: (eventIndex, signal) => this._revealEventIndex(eventIndex, signal),
+    clear: () => {
+      // The table reports the clear itself, which is what reaches the inspector.
+      for (const table of this._tables) {
+        table.deselectRow();
+      }
+    },
+    // A picked row merges calls, so the mark shows all of them while the view
+    // moves to the first of them.
+    revealMerged: revealFirstOf((eventIndex, signal) => this._revealEventIndex(eventIndex, signal)),
+  });
+
   override connectedCallback(): void {
     super.connectedCallback();
     this._categoryColoringOff = wireCategoryColoring(this);
-    this._inspectorUnsubscribe = wireInspectorTab('calltree', this._emphasis, {
-      mark: (eventIndexes) => this._markLocated(eventIndexes),
-      reveal: (eventIndex, signal) => this._revealEventIndex(eventIndex, signal),
-      clear: () => {
-        // The table reports the clear itself, which is what reaches the inspector.
-        for (const table of this._tables) {
-          table.deselectRow();
-        }
-      },
-      // A picked row merges calls, so the mark shows all of them while the view
-      // moves to the first of them.
-      revealMerged: revealFirstOf((eventIndex, signal) =>
-        this._revealEventIndex(eventIndex, signal),
-      ),
-    });
 
     // A detach destroyed the tables, and `updated` builds only for the log's
     // arrival. With a log already in hand this is a re-attach, and the build's
@@ -230,8 +221,6 @@ export class CalltreeView extends LitElement {
     this._visibilityWait = null;
     this._categoryColoringOff?.();
     this._categoryColoringOff = null;
-    this._inspectorUnsubscribe?.();
-    this._inspectorUnsubscribe = null;
     this._destroyCurrentTable();
   }
 
@@ -247,13 +236,6 @@ export class CalltreeView extends LitElement {
 
   firstUpdated(): void {
     this.contextMenu = this.renderRoot.querySelector('context-menu');
-    void this._loadColumnSettings();
-  }
-
-  private async _loadColumnSettings(): Promise<void> {
-    const settings = await getSettings();
-    this.columnOverrides = settings.callTree?.columnOverrides ?? {};
-    this._setColumnView(resolveColumnView(CALL_TREE_VIEWS, settings.callTree?.columnView));
   }
 
   static styles = [
@@ -354,8 +336,8 @@ export class CalltreeView extends LitElement {
                 label="Column view"
                 @change="${this._handleColumnViewChange}"
                 @vs-reset-option="${this._onResetOption}"
-                .value="${this.columnView}"
-                .resettableValues="${Object.keys(this.columnOverrides)}"
+                .value="${this._columns.view}"
+                .resettableValues="${this._columns.editedViews}"
               >
                 ${repeat(
                   CALL_TREE_VIEWS,
@@ -363,7 +345,7 @@ export class CalltreeView extends LitElement {
                   (view) =>
                     html`<vscode-option
                       value="${view.id}"
-                      ?selected="${this.columnView === view.id}"
+                      ?selected="${this._columns.view === view.id}"
                       >${view.id}</vscode-option
                     >`,
                 )}
@@ -625,15 +607,7 @@ export class CalltreeView extends LitElement {
   }
 
   private _handleColumnViewChange(event: Event) {
-    const target = event.target as HTMLInputElement;
-    const id = target.value || 'General';
-    this._setColumnView(id);
-    updateSetting('callTree.columnView', id);
-  }
-
-  /** Effective fields for a view id: the user override, else the built-in preset. */
-  private _columnViewFields(id: string): string[] | null {
-    return this.columnOverrides[id] ?? getColumnView(CALL_TREE_VIEWS, id)?.fields ?? null;
+    this._columns.choose((event.target as HTMLInputElement).value || 'General');
   }
 
   private get _tables(): Tabulator[] {
@@ -642,17 +616,9 @@ export class CalltreeView extends LitElement {
     );
   }
 
-  private _setColumnView(id: string) {
-    this.columnView = id;
-    const fields = this._columnViewFields(id);
-    for (const table of this._tables) {
-      applyColumnView(table, fields, ALWAYS_VISIBLE);
-    }
-  }
-
   /** Applies the active view and wires the header menu once a table is built. */
   private _initTableColumns(table: Tabulator) {
-    applyColumnView(table, this._columnViewFields(this.columnView), ALWAYS_VISIBLE);
+    this._columns.applyTo(table);
     const header = table.element.querySelector<HTMLElement>('.tabulator-header');
     header?.addEventListener('contextmenu', (event) => {
       event.preventDefault();
@@ -666,17 +632,7 @@ export class CalltreeView extends LitElement {
     }
     this.contextMenuRow = null;
     this.contextMenuTable = table;
-    this.contextMenu.show(
-      buildColumnMenuItems(
-        table,
-        this.columnView,
-        CALL_TREE_VIEWS,
-        ALWAYS_VISIBLE,
-        Object.keys(this.columnOverrides),
-      ),
-      clientX,
-      clientY,
-    );
+    this.contextMenu.show(this._columns.menuItems(table), clientX, clientY);
   }
 
   private _openColumnMenu(event: Event) {
@@ -693,13 +649,7 @@ export class CalltreeView extends LitElement {
     if (!this.contextMenu?.isVisible() || !this.contextMenuTable) {
       return;
     }
-    this.contextMenu.items = buildColumnMenuItems(
-      this.contextMenuTable,
-      this.columnView,
-      CALL_TREE_VIEWS,
-      ALWAYS_VISIBLE,
-      Object.keys(this.columnOverrides),
-    );
+    this.contextMenu.items = this._columns.menuItems(this.contextMenuTable);
   }
 
   private _onColumnMenuClose() {
@@ -707,43 +657,8 @@ export class CalltreeView extends LitElement {
     this.contextMenuRow = null;
   }
 
-  /** Toggles a column in the active view's override, shared across all tables. */
-  private _toggleColumn(field: string) {
-    const table = this.contextMenuTable;
-    if (!table) {
-      return;
-    }
-    const fields = toggleField(
-      this._columnViewFields(this.columnView),
-      field,
-      getTableFields(table),
-    );
-    this.columnOverrides = { ...this.columnOverrides, [this.columnView]: fields };
-    for (const t of this._tables) {
-      applyColumnView(t, fields, ALWAYS_VISIBLE);
-    }
-    updateSetting('callTree.columnOverrides', this.columnOverrides);
-  }
-
   private _onResetOption(event: CustomEvent<{ value: string }>) {
-    this._resetColumns(event.detail.value);
-  }
-
-  /** Clears a view's override, restoring its built-in columns (defaults to the active view). */
-  private _resetColumns(id: string = this.columnView) {
-    if (!this.columnOverrides[id]) {
-      return;
-    }
-    const { [id]: _removed, ...rest } = this.columnOverrides;
-    this.columnOverrides = rest;
-    if (id === this.columnView) {
-      // Resolve the restored fields once (identical for every table).
-      const fields = this._columnViewFields(id);
-      for (const table of this._tables) {
-        applyColumnView(table, fields, ALWAYS_VISIBLE);
-      }
-    }
-    updateSetting('callTree.columnOverrides', this.columnOverrides);
+    this._columns.reset(event.detail.value);
   }
 
   _handleTypeFilter(event: Event) {
@@ -1168,7 +1083,7 @@ export class CalltreeView extends LitElement {
       if (!selection) {
         // The selection went with it, and so does a mark a picked inspector row
         // left here — it was never a selection of this table.
-        this._markLocated(this._emphasis.pick([]));
+        this._inspector.dropPick();
       }
       eventBus.emit('detail:select', {
         source,
@@ -1310,19 +1225,19 @@ export class CalltreeView extends LitElement {
     // open (keepOpen), so refresh its items live and leave contextMenuTable set —
     // it's cleared on menu-close.
     if (itemId.startsWith('view:')) {
-      const id = itemId.slice('view:'.length);
-      this._setColumnView(id);
-      updateSetting('callTree.columnView', id);
+      this._columns.choose(itemId.slice('view:'.length));
       this._refreshColumnMenu();
       return;
     }
     if (itemId.startsWith('col:')) {
-      this._toggleColumn(itemId.slice('col:'.length));
-      this._refreshColumnMenu();
+      if (this.contextMenuTable) {
+        this._columns.toggle(this.contextMenuTable, itemId.slice('col:'.length));
+        this._refreshColumnMenu();
+      }
       return;
     }
     if (itemId.startsWith('reset:')) {
-      this._resetColumns(itemId.slice('reset:'.length));
+      this._columns.reset(itemId.slice('reset:'.length));
       this._refreshColumnMenu();
       return;
     }

@@ -6,7 +6,7 @@ import '#vscode-elements/vscode-option.js';
 import '../../../components/VsSelect.js';
 import '#vscode-elements/vscode-toolbar-button.js';
 import { LitElement, css, html, unsafeCSS, type PropertyValues } from 'lit';
-import { customElement, property, state } from 'lit/decorators.js';
+import { customElement, property } from 'lit/decorators.js';
 import { repeat } from 'lit/directives/repeat.js';
 import type { RowComponent, Tabulator } from 'tabulator-tables';
 
@@ -22,22 +22,14 @@ import {
   rowDetailSelection,
   rowFrames,
 } from '../../../components/locatedRow.js';
-import { InspectorEmphasis } from '../../../components/inspectorEmphasis.js';
-import { revealFirstOf, wireInspectorTab } from '../../../components/inspectorTab.js';
+import { InspectorTabController } from '../../../components/InspectorTabController.js';
+import { revealFirstOf } from '../../../components/inspectorTab.js';
 import { SelectionEchoGuard } from '../../../core/events/SelectionEchoGuard.js';
 import { eventByEventIndex } from '../../../core/utility/EventSearch.js';
 import { isVisible } from '../../../core/utility/Util.js';
-import { getSettings, updateSetting } from '../../settings/Settings.js';
 import { createBottomUpTable } from '../../call-tree/components/BottomUpTable.js';
-import {
-  applyColumnView,
-  buildColumnMenuItems,
-  CALL_TREE_VIEWS,
-  getColumnView,
-  getTableFields,
-  resolveColumnView,
-  toggleField,
-} from '../../../tabulator/ColumnViews.js';
+import { ColumnSettingsController } from '../../../components/ColumnSettingsController.js';
+import { CALL_TREE_VIEWS } from '../../../tabulator/ColumnViews.js';
 import type { BottomUpRow } from '../../call-tree/utils/Aggregation.js';
 import { findRootBucket } from '../../call-tree/utils/bucketRows.js';
 import {
@@ -129,12 +121,13 @@ export class AnalysisView extends LitElement {
 
   analysisTable: Tabulator | null = null;
 
-  @state()
-  columnView = 'General';
-
-  /** Per-view column overrides (view id → visible fields); empty until edited. */
-  @state()
-  private columnOverrides: Record<string, string[]> = {};
+  private readonly _columns = new ColumnSettingsController(this, {
+    section: 'callTree',
+    read: (settings) => settings.callTree,
+    views: CALL_TREE_VIEWS,
+    alwaysVisible: ALWAYS_VISIBLE,
+    tables: () => (this.analysisTable ? [this.analysisTable] : []),
+  });
   private contextMenu: ContextMenu | null = null;
   tableContainer: HTMLDivElement | null = null;
   findMap: { [key: number]: RowComponent } = {};
@@ -157,10 +150,9 @@ export class AnalysisView extends LitElement {
 
   /** Guards the programmatic select made on the inspector's behalf. */
   private _echoGuard = new SelectionEchoGuard();
-  private _inspectorUnsubscribe: (() => void) | null = null;
+
   private _locatedRow = new LocatedRowMarker();
   private _locateIds = new LocatedRowIds();
-  private _emphasis = new InspectorEmphasis();
 
   private readonly _findBus = new DomListenerController<FindEventMap>(this, document, {
     'lv-find': (e) => void this._find(e),
@@ -168,33 +160,30 @@ export class AnalysisView extends LitElement {
     'lv-find-close': (e) => void this._find(e),
   });
 
+  private readonly _inspector = new InspectorTabController(this, 'analysis', {
+    // A row is a method bucket rather than one event, so a frame is translated
+    // into the paths of the rows it heads.
+    mark: (eventIndexes) => this._markLocated(eventIndexes),
+    // An inspector finding names one event; the grid holds it in the bucket for
+    // its method, so that bucket is what gets revealed.
+    reveal: (eventIndex, signal) => this._revealEventIndex(eventIndex, signal),
+    clear: () => {
+      // The table reports the clear itself, which is what reaches the inspector.
+      this.analysisTable?.deselectRow();
+    },
+    // A row buckets calls, so a merged pick moves to the first of them.
+    revealMerged: revealFirstOf((eventIndex, signal) => this._revealEventIndex(eventIndex, signal)),
+  });
+
   override connectedCallback(): void {
     super.connectedCallback();
     this._categoryColoringOff = wireCategoryColoring(this);
-    this._inspectorUnsubscribe = wireInspectorTab('analysis', this._emphasis, {
-      // A row is a method bucket rather than one event, so a frame is translated
-      // into the paths of the rows it heads.
-      mark: (eventIndexes) => this._markLocated(eventIndexes),
-      // An inspector finding names one event; the grid holds it in the bucket for
-      // its method, so that bucket is what gets revealed.
-      reveal: (eventIndex, signal) => this._revealEventIndex(eventIndex, signal),
-      clear: () => {
-        // The table reports the clear itself, which is what reaches the inspector.
-        this.analysisTable?.deselectRow();
-      },
-      // A row buckets calls, so a merged pick moves to the first of them.
-      revealMerged: revealFirstOf((eventIndex, signal) =>
-        this._revealEventIndex(eventIndex, signal),
-      ),
-    });
   }
 
   disconnectedCallback(): void {
     super.disconnectedCallback();
     this._categoryColoringOff?.();
     this._categoryColoringOff = null;
-    this._inspectorUnsubscribe?.();
-    this._inspectorUnsubscribe = null;
     this._locatedRow.clear();
   }
 
@@ -251,13 +240,6 @@ export class AnalysisView extends LitElement {
 
   firstUpdated(): void {
     this.contextMenu = this.renderRoot.querySelector('context-menu');
-    void this._loadColumnSettings();
-  }
-
-  private async _loadColumnSettings(): Promise<void> {
-    const settings = await getSettings();
-    this.columnOverrides = settings.callTree?.columnOverrides ?? {};
-    this._setColumnView(resolveColumnView(CALL_TREE_VIEWS, settings.callTree?.columnView));
   }
 
   updated(changedProperties: PropertyValues): void {
@@ -299,14 +281,16 @@ export class AnalysisView extends LitElement {
               label="Column view"
               @change="${this._handleColumnViewChange}"
               @vs-reset-option="${this._onResetOption}"
-              .value="${this.columnView}"
-              .resettableValues="${Object.keys(this.columnOverrides)}"
+              .value="${this._columns.view}"
+              .resettableValues="${this._columns.editedViews}"
             >
               ${repeat(
                 CALL_TREE_VIEWS,
                 (view) => view.id,
                 (view) =>
-                  html`<vscode-option value="${view.id}" ?selected="${this.columnView === view.id}"
+                  html`<vscode-option
+                    value="${view.id}"
+                    ?selected="${this._columns.view === view.id}"
                     >${view.id}</vscode-option
                   >`,
               )}
@@ -370,27 +354,12 @@ export class AnalysisView extends LitElement {
   }
 
   private _handleColumnViewChange(event: Event) {
-    const target = event.target as HTMLInputElement;
-    const id = target.value || 'General';
-    this._setColumnView(id);
-    updateSetting('callTree.columnView', id);
-  }
-
-  /** Effective fields for a view id: the user override, else the built-in preset. */
-  private _columnViewFields(id: string): string[] | null {
-    return this.columnOverrides[id] ?? getColumnView(CALL_TREE_VIEWS, id)?.fields ?? null;
-  }
-
-  private _setColumnView(id: string) {
-    this.columnView = id;
-    if (this.analysisTable) {
-      applyColumnView(this.analysisTable, this._columnViewFields(id), ALWAYS_VISIBLE);
-    }
+    this._columns.choose((event.target as HTMLInputElement).value || 'General');
   }
 
   /** Applies the active view and wires the header menu once the table is built. */
   private _initTableColumns(table: Tabulator) {
-    applyColumnView(table, this._columnViewFields(this.columnView), ALWAYS_VISIBLE);
+    this._columns.applyTo(table);
     const header = table.element.querySelector<HTMLElement>('.tabulator-header');
     header?.addEventListener('contextmenu', (event) => {
       event.preventDefault();
@@ -402,17 +371,7 @@ export class AnalysisView extends LitElement {
     if (!this.contextMenu || !this.analysisTable) {
       return;
     }
-    this.contextMenu.show(
-      buildColumnMenuItems(
-        this.analysisTable,
-        this.columnView,
-        CALL_TREE_VIEWS,
-        ALWAYS_VISIBLE,
-        Object.keys(this.columnOverrides),
-      ),
-      x,
-      y,
-    );
+    this.contextMenu.show(this._columns.menuItems(this.analysisTable), x, y);
   }
 
   private _openColumnMenu(event: Event) {
@@ -425,13 +384,7 @@ export class AnalysisView extends LitElement {
     if (!this.contextMenu?.isVisible() || !this.analysisTable) {
       return;
     }
-    this.contextMenu.items = buildColumnMenuItems(
-      this.analysisTable,
-      this.columnView,
-      CALL_TREE_VIEWS,
-      ALWAYS_VISIBLE,
-      Object.keys(this.columnOverrides),
-    );
+    this.contextMenu.items = this._columns.menuItems(this.analysisTable);
   }
 
   private _handleColumnMenuSelect(e: CustomEvent<{ itemId: string }>) {
@@ -441,47 +394,23 @@ export class AnalysisView extends LitElement {
       return;
     }
     if (itemId.startsWith('view:')) {
-      const id = itemId.slice('view:'.length);
-      this._setColumnView(id);
-      updateSetting('callTree.columnView', id);
+      this._columns.choose(itemId.slice('view:'.length));
       this._refreshColumnMenu();
       return;
     }
     if (itemId.startsWith('col:')) {
-      const field = itemId.slice('col:'.length);
-      const fields = toggleField(
-        this._columnViewFields(this.columnView),
-        field,
-        getTableFields(table),
-      );
-      this.columnOverrides = { ...this.columnOverrides, [this.columnView]: fields };
-      applyColumnView(table, fields, ALWAYS_VISIBLE);
-      updateSetting('callTree.columnOverrides', this.columnOverrides);
+      this._columns.toggle(table, itemId.slice('col:'.length));
       this._refreshColumnMenu();
       return;
     }
     if (itemId.startsWith('reset:')) {
-      this._resetColumns(itemId.slice('reset:'.length));
+      this._columns.reset(itemId.slice('reset:'.length));
       this._refreshColumnMenu();
     }
   }
 
   private _onResetOption(event: CustomEvent<{ value: string }>) {
-    this._resetColumns(event.detail.value);
-  }
-
-  /** Clears a view's override, restoring its built-in columns (defaults to the active view). */
-  private _resetColumns(id: string = this.columnView) {
-    const table = this.analysisTable;
-    if (!table || !this.columnOverrides[id]) {
-      return;
-    }
-    const { [id]: _removed, ...rest } = this.columnOverrides;
-    this.columnOverrides = rest;
-    if (id === this.columnView) {
-      applyColumnView(table, this._columnViewFields(id), ALWAYS_VISIBLE);
-    }
-    updateSetting('callTree.columnOverrides', this.columnOverrides);
+    this._columns.reset(event.detail.value);
   }
 
   _copyToClipboard() {

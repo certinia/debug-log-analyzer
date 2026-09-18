@@ -24,20 +24,13 @@ import { deriveSoqlObject } from '../services/sobjectClassification.js';
 import { soqlGroupHeader } from '../../soql/format/groupHeader.js';
 import { soqlInlineElement } from '../../soql/format/inlineCell.js';
 import { soqlSyntaxStyles } from '../../soql/styles/soql-syntax.css.js';
-import { getSettings, updateSetting } from '../../settings/Settings.js';
+
 import { LocatedRowMarker } from '../../../components/locatedRow.js';
 import { reportGridLocate, stampGridEventIndex } from './gridLocate.js';
 import { reportGridSelection } from './gridSelection.js';
 import { selectRowByEventIndex } from './revealRow.js';
-import {
-  applyColumnView,
-  buildColumnMenuItems,
-  getColumnView,
-  getTableFields,
-  resolveColumnView,
-  SOQL_VIEWS,
-  toggleField,
-} from '../../../tabulator/ColumnViews.js';
+import { ColumnSettingsController } from '../../../components/ColumnSettingsController.js';
+import { SOQL_VIEWS } from '../../../tabulator/ColumnViews.js';
 import {
   DB_ROW_COUNT_WIDTH,
   DB_TIME_WIDTH,
@@ -109,12 +102,13 @@ export class SOQLView extends LitElement {
   holder: HTMLElement | null = null;
   table: HTMLElement | null = null;
 
-  @state()
-  columnView = 'General';
-
-  /** Per-view column overrides (view id → visible fields); empty until edited. */
-  @state()
-  private columnOverrides: Record<string, string[]> = {};
+  private readonly _columns = new ColumnSettingsController(this, {
+    section: 'database.soql',
+    read: (settings) => settings.database?.soql,
+    views: SOQL_VIEWS,
+    alwaysVisible: ALWAYS_VISIBLE,
+    tables: () => (this.soqlTable ? [this.soqlTable] : []),
+  });
   private contextMenu: ContextMenu | null = null;
   /** eventIndex of the row whose context menu is open. */
   private contextMenuEventIndex: number | null = null;
@@ -150,13 +144,6 @@ export class SOQLView extends LitElement {
 
   firstUpdated(): void {
     this.contextMenu = this.renderRoot.querySelector('context-menu');
-    void this._loadColumnSettings();
-  }
-
-  private async _loadColumnSettings(): Promise<void> {
-    const settings = await getSettings();
-    this.columnOverrides = settings.database?.soql?.columnOverrides ?? {};
-    this._setColumnView(resolveColumnView(SOQL_VIEWS, settings.database?.soql?.columnView));
   }
 
   updated(changedProperties: PropertyValues): void {
@@ -230,12 +217,12 @@ export class SOQLView extends LitElement {
           label="Column view"
           @change="${this._handleColumnViewChange}"
           @vs-reset-option="${this._onResetOption}"
-          .value="${this.columnView}"
-          .resettableValues="${Object.keys(this.columnOverrides)}"
+          .value="${this._columns.view}"
+          .resettableValues="${this._columns.editedViews}"
         >
           ${SOQL_VIEWS.map(
             (view) =>
-              html`<vscode-option value="${view.id}" ?selected="${this.columnView === view.id}"
+              html`<vscode-option value="${view.id}" ?selected="${this._columns.view === view.id}"
                 >${view.id}</vscode-option
               >`,
           )}
@@ -287,28 +274,12 @@ export class SOQLView extends LitElement {
   }
 
   private _handleColumnViewChange(event: Event) {
-    const id = (event.target as HTMLInputElement).value || 'General';
-    this._setColumnView(id);
-    updateSetting('database.soql.columnView', id);
-  }
-
-  /** Effective fields for a view id: the user override, else the built-in preset. */
-  private _columnViewFields(id: string): string[] | null {
-    return this.columnOverrides[id] ?? getColumnView(SOQL_VIEWS, id)?.fields ?? null;
-  }
-
-  private _setColumnView(id: string) {
-    this.columnView = id;
-    // Only apply once the table is laid out; otherwise tableBuilt → _initTableColumns
-    // applies the current view (redraw on an unrendered table throws).
-    if (this.soqlTable?.element?.clientHeight) {
-      applyColumnView(this.soqlTable, this._columnViewFields(id), ALWAYS_VISIBLE);
-    }
+    this._columns.choose((event.target as HTMLInputElement).value || 'General');
   }
 
   /** Applies the active view and wires the header menu once the table is built. */
   private _initTableColumns(table: Tabulator) {
-    applyColumnView(table, this._columnViewFields(this.columnView), ALWAYS_VISIBLE);
+    this._columns.applyTo(table);
     const header = table.element.querySelector<HTMLElement>('.tabulator-header');
     header?.addEventListener('contextmenu', (event) => {
       event.preventDefault();
@@ -320,17 +291,7 @@ export class SOQLView extends LitElement {
     if (!this.contextMenu || !this.soqlTable) {
       return;
     }
-    this.contextMenu.show(
-      buildColumnMenuItems(
-        this.soqlTable,
-        this.columnView,
-        SOQL_VIEWS,
-        ALWAYS_VISIBLE,
-        Object.keys(this.columnOverrides),
-      ),
-      x,
-      y,
-    );
+    this.contextMenu.show(this._columns.menuItems(this.soqlTable), x, y);
   }
 
   private _openColumnMenu(event: Event) {
@@ -343,13 +304,7 @@ export class SOQLView extends LitElement {
     if (!this.contextMenu?.isVisible() || !this.soqlTable) {
       return;
     }
-    this.contextMenu.items = buildColumnMenuItems(
-      this.soqlTable,
-      this.columnView,
-      SOQL_VIEWS,
-      ALWAYS_VISIBLE,
-      Object.keys(this.columnOverrides),
-    );
+    this.contextMenu.items = this._columns.menuItems(this.soqlTable);
   }
 
   private _showRowContextMenu(event: MouseEvent, row: RowComponent) {
@@ -370,47 +325,23 @@ export class SOQLView extends LitElement {
       return;
     }
     if (itemId.startsWith('view:')) {
-      const id = itemId.slice('view:'.length);
-      this._setColumnView(id);
-      updateSetting('database.soql.columnView', id);
+      this._columns.choose(itemId.slice('view:'.length));
       this._refreshColumnMenu();
       return;
     }
     if (itemId.startsWith('col:')) {
-      const field = itemId.slice('col:'.length);
-      const fields = toggleField(
-        this._columnViewFields(this.columnView),
-        field,
-        getTableFields(table),
-      );
-      this.columnOverrides = { ...this.columnOverrides, [this.columnView]: fields };
-      applyColumnView(table, fields, ALWAYS_VISIBLE);
-      updateSetting('database.soql.columnOverrides', this.columnOverrides);
+      this._columns.toggle(table, itemId.slice('col:'.length));
       this._refreshColumnMenu();
       return;
     }
     if (itemId.startsWith('reset:')) {
-      this._resetColumns(itemId.slice('reset:'.length));
+      this._columns.reset(itemId.slice('reset:'.length));
       this._refreshColumnMenu();
     }
   }
 
   private _onResetOption(event: CustomEvent<{ value: string }>) {
-    this._resetColumns(event.detail.value);
-  }
-
-  /** Clears a view's override, restoring its built-in columns (defaults to the active view). */
-  private _resetColumns(id: string = this.columnView) {
-    const table = this.soqlTable;
-    if (!table || !this.columnOverrides[id]) {
-      return;
-    }
-    const { [id]: _removed, ...rest } = this.columnOverrides;
-    this.columnOverrides = rest;
-    if (id === this.columnView) {
-      applyColumnView(table, this._columnViewFields(id), ALWAYS_VISIBLE);
-    }
-    updateSetting('database.soql.columnOverrides', this.columnOverrides);
+    this._columns.reset(event.detail.value);
   }
 
   private _handleObjectFacet(event: CustomEvent<{ selected: string[] }>) {
