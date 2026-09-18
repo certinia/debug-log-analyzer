@@ -5,11 +5,6 @@
  */
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from '@jest/globals';
 
-// jsdom can't run the real elements (they read document.baseURI / setFormValue).
-jest.mock('#vscode-elements/vscode-icon.js', () => ({}));
-jest.mock('#vscode-elements/vscode-toolbar-button.js', () => ({}));
-jest.mock('#vscode-elements/vscode-button.js', () => ({}));
-
 import type { LogIdentityData } from '../../features/app/logIdentity.js';
 import type { IssueSeverity, LogIssue } from '../../features/notifications/types.js';
 

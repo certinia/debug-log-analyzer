@@ -5,11 +5,6 @@
  */
 import { describe, expect, it } from '@jest/globals';
 
-// jsdom can't run the real elements (they read document.baseURI).
-jest.mock('#vscode-elements/vscode-icon.js', () => ({}));
-jest.mock('#vscode-elements/vscode-tabs.js', () => ({}));
-jest.mock('#vscode-elements/vscode-tab-header.js', () => ({}));
-jest.mock('#vscode-elements/vscode-tab-panel.js', () => ({}));
 // The header and the inspector pull in every grid, and Tabulator needs a real DOM.
 jest.mock('../AppHeader.js', () => ({}));
 jest.mock('../../../components/LogInspector.js', () => ({}));

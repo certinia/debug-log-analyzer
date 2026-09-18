@@ -18,7 +18,6 @@ let budgets: RowBudgets;
 jest.mock('../../services/rowBudget.js', () => ({
   rowBudgets: () => budgets,
 }));
-jest.mock('#vscode-elements/vscode-icon.js', () => ({}));
 
 import '../DatabaseRowBudget.js';
 import { settledNote } from '../../../../components/__tests__/sectionTestUtils.js';

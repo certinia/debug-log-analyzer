@@ -18,8 +18,6 @@ jest.mock('tabulator-tables', () => ({
   Module: class {},
   Renderer: class {},
 }));
-// vscode-button needs ElementInternals.setFormValue (absent in jsdom).
-jest.mock('#vscode-elements/vscode-button.js', () => ({}));
 
 import type { CellComponent } from 'tabulator-tables';
 

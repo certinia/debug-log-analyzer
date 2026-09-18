@@ -29,10 +29,6 @@ jest.mock('../../../call-tree/components/BottomUpTable.js', () => ({
     tableBuilt: new Promise<Tabulator>(() => {}),
   }),
 }));
-// vscode-button needs ElementInternals.setFormValue (absent in jsdom).
-jest.mock('#vscode-elements/vscode-button.js', () => ({}));
-jest.mock('#vscode-elements/vscode-option.js', () => ({}));
-jest.mock('#vscode-elements/vscode-toolbar-button.js', () => ({}));
 
 import {
   eventBus,

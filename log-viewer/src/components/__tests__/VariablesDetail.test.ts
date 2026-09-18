@@ -9,11 +9,9 @@ import { parse } from 'apex-log-parser';
 import { MAX_MARKED_PER_VALUE } from '../../core/log/aggregateVariables.js';
 import { logStoreFor, type LogStore } from '../../core/log/LogStore.js';
 
-// Avoid the heavy CodeBlock import chain (vscode-elements, soql formatter). The
+// Avoid the heavy CodeBlock import chain (the soql formatter). The
 // raw value it renders is covered by variableValue's own tests.
 jest.mock('../CodeBlock.js', () => ({}));
-// The chevron is a vscode-icon, and its connectedCallback throws under jsdom.
-jest.mock('#vscode-elements/vscode-icon.js', () => ({}));
 
 const frameReads: { store: unknown; index: unknown }[] = [];
 jest.mock('../../core/log/frameVariables.js', () => {

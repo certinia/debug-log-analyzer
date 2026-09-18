@@ -46,6 +46,12 @@ export default {
         // Stylesheet imports have no transform here; the `.js` rule above runs first, so the
         // `*.css.ts` style modules are unaffected.
         '\\.s?css$': '<rootDir>/src/__tests__/mocks/styleStub.ts',
+        // jsdom's ElementInternals has no setFormValue, so a form-associated element fails on
+        // its first update, and vscode-icon warns on every connect about the missing codicon
+        // stylesheet. Every importer wants the side effect only. vscode-single-select is the
+        // exception: VsSelect extends the class and reads its styles, so it must stay real.
+        '^#vscode-elements/(?!vscode-single-select\\.js$)':
+          '<rootDir>/src/__tests__/mocks/vscodeElementStub.ts',
       },
       transformIgnorePatterns: [
         // allow transformation of pixi.js and its dependencies

@@ -5,9 +5,6 @@
  */
 import { describe, expect, it, beforeAll } from '@jest/globals';
 
-// <detail-dock> pulls in vscode-elements icons, which need APIs jsdom lacks.
-jest.mock('../DetailDock.js', () => ({}));
-
 import type { DockLayout } from '../DockLayout.js';
 import '../DockLayout.js';
 

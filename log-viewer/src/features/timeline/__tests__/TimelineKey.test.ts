@@ -5,9 +5,6 @@
  */
 import { describe, expect, it } from '@jest/globals';
 
-// jsdom can't run the real element (vscode-icon reads document.baseURI).
-jest.mock('../../../components/OverflowList.js', () => ({}));
-
 import type { TimelineKeyEntry, Timelinekey } from '../components/TimelineKey.js';
 import '../components/TimelineKey.js';
 

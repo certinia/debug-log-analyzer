@@ -7,8 +7,6 @@ import { beforeEach, describe, expect, it } from '@jest/globals';
 
 import type { LogDiagnostics } from '../../services/LogDiagnostics.js';
 
-jest.mock('#vscode-elements/vscode-icon.js', () => ({}));
-
 let result: LogDiagnostics = {
   diagnostics: [],
   queryPlansKnown: true,

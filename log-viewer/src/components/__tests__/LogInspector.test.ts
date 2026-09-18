@@ -6,9 +6,6 @@
 import { beforeEach, describe, expect, it } from '@jest/globals';
 import { html } from 'lit';
 
-jest.mock('#vscode-elements/vscode-icon.js', () => ({}));
-jest.mock('#vscode-elements/vscode-badge.js', () => ({}));
-jest.mock('#vscode-elements/vscode-button.js', () => ({}));
 // The swc transform can't parse `.scss`/`.css`; stub the stylesheet assets.
 jest.mock('../../tabulator/style/DataGrid.scss', () => ({ default: '' }));
 jest.mock('../../tabulator/format/Progress.css', () => ({}));
