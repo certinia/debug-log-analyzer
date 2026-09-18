@@ -259,7 +259,6 @@ describe('databaseTreeRows', () => {
 
 describe('database-concentration', () => {
   beforeEach(() => {
-    document.body.replaceChildren();
     overview = null;
   });
 
@@ -382,7 +381,6 @@ describe('database-concentration', () => {
 
 describe('database-namespaces', () => {
   beforeEach(() => {
-    document.body.replaceChildren();
     overview = null;
   });
 

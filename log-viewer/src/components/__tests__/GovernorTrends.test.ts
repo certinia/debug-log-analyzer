@@ -70,7 +70,6 @@ let seeks: { timestamp?: number; mode?: string }[];
 let unsubscribe: () => void;
 
 beforeEach(() => {
-  document.body.replaceChildren();
   series = [trend()];
   seeks = [];
   unsubscribe?.();

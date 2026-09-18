@@ -91,7 +91,6 @@ const barOf = (element: Element, label: string) =>
   bars(element).find((bar) => bar.getAttribute('label') === label);
 
 beforeEach(() => {
-  document.body.replaceChildren();
   budgets = full();
 });
 

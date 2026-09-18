@@ -121,7 +121,6 @@ const mount = (eventIndex: number, sourceView?: 'callers' | 'callees'): Promise<
 
 describe('CallTreeDetail scoped build', () => {
   beforeEach(() => {
-    document.body.replaceChildren();
     build.mockReset();
     build.mockResolvedValue(null);
     tables.instances.length = 0;

@@ -3,7 +3,7 @@
  *
  * @jest-environment jsdom
  */
-import { beforeEach, describe, expect, it } from '@jest/globals';
+import { describe, expect, it } from '@jest/globals';
 
 import { NO_LIMIT_FOR_METRIC_TEXT } from '../../../../components/governorCopy.js';
 import { formatInteger } from '../../../../core/utility/Util.js';
@@ -15,10 +15,6 @@ const strip = (metrics: GaugeMetric[]) =>
   mountElement<GovernorSummary>('governor-summary', { metrics });
 
 describe('governor-summary', () => {
-  beforeEach(() => {
-    document.body.replaceChildren();
-  });
-
   describe('a limit the log reported', () => {
     it('meters the value against it', async () => {
       const element = await strip([

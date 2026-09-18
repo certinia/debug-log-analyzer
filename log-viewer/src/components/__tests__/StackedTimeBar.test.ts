@@ -3,7 +3,7 @@
  *
  * @jest-environment jsdom
  */
-import { beforeEach, describe, expect, it } from '@jest/globals';
+import { describe, expect, it } from '@jest/globals';
 
 import { mountElement } from '../../__tests__/helpers/mount.js';
 import '../StackedTimeBar.js';
@@ -23,10 +23,6 @@ const widths = (element: Element) =>
   );
 
 describe('stacked-time-bar', () => {
-  beforeEach(() => {
-    document.body.replaceChildren();
-  });
-
   it('renders nothing without a length to show', async () => {
     expect((await mount([])).shadowRoot?.querySelector('svg')).toBeNull();
   });

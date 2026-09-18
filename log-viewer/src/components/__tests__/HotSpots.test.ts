@@ -42,7 +42,6 @@ const hotSpots = () =>
 
 describe('hot-spots', () => {
   beforeEach(() => {
-    document.body.replaceChildren();
     highlights = null;
   });
 

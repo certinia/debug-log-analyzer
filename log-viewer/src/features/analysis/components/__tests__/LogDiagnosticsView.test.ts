@@ -62,7 +62,6 @@ const text = (element: HTMLElement, selector: string) =>
 
 describe('log-diagnostics', () => {
   beforeEach(() => {
-    document.body.replaceChildren();
     result = {
       diagnostics: [],
       queryPlansKnown: true,

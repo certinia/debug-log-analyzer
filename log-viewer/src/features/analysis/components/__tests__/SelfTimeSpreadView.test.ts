@@ -50,7 +50,6 @@ const text = (element: Element, selector: string) =>
 
 describe('self-time-spread', () => {
   beforeEach(() => {
-    document.body.replaceChildren();
     spread = null;
   });
 

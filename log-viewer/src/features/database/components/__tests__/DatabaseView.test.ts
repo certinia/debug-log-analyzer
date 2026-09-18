@@ -57,7 +57,6 @@ describe('database-view selection', () => {
   let off: () => void;
 
   beforeEach(async () => {
-    document.body.replaceChildren();
     view = await mountElement<LitElement>('database-view');
     grids = {
       dml: fakeGrid('dml-view'),
@@ -71,7 +70,6 @@ describe('database-view selection', () => {
 
   afterEach(() => {
     off();
-    document.body.replaceChildren();
   });
 
   /** The grids report upward; DatabaseView alone turns that into a selection. */
@@ -184,12 +182,7 @@ describe('database-view find totals', () => {
   let view: LitElement;
 
   beforeEach(async () => {
-    document.body.replaceChildren();
     view = await mountElement<LitElement>('database-view');
-  });
-
-  afterEach(() => {
-    document.body.replaceChildren();
   });
 
   /** The totals DatabaseView rolls up to the find widget while `run` happens. */

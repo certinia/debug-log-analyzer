@@ -31,7 +31,6 @@ const loadLog = async (element: LogOverview, governorLimits: GovernorLimits) => 
 
 describe('log-overview', () => {
   beforeEach(() => {
-    document.body.replaceChildren();
     mockSeries = timeSeries();
   });
 

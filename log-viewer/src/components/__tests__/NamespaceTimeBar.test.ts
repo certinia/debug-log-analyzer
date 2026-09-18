@@ -48,7 +48,6 @@ const segments = (element: NamespaceTimeBar) => bar(element)?.segments ?? [];
 
 describe('namespace-time-bar', () => {
   beforeEach(() => {
-    document.body.replaceChildren();
     resetEvents();
     apexLog = null;
   });

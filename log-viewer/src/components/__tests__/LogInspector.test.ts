@@ -225,7 +225,6 @@ describe('LogInspector', () => {
     deferSections = false;
     pendingSections.length = 0;
     builtHiding.length = 0;
-    document.body.replaceChildren();
   });
 
   it('applies the persisted collapse to the list it was made in', async () => {

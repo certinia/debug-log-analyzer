@@ -57,7 +57,6 @@ const rowCaptions = (element: Element) =>
 
 describe('hot-path', () => {
   beforeEach(() => {
-    document.body.replaceChildren();
     highlights = null;
   });
 
