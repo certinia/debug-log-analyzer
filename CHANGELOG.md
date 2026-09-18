@@ -27,9 +27,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - ⬆️ **Requires VS Code 1.102 or newer**.
 - ⚠️ **Legacy Timeline settings deprecated**: `lana.timeline.legacy` and `lana.timeline.colors` now show as deprecated in Settings - the legacy Timeline goes in the next release, so switch now.
-- 📏 **Governor limits come only from the log**: no limit is assumed where the log reports none, so a figure is never measured against a maximum the transaction never had. Without one the gauges read as levels, the Timeline strip and the governor trends scale each metric to its own peak, and the governor cost columns read `—`.
 - 📊 **Governor columns** in the Call Tree and Analysis fill against what the transaction consumed, like the time columns beside them, so the path responsible for a metric stands out. **Gov Avg %** and **Gov Peak %** still measure headroom, and each tooltip still names the limit.
-- 📏 **Governor figures**: the Inspector overview and the Database tab report each metric at its peak, the level the governor charges the transaction at. The Timeline strip still plots the log as recorded.
+- 🎚️ **Governor figures**: the Inspector overview and the Database tab report each metric at its peak, the level the governor charges the transaction at, while the Timeline strip plots the value as recorded.
+  - no limit is assumed where the log reports none instead the Timeline strip and the governor trends scale each
+    metric to its own peak.
 - 🎨 **Header bar**: Log problems and Notifications are redesigned cards that name the problem and its time and jump to the Call Tree; Help and Report an issue move into a `•••` menu.
 - 🎨 **Timeline legend**: moved into the toolbar as colour chips, each showing the log's self time in that category.
 - 📊 **Timeline frame details**: the hover panel sits against the frame, follows the pointer, never blocks clicks, and fits long SOQL so the `WHERE` stays visible. Turn it off with `lana.timeline.showTooltip`.
