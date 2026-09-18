@@ -7,17 +7,6 @@ import { ConfigurationTarget, workspace, type Memento } from 'vscode';
 export interface Config {
   timeline: {
     activeTheme: string;
-    colors: {
-      /* eslint-disable @typescript-eslint/naming-convention */
-      'Code Unit': '#88AE58';
-      Workflow: '#51A16E';
-      Method: '#2B8F81';
-      Flow: '#5C8FA6';
-      DML: '#B06868';
-      SOQL: '#6D4C7D';
-      'System Method': '#8D6E63';
-      /* eslint-enable @typescript-eslint/naming-convention */
-    };
     customThemes: {
       [key: string]: {
         apex: string;
@@ -30,7 +19,6 @@ export interface Config {
         validation: string;
       };
     };
-    legacy: boolean;
     showTooltip: boolean;
   };
   callTree: {

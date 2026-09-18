@@ -46,6 +46,7 @@ import {
   layoutMarkerRects,
   markerDuration,
   noDataSpanAt,
+  recordedSegmentEnd,
   sortMarkersByTimeAndSeverity,
   type MarkerLayoutItem,
 } from '../markers/MarkerProcessor.js';
@@ -189,28 +190,6 @@ export class MetricStripRenderer {
   /** Whether the log recorded nothing at this instant. */
   private isNoData(timeNs: number): boolean {
     return noDataSpanAt(this.noDataSpans, timeNs) !== undefined;
-  }
-
-  /**
-   * Where a point's segment ends, or `null` when the point sits in a gap.
-   *
-   * A segment stops at the next point, at the range's end, or at the next gap — whichever
-   * comes first — so nothing measured is drawn across time the log did not record.
-   */
-  private recordedSegmentEnd(timeNs: number, nextTimeNs: number): number | null {
-    if (this.noDataSpans.length === 0) {
-      return nextTimeNs;
-    }
-    let end = nextTimeNs;
-    for (const span of this.noDataSpans) {
-      if (timeNs >= span.startTime && timeNs < span.endTime) {
-        return null;
-      }
-      if (span.startTime > timeNs && span.startTime < end) {
-        end = span.startTime;
-      }
-    }
-    return end;
   }
 
   /**
@@ -582,7 +561,7 @@ export class MetricStripRenderer {
     for (let i = 0; i < points.length; i++) {
       const point = points[i]!;
       const nextTime = points[i + 1]?.timestamp ?? totalDuration;
-      const segmentEnd = this.recordedSegmentEnd(point.timestamp, nextTime);
+      const segmentEnd = recordedSegmentEnd(this.noDataSpans, point.timestamp, nextTime);
 
       // A gap ends the run: one shape spanning it would ramp straight across the
       // unrecorded time, which reads as measured volume.
@@ -780,7 +759,8 @@ export class MetricStripRenderer {
 
     for (let i = 0; i < data.points.length; i++) {
       const point = data.points[i]!;
-      const segmentEnd = this.recordedSegmentEnd(
+      const segmentEnd = recordedSegmentEnd(
+        this.noDataSpans,
         point.timestamp,
         data.points[i + 1]?.timestamp ?? totalDuration,
       );
