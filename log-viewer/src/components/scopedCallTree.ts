@@ -204,8 +204,10 @@ interface Subtree {
  * The selected node + its real subtree, with real durations. Zero-duration
  * bookkeeping rows (heap allocations, statements, assignments) are dropped —
  * the Inspector is a summary, and the Call Tree tab is where those details are
- * read. The selection itself is kept whatever its duration, so null means the
- * build was abandoned rather than "nothing worth showing".
+ * read. So are the limit and profiling blocks, which report governor figures
+ * rather than time; the Call stack already drops the same four types. The
+ * selection itself is kept whatever it is, so null means the build was
+ * abandoned rather than "nothing worth showing".
  *
  * Iterative rather than recursive: subtree size is the second unbounded
  * dimension (the occurrence count is the first), and both have to be sliceable.
@@ -235,7 +237,12 @@ async function realSubtree(event: LogEvent, tick: Tick): Promise<Subtree | null>
     rows.push(row);
     parents.push(parent);
     for (let i = current.children.length - 1; i >= 0; i--) {
-      stack.push({ event: current.children[i]!, parent: row });
+      const child = current.children[i]!;
+      // Not walked at all: what hangs off a limit block is limit lines, which
+      // the prune below would drop one at a time.
+      if (!EXCLUDED_DETAIL_TYPES.has(child.type ?? '')) {
+        stack.push({ event: child, parent: row });
+      }
     }
   }
 
@@ -251,9 +258,8 @@ async function realSubtree(event: LogEvent, tick: Tick): Promise<Subtree | null>
     if (i === 0) {
       break; // the selection stays whatever its duration
     }
-    // A zero-duration frame stays only as the path to a kept descendant, or
-    // because its type reports limits rather than time.
-    if (row.duration.total > 0 || row._children || EXCLUDED_DETAIL_TYPES.has(row.type)) {
+    // A zero-duration frame stays only as the path to a kept descendant.
+    if (row.duration.total > 0 || row._children) {
       const parent = parents[i]!;
       (parent._children ??= []).push(row);
       calls += 1;
@@ -521,7 +527,10 @@ export async function buildWholeLogCallTree(
   }
 
   const tick = frameBudget(options);
-  const scope = await subtreeRoots(apexLog.children, tick);
+  // A profiling block sits after EXECUTION_FINISHED, so it is a root here rather
+  // than a descendant `realSubtree` would skip.
+  const roots = apexLog.children.filter((child) => !EXCLUDED_DETAIL_TYPES.has(child.type ?? ''));
+  const scope = await subtreeRoots(roots, tick);
   if (!scope) {
     return null;
   }

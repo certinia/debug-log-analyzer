@@ -1,7 +1,8 @@
 /*
  * Copyright (c) 2023 Certinia Inc. All rights reserved.
  */
-import { LitElement, css, html } from 'lit';
+import { consume } from '@lit/context';
+import { LitElement, css, html, nothing } from 'lit';
 import { customElement, property } from 'lit/decorators.js';
 import { repeat } from 'lit/directives/repeat.js';
 
@@ -13,6 +14,7 @@ import './VsChip.js';
 
 // styles
 import { globalStyles } from '../styles/global.styles.js';
+import { logStatusContext, type LogStatus } from '../core/log/logStatus.js';
 import { skeletonStyles } from '../styles/skeleton.styles.js';
 
 /**
@@ -33,6 +35,10 @@ import { skeletonStyles } from '../styles/skeleton.styles.js';
  */
 @customElement('log-levels')
 export class LogLevels extends LitElement {
+  @consume({ context: logStatusContext, subscribe: true })
+  @property({ attribute: false })
+  logStatus: LogStatus = 'parsing';
+
   @property()
   logSettings: DebugLevel[] | null = null;
 
@@ -62,6 +68,9 @@ export class LogLevels extends LitElement {
 
   render() {
     if (!this.logSettings) {
+      if (this.logStatus !== 'parsing') {
+        return nothing;
+      }
       return html`<div class="skeletons">
         ${repeat(
           Array.from({ length: 6 }),

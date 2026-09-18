@@ -49,7 +49,11 @@ import { Find } from '../../../tabulator/module/Find.js';
 import { RowKeyboardNavigation } from '../../../tabulator/module/RowKeyboardNavigation.js';
 import { RowNavigation } from '../../../tabulator/module/RowNavigation.js';
 import dataGridStyles from '../../../tabulator/style/DataGrid.scss';
-import { commonColumnDefaults, headerSortElement } from '../../call-tree/components/TableShared.js';
+import {
+  commonColumnDefaults,
+  headerSortElement,
+  textCellTooltip,
+} from '../../call-tree/components/TableShared.js';
 
 // styles
 import { globalStyles } from '../../../styles/global.styles.js';
@@ -607,7 +611,7 @@ export class DMLView extends LitElement {
           title: 'DML',
           field: 'dml',
           sorter: 'string',
-          tooltip: true,
+          tooltip: textCellTooltip,
           widthGrow: 5,
           bottomCalc: () => {
             return 'Total';
@@ -626,7 +630,7 @@ export class DMLView extends LitElement {
           field: 'objectType',
           sorter: 'string',
           width: 110,
-          tooltip: true,
+          tooltip: textCellTooltip,
           visible: false,
           formatter: (cell) => (cell.getValue() as string | null) ?? '—',
         },

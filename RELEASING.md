@@ -91,16 +91,25 @@ At each stable feature release:
 
 1. Create `lana/assets/<new>/` with the full screenshot set — re-capture the views that changed,
    copy unchanged images forward unchanged, and add any new assets for graduating features.
-   Capture inside real VS Code (so the webview's `--vscode-*` theme styling is correct), dark theme,
-   a consistent window size. Use a rich sample log such as `sample-app/debug-logs/sample-log.log`.
+
+   Run [`capture.sh`](./scripts/screenshots/capture.sh); it prompts for each shot in turn. Record
+   the hero gif by hand and convert it with
+   [`mov-to-gif.sh`](./scripts/screenshots/mov-to-gif.sh).
+
+   By hand instead: real VS Code, dark theme, one window size, a rich log such as
+   `sample-app/debug-logs/sample-log.log`. Then run
+   [`compress.sh`](./scripts/screenshots/compress.sh), or CI opens a pull request to do it.
+
 2. Find/replace `assets/<old>` → `assets/<new>` across:
    - root `README.md` (**not** `lana/README.md` — it's a generated copy)
    - `lana-docs/docs/docs/**/*.md` (body references **and** `image:` frontmatter)
    - `lana-docs/src/pages/index.mdx`
    - `lana-docs/docusaurus.config.ts` (social card image)
+   - `scripts/screenshots/capture.sh` and `mov-to-gif.sh` — each defaults to the folder, and
+     neither fails when it is stale
 3. Delete `lana/assets/<old>/`. The Marketplace only shows the latest README, so dropping old
    folders is safe; the only loss is images in tag-pinned READMEs on GitHub.
-4. Verify: `grep -rn "<old>" README.md lana-docs/` returns nothing, and the hero GIF still
+4. Verify: `grep -rn "<old>" README.md lana-docs/ scripts/` returns nothing, and the hero GIF still
    autoplays/loops in the GitHub README preview.
 
 ## 🌐 Marketplace README Limitation

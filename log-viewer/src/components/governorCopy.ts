@@ -8,8 +8,11 @@
  * columns reach the same wording without importing each other's components.
  */
 
-/** Before a log reaches the store: the inspector renders while the log parses. */
+/** No log reached the store. A log still on its way shows a skeleton instead. */
 export const NO_LOG_TEXT = 'No log is loaded.';
+
+/** The log holds nothing the section can rank or draw, because nothing was timed. */
+export const NO_TIMED_CALLS_TEXT = 'The log has no timed calls.';
 
 /** The log holds no governor usage at all, so there is nothing to read. */
 export const NO_GOVERNOR_USAGE_TEXT = 'This log records no governor usage.';

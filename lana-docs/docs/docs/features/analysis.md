@@ -12,7 +12,7 @@ keywords:
     filter salesforce logs,
     salesforce developer tools,
   ]
-image: https://raw.githubusercontent.com/certinia/debug-log-analyzer/main/lana/assets/1_20/analysis.png
+image: https://raw.githubusercontent.com/certinia/debug-log-analyzer/main/lana/assets/1_22/analysis.png
 hide_title: true
 ---
 
@@ -20,7 +20,7 @@ hide_title: true
 
 Analyze Salesforce debug logs with detailed metrics on method calls, including Self Time, Total Time, Count, Name, and Type. Easily sort, filter, and group log events by namespace or type, and export or copy results for efficient troubleshooting and performance optimization. The Analysis table uses a bottom-up caller grouping model, where each method is shown as a root with its direct callers as children.
 
-![Analysis view screenshot showing method call metrics such as Self Time, Total Time, Count, Name, and Type](https://raw.githubusercontent.com/certinia/debug-log-analyzer/main/lana/assets/1_20/analysis.png)
+![Analysis view screenshot showing method call metrics such as Self Time, Total Time, Count, Name, and Type](https://raw.githubusercontent.com/certinia/debug-log-analyzer/main/lana/assets/1_22/analysis.png)
 
 ### Sort
 
@@ -29,7 +29,7 @@ Each column can be sorted by clicking the column header, this will sort the rows
 
 ### Filtering
 
-1. **Details** – events with 0 time are hidden by default; toggle to show them from the **filters** .
+1. **Details** - events with 0 time are hidden by default; toggle to show them from the **filters** .
 
 ### Column Views
 
@@ -48,7 +48,7 @@ In this model, roots are callees and parent/child relationships represent caller
 
 ### Inspect a row
 
-Selecting a row fills the [inspector](./inspector.md) with that method's governor metrics, its call stack, and a call tree scoped to it — so you can see where an expensive method was called from without leaving the Analysis table.
+Selecting a row fills the [inspector](./inspector.md) with that method's governor metrics, its call stack, and a call tree scoped to it, so you can see where an expensive method was called from without leaving the Analysis table.
 
 ### Export to CSV + copy to clipboard
 

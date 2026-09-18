@@ -88,6 +88,25 @@ export function createDurationBarColumn(opts: {
   };
 }
 
+/**
+ * A tooltip that shows `text` and nothing else. Tabulator writes a string
+ * tooltip with `innerHTML`, which eats the generics in an Apex signature —
+ * `run(List<Contact>)` hovers as `run(List)` — and would run markup the log
+ * carries. Empty text answers `''`, which Tabulator reads as no tooltip.
+ */
+export function textTooltip(text: string): HTMLElement | '' {
+  if (!text) {
+    return '';
+  }
+  const el = document.createElement('div');
+  el.textContent = text;
+  return el;
+}
+
+/** Hover showing the cell's own value, for any column holding text the log supplied. */
+export const textCellTooltip: ColumnDefinition['tooltip'] = (_e, cell) =>
+  textTooltip(String(cell.getValue() ?? ''));
+
 export function headerSortElement(_column: unknown, dir: string): string {
   switch (dir) {
     case 'asc':
@@ -153,7 +172,7 @@ export function createTypeColumn(opts: { visible?: boolean } = {}): ColumnDefini
     headerSortStartingDir: 'asc',
     sorter: 'string',
     width: 150,
-    tooltip: true,
+    tooltip: textCellTooltip,
     visible: opts.visible ?? false,
   };
 }

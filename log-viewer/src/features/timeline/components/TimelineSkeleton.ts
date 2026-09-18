@@ -43,6 +43,13 @@ export class TimelineSkeleton extends LitElement {
     `,
   ];
 
+  override connectedCallback(): void {
+    super.connectedCallback();
+    // Decoration standing in for content: a reader is told the log is loading once,
+    // by the app's own live region.
+    this.setAttribute('aria-hidden', 'true');
+  }
+
   render() {
     return html`
       <div class="skeleton-inline" style="width: 8%; bottom: 8rem; left: 15%;">

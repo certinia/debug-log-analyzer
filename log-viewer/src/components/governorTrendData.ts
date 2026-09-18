@@ -2,7 +2,10 @@
  * Copyright (c) 2026 Certinia Inc. All rights reserved.
  */
 import { formatByteSize, formatInteger, sharePercent } from '../core/utility/Util.js';
-import type { HeatStripTimeSeries } from '../features/timeline/types/flamechart.types.js';
+import type {
+  HeatStripTimeSeries,
+  NoDataSpan,
+} from '../features/timeline/types/flamechart.types.js';
 import { rankedLimitMetrics } from './logOverviewMetrics.js';
 
 /** How many trend charts to draw before the section stops being at-a-glance. */
@@ -34,6 +37,8 @@ export interface TrendSeries {
    */
   finalRatio: number;
   format: (value: number) => string;
+  /** The spans the log recorded nothing in, so a chart can leave them unfilled. */
+  gaps: readonly NoDataSpan[];
 }
 
 /** Memo of {@link governorTrendSeries}: the charts re-render on every hover,
@@ -91,6 +96,7 @@ export function governorTrendSeries(series: HeatStripTimeSeries): TrendSeries[] 
         limit,
         finalRatio: ratio,
         format: key === 'heapSize' ? formatByteSize : formatInteger,
+        gaps: series.gaps ?? [],
       };
     },
   );
@@ -99,11 +105,12 @@ export function governorTrendSeries(series: HeatStripTimeSeries): TrendSeries[] 
 }
 
 /**
- * The series' value at time `t`, linearly interpolated between the samples
- * around it — a moving readout that follows the drawn line exactly. Past the
- * last sample the level holds and only the timestamp moves, matching the
- * chart's area (consumption never resets inside a transaction). Points must
- * be ascending by `t`, which {@link governorTrendSeries} guarantees. Returns
+ * The reading the series still holds at time `t` — the last sample at or
+ * before it, with `t` in place of its own. The log measures only where it
+ * reports, so nothing is read between two samples: the readout steps where the
+ * drawn line steps. Past the last sample the level holds and only the timestamp
+ * moves (consumption never resets inside a transaction). Points must be
+ * ascending by `t`, which {@link governorTrendSeries} guarantees. Returns
  * `null` only for an empty series.
  */
 export function pointAt(points: TrendPoint[], t: number): TrendPoint | null {
@@ -131,12 +138,6 @@ export function pointAt(points: TrendPoint[], t: number): TrendPoint | null {
     }
   }
   const next = points[lo]!; // search hit: first.t < t <= last.t
-  const prev = points[lo - 1]!; // lo >= 1: t > first.t
-  const span = next.t - prev.t;
-  const fraction = span > 0 ? (t - prev.t) / span : 1;
-  return {
-    t,
-    ratio: prev.ratio + fraction * (next.ratio - prev.ratio),
-    used: prev.used + fraction * (next.used - prev.used),
-  };
+  // A sample landing on `t` is the reading there; short of one, the sample before it still stands.
+  return next.t === t ? next : { ...points[lo - 1]!, t }; // lo >= 1: t > first.t
 }

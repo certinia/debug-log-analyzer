@@ -17,6 +17,7 @@ import { logContext } from '../../../core/log/logContext.js';
 import type { LogStore } from '../../../core/log/LogStore.js';
 import { formatInteger } from '../../../core/utility/Util.js';
 import { globalStyles } from '../../../styles/global.styles.js';
+import '../../../components/SectionSkeleton.js';
 import { inspectorSectionStyles } from '../../../styles/inspectorSection.styles.js';
 import { severityIcon, severityStyles } from '../../../styles/severity.styles.js';
 import { NO_STATEMENTS } from '../services/databaseOverview.js';
@@ -112,7 +113,7 @@ export class DatabaseRowBudget extends LitElement {
     const log = this.logStore?.log;
     const budgets = log ? rowBudgets(log) : null;
     if (!budgets?.statements) {
-      return html`<p class="note">${NO_STATEMENTS}</p>`;
+      return html`<section-skeleton shape="rows" fallback=${NO_STATEMENTS}></section-skeleton>`;
     }
     const colors = kindColors(this._palette);
     const shown = budgets.budgets.filter((budget) => (budget.used ?? budget.observed) > 0);

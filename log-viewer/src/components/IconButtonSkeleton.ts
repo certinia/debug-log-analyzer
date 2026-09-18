@@ -1,8 +1,11 @@
 /*
  * Copyright (c) 2025 Certinia Inc. All rights reserved.
  */
-import { LitElement, css, html } from 'lit';
-import { customElement } from 'lit/decorators.js';
+import { consume } from '@lit/context';
+import { LitElement, css, html, nothing } from 'lit';
+import { customElement, property } from 'lit/decorators.js';
+
+import { logStatusContext, type LogStatus } from '../core/log/logStatus.js';
 
 // styles
 import { globalStyles } from '../styles/global.styles.js';
@@ -10,6 +13,10 @@ import { skeletonStyles } from '../styles/skeleton.styles.js';
 
 @customElement('icon-button-skeleton')
 export class IconButton extends LitElement {
+  @consume({ context: logStatusContext, subscribe: true })
+  @property({ attribute: false })
+  logStatus: LogStatus = 'parsing';
+
   static styles = [
     globalStyles,
     skeletonStyles,
@@ -24,7 +31,17 @@ export class IconButton extends LitElement {
     `,
   ];
 
+  override connectedCallback(): void {
+    super.connectedCallback();
+    // Decoration standing in for content: a reader is told the log is loading once,
+    // by the app's own live region.
+    this.setAttribute('aria-hidden', 'true');
+  }
+
   render() {
+    if (this.logStatus !== 'parsing') {
+      return nothing;
+    }
     return html` <span class="skeleton"></span>`;
   }
 }

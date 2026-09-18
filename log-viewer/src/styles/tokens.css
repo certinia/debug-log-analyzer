@@ -149,6 +149,12 @@
     --vscode-problemsWarningIcon-foreground,
     var(--vscode-editorWarning-foreground, #cca700)
   );
+  /* Warn in a governor readout, the way `--lana-severity-ok` supplies safe. The severity
+     token is tuned for a glyph and reads near 2:1 as text on a light theme; darkening it
+     only turns it brown, because that is what yellow does. The chart orange reads on the
+     editor background in both themes and stays orange while it does. */
+  --lana-chart-warning: var(--vscode-charts-orange, var(--lana-severity-warning));
+
   --lana-severity-info: var(
     --vscode-problemsInfoIcon-foreground,
     var(--vscode-editorInfo-foreground, #3794ff)

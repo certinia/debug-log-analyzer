@@ -103,6 +103,18 @@ export class GovernorSummary extends LitElement {
         color: var(--lana-fg-muted);
       }
 
+      /* The figure carries the tier and the denominator stays quiet, so a value near
+         its limit says so without the 5px fill below having to be noticed. */
+      .gauge__value--safe {
+        color: var(--lana-severity-ok);
+      }
+      .gauge__value--warn {
+        color: var(--lana-chart-warning);
+      }
+      .gauge__value--danger {
+        color: var(--lana-severity-error);
+      }
+
       .gauge__na {
         font-size: var(--lana-text-xs);
         font-style: italic;
@@ -136,7 +148,7 @@ export class GovernorSummary extends LitElement {
         background: var(--lana-severity-ok);
       }
       .gauge__fill--warn {
-        background: var(--lana-severity-warning);
+        background: var(--lana-chart-warning);
       }
       .gauge__fill--danger {
         background: var(--lana-severity-error);
@@ -182,7 +194,7 @@ export class GovernorSummary extends LitElement {
       aria-valuemax="${metric.limit}"
     >
       <span class="gauge__label">${metric.label}</span>
-      <span class="gauge__value"
+      <span class="gauge__value gauge__value--${governorTier(percent)}"
         >${format(metric.used)} <span class="gauge__limit">/ ${format(metric.limit)}</span></span
       >
       <div class="gauge__track">

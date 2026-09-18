@@ -58,7 +58,11 @@ import { Find } from '../../../tabulator/module/Find.js';
 import { RowKeyboardNavigation } from '../../../tabulator/module/RowKeyboardNavigation.js';
 import { RowNavigation } from '../../../tabulator/module/RowNavigation.js';
 import dataGridStyles from '../../../tabulator/style/DataGrid.scss';
-import { commonColumnDefaults, headerSortElement } from '../../call-tree/components/TableShared.js';
+import {
+  commonColumnDefaults,
+  headerSortElement,
+  textCellTooltip,
+} from '../../call-tree/components/TableShared.js';
 
 // styles
 import { globalStyles } from '../../../styles/global.styles.js';
@@ -633,7 +637,7 @@ export class SOQLView extends LitElement {
           field: 'soql',
           headerSortStartingDir: 'asc',
           sorter: 'string',
-          tooltip: true,
+          tooltip: textCellTooltip,
           widthGrow: 5,
           bottomCalc: () => {
             return 'Total';
@@ -707,7 +711,7 @@ export class SOQLView extends LitElement {
           field: 'objectType',
           sorter: 'string',
           width: 110,
-          tooltip: true,
+          tooltip: textCellTooltip,
           visible: false,
           formatter: (cell) => (cell.getValue() as string | null) ?? '—',
         },
@@ -773,7 +777,7 @@ export class SOQLView extends LitElement {
           field: 'leadingOperationType',
           sorter: 'string',
           width: 140,
-          tooltip: true,
+          tooltip: textCellTooltip,
           visible: false,
         },
         {
@@ -781,7 +785,7 @@ export class SOQLView extends LitElement {
           field: 'sObjectType',
           sorter: 'string',
           width: 130,
-          tooltip: true,
+          tooltip: textCellTooltip,
           visible: false,
         },
         {
@@ -809,7 +813,7 @@ export class SOQLView extends LitElement {
           field: 'fields',
           sorter: 'string',
           width: 140,
-          tooltip: true,
+          tooltip: textCellTooltip,
           visible: false,
         },
         // Time column sits at the far right.

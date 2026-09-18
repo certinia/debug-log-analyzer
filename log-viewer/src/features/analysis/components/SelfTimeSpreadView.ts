@@ -12,6 +12,8 @@ import { logContext } from '../../../core/log/logContext.js';
 import type { LogStore } from '../../../core/log/LogStore.js';
 import { formatDuration, formatInteger } from '../../../core/utility/Util.js';
 import { globalStyles } from '../../../styles/global.styles.js';
+import { NO_TIMED_CALLS_TEXT } from '../../../components/governorCopy.js';
+import '../../../components/SectionSkeleton.js';
 import { inspectorSectionStyles } from '../../../styles/inspectorSection.styles.js';
 import { revealRowStyles } from '../../../styles/revealRow.styles.js';
 import {
@@ -127,7 +129,10 @@ export class SelfTimeSpreadView extends LitElement {
     const log = this.logStore?.log;
     const spread = log && getSelfTimeSpread(log);
     if (!spread?.concentration) {
-      return html`<p class="note">The log has no timed calls.</p>`;
+      return html`<section-skeleton
+        shape="chart"
+        fallback=${NO_TIMED_CALLS_TEXT}
+      ></section-skeleton>`;
     }
 
     const { signatures, total } = spread.concentration;

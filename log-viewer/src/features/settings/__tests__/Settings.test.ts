@@ -19,7 +19,7 @@ jest.mock('../../../core/messaging/VSCodeExtensionMessenger.js', () => ({
 }));
 
 import { vscodeMessenger } from '../../../core/messaging/VSCodeExtensionMessenger.js';
-import { subscribeSettings, type LanaSettings } from '../Settings.js';
+import { settingsSettled, subscribeSettings, type LanaSettings } from '../Settings.js';
 
 const requestMock = vscodeMessenger.request as jest.Mock;
 
@@ -52,5 +52,36 @@ describe('subscribeSettings', () => {
     subscribeSettings(() => {})();
 
     expect(requestMock.mock.calls.length).toBe(before + 1);
+  });
+});
+
+describe('settingsSettled', () => {
+  /** 'hung' where the promise never settles — the bug this exists to rule out. */
+  async function raceSettle(): Promise<string> {
+    return Promise.race([
+      settingsSettled().then(() => 'settled'),
+      new Promise<string>((resolve) => setTimeout(() => resolve('hung'), 50)),
+    ]);
+  }
+
+  it('settles when no settings ever arrive, so a waiter can take its default', async () => {
+    await expect(raceSettle()).resolves.toBe('settled');
+  });
+
+  it('reads again when nobody is following, so no stale read is pinned', async () => {
+    const before = requestMock.mock.calls.length;
+
+    await settingsSettled();
+    await settingsSettled();
+
+    expect(requestMock.mock.calls.length).toBe(before + 2);
+  });
+
+  it('settles once a push has supplied settings', async () => {
+    const unsubscribe = subscribeSettings(() => {});
+    push('dark');
+
+    await expect(raceSettle()).resolves.toBe('settled');
+    unsubscribe();
   });
 });
