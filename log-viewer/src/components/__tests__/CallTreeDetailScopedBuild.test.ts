@@ -43,6 +43,7 @@ jest.mock('../scopedCallTree.js', () => ({
 import { Tabulator, type RowComponent } from 'tabulator-tables';
 
 import { mountElement } from '../../__tests__/helpers/mount.js';
+import { waitForNextFrame } from '../../core/utility/FrameBudget.js';
 import type { CallTreeDetail } from '../CallTreeDetail.js';
 import '../CallTreeDetail.js';
 import { buildScopedCallTree, type ScopedCallTree, type ScopedRow } from '../scopedCallTree.js';
@@ -112,7 +113,7 @@ async function settle(el: CallTreeDetail): Promise<void> {
 
 /** Lets the rAF the build waits behind fire, then settles the render. */
 async function frame(el: CallTreeDetail): Promise<void> {
-  await new Promise((resolve) => requestAnimationFrame(resolve));
+  await waitForNextFrame();
   await settle(el);
 }
 
