@@ -16,3 +16,18 @@ class NoopResizeObserver implements ResizeObserver {
 if (!('ResizeObserver' in globalThis)) {
   (globalThis as unknown as Record<string, unknown>).ResizeObserver = NoopResizeObserver;
 }
+
+/**
+ * A mounted component stays connected until something removes it, and its
+ * `connectedCallback` subscriptions stay live with it. One test's leftovers then
+ * hear the next test's events. `replaceChildren` over `innerHTML = ''` so
+ * `disconnectedCallback` runs and the subscriptions actually release.
+ *
+ * The suites run under `node` unless a file asks for jsdom, so there is not
+ * always a document.
+ */
+if (typeof document !== 'undefined') {
+  afterEach(() => {
+    document.body.replaceChildren();
+  });
+}

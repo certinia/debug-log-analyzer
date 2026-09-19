@@ -232,6 +232,10 @@ export const selectSizingStyles = css`
 `;
 
 /** vscode-single-select where the control fits the selected value and the popup its widest option. */
+// jest.config.js stubs every `#vscode-elements/*` module and exempts this one, because a stub
+// cannot be extended. A new component that extends a vendor element needs the same exemption.
+// The exemption keeps the real element, which is form-associated: a suite that mounts
+// `<vs-select>` has to shim `ElementInternals.setFormValue`, absent in jsdom.
 @customElement('vs-select')
 export class VsSelect extends VscodeSingleSelect {
   static styles = [...VscodeSingleSelect.styles, ...globalStyles, selectSizingStyles];

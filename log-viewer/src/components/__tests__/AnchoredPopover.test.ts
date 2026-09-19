@@ -5,22 +5,19 @@
  */
 import { describe, expect, it } from '@jest/globals';
 
-// jsdom can't run the real elements (they read document.baseURI / setFormValue).
-jest.mock('#vscode-elements/vscode-icon.js', () => ({}));
-
+import { mountElement } from '../../__tests__/helpers/mount.js';
 import type { AnchoredPopover } from '../AnchoredPopover.js';
 import '../AnchoredPopover.js';
 
 async function mount(panelContent: string, showHeading = false): Promise<AnchoredPopover> {
-  const el = document.createElement('anchored-popover') as AnchoredPopover;
-  el.heading = 'Log problems';
-  el.emptyMessage = 'No problems found in this log';
-  if (showHeading) {
-    el.setAttribute('show-heading', '');
-  }
-  el.innerHTML = `<span slot="trigger">face</span>${panelContent}`;
-  document.body.appendChild(el);
-  await el.updateComplete;
+  const el = await mountElement<AnchoredPopover>('anchored-popover', (e) => {
+    e.heading = 'Log problems';
+    e.emptyMessage = 'No problems found in this log';
+    if (showHeading) {
+      e.setAttribute('show-heading', '');
+    }
+    e.innerHTML = `<span slot="trigger">face</span>${panelContent}`;
+  });
   // The panel slot is only readable after the first render, which schedules a second.
   await el.updateComplete;
   return el;

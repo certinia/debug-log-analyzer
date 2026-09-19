@@ -12,6 +12,7 @@ import type {
   MetricStripClassifiedMetric,
   MetricStripDataPoint,
 } from '../../types/flamechart.types.js';
+import { waitForNextFrame } from '../../../../core/utility/FrameBudget.js';
 import { PERCENT_COLORS } from '../rendering/tooltip-utils.js';
 import { MetricStripTooltipRenderer } from './MetricStripTooltipRenderer.js';
 
@@ -63,9 +64,7 @@ describe('MetricStripTooltipRenderer', () => {
   }
 
   /** Placement is batched into a frame, so it has to be let through. */
-  function flushFrame(): Promise<void> {
-    return new Promise((resolve) => requestAnimationFrame(() => resolve()));
-  }
+  const flushFrame = waitForNextFrame;
 
   /** One always-show metric, enough to get a row on the panel. */
   const oneMetric = [metric('cpuTime', 'CPU Time', 0.9)];

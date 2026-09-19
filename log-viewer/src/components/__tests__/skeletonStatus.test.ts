@@ -5,10 +5,6 @@
  */
 import { describe, expect, it } from '@jest/globals';
 
-// jsdom can't run the real elements (they read document.baseURI / setFormValue).
-jest.mock('#vscode-elements/vscode-icon.js', () => ({}));
-jest.mock('#vscode-elements/vscode-button.js', () => ({}));
-
 import { ContextProvider } from '@lit/context';
 
 import { logStatusContext, type LogStatus } from '../../core/log/logStatus.js';

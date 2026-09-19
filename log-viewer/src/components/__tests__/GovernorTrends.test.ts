@@ -6,6 +6,7 @@
 import { beforeEach, describe, expect, it } from '@jest/globals';
 import type { LitElement } from 'lit';
 
+import { mountElement } from '../../__tests__/helpers/mount.js';
 import { eventBus } from '../../core/events/EventBus.js';
 import type { LogStore } from '../../core/log/LogStore.js';
 import type { TrendSeries } from '../governorTrendData.js';
@@ -21,6 +22,7 @@ jest.mock('../../features/timeline/optimised/apex-limit-series.js', () => ({
   apexLimitTimeSeries: () => ({ events: [] }),
 }));
 
+import type { GovernorTrends } from '../GovernorTrends.js';
 import '../GovernorTrends.js';
 
 const LOG_NS = 1_000;
@@ -40,14 +42,9 @@ const trend = (label = 'SOQL queries'): TrendSeries => ({
 
 const aLog = () => ({ log: { duration: { total: LOG_NS } } }) as unknown as LogStore;
 
-async function mount(): Promise<LitElement> {
-  const element = document.createElement('governor-trends');
+const mount = (): Promise<GovernorTrends> =>
   // No provider in the test, so the consumed store is assigned straight on.
-  (element as unknown as { logStore: LogStore }).logStore = aLog();
-  document.body.append(element);
-  await element.updateComplete;
-  return element;
-}
+  mountElement<GovernorTrends>('governor-trends', { logStore: aLog() });
 
 /** The chart, given a width so a pointer x maps to a time. */
 function chartOf(element: LitElement, at = 0): HTMLButtonElement {
@@ -73,7 +70,6 @@ let seeks: { timestamp?: number; mode?: string }[];
 let unsubscribe: () => void;
 
 beforeEach(() => {
-  document.body.replaceChildren();
   series = [trend()];
   seeks = [];
   unsubscribe?.();

@@ -5,6 +5,7 @@
  */
 import { beforeEach, describe, expect, it } from '@jest/globals';
 
+import { mountElement } from '../../../../__tests__/helpers/mount.js';
 import type { LogStore } from '../../../../core/log/LogStore.js';
 import type { SelfTimeSpread } from '../../services/SelfTimeSpread.js';
 
@@ -39,20 +40,16 @@ const spreadOf = (overrides: Partial<SelfTimeSpread> = {}): SelfTimeSpread => ({
   ...overrides,
 });
 
-const view = async () => {
-  const element = document.createElement('self-time-spread');
-  element.logStore = { log: {} } as unknown as LogStore;
-  document.body.append(element);
-  await element.updateComplete;
-  return element;
-};
+const view = () =>
+  mountElement<HTMLElementTagNameMap['self-time-spread']>('self-time-spread', {
+    logStore: { log: {} } as unknown as LogStore,
+  });
 
 const text = (element: Element, selector: string) =>
   element.shadowRoot!.querySelector(selector)?.textContent?.replace(/\s+/g, ' ').trim();
 
 describe('self-time-spread', () => {
   beforeEach(() => {
-    document.body.replaceChildren();
     spread = null;
   });
 

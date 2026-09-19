@@ -13,9 +13,11 @@
  */
 
 import { afterEach, describe, expect, it, jest } from '@jest/globals';
+import { internalsOf, stubChartInternals } from '../../../../__tests__/helpers/flameChart.js';
+import { makeViewport } from '../../../../__tests__/helpers/viewport.js';
 import { FlameChart } from '../FlameChart.js';
 
-/** The private collaborators `resize` and `render` need, and nothing else. */
+/** The shared stub, plus the app and viewport handles this suite asserts on. */
 function stubbedChart(displayHeight = 300): {
   chart: FlameChart;
   rendererResize: jest.Mock;
@@ -25,46 +27,19 @@ function stubbedChart(displayHeight = 300): {
   const rendererResize = jest.fn();
   const appRender = jest.fn();
 
-  const internals = chart as unknown as Record<string, unknown>;
+  const internals = stubChartInternals(chart);
   internals['app'] = {
     renderer: { resize: rendererResize },
     screen: { height: 300 },
     render: appRender,
   };
-  internals['container'] = document.createElement('div');
-  internals['index'] = { maxDepth: 1 };
-  internals['worldContainer'] = { position: { set: jest.fn() } };
-  internals['batchRenderer'] = { render: jest.fn(), clear: jest.fn() };
-  internals['rectangleManager'] = {
-    getCulledRectangles: () => ({ visibleRects: new Map(), buckets: new Map() }),
-  };
   internals['viewport'] = {
-    getState: () => ({
-      zoom: 1,
-      offsetX: 0,
-      offsetY: 0,
-      displayWidth: 400,
-      displayHeight,
-    }),
+    getState: () => makeViewport({ displayWidth: 400, displayHeight }),
     setStateForResize: jest.fn(),
   };
   // The geometry init applied: 364 container - 60 minimap - 4 gap = the 300 below.
   internals['appliedMinimapHeight'] = 60;
   internals['appliedOverheadHeight'] = 64;
-  internals['state'] = {
-    viewport: null,
-    needsRender: false,
-    batchColorsCache: new Map(),
-    renderDirty: {
-      background: false,
-      culling: false,
-      eventRendering: false,
-      highlights: false,
-      overlays: false,
-      minimap: false,
-      metricStrip: false,
-    },
-  };
 
   return { chart, rendererResize, appRender };
 }
@@ -124,7 +99,7 @@ describe('FlameChart.resize', () => {
   // so every value the guard used to compare was unchanged while the overhead moved by 19.
   it('draws when the overhead moved but the main timeline height did not', () => {
     const { chart, appRender } = stubbedChart();
-    const internals = chart as unknown as Record<string, unknown>;
+    const internals = internalsOf(chart);
     internals['metricStripOrchestrator'] = {
       getIsVisible: () => true,
       getHeight: () => 15,
@@ -157,7 +132,7 @@ describe('FlameChart.resize', () => {
   // is still owed, or the chart stays blank with nothing left to fill it.
   it('books the dropped frame again when it cannot draw after all', () => {
     const { chart, appRender } = stubbedChart();
-    const internals = chart as unknown as Record<string, unknown>;
+    const internals = internalsOf(chart);
     // No rectangleManager, so `canRender` fails and `render` bails.
     internals['rectangleManager'] = null;
     (internals['state'] as { needsRender: boolean }).needsRender = true;
@@ -172,12 +147,12 @@ describe('FlameChart.resize', () => {
   it('drops a render already queued, rather than painting twice', () => {
     const { chart, appRender } = stubbedChart();
     const cancel = jest.spyOn(window, 'cancelAnimationFrame').mockImplementation(() => {});
-    (chart as unknown as Record<string, unknown>)['renderLoopId'] = 7;
+    internalsOf(chart)['renderLoopId'] = 7;
 
     chart.resize(500, 400);
 
     expect(cancel).toHaveBeenCalledWith(7);
     expect(appRender).toHaveBeenCalledTimes(1);
-    expect((chart as unknown as Record<string, number | null>)['renderLoopId']).toBeNull();
+    expect(internalsOf(chart)['renderLoopId']).toBeNull();
   });
 });

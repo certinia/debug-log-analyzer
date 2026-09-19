@@ -2,7 +2,7 @@
  * Copyright (c) 2025 Certinia Inc. All rights reserved.
  */
 import { workspace } from 'vscode';
-import type { Context } from '../../Context';
+import { asContext, createMockContext } from '../../__tests__/helpers/test-builders.js';
 import { getMethodLine, parseApex } from '../../salesforce/ApexParser/ApexSymbolLocator';
 import { OpenFileInPackage } from '../OpenFileInPackage';
 
@@ -15,20 +15,13 @@ const mockGetMethodLine = getMethodLine as jest.Mock;
 const mockOpenTextDocument = workspace.openTextDocument as jest.Mock;
 
 function createContext() {
-  const workspaceManager = {
-    findSymbol: jest.fn(),
-  };
-  const display = {
-    showErrorMessage: jest.fn(),
-    showFile: jest.fn(),
-  };
-  const context = { workspaceManager, display } as unknown as Context;
-  return { context, workspaceManager, display };
+  const workspaceManager = { findSymbol: jest.fn() };
+  const mock = createMockContext({ workspaceManager });
+  return { context: asContext(mock), workspaceManager, display: mock.display };
 }
 
 describe('OpenFileInPackage.openFileForSymbol', () => {
   beforeEach(() => {
-    jest.clearAllMocks();
     mockParseApex.mockReturnValue({ name: 'myclass', children: [] });
     mockOpenTextDocument.mockResolvedValue({ getText: () => 'public class MyClass {}' });
   });

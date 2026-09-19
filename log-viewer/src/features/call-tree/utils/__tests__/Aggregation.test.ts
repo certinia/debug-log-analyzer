@@ -1,9 +1,10 @@
 /**
  * Copyright (c) 2026 Certinia Inc. All rights reserved.
  */
-import { beforeEach, describe, expect, it } from '@jest/globals';
+import { describe, expect, it } from '@jest/globals';
 import type { LogEvent } from 'apex-log-parser';
 
+import { createEvent } from '../../../../__tests__/helpers/events.js';
 import { outermostEvents } from '../../../../core/utility/EventTree.js';
 import {
   toAggregatedCallTree,
@@ -12,76 +13,6 @@ import {
   type BottomUpRow,
 } from '../Aggregation.js';
 import { KeyPathIds } from '../../../../core/log/keyPathIds.js';
-
-type EventOptions = {
-  text: string;
-  self: number;
-  total: number;
-  parent?: LogEvent | null;
-  type?: string;
-  dmlSelf?: number;
-  dmlTotal?: number;
-  soqlSelf?: number;
-  soqlTotal?: number;
-  soslSelf?: number;
-  soslTotal?: number;
-  dmlRowSelf?: number;
-  dmlRowTotal?: number;
-  soqlRowSelf?: number;
-  soqlRowTotal?: number;
-  soslRowSelf?: number;
-  soslRowTotal?: number;
-  thrown?: number;
-  heapSelf?: number;
-  heapTotal?: number;
-};
-
-let nextTimestamp = 1;
-
-function createEvent(options: EventOptions): LogEvent {
-  const event = {
-    logParser: null,
-    parent: options.parent ?? null,
-    children: [],
-    type: (options.type ?? 'METHOD_ENTRY') as LogEvent['type'],
-    logLine: '',
-    text: options.text,
-    acceptsText: false,
-    isExit: false,
-    isParent: false,
-    isTruncated: false,
-    nextLineIsExit: false,
-    lineNumber: null,
-    namespace: 'default',
-    hasValidSymbols: true,
-    suffix: null,
-    discontinuity: false,
-    timestamp: nextTimestamp++,
-    exitStamp: null,
-    category: '',
-    debugCategory: '',
-    debugLevel: '',
-    cpuType: '',
-    duration: { self: options.self, total: options.total },
-    dmlRowCount: { self: options.dmlRowSelf ?? 0, total: options.dmlRowTotal ?? 0 },
-    soqlRowCount: { self: options.soqlRowSelf ?? 0, total: options.soqlRowTotal ?? 0 },
-    soslRowCount: { self: options.soslRowSelf ?? 0, total: options.soslRowTotal ?? 0 },
-    dmlCount: { self: options.dmlSelf ?? 0, total: options.dmlTotal ?? 0 },
-    soqlCount: { self: options.soqlSelf ?? 0, total: options.soqlTotal ?? 0 },
-    soslCount: { self: options.soslSelf ?? 0, total: options.soslTotal ?? 0 },
-    thrownCount: { self: options.thrown ?? 0, total: options.thrown ?? 0 },
-    heapAllocated: { self: options.heapSelf ?? 0, total: options.heapTotal ?? 0 },
-    heapGross: { self: 0, total: 0 },
-    heapPeak: 0,
-    exitTypes: [],
-  } as unknown as LogEvent;
-
-  if (options.parent) {
-    options.parent.children.push(event);
-  }
-
-  return event;
-}
 
 /** A table per build: the fixtures below reuse event indexes for different
  *  frames, so one frame's key must not be read back for another. */
@@ -200,10 +131,6 @@ function sumTraceSelfTime(events: LogEvent[]): number {
 }
 
 describe('toBottomUpTree', () => {
-  beforeEach(() => {
-    nextTimestamp = 1;
-  });
-
   it('attributes caller rows using the current node contribution, not the caller event metrics', () => {
     const root = createEvent({ text: 'LOG_ROOT', self: 0, total: 0, type: 'EXECUTION_STARTED' });
     const parentA = createEvent({
@@ -1031,10 +958,6 @@ describe('toBottomUpTree', () => {
 });
 
 describe('bottom-up caller row scope', () => {
-  beforeEach(() => {
-    nextTimestamp = 1;
-  });
-
   /** A -> B -> A on one branch, A -> C -> A on the other, so a caller bucket
    *  reaches a strict subset of the root bucket's occurrences. */
   function recursiveRoot(): LogEvent {
@@ -1107,10 +1030,6 @@ describe('bottom-up caller row scope', () => {
 });
 
 describe('toAggregatedCallTree', () => {
-  beforeEach(() => {
-    nextTimestamp = 1;
-  });
-
   it('includes zero-time frames so DML/SOQL/exception counts and callCount roll up', () => {
     const root = createEvent({ text: 'LOG_ROOT', self: 0, total: 0, type: 'EXECUTION_STARTED' });
     createEvent({
@@ -1130,10 +1049,6 @@ describe('toAggregatedCallTree', () => {
 });
 
 describe('_hasDetailsDeep precomputation', () => {
-  beforeEach(() => {
-    nextTimestamp = 1;
-  });
-
   it('aggregated: marks zero-time leaf with no excluded type as not significant', () => {
     const root = createEvent({ text: 'LOG_ROOT', self: 0, total: 0, type: 'EXECUTION_STARTED' });
     createEvent({ text: 'NoTime', self: 0, total: 0, parent: root });

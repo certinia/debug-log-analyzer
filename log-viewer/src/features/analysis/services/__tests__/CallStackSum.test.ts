@@ -1,8 +1,7 @@
 /**
  * Copyright (c) 2026 Certinia Inc. All rights reserved.
  */
-import { beforeEach, describe, expect, it } from '@jest/globals';
-import type { LogEvent } from 'apex-log-parser';
+import { describe, expect, it } from '@jest/globals';
 
 import {
   sumDurationTotalForRootEvents,
@@ -10,47 +9,9 @@ import {
   sumTotalForRootEvents,
 } from '../CallStackSum.js';
 import type { Metric } from '../RowGrouper.js';
-
-type EventOptions = {
-  text: string;
-  total: number;
-  heapTotal?: number;
-  parent?: LogEvent | null;
-};
-
-let nextTimestamp = 1;
-
-function createEvent(options: EventOptions): LogEvent {
-  const event = {
-    parent: options.parent ?? null,
-    children: [],
-    type: 'METHOD_ENTRY' as LogEvent['type'],
-    text: options.text,
-    namespace: 'default',
-    timestamp: nextTimestamp++,
-    duration: { self: 0, total: options.total },
-    heapAllocated: { self: 0, total: options.heapTotal ?? 0 },
-    dmlRowCount: { self: 0, total: 0 },
-    soqlRowCount: { self: 0, total: 0 },
-    soslRowCount: { self: 0, total: 0 },
-    dmlCount: { self: 0, total: 0 },
-    soqlCount: { self: 0, total: 0 },
-    soslCount: { self: 0, total: 0 },
-    thrownCount: { self: 0, total: 0 },
-  } as unknown as LogEvent;
-
-  if (options.parent) {
-    options.parent.children.push(event);
-  }
-
-  return event;
-}
+import { createEvent } from '../../../../__tests__/helpers/events.js';
 
 describe('sumDurationTotalForRootEvents', () => {
-  beforeEach(() => {
-    nextTimestamp = 1;
-  });
-
   it('counts each call-stack root once and skips events whose ancestors are visible', () => {
     // ParentA(80) → LeafA(80); ParentB(30) → LeafB(30).
     // Naive sum = 80+30+80+30 = 220 (double-counts).
@@ -76,10 +37,6 @@ describe('sumDurationTotalForRootEvents', () => {
 });
 
 describe('sumTotalForRootEvents (generic accessor)', () => {
-  beforeEach(() => {
-    nextTimestamp = 1;
-  });
-
   it('dedups by call stack for an arbitrary field (heap total)', () => {
     // Parent heap 100 (subtree total), its leaf 100; another parent 30, its leaf 30.
     // Naive sum = 260; root-only dedup = 130. Proves the BottomUp heap-total footer
@@ -96,10 +53,6 @@ describe('sumTotalForRootEvents (generic accessor)', () => {
 });
 
 describe('sumRootNodesOnly (Metric adapter)', () => {
-  beforeEach(() => {
-    nextTimestamp = 1;
-  });
-
   it('extracts Metric.nodes and applies the root-only sum', () => {
     const parent = createEvent({ text: 'parent', total: 100 });
     const child = createEvent({ text: 'child', total: 60, parent });

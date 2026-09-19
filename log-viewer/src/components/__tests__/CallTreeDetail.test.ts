@@ -18,11 +18,10 @@ jest.mock('tabulator-tables', () => ({
   Module: class {},
   Renderer: class {},
 }));
-// vscode-button needs ElementInternals.setFormValue (absent in jsdom).
-jest.mock('#vscode-elements/vscode-button.js', () => ({}));
 
 import type { CellComponent } from 'tabulator-tables';
 
+import { mountElement } from '../../__tests__/helpers/mount.js';
 import type { LogStore } from '../../core/log/LogStore.js';
 import type { CallTreeDetail } from '../CallTreeDetail.js';
 import '../CallTreeDetail.js';
@@ -64,15 +63,12 @@ function nameTooltip(
 const thisLog = {} as LogStore;
 const nextLog = {} as LogStore;
 
-async function mount(props: Partial<CallTreeDetail> = {}): Promise<CallTreeDetail> {
-  const el = document.createElement('call-tree-detail') as CallTreeDetail;
-  el.eventIndex = -1; // no selection in the test — no table is built
-  el.logStore = thisLog;
-  Object.assign(el, props);
-  document.body.appendChild(el);
-  await el.updateComplete;
-  return el;
-}
+const mount = (props: Partial<CallTreeDetail> = {}): Promise<CallTreeDetail> =>
+  mountElement<CallTreeDetail>('call-tree-detail', {
+    eventIndex: -1, // no selection in the test — no table is built
+    logStore: thisLog,
+    ...props,
+  });
 
 async function pick(el: CallTreeDetail, value: string): Promise<void> {
   switchEl(el).dispatchEvent(

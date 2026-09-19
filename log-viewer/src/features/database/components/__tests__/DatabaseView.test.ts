@@ -4,6 +4,7 @@
  * @jest-environment jsdom
  */
 import { afterEach, beforeEach, describe, expect, it } from '@jest/globals';
+import type { LitElement } from 'lit';
 
 import {
   eventBus,
@@ -21,6 +22,7 @@ jest.mock('../GovernorSummary.js', () => ({}));
 jest.mock('../DatabaseSection.js', () => ({}));
 
 import '../DatabaseView.js';
+import { mountElement } from '../../../../__tests__/helpers/mount.js';
 
 /** The slice of a grid DatabaseView drives, standing in for the real element. */
 interface FakeGrid extends HTMLElement {
@@ -49,16 +51,13 @@ function fakeGrid(tag: string, owns: number | null = null): FakeGrid {
 }
 
 describe('database-view selection', () => {
-  let view: HTMLElement;
+  let view: LitElement;
   let grids: Record<StatementType, FakeGrid>;
   let seen: Array<{ source: DetailSource; selection: DetailSelection | null }>;
   let off: () => void;
 
   beforeEach(async () => {
-    document.body.replaceChildren();
-    view = document.createElement('database-view');
-    document.body.append(view);
-    await (view as HTMLElement & { updateComplete: Promise<unknown> }).updateComplete;
+    view = await mountElement<LitElement>('database-view');
     grids = {
       dml: fakeGrid('dml-view'),
       soql: fakeGrid('soql-view', 42),
@@ -71,7 +70,6 @@ describe('database-view selection', () => {
 
   afterEach(() => {
     off();
-    document.body.replaceChildren();
   });
 
   /** The grids report upward; DatabaseView alone turns that into a selection. */
@@ -181,17 +179,10 @@ describe('database-view selection', () => {
 });
 
 describe('database-view find totals', () => {
-  let view: HTMLElement & { updateComplete: Promise<unknown> };
+  let view: LitElement;
 
   beforeEach(async () => {
-    document.body.replaceChildren();
-    view = document.createElement('database-view') as typeof view;
-    document.body.append(view);
-    await view.updateComplete;
-  });
-
-  afterEach(() => {
-    document.body.replaceChildren();
+    view = await mountElement<LitElement>('database-view');
   });
 
   /** The totals DatabaseView rolls up to the find widget while `run` happens. */

@@ -4,6 +4,7 @@
 import { describe, expect, it } from '@jest/globals';
 import type { LogCategory, LogEvent } from 'apex-log-parser';
 
+import { makeViewport } from '../../../../__tests__/helpers/viewport.js';
 import type { PixelBucket, ViewportState } from '../../types/flamechart.types.js';
 import { TIMELINE_CONSTANTS } from '../../types/flamechart.types.js';
 import type { BatchColorInfo } from '../BucketColorResolver.js';
@@ -39,21 +40,9 @@ function createEvent(
   } as unknown as LogEvent;
 }
 
-// Helper to create viewport state
-function createViewport(
-  zoom = 1,
-  offsetX = 0,
-  offsetY = 0,
-  displayWidth = 1000,
-  displayHeight = 500,
-): ViewportState {
-  return {
-    zoom,
-    offsetX,
-    offsetY,
-    displayWidth,
-    displayHeight,
-  };
+/** The 1000x500 canvas both culling oracles measure against. */
+function createViewport(over: Partial<ViewportState> = {}): ViewportState {
+  return makeViewport({ displayHeight: 500, ...over });
 }
 
 // Helper to flatten buckets Map into array for testing
@@ -124,7 +113,7 @@ describe('TemporalSegmentTree', () => {
       const manager = new RectangleCache(events, categories);
       const tree = new TemporalSegmentTree(manager.getRectsByCategory());
 
-      const viewport = createViewport(1, 0, 0);
+      const viewport = createViewport();
       const result = tree.query(viewport, EMPTY_BATCH_COLORS);
 
       expect(result.visibleRects.get('Apex')).toHaveLength(1);
@@ -138,7 +127,7 @@ describe('TemporalSegmentTree', () => {
       const manager = new RectangleCache(events, categories);
       const tree = new TemporalSegmentTree(manager.getRectsByCategory());
 
-      const viewport = createViewport(1, 0, 0);
+      const viewport = createViewport();
       const result = tree.query(viewport, EMPTY_BATCH_COLORS);
 
       // Pre-initialized map has empty arrays for known categories
@@ -157,7 +146,7 @@ describe('TemporalSegmentTree', () => {
       const manager = new RectangleCache(events, categories);
       const tree = new TemporalSegmentTree(manager.getRectsByCategory());
 
-      const viewport = createViewport(0.1, 0, 0);
+      const viewport = createViewport({ zoom: 0.1 });
       const result = tree.query(viewport, EMPTY_BATCH_COLORS);
 
       // All events should be bucketed at this zoom level
@@ -177,11 +166,11 @@ describe('TemporalSegmentTree', () => {
       const tree = new TemporalSegmentTree(manager.getRectsByCategory());
 
       // Zoomed out: all events are small
-      const zoomedOut = createViewport(0.1, 0, 0, 1000);
+      const zoomedOut = createViewport({ zoom: 0.1 });
       const resultOut = tree.query(zoomedOut, EMPTY_BATCH_COLORS);
 
       // Zoomed in: all events are visible
-      const zoomedIn = createViewport(2, 0, 0, 1000);
+      const zoomedIn = createViewport({ zoom: 2 });
       const resultIn = tree.query(zoomedIn, EMPTY_BATCH_COLORS);
 
       // More visible rects when zoomed in
@@ -197,9 +186,9 @@ describe('TemporalSegmentTree', () => {
       const manager = new RectangleCache(events, categories);
       const tree = new TemporalSegmentTree(manager.getRectsByCategory());
 
-      const zoomed1 = createViewport(0.1, 0, 0, 1000);
-      const zoomed2 = createViewport(1, 0, 0, 1000);
-      const zoomed3 = createViewport(10, 0, 0, 1000);
+      const zoomed1 = createViewport({ zoom: 0.1 });
+      const zoomed2 = createViewport();
+      const zoomed3 = createViewport({ zoom: 10 });
 
       const result1 = tree.query(zoomed1, EMPTY_BATCH_COLORS);
       const result2 = tree.query(zoomed2, EMPTY_BATCH_COLORS);
@@ -227,7 +216,7 @@ describe('TemporalSegmentTree', () => {
       const tree = new TemporalSegmentTree(manager.getRectsByCategory());
 
       // Viewport only shows time 50-150 (should only include second event)
-      const viewport = createViewport(1, 50, 0, 100);
+      const viewport = createViewport({ offsetX: 50, displayWidth: 100 });
       const result = tree.query(viewport, EMPTY_BATCH_COLORS);
 
       // Only the middle event should be visible
@@ -246,23 +235,15 @@ describe('TemporalSegmentTree', () => {
       // offsetY = 0, height = 2 rows (30px)
       // worldYBottom = 0, worldYTop = 30
       // depthStart = 0, depthEnd = 2
-      const viewportSmall = createViewport(
-        1,
-        0,
-        0,
-        1000,
-        TIMELINE_CONSTANTS.EVENT_HEIGHT * 2, // shows depths 0-1
-      );
+      const viewportSmall = createViewport({
+        displayHeight: TIMELINE_CONSTANTS.EVENT_HEIGHT * 2, // shows depths 0-1
+      });
       const resultSmall = tree.query(viewportSmall, EMPTY_BATCH_COLORS);
 
       // Create a larger viewport that shows all 3 depths
-      const viewportLarge = createViewport(
-        1,
-        0,
-        0,
-        1000,
-        TIMELINE_CONSTANTS.EVENT_HEIGHT * 4, // shows depths 0-3
-      );
+      const viewportLarge = createViewport({
+        displayHeight: TIMELINE_CONSTANTS.EVENT_HEIGHT * 4, // shows depths 0-3
+      });
       const resultLarge = tree.query(viewportLarge, EMPTY_BATCH_COLORS);
 
       // Smaller viewport should have fewer or equal events
@@ -280,7 +261,7 @@ describe('TemporalSegmentTree', () => {
       const manager = new RectangleCache(events, categories);
       const tree = new TemporalSegmentTree(manager.getRectsByCategory());
 
-      const viewport = createViewport(1, 0, 0);
+      const viewport = createViewport();
       const result = tree.query(viewport, EMPTY_BATCH_COLORS);
 
       const allBuckets = getAllBuckets(result.buckets);
@@ -299,7 +280,7 @@ describe('TemporalSegmentTree', () => {
       const manager = new RectangleCache(events, categories);
       const tree = new TemporalSegmentTree(manager.getRectsByCategory());
 
-      const viewport = createViewport(0.5, 0, 0); // threshold = 4ns
+      const viewport = createViewport({ zoom: 0.5 }); // threshold = 4ns
       const result = tree.query(viewport, EMPTY_BATCH_COLORS);
 
       // All events should be in buckets with correct count
@@ -311,7 +292,7 @@ describe('TemporalSegmentTree', () => {
       const manager = new RectangleCache(events, categories);
       const tree = new TemporalSegmentTree(manager.getRectsByCategory());
 
-      const viewport = createViewport(0.1, 0, 0); // threshold = 20ns
+      const viewport = createViewport({ zoom: 0.1 }); // threshold = 20ns
       const result = tree.query(viewport, EMPTY_BATCH_COLORS);
 
       // Bucket should have stats for both categories
@@ -334,7 +315,7 @@ describe('TemporalSegmentTree', () => {
       // Both implementations now use segment tree (legacy is in LegacyViewportCuller)
       // This test verifies the manager produces consistent results
       const manager = new RectangleCache(events, categories);
-      const viewport = createViewport(1, 0, 0);
+      const viewport = createViewport();
       const result = manager.getCulledRectangles(viewport, EMPTY_BATCH_COLORS);
 
       // For comparison with legacy, use the legacy culler directly
@@ -369,7 +350,7 @@ describe('TemporalSegmentTree', () => {
       // Query time range that only intersects with the long event (not the short one)
       // Using viewport that shows time [70, 90]
       // At zoom=1, offset=70, width=20: timeStart=70, timeEnd=90
-      const viewport = createViewport(1, 70, 0, 20, 500);
+      const viewport = createViewport({ offsetX: 70, displayWidth: 20 });
       const result = tree.query(viewport, EMPTY_BATCH_COLORS);
 
       // The long event (Method) should be visible because it spans [0, 100]
@@ -391,7 +372,7 @@ describe('TemporalSegmentTree', () => {
       const tree = new TemporalSegmentTree(manager.getRectsByCategory());
 
       // Query time range [80, 120] - only overlaps with the SOQL event (timeEnd=110)
-      const viewport = createViewport(1, 80, 0, 40, 500);
+      const viewport = createViewport({ offsetX: 80, displayWidth: 40 });
       const result = tree.query(viewport, EMPTY_BATCH_COLORS);
 
       const totalEvents = result.stats.visibleCount + result.stats.bucketedEventCount;
@@ -423,7 +404,7 @@ describe('TemporalSegmentTree', () => {
       const manager = new RectangleCache(events, categories);
       const tree = new TemporalSegmentTree(manager.getRectsByCategory());
 
-      const viewport = createViewport(0.1, 0, 0); // threshold = 20ns, event = 1ns
+      const viewport = createViewport({ zoom: 0.1 }); // threshold = 20ns, event = 1ns
       const result = tree.query(viewport, EMPTY_BATCH_COLORS);
 
       const allBuckets = getAllBuckets(result.buckets);
@@ -438,7 +419,7 @@ describe('TemporalSegmentTree', () => {
       const manager = new RectangleCache(events, categories);
       const tree = new TemporalSegmentTree(manager.getRectsByCategory());
 
-      const viewport = createViewport(1, 0, 0); // threshold = 2ns, event = 1ns
+      const viewport = createViewport(); // threshold = 2ns, event = 1ns
       const result = tree.query(viewport, EMPTY_BATCH_COLORS);
 
       const allBuckets = getAllBuckets(result.buckets);
@@ -460,7 +441,7 @@ describe('TemporalSegmentTree', () => {
       const tree = new TemporalSegmentTree(manager.getRectsByCategory());
 
       // Zoom out so all events aggregate into one bucket
-      const viewport = createViewport(0.01, 0, 0, 1000);
+      const viewport = createViewport({ zoom: 0.01 });
       const result = tree.query(viewport, EMPTY_BATCH_COLORS);
 
       // Bucket should be categorized as DML (priority 0 beats priority 1)
