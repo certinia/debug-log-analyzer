@@ -4,6 +4,7 @@
 import { describe, expect, it } from '@jest/globals';
 import type { LogCategory, LogEvent } from 'apex-log-parser';
 
+import { makeViewport } from '../../../../__tests__/helpers/viewport.js';
 import type { ViewportState } from '../../types/flamechart.types.js';
 import { TIMELINE_CONSTANTS } from '../../types/flamechart.types.js';
 import { legacyCullRectangles } from '../LegacyViewportCuller.js';
@@ -38,21 +39,9 @@ function createEvent(
   } as unknown as LogEvent;
 }
 
-// Helper to create viewport state
-function createViewport(
-  zoom = 1,
-  offsetX = 0,
-  offsetY = 0,
-  displayWidth = 1000,
-  displayHeight = 500,
-): ViewportState {
-  return {
-    zoom,
-    offsetX,
-    offsetY,
-    displayWidth,
-    displayHeight,
-  };
+/** The 1000x500 canvas both culling oracles measure against. */
+function createViewport(over: Partial<ViewportState> = {}): ViewportState {
+  return makeViewport({ displayHeight: 500, ...over });
 }
 
 // Helper to cull rectangles using the legacy O(n) algorithm
@@ -99,7 +88,7 @@ describe('Legacy bucket aggregation', () => {
     it('should return events > 2px in visibleRects', () => {
       // Event with duration 3ns at zoom=1 gives 3px width (> MIN_RECT_SIZE)
       const events = [createEvent(0, 3, 'Apex')];
-      const viewport = createViewport(1, 0, 0);
+      const viewport = createViewport();
       const result = cullRectanglesLegacy(events, categories, viewport);
 
       expect(result.visibleRects.get('Apex')).toHaveLength(1);
@@ -111,7 +100,7 @@ describe('Legacy bucket aggregation', () => {
     it('should aggregate events <= 2px into buckets', () => {
       // Event with duration 1ns at zoom=1 gives 1px width (<= MIN_RECT_SIZE)
       const events = [createEvent(0, 1, 'Apex')];
-      const viewport = createViewport(1, 0, 0);
+      const viewport = createViewport();
       const result = cullRectanglesLegacy(events, categories, viewport);
 
       // No visible rects (event is too small), so category has no entry
@@ -128,7 +117,7 @@ describe('Legacy bucket aggregation', () => {
         createEvent(20, 3, 'SOQL'), // 3px at zoom=1 - visible
         createEvent(30, 0.5, 'SOQL'), // 0.5px at zoom=1 - bucketed
       ];
-      const viewport = createViewport(1, 0, 0);
+      const viewport = createViewport();
       const result = cullRectanglesLegacy(events, categories, viewport);
 
       expect(result.visibleRects.get('Apex')).toHaveLength(1);
@@ -142,7 +131,7 @@ describe('Legacy bucket aggregation', () => {
     it('should create time-aligned bucket boundaries', () => {
       // At zoom=1, bucket width is 2ns (2px / 1)
       const events = [createEvent(5, 1, 'Apex')]; // Event at timestamp 5
-      const viewport = createViewport(1, 0, 0);
+      const viewport = createViewport();
       const result = cullRectanglesLegacy(events, categories, viewport);
 
       const allBuckets = getAllBuckets(result.buckets);
@@ -158,7 +147,7 @@ describe('Legacy bucket aggregation', () => {
     it('should group events in same time bucket together', () => {
       // Two events at timestamps 4 and 5 should be in same bucket (index 2, range [4,6))
       const events = [createEvent(4, 1, 'Apex'), createEvent(5, 1, 'Apex')];
-      const viewport = createViewport(1, 0, 0);
+      const viewport = createViewport();
       const result = cullRectanglesLegacy(events, categories, viewport);
 
       const allBuckets = getAllBuckets(result.buckets);
@@ -173,7 +162,7 @@ describe('Legacy bucket aggregation', () => {
         createEvent(0, 1, 'Apex'), // bucket index 0
         createEvent(10, 1, 'Apex'), // bucket index 5
       ];
-      const viewport = createViewport(1, 0, 0);
+      const viewport = createViewport();
       const result = cullRectanglesLegacy(events, categories, viewport);
 
       expect(countBuckets(result.buckets)).toBe(2);
@@ -186,7 +175,7 @@ describe('Legacy bucket aggregation', () => {
       const child = createEvent(0, 1, 'SOQL');
       const parent = createEvent(0, 1, 'Apex', [child]);
       const events = [parent];
-      const viewport = createViewport(1, 0, 0);
+      const viewport = createViewport();
       const result = cullRectanglesLegacy(events, categories, viewport);
 
       // Should have 2 buckets (one per depth)
@@ -199,7 +188,7 @@ describe('Legacy bucket aggregation', () => {
 
     it('should set correct Y position based on depth', () => {
       const events = [createEvent(0, 1, 'Apex')];
-      const viewport = createViewport(1, 0, 0);
+      const viewport = createViewport();
       const result = cullRectanglesLegacy(events, categories, viewport);
 
       const allBuckets = getAllBuckets(result.buckets);
@@ -211,7 +200,7 @@ describe('Legacy bucket aggregation', () => {
       const events2 = [parent];
 
       // At zoom=0.5, parent (2ns) becomes 1px (bucketed), child (1ns) becomes 0.5px (bucketed)
-      const viewport2 = createViewport(0.5, 0, 0);
+      const viewport2 = createViewport({ zoom: 0.5 });
       const result2 = cullRectanglesLegacy(events2, categories, viewport2);
 
       const allBuckets2 = getAllBuckets(result2.buckets);
@@ -227,7 +216,7 @@ describe('Legacy bucket aggregation', () => {
         createEvent(1, 1, 'SOQL'),
         createEvent(0.5, 1, 'Apex'),
       ];
-      const viewport = createViewport(1, 0, 0);
+      const viewport = createViewport();
       const result = cullRectanglesLegacy(events, categories, viewport);
 
       // All 3 events at zoom=1 with duration 1ns are < 2px, so all bucketed
@@ -242,7 +231,7 @@ describe('Legacy bucket aggregation', () => {
 
     it('should track total duration per category', () => {
       const events = [createEvent(0, 1, 'Apex'), createEvent(0.5, 0.5, 'Apex')];
-      const viewport = createViewport(1, 0, 0);
+      const viewport = createViewport();
       const result = cullRectanglesLegacy(events, categories, viewport);
 
       const allBuckets = getAllBuckets(result.buckets);
@@ -254,7 +243,7 @@ describe('Legacy bucket aggregation', () => {
   describe('bucket color resolution', () => {
     it('should prioritize DML over Method in mixed bucket', () => {
       const events = [createEvent(0, 1, 'Apex'), createEvent(0.5, 1, 'DML')];
-      const viewport = createViewport(1, 0, 0);
+      const viewport = createViewport();
       const result = cullRectanglesLegacy(events, categories, viewport);
 
       // Get bucket from DML category (dominant)
@@ -267,7 +256,7 @@ describe('Legacy bucket aggregation', () => {
 
     it('should prioritize SOQL over Method in mixed bucket', () => {
       const events = [createEvent(0, 1, 'Apex'), createEvent(0.5, 1, 'SOQL')];
-      const viewport = createViewport(1, 0, 0);
+      const viewport = createViewport();
       const result = cullRectanglesLegacy(events, categories, viewport);
 
       // Get bucket from SOQL category (dominant)
@@ -279,7 +268,7 @@ describe('Legacy bucket aggregation', () => {
   describe('bucket color blending', () => {
     it('should have a valid color for single event', () => {
       const events = [createEvent(0, 1, 'Apex')];
-      const viewport = createViewport(1, 0, 0);
+      const viewport = createViewport();
       const result = cullRectanglesLegacy(events, categories, viewport);
 
       // Color should be a valid numeric color value (pre-blended opaque)
@@ -294,7 +283,7 @@ describe('Legacy bucket aggregation', () => {
 
       // Create a bucket with a single event
       const singleEvent = [createEvent(0, 1, 'Apex')];
-      const singleViewport = createViewport(1, 0, 0);
+      const singleViewport = createViewport();
       const singleResult = cullRectanglesLegacy(singleEvent, categories, singleViewport);
       const singleBuckets = getAllBuckets(singleResult.buckets);
       const singleBucketColor = singleBuckets[0]!.color;
@@ -304,7 +293,7 @@ describe('Legacy bucket aggregation', () => {
       for (let i = 0; i < 50; i++) {
         manyEvents.push(createEvent(i * 0.03, 0.01, 'Apex')); // All in bucket index 0
       }
-      const manyViewport = createViewport(1, 0, 0);
+      const manyViewport = createViewport();
       const manyResult = cullRectanglesLegacy(manyEvents, categories, manyViewport);
       const manyBuckets = getAllBuckets(manyResult.buckets);
       const manyBucketColor = manyBuckets[0]!.color;
@@ -319,7 +308,7 @@ describe('Legacy bucket aggregation', () => {
       const event1 = createEvent(0, 1, 'Apex');
       const event2 = createEvent(0.5, 1, 'Apex');
       const events = [event1, event2];
-      const viewport = createViewport(1, 0, 0);
+      const viewport = createViewport();
       const result = cullRectanglesLegacy(events, categories, viewport);
 
       const allBuckets = getAllBuckets(result.buckets);
@@ -336,7 +325,7 @@ describe('Legacy bucket aggregation', () => {
         createEvent(10, 1, 'Apex'), // bucketed
         createEvent(20, 1, 'SOQL'), // bucketed
       ];
-      const viewport = createViewport(1, 0, 0);
+      const viewport = createViewport();
       const result = cullRectanglesLegacy(events, categories, viewport);
 
       expect(result.stats.visibleCount).toBe(1);
@@ -350,7 +339,7 @@ describe('Legacy bucket aggregation', () => {
       for (let i = 0; i < 5; i++) {
         events.push(createEvent(i * 0.3, 0.1, 'Apex'));
       }
-      const viewport = createViewport(1, 0, 0);
+      const viewport = createViewport();
       const result = cullRectanglesLegacy(events, categories, viewport);
 
       expect(result.stats.maxEventsPerBucket).toBe(5);
