@@ -6,6 +6,7 @@ import { Uri, workspace } from 'vscode';
 
 import {
   createMockApexLog,
+  asContext,
   createMockContext,
   createMockDisplay,
   createMockLogEvent,
@@ -396,7 +397,7 @@ describe('LogEventCache', () => {
     it('should register onDidCloseTextDocument listener', () => {
       const mockContext = createMockContext();
 
-      LogEventCache.apply(mockContext as unknown as import('../../Context.js').Context);
+      LogEventCache.apply(asContext(mockContext));
 
       expect(workspace.onDidCloseTextDocument).toHaveBeenCalledTimes(1);
       expect(mockContext.context.subscriptions.length).toBe(1);
@@ -418,7 +419,7 @@ describe('LogEventCache', () => {
       });
 
       const mockContext = createMockContext();
-      LogEventCache.apply(mockContext as unknown as import('../../Context.js').Context);
+      LogEventCache.apply(asContext(mockContext));
 
       // Simulate closing an apexlog document
       closeCallback!({
@@ -446,7 +447,7 @@ describe('LogEventCache', () => {
       });
 
       const mockContext = createMockContext();
-      LogEventCache.apply(mockContext as unknown as import('../../Context.js').Context);
+      LogEventCache.apply(asContext(mockContext));
 
       // A log saved as .trace or pasted into an untitled buffer never gets the apexlog
       // language, but the decoration provider still parses it, so it must still clear.

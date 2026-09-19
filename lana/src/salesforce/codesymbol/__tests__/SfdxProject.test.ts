@@ -23,7 +23,6 @@ describe('SfdxProject', () => {
   const anotherAppUri = fileUri('/workspace/another-app');
 
   beforeEach(() => {
-    jest.clearAllMocks();
     project = createProject([forceAppUri]);
   });
 

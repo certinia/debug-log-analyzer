@@ -14,7 +14,6 @@ const mockListLogs = jest.fn((limit: number) => ({ limit }));
 const mockGetLogBody = jest.fn((id: string) => ({ id }));
 
 beforeEach(() => {
-  jest.clearAllMocks();
   (getRuntime as jest.Mock).mockReturnValue({ runPromise: mockRunPromise });
   (getServicesApi as jest.Mock).mockReturnValue({
     services: { ApexLogService: { listLogs: mockListLogs, getLogBody: mockGetLogBody } },

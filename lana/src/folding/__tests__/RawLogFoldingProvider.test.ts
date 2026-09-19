@@ -8,6 +8,7 @@ import { FoldingRangeKind, languages, window, workspace } from 'vscode';
 import {
   createMockDisplay,
   createMockApexLog,
+  asContext,
   createMockContext,
   createMockLogEvent,
 } from '../../__tests__/helpers/test-builders.js';
@@ -316,7 +317,7 @@ describe('RawLogFoldingProvider', () => {
     it('should register folding range provider for apexlog', () => {
       const mockContext = createMockContext();
 
-      RawLogFoldingProvider.apply(mockContext as unknown as import('../../Context.js').Context);
+      RawLogFoldingProvider.apply(asContext(mockContext));
 
       expect(languages.registerFoldingRangeProvider).toHaveBeenCalledTimes(1);
       expect(languages.registerFoldingRangeProvider).toHaveBeenCalledWith(
@@ -328,7 +329,7 @@ describe('RawLogFoldingProvider', () => {
     it('warms on tab changes, not on document open', () => {
       const mockContext = createMockContext();
 
-      RawLogFoldingProvider.apply(mockContext as unknown as import('../../Context.js').Context);
+      RawLogFoldingProvider.apply(asContext(mockContext));
 
       // onDidOpenTextDocument fires before the tab model updates, so isOpenAsTextTab
       // would reject a legitimate open.
@@ -339,7 +340,7 @@ describe('RawLogFoldingProvider', () => {
     it('should add disposables to context subscriptions', () => {
       const mockContext = createMockContext();
 
-      RawLogFoldingProvider.apply(mockContext as unknown as import('../../Context.js').Context);
+      RawLogFoldingProvider.apply(asContext(mockContext));
 
       // emitter + folding provider registration + tab listener + active-editor listener
       expect(mockContext.context.subscriptions.length).toBe(4);
@@ -352,7 +353,7 @@ describe('RawLogFoldingProvider', () => {
 
     function applyAndCapture() {
       const mockContext = createMockContext();
-      RawLogFoldingProvider.apply(mockContext as unknown as import('../../Context.js').Context);
+      RawLogFoldingProvider.apply(asContext(mockContext));
 
       const registeredProvider = (languages.registerFoldingRangeProvider as jest.Mock).mock
         .calls[0]?.[1] as RawLogFoldingProvider;

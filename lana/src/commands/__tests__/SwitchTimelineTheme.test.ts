@@ -5,7 +5,7 @@ import { beforeEach, describe, expect, it } from '@jest/globals';
 
 import { Uri, window } from 'vscode';
 
-import { createMockContext } from '../../__tests__/helpers/test-builders.js';
+import { asContext, createMockContext } from '../../__tests__/helpers/test-builders.js';
 import { SwitchTimelineTheme } from '../SwitchTimelineTheme.js';
 
 // Mock AppConfig
@@ -82,18 +82,14 @@ describe('SwitchTimelineTheme', () => {
   describe('getCommand', () => {
     it('should return command with correct name', () => {
       const mockContext = createMockContext();
-      const command = SwitchTimelineTheme.getCommand(
-        mockContext as unknown as import('../../Context.js').Context,
-      );
+      const command = SwitchTimelineTheme.getCommand(asContext(mockContext));
 
       expect(command.name).toBe('switchTimelineTheme');
     });
 
     it('should return command with correct title', () => {
       const mockContext = createMockContext();
-      const command = SwitchTimelineTheme.getCommand(
-        mockContext as unknown as import('../../Context.js').Context,
-      );
+      const command = SwitchTimelineTheme.getCommand(asContext(mockContext));
 
       expect(command.title).toBe('Log: Timeline Theme');
     });
@@ -103,9 +99,7 @@ describe('SwitchTimelineTheme', () => {
         throw new Error('config unavailable');
       });
       const mockContext = createMockContext();
-      const command = SwitchTimelineTheme.getCommand(
-        mockContext as unknown as import('../../Context.js').Context,
-      );
+      const command = SwitchTimelineTheme.getCommand(asContext(mockContext));
 
       await expect(command.run(Uri.parse('memfs:/logs/a.log'))).resolves.toBeUndefined();
 
@@ -118,9 +112,7 @@ describe('SwitchTimelineTheme', () => {
   describe('theme list building', () => {
     it('should include all preset themes', async () => {
       const mockContext = createMockContext();
-      const command = SwitchTimelineTheme.getCommand(
-        mockContext as unknown as import('../../Context.js').Context,
-      );
+      const command = SwitchTimelineTheme.getCommand(asContext(mockContext));
 
       await command.run({} as never);
 
@@ -143,9 +135,7 @@ describe('SwitchTimelineTheme', () => {
       });
 
       const mockContext = createMockContext();
-      const command = SwitchTimelineTheme.getCommand(
-        mockContext as unknown as import('../../Context.js').Context,
-      );
+      const command = SwitchTimelineTheme.getCommand(asContext(mockContext));
 
       await command.run({} as never);
 
@@ -170,9 +160,7 @@ describe('SwitchTimelineTheme', () => {
       });
 
       const mockContext = createMockContext();
-      const command = SwitchTimelineTheme.getCommand(
-        mockContext as unknown as import('../../Context.js').Context,
-      );
+      const command = SwitchTimelineTheme.getCommand(asContext(mockContext));
 
       await command.run({} as never);
 
@@ -183,9 +171,7 @@ describe('SwitchTimelineTheme', () => {
 
     it('should mark default theme with description', async () => {
       const mockContext = createMockContext();
-      const command = SwitchTimelineTheme.getCommand(
-        mockContext as unknown as import('../../Context.js').Context,
-      );
+      const command = SwitchTimelineTheme.getCommand(asContext(mockContext));
 
       await command.run({} as never);
 
@@ -195,9 +181,7 @@ describe('SwitchTimelineTheme', () => {
 
     it('should not mark non-default built-in themes as custom', async () => {
       const mockContext = createMockContext();
-      const command = SwitchTimelineTheme.getCommand(
-        mockContext as unknown as import('../../Context.js').Context,
-      );
+      const command = SwitchTimelineTheme.getCommand(asContext(mockContext));
 
       await command.run({} as never);
 
@@ -216,9 +200,7 @@ describe('SwitchTimelineTheme', () => {
       });
 
       const mockContext = createMockContext();
-      const command = SwitchTimelineTheme.getCommand(
-        mockContext as unknown as import('../../Context.js').Context,
-      );
+      const command = SwitchTimelineTheme.getCommand(asContext(mockContext));
 
       await command.run({} as never);
 
@@ -237,9 +219,7 @@ describe('SwitchTimelineTheme', () => {
       });
 
       const mockContext = createMockContext();
-      const command = SwitchTimelineTheme.getCommand(
-        mockContext as unknown as import('../../Context.js').Context,
-      );
+      const command = SwitchTimelineTheme.getCommand(asContext(mockContext));
 
       await command.run({} as never);
 
@@ -255,9 +235,7 @@ describe('SwitchTimelineTheme', () => {
       });
 
       const mockContext = createMockContext();
-      const command = SwitchTimelineTheme.getCommand(
-        mockContext as unknown as import('../../Context.js').Context,
-      );
+      const command = SwitchTimelineTheme.getCommand(asContext(mockContext));
 
       await command.run({} as never);
 
@@ -274,9 +252,7 @@ describe('SwitchTimelineTheme', () => {
       mockGetCurrentView.mockReturnValue({ webview: mockWebview });
 
       const mockContext = createMockContext();
-      const command = SwitchTimelineTheme.getCommand(
-        mockContext as unknown as import('../../Context.js').Context,
-      );
+      const command = SwitchTimelineTheme.getCommand(asContext(mockContext));
 
       await command.run({} as never);
 
@@ -293,9 +269,7 @@ describe('SwitchTimelineTheme', () => {
       mockGetCurrentView.mockReturnValue(null);
 
       const mockContext = createMockContext();
-      const command = SwitchTimelineTheme.getCommand(
-        mockContext as unknown as import('../../Context.js').Context,
-      );
+      const command = SwitchTimelineTheme.getCommand(asContext(mockContext));
 
       await command.run({} as never);
 
@@ -308,9 +282,7 @@ describe('SwitchTimelineTheme', () => {
   describe('theme selection', () => {
     it('should update config on accept', async () => {
       const mockContext = createMockContext();
-      const command = SwitchTimelineTheme.getCommand(
-        mockContext as unknown as import('../../Context.js').Context,
-      );
+      const command = SwitchTimelineTheme.getCommand(asContext(mockContext));
 
       await command.run({} as never);
 
@@ -324,9 +296,7 @@ describe('SwitchTimelineTheme', () => {
 
     it('should hide picker on accept', async () => {
       const mockContext = createMockContext();
-      const command = SwitchTimelineTheme.getCommand(
-        mockContext as unknown as import('../../Context.js').Context,
-      );
+      const command = SwitchTimelineTheme.getCommand(asContext(mockContext));
 
       await command.run({} as never);
 
@@ -340,9 +310,7 @@ describe('SwitchTimelineTheme', () => {
     it('reports a failure to save the chosen theme', async () => {
       mockUpdateConfig.mockRejectedValue(new Error('settings are read-only'));
       const mockContext = createMockContext();
-      const command = SwitchTimelineTheme.getCommand(
-        mockContext as unknown as import('../../Context.js').Context,
-      );
+      const command = SwitchTimelineTheme.getCommand(asContext(mockContext));
 
       await command.run({} as never);
 
@@ -371,9 +339,7 @@ describe('SwitchTimelineTheme', () => {
       });
 
       const mockContext = createMockContext();
-      const command = SwitchTimelineTheme.getCommand(
-        mockContext as unknown as import('../../Context.js').Context,
-      );
+      const command = SwitchTimelineTheme.getCommand(asContext(mockContext));
 
       await command.run({} as never);
 
@@ -391,9 +357,7 @@ describe('SwitchTimelineTheme', () => {
 
     it('should dispose picker on hide', async () => {
       const mockContext = createMockContext();
-      const command = SwitchTimelineTheme.getCommand(
-        mockContext as unknown as import('../../Context.js').Context,
-      );
+      const command = SwitchTimelineTheme.getCommand(asContext(mockContext));
 
       await command.run({} as never);
       onDidHideCallback();
@@ -415,9 +379,7 @@ describe('SwitchTimelineTheme', () => {
       });
 
       const mockContext = createMockContext();
-      const command = SwitchTimelineTheme.getCommand(
-        mockContext as unknown as import('../../Context.js').Context,
-      );
+      const command = SwitchTimelineTheme.getCommand(asContext(mockContext));
 
       await command.run({} as never);
 
@@ -437,7 +399,7 @@ describe('SwitchTimelineTheme', () => {
     it('should register command with context', () => {
       const mockContext = createMockContext();
 
-      SwitchTimelineTheme.apply(mockContext as unknown as import('../../Context.js').Context);
+      SwitchTimelineTheme.apply(asContext(mockContext));
 
       expect(mockContext.context.subscriptions.length).toBe(1);
     });
@@ -445,7 +407,7 @@ describe('SwitchTimelineTheme', () => {
     it('should output registration message', () => {
       const mockContext = createMockContext();
 
-      SwitchTimelineTheme.apply(mockContext as unknown as import('../../Context.js').Context);
+      SwitchTimelineTheme.apply(asContext(mockContext));
 
       expect(mockContext.display.output).toHaveBeenCalledWith(
         "Registered command 'Lana: Timeline Theme'",
