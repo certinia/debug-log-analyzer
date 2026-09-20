@@ -21,7 +21,7 @@ function transaction(codeUnitStarted: string, prefix = USER_INFO_LINE): string {
 }
 
 function identity(rawLog: string) {
-  return deriveLogIdentity(parse(rawLog), rawLog);
+  return deriveLogIdentity(parse(rawLog));
 }
 
 describe('entry point', () => {
@@ -80,18 +80,28 @@ describe('user and start time', () => {
     );
   });
 
-  it('finds USER_INFO past a preamble longer than any fixed scan window', () => {
-    const preamble =
-      '64.0 APEX_CODE,FINE;APEX_PROFILING,INFO\n' +
-      `Execute Anonymous: ${'x'.repeat(8192)}\n` +
-      'Execute Anonymous: quoting |USER_INFO| inside the echo must not match\n';
+  it('keeps the offset when the header names no timezone', () => {
+    const log = transaction(
+      anonymous,
+      '09:18:22.6 (6297619)|USER_INFO|[EXTERNAL]|005Ea00000R6orz|tina.owen@example.com|(GMT+05:30)|GMT+05:30\n',
+    );
 
-    const { user } = identity(transaction(anonymous, preamble + USER_INFO_LINE));
-
-    expect(user).toEqual({ label: 'tina.owen', detail: 'tina.owen@example.com' });
+    expect(identity(log).startTime?.detail).toMatch(/^Started 09:18:22\S* \(GMT\+05:30\)$/);
   });
 
-  it('omits the user in a cropped log whose first event is not USER_INFO', () => {
+  it('omits the user when USER_INFO states no name, keeping its timezone', () => {
+    const log = transaction(
+      anonymous,
+      '09:18:22.6 (6297619)|USER_INFO|[EXTERNAL]|005Ea00000R6orz||(GMT-07:00) Pacific Daylight Time (America/Los_Angeles)|GMT-07:00\n',
+    );
+
+    const { user, startTime } = identity(log);
+
+    expect(user).toBeNull();
+    expect(startTime?.detail).toContain('Pacific Daylight Time');
+  });
+
+  it('omits the user when the log states no USER_INFO', () => {
     const { user, startTime } = identity(transaction(anonymous, ''));
 
     expect(user).toBeNull();
