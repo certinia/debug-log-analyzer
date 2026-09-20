@@ -300,16 +300,11 @@ describe('governor-trends', () => {
       return [...classes].find((name) => name.startsWith('trend--')) ?? null;
     };
 
-    it('reads safe below the warn threshold', async () => {
-      expect(await tierOf(79)).toBe('trend--safe');
-    });
-
-    it('warns from the threshold', async () => {
+    // Where the bands fall is proved once, in
+    // features/database/components/__tests__/GovernorSummary.test.ts. This proves the
+    // trend applies them, and that finalRatio reaches governorTier as a percent.
+    it('puts the tier the policy gives on the figure', async () => {
       expect(await tierOf(80)).toBe('trend--warn');
-    });
-
-    it('reads danger at the limit', async () => {
-      expect(await tierOf(100)).toBe('trend--danger');
     });
 
     // No limit, so no tier to report against.

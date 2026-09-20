@@ -8,7 +8,12 @@ import { describe, expect, it } from '@jest/globals';
 import { NO_LIMIT_FOR_METRIC_TEXT } from '../../../../components/governorCopy.js';
 import { formatInteger } from '../../../../core/utility/Util.js';
 import { mountElement } from '../../../../__tests__/helpers/mount.js';
-import type { GaugeMetric, GovernorSummary } from '../GovernorSummary.js';
+import {
+  GOVERNOR_WARN_PERCENT,
+  governorTier,
+  type GaugeMetric,
+  type GovernorSummary,
+} from '../GovernorSummary.js';
 import '../GovernorSummary.js';
 
 const strip = (metrics: GaugeMetric[]) =>
@@ -88,21 +93,29 @@ describe('governor-summary', () => {
       return [...classes].find((name) => name.startsWith('gauge__value--')) ?? null;
     };
 
-    it('reads safe below the warn threshold', async () => {
-      expect(await tierOf(79, 100)).toBe('gauge__value--safe');
-    });
-
-    it('warns from the threshold', async () => {
+    it('puts the tier the policy gives on the figure', async () => {
       expect(await tierOf(80, 100)).toBe('gauge__value--warn');
-    });
-
-    it('reads danger at the limit', async () => {
-      expect(await tierOf(100, 100)).toBe('gauge__value--danger');
     });
 
     // No limit, so no tier to report against.
     it('takes none where the log reported no limit', async () => {
       expect(await tierOf(12, 0)).toBeNull();
     });
+  });
+});
+
+// The boundaries of the policy its three importers read, stated here and nowhere
+// else. A component proves it applies what it is given, not where the bands fall.
+// DatabaseMetricCard.ts:29 does not import it — it holds a fourth copy, on a bare 80.
+describe('governorTier', () => {
+  it.each([
+    [0, 'safe'],
+    [GOVERNOR_WARN_PERCENT - 0.1, 'safe'],
+    [GOVERNOR_WARN_PERCENT, 'warn'],
+    [99.9, 'warn'],
+    [100, 'danger'],
+    [250, 'danger'],
+  ])('reads %p percent as %s', (percent, expected) => {
+    expect(governorTier(percent)).toBe(expected);
   });
 });

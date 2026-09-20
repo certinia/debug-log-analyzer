@@ -181,34 +181,16 @@ describe('KeyboardHandler', () => {
   });
 
   describe('zoom keys (W / S / + / - / =)', () => {
-    it('should zoom in on W key', () => {
-      dispatchKeyEvent('keydown', 'w');
+    it.each([
+      ['in', 'w'],
+      ['out', 's'],
+      ['in', '+'],
+      ['in', '='],
+      ['out', '-'],
+    ] as const)('should zoom %s on the %s key', (direction, key) => {
+      dispatchKeyEvent('keydown', key);
 
-      expect(callbacks.onZoom).toHaveBeenCalledWith('in');
-    });
-
-    it('should zoom out on S key', () => {
-      dispatchKeyEvent('keydown', 's');
-
-      expect(callbacks.onZoom).toHaveBeenCalledWith('out');
-    });
-
-    it('should zoom in on + key', () => {
-      dispatchKeyEvent('keydown', '+');
-
-      expect(callbacks.onZoom).toHaveBeenCalledWith('in');
-    });
-
-    it('should zoom in on = key', () => {
-      dispatchKeyEvent('keydown', '=');
-
-      expect(callbacks.onZoom).toHaveBeenCalledWith('in');
-    });
-
-    it('should zoom out on - key', () => {
-      dispatchKeyEvent('keydown', '-');
-
-      expect(callbacks.onZoom).toHaveBeenCalledWith('out');
+      expect(callbacks.onZoom).toHaveBeenCalledWith(direction);
     });
 
     it('should zoom with + and - even when Shift is pressed', () => {
@@ -299,37 +281,21 @@ describe('KeyboardHandler', () => {
   });
 
   describe('frame navigation (onFrameNav)', () => {
-    it('should call onFrameNav with "up" on ArrowUp when handler returns true', () => {
-      (callbacks.onFrameNav as jest.Mock).mockReturnValue(true);
-      dispatchKeyEvent('keydown', 'ArrowUp');
+    it.each([
+      ['up', 'ArrowUp'],
+      ['down', 'ArrowDown'],
+      ['left', 'ArrowLeft'],
+      ['right', 'ArrowRight'],
+    ] as const)(
+      'should call onFrameNav with "%s" on %s when handler returns true',
+      (direction, key) => {
+        (callbacks.onFrameNav as jest.Mock).mockReturnValue(true);
+        dispatchKeyEvent('keydown', key);
 
-      expect(callbacks.onFrameNav).toHaveBeenCalledWith('up');
-      expect(callbacks.onPan).not.toHaveBeenCalled();
-    });
-
-    it('should call onFrameNav with "down" on ArrowDown when handler returns true', () => {
-      (callbacks.onFrameNav as jest.Mock).mockReturnValue(true);
-      dispatchKeyEvent('keydown', 'ArrowDown');
-
-      expect(callbacks.onFrameNav).toHaveBeenCalledWith('down');
-      expect(callbacks.onPan).not.toHaveBeenCalled();
-    });
-
-    it('should call onFrameNav with "left" on ArrowLeft when handler returns true', () => {
-      (callbacks.onFrameNav as jest.Mock).mockReturnValue(true);
-      dispatchKeyEvent('keydown', 'ArrowLeft');
-
-      expect(callbacks.onFrameNav).toHaveBeenCalledWith('left');
-      expect(callbacks.onPan).not.toHaveBeenCalled();
-    });
-
-    it('should call onFrameNav with "right" on ArrowRight when handler returns true', () => {
-      (callbacks.onFrameNav as jest.Mock).mockReturnValue(true);
-      dispatchKeyEvent('keydown', 'ArrowRight');
-
-      expect(callbacks.onFrameNav).toHaveBeenCalledWith('right');
-      expect(callbacks.onPan).not.toHaveBeenCalled();
-    });
+        expect(callbacks.onFrameNav).toHaveBeenCalledWith(direction);
+        expect(callbacks.onPan).not.toHaveBeenCalled();
+      },
+    );
 
     it('should fall through to pan when onFrameNav returns false', () => {
       (callbacks.onFrameNav as jest.Mock).mockReturnValue(false);
@@ -683,6 +649,7 @@ describe('KeyboardHandler', () => {
       dispatchKeyEvent('keydown', 'Home', { repeat: true });
       dispatchKeyEvent('keydown', 'End');
       dispatchKeyEvent('keydown', 'End', { repeat: true });
+      // 0 and Escape are the same command, so a repeat of either is suppressed.
       dispatchKeyEvent('keydown', '0');
       dispatchKeyEvent('keydown', 'Escape', { repeat: true });
 
