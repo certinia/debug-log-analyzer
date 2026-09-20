@@ -2,3 +2,7 @@ build/
 out/
 
 pnpm-lock.yaml
+
+# Each live worktree is a second copy of the repo, inside it. Without this the
+# gate checks every one of them, and fails on a branch you cannot fix from here.
+.claude/worktrees/
