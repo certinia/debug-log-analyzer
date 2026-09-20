@@ -8,6 +8,7 @@ import { SymbolKind, languages } from 'vscode';
 import {
   createMockDisplay,
   createMockApexLog,
+  asContext,
   createMockContext,
   createMockLogEvent,
 } from '../../__tests__/helpers/test-builders.js';
@@ -167,14 +168,14 @@ describe('RawLogSymbolProvider', () => {
   describe('apply', () => {
     const applyProvider = () => {
       const mockContext = createMockContext();
-      RawLogSymbolProvider.apply(mockContext as unknown as import('../../Context.js').Context);
+      RawLogSymbolProvider.apply(asContext(mockContext));
       return (languages.registerDocumentSymbolProvider as jest.Mock).mock.calls[0]?.[1] as
         RawLogSymbolProvider | undefined;
     };
 
     it('gives the registered provider the context display to report through', async () => {
       const mockContext = createMockContext();
-      RawLogSymbolProvider.apply(mockContext as unknown as import('../../Context.js').Context);
+      RawLogSymbolProvider.apply(asContext(mockContext));
       const registered = (languages.registerDocumentSymbolProvider as jest.Mock).mock
         .calls[0]?.[1] as RawLogSymbolProvider;
       mockGetApexLog.mockResolvedValue(null);

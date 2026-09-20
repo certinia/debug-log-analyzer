@@ -5,8 +5,7 @@ import { beforeEach, describe, expect, it } from '@jest/globals';
 
 import { commands, window } from 'vscode';
 
-import { createMockContext } from '../../__tests__/helpers/test-builders.js';
-import type { Context } from '../../Context.js';
+import { asContext, createMockContext } from '../../__tests__/helpers/test-builders.js';
 import { WhatsNewNotification } from '../WhatsNewNotification.js';
 
 const mockShowInformationMessage = window.showInformationMessage as jest.Mock;
@@ -22,12 +21,8 @@ function contextForVersion(version: string, viewed: string[] = []) {
   return mockContext;
 }
 
-const asContext = (mockContext: ReturnType<typeof createMockContext>) =>
-  mockContext as unknown as Context;
-
 describe('WhatsNewNotification', () => {
   beforeEach(() => {
-    jest.clearAllMocks();
     mockShowInformationMessage.mockResolvedValue(undefined);
   });
 

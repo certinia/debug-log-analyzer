@@ -6,9 +6,6 @@
 import { beforeEach, describe, expect, it } from '@jest/globals';
 import { html } from 'lit';
 
-jest.mock('#vscode-elements/vscode-icon.js', () => ({}));
-jest.mock('#vscode-elements/vscode-badge.js', () => ({}));
-jest.mock('#vscode-elements/vscode-button.js', () => ({}));
 // The swc transform can't parse `.scss`/`.css`; stub the stylesheet assets.
 jest.mock('../../tabulator/style/DataGrid.scss', () => ({ default: '' }));
 jest.mock('../../tabulator/format/Progress.css', () => ({}));
@@ -79,6 +76,8 @@ jest.mock('../detailSections.js', () => ({
   },
 }));
 
+import { mountElement } from '../../__tests__/helpers/mount.js';
+import { waitForNextFrame } from '../../core/utility/FrameBudget.js';
 import { eventBus, type DetailSource } from '../../core/events/EventBus.js';
 import type { LogStore } from '../../core/log/LogStore.js';
 import type { LogInspector } from '../LogInspector.js';
@@ -102,7 +101,7 @@ async function settle(el: LogInspector): Promise<void> {
 
 /** `settle`, plus the rAF wait that lets the debounced rebuild fire first. */
 async function flush(el: LogInspector): Promise<void> {
-  await new Promise((resolve) => requestAnimationFrame(resolve));
+  await waitForNextFrame();
   await settle(el);
 }
 
@@ -112,9 +111,7 @@ function inspectorSettings(overrides: Record<string, unknown> = {}): Record<stri
 }
 
 async function mount(activeTab: string): Promise<LogInspector> {
-  const el = document.createElement('log-inspector') as LogInspector;
-  el.activeTab = activeTab;
-  document.body.appendChild(el);
+  const el = await mountElement<LogInspector>('log-inspector', { activeTab });
   await flush(el);
   return el;
 }
@@ -229,7 +226,6 @@ describe('LogInspector', () => {
     deferSections = false;
     pendingSections.length = 0;
     builtHiding.length = 0;
-    document.body.replaceChildren();
   });
 
   it('applies the persisted collapse to the list it was made in', async () => {
@@ -397,7 +393,7 @@ describe('LogInspector', () => {
     // awaited; the toggle must not be undone when that build lands.
     deferSections = true;
     select('timeline', 2);
-    await new Promise((resolve) => requestAnimationFrame(resolve));
+    await waitForNextFrame();
     openSectionMenu(el);
     pickMenuItem(el, 'section:callstack');
     await settle(el);
@@ -860,9 +856,9 @@ describe('LogInspector', () => {
     deferSections = true;
 
     select('timeline', 1);
-    await new Promise((resolve) => requestAnimationFrame(resolve)); // debounce fires -> _rebuild() epoch 1 starts, awaiting buildDetailSections
+    await waitForNextFrame(); // debounce fires -> _rebuild() epoch 1 starts, awaiting buildDetailSections
     select('timeline', 2);
-    await new Promise((resolve) => requestAnimationFrame(resolve)); // debounce fires -> _rebuild() epoch 2 starts, awaiting buildDetailSections
+    await waitForNextFrame(); // debounce fires -> _rebuild() epoch 2 starts, awaiting buildDetailSections
     expect(pendingSections).toHaveLength(2);
 
     // The newer selection's build resolves first (it's the one the user is

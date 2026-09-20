@@ -41,7 +41,6 @@ describe('legacy timeline listener lifetime', () => {
     dispose();
     added.mockRestore();
     removed.mockRestore();
-    document.body.replaceChildren();
   });
 
   it('listens for the find events once the chart is built', () => {

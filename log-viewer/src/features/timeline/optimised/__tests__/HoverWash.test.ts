@@ -13,20 +13,15 @@
 
 import { describe, expect, it } from '@jest/globals';
 import { Graphics } from 'pixi.js';
-import { TIMELINE_CONSTANTS, type ViewportState } from '../../types/flamechart.types.js';
+import { makeViewport } from '../../../../__tests__/helpers/viewport.js';
+import { TIMELINE_CONSTANTS } from '../../types/flamechart.types.js';
 import {
   createHighlightColors,
   renderHighlight,
   renderWash,
 } from '../rendering/HighlightRenderer.js';
 
-const viewport: ViewportState = {
-  zoom: 1,
-  offsetX: 0,
-  offsetY: 0,
-  displayWidth: 800,
-  displayHeight: 300,
-} as ViewportState;
+const viewport = makeViewport({ displayWidth: 800, displayHeight: 300 });
 
 /** The actions the graphics recorded, in order. */
 function actions(graphics: Graphics): string[] {

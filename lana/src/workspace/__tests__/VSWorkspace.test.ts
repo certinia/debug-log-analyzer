@@ -20,7 +20,6 @@ describe('VSWorkspace', () => {
   let vsWorkspace: VSWorkspace;
 
   beforeEach(() => {
-    jest.clearAllMocks();
     vsWorkspace = new VSWorkspace(mockWorkspaceFolder);
   });
 

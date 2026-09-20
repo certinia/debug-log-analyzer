@@ -3,7 +3,7 @@
  */
 import { describe, expect, it } from '@jest/globals';
 
-import { SOQLParser, SyntaxException } from '../features/soql/services/SOQLParser.js';
+import { SOQLParser, SyntaxException } from '../SOQLParser.js';
 
 describe('Analyse database tests', () => {
   it('throws on unparsable query', async () => {

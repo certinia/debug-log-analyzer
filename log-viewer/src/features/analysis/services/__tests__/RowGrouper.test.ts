@@ -1,74 +1,12 @@
 /**
  * Copyright (c) 2026 Certinia Inc. All rights reserved.
  */
-import { beforeEach, describe, expect, it } from '@jest/globals';
-import type { LogEvent } from 'apex-log-parser';
+import { describe, expect, it } from '@jest/globals';
 
+import { createEvent } from '../../../../__tests__/helpers/events.js';
 import { group } from '../RowGrouper.js';
 
-type EventOptions = {
-  text: string;
-  self: number;
-  total: number;
-  parent?: LogEvent | null;
-  type?: string;
-  namespace?: string;
-  dmlSelf?: number;
-  dmlTotal?: number;
-  soqlSelf?: number;
-  soqlTotal?: number;
-  thrown?: number;
-};
-
-let nextTimestamp = 1;
-
-function createEvent(options: EventOptions): LogEvent {
-  const event = {
-    logParser: null,
-    parent: options.parent ?? null,
-    children: [],
-    type: (options.type ?? 'METHOD_ENTRY') as LogEvent['type'],
-    logLine: '',
-    text: options.text,
-    acceptsText: false,
-    isExit: false,
-    isParent: false,
-    isTruncated: false,
-    nextLineIsExit: false,
-    lineNumber: null,
-    namespace: options.namespace ?? 'default',
-    hasValidSymbols: true,
-    suffix: null,
-    discontinuity: false,
-    timestamp: nextTimestamp++,
-    exitStamp: null,
-    category: '',
-    debugCategory: '',
-    debugLevel: '',
-    cpuType: '',
-    duration: { self: options.self, total: options.total },
-    dmlRowCount: { self: 0, total: 0 },
-    soqlRowCount: { self: 0, total: 0 },
-    soslRowCount: { self: 0, total: 0 },
-    dmlCount: { self: options.dmlSelf ?? 0, total: options.dmlTotal ?? 0 },
-    soqlCount: { self: options.soqlSelf ?? 0, total: options.soqlTotal ?? 0 },
-    soslCount: { self: 0, total: 0 },
-    thrownCount: { self: options.thrown ?? 0, total: options.thrown ?? 0 },
-    exitTypes: [],
-  } as unknown as LogEvent;
-
-  if (options.parent) {
-    options.parent.children.push(event);
-  }
-
-  return event;
-}
-
 describe('RowGrouper.group', () => {
-  beforeEach(() => {
-    nextTimestamp = 1;
-  });
-
   it('includes zero-time leaves so DML/SOQL/exception counts and call counts roll up', () => {
     const root = createEvent({ text: 'LOG_ROOT', self: 0, total: 0, type: 'EXECUTION_STARTED' });
     createEvent({

@@ -4,7 +4,7 @@
 import { describe, expect, it } from '@jest/globals';
 import { parse } from 'apex-log-parser';
 
-import { findEventByEventIndex } from '../core/utility/EventSearch.js';
+import { findEventByEventIndex } from '../EventSearch.js';
 
 describe('EventSearch', () => {
   it('finds the exact event by eventIndex when timestamps are duplicated', () => {

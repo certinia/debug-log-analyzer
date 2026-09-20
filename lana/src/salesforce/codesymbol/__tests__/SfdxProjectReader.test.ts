@@ -29,7 +29,6 @@ describe('getProjects', () => {
   } as WorkspaceFolder;
 
   beforeEach(() => {
-    jest.clearAllMocks();
     // Mirror the real Uri.joinPath: join segments and normalize '..'
     (Uri.joinPath as jest.Mock).mockImplementation((base: Uri, ...segments: string[]) =>
       fileUri(joinPath(base.path, ...segments)),

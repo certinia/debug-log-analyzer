@@ -31,10 +31,6 @@ function createMockWorkspace(findClassResult: Uri[]): VSWorkspace {
 }
 
 describe('SymbolFinder', () => {
-  beforeEach(() => {
-    jest.clearAllMocks();
-  });
-
   describe('findSymbol', () => {
     it('should report not-found when no classes match', async () => {
       const mockWorkspace = createMockWorkspace([]);

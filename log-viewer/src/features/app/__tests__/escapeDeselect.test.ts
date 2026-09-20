@@ -62,10 +62,6 @@ function toggleFor(panelId: string): HTMLElement {
 }
 
 describe('isDeselectEscape', () => {
-  afterEach(() => {
-    document.body.innerHTML = '';
-  });
-
   it('accepts a plain Escape', () => {
     expect(judge(document.body)).toBe(true);
   });

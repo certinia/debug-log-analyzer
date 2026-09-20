@@ -41,6 +41,7 @@ jest.mock('../callStackData.js', () => ({
   buildCallStackData: () => ({ rows: [], rootTotal: 0 }),
 }));
 
+import { mountElement } from '../../__tests__/helpers/mount.js';
 import type { CallStackDetail } from '../CallStackDetail.js';
 import '../CallStackDetail.js';
 import {
@@ -50,13 +51,8 @@ import {
   type InspectorRevealEvent,
 } from '../inspectorReveal.js';
 
-async function mount(eventIndex: number): Promise<CallStackDetail> {
-  const el = document.createElement('call-stack-detail') as CallStackDetail;
-  el.eventIndex = eventIndex;
-  document.body.appendChild(el);
-  await el.updateComplete;
-  return el;
-}
+const mount = (eventIndex: number): Promise<CallStackDetail> =>
+  mountElement<CallStackDetail>('call-stack-detail', { eventIndex });
 
 describe('CallStackDetail', () => {
   it('renders the table host and a context menu for the row actions', async () => {
