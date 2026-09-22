@@ -19,7 +19,9 @@ Welcome to the development guide for the **Apex Log Analyzer** VS Code extension
 Before you start developing, make sure you have the following tools installed:
 
 - **Node.js** v22 or above: [Install Node.js](https://nodejs.org/en/)
-- **[pnpm](https://pnpm.io/)**: This package manager will be used for installing dependencies
+- **[pnpm](https://pnpm.io/) v12**: `npm i -g pnpm@12`. This package manager will be used for
+  installing dependencies. The version is pinned in `package.json#packageManager`; Dependabot
+  cannot bump it, so raise it by hand.
 - \*\*[VS Code](https://code.visualstudio.com/)
 
 Once you’ve got these ready, you’re all set to get started! 🚀
@@ -43,6 +45,13 @@ cd apex-log-analyzer
 ```zsh
 pnpm i
 ```
+
+> pnpm settings live in `pnpm-workspace.yaml`, not `.npmrc`: pnpm 11 and later read only
+> registry and auth keys from `.npmrc`.
+>
+> Dependency build scripts are declined by default. If `pnpm i` fails with
+> `ERR_PNPM_IGNORED_BUILDS`, a dependency has gained an install script. Read it, then record
+> the decision with `pnpm approve-builds`.
 
 ## ⚙️ Building and Bundling
 
