@@ -9,9 +9,6 @@ import { vscodeMessenger } from '../../../core/messaging/VSCodeExtensionMessenge
 import { formatDuration } from '../../../core/utility/Util.js';
 import { TIME_WIDTH } from '../../../tabulator/ColumnWidths.js';
 import { progressFormatterMS } from '../../../tabulator/format/ProgressMS.js';
-import { GroupCalcs } from '../../../tabulator/groups/GroupCalcs.js';
-import { GroupChildIndent } from '../../../tabulator/groups/GroupChildIndent.js';
-import { GroupSort } from '../../../tabulator/groups/GroupSort.js';
 import {
   sumDurationTotalForRootEvents,
   sumTotalForRootEvents,
@@ -19,11 +16,13 @@ import {
 import { soqlGroupHeader } from '../../soql/format/groupHeader.js';
 import { toBottomUpTree, type BottomUpRow } from '../utils/Aggregation.js';
 import {
+  clipboardCopyOptions,
   commonColumnDefaults,
   createCountColumn,
   createGovernorMetricColumns,
   createNamespaceColumns,
   createTypeColumn,
+  groupingOptions,
   headerSortElement,
   registerTableModules,
   virtualScrollOptions,
@@ -66,8 +65,7 @@ export function createBottomUpTable(
   callbacks: BottomUpTableCallbacks,
   options: BottomUpTableOptions = {},
 ): { table: Tabulator; tableBuilt: Promise<void> } {
-  registerTableModules();
-  Tabulator.registerModule([GroupCalcs, GroupChildIndent, GroupSort]);
+  registerTableModules({ grouping: true });
 
   const nameFormatter = createCalltreeNameFormatter();
 
@@ -95,10 +93,9 @@ export function createBottomUpTable(
 
   const { enableClipboardAndDownload, exportFileName, ...tabulatorOptionOverrides } = options;
 
-  // @ts-expect-error tabulator typings are behind runtime support for keybindings
   const clipboardAndDownloadOptions: Partial<Options> = enableClipboardAndDownload
     ? {
-        clipboard: true,
+        ...clipboardCopyOptions,
         clipboardCopyConfig: {
           dataTree: false,
         },
@@ -111,8 +108,6 @@ export function createBottomUpTable(
           columnCalcs: false,
           dataTree: true,
         },
-        clipboardCopyRowRange: 'all',
-        keybindings: { copyToClipboard: ['ctrl + 67', 'meta + 67'] },
       }
     : {};
 
@@ -141,11 +136,8 @@ export function createBottomUpTable(
     initialSort: [{ column: 'totalSelfTime', dir: 'desc' }],
     headerSortElement,
     columnCalcs: 'table',
-    groupCalcs: true,
+    ...groupingOptions,
     groupHeader: soqlGroupHeader,
-    groupSort: true,
-    groupClosedShowCalcs: true,
-    groupStartOpen: false,
     groupToggleElement: 'header',
     columnDefaults: commonColumnDefaults,
     rowFormatter: callbacks.rowFormatter,

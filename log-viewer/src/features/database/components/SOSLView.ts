@@ -41,17 +41,13 @@ import { tableHolder } from '../../../tabulator/module/tableHolder.js';
 import { inCountRange, inMsRange, type FilterRange } from '../../../tabulator/filters/MinMax.js';
 import { progressFormatter } from '../../../tabulator/format/Progress.js';
 import { progressFormatterMS } from '../../../tabulator/format/ProgressMS.js';
-import { GroupCalcs } from '../../../tabulator/groups/GroupCalcs.js';
-import { GroupChildIndent } from '../../../tabulator/groups/GroupChildIndent.js';
-import { GroupSort } from '../../../tabulator/groups/GroupSort.js';
-import * as CommonModules from '../../../tabulator/module/CommonModules.js';
-import { Find } from '../../../tabulator/module/Find.js';
-import { RowKeyboardNavigation } from '../../../tabulator/module/RowKeyboardNavigation.js';
-import { RowNavigation } from '../../../tabulator/module/RowNavigation.js';
 import dataGridStyles from '../../../tabulator/style/DataGrid.scss';
 import {
+  clipboardCopyOptions,
   commonColumnDefaults,
+  groupingOptions,
   headerSortElement,
+  registerTableModules,
   textCellTooltip,
 } from '../../call-tree/components/TableShared.js';
 
@@ -455,15 +451,7 @@ export class SOSLView extends LitElement {
     void isVisible(this).then((isVisible) => {
       const tableWrapper = this._soslTableWrapper;
       if (tableWrapper && this.timelineRoot && isVisible) {
-        Tabulator.registerModule(Object.values(CommonModules));
-        Tabulator.registerModule([
-          RowKeyboardNavigation,
-          RowNavigation,
-          Find,
-          GroupCalcs,
-          GroupChildIndent,
-          GroupSort,
-        ]);
+        registerTableModules({ grouping: true });
         this._renderSOSLTable(tableWrapper, this.lines);
       }
     });
@@ -548,7 +536,7 @@ export class SOSLView extends LitElement {
     this.soslTable = new Tabulator(soslTableContainer, {
       index: 'id',
       height: '100%',
-      clipboard: true,
+      ...clipboardCopyOptions,
       downloadEncoder: this.downlodEncoder('sosl.csv'),
       downloadRowRange: 'all',
       downloadConfig: {
@@ -558,18 +546,12 @@ export class SOSLView extends LitElement {
         columnCalcs: false,
         dataTree: true,
       },
-      //@ts-expect-error types need update array is valid
-      keybindings: { copyToClipboard: ['ctrl + 67', 'meta + 67'] },
-      clipboardCopyRowRange: 'all',
       rowKeyboardNavigation: true,
       data: soslData,
       layout: 'fitColumns',
       placeholder: 'No SOSL queries found',
       columnCalcs: 'table',
-      groupCalcs: true,
-      groupSort: true,
-      groupClosedShowCalcs: true,
-      groupStartOpen: false,
+      ...groupingOptions,
       groupToggleElement: false,
       selectableRows: 'highlight',
       rowFormatter: stampGridEventIndex,
