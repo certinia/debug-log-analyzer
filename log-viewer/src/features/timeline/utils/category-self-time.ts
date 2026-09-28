@@ -1,7 +1,9 @@
 /*
  * Copyright (c) 2026 Certinia Inc. All rights reserved.
  */
-import { LOG_CATEGORY, type ApexLog, type LogCategory, type LogEvent } from 'apex-log-parser';
+import { LOG_CATEGORY, type ApexLog, type LogCategory } from 'apex-log-parser';
+
+import { walkEvents } from '../../../core/utility/EventTree.js';
 
 import type { TimelineKeyEntry } from '../components/TimelineKey.js';
 import type { LegacyTimelineGroup } from '../services/Timeline.js';
@@ -13,13 +15,9 @@ import type { LegacyTimelineGroup } from '../services/Timeline.js';
  */
 export function categorySelfTimes(root: ApexLog): Map<LogCategory, number> {
   const totals = new Map<LogCategory, number>();
-  const stack: LogEvent[] = [root];
-  for (let node = stack.pop(); node; node = stack.pop()) {
+  for (const node of walkEvents([root])) {
     if (node.category) {
       totals.set(node.category, (totals.get(node.category) ?? 0) + node.duration.self);
-    }
-    for (const child of node.children) {
-      stack.push(child);
     }
   }
   return totals;
