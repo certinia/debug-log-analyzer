@@ -4,13 +4,14 @@
 import { commands, window } from 'vscode';
 
 import type { Context } from '../Context.js';
+import { errorMessage } from '../tryCatch.js';
 
 export class WhatsNewNotification {
   static async apply(context: Context): Promise<void> {
     try {
       await WhatsNewNotification.show(context);
     } catch (error: unknown) {
-      const message = error instanceof Error ? error.message : String(error);
+      const message = errorMessage(error);
       context.display.output(`Unable to show the What's New notification: ${message}`);
     }
   }
