@@ -31,6 +31,16 @@ jest.mock('../../../call-tree/components/BottomUpTable.js', () => ({
 }));
 // vscode-button needs ElementInternals.setFormValue (absent in jsdom).
 jest.mock('#vscode-elements/vscode-button.js', () => ({}));
+// VsSelect extends vscode-single-select, whose setFormValue needs an
+// ElementInternals jsdom lacks; the render would upgrade it.
+jest.mock('../../../../components/VsSelect.js', () => ({}));
+// Connecting the view reads settings twice: firstUpdated loads the column view,
+// and category colouring subscribes. This suite has no extension host to answer.
+jest.mock('../../../settings/Settings.js', () => ({
+  ...jest.requireActual<object>('../../../settings/Settings.js'),
+  getSettings: () => Promise.resolve({}),
+  subscribeSettings: () => () => {},
+}));
 jest.mock('#vscode-elements/vscode-option.js', () => ({}));
 jest.mock('#vscode-elements/vscode-toolbar-button.js', () => ({}));
 
@@ -114,15 +124,18 @@ function findRow(rows: BottomUpRow[], text: string): BottomUpRow {
  * A view with its table rendered against `log`.
  *
  * The app hands the log down as a property, and a row's calls are read through
- * the table that built it. The table mounts in a wrapper the view finds in its
- * render root, which it has none of until it is updated, so one is stood in.
+ * the table that built it.
  */
-function mountView(log: ApexLog): AnalysisView {
+async function mountView(log: ApexLog): Promise<AnalysisView> {
   handlers.clear();
   stub = { rows: [], getRowsArgs: [], revealed: [] };
   const view = new AnalysisView();
+  document.body.append(view);
+  await view.updateComplete;
+  // `timelineRoot` only after the first update, and `_renderAnalysis` in the same
+  // tick: the `updated()` it triggers reaches `isVisible`, and jsdom has no
+  // IntersectionObserver. Assigning the table first makes that path return early.
   view.timelineRoot = log;
-  view.tableContainer = document.createElement('div');
   void view._renderAnalysis(log);
   return view;
 }
@@ -134,18 +147,18 @@ describe('analysis-view selection', () => {
   let seen: Array<{ source: DetailSource; selection: DetailSelection | null }>;
   let off: () => void;
 
-  beforeEach(() => {
+  beforeEach(async () => {
     byEventIndex = [];
     log = recursiveLog();
     roots = toBottomUpTree(log.children, logStoreFor(log).keyPathIds());
-    view = mountView(log);
+    view = await mountView(log);
     seen = [];
     off = eventBus.on('detail:select', (detail) => seen.push(detail));
   });
 
   afterEach(() => {
     off();
-    view.disconnectedCallback();
+    view.remove();
   });
 
   function select(row: RowComponent): void {
@@ -250,9 +263,9 @@ describe('analysis-view selection', () => {
 describe('analysis-view search lifetime', () => {
   let view: AnalysisView;
 
-  beforeEach(() => {
+  beforeEach(async () => {
     byEventIndex = [];
-    view = mountView(recursiveLog());
+    view = await mountView(recursiveLog());
     // What a finished search leaves behind: matches, and nothing of its own in
     // flight to guard against.
     view.totalMatches = 3;
@@ -260,7 +273,7 @@ describe('analysis-view search lifetime', () => {
   });
 
   afterEach(() => {
-    view.disconnectedCallback();
+    view.remove();
   });
 
   /** What Tabulator reports, which an expand repeats with the sort in force. */
