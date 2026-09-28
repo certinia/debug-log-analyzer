@@ -15,16 +15,11 @@ import '../../../components/OverflowList.js';
 // styles
 import { globalStyles } from '../../../styles/global.styles.js';
 
-/** One legend chip: colour dot, label, and (when known) the log's self time under it. */
+/** One legend chip: colour dot, category, and (when known) the log's self time under it. */
 export interface TimelineKeyEntry {
-  label: string;
+  category: LogCategory;
   fillColor: string;
-  /**
-   * The categories this chip stands for. Usually the one the label names, but the legacy
-   * chart folds several into a group, and its label is then no category at all.
-   */
-  categories: readonly LogCategory[];
-  /** Total self time (ns) summed over {@link categories}; omitted where no log is loaded. */
+  /** Self time (ns) under {@link category}; omitted where no log is loaded. */
   selfTimeNs?: number;
 }
 
@@ -63,14 +58,13 @@ export class Timelinekey extends LitElement {
     return html`<overflow-list menu-heading="Categories" gap="12">
       ${repeat(
         this.timelineKeys,
-        (entry) => entry.label,
+        (entry) => entry.category,
         (entry) =>
           // The seam for the interactivity follow-up (hover/click → highlight): the
-          // categories to match on, not the label, which names no category under legacy.
-          // Comma-joined, never space: `Code Unit` is one category with a space in it.
-          html`<span class="chip" data-category="${entry.categories.join(',')}">
+          // category to match on, rather than the text the chip happens to render.
+          html`<span class="chip" data-category="${entry.category}">
             <color-swatch color=${entry.fillColor}></color-swatch>
-            <span>${entry.label}</span>
+            <span>${entry.category}</span>
             ${
               entry.selfTimeNs !== undefined
                 ? html`<span class="chip__time"

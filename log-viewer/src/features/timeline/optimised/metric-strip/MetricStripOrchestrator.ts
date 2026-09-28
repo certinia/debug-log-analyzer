@@ -305,10 +305,11 @@ export class MetricStripOrchestrator {
    * Handle resize of the metric strip container.
    *
    * @param newWidth - New canvas width
+   * @param resolution - devicePixelRatio to render at
    */
-  public resize(newWidth: number): void {
+  public resize(newWidth: number, resolution: number): void {
     if (this.app) {
-      this.app.renderer.resize(newWidth, this.getHeight());
+      this.app.renderer.resize(newWidth, this.getHeight(), resolution);
     }
   }
 

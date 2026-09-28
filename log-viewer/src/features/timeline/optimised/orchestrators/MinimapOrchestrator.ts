@@ -268,12 +268,13 @@ export class MinimapOrchestrator {
    *
    * @param newWidth - New canvas width
    * @param newHeight - New full container height
+   * @param resolution - devicePixelRatio to render at
    */
-  public resize(newWidth: number, newHeight: number): void {
+  public resize(newWidth: number, newHeight: number, resolution: number): void {
     const minimapHeight = calculateMinimapHeight(newHeight);
 
     if (this.app) {
-      this.app.renderer.resize(newWidth, minimapHeight);
+      this.app.renderer.resize(newWidth, minimapHeight, resolution);
     }
 
     if (this.minimapViewport) {

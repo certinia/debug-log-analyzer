@@ -13,32 +13,21 @@ keywords: [
     vscode salesforce extension,
     apex debugging,
   ]
-image: https://raw.githubusercontent.com/certinia/debug-log-analyzer/main/lana/assets/1_20/timeline.png
+image: https://raw.githubusercontent.com/certinia/debug-log-analyzer/main/lana/assets/1_22/timeline.png
 ---
 
 ## Installation
 
 Install Apex Log Analyzer using whichever you prefer:
 
-- **Extensions sidebar** — search for `Apex Log Analyzer` and click \*\*Install
-- **Marketplace** — open the [VS Code Marketplace: Apex Log Analyzer](https://marketplace.visualstudio.com/items?itemName=financialforce.lana) and click **Install**.
-- **Command Palette** — press `Cmd/Ctrl+Shift+P` and run `ext install financialforce.lana`.
-- **Command line** — run from a terminal:
+- **Extensions sidebar** - search for `Apex Log Analyzer` and click \*\*Install
+- **Marketplace** - open the [VS Code Marketplace: Apex Log Analyzer](https://marketplace.visualstudio.com/items?itemName=financialforce.lana) and click **Install**.
+- **Command Palette** - press `Cmd/Ctrl+Shift+P` and run `ext install financialforce.lana`.
+- **Command line** - run from a terminal:
 
 ```sh
   code --install-extension financialforce.lana
 ```
-
-<img
-  src="https://raw.githubusercontent.com/certinia/debug-log-analyzer/main/lana/assets/1_20/vscode/install.png"
-  alt="The Apex Log Analyzer listing in the VS Code Extensions view with the Install button"
-  style={{
-    width: '50%',
-    height: 'auto',
-    maxWidth: '400px',
-  }}
-  loading="lazy"
-/>
 
 ### Pre-Release
 
@@ -57,12 +46,12 @@ With the `.log` file open in VSCode.
    or
 1. Click the 'Log: Show Apex Log Analysis' code lens at the top of the file\
    <img
-     src="https://raw.githubusercontent.com/certinia/debug-log-analyzer/main/lana/assets/1_20/vscode/show-analysis-lens.webp"
+     src="https://raw.githubusercontent.com/certinia/debug-log-analyzer/main/lana/assets/1_22/vscode/show-analysis-lens.png"
      alt="Screenshot showing the Log: Show Apex Log Analysis code lense in a log file"
      style={{
-       width: '50%',
+       width: '100%',
        height: 'auto',
-       maxWidth: '400px',
+       maxWidth: '350px',
      }}
      loading="lazy"
    />
@@ -79,7 +68,7 @@ With the `.log` file open in VSCode.
 
 ## ⚙️ Recommended Debug Log Levels
 
-- Set `APEX_CODE` level to `FINE` or higher — lower levels may omit important execution details.
+- Set `APEX_CODE` level to `FINE` or higher - lower levels may omit important execution details.
 - Be aware that higher debug levels introduce logging overhead, which can inflate recorded execution times.
-- Avoid truncated logs — they can result in incomplete or misleading analysis.
+- Avoid truncated logs - they can result in incomplete or misleading analysis.
 - Recommended settings for a good balance of detail and performance: `APEX_CODE,FINE; APEX_PROFILING,FINE; CALLOUT,INFO; DB,FINEST; NBA,INFO; SYSTEM,DEBUG; VALIDATION,INFO; VISUALFORCE,FINE; WAVE,INFO; WORKFLOW,FINE`

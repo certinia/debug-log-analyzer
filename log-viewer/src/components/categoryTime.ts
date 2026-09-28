@@ -10,7 +10,6 @@ import {
 } from 'lit';
 
 import { subscribeSettings, type LanaSettings } from '../features/settings/Settings.js';
-import { keyMap, LEGACY_CATEGORY_MAP } from '../features/timeline/services/Timeline.js';
 import { addCustomThemes, getTheme } from '../features/timeline/themes/ThemeSelector.js';
 import { CATEGORY_THEME_KEY, DEFAULT_THEME_NAME } from '../features/timeline/themes/Themes.js';
 
@@ -77,10 +76,9 @@ export function categorySelfTimes(root: ApexLog): CategoryTime[] {
 
 /**
  * The flame chart's own colour for each category, resolved the way
- * `TimelineView` resolves it: the active theme (custom themes registered
- * first), or the legacy per-group colours when the legacy timeline is on. With
- * no settings yet (standalone host, or before the first push) the default
- * theme answers.
+ * `TimelineView` resolves it: the active theme, custom themes registered
+ * first. With no settings yet (standalone host, or before the first push) the
+ * default theme answers.
  * @param activeTheme - A previewed theme, which wins over the pushed one. Never
  * persisted, so it can arrive before any settings do.
  */
@@ -88,14 +86,6 @@ export function categoryPalette(
   timeline: LanaSettings['timeline'] | null,
   activeTheme?: string | null,
 ): (category: string) => string {
-  if (timeline?.legacy) {
-    return (category) => {
-      const group = LEGACY_CATEGORY_MAP[category];
-      // `setColors` skips a group the setting omits, leaving the chart on its built-in
-      // colour, so that default has to be readable here too.
-      return (group && (timeline.colors[group] || keyMap.get(group)?.fillColor)) || OTHER_COLOR;
-    };
-  }
   if (timeline) {
     addCustomThemes(timeline.customThemes);
   }
@@ -108,8 +98,8 @@ export function categoryPalette(
 
 /**
  * {@link categoryPalette} for a component, kept live: the host re-renders
- * whenever the timeline theme or the legacy colours change, so its swatches and
- * meters follow the flame chart without a reload.
+ * whenever the timeline theme changes, so its swatches and meters follow the
+ * flame chart without a reload.
  */
 export class CategoryPaletteController implements ReactiveController {
   private _color = categoryPalette(null);

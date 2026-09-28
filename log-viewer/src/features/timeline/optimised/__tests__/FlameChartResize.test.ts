@@ -27,7 +27,7 @@ function stubbedChart(displayHeight = 300): {
 
   const internals = chart as unknown as Record<string, unknown>;
   internals['app'] = {
-    renderer: { resize: rendererResize },
+    renderer: { resize: rendererResize, resolution: 1 },
     screen: { height: 300 },
     render: appRender,
   };
@@ -70,8 +70,14 @@ function stubbedChart(displayHeight = 300): {
 }
 
 describe('FlameChart.resize', () => {
+  const realDevicePixelRatio = window.devicePixelRatio;
+
   afterEach(() => {
     jest.restoreAllMocks();
+    Object.defineProperty(window, 'devicePixelRatio', {
+      value: realDevicePixelRatio,
+      configurable: true,
+    });
   });
 
   it('paints before it returns, so the cleared canvas is never composited', () => {
@@ -140,6 +146,17 @@ describe('FlameChart.resize', () => {
     expect(appRender).toHaveBeenCalled();
     // Stale at 64, every hit test and tooltip would sit 19px out.
     expect(internals['mainTimelineYOffset']).toBe(83);
+  });
+
+  it('draws when only the device pixel ratio moved', () => {
+    const { chart, rendererResize, appRender } = stubbedChart();
+    jest.spyOn(window, 'requestAnimationFrame').mockReturnValue(1);
+    Object.defineProperty(window, 'devicePixelRatio', { value: 2, configurable: true });
+
+    // The geometry the skip case above rejects, so only the ratio is left to act on.
+    expect(chart.resize(400, 364)).toBe(true);
+    expect(rendererResize).toHaveBeenCalledWith(400, 300, 2);
+    expect(appRender).toHaveBeenCalled();
   });
 
   // The metric strip resizes its own canvas before asking the host to relayout, so a resize

@@ -15,7 +15,7 @@ keywords:
     apex log analyzer features,
     apex debug log analzyer for salesforce feature overview,
   ]
-image: https://raw.githubusercontent.com/certinia/debug-log-analyzer/main/lana/assets/1_20/timeline.png
+image: https://raw.githubusercontent.com/certinia/debug-log-analyzer/main/lana/assets/1_22/timeline.png
 hide_title: true
 ---
 
@@ -25,14 +25,14 @@ Explore the Apex Log Analyzer for Salesforce debug logs features including inter
 
 ## 🚦 Log problems and notifications
 
-**Log problems** are problems found in the log itself — governor limit exceptions, fatal errors, skipped lines. A chip shows the worst severity's icon with a count badge, and a tick when the log is clean. **Notifications** are messages about the tool rather than the log — today, parser diagnostics for log lines it couldn't understand. The two are kept apart so they don't read as one severity count.
+**Log problems** are problems found in the log itself - governor limit exceptions, fatal errors, skipped lines. A chip shows the worst severity's icon with a count badge, and a tick when the log is clean. **Notifications** are messages about the tool rather than the log - today, parser diagnostics for log lines it couldn't understand. The two are kept apart so they don't read as one severity count.
 
-Each opens as a list of cards: a severity icon, a summary, a dimmed line with the kind and the time in the log (e.g. `Fatal error · 24.6 s`), a message that expands on click if it runs past two lines, and — for problems that point at a spot in the log — an arrow action that jumps to it in the Call Tree.
+Each opens as a list of cards: a severity icon, a summary, a dimmed line with the kind and the time in the log (e.g. `Fatal error · 24.6 s`), a message that expands on click if it runs past two lines, and - for problems that point at a spot in the log - an arrow action that jumps to it in the Call Tree.
 
 If the parser meets a log event it doesn't recognize, a notification card carries a **Report unsupported log event** action, opening a pre-filled GitHub issue.
 
 ## 🎚️ Debug levels
 
-A row of chips shows the debug levels the log was captured with, one per category (`CATEGORY LEVEL`, e.g. `APEX_CODE FINE`). This is a read-only display of what was captured — it doesn't filter the log.
+A row of chips shows the debug levels the log was captured with, one per category (`CATEGORY LEVEL`, e.g. `APEX_CODE FINE`). This is a read-only display of what was captured - it doesn't filter the log.
 
 <DocCardList />

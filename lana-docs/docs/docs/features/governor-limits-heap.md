@@ -13,7 +13,7 @@ keywords:
     salesforce debug log analysis,
     apex log analyzer,
   ]
-image: https://raw.githubusercontent.com/certinia/debug-log-analyzer/main/lana/assets/1_20/timeline.png
+image: https://raw.githubusercontent.com/certinia/debug-log-analyzer/main/lana/assets/1_22/timeline.png
 hide_title: true
 ---
 
@@ -32,21 +32,21 @@ Every limit reported by the log is tracked: SOQL queries and query rows, SOSL qu
 | Which call path is responsible?            | The [Call Tree](./calltree.mdx#column-views) **Governor Limits** column view (average + tightest peak) |
 | What did this one statement cost?          | The [inspector](./inspector.md)'s **Details** section                                                  |
 
-Two denominators answer two questions, and the wording says which is in play. A `/` and "of limit" measure headroom against a limit the log reported. An "of" and "of log" measure contribution — a path's share of what the transaction consumed — which the Call Tree's governor columns and the inspector's Details use, so they read the same on every log.
+Two denominators answer two questions, and the wording says which is in play. A `/` and "of limit" measure headroom against a limit the log reported. An "of" and "of log" measure contribution - a path's share of what the transaction consumed - which the Call Tree's governor columns and the inspector's Details use, so they read the same on every log.
 
 ### Found vs counted
 
-The Database tab reconciles the statements found in the log against the governor-counted total. When those disagree, the difference is usually work that doesn't consume the limit — custom metadata SOQL, for example, is free unless it selects a long text area field or runs inside a Flow. Seeing both numbers means you can trust the gap instead of wondering which one is wrong.
+The Database tab reconciles the statements found in the log against the governor-counted total. When those disagree, the difference is usually work that doesn't consume the limit - custom metadata SOQL, for example, is free unless it selects a long text area field or runs inside a Flow. Seeing both numbers means you can trust the gap instead of wondering which one is wrong.
 
 :::note
-The log is the only source of a limit. Salesforce's own maximum varies by context — asynchronous Apex gets 60,000 ms of CPU against a synchronous transaction's 10,000, and other entry points differ again — so where the log reports no limit, none is shown rather than a guessed one. No debug level guarantees a limit block: complete logs at `APEX_PROFILING` `FINE` and `INFO` alike can carry none.
+The log is the only source of a limit. Salesforce's own maximum varies by context - asynchronous Apex gets 60,000 ms of CPU against a synchronous transaction's 10,000, and other entry points differ again, so where the log reports no limit, none is shown rather than a guessed one. No debug level guarantees a limit block: complete logs at `APEX_PROFILING` `FINE` and `INFO` alike can carry none.
 
 Figures still show without one. Gauges read as levels with no bar, the Timeline strip and the inspector's trend charts scale each metric to its own peak with no 80% band or 100% line, and the governor cost columns read `—`.
 :::
 
 ### Flow and Process Builder usage
 
-A Flow or Process Builder element runs its own SOQL and DML, but the log never reports it as a statement — there is no `SOQL_EXECUTE_BEGIN` or `DML_BEGIN` line to find. Instead the element reports how much it used, and that usage is counted against the element and rolls up through its callers like any other.
+A Flow or Process Builder element runs its own SOQL and DML, but the log never reports it as a statement - there is no `SOQL_EXECUTE_BEGIN` or `DML_BEGIN` line to find. Instead the element reports how much it used, and that usage is counted against the element and rolls up through its callers like any other.
 
 The figure the element reports also covers anything its own subtree logged, such as Apex it called, so only the part no logged statement accounts for is added. Where the element is the only thing that ran, that is all of it.
 
@@ -56,13 +56,13 @@ This needs `WORKFLOW` at `FINER` or above. At `FINE` the log reports no Flow usa
 
 ### Heap: net, gross and peak
 
-Heap is the awkward one. Memory is freed as well as allocated, so a single number hides what actually happened — a loop that allocates and frees the same buffer a thousand times looks identical to one that leaks. Every method and call path therefore carries three heap metrics, each with a total and a self variant:
+Heap is the awkward one. Memory is freed as well as allocated, so a single number hides what actually happened - a loop that allocates and frees the same buffer a thousand times looks identical to one that leaks. Every method and call path therefore carries three heap metrics, each with a total and a self variant:
 
-1. **Net** – bytes retained (allocated minus freed); the lasting footprint. Can be negative where a path frees more than it allocates.
-1. **Gross** – bytes allocated, ignoring frees; allocation churn and GC pressure. An allocate-then-free loop has near-zero net but large gross.
-1. **Peak** – highest live heap reached while the path ran. This is the number comparable to the heap governor limit, so it also drives the Governor Avg/Peak columns.
+1. **Net** - bytes retained (allocated minus freed); the lasting footprint. Can be negative where a path frees more than it allocates.
+1. **Gross** - bytes allocated, ignoring frees; allocation churn and GC pressure. An allocate-then-free loop has near-zero net but large gross.
+1. **Peak** - highest live heap reached while the path ran. This is the number comparable to the heap governor limit, so it also drives the Governor Avg/Peak columns.
 
-Read them together: **high gross with low net** is churn — usually a loop allocating inside its body, which costs CPU but won't breach the limit. **High net** is memory you are still holding. **Peak near the limit** is what actually throws.
+Read them together: **high gross with low net** is churn, usually a loop allocating inside its body, which costs CPU but won't breach the limit. **High net** is memory you are still holding. **Peak near the limit** is what actually throws.
 
 They appear in the Call Tree and Analysis **Memory** column view, in the inspector's **Details** section for whatever you have selected, and on the Timeline strip, which plots heap as it is allocated so you can see exactly where it spikes.
 
@@ -70,8 +70,8 @@ They appear in the Call Tree and Analysis **Memory** column view, in the inspect
 
 Because a path can consume several limits at once, the Call Tree and Analysis tables offer two summary columns:
 
-- **Gov Avg %** – average utilisation across every governor with a limit, for that path.
-- **Gov Peak %** – the single tightest governor on that path. Hidden by default; the tooltip names which limit is the peak.
+- **Gov Avg %** - average utilisation across every governor with a limit, for that path.
+- **Gov Peak %** - the single tightest governor on that path. Hidden by default; the tooltip names which limit is the peak.
 
 Sorting by **Gov Peak** is the fastest way to find the call path that is closest to breaching something, regardless of _which_ limit it is.
 

@@ -29,16 +29,7 @@ const timelineSettings = (
   overrides: Partial<LanaSettings['timeline']> = {},
 ): LanaSettings['timeline'] => ({
   activeTheme: DEFAULT_THEME_NAME,
-  colors: {
-    Method: '#111111',
-    'Code Unit': '#222222',
-    'System Method': '#333333',
-    Workflow: '#444444',
-    DML: '#555555',
-    SOQL: '#666666',
-  },
   customThemes: {},
-  legacy: false,
   showTooltip: true,
   ...overrides,
 });
@@ -74,7 +65,7 @@ describe('categorySelfTimes', () => {
 });
 
 describe('categoryPalette', () => {
-  it('resolves the active theme colours when the legacy timeline is off', () => {
+  it('resolves the active theme colours', () => {
     const color = categoryPalette(
       timelineSettings({
         activeTheme: 'Mine',
@@ -96,15 +87,6 @@ describe('categoryPalette', () => {
     expect(color('Apex')).toBe('#a1a1a1');
     expect(color('Code Unit')).toBe('#b2b2b2');
     expect(color('SOQL')).toBe('#f6f6f6');
-  });
-
-  it('resolves the legacy group colours when the legacy timeline is on', () => {
-    const color = categoryPalette(timelineSettings({ legacy: true }));
-
-    expect(color('Apex')).toBe('#111111'); // Method
-    expect(color('Callout')).toBe('#111111'); // folded into Method
-    expect(color('Validation')).toBe('#333333'); // folded into System Method
-    expect(color('Automation')).toBe('#444444'); // Workflow
   });
 
   // The quick pick is never persisted, so its theme can arrive before any settings do.
