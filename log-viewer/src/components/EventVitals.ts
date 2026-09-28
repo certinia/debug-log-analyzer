@@ -17,7 +17,7 @@ import {
   usageParts,
 } from '../core/metrics/eventMetrics.js';
 import { DEFAULT_NAMESPACE, getCallerNamespace } from '../core/utility/CallerNamespace.js';
-import { formatMs } from '../core/utility/Duration.js';
+import { formatNsAsMs } from '../core/utility/Duration.js';
 import { outermostEvents } from '../core/utility/EventTree.js';
 import { formatInteger } from '../core/utility/Util.js';
 import { sumDurationTotalForRootEvents } from '../features/analysis/services/CallStackSum.js';
@@ -297,7 +297,7 @@ export class EventVitals extends LitElement {
   }
 
   private _ms(ns: number): string {
-    return `${formatMs(ns, MS_PRECISION)} ms`;
+    return `${formatNsAsMs(ns, MS_PRECISION)} ms`;
   }
 
   private _row(rows: TemplateResult[], label: string, value: unknown, tooltip?: string) {

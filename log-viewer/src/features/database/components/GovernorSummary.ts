@@ -5,6 +5,7 @@ import { LitElement, css, html, nothing } from 'lit';
 import { customElement, property } from 'lit/decorators.js';
 
 import { NO_LIMIT_FOR_METRIC_TEXT } from '../../../components/governorCopy.js';
+import { sharePercent } from '../../../core/utility/Util.js';
 import { globalStyles } from '../../../styles/global.styles.js';
 
 /** One at-a-glance governor gauge for the overview strip. */
@@ -185,7 +186,7 @@ export class GovernorSummary extends LitElement {
       </div>`;
     }
 
-    const percent = (metric.used / metric.limit) * 100;
+    const percent = sharePercent(metric.used, metric.limit);
     return html`<div
       class="gauge ${muted ? 'muted' : ''}"
       role="meter"

@@ -3,6 +3,8 @@
  */
 import type { ColumnComponent, RowComponent } from 'tabulator-tables';
 
+import { formatNsAsMs } from '../../core/utility/Duration.js';
+
 export default function (
   value: number | null,
   _data: unknown,
@@ -11,6 +13,5 @@ export default function (
   _column?: ColumnComponent,
   _row?: RowComponent,
 ): string {
-  const returnValue = (value || 0) / 1000000;
-  return returnValue.toFixed(accessorParams.precision || 3);
+  return formatNsAsMs(value, accessorParams.precision || 3);
 }

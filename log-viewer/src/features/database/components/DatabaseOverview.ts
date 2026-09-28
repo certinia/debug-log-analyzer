@@ -16,6 +16,7 @@ import '../../../components/StackedTimeBar.js';
 import { segmentsWithTail } from '../../../components/StackedTimeBar.js';
 import { logContext } from '../../../core/log/logContext.js';
 import type { LogStore } from '../../../core/log/LogStore.js';
+import { nsToMs } from '../../../core/utility/Duration.js';
 import { formatDuration, formatInteger, sharePercent } from '../../../core/utility/Util.js';
 import { globalStyles } from '../../../styles/global.styles.js';
 import '../../../components/SectionSkeleton.js';
@@ -353,7 +354,7 @@ function statementLabel(statement: DatabaseStatement): TemplateResult | string {
  * cutting a figure in half; the reveal title keeps the full reading.
  */
 function subLine(statement: DatabaseStatement, ownPercent: number): TemplateResult {
-  const perRow = statement.rows > 0 ? statement.netNs / statement.rows / 1_000_000 : 0;
+  const perRow = statement.rows > 0 ? nsToMs(statement.netNs / statement.rows) : 0;
   // Self is the total twice over when nothing ran inside the statement.
   const descendantNs = statement.timeNs - statement.selfNs;
   const databaseNs = statement.timeNs - statement.netNs;
