@@ -59,6 +59,7 @@ function createLog(total: number, self = 0): ApexLog {
     duration: { self, total },
     children: [],
     eventsById: [],
+    truncation: { regions: [], totalSkippedBytes: 0 },
   } as unknown as ApexLog;
   log.eventsById.push(log as unknown as LogEvent);
   return log;
@@ -453,16 +454,43 @@ describe('computeExecutionHighlights hot spots', () => {
 });
 
 describe('computeExecutionHighlights truncation', () => {
-  it('counts a flagged chain as one region and returns the first event', () => {
+  it('reports the regions the parser found, and where the first one starts', () => {
     const log = createLog(1000);
-    const cut = createEvent({ text: 'Cut', isTruncated: true });
-    const childInCut = createEvent({ text: 'Child', parent: cut, isTruncated: true });
-    const laterCut = createEvent({ text: 'Later', isTruncated: true });
-    index(log, cut, childInCut, laterCut);
+    log.truncation = {
+      regions: [
+        { kind: 'skipped-lines', startTime: 10, eventIndex: 7, skippedBytes: 1000 },
+        { kind: 'max-size', startTime: 20, eventIndex: 9 },
+      ],
+      totalSkippedBytes: 1000,
+    };
 
     const { truncation } = computeExecutionHighlights(log);
 
-    expect(truncation).toEqual({ regionCount: 2, firstEventIndex: cut.eventIndex });
+    expect(truncation).toEqual({ regionCount: 2, firstEventIndex: 7 });
+  });
+
+  // The parser sets `isTruncated` on the log root as well as on each cut-off frame, so
+  // counting flagged events whose parent is not flagged found nothing on a real log.
+  it('reports a truncation whose cut-off frames all hang off the log root', () => {
+    const log = createLog(1000);
+    log.isTruncated = true;
+    const cut = createEvent({ text: 'Cut', parent: log as unknown as LogEvent, isTruncated: true });
+    index(log, cut);
+    log.truncation = {
+      regions: [{ kind: 'max-size', startTime: 10, eventIndex: cut.eventIndex }],
+      totalSkippedBytes: 0,
+    };
+
+    const { truncation } = computeExecutionHighlights(log);
+
+    expect(truncation).toEqual({ regionCount: 1, firstEventIndex: cut.eventIndex });
+  });
+
+  it('reports nothing for a log the platform did not truncate', () => {
+    const log = createLog(1000);
+    index(log, createEvent({ text: 'Work', self: 100 }));
+
+    expect(computeExecutionHighlights(log).truncation).toBeNull();
   });
 });
 

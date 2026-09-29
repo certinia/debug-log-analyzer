@@ -61,6 +61,7 @@ function apexLog(fields: Partial<ApexLog> & { namespaceLimits?: Record<string, L
     children: [],
     exceptions: [],
     logIssues: [],
+    truncation: { regions: [], totalSkippedBytes: 0 },
     duration: { self: 0, total: 0 },
     governorLimits: governorLimitsOf(namespaceLimits ?? {}),
     ...rest,
@@ -481,32 +482,45 @@ describe('computeLogDiagnostics', () => {
           description: 'An entry event was found without a corresponding exit event',
           type: 'unexpected',
         },
-        {
-          summary: 'Max-Size-reached',
-          description: 'The maximum log size has been reached. Part of the log has been truncated.',
-          type: 'skip',
-        },
       ],
+      truncation: { regions: [{ kind: 'max-size', startTime: 0 }], totalSkippedBytes: 0 },
     });
 
     const { diagnostics } = await computeLogDiagnostics();
     expect(diagnostics.map((d) => d.summary)).toEqual(['Log truncated', 'Unexpected-End']);
-    expect(diagnostics[0]?.severity).toBe('Error');
+    expect(diagnostics[0]?.severity).toBe('Warning');
     expect(diagnostics[0]?.meta).toBeUndefined();
     expect(diagnostics[0]?.message).toContain('may be undercounted');
   });
 
-  it('sums the bytes the log said it skipped, over every skipped region', async () => {
-    const skipped = (bytes: string) => ({
-      summary: 'Skipped-Lines',
-      description: `*** Skipped ${bytes} bytes of detailed log. A section of the log has been skipped and the log has been truncated.`,
-      type: 'skip' as const,
+  it('states the size the parser totalled over every skipped region', async () => {
+    log = apexLog({
+      truncation: {
+        regions: [
+          { kind: 'skipped-lines', startTime: 10, skippedBytes: 1_000_000 },
+          { kind: 'skipped-lines', startTime: 20, skippedBytes: 2_000_000 },
+        ],
+        totalSkippedBytes: 3_000_000,
+      },
     });
-    log = apexLog({ logIssues: [skipped('1,000,000'), skipped('2,000,000')] });
 
     const { diagnostics } = await computeLogDiagnostics();
     expect(diagnostics[0]?.summary).toBe('Log truncated in 2 places');
     expect(diagnostics[0]?.meta).toBe('3 MB');
+  });
+
+  it('leads with the truncation caveat, under an error finding that outranks it', async () => {
+    const text = 'System.NullPointerException: Attempt to de-reference a null object';
+    log = apexLog({
+      exceptions: [event({ type: 'FATAL_ERROR', eventIndex: 4, text })],
+      truncation: { regions: [{ kind: 'max-size', startTime: 0 }], totalSkippedBytes: 0 },
+    });
+
+    const { diagnostics } = await computeLogDiagnostics();
+    expect(diagnostics.map((d) => [d.summary, d.severity])).toEqual([
+      ['Log truncated', 'Warning'],
+      [text, 'Error'],
+    ]);
   });
 
   it('groups exceptions by their text, counting the throws', async () => {
@@ -519,6 +533,15 @@ describe('computeLogDiagnostics', () => {
     expect(diagnostics[0]?.count).toBe(2);
     expect(diagnostics[0]?.eventIndex).toBe(4);
     expect(diagnostics[0]?.evidence).toBeUndefined();
+  });
+
+  it('grades a caught exception below one that rolled the transaction back', async () => {
+    const text = 'System.NullPointerException: Attempt to de-reference a null object';
+    log = apexLog({ exceptions: [event({ type: 'EXCEPTION_THROWN', eventIndex: 4, text })] });
+    expect((await computeLogDiagnostics()).diagnostics[0]?.severity).toBe('Warning');
+
+    log = apexLog({ exceptions: [event({ type: 'FATAL_ERROR', eventIndex: 4, text })] });
+    expect((await computeLogDiagnostics()).diagnostics[0]?.severity).toBe('Error');
   });
 
   it('groups the same exception thrown from different places, and keeps the frame', async () => {
@@ -658,7 +681,7 @@ describe('computeLogDiagnostics', () => {
     namespaceLimits.cpuTime = limitValue(9_000, 10_000);
     log = apexLog({
       namespaceLimits: { default: namespaceLimits },
-      exceptions: [event({ text: 'System.QueryException: List has no rows' })],
+      exceptions: [event({ type: 'FATAL_ERROR', text: 'System.QueryException: List has no rows' })],
       eventsById: Array.from({ length: 50 }, (_, index) =>
         event({ type: 'USER_DEBUG', eventIndex: index, text: 'DEBUG|hello' }),
       ),

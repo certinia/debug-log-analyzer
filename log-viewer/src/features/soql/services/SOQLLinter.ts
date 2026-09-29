@@ -49,7 +49,9 @@ export interface SOQLLinterRule {
  */
 export class QueryPlanCostRule implements SOQLLinterRule {
   summary = 'Query is not selective.';
-  severity: Severity = 'Error';
+  // The query ran. It throws against a large object at scale, which is what makes it the
+  // strongest of the risk findings — but an Error here would say the transaction failed.
+  severity: Severity = 'Warning';
   message: string;
 
   constructor(relativeCost: number) {

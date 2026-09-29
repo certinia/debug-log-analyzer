@@ -360,6 +360,28 @@ describe('log-diagnostics', () => {
     expect(text(element, '.title')).toEqual(['Stopped.', 'Slow.', 'Noted.']);
   });
 
+  it('keeps a caveat in the list under a filter that excludes its severity', async () => {
+    result.diagnostics = [
+      {
+        id: 'truncated',
+        severity: 'Warning',
+        caveat: true,
+        summary: 'Log truncated.',
+        message: '',
+        count: 1,
+        eventIndex: 1,
+      },
+      { id: 'a', severity: 'Error', summary: 'Stopped.', message: '', count: 1, eventIndex: 2 },
+    ];
+    const element = await view();
+
+    element.shadowRoot!.querySelectorAll<HTMLButtonElement>('.rollup__seg')[0]!.click();
+    await element.updateComplete;
+
+    // Hiding it would leave the figures it caveats reading as whole.
+    expect(text(element, '.title')).toEqual(['Log truncated.', 'Stopped.']);
+  });
+
   it('releases a held severity when a new log brings new findings', async () => {
     result.diagnostics = [
       { id: 'a', severity: 'Error', summary: 'Stopped.', message: '', count: 1, eventIndex: 1 },

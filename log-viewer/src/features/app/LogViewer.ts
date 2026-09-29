@@ -22,7 +22,7 @@ import {
 import type { LogIssue } from '../notifications/types.js';
 import { installEscapeDeselect } from './escapeDeselect.js';
 import { deriveLogIdentity, type LogIdentityData } from './logIdentity.js';
-import { toLogIssue } from './logIssues.js';
+import { toLogIssues } from './logIssues.js';
 import { parserIssuesToNotifications } from './parserNotifications.js';
 
 // styles
@@ -299,7 +299,7 @@ export class LogViewer extends LitElement {
 
     // Rebuilt per load, never appended to: it describes *this* log, so a previous
     // log's problems must not carry over.
-    this.logProblems = apexLog.logIssues.map(toLogIssue);
+    this.logProblems = toLogIssues(apexLog);
 
     this.notifications = parserIssuesToNotifications(apexLog.parsingErrors);
 

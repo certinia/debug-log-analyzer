@@ -433,7 +433,9 @@ export class LogDiagnosticsView extends LitElement {
     const scoped = this.instances !== null;
     const filters = this._filters;
     const shown = filters.length
-      ? result.diagnostics.filter((diagnostic) => filters.includes(diagnostic.severity))
+      ? result.diagnostics.filter(
+          (diagnostic) => diagnostic.caveat || filters.includes(diagnostic.severity),
+        )
       : result.diagnostics;
 
     return html`
