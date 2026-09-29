@@ -7,6 +7,7 @@ import { classMap } from 'lit/directives/class-map.js';
 import { styleMap } from 'lit/directives/style-map.js';
 
 import { formatDuration, formatInteger, sharePercent } from '../core/utility/Util.js';
+import { anchoredPopoverStyles } from '../styles/anchoredPopover.styles.js';
 import { globalStyles } from '../styles/global.styles.js';
 
 // web components
@@ -108,6 +109,7 @@ export class StackedTimeBar extends LitElement {
 
   static styles = [
     globalStyles,
+    anchoredPopoverStyles,
     css`
       .chart {
         position: relative;
@@ -147,17 +149,8 @@ export class StackedTimeBar extends LitElement {
        scrolled panel can push it out of view, so the bar answers too. In the top
        layer, so no pane clips or covers it. */
       .tip {
-        position: fixed;
         position-anchor: --stacked-bar-tip;
-        /* Out from the pointer, flipping rather than leaving the window. */
         position-area: block-end span-inline-end;
-        position-try-fallbacks:
-          flip-block,
-          flip-inline,
-          flip-block flip-inline;
-        /* Rather than strand at stale coordinates once the bar scrolls away. */
-        position-visibility: anchors-visible;
-        inset: auto;
         margin-block: var(--lana-space-2xs);
         pointer-events: none;
         width: max-content;
@@ -298,7 +291,10 @@ export class StackedTimeBar extends LitElement {
                   class="tip-anchor"
                   style=${styleMap({ left: `${tipCenter.toFixed(1)}%` })}
                 ></span>
-                <div class="tip" popover="manual">
+                <div
+                  class="tip popover-anchored popover-anchored--hides-with-anchor"
+                  popover="manual"
+                >
                   ${tipSlice.label} ·
                   ${readout(tipSlice.value, denominator, this.format)}${
                     tipSlice.detail ? ` · ${tipSlice.detail}` : ''

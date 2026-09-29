@@ -357,12 +357,6 @@ export class CallTreeDetail extends LitElement {
       .grid {
         height: 100%;
       }
-      /* Name: single line, ellipsis — never wrap. */
-      .table-host .tabulator-cell.truncate {
-        white-space: nowrap;
-        overflow: hidden;
-        text-overflow: ellipsis;
-      }
     `,
   ];
 
@@ -689,7 +683,7 @@ export class CallTreeDetail extends LitElement {
           const { originalData } = cell.getData() as { originalData?: LogEvent };
           return textTooltip(originalData ? eventLabel(originalData) : (cell.getValue() as string));
         },
-        cssClass: 'datagrid-code-text truncate',
+        cssClass: 'datagrid-code-text',
         sorter: 'string',
         widthGrow: 1,
         widthShrink: 1,
