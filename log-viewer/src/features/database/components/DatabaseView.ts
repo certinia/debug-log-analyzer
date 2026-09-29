@@ -18,8 +18,7 @@ import { DomListenerController } from '../../../core/events/DomListenerControlle
 import { eventBus, type StatementType } from '../../../core/events/EventBus.js';
 import type { DbFindResultsEventDetail, FindEventMap } from '../../find/findEvents.js';
 import { apexLimitTimeSeries } from '../../timeline/optimised/apex-limit-series.js';
-import { InspectorEmphasis } from '../../../components/inspectorEmphasis.js';
-import { wireInspectorTab } from '../../../components/inspectorTab.js';
+import { InspectorTabController } from '../../../components/InspectorTabController.js';
 import { SelectionEchoGuard } from '../../../core/events/SelectionEchoGuard.js';
 import { formatInteger, isVisible } from '../../../core/utility/Util.js';
 import { soslRowsMetric } from '../limits.js';
@@ -87,12 +86,8 @@ export class DatabaseView extends LitElement {
   };
   findMap = {};
 
-  private _offInspector: (() => void) | null = null;
-
   /** Guards the selects this view makes on the inspector's behalf. */
   private _echoGuard = new SelectionEchoGuard();
-  /** Which of the inspector's reports the grids' mark follows. */
-  private _emphasis = new InspectorEmphasis();
 
   private readonly _findBus = new DomListenerController<FindEventMap>(this, document, {
     'lv-find': (e) => this._find(e.detail.count),
@@ -100,28 +95,25 @@ export class DatabaseView extends LitElement {
     'db-find-results': (e) => this._findResults(e),
   });
 
-  override connectedCallback(): void {
-    super.connectedCallback();
-    this._offInspector = wireInspectorTab('database', this._emphasis, {
-      mark: (eventIndexes) => this._markLocated(eventIndexes),
-      // The eventIndex belongs to exactly one grid, so each is offered it in turn
-      // until one owns it.
-      reveal: (eventIndex) => {
-        const views = this._views;
-        this._echoGuard.run(() => {
-          const owner = views.find((view) => view?.selectByEventIndex(eventIndex));
-          if (owner) {
-            views.filter((view) => view !== owner).forEach((view) => view?.deselectRows());
-          }
-        });
-      },
-      clear: () => {
-        // Only one grid holds the selection, and its report of the clear reaches
-        // the inspector the same way a click does.
-        this._views.forEach((view) => view?.deselectRows());
-      },
-    });
-  }
+  private readonly _inspector = new InspectorTabController(this, 'database', {
+    mark: (eventIndexes) => this._markLocated(eventIndexes),
+    // The eventIndex belongs to exactly one grid, so each is offered it in turn
+    // until one owns it.
+    reveal: (eventIndex) => {
+      const views = this._views;
+      this._echoGuard.run(() => {
+        const owner = views.find((view) => view?.selectByEventIndex(eventIndex));
+        if (owner) {
+          views.filter((view) => view !== owner).forEach((view) => view?.deselectRows());
+        }
+      });
+    },
+    clear: () => {
+      // Only one grid holds the selection, and its report of the clear reaches
+      // the inspector the same way a click does.
+      this._views.forEach((view) => view?.deselectRows());
+    },
+  });
 
   /** Offers the mark to every grid, since one of them owns the statement. */
   private _markLocated(eventIndexes: readonly number[]): void {
@@ -142,7 +134,7 @@ export class DatabaseView extends LitElement {
     if (eventIndex === null) {
       // A mark a picked inspector row left here goes with the selection: it was
       // never a selection of these grids.
-      this._markLocated(this._emphasis.pick([]));
+      this._inspector.dropPick();
       eventBus.emit('detail:select', { source: 'database', selection: null });
       return;
     }
@@ -157,12 +149,6 @@ export class DatabaseView extends LitElement {
       source: 'database',
       selection: { kind: 'event', eventIndex, type },
     });
-  }
-
-  disconnectedCallback(): void {
-    super.disconnectedCallback();
-    this._offInspector?.();
-    this._offInspector = null;
   }
 
   firstUpdated(): void {
