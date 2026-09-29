@@ -22,7 +22,7 @@
 
 import * as PIXI from 'pixi.js';
 
-import { destroyTimelineApp } from '../rendering/pixiApp.js';
+import { createTimelineApp, destroyTimelineApp } from '../rendering/pixiApp.js';
 import type { TimelineMarker, ViewportState } from '../../types/flamechart.types.js';
 import { TIMELINE_CONSTANTS } from '../../types/flamechart.types.js';
 import type { RectangleCache } from '../RectangleCache.js';
@@ -199,20 +199,7 @@ export class MinimapOrchestrator {
     const minimapHeight = calculateMinimapHeight(height);
 
     // Create PIXI Application for minimap
-    this.app = new PIXI.Application();
-    await this.app.init({
-      width,
-      height: minimapHeight,
-      antialias: false,
-      backgroundAlpha: 0,
-      resolution: window.devicePixelRatio || 1,
-      roundPixels: true,
-      autoDensity: true,
-      autoStart: false,
-    });
-    this.app.ticker.stop();
-    this.app.stage.eventMode = 'none';
-    minimapDiv.appendChild(this.app.canvas);
+    this.app = await createTimelineApp(minimapDiv, { width, height: minimapHeight });
 
     // Initialize minimap manager (state and coordinate transforms)
     this.minimapViewport = new MinimapViewport(index.totalDuration, index.maxDepth, width, height);
