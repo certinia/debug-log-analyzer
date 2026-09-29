@@ -1,5 +1,12 @@
 import { Module, type ColumnComponent, type GroupArg, type Tabulator } from 'tabulator-tables';
 
+declare module 'tabulator-tables' {
+  interface Options {
+    /** Enable this module's group sorting on the table (registered below). */
+    groupSort?: boolean;
+  }
+}
+
 export class GroupSort extends Module {
   static moduleName = 'groupSort';
 
@@ -10,7 +17,6 @@ export class GroupSort extends Module {
   }
 
   initialize() {
-    // @ts-expect-error groupSort is a custom propoerty see registerTableOption above
     if (this.table.options.groupSort) {
       this.subscribe('sort-changed', this._sortGroups.bind(this));
       // Recompute group values once filtering has refreshed the active row set —

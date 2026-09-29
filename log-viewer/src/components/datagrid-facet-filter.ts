@@ -6,6 +6,7 @@ import '#vscode-elements/vscode-icon.js';
 import { LitElement, css, html } from 'lit';
 import { customElement, property, state } from 'lit/decorators.js';
 
+import { anchoredPopoverStyles } from '../styles/anchoredPopover.styles.js';
 import { globalStyles } from '../styles/global.styles.js';
 
 let nextId = 0;
@@ -34,6 +35,7 @@ export class DatagridFacetFilter extends LitElement {
 
   static styles = [
     globalStyles,
+    anchoredPopoverStyles,
     css`
       :host {
         display: inline-flex;
@@ -98,18 +100,7 @@ export class DatagridFacetFilter extends LitElement {
       }
 
       .facet-popover {
-        position: fixed;
         position-area: bottom span-left;
-        /* Flip above / to the other side when the default placement would run
-           off-screen, so every value stays visible. */
-        position-try-fallbacks:
-          flip-block,
-          flip-inline,
-          flip-block flip-inline;
-        /* Auto-hide when the trigger scrolls out of view instead of stranding
-           at stale fixed coords in the top layer. */
-        position-visibility: anchors-visible;
-        inset: auto;
         margin: 6px 0 0 0;
         /* Hug the widest option row's content; never narrower than the
            trigger button itself (anchor-size reads the anchored trigger's
@@ -196,7 +187,7 @@ export class DatagridFacetFilter extends LitElement {
       <div
         id=${this._popoverId}
         popover
-        class="filter-popover facet-popover"
+        class="filter-popover facet-popover popover-anchored popover-anchored--hides-with-anchor"
         style="position-anchor:${this._anchorName}"
         role="listbox"
         aria-label=${this.label}

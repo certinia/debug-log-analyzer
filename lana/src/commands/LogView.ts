@@ -9,6 +9,7 @@ import { OpenFileInPackage } from '../display/OpenFileInPackage.js';
 import { WebView } from '../display/WebView.js';
 import { RawLogNavigation } from '../log-features/RawLogNavigation.js';
 import { fileOrFolderExists, readFileText, writeFileText } from '../fs/workspaceFs.js';
+import { errorMessage } from '../tryCatch.js';
 import {
   PRIVATE_SECTIONS,
   getColumnOverrides,
@@ -74,7 +75,7 @@ export class LogView {
     // channel rather than swallowed: the ask that would have shown it may never
     // come. That handler still sees it and reports it if it does.
     beforeSendLog?.catch((error: unknown) => {
-      const message = error instanceof Error ? error.message : String(error);
+      const message = errorMessage(error);
       context.display.output(`Could not retrieve the log: ${message}`);
     });
     const logName = logUri ? Utils.basename(logUri) : 'Untitled';
@@ -92,7 +93,7 @@ export class LogView {
     const codiconUri = panel.webview.asWebviewUri(Utils.joinPath(logViewerRoot, 'codicon.css'));
     const index = Utils.joinPath(logViewerRoot, 'index.html');
     const template = await readFileText(index).catch((error: unknown) => {
-      const message = error instanceof Error ? error.message : String(error);
+      const message = errorMessage(error);
       const shown = index.scheme === 'file' ? index.fsPath : index.toString(true);
       throw new Error(`Could not read the log viewer at ${shown}: ${message}`, {
         cause: error,
@@ -149,9 +150,7 @@ export class LogView {
                 const retrievedLog = await beforeSendLog;
                 await LogView.sendLog(requestId, panel, context, logUri, retrievedLog || logData);
               } catch (err: unknown) {
-                context.display.showErrorMessage(
-                  `Error loading logfile: ${err instanceof Error ? err.message : String(err)}`,
-                );
+                context.display.showErrorMessage(`Error loading logfile: ${errorMessage(err)}`);
                 throw err;
               }
               break;
@@ -222,7 +221,7 @@ export class LogView {
 
                 if (destinationFile) {
                   writeFileText(destinationFile, fileContent).catch((error) => {
-                    const msg = error instanceof Error ? error.message : String(error);
+                    const msg = errorMessage(error);
                     vscWindow.showErrorMessage(`Unable to save file: ${msg}`);
                   });
                 }
@@ -238,7 +237,7 @@ export class LogView {
             }
           }
         } catch (err: unknown) {
-          const message = err instanceof Error ? err.message : String(err);
+          const message = errorMessage(err);
           // The webview waits on a reply; unanswered, it shows a placeholder for good.
           await LogView.replyError(panel, requestId, message);
           // Not rethrown: nothing consumes an async listener's rejection, so it would

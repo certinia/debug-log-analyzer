@@ -8,6 +8,7 @@ import { customElement, property } from 'lit/decorators.js';
 import '#vscode-elements/vscode-icon.js';
 
 // styles
+import { anchoredPopoverStyles } from '../styles/anchoredPopover.styles.js';
 import { globalStyles } from '../styles/global.styles.js';
 
 /**
@@ -56,6 +57,7 @@ export class AnchoredPopover extends LitElement {
 
   static styles = [
     globalStyles,
+    anchoredPopoverStyles,
     css`
       :host {
         display: inline-flex;
@@ -77,15 +79,7 @@ export class AnchoredPopover extends LitElement {
       }
 
       .panel {
-        position: fixed;
         position-anchor: --anchored-popover-trigger;
-        /* Flip above / to the other side rather than running off-screen: the header
-           sits at the top of a panel that can be docked at either edge. */
-        position-try-fallbacks:
-          flip-block,
-          flip-inline,
-          flip-block flip-inline;
-        inset: auto;
         margin: 6px 0 0 0;
         box-sizing: border-box;
         width: var(--anchored-popover-width, 320px);
@@ -149,7 +143,7 @@ export class AnchoredPopover extends LitElement {
       </button>
       <div
         part="panel"
-        class="panel filter-popover"
+        class="panel filter-popover popover-anchored"
         id="anchored-popover-panel"
         popover
         role="group"

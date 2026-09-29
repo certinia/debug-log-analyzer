@@ -70,7 +70,7 @@ export function renderWash(
   const screenX = timestamp * viewport.zoom;
   const screenWidth = duration * viewport.zoom;
 
-  // Must match rectangle rendering in EventBatchRenderer: x + halfGap, width - gap.
+  // Must match rectangle rendering in MeshRectangleRenderer: x + halfGap, width - gap.
   const halfGap = TIMELINE_CONSTANTS.RECT_GAP / 2;
   const y = depth * TIMELINE_CONSTANTS.EVENT_HEIGHT + halfGap;
   const height = TIMELINE_CONSTANTS.EVENT_HEIGHT - TIMELINE_CONSTANTS.RECT_GAP;

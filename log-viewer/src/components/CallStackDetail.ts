@@ -17,6 +17,7 @@ import { soqlInlineElement } from '../features/soql/format/inlineCell.js';
 import { soqlSyntaxStyles } from '../features/soql/styles/soql-syntax.css.js';
 import { eventBus } from '../core/events/EventBus.js';
 import { SelectionEchoGuard } from '../core/events/SelectionEchoGuard.js';
+import { SubscriptionController } from '../core/events/SubscriptionController.js';
 import { LocatedRowMarker, rowIndexStamper } from './locatedRow.js';
 import { globalStyles } from '../styles/global.styles.js';
 import { progressColumnWidth } from '../tabulator/format/measureWidth.js';
@@ -53,20 +54,18 @@ export class CallStackDetail extends LitElement {
   private _echoGuard = new SelectionEchoGuard();
   /** Marks the row for the frame under the pointer in the tab's own view. */
   private _locatedRow = new LocatedRowMarker();
-  private _locateUnsubscribe?: () => void;
   private _contextMenu: ContextMenu | null = null;
   /** eventIndex of the row whose context menu is open. */
   private _menuEventIndex = -1;
 
+  private readonly _subscriptions = new SubscriptionController(this, () => [
+    eventBus.on('detail:locate', ({ eventIndexes }) => {
+      this._locatedRow.mark(this._tableHost(), eventIndexes);
+    }),
+  ]);
+
   firstUpdated(): void {
     this._contextMenu = this.renderRoot.querySelector('context-menu');
-  }
-
-  connectedCallback(): void {
-    super.connectedCallback();
-    this._locateUnsubscribe = eventBus.on('detail:locate', ({ eventIndexes }) => {
-      this._locatedRow.mark(this._tableHost(), eventIndexes);
-    });
   }
 
   static styles = [
@@ -90,12 +89,6 @@ export class CallStackDetail extends LitElement {
         display: flex;
         justify-content: flex-end;
       }
-      /* Frame: single line, ellipsis — never wrap. */
-      #call-stack-table .tabulator-cell.truncate {
-        white-space: nowrap;
-        overflow: hidden;
-        text-overflow: ellipsis;
-      }
     `,
   ];
 
@@ -110,8 +103,6 @@ export class CallStackDetail extends LitElement {
 
   disconnectedCallback(): void {
     super.disconnectedCallback();
-    this._locateUnsubscribe?.();
-    this._locateUnsubscribe = undefined;
     this._locatedRow.clear();
     this._table?.destroy();
     this._table = null;
@@ -167,7 +158,7 @@ export class CallStackDetail extends LitElement {
           widthGrow: 1,
           widthShrink: 1,
           minWidth: 140,
-          cssClass: 'datagrid-code-text truncate',
+          cssClass: 'datagrid-code-text',
           tooltip: textCellTooltip,
           formatter: frameFormatter,
           bottomCalc: () => 'Total',

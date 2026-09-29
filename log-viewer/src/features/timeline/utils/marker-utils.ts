@@ -8,7 +8,7 @@
  * Helper functions for extracting and validating  markers from ApexLog.
  */
 
-import type { ApexLog } from 'apex-log-parser';
+import type { ApexLog } from '@apexdevtools/apex-log-parser';
 import type { NoDataSpan, TimelineMarker } from '../types/flamechart.types.js';
 import { isMarkerType, markerTypeForIssue } from '../types/flamechart.types.js';
 
@@ -141,27 +141,4 @@ export function noDataSpans(markers: TimelineMarker[]): NoDataSpan[] {
     }
   }
   return spans.sort((a, b) => a.startTime - b.startTime);
-}
-
-/**
- * Validates a single  marker.
- * Used for runtime validation and testing.
- *
- * @param marker - Marker to validate
- * @returns True if marker is valid, false otherwise
- */
-export function validateMarker(marker: TimelineMarker): boolean {
-  if (!marker.id) {
-    return false;
-  }
-
-  if (!isMarkerType(marker.type)) {
-    return false;
-  }
-
-  if (marker.startTime < 0) {
-    return false;
-  }
-
-  return true;
 }

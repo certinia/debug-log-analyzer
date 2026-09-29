@@ -2,7 +2,7 @@
  * Copyright (c) 2026 Certinia Inc. All rights reserved.
  */
 import { describe, expect, it } from '@jest/globals';
-import type { SOQLExecuteBeginLine } from 'apex-log-parser';
+import type { SOQLExecuteBeginLine } from '@apexdevtools/apex-log-parser';
 
 import { deriveSoqlObject, parseFromObject } from '../sobjectClassification.js';
 

@@ -6,7 +6,7 @@
  * MarkerHitTest
  *
  * Shared utility for hit testing timeline markers.
- * Used by TimelineMarkerRenderer and MeshMarkerRenderer.
+ * Used by MeshMarkerRenderer.
  */
 
 import type { TimelineMarker } from '../../types/flamechart.types.js';

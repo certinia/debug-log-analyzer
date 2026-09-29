@@ -9,7 +9,7 @@ import {
   metricSparkline,
   seriesGauges,
 } from '../logOverviewMetrics.js';
-import { emptyLimits, seriesEvent, timeSeries } from './limitsTestUtils.js';
+import { emptyLimits, limitValue, seriesEvent, timeSeries } from './limitsTestUtils.js';
 
 describe('limitTotals', () => {
   it('reads every metric as it rises', () => {
@@ -23,8 +23,8 @@ describe('limitTotals', () => {
       ]),
     );
 
-    expect(totals.soqlQueries).toEqual({ used: 186, limit: 100 });
-    expect(totals.cpuTime).toEqual({ used: 10_712, limit: 10_000 });
+    expect(totals.soqlQueries).toEqual(limitValue(186, 100));
+    expect(totals.cpuTime).toEqual(limitValue(10_712, 10_000));
   });
 
   it('reads every metric from its peak: a later report can be lower', () => {
@@ -44,9 +44,9 @@ describe('limitTotals', () => {
     );
 
     // The governor charged the transaction at its highest point, breach included.
-    expect(totals.heapSize).toEqual({ used: 5_000_000, limit: 6_000_000 });
-    expect(totals.cpuTime).toEqual({ used: 10_712, limit: 10_000 });
-    expect(totals.soqlQueries).toEqual({ used: 101, limit: 100 });
+    expect(totals.heapSize).toEqual(limitValue(5_000_000, 6_000_000));
+    expect(totals.cpuTime).toEqual(limitValue(10_712, 10_000));
+    expect(totals.soqlQueries).toEqual(limitValue(101, 100));
   });
 
   it('holds every governor metric, at zero where the series has none', () => {

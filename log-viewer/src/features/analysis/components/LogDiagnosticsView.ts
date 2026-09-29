@@ -7,6 +7,7 @@ import { LitElement, css, html, unsafeCSS, type PropertyValues } from 'lit';
 import { customElement, property, state } from 'lit/decorators.js';
 
 import { dispatchInspectorReveal } from '../../../components/inspectorReveal.js';
+import { ResizeController } from '../../../core/events/ResizeController.js';
 import { logContext } from '../../../core/log/logContext.js';
 import type { LogStore } from '../../../core/log/LogStore.js';
 import { formatDuration } from '../../../core/utility/Util.js';
@@ -102,21 +103,7 @@ export class LogDiagnosticsView extends LitElement {
 
   private _columns = FALLBACK_COLUMNS;
 
-  private _resize: ResizeObserver | null = null;
-
-  override connectedCallback() {
-    super.connectedCallback();
-    if (typeof ResizeObserver !== 'undefined') {
-      this._resize = new ResizeObserver(() => this._measure());
-      this._resize.observe(this);
-    }
-  }
-
-  override disconnectedCallback() {
-    this._resize?.disconnect();
-    this._resize = null;
-    super.disconnectedCallback();
-  }
+  private readonly _resize = new ResizeController(this, () => this._measure());
 
   override willUpdate() {
     // Keyed on the occurrences themselves: the host builds the array in its own
@@ -446,7 +433,9 @@ export class LogDiagnosticsView extends LitElement {
     const scoped = this.instances !== null;
     const filters = this._filters;
     const shown = filters.length
-      ? result.diagnostics.filter((diagnostic) => filters.includes(diagnostic.severity))
+      ? result.diagnostics.filter(
+          (diagnostic) => diagnostic.caveat || filters.includes(diagnostic.severity),
+        )
       : result.diagnostics;
 
     return html`

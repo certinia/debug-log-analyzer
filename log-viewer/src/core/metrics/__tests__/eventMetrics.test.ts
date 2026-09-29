@@ -2,18 +2,18 @@
  * Copyright (c) 2026 Certinia Inc. All rights reserved.
  */
 import { describe, expect, it } from '@jest/globals';
-import type { GovernorLimits, LogEvent } from 'apex-log-parser';
-
+import type { LogEvent } from '@apexdevtools/apex-log-parser';
+import { governorLimits, limitValue } from '../../../components/__tests__/limitsTestUtils.js';
 import { EVENT_METRICS, formatBytes, HEAP_PEAK, usageParts } from '../eventMetrics.js';
 
-const limits = {
-  soqlQueries: { limit: 100 },
-  queryRows: { limit: 50_000 },
-  dmlStatements: { limit: 150 },
-  dmlRows: { limit: 10_000 },
-  soslQueries: { limit: 20 },
-  heapSize: { limit: 6_000_000 },
-} as unknown as GovernorLimits;
+const limits = governorLimits({
+  soqlQueries: limitValue(0, 100),
+  queryRows: limitValue(0, 50_000),
+  dmlStatements: limitValue(0, 150),
+  dmlRows: limitValue(0, 10_000),
+  soslQueries: limitValue(0, 20),
+  heapSize: limitValue(0, 6_000_000),
+});
 
 describe('usageParts', () => {
   it("reads the selection against the log's own total, with the limit as a qualifier", () => {

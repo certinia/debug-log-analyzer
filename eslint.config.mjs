@@ -35,15 +35,8 @@ export default defineConfig(
     languageOptions: {
       parserOptions: {
         projectService: {
-          // Neither is in a tsconfig: apex-log-parser builds only src, and a bundler
-          // config belongs to no project. Without this the parser reports them as errors.
-          allowDefaultProject: [
-            'rolldown.config.ts',
-            'apex-log-parser/__tests__/ApexLogParser.test.ts',
-            'apex-log-parser/__tests__/EventMetadata.test.ts',
-            'apex-log-parser/__tests__/FlowDatabaseAttribution.test.ts',
-            'apex-log-parser/__tests__/GranularLimits.test.ts',
-          ],
+          // A bundler config belongs to no project. Without this the parser reports it as an error.
+          allowDefaultProject: ['rolldown.config.ts'],
         },
         tsconfigRootDir: import.meta.dirname,
         // AGENTS.md keeps `typescript` aliased to @typescript/typescript6 because

@@ -12,6 +12,7 @@ import {
   type SelectionView,
   eventBus,
 } from '../core/events/EventBus.js';
+import { SubscriptionController } from '../core/events/SubscriptionController.js';
 import type { InspectorLocateEvent, InspectorRevealEvent } from './inspectorReveal.js';
 import { logContext } from '../core/log/logContext.js';
 import type { LogStore } from '../core/log/LogStore.js';
@@ -138,15 +139,15 @@ export class LogInspector extends LitElement {
   private _userAdjusted = false;
   // Guards against a slow rebuild resolving after a newer selection.
   private _rebuildEpoch = 0;
-  private _unsubscribe: Array<() => void> = [];
+
+  private readonly _subscriptions = new SubscriptionController(this, () => [
+    eventBus.on('detail:select', (d) => this._onSelect(d)),
+    eventBus.on('detail:view', (d) => this._onView(d)),
+    eventBus.on('detail:toggle', (d) => this._onToggle(d)),
+  ]);
 
   constructor() {
     super();
-    this._unsubscribe.push(
-      eventBus.on('detail:select', (d) => this._onSelect(d)),
-      eventBus.on('detail:view', (d) => this._onView(d)),
-      eventBus.on('detail:toggle', (d) => this._onToggle(d)),
-    );
     getSettings()
       .then((settings) => {
         const panel = settings?.inspector;
@@ -175,14 +176,6 @@ export class LogInspector extends LitElement {
   // Open when the user says so, else only if a selection auto-opened it.
   private get _visible(): boolean {
     return this._visiblePref ?? this._autoOpened;
-  }
-
-  disconnectedCallback(): void {
-    super.disconnectedCallback();
-    for (const off of this._unsubscribe) {
-      off();
-    }
-    this._unsubscribe = [];
   }
 
   willUpdate(changed: PropertyValues): void {

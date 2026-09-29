@@ -7,6 +7,7 @@ import {
   layoutMarkerRects,
   noDataSpanAt,
   markerDuration,
+  sortMarkersByTimeAndSeverity,
   type MarkerLayoutItem,
 } from '../markers/MarkerProcessor.js';
 
@@ -92,6 +93,17 @@ describe('layoutMarkerRects', () => {
       expect(rects).toHaveLength(2);
       expect(rects[1]!.x).toBe(51);
     });
+  });
+});
+
+describe('sortMarkersByTimeAndSeverity', () => {
+  it('orders by startTime, higher severity first on a tie', () => {
+    const sorted = sortMarkersByTimeAndSeverity([
+      { id: 'late', type: 'error', startTime: 300_000, summary: 'Late' },
+      { id: 'skip', type: 'skip', startTime: 100_000, summary: 'Skip' },
+      { id: 'exception', type: 'exception', startTime: 100_000, summary: 'Exception' },
+    ]);
+    expect(sorted.map((m) => m.id)).toEqual(['exception', 'skip', 'late']);
   });
 });
 

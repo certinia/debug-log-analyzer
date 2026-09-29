@@ -53,6 +53,22 @@ pnpm i
 > `ERR_PNPM_IGNORED_BUILDS`, a dependency has gained an install script. Read it, then record
 > the decision with `pnpm approve-builds`.
 
+### Working against a local parser
+
+The log parser is the [`@apexdevtools/apex-log-parser`](https://github.com/apex-dev-tools/apex-log-parser)
+package, pinned in `package.json`, `lana/package.json` and `log-viewer/package.json`. To test an
+unreleased change, run `pnpm build` in the parser checkout, then point all three at it:
+
+```zsh
+for d in . lana log-viewer; do
+  ln -sfn <path-to-parser> $d/node_modules/@apexdevtools/apex-log-parser
+done
+```
+
+All three are needed, because each resolves its own copy. `readlink node_modules/@apexdevtools/apex-log-parser`
+shows where it points, and `pnpm install` undoes it. Re-run the parser's `pnpm build` after
+every edit — there is no watch script.
+
 ## ⚙️ Building and Bundling
 
 You can build the extension and prepare it for local development, run the watcher to re build automatically or production use. Here's how:

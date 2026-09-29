@@ -10,12 +10,12 @@
  * Apex-specific logic is handled via callbacks.
  */
 
-import type { LogEvent } from 'apex-log-parser';
+import type { LogEvent } from '@apexdevtools/apex-log-parser';
 import * as PIXI from 'pixi.js';
 
 import { HoverTracker } from './interaction/HoverTracker.js';
 import { HoverHighlightRenderer } from './rendering/HoverHighlightRenderer.js';
-import { destroyTimelineApp } from './rendering/pixiApp.js';
+import { createTimelineApp, destroyTimelineApp } from './rendering/pixiApp.js';
 import type {
   EditorColors,
   EventNode,
@@ -1106,20 +1106,7 @@ export class FlameChart<E extends EventNode = EventNode> {
     // Minimap app is created by MinimapOrchestrator in setupMinimap()
 
     // Create main timeline app with measured height
-    this.app = new PIXI.Application();
-    await this.app.init({
-      width,
-      height: mainTimelineHeight,
-      antialias: false,
-      backgroundAlpha: 0,
-      resolution: window.devicePixelRatio || 1,
-      roundPixels: true,
-      autoDensity: true,
-      autoStart: false,
-    });
-    this.app.ticker.stop();
-    this.app.stage.eventMode = 'none';
-    mainDiv.appendChild(this.app.canvas);
+    this.app = await createTimelineApp(mainDiv, { width, height: mainTimelineHeight });
 
     return { mainTimelineHeight };
   }

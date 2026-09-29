@@ -24,6 +24,7 @@ import { eventBus } from '../../../core/events/EventBus.js';
 import { logContext } from '../../../core/log/logContext.js';
 import type { LogStore } from '../../../core/log/LogStore.js';
 import { SelectionEchoGuard } from '../../../core/events/SelectionEchoGuard.js';
+import { SubscriptionController } from '../../../core/events/SubscriptionController.js';
 import { formatDuration, formatInteger } from '../../../core/utility/Util.js';
 import { globalStyles } from '../../../styles/global.styles.js';
 import { progressColumnWidth } from '../../../tabulator/format/measureWidth.js';
@@ -149,8 +150,6 @@ export class DatabaseTime extends LitElement {
 
   /** Marks the row for the statement under the pointer in the grid beside. */
   private _locatedRow = new LocatedRowMarker();
-  private _locateUnsubscribe?: () => void;
-  private _selectionClearUnsubscribe?: () => void;
 
   /** eventIndex to the ids of the rows that name it, built on the first mark. */
   private _rowsByEvent: Map<number, number[]> | null = null;
@@ -185,33 +184,22 @@ export class DatabaseTime extends LitElement {
         flex: 1 1 auto;
         min-height: 0;
       }
-      /* Name: single line, ellipsis — never wrap. */
-      .tabulator-cell.truncate {
-        white-space: nowrap;
-        overflow: hidden;
-        text-overflow: ellipsis;
-      }
     `,
   ];
 
-  connectedCallback(): void {
-    super.connectedCallback();
-    this._locateUnsubscribe = eventBus.on('detail:locate', ({ eventIndexes }) => {
+  private readonly _subscriptions = new SubscriptionController(this, () => [
+    eventBus.on('detail:locate', ({ eventIndexes }) => {
       this._locatedRow.mark(this._host(), this._rowIdsFor(eventIndexes));
-    });
+    }),
     // Escape clears the tab's selection; a picked row here is no selection of
     // the grid, so this table drops its own.
-    this._selectionClearUnsubscribe = eventBus.on('selection:clear', () => {
+    eventBus.on('selection:clear', () => {
       this._dropPick();
-    });
-  }
+    }),
+  ]);
 
   disconnectedCallback(): void {
     super.disconnectedCallback();
-    this._locateUnsubscribe?.();
-    this._locateUnsubscribe = undefined;
-    this._selectionClearUnsubscribe?.();
-    this._selectionClearUnsubscribe = undefined;
     this._building?.abort();
     // Rows go with the table, so the mark can't outlive them.
     this._locatedRow.clear();
@@ -397,7 +385,7 @@ export class DatabaseTime extends LitElement {
         // fixed content width.
         formatter: nameFormatter,
         tooltip: textCellTooltip,
-        cssClass: 'datagrid-code-text truncate',
+        cssClass: 'datagrid-code-text',
         sorter: 'string',
         widthGrow: 1,
         widthShrink: 1,

@@ -2,7 +2,7 @@
  * Copyright (c) 2020 Certinia Inc. All rights reserved.
  */
 import { describe, expect, it } from '@jest/globals';
-import { parse } from 'apex-log-parser';
+import { parse } from '@apexdevtools/apex-log-parser';
 
 import { currentLogStore, logStoreFor, setCurrentLog } from '../LogStore.js';
 
