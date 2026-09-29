@@ -1,5 +1,12 @@
 import { Module, type GroupComponent, type Tabulator } from 'tabulator-tables';
 
+declare module 'tabulator-tables' {
+  interface Options {
+    /** Enable this module's group calcs on the table (registered below). */
+    groupCalcs?: boolean;
+  }
+}
+
 type GroupHeaderFn = (
   value: unknown,
   count: number,
@@ -18,7 +25,6 @@ export class GroupCalcs extends Module {
   }
 
   initialize() {
-    // @ts-expect-error groupCalcs is a custom option registered above
     if (!this.table.options.groupCalcs) {
       return;
     }

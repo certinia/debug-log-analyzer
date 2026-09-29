@@ -9,6 +9,7 @@ import {
   type TemplateResult,
 } from 'lit';
 
+import { walkEvents } from '../core/utility/EventTree.js';
 import { subscribeSettings, type LanaSettings } from '../features/settings/Settings.js';
 import { addCustomThemes, getTheme } from '../features/timeline/themes/ThemeSelector.js';
 import { CATEGORY_THEME_KEY, DEFAULT_THEME_NAME } from '../features/timeline/themes/Themes.js';
@@ -56,15 +57,9 @@ export function categorySelfTimes(root: ApexLog): CategoryTime[] {
     return cached;
   }
   const totals = new Map<string, number>();
-  const stack = [...root.children];
-  while (stack.length) {
-    const event = stack.pop()!; // non-empty: the loop condition just checked
-
+  for (const event of walkEvents(root.children)) {
     const category = categoryName(event.category);
     totals.set(category, (totals.get(category) ?? 0) + event.duration.self);
-    for (const child of event.children) {
-      stack.push(child);
-    }
   }
   const slices = [...totals]
     .filter(([, selfTime]) => selfTime > 0)

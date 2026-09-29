@@ -10,6 +10,7 @@ import {
 } from '@apexdevtools/apex-log-parser';
 
 import { DEFAULT_NAMESPACE, getCallerNamespace } from '../../../core/utility/CallerNamespace.js';
+import { sharePercent } from '../../../core/utility/Util.js';
 import { deriveSoqlObject } from './sobjectClassification.js';
 
 /** The label for a DML statement whose SObject the log never names. */
@@ -197,11 +198,11 @@ export function concentration(
   for (const statement of overview.ranked) {
     held += statement.netNs;
     count += 1;
-    if ((held / databaseNs) * 100 >= target) {
+    if (sharePercent(held, databaseNs) >= target) {
       break;
     }
   }
-  return { count, percent: (held / databaseNs) * 100 };
+  return { count, percent: sharePercent(held, databaseNs) };
 }
 
 /** The kind's own figures on {@link DatabaseTime}. */
@@ -325,7 +326,7 @@ function compute(root: ApexLog): DatabaseOverview {
   }
 
   time.timeNs = time.soql.timeNs + time.dml.timeNs + time.sosl.timeNs;
-  time.percentOfLog = logNs > 0 ? (time.timeNs / logNs) * 100 : 0;
+  time.percentOfLog = sharePercent(time.timeNs, logNs);
 
   return {
     time,

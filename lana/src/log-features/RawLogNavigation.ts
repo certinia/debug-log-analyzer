@@ -4,6 +4,7 @@
 import { Selection, commands, window, type Uri } from 'vscode';
 
 import { readFileText } from '../fs/workspaceFs.js';
+import { errorMessage } from '../tryCatch.js';
 
 /**
  * Handles navigation within raw Apex log files.
@@ -50,7 +51,7 @@ export class RawLogNavigation {
         selection: new Selection(lineNumber, 0, lineNumber, lineLength),
       });
     } catch (error) {
-      const msg = error instanceof Error ? error.message : String(error);
+      const msg = errorMessage(error);
       window.showErrorMessage(`Unable to navigate to log line: ${msg}`);
     }
   }
