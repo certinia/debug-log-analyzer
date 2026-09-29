@@ -25,6 +25,7 @@ import {
 import { InspectorEmphasis } from '../../../components/inspectorEmphasis.js';
 import { revealFirstOf, wireInspectorTab } from '../../../components/inspectorTab.js';
 import { SelectionEchoGuard } from '../../../core/events/SelectionEchoGuard.js';
+import { SubscriptionController } from '../../../core/events/SubscriptionController.js';
 import { eventByEventIndex } from '../../../core/utility/EventSearch.js';
 import { isVisible } from '../../../core/utility/Util.js';
 import { getSettings, updateSetting } from '../../settings/Settings.js';
@@ -152,12 +153,8 @@ export class AnalysisView extends LitElement {
   // single boolean read with no walk and no cache.
   _showDetailsFilter = (data: BottomUpRow): boolean => data._hasDetailsDeep;
 
-  /** Releases the category-colouring settings subscription; set while connected. */
-  private _categoryColoringOff: (() => void) | null = null;
-
   /** Guards the programmatic select made on the inspector's behalf. */
   private _echoGuard = new SelectionEchoGuard();
-  private _inspectorUnsubscribe: (() => void) | null = null;
   private _locatedRow = new LocatedRowMarker();
   private _locateIds = new LocatedRowIds();
   private _emphasis = new InspectorEmphasis();
@@ -168,10 +165,9 @@ export class AnalysisView extends LitElement {
     'lv-find-close': (e) => void this._find(e),
   });
 
-  override connectedCallback(): void {
-    super.connectedCallback();
-    this._categoryColoringOff = wireCategoryColoring(this);
-    this._inspectorUnsubscribe = wireInspectorTab('analysis', this._emphasis, {
+  private readonly _subscriptions = new SubscriptionController(this, () => [
+    wireCategoryColoring(this),
+    wireInspectorTab('analysis', this._emphasis, {
       // A row is a method bucket rather than one event, so a frame is translated
       // into the paths of the rows it heads.
       mark: (eventIndexes) => this._markLocated(eventIndexes),
@@ -186,15 +182,11 @@ export class AnalysisView extends LitElement {
       revealMerged: revealFirstOf((eventIndex, signal) =>
         this._revealEventIndex(eventIndex, signal),
       ),
-    });
-  }
+    }),
+  ]);
 
   disconnectedCallback(): void {
     super.disconnectedCallback();
-    this._categoryColoringOff?.();
-    this._categoryColoringOff = null;
-    this._inspectorUnsubscribe?.();
-    this._inspectorUnsubscribe = null;
     this._locatedRow.clear();
   }
 

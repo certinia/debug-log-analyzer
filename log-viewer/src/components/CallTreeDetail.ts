@@ -30,6 +30,7 @@ import { makeSumSelfTimeAllVisible } from '../features/call-tree/utils/BottomCal
 import { eventLabel } from '../features/call-tree/utils/eventText.js';
 import { soqlInlineElement } from '../features/soql/format/inlineCell.js';
 import { SelectionEchoGuard } from '../core/events/SelectionEchoGuard.js';
+import { SubscriptionController } from '../core/events/SubscriptionController.js';
 import { soqlSyntaxStyles } from '../features/soql/styles/soql-syntax.css.js';
 import { globalStyles } from '../styles/global.styles.js';
 import { progressColumnWidth } from '../tabulator/format/measureWidth.js';
@@ -204,8 +205,18 @@ export class CallTreeDetail extends LitElement {
   // The frames the tab on screen last reported under its pointer, so a table
   // that finishes building after the report still marks them.
   private _locatedEvents: readonly number[] = [];
-  private _locateUnsubscribe?: () => void;
-  private _selectionClearUnsubscribe?: () => void;
+
+  private readonly _subscriptions = new SubscriptionController(this, () => [
+    eventBus.on('detail:locate', ({ eventIndexes }) => {
+      this._locatedEvents = eventIndexes;
+      this._markLocated();
+    }),
+    // Escape clears the selection of the tab on screen. A picked row here is no
+    // selection of that view, so this table drops its own.
+    eventBus.on('selection:clear', () => {
+      this._dropPick();
+    }),
+  ]);
 
   /**
    * Bucket path to the ids of the rows that stand for it, per grouped mode. Built
@@ -232,19 +243,6 @@ export class CallTreeDetail extends LitElement {
 
   firstUpdated(): void {
     this._contextMenu = this.renderRoot.querySelector('context-menu');
-  }
-
-  connectedCallback(): void {
-    super.connectedCallback();
-    this._locateUnsubscribe = eventBus.on('detail:locate', ({ eventIndexes }) => {
-      this._locatedEvents = eventIndexes;
-      this._markLocated();
-    });
-    // Escape clears the selection of the tab on screen. A picked row here is no
-    // selection of that view, so this table drops its own.
-    this._selectionClearUnsubscribe = eventBus.on('selection:clear', () => {
-      this._dropPick();
-    });
   }
 
   /**
@@ -439,10 +437,6 @@ export class CallTreeDetail extends LitElement {
 
   disconnectedCallback(): void {
     super.disconnectedCallback();
-    this._locateUnsubscribe?.();
-    this._locateUnsubscribe = undefined;
-    this._selectionClearUnsubscribe?.();
-    this._selectionClearUnsubscribe = undefined;
     this._switch?.abort();
     this._destroyTables();
   }

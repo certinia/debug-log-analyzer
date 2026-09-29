@@ -2,13 +2,9 @@
  * Copyright (c) 2026 Certinia Inc. All rights reserved.
  */
 import type { ApexLog } from '@apexdevtools/apex-log-parser';
-import {
-  html,
-  type ReactiveController,
-  type ReactiveControllerHost,
-  type TemplateResult,
-} from 'lit';
+import { html, type ReactiveControllerHost, type TemplateResult } from 'lit';
 
+import { SubscriptionController } from '../core/events/SubscriptionController.js';
 import { walkEvents } from '../core/utility/EventTree.js';
 import { subscribeSettings, type LanaSettings } from '../features/settings/Settings.js';
 import { addCustomThemes, getTheme } from '../features/timeline/themes/ThemeSelector.js';
@@ -96,26 +92,16 @@ export function categoryPalette(
  * whenever the timeline theme changes, so its swatches and meters follow the
  * flame chart without a reload.
  */
-export class CategoryPaletteController implements ReactiveController {
+export class CategoryPaletteController {
   private _color = categoryPalette(null);
-  private _unsubscribe: (() => void) | null = null;
-  private readonly _host: ReactiveControllerHost;
 
   constructor(host: ReactiveControllerHost) {
-    this._host = host;
-    host.addController(this);
-  }
-
-  hostConnected(): void {
-    this._unsubscribe = subscribeSettings((settings) => {
-      this._color = categoryPalette(settings.timeline);
-      this._host.requestUpdate();
-    });
-  }
-
-  hostDisconnected(): void {
-    this._unsubscribe?.();
-    this._unsubscribe = null;
+    new SubscriptionController(host, () => [
+      subscribeSettings((settings) => {
+        this._color = categoryPalette(settings.timeline);
+        host.requestUpdate();
+      }),
+    ]);
   }
 
   /** The category's colour; uncategorised events read as {@link OTHER_CATEGORY}. */
