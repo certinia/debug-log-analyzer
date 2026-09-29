@@ -242,12 +242,12 @@ export class HotPath extends LitElement {
     }
     const text =
       truncation.regionCount === 1
-        ? '1 truncated call — timings below it under-report'
-        : `${truncation.regionCount} truncated calls — timings below them under-report`;
+        ? 'Log truncated — the timings below under-report'
+        : `Log truncated in ${truncation.regionCount} places — the timings below under-report`;
     return html`<button
       class="bleed-row caveat-row"
       type="button"
-      title="Show the first truncated call in the tree"
+      title="Show where the log was first truncated"
       @click=${() => dispatchInspectorReveal(this, truncation.firstEventIndex)}
     >
       <vscode-icon class="sev-warning" name="warning"></vscode-icon>

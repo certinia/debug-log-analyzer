@@ -55,7 +55,7 @@ export interface ExecutionHighlights {
    *  out. A branch is a frame the path did not follow, so it reads the same. */
   hotPathBranches: HotPathFrame[];
   hotSpots: HotSpotRow[];
-  /** Calls the log's size cap cut off; their subtrees under-report every timing. */
+  /** Sections the platform dropped; every timing spanning one under-reports. */
   truncation: { regionCount: number; firstEventIndex: number } | null;
 }
 
@@ -204,24 +204,14 @@ function largestInstance(instances: LogEvent[]): LogEvent {
  * starts before the last counted one of its signature ended is inside it. The
  * call-stack route `Aggregation.ts` and `RowGrouper.ts` take with a `Multiset`
  * is not open to a flat pass, which never sees a frame close.
- * Truncation flags every unclosed frame in a cut-off chain, so only top-most
- * flagged events count as regions; the first one seen is the first in the log.
  */
 function scanEvents(apexLog: ApexLog): Pick<ExecutionHighlights, 'hotSpots' | 'truncation'> {
   const spots = new Map<string, { row: HotSpotRow; maxSelf: number; countedUntil: number }>();
-  let regionCount = 0;
-  let firstEventIndex = -1;
 
   for (const event of apexLog.eventsById) {
     // The log itself holds the gap time, and no call stands for it.
     if (event === apexLog) {
       continue;
-    }
-    if (event.isTruncated && !event.parent?.isTruncated) {
-      regionCount++;
-      if (firstEventIndex < 0) {
-        firstEventIndex = event.eventIndex;
-      }
     }
     const self = event.duration.self;
     const timed = Math.max(self, 0);
@@ -268,9 +258,15 @@ function scanEvents(apexLog: ApexLog): Pick<ExecutionHighlights, 'hotSpots' | 't
     row.totalTime = Math.max(row.totalTime, row.selfTime);
   }
 
+  // The same regions the Analysis notice counts, so the two never state a different
+  // number for one log. An event's own `isTruncated` cannot: the parser sets it on
+  // the log root too, which masks every chain hanging off it.
+  const { regions } = apexLog.truncation;
   return {
     hotSpots,
-    truncation: regionCount > 0 ? { regionCount, firstEventIndex } : null,
+    truncation: regions.length
+      ? { regionCount: regions.length, firstEventIndex: regions[0]?.eventIndex ?? -1 }
+      : null,
   };
 }
 

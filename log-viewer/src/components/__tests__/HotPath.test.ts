@@ -295,7 +295,7 @@ describe('hot-path', () => {
     const element = await hotPath();
 
     const caveat = element.shadowRoot!.querySelector('.caveat-row')!;
-    expect(caveat.textContent).toContain('2 truncated calls');
+    expect(caveat.textContent).toContain('Log truncated in 2 places');
     expect(caveat.querySelector('vscode-icon')?.className).toBe('sev-warning');
   });
 
