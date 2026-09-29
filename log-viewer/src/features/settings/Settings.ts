@@ -6,18 +6,9 @@ import {
   vscodeMessenger,
 } from '../../core/messaging/VSCodeExtensionMessenger.js';
 
-/* eslint-disable @typescript-eslint/naming-convention */
 export type LanaSettings = {
   timeline: {
     activeTheme: string;
-    colors: {
-      Method: string;
-      'Code Unit': string;
-      'System Method': string;
-      Workflow: string;
-      DML: string;
-      SOQL: string;
-    };
     customThemes: {
       [key: string]: {
         apex: string;
@@ -30,7 +21,6 @@ export type LanaSettings = {
         validation: string;
       };
     };
-    legacy: boolean;
     showTooltip: boolean;
   };
   callTree: {
@@ -47,10 +37,12 @@ export type LanaSettings = {
   inspector: {
     position: 'left' | 'right' | 'bottom';
     size: number;
-    /** Collapsed sections, keyed by section id — shared by every tab. */
+    /** Collapsed sections, keyed `<source>:<scope>:<section id>`. */
     collapsed: Record<string, boolean>;
-    /** Pane sizes (px, used as flex weights), keyed `<orientation>:<section id>`. */
-    paneSizes: Record<string, number>;
+    /** The order the user arranged each list in, keyed `<source>:<scope>`. */
+    sectionOrder: Record<string, string[]>;
+    /** The sections a list hides, keyed like `collapsed`. */
+    hiddenSections: Record<string, boolean>;
     /** Last open/closed state; `null` means never toggled, so it may auto-open. */
     visible: boolean | null;
   };
@@ -76,6 +68,22 @@ function publish(settings: LanaSettings): void {
 }
 
 /**
+ * Settles when the first read of the settings does, whether or not it produced any. A
+ * surface that waits on a setting can then fall back to its default instead of waiting
+ * for the life of the panel.
+ */
+export function settingsSettled(): Promise<unknown> {
+  if (latest) {
+    return Promise.resolve();
+  }
+  // The cache is cleared by the last subscriber leaving, so with none it would hold a
+  // read that is never taken again and outlive the settings it holds.
+  return subscribers.size
+    ? (seedRequest ??= getSettings().catch(() => null))
+    : getSettings().catch(() => null);
+}
+
+/**
  * Delivers the current settings, then every later edit, and returns the
  * unsubscribe function. The panel keeps its context when hidden and is never
  * re-created, so the push is the only way live edits (theme colors) reach the UI —
@@ -98,7 +106,7 @@ export function subscribeSettings(callback: (settings: LanaSettings) => void): (
     // One request however many subscribers; later ones reuse the same reply.
     // No extension host to ask (standalone browser): the UI keeps its defaults.
     seedRequest ??= getSettings().catch(() => null);
-    seedRequest.then((settings) => {
+    void seedRequest.then((settings) => {
       // A push can land before the reply; it is then the newer value, so the
       // reply is dropped rather than applied over it.
       if (settings && !latest && subscribers.size) {

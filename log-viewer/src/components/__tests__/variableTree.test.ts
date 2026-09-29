@@ -9,7 +9,8 @@ import {
   type FrameVariables,
   type VariableRow,
 } from '../../core/log/frameVariables.js';
-import { parentOf, toTreeRows, type VariableTreeRow } from '../variableTree.js';
+import type { AggregateVariables, VariableSpread } from '../../core/log/aggregateVariables.js';
+import { parentOf, toSpreadRows, toTreeRows, type VariableTreeRow } from '../variableTree.js';
 
 function row(name: string, value: string, over: Partial<VariableRow> = {}): VariableRow {
   return {
@@ -422,5 +423,200 @@ describe('recorded fields', () => {
     );
 
     expect(rows.find((r) => r.id === 'this/me')?.expandable).toBe(false);
+  });
+});
+
+describe('toSpreadRows', () => {
+  function spread(name: string, values: [string, number][], over: Partial<VariableSpread> = {}) {
+    return {
+      name,
+      declaredType: null,
+      values: values.map(([text, calls], index) => ({
+        text,
+        address: null,
+        objectAddress: null,
+        calls,
+        at: [100 + index],
+        runs: 1,
+        cut: 100 + index,
+      })),
+      calls: values.reduce((sum, [, calls]) => sum + calls, 0),
+      unassigned: 0,
+      capped: false,
+      ...over,
+    } satisfies VariableSpread;
+  }
+
+  const aggregate: AggregateVariables = {
+    locals: [
+      spread('accountId', [
+        ['"001A"', 200],
+        ['"001B"', 140],
+      ]),
+      spread('retry', [
+        ['false', 328],
+        ['true', 12],
+      ]),
+      spread('batchSize', [['200', 340]]),
+    ],
+    thisType: 'ns.Svc',
+    objects: 1,
+    fields: [spread('cache', [['{}', 340]])],
+    truncated: false,
+    capped: false,
+  };
+
+  const closed = (_id: string, byDefault: boolean): boolean => byDefault;
+  const openAll = (): boolean => true;
+
+  it('opens Local and leaves this closed, one row per name', () => {
+    const rows = toSpreadRows(aggregate, closed);
+
+    expect(rows.filter((r) => r.kind === 'group').map((r) => [r.id, r.open, r.count])).toEqual([
+      ['local', true, 3],
+      ['this', false, 1],
+    ]);
+    // A name the calls disagreed on holds its values; one they agreed on is the value.
+    expect(
+      rows
+        .filter((r) => r.kind === 'spread' || r.kind === 'spread-many')
+        .map((r) => [r.id, r.kind]),
+    ).toEqual([
+      ['local/accountId', 'spread-many'],
+      ['local/retry', 'spread-many'],
+      ['local/batchSize', 'spread'],
+    ]);
+  });
+
+  // The data layer ranks them; the rows must not re-order what it decided.
+  it('keeps the order the comparison put the names in', () => {
+    const rows = toSpreadRows(aggregate, closed);
+
+    expect(
+      rows
+        .filter((r) => r.kind === 'spread' || r.kind === 'spread-many')
+        .map((r) => (r.kind === 'spread' || r.kind === 'spread-many' ? r.row.name : '')),
+    ).toEqual(['accountId', 'retry', 'batchSize']);
+  });
+
+  it('opens a name the calls disagreed on into its distinct values', () => {
+    const rows = toSpreadRows(aggregate, openAll);
+
+    const values = rows.filter((r) => r.kind === 'spread-value' && r.id.startsWith('local/retry/'));
+    expect(values.map((r) => [r.id, r.kind === 'spread-value' && r.held.calls])).toEqual([
+      ['local/retry/0', 328],
+      ['local/retry/1', 12],
+    ]);
+    // Every value is a way into a call, never a further object to open.
+    expect(values.every((r) => !r.expandable)).toBe(true);
+  });
+
+  // A constant reads exactly as it does for a single frame.
+  it('shows a name every call agreed on as its one value, with nothing to open', () => {
+    const rows = toSpreadRows(aggregate, openAll);
+
+    const held = rows.find((r) => r.id === 'local/batchSize');
+    expect(held?.expandable).toBe(false);
+    expect(held?.kind === 'spread' && held.raw).toBe('200');
+  });
+
+  it('names the class and the objects the calls ran on', () => {
+    const rows = toSpreadRows({ ...aggregate, objects: 4 }, closed);
+
+    const group = rows.find((r) => r.kind === 'group' && r.id === 'this');
+    expect(group?.kind === 'group' && group.of).toBe('ns.Svc, 4 objects');
+  });
+
+  it('names the class alone where every call ran on one object', () => {
+    const group = toSpreadRows(aggregate, closed).find(
+      (r) => r.kind === 'group' && r.id === 'this',
+    );
+
+    expect(group?.kind === 'group' && group.of).toBe('ns.Svc');
+  });
+
+  // The plan deferred this while a value drilled to a call; the panel now stays
+  // on the comparison, so a value has to open where it stands.
+  it('opens a value the log serialised in place, with no lookups at all', () => {
+    const rows = toSpreadRows(
+      { ...aggregate, locals: [spread('held', [['{"a":1,"b":2}', 340]])] },
+      openAll,
+    );
+
+    expect(rows.find((r) => r.id === 'local/held')?.expandable).toBe(true);
+    expect(rows.filter((r) => r.kind === 'entry').map((r) => r.id)).toEqual([
+      'local/held/0',
+      'local/held/1',
+    ]);
+  });
+
+  it('opens one of many values into its own properties', () => {
+    const rows = toSpreadRows(
+      {
+        ...aggregate,
+        locals: [
+          spread('held', [
+            ['{"a":1}', 200],
+            ['{"b":2}', 140],
+          ]),
+        ],
+      },
+      openAll,
+    );
+
+    expect(rows.find((r) => r.id === 'local/held/0')?.expandable).toBe(true);
+    expect(rows.map((r) => r.id)).toContain('local/held/0/0');
+  });
+
+  // Each call read at its own point, so a value resolves against the first call
+  // that held it.
+  it("reads an address as the object the value's own call recorded", () => {
+    const held = spread('ref', [['0xabc', 340]]);
+    held.values[0]!.address = '0xabc';
+    held.values[0]!.cut = 42;
+    const asked: number[] = [];
+
+    const rows = toSpreadRows({ ...aggregate, locals: [held] }, openAll, (cut) => {
+      asked.push(cut);
+      return {
+        resolve: (address) =>
+          address === '0xabc' && cut === 42 ? { text: '{"n":1}', laterAt: null } : NOT_RECORDED,
+      };
+    });
+
+    const row = rows.find((r) => r.id === 'local/ref');
+    expect(row?.kind === 'spread' && row.raw).toBe('{"n":1}');
+    expect(row?.expandable).toBe(true);
+    expect(asked).toContain(42);
+  });
+
+  // The log names the object beside a serialised value as well as in place of
+  // one, and the fields it recorded elsewhere are what opens it.
+  it("opens a serialised value into the index's fields for its object", () => {
+    const held = spread('opts', [['{"name":"A"}', 340]]);
+    held.values[0]!.objectAddress = '0xf00';
+    held.values[0]!.cut = 7;
+
+    const rows = toSpreadRows({ ...aggregate, locals: [held] }, openAll, (cut) => ({
+      fields: (address) => (address === '0xf00' && cut === 7 ? [row('tries', '3')] : []),
+      classOf: (address) => (address === '0xf00' ? 'ns.Options' : null),
+    }));
+
+    const opts = rows.find((r) => r.id === 'local/opts');
+    expect(opts?.expandable).toBe(true);
+    expect(opts?.kind === 'spread' && opts.className).toBe('ns.Options');
+    expect(rows.some((r) => r.id === 'local/opts/tries')).toBe(true);
+  });
+
+  it('says the calls hold no locals rather than showing an empty group', () => {
+    const rows = toSpreadRows({ ...aggregate, locals: [] }, closed);
+
+    expect(rows.find((r) => r.id === 'local/none')?.kind).toBe('note');
+  });
+
+  it('leaves out the this group where no call wrote a field', () => {
+    const rows = toSpreadRows({ ...aggregate, fields: [] }, closed);
+
+    expect(rows.some((r) => r.id === 'this')).toBe(false);
   });
 });

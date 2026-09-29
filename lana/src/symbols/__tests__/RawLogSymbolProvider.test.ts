@@ -6,6 +6,7 @@ import { beforeEach, describe, expect, it } from '@jest/globals';
 import { SymbolKind, languages } from 'vscode';
 
 import {
+  createMockDisplay,
   createMockApexLog,
   createMockContext,
   createMockLogEvent,
@@ -32,9 +33,11 @@ const APEX_LOG_LINE = '09:45:31.888 (1000)|EXECUTION_STARTED';
 
 describe('RawLogSymbolProvider', () => {
   let provider: RawLogSymbolProvider;
+  let display: ReturnType<typeof createMockDisplay>;
 
   beforeEach(() => {
-    provider = new RawLogSymbolProvider();
+    display = createMockDisplay();
+    provider = new RawLogSymbolProvider(display);
     mockGetApexLog.mockReset();
     // The provider only works for a document the user has open as a text tab.
     setOpenTabs(new TabInputText(Uri.file('/test/file.log')));
@@ -168,6 +171,24 @@ describe('RawLogSymbolProvider', () => {
       return (languages.registerDocumentSymbolProvider as jest.Mock).mock.calls[0]?.[1] as
         RawLogSymbolProvider | undefined;
     };
+
+    it('gives the registered provider the context display to report through', async () => {
+      const mockContext = createMockContext();
+      RawLogSymbolProvider.apply(mockContext as unknown as import('../../Context.js').Context);
+      const registered = (languages.registerDocumentSymbolProvider as jest.Mock).mock
+        .calls[0]?.[1] as RawLogSymbolProvider;
+      mockGetApexLog.mockResolvedValue(null);
+
+      await registered.provideDocumentSymbols(
+        createMockTextDocument({
+          lines: ['16:35:06.2 (2706460)|EXECUTION_STARTED'],
+          uri: '/test/file.log',
+        }) as never,
+        {} as never,
+      );
+
+      expect(mockGetApexLog).toHaveBeenCalledWith(expect.anything(), mockContext.display);
+    });
 
     const fireTabChange = () => {
       const handler = (window.tabGroups.onDidChangeTabs as jest.Mock).mock.calls[0]?.[0] as (

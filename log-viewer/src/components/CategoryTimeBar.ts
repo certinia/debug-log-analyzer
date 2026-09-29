@@ -9,6 +9,7 @@ import { logContext } from '../core/log/logContext.js';
 import { WindowStatsController } from '../core/log/windowStats.js';
 import type { LogStore } from '../core/log/LogStore.js';
 import { globalStyles } from '../styles/global.styles.js';
+import './SectionSkeleton.js';
 import { inspectorSectionStyles } from '../styles/inspectorSection.styles.js';
 import { CategoryPaletteController, categorySelfTimes, toCategoryTimes } from './categoryTime.js';
 import './StackedTimeBar.js';
@@ -45,13 +46,14 @@ export class CategoryTimeBar extends LitElement {
         ? categorySelfTimes(apexLog)
         : [];
     if (!slices.length) {
-      return html`<p class="note">
-        ${
+      return html`<section-skeleton
+        shape="bar"
+        fallback=${
           this._window.window
             ? 'No categorised time was recorded in this range.'
             : 'No categorised time was recorded in this log.'
         }
-      </p>`;
+      ></section-skeleton>`;
     }
 
     return html`<stacked-time-bar

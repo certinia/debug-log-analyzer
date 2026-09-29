@@ -17,9 +17,11 @@ export class ShowInLogAnalysis {
     const command = new Command(
       'showInLogAnalysis',
       'Log: Show in Log Analysis',
+      context,
+      'Error showing the log analysis',
       (args: ShowInLogAnalysisArgs) => ShowInLogAnalysis.execute(context, args),
     );
-    command.register(context);
+    command.register();
   }
 
   private static async execute(context: Context, args: ShowInLogAnalysisArgs): Promise<void> {

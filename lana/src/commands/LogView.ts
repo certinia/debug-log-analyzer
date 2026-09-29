@@ -9,6 +9,7 @@ import { OpenFileInPackage } from '../display/OpenFileInPackage.js';
 import { WebView } from '../display/WebView.js';
 import { RawLogNavigation } from '../log-features/RawLogNavigation.js';
 import { fileOrFolderExists, readFileText, writeFileText } from '../fs/workspaceFs.js';
+import { errorMessage } from '../tryCatch.js';
 import {
   PRIVATE_SECTIONS,
   getColumnOverrides,
@@ -21,9 +22,23 @@ import {
   type Config,
 } from '../workspace/AppConfig.js';
 
+/** Every command the webview sends. Closed, so an unknown one is refused at the door
+ *  rather than falling out of the switch below unanswered. */
+const WEB_VIEW_COMMANDS = [
+  'fetchLog',
+  'openPath',
+  'openType',
+  'openHelp',
+  'openUrl',
+  'getConfig',
+  'updateConfig',
+  'saveFile',
+  'goToLogLine',
+] as const;
+
 interface WebViewLogFileRequest<T = unknown> {
   requestId: string;
-  cmd: string;
+  cmd: (typeof WEB_VIEW_COMMANDS)[number];
   payload: T;
 }
 
@@ -55,6 +70,14 @@ export class LogView {
     logUri?: Uri,
     logData?: string,
   ): Promise<WebviewPanel> {
+    // Only the fetchLog handler awaits this, and the panel can close before the
+    // webview ever asks, so the rejection needs an owner here. Written to the
+    // channel rather than swallowed: the ask that would have shown it may never
+    // come. That handler still sees it and reports it if it does.
+    beforeSendLog?.catch((error: unknown) => {
+      const message = errorMessage(error);
+      context.display.output(`Could not retrieve the log: ${message}`);
+    });
     const logName = logUri ? Utils.basename(logUri) : 'Untitled';
     const logDir = logUri ? Utils.dirname(logUri) : context.context.extensionUri;
     const panel = WebView.apply('logFile', `Log: ${logName}`, [
@@ -65,12 +88,18 @@ export class LogView {
     this.currentLogUri = logUri;
 
     const logViewerRoot = Utils.joinPath(context.context.extensionUri, 'out');
-    const index = Utils.joinPath(logViewerRoot, 'index.html');
+    panel.iconPath = Utils.joinPath(logViewerRoot, 'certinia-icon-color.png');
     const bundleUri = panel.webview.asWebviewUri(Utils.joinPath(logViewerRoot, 'bundle.js'));
     const codiconUri = panel.webview.asWebviewUri(Utils.joinPath(logViewerRoot, 'codicon.css'));
-    const indexSrc = await this.getFile(index);
-    panel.iconPath = Utils.joinPath(logViewerRoot, 'certinia-icon-color.png');
-    panel.webview.html = indexSrc
+    const index = Utils.joinPath(logViewerRoot, 'index.html');
+    const template = await readFileText(index).catch((error: unknown) => {
+      const message = errorMessage(error);
+      const shown = index.scheme === 'file' ? index.fsPath : index.toString(true);
+      throw new Error(`Could not read the log viewer at ${shown}: ${message}`, {
+        cause: error,
+      });
+    });
+    panel.webview.html = template
       .replace(/bundle\.js/gi, bundleUri.toString(true))
       .replace(/codicon\.css/gi, codiconUri.toString(true));
 
@@ -101,107 +130,119 @@ export class LogView {
     );
 
     panel.webview.onDidReceiveMessage(
-      async (msg: WebViewLogFileRequest) => {
+      async (msg: unknown) => {
         if (!isWebViewLogFileRequest(msg)) {
+          // A request refused here is still a request someone is waiting on.
+          const { requestId, cmd } = (msg ?? {}) as Partial<WebViewLogFileRequest>;
+          await LogView.replyError(panel, requestId, `Unknown request: ${String(cmd)}`);
           return;
         }
         const { cmd, requestId, payload } = msg;
 
-        switch (cmd) {
-          case 'fetchLog': {
-            if (!requestId) {
+        try {
+          switch (cmd) {
+            case 'fetchLog': {
+              if (!requestId) {
+                break;
+              }
+              try {
+                // A retrieve that resolves to a body could not be cached, so send it inline.
+                const retrievedLog = await beforeSendLog;
+                await LogView.sendLog(requestId, panel, context, logUri, retrievedLog || logData);
+              } catch (err: unknown) {
+                context.display.showErrorMessage(`Error loading logfile: ${errorMessage(err)}`);
+                throw err;
+              }
               break;
             }
-            try {
-              // A retrieve that resolves to a body could not be cached, so send it inline.
-              const retrievedLog = await beforeSendLog;
-              await LogView.sendLog(requestId, panel, context, logUri, retrievedLog || logData);
-            } catch (err: unknown) {
-              const errorMessage = err instanceof Error ? err.message : String(err);
-              context.display.showErrorMessage(`Error loading logfile: ${errorMessage}`);
-            }
-            break;
-          }
 
-          case 'openPath': {
-            if (logUri) {
-              context.display.showFile(logUri);
-            }
-            break;
-          }
-
-          case 'openType': {
-            if (typeof payload === 'string' && payload) {
-              await OpenFileInPackage.openFileForSymbol(context, payload);
-            }
-            break;
-          }
-
-          case 'openHelp': {
-            commands.executeCommand('vscode.open', Uri.parse(this.helpUrl));
-            break;
-          }
-
-          case 'openUrl': {
-            // https only: a webview message must not be able to hand VS Code a
-            // `command:` or `file:` URI to execute.
-            const url = typeof payload === 'string' ? payload : '';
-            if (url && Uri.parse(url).scheme === 'https') {
-              commands.executeCommand('vscode.open', Uri.parse(url));
-            }
-            break;
-          }
-
-          case 'getConfig': {
-            panel.webview.postMessage({
-              requestId,
-              cmd: 'getConfig',
-              payload: LogView.resolveConfig(context),
-            });
-            break;
-          }
-
-          case 'updateConfig': {
-            if (isConfigUpdate(payload)) {
-              const { section, value } = payload;
-              if ((PRIVATE_SECTIONS as readonly string[]).includes(section)) {
-                updatePrivateSection(context.context.globalState, section, value);
-              } else {
-                updateConfig(section, value);
+            case 'openPath': {
+              if (logUri) {
+                context.display.showFile(logUri);
               }
+              break;
             }
-            break;
-          }
 
-          case 'saveFile': {
-            if (isSaveFileRequest(payload)) {
-              const { fileContent, options } = payload;
-              const defaultWorkspace = (workspace.workspaceFolders || [])[0];
-              const destinationFile = await vscWindow.showSaveDialog({
-                // With no workspace folder, let VS Code pick its own last-used location:
-                // the extension's install directory is wrong, and os.homedir() is a web
-                // polyfill that reports '/'.
-                defaultUri: defaultWorkspace
-                  ? Utils.joinPath(defaultWorkspace.uri, options.defaultFileName)
-                  : undefined,
+            case 'openType': {
+              if (typeof payload === 'string' && payload) {
+                await OpenFileInPackage.openFileForSymbol(context, payload);
+              }
+              break;
+            }
+
+            case 'openHelp': {
+              commands.executeCommand('vscode.open', Uri.parse(this.helpUrl));
+              break;
+            }
+
+            case 'openUrl': {
+              // https only: a webview message must not be able to hand VS Code a
+              // `command:` or `file:` URI to execute.
+              const url = typeof payload === 'string' ? payload : '';
+              if (url && Uri.parse(url).scheme === 'https') {
+                commands.executeCommand('vscode.open', Uri.parse(url));
+              }
+              break;
+            }
+
+            case 'getConfig': {
+              panel.webview.postMessage({
+                requestId,
+                cmd: 'getConfig',
+                payload: LogView.resolveConfig(context),
               });
+              break;
+            }
 
-              if (destinationFile) {
-                writeFileText(destinationFile, fileContent).catch((error) => {
-                  const msg = error instanceof Error ? error.message : String(error);
-                  vscWindow.showErrorMessage(`Unable to save file: ${msg}`);
-                });
+            case 'updateConfig': {
+              if (isConfigUpdate(payload)) {
+                const { section, value } = payload;
+                if ((PRIVATE_SECTIONS as readonly string[]).includes(section)) {
+                  updatePrivateSection(context.context.globalState, section, value);
+                } else {
+                  updateConfig(section, value);
+                }
               }
+              break;
             }
-            break;
-          }
 
-          case 'goToLogLine': {
-            if (isTimestampPayload(payload) && logUri) {
-              await RawLogNavigation.goToLineByTimestamp(logUri, payload.timestamp);
+            case 'saveFile': {
+              if (isSaveFileRequest(payload)) {
+                const { fileContent, options } = payload;
+                const defaultWorkspace = (workspace.workspaceFolders || [])[0];
+                const destinationFile = await vscWindow.showSaveDialog({
+                  // With no workspace folder, let VS Code pick its own last-used location:
+                  // the extension's install directory is wrong, and os.homedir() is a web
+                  // polyfill that reports '/'.
+                  defaultUri: defaultWorkspace
+                    ? Utils.joinPath(defaultWorkspace.uri, options.defaultFileName)
+                    : undefined,
+                });
+
+                if (destinationFile) {
+                  writeFileText(destinationFile, fileContent).catch((error) => {
+                    const msg = errorMessage(error);
+                    vscWindow.showErrorMessage(`Unable to save file: ${msg}`);
+                  });
+                }
+              }
+              break;
             }
-            break;
+
+            case 'goToLogLine': {
+              if (isTimestampPayload(payload) && logUri) {
+                await RawLogNavigation.goToLineByTimestamp(logUri, payload.timestamp);
+              }
+              break;
+            }
           }
+        } catch (err: unknown) {
+          const message = errorMessage(err);
+          // The webview waits on a reply; unanswered, it shows a placeholder for good.
+          await LogView.replyError(panel, requestId, message);
+          // Not rethrown: nothing consumes an async listener's rejection, so it would
+          // only surface as noise in the host.
+          context.display.output(`Request '${cmd}' failed: ${message}`);
         }
       },
       undefined,
@@ -224,6 +265,7 @@ export class LogView {
     config.database.dml.columnOverrides = overrides['database.dml.columnOverrides'] ?? {};
     config.database.sosl.columnOverrides = overrides['database.sosl.columnOverrides'] ?? {};
     const columnViews = getColumnViews(context.context.globalState);
+    config.callTree.columnView = columnViews['callTree.columnView'] ?? 'General';
     config.database.soql.columnView = columnViews['database.soql.columnView'] ?? 'General';
     config.database.dml.columnView = columnViews['database.dml.columnView'] ?? 'General';
     config.database.sosl.columnView = columnViews['database.sosl.columnView'] ?? 'General';
@@ -231,8 +273,15 @@ export class LogView {
     return config;
   }
 
-  private static async getFile(fileUri: Uri): Promise<string> {
-    return readFileText(fileUri);
+  /** Settles a pending request. A command with no `requestId` expects no reply. */
+  private static async replyError(
+    panel: WebviewPanel,
+    requestId: string | undefined,
+    error: string,
+  ) {
+    if (requestId) {
+      await panel.webview.postMessage({ requestId, error });
+    }
   }
 
   private static async sendLog(
@@ -247,9 +296,11 @@ export class LogView {
     if (!cachedUri) {
       LogView.currentLogUri = undefined;
       if (!logData) {
-        context.display.showErrorMessage('Log file could not be found.', {
+        const notFound = 'Log file could not be found.';
+        context.display.showErrorMessage(notFound, {
           modal: true,
         });
+        await LogView.replyError(panel, requestId, notFound);
         return;
       }
     }
@@ -283,7 +334,9 @@ function isWebViewLogFileRequest(value: unknown): value is WebViewLogFileRequest
     typeof value === 'object' &&
     value !== null &&
     !Array.isArray(value) &&
-    typeof (value as Record<string, unknown>).cmd === 'string' &&
+    (WEB_VIEW_COMMANDS as readonly string[]).includes(
+      (value as Record<string, unknown>).cmd as string,
+    ) &&
     ((value as Record<string, unknown>).requestId === undefined ||
       typeof (value as Record<string, unknown>).requestId === 'string')
   );

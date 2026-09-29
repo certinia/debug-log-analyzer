@@ -1,7 +1,7 @@
 /*
  * Copyright (c) 2026 Certinia Inc. All rights reserved.
  */
-import type { ApexLog, LogEvent } from 'apex-log-parser';
+import type { ApexLog, LogEvent } from '@apexdevtools/apex-log-parser';
 import type { ReactiveControllerHost } from 'lit';
 
 import { DEFAULT_NAMESPACE } from '../utility/CallerNamespace.js';

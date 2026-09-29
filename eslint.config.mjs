@@ -34,6 +34,10 @@ export default defineConfig(
     // candidates from nested repo copies (e.g. .claude agent worktrees)
     languageOptions: {
       parserOptions: {
+        projectService: {
+          // A bundler config belongs to no project. Without this the parser reports it as an error.
+          allowDefaultProject: ['rolldown.config.ts'],
+        },
         tsconfigRootDir: import.meta.dirname,
         // AGENTS.md keeps `typescript` aliased to @typescript/typescript6 because
         // typescript-eslint needs the TS <=6.0 API. Fail the lint run if a bump
@@ -44,6 +48,14 @@ export default defineConfig(
 
     rules: {
       'no-console': 'warn',
+      // Type-aware promise rules only. recommendedTypeChecked in full reports 720 errors,
+      // most of them no-unsafe-* and unbound-method against untyped libraries and test mocks.
+      // require-await is left off: `async () => syncCall()` is how Command.ts turns a
+      // synchronous throw into a rejection its boundary can catch.
+      '@typescript-eslint/await-thenable': 'error',
+      '@typescript-eslint/no-floating-promises': 'error',
+      '@typescript-eslint/no-misused-promises': 'error',
+      '@typescript-eslint/prefer-promise-reject-errors': 'error',
       '@typescript-eslint/naming-convention': [
         'warn',
         // options replace the rule's defaults, so the base selectors are restated
@@ -99,6 +111,19 @@ export default defineConfig(
       '@typescript-eslint/no-import-type-side-effects': 'error',
       curly: 'warn',
       eqeqeq: 'warn',
+    },
+  },
+  {
+    files: ['log-viewer/src/**/*.ts'],
+    rules: {
+      'no-restricted-syntax': [
+        'error',
+        {
+          selector: "Property[key.name='tooltip'][value.value=true]",
+          message:
+            'Tabulator writes a string tooltip with innerHTML, so log text is read as markup. Use textCellTooltip from features/call-tree/components/TableShared.ts.',
+        },
+      ],
     },
   },
   {

@@ -5,13 +5,20 @@
 /**
  * apex-limit-series - Apex adapter: builds the metric-strip governor-limit time series.
  *
- * This is adapter-layer code (like ApexLogTimeline) and may import apex-log-parser types.
+ * This is adapter-layer code (like ApexLogTimeline) and may import parser types.
  * The metric-strip/ classifier and renderers stay Apex-agnostic — they consume the generic
  * HeatStripTimeSeries this module produces.
  */
 
-import type { ApexLog, HeapAllocateLine, Limits, LimitUsageLine, LogEvent } from 'apex-log-parser';
+import type {
+  ApexLog,
+  HeapAllocateLine,
+  LimitUsageLine,
+  LogEvent,
+} from '@apexdevtools/apex-log-parser';
+import type { Limits } from '@apexdevtools/apex-log-parser/types';
 import type { HeatStripMetric, HeatStripTimeSeries } from '../types/flamechart.types.js';
+import { extractMarkers, noDataSpans } from '../utils/marker-utils.js';
 import {
   buildGovernorTimeSeries,
   type LimitObservation as GranularObservation,
@@ -50,27 +57,6 @@ const APEX_METRICS: Map<keyof Limits, HeatStripMetric> = new Map([
   ],
 ]);
 
-/**
- * Standard synchronous Apex governor limits, used as a fallback so a metric can render from
- * granular usage alone when the log has no cumulative limit event. Any limit reported by the log
- * (LIMIT_USAGE_FOR_NS / LIMIT_USAGE / flow) overrides these.
- */
-const DEFAULT_LIMITS = new Map<string, number>([
-  ['soqlQueries', 100],
-  ['queryRows', 50000],
-  ['soslQueries', 20],
-  ['dmlStatements', 150],
-  ['publishImmediateDml', 150],
-  ['dmlRows', 10000],
-  ['cpuTime', 10000],
-  ['heapSize', 6000000],
-  ['callouts', 100],
-  ['emailInvocations', 10],
-  ['futureCalls', 50],
-  ['queueableJobsAddedToQueue', 50],
-  ['mobileApexPushCalls', 10],
-]);
-
 /** Memo of {@link buildApexLimitTimeSeries} per log: the walk visits the full event
  *  tree, and the series feeds two surfaces — the metric strip and the inspector's
  *  governor trend charts — which must chart the same figures. */
@@ -98,7 +84,7 @@ export function apexLimitTimeSeries(apexLog: ApexLog): HeatStripTimeSeries {
  * `LIMIT_USAGE` / flow `*_LIMIT_USAGE` reports) add intermediate data points so the line
  * rises as usage happens rather than only at code-unit boundaries.
  *
- * @param apexLog - Parsed log providing cumulative snapshots, authoritative limits and the
+ * @param apexLog - Parsed log providing cumulative snapshots, the limits they report and the
  * event tree, which is walked in full for granular deltas.
  */
 function buildApexLimitTimeSeries(apexLog: ApexLog): HeatStripTimeSeries {
@@ -109,9 +95,16 @@ function buildApexLimitTimeSeries(apexLog: ApexLog): HeatStripTimeSeries {
 
   const observations: GranularObservation[] = [];
 
-  // Authoritative limit per metric = max limit reported by any cumulative snapshot, else the
-  // default. Fixed for the whole series so the "out of" total never flips (e.g. heap 6MB→12MB).
-  const metricLimits = new Map<string, number>(DEFAULT_LIMITS);
+  // The log is the only source of a limit: the highest one it reported anywhere, fixed for the
+  // whole series so the "out of" total never flips (a log can report both the synchronous and the
+  // asynchronous ceiling). A metric the log never named keeps limit 0 — its consumers scale it by
+  // its own peak rather than measure it against a number the log never gave.
+  const metricLimits = new Map<string, number>();
+  const reportLimit = (metric: keyof Limits, limit: number): void => {
+    if (limit > 0) {
+      metricLimits.set(metric, Math.max(metricLimits.get(metric) ?? 0, limit));
+    }
+  };
 
   // Cumulative snapshots — authoritative multi-metric correctives (transaction usage).
   for (const snapshot of apexLog.governorLimits.snapshots) {
@@ -127,9 +120,7 @@ function buildApexLimitTimeSeries(apexLog: ApexLog): HeatStripTimeSeries {
         used: value.used,
         scope: 'cumulative',
       });
-      if (value.limit > 0) {
-        metricLimits.set(metric, Math.max(metricLimits.get(metric) ?? 0, value.limit));
-      }
+      reportLimit(metric, value.limit);
     }
   }
 
@@ -195,6 +186,9 @@ function buildApexLimitTimeSeries(apexLog: ApexLog): HeatStripTimeSeries {
         // Flow CPU time is flow-scoped with a different limit (15000 vs the 10000 apex limit),
         // so skip it here — CPU stays sourced from LIMIT_USAGE_FOR_NS to keep percentages consistent.
         if (usage && !(event.type !== 'LIMIT_USAGE' && usage.metric === 'cpuTime')) {
+          // These lines report a block's usage, but the limit they name is the transaction's, and
+          // some logs carry them with no cumulative block at all.
+          reportLimit(usage.metric, usage.limit);
           observations.push({
             kind: 'absolute',
             timestamp,
@@ -212,5 +206,10 @@ function buildApexLimitTimeSeries(apexLog: ApexLog): HeatStripTimeSeries {
     }
   }
 
-  return buildGovernorTimeSeries(observations, metrics, metricLimits);
+  return {
+    ...buildGovernorTimeSeries(observations, metrics, metricLimits),
+    // On the series itself, not added by the Timeline alone: every surface drawing it has to
+    // leave the spans the log recorded nothing in blank.
+    gaps: noDataSpans(extractMarkers(apexLog)),
+  };
 }

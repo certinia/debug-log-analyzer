@@ -10,14 +10,12 @@ import { WindowStatsController } from '../core/log/windowStats.js';
 import type { LogStore } from '../core/log/LogStore.js';
 import { apexLimitTimeSeries } from '../features/timeline/optimised/apex-limit-series.js';
 import { globalStyles } from '../styles/global.styles.js';
-import {
-  ESTIMATED_LIMITS_TEXT,
-  NO_CUMULATIVE_LIMITS_TEXT,
-  seriesGauges,
-} from './logOverviewMetrics.js';
+import { NO_GOVERNOR_USAGE_TEXT } from './governorCopy.js';
+import { seriesGauges } from './logOverviewMetrics.js';
 
 // web components
 import '../features/database/components/GovernorSummary.js';
+import './SectionSkeleton.js';
 
 /**
  * The inspector's unselected section: the governor metrics nearest a limit,
@@ -67,20 +65,20 @@ export class LogOverview extends LitElement {
 
   render() {
     const apexLog = this.logStore?.log;
+    if (!apexLog) {
+      return html`<section-skeleton shape="gauges"></section-skeleton>`;
+    }
     if (!this.wholeLog && this._window.pending) {
       return html`<p class="note">Adding up the governor usage…</p>`;
     }
     const window = this.wholeLog ? null : this._window.counts;
-    const gauges = apexLog ? seriesGauges(apexLimitTimeSeries(apexLog), window ?? undefined) : [];
-    if (!apexLog || !gauges.length) {
-      return html`<p class="note">${NO_CUMULATIVE_LIMITS_TEXT}</p>`;
+    const gauges = seriesGauges(apexLimitTimeSeries(apexLog), window ?? undefined);
+    if (!gauges.length) {
+      return html`<p class="note">${NO_GOVERNOR_USAGE_TEXT}</p>`;
     }
 
-    // Snapshots correct the series where they exist; without any, the figures
-    // are estimated from granular events — say so.
-    const estimated = apexLog.governorLimits.snapshots.length === 0;
-    return html`<governor-summary .metrics=${gauges}></governor-summary>
-      ${estimated ? html`<p class="note">${ESTIMATED_LIMITS_TEXT}</p>` : ''}`;
+    // A gauge with no reported limit says so on hover, so the strip needs no note beneath it.
+    return html`<governor-summary .metrics=${gauges}></governor-summary>`;
   }
 }
 

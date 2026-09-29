@@ -1,10 +1,15 @@
 /*
  * Copyright (c) 2026 Certinia Inc. All rights reserved.
  */
-import type { ApexLog, GovernorLimits, LogEvent, Limits } from 'apex-log-parser';
+import type { ApexLog, LogEvent } from '@apexdevtools/apex-log-parser';
+import type { GovernorLimits, Limits } from '@apexdevtools/apex-log-parser/types';
 import { beforeEach, describe, expect, it } from '@jest/globals';
 
-import { emptyLimits } from '../../../../components/__tests__/limitsTestUtils.js';
+import {
+  emptyLimits,
+  governorLimits,
+  limitValue,
+} from '../../../../components/__tests__/limitsTestUtils.js';
 
 let log: ApexLog | null = null;
 
@@ -34,16 +39,18 @@ function event(fields: Partial<LogEvent>): LogEvent {
  * The findings read the metric-strip series, which is built from these.
  */
 function governorLimitsOf(namespaceLimits: Record<string, Limits>): GovernorLimits {
-  const byNamespace = new Map(Object.entries(namespaceLimits));
+  const entries = Object.entries(namespaceLimits);
   return {
-    ...emptyLimits(),
-    byNamespace,
-    snapshots: [...byNamespace].map(([namespace, limits], index) => ({
+    ...governorLimits(),
+    byNamespace: new Map(
+      entries.map(([namespace, limits]) => [namespace, { final: limits, peak: limits }]),
+    ),
+    snapshots: entries.map(([namespace, limits], index) => ({
       timestamp: index + 1,
       namespace,
       limits,
     })),
-  } as GovernorLimits;
+  };
 }
 
 function apexLog(fields: Partial<ApexLog> & { namespaceLimits?: Record<string, Limits> }): ApexLog {
@@ -54,6 +61,7 @@ function apexLog(fields: Partial<ApexLog> & { namespaceLimits?: Record<string, L
     children: [],
     exceptions: [],
     logIssues: [],
+    truncation: { regions: [], totalSkippedBytes: 0 },
     duration: { self: 0, total: 0 },
     governorLimits: governorLimitsOf(namespaceLimits ?? {}),
     ...rest,
@@ -78,8 +86,8 @@ describe('computeLogDiagnostics', () => {
 
   it('reports a governor limit that is reached, and one that is near', async () => {
     const namespaceLimits = emptyLimits();
-    namespaceLimits.cpuTime = { used: 10_000, limit: 10_000 };
-    namespaceLimits.soqlQueries = { used: 85, limit: 100 };
+    namespaceLimits.cpuTime = limitValue(10_000, 10_000);
+    namespaceLimits.soqlQueries = limitValue(85, 100);
     log = apexLog({ namespaceLimits: { default: namespaceLimits } });
 
     const { diagnostics } = await computeLogDiagnostics();
@@ -102,7 +110,7 @@ describe('computeLogDiagnostics', () => {
 
   it('leaves a metric below the near-limit share out', async () => {
     const namespaceLimits = emptyLimits();
-    namespaceLimits.soqlQueries = { used: 40, limit: 100 };
+    namespaceLimits.soqlQueries = limitValue(40, 100);
     log = apexLog({ namespaceLimits: { default: namespaceLimits } });
 
     expect((await computeLogDiagnostics()).diagnostics).toEqual([]);
@@ -111,7 +119,7 @@ describe('computeLogDiagnostics', () => {
   it('sums usage over every namespace, since a limit is shared unless a package is certified', async () => {
     const forNamespace = (used: number) => {
       const limits = emptyLimits();
-      limits.soqlQueries = { used, limit: 100 };
+      limits.soqlQueries = limitValue(used, 100);
       return limits;
     };
     log = apexLog({ namespaceLimits: { default: forNamespace(14), pkg: forNamespace(173) } });
@@ -126,7 +134,7 @@ describe('computeLogDiagnostics', () => {
 
   it('heads a severity band with the governor limit, whatever the counts below it', async () => {
     const namespaceLimits = emptyLimits();
-    namespaceLimits.soqlQueries = { used: 85, limit: 100 };
+    namespaceLimits.soqlQueries = limitValue(85, 100);
     log = apexLog({
       namespaceLimits: { default: namespaceLimits },
       eventsById: Array.from({ length: 6 }, (_, index) =>
@@ -474,32 +482,45 @@ describe('computeLogDiagnostics', () => {
           description: 'An entry event was found without a corresponding exit event',
           type: 'unexpected',
         },
-        {
-          summary: 'Max-Size-reached',
-          description: 'The maximum log size has been reached. Part of the log has been truncated.',
-          type: 'skip',
-        },
       ],
+      truncation: { regions: [{ kind: 'max-size', startTime: 0 }], totalSkippedBytes: 0 },
     });
 
     const { diagnostics } = await computeLogDiagnostics();
     expect(diagnostics.map((d) => d.summary)).toEqual(['Log truncated', 'Unexpected-End']);
-    expect(diagnostics[0]?.severity).toBe('Error');
+    expect(diagnostics[0]?.severity).toBe('Warning');
     expect(diagnostics[0]?.meta).toBeUndefined();
     expect(diagnostics[0]?.message).toContain('may be undercounted');
   });
 
-  it('sums the bytes the log said it skipped, over every skipped region', async () => {
-    const skipped = (bytes: string) => ({
-      summary: 'Skipped-Lines',
-      description: `*** Skipped ${bytes} bytes of detailed log. A section of the log has been skipped and the log has been truncated.`,
-      type: 'skip' as const,
+  it('states the size the parser totalled over every skipped region', async () => {
+    log = apexLog({
+      truncation: {
+        regions: [
+          { kind: 'skipped-lines', startTime: 10, skippedBytes: 1_000_000 },
+          { kind: 'skipped-lines', startTime: 20, skippedBytes: 2_000_000 },
+        ],
+        totalSkippedBytes: 3_000_000,
+      },
     });
-    log = apexLog({ logIssues: [skipped('1,000,000'), skipped('2,000,000')] });
 
     const { diagnostics } = await computeLogDiagnostics();
     expect(diagnostics[0]?.summary).toBe('Log truncated in 2 places');
     expect(diagnostics[0]?.meta).toBe('3 MB');
+  });
+
+  it('leads with the truncation caveat, under an error finding that outranks it', async () => {
+    const text = 'System.NullPointerException: Attempt to de-reference a null object';
+    log = apexLog({
+      exceptions: [event({ type: 'FATAL_ERROR', eventIndex: 4, text })],
+      truncation: { regions: [{ kind: 'max-size', startTime: 0 }], totalSkippedBytes: 0 },
+    });
+
+    const { diagnostics } = await computeLogDiagnostics();
+    expect(diagnostics.map((d) => [d.summary, d.severity])).toEqual([
+      ['Log truncated', 'Warning'],
+      [text, 'Error'],
+    ]);
   });
 
   it('groups exceptions by their text, counting the throws', async () => {
@@ -512,6 +533,15 @@ describe('computeLogDiagnostics', () => {
     expect(diagnostics[0]?.count).toBe(2);
     expect(diagnostics[0]?.eventIndex).toBe(4);
     expect(diagnostics[0]?.evidence).toBeUndefined();
+  });
+
+  it('grades a caught exception below one that rolled the transaction back', async () => {
+    const text = 'System.NullPointerException: Attempt to de-reference a null object';
+    log = apexLog({ exceptions: [event({ type: 'EXCEPTION_THROWN', eventIndex: 4, text })] });
+    expect((await computeLogDiagnostics()).diagnostics[0]?.severity).toBe('Warning');
+
+    log = apexLog({ exceptions: [event({ type: 'FATAL_ERROR', eventIndex: 4, text })] });
+    expect((await computeLogDiagnostics()).diagnostics[0]?.severity).toBe('Error');
   });
 
   it('groups the same exception thrown from different places, and keeps the frame', async () => {
@@ -557,7 +587,7 @@ describe('computeLogDiagnostics', () => {
   it('reports a limit exception as the governor breach it is, not as an exception', async () => {
     const message = 'System.LimitException: Apex CPU time limit exceeded';
     const namespaceLimits = emptyLimits();
-    namespaceLimits.cpuTime = { used: 15_163, limit: 10_000 };
+    namespaceLimits.cpuTime = limitValue(15_163, 10_000);
     log = apexLog({
       namespaceLimits: { default: namespaceLimits },
       exceptions: [
@@ -597,7 +627,7 @@ describe('computeLogDiagnostics', () => {
 
   it('names the method most of the self time went into, beside the CPU breach', async () => {
     const namespaceLimits = emptyLimits();
-    namespaceLimits.cpuTime = { used: 15_163, limit: 10_000 };
+    namespaceLimits.cpuTime = limitValue(15_163, 10_000);
     log = apexLog({
       namespaceLimits: { default: namespaceLimits },
       eventsById: [
@@ -648,10 +678,10 @@ describe('computeLogDiagnostics', () => {
 
   it('orders findings by severity, then by how often they happened', async () => {
     const namespaceLimits = emptyLimits();
-    namespaceLimits.cpuTime = { used: 9_000, limit: 10_000 };
+    namespaceLimits.cpuTime = limitValue(9_000, 10_000);
     log = apexLog({
       namespaceLimits: { default: namespaceLimits },
-      exceptions: [event({ text: 'System.QueryException: List has no rows' })],
+      exceptions: [event({ type: 'FATAL_ERROR', text: 'System.QueryException: List has no rows' })],
       eventsById: Array.from({ length: 50 }, (_, index) =>
         event({ type: 'USER_DEBUG', eventIndex: index, text: 'DEBUG|hello' }),
       ),

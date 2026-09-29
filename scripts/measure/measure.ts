@@ -20,7 +20,7 @@
 import { readFileSync } from 'node:fs';
 import { parseArgs } from 'node:util';
 
-import { type ApexLog, parse } from 'apex-log-parser';
+import { type ApexLog, parse } from '@apexdevtools/apex-log-parser';
 
 import { measureCallTree } from './call-tree.js';
 import { die, time } from './harness.js';

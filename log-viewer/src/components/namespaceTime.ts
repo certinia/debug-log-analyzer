@@ -1,10 +1,10 @@
 /*
  * Copyright (c) 2026 Certinia Inc. All rights reserved.
  */
-import type { LogEvent } from 'apex-log-parser';
+import type { LogEvent } from '@apexdevtools/apex-log-parser';
 
 import { DEFAULT_NAMESPACE } from '../core/utility/CallerNamespace.js';
-import { outermostEvents } from '../core/utility/EventTree.js';
+import { outermostEvents, walkEvents } from '../core/utility/EventTree.js';
 import { CHECK_EVERY, frameBudget, type FrameBudgetOptions } from '../core/utility/FrameBudget.js';
 
 export interface NamespaceTime {
@@ -25,18 +25,13 @@ async function namespaceSelfTimes(
 ): Promise<NamespaceTime[] | null> {
   const tick = frameBudget(options);
   const totals = new Map<string, number>();
-  const stack = outermostEvents(roots);
-  for (let walked = 0; stack.length; walked++) {
-    if (walked % CHECK_EVERY === 0 && !(await tick())) {
+  let walked = 0;
+  for (const event of walkEvents(outermostEvents(roots))) {
+    if (walked++ % CHECK_EVERY === 0 && !(await tick())) {
       return null;
     }
-    const event = stack.pop()!; // non-empty: the loop condition just checked
-
     const namespace = event.namespace || DEFAULT_NAMESPACE;
     totals.set(namespace, (totals.get(namespace) ?? 0) + event.duration.self);
-    for (const child of event.children) {
-      stack.push(child);
-    }
   }
   return toNamespaceTimes(totals);
 }
@@ -51,32 +46,48 @@ export function toNamespaceTimes(totals: ReadonlyMap<string, number>): Namespace
 
 /** Memo of the walk: the tree never changes after parse, so each scope is walked
  *  once. A frame near the root is nearly the whole log, so the scoped walk needs
- *  this as much as the whole-log one. */
-const selfTimesCache = new WeakMap<object, NamespaceTime[]>();
+ *  this as much as the whole-log one.
+ *
+ *  Keyed by the log as well as the scope: a selection outlives the log it was
+ *  made in, and its instances array then names other calls. */
+const selfTimesCache = new WeakMap<object, WeakMap<object, NamespaceTime[]>>();
 
-/** The memoised times for `scope`, or undefined if it has never been walked. Lets
- *  a caller render an already-walked scope without showing a placeholder first. */
-export function cachedNamespaceSelfTimes(scope: object): NamespaceTime[] | undefined {
-  return selfTimesCache.get(scope);
+function walkedIn(log: object): WeakMap<object, NamespaceTime[]> {
+  const held = selfTimesCache.get(log);
+  if (held) {
+    return held;
+  }
+  const made = new WeakMap<object, NamespaceTime[]>();
+  selfTimesCache.set(log, made);
+  return made;
+}
+
+/** The memoised times for `scope` in `log`, or undefined if it has never been
+ *  walked. Lets a caller render an already-walked scope without showing a
+ *  placeholder first. */
+export function cachedNamespaceSelfTimes(log: object, scope: object): NamespaceTime[] | undefined {
+  return selfTimesCache.get(log)?.get(scope);
 }
 
 /**
- * {@link namespaceSelfTimes} memoised on `scope` — the log for the whole log, the
- * frame itself for one frame, or the caller's instances array, which stays the
- * same object while the selection does. An abandoned walk is not memoised.
+ * {@link namespaceSelfTimes} memoised on `log` and `scope` — the log itself for
+ * the whole log, the frame itself for one frame, or the caller's instances
+ * array, which stays the same object while the selection does. An abandoned walk
+ * is not memoised.
  */
 export async function scopedNamespaceSelfTimes(
+  log: object,
   scope: object,
   roots: readonly LogEvent[],
   options: FrameBudgetOptions,
 ): Promise<NamespaceTime[] | null> {
-  const cached = selfTimesCache.get(scope);
+  const cached = cachedNamespaceSelfTimes(log, scope);
   if (cached) {
     return cached;
   }
   const slices = await namespaceSelfTimes(roots, options);
   if (slices) {
-    selfTimesCache.set(scope, slices);
+    walkedIn(log).set(scope, slices);
   }
   return slices;
 }

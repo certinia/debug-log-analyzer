@@ -11,7 +11,8 @@
 
 //TODO: Remove deps outside timeline
 
-import type { LogCategory, LogEvent, LogIssue } from 'apex-log-parser';
+import type { LogEvent } from '@apexdevtools/apex-log-parser';
+import type { LogCategory, LogIssue } from '@apexdevtools/apex-log-parser/types';
 import { formatDuration } from '../../../core/utility/Util.js';
 import type { PrecomputedRect } from '../optimised/RectangleCache.js';
 
@@ -68,6 +69,18 @@ export interface ViewportBounds {
 }
 
 /**
+ * Which axes a viewport move should centre. An axis left out keeps its current
+ * offset, so a caller can pan in time without disturbing the depth on screen.
+ */
+export interface ViewportPanAxes {
+  /** Centre horizontally, on the frame's midpoint. */
+  time: boolean;
+
+  /** Centre vertically, on the frame's depth. */
+  depth: boolean;
+}
+
+/**
  * Modifier keys state from mouse/keyboard events.
  * Used for Cmd/Ctrl+Click navigation.
  */
@@ -119,6 +132,9 @@ export interface HoveredFrame {
   node: EventNode;
   depth: number;
 }
+
+/** What changed the hover: the reader's pointer, or the frames moving under a still one. */
+export type HoverCause = 'pointer' | 'frames';
 
 /**
  * Tree node wrapper for hierarchical event structures.
@@ -763,65 +779,6 @@ export const SEVERITY_RANK: Record<MarkerType, number> = {
 } as const;
 
 // ============================================================================
-// SEARCH & HIGHLIGHT
-// ============================================================================
-
-/**
- * Represents a single event that matches search criteria.
- * Cache structure to avoid re-searching during navigation.
- */
-export interface SearchMatch {
-  /** Reference to the matching LogEvent. */
-  event: LogEvent;
-
-  /** Pre-computed rendering rectangle for this event. */
-  rect: PrecomputedRect;
-
-  /** Depth of event in call tree (0-indexed). */
-  depth: number;
-
-  /** Which field contained the match ('type' or 'text'). */
-  matchType: 'type' | 'text';
-}
-
-/**
- * Search behavior options.
- */
-export interface SearchOptions {
-  /** Case-sensitive matching. */
-  matchCase: boolean;
-}
-
-/**
- * Payload for find/search CustomEvents (lv-find, lv-find-match, lv-find-close).
- * Standardized communication between FindWidget and Timeline components.
- */
-export interface FindEventDetail {
-  /** Search query text. */
-  text: string;
-
-  /**
-   * Match index for navigation (1-based).
-   * - For lv-find: Always 1 (start at first match)
-   * - For lv-find-match: Current match number (1 to totalMatches)
-   * - For lv-find-close: Always 0 (no active match)
-   */
-  count: number;
-
-  /** Search options. */
-  options: SearchOptions;
-}
-
-/**
- * Payload for find results CustomEvent (lv-find-results).
- * Timeline dispatches this after search completes.
- */
-export interface FindResultsEventDetail {
-  /** Total number of matches found. */
-  totalMatches: number;
-}
-
-// ============================================================================
 // HEAT STRIP VISUALIZATION TYPES
 // ============================================================================
 
@@ -847,7 +804,7 @@ export interface HeatStripMetric {
 export interface HeatStripMetricValue {
   /** Current usage value (corrected: last cumulative baseline + granular deltas since). */
   used: number;
-  /** Maximum allowed value (limit) */
+  /** The limit the log reported for this metric; 0 when the log reported none. */
   limit: number;
   /**
    * Increment-only total from detailed events, set only for delta-tracked metrics and only
@@ -891,25 +848,6 @@ export interface NoDataSpan {
   summary: string;
 }
 
-/**
- * Snapshot of a single metric at a point in time for tooltip display.
- * Includes pre-computed percentage for convenience.
- */
-export interface HeatStripMetricSnapshot {
-  /** Current usage value */
-  used: number;
-  /** Maximum allowed value (limit) */
-  limit: number;
-  /** Pre-computed percentage (used/limit) */
-  percent: number;
-}
-
-/**
- * Metric definition for heat strip tooltip display.
- * Alias for HeatStripMetric for semantic clarity.
- */
-export type HeatStripTimeSeriesMetric = HeatStripMetric;
-
 // ============================================================================
 // METRIC STRIP VISUALIZATION TYPES
 // ============================================================================
@@ -918,6 +856,14 @@ export type HeatStripTimeSeriesMetric = HeatStripMetric;
  * Classified metric for metric strip tier system.
  * Metrics are classified into tiers based on their global max percentage.
  */
+/**
+ * What a metric's percentages are measured against. `peak` is the metric's own highest level,
+ * standing in where the log reported no limit; `none` is a metric the log reported no limit for in
+ * a log that reported some, which is off the series and cannot be read at all.
+ */
+export type MetricDenominator =
+  { kind: 'limit'; value: number } | { kind: 'peak'; value: number } | { kind: 'none' };
+
 export interface MetricStripClassifiedMetric {
   /** Unique metric identifier (e.g., 'cpuTime', 'soqlQueries') */
   metricId: string;
@@ -927,8 +873,8 @@ export interface MetricStripClassifiedMetric {
   tier: 1 | 2 | 3;
   /** Maximum percentage reached across all timestamps (0-1+) */
   globalMaxPercent: number;
-  /** Authoritative limit for this metric ("out of" total), fixed across the series. 0 if unknown. */
-  limit: number;
+  /** What this metric's percentages divide by, resolved once for the whole series. */
+  denominator: MetricDenominator;
   /** Line color for this metric (hex number 0xRRGGBB) */
   color: number;
   /** Priority for ordering (lower = higher priority, shown first) */
@@ -943,7 +889,7 @@ export interface MetricStripClassifiedMetric {
 export interface MetricStripRawValue {
   /** Current usage value (corrected line value). */
   used: number;
-  /** Maximum allowed value (limit) */
+  /** The limit the log reported for this metric; 0 when the log reported none. */
   limit: number;
   /** Increment-only tracked total, present only when it diverges below `used`. See HeatStripMetricValue.tracked. */
   tracked?: number;
@@ -975,30 +921,15 @@ export interface MetricStripProcessedData {
   globalMaxPercent: number;
   /** Whether there's any data to render */
   hasData: boolean;
+  /**
+   * True when the log reported no limit for any metric, so every percentage is a share of that
+   * metric's own peak rather than of a cap. The 80% band, the 100% line, the breach fill and the
+   * traffic-light colours mean nothing against a peak, so the renderer drops them.
+   */
+  scaledToPeak: boolean;
   /** Spans the log recorded nothing in, carried through from the series */
   gaps: NoDataSpan[];
 }
-
-/**
- * Metric strip time series input data (generic format).
- * This is the same structure as HeatStripTimeSeries - reused for metric strip.
- */
-export type MetricStripTimeSeries = HeatStripTimeSeries;
-
-// ============================================================================
-// BACKWARDS COMPATIBILITY ALIASES (deprecated, use MetricStrip* instead)
-// ============================================================================
-
-/** @deprecated Use MetricStripClassifiedMetric instead */
-export type SwimlaneClassifiedMetric = MetricStripClassifiedMetric;
-/** @deprecated Use MetricStripRawValue instead */
-export type SwimlaneRawValue = MetricStripRawValue;
-/** @deprecated Use MetricStripDataPoint instead */
-export type SwimlaneDataPoint = MetricStripDataPoint;
-/** @deprecated Use MetricStripProcessedData instead */
-export type SwimlaneProcessedData = MetricStripProcessedData;
-/** @deprecated Use MetricStripTimeSeries instead */
-export type SwimlaneTimeSeries = MetricStripTimeSeries;
 
 // ============================================================================
 // TEMPORAL SEGMENT TREE TYPES
@@ -1057,19 +988,6 @@ export interface SegmentNode {
 
   /** Call stack depth (0-indexed) */
   depth: number;
-}
-
-/**
- * Result from segment tree query.
- * Same shape as CulledRenderData for easy integration.
- */
-export interface SegmentTreeQueryResult {
-  /** Events > threshold screen width - render as rectangles */
-  visibleRects: Map<string, PrecomputedRect[]>;
-  /** Aggregated nodes for events <= threshold - render as buckets, keyed by category */
-  buckets: Map<string, PixelBucket[]>;
-  /** Render statistics */
-  stats: RenderStats;
 }
 
 /**

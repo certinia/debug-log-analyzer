@@ -1,6 +1,11 @@
 /*
  * Copyright (c) 2026 Certinia Inc. All rights reserved.
  */
+import type {
+  AggregateVariables,
+  SpreadValue,
+  VariableSpread,
+} from '../core/log/aggregateVariables.js';
 import {
   NOT_RECORDED,
   type FrameVariables,
@@ -97,15 +102,19 @@ interface GroupHead {
   self?: GroupSelf | null;
 }
 
-export type VariableTreeRow = Common &
-  (
-    | { kind: 'group'; name: string; of: string | null; count: number; self: GroupSelf | null }
-    | { kind: 'class'; className: string; count: number }
-    | ({ kind: 'variable'; row: VariableRow } & Shown)
-    | ({ kind: 'entry'; key: string | null } & Shown)
-    | { kind: 'text'; raw: string }
-    | { kind: 'note'; text: string }
-  );
+/** What a row is, before the place and disclosure state it is pushed with. */
+export type RowBody =
+  | { kind: 'group'; name: string; of: string | null; count: number; self: GroupSelf | null }
+  | { kind: 'class'; className: string; count: number }
+  | ({ kind: 'variable'; row: VariableRow } & Shown)
+  | ({ kind: 'entry'; key: string | null } & Shown)
+  | ({ kind: 'spread'; row: VariableSpread } & Shown)
+  | { kind: 'spread-many'; row: VariableSpread }
+  | ({ kind: 'spread-value'; held: SpreadValue; of: number } & Shown)
+  | { kind: 'text'; raw: string }
+  | { kind: 'note'; text: string };
+
+export type VariableTreeRow = Common & RowBody;
 
 /** The value a row shows: an address resolves to the object it names.
  *
@@ -189,22 +198,86 @@ function assembledOf(parts: readonly Part[], value: VariableValue): VariableValu
   );
 }
 
+/** A row that shows a value, before the disclosure state it is pushed with. */
+type ValueRow =
+  | { kind: 'variable'; row: VariableRow }
+  | { kind: 'entry'; key: string | null }
+  | { kind: 'spread'; row: VariableSpread }
+  | { kind: 'spread-value'; held: SpreadValue; of: number };
+
 /**
- * Every row the section shows, in order, given which ids are open.
+ * The half both builders share: what a value contributes once it is open.
  *
- * `isOpen` decides a group's default too, so the caller owns the policy: Local
- * opens, the rest do not.
+ * One emitter, so a value opens the same way at either scope. A spread's value
+ * is an object as much as a frame's local is, and the reader who can open one
+ * expects to open the other.
+ *
+ * `lookups` rides on each call rather than being captured: a frame reads every
+ * value at one point in the log, where a comparison reads each value at the
+ * point the first call to hold it stood.
  */
-export function toTreeRows(
-  frame: FrameVariables,
-  isOpen: (id: string, openByDefault: boolean) => boolean,
-  lookups: Lookups = {},
-): VariableTreeRow[] {
+function rowEmitter(isOpen: (id: string, openByDefault: boolean) => boolean) {
   const rows: VariableTreeRow[] = [];
 
   const note = (id: string, depth: number, text: string): void => {
     rows.push({ kind: 'note', id, depth, expandable: false, open: false, text });
   };
+
+  /**
+   * A row that holds others, opened where it may be and the reader wants it.
+   * The one place disclosure is decided, so every kind of row obeys one rule.
+   */
+  function node(
+    of: RowBody,
+    id: string,
+    depth: number,
+    expandable: boolean,
+    kids?: (depth: number) => void,
+    openByDefault = false,
+  ): void {
+    const open = expandable && isOpen(id, openByDefault);
+    rows.push({ ...of, id, depth, expandable, open });
+    if (open) {
+      kids?.(depth + 1);
+    }
+  }
+
+  const group = (head: GroupHead, kids: (depth: number) => void): void => {
+    const {
+      id,
+      name,
+      count,
+      expandable = true,
+      openByDefault = false,
+      of = null,
+      self = null,
+    } = head;
+    node({ kind: 'group', name, count, of, self }, id, 0, expandable, kids, openByDefault);
+  };
+
+  /**
+   * One rule for what may open: the value holds parts, or its text is too long
+   * to read in a row. An object already open above this row would be a cycle,
+   * and `MAX_DEPTH` stops a long chain.
+   */
+  function opens(depth: number, held: Shown, seen: ReadonlySet<string>): boolean {
+    const cycle = held.objectAddress !== null && seen.has(held.objectAddress);
+    return !cycle && depth < MAX_DEPTH && (held.parts.length > 0 || isExpandable(held.value));
+  }
+
+  /** A row that shows a value, and everything inside it while it is open. */
+  function value(
+    of: ValueRow,
+    id: string,
+    depth: number,
+    held: Shown,
+    seen: ReadonlySet<string>,
+    lookups: Lookups,
+  ): void {
+    node({ ...of, ...held }, id, depth, opens(depth, held, seen), (inside) =>
+      children(id, inside, held, withAddress(seen, held.objectAddress), lookups),
+    );
+  }
 
   /** The rows an open value contributes: the parts it holds, or its raw text. */
   function children(
@@ -212,14 +285,15 @@ export function toTreeRows(
     depth: number,
     holder: Shown,
     seen: ReadonlySet<string>,
+    lookups: Lookups,
   ): void {
-    const { value, raw, parts } = holder;
+    const { value: held, raw, parts } = holder;
     if (parts.length) {
       let repeats = 0;
       const keys = new Set<string>();
       for (const part of parts) {
         if ('field' in part) {
-          variable(parentId, depth, part.field, seen);
+          variable(parentId, depth, part.field, seen, lookups);
           continue;
         }
         const { entry, at } = part;
@@ -231,10 +305,14 @@ export function toTreeRows(
           }
         }
         const id = `${parentId}/${at}`;
-        const held = shown(entry.text, entry.address, entry.address, lookups);
-        if (pushValue({ kind: 'entry', key: entry.key }, id, depth, held, seen)) {
-          children(id, depth + 1, held, withAddress(seen, held.objectAddress));
-        }
+        value(
+          { kind: 'entry', key: entry.key },
+          id,
+          depth,
+          shown(entry.text, entry.address, entry.address, lookups),
+          seen,
+          lookups,
+        );
       }
       if (repeats) {
         note(
@@ -243,7 +321,7 @@ export function toTreeRows(
           `${repeats} keys repeat, kept in the order the log wrote them.`,
         );
       }
-      if (value.kind === 'container' && value.truncated) {
+      if (held.kind === 'container' && held.truncated) {
         note(`${parentId}/cut`, depth, 'The log cut this collection short.');
       }
       return;
@@ -262,58 +340,50 @@ export function toTreeRows(
     }
   }
 
-  function variables(
-    parentId: string,
-    depth: number,
-    of: readonly VariableRow[],
-    seen: ReadonlySet<string>,
-  ): void {
-    for (const row of of) {
-      variable(parentId, depth, row, seen);
-    }
-  }
-
   function variable(
     parentId: string,
     depth: number,
     row: VariableRow,
     seen: ReadonlySet<string>,
+    lookups: Lookups,
   ): void {
-    const id = `${parentId}/${row.name}`;
-    const held = shownValue(row, lookups);
-    if (pushValue({ kind: 'variable', row }, id, depth, held, seen)) {
-      children(id, depth + 1, held, withAddress(seen, held.objectAddress));
-    }
+    value(
+      { kind: 'variable', row },
+      `${parentId}/${row.name}`,
+      depth,
+      shownValue(row, lookups),
+      seen,
+      lookups,
+    );
   }
 
-  /** Pushes a row that shows a value, and says whether its children follow.
-   *
-   *  One rule for what may open: the value holds parts, or its text is too long
-   *  to read in a row. An object already open above this row would be a cycle,
-   *  and `MAX_DEPTH` stops a long chain. */
-  function pushValue(
-    of: { kind: 'variable'; row: VariableRow } | { kind: 'entry'; key: string | null },
-    id: string,
+  function variables(
+    parentId: string,
     depth: number,
-    held: Shown,
+    of: readonly VariableRow[],
     seen: ReadonlySet<string>,
-  ): boolean {
-    const cycle = held.objectAddress !== null && seen.has(held.objectAddress);
-    const expandable =
-      !cycle && depth < MAX_DEPTH && (held.parts.length > 0 || isExpandable(held.value));
-    const open = expandable && isOpen(id, false);
-    rows.push({ ...of, id, depth, expandable, open, ...held });
-    return open;
+    lookups: Lookups,
+  ): void {
+    for (const row of of) {
+      variable(parentId, depth, row, seen, lookups);
+    }
   }
 
-  const group = (head: GroupHead, kids: (depth: number) => void): void => {
-    const { id, expandable = true, openByDefault = false, of = null, self = null } = head;
-    const open = expandable && isOpen(id, openByDefault);
-    rows.push({ ...head, kind: 'group', depth: 0, expandable, open, of, self });
-    if (open) {
-      kids(1);
-    }
-  };
+  return { rows, note, group, node, value, variables };
+}
+
+/**
+ * Every row the section shows, in order, given which ids are open.
+ *
+ * `isOpen` decides a group's default too, so the caller owns the policy: Local
+ * opens, the rest do not.
+ */
+export function toTreeRows(
+  frame: FrameVariables,
+  isOpen: (id: string, openByDefault: boolean) => boolean,
+  lookups: Lookups = {},
+): VariableTreeRow[] {
+  const { rows, note, group, node, variables } = rowEmitter(isOpen);
 
   group(
     {
@@ -325,7 +395,7 @@ export function toTreeRows(
     },
     (depth) => {
       if (frame.locals.length) {
-        variables('local', depth, frame.locals, new Set());
+        variables('local', depth, frame.locals, NOTHING_OPEN, lookups);
       } else {
         note('local/none', depth, 'The log records no locals for this frame.');
       }
@@ -347,7 +417,13 @@ export function toTreeRows(
       },
       // The frame's own object, so a field pointing back at it cannot reopen it.
       (depth) =>
-        variables('this', depth, frame.fields, withAddress(new Set(), self?.objectAddress ?? null)),
+        variables(
+          'this',
+          depth,
+          frame.fields,
+          withAddress(NOTHING_OPEN, self?.objectAddress ?? null),
+          lookups,
+        ),
     );
   }
 
@@ -355,28 +431,127 @@ export function toTreeRows(
     const total = frame.statics.reduce((sum, entry) => sum + entry.rows.length, 0);
     // Statics nest one level by class: every static the log names is
     // class-qualified, and a log holds thousands of them.
-    group({ id: 'static', name: 'Static', count: total }, () => {
+    group({ id: 'static', name: 'Static', count: total }, (depth) => {
       for (const entry of frame.statics) {
-        const id = `static/${entry.className}`;
-        const open = isOpen(id, false);
-        rows.push({
-          kind: 'class',
-          id,
-          depth: 1,
-          expandable: true,
-          open,
-          className: entry.className,
-          count: entry.rows.length,
-        });
-        if (open) {
-          variables(id, 2, entry.rows, new Set());
-        }
+        node(
+          { kind: 'class', className: entry.className, count: entry.rows.length },
+          `static/${entry.className}`,
+          depth,
+          true,
+          (inside) =>
+            variables(`static/${entry.className}`, inside, entry.rows, NOTHING_OPEN, lookups),
+        );
       }
     });
   }
 
   return rows;
 }
+
+/**
+ * Every row a merged row's comparison shows, in order, given which ids are open.
+ *
+ * The same row model and the same emitter as {@link toTreeRows}, so one
+ * renderer and one keyboard tree serve both scopes, and a value that is an
+ * object opens into its fields here as it does for one frame.
+ *
+ * @param lookupsAt - the log bound to the point a value's first call read at.
+ *   Each call read at its own point, so an object is shown as that one call
+ *   recorded it; the section says so.
+ */
+export function toSpreadRows(
+  aggregate: AggregateVariables,
+  isOpen: (id: string, openByDefault: boolean) => boolean,
+  lookupsAt: (cut: number) => Lookups = () => ({}),
+): VariableTreeRow[] {
+  const { rows, note, group, node, value } = rowEmitter(isOpen);
+
+  function spread(parentId: string, depth: number, row: VariableSpread): void {
+    const id = `${parentId}/${row.name}`;
+    // One value every call held, so the row *is* that value: it reads and opens
+    // exactly as a single frame's row does, through the same emitter.
+    const only = row.values.length === 1 ? row.values[0] : null;
+    if (only) {
+      value(
+        { kind: 'spread', row },
+        id,
+        depth,
+        shownOf(only, lookupsAt),
+        NOTHING_OPEN,
+        lookupsAt(only.cut),
+      );
+      return;
+    }
+    // The calls disagreed, so the row holds their values rather than being one.
+    node({ kind: 'spread-many', row }, id, depth, row.values.length > 0, (inside) => {
+      row.values.forEach((entry, at) => {
+        value(
+          { kind: 'spread-value', held: entry, of: row.calls },
+          `${id}/${at}`,
+          inside,
+          shownOf(entry, lookupsAt),
+          NOTHING_OPEN,
+          lookupsAt(entry.cut),
+        );
+      });
+    });
+  }
+
+  group(
+    { id: 'local', name: 'Local', count: aggregate.locals.length, openByDefault: true },
+    (depth) => {
+      if (!aggregate.locals.length) {
+        note('local/none', depth, 'The log records no locals for these calls.');
+        return;
+      }
+      for (const row of aggregate.locals) {
+        spread('local', depth, row);
+      }
+    },
+  );
+
+  if (aggregate.fields.length) {
+    group(
+      {
+        id: 'this',
+        name: 'this',
+        // The calls need not have run on one object, and which they ran on is
+        // part of the reading, so the head says it rather than implying one.
+        of: objectsLabel(aggregate),
+        count: aggregate.fields.length,
+      },
+      (depth) => {
+        for (const row of aggregate.fields) {
+          spread('this', depth, row);
+        }
+      },
+    );
+  }
+
+  return rows;
+}
+
+/** One compared value as shown, read at the point its first call stood.
+ *
+ *  Only a value the log wrote as an address asks the log anything, so a scalar
+ *  never builds a view it would not read. */
+function shownOf(value: SpreadValue, lookupsAt: (cut: number) => Lookups): Shown {
+  // The object the value is, which is what opens it - the log names it beside a
+  // serialised value as well as in place of one.
+  const object = value.address ?? value.objectAddress;
+  const lookups = object ? lookupsAt(value.cut) : {};
+  return shown(value.text, value.address, object, lookups);
+}
+
+/** Whose class the fields belong to, and how many objects held them. */
+function objectsLabel(aggregate: AggregateVariables): string | null {
+  const objects = aggregate.objects > 1 ? `${aggregate.objects} objects` : null;
+  return [aggregate.thisType, objects].filter(Boolean).join(', ') || null;
+}
+
+/** Nothing open above a row, shared so a rebuild allocates none. `withAddress`
+ *  never mutates what it is given. */
+const NOTHING_OPEN: ReadonlySet<string> = new Set();
 
 /** The addresses open above a row, so the same object cannot open inside itself. */
 function withAddress(seen: ReadonlySet<string>, address: string | null): ReadonlySet<string> {

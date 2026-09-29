@@ -4,6 +4,7 @@
 import {
   window,
   workspace,
+  type Disposable,
   type QuickPick as VSCodeQuickPick,
   type QuickPickItem,
   type WebviewPanel,
@@ -14,6 +15,7 @@ import { appName } from '../AppSettings.js';
 import type { Context } from '../Context.js';
 import { Item, Options, QuickPick } from '../display/QuickPick.js';
 import type { ApexLogListItem } from '../services/salesforceServices.js';
+import { errorMessage } from '../tryCatch.js';
 import { Command } from './Command.js';
 import { LogView } from './LogView.js';
 
@@ -37,19 +39,14 @@ export class RetrieveLogFile {
   private static servicesDisposalRegistered = false;
 
   static apply(context: Context): void {
-    new Command('retrieveLogFile', 'Log: Retrieve Apex Log And Show Analysis', () =>
-      RetrieveLogFile.safeCommand(context),
-    ).register(context);
+    new Command(
+      'retrieveLogFile',
+      'Log: Retrieve Apex Log And Show Analysis',
+      context,
+      'Error loading logfile',
+      () => RetrieveLogFile.command(context),
+    ).register();
     context.display.output(`Registered command '${appName}: Retrieve Log'`);
-  }
-
-  private static async safeCommand(context: Context): Promise<WebviewPanel | void> {
-    try {
-      return await RetrieveLogFile.command(context);
-    } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : String(err);
-      context.display.showErrorMessage(`Error loading logfile: ${msg}`);
-    }
   }
 
   private static async command(context: Context): Promise<WebviewPanel | void> {
@@ -75,7 +72,12 @@ export class RetrieveLogFile {
     }
     const loadingPicker = RetrieveLogFile.showLoadingPicker();
     try {
-      const logFiles = await salesforceServices.listLogs();
+      const logFiles = await RetrieveLogFile.whileLoading(loadingPicker, (signal) =>
+        salesforceServices.listLogs(signal),
+      );
+      if (logFiles === undefined) {
+        return;
+      }
       const logFileId = await RetrieveLogFile.getLogFile(logFiles);
       if (logFileId) {
         const logUri = Utils.joinPath(
@@ -98,7 +100,7 @@ export class RetrieveLogFile {
           try {
             await salesforceServices.writeFile(logUri, logData);
           } catch (error: unknown) {
-            const message = error instanceof Error ? error.message : String(error);
+            const message = errorMessage(error);
             context.display.output(`Unable to cache retrieved log: ${message}`, true);
             return logData;
           }
@@ -112,11 +114,29 @@ export class RetrieveLogFile {
 
   private static showLoadingPicker(): VSCodeQuickPick<QuickPickItem> {
     const qp = window.createQuickPick();
-    qp.placeholder = 'Select a logfile';
+    // An org that never answers leaves this busy for good, so name the way out.
+    qp.placeholder = 'Loading logs. Press Escape to cancel.';
     qp.busy = true;
     qp.enabled = false;
     qp.show();
     return qp;
+  }
+
+  /** Dismissal cancels the work, so an org that never answers leaves nothing running behind. */
+  private static whileLoading<T>(
+    picker: VSCodeQuickPick<QuickPickItem>,
+    work: (signal: AbortSignal) => Promise<T>,
+  ): Promise<T | undefined> {
+    const cancellation = new AbortController();
+    let hidden: Disposable | undefined;
+    const dismissed = new Promise<undefined>((resolve) => {
+      hidden = picker.onDidHide(() => {
+        cancellation.abort();
+        resolve(undefined);
+      });
+    });
+
+    return Promise.race([work(cancellation.signal), dismissed]).finally(() => hidden?.dispose());
   }
 
   private static async getLogFile(files: ApexLogListItem[]): Promise<string | null> {

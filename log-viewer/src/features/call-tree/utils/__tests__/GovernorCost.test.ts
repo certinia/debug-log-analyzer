@@ -2,7 +2,9 @@
  * Copyright (c) 2026 Certinia Inc. All rights reserved.
  */
 import { describe, expect, it } from '@jest/globals';
-import type { GovernorLimits } from 'apex-log-parser';
+import type { GovernorLimits } from '@apexdevtools/apex-log-parser/types';
+
+import { governorLimits, limitValue } from '../../../../components/__tests__/limitsTestUtils.js';
 
 import {
   governorCost,
@@ -12,15 +14,14 @@ import {
 } from '../GovernorCost.js';
 
 function limits(overrides: Record<string, number> = {}): GovernorLimits {
-  const metric = (limit: number) => ({ used: 0, limit });
-  return {
-    soqlQueries: metric(overrides.soqlQueries ?? 100),
-    dmlStatements: metric(overrides.dmlStatements ?? 150),
-    soslQueries: metric(overrides.soslQueries ?? 20),
-    queryRows: metric(overrides.queryRows ?? 50000),
-    dmlRows: metric(overrides.dmlRows ?? 10000),
-    heapSize: metric(overrides.heapSize ?? 6000000),
-  } as unknown as GovernorLimits;
+  return governorLimits({
+    soqlQueries: limitValue(0, overrides.soqlQueries ?? 100),
+    dmlStatements: limitValue(0, overrides.dmlStatements ?? 150),
+    soslQueries: limitValue(0, overrides.soslQueries ?? 20),
+    queryRows: limitValue(0, overrides.queryRows ?? 50000),
+    dmlRows: limitValue(0, overrides.dmlRows ?? 10000),
+    heapSize: limitValue(0, overrides.heapSize ?? 6000000),
+  });
 }
 
 function row(overrides: Partial<Record<string, number>> = {}): GovernorCostRow {
@@ -37,8 +38,8 @@ function row(overrides: Partial<Record<string, number>> = {}): GovernorCostRow {
     heapAllocated: st(overrides.heapNet ?? 0),
     heapGross: st(overrides.heapGross ?? 0),
     heapPeak: overrides.heap ?? 0,
-    governorCost: 0,
-    governorCostMax: 0,
+    governorCost: null,
+    governorCostMax: null,
   };
 }
 
@@ -107,6 +108,31 @@ describe('governorCostMax', () => {
 
   it('is 0 when nothing is consumed', () => {
     expect(governorCostMax(row(), limits())).toBe(0);
+  });
+});
+
+describe('a log that reported no limits', () => {
+  const noLimits = limits({
+    soqlQueries: 0,
+    dmlStatements: 0,
+    soslQueries: 0,
+    queryRows: 0,
+    dmlRows: 0,
+    heapSize: 0,
+  });
+
+  // An unknown utilisation is not 0%: reading it as one would say the path is clear of limits
+  // nobody knows. The column renders the null as an em dash.
+  it('has no average utilisation to report', () => {
+    expect(governorCost(row({ soql: 50, heap: 3_000_000 }), noLimits)).toBeNull();
+  });
+
+  it('has no tightest governor to name', () => {
+    expect(governorCostMax(row({ soql: 50, heap: 3_000_000 }), noLimits)).toBeNull();
+  });
+
+  it('breaks nothing down', () => {
+    expect(governorCostBreakdown(row({ soql: 50 }), noLimits)).toEqual([]);
   });
 });
 

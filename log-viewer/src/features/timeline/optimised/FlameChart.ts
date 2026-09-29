@@ -10,22 +10,24 @@
  * Apex-specific logic is handled via callbacks.
  */
 
-import type { LogEvent } from 'apex-log-parser';
+import type { LogEvent } from '@apexdevtools/apex-log-parser';
 import * as PIXI from 'pixi.js';
 
 import { HoverTracker } from './interaction/HoverTracker.js';
 import { HoverHighlightRenderer } from './rendering/HoverHighlightRenderer.js';
-import { destroyTimelineApp } from './rendering/pixiApp.js';
+import { createTimelineApp, destroyTimelineApp } from './rendering/pixiApp.js';
 import type {
   EditorColors,
   EventNode,
   HeatStripTimeSeries,
+  HoverCause,
   ModifierKeys,
   TimelineMarker,
   TimelineOptions,
   TimelineState,
   TreeNode,
   ViewportBounds,
+  ViewportPanAxes,
   ViewportState,
 } from '../types/flamechart.types.js';
 import { TIMELINE_CONSTANTS, TimelineError, TimelineErrorCode } from '../types/flamechart.types.js';
@@ -81,12 +83,17 @@ import { waitForNextFrame } from '../../../core/utility/FrameBudget.js';
  */
 const SIZE_WAIT_FRAMES = 60;
 
+/** How long a pan to a frame takes, matching the moves the selection sync animates. */
+const PAN_ANIMATION_MS = 300;
+
 export interface FlameChartCallbacks {
+  /** Called with what the pointer is over, and with what changed that. */
   onMouseMove?: (
     screenX: number,
     screenY: number,
     eventNode: EventNode | null,
     marker: TimelineMarker | null,
+    cause: HoverCause,
   ) => void;
   onClick?: (
     screenX: number,
@@ -812,6 +819,9 @@ export class FlameChart<E extends EventNode = EventNode> {
       return false;
     }
 
+    // Read once, so the three renderers below cannot land on different ratios.
+    const resolution = window.devicePixelRatio || 1;
+
     const oldState = this.viewport.getState();
     const oldWidth = oldState.displayWidth;
 
@@ -853,7 +863,8 @@ export class FlameChart<E extends EventNode = EventNode> {
       newWidth === oldWidth &&
       mainTimelineHeight === oldState.displayHeight &&
       minimapHeight === this.appliedMinimapHeight &&
-      totalOverheadHeight === this.appliedOverheadHeight
+      totalOverheadHeight === this.appliedOverheadHeight &&
+      resolution === this.app.renderer.resolution
     ) {
       return false;
     }
@@ -870,12 +881,12 @@ export class FlameChart<E extends EventNode = EventNode> {
 
     // Resize minimap orchestrator
     if (this.minimapOrchestrator) {
-      this.minimapOrchestrator.resize(newWidth, newHeight);
+      this.minimapOrchestrator.resize(newWidth, newHeight, resolution);
     }
 
     // Resize metric strip orchestrator
     if (this.metricStripOrchestrator) {
-      this.metricStripOrchestrator.resize(newWidth);
+      this.metricStripOrchestrator.resize(newWidth, resolution);
     }
 
     // Update orchestrators with new offset
@@ -883,7 +894,7 @@ export class FlameChart<E extends EventNode = EventNode> {
     this.searchOrchestrator?.setMainTimelineYOffset(this.mainTimelineYOffset);
 
     // Resize main timeline app
-    this.app.renderer.resize(newWidth, mainTimelineHeight);
+    this.app.renderer.resize(newWidth, mainTimelineHeight, resolution);
 
     const newZoom = newWidth / visibleTimeRange;
     const newOffsetX = visibleTimeStart * newZoom;
@@ -1100,20 +1111,7 @@ export class FlameChart<E extends EventNode = EventNode> {
     // Minimap app is created by MinimapOrchestrator in setupMinimap()
 
     // Create main timeline app with measured height
-    this.app = new PIXI.Application();
-    await this.app.init({
-      width,
-      height: mainTimelineHeight,
-      antialias: false,
-      backgroundAlpha: 0,
-      resolution: window.devicePixelRatio || 1,
-      roundPixels: true,
-      autoDensity: true,
-      autoStart: false,
-    });
-    this.app.ticker.stop();
-    this.app.stage.eventMode = 'none';
-    mainDiv.appendChild(this.app.canvas);
+    this.app = await createTimelineApp(mainDiv, { width, height: mainTimelineHeight });
 
     return { mainTimelineHeight };
   }
@@ -1218,7 +1216,7 @@ export class FlameChart<E extends EventNode = EventNode> {
           this.requestHoverRender();
           // Notify callback that mouse left (clears tooltip)
           if (this.callbacks.onMouseMove) {
-            this.callbacks.onMouseMove(0, 0, null, null);
+            this.callbacks.onMouseMove(0, 0, null, null, 'pointer');
           }
         },
         onDragStart: () => {
@@ -1650,12 +1648,7 @@ export class FlameChart<E extends EventNode = EventNode> {
         this.callbacks.onMarkerNavigate?.(marker, screenX, screenY);
       },
       onAnimateToPosition: (targetX: number, targetY: number, durationMs: number) => {
-        if (!this.viewport || !this.viewportAnimator) {
-          return;
-        }
-        this.viewportAnimator.animate(this.viewport, targetX, targetY, durationMs, () =>
-          this.notifyViewportChange(),
-        );
+        this.animateViewportTo(targetX, targetY, durationMs);
       },
       requestRender: () => {
         // Selection change only needs highlights + overlays (Phase 3 optimization)
@@ -1724,7 +1717,7 @@ export class FlameChart<E extends EventNode = EventNode> {
     );
   }
 
-  private handleMouseMove(screenX: number, screenY: number): void {
+  private handleMouseMove(screenX: number, screenY: number, cause: HoverCause = 'pointer'): void {
     if (!this.viewport || !this.index || !this.hitDetector) {
       return;
     }
@@ -1757,7 +1750,13 @@ export class FlameChart<E extends EventNode = EventNode> {
     // Notify callback with container-relative coordinates
     // (screenY is canvas-relative, add minimap offset for container-relative positioning)
     if (this.callbacks.onMouseMove) {
-      this.callbacks.onMouseMove(screenX, screenY + this.mainTimelineYOffset, eventNode, marker);
+      this.callbacks.onMouseMove(
+        screenX,
+        screenY + this.mainTimelineYOffset,
+        eventNode,
+        marker,
+        cause,
+      );
     }
   }
 
@@ -2170,20 +2169,46 @@ export class FlameChart<E extends EventNode = EventNode> {
   }
 
   /**
-   * Pan (without changing zoom) so the currently selected frame is visible.
-   * Animated, and a no-op if the frame is already in view - use this for the
-   * passive selection sync, where a full zoom-to-fit would be too disruptive.
+   * Pan (without changing zoom) to put a frame in the middle of the view, on the
+   * axes asked for. Selects nothing, so a caller standing for several frames can
+   * bring one into view without naming it as the selection.
+   *
+   * @param timestamp - Frame start time in nanoseconds
+   * @param duration - Frame duration in nanoseconds
+   * @param depth - Frame depth in the call tree
+   * @param axes - Axes to centre on
    */
-  public centerOnSelectedFrame(): void {
-    this.selectionOrchestrator?.centerOnSelectedFrame();
+  public panToFrame(
+    timestamp: number,
+    duration: number,
+    depth: number,
+    axes: ViewportPanAxes,
+  ): void {
+    if (!this.viewport) {
+      return;
+    }
+
+    const target = this.viewport.centerOffsetFor(timestamp, duration, depth, axes);
+    this.animateViewportTo(target.x, target.y, PAN_ANIMATION_MS);
+  }
+
+  /** Animate the view to an offset, abandoning whatever move was in flight. */
+  private animateViewportTo(targetX: number, targetY: number, durationMs: number): void {
+    if (!this.viewport || !this.viewportAnimator) {
+      return;
+    }
+
+    this.viewportAnimator.animate(this.viewport, targetX, targetY, durationMs, () =>
+      this.notifyViewportChange(),
+    );
   }
 
   /**
    * Zoom and pan to fit `duration` from `timestamp`, at `depth`.
    *
-   * The only way a caller outside the chart moves the viewport, so that every
-   * move is reported: the inspector reads the stretch of log the chart says it
-   * is showing.
+   * With {@link panToFrame}, the only way a caller outside the chart moves the
+   * viewport, so that every move is reported: the inspector reads the stretch of
+   * log the chart says it is showing.
    *
    * @param timestamp - Start of the stretch to fit, in nanoseconds
    * @param duration - Length of that stretch, in nanoseconds
@@ -2390,12 +2415,12 @@ export class FlameChart<E extends EventNode = EventNode> {
       // stays marked stale, and the first render after the drag washes what it settled on.
       if (this.hoverTracker.setHovered(null)) {
         dirty.overlays = true;
-        this.callbacks.onMouseMove?.(0, 0, null, null);
+        this.callbacks.onMouseMove?.(0, 0, null, null, 'pointer');
       }
     } else {
       const stale = this.hoverTracker.takeStaleHit();
       if (stale) {
-        this.handleMouseMove(stale.x, stale.y);
+        this.handleMouseMove(stale.x, stale.y, 'frames');
       }
     }
 

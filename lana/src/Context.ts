@@ -38,6 +38,6 @@ export class Context {
     RawLogLineDecoration.apply(this);
     RawLogFoldingProvider.apply(this);
     RawLogSymbolProvider.apply(this);
-    WhatsNewNotification.apply(this);
+    void WhatsNewNotification.apply(this);
   }
 }

@@ -14,7 +14,11 @@
 import { describe, expect, it } from '@jest/globals';
 import { Graphics } from 'pixi.js';
 import { TIMELINE_CONSTANTS, type ViewportState } from '../../types/flamechart.types.js';
-import { renderHighlight, renderWash } from '../rendering/HighlightRenderer.js';
+import {
+  createHighlightColors,
+  renderHighlight,
+  renderWash,
+} from '../rendering/HighlightRenderer.js';
 
 const viewport: ViewportState = {
   zoom: 1,
@@ -38,7 +42,7 @@ describe('renderWash', () => {
 
     // The selection over the same frame strokes as well.
     const selection = new Graphics();
-    renderHighlight(selection, 0, 100, 0, viewport, { sourceColor: 0xffffff });
+    renderHighlight(selection, 0, 100, 0, viewport, createHighlightColors(0xffffff));
     expect(actions(selection)).toContain('stroke');
   });
 

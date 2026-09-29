@@ -16,8 +16,10 @@ import '../../../components/StackedTimeBar.js';
 import { segmentsWithTail } from '../../../components/StackedTimeBar.js';
 import { logContext } from '../../../core/log/logContext.js';
 import type { LogStore } from '../../../core/log/LogStore.js';
+import { nsToMs } from '../../../core/utility/Duration.js';
 import { formatDuration, formatInteger, sharePercent } from '../../../core/utility/Util.js';
 import { globalStyles } from '../../../styles/global.styles.js';
+import '../../../components/SectionSkeleton.js';
 import { inspectorSectionStyles } from '../../../styles/inspectorSection.styles.js';
 import { revealRowStyles } from '../../../styles/revealRow.styles.js';
 import type { SoqlBudget } from '../../soql/format/budget.js';
@@ -165,7 +167,7 @@ export class DatabaseConcentration extends LitElement {
     const log = this.logStore?.log;
     const overview = log ? databaseOverview(log) : null;
     if (!overview?.ranked.length) {
-      return html`<p class="note">${NO_STATEMENTS}</p>`;
+      return html`<section-skeleton shape="rows" fallback=${NO_STATEMENTS}></section-skeleton>`;
     }
     const { count, percent } = concentration(overview);
     const { shown, rest } = topRows(overview.ranked);
@@ -281,7 +283,7 @@ export class DatabaseNamespaces extends LitElement {
     const log = this.logStore?.log;
     const overview = log ? databaseOverview(log) : null;
     if (!overview?.askedBy.length || !log) {
-      return html`<p class="note">${NO_STATEMENTS}</p>`;
+      return html`<section-skeleton shape="rows" fallback=${NO_STATEMENTS}></section-skeleton>`;
     }
     // The log's own palette, so a namespace that moves between the two bars is
     // followed by eye and reads the same on the Timeline's bar.
@@ -352,7 +354,7 @@ function statementLabel(statement: DatabaseStatement): TemplateResult | string {
  * cutting a figure in half; the reveal title keeps the full reading.
  */
 function subLine(statement: DatabaseStatement, ownPercent: number): TemplateResult {
-  const perRow = statement.rows > 0 ? statement.netNs / statement.rows / 1_000_000 : 0;
+  const perRow = statement.rows > 0 ? nsToMs(statement.netNs / statement.rows) : 0;
   // Self is the total twice over when nothing ran inside the statement.
   const descendantNs = statement.timeNs - statement.selfNs;
   const databaseNs = statement.timeNs - statement.netNs;

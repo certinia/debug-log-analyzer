@@ -23,7 +23,7 @@
 
 import * as PIXI from 'pixi.js';
 
-import { destroyTimelineApp } from '../rendering/pixiApp.js';
+import { createTimelineApp, destroyTimelineApp } from '../rendering/pixiApp.js';
 import { formatTimeRange } from '../../../../core/utility/Util.js';
 import type {
   HeatStripTimeSeries,
@@ -35,7 +35,7 @@ import { MeshAxisRenderer } from '../time-axis/MeshAxisRenderer.js';
 import { wheelZoomFactor } from '../ViewportUtils.js';
 import { MetricStripRenderer } from './MetricStripRenderer.js';
 import { MetricStripTooltipRenderer } from './MetricStripTooltipRenderer.js';
-import { MetricTierClassifier } from './MetricTierClassifier.js';
+import { EMPTY_METRIC_STRIP_DATA, MetricTierClassifier } from './MetricTierClassifier.js';
 import { isOverChevron } from './strip-pointer.js';
 import {
   getMetricStripColors,
@@ -194,20 +194,11 @@ export class MetricStripOrchestrator {
     this.totalDuration = totalDuration;
 
     // Create PIXI Application for metric strip (starts collapsed)
-    this.app = new PIXI.Application();
-    await this.app.init({
+    this.app = await createTimelineApp(metricStripDiv, {
       width,
       height: METRIC_STRIP_COLLAPSED_HEIGHT,
       antialias: true, // Smooth lines
-      backgroundAlpha: 0,
-      resolution: window.devicePixelRatio || 1,
-      roundPixels: true,
-      autoDensity: true,
-      autoStart: false,
     });
-    this.app.ticker.stop();
-    this.app.stage.eventMode = 'none';
-    metricStripDiv.appendChild(this.app.canvas);
 
     // Create main container
     this.container = new PIXI.Container();
@@ -305,10 +296,11 @@ export class MetricStripOrchestrator {
    * Handle resize of the metric strip container.
    *
    * @param newWidth - New canvas width
+   * @param resolution - devicePixelRatio to render at
    */
-  public resize(newWidth: number): void {
+  public resize(newWidth: number, resolution: number): void {
     if (this.app) {
-      this.app.renderer.resize(newWidth, this.getHeight());
+      this.app.renderer.resize(newWidth, this.getHeight(), resolution);
     }
   }
 
@@ -474,7 +466,7 @@ export class MetricStripOrchestrator {
 
     // Render the step chart with markers
     this.renderer.render(
-      data ?? { points: [], classifiedMetrics: [], globalMaxPercent: 0, hasData: false, gaps: [] },
+      data ?? EMPTY_METRIC_STRIP_DATA,
       context.viewportState,
       context.totalDuration,
       context.markers,
@@ -486,6 +478,7 @@ export class MetricStripOrchestrator {
         context.viewportState,
         (timeNs) => this.classifier?.getDataPointAtTime(timeNs) ?? null,
         context.totalDuration,
+        data.scaledToPeak,
       );
     }
 

@@ -2,7 +2,7 @@
  * Copyright (c) 2026 Certinia Inc. All rights reserved.
  */
 import { describe, expect, it } from '@jest/globals';
-import { parse } from 'apex-log-parser';
+import { parse } from '@apexdevtools/apex-log-parser';
 
 import { deriveLogIdentity } from '../logIdentity.js';
 
@@ -21,7 +21,7 @@ function transaction(codeUnitStarted: string, prefix = USER_INFO_LINE): string {
 }
 
 function identity(rawLog: string) {
-  return deriveLogIdentity(parse(rawLog), rawLog);
+  return deriveLogIdentity(parse(rawLog));
 }
 
 describe('entry point', () => {
@@ -80,18 +80,28 @@ describe('user and start time', () => {
     );
   });
 
-  it('finds USER_INFO past a preamble longer than any fixed scan window', () => {
-    const preamble =
-      '64.0 APEX_CODE,FINE;APEX_PROFILING,INFO\n' +
-      `Execute Anonymous: ${'x'.repeat(8192)}\n` +
-      'Execute Anonymous: quoting |USER_INFO| inside the echo must not match\n';
+  it('keeps the offset when the header names no timezone', () => {
+    const log = transaction(
+      anonymous,
+      '09:18:22.6 (6297619)|USER_INFO|[EXTERNAL]|005Ea00000R6orz|tina.owen@example.com|(GMT+05:30)|GMT+05:30\n',
+    );
 
-    const { user } = identity(transaction(anonymous, preamble + USER_INFO_LINE));
-
-    expect(user).toEqual({ label: 'tina.owen', detail: 'tina.owen@example.com' });
+    expect(identity(log).startTime?.detail).toMatch(/^Started 09:18:22\S* \(GMT\+05:30\)$/);
   });
 
-  it('omits the user in a cropped log whose first event is not USER_INFO', () => {
+  it('omits the user when USER_INFO states no name, keeping its timezone', () => {
+    const log = transaction(
+      anonymous,
+      '09:18:22.6 (6297619)|USER_INFO|[EXTERNAL]|005Ea00000R6orz||(GMT-07:00) Pacific Daylight Time (America/Los_Angeles)|GMT-07:00\n',
+    );
+
+    const { user, startTime } = identity(log);
+
+    expect(user).toBeNull();
+    expect(startTime?.detail).toContain('Pacific Daylight Time');
+  });
+
+  it('omits the user when the log states no USER_INFO', () => {
     const { user, startTime } = identity(transaction(anonymous, ''));
 
     expect(user).toBeNull();
@@ -100,5 +110,20 @@ describe('user and start time', () => {
 
   it('derives nothing from an empty log', () => {
     expect(identity('')).toEqual({ entryPoint: null, user: null, startTime: null });
+  });
+
+  // This asserts a bug, not the behaviour we want. apex-log-parser#86: the parser ends its
+  // USER_INFO search at the first `|EXECUTION_STARTED` in the text, which the anonymous-apex
+  // echo can state before the header is reached, so the user and the timezone are both lost.
+  // When a parser bump makes this fail, invert it to the assertions named below. Do not loosen it.
+  it('loses the user when the echoed source states |EXECUTION_STARTED', () => {
+    const echo = "Execute Anonymous: String s = '|EXECUTION_STARTED';\n";
+
+    const { user, startTime } = identity(transaction(anonymous, echo + USER_INFO_LINE));
+
+    // Want: toEqual({ label: 'tina.owen', detail: 'tina.owen@example.com' }).
+    expect(user).toBeNull();
+    // Want: the `(GMT-07:00) Pacific Daylight Time (America/Los_Angeles)` suffix.
+    expect(startTime?.detail).toMatch(/^Started 09:18:22\S*$/);
   });
 });

@@ -1,7 +1,8 @@
 /*
  * Copyright (c) 2026 Certinia Inc. All rights reserved.
  */
-import type { GovernorLimits, LogEvent, SelfTotal } from 'apex-log-parser';
+import type { LogEvent } from '@apexdevtools/apex-log-parser';
+import type { GovernorLimits, SelfTotal } from '@apexdevtools/apex-log-parser/types';
 
 import { getCallerNamespace } from '../../../core/utility/CallerNamespace.js';
 import { EXCLUDED_DETAIL_TYPES } from './DetailsFilter.js';
@@ -32,10 +33,10 @@ export interface TimeOrderRow {
   heapGross: SelfTotal;
   /** Peak live heap (bytes) reached in this node's subtree — the limit-comparable value */
   heapPeak: number;
-  /** Average governor consumption across all reported governors (0–100%). */
-  governorCost: number;
+  /** Average governor consumption across all reported governors (0–100%); null if none. */
+  governorCost: number | null;
   /** The single tightest governor consumed on this path (0–100+%). */
-  governorCostMax: number;
+  governorCostMax: number | null;
   /**
    * True when this row is itself a "detail" (the per-row predicate matches —
    * non-zero `duration.total`, `isParent`, `discontinuity`, or a type in

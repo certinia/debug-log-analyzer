@@ -9,7 +9,8 @@ import { describe, expect, it } from '@jest/globals';
 jest.mock('../../tabulator/style/DataGrid.scss', () => ({ default: '' }));
 jest.mock('../../tabulator/format/Progress.css', () => ({}));
 // The tabulator ESM build (+ its module registrations) doesn't load under jest;
-// this suite only exercises the view-mode toggle, no table is built (eventIndex -1).
+// this suite exercises the view-mode toggle and the column set; no table is
+// built (eventIndex -1).
 jest.mock('tabulator-tables', () => ({
   Tabulator: class {
     static registerModule() {}
@@ -19,6 +20,8 @@ jest.mock('tabulator-tables', () => ({
 }));
 // vscode-button needs ElementInternals.setFormValue (absent in jsdom).
 jest.mock('#vscode-elements/vscode-button.js', () => ({}));
+
+import type { CellComponent } from 'tabulator-tables';
 
 import type { LogStore } from '../../core/log/LogStore.js';
 import type { CallTreeDetail } from '../CallTreeDetail.js';
@@ -39,6 +42,22 @@ function switchEl(el: CallTreeDetail): Element {
     throw new Error('view-mode-switch not rendered');
   }
   return found;
+}
+
+/** The Name column's tooltip, read off the column set the component builds. */
+function nameTooltip(
+  el: CallTreeDetail,
+  row: { originalData?: { text: string; type: string } },
+  value: string,
+): string {
+  const name = el['_columns']('time-order', 100).find((column) => column.field === 'text');
+  const tooltip = name?.tooltip;
+  if (typeof tooltip !== 'function') {
+    throw new Error('Name column has no tooltip');
+  }
+  const cell = { getData: () => row, getValue: () => value } as unknown as CellComponent;
+  // An element, not a string: Tabulator writes a string tooltip with `innerHTML`.
+  return (tooltip({} as MouseEvent, cell, () => {}) as HTMLElement).textContent ?? '';
 }
 
 /** Two logs, so a pick can be shown to belong to the one it was made in. */
@@ -116,5 +135,30 @@ describe('CallTreeDetail view mode', () => {
     // Another tab never sees it, so it opens on its own default.
     const database = await mount({ source: 'database', sourceView: 'callees' });
     expect(switchEl(database).getAttribute('value')).toBe('bottom-up');
+  });
+
+  it('hovers a truncated name with the label the cell shows', async () => {
+    const el = await mount();
+
+    // `eventLabel` prefixes the type where the text cannot stand alone, which is
+    // what the cell renders — the raw `text` field alone would say only "true".
+    expect(
+      nameTooltip(el, { originalData: { text: 'true', type: 'STATEMENT_EXECUTE' } }, 'true'),
+    ).toBe('STATEMENT_EXECUTE: true');
+  });
+
+  it('keeps the generics in a signature the hover has to show', async () => {
+    const el = await mount();
+
+    const signature = 'ContactTriggerHandler.handleAfterUpdate(List<Contact>, Map<Id,Contact>)';
+    expect(
+      nameTooltip(el, { originalData: { text: signature, type: 'METHOD_ENTRY' } }, signature),
+    ).toBe(signature);
+  });
+
+  it('falls back to the cell value where a row carries no frame', async () => {
+    const el = await mount();
+
+    expect(nameTooltip(el, {}, 'Total')).toBe('Total');
   });
 });

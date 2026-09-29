@@ -46,6 +46,7 @@ import {
   layoutMarkerRects,
   markerDuration,
   noDataSpanAt,
+  recordedSegmentEnd,
   sortMarkersByTimeAndSeverity,
   type MarkerLayoutItem,
 } from '../markers/MarkerProcessor.js';
@@ -53,6 +54,7 @@ import {
   BREACH_AREA_OPACITY,
   DANGER_ZONE_OPACITY,
   getMetricStripColors,
+  getDensityColor,
   getTrafficLightColor,
   METRIC_STRIP_HEIGHT,
   METRIC_STRIP_LINE_WIDTHS,
@@ -191,28 +193,6 @@ export class MetricStripRenderer {
   }
 
   /**
-   * Where a point's segment ends, or `null` when the point sits in a gap.
-   *
-   * A segment stops at the next point, at the range's end, or at the next gap — whichever
-   * comes first — so nothing measured is drawn across time the log did not record.
-   */
-  private recordedSegmentEnd(timeNs: number, nextTimeNs: number): number | null {
-    if (this.noDataSpans.length === 0) {
-      return nextTimeNs;
-    }
-    let end = nextTimeNs;
-    for (const span of this.noDataSpans) {
-      if (timeNs >= span.startTime && timeNs < span.endTime) {
-        return null;
-      }
-      if (span.startTime > timeNs && span.startTime < end) {
-        end = span.startTime;
-      }
-    }
-    return end;
-  }
-
-  /**
    * Set the collapsed state.
    */
   public setCollapsed(collapsed: boolean): void {
@@ -287,11 +267,18 @@ export class MetricStripRenderer {
     // Render expanded view layers (back to front). The fills and the breach band leave the
     // unrecorded spans blank: a fill reads as measured volume and the band is a verdict. The
     // step line carries its last reading across, because a governor total cannot fall.
-    this.renderDangerZone(displayWidth, height);
+    //
+    // The band, the 100% line and the breach fill all mark a distance from a cap, so they are
+    // drawn only where the log reported one.
+    if (!data.scaledToPeak) {
+      this.renderDangerZone(displayWidth, height);
+    }
     this.renderAreaFills(data, viewportState, totalDuration, height);
     this.renderStepChartLines(data, viewportState, totalDuration, height);
-    this.renderLimitLine(displayWidth, height);
-    this.renderBreachAreas(data, viewportState, totalDuration, height);
+    if (!data.scaledToPeak) {
+      this.renderLimitLine(displayWidth, height);
+      this.renderBreachAreas(data, viewportState, totalDuration, height);
+    }
   }
 
   /**
@@ -329,9 +316,15 @@ export class MetricStripRenderer {
     viewportState: ViewportState,
     getDataPointAtTime: (timeNs: number) => DataPointResult | null,
     totalDuration: number,
+    scaledToPeak: boolean,
   ): void {
     if (this.isCollapsed) {
-      this.renderCollapsedHeatStrips(viewportState, getDataPointAtTime, totalDuration);
+      this.renderCollapsedHeatStrips(
+        viewportState,
+        getDataPointAtTime,
+        totalDuration,
+        scaledToPeak,
+      );
     }
   }
 
@@ -347,6 +340,7 @@ export class MetricStripRenderer {
     viewportState: ViewportState,
     getDataPointAtTime: (timeNs: number) => DataPointResult | null,
     totalDuration: number,
+    scaledToPeak: boolean,
   ): void {
     const { zoom, offsetX, displayWidth } = viewportState;
     const height = this.height;
@@ -390,7 +384,9 @@ export class MetricStripRenderer {
       // A traffic light is a verdict, so the strip draws none over unrecorded time.
       if (cachedResult && !this.isNoData(bucketStartTime)) {
         const maxPercent = this.getMaxPercentAtPoint(cachedResult.point);
-        const colorInfo = getTrafficLightColor(maxPercent);
+        const colorInfo = scaledToPeak
+          ? getDensityColor(maxPercent)
+          : getTrafficLightColor(maxPercent);
         color = colorInfo.color;
         alpha = colorInfo.alpha;
       }
@@ -565,7 +561,7 @@ export class MetricStripRenderer {
     for (let i = 0; i < points.length; i++) {
       const point = points[i]!;
       const nextTime = points[i + 1]?.timestamp ?? totalDuration;
-      const segmentEnd = this.recordedSegmentEnd(point.timestamp, nextTime);
+      const segmentEnd = recordedSegmentEnd(this.noDataSpans, point.timestamp, nextTime);
 
       // A gap ends the run: one shape spanning it would ramp straight across the
       // unrecorded time, which reads as measured volume.
@@ -763,7 +759,8 @@ export class MetricStripRenderer {
 
     for (let i = 0; i < data.points.length; i++) {
       const point = data.points[i]!;
-      const segmentEnd = this.recordedSegmentEnd(
+      const segmentEnd = recordedSegmentEnd(
+        this.noDataSpans,
         point.timestamp,
         data.points[i + 1]?.timestamp ?? totalDuration,
       );

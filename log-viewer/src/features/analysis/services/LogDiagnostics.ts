@@ -4,10 +4,10 @@
 import type {
   ApexLog,
   DMLBeginLine,
-  Limits,
   LogEvent,
   SOQLExecuteBeginLine,
-} from 'apex-log-parser';
+} from '@apexdevtools/apex-log-parser';
+import type { Limits } from '@apexdevtools/apex-log-parser/types';
 
 import { GOVERNOR_METRICS, limitTotals } from '../../../components/logOverviewMetrics.js';
 import { formatByteSize, formatDuration, formatInteger } from '../../../core/utility/Util.js';
@@ -42,12 +42,11 @@ const HOT_SPOT_SHARE = 0.2;
 const MAX_LINTED_QUERIES = 250;
 
 /**
- * Where a finding sits in its severity band, ahead of any count. Truncation
- * caveats every figure below it, and a governor limit is the transaction's
- * hardest constraint — while every governor finding carries a count of 1, so
- * counting alone would bury it under whatever repeated most.
+ * Where a finding sits in its severity band, ahead of any count. A governor limit is
+ * the transaction's hardest constraint, while every governor finding carries a count
+ * of 1, so counting alone would bury it under whatever repeated most.
  */
-const TIER = { truncation: 0, limit: 1, other: 2 } as const;
+const TIER = { limit: 0, other: 1 } as const;
 type DiagnosticTier = (typeof TIER)[keyof typeof TIER];
 
 /**
@@ -97,6 +96,11 @@ export interface Diagnostic {
   /** Stable key. Identical findings share one, so they group with a count. */
   id: string;
   severity: Severity;
+  /**
+   * Set where the finding qualifies every other one, so the severity toggles must not
+   * filter it away: hiding it leaves the figures it caveats reading as whole.
+   */
+  caveat?: true;
   /** Its {@link TIER}, when it outranks the counts. Defaults to `other`. */
   tier?: DiagnosticTier;
   summary: string;
@@ -125,7 +129,7 @@ export interface Diagnostic {
 
 export interface LogDiagnostics {
   /**
-   * Findings, highest severity first, then by {@link TIER}, then most frequent.
+   * Findings: truncation first, then highest severity, then by {@link TIER}, then most frequent.
    */
   diagnostics: Diagnostic[];
   /**
@@ -273,18 +277,13 @@ interface Breach {
  * breach is one row.
  *
  * Figures come from {@link limitTotals}, so a metric reads the same here as on
- * every other governor surface. Those figures sum usage over every namespace and,
- * without a cumulative snapshot, measure it against the synchronous defaults — so
- * a ratio alone never reads as a breach. Only a `LimitException` says the governor
+ * every other governor surface. Those figures sum usage over every namespace, so a
+ * ratio alone never reads as a breach. Only a `LimitException` says the governor
  * stopped the transaction.
- *
- * @param reported - Whether the log carries a cumulative limit snapshot. Without
- *   one the limits are assumed, and a ratio over an assumed limit says nothing.
  */
 function limitDiagnostics(
   totals: Limits,
   limitExceptions: LogEvent[],
-  reported: boolean,
   hotSpot: HotSpot | null,
 ): Diagnostic[] {
   const breaches = new Map<keyof Limits, Breach>();
@@ -310,10 +309,11 @@ function limitDiagnostics(
   for (const { key, label } of GOVERNOR_METRICS) {
     const breach = breaches.get(key);
     const { used, limit } = totals[key];
-    // A metric with no usage, or no limit reported, has no figures to show.
+    // A metric with no usage, or no limit reported, has no figures to show — and with no limit
+    // it has no ratio either, so it can never read as near one.
     const known = used > 0 && limit > 0;
     const ratio = known ? used / limit : 0;
-    if (!breach && (!reported || ratio < NEAR_LIMIT_RATIO)) {
+    if (!breach && ratio < NEAR_LIMIT_RATIO) {
       continue;
     }
 
@@ -389,7 +389,8 @@ function exceptionDiagnostics(exceptions: LogEvent[]): Diagnostic[] {
     const eventIndex = thrownIn ? enclosingMethodIndex(thrownIn) : group.eventIndex;
     return {
       id: `exception|${head}`,
-      severity: 'Error' as Severity,
+      // Caught, so the transaction completed: expensive, not failed.
+      severity: (fatal ? 'Error' : 'Warning') as Severity,
       summary: head,
       meta: fatal ? 'unhandled' : undefined,
       message: fatal
@@ -402,9 +403,6 @@ function exceptionDiagnostics(exceptions: LogEvent[]): Diagnostic[] {
   });
 }
 
-/** The byte figure the platform put in its own `*** Skipped N bytes` line. */
-const SKIPPED_BYTES = /Skipped\s+([\d,]+)\s+bytes/i;
-
 /**
  * The log's own truncation, as the finding that caveats all the others.
  *
@@ -413,25 +411,23 @@ const SKIPPED_BYTES = /Skipped\s+([\d,]+)\s+bytes/i;
  * the caveat is the same and the reader acts on it once.
  */
 function truncationDiagnostics(log: ApexLog): Diagnostic[] {
-  const skips = log.logIssues.filter((issue) => issue.type === 'skip');
-  if (!skips.length) {
+  const { regions, totalSkippedBytes } = log.truncation;
+  if (!regions.length) {
     return [];
   }
-  const bytes = skips.reduce((total, issue) => {
-    const figure = SKIPPED_BYTES.exec(issue.description)?.[1];
-    return total + (figure ? Number(figure.replaceAll(',', '')) : 0);
-  }, 0);
   return [
     {
       id: 'truncated',
-      severity: 'Error',
-      tier: TIER.truncation,
-      summary: skips.length > 1 ? `Log truncated in ${skips.length} places` : 'Log truncated',
-      meta: bytes > 0 ? formatByteSize(bytes) : undefined,
+      // Warning, not Error: the transaction is sound, only the evidence is incomplete.
+      severity: 'Warning',
+      caveat: true,
+      summary: regions.length > 1 ? `Log truncated in ${regions.length} places` : 'Log truncated',
+      // Zero when every region is `max-size`, which states no figure.
+      meta: totalSkippedBytes > 0 ? formatByteSize(totalSkippedBytes) : undefined,
       message:
         'A section of the log was skipped, so the figures here may be undercounted. Narrow the log levels, or log a smaller transaction.',
-      count: skips.length,
-      eventIndex: skips[0]?.eventIndex ?? -1,
+      count: regions.length,
+      eventIndex: regions[0]?.eventIndex ?? -1,
     },
   ];
 }
@@ -913,27 +909,29 @@ async function analyse(log: ApexLog): Promise<LogDiagnostics> {
   const limitExceptions = log.exceptions.filter(isLimit);
   const others = log.exceptions.filter((event) => !isLimit(event));
   const ranked = [
+    // The caveat leads: it says every figure under it may be an undercount.
     ...truncationDiagnostics(log),
-    ...limitDiagnostics(
-      limitTotals(apexLimitTimeSeries(log)),
-      limitExceptions,
-      log.governorLimits.snapshots.length > 0,
-      hotSpot(selfTime, totalSelf),
+    ...[
+      ...limitDiagnostics(
+        limitTotals(apexLimitTimeSeries(log)),
+        limitExceptions,
+        hotSpot(selfTime, totalSelf),
+      ),
+      ...logIssueDiagnostics(log),
+      ...exceptionDiagnostics(others),
+      ...plans.diagnostics,
+      ...lint.diagnostics,
+      ...repetitionDiagnostics(queries, 'SOQL'),
+      ...repetitionDiagnostics(dml, 'DML'),
+      ...rowAtATimeDiagnostics(queries),
+      ...debugDiagnostics(debugLines),
+    ].sort(
+      (a, b) =>
+        SEVERITY_TYPES.indexOf(a.severity) - SEVERITY_TYPES.indexOf(b.severity) ||
+        (a.tier ?? TIER.other) - (b.tier ?? TIER.other) ||
+        b.count - a.count,
     ),
-    ...logIssueDiagnostics(log),
-    ...exceptionDiagnostics(others),
-    ...plans.diagnostics,
-    ...lint.diagnostics,
-    ...repetitionDiagnostics(queries, 'SOQL'),
-    ...repetitionDiagnostics(dml, 'DML'),
-    ...rowAtATimeDiagnostics(queries),
-    ...debugDiagnostics(debugLines),
-  ].sort(
-    (a, b) =>
-      SEVERITY_TYPES.indexOf(a.severity) - SEVERITY_TYPES.indexOf(b.severity) ||
-      (a.tier ?? TIER.other) - (b.tier ?? TIER.other) ||
-      b.count - a.count,
-  );
+  ];
 
   return {
     diagnostics: ranked,

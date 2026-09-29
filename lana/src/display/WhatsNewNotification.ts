@@ -4,9 +4,19 @@
 import { commands, window } from 'vscode';
 
 import type { Context } from '../Context.js';
+import { errorMessage } from '../tryCatch.js';
 
 export class WhatsNewNotification {
   static async apply(context: Context): Promise<void> {
+    try {
+      await WhatsNewNotification.show(context);
+    } catch (error: unknown) {
+      const message = errorMessage(error);
+      context.display.output(`Unable to show the What's New notification: ${message}`);
+    }
+  }
+
+  private static async show(context: Context): Promise<void> {
     const extensionInfo = context.context.extension;
     const versionNumber: string[] = extensionInfo.packageJSON.version.split(/[.-]/);
     const versionText = versionNumber.slice(0, 3).join('.');
@@ -22,15 +32,19 @@ export class WhatsNewNotification {
 
     const extensionId = extensionInfo.id;
     const whatsNew = "See What's New";
-    window
-      .showInformationMessage("Apex Log Analyzer has been updated. See What's New.", whatsNew)
-      .then((selection) => {
-        if (selection === whatsNew) {
-          commands.executeCommand('extension.open', extensionId, 'changelog');
-        }
-      });
 
-    // if whats new was clicked, dismissed or timed out we do not want to show the notification again so register this version in the change log viewed state.
-    context.context.globalState.update(changeLogViewedkey, [versionText]);
+    // Started now because the notification may never be answered, awaited last so it can
+    // neither hide the notification nor drop the click.
+    const recorded = context.context.globalState.update(changeLogViewedkey, [versionText]);
+
+    const selection = await window.showInformationMessage(
+      "Apex Log Analyzer has been updated. See What's New.",
+      whatsNew,
+    );
+    if (selection === whatsNew) {
+      commands.executeCommand('extension.open', extensionId, 'changelog');
+    }
+
+    await recorded;
   }
 }

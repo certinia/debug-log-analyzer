@@ -8,27 +8,21 @@ import { LitElement, css, html, unsafeCSS, type PropertyValues } from 'lit';
 import { customElement, property, state } from 'lit/decorators.js';
 import { Tabulator, type GroupComponent, type RowComponent } from 'tabulator-tables';
 
-import type { ApexLog, SOSLExecuteBeginLine } from 'apex-log-parser';
+import type { ApexLog, SOSLExecuteBeginLine } from '@apexdevtools/apex-log-parser';
 import { vscodeMessenger } from '../../../core/messaging/VSCodeExtensionMessenger.js';
 import { getCallerNamespace } from '../../../core/utility/CallerNamespace.js';
+import { DomListenerController } from '../../../core/events/DomListenerController.js';
+import type { FindEventDetail, FindEventMap } from '../../find/findEvents.js';
 import { goToRow } from '../../call-tree/navigation.js';
 import { isVisible } from '../../../core/utility/Util.js';
-import { getSettings, updateSetting } from '../../settings/Settings.js';
 import { LocatedRowMarker } from '../../../components/locatedRow.js';
 import { reportGridLocate, stampGridEventIndex } from './gridLocate.js';
 import { reportGridSelection } from './gridSelection.js';
 import { selectRowByEventIndex } from './revealRow.js';
 import { soqlInlineElement } from '../../soql/format/inlineCell.js';
 import { soqlSyntaxStyles } from '../../soql/styles/soql-syntax.css.js';
-import {
-  applyColumnView,
-  buildColumnMenuItems,
-  getColumnView,
-  getTableFields,
-  resolveColumnView,
-  SOSL_VIEWS,
-  toggleField,
-} from '../../../tabulator/ColumnViews.js';
+import { ColumnSettingsController } from '../../../components/ColumnSettingsController.js';
+import { SOSL_VIEWS } from '../../../tabulator/ColumnViews.js';
 import {
   DB_ROW_COUNT_WIDTH,
   DB_TIME_WIDTH,
@@ -41,15 +35,15 @@ import { tableHolder } from '../../../tabulator/module/tableHolder.js';
 import { inCountRange, inMsRange, type FilterRange } from '../../../tabulator/filters/MinMax.js';
 import { progressFormatter } from '../../../tabulator/format/Progress.js';
 import { progressFormatterMS } from '../../../tabulator/format/ProgressMS.js';
-import { GroupCalcs } from '../../../tabulator/groups/GroupCalcs.js';
-import { GroupChildIndent } from '../../../tabulator/groups/GroupChildIndent.js';
-import { GroupSort } from '../../../tabulator/groups/GroupSort.js';
-import * as CommonModules from '../../../tabulator/module/CommonModules.js';
-import { Find } from '../../../tabulator/module/Find.js';
-import { RowKeyboardNavigation } from '../../../tabulator/module/RowKeyboardNavigation.js';
-import { RowNavigation } from '../../../tabulator/module/RowNavigation.js';
 import dataGridStyles from '../../../tabulator/style/DataGrid.scss';
-import { commonColumnDefaults, headerSortElement } from '../../call-tree/components/TableShared.js';
+import {
+  clipboardCopyOptions,
+  commonColumnDefaults,
+  groupingOptions,
+  headerSortElement,
+  registerTableModules,
+  textCellTooltip,
+} from '../../call-tree/components/TableShared.js';
 
 // styles
 import { globalStyles } from '../../../styles/global.styles.js';
@@ -101,12 +95,13 @@ export class SOSLView extends LitElement {
   totalMatches = 0;
   blockClearHighlights = true;
 
-  @state()
-  columnView = 'General';
-
-  /** Per-view column overrides (view id → visible fields); empty until edited. */
-  @state()
-  private columnOverrides: Record<string, string[]> = {};
+  private readonly _columns = new ColumnSettingsController(this, {
+    section: 'database.sosl',
+    read: (settings) => settings.database?.sosl,
+    views: SOSL_VIEWS,
+    alwaysVisible: ALWAYS_VISIBLE,
+    tables: () => (this.soslTable ? [this.soslTable] : []),
+  });
   private contextMenu: ContextMenu | null = null;
   /** eventIndex of the row whose context menu is open. */
   private contextMenuEventIndex: number | null = null;
@@ -119,28 +114,13 @@ export class SOSLView extends LitElement {
   private rowCountRange: FilterRange = { start: null, end: null };
   private timeTakenRange: FilterRange = { start: null, end: null };
 
-  constructor() {
-    super();
-
-    document.addEventListener('lv-find', this._findEvt);
-    document.addEventListener('lv-find-close', this._findEvt);
-  }
-
-  disconnectedCallback(): void {
-    super.disconnectedCallback();
-    document.removeEventListener('lv-find', this._findEvt);
-    document.removeEventListener('lv-find-close', this._findEvt);
-  }
+  private readonly _findBus = new DomListenerController<FindEventMap>(this, document, {
+    'lv-find': (e) => void this._find(e),
+    'lv-find-close': (e) => void this._find(e),
+  });
 
   firstUpdated(): void {
     this.contextMenu = this.renderRoot.querySelector('context-menu');
-    void this._loadColumnSettings();
-  }
-
-  private async _loadColumnSettings(): Promise<void> {
-    const settings = await getSettings();
-    this.columnOverrides = settings.database?.sosl?.columnOverrides ?? {};
-    this._setColumnView(resolveColumnView(SOSL_VIEWS, settings.database?.sosl?.columnView));
   }
 
   updated(changedProperties: PropertyValues): void {
@@ -152,7 +132,7 @@ export class SOSLView extends LitElement {
     }
 
     if (changedProperties.has('highlightIndex')) {
-      this._highlightMatches(this.highlightIndex);
+      void this._highlightMatches(this.highlightIndex);
     }
   }
 
@@ -211,12 +191,12 @@ export class SOSLView extends LitElement {
           label="Column view"
           @change="${this._handleColumnViewChange}"
           @vs-reset-option="${this._onResetOption}"
-          .value="${this.columnView}"
-          .resettableValues="${Object.keys(this.columnOverrides)}"
+          .value="${this._columns.view}"
+          .resettableValues="${this._columns.editedViews}"
         >
           ${SOSL_VIEWS.map(
             (view) =>
-              html`<vscode-option value="${view.id}" ?selected="${this.columnView === view.id}"
+              html`<vscode-option value="${view.id}" ?selected="${this._columns.view === view.id}"
                 >${view.id}</vscode-option
               >`,
           )}
@@ -267,28 +247,12 @@ export class SOSLView extends LitElement {
   }
 
   private _handleColumnViewChange(event: Event) {
-    const id = (event.target as HTMLInputElement).value || 'General';
-    this._setColumnView(id);
-    updateSetting('database.sosl.columnView', id);
-  }
-
-  /** Effective fields for a view id: the user override, else the built-in preset. */
-  private _columnViewFields(id: string): string[] | null {
-    return this.columnOverrides[id] ?? getColumnView(SOSL_VIEWS, id)?.fields ?? null;
-  }
-
-  private _setColumnView(id: string) {
-    this.columnView = id;
-    // Only apply once the table is laid out; otherwise tableBuilt → _initTableColumns
-    // applies the current view (redraw on an unrendered table throws).
-    if (this.soslTable?.element?.clientHeight) {
-      applyColumnView(this.soslTable, this._columnViewFields(id), ALWAYS_VISIBLE);
-    }
+    this._columns.choose((event.target as HTMLInputElement).value || 'General');
   }
 
   /** Applies the active view and wires the header menu once the table is built. */
   private _initTableColumns(table: Tabulator) {
-    applyColumnView(table, this._columnViewFields(this.columnView), ALWAYS_VISIBLE);
+    this._columns.applyTo(table);
     const header = table.element.querySelector<HTMLElement>('.tabulator-header');
     header?.addEventListener('contextmenu', (event) => {
       event.preventDefault();
@@ -300,17 +264,7 @@ export class SOSLView extends LitElement {
     if (!this.contextMenu || !this.soslTable) {
       return;
     }
-    this.contextMenu.show(
-      buildColumnMenuItems(
-        this.soslTable,
-        this.columnView,
-        SOSL_VIEWS,
-        ALWAYS_VISIBLE,
-        Object.keys(this.columnOverrides),
-      ),
-      x,
-      y,
-    );
+    this.contextMenu.show(this._columns.menuItems(this.soslTable), x, y);
   }
 
   private _openColumnMenu(event: Event) {
@@ -323,13 +277,7 @@ export class SOSLView extends LitElement {
     if (!this.contextMenu?.isVisible() || !this.soslTable) {
       return;
     }
-    this.contextMenu.items = buildColumnMenuItems(
-      this.soslTable,
-      this.columnView,
-      SOSL_VIEWS,
-      ALWAYS_VISIBLE,
-      Object.keys(this.columnOverrides),
-    );
+    this.contextMenu.items = this._columns.menuItems(this.soslTable);
   }
 
   private _showRowContextMenu(event: MouseEvent, row: RowComponent) {
@@ -350,47 +298,23 @@ export class SOSLView extends LitElement {
       return;
     }
     if (itemId.startsWith('view:')) {
-      const id = itemId.slice('view:'.length);
-      this._setColumnView(id);
-      updateSetting('database.sosl.columnView', id);
+      this._columns.choose(itemId.slice('view:'.length));
       this._refreshColumnMenu();
       return;
     }
     if (itemId.startsWith('col:')) {
-      const field = itemId.slice('col:'.length);
-      const fields = toggleField(
-        this._columnViewFields(this.columnView),
-        field,
-        getTableFields(table),
-      );
-      this.columnOverrides = { ...this.columnOverrides, [this.columnView]: fields };
-      applyColumnView(table, fields, ALWAYS_VISIBLE);
-      updateSetting('database.sosl.columnOverrides', this.columnOverrides);
+      this._columns.toggle(table, itemId.slice('col:'.length));
       this._refreshColumnMenu();
       return;
     }
     if (itemId.startsWith('reset:')) {
-      this._resetColumns(itemId.slice('reset:'.length));
+      this._columns.reset(itemId.slice('reset:'.length));
       this._refreshColumnMenu();
     }
   }
 
   private _onResetOption(event: CustomEvent<{ value: string }>) {
-    this._resetColumns(event.detail.value);
-  }
-
-  /** Clears a view's override, restoring its built-in columns (defaults to the active view). */
-  private _resetColumns(id: string = this.columnView) {
-    const table = this.soslTable;
-    if (!table || !this.columnOverrides[id]) {
-      return;
-    }
-    const { [id]: _removed, ...rest } = this.columnOverrides;
-    this.columnOverrides = rest;
-    if (id === this.columnView) {
-      applyColumnView(table, this._columnViewFields(id), ALWAYS_VISIBLE);
-    }
-    updateSetting('database.sosl.columnOverrides', this.columnOverrides);
+    this._columns.reset(event.detail.value);
   }
 
   private _handleNamespaceFacet(event: CustomEvent<{ selected: string[] }>) {
@@ -425,10 +349,6 @@ export class SOSLView extends LitElement {
     this.soslTable?.download('csv', 'sosl.csv', { bom: true, delimiter: ',' });
   }
 
-  _findEvt = ((event: FindEvt) => {
-    this._find(event);
-  }) as EventListener;
-
   _soslGroupBy(event: Event) {
     if (!this.soslTable) {
       return;
@@ -448,18 +368,10 @@ export class SOSLView extends LitElement {
       return;
     }
 
-    isVisible(this).then((isVisible) => {
+    void isVisible(this).then((isVisible) => {
       const tableWrapper = this._soslTableWrapper;
       if (tableWrapper && this.timelineRoot && isVisible) {
-        Tabulator.registerModule(Object.values(CommonModules));
-        Tabulator.registerModule([
-          RowKeyboardNavigation,
-          RowNavigation,
-          Find,
-          GroupCalcs,
-          GroupChildIndent,
-          GroupSort,
-        ]);
+        registerTableModules({ grouping: true });
         this._renderSOSLTable(tableWrapper, this.lines);
       }
     });
@@ -482,7 +394,7 @@ export class SOSLView extends LitElement {
     this.oldIndex = highlightIndex;
   }
 
-  async _find(e: CustomEvent<{ text: string; count: number; options: { matchCase: boolean } }>) {
+  async _find(e: CustomEvent<FindEventDetail>) {
     const isTableVisible = !!this.soslTable?.element?.clientHeight;
     if (!isTableVisible && !this.totalMatches) {
       return;
@@ -544,7 +456,7 @@ export class SOSLView extends LitElement {
     this.soslTable = new Tabulator(soslTableContainer, {
       index: 'id',
       height: '100%',
-      clipboard: true,
+      ...clipboardCopyOptions,
       downloadEncoder: this.downlodEncoder('sosl.csv'),
       downloadRowRange: 'all',
       downloadConfig: {
@@ -554,18 +466,12 @@ export class SOSLView extends LitElement {
         columnCalcs: false,
         dataTree: true,
       },
-      //@ts-expect-error types need update array is valid
-      keybindings: { copyToClipboard: ['ctrl + 67', 'meta + 67'] },
-      clipboardCopyRowRange: 'all',
       rowKeyboardNavigation: true,
       data: soslData,
       layout: 'fitColumns',
       placeholder: 'No SOSL queries found',
       columnCalcs: 'table',
-      groupCalcs: true,
-      groupSort: true,
-      groupClosedShowCalcs: true,
-      groupStartOpen: false,
+      ...groupingOptions,
       groupToggleElement: false,
       selectableRows: 'highlight',
       rowFormatter: stampGridEventIndex,
@@ -576,7 +482,7 @@ export class SOSLView extends LitElement {
           title: 'SOSL',
           field: 'sosl',
           sorter: 'string',
-          tooltip: true,
+          tooltip: textCellTooltip,
           widthGrow: 5,
           bottomCalc: () => {
             return 'Total';
@@ -802,5 +708,3 @@ interface SOSLRow {
   timeTaken?: number;
   eventIndex?: number;
 }
-
-type FindEvt = CustomEvent<{ text: string; count: number; options: { matchCase: boolean } }>;

@@ -2,8 +2,8 @@
  * Copyright (c) 2026 Certinia Inc. All rights reserved.
  */
 import { describe, expect, it } from '@jest/globals';
-import type { GovernorLimits, LogEvent } from 'apex-log-parser';
-
+import type { LogEvent } from '@apexdevtools/apex-log-parser';
+import { governorLimits, limitValue } from '../../../../components/__tests__/limitsTestUtils.js';
 import { eventLabel, eventName, formatCallStack, formatEventDetails } from '../eventText.js';
 
 type EventOptions = {
@@ -52,13 +52,13 @@ function createEvent(options: EventOptions): LogEvent {
   return event;
 }
 
-const limits = {
-  soqlQueries: { used: 1, limit: 100 },
-  queryRows: { used: 300, limit: 50000 },
-  dmlStatements: { used: 1, limit: 150 },
-  dmlRows: { used: 3, limit: 10000 },
-  soslQueries: { used: 0, limit: 20 },
-} as unknown as GovernorLimits;
+const limits = governorLimits({
+  soqlQueries: limitValue(1, 100),
+  queryRows: limitValue(300, 50000),
+  dmlStatements: limitValue(1, 150),
+  dmlRows: limitValue(3, 10000),
+  soslQueries: limitValue(0, 20),
+});
 
 describe('eventName', () => {
   it('appends the suffix when present', () => {

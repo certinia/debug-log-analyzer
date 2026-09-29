@@ -154,4 +154,22 @@ describe('CallStackDetail', () => {
     expect(built).toEqual([]);
     el.remove();
   });
+
+  it('keeps the generics in a frame the hover has to show', async () => {
+    built.length = 0;
+    await mount(5);
+
+    const columns = built.at(-1)?.columns as { field?: string; tooltip?: unknown }[];
+    const tooltip = columns.find((column) => column.field === 'text')?.tooltip;
+    if (typeof tooltip !== 'function') {
+      throw new Error('Frame column has no tooltip');
+    }
+
+    const signature = 'ContactTriggerHandler.handleAfterUpdate(List<Contact>, Map<Id,Contact>)';
+    const cell = { getValue: () => signature };
+    // An element, not a string: Tabulator writes a string tooltip with `innerHTML`.
+    const shown = tooltip({}, cell, () => {}) as HTMLElement;
+
+    expect(shown.textContent).toBe(signature);
+  });
 });

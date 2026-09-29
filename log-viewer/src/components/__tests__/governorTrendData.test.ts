@@ -42,6 +42,24 @@ describe('governorTrendSeries', () => {
     ]);
   });
 
+  // No limit to divide by, so the metric's own peak stands in: the shape still draws, and `limit`
+  // stays 0, which is how the chart knows to drop the guide and the tier colour.
+  it("charts against the metric's own peak when the log reported no limit", () => {
+    const series = governorTrendSeries(
+      timeSeries([
+        seriesEvent(1_000, { queryRows: { used: 300, limit: 0 } }),
+        seriesEvent(2_000, { queryRows: { used: 1_200, limit: 0 } }),
+      ]),
+    );
+
+    expect(series[0]).toMatchObject({ label: 'Query Rows', used: 1_200, limit: 0, finalRatio: 0 });
+    expect(series[0]?.points).toEqual([
+      { t: 0, ratio: 0, used: 0 },
+      { t: 1_000, ratio: 25, used: 300 },
+      { t: 2_000, ratio: 100, used: 1_200 },
+    ]);
+  });
+
   it('leaves out a metric whose final consumption is zero', () => {
     const series = governorTrendSeries(
       timeSeries([
@@ -106,9 +124,9 @@ describe('pointAt', () => {
   const point = (t: number, used: number): TrendPoint => ({ t, ratio: used, used });
   const points = [point(0, 0), point(1_000, 40), point(4_000, 100)];
 
-  it('interpolates linearly between the samples around t', () => {
-    expect(pointAt(points, 500)).toEqual({ t: 500, ratio: 20, used: 20 });
-    expect(pointAt(points, 2_500)).toEqual({ t: 2_500, ratio: 70, used: 70 });
+  it('holds the reading before t, rather than reading between two samples', () => {
+    expect(pointAt(points, 500)).toEqual({ t: 500, ratio: 0, used: 0 });
+    expect(pointAt(points, 2_500)).toEqual({ t: 2_500, ratio: 40, used: 40 });
   });
 
   it('returns a sample exactly at its own time', () => {

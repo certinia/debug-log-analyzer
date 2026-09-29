@@ -55,7 +55,7 @@ export class VSCodeExtensionMessenger {
     return new Promise((resolve, reject) => {
       const listener = (incomingPayload: unknown, error: unknown) => {
         if (error) {
-          reject(error);
+          reject(error instanceof Error ? error : new Error(String(error), { cause: error }));
         } else {
           resolve(incomingPayload as T);
         }

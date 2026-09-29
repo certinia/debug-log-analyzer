@@ -1,7 +1,7 @@
 /*
  * Copyright (c) 2026 Certinia Inc. All rights reserved.
  */
-import type { ApexLog } from 'apex-log-parser';
+import type { ApexLog } from '@apexdevtools/apex-log-parser';
 import { Tabulator, type RowComponent } from 'tabulator-tables';
 
 import { vscodeMessenger } from '../../../core/messaging/VSCodeExtensionMessenger.js';
@@ -97,7 +97,7 @@ export function createTimeOrderTable(
       },
       ...createNamespaceColumns(),
       createTypeColumn(),
-      ...createGovernorMetricColumns(governorLimits, heapFooters),
+      ...createGovernorMetricColumns(rootMethod, heapFooters),
       // Time columns sit at the far right of every call-tree table.
       {
         title: 'Total Time (ms)',

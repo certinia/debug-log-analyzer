@@ -8,26 +8,28 @@
 
 import { afterEach, beforeEach, describe, expect, it } from '@jest/globals';
 import type {
+  MetricDenominator,
   MetricStripClassifiedMetric,
   MetricStripDataPoint,
 } from '../../types/flamechart.types.js';
+import { PERCENT_COLORS } from '../rendering/tooltip-utils.js';
 import { MetricStripTooltipRenderer } from './MetricStripTooltipRenderer.js';
 
 /**
- * Build a classified metric. Only metricId/displayName/globalMaxPercent/limit matter here.
+ * Build a classified metric. Only metricId/displayName/globalMaxPercent/denominator matter here.
  */
 function metric(
   metricId: string,
   displayName: string,
   globalMaxPercent: number,
-  limit = 100,
+  denominator: MetricDenominator = { kind: 'limit', value: 100 },
 ): MetricStripClassifiedMetric {
   return {
     metricId,
     displayName,
     tier: 1,
     globalMaxPercent,
-    limit,
+    denominator,
     color: 0xffffff,
     priority: 0,
     unit: '',
@@ -187,7 +189,7 @@ describe('MetricStripTooltipRenderer', () => {
 
   it('always shows the (used / limit) value, even at 0% with no data point for the metric', () => {
     // cpuTime has a limit but no entry in rawValues (not observed yet at this timestamp).
-    const metrics = [metric('cpuTime', 'CPU Time', 0, 10000)];
+    const metrics = [metric('cpuTime', 'CPU Time', 0, { kind: 'limit', value: 10_000 })];
     const dataPoint: MetricStripDataPoint = {
       timestamp: 0,
       values: new Map([['cpuTime', 0]]),
@@ -199,6 +201,34 @@ describe('MetricStripTooltipRenderer', () => {
 
     const text = (container.querySelector('.metric-strip-tooltip') as HTMLElement).textContent!;
     expect(text).toContain('(0 / 10,000)');
+  });
+
+  describe('a log that reported no limits', () => {
+    // Peak 1,240: the reading is a share of the log's own peak, not of a cap.
+    const metrics = [metric('queryRows', 'Query Rows', 1, { kind: 'peak', value: 1240 })];
+    const dataPoint: MetricStripDataPoint = {
+      timestamp: 0,
+      values: new Map([['queryRows', 0.62]]),
+      rawValues: new Map([['queryRows', { used: 770, limit: 0 }]]),
+      tier3Max: 0,
+    };
+
+    it('reads the value against the log\'s own peak, spelled "of"', () => {
+      renderer.show(0, 0, dataPoint, metrics, 60);
+
+      expect(panel().textContent).toContain('(770 of 1,240)');
+      expect(panel().textContent).not.toContain('/');
+    });
+
+    it('gives the figure no severity colour, since there is no cap to be near', () => {
+      renderer.show(0, 0, dataPoint, metrics, 60);
+      const [row] = rows();
+      const percent = row!.children[2] as HTMLElement;
+
+      expect(percent.textContent).toContain('62.0%');
+      // 62% would be amber against a limit; against a peak it stays the panel's own foreground.
+      expect(percent.style.color).not.toBe(PERCENT_COLORS.warning);
+    });
   });
 
   it('keeps the same row order at different timestamps', () => {

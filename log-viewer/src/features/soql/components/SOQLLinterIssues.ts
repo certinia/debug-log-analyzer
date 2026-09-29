@@ -5,7 +5,7 @@ import '#vscode-elements/vscode-icon.js';
 import { LitElement, css, html, type PropertyValues } from 'lit';
 import { customElement, property, state } from 'lit/decorators.js';
 
-import type { SOQLExecuteBeginLine } from 'apex-log-parser';
+import type { SOQLExecuteBeginLine } from '@apexdevtools/apex-log-parser';
 import { currentLogStore } from '../../../core/log/LogStore.js';
 import {
   QueryPlanCostRule,
@@ -99,7 +99,7 @@ export class SOQLLinterIssues extends LitElement {
     `,
   ];
 
-  async updated(changed: PropertyValues): Promise<void> {
+  updated(changed: PropertyValues): void {
     if (this.issues) {
       if (changed.has('issues')) {
         this._issues = this.issues;
@@ -107,8 +107,12 @@ export class SOQLLinterIssues extends LitElement {
       return;
     }
     if (changed.has('soql') || changed.has('eventIndex')) {
-      this._issues = await computeSoqlIssues(this.eventIndex);
+      void this.refreshIssues();
     }
+  }
+
+  private async refreshIssues(): Promise<void> {
+    this._issues = await computeSoqlIssues(this.eventIndex);
   }
 
   render() {

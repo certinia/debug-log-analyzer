@@ -136,14 +136,6 @@ export const globalStyles = [
       outline-offset: var(--lana-focus-offset);
     }
 
-    .vs-checkbox-label {
-      display: inline-flex;
-      align-items: center;
-      gap: var(--lana-space-xs);
-      font-size: var(--lana-text-base);
-      cursor: pointer;
-    }
-
     /* Shared base for every compact filter-bar control (facet/range trigger
      pills, toggle pills, dense VsSelect face) — one place for the
      height/padding/border/radius/hover/focus so they're never re-tuned
@@ -199,8 +191,8 @@ export const globalStyles = [
 
     /* Shared base for every filter-bar popover (facet checklist, range inputs,
      VsSelect dropdown, context menu) so they render as one family. Consumers
-     keep their own positioning (fixed/anchor/inset/margin/size) and add this
-     class for the look. */
+     keep their own anchor, placement and size; .popover-anchored in
+     anchoredPopover.styles.ts carries the fixed/inset positioning. */
     .filter-popover {
       background-color: var(--filter-popover-bg);
       border: var(--lana-stroke) solid var(--filter-popover-border-color);
@@ -219,6 +211,16 @@ export const globalStyles = [
 
     .filter-popover-row:hover {
       background-color: var(--lana-row-hover-bg);
+    }
+
+    /* Off-screen, not hidden: a display:none region is never announced. */
+    .sr-only {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      overflow: hidden;
+      clip-path: inset(50%);
+      white-space: nowrap;
     }
   `,
 ];

@@ -23,7 +23,7 @@ const cpuTime: MetricStripClassifiedMetric = {
   displayName: 'CPU Time',
   tier: 1,
   globalMaxPercent: 0.5,
-  limit: 100,
+  denominator: { kind: 'limit', value: 100 },
   color: 0xff0000,
   priority: 0,
   unit: '',
@@ -40,7 +40,14 @@ function point(timestamp: number, percent: number): MetricStripDataPoint {
 }
 
 function data(points: MetricStripDataPoint[], gaps: NoDataSpan[]): MetricStripProcessedData {
-  return { points, classifiedMetrics: [cpuTime], globalMaxPercent: 0.5, hasData: true, gaps };
+  return {
+    points,
+    classifiedMetrics: [cpuTime],
+    globalMaxPercent: 0.5,
+    hasData: true,
+    scaledToPeak: false,
+    gaps,
+  };
 }
 
 const viewportState: ViewportState = {

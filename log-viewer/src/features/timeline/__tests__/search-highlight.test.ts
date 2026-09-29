@@ -11,7 +11,7 @@
  * - Edge cases (empty search, invalid cursor, off-screen events)
  */
 import { beforeEach, describe, expect, it, jest } from '@jest/globals';
-import type { LogEvent } from 'apex-log-parser';
+import type { LogEvent } from '@apexdevtools/apex-log-parser';
 import * as PIXI from 'pixi.js';
 
 import type { PrecomputedRect } from '../optimised/RectangleCache.js';
@@ -27,7 +27,7 @@ describe('SearchHighlightRenderer', () => {
     fill: jest.SpiedFunction<PIXI.Graphics['fill']>;
   };
 
-  // Create a mock LogEvent for testing (following batching.test.ts pattern)
+  // Create a mock LogEvent for testing
   const createMockEvent = (timestamp: number, duration: number): LogEvent => {
     const event = {
       timestamp,
@@ -160,8 +160,8 @@ describe('SearchHighlightRenderer', () => {
       expect(mockGraphics.rect).toHaveBeenCalled();
       expect(mockGraphics.fill).toHaveBeenCalled();
 
-      // Should have called rect twice (once for fill, once for stroke)
-      expect(mockGraphics.rect).toHaveBeenCalledTimes(2);
+      // Three rects: the wash, the halo outside the border, and the border
+      expect(mockGraphics.rect).toHaveBeenCalledTimes(3);
     });
 
     it('should render for small rectangles', () => {

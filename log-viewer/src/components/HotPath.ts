@@ -17,8 +17,11 @@ import {
   type HotPathFrame,
 } from '../features/call-tree/utils/ExecutionHighlights.js';
 import { globalStyles } from '../styles/global.styles.js';
+import { NO_TIMED_CALLS_TEXT } from './governorCopy.js';
+import './SectionSkeleton.js';
 import { inspectorSectionStyles } from '../styles/inspectorSection.styles.js';
 import { revealRowStyles } from '../styles/revealRow.styles.js';
+import { severityStyles } from '../styles/severity.styles.js';
 import { CategoryPaletteController, categoryLabel } from './categoryTime.js';
 import { dispatchInspectorLocate, dispatchInspectorReveal } from './inspectorReveal.js';
 import { revealRowMeter, revealRowTitle } from './revealRowMeter.js';
@@ -58,6 +61,7 @@ export class HotPath extends LitElement {
     globalStyles,
     inspectorSectionStyles,
     revealRowStyles,
+    severityStyles,
     css`
       /* An actionable data-quality caveat, tinted so it reads apart from the rows. */
       .caveat-row {
@@ -66,7 +70,6 @@ export class HotPath extends LitElement {
         margin-bottom: var(--lana-space-2xs);
         padding: var(--lana-space-2xs) var(--lana-space-xs);
         background: var(--lana-callout-warning-bg);
-        color: var(--lana-severity-warning);
         white-space: normal;
       }
 
@@ -74,6 +77,7 @@ export class HotPath extends LitElement {
         background: var(--lana-callout-warning-bg-hover);
       }
 
+      /* The icon carries the warning, not the sentence. */
       .caveat-row vscode-icon {
         flex: 0 0 auto;
       }
@@ -96,7 +100,10 @@ export class HotPath extends LitElement {
     const log = this.logStore?.log;
     const highlights = log && getExecutionHighlights(log);
     if (!highlights || !highlights.hotPath.length) {
-      return html`<p class="note">The log has no timed calls.</p>`;
+      return html`<section-skeleton
+        shape="rows"
+        fallback=${NO_TIMED_CALLS_TEXT}
+      ></section-skeleton>`;
     }
 
     // The last frame is the one the path exists to name, so a long path keeps it
@@ -235,15 +242,15 @@ export class HotPath extends LitElement {
     }
     const text =
       truncation.regionCount === 1
-        ? '1 truncated call — timings below it under-report'
-        : `${truncation.regionCount} truncated calls — timings below them under-report`;
+        ? 'Log truncated, so the timings below may under-report'
+        : `Log truncated in ${truncation.regionCount} places, so the timings below may under-report`;
     return html`<button
       class="bleed-row caveat-row"
       type="button"
-      title="Show the first truncated call in the tree"
+      title="Show where the log was first truncated"
       @click=${() => dispatchInspectorReveal(this, truncation.firstEventIndex)}
     >
-      <vscode-icon name="warning"></vscode-icon>
+      <vscode-icon class="sev-warning" name="warning"></vscode-icon>
       <span>${text}</span>
     </button>`;
   }

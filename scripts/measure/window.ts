@@ -5,7 +5,7 @@
 /**
  * Times the inspector's range scope: one read of the log, then a window per frame.
  */
-import type { ApexLog } from 'apex-log-parser';
+import type { ApexLog } from '@apexdevtools/apex-log-parser';
 
 import { windowIndexFor } from '../../log-viewer/src/core/log/windowStats.js';
 import { time } from './harness.js';

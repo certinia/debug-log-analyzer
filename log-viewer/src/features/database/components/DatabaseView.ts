@@ -8,18 +8,19 @@ import { customElement, property, state } from 'lit/decorators.js';
 import type {
   ApexLog,
   DMLBeginLine,
-  Limits,
   SOQLExecuteBeginLine,
   SOSLExecuteBeginLine,
-} from 'apex-log-parser';
+} from '@apexdevtools/apex-log-parser';
+import type { Limits } from '@apexdevtools/apex-log-parser/types';
 
 import { limitTotals } from '../../../components/logOverviewMetrics.js';
+import { DomListenerController } from '../../../core/events/DomListenerController.js';
 import { eventBus, type StatementType } from '../../../core/events/EventBus.js';
+import type { DbFindResultsEventDetail, FindEventMap } from '../../find/findEvents.js';
 import { apexLimitTimeSeries } from '../../timeline/optimised/apex-limit-series.js';
-import { InspectorEmphasis } from '../../../components/inspectorEmphasis.js';
-import { wireInspectorTab } from '../../../components/inspectorTab.js';
+import { InspectorTabController } from '../../../components/InspectorTabController.js';
 import { SelectionEchoGuard } from '../../../core/events/SelectionEchoGuard.js';
-import { isVisible } from '../../../core/utility/Util.js';
+import { formatInteger, isVisible } from '../../../core/utility/Util.js';
 import { soslRowsMetric } from '../limits.js';
 import { logStoreFor } from '../../../core/log/LogStore.js';
 
@@ -85,40 +86,34 @@ export class DatabaseView extends LitElement {
   };
   findMap = {};
 
-  private _offInspector: (() => void) | null = null;
-
   /** Guards the selects this view makes on the inspector's behalf. */
   private _echoGuard = new SelectionEchoGuard();
-  /** Which of the inspector's reports the grids' mark follows. */
-  private _emphasis = new InspectorEmphasis();
 
-  constructor() {
-    super();
+  private readonly _findBus = new DomListenerController<FindEventMap>(this, document, {
+    'lv-find': (e) => this._find(e.detail.count),
+    'lv-find-match': (e) => this._find(e.detail.count),
+    'db-find-results': (e) => this._findResults(e),
+  });
 
-    document.addEventListener('db-find-results', this._findResults as EventListener);
-    document.addEventListener('lv-find-match', this._findHandler as EventListener);
-    document.addEventListener('lv-find', this._findHandler as EventListener);
-
-    this._offInspector = wireInspectorTab('database', this._emphasis, {
-      mark: (eventIndexes) => this._markLocated(eventIndexes),
-      // The eventIndex belongs to exactly one grid, so each is offered it in turn
-      // until one owns it.
-      reveal: (eventIndex) => {
-        const views = this._views;
-        this._echoGuard.run(() => {
-          const owner = views.find((view) => view?.selectByEventIndex(eventIndex));
-          if (owner) {
-            views.filter((view) => view !== owner).forEach((view) => view?.deselectRows());
-          }
-        });
-      },
-      clear: () => {
-        // Only one grid holds the selection, and its report of the clear reaches
-        // the inspector the same way a click does.
-        this._views.forEach((view) => view?.deselectRows());
-      },
-    });
-  }
+  private readonly _inspector = new InspectorTabController(this, 'database', {
+    mark: (eventIndexes) => this._markLocated(eventIndexes),
+    // The eventIndex belongs to exactly one grid, so each is offered it in turn
+    // until one owns it.
+    reveal: (eventIndex) => {
+      const views = this._views;
+      this._echoGuard.run(() => {
+        const owner = views.find((view) => view?.selectByEventIndex(eventIndex));
+        if (owner) {
+          views.filter((view) => view !== owner).forEach((view) => view?.deselectRows());
+        }
+      });
+    },
+    clear: () => {
+      // Only one grid holds the selection, and its report of the clear reaches
+      // the inspector the same way a click does.
+      this._views.forEach((view) => view?.deselectRows());
+    },
+  });
 
   /** Offers the mark to every grid, since one of them owns the statement. */
   private _markLocated(eventIndexes: readonly number[]): void {
@@ -139,7 +134,7 @@ export class DatabaseView extends LitElement {
     if (eventIndex === null) {
       // A mark a picked inspector row left here goes with the selection: it was
       // never a selection of these grids.
-      this._markLocated(this._emphasis.pick([]));
+      this._inspector.dropPick();
       eventBus.emit('detail:select', { source: 'database', selection: null });
       return;
     }
@@ -154,15 +149,6 @@ export class DatabaseView extends LitElement {
       source: 'database',
       selection: { kind: 'event', eventIndex, type },
     });
-  }
-
-  disconnectedCallback(): void {
-    super.disconnectedCallback();
-    document.removeEventListener('db-find-results', this._findResults as EventListener);
-    document.removeEventListener('lv-find-match', this._findHandler as EventListener);
-    document.removeEventListener('lv-find', this._findHandler as EventListener);
-    this._offInspector?.();
-    this._offInspector = null;
   }
 
   firstUpdated(): void {
@@ -345,7 +331,38 @@ export class DatabaseView extends LitElement {
   }
 
   private _toggle(kind: SectionKind) {
-    this.collapsed = { ...this.collapsed, [kind]: !this.collapsed[kind] };
+    const collapsing = !this.collapsed[kind];
+    this.collapsed = { ...this.collapsed, [kind]: collapsing };
+    if (collapsing) {
+      this._dropMatches(kind);
+    }
+  }
+
+  /**
+   * A collapsed section takes its grid with it, so the matches that grid reported
+   * can no longer be reached: drop them, and report the total the widget can.
+   */
+  private _dropMatches(kind: SectionKind): void {
+    if (kind === 'dml') {
+      this.dmlMatches = 0;
+      this.dmlHighlightIndex = 0;
+    } else if (kind === 'soql') {
+      this.soqlMatches = 0;
+      this.soqlHighlightIndex = 0;
+    } else {
+      this.soslMatches = 0;
+      this.soslHighlightIndex = 0;
+    }
+    this._reportTotal();
+  }
+
+  /** The three grids' matches read as one count in the find widget. */
+  private _reportTotal(): void {
+    document.dispatchEvent(
+      new CustomEvent('lv-find-results', {
+        detail: { totalMatches: this.dmlMatches + this.soqlMatches + this.soslMatches },
+      }),
+    );
   }
 
   /** Cumulative limits are only present when the log recorded a usage snapshot. */
@@ -438,6 +455,7 @@ export class DatabaseView extends LitElement {
         found,
         used: this._used(metric.used),
         limit: this._limit(metric.limit),
+        format: formatInteger,
       });
     };
     const z = { used: 0, limit: 0 };
@@ -449,14 +467,7 @@ export class DatabaseView extends LitElement {
     return gauges;
   }
 
-  _findHandler = (
-    e: CustomEvent<{ text: string; count: number; options: { matchCase: boolean } }>,
-  ) => {
-    this._find(e.detail);
-  };
-
-  _find = (arg: { count: number }) => {
-    const matchIndex = arg.count;
+  _find(matchIndex: number) {
     if (matchIndex <= this.dmlMatches) {
       this.dmlHighlightIndex = matchIndex;
       this.soqlHighlightIndex = 0;
@@ -470,9 +481,9 @@ export class DatabaseView extends LitElement {
       this.dmlHighlightIndex = 0;
       this.soqlHighlightIndex = 0;
     }
-  };
+  }
 
-  _findResults = (e: CustomEvent<{ totalMatches: number; type: SectionKind }>) => {
+  _findResults(e: CustomEvent<DbFindResultsEventDetail>) {
     if (e.detail.type === 'dml') {
       this.dmlMatches = e.detail.totalMatches;
     } else if (e.detail.type === 'soql') {
@@ -481,14 +492,9 @@ export class DatabaseView extends LitElement {
       this.soslMatches = e.detail.totalMatches;
     }
 
-    this._find({ count: 1 });
-
-    document.dispatchEvent(
-      new CustomEvent('lv-find-results', {
-        detail: { totalMatches: this.dmlMatches + this.soqlMatches + this.soslMatches },
-      }),
-    );
-  };
+    this._find(1);
+    this._reportTotal();
+  }
 }
 
 interface SectionSpec {

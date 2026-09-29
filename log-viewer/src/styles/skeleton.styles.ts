@@ -1,5 +1,8 @@
 import { css } from 'lit';
 
+/** Opacity only, and deliberately: it is the one property Blink runs on the
+ *  compositor, so the pulse keeps moving through the synchronous parse it covers.
+ *  A background-position or transform shimmer would freeze for the whole parse. */
 export const skeletonStyles = css`
   .skeleton {
     animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
@@ -16,6 +19,12 @@ export const skeletonStyles = css`
     }
     50% {
       opacity: 0.5;
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .skeleton {
+      animation: none;
     }
   }
 `;

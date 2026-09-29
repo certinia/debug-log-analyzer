@@ -15,7 +15,6 @@ import {
 // styles
 import { globalStyles } from '../styles/global.styles.js';
 import { headerControlStyles } from '../styles/headerControl.styles.js';
-import { skeletonStyles } from '../styles/skeleton.styles.js';
 
 // web components
 import '../features/notifications/components/IssueList.js';
@@ -34,14 +33,12 @@ import './IconButtonSkeleton.js';
  */
 @customElement('log-problems')
 export class LogProblemsChip extends LitElement {
-  /** `null` while the log is still parsing — renders a skeleton. */
   @property({ attribute: false })
   issues: readonly LogIssue[] | null = null;
 
   static styles = [
     globalStyles,
     headerControlStyles,
-    skeletonStyles,
     css`
       :host {
         display: inline-flex;
@@ -54,11 +51,6 @@ export class LogProblemsChip extends LitElement {
          author styles do win over :host). */
       .problems--clean vscode-icon {
         color: var(--lana-fg-muted);
-      }
-
-      .skeleton {
-        width: 16px;
-        height: 16px;
       }
     `,
   ];

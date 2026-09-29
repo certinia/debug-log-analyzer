@@ -2,7 +2,7 @@
  * Copyright (c) 2026 Certinia Inc. All rights reserved.
  */
 import { consume } from '@lit/context';
-import type { LogEvent } from 'apex-log-parser';
+import type { LogEvent } from '@apexdevtools/apex-log-parser';
 import { LitElement, css, html, unsafeCSS, type PropertyValues } from 'lit';
 import { customElement, property, state } from 'lit/decorators.js';
 import {
@@ -22,6 +22,7 @@ import {
   headerSortElement,
   clipboardCopyOptions,
   registerTableModules,
+  textTooltip,
   virtualScrollOptions,
 } from '../features/call-tree/components/TableShared.js';
 import { waitForNextFrame, type FrameBudgetOptions } from '../core/utility/FrameBudget.js';
@@ -29,6 +30,7 @@ import { makeSumSelfTimeAllVisible } from '../features/call-tree/utils/BottomCal
 import { eventLabel } from '../features/call-tree/utils/eventText.js';
 import { soqlInlineElement } from '../features/soql/format/inlineCell.js';
 import { SelectionEchoGuard } from '../core/events/SelectionEchoGuard.js';
+import { SubscriptionController } from '../core/events/SubscriptionController.js';
 import { soqlSyntaxStyles } from '../features/soql/styles/soql-syntax.css.js';
 import { globalStyles } from '../styles/global.styles.js';
 import { progressColumnWidth } from '../tabulator/format/measureWidth.js';
@@ -38,13 +40,7 @@ import dataGridStyles from '../tabulator/style/DataGrid.scss';
 import './ContextMenu.js';
 import type { ContextMenu } from './ContextMenu.js';
 import { dispatchInspectorLocate, dispatchInspectorReveal } from './inspectorReveal.js';
-import {
-  LOCATED_ROW_CLASS,
-  LocatedRowIds,
-  LocatedRowMarker,
-  rowId,
-  rowIndexStamper,
-} from './locatedRow.js';
+import { LocatedRowIds, LocatedRowMarker, rowId, rowIndexStamper } from './locatedRow.js';
 import { PANEL_ROW_MENU_ITEMS, runPanelRowAction } from './panelRowMenu.js';
 import {
   buildScopedCallTree,
@@ -56,6 +52,7 @@ import {
   type ScopedCallTree,
   type ScopedRow,
 } from './scopedCallTree.js';
+import './GridSkeleton.js';
 import './ViewModeSwitch.js';
 import { VIEW_MODES, defaultViewMode, isViewMode, type ViewMode } from './callTreeViewModes.js';
 
@@ -208,8 +205,18 @@ export class CallTreeDetail extends LitElement {
   // The frames the tab on screen last reported under its pointer, so a table
   // that finishes building after the report still marks them.
   private _locatedEvents: readonly number[] = [];
-  private _locateUnsubscribe?: () => void;
-  private _selectionClearUnsubscribe?: () => void;
+
+  private readonly _subscriptions = new SubscriptionController(this, () => [
+    eventBus.on('detail:locate', ({ eventIndexes }) => {
+      this._locatedEvents = eventIndexes;
+      this._markLocated();
+    }),
+    // Escape clears the selection of the tab on screen. A picked row here is no
+    // selection of that view, so this table drops its own.
+    eventBus.on('selection:clear', () => {
+      this._dropPick();
+    }),
+  ]);
 
   /**
    * Bucket path to the ids of the rows that stand for it, per grouped mode. Built
@@ -236,19 +243,6 @@ export class CallTreeDetail extends LitElement {
 
   firstUpdated(): void {
     this._contextMenu = this.renderRoot.querySelector('context-menu');
-  }
-
-  connectedCallback(): void {
-    super.connectedCallback();
-    this._locateUnsubscribe = eventBus.on('detail:locate', ({ eventIndexes }) => {
-      this._locatedEvents = eventIndexes;
-      this._markLocated();
-    });
-    // Escape clears the selection of the tab on screen. A picked row here is no
-    // selection of that view, so this table drops its own.
-    this._selectionClearUnsubscribe = eventBus.on('selection:clear', () => {
-      this._dropPick();
-    });
   }
 
   /**
@@ -363,16 +357,6 @@ export class CallTreeDetail extends LitElement {
       .grid {
         height: 100%;
       }
-      /* Name: single line, ellipsis — never wrap. */
-      .table-host .tabulator-cell.truncate {
-        white-space: nowrap;
-        overflow: hidden;
-        text-overflow: ellipsis;
-      }
-      /* The frame under the pointer in the tab on screen. */
-      .table-host .tabulator-row.${unsafeCSS(LOCATED_ROW_CLASS)} {
-        background-color: var(--lana-row-hover-bg);
-      }
     `,
   ];
 
@@ -447,10 +431,6 @@ export class CallTreeDetail extends LitElement {
 
   disconnectedCallback(): void {
     super.disconnectedCallback();
-    this._locateUnsubscribe?.();
-    this._locateUnsubscribe = undefined;
-    this._selectionClearUnsubscribe?.();
-    this._selectionClearUnsubscribe = undefined;
     this._switch?.abort();
     this._destroyTables();
   }
@@ -633,10 +613,11 @@ export class CallTreeDetail extends LitElement {
         // The same aggregate a merged row in the tab itself reports, so Details
         // reads the same either way. Built from the row: a scoped row carries no
         // key, which is what the tab's own rows are read through.
-        const instances = locatableEventIndexes(data);
-        dispatchInspectorLocate(this, frameEventIndexes(data), true, {
+        const frames = frameEventIndexes(data);
+        dispatchInspectorLocate(this, frames, true, {
           kind: 'aggregate',
-          instances,
+          instances: locatableEventIndexes(data),
+          frames,
           calledBy: this.viewMode === 'bottom-up' ? callerOfRow(rows[0]) : undefined,
         });
       }
@@ -696,7 +677,13 @@ export class CallTreeDetail extends LitElement {
         // columns hold a fixed content width. Below Name's minWidth the table
         // scrolls horizontally.
         formatter: compactNameFormatter,
-        cssClass: 'datagrid-code-text truncate',
+        // Not `tooltip: true`: that answers with the raw `text` field, not the
+        // label the formatter renders.
+        tooltip: (_e, cell: CellComponent) => {
+          const { originalData } = cell.getData() as { originalData?: LogEvent };
+          return textTooltip(originalData ? eventLabel(originalData) : (cell.getValue() as string));
+        },
+        cssClass: 'datagrid-code-text',
         sorter: 'string',
         widthGrow: 1,
         widthShrink: 1,
@@ -761,6 +748,7 @@ export class CallTreeDetail extends LitElement {
         ></view-mode-switch>
       </div>
       <div class="tables">
+        ${this.logStore ? '' : html`<grid-skeleton></grid-skeleton>`}
         <div class="table-host ${this.viewMode === 'time-order' ? '' : 'is-hidden'}">
           <div id="time-order-tree" class="grid"></div>
         </div>

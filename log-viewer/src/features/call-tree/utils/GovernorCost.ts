@@ -1,7 +1,9 @@
 /*
  * Copyright (c) 2026 Certinia Inc. All rights reserved.
  */
-import type { GovernorLimits, SelfTotal } from 'apex-log-parser';
+import type { GovernorLimits, SelfTotal } from '@apexdevtools/apex-log-parser/types';
+
+import { sharePercent } from '../../../core/utility/Util.js';
 
 /**
  * The governor usage a node reports — all that's needed to *derive* cost. Both
@@ -33,15 +35,17 @@ export interface GovernorCostRow extends GovernorUsage {
    * governor's own `used/limit × 100`, across all governors that have a reported
    * limit (untouched ones count as 0%). A path that uses 50% of query rows and
    * 50% of DML statements — and nothing else — with five reported governors
-   * scores `(50 + 50 + 0 + 0 + 0) / 5 = 20%`.
+   * scores `(50 + 50 + 0 + 0 + 0) / 5 = 20%`. `null` where the log reported no
+   * limits at all: a utilisation with nothing to divide by is not 0%, it is unknown.
    */
-  governorCost: number;
+  governorCost: number | null;
   /**
    * The single tightest governor consumed on this path (0–100+%): the max of
    * each governor's `used/limit × 100`. Flags a path near/over one specific
    * limit even when its average across governors ({@link governorCost}) is low.
+   * `null` where the log reported no limits.
    */
-  governorCostMax: number;
+  governorCostMax: number | null;
 }
 
 interface CostMetric {
@@ -66,12 +70,12 @@ interface CostMetric {
  * so it is the value comparable to the heap limit per path.
  */
 const COST_METRICS: CostMetric[] = [
-  { label: 'SOQL', used: (r) => r.soqlCount.total, limit: (l) => l.soqlQueries.limit },
-  { label: 'DML', used: (r) => r.dmlCount.total, limit: (l) => l.dmlStatements.limit },
-  { label: 'SOSL', used: (r) => r.soslCount.total, limit: (l) => l.soslQueries.limit },
-  { label: 'SOQL Rows', used: (r) => r.soqlRowCount.total, limit: (l) => l.queryRows.limit },
-  { label: 'DML Rows', used: (r) => r.dmlRowCount.total, limit: (l) => l.dmlRows.limit },
-  { label: 'Heap', used: (r) => r.heapPeak, limit: (l) => l.heapSize.limit },
+  { label: 'SOQL', used: (r) => r.soqlCount.total, limit: (l) => l.final.soqlQueries.limit },
+  { label: 'DML', used: (r) => r.dmlCount.total, limit: (l) => l.final.dmlStatements.limit },
+  { label: 'SOSL', used: (r) => r.soslCount.total, limit: (l) => l.final.soslQueries.limit },
+  { label: 'SOQL Rows', used: (r) => r.soqlRowCount.total, limit: (l) => l.final.queryRows.limit },
+  { label: 'DML Rows', used: (r) => r.dmlRowCount.total, limit: (l) => l.final.dmlRows.limit },
+  { label: 'Heap', used: (r) => r.heapPeak, limit: (l) => l.peak.heapSize.limit },
 ];
 
 /**
@@ -81,33 +85,36 @@ const COST_METRICS: CostMetric[] = [
  * total, so this measures overall governor utilisation across all of them, not
  * the single tightest one. Governors never reported in the log (limit 0) are
  * excluded from both the sum and the divisor.
+ *
+ * `null` where no governor carries a reported limit — with nothing to divide by there is no
+ * utilisation, and reading it as 0% would say the path is clear of limits nobody knows.
  */
-export function governorCost(row: GovernorUsage, limits: GovernorLimits): number {
+export function governorCost(row: GovernorUsage, limits: GovernorLimits): number | null {
   let total = 0;
   let count = 0;
   for (const metric of COST_METRICS) {
     const limit = metric.limit(limits);
     if (limit > 0) {
-      total += (metric.used(row) / limit) * 100;
+      total += sharePercent(metric.used(row), limit);
       count++;
     }
   }
-  return count > 0 ? total / count : 0;
+  return count > 0 ? total / count : null;
 }
 
 /**
  * The single tightest governor consumed on this path (0–100+%): the max of each
  * governor's `used/limit × 100`, over governors with a reported limit. The
  * "am I about to breach one specific limit" signal, complementing the averaged
- * {@link governorCost}.
+ * {@link governorCost}. `null` where no governor carries a reported limit.
  */
-export function governorCostMax(row: GovernorUsage, limits: GovernorLimits): number {
-  let max = 0;
+export function governorCostMax(row: GovernorUsage, limits: GovernorLimits): number | null {
+  let max: number | null = null;
   for (const metric of COST_METRICS) {
     const limit = metric.limit(limits);
     if (limit > 0) {
-      const percent = (metric.used(row) / limit) * 100;
-      if (percent > max) {
+      const percent = sharePercent(metric.used(row), limit);
+      if (max === null || percent > max) {
         max = percent;
       }
     }
@@ -137,7 +144,7 @@ export function governorCostBreakdown(
     const limit = metric.limit(limits);
     const used = metric.used(row);
     if (limit > 0 && used > 0) {
-      metrics.push({ label: metric.label, used, limit, percent: (used / limit) * 100 });
+      metrics.push({ label: metric.label, used, limit, percent: sharePercent(used, limit) });
     }
   }
   return metrics.sort((a, b) => b.percent - a.percent);

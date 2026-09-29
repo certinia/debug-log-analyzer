@@ -22,9 +22,12 @@ export interface ApexLogListItem {
 }
 /* eslint-enable @typescript-eslint/naming-convention */
 
-export function listLogs(limit = MAX_LOG_RECORDS): Promise<ApexLogListItem[]> {
+export function listLogs(
+  signal?: AbortSignal,
+  limit = MAX_LOG_RECORDS,
+): Promise<ApexLogListItem[]> {
   const { ApexLogService } = getServicesApi().services;
-  return getRuntime().runPromise(ApexLogService.listLogs(limit));
+  return getRuntime().runPromise(ApexLogService.listLogs(limit), { signal });
 }
 
 export function getLogBody(logId: string): Promise<string> {

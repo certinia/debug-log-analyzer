@@ -90,16 +90,54 @@ function sortByTime(observations: LimitObservation[]): LimitObservation[] {
 }
 
 /**
+ * The coalescing threshold per metric, sized from its reported limit or — where the log reported
+ * none — the highest level it ever held.
+ *
+ * The running net, not the sum of the magnitudes: heap allocates and frees far more than it holds,
+ * and sizing from that churn would set a threshold the curve never crosses, leaving a metric with a
+ * handful of points instead of a shape. Observations must be time-sorted.
+ */
+function coalescingThresholds(
+  sorted: LimitObservation[],
+  limits: Map<string, number>,
+): Map<string, number> {
+  const scales = new Map<string, number>(limits);
+  // One entry per unlimited metric, mutated in place: this walks every heap allocation in the log.
+  const levels = new Map<string, { running: number; peak: number }>();
+  for (const obs of sorted) {
+    if (obs.kind === 'delta' && (limits.get(obs.metric) ?? 0) <= 0) {
+      let level = levels.get(obs.metric);
+      if (!level) {
+        level = { running: 0, peak: 0 };
+        levels.set(obs.metric, level);
+      }
+      level.running += obs.delta;
+      const held = Math.abs(level.running);
+      if (held > level.peak) {
+        level.peak = held;
+        scales.set(obs.metric, held);
+      }
+    }
+  }
+
+  for (const [metric, scale] of scales) {
+    scales.set(metric, Math.max(1, Math.floor(scale / POINT_BUDGET)));
+  }
+  return scales;
+}
+
+/**
  * Coalesce consecutive same-`(namespace, metric)` deltas: accumulate and emit a single delta only
- * once `|pending| ≥ max(1, floor(limit / POINT_BUDGET))`, on the triggering event's timestamp.
+ * once `|pending| ≥ max(1, floor(scale / POINT_BUDGET))`, on the triggering event's timestamp.
  * Pending deltas are flushed before any absolute for the same key (so the correction sees them) and
- * at end of stream. Counts (small limits → threshold 1) stay per-event; rows/heap coalesce. Absolutes
+ * at end of stream. Counts (small scales → threshold 1) stay per-event; rows/heap coalesce. Absolutes
  * pass through untouched. Input must be time-sorted; output is re-sorted (the flush order can differ).
  */
 function coalesceDeltas(
   sorted: LimitObservation[],
   limits: Map<string, number>,
 ): LimitObservation[] {
+  const thresholds = coalescingThresholds(sorted, limits);
   const out: LimitObservation[] = [];
   // namespace -> metric -> accumulated delta + latest timestamp
   const pending = new Map<string, Map<string, { sum: number; ts: number }>>();
@@ -116,7 +154,7 @@ function coalesceDeltas(
 
   for (const obs of sorted) {
     if (obs.kind === 'delta') {
-      const threshold = Math.max(1, Math.floor((limits.get(obs.metric) ?? 0) / POINT_BUDGET));
+      const threshold = thresholds.get(obs.metric) ?? 1;
       let byMetric = pending.get(obs.namespace);
       if (!byMetric) {
         byMetric = new Map();
@@ -172,9 +210,10 @@ function reportedCaps(observations: LimitObservation[]): Map<string, Map<string,
  *
  * @param observations - Delta and absolute observations, any order.
  * @param metrics - Metric definitions to attach to the series.
- * @param limits - Authoritative, fixed per-metric limit (the "out of" total). Resolved once by the
- *   caller (max cumulative-snapshot limit, else default) so the total never changes across the
- *   series. A metric is emitted only once it has a limit here (> 0) and at least one observation.
+ * @param limits - The per-metric limit the log reported (the "out of" total), resolved once by the
+ *   caller from the cumulative snapshots so the total never changes across the series. A metric the
+ *   log reported no limit for is emitted with `limit: 0`; its consumers scale it by its own peak
+ *   instead. Nothing here substitutes a limit the log did not give.
  */
 export function buildGovernorTimeSeries(
   observations: LimitObservation[],
@@ -241,7 +280,7 @@ export function buildGovernorTimeSeries(
   return { metrics, events };
 }
 
-/** Emit one combined point: sum last-known per-namespace values for every metric with a known limit. */
+/** Emit one combined point: sum the last-known per-namespace values for every observed metric. */
 function emitPoint(
   timestamp: number,
   state: Map<string, Map<string, MetricState>>,
@@ -267,11 +306,8 @@ function emitPoint(
 
   const values = new Map<string, HeatStripMetricValue>();
   for (const [metric, a] of agg) {
-    const limit = limits.get(metric) ?? 0;
-    if (limit <= 0) {
-      continue;
-    }
-    const value: HeatStripMetricValue = { used: a.used, limit };
+    // 0 means the log reported no limit — the value still belongs on the series.
+    const value: HeatStripMetricValue = { used: a.used, limit: limits.get(metric) ?? 0 };
     if (a.anyDelta && a.trackedSum < a.used) {
       value.tracked = a.trackedSum;
     }

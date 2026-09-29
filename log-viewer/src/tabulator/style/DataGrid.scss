@@ -238,6 +238,14 @@ $codicon-chevron-down: '\eab4';
       color: var(--vscode-list-activeSelectionForeground);
     }
 
+    // What the inspector located: the row it named, in whichever grid is on
+    // screen. It ties with hover and with selection, so it has to come after
+    // both — a mark holds until Escape, where a hover is only where the pointer
+    // is now.
+    .tabulator-row.located-row {
+      background-color: var(--lana-row-hover-bg);
+    }
+
     .tabulator-cell.datagrid-textarea {
       white-space: pre-wrap;
       overflow-wrap: break-word;

@@ -1,9 +1,10 @@
 /*
  * Copyright (c) 2026 Certinia Inc. All rights reserved.
  */
-import type { GovernorLimits, LogEvent, SelfTotal } from 'apex-log-parser';
+import type { LogEvent } from '@apexdevtools/apex-log-parser';
+import type { GovernorLimits, SelfTotal } from '@apexdevtools/apex-log-parser/types';
 
-import { formatInteger } from '../utility/Util.js';
+import { formatInteger, sharePercent } from '../utility/Util.js';
 
 /**
  * The statement a database metric belongs to — which grid a selection came from, and
@@ -37,11 +38,11 @@ export interface EventMetric {
  * order — so a row never overtakes another as a selection or a hover moves.
  */
 export const EVENT_METRICS: readonly EventMetric[] = [
-  { label: 'SOQL', pick: (e) => e.soqlCount, limit: (l) => l.soqlQueries.limit },
-  { label: 'SOQL Rows', pick: (e) => e.soqlRowCount, limit: (l) => l.queryRows.limit },
-  { label: 'DML', pick: (e) => e.dmlCount, limit: (l) => l.dmlStatements.limit },
-  { label: 'DML Rows', pick: (e) => e.dmlRowCount, limit: (l) => l.dmlRows.limit },
-  { label: 'SOSL', pick: (e) => e.soslCount, limit: (l) => l.soslQueries.limit },
+  { label: 'SOQL', pick: (e) => e.soqlCount, limit: (l) => l.final.soqlQueries.limit },
+  { label: 'SOQL Rows', pick: (e) => e.soqlRowCount, limit: (l) => l.final.queryRows.limit },
+  { label: 'DML', pick: (e) => e.dmlCount, limit: (l) => l.final.dmlStatements.limit },
+  { label: 'DML Rows', pick: (e) => e.dmlRowCount, limit: (l) => l.final.dmlRows.limit },
+  { label: 'SOSL', pick: (e) => e.soslCount, limit: (l) => l.final.soslQueries.limit },
   {
     label: 'SOSL Rows',
     pick: (e) => e.soslRowCount,
@@ -61,7 +62,7 @@ export const EVENT_METRICS: readonly EventMetric[] = [
 export const HEAP_PEAK = {
   label: 'Heap peak',
   pick: (event: LogEvent): number => event.heapPeak,
-  limit: (limits: GovernorLimits): number => limits.heapSize.limit,
+  limit: (limits: GovernorLimits): number => limits.peak.heapSize.limit,
   bytes: true,
 } as const;
 
@@ -77,28 +78,41 @@ export function selfLabel(self: string): string {
 
 /** A metric reading, split so a caller can lay the parts out however it likes. */
 export interface UsageParts {
-  /** `used / limit`, or the count alone where there is no limit. */
+  /** `used of the log's total`, or the count alone where the reading is the whole log. */
   primary: string;
-  /** The percentage and any self reading — secondary, in reading order. */
+  /** The shares, the limit reading and any self reading — secondary, in reading order. */
   qualifiers: string[];
 }
 
 /**
- * `used / limit` with its derived percentage and any self reading, so the primary
- * number reads first. Without a known limit there is no denominator and no percentage.
+ * A reading against what the transaction consumed, with any limit as a qualifier.
+ *
+ * The primary number answers the question a per-selection reading is asked — how much of the
+ * transaction's own consumption this is — so it is spelled "of", never "/", and reads on every log
+ * whether or not one reported limits. A whole-log reading carries no denominator — its share of
+ * itself is 100% — and neither does a log total of zero or less, which a signed metric like net
+ * heap can reach. A selection reading *past* the log's own total does keep one, rather than hiding
+ * the anomaly behind a bare number. A limit the log reported follows as a qualifier.
+ *
+ * @param total - This selection's consumption.
+ * @param logTotal - The transaction's consumption of the same metric.
+ * @param limit - The limit the log reported, or 0 where it reported none.
+ * @param format - How to write each number.
+ * @param self - The selection's own share, already formatted, or null where it adds nothing.
  */
 export function usageParts(
   total: number,
+  logTotal: number,
   limit: number,
   format: (value: number) => string,
   self: string | null,
 ): UsageParts {
-  const fraction = limit > 0 ? total / limit : null;
+  const noDenominator = logTotal <= 0 || logTotal === total;
   return {
-    primary: limit > 0 ? `${format(total)} / ${format(limit)}` : format(total),
-    // Percentage first: it qualifies the ratio immediately before it.
+    primary: noDenominator ? format(total) : `${format(total)} of ${format(logTotal)}`,
     qualifiers: [
-      fraction !== null ? `${(fraction * 100).toFixed(2)}%` : null,
+      noDenominator ? null : `${sharePercent(total, logTotal).toFixed(2)}% of log`,
+      limit > 0 ? `${sharePercent(total, limit).toFixed(2)}% of the ${format(limit)} limit` : null,
       self && selfLabel(self),
     ].filter((part): part is string => !!part),
   };

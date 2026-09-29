@@ -34,8 +34,8 @@ export class DetailDock extends LitElement {
   @property({ attribute: false })
   collapsed: Record<string, boolean> = {};
 
-  @property({ attribute: false })
-  paneSizes: Record<string, number> = {};
+  @property({ type: Number })
+  layoutEpoch = 0;
 
   static styles = [
     globalStyles,
@@ -140,7 +140,7 @@ export class DetailDock extends LitElement {
               orientation=${this.dock === 'bottom' ? 'horizontal' : 'vertical'}
               .sections=${this.sections}
               .collapsed=${this.collapsed}
-              .paneSizes=${this.paneSizes}
+              .layoutEpoch=${this.layoutEpoch}
             ></pane-view>`
           : html`<div class="empty">${this.emptyText}</div>`
       }

@@ -8,6 +8,6 @@ export function nsToMs(ns: number | null | undefined): number {
 }
 
 /** Format a nanosecond duration as a millisecond string. */
-export function formatMs(ns: number | null | undefined, precision = 2): string {
+export function formatNsAsMs(ns: number | null | undefined, precision = 2): string {
   return nsToMs(ns).toFixed(precision);
 }

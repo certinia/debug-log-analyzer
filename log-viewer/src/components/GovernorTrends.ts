@@ -15,6 +15,7 @@ import {
   governorTier,
 } from '../features/database/components/GovernorSummary.js';
 import { apexLimitTimeSeries } from '../features/timeline/optimised/apex-limit-series.js';
+import { recordedSegmentEnd } from '../features/timeline/optimised/markers/MarkerProcessor.js';
 import { SEEK_LOG_SHARE } from '../features/timeline/utils/navigate-window.js';
 import { globalStyles } from '../styles/global.styles.js';
 import { inspectorSectionStyles } from '../styles/inspectorSection.styles.js';
@@ -24,7 +25,8 @@ import {
   type TrendPoint,
   type TrendSeries,
 } from './governorTrendData.js';
-import { NO_CUMULATIVE_LIMITS_TEXT } from './logOverviewMetrics.js';
+import { NO_GOVERNOR_USAGE_TEXT } from './governorCopy.js';
+import './SectionSkeleton.js';
 
 /** A placed cursor: the sample, and the chart it belongs to. */
 interface Cursor {
@@ -65,27 +67,82 @@ function trendGeometry(series: TrendSeries, logTotal: number): TrendGeometry {
     return cached;
   }
 
-  const maxRatio = Math.max(100, ...series.points.map((p) => p.ratio));
+  // At least 100%, so a safe line reads as safe. The highest point is already on the series: the
+  // ratio peaks at `finalRatio` where a limit was reported, and at exactly 100% where the
+  // denominator is the metric's own peak.
+  const maxRatio = Math.max(100, series.limit > 0 ? series.finalRatio : 100);
   const x = (t: number) => (logTotal > 0 ? (t / logTotal) * VIEW_W : 0);
   const y = (ratio: number) => VIEW_H - (ratio / maxRatio) * VIEW_H;
 
-  const path = series.points
-    .map((p, i) => `${i === 0 ? 'M' : 'L'}${x(p.t).toFixed(2)} ${y(p.ratio).toFixed(2)}`)
-    .join(' ');
-  // Consumption never resets inside a transaction, so hold the last sample's
-  // level out to the end of the log before closing down to the baseline.
-  // A series always holds an anchor plus at least one sample.
-  const lastY = y(series.points[series.points.length - 1]!.ratio).toFixed(2);
-  const line = `${path} L${VIEW_W} ${lastY}`;
-
   const geometry = {
-    line,
-    area: `${line} L${VIEW_W} ${VIEW_H} L0 ${VIEW_H} Z`,
+    ...trendPaths(series, x, y, logTotal),
     guideY: y(GOVERNOR_WARN_PERCENT).toFixed(2),
     x,
   };
   geometryCache.set(series, geometry);
   return geometry;
+}
+
+/**
+ * The step line and the fill under it, drawn in one pass over the readings.
+ *
+ * A step, not a ramp: the log reports a level, and that level stands until the next report, so a
+ * line between two reports would put usage at an instant nothing measured. The line carries across
+ * a gap for the reason the Timeline strip's does - a governor total cannot fall - while the fill
+ * stops there and picks up where the log resumed, since a fill reads as measured volume.
+ */
+function trendPaths(
+  series: TrendSeries,
+  x: (t: number) => number,
+  y: (ratio: number) => number,
+  endT: number,
+): { line: string; area: string } {
+  const { points, gaps } = series;
+  const steps: string[] = [];
+  const shapes: string[] = [];
+  // The run being filled, seeded with its own move-to, so an empty run means none is open.
+  let run: string[] = [];
+  let runEndX = '';
+  const closeRun = () => {
+    if (run.length) {
+      shapes.push(`${run.join(' ')} L${runEndX} ${VIEW_H} Z`);
+      run = [];
+    }
+  };
+
+  let held = '';
+  for (let i = 0; i < points.length; i++) {
+    const point = points[i]!;
+    const px = x(point.t).toFixed(2);
+    const py = y(point.ratio).toFixed(2);
+    if (i === 0) {
+      steps.push(`M${px} ${py}`);
+    } else {
+      steps.push(`L${px} ${held}`, `L${px} ${py}`);
+    }
+    held = py;
+
+    const nextT = points[i + 1]?.t ?? endT;
+    const segmentEnd = recordedSegmentEnd(gaps, point.t, nextT);
+    if (segmentEnd === null) {
+      closeRun();
+      continue;
+    }
+    if (!run.length) {
+      run.push(`M${px} ${VIEW_H}`);
+    }
+    runEndX = x(segmentEnd).toFixed(2);
+    run.push(`L${px} ${py}`, `L${runEndX} ${py}`);
+    // A gap cut the segment short, so the shape ends here even though no reading fell in it.
+    if (segmentEnd < nextT) {
+      closeRun();
+    }
+  }
+  closeRun();
+
+  // Consumption never resets inside a transaction, so hold the last level out to the end of the
+  // log. A series always holds an anchor plus at least one sample.
+  return { line: `${steps.join(' ')} L${VIEW_W} ${held}`, area: shapes.join(' ') };
 }
 
 /**
@@ -173,14 +230,16 @@ export class GovernorTrends extends LitElement {
         border-bottom: var(--lana-stroke) solid var(--lana-surface-border);
         padding: 0;
         background: none;
-        color: inherit;
         cursor: pointer;
       }
 
+      /* Overflow visible: a peak-scaled series tops out at exactly 100%, putting the vertex on
+         y=0, where half the non-scaling stroke would fall outside the viewBox and be clipped. */
       .trend__plot {
         display: block;
         width: 100%;
         height: 44px;
+        overflow: visible;
       }
 
       .trend__chart:focus-visible {
@@ -192,10 +251,15 @@ export class GovernorTrends extends LitElement {
         color: var(--lana-severity-ok);
       }
       .trend--warn {
-        color: var(--lana-severity-warning);
+        color: var(--lana-chart-warning);
       }
       .trend--danger {
         color: var(--lana-severity-error);
+      }
+
+      /* No reported limit, so no severity: the shape is a level, drawn in the muted foreground. */
+      .trend--level {
+        color: var(--lana-fg-muted);
       }
 
       .trend__area {
@@ -236,16 +300,17 @@ export class GovernorTrends extends LitElement {
   render() {
     const apexLog = this.logStore?.log;
     if (!apexLog) {
-      return html`<p class="note">No log is loaded.</p>`;
+      return html`<section-skeleton shape="chart"></section-skeleton>`;
     }
     const series = governorTrendSeries(apexLimitTimeSeries(apexLog));
     if (!series.length) {
-      return html`<p class="note">${NO_CUMULATIVE_LIMITS_TEXT}</p>`;
+      return html`<p class="note">${NO_GOVERNOR_USAGE_TEXT}</p>`;
     }
 
-    // With no cumulative snapshots the series draws from granular events and
-    // the default limits — the Log overview above carries the estimated note.
-    const logTotal = apexLog.duration.total;
+    // `exitStamp`, not `duration.total`: readings carry the log's own timestamps, and the Timeline
+    // runs from 0 to the last one. Measuring from the first event instead put every reading right
+    // of where the Timeline draws it, and seeked short of the instant the reader pointed at.
+    const logTotal = apexLog.exitStamp;
     return html`<div class="trends">${series.map((s) => this._renderTrend(s, logTotal))}</div>`;
   }
 
@@ -257,21 +322,38 @@ export class GovernorTrends extends LitElement {
     // sparse, so a chart clipped to a short window would draw nothing.
     const window = this._range.window;
 
-    return html`<div class="trend trend--${governorTier(series.finalRatio)}">
+    // No reported limit: the denominator is the metric's own peak, so the figure is spelled "of"
+    // rather than "/", and the guide and the tier colour — both distances from a cap — come off.
+    const metered = series.limit > 0;
+
+    // Only once a cursor names a moment: the whole-log figure *is* the peak, so with no cursor the
+    // denominator would restate the value beside it. Cursor presence, not the value — gating on the
+    // value would drop the suffix across the flat tail and change the readout's width mid-scrub.
+    const denominator = metered
+      ? `/ ${series.format(series.limit)}`
+      : cursor
+        ? `of ${series.format(series.used)}`
+        : '';
+
+    return html`<div class="trend">
       <div class="trend__head">
         <span class="trend__label">${series.label}</span>
-        <span class="trend__value" aria-live="polite"
+        <span
+          class="trend__value ${metered ? `trend--${governorTier(series.finalRatio)}` : ''}"
+          aria-live="polite"
           >${cursor ? html`${formatDuration(cursor.t)} · ` : ''}${series.format(
             cursor ? cursor.used : series.used,
-          )} <span class="trend__limit">/ ${series.format(series.limit)}</span></span
+          )} <span class="trend__limit">${denominator}</span></span
         >
       </div>
       <button
-        class="trend__chart"
+        class="trend__chart trend--${metered ? governorTier(series.finalRatio) : 'level'}"
         type="button"
-        aria-label="${series.label}: ${Math.round(
-          series.finalRatio,
-        )}% of the limit used. Move the timeline to a point in the log."
+        aria-label="${series.label}: ${
+          metered
+            ? `${Math.round(series.finalRatio)}% of the limit used`
+            : `peak ${series.format(series.used)}, no limit reported`
+        }. Move the timeline to a point in the log."
         @pointermove=${(event: PointerEvent) => this._onPointerMove(event, series, logTotal)}
         @pointerleave=${() => this._onPointerLeave()}
         @click=${(event: PointerEvent) => this._onClick(event, series, logTotal)}
@@ -291,7 +373,11 @@ export class GovernorTrends extends LitElement {
             }
             <path class="trend__area" d=${area}></path>
             <path class="trend__line" d=${line}></path>
-            <line class="trend__guide" x1="0" y1=${guideY} x2=${VIEW_W} y2=${guideY}></line>
+            ${
+              metered
+                ? svg`<line class="trend__guide" x1="0" y1=${guideY} x2=${VIEW_W} y2=${guideY}></line>`
+                : ''
+            }
             ${cursorX === null ? '' : svg`<line class="trend__cursor" x1=${cursorX} y1="0" x2=${cursorX} y2=${VIEW_H}></line>`}
           `}
         </svg>

@@ -3,12 +3,12 @@
  *
  * @jest-environment jsdom
  */
-import type { GovernorLimits } from 'apex-log-parser';
+import type { GovernorLimits } from '@apexdevtools/apex-log-parser/types';
 import { beforeEach, describe, expect, it } from '@jest/globals';
 
 import type { LogStore } from '../../core/log/LogStore.js';
 import type { HeatStripTimeSeries } from '../../features/timeline/types/flamechart.types.js';
-import { emptyLimits, seriesEvent, timeSeries } from './limitsTestUtils.js';
+import { governorLimits, seriesEvent, timeSeries } from './limitsTestUtils.js';
 
 // The metric strip's series, which the overview always reads its gauges from
 // so they match the timeline and the trend charts.
@@ -39,57 +39,47 @@ describe('log-overview', () => {
     mockSeries = timeSeries();
   });
 
-  it('says the totals are unknown while no log holds cumulative limits', async () => {
+  const noLog = governorLimits();
+
+  const seriesWithSoql = (limit: number): HeatStripTimeSeries =>
+    timeSeries([seriesEvent(1_000, { soqlQueries: { used: 40, limit } })]);
+
+  it('waits on the log rather than naming one that has not arrived', async () => {
     const element = await overview();
-    expect(element.shadowRoot?.querySelector('.note')?.textContent).toContain(
-      'CUMULATIVE_LIMIT_USAGE',
-    );
+
+    // Which sentence a skeleton settles on is SectionSkeleton's own business.
+    expect(element.shadowRoot?.querySelector('section-skeleton')).not.toBeNull();
     expect(element.shadowRoot?.querySelector('governor-summary')).toBeNull();
   });
 
-  const seriesWithSoql = (): HeatStripTimeSeries =>
-    timeSeries([seriesEvent(1_000, { soqlQueries: { used: 40, limit: 100 } })]);
-
-  it('shows the series gauges without a note while the log holds snapshots', async () => {
+  it('shows the gauges without a note while the log reports a limit', async () => {
     const element = await overview();
 
-    mockSeries = seriesWithSoql();
-    await loadLog(element, {
-      ...emptyLimits(),
-      byNamespace: new Map(),
-      snapshots: [{ timestamp: 1_000, namespace: 'default', limits: emptyLimits() }],
-    } as GovernorLimits);
+    mockSeries = seriesWithSoql(100);
+    await loadLog(element, noLog);
 
     expect(element.shadowRoot?.querySelector('governor-summary')).not.toBeNull();
     expect(element.shadowRoot?.querySelector('.note')).toBeNull();
   });
 
-  it('says the figures are estimated when cumulative limits are absent', async () => {
+  // Figures still show where the log reported no limit; the gauge says so on hover, so the strip
+  // carries no note of its own.
+  it('shows the gauges with no note when the log reported no limits', async () => {
     const element = await overview();
 
-    mockSeries = seriesWithSoql();
-    await loadLog(element, {
-      ...emptyLimits(),
-      byNamespace: new Map(),
-      snapshots: [],
-    } as GovernorLimits);
+    mockSeries = seriesWithSoql(0);
+    await loadLog(element, noLog);
 
     expect(element.shadowRoot?.querySelector('governor-summary')).not.toBeNull();
-    expect(element.shadowRoot?.querySelector('.note')?.textContent).toContain('estimated');
+    expect(element.shadowRoot?.querySelector('.note')).toBeNull();
   });
 
-  it('says the totals are unknown when the series itself is empty', async () => {
+  it('says nothing was recorded when the series itself is empty', async () => {
     const element = await overview();
 
-    await loadLog(element, {
-      ...emptyLimits(),
-      byNamespace: new Map(),
-      snapshots: [],
-    } as GovernorLimits);
+    await loadLog(element, noLog);
 
     expect(element.shadowRoot?.querySelector('governor-summary')).toBeNull();
-    expect(element.shadowRoot?.querySelector('.note')?.textContent).toContain(
-      'CUMULATIVE_LIMIT_USAGE',
-    );
+    expect(element.shadowRoot?.querySelector('.note')?.textContent).toContain('no governor usage');
   });
 });

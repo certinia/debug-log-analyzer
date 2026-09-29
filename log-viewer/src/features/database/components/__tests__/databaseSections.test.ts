@@ -10,11 +10,17 @@ import { describe, expect, it } from '@jest/globals';
 jest.mock('../../../../components/CallStackDetail.js', () => ({}));
 jest.mock('../../../../components/CallTreeDetail.js', () => ({}));
 jest.mock('../../../../components/EventVitals.js', () => ({}));
+// Counted, so a hidden section can be shown to skip the lint rather than just
+// to drop its result.
+let lintCalls = 0;
 jest.mock('../../../soql/components/SOQLLinterIssues.js', () => ({
-  computeSoqlIssues: async () => [
-    { severity: 'Warning', summary: 'w', message: 'm' },
-    { severity: 'Info', summary: 'i', message: 'm' },
-  ],
+  computeSoqlIssues: async () => {
+    lintCalls++;
+    return [
+      { severity: 'Warning', summary: 'w', message: 'm' },
+      { severity: 'Info', summary: 'i', message: 'm' },
+    ];
+  },
 }));
 
 import { render, type TemplateResult } from 'lit';
@@ -51,8 +57,24 @@ describe('buildDatabaseSections', () => {
     expect(sections.find((s) => s.id === 'issues')?.badge).toBe('2');
     // The smallest section.
     expect(sections.find((s) => s.id === 'issues')?.weight).toBe(1);
-    // The vitals are a fixed set of figures: they take their own height only.
-    expect(sections.find((s) => s.id === 'vitals')?.fit).toBe('content');
+    // The statement's figures take a steady height rather than resizing the
+    // stack from one statement to the next; the variables take a share.
+    expect(sections.find((s) => s.id === 'vitals')?.height).toBe('md');
+    expect(sections.find((s) => s.id === 'variables')?.weight).toBe(3);
+  });
+
+  it('skips the lint for a hidden issues section, but still offers it', async () => {
+    const before = lintCalls;
+    const sections = await buildDatabaseSections(
+      { eventIndex: 3, type: 'soql' },
+      new Set(['issues']),
+    );
+
+    const issues = sections.find((s) => s.id === 'issues');
+    // Still in the list, so the header menu can bring it back.
+    expect(issues).toBeDefined();
+    expect(issues?.badge).toBeUndefined();
+    expect(lintCalls).toBe(before);
   });
 
   it('omits the SOQL issues section for a DML selection', async () => {

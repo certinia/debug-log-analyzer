@@ -6,6 +6,7 @@ import { beforeEach, describe, expect, it } from '@jest/globals';
 import { FoldingRangeKind, languages, window, workspace } from 'vscode';
 
 import {
+  createMockDisplay,
   createMockApexLog,
   createMockContext,
   createMockLogEvent,
@@ -32,7 +33,7 @@ describe('RawLogFoldingProvider', () => {
   let provider: RawLogFoldingProvider;
 
   beforeEach(() => {
-    provider = new RawLogFoldingProvider();
+    provider = new RawLogFoldingProvider(createMockDisplay());
     mockGetApexLog.mockReset();
     // The provider only works for a document the user has open as a text tab.
     setOpenTabs(new TabInputText(Uri.file('/test/file.log')));
@@ -367,13 +368,13 @@ describe('RawLogFoldingProvider', () => {
         tabsHandler({});
       };
 
-      return { registeredProvider, openHandler, activeEditorHandler };
+      return { registeredProvider, openHandler, activeEditorHandler, display: mockContext.display };
     }
 
     const flush = () => new Promise<void>((resolve) => queueMicrotask(resolve));
 
     it('warms the cache and fires onDidChangeFoldingRanges when an apex log opens', async () => {
-      const { registeredProvider, openHandler } = applyAndCapture();
+      const { registeredProvider, openHandler, display } = applyAndCapture();
       const fired = jest.fn();
       registeredProvider.onDidChangeFoldingRanges?.(fired);
 
@@ -384,12 +385,13 @@ describe('RawLogFoldingProvider', () => {
 
       expect(mockGetApexLog).toHaveBeenCalledWith(
         expect.objectContaining({ scheme: 'file', path: '/test/file.log' }),
+        display,
       );
       expect(fired).toHaveBeenCalledTimes(1);
     });
 
     it('warms the cache and fires when an apex log editor becomes active (reopen)', async () => {
-      const { registeredProvider, activeEditorHandler } = applyAndCapture();
+      const { registeredProvider, activeEditorHandler, display } = applyAndCapture();
       const fired = jest.fn();
       registeredProvider.onDidChangeFoldingRanges?.(fired);
 
@@ -400,6 +402,7 @@ describe('RawLogFoldingProvider', () => {
 
       expect(mockGetApexLog).toHaveBeenCalledWith(
         expect.objectContaining({ scheme: 'file', path: '/test/file.log' }),
+        display,
       );
       expect(fired).toHaveBeenCalledTimes(1);
     });
@@ -418,7 +421,7 @@ describe('RawLogFoldingProvider', () => {
     });
 
     it('does not fire when the log fails to parse', async () => {
-      const { registeredProvider, openHandler } = applyAndCapture();
+      const { registeredProvider, openHandler, display } = applyAndCapture();
       const fired = jest.fn();
       registeredProvider.onDidChangeFoldingRanges?.(fired);
 
@@ -429,6 +432,7 @@ describe('RawLogFoldingProvider', () => {
 
       expect(mockGetApexLog).toHaveBeenCalledWith(
         expect.objectContaining({ scheme: 'file', path: '/test/file.log' }),
+        display,
       );
       expect(fired).not.toHaveBeenCalled();
     });

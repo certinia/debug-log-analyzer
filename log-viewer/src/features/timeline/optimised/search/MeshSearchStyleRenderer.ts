@@ -25,14 +25,13 @@
  * - Implement search logic
  */
 
-import type { Container, Geometry, Shader } from 'pixi.js';
-import { Mesh } from 'pixi.js';
+import type { Container, Geometry, Mesh, Shader } from 'pixi.js';
 import type { PixelBucket, RenderBatch, ViewportState } from '../../types/flamechart.types.js';
 import { BUCKET_CONSTANTS, TIMELINE_CONSTANTS } from '../../types/flamechart.types.js';
 import type { MatchedEventInfo } from '../../types/search.types.js';
 import type { PrecomputedRect } from '../RectangleCache.js';
-import { RectangleGeometry, type ViewportTransform } from '../RectangleGeometry.js';
-import { createRectangleShader } from '../RectangleShader.js';
+import type { RectangleGeometry, ViewportTransform } from '../RectangleGeometry.js';
+import { createRectangleMesh } from '../rendering/rectangleMesh.js';
 import { colorToGreyscale } from '../rendering/ColorUtils.js';
 import { buildMatchIndex, resolveBucketSearchColor } from './SearchBucketMatcher.js';
 
@@ -45,26 +44,16 @@ import { buildMatchIndex, resolveBucketSearchColor } from './SearchBucketMatcher
 export class MeshSearchStyleRenderer {
   private batches: Map<string, RenderBatch>;
   private geometry: RectangleGeometry;
-  private shader: Shader;
   private mesh: Mesh<Geometry, Shader>;
   private lastViewport: ViewportState | null = null;
 
   constructor(container: Container, batches: Map<string, RenderBatch>) {
     this.batches = batches;
 
-    // Create geometry and shader
-    this.geometry = new RectangleGeometry();
-    this.shader = createRectangleShader();
-
-    // Create mesh
-    this.mesh = new Mesh<Geometry, Shader>({
-      geometry: this.geometry.getGeometry(),
-      shader: this.shader,
-    });
-    this.mesh.label = 'MeshSearchStyleRenderer';
+    const { geometry, mesh } = createRectangleMesh(container, 'MeshSearchStyleRenderer');
+    this.geometry = geometry;
+    this.mesh = mesh;
     this.mesh.visible = false;
-
-    container.addChild(this.mesh);
   }
 
   /**

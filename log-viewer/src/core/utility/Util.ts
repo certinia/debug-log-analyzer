@@ -173,20 +173,41 @@ export function debounce<T extends unknown[]>(callBack: (...args: T) => unknown)
   };
 }
 
+/**
+ * Resolve true once `element` is on screen.
+ *
+ * Without a `signal` the promise waits for as long as the element stays off
+ * screen, holding its observer. Pass one from a caller that can ask more than
+ * once: aborting releases the observer and resolves false.
+ */
 export async function isVisible(
   element: HTMLElement,
   options?: IntersectionObserverInit,
+  signal?: AbortSignal,
 ): Promise<boolean> {
   return new Promise<boolean>((resolve) => {
+    if (signal?.aborted) {
+      resolve(false);
+      return;
+    }
+
     const observer = new IntersectionObserver((entries, observerInstance) => {
       for (const entry of entries) {
         if (entry.isIntersecting) {
+          // The signal outlives this call, so the listener goes with the wait.
+          signal?.removeEventListener('abort', release);
           resolve(true);
           observerInstance.disconnect();
           return;
         }
       }
     }, options);
+
+    const release = (): void => {
+      observer.disconnect();
+      resolve(false);
+    };
+    signal?.addEventListener('abort', release, { once: true });
 
     observer.observe(element);
   });

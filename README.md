@@ -1,9 +1,9 @@
-# 🚀 Apex Log Analyzer – Visualize Salesforce Debug Logs in VS Code
+# 🚀 Apex Log Analyzer - Visualize Salesforce Debug Logs in VS Code
 
-**Analyze Salesforce Apex Debug logs with blazing speed.**  
-Apex Log Analyzer is a blazing-fast VS Code extension for Salesforce developers. Instantly visualize and debug Apex logs with interactive flame charts, dynamic call trees, and detailed SOQL/DML breakdowns. Identify performance bottlenecks, gain deep insight into complex transactions and optimize slow Apex methods faster than ever.
+**Find what made a Salesforce Apex transaction slow.**  
+Apex Log Analyzer is a fast VS Code extension for Salesforce developers. Instantly visualize and debug Apex logs with interactive flame charts, dynamic call trees, and detailed SOQL/DML breakdowns. Identify performance bottlenecks, gain deep insight into complex transactions and optimize slow Apex methods faster than ever.
 
-![Apex Log Analyzer Preview](https://raw.githubusercontent.com/certinia/debug-log-analyzer/main/lana/assets/1_20/preview.gif)
+![Apex Log Analyzer Preview](https://raw.githubusercontent.com/certinia/debug-log-analyzer/main/lana/assets/1_22/preview.gif)
 
 [Installation](#%EF%B8%8F-installation 'Install Apex Log Analyzer in VS Code') |
 [Debug Log Levels](#%EF%B8%8F-recommended-debug-log-levels 'Go to Recommended Debug Log Levels') |
@@ -15,22 +15,20 @@ Apex Log Analyzer is a blazing-fast VS Code extension for Salesforce developers.
 
 ## 🚀 Key Features
 
-- **🔥 [See where the time went](#-timeline)** – An interactive flame chart of the whole transaction, with a minimap for navigating massive logs.
-- **🌲 [Follow the execution](#-call-tree)** – The full call tree in time order, aggregated, or bottom-up, with timing, row counts and DML/SOQL metrics.
-- **🚦 [At a glance header](#-header)** – A "Log problems" chip and Notifications bell summarize issues, and chips show the debug levels the log was captured with.
-- **🧭 [Inspect anything](#-inspector-) 🧪** – Select any frame or statement and the dockable inspector shows its vitals, call stack and its own call tree.
-- **🗄️ [Find the slow SOQL, DML and SOSL](#%EF%B8%8F-database-analysis)** – Every statement with its timing, row counts and selectivity, so the expensive ones stand out.
-- **📊 [Stay inside governor limits](#-governor-limits--heap)** – Usage against the limit for every governor, and where in the transaction you consumed it.
-- **🧠 [Understand heap](#-governor-limits--heap)** – Net, gross and peak per method, so allocate-then-free churn no longer looks like a leak.
-- **📈 [Find the hot Apex](#-apex-analysis)** – Group by method or namespace to see what actually costs you time.
-- **🔍 [Search the whole log](#-global-search)** – One search across the flame chart, call tree and database tables.
-- **📄 [Jump to the raw log](#-raw-log-navigation)** – Move between the analysis and the log file itself, in both directions.
-- **🤖 [Ask an AI about a log](#-ai-assistant-mcp-server)** – An MCP server so your assistant can analyze logs with you.
-- **🧠 [Filter to what matters](#%EF%B8%8F-database-analysis)** – Narrow any grid by namespace, object or type, or to a value range.
+- **🔥 [See where the time went](#-timeline)** - An interactive flame chart of the whole transaction, with a minimap for navigating massive logs.
+- **🌲 [Follow the execution](#-call-tree)** - The full call tree in time order, aggregated, or bottom-up, with timing, row counts and DML/SOQL metrics.
+- **🚦 [At a glance header](#-header)** - A "Log problems" chip and Notifications bell summarize issues, and chips show the debug levels the log was captured with.
+- **🧭 [Inspect anything](#-inspector)** - Select any frame or statement and the dockable inspector shows its vitals, call stack and its own call tree.
+- **🗄️ [Find the slow SOQL, DML and SOSL](#%EF%B8%8F-database-analysis)** - Every statement with its timing, row counts and selectivity, so the expensive ones stand out.
+- **📊 [Stay inside governor limits](#-governor-limits--heap)** - Usage against the limit for every governor, and where in the transaction you consumed it.
+- **🧠 [Understand heap](#-governor-limits--heap)** - Net, gross and peak per method, so allocate-then-free churn no longer looks like a leak.
+- **📈 [Find the hot Apex](#-apex-analysis)** - Group by method or namespace to see what actually costs you time.
+- **🔍 [Search the whole log](#-global-search)** - One search across the flame chart, call tree and database tables.
+- **📄 [Jump to the raw log](#-raw-log-navigation)** - Move between the analysis and the log file itself, in both directions.
+- **🤖 [Ask an AI about a log](#-ai-assistant-mcp-server)** - An MCP server so your assistant can analyze logs with you.
+- **🧠 [Filter to what matters](#%EF%B8%8F-database-analysis)** - Narrow any grid by namespace, object or type, or to a value range.
 
 > ✨ Works with any `.log` Salesforce debug log file.
-
-> 🧪 **Pre-Release only** — available in the [Pre-Release Version](#-try-the-pre-release-version); not yet in the stable release.
 
 ## 🛠️ Installation
 
@@ -79,35 +77,35 @@ Use `Log: Retrieve Apex Log And Show Analysis` from the Command Palette.
 
 ## ⚙️ Recommended Debug Log Levels
 
-- Set `APEX_CODE` level to `FINE` or higher — lower levels may omit important execution details.
+- Set `APEX_CODE` level to `FINE` or higher - lower levels may omit important execution details.
 - Be aware that higher debug levels introduce logging overhead, which can inflate recorded execution times.
-- Avoid truncated logs — they can result in incomplete or misleading analysis.
+- Avoid truncated logs - they can result in incomplete or misleading analysis.
 - Recommended settings for a good balance of detail and performance: `APEX_CODE,FINE; APEX_PROFILING,FINE; CALLOUT,INFO; DB,FINEST; NBA,INFO; SYSTEM,DEBUG; VALIDATION,INFO; VISUALFORCE,FINE; WAVE,INFO; WORKFLOW,FINE`
 
 ## 🚦 Header
 
 The bar above the tabs summarizes the log at a glance:
 
-- **Log problems** – A chip for problems found in the log itself (governor limit exceptions, fatal errors, skipped lines), with a count badge; click it for the full breakdown.
-- **Notifications** – A separate bell for messages about the tool rather than the log, kept apart from log problems so the two don't read as one severity count.
-- **Log info** – Entry point, user, and start time; hover for full details.
-- **Debug levels** – Chips showing the debug levels the log was captured with, one per category. Read-only display, not a filter.
-- **`•••` menu** – Help, report an issue, and whatever the header sheds as the window narrows.
+- **Log problems** - A chip for problems found in the log itself (governor limit exceptions, fatal errors, skipped lines), with a count badge; click it for the full breakdown.
+- **Notifications** - A separate bell for messages about the tool rather than the log, kept apart from log problems so the two don't read as one severity count.
+- **Log info** - Entry point, user, and start time; hover for full details.
+- **Debug levels** - Chips showing the debug levels the log was captured with, one per category. Read-only display, not a filter.
+- **`•••` menu** - Help, report an issue, and whatever the header sheds as the window narrows.
 
 ## 🔥 Timeline
 
-The Timeline view shows a live visualization of your Salesforce Apex log execution — including methods, SOQL queries, DML operations, workflows, flows, and more.
+The Timeline view shows a live visualization of your Salesforce Apex log execution, including methods, SOQL queries, DML operations, workflows, flows, and more.
 
-- **⚡ Fast** – Blazing-fast zoom, pan, and rendering even on massive logs (500k+ lines).
-- **🗺️ Minimap** – Bird's-eye view with skyline density overview, viewport lens, and instant teleport.
-- **📊 Governor Limits Strip** – At-a-glance limit usage with traffic light coloring, built from individual log events so every limit (heap included) updates as it's consumed, not just at cumulative snapshots. Expand for a detailed step chart.
-- **📏 Measure & Zoom** – `Shift+Drag` to measure durations, `Alt/Option+Drag` to area-zoom, precision keyboard controls.
-- **🕐 Wall-Clock Time** – Toggle between elapsed and real-time (HH:MM:SS.mmm) on the time axis via the toolbar clock button.
-- **🧭 [Inspector](#-inspector-) 🧪** – Select a frame to inspect it alongside the chart.
+- **⚡ Fast** - Zoom, pan and render smoothly even on massive logs (500k+ lines).
+- **🗺️ Minimap** - Bird's-eye view with skyline density overview, viewport lens, and instant teleport.
+- **📊 Governor Limits Strip** - At-a-glance limit usage with traffic light coloring, built from individual log events so every limit (heap included) updates as it's consumed, not just at cumulative snapshots. Expand for a detailed step chart.
+- **📏 Measure & Zoom** - `Shift+Drag` to measure durations, `Alt/Option+Drag` to area-zoom, precision keyboard controls.
+- **🕐 Wall-Clock Time** - Toggle between elapsed and real-time (HH:MM:SS.mmm) on the time axis via the toolbar clock button.
+- **🧭 [Inspector](#-inspector)** - Select a frame to inspect it alongside the chart.
 
 Also: Frame Selection & Navigation, Dynamic Frame Labels, Adaptive Frame Detail, Tooltips, Context Menu, Search & Highlight, 19 Curated Themes.
 
-![Flame Chart](https://raw.githubusercontent.com/certinia/debug-log-analyzer/main/lana/assets/1_20/timeline.png)
+![Flame Chart](https://raw.githubusercontent.com/certinia/debug-log-analyzer/main/lana/assets/1_22/timeline.png)
 
 > 🧠 Great for spotting long-running operations, inefficient queries, and bottlenecks.
 
@@ -117,67 +115,69 @@ Explore nested method calls with performance metrics:
 
 - **Metrics**: Self Time, Total Time, SOQL/DML/SOSL Counts + Rows, Heap (net/gross/peak), Governor Limit Avg + Peak, Thrown
 - **Call Tree Views**: Use Time Order for sequence, Aggregated for repeated hot paths, Bottom-Up for caller attribution
-- **Column Views** – Switch preset column sets (General, Time, Governor Limits, Database, Memory), show/hide columns from the header menu, reset to defaults
-- **Column widths** – Sized to fit their header and values, across every table in the extension
+- **Column Views** - Switch preset column sets (General, Time, Governor Limits, Database, Memory), show/hide columns from the header menu, reset to defaults
+- **Column widths** - Sized to fit their header and values, across every table in the extension
 - **Group Bottom-Up by Namespace or Type**
-- **Filter bar** – Namespace, event Type, and a Total/Self Time range, plus **Details** and **Debug Only** toggles
+- **Filter bar** - Namespace, event Type, and a Total/Self Time range, plus **Details** and **Debug Only** toggles
 - **Keyboard Navigation**
-- **Click to go to Code** – Jump to the source method in your project
-- **[Inspector](#-inspector-) 🧪** – Select a row to inspect just that call path
+- **Click to go to Code** - Jump to the source method in your project
+- **[Inspector](#-inspector)** - Select a row to inspect just that call path
 
-![Call Tree](https://raw.githubusercontent.com/certinia/debug-log-analyzer/main/lana/assets/1_20/calltree.png)
+![Call Tree](https://raw.githubusercontent.com/certinia/debug-log-analyzer/main/lana/assets/1_22/calltree.png)
 
-## 🧭 Inspector 🧪
+## 🧭 Inspector
 
-Select anything — a timeline frame, a call tree or analysis row, a SOQL/DML/SOSL statement — and inspect it without leaving the tab you're on:
+Select anything - a timeline frame, a call tree or analysis row, a SOQL/DML/SOSL statement - and inspect it without leaving the tab you're on:
 
-- **Details** – Type, timing, and every governor metric the selection consumed as `used / limit`. Queries are syntax highlighted, with a click to copy.
-- **Call stack** – The frames that led to the selection, with total and self time.
-- **Call tree** – The selection's own subtree, in Time Order, Aggregated or Bottom-Up. Scoped to what you picked, which is what makes it different from the Call Tree tab.
-- **SOQL issues** – Optimization tips for the selected query.
-- **Nothing selected?** – It shows the whole log: the governor metrics closest to their limits; on the Timeline tab, time by category, governor usage over time and the full call tree; and on the Analysis tab a **Findings** list — what is slow or wrong in the log, each finding linking to the row behind it.
-- **Dock it where you want** – Left, right or bottom; drag to resize, collapse the sections you don't need. Your layout is remembered.
+- **Details** - Type, timing, and every governor metric the selection consumed as `used / limit`. Queries are syntax highlighted, with a click to copy.
+- **Call stack** - The frames that led to the selection, with total and self time.
+- **Call tree** - The selection's own subtree, in Time Order, Aggregated or Bottom-Up. Scoped to what you picked, which is what makes it different from the Call Tree tab.
+- **SOQL issues** - Optimization tips for the selected query.
+- **Nothing selected?** - It shows the whole log: the governor metrics closest to their limits; on the Timeline tab, time by category, governor usage over time and the full call tree; and on the Analysis tab a **Findings** list - what is slow or wrong in the log, each finding linking to the row behind it.
+- **Dock it where you want** - Left, right or bottom; drag to resize, collapse the sections you don't need. Your layout is remembered.
 - **Right-click a row** for **Show in Call Tree**, **Copy Name**, **Copy Details** or **Copy Call Stack**; `Cmd/Ctrl+C` copies the table.
+
+![Inspector](https://raw.githubusercontent.com/certinia/debug-log-analyzer/main/lana/assets/1_22/inspector.png)
 
 ## 🧠 Apex Analysis
 
 See which methods are the slowest, most frequent. or expensive.
 
 - **Group by Type, Namespace, or Caller Namespace **
-- **Column Views** – Preset column sets, show/hide columns, reset to defaults
+- **Column Views** - Preset column sets, show/hide columns, reset to defaults
 - **Sort by Duration, Count, Name, Type or Namespace**
-- **Filter** – show or hide zero-time events (Details)
+- **Filter** - show or hide zero-time events (Details)
 - **Copy or Export to CSV**
 
-![Analysis](https://raw.githubusercontent.com/certinia/debug-log-analyzer/main/lana/assets/1_20/analysis.png)
+![Analysis](https://raw.githubusercontent.com/certinia/debug-log-analyzer/main/lana/assets/1_22/analysis.png)
 
 ## 🗄️ Database Analysis
 
 Highlight slow Salesforce SOQL queries, non-selective filters, and DML issues, and see how each contributes to governor limits.
 
-- **Governor limit overview** – SOQL, SOSL, DML and query/DML rows shown as `used / limit` at the top of the tab.
-- **Tracked vs consumed** – each section reconciles statements seen in the log against the governor-counted total, so you can spot queries that didn't count (e.g. custom metadata).
-- **Separate SOQL, DML and SOSL tables** – SOSL is fully searchable, with its rows metered against the 2,000-per-query cap.
+- **Governor limit overview** - SOQL, SOSL, DML and query/DML rows shown as `used / limit` at the top of the tab.
+- **Tracked vs consumed** - each section reconciles statements seen in the log against the governor-counted total, so you can spot queries that didn't count (e.g. custom metadata).
+- **Separate SOQL, DML and SOSL tables** - SOSL is fully searchable, with its rows metered against the 2,000-per-query cap.
 - **Object column + Group by Object / Namespace / Caller Namespace / Query**
-- **Filter bar** – Namespace, Object, Caller Namespace, and a Row Count / Time Taken range
+- **Filter bar** - Namespace, Object, Caller Namespace, and a Row Count / Time Taken range
 - **SOQL Duration, Selectivity, Aggregates, Row Count**
-- **Column Views** – Preset column sets (incl. a SOQL Query Plan view), show/hide columns, reset to defaults
-- **Show in Call Tree** – right-click a statement to jump to it in the full Call Tree
-- **[Inspector](#-inspector-) 🧪** – select a statement to inspect it, including its SOQL optimization tips
+- **Column Views** - Preset column sets (incl. a SOQL Query Plan view), show/hide columns, reset to defaults
+- **Show in Call Tree** - right-click a statement to jump to it in the full Call Tree
+- **[Inspector](#-inspector)** - select a statement to inspect it, including its SOQL optimization tips
 - **Sort**, **Copy or Export to CSV**
 
-![Database](https://raw.githubusercontent.com/certinia/debug-log-analyzer/main/lana/assets/1_20/database.png)
+![Database](https://raw.githubusercontent.com/certinia/debug-log-analyzer/main/lana/assets/1_22/database.png)
 
 ## 📊 Governor Limits + Heap
 
 Salesforce enforces governor limits per transaction. This extension tracks them _throughout_ the log, not just as a final tally:
 
-- **Everywhere you look** – limit usage on the Timeline strip, per-path columns in the Call Tree (average + tightest peak), and a `used / limit` overview on the Database tab.
-- **Tracked vs consumed** – reconciles what the log shows against the governor-counted total, so you can spot work that didn't count against a limit (e.g. custom metadata SOQL).
-- **🧠 Heap, in depth** – heap is the tricky one, since memory gets freed as well as allocated and a single number hides what happened. Every method and call path carries three heap metrics:
-  - **Net** – bytes retained (allocated minus freed); the lasting footprint.
-  - **Gross** – bytes allocated, ignoring frees; allocation churn and GC pressure.
-  - **Peak** – highest live heap reached on the path; the number the heap governor actually enforces.
+- **Everywhere you look** - limit usage on the Timeline strip, per-path columns in the Call Tree (average + tightest peak), and a `used / limit` overview on the Database tab.
+- **Tracked vs consumed** - reconciles what the log shows against the governor-counted total, so you can spot work that didn't count against a limit (e.g. custom metadata SOQL).
+- **🧠 Heap, in depth** - heap is the tricky one, since memory gets freed as well as allocated and a single number hides what happened. Every method and call path carries three heap metrics:
+  - **Net** - bytes retained (allocated minus freed); the lasting footprint.
+  - **Gross** - bytes allocated, ignoring frees; allocation churn and GC pressure.
+  - **Peak** - highest live heap reached on the path; the number the heap governor actually enforces.
 
 ## 🔍 Global Search
 
@@ -194,12 +194,12 @@ Quickly step through matches, auto-expand parents, and automatically show timeli
 
 Seamlessly navigate between the visual analysis and your raw `.log` files:
 
-- **Show in Raw Log** – Right-click any frame in Timeline or Call Tree → "Show in Log File" to jump to the exact line.
-- **Show in Log Analysis** – Hover a raw log line to see metrics and click "Show in Log Analysis" to jump back.
-- **Code Folding** – Collapse/expand matching start/end events (METHOD_ENTRY/EXIT, DML_BEGIN/END, etc.) using the gutter icons or `Ctrl+Shift+[`/`]`.
-- **Line Decorations** – Duration appears as ghost text at the end of the cursor line (e.g., `1.23s (self: 45ms)`).
-- **Hover Details** – Hover near the ghost text to see SOQL/DML counts, row counts, and exception info.
-- **Total Duration** – First line displays total log execution time.
+- **Show in Raw Log** - Right-click any frame in Timeline or Call Tree → "Show in Log File" to jump to the exact line.
+- **Show in Log Analysis** - Hover a raw log line to see metrics and click "Show in Log Analysis" to jump back.
+- **Code Folding** - Collapse/expand matching start/end events (METHOD_ENTRY/EXIT, DML_BEGIN/END, etc.) using the gutter icons or `Ctrl+Shift+[`/`]`.
+- **Line Decorations** - Duration appears as ghost text at the end of the cursor line (e.g., `1.23s (self: 45ms)`).
+- **Hover Details** - Hover near the ghost text to see SOQL/DML counts, row counts, and exception info.
+- **Total Duration** - First line displays total log execution time.
 
 ## 🤖 AI Assistant (MCP Server)
 
@@ -276,10 +276,10 @@ Or go to: `Preferences > Extensions > Apex Log Analyzer`.
 
 ## 💬 Community
 
-- [All Discussions](https://github.com/certinia/debug-log-analyzer/discussions) – Browse or start a discussion if nothing below fits.
-- [Announcements](https://github.com/certinia/debug-log-analyzer/discussions/categories/announcement) – Release notes and project updates
-- [Q&A](https://github.com/certinia/debug-log-analyzer/discussions/categories/q-a) – Ask usage questions
-- [Ideas](https://github.com/certinia/debug-log-analyzer/discussions/categories/ideas) – Suggest or discuss features
+- [All Discussions](https://github.com/certinia/debug-log-analyzer/discussions) - Browse or start a discussion if nothing below fits.
+- [Announcements](https://github.com/certinia/debug-log-analyzer/discussions/categories/announcement) - Release notes and project updates
+- [Q&A](https://github.com/certinia/debug-log-analyzer/discussions/categories/q-a) - Ask usage questions
+- [Ideas](https://github.com/certinia/debug-log-analyzer/discussions/categories/ideas) - Suggest or discuss features
 
 ## ❤️ Contributors
 
@@ -306,4 +306,4 @@ Copyright &copy; Certinia Inc. All rights reserved.
 
 This project uses [Tabulator Tables](http://tabulator.info/), an open-source table library, under the MIT license. Tabulator is a powerful and flexible table library that helped with the interactive table features in the Apex Log Analyzer extension.
 
-Additionally, the timeline color themes in Apex Log Analyzer draw inspiration from several open-source color palettes, editor themes, and UIs — including Salesforce UI, Chrome DevTools, and Firefox DevTools. We are grateful to the creators and maintainers of Catppuccin, Dracula, Nord, Solarized, Monokai Pro, Okabe–Ito, Material Design, and the broader theme communities whose work influenced the presets included in our timeline themes.
+Additionally, the timeline color themes in Apex Log Analyzer draw inspiration from several open-source color palettes, editor themes, and UIs, including Salesforce UI, Chrome DevTools, and Firefox DevTools. We are grateful to the creators and maintainers of Catppuccin, Dracula, Nord, Solarized, Monokai Pro, Okabe–Ito, Material Design, and the broader theme communities whose work influenced the presets included in our timeline themes.

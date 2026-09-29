@@ -2,7 +2,7 @@
  * Copyright (c) 2026 Certinia Inc. All rights reserved.
  */
 import { consume } from '@lit/context';
-import type { ApexLog, LogEvent } from 'apex-log-parser';
+import type { ApexLog, LogEvent } from '@apexdevtools/apex-log-parser';
 import { LitElement, html, type PropertyValues } from 'lit';
 import { customElement, property, state } from 'lit/decorators.js';
 
@@ -10,6 +10,7 @@ import { logContext } from '../core/log/logContext.js';
 import { WindowStatsController } from '../core/log/windowStats.js';
 import type { LogStore } from '../core/log/LogStore.js';
 import { globalStyles } from '../styles/global.styles.js';
+import './SectionSkeleton.js';
 import { inspectorSectionStyles } from '../styles/inspectorSection.styles.js';
 import { segmentsWithTail } from './StackedTimeBar.js';
 import './StackedTimeBar.js';
@@ -80,7 +81,10 @@ export class NamespaceTimeBar extends LitElement {
       slices = windowed ? toNamespaceTimes(windowed.selfByNamespace) : null;
     }
     if (!slices) {
-      return html`<p class="note">Adding up the self time…</p>`;
+      return html`<section-skeleton
+        shape="bar"
+        fallback="Adding up the self time…"
+      ></section-skeleton>`;
     }
     // The palette is the log's, so it stands whatever the scope is: the window
     // answers without the scope walk that used to resolve it.
@@ -144,11 +148,11 @@ export class NamespaceTimeBar extends LitElement {
       return;
     }
     // A scope walked before answers now, so a re-selection shows no placeholder.
-    this._slices = cachedNamespaceSelfTimes(scope.key) ?? null;
+    this._slices = cachedNamespaceSelfTimes(scope.log, scope.key) ?? null;
     if (this._slices) {
       return;
     }
-    const slices = await scopedNamespaceSelfTimes(scope.key, scope.roots, {
+    const slices = await scopedNamespaceSelfTimes(scope.log, scope.key, scope.roots, {
       signal: walk.signal,
     });
     if (this._walk !== walk) {

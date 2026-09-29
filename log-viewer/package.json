@@ -8,6 +8,7 @@
     "#vscode-elements/*.js": "@vscode-elements/elements/dist/*/index.js"
   },
   "dependencies": {
+    "@apexdevtools/apex-log-parser": "0.1.1",
     "@apexdevtools/apex-parser": "5.2.0",
     "@lit/context": "^1.1.6",
     "@vscode-elements/elements": "^2.5.1",
@@ -21,7 +22,7 @@
     "@types/jest": "^30.0.0",
     "@types/tabulator-tables": "^6.3.6",
     "lightningcss": "^1.33.0",
-    "sass": "^1.103.1",
+    "sass": "^1.104.1",
     "typescript": "npm:@typescript/typescript6@^6.0.2"
   }
 }

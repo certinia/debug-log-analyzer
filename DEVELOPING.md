@@ -44,6 +44,22 @@ cd apex-log-analyzer
 pnpm i
 ```
 
+### Working against a local parser
+
+The log parser is the [`@apexdevtools/apex-log-parser`](https://github.com/apex-dev-tools/apex-log-parser)
+package, pinned in `package.json`, `lana/package.json` and `log-viewer/package.json`. To test an
+unreleased change, run `pnpm build` in the parser checkout, then point all three at it:
+
+```zsh
+for d in . lana log-viewer; do
+  ln -sfn <path-to-parser> $d/node_modules/@apexdevtools/apex-log-parser
+done
+```
+
+All three are needed, because each resolves its own copy. `readlink node_modules/@apexdevtools/apex-log-parser`
+shows where it points, and `pnpm install` undoes it. Re-run the parser's `pnpm build` after
+every edit — there is no watch script.
+
 ## ⚙️ Building and Bundling
 
 You can build the extension and prepare it for local development, run the watcher to re build automatically or production use. Here's how:
@@ -72,14 +88,14 @@ pnpm build:dev
 pnpm build
 ```
 
-### **(Experimental)**
+### **rollup fallback**
 
-The following commands are also available and use [rolldown](https://rolldown.rs/) as a replacement for rollup.
-The are faster but since rolldown is beta something do not work correctly e.g css bundling in js.
+The commands above use [rolldown](https://rolldown.rs/). rollup stays in the repo as a fallback
+until rolldown is proven in a release. It builds the same outputs, more slowly.
 
-1. pnpm watch:fast
-1. pnpm build:dev:fast
-1. pnpm build:fast
+1. pnpm watch:rollup
+1. pnpm build:dev:rollup
+1. pnpm build:rollup
 
 ## 🚀 Running the Extension Locally
 
@@ -93,6 +109,22 @@ Once you’ve built the extension or run the watcher, you can run it inside a lo
 2. **Refresh the extension host:**
 
    If you're using the **watch** mode (see below), refresh the extension host view by pressing CMD/CTRL + R or clicking the restart icon.
+
+### In VS Code Web
+
+The desktop extension host runs the desktop build only. To run the web build in a real web host:
+
+```zsh
+pnpm serve:web
+```
+
+Open `http://localhost:3001` (set `PORT` to change it). `pnpm test:e2e:web` runs the end-to-end
+tests against the same host.
+
+Commands that need a Salesforce org also need the Salesforce Services extension. The server serves
+your local copy of it, because a `localhost` page cannot fetch one from the marketplace CDN.
+Install the Salesforce Extension Pack in VS Code, or point `LANA_SERVICES_EXTENSION_PATH` at an
+unpacked copy. Without either, the log viewer still works but org commands do not.
 
 ## 🧪 Testing Your Changes
 

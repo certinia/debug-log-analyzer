@@ -187,7 +187,7 @@ export class ContextMenu extends LitElement {
       window.addEventListener('resize', this.boundHandleResize);
 
       // Adjust position if menu goes off-screen (after render)
-      this.updateComplete.then(() => this.adjustPosition());
+      void this.updateComplete.then(() => this.adjustPosition());
 
       // Focus the menu for keyboard navigation
       this.shadowRoot?.querySelector('.menu')?.setAttribute('tabindex', '-1');

@@ -1,8 +1,11 @@
 /*
  * Copyright (c) 2021 Certinia Inc. All rights reserved.
  */
-import { LitElement, css, html } from 'lit';
+import { LitElement, css, html, nothing } from 'lit';
+import { consume } from '@lit/context';
 import { customElement, property } from 'lit/decorators.js';
+
+import { logStatusContext, type LogStatus } from '../core/log/logStatus.js';
 
 import { vscodeMessenger } from '../core/messaging/VSCodeExtensionMessenger.js';
 // styles
@@ -11,6 +14,10 @@ import { skeletonStyles } from '../styles/skeleton.styles.js';
 
 @customElement('log-title')
 export class LogTitle extends LitElement {
+  @consume({ context: logStatusContext, subscribe: true })
+  @property({ attribute: false })
+  logStatus: LogStatus = 'parsing';
+
   @property()
   logName = '';
 
@@ -74,7 +81,7 @@ export class LogTitle extends LitElement {
 
   render() {
     if (!this.logName) {
-      return html`<div class="skeleton">&nbsp;</div>`;
+      return this.logStatus === 'parsing' ? html`<div class="skeleton">&nbsp;</div>` : nothing;
     }
 
     const tooltip = this.details ? `${this.logPath}\n${this.details}` : this.logPath;

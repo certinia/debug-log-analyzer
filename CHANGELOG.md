@@ -7,11 +7,33 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- ✂️ **Truncation**: each skipped section states how much of the log it dropped.
+
 ### Added
 
-- 🧭 **Inspector**: select a timeline frame, a table row or a statement to see its details, governor usage, call stack and subtree - or select nothing for a whole-log overview. Dock it left, right or bottom. ([#113] [#373] [#63])
-- 🔬 **Variables**: see the **Local** and **Static** variables in scope at the frame you selected, each holding the value it had at that point; an object opens into its fields. Needs Apex Code at **FINEST**. ([#373])
 - 🔭 **Timeline window**: zoom the Timeline and the Inspector summary follows the stretch of log on screen; CPU and heap stay whole-log, since the log reports them only in total. ([#875])
+
+### Removed
+
+- 🪓 **Breaking**: the legacy Timeline and all its settings are dropped.
+
+## [1.22.1] - 2026-09-18
+
+### Fixed
+
+- 📈 **Governor usage over time**: the Inspector's charts drew a line between readings, which was misleading; they now step, on the same timescale and with the same blank unrecorded spans as the governor limits strip.
+
+## [1.22.0] - 2026-09-18
+
+### Added
+
+- 🧭 **Inspector**: select a timeline frame, a table row or a statement to see its details, governor usage, call stack and subtree - or select nothing for a whole-log overview. Dock it left, right or bottom, and each tab keeps its own arrangement. ([#113] [#405] [#373] [#63])
+  - **Reorder**: drag a section header, or press `Alt+Up` / `Alt+Down`.
+  - **Choose sections**: right-click a header to tick sections on and off, or reset the list.
+  - **Resize**: drag a divider; double-click one to restore the default sizes.
+- 🔬 **Variables**: see the **Local** and **Static** variables in scope at the frame you selected, each holding the value it had at that point; an object opens into its fields. Pick a merged row and it compares its calls instead, which names varied and every value they held, with how many calls held each; hover a value to light those calls in the timeline and grids. Needs Apex Code at **FINEST**. ([#373])
 - 🧠 **Heap analysis**: every method and call path reports heap three ways - **Net** (retained), **Gross** (allocated) and **Peak** (highest live) - so allocate-then-free churn no longer looks like a leak. ([#32])
 - 🗄️ **Database governor limits**: SOQL, SOSL, DML and row counts show as `used / limit`, flagging queries that did not consume the limit, plus a dedicated SOSL table. ([#162])
 - 🔴 **Timeline exception markers**: exceptions show as red lines, with a Throws count in method tooltips. ([#828])
@@ -19,11 +41,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - 🗂️ **Choose your columns** in Call Tree, Analysis and Database: switch between presets, show or hide any column, and your choice is remembered. ([#298])
 - 🏷️ **New columns**: Object on SOQL and DML, SOSL Count and Rows, Avg Self Time, a Self variant of every governor metric, and a SOQL Query Plan view. ([#298])
 - 🪪 **Header**: shows the entry point, user and start time, with more detail on hover.
+- 🌐 **VS Code for the Web**: open and analyse logs in vscode.dev, github.dev and Salesforce Web Console.
 
 ### Changed
 
 - ⬆️ **Requires VS Code 1.102 or newer**.
-- 📏 **Governor figures**: the Inspector overview and the Database tab report each metric at its peak, the level the governor charges the transaction at. The Timeline strip still plots the log as recorded.
+- ⚠️ **Legacy Timeline settings deprecated**: `lana.timeline.legacy` and `lana.timeline.colors` now show as deprecated in Settings - the legacy Timeline goes in the next release, so switch now.
+- 📊 **Governor columns** in the Call Tree and Analysis fill against what the transaction consumed, like the time columns beside them, so the path responsible for a metric stands out. **Gov Avg %** and **Gov Peak %** still measure headroom, and each tooltip still names the limit.
+- 🎚️ **Governor figures**: the Inspector overview and the Database tab report each metric at its peak, the level the governor charges the transaction at, while the Timeline strip plots the value as recorded.
+  - no limit is assumed where the log reports none instead the Timeline strip and the governor trends scale each
+    metric to its own peak.
 - 🎨 **Header bar**: Log problems and Notifications are redesigned cards that name the problem and its time and jump to the Call Tree; Help and Report an issue move into a `•••` menu.
 - 🎨 **Timeline legend**: moved into the toolbar as colour chips, each showing the log's self time in that category.
 - 📊 **Timeline frame details**: the hover panel sits against the frame, follows the pointer, never blocks clicks, and fits long SOQL so the `WHERE` stays visible. Turn it off with `lana.timeline.showTooltip`.
@@ -47,13 +74,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - 🐛 **Go to Code** matches methods with namespace or `System` qualified parameter types. ([#834])
 - 🎨 **Theme switch**: Timeline and view colours update straight away instead of needing the log reopened.
 
-## [1.20.1] 2026-07-23
+## [1.20.1] - 2026-07-23
 
 ### Fixed
 
 - 🪟 **Timeline on Windows**: fixed the Flame Chart failing to load due to fractional display scaling (125% / 150% / 175%) - zoom, pan and keyboard navigation all appeared unresponsive ([#863]).
 
-## [1.20.0] 2026-06-18
+## [1.20.0] - 2026-06-18
 
 ### Added
 
@@ -145,13 +172,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - 🎯 **Number Precision**: Total and Self Time column precision changed to 2 decimal places for improved readability. ([#671])
 - 🎨 **Navigation Bar**: Redesigned to better match VS Code’s look and feel. ([#694])
 
-## [1.18.1] 2025-07-09
+## [1.18.1] - 2025-07-09
 
 ### Fixed
 
 - Remove assests from the published extension
 
-## [1.18.0] 2025-07-09
+## [1.18.0] - 2025-07-09
 
 ### Added
 
@@ -533,7 +560,7 @@ Skipped due to adopting odd numbering for pre releases and even number for relea
 - Add explorer menu item.
 - Provide more information when selecting log to download.
 
-<!-- Unreleased -->
+<!-- 1.22.0 -->
 
 [#873]: https://github.com/certinia/debug-log-analyzer/issues/873
 [#871]: https://github.com/certinia/debug-log-analyzer/issues/871
@@ -543,6 +570,7 @@ Skipped due to adopting odd numbering for pre releases and even number for relea
 [#848]: https://github.com/certinia/debug-log-analyzer/issues/848
 [#828]: https://github.com/certinia/debug-log-analyzer/issues/828
 [#827]: https://github.com/certinia/debug-log-analyzer/issues/827
+[#405]: https://github.com/certinia/debug-log-analyzer/issues/405
 [#373]: https://github.com/certinia/debug-log-analyzer/issues/373
 [#298]: https://github.com/certinia/debug-log-analyzer/issues/298
 [#162]: https://github.com/certinia/debug-log-analyzer/issues/162
