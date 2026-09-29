@@ -4,10 +4,10 @@
  * @jest-environment jsdom
  */
 import { describe, expect, it } from '@jest/globals';
-import { parse } from '@apexdevtools/apex-log-parser';
 
 import { MAX_MARKED_PER_VALUE } from '../../core/log/aggregateVariables.js';
-import { logStoreFor, type LogStore } from '../../core/log/LogStore.js';
+import { SETTINGS, indexOf, storeOf } from '../../__tests__/helpers/apexLog.js';
+import type { LogStore } from '../../core/log/LogStore.js';
 
 // Avoid the heavy CodeBlock import chain (vscode-elements, soql formatter). The
 // raw value it renders is covered by variableValue's own tests.
@@ -32,21 +32,7 @@ jest.mock('../../core/log/frameVariables.js', () => {
 import { STATICS_NOTE, type VariablesDetail } from '../VariablesDetail.js';
 import '../VariablesDetail.js';
 
-const FINEST = '64.0 APEX_CODE,FINEST;APEX_PROFILING,NONE;DB,NONE\n';
-const FINE = '64.0 APEX_CODE,FINE;APEX_PROFILING,NONE;DB,NONE\n';
-
-function logOf(body: string, settings = FINEST): LogStore {
-  return logStoreFor(
-    parse(
-      settings +
-        '09:18:22.6 (100)|EXECUTION_STARTED\n' +
-        '09:18:22.6 (200)|CODE_UNIT_STARTED|[EXTERNAL]|066d0000002m8ij|apex://pkg.Entry\n' +
-        body +
-        '09:18:22.6 (900000)|CODE_UNIT_FINISHED|apex://pkg.Entry\n' +
-        '09:18:22.6 (901000)|EXECUTION_FINISHED\n',
-    ),
-  );
-}
+const logOf = (body: string, settings = SETTINGS.finest): LogStore => storeOf(body, settings).store;
 
 const FRAME =
   '09:18:22.6 (1000)|METHOD_ENTRY|[1]|01p|ns.Outer.run()\n' +
@@ -55,15 +41,6 @@ const FRAME =
   '09:18:22.6 (1250)|VARIABLE_ASSIGNMENT|[3]|this.name|"Acme"\n' +
   '09:18:22.6 (1300)|VARIABLE_ASSIGNMENT|[4]|ns.Cache.hits|{"a":1,"b":2}\n' +
   '09:18:22.6 (1700)|METHOD_EXIT|[1]|ns.Outer.run()\n';
-
-/** The eventIndex of the frame whose log text is `text`. */
-function indexOf(store: LogStore, text: string): number {
-  const found = store.log.eventsById.find((event) => event.text === text);
-  if (!found) {
-    throw new Error(`no event with text ${text}`);
-  }
-  return found.eventIndex;
-}
 
 /** No provider in the test, so the consumed store is assigned straight on. */
 async function mount(store: LogStore, props: Partial<VariablesDetail>): Promise<VariablesDetail> {
@@ -117,14 +94,14 @@ describe('VariablesDetail swapping logs', () => {
   // The wrong read is discarded before it paints, so only the read itself shows it.
   it('does not read the new log through the index of the last one', async () => {
     const first = logOf(FRAME);
-    const el = await mount(first, { eventIndex: indexOf(first, 'ns.Outer.run()') });
+    const el = await mount(first, { eventIndex: indexOf(first.log, 'ns.Outer.run()') });
     expect(rowNames(el)).toContain('total');
     const firstIndex = frameReads.find((read) => read.store === first)?.index;
     expect(firstIndex).toBeDefined();
 
     const second = logOf(FRAME);
     el.logStore = second;
-    el.eventIndex = indexOf(second, 'ns.Outer.run()');
+    el.eventIndex = indexOf(second.log, 'ns.Outer.run()');
     await el.updateComplete;
 
     expect(frameReads.some((read) => read.store === second && read.index === firstIndex)).toBe(
@@ -145,7 +122,7 @@ describe('VariablesDetail read failure', () => {
     });
     const errorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
 
-    const el = await mount(store, { eventIndex: indexOf(store, 'ns.Outer.run()') });
+    const el = await mount(store, { eventIndex: indexOf(store.log, 'ns.Outer.run()') });
 
     expect(notes(el)).toContain('Could not read the log for variables.');
     errorSpy.mockRestore();
@@ -158,8 +135,8 @@ describe('VariablesDetail skips the frame read for an aggregate', () => {
   it('never asks for the frame when more than one instance is selected', async () => {
     const store = logOf(FRAME);
     const el = await mount(store, {
-      eventIndex: indexOf(store, 'ns.Outer.run()'),
-      frames: [indexOf(store, 'ns.Outer.run()'), indexOf(store, 'ns.Outer.run()')],
+      eventIndex: indexOf(store.log, 'ns.Outer.run()'),
+      frames: [indexOf(store.log, 'ns.Outer.run()'), indexOf(store.log, 'ns.Outer.run()')],
     });
 
     expect((el as unknown as { _frame: unknown })._frame).toBeNull();
@@ -170,9 +147,9 @@ describe('VariablesDetail empty states', () => {
   // Telling a FINEST user to set FINEST is the worst answer available, so each
   // case has to read differently.
   it('names the log level that would fill it', async () => {
-    const store = logOf(FRAME, FINE);
+    const store = logOf(FRAME, SETTINGS.fine);
 
-    const el = await mount(store, { eventIndex: indexOf(store, 'ns.Outer.run()') });
+    const el = await mount(store, { eventIndex: indexOf(store.log, 'ns.Outer.run()') });
 
     expect(notes(el)).toEqual(['Variables available with the Apex Code log level at FINEST.']);
   });
@@ -180,7 +157,7 @@ describe('VariablesDetail empty states', () => {
   it('says a FINEST log recorded no write at all', async () => {
     const store = logOf('09:18:22.6 (1000)|METHOD_ENTRY|[1]|01p|ns.Outer.run()\n');
 
-    const el = await mount(store, { eventIndex: indexOf(store, 'ns.Outer.run()') });
+    const el = await mount(store, { eventIndex: indexOf(store.log, 'ns.Outer.run()') });
 
     expect(notes(el)).toEqual(['This log records no variable assignments.']);
   });
@@ -192,7 +169,7 @@ describe('VariablesDetail empty states', () => {
         '09:18:22.6 (1900)|METHOD_EXIT|[9]|ns.Quiet.run()\n',
     );
 
-    const el = await mount(store, { eventIndex: indexOf(store, 'ns.Quiet.run()') });
+    const el = await mount(store, { eventIndex: indexOf(store.log, 'ns.Quiet.run()') });
 
     // The statics are still visible from it, so this frame reports them.
     expect(groupNames(el)).toContain('Static');
@@ -237,7 +214,7 @@ describe('VariablesDetail groups', () => {
   it('shows Local, this and Static, in that order', async () => {
     const store = logOf(FRAME);
 
-    const el = await mount(store, { eventIndex: indexOf(store, 'ns.Outer.run()') });
+    const el = await mount(store, { eventIndex: indexOf(store.log, 'ns.Outer.run()') });
 
     expect(groupNames(el)).toEqual(['Local', 'this', 'Static']);
   });
@@ -245,7 +222,7 @@ describe('VariablesDetail groups', () => {
   it('opens Local and leaves the rest closed', async () => {
     const store = logOf(FRAME);
 
-    const el = await mount(store, { eventIndex: indexOf(store, 'ns.Outer.run()') });
+    const el = await mount(store, { eventIndex: indexOf(store.log, 'ns.Outer.run()') });
 
     const groups = treeRows(el).filter((row) => row.querySelector('.group-name'));
     expect(groups.map((row) => row.getAttribute('aria-expanded'))).toEqual([
@@ -261,7 +238,7 @@ describe('VariablesDetail groups', () => {
   it('gives every row that opens a chevron, and every other row its gap', async () => {
     const store = logOf(FRAME);
 
-    const el = await mount(store, { eventIndex: indexOf(store, 'ns.Outer.run()') });
+    const el = await mount(store, { eventIndex: indexOf(store.log, 'ns.Outer.run()') });
 
     for (const row of treeRows(el)) {
       const opens = row.getAttribute('aria-expanded') !== null;
@@ -273,7 +250,7 @@ describe('VariablesDetail groups', () => {
   it('shows the declared type the log recorded', async () => {
     const store = logOf(FRAME);
 
-    const el = await mount(store, { eventIndex: indexOf(store, 'ns.Outer.run()') });
+    const el = await mount(store, { eventIndex: indexOf(store.log, 'ns.Outer.run()') });
 
     expect(rowText(el)).toContain('Integer');
   });
@@ -285,11 +262,11 @@ describe('VariablesDetail groups', () => {
         '09:18:22.6 (1850)|VARIABLE_ASSIGNMENT|[10]|other|7\n' +
         '09:18:22.6 (1900)|METHOD_EXIT|[9]|ns.Second.run()\n',
     );
-    const el = await mount(store, { eventIndex: indexOf(store, 'ns.Outer.run()') });
+    const el = await mount(store, { eventIndex: indexOf(store.log, 'ns.Outer.run()') });
 
     treeRows(el)[0]?.click();
     await el.updateComplete;
-    el.eventIndex = indexOf(store, 'ns.Second.run()');
+    el.eventIndex = indexOf(store.log, 'ns.Second.run()');
     await el.updateComplete;
 
     expect(treeRows(el)[0]?.getAttribute('aria-expanded')).toBe('false');
@@ -299,7 +276,7 @@ describe('VariablesDetail groups', () => {
   it('offers no expander on a value a row can hold', async () => {
     const store = logOf(FRAME);
 
-    const el = await mount(store, { eventIndex: indexOf(store, 'ns.Outer.run()') });
+    const el = await mount(store, { eventIndex: indexOf(store.log, 'ns.Outer.run()') });
 
     // `total` is 42, so its row opens on nothing.
     const total = rowNamed(el, 'total');
@@ -314,7 +291,7 @@ describe('VariablesDetail groups', () => {
         '09:18:22.6 (1100)|VARIABLE_ASSIGNMENT|[2]|held|{"a":1,"b":2}\n' +
         '09:18:22.6 (1300)|METHOD_EXIT|[1]|ns.Outer.run()\n',
     );
-    const el = await mount(store, { eventIndex: indexOf(store, 'ns.Outer.run()') });
+    const el = await mount(store, { eventIndex: indexOf(store.log, 'ns.Outer.run()') });
     const held = () => treeRows(el).find((row) => row.dataset.id === 'local/held');
 
     const before = held()?.querySelector('.value')?.textContent?.trim();
@@ -336,7 +313,7 @@ describe('VariablesDetail groups', () => {
         '09:18:22.6 (1300)|METHOD_EXIT|[1]|ns.Outer.run()\n',
     );
 
-    const el = await mount(store, { eventIndex: indexOf(store, 'ns.Outer.run()') });
+    const el = await mount(store, { eventIndex: indexOf(store.log, 'ns.Outer.run()') });
 
     expect(rowText(el)).toContain('not assigned');
   });
@@ -345,7 +322,7 @@ describe('VariablesDetail groups', () => {
   it('joins a name to its value with a colon', async () => {
     const store = logOf(FRAME);
 
-    const el = await mount(store, { eventIndex: indexOf(store, 'ns.Outer.run()') });
+    const el = await mount(store, { eventIndex: indexOf(store.log, 'ns.Outer.run()') });
 
     expect(rowNamed(el, 'total')?.querySelector('.name')?.textContent).toBe('total:');
   });
@@ -358,7 +335,7 @@ describe('VariablesDetail groups', () => {
         '09:18:22.6 (1300)|METHOD_EXIT|[1]|ns.Outer.run()\n',
     );
 
-    const el = await mount(store, { eventIndex: indexOf(store, 'ns.Outer.run()') });
+    const el = await mount(store, { eventIndex: indexOf(store.log, 'ns.Outer.run()') });
 
     expect(rowNamed(el, 'never')?.querySelector('.name')?.textContent).toBe('never');
   });
@@ -372,7 +349,7 @@ describe('VariablesDetail groups', () => {
         '09:18:22.6 (1300)|METHOD_EXIT|[1]|ns.Outer.run()\n',
     );
 
-    const el = await mount(store, { eventIndex: indexOf(store, 'ns.Outer.run()') });
+    const el = await mount(store, { eventIndex: indexOf(store.log, 'ns.Outer.run()') });
     const alias = rowNamed(el, 'alias');
 
     expect(alias?.querySelector('.missing')?.textContent).toContain('no value recorded');
@@ -392,7 +369,7 @@ describe('VariablesDetail groups', () => {
         '09:18:22.6 (1600)|METHOD_EXIT|[4]|ns.Outer.after()\n',
     );
 
-    const el = await mount(store, { eventIndex: indexOf(store, 'ns.Outer.run()') });
+    const el = await mount(store, { eventIndex: indexOf(store.log, 'ns.Outer.run()') });
     const alias = rowNamed(el, 'alias');
 
     expect(alias?.querySelector('.missing')?.textContent).toContain('recorded later');
@@ -415,7 +392,7 @@ describe('VariablesDetail groups', () => {
         '09:18:22.6 (1300)|METHOD_EXIT|[1]|ns.Outer.run()\n',
     );
 
-    const el = await mount(store, { eventIndex: indexOf(store, 'ns.Outer.run()') });
+    const el = await mount(store, { eventIndex: indexOf(store.log, 'ns.Outer.run()') });
     const writer = rowNamed(el, 'writer');
 
     // The row has no width for the namespace, so the hover carries it whole.
@@ -438,7 +415,7 @@ describe('VariablesDetail groups', () => {
         '09:18:22.6 (1300)|METHOD_EXIT|[1]|ns.Outer.run()\n',
     );
 
-    const el = await mount(store, { eventIndex: indexOf(store, 'ns.Outer.run()') });
+    const el = await mount(store, { eventIndex: indexOf(store.log, 'ns.Outer.run()') });
 
     expect(rowNamed(el, 'writer')?.querySelector('.cls')).toBeNull();
   });
@@ -454,7 +431,7 @@ describe('VariablesDetail groups', () => {
         '09:18:22.6 (1300)|METHOD_EXIT|[1]|ns.Writer.run()\n',
     );
 
-    const el = await mount(store, { eventIndex: indexOf(store, 'ns.Writer.run()') });
+    const el = await mount(store, { eventIndex: indexOf(store.log, 'ns.Writer.run()') });
 
     expect(rowNames(el)).not.toContain('this');
     expect(groupNames(el)).toContain('this');
@@ -471,7 +448,7 @@ describe('VariablesDetail groups', () => {
         '09:18:22.6 (1300)|METHOD_EXIT|[1]|ns.Outer.run()\n',
     );
 
-    const el = await mount(store, { eventIndex: indexOf(store, 'ns.Outer.run()') });
+    const el = await mount(store, { eventIndex: indexOf(store.log, 'ns.Outer.run()') });
 
     expect(rowNamed(el, 'payload')?.querySelector('.chip')?.textContent).toBe('json');
   });
@@ -484,7 +461,7 @@ describe('VariablesDetail groups', () => {
         '09:18:22.6 (1300)|METHOD_EXIT|[1]|ns.Outer.run()\n',
     );
 
-    const el = await mount(store, { eventIndex: indexOf(store, 'ns.Outer.run()') });
+    const el = await mount(store, { eventIndex: indexOf(store.log, 'ns.Outer.run()') });
     const alias = rowNamed(el, 'alias');
 
     expect(alias?.querySelector('.value')?.textContent).toContain('Id');
@@ -507,7 +484,7 @@ describe('VariablesDetail keyboard', () => {
         '09:18:22.6 (1000)|METHOD_ENTRY|[2]|01p|ns.Outer.run()\n' +
         '09:18:22.6 (1300)|METHOD_EXIT|[2]|ns.Outer.run()\n',
     );
-    const el = await mount(store, { eventIndex: indexOf(store, 'ns.Outer.run()') });
+    const el = await mount(store, { eventIndex: indexOf(store.log, 'ns.Outer.run()') });
 
     // Local starts open with no locals, so it opens onto a note.
     expect(tabStop(el)).toBe('local');
@@ -522,7 +499,7 @@ describe('VariablesDetail keyboard', () => {
   it('gives the tree one tab stop', async () => {
     const store = logOf(FRAME);
 
-    const el = await mount(store, { eventIndex: indexOf(store, 'ns.Outer.run()') });
+    const el = await mount(store, { eventIndex: indexOf(store.log, 'ns.Outer.run()') });
 
     expect(el.shadowRoot?.querySelectorAll('[tabindex="0"]')).toHaveLength(1);
     expect(tabStop(el)).toBe('local');
@@ -530,7 +507,7 @@ describe('VariablesDetail keyboard', () => {
 
   it('walks down and up', async () => {
     const store = logOf(FRAME);
-    const el = await mount(store, { eventIndex: indexOf(store, 'ns.Outer.run()') });
+    const el = await mount(store, { eventIndex: indexOf(store.log, 'ns.Outer.run()') });
 
     await press(el, 'ArrowDown');
     const second = tabStop(el);
@@ -542,7 +519,7 @@ describe('VariablesDetail keyboard', () => {
 
   it('opens with the right arrow and closes with the left', async () => {
     const store = logOf(FRAME);
-    const el = await mount(store, { eventIndex: indexOf(store, 'ns.Outer.run()') });
+    const el = await mount(store, { eventIndex: indexOf(store.log, 'ns.Outer.run()') });
 
     // Walk to `this`, which starts closed.
     while (tabStop(el) !== 'this') {
@@ -559,7 +536,7 @@ describe('VariablesDetail keyboard', () => {
 
   it('steps out to the row that holds it', async () => {
     const store = logOf(FRAME);
-    const el = await mount(store, { eventIndex: indexOf(store, 'ns.Outer.run()') });
+    const el = await mount(store, { eventIndex: indexOf(store.log, 'ns.Outer.run()') });
 
     // Local is open, so the row below it is one of its own.
     await press(el, 'ArrowDown');
@@ -570,7 +547,7 @@ describe('VariablesDetail keyboard', () => {
 
   it('reaches the first and last row', async () => {
     const store = logOf(FRAME);
-    const el = await mount(store, { eventIndex: indexOf(store, 'ns.Outer.run()') });
+    const el = await mount(store, { eventIndex: indexOf(store.log, 'ns.Outer.run()') });
 
     await press(el, 'End');
     const last = tabStop(el);
@@ -582,7 +559,7 @@ describe('VariablesDetail keyboard', () => {
 
   it('opens every group at one depth with a star', async () => {
     const store = logOf(FRAME);
-    const el = await mount(store, { eventIndex: indexOf(store, 'ns.Outer.run()') });
+    const el = await mount(store, { eventIndex: indexOf(store.log, 'ns.Outer.run()') });
 
     await press(el, '*');
 
@@ -596,7 +573,7 @@ describe('VariablesDetail keyboard', () => {
 
   it('toggles with Enter', async () => {
     const store = logOf(FRAME);
-    const el = await mount(store, { eventIndex: indexOf(store, 'ns.Outer.run()') });
+    const el = await mount(store, { eventIndex: indexOf(store.log, 'ns.Outer.run()') });
 
     await press(el, 'Enter');
 
@@ -607,7 +584,7 @@ describe('VariablesDetail keyboard', () => {
 describe('VariablesDetail keyboard, key repeat', () => {
   it('holds a row where a held Enter left it, rather than flapping', async () => {
     const store = logOf(FRAME);
-    const el = await mount(store, { eventIndex: indexOf(store, 'ns.Outer.run()') });
+    const el = await mount(store, { eventIndex: indexOf(store.log, 'ns.Outer.run()') });
 
     await press(el, 'Enter');
     await press(el, 'Enter', { repeat: true });
@@ -620,7 +597,7 @@ describe('VariablesDetail keyboard, key repeat', () => {
 
   it('leaves a group closed that a held star would re-open', async () => {
     const store = logOf(FRAME);
-    const el = await mount(store, { eventIndex: indexOf(store, 'ns.Outer.run()') });
+    const el = await mount(store, { eventIndex: indexOf(store.log, 'ns.Outer.run()') });
     const local = () => treeRows(el).find((row) => row.dataset.id === 'local');
 
     // Local starts open, and holds the tab stop, so Enter closes it.
@@ -632,7 +609,7 @@ describe('VariablesDetail keyboard, key repeat', () => {
 
   it('keeps the key consumed on a suppressed repeat', async () => {
     const store = logOf(FRAME);
-    const el = await mount(store, { eventIndex: indexOf(store, 'ns.Outer.run()') });
+    const el = await mount(store, { eventIndex: indexOf(store.log, 'ns.Outer.run()') });
 
     const event = await press(el, 'Enter', { repeat: true });
 
@@ -641,7 +618,7 @@ describe('VariablesDetail keyboard, key repeat', () => {
 
   it('walks on every repeat, so holding an arrow scrubs', async () => {
     const store = logOf(FRAME);
-    const el = await mount(store, { eventIndex: indexOf(store, 'ns.Outer.run()') });
+    const el = await mount(store, { eventIndex: indexOf(store.log, 'ns.Outer.run()') });
 
     await press(el, 'ArrowDown');
     const second = tabStop(el);
@@ -660,7 +637,7 @@ describe('VariablesDetail reads the scope once per selection', () => {
 
   it('keeps the same reading when a row opens', async () => {
     const store = logOf(FRAME);
-    const el = await mount(store, { eventIndex: indexOf(store, 'ns.Outer.run()') });
+    const el = await mount(store, { eventIndex: indexOf(store.log, 'ns.Outer.run()') });
     const before = held(el);
 
     treeRows(el)[0]?.click();
@@ -679,7 +656,7 @@ describe('VariablesDetail reads the scope once per selection', () => {
   // pay it again: a held arrow key fires ~20 times a second.
   it('keeps the same rows when the tab stop moves', async () => {
     const store = logOf(FRAME);
-    const el = await mount(store, { eventIndex: indexOf(store, 'ns.Outer.run()') });
+    const el = await mount(store, { eventIndex: indexOf(store.log, 'ns.Outer.run()') });
     const before = rows(el);
 
     tree(el).dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true }));
@@ -691,7 +668,7 @@ describe('VariablesDetail reads the scope once per selection', () => {
 
   it('builds the rows again when a row opens', async () => {
     const store = logOf(FRAME);
-    const el = await mount(store, { eventIndex: indexOf(store, 'ns.Outer.run()') });
+    const el = await mount(store, { eventIndex: indexOf(store.log, 'ns.Outer.run()') });
     const before = rows(el);
 
     treeRows(el)[0]?.click();
@@ -707,10 +684,10 @@ describe('VariablesDetail reads the scope once per selection', () => {
         '09:18:22.6 (1850)|VARIABLE_ASSIGNMENT|[10]|other|7\n' +
         '09:18:22.6 (1900)|METHOD_EXIT|[9]|ns.Second.run()\n',
     );
-    const el = await mount(store, { eventIndex: indexOf(store, 'ns.Outer.run()') });
+    const el = await mount(store, { eventIndex: indexOf(store.log, 'ns.Outer.run()') });
     const before = held(el);
 
-    el.eventIndex = indexOf(store, 'ns.Second.run()');
+    el.eventIndex = indexOf(store.log, 'ns.Second.run()');
     await el.updateComplete;
 
     expect(held(el)).not.toBe(before);
@@ -725,7 +702,7 @@ describe('VariablesDetail properties', () => {
         '09:18:22.6 (1100)|VARIABLE_ASSIGNMENT|[2]|outer|{"inner":{"a":1,"b":2},"n":3}\n' +
         '09:18:22.6 (1300)|METHOD_EXIT|[1]|ns.Outer.run()\n',
     );
-    const el = await mount(store, { eventIndex: indexOf(store, 'ns.Outer.run()') });
+    const el = await mount(store, { eventIndex: indexOf(store.log, 'ns.Outer.run()') });
     const at = (id: string) => treeRows(el).find((r) => r.dataset.id === id);
 
     at('local/outer')?.click();
@@ -746,7 +723,7 @@ describe('VariablesDetail properties', () => {
         '09:18:22.6 (1100)|VARIABLE_ASSIGNMENT|[2]|outer|{"n":3}\n' +
         '09:18:22.6 (1300)|METHOD_EXIT|[1]|ns.Outer.run()\n',
     );
-    const el = await mount(store, { eventIndex: indexOf(store, 'ns.Outer.run()') });
+    const el = await mount(store, { eventIndex: indexOf(store.log, 'ns.Outer.run()') });
 
     treeRows(el)
       .find((r) => r.dataset.id === 'local/outer')
@@ -778,7 +755,7 @@ describe('VariablesDetail object fields', () => {
   it('counts the fields beside a value the log wrote as {}', async () => {
     const store = logOf(BUILT);
 
-    const el = await mount(store, { eventIndex: indexOf(store, 'ns.Outer.run()') });
+    const el = await mount(store, { eventIndex: indexOf(store.log, 'ns.Outer.run()') });
     const holder = rowNamed(el, 'holder');
 
     expect(holder?.querySelector('.count')?.textContent?.trim()).toBe('1');
@@ -789,7 +766,7 @@ describe('VariablesDetail object fields', () => {
   it('previews the recorded fields on the closed row', async () => {
     const store = logOf(BUILT);
 
-    const el = await mount(store, { eventIndex: indexOf(store, 'ns.Outer.run()') });
+    const el = await mount(store, { eventIndex: indexOf(store.log, 'ns.Outer.run()') });
     const holder = rowNamed(el, 'holder');
 
     expect(holder?.querySelector('.value')?.textContent).toContain('sObj: "Account"');
@@ -806,7 +783,7 @@ describe('VariablesDetail object fields', () => {
         '09:18:22.6 (1040)|METHOD_EXIT|[1]|ns.Outer.run()\n',
     );
 
-    const el = await mount(store, { eventIndex: indexOf(store, 'ns.Outer.run()') });
+    const el = await mount(store, { eventIndex: indexOf(store.log, 'ns.Outer.run()') });
     const big = rowNamed(el, 'big');
 
     expect(big?.querySelector('.missing')).toBeNull();
@@ -824,7 +801,7 @@ describe('VariablesDetail object fields', () => {
         '09:18:22.6 (1030)|VARIABLE_ASSIGNMENT|[3]|holder|{}|0xddd\n' +
         '09:18:22.6 (1040)|METHOD_EXIT|[1]|ns.Loop.run()\n',
     );
-    const el = await mount(store, { eventIndex: indexOf(store, 'ns.Loop.run()') });
+    const el = await mount(store, { eventIndex: indexOf(store.log, 'ns.Loop.run()') });
 
     // The field names the object it belongs to, so it may be read but not opened.
     treeRows(el)
@@ -841,7 +818,7 @@ describe('VariablesDetail object fields', () => {
   it('offers nothing to open where the log recorded no fields', async () => {
     const store = logOf(BUILT);
 
-    const el = await mount(store, { eventIndex: indexOf(store, 'ns.Outer.run()') });
+    const el = await mount(store, { eventIndex: indexOf(store.log, 'ns.Outer.run()') });
     const plain = rowNamed(el, 'plain');
 
     expect(plain?.querySelector('.count')).toBeNull();
@@ -1055,7 +1032,7 @@ describe('VariablesDetail comparing a merged row', () => {
   it('does not say the statics are not compared for a single frame', async () => {
     const store = logOf(FRAME);
 
-    const el = await mount(store, { eventIndex: indexOf(store, 'ns.Outer.run()') });
+    const el = await mount(store, { eventIndex: indexOf(store.log, 'ns.Outer.run()') });
 
     expect(notes(el)).not.toContain(STATICS_NOTE);
   });
@@ -1083,7 +1060,7 @@ describe('VariablesDetail comparing a merged row', () => {
     // frame that made them.
     const el = await mount(store, {
       eventIndex: calls[0]!,
-      frames: [indexOf(store, 'ns.Outer.run()')],
+      frames: [indexOf(store.log, 'ns.Outer.run()')],
     });
 
     expect(rowNames(el)).toContain('outerLocal');
