@@ -483,7 +483,6 @@ describe('computeLogDiagnostics', () => {
           type: 'unexpected',
         },
       ],
-      // `max-size` states no size, so the finding carries no figure.
       truncation: { regions: [{ kind: 'max-size', startTime: 0 }], totalSkippedBytes: 0 },
     });
 

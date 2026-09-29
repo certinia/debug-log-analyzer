@@ -42,12 +42,11 @@ const HOT_SPOT_SHARE = 0.2;
 const MAX_LINTED_QUERIES = 250;
 
 /**
- * Where a finding sits in its severity band, ahead of any count. Truncation
- * caveats every figure below it, and a governor limit is the transaction's
- * hardest constraint — while every governor finding carries a count of 1, so
- * counting alone would bury it under whatever repeated most.
+ * Where a finding sits in its severity band, ahead of any count. A governor limit is
+ * the transaction's hardest constraint, while every governor finding carries a count
+ * of 1, so counting alone would bury it under whatever repeated most.
  */
-const TIER = { truncation: 0, limit: 1, other: 2 } as const;
+const TIER = { limit: 0, other: 1 } as const;
 type DiagnosticTier = (typeof TIER)[keyof typeof TIER];
 
 /**
@@ -413,10 +412,8 @@ function truncationDiagnostics(log: ApexLog): Diagnostic[] {
   return [
     {
       id: 'truncated',
-      // The transaction is sound; only the evidence is incomplete. It still leads the
-      // list, which the sort pins on {@link TIER.truncation} rather than on severity.
+      // Warning, not Error: the transaction is sound, only the evidence is incomplete.
       severity: 'Warning',
-      tier: TIER.truncation,
       summary: regions.length > 1 ? `Log truncated in ${regions.length} places` : 'Log truncated',
       // Zero when every region is `max-size`, which states no figure.
       meta: totalSkippedBytes > 0 ? formatByteSize(totalSkippedBytes) : undefined,
@@ -905,29 +902,29 @@ async function analyse(log: ApexLog): Promise<LogDiagnostics> {
   const limitExceptions = log.exceptions.filter(isLimit);
   const others = log.exceptions.filter((event) => !isLimit(event));
   const ranked = [
+    // The caveat leads: it says every figure under it may be an undercount.
     ...truncationDiagnostics(log),
-    ...limitDiagnostics(
-      limitTotals(apexLimitTimeSeries(log)),
-      limitExceptions,
-      hotSpot(selfTime, totalSelf),
+    ...[
+      ...limitDiagnostics(
+        limitTotals(apexLimitTimeSeries(log)),
+        limitExceptions,
+        hotSpot(selfTime, totalSelf),
+      ),
+      ...logIssueDiagnostics(log),
+      ...exceptionDiagnostics(others),
+      ...plans.diagnostics,
+      ...lint.diagnostics,
+      ...repetitionDiagnostics(queries, 'SOQL'),
+      ...repetitionDiagnostics(dml, 'DML'),
+      ...rowAtATimeDiagnostics(queries),
+      ...debugDiagnostics(debugLines),
+    ].sort(
+      (a, b) =>
+        SEVERITY_TYPES.indexOf(a.severity) - SEVERITY_TYPES.indexOf(b.severity) ||
+        (a.tier ?? TIER.other) - (b.tier ?? TIER.other) ||
+        b.count - a.count,
     ),
-    ...logIssueDiagnostics(log),
-    ...exceptionDiagnostics(others),
-    ...plans.diagnostics,
-    ...lint.diagnostics,
-    ...repetitionDiagnostics(queries, 'SOQL'),
-    ...repetitionDiagnostics(dml, 'DML'),
-    ...rowAtATimeDiagnostics(queries),
-    ...debugDiagnostics(debugLines),
-  ].sort(
-    (a, b) =>
-      // Truncation leads whatever its severity: it says every figure under it may be an
-      // undercount, so it cannot sort below the figures it qualifies.
-      Number(a.tier !== TIER.truncation) - Number(b.tier !== TIER.truncation) ||
-      SEVERITY_TYPES.indexOf(a.severity) - SEVERITY_TYPES.indexOf(b.severity) ||
-      (a.tier ?? TIER.other) - (b.tier ?? TIER.other) ||
-      b.count - a.count,
-  );
+  ];
 
   return {
     diagnostics: ranked,
