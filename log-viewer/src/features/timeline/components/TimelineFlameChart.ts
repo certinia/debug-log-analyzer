@@ -132,6 +132,16 @@ export class TimelineFlameChart extends LitElement {
     }),
   ]);
 
+  override connectedCallback(): void {
+    super.connectedCallback();
+
+    // `updated` re-initialises only when the log or the options change, so a
+    // re-attach would otherwise leave the destroyed Pixi app unrebuilt.
+    if (this.apexLog) {
+      void this.initializeTimeline();
+    }
+  }
+
   override disconnectedCallback(): void {
     // Lit can drop this element while the panel stays open, so the Pixi app has to go
     // with it or its WebGL context leaks.
