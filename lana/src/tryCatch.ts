@@ -10,8 +10,13 @@ export type Result<T> = [T, null] | [null, Error];
  * That keeps `Result` discriminable: without it the error slot widens to `unknown`
  * and `if (error)` stops narrowing the value.
  */
-function toError(thrown: unknown): Error {
+export function toError(thrown: unknown): Error {
   return thrown instanceof Error ? thrown : new Error(String(thrown), { cause: thrown });
+}
+
+/** What a caught value says, for a message a user reads. {@link toError} keeps the rest. */
+export function errorMessage(thrown: unknown): string {
+  return toError(thrown).message;
 }
 
 /** Runs `fn`, returning what it resolves to, or the error it threw or rejected with. */

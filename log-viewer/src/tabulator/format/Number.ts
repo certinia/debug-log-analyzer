@@ -3,13 +3,14 @@
  */
 import type { CellComponent, EmptyCallback } from 'tabulator-tables';
 
+import { formatNsAsMs } from '../../core/utility/Duration.js';
+
 export default function (
   cell: CellComponent,
   formatterParams: NumberParams,
   _onRendered: EmptyCallback,
 ) {
-  const value = (cell.getValue() || 0) / 1000000;
-  return value.toFixed(formatterParams.precision || 3);
+  return formatNsAsMs(cell.getValue(), formatterParams.precision || 3);
 }
 
 export interface NumberParams {

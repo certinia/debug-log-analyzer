@@ -50,17 +50,13 @@ import { tableHolder } from '../../../tabulator/module/tableHolder.js';
 import { inCountRange, inMsRange, type FilterRange } from '../../../tabulator/filters/MinMax.js';
 import { progressFormatter } from '../../../tabulator/format/Progress.js';
 import { progressFormatterMS } from '../../../tabulator/format/ProgressMS.js';
-import { GroupCalcs } from '../../../tabulator/groups/GroupCalcs.js';
-import { GroupChildIndent } from '../../../tabulator/groups/GroupChildIndent.js';
-import { GroupSort } from '../../../tabulator/groups/GroupSort.js';
-import * as CommonModules from '../../../tabulator/module/CommonModules.js';
-import { Find } from '../../../tabulator/module/Find.js';
-import { RowKeyboardNavigation } from '../../../tabulator/module/RowKeyboardNavigation.js';
-import { RowNavigation } from '../../../tabulator/module/RowNavigation.js';
 import dataGridStyles from '../../../tabulator/style/DataGrid.scss';
 import {
+  clipboardCopyOptions,
   commonColumnDefaults,
+  groupingOptions,
   headerSortElement,
+  registerTableModules,
   textCellTooltip,
 } from '../../call-tree/components/TableShared.js';
 
@@ -495,15 +491,7 @@ export class SOQLView extends LitElement {
     void isVisible(this).then((isVisible) => {
       const tableWrapper = this._soqlTableWrapper;
       if (tableWrapper && this.timelineRoot && isVisible) {
-        Tabulator.registerModule(Object.values(CommonModules));
-        Tabulator.registerModule([
-          RowKeyboardNavigation,
-          RowNavigation,
-          Find,
-          GroupCalcs,
-          GroupChildIndent,
-          GroupSort,
-        ]);
+        registerTableModules({ grouping: true });
         this._renderSOQLTable(tableWrapper, this.lines);
       }
     });
@@ -608,7 +596,7 @@ export class SOQLView extends LitElement {
       layout: 'fitColumns',
       placeholder: 'No SOQL queries found',
       columnCalcs: 'table',
-      clipboard: true,
+      ...clipboardCopyOptions,
       downloadEncoder: this.downlodEncoder('soql.csv'),
       downloadRowRange: 'all',
       downloadConfig: {
@@ -618,14 +606,8 @@ export class SOQLView extends LitElement {
         columnCalcs: false,
         dataTree: true,
       },
-      //@ts-expect-error types need update array is valid
-      keybindings: { copyToClipboard: ['ctrl + 67', 'meta + 67'] },
-      clipboardCopyRowRange: 'all',
-      groupCalcs: true,
+      ...groupingOptions,
       groupHeader: soqlGroupHeader,
-      groupSort: true,
-      groupClosedShowCalcs: true,
-      groupStartOpen: false,
       groupToggleElement: false,
       selectableRows: 'highlight',
       rowFormatter: stampGridEventIndex,

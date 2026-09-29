@@ -15,6 +15,7 @@ import { appName } from '../AppSettings.js';
 import type { Context } from '../Context.js';
 import { Item, Options, QuickPick } from '../display/QuickPick.js';
 import type { ApexLogListItem } from '../services/salesforceServices.js';
+import { errorMessage } from '../tryCatch.js';
 import { Command } from './Command.js';
 import { LogView } from './LogView.js';
 
@@ -99,7 +100,7 @@ export class RetrieveLogFile {
           try {
             await salesforceServices.writeFile(logUri, logData);
           } catch (error: unknown) {
-            const message = error instanceof Error ? error.message : String(error);
+            const message = errorMessage(error);
             context.display.output(`Unable to cache retrieved log: ${message}`, true);
             return logData;
           }

@@ -6,6 +6,7 @@ import { Utils } from 'vscode-uri';
 
 import type { Context } from '../Context.js';
 import { getMethodLine, parseApex } from '../salesforce/ApexParser/ApexSymbolLocator.js';
+import { errorMessage } from '../tryCatch.js';
 
 export class OpenFileInPackage {
   static async openFileForSymbol(context: Context, symbolName: string): Promise<void> {
@@ -46,7 +47,7 @@ export class OpenFileInPackage {
 
       context.display.showFile(uri, options);
     } catch (err) {
-      const message = err instanceof Error ? err.message : String(err);
+      const message = errorMessage(err);
       context.display.showErrorMessage(`Unable to open '${symbolName}': ${message}`);
     }
   }

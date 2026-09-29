@@ -13,6 +13,9 @@ import {
 import { NO_REPORTED_LIMITS_TEXT } from '../../../components/governorCopy.js';
 import { formatInteger, sharePercent } from '../../../core/utility/Util.js';
 import { NAMESPACE_WIDTH } from '../../../tabulator/ColumnWidths.js';
+import { GroupCalcs } from '../../../tabulator/groups/GroupCalcs.js';
+import { GroupChildIndent } from '../../../tabulator/groups/GroupChildIndent.js';
+import { GroupSort } from '../../../tabulator/groups/GroupSort.js';
 import {
   progressFormatter,
   type ProgressParams as ProgressBarParams,
@@ -31,10 +34,34 @@ export interface TableCallbacks {
   rowFormatter?: (row: RowComponent) => void;
 }
 
-export function registerTableModules(): void {
+/**
+ * Puts the modules a grid needs into Tabulator's registry. The registry is static
+ * and process-wide, so this adds to what every later table gets — it does not
+ * scope anything to one grid. `grouping` adds the three modules the grouping
+ * tables need; pair it with {@link groupingOptions}, which is what turns grouping
+ * on for a given table.
+ */
+export function registerTableModules(options: { grouping?: boolean } = {}): void {
   Tabulator.registerModule(Object.values(CommonModules));
   Tabulator.registerModule([RowKeyboardNavigation, RowNavigation, AnchoringPolicy, Find]);
+  if (options.grouping) {
+    Tabulator.registerModule([GroupCalcs, GroupChildIndent, GroupSort]);
+  }
 }
+
+/**
+ * Grouping as every grouping table wants it: calcs on, sorted, calcs still shown
+ * when a group is closed, and every group closed to start. The table half of
+ * {@link registerTableModules}'s `grouping`; a caller needs both. `groupToggleElement`
+ * is left to the table: a grid with a `groupClick` handler sets `false`, one without
+ * needs `'header'` or its groups stop opening.
+ */
+export const groupingOptions = {
+  groupCalcs: true,
+  groupSort: true,
+  groupClosedShowCalcs: true,
+  groupStartOpen: false,
+} satisfies Partial<Options>;
 
 /**
  * Table options that make `Cmd/Ctrl+C` copy the whole table, as every top-level
@@ -44,8 +71,9 @@ export function registerTableModules(): void {
 export const clipboardCopyOptions = {
   clipboard: true,
   clipboardCopyRowRange: 'all',
-  keybindings: { copyToClipboard: ['ctrl + 67', 'meta + 67'] },
-} as unknown as Partial<Options>;
+  // Cast the one value, not the object: a typo in the keys above still fails here.
+  keybindings: { copyToClipboard: ['ctrl + 67', 'meta + 67'] } as unknown as Options['keybindings'],
+} satisfies Partial<Options>;
 
 /**
  * Virtual row rendering plus the scroll anchoring that goes with it — one

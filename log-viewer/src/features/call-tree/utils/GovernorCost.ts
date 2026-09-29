@@ -3,6 +3,8 @@
  */
 import type { GovernorLimits, SelfTotal } from '@apexdevtools/apex-log-parser/types';
 
+import { sharePercent } from '../../../core/utility/Util.js';
+
 /**
  * The governor usage a node reports — all that's needed to *derive* cost. Both
  * the call-tree row models and the parser's `LogEvent` satisfy this, so the
@@ -93,7 +95,7 @@ export function governorCost(row: GovernorUsage, limits: GovernorLimits): number
   for (const metric of COST_METRICS) {
     const limit = metric.limit(limits);
     if (limit > 0) {
-      total += (metric.used(row) / limit) * 100;
+      total += sharePercent(metric.used(row), limit);
       count++;
     }
   }
@@ -111,7 +113,7 @@ export function governorCostMax(row: GovernorUsage, limits: GovernorLimits): num
   for (const metric of COST_METRICS) {
     const limit = metric.limit(limits);
     if (limit > 0) {
-      const percent = (metric.used(row) / limit) * 100;
+      const percent = sharePercent(metric.used(row), limit);
       if (max === null || percent > max) {
         max = percent;
       }
@@ -142,7 +144,7 @@ export function governorCostBreakdown(
     const limit = metric.limit(limits);
     const used = metric.used(row);
     if (limit > 0 && used > 0) {
-      metrics.push({ label: metric.label, used, limit, percent: (used / limit) * 100 });
+      metrics.push({ label: metric.label, used, limit, percent: sharePercent(used, limit) });
     }
   }
   return metrics.sort((a, b) => b.percent - a.percent);
