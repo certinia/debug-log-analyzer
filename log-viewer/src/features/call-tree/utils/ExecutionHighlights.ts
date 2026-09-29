@@ -55,7 +55,7 @@ export interface ExecutionHighlights {
    *  out. A branch is a frame the path did not follow, so it reads the same. */
   hotPathBranches: HotPathFrame[];
   hotSpots: HotSpotRow[];
-  /** Sections the platform dropped; every timing spanning one under-reports. */
+  /** Sections the platform dropped; a timing spanning one may under-report. */
   truncation: { regionCount: number; firstEventIndex: number } | null;
 }
 

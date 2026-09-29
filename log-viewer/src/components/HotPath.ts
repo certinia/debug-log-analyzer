@@ -242,8 +242,8 @@ export class HotPath extends LitElement {
     }
     const text =
       truncation.regionCount === 1
-        ? 'Log truncated — the timings below under-report'
-        : `Log truncated in ${truncation.regionCount} places — the timings below under-report`;
+        ? 'Log truncated, so the timings below may under-report'
+        : `Log truncated in ${truncation.regionCount} places, so the timings below may under-report`;
     return html`<button
       class="bleed-row caveat-row"
       type="button"
