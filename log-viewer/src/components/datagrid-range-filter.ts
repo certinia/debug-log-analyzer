@@ -6,6 +6,7 @@ import '#vscode-elements/vscode-icon.js';
 import { LitElement, css, html } from 'lit';
 import { customElement, property, state } from 'lit/decorators.js';
 
+import { anchoredPopoverStyles } from '../styles/anchoredPopover.styles.js';
 import { globalStyles } from '../styles/global.styles.js';
 
 let nextId = 0;
@@ -37,6 +38,7 @@ export class DatagridRangeFilter extends LitElement {
 
   static styles = [
     globalStyles,
+    anchoredPopoverStyles,
     css`
       :host {
         display: inline-flex;
@@ -84,18 +86,7 @@ export class DatagridRangeFilter extends LitElement {
       }
 
       .range-popover {
-        position: fixed;
         position-area: bottom span-left;
-        /* Flip above / to the other side when the default placement would run
-           off-screen so the inputs stay visible. */
-        position-try-fallbacks:
-          flip-block,
-          flip-inline,
-          flip-block flip-inline;
-        /* Auto-hide when the trigger scrolls out of view instead of stranding
-           at stale fixed coords in the top layer. */
-        position-visibility: anchors-visible;
-        inset: auto;
         margin: 6px 0 0 0;
         padding: 8px;
       }
@@ -186,7 +177,7 @@ export class DatagridRangeFilter extends LitElement {
       <div
         id=${this._popoverId}
         popover
-        class="filter-popover range-popover"
+        class="filter-popover range-popover popover-anchored popover-anchored--hides-with-anchor"
         style="position-anchor:${this._anchorName}"
         role="dialog"
         aria-label=${this.label}
