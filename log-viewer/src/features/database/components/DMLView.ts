@@ -15,20 +15,12 @@ import { DomListenerController } from '../../../core/events/DomListenerControlle
 import type { FindEventDetail, FindEventMap } from '../../find/findEvents.js';
 import { goToRow } from '../../call-tree/navigation.js';
 import { isVisible } from '../../../core/utility/Util.js';
-import { getSettings, updateSetting } from '../../settings/Settings.js';
 import { LocatedRowMarker } from '../../../components/locatedRow.js';
 import { reportGridLocate, stampGridEventIndex } from './gridLocate.js';
 import { reportGridSelection } from './gridSelection.js';
 import { selectRowByEventIndex } from './revealRow.js';
-import {
-  applyColumnView,
-  buildColumnMenuItems,
-  DML_VIEWS,
-  getColumnView,
-  getTableFields,
-  resolveColumnView,
-  toggleField,
-} from '../../../tabulator/ColumnViews.js';
+import { ColumnSettingsController } from '../../../components/ColumnSettingsController.js';
+import { DML_VIEWS } from '../../../tabulator/ColumnViews.js';
 import {
   DB_ROW_COUNT_WIDTH,
   DB_TIME_WIDTH,
@@ -102,12 +94,13 @@ export class DMLView extends LitElement {
   totalMatches = 0;
   blockClearHighlights = true;
 
-  @state()
-  columnView = 'General';
-
-  /** Per-view column overrides (view id → visible fields); empty until edited. */
-  @state()
-  private columnOverrides: Record<string, string[]> = {};
+  private readonly _columns = new ColumnSettingsController(this, {
+    section: 'database.dml',
+    read: (settings) => settings.database?.dml,
+    views: DML_VIEWS,
+    alwaysVisible: ALWAYS_VISIBLE,
+    tables: () => (this.dmlTable ? [this.dmlTable] : []),
+  });
   private contextMenu: ContextMenu | null = null;
   /** eventIndex of the row whose context menu is open. */
   private contextMenuEventIndex: number | null = null;
@@ -130,13 +123,6 @@ export class DMLView extends LitElement {
 
   firstUpdated(): void {
     this.contextMenu = this.renderRoot.querySelector('context-menu');
-    void this._loadColumnSettings();
-  }
-
-  private async _loadColumnSettings(): Promise<void> {
-    const settings = await getSettings();
-    this.columnOverrides = settings.database?.dml?.columnOverrides ?? {};
-    this._setColumnView(resolveColumnView(DML_VIEWS, settings.database?.dml?.columnView));
   }
 
   updated(changedProperties: PropertyValues): void {
@@ -211,12 +197,12 @@ export class DMLView extends LitElement {
           label="Column view"
           @change="${this._handleColumnViewChange}"
           @vs-reset-option="${this._onResetOption}"
-          .value="${this.columnView}"
-          .resettableValues="${Object.keys(this.columnOverrides)}"
+          .value="${this._columns.view}"
+          .resettableValues="${this._columns.editedViews}"
         >
           ${DML_VIEWS.map(
             (view) =>
-              html`<vscode-option value="${view.id}" ?selected="${this.columnView === view.id}"
+              html`<vscode-option value="${view.id}" ?selected="${this._columns.view === view.id}"
                 >${view.id}</vscode-option
               >`,
           )}
@@ -268,28 +254,12 @@ export class DMLView extends LitElement {
   }
 
   private _handleColumnViewChange(event: Event) {
-    const id = (event.target as HTMLInputElement).value || 'General';
-    this._setColumnView(id);
-    updateSetting('database.dml.columnView', id);
-  }
-
-  /** Effective fields for a view id: the user override, else the built-in preset. */
-  private _columnViewFields(id: string): string[] | null {
-    return this.columnOverrides[id] ?? getColumnView(DML_VIEWS, id)?.fields ?? null;
-  }
-
-  private _setColumnView(id: string) {
-    this.columnView = id;
-    // Only apply once the table is laid out; otherwise tableBuilt → _initTableColumns
-    // applies the current view (redraw on an unrendered table throws).
-    if (this.dmlTable?.element?.clientHeight) {
-      applyColumnView(this.dmlTable, this._columnViewFields(id), ALWAYS_VISIBLE);
-    }
+    this._columns.choose((event.target as HTMLInputElement).value || 'General');
   }
 
   /** Applies the active view and wires the header menu once the table is built. */
   private _initTableColumns(table: Tabulator) {
-    applyColumnView(table, this._columnViewFields(this.columnView), ALWAYS_VISIBLE);
+    this._columns.applyTo(table);
     const header = table.element.querySelector<HTMLElement>('.tabulator-header');
     header?.addEventListener('contextmenu', (event) => {
       event.preventDefault();
@@ -301,17 +271,7 @@ export class DMLView extends LitElement {
     if (!this.contextMenu || !this.dmlTable) {
       return;
     }
-    this.contextMenu.show(
-      buildColumnMenuItems(
-        this.dmlTable,
-        this.columnView,
-        DML_VIEWS,
-        ALWAYS_VISIBLE,
-        Object.keys(this.columnOverrides),
-      ),
-      x,
-      y,
-    );
+    this.contextMenu.show(this._columns.menuItems(this.dmlTable), x, y);
   }
 
   private _openColumnMenu(event: Event) {
@@ -324,13 +284,7 @@ export class DMLView extends LitElement {
     if (!this.contextMenu?.isVisible() || !this.dmlTable) {
       return;
     }
-    this.contextMenu.items = buildColumnMenuItems(
-      this.dmlTable,
-      this.columnView,
-      DML_VIEWS,
-      ALWAYS_VISIBLE,
-      Object.keys(this.columnOverrides),
-    );
+    this.contextMenu.items = this._columns.menuItems(this.dmlTable);
   }
 
   private _showRowContextMenu(event: MouseEvent, row: RowComponent) {
@@ -351,47 +305,23 @@ export class DMLView extends LitElement {
       return;
     }
     if (itemId.startsWith('view:')) {
-      const id = itemId.slice('view:'.length);
-      this._setColumnView(id);
-      updateSetting('database.dml.columnView', id);
+      this._columns.choose(itemId.slice('view:'.length));
       this._refreshColumnMenu();
       return;
     }
     if (itemId.startsWith('col:')) {
-      const field = itemId.slice('col:'.length);
-      const fields = toggleField(
-        this._columnViewFields(this.columnView),
-        field,
-        getTableFields(table),
-      );
-      this.columnOverrides = { ...this.columnOverrides, [this.columnView]: fields };
-      applyColumnView(table, fields, ALWAYS_VISIBLE);
-      updateSetting('database.dml.columnOverrides', this.columnOverrides);
+      this._columns.toggle(table, itemId.slice('col:'.length));
       this._refreshColumnMenu();
       return;
     }
     if (itemId.startsWith('reset:')) {
-      this._resetColumns(itemId.slice('reset:'.length));
+      this._columns.reset(itemId.slice('reset:'.length));
       this._refreshColumnMenu();
     }
   }
 
   private _onResetOption(event: CustomEvent<{ value: string }>) {
-    this._resetColumns(event.detail.value);
-  }
-
-  /** Clears a view's override, restoring its built-in columns (defaults to the active view). */
-  private _resetColumns(id: string = this.columnView) {
-    const table = this.dmlTable;
-    if (!table || !this.columnOverrides[id]) {
-      return;
-    }
-    const { [id]: _removed, ...rest } = this.columnOverrides;
-    this.columnOverrides = rest;
-    if (id === this.columnView) {
-      applyColumnView(table, this._columnViewFields(id), ALWAYS_VISIBLE);
-    }
-    updateSetting('database.dml.columnOverrides', this.columnOverrides);
+    this._columns.reset(event.detail.value);
   }
 
   private _handleCallerNamespaceFacet(event: CustomEvent<{ selected: string[] }>) {
