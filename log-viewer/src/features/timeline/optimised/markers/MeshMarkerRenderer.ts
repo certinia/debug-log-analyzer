@@ -15,8 +15,7 @@
  * - True alpha transparency for theme-adaptive colors
  */
 
-import type { Container, Geometry, Shader } from 'pixi.js';
-import { Mesh } from 'pixi.js';
+import type { Container, Geometry, Mesh, Shader } from 'pixi.js';
 import type { TimelineMarker } from '../../types/flamechart.types.js';
 import {
   MARKER_ALPHA_BY_TYPE,
@@ -25,8 +24,8 @@ import {
   MARKER_GAP_PX,
   MARKER_MIN_WIDTH_PX,
 } from '../../types/flamechart.types.js';
-import { RectangleGeometry, type ViewportTransform } from '../RectangleGeometry.js';
-import { createRectangleShader } from '../RectangleShader.js';
+import type { RectangleGeometry, ViewportTransform } from '../RectangleGeometry.js';
+import { createRectangleMesh } from '../rendering/rectangleMesh.js';
 import type { TimelineViewport } from '../TimelineViewport.js';
 import { hitTestMarkers, type MarkerIndicator } from './MarkerHitTest.js';
 import { layoutMarkerRects, sortMarkersByTimeAndSeverity } from './MarkerProcessor.js';
@@ -45,7 +44,6 @@ export class MeshMarkerRenderer {
   private viewport: TimelineViewport;
   private markers: readonly TimelineMarker[];
   private geometry: RectangleGeometry;
-  private shader: Shader;
   private mesh: Mesh<Geometry, Shader>;
   private visibleIndicators: MarkerIndicator[] = [];
 
@@ -63,18 +61,9 @@ export class MeshMarkerRenderer {
     // Sort markers by startTime for efficient end time resolution
     this.markers = sortMarkersByTimeAndSeverity(markers);
 
-    // Create geometry and shader
-    this.geometry = new RectangleGeometry();
-    this.shader = createRectangleShader();
-
-    // Create mesh
-    this.mesh = new Mesh<Geometry, Shader>({
-      geometry: this.geometry.getGeometry(),
-      shader: this.shader,
-    });
-    this.mesh.label = 'MeshMarkerRenderer';
-
-    container.addChild(this.mesh);
+    const { geometry, mesh } = createRectangleMesh(container, 'MeshMarkerRenderer');
+    this.geometry = geometry;
+    this.mesh = mesh;
   }
 
   /**

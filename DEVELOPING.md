@@ -72,14 +72,14 @@ pnpm build:dev
 pnpm build
 ```
 
-### **(Experimental)**
+### **rollup fallback**
 
-The following commands are also available and use [rolldown](https://rolldown.rs/) as a replacement for rollup.
-The are faster but since rolldown is beta something do not work correctly e.g css bundling in js.
+The commands above use [rolldown](https://rolldown.rs/). rollup stays in the repo as a fallback
+until rolldown is proven in a release. It builds the same outputs, more slowly.
 
-1. pnpm watch:fast
-1. pnpm build:dev:fast
-1. pnpm build:fast
+1. pnpm watch:rollup
+1. pnpm build:dev:rollup
+1. pnpm build:rollup
 
 ## 🚀 Running the Extension Locally
 

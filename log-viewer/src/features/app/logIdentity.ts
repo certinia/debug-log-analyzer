@@ -1,7 +1,11 @@
 /*
  * Copyright (c) 2026 Certinia Inc. All rights reserved.
  */
-import { CodeUnitStartedLine, ExecutionStartedLine, type ApexLog } from 'apex-log-parser';
+import {
+  CodeUnitStartedLine,
+  ExecutionStartedLine,
+  type ApexLog,
+} from '@apexdevtools/apex-log-parser';
 
 import { formatWallClockTime } from '../../core/utility/Util.js';
 

@@ -22,10 +22,6 @@
     "composite": true,
     "declarationMap": true,
 
-    "paths": {
-      "apex-log-parser": ["../apex-log-parser/src/index.ts"]
-    },
-
     "strictFunctionTypes": true,
 
     "allowSyntheticDefaultImports": true,
@@ -41,6 +37,5 @@
     "sourceMap": false
   },
   "include": ["./src/**/*.ts", "declarations.d.ts"],
-  "exclude": ["**/node_modules", "**/.*/"],
-  "references": [{ "path": "../apex-log-parser" }]
+  "exclude": ["**/node_modules", "**/.*/"]
 }
