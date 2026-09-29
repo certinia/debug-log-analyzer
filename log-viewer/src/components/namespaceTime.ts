@@ -1,10 +1,10 @@
 /*
  * Copyright (c) 2026 Certinia Inc. All rights reserved.
  */
-import type { LogEvent } from 'apex-log-parser';
+import type { LogEvent } from '@apexdevtools/apex-log-parser';
 
 import { DEFAULT_NAMESPACE } from '../core/utility/CallerNamespace.js';
-import { outermostEvents } from '../core/utility/EventTree.js';
+import { outermostEvents, walkEvents } from '../core/utility/EventTree.js';
 import { CHECK_EVERY, frameBudget, type FrameBudgetOptions } from '../core/utility/FrameBudget.js';
 
 export interface NamespaceTime {
@@ -25,18 +25,13 @@ async function namespaceSelfTimes(
 ): Promise<NamespaceTime[] | null> {
   const tick = frameBudget(options);
   const totals = new Map<string, number>();
-  const stack = outermostEvents(roots);
-  for (let walked = 0; stack.length; walked++) {
-    if (walked % CHECK_EVERY === 0 && !(await tick())) {
+  let walked = 0;
+  for (const event of walkEvents(outermostEvents(roots))) {
+    if (walked++ % CHECK_EVERY === 0 && !(await tick())) {
       return null;
     }
-    const event = stack.pop()!; // non-empty: the loop condition just checked
-
     const namespace = event.namespace || DEFAULT_NAMESPACE;
     totals.set(namespace, (totals.get(namespace) ?? 0) + event.duration.self);
-    for (const child of event.children) {
-      stack.push(child);
-    }
   }
   return [...totals]
     .filter(([, selfTime]) => selfTime > 0)

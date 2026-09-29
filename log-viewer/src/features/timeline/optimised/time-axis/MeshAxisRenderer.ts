@@ -23,12 +23,12 @@
  * - Nanoseconds: Major ticks at 1ns, 2ns, 5ns, 10ns intervals
  */
 
-import type { Geometry, Shader } from 'pixi.js';
-import { Container, Mesh, Text } from 'pixi.js';
+import type { Geometry, Mesh, Shader } from 'pixi.js';
+import { Container, Text } from 'pixi.js';
 
 import type { ViewportState } from '../../types/flamechart.types.js';
-import { RectangleGeometry, type ViewportTransform } from '../RectangleGeometry.js';
-import { createRectangleShader } from '../RectangleShader.js';
+import type { RectangleGeometry, ViewportTransform } from '../RectangleGeometry.js';
+import { createRectangleMesh } from '../rendering/rectangleMesh.js';
 import { ClockTimeAxisRenderer } from './ClockTimeAxisRenderer.js';
 import { ElapsedTimeAxisRenderer } from './ElapsedTimeAxisRenderer.js';
 import { NS_PER_MS, selectInterval } from './timeAxisConstants.js';
@@ -98,7 +98,6 @@ export interface TimeAxisLabelStrategy {
 
 export class MeshAxisRenderer {
   private geometry: RectangleGeometry;
-  private shader: Shader;
   private mesh: Mesh<Geometry, Shader>;
   private labelsContainer: Container;
   private screenSpaceContainer: Container | null = null;
@@ -142,17 +141,9 @@ export class MeshAxisRenderer {
     this.gridLineColor = this.config.lineColor;
     this.backgroundColor = this.config.backgroundColor ?? 0x252526;
 
-    // Create geometry and shader for grid lines
-    this.geometry = new RectangleGeometry();
-    this.shader = createRectangleShader();
-
-    // Create mesh
-    this.mesh = new Mesh<Geometry, Shader>({
-      geometry: this.geometry.getGeometry(),
-      shader: this.shader,
-    });
-    this.mesh.label = 'MeshAxisRenderer';
-    container.addChild(this.mesh);
+    const { geometry, mesh } = createRectangleMesh(container, 'MeshAxisRenderer');
+    this.geometry = geometry;
+    this.mesh = mesh;
 
     // Labels container - will be added to screen space container when provided
     this.labelsContainer = new Container();

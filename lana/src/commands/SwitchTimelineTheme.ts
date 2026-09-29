@@ -6,6 +6,7 @@ import { window } from 'vscode';
 
 import { appName } from '../AppSettings.js';
 import type { Context } from '../Context.js';
+import { errorMessage } from '../tryCatch.js';
 import { getConfig, updateConfig } from '../workspace/AppConfig.js';
 import { Command } from './Command.js';
 import { LogView } from './LogView.js';
@@ -69,7 +70,7 @@ export class SwitchTimelineTheme {
         try {
           await updateConfig('timeline.activeTheme', selectedTheme);
         } catch (error: unknown) {
-          const message = error instanceof Error ? error.message : String(error);
+          const message = errorMessage(error);
           context.display.showErrorMessage(`Error changing timeline theme: ${message}`);
         }
         pick.hide();

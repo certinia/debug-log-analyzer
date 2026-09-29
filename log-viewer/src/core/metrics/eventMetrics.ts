@@ -1,7 +1,8 @@
 /*
  * Copyright (c) 2026 Certinia Inc. All rights reserved.
  */
-import type { GovernorLimits, LogEvent, SelfTotal } from 'apex-log-parser';
+import type { LogEvent } from '@apexdevtools/apex-log-parser';
+import type { GovernorLimits, SelfTotal } from '@apexdevtools/apex-log-parser/types';
 
 import { formatInteger, sharePercent } from '../utility/Util.js';
 
@@ -37,11 +38,11 @@ export interface EventMetric {
  * order — so a row never overtakes another as a selection or a hover moves.
  */
 export const EVENT_METRICS: readonly EventMetric[] = [
-  { label: 'SOQL', pick: (e) => e.soqlCount, limit: (l) => l.soqlQueries.limit },
-  { label: 'SOQL Rows', pick: (e) => e.soqlRowCount, limit: (l) => l.queryRows.limit },
-  { label: 'DML', pick: (e) => e.dmlCount, limit: (l) => l.dmlStatements.limit },
-  { label: 'DML Rows', pick: (e) => e.dmlRowCount, limit: (l) => l.dmlRows.limit },
-  { label: 'SOSL', pick: (e) => e.soslCount, limit: (l) => l.soslQueries.limit },
+  { label: 'SOQL', pick: (e) => e.soqlCount, limit: (l) => l.final.soqlQueries.limit },
+  { label: 'SOQL Rows', pick: (e) => e.soqlRowCount, limit: (l) => l.final.queryRows.limit },
+  { label: 'DML', pick: (e) => e.dmlCount, limit: (l) => l.final.dmlStatements.limit },
+  { label: 'DML Rows', pick: (e) => e.dmlRowCount, limit: (l) => l.final.dmlRows.limit },
+  { label: 'SOSL', pick: (e) => e.soslCount, limit: (l) => l.final.soslQueries.limit },
   {
     label: 'SOSL Rows',
     pick: (e) => e.soslRowCount,
@@ -61,7 +62,7 @@ export const EVENT_METRICS: readonly EventMetric[] = [
 export const HEAP_PEAK = {
   label: 'Heap peak',
   pick: (event: LogEvent): number => event.heapPeak,
-  limit: (limits: GovernorLimits): number => limits.heapSize.limit,
+  limit: (limits: GovernorLimits): number => limits.peak.heapSize.limit,
   bytes: true,
 } as const;
 

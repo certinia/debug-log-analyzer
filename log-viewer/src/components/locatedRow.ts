@@ -2,7 +2,7 @@
  * Copyright (c) 2026 Certinia Inc. All rights reserved.
  */
 
-import type { ApexLog, LogEvent } from 'apex-log-parser';
+import type { ApexLog, LogEvent } from '@apexdevtools/apex-log-parser';
 import type { RowComponent } from 'tabulator-tables';
 
 import type { DetailSelection, SelectionView } from '../core/events/EventBus.js';

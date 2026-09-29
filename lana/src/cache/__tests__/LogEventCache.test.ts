@@ -13,11 +13,11 @@ import {
 import { LogEventCache } from '../LogEventCache.js';
 
 // Mock apex-log-parser
-jest.mock('apex-log-parser', () => ({
+jest.mock('@apexdevtools/apex-log-parser', () => ({
   parse: jest.fn(),
 }));
 
-import { parse } from 'apex-log-parser';
+import { parse } from '@apexdevtools/apex-log-parser';
 
 // The file-I/O layer is deliberately not mocked out. Stubbing the whole module is
 // what let getApexLog read through a service that throws until another extension

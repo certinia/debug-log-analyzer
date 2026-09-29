@@ -4,7 +4,7 @@
 import { LitElement, css, html } from 'lit';
 import { customElement, property } from 'lit/decorators.js';
 
-import type { ApexLog } from 'apex-log-parser';
+import type { ApexLog } from '@apexdevtools/apex-log-parser';
 import type { LogIssue } from '../notifications/types.js';
 import type { LogIdentityData } from './logIdentity.js';
 

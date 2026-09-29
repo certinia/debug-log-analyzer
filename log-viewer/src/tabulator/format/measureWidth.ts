@@ -1,7 +1,7 @@
 /*
  * Copyright (c) 2026 Certinia Inc. All rights reserved.
  */
-import { formatMs } from '../../core/utility/Duration.js';
+import { formatNsAsMs } from '../../core/utility/Duration.js';
 
 // Deterministic estimate rather than canvas measurement: the webview cell font
 // isn't reliably readable at build time, and under-measuring makes the column
@@ -17,6 +17,6 @@ const MIN_WIDTH = 110;
  * log's largest value and never under-sizes enough to wrap.
  */
 export function progressColumnWidth(rootTotalNs: number): number {
-  const chars = formatMs(rootTotalNs).length + ' (100.00%)'.length;
+  const chars = formatNsAsMs(rootTotalNs).length + ' (100.00%)'.length;
   return Math.max(MIN_WIDTH, Math.round(chars * CH_PX + PADDING));
 }

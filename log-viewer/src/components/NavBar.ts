@@ -7,6 +7,7 @@ import { LitElement, css, html, nothing, type PropertyValues, type TemplateResul
 import { customElement, property, state } from 'lit/decorators.js';
 
 import { eventBus } from '../core/events/EventBus.js';
+import { ResizeController } from '../core/events/ResizeController.js';
 import { logStatusContext, type LogStatus } from '../core/log/logStatus.js';
 import { formatDuration } from '../core/utility/Util.js';
 import type { LogIdentityData } from '../features/app/logIdentity.js';
@@ -128,7 +129,15 @@ export class NavBar extends LitElement {
   private _hostWidth = 0;
   private _titleFloor = TITLE_FLOOR_FALLBACK;
   private _titleEl: LogTitle | null = null;
-  private _resizeObserver: ResizeObserver | null = null;
+
+  private readonly _resize = new ResizeController(this, (entries) => {
+    const width = entries[0]?.contentRect.width ?? 0;
+    // Zero width means we're hidden, not narrow — keep the current layout.
+    if (width > 0) {
+      this._hostWidth = width;
+      this._fit();
+    }
+  });
 
   static styles = [
     globalStyles,
@@ -223,25 +232,6 @@ export class NavBar extends LitElement {
       }
     `,
   ];
-
-  override connectedCallback(): void {
-    super.connectedCallback();
-    this._resizeObserver = new ResizeObserver((entries) => {
-      const width = entries[0]?.contentRect.width ?? 0;
-      // Zero width means we're hidden, not narrow — keep the current layout.
-      if (width > 0) {
-        this._hostWidth = width;
-        this._fit();
-      }
-    });
-    this._resizeObserver.observe(this);
-  }
-
-  override disconnectedCallback(): void {
-    this._resizeObserver?.disconnect();
-    this._resizeObserver = null;
-    super.disconnectedCallback();
-  }
 
   /**
    * A new log can widen a chunk — a badge gaining a digit, or log meta replacing its

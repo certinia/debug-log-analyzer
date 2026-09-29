@@ -24,19 +24,17 @@
  * - Handle search logic (done by MeshSearchStyleRenderer)
  */
 
-import type { Container, Geometry, Shader } from 'pixi.js';
-import { Mesh } from 'pixi.js';
+import type { Container, Geometry, Mesh, Shader } from 'pixi.js';
 import type { PixelBucket, RenderBatch, ViewportState } from '../types/flamechart.types.js';
 import { BUCKET_CONSTANTS, TIMELINE_CONSTANTS } from '../types/flamechart.types.js';
 import type { PrecomputedRect } from './RectangleCache.js';
-import { RectangleGeometry, type ViewportTransform } from './RectangleGeometry.js';
-import { createRectangleShader } from './RectangleShader.js';
+import type { RectangleGeometry, ViewportTransform } from './RectangleGeometry.js';
+import { createRectangleMesh } from './rendering/rectangleMesh.js';
 
 export class MeshRectangleRenderer {
   private batches: Map<string, RenderBatch>;
   private parentContainer: Container;
   private geometry: RectangleGeometry;
-  private shader: Shader;
   private mesh: Mesh<Geometry, Shader>;
   private lastViewport: ViewportState | null = null;
 
@@ -44,19 +42,9 @@ export class MeshRectangleRenderer {
     this.batches = batches;
     this.parentContainer = container;
 
-    // Create geometry and shader
-    this.geometry = new RectangleGeometry();
-    this.shader = createRectangleShader();
-
-    // Create mesh for rendering rectangles
-    this.mesh = new Mesh<Geometry, Shader>({
-      geometry: this.geometry.getGeometry(),
-      shader: this.shader,
-    });
-    this.mesh.label = 'MeshRectangleRenderer';
-
-    // Add to parent container
-    container.addChild(this.mesh);
+    const { geometry, mesh } = createRectangleMesh(container, 'MeshRectangleRenderer');
+    this.geometry = geometry;
+    this.mesh = mesh;
   }
 
   /**

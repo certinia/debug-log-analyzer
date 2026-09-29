@@ -1,7 +1,8 @@
 /*
  * Copyright (c) 2026 Certinia Inc. All rights reserved.
  */
-import { LOG_LEVEL, type ApexLog, type LogEvent } from 'apex-log-parser';
+import type { ApexLog, LogEvent } from '@apexdevtools/apex-log-parser';
+import { LOG_LEVEL } from '@apexdevtools/apex-log-parser/types';
 
 import {
   CHECK_EVERY,
@@ -142,7 +143,7 @@ interface Declared {
 
 /** The Apex Code log level this log was captured at, or null if it says none. */
 export function apexCodeLevel(log: ApexLog): string | null {
-  return log.debugLevels.find((level) => level.logCategory === 'APEX_CODE')?.logLevel ?? null;
+  return log.debugLevels.apexCode ?? null;
 }
 
 /** True where the log was captured at the only level that records variables. */

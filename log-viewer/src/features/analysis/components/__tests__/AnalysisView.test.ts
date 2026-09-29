@@ -4,7 +4,7 @@
  * @jest-environment jsdom
  */
 import { afterEach, beforeEach, describe, expect, it } from '@jest/globals';
-import type { ApexLog, LogEvent } from 'apex-log-parser';
+import type { ApexLog, LogEvent } from '@apexdevtools/apex-log-parser';
 import type { RowComponent, Tabulator } from 'tabulator-tables';
 
 // The grid brings tabulator and its module registrations, which don't load under

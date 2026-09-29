@@ -2,7 +2,7 @@
  * Copyright (c) 2026 Certinia Inc. All rights reserved.
  */
 import { describe, expect, it } from '@jest/globals';
-import type { ApexLog } from 'apex-log-parser';
+import type { ApexLog } from '@apexdevtools/apex-log-parser';
 
 import { emptyLimits } from '../../../../components/__tests__/limitsTestUtils.js';
 import { apexLimitTimeSeries } from '../apex-limit-series.js';
