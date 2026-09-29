@@ -22,7 +22,7 @@
 
 import * as PIXI from 'pixi.js';
 
-import { destroyTimelineApp } from '../rendering/pixiApp.js';
+import { createTimelineApp, destroyTimelineApp } from '../rendering/pixiApp.js';
 import type { TimelineMarker, ViewportState } from '../../types/flamechart.types.js';
 import { TIMELINE_CONSTANTS } from '../../types/flamechart.types.js';
 import type { RectangleCache } from '../RectangleCache.js';
@@ -181,20 +181,7 @@ export class MinimapOrchestrator {
     const minimapHeight = calculateMinimapHeight(height);
 
     // Create PIXI Application for minimap
-    this.app = new PIXI.Application();
-    await this.app.init({
-      width,
-      height: minimapHeight,
-      antialias: false,
-      backgroundAlpha: 0,
-      resolution: window.devicePixelRatio || 1,
-      roundPixels: true,
-      autoDensity: true,
-      autoStart: false,
-    });
-    this.app.ticker.stop();
-    this.app.stage.eventMode = 'none';
-    minimapDiv.appendChild(this.app.canvas);
+    this.app = await createTimelineApp(minimapDiv, { width, height: minimapHeight });
 
     // Initialize minimap manager (state and coordinate transforms)
     this.minimapViewport = new MinimapViewport(index.totalDuration, index.maxDepth, width, height);
@@ -250,12 +237,13 @@ export class MinimapOrchestrator {
    *
    * @param newWidth - New canvas width
    * @param newHeight - New full container height
+   * @param resolution - devicePixelRatio to render at
    */
-  public resize(newWidth: number, newHeight: number): void {
+  public resize(newWidth: number, newHeight: number, resolution: number): void {
     const minimapHeight = calculateMinimapHeight(newHeight);
 
     if (this.app) {
-      this.app.renderer.resize(newWidth, minimapHeight);
+      this.app.renderer.resize(newWidth, minimapHeight, resolution);
     }
 
     if (this.minimapViewport) {

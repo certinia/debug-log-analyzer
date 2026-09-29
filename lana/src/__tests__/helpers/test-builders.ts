@@ -6,7 +6,8 @@
  * Factory functions for building test data in lana tests.
  */
 
-import type { ApexLog, LogEvent } from 'apex-log-parser';
+import type { ApexLog, LogEvent } from '@apexdevtools/apex-log-parser';
+import type { LimitValue, Limits } from '@apexdevtools/apex-log-parser/types';
 
 import { createMockExtensionContext, type MockExtensionContext } from '../mocks/vscode.js';
 
@@ -88,6 +89,26 @@ type PartialApexLog = Partial<{
   duration: { self: number; total: number };
 }>;
 
+/** Every governor metric at zero. `lana` reads none of them; the shape is what `ApexLog` states. */
+function emptyLimits(): Limits {
+  const zero = (): LimitValue => ({ used: 0, limit: 0, percentUsed: null });
+  return {
+    soqlQueries: zero(),
+    soslQueries: zero(),
+    queryRows: zero(),
+    dmlStatements: zero(),
+    publishImmediateDml: zero(),
+    dmlRows: zero(),
+    cpuTime: zero(),
+    heapSize: zero(),
+    callouts: zero(),
+    emailInvocations: zero(),
+    futureCalls: zero(),
+    queueableJobsAddedToQueue: zero(),
+    mobileApexPushCalls: zero(),
+  };
+}
+
 /**
  * Creates a mock ApexLog with sensible defaults.
  * Useful for testing components that work with parsed log data.
@@ -126,24 +147,13 @@ export function createMockApexLog(overrides: PartialApexLog = {}): ApexLog {
     recalculateDurations: jest.fn(),
     setTimes: jest.fn(),
     size: 0,
-    debugLevels: [],
+    debugLevels: {},
     namespaces: [],
     logIssues: [],
     parsingErrors: [],
     governorLimits: {
-      soqlQueries: { used: 0, limit: 0 },
-      soslQueries: { used: 0, limit: 0 },
-      queryRows: { used: 0, limit: 0 },
-      dmlStatements: { used: 0, limit: 0 },
-      publishImmediateDml: { used: 0, limit: 0 },
-      dmlRows: { used: 0, limit: 0 },
-      cpuTime: { used: 0, limit: 0 },
-      heapSize: { used: 0, limit: 0 },
-      callouts: { used: 0, limit: 0 },
-      emailInvocations: { used: 0, limit: 0 },
-      futureCalls: { used: 0, limit: 0 },
-      queueableJobsAddedToQueue: { used: 0, limit: 0 },
-      mobileApexPushCalls: { used: 0, limit: 0 },
+      final: emptyLimits(),
+      peak: emptyLimits(),
       byNamespace: new Map(),
       snapshots: [],
     },

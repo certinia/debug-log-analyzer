@@ -2,7 +2,7 @@
  * Copyright (c) 2026 Certinia Inc. All rights reserved.
  */
 import { describe, expect, it, jest } from '@jest/globals';
-import { type ApexLog, parse } from 'apex-log-parser';
+import { type ApexLog, parse } from '@apexdevtools/apex-log-parser';
 
 import {
   aggregateVariablesFor,

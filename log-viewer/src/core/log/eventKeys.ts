@@ -1,7 +1,7 @@
 /*
  * Copyright (c) 2026 Certinia Inc. All rights reserved.
  */
-import type { LogEvent } from 'apex-log-parser';
+import type { LogEvent } from '@apexdevtools/apex-log-parser';
 
 /**
  * Generates a unique key for grouping events by signature.

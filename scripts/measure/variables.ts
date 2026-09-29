@@ -6,7 +6,7 @@
  * Times the Variables section: one log-wide walk, a frame snapshot, then the
  * busiest merged row's comparison.
  */
-import type { ApexLog, LogEvent } from 'apex-log-parser';
+import type { ApexLog, LogEvent } from '@apexdevtools/apex-log-parser';
 
 import { aggregateVariablesFor } from '../../log-viewer/src/core/log/aggregateVariables.js';
 import { getEventKey } from '../../log-viewer/src/core/log/eventKeys.js';

@@ -2,7 +2,7 @@
  * Copyright (c) 2026 Certinia Inc. All rights reserved.
  */
 
-import type { LogEvent } from 'apex-log-parser';
+import type { LogEvent } from '@apexdevtools/apex-log-parser';
 
 /** Regex to extract nanosecond timestamp from log line. Format: "HH:MM:SS.d (nanoseconds)|EVENT_TYPE" */
 export const TIMESTAMP_REGEX = /^\d{2}:\d{2}:\d{2}\.\d+\s*\((\d+)\)\|/;

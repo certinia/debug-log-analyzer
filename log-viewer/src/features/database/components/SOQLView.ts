@@ -13,10 +13,12 @@ import {
   type RowComponent,
 } from 'tabulator-tables';
 
-import type { ApexLog, SOQLExecuteBeginLine } from 'apex-log-parser';
+import type { ApexLog, SOQLExecuteBeginLine } from '@apexdevtools/apex-log-parser';
 import { vscodeMessenger } from '../../../core/messaging/VSCodeExtensionMessenger.js';
 import { isVisible } from '../../../core/utility/Util.js';
 import { getCallerNamespace } from '../../../core/utility/CallerNamespace.js';
+import { DomListenerController } from '../../../core/events/DomListenerController.js';
+import type { FindEventDetail, FindEventMap } from '../../find/findEvents.js';
 import { goToRow } from '../../call-tree/navigation.js';
 import { deriveSoqlObject } from '../services/sobjectClassification.js';
 import { soqlGroupHeader } from '../../soql/format/groupHeader.js';
@@ -48,17 +50,13 @@ import { tableHolder } from '../../../tabulator/module/tableHolder.js';
 import { inCountRange, inMsRange, type FilterRange } from '../../../tabulator/filters/MinMax.js';
 import { progressFormatter } from '../../../tabulator/format/Progress.js';
 import { progressFormatterMS } from '../../../tabulator/format/ProgressMS.js';
-import { GroupCalcs } from '../../../tabulator/groups/GroupCalcs.js';
-import { GroupChildIndent } from '../../../tabulator/groups/GroupChildIndent.js';
-import { GroupSort } from '../../../tabulator/groups/GroupSort.js';
-import * as CommonModules from '../../../tabulator/module/CommonModules.js';
-import { Find } from '../../../tabulator/module/Find.js';
-import { RowKeyboardNavigation } from '../../../tabulator/module/RowKeyboardNavigation.js';
-import { RowNavigation } from '../../../tabulator/module/RowNavigation.js';
 import dataGridStyles from '../../../tabulator/style/DataGrid.scss';
 import {
+  clipboardCopyOptions,
   commonColumnDefaults,
+  groupingOptions,
   headerSortElement,
+  registerTableModules,
   textCellTooltip,
 } from '../../call-tree/components/TableShared.js';
 
@@ -145,18 +143,10 @@ export class SOQLView extends LitElement {
     return this.renderRoot?.querySelector('#db-soql-table');
   }
 
-  constructor() {
-    super();
-
-    document.addEventListener('lv-find', this._findEvt);
-    document.addEventListener('lv-find-close', this._findEvt);
-  }
-
-  disconnectedCallback(): void {
-    super.disconnectedCallback();
-    document.removeEventListener('lv-find', this._findEvt);
-    document.removeEventListener('lv-find-close', this._findEvt);
-  }
+  private readonly _findBus = new DomListenerController<FindEventMap>(this, document, {
+    'lv-find': (e) => void this._find(e),
+    'lv-find-close': (e) => void this._find(e),
+  });
 
   firstUpdated(): void {
     this.contextMenu = this.renderRoot.querySelector('context-menu');
@@ -483,10 +473,6 @@ export class SOQLView extends LitElement {
     this.soqlTable?.download('csv', 'soql.csv', { bom: true, delimiter: ',' });
   }
 
-  _findEvt = ((event: FindEvt) => {
-    void this._find(event);
-  }) as EventListener;
-
   _soqlGroupBy(event: Event) {
     if (!this.soqlTable) {
       return;
@@ -505,15 +491,7 @@ export class SOQLView extends LitElement {
     void isVisible(this).then((isVisible) => {
       const tableWrapper = this._soqlTableWrapper;
       if (tableWrapper && this.timelineRoot && isVisible) {
-        Tabulator.registerModule(Object.values(CommonModules));
-        Tabulator.registerModule([
-          RowKeyboardNavigation,
-          RowNavigation,
-          Find,
-          GroupCalcs,
-          GroupChildIndent,
-          GroupSort,
-        ]);
+        registerTableModules({ grouping: true });
         this._renderSOQLTable(tableWrapper, this.lines);
       }
     });
@@ -537,7 +515,7 @@ export class SOQLView extends LitElement {
     this.oldIndex = highlightIndex;
   }
 
-  async _find(e: CustomEvent<{ text: string; count: number; options: { matchCase: boolean } }>) {
+  async _find(e: CustomEvent<FindEventDetail>) {
     const isTableVisible = !!this.soqlTable?.element?.clientHeight;
     if (!isTableVisible && !this.totalMatches) {
       return;
@@ -618,7 +596,7 @@ export class SOQLView extends LitElement {
       layout: 'fitColumns',
       placeholder: 'No SOQL queries found',
       columnCalcs: 'table',
-      clipboard: true,
+      ...clipboardCopyOptions,
       downloadEncoder: this.downlodEncoder('soql.csv'),
       downloadRowRange: 'all',
       downloadConfig: {
@@ -628,14 +606,8 @@ export class SOQLView extends LitElement {
         columnCalcs: false,
         dataTree: true,
       },
-      //@ts-expect-error types need update array is valid
-      keybindings: { copyToClipboard: ['ctrl + 67', 'meta + 67'] },
-      clipboardCopyRowRange: 'all',
-      groupCalcs: true,
+      ...groupingOptions,
       groupHeader: soqlGroupHeader,
-      groupSort: true,
-      groupClosedShowCalcs: true,
-      groupStartOpen: false,
       groupToggleElement: false,
       selectableRows: 'highlight',
       rowFormatter: stampGridEventIndex,
@@ -999,5 +971,3 @@ interface GridSOQLData {
   fields?: string | null;
   eventIndex?: number;
 }
-
-type FindEvt = CustomEvent<{ text: string; count: number; options: { matchCase: boolean } }>;

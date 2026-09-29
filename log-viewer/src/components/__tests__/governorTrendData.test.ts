@@ -124,9 +124,9 @@ describe('pointAt', () => {
   const point = (t: number, used: number): TrendPoint => ({ t, ratio: used, used });
   const points = [point(0, 0), point(1_000, 40), point(4_000, 100)];
 
-  it('interpolates linearly between the samples around t', () => {
-    expect(pointAt(points, 500)).toEqual({ t: 500, ratio: 20, used: 20 });
-    expect(pointAt(points, 2_500)).toEqual({ t: 2_500, ratio: 70, used: 70 });
+  it('holds the reading before t, rather than reading between two samples', () => {
+    expect(pointAt(points, 500)).toEqual({ t: 500, ratio: 0, used: 0 });
+    expect(pointAt(points, 2_500)).toEqual({ t: 2_500, ratio: 40, used: 40 });
   });
 
   it('returns a sample exactly at its own time', () => {

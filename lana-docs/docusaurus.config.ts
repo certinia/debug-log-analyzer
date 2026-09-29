@@ -14,7 +14,7 @@ const config: Config = {
   },
   title: 'Apex Log Analyzer for Salesforce',
   tagline:
-    'blazing-fast VS Code extension for Salesforce. Visualize and debug Apex logs with interactive flame charts, dynamic call trees, and detailed SOQL/DML breakdowns. Identify performance bottlenecks, gain deep transaction insights and optimize slow Apex.',
+    'fast VS Code extension for Salesforce developers. Visualize and debug Apex logs with interactive flame charts, dynamic call trees, and detailed SOQL/DML breakdowns. Identify performance bottlenecks, gain deep transaction insights and optimize slow Apex.',
   // Set the production url of your site here
   url: prodUrl,
   // Set the /<baseUrl>/ pathname under which your site is served
@@ -107,12 +107,12 @@ const config: Config = {
   ],
   themeConfig: {
     announcementBar: {
-      id: 'lana-1_20_0', // Unique ID to prevent showing again if dismissed
-      content: `🎉️ <b><a href="/${projectName}/community/changelog">Apex Log Analyzer v1.20</a> is out!</b>`,
+      id: 'lana-1_22_0', // Unique ID to prevent showing again if dismissed
+      content: `🎉️ <b><a href="/${projectName}/community/changelog">Apex Log Analyzer v1.22</a> is out!</b>`,
       isCloseable: true,
     },
     // Replace with your project's social card
-    image: `https://raw.githubusercontent.com/${organizationName}/${projectName}/main/lana/assets/1_20/preview.gif`,
+    image: `https://raw.githubusercontent.com/${organizationName}/${projectName}/main/lana/assets/1_22/preview.gif`,
     metadata: [
       {
         name: 'keywords',

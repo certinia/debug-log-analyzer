@@ -4,7 +4,7 @@
  * @jest-environment jsdom
  */
 import { describe, expect, it } from '@jest/globals';
-import { parse } from 'apex-log-parser';
+import { parse } from '@apexdevtools/apex-log-parser';
 
 import { MAX_MARKED_PER_VALUE } from '../../core/log/aggregateVariables.js';
 import { logStoreFor, type LogStore } from '../../core/log/LogStore.js';

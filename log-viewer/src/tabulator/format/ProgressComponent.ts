@@ -1,6 +1,7 @@
 /*
  * Copyright (c) 2025 Certinia Inc. All rights reserved.
  */
+import { sharePercent } from '../../core/utility/Util.js';
 
 type ProgressOptions = {
   showPercentageText?: boolean;
@@ -22,7 +23,7 @@ export function progressComponent(
   const roundedValue = (value || 0).toFixed(precision);
 
   if (totalValue !== null && totalValue !== undefined) {
-    const exactPercent = totalValue !== 0 ? (value / totalValue) * 100 : 0;
+    const exactPercent = sharePercent(value, totalValue);
     const percentComplete = Math.round(exactPercent);
 
     const wrapper = document.createElement('div');

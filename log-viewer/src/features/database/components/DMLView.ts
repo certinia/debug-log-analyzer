@@ -8,9 +8,11 @@ import { LitElement, css, html, unsafeCSS, type PropertyValues } from 'lit';
 import { customElement, property, state } from 'lit/decorators.js';
 import { Tabulator, type GroupComponent, type RowComponent } from 'tabulator-tables';
 
-import type { ApexLog, DMLBeginLine } from 'apex-log-parser';
+import type { ApexLog, DMLBeginLine } from '@apexdevtools/apex-log-parser';
 import { vscodeMessenger } from '../../../core/messaging/VSCodeExtensionMessenger.js';
 import { getCallerNamespace } from '../../../core/utility/CallerNamespace.js';
+import { DomListenerController } from '../../../core/events/DomListenerController.js';
+import type { FindEventDetail, FindEventMap } from '../../find/findEvents.js';
 import { goToRow } from '../../call-tree/navigation.js';
 import { isVisible } from '../../../core/utility/Util.js';
 import { getSettings, updateSetting } from '../../settings/Settings.js';
@@ -39,17 +41,13 @@ import { tableHolder } from '../../../tabulator/module/tableHolder.js';
 import { inCountRange, inMsRange, type FilterRange } from '../../../tabulator/filters/MinMax.js';
 import { progressFormatter } from '../../../tabulator/format/Progress.js';
 import { progressFormatterMS } from '../../../tabulator/format/ProgressMS.js';
-import { GroupCalcs } from '../../../tabulator/groups/GroupCalcs.js';
-import { GroupChildIndent } from '../../../tabulator/groups/GroupChildIndent.js';
-import { GroupSort } from '../../../tabulator/groups/GroupSort.js';
-import * as CommonModules from '../../../tabulator/module/CommonModules.js';
-import { Find } from '../../../tabulator/module/Find.js';
-import { RowKeyboardNavigation } from '../../../tabulator/module/RowKeyboardNavigation.js';
-import { RowNavigation } from '../../../tabulator/module/RowNavigation.js';
 import dataGridStyles from '../../../tabulator/style/DataGrid.scss';
 import {
+  clipboardCopyOptions,
   commonColumnDefaults,
+  groupingOptions,
   headerSortElement,
+  registerTableModules,
   textCellTooltip,
 } from '../../call-tree/components/TableShared.js';
 
@@ -125,18 +123,10 @@ export class DMLView extends LitElement {
   private rowCountRange: FilterRange = { start: null, end: null };
   private timeTakenRange: FilterRange = { start: null, end: null };
 
-  constructor() {
-    super();
-
-    document.addEventListener('lv-find', this._findEvt);
-    document.addEventListener('lv-find-close', this._findEvt);
-  }
-
-  disconnectedCallback(): void {
-    super.disconnectedCallback();
-    document.removeEventListener('lv-find', this._findEvt);
-    document.removeEventListener('lv-find-close', this._findEvt);
-  }
+  private readonly _findBus = new DomListenerController<FindEventMap>(this, document, {
+    'lv-find': (e) => void this._find(e),
+    'lv-find-close': (e) => void this._find(e),
+  });
 
   firstUpdated(): void {
     this.contextMenu = this.renderRoot.querySelector('context-menu');
@@ -465,10 +455,6 @@ export class DMLView extends LitElement {
     this.dmlTable?.download('csv', 'dml.csv', { bom: true, delimiter: ',' });
   }
 
-  _findEvt = ((event: FindEvt) => {
-    void this._find(event);
-  }) as EventListener;
-
   _dmlGroupBy(event: Event) {
     if (!this.dmlTable) {
       return;
@@ -491,15 +477,7 @@ export class DMLView extends LitElement {
     void isVisible(this).then((isVisible) => {
       const tableWrapper = this._dmlTableWrapper;
       if (tableWrapper && this.timelineRoot && isVisible) {
-        Tabulator.registerModule(Object.values(CommonModules));
-        Tabulator.registerModule([
-          RowKeyboardNavigation,
-          RowNavigation,
-          Find,
-          GroupCalcs,
-          GroupChildIndent,
-          GroupSort,
-        ]);
+        registerTableModules({ grouping: true });
         this._renderDMLTable(tableWrapper, this.lines);
       }
     });
@@ -523,7 +501,7 @@ export class DMLView extends LitElement {
     this.oldIndex = highlightIndex;
   }
 
-  async _find(e: CustomEvent<{ text: string; count: number; options: { matchCase: boolean } }>) {
+  async _find(e: CustomEvent<FindEventDetail>) {
     const isTableVisible = !!this.dmlTable?.element?.clientHeight;
     if (!isTableVisible && !this.totalMatches) {
       return;
@@ -589,7 +567,7 @@ export class DMLView extends LitElement {
     this.dmlTable = new Tabulator(dmlTableContainer, {
       index: 'id',
       height: '100%',
-      clipboard: true,
+      ...clipboardCopyOptions,
       downloadEncoder: this.downlodEncoder('dml.csv'),
       downloadRowRange: 'all',
       downloadConfig: {
@@ -599,18 +577,12 @@ export class DMLView extends LitElement {
         columnCalcs: false,
         dataTree: true,
       },
-      //@ts-expect-error types need update array is valid
-      keybindings: { copyToClipboard: ['ctrl + 67', 'meta + 67'] },
-      clipboardCopyRowRange: 'all',
       rowKeyboardNavigation: true,
       data: dmlData, //set initial table data
       layout: 'fitColumns',
       placeholder: 'No DML statements found',
       columnCalcs: 'table',
-      groupCalcs: true,
-      groupSort: true,
-      groupClosedShowCalcs: true,
-      groupStartOpen: false,
+      ...groupingOptions,
       groupToggleElement: false,
       selectableRows: 'highlight',
       rowFormatter: stampGridEventIndex,
@@ -840,5 +812,3 @@ interface DMLRow {
   timeTaken?: number;
   eventIndex?: number;
 }
-
-type FindEvt = CustomEvent<{ text: string; count: number; options: { matchCase: boolean } }>;

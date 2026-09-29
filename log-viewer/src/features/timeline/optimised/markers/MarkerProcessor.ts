@@ -79,6 +79,33 @@ export function noDataSpanAt(
   return undefined;
 }
 
+/**
+ * Where a reading's segment ends, or `null` when the reading itself falls in a gap.
+ *
+ * A segment stops at the next reading, at the end of the range, or at the next gap — whichever
+ * comes first — so nothing measured is drawn across time the log did not record.
+ *
+ * @param spans - Spans sorted by start time, as `noDataSpans` returns them
+ * @param timeNs - The reading's own instant
+ * @param nextTimeNs - Where the segment would end with no gap in the way
+ */
+export function recordedSegmentEnd(
+  spans: readonly NoDataSpan[] | undefined,
+  timeNs: number,
+  nextTimeNs: number,
+): number | null {
+  let end = nextTimeNs;
+  for (const span of spans ?? []) {
+    if (timeNs >= span.startTime && timeNs < span.endTime) {
+      return null;
+    }
+    if (span.startTime > timeNs && span.startTime < end) {
+      end = span.startTime;
+    }
+  }
+  return end;
+}
+
 /** A resolved rectangle to draw. */
 export interface MarkerDrawRect {
   x: number;

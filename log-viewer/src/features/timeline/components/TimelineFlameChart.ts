@@ -12,7 +12,7 @@
 import { css, html, LitElement, type PropertyValues, unsafeCSS } from 'lit';
 import { customElement, property, query, state } from 'lit/decorators.js';
 
-import type { ApexLog } from 'apex-log-parser';
+import type { ApexLog } from '@apexdevtools/apex-log-parser';
 import { themeObserver } from '../../../core/theme/ThemeObserver.js';
 import { ApexLogTimeline } from '../optimised/ApexLogTimeline.js';
 import { parseColorToHex } from '../optimised/rendering/ColorUtils.js';
@@ -126,8 +126,8 @@ export class TimelineFlameChart extends LitElement {
   override disconnectedCallback(): void {
     this.themeUnsubscribe?.();
     this.themeUnsubscribe = null;
-    // A `lana.timeline.legacy` toggle swaps this element out while the panel is
-    // open, so the Pixi app has to go with it or its WebGL context leaks.
+    // Lit can drop this element while the panel stays open, so the Pixi app has to go
+    // with it or its WebGL context leaks.
     this.cleanup();
     super.disconnectedCallback();
   }

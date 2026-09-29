@@ -7,6 +7,11 @@ import type { IssueAction } from '../notifications/types.js';
 /** Document event asking the Call Tree tab to reveal a log event. */
 export const CALLTREE_GO_TO_ROW = 'calltree-go-to-row';
 
+/** {@link CALLTREE_GO_TO_ROW} keyed by name, for a listener that wants its payload. */
+export interface CalltreeNavigationEventMap {
+  [CALLTREE_GO_TO_ROW]: CustomEvent<{ eventIndex: number }>;
+}
+
 /**
  * Reveal a log event in the main Call Tree tab: switches to the tab, forces
  * time-order and scrolls/focuses the row. Lives apart from `CalltreeView` so

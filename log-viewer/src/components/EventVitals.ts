@@ -1,7 +1,8 @@
 /*
  * Copyright (c) 2026 Certinia Inc. All rights reserved.
  */
-import { SOQLExecuteBeginLine, type LogEvent, type SelfTotal } from 'apex-log-parser';
+import { SOQLExecuteBeginLine, type LogEvent } from '@apexdevtools/apex-log-parser';
+import type { SelfTotal } from '@apexdevtools/apex-log-parser/types';
 import { consume } from '@lit/context';
 import { LitElement, css, html, type TemplateResult } from 'lit';
 import { customElement, property } from 'lit/decorators.js';
@@ -17,7 +18,7 @@ import {
   usageParts,
 } from '../core/metrics/eventMetrics.js';
 import { DEFAULT_NAMESPACE, getCallerNamespace } from '../core/utility/CallerNamespace.js';
-import { formatMs } from '../core/utility/Duration.js';
+import { formatNsAsMs } from '../core/utility/Duration.js';
 import { outermostEvents } from '../core/utility/EventTree.js';
 import { formatInteger } from '../core/utility/Util.js';
 import { sumDurationTotalForRootEvents } from '../features/analysis/services/CallStackSum.js';
@@ -297,7 +298,7 @@ export class EventVitals extends LitElement {
   }
 
   private _ms(ns: number): string {
-    return `${formatMs(ns, MS_PRECISION)} ms`;
+    return `${formatNsAsMs(ns, MS_PRECISION)} ms`;
   }
 
   private _row(rows: TemplateResult[], label: string, value: unknown, tooltip?: string) {

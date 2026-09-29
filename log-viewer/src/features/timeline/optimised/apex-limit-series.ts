@@ -5,13 +5,20 @@
 /**
  * apex-limit-series - Apex adapter: builds the metric-strip governor-limit time series.
  *
- * This is adapter-layer code (like ApexLogTimeline) and may import apex-log-parser types.
+ * This is adapter-layer code (like ApexLogTimeline) and may import parser types.
  * The metric-strip/ classifier and renderers stay Apex-agnostic — they consume the generic
  * HeatStripTimeSeries this module produces.
  */
 
-import type { ApexLog, HeapAllocateLine, Limits, LimitUsageLine, LogEvent } from 'apex-log-parser';
+import type {
+  ApexLog,
+  HeapAllocateLine,
+  LimitUsageLine,
+  LogEvent,
+} from '@apexdevtools/apex-log-parser';
+import type { Limits } from '@apexdevtools/apex-log-parser/types';
 import type { HeatStripMetric, HeatStripTimeSeries } from '../types/flamechart.types.js';
+import { extractMarkers, noDataSpans } from '../utils/marker-utils.js';
 import {
   buildGovernorTimeSeries,
   type LimitObservation as GranularObservation,
@@ -199,5 +206,10 @@ function buildApexLimitTimeSeries(apexLog: ApexLog): HeatStripTimeSeries {
     }
   }
 
-  return buildGovernorTimeSeries(observations, metrics, metricLimits);
+  return {
+    ...buildGovernorTimeSeries(observations, metrics, metricLimits),
+    // On the series itself, not added by the Timeline alone: every surface drawing it has to
+    // leave the spans the log recorded nothing in blank.
+    gaps: noDataSpans(extractMarkers(apexLog)),
+  };
 }

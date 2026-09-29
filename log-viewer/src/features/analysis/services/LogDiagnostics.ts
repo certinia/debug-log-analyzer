@@ -4,10 +4,10 @@
 import type {
   ApexLog,
   DMLBeginLine,
-  Limits,
   LogEvent,
   SOQLExecuteBeginLine,
-} from 'apex-log-parser';
+} from '@apexdevtools/apex-log-parser';
+import type { Limits } from '@apexdevtools/apex-log-parser/types';
 
 import { GOVERNOR_METRICS, limitTotals } from '../../../components/logOverviewMetrics.js';
 import { formatByteSize, formatDuration, formatInteger } from '../../../core/utility/Util.js';
