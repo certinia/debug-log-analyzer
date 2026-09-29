@@ -295,9 +295,7 @@ export class LogViewer extends LitElement {
     this.logSize = apexLog.size;
     this.timelineRoot = apexLog;
     this.logDuration = apexLog.duration.total;
-    // Raw text is needed for the user: USER_INFO precedes EXECUTION_STARTED, so the
-    // parser never sees it. See deriveLogIdentity.
-    this.logIdentity = deriveLogIdentity(apexLog, logData);
+    this.logIdentity = deriveLogIdentity(apexLog);
 
     // Rebuilt per load, never appended to: it describes *this* log, so a previous
     // log's problems must not carry over.

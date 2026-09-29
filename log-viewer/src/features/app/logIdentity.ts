@@ -1,11 +1,8 @@
 /*
  * Copyright (c) 2026 Certinia Inc. All rights reserved.
  */
-import {
-  CodeUnitStartedLine,
-  ExecutionStartedLine,
-  type ApexLog,
-} from '@apexdevtools/apex-log-parser';
+import type { ApexLog, CodeUnitStartedLine } from '@apexdevtools/apex-log-parser';
+import type { LogTimezone } from '@apexdevtools/apex-log-parser/types';
 
 import { formatWallClockTime } from '../../core/utility/Util.js';
 
@@ -22,48 +19,19 @@ export interface LogIdentityData {
   startTime: LogIdentityItem | null;
 }
 
-/**
- * Derives the header identity from a parsed log. `rawLog` is needed for the user:
- * parsing starts at `EXECUTION_STARTED`, so the `USER_INFO` line before it never
- * becomes an event. TODO(spike): hoist USER_INFO onto `ApexLog` in the parser and
- * drop the raw-text scan.
- */
-export function deriveLogIdentity(log: ApexLog, rawLog: string): LogIdentityData {
-  const userInfo = parseUserInfo(rawLog);
+/** Derives the header identity from a parsed log. */
+export function deriveLogIdentity(log: ApexLog): LogIdentityData {
+  const { entryPoint, userInfo } = log;
+  // A header line can state no name at all. Keyed on the name, not the line, so the
+  // header drops the chunk rather than showing a separator around an empty item.
+  const userName = userInfo?.userName;
   return {
-    entryPoint: entryPointItem(log),
-    user: userInfo
-      ? { label: userInfo.username.split('@')[0] || userInfo.username, detail: userInfo.username }
-      : null,
+    entryPoint: entryPoint ? { label: entryPointLabel(entryPoint), detail: entryPoint.text } : null,
+    user: userName ? { label: userName.split('@')[0] || userName, detail: userName } : null,
     // The timezone sits with the time, not the user: the log's timestamps are
     // rendered in that zone, so it qualifies the clock reading.
-    startTime: startTimeItem(log, userInfo?.timezone),
+    startTime: startTimeItem(log, userInfo ? formatTimezone(userInfo.timezone) : ''),
   };
-}
-
-function entryPointItem(log: ApexLog): LogIdentityItem | null {
-  const unit = firstCodeUnit(log);
-  return unit ? { label: entryPointLabel(unit), detail: unit.text } : null;
-}
-
-/**
- * The first `CODE_UNIT_STARTED` stands in for the request's operation, the same
- * field Salesforce's own debug-log list calls "Operation". It is usually nested
- * under `EXECUTION_STARTED`, but sits at the root when that marker is absent.
- */
-function firstCodeUnit(log: ApexLog): CodeUnitStartedLine | null {
-  for (const child of log.children) {
-    if (child instanceof CodeUnitStartedLine) {
-      return child;
-    }
-    if (child instanceof ExecutionStartedLine) {
-      const unit = child.children.find((c) => c instanceof CodeUnitStartedLine);
-      if (unit) {
-        return unit;
-      }
-    }
-  }
-  return null;
 }
 
 function entryPointLabel(unit: CodeUnitStartedLine): string {
@@ -88,32 +56,24 @@ function entryPointLabel(unit: CodeUnitStartedLine): string {
   }
 }
 
-/** Matches an event line's `HH:MM:SS.f (elapsedNs)|` prefix. */
-const TIMESTAMPED_LINE = /^\d{2}:\d{2}:\d{2}\.\d+ \(\d+\)\|/;
-
-function parseUserInfo(rawLog: string): { username: string; timezone: string } | null {
-  // USER_INFO is the first *timestamped* line; only the untimestamped preamble
-  // (version header, `Execute Anonymous:` echoes) precedes it. Walking lines and
-  // stopping at the first event keeps the cost at the preamble's size, survives a
-  // preamble of any length, and can't match a `USER_INFO` quoted inside the echoes
-  // or some later event's payload. A cropped log bails at its first event line.
-  let start = 0;
-  while (start < rawLog.length) {
-    const nl = rawLog.indexOf('\n', start);
-    const eol = nl === -1 ? rawLog.length : nl;
-    const line = rawLog.slice(start, eol);
-    if (TIMESTAMPED_LINE.test(line)) {
-      // timestamp|USER_INFO|[EXTERNAL]|userId|username|timezone label|timezone offset
-      const parts = line.split('|');
-      const username = parts[1] === 'USER_INFO' ? (parts[4]?.trim() ?? '') : '';
-      return username ? { username, timezone: parts[5]?.trim() ?? '' } : null;
-    }
-    start = eol + 1;
-  }
-  return null;
+/**
+ * Rebuilds the header's `(GMT±HH:MM) Label (IANA/Name)` wording from the parts the parser splits
+ * it into. The offset reproduces exactly, but a log stating a bare label gains a prefix it never
+ * carried, since nothing in `LogTimezone` says whether one was there. apex-log-parser#85 asks for
+ * the source text, which would replace this.
+ */
+function formatTimezone({ label, name, offsetMinutes }: LogTimezone): string {
+  const offset = offsetMinutes === null ? '' : `(GMT${gmtOffset(offsetMinutes)})`;
+  return [offset, label, name ? `(${name})` : ''].filter(Boolean).join(' ');
 }
 
-function startTimeItem(log: ApexLog, timezone?: string): LogIdentityItem | null {
+function gmtOffset(offsetMinutes: number): string {
+  const pad = (value: number): string => String(value).padStart(2, '0');
+  const absolute = Math.abs(offsetMinutes);
+  return `${offsetMinutes < 0 ? '-' : '+'}${pad(Math.floor(absolute / 60))}:${pad(absolute % 60)}`;
+}
+
+function startTimeItem(log: ApexLog, timezone: string): LogIdentityItem | null {
   if (log.startTime === null) {
     return null;
   }
