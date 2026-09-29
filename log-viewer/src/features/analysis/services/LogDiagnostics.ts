@@ -96,6 +96,11 @@ export interface Diagnostic {
   /** Stable key. Identical findings share one, so they group with a count. */
   id: string;
   severity: Severity;
+  /**
+   * Set where the finding qualifies every other one, so the severity toggles must not
+   * filter it away: hiding it leaves the figures it caveats reading as whole.
+   */
+  caveat?: true;
   /** Its {@link TIER}, when it outranks the counts. Defaults to `other`. */
   tier?: DiagnosticTier;
   summary: string;
@@ -414,6 +419,7 @@ function truncationDiagnostics(log: ApexLog): Diagnostic[] {
       id: 'truncated',
       // Warning, not Error: the transaction is sound, only the evidence is incomplete.
       severity: 'Warning',
+      caveat: true,
       summary: regions.length > 1 ? `Log truncated in ${regions.length} places` : 'Log truncated',
       // Zero when every region is `max-size`, which states no figure.
       meta: totalSkippedBytes > 0 ? formatByteSize(totalSkippedBytes) : undefined,
