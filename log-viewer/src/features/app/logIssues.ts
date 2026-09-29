@@ -13,7 +13,9 @@ const SEVERITY_BY_ISSUE_TYPE: ReadonlyMap<string, IssueSeverity> = new Map([
   ['fatal', 'error'],
   ['error', 'error'],
   ['unexpected', 'warning'],
-  ['skip', 'info'],
+  // Matches the Analysis notice for the same event: the transaction is sound, the
+  // evidence is incomplete. The two surfaces must not grade one truncation twice.
+  ['skip', 'warning'],
 ]);
 
 /**

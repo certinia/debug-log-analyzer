@@ -16,7 +16,7 @@ describe('toLogIssue', () => {
       startTime: 120,
     });
 
-    expect(issue.severity).toBe('info');
+    expect(issue.severity).toBe('warning');
     expect(issue.category).toBe('skip');
     expect(issue.timestamp).toBe(120);
     expect(issue.action?.label).toBe('Go to call tree');

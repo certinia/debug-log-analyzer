@@ -10,7 +10,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 
 - ✂️ **Truncation**: each skipped section states how much of the log it dropped.
-- ⚠️ **Truncation**: the Analysis notice reads as a warning rather than an error, and still leads the findings.
 
 ### Removed
 
