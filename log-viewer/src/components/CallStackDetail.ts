@@ -90,12 +90,6 @@ export class CallStackDetail extends LitElement {
         display: flex;
         justify-content: flex-end;
       }
-      /* Frame: single line, ellipsis — never wrap. */
-      #call-stack-table .tabulator-cell.truncate {
-        white-space: nowrap;
-        overflow: hidden;
-        text-overflow: ellipsis;
-      }
     `,
   ];
 
@@ -167,7 +161,7 @@ export class CallStackDetail extends LitElement {
           widthGrow: 1,
           widthShrink: 1,
           minWidth: 140,
-          cssClass: 'datagrid-code-text truncate',
+          cssClass: 'datagrid-code-text',
           tooltip: textCellTooltip,
           formatter: frameFormatter,
           bottomCalc: () => 'Total',

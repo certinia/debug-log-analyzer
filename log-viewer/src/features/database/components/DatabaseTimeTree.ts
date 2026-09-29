@@ -185,12 +185,6 @@ export class DatabaseTime extends LitElement {
         flex: 1 1 auto;
         min-height: 0;
       }
-      /* Name: single line, ellipsis — never wrap. */
-      .tabulator-cell.truncate {
-        white-space: nowrap;
-        overflow: hidden;
-        text-overflow: ellipsis;
-      }
     `,
   ];
 
@@ -397,7 +391,7 @@ export class DatabaseTime extends LitElement {
         // fixed content width.
         formatter: nameFormatter,
         tooltip: textCellTooltip,
-        cssClass: 'datagrid-code-text truncate',
+        cssClass: 'datagrid-code-text',
         sorter: 'string',
         widthGrow: 1,
         widthShrink: 1,
