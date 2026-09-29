@@ -7,7 +7,7 @@ import {
   type LogEvent,
   SOQLExecuteBeginLine,
   SOSLExecuteBeginLine,
-} from 'apex-log-parser';
+} from '@apexdevtools/apex-log-parser';
 
 import { KeyPathIds } from './keyPathIds.js';
 

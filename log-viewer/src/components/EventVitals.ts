@@ -1,7 +1,8 @@
 /*
  * Copyright (c) 2026 Certinia Inc. All rights reserved.
  */
-import { SOQLExecuteBeginLine, type LogEvent, type SelfTotal } from 'apex-log-parser';
+import { SOQLExecuteBeginLine, type LogEvent } from '@apexdevtools/apex-log-parser';
+import type { SelfTotal } from '@apexdevtools/apex-log-parser/types';
 import { consume } from '@lit/context';
 import { LitElement, css, html, type TemplateResult } from 'lit';
 import { customElement, property } from 'lit/decorators.js';

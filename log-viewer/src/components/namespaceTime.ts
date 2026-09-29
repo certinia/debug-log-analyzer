@@ -1,7 +1,7 @@
 /*
  * Copyright (c) 2026 Certinia Inc. All rights reserved.
  */
-import type { LogEvent } from 'apex-log-parser';
+import type { LogEvent } from '@apexdevtools/apex-log-parser';
 
 import { DEFAULT_NAMESPACE } from '../core/utility/CallerNamespace.js';
 import { outermostEvents } from '../core/utility/EventTree.js';

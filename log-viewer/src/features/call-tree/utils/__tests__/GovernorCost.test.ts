@@ -2,7 +2,9 @@
  * Copyright (c) 2026 Certinia Inc. All rights reserved.
  */
 import { describe, expect, it } from '@jest/globals';
-import type { GovernorLimits } from 'apex-log-parser';
+import type { GovernorLimits } from '@apexdevtools/apex-log-parser/types';
+
+import { governorLimits, limitValue } from '../../../../components/__tests__/limitsTestUtils.js';
 
 import {
   governorCost,
@@ -12,15 +14,14 @@ import {
 } from '../GovernorCost.js';
 
 function limits(overrides: Record<string, number> = {}): GovernorLimits {
-  const metric = (limit: number) => ({ used: 0, limit });
-  return {
-    soqlQueries: metric(overrides.soqlQueries ?? 100),
-    dmlStatements: metric(overrides.dmlStatements ?? 150),
-    soslQueries: metric(overrides.soslQueries ?? 20),
-    queryRows: metric(overrides.queryRows ?? 50000),
-    dmlRows: metric(overrides.dmlRows ?? 10000),
-    heapSize: metric(overrides.heapSize ?? 6000000),
-  } as unknown as GovernorLimits;
+  return governorLimits({
+    soqlQueries: limitValue(0, overrides.soqlQueries ?? 100),
+    dmlStatements: limitValue(0, overrides.dmlStatements ?? 150),
+    soslQueries: limitValue(0, overrides.soslQueries ?? 20),
+    queryRows: limitValue(0, overrides.queryRows ?? 50000),
+    dmlRows: limitValue(0, overrides.dmlRows ?? 10000),
+    heapSize: limitValue(0, overrides.heapSize ?? 6000000),
+  });
 }
 
 function row(overrides: Partial<Record<string, number>> = {}): GovernorCostRow {

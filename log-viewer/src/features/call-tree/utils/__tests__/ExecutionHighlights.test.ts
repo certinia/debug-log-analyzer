@@ -3,7 +3,7 @@
  */
 import { describe, expect, it } from '@jest/globals';
 
-import type { ApexLog, LogEvent } from 'apex-log-parser';
+import type { ApexLog, LogEvent } from '@apexdevtools/apex-log-parser';
 import { computeExecutionHighlights, getExecutionHighlights } from '../ExecutionHighlights.js';
 
 // The parser takes 0 for the log itself, so real events start at 1.

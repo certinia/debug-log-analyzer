@@ -4,7 +4,7 @@
  * @jest-environment jsdom
  */
 import { beforeEach, describe, expect, it } from '@jest/globals';
-import type { ApexLog } from 'apex-log-parser';
+import type { ApexLog } from '@apexdevtools/apex-log-parser';
 import type { LitElement } from 'lit';
 
 import type { StackedTimeBar } from '../../../../components/StackedTimeBar.js';

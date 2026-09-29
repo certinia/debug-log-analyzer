@@ -8,10 +8,10 @@ The module follows a **pure orchestrator** pattern where FlameChart is a generic
 
 ## Dependency Boundaries
 
-**Critical: Files in `timeline/optimised/` must NOT import from `log-parser` or `LogEvents.js`.**
+**Critical: Files in `timeline/optimised/` must NOT import from `@apexdevtools/apex-log-parser`.**
 
 Exception: the adapter-layer files `ApexLogTimeline.ts` and `apex-limit-series.ts` may import
-log-parser types. Keep any file that imports them out of `metric-strip/`, which stays Apex-agnostic.
+parser types. Keep any file that imports them out of `metric-strip/`, which stays Apex-agnostic.
 
 ### Import Rules
 
@@ -19,8 +19,8 @@ log-parser types. Keep any file that imports them out of `metric-strip/`, which 
 // GOOD: Import from types file (the boundary)
 import type { EventNode, LogEvent } from '../types/flamechart.types.js';
 
-// BAD: Direct import from log-parser (violates boundary)
-import type { LogEvent } from 'apex-log-parser';
+// BAD: Direct import from the parser package (violates boundary)
+import type { LogEvent } from '@apexdevtools/apex-log-parser';
 ```
 
 ### API Boundary
@@ -41,7 +41,7 @@ When FlameChart needs to pass event data to callbacks:
 
 ### Internal Types
 
-`LogEvent` is still used internally by data structures (`RectangleCache`, `TimelineEventIndex`, `PixelBucket`) for performance reasons. These types are imported through `flamechart.types.ts` which re-exports them from log-parser.
+`LogEvent` is still used internally by data structures (`RectangleCache`, `TimelineEventIndex`, `PixelBucket`) for performance reasons. These types are imported through `flamechart.types.ts` which re-exports them from the parser package.
 
 ### Metric Strip Architecture
 

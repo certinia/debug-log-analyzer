@@ -6,7 +6,7 @@
 import { describe, expect, it } from '@jest/globals';
 import type { RowComponent } from 'tabulator-tables';
 
-import type { ApexLog, LogEvent } from 'apex-log-parser';
+import type { ApexLog, LogEvent } from '@apexdevtools/apex-log-parser';
 
 import { logStoreFor } from '../../core/log/LogStore.js';
 import { KeyPathIds, ROOT_PATH_ID } from '../../core/log/keyPathIds.js';

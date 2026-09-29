@@ -15,7 +15,7 @@ import {
   type TextDocument,
 } from 'vscode';
 
-import type { LogEvent } from 'apex-log-parser';
+import type { LogEvent } from '@apexdevtools/apex-log-parser';
 
 import type { Context } from '../Context.js';
 import { LogEventCache, type LogReporter } from '../cache/LogEventCache.js';

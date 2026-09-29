@@ -10,7 +10,7 @@ import { customElement, property, state } from 'lit/decorators.js';
 import { repeat } from 'lit/directives/repeat.js';
 import type { RowComponent, Tabulator } from 'tabulator-tables';
 
-import type { ApexLog, LogEvent } from 'apex-log-parser';
+import type { ApexLog, LogEvent } from '@apexdevtools/apex-log-parser';
 import { DomListenerController } from '../../../core/events/DomListenerController.js';
 import { eventBus, type DetailSource } from '../../../core/events/EventBus.js';
 import type { FindEventDetail, FindEventMap } from '../../find/findEvents.js';

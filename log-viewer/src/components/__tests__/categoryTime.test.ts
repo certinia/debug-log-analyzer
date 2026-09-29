@@ -4,7 +4,7 @@
  * @jest-environment jsdom
  */
 import { describe, expect, it } from '@jest/globals';
-import type { ApexLog } from 'apex-log-parser';
+import type { ApexLog } from '@apexdevtools/apex-log-parser';
 
 import type { LanaSettings } from '../../features/settings/Settings.js';
 import { DEFAULT_THEME_NAME } from '../../features/timeline/themes/Themes.js';

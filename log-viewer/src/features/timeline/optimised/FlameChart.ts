@@ -10,7 +10,7 @@
  * Apex-specific logic is handled via callbacks.
  */
 
-import type { LogEvent } from 'apex-log-parser';
+import type { LogEvent } from '@apexdevtools/apex-log-parser';
 import * as PIXI from 'pixi.js';
 
 import { HoverTracker } from './interaction/HoverTracker.js';
