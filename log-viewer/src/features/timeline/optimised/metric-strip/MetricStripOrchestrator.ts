@@ -23,7 +23,7 @@
 
 import * as PIXI from 'pixi.js';
 
-import { destroyTimelineApp } from '../rendering/pixiApp.js';
+import { createTimelineApp, destroyTimelineApp } from '../rendering/pixiApp.js';
 import { formatTimeRange } from '../../../../core/utility/Util.js';
 import type {
   HeatStripTimeSeries,
@@ -194,20 +194,11 @@ export class MetricStripOrchestrator {
     this.totalDuration = totalDuration;
 
     // Create PIXI Application for metric strip (starts collapsed)
-    this.app = new PIXI.Application();
-    await this.app.init({
+    this.app = await createTimelineApp(metricStripDiv, {
       width,
       height: METRIC_STRIP_COLLAPSED_HEIGHT,
       antialias: true, // Smooth lines
-      backgroundAlpha: 0,
-      resolution: window.devicePixelRatio || 1,
-      roundPixels: true,
-      autoDensity: true,
-      autoStart: false,
     });
-    this.app.ticker.stop();
-    this.app.stage.eventMode = 'none';
-    metricStripDiv.appendChild(this.app.canvas);
 
     // Create main container
     this.container = new PIXI.Container();
