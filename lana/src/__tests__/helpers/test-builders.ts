@@ -7,34 +7,26 @@
  */
 
 import type { ApexLog, LogEvent } from '@apexdevtools/apex-log-parser';
-import type { LimitValue, Limits } from '@apexdevtools/apex-log-parser/types';
 
 import { createMockExtensionContext, type MockExtensionContext } from '../mocks/vscode.js';
 
-/**
- * Partial type for creating mock LogEvent objects.
- * Only requires the fields you want to set, everything else gets defaults.
- */
-type PartialLogEvent = Partial<{
-  type: string | null;
-  text: string;
-  timestamp: number;
-  exitStamp: number | null;
-  children: LogEvent[];
-  parent: LogEvent | null;
-  duration: { self: number; total: number };
-  soqlCount: { self: number; total: number };
-  soqlRowCount: { self: number; total: number };
-  dmlCount: { self: number; total: number };
-  dmlRowCount: { self: number; total: number };
-  thrownCount: { self: number; total: number };
-  lineNumber: number | 'EXTERNAL' | null;
-  namespace: string;
-  logLine: string;
-  isExit: boolean;
-  isParent: boolean;
-  isTruncated: boolean;
-}>;
+/** Widen as `lana` reads more: a field absent here is `undefined` on the mock, not a type error. */
+type PartialLogEvent = Partial<
+  Pick<
+    LogEvent,
+    | 'children'
+    | 'dmlCount'
+    | 'dmlRowCount'
+    | 'duration'
+    | 'exitStamp'
+    | 'soqlCount'
+    | 'soqlRowCount'
+    | 'text'
+    | 'thrownCount'
+    | 'timestamp'
+    | 'type'
+  >
+>;
 
 /**
  * Creates a mock LogEvent with sensible defaults.
@@ -42,72 +34,23 @@ type PartialLogEvent = Partial<{
  */
 export function createMockLogEvent(overrides: PartialLogEvent = {}): LogEvent {
   const base = {
-    logParser: {} as unknown,
-    parent: null,
     children: [],
-    type: 'METHOD_ENTRY' as const,
-    logLine: '',
+    type: 'METHOD_ENTRY',
     text: 'Test Event',
-    acceptsText: false,
-    isExit: false,
-    isParent: false,
-    isTruncated: false,
-    nextLineIsExit: false,
-    lineNumber: null,
-    namespace: 'default',
-    hasValidSymbols: false,
-    suffix: null,
-    discontinuity: false,
     timestamp: 1000000,
     exitStamp: 2000000,
-    category: 'Method' as const,
-    cpuType: 'method' as const,
     duration: { self: 1000000, total: 1000000 },
     dmlRowCount: { self: 0, total: 0 },
     soqlRowCount: { self: 0, total: 0 },
-    soslRowCount: { self: 0, total: 0 },
     dmlCount: { self: 0, total: 0 },
     soqlCount: { self: 0, total: 0 },
-    soslCount: { self: 0, total: 0 },
     thrownCount: { self: 0, total: 0 },
-    exitTypes: [],
-    recalculateDurations: jest.fn(),
-  };
+  } satisfies PartialLogEvent;
 
-  return { ...base, ...overrides } as unknown as LogEvent;
+  return { ...base, ...overrides } as LogEvent;
 }
 
-/**
- * Partial type for creating mock ApexLog objects.
- */
-type PartialApexLog = Partial<{
-  children: LogEvent[];
-  timestamp: number;
-  exitStamp: number;
-  size: number;
-  namespaces: string[];
-  duration: { self: number; total: number };
-}>;
-
-/** Every governor metric at zero. `lana` reads none of them; the shape is what `ApexLog` states. */
-function emptyLimits(): Limits {
-  const zero = (): LimitValue => ({ used: 0, limit: 0, percentUsed: null });
-  return {
-    soqlQueries: zero(),
-    soslQueries: zero(),
-    queryRows: zero(),
-    dmlStatements: zero(),
-    publishImmediateDml: zero(),
-    dmlRows: zero(),
-    cpuTime: zero(),
-    heapSize: zero(),
-    callouts: zero(),
-    emailInvocations: zero(),
-    futureCalls: zero(),
-    queueableJobsAddedToQueue: zero(),
-    mobileApexPushCalls: zero(),
-  };
-}
+type PartialApexLog = Partial<Pick<ApexLog, 'children' | 'size'>>;
 
 /**
  * Creates a mock ApexLog with sensible defaults.
@@ -115,52 +58,11 @@ function emptyLimits(): Limits {
  */
 export function createMockApexLog(overrides: PartialApexLog = {}): ApexLog {
   const base = {
-    logParser: {} as unknown,
-    parent: null,
     children: [],
-    type: null,
-    logLine: '',
-    text: 'LOG_ROOT',
-    acceptsText: false,
-    isExit: false,
-    isParent: false,
-    isTruncated: false,
-    nextLineIsExit: false,
-    lineNumber: null,
-    namespace: '',
-    hasValidSymbols: false,
-    suffix: null,
-    discontinuity: false,
-    timestamp: 0,
-    exitStamp: 0,
-    category: '' as const,
-    cpuType: '' as const,
-    duration: { self: 0, total: 0 },
-    dmlRowCount: { self: 0, total: 0 },
-    soqlRowCount: { self: 0, total: 0 },
-    soslRowCount: { self: 0, total: 0 },
-    dmlCount: { self: 0, total: 0 },
-    soqlCount: { self: 0, total: 0 },
-    soslCount: { self: 0, total: 0 },
-    thrownCount: { self: 0, total: 0 },
-    exitTypes: [],
-    recalculateDurations: jest.fn(),
-    setTimes: jest.fn(),
     size: 0,
-    debugLevels: {},
-    namespaces: [],
-    logIssues: [],
-    parsingErrors: [],
-    governorLimits: {
-      final: emptyLimits(),
-      peak: emptyLimits(),
-      byNamespace: new Map(),
-      snapshots: [],
-    },
-    executionEndTime: 0,
-  };
+  } satisfies PartialApexLog;
 
-  return { ...base, ...overrides } as unknown as ApexLog;
+  return { ...base, ...overrides } as ApexLog;
 }
 
 /**
