@@ -1,7 +1,7 @@
 /*
  * Copyright (c) 2022 Certinia Inc. All rights reserved.
  */
-import type { LogEvent } from 'apex-log-parser';
+import type { LogEvent } from '@apexdevtools/apex-log-parser';
 import type { CellComponent, EmptyCallback } from 'tabulator-tables';
 import { formatSOQL } from '../../soql/format/formatter.js';
 import { eventLabel, eventName } from '../utils/eventText.js';

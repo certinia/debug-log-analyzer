@@ -11,7 +11,7 @@
  * - Edge cases (empty search, invalid cursor, off-screen events)
  */
 import { beforeEach, describe, expect, it, jest } from '@jest/globals';
-import type { LogEvent } from 'apex-log-parser';
+import type { LogEvent } from '@apexdevtools/apex-log-parser';
 import * as PIXI from 'pixi.js';
 
 import type { PrecomputedRect } from '../optimised/RectangleCache.js';

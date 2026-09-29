@@ -73,8 +73,9 @@ Lit. Public API is `@property`, internal state is `@state`, styles are `static s
 `core/messaging/VSCodeExtensionMessenger.ts` · `core/theme/ThemeObserver.ts` · `styles/tokens.css` ·
 `components/` · `tabulator/`
 
-The parser is the `apex-log-parser` package, so a change there reaches `lana/` too.
+The parser is the `@apexdevtools/apex-log-parser` package, pinned in `log-viewer/package.json`,
+`lana/package.json` and the root. A bump must change all three.
 
 ## Testing
 
-- Features and fixes ship with tests. Parser format changes cover the old and the new format.
+- Features and fixes ship with tests. Log format coverage lives in the parser's own suite.

@@ -7,7 +7,7 @@ import {
   type LogEvent,
   SOQLExecuteBeginLine,
   SOSLExecuteBeginLine,
-} from 'apex-log-parser';
+} from '@apexdevtools/apex-log-parser';
 
 import { DEFAULT_NAMESPACE, getCallerNamespace } from '../../../core/utility/CallerNamespace.js';
 import { deriveSoqlObject } from './sobjectClassification.js';
