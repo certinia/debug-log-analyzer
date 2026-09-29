@@ -20,8 +20,6 @@ import type {
 const apexLog = { namespaces: ['pkg', 'trigPkg'] } as unknown as ApexLog;
 let overview: DatabaseOverview | null = null;
 
-// jsdom has no stylesheet for the icon element to adopt, so it is left unregistered.
-jest.mock('#vscode-elements/vscode-icon.js', () => ({}));
 // The tabulator ESM build and its module registrations don't load under jest; the
 // tree's grid is never built here, only its row mapper is exercised.
 jest.mock('tabulator-tables', () => ({

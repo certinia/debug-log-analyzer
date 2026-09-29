@@ -28,8 +28,6 @@ jest.mock('tabulator-tables', () => {
   }
   return { Tabulator, Module: class {}, Renderer: class {} };
 });
-// vscode-button needs ElementInternals.setFormValue (absent in jsdom).
-jest.mock('#vscode-elements/vscode-button.js', () => ({}));
 
 // The walk is what this suite is about, so it's stubbed; each test says whether
 // it yields a tree or nothing, and when.
