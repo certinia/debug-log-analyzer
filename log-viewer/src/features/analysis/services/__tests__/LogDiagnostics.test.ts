@@ -512,7 +512,7 @@ describe('computeLogDiagnostics', () => {
   it('leads with the truncation caveat, under an error finding that outranks it', async () => {
     const text = 'System.NullPointerException: Attempt to de-reference a null object';
     log = apexLog({
-      exceptions: [event({ type: 'EXCEPTION_THROWN', eventIndex: 4, text })],
+      exceptions: [event({ type: 'FATAL_ERROR', eventIndex: 4, text })],
       truncation: { regions: [{ kind: 'max-size', startTime: 0 }], totalSkippedBytes: 0 },
     });
 
@@ -533,6 +533,15 @@ describe('computeLogDiagnostics', () => {
     expect(diagnostics[0]?.count).toBe(2);
     expect(diagnostics[0]?.eventIndex).toBe(4);
     expect(diagnostics[0]?.evidence).toBeUndefined();
+  });
+
+  it('grades a caught exception below one that rolled the transaction back', async () => {
+    const text = 'System.NullPointerException: Attempt to de-reference a null object';
+    log = apexLog({ exceptions: [event({ type: 'EXCEPTION_THROWN', eventIndex: 4, text })] });
+    expect((await computeLogDiagnostics()).diagnostics[0]?.severity).toBe('Warning');
+
+    log = apexLog({ exceptions: [event({ type: 'FATAL_ERROR', eventIndex: 4, text })] });
+    expect((await computeLogDiagnostics()).diagnostics[0]?.severity).toBe('Error');
   });
 
   it('groups the same exception thrown from different places, and keeps the frame', async () => {
@@ -672,7 +681,7 @@ describe('computeLogDiagnostics', () => {
     namespaceLimits.cpuTime = limitValue(9_000, 10_000);
     log = apexLog({
       namespaceLimits: { default: namespaceLimits },
-      exceptions: [event({ text: 'System.QueryException: List has no rows' })],
+      exceptions: [event({ type: 'FATAL_ERROR', text: 'System.QueryException: List has no rows' })],
       eventsById: Array.from({ length: 50 }, (_, index) =>
         event({ type: 'USER_DEBUG', eventIndex: index, text: 'DEBUG|hello' }),
       ),

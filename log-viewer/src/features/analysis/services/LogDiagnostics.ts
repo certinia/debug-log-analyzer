@@ -389,7 +389,8 @@ function exceptionDiagnostics(exceptions: LogEvent[]): Diagnostic[] {
     const eventIndex = thrownIn ? enclosingMethodIndex(thrownIn) : group.eventIndex;
     return {
       id: `exception|${head}`,
-      severity: 'Error' as Severity,
+      // Caught, so the transaction completed: expensive, not failed.
+      severity: (fatal ? 'Error' : 'Warning') as Severity,
       summary: head,
       meta: fatal ? 'unhandled' : undefined,
       message: fatal
