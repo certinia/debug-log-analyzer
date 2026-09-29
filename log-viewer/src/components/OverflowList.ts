@@ -9,6 +9,7 @@ import '#vscode-elements/vscode-icon.js';
 import './Divider.js';
 
 // styles
+import { anchoredPopoverStyles } from '../styles/anchoredPopover.styles.js';
 import { globalStyles } from '../styles/global.styles.js';
 
 import { computeVisibleCount } from './overflowFit.js';
@@ -68,6 +69,7 @@ export class OverflowList extends LitElement {
 
   static styles = [
     globalStyles,
+    anchoredPopoverStyles,
     css`
       :host {
         display: block;
@@ -151,25 +153,11 @@ export class OverflowList extends LitElement {
       /* Native-menu chrome for the pop-out. Top-layer popover anchored to the toggle
          (escapes any ancestor overflow clip); side follows collapse-from. */
       .panel {
-        position: fixed;
         position-anchor: --overflow-list-toggle;
-        /* Flip above / to the other side when the default placement would run
-           off-screen, so the whole menu stays visible near an edge. */
-        position-try-fallbacks:
-          flip-block,
-          flip-inline,
-          flip-block flip-inline;
-        inset: auto;
         margin: var(--lana-space-xs) 0 0 0;
         min-width: 200px;
         max-width: min(92vw, 340px);
         padding: var(--lana-space-xs);
-        background-color: var(--filter-popover-bg);
-        border: var(--lana-stroke) solid var(--filter-popover-border-color);
-        border-radius: var(--filter-popover-radius);
-        box-shadow: var(--filter-popover-shadow);
-        color: var(--vscode-menu-foreground, var(--lana-fg));
-        font-family: var(--lana-font-ui);
       }
 
       .container.end .panel {
@@ -371,7 +359,7 @@ export class OverflowList extends LitElement {
         hiddenCount > 0
           ? html`<div
               part="menu"
-              class="panel"
+              class="panel filter-popover popover-anchored"
               id=${PANEL_ID}
               popover
               role="group"
