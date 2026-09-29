@@ -13,6 +13,7 @@ import { css, html, LitElement, type PropertyValues, unsafeCSS } from 'lit';
 import { customElement, property, query, state } from 'lit/decorators.js';
 
 import type { ApexLog } from '@apexdevtools/apex-log-parser';
+import { SubscriptionController } from '../../../core/events/SubscriptionController.js';
 import { themeObserver } from '../../../core/theme/ThemeObserver.js';
 import { ApexLogTimeline } from '../optimised/ApexLogTimeline.js';
 import { parseColorToHex } from '../optimised/rendering/ColorUtils.js';
@@ -110,26 +111,30 @@ export class TimelineFlameChart extends LitElement {
   @query('.timeline-container')
   private containerRef!: HTMLElement;
 
-  /** Unsubscribe for the appearance subscription; set while connected. */
-  private themeUnsubscribe: (() => void) | null = null;
-
   /** Bumped by every `cleanup()`, so an in-flight `init` can tell it was superseded. */
   private initEpoch = 0;
 
+  private readonly subscriptions = new SubscriptionController(this, () => [
+    themeObserver.on(() => {
+      this.refreshTheme();
+    }),
+  ]);
+
   override connectedCallback(): void {
     super.connectedCallback();
-    this.themeUnsubscribe ??= themeObserver.on(() => {
-      this.refreshTheme();
-    });
+
+    // `updated` re-initialises only when the log or the options change, so a
+    // re-attach would otherwise leave the destroyed Pixi app unrebuilt.
+    if (this.apexLog) {
+      void this.initializeTimeline();
+    }
   }
 
   override disconnectedCallback(): void {
-    this.themeUnsubscribe?.();
-    this.themeUnsubscribe = null;
     // Lit can drop this element while the panel stays open, so the Pixi app has to go
     // with it or its WebGL context leaks.
-    this.cleanup();
     super.disconnectedCallback();
+    this.cleanup();
   }
 
   override updated(changedProperties: PropertyValues): void {

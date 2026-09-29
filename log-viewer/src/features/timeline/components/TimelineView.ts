@@ -11,6 +11,7 @@ import { logStatusContext, type LogStatus } from '../../../core/log/logStatus.js
 import type { ApexLog } from '@apexdevtools/apex-log-parser';
 import type { LogCategory } from '@apexdevtools/apex-log-parser/types';
 import { categoryPalette } from '../../../components/categoryTime.js';
+import { SubscriptionController } from '../../../core/events/SubscriptionController.js';
 import { VSCodeExtensionMessenger } from '../../../core/messaging/VSCodeExtensionMessenger.js';
 import {
   settingsSettled,
@@ -77,12 +78,6 @@ export class TimelineView extends LitElement {
 
   @state()
   private settingsReady = false;
-
-  /** Unsubscribe for the settings subscription; set while connected. */
-  private settingsUnsubscribe: (() => void) | null = null;
-
-  /** Removes the theme-preview message listener; set while connected. */
-  private themePreviewUnsubscribe: (() => void) | null = null;
 
   /**
    * The persisted palette last applied. A quick-pick preview is not persisted, so an
@@ -183,37 +178,28 @@ export class TimelineView extends LitElement {
     `,
   ];
 
-  override connectedCallback() {
-    super.connectedCallback();
-
-    this.themePreviewUnsubscribe ??= VSCodeExtensionMessenger.listen<{ activeTheme: string }>(
-      (event) => {
-        const { cmd, payload } = event.data;
-        if (cmd === 'switchTimelineTheme' && this.activeTheme !== payload.activeTheme) {
-          this.setTheme(payload.activeTheme ?? DEFAULT_THEME_NAME);
-        }
-      },
-    );
-
+  private readonly subscriptions = new SubscriptionController(this, () => [
+    VSCodeExtensionMessenger.listen<{ activeTheme: string }>((event) => {
+      const { cmd, payload } = event.data;
+      if (cmd === 'switchTimelineTheme' && this.activeTheme !== payload.activeTheme) {
+        this.setTheme(payload.activeTheme ?? DEFAULT_THEME_NAME);
+      }
+    }),
     // The panel is never re-created, so live `lana.timeline.*` edits only reach the
     // chart through this subscription.
-    this.settingsUnsubscribe ??= subscribeSettings((settings) => {
+    subscribeSettings((settings) => {
       this.applyTimelineSettings(settings);
-    });
+    }),
+  ]);
+
+  override connectedCallback() {
+    super.connectedCallback();
 
     void settingsSettled().then(() => {
       // Nothing came to fill them, so draw with the defaults rather than leave the tab
       // shimmering for the life of the panel.
       this.settingsReady = true;
     });
-  }
-
-  override disconnectedCallback() {
-    this.settingsUnsubscribe?.();
-    this.settingsUnsubscribe = null;
-    this.themePreviewUnsubscribe?.();
-    this.themePreviewUnsubscribe = null;
-    super.disconnectedCallback();
   }
 
   private applyTimelineSettings(settings: LanaSettings) {

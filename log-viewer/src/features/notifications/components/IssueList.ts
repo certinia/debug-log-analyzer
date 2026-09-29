@@ -5,6 +5,7 @@ import '#vscode-elements/vscode-icon.js';
 import { LitElement, css, html, type PropertyValues, type TemplateResult } from 'lit';
 import { customElement, property, state } from 'lit/decorators.js';
 
+import { ResizeController } from '../../../core/events/ResizeController.js';
 import { formatDuration } from '../../../core/utility/Util.js';
 import { markerColorCss } from '../../timeline/types/flamechart.types.js';
 import { SEVERITY_META, sortBySeverity, type LogIssue } from '../types.js';
@@ -178,19 +179,9 @@ export class IssueList extends LitElement {
    * Both popovers render their list while closed, where there is no layout at all — so the list
    * has to re-measure when it is given a size, not only when it renders.
    */
-  private readonly _resize = new ResizeObserver(() => {
+  private readonly _resize = new ResizeController(this, () => {
     this._measure();
   });
-
-  override connectedCallback(): void {
-    super.connectedCallback();
-    this._resize.observe(this);
-  }
-
-  override disconnectedCallback(): void {
-    this._resize.disconnect();
-    super.disconnectedCallback();
-  }
 
   /** Re-measure after every render: a new list, or an expansion, changes what is clipped. */
   override updated(): void {

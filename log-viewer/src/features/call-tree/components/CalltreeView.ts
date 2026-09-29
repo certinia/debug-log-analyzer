@@ -15,6 +15,7 @@ import { DomListenerController } from '../../../core/events/DomListenerControlle
 import { eventBus, type DetailSource } from '../../../core/events/EventBus.js';
 import type { FindEventDetail, FindEventMap } from '../../find/findEvents.js';
 import { SelectionEchoGuard } from '../../../core/events/SelectionEchoGuard.js';
+import { SubscriptionController } from '../../../core/events/SubscriptionController.js';
 import { vscodeMessenger } from '../../../core/messaging/VSCodeExtensionMessenger.js';
 import { eventByEventIndex } from '../../../core/utility/EventSearch.js';
 import { isVisible } from '../../../core/utility/Util.js';
@@ -171,8 +172,6 @@ export class CalltreeView extends LitElement {
   /** The table whose header was right-clicked (for column-toggle actions). */
   private contextMenuTable: Tabulator | null = null;
   private viewSwitchEpoch = 0;
-  /** Releases the category-colouring settings subscription; set while connected. */
-  private _categoryColoringOff: (() => void) | null = null;
   /** Drops a pending wait for the view to come on screen, once per attach. */
   private _visibilityWait: AbortController | null = null;
 
@@ -182,7 +181,6 @@ export class CalltreeView extends LitElement {
 
   /** Guards the programmatic select made on the inspector's behalf. */
   private _echoGuard = new SelectionEchoGuard();
-  private _inspectorUnsubscribe: (() => void) | null = null;
   private _locatedRow = new LocatedRowMarker();
   private _locateIds = new LocatedRowIds();
   /** Which of the inspector's reports the mark follows. */
@@ -197,10 +195,9 @@ export class CalltreeView extends LitElement {
     'lv-find-close': (e) => void this._find(e),
   });
 
-  override connectedCallback(): void {
-    super.connectedCallback();
-    this._categoryColoringOff = wireCategoryColoring(this);
-    this._inspectorUnsubscribe = wireInspectorTab('calltree', this._emphasis, {
+  private readonly _subscriptions = new SubscriptionController(this, () => [
+    wireCategoryColoring(this),
+    wireInspectorTab('calltree', this._emphasis, {
       mark: (eventIndexes) => this._markLocated(eventIndexes),
       reveal: (eventIndex, signal) => this._revealEventIndex(eventIndex, signal),
       clear: () => {
@@ -214,7 +211,11 @@ export class CalltreeView extends LitElement {
       revealMerged: revealFirstOf((eventIndex, signal) =>
         this._revealEventIndex(eventIndex, signal),
       ),
-    });
+    }),
+  ]);
+
+  override connectedCallback(): void {
+    super.connectedCallback();
 
     // A detach destroyed the tables, and `updated` builds only for the log's
     // arrival. With a log already in hand this is a re-attach, and the build's
@@ -228,10 +229,6 @@ export class CalltreeView extends LitElement {
     super.disconnectedCallback();
     this._visibilityWait?.abort();
     this._visibilityWait = null;
-    this._categoryColoringOff?.();
-    this._categoryColoringOff = null;
-    this._inspectorUnsubscribe?.();
-    this._inspectorUnsubscribe = null;
     this._destroyCurrentTable();
   }
 
