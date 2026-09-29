@@ -8,154 +8,55 @@ import { createMockLogEvent } from './helpers/test-builders.js';
 
 describe('log-utils', () => {
   describe('formatDuration', () => {
-    describe('milliseconds (< 1 second)', () => {
-      it('should format nanoseconds as milliseconds for small values', () => {
-        expect(formatDuration(1_000_000)).toBe('1.00ms');
-      });
-
-      it('should format sub-millisecond values', () => {
-        expect(formatDuration(500_000)).toBe('0.50ms');
-      });
-
-      it('should format zero duration', () => {
-        expect(formatDuration(0)).toBe('0.00ms');
-      });
-
-      it('should format values just under 1 second', () => {
-        expect(formatDuration(999_000_000)).toBe('999.00ms');
-      });
-
-      it('should format with 2 decimal places', () => {
-        expect(formatDuration(123_456_789)).toBe('123.46ms');
-      });
+    // The unit steps at 1s and at 60s, so the rows either side of each are the ones
+    // that matter.
+    it.each([
+      [0, '0.00ms'],
+      [500_000, '0.50ms'],
+      [1_000_000, '1.00ms'],
+      [999_000_000, '999.00ms'],
+      [1_000_000_000, '1.00s'],
+      [1_500_000_000, '1.50s'],
+      [30_000_000_000, '30.00s'],
+      [59_990_000_000, '59.99s'],
+      [60_000_000_000, '1m 0.00s'],
+      [90_000_000_000, '1m 30.00s'],
+      [150_000_000_000, '2m 30.00s'],
+      [600_000_000_000, '10m 0.00s'],
+    ])('formats %d ns as %s', (ns, expected) => {
+      expect(formatDuration(ns)).toBe(expected);
     });
 
-    describe('seconds (1-60 seconds)', () => {
-      it('should format exactly 1 second', () => {
-        expect(formatDuration(1_000_000_000)).toBe('1.00s');
-      });
-
-      it('should format seconds with decimals', () => {
-        expect(formatDuration(1_500_000_000)).toBe('1.50s');
-      });
-
-      it('should format values just under 60 seconds', () => {
-        expect(formatDuration(59_990_000_000)).toBe('59.99s');
-      });
-
-      it('should format 30 seconds', () => {
-        expect(formatDuration(30_000_000_000)).toBe('30.00s');
-      });
-    });
-
-    describe('minutes (>= 60 seconds)', () => {
-      it('should format exactly 1 minute', () => {
-        expect(formatDuration(60_000_000_000)).toBe('1m 0.00s');
-      });
-
-      it('should format 1 minute and 30 seconds', () => {
-        expect(formatDuration(90_000_000_000)).toBe('1m 30.00s');
-      });
-
-      it('should format multiple minutes', () => {
-        expect(formatDuration(150_000_000_000)).toBe('2m 30.00s');
-      });
-
-      it('should format large duration', () => {
-        expect(formatDuration(600_000_000_000)).toBe('10m 0.00s');
-      });
-
-      it('should format minutes with fractional seconds', () => {
-        expect(formatDuration(61_234_567_890)).toBe('1m 1.23s');
-      });
+    it.each([
+      [123_456_789, '123.46ms'],
+      [61_234_567_890, '1m 1.23s'],
+    ])('rounds %d ns to two decimal places, giving %s', (ns, expected) => {
+      expect(formatDuration(ns)).toBe(expected);
     });
   });
 
   describe('TIMESTAMP_REGEX', () => {
-    describe('valid timestamps', () => {
-      it('should match standard timestamp format', () => {
-        const line = '09:45:31.888 (38889007737)|METHOD_ENTRY';
-        const match = line.match(TIMESTAMP_REGEX);
-
-        expect(match).not.toBeNull();
-        expect(match?.[1]).toBe('38889007737');
-      });
-
-      it('should match timestamp at start of log line', () => {
-        const line = '12:00:00.000 (1000)|CODE_UNIT_STARTED';
-        const match = line.match(TIMESTAMP_REGEX);
-
-        expect(match).not.toBeNull();
-        expect(match?.[1]).toBe('1000');
-      });
-
-      it('should match timestamp with long nanoseconds', () => {
-        const line = '23:59:59.999 (999999999999)|SOQL_EXECUTE_BEGIN';
-        const match = line.match(TIMESTAMP_REGEX);
-
-        expect(match).not.toBeNull();
-        expect(match?.[1]).toBe('999999999999');
-      });
-
-      it('should match timestamp with short nanoseconds', () => {
-        const line = '00:00:00.001 (1)|DML_BEGIN';
-        const match = line.match(TIMESTAMP_REGEX);
-
-        expect(match).not.toBeNull();
-        expect(match?.[1]).toBe('1');
-      });
-
-      it('should match timestamp with varying decimal precision', () => {
-        const line = '10:30:45.1 (12345)|EXECUTION_STARTED';
-        const match = line.match(TIMESTAMP_REGEX);
-
-        expect(match).not.toBeNull();
-        expect(match?.[1]).toBe('12345');
-      });
-
-      it('should match timestamp with space before parentheses', () => {
-        const line = '09:45:31.888 (38889007737)|METHOD_ENTRY';
-        const match = line.match(TIMESTAMP_REGEX);
-
-        expect(match).not.toBeNull();
-      });
+    it.each([
+      ['09:45:31.888 (38889007737)|METHOD_ENTRY', '38889007737'],
+      ['12:00:00.000 (1000)|CODE_UNIT_STARTED', '1000'],
+      ['23:59:59.999 (999999999999)|SOQL_EXECUTE_BEGIN', '999999999999'],
+      ['00:00:00.001 (1)|DML_BEGIN', '1'],
+      // One decimal place, not three.
+      ['10:30:45.1 (12345)|EXECUTION_STARTED', '12345'],
+    ])('captures the nanoseconds of %s', (line, expected) => {
+      expect(line.match(TIMESTAMP_REGEX)?.[1]).toBe(expected);
     });
 
-    describe('invalid timestamps', () => {
-      it('should not match line without timestamp', () => {
-        const line = 'This is just some text';
-        const match = line.match(TIMESTAMP_REGEX);
-
-        expect(match).toBeNull();
-      });
-
-      it('should not match malformed time', () => {
-        const line = '9:45:31.888 (38889007737)|METHOD_ENTRY';
-        const match = line.match(TIMESTAMP_REGEX);
-
-        expect(match).toBeNull();
-      });
-
-      it('should not match timestamp without pipe', () => {
-        const line = '09:45:31.888 (38889007737) METHOD_ENTRY';
-        const match = line.match(TIMESTAMP_REGEX);
-
-        expect(match).toBeNull();
-      });
-
-      it('should not match timestamp in middle of line', () => {
-        const line = 'prefix 09:45:31.888 (38889007737)|METHOD_ENTRY';
-        const match = line.match(TIMESTAMP_REGEX);
-
-        expect(match).toBeNull();
-      });
-
-      it('should not match empty string', () => {
-        const line = '';
-        const match = line.match(TIMESTAMP_REGEX);
-
-        expect(match).toBeNull();
-      });
+    it.each([
+      'This is just some text',
+      // A single-digit hour.
+      '9:45:31.888 (38889007737)|METHOD_ENTRY',
+      '09:45:31.888 (38889007737) METHOD_ENTRY',
+      // Anchored, so a timestamp that does not start the line is not one.
+      'prefix 09:45:31.888 (38889007737)|METHOD_ENTRY',
+      '',
+    ])('does not match %p', (line) => {
+      expect(line.match(TIMESTAMP_REGEX)).toBeNull();
     });
   });
 

@@ -3,7 +3,7 @@
  */
 import { describe, expect, it } from '@jest/globals';
 
-import { createMockContext } from '../../__tests__/helpers/test-builders.js';
+import { asContext, createMockContext } from '../../__tests__/helpers/test-builders.js';
 import { createMockTextDocument } from '../../__tests__/mocks/vscode.js';
 import {
   TabInputText,
@@ -115,9 +115,7 @@ describe('ApexLogLanguageDetector', () => {
     });
     workspace.textDocuments = [doc];
 
-    ApexLogLanguageDetector.apply(
-      createMockContext() as unknown as import('../../Context.js').Context,
-    );
+    ApexLogLanguageDetector.apply(asContext(createMockContext()));
 
     expect(languages.setTextDocumentLanguage).toHaveBeenCalledWith(doc, 'apexlog');
   });
@@ -130,9 +128,7 @@ describe('ApexLogLanguageDetector', () => {
     Object.defineProperty(doc, 'uri', { value: Uri.parse('git:/repository/logs/virtual.json') });
     workspace.textDocuments = [doc];
 
-    ApexLogLanguageDetector.apply(
-      createMockContext() as unknown as import('../../Context.js').Context,
-    );
+    ApexLogLanguageDetector.apply(asContext(createMockContext()));
 
     expect(languages.setTextDocumentLanguage).not.toHaveBeenCalled();
   });
@@ -142,9 +138,7 @@ describe('ApexLogLanguageDetector', () => {
       input: new TabInputText(Uri.parse('memfs:/logs/huge.log')),
     };
 
-    ApexLogLanguageDetector.apply(
-      createMockContext() as unknown as import('../../Context.js').Context,
-    );
+    ApexLogLanguageDetector.apply(asContext(createMockContext()));
 
     expect(commands.executeCommand).toHaveBeenLastCalledWith('setContext', 'lana.isApexLog', true);
   });
@@ -154,9 +148,7 @@ describe('ApexLogLanguageDetector', () => {
       input: new TabInputText(Uri.parse('memfs:/logs/huge.log')),
     };
 
-    ApexLogLanguageDetector.apply(
-      createMockContext() as unknown as import('../../Context.js').Context,
-    );
+    ApexLogLanguageDetector.apply(asContext(createMockContext()));
 
     expect(workspace.fs.readFile).not.toHaveBeenCalled();
   });
@@ -166,9 +158,7 @@ describe('ApexLogLanguageDetector', () => {
       input: new TabInputText(Uri.parse('memfs:/notes.json')),
     };
 
-    ApexLogLanguageDetector.apply(
-      createMockContext() as unknown as import('../../Context.js').Context,
-    );
+    ApexLogLanguageDetector.apply(asContext(createMockContext()));
 
     expect(commands.executeCommand).toHaveBeenLastCalledWith('setContext', 'lana.isApexLog', false);
   });
@@ -176,9 +166,7 @@ describe('ApexLogLanguageDetector', () => {
   it('clears the key when the active tab is not a text tab', () => {
     window.tabGroups.activeTabGroup.activeTab = { input: {} };
 
-    ApexLogLanguageDetector.apply(
-      createMockContext() as unknown as import('../../Context.js').Context,
-    );
+    ApexLogLanguageDetector.apply(asContext(createMockContext()));
 
     expect(commands.executeCommand).toHaveBeenLastCalledWith('setContext', 'lana.isApexLog', false);
   });

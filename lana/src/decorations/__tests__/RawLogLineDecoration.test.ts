@@ -7,6 +7,7 @@ import { window, type TextDocument, type TextEditor } from 'vscode';
 
 import {
   createMockApexLog,
+  asContext,
   createMockContext,
   createMockLogEvent,
 } from '../../__tests__/helpers/test-builders.js';
@@ -19,7 +20,6 @@ import {
   setOpenTabs,
 } from '../../__tests__/mocks/vscode.js';
 import { LogEventCache } from '../../cache/LogEventCache.js';
-import type { Context } from '../../Context.js';
 import { RawLogLineDecoration } from '../RawLogLineDecoration.js';
 
 jest.mock('../../cache/LogEventCache.js', () => ({
@@ -60,13 +60,12 @@ describe('RawLogLineDecoration', () => {
   let mockContext: ReturnType<typeof createMockContext>;
 
   beforeEach(() => {
-    jest.clearAllMocks();
     jest.useFakeTimers();
     // The class keeps one instance for the life of the extension host.
     (RawLogLineDecoration as unknown as { instance: unknown }).instance = null;
     setOpenTabs(new TabInputText(Uri.file(LOG_URI)));
     mockContext = createMockContext();
-    RawLogLineDecoration.apply(mockContext as unknown as Context);
+    RawLogLineDecoration.apply(asContext(mockContext));
   });
 
   afterEach(() => {
@@ -79,8 +78,8 @@ describe('RawLogLineDecoration', () => {
     });
 
     it('registers once, however many times it is applied', () => {
-      RawLogLineDecoration.apply(mockContext as unknown as Context);
-      RawLogLineDecoration.apply(mockContext as unknown as Context);
+      RawLogLineDecoration.apply(asContext(mockContext));
+      RawLogLineDecoration.apply(asContext(mockContext));
 
       expect(mockOnSelectionChange).toHaveBeenCalledTimes(1);
     });

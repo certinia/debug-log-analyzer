@@ -5,19 +5,12 @@
  */
 import { describe, expect, it } from '@jest/globals';
 
-// jsdom can't run the real element (vscode-icon reads document.baseURI).
-jest.mock('../../../components/OverflowList.js', () => ({}));
-
+import { mountElement } from '../../../__tests__/helpers/mount.js';
 import type { TimelineKeyEntry, Timelinekey } from '../components/TimelineKey.js';
 import '../components/TimelineKey.js';
 
-async function mount(entries: TimelineKeyEntry[]): Promise<Timelinekey> {
-  const el = document.createElement('timeline-key') as Timelinekey;
-  el.timelineKeys = entries;
-  document.body.appendChild(el);
-  await el.updateComplete;
-  return el;
-}
+const mount = (entries: TimelineKeyEntry[]): Promise<Timelinekey> =>
+  mountElement<Timelinekey>('timeline-key', { timelineKeys: entries });
 
 function chips(el: Timelinekey): HTMLElement[] {
   return [...(el.shadowRoot?.querySelectorAll<HTMLElement>('.chip') ?? [])];

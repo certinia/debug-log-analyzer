@@ -14,48 +14,30 @@
  */
 
 import { describe, expect, it, jest } from '@jest/globals';
+import { internalsOf, stubChartInternals } from '../../../../__tests__/helpers/flameChart.js';
+import { makeViewport } from '../../../../__tests__/helpers/viewport.js';
 import { FlameChart } from '../FlameChart.js';
 
 const HIT_NODE = { id: '0-0', timestamp: 0, duration: 10, depth: 0, original: { eventIndex: 1 } };
 
-/** The private collaborators one `render()` needs to reach the wash, and nothing else. */
+/** The shared stub, plus the hit-test and wash handles this suite asserts on. */
 function stubbedChart(): { chart: FlameChart; hoverRender: jest.Mock; hitTest: jest.Mock } {
   const chart = new FlameChart();
   const hoverRender = jest.fn();
   const hitTest = jest.fn(() => ({ eventNode: HIT_NODE, marker: null }));
 
-  const internals = chart as unknown as Record<string, unknown>;
+  // Culling dirty: the re-hit this is about happens inside the cull the render then does.
+  const internals = stubChartInternals(chart, { culling: true });
   internals['app'] = {
     renderer: { resize: jest.fn() },
     screen: { height: 300 },
     render: jest.fn(),
   };
-  internals['container'] = document.createElement('div');
-  internals['index'] = { maxDepth: 1 };
-  internals['worldContainer'] = { position: { set: jest.fn() } };
-  internals['batchRenderer'] = { render: jest.fn(), clear: jest.fn() };
-  internals['rectangleManager'] = {
-    getCulledRectangles: () => ({ visibleRects: new Map(), buckets: new Map() }),
-  };
   internals['hitDetector'] = { setVisibleRects: jest.fn(), setBuckets: jest.fn(), hitTest };
   internals['hoverHighlightRenderer'] = { render: hoverRender };
   internals['viewport'] = {
-    getState: () => ({ zoom: 1, offsetX: 0, offsetY: 0, displayWidth: 400, displayHeight: 300 }),
+    getState: () => makeViewport({ displayWidth: 400, displayHeight: 300 }),
     screenYToDepth: () => 0,
-  };
-  internals['state'] = {
-    viewport: null,
-    needsRender: false,
-    batchColorsCache: new Map(),
-    renderDirty: {
-      background: false,
-      culling: true,
-      eventRendering: false,
-      highlights: false,
-      overlays: false,
-      minimap: false,
-      metricStrip: false,
-    },
   };
 
   return { chart, hoverRender, hitTest };
@@ -64,7 +46,7 @@ function stubbedChart(): { chart: FlameChart; hoverRender: jest.Mock; hitTest: j
 describe('the hover wash after the frames move', () => {
   it('washes the frame now under the pointer, in the render that moved it', () => {
     const { chart, hoverRender } = stubbedChart();
-    const internals = chart as unknown as Record<string, unknown>;
+    const internals = internalsOf(chart);
     const tracker = internals['hoverTracker'] as {
       setPointer: (x: number, y: number) => void;
       invalidateHit: () => void;
@@ -83,7 +65,7 @@ describe('the hover wash after the frames move', () => {
   // doing. A panel put on a frame by find or by the keyboard reads that and stays put.
   it('reports a re-hit as the frames moving, not as a pointer move', () => {
     const { chart } = stubbedChart();
-    const internals = chart as unknown as Record<string, unknown>;
+    const internals = internalsOf(chart);
     const onMouseMove = jest.fn();
     internals['callbacks'] = { onMouseMove };
     const tracker = internals['hoverTracker'] as {
@@ -102,7 +84,7 @@ describe('the hover wash after the frames move', () => {
   // and a tooltip churning through frames as they slide past, are both noise.
   it('washes nothing while a drag owns the pointer, and asks once it ends', () => {
     const { chart, hitTest, hoverRender } = stubbedChart();
-    const internals = chart as unknown as Record<string, unknown>;
+    const internals = internalsOf(chart);
     let dragging = true;
     internals['interactionHandler'] = {
       isPointerDragging: () => dragging,
@@ -137,7 +119,7 @@ describe('the hover wash after the frames move', () => {
   // Culling is what moves the frames, so a render that reuses it leaves the answer standing.
   it('does not ask again on a render that reuses the culled frames', () => {
     const { chart, hitTest } = stubbedChart();
-    const internals = chart as unknown as Record<string, unknown>;
+    const internals = internalsOf(chart);
     (internals['hoverTracker'] as { setPointer: (x: number, y: number) => void }).setPointer(
       40,
       10,

@@ -8,7 +8,13 @@
 
 import type { ApexLog, LogEvent } from 'apex-log-parser';
 
-import { createMockExtensionContext, type MockExtensionContext } from '../mocks/vscode.js';
+import type { Context } from '../../Context.js';
+
+import {
+  commands,
+  createMockExtensionContext,
+  type MockExtensionContext,
+} from '../mocks/vscode.js';
 
 /**
  * Partial type for creating mock LogEvent objects.
@@ -199,4 +205,26 @@ export function createMockContext(overrides: Partial<MockContext> = {}): MockCon
   };
 
   return { ...base, ...overrides };
+}
+
+/**
+ * A mock where the code under test wants the real Context. The mock carries the
+ * fields a command reaches for and nothing else, so the compiler cannot see it as
+ * one without being told.
+ */
+export function asContext(mock: MockContext): Context {
+  return mock as unknown as Context;
+}
+
+/**
+ * The handler the code under test registered last. A command registers on apply,
+ * so the last call is the one the case just made. Every handler is `Command.run`,
+ * which is why one signature covers them all.
+ */
+export function lastRegisteredCommand(): (...args: unknown[]) => Promise<unknown> {
+  const handler = commands.registerCommand.mock.calls.at(-1)?.[1];
+  if (!handler) {
+    throw new Error('no command registered — did the case call apply()?');
+  }
+  return handler as (...args: unknown[]) => Promise<unknown>;
 }

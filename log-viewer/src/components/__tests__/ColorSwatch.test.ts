@@ -5,16 +5,12 @@
  */
 import { describe, expect, it } from '@jest/globals';
 
+import { mountElement } from '../../__tests__/helpers/mount.js';
 import type { ColorSwatch } from '../ColorSwatch.js';
 import '../ColorSwatch.js';
 
-async function mount(props: Partial<Pick<ColorSwatch, 'color'>> = {}) {
-  const element = document.createElement('color-swatch');
-  Object.assign(element, props);
-  document.body.appendChild(element);
-  await element.updateComplete;
-  return element;
-}
+const mount = (props: Partial<Pick<ColorSwatch, 'color'>> = {}) =>
+  mountElement<ColorSwatch>('color-swatch', props);
 
 describe('ColorSwatch', () => {
   it('paints itself in the colour it is given', async () => {

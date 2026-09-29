@@ -1,26 +1,21 @@
 /*
  * Copyright (c) 2026 Certinia Inc. All rights reserved.
  */
-import { beforeEach, describe, expect, it } from '@jest/globals';
+import { describe, expect, it } from '@jest/globals';
 import { commands } from 'vscode';
 
-import type { Context } from '../../Context.js';
-import { createMockContext } from '../../__tests__/helpers/test-builders.js';
+import { asContext, createMockContext } from '../../__tests__/helpers/test-builders.js';
 import { Command } from '../Command.js';
 
 const mockRegisterCommand = commands.registerCommand as jest.Mock;
 
 describe('Command', () => {
-  beforeEach(() => {
-    jest.clearAllMocks();
-  });
-
   it('returns what the handler returns', async () => {
     const context = createMockContext();
     const command = new Command(
       'aCommand',
       'A Command',
-      context as unknown as Context,
+      asContext(context),
       'Error running the command',
       () => Promise.resolve('a result'),
     );
@@ -34,7 +29,7 @@ describe('Command', () => {
     const command = new Command(
       'aCommand',
       'A Command',
-      context as unknown as Context,
+      asContext(context),
       'Error running the command',
       () => Promise.reject(new Error('it broke')),
     );
@@ -50,7 +45,7 @@ describe('Command', () => {
     const command = new Command(
       'aCommand',
       'A Command',
-      context as unknown as Context,
+      asContext(context),
       'Error running the command',
       () => {
         throw new Error('it broke');
@@ -65,12 +60,8 @@ describe('Command', () => {
 
   it('registers the guarded handler, not the raw one', async () => {
     const context = createMockContext();
-    new Command(
-      'aCommand',
-      'A Command',
-      context as unknown as Context,
-      'Error running the command',
-      () => Promise.reject(new Error('it broke')),
+    new Command('aCommand', 'A Command', asContext(context), 'Error running the command', () =>
+      Promise.reject(new Error('it broke')),
     ).register();
 
     const [name, registered] = mockRegisterCommand.mock.calls[0] as [

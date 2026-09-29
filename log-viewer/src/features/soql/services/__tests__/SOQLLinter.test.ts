@@ -4,7 +4,7 @@
 import { describe, expect, it } from '@jest/globals';
 import { ApexLogParser, LogEvent } from 'apex-log-parser';
 
-import { SOQLLinter } from '../../features/soql/services/SOQLLinter.js';
+import { SOQLLinter } from '../SOQLLinter.js';
 
 class DummySOQLLine extends LogEvent {
   constructor(parser: ApexLogParser, parts: string[]) {
@@ -88,41 +88,13 @@ describe('Negative Filter Operator Rule tests', () => {
     severity: 'Warning',
   };
 
-  it('!= : should return rule', async () => {
-    const soql = "SELECT Id FROM ANOBJECT__c WHERE Name != 'A Name'";
-
-    const results = await new SOQLLinter().lint(soql);
-
-    expect(results).toEqual([negativeFilterRule]);
-  });
-
-  it('<> : should return rule', async () => {
-    const soql = "SELECT Id FROM ANOBJECT__c WHERE Name <> 'A Name'";
-
-    const results = await new SOQLLinter().lint(soql);
-
-    expect(results).toEqual([negativeFilterRule]);
-  });
-
-  it('EXCLUDES : should return rule', async () => {
-    const soql = "SELECT Id FROM ANOBJECT__c WHERE Name EXCLUDES ('A Name')";
-
-    const results = await new SOQLLinter().lint(soql);
-
-    expect(results).toEqual([negativeFilterRule]);
-  });
-
-  it('NOT : should return rule', async () => {
-    const soql = "SELECT Id FROM ANOBJECT__c WHERE NOT Name = 'A Name'";
-
-    const results = await new SOQLLinter().lint(soql);
-
-    expect(results).toEqual([negativeFilterRule]);
-  });
-
-  it('NOT IN : should return rule', async () => {
-    const soql = "SELECT Id FROM ANOBJECT__c WHERE Id NOT IN ('a0000000000aaaa')";
-
+  it.each([
+    "SELECT Id FROM ANOBJECT__c WHERE Name != 'A Name'",
+    "SELECT Id FROM ANOBJECT__c WHERE Name <> 'A Name'",
+    "SELECT Id FROM ANOBJECT__c WHERE Name EXCLUDES ('A Name')",
+    "SELECT Id FROM ANOBJECT__c WHERE NOT Name = 'A Name'",
+    "SELECT Id FROM ANOBJECT__c WHERE Id NOT IN ('a0000000000aaaa')",
+  ])('should return rule for %s', async (soql) => {
     const results = await new SOQLLinter().lint(soql);
 
     expect(results).toEqual([negativeFilterRule]);

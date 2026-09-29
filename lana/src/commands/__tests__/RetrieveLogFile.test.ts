@@ -2,8 +2,12 @@
  * Copyright (c) 2026 Certinia Inc. All rights reserved.
  */
 import { beforeEach, describe, expect, it } from '@jest/globals';
-import { commands, Uri, window, workspace } from 'vscode';
-import { createMockContext } from '../../__tests__/helpers/test-builders.js';
+import { Uri, window, workspace } from 'vscode';
+import {
+  asContext,
+  createMockContext,
+  lastRegisteredCommand,
+} from '../../__tests__/helpers/test-builders.js';
 import { QuickPick } from '../../display/QuickPick.js';
 import {
   ensureServicesAvailable,
@@ -56,7 +60,6 @@ const mockListLogs = listLogs as jest.Mock;
 const mockGetLogBody = getLogBody as jest.Mock;
 const mockWriteFile = writeFile as jest.Mock;
 const mockCreateView = LogView.createView as jest.Mock;
-const mockRegisterCommand = commands.registerCommand as jest.Mock;
 const mockWorkspace = workspace as unknown as {
   workspaceFolders: Array<{
     uri: ReturnType<typeof Uri.file>;
@@ -82,7 +85,6 @@ function retrieveLogPromise(): Promise<string | void> {
 
 describe('RetrieveLogFile', () => {
   beforeEach(() => {
-    jest.clearAllMocks();
     mockEnsureServicesAvailable.mockResolvedValue(true);
     mockFileOrFolderExists.mockResolvedValue(false);
     mockWorkspace.workspaceFolders = [
@@ -114,13 +116,12 @@ describe('RetrieveLogFile', () => {
 
   const settle = () => new Promise((resolve) => setImmediate(resolve));
 
-  const command = (): (() => Promise<unknown>) =>
-    mockRegisterCommand.mock.calls[mockRegisterCommand.mock.calls.length - 1]?.[1];
+  const command = () => lastRegisteredCommand();
 
   it('closes the loading picker and says so when Salesforce cannot list the logs', async () => {
     mockListLogs.mockRejectedValue(new Error('no org connection'));
     const context = createMockContext();
-    RetrieveLogFile.apply(context as unknown as import('../../Context.js').Context);
+    RetrieveLogFile.apply(asContext(context));
 
     await command()();
 
@@ -133,7 +134,7 @@ describe('RetrieveLogFile', () => {
   it('cancels the log list when the user dismisses the picker', async () => {
     mockListLogs.mockReturnValue(new Promise(() => {}));
     const context = createMockContext();
-    RetrieveLogFile.apply(context as unknown as import('../../Context.js').Context);
+    RetrieveLogFile.apply(asContext(context));
 
     const running = command()();
     await settle();
@@ -149,7 +150,7 @@ describe('RetrieveLogFile', () => {
   it('closes the loading picker and reports nothing when the user dismisses it', async () => {
     mockListLogs.mockReturnValue(new Promise(() => {}));
     const context = createMockContext();
-    RetrieveLogFile.apply(context as unknown as import('../../Context.js').Context);
+    RetrieveLogFile.apply(asContext(context));
 
     const running = command()();
     await settle();
@@ -163,13 +164,13 @@ describe('RetrieveLogFile', () => {
 
   it('registers the command', () => {
     const context = createMockContext();
-    RetrieveLogFile.apply(context as unknown as import('../../Context.js').Context);
+    RetrieveLogFile.apply(asContext(context));
     expect(context.context.subscriptions).toHaveLength(1);
   });
 
   it('lists logs through Salesforce Services', async () => {
     const context = createMockContext();
-    RetrieveLogFile.apply(context as unknown as import('../../Context.js').Context);
+    RetrieveLogFile.apply(asContext(context));
     await command()();
     expect(mockEnsureServicesAvailable).toHaveBeenCalledWith();
     expect(mockListLogs).toHaveBeenCalledWith(expect.any(AbortSignal));
@@ -179,7 +180,7 @@ describe('RetrieveLogFile', () => {
     mockListLogs.mockResolvedValue([log('selected-log')]);
     mockPick.mockResolvedValue([{ logId: 'selected-log' }]);
     const context = createMockContext();
-    RetrieveLogFile.apply(context as unknown as import('../../Context.js').Context);
+    RetrieveLogFile.apply(asContext(context));
     await command()();
 
     expect(mockCreateView).toHaveBeenCalledWith(
@@ -207,7 +208,7 @@ describe('RetrieveLogFile', () => {
     mockListLogs.mockResolvedValue([log('selected-log')]);
     mockPick.mockResolvedValue([{ logId: 'selected-log' }]);
     const context = createMockContext();
-    RetrieveLogFile.apply(context as unknown as import('../../Context.js').Context);
+    RetrieveLogFile.apply(asContext(context));
 
     await command()();
 
@@ -226,7 +227,7 @@ describe('RetrieveLogFile', () => {
     mockPick.mockResolvedValue([{ logId: 'cached-log' }]);
     mockFileOrFolderExists.mockResolvedValue(true);
     const context = createMockContext();
-    RetrieveLogFile.apply(context as unknown as import('../../Context.js').Context);
+    RetrieveLogFile.apply(asContext(context));
     await command()();
 
     expect(mockGetLogBody).not.toHaveBeenCalled();
@@ -242,7 +243,7 @@ describe('RetrieveLogFile', () => {
     mockEnsureServicesAvailable.mockResolvedValue(false);
     mockWorkspace.workspaceFolders = [];
     const context = createMockContext();
-    RetrieveLogFile.apply(context as unknown as import('../../Context.js').Context);
+    RetrieveLogFile.apply(asContext(context));
     await command()();
 
     expect(mockListLogs).not.toHaveBeenCalled();
@@ -254,7 +255,7 @@ describe('RetrieveLogFile', () => {
     mockPick.mockResolvedValue([{ logId: 'selected-log' }]);
     mockWriteFile.mockRejectedValue(new Error('read-only workspace'));
     const context = createMockContext();
-    RetrieveLogFile.apply(context as unknown as import('../../Context.js').Context);
+    RetrieveLogFile.apply(asContext(context));
     await command()();
 
     expect(mockCreateView).toHaveBeenCalled();
@@ -276,7 +277,7 @@ describe('RetrieveLogFile', () => {
       return Promise.resolve([]);
     });
     const context = createMockContext();
-    RetrieveLogFile.apply(context as unknown as import('../../Context.js').Context);
+    RetrieveLogFile.apply(asContext(context));
     await command()();
     expect(items.map((item) => item.logId)).toEqual(['new', 'old']);
   });
@@ -299,7 +300,7 @@ describe('RetrieveLogFile', () => {
       return Promise.resolve([]);
     });
     const context = createMockContext();
-    RetrieveLogFile.apply(context as unknown as import('../../Context.js').Context);
+    RetrieveLogFile.apply(asContext(context));
     await command()();
     expect(description).toContain(expectedDuration);
   });
@@ -311,7 +312,7 @@ describe('RetrieveLogFile', () => {
       mockPick.mockResolvedValue([{ logId: 'denied' }]);
       mockGetLogBody.mockResolvedValue(response);
       const context = createMockContext();
-      RetrieveLogFile.apply(context as unknown as import('../../Context.js').Context);
+      RetrieveLogFile.apply(asContext(context));
       await command()();
       await expect(retrieveLogPromise()).rejects.toThrow('Salesforce denied access');
     },

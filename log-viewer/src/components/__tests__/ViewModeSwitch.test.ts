@@ -5,10 +5,7 @@
  */
 import { describe, expect, it } from '@jest/globals';
 
-// vscode-button needs ElementInternals.setFormValue (absent in jsdom); skip its
-// registration so `<vscode-button>` stays a plain element we can assert on.
-jest.mock('#vscode-elements/vscode-button.js', () => ({}));
-
+import { mountElement } from '../../__tests__/helpers/mount.js';
 import type { ViewModeSwitch } from '../ViewModeSwitch.js';
 import '../ViewModeSwitch.js';
 
@@ -22,14 +19,8 @@ function buttons(el: ViewModeSwitch): HTMLElement[] {
   return Array.from(el.shadowRoot?.querySelectorAll('vscode-button') ?? []) as HTMLElement[];
 }
 
-async function mount(value = 'a'): Promise<ViewModeSwitch> {
-  const el = document.createElement('view-mode-switch') as ViewModeSwitch;
-  el.options = OPTIONS;
-  el.value = value;
-  document.body.appendChild(el);
-  await el.updateComplete;
-  return el;
-}
+const mount = (value = 'a'): Promise<ViewModeSwitch> =>
+  mountElement<ViewModeSwitch>('view-mode-switch', { options: OPTIONS, value });
 
 describe('ViewModeSwitch', () => {
   it('renders one button per option and marks the active one non-secondary', async () => {

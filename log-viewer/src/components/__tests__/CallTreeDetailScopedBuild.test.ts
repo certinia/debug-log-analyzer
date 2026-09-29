@@ -28,8 +28,6 @@ jest.mock('tabulator-tables', () => {
   }
   return { Tabulator, Module: class {}, Renderer: class {} };
 });
-// vscode-button needs ElementInternals.setFormValue (absent in jsdom).
-jest.mock('#vscode-elements/vscode-button.js', () => ({}));
 
 // The walk is what this suite is about, so it's stubbed; each test says whether
 // it yields a tree or nothing, and when.
@@ -44,6 +42,8 @@ jest.mock('../scopedCallTree.js', () => ({
 
 import { Tabulator, type RowComponent } from 'tabulator-tables';
 
+import { mountElement } from '../../__tests__/helpers/mount.js';
+import { waitForNextFrame } from '../../core/utility/FrameBudget.js';
 import type { CallTreeDetail } from '../CallTreeDetail.js';
 import '../CallTreeDetail.js';
 import { buildScopedCallTree, type ScopedCallTree, type ScopedRow } from '../scopedCallTree.js';
@@ -113,25 +113,15 @@ async function settle(el: CallTreeDetail): Promise<void> {
 
 /** Lets the rAF the build waits behind fire, then settles the render. */
 async function frame(el: CallTreeDetail): Promise<void> {
-  await new Promise((resolve) => requestAnimationFrame(resolve));
+  await waitForNextFrame();
   await settle(el);
 }
 
-async function mount(
-  eventIndex: number,
-  sourceView?: 'callers' | 'callees',
-): Promise<CallTreeDetail> {
-  const el = document.createElement('call-tree-detail') as CallTreeDetail;
-  el.eventIndex = eventIndex;
-  el.sourceView = sourceView;
-  document.body.appendChild(el);
-  await el.updateComplete;
-  return el;
-}
+const mount = (eventIndex: number, sourceView?: 'callers' | 'callees'): Promise<CallTreeDetail> =>
+  mountElement<CallTreeDetail>('call-tree-detail', { eventIndex, sourceView });
 
 describe('CallTreeDetail scoped build', () => {
   beforeEach(() => {
-    document.body.replaceChildren();
     build.mockReset();
     build.mockResolvedValue(null);
     tables.instances.length = 0;

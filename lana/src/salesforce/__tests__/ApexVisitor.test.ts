@@ -360,12 +360,8 @@ describe('ApexVisitor', () => {
   });
 
   describe('visit', () => {
-    it('should return empty object when ctx is null', () => {
-      expect(visitor.visit(asVisitCtx(null))).toEqual({});
-    });
-
-    it('should return empty object when ctx is undefined', () => {
-      expect(visitor.visit(asVisitCtx(undefined))).toEqual({});
+    it.each([null, undefined])('should return empty object when ctx is %p', (ctx) => {
+      expect(visitor.visit(asVisitCtx(ctx))).toEqual({});
     });
 
     it('should call accept on context when ctx exists', () => {

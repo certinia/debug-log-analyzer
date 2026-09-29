@@ -16,7 +16,8 @@ import * as PIXI from 'pixi.js';
 
 import type { PrecomputedRect } from '../optimised/RectangleCache.js';
 import { SearchHighlightRenderer } from '../optimised/search/SearchHighlightRenderer.js';
-import type { EventNode, ViewportState } from '../types/flamechart.types.js';
+import { makeViewport } from '../../../__tests__/helpers/viewport.js';
+import type { EventNode } from '../types/flamechart.types.js';
 import type { SearchCursor, SearchMatch } from '../types/search.types.js';
 
 describe('SearchHighlightRenderer', () => {
@@ -144,13 +145,7 @@ describe('SearchHighlightRenderer', () => {
     it('should render overlay and border for current match', () => {
       // Given: event with normal screen width
       const match = createMockMatch(0, 10000, 0);
-      const viewport: ViewportState = {
-        zoom: 0.005, // screenWidth = 10000 * 0.005 = 50px
-        offsetX: 0,
-        offsetY: 0,
-        displayWidth: 1000,
-        displayHeight: 600,
-      };
+      const viewport = makeViewport({ zoom: 0.005 }); // screenWidth = 10000 * 0.005 = 50px
 
       // When: rendering highlight
       const cursor = createMockCursor([match], 0);
@@ -167,13 +162,7 @@ describe('SearchHighlightRenderer', () => {
     it('should render for small rectangles', () => {
       // Given: event with small screen width
       const match = createMockMatch(0, 100, 0);
-      const viewport: ViewportState = {
-        zoom: 0.002, // screenWidth = 100 * 0.002 = 0.2px
-        offsetX: 0,
-        offsetY: 0,
-        displayWidth: 1000,
-        displayHeight: 600,
-      };
+      const viewport = makeViewport({ zoom: 0.002 }); // screenWidth = 100 * 0.002 = 0.2px
 
       // When: rendering
       const cursor = createMockCursor([match], 0);
@@ -186,13 +175,7 @@ describe('SearchHighlightRenderer', () => {
     it('should render for large rectangles', () => {
       // Given: event with large screen width
       const match = createMockMatch(0, 40000, 0);
-      const viewport: ViewportState = {
-        zoom: 0.005, // screenWidth = 40000 * 0.005 = 200px
-        offsetX: 0,
-        offsetY: 0,
-        displayWidth: 1000,
-        displayHeight: 600,
-      };
+      const viewport = makeViewport({ zoom: 0.005 }); // screenWidth = 40000 * 0.005 = 200px
 
       // When: rendering
       const cursor = createMockCursor([match], 0);
@@ -206,13 +189,7 @@ describe('SearchHighlightRenderer', () => {
   describe('edge cases', () => {
     it('should handle event at timestamp zero', () => {
       const match = createMockMatch(0, 100, 0);
-      const viewport: ViewportState = {
-        zoom: 0.001, // screenWidth = 0.1px
-        offsetX: 0,
-        offsetY: 0,
-        displayWidth: 1000,
-        displayHeight: 600,
-      };
+      const viewport = makeViewport({ zoom: 0.001 }); // screenWidth = 0.1px
 
       // Should not throw and should render
       const cursor = createMockCursor([match], 0);
@@ -222,13 +199,7 @@ describe('SearchHighlightRenderer', () => {
 
     it('should handle very large duration events', () => {
       const match = createMockMatch(0, 1_000_000, 0); // 1ms
-      const viewport: ViewportState = {
-        zoom: 0.005, // screenWidth = 5000px
-        offsetX: 0,
-        offsetY: 0,
-        displayWidth: 1000,
-        displayHeight: 600,
-      };
+      const viewport = makeViewport({ zoom: 0.005 }); // screenWidth = 5000px
 
       const cursor = createMockCursor([match], 0);
       expect(() => renderer.render(cursor, viewport)).not.toThrow();
@@ -237,13 +208,7 @@ describe('SearchHighlightRenderer', () => {
 
     it('should handle negative offset (panned left)', () => {
       const match = createMockMatch(500, 100, 0);
-      const viewport: ViewportState = {
-        zoom: 0.001,
-        offsetX: -100, // Panned left
-        offsetY: 0,
-        displayWidth: 1000,
-        displayHeight: 600,
-      };
+      const viewport = makeViewport({ zoom: 0.001, offsetX: -100 }); // Panned left
 
       const cursor = createMockCursor([match], 0);
       expect(() => renderer.render(cursor, viewport)).not.toThrow();
@@ -252,13 +217,8 @@ describe('SearchHighlightRenderer', () => {
     it('should not render when match is outside viewport', () => {
       // Event far off-screen to the right
       const match = createMockMatch(1_000_000, 100, 0);
-      const viewport: ViewportState = {
-        zoom: 0.001,
-        offsetX: 0,
-        offsetY: 0,
-        displayWidth: 1000,
-        displayHeight: 600,
-      };
+      // The cull is `timestamp >= displayWidth / zoom`, so both numbers decide this one.
+      const viewport = makeViewport({ zoom: 0.001, displayWidth: 1000 });
 
       const cursor = createMockCursor([match], 0);
       renderer.render(cursor, viewport);
@@ -269,13 +229,7 @@ describe('SearchHighlightRenderer', () => {
 
     it('should not render when currentIndex is invalid', () => {
       const match = createMockMatch(0, 100, 0);
-      const viewport: ViewportState = {
-        zoom: 0.005,
-        offsetX: 0,
-        offsetY: 0,
-        displayWidth: 1000,
-        displayHeight: 600,
-      };
+      const viewport = makeViewport({ zoom: 0.005 });
 
       // Invalid index (-1)
       const invalidCursor1 = createMockCursor([match], -1);
@@ -291,13 +245,7 @@ describe('SearchHighlightRenderer', () => {
     });
 
     it('should handle empty matches array', () => {
-      const viewport: ViewportState = {
-        zoom: 0.005,
-        offsetX: 0,
-        offsetY: 0,
-        displayWidth: 1000,
-        displayHeight: 600,
-      };
+      const viewport = makeViewport({ zoom: 0.005 });
 
       const emptyCursor = createMockCursor([], 0);
       expect(() => renderer.render(emptyCursor, viewport)).not.toThrow();
@@ -308,13 +256,7 @@ describe('SearchHighlightRenderer', () => {
   describe('multiple render calls', () => {
     it('should clear graphics before each render', () => {
       const match = createMockMatch(0, 100, 0);
-      const viewport: ViewportState = {
-        zoom: 0.005,
-        offsetX: 0,
-        offsetY: 0,
-        displayWidth: 1000,
-        displayHeight: 600,
-      };
+      const viewport = makeViewport({ zoom: 0.005 });
 
       // First render
       const cursor = createMockCursor([match], 0);
@@ -332,13 +274,7 @@ describe('SearchHighlightRenderer', () => {
     });
 
     it('should handle undefined cursor', () => {
-      const viewport: ViewportState = {
-        zoom: 0.005,
-        offsetX: 0,
-        offsetY: 0,
-        displayWidth: 1000,
-        displayHeight: 600,
-      };
+      const viewport = makeViewport({ zoom: 0.005 });
 
       expect(() => renderer.render(undefined, viewport)).not.toThrow();
       expect(mockGraphics.rect).not.toHaveBeenCalled();

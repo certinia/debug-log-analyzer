@@ -14,8 +14,8 @@
 import { describe, expect, it } from '@jest/globals';
 import type { LogEvent } from 'apex-log-parser';
 
+import { makeViewport } from '../../../__tests__/helpers/viewport.js';
 import { TimelineEventIndex } from '../optimised/TimelineEventIndex.js';
-import type { ViewportState } from '../types/flamechart.types.js';
 
 describe('TimelineEventIndex', () => {
   /**
@@ -35,23 +35,6 @@ describe('TimelineEventIndex', () => {
       category: 'Method',
       subcategory: 'Method',
     } as unknown as LogEvent;
-  }
-
-  /**
-   * Helper to create a simple viewport state
-   */
-  function createViewport(
-    zoom: number = 1,
-    offsetX: number = 0,
-    offsetY: number = 0,
-  ): ViewportState {
-    return {
-      zoom,
-      offsetX,
-      offsetY,
-      displayWidth: 1000,
-      displayHeight: 600,
-    };
   }
 
   describe('initialization and metadata', () => {
@@ -101,7 +84,7 @@ describe('TimelineEventIndex', () => {
       const events = [createEvent(0, 100), createEvent(200, 100), createEvent(400, 100)];
 
       const index = new TimelineEventIndex(events);
-      const viewport = createViewport(1, 0, 0);
+      const viewport = makeViewport();
 
       // Click at screenX=50 (middle of first event)
       const event = index.findEventAtPosition(50, 300, viewport, 0, false);
@@ -115,7 +98,7 @@ describe('TimelineEventIndex', () => {
       const events = [createEvent(0, 100), createEvent(200, 100), createEvent(400, 100)];
 
       const index = new TimelineEventIndex(events);
-      const viewport = createViewport(2, 0, 0); // 2x zoom
+      const viewport = makeViewport({ zoom: 2 }); // 2x zoom
 
       // With 2x zoom, event [0-100] is rendered at [0-200] screen pixels
       const event = index.findEventAtPosition(100, 300, viewport, 0, false);
@@ -129,7 +112,7 @@ describe('TimelineEventIndex', () => {
       const events = [createEvent(0, 100), createEvent(200, 100), createEvent(400, 100)];
 
       const index = new TimelineEventIndex(events);
-      const viewport = createViewport(1, 100, 0); // Pan 100px right
+      const viewport = makeViewport({ offsetX: 100 }); // Pan 100px right
 
       // With offsetX=100, event [0-100] is rendered at [-100 to 0]
       // Event [200-300] is rendered at [100-200]
@@ -144,7 +127,7 @@ describe('TimelineEventIndex', () => {
       const events = [createEvent(0, 100), createEvent(200, 100)];
 
       const index = new TimelineEventIndex(events);
-      const viewport = createViewport(1, 0, 0);
+      const viewport = makeViewport();
 
       // Click at screenX=150 (gap between events)
       const event = index.findEventAtPosition(150, 300, viewport, 0, false);
@@ -156,7 +139,7 @@ describe('TimelineEventIndex', () => {
       const events = [createEvent(100, 100), createEvent(300, 100)];
 
       const index = new TimelineEventIndex(events);
-      const viewport = createViewport(1, 0, 0);
+      const viewport = makeViewport();
 
       // Click at screenX=50 (before first event)
       const event = index.findEventAtPosition(50, 300, viewport, 0, false);
@@ -168,7 +151,7 @@ describe('TimelineEventIndex', () => {
       const events = [createEvent(0, 100), createEvent(200, 100)];
 
       const index = new TimelineEventIndex(events);
-      const viewport = createViewport(1, 0, 0);
+      const viewport = makeViewport();
 
       // Click at screenX=500 (after last event)
       const event = index.findEventAtPosition(500, 300, viewport, 0, false);
@@ -181,7 +164,7 @@ describe('TimelineEventIndex', () => {
       const events = [createEvent(0, 0.01)]; // 0.01ns duration
 
       const index = new TimelineEventIndex(events);
-      const viewport = createViewport(1, 0, 0); // 1px per ns
+      const viewport = makeViewport(); // 1px per ns
 
       // Event width = 0.01px (below 0.05 threshold)
       const event = index.findEventAtPosition(0, 300, viewport, 0, false);
@@ -194,7 +177,7 @@ describe('TimelineEventIndex', () => {
       const events = [createEvent(0, 0.01)]; // 0.01ns duration
 
       const index = new TimelineEventIndex(events);
-      const viewport = createViewport(1, 0, 0);
+      const viewport = makeViewport();
 
       // With shouldIgnoreWidth=true
       const event = index.findEventAtPosition(0, 300, viewport, 0, true);
@@ -211,7 +194,7 @@ describe('TimelineEventIndex', () => {
       const events = [parent];
 
       const index = new TimelineEventIndex(events);
-      const viewport = createViewport(1, 0, 0);
+      const viewport = makeViewport();
 
       // Click on parent at depth 0
       const event = index.findEventAtPosition(10, 300, viewport, 0, false);
@@ -226,7 +209,7 @@ describe('TimelineEventIndex', () => {
       const events = [parent];
 
       const index = new TimelineEventIndex(events);
-      const viewport = createViewport(1, 0, 0);
+      const viewport = makeViewport();
 
       // Click on child at depth 1
       const event = index.findEventAtPosition(60, 300, viewport, 1, false);
@@ -241,7 +224,7 @@ describe('TimelineEventIndex', () => {
       const events = [parent];
 
       const index = new TimelineEventIndex(events);
-      const viewport = createViewport(1, 0, 0);
+      const viewport = makeViewport();
 
       // Click on child position but search at depth 0 (parent level)
       const event = index.findEventAtPosition(60, 300, viewport, 0, false);
@@ -257,7 +240,7 @@ describe('TimelineEventIndex', () => {
       const events = [level0];
 
       const index = new TimelineEventIndex(events);
-      const viewport = createViewport(1, 0, 0);
+      const viewport = makeViewport();
 
       // Find event at depth 2
       const event = index.findEventAtPosition(65, 300, viewport, 2, false);
@@ -272,7 +255,7 @@ describe('TimelineEventIndex', () => {
       const events = [parent];
 
       const index = new TimelineEventIndex(events);
-      const viewport = createViewport(1, 0, 0);
+      const viewport = makeViewport();
 
       // Search at depth 5 (doesn't exist)
       const event = index.findEventAtPosition(60, 300, viewport, 5, false);
@@ -412,7 +395,7 @@ describe('TimelineEventIndex', () => {
       const events = [createEvent(100, 50), createEvent(100, 50), createEvent(100, 50)];
 
       const index = new TimelineEventIndex(events);
-      const viewport = createViewport(1, 0, 0);
+      const viewport = makeViewport();
 
       // Should find one of them
       const event = index.findEventAtPosition(120, 300, viewport, 0, false);
@@ -425,7 +408,7 @@ describe('TimelineEventIndex', () => {
       const events = [createEvent(100, 0)];
 
       const index = new TimelineEventIndex(events);
-      const viewport = createViewport(1, 0, 0);
+      const viewport = makeViewport();
 
       // Zero-duration event has no width, can't be found normally
       const event = index.findEventAtPosition(100, 300, viewport, 0, false);

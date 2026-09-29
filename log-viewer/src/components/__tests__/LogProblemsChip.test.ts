@@ -5,10 +5,7 @@
  */
 import { describe, expect, it } from '@jest/globals';
 
-// jsdom can't run the real elements (they read document.baseURI / setFormValue).
-jest.mock('#vscode-elements/vscode-icon.js', () => ({}));
-jest.mock('#vscode-elements/vscode-button.js', () => ({}));
-
+import { mountElement } from '../../__tests__/helpers/mount.js';
 import type { IssueSeverity, LogIssue } from '../../features/notifications/types.js';
 
 import type { LogProblemsChip } from '../LogProblemsChip.js';
@@ -26,13 +23,8 @@ function issue(severity: IssueSeverity): LogIssue {
   };
 }
 
-async function mount(issues: readonly LogIssue[] | null): Promise<LogProblemsChip> {
-  const el = document.createElement('log-problems') as LogProblemsChip;
-  el.issues = issues;
-  document.body.appendChild(el);
-  await el.updateComplete;
-  return el;
-}
+const mount = (issues: readonly LogIssue[] | null): Promise<LogProblemsChip> =>
+  mountElement<LogProblemsChip>('log-problems', { issues });
 
 function chip(el: LogProblemsChip): HTMLElement | null {
   return el.shadowRoot?.querySelector('.header-control') ?? null;

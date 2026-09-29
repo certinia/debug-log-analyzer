@@ -5,22 +5,17 @@
  */
 import { describe, expect, it } from '@jest/globals';
 
+import { mountElement } from '../../__tests__/helpers/mount.js';
 import type { LogStatus } from '../../core/log/logStatus.js';
 import { NO_GOVERNOR_USAGE_TEXT, NO_LOG_TEXT } from '../governorCopy.js';
 import type { SectionSkeleton, SkeletonShape } from '../SectionSkeleton.js';
 import '../SectionSkeleton.js';
 
-async function mount(props: {
+const mount = (props: {
   logStatus?: LogStatus;
   shape?: SkeletonShape;
   fallback?: string;
-}): Promise<SectionSkeleton> {
-  const el = document.createElement('section-skeleton') as SectionSkeleton;
-  Object.assign(el, props);
-  document.body.appendChild(el);
-  await el.updateComplete;
-  return el;
-}
+}): Promise<SectionSkeleton> => mountElement<SectionSkeleton>('section-skeleton', props);
 
 /** How many bars each row holds, top to bottom. */
 function rowWidths(el: SectionSkeleton): string[][] {

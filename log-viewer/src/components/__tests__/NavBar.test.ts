@@ -5,11 +5,7 @@
  */
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from '@jest/globals';
 
-// jsdom can't run the real elements (they read document.baseURI / setFormValue).
-jest.mock('#vscode-elements/vscode-icon.js', () => ({}));
-jest.mock('#vscode-elements/vscode-toolbar-button.js', () => ({}));
-jest.mock('#vscode-elements/vscode-button.js', () => ({}));
-
+import { mountElement } from '../../__tests__/helpers/mount.js';
 import type { LogIdentityData } from '../../features/app/logIdentity.js';
 import type { IssueSeverity, LogIssue } from '../../features/notifications/types.js';
 
@@ -116,18 +112,15 @@ function issue(severity: IssueSeverity): LogIssue {
   };
 }
 
-async function mount(
+const mount = (
   problems: readonly LogIssue[] = [],
   notifications: readonly LogIssue[] = [],
-): Promise<NavBar> {
-  const el = document.createElement('nav-bar') as NavBar;
-  el.logName = 'test.log';
-  el.logProblems = problems;
-  el.notifications = notifications;
-  document.body.appendChild(el);
-  await el.updateComplete;
-  return el;
-}
+): Promise<NavBar> =>
+  mountElement<NavBar>('nav-bar', {
+    logName: 'test.log',
+    logProblems: problems,
+    notifications,
+  });
 
 async function resize(el: NavBar, width: number): Promise<NavBar> {
   notify?.(width);

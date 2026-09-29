@@ -6,6 +6,7 @@
 import { beforeEach, describe, expect, it } from '@jest/globals';
 import type { LitElement } from 'lit';
 
+import { mountElement } from '../../__tests__/helpers/mount.js';
 import { eventBus } from '../../core/events/EventBus.js';
 import type { LogStore } from '../../core/log/LogStore.js';
 import type { TrendSeries } from '../governorTrendData.js';
@@ -21,6 +22,7 @@ jest.mock('../../features/timeline/optimised/apex-limit-series.js', () => ({
   apexLimitTimeSeries: () => ({ events: [] }),
 }));
 
+import type { GovernorTrends } from '../GovernorTrends.js';
 import '../GovernorTrends.js';
 
 const LOG_NS = 1_000;
@@ -40,14 +42,9 @@ const trend = (label = 'SOQL queries'): TrendSeries => ({
 
 const aLog = () => ({ log: { duration: { total: LOG_NS } } }) as unknown as LogStore;
 
-async function mount(): Promise<LitElement> {
-  const element = document.createElement('governor-trends');
+const mount = (): Promise<GovernorTrends> =>
   // No provider in the test, so the consumed store is assigned straight on.
-  (element as unknown as { logStore: LogStore }).logStore = aLog();
-  document.body.append(element);
-  await element.updateComplete;
-  return element;
-}
+  mountElement<GovernorTrends>('governor-trends', { logStore: aLog() });
 
 /** The chart, given a width so a pointer x maps to a time. */
 function chartOf(element: LitElement, at = 0): HTMLButtonElement {
@@ -73,7 +70,6 @@ let seeks: { timestamp?: number; mode?: string }[];
 let unsubscribe: () => void;
 
 beforeEach(() => {
-  document.body.replaceChildren();
   series = [trend()];
   seeks = [];
   unsubscribe?.();
@@ -304,16 +300,11 @@ describe('governor-trends', () => {
       return [...classes].find((name) => name.startsWith('trend--')) ?? null;
     };
 
-    it('reads safe below the warn threshold', async () => {
-      expect(await tierOf(79)).toBe('trend--safe');
-    });
-
-    it('warns from the threshold', async () => {
+    // Where the bands fall is proved once, in
+    // features/database/components/__tests__/GovernorSummary.test.ts. This proves the
+    // trend applies them, and that finalRatio reaches governorTier as a percent.
+    it('puts the tier the policy gives on the figure', async () => {
       expect(await tierOf(80)).toBe('trend--warn');
-    });
-
-    it('reads danger at the limit', async () => {
-      expect(await tierOf(100)).toBe('trend--danger');
     });
 
     // No limit, so no tier to report against.

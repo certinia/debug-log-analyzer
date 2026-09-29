@@ -5,10 +5,7 @@
  */
 import { describe, expect, it } from '@jest/globals';
 
-// jsdom can't run the real elements (they read document.baseURI / setFormValue).
-jest.mock('#vscode-elements/vscode-icon.js', () => ({}));
-jest.mock('#vscode-elements/vscode-button.js', () => ({}));
-
+import { mountElement } from '../../../__tests__/helpers/mount.js';
 import type { IssueSeverity, LogIssue } from '../types.js';
 
 import type { NotificationCentre } from '../components/NotificationCentre.js';
@@ -26,13 +23,8 @@ function issue(severity: IssueSeverity): LogIssue {
   };
 }
 
-async function mount(issues: readonly LogIssue[]): Promise<NotificationCentre> {
-  const el = document.createElement('notification-centre') as NotificationCentre;
-  el.issues = issues;
-  document.body.appendChild(el);
-  await el.updateComplete;
-  return el;
-}
+const mount = (issues: readonly LogIssue[]): Promise<NotificationCentre> =>
+  mountElement<NotificationCentre>('notification-centre', { issues });
 
 function badge(el: NotificationCentre): HTMLElement | null {
   return el.shadowRoot?.querySelector('.header-control__badge') ?? null;

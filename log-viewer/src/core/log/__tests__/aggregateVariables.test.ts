@@ -2,7 +2,8 @@
  * Copyright (c) 2026 Certinia Inc. All rights reserved.
  */
 import { describe, expect, it, jest } from '@jest/globals';
-import { type ApexLog, parse } from 'apex-log-parser';
+
+import { indexesOf, storeOf } from '../../../__tests__/helpers/apexLog.js';
 
 import {
   aggregateVariablesFor,
@@ -10,33 +11,10 @@ import {
   MAX_VALUES_PER_NAME,
 } from '../aggregateVariables.js';
 import { variableIndexFor } from '../frameVariables.js';
-import { logStoreFor, type LogStore } from '../LogStore.js';
-
-const SETTINGS = '64.0 APEX_CODE,FINEST;APEX_PROFILING,NONE;DB,NONE\n';
 
 /** Resolves at once, so a test measures the walk rather than the frames it
  *  would leave to the next paint. */
 const yieldSlice = (): Promise<void> => Promise.resolve();
-
-function storeOf(body: string): { log: ApexLog; store: LogStore } {
-  const log = parse(
-    SETTINGS +
-      '09:18:22.6 (100)|EXECUTION_STARTED\n' +
-      '09:18:22.6 (200)|CODE_UNIT_STARTED|[EXTERNAL]|066d0000002m8ij|apex://pkg.Entry\n' +
-      body +
-      '09:18:22.6 (900000)|CODE_UNIT_FINISHED|apex://pkg.Entry\n' +
-      '09:18:22.6 (901000)|EXECUTION_FINISHED\n',
-  );
-  return { log, store: logStoreFor(log) };
-}
-
-/** Every frame whose log text is `text`, in log order. Frames only: a
- *  METHOD_EXIT carries the same text as the entry it closes. */
-function indexesOf(log: ApexLog, text: string): number[] {
-  return log.eventsById
-    .filter((event) => event.isParent && event.text === text)
-    .map((event) => event.eventIndex);
-}
 
 /** One call of `ns.Svc.run()` writing `retry` and `accountId`. */
 function call(at: number, retry: string, accountId: string): string {

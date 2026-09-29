@@ -6,6 +6,7 @@
 import { beforeAll, describe, expect, it } from '@jest/globals';
 import { parse } from 'apex-log-parser';
 
+import { mountElement } from '../../__tests__/helpers/mount.js';
 import { logStoreFor, type LogStore } from '../../core/log/LogStore.js';
 
 // Avoid the heavy CodeBlock import chain (vscode-elements, soql formatter); the
@@ -42,13 +43,8 @@ function valueFor(el: EventVitals, label: string): string | undefined {
 }
 
 /** No provider in the test, so the consumed store is assigned straight on. */
-async function mount(store: LogStore, props: Partial<EventVitals>): Promise<EventVitals> {
-  const el = document.createElement('event-vitals') as EventVitals;
-  Object.assign(el, { logStore: store }, props);
-  document.body.appendChild(el);
-  await el.updateComplete;
-  return el;
-}
+const mount = (store: LogStore, props: Partial<EventVitals>): Promise<EventVitals> =>
+  mountElement<EventVitals>('event-vitals', { logStore: store, ...props });
 
 describe('EventVitals', () => {
   let store: LogStore;
