@@ -28,32 +28,35 @@ const LABEL_BY_ISSUE_TYPE: ReadonlyMap<string, string> = new Map([
 /**
  * Every parsed issue as a card, with each skip stating how much the platform dropped.
  *
- * `truncation.regions` and the `skip` issues are the same events twice — one region per
- * issue, in log order — so the figure is joined back on `eventIndex` rather than reread
- * from the issue's prose.
+ * `truncation.regions` is the `skip` issues over again, in the same order, so the figures
+ * pair off by position. They cannot pair off on `eventIndex`: that names the last event
+ * before the marker, which two adjacent markers share, and which a neighbouring issue of
+ * another type can carry too.
  */
 export function toLogIssues(log: ApexLog): LogIssue[] {
-  const skippedBytes = new Map<number, number>();
-  for (const region of log.truncation.regions) {
-    // A `max-size` region states no figure: the platform stopped writing rather than skipped.
-    if (region.eventIndex !== undefined && region.skippedBytes !== undefined) {
-      skippedBytes.set(region.eventIndex, region.skippedBytes);
-    }
-  }
+  const { regions } = log.truncation;
+  let next = 0;
   return log.logIssues.map((issue) => {
-    const card = toLogIssue(issue);
-    const bytes = issue.eventIndex !== undefined ? skippedBytes.get(issue.eventIndex) : undefined;
-    return bytes === undefined ? card : { ...card, label: formatByteSize(bytes) };
+    if (issue.type !== 'skip') {
+      return toLogIssue(issue);
+    }
+    // A `max-size` region states no figure: the platform stopped writing rather than skipped.
+    const skippedBytes = regions[next++]?.skippedBytes;
+    return toLogIssue(issue, skippedBytes === undefined ? undefined : formatByteSize(skippedBytes));
   });
 }
 
-/** A parsed log issue as a card: severity, rail colour, head, and where activating it goes. */
-export function toLogIssue(issue: ParsedLogIssue): LogIssue {
+/**
+ * A parsed log issue as a card: severity, rail colour, head, and where activating it goes.
+ *
+ * `label` overrides the kind badge, for a skip that states its size instead.
+ */
+export function toLogIssue(issue: ParsedLogIssue, label?: string): LogIssue {
   return {
     summary: issue.summary,
     message: issue.description,
     severity: toSeverity(issue.type),
-    label: LABEL_BY_ISSUE_TYPE.get(issue.type) || null,
+    label: label ?? LABEL_BY_ISSUE_TYPE.get(issue.type) ?? null,
     action: issue.eventIndex !== undefined ? goToCallTreeAction(issue.eventIndex) : null,
     // The card's rail is the colour the timeline draws for the same issue.
     category: markerTypeForIssue(issue.type),
