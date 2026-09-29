@@ -5,10 +5,6 @@
  */
 import { describe, expect, it } from '@jest/globals';
 
-// The swc transform can't parse `.scss`; stub the stylesheet assets.
-jest.mock('../../tabulator/style/DataGrid.scss', () => ({ default: '' }));
-jest.mock('../../tabulator/format/Progress.css', () => ({}));
-
 // Capture the options the component hands to Tabulator. The real ESM build (and
 // its module registrations) doesn't load under jest.
 const built: Record<string, unknown>[] = [];
