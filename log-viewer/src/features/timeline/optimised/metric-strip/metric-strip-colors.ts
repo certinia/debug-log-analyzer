@@ -13,12 +13,6 @@
  * MetricStrip color palette.
  */
 export interface MetricStripColors {
-  // Metric line colors (Big 4)
-  soql: number;
-  dml: number;
-  cpu: number;
-  heap: number;
-
   // Tier 3 aggregate line
   tier3: number;
 
@@ -40,12 +34,6 @@ export interface MetricStripColors {
  * Vibrant colors that work on both light and dark backgrounds.
  */
 export const METRIC_STRIP_COLORS: MetricStripColors = {
-  // Metric line colors - vibrant, work on both backgrounds
-  soql: 0xe64c4c, // Warm red
-  dml: 0x00a3a3, // Teal
-  cpu: 0xf5a623, // Amber/orange
-  heap: 0x4ecdc4, // Mint teal
-
   // Tier 3 aggregate line (medium grey)
   tier3: 0x808080,
 
@@ -251,34 +239,6 @@ export function getDensityColor(fraction: number): TrafficLightColor {
 }
 
 /**
- * Default metric color mapping for Apex governor limits.
- * Maps metric IDs to their assigned colors.
- * @deprecated Use getRankBasedColor() for rank-based coloring instead
- */
-export const APEX_METRIC_COLORS: Record<string, number> = {
-  cpuTime: METRIC_STRIP_COLORS.cpu,
-  soqlQueries: METRIC_STRIP_COLORS.soql,
-  dmlStatements: METRIC_STRIP_COLORS.dml,
-  heapSize: METRIC_STRIP_COLORS.heap,
-  // Additional colors for Tier 2-eligible metrics
-  queryRows: 0xf59e0b, // Amber
-  dmlRows: 0x8b5cf6, // Purple
-  soslQueries: 0x3b82f6, // Blue
-  callouts: 0xec4899, // Pink
-  futureCalls: 0x14b8a6, // Teal
-};
-
-/**
- * Get metric color for a specific metric ID.
- *
- * @param metricId - The metric identifier
- * @returns Color for the metric, or tier3 color as fallback
- */
-export function getMetricColor(metricId: string): number {
-  return APEX_METRIC_COLORS[metricId] ?? METRIC_STRIP_COLORS.tier3;
-}
-
-/**
  * Time grid line color for vertical tick marks.
  * Matches the main timeline axis grid color.
  */
@@ -293,17 +253,3 @@ export const METRIC_STRIP_TIME_GRID_OPACITY = 0.3;
  * Width of the expand/collapse toggle area on the left side.
  */
 export const METRIC_STRIP_TOGGLE_WIDTH = 20;
-
-/**
- * Toggle button colors.
- */
-export const METRIC_STRIP_TOGGLE_COLORS = {
-  /** Background when not hovered. */
-  background: 0x333333,
-  /** Background when hovered. */
-  backgroundHover: 0x444444,
-  /** Chevron icon color. */
-  icon: 0xcccccc,
-  /** Chevron icon color when hovered. */
-  iconHover: 0xffffff,
-} as const;

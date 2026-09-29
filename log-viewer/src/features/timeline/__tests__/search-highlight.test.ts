@@ -27,7 +27,7 @@ describe('SearchHighlightRenderer', () => {
     fill: jest.SpiedFunction<PIXI.Graphics['fill']>;
   };
 
-  // Create a mock LogEvent for testing (following batching.test.ts pattern)
+  // Create a mock LogEvent for testing
   const createMockEvent = (timestamp: number, duration: number): LogEvent => {
     const event = {
       timestamp,

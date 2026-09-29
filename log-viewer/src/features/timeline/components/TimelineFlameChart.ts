@@ -54,15 +54,6 @@ export class TimelineFlameChart extends LitElement {
         max-width: 80%;
         text-align: center;
       }
-
-      .loading-message {
-        position: absolute;
-        top: 50%;
-        left: 50%;
-        transform: translate(-50%, -50%);
-        padding: var(--lana-space-lg);
-        color: var(--lana-fg-muted);
-      }
     `,
   ];
 
@@ -110,9 +101,6 @@ export class TimelineFlameChart extends LitElement {
   // ============================================================================
   // STATE
   // ============================================================================
-
-  @state()
-  private isInitialized = false;
 
   @state()
   private errorMessage: string | null = null;

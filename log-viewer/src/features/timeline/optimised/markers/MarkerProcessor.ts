@@ -7,7 +7,7 @@
  *
  * Shared utilities for processing timeline markers (truncation regions).
  * Consolidates pre-blended color computation and marker processing logic
- * used by both MeshMarkerRenderer and TimelineMarkerRenderer.
+ * used by the marker, metric-strip, minimap and selection renderers.
  */
 
 import type { NoDataSpan, TimelineMarker } from '../../types/flamechart.types.js';

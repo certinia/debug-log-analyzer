@@ -7,10 +7,9 @@ import { LitElement, css, html } from 'lit';
 import { customElement, property, state } from 'lit/decorators.js';
 
 import { globalStyles } from '../styles/global.styles.js';
+import type { FilterRange } from '../tabulator/filters/MinMax.js';
 
 let nextId = 0;
-
-export type FilterRange = { start: number | null; end: number | null };
 
 /**
  * Min/max range control for the datagrid filter bar's `filters` slot — a pill

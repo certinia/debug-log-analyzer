@@ -100,12 +100,6 @@ export class AnalysisView extends LitElement {
         width: 100%;
       }
 
-      .header-bar {
-        display: flex;
-        gap: 10px;
-        margin-bottom: 4px;
-      }
-
       .filter-container {
         display: flex;
         gap: 4px;
