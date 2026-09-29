@@ -125,7 +125,7 @@ export interface Diagnostic {
 
 export interface LogDiagnostics {
   /**
-   * Findings, highest severity first, then by {@link TIER}, then most frequent.
+   * Findings: truncation first, then highest severity, then by {@link TIER}, then most frequent.
    */
   diagnostics: Diagnostic[];
   /**
@@ -398,9 +398,6 @@ function exceptionDiagnostics(exceptions: LogEvent[]): Diagnostic[] {
   });
 }
 
-/** The byte figure the platform put in its own `*** Skipped N bytes` line. */
-const SKIPPED_BYTES = /Skipped\s+([\d,]+)\s+bytes/i;
-
 /**
  * The log's own truncation, as the finding that caveats all the others.
  *
@@ -409,25 +406,24 @@ const SKIPPED_BYTES = /Skipped\s+([\d,]+)\s+bytes/i;
  * the caveat is the same and the reader acts on it once.
  */
 function truncationDiagnostics(log: ApexLog): Diagnostic[] {
-  const skips = log.logIssues.filter((issue) => issue.type === 'skip');
-  if (!skips.length) {
+  const { regions, totalSkippedBytes } = log.truncation;
+  if (!regions.length) {
     return [];
   }
-  const bytes = skips.reduce((total, issue) => {
-    const figure = SKIPPED_BYTES.exec(issue.description)?.[1];
-    return total + (figure ? Number(figure.replaceAll(',', '')) : 0);
-  }, 0);
   return [
     {
       id: 'truncated',
-      severity: 'Error',
+      // The transaction is sound; only the evidence is incomplete. It still leads the
+      // list, which the sort pins on {@link TIER.truncation} rather than on severity.
+      severity: 'Warning',
       tier: TIER.truncation,
-      summary: skips.length > 1 ? `Log truncated in ${skips.length} places` : 'Log truncated',
-      meta: bytes > 0 ? formatByteSize(bytes) : undefined,
+      summary: regions.length > 1 ? `Log truncated in ${regions.length} places` : 'Log truncated',
+      // Zero when every region is `max-size`, which states no figure.
+      meta: totalSkippedBytes > 0 ? formatByteSize(totalSkippedBytes) : undefined,
       message:
         'A section of the log was skipped, so the figures here may be undercounted. Narrow the log levels, or log a smaller transaction.',
-      count: skips.length,
-      eventIndex: skips[0]?.eventIndex ?? -1,
+      count: regions.length,
+      eventIndex: regions[0]?.eventIndex ?? -1,
     },
   ];
 }
@@ -925,6 +921,9 @@ async function analyse(log: ApexLog): Promise<LogDiagnostics> {
     ...debugDiagnostics(debugLines),
   ].sort(
     (a, b) =>
+      // Truncation leads whatever its severity: it says every figure under it may be an
+      // undercount, so it cannot sort below the figures it qualifies.
+      Number(a.tier !== TIER.truncation) - Number(b.tier !== TIER.truncation) ||
       SEVERITY_TYPES.indexOf(a.severity) - SEVERITY_TYPES.indexOf(b.severity) ||
       (a.tier ?? TIER.other) - (b.tier ?? TIER.other) ||
       b.count - a.count,

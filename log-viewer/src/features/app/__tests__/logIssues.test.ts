@@ -2,8 +2,9 @@
  * Copyright (c) 2026 Certinia Inc. All rights reserved.
  */
 import { describe, expect, it } from '@jest/globals';
+import { parse } from '@apexdevtools/apex-log-parser';
 
-import { toLogIssue } from '../logIssues.js';
+import { toLogIssue, toLogIssues } from '../logIssues.js';
 
 describe('toLogIssue', () => {
   it('maps severity, rail category and the call-tree action', () => {
@@ -57,5 +58,30 @@ describe('toLogIssue', () => {
     const issue = toLogIssue({ summary: 'boom', description: '', type: 'error', startTime: 0 });
 
     expect(issue.timestamp).toBe(0);
+  });
+});
+
+describe('toLogIssues', () => {
+  /** Two skipped regions, then the size cutoff. Both markers need a parsed event before them. */
+  const TRUNCATED =
+    '09:18:22.6 (6574780)|EXECUTION_STARTED\n' +
+    '09:18:22.6 (7000000)|CODE_UNIT_STARTED|[EXTERNAL]|execute_anonymous_apex\n' +
+    '09:18:22.7 (8000000)|METHOD_ENTRY|[1]|a1b|Foo.bar()\n' +
+    '*** Skipped 121,000 bytes of detailed log\n' +
+    '09:18:22.8 (9000000)|METHOD_EXIT|[1]|a1b|Foo.bar()\n' +
+    '*** Skipped 34,500 bytes of detailed log\n' +
+    '09:18:22.9 (10000000)|METHOD_ENTRY|[2]|a1b|Foo.baz()\n' +
+    '******* MAXIMUM DEBUG LOG SIZE REACHED *******\n';
+
+  it('labels each skipped region with the size the parser read for it', () => {
+    const skips = toLogIssues(parse(TRUNCATED)).filter((issue) => issue.category === 'skip');
+
+    // Guards the join: a region matched to the wrong issue shows as a swapped size here,
+    // which a per-card assertion would miss.
+    expect(skips.map((issue) => [issue.summary, issue.label])).toEqual([
+      ['Skipped-Lines', '121 KB'],
+      ['Skipped-Lines', '34.5 KB'],
+      ['Max-Size-reached', null],
+    ]);
   });
 });

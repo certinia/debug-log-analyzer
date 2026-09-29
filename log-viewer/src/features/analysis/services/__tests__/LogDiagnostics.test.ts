@@ -61,6 +61,7 @@ function apexLog(fields: Partial<ApexLog> & { namespaceLimits?: Record<string, L
     children: [],
     exceptions: [],
     logIssues: [],
+    truncation: { regions: [], totalSkippedBytes: 0 },
     duration: { self: 0, total: 0 },
     governorLimits: governorLimitsOf(namespaceLimits ?? {}),
     ...rest,
@@ -481,32 +482,46 @@ describe('computeLogDiagnostics', () => {
           description: 'An entry event was found without a corresponding exit event',
           type: 'unexpected',
         },
-        {
-          summary: 'Max-Size-reached',
-          description: 'The maximum log size has been reached. Part of the log has been truncated.',
-          type: 'skip',
-        },
       ],
+      // `max-size` states no size, so the finding carries no figure.
+      truncation: { regions: [{ kind: 'max-size', startTime: 0 }], totalSkippedBytes: 0 },
     });
 
     const { diagnostics } = await computeLogDiagnostics();
     expect(diagnostics.map((d) => d.summary)).toEqual(['Log truncated', 'Unexpected-End']);
-    expect(diagnostics[0]?.severity).toBe('Error');
+    expect(diagnostics[0]?.severity).toBe('Warning');
     expect(diagnostics[0]?.meta).toBeUndefined();
     expect(diagnostics[0]?.message).toContain('may be undercounted');
   });
 
-  it('sums the bytes the log said it skipped, over every skipped region', async () => {
-    const skipped = (bytes: string) => ({
-      summary: 'Skipped-Lines',
-      description: `*** Skipped ${bytes} bytes of detailed log. A section of the log has been skipped and the log has been truncated.`,
-      type: 'skip' as const,
+  it('states the size the parser totalled over every skipped region', async () => {
+    log = apexLog({
+      truncation: {
+        regions: [
+          { kind: 'skipped-lines', startTime: 10, skippedBytes: 1_000_000 },
+          { kind: 'skipped-lines', startTime: 20, skippedBytes: 2_000_000 },
+        ],
+        totalSkippedBytes: 3_000_000,
+      },
     });
-    log = apexLog({ logIssues: [skipped('1,000,000'), skipped('2,000,000')] });
 
     const { diagnostics } = await computeLogDiagnostics();
     expect(diagnostics[0]?.summary).toBe('Log truncated in 2 places');
     expect(diagnostics[0]?.meta).toBe('3 MB');
+  });
+
+  it('leads with the truncation caveat, under an error finding that outranks it', async () => {
+    const text = 'System.NullPointerException: Attempt to de-reference a null object';
+    log = apexLog({
+      exceptions: [event({ type: 'EXCEPTION_THROWN', eventIndex: 4, text })],
+      truncation: { regions: [{ kind: 'max-size', startTime: 0 }], totalSkippedBytes: 0 },
+    });
+
+    const { diagnostics } = await computeLogDiagnostics();
+    expect(diagnostics.map((d) => [d.summary, d.severity])).toEqual([
+      ['Log truncated', 'Warning'],
+      [text, 'Error'],
+    ]);
   });
 
   it('groups exceptions by their text, counting the throws', async () => {
