@@ -18,10 +18,16 @@ import { type BatchColorInfo, resolveColor } from '../BucketColorResolver.js';
 import { colorToGreyscale } from '../rendering/ColorUtils.js';
 
 /**
- * Spatial index of matched events grouped by depth.
- * Enables O(1) depth lookup + linear scan within a depth level.
+ * Spatial index of matched events grouped by depth, each depth ordered by timestamp.
  */
-export type MatchesByDepth = Map<number, ReadonlyArray<{ timestamp: number; category: string }>>;
+export type MatchesByDepth = Map<number, ReadonlyArray<MatchedEventInfo>>;
+
+/**
+ * A search's matches do not change while the chart pans or zooms, but the renderer asks
+ * for the index on every frame. Keyed on the array, so the entry falls away with the
+ * search that produced it.
+ */
+const indexCache = new WeakMap<ReadonlyArray<MatchedEventInfo>, MatchesByDepth>();
 
 /**
  * Build a spatial index of matched events grouped by tree depth.
@@ -32,17 +38,52 @@ export type MatchesByDepth = Map<number, ReadonlyArray<{ timestamp: number; cate
 export function buildMatchIndex(
   matchedEventsInfo: ReadonlyArray<MatchedEventInfo>,
 ): MatchesByDepth {
-  const matchesByDepth = new Map<number, Array<{ timestamp: number; category: string }>>();
+  const cached = indexCache.get(matchedEventsInfo);
+  if (cached) {
+    return cached;
+  }
+
+  const matchesByDepth = new Map<number, MatchedEventInfo[]>();
   for (const info of matchedEventsInfo) {
     let depthMatches = matchesByDepth.get(info.depth);
     if (!depthMatches) {
       depthMatches = [];
       matchesByDepth.set(info.depth, depthMatches);
     }
-    depthMatches.push({ timestamp: info.timestamp, category: info.category });
+    depthMatches.push(info);
   }
+
+  // Sorted so a bucket can seek its own time range, rather than every bucket reading
+  // every match at its depth.
+  for (const depthMatches of matchesByDepth.values()) {
+    depthMatches.sort((a, b) => a.timestamp - b.timestamp);
+  }
+
+  indexCache.set(matchedEventsInfo, matchesByDepth);
   return matchesByDepth;
 }
+
+/** Index of the first match at or after `time`, or `matches.length` where there is none. */
+function firstAtOrAfter(matches: ReadonlyArray<MatchedEventInfo>, time: number): number {
+  let low = 0;
+  let high = matches.length;
+  while (low < high) {
+    const mid = (low + high) >>> 1;
+    const match = matches[mid];
+    if (match && match.timestamp < time) {
+      low = mid + 1;
+    } else {
+      high = mid;
+    }
+  }
+  return low;
+}
+
+/**
+ * Counts per category for the bucket being resolved. Reused across buckets: `resolveColor`
+ * reads it and holds nothing, and a frame resolves one bucket at a time.
+ */
+const bucketCategoryStats = new Map<string, CategoryAggregation>();
 
 /**
  * Resolve the display color for a bucket based on search match status.
@@ -61,35 +102,39 @@ export function resolveBucketSearchColor(
   matchIndex: MatchesByDepth,
   batchColors: Map<string, BatchColorInfo>,
 ): number {
-  const matchedCategoryStats = new Map<string, CategoryAggregation>();
-
   const depthMatches = matchIndex.get(bucket.depth);
-  if (depthMatches) {
-    for (const match of depthMatches) {
-      if (
-        match.timestamp >= bucket.timeStart &&
-        match.timestamp < bucket.timeEnd &&
-        match.category
-      ) {
-        let stats = matchedCategoryStats.get(match.category);
-        if (!stats) {
-          stats = { count: 0, totalDuration: 0 };
-          matchedCategoryStats.set(match.category, stats);
-        }
-        stats.count++;
-      }
+  if (!depthMatches) {
+    return colorToGreyscale(bucket.color);
+  }
+
+  bucketCategoryStats.clear();
+
+  for (let i = firstAtOrAfter(depthMatches, bucket.timeStart); i < depthMatches.length; i++) {
+    const match = depthMatches[i];
+    if (!match || match.timestamp >= bucket.timeEnd) {
+      break;
     }
+    if (!match.category) {
+      continue;
+    }
+
+    let stats = bucketCategoryStats.get(match.category);
+    if (!stats) {
+      stats = { count: 0, totalDuration: 0 };
+      bucketCategoryStats.set(match.category, stats);
+    }
+    stats.count++;
   }
 
-  if (matchedCategoryStats.size > 0) {
-    return resolveColor(
-      {
-        byCategory: matchedCategoryStats,
-        dominantCategory: '',
-      },
-      batchColors,
-    ).color;
+  if (bucketCategoryStats.size === 0) {
+    return colorToGreyscale(bucket.color);
   }
 
-  return colorToGreyscale(bucket.color);
+  return resolveColor(
+    {
+      byCategory: bucketCategoryStats,
+      dominantCategory: '',
+    },
+    batchColors,
+  ).color;
 }

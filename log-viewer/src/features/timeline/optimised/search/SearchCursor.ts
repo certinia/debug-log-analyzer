@@ -15,6 +15,8 @@ import type { MatchedEventInfo, SearchCursor, SearchMatch } from '../../types/se
 export class SearchCursorImpl<E extends EventNode> implements SearchCursor<E> {
   private _currentIndex: number;
   private readonly _matches: SearchMatch<E>[];
+  private _matchedEventIds: ReadonlySet<string> | null = null;
+  private _matchedEventsInfo: ReadonlyArray<MatchedEventInfo> | null = null;
 
   constructor(matches: SearchMatch<E>[]) {
     this._matches = matches;
@@ -88,16 +90,24 @@ export class SearchCursorImpl<E extends EventNode> implements SearchCursor<E> {
     return this._currentIndex > 0;
   }
 
+  /**
+   * Both of these are asked for on every frame the chart draws in search mode, and
+   * neither depends on the cursor position, so each is built once. `_matches` is set
+   * in the constructor and never changes, which is what makes that safe.
+   *
+   * Holding the identity also matters downstream: `buildMatchIndex` keys its cache on
+   * the array it is handed.
+   */
   getMatchedEventIds(): ReadonlySet<string> {
-    return new Set(this._matches.map((m) => m.event.id));
+    return (this._matchedEventIds ??= new Set(this._matches.map((m) => m.event.id)));
   }
 
   getMatchedEventsInfo(): ReadonlyArray<MatchedEventInfo> {
-    return this._matches.map((m) => ({
+    return (this._matchedEventsInfo ??= this._matches.map((m) => ({
       timestamp: m.event.timestamp,
       duration: m.event.duration ?? 0,
       depth: m.depth,
       category: m.rect.category,
-    }));
+    })));
   }
 }
