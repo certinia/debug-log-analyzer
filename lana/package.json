@@ -325,6 +325,7 @@
     "@types/node": "~22.20.4",
     "@types/vscode": "~1.102.0",
     "@vscode/vsce": "^3.9.2",
+    "tslib": "^2.8.1",
     "typescript": "npm:@typescript/typescript6@^6.0.2"
   }
 }
