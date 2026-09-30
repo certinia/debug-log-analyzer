@@ -311,7 +311,7 @@ Tests should focus on the manager's API, not internal implementation.
    - Mesh-based rendering (RectangleGeometry + custom shader) for rectangles/filled shapes
    - Single draw call for many rectangles, much faster than Graphics
    - Keep Graphics for thin lines (step charts, dashed lines) - mesh overhead not justified
-   - See `MeshRectangleRenderer`, `MeshMetricStripRenderer` for examples
+   - See `rendering/rectangleMesh.ts` and `rendering/MeshRectangleWriter.ts` for examples
 
 5. **Profile before optimizing**
    - Use Chrome DevTools Performance tab

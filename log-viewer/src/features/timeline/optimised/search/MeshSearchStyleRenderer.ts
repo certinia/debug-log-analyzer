@@ -8,11 +8,6 @@
  * Renders rectangles with search-aware styling using PixiJS Mesh (Chrome DevTools style).
  * Matched events retain original colors, non-matched events are desaturated to greyscale.
  *
- * Performance optimizations:
- * - Single Mesh draw call for all rectangles
- * - Direct buffer updates (no scene graph overhead)
- * - Clip-space coordinates (no uniform binding overhead)
- *
  * Responsibilities:
  * - Render rectangles with search styling
  * - Desaturate non-matched events
@@ -25,44 +20,19 @@
  * - Implement search logic
  */
 
-import type { Container, Geometry, Mesh, Shader } from 'pixi.js';
+import type { Container } from 'pixi.js';
 import type { PixelBucket, RenderBatch, ViewportState } from '../../types/flamechart.types.js';
-import { BUCKET_CONSTANTS, TIMELINE_CONSTANTS } from '../../types/flamechart.types.js';
+import { TIMELINE_CONSTANTS } from '../../types/flamechart.types.js';
 import type { MatchedEventInfo } from '../../types/search.types.js';
 import type { PrecomputedRect } from '../RectangleCache.js';
-import type { RectangleGeometry, ViewportTransform } from '../RectangleGeometry.js';
-import { createRectangleMesh } from '../rendering/rectangleMesh.js';
 import { colorToGreyscale } from '../rendering/ColorUtils.js';
+import { MeshRectangleWriter } from '../rendering/MeshRectangleWriter.js';
 import { buildMatchIndex, resolveBucketSearchColor } from './SearchBucketMatcher.js';
 
-/**
- * MeshSearchStyleRenderer
- *
- * Pure rendering class for search-aware styling of timeline events using Mesh.
- * Receives pre-computed, culled rectangles and matched events set.
- */
-export class MeshSearchStyleRenderer {
-  private batches: Map<string, RenderBatch>;
-  private geometry: RectangleGeometry;
-  private mesh: Mesh<Geometry, Shader>;
-  private lastViewport: ViewportState | null = null;
-
+export class MeshSearchStyleRenderer extends MeshRectangleWriter {
   constructor(container: Container, batches: Map<string, RenderBatch>) {
-    this.batches = batches;
-
-    const { geometry, mesh } = createRectangleMesh(container, 'MeshSearchStyleRenderer');
-    this.geometry = geometry;
-    this.mesh = mesh;
+    super(container, batches, 'MeshSearchStyleRenderer');
     this.mesh.visible = false;
-  }
-
-  /**
-   * Set the stage container for clip-space rendering.
-   * NOTE: With clip-space coordinates, we don't need to move to stage root.
-   * The mesh outputs directly to gl_Position, bypassing all container transforms.
-   */
-  public setStageContainer(_stage: Container): void {
-    // No-op: Keep mesh in worldContainer. Clip-space shader bypasses transforms anyway.
   }
 
   /**
@@ -84,41 +54,10 @@ export class MeshSearchStyleRenderer {
     viewport?: ViewportState,
     matchedEventsInfo: ReadonlyArray<MatchedEventInfo> = [],
   ): void {
-    // Use provided viewport or fall back to stored one
-    const vp = viewport || this.lastViewport;
-    if (!vp) {
+    const viewportTransform = this.beginFrame(culledRects, buckets, viewport);
+    if (!viewportTransform) {
       return;
     }
-    this.lastViewport = vp;
-
-    // Count total rectangles needed
-    let totalRects = 0;
-    for (const rectangles of culledRects.values()) {
-      totalRects += rectangles.length;
-    }
-    for (const categoryBuckets of buckets.values()) {
-      totalRects += categoryBuckets.length;
-    }
-
-    // Early exit if nothing to render
-    if (totalRects === 0) {
-      this.geometry.setDrawCount(0);
-      this.mesh.visible = false;
-      return;
-    }
-
-    // Ensure buffer capacity
-    this.geometry.ensureCapacity(totalRects);
-
-    // Create viewport transform for coordinate conversion
-    // No canvasYOffset needed - main timeline has its own canvas
-    const viewportTransform: ViewportTransform = {
-      offsetX: vp.offsetX,
-      offsetY: vp.offsetY,
-      displayWidth: vp.displayWidth,
-      displayHeight: vp.displayHeight,
-      canvasYOffset: 0,
-    };
 
     // Pre-calculate constants outside loops
     const gap = TIMELINE_CONSTANTS.RECT_GAP;
@@ -137,7 +76,6 @@ export class MeshSearchStyleRenderer {
       const greyColor = colorToGreyscale(originalColor);
 
       for (const rect of rectangles) {
-        // Use original color for matched events, greyscale for non-matched
         const color = matchedEventIds.has(rect.id) ? originalColor : greyColor;
 
         const x = rect.x + halfGap;
@@ -152,90 +90,13 @@ export class MeshSearchStyleRenderer {
       }
     }
 
-    // Write all buckets with search styling
-    rectIndex = this.writeBucketsWithSearch(
-      buckets,
-      matchedEventsInfo,
-      rectIndex,
-      viewportTransform,
+    // A bucket's colour comes from the matches inside it, by time range: `eventRefs` is
+    // empty on a memory-optimised bucket.
+    const matchIndex = buildMatchIndex(matchedEventsInfo);
+    rectIndex = this.writeBuckets(buckets, rectIndex, viewportTransform, (bucket) =>
+      resolveBucketSearchColor(bucket, matchIndex, this.batches),
     );
 
-    // Set draw count and make visible
-    this.geometry.setDrawCount(rectIndex);
-    this.mesh.visible = true;
-  }
-
-  /**
-   * Clear all rendered content (hide the mesh).
-   * Called when exiting search mode to return to normal rendering.
-   */
-  public clear(): void {
-    this.geometry.setDrawCount(0);
-    this.mesh.visible = false;
-  }
-
-  /**
-   * Clean up resources.
-   */
-  public destroy(): void {
-    this.geometry.destroy();
-    this.mesh.destroy();
-  }
-
-  // ============================================================================
-  // PRIVATE HELPERS
-  // ============================================================================
-
-  /**
-   * Write all buckets with search styling to geometry buffers.
-   *
-   * Each bucket's color is determined by whether it contains matched events.
-   * Buckets with matches use resolved color from matched events.
-   * Buckets without matches use desaturated greyscale.
-   *
-   * Uses time-range matching since bucket.eventRefs may be empty for memory-optimized buckets.
-   *
-   * @param buckets - Aggregated buckets grouped by category
-   * @param matchedEventsInfo - Lightweight info about matched events
-   * @param startIndex - Starting rectangle index in the buffer
-   * @param viewportTransform - Transform for coordinate conversion
-   * @returns Next available rectangle index
-   */
-  private writeBucketsWithSearch(
-    buckets: Map<string, PixelBucket[]>,
-    matchedEventsInfo: ReadonlyArray<MatchedEventInfo>,
-    startIndex: number,
-    viewportTransform: ViewportTransform,
-  ): number {
-    const matchIndex = buildMatchIndex(matchedEventsInfo);
-
-    // Pre-calculate constants outside loops
-    const gap = TIMELINE_CONSTANTS.RECT_GAP;
-    const halfGap = gap / 2;
-    const blockWidth = BUCKET_CONSTANTS.BUCKET_BLOCK_WIDTH;
-    const eventHeight = TIMELINE_CONSTANTS.EVENT_HEIGHT;
-    const gappedHeight = Math.max(0, eventHeight - gap);
-
-    let rectIndex = startIndex;
-
-    // Write all buckets from all categories
-    for (const categoryBuckets of buckets.values()) {
-      for (const bucket of categoryBuckets) {
-        const displayColor = resolveBucketSearchColor(bucket, matchIndex, this.batches);
-
-        this.geometry.writeRectangle(
-          rectIndex,
-          bucket.x + halfGap,
-          bucket.y + halfGap,
-          blockWidth,
-          gappedHeight,
-          displayColor,
-          viewportTransform,
-        );
-        rectIndex++;
-      }
-    }
-
-    return rectIndex;
+    this.endFrame(rectIndex);
   }
 }
