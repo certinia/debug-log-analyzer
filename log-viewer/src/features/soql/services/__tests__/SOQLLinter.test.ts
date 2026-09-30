@@ -4,7 +4,7 @@
 import { describe, expect, it } from '@jest/globals';
 import { ApexLogParser, LogEvent } from '@apexdevtools/apex-log-parser';
 
-import { SOQLLinter } from '../../features/soql/services/SOQLLinter.js';
+import { SOQLLinter } from '../SOQLLinter.js';
 
 class DummySOQLLine extends LogEvent {
   constructor(parser: ApexLogParser, parts: string[]) {

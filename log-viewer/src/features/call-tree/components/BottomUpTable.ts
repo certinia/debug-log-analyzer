@@ -23,6 +23,7 @@ import {
   createGovernorMetricColumns,
   createNamespaceColumns,
   createTypeColumn,
+  downloadOptions,
   groupingOptions,
   headerSortElement,
   registerTableModules,
@@ -39,25 +40,6 @@ export type BottomUpTableOptions = Partial<Options> & {
 
 export interface BottomUpTableCallbacks extends TableCallbacks {
   showDetailsFilter?: (data: BottomUpRow) => boolean;
-}
-
-type VSCodeSaveFile = {
-  fileContent: string;
-  options: { defaultFileName: string };
-};
-
-function createDownloadEncoder(defaultFileName: string) {
-  return function (fileContents: string, mimeType: string) {
-    const vscodeHost = vscodeMessenger.getVsCodeAPI();
-    if (vscodeHost) {
-      vscodeMessenger.send<VSCodeSaveFile>('saveFile', {
-        fileContent: fileContents,
-        options: { defaultFileName },
-      });
-      return false;
-    }
-    return new Blob([fileContents], { type: mimeType });
-  };
 }
 
 export function createBottomUpTable(
@@ -101,15 +83,8 @@ export function createBottomUpTable(
         clipboardCopyConfig: {
           dataTree: false,
         },
-        downloadEncoder: createDownloadEncoder(exportFileName ?? 'analysis.csv'),
+        ...downloadOptions(exportFileName ?? 'analysis.csv'),
         downloadRowRange: initialisedRowRange,
-        downloadConfig: {
-          columnHeaders: true,
-          columnGroups: true,
-          rowGroups: true,
-          columnCalcs: false,
-          dataTree: true,
-        },
       }
     : {};
 

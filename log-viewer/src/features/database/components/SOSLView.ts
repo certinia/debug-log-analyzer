@@ -9,7 +9,6 @@ import { customElement, property, state } from 'lit/decorators.js';
 import { Tabulator, type GroupComponent, type RowComponent } from 'tabulator-tables';
 
 import type { ApexLog, SOSLExecuteBeginLine } from '@apexdevtools/apex-log-parser';
-import { vscodeMessenger } from '../../../core/messaging/VSCodeExtensionMessenger.js';
 import { getCallerNamespace } from '../../../core/utility/CallerNamespace.js';
 import { DomListenerController } from '../../../core/events/DomListenerController.js';
 import type { FindEventDetail, FindEventMap } from '../../find/findEvents.js';
@@ -39,6 +38,7 @@ import dataGridStyles from '../../../tabulator/style/DataGrid.scss';
 import {
   clipboardCopyOptions,
   commonColumnDefaults,
+  downloadOptions,
   groupingOptions,
   headerSortElement,
   registerTableModules,
@@ -457,15 +457,7 @@ export class SOSLView extends LitElement {
       index: 'id',
       height: '100%',
       ...clipboardCopyOptions,
-      downloadEncoder: this.downlodEncoder('sosl.csv'),
-      downloadRowRange: 'all',
-      downloadConfig: {
-        columnHeaders: true,
-        columnGroups: true,
-        rowGroups: true,
-        columnCalcs: false,
-        dataTree: true,
-      },
+      ...downloadOptions('sosl.csv'),
       rowKeyboardNavigation: true,
       data: soslData,
       layout: 'fitColumns',
@@ -673,31 +665,7 @@ export class SOSLView extends LitElement {
   markLocated(eventIndexes: readonly number[]): void {
     this._locatedRow.mark(this.soslTable?.element ?? null, eventIndexes);
   }
-
-  downlodEncoder(defaultFileName: string) {
-    return function (fileContents: string, mimeType: string) {
-      const vscode = vscodeMessenger.getVsCodeAPI();
-      if (vscode) {
-        vscodeMessenger.send<VSCodeSaveFile>('saveFile', {
-          fileContent: fileContents,
-          options: {
-            defaultFileName: defaultFileName,
-          },
-        });
-        return false;
-      }
-
-      return new Blob([fileContents], { type: mimeType });
-    };
-  }
 }
-
-type VSCodeSaveFile = {
-  fileContent: string;
-  options: {
-    defaultFileName: string;
-  };
-};
 
 interface SOSLRow {
   id: number;

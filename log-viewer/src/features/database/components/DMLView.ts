@@ -9,7 +9,6 @@ import { customElement, property, state } from 'lit/decorators.js';
 import { Tabulator, type GroupComponent, type RowComponent } from 'tabulator-tables';
 
 import type { ApexLog, DMLBeginLine } from '@apexdevtools/apex-log-parser';
-import { vscodeMessenger } from '../../../core/messaging/VSCodeExtensionMessenger.js';
 import { getCallerNamespace } from '../../../core/utility/CallerNamespace.js';
 import { DomListenerController } from '../../../core/events/DomListenerController.js';
 import type { FindEventDetail, FindEventMap } from '../../find/findEvents.js';
@@ -37,6 +36,7 @@ import dataGridStyles from '../../../tabulator/style/DataGrid.scss';
 import {
   clipboardCopyOptions,
   commonColumnDefaults,
+  downloadOptions,
   groupingOptions,
   headerSortElement,
   registerTableModules,
@@ -498,15 +498,7 @@ export class DMLView extends LitElement {
       index: 'id',
       height: '100%',
       ...clipboardCopyOptions,
-      downloadEncoder: this.downlodEncoder('dml.csv'),
-      downloadRowRange: 'all',
-      downloadConfig: {
-        columnHeaders: true,
-        columnGroups: true,
-        rowGroups: true,
-        columnCalcs: false,
-        dataTree: true,
-      },
+      ...downloadOptions('dml.csv'),
       rowKeyboardNavigation: true,
       data: dmlData, //set initial table data
       layout: 'fitColumns',
@@ -706,31 +698,7 @@ export class DMLView extends LitElement {
     this.holder ??= tableHolder(this.dmlTable?.element);
     return this.holder;
   }
-
-  downlodEncoder(defaultFileName: string) {
-    return function (fileContents: string, mimeType: string) {
-      const vscode = vscodeMessenger.getVsCodeAPI();
-      if (vscode) {
-        vscodeMessenger.send<VSCodeSaveFile>('saveFile', {
-          fileContent: fileContents,
-          options: {
-            defaultFileName: defaultFileName,
-          },
-        });
-        return false;
-      }
-
-      return new Blob([fileContents], { type: mimeType });
-    };
-  }
 }
-
-type VSCodeSaveFile = {
-  fileContent: string;
-  options: {
-    defaultFileName: string;
-  };
-};
 
 interface DMLRow {
   id: number;

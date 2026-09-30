@@ -11,6 +11,7 @@ import {
 } from 'tabulator-tables';
 
 import { NO_REPORTED_LIMITS_TEXT } from '../../../components/governorCopy.js';
+import { saveFile } from '../../../core/messaging/saveFile.js';
 import { formatInteger, sharePercent } from '../../../core/utility/Util.js';
 import { NAMESPACE_WIDTH } from '../../../tabulator/ColumnWidths.js';
 import { GroupCalcs } from '../../../tabulator/groups/GroupCalcs.js';
@@ -74,6 +75,30 @@ export const clipboardCopyOptions = {
   // Cast the one value, not the object: a typo in the keys above still fails here.
   keybindings: { copyToClipboard: ['ctrl + 67', 'meta + 67'] } as unknown as Options['keybindings'],
 } satisfies Partial<Options>;
+
+/**
+ * Table options that export the whole grid as CSV. Spread beside
+ * {@link clipboardCopyOptions}, which is the other half of the same feature.
+ *
+ * Tabulator runs its own `<a download>` for any truthy encoder result, so handing the
+ * file to the extension host has to answer `false` to stop it saving twice.
+ */
+export function downloadOptions(defaultFileName: string) {
+  return {
+    downloadEncoder: (fileContents: string, mimeType: string) =>
+      saveFile(fileContents, defaultFileName)
+        ? false
+        : new Blob([fileContents], { type: mimeType }),
+    downloadRowRange: 'all',
+    downloadConfig: {
+      columnHeaders: true,
+      columnGroups: true,
+      rowGroups: true,
+      columnCalcs: false,
+      dataTree: true,
+    },
+  } satisfies Partial<Options>;
+}
 
 /**
  * Virtual row rendering plus the scroll anchoring that goes with it — one
