@@ -45,6 +45,7 @@ export default {
       rootDir: '<rootDir>/log-viewer',
       moduleNameMapper: {
         ...defaultConfig.moduleNameMapper,
+        '^#test-helpers/(.*)\\.js$': '<rootDir>/src/__tests__/helpers/$1',
         // Stylesheet imports have no transform here; the `.js` rule above runs first, so the
         // `*.css.ts` style modules are unaffected.
         '\\.s?css$': '<rootDir>/src/__tests__/mocks/styleStub.ts',
