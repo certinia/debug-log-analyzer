@@ -82,7 +82,6 @@ function retrieveLogPromise(): Promise<string | void> {
 
 describe('RetrieveLogFile', () => {
   beforeEach(() => {
-    jest.clearAllMocks();
     mockEnsureServicesAvailable.mockResolvedValue(true);
     mockFileOrFolderExists.mockResolvedValue(false);
     mockWorkspace.workspaceFolders = [

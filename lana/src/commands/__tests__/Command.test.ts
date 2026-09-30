@@ -1,7 +1,7 @@
 /*
  * Copyright (c) 2026 Certinia Inc. All rights reserved.
  */
-import { beforeEach, describe, expect, it } from '@jest/globals';
+import { describe, expect, it } from '@jest/globals';
 import { commands } from 'vscode';
 
 import type { Context } from '../../Context.js';
@@ -11,10 +11,6 @@ import { Command } from '../Command.js';
 const mockRegisterCommand = commands.registerCommand as jest.Mock;
 
 describe('Command', () => {
-  beforeEach(() => {
-    jest.clearAllMocks();
-  });
-
   it('returns what the handler returns', async () => {
     const context = createMockContext();
     const command = new Command(

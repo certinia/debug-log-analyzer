@@ -24,7 +24,6 @@ const mockRegisterCommand = commands.registerCommand as jest.Mock;
 
 describe('ShowInLogAnalysis', () => {
   beforeEach(() => {
-    jest.clearAllMocks();
     mockGetCurrentView.mockReturnValue(undefined);
     mockCreateView.mockResolvedValue(undefined);
   });

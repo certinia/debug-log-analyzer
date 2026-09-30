@@ -28,7 +28,6 @@ function createContext() {
 
 describe('OpenFileInPackage.openFileForSymbol', () => {
   beforeEach(() => {
-    jest.clearAllMocks();
     mockParseApex.mockReturnValue({ name: 'myclass', children: [] });
     mockOpenTextDocument.mockResolvedValue({ getText: () => 'public class MyClass {}' });
   });

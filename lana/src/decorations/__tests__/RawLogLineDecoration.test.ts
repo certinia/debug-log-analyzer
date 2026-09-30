@@ -60,7 +60,6 @@ describe('RawLogLineDecoration', () => {
   let mockContext: ReturnType<typeof createMockContext>;
 
   beforeEach(() => {
-    jest.clearAllMocks();
     jest.useFakeTimers();
     // The class keeps one instance for the life of the extension host.
     (RawLogLineDecoration as unknown as { instance: unknown }).instance = null;

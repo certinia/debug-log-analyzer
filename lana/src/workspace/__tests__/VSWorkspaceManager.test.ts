@@ -27,7 +27,6 @@ function createManager(...folders: object[]): VSWorkspaceManager {
 
 describe('VSWorkspaceManager', () => {
   beforeEach(() => {
-    jest.clearAllMocks();
     (workspace as { workspaceFolders?: unknown[] }).workspaceFolders = undefined;
   });
 

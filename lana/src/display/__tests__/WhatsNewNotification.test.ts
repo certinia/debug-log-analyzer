@@ -27,7 +27,6 @@ const asContext = (mockContext: ReturnType<typeof createMockContext>) =>
 
 describe('WhatsNewNotification', () => {
   beforeEach(() => {
-    jest.clearAllMocks();
     mockShowInformationMessage.mockResolvedValue(undefined);
   });
 
