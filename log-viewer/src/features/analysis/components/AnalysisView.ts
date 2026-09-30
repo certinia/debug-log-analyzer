@@ -402,7 +402,9 @@ export class AnalysisView extends LitElement {
   }
 
   _copyToClipboard() {
-    this.analysisTable?.copyToClipboard('all');
+    // No range: an argument wins over `clipboardCopyRowRange`, which is what fills the
+    // tree state in.
+    this.analysisTable?.copyToClipboard();
   }
 
   _exportToCSV() {
