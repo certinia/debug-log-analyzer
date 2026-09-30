@@ -13,6 +13,7 @@
  */
 
 import { afterEach, describe, expect, it, jest } from '@jest/globals';
+import { makeViewport } from '#test-helpers/viewport.js';
 import { FlameChart } from '../FlameChart.js';
 
 /** The private collaborators `resize` and `render` need, and nothing else. */
@@ -39,13 +40,7 @@ function stubbedChart(displayHeight = 300): {
     getCulledRectangles: () => ({ visibleRects: new Map(), buckets: new Map() }),
   };
   internals['viewport'] = {
-    getState: () => ({
-      zoom: 1,
-      offsetX: 0,
-      offsetY: 0,
-      displayWidth: 400,
-      displayHeight,
-    }),
+    getState: () => makeViewport({ displayWidth: 400, displayHeight }),
     setStateForResize: jest.fn(),
   };
   // The geometry init applied: 364 container - 60 minimap - 4 gap = the 300 below.
