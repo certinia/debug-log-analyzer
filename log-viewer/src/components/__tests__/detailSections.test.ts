@@ -5,7 +5,7 @@
  */
 import { describe, expect, it } from '@jest/globals';
 
-// Avoid the heavy component import chains (Tabulator, scss, vscode-elements);
+// Avoid the heavy component import chains (Tabulator, scss);
 // this suite only exercises the section-assembly logic.
 jest.mock('../CallStackDetail.js', () => ({}));
 jest.mock('../CallTreeDetail.js', () => ({}));

@@ -8,7 +8,7 @@ import { parse } from '@apexdevtools/apex-log-parser';
 
 import { logStoreFor, type LogStore } from '../../core/log/LogStore.js';
 
-// Avoid the heavy CodeBlock import chain (vscode-elements, soql formatter); the
+// Avoid the heavy CodeBlock import chain (the soql formatter); the
 // field order is expressed by the `.label` spans, not the code preview.
 jest.mock('../CodeBlock.js', () => ({}));
 

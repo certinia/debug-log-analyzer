@@ -5,8 +5,6 @@
  */
 import { beforeAll, describe, expect, it } from '@jest/globals';
 
-jest.mock('#vscode-elements/vscode-icon.js', () => ({}));
-
 import type { CodeBlock } from '../CodeBlock.js';
 import '../CodeBlock.js';
 

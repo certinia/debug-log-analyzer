@@ -5,9 +5,6 @@
  */
 import { describe, expect, it } from '@jest/globals';
 
-// The swc transform can't parse `.scss`/`.css`; stub the stylesheet assets.
-jest.mock('../../tabulator/style/DataGrid.scss', () => ({ default: '' }));
-jest.mock('../../tabulator/format/Progress.css', () => ({}));
 // The tabulator ESM build (+ its module registrations) doesn't load under jest;
 // this suite exercises the view-mode toggle and the column set; no table is
 // built (eventIndex -1).
@@ -18,8 +15,6 @@ jest.mock('tabulator-tables', () => ({
   Module: class {},
   Renderer: class {},
 }));
-// vscode-button needs ElementInternals.setFormValue (absent in jsdom).
-jest.mock('#vscode-elements/vscode-button.js', () => ({}));
 
 import type { CellComponent } from 'tabulator-tables';
 

@@ -6,13 +6,6 @@
 import { beforeEach, describe, expect, it } from '@jest/globals';
 import { html } from 'lit';
 
-jest.mock('#vscode-elements/vscode-icon.js', () => ({}));
-jest.mock('#vscode-elements/vscode-badge.js', () => ({}));
-jest.mock('#vscode-elements/vscode-button.js', () => ({}));
-// The swc transform can't parse `.scss`/`.css`; stub the stylesheet assets.
-jest.mock('../../tabulator/style/DataGrid.scss', () => ({ default: '' }));
-jest.mock('../../tabulator/format/Progress.css', () => ({}));
-
 const settings: { inspector?: unknown } = {};
 const written: Array<{ section: string; value: unknown }> = [];
 // Settings normally reply at once; `deferSettings` holds the reply so a test can
