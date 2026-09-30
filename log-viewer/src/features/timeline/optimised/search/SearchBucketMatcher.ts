@@ -12,9 +12,13 @@
  * Extracted from MeshSearchStyleRenderer to enable reuse and independent testing.
  */
 
-import type { CategoryAggregation, PixelBucket } from '../../types/flamechart.types.js';
+import type { PixelBucket } from '../../types/flamechart.types.js';
 import type { MatchedEventInfo } from '../../types/search.types.js';
-import { type BatchColorInfo, resolveColor } from '../BucketColorResolver.js';
+import {
+  type BatchColorInfo,
+  UNKNOWN_CATEGORY_COLOR,
+  categoryPriority,
+} from '../BucketColorResolver.js';
 import { colorToGreyscale } from '../rendering/ColorUtils.js';
 
 /**
@@ -22,11 +26,7 @@ import { colorToGreyscale } from '../rendering/ColorUtils.js';
  */
 export type MatchesByDepth = Map<number, ReadonlyArray<MatchedEventInfo>>;
 
-/**
- * A search's matches do not change while the chart pans or zooms, but the renderer asks
- * for the index on every frame. Keyed on the array, so the entry falls away with the
- * search that produced it.
- */
+/** The renderer asks on every frame; `SearchCursorImpl` answers with the same array each time. */
 const indexCache = new WeakMap<ReadonlyArray<MatchedEventInfo>, MatchesByDepth>();
 
 /**
@@ -53,8 +53,6 @@ export function buildMatchIndex(
     depthMatches.push(info);
   }
 
-  // Sorted so a bucket can seek its own time range, rather than every bucket reading
-  // every match at its depth.
   for (const depthMatches of matchesByDepth.values()) {
     depthMatches.sort((a, b) => a.timestamp - b.timestamp);
   }
@@ -63,7 +61,6 @@ export function buildMatchIndex(
   return matchesByDepth;
 }
 
-/** Index of the first match at or after `time`, or `matches.length` where there is none. */
 function firstAtOrAfter(matches: ReadonlyArray<MatchedEventInfo>, time: number): number {
   let low = 0;
   let high = matches.length;
@@ -80,25 +77,17 @@ function firstAtOrAfter(matches: ReadonlyArray<MatchedEventInfo>, time: number):
 }
 
 /**
- * Counts per category for the bucket being resolved. Reused across buckets: `resolveColor`
- * reads it and holds nothing, and a frame resolves one bucket at a time.
- */
-const bucketCategoryStats = new Map<string, CategoryAggregation>();
-
-/**
- * Resolve the display color for a bucket based on search match status.
+ * Colour for a bucket holding a match, or its own colour in greyscale where it holds none.
  *
- * If any matched events overlap the bucket's time range at its depth,
- * the color is resolved from the matched category stats.
- * Otherwise, the bucket's pre-blended color is desaturated to greyscale.
- *
- * @param bucket - The pixel bucket to resolve color for
- * @param matchIndex - Spatial index from buildMatchIndex()
- * @param batchColors - Theme-aware category colors
- * @returns Resolved display color (0xRRGGBB)
+ * The winner is tracked in place rather than through `resolveColor`, which needs a map of
+ * per-category counts to answer the same question. Those counts cannot change the answer
+ * here: `CATEGORY_PRIORITY` ranks every category distinctly, so the count tie-break is
+ * unreachable, and the duration tie-break reads a total this path never sums. Categories
+ * outside that list tie at `Infinity`, and `resolveColor` gives that tie to the first, so
+ * the first match is taken as the winner to beat.
  */
 export function resolveBucketSearchColor(
-  bucket: PixelBucket,
+  bucket: Pick<PixelBucket, 'depth' | 'timeStart' | 'timeEnd' | 'color'>,
   matchIndex: MatchesByDepth,
   batchColors: Map<string, BatchColorInfo>,
 ): number {
@@ -107,7 +96,9 @@ export function resolveBucketSearchColor(
     return colorToGreyscale(bucket.color);
   }
 
-  bucketCategoryStats.clear();
+  let winner = '';
+  let winningPriority = Infinity;
+  let matched = false;
 
   for (let i = firstAtOrAfter(depthMatches, bucket.timeStart); i < depthMatches.length; i++) {
     const match = depthMatches[i];
@@ -117,24 +108,17 @@ export function resolveBucketSearchColor(
     if (!match.category) {
       continue;
     }
-
-    let stats = bucketCategoryStats.get(match.category);
-    if (!stats) {
-      stats = { count: 0, totalDuration: 0 };
-      bucketCategoryStats.set(match.category, stats);
+    const priority = categoryPriority(match.category);
+    if (!matched || priority < winningPriority) {
+      winner = match.category;
+      winningPriority = priority;
     }
-    stats.count++;
+    matched = true;
   }
 
-  if (bucketCategoryStats.size === 0) {
+  if (!matched) {
     return colorToGreyscale(bucket.color);
   }
 
-  return resolveColor(
-    {
-      byCategory: bucketCategoryStats,
-      dominantCategory: '',
-    },
-    batchColors,
-  ).color;
+  return batchColors.get(winner)?.color ?? UNKNOWN_CATEGORY_COLOR;
 }

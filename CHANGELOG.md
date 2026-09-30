@@ -9,7 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-- ⚡ **Search**: shading the timeline is up to 29× faster on a log with thousands of matches.
+- ⚡ **Search**: the Timeline draws 7× faster on a search matching tens of thousands of frames.
 - ✂️ **Truncation**: each skipped section states how much of the log it dropped.
 
 ### Removed

@@ -27,6 +27,11 @@ const PRIORITY_MAP = new Map<string, number>(
   BUCKET_CONSTANTS.CATEGORY_PRIORITY.map((cat, index) => [cat, index]),
 );
 
+/** Rank of a category, lower winning. `Infinity` for one outside `CATEGORY_PRIORITY`. */
+export function categoryPriority(category: string): number {
+  return PRIORITY_MAP.get(category) ?? Infinity;
+}
+
 /**
  * Result of color resolution including the dominant category.
  */
@@ -77,7 +82,7 @@ export function resolveColor(
   let winningCount = -1;
 
   for (const [category, stats] of byCategory) {
-    const priority = PRIORITY_MAP.get(category) ?? Infinity;
+    const priority = categoryPriority(category);
 
     // Compare by priority first
     if (priority < winningPriority) {
