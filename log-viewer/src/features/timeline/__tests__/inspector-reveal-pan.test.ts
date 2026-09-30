@@ -46,7 +46,7 @@ function timelineWith(...events: Frame[]): {
       selected++;
       return true;
     },
-    getViewportManager: () => ({ getBounds: () => BOUNDS }),
+    getViewportBounds: () => BOUNDS,
     panToFrame: (timestamp: number, duration: number, depth: number, axes: ViewportPanAxes) => {
       panned.push({ timestamp, duration, depth, axes });
     },

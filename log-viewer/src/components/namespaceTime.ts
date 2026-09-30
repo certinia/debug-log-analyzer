@@ -33,6 +33,11 @@ async function namespaceSelfTimes(
     const namespace = event.namespace || DEFAULT_NAMESPACE;
     totals.set(namespace, (totals.get(namespace) ?? 0) + event.duration.self);
   }
+  return toNamespaceTimes(totals);
+}
+
+/** Self time per namespace, ranked for display: empty buckets go, largest first. */
+export function toNamespaceTimes(totals: ReadonlyMap<string, number>): NamespaceTime[] {
   return [...totals]
     .filter(([, selfTime]) => selfTime > 0)
     .map(([namespace, selfTime]) => ({ namespace, selfTime }))

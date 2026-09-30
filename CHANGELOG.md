@@ -11,6 +11,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - ✂️ **Truncation**: each skipped section states how much of the log it dropped.
 
+### Added
+
+- 🔭 **Timeline window**: zoom the Timeline and the Inspector summary follows the stretch of log on screen; CPU and heap stay whole-log, since the log reports them only in total. ([#875])
+
 ### Removed
 
 - 🪓 **Breaking**: the legacy Timeline and all its settings are dropped.
@@ -570,6 +574,7 @@ Skipped due to adopting odd numbering for pre releases and even number for relea
 [#373]: https://github.com/certinia/debug-log-analyzer/issues/373
 [#298]: https://github.com/certinia/debug-log-analyzer/issues/298
 [#162]: https://github.com/certinia/debug-log-analyzer/issues/162
+[#875]: https://github.com/certinia/debug-log-analyzer/issues/875
 [#113]: https://github.com/certinia/debug-log-analyzer/issues/113
 [#63]: https://github.com/certinia/debug-log-analyzer/issues/63
 [#32]: https://github.com/certinia/debug-log-analyzer/issues/32
