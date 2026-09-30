@@ -9,7 +9,7 @@ import {
   sumTotalForRootEvents,
 } from '../CallStackSum.js';
 import type { Metric } from '../RowGrouper.js';
-import { createEvent } from '../../../../__tests__/helpers/events.js';
+import { createEvent } from '#test-helpers/events.js';
 
 describe('sumDurationTotalForRootEvents', () => {
   it('counts each call-stack root once and skips events whose ancestors are visible', () => {

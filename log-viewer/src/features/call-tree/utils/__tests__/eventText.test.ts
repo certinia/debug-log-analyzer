@@ -2,7 +2,7 @@
  * Copyright (c) 2026 Certinia Inc. All rights reserved.
  */
 import { describe, expect, it } from '@jest/globals';
-import { createEvent } from '../../../../__tests__/helpers/events.js';
+import { createEvent } from '#test-helpers/events.js';
 import { governorLimits, limitValue } from '../../../../components/__tests__/limitsTestUtils.js';
 import { eventLabel, eventName, formatCallStack, formatEventDetails } from '../eventText.js';
 

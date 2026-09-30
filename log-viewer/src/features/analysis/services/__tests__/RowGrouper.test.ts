@@ -3,7 +3,7 @@
  */
 import { describe, expect, it } from '@jest/globals';
 
-import { createEvent } from '../../../../__tests__/helpers/events.js';
+import { createEvent } from '#test-helpers/events.js';
 import { group } from '../RowGrouper.js';
 
 describe('RowGrouper.group', () => {

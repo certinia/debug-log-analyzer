@@ -4,7 +4,7 @@
 import { describe, expect, it } from '@jest/globals';
 import type { LogEvent } from '@apexdevtools/apex-log-parser';
 
-import { createEvent } from '../../../../__tests__/helpers/events.js';
+import { createEvent } from '#test-helpers/events.js';
 import { outermostEvents } from '../../../../core/utility/EventTree.js';
 import {
   toAggregatedCallTree,

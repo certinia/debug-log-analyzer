@@ -3,7 +3,7 @@
  */
 import { describe, expect, it } from '@jest/globals';
 
-import { SETTINGS, indexOf, storeOf } from '../../../__tests__/helpers/apexLog.js';
+import { SETTINGS, indexOf, storeOf } from '#test-helpers/apexLog.js';
 
 import {
   apexCodeLevel,

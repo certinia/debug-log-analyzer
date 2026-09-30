@@ -127,6 +127,25 @@ export default defineConfig(
     },
   },
   {
+    files: ['log-viewer/src/**/*.ts'],
+    ignores: ['**/__tests__/**', '**/*.test.ts'],
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        {
+          patterns: [
+            {
+              // `group` is gitignore syntax, where a leading `#` is a comment.
+              regex: '^#test-helpers/',
+              message:
+                'Test fixtures only. tsconfig paths resolve this alias in production code too, so this rule is what keeps it out of the bundle.',
+            },
+          ],
+        },
+      ],
+    },
+  },
+  {
     files: ['lana/src/**/*.ts'],
     ignores: [
       'lana/src/commands/RetrieveLogFile.ts',

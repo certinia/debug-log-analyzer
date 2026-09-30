@@ -6,7 +6,7 @@
 import { describe, expect, it } from '@jest/globals';
 
 import { MAX_MARKED_PER_VALUE } from '../../core/log/aggregateVariables.js';
-import { SETTINGS, indexOf, storeOf } from '../../__tests__/helpers/apexLog.js';
+import { SETTINGS, indexOf, storeOf } from '#test-helpers/apexLog.js';
 import type { LogStore } from '../../core/log/LogStore.js';
 
 // Avoid the heavy CodeBlock import chain (vscode-elements, soql formatter). The

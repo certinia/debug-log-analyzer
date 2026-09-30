@@ -3,7 +3,7 @@
  */
 import { describe, expect, it, jest } from '@jest/globals';
 
-import { indexesOf, storeOf } from '../../../__tests__/helpers/apexLog.js';
+import { indexesOf, storeOf } from '#test-helpers/apexLog.js';
 
 import {
   aggregateVariablesFor,
