@@ -8,6 +8,7 @@ import { logStoreFor } from '../../../core/log/LogStore.js';
 import { vscodeMessenger } from '../../../core/messaging/VSCodeExtensionMessenger.js';
 import { formatDuration } from '../../../core/utility/Util.js';
 import { TIME_WIDTH } from '../../../tabulator/ColumnWidths.js';
+import { initialisedRowRange } from '../../../tabulator/module/initialisedRows.js';
 import { progressFormatterMS } from '../../../tabulator/format/ProgressMS.js';
 import {
   sumDurationTotalForRootEvents,
@@ -96,11 +97,12 @@ export function createBottomUpTable(
   const clipboardAndDownloadOptions: Partial<Options> = enableClipboardAndDownload
     ? {
         ...clipboardCopyOptions,
+        clipboardCopyRowRange: initialisedRowRange,
         clipboardCopyConfig: {
           dataTree: false,
         },
         downloadEncoder: createDownloadEncoder(exportFileName ?? 'analysis.csv'),
-        downloadRowRange: 'all',
+        downloadRowRange: initialisedRowRange,
         downloadConfig: {
           columnHeaders: true,
           columnGroups: true,
