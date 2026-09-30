@@ -3,7 +3,7 @@
  */
 import { describe, expect, it } from '@jest/globals';
 
-import { createMockContext } from '../../__tests__/helpers/test-builders.js';
+import { asContext, createMockContext } from '../../__tests__/helpers/test-builders.js';
 import { Uri, workspace } from '../../__tests__/mocks/vscode.js';
 import { getConfig } from '../../workspace/AppConfig.js';
 import { WebView } from '../../display/WebView.js';
@@ -75,7 +75,7 @@ describe('LogView', () => {
     );
 
     await LogView.createView(
-      createMockContext() as unknown as import('../../Context.js').Context,
+      asContext(createMockContext()),
       Promise.resolve(),
       Uri.parse('memfs:/repository/logs/virtual.log'),
       'log body',
@@ -109,12 +109,7 @@ describe('LogView', () => {
     const context = createMockContext();
     const logUri = Uri.parse('memfs:/repository/logs/virtual.log');
 
-    await LogView.createView(
-      context as unknown as import('../../Context.js').Context,
-      Promise.resolve(),
-      logUri,
-      'log body',
-    );
+    await LogView.createView(asContext(context), Promise.resolve(), logUri, 'log body');
     // createView must resolve and rewrite the bundled index.html. It read that
     // file through a service needing another extension's initialisation, so it
     // rejected before the webview had any content.
@@ -147,7 +142,7 @@ describe('LogView', () => {
       new TextEncoder().encode('<script src="bundle.js"></script><link href="codicon.css">'),
     );
 
-    await LogView.createView(createMockContext() as unknown as import('../../Context.js').Context);
+    await LogView.createView(asContext(createMockContext()));
 
     expect(mockReadFile).toHaveBeenCalledWith(Uri.parse('file:///test/extension/out/index.html'));
     expect(panel.webview.html).toContain('webview:/test/extension/out/bundle.js');
@@ -166,7 +161,7 @@ describe('LogView', () => {
     try {
       const context = createMockContext();
       const failed = Promise.reject(new Error('org unreachable'));
-      await LogView.createView(context as unknown as import('../../Context.js').Context, failed);
+      await LogView.createView(asContext(context), failed);
       // No fetchLog is posted, so nothing here awaits the body.
       await new Promise((resolve) => setImmediate(resolve));
       expect(unhandled).toEqual([]);
@@ -185,9 +180,9 @@ describe('LogView', () => {
     mockApplyWebView.mockReturnValue(panel as unknown as import('vscode').WebviewPanel);
     mockReadFile.mockRejectedValue(new Error('ENOENT'));
 
-    await expect(
-      LogView.createView(createMockContext() as unknown as import('../../Context.js').Context),
-    ).rejects.toThrow('Could not read the log viewer at /test/extension/out/index.html: ENOENT');
+    await expect(LogView.createView(asContext(createMockContext()))).rejects.toThrow(
+      'Could not read the log viewer at /test/extension/out/index.html: ENOENT',
+    );
   });
 
   it('answers a request whose case throws, so the webview stops waiting', async () => {

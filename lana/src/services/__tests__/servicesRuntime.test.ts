@@ -32,7 +32,6 @@ const validApi = () => ({
 
 describe('servicesRuntime', () => {
   beforeEach(() => {
-    jest.clearAllMocks();
     mockGetExtension.mockReturnValue(undefined);
     mockShowErrorMessage.mockResolvedValue(undefined);
   });
