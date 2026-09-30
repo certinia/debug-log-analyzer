@@ -9,6 +9,11 @@ on:
 permissions:
   contents: read
 
+# ci:install is the only install; `pnpm run` must not start another one without
+# --ignore-scripts.
+env:
+  PNPM_CONFIG_VERIFY_DEPS_BEFORE_RUN: false
+
 jobs:
   check:
     name: Check for pre release changes
@@ -62,15 +67,11 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v7
-      - name: Setup pnpm
-        uses: pnpm/action-setup@v6.1.0
+      - uses: pnpm/setup@v2
         with:
-          version: 10
-      - name: Set up Node
-        uses: actions/setup-node@v7
-        with:
-          node-version: '24'
-          cache: 'pnpm'
+          runtime: node@24
+          cache: true
+          install: false
       - name: Dependencies
         run: pnpm run ci:install
       - name: update pre-release version
