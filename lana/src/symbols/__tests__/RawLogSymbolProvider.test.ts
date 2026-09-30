@@ -8,6 +8,7 @@ import { SymbolKind, languages } from 'vscode';
 import {
   createMockDisplay,
   createMockApexLog,
+  asContext,
   createMockContext,
   createMockLogEvent,
 } from '../../__tests__/helpers/test-builders.js';
@@ -167,16 +168,18 @@ describe('RawLogSymbolProvider', () => {
   describe('apply', () => {
     const applyProvider = () => {
       const mockContext = createMockContext();
-      RawLogSymbolProvider.apply(mockContext as unknown as import('../../Context.js').Context);
-      return (languages.registerDocumentSymbolProvider as jest.Mock).mock.calls[0]?.[1] as
-        RawLogSymbolProvider | undefined;
+      RawLogSymbolProvider.apply(asContext(mockContext));
+      const registered = (languages.registerDocumentSymbolProvider as jest.Mock).mock.calls.at(
+        -1,
+      )?.[1] as RawLogSymbolProvider | undefined;
+      if (!registered) {
+        throw new Error('no document symbol provider registered');
+      }
+      return { registered, display: mockContext.display };
     };
 
     it('gives the registered provider the context display to report through', async () => {
-      const mockContext = createMockContext();
-      RawLogSymbolProvider.apply(mockContext as unknown as import('../../Context.js').Context);
-      const registered = (languages.registerDocumentSymbolProvider as jest.Mock).mock
-        .calls[0]?.[1] as RawLogSymbolProvider;
+      const { registered, display } = applyProvider();
       mockGetApexLog.mockResolvedValue(null);
 
       await registered.provideDocumentSymbols(
@@ -187,7 +190,7 @@ describe('RawLogSymbolProvider', () => {
         {} as never,
       );
 
-      expect(mockGetApexLog).toHaveBeenCalledWith(expect.anything(), mockContext.display);
+      expect(mockGetApexLog).toHaveBeenCalledWith(expect.anything(), display);
     });
 
     const fireTabChange = () => {
@@ -210,9 +213,9 @@ describe('RawLogSymbolProvider', () => {
     it('asks VS Code again once the tab model lists a log it had rejected', async () => {
       const doc = createMockTextDocument({ lines: [APEX_LOG_LINE], uri: '/test/file.log' });
       setOpenTabs();
-      const registered = applyProvider();
+      const { registered } = applyProvider();
 
-      await registered?.provideDocumentSymbols(doc, {} as never);
+      await registered.provideDocumentSymbols(doc, {} as never);
 
       setOpenTabs(new TabInputText(Uri.file('/test/file.log')));
       window.activeTextEditor = { document: doc };
@@ -225,9 +228,9 @@ describe('RawLogSymbolProvider', () => {
       const uri = Uri.file('/test/file.log');
       const doc = createMockTextDocument({ lines: [APEX_LOG_LINE], uri: '/test/file.log' });
       setOpenTabs();
-      const registered = applyProvider();
+      const { registered } = applyProvider();
 
-      await registered?.provideDocumentSymbols(doc, {} as never);
+      await registered.provideDocumentSymbols(doc, {} as never);
 
       setOpenTabs(new TabInputTextDiff(Uri.parse('git:/test/file.log'), uri));
       window.activeTextEditor = { document: doc };
