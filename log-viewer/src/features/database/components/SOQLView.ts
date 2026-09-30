@@ -14,7 +14,6 @@ import {
 } from 'tabulator-tables';
 
 import type { ApexLog, SOQLExecuteBeginLine } from '@apexdevtools/apex-log-parser';
-import { vscodeMessenger } from '../../../core/messaging/VSCodeExtensionMessenger.js';
 import { isVisible } from '../../../core/utility/Util.js';
 import { getCallerNamespace } from '../../../core/utility/CallerNamespace.js';
 import { DomListenerController } from '../../../core/events/DomListenerController.js';
@@ -47,6 +46,7 @@ import dataGridStyles from '../../../tabulator/style/DataGrid.scss';
 import {
   clipboardCopyOptions,
   commonColumnDefaults,
+  downloadOptions,
   groupingOptions,
   headerSortElement,
   registerTableModules,
@@ -528,15 +528,7 @@ export class SOQLView extends LitElement {
       placeholder: 'No SOQL queries found',
       columnCalcs: 'table',
       ...clipboardCopyOptions,
-      downloadEncoder: this.downlodEncoder('soql.csv'),
-      downloadRowRange: 'all',
-      downloadConfig: {
-        columnHeaders: true,
-        columnGroups: true,
-        rowGroups: true,
-        columnCalcs: false,
-        dataTree: true,
-      },
+      ...downloadOptions('soql.csv'),
       ...groupingOptions,
       groupHeader: soqlGroupHeader,
       groupToggleElement: false,
@@ -858,31 +850,7 @@ export class SOQLView extends LitElement {
     this.holder ??= tableHolder(this.soqlTable?.element);
     return this.holder;
   }
-
-  downlodEncoder(defaultFileName: string) {
-    return function (fileContents: string, mimeType: string) {
-      const vscode = vscodeMessenger.getVsCodeAPI();
-      if (vscode) {
-        vscodeMessenger.send<VSCodeSaveFile>('saveFile', {
-          fileContent: fileContents,
-          options: {
-            defaultFileName: defaultFileName,
-          },
-        });
-        return false;
-      }
-
-      return new Blob([fileContents], { type: mimeType });
-    };
-  }
 }
-
-type VSCodeSaveFile = {
-  fileContent: string;
-  options: {
-    defaultFileName: string;
-  };
-};
 
 interface GridSOQLData {
   id: number;
