@@ -14,23 +14,18 @@ describe('log-utils', () => {
       [0, '0.00ms'],
       [500_000, '0.50ms'],
       [1_000_000, '1.00ms'],
+      [123_456_789, '123.46ms'],
       [999_000_000, '999.00ms'],
       [1_000_000_000, '1.00s'],
       [1_500_000_000, '1.50s'],
       [30_000_000_000, '30.00s'],
       [59_990_000_000, '59.99s'],
       [60_000_000_000, '1m 0.00s'],
+      [61_234_567_890, '1m 1.23s'],
       [90_000_000_000, '1m 30.00s'],
       [150_000_000_000, '2m 30.00s'],
       [600_000_000_000, '10m 0.00s'],
     ])('formats %d ns as %s', (ns, expected) => {
-      expect(formatDuration(ns)).toBe(expected);
-    });
-
-    it.each([
-      [123_456_789, '123.46ms'],
-      [61_234_567_890, '1m 1.23s'],
-    ])('rounds %d ns to two decimal places, giving %s', (ns, expected) => {
       expect(formatDuration(ns)).toBe(expected);
     });
   });
@@ -61,224 +56,64 @@ describe('log-utils', () => {
   });
 
   describe('buildMetricParts', () => {
-    describe('duration formatting', () => {
-      it('should include total duration when self equals total', () => {
-        const event = createMockLogEvent({
-          duration: { self: 1_000_000_000, total: 1_000_000_000 },
-        });
-
-        const parts = buildMetricParts(event);
-
-        expect(parts[0]).toBe('**1.00s**');
-      });
-
-      it('should include self time when different from total', () => {
-        const event = createMockLogEvent({
-          duration: { self: 500_000_000, total: 1_000_000_000 },
-        });
-
-        const parts = buildMetricParts(event);
-
-        expect(parts[0]).toBe('**1.00s** (self: 500.00ms)');
-      });
-
-      it('should format zero duration', () => {
-        const event = createMockLogEvent({
-          duration: { self: 0, total: 0 },
-        });
-
-        const parts = buildMetricParts(event);
-
-        expect(parts[0]).toBe('**0.00ms**');
-      });
+    it.each([
+      [1_000_000_000, 1_000_000_000, '**1.00s**'],
+      [100_000_000, 100_000_000, '**100.00ms**'],
+      [0, 0, '**0.00ms**'],
+      [500_000_000, 1_000_000_000, '**1.00s** (self: 500.00ms)'],
+    ])('leads with self %d ns of total %d ns as %s', (self, total, expected) => {
+      expect(buildMetricParts(createMockLogEvent({ duration: { self, total } }))).toEqual([
+        expected,
+      ]);
     });
 
-    describe('SOQL metrics', () => {
-      it('should include SOQL count when present', () => {
-        const event = createMockLogEvent({
-          duration: { self: 0, total: 0 },
-          soqlCount: { self: 0, total: 5 },
-        });
-
-        const parts = buildMetricParts(event);
-
-        expect(parts).toContain('5 SOQL');
+    it.each([
+      ['soqlCount', 0, 5, '5 SOQL'],
+      ['soqlCount', 2, 5, '5 SOQL (self: 2)'],
+      ['soqlRowCount', 0, 100, '100 rows'],
+      ['dmlCount', 0, 3, '3 DML'],
+      ['dmlCount', 1, 3, '3 DML (self: 1)'],
+      ['dmlRowCount', 0, 50, '50 DML rows'],
+      ['thrownCount', 2, 2, '⚠️ 2 thrown'],
+    ])('adds %s self %d of %d as %s', (field, self, total, expected) => {
+      const event = createMockLogEvent({
+        duration: { self: 0, total: 0 },
+        [field]: { self, total },
       });
 
-      it('should include SOQL self count when non-zero', () => {
-        const event = createMockLogEvent({
-          duration: { self: 0, total: 0 },
-          soqlCount: { self: 2, total: 5 },
-        });
-
-        const parts = buildMetricParts(event);
-
-        expect(parts).toContain('5 SOQL (self: 2)');
-      });
-
-      it('should not include SOQL when count is zero', () => {
-        const event = createMockLogEvent({
-          duration: { self: 0, total: 0 },
-          soqlCount: { self: 0, total: 0 },
-        });
-
-        const parts = buildMetricParts(event);
-
-        expect(parts.some((p) => p.includes('SOQL'))).toBe(false);
-      });
-
-      it('should include SOQL row count when present', () => {
-        const event = createMockLogEvent({
-          duration: { self: 0, total: 0 },
-          soqlRowCount: { self: 0, total: 100 },
-        });
-
-        const parts = buildMetricParts(event);
-
-        expect(parts).toContain('100 rows');
-      });
-
-      it('should not include SOQL rows when zero', () => {
-        const event = createMockLogEvent({
-          duration: { self: 0, total: 0 },
-          soqlRowCount: { self: 0, total: 0 },
-        });
-
-        const parts = buildMetricParts(event);
-
-        expect(parts.some((p) => p.includes('rows'))).toBe(false);
-      });
+      expect(buildMetricParts(event)).toEqual(['**0.00ms**', expected]);
     });
 
-    describe('DML metrics', () => {
-      it('should include DML count when present', () => {
+    it.each(['soqlCount', 'soqlRowCount', 'dmlCount', 'dmlRowCount', 'thrownCount'])(
+      'omits %s when it is zero',
+      (field) => {
         const event = createMockLogEvent({
           duration: { self: 0, total: 0 },
-          dmlCount: { self: 0, total: 3 },
+          [field]: { self: 0, total: 0 },
         });
 
-        const parts = buildMetricParts(event);
+        expect(buildMetricParts(event)).toEqual(['**0.00ms**']);
+      },
+    );
 
-        expect(parts).toContain('3 DML');
+    it('orders every metric after the duration', () => {
+      const event = createMockLogEvent({
+        duration: { self: 500_000_000, total: 1_000_000_000 },
+        soqlCount: { self: 1, total: 5 },
+        soqlRowCount: { self: 0, total: 100 },
+        dmlCount: { self: 1, total: 3 },
+        dmlRowCount: { self: 0, total: 50 },
+        thrownCount: { self: 1, total: 1 },
       });
 
-      it('should include DML self count when non-zero', () => {
-        const event = createMockLogEvent({
-          duration: { self: 0, total: 0 },
-          dmlCount: { self: 1, total: 3 },
-        });
-
-        const parts = buildMetricParts(event);
-
-        expect(parts).toContain('3 DML (self: 1)');
-      });
-
-      it('should not include DML when count is zero', () => {
-        const event = createMockLogEvent({
-          duration: { self: 0, total: 0 },
-          dmlCount: { self: 0, total: 0 },
-        });
-
-        const parts = buildMetricParts(event);
-
-        expect(parts.some((p) => p.includes('DML'))).toBe(false);
-      });
-
-      it('should include DML row count when present', () => {
-        const event = createMockLogEvent({
-          duration: { self: 0, total: 0 },
-          dmlRowCount: { self: 0, total: 50 },
-        });
-
-        const parts = buildMetricParts(event);
-
-        expect(parts).toContain('50 DML rows');
-      });
-
-      it('should not include DML rows when zero', () => {
-        const event = createMockLogEvent({
-          duration: { self: 0, total: 0 },
-          dmlRowCount: { self: 0, total: 0 },
-        });
-
-        const parts = buildMetricParts(event);
-
-        expect(parts.some((p) => p.includes('DML rows'))).toBe(false);
-      });
-    });
-
-    describe('exception metrics', () => {
-      it('should include thrown count when present', () => {
-        const event = createMockLogEvent({
-          duration: { self: 0, total: 0 },
-          thrownCount: { self: 2, total: 2 },
-        });
-
-        const parts = buildMetricParts(event);
-
-        expect(parts.some((p) => p.includes('2 thrown'))).toBe(true);
-      });
-
-      it('should not include thrown when zero', () => {
-        const event = createMockLogEvent({
-          duration: { self: 0, total: 0 },
-          thrownCount: { self: 0, total: 0 },
-        });
-
-        const parts = buildMetricParts(event);
-
-        expect(parts.some((p) => p.includes('thrown'))).toBe(false);
-      });
-
-      it('should include warning emoji for exceptions', () => {
-        const event = createMockLogEvent({
-          duration: { self: 0, total: 0 },
-          thrownCount: { self: 1, total: 1 },
-        });
-
-        const parts = buildMetricParts(event);
-
-        expect(parts.some((p) => p.includes('\u26a0\ufe0f'))).toBe(true);
-      });
-    });
-
-    describe('combined metrics', () => {
-      it('should include all metrics in correct order', () => {
-        const event = createMockLogEvent({
-          duration: { self: 500_000_000, total: 1_000_000_000 },
-          soqlCount: { self: 1, total: 5 },
-          soqlRowCount: { self: 0, total: 100 },
-          dmlCount: { self: 1, total: 3 },
-          dmlRowCount: { self: 0, total: 50 },
-          thrownCount: { self: 1, total: 1 },
-        });
-
-        const parts = buildMetricParts(event);
-
-        expect(parts.length).toBe(6);
-        expect(parts[0]).toContain('1.00s');
-        expect(parts[1]).toContain('SOQL');
-        expect(parts[2]).toContain('rows');
-        expect(parts[3]).toContain('DML');
-        expect(parts[4]).toContain('DML rows');
-        expect(parts[5]).toContain('thrown');
-      });
-
-      it('should handle event with only duration', () => {
-        const event = createMockLogEvent({
-          duration: { self: 100_000_000, total: 100_000_000 },
-          soqlCount: { self: 0, total: 0 },
-          soqlRowCount: { self: 0, total: 0 },
-          dmlCount: { self: 0, total: 0 },
-          dmlRowCount: { self: 0, total: 0 },
-          thrownCount: { self: 0, total: 0 },
-        });
-
-        const parts = buildMetricParts(event);
-
-        expect(parts.length).toBe(1);
-        expect(parts[0]).toBe('**100.00ms**');
-      });
+      expect(buildMetricParts(event)).toEqual([
+        '**1.00s** (self: 500.00ms)',
+        '5 SOQL (self: 1)',
+        '100 rows',
+        '3 DML (self: 1)',
+        '50 DML rows',
+        '⚠️ 1 thrown',
+      ]);
     });
   });
 });

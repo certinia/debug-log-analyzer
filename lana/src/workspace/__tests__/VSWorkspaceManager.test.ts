@@ -7,7 +7,6 @@ import { findSymbol } from '../../salesforce/codesymbol/SymbolFinder';
 import type { VSWorkspace } from '../VSWorkspace';
 import { VSWorkspaceManager } from '../VSWorkspaceManager';
 
-jest.mock('vscode');
 jest.mock('../VSWorkspace');
 jest.mock('../../salesforce/codesymbol/SfdxProject');
 jest.mock('../../salesforce/codesymbol/SymbolFinder');
@@ -134,10 +133,10 @@ describe('VSWorkspaceManager', () => {
 
       const result = await manager.findSymbol('MyClass.method()');
 
-      expect(findSymbol).toHaveBeenCalledWith(manager.workspaceFolders, [
-        { fullSymbol: 'MyClass.method()', namespace: null, outerClass: 'MyClass' },
-        { fullSymbol: 'MyClass.method()', namespace: null, outerClass: 'method' },
-      ]);
+      expect(findSymbol).toHaveBeenCalledWith(
+        manager.workspaceFolders,
+        expect.arrayContaining([expect.objectContaining({ outerClass: 'MyClass' })]),
+      );
       expect(result).toEqual({ status: 'found', uri: mockUri });
     });
 

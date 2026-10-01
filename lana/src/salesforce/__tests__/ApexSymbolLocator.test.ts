@@ -1,11 +1,16 @@
 /*
  * Copyright (c) 2025 Certinia Inc. All rights reserved.
  */
-import { beforeEach, describe, expect, it } from '@jest/globals';
+import { describe, expect, it } from '@jest/globals';
 import { getMethodLine, parseApex } from '../ApexParser/ApexSymbolLocator';
-import { ApexVisitor, type ApexNode } from '../ApexParser/ApexVisitor';
 
-jest.mock('../ApexParser/ApexVisitor');
+jest.mock('../ApexParser/ApexVisitor', () => ({
+  ApexVisitor: class {
+    visit() {
+      return mockAST;
+    }
+  },
+}));
 jest.mock('@apexdevtools/apex-parser', () => ({
   ApexParserFactory: {
     createParser: jest.fn(() => ({ compilationUnit: jest.fn() })),
@@ -13,483 +18,113 @@ jest.mock('@apexdevtools/apex-parser', () => ({
   ApexParserBaseVisitor: class {},
 }));
 
-describe('ApexSymbolLocator', () => {
-  const mockAST = {
-    children: [
-      {
-        nature: 'Class',
-        name: 'myclass',
-        line: 1,
-        children: [
-          {
-            nature: 'Method',
-            name: 'foo',
-            params: '',
-            line: 2,
-          },
-          {
-            nature: 'Method',
-            name: 'bar',
-            params: 'integer',
-            line: 3,
-          },
-          {
-            nature: 'Method',
-            name: 'bar',
-            params: 'integer,integer',
-            line: 4,
-          },
-          {
-            nature: 'Method',
-            name: 'bar',
-            params: 'MyClass.InnerClass, InnerClass, integer,integer',
-            line: 5,
-          },
-          {
-            nature: 'Class',
-            name: 'inner',
-            line: 6,
-            children: [
-              {
-                nature: 'Constructor',
-                name: 'Inner',
-                params: '',
-                line: 7,
-              },
-              {
-                nature: 'Constructor',
-                name: 'Inner',
-                params: 'String',
-                line: 8,
-              },
-              {
-                nature: 'Method',
-                name: 'bar',
-                params: 'integer',
-                line: 9,
-              },
-            ],
-          },
-          {
-            nature: 'Constructor',
-            name: 'MyClass',
-            params: '',
-            line: 10,
-          },
-          {
-            nature: 'Constructor',
-            name: 'MyClass',
-            params: 'string',
-            line: 11,
-          },
-          {
-            nature: 'Constructor',
-            name: 'MyClass',
-            params: 'string,integer',
-            line: 12,
-          },
-          {
-            nature: 'Constructor',
-            name: 'MyClass',
-            params: 'Map<Id, MyClass.InnerClass>, Map<Id, InnerClass>, String, Integer',
-            line: 13,
-          },
-          {
-            nature: 'Class',
-            name: 'inner2',
-            line: 14,
-            children: [],
-          },
-        ],
-      },
+const mockAST = {
+  children: [
+    {
+      nature: 'Class',
+      name: 'myclass',
+      line: 1,
+      children: [
+        { nature: 'Method', name: 'foo', params: '', line: 2 },
+        { nature: 'Method', name: 'bar', params: 'integer', line: 3 },
+        { nature: 'Method', name: 'bar', params: 'integer,integer', line: 4 },
+        {
+          nature: 'Method',
+          name: 'bar',
+          params: 'MyClass.InnerClass, InnerClass, integer,integer',
+          line: 5,
+        },
+        {
+          nature: 'Class',
+          name: 'inner',
+          line: 6,
+          children: [
+            { nature: 'Constructor', name: 'Inner', params: '', line: 7 },
+            { nature: 'Constructor', name: 'Inner', params: 'String', line: 8 },
+            { nature: 'Method', name: 'bar', params: 'integer', line: 9 },
+          ],
+        },
+        { nature: 'Constructor', name: 'MyClass', params: '', line: 10 },
+        { nature: 'Constructor', name: 'MyClass', params: 'string', line: 11 },
+        { nature: 'Constructor', name: 'MyClass', params: 'string,integer', line: 12 },
+        {
+          nature: 'Constructor',
+          name: 'MyClass',
+          params: 'Map<Id, MyClass.InnerClass>, Map<Id, InnerClass>, String, Integer',
+          line: 13,
+        },
+        { nature: 'Class', name: 'inner2', line: 14, children: [] },
+      ],
+    },
+  ],
+};
+
+describe('getMethodLine', () => {
+  const root = parseApex('');
+
+  it.each([
+    ['MyClass.foo()', 2],
+    ['MyClass.bar(Integer)', 3],
+    ['MyClass.bar(Integer, Integer)', 4],
+    ['MyClass.bar(System.Integer)', 3],
+    ['myns.MyClass.bar(myns.Integer)', 3],
+    // only the source declaration qualifies the param type
+    ['MyClass.bar(InnerClass, InnerClass, Integer, Integer)', 5],
+    ['MyClass.Inner.bar(Integer)', 9],
+    // an unknown middle segment falls through to the outer class's method
+    ['MyClass.NonExistent.foo()', 2],
+    ['MyClass()', 10],
+    ['MyClass(String)', 11],
+    ['MyClass(String, Integer)', 12],
+    ['MyClass(Map<Id, MyClass.InnerClass>, Map<Id, InnerClass>, String, Integer)', 13],
+    // within MyClass, `InnerClass` and `MyClass.InnerClass` are the same type
+    ['MyClass(Map<Id, InnerClass>, Map<Id, MyClass.InnerClass>, String, Integer)', 13],
+    ['MyClass(System.String)', 11],
+    ['MyClass.Inner()', 7],
+    ['MyClass.Inner(String)', 8],
+    ['myclass()', 10],
+    ['MyClass(string)', 11],
+    ['myclass.inner()', 7],
+    ['MyClass.INNER(string)', 8],
+    ['myns.MyClass.foo()', 2],
+    ['myns.MyClass()', 10],
+    ['myns.MyClass.Inner.bar(Integer)', 9],
+    ['myns.MyClass(String, Integer)', 12],
+    ['ns.MyClass.bar(Integer, Integer)', 4],
+    ['com.example.MyClass.bar(Integer)', 3],
+    ['MYNS.myclass.foo()', 2],
+    // with a namespace the bare `MyClass.` qualifier in the source must still strip
+    ['myns.MyClass.bar(myns.MyClass.InnerClass, InnerClass, Integer, Integer)', 5],
+  ])('finds %s on line %i', (symbol, line) => {
+    expect(getMethodLine(root, symbol)).toMatchObject({ line, isExactMatch: true });
+  });
+
+  it.each([
+    ['MyClass.notFound()', 1, 'notFound()'],
+    ['NotAClass.foo()', 1, 'foo()'],
+    ['MyClass(Boolean)', 1, 'MyClass(Boolean)'],
+    ['MyClass.Inner.notFound()', 6, 'notFound()'],
+    ['MyClass.Inner(Boolean)', 6, 'Inner(Boolean)'],
+    // the source qualifies these params differently, so no overload matches
+    [
+      'MyClass.Inner.bar(MyClass.InnerClass, InnerClass, Integer, Integer)',
+      6,
+      'bar(MyClass.InnerClass, InnerClass, Integer, Integer)',
     ],
-  };
-
-  beforeEach(() => {
-    (ApexVisitor as jest.MockedClass<typeof ApexVisitor>).mockImplementation(() => {
-      return {
-        visit: jest.fn().mockReturnValue(mockAST),
-        visitChildren: jest.fn(),
-        visitClassDeclaration: jest.fn(),
-        visitMethodDeclaration: jest.fn(),
-        visitTerminal: jest.fn(),
-        visitErrorNode: jest.fn(),
-        visitTriggerDeclaration: jest.fn(),
-        visitInterfaceDeclaration: jest.fn(),
-      } as unknown as ApexVisitor;
+    // an inner class with no declared constructor
+    ['MyClass.Inner2()', 14, 'Inner2()'],
+    ['myns.MyClass.missing()', 1, 'missing()'],
+    ['ns1.ns2.MyClass.unknownMethod()', 1, 'unknownMethod()'],
+    ['ns.MyClass.Inner.notFound()', 6, 'notFound()'],
+  ])('falls back from %s to line %i, naming %s', (symbol, line, missingSymbol) => {
+    expect(getMethodLine(root, symbol)).toMatchObject({
+      line,
+      isExactMatch: false,
+      missingSymbol,
     });
   });
 
-  describe('getMethodLine', () => {
-    let root: ApexNode;
-
-    beforeEach(() => {
-      root = parseApex('');
-    });
-
-    it('should find method line for top-level method', () => {
-      const result = getMethodLine(root, 'MyClass.foo()');
-      expect(result.line).toBe(2);
-      expect(result.isExactMatch).toBe(true);
-    });
-
-    it('should return a non-match for a symbol with no parentheses', () => {
-      const result = getMethodLine(root, 'MyClass');
-      expect(result.isExactMatch).toBe(false);
-      expect(result.line).toBe(1);
-    });
-
-    it('should find method line for method with params', () => {
-      const result = getMethodLine(root, 'MyClass.bar(Integer)');
-      expect(result.line).toBe(3);
-      expect(result.isExactMatch).toBe(true);
-    });
-
-    it('should find method line for overloaded method', () => {
-      const result = getMethodLine(root, 'MyClass.bar(Integer, Integer)');
-      expect(result.line).toBe(4);
-      expect(result.isExactMatch).toBe(true);
-    });
-
-    it('should match a method param qualified with the System namespace', () => {
-      const result = getMethodLine(root, 'MyClass.bar(System.Integer)');
-      expect(result.line).toBe(3);
-      expect(result.isExactMatch).toBe(true);
-    });
-
-    it('should match a method param qualified with the org namespace', () => {
-      const result = getMethodLine(root, 'myns.MyClass.bar(myns.Integer)');
-      expect(result.line).toBe(3);
-      expect(result.isExactMatch).toBe(true);
-    });
-
-    it('should match when only the source declaration qualifies the param type', () => {
-      // Source (line 5) declares `MyClass.InnerClass, InnerClass, ...`; the log symbol
-      // is fully unqualified — stripping the outer-class qualifier from the source side matches.
-      const result = getMethodLine(root, 'MyClass.bar(InnerClass, InnerClass, Integer, Integer)');
-      expect(result.line).toBe(5);
-      expect(result.isExactMatch).toBe(true);
-    });
-
-    it('should find method line for inner class method', () => {
-      const result = getMethodLine(root, 'MyClass.Inner.bar(Integer)');
-      expect(result.line).toBe(9);
-      expect(result.isExactMatch).toBe(true);
-    });
-
-    it('should handle symbol not found', () => {
-      const result = getMethodLine(root, 'MyClass.notFound()');
-      expect(result.line).toBe(1);
-      expect(result.isExactMatch).toBe(false);
-      expect(result.missingSymbol).toBe('notFound()');
-    });
-
-    it('should handle symbol not found on inner class', () => {
-      const result = getMethodLine(root, 'MyClass.Inner.notFound()');
-      expect(result.line).toBe(6);
-      expect(result.isExactMatch).toBe(false);
-      expect(result.missingSymbol).toBe('notFound()');
-    });
-
-    it('should handle missing class', () => {
-      const result = getMethodLine(root, 'NotAClass.foo()');
-      expect(result.line).toBe(1);
-      expect(result.isExactMatch).toBe(false);
-      expect(result.missingSymbol).toBe('foo()');
-    });
-  });
-
-  describe('getMethodLine - constructor cases', () => {
-    let root: ApexNode;
-
-    beforeEach(() => {
-      root = parseApex('');
-    });
-
-    it('should find constructor with no parameters', () => {
-      const result = getMethodLine(root, 'MyClass()');
-      expect(result.line).toBe(10);
-      expect(result.isExactMatch).toBe(true);
-    });
-
-    it('should find constructor with single parameter', () => {
-      const result = getMethodLine(root, 'MyClass(String)');
-      expect(result.line).toBe(11);
-      expect(result.isExactMatch).toBe(true);
-    });
-
-    it('should find overloaded constructor with multiple parameters', () => {
-      const result = getMethodLine(root, 'MyClass(String, Integer)');
-      expect(result.line).toBe(12);
-      expect(result.isExactMatch).toBe(true);
-    });
-
-    it('should find overloaded constructor with multiple parameters + custom types', () => {
-      const result = getMethodLine(
-        root,
-        'MyClass(Map<Id, MyClass.InnerClass>, Map<Id, InnerClass>, String, Integer)',
-      );
-      expect(result.line).toBe(13);
-      expect(result.isExactMatch).toBe(true);
-    });
-
-    it('should find overloaded constructor + custom types regardless of class-prefix placement', () => {
-      // Within MyClass, `InnerClass` and `MyClass.InnerClass` are the same type, so this
-      // resolves to the line 13 constructor even though the qualifier is on a different arg.
-      const result = getMethodLine(
-        root,
-        'MyClass(Map<Id, InnerClass>, Map<Id, MyClass.InnerClass>, String, Integer)',
-      );
-      expect(result.line).toBe(13);
-      expect(result.isExactMatch).toBe(true);
-    });
-
-    it('should find inner constructors', () => {
-      let result = getMethodLine(root, 'MyClass.inner()');
-      expect(result.line).toBe(7);
-      expect(result.isExactMatch).toBe(true);
-
-      result = getMethodLine(root, 'MyClass.inner(string)');
-      expect(result.line).toBe(8);
-      expect(result.isExactMatch).toBe(true);
-    });
-
-    it('should handle constructor not found with wrong params', () => {
-      const result = getMethodLine(root, 'MyClass(Boolean)');
-      expect(result.line).toBe(1);
-      expect(result.isExactMatch).toBe(false);
-      expect(result.missingSymbol).toBe('MyClass(Boolean)');
-    });
-
-    it('should handle case-insensitive constructor lookup', () => {
-      const result = getMethodLine(root, 'myclass()');
-      expect(result.line).toBe(10);
-      expect(result.isExactMatch).toBe(true);
-    });
-
-    it('should handle case-insensitive parameter type lookup', () => {
-      const result = getMethodLine(root, 'MyClass(string)');
-      expect(result.line).toBe(11);
-      expect(result.isExactMatch).toBe(true);
-    });
-
-    it('should match a constructor param qualified with the System namespace', () => {
-      const result = getMethodLine(root, 'MyClass(System.String)');
-      expect(result.line).toBe(11);
-      expect(result.isExactMatch).toBe(true);
-    });
-  });
-
-  describe('getMethodLine - namespace cases', () => {
-    let root: ApexNode;
-
-    beforeEach(() => {
-      root = parseApex('');
-    });
-
-    it('should find method with namespace prefix', () => {
-      const result = getMethodLine(root, 'myns.MyClass.foo()');
-      expect(result.line).toBe(2);
-      expect(result.isExactMatch).toBe(true);
-    });
-
-    it('should find constructor with namespace prefix', () => {
-      const result = getMethodLine(root, 'myns.MyClass()');
-      expect(result.line).toBe(10);
-      expect(result.isExactMatch).toBe(true);
-    });
-
-    it('should find inner class method with namespace', () => {
-      const result = getMethodLine(root, 'myns.MyClass.Inner.bar(Integer)');
-      expect(result.line).toBe(9);
-      expect(result.isExactMatch).toBe(true);
-    });
-
-    it('should find constructor with namespace and parameters', () => {
-      const result = getMethodLine(root, 'myns.MyClass(String, Integer)');
-      expect(result.line).toBe(12);
-      expect(result.isExactMatch).toBe(true);
-    });
-
-    it('should find overloaded method with namespace', () => {
-      const result = getMethodLine(root, 'ns.MyClass.bar(Integer, Integer)');
-      expect(result.line).toBe(4);
-      expect(result.isExactMatch).toBe(true);
-    });
-
-    it('should handle missing method with namespace', () => {
-      const result = getMethodLine(root, 'myns.MyClass.missing()');
-      expect(result.line).toBe(1);
-      expect(result.isExactMatch).toBe(false);
-      expect(result.missingSymbol).toBe('missing()');
-    });
-
-    it('should handle namespace with missing inner class method', () => {
-      const result = getMethodLine(root, 'ns.MyClass.Inner.notFound()');
-      expect(result.line).toBe(6);
-      expect(result.isExactMatch).toBe(false);
-      expect(result.missingSymbol).toBe('notFound()');
-    });
-
-    it('should ignore namespace and find correct class', () => {
-      const result = getMethodLine(root, 'com.example.MyClass.bar(Integer)');
-      expect(result.line).toBe(3);
-      expect(result.isExactMatch).toBe(true);
-    });
-
-    it('should handle case-insensitive namespace', () => {
-      const result = getMethodLine(root, 'MYNS.myclass.foo()');
-      expect(result.line).toBe(2);
-      expect(result.isExactMatch).toBe(true);
-    });
-
-    it('should match a source param qualified with the bare outer class name', () => {
-      // Source (line 5) declares `MyClass.InnerClass, ...`; with a namespace the outer
-      // class arrives as 'myns.myclass', so the bare 'myclass.' qualifier must also strip.
-      const result = getMethodLine(
-        root,
-        'myns.MyClass.bar(myns.MyClass.InnerClass, InnerClass, Integer, Integer)',
-      );
-      expect(result.line).toBe(5);
-      expect(result.isExactMatch).toBe(true);
-    });
-  });
-
-  describe('getMethodLine - inner class methods', () => {
-    let root: ApexNode;
-
-    beforeEach(() => {
-      root = parseApex('');
-    });
-
-    it('should find inner class method bar with single integer param', () => {
-      const result = getMethodLine(root, 'MyClass.Inner.bar(Integer)');
-      expect(result.line).toBe(9);
-      expect(result.isExactMatch).toBe(true);
-    });
-
-    it('should return inner class line when method with qualified type parameters not found', () => {
-      const result = getMethodLine(
-        root,
-        'MyClass.Inner.bar(MyClass.InnerClass, InnerClass, Integer, Integer)',
-      );
-      expect(result.line).toBe(6);
-      expect(result.isExactMatch).toBe(false);
-    });
-
-    it('should return inner class line when method not found in inner class', () => {
-      const result = getMethodLine(root, 'MyClass.Inner.missingMethod()');
-      expect(result.line).toBe(6);
-      expect(result.isExactMatch).toBe(false);
-      expect(result.missingSymbol).toBe('missingMethod()');
-    });
-
-    it('should return inner class line when constructor not found in inner class', () => {
-      const result = getMethodLine(root, 'MyClass.Inner(Boolean)');
-      expect(result.line).toBe(6);
-      expect(result.isExactMatch).toBe(false);
-      expect(result.missingSymbol).toBe('Inner(Boolean)');
-    });
-
-    it('should find inner class constructor with no parameters', () => {
-      const result = getMethodLine(root, 'MyClass.Inner()');
-      expect(result.line).toBe(7);
-      expect(result.isExactMatch).toBe(true);
-    });
-
-    it('should find inner class constructor with string parameter', () => {
-      const result = getMethodLine(root, 'MyClass.Inner(String)');
-      expect(result.line).toBe(8);
-      expect(result.isExactMatch).toBe(true);
-    });
-
-    it('should return method line when inner class not found', () => {
-      const result = getMethodLine(root, 'MyClass.NonExistent.foo()');
-      expect(result.line).toBe(2);
-      expect(result.isExactMatch).toBe(true);
-    });
-  });
-
-  describe('getMethodLine - fallback to class line', () => {
-    let root: ApexNode;
-
-    beforeEach(() => {
-      root = parseApex('');
-    });
-
-    it('should return outer class line when method not found', () => {
-      const result = getMethodLine(root, 'MyClass.unknownMethod()');
-      expect(result.line).toBe(1);
-      expect(result.isExactMatch).toBe(false);
-    });
-
-    it('should return outer class line when constructor not found', () => {
-      const result = getMethodLine(root, 'MyClass(Double)');
-      expect(result.line).toBe(1);
-      expect(result.isExactMatch).toBe(false);
-    });
-
-    it('should return inner class line when method not found in inner class', () => {
-      const result = getMethodLine(root, 'MyClass.Inner.unknownMethod()');
-      expect(result.line).toBe(6);
-      expect(result.isExactMatch).toBe(false);
-    });
-
-    it('should return inner class line when constructor params do not match', () => {
-      const result = getMethodLine(root, 'MyClass.Inner(Double)');
-      expect(result.line).toBe(6);
-      expect(result.isExactMatch).toBe(false);
-    });
-
-    it('should return outer class line with namespace when method not found', () => {
-      const result = getMethodLine(root, 'ns1.ns2.MyClass.unknownMethod()');
-      expect(result.line).toBe(1);
-      expect(result.isExactMatch).toBe(false);
-      expect(result.missingSymbol).toBe('unknownMethod()');
-    });
-
-    it('should return inner class line with namespace when inner method not found', () => {
-      const result = getMethodLine(root, 'ns.MyClass.Inner.unknownMethod()');
-      expect(result.line).toBe(6);
-      expect(result.isExactMatch).toBe(false);
-    });
-
-    it('should return inner class line when no default constructor found', () => {
-      const result = getMethodLine(root, 'MyClass.Inner2()');
-      expect(result.line).toBe(14);
-      expect(result.isExactMatch).toBe(false);
-    });
-  });
-
-  describe('getMethodLine - inner class with multiple constructors', () => {
-    let root: ApexNode;
-
-    beforeEach(() => {
-      root = parseApex('');
-    });
-
-    it('should find first inner class constructor (no params)', () => {
-      const result = getMethodLine(root, 'MyClass.Inner()');
-      expect(result.line).toBe(7);
-      expect(result.isExactMatch).toBe(true);
-    });
-
-    it('should find second inner class constructor (string param)', () => {
-      const result = getMethodLine(root, 'MyClass.Inner(String)');
-      expect(result.line).toBe(8);
-      expect(result.isExactMatch).toBe(true);
-    });
-
-    it('should handle case-insensitive inner class constructor lookup', () => {
-      const result = getMethodLine(root, 'myclass.inner()');
-      expect(result.line).toBe(7);
-      expect(result.isExactMatch).toBe(true);
-    });
-
-    it('should handle case-insensitive inner class constructor parameter lookup', () => {
-      const result = getMethodLine(root, 'MyClass.INNER(string)');
-      expect(result.line).toBe(8);
-      expect(result.isExactMatch).toBe(true);
-    });
+  it('returns a non-match for a symbol with no parentheses', () => {
+    expect(getMethodLine(root, 'MyClass')).toEqual({ line: 1, character: 0, isExactMatch: false });
   });
 });
