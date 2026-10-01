@@ -20,14 +20,12 @@ Ask your AI assistant what's slow in a Salesforce Apex debug log. [`@certinia/ap
 
 Requires [Node.js](https://nodejs.org/) 22 or later. Runs on your machine, with no API keys.
 
-| Tool                           | What it does                                                                                      |
-| ------------------------------ | ------------------------------------------------------------------------------------------------- |
-| `apexlog_get_summary`          | Duration, governor limits, fatal errors, and whether the log is complete. Start here.             |
-| `apexlog_list_slow_operations` | Ranks methods, SOQL, DML and flows by self time.                                                  |
-| `apexlog_list_limit_risks`     | The governor limits nearest their ceiling, worst first.                                           |
-| `apexlog_execute_anonymous`    | Runs anonymous Apex in an org and saves the log for the other tools. Asks before production orgs. |
+Your assistant can:
 
-`apexlog_execute_anonymous` needs an org authenticated with the [Salesforce CLI](https://developer.salesforce.com/tools/salesforcecli).
+- Summarize a log: duration, governor limits, fatal errors, and whether the log is complete.
+- Rank methods, SOQL, DML and flows by self time.
+- Flag governor limits near their ceiling.
+- Run anonymous Apex in an org, then analyze the log. Needs an org authenticated with the [Salesforce CLI](https://developer.salesforce.com/tools/salesforcecli). Asks before it runs in production.
 
 **Try asking:**
 
@@ -58,4 +56,4 @@ claude mcp add apex-log-mcp -- npx -y @certinia/apex-log-mcp
 
 ### Other MCP clients
 
-Use the same command, `npx -y @certinia/apex-log-mcp`. The [`@certinia/apex-log-mcp` README](https://github.com/certinia/debug-log-analyzer-mcp#readme) covers tool parameters and server flags, such as `--no-apex-execution` for analysis only.
+Use the same command, `npx -y @certinia/apex-log-mcp`. The [`@certinia/apex-log-mcp` README](https://github.com/certinia/debug-log-analyzer-mcp#readme) covers each tool and the server flags, such as analysis-only mode.
