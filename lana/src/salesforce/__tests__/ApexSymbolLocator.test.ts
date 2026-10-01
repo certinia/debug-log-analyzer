@@ -321,14 +321,14 @@ describe('ApexSymbolLocator', () => {
       const result = getMethodLine(root, 'myns.MyClass.missing()');
       expect(result.line).toBe(1);
       expect(result.isExactMatch).toBe(false);
-      expect(result.missingSymbol).toBe('lass.missing()');
+      expect(result.missingSymbol).toBe('missing()');
     });
 
     it('should handle namespace with missing inner class method', () => {
       const result = getMethodLine(root, 'ns.MyClass.Inner.notFound()');
       expect(result.line).toBe(6);
       expect(result.isExactMatch).toBe(false);
-      expect(result.missingSymbol).toBe('er.notFound()');
+      expect(result.missingSymbol).toBe('notFound()');
     });
 
     it('should ignore namespace and find correct class', () => {
@@ -445,6 +445,7 @@ describe('ApexSymbolLocator', () => {
       const result = getMethodLine(root, 'ns1.ns2.MyClass.unknownMethod()');
       expect(result.line).toBe(1);
       expect(result.isExactMatch).toBe(false);
+      expect(result.missingSymbol).toBe('unknownMethod()');
     });
 
     it('should return inner class line with namespace when inner method not found', () => {

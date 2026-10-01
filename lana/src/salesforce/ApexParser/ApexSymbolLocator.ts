@@ -95,7 +95,10 @@ export function getMethodLine(rootNode: ApexNode, fullyQualifiedSymbol: string):
   result.line = currentRoot.line ?? 1;
   result.isExactMatch = false;
   // keep the original case for error messages.
-  result.missingSymbol = fullyQualifiedSymbol.slice(className.lastIndexOf('.') + 1);
+  const namespacePrefixLength = namespace ? namespace.length + 1 : 0;
+  result.missingSymbol = fullyQualifiedSymbol.slice(
+    namespacePrefixLength + className.lastIndexOf('.') + 1,
+  );
   return result;
 }
 
