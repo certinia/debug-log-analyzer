@@ -5,9 +5,6 @@ import type { ApexLog } from '@apexdevtools/apex-log-parser';
 import { Tabulator, type RowComponent } from 'tabulator-tables';
 
 import { vscodeMessenger } from '../../../core/messaging/VSCodeExtensionMessenger.js';
-import { formatDuration } from '../../../core/utility/Util.js';
-import { TIME_WIDTH } from '../../../tabulator/ColumnWidths.js';
-import { progressFormatterMS } from '../../../tabulator/format/ProgressMS.js';
 import { makeSumSelfTimeAllVisible } from '../utils/BottomCalcs.js';
 import { toTimeOrderTree, type TimeOrderRow } from '../utils/TimeOrderTree.js';
 import { createCalltreeNameFormatter } from './CalltreeNameFormatter.js';
@@ -16,6 +13,7 @@ import {
   createGovernorMetricColumns,
   createNamespaceColumns,
   createSelfSumHeapFooters,
+  createTimeColumn,
   createTypeColumn,
   headerSortElement,
   registerTableModules,
@@ -99,46 +97,18 @@ export function createTimeOrderTable(
       createTypeColumn(),
       ...createGovernorMetricColumns(rootMethod, heapFooters),
       // Time columns sit at the far right of every call-tree table.
-      {
+      createTimeColumn({
         title: 'Total Time (ms)',
         field: 'duration.total',
-        sorter: 'number',
-        headerSortTristate: true,
-        width: TIME_WIDTH,
-        hozAlign: 'right',
-        headerHozAlign: 'right',
-        formatter: progressFormatterMS,
-        formatterParams: {
-          precision: 2,
-          totalValue: rootMethod.duration.total,
-        },
-        bottomCalcFormatter: progressFormatterMS,
+        totalValue: rootMethod.duration.total,
         bottomCalc: 'sum',
-        bottomCalcFormatterParams: { precision: 2, totalValue: rootMethod.duration.total },
-        tooltip(_event, cell, _onRender) {
-          return formatDuration(cell.getValue());
-        },
-      },
-      {
+      }),
+      createTimeColumn({
         title: 'Self Time (ms)',
         field: 'duration.self',
-        sorter: 'number',
-        headerSortTristate: true,
-        width: TIME_WIDTH,
-        hozAlign: 'right',
-        headerHozAlign: 'right',
+        totalValue: rootMethod.duration.total,
         bottomCalc: selfTimeBottomCalc,
-        bottomCalcFormatterParams: { precision: 2, totalValue: rootMethod.duration.total },
-        bottomCalcFormatter: progressFormatterMS,
-        formatter: progressFormatterMS,
-        formatterParams: {
-          precision: 2,
-          totalValue: rootMethod.duration.total,
-        },
-        tooltip(_event, cell, _onRender) {
-          return formatDuration(cell.getValue());
-        },
-      },
+      }),
     ],
   });
   tableRef.current = table;

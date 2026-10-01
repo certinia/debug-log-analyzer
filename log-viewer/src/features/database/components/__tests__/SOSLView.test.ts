@@ -27,6 +27,7 @@ jest.mock('../../../settings/Settings.js', () => ({
   subscribeSettings: () => () => {},
 }));
 
+import type { GridFindController } from '../../../../components/GridFindController.js';
 import { SOSLView } from '../SOSLView.js';
 
 const FOUND = { totalMatches: 3, matchIndexes: { 0: {}, 1: {} } };
@@ -59,7 +60,7 @@ type Stub = ReturnType<typeof tableStub>;
 type Internals = Omit<SOSLView, 'soslTable'> & {
   soslTable: unknown;
   namespaceSelected: string[];
-  _clearSearchHighlights(): void;
+  _finder: GridFindController;
   _handleRowCountRange(e: CustomEvent): void;
   _namespaceFilter(row: unknown): boolean;
   _rowCountFilter(row: unknown): boolean;
@@ -102,10 +103,10 @@ describe('SOSLView', () => {
 
   describe('find', () => {
     it('searches the table and reports the count as its own grid', async () => {
-      await inner._find(findEvent('lv-find', 'update'));
+      await inner._finder.find(findEvent('lv-find', 'update'));
 
       expect(table.find).toHaveBeenCalledTimes(1);
-      expect(inner.totalMatches).toBe(3);
+      expect(inner._finder.totalMatches).toBe(3);
       expect(results).toHaveLength(1);
       expect(results[0]?.detail).toEqual({ totalMatches: 3, type: 'sosl' });
     });
@@ -118,51 +119,51 @@ describe('SOSLView', () => {
     });
 
     it('does not search again for the same text and case option', async () => {
-      await inner._find(findEvent('lv-find', 'update'));
-      await inner._find(findEvent('lv-find', 'update'));
+      await inner._finder.find(findEvent('lv-find', 'update'));
+      await inner._finder.find(findEvent('lv-find', 'update'));
 
       expect(table.find).toHaveBeenCalledTimes(1);
     });
 
     it('searches again when only the case option changed', async () => {
-      await inner._find(findEvent('lv-find', 'update'));
-      await inner._find(findEvent('lv-find', 'update', true));
+      await inner._finder.find(findEvent('lv-find', 'update'));
+      await inner._finder.find(findEvent('lv-find', 'update', true));
 
       expect(table.find).toHaveBeenCalledTimes(2);
     });
 
     it('drops the text and reports nothing upward when the widget closes', async () => {
-      await inner._find(findEvent('lv-find', 'update'));
+      await inner._finder.find(findEvent('lv-find', 'update'));
       results.length = 0;
 
-      await inner._find(findEvent('lv-find-close', 'update'));
+      await inner._finder.find(findEvent('lv-find-close', 'update'));
 
-      expect(inner.findArgs.text).toBe('');
+      expect(inner._finder.findArgs.text).toBe('');
       // The widget is closing, so it is not told what it would have found.
       expect(results).toHaveLength(0);
     });
 
     it('copies the detail rather than holding the event', async () => {
       const event = findEvent('lv-find', 'update');
-      await inner._find(event);
+      await inner._finder.find(event);
 
-      expect(inner.findArgs).not.toBe(event.detail);
-      expect(inner.findArgs.text).toBe('update');
+      expect(inner._finder.findArgs).not.toBe(event.detail);
+      expect(inner._finder.findArgs.text).toBe('update');
     });
 
     it('does nothing for a hidden table that never matched', async () => {
       inner.soslTable = { ...table, element: { clientHeight: 0 } };
 
-      await inner._find(findEvent('lv-find', 'update'));
+      await inner._finder.find(findEvent('lv-find', 'update'));
 
       expect(table.find).not.toHaveBeenCalled();
     });
 
     it('still answers a hidden table that has matches standing', async () => {
-      await inner._find(findEvent('lv-find', 'update'));
+      await inner._finder.find(findEvent('lv-find', 'update'));
       inner.soslTable = { ...table, element: { clientHeight: 0 } };
 
-      await inner._find(findEvent('lv-find', 'insert'));
+      await inner._finder.find(findEvent('lv-find', 'insert'));
 
       expect(table.find).toHaveBeenCalledTimes(2);
     });
@@ -170,35 +171,35 @@ describe('SOSLView', () => {
 
   describe('stepping through the matches', () => {
     it('marks the match at the index, without scrolling or taking focus', async () => {
-      await inner._find(findEvent('lv-find', 'update'));
+      await inner._finder.find(findEvent('lv-find', 'update'));
 
-      await inner._highlightMatches(1);
+      await inner._finder.highlight(1);
 
-      expect(table.setCurrentMatch).toHaveBeenCalledWith(1, inner.findMap[1], {
+      expect(table.setCurrentMatch).toHaveBeenCalledWith(1, inner._finder.findMap[1], {
         scrollIfVisible: false,
         focusRow: false,
       });
-      expect(inner.findArgs.count).toBe(1);
+      expect(inner._finder.findArgs.count).toBe(1);
     });
 
     // The guard is what stops the grid's own `dataFiltering` from dropping the match.
     it('holds the guard up only while the match is being marked', async () => {
-      await inner._find(findEvent('lv-find', 'update'));
+      await inner._finder.find(findEvent('lv-find', 'update'));
       let guardWhileMarking;
       table.setCurrentMatch.mockImplementation(async () => {
-        guardWhileMarking = inner.blockClearHighlights;
+        guardWhileMarking = inner._finder.blockClearHighlights;
       });
 
-      await inner._highlightMatches(1);
+      await inner._finder.highlight(1);
 
       expect(guardWhileMarking).toBe(true);
-      expect(inner.blockClearHighlights).toBe(false);
+      expect(inner._finder.blockClearHighlights).toBe(false);
     });
 
     it('does nothing where the table is hidden', async () => {
       inner.soslTable = { ...table, element: { clientHeight: 0 } };
 
-      await inner._highlightMatches(1);
+      await inner._finder.highlight(1);
 
       expect(table.setCurrentMatch).not.toHaveBeenCalled();
     });
@@ -206,22 +207,22 @@ describe('SOSLView', () => {
 
   describe('dropping a search', () => {
     it('reports an empty count for its own grid', () => {
-      inner._resetFindWidget();
+      inner._finder.reset();
 
       expect(results[0]?.detail).toEqual({ totalMatches: 0, type: 'sosl' });
     });
 
     it('clears the highlights, the map and the count', async () => {
-      await inner._find(findEvent('lv-find', 'update'));
+      await inner._finder.find(findEvent('lv-find', 'update'));
       results.length = 0;
 
-      inner._clearSearchHighlights();
+      inner._finder.clear();
 
       expect(table.clearFindHighlights).toHaveBeenCalledTimes(1);
-      expect(inner.findArgs.text).toBe('');
-      expect(inner.findArgs.count).toBe(0);
-      expect(inner.findMap).toEqual({});
-      expect(inner.totalMatches).toBe(0);
+      expect(inner._finder.findArgs.text).toBe('');
+      expect(inner._finder.findArgs.count).toBe(0);
+      expect(inner._finder.findMap).toEqual({});
+      expect(inner._finder.totalMatches).toBe(0);
       expect(results[0]?.detail).toEqual({ totalMatches: 0, type: 'sosl' });
     });
   });

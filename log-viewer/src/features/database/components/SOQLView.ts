@@ -16,8 +16,6 @@ import {
 import type { ApexLog, SOQLExecuteBeginLine } from '@apexdevtools/apex-log-parser';
 import { isVisible } from '../../../core/utility/Util.js';
 import { getCallerNamespace } from '../../../core/utility/CallerNamespace.js';
-import { DomListenerController } from '../../../core/events/DomListenerController.js';
-import type { FindEventDetail, FindEventMap } from '../../find/findEvents.js';
 import { goToRow } from '../../call-tree/navigation.js';
 import { deriveSoqlObject } from '../services/sobjectClassification.js';
 import { soqlGroupHeader } from '../../soql/format/groupHeader.js';
@@ -29,6 +27,7 @@ import { reportGridLocate, stampGridEventIndex } from './gridLocate.js';
 import { reportGridSelection } from './gridSelection.js';
 import { selectRowByEventIndex } from './revealRow.js';
 import { ColumnSettingsController } from '../../../components/ColumnSettingsController.js';
+import { GridFindController } from '../../../components/GridFindController.js';
 import { SOQL_VIEWS } from '../../../tabulator/ColumnViews.js';
 import {
   DB_ROW_COUNT_WIDTH,
@@ -95,9 +94,6 @@ export class SOQLView extends LitElement {
   @property({ attribute: false })
   lines: SOQLExecuteBeginLine[] = [];
 
-  @state()
-  oldIndex: number = 0;
-
   soqlTable: Tabulator | null = null;
   holder: HTMLElement | null = null;
   table: HTMLElement | null = null;
@@ -124,23 +120,17 @@ export class SOQLView extends LitElement {
   private rowCountRange: FilterRange = { start: null, end: null };
   private timeTakenRange: FilterRange = { start: null, end: null };
 
-  findArgs: { text: string; count: number; options: { matchCase: boolean } } = {
-    text: '',
-    count: 0,
-    options: { matchCase: false },
-  };
-  findMap: { [key: number]: RowComponent } = {};
-  totalMatches = 0;
-  blockClearHighlights = true;
+  private readonly _finder = new GridFindController(this, {
+    table: () => this.soqlTable,
+    report: (totalMatches) =>
+      document.dispatchEvent(
+        new CustomEvent('db-find-results', { detail: { totalMatches, type: 'soql' } }),
+      ),
+  });
 
   get _soqlTableWrapper(): HTMLDivElement | null {
     return this.renderRoot?.querySelector('#db-soql-table');
   }
-
-  private readonly _findBus = new DomListenerController<FindEventMap>(this, document, {
-    'lv-find': (e) => void this._find(e),
-    'lv-find-close': (e) => void this._find(e),
-  });
 
   firstUpdated(): void {
     this.contextMenu = this.renderRoot.querySelector('context-menu');
@@ -155,7 +145,7 @@ export class SOQLView extends LitElement {
     }
 
     if (changedProperties.has('highlightIndex')) {
-      void this._highlightMatches(this.highlightIndex);
+      void this._finder.highlight(this.highlightIndex);
     }
   }
 
@@ -426,58 +416,6 @@ export class SOQLView extends LitElement {
         this._renderSOQLTable(tableWrapper, this.lines);
       }
     });
-  }
-
-  async _highlightMatches(highlightIndex: number) {
-    if (!this.soqlTable?.element?.clientHeight) {
-      return;
-    }
-
-    this.findArgs.count = highlightIndex;
-    const currentRow = this.findMap[highlightIndex];
-    this.blockClearHighlights = true;
-    //@ts-expect-error This is a custom function added in by Find custom module
-    await this.soqlTable.setCurrentMatch(highlightIndex, currentRow, {
-      scrollIfVisible: false,
-      focusRow: false,
-    });
-    this.blockClearHighlights = false;
-
-    this.oldIndex = highlightIndex;
-  }
-
-  async _find(e: CustomEvent<FindEventDetail>) {
-    const isTableVisible = !!this.soqlTable?.element?.clientHeight;
-    if (!isTableVisible && !this.totalMatches) {
-      return;
-    }
-
-    const newFindArgs = JSON.parse(JSON.stringify(e.detail));
-    const newSearch =
-      newFindArgs.text !== this.findArgs.text ||
-      newFindArgs.options.matchCase !== this.findArgs.options?.matchCase;
-    this.findArgs = newFindArgs;
-
-    const clearHighlights = e.type === 'lv-find-close';
-    if (clearHighlights) {
-      newFindArgs.text = '';
-    }
-    if (newSearch || clearHighlights) {
-      this.blockClearHighlights = true;
-      //@ts-expect-error This is a custom function added in by Find custom module
-      const result = await this.soqlTable.find(this.findArgs);
-      this.blockClearHighlights = false;
-      this.totalMatches = result.totalMatches;
-      this.findMap = result.matchIndexes;
-
-      if (!clearHighlights) {
-        document.dispatchEvent(
-          new CustomEvent('db-find-results', {
-            detail: { totalMatches: result.totalMatches, type: 'soql' },
-          }),
-        );
-      }
-    }
   }
 
   _renderSOQLTable(soqlTableContainer: HTMLElement, soqlLines: SOQLExecuteBeginLine[]) {
@@ -787,26 +725,9 @@ export class SOQLView extends LitElement {
       }
     });
 
-    this.soqlTable.on('dataSorted', () => {
-      if (!this.blockClearHighlights && this.totalMatches > 0) {
-        this._resetFindWidget();
-        this._clearSearchHighlights();
-      }
-    });
-
-    this.soqlTable.on('dataGrouped', () => {
-      if (!this.blockClearHighlights && this.totalMatches > 0) {
-        this._resetFindWidget();
-        this._clearSearchHighlights();
-      }
-    });
-
-    this.soqlTable.on('dataFiltering', () => {
-      if (!this.blockClearHighlights && this.totalMatches > 0) {
-        this._resetFindWidget();
-        this._clearSearchHighlights();
-      }
-    });
+    for (const reshaped of ['dataSorted', 'dataGrouped', 'dataFiltering'] as const) {
+      this.soqlTable.on(reshaped, () => this._finder.dropOnReshape());
+    }
 
     this.soqlTable.on('renderComplete', () => {
       const holder = this._getTableHolder();
@@ -816,29 +737,6 @@ export class SOQLView extends LitElement {
       const table = this._getTable();
       holder.style.minHeight = Math.min(holder.clientHeight, table.clientHeight) + 'px';
     });
-  }
-
-  _resetFindWidget() {
-    document.dispatchEvent(
-      new CustomEvent('db-find-results', {
-        detail: { totalMatches: 0, type: 'soql' },
-      }),
-    );
-  }
-
-  _clearSearchHighlights() {
-    this.findArgs.text = '';
-    this.findArgs.count = 0;
-    //@ts-expect-error This is a custom function added in by Find custom module
-    this.soqlTable.clearFindHighlights();
-    this.findMap = {};
-    this.totalMatches = 0;
-
-    document.dispatchEvent(
-      new CustomEvent('db-find-results', {
-        detail: { totalMatches: this.totalMatches, type: 'soql' },
-      }),
-    );
   }
 
   _getTable() {
