@@ -54,6 +54,12 @@ export default {
         // beats `jest.requireActual`, so no suite can ask for a real element back.
         '^#vscode-elements/(?!vscode-single-select\\.js$)':
           '<rootDir>/src/__tests__/mocks/emptyModule.ts',
+        // One bundle, not the ~720-module `require` entry; the path must track pixi's `dist/`.
+        '^pixi\\.js$': '<rootDir>/node_modules/pixi.js/dist/pixi.mjs',
+      },
+      transform: {
+        ...defaultConfig.transform,
+        '^.+\\.mjs$': defaultConfig.transform['^.+\\.(ts|js)?$'],
       },
       transformIgnorePatterns: [
         // allow transformation of pixi.js and its dependencies
