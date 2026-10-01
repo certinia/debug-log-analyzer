@@ -12,8 +12,8 @@ import {
 
 import { NO_REPORTED_LIMITS_TEXT } from '../../../components/governorCopy.js';
 import { saveFile } from '../../../core/messaging/saveFile.js';
-import { formatInteger, sharePercent } from '../../../core/utility/Util.js';
-import { NAMESPACE_WIDTH } from '../../../tabulator/ColumnWidths.js';
+import { formatDuration, formatInteger, sharePercent } from '../../../core/utility/Util.js';
+import { NAMESPACE_WIDTH, TIME_WIDTH } from '../../../tabulator/ColumnWidths.js';
 import { GroupCalcs } from '../../../tabulator/groups/GroupCalcs.js';
 import { GroupChildIndent } from '../../../tabulator/groups/GroupChildIndent.js';
 import { GroupSort } from '../../../tabulator/groups/GroupSort.js';
@@ -252,6 +252,50 @@ export function createCountColumn(opts: {
     hozAlign: 'right',
     headerHozAlign: 'right',
     bottomCalc: 'sum',
+  };
+}
+
+/** Time columns: the narrowest the bar and its figure stay legible together. */
+const TIME_MIN_WIDTH = 120;
+
+/**
+ * A call-tree time column: milliseconds drawn as a bar against the whole
+ * transaction, right-aligned, hovering as a formatted duration.
+ *
+ * Shared so a column and its footer cannot drift apart — both scale against
+ * `totalValue`, and three tables were carrying hand-copied pairs. `bottomCalc`
+ * is per-table, because a top-down table sums plainly where Bottom-Up has to
+ * account for repeated call stacks; leave it out for a column with no
+ * meaningful total.
+ */
+export function createTimeColumn(opts: {
+  title: string;
+  field: string;
+  totalValue: number;
+  bottomCalc?: ColumnDefinition['bottomCalc'];
+  visible?: boolean;
+}): ColumnDefinition {
+  const barParams = { precision: 2, totalValue: opts.totalValue };
+  return {
+    title: opts.title,
+    field: opts.field,
+    sorter: 'number',
+    headerSortTristate: true,
+    width: TIME_WIDTH,
+    minWidth: TIME_MIN_WIDTH,
+    hozAlign: 'right',
+    headerHozAlign: 'right',
+    formatter: progressFormatterMS,
+    formatterParams: barParams,
+    tooltip: (_event, cell) => formatDuration(cell.getValue()),
+    visible: opts.visible,
+    ...(opts.bottomCalc === undefined
+      ? {}
+      : {
+          bottomCalc: opts.bottomCalc,
+          bottomCalcFormatter: progressFormatterMS,
+          bottomCalcFormatterParams: barParams,
+        }),
   };
 }
 
