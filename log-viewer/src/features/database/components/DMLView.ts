@@ -17,6 +17,8 @@ import { reportGridLocate, stampGridEventIndex } from './gridLocate.js';
 import { reportGridSelection } from './gridSelection.js';
 import { selectRowByEventIndex } from './revealRow.js';
 import { ColumnSettingsController } from '../../../components/ColumnSettingsController.js';
+import { GridColumnMenuController } from '../../../components/GridColumnMenuController.js';
+import { columnViewSelect, gridToolbarActions } from '../../../components/gridToolbar.js';
 import { GridFindController } from '../../../components/GridFindController.js';
 import { DML_VIEWS } from '../../../tabulator/ColumnViews.js';
 import {
@@ -96,7 +98,11 @@ export class DMLView extends LitElement {
     alwaysVisible: ALWAYS_VISIBLE,
     tables: () => (this.dmlTable ? [this.dmlTable] : []),
   });
-  private contextMenu: ContextMenu | null = null;
+  private readonly _menus = new GridColumnMenuController({
+    table: () => this.dmlTable,
+    menu: () => this._contextMenu,
+    columns: this._columns,
+  });
   /** eventIndex of the row whose context menu is open. */
   private contextMenuEventIndex: number | null = null;
   /** Marks the rows for the statements under the inspector's pointer. */
@@ -111,8 +117,8 @@ export class DMLView extends LitElement {
   private rowCountRange: FilterRange = { start: null, end: null };
   private timeTakenRange: FilterRange = { start: null, end: null };
 
-  firstUpdated(): void {
-    this.contextMenu = this.renderRoot.querySelector('context-menu');
+  private get _contextMenu(): ContextMenu | null {
+    return this.renderRoot.querySelector('context-menu');
   }
 
   updated(changedProperties: PropertyValues): void {
@@ -179,24 +185,12 @@ export class DMLView extends LitElement {
           ></datagrid-range-filter>
         </overflow-list>
 
-        <vs-select
-          dense
-          slot="table-actions"
-          id="dml-column-view"
-          prefix="Columns"
-          label="Column view"
-          @change="${this._handleColumnViewChange}"
-          @vs-reset-option="${this._onResetOption}"
-          .value="${this._columns.view}"
-          .resettableValues="${this._columns.editedViews}"
-        >
-          ${DML_VIEWS.map(
-            (view) =>
-              html`<vscode-option value="${view.id}" ?selected="${this._columns.view === view.id}"
-                >${view.id}</vscode-option
-              >`,
-          )}
-        </vs-select>
+        ${columnViewSelect({
+          id: 'dml-column-view',
+          views: DML_VIEWS,
+          columns: this._columns,
+          menus: this._menus,
+        })}
 
         <vs-select
           dense
@@ -213,26 +207,11 @@ export class DMLView extends LitElement {
           <vscode-option>None</vscode-option>
         </vs-select>
 
-        <div slot="actions">
-          <vscode-toolbar-button
-            icon="list-selection"
-            label="Columns"
-            title="Columns"
-            @click=${this._openColumnMenu}
-          ></vscode-toolbar-button>
-          <vscode-toolbar-button
-            icon="desktop-download"
-            label="Export to CSV"
-            title="Export to CSV"
-            @click=${this._exportToCSV}
-          ></vscode-toolbar-button>
-          <vscode-toolbar-button
-            icon="copy"
-            label="Copy to clipboard"
-            title="Copy to clipboard"
-            @click=${this._copyToClipboard}
-          ></vscode-toolbar-button>
-        </div>
+        ${gridToolbarActions({
+          menus: this._menus,
+          exportToCSV: () => this._exportToCSV(),
+          copyToClipboard: () => this._copyToClipboard(),
+        })}
       </datagrid-filter-bar>
 
       <div id="dml-table-container">
@@ -243,50 +222,12 @@ export class DMLView extends LitElement {
     `;
   }
 
-  private _handleColumnViewChange(event: Event) {
-    this._columns.choose((event.target as HTMLInputElement).value || 'General');
-  }
-
-  /** Applies the active view and wires the header menu once the table is built. */
-  private _initTableColumns(table: Tabulator) {
-    this._columns.applyTo(table);
-    const header = table.element.querySelector<HTMLElement>('.tabulator-header');
-    header?.addEventListener('contextmenu', (event) => {
-      event.preventDefault();
-      this._showColumnMenu(event.clientX, event.clientY);
-    });
-  }
-
-  private _showColumnMenu(x: number, y: number) {
-    if (!this.contextMenu || !this.dmlTable) {
-      return;
-    }
-    this.contextMenu.show(this._columns.menuItems(this.dmlTable), x, y);
-  }
-
-  private _openColumnMenu(event: Event) {
-    const rect = (event.currentTarget as HTMLElement).getBoundingClientRect();
-    this._showColumnMenu(rect.left, rect.bottom);
-  }
-
-  /** Rebuilds the open column menu so checkmarks/reset icons reflect current state. */
-  private _refreshColumnMenu() {
-    if (!this.contextMenu?.isVisible() || !this.dmlTable) {
-      return;
-    }
-    this.contextMenu.items = this._columns.menuItems(this.dmlTable);
-  }
-
   private _showRowContextMenu(event: MouseEvent, row: RowComponent) {
-    this.contextMenuEventIndex = showStatementRowMenu(event, row, this.dmlTable, this.contextMenu);
+    this.contextMenuEventIndex = showStatementRowMenu(event, row, this.dmlTable, this._contextMenu);
   }
 
   private _handleContextMenuSelect(e: CustomEvent<{ itemId: string }>) {
     const { itemId } = e.detail;
-    const table = this.dmlTable;
-    if (!table) {
-      return;
-    }
     if (itemId === 'show-in-call-tree') {
       const eventIndex = this.contextMenuEventIndex;
       if (eventIndex !== null) {
@@ -294,24 +235,7 @@ export class DMLView extends LitElement {
       }
       return;
     }
-    if (itemId.startsWith('view:')) {
-      this._columns.choose(itemId.slice('view:'.length));
-      this._refreshColumnMenu();
-      return;
-    }
-    if (itemId.startsWith('col:')) {
-      this._columns.toggle(table, itemId.slice('col:'.length));
-      this._refreshColumnMenu();
-      return;
-    }
-    if (itemId.startsWith('reset:')) {
-      this._columns.reset(itemId.slice('reset:'.length));
-      this._refreshColumnMenu();
-    }
-  }
-
-  private _onResetOption(event: CustomEvent<{ value: string }>) {
-    this._columns.reset(event.detail.value);
+    this._menus.select(itemId);
   }
 
   private _handleCallerNamespaceFacet(event: CustomEvent<{ selected: string[] }>) {
@@ -565,7 +489,7 @@ export class DMLView extends LitElement {
       //@ts-expect-error This is a custom function added in the GroupSort custom module
       this.dmlTable?.setSortedGroupBy('dml');
       if (this.dmlTable) {
-        this._initTableColumns(this.dmlTable);
+        this._menus.initTable(this.dmlTable);
         this.dmlTable.addFilter(this._callerNamespaceFilter);
         this.dmlTable.addFilter(this._objectFilter);
         this.dmlTable.addFilter(this._rowCountFilter);
