@@ -10,8 +10,6 @@ import { Tabulator, type GroupComponent, type RowComponent } from 'tabulator-tab
 
 import type { ApexLog, SOSLExecuteBeginLine } from '@apexdevtools/apex-log-parser';
 import { getCallerNamespace } from '../../../core/utility/CallerNamespace.js';
-import { DomListenerController } from '../../../core/events/DomListenerController.js';
-import type { FindEventDetail, FindEventMap } from '../../find/findEvents.js';
 import { goToRow } from '../../call-tree/navigation.js';
 import { isVisible } from '../../../core/utility/Util.js';
 import { LocatedRowMarker } from '../../../components/locatedRow.js';
@@ -21,6 +19,7 @@ import { selectRowByEventIndex } from './revealRow.js';
 import { soqlInlineElement } from '../../soql/format/inlineCell.js';
 import { soqlSyntaxStyles } from '../../soql/styles/soql-syntax.css.js';
 import { ColumnSettingsController } from '../../../components/ColumnSettingsController.js';
+import { GridFindController } from '../../../components/GridFindController.js';
 import { SOSL_VIEWS } from '../../../tabulator/ColumnViews.js';
 import {
   DB_ROW_COUNT_WIDTH,
@@ -76,9 +75,6 @@ export class SOSLView extends LitElement {
   @property()
   highlightIndex: number = 0;
 
-  @property()
-  oldIndex: number = 0;
-
   /** SOSL lines to display; supplied by the parent DatabaseView. */
   @property({ attribute: false })
   lines: SOSLExecuteBeginLine[] = [];
@@ -86,14 +82,13 @@ export class SOSLView extends LitElement {
   soslTable: Tabulator | null = null;
   holder: HTMLElement | null = null;
   table: HTMLElement | null = null;
-  findArgs: { text: string; count: number; options: { matchCase: boolean } } = {
-    text: '',
-    count: 0,
-    options: { matchCase: false },
-  };
-  findMap: { [key: number]: RowComponent } = {};
-  totalMatches = 0;
-  blockClearHighlights = true;
+  private readonly _finder = new GridFindController(this, {
+    table: () => this.soslTable,
+    report: (totalMatches) =>
+      document.dispatchEvent(
+        new CustomEvent('db-find-results', { detail: { totalMatches, type: 'sosl' } }),
+      ),
+  });
 
   private readonly _columns = new ColumnSettingsController(this, {
     section: 'database.sosl',
@@ -114,11 +109,6 @@ export class SOSLView extends LitElement {
   private rowCountRange: FilterRange = { start: null, end: null };
   private timeTakenRange: FilterRange = { start: null, end: null };
 
-  private readonly _findBus = new DomListenerController<FindEventMap>(this, document, {
-    'lv-find': (e) => void this._find(e),
-    'lv-find-close': (e) => void this._find(e),
-  });
-
   firstUpdated(): void {
     this.contextMenu = this.renderRoot.querySelector('context-menu');
   }
@@ -132,7 +122,7 @@ export class SOSLView extends LitElement {
     }
 
     if (changedProperties.has('highlightIndex')) {
-      void this._highlightMatches(this.highlightIndex);
+      void this._finder.highlight(this.highlightIndex);
     }
   }
 
@@ -377,57 +367,6 @@ export class SOSLView extends LitElement {
     });
   }
 
-  async _highlightMatches(highlightIndex: number) {
-    if (!this.soslTable?.element?.clientHeight) {
-      return;
-    }
-
-    this.findArgs.count = highlightIndex;
-    const currentRow = this.findMap[highlightIndex];
-    this.blockClearHighlights = true;
-    //@ts-expect-error This is a custom function added in by Find custom module
-    await this.soslTable.setCurrentMatch(highlightIndex, currentRow, {
-      scrollIfVisible: false,
-      focusRow: false,
-    });
-    this.blockClearHighlights = false;
-    this.oldIndex = highlightIndex;
-  }
-
-  async _find(e: CustomEvent<FindEventDetail>) {
-    const isTableVisible = !!this.soslTable?.element?.clientHeight;
-    if (!isTableVisible && !this.totalMatches) {
-      return;
-    }
-
-    const newFindArgs = JSON.parse(JSON.stringify(e.detail));
-    const newSearch =
-      newFindArgs.text !== this.findArgs.text ||
-      newFindArgs.options.matchCase !== this.findArgs.options?.matchCase;
-    this.findArgs = newFindArgs;
-
-    const clearHighlights = e.type === 'lv-find-close';
-    if (clearHighlights) {
-      newFindArgs.text = '';
-    }
-    if (newSearch || clearHighlights) {
-      this.blockClearHighlights = true;
-      //@ts-expect-error This is a custom function added in by Find custom module
-      const result = await this.soslTable.find(this.findArgs);
-      this.blockClearHighlights = false;
-      this.totalMatches = result.totalMatches;
-      this.findMap = result.matchIndexes;
-
-      if (!clearHighlights) {
-        document.dispatchEvent(
-          new CustomEvent('db-find-results', {
-            detail: { totalMatches: result.totalMatches, type: 'sosl' },
-          }),
-        );
-      }
-    }
-  }
-
   _renderSOSLTable(soslTableContainer: HTMLElement, soslLines: SOSLExecuteBeginLine[]) {
     const soslData: SOSLRow[] = [];
     let nextRowId = 0;
@@ -591,49 +530,9 @@ export class SOSLView extends LitElement {
       holder.style.minHeight = Math.min(holder.clientHeight, table.clientHeight) + 'px';
     });
 
-    this.soslTable.on('dataSorted', () => {
-      if (!this.blockClearHighlights && this.totalMatches > 0) {
-        this._resetFindWidget();
-        this._clearSearchHighlights();
-      }
-    });
-
-    this.soslTable.on('dataGrouped', () => {
-      if (!this.blockClearHighlights && this.totalMatches > 0) {
-        this._resetFindWidget();
-        this._clearSearchHighlights();
-      }
-    });
-
-    this.soslTable.on('dataFiltering', () => {
-      if (!this.blockClearHighlights && this.totalMatches > 0) {
-        this._resetFindWidget();
-        this._clearSearchHighlights();
-      }
-    });
-  }
-
-  _resetFindWidget() {
-    document.dispatchEvent(
-      new CustomEvent('db-find-results', {
-        detail: { totalMatches: 0, type: 'sosl' },
-      }),
-    );
-  }
-
-  private _clearSearchHighlights() {
-    this.findArgs.text = '';
-    this.findArgs.count = 0;
-    //@ts-expect-error This is a custom function added in by Find custom module
-    this.soslTable.clearFindHighlights();
-    this.findMap = {};
-    this.totalMatches = 0;
-
-    document.dispatchEvent(
-      new CustomEvent('db-find-results', {
-        detail: { totalMatches: this.totalMatches, type: 'sosl' },
-      }),
-    );
+    for (const reshaped of ['dataSorted', 'dataGrouped', 'dataFiltering'] as const) {
+      this.soslTable.on(reshaped, () => this._finder.dropOnReshape());
+    }
   }
 
   _getTable() {

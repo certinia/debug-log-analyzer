@@ -10,8 +10,6 @@ import { Tabulator, type GroupComponent, type RowComponent } from 'tabulator-tab
 
 import type { ApexLog, DMLBeginLine } from '@apexdevtools/apex-log-parser';
 import { getCallerNamespace } from '../../../core/utility/CallerNamespace.js';
-import { DomListenerController } from '../../../core/events/DomListenerController.js';
-import type { FindEventDetail, FindEventMap } from '../../find/findEvents.js';
 import { goToRow } from '../../call-tree/navigation.js';
 import { isVisible } from '../../../core/utility/Util.js';
 import { LocatedRowMarker } from '../../../components/locatedRow.js';
@@ -19,6 +17,7 @@ import { reportGridLocate, stampGridEventIndex } from './gridLocate.js';
 import { reportGridSelection } from './gridSelection.js';
 import { selectRowByEventIndex } from './revealRow.js';
 import { ColumnSettingsController } from '../../../components/ColumnSettingsController.js';
+import { GridFindController } from '../../../components/GridFindController.js';
 import { DML_VIEWS } from '../../../tabulator/ColumnViews.js';
 import {
   DB_ROW_COUNT_WIDTH,
@@ -75,9 +74,6 @@ export class DMLView extends LitElement {
   @property()
   highlightIndex: number = 0;
 
-  @property()
-  oldIndex: number = 0;
-
   /** DML lines to display; supplied by the parent DatabaseView. */
   @property({ attribute: false })
   lines: DMLBeginLine[] = [];
@@ -85,14 +81,13 @@ export class DMLView extends LitElement {
   dmlTable: Tabulator | null = null;
   holder: HTMLElement | null = null;
   table: HTMLElement | null = null;
-  findArgs: { text: string; count: number; options: { matchCase: boolean } } = {
-    text: '',
-    count: 0,
-    options: { matchCase: false },
-  };
-  findMap: { [key: number]: RowComponent } = {};
-  totalMatches = 0;
-  blockClearHighlights = true;
+  private readonly _finder = new GridFindController(this, {
+    table: () => this.dmlTable,
+    report: (totalMatches) =>
+      document.dispatchEvent(
+        new CustomEvent('db-find-results', { detail: { totalMatches, type: 'dml' } }),
+      ),
+  });
 
   private readonly _columns = new ColumnSettingsController(this, {
     section: 'database.dml',
@@ -116,11 +111,6 @@ export class DMLView extends LitElement {
   private rowCountRange: FilterRange = { start: null, end: null };
   private timeTakenRange: FilterRange = { start: null, end: null };
 
-  private readonly _findBus = new DomListenerController<FindEventMap>(this, document, {
-    'lv-find': (e) => void this._find(e),
-    'lv-find-close': (e) => void this._find(e),
-  });
-
   firstUpdated(): void {
     this.contextMenu = this.renderRoot.querySelector('context-menu');
   }
@@ -134,7 +124,7 @@ export class DMLView extends LitElement {
     }
 
     if (changedProperties.has('highlightIndex')) {
-      void this._highlightMatches(this.highlightIndex);
+      void this._finder.highlight(this.highlightIndex);
     }
   }
 
@@ -413,58 +403,6 @@ export class DMLView extends LitElement {
     });
   }
 
-  // todo: fix search on grouped data
-  async _highlightMatches(highlightIndex: number) {
-    if (!this.dmlTable?.element?.clientHeight) {
-      return;
-    }
-
-    this.findArgs.count = highlightIndex;
-    const currentRow = this.findMap[highlightIndex];
-    this.blockClearHighlights = true;
-    //@ts-expect-error This is a custom function added in by Find custom module
-    await this.dmlTable.setCurrentMatch(highlightIndex, currentRow, {
-      scrollIfVisible: false,
-      focusRow: false,
-    });
-    this.blockClearHighlights = false;
-    this.oldIndex = highlightIndex;
-  }
-
-  async _find(e: CustomEvent<FindEventDetail>) {
-    const isTableVisible = !!this.dmlTable?.element?.clientHeight;
-    if (!isTableVisible && !this.totalMatches) {
-      return;
-    }
-
-    const newFindArgs = JSON.parse(JSON.stringify(e.detail));
-    const newSearch =
-      newFindArgs.text !== this.findArgs.text ||
-      newFindArgs.options.matchCase !== this.findArgs.options?.matchCase;
-    this.findArgs = newFindArgs;
-
-    const clearHighlights = e.type === 'lv-find-close';
-    if (clearHighlights) {
-      newFindArgs.text = '';
-    }
-    if (newSearch || clearHighlights) {
-      this.blockClearHighlights = true;
-      //@ts-expect-error This is a custom function added in by Find custom module
-      const result = await this.dmlTable.find(this.findArgs);
-      this.blockClearHighlights = false;
-      this.totalMatches = result.totalMatches;
-      this.findMap = result.matchIndexes;
-
-      if (!clearHighlights) {
-        document.dispatchEvent(
-          new CustomEvent('db-find-results', {
-            detail: { totalMatches: result.totalMatches, type: 'dml' },
-          }),
-        );
-      }
-    }
-  }
-
   _renderDMLTable(dmlTableContainer: HTMLElement, dmlLines: DMLBeginLine[]) {
     const dmlData: DMLRow[] = [];
     let nextRowId = 0;
@@ -644,49 +582,9 @@ export class DMLView extends LitElement {
       holder.style.minHeight = Math.min(holder.clientHeight, table.clientHeight) + 'px';
     });
 
-    this.dmlTable.on('dataSorted', () => {
-      if (!this.blockClearHighlights && this.totalMatches > 0) {
-        this._resetFindWidget();
-        this._clearSearchHighlights();
-      }
-    });
-
-    this.dmlTable.on('dataGrouped', () => {
-      if (!this.blockClearHighlights && this.totalMatches > 0) {
-        this._resetFindWidget();
-        this._clearSearchHighlights();
-      }
-    });
-
-    this.dmlTable.on('dataFiltering', () => {
-      if (!this.blockClearHighlights && this.totalMatches > 0) {
-        this._resetFindWidget();
-        this._clearSearchHighlights();
-      }
-    });
-  }
-
-  _resetFindWidget() {
-    document.dispatchEvent(
-      new CustomEvent('db-find-results', {
-        detail: { totalMatches: 0, type: 'dml' },
-      }),
-    );
-  }
-
-  private _clearSearchHighlights() {
-    this.findArgs.text = '';
-    this.findArgs.count = 0;
-    //@ts-expect-error This is a custom function added in by Find custom module
-    this.dmlTable.clearFindHighlights();
-    this.findMap = {};
-    this.totalMatches = 0;
-
-    document.dispatchEvent(
-      new CustomEvent('db-find-results', {
-        detail: { totalMatches: this.totalMatches, type: 'dml' },
-      }),
-    );
+    for (const reshaped of ['dataSorted', 'dataGrouped', 'dataFiltering'] as const) {
+      this.dmlTable.on(reshaped, () => this._finder.dropOnReshape());
+    }
   }
 
   _getTable() {
