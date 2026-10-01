@@ -84,16 +84,12 @@ describe('sameConfig', () => {
     expect(sameConfig(base(), base())).toBe(true);
   });
 
-  it('sees a changed value inside an open-ended record', () => {
+  it.each([
+    ['a changed value inside an open-ended record', 'Time', ['a', 'c']],
+    ['an added key', 'Governor', ['x']],
+  ])('sees %s', (_label, key, value) => {
     const changed = base();
-    changed.callTree.columnOverrides.Time = ['a', 'c'];
-
-    expect(sameConfig(base(), changed)).toBe(false);
-  });
-
-  it('sees an added key', () => {
-    const changed = base();
-    changed.callTree.columnOverrides.Governor = ['x'];
+    changed.callTree.columnOverrides[key] = value;
 
     expect(sameConfig(base(), changed)).toBe(false);
   });
@@ -111,7 +107,7 @@ describe('AppConfig column overrides', () => {
       expect(overrides['callTree.columnOverrides']).toEqual({ Time: ['a', 'b'] });
       expect(overrides['database.soql.columnOverrides']).toEqual({});
       expect(overrides['database.dml.columnOverrides']).toEqual({});
-      expect(globalState.get).toHaveBeenCalledTimes(COLUMN_OVERRIDE_SECTIONS.length);
+      expect(Object.keys(overrides)).toEqual([...COLUMN_OVERRIDE_SECTIONS]);
     });
   });
 
@@ -124,7 +120,7 @@ describe('AppConfig column overrides', () => {
       // The Call Tree's view is remembered UI state, not a `lana.*` setting.
       expect(views['callTree.columnView']).toBe('Memory');
       expect(views['database.soql.columnView']).toBe('General');
-      expect(globalState.get).toHaveBeenCalledTimes(COLUMN_VIEW_SECTIONS.length);
+      expect(Object.keys(views)).toEqual([...COLUMN_VIEW_SECTIONS]);
     });
   });
 

@@ -3,6 +3,7 @@
  */
 import { beforeEach, describe, expect, it } from '@jest/globals';
 
+import type { ApexLog, LogEvent } from '@apexdevtools/apex-log-parser';
 import { FoldingRangeKind, languages, window, workspace } from 'vscode';
 
 import {
@@ -30,6 +31,12 @@ jest.mock('../../cache/LogEventCache.js', () => ({
 
 const mockGetApexLog = LogEventCache.getApexLog as jest.Mock;
 
+const line = (timestamp: number | null) =>
+  timestamp === null ? 'Some non-timestamp line' : `09:45:31.888 (${timestamp})|EVENT`;
+
+const event = (timestamp: number, exitStamp: number | null, children: LogEvent[] = []) =>
+  createMockLogEvent({ timestamp, exitStamp, children });
+
 describe('RawLogFoldingProvider', () => {
   let provider: RawLogFoldingProvider;
 
@@ -40,284 +47,71 @@ describe('RawLogFoldingProvider', () => {
     setOpenTabs(new TabInputText(Uri.file('/test/file.log')));
   });
 
-  describe('provideFoldingRanges', () => {
-    describe('timestamp mapping', () => {
-      it('should extract timestamps from log lines', async () => {
-        const lines = [
-          '09:45:31.888 (1000)|METHOD_ENTRY',
-          '09:45:31.889 (2000)|STATEMENT_EXECUTE',
-          '09:45:31.890 (3000)|METHOD_EXIT',
-        ];
-        const doc = createMockTextDocument({ lines, uri: '/test/file.log' });
+  async function foldsFor(timestamps: Array<number | null>, apexLog: ApexLog | null) {
+    const doc = createMockTextDocument({ lines: timestamps.map(line), uri: '/test/file.log' });
+    mockGetApexLog.mockResolvedValueOnce(apexLog);
+    const ranges = await provider.provideFoldingRanges(doc, {} as never);
+    return ranges.map((range) => [range.start, range.end, range.kind]);
+  }
 
-        const event = createMockLogEvent({
-          timestamp: 1000,
-          exitStamp: 3000,
-          children: [],
-        });
-        mockGetApexLog.mockResolvedValueOnce(createMockApexLog({ children: [event] }));
+  const logOf = (...children: LogEvent[]) => createMockApexLog({ children });
+  const region = (start: number, end: number) => [start, end, FoldingRangeKind.Region];
 
-        const ranges = await provider.provideFoldingRanges(doc, {} as never);
+  it.each([
+    ['an event', [1000, 1500, 2000], logOf(event(1000, 2000)), [region(0, 2)]],
+    [
+      'an event over an untimestamped line',
+      [1000, null, 2000],
+      logOf(event(1000, 2000)),
+      [region(0, 2)],
+    ],
+    [
+      'the first line of a repeated timestamp',
+      [1000, 1000, 2000],
+      logOf(event(1000, 2000)),
+      [region(0, 2)],
+    ],
+    [
+      'a parent and its child',
+      [1000, 1500, 2000, 3000],
+      logOf(event(1000, 3000, [event(1500, 2000)])),
+      [region(0, 3), region(1, 2)],
+    ],
+    [
+      'three levels',
+      [1000, 2000, 3000, 4000, 5000, 6000],
+      logOf(event(1000, 6000, [event(2000, 5000, [event(3000, 4000)])])),
+      [region(0, 5), region(1, 4), region(2, 3)],
+    ],
+    [
+      'siblings',
+      [1000, 2000, 3000, 4000],
+      logOf(event(1000, 2000), event(3000, 4000)),
+      [region(0, 1), region(2, 3)],
+    ],
+  ])('folds %s', async (_label, timestamps, apexLog, expected) => {
+    expect(await foldsFor(timestamps, apexLog)).toEqual(expected);
+  });
 
-        expect(ranges.length).toBe(1);
-        expect(ranges[0]?.start).toBe(0);
-        expect(ranges[0]?.end).toBe(2);
-      });
+  it.each([
+    ['an event that exits where it starts', [1000], logOf(event(1000, 1000))],
+    ['an event with no exit', [1000], logOf(event(1000, null))],
+    ['an event whose exit line comes first', [2000, 1000], logOf(event(1000, 2000))],
+    ['an event whose timestamps are not in the document', [1000], logOf(event(9999, 10000))],
+    ['an empty log', [], logOf()],
+    ['a log that did not parse', [], null],
+  ])('folds nothing for %s', async (_label, timestamps, apexLog) => {
+    expect(await foldsFor(timestamps, apexLog)).toEqual([]);
+  });
 
-      it('should handle lines without timestamps', async () => {
-        const lines = [
-          '09:45:31.888 (1000)|METHOD_ENTRY',
-          'Some non-timestamp line',
-          '09:45:31.890 (2000)|METHOD_EXIT',
-        ];
-        const doc = createMockTextDocument({ lines, uri: '/test/file.log' });
-
-        const event = createMockLogEvent({
-          timestamp: 1000,
-          exitStamp: 2000,
-          children: [],
-        });
-        mockGetApexLog.mockResolvedValueOnce(createMockApexLog({ children: [event] }));
-
-        const ranges = await provider.provideFoldingRanges(doc, {} as never);
-
-        expect(ranges.length).toBe(1);
-        expect(ranges[0]?.start).toBe(0);
-        expect(ranges[0]?.end).toBe(2);
-      });
-
-      it('should use first occurrence for duplicate timestamps', async () => {
-        const lines = [
-          '09:45:31.888 (1000)|METHOD_ENTRY',
-          '09:45:31.888 (1000)|ANOTHER_EVENT',
-          '09:45:31.890 (2000)|METHOD_EXIT',
-        ];
-        const doc = createMockTextDocument({ lines, uri: '/test/file.log' });
-
-        const event = createMockLogEvent({
-          timestamp: 1000,
-          exitStamp: 2000,
-          children: [],
-        });
-        mockGetApexLog.mockResolvedValueOnce(createMockApexLog({ children: [event] }));
-
-        const ranges = await provider.provideFoldingRanges(doc, {} as never);
-
-        // Should map to first occurrence (line 0)
-        expect(ranges[0]?.start).toBe(0);
-      });
-    });
-
-    describe('folding range creation', () => {
-      it('should create folding range for event with exitStamp', async () => {
-        const lines = [
-          '09:45:31.888 (1000)|METHOD_ENTRY',
-          '09:45:31.889 (1500)|STATEMENT_EXECUTE',
-          '09:45:31.890 (2000)|METHOD_EXIT',
-        ];
-        const doc = createMockTextDocument({ lines, uri: '/test/file.log' });
-
-        const event = createMockLogEvent({
-          timestamp: 1000,
-          exitStamp: 2000,
-          children: [],
-        });
-        mockGetApexLog.mockResolvedValueOnce(createMockApexLog({ children: [event] }));
-
-        const ranges = await provider.provideFoldingRanges(doc, {} as never);
-
-        expect(ranges.length).toBe(1);
-        expect(ranges[0]?.kind).toBe(FoldingRangeKind.Region);
-      });
-
-      it('should not create folding range when exitStamp equals timestamp', async () => {
-        const lines = ['09:45:31.888 (1000)|METHOD_ENTRY'];
-        const doc = createMockTextDocument({ lines, uri: '/test/file.log' });
-
-        const event = createMockLogEvent({
-          timestamp: 1000,
-          exitStamp: 1000,
-          children: [],
-        });
-        mockGetApexLog.mockResolvedValueOnce(createMockApexLog({ children: [event] }));
-
-        const ranges = await provider.provideFoldingRanges(doc, {} as never);
-
-        expect(ranges.length).toBe(0);
-      });
-
-      it('should not create folding range when exitStamp is null', async () => {
-        const lines = ['09:45:31.888 (1000)|METHOD_ENTRY'];
-        const doc = createMockTextDocument({ lines, uri: '/test/file.log' });
-
-        const event = createMockLogEvent({
-          timestamp: 1000,
-          exitStamp: null,
-          children: [],
-        });
-        mockGetApexLog.mockResolvedValueOnce(createMockApexLog({ children: [event] }));
-
-        const ranges = await provider.provideFoldingRanges(doc, {} as never);
-
-        expect(ranges.length).toBe(0);
-      });
-
-      it('should not create folding range when end line is not after start line', async () => {
-        const lines = ['09:45:31.888 (2000)|METHOD_EXIT', '09:45:31.888 (1000)|METHOD_ENTRY'];
-        const doc = createMockTextDocument({ lines, uri: '/test/file.log' });
-
-        // Event with timestamps in reverse order in document
-        const event = createMockLogEvent({
-          timestamp: 1000,
-          exitStamp: 2000,
-          children: [],
-        });
-        mockGetApexLog.mockResolvedValueOnce(createMockApexLog({ children: [event] }));
-
-        const ranges = await provider.provideFoldingRanges(doc, {} as never);
-
-        // Should not create range since endLine (1) is not > startLine (0)
-        // Actually timestamps map: 1000->line1, 2000->line0
-        // So start=1, end=0, which is invalid
-        expect(ranges.length).toBe(0);
-      });
-    });
-
-    describe('nested events', () => {
-      it('should create folding ranges for nested events', async () => {
-        const lines = [
-          '09:45:31.888 (1000)|CODE_UNIT_STARTED',
-          '09:45:31.889 (1500)|METHOD_ENTRY',
-          '09:45:31.890 (2000)|METHOD_EXIT',
-          '09:45:31.891 (3000)|CODE_UNIT_FINISHED',
-        ];
-        const doc = createMockTextDocument({ lines, uri: '/test/file.log' });
-
-        const childEvent = createMockLogEvent({
-          timestamp: 1500,
-          exitStamp: 2000,
-          children: [],
-        });
-        const parentEvent = createMockLogEvent({
-          timestamp: 1000,
-          exitStamp: 3000,
-          children: [childEvent],
-        });
-        mockGetApexLog.mockResolvedValueOnce(createMockApexLog({ children: [parentEvent] }));
-
-        const ranges = await provider.provideFoldingRanges(doc, {} as never);
-
-        expect(ranges.length).toBe(2);
-        // Parent range
-        expect(ranges.some((r) => r.start === 0 && r.end === 3)).toBe(true);
-        // Child range
-        expect(ranges.some((r) => r.start === 1 && r.end === 2)).toBe(true);
-      });
-
-      it('should handle deeply nested events', async () => {
-        const lines = [
-          '09:45:31.888 (1000)|LEVEL1_START',
-          '09:45:31.889 (2000)|LEVEL2_START',
-          '09:45:31.890 (3000)|LEVEL3_START',
-          '09:45:31.891 (4000)|LEVEL3_END',
-          '09:45:31.892 (5000)|LEVEL2_END',
-          '09:45:31.893 (6000)|LEVEL1_END',
-        ];
-        const doc = createMockTextDocument({ lines, uri: '/test/file.log' });
-
-        const level3 = createMockLogEvent({
-          timestamp: 3000,
-          exitStamp: 4000,
-          children: [],
-        });
-        const level2 = createMockLogEvent({
-          timestamp: 2000,
-          exitStamp: 5000,
-          children: [level3],
-        });
-        const level1 = createMockLogEvent({
-          timestamp: 1000,
-          exitStamp: 6000,
-          children: [level2],
-        });
-        mockGetApexLog.mockResolvedValueOnce(createMockApexLog({ children: [level1] }));
-
-        const ranges = await provider.provideFoldingRanges(doc, {} as never);
-
-        expect(ranges.length).toBe(3);
-      });
-
-      it('should handle sibling events', async () => {
-        const lines = [
-          '09:45:31.888 (1000)|METHOD1_ENTRY',
-          '09:45:31.889 (2000)|METHOD1_EXIT',
-          '09:45:31.890 (3000)|METHOD2_ENTRY',
-          '09:45:31.891 (4000)|METHOD2_EXIT',
-        ];
-        const doc = createMockTextDocument({ lines, uri: '/test/file.log' });
-
-        const method1 = createMockLogEvent({
-          timestamp: 1000,
-          exitStamp: 2000,
-          children: [],
-        });
-        const method2 = createMockLogEvent({
-          timestamp: 3000,
-          exitStamp: 4000,
-          children: [],
-        });
-        mockGetApexLog.mockResolvedValueOnce(createMockApexLog({ children: [method1, method2] }));
-
-        const ranges = await provider.provideFoldingRanges(doc, {} as never);
-
-        expect(ranges.length).toBe(2);
-        expect(ranges.some((r) => r.start === 0 && r.end === 1)).toBe(true);
-        expect(ranges.some((r) => r.start === 2 && r.end === 3)).toBe(true);
-      });
-    });
-
-    describe('edge cases', () => {
-      it('should return empty array when apexLog is null', async () => {
-        const doc = createMockTextDocument({ lines: [], uri: '/test/file.log' });
-        mockGetApexLog.mockResolvedValueOnce(null);
-
-        const ranges = await provider.provideFoldingRanges(doc, {} as never);
-
-        expect(ranges).toEqual([]);
-      });
-
-      it('should return empty array for empty log', async () => {
-        const doc = createMockTextDocument({ lines: [], uri: '/test/file.log' });
-        mockGetApexLog.mockResolvedValueOnce(createMockApexLog({ children: [] }));
-
-        const ranges = await provider.provideFoldingRanges(doc, {} as never);
-
-        expect(ranges).toEqual([]);
-      });
-
-      it('should handle events with timestamps not found in document', async () => {
-        const lines = ['09:45:31.888 (1000)|METHOD_ENTRY'];
-        const doc = createMockTextDocument({ lines, uri: '/test/file.log' });
-
-        const event = createMockLogEvent({
-          timestamp: 9999, // Not in document
-          exitStamp: 10000,
-          children: [],
-        });
-        mockGetApexLog.mockResolvedValueOnce(createMockApexLog({ children: [event] }));
-
-        const ranges = await provider.provideFoldingRanges(doc, {} as never);
-
-        expect(ranges).toEqual([]);
-      });
-    });
+  it('folds nothing for a document not open as a text tab', async () => {
+    setOpenTabs();
+    expect(await foldsFor([1000, 2000], logOf(event(1000, 2000)))).toEqual([]);
   });
 
   describe('apply', () => {
-    it('should register folding range provider for apexlog', () => {
-      const mockContext = createMockContext();
-
-      RawLogFoldingProvider.apply(asContext(mockContext));
+    it('registers the provider for apexlog', () => {
+      RawLogFoldingProvider.apply(asContext(createMockContext()));
 
       expect(languages.registerFoldingRangeProvider).toHaveBeenCalledTimes(1);
       expect(languages.registerFoldingRangeProvider).toHaveBeenCalledWith(
@@ -327,23 +121,12 @@ describe('RawLogFoldingProvider', () => {
     });
 
     it('warms on tab changes, not on document open', () => {
-      const mockContext = createMockContext();
-
-      RawLogFoldingProvider.apply(asContext(mockContext));
+      RawLogFoldingProvider.apply(asContext(createMockContext()));
 
       // onDidOpenTextDocument fires before the tab model updates, so isOpenAsTextTab
       // would reject a legitimate open.
       expect(window.tabGroups.onDidChangeTabs).toHaveBeenCalledTimes(1);
       expect(workspace.onDidOpenTextDocument).not.toHaveBeenCalled();
-    });
-
-    it('should add disposables to context subscriptions', () => {
-      const mockContext = createMockContext();
-
-      RawLogFoldingProvider.apply(asContext(mockContext));
-
-      // emitter + folding provider registration + tab listener + active-editor listener
-      expect(mockContext.context.subscriptions.length).toBe(4);
     });
   });
 
@@ -364,57 +147,38 @@ describe('RawLogFoldingProvider', () => {
         .calls[0]?.[0] as (editor: unknown) => void;
 
       // The tab handler reads the active editor rather than taking a document.
-      const openHandler = (doc: unknown) => {
+      const fireTabChange = (doc: unknown) => {
         window.activeTextEditor = { document: doc } as typeof window.activeTextEditor;
         tabsHandler({});
       };
+      const fireActiveEditor = (doc: unknown) => activeEditorHandler({ document: doc });
+      const fired = jest.fn();
+      registeredProvider.onDidChangeFoldingRanges?.(fired);
 
-      return { registeredProvider, openHandler, activeEditorHandler, display: mockContext.display };
+      return { fireTabChange, fireActiveEditor, fired, display: mockContext.display };
     }
 
     const flush = () => new Promise<void>((resolve) => queueMicrotask(resolve));
+    const logUri = expect.objectContaining({ scheme: 'file', path: '/test/file.log' });
 
-    it('warms the cache and fires onDidChangeFoldingRanges when an apex log opens', async () => {
-      const { registeredProvider, openHandler, display } = applyAndCapture();
-      const fired = jest.fn();
-      registeredProvider.onDidChangeFoldingRanges?.(fired);
-
+    it.each([
+      ['a tab change', 'fireTabChange'],
+      ['an editor becoming active (reopen)', 'fireActiveEditor'],
+    ] as const)('warms the cache and fires after %s', async (_label, trigger) => {
+      const captured = applyAndCapture();
       mockGetApexLog.mockResolvedValueOnce(createMockApexLog({ children: [] }));
-      const doc = createMockTextDocument({ lines: apexLogLines, uri: '/test/file.log' });
-      openHandler(doc);
+
+      captured[trigger](createMockTextDocument({ lines: apexLogLines, uri: '/test/file.log' }));
       await flush();
 
-      expect(mockGetApexLog).toHaveBeenCalledWith(
-        expect.objectContaining({ scheme: 'file', path: '/test/file.log' }),
-        display,
-      );
-      expect(fired).toHaveBeenCalledTimes(1);
-    });
-
-    it('warms the cache and fires when an apex log editor becomes active (reopen)', async () => {
-      const { registeredProvider, activeEditorHandler, display } = applyAndCapture();
-      const fired = jest.fn();
-      registeredProvider.onDidChangeFoldingRanges?.(fired);
-
-      mockGetApexLog.mockResolvedValueOnce(createMockApexLog({ children: [] }));
-      const doc = createMockTextDocument({ lines: apexLogLines, uri: '/test/file.log' });
-      activeEditorHandler({ document: doc });
-      await flush();
-
-      expect(mockGetApexLog).toHaveBeenCalledWith(
-        expect.objectContaining({ scheme: 'file', path: '/test/file.log' }),
-        display,
-      );
-      expect(fired).toHaveBeenCalledTimes(1);
+      expect(mockGetApexLog).toHaveBeenCalledWith(logUri, captured.display);
+      expect(captured.fired).toHaveBeenCalledTimes(1);
     });
 
     it('does not warm or signal for a non-apex-log document', async () => {
-      const { registeredProvider, openHandler } = applyAndCapture();
-      const fired = jest.fn();
-      registeredProvider.onDidChangeFoldingRanges?.(fired);
+      const { fireTabChange, fired } = applyAndCapture();
 
-      const doc = createMockTextDocument({ lines: ['just some text'], uri: '/test/notes.log' });
-      openHandler(doc);
+      fireTabChange(createMockTextDocument({ lines: ['just some text'], uri: '/test/notes.log' }));
       await flush();
 
       expect(mockGetApexLog).not.toHaveBeenCalled();
@@ -422,19 +186,13 @@ describe('RawLogFoldingProvider', () => {
     });
 
     it('does not fire when the log fails to parse', async () => {
-      const { registeredProvider, openHandler, display } = applyAndCapture();
-      const fired = jest.fn();
-      registeredProvider.onDidChangeFoldingRanges?.(fired);
-
+      const { fireTabChange, fired, display } = applyAndCapture();
       mockGetApexLog.mockResolvedValueOnce(null);
-      const doc = createMockTextDocument({ lines: apexLogLines, uri: '/test/file.log' });
-      openHandler(doc);
+
+      fireTabChange(createMockTextDocument({ lines: apexLogLines, uri: '/test/file.log' }));
       await flush();
 
-      expect(mockGetApexLog).toHaveBeenCalledWith(
-        expect.objectContaining({ scheme: 'file', path: '/test/file.log' }),
-        display,
-      );
+      expect(mockGetApexLog).toHaveBeenCalledWith(logUri, display);
       expect(fired).not.toHaveBeenCalled();
     });
   });

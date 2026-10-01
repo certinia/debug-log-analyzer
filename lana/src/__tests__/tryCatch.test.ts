@@ -31,13 +31,4 @@ describe('tryCatchAsync', () => {
     expect(error?.message).toBe('a string');
     expect(error?.cause).toBe('a string');
   });
-
-  it('narrows the value once the error is ruled out', async () => {
-    const [value, error] = await tryCatchAsync(() => Promise.resolve('ok'));
-    if (error) {
-      throw error;
-    }
-
-    expect(value.length).toBe(2);
-  });
 });

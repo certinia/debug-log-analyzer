@@ -49,7 +49,7 @@ describe('servicesRuntime', () => {
     {},
     { services: {} },
     { services: { prebuiltServicesDependencies: {}, ApexLogService: {} } },
-  ])('rejects an incompatible API shape', (api) => {
+  ])('rejects an incompatible API shape: %p', (api) => {
     expect(isSalesforceServicesApi(api)).toBe(false);
   });
 

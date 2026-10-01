@@ -37,86 +37,46 @@ const mockApplyWebView = WebView.apply as jest.Mock;
 // bundled index.html, and mocking that module away is what hid it reading
 // through a service that throws unless another extension has initialised it.
 const mockReadFile = workspace.fs.readFile as unknown as jest.Mock;
+const TEMPLATE = '<script src="bundle.js"></script><link href="codicon.css">';
 
 describe('LogView', () => {
-  function createPanel() {
-    return {
+  /** The panel createView will get, and a way to message it as the webview would. */
+  function stubPanel() {
+    let receiveMessage: ((message: unknown) => Promise<void>) | undefined;
+    const panel = {
       iconPath: undefined,
       onDidDispose: jest.fn(() => ({ dispose: jest.fn() })),
+      reveal: jest.fn(),
       webview: {
         asWebviewUri: jest.fn((uri: { path: string }) => Uri.parse(`webview:${uri.path}`)),
         html: '',
-        onDidReceiveMessage: jest.fn(() => ({ dispose: jest.fn() })),
-        postMessage: jest.fn(),
+        onDidReceiveMessage: jest.fn((listener: (message: unknown) => Promise<void>) => {
+          receiveMessage = listener;
+          return { dispose: jest.fn() };
+        }),
+        postMessage: jest.fn().mockResolvedValue(true),
       },
     };
+    mockApplyWebView.mockReturnValue(panel as unknown as import('vscode').WebviewPanel);
+    return { panel, receive: (message: unknown) => receiveMessage!(message) };
   }
 
   async function createViewWithListener() {
-    let receiveMessage: ((message: unknown) => Promise<void>) | undefined;
-    const postMessage = jest.fn().mockResolvedValue(true);
-    const panel = {
-      iconPath: undefined,
-      onDidDispose: jest.fn(() => ({ dispose: jest.fn() })),
-      reveal: jest.fn(),
-      webview: {
-        asWebviewUri: jest.fn((uri: { path: string }) => Uri.parse(`webview:${uri.path}`)),
-        html: '',
-        onDidReceiveMessage: jest.fn((listener: (message: unknown) => Promise<void>) => {
-          receiveMessage = listener;
-          return { dispose: jest.fn() };
-        }),
-        postMessage,
-      },
-    };
-    mockApplyWebView.mockReturnValue(panel as unknown as import('vscode').WebviewPanel);
-    mockReadFile.mockResolvedValue(
-      new TextEncoder().encode('<script src="bundle.js"></script><link href="codicon.css">'),
-    );
-
-    await LogView.createView(
-      asContext(createMockContext()),
-      Promise.resolve(),
-      Uri.parse('memfs:/repository/logs/virtual.log'),
-      'log body',
-    );
-
-    return { postMessage, receive: (message: unknown) => receiveMessage!(message) };
-  }
-
-  it('uses a display path in the payload and the captured URI for open actions', async () => {
-    let receiveMessage: ((message: unknown) => Promise<void>) | undefined;
-    const postMessage = jest.fn().mockResolvedValue(true);
-    const panel = {
-      iconPath: undefined,
-      onDidDispose: jest.fn(() => ({ dispose: jest.fn() })),
-      reveal: jest.fn(),
-      webview: {
-        asWebviewUri: jest.fn((uri: { path: string }) => Uri.parse(`webview:${uri.path}`)),
-        html: '',
-        onDidReceiveMessage: jest.fn((listener: (message: unknown) => Promise<void>) => {
-          receiveMessage = listener;
-          return { dispose: jest.fn() };
-        }),
-        postMessage,
-      },
-    };
-    mockApplyWebView.mockReturnValue(panel as unknown as import('vscode').WebviewPanel);
-    mockReadFile.mockResolvedValue(
-      new TextEncoder().encode('<script src="bundle.js"></script><link href="codicon.css">'),
-    );
-    workspace.asRelativePath.mockReturnValue('workspace/logs/virtual.log');
+    const { panel, receive } = stubPanel();
+    mockReadFile.mockResolvedValue(new TextEncoder().encode(TEMPLATE));
     const context = createMockContext();
     const logUri = Uri.parse('memfs:/repository/logs/virtual.log');
 
     await LogView.createView(asContext(context), Promise.resolve(), logUri, 'log body');
-    // createView must resolve and rewrite the bundled index.html. It read that
-    // file through a service needing another extension's initialisation, so it
-    // rejected before the webview had any content.
-    expect(panel.webview.html).toContain('webview:/test/extension/out/bundle.js');
-    expect(panel.webview.html).not.toContain('src="bundle.js"');
 
-    await receiveMessage?.({ cmd: 'fetchLog', requestId: 'request-1' });
+    return { context, logUri, receive, postMessage: panel.webview.postMessage };
+  }
+
+  it('uses a display path in the payload and the captured URI for open actions', async () => {
+    workspace.asRelativePath.mockReturnValueOnce('workspace/logs/virtual.log');
+    const { context, logUri, receive, postMessage } = await createViewWithListener();
+
+    await receive({ cmd: 'fetchLog', requestId: 'request-1' });
 
     expect(postMessage).toHaveBeenCalledWith({
       requestId: 'request-1',
@@ -130,17 +90,14 @@ describe('LogView', () => {
       },
     });
 
-    await receiveMessage?.({ cmd: 'openPath', payload: 'file:///untrusted.log' });
+    await receive({ cmd: 'openPath', payload: 'file:///untrusted.log' });
 
     expect(context.display.showFile).toHaveBeenCalledWith(logUri);
   });
 
   it('points the packaged template at webview URIs', async () => {
-    const panel = createPanel();
-    mockApplyWebView.mockReturnValue(panel as unknown as import('vscode').WebviewPanel);
-    mockReadFile.mockResolvedValue(
-      new TextEncoder().encode('<script src="bundle.js"></script><link href="codicon.css">'),
-    );
+    const { panel } = stubPanel();
+    mockReadFile.mockResolvedValue(new TextEncoder().encode(TEMPLATE));
 
     await LogView.createView(asContext(createMockContext()));
 
@@ -150,8 +107,7 @@ describe('LogView', () => {
   });
 
   it('owns the rejection of a body the webview never asks for', async () => {
-    const panel = createPanel();
-    mockApplyWebView.mockReturnValue(panel as unknown as import('vscode').WebviewPanel);
+    stubPanel();
     mockReadFile.mockResolvedValue(new TextEncoder().encode('<html></html>'));
     const unhandled: unknown[] = [];
     const record = (reason: unknown): void => {
@@ -176,8 +132,7 @@ describe('LogView', () => {
   });
 
   it('names the file it could not read when the packaged template is missing', async () => {
-    const panel = createPanel();
-    mockApplyWebView.mockReturnValue(panel as unknown as import('vscode').WebviewPanel);
+    stubPanel();
     mockReadFile.mockRejectedValue(new Error('ENOENT'));
 
     await expect(LogView.createView(asContext(createMockContext()))).rejects.toThrow(

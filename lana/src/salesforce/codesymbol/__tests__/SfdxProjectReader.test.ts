@@ -2,24 +2,21 @@
  * Copyright (c) 2025 Certinia Inc. All rights reserved.
  */
 import { RelativePattern, Uri, workspace, type WorkspaceFolder } from 'vscode';
+import type { SfdxProject } from '../SfdxProject';
 import { getProjects } from '../SfdxProjectReader';
 
-jest.mock('vscode');
-
-const fileUri = (path: string): Uri => ({ path, fsPath: path }) as Uri;
-
-const joinPath = (base: string, ...segments: string[]): string =>
-  [base, ...segments].join('/').replace(/\/[^/]+\/\.\.\//g, '/');
-
 /** Mock the workspace scan so each project file resolves to its own contents, in order. */
-function mockProjectFiles(files: { uri: Uri; contents: string }[]): void {
-  (workspace.findFiles as jest.Mock).mockResolvedValue(files.map((file) => file.uri));
+function mockProjectFiles(files: { path: string; contents: string }[]): void {
+  (workspace.findFiles as jest.Mock).mockResolvedValue(files.map((file) => Uri.file(file.path)));
 
   const readFile = workspace.fs.readFile as jest.Mock;
   for (const file of files) {
     readFile.mockResolvedValueOnce(new TextEncoder().encode(file.contents));
   }
 }
+
+const packagePaths = (project: SfdxProject | undefined) =>
+  project?.packageDirectories.map((dir) => ({ path: dir.uri.path, default: dir.default }));
 
 describe('getProjects', () => {
   const mockWorkspaceFolder = {
@@ -28,171 +25,97 @@ describe('getProjects', () => {
     index: 0,
   } as WorkspaceFolder;
 
+  let warn: jest.SpyInstance;
+
   beforeEach(() => {
-    // Mirror the real Uri.joinPath: join segments and normalize '..'
-    (Uri.joinPath as jest.Mock).mockImplementation((base: Uri, ...segments: string[]) =>
-      fileUri(joinPath(base.path, ...segments)),
-    );
+    warn = jest.spyOn(console, 'warn').mockImplementation();
   });
 
-  it('should return empty array when no sfdx-project.json files found', async () => {
+  afterEach(() => {
+    warn.mockRestore();
+  });
+
+  it('finds nothing when the workspace has no sfdx-project.json', async () => {
     mockProjectFiles([]);
 
-    const result = await getProjects(mockWorkspaceFolder);
-
-    expect(result).toEqual([]);
+    expect(await getProjects(mockWorkspaceFolder)).toEqual([]);
     expect(RelativePattern).toHaveBeenCalledWith(mockWorkspaceFolder, '**/sfdx-project.json');
   });
 
-  it('should parse valid sfdx-project.json files', async () => {
-    const mockProjectContent = {
-      name: 'my-project',
-      namespace: 'myns',
-      packageDirectories: [{ path: 'force-app', default: true }],
-    };
-
+  it('reads a project with its name, namespace and package directories', async () => {
     mockProjectFiles([
       {
-        uri: fileUri('/workspace/sfdx-project.json'),
-        contents: JSON.stringify(mockProjectContent),
+        path: '/workspace/sfdx-project.json',
+        contents: JSON.stringify({
+          name: 'my-project',
+          namespace: 'myns',
+          packageDirectories: [{ path: 'force-app', default: true }],
+        }),
       },
     ]);
 
-    const result = await getProjects(mockWorkspaceFolder);
+    const [project] = await getProjects(mockWorkspaceFolder);
 
-    expect(result).toHaveLength(1);
-    expect(result[0]).toMatchObject({
-      name: 'my-project',
-      namespace: 'myns',
-      packageDirectories: [{ uri: fileUri('/workspace/force-app'), default: true }],
-    });
+    expect(project).toMatchObject({ name: 'my-project', namespace: 'myns' });
+    expect(packagePaths(project)).toEqual([{ path: '/workspace/force-app', default: true }]);
   });
 
-  it('should resolve package directories relative to a nested project file', async () => {
-    const mockProjectContent = {
-      name: 'pkg-a',
-      namespace: '',
-      packageDirectories: [{ path: 'src/main', default: true }],
-    };
-
+  it('resolves package directories relative to a nested project file', async () => {
     mockProjectFiles([
       {
-        uri: fileUri('/workspace/packages/pkg-a/sfdx-project.json'),
-        contents: JSON.stringify(mockProjectContent),
+        path: '/workspace/packages/pkg-a/sfdx-project.json',
+        contents: JSON.stringify({
+          name: 'pkg-a',
+          namespace: '',
+          packageDirectories: [{ path: 'src/main', default: true }],
+        }),
       },
     ]);
 
-    const result = await getProjects(mockWorkspaceFolder);
+    const [project] = await getProjects(mockWorkspaceFolder);
 
-    expect(result).toHaveLength(1);
-    expect(result[0]?.packageDirectories).toEqual([
-      { uri: fileUri('/workspace/packages/pkg-a/src/main'), default: true },
+    expect(packagePaths(project)).toEqual([
+      { path: '/workspace/packages/pkg-a/src/main', default: true },
     ]);
   });
 
-  it('should default missing name, namespace and package default flags', async () => {
-    const mockProjectContent = {
-      packageDirectories: [{ path: 'force-app' }],
-    };
-
+  it('defaults a missing name, namespace and package default flag', async () => {
     mockProjectFiles([
       {
-        uri: fileUri('/workspace/sfdx-project.json'),
-        contents: JSON.stringify(mockProjectContent),
+        path: '/workspace/sfdx-project.json',
+        contents: JSON.stringify({ packageDirectories: [{ path: 'force-app' }] }),
       },
     ]);
 
-    const result = await getProjects(mockWorkspaceFolder);
+    const [project] = await getProjects(mockWorkspaceFolder);
 
-    expect(result).toHaveLength(1);
-    expect(result[0]).toMatchObject({
-      name: null,
-      namespace: '',
-      packageDirectories: [{ uri: fileUri('/workspace/force-app'), default: false }],
-    });
+    expect(project).toMatchObject({ name: null, namespace: '' });
+    expect(packagePaths(project)).toEqual([{ path: '/workspace/force-app', default: false }]);
   });
 
-  it('should parse multiple sfdx-project.json files', async () => {
-    const mockProjects = [
-      { name: 'project1', namespace: 'ns1', packageDirectories: [] },
-      { name: 'project2', namespace: 'ns2', packageDirectories: [] },
-    ];
+  it.each([
+    ['invalid JSON', 'invalid json'],
+    [
+      'no packageDirectories array',
+      JSON.stringify({ name: 'no-dirs', packageDirectories: 'force-app' }),
+    ],
+  ])(
+    'warns about and skips a project file with %s, then reads the rest',
+    async (_label, contents) => {
+      const validProject = { name: 'valid', namespace: '', packageDirectories: [] };
+      mockProjectFiles([
+        { path: '/workspace/broken/sfdx-project.json', contents },
+        { path: '/workspace/valid/sfdx-project.json', contents: JSON.stringify(validProject) },
+      ]);
 
-    mockProjectFiles([
-      {
-        uri: fileUri('/workspace/project1/sfdx-project.json'),
-        contents: JSON.stringify(mockProjects[0]),
-      },
-      {
-        uri: fileUri('/workspace/project2/sfdx-project.json'),
-        contents: JSON.stringify(mockProjects[1]),
-      },
-    ]);
+      const projects = await getProjects(mockWorkspaceFolder);
 
-    const result = await getProjects(mockWorkspaceFolder);
-
-    expect(result).toHaveLength(2);
-    expect(result[0]).toMatchObject(mockProjects[0]!);
-    expect(result[1]).toMatchObject(mockProjects[1]!);
-  });
-
-  it('should skip invalid JSON files and log warning', async () => {
-    const consoleSpy = jest.spyOn(console, 'warn').mockImplementation();
-
-    mockProjectFiles([
-      { uri: fileUri('/workspace/invalid/sfdx-project.json'), contents: 'invalid json' },
-    ]);
-
-    const result = await getProjects(mockWorkspaceFolder);
-
-    expect(result).toEqual([]);
-    expect(consoleSpy).toHaveBeenCalledWith(
-      expect.stringContaining('Failed to parse sfdx-project.json'),
-      expect.any(Error),
-    );
-
-    consoleSpy.mockRestore();
-  });
-
-  it('should skip project files without a packageDirectories array', async () => {
-    const consoleSpy = jest.spyOn(console, 'warn').mockImplementation();
-
-    mockProjectFiles([
-      {
-        uri: fileUri('/workspace/sfdx-project.json'),
-        contents: JSON.stringify({ name: 'no-dirs', packageDirectories: 'force-app' }),
-      },
-    ]);
-
-    const result = await getProjects(mockWorkspaceFolder);
-
-    expect(result).toEqual([]);
-    expect(consoleSpy).toHaveBeenCalledWith(
-      expect.stringContaining('Failed to parse sfdx-project.json'),
-      expect.any(Error),
-    );
-
-    consoleSpy.mockRestore();
-  });
-
-  it('should continue processing other files when one fails', async () => {
-    const validProject = { name: 'valid', namespace: '', packageDirectories: [] };
-    const consoleSpy = jest.spyOn(console, 'warn').mockImplementation();
-
-    mockProjectFiles([
-      { uri: fileUri('/workspace/invalid/sfdx-project.json'), contents: 'invalid json' },
-      {
-        uri: fileUri('/workspace/valid/sfdx-project.json'),
-        contents: JSON.stringify(validProject),
-      },
-    ]);
-
-    const result = await getProjects(mockWorkspaceFolder);
-
-    expect(result).toHaveLength(1);
-    expect(result[0]).toMatchObject(validProject);
-    expect(consoleSpy).toHaveBeenCalled();
-
-    consoleSpy.mockRestore();
-  });
+      expect(projects).toHaveLength(1);
+      expect(projects[0]).toMatchObject(validProject);
+      expect(warn).toHaveBeenCalledWith(
+        expect.stringContaining('Failed to parse sfdx-project.json'),
+        expect.any(Error),
+      );
+    },
+  );
 });
