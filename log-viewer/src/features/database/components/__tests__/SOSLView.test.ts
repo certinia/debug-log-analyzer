@@ -291,6 +291,27 @@ describe('SOSLView', () => {
     });
   });
 
+  // The shared templates render through a nested result, so what is checked here
+  // is that the elements still land as direct children of the bar, carrying the
+  // slot that puts them where they belong.
+  describe('shared toolbar templates', () => {
+    const bar = () => view.renderRoot.querySelector('datagrid-filter-bar');
+
+    it('slots the column-view select into the bar', () => {
+      const select = view.renderRoot.querySelector('#sosl-column-view');
+
+      expect(select?.getAttribute('slot')).toBe('table-actions');
+      expect(select?.parentElement).toBe(bar());
+    });
+
+    it('slots the action buttons into the bar', () => {
+      const actions = view.renderRoot.querySelector('div[slot="actions"]');
+
+      expect(actions?.parentElement).toBe(bar());
+      expect(actions?.querySelectorAll('vscode-toolbar-button')).toHaveLength(3);
+    });
+  });
+
   describe('selection', () => {
     it('drops the row highlight', () => {
       inner.deselectRows();

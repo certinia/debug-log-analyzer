@@ -28,6 +28,7 @@ import { reportGridSelection } from './gridSelection.js';
 import { selectRowByEventIndex } from './revealRow.js';
 import { ColumnSettingsController } from '../../../components/ColumnSettingsController.js';
 import { GridColumnMenuController } from '../../../components/GridColumnMenuController.js';
+import { columnViewSelect, gridToolbarActions } from '../../../components/gridToolbar.js';
 import { GridFindController } from '../../../components/GridFindController.js';
 import { SOQL_VIEWS } from '../../../tabulator/ColumnViews.js';
 import {
@@ -204,24 +205,12 @@ export class SOQLView extends LitElement {
           ></datagrid-range-filter>
         </overflow-list>
 
-        <vs-select
-          dense
-          slot="table-actions"
-          id="soql-column-view"
-          prefix="Columns"
-          label="Column view"
-          @change="${this._menus.chooseView}"
-          @vs-reset-option="${this._menus.resetView}"
-          .value="${this._columns.view}"
-          .resettableValues="${this._columns.editedViews}"
-        >
-          ${SOQL_VIEWS.map(
-            (view) =>
-              html`<vscode-option value="${view.id}" ?selected="${this._columns.view === view.id}"
-                >${view.id}</vscode-option
-              >`,
-          )}
-        </vs-select>
+        ${columnViewSelect({
+          id: 'soql-column-view',
+          views: SOQL_VIEWS,
+          columns: this._columns,
+          menus: this._menus,
+        })}
 
         <vs-select
           dense
@@ -238,26 +227,11 @@ export class SOQLView extends LitElement {
           <vscode-option>None</vscode-option>
         </vs-select>
 
-        <div slot="actions">
-          <vscode-toolbar-button
-            icon="list-selection"
-            label="Columns"
-            title="Columns"
-            @click=${this._menus.open}
-          ></vscode-toolbar-button>
-          <vscode-toolbar-button
-            icon="desktop-download"
-            label="Export to CSV"
-            title="Export to CSV"
-            @click=${this._exportToCSV}
-          ></vscode-toolbar-button>
-          <vscode-toolbar-button
-            icon="copy"
-            label="Copy to clipboard"
-            title="Copy to clipboard"
-            @click=${this._copyToClipboard}
-          ></vscode-toolbar-button>
-        </div>
+        ${gridToolbarActions({
+          menus: this._menus,
+          exportToCSV: () => this._exportToCSV(),
+          copyToClipboard: () => this._copyToClipboard(),
+        })}
       </datagrid-filter-bar>
 
       <div id="soql-table-container">

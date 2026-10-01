@@ -30,6 +30,7 @@ import { isVisible } from '../../../core/utility/Util.js';
 import { createBottomUpTable } from '../../call-tree/components/BottomUpTable.js';
 import { ColumnSettingsController } from '../../../components/ColumnSettingsController.js';
 import { GridColumnMenuController } from '../../../components/GridColumnMenuController.js';
+import { gridToolbarActions } from '../../../components/gridToolbar.js';
 import { CALL_TREE_VIEWS } from '../../../tabulator/ColumnViews.js';
 import type { BottomUpRow } from '../../call-tree/utils/Aggregation.js';
 import { findRootBucket } from '../../call-tree/utils/bucketRows.js';
@@ -310,26 +311,11 @@ export class AnalysisView extends LitElement {
             <vscode-option>Type</vscode-option>
           </vs-select>
 
-          <div slot="actions">
-            <vscode-toolbar-button
-              icon="list-selection"
-              label="Columns"
-              title="Columns"
-              @click=${this._menus.open}
-            ></vscode-toolbar-button>
-            <vscode-toolbar-button
-              icon="desktop-download"
-              label="Export to CSV"
-              title="Export to CSV"
-              @click=${this._exportToCSV}
-            ></vscode-toolbar-button>
-            <vscode-toolbar-button
-              icon="copy"
-              label="Copy to clipboard"
-              title="Copy to clipboard"
-              @click=${this._copyToClipboard}
-            ></vscode-toolbar-button>
-          </div>
+          ${gridToolbarActions({
+            menus: this._menus,
+            exportToCSV: () => this._exportToCSV(),
+            copyToClipboard: () => this._copyToClipboard(),
+          })}
         </datagrid-filter-bar>
 
         <div id="analysis-table-container">
