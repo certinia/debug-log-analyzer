@@ -19,6 +19,7 @@ import { selectRowByEventIndex } from './revealRow.js';
 import { soqlInlineElement } from '../../soql/format/inlineCell.js';
 import { soqlSyntaxStyles } from '../../soql/styles/soql-syntax.css.js';
 import { ColumnSettingsController } from '../../../components/ColumnSettingsController.js';
+import { GridColumnMenuController } from '../../../components/GridColumnMenuController.js';
 import { GridFindController } from '../../../components/GridFindController.js';
 import { SOSL_VIEWS } from '../../../tabulator/ColumnViews.js';
 import {
@@ -97,7 +98,11 @@ export class SOSLView extends LitElement {
     alwaysVisible: ALWAYS_VISIBLE,
     tables: () => (this.soslTable ? [this.soslTable] : []),
   });
-  private contextMenu: ContextMenu | null = null;
+  private readonly _menus = new GridColumnMenuController({
+    table: () => this.soslTable,
+    menu: () => this._contextMenu,
+    columns: this._columns,
+  });
   /** eventIndex of the row whose context menu is open. */
   private contextMenuEventIndex: number | null = null;
   /** Marks the rows for the statements under the inspector's pointer. */
@@ -109,8 +114,8 @@ export class SOSLView extends LitElement {
   private rowCountRange: FilterRange = { start: null, end: null };
   private timeTakenRange: FilterRange = { start: null, end: null };
 
-  firstUpdated(): void {
-    this.contextMenu = this.renderRoot.querySelector('context-menu');
+  private get _contextMenu(): ContextMenu | null {
+    return this.renderRoot.querySelector('context-menu');
   }
 
   updated(changedProperties: PropertyValues): void {
@@ -179,8 +184,8 @@ export class SOSLView extends LitElement {
           id="sosl-column-view"
           prefix="Columns"
           label="Column view"
-          @change="${this._handleColumnViewChange}"
-          @vs-reset-option="${this._onResetOption}"
+          @change="${this._menus.chooseView}"
+          @vs-reset-option="${this._menus.resetView}"
           .value="${this._columns.view}"
           .resettableValues="${this._columns.editedViews}"
         >
@@ -211,7 +216,7 @@ export class SOSLView extends LitElement {
             icon="list-selection"
             label="Columns"
             title="Columns"
-            @click=${this._openColumnMenu}
+            @click=${this._menus.open}
           ></vscode-toolbar-button>
           <vscode-toolbar-button
             icon="desktop-download"
@@ -236,50 +241,17 @@ export class SOSLView extends LitElement {
     `;
   }
 
-  private _handleColumnViewChange(event: Event) {
-    this._columns.choose((event.target as HTMLInputElement).value || 'General');
-  }
-
-  /** Applies the active view and wires the header menu once the table is built. */
-  private _initTableColumns(table: Tabulator) {
-    this._columns.applyTo(table);
-    const header = table.element.querySelector<HTMLElement>('.tabulator-header');
-    header?.addEventListener('contextmenu', (event) => {
-      event.preventDefault();
-      this._showColumnMenu(event.clientX, event.clientY);
-    });
-  }
-
-  private _showColumnMenu(x: number, y: number) {
-    if (!this.contextMenu || !this.soslTable) {
-      return;
-    }
-    this.contextMenu.show(this._columns.menuItems(this.soslTable), x, y);
-  }
-
-  private _openColumnMenu(event: Event) {
-    const rect = (event.currentTarget as HTMLElement).getBoundingClientRect();
-    this._showColumnMenu(rect.left, rect.bottom);
-  }
-
-  /** Rebuilds the open column menu so checkmarks/reset icons reflect current state. */
-  private _refreshColumnMenu() {
-    if (!this.contextMenu?.isVisible() || !this.soslTable) {
-      return;
-    }
-    this.contextMenu.items = this._columns.menuItems(this.soslTable);
-  }
-
   private _showRowContextMenu(event: MouseEvent, row: RowComponent) {
-    this.contextMenuEventIndex = showStatementRowMenu(event, row, this.soslTable, this.contextMenu);
+    this.contextMenuEventIndex = showStatementRowMenu(
+      event,
+      row,
+      this.soslTable,
+      this._contextMenu,
+    );
   }
 
   private _handleContextMenuSelect(e: CustomEvent<{ itemId: string }>) {
     const { itemId } = e.detail;
-    const table = this.soslTable;
-    if (!table) {
-      return;
-    }
     if (itemId === 'show-in-call-tree') {
       const eventIndex = this.contextMenuEventIndex;
       if (eventIndex !== null) {
@@ -287,24 +259,7 @@ export class SOSLView extends LitElement {
       }
       return;
     }
-    if (itemId.startsWith('view:')) {
-      this._columns.choose(itemId.slice('view:'.length));
-      this._refreshColumnMenu();
-      return;
-    }
-    if (itemId.startsWith('col:')) {
-      this._columns.toggle(table, itemId.slice('col:'.length));
-      this._refreshColumnMenu();
-      return;
-    }
-    if (itemId.startsWith('reset:')) {
-      this._columns.reset(itemId.slice('reset:'.length));
-      this._refreshColumnMenu();
-    }
-  }
-
-  private _onResetOption(event: CustomEvent<{ value: string }>) {
-    this._columns.reset(event.detail.value);
+    this._menus.select(itemId);
   }
 
   private _handleNamespaceFacet(event: CustomEvent<{ selected: string[] }>) {
@@ -514,7 +469,7 @@ export class SOSLView extends LitElement {
       //@ts-expect-error This is a custom function added in the GroupSort custom module
       this.soslTable?.setSortedGroupBy('sosl');
       if (this.soslTable) {
-        this._initTableColumns(this.soslTable);
+        this._menus.initTable(this.soslTable);
         this.soslTable.addFilter(this._namespaceFilter);
         this.soslTable.addFilter(this._rowCountFilter);
         this.soslTable.addFilter(this._timeTakenFilter);
