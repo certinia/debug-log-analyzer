@@ -5,16 +5,6 @@
 /*
  * Copyright (c) 2025 Certinia Inc. All rights reserved.
  */
-
-/**
- * Unit tests for KeyboardHandler
- *
- * Tests keyboard input handling for flame chart viewport controls:
- * - Pan via Arrow keys and A/D keys
- * - Zoom via W/S and +/-/= keys
- * - Reset zoom via Home / 0 keys
- * - Escape key for cancel/deselect
- */
 import { afterEach, beforeEach, describe, expect, it, jest } from '@jest/globals';
 
 import {
@@ -26,26 +16,39 @@ import {
 } from '../optimised/interaction/KeyboardHandler.js';
 import { TimelineViewport } from '../optimised/TimelineViewport.js';
 
-describe('KeyboardHandler', () => {
-  const DISPLAY_WIDTH = 1000;
-  const DISPLAY_HEIGHT = 600;
-  const TOTAL_DURATION = 1_000_000;
-  const MAX_DEPTH = 10;
+const DISPLAY_WIDTH = 1000;
+const DISPLAY_HEIGHT = 600;
+const STEP_X = DISPLAY_WIDTH * KEYBOARD_CONSTANTS.panStepPercent;
+const STEP_Y = DISPLAY_HEIGHT * KEYBOARD_CONSTANTS.panStepPercent;
 
+/** The main timeline's commands; a key that fires one fires no other. */
+const COMMANDS = [
+  'onPan',
+  'onZoom',
+  'onResetZoom',
+  'onEscape',
+  'onJumpToCallTree',
+  'onFocus',
+  'onCopy',
+] as const;
+type Command = (typeof COMMANDS)[number];
+
+const SHIFT = { shiftKey: true };
+const CTRL = { ctrlKey: true };
+const ALT = { altKey: true };
+const META = { metaKey: true };
+
+describe('KeyboardHandler', () => {
   let container: HTMLElement;
   let viewport: TimelineViewport;
   let handler: KeyboardHandler;
   let callbacks: Required<KeyboardCallbacks>;
 
   beforeEach(() => {
-    // Create a mock container element
     container = document.createElement('div');
     document.body.appendChild(container);
+    viewport = new TimelineViewport(DISPLAY_WIDTH, DISPLAY_HEIGHT, 1_000_000, 10);
 
-    // Create viewport
-    viewport = new TimelineViewport(DISPLAY_WIDTH, DISPLAY_HEIGHT, TOTAL_DURATION, MAX_DEPTH);
-
-    // Create mock callbacks
     callbacks = {
       onPan: jest.fn<(deltaX: number, deltaY: number) => void>(),
       onZoom: jest.fn<(direction: 'in' | 'out') => void>(),
@@ -56,7 +59,6 @@ describe('KeyboardHandler', () => {
       onJumpToCallTree: jest.fn<() => void>(),
       onFocus: jest.fn<() => void>(),
       onCopy: jest.fn<() => void>(),
-      // Minimap keyboard callbacks
       isInMinimapArea: jest.fn<() => boolean>().mockReturnValue(false),
       onMinimapPanViewport: jest.fn<(deltaTimeNs: number) => void>(),
       onMinimapPanDepth: jest.fn<(deltaY: number) => void>(),
@@ -64,7 +66,6 @@ describe('KeyboardHandler', () => {
       onMinimapJumpStart: jest.fn<() => void>(),
       onMinimapJumpEnd: jest.fn<() => void>(),
       onMinimapResetZoom: jest.fn<() => void>(),
-      // Metric strip keyboard callbacks
       isInMetricStripArea: jest.fn<() => boolean>().mockReturnValue(false),
       onMetricStripPanViewport: jest.fn<(deltaTimeNs: number) => void>(),
       onMetricStripPanDepth: jest.fn<(deltaY: number) => void>(),
@@ -84,15 +85,8 @@ describe('KeyboardHandler', () => {
     jest.clearAllMocks();
   });
 
-  /**
-   * Helper to dispatch a keyboard event
-   */
-  function dispatchKeyEvent(
-    type: 'keydown' | 'keyup',
-    key: string,
-    options: Partial<KeyboardEventInit> = {},
-  ): KeyboardEvent {
-    const event = new KeyboardEvent(type, {
+  function press(key: string, options: Partial<KeyboardEventInit> = {}): KeyboardEvent {
+    const event = new KeyboardEvent('keydown', {
       key,
       bubbles: true,
       cancelable: true,
@@ -102,537 +96,187 @@ describe('KeyboardHandler', () => {
     return event;
   }
 
-  describe('pan keys (Arrow keys and A/D)', () => {
-    it('should pan left on ArrowLeft', () => {
-      dispatchKeyEvent('keydown', 'ArrowLeft');
+  const mock = (name: keyof KeyboardCallbacks) => callbacks[name] as jest.Mock;
 
-      expect(callbacks.onPan).toHaveBeenCalledTimes(1);
-      const [deltaX, deltaY] = (callbacks.onPan as jest.Mock).mock.calls[0] as [number, number];
-      expect(deltaX).toBeLessThan(0); // Pan left = negative deltaX
-      expect(deltaY).toBe(0);
-    });
+  function expectOnly(command: Command | null): void {
+    for (const other of COMMANDS) {
+      if (other !== command) {
+        expect(mock(other)).not.toHaveBeenCalled();
+      }
+    }
+  }
 
-    it('should pan right on ArrowRight', () => {
-      dispatchKeyEvent('keydown', 'ArrowRight');
+  it.each<[string, Partial<KeyboardEventInit>, Command, unknown[]]>([
+    ['ArrowLeft', {}, 'onPan', [-STEP_X, 0]],
+    ['ArrowRight', {}, 'onPan', [STEP_X, 0]],
+    ['ArrowUp', {}, 'onPan', [0, -STEP_Y]],
+    ['ArrowDown', {}, 'onPan', [0, STEP_Y]],
+    ['a', {}, 'onPan', [-STEP_X, 0]],
+    ['d', {}, 'onPan', [STEP_X, 0]],
+    ['ArrowLeft', SHIFT, 'onPan', [-STEP_X, 0]],
+    // Shift turns W/S into a vertical pan, as Shift turns the wheel.
+    ['w', SHIFT, 'onPan', [0, -STEP_Y]],
+    ['s', SHIFT, 'onPan', [0, STEP_Y]],
+    ['w', {}, 'onZoom', ['in']],
+    ['+', {}, 'onZoom', ['in']],
+    ['=', {}, 'onZoom', ['in']],
+    ['s', {}, 'onZoom', ['out']],
+    ['-', {}, 'onZoom', ['out']],
+    ['+', SHIFT, 'onZoom', ['in']],
+    ['-', SHIFT, 'onZoom', ['out']],
+    ['Home', {}, 'onResetZoom', []],
+    ['0', {}, 'onResetZoom', []],
+    ['Home', SHIFT, 'onResetZoom', []],
+    ['Escape', {}, 'onEscape', []],
+    ['j', {}, 'onJumpToCallTree', []],
+    ['J', {}, 'onJumpToCallTree', []],
+    ['Enter', {}, 'onFocus', []],
+    ['z', {}, 'onFocus', []],
+    ['Z', {}, 'onFocus', []],
+    ['c', CTRL, 'onCopy', []],
+    ['c', META, 'onCopy', []],
+    ['C', CTRL, 'onCopy', []],
+  ])('%s %o calls %s once, and claims the key', (key, options, command, args) => {
+    const event = press(key, options);
 
-      expect(callbacks.onPan).toHaveBeenCalledTimes(1);
-      const [deltaX, deltaY] = (callbacks.onPan as jest.Mock).mock.calls[0] as [number, number];
-      expect(deltaX).toBeGreaterThan(0); // Pan right = positive deltaX
-      expect(deltaY).toBe(0);
-    });
-
-    it('should pan up on ArrowUp', () => {
-      dispatchKeyEvent('keydown', 'ArrowUp');
-
-      expect(callbacks.onPan).toHaveBeenCalledTimes(1);
-      const [deltaX, deltaY] = (callbacks.onPan as jest.Mock).mock.calls[0] as [number, number];
-      expect(deltaX).toBe(0);
-      expect(deltaY).toBeLessThan(0); // Pan up = negative deltaY
-    });
-
-    it('should pan down on ArrowDown', () => {
-      dispatchKeyEvent('keydown', 'ArrowDown');
-
-      expect(callbacks.onPan).toHaveBeenCalledTimes(1);
-      const [deltaX, deltaY] = (callbacks.onPan as jest.Mock).mock.calls[0] as [number, number];
-      expect(deltaX).toBe(0);
-      expect(deltaY).toBeGreaterThan(0); // Pan down = positive deltaY
-    });
-
-    it('should pan left on A key', () => {
-      dispatchKeyEvent('keydown', 'a');
-
-      expect(callbacks.onPan).toHaveBeenCalledTimes(1);
-      const [deltaX, deltaY] = (callbacks.onPan as jest.Mock).mock.calls[0] as [number, number];
-      expect(deltaX).toBeLessThan(0);
-      expect(deltaY).toBe(0);
-    });
-
-    it('should pan right on D key', () => {
-      dispatchKeyEvent('keydown', 'd');
-
-      expect(callbacks.onPan).toHaveBeenCalledTimes(1);
-      const [deltaX, deltaY] = (callbacks.onPan as jest.Mock).mock.calls[0] as [number, number];
-      expect(deltaX).toBeGreaterThan(0);
-      expect(deltaY).toBe(0);
-    });
-
-    it('should pan with Shift + Arrow keys (always pan even when frame selected)', () => {
-      dispatchKeyEvent('keydown', 'ArrowLeft', { shiftKey: true });
-
-      expect(callbacks.onPan).toHaveBeenCalledTimes(1);
-      const [deltaX] = (callbacks.onPan as jest.Mock).mock.calls[0] as [number];
-      expect(deltaX).toBeLessThan(0);
-    });
-
-    it('should pan by correct percentage of viewport', () => {
-      dispatchKeyEvent('keydown', 'ArrowRight');
-
-      const expectedStepX = DISPLAY_WIDTH * KEYBOARD_CONSTANTS.panStepPercent;
-      const [deltaX] = (callbacks.onPan as jest.Mock).mock.calls[0] as [number];
-      expect(deltaX).toBeCloseTo(expectedStepX, 5);
-    });
-
-    it('should prevent default on handled pan keys', () => {
-      const event = dispatchKeyEvent('keydown', 'ArrowLeft');
-
-      expect(event.defaultPrevented).toBe(true);
-    });
+    expect(mock(command)).toHaveBeenCalledTimes(1);
+    expect(mock(command)).toHaveBeenCalledWith(...args);
+    expectOnly(command);
+    expect(event.defaultPrevented).toBe(true);
   });
 
-  describe('zoom keys (W / S / + / - / =)', () => {
-    it('should zoom in on W key', () => {
-      dispatchKeyEvent('keydown', 'w');
+  // A browser or VS Code shortcut must reach its owner.
+  it.each<[string, Partial<KeyboardEventInit>]>([
+    ['0', CTRL],
+    ['Home', ALT],
+    ['0', META],
+    ['j', CTRL],
+    ['j', ALT],
+    ['j', META],
+    ['Enter', CTRL],
+    ['z', CTRL],
+    ['Enter', ALT],
+    ['z', ALT],
+    ['Enter', META],
+    ['z', META],
+    ['c', {}],
+    ['c', { ctrlKey: true, altKey: true }],
+    ['x', {}],
+    ['Tab', {}],
+  ])('%s %o calls nothing, and leaves the key to the browser', (key, options) => {
+    const event = press(key, options);
 
-      expect(callbacks.onZoom).toHaveBeenCalledWith('in');
-    });
-
-    it('should zoom out on S key', () => {
-      dispatchKeyEvent('keydown', 's');
-
-      expect(callbacks.onZoom).toHaveBeenCalledWith('out');
-    });
-
-    it('should zoom in on + key', () => {
-      dispatchKeyEvent('keydown', '+');
-
-      expect(callbacks.onZoom).toHaveBeenCalledWith('in');
-    });
-
-    it('should zoom in on = key', () => {
-      dispatchKeyEvent('keydown', '=');
-
-      expect(callbacks.onZoom).toHaveBeenCalledWith('in');
-    });
-
-    it('should zoom out on - key', () => {
-      dispatchKeyEvent('keydown', '-');
-
-      expect(callbacks.onZoom).toHaveBeenCalledWith('out');
-    });
-
-    it('should zoom with + and - even when Shift is pressed', () => {
-      // Note: Shift+w triggers vertical pan (not zoom) per design
-      dispatchKeyEvent('keydown', '+', { shiftKey: true });
-      dispatchKeyEvent('keydown', '-', { shiftKey: true });
-
-      expect(callbacks.onZoom).toHaveBeenCalledTimes(2);
-      expect(callbacks.onZoom).toHaveBeenCalledWith('in');
-      expect(callbacks.onZoom).toHaveBeenCalledWith('out');
-    });
-
-    it('should pan vertically with Shift+w/s instead of zoom', () => {
-      dispatchKeyEvent('keydown', 'w', { shiftKey: true });
-      dispatchKeyEvent('keydown', 's', { shiftKey: true });
-
-      expect(callbacks.onZoom).not.toHaveBeenCalled();
-      expect(callbacks.onPan).toHaveBeenCalledTimes(2);
-    });
-
-    it('should prevent default on handled zoom keys', () => {
-      const event = dispatchKeyEvent('keydown', 'w');
-
-      expect(event.defaultPrevented).toBe(true);
-    });
+    expectOnly(null);
+    expect(event.defaultPrevented).toBe(false);
   });
 
-  describe('reset keys (Home / 0)', () => {
-    it('should reset zoom on Home key', () => {
-      dispatchKeyEvent('keydown', 'Home');
+  // The command is already done, so a held key would only re-run it.
+  it.each<[Command, string, Partial<KeyboardEventInit>, string[]]>([
+    ['onResetZoom', 'Home', {}, ['Home', '0']],
+    ['onJumpToCallTree', 'j', {}, ['j', 'j']],
+    ['onFocus', 'Enter', {}, ['Enter', 'z']],
+    ['onCopy', 'c', CTRL, ['c']],
+  ])(
+    '%s fires once on a held key, and still claims each repeat',
+    (command, key, options, repeats) => {
+      press(key, options);
+      const events = repeats.map((repeat) => press(repeat, { ...options, repeat: true }));
 
-      expect(callbacks.onResetZoom).toHaveBeenCalled();
-    });
+      expect(mock(command)).toHaveBeenCalledTimes(1);
+      expect(events.map((event) => event.defaultPrevented)).toEqual(repeats.map(() => true));
+    },
+  );
 
-    it('should reset zoom on 0 key', () => {
-      dispatchKeyEvent('keydown', '0');
+  it('pans and zooms on every repeat, so holding a key scrubs', () => {
+    press('ArrowLeft', { repeat: true });
+    press('a', { repeat: true });
+    press('w', { repeat: true });
+    press('s', { repeat: true });
 
-      expect(callbacks.onResetZoom).toHaveBeenCalled();
-    });
-
-    it('should reset when Shift is pressed (Shift does not block)', () => {
-      dispatchKeyEvent('keydown', 'Home', { shiftKey: true });
-
-      expect(callbacks.onResetZoom).toHaveBeenCalled();
-    });
-
-    it('should not reset when Ctrl/Alt/Meta is pressed', () => {
-      dispatchKeyEvent('keydown', '0', { ctrlKey: true });
-      dispatchKeyEvent('keydown', 'Home', { altKey: true });
-      dispatchKeyEvent('keydown', '0', { metaKey: true });
-
-      expect(callbacks.onResetZoom).not.toHaveBeenCalled();
-    });
-
-    it('should prevent default on handled reset keys', () => {
-      const event = dispatchKeyEvent('keydown', 'Home');
-
-      expect(event.defaultPrevented).toBe(true);
-    });
-
-    it('should not call onResetZoom on a key repeat', () => {
-      dispatchKeyEvent('keydown', 'Home');
-      dispatchKeyEvent('keydown', 'Home', { repeat: true });
-      dispatchKeyEvent('keydown', '0', { repeat: true });
-
-      expect(callbacks.onResetZoom).toHaveBeenCalledTimes(1);
-    });
-
-    it('should still prevent default on a repeated Home key', () => {
-      const event = dispatchKeyEvent('keydown', 'Home', { repeat: true });
-
-      expect(event.defaultPrevented).toBe(true);
-    });
+    expect(callbacks.onPan).toHaveBeenCalledTimes(2);
+    expect(callbacks.onZoom).toHaveBeenCalledTimes(2);
   });
 
-  describe('escape key', () => {
-    it('should call onEscape callback on Escape key', () => {
-      dispatchKeyEvent('keydown', 'Escape');
+  it.each<
+    [
+      string,
+      string,
+      Partial<KeyboardEventInit>,
+      boolean,
+      boolean,
+      MarkerNavDirection | null,
+      FrameNavDirection | null,
+      boolean,
+    ]
+  >([
+    ['marker nav takes left', 'ArrowLeft', {}, true, true, 'left', null, false],
+    ['marker nav takes right', 'ArrowRight', {}, true, true, 'right', null, false],
+    ['frame nav takes up, which has no marker', 'ArrowUp', {}, true, true, null, 'up', false],
+    ['frame nav takes down, which has no marker', 'ArrowDown', {}, true, true, null, 'down', false],
+    [
+      'frame nav takes a left marker nav declines',
+      'ArrowLeft',
+      {},
+      false,
+      true,
+      'left',
+      'left',
+      false,
+    ],
+    [
+      'frame nav takes a right marker nav declines',
+      'ArrowRight',
+      {},
+      false,
+      true,
+      'right',
+      'right',
+      false,
+    ],
+    ['pan takes a key both decline', 'ArrowLeft', {}, false, false, 'left', 'left', true],
+    ['pan takes Shift+arrow', 'ArrowLeft', SHIFT, true, true, null, null, true],
+    ['pan takes A', 'a', {}, true, true, null, null, true],
+    ['pan takes D', 'd', {}, true, true, null, null, true],
+  ])('%s', (_name, key, options, markerTakes, frameTakes, marker, frame, pans) => {
+    mock('onMarkerNav').mockReturnValue(markerTakes);
+    mock('onFrameNav').mockReturnValue(frameTakes);
 
-      expect(callbacks.onEscape).toHaveBeenCalled();
-    });
+    press(key, options);
 
-    it('should prevent default on Escape', () => {
-      const event = dispatchKeyEvent('keydown', 'Escape');
-
-      expect(event.defaultPrevented).toBe(true);
-    });
-  });
-
-  describe('frame navigation (onFrameNav)', () => {
-    it('should call onFrameNav with "up" on ArrowUp when handler returns true', () => {
-      (callbacks.onFrameNav as jest.Mock).mockReturnValue(true);
-      dispatchKeyEvent('keydown', 'ArrowUp');
-
-      expect(callbacks.onFrameNav).toHaveBeenCalledWith('up');
-      expect(callbacks.onPan).not.toHaveBeenCalled();
-    });
-
-    it('should call onFrameNav with "down" on ArrowDown when handler returns true', () => {
-      (callbacks.onFrameNav as jest.Mock).mockReturnValue(true);
-      dispatchKeyEvent('keydown', 'ArrowDown');
-
-      expect(callbacks.onFrameNav).toHaveBeenCalledWith('down');
-      expect(callbacks.onPan).not.toHaveBeenCalled();
-    });
-
-    it('should call onFrameNav with "left" on ArrowLeft when handler returns true', () => {
-      (callbacks.onFrameNav as jest.Mock).mockReturnValue(true);
-      dispatchKeyEvent('keydown', 'ArrowLeft');
-
-      expect(callbacks.onFrameNav).toHaveBeenCalledWith('left');
-      expect(callbacks.onPan).not.toHaveBeenCalled();
-    });
-
-    it('should call onFrameNav with "right" on ArrowRight when handler returns true', () => {
-      (callbacks.onFrameNav as jest.Mock).mockReturnValue(true);
-      dispatchKeyEvent('keydown', 'ArrowRight');
-
-      expect(callbacks.onFrameNav).toHaveBeenCalledWith('right');
-      expect(callbacks.onPan).not.toHaveBeenCalled();
-    });
-
-    it('should fall through to pan when onFrameNav returns false', () => {
-      (callbacks.onFrameNav as jest.Mock).mockReturnValue(false);
-      dispatchKeyEvent('keydown', 'ArrowLeft');
-
-      expect(callbacks.onFrameNav).toHaveBeenCalledWith('left');
-      expect(callbacks.onPan).toHaveBeenCalled();
-    });
-
-    it('should skip onFrameNav and pan directly when Shift is held', () => {
-      (callbacks.onFrameNav as jest.Mock).mockReturnValue(true);
-      dispatchKeyEvent('keydown', 'ArrowLeft', { shiftKey: true });
-
-      expect(callbacks.onFrameNav).not.toHaveBeenCalled();
-      expect(callbacks.onPan).toHaveBeenCalled();
-    });
-
-    it('should not call onFrameNav for A/D keys', () => {
-      (callbacks.onFrameNav as jest.Mock).mockReturnValue(true);
-      dispatchKeyEvent('keydown', 'a');
-      dispatchKeyEvent('keydown', 'd');
-
-      expect(callbacks.onFrameNav).not.toHaveBeenCalled();
-      expect(callbacks.onPan).toHaveBeenCalledTimes(2);
-    });
-  });
-
-  describe('marker navigation (onMarkerNav)', () => {
-    it('should call onMarkerNav with "left" on ArrowLeft when handler returns true', () => {
-      (callbacks.onMarkerNav as jest.Mock).mockReturnValue(true);
-      dispatchKeyEvent('keydown', 'ArrowLeft');
-
-      expect(callbacks.onMarkerNav).toHaveBeenCalledWith('left');
-      expect(callbacks.onFrameNav).not.toHaveBeenCalled();
-      expect(callbacks.onPan).not.toHaveBeenCalled();
-    });
-
-    it('should call onMarkerNav with "right" on ArrowRight when handler returns true', () => {
-      (callbacks.onMarkerNav as jest.Mock).mockReturnValue(true);
-      dispatchKeyEvent('keydown', 'ArrowRight');
-
-      expect(callbacks.onMarkerNav).toHaveBeenCalledWith('right');
-      expect(callbacks.onFrameNav).not.toHaveBeenCalled();
-      expect(callbacks.onPan).not.toHaveBeenCalled();
-    });
-
-    it('should fall through to frame nav when onMarkerNav returns false', () => {
-      (callbacks.onMarkerNav as jest.Mock).mockReturnValue(false);
-      (callbacks.onFrameNav as jest.Mock).mockReturnValue(true);
-      dispatchKeyEvent('keydown', 'ArrowLeft');
-
-      expect(callbacks.onMarkerNav).toHaveBeenCalledWith('left');
-      expect(callbacks.onFrameNav).toHaveBeenCalledWith('left');
-      expect(callbacks.onPan).not.toHaveBeenCalled();
-    });
-
-    it('should fall through to pan when both marker and frame nav return false', () => {
-      (callbacks.onMarkerNav as jest.Mock).mockReturnValue(false);
-      (callbacks.onFrameNav as jest.Mock).mockReturnValue(false);
-      dispatchKeyEvent('keydown', 'ArrowLeft');
-
-      expect(callbacks.onMarkerNav).toHaveBeenCalled();
-      expect(callbacks.onFrameNav).toHaveBeenCalled();
-      expect(callbacks.onPan).toHaveBeenCalled();
-    });
-
-    it('should skip marker nav and go directly to pan when Shift is held', () => {
-      (callbacks.onMarkerNav as jest.Mock).mockReturnValue(true);
-      dispatchKeyEvent('keydown', 'ArrowLeft', { shiftKey: true });
-
-      expect(callbacks.onMarkerNav).not.toHaveBeenCalled();
-      expect(callbacks.onFrameNav).not.toHaveBeenCalled();
-      expect(callbacks.onPan).toHaveBeenCalled();
-    });
-
-    it('should not call onMarkerNav for ArrowUp/ArrowDown', () => {
-      (callbacks.onMarkerNav as jest.Mock).mockReturnValue(true);
-      dispatchKeyEvent('keydown', 'ArrowUp');
-      dispatchKeyEvent('keydown', 'ArrowDown');
-
-      expect(callbacks.onMarkerNav).not.toHaveBeenCalled();
-    });
+    expect(mock('onMarkerNav').mock.calls).toEqual(marker ? [[marker]] : []);
+    expect(mock('onFrameNav').mock.calls).toEqual(frame ? [[frame]] : []);
+    expect(mock('onPan')).toHaveBeenCalledTimes(pans ? 1 : 0);
   });
 
   describe('attach/detach', () => {
-    it('should handle events when attached', () => {
-      dispatchKeyEvent('keydown', 'w');
-
-      expect(callbacks.onZoom).toHaveBeenCalled();
-    });
-
-    it('should not handle events after detach', () => {
+    it('stops listening on detach, however often it is called', () => {
       handler.detach();
-      dispatchKeyEvent('keydown', 'w');
+      handler.detach();
+      press('w');
 
       expect(callbacks.onZoom).not.toHaveBeenCalled();
     });
 
-    it('should handle events after re-attach', () => {
+    it('listens again after a re-attach', () => {
       handler.detach();
       handler.attach();
-      dispatchKeyEvent('keydown', 'w');
+      press('w');
 
-      expect(callbacks.onZoom).toHaveBeenCalled();
-    });
-
-    it('should not attach twice', () => {
-      handler.attach(); // Already attached in beforeEach
-      dispatchKeyEvent('keydown', 'w');
-
-      // Should still only fire once
       expect(callbacks.onZoom).toHaveBeenCalledTimes(1);
     });
 
-    it('should handle multiple detach calls gracefully', () => {
-      handler.detach();
-      handler.detach();
+    it('does not attach twice', () => {
+      handler.attach();
+      press('w');
 
-      // Should not throw
-      expect(true).toBe(true);
-    });
-  });
-
-  describe('destroy', () => {
-    beforeEach(() => {
-      jest.useFakeTimers();
+      expect(callbacks.onZoom).toHaveBeenCalledTimes(1);
     });
 
-    afterEach(() => {
-      jest.useRealTimers();
-    });
-
-    it('should detach event listeners on destroy', () => {
+    it('stops listening on destroy', () => {
       handler.destroy();
-      dispatchKeyEvent('keydown', 'w');
+      press('w');
 
       expect(callbacks.onZoom).not.toHaveBeenCalled();
-    });
-  });
-
-  describe('jump to call tree (J key)', () => {
-    it('should call onJumpToCallTree on J key', () => {
-      dispatchKeyEvent('keydown', 'j');
-
-      expect(callbacks.onJumpToCallTree).toHaveBeenCalled();
-    });
-
-    it('should call onJumpToCallTree on uppercase J key', () => {
-      dispatchKeyEvent('keydown', 'J');
-
-      expect(callbacks.onJumpToCallTree).toHaveBeenCalled();
-    });
-
-    it('should not call onJumpToCallTree when Ctrl is pressed', () => {
-      dispatchKeyEvent('keydown', 'j', { ctrlKey: true });
-
-      expect(callbacks.onJumpToCallTree).not.toHaveBeenCalled();
-    });
-
-    it('should not call onJumpToCallTree when Alt is pressed', () => {
-      dispatchKeyEvent('keydown', 'j', { altKey: true });
-
-      expect(callbacks.onJumpToCallTree).not.toHaveBeenCalled();
-    });
-
-    it('should not call onJumpToCallTree when Meta is pressed', () => {
-      dispatchKeyEvent('keydown', 'j', { metaKey: true });
-
-      expect(callbacks.onJumpToCallTree).not.toHaveBeenCalled();
-    });
-
-    it('should prevent default on J key', () => {
-      const event = dispatchKeyEvent('keydown', 'j');
-
-      expect(event.defaultPrevented).toBe(true);
-    });
-
-    it('should not call onJumpToCallTree on a key repeat', () => {
-      dispatchKeyEvent('keydown', 'j');
-      dispatchKeyEvent('keydown', 'j', { repeat: true });
-      dispatchKeyEvent('keydown', 'j', { repeat: true });
-
-      expect(callbacks.onJumpToCallTree).toHaveBeenCalledTimes(1);
-    });
-
-    it('should still prevent default on a repeated J key', () => {
-      const event = dispatchKeyEvent('keydown', 'j', { repeat: true });
-
-      expect(event.defaultPrevented).toBe(true);
-    });
-  });
-
-  describe('focus keys (Enter / Z)', () => {
-    it('should call onFocus on Enter key', () => {
-      dispatchKeyEvent('keydown', 'Enter');
-
-      expect(callbacks.onFocus).toHaveBeenCalled();
-    });
-
-    it('should call onFocus on z key', () => {
-      dispatchKeyEvent('keydown', 'z');
-
-      expect(callbacks.onFocus).toHaveBeenCalled();
-    });
-
-    it('should call onFocus on Z key', () => {
-      dispatchKeyEvent('keydown', 'Z');
-
-      expect(callbacks.onFocus).toHaveBeenCalled();
-    });
-
-    it('should not call onFocus when Ctrl is pressed', () => {
-      dispatchKeyEvent('keydown', 'Enter', { ctrlKey: true });
-      dispatchKeyEvent('keydown', 'z', { ctrlKey: true });
-
-      expect(callbacks.onFocus).not.toHaveBeenCalled();
-    });
-
-    it('should not call onFocus when Alt is pressed', () => {
-      dispatchKeyEvent('keydown', 'Enter', { altKey: true });
-      dispatchKeyEvent('keydown', 'z', { altKey: true });
-
-      expect(callbacks.onFocus).not.toHaveBeenCalled();
-    });
-
-    it('should not call onFocus when Meta is pressed', () => {
-      dispatchKeyEvent('keydown', 'Enter', { metaKey: true });
-      dispatchKeyEvent('keydown', 'z', { metaKey: true });
-
-      expect(callbacks.onFocus).not.toHaveBeenCalled();
-    });
-
-    it('should prevent default on Enter/Z keys', () => {
-      const enterEvent = dispatchKeyEvent('keydown', 'Enter');
-      const zEvent = dispatchKeyEvent('keydown', 'z');
-
-      expect(enterEvent.defaultPrevented).toBe(true);
-      expect(zEvent.defaultPrevented).toBe(true);
-    });
-
-    it('should not call onFocus on a key repeat', () => {
-      dispatchKeyEvent('keydown', 'Enter');
-      dispatchKeyEvent('keydown', 'Enter', { repeat: true });
-      dispatchKeyEvent('keydown', 'z', { repeat: true });
-
-      expect(callbacks.onFocus).toHaveBeenCalledTimes(1);
-    });
-
-    it('should still prevent default on a repeated Enter', () => {
-      const event = dispatchKeyEvent('keydown', 'Enter', { repeat: true });
-
-      expect(event.defaultPrevented).toBe(true);
-    });
-  });
-
-  describe('Copy (Ctrl/Cmd+C)', () => {
-    it('should call onCopy on Ctrl+C', () => {
-      dispatchKeyEvent('keydown', 'c', { ctrlKey: true });
-
-      expect(callbacks.onCopy).toHaveBeenCalled();
-    });
-
-    it('should call onCopy on Cmd+C (Mac)', () => {
-      dispatchKeyEvent('keydown', 'c', { metaKey: true });
-
-      expect(callbacks.onCopy).toHaveBeenCalled();
-    });
-
-    it('should call onCopy on uppercase C', () => {
-      dispatchKeyEvent('keydown', 'C', { ctrlKey: true });
-
-      expect(callbacks.onCopy).toHaveBeenCalled();
-    });
-
-    it('should not call onCopy without modifier', () => {
-      dispatchKeyEvent('keydown', 'c');
-
-      expect(callbacks.onCopy).not.toHaveBeenCalled();
-    });
-
-    it('should not call onCopy with Alt modifier', () => {
-      dispatchKeyEvent('keydown', 'c', { ctrlKey: true, altKey: true });
-
-      expect(callbacks.onCopy).not.toHaveBeenCalled();
-    });
-
-    it('should prevent default on Ctrl/Cmd+C', () => {
-      const event = dispatchKeyEvent('keydown', 'c', { ctrlKey: true });
-
-      expect(event.defaultPrevented).toBe(true);
-    });
-
-    it('should not call onCopy on a key repeat', () => {
-      dispatchKeyEvent('keydown', 'c', { ctrlKey: true });
-      dispatchKeyEvent('keydown', 'c', { ctrlKey: true, repeat: true });
-
-      expect(callbacks.onCopy).toHaveBeenCalledTimes(1);
-    });
-
-    it('should still prevent default on a repeated Ctrl/Cmd+C', () => {
-      const event = dispatchKeyEvent('keydown', 'c', { ctrlKey: true, repeat: true });
-
-      expect(event.defaultPrevented).toBe(true);
     });
   });
 
@@ -659,17 +303,17 @@ describe('KeyboardHandler', () => {
     },
   ] as const)('$area commands (pointer over the $area)', (keys) => {
     beforeEach(() => {
-      (callbacks[keys.inArea] as jest.Mock).mockReturnValue(true);
+      mock(keys.inArea).mockReturnValue(true);
     });
 
-    it('should call each command once on a held key', () => {
-      dispatchKeyEvent('keydown', 'Home');
-      dispatchKeyEvent('keydown', 'Home', { repeat: true });
-      dispatchKeyEvent('keydown', 'End');
-      dispatchKeyEvent('keydown', 'End', { repeat: true });
+    it('calls each command once on a held key', () => {
+      press('Home');
+      press('Home', { repeat: true });
+      press('End');
+      press('End', { repeat: true });
       // 0 and Escape are the same command, so a repeat of either is suppressed.
-      dispatchKeyEvent('keydown', '0');
-      dispatchKeyEvent('keydown', 'Escape', { repeat: true });
+      press('0');
+      press('Escape', { repeat: true });
 
       expect(callbacks[keys.jumpStart]).toHaveBeenCalledTimes(1);
       expect(callbacks[keys.jumpEnd]).toHaveBeenCalledTimes(1);
@@ -678,65 +322,29 @@ describe('KeyboardHandler', () => {
 
     // End is this area's alone: the main timeline ignores it, so a repeat that
     // reported nothing prevented would mean the area handler never saw it.
-    it('should still prevent default on a repeated command', () => {
-      const event = dispatchKeyEvent('keydown', 'End', { repeat: true });
-
-      expect(event.defaultPrevented).toBe(true);
+    it('still prevents default on a repeated command', () => {
+      expect(press('End', { repeat: true }).defaultPrevented).toBe(true);
     });
 
-    it(`should pan and zoom ${keys.moves} on every repeat`, () => {
-      dispatchKeyEvent('keydown', 'ArrowLeft', { repeat: true });
-      dispatchKeyEvent('keydown', 'ArrowRight', { repeat: true });
-      dispatchKeyEvent('keydown', 'w', { repeat: true });
+    it(`pans and zooms ${keys.moves} on every repeat`, () => {
+      press('ArrowLeft', { repeat: true });
+      press('ArrowRight', { repeat: true });
+      press('w', { repeat: true });
 
       expect(callbacks[keys.pan]).toHaveBeenCalledTimes(2);
       expect(callbacks[keys.zoom]).toHaveBeenCalledTimes(1);
     });
   });
 
-  describe('key repeat on continuous controls', () => {
-    it('should pan and zoom on every repeat, so holding a key scrubs', () => {
-      dispatchKeyEvent('keydown', 'ArrowLeft', { repeat: true });
-      dispatchKeyEvent('keydown', 'a', { repeat: true });
-      dispatchKeyEvent('keydown', 'w', { repeat: true });
-      dispatchKeyEvent('keydown', 's', { repeat: true });
+  it('works without callbacks', () => {
+    handler.destroy();
+    const bare = new KeyboardHandler(container, viewport);
+    bare.attach();
 
-      expect(callbacks.onPan).toHaveBeenCalledTimes(2);
-      expect(callbacks.onZoom).toHaveBeenCalledTimes(2);
-    });
-  });
+    expect(() =>
+      ['w', 'a', 'ArrowLeft', 'Home', 'Escape', 'j'].forEach((key) => press(key)),
+    ).not.toThrow();
 
-  describe('unhandled keys', () => {
-    it('should not prevent default on unhandled keys', () => {
-      const event = dispatchKeyEvent('keydown', 'x');
-
-      expect(event.defaultPrevented).toBe(false);
-    });
-
-    it('should not call callbacks on unhandled keys', () => {
-      dispatchKeyEvent('keydown', 'x');
-      dispatchKeyEvent('keydown', 'Tab');
-
-      expect(callbacks.onPan).not.toHaveBeenCalled();
-      expect(callbacks.onZoom).not.toHaveBeenCalled();
-      expect(callbacks.onResetZoom).not.toHaveBeenCalled();
-      expect(callbacks.onEscape).not.toHaveBeenCalled();
-      expect(callbacks.onFocus).not.toHaveBeenCalled();
-    });
-  });
-
-  describe('optional callbacks', () => {
-    it('should work without callbacks', () => {
-      const handlerWithoutCallbacks = new KeyboardHandler(container, viewport);
-      handlerWithoutCallbacks.attach();
-
-      // Should not throw
-      dispatchKeyEvent('keydown', 'w');
-      dispatchKeyEvent('keydown', 'a');
-      dispatchKeyEvent('keydown', 'Home');
-      dispatchKeyEvent('keydown', 'Escape');
-
-      handlerWithoutCallbacks.destroy();
-    });
+    bare.destroy();
   });
 });

@@ -5,68 +5,42 @@ import { describe, expect, it } from '@jest/globals';
 
 import { SOQLParser, SyntaxException } from '../SOQLParser.js';
 
-describe('Analyse database tests', () => {
+type Tree = Awaited<ReturnType<SOQLParser['parse']>>;
+
+describe('SOQLParser', () => {
   it('throws on unparsable query', async () => {
-    const parser = new SOQLParser();
-    try {
-      await parser.parse('');
-      expect(true).toBe(false);
-    } catch (ex) {
-      expect(ex).toEqual(new SyntaxException(1, 0, "mismatched input '<EOF>' expecting 'select'"));
-    }
+    await expect(new SOQLParser().parse('')).rejects.toEqual(
+      new SyntaxException(1, 0, "mismatched input '<EOF>' expecting 'select'"),
+    );
   });
 
-  it('extracts simple FROM object', async () => {
-    const parser = new SOQLParser();
-    const tree = await parser.parse('SELECT Id FROM Account');
-    expect(tree.fromObject()).toEqual('Account');
-  });
-
-  it('determines if only fields are being selected', async () => {
-    const parser = new SOQLParser();
-    const tree = await parser.parse('SELECT Id FROM Account');
-    expect(tree.isSimpleSelect()).toEqual(true);
-  });
-
-  it('determines if none-fields are being selected', async () => {
-    const parser = new SOQLParser();
-    const tree = await parser.parse('SELECT Count(Id) FROM Account');
-    expect(tree.isSimpleSelect()).toEqual(false);
-  });
-
-  it('determines if none-trival clauses are being used', async () => {
-    const parser = new SOQLParser();
-    const tree = await parser.parse('SELECT Id FROM Account GROUP BY Name LIMIT 2');
-    expect(tree.isTrivialQuery()).toEqual(false);
-  });
-
-  it('determines no LIMIT', async () => {
-    const parser = new SOQLParser();
-    const tree = await parser.parse('SELECT Id FROM Account');
-    expect(tree.limitValue()).toEqual(undefined);
-  });
-
-  it('determines LIMIT number', async () => {
-    const parser = new SOQLParser();
-    const tree = await parser.parse('SELECT Id FROM Account LIMIT 2');
-    expect(tree.limitValue()).toEqual(2);
-  });
-
-  it('determines LIMIT expression', async () => {
-    const parser = new SOQLParser();
-    const tree = await parser.parse('SELECT Id FROM Account LIMIT :tmp');
-    expect(tree.limitValue()).toEqual(':tmp');
-  });
-
-  it('determines if does not have ORDER BY', async () => {
-    const parser = new SOQLParser();
-    const tree = await parser.parse('SELECT Id FROM Account');
-    expect(tree.isOrdered()).toEqual(false);
-  });
-
-  it('determines if has ORDER BY', async () => {
-    const parser = new SOQLParser();
-    const tree = await parser.parse('SELECT Id FROM Account ORDER BY Name');
-    expect(tree.isOrdered()).toEqual(true);
+  it.each<[string, string, (tree: Tree) => unknown, unknown]>([
+    ['the FROM object', 'SELECT Id FROM Account', (tree) => tree.fromObject(), 'Account'],
+    ['a select of fields only', 'SELECT Id FROM Account', (tree) => tree.isSimpleSelect(), true],
+    [
+      'a select of more than fields',
+      'SELECT Count(Id) FROM Account',
+      (tree) => tree.isSimpleSelect(),
+      false,
+    ],
+    ['a trivial query', 'SELECT Id FROM Account', (tree) => tree.isTrivialQuery(), true],
+    [
+      'a query with non-trivial clauses',
+      'SELECT Id FROM Account GROUP BY Name LIMIT 2',
+      (tree) => tree.isTrivialQuery(),
+      false,
+    ],
+    ['no LIMIT', 'SELECT Id FROM Account', (tree) => tree.limitValue(), undefined],
+    ['a LIMIT number', 'SELECT Id FROM Account LIMIT 2', (tree) => tree.limitValue(), 2],
+    [
+      'a LIMIT expression',
+      'SELECT Id FROM Account LIMIT :tmp',
+      (tree) => tree.limitValue(),
+      ':tmp',
+    ],
+    ['no ORDER BY', 'SELECT Id FROM Account', (tree) => tree.isOrdered(), false],
+    ['an ORDER BY', 'SELECT Id FROM Account ORDER BY Name', (tree) => tree.isOrdered(), true],
+  ])('reads %s', async (_name, soql, read, expected) => {
+    expect(read(await new SOQLParser().parse(soql))).toEqual(expected);
   });
 });
