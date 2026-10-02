@@ -5,18 +5,11 @@
  */
 import { describe, expect, it } from '@jest/globals';
 
-import type { LogEvent } from '@apexdevtools/apex-log-parser';
-
 import {
   dispatchInspectorReveal,
   INSPECTOR_REVEAL_EVENT,
   type InspectorRevealEvent,
 } from '../inspectorReveal.js';
-import { revealableEventIndex, type ScopedRow } from '../scopedCallTree.js';
-
-function scopedRow(id: number, eventIndex: number): Partial<ScopedRow> {
-  return { id, originalData: { eventIndex } as LogEvent };
-}
 
 describe('dispatchInspectorReveal', () => {
   it('raises a composed event that escapes the section shadow root', () => {
@@ -34,19 +27,5 @@ describe('dispatchInspectorReveal', () => {
     dispatchInspectorReveal(section, 42);
 
     expect(seen).toEqual([42]);
-  });
-});
-
-describe('revealableEventIndex', () => {
-  it('reveals a real row by its own event', () => {
-    expect(revealableEventIndex(scopedRow(3, 17))).toBe(17);
-  });
-
-  it('reveals nothing for a merged row, whose id is synthetic and negative', () => {
-    expect(revealableEventIndex(scopedRow(-1, 17))).toBeNull();
-  });
-
-  it('reveals nothing when there is no row', () => {
-    expect(revealableEventIndex(undefined)).toBeNull();
   });
 });

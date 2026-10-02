@@ -97,89 +97,55 @@ describe('isVisible', () => {
 });
 
 describe('formatDuration', () => {
-  it('Shows ms with decimals for very small values (sub-millisecond)', () => {
-    expect(formatDuration(5)).toBe('0 ms'); // 0.000005 ms rounds to 0
-    expect(formatDuration(50)).toBe('0 ms'); // 0.00005 ms rounds to 0
-    expect(formatDuration(500)).toBe('0.001 ms');
-    expect(formatDuration(1000)).toBe('0.001 ms');
-    expect(formatDuration(5000)).toBe('0.005 ms');
-    expect(formatDuration(9999)).toBe('0.01 ms');
-    expect(formatDuration(10000)).toBe('0.01 ms');
-    expect(formatDuration(50000)).toBe('0.05 ms');
-    expect(formatDuration(99999)).toBe('0.1 ms');
+  // Input is ns. Trailing zeros are dropped in every unit. Sub-ms rounds to 3
+  // decimal places, ms and s to 2, and the seconds inside a minute to 1.
+  it.each([
+    [0, '0 ms'],
+    [5, '0 ms'], // 0.000005 ms rounds to 0
+    [50, '0 ms'], // 0.00005 ms rounds to 0
+    [500, '0.001 ms'],
+    [1000, '0.001 ms'],
+    [1234, '0.001 ms'],
+    [5000, '0.005 ms'],
+    [9876, '0.01 ms'],
+    [9999, '0.01 ms'],
+    [10000, '0.01 ms'],
+    [50000, '0.05 ms'],
+    [99999, '0.1 ms'],
+    [100_000, '0.1 ms'],
+    [500_000, '0.5 ms'],
+    [1_000_000, '1 ms'],
+    [1_234_567, '1.23 ms'],
+    [9_876_543, '9.88 ms'],
+    [9_999_999, '10 ms'],
+    [10_000_000, '10 ms'],
+    [99_999_999, '100 ms'],
+    [100_000_000, '100 ms'],
+    [999_000_000, '999 ms'],
+    [1_234_567_890, '1.23 s'],
+    [5_000_000_000, '5 s'],
+    [9_876_543_210, '9.88 s'],
+    [59_500_000_000, '59.5 s'],
+    [60_000_000_000, '1m'],
+    [125_000_000_000, '2m 5s'],
+    [125_500_000_000, '2m 5.5s'],
+    [125_670_000_000, '2m 5.7s'],
+  ])('formats %d ns as %s', (ns, expected) => {
+    expect(formatDuration(ns)).toBe(expected);
   });
 
-  it('handles ms duration', () => {
-    expect(formatDuration(100_000)).toBe('0.1 ms');
-    expect(formatDuration(500_000)).toBe('0.5 ms');
-    expect(formatDuration(1_000_000)).toBe('1 ms');
-    expect(formatDuration(1_234_567)).toBe('1.23 ms');
-    expect(formatDuration(9_999_999)).toBe('10 ms');
-    expect(formatDuration(10_000_000)).toBe('10 ms');
-    expect(formatDuration(99_999_999)).toBe('100 ms');
-    expect(formatDuration(100_000_000)).toBe('100 ms');
-    expect(formatDuration(999_000_000)).toBe('999 ms');
-  });
-
-  it('handles zero duration', () => {
-    expect(formatDuration(0)).toBe('0 ms');
-  });
-
-  it('handles seconds', () => {
-    expect(formatDuration(5_000_000_000)).toBe('5 s');
-    expect(formatDuration(59_500_000_000)).toBe('59.5 s');
-  });
-
-  it('handles minutes and seconds', () => {
-    expect(formatDuration(60_000_000_000)).toBe('1m');
-    expect(formatDuration(125_000_000_000)).toBe('2m 5s');
-    expect(formatDuration(125_500_000_000)).toBe('2m 5.5s');
-  });
-
-  it('handles remove trailing 0 for all units types', () => {
-    expect(formatDuration(5000)).toBe('0.005 ms');
-    expect(formatDuration(100_000)).toBe('0.1 ms');
-    expect(formatDuration(5_000_000_000)).toBe('5 s');
-    expect(formatDuration(60_000_000_000)).toBe('1m');
-  });
-
-  it('handles rounding to appropriate precision', () => {
-    // sub-milliseconds (up to 3 decimal places)
-    expect(formatDuration(1234)).toBe('0.001 ms');
-    expect(formatDuration(9876)).toBe('0.01 ms');
-
-    // milliseconds (up to 2 decimal places)
-    expect(formatDuration(1_234_567)).toBe('1.23 ms');
-    expect(formatDuration(9_876_543)).toBe('9.88 ms');
-
-    // seconds (up to 2 decimal places)
-    expect(formatDuration(1_234_567_890)).toBe('1.23 s');
-    expect(formatDuration(9_876_543_210)).toBe('9.88 s');
-  });
-
-  it('rounds to 1dp for min and s', () => {
-    // minutes with fractional seconds
-    expect(formatDuration(125_670_000_000)).toBe('2m 5.7s');
-  });
-
-  describe('compact option', () => {
-    it('omits spaces for milliseconds', () => {
-      expect(formatDuration(0, { compact: true })).toBe('0ms');
-      expect(formatDuration(50000, { compact: true })).toBe('0.05ms');
-      expect(formatDuration(1_000_000, { compact: true })).toBe('1ms');
-      expect(formatDuration(1_234_567, { compact: true })).toBe('1.23ms');
-      expect(formatDuration(100_000_000, { compact: true })).toBe('100ms');
-    });
-
-    it('omits spaces for seconds', () => {
-      expect(formatDuration(5_000_000_000, { compact: true })).toBe('5s');
-      expect(formatDuration(59_500_000_000, { compact: true })).toBe('59.5s');
-    });
-
-    it('omits spaces for minutes', () => {
-      expect(formatDuration(60_000_000_000, { compact: true })).toBe('1m');
-      expect(formatDuration(125_000_000_000, { compact: true })).toBe('2m5s');
-      expect(formatDuration(125_500_000_000, { compact: true })).toBe('2m5.5s');
-    });
+  it.each([
+    [0, '0ms'],
+    [50000, '0.05ms'],
+    [1_000_000, '1ms'],
+    [1_234_567, '1.23ms'],
+    [100_000_000, '100ms'],
+    [5_000_000_000, '5s'],
+    [59_500_000_000, '59.5s'],
+    [60_000_000_000, '1m'],
+    [125_000_000_000, '2m5s'],
+    [125_500_000_000, '2m5.5s'],
+  ])('compact: formats %d ns as %s, with no spaces', (ns, expected) => {
+    expect(formatDuration(ns, { compact: true })).toBe(expected);
   });
 });

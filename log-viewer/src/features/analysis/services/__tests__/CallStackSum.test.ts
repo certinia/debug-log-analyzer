@@ -3,12 +3,7 @@
  */
 import { describe, expect, it } from '@jest/globals';
 
-import {
-  sumDurationTotalForRootEvents,
-  sumRootNodesOnly,
-  sumTotalForRootEvents,
-} from '../CallStackSum.js';
-import type { Metric } from '../RowGrouper.js';
+import { sumDurationTotalForRootEvents, sumTotalForRootEvents } from '../CallStackSum.js';
 import { createEvent } from '#test-helpers/events.js';
 
 describe('sumDurationTotalForRootEvents', () => {
@@ -49,16 +44,5 @@ describe('sumTotalForRootEvents (generic accessor)', () => {
     expect(
       sumTotalForRootEvents([[parentA], [parentB], [leafA, leafB]], (n) => n.heapAllocated.total),
     ).toBe(130);
-  });
-});
-
-describe('sumRootNodesOnly (Metric adapter)', () => {
-  it('extracts Metric.nodes and applies the root-only sum', () => {
-    const parent = createEvent({ text: 'parent', total: 100 });
-    const child = createEvent({ text: 'child', total: 60, parent });
-
-    const metricParent = { nodes: [parent] } as unknown as Metric;
-    const metricChild = { nodes: [child] } as unknown as Metric;
-    expect(sumRootNodesOnly([], [metricParent, metricChild], {})).toBe(100);
   });
 });

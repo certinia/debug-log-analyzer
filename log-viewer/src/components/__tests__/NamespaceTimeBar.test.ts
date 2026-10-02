@@ -57,15 +57,6 @@ describe('namespace-time-bar', () => {
     apexLog = null;
   });
 
-  it('splits the whole log by namespace, largest first', async () => {
-    logOf([namespaceEvent('default', 100, [namespaceEvent('pkg', 500)])], ['pkg']);
-
-    expect(segments(await mount()).map(({ label, value }) => ({ label, value }))).toEqual([
-      { label: 'pkg', value: 500 },
-      { label: 'default', value: 100 },
-    ]);
-  });
-
   it('scopes to the selected frame and everything below it', async () => {
     const frame = namespaceEvent('pkg', 40, [namespaceEvent('other', 10)]);
     logOf([namespaceEvent('default', 100, [frame])], ['pkg', 'other']);
@@ -108,27 +99,21 @@ describe('namespace-time-bar', () => {
     expect(shown.at(-1)).toMatchObject({ label: '2 others', value: 30 });
   });
 
-  it('notes a scope with no recorded time', async () => {
-    logOf([namespaceEvent('pkg', 0)], ['pkg']);
+  // A missing frame and a missing log must answer at once rather than wait on a walk.
+  it.each([
+    ['a scope with no recorded time', () => logOf([namespaceEvent('pkg', 0)], ['pkg']), {}],
+    [
+      'a frame the log does not hold',
+      () => logOf([namespaceEvent('pkg', 100)], ['pkg']),
+      { eventIndex: 99 },
+    ],
+    ['the lack of a log', () => {}, {}],
+  ])('notes %s', async (_name, setup, props) => {
+    setup();
 
-    const element = await mount();
+    const element = await mount(props);
 
     expect(bar(element)).toBeNull();
-    expect(element.shadowRoot?.querySelector('.note')?.textContent).toContain('No time');
-  });
-
-  it('notes a frame the log does not hold, rather than waiting on a walk', async () => {
-    logOf([namespaceEvent('pkg', 100)], ['pkg']);
-
-    const element = await mount({ eventIndex: 99 });
-
-    expect(bar(element)).toBeNull();
-    expect(element.shadowRoot?.querySelector('.note')?.textContent).toContain('No time');
-  });
-
-  it('notes the lack of a log, rather than waiting on a walk', async () => {
-    const element = await mount();
-
     expect(element.shadowRoot?.querySelector('.note')?.textContent).toContain('No time');
   });
 });

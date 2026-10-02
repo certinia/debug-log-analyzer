@@ -109,19 +109,6 @@ export class TreeNavigator {
   }
 
   /**
-   * Get the first child of a node (Arrow Down navigation).
-   *
-   * @param node - Current node
-   * @returns First child node, or null if node is a leaf
-   */
-  public getFirstChild(node: TreeNode<EventNode>): TreeNode<EventNode> | null {
-    if (!node.children || node.children.length === 0) {
-      return null;
-    }
-    return node.children[0] ?? null;
-  }
-
-  /**
    * Get the child whose time range contains the center of the parent's time range.
    * Falls back to closest child if no exact overlap.
    *

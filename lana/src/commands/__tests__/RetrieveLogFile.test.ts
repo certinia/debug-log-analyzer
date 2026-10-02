@@ -20,29 +20,8 @@ import { LogView } from '../LogView.js';
 import { RetrieveLogFile } from '../RetrieveLogFile.js';
 
 jest.mock('../../display/QuickPick.js', () => ({
+  ...jest.requireActual<object>('../../display/QuickPick.js'),
   QuickPick: { pick: jest.fn() },
-  Item: class {
-    name: string;
-    desc: string;
-    details: string;
-    sticky: boolean;
-    selected: boolean;
-
-    constructor(name: string, desc: string, details: string, sticky: boolean, selected: boolean) {
-      this.name = name;
-      this.desc = desc;
-      this.details = details;
-      this.sticky = sticky;
-      this.selected = selected;
-    }
-  },
-  Options: class {
-    placeholder: string;
-
-    constructor(placeholder: string) {
-      this.placeholder = placeholder;
-    }
-  },
 }));
 jest.mock('../../services/salesforceServices.js', () => ({
   ensureServicesAvailable: jest.fn(),
@@ -131,7 +110,7 @@ describe('RetrieveLogFile', () => {
     );
   });
 
-  it('cancels the log list when the user dismisses the picker', async () => {
+  it('cancels the log list, closes the picker and reports nothing when the user dismisses it', async () => {
     mockListLogs.mockReturnValue(new Promise(() => {}));
     const context = createMockContext();
     RetrieveLogFile.apply(asContext(context));
@@ -145,35 +124,9 @@ describe('RetrieveLogFile', () => {
     await running;
 
     expect(signal.aborted).toBe(true);
-  });
-
-  it('closes the loading picker and reports nothing when the user dismisses it', async () => {
-    mockListLogs.mockReturnValue(new Promise(() => {}));
-    const context = createMockContext();
-    RetrieveLogFile.apply(asContext(context));
-
-    const running = command()();
-    await settle();
-    dismissPicker();
-    await running;
-
     expect(picker.dispose).toHaveBeenCalled();
     expect(context.display.showErrorMessage).not.toHaveBeenCalled();
     expect(mockPick).not.toHaveBeenCalled();
-  });
-
-  it('registers the command', () => {
-    const context = createMockContext();
-    RetrieveLogFile.apply(asContext(context));
-    expect(context.context.subscriptions).toHaveLength(1);
-  });
-
-  it('lists logs through Salesforce Services', async () => {
-    const context = createMockContext();
-    RetrieveLogFile.apply(asContext(context));
-    await command()();
-    expect(mockEnsureServicesAvailable).toHaveBeenCalledWith();
-    expect(mockListLogs).toHaveBeenCalledWith(expect.any(AbortSignal));
   });
 
   it('retrieves and caches an uncached log', async () => {
@@ -296,7 +249,7 @@ describe('RetrieveLogFile', () => {
     mockListLogs.mockResolvedValue([log('duration', undefined, durationMilliseconds)]);
     let description = '';
     mockPick.mockImplementation((items) => {
-      description = items[0]?.desc ?? '';
+      description = items[0]?.description ?? '';
       return Promise.resolve([]);
     });
     const context = createMockContext();

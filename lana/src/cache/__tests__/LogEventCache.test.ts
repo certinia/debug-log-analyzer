@@ -2,6 +2,7 @@
  * Copyright (c) 2026 Certinia Inc. All rights reserved.
  */
 import { beforeEach, describe, expect, it } from '@jest/globals';
+import type { LogEvent } from '@apexdevtools/apex-log-parser';
 import { Uri, workspace } from 'vscode';
 
 import {
@@ -24,15 +25,21 @@ import { parse } from '@apexdevtools/apex-log-parser';
 // what let getApexLog read through a service that throws until another extension
 // initialises it, with the failure swallowed by its own catch.
 const mockReadFile = workspace.fs.readFile as jest.Mock;
-const readsText = (text: string) => new TextEncoder().encode(text);
 const mockParse = parse as jest.Mock;
 
-describe('LogEventCache', () => {
-  const display = createMockDisplay();
+function readsAnyLog(): void {
+  mockReadFile.mockResolvedValue(new TextEncoder().encode('content'));
+  mockParse.mockImplementation(() => createMockApexLog());
+}
 
+const display = createMockDisplay();
+const open = (name: string) => LogEventCache.getApexLog(Uri.file(`/test/${name}.log`), display);
+
+describe('LogEventCache', () => {
   beforeEach(() => {
+    mockReadFile.mockReset();
+    mockParse.mockReset();
     (display.output as jest.Mock).mockClear();
-    // Clear the cache between tests by accessing private static
     // @ts-expect-error - accessing private static for testing
     LogEventCache.cache.clear();
     // @ts-expect-error - accessing private static for testing
@@ -40,424 +47,163 @@ describe('LogEventCache', () => {
   });
 
   describe('getApexLog', () => {
-    describe('cache behavior', () => {
-      it('should return cached ApexLog on subsequent calls', async () => {
-        const mockApexLog = createMockApexLog({ size: 1000 });
-        mockReadFile.mockResolvedValueOnce(readsText('log content'));
-        mockParse.mockReturnValueOnce(mockApexLog);
+    it('reads and parses a log once, then serves it from the cache', async () => {
+      readsAnyLog();
 
-        // First call - should read and parse
-        const result1 = await LogEventCache.getApexLog(Uri.file('/test/file.log'), display);
-        expect(result1).toBe(mockApexLog);
-        expect(mockReadFile).toHaveBeenCalledTimes(1);
+      const first = await open('file');
+      const second = await open('file');
 
-        // Second call - should return cached
-        const result2 = await LogEventCache.getApexLog(Uri.file('/test/file.log'), display);
-        expect(result2).toBe(mockApexLog);
-        expect(mockReadFile).toHaveBeenCalledTimes(1); // Still 1
-      });
+      expect(second).toBe(first);
+      expect(mockReadFile).toHaveBeenCalledTimes(1);
+    });
 
-      it('should move accessed item to end (most recently used)', async () => {
-        const log1 = createMockApexLog({ size: 100 });
-        const log2 = createMockApexLog({ size: 200 });
+    it('evicts the least recently used log past 10 entries', async () => {
+      readsAnyLog();
+      for (let i = 0; i < 10; i++) {
+        await open(`file${i}`);
+      }
+      // Touching file0 makes file1 the oldest.
+      await open('file0');
+      await open('file10');
+      mockReadFile.mockClear();
 
-        mockReadFile
-          .mockResolvedValueOnce(readsText('content1'))
-          .mockResolvedValueOnce(readsText('content2'));
-        mockParse.mockReturnValueOnce(log1).mockReturnValueOnce(log2);
+      await open('file0');
+      expect(mockReadFile).not.toHaveBeenCalled();
+      await open('file1');
+      expect(mockReadFile).toHaveBeenCalledTimes(1);
+    });
 
-        await LogEventCache.getApexLog(Uri.file('/test/file1.log'), display);
-        await LogEventCache.getApexLog(Uri.file('/test/file2.log'), display);
+    it.each([
+      ['the read', () => mockReadFile.mockRejectedValueOnce(new Error('File not found'))],
+      [
+        'the parse',
+        () => {
+          mockReadFile.mockResolvedValueOnce(new TextEncoder().encode('invalid'));
+          mockParse.mockImplementationOnce(() => {
+            throw new Error('Parse error');
+          });
+        },
+      ],
+    ])('returns null when %s fails', async (_label, fail) => {
+      fail();
+      expect(await open('broken')).toBeNull();
+    });
 
-        // Access file1 again - should move to end
-        await LogEventCache.getApexLog(Uri.file('/test/file1.log'), display);
+    it('reports why a log could not be read, once until it is reopened', async () => {
+      mockReadFile.mockRejectedValue(new Error('File not found'));
 
-        // @ts-expect-error - accessing private static for testing
-        const keys = Array.from(LogEventCache.cache.keys());
-        expect(keys).toEqual(['file:///test/file2.log', 'file:///test/file1.log']);
-      });
+      await open('nonexistent');
+      await open('nonexistent');
+      expect(display.output).toHaveBeenCalledTimes(1);
+      expect(display.output).toHaveBeenCalledWith(
+        'Could not read file:///test/nonexistent.log: File not found',
+        true,
+      );
 
-      it('should evict oldest entry when cache reaches MAX_CACHE_SIZE', async () => {
-        // Create 11 logs to trigger eviction (MAX_CACHE_SIZE is 10)
-        for (let i = 0; i < 11; i++) {
-          const mockLog = createMockApexLog({ size: i * 100 });
-          mockReadFile.mockResolvedValueOnce(readsText(`content${i}`));
-          mockParse.mockReturnValueOnce(mockLog);
-
-          await LogEventCache.getApexLog(Uri.file(`/test/file${i}.log`), display);
-        }
-
-        // @ts-expect-error - accessing private static for testing
-        const cacheSize = LogEventCache.cache.size;
-        expect(cacheSize).toBe(10);
-
-        // First file should be evicted
-        // @ts-expect-error - accessing private static for testing
-        const hasFirst = LogEventCache.cache.has('file:///test/file0.log');
-        expect(hasFirst).toBe(false);
-
-        // Last file should exist
-        // @ts-expect-error - accessing private static for testing
-        const hasLast = LogEventCache.cache.has('file:///test/file10.log');
-        expect(hasLast).toBe(true);
-      });
-
-      it('should return null when file read fails', async () => {
-        mockReadFile.mockRejectedValueOnce(new Error('File not found'));
-
-        const result = await LogEventCache.getApexLog(Uri.file('/test/nonexistent.log'), display);
-
-        expect(result).toBeNull();
-      });
-
-      it('should return null when parse fails', async () => {
-        mockReadFile.mockResolvedValueOnce(readsText('invalid content'));
-        mockParse.mockImplementationOnce(() => {
-          throw new Error('Parse error');
-        });
-
-        const result = await LogEventCache.getApexLog(Uri.file('/test/invalid.log'), display);
-
-        expect(result).toBeNull();
-      });
-
-      it('should report why the log could not be read', async () => {
-        mockReadFile.mockRejectedValueOnce(new Error('File not found'));
-
-        await LogEventCache.getApexLog(Uri.file('/test/nonexistent.log'), display);
-
-        expect(display.output).toHaveBeenCalledWith(
-          'Could not read file:///test/nonexistent.log: File not found',
-          true,
-        );
-      });
-
-      it('should report a failing log once, not on every retry', async () => {
-        mockReadFile.mockRejectedValue(new Error('File not found'));
-
-        await LogEventCache.getApexLog(Uri.file('/test/nonexistent.log'), display);
-        await LogEventCache.getApexLog(Uri.file('/test/nonexistent.log'), display);
-
-        expect(display.output).toHaveBeenCalledTimes(1);
-      });
-
-      it('should report again after the log is closed and reopened', async () => {
-        mockReadFile.mockRejectedValue(new Error('File not found'));
-
-        await LogEventCache.getApexLog(Uri.file('/test/nonexistent.log'), display);
-        LogEventCache.clearCache('file:///test/nonexistent.log');
-        await LogEventCache.getApexLog(Uri.file('/test/nonexistent.log'), display);
-
-        expect(display.output).toHaveBeenCalledTimes(2);
-      });
+      LogEventCache.clearCache('file:///test/nonexistent.log');
+      await open('nonexistent');
+      expect(display.output).toHaveBeenCalledTimes(2);
     });
   });
 
   describe('findEventByTimestamp', () => {
-    describe('binary search', () => {
-      it('should find event with exact timestamp match', () => {
-        const event = createMockLogEvent({ timestamp: 1000, exitStamp: 2000 });
-        const apexLog = createMockApexLog({ children: [event] });
+    const at = (timestamp: number, exitStamp: number | null, children: LogEvent[] = []) =>
+      createMockLogEvent({ timestamp, exitStamp, children });
 
-        const result = LogEventCache.findEventByTimestamp(apexLog, 1000);
+    describe('among siblings', () => {
+      const span = at(1000, 3000);
+      const zeroLength = at(1000, 1000);
+      const noExit = at(1000, null);
+      const first = at(1000, 2000);
+      const second = at(3000, 4000);
+      const third = at(5000, 6000);
+      const gapped = [at(1000, 2000), at(4000, 5000)];
+      const hundred = Array.from({ length: 100 }, (_, i) => at(i * 100, i * 100 + 50));
 
-        expect(result).toEqual({ event, depth: 0 });
+      it.each([
+        ['its start', [span], 1000, span],
+        ['inside it', [span], 2000, span],
+        ['its end', [span], 3000, span],
+        ['a zero-length event', [zeroLength], 1000, zeroLength],
+        ['an event with no exit, at its start', [noExit], 1000, noExit],
+        ['the middle of three', [first, second, third], 3500, second],
+        ['one of a hundred', hundred, 5025, hundred[50]],
+      ])('finds the event at %s', (_label, children, timestamp, event) => {
+        const apexLog = createMockApexLog({ children });
+        expect(LogEventCache.findEventByTimestamp(apexLog, timestamp)).toEqual({
+          event,
+          depth: 0,
+        });
       });
 
-      it('should find event when timestamp is within range', () => {
-        const event = createMockLogEvent({ timestamp: 1000, exitStamp: 3000 });
-        const apexLog = createMockApexLog({ children: [event] });
-
-        const result = LogEventCache.findEventByTimestamp(apexLog, 2000);
-
-        expect(result).toEqual({ event, depth: 0 });
-      });
-
-      it('should find event at end of range', () => {
-        const event = createMockLogEvent({ timestamp: 1000, exitStamp: 3000 });
-        const apexLog = createMockApexLog({ children: [event] });
-
-        const result = LogEventCache.findEventByTimestamp(apexLog, 3000);
-
-        expect(result).toEqual({ event, depth: 0 });
-      });
-
-      it('should return null when timestamp is before all events', () => {
-        const event = createMockLogEvent({ timestamp: 1000, exitStamp: 2000 });
-        const apexLog = createMockApexLog({ children: [event] });
-
-        const result = LogEventCache.findEventByTimestamp(apexLog, 500);
-
-        expect(result).toBeNull();
-      });
-
-      it('should return null when timestamp is after all events', () => {
-        const event = createMockLogEvent({ timestamp: 1000, exitStamp: 2000 });
-        const apexLog = createMockApexLog({ children: [event] });
-
-        const result = LogEventCache.findEventByTimestamp(apexLog, 3000);
-
-        expect(result).toBeNull();
-      });
-
-      it('should find correct event among multiple events', () => {
-        const event1 = createMockLogEvent({ timestamp: 1000, exitStamp: 2000 });
-        const event2 = createMockLogEvent({ timestamp: 3000, exitStamp: 4000 });
-        const event3 = createMockLogEvent({ timestamp: 5000, exitStamp: 6000 });
-        const apexLog = createMockApexLog({ children: [event1, event2, event3] });
-
-        const result = LogEventCache.findEventByTimestamp(apexLog, 3500);
-
-        expect(result).toEqual({ event: event2, depth: 0 });
-      });
-
-      it('should find event in gap between sibling events', () => {
-        const event1 = createMockLogEvent({ timestamp: 1000, exitStamp: 2000 });
-        const event2 = createMockLogEvent({ timestamp: 4000, exitStamp: 5000 });
-        const apexLog = createMockApexLog({ children: [event1, event2] });
-
-        // Timestamp 3000 is between event1 end and event2 start
-        const result = LogEventCache.findEventByTimestamp(apexLog, 3000);
-
-        expect(result).toBeNull();
+      it.each([
+        ['before every event', [span], 500],
+        ['after every event', [first], 3000],
+        ['past an event with no exit', [noExit], 1001],
+        ['in a gap between siblings', gapped, 3000],
+        ['in an empty log', [], 1000],
+      ])('finds nothing %s', (_label, children, timestamp) => {
+        const apexLog = createMockApexLog({ children });
+        expect(LogEventCache.findEventByTimestamp(apexLog, timestamp)).toBeNull();
       });
     });
 
-    describe('nested events', () => {
-      it('should search children and find nested event', () => {
-        const childEvent = createMockLogEvent({ timestamp: 1200, exitStamp: 1800 });
-        const parentEvent = createMockLogEvent({
-          timestamp: 1000,
-          exitStamp: 2000,
-          children: [childEvent],
-        });
-        const apexLog = createMockApexLog({ children: [parentEvent] });
+    describe('nested', () => {
+      const child = at(1200, 1800);
+      const withChild = at(1000, 2000, [child]);
+      const grandchild = at(1300, 1700);
+      const withGrandchild = at(1000, 2000, [at(1200, 1800, [grandchild])]);
+      const earlyChild = at(1000, 2000, [at(1300, 1400)]);
+      const middle = at(1400, 1600);
+      const withThree = at(1000, 2000, [at(1100, 1300), middle, at(1700, 1900)]);
 
-        const result = LogEventCache.findEventByTimestamp(apexLog, 1500);
-
-        expect(result).toEqual({ event: childEvent, depth: 1 });
-      });
-
-      it('should find deeply nested event at correct depth', () => {
-        const grandchild = createMockLogEvent({ timestamp: 1300, exitStamp: 1700 });
-        const child = createMockLogEvent({
-          timestamp: 1200,
-          exitStamp: 1800,
-          children: [grandchild],
-        });
-        const parent = createMockLogEvent({
-          timestamp: 1000,
-          exitStamp: 2000,
-          children: [child],
-        });
-        const apexLog = createMockApexLog({ children: [parent] });
-
-        const result = LogEventCache.findEventByTimestamp(apexLog, 1500);
-
-        expect(result).toEqual({ event: grandchild, depth: 2 });
-      });
-
-      it('should return parent when timestamp is outside child ranges', () => {
-        const child = createMockLogEvent({ timestamp: 1300, exitStamp: 1400 });
-        const parent = createMockLogEvent({
-          timestamp: 1000,
-          exitStamp: 2000,
-          children: [child],
-        });
-        const apexLog = createMockApexLog({ children: [parent] });
-
-        // 1500 is after child ends but before parent ends
-        const result = LogEventCache.findEventByTimestamp(apexLog, 1500);
-
-        expect(result).toEqual({ event: parent, depth: 0 });
-      });
-
-      it('should handle events with multiple children at same level', () => {
-        const child1 = createMockLogEvent({ timestamp: 1100, exitStamp: 1300 });
-        const child2 = createMockLogEvent({ timestamp: 1400, exitStamp: 1600 });
-        const child3 = createMockLogEvent({ timestamp: 1700, exitStamp: 1900 });
-        const parent = createMockLogEvent({
-          timestamp: 1000,
-          exitStamp: 2000,
-          children: [child1, child2, child3],
-        });
-        const apexLog = createMockApexLog({ children: [parent] });
-
-        const result = LogEventCache.findEventByTimestamp(apexLog, 1500);
-
-        expect(result).toEqual({ event: child2, depth: 1 });
-      });
-    });
-
-    describe('edge cases', () => {
-      it('should return null for empty events array', () => {
-        const apexLog = createMockApexLog({ children: [] });
-
-        const result = LogEventCache.findEventByTimestamp(apexLog, 1000);
-
-        expect(result).toBeNull();
-      });
-
-      it('should handle single event in array', () => {
-        const event = createMockLogEvent({ timestamp: 1000, exitStamp: 2000 });
-        const apexLog = createMockApexLog({ children: [event] });
-
-        const result = LogEventCache.findEventByTimestamp(apexLog, 1500);
-
-        expect(result).toEqual({ event, depth: 0 });
-      });
-
-      it('should handle event with null exitStamp (use timestamp as end)', () => {
-        const event = createMockLogEvent({ timestamp: 1000, exitStamp: null });
-        const apexLog = createMockApexLog({ children: [event] });
-
-        // Should only match exact timestamp when exitStamp is null
-        const exactResult = LogEventCache.findEventByTimestamp(apexLog, 1000);
-        expect(exactResult).toEqual({ event, depth: 0 });
-
-        const afterResult = LogEventCache.findEventByTimestamp(apexLog, 1001);
-        expect(afterResult).toBeNull();
-      });
-
-      it('should handle event where exitStamp equals timestamp', () => {
-        const event = createMockLogEvent({ timestamp: 1000, exitStamp: 1000 });
-        const apexLog = createMockApexLog({ children: [event] });
-
-        const result = LogEventCache.findEventByTimestamp(apexLog, 1000);
-
-        expect(result).toEqual({ event, depth: 0 });
-      });
-
-      it('should handle large number of events', () => {
-        const events = [];
-        for (let i = 0; i < 100; i++) {
-          events.push(
-            createMockLogEvent({
-              timestamp: i * 100,
-              exitStamp: i * 100 + 50,
-            }),
-          );
-        }
-        const apexLog = createMockApexLog({ children: events });
-
-        // Search for event in the middle
-        const result = LogEventCache.findEventByTimestamp(apexLog, 5025);
-
-        expect(result?.event.timestamp).toBe(5000);
-        expect(result?.depth).toBe(0);
+      it.each([
+        ['a child', withChild, child, 1],
+        ['a grandchild', withGrandchild, grandchild, 2],
+        ['the parent outside its child', earlyChild, earlyChild, 0],
+        ['the middle of three children', withThree, middle, 1],
+      ])('finds %s at its depth', (_label, root, event, depth) => {
+        const apexLog = createMockApexLog({ children: [root] });
+        expect(LogEventCache.findEventByTimestamp(apexLog, 1500)).toEqual({ event, depth });
       });
     });
   });
 
-  describe('clearCache', () => {
-    it('should remove specific entry from cache', async () => {
-      const mockApexLog = createMockApexLog();
-      mockReadFile.mockResolvedValueOnce(readsText('content'));
-      mockParse.mockReturnValueOnce(mockApexLog);
+  it('clears one log and keeps the others', async () => {
+    readsAnyLog();
+    await open('file1');
+    await open('file2');
+    mockReadFile.mockClear();
 
-      await LogEventCache.getApexLog(Uri.file('/test/file.log'), display);
+    LogEventCache.clearCache('file:///test/file1.log');
 
-      // @ts-expect-error - accessing private static for testing
-      expect(LogEventCache.cache.has('file:///test/file.log')).toBe(true);
-
-      LogEventCache.clearCache('file:///test/file.log');
-
-      // @ts-expect-error - accessing private static for testing
-      expect(LogEventCache.cache.has('file:///test/file.log')).toBe(false);
-    });
-
-    it('should not affect other cached entries', async () => {
-      const log1 = createMockApexLog({ size: 100 });
-      const log2 = createMockApexLog({ size: 200 });
-
-      mockReadFile
-        .mockResolvedValueOnce(readsText('content1'))
-        .mockResolvedValueOnce(readsText('content2'));
-      mockParse.mockReturnValueOnce(log1).mockReturnValueOnce(log2);
-
-      await LogEventCache.getApexLog(Uri.file('/test/file1.log'), display);
-      await LogEventCache.getApexLog(Uri.file('/test/file2.log'), display);
-
-      LogEventCache.clearCache('file:///test/file1.log');
-
-      // @ts-expect-error - accessing private static for testing
-      expect(LogEventCache.cache.has('file:///test/file1.log')).toBe(false);
-      // @ts-expect-error - accessing private static for testing
-      expect(LogEventCache.cache.has('file:///test/file2.log')).toBe(true);
-    });
-
-    it('should handle clearing non-existent entry gracefully', () => {
-      expect(() => {
-        LogEventCache.clearCache('file:///test/nonexistent.log');
-      }).not.toThrow();
-    });
+    await open('file2');
+    expect(mockReadFile).not.toHaveBeenCalled();
+    await open('file1');
+    expect(mockReadFile).toHaveBeenCalledTimes(1);
   });
 
-  describe('apply', () => {
-    it('should register onDidCloseTextDocument listener', () => {
-      const mockContext = createMockContext();
-
-      LogEventCache.apply(asContext(mockContext));
-
-      expect(workspace.onDidCloseTextDocument).toHaveBeenCalledTimes(1);
-      expect(mockContext.context.subscriptions.length).toBe(1);
-    });
-
-    it('should clear cache when apexlog document is closed', async () => {
-      // Setup cache
-      const mockApexLog = createMockApexLog();
-      mockReadFile.mockResolvedValueOnce(readsText('content'));
-      mockParse.mockReturnValueOnce(mockApexLog);
-      await LogEventCache.getApexLog(Uri.file('/test/file.log'), display);
-
-      // Capture the callback
-      let closeCallback:
-        ((doc: { languageId: string; uri: { toString: () => string } }) => void) | null = null;
-      (workspace.onDidCloseTextDocument as jest.Mock).mockImplementationOnce((cb) => {
-        closeCallback = cb;
+  // A log saved as .trace or pasted into an untitled buffer never gets the apexlog
+  // language, but the decoration provider still parses it, so it must still clear.
+  it.each(['apexlog', 'javascript'])(
+    'clears a log when its %s document closes',
+    async (languageId) => {
+      readsAnyLog();
+      await open('file');
+      let onClose: ((doc: { languageId: string; uri: Uri }) => void) | undefined;
+      (workspace.onDidCloseTextDocument as jest.Mock).mockImplementationOnce((callback) => {
+        onClose = callback as typeof onClose;
         return { dispose: jest.fn() };
       });
-
       const mockContext = createMockContext();
+
       LogEventCache.apply(asContext(mockContext));
+      onClose?.({ languageId, uri: Uri.file('/test/file.log') });
+      mockReadFile.mockClear();
+      await open('file');
 
-      // Simulate closing an apexlog document
-      closeCallback!({
-        languageId: 'apexlog',
-        uri: { toString: () => 'file:///test/file.log' },
-      });
-
-      // @ts-expect-error - accessing private static for testing
-      expect(LogEventCache.cache.has('file:///test/file.log')).toBe(false);
-    });
-
-    it('should clear cache when a document of any language is closed', async () => {
-      // Setup cache
-      const mockApexLog = createMockApexLog();
-      mockReadFile.mockResolvedValueOnce(readsText('content'));
-      mockParse.mockReturnValueOnce(mockApexLog);
-      await LogEventCache.getApexLog(Uri.file('/test/file.log'), display);
-
-      // Capture the callback
-      let closeCallback:
-        ((doc: { languageId: string; uri: { toString: () => string } }) => void) | null = null;
-      (workspace.onDidCloseTextDocument as jest.Mock).mockImplementationOnce((cb) => {
-        closeCallback = cb;
-        return { dispose: jest.fn() };
-      });
-
-      const mockContext = createMockContext();
-      LogEventCache.apply(asContext(mockContext));
-
-      // A log saved as .trace or pasted into an untitled buffer never gets the apexlog
-      // language, but the decoration provider still parses it, so it must still clear.
-      closeCallback!({
-        languageId: 'javascript',
-        uri: { toString: () => 'file:///test/file.log' },
-      });
-
-      // @ts-expect-error - accessing private static for testing
-      expect(LogEventCache.cache.has('file:///test/file.log')).toBe(false);
-    });
-  });
+      expect(mockContext.context.subscriptions).toHaveLength(1);
+      expect(mockReadFile).toHaveBeenCalledTimes(1);
+    },
+  );
 });

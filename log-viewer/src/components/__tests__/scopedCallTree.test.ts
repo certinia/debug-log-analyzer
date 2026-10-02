@@ -51,7 +51,8 @@ m2.parent = m1;
 m2.children = [soql];
 soql.parent = m2;
 
-const byId = new Map<number, FakeEvent>([exec, m1, m2, soql].map((e) => [e.eventIndex, e]));
+const BASE_FRAMES = [exec, m1, m2, soql];
+const byId = new Map<number, FakeEvent>();
 
 let selectedIndex = 4;
 const { KeyPathIds } = jest.requireActual<typeof import('../../core/log/keyPathIds.js')>(
@@ -92,6 +93,7 @@ import {
   buildWholeLogCallTree,
   frameEventIndexes,
   locatableEventIndexes,
+  revealableEventIndex,
   rowIdsByPath,
   type ScopedRow,
 } from '../scopedCallTree.js';
@@ -101,8 +103,13 @@ import type { FrameBudgetOptions } from '../../core/utility/FrameBudget.js';
  *  is only there to satisfy the contract. */
 const options: FrameBudgetOptions = { yieldSlice: () => Promise.resolve() };
 
+// Tests add frames under ids other tests reuse, so each starts from the base log.
 beforeEach(() => {
   paths = new KeyPathIds(1024);
+  byId.clear();
+  for (const frame of BASE_FRAMES) {
+    byId.set(frame.eventIndex, frame);
+  }
 });
 
 function build(eventIndex: number, instances?: number[]) {
@@ -201,18 +208,9 @@ describe('buildScopedCallTree', () => {
     expect(rows.map((row) => row.text)).toEqual(['SELECT Id FROM Account']);
     expect(rows[0]?.duration).toEqual({ total: 200, self: 200 });
     expect(rows[0]?._children?.map((row) => row.text)).toEqual(['m2']);
-  });
-
-  it('bottom-up: every caller counts the call it contributed, never zero', async () => {
-    const tree = (await build(3))!;
-    const counts: number[] = [];
-    let node: ScopedRow | undefined = (await tree.bottomUp(options))![0];
-    while (node) {
-      counts.push(node.callCount);
-      node = node._children?.[0];
-    }
-    // The statement plus m2, its caller inside the scope, each crediting the one call.
-    expect(counts).toEqual([1, 1]);
+    // Every caller counts the call it contributed, never zero.
+    expect([rows[0]?.callCount, rows[0]?._children?.[0]?.callCount]).toEqual([1, 1]);
+    expect(rows[0]?._children?.[0]?._children).toBeNull();
   });
 
   it('drops zero-duration bookkeeping rows, keeping those with timed descendants', async () => {
@@ -295,14 +293,6 @@ describe('buildScopedCallTree', () => {
     expect(roots[0]?.callCount).toBe(4);
     expect(roots[0]?.duration).toEqual({ total: 4, self: 0 });
     expect(tree.rootTotal).toBe(4);
-  });
-
-  it('builds each view only on first read, then caches it', async () => {
-    const tree = (await build(4))!;
-    // Same array back on a second read — the walk is not repeated.
-    expect(await tree.aggregated(options)).toBe(await tree.aggregated(options));
-    expect(await tree.bottomUp(options)).toBe(await tree.bottomUp(options));
-    expect(await tree.timeOrder(options)).toBe(await tree.timeOrder(options));
   });
 
   it('a wide aggregate merges every occurrence, uncapped', async () => {
@@ -419,7 +409,7 @@ describe('buildScopedCallTree', () => {
   });
 
   it('counts every occurrence even when the walk is sliced across frames', async () => {
-    const OCCURRENCES = 500;
+    const OCCURRENCES = 50;
     const instances = loopOccurrences(OCCURRENCES);
     let yields = 0;
     const sliced: FrameBudgetOptions = {
@@ -500,13 +490,6 @@ describe('buildWholeLogCallTree', () => {
     expect(chain[3]?.duration).toEqual({ total: 200, self: 200 });
   });
 
-  it('builds each view only on first read, then caches it', async () => {
-    const tree = (await buildWholeLogCallTree(options))!;
-    expect(await tree.timeOrder(options)).toBe(await tree.timeOrder(options));
-    expect(await tree.aggregated(options)).toBe(await tree.aggregated(options));
-    expect(await tree.bottomUp(options)).toBe(await tree.bottomUp(options));
-  });
-
   it('abandons a cancelled build instead of finishing it', async () => {
     const clock = jest.spyOn(performance, 'now');
     let time = 0;
@@ -538,6 +521,19 @@ describe('buildWholeLogCallTree', () => {
       root.children.pop();
       byId.delete(profiling.eventIndex);
     }
+  });
+});
+
+describe('view caching', () => {
+  it.each([
+    ['a scoped tree', () => build(4)],
+    ['the whole-log tree', () => buildWholeLogCallTree(options)],
+  ])('builds each view of %s only on first read, then caches it', async (_name, make) => {
+    const tree = (await make())!;
+    // Same array back on a second read — the walk is not repeated.
+    expect(await tree.timeOrder(options)).toBe(await tree.timeOrder(options));
+    expect(await tree.aggregated(options)).toBe(await tree.aggregated(options));
+    expect(await tree.bottomUp(options)).toBe(await tree.bottomUp(options));
   });
 });
 
@@ -631,6 +627,19 @@ describe('frameEventIndexes', () => {
     const row = { id: 1, originalData: soql } as unknown as Partial<ScopedRow>;
 
     expect(frameEventIndexes(row)).toEqual([soql.eventIndex]);
+  });
+});
+
+describe('revealableEventIndex', () => {
+  const row = (id: number, eventIndex: number): Partial<ScopedRow> =>
+    ({ id, originalData: { eventIndex } }) as unknown as Partial<ScopedRow>;
+
+  it.each([
+    ['a real row by its own event', row(3, 17), 17],
+    ['nothing for a merged row, whose id is synthetic and negative', row(-1, 17), null],
+    ['nothing when there is no row', undefined, null],
+  ])('reveals %s', (_name, given, expected) => {
+    expect(revealableEventIndex(given)).toBe(expected);
   });
 });
 

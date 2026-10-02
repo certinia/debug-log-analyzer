@@ -61,7 +61,7 @@ describe('CallStackDetail', () => {
     expect(el.shadowRoot?.querySelector('context-menu')).not.toBeNull();
   });
 
-  it('enables clipboard copy on the table, as the main grids do', async () => {
+  it('copies to the clipboard and navigates by keyboard, as the main grids do', async () => {
     built.length = 0;
     await mount(2);
 
@@ -70,13 +70,7 @@ describe('CallStackDetail', () => {
     expect(options?.clipboardCopyRowRange).toBe('all');
     // Ctrl/Cmd+C, so the keyboard shortcut matches every other grid.
     expect(options?.keybindings).toEqual({ copyToClipboard: ['ctrl + 67', 'meta + 67'] });
-  });
-
-  it('keeps a single row selected so the inspector follows keyboard navigation', async () => {
-    built.length = 0;
-    await mount(3);
-
-    const options = built.at(-1);
+    // A single row stays selected, so the inspector follows keyboard navigation.
     expect(options?.selectableRows).toBe('highlight');
     expect(options?.rowKeyboardNavigation).toBe(true);
   });
