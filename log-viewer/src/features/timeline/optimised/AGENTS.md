@@ -52,7 +52,8 @@ The metric strip visualization (governor limits) is rendered below the main time
 - `MetricTierClassifier` processes `HeatStripTimeSeries` data and classifies metrics into tiers
 - `apex-limit-series.ts` transforms `ApexLog` (snapshots + event tree) → `HeatStripTimeSeries`;
   `ApexLogTimeline` calls it during `init()`
-- Apex-specific display names, units, and priority order are defined ONLY in `apex-limit-series.ts`
+- Apex-specific display names, units, and priority order come from `core/metrics/governorMetrics.ts`
+  and reach the strip ONLY through `apex-limit-series.ts`
 
 The metric strip supports collapsed (heat-style) and expanded (step chart) views, toggled via a chevron icon.
 

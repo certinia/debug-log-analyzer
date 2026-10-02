@@ -14,9 +14,11 @@ let nextTimestamp = 1;
 interface EventOptions {
   text: string;
   type?: string;
+  category?: LogEvent['category'];
   namespace?: string;
   self?: number;
   total?: number;
+  timestamp?: number;
   exitStamp?: number | null;
   suffix?: string | null;
   parent?: LogEvent | null;
@@ -34,6 +36,9 @@ interface EventOptions {
   soslRowTotal?: number;
   thrown?: number;
   heapTotal?: number;
+  isTruncated?: boolean;
+  /** Opt-in only; see {@link createEvent}. */
+  eventIndex?: number;
 }
 
 /**
@@ -41,21 +46,24 @@ interface EventOptions {
  * rather than a blind cast, so a renamed or reshaped field on the real class
  * fails the typecheck here instead of drifting silently.
  *
- * Do not add `eventIndex`. `keyIdOf` in `core/log/keyPathIds.ts` keys every frame
+ * Do not default `eventIndex`. `keyIdOf` in `core/log/keyPathIds.ts` keys every frame
  * that has no index onto one shared slot, so giving them all index 0 makes them
- * read back the first frame's key.
+ * read back the first frame's key. A test that needs one passes a distinct value.
  */
 export function createEvent(options: EventOptions): LogEvent {
   const event: Partial<LogEvent> = {
     parent: options.parent ?? null,
     children: [],
     type: (options.type ?? 'METHOD_ENTRY') as LogEvent['type'],
+    category: options.category,
     text: options.text,
     namespace: options.namespace ?? 'default',
     suffix: options.suffix ?? null,
     cpuType: '',
     hasValidSymbols: true,
-    timestamp: nextTimestamp++,
+    timestamp: options.timestamp ?? nextTimestamp++,
+    eventIndex: options.eventIndex,
+    isTruncated: options.isTruncated ?? false,
     exitStamp: options.exitStamp ?? null,
     duration: { self: options.self ?? 0, total: options.total ?? 0 },
     dmlRowCount: { self: options.dmlRowSelf ?? 0, total: options.dmlRowTotal ?? 0 },
@@ -73,4 +81,14 @@ export function createEvent(options: EventOptions): LogEvent {
   const built = event as LogEvent;
   options.parent?.children.push(built);
   return built;
+}
+
+/** A frame carrying only the type, text and parent its bucket key and path are built from. */
+export function callFrame(
+  text: string,
+  parent: LogEvent | null,
+  eventIndex?: number,
+  type = 'METHOD_ENTRY',
+): LogEvent {
+  return { type, namespace: '', text, parent, eventIndex } as unknown as LogEvent;
 }

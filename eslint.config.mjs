@@ -3,8 +3,30 @@ import { defineConfig, globalIgnores } from 'eslint/config';
 import prettierConfig from 'eslint-config-prettier/flat';
 import tseslint from 'typescript-eslint';
 
+const WEBVIEW_BANNED_BUILTINS = [
+  'buffer',
+  'child_process',
+  'crypto',
+  'events',
+  'fs',
+  'fs/promises',
+  'http',
+  'https',
+  'net',
+  'os',
+  'path',
+  'process',
+  'stream',
+  'url',
+  'util',
+  'zlib',
+];
+
 const NO_NODE_BUILTINS =
   'lana also runs in the VS Code web extension host, where the bundler stubs these to empty modules and the failure only shows at runtime. Use the vscode API or vscode-uri Utils.';
+
+const NO_NODE_BUILTINS_WEBVIEW =
+  'log-viewer runs in a webview with no Node. The bundler polyfills these silently, so the import type-checks and bundles. Use a web API instead.';
 
 export default defineConfig(
   globalIgnores([
@@ -133,7 +155,12 @@ export default defineConfig(
       'no-restricted-imports': [
         'error',
         {
+          paths: WEBVIEW_BANNED_BUILTINS.map((name) => ({
+            name,
+            message: NO_NODE_BUILTINS_WEBVIEW,
+          })),
           patterns: [
+            { group: ['node:*'], message: NO_NODE_BUILTINS_WEBVIEW },
             {
               // `group` is gitignore syntax, where a leading `#` is a comment.
               regex: '^#test-helpers/',

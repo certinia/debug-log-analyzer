@@ -13,7 +13,13 @@ import type { NamespaceTimeBar } from '../NamespaceTimeBar.js';
 import { DEFAULT_MAX_SEGMENTS } from '../StackedTimeBar.js';
 import '../NamespaceTimeBar.js';
 import { logNamespacePalette } from '../namespacePalette.js';
-import { ev, eventByIndex, log, resetEvents, type FakeEvent } from './fixtures/logEvents.js';
+import {
+  namespaceEvent,
+  eventByIndex,
+  log,
+  resetEvents,
+  type FakeEvent,
+} from './fixtures/logEvents.js';
 
 const logOf = (children: FakeEvent[], namespaces: string[]) => {
   apexLog = log(children, namespaces);
@@ -52,8 +58,8 @@ describe('namespace-time-bar', () => {
   });
 
   it('scopes to the selected frame and everything below it', async () => {
-    const frame = ev('pkg', 40, [ev('other', 10)]);
-    logOf([ev('default', 100, [frame])], ['pkg', 'other']);
+    const frame = namespaceEvent('pkg', 40, [namespaceEvent('other', 10)]);
+    logOf([namespaceEvent('default', 100, [frame])], ['pkg', 'other']);
 
     const element = await mount({ eventIndex: frame.eventIndex });
 
@@ -64,8 +70,8 @@ describe('namespace-time-bar', () => {
   });
 
   it('sums every occurrence of an aggregate, counting a nested one once', async () => {
-    const inner = ev('pkg', 20);
-    const outer = ev('pkg', 30, [inner]);
+    const inner = namespaceEvent('pkg', 20);
+    const outer = namespaceEvent('pkg', 30, [inner]);
     logOf([outer], ['pkg']);
 
     const element = await mount({ instances: [outer.eventIndex, inner.eventIndex] });
@@ -80,7 +86,9 @@ describe('namespace-time-bar', () => {
     ).concat('nsA', 'nsB');
     // Descending self time, so the two smallest fall past the palette.
     logOf(
-      namespaces.map((namespace, index) => ev(namespace, (namespaces.length - index) * 10)),
+      namespaces.map((namespace, index) =>
+        namespaceEvent(namespace, (namespaces.length - index) * 10),
+      ),
       namespaces,
     );
 
@@ -93,8 +101,12 @@ describe('namespace-time-bar', () => {
 
   // A missing frame and a missing log must answer at once rather than wait on a walk.
   it.each([
-    ['a scope with no recorded time', () => logOf([ev('pkg', 0)], ['pkg']), {}],
-    ['a frame the log does not hold', () => logOf([ev('pkg', 100)], ['pkg']), { eventIndex: 99 }],
+    ['a scope with no recorded time', () => logOf([namespaceEvent('pkg', 0)], ['pkg']), {}],
+    [
+      'a frame the log does not hold',
+      () => logOf([namespaceEvent('pkg', 100)], ['pkg']),
+      { eventIndex: 99 },
+    ],
     ['the lack of a log', () => {}, {}],
   ])('notes %s', async (_name, setup, props) => {
     setup();

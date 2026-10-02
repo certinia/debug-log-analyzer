@@ -2,14 +2,10 @@
  * Copyright (c) 2026 Certinia Inc. All rights reserved.
  */
 import { describe, expect, it } from '@jest/globals';
-import type { LogEvent } from '@apexdevtools/apex-log-parser';
 import type { RowComponent } from 'tabulator-tables';
 
+import { callFrame } from '#test-helpers/events.js';
 import { findBucketRow } from '../bucketRows.js';
-
-function ev(text: string, parent: LogEvent | null): LogEvent {
-  return { type: 'METHOD_ENTRY', namespace: '', text, parent } as unknown as LogEvent;
-}
 
 const key = (text: string) => `METHOD_ENTRY||${text}`;
 
@@ -57,7 +53,12 @@ describe('findBucketRow', () => {
     it('heads the frame with a top-level row, so its own key finds it', async () => {
       const rows = [row('other'), row('target')];
 
-      const found = await findBucketRow(asRows(rows), ev('target', null), 'callers', settled);
+      const found = await findBucketRow(
+        asRows(rows),
+        callFrame('target', null),
+        'callers',
+        settled,
+      );
 
       expect(found && (found.getData() as { key: string }).key).toBe(key('target'));
     });
@@ -65,7 +66,7 @@ describe('findBucketRow', () => {
     it('finds nothing where no row heads the frame', async () => {
       const found = await findBucketRow(
         asRows([row('other')]),
-        ev('gone', null),
+        callFrame('gone', null),
         'callers',
         settled,
       );
@@ -76,10 +77,10 @@ describe('findBucketRow', () => {
 
   describe('a top-down view', () => {
     // exec -> a -> target, and a second exec branch holding the same method.
-    const root = ev('LOG_ROOT', null);
-    const exec = ev('exec', root);
-    const outer = ev('a', exec);
-    const target = ev('target', outer);
+    const root = callFrame('LOG_ROOT', null);
+    const exec = callFrame('exec', root);
+    const outer = callFrame('a', exec);
+    const target = callFrame('target', outer);
 
     it('descends the call path and expands what it walks through', async () => {
       const deep = row('target');

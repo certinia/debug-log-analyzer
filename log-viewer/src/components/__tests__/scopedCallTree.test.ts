@@ -14,7 +14,7 @@ interface FakeEvent {
   children: FakeEvent[];
 }
 
-function ev(
+function timedFrame(
   eventIndex: number,
   type: string,
   text: string,
@@ -34,11 +34,14 @@ function ev(
 }
 
 // exec → m1 → m2 → soql (200ms leaf), no branches.
-const root = ev(0, 'ROOT', 'root', { total: 500, self: 0 });
-const exec = ev(1, 'CODE_UNIT_STARTED', 'exec', { total: 500, self: 0 });
-const m1 = ev(2, 'METHOD_ENTRY', 'm1', { total: 500, self: 0 });
-const m2 = ev(3, 'METHOD_ENTRY', 'm2', { total: 500, self: 0 });
-const soql = ev(4, 'SOQL_EXECUTE_BEGIN', 'SELECT Id FROM Account', { total: 200, self: 200 });
+const root = timedFrame(0, 'ROOT', 'root', { total: 500, self: 0 });
+const exec = timedFrame(1, 'CODE_UNIT_STARTED', 'exec', { total: 500, self: 0 });
+const m1 = timedFrame(2, 'METHOD_ENTRY', 'm1', { total: 500, self: 0 });
+const m2 = timedFrame(3, 'METHOD_ENTRY', 'm2', { total: 500, self: 0 });
+const soql = timedFrame(4, 'SOQL_EXECUTE_BEGIN', 'SELECT Id FROM Account', {
+  total: 200,
+  self: 200,
+});
 root.children = [exec];
 exec.parent = root;
 exec.children = [m1];
@@ -116,14 +119,14 @@ function build(eventIndex: number, instances?: number[]) {
 /** A statement called from a loop: `count` occurrences of the same frame, each
  *  with its own small subtree. Returns their eventIndexes. */
 function loopOccurrences(count: number): number[] {
-  const loop = ev(300, 'METHOD_ENTRY', 'loop', { total: count, self: 0 });
+  const loop = timedFrame(300, 'METHOD_ENTRY', 'loop', { total: count, self: 0 });
   loop.parent = root;
   byId.set(loop.eventIndex, loop);
 
   const instances: number[] = [];
   let nextId = 301;
   for (let i = 0; i < count; i++) {
-    const call = ev(nextId++, 'SOQL_EXECUTE_BEGIN', 'SELECT Id FROM Account', {
+    const call = timedFrame(nextId++, 'SOQL_EXECUTE_BEGIN', 'SELECT Id FROM Account', {
       total: 1,
       self: 1,
     });
@@ -142,8 +145,8 @@ function types(rows: readonly ScopedRow[]): string[] {
 
 /** A limit block under m2, with the limit line it holds. Undone by the caller. */
 function limitBlockUnderM2(): () => void {
-  const block = ev(400, 'CUMULATIVE_LIMIT_USAGE', 'LIMIT_USAGE', { total: 3, self: 3 });
-  const line = ev(401, 'LIMIT_USAGE_FOR_NS', '(default)', { total: 0, self: 0 });
+  const block = timedFrame(400, 'CUMULATIVE_LIMIT_USAGE', 'LIMIT_USAGE', { total: 3, self: 3 });
+  const line = timedFrame(401, 'LIMIT_USAGE_FOR_NS', '(default)', { total: 0, self: 0 });
   block.parent = m2;
   block.children = [line];
   line.parent = block;
@@ -211,10 +214,10 @@ describe('buildScopedCallTree', () => {
   });
 
   it('drops zero-duration bookkeeping rows, keeping those with timed descendants', async () => {
-    const scope = ev(200, 'METHOD_ENTRY', 'scope', { total: 50, self: 0 });
-    const heap = ev(201, 'HEAP_ALLOCATE', 'Bytes:8', { total: 0, self: 0 });
-    const statement = ev(202, 'STATEMENT_EXECUTE', '[12]', { total: 0, self: 0 });
-    const timed = ev(203, 'METHOD_ENTRY', 'timed', { total: 50, self: 50 });
+    const scope = timedFrame(200, 'METHOD_ENTRY', 'scope', { total: 50, self: 0 });
+    const heap = timedFrame(201, 'HEAP_ALLOCATE', 'Bytes:8', { total: 0, self: 0 });
+    const statement = timedFrame(202, 'STATEMENT_EXECUTE', '[12]', { total: 0, self: 0 });
+    const timed = timedFrame(203, 'METHOD_ENTRY', 'timed', { total: 50, self: 50 });
     scope.parent = root;
     scope.children = [heap, statement];
     heap.parent = scope;
@@ -260,7 +263,7 @@ describe('buildScopedCallTree', () => {
   });
 
   it('keeps the selection itself even when it has no duration', async () => {
-    const scope = ev(210, 'VARIABLE_SCOPE_BEGIN', 'scope', { total: 0, self: 0 });
+    const scope = timedFrame(210, 'VARIABLE_SCOPE_BEGIN', 'scope', { total: 0, self: 0 });
     scope.parent = root;
     byId.set(scope.eventIndex, scope);
 
@@ -317,8 +320,8 @@ describe('buildScopedCallTree', () => {
   it('an aggregate of nested occurrences counts each one once', async () => {
     // A recursive frame: the outer call already holds the inner one, so taking
     // both as roots would walk the inner call twice.
-    const outer = ev(400, 'METHOD_ENTRY', 'rec', { total: 10, self: 4 });
-    const inner = ev(401, 'METHOD_ENTRY', 'rec', { total: 6, self: 6 });
+    const outer = timedFrame(400, 'METHOD_ENTRY', 'rec', { total: 10, self: 4 });
+    const inner = timedFrame(401, 'METHOD_ENTRY', 'rec', { total: 6, self: 6 });
     outer.parent = root;
     outer.children = [inner];
     inner.parent = outer;
@@ -339,9 +342,9 @@ describe('buildScopedCallTree', () => {
   it('bottom-up: a recursive frame counts the time it shares with itself once', async () => {
     // rec → work → rec. The outer call's 10 already holds the inner call's 6, so
     // the row reads 10 and not 16, while both calls' self time is its own.
-    const outer = ev(500, 'METHOD_ENTRY', 'rec', { total: 10, self: 1 });
-    const work = ev(501, 'METHOD_ENTRY', 'work', { total: 9, self: 3 });
-    const inner = ev(502, 'METHOD_ENTRY', 'rec', { total: 6, self: 6 });
+    const outer = timedFrame(500, 'METHOD_ENTRY', 'rec', { total: 10, self: 1 });
+    const work = timedFrame(501, 'METHOD_ENTRY', 'work', { total: 9, self: 3 });
+    const inner = timedFrame(502, 'METHOD_ENTRY', 'rec', { total: 6, self: 6 });
     outer.parent = root;
     outer.children = [work];
     work.parent = outer;
@@ -363,8 +366,8 @@ describe('buildScopedCallTree', () => {
     // A code unit that calls itself as a method entry: the Call Tree tab treats
     // the two as one method, so the inner call's 6 comes off the outer call's 10
     // here too, leaving 4 + 6 rather than 10 + 6.
-    const outer = ev(510, 'CODE_UNIT_STARTED', 'rec', { total: 10, self: 1 });
-    const inner = ev(511, 'METHOD_ENTRY', 'rec', { total: 6, self: 6 });
+    const outer = timedFrame(510, 'CODE_UNIT_STARTED', 'rec', { total: 10, self: 1 });
+    const inner = timedFrame(511, 'METHOD_ENTRY', 'rec', { total: 6, self: 6 });
     outer.parent = root;
     outer.children = [inner];
     inner.parent = outer;
@@ -450,10 +453,10 @@ describe('buildScopedCallTree', () => {
   });
 
   it('materialises every child rather than capping the subtree', async () => {
-    const big = ev(100, 'METHOD_ENTRY', 'big', { total: 100, self: 0 });
+    const big = timedFrame(100, 'METHOD_ENTRY', 'big', { total: 100, self: 0 });
     big.parent = root;
     big.children = Array.from({ length: 5 }, (_unused, i) =>
-      ev(1_000 + i, 'METHOD_ENTRY', `kid${i}`, { total: 1, self: 1 }),
+      timedFrame(1_000 + i, 'METHOD_ENTRY', `kid${i}`, { total: 1, self: 1 }),
     );
     for (const kid of big.children) {
       kid.parent = big;
@@ -502,7 +505,10 @@ describe('buildWholeLogCallTree', () => {
     }
   });
   it('leaves out a profiling block the log left at the top level', async () => {
-    const profiling = ev(500, 'CUMULATIVE_PROFILING_BEGIN', 'profiling', { total: 2, self: 2 });
+    const profiling = timedFrame(500, 'CUMULATIVE_PROFILING_BEGIN', 'profiling', {
+      total: 2,
+      self: 2,
+    });
     profiling.parent = root;
     root.children.push(profiling);
     byId.set(profiling.eventIndex, profiling);
@@ -545,8 +551,8 @@ describe('holds', () => {
   it('leaves out a frame at the same bucket path elsewhere in the log', async () => {
     // A second call of the same method, which a loop or a trigger makes common:
     // its rows would be named by the same path as the selection's.
-    const twin = ev(500, 'METHOD_ENTRY', 'm2', { total: 200, self: 0 });
-    const twinLeaf = ev(501, 'SOQL_EXECUTE_BEGIN', 'SELECT Id FROM Account', {
+    const twin = timedFrame(500, 'METHOD_ENTRY', 'm2', { total: 200, self: 0 });
+    const twinLeaf = timedFrame(501, 'SOQL_EXECUTE_BEGIN', 'SELECT Id FROM Account', {
       total: 200,
       self: 200,
     });

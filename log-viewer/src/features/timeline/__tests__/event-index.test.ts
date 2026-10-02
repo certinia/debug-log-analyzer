@@ -14,32 +14,14 @@
 import { describe, expect, it } from '@jest/globals';
 import type { LogEvent } from '@apexdevtools/apex-log-parser';
 
+import { timelineEvent } from '#test-helpers/timeline.js';
 import { makeViewport } from '#test-helpers/viewport.js';
 import { TimelineEventIndex } from '../optimised/TimelineEventIndex.js';
 
 describe('TimelineEventIndex', () => {
-  /**
-   * Helper to create a mock LogEvent with duration
-   */
-  function createEvent(timestamp: number, duration: number, children: LogEvent[] = []): LogEvent {
-    return {
-      timestamp,
-      exitStamp: timestamp + duration,
-      duration: {
-        total: duration,
-        exclusive: duration,
-      },
-      children,
-      text: `Event at ${timestamp}`,
-      lineNumber: 0,
-      category: 'Method',
-      subcategory: 'Method',
-    } as unknown as LogEvent;
-  }
-
   describe('initialization and metadata', () => {
     it('should calculate max depth correctly for flat events', () => {
-      const events = [createEvent(0, 100), createEvent(200, 100), createEvent(400, 100)];
+      const events = [timelineEvent(0, 100), timelineEvent(200, 100), timelineEvent(400, 100)];
 
       const index = new TimelineEventIndex(events);
 
@@ -47,8 +29,8 @@ describe('TimelineEventIndex', () => {
     });
 
     it('should calculate max depth correctly for nested events', () => {
-      const child = createEvent(50, 20);
-      const parent = createEvent(0, 100, [child]);
+      const child = timelineEvent(50, 20);
+      const parent = timelineEvent(0, 100, 'Apex', [child]);
       const events = [parent];
 
       const index = new TimelineEventIndex(events);
@@ -57,10 +39,10 @@ describe('TimelineEventIndex', () => {
     });
 
     it('should calculate max depth correctly for deeply nested events', () => {
-      const level3 = createEvent(30, 10);
-      const level2 = createEvent(20, 40, [level3]);
-      const level1 = createEvent(10, 60, [level2]);
-      const level0 = createEvent(0, 100, [level1]);
+      const level3 = timelineEvent(30, 10);
+      const level2 = timelineEvent(20, 40, 'Apex', [level3]);
+      const level1 = timelineEvent(10, 60, 'Apex', [level2]);
+      const level0 = timelineEvent(0, 100, 'Apex', [level1]);
       const events = [level0];
 
       const index = new TimelineEventIndex(events);
@@ -69,7 +51,7 @@ describe('TimelineEventIndex', () => {
     });
 
     it('should calculate total duration correctly', () => {
-      const events = [createEvent(0, 100), createEvent(200, 150), createEvent(500, 200)];
+      const events = [timelineEvent(0, 100), timelineEvent(200, 150), timelineEvent(500, 200)];
 
       const index = new TimelineEventIndex(events);
 
@@ -81,7 +63,7 @@ describe('TimelineEventIndex', () => {
   describe('findEventAtPosition - binary search', () => {
     it('should find event at correct position with zoom=1', () => {
       // Events: [0-100], [200-300], [400-500]
-      const events = [createEvent(0, 100), createEvent(200, 100), createEvent(400, 100)];
+      const events = [timelineEvent(0, 100), timelineEvent(200, 100), timelineEvent(400, 100)];
 
       const index = new TimelineEventIndex(events);
       const viewport = makeViewport();
@@ -95,7 +77,7 @@ describe('TimelineEventIndex', () => {
 
     it('should find event at correct position with zoom > 1', () => {
       // Events: [0-100], [200-300], [400-500]
-      const events = [createEvent(0, 100), createEvent(200, 100), createEvent(400, 100)];
+      const events = [timelineEvent(0, 100), timelineEvent(200, 100), timelineEvent(400, 100)];
 
       const index = new TimelineEventIndex(events);
       const viewport = makeViewport({ zoom: 2 }); // 2x zoom
@@ -109,7 +91,7 @@ describe('TimelineEventIndex', () => {
 
     it('should find event at correct position with pan offset', () => {
       // Events: [0-100], [200-300], [400-500]
-      const events = [createEvent(0, 100), createEvent(200, 100), createEvent(400, 100)];
+      const events = [timelineEvent(0, 100), timelineEvent(200, 100), timelineEvent(400, 100)];
 
       const index = new TimelineEventIndex(events);
       const viewport = makeViewport({ offsetX: 100 }); // Pan 100px right
@@ -124,7 +106,7 @@ describe('TimelineEventIndex', () => {
 
     it('should return null when clicking between events', () => {
       // Events: [0-100], [200-300]
-      const events = [createEvent(0, 100), createEvent(200, 100)];
+      const events = [timelineEvent(0, 100), timelineEvent(200, 100)];
 
       const index = new TimelineEventIndex(events);
       const viewport = makeViewport();
@@ -136,7 +118,7 @@ describe('TimelineEventIndex', () => {
     });
 
     it('should return null when clicking before all events', () => {
-      const events = [createEvent(100, 100), createEvent(300, 100)];
+      const events = [timelineEvent(100, 100), timelineEvent(300, 100)];
 
       const index = new TimelineEventIndex(events);
       const viewport = makeViewport();
@@ -148,7 +130,7 @@ describe('TimelineEventIndex', () => {
     });
 
     it('should return null when clicking after all events', () => {
-      const events = [createEvent(0, 100), createEvent(200, 100)];
+      const events = [timelineEvent(0, 100), timelineEvent(200, 100)];
 
       const index = new TimelineEventIndex(events);
       const viewport = makeViewport();
@@ -161,7 +143,7 @@ describe('TimelineEventIndex', () => {
 
     it('should respect minimum width threshold', () => {
       // Create very small event (width < 0.05 pixels)
-      const events = [createEvent(0, 0.01)]; // 0.01ns duration
+      const events = [timelineEvent(0, 0.01)]; // 0.01ns duration
 
       const index = new TimelineEventIndex(events);
       const viewport = makeViewport(); // 1px per ns
@@ -174,7 +156,7 @@ describe('TimelineEventIndex', () => {
 
     it('should find small events when ignoring width threshold', () => {
       // Create very small event
-      const events = [createEvent(0, 0.01)]; // 0.01ns duration
+      const events = [timelineEvent(0, 0.01)]; // 0.01ns duration
 
       const index = new TimelineEventIndex(events);
       const viewport = makeViewport();
@@ -189,8 +171,8 @@ describe('TimelineEventIndex', () => {
 
   describe('findEventAtPosition - hierarchical depth search', () => {
     it('should find parent event at depth 0', () => {
-      const child = createEvent(50, 20);
-      const parent = createEvent(0, 100, [child]);
+      const child = timelineEvent(50, 20);
+      const parent = timelineEvent(0, 100, 'Apex', [child]);
       const events = [parent];
 
       const index = new TimelineEventIndex(events);
@@ -204,8 +186,8 @@ describe('TimelineEventIndex', () => {
     });
 
     it('should find child event at depth 1', () => {
-      const child = createEvent(50, 20);
-      const parent = createEvent(0, 100, [child]);
+      const child = timelineEvent(50, 20);
+      const parent = timelineEvent(0, 100, 'Apex', [child]);
       const events = [parent];
 
       const index = new TimelineEventIndex(events);
@@ -219,8 +201,8 @@ describe('TimelineEventIndex', () => {
     });
 
     it('should not find child when searching at parent depth', () => {
-      const child = createEvent(50, 20);
-      const parent = createEvent(0, 100, [child]);
+      const child = timelineEvent(50, 20);
+      const parent = timelineEvent(0, 100, 'Apex', [child]);
       const events = [parent];
 
       const index = new TimelineEventIndex(events);
@@ -234,9 +216,9 @@ describe('TimelineEventIndex', () => {
     });
 
     it('should handle deeply nested events', () => {
-      const level2 = createEvent(60, 10);
-      const level1 = createEvent(50, 30, [level2]);
-      const level0 = createEvent(0, 100, [level1]);
+      const level2 = timelineEvent(60, 10);
+      const level1 = timelineEvent(50, 30, 'Apex', [level2]);
+      const level0 = timelineEvent(0, 100, 'Apex', [level1]);
       const events = [level0];
 
       const index = new TimelineEventIndex(events);
@@ -250,8 +232,8 @@ describe('TimelineEventIndex', () => {
     });
 
     it('should return null when target depth exceeds hierarchy', () => {
-      const child = createEvent(50, 20);
-      const parent = createEvent(0, 100, [child]);
+      const child = timelineEvent(50, 20);
+      const parent = timelineEvent(0, 100, 'Apex', [child]);
       const events = [parent];
 
       const index = new TimelineEventIndex(events);
@@ -266,7 +248,7 @@ describe('TimelineEventIndex', () => {
 
   describe('findEventsInRegion - culling', () => {
     it('should find all events in visible region', () => {
-      const events = [createEvent(0, 100), createEvent(200, 100), createEvent(400, 100)];
+      const events = [timelineEvent(0, 100), timelineEvent(200, 100), timelineEvent(400, 100)];
 
       const index = new TimelineEventIndex(events);
 
@@ -284,7 +266,7 @@ describe('TimelineEventIndex', () => {
     });
 
     it('should filter out events outside time range', () => {
-      const events = [createEvent(0, 100), createEvent(200, 100), createEvent(400, 100)];
+      const events = [timelineEvent(0, 100), timelineEvent(200, 100), timelineEvent(400, 100)];
 
       const index = new TimelineEventIndex(events);
 
@@ -303,8 +285,8 @@ describe('TimelineEventIndex', () => {
     });
 
     it('should filter out events outside depth range', () => {
-      const child = createEvent(50, 20);
-      const parent = createEvent(0, 100, [child]);
+      const child = timelineEvent(50, 20);
+      const parent = timelineEvent(0, 100, 'Apex', [child]);
       const events = [parent];
 
       const index = new TimelineEventIndex(events);
@@ -325,8 +307,8 @@ describe('TimelineEventIndex', () => {
     });
 
     it('should include nested events in region', () => {
-      const child = createEvent(50, 20);
-      const parent = createEvent(0, 100, [child]);
+      const child = timelineEvent(50, 20);
+      const parent = timelineEvent(0, 100, 'Apex', [child]);
       const events = [parent];
 
       const index = new TimelineEventIndex(events);
@@ -345,7 +327,7 @@ describe('TimelineEventIndex', () => {
     });
 
     it('should return empty array when no events in region', () => {
-      const events = [createEvent(0, 100), createEvent(200, 100)];
+      const events = [timelineEvent(0, 100), timelineEvent(200, 100)];
 
       const index = new TimelineEventIndex(events);
 
@@ -364,7 +346,7 @@ describe('TimelineEventIndex', () => {
 
     it('should handle partial overlap correctly', () => {
       // Event [100-200]
-      const events = [createEvent(100, 100)];
+      const events = [timelineEvent(100, 100)];
 
       const index = new TimelineEventIndex(events);
 
@@ -392,7 +374,7 @@ describe('TimelineEventIndex', () => {
     });
 
     it('should handle multiple events at same timestamp', () => {
-      const events = [createEvent(100, 50), createEvent(100, 50), createEvent(100, 50)];
+      const events = [timelineEvent(100, 50), timelineEvent(100, 50), timelineEvent(100, 50)];
 
       const index = new TimelineEventIndex(events);
       const viewport = makeViewport();
@@ -405,7 +387,7 @@ describe('TimelineEventIndex', () => {
     });
 
     it('should handle zero-duration events', () => {
-      const events = [createEvent(100, 0)];
+      const events = [timelineEvent(100, 0)];
 
       const index = new TimelineEventIndex(events);
       const viewport = makeViewport();
@@ -418,7 +400,7 @@ describe('TimelineEventIndex', () => {
 
     it('should handle extremely large timestamps', () => {
       const largeTimestamp = 1_000_000_000_000; // 1 trillion ns
-      const events = [createEvent(largeTimestamp, 1000)];
+      const events = [timelineEvent(largeTimestamp, 1000)];
 
       const index = new TimelineEventIndex(events);
 
