@@ -4,9 +4,17 @@ import {
   hasContent,
   openFileFromExplorerTree,
   webviewActiveFrame,
+  WORKBENCH,
 } from '@salesforce/playwright-vscode-ext';
 
 import { LOG_FILE_NAME } from './logWorkspace';
+
+// Not waitForVSCodeWorkbench: it loads a bare `/`, and only the URL payload can set skipWelcome.
+export const openWorkbench = async (page: Page): Promise<void> => {
+  const payload = encodeURIComponent(JSON.stringify([['skipWelcome', 'true']]));
+  await page.goto(`/?payload=${payload}`, { waitUntil: 'domcontentloaded' });
+  await expect(page.locator(WORKBENCH)).toBeVisible({ timeout: 60_000 });
+};
 
 export const assertLogAnalysisRenders = async (page: Page): Promise<void> => {
   const analysis = await webviewActiveFrame(page, hasContent('log-viewer'), {
