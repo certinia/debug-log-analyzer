@@ -7,11 +7,21 @@ import type { GovernorLimits } from '@apexdevtools/apex-log-parser/types';
 import { governorLimits, limitValue } from '#test-helpers/limits.js';
 
 import {
-  governorCost,
+  costLimitsOf,
   governorCostBreakdown,
-  governorCostMax,
+  setGovernorCost,
   type GovernorCostRow,
 } from '../GovernorCost.js';
+
+function governorCost(r: GovernorCostRow, l: GovernorLimits): number | null {
+  setGovernorCost(r, costLimitsOf(l));
+  return r.governorCost;
+}
+
+function governorCostMax(r: GovernorCostRow, l: GovernorLimits): number | null {
+  setGovernorCost(r, costLimitsOf(l));
+  return r.governorCostMax;
+}
 
 function limits(overrides: Record<string, number> = {}): GovernorLimits {
   return governorLimits({
@@ -108,6 +118,34 @@ describe('governorCostMax', () => {
 
   it('is 0 when nothing is consumed', () => {
     expect(governorCostMax(row(), limits())).toBe(0);
+  });
+});
+
+describe('setGovernorCost', () => {
+  it('sets the average and the tightest governor from the limits read once', () => {
+    const r = row({ soql: 90, dml: 15, heap: 3000000 });
+    setGovernorCost(r, costLimitsOf(limits()));
+    expect(r.governorCost).toBeCloseTo(150 / REPORTED_GOVERNORS, 5);
+    expect(r.governorCostMax).toBeCloseTo(90, 5);
+  });
+
+  it('sets both to null when the log reported no limits', () => {
+    const r = row({ soql: 50 });
+    setGovernorCost(
+      r,
+      costLimitsOf(
+        limits({
+          soqlQueries: 0,
+          dmlStatements: 0,
+          soslQueries: 0,
+          queryRows: 0,
+          dmlRows: 0,
+          heapSize: 0,
+        }),
+      ),
+    );
+    expect(r.governorCost).toBeNull();
+    expect(r.governorCostMax).toBeNull();
   });
 });
 
