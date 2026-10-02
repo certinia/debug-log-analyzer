@@ -257,90 +257,61 @@ describe('computeLogDiagnostics', () => {
     expect(found?.message).toContain('11 statements');
   });
 
-  it('stays quiet when no rows were counted: the evidence is absent, not one row', async () => {
-    log = apexLog({
-      eventsById: Array.from({ length: 5 }, (_, index) =>
-        soql({
-          eventIndex: index,
-          lineNumber: 40 + index,
-          text: dynamicSoql(index),
-          soqlRowCount: { self: 0, total: 0 },
-        } as Partial<LogEvent>),
-      ),
-    });
-
-    const { diagnostics } = await computeLogDiagnostics();
-    expect(diagnostics.some((d) => d.id.startsWith('row-at-a-time|'))).toBe(false);
-  });
-
-  it('keeps one query built per record quiet when each returns many rows', async () => {
-    log = apexLog({
-      eventsById: Array.from({ length: 6 }, (_, index) =>
-        soql({
-          eventIndex: index,
-          lineNumber: 10 + index,
-          text: `SELECT Id FROM Account WHERE Name = 'Acme ${index}'`,
-          soqlRowCount: { self: 200, total: 200 },
-        } as Partial<LogEvent>),
-      ),
-    });
-
-    const { diagnostics } = await computeLogDiagnostics();
-    expect(diagnostics.some((d) => d.id.startsWith('row-at-a-time|'))).toBe(false);
-  });
-
-  it('leaves a bulkified query to the repeated-statement rules', async () => {
-    log = apexLog({
-      eventsById: Array.from({ length: 6 }, (_, index) =>
-        soql({
-          eventIndex: index,
-          lineNumber: 42,
-          // A compiled bind logs as its name, so every call shares one text.
-          text: 'SELECT Id FROM Account WHERE Id IN :idSet',
-          soqlRowCount: { self: 200, total: 200 },
-        } as Partial<LogEvent>),
-      ),
-    });
-
-    const { diagnostics } = await computeLogDiagnostics();
-    expect(diagnostics.some((d) => d.id.startsWith('repeat-line|'))).toBe(true);
-    expect(diagnostics.some((d) => d.id.startsWith('row-at-a-time|'))).toBe(false);
-  });
-
-  it('leaves statements from one line to the per-line rule', async () => {
+  // A bound variable logs as its name; a query built as a string carries the record's values.
+  it.each<[string, (i: number) => number, (i: number) => string, number, string[]]>([
+    ['no rows counted: the evidence is absent, not one row', (i) => 40 + i, dynamicSoql, 0, []],
+    [
+      'one query built per record returning many rows',
+      (i) => 10 + i,
+      (i) => `SELECT Id FROM Account WHERE Name = 'Acme ${i}'`,
+      200,
+      [],
+    ],
+    [
+      'a bulkified query',
+      () => 42,
+      () => 'SELECT Id FROM Account WHERE Id IN :idSet',
+      200,
+      ['repeat-line'],
+    ],
+    [
+      'one statement from one line',
+      () => 42,
+      () => 'SELECT Id FROM Account WHERE Id = :id LIMIT 1',
+      1,
+      ['repeat-line'],
+    ],
+    [
+      'one statement from several lines',
+      (i) => 40 + i,
+      () => 'SELECT Id FROM Account WHERE Id = :id LIMIT 1',
+      1,
+      ['repeat-text'],
+    ],
+    [
+      'a loop on one line whose text carries the record values',
+      () => 42,
+      (i) => dynamicSoql(i, 'Account'),
+      1,
+      ['row-at-a-time'],
+    ],
+  ])('raises the right repetition rule for %s', async (_name, line, text, rows, expected) => {
     log = apexLog({
       eventsById: Array.from({ length: 6 }, (_, index) =>
         soql({
           eventIndex: index,
-          lineNumber: 42,
-          text: 'SELECT Id FROM Account WHERE Id = :id LIMIT 1',
-          soqlRowCount: { self: 1, total: 1 },
+          lineNumber: line(index),
+          text: text(index),
+          soqlRowCount: { self: rows, total: rows },
         } as Partial<LogEvent>),
       ),
     });
 
     const { diagnostics } = await computeLogDiagnostics();
-    expect(diagnostics.some((d) => d.id.startsWith('repeat-line|'))).toBe(true);
-    expect(diagnostics.some((d) => d.id.startsWith('row-at-a-time|'))).toBe(false);
-  });
-
-  it('reports a loop on one line whose query text carries the record values', async () => {
-    log = apexLog({
-      eventsById: Array.from({ length: 6 }, (_, index) =>
-        soql({
-          eventIndex: index,
-          lineNumber: 42,
-          text: dynamicSoql(index, 'Account'),
-          soqlRowCount: { self: 1, total: 1 },
-        } as Partial<LogEvent>),
-      ),
-    });
-
-    const { diagnostics } = await computeLogDiagnostics();
-    // Every text differs, so neither repetition rule sees the loop.
-    expect(diagnostics.some((d) => d.id.startsWith('repeat-line|'))).toBe(false);
-    expect(diagnostics.some((d) => d.id.startsWith('repeat-text|'))).toBe(false);
-    expect(diagnostics.some((d) => d.id.startsWith('row-at-a-time|'))).toBe(true);
+    const raised = ['repeat-line', 'repeat-text', 'row-at-a-time'].filter((rule) =>
+      diagnostics.some((d) => d.id.startsWith(`${rule}|`)),
+    );
+    expect(raised).toEqual(expected);
   });
 
   it('counts one line in two classes as two call sites', async () => {
@@ -383,23 +354,6 @@ describe('computeLogDiagnostics', () => {
     expect(repeats[0]?.message).toContain(
       'Possible SOQL in a loop: it executed 6 times from Class.A.run().',
     );
-  });
-
-  it('leaves one identical statement from several lines to the repeated-statement rule', async () => {
-    log = apexLog({
-      eventsById: Array.from({ length: 6 }, (_, index) =>
-        soql({
-          eventIndex: index,
-          lineNumber: 40 + index,
-          text: 'SELECT Id FROM Account WHERE Id = :id LIMIT 1',
-          soqlRowCount: { self: 1, total: 1 },
-        } as Partial<LogEvent>),
-      ),
-    });
-
-    const { diagnostics } = await computeLogDiagnostics();
-    expect(diagnostics.some((d) => d.id.startsWith('repeat-text|'))).toBe(true);
-    expect(diagnostics.some((d) => d.id.startsWith('row-at-a-time|'))).toBe(false);
   });
 
   it('runs the SOQL rules once per distinct query and carries the count', async () => {
@@ -755,29 +709,24 @@ describe('scopeDiagnostics', () => {
     log = null;
   });
 
-  it('keeps a finding whose events are below the selection', async () => {
+  // The log figures stay, so a scoped share still reads against the whole log.
+  it('keeps a finding whose events are below the selection, and the log figures', async () => {
     const result = await repeatsUnderAMethod();
     expect(result.diagnostics.length).toBeGreaterThan(0);
 
     const scoped = scopeDiagnostics(result, [0]);
     expect(scoped.diagnostics).toEqual(result.diagnostics);
-  });
-
-  it('drops a finding the selection never reached', async () => {
-    const result = await repeatsUnderAMethod();
-    // A sibling frame: nothing the findings name is inside it.
-    expect(scopeDiagnostics(result, [42]).diagnostics).toEqual([]);
-  });
-
-  it('keeps the log figures, so a scoped share still reads against the whole log', async () => {
-    const result = await repeatsUnderAMethod();
-    const scoped = scopeDiagnostics(result, [0]);
     expect(scoped.logNs).toBe(result.logNs);
     expect(scoped.lintedQueries).toEqual(result.lintedQueries);
   });
 
-  it('scopes to nothing when no occurrences are given', async () => {
+  it.each([
+    // A sibling frame: nothing the findings name is inside it.
+    ['a selection the findings never reached', [42]],
+    ['no occurrences', []],
+  ])('scopes to nothing for %s', async (_name, occurrences) => {
     const result = await repeatsUnderAMethod();
-    expect(scopeDiagnostics(result, []).diagnostics).toEqual([]);
+
+    expect(scopeDiagnostics(result, occurrences).diagnostics).toEqual([]);
   });
 });

@@ -187,36 +187,9 @@ describe('FrameTooltipRenderer', () => {
     jest.useRealTimers();
   });
 
-  describe('initialization', () => {
-    it('should create tooltip element in container', () => {
-      const tooltip = tooltipEl();
-
-      expect(tooltip).not.toBeNull();
-      expect(tooltip instanceof HTMLElement).toBe(true);
-    });
-
-    it('should initialize tooltip as hidden', () => {
-      expect(tooltipEl().dataset.visible).toBeUndefined();
-    });
-
-    it('should apply default options', () => {
-      showSettled(tooltipEvent(0, 100), cursorAnchor(100, 100));
-
-      expect(tooltipEl().dataset.visible).toBe('true');
-    });
-
-    it('should accept custom options', () => {
-      frameTooltipRenderer.destroy();
-
-      frameTooltipRenderer = new FrameTooltipRenderer(container, {
-        categoryColors: { Apex: '#88ae58' },
-        cursorOffset: 20,
-      });
-
-      showSettled(tooltipEvent(0, 100), cursorAnchor(100, 100));
-
-      expect(tooltipEl().dataset.visible).toBe('true');
-    });
+  it('creates the tooltip element hidden', () => {
+    expect(tooltipEl()).toBeInstanceOf(HTMLElement);
+    expect(tooltipEl().dataset.visible).toBeUndefined();
   });
 
   describe('show and hide timing', () => {
@@ -341,19 +314,13 @@ describe('FrameTooltipRenderer', () => {
   });
 
   describe('content generation', () => {
-    it('should display event type', () => {
-      showSettled(tooltipEvent(0, 100, 'MyCustomEvent'), cursorAnchor(100, 100));
-
-      expect(tooltipEl().textContent).toContain('MyCustomEvent');
-    });
-
     it('should display event text', () => {
-      const event = tooltipEvent(0, 100, 'Event', 'SOQL');
-      event.text = 'SOQL query execution';
+      const event = tooltipEvent(0, 100);
+      event.text = 'Custom event description';
 
       showSettled(event, cursorAnchor(100, 100));
 
-      expect(tooltipEl().textContent).toContain('SOQL query execution');
+      expect(tooltipEl().textContent).toContain('Custom event description');
     });
 
     it("should lead with the duration and the frame's own share of it", () => {
@@ -375,13 +342,22 @@ describe('FrameTooltipRenderer', () => {
       expect(tooltipEl().textContent).not.toContain('self 1');
     });
 
-    it('should not display a Throws row when no exceptions were thrown', () => {
-      const event = tooltipEvent(0, 1_500_000);
-      event.thrownCount = { total: 0, self: 0 };
+    it.each<[string, string, Partial<TooltipOptions>, Partial<LogEvent>]>([
+      ['Throws', 'no exceptions were thrown', {}, { thrownCount: { total: 0, self: 0 } }],
+      [
+        'Heap Net',
+        'net heap is 0 (allocated then freed)',
+        {},
+        { heapAllocated: { self: 0, total: 0 } },
+      ],
+      ['Wall clock', 'the log has no startTime', { apexLog: logOf() }, {}],
+      ['Wall clock', 'there is no log', {}, {}],
+    ])('should leave out the %s row when %s', (label, _when, options, over) => {
+      rebuild(options);
 
-      showSettled(event, cursorAnchor(100, 100));
+      showSettled(Object.assign(tooltipEvent(0, 1_500_000), over), cursorAnchor(100, 100));
 
-      expect(rowValue('Throws')).toBeUndefined();
+      expect(rowValue(label)).toBeUndefined();
     });
 
     /**
@@ -424,35 +400,6 @@ describe('FrameTooltipRenderer', () => {
       expect(rowSelf('Heap Net')).toBe('self 1.6 MB');
     });
 
-    it('should not display a heap row when net heap is 0 (allocated then freed)', () => {
-      const event = tooltipEvent(0, 1_500_000);
-      event.heapAllocated = { self: 0, total: 0 };
-
-      showSettled(event, cursorAnchor(100, 100));
-
-      expect(rowValue('Heap Net')).toBeUndefined();
-    });
-
-    it('should display custom event text', () => {
-      const event = tooltipEvent(0, 100);
-      event.text = 'Custom event description';
-
-      showSettled(event, cursorAnchor(100, 100));
-
-      expect(tooltipEl().textContent).toContain('Custom event description');
-    });
-
-    it('should handle long event text', () => {
-      const event = tooltipEvent(0, 100);
-      event.text = 'A'.repeat(150); // 150 characters
-
-      showSettled(event, cursorAnchor(100, 100));
-
-      // The text is clamped by CSS, so all of it stays in the DOM.
-      expect(tooltipEl().dataset.visible).toBe('true');
-      expect(tooltipEl().textContent).toContain('A');
-    });
-
     it('should escape HTML in event data', () => {
       const event = tooltipEvent(0, 100);
       event.text = '<script>alert("xss")</script>';
@@ -465,29 +412,28 @@ describe('FrameTooltipRenderer', () => {
       expect(tooltipEl().querySelector('script')).toBeNull();
     });
 
-    it('should name the category on the identity line and paint the rail with it', () => {
+    // The category is left off for an uncategorised event, and the namespace where it is the default.
+    it.each([
+      ['Apex', '', 'Apex · Event · from line 42'],
+      ['Apex', 'default', 'Apex · Event · from line 42'],
+      ['', '', 'Event · from line 42'],
+      ['Apex', 'acme', 'Apex · Event · acme · from line 42'],
+    ])('reads category %j and namespace %j as "%s"', (category, namespace, expected) => {
+      const event = tooltipEvent(0, 100, 'Event', category);
+      event.namespace = namespace;
+
+      showSettled(event, cursorAnchor(100, 100));
+
+      expect(identity()).toBe(expected);
+    });
+
+    it("should paint the rail in the category's colour", () => {
       rebuild({ categoryColors: { Apex: '#88ae58' } });
 
       showSettled(tooltipEvent(0, 100, 'Event', 'Apex'), cursorAnchor(100, 100));
 
-      expect(identity()).toBe('Apex · Event · from line 42');
       const body = container.querySelector<HTMLElement>('.timeline-tooltip');
       expect(body?.style.borderColor).toBe('rgb(136, 174, 88)');
-    });
-
-    it('should leave the category off the identity line for an uncategorised event', () => {
-      showSettled(tooltipEvent(0, 100, 'Event', ''), cursorAnchor(100, 100));
-
-      expect(identity()).toBe('Event · from line 42');
-    });
-
-    it('should name the namespace only where it is not the default', () => {
-      const event = tooltipEvent(0, 100, 'Event', 'Apex');
-      event.namespace = 'acme';
-
-      showSettled(event, cursorAnchor(100, 100));
-
-      expect(identity()).toBe('Apex · Event · acme · from line 42');
     });
 
     it('should display wall-clock time row when apexLog has startTime', () => {
@@ -503,20 +449,6 @@ describe('FrameTooltipRenderer', () => {
       const clock = row('Wall clock');
       expect(clock?.classList.contains('tooltip-row--wide')).toBe(true);
       expect(clock?.querySelector('.tooltip-self')).toBeNull();
-    });
-
-    it('should not display wall-clock time row when apexLog has no startTime', () => {
-      rebuild({ apexLog: logOf() });
-
-      showSettled(tooltipEvent(0, 1_000_000), cursorAnchor(100, 100));
-
-      expect(rowValue('Wall clock')).toBeUndefined();
-    });
-
-    it('should not display wall-clock time row when no apexLog', () => {
-      showSettled(tooltipEvent(0, 1_000_000), cursorAnchor(100, 100));
-
-      expect(rowValue('Wall clock')).toBeUndefined();
     });
   });
 
@@ -746,15 +678,7 @@ describe('FrameTooltipRenderer', () => {
   });
 
   describe('cleanup', () => {
-    it('should remove tooltip element on destroy', () => {
-      expect(tooltipEl()).not.toBeNull();
-
-      frameTooltipRenderer.destroy();
-
-      expect(container.querySelector('#timeline-tooltip')).toBeNull();
-    });
-
-    it('should handle destroy after show', () => {
+    it('should remove the tooltip element on destroy after show', () => {
       showSettled(tooltipEvent(0, 100), cursorAnchor(100, 100));
 
       frameTooltipRenderer.destroy();
@@ -778,23 +702,21 @@ describe('FrameTooltipRenderer', () => {
   });
 
   describe('edge cases', () => {
-    it('should handle event with minimal data', () => {
-      const event = {
-        isParent: true,
-        timestamp: 0,
-        text: 'Minimal event',
-        duration: { total: 0, self: 0 },
-      } as unknown as LogEvent;
+    it.each([
+      [
+        'minimal data',
+        () =>
+          ({
+            isParent: true,
+            timestamp: 0,
+            text: 'Minimal event',
+            duration: { total: 0, self: 0 },
+          }) as unknown as LogEvent,
+      ],
+      ['zero duration', () => tooltipEvent(0, 0)],
+    ])('should show an event with %s', (_name, make) => {
+      showSettled(make(), cursorAnchor(100, 100));
 
-      showSettled(event, cursorAnchor(100, 100));
-
-      expect(tooltipEl().dataset.visible).toBe('true');
-    });
-
-    it('should handle zero duration', () => {
-      showSettled(tooltipEvent(0, 0), cursorAnchor(100, 100));
-
-      // Just check the tooltip displays - no duration shown for 0
       expect(tooltipEl().dataset.visible).toBe('true');
     });
 

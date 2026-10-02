@@ -6,196 +6,85 @@ import { describe, expect, it } from '@jest/globals';
 import type { CategoryAggregation, CategoryStats } from '../../types/flamechart.types.js';
 import { type BatchColorInfo, resolveColor } from '../BucketColorResolver.js';
 
-/**
- * Tests for BucketColorResolver - resolves bucket color from category statistics.
- *
- * Priority order: DML > SOQL > Callout > Apex > Code Unit > System > Automation > Validation
- * Tie-breakers: total duration → event count
- */
+const COLORS: Record<string, number> = {
+  Apex: 0x2b8f81,
+  'Code Unit': 0x88ae58,
+  System: 0x8d6e63,
+  Automation: 0x51a16e,
+  DML: 0xb06868,
+  SOQL: 0x6d4c7d,
+  Callout: 0xcca033,
+  Validation: 0x5c8fa6,
+};
+const BATCH_COLORS = new Map<string, BatchColorInfo>(
+  Object.entries(COLORS).map(([name, color]) => [name, { color }]),
+);
+const GRAY = 0x888888;
 
-/** Default theme colors used for test assertions. */
-const TEST_BATCH_COLORS: Map<string, BatchColorInfo> = new Map([
-  ['Apex', { color: 0x2b8f81 }],
-  ['Code Unit', { color: 0x88ae58 }],
-  ['System', { color: 0x8d6e63 }],
-  ['Automation', { color: 0x51a16e }],
-  ['DML', { color: 0xb06868 }],
-  ['SOQL', { color: 0x6d4c7d }],
-  ['Callout', { color: 0xcca033 }],
-  ['Validation', { color: 0x5c8fa6 }],
-]);
-
-// Helper to create CategoryStats
-function createCategoryStats(
-  categories: Record<string, { count: number; totalDuration: number }>,
-): CategoryStats {
-  const byCategory = new Map<string, CategoryAggregation>();
-  for (const [name, stats] of Object.entries(categories)) {
-    byCategory.set(name, stats);
-  }
+/** Each category as [count, totalDuration]. */
+function statsOf(categories: Record<string, [number, number]>): CategoryStats {
   return {
-    byCategory,
-    dominantCategory: '', // Will be calculated by resolveColor
+    byCategory: new Map<string, CategoryAggregation>(
+      Object.entries(categories).map(([name, [count, totalDuration]]) => [
+        name,
+        { count, totalDuration },
+      ]),
+    ),
+    dominantCategory: '',
   };
 }
 
-describe('BucketColorResolver', () => {
-  describe('priority order resolution', () => {
-    it('should prioritize DML over all other categories', () => {
-      const stats = createCategoryStats({
-        DML: { count: 1, totalDuration: 100 },
-        SOQL: { count: 10, totalDuration: 1000 },
-        Apex: { count: 100, totalDuration: 10000 },
-      });
-
-      const result = resolveColor(stats, TEST_BATCH_COLORS);
-
-      // DML color is #B06868 = 0xB06868
-      expect(result.color).toBe(0xb06868);
-      expect(result.dominantCategory).toBe('DML');
-    });
-
-    it('should prioritize SOQL over Apex, Code Unit, etc.', () => {
-      const stats = createCategoryStats({
-        SOQL: { count: 1, totalDuration: 100 },
-        Apex: { count: 10, totalDuration: 1000 },
-        'Code Unit': { count: 100, totalDuration: 10000 },
-      });
-
-      const result = resolveColor(stats, TEST_BATCH_COLORS);
-
-      // SOQL color is #6D4C7D = 0x6D4C7D
-      expect(result.color).toBe(0x6d4c7d);
-      expect(result.dominantCategory).toBe('SOQL');
-    });
-
-    it('should prioritize Callout over Apex, Code Unit, System', () => {
-      const stats = createCategoryStats({
-        Callout: { count: 1, totalDuration: 100 },
-        Apex: { count: 10, totalDuration: 1000 },
-        System: { count: 100, totalDuration: 10000 },
-      });
-
-      const result = resolveColor(stats, TEST_BATCH_COLORS);
-
-      // Callout color is #CCA033 = 0xCCA033
-      expect(result.color).toBe(0xcca033);
-      expect(result.dominantCategory).toBe('Callout');
-    });
-
-    it('should prioritize Apex over Code Unit, System, Automation', () => {
-      const stats = createCategoryStats({
-        Apex: { count: 1, totalDuration: 100 },
-        'Code Unit': { count: 10, totalDuration: 1000 },
-        System: { count: 100, totalDuration: 10000 },
-      });
-
-      const result = resolveColor(stats, TEST_BATCH_COLORS);
-
-      // Apex color is #2B8F81 = 0x2B8F81
-      expect(result.color).toBe(0x2b8f81);
-      expect(result.dominantCategory).toBe('Apex');
-    });
-
-    it('should prioritize System over Automation', () => {
-      const stats = createCategoryStats({
-        System: { count: 1, totalDuration: 100 },
-        Automation: { count: 10, totalDuration: 1000 },
-      });
-
-      const result = resolveColor(stats, TEST_BATCH_COLORS);
-
-      // System color is #8D6E63 = 0x8D6E63
-      expect(result.color).toBe(0x8d6e63);
-      expect(result.dominantCategory).toBe('System');
-    });
-
-    it('should prioritize Automation over Validation', () => {
-      const stats = createCategoryStats({
-        Automation: { count: 1, totalDuration: 100 },
-        Validation: { count: 10, totalDuration: 1000 },
-      });
-
-      const result = resolveColor(stats, TEST_BATCH_COLORS);
-
-      // Automation color is #51A16E = 0x51A16E
-      expect(result.color).toBe(0x51a16e);
-      expect(result.dominantCategory).toBe('Automation');
-    });
-
-    it('should return Validation color when only Validation present', () => {
-      const stats = createCategoryStats({
-        Validation: { count: 5, totalDuration: 500 },
-      });
-
-      const result = resolveColor(stats, TEST_BATCH_COLORS);
-
-      // Validation color is #5C8FA6 = 0x5C8FA6
-      expect(result.color).toBe(0x5c8fa6);
-      expect(result.dominantCategory).toBe('Validation');
+describe('resolveColor', () => {
+  // Priority wins outright, so each row gives the winner the least time and the fewest events.
+  it.each<[string, Record<string, [number, number]>, string]>([
+    ['DML over SOQL and Apex', { DML: [1, 100], SOQL: [10, 1000], Apex: [100, 10000] }, 'DML'],
+    [
+      'SOQL over Apex and Code Unit',
+      { SOQL: [1, 100], Apex: [10, 1000], 'Code Unit': [100, 10000] },
+      'SOQL',
+    ],
+    [
+      'Callout over Apex and System',
+      { Callout: [1, 100], Apex: [10, 1000], System: [100, 10000] },
+      'Callout',
+    ],
+    [
+      'Apex over Code Unit and System',
+      { Apex: [1, 100], 'Code Unit': [10, 1000], System: [100, 10000] },
+      'Apex',
+    ],
+    ['System over Automation', { System: [1, 100], Automation: [10, 1000] }, 'System'],
+    ['Automation over Validation', { Automation: [1, 100], Validation: [10, 1000] }, 'Automation'],
+    ['Validation alone', { Validation: [5, 500] }, 'Validation'],
+    [
+      'a known category over an unknown one',
+      { Unknown: [100, 10000], Automation: [1, 100] },
+      'Automation',
+    ],
+  ])('picks %s', (_name, categories, winner) => {
+    expect(resolveColor(statsOf(categories), BATCH_COLORS)).toEqual({
+      color: COLORS[winner],
+      dominantCategory: winner,
     });
   });
 
-  describe('duration tie-breaking', () => {
-    it('should use duration to break ties between same-priority categories', () => {
-      const stats = createCategoryStats({
-        Apex: { count: 5, totalDuration: 1000 },
-      });
-
-      const result = resolveColor(stats, TEST_BATCH_COLORS);
-      expect(result.dominantCategory).toBe('Apex');
+  // Only categories outside the priority list can tie on it.
+  it.each<[string, Record<string, [number, number]>, string]>([
+    ['an unknown category alone', { Unknown: [5, 500] }, 'Unknown'],
+    ['the longer of two unknown categories', { Short: [10, 100], Long: [1, 500] }, 'Long'],
+    [
+      'the busier of two unknown categories of equal time',
+      { Quiet: [1, 500], Busy: [10, 500] },
+      'Busy',
+    ],
+  ])('paints %s gray, and names it', (_name, categories, winner) => {
+    expect(resolveColor(statsOf(categories), BATCH_COLORS)).toEqual({
+      color: GRAY,
+      dominantCategory: winner,
     });
   });
 
-  describe('count tie-breaking', () => {
-    it('should use count when priority and duration are equal', () => {
-      const stats = createCategoryStats({
-        DML: { count: 10, totalDuration: 500 },
-      });
-
-      const result = resolveColor(stats, TEST_BATCH_COLORS);
-      expect(result.dominantCategory).toBe('DML');
-    });
-  });
-
-  describe('unknown category handling', () => {
-    it('should return gray color for unknown categories', () => {
-      const stats = createCategoryStats({
-        UnknownCategory: { count: 5, totalDuration: 500 },
-      });
-
-      const result = resolveColor(stats, TEST_BATCH_COLORS);
-
-      // Gray fallback is #888888 = 0x888888
-      expect(result.color).toBe(0x888888);
-      expect(result.dominantCategory).toBe('UnknownCategory');
-    });
-
-    it('should prioritize known categories over unknown ones', () => {
-      const stats = createCategoryStats({
-        UnknownCategory: { count: 100, totalDuration: 10000 },
-        Automation: { count: 1, totalDuration: 100 },
-      });
-
-      const result = resolveColor(stats, TEST_BATCH_COLORS);
-
-      // Automation is known, so it should win over unknown
-      expect(result.color).toBe(0x51a16e);
-      expect(result.dominantCategory).toBe('Automation');
-    });
-  });
-
-  describe('empty category stats', () => {
-    it('should return gray color for empty category stats', () => {
-      const stats: CategoryStats = {
-        byCategory: new Map(),
-        dominantCategory: '',
-      };
-
-      const result = resolveColor(stats, TEST_BATCH_COLORS);
-
-      expect(result.color).toBe(0x888888);
-      expect(result.dominantCategory).toBe('');
-    });
+  it('paints no categories gray, and names none', () => {
+    expect(resolveColor(statsOf({}), BATCH_COLORS)).toEqual({ color: GRAY, dominantCategory: '' });
   });
 });
