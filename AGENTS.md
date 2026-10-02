@@ -28,7 +28,7 @@ Always use pnpm.
   pre-commit gate, so `typecheck` on top of it is wasted.
 - `pnpm exec jest --selectProjects <log-viewer|lana>` — scoped tests,
   matching what CI runs per runner.
-- `pnpm prettier-format` — auto-format
+- `pnpm format` — auto-format
 
 `DEVELOPING.md` covers the rest, including the `*:fast` rolldown variants and their caveats.
 
@@ -75,7 +75,7 @@ the TS ≤6.0 API (lands in TS 7.1). Don't remove until typescript-eslint suppor
 ### Surgical changes
 
 - Every changed line traces to the request. No drive-by reformatting or renaming, since
-  `pnpm prettier-format` owns style. A bug seen in passing is mentioned, not fixed.
+  `pnpm format` owns style. A bug seen in passing is mentioned, not fixed.
 - Never hand-edit the vendored `tabulator_esm.mjs` beyond the sanctioned documented patches.
 - The root `README.md`, `CHANGELOG.md` and `LICENSE.txt` are the sources of truth. The `lana/`
   copies are build output.

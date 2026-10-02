@@ -54,7 +54,7 @@
     "test:e2e:web": "pnpm build && playwright test --config=lana/test/playwright/playwright.config.web.ts",
     "serve:web": "pnpm build && tsx lana/test/playwright/web/headlessServer.ts",
     "ci:install": "pnpm install --frozen-lockfile --prefer-offline --ignore-scripts",
-    "prettier-format": "prettier '**/*.ts' --cache --write --experimental-cli"
+    "format": "prettier '**/*.ts' --cache --write --experimental-cli"
   },
   "lint-staged": {
     "*.{ts,css,md,mdx,scss}": "prettier --cache --write --experimental-cli"
