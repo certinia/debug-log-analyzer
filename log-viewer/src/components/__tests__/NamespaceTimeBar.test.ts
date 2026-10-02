@@ -13,7 +13,13 @@ import type { NamespaceTimeBar } from '../NamespaceTimeBar.js';
 import { DEFAULT_MAX_SEGMENTS } from '../StackedTimeBar.js';
 import '../NamespaceTimeBar.js';
 import { logNamespacePalette } from '../namespacePalette.js';
-import { ev, eventByIndex, log, resetEvents, type FakeEvent } from './fixtures/logEvents.js';
+import {
+  namespaceEvent,
+  eventByIndex,
+  log,
+  resetEvents,
+  type FakeEvent,
+} from './fixtures/logEvents.js';
 
 const logOf = (children: FakeEvent[], namespaces: string[]) => {
   apexLog = log(children, namespaces);
@@ -52,7 +58,7 @@ describe('namespace-time-bar', () => {
   });
 
   it('splits the whole log by namespace, largest first', async () => {
-    logOf([ev('default', 100, [ev('pkg', 500)])], ['pkg']);
+    logOf([namespaceEvent('default', 100, [namespaceEvent('pkg', 500)])], ['pkg']);
 
     expect(segments(await mount()).map(({ label, value }) => ({ label, value }))).toEqual([
       { label: 'pkg', value: 500 },
@@ -61,8 +67,8 @@ describe('namespace-time-bar', () => {
   });
 
   it('scopes to the selected frame and everything below it', async () => {
-    const frame = ev('pkg', 40, [ev('other', 10)]);
-    logOf([ev('default', 100, [frame])], ['pkg', 'other']);
+    const frame = namespaceEvent('pkg', 40, [namespaceEvent('other', 10)]);
+    logOf([namespaceEvent('default', 100, [frame])], ['pkg', 'other']);
 
     const element = await mount({ eventIndex: frame.eventIndex });
 
@@ -73,8 +79,8 @@ describe('namespace-time-bar', () => {
   });
 
   it('sums every occurrence of an aggregate, counting a nested one once', async () => {
-    const inner = ev('pkg', 20);
-    const outer = ev('pkg', 30, [inner]);
+    const inner = namespaceEvent('pkg', 20);
+    const outer = namespaceEvent('pkg', 30, [inner]);
     logOf([outer], ['pkg']);
 
     const element = await mount({ instances: [outer.eventIndex, inner.eventIndex] });
@@ -89,7 +95,9 @@ describe('namespace-time-bar', () => {
     ).concat('nsA', 'nsB');
     // Descending self time, so the two smallest fall past the palette.
     logOf(
-      namespaces.map((namespace, index) => ev(namespace, (namespaces.length - index) * 10)),
+      namespaces.map((namespace, index) =>
+        namespaceEvent(namespace, (namespaces.length - index) * 10),
+      ),
       namespaces,
     );
 
@@ -101,7 +109,7 @@ describe('namespace-time-bar', () => {
   });
 
   it('notes a scope with no recorded time', async () => {
-    logOf([ev('pkg', 0)], ['pkg']);
+    logOf([namespaceEvent('pkg', 0)], ['pkg']);
 
     const element = await mount();
 
@@ -110,7 +118,7 @@ describe('namespace-time-bar', () => {
   });
 
   it('notes a frame the log does not hold, rather than waiting on a walk', async () => {
-    logOf([ev('pkg', 100)], ['pkg']);
+    logOf([namespaceEvent('pkg', 100)], ['pkg']);
 
     const element = await mount({ eventIndex: 99 });
 

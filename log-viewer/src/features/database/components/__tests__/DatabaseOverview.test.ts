@@ -37,7 +37,7 @@ jest.mock('../../services/databaseOverview.js', () => ({
 
 import { databaseTreeRows, ownCodeTotal, type DatabaseTreeRow } from '../DatabaseTimeTree.js';
 import '../DatabaseOverview.js';
-import { settledNote } from '../../../../components/__tests__/sectionTestUtils.js';
+import { settledNote } from '#test-helpers/sections.js';
 
 const emptyOverview = (): DatabaseOverview => ({
   time: {

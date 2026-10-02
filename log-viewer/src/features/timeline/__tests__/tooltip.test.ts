@@ -37,7 +37,7 @@ describe('FrameTooltipRenderer', () => {
   /**
    * Helper to create a mock LogEvent
    */
-  function createEvent(
+  function tooltipEvent(
     timestamp: number,
     duration: number,
     type: string = 'TestEvent',
@@ -200,7 +200,7 @@ describe('FrameTooltipRenderer', () => {
     });
 
     it('should apply default options', () => {
-      showSettled(createEvent(0, 100), cursorAnchor(100, 100));
+      showSettled(tooltipEvent(0, 100), cursorAnchor(100, 100));
 
       expect(tooltipEl().dataset.visible).toBe('true');
     });
@@ -213,7 +213,7 @@ describe('FrameTooltipRenderer', () => {
         cursorOffset: 20,
       });
 
-      showSettled(createEvent(0, 100), cursorAnchor(100, 100));
+      showSettled(tooltipEvent(0, 100), cursorAnchor(100, 100));
 
       expect(tooltipEl().dataset.visible).toBe('true');
     });
@@ -221,7 +221,7 @@ describe('FrameTooltipRenderer', () => {
 
   describe('show and hide timing', () => {
     it('should not show the tooltip before the delay expires', () => {
-      frameTooltipRenderer.show(createEvent(0, 100), cursorAnchor(100, 100));
+      frameTooltipRenderer.show(tooltipEvent(0, 100), cursorAnchor(100, 100));
 
       jest.advanceTimersByTime(SHOW_DELAY_MS - 1);
       expect(tooltipEl().dataset.visible).toBeUndefined();
@@ -231,7 +231,7 @@ describe('FrameTooltipRenderer', () => {
     });
 
     it('should never show when the pointer leaves before the delay expires', () => {
-      frameTooltipRenderer.show(createEvent(0, 100), cursorAnchor(100, 100));
+      frameTooltipRenderer.show(tooltipEvent(0, 100), cursorAnchor(100, 100));
 
       jest.advanceTimersByTime(SHOW_DELAY_MS - 20);
       frameTooltipRenderer.hide();
@@ -241,9 +241,9 @@ describe('FrameTooltipRenderer', () => {
     });
 
     it('should swap content with no delay when moving to another frame', () => {
-      const event1 = createEvent(0, 100, 'Event1');
+      const event1 = tooltipEvent(0, 100, 'Event1');
       event1.text = 'Event1';
-      const event2 = createEvent(200, 100, 'Event2');
+      const event2 = tooltipEvent(200, 100, 'Event2');
       event2.text = 'Event2';
 
       showSettled(event1, cursorAnchor(100, 100));
@@ -256,7 +256,7 @@ describe('FrameTooltipRenderer', () => {
     });
 
     it('should hide only after the grace period', () => {
-      showSettled(createEvent(0, 100), cursorAnchor(100, 100));
+      showSettled(tooltipEvent(0, 100), cursorAnchor(100, 100));
 
       frameTooltipRenderer.hide();
       jest.advanceTimersByTime(HIDE_GRACE_MS - 1);
@@ -267,7 +267,7 @@ describe('FrameTooltipRenderer', () => {
     });
 
     it('should stay visible when a show lands inside the grace period', () => {
-      const event = createEvent(0, 100);
+      const event = tooltipEvent(0, 100);
       showSettled(event, cursorAnchor(100, 100));
 
       frameTooltipRenderer.hide();
@@ -279,7 +279,7 @@ describe('FrameTooltipRenderer', () => {
     });
 
     it('should hide with no grace period on hideImmediate', () => {
-      showSettled(createEvent(0, 100), cursorAnchor(100, 100));
+      showSettled(tooltipEvent(0, 100), cursorAnchor(100, 100));
 
       frameTooltipRenderer.hideImmediate();
 
@@ -287,7 +287,7 @@ describe('FrameTooltipRenderer', () => {
     });
 
     it('should re-anchor when the frame moves under a held pointer', () => {
-      const event = createEvent(0, 100);
+      const event = tooltipEvent(0, 100);
       sizeTooltip(200, 100);
 
       showSettled(event, frameAnchor({ x: 300, y: 400, width: 100, height: 20 }));
@@ -300,7 +300,7 @@ describe('FrameTooltipRenderer', () => {
     });
 
     it('should hold its place while the context menu is open', () => {
-      const event = createEvent(0, 100);
+      const event = tooltipEvent(0, 100);
       const anchor = frameAnchor({ x: 300, y: 400, width: 400, height: 20 });
       sizeTooltip(200, 100);
 
@@ -317,13 +317,13 @@ describe('FrameTooltipRenderer', () => {
     it('should not show a tooltip while disabled', () => {
       frameTooltipRenderer.setEnabled(false);
 
-      showSettled(createEvent(0, 100), cursorAnchor(100, 100));
+      showSettled(tooltipEvent(0, 100), cursorAnchor(100, 100));
 
       expect(tooltipEl().dataset.visible).not.toBe('true');
     });
 
     it('should hide a visible tooltip at once when disabled', () => {
-      showSettled(createEvent(0, 100), cursorAnchor(100, 100));
+      showSettled(tooltipEvent(0, 100), cursorAnchor(100, 100));
 
       frameTooltipRenderer.setEnabled(false);
 
@@ -334,7 +334,7 @@ describe('FrameTooltipRenderer', () => {
       frameTooltipRenderer.setEnabled(false);
       frameTooltipRenderer.setEnabled(true);
 
-      showSettled(createEvent(0, 100), cursorAnchor(100, 100));
+      showSettled(tooltipEvent(0, 100), cursorAnchor(100, 100));
 
       expect(tooltipEl().dataset.visible).toBe('true');
     });
@@ -342,13 +342,13 @@ describe('FrameTooltipRenderer', () => {
 
   describe('content generation', () => {
     it('should display event type', () => {
-      showSettled(createEvent(0, 100, 'MyCustomEvent'), cursorAnchor(100, 100));
+      showSettled(tooltipEvent(0, 100, 'MyCustomEvent'), cursorAnchor(100, 100));
 
       expect(tooltipEl().textContent).toContain('MyCustomEvent');
     });
 
     it('should display event text', () => {
-      const event = createEvent(0, 100, 'Event', 'SOQL');
+      const event = tooltipEvent(0, 100, 'Event', 'SOQL');
       event.text = 'SOQL query execution';
 
       showSettled(event, cursorAnchor(100, 100));
@@ -358,14 +358,14 @@ describe('FrameTooltipRenderer', () => {
 
     it("should lead with the duration and the frame's own share of it", () => {
       // Timestamp: 2,000,000 ns = 2.000ms, duration: 100,000 ns = 0.1ms, self 50%.
-      showSettled(createEvent(2_000_000, 100_000), cursorAnchor(100, 100));
+      showSettled(tooltipEvent(2_000_000, 100_000), cursorAnchor(100, 100));
 
       expect(rowValue('Time')).toBe('0.1 ms');
       expect(rowSelf('Time')).toBe('self 0.05 ms');
     });
 
     it('should display a Throws row with the total (no self) when exceptions were thrown', () => {
-      const event = createEvent(0, 1_500_000);
+      const event = tooltipEvent(0, 1_500_000);
       event.thrownCount = { total: 3, self: 1 };
 
       showSettled(event, cursorAnchor(100, 100));
@@ -376,7 +376,7 @@ describe('FrameTooltipRenderer', () => {
     });
 
     it('should not display a Throws row when no exceptions were thrown', () => {
-      const event = createEvent(0, 1_500_000);
+      const event = tooltipEvent(0, 1_500_000);
       event.thrownCount = { total: 0, self: 0 };
 
       showSettled(event, cursorAnchor(100, 100));
@@ -391,7 +391,7 @@ describe('FrameTooltipRenderer', () => {
      */
     it("should read the branch against the log's own figure, not a governor limit", () => {
       rebuild({ apexLog: logOf({ soslRowCount: { total: 1000, self: 1000 } }) });
-      const event = createEvent(0, 1_500_000, 'SOSL_EXECUTE_BEGIN');
+      const event = tooltipEvent(0, 1_500_000, 'SOSL_EXECUTE_BEGIN');
       event.soslRowCount = { total: 500, self: 500 };
 
       showSettled(event, cursorAnchor(100, 100));
@@ -402,7 +402,7 @@ describe('FrameTooltipRenderer', () => {
 
     /** Spelled on every row: with no header line the figure has to name itself. */
     it('should name the self reading on every row', () => {
-      const event = createEvent(0, 1_500_000);
+      const event = tooltipEvent(0, 1_500_000);
       event.soqlCount = { total: 3, self: 1 };
       event.dmlCount = { total: 2, self: 0 };
 
@@ -413,7 +413,7 @@ describe('FrameTooltipRenderer', () => {
     });
 
     it("should read net heap compactly, with the method's own share", () => {
-      const event = createEvent(0, 1_500_000);
+      const event = tooltipEvent(0, 1_500_000);
       event.heapAllocated = { self: 1_572_864, total: 4_000_000 };
 
       showSettled(event, cursorAnchor(100, 100));
@@ -425,7 +425,7 @@ describe('FrameTooltipRenderer', () => {
     });
 
     it('should not display a heap row when net heap is 0 (allocated then freed)', () => {
-      const event = createEvent(0, 1_500_000);
+      const event = tooltipEvent(0, 1_500_000);
       event.heapAllocated = { self: 0, total: 0 };
 
       showSettled(event, cursorAnchor(100, 100));
@@ -434,7 +434,7 @@ describe('FrameTooltipRenderer', () => {
     });
 
     it('should display custom event text', () => {
-      const event = createEvent(0, 100);
+      const event = tooltipEvent(0, 100);
       event.text = 'Custom event description';
 
       showSettled(event, cursorAnchor(100, 100));
@@ -443,7 +443,7 @@ describe('FrameTooltipRenderer', () => {
     });
 
     it('should handle long event text', () => {
-      const event = createEvent(0, 100);
+      const event = tooltipEvent(0, 100);
       event.text = 'A'.repeat(150); // 150 characters
 
       showSettled(event, cursorAnchor(100, 100));
@@ -454,7 +454,7 @@ describe('FrameTooltipRenderer', () => {
     });
 
     it('should escape HTML in event data', () => {
-      const event = createEvent(0, 100);
+      const event = tooltipEvent(0, 100);
       event.text = '<script>alert("xss")</script>';
 
       showSettled(event, cursorAnchor(100, 100));
@@ -468,7 +468,7 @@ describe('FrameTooltipRenderer', () => {
     it('should name the category on the identity line and paint the rail with it', () => {
       rebuild({ categoryColors: { Apex: '#88ae58' } });
 
-      showSettled(createEvent(0, 100, 'Event', 'Apex'), cursorAnchor(100, 100));
+      showSettled(tooltipEvent(0, 100, 'Event', 'Apex'), cursorAnchor(100, 100));
 
       expect(identity()).toBe('Apex · Event · from line 42');
       const body = container.querySelector<HTMLElement>('.timeline-tooltip');
@@ -476,13 +476,13 @@ describe('FrameTooltipRenderer', () => {
     });
 
     it('should leave the category off the identity line for an uncategorised event', () => {
-      showSettled(createEvent(0, 100, 'Event', ''), cursorAnchor(100, 100));
+      showSettled(tooltipEvent(0, 100, 'Event', ''), cursorAnchor(100, 100));
 
       expect(identity()).toBe('Event · from line 42');
     });
 
     it('should name the namespace only where it is not the default', () => {
-      const event = createEvent(0, 100, 'Event', 'Apex');
+      const event = tooltipEvent(0, 100, 'Event', 'Apex');
       event.namespace = 'acme';
 
       showSettled(event, cursorAnchor(100, 100));
@@ -495,7 +495,7 @@ describe('FrameTooltipRenderer', () => {
       rebuild({ apexLog: logOf({ startTime: 37_764_600, timestamp: 6_329_577 }) });
 
       // Event at timestamp 6329577ns with duration 1,000,000ns
-      showSettled(createEvent(6329577, 1_000_000), cursorAnchor(100, 100));
+      showSettled(tooltipEvent(6329577, 1_000_000), cursorAnchor(100, 100));
 
       expect(rowValue('Wall clock')).toBe('10:29:24.600 → 10:29:24.601');
       // A clock range is wider than the figure columns, so a row inside them would run
@@ -508,13 +508,13 @@ describe('FrameTooltipRenderer', () => {
     it('should not display wall-clock time row when apexLog has no startTime', () => {
       rebuild({ apexLog: logOf() });
 
-      showSettled(createEvent(0, 1_000_000), cursorAnchor(100, 100));
+      showSettled(tooltipEvent(0, 1_000_000), cursorAnchor(100, 100));
 
       expect(rowValue('Wall clock')).toBeUndefined();
     });
 
     it('should not display wall-clock time row when no apexLog', () => {
-      showSettled(createEvent(0, 1_000_000), cursorAnchor(100, 100));
+      showSettled(tooltipEvent(0, 1_000_000), cursorAnchor(100, 100));
 
       expect(rowValue('Wall clock')).toBeUndefined();
     });
@@ -531,7 +531,7 @@ describe('FrameTooltipRenderer', () => {
     }
 
     function soqlEvent(text: string): LogEvent {
-      const event = createEvent(0, 100, 'SOQL_EXECUTE_BEGIN', 'SOQL');
+      const event = tooltipEvent(0, 100, 'SOQL_EXECUTE_BEGIN', 'SOQL');
       event.text = text;
       return event;
     }
@@ -614,7 +614,7 @@ describe('FrameTooltipRenderer', () => {
     });
 
     it('should pin the panel above the frame band', () => {
-      showSettled(createEvent(0, 100), frameAnchor({ x: 300, y: 500, width: 100, height: 20 }));
+      showSettled(tooltipEvent(0, 100), frameAnchor({ x: 300, y: 500, width: 100, height: 20 }));
 
       // Centred on the cursor, which sits at the frame's left edge here: 300 - 200 / 2.
       expect(placement().left).toBe(200);
@@ -624,14 +624,14 @@ describe('FrameTooltipRenderer', () => {
 
     it('should flip below the frame when there is no room above', () => {
       // Only 50px between the chart top and the frame, so the panel cannot fit above.
-      showSettled(createEvent(0, 100), frameAnchor({ x: 300, y: 90, width: 100, height: 20 }, 40));
+      showSettled(tooltipEvent(0, 100), frameAnchor({ x: 300, y: 90, width: 100, height: 20 }, 40));
 
       // Below the frame, with the 3px gap: 90 + 20 + 3.
       expect(placement().top).toBe(113);
     });
 
     it('should keep the side it flipped to while the frame moves under the pointer', () => {
-      const event = createEvent(0, 100);
+      const event = tooltipEvent(0, 100);
       // Room above is 3px short of the panel, so the first placement flips below.
       const rect = { x: 300, y: 100, width: 400, height: 20 };
 
@@ -647,7 +647,7 @@ describe('FrameTooltipRenderer', () => {
 
     it('should centre on the cursor rather than on the frame', () => {
       showSettled(
-        createEvent(0, 100),
+        tooltipEvent(0, 100),
         frameAnchor({ x: 100, y: 500, width: 600, height: 20 }, 0, 400),
       );
 
@@ -656,7 +656,7 @@ describe('FrameTooltipRenderer', () => {
     });
 
     it('should follow the pointer as it moves within one frame', () => {
-      const event = createEvent(0, 100);
+      const event = tooltipEvent(0, 100);
       const rect = { x: 100, y: 500, width: 600, height: 20 };
 
       showSettled(event, frameAnchor(rect, 0, 200));
@@ -669,7 +669,7 @@ describe('FrameTooltipRenderer', () => {
 
     it('should not measure the panel again for a pointer move within one frame', () => {
       const element = tooltipEl();
-      const event = createEvent(0, 100);
+      const event = tooltipEvent(0, 100);
       const rect = { x: 100, y: 500, width: 600, height: 20 };
       showSettled(event, frameAnchor(rect, 0, 200));
 
@@ -681,18 +681,18 @@ describe('FrameTooltipRenderer', () => {
       expect(measured).not.toHaveBeenCalled();
 
       // New content is a new height, so the panel is measured again.
-      frameTooltipRenderer.show(createEvent(200, 100), frameAnchor(rect, 0, 650));
+      frameTooltipRenderer.show(tooltipEvent(200, 100), frameAnchor(rect, 0, 650));
       expect(measured).toHaveBeenCalled();
     });
 
     it('should never place the panel over the minimap or metric strip', () => {
-      showSettled(createEvent(0, 100), frameAnchor({ x: 300, y: 60, width: 100, height: 20 }, 40));
+      showSettled(tooltipEvent(0, 100), frameAnchor({ x: 300, y: 60, width: 100, height: 20 }, 40));
 
       expect(placement().top).toBeGreaterThanOrEqual(40);
     });
 
     it('should keep the panel inside the container', () => {
-      showSettled(createEvent(0, 100), frameAnchor({ x: 960, y: 500, width: 40, height: 20 }));
+      showSettled(tooltipEvent(0, 100), frameAnchor({ x: 960, y: 500, width: 40, height: 20 }));
 
       const left = placement().left;
       expect(left).toBeGreaterThanOrEqual(0);
@@ -703,13 +703,13 @@ describe('FrameTooltipRenderer', () => {
       container.getBoundingClientRect = () =>
         ({ width: 150, height: 600, top: 0, left: 0, right: 150, bottom: 600 }) as DOMRect;
 
-      showSettled(createEvent(0, 100), frameAnchor({ x: 20, y: 500, width: 40, height: 20 }));
+      showSettled(tooltipEvent(0, 100), frameAnchor({ x: 20, y: 500, width: 40, height: 20 }));
 
       expect(placement().left).toBe(0);
     });
 
     it('should place below and right of the cursor when there is no frame rect', () => {
-      showSettled(createEvent(0, 100), cursorAnchor(100, 100));
+      showSettled(tooltipEvent(0, 100), cursorAnchor(100, 100));
 
       expect(placement()).toEqual({ left: 110, top: 110 });
     });
@@ -718,27 +718,27 @@ describe('FrameTooltipRenderer', () => {
       rebuild({ cursorOffset: 20 });
       sizeTooltip(200, 100);
 
-      showSettled(createEvent(0, 100), cursorAnchor(100, 100));
+      showSettled(tooltipEvent(0, 100), cursorAnchor(100, 100));
 
       expect(placement()).toEqual({ left: 120, top: 120 });
     });
 
     it('should flip to the other side of the cursor near the right and bottom edges', () => {
-      showSettled(createEvent(0, 100), cursorAnchor(950, 550));
+      showSettled(tooltipEvent(0, 100), cursorAnchor(950, 550));
 
       // Flipped: 950 - 200 - 10, and 550 - 100 - 10.
       expect(placement()).toEqual({ left: 740, top: 440 });
     });
 
     it('should clamp negative cursor coordinates to the container', () => {
-      showSettled(createEvent(0, 100), cursorAnchor(-100, -100));
+      showSettled(tooltipEvent(0, 100), cursorAnchor(-100, -100));
 
       expect(placement().left).toBeGreaterThanOrEqual(0);
       expect(placement().top).toBeGreaterThanOrEqual(0);
     });
 
     it('should clamp cursor coordinates beyond the container', () => {
-      showSettled(createEvent(0, 100), cursorAnchor(2000, 2000));
+      showSettled(tooltipEvent(0, 100), cursorAnchor(2000, 2000));
 
       expect(placement().left).toBeLessThanOrEqual(800);
       expect(placement().top).toBeLessThanOrEqual(500);
@@ -755,7 +755,7 @@ describe('FrameTooltipRenderer', () => {
     });
 
     it('should handle destroy after show', () => {
-      showSettled(createEvent(0, 100), cursorAnchor(100, 100));
+      showSettled(tooltipEvent(0, 100), cursorAnchor(100, 100));
 
       frameTooltipRenderer.destroy();
 
@@ -763,7 +763,7 @@ describe('FrameTooltipRenderer', () => {
     });
 
     it('should drop a pending show on destroy', () => {
-      frameTooltipRenderer.show(createEvent(0, 100), cursorAnchor(100, 100));
+      frameTooltipRenderer.show(tooltipEvent(0, 100), cursorAnchor(100, 100));
 
       frameTooltipRenderer.destroy();
 
@@ -792,7 +792,7 @@ describe('FrameTooltipRenderer', () => {
     });
 
     it('should handle zero duration', () => {
-      showSettled(createEvent(0, 0), cursorAnchor(100, 100));
+      showSettled(tooltipEvent(0, 0), cursorAnchor(100, 100));
 
       // Just check the tooltip displays - no duration shown for 0
       expect(tooltipEl().dataset.visible).toBe('true');
@@ -800,7 +800,7 @@ describe('FrameTooltipRenderer', () => {
 
     it('should handle very large durations', () => {
       // 1 second = 1,000,000,000 ns
-      showSettled(createEvent(0, 1_000_000_000), cursorAnchor(100, 100));
+      showSettled(tooltipEvent(0, 1_000_000_000), cursorAnchor(100, 100));
 
       // Should show duration in seconds or milliseconds
       expect(tooltipEl().textContent).toMatch(/\d+\s*(s|ms)/);
@@ -808,7 +808,7 @@ describe('FrameTooltipRenderer', () => {
   });
   describe('the group rule', () => {
     it('rules the first group, parting the identity from the readings', () => {
-      showSettled(createEvent(0, 100), cursorAnchor(100, 100));
+      showSettled(tooltipEvent(0, 100), cursorAnchor(100, 100));
 
       expect(tooltipEl().querySelectorAll('.tooltip-group--ruled')).toHaveLength(1);
     });

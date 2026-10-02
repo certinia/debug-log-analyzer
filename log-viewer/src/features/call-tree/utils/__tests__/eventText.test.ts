@@ -3,7 +3,7 @@
  */
 import { describe, expect, it } from '@jest/globals';
 import { createEvent } from '#test-helpers/events.js';
-import { governorLimits, limitValue } from '../../../../components/__tests__/limitsTestUtils.js';
+import { governorLimits, limitValue } from '#test-helpers/limits.js';
 import { eventLabel, eventName, formatCallStack, formatEventDetails } from '../eventText.js';
 
 const limits = governorLimits({

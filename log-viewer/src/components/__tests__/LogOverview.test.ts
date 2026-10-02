@@ -8,7 +8,7 @@ import { beforeEach, describe, expect, it } from '@jest/globals';
 
 import type { LogStore } from '../../core/log/LogStore.js';
 import type { HeatStripTimeSeries } from '../../features/timeline/types/flamechart.types.js';
-import { governorLimits, seriesEvent, timeSeries } from './limitsTestUtils.js';
+import { governorLimits, seriesEvent, timeSeries } from '#test-helpers/limits.js';
 
 // The metric strip's series, which the overview always reads its gauges from
 // so they match the timeline and the trend charts.

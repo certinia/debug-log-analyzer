@@ -20,7 +20,7 @@ jest.mock('../../services/rowBudget.js', () => ({
 }));
 
 import '../DatabaseRowBudget.js';
-import { settledNote } from '../../../../components/__tests__/sectionTestUtils.js';
+import { settledNote } from '#test-helpers/sections.js';
 
 const full = (): RowBudgets => ({
   budgets: [

@@ -9,7 +9,7 @@ import {
   metricSparkline,
   seriesGauges,
 } from '../logOverviewMetrics.js';
-import { emptyLimits, limitValue, seriesEvent, timeSeries } from './limitsTestUtils.js';
+import { emptyLimits, limitValue, seriesEvent, timeSeries } from '#test-helpers/limits.js';
 
 describe('limitTotals', () => {
   it('reads every metric as it rises', () => {

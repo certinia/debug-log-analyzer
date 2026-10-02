@@ -13,86 +13,11 @@
  */
 import { beforeEach, describe, expect, it } from '@jest/globals';
 
+import { buildMapsFromNodes, createNode, eventNode } from '#test-helpers/navigation.js';
 import { TreeNavigator } from '../optimised/selection/TreeNavigator.js';
 import type { EventNode, TreeNode } from '../types/flamechart.types.js';
-import type { NavigationMaps } from '../utils/tree-converter.js';
 
 describe('TreeNavigator', () => {
-  /**
-   * Helper to create a mock EventNode
-   */
-  function createEvent(id: string, text: string = `Event ${id}`): EventNode {
-    return {
-      id,
-      timestamp: parseInt(id) * 1000,
-      duration: 1000,
-      type: 'METHOD_ENTRY',
-      text,
-    };
-  }
-
-  /**
-   * Helper to create a TreeNode wrapping an EventNode
-   */
-  function createNode(
-    event: EventNode,
-    children?: TreeNode<EventNode>[],
-    depth = 0,
-  ): TreeNode<EventNode> {
-    return {
-      data: event,
-      children,
-      depth,
-    };
-  }
-
-  /**
-   * Helper to build NavigationMaps from root nodes (for testing).
-   * Mimics what logEventToTreeNode does during production.
-   */
-  function buildMapsFromNodes(rootNodes: TreeNode<EventNode>[]): NavigationMaps {
-    const maps: NavigationMaps = {
-      originalMap: new Map(),
-      nodeMap: new Map(),
-      parentMap: new Map(),
-      siblingMap: new Map(),
-      depthMap: new Map(),
-      depthLookup: new Map(),
-    };
-
-    function processNode(
-      node: TreeNode<EventNode>,
-      parent: TreeNode<EventNode> | null,
-      siblings: TreeNode<EventNode>[],
-      siblingIndex: number,
-    ): void {
-      const depth = node.depth ?? 0;
-      maps.nodeMap.set(node.data.id, node);
-      maps.parentMap.set(node.data.id, parent);
-      maps.siblingMap.set(node.data.id, { index: siblingIndex, siblings });
-      maps.depthLookup.set(node.data.id, depth);
-
-      let nodesAtDepth = maps.depthMap.get(depth);
-      if (!nodesAtDepth) {
-        nodesAtDepth = [];
-        maps.depthMap.set(depth, nodesAtDepth);
-      }
-      nodesAtDepth.push(node);
-
-      if (node.children) {
-        for (let i = 0; i < node.children.length; i++) {
-          processNode(node.children[i]!, node, node.children, i);
-        }
-      }
-    }
-
-    for (let i = 0; i < rootNodes.length; i++) {
-      processNode(rootNodes[i]!, null, rootNodes, i);
-    }
-
-    return maps;
-  }
-
   describe('basic tree structure', () => {
     // Tree structure:
     //   root1 (id: 1)
@@ -109,11 +34,11 @@ describe('TreeNavigator', () => {
     let grandchild1: TreeNode<EventNode>;
 
     beforeEach(() => {
-      grandchild1 = createNode(createEvent('111'), undefined, 2);
-      child1 = createNode(createEvent('11'), [grandchild1], 1);
-      child2 = createNode(createEvent('12'), undefined, 1);
-      root1 = createNode(createEvent('1'), [child1, child2], 0);
-      root2 = createNode(createEvent('2'), undefined, 0);
+      grandchild1 = createNode(eventNode('111'), undefined, 2);
+      child1 = createNode(eventNode('11'), [grandchild1], 1);
+      child2 = createNode(eventNode('12'), undefined, 1);
+      root1 = createNode(eventNode('1'), [child1, child2], 0);
+      root2 = createNode(eventNode('2'), undefined, 0);
 
       const rootNodes = [root1, root2];
       navigator = new TreeNavigator(rootNodes, buildMapsFromNodes(rootNodes));
@@ -222,7 +147,7 @@ describe('TreeNavigator', () => {
     });
 
     it('should handle single node tree', () => {
-      const singleNode = createNode(createEvent('1'));
+      const singleNode = createNode(eventNode('1'));
       const rootNodes = [singleNode];
       const navigator = new TreeNavigator(rootNodes, buildMapsFromNodes(rootNodes));
 
@@ -234,7 +159,7 @@ describe('TreeNavigator', () => {
     });
 
     it('should handle nodes with empty children array', () => {
-      const nodeWithEmptyChildren = createNode(createEvent('1'), []);
+      const nodeWithEmptyChildren = createNode(eventNode('1'), []);
       const rootNodes = [nodeWithEmptyChildren];
       const navigator = new TreeNavigator(rootNodes, buildMapsFromNodes(rootNodes));
 
@@ -243,11 +168,11 @@ describe('TreeNavigator', () => {
 
     it('should handle deep nesting', () => {
       // Create a deep chain: 1 -> 2 -> 3 -> 4 -> 5
-      const level5 = createNode(createEvent('5'), undefined, 4);
-      const level4 = createNode(createEvent('4'), [level5], 3);
-      const level3 = createNode(createEvent('3'), [level4], 2);
-      const level2 = createNode(createEvent('2'), [level3], 1);
-      const level1 = createNode(createEvent('1'), [level2], 0);
+      const level5 = createNode(eventNode('5'), undefined, 4);
+      const level4 = createNode(eventNode('4'), [level5], 3);
+      const level3 = createNode(eventNode('3'), [level4], 2);
+      const level2 = createNode(eventNode('2'), [level3], 1);
+      const level1 = createNode(eventNode('1'), [level2], 0);
 
       const rootNodes = [level1];
       const navigator = new TreeNavigator(rootNodes, buildMapsFromNodes(rootNodes));
@@ -268,10 +193,10 @@ describe('TreeNavigator', () => {
     });
 
     it('should handle multiple siblings at same level', () => {
-      const sibling1 = createNode(createEvent('1'));
-      const sibling2 = createNode(createEvent('2'));
-      const sibling3 = createNode(createEvent('3'));
-      const sibling4 = createNode(createEvent('4'));
+      const sibling1 = createNode(eventNode('1'));
+      const sibling2 = createNode(eventNode('2'));
+      const sibling3 = createNode(eventNode('3'));
+      const sibling4 = createNode(eventNode('4'));
 
       const rootNodes = [sibling1, sibling2, sibling3, sibling4];
       const navigator = new TreeNavigator(rootNodes, buildMapsFromNodes(rootNodes));
@@ -301,13 +226,13 @@ describe('TreeNavigator', () => {
       //     └── c
       //         └── f
 
-      const g = createNode(createEvent('g'), undefined, 3);
-      const d = createNode(createEvent('d'), [g], 2);
-      const e = createNode(createEvent('e'), undefined, 2);
-      const f = createNode(createEvent('f'), undefined, 2);
-      const b = createNode(createEvent('b'), [d, e], 1);
-      const c = createNode(createEvent('c'), [f], 1);
-      const a = createNode(createEvent('a'), [b, c], 0);
+      const g = createNode(eventNode('g'), undefined, 3);
+      const d = createNode(eventNode('d'), [g], 2);
+      const e = createNode(eventNode('e'), undefined, 2);
+      const f = createNode(eventNode('f'), undefined, 2);
+      const b = createNode(eventNode('b'), [d, e], 1);
+      const c = createNode(eventNode('c'), [f], 1);
+      const a = createNode(eventNode('a'), [b, c], 0);
 
       const rootNodes = [a];
       const navigator = new TreeNavigator(rootNodes, buildMapsFromNodes(rootNodes));
