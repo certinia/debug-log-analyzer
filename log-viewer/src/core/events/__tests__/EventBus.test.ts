@@ -6,33 +6,21 @@ import { describe, expect, it } from '@jest/globals';
 import { eventBus } from '../EventBus.js';
 
 describe('eventBus.onSource', () => {
-  it('hands over an event that names the source, and nothing else', () => {
-    const seen: number[] = [];
-    const off = eventBus.onSource('inspector:reveal', 'calltree', (detail) => {
-      seen.push(detail.eventIndex);
+  it('hands each event to the tab that names it, and to no other', () => {
+    const seen: string[] = [];
+    const offTimeline = eventBus.onSource('inspector:reveal', 'timeline', (detail) => {
+      seen.push(`timeline ${detail.eventIndex}`);
+    });
+    const offCalltree = eventBus.onSource('inspector:reveal', 'calltree', (detail) => {
+      seen.push(`calltree ${detail.eventIndex}`);
     });
 
     eventBus.emit('inspector:reveal', { source: 'calltree', eventIndex: 4 });
     eventBus.emit('inspector:reveal', { source: 'analysis', eventIndex: 5 });
 
-    off();
-    expect(seen).toEqual([4]);
-  });
-
-  it('gives one event to the tab that names it and to no other', () => {
-    const seen: string[] = [];
-    const offTimeline = eventBus.onSource('inspector:locate', 'timeline', () => {
-      seen.push('timeline');
-    });
-    const offCalltree = eventBus.onSource('inspector:locate', 'calltree', () => {
-      seen.push('calltree');
-    });
-
-    eventBus.emit('inspector:locate', { source: 'calltree', eventIndexes: [4], sticky: false });
-
     offTimeline();
     offCalltree();
-    expect(seen).toEqual(['calltree']);
+    expect(seen).toEqual(['calltree 4']);
   });
 
   it('stops on unsubscribe', () => {

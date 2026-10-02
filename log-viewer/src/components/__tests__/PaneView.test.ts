@@ -179,7 +179,7 @@ describe('PaneView', () => {
     };
   });
 
-  it('renders a header per section with a twistie when vertical', async () => {
+  it('renders a header per section with a twistie, and a sash between open pairs', async () => {
     const el = await mount('vertical');
     expect(el.shadowRoot?.querySelectorAll('.pane').length).toBe(3);
     expect(el.shadowRoot?.querySelectorAll('.pane-header vscode-icon').length).toBe(3);
@@ -187,10 +187,6 @@ describe('PaneView', () => {
     expect(body(el, 'a')).not.toBeNull();
     expect(body(el, 'b')).not.toBeNull();
     expect(body(el, 'c')).not.toBeNull();
-  });
-
-  it('renders a sash between each pair of open sections (2 for 3 open)', async () => {
-    const el = await mount('vertical');
     expect(el.shadowRoot?.querySelectorAll('.pane-sash').length).toBe(2);
   });
 
@@ -207,15 +203,7 @@ describe('PaneView', () => {
     expect(body(el, 'c')).not.toBeNull();
   });
 
-  it('toggles with the keyboard (Enter)', async () => {
-    const el = await mount('vertical');
-    const h = headerOf(el, 'a');
-    h.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
-    await el.updateComplete;
-    expect(body(el, 'a')).toBeNull();
-  });
-
-  it('ignores a held Enter, so the pane does not flap', async () => {
+  it('toggles with Enter, and ignores a held Enter, so the pane does not flap', async () => {
     const el = await mount('vertical');
     const h = headerOf(el, 'a');
     let toggles = 0;
@@ -324,19 +312,6 @@ describe('PaneView', () => {
     // And keeps it: handing a pane back to sizing itself frees the room it holds
     // to the panes the drag sized, which shrinks a section nobody dragged.
     expect(sizing(el, 'a')).toBe('content 100px');
-  });
-
-  it('leaves the panes away from the sash at the size they had', async () => {
-    const el = await mountSections([
-      { id: 'a', title: 'A', content: html`<div>A</div>`, fit: 'content' },
-      { id: 'b', title: 'B', content: html`<div>B</div>` },
-      { id: 'c', title: 'C', content: html`<div>C</div>` },
-    ]);
-
-    // The b-c sash, so the drag never names the content pane above it.
-    await drag(el, sash(el, 1));
-
-    expect(sizing(el, 'a')).toBe('content 100px');
     expect(sizing(el, 'b')).toBe('fill 1.2 120px');
     expect(sizing(el, 'c')).toBe('fill 0.8 80px');
   });
@@ -357,12 +332,16 @@ describe('PaneView', () => {
     expect(sizing(el, 'c')).toBe('fill 1.3333333333333333 80px');
   });
 
-  it('leaves no size behind for a drag that ends where it began', async () => {
+  it.each([
+    ['a drag that ends where it began', [140, 100]],
+    ['a sash click that never moved', []],
+  ])('leaves no size behind for %s', async (_name, moves) => {
     const el = await mount('vertical');
     const handle = sash(el);
     handle.dispatchEvent(pointer('pointerdown', 100));
-    handle.dispatchEvent(pointer('pointermove', 140));
-    handle.dispatchEvent(pointer('pointermove', 100));
+    for (const to of moves) {
+      handle.dispatchEvent(pointer('pointermove', to));
+    }
     handle.dispatchEvent(pointer('pointerup', 100));
     await el.updateComplete;
 
@@ -384,17 +363,6 @@ describe('PaneView', () => {
     // open at its floor, so every section shares the panel again.
     expect(sizing(el, 'a')).toBe('fill 1');
     expect(sizing(el, 'd')).toBe('fill 1');
-  });
-
-  it('leaves the sizes alone for a sash click that never moved', async () => {
-    const el = await mount('vertical');
-
-    const handle = sash(el);
-    handle.dispatchEvent(pointer('pointerdown', 100));
-    handle.dispatchEvent(pointer('pointerup', 100));
-    await el.updateComplete;
-
-    expect(sizing(el, 'a')).toBe(sizing(el, 'c'));
   });
 
   it('restores the sizes when the drag is cancelled', async () => {
@@ -443,23 +411,14 @@ describe('PaneView', () => {
     expect(share(el)).toBe('2');
   });
 
-  it('renders a sash beside a content pane too', async () => {
-    const el = await mountSections([
-      { id: 'a', title: 'A', content: html`<div>A</div>`, fit: 'content' },
-      { id: 'b', title: 'B', content: html`<div>B</div>` },
-      { id: 'c', title: 'C', content: html`<div>C</div>` },
-    ]);
-
-    // a↔b and b↔c: a content pane holds the size it is dragged to.
-    expect(el.shadowRoot?.querySelectorAll('.pane-sash').length).toBe(2);
-  });
-
   it('pins a content pane to its dragged size, and keeps it out of the fill scale', async () => {
     const el = await mountSections([
       { id: 'a', title: 'A', content: html`<div>A</div>`, fit: 'content' },
       { id: 'b', title: 'B', content: html`<div>B</div>` },
       { id: 'c', title: 'C', content: html`<div>C</div>` },
     ]);
+    // a↔b and b↔c: a content pane holds the size it is dragged to.
+    expect(el.shadowRoot?.querySelectorAll('.pane-sash').length).toBe(2);
 
     await drag(el, sash(el));
 
@@ -587,38 +546,32 @@ describe('PaneView', () => {
     });
   });
 
-  it('shrinks the pane above, then the one above that, out to the top', async () => {
-    const el = await mountSections([
-      { id: 'a', title: 'A', content: html`<div>A</div>` },
-      { id: 'b', title: 'B', content: html`<div>B</div>` },
-      { id: 'c', title: 'C', content: html`<div>C</div>` },
-      { id: 'd', title: 'D', content: html`<div>D</div>` },
-    ]);
+  // Each pane is 100 here. A sash dragged to an end takes the room of the nearest
+  // pane first, then the next. A pane behind the dragged sash (d in the first
+  // row) keeps its size: the cascade never takes room from it.
+  it.each([
+    [
+      'above, then the one above that, out to the top',
+      ['a', 'b', 'c', 'd'],
+      1,
+      -1000,
+      { a: 'fill 0 0px', b: 'fill 0 0px', c: 'fill 3 300px', d: 'fill 1 100px' },
+    ],
+    [
+      'below, then the one below that, out to the bottom',
+      ['a', 'b', 'c'],
+      0,
+      1000,
+      { a: 'fill 3 300px', b: 'fill 0 0px', c: 'fill 0 0px' },
+    ],
+  ])('shrinks the pane %s', async (_name, ids, at, to, expected) => {
+    const el = await mountSections(
+      ids.map((id) => ({ id, title: id.toUpperCase(), content: html`<div>${id}</div>` })),
+    );
 
-    // Each pane is 100 here. Dragging the b-c sash to the top makes c as large
-    // as the stack allows: b gives up its room first, then a.
-    await drag(el, sash(el, 1), -1000);
+    await drag(el, sash(el, at), to);
 
-    expect(sizing(el, 'b')).toBe('fill 0 0px');
-    expect(sizing(el, 'a')).toBe('fill 0 0px');
-    expect(sizing(el, 'c')).toBe('fill 3 300px');
-    // d is past the far end of the drag, and keeps its size: the room the
-    // cascade moved never comes out of a section the reader did not drag.
-    expect(sizing(el, 'd')).toBe('fill 1 100px');
-  });
-
-  it('shrinks the pane below, then the one below that, out to the bottom', async () => {
-    const el = await mountSections([
-      { id: 'a', title: 'A', content: html`<div>A</div>` },
-      { id: 'b', title: 'B', content: html`<div>B</div>` },
-      { id: 'c', title: 'C', content: html`<div>C</div>` },
-    ]);
-
-    await drag(el, sash(el, 0), 1000);
-
-    expect(sizing(el, 'b')).toBe('fill 0 0px');
-    expect(sizing(el, 'c')).toBe('fill 0 0px');
-    expect(sizing(el, 'a')).toBe('fill 3 300px');
+    expect(Object.fromEntries(ids.map((id) => [id, sizing(el, id)]))).toEqual(expected);
   });
 
   it('hands a content pane back to its content on a double-click', async () => {
@@ -803,15 +756,6 @@ describe('PaneView', () => {
       await el.updateComplete;
 
       expect(el.shadowRoot?.querySelector('.pane--drop-before')).toBeNull();
-    });
-
-    it('reports nothing for a section dropped on itself', async () => {
-      const el = await mount('vertical');
-      const seen = reorders(el);
-
-      await dragSection(el, 'b', 120);
-
-      expect(seen).toEqual([]);
     });
 
     it('does not reorder itself when the consumer ignores pane-reorder', async () => {

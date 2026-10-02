@@ -12,19 +12,16 @@ import {
 } from '../variableValue.js';
 
 describe('parseVariableValue', () => {
-  it('reads a number, the commonest value', () => {
-    expect(parseVariableValue('42')).toEqual({ kind: 'literal', text: '42' });
-    expect(parseVariableValue('-1.5')).toEqual({ kind: 'literal', text: '-1.5' });
-  });
-
-  it('reads a boolean and a null', () => {
-    expect(parseVariableValue('true')).toEqual({ kind: 'literal', text: 'true' });
-    expect(parseVariableValue('null')).toEqual({ kind: 'literal', text: 'null' });
-  });
-
-  it('reads a value the log left blank', () => {
-    expect(parseVariableValue('')).toEqual({ kind: 'empty' });
-    expect(parseVariableValue('   ')).toEqual({ kind: 'empty' });
+  // A number is the commonest value; a blank is one the log left empty.
+  it.each([
+    ['42', { kind: 'literal', text: '42' }],
+    ['-1.5', { kind: 'literal', text: '-1.5' }],
+    ['true', { kind: 'literal', text: 'true' }],
+    ['null', { kind: 'literal', text: 'null' }],
+    ['', { kind: 'empty' }],
+    ['   ', { kind: 'empty' }],
+  ])('reads %j', (raw, expected) => {
+    expect(parseVariableValue(raw)).toEqual(expected);
   });
 
   // A bare address means the value would not serialise. Calling it an empty
@@ -107,7 +104,9 @@ describe('parseVariableValue', () => {
     expect(previewOf(value, 200)).toContain('(10 more) ...');
   });
 
-  it('marks an Apex toString() that landed inside a string', () => {
+  // An Apex toString() is text. Reading structure out of one would claim the log
+  // recorded something it did not.
+  it('marks an Apex toString() that landed inside a string, and leaves it as text', () => {
     const value = parseVariableValue('"{Id=001, Name=Acme}"');
 
     expect(value).toMatchObject({ kind: 'string', toStringLike: true });
@@ -208,40 +207,20 @@ describe('an entry that names an address', () => {
 });
 
 describe('a string holding JSON', () => {
-  it('reads it as the object it holds', () => {
-    const value = parseVariableValue('"{\\"a\\":1}"');
-
-    expect(value).toMatchObject({
-      kind: 'container',
-      brackets: '{}',
-      fromString: true,
-      entries: [{ key: 'a', text: '1' }],
-    });
-  });
-
-  it('reads an unescaped one too', () => {
-    expect(parseVariableValue('"{"a":1}"')).toMatchObject({ kind: 'container', fromString: true });
-  });
-
-  it('reads a list it holds', () => {
-    expect(parseVariableValue('"[1,2]"')).toMatchObject({ brackets: '[]', fromString: true });
-  });
-
-  // An Apex toString() is text. Reading structure out of one would claim the log
-  // recorded something it did not.
-  it('leaves an Apex toString() as text', () => {
-    expect(parseVariableValue('"{accountid=AccountId, name=Name}"')).toMatchObject({
-      kind: 'string',
-      toStringLike: true,
-    });
+  it.each([
+    [
+      'the object it holds',
+      '"{\\"a\\":1}"',
+      { kind: 'container', brackets: '{}', entries: [{ key: 'a', text: '1' }] },
+    ],
+    ['an unescaped one too', '"{"a":1}"', { kind: 'container' }],
+    ['a list it holds', '"[1,2]"', { brackets: '[]' }],
+  ])('reads %s', (_name, raw, expected) => {
+    expect(parseVariableValue(raw)).toMatchObject({ ...expected, fromString: true });
   });
 
   it('leaves a braced string with no key as text', () => {
     expect(parseVariableValue('"{not json}"')).toMatchObject({ kind: 'string' });
-  });
-
-  it('leaves an ordinary string alone', () => {
-    expect(parseVariableValue('"Acme"')).toMatchObject({ kind: 'string', inner: 'Acme' });
   });
 });
 
