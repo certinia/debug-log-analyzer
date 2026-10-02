@@ -155,19 +155,6 @@ describe('TreeNavigator', () => {
       });
     });
 
-    describe('getFirstChild', () => {
-      it('should return first child for parent nodes', () => {
-        expect(navigator.getFirstChild(root1)).toBe(child1);
-        expect(navigator.getFirstChild(child1)).toBe(grandchild1);
-      });
-
-      it('should return null for leaf nodes', () => {
-        expect(navigator.getFirstChild(root2)).toBeNull();
-        expect(navigator.getFirstChild(child2)).toBeNull();
-        expect(navigator.getFirstChild(grandchild1)).toBeNull();
-      });
-    });
-
     describe('getNextSibling', () => {
       it('should return next sibling', () => {
         expect(navigator.getNextSibling(child1)).toBe(child2);
@@ -228,17 +215,8 @@ describe('TreeNavigator', () => {
 
       expect(navigator.findById('1')).toBe(singleNode);
       expect(navigator.getParent(singleNode)).toBeNull();
-      expect(navigator.getFirstChild(singleNode)).toBeNull();
       expect(navigator.getNextSibling(singleNode)).toBeNull();
       expect(navigator.getPrevSibling(singleNode)).toBeNull();
-    });
-
-    it('should handle nodes with empty children array', () => {
-      const nodeWithEmptyChildren = createNode(createEvent('1'), []);
-      const rootNodes = [nodeWithEmptyChildren];
-      const navigator = new TreeNavigator(rootNodes, buildMapsFromNodes(rootNodes));
-
-      expect(navigator.getFirstChild(nodeWithEmptyChildren)).toBeNull();
     });
 
     it('should handle deep nesting', () => {
@@ -252,14 +230,6 @@ describe('TreeNavigator', () => {
       const rootNodes = [level1];
       const navigator = new TreeNavigator(rootNodes, buildMapsFromNodes(rootNodes));
 
-      // Navigate down
-      expect(navigator.getFirstChild(level1)).toBe(level2);
-      expect(navigator.getFirstChild(level2)).toBe(level3);
-      expect(navigator.getFirstChild(level3)).toBe(level4);
-      expect(navigator.getFirstChild(level4)).toBe(level5);
-      expect(navigator.getFirstChild(level5)).toBeNull();
-
-      // Navigate up
       expect(navigator.getParent(level5)).toBe(level4);
       expect(navigator.getParent(level4)).toBe(level3);
       expect(navigator.getParent(level3)).toBe(level2);

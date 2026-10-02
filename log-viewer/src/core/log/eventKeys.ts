@@ -17,7 +17,6 @@ export function getEventKey(event: LogEvent): string {
  * Generates a key for call-stack tracking to detect recursive calls.
  * Excludes event type so the same method is recognised regardless of entry type
  * (e.g. CODE_UNIT_STARTED at the top level, METHOD_ENTRY for recursive calls).
- * Matches the approach used by the analysis view's RowGrouper.
  */
 export function getStackKey(event: LogEvent): string {
   return `${event.namespace}|${event.text}`;
