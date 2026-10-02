@@ -1,7 +1,7 @@
 /*
  * Copyright (c) 2026 Certinia Inc. All rights reserved.
  */
-import { describe, expect, it } from '@jest/globals';
+import { describe, expect, it } from 'vitest';
 
 import type { MatchedEventInfo } from '../../../types/search.types.js';
 import type { BatchColorInfo } from '../../BucketColorResolver.js';

@@ -1,6 +1,7 @@
 /*
  * Copyright (c) 2026 Certinia Inc. All rights reserved.
  */
+import { describe, expect, it } from 'vitest';
 import { SOSL_ROWS_PER_QUERY_LIMIT, soslRowsMetric } from '../limits.js';
 
 describe('soslRowsMetric', () => {

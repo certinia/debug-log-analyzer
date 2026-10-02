@@ -1,12 +1,12 @@
 /*
  * Copyright (c) 2026 Certinia Inc. All rights reserved.
  */
-import { beforeEach, describe, expect, it } from '@jest/globals';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { RowComponent } from 'tabulator-tables';
 
-// The tabulator ESM build doesn't load under jest, and the module registers
+// The tabulator ESM build doesn't load in tests, and the module registers
 // itself on import.
-jest.mock('tabulator-tables', () => ({
+vi.mock('tabulator-tables', () => ({
   Module: class {
     constructor(_table: unknown) {}
     registerTableOption() {}
@@ -22,7 +22,7 @@ import { RowKeyboardNavigation } from '../RowKeyboardNavigation.js';
 
 function setup(selected: RowComponent[] = []) {
   const handlers: Record<string, ((...args: unknown[]) => void)[]> = {};
-  const holder = { focus: jest.fn() };
+  const holder = { focus: vi.fn() };
   const table = {
     options: {},
     on: (evt: string, fn: (...args: unknown[]) => void) => {
@@ -34,7 +34,7 @@ function setup(selected: RowComponent[] = []) {
   const plugin = new RowKeyboardNavigation(table as never);
   plugin.initialize();
 
-  const row = { select: jest.fn() } as unknown as RowComponent;
+  const row = { select: vi.fn() } as unknown as RowComponent;
   const expand = () => handlers['dataTreeRowExpanded']?.forEach((fn) => fn(row, 0));
   const collapse = () => handlers['dataTreeRowCollapsed']?.forEach((fn) => fn(row, 0));
   return { handlers, holder, row, expand, collapse };
@@ -42,7 +42,7 @@ function setup(selected: RowComponent[] = []) {
 
 describe('RowKeyboardNavigation', () => {
   beforeEach(() => {
-    jest.clearAllMocks();
+    vi.clearAllMocks();
   });
 
   it('selects and focuses the row the user expanded first', () => {
@@ -55,7 +55,7 @@ describe('RowKeyboardNavigation', () => {
   });
 
   it('leaves an existing selection where it is, and still takes focus back', () => {
-    const selected = { select: jest.fn() } as unknown as RowComponent;
+    const selected = { select: vi.fn() } as unknown as RowComponent;
     const { row, holder, expand } = setup([selected]);
 
     expand();
@@ -103,12 +103,12 @@ describe('RowKeyboardNavigation key bindings', () => {
     expanded = false,
   }: { rowNav?: boolean; dataTree?: boolean; expanded?: boolean } = {}) {
     const rowOf = (name: string) => {
-      const scrollIntoView = jest.fn();
+      const scrollIntoView = vi.fn();
       return {
         name,
         scrollIntoView,
-        select: jest.fn(),
-        deselect: jest.fn(),
+        select: vi.fn(),
+        deselect: vi.fn(),
         getElement: () => ({ scrollIntoView }),
       };
     };
@@ -121,8 +121,8 @@ describe('RowKeyboardNavigation key bindings', () => {
       getNextRow: () => next,
       getTreeParent: () => parent,
       isTreeExpanded: () => expanded,
-      treeExpand: jest.fn(),
-      treeCollapse: jest.fn(),
+      treeExpand: vi.fn(),
+      treeCollapse: vi.fn(),
     };
     // The child of the selected row, which an expanded row steps into.
     Object.assign(next, { getTreeParent: () => current });
@@ -134,7 +134,7 @@ describe('RowKeyboardNavigation key bindings', () => {
     };
     const scope = { table } as unknown as never;
     const press = (action: keyof typeof actions, target: unknown = body) => {
-      const event = { target, preventDefault: jest.fn() } as unknown as KeyboardEvent;
+      const event = { target, preventDefault: vi.fn() } as unknown as KeyboardEvent;
       actions[action].call(scope, event);
       return event;
     };

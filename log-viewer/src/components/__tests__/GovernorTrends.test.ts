@@ -1,9 +1,9 @@
 /*
  * Copyright (c) 2026 Certinia Inc. All rights reserved.
  *
- * @jest-environment jsdom
+ * @vitest-environment jsdom
  */
-import { beforeEach, describe, expect, it } from '@jest/globals';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { LitElement } from 'lit';
 
 import { eventBus } from '../../core/events/EventBus.js';
@@ -14,11 +14,11 @@ import type { TrendSeries } from '../governorTrendData.js';
 // The charts are driven from one stub series, so the seek is the only logic
 // under test. `pointAt` stays real: the click reads the series through it.
 let series: TrendSeries[];
-jest.mock('../governorTrendData.js', () => ({
-  ...jest.requireActual('../governorTrendData.js'),
+vi.mock('../governorTrendData.js', async () => ({
+  ...(await vi.importActual('../governorTrendData.js')),
   governorTrendSeries: () => series,
 }));
-jest.mock('../../features/timeline/optimised/apex-limit-series.js', () => ({
+vi.mock('../../features/timeline/optimised/apex-limit-series.js', () => ({
   apexLimitTimeSeries: () => ({ events: [] }),
 }));
 

@@ -1,18 +1,18 @@
 /*
  * Copyright (c) 2026 Certinia Inc. All rights reserved.
  */
-import { beforeEach, describe, expect, it } from '@jest/globals';
+import { beforeEach, describe, expect, it, type Mock, vi } from 'vitest';
 
 // Hoisted above the import, so the mock can't close over a `const` declared here.
-jest.mock('../VSCodeExtensionMessenger.js', () => ({
-  vscodeMessenger: { getVsCodeAPI: jest.fn(), send: jest.fn() },
+vi.mock('../VSCodeExtensionMessenger.js', () => ({
+  vscodeMessenger: { getVsCodeAPI: vi.fn(), send: vi.fn() },
 }));
 
 import { vscodeMessenger } from '../VSCodeExtensionMessenger.js';
 import { saveFile } from '../saveFile.js';
 
-const getVsCodeAPI = vscodeMessenger.getVsCodeAPI as jest.Mock;
-const send = vscodeMessenger.send as jest.Mock;
+const getVsCodeAPI = vscodeMessenger.getVsCodeAPI as Mock;
+const send = vscodeMessenger.send as Mock;
 
 describe('saveFile', () => {
   beforeEach(() => {

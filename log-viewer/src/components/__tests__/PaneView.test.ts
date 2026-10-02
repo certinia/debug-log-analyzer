@@ -1,9 +1,9 @@
 /*
  * Copyright (c) 2025 Certinia Inc. All rights reserved.
  *
- * @jest-environment jsdom
+ * @vitest-environment jsdom
  */
-import { beforeAll, describe, expect, it } from '@jest/globals';
+import { beforeAll, describe, expect, it } from 'vitest';
 import { html } from 'lit';
 
 import type { PaneOrientation, PaneSection, PaneView } from '../PaneView.js';

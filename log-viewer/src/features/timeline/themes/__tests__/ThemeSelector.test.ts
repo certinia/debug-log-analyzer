@@ -1,6 +1,7 @@
 /*
  * Copyright (c) 2025 Certinia Inc. All rights reserved.
  */
+import { describe, expect, it } from 'vitest';
 import { addCustomThemes, getTheme } from '../ThemeSelector.js';
 import { DEFAULT_THEME_NAME, type TimelineColors } from '../Themes.js';
 

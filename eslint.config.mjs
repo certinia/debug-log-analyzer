@@ -57,8 +57,8 @@ export default defineConfig(
     languageOptions: {
       parserOptions: {
         projectService: {
-          // A bundler config belongs to no project. Without this the parser reports it as an error.
-          allowDefaultProject: ['rolldown.config.ts'],
+          // A bundler or test config belongs to no project. Without this the parser reports it as an error.
+          allowDefaultProject: ['rolldown.config.ts', 'vitest.config.mts'],
         },
         tsconfigRootDir: import.meta.dirname,
         // AGENTS.md keeps `typescript` aliased to @typescript/typescript6 because

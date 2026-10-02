@@ -1,11 +1,11 @@
 /**
- * @jest-environment jsdom
+ * @vitest-environment jsdom
  */
 
 /*
  * Copyright (c) 2025 Certinia Inc. All rights reserved.
  */
-import { afterEach, beforeEach, describe, expect, it, jest } from '@jest/globals';
+import { afterEach, beforeEach, describe, expect, it, type Mock, vi } from 'vitest';
 
 import {
   KEYBOARD_CONSTANTS,
@@ -50,29 +50,29 @@ describe('KeyboardHandler', () => {
     viewport = new TimelineViewport(DISPLAY_WIDTH, DISPLAY_HEIGHT, 1_000_000, 10);
 
     callbacks = {
-      onPan: jest.fn<(deltaX: number, deltaY: number) => void>(),
-      onZoom: jest.fn<(direction: 'in' | 'out') => void>(),
-      onResetZoom: jest.fn<() => void>(),
-      onEscape: jest.fn<() => void>(),
-      onMarkerNav: jest.fn<(direction: MarkerNavDirection) => boolean>(),
-      onFrameNav: jest.fn<(direction: FrameNavDirection) => boolean>(),
-      onJumpToCallTree: jest.fn<() => void>(),
-      onFocus: jest.fn<() => void>(),
-      onCopy: jest.fn<() => void>(),
-      isInMinimapArea: jest.fn<() => boolean>().mockReturnValue(false),
-      onMinimapPanViewport: jest.fn<(deltaTimeNs: number) => void>(),
-      onMinimapPanDepth: jest.fn<(deltaY: number) => void>(),
-      onMinimapZoom: jest.fn<(direction: 'in' | 'out') => void>(),
-      onMinimapJumpStart: jest.fn<() => void>(),
-      onMinimapJumpEnd: jest.fn<() => void>(),
-      onMinimapResetZoom: jest.fn<() => void>(),
-      isInMetricStripArea: jest.fn<() => boolean>().mockReturnValue(false),
-      onMetricStripPanViewport: jest.fn<(deltaTimeNs: number) => void>(),
-      onMetricStripPanDepth: jest.fn<(deltaY: number) => void>(),
-      onMetricStripZoom: jest.fn<(direction: 'in' | 'out') => void>(),
-      onMetricStripJumpStart: jest.fn<() => void>(),
-      onMetricStripJumpEnd: jest.fn<() => void>(),
-      onMetricStripResetZoom: jest.fn<() => void>(),
+      onPan: vi.fn<(deltaX: number, deltaY: number) => void>(),
+      onZoom: vi.fn<(direction: 'in' | 'out') => void>(),
+      onResetZoom: vi.fn<() => void>(),
+      onEscape: vi.fn<() => void>(),
+      onMarkerNav: vi.fn<(direction: MarkerNavDirection) => boolean>(),
+      onFrameNav: vi.fn<(direction: FrameNavDirection) => boolean>(),
+      onJumpToCallTree: vi.fn<() => void>(),
+      onFocus: vi.fn<() => void>(),
+      onCopy: vi.fn<() => void>(),
+      isInMinimapArea: vi.fn<() => boolean>().mockReturnValue(false),
+      onMinimapPanViewport: vi.fn<(deltaTimeNs: number) => void>(),
+      onMinimapPanDepth: vi.fn<(deltaY: number) => void>(),
+      onMinimapZoom: vi.fn<(direction: 'in' | 'out') => void>(),
+      onMinimapJumpStart: vi.fn<() => void>(),
+      onMinimapJumpEnd: vi.fn<() => void>(),
+      onMinimapResetZoom: vi.fn<() => void>(),
+      isInMetricStripArea: vi.fn<() => boolean>().mockReturnValue(false),
+      onMetricStripPanViewport: vi.fn<(deltaTimeNs: number) => void>(),
+      onMetricStripPanDepth: vi.fn<(deltaY: number) => void>(),
+      onMetricStripZoom: vi.fn<(direction: 'in' | 'out') => void>(),
+      onMetricStripJumpStart: vi.fn<() => void>(),
+      onMetricStripJumpEnd: vi.fn<() => void>(),
+      onMetricStripResetZoom: vi.fn<() => void>(),
     };
 
     handler = new KeyboardHandler(container, viewport, callbacks);
@@ -82,7 +82,7 @@ describe('KeyboardHandler', () => {
   afterEach(() => {
     handler.destroy();
     document.body.removeChild(container);
-    jest.clearAllMocks();
+    vi.clearAllMocks();
   });
 
   function press(key: string, options: Partial<KeyboardEventInit> = {}): KeyboardEvent {
@@ -96,7 +96,7 @@ describe('KeyboardHandler', () => {
     return event;
   }
 
-  const mock = (name: keyof KeyboardCallbacks) => callbacks[name] as jest.Mock;
+  const mock = (name: keyof KeyboardCallbacks) => callbacks[name] as Mock;
 
   function expectOnly(command: Command | null): void {
     for (const other of COMMANDS) {

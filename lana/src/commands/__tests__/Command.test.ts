@@ -1,13 +1,13 @@
 /*
  * Copyright (c) 2026 Certinia Inc. All rights reserved.
  */
-import { describe, expect, it } from '@jest/globals';
+import { describe, expect, it, type Mock } from 'vitest';
 import { commands } from 'vscode';
 
 import { asContext, createMockContext } from '../../__tests__/helpers/test-builders.js';
 import { Command } from '../Command.js';
 
-const mockRegisterCommand = commands.registerCommand as jest.Mock;
+const mockRegisterCommand = commands.registerCommand as Mock;
 
 describe('Command', () => {
   it('returns what the handler returns', async () => {

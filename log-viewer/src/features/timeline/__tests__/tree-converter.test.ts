@@ -7,7 +7,7 @@
  * chart's own width.
  */
 
-import { describe, expect, it } from '@jest/globals';
+import { describe, expect, it } from 'vitest';
 import type { LogEvent } from '@apexdevtools/apex-log-parser';
 import { logEventToTreeAndRects } from '../utils/tree-converter.js';
 

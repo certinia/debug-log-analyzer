@@ -1,4 +1,4 @@
-import { describe, expect, it, jest } from '@jest/globals';
+import { describe, expect, it, type Mock, vi } from 'vitest';
 import { ScrollAnchor } from '../ScrollAnchor';
 
 function rect(top: number, height: number) {
@@ -38,13 +38,13 @@ function setup({
   const handlers: Record<string, ((...args: unknown[]) => void)[]> = {};
   const table = {
     handlers,
-    on: jest.fn((evt: string, fn: (...args: unknown[]) => void) => {
+    on: vi.fn((evt: string, fn: (...args: unknown[]) => void) => {
       (handlers[evt] ??= []).push(fn);
     }),
-    element: { querySelector: jest.fn(() => holder) },
-    getRows: jest.fn((type?: string) => (type === 'visible' ? visible : [])),
+    element: { querySelector: vi.fn(() => holder) },
+    getRows: vi.fn((type?: string) => (type === 'visible' ? visible : [])),
     rowManager: { renderer, getDisplayRows: () => displayRows },
-    scrollToRow: jest.fn(() => Promise.resolve()),
+    scrollToRow: vi.fn(() => Promise.resolve()),
   };
   const plugin = new ScrollAnchor(table as never);
   (plugin as unknown as { table: typeof table }).table = table;
@@ -58,7 +58,7 @@ function paddedHolder(scrollTop: number, style: Record<string, string>) {
   const tableEl = { style };
   const holder = {
     scrollTop,
-    querySelector: jest.fn((sel: string) => (sel === '.tabulator-table' ? tableEl : null)),
+    querySelector: vi.fn((sel: string) => (sel === '.tabulator-table' ? tableEl : null)),
   };
   return { tableEl, holder };
 }
@@ -116,7 +116,7 @@ describe('ScrollAnchor', () => {
     // Simulate Tabulator firing renderStarted a second time within the same
     // cycle (e.g. nested rerenders). The `!this.anchorRow` guard should make
     // this a no-op even though the visible set has changed.
-    (table.getRows as jest.Mock).mockImplementation((...args: unknown[]) => {
+    (table.getRows as Mock).mockImplementation((...args: unknown[]) => {
       if (args[0] === 'visible') {
         return [r3, r2, r1]; // reversed
       }
@@ -166,7 +166,7 @@ describe('ScrollAnchor', () => {
       scrollTop: 800,
       scrollHeight: 1000, // 800 + 200 stale pad
       clientHeight: 100,
-      querySelector: jest.fn((sel: string) => (sel === '.tabulator-table' ? tableEl : null)),
+      querySelector: vi.fn((sel: string) => (sel === '.tabulator-table' ? tableEl : null)),
       getBoundingClientRect: () => rect(0, 100),
     };
     const renderer: Record<string, unknown> = { vDomBottom: 0, vDomBottomPad: 200 };
@@ -307,8 +307,8 @@ describe('ScrollAnchor', () => {
       querySelector: () => null,
     };
     const renderer = {
-      rows: jest.fn(() => [internalRow]),
-      _virtualRenderFill: jest.fn(),
+      rows: vi.fn(() => [internalRow]),
+      _virtualRenderFill: vi.fn(),
     };
     const { plugin, table, handlers } = setup({ holder, renderer, displayRows: [internalRow] });
 

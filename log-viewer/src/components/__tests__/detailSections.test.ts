@@ -1,27 +1,27 @@
 /*
  * Copyright (c) 2026 Certinia Inc. All rights reserved.
  *
- * @jest-environment jsdom
+ * @vitest-environment jsdom
  */
-import { describe, expect, it } from '@jest/globals';
+import { describe, expect, it, vi } from 'vitest';
 
 // Avoid the heavy component import chains (Tabulator, scss);
 // this suite only exercises the section-assembly logic.
-jest.mock('../CallStackDetail.js', () => ({}));
-jest.mock('../CallTreeDetail.js', () => ({}));
-jest.mock('../CategoryTimeBar.js', () => ({}));
-jest.mock('../EventVitals.js', () => ({}));
-jest.mock('../GovernorTrends.js', () => ({}));
-jest.mock('../HotPath.js', () => ({}));
-jest.mock('../HotSpots.js', () => ({}));
-jest.mock('../LogOverview.js', () => ({}));
-jest.mock('../NamespaceTimeBar.js', () => ({}));
-jest.mock('../../features/database/components/DatabaseOverview.js', () => ({}));
-jest.mock('../../features/database/components/DatabaseRowBudget.js', () => ({}));
-jest.mock('../../features/database/components/DatabaseTimeTree.js', () => ({}));
+vi.mock('../CallStackDetail.js', () => ({}));
+vi.mock('../CallTreeDetail.js', () => ({}));
+vi.mock('../CategoryTimeBar.js', () => ({}));
+vi.mock('../EventVitals.js', () => ({}));
+vi.mock('../GovernorTrends.js', () => ({}));
+vi.mock('../HotPath.js', () => ({}));
+vi.mock('../HotSpots.js', () => ({}));
+vi.mock('../LogOverview.js', () => ({}));
+vi.mock('../NamespaceTimeBar.js', () => ({}));
+vi.mock('../../features/database/components/DatabaseOverview.js', () => ({}));
+vi.mock('../../features/database/components/DatabaseRowBudget.js', () => ({}));
+vi.mock('../../features/database/components/DatabaseTimeTree.js', () => ({}));
 
 const databaseCalls: { eventIndex: number; type: string; activeEventIndex?: number | null }[] = [];
-jest.mock('../../features/database/components/databaseSections.js', () => ({
+vi.mock('../../features/database/components/databaseSections.js', () => ({
   buildDatabaseSections: async (selection: {
     eventIndex: number;
     type: string;

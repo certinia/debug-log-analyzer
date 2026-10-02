@@ -1,7 +1,7 @@
 /*
  * Copyright (c) 2026 Certinia Inc. All rights reserved.
  */
-import { describe, expect, it } from '@jest/globals';
+import { describe, expect, it, type Mock, vi } from 'vitest';
 
 import { createMockExtensionContext } from './mocks/vscode.js';
 import { Context } from '../Context.js';
@@ -9,17 +9,17 @@ import { Display } from '../display/Display.js';
 import { activate, deactivate } from '../Main.js';
 import { disposeServices, initServices } from '../services/servicesRuntime.js';
 
-jest.mock('../Context.js', () => ({ Context: jest.fn() }));
-jest.mock('../display/Display.js', () => ({ Display: jest.fn() }));
-jest.mock('../services/servicesRuntime.js', () => ({
-  disposeServices: jest.fn(),
-  initServices: jest.fn(),
+vi.mock('../Context.js', () => ({ Context: vi.fn() }));
+vi.mock('../display/Display.js', () => ({ Display: vi.fn() }));
+vi.mock('../services/servicesRuntime.js', () => ({
+  disposeServices: vi.fn(),
+  initServices: vi.fn(),
 }));
 
-const mockContext = Context as jest.Mock;
-const mockDisplay = Display as jest.Mock;
-const mockDisposeServices = disposeServices as jest.Mock;
-const mockInitServices = initServices as jest.Mock;
+const mockContext = Context as Mock;
+const mockDisplay = Display as Mock;
+const mockDisposeServices = disposeServices as Mock;
+const mockInitServices = initServices as Mock;
 
 describe('Main', () => {
   it('activates without initializing Salesforce Services', () => {

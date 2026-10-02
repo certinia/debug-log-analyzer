@@ -1,15 +1,15 @@
 /*
  * Copyright (c) 2026 Certinia Inc. All rights reserved.
  *
- * @jest-environment jsdom
+ * @vitest-environment jsdom
  */
-import { afterEach, beforeEach, describe, expect, it } from '@jest/globals';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { ApexLog, LogEvent } from '@apexdevtools/apex-log-parser';
 import type { RowComponent, Tabulator } from 'tabulator-tables';
 
 // The grid brings tabulator and its module registrations, which don't load under
-// jest; this suite drives only the selection the view reports to the inspector.
-jest.mock('../../../call-tree/components/BottomUpTable.js', () => ({
+// tests; this suite drives only the selection the view reports to the inspector.
+vi.mock('../../../call-tree/components/BottomUpTable.js', () => ({
   createBottomUpTable: () => ({
     table: {
       on: (name: string, handler: unknown) => handlers.set(name, handler),
@@ -31,11 +31,11 @@ jest.mock('../../../call-tree/components/BottomUpTable.js', () => ({
 }));
 // VsSelect extends vscode-single-select, whose setFormValue needs an
 // ElementInternals jsdom lacks; the render would upgrade it.
-jest.mock('../../../../components/VsSelect.js', () => ({}));
+vi.mock('../../../../components/VsSelect.js', () => ({}));
 // Connecting the view reads settings twice: firstUpdated loads the column view,
 // and category colouring subscribes. This suite has no extension host to answer.
-jest.mock('../../../settings/Settings.js', () => ({
-  ...jest.requireActual<object>('../../../settings/Settings.js'),
+vi.mock('../../../settings/Settings.js', async () => ({
+  ...(await vi.importActual<object>('../../../settings/Settings.js')),
   getSettings: () => Promise.resolve({}),
   subscribeSettings: () => () => {},
 }));

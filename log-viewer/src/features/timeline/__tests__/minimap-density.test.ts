@@ -9,7 +9,7 @@
  * holds every bucket its children do not, and that the skyline's on-top time
  * picks the dominant category.
  */
-import { describe, expect, it } from '@jest/globals';
+import { describe, expect, it } from 'vitest';
 import type { LogEvent } from '@apexdevtools/apex-log-parser';
 
 import { MinimapDensityQuery } from '../optimised/minimap/MinimapDensityQuery.js';

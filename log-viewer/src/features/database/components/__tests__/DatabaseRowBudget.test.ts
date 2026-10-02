@@ -1,9 +1,9 @@
 /*
  * Copyright (c) 2026 Certinia Inc. All rights reserved.
  *
- * @jest-environment jsdom
+ * @vitest-environment jsdom
  */
-import { beforeEach, describe, expect, it } from '@jest/globals';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { ApexLog } from '@apexdevtools/apex-log-parser';
 import type { LitElement } from 'lit';
 
@@ -15,7 +15,7 @@ import type { RowBudget, RowBudgets } from '../../services/rowBudget.js';
 const apexLog = { namespaces: ['pkg'] } as unknown as ApexLog;
 let budgets: RowBudgets;
 
-jest.mock('../../services/rowBudget.js', () => ({
+vi.mock('../../services/rowBudget.js', () => ({
   rowBudgets: () => budgets,
 }));
 

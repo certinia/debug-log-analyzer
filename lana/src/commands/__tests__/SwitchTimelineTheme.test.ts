@@ -1,7 +1,7 @@
 /*
  * Copyright (c) 2026 Certinia Inc. All rights reserved.
  */
-import { beforeEach, describe, expect, it } from '@jest/globals';
+import { beforeEach, describe, expect, it, type Mock, vi } from 'vitest';
 
 import { Uri, window } from 'vscode';
 
@@ -9,24 +9,24 @@ import { asContext, createMockContext } from '../../__tests__/helpers/test-build
 import { SwitchTimelineTheme } from '../SwitchTimelineTheme.js';
 
 // Mock AppConfig
-jest.mock('../../workspace/AppConfig.js', () => ({
-  getConfig: jest.fn(),
-  updateConfig: jest.fn(),
+vi.mock('../../workspace/AppConfig.js', () => ({
+  getConfig: vi.fn(),
+  updateConfig: vi.fn(),
 }));
 
 // Mock LogView
-jest.mock('../LogView.js', () => ({
+vi.mock('../LogView.js', () => ({
   LogView: {
-    getCurrentView: jest.fn(),
+    getCurrentView: vi.fn(),
   },
 }));
 
 import { getConfig, updateConfig } from '../../workspace/AppConfig.js';
 import { LogView } from '../LogView.js';
 
-const mockGetConfig = getConfig as jest.Mock;
-const mockUpdateConfig = updateConfig as jest.Mock;
-const mockGetCurrentView = LogView.getCurrentView as jest.Mock;
+const mockGetConfig = getConfig as Mock;
+const mockUpdateConfig = updateConfig as Mock;
+const mockGetCurrentView = LogView.getCurrentView as Mock;
 
 function themeConfig(activeTheme: string, customThemes: Record<string, object> = {}) {
   return { timeline: { activeTheme, customThemes } };
@@ -37,18 +37,18 @@ describe('SwitchTimelineTheme', () => {
     items: Array<{ label: string; description?: string }>;
     activeItems: Array<{ label: string }>;
     placeholder: string;
-    show: jest.Mock;
-    hide: jest.Mock;
-    dispose: jest.Mock;
-    onDidChangeActive: jest.Mock;
-    onDidAccept: jest.Mock;
-    onDidHide: jest.Mock;
+    show: Mock;
+    hide: Mock;
+    dispose: Mock;
+    onDidChangeActive: Mock;
+    onDidAccept: Mock;
+    onDidHide: Mock;
   };
 
   let onDidAcceptCallback: () => Promise<void>;
   let onDidHideCallback: () => void;
   let onDidChangeActiveCallback: (items: Array<{ label: string }>) => void;
-  const webview = { postMessage: jest.fn() };
+  const webview = { postMessage: vi.fn() };
 
   async function openPicker() {
     const mockContext = createMockContext();
@@ -66,23 +66,23 @@ describe('SwitchTimelineTheme', () => {
       items: [],
       activeItems: [],
       placeholder: '',
-      show: jest.fn(),
-      hide: jest.fn(),
-      dispose: jest.fn(),
-      onDidChangeActive: jest.fn((cb) => {
+      show: vi.fn(),
+      hide: vi.fn(),
+      dispose: vi.fn(),
+      onDidChangeActive: vi.fn((cb) => {
         onDidChangeActiveCallback = cb;
-        return { dispose: jest.fn() };
+        return { dispose: vi.fn() };
       }),
-      onDidAccept: jest.fn((cb) => {
+      onDidAccept: vi.fn((cb) => {
         onDidAcceptCallback = cb;
-        return { dispose: jest.fn() };
+        return { dispose: vi.fn() };
       }),
-      onDidHide: jest.fn((cb) => {
+      onDidHide: vi.fn((cb) => {
         onDidHideCallback = cb;
-        return { dispose: jest.fn() };
+        return { dispose: vi.fn() };
       }),
     };
-    (window.createQuickPick as jest.Mock).mockReturnValue(mockQuickPick);
+    (window.createQuickPick as Mock).mockReturnValue(mockQuickPick);
     mockGetConfig.mockReturnValue(themeConfig('50 Shades of Green'));
     mockUpdateConfig.mockResolvedValue(undefined);
     mockGetCurrentView.mockReturnValue({ webview });

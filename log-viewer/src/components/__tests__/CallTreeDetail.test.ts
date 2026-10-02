@@ -1,15 +1,17 @@
 /*
  * Copyright (c) 2026 Certinia Inc. All rights reserved.
  *
- * @jest-environment jsdom
+ * @vitest-environment jsdom
  */
-import { describe, expect, it } from '@jest/globals';
+import { describe, expect, it, vi } from 'vitest';
 
-jest.mock('tabulator-tables', () => ({
+vi.mock('tabulator-tables', () => ({
   Tabulator: class {
     static registerModule() {}
   },
   Module: class {},
+  KeybindingsModule: class {},
+  SelectRowModule: class {},
   Renderer: class {},
 }));
 // This suite exercises the view-mode toggle and the column set; no table is

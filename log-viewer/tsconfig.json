@@ -17,7 +17,7 @@
     "moduleResolution": "Bundler",
     "module": "ESNext",
     "noEmit": true,
-    "types": ["jest"],
+    "types": [],
     "paths": { "#test-helpers/*": ["./src/__tests__/helpers/*"] },
 
     "composite": true,

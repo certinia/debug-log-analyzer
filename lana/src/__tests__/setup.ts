@@ -3,10 +3,11 @@
  */
 
 /**
- * Jest setup file for lana tests.
+ * Vitest setup file for lana tests.
  * Auto-injects vscode mock and resets state between tests.
  */
 
+import { afterEach, beforeEach, vi } from 'vitest';
 import { resetMocks } from './mocks/vscode.js';
 
 // Reset mock state before each test
@@ -16,5 +17,5 @@ beforeEach(() => {
 
 // Clear all mocks after each test
 afterEach(() => {
-  jest.clearAllMocks();
+  vi.clearAllMocks();
 });

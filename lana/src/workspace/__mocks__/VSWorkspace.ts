@@ -1,6 +1,7 @@
 /*
  * Copyright (c) 2025 Certinia Inc. All rights reserved.
  */
+import { type Mock, vi } from 'vitest';
 import type { WorkspaceFolder } from 'vscode';
 import type { SfdxProject } from '../../salesforce/codesymbol/SfdxProject';
 
@@ -12,10 +13,10 @@ export class VSWorkspace {
     this.workspaceFolder = workspaceFolder;
   }
 
-  path = jest.fn();
-  name = jest.fn();
-  parseSfdxProjects = jest.fn();
-  getProjectsForNamespace = jest.fn();
-  getAllProjects = jest.fn();
-  findClass = jest.fn();
+  path: Mock = vi.fn();
+  name: Mock = vi.fn();
+  parseSfdxProjects: Mock = vi.fn();
+  getProjectsForNamespace: Mock = vi.fn();
+  getAllProjects: Mock = vi.fn();
+  findClass: Mock = vi.fn();
 }

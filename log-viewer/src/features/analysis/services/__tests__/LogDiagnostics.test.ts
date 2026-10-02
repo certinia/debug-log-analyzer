@@ -3,13 +3,13 @@
  */
 import type { ApexLog, LogEvent } from '@apexdevtools/apex-log-parser';
 import type { GovernorLimits, Limits } from '@apexdevtools/apex-log-parser/types';
-import { beforeEach, describe, expect, it } from '@jest/globals';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { emptyLimits, governorLimits, limitValue } from '#test-helpers/limits.js';
 
 let log: ApexLog | null = null;
 
-jest.mock('../../../../core/log/LogStore.js', () => ({
+vi.mock('../../../../core/log/LogStore.js', () => ({
   currentLogStore: () => (log ? { log, stackByEventIndex: () => [] } : null),
 }));
 

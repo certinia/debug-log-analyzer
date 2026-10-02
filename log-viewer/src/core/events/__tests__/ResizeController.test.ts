@@ -1,10 +1,10 @@
 /**
- * @jest-environment jsdom
+ * @vitest-environment jsdom
  */
 /*
  * Copyright (c) 2026 Certinia Inc. All rights reserved.
  */
-import { afterEach, describe, expect, it, jest } from '@jest/globals';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { ResizeController } from '../ResizeController.js';
 import { fakeHost } from '#test-helpers/fakeHost.js';
@@ -36,7 +36,7 @@ function entryFor(element: Element, width: number): ResizeObserverEntry {
 }
 
 afterEach(() => {
-  jest.restoreAllMocks();
+  vi.restoreAllMocks();
 });
 
 describe('ResizeController', () => {

@@ -1,7 +1,7 @@
 /*
  * Copyright (c) 2025 Certinia Inc. All rights reserved.
  */
-import { describe, expect, it } from '@jest/globals';
+import { describe, expect, it } from 'vitest';
 
 import { navFixture, navMaps, navNode, type NavName } from '#test-helpers/navTree.js';
 import { TreeNavigator } from '../optimised/selection/TreeNavigator.js';

@@ -1,12 +1,12 @@
 /**
  * Copyright (c) 2026 Certinia Inc. All rights reserved.
  */
-import { beforeEach, describe, expect, it } from '@jest/globals';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Tabulator } from 'tabulator-tables';
 
 // The controller reads and writes settings through the extension host, which this
 // suite answers for.
-jest.mock('../../features/settings/Settings.js', () => ({
+vi.mock('../../features/settings/Settings.js', () => ({
   getSettings: () => {
     reads++;
     return Promise.resolve(stored);

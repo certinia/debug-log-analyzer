@@ -1,6 +1,7 @@
 /*
  * Copyright (c) 2025 Certinia Inc. All rights reserved.
  */
+import { type Mock, vi } from 'vitest';
 import type { PackageDirectory } from '../SfdxProject';
 
 export class SfdxProject {
@@ -18,6 +19,6 @@ export class SfdxProject {
     this.packageDirectories = packageDirectories;
   }
 
-  findClass = jest.fn();
-  buildClassIndex = jest.fn();
+  findClass: Mock = vi.fn();
+  buildClassIndex: Mock = vi.fn();
 }

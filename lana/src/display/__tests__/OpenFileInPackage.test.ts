@@ -1,21 +1,22 @@
 /*
  * Copyright (c) 2025 Certinia Inc. All rights reserved.
  */
+import { beforeEach, describe, expect, it, type Mock, vi } from 'vitest';
 import { workspace } from 'vscode';
 import { asContext, createMockContext } from '../../__tests__/helpers/test-builders.js';
 import { getMethodLine, parseApex } from '../../salesforce/ApexParser/ApexSymbolLocator';
 import { OpenFileInPackage } from '../OpenFileInPackage';
 
-// Note: no `jest.mock('vscode')` — the moduleNameMapper already supplies the mock, and
+// Note: no `vi.mock('vscode')` — the `vscode` alias already supplies the mock, and
 // automocking would neuter the Position/Selection classes this test asserts against.
-jest.mock('../../salesforce/ApexParser/ApexSymbolLocator');
+vi.mock('../../salesforce/ApexParser/ApexSymbolLocator');
 
-const mockParseApex = parseApex as jest.Mock;
-const mockGetMethodLine = getMethodLine as jest.Mock;
-const mockOpenTextDocument = workspace.openTextDocument as jest.Mock;
+const mockParseApex = parseApex as Mock;
+const mockGetMethodLine = getMethodLine as Mock;
+const mockOpenTextDocument = workspace.openTextDocument as Mock;
 
 function createContext() {
-  const workspaceManager = { findSymbol: jest.fn() };
+  const workspaceManager = { findSymbol: vi.fn() };
   const mock = createMockContext({ workspaceManager });
   return { context: asContext(mock), workspaceManager, display: mock.display };
 }
@@ -86,7 +87,7 @@ describe('OpenFileInPackage.openFileForSymbol', () => {
     );
     expect(display.showErrorMessage).not.toHaveBeenCalled();
     expect(display.showFile).toHaveBeenCalledTimes(1);
-    const [uri, options] = display.showFile.mock.calls[0];
+    const [uri, options] = display.showFile.mock.calls[0] ?? [];
     expect(uri).toEqual(expect.objectContaining({ fsPath: '/ws/force-app/MyClass.cls' }));
     // line is converted to zero-indexed; character used as-is
     expect(options.selection.start).toEqual(expect.objectContaining({ line: 11, character: 4 }));
@@ -103,7 +104,7 @@ describe('OpenFileInPackage.openFileForSymbol', () => {
 
     await OpenFileInPackage.openFileForSymbol(context, 'MyClass.foo()');
 
-    const [, options] = display.showFile.mock.calls[0];
+    const [, options] = display.showFile.mock.calls[0] ?? [];
     expect(options.selection.start).toEqual(expect.objectContaining({ line: 2, character: 0 }));
   });
 

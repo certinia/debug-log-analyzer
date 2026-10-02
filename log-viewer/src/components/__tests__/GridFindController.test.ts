@@ -1,11 +1,11 @@
 /**
- * @jest-environment jsdom
+ * @vitest-environment jsdom
  */
 
 /*
  * Copyright (c) 2026 Certinia Inc. All rights reserved.
  */
-import { afterEach, beforeEach, describe, expect, it, jest } from '@jest/globals';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Tabulator } from 'tabulator-tables';
 
 import { fakeHost, type FakeHost } from '#test-helpers/fakeHost.js';
@@ -16,9 +16,9 @@ const FOUND = { totalMatches: 3, matchIndexes: { 0: {}, 1: {} } };
 function tableStub(clientHeight = 20) {
   return {
     element: { clientHeight },
-    find: jest.fn(async (_args: unknown) => FOUND),
-    clearFindHighlights: jest.fn(),
-    setCurrentMatch: jest.fn(async (_index: number, _row: unknown, _options: unknown) => undefined),
+    find: vi.fn(async (_args: unknown) => FOUND),
+    clearFindHighlights: vi.fn(),
+    setCurrentMatch: vi.fn(async (_index: number, _row: unknown, _options: unknown) => undefined),
   };
 }
 
@@ -107,7 +107,7 @@ describe('GridFindController', () => {
     });
 
     it('still answers a hidden table that has matches standing', async () => {
-      const find = jest.fn(async (_args: unknown) => FOUND);
+      const find = vi.fn(async (_args: unknown) => FOUND);
       table = { ...tableStub(), find };
       await finder.find(findEvent('lv-find', 'update'));
       table = { ...tableStub(0), find };

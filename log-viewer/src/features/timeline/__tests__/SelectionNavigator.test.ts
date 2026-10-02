@@ -1,7 +1,7 @@
 /*
  * Copyright (c) 2025 Certinia Inc. All rights reserved.
  */
-import { beforeEach, describe, expect, it } from '@jest/globals';
+import { beforeEach, describe, expect, it } from 'vitest';
 
 import { navFixture, navMaps, type NavName } from '#test-helpers/navTree.js';
 import type { FrameNavDirection } from '../optimised/interaction/KeyboardHandler.js';

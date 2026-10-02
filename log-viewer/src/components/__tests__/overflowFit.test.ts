@@ -1,6 +1,7 @@
 /*
  * Copyright (c) 2026 Certinia Inc. All rights reserved.
  */
+import { describe, expect, it } from 'vitest';
 import { computeVisibleCount } from '../overflowFit.js';
 
 describe('computeVisibleCount', () => {

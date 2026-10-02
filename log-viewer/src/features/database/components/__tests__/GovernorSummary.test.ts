@@ -1,9 +1,9 @@
 /*
  * Copyright (c) 2026 Certinia Inc. All rights reserved.
  *
- * @jest-environment jsdom
+ * @vitest-environment jsdom
  */
-import { beforeEach, describe, expect, it } from '@jest/globals';
+import { beforeEach, describe, expect, it } from 'vitest';
 
 import { NO_LIMIT_FOR_METRIC_TEXT } from '../../../../components/governorCopy.js';
 import { formatInteger } from '../../../../core/utility/Util.js';

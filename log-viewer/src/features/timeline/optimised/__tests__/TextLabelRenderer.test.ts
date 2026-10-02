@@ -1,10 +1,10 @@
 /*
  * Copyright (c) 2025 Certinia Inc. All rights reserved.
  */
-import { describe, expect, it } from '@jest/globals';
+import { describe, expect, it, vi } from 'vitest';
 
 // The renderer touches pixi only inside its methods, so the 2MB bundle need not load.
-jest.mock('pixi.js', () => ({}));
+vi.mock('pixi.js', () => ({}));
 
 import { TextLabelRenderer } from '../TextLabelRenderer.js';
 

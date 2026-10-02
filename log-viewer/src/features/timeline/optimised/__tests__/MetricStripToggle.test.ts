@@ -1,5 +1,5 @@
 /**
- * @jest-environment jsdom
+ * @vitest-environment jsdom
  */
 
 /*
@@ -11,7 +11,7 @@
  * and draws as part of that. Asking it to draw again is a second full render for one click.
  */
 
-import { describe, expect, it, jest } from '@jest/globals';
+import { describe, expect, it, type Mock, vi } from 'vitest';
 import {
   MetricStripOrchestrator,
   type MetricStripOrchestratorCallbacks,
@@ -19,16 +19,16 @@ import {
 
 function orchestrator(): {
   strip: MetricStripOrchestrator;
-  onHeightChange: jest.Mock;
-  requestRender: jest.Mock;
+  onHeightChange: Mock;
+  requestRender: Mock;
 } {
-  const onHeightChange = jest.fn();
-  const requestRender = jest.fn();
+  const onHeightChange = vi.fn();
+  const requestRender = vi.fn();
   const callbacks = {
-    onZoomToRegion: jest.fn(),
-    onCursorMove: jest.fn(),
+    onZoomToRegion: vi.fn(),
+    onCursorMove: vi.fn(),
     requestRender,
-    requestCursorRender: jest.fn(),
+    requestCursorRender: vi.fn(),
     onHeightChange,
   } as unknown as MetricStripOrchestratorCallbacks;
 

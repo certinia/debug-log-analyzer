@@ -1,28 +1,28 @@
 /**
- * @jest-environment jsdom
+ * @vitest-environment jsdom
  */
 
 /*
  * Copyright (c) 2026 Certinia Inc. All rights reserved.
  */
-// `jest` is the global on purpose: importing it from `@jest/globals` defeats the
-// hoisting the `jest.mock` calls below depend on.
-import { afterEach, beforeEach, describe, expect, it } from '@jest/globals';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 // The shared manual mock leaves `Tabulator` out on purpose, and `RowKeyboardNavigation`
 // registers against it as it loads. Nothing here constructs one.
-jest.mock('tabulator-tables', () => ({
+vi.mock('tabulator-tables', () => ({
   Tabulator: class {
     static registerModule() {}
   },
   Module: class {},
+  KeybindingsModule: class {},
+  SelectRowModule: class {},
   Renderer: class {},
 }));
 
 // Extends `vscode-single-select`, whose `setFormValue` needs an `ElementInternals` jsdom lacks.
-jest.mock('../../../../components/VsSelect.js', () => ({}));
-jest.mock('../../../settings/Settings.js', () => ({
-  ...jest.requireActual<object>('../../../settings/Settings.js'),
+vi.mock('../../../../components/VsSelect.js', () => ({}));
+vi.mock('../../../settings/Settings.js', async () => ({
+  ...(await vi.importActual<object>('../../../settings/Settings.js')),
   getSettings: () => Promise.resolve({}),
   subscribeSettings: () => () => {},
 }));
@@ -107,13 +107,13 @@ const GRIDS: Array<[string, Grid]> = [
 function tableStub() {
   return {
     element: { clientHeight: 20 },
-    find: jest.fn(async () => ({ totalMatches: 3, matchIndexes: { 0: {}, 1: {} } })),
-    clearFindHighlights: jest.fn(),
-    refreshFilter: jest.fn(),
-    download: jest.fn(),
-    copyToClipboard: jest.fn(),
-    deselectRow: jest.fn(),
-    setSortedGroupBy: jest.fn(),
+    find: vi.fn(async () => ({ totalMatches: 3, matchIndexes: { 0: {}, 1: {} } })),
+    clearFindHighlights: vi.fn(),
+    refreshFilter: vi.fn(),
+    download: vi.fn(),
+    copyToClipboard: vi.fn(),
+    deselectRow: vi.fn(),
+    setSortedGroupBy: vi.fn(),
   };
 }
 

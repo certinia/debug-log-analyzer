@@ -1,7 +1,7 @@
 /*
  * Copyright (c) 2026 Certinia Inc. All rights reserved.
  */
-import { beforeEach, describe, expect, it } from '@jest/globals';
+import { beforeEach, describe, expect, it, type Mock, vi } from 'vitest';
 
 import {
   asContext,
@@ -11,17 +11,17 @@ import {
 import { LogView } from '../LogView.js';
 import { ShowInLogAnalysis } from '../ShowInLogAnalysis.js';
 
-jest.mock('../LogView.js', () => ({
+vi.mock('../LogView.js', () => ({
   LogView: {
-    createView: jest.fn(),
-    getCurrentView: jest.fn(),
-    getLogUri: jest.fn(),
-    setPendingNavigation: jest.fn(),
+    createView: vi.fn(),
+    getCurrentView: vi.fn(),
+    getLogUri: vi.fn(),
+    setPendingNavigation: vi.fn(),
   },
 }));
 
-const mockCreateView = LogView.createView as jest.Mock;
-const mockGetCurrentView = LogView.getCurrentView as jest.Mock;
+const mockCreateView = LogView.createView as Mock;
+const mockGetCurrentView = LogView.getCurrentView as Mock;
 
 describe('ShowInLogAnalysis', () => {
   beforeEach(() => {

@@ -1,9 +1,9 @@
 /*
  * Copyright (c) 2025 Certinia Inc. All rights reserved.
  *
- * @jest-environment jsdom
+ * @vitest-environment jsdom
  */
-import { beforeAll, describe, expect, it } from '@jest/globals';
+import { beforeAll, describe, expect, it, vi } from 'vitest';
 
 import type { CodeBlock } from '../CodeBlock.js';
 import '../CodeBlock.js';
@@ -44,7 +44,7 @@ describe('CodeBlock', () => {
   });
 
   it('copies the code to the clipboard', async () => {
-    const writeText = jest.fn().mockResolvedValue(undefined);
+    const writeText = vi.fn().mockResolvedValue(undefined);
     Object.assign(navigator, { clipboard: { writeText } });
 
     const el = await mount((e) => {

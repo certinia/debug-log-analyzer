@@ -1,7 +1,7 @@
 /*
  * Copyright (c) 2025 Certinia Inc. All rights reserved.
  */
-import { describe, expect, it } from '@jest/globals';
+import { describe, expect, it } from 'vitest';
 
 import type { TimelineMarker } from '../../types/flamechart.types.js';
 import { hitTestMarkers, type MarkerIndicator } from '../markers/MarkerHitTest.js';

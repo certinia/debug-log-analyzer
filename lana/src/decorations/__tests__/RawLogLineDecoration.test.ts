@@ -1,7 +1,7 @@
 /*
  * Copyright (c) 2026 Certinia Inc. All rights reserved.
  */
-import { afterEach, beforeEach, describe, expect, it } from '@jest/globals';
+import { afterEach, beforeEach, describe, expect, it, type Mock, vi } from 'vitest';
 
 import { window, type TextDocument, type TextEditor } from 'vscode';
 
@@ -22,16 +22,16 @@ import {
 import { LogEventCache } from '../../cache/LogEventCache.js';
 import { RawLogLineDecoration } from '../RawLogLineDecoration.js';
 
-jest.mock('../../cache/LogEventCache.js', () => ({
+vi.mock('../../cache/LogEventCache.js', () => ({
   LogEventCache: {
-    getApexLog: jest.fn(),
-    findEventByTimestamp: jest.fn(),
+    getApexLog: vi.fn(),
+    findEventByTimestamp: vi.fn(),
   },
 }));
 
-const mockGetApexLog = LogEventCache.getApexLog as jest.Mock;
-const mockFindEvent = LogEventCache.findEventByTimestamp as jest.Mock;
-const mockOnSelectionChange = window.onDidChangeTextEditorSelection as jest.Mock;
+const mockGetApexLog = LogEventCache.getApexLog as Mock;
+const mockFindEvent = LogEventCache.findEventByTimestamp as Mock;
+const mockOnSelectionChange = window.onDidChangeTextEditorSelection as Mock;
 
 const LOG_URI = '/test/file.log';
 const EXECUTION_STARTED = '09:45:31.888 (1000)|EXECUTION_STARTED';
@@ -41,7 +41,7 @@ function makeEditor(document: TextDocument, line = 0): TextEditor {
   return {
     document,
     selection: new Selection(at, at),
-    setDecorations: jest.fn(),
+    setDecorations: vi.fn(),
   } as unknown as TextEditor;
 }
 
@@ -51,7 +51,7 @@ async function selectIn(editor: TextEditor): Promise<void> {
     textEditor: TextEditor;
   }) => void;
   listener({ textEditor: editor });
-  jest.advanceTimersByTime(100);
+  vi.advanceTimersByTime(100);
   await Promise.resolve();
   await Promise.resolve();
 }
@@ -60,7 +60,7 @@ describe('RawLogLineDecoration', () => {
   let mockContext: ReturnType<typeof createMockContext>;
 
   beforeEach(() => {
-    jest.useFakeTimers();
+    vi.useFakeTimers();
     // The class keeps one instance for the life of the extension host.
     (RawLogLineDecoration as unknown as { instance: unknown }).instance = null;
     setOpenTabs(new TabInputText(Uri.file(LOG_URI)));
@@ -69,7 +69,7 @@ describe('RawLogLineDecoration', () => {
   });
 
   afterEach(() => {
-    jest.useRealTimers();
+    vi.useRealTimers();
   });
 
   it('registers one selection listener, however many times it is applied', () => {
@@ -94,7 +94,7 @@ describe('RawLogLineDecoration', () => {
     await selectIn(editor);
 
     expect(mockGetApexLog).toHaveBeenCalledWith(document.uri, mockContext.display);
-    const decorations = (editor.setDecorations as jest.Mock).mock.calls[0]?.[1] as {
+    const decorations = (editor.setDecorations as Mock).mock.calls[0]?.[1] as {
       renderOptions: { after: { contentText: string } };
     }[];
     expect(decorations.map((d) => d.renderOptions.after.contentText)).toEqual([expected]);
@@ -102,7 +102,7 @@ describe('RawLogLineDecoration', () => {
 
   describe('clearing the decoration', () => {
     const expectCleared = (editor: TextEditor) => {
-      const calls = (editor.setDecorations as jest.Mock).mock.calls;
+      const calls = (editor.setDecorations as Mock).mock.calls;
       expect(calls).toHaveLength(1);
       expect(calls[0]?.[1]).toEqual([]);
     };
@@ -172,7 +172,7 @@ describe('RawLogLineDecoration', () => {
       }) => void;
 
       listener({ textEditor: editor });
-      jest.advanceTimersByTime(99);
+      vi.advanceTimersByTime(99);
 
       expect(editor.setDecorations).not.toHaveBeenCalled();
     });
@@ -187,9 +187,9 @@ describe('RawLogLineDecoration', () => {
       }) => void;
 
       listener({ textEditor: first });
-      jest.advanceTimersByTime(50);
+      vi.advanceTimersByTime(50);
       listener({ textEditor: second });
-      jest.advanceTimersByTime(100);
+      vi.advanceTimersByTime(100);
       await Promise.resolve();
 
       expect(first.setDecorations).not.toHaveBeenCalled();
