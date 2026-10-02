@@ -867,7 +867,7 @@ export type MetricDenominator =
 export interface MetricStripClassifiedMetric {
   /** Unique metric identifier (e.g., 'cpuTime', 'soqlQueries') */
   metricId: string;
-  /** Display name for the metric (e.g., 'CPU Time', 'SOQL Queries') */
+  /** Display name for the metric (e.g., 'CPU Time', 'SOQL') */
   displayName: string;
   /** Tier classification: 1 = top 3, 2 = >80% at any point, 3 = remaining */
   tier: 1 | 2 | 3;

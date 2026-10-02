@@ -1,8 +1,14 @@
 /*
  * Copyright (c) 2026 Certinia Inc. All rights reserved.
  */
-import type { GovernorLimits, SelfTotal } from '@apexdevtools/apex-log-parser/types';
+import type {
+  GovernorLimits,
+  LimitMetricUnit,
+  Limits,
+  SelfTotal,
+} from '@apexdevtools/apex-log-parser/types';
 
+import { GOVERNOR_METRIC } from '../../../core/metrics/governorMetrics.js';
 import { sharePercent } from '../../../core/utility/Util.js';
 
 /**
@@ -49,7 +55,7 @@ export interface GovernorCostRow extends GovernorUsage {
 }
 
 interface CostMetric {
-  label: string;
+  key: keyof Limits;
   /** Reads the node's cumulative usage for this metric. */
   used: (row: GovernorUsage) => number;
   /** Reads the log's maximum for this metric. */
@@ -70,12 +76,16 @@ interface CostMetric {
  * so it is the value comparable to the heap limit per path.
  */
 const COST_METRICS: CostMetric[] = [
-  { label: 'SOQL', used: (r) => r.soqlCount.total, limit: (l) => l.final.soqlQueries.limit },
-  { label: 'DML', used: (r) => r.dmlCount.total, limit: (l) => l.final.dmlStatements.limit },
-  { label: 'SOSL', used: (r) => r.soslCount.total, limit: (l) => l.final.soslQueries.limit },
-  { label: 'SOQL Rows', used: (r) => r.soqlRowCount.total, limit: (l) => l.final.queryRows.limit },
-  { label: 'DML Rows', used: (r) => r.dmlRowCount.total, limit: (l) => l.final.dmlRows.limit },
-  { label: 'Heap', used: (r) => r.heapPeak, limit: (l) => l.peak.heapSize.limit },
+  { key: 'soqlQueries', used: (r) => r.soqlCount.total, limit: (l) => l.final.soqlQueries.limit },
+  {
+    key: 'dmlStatements',
+    used: (r) => r.dmlCount.total,
+    limit: (l) => l.final.dmlStatements.limit,
+  },
+  { key: 'soslQueries', used: (r) => r.soslCount.total, limit: (l) => l.final.soslQueries.limit },
+  { key: 'queryRows', used: (r) => r.soqlRowCount.total, limit: (l) => l.final.queryRows.limit },
+  { key: 'dmlRows', used: (r) => r.dmlRowCount.total, limit: (l) => l.final.dmlRows.limit },
+  { key: 'heapSize', used: (r) => r.heapPeak, limit: (l) => l.peak.heapSize.limit },
 ];
 
 /**
@@ -124,6 +134,7 @@ export function governorCostMax(row: GovernorUsage, limits: GovernorLimits): num
 
 export interface GovernorCostMetric {
   label: string;
+  unit: LimitMetricUnit;
   used: number;
   limit: number;
   /** This metric's own `used/limit × 100` contribution to the total. */
@@ -144,7 +155,8 @@ export function governorCostBreakdown(
     const limit = metric.limit(limits);
     const used = metric.used(row);
     if (limit > 0 && used > 0) {
-      metrics.push({ label: metric.label, used, limit, percent: sharePercent(used, limit) });
+      const { label, unit } = GOVERNOR_METRIC[metric.key];
+      metrics.push({ label, unit, used, limit, percent: sharePercent(used, limit) });
     }
   }
   return metrics.sort((a, b) => b.percent - a.percent);

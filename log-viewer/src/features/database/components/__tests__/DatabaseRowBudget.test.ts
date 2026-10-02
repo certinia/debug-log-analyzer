@@ -104,7 +104,7 @@ describe('database-rows', () => {
     const element = await mount();
 
     expect(texts(element, '.budget__head')).toEqual([
-      'Query rows 45,000 / 50,000',
+      'SOQL rows 45,000 / 50,000',
       'DML rows 400 / 10,000',
     ]);
   });
@@ -113,7 +113,7 @@ describe('database-rows', () => {
     const element = await mount();
 
     expect(
-      ['Query rows', 'DML rows'].map((label) => {
+      ['SOQL rows', 'DML rows'].map((label) => {
         const bar = barOf(element, label);
         return [bar?.format(1_000), bar?.total];
       }),
@@ -182,7 +182,7 @@ describe('database-rows', () => {
   it('leaves out a limit the log holds nothing against', async () => {
     budgets = withBudgets({}, { used: 0, observed: 0, groups: [] });
 
-    expect(texts(await mount(), '.budget__head')).toEqual(['Query rows 45,000 / 50,000']);
+    expect(texts(await mount(), '.budget__head')).toEqual(['SOQL rows 45,000 / 50,000']);
   });
 
   it('says why the rows can pass a limit that the bar is drawn against', async () => {
@@ -211,13 +211,13 @@ describe('database-rows', () => {
     budgets = { ...withBudgets({ used: null }, { used: null }), hasLimits: false };
 
     expect(texts(await mount(), '.budget__head')).toEqual([
-      'Query rows 45,000 / 50,000',
+      'SOQL rows 45,000 / 50,000',
       'DML rows 300 / 10,000',
     ]);
   });
 
   it('brings the two limits together per SObject, read beside written', async () => {
-    const objects = barOf(await mount(), 'Query and DML rows by SObject');
+    const objects = barOf(await mount(), 'SOQL and DML rows by SObject');
 
     expect(
       objects?.segments.map((segment) => [segment.label, segment.value, segment.detail]),

@@ -43,7 +43,7 @@ function row(overrides: Partial<Record<string, number>> = {}): GovernorCostRow {
   };
 }
 
-// COST_METRICS has 6 entries (SOQL, DML, SOSL, SOQL Rows, DML Rows, Heap);
+// COST_METRICS has 6 entries (SOQL, DML, SOSL, SOQL Rows, DML Rows, Heap Size);
 // limits() reports a limit for all 6, so the divisor is 6 in these tests. SOSL
 // rows are excluded — they have no governor limit.
 const REPORTED_GOVERNORS = 6;
@@ -139,8 +139,14 @@ describe('a log that reported no limits', () => {
 describe('governorCostBreakdown', () => {
   it('lists each consumed metric, highest contribution first', () => {
     const breakdown = governorCostBreakdown(row({ soql: 90, dml: 15, heap: 3000000 }), limits());
-    expect(breakdown.map((m) => m.label)).toEqual(['SOQL', 'Heap', 'DML']);
-    expect(breakdown[0]).toEqual({ label: 'SOQL', used: 90, limit: 100, percent: 90 });
+    expect(breakdown.map((m) => m.label)).toEqual(['SOQL', 'Heap Size', 'DML']);
+    expect(breakdown[0]).toEqual({
+      label: 'SOQL',
+      unit: 'count',
+      used: 90,
+      limit: 100,
+      percent: 90,
+    });
   });
 
   it('omits metrics with no usage or no known limit', () => {

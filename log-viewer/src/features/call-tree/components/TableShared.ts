@@ -29,7 +29,11 @@ import { RowKeyboardNavigation } from '../../../tabulator/module/RowKeyboardNavi
 import { RowNavigation } from '../../../tabulator/module/RowNavigation.js';
 import { VirtualVerticalRenderer } from '../../../tabulator/renderer/VirtualVerticalRenderer.js';
 import { makeSumFieldAllVisible } from '../utils/BottomCalcs.js';
-import { governorCostBreakdown, type GovernorCostRow } from '../utils/GovernorCost.js';
+import {
+  governorCostBreakdown,
+  type GovernorCostMetric,
+  type GovernorCostRow,
+} from '../utils/GovernorCost.js';
 
 export interface TableCallbacks {
   rowFormatter?: (row: RowComponent) => void;
@@ -359,9 +363,14 @@ function createUtilisationColumn(opts: {
   };
 }
 
+function usedOfLimit({ unit, used, limit }: GovernorCostMetric): string {
+  const figure = (value: number): string => (unit === 'byte' ? formatInteger(value) : `${value}`);
+  return `${figure(used)}/${figure(limit)}`;
+}
+
 /**
  * The shared "Gov Avg %" column — the average governor consumption across all
- * governors on a call path (see {@link governorCost}), rendered as a progress
+ * governors on a call path (see {@link GovernorCostRow.governorCost}), rendered as a progress
  * bar. Reused across all call-tree/analysis tables. `governorCost` is populated
  * during tree build; the tooltip breaks the average down per metric. This column and Gov Peak %
  * are where headroom is answered, so they stay measured against the limits and read `—` without
@@ -381,11 +390,7 @@ export function createGovernorCostColumn(governorLimits: GovernorLimits): Column
       if (!breakdown.length) {
         return `${value.toFixed(1)}%`;
       }
-      const rows = breakdown.map((m) => {
-        const used = m.label === 'Heap' ? formatInteger(m.used) : `${m.used}`;
-        const limit = m.label === 'Heap' ? formatInteger(m.limit) : `${m.limit}`;
-        return `${m.label} ${used}/${limit} (${m.percent.toFixed(1)}%)`;
-      });
+      const rows = breakdown.map((m) => `${m.label} ${usedOfLimit(m)} (${m.percent.toFixed(1)}%)`);
       return `${value.toFixed(1)}% — average utilisation across all governors<br>${rows.join('<br>')}`;
     },
   });
@@ -393,7 +398,7 @@ export function createGovernorCostColumn(governorLimits: GovernorLimits): Column
 
 /**
  * The "Gov Peak %" column — the single tightest governor consumed on a path
- * (see {@link governorCostMax}), rendered as a bar. Complements the averaged
+ * (see {@link GovernorCostRow.governorCostMax}), rendered as a bar. Complements the averaged
  * Gov Avg column; hidden by default (surfaced by the Governor Limits view or a
  * user toggle). The tooltip names which governor is the peak.
  */
@@ -412,9 +417,7 @@ export function createGovernorPeakColumn(governorLimits: GovernorLimits): Column
       if (!top) {
         return `${peak.toFixed(1)}%`;
       }
-      const used = top.label === 'Heap' ? formatInteger(top.used) : `${top.used}`;
-      const limit = top.label === 'Heap' ? formatInteger(top.limit) : `${top.limit}`;
-      return `Tightest single governor: ${top.label} ${used}/${limit} (${peak.toFixed(1)}%)`;
+      return `Tightest single governor: ${top.label} ${usedOfLimit(top)} (${peak.toFixed(1)}%)`;
     },
   });
 }

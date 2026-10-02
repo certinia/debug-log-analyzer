@@ -420,8 +420,8 @@ describe('FrameTooltipRenderer', () => {
 
       // Net subtree total and the method's own net. The card is width-bound, so bytes
       // read compactly here where the inspector separates thousands.
-      expect(rowValue('Heap net')).toBe('4 MB');
-      expect(rowSelf('Heap net')).toBe('self 1.6 MB');
+      expect(rowValue('Heap Net')).toBe('4 MB');
+      expect(rowSelf('Heap Net')).toBe('self 1.6 MB');
     });
 
     it('should not display a heap row when net heap is 0 (allocated then freed)', () => {
@@ -430,7 +430,7 @@ describe('FrameTooltipRenderer', () => {
 
       showSettled(event, cursorAnchor(100, 100));
 
-      expect(rowValue('Heap net')).toBeUndefined();
+      expect(rowValue('Heap Net')).toBeUndefined();
     });
 
     it('should display custom event text', () => {
