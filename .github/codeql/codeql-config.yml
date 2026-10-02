@@ -1,0 +1,9 @@
+paths:
+  - lana
+  - log-viewer
+paths-ignore:
+  - '**/__tests__/**'
+  - '**/__mocks__/**'
+  - lana/test
+  - '**/*.test.ts'
+  - '**/*.spec.ts'
