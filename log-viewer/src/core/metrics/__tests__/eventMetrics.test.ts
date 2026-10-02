@@ -72,8 +72,8 @@ describe('EVENT_METRICS', () => {
     expect(undenominated.map((metric) => metric.label)).toEqual([
       'SOSL Rows',
       'Throws',
-      'Heap net',
-      'Heap alloc',
+      'Heap Net',
+      'Heap Alloc',
     ]);
   });
 
@@ -87,8 +87,8 @@ describe('EVENT_METRICS', () => {
       'SOSL',
       'SOSL Rows',
       'Throws',
-      'Heap net',
-      'Heap alloc',
+      'Heap Net',
+      'Heap Alloc',
     ]);
   });
 });

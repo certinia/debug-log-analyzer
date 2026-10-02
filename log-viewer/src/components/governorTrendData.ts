@@ -1,12 +1,12 @@
 /*
  * Copyright (c) 2026 Certinia Inc. All rights reserved.
  */
-import { formatByteSize, formatInteger, sharePercent } from '../core/utility/Util.js';
+import { sharePercent } from '../core/utility/Util.js';
 import type {
   HeatStripTimeSeries,
   NoDataSpan,
 } from '../features/timeline/types/flamechart.types.js';
-import { rankedLimitMetrics } from './logOverviewMetrics.js';
+import { limitFormat, rankedLimitMetrics } from './logOverviewMetrics.js';
 
 /** How many trend charts to draw before the section stops being at-a-glance. */
 const MAX_TRENDS = 4;
@@ -95,7 +95,7 @@ export function governorTrendSeries(series: HeatStripTimeSeries): TrendSeries[] 
         used,
         limit,
         finalRatio: ratio,
-        format: key === 'heapSize' ? formatByteSize : formatInteger,
+        format: limitFormat(key),
         gaps: series.gaps ?? [],
       };
     },

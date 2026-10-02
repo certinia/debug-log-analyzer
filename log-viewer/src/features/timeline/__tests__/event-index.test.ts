@@ -4,28 +4,18 @@
 import { describe, expect, it } from '@jest/globals';
 import type { LogEvent } from '@apexdevtools/apex-log-parser';
 
+import { timelineEvent } from '#test-helpers/timeline.js';
 import { makeViewport } from '#test-helpers/viewport.js';
 import { TimelineEventIndex } from '../optimised/TimelineEventIndex.js';
 
-function createEvent(timestamp: number, duration: number, children: LogEvent[] = []): LogEvent {
-  return {
-    timestamp,
-    exitStamp: timestamp + duration,
-    duration: { total: duration, exclusive: duration },
-    children,
-    text: `Event at ${timestamp}`,
-    lineNumber: 0,
-    category: 'Method',
-    subcategory: 'Method',
-  } as unknown as LogEvent;
-}
-
 // [0-100], [200-300], [400-500]
-const flat = () => [createEvent(0, 100), createEvent(200, 100), createEvent(400, 100)];
+const flat = () => [timelineEvent(0, 100), timelineEvent(200, 100), timelineEvent(400, 100)];
 // [0-100] holding [50-70]
-const nested = () => [createEvent(0, 100, [createEvent(50, 20)])];
+const nested = () => [timelineEvent(0, 100, 'Apex', [timelineEvent(50, 20)])];
 // [0-100] holding [50-80] holding [60-70]
-const deep = () => [createEvent(0, 100, [createEvent(50, 30, [createEvent(60, 10)])])];
+const deep = () => [
+  timelineEvent(0, 100, 'Apex', [timelineEvent(50, 30, 'Apex', [timelineEvent(60, 10)])]),
+];
 
 describe('TimelineEventIndex', () => {
   it.each<[string, () => LogEvent[], number, number]>([
@@ -34,19 +24,21 @@ describe('TimelineEventIndex', () => {
     [
       'four levels',
       () => [
-        createEvent(0, 100, [createEvent(10, 60, [createEvent(20, 40, [createEvent(30, 10)])])]),
+        timelineEvent(0, 100, 'Apex', [
+          timelineEvent(10, 60, 'Apex', [timelineEvent(20, 40, 'Apex', [timelineEvent(30, 10)])]),
+        ]),
       ],
       3,
       100,
     ],
     [
       'uneven durations',
-      () => [createEvent(0, 100), createEvent(200, 150), createEvent(500, 200)],
+      () => [timelineEvent(0, 100), timelineEvent(200, 150), timelineEvent(500, 200)],
       0,
       700,
     ],
     ['no events', () => [], 0, 0],
-    ['an extremely large timestamp', () => [createEvent(1e12, 1000)], 0, 1e12 + 1000],
+    ['an extremely large timestamp', () => [timelineEvent(1e12, 1000)], 0, 1e12 + 1000],
   ])('reads the depth and duration of %s', (_name, events, maxDepth, totalDuration) => {
     const index = new TimelineEventIndex(events());
 
@@ -70,19 +62,19 @@ describe('TimelineEventIndex', () => {
       ['an event at 2x zoom', flat, 100, { zoom: 2 }, 0, false, 0],
       ['an event under a pan offset', flat, 150, { offsetX: 100 }, 0, false, 200],
       ['nothing between events', flat, 150, {}, 0, false, null],
-      ['nothing before all events', () => [createEvent(100, 100)], 50, {}, 0, false, null],
+      ['nothing before all events', () => [timelineEvent(100, 100)], 50, {}, 0, false, null],
       ['nothing after all events', flat, 600, {}, 0, false, null],
       [
         'nothing narrower than the minimum width',
-        () => [createEvent(0, 0.01)],
+        () => [timelineEvent(0, 0.01)],
         0,
         {},
         0,
         false,
         null,
       ],
-      ['a narrow event when width is ignored', () => [createEvent(0, 0.01)], 0, {}, 0, true, 0],
-      ['nothing for a zero-duration event', () => [createEvent(100, 0)], 100, {}, 0, false, null],
+      ['a narrow event when width is ignored', () => [timelineEvent(0, 0.01)], 0, {}, 0, true, 0],
+      ['nothing for a zero-duration event', () => [timelineEvent(100, 0)], 100, {}, 0, false, null],
       ['the parent at depth 0', nested, 10, {}, 0, false, 0],
       ['the parent, not the child under it, at depth 0', nested, 60, {}, 0, false, 0],
       ['the child at depth 1', nested, 60, {}, 1, false, 50],
@@ -90,7 +82,7 @@ describe('TimelineEventIndex', () => {
       ['nothing past the deepest level', nested, 60, {}, 5, false, null],
       [
         'one of several events at the same timestamp',
-        () => [createEvent(100, 50), createEvent(100, 50), createEvent(100, 50)],
+        () => [timelineEvent(100, 50), timelineEvent(100, 50), timelineEvent(100, 50)],
         120,
         {},
         0,
@@ -118,7 +110,7 @@ describe('TimelineEventIndex', () => {
       ['only the events inside the time range', flat, [150, 350, 0, 1], [200]],
       [
         'an event the region only partly overlaps',
-        () => [createEvent(100, 100)],
+        () => [timelineEvent(100, 100)],
         [150, 300, 0, 1],
         [100],
       ],

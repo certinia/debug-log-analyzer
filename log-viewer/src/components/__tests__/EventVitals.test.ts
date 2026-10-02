@@ -177,7 +177,7 @@ describe('EventVitals', () => {
   it('omits fields with no value', async () => {
     const el = await mount(store, { eventIndex: dmlIndex, type: 'dml' });
     // A DML statement allocates no heap and throws nothing in this log.
-    expect(labels(el)).not.toContain('Heap net');
+    expect(labels(el)).not.toContain('Heap Net');
     expect(labels(el)).not.toContain('Throws');
   });
 

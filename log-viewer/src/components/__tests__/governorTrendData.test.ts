@@ -52,7 +52,7 @@ describe('governorTrendSeries', () => {
       ]),
     );
 
-    expect(series[0]).toMatchObject({ label: 'Query Rows', used: 1_200, limit: 0, finalRatio: 0 });
+    expect(series[0]).toMatchObject({ label: 'SOQL Rows', used: 1_200, limit: 0, finalRatio: 0 });
     expect(series[0]?.points).toEqual([
       { t: 0, ratio: 0, used: 0 },
       { t: 1_000, ratio: 25, used: 300 },
@@ -89,7 +89,7 @@ describe('governorTrendSeries', () => {
       ),
     );
 
-    expect(series.map((s) => s.label)).toEqual(['SOQL', 'DML', 'Query Rows', 'Callouts']);
+    expect(series.map((s) => s.label)).toEqual(['SOQL', 'DML', 'SOQL Rows', 'Callouts']);
   });
 
   it('formats heap as bytes and everything else as integers', () => {

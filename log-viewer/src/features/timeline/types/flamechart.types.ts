@@ -755,18 +755,6 @@ export const TEXT_LABEL_CONSTANTS = {
 } as const;
 
 /**
- * Severity levels in ascending order (lowest to highest).
- * Used for z-index stacking when indicators overlap.
- * Render order: unexpected first (bottom layer) → skip → error → exception (top layer).
- */
-export const SEVERITY_ORDER: readonly MarkerType[] = [
-  'unexpected',
-  'skip',
-  'error',
-  'exception',
-] as const;
-
-/**
  * Maps marker type to severity rank (higher = more severe).
  * Used for sorting and prioritization logic during hit testing.
  */
@@ -867,7 +855,7 @@ export type MetricDenominator =
 export interface MetricStripClassifiedMetric {
   /** Unique metric identifier (e.g., 'cpuTime', 'soqlQueries') */
   metricId: string;
-  /** Display name for the metric (e.g., 'CPU Time', 'SOQL Queries') */
+  /** Display name for the metric (e.g., 'CPU Time', 'SOQL') */
   displayName: string;
   /** Tier classification: 1 = top 3, 2 = >80% at any point, 3 = remaining */
   tier: 1 | 2 | 3;

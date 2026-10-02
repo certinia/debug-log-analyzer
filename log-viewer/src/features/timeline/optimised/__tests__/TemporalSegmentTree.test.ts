@@ -6,6 +6,7 @@ import type { LogEvent } from '@apexdevtools/apex-log-parser';
 import type { LogCategory } from '@apexdevtools/apex-log-parser/types';
 
 import type { PixelBucket, ViewportState } from '../../types/flamechart.types.js';
+import { timelineEvent } from '#test-helpers/timeline.js';
 import { makeViewport } from '#test-helpers/viewport.js';
 import { TIMELINE_CONSTANTS } from '../../types/flamechart.types.js';
 import type { BatchColorInfo } from '../BucketColorResolver.js';
@@ -25,23 +26,6 @@ const CATEGORIES = new Set([
   'Validation',
 ]);
 
-function createEvent(
-  timestamp: number,
-  duration: number,
-  category: LogCategory,
-  children: LogEvent[] = [],
-): LogEvent {
-  return {
-    timestamp,
-    exitStamp: timestamp + duration,
-    duration: { total: duration, self: duration, netSelf: duration },
-    category,
-    type: 'METHOD_ENTRY',
-    text: `Event at ${timestamp}`,
-    children,
-  } as unknown as LogEvent;
-}
-
 function build(events: LogEvent[]): TemporalSegmentTree {
   return new TemporalSegmentTree(new RectangleCache(events, CATEGORIES).getRectsByCategory());
 }
@@ -60,12 +44,17 @@ describe('TemporalSegmentTree', () => {
   it.each<[string, LogEvent[], number]>([
     [
       'flat events',
-      [createEvent(0, 10, 'Apex'), createEvent(20, 10, 'SOQL'), createEvent(40, 10, 'DML')],
+      [timelineEvent(0, 10, 'Apex'), timelineEvent(20, 10, 'SOQL'), timelineEvent(40, 10, 'DML')],
       0,
     ],
     [
       'nested events',
-      [createEvent(0, 100, 'Apex', [createEvent(10, 30, 'SOQL'), createEvent(50, 30, 'DML')])],
+      [
+        timelineEvent(0, 100, 'Apex', [
+          timelineEvent(10, 30, 'SOQL'),
+          timelineEvent(50, 30, 'DML'),
+        ]),
+      ],
       1,
     ],
     ['no events', [], 0],
@@ -76,7 +65,7 @@ describe('TemporalSegmentTree', () => {
   describe('query', () => {
     // At zoom 1 an event wider than 2ns draws as a rect, and anything narrower is bucketed.
     it('draws an event wider than the threshold as a rect', () => {
-      const result = query([createEvent(0, 10, 'Apex')], makeViewport());
+      const result = query([timelineEvent(0, 10, 'Apex')], makeViewport());
 
       expect(result.visibleRects.get('Apex')).toHaveLength(1);
       expect(result.all).toHaveLength(0);
@@ -84,7 +73,7 @@ describe('TemporalSegmentTree', () => {
     });
 
     it('buckets an event under the threshold, under its own category', () => {
-      const result = query([createEvent(0, 1, 'DML')], makeViewport());
+      const result = query([timelineEvent(0, 1, 'DML')], makeViewport());
 
       expect(result.visibleRects.get('DML')).toHaveLength(0);
       expect(result.buckets.get('DML')).toHaveLength(1);
@@ -94,7 +83,7 @@ describe('TemporalSegmentTree', () => {
 
     it('buckets small events together, with the stats of each category', () => {
       const result = query(
-        [createEvent(0, 1, 'Apex'), createEvent(1, 1, 'SOQL')],
+        [timelineEvent(0, 1, 'Apex'), timelineEvent(1, 1, 'SOQL')],
         makeViewport({ zoom: 0.1 }),
       );
 
@@ -111,7 +100,7 @@ describe('TemporalSegmentTree', () => {
       ['last', ['SOQL', 'SOQL', 'DML']],
       ['first', ['DML', 'SOQL', 'SOQL']],
     ])('files a bucket under the category of highest priority, met %s', (_name, order) => {
-      const events = order.map((category, index) => createEvent(index, 1, category));
+      const events = order.map((category, index) => timelineEvent(index, 1, category));
 
       const result = query(events, makeViewport({ zoom: 0.01 }));
 
@@ -125,9 +114,9 @@ describe('TemporalSegmentTree', () => {
       [10, 3],
     ])('accounts for every event at zoom %d, drawing %d as rects', (zoom, drawn) => {
       const events = [
-        createEvent(0, 5, 'Apex'),
-        createEvent(10, 5, 'SOQL'),
-        createEvent(20, 5, 'DML'),
+        timelineEvent(0, 5, 'Apex'),
+        timelineEvent(10, 5, 'SOQL'),
+        timelineEvent(20, 5, 'DML'),
       ];
 
       const result = query(events, makeViewport({ zoom }));
@@ -138,9 +127,9 @@ describe('TemporalSegmentTree', () => {
 
     it('leaves out events outside the time range', () => {
       const events = [
-        createEvent(0, 10, 'Apex'),
-        createEvent(100, 10, 'SOQL'),
-        createEvent(200, 10, 'DML'),
+        timelineEvent(0, 10, 'Apex'),
+        timelineEvent(100, 10, 'SOQL'),
+        timelineEvent(200, 10, 'DML'),
       ];
 
       const result = query(events, makeViewport({ offsetX: 50, displayWidth: 100 }));
@@ -155,7 +144,9 @@ describe('TemporalSegmentTree', () => {
       [4, 3],
     ])('shows a view %d rows tall over a 3-deep stack as %d events', (rows, expected) => {
       const events = [
-        createEvent(0, 100, 'Apex', [createEvent(10, 80, 'SOQL', [createEvent(20, 60, 'DML')])]),
+        timelineEvent(0, 100, 'Apex', [
+          timelineEvent(10, 80, 'SOQL', [timelineEvent(20, 60, 'DML')]),
+        ]),
       ];
 
       const result = query(
@@ -168,10 +159,10 @@ describe('TemporalSegmentTree', () => {
 
     it('counts the same events as the legacy culler', () => {
       const events = [
-        createEvent(0, 10, 'Apex'),
-        createEvent(20, 5, 'SOQL'),
-        createEvent(30, 3, 'DML'),
-        createEvent(40, 1, 'Apex'),
+        timelineEvent(0, 10, 'Apex'),
+        timelineEvent(20, 5, 'SOQL'),
+        timelineEvent(30, 3, 'DML'),
+        timelineEvent(40, 1, 'Apex'),
       ];
       const cache = new RectangleCache(events, CATEGORIES);
 
@@ -192,7 +183,7 @@ describe('TemporalSegmentTree', () => {
   describe('branch bounds', () => {
     it('finds a long event when a later, shorter event ends first', () => {
       const result = query(
-        [createEvent(0, 100, 'Apex'), createEvent(50, 10, 'SOQL')],
+        [timelineEvent(0, 100, 'Apex'), timelineEvent(50, 10, 'SOQL')],
         makeViewport({ offsetX: 70, displayWidth: 20 }),
       );
 
@@ -202,10 +193,10 @@ describe('TemporalSegmentTree', () => {
 
     it('finds the one event that ends latest among several', () => {
       const events = [
-        createEvent(0, 50, 'Apex'),
-        createEvent(10, 100, 'SOQL'),
-        createEvent(20, 30, 'DML'),
-        createEvent(30, 20, 'Apex'),
+        timelineEvent(0, 50, 'Apex'),
+        timelineEvent(10, 100, 'SOQL'),
+        timelineEvent(20, 30, 'DML'),
+        timelineEvent(30, 20, 'Apex'),
       ];
 
       const result = query(events, makeViewport({ offsetX: 80, displayWidth: 40 }));
@@ -216,8 +207,8 @@ describe('TemporalSegmentTree', () => {
 
     it('finds a long event by region, for hit testing', () => {
       const found = build([
-        createEvent(0, 100, 'Apex'),
-        createEvent(50, 10, 'SOQL'),
+        timelineEvent(0, 100, 'Apex'),
+        timelineEvent(50, 10, 'SOQL'),
       ]).queryEventsInRegion(70, 90, 0, 0);
 
       expect(found.map((event) => event.category)).toEqual(['Apex']);

@@ -35,9 +35,9 @@ import { governorTier } from './GovernorSummary.js';
 /** More than a namespace bar: shades in a wide card, not a dock legend. */
 const MAX_OBJECTS = 8;
 
-const OBJECTS_LABEL = 'Query and DML rows by SObject';
+const OBJECTS_LABEL = 'SOQL and DML rows by SObject';
 
-const KIND_LABEL: Record<RowBudgetKind, string> = { SOQL: 'Query rows', DML: 'DML rows' };
+const KIND_LABEL: Record<RowBudgetKind, string> = { SOQL: 'SOQL rows', DML: 'DML rows' };
 
 /**
  * The rows a log holds against the two row limits, split by the SObject that

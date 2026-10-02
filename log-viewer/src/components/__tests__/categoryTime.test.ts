@@ -17,7 +17,7 @@ interface FakeEvent {
   children: FakeEvent[];
 }
 
-const ev = (category: string, self: number, children: FakeEvent[] = []): FakeEvent => ({
+const categoryEvent = (category: string, self: number, children: FakeEvent[] = []): FakeEvent => ({
   category,
   duration: { total: self + children.reduce((sum, c) => sum + c.duration.total, 0), self },
   children,
@@ -37,8 +37,8 @@ const timelineSettings = (
 describe('categorySelfTimes', () => {
   it('sums self time per category over the whole tree, largest first', () => {
     const root = log([
-      ev('Apex', 100, [ev('SOQL', 500), ev('Apex', 50)]),
-      ev('DML', 200, [ev('Apex', 25)]),
+      categoryEvent('Apex', 100, [categoryEvent('SOQL', 500), categoryEvent('Apex', 50)]),
+      categoryEvent('DML', 200, [categoryEvent('Apex', 25)]),
     ]);
 
     expect(categorySelfTimes(root)).toEqual([
@@ -49,7 +49,11 @@ describe('categorySelfTimes', () => {
   });
 
   it('buckets uncategorised events under Other and drops empty categories', () => {
-    const root = log([ev('', 40), ev('Apex', 0), ev('System', 10)]);
+    const root = log([
+      categoryEvent('', 40),
+      categoryEvent('Apex', 0),
+      categoryEvent('System', 10),
+    ]);
 
     expect(categorySelfTimes(root)).toEqual([
       { category: OTHER_CATEGORY, selfTime: 40 },
@@ -58,7 +62,7 @@ describe('categorySelfTimes', () => {
   });
 
   it('memoises per log, returning the same array for the same tree', () => {
-    const root = log([ev('Apex', 100)]);
+    const root = log([categoryEvent('Apex', 100)]);
 
     expect(categorySelfTimes(root)).toBe(categorySelfTimes(root));
   });
