@@ -5,11 +5,7 @@ import type { ApexLog, LogEvent } from '@apexdevtools/apex-log-parser';
 import type { GovernorLimits, Limits } from '@apexdevtools/apex-log-parser/types';
 import { beforeEach, describe, expect, it } from '@jest/globals';
 
-import {
-  emptyLimits,
-  governorLimits,
-  limitValue,
-} from '../../../../components/__tests__/limitsTestUtils.js';
+import { emptyLimits, governorLimits, limitValue } from '#test-helpers/limits.js';
 
 let log: ApexLog | null = null;
 

@@ -5,7 +5,7 @@ import { describe, expect, it } from '@jest/globals';
 
 import { formatByteSize } from '../../core/utility/Util.js';
 import { governorTrendSeries, pointAt, type TrendPoint } from '../governorTrendData.js';
-import { seriesEvent, timeSeries } from './limitsTestUtils.js';
+import { seriesEvent, timeSeries } from '#test-helpers/limits.js';
 
 describe('governorTrendSeries', () => {
   it('charts a sampled metric, anchored at the start of the log', () => {

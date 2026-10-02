@@ -4,7 +4,7 @@
 import { describe, expect, it } from '@jest/globals';
 import type { GovernorLimits } from '@apexdevtools/apex-log-parser/types';
 
-import { governorLimits, limitValue } from '../../../../components/__tests__/limitsTestUtils.js';
+import { governorLimits, limitValue } from '#test-helpers/limits.js';
 
 import {
   governorCost,

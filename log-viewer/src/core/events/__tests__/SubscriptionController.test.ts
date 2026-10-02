@@ -8,7 +8,7 @@ import { describe, expect, it } from '@jest/globals';
 import { LitElement, html } from 'lit';
 
 import { SubscriptionController } from '../SubscriptionController.js';
-import { fakeHost } from './fakeHost.js';
+import { fakeHost } from '#test-helpers/fakeHost.js';
 
 describe('SubscriptionController', () => {
   it('subscribes on connect, not while it is built', () => {

@@ -4,7 +4,7 @@
 import { describe, expect, it } from '@jest/globals';
 import type { ApexLog } from '@apexdevtools/apex-log-parser';
 
-import { emptyLimits } from '../../../../components/__tests__/limitsTestUtils.js';
+import { emptyLimits } from '#test-helpers/limits.js';
 import { apexLimitTimeSeries } from '../apex-limit-series.js';
 
 const aLog = (logIssues: ApexLog['logIssues']) =>

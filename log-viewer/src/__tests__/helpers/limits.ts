@@ -7,7 +7,7 @@ import type {
   HeatStripEvent,
   HeatStripTimeSeries,
 } from '../../features/timeline/types/flamechart.types.js';
-import { limitValue } from '../logOverviewMetrics.js';
+import { limitValue } from '../../components/logOverviewMetrics.js';
 
 export { limitValue };
 
