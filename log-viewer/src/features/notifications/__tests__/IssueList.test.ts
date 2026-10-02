@@ -1,9 +1,9 @@
 /*
  * Copyright (c) 2026 Certinia Inc. All rights reserved.
  *
- * @jest-environment jsdom
+ * @vitest-environment jsdom
  */
-import { afterEach, beforeAll, describe, expect, it } from '@jest/globals';
+import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
 
 import type { IssueAction, IssueSeverity, LogIssue } from '../types.js';
 
@@ -131,7 +131,7 @@ describe('IssueList', () => {
   });
 
   it('activates by clicking the card and by the keyboard-reachable action button', async () => {
-    const run = jest.fn();
+    const run = vi.fn();
     const el = await mount([issue('error', 'has action', { label: 'Go somewhere', run })]);
 
     // The card is a group so its message can be a button: a control inside a control is
@@ -157,9 +157,7 @@ describe('IssueList', () => {
   });
 
   it('puts the action button on the summary line, not below the message', async () => {
-    const el = await mount([
-      issue('error', 'has action', { label: 'Go somewhere', run: jest.fn() }),
-    ]);
+    const el = await mount([issue('error', 'has action', { label: 'Go somewhere', run: vi.fn() })]);
 
     const head = el.shadowRoot?.querySelector('.issue__head');
     expect(head?.querySelector('.issue__summary')).not.toBeNull();
@@ -168,7 +166,7 @@ describe('IssueList', () => {
 
   it('uses the action icon when one is supplied', async () => {
     const el = await mount([
-      issue('warning', 'report me', { label: 'Report', icon: 'link-external', run: jest.fn() }),
+      issue('warning', 'report me', { label: 'Report', icon: 'link-external', run: vi.fn() }),
     ]);
 
     expect(el.shadowRoot?.querySelector('vscode-icon.issue__go')?.getAttribute('name')).toBe(
@@ -194,7 +192,7 @@ describe('IssueList', () => {
 
   it('toggles a clipped message on click without activating the card', async () => {
     stubOverflow();
-    const run = jest.fn();
+    const run = vi.fn();
     const el = await mount([issue('error', 'long', { label: 'Go somewhere', run })]);
     // A second settle: the first render's `updated()` is what measures the overflow, and the
     // state it sets is what turns the message into a toggle.
@@ -221,7 +219,7 @@ describe('IssueList', () => {
   });
 
   it('re-measures when it is given a size, since both popovers render it closed', async () => {
-    const el = await mount([issue('error', 'long', { label: 'Go somewhere', run: jest.fn() })]);
+    const el = await mount([issue('error', 'long', { label: 'Go somewhere', run: vi.fn() })]);
 
     // No layout yet — as inside a closed popover, where measuring would find nothing clipped.
     expect(el.shadowRoot?.querySelector('button.issue__message')).toBeNull();
@@ -236,7 +234,7 @@ describe('IssueList', () => {
 
   it('titles both the action button and the message toggle', async () => {
     stubOverflow();
-    const el = await mount([issue('error', 'long', { label: 'Go somewhere', run: jest.fn() })]);
+    const el = await mount([issue('error', 'long', { label: 'Go somewhere', run: vi.fn() })]);
     await el.updateComplete;
 
     expect(el.shadowRoot?.querySelector('vscode-icon.issue__go')?.getAttribute('title')).toBe(
@@ -274,7 +272,7 @@ describe('IssueList', () => {
   });
 
   it('does not activate the card when the click ends a text selection', async () => {
-    const run = jest.fn();
+    const run = vi.fn();
     const el = await mount([issue('error', 'selectable', { label: 'Go somewhere', run })]);
 
     const selection = document.getSelection();

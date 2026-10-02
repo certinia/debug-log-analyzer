@@ -1,15 +1,15 @@
 /*
  * Copyright (c) 2026 Certinia Inc. All rights reserved.
  */
-import { beforeEach, describe, expect, it } from '@jest/globals';
+import { beforeEach, describe, expect, it, type Mock } from 'vitest';
 
 import { commands, window } from 'vscode';
 
 import { asContext, createMockContext } from '../../__tests__/helpers/test-builders.js';
 import { WhatsNewNotification } from '../WhatsNewNotification.js';
 
-const mockShowInformationMessage = window.showInformationMessage as jest.Mock;
-const mockExecuteCommand = commands.executeCommand as jest.Mock;
+const mockShowInformationMessage = window.showInformationMessage as Mock;
+const mockExecuteCommand = commands.executeCommand as Mock;
 
 const SEE_WHATS_NEW = "See What's New";
 const VIEWED_KEY = 'update.confirmed.versions';
@@ -17,7 +17,7 @@ const VIEWED_KEY = 'update.confirmed.versions';
 function contextForVersion(version: string, viewed: string[] = []) {
   const mockContext = createMockContext();
   mockContext.context.extension.packageJSON = { name: 'lana', version };
-  (mockContext.context.globalState.get as jest.Mock).mockReturnValue(viewed);
+  (mockContext.context.globalState.get as Mock).mockReturnValue(viewed);
   return mockContext;
 }
 
@@ -97,7 +97,7 @@ describe('WhatsNewNotification', () => {
     it('treats no stored versions as none seen', async () => {
       const mockContext = createMockContext();
       mockContext.context.extension.packageJSON = { name: 'lana', version: '1.2.0' };
-      (mockContext.context.globalState.get as jest.Mock).mockReturnValue(undefined);
+      (mockContext.context.globalState.get as Mock).mockReturnValue(undefined);
 
       await WhatsNewNotification.apply(asContext(mockContext));
 

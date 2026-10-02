@@ -1,17 +1,17 @@
 /*
  * Copyright (c) 2026 Certinia Inc. All rights reserved.
  *
- * @jest-environment jsdom
+ * @vitest-environment jsdom
  */
-import { describe, expect, it } from '@jest/globals';
+import { describe, expect, it, vi } from 'vitest';
 
 // Capture the options the component hands to Tabulator. The real ESM build (and
-// its module registrations) doesn't load under jest.
+// its module registrations) doesn't load in tests.
 const built: Record<string, unknown>[] = [];
 const selected: number[][] = [];
 type TableHandler = (...args: unknown[]) => void;
 const handlers: Record<string, TableHandler> = {};
-jest.mock('tabulator-tables', () => ({
+vi.mock('tabulator-tables', () => ({
   Tabulator: class {
     static registerModule() {}
     constructor(_el: HTMLElement, options: Record<string, unknown>) {
@@ -29,11 +29,13 @@ jest.mock('tabulator-tables', () => ({
     }
   },
   Module: class {},
+  KeybindingsModule: class {},
+  SelectRowModule: class {},
   Renderer: class {},
 }));
 
 // No log store in the test, so the stack is empty.
-jest.mock('../callStackData.js', () => ({
+vi.mock('../callStackData.js', () => ({
   buildCallStackData: () => ({ rows: [], rootTotal: 0 }),
 }));
 

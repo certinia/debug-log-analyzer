@@ -1,7 +1,7 @@
 /*
  * Copyright (c) 2026 Certinia Inc. All rights reserved.
  */
-import { beforeEach, describe, expect, it } from '@jest/globals';
+import { beforeEach, describe, expect, it, type Mock, vi } from 'vitest';
 
 import { SymbolKind, languages } from 'vscode';
 
@@ -23,13 +23,13 @@ import {
 import { LogEventCache } from '../../cache/LogEventCache.js';
 import { RawLogSymbolProvider } from '../RawLogSymbolProvider.js';
 
-jest.mock('../../cache/LogEventCache.js', () => ({
+vi.mock('../../cache/LogEventCache.js', () => ({
   LogEventCache: {
-    getApexLog: jest.fn(),
+    getApexLog: vi.fn(),
   },
 }));
 
-const mockGetApexLog = LogEventCache.getApexLog as jest.Mock;
+const mockGetApexLog = LogEventCache.getApexLog as Mock;
 const APEX_LOG_LINE = '09:45:31.888 (1000)|EXECUTION_STARTED';
 
 describe('RawLogSymbolProvider', () => {
@@ -166,7 +166,7 @@ describe('RawLogSymbolProvider', () => {
     const applyProvider = () => {
       const mockContext = createMockContext();
       RawLogSymbolProvider.apply(asContext(mockContext));
-      const registered = (languages.registerDocumentSymbolProvider as jest.Mock).mock.calls.at(
+      const registered = (languages.registerDocumentSymbolProvider as Mock).mock.calls.at(
         -1,
       )?.[1] as RawLogSymbolProvider | undefined;
       if (!registered) {
@@ -176,7 +176,7 @@ describe('RawLogSymbolProvider', () => {
     };
 
     const fireTabChange = () => {
-      const handler = (window.tabGroups.onDidChangeTabs as jest.Mock).mock.calls[0]?.[0] as (
+      const handler = (window.tabGroups.onDidChangeTabs as Mock).mock.calls[0]?.[0] as (
         event: unknown,
       ) => void;
       handler(undefined);

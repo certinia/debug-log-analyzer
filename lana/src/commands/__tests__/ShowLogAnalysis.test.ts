@@ -1,7 +1,7 @@
 /*
  * Copyright (c) 2026 Certinia Inc. All rights reserved.
  */
-import { beforeEach, describe, expect, it } from '@jest/globals';
+import { beforeEach, describe, expect, it, type Mock, vi } from 'vitest';
 import { Uri } from 'vscode';
 
 import {
@@ -13,11 +13,11 @@ import { fileOrFolderExists } from '../../fs/workspaceFs.js';
 import { LogView } from '../LogView.js';
 import { ShowLogAnalysis } from '../ShowLogAnalysis.js';
 
-jest.mock('../../fs/workspaceFs.js', () => ({ fileOrFolderExists: jest.fn() }));
-jest.mock('../LogView.js', () => ({ LogView: { createView: jest.fn() } }));
+vi.mock('../../fs/workspaceFs.js', () => ({ fileOrFolderExists: vi.fn() }));
+vi.mock('../LogView.js', () => ({ LogView: { createView: vi.fn() } }));
 
-const mockFileOrFolderExists = fileOrFolderExists as jest.Mock;
-const mockCreateView = LogView.createView as jest.Mock;
+const mockFileOrFolderExists = fileOrFolderExists as Mock;
+const mockCreateView = LogView.createView as Mock;
 
 describe('ShowLogAnalysis', () => {
   beforeEach(() => {

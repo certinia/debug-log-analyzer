@@ -1,9 +1,9 @@
 /*
  * Copyright (c) 2026 Certinia Inc. All rights reserved.
  *
- * @jest-environment jsdom
+ * @vitest-environment jsdom
  */
-import { afterEach, beforeEach, describe, expect, it } from '@jest/globals';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import {
   eventBus,
@@ -14,11 +14,11 @@ import {
 
 // The three grids and the summary bring tabulator and its stylesheets with them;
 // this suite only drives the selection contract between them and DatabaseView.
-jest.mock('../DMLView.js', () => ({}));
-jest.mock('../SOQLView.js', () => ({}));
-jest.mock('../SOSLView.js', () => ({}));
-jest.mock('../GovernorSummary.js', () => ({}));
-jest.mock('../DatabaseSection.js', () => ({}));
+vi.mock('../DMLView.js', () => ({}));
+vi.mock('../SOQLView.js', () => ({}));
+vi.mock('../SOSLView.js', () => ({}));
+vi.mock('../GovernorSummary.js', () => ({}));
+vi.mock('../DatabaseSection.js', () => ({}));
 
 import '../DatabaseView.js';
 

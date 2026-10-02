@@ -1,7 +1,7 @@
 /*
  * Copyright (c) 2026 Certinia Inc. All rights reserved.
  */
-import { describe, expect, it } from '@jest/globals';
+import { describe, expect, it } from 'vitest';
 
 import type { FrameBudgetOptions } from '../../core/utility/FrameBudget.js';
 import { cachedNamespaceSelfTimes, scopedNamespaceSelfTimes } from '../namespaceTime.js';

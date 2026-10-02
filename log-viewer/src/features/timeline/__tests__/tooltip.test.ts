@@ -1,5 +1,5 @@
 /**
- * @jest-environment jsdom
+ * @vitest-environment jsdom
  */
 
 /*
@@ -15,7 +15,7 @@
  * - Content generation from event data, with clamped query previews
  * - The on/off switch
  */
-import { afterEach, beforeEach, describe, expect, it, jest } from '@jest/globals';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { ApexLog, LogEvent } from '@apexdevtools/apex-log-parser';
 
 import {
@@ -156,11 +156,11 @@ describe('FrameTooltipRenderer', () => {
   /** Show and let the delay expire, which is what a settled hover looks like. */
   function showSettled(event: LogEvent, anchor: TooltipAnchor): void {
     frameTooltipRenderer.show(event, anchor);
-    jest.advanceTimersByTime(SHOW_DELAY_MS);
+    vi.advanceTimersByTime(SHOW_DELAY_MS);
   }
 
   beforeEach(() => {
-    jest.useFakeTimers();
+    vi.useFakeTimers();
 
     // Create container element
     container = document.createElement('div');
@@ -184,7 +184,7 @@ describe('FrameTooltipRenderer', () => {
   afterEach(() => {
     frameTooltipRenderer.destroy();
     document.body.removeChild(container);
-    jest.useRealTimers();
+    vi.useRealTimers();
   });
 
   it('creates the tooltip element hidden', () => {
@@ -196,19 +196,19 @@ describe('FrameTooltipRenderer', () => {
     it('should not show the tooltip before the delay expires', () => {
       frameTooltipRenderer.show(tooltipEvent(0, 100), cursorAnchor(100, 100));
 
-      jest.advanceTimersByTime(SHOW_DELAY_MS - 1);
+      vi.advanceTimersByTime(SHOW_DELAY_MS - 1);
       expect(tooltipEl().dataset.visible).toBeUndefined();
 
-      jest.advanceTimersByTime(1);
+      vi.advanceTimersByTime(1);
       expect(tooltipEl().dataset.visible).toBe('true');
     });
 
     it('should never show when the pointer leaves before the delay expires', () => {
       frameTooltipRenderer.show(tooltipEvent(0, 100), cursorAnchor(100, 100));
 
-      jest.advanceTimersByTime(SHOW_DELAY_MS - 20);
+      vi.advanceTimersByTime(SHOW_DELAY_MS - 20);
       frameTooltipRenderer.hide();
-      jest.advanceTimersByTime(SHOW_DELAY_MS);
+      vi.advanceTimersByTime(SHOW_DELAY_MS);
 
       expect(tooltipEl().dataset.visible).toBeUndefined();
     });
@@ -232,10 +232,10 @@ describe('FrameTooltipRenderer', () => {
       showSettled(tooltipEvent(0, 100), cursorAnchor(100, 100));
 
       frameTooltipRenderer.hide();
-      jest.advanceTimersByTime(HIDE_GRACE_MS - 1);
+      vi.advanceTimersByTime(HIDE_GRACE_MS - 1);
       expect(tooltipEl().dataset.visible).toBe('true');
 
-      jest.advanceTimersByTime(1);
+      vi.advanceTimersByTime(1);
       expect(tooltipEl().dataset.visible).toBe('false');
     });
 
@@ -244,9 +244,9 @@ describe('FrameTooltipRenderer', () => {
       showSettled(event, cursorAnchor(100, 100));
 
       frameTooltipRenderer.hide();
-      jest.advanceTimersByTime(HIDE_GRACE_MS - 10);
+      vi.advanceTimersByTime(HIDE_GRACE_MS - 10);
       frameTooltipRenderer.show(event, cursorAnchor(110, 100));
-      jest.advanceTimersByTime(HIDE_GRACE_MS);
+      vi.advanceTimersByTime(HIDE_GRACE_MS);
 
       expect(tooltipEl().dataset.visible).toBe('true');
     });
@@ -605,7 +605,7 @@ describe('FrameTooltipRenderer', () => {
       const rect = { x: 100, y: 500, width: 600, height: 20 };
       showSettled(event, frameAnchor(rect, 0, 200));
 
-      const measured = jest.fn(() => 100);
+      const measured = vi.fn(() => 100);
       Object.defineProperty(element, 'offsetHeight', { configurable: true, get: measured });
 
       // Same content: the panel re-places to follow the cursor, but its size still holds.
@@ -691,7 +691,7 @@ describe('FrameTooltipRenderer', () => {
 
       frameTooltipRenderer.destroy();
 
-      expect(() => jest.advanceTimersByTime(SHOW_DELAY_MS)).not.toThrow();
+      expect(() => vi.advanceTimersByTime(SHOW_DELAY_MS)).not.toThrow();
     });
 
     it('should handle multiple destroy calls safely', () => {
@@ -747,7 +747,7 @@ describe('FrameTooltipRenderer', () => {
         } as TimelineMarker,
         cursorAnchor(100, 100),
       );
-      jest.advanceTimersByTime(SHOW_DELAY_MS);
+      vi.advanceTimersByTime(SHOW_DELAY_MS);
 
       const panel = tooltipEl();
       expect(panel.querySelectorAll('.tooltip-group')).toHaveLength(1);

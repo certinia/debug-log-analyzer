@@ -1,9 +1,9 @@
 /*
  * Copyright (c) 2026 Certinia Inc. All rights reserved.
  *
- * @jest-environment jsdom
+ * @vitest-environment jsdom
  */
-import { describe, expect, it } from '@jest/globals';
+import { describe, expect, it, vi } from 'vitest';
 
 import { MAX_MARKED_PER_VALUE } from '../../core/log/aggregateVariables.js';
 import { SETTINGS, indexOf, indexesOf, storeOf } from '#test-helpers/apexLog.js';
@@ -11,12 +11,12 @@ import type { LogStore } from '../../core/log/LogStore.js';
 
 // Avoid the heavy CodeBlock import chain (the soql formatter). The raw value it
 // renders is covered by variableValue's own tests.
-jest.mock('../CodeBlock.js', () => ({}));
+vi.mock('../CodeBlock.js', () => ({}));
 
 // `options` tells the section's own read (none) from the comparison's per-call reads.
 const frameReads: { store: unknown; index: unknown; options: unknown }[] = [];
-jest.mock('../../core/log/frameVariables.js', () => {
-  const actual = jest.requireActual<typeof import('../../core/log/frameVariables.js')>(
+vi.mock('../../core/log/frameVariables.js', async () => {
+  const actual = await vi.importActual<typeof import('../../core/log/frameVariables.js')>(
     '../../core/log/frameVariables.js',
   );
   return {
@@ -29,8 +29,8 @@ jest.mock('../../core/log/frameVariables.js', () => {
 });
 
 let treeBuilds = 0;
-jest.mock('../variableTree.js', () => {
-  const actual = jest.requireActual<typeof import('../variableTree.js')>('../variableTree.js');
+vi.mock('../variableTree.js', async () => {
+  const actual = await vi.importActual<typeof import('../variableTree.js')>('../variableTree.js');
   return {
     ...actual,
     toTreeRows: (...args: Parameters<typeof actual.toTreeRows>) => {
@@ -131,7 +131,7 @@ describe('VariablesDetail read failure', () => {
         throw new Error('boom');
       },
     });
-    const errorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
 
     const el = await mount(store, { eventIndex: indexOf(store.log, 'ns.Outer.run()') });
 

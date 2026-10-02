@@ -1,40 +1,50 @@
 /*
  * Copyright (c) 2026 Certinia Inc. All rights reserved.
  *
- * @jest-environment jsdom
+ * @vitest-environment jsdom
  */
-import { beforeEach, describe, expect, it } from '@jest/globals';
+import { beforeEach, describe, expect, it, type Mock, vi } from 'vitest';
 
-// The tabulator ESM build (+ its module registrations) doesn't load under jest;
+// The tabulator ESM build (+ its module registrations) doesn't load in tests;
 // this stub records what the component does to a table instead.
-jest.mock('tabulator-tables', () => {
+vi.mock('tabulator-tables', () => {
   class Tabulator {
     static registerModule() {}
     static instances: Tabulator[] = [];
-    setData = jest.fn(() => Promise.resolve());
-    redraw = jest.fn();
-    destroy = jest.fn();
-    on = jest.fn();
-    getSelectedRows = jest.fn(() => []);
-    selectRow = jest.fn();
+    setData = vi.fn(() => Promise.resolve());
+    redraw = vi.fn();
+    destroy = vi.fn();
+    on = vi.fn();
+    getSelectedRows = vi.fn(() => []);
+    selectRow = vi.fn();
     options: Record<string, unknown>;
     constructor(_element: HTMLElement, options: Record<string, unknown>) {
       this.options = options;
       Tabulator.instances.push(this);
     }
   }
-  return { Tabulator, Module: class {}, Renderer: class {} };
+  return {
+    Tabulator,
+    Module: class {},
+    KeybindingsModule: class {},
+    SelectRowModule: class {},
+    Renderer: class {},
+  };
 });
 
 // The walk is what this suite is about, so it's stubbed; each test says whether
 // it yields a tree or nothing, and when.
-jest.mock('../scopedCallTree.js', () => ({
-  buildScopedCallTree: jest.fn(() => Promise.resolve(null)),
+vi.mock('../scopedCallTree.js', async () => ({
+  buildScopedCallTree: vi.fn(() => Promise.resolve(null)),
   // Keep the real row readers: the hover test is about which rows name a frame.
-  revealableEventIndex: jest.requireActual('../scopedCallTree.js').revealableEventIndex,
-  locatableEventIndexes: jest.requireActual('../scopedCallTree.js').locatableEventIndexes,
-  frameEventIndexes: jest.requireActual('../scopedCallTree.js').frameEventIndexes,
-  rowIdsByPath: jest.requireActual('../scopedCallTree.js').rowIdsByPath,
+  revealableEventIndex: (await vi.importActual<Record<string, unknown>>('../scopedCallTree.js'))
+    .revealableEventIndex,
+  locatableEventIndexes: (await vi.importActual<Record<string, unknown>>('../scopedCallTree.js'))
+    .locatableEventIndexes,
+  frameEventIndexes: (await vi.importActual<Record<string, unknown>>('../scopedCallTree.js'))
+    .frameEventIndexes,
+  rowIdsByPath: (await vi.importActual<Record<string, unknown>>('../scopedCallTree.js'))
+    .rowIdsByPath,
 }));
 
 import { Tabulator, type RowComponent } from 'tabulator-tables';
@@ -51,19 +61,19 @@ import type { ApexLog } from '@apexdevtools/apex-log-parser';
 import { logStoreFor, type LogStore } from '../../core/log/LogStore.js';
 import { ROOT_PATH_ID } from '../../core/log/keyPathIds.js';
 
-const build = jest.mocked(buildScopedCallTree);
+const build = vi.mocked(buildScopedCallTree);
 
 interface StubTable {
   options: {
     columns: Array<{ field: string; formatterParams: ProgressParams; width: number }>;
     placeholder: () => string;
   };
-  on: jest.Mock;
-  setData: jest.Mock;
-  redraw: jest.Mock;
-  destroy: jest.Mock;
-  selectRow: jest.Mock;
-  getSelectedRows: jest.Mock;
+  on: Mock;
+  setData: Mock;
+  redraw: Mock;
+  destroy: Mock;
+  selectRow: Mock;
+  getSelectedRows: Mock;
 }
 
 /** The stub tables built so far, oldest first. */
@@ -194,7 +204,7 @@ describe('CallTreeDetail scoped build', () => {
     const el = await mount(5);
     await frame(el);
     const table = tables.instances[0]!;
-    const picked = { deselect: jest.fn(), getData: () => ({ id: 9 }) };
+    const picked = { deselect: vi.fn(), getData: () => ({ id: 9 }) };
     table.getSelectedRows.mockReturnValue([picked]);
     table.selectRow.mockClear();
 
@@ -213,7 +223,7 @@ describe('CallTreeDetail scoped build', () => {
     const el = await mount(5, 'callees');
     await frame(el);
     const table = tables.instances[0]!;
-    const picked = { deselect: jest.fn() };
+    const picked = { deselect: vi.fn() };
     table.getSelectedRows.mockReturnValue([picked]);
 
     el.activeEventIndex = 9;

@@ -3,14 +3,11 @@
  */
 
 /**
- * Jest applies this to every log-viewer suite that resolves `tabulator-tables`, whether
- * or not the suite asks. That is why nothing references it and it reads as dead: delete
- * it and the suites subclassing `Module` or `Renderer` fail with
- * `Class extends value undefined`.
+ * `vitest.config.mts` aliases `tabulator-tables` to this for every log-viewer suite, whether
+ * or not the suite asks.
  *
- * The real package cannot load at all under jest. Its `require` condition resolves to
- * the UMD build, whose export is the bare `TabulatorFull` class, so `Module`, `Renderer`
- * and `Tabulator` are all undefined. A suite needing more than the two classes below
+ * The real package reads `document` as it loads (`Row`'s static initializer), so a suite on
+ * the `node` environment cannot import it. A suite needing more than the two classes below
  * passes its own factory, which overrides this.
  *
  * Keep `Tabulator` out of here. `registerModule` writes a process-wide registry, so

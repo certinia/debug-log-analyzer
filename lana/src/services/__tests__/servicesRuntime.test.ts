@@ -1,7 +1,7 @@
 /*
  * Copyright (c) 2026 Certinia Inc. All rights reserved.
  */
-import { afterEach, beforeEach, describe, expect, it } from '@jest/globals';
+import { afterEach, beforeEach, describe, expect, it, type Mock, vi } from 'vitest';
 import * as EffectContext from 'effect/Context';
 import { commands, extensions, window } from 'vscode';
 
@@ -11,21 +11,21 @@ import {
   isSalesforceServicesApi,
 } from '../servicesRuntime.js';
 
-const mockGetExtension = extensions.getExtension as jest.Mock;
-const mockShowErrorMessage = window.showErrorMessage as jest.Mock;
-const mockExecuteCommand = commands.executeCommand as jest.Mock;
+const mockGetExtension = extensions.getExtension as Mock;
+const mockShowErrorMessage = window.showErrorMessage as Mock;
+const mockExecuteCommand = commands.executeCommand as Mock;
 
 const validApi = () => ({
   services: {
     prebuiltServicesDependencies: EffectContext.empty(),
     ApexLogService: {
-      listLogs: jest.fn(),
-      getLogBody: jest.fn(),
+      listLogs: vi.fn(),
+      getLogBody: vi.fn(),
     },
     FsService: {
-      readFile: jest.fn(),
-      safeWriteFile: jest.fn(),
-      fileOrFolderExists: jest.fn(),
+      readFile: vi.fn(),
+      safeWriteFile: vi.fn(),
+      fileOrFolderExists: vi.fn(),
     },
   },
 });
@@ -83,7 +83,7 @@ describe('servicesRuntime', () => {
   });
 
   it('activates Salesforce Services once for concurrent requests', async () => {
-    const activate = jest.fn().mockResolvedValue(validApi());
+    const activate = vi.fn().mockResolvedValue(validApi());
     mockGetExtension.mockReturnValue({ isActive: false, activate });
 
     await expect(
@@ -96,7 +96,7 @@ describe('servicesRuntime', () => {
   it('preserves unexpected activation failures', async () => {
     mockGetExtension.mockReturnValue({
       isActive: false,
-      activate: jest.fn().mockRejectedValue(new Error('activation failed')),
+      activate: vi.fn().mockRejectedValue(new Error('activation failed')),
     });
 
     await expect(ensureServicesAvailable()).rejects.toThrow('activation failed');

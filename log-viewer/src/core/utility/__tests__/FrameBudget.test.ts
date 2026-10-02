@@ -1,7 +1,7 @@
 /*
  * Copyright (c) 2026 Certinia Inc. All rights reserved.
  */
-import { describe, expect, it, jest } from '@jest/globals';
+import { describe, expect, it, vi } from 'vitest';
 
 import { frameBudget, waitForNextTask } from '../FrameBudget.js';
 
@@ -17,9 +17,9 @@ describe('waitForNextTask', () => {
 describe('frameBudget', () => {
   it('yields once the slice is spent, and reports an abandoned build', async () => {
     const controller = new AbortController();
-    const yieldSlice = jest.fn(() => Promise.resolve());
+    const yieldSlice = vi.fn(() => Promise.resolve());
     // Runs the clock past the 8ms slice, so the next tick must yield.
-    const now = jest.spyOn(performance, 'now');
+    const now = vi.spyOn(performance, 'now');
     now.mockReturnValue(0);
     const tick = frameBudget({ yieldSlice, signal: controller.signal });
 

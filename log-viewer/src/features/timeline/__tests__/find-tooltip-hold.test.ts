@@ -1,5 +1,5 @@
 /**
- * @jest-environment jsdom
+ * @vitest-environment jsdom
  */
 
 /*
@@ -13,7 +13,7 @@
  * the chart. It is held until the reader moves the pointer, and closing the find drops it.
  */
 
-import { beforeEach, describe, expect, it, jest } from '@jest/globals';
+import { beforeEach, describe, expect, it, type Mock, vi } from 'vitest';
 import { ApexLogTimeline } from '../optimised/ApexLogTimeline.js';
 import type { EventNode, HoverCause, TimelineMarker } from '../types/flamechart.types.js';
 
@@ -26,7 +26,7 @@ const MATCH: EventNode = {
   original: { eventIndex: 7, isParent: true },
 };
 
-type Tooltip = { show: jest.Mock; showTruncation: jest.Mock; hide: jest.Mock };
+type Tooltip = { show: Mock; showTruncation: Mock; hide: Mock };
 
 function timeline(): {
   navigateToMatch: () => void;
@@ -37,15 +37,15 @@ function timeline(): {
 } {
   const chart = new ApexLogTimeline();
   const internals = chart as unknown as Record<string, unknown>;
-  const tooltip: Tooltip = { show: jest.fn(), showTruncation: jest.fn(), hide: jest.fn() };
+  const tooltip: Tooltip = { show: vi.fn(), showTruncation: vi.fn(), hide: vi.fn() };
 
   internals['tooltipRenderer'] = tooltip;
   internals['flamechart'] = {
     containerYToDepth: () => 0,
     getFrameRect: () => ({ x: 10, y: 20, width: 30, height: 15 }),
     getChartTopY: () => 40,
-    clearSearch: jest.fn(),
-    locateByEventNodes: jest.fn(),
+    clearSearch: vi.fn(),
+    locateByEventNodes: vi.fn(),
   };
   const container = document.createElement('div');
   document.body.appendChild(container);

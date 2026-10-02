@@ -6,7 +6,7 @@
  * What the pointer is over, and when that answer has to be worked out again.
  */
 
-import { describe, expect, it } from '@jest/globals';
+import { describe, expect, it } from 'vitest';
 import type { EventNode, HoveredFrame } from '../../types/flamechart.types.js';
 import { HoverTracker } from '../interaction/HoverTracker.js';
 

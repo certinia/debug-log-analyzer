@@ -10,7 +10,7 @@
  * - Viewport culling
  * - Edge cases (empty search, invalid cursor, off-screen events)
  */
-import { beforeEach, describe, expect, it, jest } from '@jest/globals';
+import { beforeEach, describe, expect, it, type MockInstance, vi } from 'vitest';
 import type { LogEvent } from '@apexdevtools/apex-log-parser';
 import * as PIXI from 'pixi.js';
 
@@ -24,8 +24,8 @@ describe('SearchHighlightRenderer', () => {
   let container: PIXI.Container;
   let renderer: SearchHighlightRenderer;
   let mockGraphics: {
-    rect: jest.SpiedFunction<PIXI.Graphics['rect']>;
-    fill: jest.SpiedFunction<PIXI.Graphics['fill']>;
+    rect: MockInstance<PIXI.Graphics['rect']>;
+    fill: MockInstance<PIXI.Graphics['fill']>;
   };
 
   // Create a mock LogEvent for testing
@@ -90,16 +90,16 @@ describe('SearchHighlightRenderer', () => {
       matches,
       currentIndex,
       total: matches.length,
-      next: jest.fn<() => SearchMatch<EventNode> | null>(),
-      prev: jest.fn<() => SearchMatch<EventNode> | null>(),
-      first: jest.fn<() => SearchMatch<EventNode> | null>(),
-      last: jest.fn<() => SearchMatch<EventNode> | null>(),
-      seek: jest.fn<(index: number) => SearchMatch<EventNode> | null>(),
-      getCurrent: jest.fn<() => SearchMatch<EventNode> | null>(() => matches[currentIndex] ?? null),
-      hasNext: jest.fn<() => boolean>(() => currentIndex < matches.length - 1),
-      hasPrev: jest.fn<() => boolean>(() => currentIndex > 0),
-      getMatchedEventIds: jest.fn(() => new Set(matches.map((m) => m.event.id))),
-      getMatchedEventsInfo: jest.fn(() =>
+      next: vi.fn<() => SearchMatch<EventNode> | null>(),
+      prev: vi.fn<() => SearchMatch<EventNode> | null>(),
+      first: vi.fn<() => SearchMatch<EventNode> | null>(),
+      last: vi.fn<() => SearchMatch<EventNode> | null>(),
+      seek: vi.fn<(index: number) => SearchMatch<EventNode> | null>(),
+      getCurrent: vi.fn<() => SearchMatch<EventNode> | null>(() => matches[currentIndex] ?? null),
+      hasNext: vi.fn<() => boolean>(() => currentIndex < matches.length - 1),
+      hasPrev: vi.fn<() => boolean>(() => currentIndex > 0),
+      getMatchedEventIds: vi.fn(() => new Set(matches.map((m) => m.event.id))),
+      getMatchedEventsInfo: vi.fn(() =>
         matches.map((m) => ({
           timestamp: m.event.timestamp,
           duration: m.event.duration,
@@ -113,10 +113,10 @@ describe('SearchHighlightRenderer', () => {
   beforeEach(() => {
     // Mock getComputedStyle for SearchHighlightRenderer
     const mockStyle: Partial<CSSStyleDeclaration> = {
-      getPropertyValue: jest.fn<(property: string) => string>().mockReturnValue('#ff9632'),
+      getPropertyValue: vi.fn<(property: string) => string>().mockReturnValue('#ff9632'),
     };
 
-    globalThis.getComputedStyle = jest
+    globalThis.getComputedStyle = vi
       .fn<() => CSSStyleDeclaration>()
       .mockReturnValue(mockStyle as CSSStyleDeclaration);
 
@@ -136,8 +136,8 @@ describe('SearchHighlightRenderer', () => {
       .currentMatchGraphics;
 
     mockGraphics = {
-      rect: jest.spyOn(currentGraphics, 'rect'),
-      fill: jest.spyOn(currentGraphics, 'fill'),
+      rect: vi.spyOn(currentGraphics, 'rect'),
+      fill: vi.spyOn(currentGraphics, 'fill'),
     };
   });
 

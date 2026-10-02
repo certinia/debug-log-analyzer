@@ -1,9 +1,9 @@
 /*
  * Copyright (c) 2026 Certinia Inc. All rights reserved.
  *
- * @jest-environment jsdom
+ * @vitest-environment jsdom
  */
-import { describe, expect, it, beforeEach } from '@jest/globals';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { LogEvent } from '@apexdevtools/apex-log-parser';
 import type { GovernorLimits } from '@apexdevtools/apex-log-parser/types';
 
@@ -14,15 +14,15 @@ const copied: string[] = [];
 let event: LogEvent | null = null;
 let limits: GovernorLimits | null = null;
 
-jest.mock('../../features/call-tree/navigation.js', () => ({
+vi.mock('../../features/call-tree/navigation.js', () => ({
   goToRow: async (target: { eventIndex: number }) => {
     revealed.push(target.eventIndex);
   },
 }));
-jest.mock('../../core/utility/Clipboard.js', () => ({
+vi.mock('../../core/utility/Clipboard.js', () => ({
   copyToClipboard: (text: string) => copied.push(text),
 }));
-jest.mock('../../core/log/LogStore.js', () => ({
+vi.mock('../../core/log/LogStore.js', () => ({
   currentLogStore: () => ({
     eventByIndex: (i: number) => (i === 42 ? event : null),
     log: { governorLimits: limits },

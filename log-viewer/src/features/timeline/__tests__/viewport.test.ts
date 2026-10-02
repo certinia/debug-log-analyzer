@@ -11,7 +11,7 @@
  * - Coordinate transformations (Y-axis inversion)
  * - Window resize handling
  */
-import { beforeEach, describe, expect, it } from '@jest/globals';
+import { beforeEach, describe, expect, it } from 'vitest';
 
 import { TimelineViewport } from '../optimised/TimelineViewport.js';
 import { TIMELINE_CONSTANTS } from '../types/flamechart.types.js';

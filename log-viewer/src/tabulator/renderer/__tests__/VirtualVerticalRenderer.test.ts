@@ -1,4 +1,4 @@
-import { describe, expect, it, jest } from '@jest/globals';
+import { afterEach, beforeEach, describe, expect, it, type Mock, vi } from 'vitest';
 
 import { VirtualVerticalRenderer } from '../VirtualVerticalRenderer';
 import { seedHeightIndex, type HeightIndexInternals, type RowStubBase } from './rendererTestUtils';
@@ -44,9 +44,9 @@ interface RendererInternals extends HeightIndexInternals {
 function makeTable(
   rows: RowStub[] = [],
   seedCount = rows.length,
-): { r: RendererInternals; setDisplayRows: (next: RowStub[]) => void; tableEmpty: jest.Mock } {
+): { r: RendererInternals; setDisplayRows: (next: RowStub[]) => void; tableEmpty: Mock } {
   let current = rows;
-  const tableEmpty = jest.fn();
+  const tableEmpty = vi.fn();
   const table = {
     rowManager: {
       element: { scrollTop: 0, clientHeight: 100, scrollHeight: 10000, clientWidth: 200 },
@@ -560,7 +560,7 @@ describe('VirtualVerticalRenderer fast-fling scroll deferral', () => {
 
   function makeDeferSetup(): {
     r: DeferRenderer;
-    renderWindow: jest.Mock;
+    renderWindow: Mock;
     holder: { scrollTop: number; clientHeight: number };
   } {
     // 1000 unmeasured rows at the default 30px estimate: row i sits at
@@ -568,7 +568,7 @@ describe('VirtualVerticalRenderer fast-fling scroll deferral', () => {
     const rows = Array.from({ length: 1000 }, (_, i) => makeRowStub(i * 30, false));
     const { r: base } = makeTable(rows);
     const r = base as unknown as DeferRenderer;
-    const renderWindow = jest.fn();
+    const renderWindow = vi.fn();
     (base as unknown as { _renderWindow: () => void })._renderWindow = renderWindow as () => void;
     r.renderedRange = { top: 0, bottom: 10 };
     return { r, renderWindow, holder: base.elementVertical };
@@ -645,9 +645,9 @@ describe('VirtualVerticalRenderer fast-fling scroll deferral', () => {
 
   it('pipes scrollHorizontal only when scrollLeft actually changes', () => {
     const { r, holder } = makeDeferSetup();
-    const pipe = jest.fn();
+    const pipe = vi.fn();
     const internals = r as unknown as {
-      table: { rowManager: { scrollHorizontal: jest.Mock; element: { scrollLeft?: number } } };
+      table: { rowManager: { scrollHorizontal: Mock; element: { scrollLeft?: number } } };
     };
     internals.table.rowManager.scrollHorizontal = pipe;
 

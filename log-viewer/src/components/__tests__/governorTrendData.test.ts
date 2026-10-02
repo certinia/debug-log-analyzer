@@ -1,7 +1,7 @@
 /*
  * Copyright (c) 2026 Certinia Inc. All rights reserved.
  */
-import { describe, expect, it } from '@jest/globals';
+import { describe, expect, it } from 'vitest';
 
 import { formatByteSize } from '../../core/utility/Util.js';
 import { governorTrendSeries, pointAt, type TrendPoint } from '../governorTrendData.js';

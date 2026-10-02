@@ -1,7 +1,7 @@
 /*
  * Copyright (c) 2026 Certinia Inc. All rights reserved.
  */
-import { beforeEach, describe, expect, it } from '@jest/globals';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 interface FakeEvent {
   eventIndex: number;
@@ -55,17 +55,17 @@ const BASE_FRAMES = [exec, m1, m2, soql];
 const byId = new Map<number, FakeEvent>();
 
 let selectedIndex = 4;
-const { KeyPathIds } = jest.requireActual<typeof import('../../core/log/keyPathIds.js')>(
+const { KeyPathIds } = await vi.importActual<typeof import('../../core/log/keyPathIds.js')>(
   '../../core/log/keyPathIds.js',
 );
 // One table per log in production. The fixtures below reuse event indexes for
 // different frames, so each test gets its own rather than one frame's key being
 // read back for another.
 let paths = new KeyPathIds(1024);
-const { LogStore } = jest.requireActual<typeof import('../../core/log/LogStore.js')>(
+const { LogStore } = await vi.importActual<typeof import('../../core/log/LogStore.js')>(
   '../../core/log/LogStore.js',
 );
-jest.mock('../../core/log/LogStore.js', () => ({
+vi.mock('../../core/log/LogStore.js', () => ({
   currentLogStore: () => {
     const store = {
       log: root,
@@ -421,7 +421,7 @@ describe('buildScopedCallTree', () => {
 
     // Every clock read lands past the slice deadline, so each check yields —
     // the totals must come out the same as an unsliced build.
-    const clock = jest.spyOn(performance, 'now');
+    const clock = vi.spyOn(performance, 'now');
     let time = 0;
     clock.mockImplementation(() => (time += 100));
     try {
@@ -437,7 +437,7 @@ describe('buildScopedCallTree', () => {
 
   it('abandons a superseded walk instead of finishing it', async () => {
     const instances = loopOccurrences(500);
-    const clock = jest.spyOn(performance, 'now');
+    const clock = vi.spyOn(performance, 'now');
     let time = 0;
     clock.mockImplementation(() => (time += 100));
     try {
@@ -491,7 +491,7 @@ describe('buildWholeLogCallTree', () => {
   });
 
   it('abandons a cancelled build instead of finishing it', async () => {
-    const clock = jest.spyOn(performance, 'now');
+    const clock = vi.spyOn(performance, 'now');
     let time = 0;
     clock.mockImplementation(() => (time += 100));
     try {

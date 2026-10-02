@@ -1,9 +1,9 @@
 /*
  * Copyright (c) 2026 Certinia Inc. All rights reserved.
  *
- * @jest-environment jsdom
+ * @vitest-environment jsdom
  */
-import { beforeEach, describe, expect, it } from '@jest/globals';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { html } from 'lit';
 
 const settings: { inspector?: unknown } = {};
@@ -12,7 +12,7 @@ const written: Array<{ section: string; value: unknown }> = [];
 // interact while the load is still in flight.
 let deferSettings = false;
 let releaseSettings: (() => void) | null = null;
-jest.mock('../../features/settings/Settings.js', () => ({
+vi.mock('../../features/settings/Settings.js', () => ({
   getSettings: () =>
     deferSettings
       ? new Promise((resolve) => {
@@ -34,7 +34,7 @@ const pendingSections: Array<() => void> = [];
 // What each build was told to hide, so skipped work is provable and not just
 // filtered away afterwards.
 const builtHiding: string[][] = [];
-jest.mock('../detailSections.js', () => ({
+vi.mock('../detailSections.js', () => ({
   buildDetailSections: (
     _source: string,
     selection: { eventIndex?: number } | null,

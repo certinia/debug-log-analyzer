@@ -1,7 +1,7 @@
 /*
  * Copyright (c) 2025 Certinia Inc. All rights reserved.
  */
-import { describe, expect, it } from '@jest/globals';
+import { describe, expect, it } from 'vitest';
 import type { LogEvent } from '@apexdevtools/apex-log-parser';
 import type { LogCategory } from '@apexdevtools/apex-log-parser/types';
 

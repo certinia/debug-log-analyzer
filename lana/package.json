@@ -321,7 +321,6 @@
   },
   "devDependencies": {
     "@salesforce/vscode-services": "^67.20.0",
-    "@types/jest": "^30.0.0",
     "@types/node": "~22.20.4",
     "@types/vscode": "~1.102.0",
     "@vscode/vsce": "^4.0.0",

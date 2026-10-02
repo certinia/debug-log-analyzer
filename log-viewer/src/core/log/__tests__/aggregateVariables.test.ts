@@ -1,7 +1,7 @@
 /*
  * Copyright (c) 2026 Certinia Inc. All rights reserved.
  */
-import { describe, expect, it, jest } from '@jest/globals';
+import { describe, expect, it, vi } from 'vitest';
 
 import { indexesOf, storeOf } from '#test-helpers/apexLog.js';
 
@@ -177,7 +177,7 @@ describe('aggregateVariablesFor', () => {
     const index = await variableIndexFor(log, { yieldSlice });
     const frames = indexesOf(log, 'ns.Svc.run()');
     // Only a spent slice yields, and only a yield reads the signal.
-    const clock = jest.spyOn(performance, 'now');
+    const clock = vi.spyOn(performance, 'now');
     let time = 0;
     clock.mockImplementation(() => (time += 100));
     try {

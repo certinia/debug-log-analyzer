@@ -1,14 +1,14 @@
 /**
- * @jest-environment jsdom
+ * @vitest-environment jsdom
  */
 /*
  * Copyright (c) 2026 Certinia Inc. All rights reserved.
  */
-import { describe, expect, it } from '@jest/globals';
+import { describe, expect, it, vi } from 'vitest';
 
-// The tabulator ESM build doesn't load under jest, and the module registers
+// The tabulator ESM build doesn't load in tests, and the module registers
 // itself on import.
-jest.mock('tabulator-tables', () => ({
+vi.mock('tabulator-tables', () => ({
   Module: class {
     table: unknown;
     constructor(table: unknown) {
@@ -45,7 +45,7 @@ function setup() {
   };
   find.initialize();
 
-  const applied = jest.fn();
+  const applied = vi.fn();
   find._applyHighlights = applied;
   const attach = () => subscribed['render-virtual-attach']?.forEach((fn) => fn());
   const scroll = () => tableEvents['scrollVertical']?.forEach((fn) => fn());

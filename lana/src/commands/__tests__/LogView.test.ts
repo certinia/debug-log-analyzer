@@ -1,7 +1,7 @@
 /*
  * Copyright (c) 2026 Certinia Inc. All rights reserved.
  */
-import { describe, expect, it } from '@jest/globals';
+import { describe, expect, it, type Mock, vi } from 'vitest';
 
 import { asContext, createMockContext } from '../../__tests__/helpers/test-builders.js';
 import { Uri, workspace } from '../../__tests__/mocks/vscode.js';
@@ -9,14 +9,14 @@ import { getConfig } from '../../workspace/AppConfig.js';
 import { WebView } from '../../display/WebView.js';
 import { LogView } from '../LogView.js';
 
-jest.mock('../../display/WebView.js', () => ({
-  WebView: { apply: jest.fn() },
+vi.mock('../../display/WebView.js', () => ({
+  WebView: { apply: vi.fn() },
 }));
-jest.mock('../../workspace/AppConfig.js', () => ({
+vi.mock('../../workspace/AppConfig.js', () => ({
   PRIVATE_SECTIONS: [],
-  getColumnOverrides: jest.fn(() => ({})),
-  getColumnViews: jest.fn(() => ({})),
-  getConfig: jest.fn(() => ({
+  getColumnOverrides: vi.fn(() => ({})),
+  getColumnViews: vi.fn(() => ({})),
+  getConfig: vi.fn(() => ({
     timeline: {},
     callTree: { columnOverrides: {} },
     database: {
@@ -26,17 +26,17 @@ jest.mock('../../workspace/AppConfig.js', () => ({
     },
     inspector: {},
   })),
-  getInspectorState: jest.fn(() => ({})),
-  sameConfig: jest.fn(() => true),
-  updateConfig: jest.fn(),
-  updatePrivateSection: jest.fn(),
+  getInspectorState: vi.fn(() => ({})),
+  sameConfig: vi.fn(() => true),
+  updateConfig: vi.fn(),
+  updatePrivateSection: vi.fn(),
 }));
 
-const mockApplyWebView = WebView.apply as jest.Mock;
+const mockApplyWebView = WebView.apply as Mock;
 // The file-I/O layer is deliberately not mocked out: createView reads its own
 // bundled index.html, and mocking that module away is what hid it reading
 // through a service that throws unless another extension has initialised it.
-const mockReadFile = workspace.fs.readFile as unknown as jest.Mock;
+const mockReadFile = workspace.fs.readFile as unknown as Mock;
 const TEMPLATE = '<script src="bundle.js"></script><link href="codicon.css">';
 
 describe('LogView', () => {
@@ -45,16 +45,16 @@ describe('LogView', () => {
     let receiveMessage: ((message: unknown) => Promise<void>) | undefined;
     const panel = {
       iconPath: undefined,
-      onDidDispose: jest.fn(() => ({ dispose: jest.fn() })),
-      reveal: jest.fn(),
+      onDidDispose: vi.fn(() => ({ dispose: vi.fn() })),
+      reveal: vi.fn(),
       webview: {
-        asWebviewUri: jest.fn((uri: { path: string }) => Uri.parse(`webview:${uri.path}`)),
+        asWebviewUri: vi.fn((uri: { path: string }) => Uri.parse(`webview:${uri.path}`)),
         html: '',
-        onDidReceiveMessage: jest.fn((listener: (message: unknown) => Promise<void>) => {
+        onDidReceiveMessage: vi.fn((listener: (message: unknown) => Promise<void>) => {
           receiveMessage = listener;
-          return { dispose: jest.fn() };
+          return { dispose: vi.fn() };
         }),
-        postMessage: jest.fn().mockResolvedValue(true),
+        postMessage: vi.fn().mockResolvedValue(true),
       },
     };
     mockApplyWebView.mockReturnValue(panel as unknown as import('vscode').WebviewPanel);
@@ -143,7 +143,7 @@ describe('LogView', () => {
   it('answers a request whose case throws, so the webview stops waiting', async () => {
     const { receive, postMessage } = await createViewWithListener();
 
-    (getConfig as jest.Mock).mockImplementationOnce(() => {
+    (getConfig as Mock).mockImplementationOnce(() => {
       throw new Error('settings unavailable');
     });
     await receive({ cmd: 'getConfig', requestId: 'request-2' });

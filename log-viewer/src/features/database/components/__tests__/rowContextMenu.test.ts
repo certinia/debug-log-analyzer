@@ -1,9 +1,9 @@
 /*
  * Copyright (c) 2026 Certinia Inc. All rights reserved.
  *
- * @jest-environment jsdom
+ * @vitest-environment jsdom
  */
-import { describe, expect, it } from '@jest/globals';
+import { describe, expect, it } from 'vitest';
 import type { RowComponent, Tabulator } from 'tabulator-tables';
 
 import type { ContextMenu } from '../../../../components/ContextMenu.js';

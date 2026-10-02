@@ -1,12 +1,12 @@
 /**
- * @jest-environment jsdom
+ * @vitest-environment jsdom
  */
 
 /*
  * Copyright (c) 2026 Certinia Inc. All rights reserved.
  */
 
-import { afterEach, describe, expect, it, jest } from '@jest/globals';
+import { afterEach, describe, expect, it, type Mock, vi } from 'vitest';
 import { makeViewport } from '#test-helpers/viewport.js';
 import { FlameChart } from '../FlameChart.js';
 
@@ -16,16 +16,16 @@ const HIT_NODE = { id: '0-0', timestamp: 0, duration: 10, depth: 0, original: { 
 function stubbedChart({ displayHeight = 300, culling = false } = {}): {
   chart: FlameChart;
   internals: Record<string, unknown>;
-  rendererResize: jest.Mock;
-  appRender: jest.Mock;
-  hoverRender: jest.Mock;
-  hitTest: jest.Mock;
+  rendererResize: Mock;
+  appRender: Mock;
+  hoverRender: Mock;
+  hitTest: Mock;
 } {
   const chart = new FlameChart();
-  const rendererResize = jest.fn();
-  const appRender = jest.fn();
-  const hoverRender = jest.fn();
-  const hitTest = jest.fn(() => ({ eventNode: HIT_NODE, marker: null }));
+  const rendererResize = vi.fn();
+  const appRender = vi.fn();
+  const hoverRender = vi.fn();
+  const hitTest = vi.fn(() => ({ eventNode: HIT_NODE, marker: null }));
 
   const internals = chart as unknown as Record<string, unknown>;
   internals['app'] = {
@@ -35,16 +35,16 @@ function stubbedChart({ displayHeight = 300, culling = false } = {}): {
   };
   internals['container'] = document.createElement('div');
   internals['index'] = { maxDepth: 1 };
-  internals['worldContainer'] = { position: { set: jest.fn() } };
-  internals['batchRenderer'] = { render: jest.fn(), clear: jest.fn() };
+  internals['worldContainer'] = { position: { set: vi.fn() } };
+  internals['batchRenderer'] = { render: vi.fn(), clear: vi.fn() };
   internals['rectangleManager'] = {
     getCulledRectangles: () => ({ visibleRects: new Map(), buckets: new Map() }),
   };
-  internals['hitDetector'] = { setVisibleRects: jest.fn(), setBuckets: jest.fn(), hitTest };
+  internals['hitDetector'] = { setVisibleRects: vi.fn(), setBuckets: vi.fn(), hitTest };
   internals['hoverHighlightRenderer'] = { render: hoverRender };
   internals['viewport'] = {
     getState: () => makeViewport({ displayWidth: 400, displayHeight }),
-    setStateForResize: jest.fn(),
+    setStateForResize: vi.fn(),
     screenYToDepth: () => 0,
   };
   // The geometry init applied: 364 container - 60 minimap - 4 gap = the 300 below.
@@ -105,7 +105,7 @@ describe('the hover wash after the frames move', () => {
   // doing. A panel put on a frame by find or by the keyboard reads that and stays put.
   it('reports a re-hit as the frames moving, not as a pointer move', () => {
     const { chart, internals } = stubbedChart({ culling: true });
-    const onMouseMove = jest.fn();
+    const onMouseMove = vi.fn();
     internals['callbacks'] = { onMouseMove };
     pointerStale(internals);
 
@@ -121,9 +121,9 @@ describe('the hover wash after the frames move', () => {
     let dragging = true;
     internals['interactionHandler'] = {
       isPointerDragging: () => dragging,
-      updateCursor: jest.fn(),
+      updateCursor: vi.fn(),
     };
-    const onMouseMove = jest.fn();
+    const onMouseMove = vi.fn();
     internals['callbacks'] = { onMouseMove };
     (internals['hoverTracker'] as Tracker).setHovered({ node: HIT_NODE, depth: 0 });
     pointerStale(internals);
@@ -166,7 +166,7 @@ describe('FlameChart.resize', () => {
   const realDevicePixelRatio = window.devicePixelRatio;
 
   afterEach(() => {
-    jest.restoreAllMocks();
+    vi.restoreAllMocks();
     Object.defineProperty(window, 'devicePixelRatio', {
       value: realDevicePixelRatio,
       configurable: true,
@@ -175,7 +175,7 @@ describe('FlameChart.resize', () => {
 
   it('paints before it returns, so the cleared canvas is never composited', () => {
     const { chart, rendererResize, appRender } = stubbedChart();
-    const raf = jest.spyOn(window, 'requestAnimationFrame').mockReturnValue(1);
+    const raf = vi.spyOn(window, 'requestAnimationFrame').mockReturnValue(1);
 
     chart.resize(500, 400);
 
@@ -200,7 +200,7 @@ describe('FlameChart.resize', () => {
 
   it('still draws when the main timeline height changes at the same width', () => {
     const { chart, appRender } = stubbedChart();
-    jest.spyOn(window, 'requestAnimationFrame').mockReturnValue(1);
+    vi.spyOn(window, 'requestAnimationFrame').mockReturnValue(1);
 
     chart.resize(400, 400);
 
@@ -212,7 +212,7 @@ describe('FlameChart.resize', () => {
   it('draws when only the minimap height moved', () => {
     // 604 - 60 - 4 and 605 - 61 - 4 are both 540, so only the minimap changed.
     const { chart, appRender } = stubbedChart({ displayHeight: 540 });
-    jest.spyOn(window, 'requestAnimationFrame').mockReturnValue(1);
+    vi.spyOn(window, 'requestAnimationFrame').mockReturnValue(1);
 
     expect(chart.resize(400, 605)).toBe(true);
     expect(appRender).toHaveBeenCalled();
@@ -226,12 +226,12 @@ describe('FlameChart.resize', () => {
     internals['metricStripOrchestrator'] = {
       getIsVisible: () => true,
       getHeight: () => 15,
-      resize: jest.fn(),
+      resize: vi.fn(),
       holdsHover: () => false,
       getCursorTimeNs: () => null,
-      render: jest.fn(),
+      render: vi.fn(),
     };
-    jest.spyOn(window, 'requestAnimationFrame').mockReturnValue(1);
+    vi.spyOn(window, 'requestAnimationFrame').mockReturnValue(1);
 
     // 383 - 60 - 4 - 15 - 4 = the 300 the viewport already reports, at the same width.
     expect(chart.resize(400, 383)).toBe(true);
@@ -242,7 +242,7 @@ describe('FlameChart.resize', () => {
 
   it('draws when only the device pixel ratio moved', () => {
     const { chart, rendererResize, appRender } = stubbedChart();
-    jest.spyOn(window, 'requestAnimationFrame').mockReturnValue(1);
+    vi.spyOn(window, 'requestAnimationFrame').mockReturnValue(1);
     Object.defineProperty(window, 'devicePixelRatio', { value: 2, configurable: true });
 
     // The geometry the skip case above rejects, so only the ratio is left to act on.
@@ -255,7 +255,7 @@ describe('FlameChart.resize', () => {
   // that cannot run has to say so — otherwise nothing draws the strip it just blanked.
   it('reports whether it applied, so a caller can draw instead', () => {
     const { chart } = stubbedChart();
-    jest.spyOn(window, 'requestAnimationFrame').mockReturnValue(1);
+    vi.spyOn(window, 'requestAnimationFrame').mockReturnValue(1);
 
     // Smaller than the minimap and its gap, so no main timeline is left.
     expect(chart.resize(400, 40)).toBe(false);
@@ -269,7 +269,7 @@ describe('FlameChart.resize', () => {
     // No rectangleManager, so `canRender` fails and `render` bails.
     internals['rectangleManager'] = null;
     (internals['state'] as { needsRender: boolean }).needsRender = true;
-    const raf = jest.spyOn(window, 'requestAnimationFrame').mockReturnValue(1);
+    const raf = vi.spyOn(window, 'requestAnimationFrame').mockReturnValue(1);
 
     chart.resize(500, 400);
 
@@ -279,7 +279,7 @@ describe('FlameChart.resize', () => {
 
   it('drops a render already queued, rather than painting twice', () => {
     const { chart, internals, appRender } = stubbedChart();
-    const cancel = jest.spyOn(window, 'cancelAnimationFrame').mockImplementation(() => {});
+    const cancel = vi.spyOn(window, 'cancelAnimationFrame').mockImplementation(() => {});
     internals['renderLoopId'] = 7;
 
     chart.resize(500, 400);

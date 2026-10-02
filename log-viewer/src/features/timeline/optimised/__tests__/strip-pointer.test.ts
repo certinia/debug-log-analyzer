@@ -6,7 +6,7 @@
  * Unit tests for the metric strip's collapse chevron hit area.
  */
 
-import { describe, expect, it } from '@jest/globals';
+import { describe, expect, it } from 'vitest';
 import { chevronBox, isOverChevron } from '../metric-strip/strip-pointer.js';
 
 describe('isOverChevron', () => {

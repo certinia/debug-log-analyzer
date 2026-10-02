@@ -6,6 +6,7 @@
  * Factory functions for building test data in lana tests.
  */
 
+import { type Mock, vi } from 'vitest';
 import type { ApexLog, LogEvent } from '@apexdevtools/apex-log-parser';
 
 import type { Context } from '../../Context.js';
@@ -74,20 +75,20 @@ export function createMockApexLog(overrides: PartialApexLog = {}): ApexLog {
  * Mock Display object for Context.
  */
 export interface MockDisplay {
-  output: jest.Mock;
-  showErrorMessage: jest.Mock;
-  showFile: jest.Mock;
-  showInformationMessage: jest.Mock;
-  showWarningMessage: jest.Mock;
+  output: Mock;
+  showErrorMessage: Mock;
+  showFile: Mock;
+  showInformationMessage: Mock;
+  showWarningMessage: Mock;
 }
 
 export function createMockDisplay(): MockDisplay {
   return {
-    output: jest.fn(),
-    showErrorMessage: jest.fn(),
-    showFile: jest.fn(),
-    showInformationMessage: jest.fn(),
-    showWarningMessage: jest.fn(),
+    output: vi.fn(),
+    showErrorMessage: vi.fn(),
+    showFile: vi.fn(),
+    showInformationMessage: vi.fn(),
+    showWarningMessage: vi.fn(),
   };
 }
 
@@ -126,7 +127,7 @@ export function asContext(mock: MockContext): Context {
  * A command registers on apply, so the last call is the one the case just made.
  * Every handler is `Command.run`, which is why one signature covers them all.
  *
- * Reads the shared mock by path, so a suite that calls `jest.mock('vscode')` gets
+ * Reads the shared mock by path, so a suite that calls `vi.mock('vscode')` gets
  * an automock this cannot see, and the throw below names the wrong cause.
  */
 export function lastRegisteredCommand(): (...args: unknown[]) => Promise<unknown> {
