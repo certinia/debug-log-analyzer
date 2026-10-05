@@ -679,8 +679,10 @@ export class VirtualVerticalRenderer extends Renderer {
       if (this.renderedRange.top === prevTop && this.renderedRange.bottom === prevBottom) {
         break;
       }
+      /* oxlint-disable no-useless-assignment -- nursery false positive: read at the loop top */
       prevTop = this.renderedRange.top;
       prevBottom = this.renderedRange.bottom;
+      /* oxlint-enable no-useless-assignment */
     }
   }
 

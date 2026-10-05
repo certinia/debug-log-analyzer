@@ -3,7 +3,6 @@
   "private": true,
   "devDependencies": {
     "@apexdevtools/apex-log-parser": "0.1.1",
-    "@eslint/js": "^10.0.1",
     "@playwright/test": "^1.63.0",
     "@prettier/plugin-oxc": "^0.2.3",
     "@rolldown/plugin-node-polyfills": "^1.0.3",
@@ -17,12 +16,12 @@
     "@types/jest": "^30.0.0",
     "@vscode/test-web": "^0.0.81",
     "concurrently": "^10.0.5",
-    "eslint": "^10.11.0",
-    "eslint-config-prettier": "^10.1.8",
     "husky": "^9.1.7",
     "jest": "^30.5.2",
     "jest-environment-jsdom": "^30.5.2",
     "lint-staged": "^17.6.0",
+    "oxlint": "^1.86.0",
+    "oxlint-tsgolint": "^7.0.2003",
     "prettier": "^3.9.9",
     "rolldown": "^1.2.12",
     "rollup": "^4.63.5",
@@ -31,8 +30,7 @@
     "rollup-plugin-swc3": "^0.12.1",
     "tsx": "^4.23.15",
     "typescript": "npm:@typescript/typescript6@^6.0.2",
-    "typescript-7": "npm:typescript@^7.0.2",
-    "typescript-eslint": "^8.71.0"
+    "typescript-7": "npm:typescript@^7.0.2"
   },
   "scripts": {
     "preinstall": "npx only-allow pnpm",
@@ -48,13 +46,13 @@
     "typecheck": "tsc -b && tsc -p scripts/tsconfig.json",
     "typecheck:tsc6": "tsc6 -b",
     "measure": "rolldown -c scripts/measure/rolldown.config.ts && node --expose-gc --max-old-space-size=12288 scripts/measure/out/measure.mjs",
-    "lint": "concurrently -r -g 'eslint . --cache --cache-location node_modules/.cache/eslint/' 'prettier --cache **/*.{ts,css,md,mdx,scss} --check --experimental-cli' 'pnpm run typecheck'",
+    "lint": "concurrently -r -g 'oxlint' 'prettier --cache **/*.{ts,css,md,mdx,scss} --check --experimental-cli' 'pnpm run typecheck'",
     "test": "jest",
     "test:ci": "jest --runInBand",
     "test:e2e:web": "pnpm build && playwright test --config=lana/test/playwright/playwright.config.web.ts",
     "serve:web": "pnpm build && tsx lana/test/playwright/web/headlessServer.ts",
     "ci:install": "pnpm install --frozen-lockfile --prefer-offline --ignore-scripts",
-    "prettier-format": "prettier '**/*.ts' --cache --write --experimental-cli"
+    "format": "prettier '**/*.{ts,css,md,mdx,scss}' --cache --write --experimental-cli"
   },
   "lint-staged": {
     "*.{ts,css,md,mdx,scss}": "prettier --cache --write --experimental-cli"
