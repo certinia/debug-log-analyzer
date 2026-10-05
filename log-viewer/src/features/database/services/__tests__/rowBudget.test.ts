@@ -18,15 +18,15 @@ import {
 let overview: DatabaseOverview;
 let peaks: Limits;
 
-vi.mock('../databaseOverview.js', async () => ({
-  ...(await vi.importActual('../databaseOverview.js')),
+vi.mock('../databaseOverview.js', async (importOriginal) => ({
+  ...(await importOriginal()),
   databaseOverview: () => overview,
 }));
 vi.mock('../../../timeline/optimised/apex-limit-series.js', () => ({
   apexLimitTimeSeries: () => ({ events: [] }),
 }));
-vi.mock('../../../../components/logOverviewMetrics.js', async () => ({
-  ...(await vi.importActual('../../../../components/logOverviewMetrics.js')),
+vi.mock('../../../../components/logOverviewMetrics.js', async (importOriginal) => ({
+  ...(await importOriginal()),
   limitTotals: () => peaks,
 }));
 

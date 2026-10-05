@@ -14,8 +14,8 @@ import type { TrendSeries } from '../governorTrendData.js';
 // The charts are driven from one stub series, so the seek is the only logic
 // under test. `pointAt` stays real: the click reads the series through it.
 let series: TrendSeries[];
-vi.mock('../governorTrendData.js', async () => ({
-  ...(await vi.importActual('../governorTrendData.js')),
+vi.mock('../governorTrendData.js', async (importOriginal) => ({
+  ...(await importOriginal()),
   governorTrendSeries: () => series,
 }));
 vi.mock('../../features/timeline/optimised/apex-limit-series.js', () => ({

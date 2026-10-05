@@ -6,15 +6,14 @@ import type { RowComponent } from 'tabulator-tables';
 
 // The tabulator ESM build doesn't load in tests, and the module registers
 // itself on import.
-vi.mock('tabulator-tables', () => ({
+vi.mock('tabulator-tables', async (importOriginal) => ({
+  ...(await importOriginal<object>()),
   Module: class {
     constructor(_table: unknown) {}
     registerTableOption() {}
     setOption() {}
   },
   Tabulator: { registerModule: () => {} },
-  KeybindingsModule: {},
-  SelectRowModule: {},
 }));
 
 import { withCodeDrivenExpand } from '../expandOrigin.js';

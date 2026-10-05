@@ -15,10 +15,8 @@ vi.mock('../CodeBlock.js', () => ({}));
 
 // `options` tells the section's own read (none) from the comparison's per-call reads.
 const frameReads: { store: unknown; index: unknown; options: unknown }[] = [];
-vi.mock('../../core/log/frameVariables.js', async () => {
-  const actual = await vi.importActual<typeof import('../../core/log/frameVariables.js')>(
-    '../../core/log/frameVariables.js',
-  );
+vi.mock('../../core/log/frameVariables.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../../core/log/frameVariables.js')>();
   return {
     ...actual,
     frameVariablesFor: (...args: Parameters<typeof actual.frameVariablesFor>) => {
@@ -29,8 +27,8 @@ vi.mock('../../core/log/frameVariables.js', async () => {
 });
 
 let treeBuilds = 0;
-vi.mock('../variableTree.js', async () => {
-  const actual = await vi.importActual<typeof import('../variableTree.js')>('../variableTree.js');
+vi.mock('../variableTree.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../variableTree.js')>();
   return {
     ...actual,
     toTreeRows: (...args: Parameters<typeof actual.toTreeRows>) => {

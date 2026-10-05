@@ -7,7 +7,7 @@ import { beforeEach, describe, expect, it, type Mock, vi } from 'vitest';
 
 // The tabulator ESM build (+ its module registrations) doesn't load in tests;
 // this stub records what the component does to a table instead.
-vi.mock('tabulator-tables', () => {
+vi.mock('tabulator-tables', async (importOriginal) => {
   class Tabulator {
     static registerModule() {}
     static instances: Tabulator[] = [];
@@ -24,28 +24,25 @@ vi.mock('tabulator-tables', () => {
     }
   }
   return {
+    ...(await importOriginal<object>()),
     Tabulator,
-    Module: class {},
-    KeybindingsModule: class {},
-    SelectRowModule: class {},
-    Renderer: class {},
   };
 });
 
 // The walk is what this suite is about, so it's stubbed; each test says whether
 // it yields a tree or nothing, and when.
-vi.mock('../scopedCallTree.js', async () => ({
-  buildScopedCallTree: vi.fn(() => Promise.resolve(null)),
+vi.mock('../scopedCallTree.js', async (importOriginal) => {
   // Keep the real row readers: the hover test is about which rows name a frame.
-  revealableEventIndex: (await vi.importActual<Record<string, unknown>>('../scopedCallTree.js'))
-    .revealableEventIndex,
-  locatableEventIndexes: (await vi.importActual<Record<string, unknown>>('../scopedCallTree.js'))
-    .locatableEventIndexes,
-  frameEventIndexes: (await vi.importActual<Record<string, unknown>>('../scopedCallTree.js'))
-    .frameEventIndexes,
-  rowIdsByPath: (await vi.importActual<Record<string, unknown>>('../scopedCallTree.js'))
-    .rowIdsByPath,
-}));
+  const { revealableEventIndex, locatableEventIndexes, frameEventIndexes, rowIdsByPath } =
+    await importOriginal<typeof import('../scopedCallTree.js')>();
+  return {
+    buildScopedCallTree: vi.fn(() => Promise.resolve(null)),
+    revealableEventIndex,
+    locatableEventIndexes,
+    frameEventIndexes,
+    rowIdsByPath,
+  };
+});
 
 import { Tabulator, type RowComponent } from 'tabulator-tables';
 

@@ -9,20 +9,17 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 // The shared manual mock leaves `Tabulator` out on purpose, and `RowKeyboardNavigation`
 // registers against it as it loads. Nothing here constructs one.
-vi.mock('tabulator-tables', () => ({
+vi.mock('tabulator-tables', async (importOriginal) => ({
+  ...(await importOriginal<object>()),
   Tabulator: class {
     static registerModule() {}
   },
-  Module: class {},
-  KeybindingsModule: class {},
-  SelectRowModule: class {},
-  Renderer: class {},
 }));
 
 // Extends `vscode-single-select`, whose `setFormValue` needs an `ElementInternals` jsdom lacks.
 vi.mock('../../../../components/VsSelect.js', () => ({}));
-vi.mock('../../../settings/Settings.js', async () => ({
-  ...(await vi.importActual<object>('../../../settings/Settings.js')),
+vi.mock('../../../settings/Settings.js', async (importOriginal) => ({
+  ...(await importOriginal<object>()),
   getSettings: () => Promise.resolve({}),
   subscribeSettings: () => () => {},
 }));

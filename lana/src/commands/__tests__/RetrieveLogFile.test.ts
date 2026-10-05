@@ -19,8 +19,8 @@ import {
 import { LogView } from '../LogView.js';
 import { RetrieveLogFile } from '../RetrieveLogFile.js';
 
-vi.mock('../../display/QuickPick.js', async () => ({
-  ...(await vi.importActual<object>('../../display/QuickPick.js')),
+vi.mock('../../display/QuickPick.js', async (importOriginal) => ({
+  ...(await importOriginal<object>()),
   QuickPick: { pick: vi.fn() },
 }));
 vi.mock('../../services/salesforceServices.js', () => ({

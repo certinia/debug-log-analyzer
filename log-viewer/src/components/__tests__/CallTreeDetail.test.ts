@@ -5,14 +5,11 @@
  */
 import { describe, expect, it, vi } from 'vitest';
 
-vi.mock('tabulator-tables', () => ({
+vi.mock('tabulator-tables', async (importOriginal) => ({
+  ...(await importOriginal<object>()),
   Tabulator: class {
     static registerModule() {}
   },
-  Module: class {},
-  KeybindingsModule: class {},
-  SelectRowModule: class {},
-  Renderer: class {},
 }));
 // This suite exercises the view-mode toggle and the column set; no table is
 // built (eventIndex -1).

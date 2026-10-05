@@ -11,7 +11,8 @@ const built: Record<string, unknown>[] = [];
 const selected: number[][] = [];
 type TableHandler = (...args: unknown[]) => void;
 const handlers: Record<string, TableHandler> = {};
-vi.mock('tabulator-tables', () => ({
+vi.mock('tabulator-tables', async (importOriginal) => ({
+  ...(await importOriginal<object>()),
   Tabulator: class {
     static registerModule() {}
     constructor(_el: HTMLElement, options: Record<string, unknown>) {
@@ -28,10 +29,6 @@ vi.mock('tabulator-tables', () => ({
       selected.push(indexes);
     }
   },
-  Module: class {},
-  KeybindingsModule: class {},
-  SelectRowModule: class {},
-  Renderer: class {},
 }));
 
 // No log store in the test, so the stack is empty.

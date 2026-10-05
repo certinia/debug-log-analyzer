@@ -19,8 +19,8 @@ vi.mock('../BottomUpTable.js', () => ({ createBottomUpTable: () => build('bottom
 vi.mock('../../../../components/VsSelect.js', () => ({}));
 // Connecting the view reads settings twice: firstUpdated loads the column view,
 // and category colouring subscribes. This suite has no extension host to answer.
-vi.mock('../../../settings/Settings.js', async () => ({
-  ...(await vi.importActual<object>('../../../settings/Settings.js')),
+vi.mock('../../../settings/Settings.js', async (importOriginal) => ({
+  ...(await importOriginal<object>()),
   getSettings: () => Promise.resolve({}),
   subscribeSettings: () => () => {},
 }));

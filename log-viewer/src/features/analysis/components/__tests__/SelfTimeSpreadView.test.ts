@@ -9,8 +9,8 @@ import type { LogStore } from '../../../../core/log/LogStore.js';
 import type { SelfTimeSpread } from '../../services/SelfTimeSpread.js';
 
 let spread: SelfTimeSpread | null = null;
-vi.mock('../../services/SelfTimeSpread.js', async () => ({
-  ...(await vi.importActual<object>('../../services/SelfTimeSpread.js')),
+vi.mock('../../services/SelfTimeSpread.js', async (importOriginal) => ({
+  ...(await importOriginal<object>()),
   getSelfTimeSpread: () => spread,
 }));
 

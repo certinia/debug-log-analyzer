@@ -7,8 +7,8 @@
  * or not the suite asks.
  *
  * The real package reads `document` as it loads (`Row`'s static initializer), so a suite on
- * the `node` environment cannot import it. A suite needing more than the two classes below
- * passes its own factory, which overrides this.
+ * the `node` environment cannot import it. A suite needing more spreads `importOriginal()`
+ * into its own factory and overrides what it changes.
  *
  * Keep `Tabulator` out of here. `registerModule` writes a process-wide registry, so
  * stubbing it for every suite would let a module register nothing and say nothing.
@@ -19,6 +19,9 @@ export class Module {
   }
   registerTableOption() {}
 }
+
+export class KeybindingsModule {}
+export class SelectRowModule {}
 
 // Minimal stub of tabulator's `Renderer` base class. The real one (in
 // tabulator_esm.mjs:23488) reads table.rowManager.element / tableElement
