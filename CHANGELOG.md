@@ -9,11 +9,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- ⚡ **Search**: the Timeline draws 7× faster on a search matching tens of thousands of frames.
 - ✂️ **Truncation**: each skipped section states how much of the log it dropped.
 
 ### Removed
 
 - 🪓 **Breaking**: the legacy Timeline and all its settings are dropped.
+
+### Fixed
+
+- 📤 **Copy and export**: both work on Analysis and Bottom-Up. ([#1110])
+- 🐛 **Go to Code**: errors for methods not found in the file are shown correctly.
 
 ## [1.22.1] - 2026-09-18
 
@@ -752,3 +758,4 @@ Skipped due to adopting odd numbering for pre releases and even number for relea
 [#242]: https://github.com/certinia/debug-log-analyzer/issues/242
 [#235]: https://github.com/certinia/debug-log-analyzer/issues/235
 [#264]: https://github.com/certinia/debug-log-analyzer/issues/264
+[#1110]: https://github.com/certinia/debug-log-analyzer/issues/1110

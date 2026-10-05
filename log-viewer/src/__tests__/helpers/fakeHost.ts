@@ -5,10 +5,13 @@ import type { ReactiveController, ReactiveControllerHost } from 'lit';
 
 type Driver = { connect: () => void; disconnect: () => void };
 
+/** A controller host whose lifecycle a test drives by hand. */
+export type FakeHost = ReactiveControllerHost & Driver;
+
 /** Drives the controller hooks by hand. Pass an element for a host read as one. */
-export function fakeHost(): ReactiveControllerHost & Driver;
-export function fakeHost<E extends Element>(element: E): ReactiveControllerHost & Driver & E;
-export function fakeHost(element?: Element): ReactiveControllerHost & Driver {
+export function fakeHost(): FakeHost;
+export function fakeHost<E extends Element>(element: E): FakeHost & E;
+export function fakeHost(element?: Element): FakeHost {
   const controllers = new Set<ReactiveController>();
   const host = {
     addController: (c: ReactiveController) => void controllers.add(c),

@@ -7,9 +7,10 @@ import type {
   LogEvent,
   SOQLExecuteBeginLine,
 } from '@apexdevtools/apex-log-parser';
-import type { Limits } from '@apexdevtools/apex-log-parser/types';
+import type { LimitMetricUnit, Limits } from '@apexdevtools/apex-log-parser/types';
 
-import { GOVERNOR_METRICS, limitTotals } from '../../../components/logOverviewMetrics.js';
+import { limitTotals } from '../../../components/logOverviewMetrics.js';
+import { GOVERNOR_METRICS } from '../../../core/metrics/governorMetrics.js';
 import { formatByteSize, formatDuration, formatInteger } from '../../../core/utility/Util.js';
 import { getEventKey } from '../../../core/log/eventKeys.js';
 import { currentLogStore } from '../../../core/log/LogStore.js';
@@ -182,29 +183,11 @@ function groupBy(events: LogEvent[], key: (event: LogEvent) => string | null): M
 }
 
 /** How each metric's figures read. Bytes and milliseconds are not bare counts. */
-const LIMIT_FORMATS: Partial<Record<keyof Limits, (value: number) => string>> = {
-  heapSize: formatByteSize,
-  cpuTime: (value) => `${formatInteger(value)} ms`,
+const LIMIT_FORMATS: Record<LimitMetricUnit, (value: number) => string> = {
+  byte: formatByteSize,
+  millisecond: (value) => `${formatInteger(value)} ms`,
+  count: formatInteger,
 };
-
-/**
- * The metric a `System.LimitException` names, in the platform's own wording. The
- * exception and the cumulative total are the same fact, so the mapping lets the
- * pane report it once.
- */
-const LIMIT_EXCEPTION_METRICS: ReadonlyArray<{ key: keyof Limits; phrase: string }> = [
-  { key: 'cpuTime', phrase: 'apex cpu time' },
-  { key: 'heapSize', phrase: 'apex heap size' },
-  { key: 'soqlQueries', phrase: 'too many soql queries' },
-  { key: 'queryRows', phrase: 'too many query rows' },
-  { key: 'dmlStatements', phrase: 'too many dml statements' },
-  { key: 'dmlRows', phrase: 'too many dml rows' },
-  { key: 'soslQueries', phrase: 'too many sosl queries' },
-  { key: 'callouts', phrase: 'too many callouts' },
-  { key: 'emailInvocations', phrase: 'too many email invocations' },
-  { key: 'futureCalls', phrase: 'too many future calls' },
-  { key: 'queueableJobsAddedToQueue', phrase: 'too many queueable jobs' },
-];
 
 /** The heaviest event by self time, and its share of all the self time in the log. */
 interface HotSpot {
@@ -291,7 +274,9 @@ function limitDiagnostics(
   for (const event of limitExceptions) {
     const { head, frame } = splitException(event.text);
     const lower = head.toLowerCase();
-    const named = LIMIT_EXCEPTION_METRICS.find((entry) => lower.includes(entry.phrase));
+    const named = GOVERNOR_METRICS.find(
+      ({ exceptionPhrase }) => exceptionPhrase && lower.includes(exceptionPhrase),
+    );
     if (!named) {
       unmapped.push(event);
       continue;
@@ -306,7 +291,7 @@ function limitDiagnostics(
   }
 
   const found: Diagnostic[] = [];
-  for (const { key, label } of GOVERNOR_METRICS) {
+  for (const { key, label, unit } of GOVERNOR_METRICS) {
     const breach = breaches.get(key);
     const { used, limit } = totals[key];
     // A metric with no usage, or no limit reported, has no figures to show — and with no limit
@@ -317,7 +302,7 @@ function limitDiagnostics(
       continue;
     }
 
-    const format = LIMIT_FORMATS[key] ?? formatInteger;
+    const format = LIMIT_FORMATS[unit];
     const cause: DiagnosticCause | undefined =
       key === 'cpuTime' && hotSpot
         ? {

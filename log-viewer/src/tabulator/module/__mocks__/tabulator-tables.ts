@@ -1,4 +1,21 @@
-// __mocks__/tabulator-tables.ts
+/*
+ * Copyright (c) 2026 Certinia Inc. All rights reserved.
+ */
+
+/**
+ * Jest applies this to every log-viewer suite that resolves `tabulator-tables`, whether
+ * or not the suite asks. That is why nothing references it and it reads as dead: delete
+ * it and the suites subclassing `Module` or `Renderer` fail with
+ * `Class extends value undefined`.
+ *
+ * The real package cannot load at all under jest. Its `require` condition resolves to
+ * the UMD build, whose export is the bare `TabulatorFull` class, so `Module`, `Renderer`
+ * and `Tabulator` are all undefined. A suite needing more than the two classes below
+ * passes its own factory, which overrides this.
+ *
+ * Keep `Tabulator` out of here. `registerModule` writes a process-wide registry, so
+ * stubbing it for every suite would let a module register nothing and say nothing.
+ */
 export class Module {
   constructor(_table?: unknown) {
     // this.table = table;

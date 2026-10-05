@@ -70,8 +70,17 @@ jobs:
           install: false
       - name: Install Packages
         run: pnpm run ci:install
+      # No browser cache: Playwright's CI docs say a restore takes about as long as the download.
+      # No --with-deps: the runner image has Chromium's libraries, and apt only adds unused fonts.
       - name: Install Chromium
-        run: pnpm exec playwright install --with-deps chromium
+        run: pnpm exec playwright install --only-shell chromium
+      # A localhost page cannot fetch Services from the gallery, so the test server serves this copy.
+      - name: Download Salesforce Services
+        run: |
+          url=$(curl -fsS https://open-vsx.org/api/salesforce/salesforcedx-vscode-services/latest | jq -er .files.download)
+          curl -fsSL -o "$RUNNER_TEMP/services.vsix" "$url"
+          unzip -q "$RUNNER_TEMP/services.vsix" 'extension/*' -d "$RUNNER_TEMP/services"
+          echo "LANA_SERVICES_EXTENSION_PATH=$RUNNER_TEMP/services/extension" >> "$GITHUB_ENV"
       - name: Tests
         run: pnpm run test:e2e:web
       - name: Upload Playwright HTML report

@@ -8,6 +8,7 @@ import { SymbolKind, languages } from 'vscode';
 import {
   createMockDisplay,
   createMockApexLog,
+  asContext,
   createMockContext,
   createMockLogEvent,
 } from '../../__tests__/helpers/test-builders.js';
@@ -146,17 +147,14 @@ describe('RawLogSymbolProvider', () => {
       expect(symbols).toEqual([]);
     });
 
-    it('returns no symbols when the tab model does not list the document', async () => {
-      setOpenTabs();
-      const doc = createMockTextDocument({ lines: [APEX_LOG_LINE], uri: '/test/file.log' });
-
-      expect(await provider.provideDocumentSymbols(doc, {} as never)).toEqual([]);
-      expect(mockGetApexLog).not.toHaveBeenCalled();
-    });
-
-    it('returns no symbols for a URI shown as a diff side', async () => {
-      const uri = Uri.file('/test/file.log');
-      setOpenTabs(new TabInputTextDiff(Uri.parse('git:/test/file.log'), uri));
+    it.each([
+      ['the tab model does not list the document', []],
+      [
+        'the document is only shown as a diff side',
+        [new TabInputTextDiff(Uri.parse('git:/test/file.log'), Uri.file('/test/file.log'))],
+      ],
+    ])('returns no symbols, without parsing, when %s', async (_label, tabs) => {
+      setOpenTabs(...tabs);
       const doc = createMockTextDocument({ lines: [APEX_LOG_LINE], uri: '/test/file.log' });
 
       expect(await provider.provideDocumentSymbols(doc, {} as never)).toEqual([]);
@@ -167,28 +165,15 @@ describe('RawLogSymbolProvider', () => {
   describe('apply', () => {
     const applyProvider = () => {
       const mockContext = createMockContext();
-      RawLogSymbolProvider.apply(mockContext as unknown as import('../../Context.js').Context);
-      return (languages.registerDocumentSymbolProvider as jest.Mock).mock.calls[0]?.[1] as
-        RawLogSymbolProvider | undefined;
+      RawLogSymbolProvider.apply(asContext(mockContext));
+      const registered = (languages.registerDocumentSymbolProvider as jest.Mock).mock.calls.at(
+        -1,
+      )?.[1] as RawLogSymbolProvider | undefined;
+      if (!registered) {
+        throw new Error('no document symbol provider registered');
+      }
+      return { registered, display: mockContext.display };
     };
-
-    it('gives the registered provider the context display to report through', async () => {
-      const mockContext = createMockContext();
-      RawLogSymbolProvider.apply(mockContext as unknown as import('../../Context.js').Context);
-      const registered = (languages.registerDocumentSymbolProvider as jest.Mock).mock
-        .calls[0]?.[1] as RawLogSymbolProvider;
-      mockGetApexLog.mockResolvedValue(null);
-
-      await registered.provideDocumentSymbols(
-        createMockTextDocument({
-          lines: ['16:35:06.2 (2706460)|EXECUTION_STARTED'],
-          uri: '/test/file.log',
-        }) as never,
-        {} as never,
-      );
-
-      expect(mockGetApexLog).toHaveBeenCalledWith(expect.anything(), mockContext.display);
-    });
 
     const fireTabChange = () => {
       const handler = (window.tabGroups.onDidChangeTabs as jest.Mock).mock.calls[0]?.[0] as (
@@ -197,46 +182,50 @@ describe('RawLogSymbolProvider', () => {
       handler(undefined);
     };
 
-    it('registers a document symbol provider for apexlog', () => {
-      applyProvider();
+    it('registers a provider for apexlog that reports through the context display', async () => {
+      const { registered, display } = applyProvider();
+      mockGetApexLog.mockResolvedValue(null);
 
       expect(languages.registerDocumentSymbolProvider).toHaveBeenCalledTimes(1);
       expect(languages.registerDocumentSymbolProvider).toHaveBeenCalledWith(
         [{ language: 'apexlog' }],
         expect.any(RawLogSymbolProvider),
       );
+
+      await registered.provideDocumentSymbols(
+        createMockTextDocument({ lines: [APEX_LOG_LINE], uri: '/test/file.log' }),
+        {} as never,
+      );
+
+      expect(mockGetApexLog).toHaveBeenCalledWith(expect.anything(), display);
     });
 
-    it('asks VS Code again once the tab model lists a log it had rejected', async () => {
+    it.each([
+      [
+        'asks VS Code again once the tab model lists it as text',
+        new TabInputText(Uri.file('/test/file.log')),
+        2,
+      ],
+      [
+        'stays put while it is still only a diff side',
+        new TabInputTextDiff(Uri.parse('git:/test/file.log'), Uri.file('/test/file.log')),
+        1,
+      ],
+    ])('for a rejected log, %s', async (_label, tabAfter, registrations) => {
       const doc = createMockTextDocument({ lines: [APEX_LOG_LINE], uri: '/test/file.log' });
       setOpenTabs();
-      const registered = applyProvider();
+      const { registered } = applyProvider();
 
-      await registered?.provideDocumentSymbols(doc, {} as never);
+      await registered.provideDocumentSymbols(doc, {} as never);
 
-      setOpenTabs(new TabInputText(Uri.file('/test/file.log')));
+      setOpenTabs(tabAfter);
       window.activeTextEditor = { document: doc };
       fireTabChange();
 
-      expect(languages.registerDocumentSymbolProvider).toHaveBeenCalledTimes(2);
+      expect(languages.registerDocumentSymbolProvider).toHaveBeenCalledTimes(registrations);
     });
 
-    it('does not re-register for a log that is still only a diff side', async () => {
-      const uri = Uri.file('/test/file.log');
-      const doc = createMockTextDocument({ lines: [APEX_LOG_LINE], uri: '/test/file.log' });
-      setOpenTabs();
-      const registered = applyProvider();
-
-      await registered?.provideDocumentSymbols(doc, {} as never);
-
-      setOpenTabs(new TabInputTextDiff(Uri.parse('git:/test/file.log'), uri));
-      window.activeTextEditor = { document: doc };
-      fireTabChange();
-
-      expect(languages.registerDocumentSymbolProvider).toHaveBeenCalledTimes(1);
-    });
-
-    it('does not re-register when no request was rejected', () => {
+    it('does not re-register a log no request was rejected for', () => {
       const doc = createMockTextDocument({ lines: [APEX_LOG_LINE], uri: '/test/file.log' });
       applyProvider();
 

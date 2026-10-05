@@ -12,12 +12,6 @@ import type { Tabulator } from 'tabulator-tables';
 jest.mock('../TimeOrderTable.js', () => ({ createTimeOrderTable: () => build('time-order') }));
 jest.mock('../AggregatedTable.js', () => ({ createAggregatedTable: () => build('aggregated') }));
 jest.mock('../BottomUpTable.js', () => ({ createBottomUpTable: () => build('bottom-up') }));
-// vscode-button needs ElementInternals.setFormValue (absent in jsdom).
-jest.mock('#vscode-elements/vscode-button.js', () => ({}));
-jest.mock('#vscode-elements/vscode-option.js', () => ({}));
-jest.mock('#vscode-elements/vscode-toolbar-button.js', () => ({}));
-// vscode-icon re-links the codicon stylesheet by href, which jsdom has none of.
-jest.mock('#vscode-elements/vscode-icon.js', () => ({}));
 // VsSelect extends vscode-single-select, whose setFormValue needs an
 // ElementInternals jsdom lacks; the render would upgrade it.
 jest.mock('../../../../components/VsSelect.js', () => ({}));

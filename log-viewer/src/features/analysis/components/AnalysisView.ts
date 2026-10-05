@@ -12,7 +12,6 @@ import type { RowComponent, Tabulator } from 'tabulator-tables';
 
 import type { ApexLog } from '@apexdevtools/apex-log-parser';
 import '../../../components/ContextMenu.js';
-import type { ContextMenu } from '../../../components/ContextMenu.js';
 import { DomListenerController } from '../../../core/events/DomListenerController.js';
 import { eventBus } from '../../../core/events/EventBus.js';
 import type { FindEventDetail, FindEventMap } from '../../find/findEvents.js';
@@ -30,6 +29,8 @@ import { eventByEventIndex } from '../../../core/utility/EventSearch.js';
 import { isVisible } from '../../../core/utility/Util.js';
 import { createBottomUpTable } from '../../call-tree/components/BottomUpTable.js';
 import { ColumnSettingsController } from '../../../components/ColumnSettingsController.js';
+import { GridColumnMenuController } from '../../../components/GridColumnMenuController.js';
+import { gridToolbarActions } from '../../../components/gridToolbar.js';
 import { CALL_TREE_VIEWS } from '../../../tabulator/ColumnViews.js';
 import type { BottomUpRow } from '../../call-tree/utils/Aggregation.js';
 import { findRootBucket } from '../../call-tree/utils/bucketRows.js';
@@ -123,7 +124,11 @@ export class AnalysisView extends LitElement {
     alwaysVisible: ALWAYS_VISIBLE,
     tables: () => (this.analysisTable ? [this.analysisTable] : []),
   });
-  private contextMenu: ContextMenu | null = null;
+  private readonly _menus = new GridColumnMenuController({
+    table: () => this.analysisTable,
+    menu: () => this.renderRoot.querySelector('context-menu'),
+    columns: this._columns,
+  });
   tableContainer: HTMLDivElement | null = null;
   findMap: { [key: number]: RowComponent } = {};
   findArgs: { text: string; count: number; options: { matchCase: boolean } } = {
@@ -226,10 +231,6 @@ export class AnalysisView extends LitElement {
     );
   }
 
-  firstUpdated(): void {
-    this.contextMenu = this.renderRoot.querySelector('context-menu');
-  }
-
   updated(changedProperties: PropertyValues): void {
     if (
       this.timelineRoot &&
@@ -267,8 +268,8 @@ export class AnalysisView extends LitElement {
               id="column-view"
               prefix="Columns"
               label="Column view"
-              @change="${this._handleColumnViewChange}"
-              @vs-reset-option="${this._onResetOption}"
+              @change="${this._menus.chooseView}"
+              @vs-reset-option="${this._menus.resetView}"
               .value="${this._columns.view}"
               .resettableValues="${this._columns.editedViews}"
             >
@@ -310,26 +311,11 @@ export class AnalysisView extends LitElement {
             <vscode-option>Type</vscode-option>
           </vs-select>
 
-          <div slot="actions">
-            <vscode-toolbar-button
-              icon="list-selection"
-              label="Columns"
-              title="Columns"
-              @click=${this._openColumnMenu}
-            ></vscode-toolbar-button>
-            <vscode-toolbar-button
-              icon="desktop-download"
-              label="Export to CSV"
-              title="Export to CSV"
-              @click=${this._exportToCSV}
-            ></vscode-toolbar-button>
-            <vscode-toolbar-button
-              icon="copy"
-              label="Copy to clipboard"
-              title="Copy to clipboard"
-              @click=${this._copyToClipboard}
-            ></vscode-toolbar-button>
-          </div>
+          ${gridToolbarActions({
+            menus: this._menus,
+            exportToCSV: () => this._exportToCSV(),
+            copyToClipboard: () => this._copyToClipboard(),
+          })}
         </datagrid-filter-bar>
 
         <div id="analysis-table-container">
@@ -341,68 +327,14 @@ export class AnalysisView extends LitElement {
     `;
   }
 
-  private _handleColumnViewChange(event: Event) {
-    this._columns.choose((event.target as HTMLInputElement).value || 'General');
-  }
-
-  /** Applies the active view and wires the header menu once the table is built. */
-  private _initTableColumns(table: Tabulator) {
-    this._columns.applyTo(table);
-    const header = table.element.querySelector<HTMLElement>('.tabulator-header');
-    header?.addEventListener('contextmenu', (event) => {
-      event.preventDefault();
-      this._showColumnMenu(event.clientX, event.clientY);
-    });
-  }
-
-  private _showColumnMenu(x: number, y: number) {
-    if (!this.contextMenu || !this.analysisTable) {
-      return;
-    }
-    this.contextMenu.show(this._columns.menuItems(this.analysisTable), x, y);
-  }
-
-  private _openColumnMenu(event: Event) {
-    const rect = (event.currentTarget as HTMLElement).getBoundingClientRect();
-    this._showColumnMenu(rect.left, rect.bottom);
-  }
-
-  /** Rebuilds the open column menu so checkmarks/reset icons reflect current state. */
-  private _refreshColumnMenu() {
-    if (!this.contextMenu?.isVisible() || !this.analysisTable) {
-      return;
-    }
-    this.contextMenu.items = this._columns.menuItems(this.analysisTable);
-  }
-
   private _handleColumnMenuSelect(e: CustomEvent<{ itemId: string }>) {
-    const { itemId } = e.detail;
-    const table = this.analysisTable;
-    if (!table) {
-      return;
-    }
-    if (itemId.startsWith('view:')) {
-      this._columns.choose(itemId.slice('view:'.length));
-      this._refreshColumnMenu();
-      return;
-    }
-    if (itemId.startsWith('col:')) {
-      this._columns.toggle(table, itemId.slice('col:'.length));
-      this._refreshColumnMenu();
-      return;
-    }
-    if (itemId.startsWith('reset:')) {
-      this._columns.reset(itemId.slice('reset:'.length));
-      this._refreshColumnMenu();
-    }
-  }
-
-  private _onResetOption(event: CustomEvent<{ value: string }>) {
-    this._columns.reset(event.detail.value);
+    this._menus.select(e.detail.itemId);
   }
 
   _copyToClipboard() {
-    this.analysisTable?.copyToClipboard('all');
+    // No range: an argument wins over `clipboardCopyRowRange`, which is what fills the
+    // tree state in.
+    this.analysisTable?.copyToClipboard();
   }
 
   _exportToCSV() {
@@ -573,7 +505,7 @@ export class AnalysisView extends LitElement {
     });
 
     await tableBuilt;
-    this._initTableColumns(this.analysisTable);
+    this._menus.initTable(this.analysisTable);
   }
 
   _resetFindWidget() {

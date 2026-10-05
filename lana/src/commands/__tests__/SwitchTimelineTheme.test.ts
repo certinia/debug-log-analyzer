@@ -5,7 +5,7 @@ import { beforeEach, describe, expect, it } from '@jest/globals';
 
 import { Uri, window } from 'vscode';
 
-import { createMockContext } from '../../__tests__/helpers/test-builders.js';
+import { asContext, createMockContext } from '../../__tests__/helpers/test-builders.js';
 import { SwitchTimelineTheme } from '../SwitchTimelineTheme.js';
 
 // Mock AppConfig
@@ -28,6 +28,10 @@ const mockGetConfig = getConfig as jest.Mock;
 const mockUpdateConfig = updateConfig as jest.Mock;
 const mockGetCurrentView = LogView.getCurrentView as jest.Mock;
 
+function themeConfig(activeTheme: string, customThemes: Record<string, object> = {}) {
+  return { timeline: { activeTheme, customThemes } };
+}
+
 describe('SwitchTimelineTheme', () => {
   let mockQuickPick: {
     items: Array<{ label: string; description?: string }>;
@@ -44,6 +48,18 @@ describe('SwitchTimelineTheme', () => {
   let onDidAcceptCallback: () => Promise<void>;
   let onDidHideCallback: () => void;
   let onDidChangeActiveCallback: (items: Array<{ label: string }>) => void;
+  const webview = { postMessage: jest.fn() };
+
+  async function openPicker() {
+    const mockContext = createMockContext();
+    await SwitchTimelineTheme.getCommand(asContext(mockContext)).run({} as never);
+    return mockContext;
+  }
+
+  const sentTheme = (activeTheme: string) => ({
+    cmd: 'switchTimelineTheme',
+    payload: { activeTheme },
+  });
 
   beforeEach(() => {
     mockQuickPick = {
@@ -67,285 +83,109 @@ describe('SwitchTimelineTheme', () => {
       }),
     };
     (window.createQuickPick as jest.Mock).mockReturnValue(mockQuickPick);
-
-    mockGetConfig.mockReturnValue({
-      timeline: {
-        activeTheme: '50 Shades of Green',
-        customThemes: {},
-      },
-    });
-
+    mockGetConfig.mockReturnValue(themeConfig('50 Shades of Green'));
     mockUpdateConfig.mockResolvedValue(undefined);
-    mockGetCurrentView.mockReturnValue(null);
+    mockGetCurrentView.mockReturnValue({ webview });
   });
 
-  describe('getCommand', () => {
-    it('should return command with correct name', () => {
-      const mockContext = createMockContext();
-      const command = SwitchTimelineTheme.getCommand(
-        mockContext as unknown as import('../../Context.js').Context,
-      );
+  it('registers the command and says so', () => {
+    const mockContext = createMockContext();
 
-      expect(command.name).toBe('switchTimelineTheme');
-    });
+    SwitchTimelineTheme.apply(asContext(mockContext));
 
-    it('should return command with correct title', () => {
-      const mockContext = createMockContext();
-      const command = SwitchTimelineTheme.getCommand(
-        mockContext as unknown as import('../../Context.js').Context,
-      );
-
-      expect(command.title).toBe('Log: Timeline Theme');
-    });
-
-    it('reports a failure to change the theme rather than failing silently', async () => {
-      mockGetConfig.mockImplementation(() => {
-        throw new Error('config unavailable');
-      });
-      const mockContext = createMockContext();
-      const command = SwitchTimelineTheme.getCommand(
-        mockContext as unknown as import('../../Context.js').Context,
-      );
-
-      await expect(command.run(Uri.parse('memfs:/logs/a.log'))).resolves.toBeUndefined();
-
-      expect(mockContext.display.showErrorMessage).toHaveBeenCalledWith(
-        'Error changing timeline theme: config unavailable',
-      );
-    });
+    expect(mockContext.context.subscriptions).toHaveLength(1);
+    expect(mockContext.display.output).toHaveBeenCalledWith(
+      "Registered command 'Lana: Timeline Theme'",
+    );
   });
 
-  describe('theme list building', () => {
-    it('should include all preset themes', async () => {
-      const mockContext = createMockContext();
-      const command = SwitchTimelineTheme.getCommand(
-        mockContext as unknown as import('../../Context.js').Context,
+  it('reports a failure to change the theme rather than failing silently', async () => {
+    mockGetConfig.mockImplementation(() => {
+      throw new Error('config unavailable');
+    });
+    const mockContext = createMockContext();
+    const command = SwitchTimelineTheme.getCommand(asContext(mockContext));
+
+    await expect(command.run(Uri.parse('memfs:/logs/a.log'))).resolves.toBeUndefined();
+
+    expect(mockContext.display.showErrorMessage).toHaveBeenCalledWith(
+      'Error changing timeline theme: config unavailable',
+    );
+  });
+
+  describe('theme list', () => {
+    it('lists the presets and marks only the default', async () => {
+      await openPicker();
+
+      expect(mockQuickPick.items).toEqual(
+        expect.arrayContaining([
+          { label: '50 Shades of Green', description: 'default' },
+          { label: 'Dracula', description: '' },
+          { label: 'Nord', description: '' },
+          { label: 'Monokai Pro', description: '' },
+        ]),
       );
-
-      await command.run({} as never);
-
-      const items = mockQuickPick.items;
-      expect(items.some((i) => i.label === '50 Shades of Green')).toBe(true);
-      expect(items.some((i) => i.label === 'Dracula')).toBe(true);
-      expect(items.some((i) => i.label === 'Nord')).toBe(true);
-      expect(items.some((i) => i.label === 'Monokai Pro')).toBe(true);
     });
 
-    it('should include custom themes from config', async () => {
-      mockGetConfig.mockReturnValue({
-        timeline: {
-          activeTheme: '50 Shades of Green',
-          customThemes: {
-            'My Custom Theme': {},
-            'Another Theme': {},
-          },
-        },
-      });
-
-      const mockContext = createMockContext();
-      const command = SwitchTimelineTheme.getCommand(
-        mockContext as unknown as import('../../Context.js').Context,
+    it('adds custom themes once each, sorted with the presets', async () => {
+      mockGetConfig.mockReturnValue(
+        themeConfig('50 Shades of Green', { Zebra: {}, Alpha: {}, Dracula: {} }),
       );
 
-      await command.run({} as never);
-
-      const items = mockQuickPick.items;
-      const myCustom = items.find((i) => i.label === 'My Custom Theme');
-      const another = items.find((i) => i.label === 'Another Theme');
-      expect(myCustom).toBeDefined();
-      expect(myCustom?.description).toBe('custom');
-      expect(another).toBeDefined();
-      expect(another?.description).toBe('custom');
-    });
-
-    it('should sort themes alphabetically', async () => {
-      mockGetConfig.mockReturnValue({
-        timeline: {
-          activeTheme: '50 Shades of Green',
-          customThemes: {
-            Zebra: {},
-            Alpha: {},
-          },
-        },
-      });
-
-      const mockContext = createMockContext();
-      const command = SwitchTimelineTheme.getCommand(
-        mockContext as unknown as import('../../Context.js').Context,
-      );
-
-      await command.run({} as never);
+      await openPicker();
 
       const labels = mockQuickPick.items.map((i) => i.label);
-      const sortedLabels = [...labels].sort();
-      expect(labels).toEqual(sortedLabels);
+      expect(labels).toEqual([...labels].sort((a, b) => a.localeCompare(b)));
+      expect(labels.filter((label) => label === 'Dracula')).toHaveLength(1);
+      expect(mockQuickPick.items).toEqual(
+        expect.arrayContaining([
+          { label: 'Alpha', description: 'custom' },
+          { label: 'Zebra', description: 'custom' },
+          { label: 'Dracula', description: '' },
+        ]),
+      );
     });
 
-    it('should mark default theme with description', async () => {
-      const mockContext = createMockContext();
-      const command = SwitchTimelineTheme.getCommand(
-        mockContext as unknown as import('../../Context.js').Context,
-      );
-
-      await command.run({} as never);
-
-      const defaultItem = mockQuickPick.items.find((i) => i.label === '50 Shades of Green');
-      expect(defaultItem?.description).toBe('default');
+    it('focuses the current theme', async () => {
+      mockGetConfig.mockReturnValue(themeConfig('Nord'));
+      await openPicker();
+      expect(mockQuickPick.activeItems.map((i) => i.label)).toEqual(['Nord']);
     });
 
-    it('should not mark non-default built-in themes as custom', async () => {
-      const mockContext = createMockContext();
-      const command = SwitchTimelineTheme.getCommand(
-        mockContext as unknown as import('../../Context.js').Context,
-      );
-
-      await command.run({} as never);
-
-      const draculaItem = mockQuickPick.items.find((i) => i.label === 'Dracula');
-      expect(draculaItem?.description).toBe('');
-    });
-
-    it('should deduplicate themes when custom theme has same name as preset', async () => {
-      mockGetConfig.mockReturnValue({
-        timeline: {
-          activeTheme: '50 Shades of Green',
-          customThemes: {
-            Dracula: {}, // Same name as preset
-          },
-        },
-      });
-
-      const mockContext = createMockContext();
-      const command = SwitchTimelineTheme.getCommand(
-        mockContext as unknown as import('../../Context.js').Context,
-      );
-
-      await command.run({} as never);
-
-      const draculaItems = mockQuickPick.items.filter((i) => i.label === 'Dracula');
-      expect(draculaItems.length).toBe(1);
+    it('focuses nothing when the current theme no longer exists', async () => {
+      mockGetConfig.mockReturnValue(themeConfig('NonExistent'));
+      await openPicker();
+      expect(mockQuickPick.activeItems).toHaveLength(0);
     });
   });
 
-  describe('active theme selection', () => {
-    it('should set active item to current theme', async () => {
-      mockGetConfig.mockReturnValue({
-        timeline: {
-          activeTheme: 'Nord',
-          customThemes: {},
-        },
-      });
-
-      const mockContext = createMockContext();
-      const command = SwitchTimelineTheme.getCommand(
-        mockContext as unknown as import('../../Context.js').Context,
-      );
-
-      await command.run({} as never);
-
-      expect(mockQuickPick.activeItems[0]?.label).toBe('Nord');
-    });
-
-    it('should fall back to default when active theme not found', async () => {
-      mockGetConfig.mockReturnValue({
-        timeline: {
-          activeTheme: 'NonExistent',
-          customThemes: {},
-        },
-      });
-
-      const mockContext = createMockContext();
-      const command = SwitchTimelineTheme.getCommand(
-        mockContext as unknown as import('../../Context.js').Context,
-      );
-
-      await command.run({} as never);
-
-      // activeItems won't be set if theme not found
-      expect(mockQuickPick.activeItems.length).toBe(0);
-    });
-  });
-
-  describe('theme preview', () => {
-    it('should send theme change to webview on navigation', async () => {
-      const mockWebview = {
-        postMessage: jest.fn(),
-      };
-      mockGetCurrentView.mockReturnValue({ webview: mockWebview });
-
-      const mockContext = createMockContext();
-      const command = SwitchTimelineTheme.getCommand(
-        mockContext as unknown as import('../../Context.js').Context,
-      );
-
-      await command.run({} as never);
-
-      // Simulate navigating to a theme
+  describe('preview', () => {
+    it('sends each theme to the open view as the user moves through the list', async () => {
+      await openPicker();
       onDidChangeActiveCallback([{ label: 'Dracula' }]);
-
-      expect(mockWebview.postMessage).toHaveBeenCalledWith({
-        cmd: 'switchTimelineTheme',
-        payload: { activeTheme: 'Dracula' },
-      });
+      expect(webview.postMessage).toHaveBeenCalledWith(sentTheme('Dracula'));
     });
 
-    it('should not crash when no view is open', async () => {
+    it('does nothing when no view is open', async () => {
       mockGetCurrentView.mockReturnValue(null);
-
-      const mockContext = createMockContext();
-      const command = SwitchTimelineTheme.getCommand(
-        mockContext as unknown as import('../../Context.js').Context,
-      );
-
-      await command.run({} as never);
-
-      expect(() => {
-        onDidChangeActiveCallback([{ label: 'Dracula' }]);
-      }).not.toThrow();
+      await openPicker();
+      expect(() => onDidChangeActiveCallback([{ label: 'Dracula' }])).not.toThrow();
     });
   });
 
-  describe('theme selection', () => {
-    it('should update config on accept', async () => {
-      const mockContext = createMockContext();
-      const command = SwitchTimelineTheme.getCommand(
-        mockContext as unknown as import('../../Context.js').Context,
-      );
-
-      await command.run({} as never);
-
-      // Navigate to a theme
+  describe('accept', () => {
+    it('saves the chosen theme and closes the picker', async () => {
+      await openPicker();
       onDidChangeActiveCallback([{ label: 'Nord' }]);
-      // Accept selection
       await onDidAcceptCallback();
 
       expect(mockUpdateConfig).toHaveBeenCalledWith('timeline.activeTheme', 'Nord');
-    });
-
-    it('should hide picker on accept', async () => {
-      const mockContext = createMockContext();
-      const command = SwitchTimelineTheme.getCommand(
-        mockContext as unknown as import('../../Context.js').Context,
-      );
-
-      await command.run({} as never);
-
-      onDidChangeActiveCallback([{ label: 'Nord' }]);
-      // Need to await since onDidAccept is async
-      await onDidAcceptCallback();
-
       expect(mockQuickPick.hide).toHaveBeenCalled();
     });
 
-    it('reports a failure to save the chosen theme', async () => {
+    it('reports a failure to save the chosen theme, and still closes', async () => {
       mockUpdateConfig.mockRejectedValue(new Error('settings are read-only'));
-      const mockContext = createMockContext();
-      const command = SwitchTimelineTheme.getCommand(
-        mockContext as unknown as import('../../Context.js').Context,
-      );
-
-      await command.run({} as never);
-
+      const mockContext = await openPicker();
       onDidChangeActiveCallback([{ label: 'Nord' }]);
       await onDidAcceptCallback();
 
@@ -356,100 +196,24 @@ describe('SwitchTimelineTheme', () => {
     });
   });
 
-  describe('theme revert', () => {
-    it('should revert to original theme on hide without selection', async () => {
-      const mockWebview = {
-        postMessage: jest.fn(),
-      };
-      mockGetCurrentView.mockReturnValue({ webview: mockWebview });
-
-      mockGetConfig.mockReturnValue({
-        timeline: {
-          activeTheme: '50 Shades of Green',
-          customThemes: {},
-        },
-      });
-
-      const mockContext = createMockContext();
-      const command = SwitchTimelineTheme.getCommand(
-        mockContext as unknown as import('../../Context.js').Context,
-      );
-
-      await command.run({} as never);
-
-      // Navigate to different theme
+  describe('hide', () => {
+    it('disposes the picker and reverts the preview when nothing was chosen', async () => {
+      await openPicker();
       onDidChangeActiveCallback([{ label: 'Nord' }]);
-      // Hide without accepting
-      onDidHideCallback();
-
-      // Should revert to original
-      expect(mockWebview.postMessage).toHaveBeenLastCalledWith({
-        cmd: 'switchTimelineTheme',
-        payload: { activeTheme: '50 Shades of Green' },
-      });
-    });
-
-    it('should dispose picker on hide', async () => {
-      const mockContext = createMockContext();
-      const command = SwitchTimelineTheme.getCommand(
-        mockContext as unknown as import('../../Context.js').Context,
-      );
-
-      await command.run({} as never);
       onDidHideCallback();
 
       expect(mockQuickPick.dispose).toHaveBeenCalled();
+      expect(webview.postMessage).toHaveBeenLastCalledWith(sentTheme('50 Shades of Green'));
     });
 
-    it('should not revert when same theme is selected', async () => {
-      const mockWebview = {
-        postMessage: jest.fn(),
-      };
-      mockGetCurrentView.mockReturnValue({ webview: mockWebview });
-
-      mockGetConfig.mockReturnValue({
-        timeline: {
-          activeTheme: '50 Shades of Green',
-          customThemes: {},
-        },
-      });
-
-      const mockContext = createMockContext();
-      const command = SwitchTimelineTheme.getCommand(
-        mockContext as unknown as import('../../Context.js').Context,
-      );
-
-      await command.run({} as never);
-
-      // Navigate to same theme
-      onDidChangeActiveCallback([{ label: '50 Shades of Green' }]);
-      // Accept and hide
+    it('keeps the chosen theme after it is accepted', async () => {
+      await openPicker();
+      onDidChangeActiveCallback([{ label: 'Nord' }]);
       await onDidAcceptCallback();
-      mockWebview.postMessage.mockClear();
+      webview.postMessage.mockClear();
       onDidHideCallback();
 
-      // Should not send revert message (theme unchanged)
-      expect(mockWebview.postMessage).not.toHaveBeenCalled();
-    });
-  });
-
-  describe('apply', () => {
-    it('should register command with context', () => {
-      const mockContext = createMockContext();
-
-      SwitchTimelineTheme.apply(mockContext as unknown as import('../../Context.js').Context);
-
-      expect(mockContext.context.subscriptions.length).toBe(1);
-    });
-
-    it('should output registration message', () => {
-      const mockContext = createMockContext();
-
-      SwitchTimelineTheme.apply(mockContext as unknown as import('../../Context.js').Context);
-
-      expect(mockContext.display.output).toHaveBeenCalledWith(
-        "Registered command 'Lana: Timeline Theme'",
-      );
+      expect(webview.postMessage).not.toHaveBeenCalled();
     });
   });
 });

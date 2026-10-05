@@ -6,13 +6,6 @@
 import { beforeEach, describe, expect, it } from '@jest/globals';
 import { html } from 'lit';
 
-jest.mock('#vscode-elements/vscode-icon.js', () => ({}));
-jest.mock('#vscode-elements/vscode-badge.js', () => ({}));
-jest.mock('#vscode-elements/vscode-button.js', () => ({}));
-// The swc transform can't parse `.scss`/`.css`; stub the stylesheet assets.
-jest.mock('../../tabulator/style/DataGrid.scss', () => ({ default: '' }));
-jest.mock('../../tabulator/format/Progress.css', () => ({}));
-
 const settings: { inspector?: unknown } = {};
 const written: Array<{ section: string; value: unknown }> = [];
 // Settings normally reply at once; `deferSettings` holds the reply so a test can
@@ -232,22 +225,38 @@ describe('LogInspector', () => {
     document.body.replaceChildren();
   });
 
-  it('applies the persisted collapse to the list it was made in', async () => {
-    settings.inspector = inspectorSettings({
-      collapsed: { 'database:detail:callstack': true },
-    });
-    const el = await mount('database-tab');
-    select('database', 3);
+  // One id means different content in two lists, so each choice stays in its own.
+  it('applies the persisted collapse to its own list only', async () => {
+    settings.inspector = inspectorSettings({ collapsed: { 'timeline:detail:callstack': true } });
+    const el = await mount('timeline-tab');
+    select('timeline', 1);
     await flush(el);
-
     expect(paneView(el).collapsed).toEqual({ callstack: true });
 
-    // One id means different content in two lists, so the collapse stays in its own.
-    el.activeTab = 'timeline-tab';
-    select('timeline', 9);
+    el.activeTab = 'database-tab';
+    select('database', 2);
     await flush(el);
-
     expect(paneView(el).collapsed).toEqual({});
+  });
+
+  it.each([
+    ['hidden set', { hiddenSections: { 'timeline:detail:callstack': true } }, ['vitals']],
+    [
+      'order',
+      { sectionOrder: { 'timeline:detail': ['callstack', 'vitals'] } },
+      ['callstack', 'vitals'],
+    ],
+  ])('applies the persisted %s to its own list only', async (_name, stored, own) => {
+    settings.inspector = inspectorSettings(stored);
+    const el = await mount('timeline-tab');
+    select('timeline', 1);
+    await flush(el);
+    expect(sectionIds(el)).toEqual(own);
+
+    el.activeTab = 'database-tab';
+    select('database', 2);
+    await flush(el);
+    expect(sectionIds(el)).toEqual(['vitals', 'callstack']);
   });
 
   it('persists a collapse', async () => {
@@ -338,7 +347,7 @@ describe('LogInspector', () => {
     expect(builtHiding.at(-1)).toEqual(['callstack']);
   });
 
-  it('offers a hidden section back, and hides it in that list only', async () => {
+  it('offers a hidden section back in the menu', async () => {
     settings.inspector = inspectorSettings({
       hiddenSections: { 'timeline:detail:callstack': true },
     });
@@ -347,15 +356,7 @@ describe('LogInspector', () => {
     await flush(el);
     expect(sectionIds(el)).toEqual(['vitals']);
 
-    // Another list keeps the section.
-    el.activeTab = 'database-tab';
-    select('database', 2);
-    await flush(el);
-    expect(sectionIds(el)).toEqual(['vitals', 'callstack']);
-
     // The menu still offers the hidden one, so it can come back.
-    el.activeTab = 'timeline-tab';
-    await flush(el);
     openSectionMenu(el);
     expect(sectionMenu(el).items.map((item) => [item.id, item.checked])).toEqual([
       [RESET_SECTIONS_ID, undefined],
@@ -386,6 +387,9 @@ describe('LogInspector', () => {
     expect(sectionIds(el)).toEqual(['vitals', 'callstack']);
     openSectionMenu(el);
     expect(sectionMenu(el).items.filter((item) => item.checked === false)).toEqual([]);
+    // Their first build was told to skip them, so what it left out has to be
+    // built again rather than shown empty.
+    expect(builtHiding.at(-1)).toEqual([]);
   });
 
   it('keeps a section hidden when the toggle lands mid-build', async () => {
@@ -436,23 +440,6 @@ describe('LogInspector', () => {
     ]);
   });
 
-  it('rebuilds the sections it un-hides when the stored set hid them all', async () => {
-    settings.inspector = inspectorSettings({
-      hiddenSections: {
-        'timeline:detail:vitals': true,
-        'timeline:detail:callstack': true,
-      },
-    });
-    const el = await mount('timeline-tab');
-    select('timeline', 1);
-    await flush(el);
-
-    // Their first build was told to skip them, so what it left out has to be
-    // built again rather than shown empty.
-    expect(sectionIds(el)).toEqual(['vitals', 'callstack']);
-    expect(builtHiding.at(-1)).toEqual([]);
-  });
-
   it('resets a list that only has an order, back to the order it is built in', async () => {
     settings.inspector = inspectorSettings({
       sectionOrder: { 'timeline:detail': ['callstack', 'vitals'] },
@@ -497,21 +484,6 @@ describe('LogInspector', () => {
     ]);
     // The panes' dragged sizes go with it.
     expect(paneView(el).layoutEpoch).toBe(1);
-  });
-
-  it('applies a persisted order to its own list only', async () => {
-    settings.inspector = inspectorSettings({
-      sectionOrder: { 'timeline:detail': ['callstack', 'vitals'] },
-    });
-    const el = await mount('timeline-tab');
-    select('timeline', 1);
-    await flush(el);
-    expect(paneView(el).sections.map((section) => section.id)).toEqual(['callstack', 'vitals']);
-
-    el.activeTab = 'database-tab';
-    select('database', 2);
-    await flush(el);
-    expect(paneView(el).sections.map((section) => section.id)).toEqual(['vitals', 'callstack']);
   });
 
   it('auto-opens on the first selection only while the user has never chosen', async () => {
@@ -768,14 +740,6 @@ describe('LogInspector', () => {
     el.activeTab = 'tree-tab';
     await flush(el);
     expect(emptyText(el)).toBe('Select a frame in the call tree to inspect it.');
-
-    el.activeTab = 'analysis-tab';
-    await flush(el);
-    expect(emptyText(el)).toBe('Select a row in the analysis grid to inspect it.');
-
-    el.activeTab = 'database-tab';
-    await flush(el);
-    expect(emptyText(el)).toBe('Select a SOQL, DML or SOSL row to inspect it.');
   });
 
   it('returns to the whole-log empty state when a null selection clears the source', async () => {

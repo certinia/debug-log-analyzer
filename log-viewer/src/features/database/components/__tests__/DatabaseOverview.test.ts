@@ -20,10 +20,6 @@ import type {
 const apexLog = { namespaces: ['pkg', 'trigPkg'] } as unknown as ApexLog;
 let overview: DatabaseOverview | null = null;
 
-// jsdom has no stylesheet for the icon element to adopt, so it is left unregistered.
-jest.mock('#vscode-elements/vscode-icon.js', () => ({}));
-// The tabulator ESM build and its module registrations don't load under jest; the
-// tree's grid is never built here, only its row mapper is exercised.
 jest.mock('tabulator-tables', () => ({
   Tabulator: class {
     static registerModule() {}
@@ -31,6 +27,7 @@ jest.mock('tabulator-tables', () => ({
   Module: class {},
   Renderer: class {},
 }));
+// The tree's grid is never built here, only its row mapper is exercised.
 // Only the figures are stubbed: `concentration` is a pure sum over the fixture,
 // so the sections are tested against the same figures they ship with.
 jest.mock('../../services/databaseOverview.js', () => ({
@@ -40,7 +37,7 @@ jest.mock('../../services/databaseOverview.js', () => ({
 
 import { databaseTreeRows, ownCodeTotal, type DatabaseTreeRow } from '../DatabaseTimeTree.js';
 import '../DatabaseOverview.js';
-import { settledNote } from '../../../../components/__tests__/sectionTestUtils.js';
+import { settledNote } from '#test-helpers/sections.js';
 
 const emptyOverview = (): DatabaseOverview => ({
   time: {

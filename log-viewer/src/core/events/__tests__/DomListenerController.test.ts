@@ -5,23 +5,11 @@
  * Copyright (c) 2026 Certinia Inc. All rights reserved.
  */
 import { beforeEach, describe, expect, it } from '@jest/globals';
-import { LitElement, html, type ReactiveController } from 'lit';
+import { LitElement, html } from 'lit';
 
 import { DomListenerController, type DomListeners } from '../DomListenerController.js';
 import type { FindEventDetail, FindEventMap } from '../../../features/find/findEvents.js';
-
-/** A host that drives the controller hooks without needing a real element. */
-function fakeHost() {
-  const controllers = new Set<ReactiveController>();
-  return {
-    addController: (c: ReactiveController) => void controllers.add(c),
-    removeController: (c: ReactiveController) => void controllers.delete(c),
-    requestUpdate: () => {},
-    updateComplete: Promise.resolve(true),
-    connect: () => controllers.forEach((c) => c.hostConnected?.()),
-    disconnect: () => controllers.forEach((c) => c.hostDisconnected?.()),
-  };
-}
+import { fakeHost } from '#test-helpers/fakeHost.js';
 
 const DETAIL: FindEventDetail = { text: 'abc', count: 2, options: { matchCase: true } };
 

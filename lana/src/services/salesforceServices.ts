@@ -10,7 +10,6 @@ export { disposeServices, ensureServicesAvailable } from './servicesRuntime.js';
 /** The previous LogService query set no LIMIT, so it returned a full Tooling API page. */
 const MAX_LOG_RECORDS = 2000;
 
-/* eslint-disable @typescript-eslint/naming-convention -- Salesforce API field names are case-sensitive. */
 export interface ApexLogListItem {
   Id: string;
   LogUser?: { Name?: string };
@@ -20,7 +19,6 @@ export interface ApexLogListItem {
   Status: string;
   DurationMilliseconds?: number;
 }
-/* eslint-enable @typescript-eslint/naming-convention */
 
 export function listLogs(
   signal?: AbortSignal,

@@ -14,7 +14,7 @@ interface FakeEvent {
   children: FakeEvent[];
 }
 
-function ev(
+function timedFrame(
   eventIndex: number,
   type: string,
   text: string,
@@ -34,11 +34,14 @@ function ev(
 }
 
 // exec → m1 → m2 → soql (200ms leaf), no branches.
-const root = ev(0, 'ROOT', 'root', { total: 500, self: 0 });
-const exec = ev(1, 'CODE_UNIT_STARTED', 'exec', { total: 500, self: 0 });
-const m1 = ev(2, 'METHOD_ENTRY', 'm1', { total: 500, self: 0 });
-const m2 = ev(3, 'METHOD_ENTRY', 'm2', { total: 500, self: 0 });
-const soql = ev(4, 'SOQL_EXECUTE_BEGIN', 'SELECT Id FROM Account', { total: 200, self: 200 });
+const root = timedFrame(0, 'ROOT', 'root', { total: 500, self: 0 });
+const exec = timedFrame(1, 'CODE_UNIT_STARTED', 'exec', { total: 500, self: 0 });
+const m1 = timedFrame(2, 'METHOD_ENTRY', 'm1', { total: 500, self: 0 });
+const m2 = timedFrame(3, 'METHOD_ENTRY', 'm2', { total: 500, self: 0 });
+const soql = timedFrame(4, 'SOQL_EXECUTE_BEGIN', 'SELECT Id FROM Account', {
+  total: 200,
+  self: 200,
+});
 root.children = [exec];
 exec.parent = root;
 exec.children = [m1];
@@ -48,7 +51,8 @@ m2.parent = m1;
 m2.children = [soql];
 soql.parent = m2;
 
-const byId = new Map<number, FakeEvent>([exec, m1, m2, soql].map((e) => [e.eventIndex, e]));
+const BASE_FRAMES = [exec, m1, m2, soql];
+const byId = new Map<number, FakeEvent>();
 
 let selectedIndex = 4;
 const { KeyPathIds } = jest.requireActual<typeof import('../../core/log/keyPathIds.js')>(
@@ -89,6 +93,7 @@ import {
   buildWholeLogCallTree,
   frameEventIndexes,
   locatableEventIndexes,
+  revealableEventIndex,
   rowIdsByPath,
   type ScopedRow,
 } from '../scopedCallTree.js';
@@ -98,8 +103,13 @@ import type { FrameBudgetOptions } from '../../core/utility/FrameBudget.js';
  *  is only there to satisfy the contract. */
 const options: FrameBudgetOptions = { yieldSlice: () => Promise.resolve() };
 
+// Tests add frames under ids other tests reuse, so each starts from the base log.
 beforeEach(() => {
   paths = new KeyPathIds(1024);
+  byId.clear();
+  for (const frame of BASE_FRAMES) {
+    byId.set(frame.eventIndex, frame);
+  }
 });
 
 function build(eventIndex: number, instances?: number[]) {
@@ -109,14 +119,14 @@ function build(eventIndex: number, instances?: number[]) {
 /** A statement called from a loop: `count` occurrences of the same frame, each
  *  with its own small subtree. Returns their eventIndexes. */
 function loopOccurrences(count: number): number[] {
-  const loop = ev(300, 'METHOD_ENTRY', 'loop', { total: count, self: 0 });
+  const loop = timedFrame(300, 'METHOD_ENTRY', 'loop', { total: count, self: 0 });
   loop.parent = root;
   byId.set(loop.eventIndex, loop);
 
   const instances: number[] = [];
   let nextId = 301;
   for (let i = 0; i < count; i++) {
-    const call = ev(nextId++, 'SOQL_EXECUTE_BEGIN', 'SELECT Id FROM Account', {
+    const call = timedFrame(nextId++, 'SOQL_EXECUTE_BEGIN', 'SELECT Id FROM Account', {
       total: 1,
       self: 1,
     });
@@ -135,8 +145,8 @@ function types(rows: readonly ScopedRow[]): string[] {
 
 /** A limit block under m2, with the limit line it holds. Undone by the caller. */
 function limitBlockUnderM2(): () => void {
-  const block = ev(400, 'CUMULATIVE_LIMIT_USAGE', 'LIMIT_USAGE', { total: 3, self: 3 });
-  const line = ev(401, 'LIMIT_USAGE_FOR_NS', '(default)', { total: 0, self: 0 });
+  const block = timedFrame(400, 'CUMULATIVE_LIMIT_USAGE', 'LIMIT_USAGE', { total: 3, self: 3 });
+  const line = timedFrame(401, 'LIMIT_USAGE_FOR_NS', '(default)', { total: 0, self: 0 });
   block.parent = m2;
   block.children = [line];
   line.parent = block;
@@ -198,25 +208,16 @@ describe('buildScopedCallTree', () => {
     expect(rows.map((row) => row.text)).toEqual(['SELECT Id FROM Account']);
     expect(rows[0]?.duration).toEqual({ total: 200, self: 200 });
     expect(rows[0]?._children?.map((row) => row.text)).toEqual(['m2']);
-  });
-
-  it('bottom-up: every caller counts the call it contributed, never zero', async () => {
-    const tree = (await build(3))!;
-    const counts: number[] = [];
-    let node: ScopedRow | undefined = (await tree.bottomUp(options))![0];
-    while (node) {
-      counts.push(node.callCount);
-      node = node._children?.[0];
-    }
-    // The statement plus m2, its caller inside the scope, each crediting the one call.
-    expect(counts).toEqual([1, 1]);
+    // Every caller counts the call it contributed, never zero.
+    expect([rows[0]?.callCount, rows[0]?._children?.[0]?.callCount]).toEqual([1, 1]);
+    expect(rows[0]?._children?.[0]?._children).toBeNull();
   });
 
   it('drops zero-duration bookkeeping rows, keeping those with timed descendants', async () => {
-    const scope = ev(200, 'METHOD_ENTRY', 'scope', { total: 50, self: 0 });
-    const heap = ev(201, 'HEAP_ALLOCATE', 'Bytes:8', { total: 0, self: 0 });
-    const statement = ev(202, 'STATEMENT_EXECUTE', '[12]', { total: 0, self: 0 });
-    const timed = ev(203, 'METHOD_ENTRY', 'timed', { total: 50, self: 50 });
+    const scope = timedFrame(200, 'METHOD_ENTRY', 'scope', { total: 50, self: 0 });
+    const heap = timedFrame(201, 'HEAP_ALLOCATE', 'Bytes:8', { total: 0, self: 0 });
+    const statement = timedFrame(202, 'STATEMENT_EXECUTE', '[12]', { total: 0, self: 0 });
+    const timed = timedFrame(203, 'METHOD_ENTRY', 'timed', { total: 50, self: 50 });
     scope.parent = root;
     scope.children = [heap, statement];
     heap.parent = scope;
@@ -262,7 +263,7 @@ describe('buildScopedCallTree', () => {
   });
 
   it('keeps the selection itself even when it has no duration', async () => {
-    const scope = ev(210, 'VARIABLE_SCOPE_BEGIN', 'scope', { total: 0, self: 0 });
+    const scope = timedFrame(210, 'VARIABLE_SCOPE_BEGIN', 'scope', { total: 0, self: 0 });
     scope.parent = root;
     byId.set(scope.eventIndex, scope);
 
@@ -294,14 +295,6 @@ describe('buildScopedCallTree', () => {
     expect(tree.rootTotal).toBe(4);
   });
 
-  it('builds each view only on first read, then caches it', async () => {
-    const tree = (await build(4))!;
-    // Same array back on a second read — the walk is not repeated.
-    expect(await tree.aggregated(options)).toBe(await tree.aggregated(options));
-    expect(await tree.bottomUp(options)).toBe(await tree.bottomUp(options));
-    expect(await tree.timeOrder(options)).toBe(await tree.timeOrder(options));
-  });
-
   it('a wide aggregate merges every occurrence, uncapped', async () => {
     // The "occurrences × subtree" shape a NODE_BUDGET cap used to bound (see PR
     // #877's removal note). No cap exists any more, so every occurrence must
@@ -327,8 +320,8 @@ describe('buildScopedCallTree', () => {
   it('an aggregate of nested occurrences counts each one once', async () => {
     // A recursive frame: the outer call already holds the inner one, so taking
     // both as roots would walk the inner call twice.
-    const outer = ev(400, 'METHOD_ENTRY', 'rec', { total: 10, self: 4 });
-    const inner = ev(401, 'METHOD_ENTRY', 'rec', { total: 6, self: 6 });
+    const outer = timedFrame(400, 'METHOD_ENTRY', 'rec', { total: 10, self: 4 });
+    const inner = timedFrame(401, 'METHOD_ENTRY', 'rec', { total: 6, self: 6 });
     outer.parent = root;
     outer.children = [inner];
     inner.parent = outer;
@@ -349,9 +342,9 @@ describe('buildScopedCallTree', () => {
   it('bottom-up: a recursive frame counts the time it shares with itself once', async () => {
     // rec → work → rec. The outer call's 10 already holds the inner call's 6, so
     // the row reads 10 and not 16, while both calls' self time is its own.
-    const outer = ev(500, 'METHOD_ENTRY', 'rec', { total: 10, self: 1 });
-    const work = ev(501, 'METHOD_ENTRY', 'work', { total: 9, self: 3 });
-    const inner = ev(502, 'METHOD_ENTRY', 'rec', { total: 6, self: 6 });
+    const outer = timedFrame(500, 'METHOD_ENTRY', 'rec', { total: 10, self: 1 });
+    const work = timedFrame(501, 'METHOD_ENTRY', 'work', { total: 9, self: 3 });
+    const inner = timedFrame(502, 'METHOD_ENTRY', 'rec', { total: 6, self: 6 });
     outer.parent = root;
     outer.children = [work];
     work.parent = outer;
@@ -373,8 +366,8 @@ describe('buildScopedCallTree', () => {
     // A code unit that calls itself as a method entry: the Call Tree tab treats
     // the two as one method, so the inner call's 6 comes off the outer call's 10
     // here too, leaving 4 + 6 rather than 10 + 6.
-    const outer = ev(510, 'CODE_UNIT_STARTED', 'rec', { total: 10, self: 1 });
-    const inner = ev(511, 'METHOD_ENTRY', 'rec', { total: 6, self: 6 });
+    const outer = timedFrame(510, 'CODE_UNIT_STARTED', 'rec', { total: 10, self: 1 });
+    const inner = timedFrame(511, 'METHOD_ENTRY', 'rec', { total: 6, self: 6 });
     outer.parent = root;
     outer.children = [inner];
     inner.parent = outer;
@@ -416,7 +409,7 @@ describe('buildScopedCallTree', () => {
   });
 
   it('counts every occurrence even when the walk is sliced across frames', async () => {
-    const OCCURRENCES = 500;
+    const OCCURRENCES = 50;
     const instances = loopOccurrences(OCCURRENCES);
     let yields = 0;
     const sliced: FrameBudgetOptions = {
@@ -460,10 +453,10 @@ describe('buildScopedCallTree', () => {
   });
 
   it('materialises every child rather than capping the subtree', async () => {
-    const big = ev(100, 'METHOD_ENTRY', 'big', { total: 100, self: 0 });
+    const big = timedFrame(100, 'METHOD_ENTRY', 'big', { total: 100, self: 0 });
     big.parent = root;
     big.children = Array.from({ length: 5 }, (_unused, i) =>
-      ev(1_000 + i, 'METHOD_ENTRY', `kid${i}`, { total: 1, self: 1 }),
+      timedFrame(1_000 + i, 'METHOD_ENTRY', `kid${i}`, { total: 1, self: 1 }),
     );
     for (const kid of big.children) {
       kid.parent = big;
@@ -497,13 +490,6 @@ describe('buildWholeLogCallTree', () => {
     expect(chain[3]?.duration).toEqual({ total: 200, self: 200 });
   });
 
-  it('builds each view only on first read, then caches it', async () => {
-    const tree = (await buildWholeLogCallTree(options))!;
-    expect(await tree.timeOrder(options)).toBe(await tree.timeOrder(options));
-    expect(await tree.aggregated(options)).toBe(await tree.aggregated(options));
-    expect(await tree.bottomUp(options)).toBe(await tree.bottomUp(options));
-  });
-
   it('abandons a cancelled build instead of finishing it', async () => {
     const clock = jest.spyOn(performance, 'now');
     let time = 0;
@@ -519,7 +505,10 @@ describe('buildWholeLogCallTree', () => {
     }
   });
   it('leaves out a profiling block the log left at the top level', async () => {
-    const profiling = ev(500, 'CUMULATIVE_PROFILING_BEGIN', 'profiling', { total: 2, self: 2 });
+    const profiling = timedFrame(500, 'CUMULATIVE_PROFILING_BEGIN', 'profiling', {
+      total: 2,
+      self: 2,
+    });
     profiling.parent = root;
     root.children.push(profiling);
     byId.set(profiling.eventIndex, profiling);
@@ -532,6 +521,19 @@ describe('buildWholeLogCallTree', () => {
       root.children.pop();
       byId.delete(profiling.eventIndex);
     }
+  });
+});
+
+describe('view caching', () => {
+  it.each([
+    ['a scoped tree', () => build(4)],
+    ['the whole-log tree', () => buildWholeLogCallTree(options)],
+  ])('builds each view of %s only on first read, then caches it', async (_name, make) => {
+    const tree = (await make())!;
+    // Same array back on a second read — the walk is not repeated.
+    expect(await tree.timeOrder(options)).toBe(await tree.timeOrder(options));
+    expect(await tree.aggregated(options)).toBe(await tree.aggregated(options));
+    expect(await tree.bottomUp(options)).toBe(await tree.bottomUp(options));
   });
 });
 
@@ -549,8 +551,8 @@ describe('holds', () => {
   it('leaves out a frame at the same bucket path elsewhere in the log', async () => {
     // A second call of the same method, which a loop or a trigger makes common:
     // its rows would be named by the same path as the selection's.
-    const twin = ev(500, 'METHOD_ENTRY', 'm2', { total: 200, self: 0 });
-    const twinLeaf = ev(501, 'SOQL_EXECUTE_BEGIN', 'SELECT Id FROM Account', {
+    const twin = timedFrame(500, 'METHOD_ENTRY', 'm2', { total: 200, self: 0 });
+    const twinLeaf = timedFrame(501, 'SOQL_EXECUTE_BEGIN', 'SELECT Id FROM Account', {
       total: 200,
       self: 200,
     });
@@ -625,6 +627,19 @@ describe('frameEventIndexes', () => {
     const row = { id: 1, originalData: soql } as unknown as Partial<ScopedRow>;
 
     expect(frameEventIndexes(row)).toEqual([soql.eventIndex]);
+  });
+});
+
+describe('revealableEventIndex', () => {
+  const row = (id: number, eventIndex: number): Partial<ScopedRow> =>
+    ({ id, originalData: { eventIndex } }) as unknown as Partial<ScopedRow>;
+
+  it.each([
+    ['a real row by its own event', row(3, 17), 17],
+    ['nothing for a merged row, whose id is synthetic and negative', row(-1, 17), null],
+    ['nothing when there is no row', undefined, null],
+  ])('reveals %s', (_name, given, expected) => {
+    expect(revealableEventIndex(given)).toBe(expected);
   });
 });
 

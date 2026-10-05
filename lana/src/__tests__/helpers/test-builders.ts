@@ -8,7 +8,12 @@
 
 import type { ApexLog, LogEvent } from '@apexdevtools/apex-log-parser';
 
-import { createMockExtensionContext, type MockExtensionContext } from '../mocks/vscode.js';
+import type { Context } from '../../Context.js';
+import {
+  commands,
+  createMockExtensionContext,
+  type MockExtensionContext,
+} from '../mocks/vscode.js';
 
 /** Widen as `lana` reads more: a field absent here is `undefined` on the mock, not a type error. */
 type PartialLogEvent = Partial<
@@ -111,4 +116,23 @@ export function createMockContext(overrides: Partial<MockContext> = {}): MockCon
   };
 
   return { ...base, ...overrides };
+}
+
+export function asContext(mock: MockContext): Context {
+  return mock as unknown as Context;
+}
+
+/**
+ * A command registers on apply, so the last call is the one the case just made.
+ * Every handler is `Command.run`, which is why one signature covers them all.
+ *
+ * Reads the shared mock by path, so a suite that calls `jest.mock('vscode')` gets
+ * an automock this cannot see, and the throw below names the wrong cause.
+ */
+export function lastRegisteredCommand(): (...args: unknown[]) => Promise<unknown> {
+  const handler = commands.registerCommand.mock.calls.at(-1)?.[1];
+  if (!handler) {
+    throw new Error('no command registered - did the case call apply()?');
+  }
+  return handler as (...args: unknown[]) => Promise<unknown>;
 }

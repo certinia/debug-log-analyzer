@@ -6,9 +6,6 @@ import { Tabulator } from 'tabulator-tables';
 
 import { logStoreFor } from '../../../core/log/LogStore.js';
 import { vscodeMessenger } from '../../../core/messaging/VSCodeExtensionMessenger.js';
-import { formatDuration } from '../../../core/utility/Util.js';
-import { TIME_WIDTH } from '../../../tabulator/ColumnWidths.js';
-import { progressFormatterMS } from '../../../tabulator/format/ProgressMS.js';
 import { toAggregatedCallTree, type AggregatedRow } from '../utils/Aggregation.js';
 import { makeSumSelfTimeAllVisible } from '../utils/BottomCalcs.js';
 import { eventLabel, eventName } from '../utils/eventText.js';
@@ -17,6 +14,7 @@ import {
   createCountColumn,
   createGovernorMetricColumns,
   createNamespaceColumns,
+  createTimeColumn,
   createSelfSumHeapFooters,
   createTypeColumn,
   headerSortElement,
@@ -127,57 +125,23 @@ export function createAggregatedTable(
       createCountColumn({ title: 'Calls', field: 'callCount', width: 70 }),
       ...createGovernorMetricColumns(rootMethod, heapFooters),
       // Time columns sit at the far right of every call-tree table.
-      {
+      createTimeColumn({
         title: 'Total Time (ms)',
         field: 'totalTime',
-        sorter: 'number',
-        headerSortTristate: true,
-        width: TIME_WIDTH,
-        minWidth: 120,
-        hozAlign: 'right',
-        headerHozAlign: 'right',
-        formatter: progressFormatterMS,
-        formatterParams: {
-          precision: 2,
-          totalValue: rootMethod.duration.total,
-        },
-        bottomCalcFormatter: progressFormatterMS,
+        totalValue: rootMethod.duration.total,
         bottomCalc: 'sum',
-        bottomCalcFormatterParams: { precision: 2, totalValue: rootMethod.duration.total },
-        tooltip: (_event, cell) => formatDuration(cell.getValue()),
-      },
-      {
+      }),
+      createTimeColumn({
         title: 'Self Time (ms)',
         field: 'totalSelfTime',
-        sorter: 'number',
-        headerSortTristate: true,
-        width: TIME_WIDTH,
-        minWidth: 120,
-        hozAlign: 'right',
-        headerHozAlign: 'right',
-        formatter: progressFormatterMS,
-        formatterParams: {
-          precision: 2,
-          totalValue: rootMethod.duration.total,
-        },
-        bottomCalcFormatter: progressFormatterMS,
+        totalValue: rootMethod.duration.total,
         bottomCalc: selfTimeBottomCalc,
-        bottomCalcFormatterParams: { precision: 2, totalValue: rootMethod.duration.total },
-        tooltip: (_event, cell) => formatDuration(cell.getValue()),
-      },
-      {
+      }),
+      createTimeColumn({
         title: 'Avg Self Time (ms)',
         field: 'avgSelfTime',
-        sorter: 'number',
-        headerSortTristate: true,
-        width: TIME_WIDTH,
-        minWidth: 120,
-        hozAlign: 'right',
-        headerHozAlign: 'right',
-        formatter: progressFormatterMS,
-        formatterParams: { precision: 2, totalValue: rootMethod.duration.total },
-        tooltip: (_event, cell) => formatDuration(cell.getValue()),
-      },
+        totalValue: rootMethod.duration.total,
+      }),
     ],
   });
   tableRef.current = table;

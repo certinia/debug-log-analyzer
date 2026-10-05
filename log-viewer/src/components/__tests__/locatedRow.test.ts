@@ -8,6 +8,7 @@ import type { RowComponent } from 'tabulator-tables';
 
 import type { ApexLog, LogEvent } from '@apexdevtools/apex-log-parser';
 
+import { callFrame } from '#test-helpers/events.js';
 import { logStoreFor } from '../../core/log/LogStore.js';
 import { KeyPathIds, ROOT_PATH_ID } from '../../core/log/keyPathIds.js';
 import {
@@ -46,10 +47,6 @@ function bucketRow(ids: KeyPathIds, ...keys: string[]): RowComponent {
     key: keys[keys.length - 1],
     _pathId: pathId,
   });
-}
-
-function ev(text: string, parent: LogEvent | null, eventIndex?: number): LogEvent {
-  return { type: 'METHOD_ENTRY', namespace: '', text, parent, eventIndex } as unknown as LogEvent;
 }
 
 /** A table host holding a rendered row element per index, as the stamp leaves
@@ -291,9 +288,9 @@ describe('LocatedRowMarker', () => {
 describe('rowFrames', () => {
   /** exec -> m1 -> soql, with the indexes the log answers about. */
   function log() {
-    const exec = ev('exec', null, 1);
-    const m1 = ev('m1', exec, 3);
-    const soql = ev('soql', m1, 5);
+    const exec = callFrame('exec', null, 1);
+    const m1 = callFrame('m1', exec, 3);
+    const soql = callFrame('soql', m1, 5);
     return {
       soql,
       apexLog: { eventsById: { 1: exec, 3: m1, 5: soql } } as unknown as ApexLog,
@@ -344,9 +341,9 @@ describe('rowDetailSelection', () => {
   /** exec -> m1 -> soql, with the bucket and caller rows a bottom-up grid
    *  leaves: the bucket holds the occurrences, the caller row derives its own. */
   function rows() {
-    const exec = ev('exec', null, 1);
-    const m1 = ev('m1', exec, 3);
-    const soql = ev('soql', m1, 5);
+    const exec = callFrame('exec', null, 1);
+    const m1 = callFrame('m1', exec, 3);
+    const soql = callFrame('soql', m1, 5);
     const apexLog = { eventsById: { 1: exec, 3: m1, 5: soql } } as unknown as ApexLog;
     const paths = logStoreFor(apexLog).keyPathIds();
     const bucketPath = paths.step(ROOT_PATH_ID, paths.keyIdOf(soql));
@@ -403,7 +400,7 @@ describe('rowDetailSelection', () => {
   });
 
   it('names the one call a Time Order row is', () => {
-    const soql = ev('soql', null, 5);
+    const soql = callFrame('soql', null, 5);
     const row = rowComponent(document.createElement('div'), { originalData: soql });
 
     expect(rowDetailSelection(row, null, 'callees')).toEqual({ kind: 'event', eventIndex: 5 });
@@ -411,9 +408,9 @@ describe('rowDetailSelection', () => {
 });
 
 describe('LocatedRowIds', () => {
-  const root = ev('exec', null);
-  const outerFrame = ev('outer', root);
-  const frame = ev('inner', outerFrame);
+  const root = callFrame('exec', null);
+  const outerFrame = callFrame('outer', root);
+  const frame = callFrame('inner', outerFrame);
   const log = { eventsById: { 5: frame } } as unknown as ApexLog;
 
   it('builds the paths of the rows the frames stand for', () => {
