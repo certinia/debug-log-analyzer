@@ -21,6 +21,7 @@ export default defineConfig({
               find: /^#test-helpers\/(.*)\.js$/,
               replacement: here('./log-viewer/src/__tests__/helpers/$1.ts'),
             },
+            // `VsSelect.ts` extends the real `vscode-single-select`; an empty module breaks it at load.
             {
               find: /^#vscode-elements\/(?!vscode-single-select\.js$).*$/,
               replacement: here('./log-viewer/src/__tests__/mocks/emptyModule.ts'),

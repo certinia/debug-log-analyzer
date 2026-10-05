@@ -16,6 +16,13 @@ if (!('ResizeObserver' in globalThis)) {
   (globalThis as unknown as Record<string, unknown>).ResizeObserver = NoopResizeObserver;
 }
 
+// Retired: vitest's jsdom env copies node's `TextEncoder` onto the window. Re-add this (and the
+// `node:util` declaration in `declarations.d.ts`) for a DOM env that does not; the parser needs it.
+// import { TextEncoder } from 'node:util';
+// if (!('TextEncoder' in globalThis)) {
+//   (globalThis as unknown as Record<string, unknown>).TextEncoder = TextEncoder;
+// }
+
 /**
  * jsdom paces frames at 60 Hz, so every awaited frame costs 16 ms of real time. This keeps its
  * semantics without the wait: one task runs every callback queued for the frame, so a test's

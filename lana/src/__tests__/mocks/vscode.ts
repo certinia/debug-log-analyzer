@@ -2,11 +2,6 @@
  * Copyright (c) 2026 Certinia Inc. All rights reserved.
  */
 
-/**
- * VS Code API mock for unit tests.
- * Provides stateful mocks for testing VS Code extension functionality.
- */
-
 import { type Mock, vi } from 'vitest';
 // Type-only import (erased at runtime, so it does not clash with the vitest
 // `vscode` alias). Typing factories against the real interfaces means
