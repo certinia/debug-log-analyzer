@@ -7,5 +7,5 @@
     "declarationMap": false,
     "noEmit": true
   },
-  "include": ["measure/**/*.ts"]
+  "include": ["measure/**/*.ts", "../log-viewer/declarations.d.ts"]
 }
