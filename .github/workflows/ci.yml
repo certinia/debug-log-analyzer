@@ -75,8 +75,9 @@ jobs:
       - name: Install Packages
         run: pnpm run ci:install
       # No browser cache: Playwright's CI docs say a restore takes about as long as the download.
+      # No --with-deps: the runner image has Chromium's libraries, and apt only adds unused fonts.
       - name: Install Chromium
-        run: pnpm exec playwright install --with-deps --only-shell chromium
+        run: pnpm exec playwright install --only-shell chromium
       - name: Tests
         run: pnpm run test:e2e:web
       - name: Upload Playwright HTML report
