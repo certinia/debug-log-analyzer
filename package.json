@@ -53,7 +53,7 @@
     "test": "jest",
     "test:ci": "jest --runInBand",
     "test:e2e:web": "node --run build:prod && playwright test --config=lana/test/playwright/playwright.config.web.ts",
-    "serve:web": "pnpm build && tsx lana/test/playwright/web/headlessServer.ts",
+    "serve:web": "pnpm build && tsx lana/test/playwright/web/headlessServer.ts --with-services",
     "ci:install": "pnpm install --frozen-lockfile --prefer-offline --ignore-scripts",
     "prettier-format": "prettier '**/*.ts' --cache --write --experimental-cli"
   },

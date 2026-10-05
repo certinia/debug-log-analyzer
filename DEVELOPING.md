@@ -119,7 +119,7 @@ pnpm serve:web
 ```
 
 Open `http://localhost:3001` (set `PORT` to change it). `pnpm test:e2e:web` runs the end-to-end
-tests against the same host.
+tests against the same host, but without Salesforce Services, because the tests use no org.
 
 Commands that need a Salesforce org also need the Salesforce Services extension. The server serves
 your local copy of it, because a `localhost` page cannot fetch one from the marketplace CDN.
