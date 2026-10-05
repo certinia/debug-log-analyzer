@@ -1,0 +1,176 @@
+{
+  "$schema": "./node_modules/oxlint/configuration_schema.json",
+  // Rules are listed in full so the set matches eslint:recommended + typescript-eslint
+  // recommended exactly, rather than oxlint's own default categories.
+  "categories": { "correctness": "off" },
+  "plugins": ["eslint", "typescript"],
+  "options": { "typeAware": true },
+  "ignorePatterns": [
+    // agent worktrees/scratch: nested repo copies
+    "**/.claude/",
+    "**/.sf/",
+    "**/.sfdx/",
+    "**/dist/",
+    "**/build/",
+    "**/out/",
+    "**/coverage/",
+    "**/.docusaurus/",
+    "**/.vscode-test-web/",
+    "**/playwright-report/",
+    // tsgolint rejects the `baseUrl` that @docusaurus/tsconfig sets
+    "lana-docs/",
+    // only TypeScript is linted
+    "**/*.js",
+    "**/*.mjs",
+    "**/*.cjs"
+  ],
+  "rules": {
+    "for-direction": "error",
+    "no-async-promise-executor": "error",
+    "no-case-declarations": "error",
+    "no-compare-neg-zero": "error",
+    "no-cond-assign": "error",
+    "no-constant-binary-expression": "error",
+    "no-constant-condition": "error",
+    "no-control-regex": "error",
+    "no-debugger": "error",
+    "no-delete-var": "error",
+    "no-dupe-else-if": "error",
+    "no-duplicate-case": "error",
+    "no-empty": "error",
+    "no-empty-character-class": "error",
+    "no-empty-pattern": "error",
+    "no-empty-static-block": "error",
+    "no-ex-assign": "error",
+    "no-extra-boolean-cast": "error",
+    "no-fallthrough": "error",
+    "no-global-assign": "error",
+    "no-invalid-regexp": "error",
+    "no-irregular-whitespace": "error",
+    "no-loss-of-precision": "error",
+    "no-misleading-character-class": "error",
+    "no-nonoctal-decimal-escape": "error",
+    "no-prototype-builtins": "error",
+    "no-regex-spaces": "error",
+    "no-self-assign": "error",
+    "no-shadow-restricted-names": "error",
+    "no-sparse-arrays": "error",
+    "no-unassigned-vars": "error",
+    "no-unsafe-finally": "error",
+    "no-unsafe-optional-chaining": "error",
+    "no-unused-labels": "error",
+    "no-unused-private-class-members": "error",
+    "no-useless-assignment": "error",
+    "no-useless-backreference": "error",
+    "no-useless-catch": "error",
+    "no-useless-escape": "error",
+    "preserve-caught-error": "error",
+    "require-yield": "error",
+    "use-isnan": "error",
+    "valid-typeof": "error",
+    "no-var": "error",
+    "prefer-const": "error",
+    "prefer-rest-params": "error",
+    "prefer-spread": "error",
+    "no-array-constructor": "error",
+    "no-unused-expressions": "error",
+    "no-unused-vars": ["error", { "argsIgnorePattern": "^_", "varsIgnorePattern": "^_" }],
+    "typescript/ban-ts-comment": "error",
+    "typescript/no-duplicate-enum-values": "error",
+    "typescript/no-empty-object-type": "error",
+    "typescript/no-explicit-any": "warn",
+    "typescript/no-extra-non-null-assertion": "error",
+    "typescript/no-misused-new": "error",
+    "typescript/no-namespace": "error",
+    "typescript/no-non-null-asserted-optional-chain": "error",
+    "typescript/no-require-imports": "error",
+    "typescript/no-this-alias": "error",
+    "typescript/no-unnecessary-type-constraint": "error",
+    "typescript/no-unsafe-declaration-merging": "error",
+    "typescript/no-unsafe-function-type": "error",
+    "typescript/no-wrapper-object-types": "error",
+    "typescript/prefer-as-const": "error",
+    "typescript/prefer-namespace-keyword": "error",
+    "typescript/triple-slash-reference": "error",
+    "no-console": "warn",
+    "curly": "warn",
+    "eqeqeq": "warn",
+
+    // Type-aware promise rules only. The full recommendedTypeChecked set reports 720 errors,
+    // most of them no-unsafe-* and unbound-method against untyped libraries and test mocks.
+    // require-await is left off: `async () => syncCall()` is how Command.ts turns a
+    // synchronous throw into a rejection its boundary can catch.
+    "typescript/await-thenable": "error",
+    "typescript/no-floating-promises": "error",
+    "typescript/no-misused-promises": "error",
+    "typescript/prefer-promise-reject-errors": "error",
+
+    "typescript/consistent-type-imports": [
+      "error",
+      {
+        "prefer": "type-imports",
+        "fixStyle": "separate-type-imports",
+        // inline `import('...').Foo` type annotations are already type-only;
+        // they don't survive into bundler emit, so this rule focuses purely
+        // on the statement-level "type imported as value" bug.
+        "disallowTypeAnnotations": false
+      }
+    ],
+    "typescript/no-import-type-side-effects": "error"
+  },
+  "overrides": [
+    {
+      "files": ["log-viewer/src/**/*.ts"],
+      "jsPlugins": ["./scripts/oxlint-plugin-lana.mjs"],
+      "rules": { "lana/no-tabulator-html-tooltip": "error" }
+    },
+    {
+      "files": ["log-viewer/src/**/*.ts"],
+      "excludeFiles": ["**/__tests__/**", "**/*.test.ts"],
+      "rules": {
+        "no-restricted-imports": [
+          "error",
+          {
+            "patterns": [
+              {
+                "regex": "^(node:.*|buffer|child_process|crypto|events|fs|fs/promises|http|https|net|os|path|process|stream|url|util|zlib)$",
+                "message": "log-viewer runs in a webview with no Node. The bundler polyfills these silently, so the import type-checks and bundles. Use a web API instead."
+              },
+              {
+                // `group` is gitignore syntax, where a leading `#` is a comment.
+                "regex": "^#test-helpers/",
+                "message": "Test fixtures only. tsconfig paths resolve this alias in production code too, so this rule is what keeps it out of the bundle."
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "files": ["lana/src/**/*.ts"],
+      "excludeFiles": [
+        "lana/src/commands/RetrieveLogFile.ts",
+        "lana/src/commands/__tests__/RetrieveLogFile.test.ts",
+        "lana/src/services/**"
+      ],
+      "rules": {
+        "no-restricted-imports": [
+          "error",
+          {
+            "patterns": [
+              {
+                // Anchored: an open match would also catch our own lana/src/fs/.
+                "regex": "^(node:.*|fs|fs/promises|os|path|crypto|child_process)$",
+                "message": "lana also runs in the VS Code web extension host, where the bundler stubs these to empty modules and the failure only shows at runtime. Use the vscode API or vscode-uri Utils."
+              },
+              {
+                "group": ["**/services/salesforceServices*"],
+                "message": "Salesforce Services is for org operations and throws until ensureServicesAvailable() has run. Use lana/src/fs/workspaceFs.ts for file I/O."
+              }
+            ]
+          }
+        ]
+      }
+    }
+  ]
+}
