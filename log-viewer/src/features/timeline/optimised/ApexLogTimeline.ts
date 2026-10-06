@@ -58,6 +58,7 @@ import { buildTimelineFrames } from '../utils/timeline-frames.js';
 import { FlameChart } from './FlameChart.js';
 import { FrameTooltipRenderer, type TooltipAnchor } from './FrameTooltipRenderer.js';
 import { apexLimitTimeSeries } from './apex-limit-series.js';
+import { textPredicate } from './search/EventMatcher.js';
 
 interface ApexTimelineOptions extends TimelineOptions {
   themeName?: string | null;
@@ -1078,14 +1079,8 @@ export class ApexLogTimeline {
       return;
     }
 
-    // Convert search text to predicate function (thin facade)
     const caseSensitive = options.matchCase;
-    const searchText = caseSensitive ? text : text.toLowerCase();
-    const predicate = (text: string, type: string) => {
-      const eventText = caseSensitive ? text : text.toLowerCase();
-      const eventType = caseSensitive ? type : type.toLowerCase();
-      return eventText.includes(searchText) || eventType.includes(searchText);
-    };
+    const predicate = textPredicate(text, caseSensitive);
 
     // Perform search using new API (map matchCase to caseSensitive)
     this.searchCursor = this.flamechart.search(predicate, { caseSensitive });

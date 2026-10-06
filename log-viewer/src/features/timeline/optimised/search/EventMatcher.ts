@@ -15,6 +15,7 @@
  * - Track current search state
  */
 
+import type { PrecomputedRect } from '../RectangleCache.js';
 import type { EventNode, TimelineFrames } from '../../types/flamechart.types.js';
 import type {
   FramePredicate,
@@ -83,15 +84,50 @@ export class EventMatcher<E extends EventNode> {
       }
       const rect = frames.rectOf(row);
       if (rect && predicate(frames.text(row), frames.type(row))) {
-        matches.push({
-          event: frames.node(row).data,
-          rect,
-          depth: frames.depth[row]!,
-          matchType: 'text',
-        });
+        matches.push(new RowMatch(frames, row, rect));
       }
       row++;
     }
     return matches;
+  }
+}
+
+/** A predicate for frames whose text or type holds `searchText`. */
+export function textPredicate(searchText: string, caseSensitive = false): FramePredicate {
+  const needle = caseSensitive ? searchText : searchText.toLowerCase();
+  const typeHits = new Map<string, boolean>();
+  return (text, type) => {
+    let typeHit = typeHits.get(type);
+    if (typeHit === undefined) {
+      typeHit = (caseSensitive ? type : type.toLowerCase()).includes(needle);
+      typeHits.set(type, typeHit);
+    }
+    return typeHit || (caseSensitive ? text : text.toLowerCase()).includes(needle);
+  };
+}
+
+// Builds its event only when asked: a search can match a hundred thousand frames.
+class RowMatch<E extends EventNode> implements SearchMatch<E> {
+  readonly rect: PrecomputedRect;
+  private readonly frames: TimelineFrames<E>;
+  private readonly row: number;
+  private built?: E;
+
+  constructor(frames: TimelineFrames<E>, row: number, rect: PrecomputedRect) {
+    this.frames = frames;
+    this.row = row;
+    this.rect = rect;
+  }
+
+  get depth(): number {
+    return this.rect.depth;
+  }
+
+  get matchType(): 'text' {
+    return 'text';
+  }
+
+  get event(): E {
+    return (this.built ??= this.frames.node(this.row).data);
   }
 }

@@ -35,16 +35,16 @@ export interface MatchedEventInfo {
  */
 export interface SearchMatch<E extends EventNode> {
   /** The matched event */
-  event: E;
+  readonly event: E;
 
-  /** Pre-computed rectangle for rendering */
-  rect: PrecomputedRect;
+  /** Pre-computed rectangle for rendering; `rect.id` is `event.id` */
+  readonly rect: PrecomputedRect;
 
   /** Depth in the event tree (0-indexed) */
-  depth: number;
+  readonly depth: number;
 
   /** Type of match (text content or event type) */
-  matchType: 'text' | 'type';
+  readonly matchType: 'text' | 'type';
 }
 
 /**

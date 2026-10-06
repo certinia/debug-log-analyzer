@@ -3,12 +3,7 @@
  */
 import { describe, expect, it } from '@jest/globals';
 
-import { storeOf } from '#test-helpers/apexLog.js';
-import { buildLogIndex } from '../../../core/log/LogIndex.js';
-import { BUCKET_CONSTANTS } from '../types/flamechart.types.js';
-import { buildTimelineFrames } from '../utils/timeline-frames.js';
-
-const CATEGORIES = new Set<string>(BUCKET_CONSTANTS.CATEGORY_PRIORITY);
+import { framesOf } from '#test-helpers/timeline.js';
 
 const NESTED =
   '09:18:22.6 (1000)|METHOD_ENTRY|[1]|01p|ns.Outer.run()\n' +
@@ -20,12 +15,6 @@ const NESTED =
   '09:18:22.6 (1600)|METHOD_ENTRY|[5]|01p|ns.Inner.second()\n' +
   '09:18:22.6 (1700)|METHOD_EXIT|[5]|ns.Inner.second()\n' +
   '09:18:22.6 (1800)|METHOD_EXIT|[1]|ns.Outer.run()\n';
-
-function framesOf(body: string, logEnd = 0) {
-  const { log } = storeOf(body);
-  const index = buildLogIndex(log);
-  return { log, index, frames: buildTimelineFrames(index, CATEGORIES, logEnd) };
-}
 
 describe('buildTimelineFrames', () => {
   it('draws a rect for every shown frame, and none for a frame with no duration', () => {

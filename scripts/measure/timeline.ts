@@ -13,7 +13,10 @@ import { buildLogIndex } from '../../log-viewer/src/core/log/LogIndex.js';
 import { apexLimitTimeSeries } from '../../log-viewer/src/features/timeline/optimised/apex-limit-series.js';
 import type { BatchColorInfo } from '../../log-viewer/src/features/timeline/optimised/BucketColorResolver.js';
 import { RectangleCache } from '../../log-viewer/src/features/timeline/optimised/RectangleCache.js';
-import { EventMatcher } from '../../log-viewer/src/features/timeline/optimised/search/EventMatcher.js';
+import {
+  EventMatcher,
+  textPredicate,
+} from '../../log-viewer/src/features/timeline/optimised/search/EventMatcher.js';
 import { TreeNavigator } from '../../log-viewer/src/features/timeline/optimised/selection/TreeNavigator.js';
 import {
   BUCKET_CONSTANTS,
@@ -112,10 +115,7 @@ export async function measureTimeline(log: ApexLog): Promise<void> {
   line('frames', `${rects}, maxDepth ${frames.maxDepth}`);
 
   const search = await time(`search "${SEARCH_TEXT}"`, () =>
-    matcher.search(
-      (text, type) =>
-        text.toLowerCase().includes(SEARCH_TEXT) || type.toLowerCase().includes(SEARCH_TEXT),
-    ),
+    matcher.search(textPredicate(SEARCH_TEXT)),
   );
   line('matches', String(search.total));
 
