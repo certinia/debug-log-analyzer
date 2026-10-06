@@ -6,8 +6,9 @@ import type {
   DMLBeginLine,
   LogEvent,
   SOQLExecuteBeginLine,
+  LimitMetricUnit,
+  Limits,
 } from '@apexdevtools/apex-log-parser';
-import type { LimitMetricUnit, Limits } from '@apexdevtools/apex-log-parser/types';
 
 import { limitTotals } from '../../../components/logOverviewMetrics.js';
 import { GOVERNOR_METRICS } from '../../../core/metrics/governorMetrics.js';

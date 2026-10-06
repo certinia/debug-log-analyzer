@@ -1,8 +1,7 @@
 /*
  * Copyright (c) 2026 Certinia Inc. All rights reserved.
  */
-import type { LogEvent } from '@apexdevtools/apex-log-parser';
-import type { GovernorLimits, Limits, SelfTotal } from '@apexdevtools/apex-log-parser/types';
+import type { LogEvent, GovernorLimits, Limits, SelfTotal } from '@apexdevtools/apex-log-parser';
 
 import { formatInteger, sharePercent } from '../utility/Util.js';
 import { GOVERNOR_METRIC } from './governorMetrics.js';

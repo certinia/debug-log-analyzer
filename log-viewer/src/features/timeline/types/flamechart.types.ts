@@ -11,8 +11,7 @@
 
 //TODO: Remove deps outside timeline
 
-import type { LogEvent } from '@apexdevtools/apex-log-parser';
-import type { LogCategory, LogIssue } from '@apexdevtools/apex-log-parser/types';
+import type { LogEvent, LogCategory, LogIssue } from '@apexdevtools/apex-log-parser';
 import { formatDuration } from '../../../core/utility/Util.js';
 import type { PrecomputedRect } from '../optimised/RectangleCache.js';
 

@@ -1,7 +1,7 @@
 /*
  * Copyright (c) 2026 Certinia Inc. All rights reserved.
  */
-import type { LimitValue, Limits } from '@apexdevtools/apex-log-parser/types';
+import type { LimitValue, Limits } from '@apexdevtools/apex-log-parser';
 
 import { GOVERNOR_METRIC, GOVERNOR_METRICS } from '../core/metrics/governorMetrics.js';
 import { formatByteSize, formatInteger, sharePercent } from '../core/utility/Util.js';

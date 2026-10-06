@@ -1,8 +1,7 @@
 /*
  * Copyright (c) 2026 Certinia Inc. All rights reserved.
  */
-import type { LogEvent } from '@apexdevtools/apex-log-parser';
-import type { LogCategory } from '@apexdevtools/apex-log-parser/types';
+import type { LogEvent, LogCategory } from '@apexdevtools/apex-log-parser';
 
 /** A frame spanning `duration` from `timestamp`, all of it self time. */
 export function timelineEvent(

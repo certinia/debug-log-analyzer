@@ -6,7 +6,7 @@ import type {
   LimitMetricUnit,
   Limits,
   SelfTotal,
-} from '@apexdevtools/apex-log-parser/types';
+} from '@apexdevtools/apex-log-parser';
 
 import { GOVERNOR_METRIC } from '../../../core/metrics/governorMetrics.js';
 import { sharePercent } from '../../../core/utility/Util.js';
