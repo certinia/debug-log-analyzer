@@ -52,6 +52,21 @@ pnpm i
 > Dependency build scripts are declined by default. If `pnpm i` fails with
 > `ERR_PNPM_IGNORED_BUILDS`, a dependency has gained an install script. Read it, then record
 > the decision with `pnpm approve-builds`.
+>
+> If every pnpm command fails with `invalid peer certificate: UnsupportedCertVersion`, your
+> global `~/.npmrc` has a `certfile` that points at an X.509 v1 client certificate. pnpm 12
+> rejects these, even for a different registry. npm and pnpm 10 still accept them. To give
+> pnpm 11 and later a separate user config, run this once:
+>
+> ```zsh
+> mkdir -p ~/.config/pnpm
+> printf 'registry=https://registry.npmjs.org/\n' > ~/.config/pnpm/npmrc
+> printf "npmrcAuthFile: $HOME/.config/pnpm/npmrc\n" > ~/.config/pnpm/config.yaml
+> ```
+>
+> pnpm 11 and later then read `~/.config/pnpm/npmrc` instead of `~/.npmrc`. npm and pnpm 10
+> do not read `config.yaml`, so they keep your certificate. Delete `config.yaml` when your
+> certificate is reissued as v3.
 
 ### Working against a local parser
 
