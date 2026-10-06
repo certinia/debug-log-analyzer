@@ -108,6 +108,7 @@ export function digestTimeline(log: ApexLog): void {
 export async function measureTimeline(log: ApexLog): Promise<void> {
   const before = heapMb();
   const { frames, cache, matcher } = await time('build to first frame', () => build(log));
+  line('heap after build', `${heapMb() - before}MB`);
   let rects = 0;
   for (const each of frames.rectsByCategory.values()) {
     rects += each.length;
