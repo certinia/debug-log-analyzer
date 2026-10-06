@@ -2,7 +2,7 @@
  * Copyright (c) 2026 Certinia Inc. All rights reserved.
  */
 import { describe, expect, it } from 'vitest';
-import type { GovernorLimits } from '@apexdevtools/apex-log-parser/types';
+import type { GovernorLimits } from '@apexdevtools/apex-log-parser';
 
 import { governorLimits, limitValue } from '#test-helpers/limits.js';
 

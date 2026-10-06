@@ -9,25 +9,28 @@
  * Decoupled from LogEvent-specific implementation, works with any EventNode type.
  *
  * Responsibilities:
- * - Traverse tree structure using TreeNode
+ * - Scan the shown frames in pre-order
  * - Apply predicate function to find matches
  * - Build SearchCursor with matched events and rendering data
  * - Track current search state
  */
 
-import type { EventNode, TreeNode } from '../../types/flamechart.types.js';
-import type { SearchCursor, SearchMatch, SearchOptions } from '../../types/search.types.js';
 import type { PrecomputedRect } from '../RectangleCache.js';
+import type { EventNode, TimelineFrames } from '../../types/flamechart.types.js';
+import type {
+  FramePredicate,
+  SearchCursor,
+  SearchMatch,
+  SearchOptions,
+} from '../../types/search.types.js';
 import { SearchCursorImpl } from './SearchCursor.js';
 
 export class EventMatcher<E extends EventNode> {
-  private rectMap: Map<string, PrecomputedRect>;
   private currentCursor?: SearchCursorImpl<E>;
-  private roots: TreeNode<E>[];
+  private frames: TimelineFrames<E>;
 
-  constructor(roots: TreeNode<E>[], rectMap: Map<string, PrecomputedRect>) {
-    this.roots = roots;
-    this.rectMap = rectMap;
+  constructor(frames: TimelineFrames<E>) {
+    this.frames = frames;
   }
 
   /**
@@ -37,8 +40,8 @@ export class EventMatcher<E extends EventNode> {
    * @param options - Search options (caseSensitive, matchWholeWord)
    * @returns SearchCursor for navigating results
    */
-  search(predicate: (event: E) => boolean, _options: SearchOptions = {}): SearchCursor<E> {
-    const matches = this.traverse(this.roots, predicate);
+  search(predicate: FramePredicate, _options: SearchOptions = {}): SearchCursor<E> {
+    const matches = this.scan(predicate);
     this.currentCursor = new SearchCursorImpl(matches);
     return this.currentCursor;
   }
@@ -68,40 +71,63 @@ export class EventMatcher<E extends EventNode> {
   }
 
   /**
-   * Traverse tree and collect matches.
-   *
-   * Uses depth-first traversal to maintain event order.
-   * Skips events without rendering data (culled or off-screen).
-   *
-   * @param nodes - Current level nodes
-   * @param predicate - Function to test each event
-   * @param depth - Current depth (for depth tracking)
-   * @param matches - Accumulated matches
-   * @returns Array of matches with rendering data
+   * Collect the shown frames that match and have a rect, in pre-order: the order
+   * the frames appear in the log.
    */
-  private traverse(
-    nodes: TreeNode<E>[],
-    predicate: (event: E) => boolean,
-    depth = 0,
-    matches: SearchMatch<E>[] = [],
-  ): SearchMatch<E>[] {
-    for (const node of nodes) {
-      if (predicate(node.data)) {
-        const rect = this.rectMap.get(node.data.id);
-        if (rect) {
-          matches.push({
-            event: node.data,
-            rect,
-            depth: node.depth ?? depth,
-            matchType: 'text',
-          });
-        }
+  private scan(predicate: FramePredicate): SearchMatch<E>[] {
+    const frames = this.frames;
+    const matches: SearchMatch<E>[] = [];
+    for (let row = 0; row < frames.rowCount;) {
+      if (!frames.isVisible(row)) {
+        row = frames.subtreeEnd[row]!;
+        continue;
       }
-
-      if (node.children && node.children.length > 0) {
-        this.traverse(node.children, predicate, depth + 1, matches);
+      const rect = frames.rectOf(row);
+      if (rect && predicate(frames.text(row), frames.type(row))) {
+        matches.push(new RowMatch(frames, row, rect));
       }
+      row++;
     }
     return matches;
+  }
+}
+
+/** A predicate for frames whose text or type holds `searchText`. */
+export function textPredicate(searchText: string, caseSensitive = false): FramePredicate {
+  const needle = caseSensitive ? searchText : searchText.toLowerCase();
+  const typeHits = new Map<string, boolean>();
+  return (text, type) => {
+    let typeHit = typeHits.get(type);
+    if (typeHit === undefined) {
+      typeHit = (caseSensitive ? type : type.toLowerCase()).includes(needle);
+      typeHits.set(type, typeHit);
+    }
+    return typeHit || (caseSensitive ? text : text.toLowerCase()).includes(needle);
+  };
+}
+
+// Builds its event only when asked: a search can match a hundred thousand frames.
+class RowMatch<E extends EventNode> implements SearchMatch<E> {
+  readonly rect: PrecomputedRect;
+  private readonly frames: TimelineFrames<E>;
+  private readonly row: number;
+  private built?: E;
+
+  constructor(frames: TimelineFrames<E>, row: number, rect: PrecomputedRect) {
+    this.frames = frames;
+    this.row = row;
+    this.rect = rect;
+  }
+
+  get depth(): number {
+    return this.rect.depth;
+  }
+
+  get matchType(): 'text' {
+    return 'text';
+  }
+
+  get event(): E {
+    return (this.built ??= this.frames.node(this.row).data);
   }
 }

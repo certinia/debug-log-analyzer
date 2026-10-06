@@ -3,7 +3,7 @@
  */
 import { beforeEach, describe, expect, it } from 'vitest';
 
-import { navFixture, navMaps, type NavName } from '#test-helpers/navTree.js';
+import { navFixture, navFrames, type NavName } from '#test-helpers/navTree.js';
 import type { FrameNavDirection } from '../optimised/interaction/KeyboardHandler.js';
 import { SelectionNavigator } from '../optimised/selection/SelectionNavigator.js';
 import type { EventNode } from '../types/flamechart.types.js';
@@ -15,7 +15,7 @@ describe('SelectionNavigator', () => {
   beforeEach(() => {
     const fixture = navFixture();
     nodes = fixture.nodes;
-    manager = new SelectionNavigator(fixture.roots, fixture.maps);
+    manager = new SelectionNavigator(fixture.frames);
   });
 
   it('selects a node, and replaces the selection with the next one', () => {
@@ -68,20 +68,15 @@ describe('SelectionNavigator', () => {
     expect(manager.getSelected()).toBe(nodes[expected ?? from]);
   });
 
-  it('finds a node by id', () => {
-    expect(manager.findById('g')).toBe(nodes.g);
-    expect(manager.findById('999')).toBeNull();
-  });
-
   it('maps a hit-test frame back to its node through the parsed event', () => {
     expect(manager.findByOriginal({ ...nodes.e.data })).toBe(nodes.e);
     expect(manager.findByOriginal({ ...nodes.e.data, original: undefined })).toBeNull();
   });
 
   it('handles an empty tree', () => {
-    const empty = new SelectionNavigator<EventNode>([], navMaps([]));
+    const empty = new SelectionNavigator<EventNode>(navFrames([]));
 
     expect(empty.hasSelection()).toBe(false);
-    expect(empty.findById('a')).toBeNull();
+    expect(empty.findByOriginal({ ...nodes.a.data })).toBeNull();
   });
 });

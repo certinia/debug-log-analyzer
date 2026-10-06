@@ -2,7 +2,7 @@
  * Copyright (c) 2026 Certinia Inc. All rights reserved.
  */
 import { describe, expect, it } from 'vitest';
-import { ALL_LIMIT_METRICS } from '@apexdevtools/apex-log-parser/types';
+import { ALL_LIMIT_METRICS } from '@apexdevtools/apex-log-parser';
 
 import { GOVERNOR_METRIC } from '../governorMetrics.js';
 

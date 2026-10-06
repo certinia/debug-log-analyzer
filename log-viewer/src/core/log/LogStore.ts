@@ -9,7 +9,9 @@ import {
   SOSLExecuteBeginLine,
 } from '@apexdevtools/apex-log-parser';
 
+import { CHECK_EVERY, frameBudget, type FrameBudgetOptions } from '../utility/FrameBudget.js';
 import { KeyPathIds } from './keyPathIds.js';
+import { type LogIndex, LogIndexBuilder } from './LogIndex.js';
 
 export type Stack = LogEvent[];
 
@@ -25,6 +27,7 @@ export class LogStore {
 
   private _statements: Statements | null = null;
   private _keyPathIds: KeyPathIds | null = null;
+  private _logIndex: Promise<LogIndex> | null = null;
 
   constructor(log: ApexLog) {
     this.log = log;
@@ -101,6 +104,20 @@ export class LogStore {
     return (this._keyPathIds ??= new KeyPathIds(this.log.eventsById?.length ?? 0));
   }
 
+  /**
+   * The log as flat columns, built once in slices that hand the thread back
+   * between them.
+   *
+   * One build, shared by every caller, so it takes no signal: a caller that stops
+   * waiting just stops awaiting it.
+   */
+  logIndex(options: Pick<FrameBudgetOptions, 'yieldSlice'> = {}): Promise<LogIndex> {
+    return (this._logIndex ??= buildInSlices(this.log, options).catch((error: unknown) => {
+      this._logIndex = null;
+      throw error;
+    }));
+  }
+
   private statements(): Statements {
     return (this._statements ??= collectStatements(this.log));
   }
@@ -110,6 +127,18 @@ interface Statements {
   soql: SOQLExecuteBeginLine[];
   dml: DMLBeginLine[];
   sosl: SOSLExecuteBeginLine[];
+}
+
+async function buildInSlices(
+  log: ApexLog,
+  options: Pick<FrameBudgetOptions, 'yieldSlice'>,
+): Promise<LogIndex> {
+  const builder = new LogIndexBuilder(log);
+  const tick = frameBudget(options);
+  while (!builder.step(CHECK_EVERY)) {
+    await tick();
+  }
+  return builder.finish();
 }
 
 /** The three statement kinds below `root`, in log order, from one walk. */

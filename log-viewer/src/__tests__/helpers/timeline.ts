@@ -1,8 +1,20 @@
 /*
  * Copyright (c) 2026 Certinia Inc. All rights reserved.
  */
-import type { LogEvent } from '@apexdevtools/apex-log-parser';
-import type { LogCategory } from '@apexdevtools/apex-log-parser/types';
+import type { LogEvent, LogCategory } from '@apexdevtools/apex-log-parser';
+
+import { buildLogIndex } from '../../core/log/LogIndex.js';
+import { BUCKET_CONSTANTS } from '../../features/timeline/types/flamechart.types.js';
+import { buildTimelineFrames } from '../../features/timeline/utils/timeline-frames.js';
+import { storeOf } from './apexLog.js';
+
+/** The timeline's frames for a log `body`, as the chart builds them. */
+export function framesOf(body: string, logEnd = 0) {
+  const { log } = storeOf(body);
+  const index = buildLogIndex(log);
+  const categories = new Set<string>(BUCKET_CONSTANTS.CATEGORY_PRIORITY);
+  return { log, index, frames: buildTimelineFrames(index, categories, logEnd) };
+}
 
 /** A frame spanning `duration` from `timestamp`, all of it self time. */
 export function timelineEvent(

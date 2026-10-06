@@ -2,8 +2,7 @@
  * Copyright (c) 2026 Certinia Inc. All rights reserved.
  */
 import { describe, expect, it } from 'vitest';
-import type { ApexLog, LogEvent } from '@apexdevtools/apex-log-parser';
-import type { LogCategory } from '@apexdevtools/apex-log-parser/types';
+import type { ApexLog, LogEvent, LogCategory } from '@apexdevtools/apex-log-parser';
 
 import { categorySelfTimes, toTimelineKeys } from '../utils/category-self-time.js';
 

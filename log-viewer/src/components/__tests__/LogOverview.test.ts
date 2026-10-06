@@ -3,7 +3,7 @@
  *
  * @vitest-environment jsdom
  */
-import type { GovernorLimits } from '@apexdevtools/apex-log-parser/types';
+import type { GovernorLimits } from '@apexdevtools/apex-log-parser';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type { LogStore } from '../../core/log/LogStore.js';

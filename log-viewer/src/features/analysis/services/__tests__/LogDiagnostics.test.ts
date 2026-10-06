@@ -1,8 +1,7 @@
 /*
  * Copyright (c) 2026 Certinia Inc. All rights reserved.
  */
-import type { ApexLog, LogEvent } from '@apexdevtools/apex-log-parser';
-import type { GovernorLimits, Limits } from '@apexdevtools/apex-log-parser/types';
+import type { ApexLog, LogEvent, GovernorLimits, Limits } from '@apexdevtools/apex-log-parser';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { emptyLimits, governorLimits, limitValue } from '#test-helpers/limits.js';

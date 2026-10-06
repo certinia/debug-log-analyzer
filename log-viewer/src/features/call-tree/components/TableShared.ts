@@ -1,8 +1,7 @@
 /*
  * Copyright (c) 2025 Certinia Inc. All rights reserved.
  */
-import type { ApexLog } from '@apexdevtools/apex-log-parser';
-import type { GovernorLimits } from '@apexdevtools/apex-log-parser/types';
+import type { ApexLog, GovernorLimits } from '@apexdevtools/apex-log-parser';
 import {
   Tabulator,
   type ColumnDefinition,

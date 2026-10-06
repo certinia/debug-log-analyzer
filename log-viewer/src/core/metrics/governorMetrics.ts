@@ -1,11 +1,7 @@
 /*
  * Copyright (c) 2026 Certinia Inc. All rights reserved.
  */
-import {
-  LIMIT_METRIC,
-  type LimitMetricUnit,
-  type Limits,
-} from '@apexdevtools/apex-log-parser/types';
+import { LIMIT_METRIC, type LimitMetricUnit, type Limits } from '@apexdevtools/apex-log-parser';
 
 /** A governor metric as every surface names, orders and formats it. */
 export interface GovernorMetric<K extends keyof Limits = keyof Limits> {

@@ -4,8 +4,7 @@
  * @vitest-environment jsdom
  */
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import type { LogEvent } from '@apexdevtools/apex-log-parser';
-import type { GovernorLimits } from '@apexdevtools/apex-log-parser/types';
+import type { LogEvent, GovernorLimits } from '@apexdevtools/apex-log-parser';
 
 import { governorLimits, limitValue } from '#test-helpers/limits.js';
 

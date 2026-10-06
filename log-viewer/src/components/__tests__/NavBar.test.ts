@@ -4,6 +4,7 @@
  * @vitest-environment jsdom
  */
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
+import type { LitElement } from 'lit';
 
 import type { LogIdentityData } from '../../features/app/logIdentity.js';
 import type { IssueSeverity, LogIssue } from '../../features/notifications/types.js';
@@ -283,6 +284,25 @@ describe('NavBar collapse ladder', () => {
     };
 
     expect(detailRows(await resize(el, 400))).toEqual(['User: sam']);
+  });
+
+  it('keeps the entry point count outside the capped label, inline and folded', async () => {
+    const el = await mount();
+    el.logStatus = 'ready';
+    el.logIdentity = {
+      entryPoint: { label: 'MyQueueable', detail: '2 entry points', count: 1 },
+      user: null,
+      startTime: null,
+    };
+
+    const entry = (await resize(el, 900)).shadowRoot?.querySelector('log-identity');
+    await (entry as LitElement | null)?.updateComplete;
+    expect(entry?.shadowRoot?.querySelector('.label')?.textContent).toBe('MyQueueable');
+    expect(entry?.shadowRoot?.querySelector('.count')?.textContent).toBe('+1');
+
+    expect(detailRows(await resize(el, 350))).toContain(
+      'Entry point: MyQueueable +1 (2 entry points)',
+    );
   });
 
   it('moves the bell into the menu next', async () => {

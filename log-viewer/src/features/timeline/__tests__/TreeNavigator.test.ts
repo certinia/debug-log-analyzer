@@ -3,9 +3,14 @@
  */
 import { describe, expect, it } from 'vitest';
 
-import { navFixture, navMaps, navNode, type NavName } from '#test-helpers/navTree.js';
+import {
+  navFixture,
+  navFrames,
+  navNode,
+  type NavName,
+  type NavNode,
+} from '#test-helpers/navTree.js';
 import { TreeNavigator } from '../optimised/selection/TreeNavigator.js';
-import type { EventNode, TreeNode } from '../types/flamechart.types.js';
 
 type Step =
   | 'getParent'
@@ -15,13 +20,13 @@ type Step =
   | 'getPrevAtDepth'
   | 'getChildAtCenter';
 
-function navigatorOver(roots: TreeNode<EventNode>[]): TreeNavigator {
-  return new TreeNavigator(roots, navMaps(roots));
+function navigatorOver(roots: NavNode[]): TreeNavigator {
+  return new TreeNavigator(navFrames(roots));
 }
 
 describe('TreeNavigator', () => {
-  const { roots, maps, nodes } = navFixture();
-  const navigator = new TreeNavigator(roots, maps);
+  const { frames, nodes } = navFixture();
+  const navigator = new TreeNavigator(frames);
 
   it.each<[Step, NavName, NavName | null]>([
     ['getParent', 'a', null],
@@ -56,14 +61,6 @@ describe('TreeNavigator', () => {
     expect(navigator[step](nodes[from])).toBe(expected ? nodes[expected] : null);
   });
 
-  it.each<[string, NavName | null]>([
-    ['a', 'a'],
-    ['g', 'g'],
-    ['999', null],
-  ])('findById(%s) is %s', (id, expected) => {
-    expect(navigator.findById(id)).toBe(expected ? nodes[expected] : null);
-  });
-
   it('finds a node by the parsed event it was built from', () => {
     expect(navigator.findByOriginal(nodes.e.data.original)).toBe(nodes.e);
     expect(navigator.findByOriginal({})).toBeNull();
@@ -86,6 +83,17 @@ describe('TreeNavigator', () => {
   });
 
   it('finds nothing in an empty tree', () => {
-    expect(navigatorOver([]).findById('a')).toBeNull();
+    expect(navigatorOver([]).findByOriginal({})).toBeNull();
+  });
+
+  it('skips a sibling with no duration, which the timeline does not show', () => {
+    const before = navNode('before', 0, 10, 1);
+    const hidden = navNode('hidden', 10, 0, 1);
+    const after = navNode('after', 20, 10, 1);
+    const parent = navNode('p', 0, 100, 0, [before, hidden, after]);
+    const navigator = navigatorOver([parent]);
+
+    expect(navigator.getNextSibling(before)).toBe(after);
+    expect(navigator.getPrevSibling(after)).toBe(before);
   });
 });

@@ -137,7 +137,8 @@ describe('MeshRectangleRenderer', () => {
       const timed = timelineEvent(100, 200, 'Apex');
       const cache = new RectangleCache([timed, instant], new Set(['Apex']));
 
-      expect(cache.getRectMap().has(instant)).toBe(false);
+      const rects = [...cache.getRectsByCategory().values()].flat();
+      expect(rects.some((rect) => rect.eventRef === instant)).toBe(false);
       expect(visible(cache, makeViewport()).map((r) => r.eventRef)).toEqual([timed]);
     });
 
@@ -146,7 +147,8 @@ describe('MeshRectangleRenderer', () => {
       const known = timelineEvent(100, 200, 'Apex');
       const cache = new RectangleCache([known, unknown], new Set(['Apex']));
 
-      expect(cache.getRectMap().has(unknown)).toBe(false);
+      const rects = [...cache.getRectsByCategory().values()].flat();
+      expect(rects.some((rect) => rect.eventRef === unknown)).toBe(false);
       expect(visible(cache, makeViewport()).map((r) => r.eventRef)).toEqual([known]);
     });
 
