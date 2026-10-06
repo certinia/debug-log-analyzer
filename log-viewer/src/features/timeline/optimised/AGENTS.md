@@ -43,6 +43,11 @@ When FlameChart needs to pass event data to callbacks:
 
 `LogEvent` is still used internally by data structures (`RectangleCache`, `TimelineEventIndex`, `PixelBucket`) for performance reasons. These types are imported through `flamechart.types.ts` which re-exports them from the parser package.
 
+### TimelineFrames
+
+- The chart reads the log only through `TimelineFrames`, built from `LogIndex`.
+- Work by row. No tree, no per-event Map. `node(row)` on demand only.
+
 ### Metric Strip Architecture
 
 The metric strip visualization (governor limits) is rendered below the main timeline and above the minimap:
@@ -92,21 +97,21 @@ const events = rectangleCache.queryEventsInRegion(timeStart, timeEnd, depthStart
 ### ApexLogTimeline (Apex Adapter)
 
 - Apex-specific translation layer
-- Converts ApexLog to generic EventNode data
+- Builds `TimelineFrames`
 - Handles themes, tooltips, markers
 - Delegates rendering to FlameChart
 
 ### SelectionNavigator
 
 - Owns selection state (`selectedNode`)
-- Tree navigation logic (up/down/left/right)
+- Navigation (up/down/left/right)
 - Selection lifecycle (select, clear, navigate)
-- Maps hit test results to tree nodes
+- Maps hit test results to rows
 
 ### EventMatcher
 
 - Owns search state and cursor
-- Tree traversal with predicates
+- Scans shown rows with a `(text, type)` predicate
 - Match collection and navigation
 
 ### Renderers (\*Renderer classes)
@@ -266,7 +271,7 @@ optimised/
 ├── selection/
 │   ├── SelectionNavigator.ts   # Selection state and navigation
 │   ├── SelectionHighlightRenderer.ts  # Selection visuals
-│   └── TreeNavigator.ts       # Tree traversal (internal)
+│   └── TreeNavigator.ts       # Moves by row (internal)
 ├── search/
 │   ├── EventMatcher.ts         # Search state and matching
 │   ├── SearchHighlightRenderer.ts  # Search visuals

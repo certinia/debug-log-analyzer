@@ -3,7 +3,6 @@
  */
 import type { LogEvent } from '@apexdevtools/apex-log-parser';
 
-// `tree-converter` keys a node on the timestamp, so no two may share one.
 let nextTimestamp = 1;
 
 /**
