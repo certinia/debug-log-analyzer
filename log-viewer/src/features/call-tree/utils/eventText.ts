@@ -1,8 +1,7 @@
 /*
  * Copyright (c) 2026 Certinia Inc. All rights reserved.
  */
-import type { LogEvent } from '@apexdevtools/apex-log-parser';
-import type { GovernorLimits } from '@apexdevtools/apex-log-parser/types';
+import type { LogEvent, GovernorLimits } from '@apexdevtools/apex-log-parser';
 
 import { formatDuration } from '../../../core/utility/Util.js';
 import { SOSL_ROWS_PER_QUERY_LIMIT } from '../../database/limits.js';

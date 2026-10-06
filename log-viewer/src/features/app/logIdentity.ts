@@ -1,8 +1,7 @@
 /*
  * Copyright (c) 2026 Certinia Inc. All rights reserved.
  */
-import type { ApexLog, CodeUnitStartedLine } from '@apexdevtools/apex-log-parser';
-import type { LogTimezone } from '@apexdevtools/apex-log-parser/types';
+import type { ApexLog, CodeUnitStartedLine, LogTimezone } from '@apexdevtools/apex-log-parser';
 
 import { formatWallClockTime } from '../../core/utility/Util.js';
 
@@ -21,7 +20,8 @@ export interface LogIdentityData {
 
 /** Derives the header identity from a parsed log. */
 export function deriveLogIdentity(log: ApexLog): LogIdentityData {
-  const { entryPoint, userInfo } = log;
+  const { userInfo } = log;
+  const entryPoint = log.entryPoints[0] ?? null;
   // A header line can state no name at all. Keyed on the name, not the line, so the
   // header drops the chunk rather than showing a separator around an empty item.
   const userName = userInfo?.userName;
@@ -30,7 +30,7 @@ export function deriveLogIdentity(log: ApexLog): LogIdentityData {
     user: userName ? { label: userName.split('@')[0] || userName, detail: userName } : null,
     // The timezone sits with the time, not the user: the log's timestamps are
     // rendered in that zone, so it qualifies the clock reading.
-    startTime: startTimeItem(log, userInfo ? formatTimezone(userInfo.timezone) : ''),
+    startTime: startTimeItem(log, userInfo?.timezone ? formatTimezone(userInfo.timezone) : ''),
   };
 }
 

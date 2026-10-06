@@ -4,8 +4,7 @@
  * @jest-environment jsdom
  */
 import { describe, expect, it, beforeEach } from '@jest/globals';
-import type { LogEvent } from '@apexdevtools/apex-log-parser';
-import type { GovernorLimits } from '@apexdevtools/apex-log-parser/types';
+import type { LogEvent, GovernorLimits } from '@apexdevtools/apex-log-parser';
 
 import { governorLimits, limitValue } from '#test-helpers/limits.js';
 

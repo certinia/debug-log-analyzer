@@ -112,18 +112,14 @@ describe('user and start time', () => {
     expect(identity('')).toEqual({ entryPoint: null, user: null, startTime: null });
   });
 
-  // This asserts a bug, not the behaviour we want. apex-log-parser#86: the parser ends its
-  // USER_INFO search at the first `|EXECUTION_STARTED` in the text, which the anonymous-apex
-  // echo can state before the header is reached, so the user and the timezone are both lost.
-  // When a parser bump makes this fail, invert it to the assertions named below. Do not loosen it.
-  it('loses the user when the echoed source states |EXECUTION_STARTED', () => {
+  it('keeps the user when the echoed source states |EXECUTION_STARTED', () => {
     const echo = "Execute Anonymous: String s = '|EXECUTION_STARTED';\n";
 
     const { user, startTime } = identity(transaction(anonymous, echo + USER_INFO_LINE));
 
-    // Want: toEqual({ label: 'tina.owen', detail: 'tina.owen@example.com' }).
-    expect(user).toBeNull();
-    // Want: the `(GMT-07:00) Pacific Daylight Time (America/Los_Angeles)` suffix.
-    expect(startTime?.detail).toMatch(/^Started 09:18:22\S*$/);
+    expect(user).toEqual({ label: 'tina.owen', detail: 'tina.owen@example.com' });
+    expect(startTime?.detail).toMatch(
+      /^Started 09:18:22\S* \(GMT-07:00\) Pacific Daylight Time \(America\/Los_Angeles\)$/,
+    );
   });
 });

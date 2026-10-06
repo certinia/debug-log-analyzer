@@ -11,6 +11,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - ⚡ **Search**: the Timeline draws 7× faster on a search matching tens of thousands of frames.
 - ✂️ **Truncation**: each skipped section states how much of the log it dropped.
+- 🌊 **Flows**: names drop the `FLOW_START_INTERVIEWS :` and `WF_CRITERIA :` prefixes.
+- 📚 **Multiple logs**: a file holding several logs shows the first and flags the rest.
+- 🪪 **Call tree**: the `USER_INFO` line shows as a row.
 
 ### Removed
 
@@ -20,6 +23,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - 📤 **Copy and export**: both work on Analysis and Bottom-Up. ([#1110])
 - 🐛 **Go to Code**: errors for methods not found in the file are shown correctly.
+- 🌊 **Flow errors**: multi-line errors show their message.
 
 ## [1.22.1] - 2026-09-18
 

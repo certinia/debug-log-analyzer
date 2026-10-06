@@ -1,8 +1,7 @@
 /*
  * Copyright (c) 2026 Certinia Inc. All rights reserved.
  */
-import { parse, type ApexLog } from '@apexdevtools/apex-log-parser';
-import { LOG_LEVEL } from '@apexdevtools/apex-log-parser/types';
+import { parse, type ApexLog, LOG_LEVEL } from '@apexdevtools/apex-log-parser';
 
 import { logStoreFor, type LogStore } from '../../core/log/LogStore.js';
 

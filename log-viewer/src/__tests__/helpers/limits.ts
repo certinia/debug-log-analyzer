@@ -1,7 +1,7 @@
 /*
  * Copyright (c) 2026 Certinia Inc. All rights reserved.
  */
-import type { GovernorLimits, Limits } from '@apexdevtools/apex-log-parser/types';
+import type { GovernorLimits, Limits } from '@apexdevtools/apex-log-parser';
 
 import type {
   HeatStripEvent,
