@@ -12,6 +12,9 @@
 import type { PrecomputedRect } from '../optimised/RectangleCache.js';
 import type { EventNode } from './flamechart.types.js';
 
+/** Tests a frame by its text and type, so a search reads strings rather than nodes. */
+export type FramePredicate = (text: string, type: string) => boolean;
+
 /**
  * Lightweight info about a matched event for bucket search highlighting.
  * Used instead of full SearchMatch to avoid exposing event details to renderers.
@@ -32,16 +35,16 @@ export interface MatchedEventInfo {
  */
 export interface SearchMatch<E extends EventNode> {
   /** The matched event */
-  event: E;
+  readonly event: E;
 
-  /** Pre-computed rectangle for rendering */
-  rect: PrecomputedRect;
+  /** Pre-computed rectangle for rendering; `rect.id` is `event.id` */
+  readonly rect: PrecomputedRect;
 
   /** Depth in the event tree (0-indexed) */
-  depth: number;
+  readonly depth: number;
 
   /** Type of match (text content or event type) */
-  matchType: 'text' | 'type';
+  readonly matchType: 'text' | 'type';
 }
 
 /**

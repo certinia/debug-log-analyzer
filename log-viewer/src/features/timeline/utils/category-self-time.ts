@@ -1,8 +1,7 @@
 /*
  * Copyright (c) 2026 Certinia Inc. All rights reserved.
  */
-import type { ApexLog } from '@apexdevtools/apex-log-parser';
-import { LOG_CATEGORY, type LogCategory } from '@apexdevtools/apex-log-parser/types';
+import { type ApexLog, LOG_CATEGORY, type LogCategory } from '@apexdevtools/apex-log-parser';
 
 import { walkEvents } from '../../../core/utility/EventTree.js';
 

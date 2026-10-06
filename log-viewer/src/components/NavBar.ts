@@ -499,7 +499,8 @@ export class NavBar extends LitElement {
       if (!show[chunk] && item) {
         // No tooltip when it only repeats the row: a hover has to add something.
         const detail = item.detail === item.label ? undefined : item.detail;
-        rows.push({ label, value: item.label, detail });
+        const value = item.count ? `${item.label} +${item.count}` : item.label;
+        rows.push({ label, value, detail });
       }
     }
 

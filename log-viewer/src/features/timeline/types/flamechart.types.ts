@@ -11,10 +11,11 @@
 
 //TODO: Remove deps outside timeline
 
-import type { LogEvent } from '@apexdevtools/apex-log-parser';
-import type { LogCategory, LogIssue } from '@apexdevtools/apex-log-parser/types';
+import type { LogEvent, LogCategory, LogIssue } from '@apexdevtools/apex-log-parser';
 import { formatDuration } from '../../../core/utility/Util.js';
 import type { PrecomputedRect } from '../optimised/RectangleCache.js';
+
+export { NO_ROW } from '../../../core/log/LogIndex.js';
 
 // Re-export LogEvent for internal use within timeline/ folder
 // Note: FlameChart's PUBLIC API (callbacks) should use EventNode, not LogEvent
@@ -136,20 +137,52 @@ export interface HoveredFrame {
 /** What changed the hover: the reader's pointer, or the frames moving under a still one. */
 export type HoverCause = 'pointer' | 'frames';
 
-/**
- * Tree node wrapper for hierarchical event structures.
- * Enables generic tree traversal without assuming specific
- * event hierarchy implementation (e.g., event.children).
- */
+/** A frame of {@link TimelineFrames}, as selection and navigation hand it round. */
 export interface TreeNode<T extends EventNode> {
   /** Event data */
   data: T;
 
-  /** Child nodes (optional for leaf nodes) */
-  children?: TreeNode<T>[];
-
-  /** Depth in tree (0-indexed, optional for automatic calculation) */
+  /** Depth in tree (0-indexed) */
   depth?: number;
+
+  /** The node's row in {@link TimelineFrames}. */
+  row: number;
+}
+
+/**
+ * The timeline's frames, one row per event in pre-order, as flat columns.
+ *
+ * A row is shown when it and every parent have a duration. Only a shown row has
+ * a place at its depth, a node, or a rect.
+ */
+export interface TimelineFrames<E extends EventNode> {
+  readonly rowCount: number;
+  /** The deepest shown row. */
+  readonly maxDepth: number;
+  /** The end of the last shown row, or of the log if that is later. */
+  readonly totalDuration: number;
+  readonly start: Float64Array;
+  readonly total: Float64Array;
+  readonly depth: Uint16Array;
+  /** {@link NO_ROW} for a top-level row. */
+  readonly parent: Int32Array;
+  /** The first row after this row's subtree. */
+  readonly subtreeEnd: Int32Array;
+  /** Every rect, by category. */
+  readonly rectsByCategory: Map<string, PrecomputedRect[]>;
+  /** Every rect, by depth, each list in pre-order. */
+  readonly rectsByDepth: Map<number, PrecomputedRect[]>;
+
+  isVisible(row: number): boolean;
+  /** The shown rows at a depth, ascending by start. */
+  rowsAtDepth(depth: number): Int32Array;
+  /** A new node for a shown row. */
+  node(row: number): TreeNode<E>;
+  text(row: number): string;
+  type(row: number): string;
+  /** The shown row for an {@link EventNode.original}, or {@link NO_ROW}. */
+  rowOfOriginal(original: unknown): number;
+  rectOf(row: number): PrecomputedRect | undefined;
 }
 
 // ============================================================================

@@ -1,11 +1,10 @@
 {
   "extends": "../log-viewer/tsconfig.json",
   "compilerOptions": {
-    "lib": ["ES2023", "dom", "DOM.Iterable"],
     "types": ["node"],
     "composite": false,
     "declarationMap": false,
     "noEmit": true
   },
-  "include": ["measure/**/*.ts"]
+  "include": ["measure/**/*.ts", "../log-viewer/declarations.d.ts"]
 }

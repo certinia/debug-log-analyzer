@@ -5,11 +5,9 @@ const defaultConfig = {
     // The parser is ESM-only: its `exports` offers `import`, and jest's CJS runtime asks for
     // `require`. Naming the files steps past the exports gate for this package alone — widening
     // the export conditions pulls every other dependency's ESM build in with it. The cost is that
-    // these two paths must track the parser's own `exports`.
+    // this path must track the parser's own `exports`.
     '^@apexdevtools/apex-log-parser$':
       '<rootDir>/node_modules/@apexdevtools/apex-log-parser/dist/index.js',
-    '^@apexdevtools/apex-log-parser/types$':
-      '<rootDir>/node_modules/@apexdevtools/apex-log-parser/dist/publicTypes.js',
   },
   transform: {
     '^.+\\.(ts|js)?$': [

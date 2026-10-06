@@ -6,25 +6,21 @@
  * TreeNavigator
  *
  * Provides tree traversal for flame chart frame selection.
- * Uses pre-built navigation maps for O(1) lookup operations.
- *
- * Maps are built during tree conversion (logEventToTreeNode) to avoid
- * duplicate O(n) traversal work.
  */
 
-import type { EventNode, TreeNode } from '../../types/flamechart.types.js';
-import type { NavigationMaps, SiblingInfo } from '../../utils/tree-converter.js';
+import {
+  type EventNode,
+  NO_ROW,
+  type TimelineFrames,
+  type TreeNode,
+} from '../../types/flamechart.types.js';
 
 /**
- * TreeNavigator enables parent/child/sibling traversal of TreeNode structures.
+ * TreeNavigator enables parent/child/sibling traversal of the shown frames.
  *
  * Usage:
  * ```typescript
- * const { treeNodes, maps } = logEventToTreeNode(events);
- * const navigator = new TreeNavigator(treeNodes, maps);
- *
- * // Find a node by its event ID
- * const node = navigator.findById('event-123');
+ * const navigator = new TreeNavigator(frames);
  *
  * // Get parent (for flame chart: Arrow Down = visually down to parent)
  * const parent = navigator.getParent(node);
@@ -38,53 +34,10 @@ import type { NavigationMaps, SiblingInfo } from '../../utils/tree-converter.js'
  * ```
  */
 export class TreeNavigator {
-  /** Maps event ID to its TreeNode */
-  private nodeMap: Map<string, TreeNode<EventNode>>;
+  private frames: TimelineFrames<EventNode>;
 
-  /** Maps event ID to its parent TreeNode (null for root nodes) */
-  private parentMap: Map<string, TreeNode<EventNode> | null>;
-
-  /** Maps event ID to sibling info for efficient sibling navigation */
-  private siblingMap: Map<string, SiblingInfo>;
-
-  /** Maps original reference to TreeNode for hit test lookup */
-  private originalMap: Map<unknown, TreeNode<EventNode>>;
-
-  /** Maps depth to nodes at that depth, sorted by timestamp for cross-parent navigation */
-  private depthMap: Map<number, TreeNode<EventNode>[]>;
-
-  /** Maps event ID to its depth for quick lookup */
-  private depthLookup: Map<string, number>;
-
-  /**
-   * Construct a TreeNavigator from pre-built navigation maps.
-   * Maps are built during tree conversion (logEventToTreeNode).
-   *
-   * @param rootNodes - Array of root-level TreeNodes (unused, kept for API compatibility)
-   * @param maps - Pre-built navigation maps from tree conversion
-   */
-  constructor(_rootNodes: TreeNode<EventNode>[], maps: NavigationMaps) {
-    this.originalMap = maps.originalMap;
-    this.nodeMap = maps.nodeMap;
-    this.parentMap = maps.parentMap;
-    this.siblingMap = maps.siblingMap;
-    this.depthMap = maps.depthMap;
-    this.depthLookup = maps.depthLookup;
-
-    // Sort each depth array by timestamp for efficient binary search
-    for (const nodesAtDepth of this.depthMap.values()) {
-      nodesAtDepth.sort((a, b) => a.data.timestamp - b.data.timestamp);
-    }
-  }
-
-  /**
-   * Find a TreeNode by its event ID.
-   *
-   * @param id - Event ID to search for
-   * @returns The TreeNode, or null if not found
-   */
-  public findById(id: string): TreeNode<EventNode> | null {
-    return this.nodeMap.get(id) ?? null;
+  constructor(frames: TimelineFrames<EventNode>) {
+    this.frames = frames;
   }
 
   /**
@@ -95,7 +48,7 @@ export class TreeNavigator {
    * @returns The TreeNode, or null if not found
    */
   public findByOriginal(original: unknown): TreeNode<EventNode> | null {
-    return this.originalMap.get(original) ?? null;
+    return this.nodeAt(this.frames.rowOfOriginal(original));
   }
 
   /**
@@ -105,7 +58,7 @@ export class TreeNavigator {
    * @returns Parent node, or null if node is a root
    */
   public getParent(node: TreeNode<EventNode>): TreeNode<EventNode> | null {
-    return this.parentMap.get(node.data.id) ?? null;
+    return this.nodeAt(this.frames.parent[node.row]!);
   }
 
   /**
@@ -119,33 +72,28 @@ export class TreeNavigator {
    * @returns Child node at center, or null if node is a leaf
    */
   public getChildAtCenter(node: TreeNode<EventNode>): TreeNode<EventNode> | null {
-    if (!node.children || node.children.length === 0) {
-      return null;
-    }
+    const row = node.row;
+    const { start, total, subtreeEnd } = this.frames;
+    const parentCenter = start[row]! + total[row]! / 2;
 
-    const parentCenter = node.data.timestamp + node.data.duration / 2;
-
-    // Find child containing the center point
-    for (const child of node.children) {
-      const childStart = child.data.timestamp;
-      const childEnd = childStart + child.data.duration;
-      if (parentCenter >= childStart && parentCenter < childEnd) {
-        return child;
-      }
-    }
-
-    // Fallback: find closest child to center
-    let closest = node.children[0]!;
+    let closest = NO_ROW;
     let minDistance = Infinity;
-    for (const child of node.children) {
-      const childCenter = child.data.timestamp + child.data.duration / 2;
-      const distance = Math.abs(childCenter - parentCenter);
+    for (let child = row + 1; child < subtreeEnd[row]!; child = subtreeEnd[child]!) {
+      if (!this.frames.isVisible(child)) {
+        continue;
+      }
+      const childStart = start[child]!;
+      const childEnd = childStart + total[child]!;
+      if (parentCenter >= childStart && parentCenter < childEnd) {
+        return this.nodeAt(child);
+      }
+      const distance = Math.abs(childStart + total[child]! / 2 - parentCenter);
       if (distance < minDistance) {
         minDistance = distance;
         closest = child;
       }
     }
-    return closest;
+    return this.nodeAt(closest);
   }
 
   /**
@@ -155,17 +103,16 @@ export class TreeNavigator {
    * @returns Next sibling, or null if node is last sibling
    */
   public getNextSibling(node: TreeNode<EventNode>): TreeNode<EventNode> | null {
-    const siblingInfo = this.siblingMap.get(node.data.id);
-    if (!siblingInfo) {
-      return null;
+    const row = node.row;
+    const { parent, subtreeEnd } = this.frames;
+    const owner = parent[row]!;
+    const end = owner === NO_ROW ? this.frames.rowCount : subtreeEnd[owner]!;
+    for (let next = subtreeEnd[row]!; next < end; next = subtreeEnd[next]!) {
+      if (this.frames.isVisible(next)) {
+        return this.nodeAt(next);
+      }
     }
-
-    const nextIndex = siblingInfo.index + 1;
-    if (nextIndex >= siblingInfo.siblings.length) {
-      return null;
-    }
-
-    return siblingInfo.siblings[nextIndex] ?? null;
+    return null;
   }
 
   /**
@@ -175,17 +122,17 @@ export class TreeNavigator {
    * @returns Previous sibling, or null if node is first sibling
    */
   public getPrevSibling(node: TreeNode<EventNode>): TreeNode<EventNode> | null {
-    const siblingInfo = this.siblingMap.get(node.data.id);
-    if (!siblingInfo) {
-      return null;
+    const row = node.row;
+    const { parent, subtreeEnd } = this.frames;
+    const owner = parent[row]!;
+    // Siblings chain forward only, so walk them from the first up to this one.
+    let prev = NO_ROW;
+    for (let sibling = owner + 1; sibling < row; sibling = subtreeEnd[sibling]!) {
+      if (this.frames.isVisible(sibling)) {
+        prev = sibling;
+      }
     }
-
-    const prevIndex = siblingInfo.index - 1;
-    if (prevIndex < 0) {
-      return null;
-    }
-
-    return siblingInfo.siblings[prevIndex] ?? null;
+    return this.nodeAt(prev);
   }
 
   /**
@@ -197,43 +144,26 @@ export class TreeNavigator {
    * @returns Next node at same depth, or null if at end
    */
   public getNextAtDepth(node: TreeNode<EventNode>): TreeNode<EventNode> | null {
-    const depth = this.depthLookup.get(node.data.id);
-    if (depth === undefined) {
-      return null;
-    }
-
-    const nodesAtDepth = this.depthMap.get(depth);
-    if (!nodesAtDepth || nodesAtDepth.length === 0) {
-      return null;
-    }
+    const row = node.row;
+    const { start, total } = this.frames;
+    const rows = this.frames.rowsAtDepth(this.frames.depth[row]!);
 
     // Binary search for first node that starts at or after current node ends
     // Using < (not <=) to include adjacent frames where one ends exactly where next starts
-    const nodeEnd = node.data.timestamp + node.data.duration;
+    const nodeEnd = start[row]! + total[row]!;
     let left = 0;
-    let right = nodesAtDepth.length;
-
+    let right = rows.length;
     while (left < right) {
-      const mid = Math.floor((left + right) / 2);
-      const midNode = nodesAtDepth[mid]!;
-      if (midNode.data.timestamp < nodeEnd) {
+      const mid = (left + right) >>> 1;
+      if (start[rows[mid]!]! < nodeEnd) {
         left = mid + 1;
       } else {
         right = mid;
       }
     }
 
-    // left is now the index of the first node starting at or after nodeEnd
-    if (left >= nodesAtDepth.length) {
-      return null;
-    }
-
-    const candidate = nodesAtDepth[left];
-    // Make sure we don't return the same node
-    if (candidate && candidate.data.id !== node.data.id) {
-      return candidate;
-    }
-    return null;
+    const candidate = rows[left] ?? NO_ROW;
+    return candidate === row ? null : this.nodeAt(candidate);
   }
 
   /**
@@ -245,44 +175,30 @@ export class TreeNavigator {
    * @returns Previous node at same depth, or null if at start
    */
   public getPrevAtDepth(node: TreeNode<EventNode>): TreeNode<EventNode> | null {
-    const depth = this.depthLookup.get(node.data.id);
-    if (depth === undefined) {
-      return null;
-    }
-
-    const nodesAtDepth = this.depthMap.get(depth);
-    if (!nodesAtDepth || nodesAtDepth.length === 0) {
-      return null;
-    }
+    const row = node.row;
+    const { start, total } = this.frames;
+    const rows = this.frames.rowsAtDepth(this.frames.depth[row]!);
 
     // Binary search for last node that ends at or before current node starts
     // Using <= to include adjacent frames where one ends exactly where next starts
-    const nodeStart = node.data.timestamp;
+    const nodeStart = start[row]!;
     let left = 0;
-    let right = nodesAtDepth.length;
-
+    let right = rows.length;
     while (left < right) {
-      const mid = Math.floor((left + right) / 2);
-      const midNode = nodesAtDepth[mid]!;
-      const midEnd = midNode.data.timestamp + midNode.data.duration;
-      if (midEnd <= nodeStart) {
+      const mid = (left + right) >>> 1;
+      const midRow = rows[mid]!;
+      if (start[midRow]! + total[midRow]! <= nodeStart) {
         left = mid + 1;
       } else {
         right = mid;
       }
     }
 
-    // left-1 is the index of the last node ending at or before nodeStart
-    const prevIndex = left - 1;
-    if (prevIndex < 0) {
-      return null;
-    }
+    const candidate = rows[left - 1] ?? NO_ROW;
+    return candidate === row ? null : this.nodeAt(candidate);
+  }
 
-    const candidate = nodesAtDepth[prevIndex];
-    // Make sure we don't return the same node
-    if (candidate && candidate.data.id !== node.data.id) {
-      return candidate;
-    }
-    return null;
+  private nodeAt(row: number): TreeNode<EventNode> | null {
+    return row === NO_ROW ? null : this.frames.node(row);
   }
 }

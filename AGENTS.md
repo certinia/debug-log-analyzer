@@ -12,8 +12,7 @@ VS Code extension for analyzing Salesforce debug logs with interactive visualiza
 - `log-viewer/` — webview UI (TypeScript; lit / html / css)
 - The log parser is the `@apexdevtools/apex-log-parser` package, released from
   [apex-dev-tools/apex-log-parser](https://github.com/apex-dev-tools/apex-log-parser). Both
-  `lana/` and `log-viewer/` depend on it. Runtime lives on the root export, types and consts on
-  the `/types` subpath.
+  `lana/` and `log-viewer/` depend on it. Import everything from the root export.
 - `lana-docs/` — Docusaurus documentation
 - `sample-app/` — sample Salesforce app with test logs
 

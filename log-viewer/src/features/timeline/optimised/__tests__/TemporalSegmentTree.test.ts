@@ -2,8 +2,7 @@
  * Copyright (c) 2025 Certinia Inc. All rights reserved.
  */
 import { describe, expect, it } from '@jest/globals';
-import type { LogEvent } from '@apexdevtools/apex-log-parser';
-import type { LogCategory } from '@apexdevtools/apex-log-parser/types';
+import type { LogEvent, LogCategory } from '@apexdevtools/apex-log-parser';
 
 import type { PixelBucket, ViewportState } from '../../types/flamechart.types.js';
 import { timelineEvent } from '#test-helpers/timeline.js';

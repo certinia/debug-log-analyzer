@@ -98,8 +98,8 @@ export class SearchHighlightRenderer {
     // Use shared highlight rendering logic
     renderHighlight(
       this.currentMatchGraphics,
-      currentMatch.event.timestamp,
-      currentMatch.event.duration,
+      currentMatch.rect.timeStart,
+      currentMatch.rect.duration,
       currentMatch.depth,
       viewport,
       this.colors,
@@ -169,8 +169,8 @@ export class SearchHighlightRenderer {
     rect: PrecomputedRect,
     bounds: CullingBounds,
   ): boolean {
-    const rectTimeStart = match.event.timestamp;
-    const rectTimeEnd = rectTimeStart + match.event.duration;
+    const rectTimeStart = rect.timeStart;
+    const rectTimeEnd = rect.timeEnd;
     if (rectTimeEnd <= bounds.timeStart || rectTimeStart >= bounds.timeEnd) {
       return false;
     }

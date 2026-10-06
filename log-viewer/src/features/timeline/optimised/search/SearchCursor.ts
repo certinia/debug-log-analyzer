@@ -91,7 +91,7 @@ export class SearchCursorImpl<E extends EventNode> implements SearchCursor<E> {
   }
 
   getMatchedEventIds(): ReadonlySet<string> {
-    return (this._matchedEventIds ??= new Set(this._matches.map((m) => m.event.id)));
+    return (this._matchedEventIds ??= new Set(this._matches.map((m) => m.rect.id)));
   }
 
   /**
@@ -101,8 +101,8 @@ export class SearchCursorImpl<E extends EventNode> implements SearchCursor<E> {
    */
   getMatchedEventsInfo(): ReadonlyArray<MatchedEventInfo> {
     return (this._matchedEventsInfo ??= this._matches.map((m) => ({
-      timestamp: m.event.timestamp,
-      duration: m.event.duration ?? 0,
+      timestamp: m.rect.timeStart,
+      duration: m.rect.duration,
       depth: m.depth,
       category: m.rect.category,
     })));

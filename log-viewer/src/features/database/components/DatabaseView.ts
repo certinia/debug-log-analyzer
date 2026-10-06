@@ -10,8 +10,8 @@ import type {
   DMLBeginLine,
   SOQLExecuteBeginLine,
   SOSLExecuteBeginLine,
+  Limits,
 } from '@apexdevtools/apex-log-parser';
-import type { Limits } from '@apexdevtools/apex-log-parser/types';
 
 import { limitTotals } from '../../../components/logOverviewMetrics.js';
 import { DomListenerController } from '../../../core/events/DomListenerController.js';
