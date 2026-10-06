@@ -5,7 +5,7 @@
  */
 import { describe, expect, it } from '@jest/globals';
 
-// Avoid the heavy component import chains (CalltreeView scss, vscode-elements);
+// Avoid the heavy component import chains (CalltreeView scss);
 // this suite only exercises the section-assembly logic.
 jest.mock('../../../../components/CallStackDetail.js', () => ({}));
 jest.mock('../../../../components/CallTreeDetail.js', () => ({}));

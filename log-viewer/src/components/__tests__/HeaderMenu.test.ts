@@ -5,9 +5,6 @@
  */
 import { describe, expect, it } from '@jest/globals';
 
-// jsdom can't run the real elements (they read document.baseURI / setFormValue).
-jest.mock('#vscode-elements/vscode-icon.js', () => ({}));
-
 import type { HeaderMenu } from '../HeaderMenu.js';
 import '../HeaderMenu.js';
 

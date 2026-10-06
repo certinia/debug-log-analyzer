@@ -1,8 +1,7 @@
 /*
  * Copyright (c) 2025 Certinia Inc. All rights reserved.
  */
-import type { ApexLog } from '@apexdevtools/apex-log-parser';
-import type { GovernorLimits } from '@apexdevtools/apex-log-parser/types';
+import type { ApexLog, GovernorLimits } from '@apexdevtools/apex-log-parser';
 import {
   Tabulator,
   type ColumnDefinition,
@@ -11,8 +10,9 @@ import {
 } from 'tabulator-tables';
 
 import { NO_REPORTED_LIMITS_TEXT } from '../../../components/governorCopy.js';
-import { formatInteger, sharePercent } from '../../../core/utility/Util.js';
-import { NAMESPACE_WIDTH } from '../../../tabulator/ColumnWidths.js';
+import { saveFile } from '../../../core/messaging/saveFile.js';
+import { formatDuration, formatInteger, sharePercent } from '../../../core/utility/Util.js';
+import { NAMESPACE_WIDTH, TIME_WIDTH } from '../../../tabulator/ColumnWidths.js';
 import { GroupCalcs } from '../../../tabulator/groups/GroupCalcs.js';
 import { GroupChildIndent } from '../../../tabulator/groups/GroupChildIndent.js';
 import { GroupSort } from '../../../tabulator/groups/GroupSort.js';
@@ -28,7 +28,11 @@ import { RowKeyboardNavigation } from '../../../tabulator/module/RowKeyboardNavi
 import { RowNavigation } from '../../../tabulator/module/RowNavigation.js';
 import { VirtualVerticalRenderer } from '../../../tabulator/renderer/VirtualVerticalRenderer.js';
 import { makeSumFieldAllVisible } from '../utils/BottomCalcs.js';
-import { governorCostBreakdown, type GovernorCostRow } from '../utils/GovernorCost.js';
+import {
+  governorCostBreakdown,
+  type GovernorCostMetric,
+  type GovernorCostRow,
+} from '../utils/GovernorCost.js';
 
 export interface TableCallbacks {
   rowFormatter?: (row: RowComponent) => void;
@@ -74,6 +78,30 @@ export const clipboardCopyOptions = {
   // Cast the one value, not the object: a typo in the keys above still fails here.
   keybindings: { copyToClipboard: ['ctrl + 67', 'meta + 67'] } as unknown as Options['keybindings'],
 } satisfies Partial<Options>;
+
+/**
+ * Table options that export the whole grid as CSV. Spread beside
+ * {@link clipboardCopyOptions}, which is the other half of the same feature.
+ *
+ * Tabulator runs its own `<a download>` for any truthy encoder result, so handing the
+ * file to the extension host has to answer `false` to stop it saving twice.
+ */
+export function downloadOptions(defaultFileName: string) {
+  return {
+    downloadEncoder: (fileContents: string, mimeType: string) =>
+      saveFile(fileContents, defaultFileName)
+        ? false
+        : new Blob([fileContents], { type: mimeType }),
+    downloadRowRange: 'all',
+    downloadConfig: {
+      columnHeaders: true,
+      columnGroups: true,
+      rowGroups: true,
+      columnCalcs: false,
+      dataTree: true,
+    },
+  } satisfies Partial<Options>;
+}
 
 /**
  * Virtual row rendering plus the scroll anchoring that goes with it — one
@@ -230,6 +258,50 @@ export function createCountColumn(opts: {
   };
 }
 
+/** Time columns: the narrowest the bar and its figure stay legible together. */
+const TIME_MIN_WIDTH = 120;
+
+/**
+ * A call-tree time column: milliseconds drawn as a bar against the whole
+ * transaction, right-aligned, hovering as a formatted duration.
+ *
+ * Shared so a column and its footer cannot drift apart — both scale against
+ * `totalValue`, and three tables were carrying hand-copied pairs. `bottomCalc`
+ * is per-table, because a top-down table sums plainly where Bottom-Up has to
+ * account for repeated call stacks; leave it out for a column with no
+ * meaningful total.
+ */
+export function createTimeColumn(opts: {
+  title: string;
+  field: string;
+  totalValue: number;
+  bottomCalc?: ColumnDefinition['bottomCalc'];
+  visible?: boolean;
+}): ColumnDefinition {
+  const barParams = { precision: 2, totalValue: opts.totalValue };
+  return {
+    title: opts.title,
+    field: opts.field,
+    sorter: 'number',
+    headerSortTristate: true,
+    width: TIME_WIDTH,
+    minWidth: TIME_MIN_WIDTH,
+    hozAlign: 'right',
+    headerHozAlign: 'right',
+    formatter: progressFormatterMS,
+    formatterParams: barParams,
+    tooltip: (_event, cell) => formatDuration(cell.getValue()),
+    visible: opts.visible,
+    ...(opts.bottomCalc === undefined
+      ? {}
+      : {
+          bottomCalc: opts.bottomCalc,
+          bottomCalcFormatter: progressFormatterMS,
+          bottomCalcFormatterParams: barParams,
+        }),
+  };
+}
+
 /**
  * Renders a utilisation percentage, or an em dash where the log reported no limits to measure
  * against — an unknown utilisation is not 0%, and an empty bar would read as one.
@@ -290,9 +362,14 @@ function createUtilisationColumn(opts: {
   };
 }
 
+function usedOfLimit({ unit, used, limit }: GovernorCostMetric): string {
+  const figure = (value: number): string => (unit === 'byte' ? formatInteger(value) : `${value}`);
+  return `${figure(used)}/${figure(limit)}`;
+}
+
 /**
  * The shared "Gov Avg %" column — the average governor consumption across all
- * governors on a call path (see {@link governorCost}), rendered as a progress
+ * governors on a call path (see {@link GovernorCostRow.governorCost}), rendered as a progress
  * bar. Reused across all call-tree/analysis tables. `governorCost` is populated
  * during tree build; the tooltip breaks the average down per metric. This column and Gov Peak %
  * are where headroom is answered, so they stay measured against the limits and read `—` without
@@ -312,11 +389,7 @@ export function createGovernorCostColumn(governorLimits: GovernorLimits): Column
       if (!breakdown.length) {
         return `${value.toFixed(1)}%`;
       }
-      const rows = breakdown.map((m) => {
-        const used = m.label === 'Heap' ? formatInteger(m.used) : `${m.used}`;
-        const limit = m.label === 'Heap' ? formatInteger(m.limit) : `${m.limit}`;
-        return `${m.label} ${used}/${limit} (${m.percent.toFixed(1)}%)`;
-      });
+      const rows = breakdown.map((m) => `${m.label} ${usedOfLimit(m)} (${m.percent.toFixed(1)}%)`);
       return `${value.toFixed(1)}% — average utilisation across all governors<br>${rows.join('<br>')}`;
     },
   });
@@ -324,7 +397,7 @@ export function createGovernorCostColumn(governorLimits: GovernorLimits): Column
 
 /**
  * The "Gov Peak %" column — the single tightest governor consumed on a path
- * (see {@link governorCostMax}), rendered as a bar. Complements the averaged
+ * (see {@link GovernorCostRow.governorCostMax}), rendered as a bar. Complements the averaged
  * Gov Avg column; hidden by default (surfaced by the Governor Limits view or a
  * user toggle). The tooltip names which governor is the peak.
  */
@@ -343,9 +416,7 @@ export function createGovernorPeakColumn(governorLimits: GovernorLimits): Column
       if (!top) {
         return `${peak.toFixed(1)}%`;
       }
-      const used = top.label === 'Heap' ? formatInteger(top.used) : `${top.used}`;
-      const limit = top.label === 'Heap' ? formatInteger(top.limit) : `${top.limit}`;
-      return `Tightest single governor: ${top.label} ${used}/${limit} (${peak.toFixed(1)}%)`;
+      return `Tightest single governor: ${top.label} ${usedOfLimit(top)} (${peak.toFixed(1)}%)`;
     },
   });
 }

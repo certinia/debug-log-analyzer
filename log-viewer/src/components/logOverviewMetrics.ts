@@ -1,8 +1,9 @@
 /*
  * Copyright (c) 2026 Certinia Inc. All rights reserved.
  */
-import type { LimitValue, Limits } from '@apexdevtools/apex-log-parser/types';
+import type { LimitValue, Limits } from '@apexdevtools/apex-log-parser';
 
+import { GOVERNOR_METRIC, GOVERNOR_METRICS } from '../core/metrics/governorMetrics.js';
 import { formatByteSize, formatInteger, sharePercent } from '../core/utility/Util.js';
 import type { GaugeMetric } from '../features/database/components/GovernorSummary.js';
 import type { HeatStripTimeSeries } from '../features/timeline/types/flamechart.types.js';
@@ -17,29 +18,6 @@ const MAX_GAUGES = 6;
 export function limitValue(used: number, limit: number): LimitValue {
   return { used, limit, percentUsed: limit > 0 ? (used / limit) * 100 : null };
 }
-
-/**
- * Every governor-tracked metric, with the label the inspector shows for it. A
- * local list rather than the timeline adapter's `APEX_METRICS`, which is
- * internal to that feature. The gauges and the governor trend charts read it
- * through {@link rankedLimitMetrics}, and the log diagnostics read it
- * directly, so every surface names the same metrics the same way.
- */
-export const GOVERNOR_METRICS: ReadonlyArray<{ key: keyof Limits; label: string }> = [
-  { key: 'cpuTime', label: 'CPU Time' },
-  { key: 'heapSize', label: 'Heap Size' },
-  { key: 'soqlQueries', label: 'SOQL' },
-  { key: 'queryRows', label: 'Query Rows' },
-  { key: 'dmlStatements', label: 'DML' },
-  { key: 'dmlRows', label: 'DML Rows' },
-  { key: 'soslQueries', label: 'SOSL' },
-  { key: 'publishImmediateDml', label: 'Publish Immediate DML' },
-  { key: 'callouts', label: 'Callouts' },
-  { key: 'emailInvocations', label: 'Email Invocations' },
-  { key: 'futureCalls', label: 'Future Calls' },
-  { key: 'queueableJobsAddedToQueue', label: 'Queueable Jobs' },
-  { key: 'mobileApexPushCalls', label: 'Mobile Push Calls' },
-];
 
 /** A metric's highest level across the series. */
 function peakUsed(series: HeatStripTimeSeries, key: keyof Limits): number {
@@ -199,6 +177,11 @@ export function seriesGauges(series: HeatStripTimeSeries): GaugeMetric[] {
     used,
     limit,
     spark: limit > 0 ? undefined : metricSparkline(series, key),
-    format: key === 'heapSize' ? formatByteSize : formatInteger,
+    format: limitFormat(key),
   }));
+}
+
+/** How a gauge or trend chart prints a metric's figures. */
+export function limitFormat(key: keyof Limits): (value: number) => string {
+  return GOVERNOR_METRIC[key].unit === 'byte' ? formatByteSize : formatInteger;
 }

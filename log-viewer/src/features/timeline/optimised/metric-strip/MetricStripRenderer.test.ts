@@ -12,8 +12,8 @@ import type {
   MetricStripDataPoint,
   MetricStripProcessedData,
   NoDataSpan,
-  ViewportState,
 } from '../../types/flamechart.types.js';
+import { makeViewport } from '#test-helpers/viewport.js';
 import { MetricStripRenderer } from './MetricStripRenderer.js';
 
 const TOTAL_DURATION = 4000;
@@ -50,13 +50,7 @@ function data(points: MetricStripDataPoint[], gaps: NoDataSpan[]): MetricStripPr
   };
 }
 
-const viewportState: ViewportState = {
-  zoom: 0.1,
-  offsetX: 0,
-  offsetY: 0,
-  displayWidth: 400,
-  displayHeight: 60,
-} as ViewportState;
+const viewportState = makeViewport({ zoom: 0.1, displayWidth: 400, displayHeight: 60 });
 
 /** How many separate shapes the area fill painted. */
 function areaFillCount(renderer: MetricStripRenderer): number {

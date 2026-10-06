@@ -15,6 +15,8 @@ import type { MatchedEventInfo, SearchCursor, SearchMatch } from '../../types/se
 export class SearchCursorImpl<E extends EventNode> implements SearchCursor<E> {
   private _currentIndex: number;
   private readonly _matches: SearchMatch<E>[];
+  private _matchedEventIds: ReadonlySet<string> | null = null;
+  private _matchedEventsInfo: ReadonlyArray<MatchedEventInfo> | null = null;
 
   constructor(matches: SearchMatch<E>[]) {
     this._matches = matches;
@@ -89,15 +91,20 @@ export class SearchCursorImpl<E extends EventNode> implements SearchCursor<E> {
   }
 
   getMatchedEventIds(): ReadonlySet<string> {
-    return new Set(this._matches.map((m) => m.event.id));
+    return (this._matchedEventIds ??= new Set(this._matches.map((m) => m.rect.id)));
   }
 
+  /**
+   * Both memos hold for the life of the cursor, which needs `_matches` to be the caller's
+   * last word on the match set. `buildMatchIndex` also keys its cache on this array, so it
+   * must stay the same one.
+   */
   getMatchedEventsInfo(): ReadonlyArray<MatchedEventInfo> {
-    return this._matches.map((m) => ({
-      timestamp: m.event.timestamp,
-      duration: m.event.duration ?? 0,
+    return (this._matchedEventsInfo ??= this._matches.map((m) => ({
+      timestamp: m.rect.timeStart,
+      duration: m.rect.duration,
       depth: m.depth,
       category: m.rect.category,
-    }));
+    })));
   }
 }

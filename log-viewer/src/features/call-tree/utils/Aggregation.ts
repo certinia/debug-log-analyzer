@@ -2,12 +2,11 @@
  * Copyright (c) 2026 Certinia Inc. All rights reserved.
  */
 
-import type { LogEvent } from '@apexdevtools/apex-log-parser';
-import type { GovernorLimits, SelfTotal } from '@apexdevtools/apex-log-parser/types';
+import type { LogEvent, GovernorLimits, SelfTotal } from '@apexdevtools/apex-log-parser';
 import { ROOT_PATH_ID, type KeyPathIds } from '../../../core/log/keyPathIds.js';
 import { getCallerNamespace } from '../../../core/utility/CallerNamespace.js';
 import { computeHasDetailsDeep } from './DetailsFilter.js';
-import { setGovernorCost } from './GovernorCost.js';
+import { type CostLimits, costLimitsOf, setGovernorCost } from './GovernorCost.js';
 
 /**
  * Represents a row in the aggregated call tree view.
@@ -156,6 +155,7 @@ export function toAggregatedCallTree(
   // tree so deepFilter caches don't collide across cascaded subtree passes.
   let next = 0;
   const idFor = (): number => ++next;
+  const costLimits = governorLimits && costLimitsOf(governorLimits);
 
   // Group root-level events by signature with call stack tracking. Keyed by the
   // log's interned ids: a bucket key is hashed once for the log rather than once
@@ -184,8 +184,8 @@ export function toAggregatedCallTree(
 
   // Recursively aggregate children for each row
   for (const row of rootMap.values()) {
-    row._children = aggregateChildrenRecursive(row, paths, idFor, governorLimits);
-    finaliseAggregatedRow(row, governorLimits);
+    row._children = aggregateChildrenRecursive(row, paths, idFor, costLimits);
+    finaliseAggregatedRow(row, costLimits);
   }
 
   // Sort by total time descending
@@ -196,10 +196,10 @@ export function toAggregatedCallTree(
 const NO_STACK = -1;
 
 /** Averages, governor cost and the Show Details roll-up, once `_children` is set. */
-function finaliseAggregatedRow(row: AggregatedRow, governorLimits?: GovernorLimits): void {
+function finaliseAggregatedRow(row: AggregatedRow, costLimits?: CostLimits): void {
   calculateAverages(row);
-  if (governorLimits) {
-    setGovernorCost(row, governorLimits);
+  if (costLimits) {
+    setGovernorCost(row, costLimits);
   }
   row._hasDetailsDeep = computeHasDetailsDeep(row, row.totalTime, row.originalData.type);
 }
@@ -212,7 +212,7 @@ function aggregateChildrenRecursive(
   parent: AggregatedRow,
   paths: KeyPathIds,
   idFor: () => number,
-  governorLimits?: GovernorLimits,
+  costLimits?: CostLimits,
 ): AggregatedRow[] | null {
   const childMap = new Map<number, AggregatedRow>();
   // The parent's frame is open over every call in it, so a call of that same
@@ -244,8 +244,8 @@ function aggregateChildrenRecursive(
 
   // Recursively aggregate children using stack key for recursion tracking
   for (const row of childMap.values()) {
-    row._children = aggregateChildrenRecursive(row, paths, idFor, governorLimits);
-    finaliseAggregatedRow(row, governorLimits);
+    row._children = aggregateChildrenRecursive(row, paths, idFor, costLimits);
+    finaliseAggregatedRow(row, costLimits);
   }
 
   // Sort by total time descending
@@ -581,7 +581,7 @@ export function toBottomUpTree(
     }
   }
 
-  return finalizeBuckets(rootBuckets, governorLimits);
+  return finalizeBuckets(rootBuckets, governorLimits && costLimitsOf(governorLimits));
 }
 
 /**
@@ -591,24 +591,24 @@ export function toBottomUpTree(
  */
 function finalizeBuckets(
   rootBuckets: Map<number, BottomUpRow>,
-  governorLimits?: GovernorLimits,
+  costLimits?: CostLimits,
 ): BottomUpRow[] {
   const roots = Array.from(rootBuckets.values());
   for (const row of roots) {
-    finalizeBucketRecursive(row, governorLimits);
+    finalizeBucketRecursive(row, costLimits);
   }
   sortBuckets(roots);
   return roots;
 }
 
-function finalizeBucketRecursive(row: BottomUpRow, governorLimits?: GovernorLimits): void {
+function finalizeBucketRecursive(row: BottomUpRow, costLimits?: CostLimits): void {
   calculateBottomUpAverages(row);
-  if (governorLimits) {
-    setGovernorCost(row, governorLimits);
+  if (costLimits) {
+    setGovernorCost(row, costLimits);
   }
   if (row._children && row._children.length > 0) {
     for (const child of row._children) {
-      finalizeBucketRecursive(child, governorLimits);
+      finalizeBucketRecursive(child, costLimits);
     }
     sortBuckets(row._children);
   }

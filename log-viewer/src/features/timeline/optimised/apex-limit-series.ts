@@ -15,8 +15,10 @@ import type {
   HeapAllocateLine,
   LimitUsageLine,
   LogEvent,
+  LimitMetricUnit,
+  Limits,
 } from '@apexdevtools/apex-log-parser';
-import type { Limits } from '@apexdevtools/apex-log-parser/types';
+import { GOVERNOR_METRICS } from '../../../core/metrics/governorMetrics.js';
 import type { HeatStripMetric, HeatStripTimeSeries } from '../types/flamechart.types.js';
 import { extractMarkers, noDataSpans } from '../utils/marker-utils.js';
 import {
@@ -24,38 +26,17 @@ import {
   type LimitObservation as GranularObservation,
 } from './metric-strip/governor-timeline.js';
 
-/**
- * Apex-specific metric definitions for heat strip visualization.
- * "Big 4" limits (CPU, SOQL, DML, Heap) have priority < 4 and are always shown.
- * Other limits have priority >= 4 and are only shown when > 0%.
- */
-const APEX_METRICS: Map<keyof Limits, HeatStripMetric> = new Map([
-  ['cpuTime', { id: 'cpuTime', displayName: 'CPU Time', unit: 'ms', priority: 0 }],
-  ['soqlQueries', { id: 'soqlQueries', displayName: 'SOQL Queries', unit: '', priority: 1 }],
-  ['dmlStatements', { id: 'dmlStatements', displayName: 'DML Statements', unit: '', priority: 2 }],
-  ['heapSize', { id: 'heapSize', displayName: 'Heap Size', unit: 'bytes', priority: 3 }],
-  ['queryRows', { id: 'queryRows', displayName: 'Query Rows', unit: '', priority: 4 }],
-  ['soslQueries', { id: 'soslQueries', displayName: 'SOSL Queries', unit: '', priority: 5 }],
-  ['dmlRows', { id: 'dmlRows', displayName: 'DML Rows', unit: '', priority: 6 }],
-  [
-    'publishImmediateDml',
-    { id: 'publishImmediateDml', displayName: 'Publish Immediate DML', unit: '', priority: 7 },
-  ],
-  ['callouts', { id: 'callouts', displayName: 'Callouts', unit: '', priority: 8 }],
-  [
-    'emailInvocations',
-    { id: 'emailInvocations', displayName: 'Email Invocations', unit: '', priority: 9 },
-  ],
-  ['futureCalls', { id: 'futureCalls', displayName: 'Future Calls', unit: '', priority: 10 }],
-  [
-    'queueableJobsAddedToQueue',
-    { id: 'queueableJobsAddedToQueue', displayName: 'Queueable Jobs', unit: '', priority: 11 },
-  ],
-  [
-    'mobileApexPushCalls',
-    { id: 'mobileApexPushCalls', displayName: 'Mobile Push Calls', unit: '', priority: 12 },
-  ],
-]);
+const STRIP_UNIT: Record<LimitMetricUnit, string> = { millisecond: 'ms', byte: 'bytes', count: '' };
+
+/** The heat strip's metrics, in strip priority order. */
+const APEX_METRICS: Map<keyof Limits, HeatStripMetric> = new Map(
+  [...GOVERNOR_METRICS]
+    .sort((a, b) => a.priority - b.priority)
+    .map(({ key, label, unit, priority }) => [
+      key,
+      { id: key, displayName: label, unit: STRIP_UNIT[unit], priority },
+    ]),
+);
 
 /** Memo of {@link buildApexLimitTimeSeries} per log: the walk visits the full event
  *  tree, and the series feeds two surfaces — the metric strip and the inspector's

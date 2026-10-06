@@ -5,12 +5,9 @@ import { beforeEach, describe, expect, it } from '@jest/globals';
 
 import type { LogEvent } from '@apexdevtools/apex-log-parser';
 
-import { KeyPathIds, ROOT_PATH_ID } from '../keyPathIds.js';
+import { callFrame } from '#test-helpers/events.js';
 
-/** A frame at `eventIndex`, of the type and text a bucket key is built from. */
-function ev(eventIndex: number, text: string, parent: LogEvent | null, type = 'METHOD_ENTRY') {
-  return { eventIndex, type, namespace: '', text, parent } as unknown as LogEvent;
-}
+import { KeyPathIds, ROOT_PATH_ID } from '../keyPathIds.js';
 
 describe('KeyPathIds', () => {
   let ids: KeyPathIds;
@@ -62,9 +59,9 @@ describe('KeyPathIds', () => {
   });
 
   describe('chainNodeAt', () => {
-    const root = ev(1, 'exec', null);
-    const outer = ev(2, 'outer', root);
-    const inner = ev(3, 'inner', outer);
+    const root = callFrame('exec', null, 1);
+    const outer = callFrame('outer', root, 2);
+    const inner = callFrame('inner', outer, 3);
 
     it('names the frame the row sits at, which is what a caller row stands for', () => {
       const leafRow = pathFor(ids, 'METHOD_ENTRY||inner');
@@ -96,8 +93,8 @@ describe('KeyPathIds', () => {
 
   describe('keyIdOf', () => {
     it('keeps one id per signature, not one per frame', () => {
-      const first = ev(1, 'Util.log', null);
-      const second = ev(2, 'Util.log', null);
+      const first = callFrame('Util.log', null, 1);
+      const second = callFrame('Util.log', null, 2);
 
       expect(ids.keyIdOf(first)).toBe(ids.keyIdOf(first));
       // Same type, namespace and text is the same bucket.
@@ -118,14 +115,14 @@ describe('KeyPathIds', () => {
       expect(ids.keyIdOf(loose)).toBe(ids.keyIdOf(loose));
       expect(ids.keyIdOf(other)).not.toBe(ids.keyIdOf(loose));
       // And one whose index is past the end of the log's own array.
-      expect(ids.keyIdOf(ev(9999, 'past the end', null))).not.toBe(ids.keyIdOf(loose));
+      expect(ids.keyIdOf(callFrame('past the end', null, 9999))).not.toBe(ids.keyIdOf(loose));
     });
   });
 
   describe('stackIdOf', () => {
     it('reads through the entry type, which a bucket key does not', () => {
-      const unit = ev(1, 'Thing.run()', null, 'CODE_UNIT_STARTED');
-      const method = ev(2, 'Thing.run()', null, 'METHOD_ENTRY');
+      const unit = callFrame('Thing.run()', null, 1, 'CODE_UNIT_STARTED');
+      const method = callFrame('Thing.run()', null, 2, 'METHOD_ENTRY');
 
       // A method that recurses as a code unit is one frame to the stack.
       expect(ids.stackIdOf(unit)).toBe(ids.stackIdOf(method));
@@ -133,14 +130,16 @@ describe('KeyPathIds', () => {
     });
 
     it('tells two frames apart', () => {
-      expect(ids.stackIdOf(ev(1, 'one', null))).not.toBe(ids.stackIdOf(ev(2, 'two', null)));
+      expect(ids.stackIdOf(callFrame('one', null, 1))).not.toBe(
+        ids.stackIdOf(callFrame('two', null, 2)),
+      );
     });
   });
 
   describe('pathIdOf', () => {
-    const root = ev(1, 'exec', null);
-    const outer = ev(2, 'outer', root);
-    const inner = ev(3, 'inner', outer);
+    const root = callFrame('exec', null, 1);
+    const outer = callFrame('outer', root, 2);
+    const inner = callFrame('inner', outer, 3);
 
     it('names one row in a top-down view, at the depth the frame ran at', () => {
       expect(ids.pathIdOf(inner)).toBe(pathFor(ids, 'METHOD_ENTRY||outer', 'METHOD_ENTRY||inner'));

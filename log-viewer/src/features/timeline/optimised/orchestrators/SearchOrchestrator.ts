@@ -30,12 +30,17 @@ import type {
   EventNode,
   PixelBucket,
   RenderBatch,
-  TreeNode,
+  TimelineFrames,
   ViewportState,
 } from '../../types/flamechart.types.js';
-import type { MatchedEventInfo, SearchCursor, SearchOptions } from '../../types/search.types.js';
+import type {
+  FramePredicate,
+  MatchedEventInfo,
+  SearchCursor,
+  SearchOptions,
+} from '../../types/search.types.js';
 import { createHighlightColors } from '../rendering/HighlightRenderer.js';
-import type { PrecomputedRect, RectangleCache } from '../RectangleCache.js';
+import type { PrecomputedRect } from '../RectangleCache.js';
 import { EventMatcher } from '../search/EventMatcher.js';
 import { FlameChartCursor } from '../search/FlameChartCursor.js';
 import { MeshSearchStyleRenderer } from '../search/MeshSearchStyleRenderer.js';
@@ -134,8 +139,7 @@ export class SearchOrchestrator<E extends EventNode = EventNode> {
    * Initialize the search system.
    *
    * @param worldContainer - PixiJS container for renderers
-   * @param treeNodes - Pre-converted TreeNode structure for search
-   * @param rectangleManager - Rectangle manager for building rect map
+   * @param frames - The timeline's frames, to search
    * @param batches - Event batches for styled rendering
    * @param textLabelRenderer - Text label renderer for search label coordination
    * @param viewport - Main timeline viewport (for coordinate calculations)
@@ -143,8 +147,7 @@ export class SearchOrchestrator<E extends EventNode = EventNode> {
    */
   public init(
     worldContainer: PIXI.Container,
-    treeNodes: TreeNode<E>[],
-    rectangleManager: RectangleCache,
+    frames: TimelineFrames<E>,
     batches: Map<string, RenderBatch>,
     textLabelRenderer: TextLabelRenderer,
     viewport: TimelineViewport,
@@ -154,11 +157,8 @@ export class SearchOrchestrator<E extends EventNode = EventNode> {
     this.viewport = viewport;
     this.mainTimelineYOffset = mainTimelineYOffset;
 
-    // PERF: Use cached rectMapById instead of rebuilding (~18ms saved)
-    const rectMap = rectangleManager.getRectMapById();
-
     // Initialize eventMatcher eagerly (needed for search() calls)
-    this.eventMatcher = new EventMatcher(treeNodes, rectMap);
+    this.eventMatcher = new EventMatcher(frames);
 
     // PERF: Defer renderer initialization to first search() call (~6ms saved at init)
     // Store data needed for deferred initialization
@@ -304,7 +304,7 @@ export class SearchOrchestrator<E extends EventNode = EventNode> {
    * @param options - Search options (caseSensitive, matchWholeWord)
    * @returns FlameChartCursor for navigating results, or null if search not initialized
    */
-  public search(predicate: (event: E) => boolean, options?: SearchOptions): SearchCursor<E> | null {
+  public search(predicate: FramePredicate, options?: SearchOptions): SearchCursor<E> | null {
     if (!this.eventMatcher) {
       return null;
     }

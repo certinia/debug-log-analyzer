@@ -1,8 +1,7 @@
 /*
  * Copyright (c) 2026 Certinia Inc. All rights reserved.
  */
-import type { ApexLog, LogEvent } from '@apexdevtools/apex-log-parser';
-import type { LogCategory } from '@apexdevtools/apex-log-parser/types';
+import type { ApexLog, LogEvent, LogCategory } from '@apexdevtools/apex-log-parser';
 
 import { getEventKey } from '../../../core/log/eventKeys.js';
 
@@ -202,8 +201,8 @@ function largestInstance(instances: LogEvent[]): LogEvent {
  * end. Total time counts the outermost instances only: recursion nests the same
  * wall time inside itself, and `eventsById` is in time order, so an instance that
  * starts before the last counted one of its signature ended is inside it. The
- * call-stack route `Aggregation.ts` and `RowGrouper.ts` take with a `Multiset`
- * is not open to a flat pass, which never sees a frame close.
+ * call-stack route `Aggregation.ts` takes is not open to a flat pass, which never
+ * sees a frame close.
  */
 function scanEvents(apexLog: ApexLog): Pick<ExecutionHighlights, 'hotSpots' | 'truncation'> {
   const spots = new Map<string, { row: HotSpotRow; maxSelf: number; countedUntil: number }>();

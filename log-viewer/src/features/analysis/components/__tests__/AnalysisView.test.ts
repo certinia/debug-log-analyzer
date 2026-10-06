@@ -29,8 +29,6 @@ jest.mock('../../../call-tree/components/BottomUpTable.js', () => ({
     tableBuilt: new Promise<Tabulator>(() => {}),
   }),
 }));
-// vscode-button needs ElementInternals.setFormValue (absent in jsdom).
-jest.mock('#vscode-elements/vscode-button.js', () => ({}));
 // VsSelect extends vscode-single-select, whose setFormValue needs an
 // ElementInternals jsdom lacks; the render would upgrade it.
 jest.mock('../../../../components/VsSelect.js', () => ({}));
@@ -41,8 +39,6 @@ jest.mock('../../../settings/Settings.js', () => ({
   getSettings: () => Promise.resolve({}),
   subscribeSettings: () => () => {},
 }));
-jest.mock('#vscode-elements/vscode-option.js', () => ({}));
-jest.mock('#vscode-elements/vscode-toolbar-button.js', () => ({}));
 
 import {
   eventBus,

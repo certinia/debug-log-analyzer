@@ -11,10 +11,11 @@
  */
 import type { ApexLog } from '@apexdevtools/apex-log-parser';
 
+import { buildLogIndex } from '../../log-viewer/src/core/log/LogIndex.js';
 import { MinimapDensityQuery } from '../../log-viewer/src/features/timeline/optimised/minimap/MinimapDensityQuery.js';
 import { RectangleCache } from '../../log-viewer/src/features/timeline/optimised/RectangleCache.js';
 import { BUCKET_CONSTANTS } from '../../log-viewer/src/features/timeline/types/flamechart.types.js';
-import { logEventToTreeAndRects } from '../../log-viewer/src/features/timeline/utils/tree-converter.js';
+import { buildTimelineFrames } from '../../log-viewer/src/features/timeline/utils/timeline-frames.js';
 import { heapMb, line, ms, nowMs, time } from './harness.js';
 
 /** The widths the digest samples: odd and even, and either side of a 1536px panel. */
@@ -43,18 +44,15 @@ interface Subject {
 /** One query per run: the one width it caches makes every other width a miss anyway. */
 function build(log: ApexLog): Subject {
   const categories = new Set<string>(BUCKET_CONSTANTS.CATEGORY_PRIORITY);
-  const precomputed = logEventToTreeAndRects(log.children, categories, log.exitStamp);
-  const cache = new RectangleCache(log.children, categories, precomputed);
+  const frames = buildTimelineFrames(buildLogIndex(log), categories, log.exitStamp);
+  const cache = new RectangleCache(log.children, categories, frames);
+  const rects = [...cache.getRectsByCategory().values()];
 
   return {
-    query: new MinimapDensityQuery(
-      [...cache.getRectsByCategory().values()],
-      precomputed.totalDuration,
-      precomputed.maxDepth,
-    ),
-    // One entry per rect the conversion made, so this is the sweep's own input.
-    frames: precomputed.rectMap.size,
-    maxDepth: precomputed.maxDepth,
+    query: new MinimapDensityQuery(rects, frames.totalDuration, frames.maxDepth),
+    // One entry per rect, so this is the sweep's own input.
+    frames: rects.reduce((sum, each) => sum + each.length, 0),
+    maxDepth: frames.maxDepth,
   };
 }
 

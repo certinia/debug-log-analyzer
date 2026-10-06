@@ -22,11 +22,11 @@
 import type * as PIXI from 'pixi.js';
 import type {
   EventNode,
+  TimelineFrames,
   TimelineMarker,
   TreeNode,
   ViewportState,
 } from '../../types/flamechart.types.js';
-import type { NavigationMaps } from '../../utils/tree-converter.js';
 import type { FrameNavDirection } from '../interaction/KeyboardHandler.js';
 import { markerDuration } from '../markers/MarkerProcessor.js';
 import { SelectionHighlightRenderer } from '../selection/SelectionHighlightRenderer.js';
@@ -183,8 +183,7 @@ export class SelectionOrchestrator<E extends EventNode = EventNode> {
    *
    * @param worldContainer - PixiJS container for renderer
    * @param viewport - Main timeline viewport (for coordinate calculations)
-   * @param treeNodes - Pre-converted TreeNode structure for navigation
-   * @param maps - Pre-built navigation maps from tree conversion
+   * @param frames - The timeline's frames, for navigation
    * @param markers - Timeline markers for marker selection
    * @param totalDuration - Total timeline duration in nanoseconds
    * @param maxDepth - Maximum depth in the timeline
@@ -193,8 +192,7 @@ export class SelectionOrchestrator<E extends EventNode = EventNode> {
   public init(
     worldContainer: PIXI.Container,
     viewport: TimelineViewport,
-    treeNodes: TreeNode<E>[],
-    maps: NavigationMaps,
+    frames: TimelineFrames<E>,
     markers: TimelineMarker[],
     totalDuration: number,
     maxDepth: number,
@@ -207,7 +205,7 @@ export class SelectionOrchestrator<E extends EventNode = EventNode> {
     this.mainTimelineYOffset = mainTimelineYOffset;
 
     // Initialize selection manager
-    this.selectionNavigator = new SelectionNavigator<E>(treeNodes, maps);
+    this.selectionNavigator = new SelectionNavigator<E>(frames);
     this.selectionNavigator.setMarkers(markers);
 
     // Initialize selection highlight renderer

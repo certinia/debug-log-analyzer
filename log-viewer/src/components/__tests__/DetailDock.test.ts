@@ -6,9 +6,6 @@
 import { beforeAll, describe, expect, it } from '@jest/globals';
 import { html } from 'lit';
 
-jest.mock('#vscode-elements/vscode-icon.js', () => ({}));
-jest.mock('#vscode-elements/vscode-badge.js', () => ({}));
-
 import type { DetailDock } from '../DetailDock.js';
 import '../DetailDock.js';
 import type { PaneSection } from '../PaneView.js';

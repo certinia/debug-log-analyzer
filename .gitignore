@@ -13,3 +13,4 @@ coverage/
 scripts/measure/out/
 /lana/test-results
 /lana/playwright-report
+.pnpm-store/

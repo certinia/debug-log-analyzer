@@ -1,56 +1,10 @@
-/**
+/*
  * Copyright (c) 2026 Certinia Inc. All rights reserved.
  */
 import { describe, expect, it } from '@jest/globals';
-import type { LogEvent } from '@apexdevtools/apex-log-parser';
-import { governorLimits, limitValue } from '../../../../components/__tests__/limitsTestUtils.js';
+import { createEvent } from '#test-helpers/events.js';
+import { governorLimits, limitValue } from '#test-helpers/limits.js';
 import { eventLabel, eventName, formatCallStack, formatEventDetails } from '../eventText.js';
-
-type EventOptions = {
-  text: string;
-  type?: string;
-  self?: number;
-  total?: number;
-  exitStamp?: number | null;
-  suffix?: string | null;
-  parent?: LogEvent | null;
-  soqlTotal?: number;
-  soqlSelf?: number;
-  soqlRowTotal?: number;
-  soqlRowSelf?: number;
-  dmlTotal?: number;
-  dmlSelf?: number;
-  soslRowTotal?: number;
-  soslRowSelf?: number;
-};
-
-let nextTimestamp = 1;
-
-function createEvent(options: EventOptions): LogEvent {
-  const event = {
-    parent: options.parent ?? null,
-    children: [],
-    type: (options.type ?? 'METHOD_ENTRY') as LogEvent['type'],
-    text: options.text,
-    suffix: options.suffix ?? null,
-    namespace: 'default',
-    timestamp: nextTimestamp++,
-    exitStamp: options.exitStamp === undefined ? 1000 : options.exitStamp,
-    cpuType: '',
-    duration: { self: options.self ?? 0, total: options.total ?? 0 },
-    dmlRowCount: { self: 0, total: 0 },
-    soqlRowCount: { self: options.soqlRowSelf ?? 0, total: options.soqlRowTotal ?? 0 },
-    soslRowCount: { self: options.soslRowSelf ?? 0, total: options.soslRowTotal ?? 0 },
-    dmlCount: { self: options.dmlSelf ?? 0, total: options.dmlTotal ?? 0 },
-    soqlCount: { self: options.soqlSelf ?? 0, total: options.soqlTotal ?? 0 },
-    soslCount: { self: 0, total: 0 },
-  } as unknown as LogEvent;
-
-  if (options.parent) {
-    options.parent.children.push(event);
-  }
-  return event;
-}
 
 const limits = governorLimits({
   soqlQueries: limitValue(1, 100),
@@ -110,6 +64,8 @@ describe('formatEventDetails', () => {
       text: 'MyClass.run()',
       total: 5_000_000,
       self: 2_000_000,
+      // The duration is only reported for a frame that exited.
+      exitStamp: 1000,
     });
     expect(formatEventDetails(event)).toBe(
       ['Name: MyClass.run()', 'Type: METHOD_ENTRY', 'Duration: 5 ms (self 2 ms)'].join('\n'),
@@ -126,6 +82,7 @@ describe('formatEventDetails', () => {
       text: 'SELECT Id FROM Account',
       type: 'SOQL_EXECUTE_BEGIN',
       total: 1_000_000,
+      exitStamp: 1000,
       soqlTotal: 1,
       soqlSelf: 1,
       soqlRowTotal: 300,

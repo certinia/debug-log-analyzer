@@ -25,3 +25,27 @@ if (!('ResizeObserver' in globalThis)) {
 if (!('TextEncoder' in globalThis)) {
   (globalThis as unknown as Record<string, unknown>).TextEncoder = TextEncoder;
 }
+
+/**
+ * jsdom paces frames at 60 Hz, so every awaited frame costs 16 ms of real time. This keeps its
+ * semantics without the wait: one task runs every callback queued for the frame, so a test's
+ * frame and a component's frame still resolve together.
+ */
+if ('requestAnimationFrame' in globalThis) {
+  const queued = new Map<number, FrameRequestCallback>();
+  let lastHandle = 0;
+  const runFrame = (): void => {
+    const callbacks = [...queued.values()];
+    queued.clear();
+    const now = performance.now();
+    callbacks.forEach((callback) => callback(now));
+  };
+  globalThis.requestAnimationFrame = (callback: FrameRequestCallback): number => {
+    queued.set(++lastHandle, callback);
+    setTimeout(runFrame, 0);
+    return lastHandle;
+  };
+  globalThis.cancelAnimationFrame = (handle: number): void => {
+    queued.delete(handle);
+  };
+}

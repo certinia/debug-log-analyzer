@@ -5,10 +5,6 @@
  */
 import { describe, expect, it } from '@jest/globals';
 
-// vscode-button needs ElementInternals.setFormValue (absent in jsdom); skip its
-// registration so `<vscode-button>` stays a plain element we can assert on.
-jest.mock('#vscode-elements/vscode-button.js', () => ({}));
-
 import type { ViewModeSwitch } from '../ViewModeSwitch.js';
 import '../ViewModeSwitch.js';
 

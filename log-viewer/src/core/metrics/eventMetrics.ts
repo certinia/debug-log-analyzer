@@ -1,10 +1,10 @@
 /*
  * Copyright (c) 2026 Certinia Inc. All rights reserved.
  */
-import type { LogEvent } from '@apexdevtools/apex-log-parser';
-import type { GovernorLimits, SelfTotal } from '@apexdevtools/apex-log-parser/types';
+import type { LogEvent, GovernorLimits, Limits, SelfTotal } from '@apexdevtools/apex-log-parser';
 
 import { formatInteger, sharePercent } from '../utility/Util.js';
+import { GOVERNOR_METRIC } from './governorMetrics.js';
 
 /**
  * The statement a database metric belongs to — which grid a selection came from, and
@@ -28,6 +28,10 @@ export interface EventMetric {
   noSelf?: boolean;
 }
 
+function governed(key: keyof Limits, pick: EventMetric['pick']): EventMetric {
+  return { label: GOVERNOR_METRIC[key].label, pick, limit: (l) => l.final[key].limit };
+}
+
 /**
  * Every governor-tracked metric a frame reports, most important first. The `limit`
  * is the row's denominator, so a metric is shown once — never as both a count and a
@@ -38,11 +42,11 @@ export interface EventMetric {
  * order — so a row never overtakes another as a selection or a hover moves.
  */
 export const EVENT_METRICS: readonly EventMetric[] = [
-  { label: 'SOQL', pick: (e) => e.soqlCount, limit: (l) => l.final.soqlQueries.limit },
-  { label: 'SOQL Rows', pick: (e) => e.soqlRowCount, limit: (l) => l.final.queryRows.limit },
-  { label: 'DML', pick: (e) => e.dmlCount, limit: (l) => l.final.dmlStatements.limit },
-  { label: 'DML Rows', pick: (e) => e.dmlRowCount, limit: (l) => l.final.dmlRows.limit },
-  { label: 'SOSL', pick: (e) => e.soslCount, limit: (l) => l.final.soslQueries.limit },
+  governed('soqlQueries', (e) => e.soqlCount),
+  governed('queryRows', (e) => e.soqlRowCount),
+  governed('dmlStatements', (e) => e.dmlCount),
+  governed('dmlRows', (e) => e.dmlRowCount),
+  governed('soslQueries', (e) => e.soslCount),
   {
     label: 'SOSL Rows',
     pick: (e) => e.soslRowCount,
@@ -51,8 +55,8 @@ export const EVENT_METRICS: readonly EventMetric[] = [
     limit: (_limits, type) => (type === 'sosl' ? SOSL_ROWS_PER_QUERY_LIMIT : 0),
   },
   { label: 'Throws', pick: (e) => e.thrownCount, limit: () => 0, noSelf: true },
-  { label: 'Heap net', pick: (e) => e.heapAllocated, limit: () => 0, bytes: true },
-  { label: 'Heap alloc', pick: (e) => e.heapGross, limit: () => 0, bytes: true },
+  { label: 'Heap Net', pick: (e) => e.heapAllocated, limit: () => 0, bytes: true },
+  { label: 'Heap Alloc', pick: (e) => e.heapGross, limit: () => 0, bytes: true },
 ];
 
 /**
@@ -60,7 +64,7 @@ export const EVENT_METRICS: readonly EventMetric[] = [
  * is not a {@link SelfTotal} and sits outside {@link EVENT_METRICS}, read last.
  */
 export const HEAP_PEAK = {
-  label: 'Heap peak',
+  label: 'Heap Peak',
   pick: (event: LogEvent): number => event.heapPeak,
   limit: (limits: GovernorLimits): number => limits.peak.heapSize.limit,
   bytes: true,

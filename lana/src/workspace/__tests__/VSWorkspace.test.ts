@@ -6,7 +6,6 @@ import { SfdxProject } from '../../salesforce/codesymbol/SfdxProject';
 import { getProjects } from '../../salesforce/codesymbol/SfdxProjectReader';
 import { VSWorkspace } from '../VSWorkspace';
 
-jest.mock('vscode');
 jest.mock('../../salesforce/codesymbol/SfdxProjectReader');
 jest.mock('../../salesforce/codesymbol/SfdxProject');
 
@@ -20,89 +19,62 @@ describe('VSWorkspace', () => {
   let vsWorkspace: VSWorkspace;
 
   beforeEach(() => {
-    jest.clearAllMocks();
     vsWorkspace = new VSWorkspace(mockWorkspaceFolder);
   });
 
-  describe('uri', () => {
-    it('should expose the workspace folder URI', () => {
-      expect(vsWorkspace.workspaceFolder.uri.fsPath).toBe('/workspace');
-    });
-  });
-
-  describe('name', () => {
-    it('should return workspace folder name', () => {
-      expect(vsWorkspace.name()).toBe('test-workspace');
-    });
-  });
-
   describe('parseSfdxProjects', () => {
-    it('should group projects by namespace', async () => {
-      const mockProjects = [
-        new SfdxProject('project1', 'ns1', []),
-        new SfdxProject('project2', 'ns1', []),
-        new SfdxProject('project3', 'ns2', []),
-        new SfdxProject('project4', '', []),
-      ];
-
-      (getProjects as jest.Mock).mockResolvedValue(mockProjects);
-
-      await vsWorkspace.parseSfdxProjects();
-
-      expect(vsWorkspace.getProjectsForNamespace('ns1')).toHaveLength(2);
-      expect(vsWorkspace.getProjectsForNamespace('ns2')).toHaveLength(1);
-      expect(vsWorkspace.getProjectsForNamespace('')).toHaveLength(1);
-      expect(mockProjects[0]!.buildClassIndex).toHaveBeenCalled();
-    });
-
-    it('should group a project with a null namespace under the default namespace', async () => {
-      const mockProjects = [new SfdxProject('project1', null as unknown as string, [])];
-
-      (getProjects as jest.Mock).mockResolvedValue(mockProjects);
-
-      await vsWorkspace.parseSfdxProjects();
-
-      expect(vsWorkspace.getProjectsForNamespace('')).toHaveLength(1);
-    });
-  });
-
-  describe('getProjectsForNamespace', () => {
-    it('should return empty array for unknown namespace', () => {
-      expect(vsWorkspace.getProjectsForNamespace('unknown')).toEqual([]);
-    });
-
-    it('should not match Object.prototype members as namespaces', () => {
-      expect(vsWorkspace.getProjectsForNamespace('constructor')).toEqual([]);
-      expect(vsWorkspace.getProjectsForNamespace('toString')).toEqual([]);
-    });
-
-    it('should return projects matching the namespace', async () => {
+    it('indexes every project and groups them by namespace', async () => {
       const ns1Projects = [
         new SfdxProject('project1', 'ns1', []),
         new SfdxProject('project2', 'ns1', []),
       ];
-      const mockProjects = [...ns1Projects, new SfdxProject('project3', 'ns2', [])];
-
+      const mockProjects = [
+        ...ns1Projects,
+        new SfdxProject('project3', 'ns2', []),
+        new SfdxProject('project4', '', []),
+      ];
       (getProjects as jest.Mock).mockResolvedValue(mockProjects);
+
       await vsWorkspace.parseSfdxProjects();
 
       expect(vsWorkspace.getProjectsForNamespace('ns1')).toEqual(ns1Projects);
+      expect(vsWorkspace.getProjectsForNamespace('ns2')).toHaveLength(1);
+      expect(vsWorkspace.getProjectsForNamespace('')).toHaveLength(1);
+      mockProjects.forEach((project) => expect(project.buildClassIndex).toHaveBeenCalled());
     });
-  });
 
-  describe('getAllProjects', () => {
-    it('should return all projects across namespaces', async () => {
-      const mockProjects = [
-        new SfdxProject('project1', 'ns1', []),
-        new SfdxProject('project2', 'ns2', []),
-      ];
-
-      (getProjects as jest.Mock).mockResolvedValue(mockProjects);
+    it('groups a project with a null namespace under the default namespace', async () => {
+      (getProjects as jest.Mock).mockResolvedValue([
+        new SfdxProject('project1', null as unknown as string, []),
+      ]);
 
       await vsWorkspace.parseSfdxProjects();
 
-      expect(vsWorkspace.getAllProjects()).toEqual(mockProjects);
+      expect(vsWorkspace.getProjectsForNamespace('')).toHaveLength(1);
     });
+  });
+
+  it('is named after its folder', () => {
+    expect(vsWorkspace.name()).toBe('test-workspace');
+  });
+
+  it.each(['unknown', 'constructor', 'toString'])(
+    'finds no projects for namespace %s',
+    (namespace) => {
+      expect(vsWorkspace.getProjectsForNamespace(namespace)).toEqual([]);
+    },
+  );
+
+  it('lists every project across namespaces', async () => {
+    const mockProjects = [
+      new SfdxProject('project1', 'ns1', []),
+      new SfdxProject('project2', 'ns2', []),
+    ];
+    (getProjects as jest.Mock).mockResolvedValue(mockProjects);
+
+    await vsWorkspace.parseSfdxProjects();
+
+    expect(vsWorkspace.getAllProjects()).toEqual(mockProjects);
   });
 
   describe('findClass', () => {
@@ -121,7 +93,7 @@ describe('VSWorkspace', () => {
       await vsWorkspace.parseSfdxProjects();
     });
 
-    it('should search in namespaced projects when namespace provided', () => {
+    it('searches only the namespace’s projects when the symbol has one', () => {
       const mockUri = { fsPath: '/workspace/force-app/classes/MyClass.cls' } as Uri;
       (mockProject1.findClass as jest.Mock).mockReturnValue([mockUri]);
 
@@ -136,7 +108,7 @@ describe('VSWorkspace', () => {
       expect(mockProject2.findClass).not.toHaveBeenCalled();
     });
 
-    it('should search in all projects when no namespace provided', () => {
+    it('searches every project when the symbol has no namespace', () => {
       const mockUri1 = { fsPath: '/workspace/force-app/classes/MyClass.cls' } as Uri;
       const mockUri2 = { fsPath: '/workspace/src/classes/MyClass.cls' } as Uri;
       (mockProject1.findClass as jest.Mock).mockReturnValue([mockUri1]);

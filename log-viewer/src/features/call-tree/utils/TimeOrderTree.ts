@@ -1,12 +1,11 @@
 /*
  * Copyright (c) 2026 Certinia Inc. All rights reserved.
  */
-import type { LogEvent } from '@apexdevtools/apex-log-parser';
-import type { GovernorLimits, SelfTotal } from '@apexdevtools/apex-log-parser/types';
+import type { LogEvent, GovernorLimits, SelfTotal } from '@apexdevtools/apex-log-parser';
 
 import { getCallerNamespace } from '../../../core/utility/CallerNamespace.js';
 import { EXCLUDED_DETAIL_TYPES } from './DetailsFilter.js';
-import { setGovernorCost } from './GovernorCost.js';
+import { costLimitsOf, setGovernorCost } from './GovernorCost.js';
 
 /**
  * One row per LogEvent for the time-order view; no merging at any level.
@@ -60,6 +59,7 @@ export function toTimeOrderTree(
   if (!len) {
     return undefined;
   }
+  const costLimits = governorLimits && costLimitsOf(governorLimits);
 
   function buildRow(event: LogEvent): TimeOrderRow {
     const id = event.eventIndex;
@@ -106,8 +106,8 @@ export function toTimeOrderTree(
       governorCostMax: 0,
       _hasDetailsDeep: selfIsDetail || childHasDetailsDeep,
     };
-    if (governorLimits) {
-      setGovernorCost(row, governorLimits);
+    if (costLimits) {
+      setGovernorCost(row, costLimits);
     }
     return row;
   }

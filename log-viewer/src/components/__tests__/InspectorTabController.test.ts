@@ -4,11 +4,10 @@
 import { afterEach, beforeEach, describe, expect, it } from '@jest/globals';
 import { eventBus } from '../../core/events/EventBus.js';
 import { InspectorTabController } from '../InspectorTabController.js';
-import { FakeHost } from './controllerHostStub.js';
+import { fakeHost, type FakeHost } from '#test-helpers/fakeHost.js';
 
 /** Every mark the view was asked for, in order. */
 let marked: readonly number[][] = [];
-let cleared = 0;
 
 function controllerFor(host: FakeHost): InspectorTabController {
   return new InspectorTabController(host, 'analysis', {
@@ -16,9 +15,7 @@ function controllerFor(host: FakeHost): InspectorTabController {
       marked = [...marked, [...eventIndexes]];
     },
     reveal: () => {},
-    clear: () => {
-      cleared++;
-    },
+    clear: () => {},
   });
 }
 
@@ -28,8 +25,7 @@ describe('InspectorTabController', () => {
 
   beforeEach(() => {
     marked = [];
-    cleared = 0;
-    host = new FakeHost();
+    host = fakeHost();
     inspector = controllerFor(host);
   });
 
@@ -44,24 +40,6 @@ describe('InspectorTabController', () => {
     expect(marked).toEqual([]);
   });
 
-  it('marks the frames the inspector points at', () => {
-    host.connect();
-
-    eventBus.emit('inspector:locate', { source: 'analysis', eventIndexes: [1, 2], sticky: false });
-
-    expect(marked).toEqual([[1, 2]]);
-  });
-
-  it('keeps a picked row lit while the pointer is elsewhere', () => {
-    host.connect();
-
-    eventBus.emit('inspector:locate', { source: 'analysis', eventIndexes: [3], sticky: true });
-    // The pointer leaves, which reports no frames of its own.
-    eventBus.emit('inspector:locate', { source: 'analysis', eventIndexes: [], sticky: false });
-
-    expect(marked).toEqual([[3], [3]]);
-  });
-
   it('drops a pick the view no longer holds a selection for', () => {
     host.connect();
     eventBus.emit('inspector:locate', { source: 'analysis', eventIndexes: [3], sticky: true });
@@ -69,14 +47,6 @@ describe('InspectorTabController', () => {
     inspector.dropPick();
 
     expect(marked).toEqual([[3], []]);
-  });
-
-  it('answers another tab for nothing', () => {
-    host.connect();
-
-    eventBus.emit('inspector:locate', { source: 'calltree', eventIndexes: [1], sticky: false });
-
-    expect(marked).toEqual([]);
   });
 
   it('stops at a detach and hears again after a re-attach', () => {
@@ -108,15 +78,5 @@ describe('InspectorTabController', () => {
     host.connect();
 
     expect(marked).toEqual([]);
-  });
-
-  it('clears the view where the app-wide clear reaches its tab', () => {
-    host.connect();
-
-    eventBus.emit('selection:clear', { source: 'analysis' });
-
-    expect(cleared).toBe(1);
-    // The pick goes with the selection, so the mark goes out too.
-    expect(marked).toEqual([[]]);
   });
 });

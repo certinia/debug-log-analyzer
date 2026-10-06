@@ -5,9 +5,6 @@
  */
 import { beforeEach, describe, expect, it } from '@jest/globals';
 
-// The swc transform can't parse `.scss`/`.css`; stub the stylesheet assets.
-jest.mock('../../tabulator/style/DataGrid.scss', () => ({ default: '' }));
-jest.mock('../../tabulator/format/Progress.css', () => ({}));
 // The tabulator ESM build (+ its module registrations) doesn't load under jest;
 // this stub records what the component does to a table instead.
 jest.mock('tabulator-tables', () => {
@@ -28,8 +25,6 @@ jest.mock('tabulator-tables', () => {
   }
   return { Tabulator, Module: class {}, Renderer: class {} };
 });
-// vscode-button needs ElementInternals.setFormValue (absent in jsdom).
-jest.mock('#vscode-elements/vscode-button.js', () => ({}));
 
 // The walk is what this suite is about, so it's stubbed; each test says whether
 // it yields a tree or nothing, and when.

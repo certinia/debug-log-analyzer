@@ -8,8 +8,6 @@ import { beforeEach, describe, expect, it } from '@jest/globals';
 import type { LogStore } from '../../core/log/LogStore.js';
 import type { ExecutionHighlights } from '../../features/call-tree/utils/ExecutionHighlights.js';
 
-jest.mock('#vscode-elements/vscode-icon.js', () => ({}));
-
 let highlights: ExecutionHighlights | null = null;
 jest.mock('../../features/call-tree/utils/ExecutionHighlights.js', () => ({
   getExecutionHighlights: () => highlights,

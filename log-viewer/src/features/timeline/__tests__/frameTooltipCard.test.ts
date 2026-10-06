@@ -163,7 +163,7 @@ describe('frameCard', () => {
    * mismatch that keeps the log's span off the timing row.
    */
   it('states a byte reading alone, with no log figure beside it', () => {
-    const heap = row(card({ heapAllocated: { total: 1_000, self: 500 } }), 'Heap net');
+    const heap = row(card({ heapAllocated: { total: 1_000, self: 500 } }), 'Heap Net');
 
     expect(heap?.value).toBe('1 KB');
     expect(heap?.self).toBe('500 bytes');
@@ -172,7 +172,7 @@ describe('frameCard', () => {
   });
 
   it('reads the heap peak alone: a max is no share of a total', () => {
-    const peak = row(card({ heapPeak: 3_000_000 }), 'Heap peak');
+    const peak = row(card({ heapPeak: 3_000_000 }), 'Heap Peak');
 
     expect(peak?.value).toBe('3 MB');
     expect(peak?.share).toBeNull();
@@ -180,7 +180,7 @@ describe('frameCard', () => {
 
   // A share of a signed net says nothing, so the log's figure is left off.
   it('states a negative net heap alone', () => {
-    const heap = row(card({ heapAllocated: { total: -500, self: -500 } }), 'Heap net');
+    const heap = row(card({ heapAllocated: { total: -500, self: -500 } }), 'Heap Net');
 
     expect(heap?.value).toBe('-500 bytes');
     expect(heap?.share).toBeNull();

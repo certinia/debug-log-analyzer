@@ -14,11 +14,8 @@ import {
 } from 'tabulator-tables';
 
 import type { ApexLog, SOQLExecuteBeginLine } from '@apexdevtools/apex-log-parser';
-import { vscodeMessenger } from '../../../core/messaging/VSCodeExtensionMessenger.js';
 import { isVisible } from '../../../core/utility/Util.js';
 import { getCallerNamespace } from '../../../core/utility/CallerNamespace.js';
-import { DomListenerController } from '../../../core/events/DomListenerController.js';
-import type { FindEventDetail, FindEventMap } from '../../find/findEvents.js';
 import { goToRow } from '../../call-tree/navigation.js';
 import { deriveSoqlObject } from '../services/sobjectClassification.js';
 import { soqlGroupHeader } from '../../soql/format/groupHeader.js';
@@ -30,6 +27,9 @@ import { reportGridLocate, stampGridEventIndex } from './gridLocate.js';
 import { reportGridSelection } from './gridSelection.js';
 import { selectRowByEventIndex } from './revealRow.js';
 import { ColumnSettingsController } from '../../../components/ColumnSettingsController.js';
+import { GridColumnMenuController } from '../../../components/GridColumnMenuController.js';
+import { columnViewSelect, gridToolbarActions } from '../../../components/gridToolbar.js';
+import { GridFindController } from '../../../components/GridFindController.js';
 import { SOQL_VIEWS } from '../../../tabulator/ColumnViews.js';
 import {
   DB_ROW_COUNT_WIDTH,
@@ -47,6 +47,7 @@ import dataGridStyles from '../../../tabulator/style/DataGrid.scss';
 import {
   clipboardCopyOptions,
   commonColumnDefaults,
+  downloadOptions,
   groupingOptions,
   headerSortElement,
   registerTableModules,
@@ -95,9 +96,6 @@ export class SOQLView extends LitElement {
   @property({ attribute: false })
   lines: SOQLExecuteBeginLine[] = [];
 
-  @state()
-  oldIndex: number = 0;
-
   soqlTable: Tabulator | null = null;
   holder: HTMLElement | null = null;
   table: HTMLElement | null = null;
@@ -109,7 +107,11 @@ export class SOQLView extends LitElement {
     alwaysVisible: ALWAYS_VISIBLE,
     tables: () => (this.soqlTable ? [this.soqlTable] : []),
   });
-  private contextMenu: ContextMenu | null = null;
+  private readonly _menus = new GridColumnMenuController({
+    table: () => this.soqlTable,
+    menu: () => this._contextMenu,
+    columns: this._columns,
+  });
   /** eventIndex of the row whose context menu is open. */
   private contextMenuEventIndex: number | null = null;
   /** Marks the rows for the statements under the inspector's pointer. */
@@ -124,26 +126,20 @@ export class SOQLView extends LitElement {
   private rowCountRange: FilterRange = { start: null, end: null };
   private timeTakenRange: FilterRange = { start: null, end: null };
 
-  findArgs: { text: string; count: number; options: { matchCase: boolean } } = {
-    text: '',
-    count: 0,
-    options: { matchCase: false },
-  };
-  findMap: { [key: number]: RowComponent } = {};
-  totalMatches = 0;
-  blockClearHighlights = true;
+  private readonly _finder = new GridFindController(this, {
+    table: () => this.soqlTable,
+    report: (totalMatches) =>
+      document.dispatchEvent(
+        new CustomEvent('db-find-results', { detail: { totalMatches, type: 'soql' } }),
+      ),
+  });
 
   get _soqlTableWrapper(): HTMLDivElement | null {
     return this.renderRoot?.querySelector('#db-soql-table');
   }
 
-  private readonly _findBus = new DomListenerController<FindEventMap>(this, document, {
-    'lv-find': (e) => void this._find(e),
-    'lv-find-close': (e) => void this._find(e),
-  });
-
-  firstUpdated(): void {
-    this.contextMenu = this.renderRoot.querySelector('context-menu');
+  private get _contextMenu(): ContextMenu | null {
+    return this.renderRoot.querySelector('context-menu');
   }
 
   updated(changedProperties: PropertyValues): void {
@@ -155,7 +151,7 @@ export class SOQLView extends LitElement {
     }
 
     if (changedProperties.has('highlightIndex')) {
-      void this._highlightMatches(this.highlightIndex);
+      void this._finder.highlight(this.highlightIndex);
     }
   }
 
@@ -209,24 +205,12 @@ export class SOQLView extends LitElement {
           ></datagrid-range-filter>
         </overflow-list>
 
-        <vs-select
-          dense
-          slot="table-actions"
-          id="soql-column-view"
-          prefix="Columns"
-          label="Column view"
-          @change="${this._handleColumnViewChange}"
-          @vs-reset-option="${this._onResetOption}"
-          .value="${this._columns.view}"
-          .resettableValues="${this._columns.editedViews}"
-        >
-          ${SOQL_VIEWS.map(
-            (view) =>
-              html`<vscode-option value="${view.id}" ?selected="${this._columns.view === view.id}"
-                >${view.id}</vscode-option
-              >`,
-          )}
-        </vs-select>
+        ${columnViewSelect({
+          id: 'soql-column-view',
+          views: SOQL_VIEWS,
+          columns: this._columns,
+          menus: this._menus,
+        })}
 
         <vs-select
           dense
@@ -243,26 +227,11 @@ export class SOQLView extends LitElement {
           <vscode-option>None</vscode-option>
         </vs-select>
 
-        <div slot="actions">
-          <vscode-toolbar-button
-            icon="list-selection"
-            label="Columns"
-            title="Columns"
-            @click=${this._openColumnMenu}
-          ></vscode-toolbar-button>
-          <vscode-toolbar-button
-            icon="desktop-download"
-            label="Export to CSV"
-            title="Export to CSV"
-            @click=${this._exportToCSV}
-          ></vscode-toolbar-button>
-          <vscode-toolbar-button
-            icon="copy"
-            label="Copy to clipboard"
-            title="Copy to clipboard"
-            @click=${this._copyToClipboard}
-          ></vscode-toolbar-button>
-        </div>
+        ${gridToolbarActions({
+          menus: this._menus,
+          exportToCSV: () => this._exportToCSV(),
+          copyToClipboard: () => this._copyToClipboard(),
+        })}
       </datagrid-filter-bar>
 
       <div id="soql-table-container">
@@ -273,50 +242,17 @@ export class SOQLView extends LitElement {
     `;
   }
 
-  private _handleColumnViewChange(event: Event) {
-    this._columns.choose((event.target as HTMLInputElement).value || 'General');
-  }
-
-  /** Applies the active view and wires the header menu once the table is built. */
-  private _initTableColumns(table: Tabulator) {
-    this._columns.applyTo(table);
-    const header = table.element.querySelector<HTMLElement>('.tabulator-header');
-    header?.addEventListener('contextmenu', (event) => {
-      event.preventDefault();
-      this._showColumnMenu(event.clientX, event.clientY);
-    });
-  }
-
-  private _showColumnMenu(x: number, y: number) {
-    if (!this.contextMenu || !this.soqlTable) {
-      return;
-    }
-    this.contextMenu.show(this._columns.menuItems(this.soqlTable), x, y);
-  }
-
-  private _openColumnMenu(event: Event) {
-    const rect = (event.currentTarget as HTMLElement).getBoundingClientRect();
-    this._showColumnMenu(rect.left, rect.bottom);
-  }
-
-  /** Rebuilds the open column menu so checkmarks/reset icons reflect current state. */
-  private _refreshColumnMenu() {
-    if (!this.contextMenu?.isVisible() || !this.soqlTable) {
-      return;
-    }
-    this.contextMenu.items = this._columns.menuItems(this.soqlTable);
-  }
-
   private _showRowContextMenu(event: MouseEvent, row: RowComponent) {
-    this.contextMenuEventIndex = showStatementRowMenu(event, row, this.soqlTable, this.contextMenu);
+    this.contextMenuEventIndex = showStatementRowMenu(
+      event,
+      row,
+      this.soqlTable,
+      this._contextMenu,
+    );
   }
 
   private _handleContextMenuSelect(e: CustomEvent<{ itemId: string }>) {
     const { itemId } = e.detail;
-    const table = this.soqlTable;
-    if (!table) {
-      return;
-    }
     if (itemId === 'show-in-call-tree') {
       const eventIndex = this.contextMenuEventIndex;
       if (eventIndex !== null) {
@@ -324,24 +260,7 @@ export class SOQLView extends LitElement {
       }
       return;
     }
-    if (itemId.startsWith('view:')) {
-      this._columns.choose(itemId.slice('view:'.length));
-      this._refreshColumnMenu();
-      return;
-    }
-    if (itemId.startsWith('col:')) {
-      this._columns.toggle(table, itemId.slice('col:'.length));
-      this._refreshColumnMenu();
-      return;
-    }
-    if (itemId.startsWith('reset:')) {
-      this._columns.reset(itemId.slice('reset:'.length));
-      this._refreshColumnMenu();
-    }
-  }
-
-  private _onResetOption(event: CustomEvent<{ value: string }>) {
-    this._columns.reset(event.detail.value);
+    this._menus.select(itemId);
   }
 
   private _handleObjectFacet(event: CustomEvent<{ selected: string[] }>) {
@@ -428,58 +347,6 @@ export class SOQLView extends LitElement {
     });
   }
 
-  async _highlightMatches(highlightIndex: number) {
-    if (!this.soqlTable?.element?.clientHeight) {
-      return;
-    }
-
-    this.findArgs.count = highlightIndex;
-    const currentRow = this.findMap[highlightIndex];
-    this.blockClearHighlights = true;
-    //@ts-expect-error This is a custom function added in by Find custom module
-    await this.soqlTable.setCurrentMatch(highlightIndex, currentRow, {
-      scrollIfVisible: false,
-      focusRow: false,
-    });
-    this.blockClearHighlights = false;
-
-    this.oldIndex = highlightIndex;
-  }
-
-  async _find(e: CustomEvent<FindEventDetail>) {
-    const isTableVisible = !!this.soqlTable?.element?.clientHeight;
-    if (!isTableVisible && !this.totalMatches) {
-      return;
-    }
-
-    const newFindArgs = JSON.parse(JSON.stringify(e.detail));
-    const newSearch =
-      newFindArgs.text !== this.findArgs.text ||
-      newFindArgs.options.matchCase !== this.findArgs.options?.matchCase;
-    this.findArgs = newFindArgs;
-
-    const clearHighlights = e.type === 'lv-find-close';
-    if (clearHighlights) {
-      newFindArgs.text = '';
-    }
-    if (newSearch || clearHighlights) {
-      this.blockClearHighlights = true;
-      //@ts-expect-error This is a custom function added in by Find custom module
-      const result = await this.soqlTable.find(this.findArgs);
-      this.blockClearHighlights = false;
-      this.totalMatches = result.totalMatches;
-      this.findMap = result.matchIndexes;
-
-      if (!clearHighlights) {
-        document.dispatchEvent(
-          new CustomEvent('db-find-results', {
-            detail: { totalMatches: result.totalMatches, type: 'soql' },
-          }),
-        );
-      }
-    }
-  }
-
   _renderSOQLTable(soqlTableContainer: HTMLElement, soqlLines: SOQLExecuteBeginLine[]) {
     let nextRowId = 0;
 
@@ -528,15 +395,7 @@ export class SOQLView extends LitElement {
       placeholder: 'No SOQL queries found',
       columnCalcs: 'table',
       ...clipboardCopyOptions,
-      downloadEncoder: this.downlodEncoder('soql.csv'),
-      downloadRowRange: 'all',
-      downloadConfig: {
-        columnHeaders: true,
-        columnGroups: true,
-        rowGroups: true,
-        columnCalcs: false,
-        dataTree: true,
-      },
+      ...downloadOptions('soql.csv'),
       ...groupingOptions,
       groupHeader: soqlGroupHeader,
       groupToggleElement: false,
@@ -787,7 +646,7 @@ export class SOQLView extends LitElement {
       //@ts-expect-error This is a custom function added in the GroupSort custom module
       this.soqlTable?.setSortedGroupBy('soql');
       if (this.soqlTable) {
-        this._initTableColumns(this.soqlTable);
+        this._menus.initTable(this.soqlTable);
         this.soqlTable.addFilter(this._objectFilter);
         this.soqlTable.addFilter(this._namespaceFilter);
         this.soqlTable.addFilter(this._rowCountFilter);
@@ -795,26 +654,9 @@ export class SOQLView extends LitElement {
       }
     });
 
-    this.soqlTable.on('dataSorted', () => {
-      if (!this.blockClearHighlights && this.totalMatches > 0) {
-        this._resetFindWidget();
-        this._clearSearchHighlights();
-      }
-    });
-
-    this.soqlTable.on('dataGrouped', () => {
-      if (!this.blockClearHighlights && this.totalMatches > 0) {
-        this._resetFindWidget();
-        this._clearSearchHighlights();
-      }
-    });
-
-    this.soqlTable.on('dataFiltering', () => {
-      if (!this.blockClearHighlights && this.totalMatches > 0) {
-        this._resetFindWidget();
-        this._clearSearchHighlights();
-      }
-    });
+    for (const reshaped of ['dataSorted', 'dataGrouped', 'dataFiltering'] as const) {
+      this.soqlTable.on(reshaped, () => this._finder.dropOnReshape());
+    }
 
     this.soqlTable.on('renderComplete', () => {
       const holder = this._getTableHolder();
@@ -826,29 +668,6 @@ export class SOQLView extends LitElement {
     });
   }
 
-  _resetFindWidget() {
-    document.dispatchEvent(
-      new CustomEvent('db-find-results', {
-        detail: { totalMatches: 0, type: 'soql' },
-      }),
-    );
-  }
-
-  _clearSearchHighlights() {
-    this.findArgs.text = '';
-    this.findArgs.count = 0;
-    //@ts-expect-error This is a custom function added in by Find custom module
-    this.soqlTable.clearFindHighlights();
-    this.findMap = {};
-    this.totalMatches = 0;
-
-    document.dispatchEvent(
-      new CustomEvent('db-find-results', {
-        detail: { totalMatches: this.totalMatches, type: 'soql' },
-      }),
-    );
-  }
-
   _getTable() {
     this.table ??= this.soqlTable?.element.querySelector('.tabulator-table') as HTMLElement;
     return this.table;
@@ -858,31 +677,7 @@ export class SOQLView extends LitElement {
     this.holder ??= tableHolder(this.soqlTable?.element);
     return this.holder;
   }
-
-  downlodEncoder(defaultFileName: string) {
-    return function (fileContents: string, mimeType: string) {
-      const vscode = vscodeMessenger.getVsCodeAPI();
-      if (vscode) {
-        vscodeMessenger.send<VSCodeSaveFile>('saveFile', {
-          fileContent: fileContents,
-          options: {
-            defaultFileName: defaultFileName,
-          },
-        });
-        return false;
-      }
-
-      return new Blob([fileContents], { type: mimeType });
-    };
-  }
 }
-
-type VSCodeSaveFile = {
-  fileContent: string;
-  options: {
-    defaultFileName: string;
-  };
-};
 
 interface GridSOQLData {
   id: number;

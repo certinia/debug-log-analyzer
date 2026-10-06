@@ -3,9 +3,9 @@
  */
 import { beforeEach, describe, expect, it, jest } from '@jest/globals';
 
-import { ApexVisitor } from '../ApexParser/ApexVisitor';
+import { ApexVisitor, type ApexNode } from '../ApexParser/ApexVisitor';
 
-jest.mock('@apexdevtools/apex-parser');
+jest.mock('@apexdevtools/apex-parser', () => ({ ApexParserBaseVisitor: class {} }));
 
 type ClassDeclarationCtx = Parameters<ApexVisitor['visitClassDeclaration']>[0];
 type MethodDeclarationCtx = Parameters<ApexVisitor['visitMethodDeclaration']>[0];
@@ -15,500 +15,206 @@ type ErrorNodeCtx = Parameters<ApexVisitor['visitErrorNode']>[0];
 type VisitCtx = Parameters<ApexVisitor['visit']>[0];
 type RuleNodeCtx = Parameters<ApexVisitor['visitChildren']>[0];
 
-const asClassDeclarationCtx = (ctx: unknown): ClassDeclarationCtx => ctx as ClassDeclarationCtx;
-const asMethodDeclarationCtx = (ctx: unknown): MethodDeclarationCtx => ctx as MethodDeclarationCtx;
-const asConstructorDeclarationCtx = (ctx: unknown): ConstructorDeclarationCtx =>
-  ctx as ConstructorDeclarationCtx;
-const asTerminalCtx = (ctx: unknown): TerminalCtx => ctx as TerminalCtx;
-const asErrorNodeCtx = (ctx: unknown): ErrorNodeCtx => ctx as ErrorNodeCtx;
-const asVisitCtx = (ctx: unknown): VisitCtx => ctx as VisitCtx;
-const asRuleNodeCtx = (ctx: unknown): RuleNodeCtx => ctx as RuleNodeCtx;
+interface DeclarationShape {
+  name?: string | null;
+  column?: number | null;
+  line?: number;
+  params?: string[];
+  children?: unknown[];
+}
+
+function formalParameters(params: string[] | undefined) {
+  return () => ({
+    formalParameterList: () =>
+      params && {
+        formalParameter_list: () =>
+          params.map((type) => ({ typeRef: () => ({ getText: () => type }) })),
+      },
+  });
+}
+
+function classCtx({ name = 'MyClass', column = 0, line = 1, children = [] }: DeclarationShape) {
+  return {
+    id: () => ({ getText: () => name, start: { column } }),
+    children,
+    start: { line },
+  } as unknown as ClassDeclarationCtx;
+}
+
+function methodCtx({
+  name = 'myMethod',
+  column = 0,
+  line = 1,
+  params,
+  children = [],
+}: DeclarationShape) {
+  return {
+    id: () => ({ getText: () => name, start: { column } }),
+    children,
+    formalParameters: formalParameters(params),
+    start: { line },
+  } as unknown as MethodDeclarationCtx;
+}
+
+function constructorCtx(
+  ids: Array<string | null>,
+  { column = 0, line = 1, params, children = [] }: DeclarationShape = {},
+) {
+  return {
+    qualifiedName: () => ({ id_list: () => ids.map((id) => ({ getText: () => id })) }),
+    children,
+    formalParameters: formalParameters(params),
+    start: { line, column },
+  } as unknown as ConstructorDeclarationCtx;
+}
+
+/** A rule whose children visit to `results`, in order. */
+function ruleCtx(...results: unknown[]): RuleNodeCtx {
+  return {
+    getChildCount: () => results.length,
+    getChild: (index: number) => ({ accept: () => results[index] }),
+  } as unknown as RuleNodeCtx;
+}
 
 describe('ApexVisitor', () => {
   let visitor: ApexVisitor;
+  const visited: ApexNode = { nature: 'Method', name: 'foo' };
 
   beforeEach(() => {
     visitor = new ApexVisitor();
   });
 
+  /** Declarations take their children from visitChildren, which has its own tests below. */
+  const stubVisitChildren = () => {
+    visitor.visitChildren = jest
+      .fn<typeof visitor.visitChildren>()
+      .mockReturnValue({ children: [visited] });
+  };
+
   describe('visitClassDeclaration', () => {
-    it('should use empty string when ident.getText() is null', () => {
-      const ctx = {
-        id: () => ({
-          getText: () => null,
-          start: { column: 5 },
-        }),
-        children: [],
-        start: { line: 1 },
-      };
-      visitor.visitChildren = jest
-        .fn<typeof visitor.visitChildren>()
-        .mockReturnValue({ children: [] });
+    it('builds a class node from its id, line and visited children', () => {
+      stubVisitChildren();
+      const node = visitor.visitClassDeclaration(
+        classCtx({ name: 'MyClass', column: 4, line: 5, children: [{}] }),
+      );
 
-      const node = visitor.visitClassDeclaration(asClassDeclarationCtx(ctx));
-
-      expect(node.name).toBe('');
+      expect(node).toEqual({
+        nature: 'Class',
+        name: 'MyClass',
+        line: 5,
+        idCharacter: 4,
+        children: [visited],
+      });
     });
 
-    it('should use 0 when column is null', () => {
-      const ctx = {
-        id: () => ({
-          getText: () => 'MyClass',
-          start: { column: null },
-        }),
-        children: [],
-        start: { line: 1 },
-      };
-      visitor.visitChildren = jest
-        .fn<typeof visitor.visitChildren>()
-        .mockReturnValue({ children: [] });
-
-      const node = visitor.visitClassDeclaration(asClassDeclarationCtx(ctx));
-
-      expect(node.idCharacter).toBe(0);
+    it('falls back to an empty name and column 0', () => {
+      const node = visitor.visitClassDeclaration(classCtx({ name: null, column: null }));
+      expect(node).toMatchObject({ name: '', idCharacter: 0 });
     });
 
-    it('should return class node with name and children', () => {
-      const ctx = {
-        id: () => ({
-          getText: () => 'MyClass',
-          start: { column: 0 },
-        }),
-        children: [{}],
-        getChildCount: () => 1,
-        getChild: jest.fn().mockReturnValue({
-          accept: jest.fn().mockReturnValue({ nature: 'Method', name: 'foo' }),
-        }),
-        start: { line: 5 },
-      };
-      visitor.visitChildren = jest
-        .fn<typeof visitor.visitChildren>()
-        .mockReturnValue({ children: [{ nature: 'Method', name: 'foo' }] });
-
-      const node = visitor.visitClassDeclaration(asClassDeclarationCtx(ctx));
-
-      expect(node.nature).toBe('Class');
-      expect(node.name).toBe('MyClass');
-      expect(node.line).toBe(5);
-      expect(node.children).toEqual([{ nature: 'Method', name: 'foo' }]);
-    });
-
-    it('should handle missing Identifier', () => {
-      const ctx = {
-        id: () => ({
-          getText: () => '',
-          start: { column: 0 },
-        }),
-        children: [],
-        start: { line: 10 },
-      };
-      visitor.visitChildren = jest
-        .fn<typeof visitor.visitChildren>()
-        .mockReturnValue({ children: [] });
-
-      const node = visitor.visitClassDeclaration(asClassDeclarationCtx(ctx));
-
-      expect(node.name).toBe('');
-      expect(node.line).toBe(10);
-    });
-
-    it('should handle missing children', () => {
-      const ctx = {
-        id: () => ({
-          getText: () => 'NoChildren',
-          start: { column: 0 },
-        }),
-        children: undefined,
-        start: { line: 15 },
-      };
-
-      const node = visitor.visitClassDeclaration(asClassDeclarationCtx(ctx));
-
+    it('gives a class with no children an empty list', () => {
+      const node = visitor.visitClassDeclaration(classCtx({ children: undefined }));
       expect(node.children).toEqual([]);
-      expect(node.line).toBe(15);
     });
   });
 
   describe('visitMethodDeclaration', () => {
-    it('should use empty string when ident.getText() is null', () => {
-      const ctx = {
-        id: () => ({
-          getText: () => null,
-          start: { column: 5 },
+    it('builds a method node with its param types joined', () => {
+      stubVisitChildren();
+      const node = visitor.visitMethodDeclaration(
+        methodCtx({
+          name: 'myMethod',
+          column: 2,
+          line: 42,
+          params: ['Integer', 'String'],
+          children: [{}],
         }),
-        children: [],
-        formalParameters: () => ({
-          formalParameterList: () => undefined,
-        }),
-        start: { line: 1 },
-      };
-      visitor.visitChildren = jest
-        .fn<typeof visitor.visitChildren>()
-        .mockReturnValue({ children: [] });
+      );
 
-      const node = visitor.visitMethodDeclaration(asMethodDeclarationCtx(ctx));
-
-      expect(node.name).toBe('');
+      expect(node).toEqual({
+        nature: 'Method',
+        name: 'myMethod',
+        params: 'Integer,String',
+        line: 42,
+        idCharacter: 2,
+        children: [visited],
+      });
     });
 
-    it('should use 0 when column is null', () => {
-      const ctx = {
-        id: () => ({
-          getText: () => 'myMethod',
-          start: { column: null },
-        }),
-        children: [],
-        formalParameters: () => ({
-          formalParameterList: () => undefined,
-        }),
-        start: { line: 1 },
-      };
-      visitor.visitChildren = jest
-        .fn<typeof visitor.visitChildren>()
-        .mockReturnValue({ children: [] });
-
-      const node = visitor.visitMethodDeclaration(asMethodDeclarationCtx(ctx));
-
-      expect(node.idCharacter).toBe(0);
-    });
-
-    it('should return method node with name, params, and line', () => {
-      const ctx = {
-        id: () => ({
-          getText: () => 'myMethod',
-          start: { column: 2 },
-        }),
-        children: [{}],
-        formalParameters: () => ({
-          formalParameterList: () => ({
-            formalParameter_list: () => [
-              { typeRef: () => ({ getText: () => 'Integer' }) },
-              { typeRef: () => ({ getText: () => 'String' }) },
-            ],
-          }),
-        }),
-        start: { line: 42 },
-      };
-      visitor.visitChildren = jest
-        .fn<typeof visitor.visitChildren>()
-        .mockReturnValue({ children: [] });
-
-      const node = visitor.visitMethodDeclaration(asMethodDeclarationCtx(ctx));
-
-      expect(node.nature).toBe('Method');
-      expect(node.name).toBe('myMethod');
-      expect(node.params).toBe('Integer,String');
-      expect(node.line).toBe(42);
-    });
-
-    it('should handle missing Identifier and params', () => {
-      const ctx = {
-        id: () => ({
-          getText: () => '',
-          start: { column: 0 },
-        }),
-        children: [],
-        formalParameters: () => ({
-          formalParameterList: () => undefined,
-        }),
-        start: { line: 1 },
-      };
-      visitor.visitChildren = jest
-        .fn<typeof visitor.visitChildren>()
-        .mockReturnValue({ children: [] });
-
-      const node = visitor.visitMethodDeclaration(asMethodDeclarationCtx(ctx));
-
-      expect(node.name).toBe('');
-      expect(node.params).toBe('');
+    it('falls back to an empty name, column 0 and no params', () => {
+      const node = visitor.visitMethodDeclaration(methodCtx({ name: null, column: null }));
+      expect(node).toMatchObject({ name: '', idCharacter: 0, params: '' });
     });
   });
 
   describe('visitConstructorDeclaration', () => {
-    it('should use empty string when constructorName.getText() is null', () => {
-      const ctx = {
-        qualifiedName: () => ({
-          id_list: () => [{ getText: () => null }],
+    it('names the constructor by the last qualified id', () => {
+      stubVisitChildren();
+      const node = visitor.visitConstructorDeclaration(
+        constructorCtx(['OuterClass', 'MyConstructor'], {
+          column: 5,
+          line: 20,
+          params: ['String', 'Integer'],
+          children: [{}],
         }),
-        children: [],
-        formalParameters: () => ({
-          formalParameterList: () => undefined,
-        }),
-        start: { line: 1, column: 5 },
-      };
-      visitor.visitChildren = jest
-        .fn<typeof visitor.visitChildren>()
-        .mockReturnValue({ children: [] });
+      );
 
-      const node = visitor.visitConstructorDeclaration(asConstructorDeclarationCtx(ctx));
-
-      expect(node.name).toBe('');
+      expect(node).toEqual({
+        nature: 'Constructor',
+        name: 'MyConstructor',
+        params: 'String,Integer',
+        line: 20,
+        idCharacter: 5,
+        children: [visited],
+      });
     });
 
-    it('should use 0 when start.column is null', () => {
-      const ctx = {
-        qualifiedName: () => ({
-          id_list: () => [{ getText: () => 'MyConstructor' }],
-        }),
-        children: [],
-        formalParameters: () => ({
-          formalParameterList: () => undefined,
-        }),
-        start: { line: 1, column: null },
-      };
-      visitor.visitChildren = jest
-        .fn<typeof visitor.visitChildren>()
-        .mockReturnValue({ children: [] });
-
-      const node = visitor.visitConstructorDeclaration(asConstructorDeclarationCtx(ctx));
-
-      expect(node.idCharacter).toBe(0);
-    });
-
-    it('should return constructor node with name, params, and line', () => {
-      const ctx = {
-        qualifiedName: () => ({
-          id_list: () => [{ getText: () => 'OuterClass' }, { getText: () => 'MyConstructor' }],
-        }),
-        children: [{}],
-        formalParameters: () => ({
-          formalParameterList: () => ({
-            formalParameter_list: () => [
-              { typeRef: () => ({ getText: () => 'String' }) },
-              { typeRef: () => ({ getText: () => 'Integer' }) },
-            ],
-          }),
-        }),
-        start: { line: 20, column: 5 },
-      };
-      visitor.visitChildren = jest
-        .fn<typeof visitor.visitChildren>()
-        .mockReturnValue({ children: [] });
-
-      const node = visitor.visitConstructorDeclaration(asConstructorDeclarationCtx(ctx));
-
-      expect(node.nature).toBe('Constructor');
-      expect(node.name).toBe('MyConstructor');
-      expect(node.params).toBe('String,Integer');
-      expect(node.line).toBe(20);
-      expect(node.idCharacter).toBe(5);
-    });
-
-    it('should handle constructor with no params', () => {
-      const ctx = {
-        qualifiedName: () => ({
-          id_list: () => [{ getText: () => 'MyClass' }],
-        }),
-        children: [],
-        formalParameters: () => ({
-          formalParameterList: () => undefined,
-        }),
-        start: { line: 10, column: 2 },
-      };
-      visitor.visitChildren = jest
-        .fn<typeof visitor.visitChildren>()
-        .mockReturnValue({ children: [] });
-
-      const node = visitor.visitConstructorDeclaration(asConstructorDeclarationCtx(ctx));
-
-      expect(node.nature).toBe('Constructor');
-      expect(node.name).toBe('MyClass');
-      expect(node.params).toBe('');
-      expect(node.line).toBe(10);
-    });
-
-    it('should handle nested class constructor', () => {
-      const ctx = {
-        qualifiedName: () => ({
-          id_list: () => [
-            { getText: () => 'OuterClass' },
-            { getText: () => 'InnerClass' },
-            { getText: () => 'InnerClass' },
-          ],
-        }),
-        children: [{}],
-        formalParameters: () => ({
-          formalParameterList: () => ({
-            formalParameter_list: () => [{ typeRef: () => ({ getText: () => 'Boolean' }) }],
-          }),
-        }),
-        start: { line: 35, column: 10 },
-      };
-      visitor.visitChildren = jest
-        .fn<typeof visitor.visitChildren>()
-        .mockReturnValue({ children: [] });
-
-      const node = visitor.visitConstructorDeclaration(asConstructorDeclarationCtx(ctx));
-
-      expect(node.nature).toBe('Constructor');
-      expect(node.name).toBe('InnerClass');
-      expect(node.params).toBe('Boolean');
-      expect(node.line).toBe(35);
+    it('falls back to an empty name, column 0 and no params', () => {
+      const node = visitor.visitConstructorDeclaration(constructorCtx([null], { column: null }));
+      expect(node).toMatchObject({ name: '', idCharacter: 0, params: '' });
     });
   });
 
-  describe('visitTerminal', () => {
-    it('should return empty object', () => {
-      expect(visitor.visitTerminal(asTerminalCtx({}))).toEqual({});
-    });
-  });
-
-  describe('visitErrorNode', () => {
-    it('should return empty object', () => {
-      expect(visitor.visitErrorNode(asErrorNodeCtx({}))).toEqual({});
-    });
+  it('adds no node for a terminal or an error node', () => {
+    expect(visitor.visitTerminal({} as TerminalCtx)).toEqual({});
+    expect(visitor.visitErrorNode({} as ErrorNodeCtx)).toEqual({});
   });
 
   describe('visit', () => {
-    it('should return empty object when ctx is null', () => {
-      expect(visitor.visit(asVisitCtx(null))).toEqual({});
+    it.each([null, undefined])('returns an empty node for %p', (ctx) => {
+      expect(visitor.visit(ctx as unknown as VisitCtx)).toEqual({});
     });
 
-    it('should return empty object when ctx is undefined', () => {
-      expect(visitor.visit(asVisitCtx(undefined))).toEqual({});
-    });
+    it('delegates to the context', () => {
+      const accept = jest.fn().mockReturnValue({ nature: 'Method', name: 'test' });
 
-    it('should call accept on context when ctx exists', () => {
-      const mockAccept = jest.fn().mockReturnValue({ nature: 'Method', name: 'test' });
-      const ctx = { accept: mockAccept };
-
-      const result = visitor.visit(asVisitCtx(ctx));
-
-      expect(mockAccept).toHaveBeenCalledWith(visitor);
-      expect(result).toEqual({ nature: 'Method', name: 'test' });
+      expect(visitor.visit({ accept } as unknown as VisitCtx)).toEqual({
+        nature: 'Method',
+        name: 'test',
+      });
+      expect(accept).toHaveBeenCalledWith(visitor);
     });
   });
 
   describe('visitChildren', () => {
-    it('should skip null nodes returned from visit', () => {
-      const ctx = {
-        getChildCount: () => 2,
-        getChild: jest
-          .fn<(index: number) => { accept: () => unknown }>()
-          .mockImplementation((index: number) => ({
-            accept: jest
-              .fn()
-              .mockReturnValue(index === 0 ? null : { nature: 'Method', name: 'foo' }),
-          })),
-      };
-
-      const result = visitor.visitChildren(asRuleNodeCtx(ctx));
-
-      expect(result.children).toHaveLength(1);
-      expect(result.children![0]).toEqual({ nature: 'Method', name: 'foo' });
+    it.each([null, undefined])('skips a child that visits to %p', (empty) => {
+      expect(visitor.visitChildren(ruleCtx(empty, visited)).children).toEqual([visited]);
     });
 
-    it('should skip undefined nodes returned from visit', () => {
-      const ctx = {
-        getChildCount: () => 2,
-        getChild: jest
-          .fn<(index: number) => { accept: () => unknown }>()
-          .mockImplementation((index: number) => ({
-            accept: jest
-              .fn()
-              .mockReturnValue(index === 0 ? undefined : { nature: 'Method', name: 'bar' }),
-          })),
-      };
+    it('keeps declarations and lifts a wrapper’s children, in order', () => {
+      const myClass: ApexNode = { nature: 'Class', name: 'MyClass' };
+      const nested: ApexNode = { nature: 'Method', name: 'nested' };
 
-      const result = visitor.visitChildren(asRuleNodeCtx(ctx));
+      const { children } = visitor.visitChildren(ruleCtx(myClass, { children: [nested, visited] }));
 
-      expect(result.children).toHaveLength(1);
-      expect(result.children![0]).toEqual({ nature: 'Method', name: 'bar' });
+      expect(children).toEqual([myClass, nested, visited]);
     });
 
-    it('should process multiple valid nodes', () => {
-      const ctx = {
-        getChildCount: () => 3,
-        getChild: jest
-          .fn<(index: number) => { accept: () => unknown }>()
-          .mockImplementation((index: number) => ({
-            accept: jest.fn().mockReturnValue({ nature: 'Method', name: `method${index}` }),
-          })),
-      };
-
-      const result = visitor.visitChildren(asRuleNodeCtx(ctx));
-
-      expect(result.children).toHaveLength(3);
-    });
-
-    it('should flatten children from non-anon nodes (nodes without nature)', () => {
-      // A node without 'nature' should have its children extracted
-      const ctx = {
-        getChildCount: () => 1,
-        getChild: jest.fn().mockReturnValue({
-          accept: jest.fn().mockReturnValue({
-            // No nature property - this is a "non-anon" wrapper node
-            children: [
-              { nature: 'Method', name: 'nested1' },
-              { nature: 'Method', name: 'nested2' },
-            ],
-          }),
-        }),
-      };
-
-      const result = visitor.visitChildren(asRuleNodeCtx(ctx));
-
-      // The children should be flattened
-      expect(result.children).toHaveLength(2);
-      expect(result.children![0]).toEqual({ nature: 'Method', name: 'nested1' });
-      expect(result.children![1]).toEqual({ nature: 'Method', name: 'nested2' });
-    });
-
-    it('should handle non-anon nodes with empty children array', () => {
-      const ctx = {
-        getChildCount: () => 1,
-        getChild: jest.fn().mockReturnValue({
-          accept: jest.fn().mockReturnValue({
-            // No nature, empty children
-            children: [],
-          }),
-        }),
-      };
-
-      const result = visitor.visitChildren(asRuleNodeCtx(ctx));
-
-      expect(result.children).toHaveLength(0);
-    });
-
-    it('should handle non-anon nodes with no children property', () => {
-      const ctx = {
-        getChildCount: () => 1,
-        getChild: jest.fn().mockReturnValue({
-          accept: jest.fn().mockReturnValue({
-            // No nature, no children property
-            name: 'wrapper',
-          }),
-        }),
-      };
-
-      const result = visitor.visitChildren(asRuleNodeCtx(ctx));
-
-      // Node is not anon (no nature) and has no children, so nothing added
-      expect(result.children).toHaveLength(0);
-    });
-
-    it('should handle mix of anon and non-anon nodes', () => {
-      const ctx = {
-        getChildCount: () => 2,
-        getChild: jest
-          .fn<(index: number) => { accept: () => unknown }>()
-          .mockImplementation((index: number) => ({
-            accept: jest.fn().mockReturnValue(
-              index === 0
-                ? { nature: 'Class', name: 'MyClass' } // Anon node (has nature)
-                : {
-                    // Non-anon node (no nature)
-                    children: [{ nature: 'Method', name: 'nested' }],
-                  },
-            ),
-          })),
-      };
-
-      const result = visitor.visitChildren(asRuleNodeCtx(ctx));
-
-      expect(result.children).toHaveLength(2);
-      expect(result.children![0]).toEqual({ nature: 'Class', name: 'MyClass' });
-      expect(result.children![1]).toEqual({ nature: 'Method', name: 'nested' });
+    it.each([
+      ['an empty child list', { children: [] }],
+      ['no child list', { name: 'wrapper' }],
+    ])('adds nothing for a wrapper with %s', (_label, wrapper) => {
+      expect(visitor.visitChildren(ruleCtx(wrapper)).children).toEqual([]);
     });
   });
 });

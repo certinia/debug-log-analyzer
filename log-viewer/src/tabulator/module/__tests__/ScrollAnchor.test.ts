@@ -23,27 +23,48 @@ function makeRow(top: number, height = 20) {
   };
 }
 
-function makeBareTable() {
+/** A table whose holder, visible rows, renderer and display rows a test names. */
+function setup({
+  holder,
+  visible = [],
+  renderer,
+  displayRows = [],
+}: {
+  holder?: object;
+  visible?: unknown[];
+  renderer?: Record<string, unknown>;
+  displayRows?: unknown[];
+} = {}) {
   const handlers: Record<string, ((...args: unknown[]) => void)[]> = {};
-  return {
+  const table = {
     handlers,
     on: jest.fn((evt: string, fn: (...args: unknown[]) => void) => {
       (handlers[evt] ??= []).push(fn);
     }),
-    element: { querySelector: jest.fn() },
-    getRows: jest.fn(() => []),
-    rowManager: { getDisplayRows: () => [] },
+    element: { querySelector: jest.fn(() => holder) },
+    getRows: jest.fn((type?: string) => (type === 'visible' ? visible : [])),
+    rowManager: { renderer, getDisplayRows: () => displayRows },
     scrollToRow: jest.fn(() => Promise.resolve()),
   };
-}
-
-function setup() {
-  const table = makeBareTable();
   const plugin = new ScrollAnchor(table as never);
   (plugin as unknown as { table: typeof table }).table = table;
   (plugin as unknown as { options: () => boolean }).options = () => true;
   plugin.initialize();
-  return { plugin, table };
+  return { plugin, table, handlers };
+}
+
+/** The holder the padding resets read: the table element is its only child. */
+function paddedHolder(scrollTop: number, style: Record<string, string>) {
+  const tableEl = { style };
+  const holder = {
+    scrollTop,
+    querySelector: jest.fn((sel: string) => (sel === '.tabulator-table' ? tableEl : null)),
+  };
+  return { tableEl, holder };
+}
+
+function anchorWithNoParent() {
+  return { _getSelf: () => ({}), getTreeParent: () => false };
 }
 
 describe('ScrollAnchor', () => {
@@ -54,27 +75,12 @@ describe('ScrollAnchor', () => {
     const r2 = makeRow(30, 30);
     const r3 = makeRow(60, 30);
     const holder = { getBoundingClientRect: () => rect(0, 100) };
-
-    const table = {
-      on: jest.fn(),
-      element: { querySelector: jest.fn() },
-      getRows: jest.fn((type?: string) => {
-        if (type === 'visible') {
-          return [r1, r2, r3];
-        }
-        return [];
-      }),
-    };
-
-    const plugin = new ScrollAnchor(table as never);
-    (plugin as unknown as { table: typeof table }).table = table;
+    const { plugin } = setup({ visible: [r1, r2, r3] });
 
     const found = (
       plugin as unknown as { _findMiddleVisibleRow: (h: unknown) => unknown }
     )._findMiddleVisibleRow(holder);
     expect(found).toBe(r2);
-    // r3 should never be reached.
-    void r3;
   });
 
   it('skips the recenter on a single tree toggle (preserves scrollTop)', () => {
@@ -102,27 +108,7 @@ describe('ScrollAnchor', () => {
     const r2 = makeRow(30, 30);
     const r3 = makeRow(60, 30);
     const holder = { getBoundingClientRect: () => rect(0, 100) };
-    const handlers: Record<string, ((...args: unknown[]) => void)[]> = {};
-    const table = {
-      handlers,
-      on: jest.fn((evt: string, fn: (...args: unknown[]) => void) => {
-        (handlers[evt] ??= []).push(fn);
-      }),
-      element: { querySelector: jest.fn(() => holder) },
-      getRows: jest.fn((type?: string) => {
-        if (type === 'visible') {
-          return [r1, r2, r3];
-        }
-        return [];
-      }),
-      rowManager: { getDisplayRows: () => [] },
-      scrollToRow: jest.fn(() => Promise.resolve()),
-    };
-
-    const plugin = new ScrollAnchor(table as never);
-    (plugin as unknown as { table: typeof table }).table = table;
-    (plugin as unknown as { options: () => boolean }).options = () => true;
-    plugin.initialize();
+    const { plugin, table, handlers } = setup({ holder, visible: [r1, r2, r3] });
 
     handlers.renderStarted?.[0]?.();
     expect((plugin as unknown as { anchorRow: unknown }).anchorRow).toBe(r2);
@@ -140,67 +126,35 @@ describe('ScrollAnchor', () => {
     expect((plugin as unknown as { anchorRow: unknown }).anchorRow).toBe(r2);
   });
 
-  it('zeros stale paddingBottom when the last display row is in the rendered window', () => {
-    const tableEl = { style: { paddingBottom: '80px' } };
-    const holder = {
-      scrollTop: 0,
-      querySelector: jest.fn((sel: string) => (sel === '.tabulator-table' ? tableEl : null)),
-    };
-    // 3 rows total; vDomBottom = 2 (== rowsCount - 1) → last row is rendered.
-    const renderer: Record<string, unknown> = { vDomBottom: 2, vDomBottomPad: 80 };
-    const internalRows = [{}, {}, {}];
-    const handlers: Record<string, ((...args: unknown[]) => void)[]> = {};
-    const table = {
-      handlers,
-      on: jest.fn((evt: string, fn: (...args: unknown[]) => void) => {
-        (handlers[evt] ??= []).push(fn);
-      }),
-      element: { querySelector: jest.fn(() => holder) },
-      getRows: jest.fn(() => []),
-      rowManager: { renderer, getDisplayRows: () => internalRows },
-      scrollToRow: jest.fn(() => Promise.resolve()),
-    };
-    const plugin = new ScrollAnchor(table as never);
-    (plugin as unknown as { table: typeof table }).table = table;
-    (plugin as unknown as { options: () => boolean }).options = () => true;
-    plugin.initialize();
+  // With the last display row in the rendered window the pad is stale; with rows
+  // below the window it is legitimately non-zero, and must not be touched.
+  it.each([
+    [
+      'zeros stale paddingBottom when the last display row is in the rendered window',
+      3,
+      2,
+      80,
+      '0px',
+      0,
+    ],
+    [
+      'leaves paddingBottom alone when the last display row is not yet rendered',
+      10,
+      4,
+      120,
+      '80px',
+      120,
+    ],
+  ])('%s', (_name, rowCount, vDomBottom, pad, expectedStyle, expectedPad) => {
+    const { tableEl, holder } = paddedHolder(0, { paddingBottom: '80px' });
+    const renderer: Record<string, unknown> = { vDomBottom, vDomBottomPad: pad };
+    const displayRows = Array.from({ length: rowCount }, () => ({}));
+    const { plugin } = setup({ holder, renderer, displayRows });
 
     (plugin as unknown as { _resetStaleBottomPadding: () => void })._resetStaleBottomPadding();
 
-    expect(tableEl.style.paddingBottom).toBe('0px');
-    expect(renderer.vDomBottomPad).toBe(0);
-  });
-
-  it('leaves paddingBottom alone when the last display row is not yet rendered', () => {
-    const tableEl = { style: { paddingBottom: '80px' } };
-    const holder = {
-      scrollTop: 0,
-      querySelector: jest.fn((sel: string) => (sel === '.tabulator-table' ? tableEl : null)),
-    };
-    // 10 rows total; vDomBottom = 4 → there are rows below the window. The pad
-    // is legitimately non-zero in this case; we must not touch it.
-    const renderer: Record<string, unknown> = { vDomBottom: 4, vDomBottomPad: 120 };
-    const internalRows = Array.from({ length: 10 }, () => ({}));
-    const handlers: Record<string, ((...args: unknown[]) => void)[]> = {};
-    const table = {
-      handlers,
-      on: jest.fn((evt: string, fn: (...args: unknown[]) => void) => {
-        (handlers[evt] ??= []).push(fn);
-      }),
-      element: { querySelector: jest.fn(() => holder) },
-      getRows: jest.fn(() => []),
-      rowManager: { renderer, getDisplayRows: () => internalRows },
-      scrollToRow: jest.fn(() => Promise.resolve()),
-    };
-    const plugin = new ScrollAnchor(table as never);
-    (plugin as unknown as { table: typeof table }).table = table;
-    (plugin as unknown as { options: () => boolean }).options = () => true;
-    plugin.initialize();
-
-    (plugin as unknown as { _resetStaleBottomPadding: () => void })._resetStaleBottomPadding();
-
-    expect(tableEl.style.paddingBottom).toBe('80px');
-    expect(renderer.vDomBottomPad).toBe(120);
+    expect(tableEl.style.paddingBottom).toBe(expectedStyle);
+    expect(renderer.vDomBottomPad).toBe(expectedPad);
   });
 
   it('resets paddings before the anchor restore in renderComplete (so scrollHeight is accurate for was-at-bottom)', () => {
@@ -216,22 +170,7 @@ describe('ScrollAnchor', () => {
       getBoundingClientRect: () => rect(0, 100),
     };
     const renderer: Record<string, unknown> = { vDomBottom: 0, vDomBottomPad: 200 };
-    const internalRows = [{}];
-    const handlers: Record<string, ((...args: unknown[]) => void)[]> = {};
-    const table = {
-      handlers,
-      on: jest.fn((evt: string, fn: (...args: unknown[]) => void) => {
-        (handlers[evt] ??= []).push(fn);
-      }),
-      element: { querySelector: jest.fn(() => holder) },
-      getRows: jest.fn(() => []),
-      rowManager: { renderer, getDisplayRows: () => internalRows },
-      scrollToRow: jest.fn(() => Promise.resolve()),
-    };
-    const plugin = new ScrollAnchor(table as never);
-    (plugin as unknown as { table: typeof table }).table = table;
-    (plugin as unknown as { options: () => boolean }).options = () => true;
-    plugin.initialize();
+    const { plugin, handlers } = setup({ holder, renderer, displayRows: [{}] });
 
     // Seed wasAtBottom directly; the renderComplete handler should run both
     // padding resets, then snap scrollTop to the corrected max.
@@ -251,197 +190,63 @@ describe('ScrollAnchor', () => {
     expect(holder.scrollTop).toBe(700);
   });
 
-  it('zeros stale paddingTop after filter when scrollTop is less than paddingTop', () => {
-    const tableEl = { style: { paddingTop: '120px' } };
-    const holder = {
-      scrollTop: 0,
-      querySelector: jest.fn((sel: string) => (sel === '.tabulator-table' ? tableEl : null)),
-    };
-    const handlers: Record<string, ((...args: unknown[]) => void)[]> = {};
-    const renderer: Record<string, unknown> = { vDomTopPad: 120 };
-    const table = {
-      handlers,
-      on: jest.fn((evt: string, fn: (...args: unknown[]) => void) => {
-        (handlers[evt] ??= []).push(fn);
-      }),
-      element: { querySelector: jest.fn(() => holder) },
-      getRows: jest.fn(() => []),
-      rowManager: { renderer, getDisplayRows: () => [] },
-      scrollToRow: jest.fn(() => Promise.resolve()),
-    };
-
-    const plugin = new ScrollAnchor(table as never);
-    (plugin as unknown as { table: typeof table }).table = table;
-    (plugin as unknown as { options: () => boolean }).options = () => true;
-    plugin.initialize();
+  // A filter can leave a top pad scrollTop never reached; a scrollTop that has
+  // accounted for the pad is the legitimate state.
+  it.each([
+    ['zeros stale paddingTop after filter when scrollTop is less than paddingTop', 0, 120, 0],
+    [
+      'does NOT zero paddingTop when scrollTop has accounted for it (legitimate state)',
+      500,
+      500,
+      500,
+    ],
+  ])('%s', (_name, scrollTop, pad, expectedPad) => {
+    const { tableEl, holder } = paddedHolder(scrollTop, { paddingTop: `${pad}px` });
+    const renderer: Record<string, unknown> = { vDomTopPad: pad };
+    const { plugin } = setup({ holder, renderer });
 
     (plugin as unknown as { _resetStaleTopPadding: () => void })._resetStaleTopPadding();
 
-    expect(tableEl.style.paddingTop).toBe('0px');
-    expect(renderer.vDomTopPad).toBe(0);
+    expect(tableEl.style.paddingTop).toBe(`${expectedPad}px`);
+    expect(renderer.vDomTopPad).toBe(expectedPad);
   });
 
-  it('captures wasAtTop when the user is at the scroll top', () => {
-    const r1 = makeRow(0, 20);
-    const r2 = makeRow(20, 20);
+  it.each([
+    ['wasAtTop when the user is at the scroll top', 0, true, false],
+    ['wasAtBottom when the user is at the scroll bottom', 900, false, true],
+  ])('captures %s', (_name, scrollTop, atTop, atBottom) => {
     const holder = {
-      scrollTop: 0,
+      scrollTop,
       scrollHeight: 1000,
       clientHeight: 100,
       getBoundingClientRect: () => rect(0, 100),
     };
-    const handlers: Record<string, ((...args: unknown[]) => void)[]> = {};
-    const table = {
-      handlers,
-      on: jest.fn((evt: string, fn: (...args: unknown[]) => void) => {
-        (handlers[evt] ??= []).push(fn);
-      }),
-      element: { querySelector: jest.fn(() => holder) },
-      getRows: jest.fn((type?: string) => (type === 'visible' ? [r1, r2] : [])),
-      rowManager: { getDisplayRows: () => [] },
-      scrollToRow: jest.fn(() => Promise.resolve()),
-    };
-    const plugin = new ScrollAnchor(table as never);
-    (plugin as unknown as { table: typeof table }).table = table;
-    (plugin as unknown as { options: () => boolean }).options = () => true;
-    plugin.initialize();
+    const { plugin, handlers } = setup({ holder, visible: [makeRow(0, 20), makeRow(20, 20)] });
 
     handlers.renderStarted?.[0]?.();
 
-    expect((plugin as unknown as { wasAtTop: boolean }).wasAtTop).toBe(true);
-    expect((plugin as unknown as { wasAtBottom: boolean }).wasAtBottom).toBe(false);
+    const p = plugin as unknown as { wasAtTop: boolean; wasAtBottom: boolean };
+    expect(p.wasAtTop).toBe(atTop);
+    expect(p.wasAtBottom).toBe(atBottom);
   });
 
-  it('captures wasAtBottom when the user is at the scroll bottom', () => {
-    const r1 = makeRow(0, 20);
-    const r2 = makeRow(20, 20);
+  it.each([
+    ['wasAtTop, snaps scrollTop to 0', 'wasAtTop', 0],
+    ['wasAtBottom, snaps scrollTop to max', 'wasAtBottom', 900],
+  ] as const)('on renderComplete with %s instead of centering', (_name, flag, expected) => {
     const holder = {
-      scrollTop: 900,
-      scrollHeight: 1000,
-      clientHeight: 100,
-      getBoundingClientRect: () => rect(0, 100),
-    };
-    const handlers: Record<string, ((...args: unknown[]) => void)[]> = {};
-    const table = {
-      handlers,
-      on: jest.fn((evt: string, fn: (...args: unknown[]) => void) => {
-        (handlers[evt] ??= []).push(fn);
-      }),
-      element: { querySelector: jest.fn(() => holder) },
-      getRows: jest.fn((type?: string) => (type === 'visible' ? [r1, r2] : [])),
-      rowManager: { getDisplayRows: () => [] },
-      scrollToRow: jest.fn(() => Promise.resolve()),
-    };
-    const plugin = new ScrollAnchor(table as never);
-    (plugin as unknown as { table: typeof table }).table = table;
-    (plugin as unknown as { options: () => boolean }).options = () => true;
-    plugin.initialize();
-
-    handlers.renderStarted?.[0]?.();
-
-    expect((plugin as unknown as { wasAtBottom: boolean }).wasAtBottom).toBe(true);
-    expect((plugin as unknown as { wasAtTop: boolean }).wasAtTop).toBe(false);
-  });
-
-  it('on renderComplete with wasAtTop, snaps scrollTop to 0 instead of centering', () => {
-    const holder: {
-      scrollTop: number;
-      scrollHeight: number;
-      clientHeight: number;
-      querySelector: () => null;
-    } = {
-      scrollTop: 0,
+      scrollTop: 200,
       scrollHeight: 1000,
       clientHeight: 100,
       querySelector: () => null,
     };
-    const handlers: Record<string, ((...args: unknown[]) => void)[]> = {};
-    const table = {
-      handlers,
-      on: jest.fn((evt: string, fn: (...args: unknown[]) => void) => {
-        (handlers[evt] ??= []).push(fn);
-      }),
-      element: { querySelector: jest.fn(() => holder) },
-      getRows: jest.fn(() => []),
-      rowManager: { getDisplayRows: () => [] },
-      scrollToRow: jest.fn(() => Promise.resolve()),
-    };
-    const plugin = new ScrollAnchor(table as never);
-    (plugin as unknown as { table: typeof table }).table = table;
-    (plugin as unknown as { options: () => boolean }).options = () => true;
-    plugin.initialize();
+    const { plugin, table, handlers } = setup({ holder });
 
-    (plugin as unknown as { wasAtTop: boolean }).wasAtTop = true;
-    holder.scrollTop = 200;
+    (plugin as unknown as Record<typeof flag, boolean>)[flag] = true;
     handlers.renderComplete?.[0]?.();
 
-    expect(holder.scrollTop).toBe(0);
+    expect(holder.scrollTop).toBe(expected);
     expect(table.scrollToRow).not.toHaveBeenCalled();
-  });
-
-  it('on renderComplete with wasAtBottom, snaps scrollTop to max instead of centering', () => {
-    const holder: {
-      scrollTop: number;
-      scrollHeight: number;
-      clientHeight: number;
-      querySelector: () => null;
-    } = {
-      scrollTop: 0,
-      scrollHeight: 1000,
-      clientHeight: 100,
-      querySelector: () => null,
-    };
-    const handlers: Record<string, ((...args: unknown[]) => void)[]> = {};
-    const table = {
-      handlers,
-      on: jest.fn((evt: string, fn: (...args: unknown[]) => void) => {
-        (handlers[evt] ??= []).push(fn);
-      }),
-      element: { querySelector: jest.fn(() => holder) },
-      getRows: jest.fn(() => []),
-      rowManager: { getDisplayRows: () => [] },
-      scrollToRow: jest.fn(() => Promise.resolve()),
-    };
-    const plugin = new ScrollAnchor(table as never);
-    (plugin as unknown as { table: typeof table }).table = table;
-    (plugin as unknown as { options: () => boolean }).options = () => true;
-    plugin.initialize();
-
-    (plugin as unknown as { wasAtBottom: boolean }).wasAtBottom = true;
-    handlers.renderComplete?.[0]?.();
-
-    expect(holder.scrollTop).toBe(900);
-    expect(table.scrollToRow).not.toHaveBeenCalled();
-  });
-
-  it('does NOT zero paddingTop when scrollTop has accounted for it (legitimate state)', () => {
-    const tableEl = { style: { paddingTop: '500px' } };
-    const holder = {
-      scrollTop: 500,
-      querySelector: jest.fn((sel: string) => (sel === '.tabulator-table' ? tableEl : null)),
-    };
-    const handlers: Record<string, ((...args: unknown[]) => void)[]> = {};
-    const renderer: Record<string, unknown> = { vDomTopPad: 500 };
-    const table = {
-      handlers,
-      on: jest.fn((evt: string, fn: (...args: unknown[]) => void) => {
-        (handlers[evt] ??= []).push(fn);
-      }),
-      element: { querySelector: jest.fn(() => holder) },
-      getRows: jest.fn(() => []),
-      rowManager: { renderer, getDisplayRows: () => [] },
-      scrollToRow: jest.fn(() => Promise.resolve()),
-    };
-
-    const plugin = new ScrollAnchor(table as never);
-    (plugin as unknown as { table: typeof table }).table = table;
-    (plugin as unknown as { options: () => boolean }).options = () => true;
-    plugin.initialize();
-
-    (plugin as unknown as { _resetStaleTopPadding: () => void })._resetStaleTopPadding();
-
-    expect(tableEl.style.paddingTop).toBe('500px');
-    expect(renderer.vDomTopPad).toBe(500);
   });
 
   it('a second toggle in the same burst clears the skip flag (bulk recenter runs)', () => {
@@ -459,15 +264,13 @@ describe('ScrollAnchor', () => {
   it('captures the anchor offset within the holder for pixel-accurate restore', () => {
     // Anchor row offsetTop=130, holder.scrollTop=100 → captured offset = 30 (the
     // row's Y position inside the visible holder viewport).
-    const r1Internal = {};
-    const r2Internal = {};
     const r1 = {
       getElement: () => ({ offsetTop: 100, getBoundingClientRect: () => rect(50, 20) }),
-      _getSelf: () => r1Internal,
+      _getSelf: () => ({}),
     };
     const r2 = {
       getElement: () => ({ offsetTop: 130, getBoundingClientRect: () => rect(80, 40) }),
-      _getSelf: () => r2Internal,
+      _getSelf: () => ({}),
     };
     const holder = {
       scrollTop: 100,
@@ -475,21 +278,7 @@ describe('ScrollAnchor', () => {
       clientHeight: 100,
       getBoundingClientRect: () => rect(50, 100),
     };
-    const handlers: Record<string, ((...args: unknown[]) => void)[]> = {};
-    const table = {
-      handlers,
-      on: jest.fn((evt: string, fn: (...args: unknown[]) => void) => {
-        (handlers[evt] ??= []).push(fn);
-      }),
-      element: { querySelector: jest.fn(() => holder) },
-      getRows: jest.fn((type?: string) => (type === 'visible' ? [r1, r2] : [])),
-      rowManager: { getDisplayRows: () => [] },
-      scrollToRow: jest.fn(() => Promise.resolve()),
-    };
-    const plugin = new ScrollAnchor(table as never);
-    (plugin as unknown as { table: typeof table }).table = table;
-    (plugin as unknown as { options: () => boolean }).options = () => true;
-    plugin.initialize();
+    const { plugin, handlers } = setup({ holder, visible: [r1, r2] });
 
     handlers.renderStarted?.[0]?.();
 
@@ -505,23 +294,12 @@ describe('ScrollAnchor', () => {
     // Crucially the assertion runs immediately after the renderComplete call — no await,
     // no rAF, no setTimeout. If the write were async this would still be the old value.
     const internalRow = { __internal: true };
-    const rowEl = { offsetTop: 500 };
-    const r2: {
-      getElement: () => unknown;
-      getData: () => { originalData: { timestamp: number } };
-      _getSelf: () => unknown;
-    } = {
-      getElement: () => rowEl,
+    const r2 = {
+      getElement: () => ({ offsetTop: 500 }),
       getData: () => ({ originalData: { timestamp: 0 } }),
       _getSelf: () => internalRow,
     };
-    const holder: {
-      scrollTop: number;
-      scrollHeight: number;
-      clientHeight: number;
-      getBoundingClientRect: () => ReturnType<typeof rect>;
-      querySelector: () => null;
-    } = {
+    const holder = {
       scrollTop: 100,
       scrollHeight: 5000,
       clientHeight: 100,
@@ -532,21 +310,7 @@ describe('ScrollAnchor', () => {
       rows: jest.fn(() => [internalRow]),
       _virtualRenderFill: jest.fn(),
     };
-    const handlers: Record<string, ((...args: unknown[]) => void)[]> = {};
-    const table = {
-      handlers,
-      on: jest.fn((evt: string, fn: (...args: unknown[]) => void) => {
-        (handlers[evt] ??= []).push(fn);
-      }),
-      element: { querySelector: jest.fn(() => holder) },
-      getRows: jest.fn(() => []),
-      rowManager: { renderer, getDisplayRows: () => [internalRow] },
-      scrollToRow: jest.fn(() => Promise.resolve()),
-    };
-    const plugin = new ScrollAnchor(table as never);
-    (plugin as unknown as { table: typeof table }).table = table;
-    (plugin as unknown as { options: () => boolean }).options = () => true;
-    plugin.initialize();
+    const { plugin, table, handlers } = setup({ holder, renderer, displayRows: [internalRow] });
 
     // Manually seed the captured anchor (skip dataSorting/renderStarted to keep test focused).
     const p = plugin as unknown as {
@@ -566,17 +330,15 @@ describe('ScrollAnchor', () => {
   it('fallback: collapse case walks up getTreeParent to the nearest displayed ancestor', () => {
     // Anchor row was a child collapsed under a parent. Parent is displayed.
     const parentInternal = {};
-    const childInternal = {};
     const parentComponent = {
       _getSelf: () => parentInternal,
       getTreeParent: () => false,
     };
     const childComponent = {
-      _getSelf: () => childInternal,
+      _getSelf: () => ({}),
       getTreeParent: () => parentComponent,
     };
-    const { table, plugin } = setup();
-    table.rowManager.getDisplayRows = () => [parentInternal] as never;
+    const { plugin } = setup({ displayRows: [parentInternal] });
 
     const p = plugin as unknown as { anchorRow: unknown };
     p.anchorRow = childComponent;
@@ -587,49 +349,20 @@ describe('ScrollAnchor', () => {
     expect(resolved).toBe(parentComponent);
   });
 
-  it('fallback: filter case picks the row at the captured display-rows index (clamped)', () => {
-    // Anchor row was at display-index 50 pre-render. Post-render display set has
-    // only 10 rows (filter removed most). Index clamped to 9 (length - 1).
-    const internalRows = Array.from({ length: 10 }, (_, i) => ({ id: i }));
-    const expectedComponent = { mark: 'expected' };
-    (internalRows[9] as unknown as { getComponent: () => unknown }).getComponent = () =>
+  // An index past the end (a filter removed most rows) is clamped to the last row.
+  it.each([
+    ['picks the row at the captured display-rows index (clamped)', 10, 50, 9],
+    ['with exact index returns the row at that index', 100, 30, 30],
+  ])('fallback: filter case %s', (_name, rowCount, capturedIndex, expectedIndex) => {
+    const displayRows = Array.from({ length: rowCount }, (_, i) => ({ id: i }));
+    const expectedComponent = { mark: `at-${expectedIndex}` };
+    (displayRows[expectedIndex] as unknown as { getComponent: () => unknown }).getComponent = () =>
       expectedComponent;
-
-    const anchorInternal = {};
-    const anchorComponent = {
-      _getSelf: () => anchorInternal,
-      getTreeParent: () => false,
-    };
-    const { table, plugin } = setup();
-    table.rowManager.getDisplayRows = () => internalRows as never;
+    const { plugin } = setup({ displayRows });
 
     const p = plugin as unknown as { anchorRow: unknown; anchorDisplayIndex: number };
-    p.anchorRow = anchorComponent;
-    p.anchorDisplayIndex = 50;
-
-    const resolved = (
-      plugin as unknown as { _resolveAnchorRow: () => unknown }
-    )._resolveAnchorRow();
-    expect(resolved).toBe(expectedComponent);
-  });
-
-  it('fallback: filter case with exact index returns the row at that index', () => {
-    const internalRows = Array.from({ length: 100 }, (_, i) => ({ id: i }));
-    const expectedComponent = { mark: 'at-30' };
-    (internalRows[30] as unknown as { getComponent: () => unknown }).getComponent = () =>
-      expectedComponent;
-
-    const anchorInternal = {};
-    const anchorComponent = {
-      _getSelf: () => anchorInternal,
-      getTreeParent: () => false,
-    };
-    const { table, plugin } = setup();
-    table.rowManager.getDisplayRows = () => internalRows as never;
-
-    const p = plugin as unknown as { anchorRow: unknown; anchorDisplayIndex: number };
-    p.anchorRow = anchorComponent;
-    p.anchorDisplayIndex = 30;
+    p.anchorRow = anchorWithNoParent();
+    p.anchorDisplayIndex = capturedIndex;
 
     const resolved = (
       plugin as unknown as { _resolveAnchorRow: () => unknown }
@@ -638,16 +371,10 @@ describe('ScrollAnchor', () => {
   });
 
   it('fallback: returns null when no parent is displayed and display rows are empty', () => {
-    const anchorInternal = {};
-    const anchorComponent = {
-      _getSelf: () => anchorInternal,
-      getTreeParent: () => false,
-    };
-    const { table, plugin } = setup();
-    table.rowManager.getDisplayRows = () => [] as never;
+    const { plugin } = setup();
 
     const p = plugin as unknown as { anchorRow: unknown; anchorDisplayIndex: number };
-    p.anchorRow = anchorComponent;
+    p.anchorRow = anchorWithNoParent();
     p.anchorDisplayIndex = 5;
 
     const resolved = (

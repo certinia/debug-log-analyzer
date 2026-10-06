@@ -10,8 +10,8 @@ import type {
   DMLBeginLine,
   SOQLExecuteBeginLine,
   SOSLExecuteBeginLine,
+  Limits,
 } from '@apexdevtools/apex-log-parser';
-import type { Limits } from '@apexdevtools/apex-log-parser/types';
 
 import { limitTotals } from '../../../components/logOverviewMetrics.js';
 import { DomListenerController } from '../../../core/events/DomListenerController.js';
@@ -463,7 +463,7 @@ export class DatabaseView extends LitElement {
     add('SOQL', this._count('soql'), limits?.soqlQueries ?? z);
     add('SOSL', this._count('sosl'), limits?.soslQueries ?? z);
     add('DML Rows', this._rows('dml'), limits?.dmlRows ?? z);
-    add('Query Rows', this._rows('soql'), limits?.queryRows ?? z);
+    add('SOQL Rows', this._rows('soql'), limits?.queryRows ?? z);
     return gauges;
   }
 

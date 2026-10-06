@@ -1,7 +1,7 @@
 ---
 id: mcp
 title: AI Assistant (MCP Server)
-description: Use the companion @certinia/apex-log-mcp Model Context Protocol server to expose Apex log analysis tools to AI assistants like GitHub Copilot Chat, Claude Code, and Cursor.
+description: The @certinia/apex-log-mcp MCP server lets GitHub Copilot Chat, Claude Code, Cursor and other AI assistants analyze Salesforce Apex debug logs.
 keywords:
   [
     salesforce apex mcp,
@@ -16,18 +16,31 @@ hide_title: true
 
 ## 🤖 AI Assistant (MCP Server)
 
-A companion Model Context Protocol server, [`@certinia/apex-log-mcp`](https://www.npmjs.com/package/@certinia/apex-log-mcp) ([source on GitHub](https://github.com/certinia/debug-log-analyzer-mcp)), exposes Apex log analysis tools to AI assistants. Use it with GitHub Copilot Chat, Claude Code, Cursor, or any MCP client.
+Ask your AI assistant what's slow in a Salesforce Apex debug log. [`@certinia/apex-log-mcp`](https://www.npmjs.com/package/@certinia/apex-log-mcp) is an MCP server for GitHub Copilot Chat, Claude Code, Cursor or any MCP client. It uses the same log parser as this extension ([source on GitHub](https://github.com/certinia/debug-log-analyzer-mcp)).
 
-**Available tools:** `get_apex_log_summary`, `analyze_apex_log_performance`, `find_performance_bottlenecks`, `execute_anonymous`.
+Requires [Node.js](https://nodejs.org/) 22 or later. Runs on your machine, with no API keys.
+
+Your assistant can:
+
+- Summarize a log: duration, governor limits, fatal errors, and whether the log is complete.
+- Rank methods, SOQL, DML and flows by self time.
+- Flag governor limits near their ceiling.
+- Run anonymous Apex in an org, then analyze the log. Needs an org authenticated with the [Salesforce CLI](https://developer.salesforce.com/tools/salesforcecli). Asks before it runs in production.
+
+**Try asking:**
+
+- "Summarize this debug log."
+- "What are the 5 slowest methods?"
+- "Are we close to any governor limits?"
 
 ### VS Code (GitHub Copilot Chat)
 
-Run **MCP: Add Server** from the Command Palette and add an `npx` server with the command `npx -y @certinia/apex-log-mcp`, or add it to `.vscode/mcp.json`:
+Run **MCP: Add Server** from the Command Palette, or add this to `.vscode/mcp.json`:
 
 ```json
 {
   "servers": {
-    "apex-log-analyzer": {
+    "apex-log-mcp": {
       "command": "npx",
       "args": ["-y", "@certinia/apex-log-mcp"]
     }
@@ -37,12 +50,10 @@ Run **MCP: Add Server** from the Command Palette and add an `npx` server with th
 
 ### Claude Code
 
-Add the server with the Claude CLI:
-
 ```bash
-claude mcp add apex-log-analyzer -- npx -y @certinia/apex-log-mcp
+claude mcp add apex-log-mcp -- npx -y @certinia/apex-log-mcp
 ```
 
 ### Other MCP clients
 
-The same npm package works in Cursor, and other MCP hosts. See the [`@certinia/apex-log-mcp` README](https://github.com/certinia/debug-log-analyzer-mcp#readme) for client-specific configuration snippets.
+Use the same command, `npx -y @certinia/apex-log-mcp`. The [`@certinia/apex-log-mcp` README](https://github.com/certinia/debug-log-analyzer-mcp#readme) covers each tool and the server flags, such as analysis-only mode.

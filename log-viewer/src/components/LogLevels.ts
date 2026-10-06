@@ -6,7 +6,7 @@ import { LitElement, css, html, nothing } from 'lit';
 import { customElement, property } from 'lit/decorators.js';
 import { repeat } from 'lit/directives/repeat.js';
 
-import type { DebugLevels, LogLevel } from '@apexdevtools/apex-log-parser/types';
+import type { DebugLevels, LogLevel } from '@apexdevtools/apex-log-parser';
 
 // web components
 import './OverflowList.js';

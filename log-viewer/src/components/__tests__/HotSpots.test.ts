@@ -14,7 +14,7 @@ jest.mock('../../features/call-tree/utils/ExecutionHighlights.js', () => ({
 }));
 
 import '../HotSpots.js';
-import { settledNote } from './sectionTestUtils.js';
+import { settledNote } from '#test-helpers/sections.js';
 
 const spotsOf = (): ExecutionHighlights => ({
   totalTime: 1_000_000_000,

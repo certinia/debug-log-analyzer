@@ -1,8 +1,14 @@
 /*
  * Copyright (c) 2026 Certinia Inc. All rights reserved.
  */
-import type { GovernorLimits, SelfTotal } from '@apexdevtools/apex-log-parser/types';
+import type {
+  GovernorLimits,
+  LimitMetricUnit,
+  Limits,
+  SelfTotal,
+} from '@apexdevtools/apex-log-parser';
 
+import { GOVERNOR_METRIC } from '../../../core/metrics/governorMetrics.js';
 import { sharePercent } from '../../../core/utility/Util.js';
 
 /**
@@ -49,11 +55,11 @@ export interface GovernorCostRow extends GovernorUsage {
 }
 
 interface CostMetric {
-  label: string;
+  key: keyof Limits;
   /** Reads the node's cumulative usage for this metric. */
   used: (row: GovernorUsage) => number;
-  /** Reads the log's maximum for this metric. */
-  limit: (limits: GovernorLimits) => number;
+  /** The limits snapshot this metric's maximum is read from; `final` when absent. */
+  snapshot?: 'peak';
 }
 
 /**
@@ -70,60 +76,31 @@ interface CostMetric {
  * so it is the value comparable to the heap limit per path.
  */
 const COST_METRICS: CostMetric[] = [
-  { label: 'SOQL', used: (r) => r.soqlCount.total, limit: (l) => l.final.soqlQueries.limit },
-  { label: 'DML', used: (r) => r.dmlCount.total, limit: (l) => l.final.dmlStatements.limit },
-  { label: 'SOSL', used: (r) => r.soslCount.total, limit: (l) => l.final.soslQueries.limit },
-  { label: 'SOQL Rows', used: (r) => r.soqlRowCount.total, limit: (l) => l.final.queryRows.limit },
-  { label: 'DML Rows', used: (r) => r.dmlRowCount.total, limit: (l) => l.final.dmlRows.limit },
-  { label: 'Heap', used: (r) => r.heapPeak, limit: (l) => l.peak.heapSize.limit },
+  { key: 'soqlQueries', used: (r) => r.soqlCount.total },
+  { key: 'dmlStatements', used: (r) => r.dmlCount.total },
+  { key: 'soslQueries', used: (r) => r.soslCount.total },
+  { key: 'queryRows', used: (r) => r.soqlRowCount.total },
+  { key: 'dmlRows', used: (r) => r.dmlRowCount.total },
+  { key: 'heapSize', used: (r) => r.heapPeak, snapshot: 'peak' },
 ];
 
-/**
- * Average governor consumption on this path (0–100%): the mean of each
- * governor's own `used/limit × 100`, over every governor with a reported limit
- * (limit > 0). Governors the path didn't touch count as 0% and still divide the
- * total, so this measures overall governor utilisation across all of them, not
- * the single tightest one. Governors never reported in the log (limit 0) are
- * excluded from both the sum and the divisor.
- *
- * `null` where no governor carries a reported limit — with nothing to divide by there is no
- * utilisation, and reading it as 0% would say the path is clear of limits nobody knows.
- */
-export function governorCost(row: GovernorUsage, limits: GovernorLimits): number | null {
-  let total = 0;
-  let count = 0;
-  for (const metric of COST_METRICS) {
-    const limit = metric.limit(limits);
-    if (limit > 0) {
-      total += sharePercent(metric.used(row), limit);
-      count++;
-    }
-  }
-  return count > 0 ? total / count : null;
-}
+/** The cost metrics that carry a reported limit, each paired with it. Built by {@link costLimitsOf}. */
+export type CostLimits = ReadonlyArray<CostMetric & { limit: number }>;
 
 /**
- * The single tightest governor consumed on this path (0–100+%): the max of each
- * governor's `used/limit × 100`, over governors with a reported limit. The
- * "am I about to breach one specific limit" signal, complementing the averaged
- * {@link governorCost}. `null` where no governor carries a reported limit.
+ * Reads each cost metric's limit once per tree build, keeping only those with a reported
+ * limit, for {@link setGovernorCost} to apply per row.
  */
-export function governorCostMax(row: GovernorUsage, limits: GovernorLimits): number | null {
-  let max: number | null = null;
-  for (const metric of COST_METRICS) {
-    const limit = metric.limit(limits);
-    if (limit > 0) {
-      const percent = sharePercent(metric.used(row), limit);
-      if (max === null || percent > max) {
-        max = percent;
-      }
-    }
-  }
-  return max;
+export function costLimitsOf(limits: GovernorLimits): CostLimits {
+  return COST_METRICS.map((metric) => ({
+    ...metric,
+    limit: limits[metric.snapshot ?? 'final'][metric.key].limit,
+  })).filter((metric) => metric.limit > 0);
 }
 
 export interface GovernorCostMetric {
   label: string;
+  unit: LimitMetricUnit;
   used: number;
   limit: number;
   /** This metric's own `used/limit × 100` contribution to the total. */
@@ -140,11 +117,11 @@ export function governorCostBreakdown(
   limits: GovernorLimits,
 ): GovernorCostMetric[] {
   const metrics: GovernorCostMetric[] = [];
-  for (const metric of COST_METRICS) {
-    const limit = metric.limit(limits);
-    const used = metric.used(row);
-    if (limit > 0 && used > 0) {
-      metrics.push({ label: metric.label, used, limit, percent: sharePercent(used, limit) });
+  for (const { key, used: usedOf, limit } of costLimitsOf(limits)) {
+    const used = usedOf(row);
+    if (used > 0) {
+      const { label, unit } = GOVERNOR_METRIC[key];
+      metrics.push({ label, unit, used, limit, percent: sharePercent(used, limit) });
     }
   }
   return metrics.sort((a, b) => b.percent - a.percent);
@@ -152,11 +129,20 @@ export function governorCostBreakdown(
 
 /**
  * Sets {@link GovernorCostRow.governorCost} and {@link GovernorCostRow.governorCostMax}
- * on a single row from its already-aggregated totals. Called from each tree
- * builder at the point a row is finalized, so governor cost is computed in the
- * same pass that builds the tree (no separate traversal).
+ * on a single row from its already-aggregated totals, in one pass over the metrics. Called
+ * from each tree builder at the point a row is finalized, so governor cost is computed in
+ * the same pass that builds the tree (no separate traversal).
  */
-export function setGovernorCost(row: GovernorCostRow, limits: GovernorLimits): void {
-  row.governorCost = governorCost(row, limits);
-  row.governorCostMax = governorCostMax(row, limits);
+export function setGovernorCost(row: GovernorCostRow, costLimits: CostLimits): void {
+  let total = 0;
+  let max: number | null = null;
+  for (const { used, limit } of costLimits) {
+    const percent = sharePercent(used(row), limit);
+    total += percent;
+    if (max === null || percent > max) {
+      max = percent;
+    }
+  }
+  row.governorCost = costLimits.length > 0 ? total / costLimits.length : null;
+  row.governorCostMax = max;
 }

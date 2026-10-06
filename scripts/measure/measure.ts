@@ -25,6 +25,7 @@ import { type ApexLog, parse } from '@apexdevtools/apex-log-parser';
 import { measureCallTree } from './call-tree.js';
 import { die, time } from './harness.js';
 import { digestMinimap, measureMinimap } from './minimap.js';
+import { digestTimeline, measureTimeline } from './timeline.js';
 import { measureVariables } from './variables.js';
 
 /** The one log every measurement runs over, so the numbers compare across branches. */
@@ -41,6 +42,7 @@ interface Area {
 const AREAS: Record<string, Area> = {
   'call-tree': { run: measureCallTree },
   minimap: { run: measureMinimap, digest: digestMinimap },
+  timeline: { run: measureTimeline, digest: digestTimeline },
   variables: { run: measureVariables },
 };
 
