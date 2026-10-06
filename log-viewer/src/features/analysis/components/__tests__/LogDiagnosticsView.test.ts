@@ -1,9 +1,9 @@
 /*
  * Copyright (c) 2026 Certinia Inc. All rights reserved.
  *
- * @jest-environment jsdom
+ * @vitest-environment jsdom
  */
-import { beforeEach, describe, expect, it } from '@jest/globals';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type { LogDiagnostics } from '../../services/LogDiagnostics.js';
 
@@ -18,7 +18,7 @@ let result: LogDiagnostics = {
 let keep = (_id: string) => true;
 let askedAbout: readonly number[] = [];
 
-jest.mock('../../services/LogDiagnostics.js', () => ({
+vi.mock('../../services/LogDiagnostics.js', () => ({
   computeLogDiagnostics: () => Promise.resolve(result),
   scopeDiagnostics: (all: LogDiagnostics, instances: readonly number[]) => {
     askedAbout = instances;

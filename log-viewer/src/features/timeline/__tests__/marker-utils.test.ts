@@ -6,7 +6,7 @@
  * Unit tests for marker extraction (extractMarkers, extractExceptionMarkers).
  */
 
-import { describe, expect, it } from '@jest/globals';
+import { describe, expect, it } from 'vitest';
 import type { ApexLog, LogEvent, LogIssue } from '@apexdevtools/apex-log-parser';
 import type { TimelineMarker } from '../types/flamechart.types.js';
 import { extractExceptionMarkers, extractMarkers, noDataSpans } from '../utils/marker-utils.js';

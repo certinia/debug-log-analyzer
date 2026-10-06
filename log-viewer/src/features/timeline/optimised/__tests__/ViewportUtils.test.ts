@@ -9,7 +9,7 @@
  * direction, always-positive factor, in/out symmetry, per-event clamping, and
  * deltaMode normalization.
  */
-import { describe, expect, it } from '@jest/globals';
+import { describe, expect, it } from 'vitest';
 
 import { wheelZoomFactor } from '../ViewportUtils.js';
 

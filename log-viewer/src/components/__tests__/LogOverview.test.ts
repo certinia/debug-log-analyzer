@@ -1,10 +1,10 @@
 /*
  * Copyright (c) 2026 Certinia Inc. All rights reserved.
  *
- * @jest-environment jsdom
+ * @vitest-environment jsdom
  */
 import type { GovernorLimits } from '@apexdevtools/apex-log-parser';
-import { beforeEach, describe, expect, it } from '@jest/globals';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type { LogStore } from '../../core/log/LogStore.js';
 import type { HeatStripTimeSeries } from '../../features/timeline/types/flamechart.types.js';
@@ -13,7 +13,7 @@ import { governorLimits, seriesEvent, timeSeries } from '#test-helpers/limits.js
 // The metric strip's series, which the overview always reads its gauges from
 // so they match the timeline and the trend charts.
 let mockSeries: HeatStripTimeSeries = timeSeries();
-jest.mock('../../features/timeline/optimised/apex-limit-series.js', () => ({
+vi.mock('../../features/timeline/optimised/apex-limit-series.js', () => ({
   apexLimitTimeSeries: () => mockSeries,
 }));
 

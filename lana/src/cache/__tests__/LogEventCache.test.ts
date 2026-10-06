@@ -1,7 +1,7 @@
 /*
  * Copyright (c) 2026 Certinia Inc. All rights reserved.
  */
-import { beforeEach, describe, expect, it } from '@jest/globals';
+import { beforeEach, describe, expect, it, type Mock, vi } from 'vitest';
 import type { LogEvent } from '@apexdevtools/apex-log-parser';
 import { Uri, workspace } from 'vscode';
 
@@ -15,8 +15,8 @@ import {
 import { LogEventCache } from '../LogEventCache.js';
 
 // Mock apex-log-parser
-jest.mock('@apexdevtools/apex-log-parser', () => ({
-  parse: jest.fn(),
+vi.mock('@apexdevtools/apex-log-parser', () => ({
+  parse: vi.fn(),
 }));
 
 import { parse } from '@apexdevtools/apex-log-parser';
@@ -24,8 +24,8 @@ import { parse } from '@apexdevtools/apex-log-parser';
 // The file-I/O layer is deliberately not mocked out. Stubbing the whole module is
 // what let getApexLog read through a service that throws until another extension
 // initialises it, with the failure swallowed by its own catch.
-const mockReadFile = workspace.fs.readFile as jest.Mock;
-const mockParse = parse as jest.Mock;
+const mockReadFile = workspace.fs.readFile as Mock;
+const mockParse = parse as Mock;
 
 function readsAnyLog(): void {
   mockReadFile.mockResolvedValue(new TextEncoder().encode('content'));
@@ -39,7 +39,7 @@ describe('LogEventCache', () => {
   beforeEach(() => {
     mockReadFile.mockReset();
     mockParse.mockReset();
-    (display.output as jest.Mock).mockClear();
+    (display.output as Mock).mockClear();
     // @ts-expect-error - accessing private static for testing
     LogEventCache.cache.clear();
     // @ts-expect-error - accessing private static for testing
@@ -191,9 +191,9 @@ describe('LogEventCache', () => {
       readsAnyLog();
       await open('file');
       let onClose: ((doc: { languageId: string; uri: Uri }) => void) | undefined;
-      (workspace.onDidCloseTextDocument as jest.Mock).mockImplementationOnce((callback) => {
+      (workspace.onDidCloseTextDocument as Mock).mockImplementationOnce((callback) => {
         onClose = callback as typeof onClose;
-        return { dispose: jest.fn() };
+        return { dispose: vi.fn() };
       });
       const mockContext = createMockContext();
 

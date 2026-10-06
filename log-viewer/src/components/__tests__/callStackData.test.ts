@@ -1,7 +1,7 @@
 /*
  * Copyright (c) 2025 Certinia Inc. All rights reserved.
  */
-import { describe, expect, it } from '@jest/globals';
+import { describe, expect, it, vi } from 'vitest';
 
 const stack = [
   {
@@ -26,7 +26,7 @@ const stack = [
 
 let currentStack: typeof stack | [] = stack;
 
-jest.mock('../../core/log/LogStore.js', () => ({
+vi.mock('../../core/log/LogStore.js', () => ({
   currentLogStore: () => ({ stackByEventIndex: () => currentStack }),
 }));
 

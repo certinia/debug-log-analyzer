@@ -1,7 +1,7 @@
 /*
  * Copyright (c) 2026 Certinia Inc. All rights reserved.
  */
-import { afterEach, describe, expect, it, jest } from '@jest/globals';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { Memento } from 'vscode';
 import { workspace } from 'vscode';
 
@@ -18,30 +18,30 @@ import {
 
 function mockMemento(store: Record<string, unknown> = {}): Memento {
   return {
-    keys: jest.fn(() => Object.keys(store)),
-    get: jest.fn((key: string, fallback?: unknown) =>
+    keys: vi.fn(() => Object.keys(store)),
+    get: vi.fn((key: string, fallback?: unknown) =>
       key in store ? store[key] : fallback,
     ) as Memento['get'],
-    update: jest.fn(() => Promise.resolve()),
+    update: vi.fn(() => Promise.resolve()),
   } as unknown as Memento;
 }
 
 function mockLanaConfig(values: Record<string, unknown>): void {
   const config = {
     ...values,
-    get: jest.fn(),
-    has: jest.fn(() => false),
-    inspect: jest.fn(() => undefined),
-    update: jest.fn(),
+    get: vi.fn(),
+    has: vi.fn(() => false),
+    inspect: vi.fn(() => undefined),
+    update: vi.fn(),
   };
-  jest
-    .mocked(workspace.getConfiguration)
-    .mockReturnValue(config as unknown as ReturnType<typeof workspace.getConfiguration>);
+  vi.mocked(workspace.getConfiguration).mockReturnValue(
+    config as unknown as ReturnType<typeof workspace.getConfiguration>,
+  );
 }
 
 describe('getConfig', () => {
   afterEach(() => {
-    jest.mocked(workspace.getConfiguration).mockReset();
+    vi.mocked(workspace.getConfiguration).mockReset();
   });
 
   it('seeds the database branch the merged settings tree never carries', () => {

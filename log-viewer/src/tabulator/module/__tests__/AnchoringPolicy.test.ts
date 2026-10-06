@@ -1,7 +1,7 @@
 /**
  * Copyright (c) 2026 Certinia Inc. All rights reserved.
  */
-import { describe, expect, it, jest } from '@jest/globals';
+import { describe, expect, it, vi } from 'vitest';
 
 import { AnchoringPolicy } from '../AnchoringPolicy';
 
@@ -79,16 +79,16 @@ function setup(opts: SetupOpts = {}) {
   const handlers: Record<string, ((...args: unknown[]) => void)[]> = {};
   // The policy delegates restores to renderer.setAnchor — the seam
   // VirtualVerticalRenderer exposes. Mock it to assert exact call args.
-  const setAnchor = jest.fn((_row: unknown, _offset: number) => {});
+  const setAnchor = vi.fn((_row: unknown, _offset: number) => {});
   const renderer: Record<string, unknown> = { setAnchor };
   const displayInternals = (opts.displayRows ?? []).map((r) => r.internalRow);
   const table = {
     handlers,
-    on: jest.fn((evt: string, fn: (...args: unknown[]) => void) => {
+    on: vi.fn((evt: string, fn: (...args: unknown[]) => void) => {
       (handlers[evt] ??= []).push(fn);
     }),
-    element: { querySelector: jest.fn(() => holder) },
-    getRows: jest.fn((type?: string) => {
+    element: { querySelector: vi.fn(() => holder) },
+    getRows: vi.fn((type?: string) => {
       if (type === 'visible') {
         return opts.visibleRows ?? [];
       }
@@ -216,7 +216,7 @@ describe('AnchoringPolicy', () => {
       displayRows: [anchor],
       holderScrollTop: 0,
     });
-    const setScrollTop = jest.fn();
+    const setScrollTop = vi.fn();
     (table.rowManager.renderer as Record<string, unknown>)['setScrollTop'] = setScrollTop;
 
     table.handlers.renderStarted?.[0]?.();

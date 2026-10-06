@@ -1,17 +1,17 @@
 /**
- * @jest-environment jsdom
+ * @vitest-environment jsdom
  */
 
 /*
  * Copyright (c) 2026 Certinia Inc. All rights reserved.
  */
 
-import { beforeEach, describe, expect, it, jest } from '@jest/globals';
+import { beforeEach, describe, expect, it, type Mock, vi } from 'vitest';
 import { TimelineResizeHandler } from '../TimelineResizeHandler.js';
 
 describe('TimelineResizeHandler devicePixelRatio watching', () => {
   let queries: { media: string; fire: () => void }[];
-  let renderer: { resize: jest.Mock<(width: number, height: number) => void> };
+  let renderer: { resize: Mock<(width: number, height: number) => void> };
   let container: HTMLElement;
 
   function setRatio(value: number): void {
@@ -24,7 +24,7 @@ describe('TimelineResizeHandler devicePixelRatio watching', () => {
 
   beforeEach(() => {
     queries = [];
-    renderer = { resize: jest.fn<(width: number, height: number) => void>() };
+    renderer = { resize: vi.fn<(width: number, height: number) => void>() };
     container = document.createElement('div');
     setBox(400, 364);
     setRatio(1);

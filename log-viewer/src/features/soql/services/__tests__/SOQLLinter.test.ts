@@ -1,7 +1,7 @@
 /*
  * Copyright (c) 2021 Certinia Inc. All rights reserved.
  */
-import { describe, expect, it } from '@jest/globals';
+import { describe, expect, it } from 'vitest';
 import { ApexLogParser, LogEvent } from '@apexdevtools/apex-log-parser';
 
 import { SOQLLinter } from '../SOQLLinter.js';

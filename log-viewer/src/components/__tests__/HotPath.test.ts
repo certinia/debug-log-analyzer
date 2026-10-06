@@ -1,15 +1,15 @@
 /*
  * Copyright (c) 2026 Certinia Inc. All rights reserved.
  *
- * @jest-environment jsdom
+ * @vitest-environment jsdom
  */
-import { beforeEach, describe, expect, it } from '@jest/globals';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type { LogStore } from '../../core/log/LogStore.js';
 import type { ExecutionHighlights } from '../../features/call-tree/utils/ExecutionHighlights.js';
 
 let highlights: ExecutionHighlights | null = null;
-jest.mock('../../features/call-tree/utils/ExecutionHighlights.js', () => ({
+vi.mock('../../features/call-tree/utils/ExecutionHighlights.js', () => ({
   getExecutionHighlights: () => highlights,
 }));
 

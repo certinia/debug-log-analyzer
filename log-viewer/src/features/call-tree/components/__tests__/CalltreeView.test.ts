@@ -1,24 +1,26 @@
 /*
  * Copyright (c) 2026 Certinia Inc. All rights reserved.
  *
- * @jest-environment jsdom
+ * @vitest-environment jsdom
  */
-import { afterEach, beforeEach, describe, expect, it } from '@jest/globals';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { ApexLog } from '@apexdevtools/apex-log-parser';
 import type { Tabulator } from 'tabulator-tables';
 
 // The grids bring tabulator and its module registrations, which don't load under
-// jest; this suite drives only which table the view builds, and when.
-jest.mock('../TimeOrderTable.js', () => ({ createTimeOrderTable: () => build('time-order') }));
-jest.mock('../AggregatedTable.js', () => ({ createAggregatedTable: () => build('aggregated') }));
-jest.mock('../BottomUpTable.js', () => ({ createBottomUpTable: () => build('bottom-up') }));
+// tests; this suite drives only which table the view builds, and when.
+vi.mock('../TimeOrderTable.js', () => ({ createTimeOrderTable: () => build('time-order') }));
+vi.mock('../AggregatedTable.js', () => ({
+  createAggregatedTable: () => build('aggregated'),
+}));
+vi.mock('../BottomUpTable.js', () => ({ createBottomUpTable: () => build('bottom-up') }));
 // VsSelect extends vscode-single-select, whose setFormValue needs an
 // ElementInternals jsdom lacks; the render would upgrade it.
-jest.mock('../../../../components/VsSelect.js', () => ({}));
+vi.mock('../../../../components/VsSelect.js', () => ({}));
 // Connecting the view reads settings twice: firstUpdated loads the column view,
 // and category colouring subscribes. This suite has no extension host to answer.
-jest.mock('../../../settings/Settings.js', () => ({
-  ...jest.requireActual<object>('../../../settings/Settings.js'),
+vi.mock('../../../settings/Settings.js', async (importOriginal) => ({
+  ...(await importOriginal<object>()),
   getSettings: () => Promise.resolve({}),
   subscribeSettings: () => () => {},
 }));

@@ -1,20 +1,21 @@
 /*
  * Copyright (c) 2025 Certinia Inc. All rights reserved.
  */
+import { beforeEach, describe, expect, it, type Mock, vi } from 'vitest';
 import { workspace } from 'vscode';
 import { SfdxProject } from '../../salesforce/codesymbol/SfdxProject';
 import { findSymbol } from '../../salesforce/codesymbol/SymbolFinder';
 import type { VSWorkspace } from '../VSWorkspace';
 import { VSWorkspaceManager } from '../VSWorkspaceManager';
 
-jest.mock('../VSWorkspace');
-jest.mock('../../salesforce/codesymbol/SfdxProject');
-jest.mock('../../salesforce/codesymbol/SymbolFinder');
+vi.mock('../VSWorkspace');
+vi.mock('../../salesforce/codesymbol/SfdxProject');
+vi.mock('../../salesforce/codesymbol/SymbolFinder');
 
 function createMockWorkspace() {
   return {
-    parseSfdxProjects: jest.fn().mockResolvedValue(undefined),
-    getAllProjects: jest.fn().mockReturnValue([]),
+    parseSfdxProjects: vi.fn().mockResolvedValue(undefined),
+    getAllProjects: vi.fn().mockReturnValue([]),
   };
 }
 
@@ -129,7 +130,7 @@ describe('VSWorkspaceManager', () => {
 
     it('should parse the symbol into candidates and delegate to the finder', async () => {
       const { manager } = createManagerWithWorkspace();
-      (findSymbol as jest.Mock).mockResolvedValue({ status: 'found', uri: mockUri });
+      (findSymbol as Mock).mockResolvedValue({ status: 'found', uri: mockUri });
 
       const result = await manager.findSymbol('MyClass.method()');
 
@@ -152,7 +153,7 @@ describe('VSWorkspaceManager', () => {
     it('should rebuild a pre-existing index once and retry when all candidates miss', async () => {
       const { manager, mockWorkspace } = createManagerWithWorkspace();
       await manager.initialiseWorkspaceProjectInfo();
-      (findSymbol as jest.Mock)
+      (findSymbol as Mock)
         .mockResolvedValueOnce({ status: 'not-found' })
         .mockResolvedValueOnce({ status: 'found', uri: mockUri });
 
@@ -165,7 +166,7 @@ describe('VSWorkspaceManager', () => {
 
     it('should not retry when the index was built by this call', async () => {
       const { manager, mockWorkspace } = createManagerWithWorkspace();
-      (findSymbol as jest.Mock).mockResolvedValue({ status: 'not-found' });
+      (findSymbol as Mock).mockResolvedValue({ status: 'not-found' });
 
       const result = await manager.findSymbol('MyClass.method()');
 
@@ -177,7 +178,7 @@ describe('VSWorkspaceManager', () => {
     it('should not retry when the user cancelled the picker', async () => {
       const { manager, mockWorkspace } = createManagerWithWorkspace();
       await manager.initialiseWorkspaceProjectInfo();
-      (findSymbol as jest.Mock).mockResolvedValue({ status: 'cancelled' });
+      (findSymbol as Mock).mockResolvedValue({ status: 'cancelled' });
 
       const result = await manager.findSymbol('MyClass.method()');
 

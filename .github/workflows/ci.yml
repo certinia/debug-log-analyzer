@@ -32,8 +32,7 @@ jobs:
         run: pnpm run lint
 
   tests:
-    # Split per jest project so they run on parallel runners and failures are isolated.
-    # Kept as --runInBand: on 2-vCPU runners the worker pool is slower than serial.
+    # Split per vitest project so they run on parallel runners and failures are isolated.
     name: Test (${{ matrix.project }})
     runs-on: ubuntu-latest
     strategy:
@@ -55,7 +54,7 @@ jobs:
       - name: Install Packages
         run: pnpm run ci:install
       - name: Tests
-        run: pnpm exec jest --selectProjects ${{ matrix.project }} --runInBand
+        run: pnpm exec vitest run --project ${{ matrix.project }}
 
   e2e:
     name: Test (web e2e)

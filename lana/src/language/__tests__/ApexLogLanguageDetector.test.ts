@@ -1,7 +1,7 @@
 /*
  * Copyright (c) 2026 Certinia Inc. All rights reserved.
  */
-import { describe, expect, it } from '@jest/globals';
+import { describe, expect, it } from 'vitest';
 
 import { asContext, createMockContext } from '../../__tests__/helpers/test-builders.js';
 import { createMockTextDocument } from '../../__tests__/mocks/vscode.js';

@@ -1,16 +1,16 @@
 /*
  * Copyright (c) 2026 Certinia Inc. All rights reserved.
  *
- * @jest-environment jsdom
+ * @vitest-environment jsdom
  */
-import { beforeEach, describe, expect, it } from '@jest/globals';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type { LogStore } from '../../../../core/log/LogStore.js';
 import type { SelfTimeSpread } from '../../services/SelfTimeSpread.js';
 
 let spread: SelfTimeSpread | null = null;
-jest.mock('../../services/SelfTimeSpread.js', () => ({
-  ...jest.requireActual<object>('../../services/SelfTimeSpread.js'),
+vi.mock('../../services/SelfTimeSpread.js', async (importOriginal) => ({
+  ...(await importOriginal<object>()),
   getSelfTimeSpread: () => spread,
 }));
 

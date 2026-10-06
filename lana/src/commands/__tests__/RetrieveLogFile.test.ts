@@ -1,7 +1,7 @@
 /*
  * Copyright (c) 2026 Certinia Inc. All rights reserved.
  */
-import { beforeEach, describe, expect, it } from '@jest/globals';
+import { beforeEach, describe, expect, it, type Mock, vi } from 'vitest';
 import { Uri, window, workspace } from 'vscode';
 import {
   asContext,
@@ -19,26 +19,26 @@ import {
 import { LogView } from '../LogView.js';
 import { RetrieveLogFile } from '../RetrieveLogFile.js';
 
-jest.mock('../../display/QuickPick.js', () => ({
-  ...jest.requireActual<object>('../../display/QuickPick.js'),
-  QuickPick: { pick: jest.fn() },
+vi.mock('../../display/QuickPick.js', async (importOriginal) => ({
+  ...(await importOriginal<object>()),
+  QuickPick: { pick: vi.fn() },
 }));
-jest.mock('../../services/salesforceServices.js', () => ({
-  ensureServicesAvailable: jest.fn(),
-  fileOrFolderExists: jest.fn(),
-  getLogBody: jest.fn(),
-  listLogs: jest.fn(),
-  writeFile: jest.fn(),
+vi.mock('../../services/salesforceServices.js', () => ({
+  ensureServicesAvailable: vi.fn(),
+  fileOrFolderExists: vi.fn(),
+  getLogBody: vi.fn(),
+  listLogs: vi.fn(),
+  writeFile: vi.fn(),
 }));
-jest.mock('../LogView.js', () => ({ LogView: { createView: jest.fn() } }));
+vi.mock('../LogView.js', () => ({ LogView: { createView: vi.fn() } }));
 
-const mockPick = QuickPick.pick as jest.Mock;
-const mockEnsureServicesAvailable = ensureServicesAvailable as jest.Mock;
-const mockFileOrFolderExists = fileOrFolderExists as jest.Mock;
-const mockListLogs = listLogs as jest.Mock;
-const mockGetLogBody = getLogBody as jest.Mock;
-const mockWriteFile = writeFile as jest.Mock;
-const mockCreateView = LogView.createView as jest.Mock;
+const mockPick = QuickPick.pick as Mock;
+const mockEnsureServicesAvailable = ensureServicesAvailable as Mock;
+const mockFileOrFolderExists = fileOrFolderExists as Mock;
+const mockListLogs = listLogs as Mock;
+const mockGetLogBody = getLogBody as Mock;
+const mockWriteFile = writeFile as Mock;
+const mockCreateView = LogView.createView as Mock;
 const mockWorkspace = workspace as unknown as {
   workspaceFolders: Array<{
     uri: ReturnType<typeof Uri.file>;
@@ -75,18 +75,18 @@ describe('RetrieveLogFile', () => {
     mockWriteFile.mockResolvedValue(undefined);
     dismissPicker = () => undefined;
     picker = makePicker();
-    (window.createQuickPick as jest.Mock).mockReturnValue(picker);
+    (window.createQuickPick as Mock).mockReturnValue(picker);
   });
 
   const makePicker = () => ({
     busy: false,
     enabled: true,
     placeholder: '',
-    show: jest.fn(),
-    dispose: jest.fn(),
-    onDidHide: jest.fn((listener: () => void) => {
+    show: vi.fn(),
+    dispose: vi.fn(),
+    onDidHide: vi.fn((listener: () => void) => {
       dismissPicker = listener;
-      return { dispose: jest.fn() };
+      return { dispose: vi.fn() };
     }),
   });
 

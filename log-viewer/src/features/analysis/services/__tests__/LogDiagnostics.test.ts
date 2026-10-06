@@ -2,13 +2,13 @@
  * Copyright (c) 2026 Certinia Inc. All rights reserved.
  */
 import type { ApexLog, LogEvent, GovernorLimits, Limits } from '@apexdevtools/apex-log-parser';
-import { beforeEach, describe, expect, it } from '@jest/globals';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { emptyLimits, governorLimits, limitValue } from '#test-helpers/limits.js';
 
 let log: ApexLog | null = null;
 
-jest.mock('../../../../core/log/LogStore.js', () => ({
+vi.mock('../../../../core/log/LogStore.js', () => ({
   currentLogStore: () => (log ? { log, stackByEventIndex: () => [] } : null),
 }));
 

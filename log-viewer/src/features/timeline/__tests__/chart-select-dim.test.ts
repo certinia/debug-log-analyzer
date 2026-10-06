@@ -1,5 +1,5 @@
 /**
- * @jest-environment jsdom
+ * @vitest-environment jsdom
  */
 
 /*
@@ -11,7 +11,7 @@
  * select keeps its dim. Chrome DevTools dims for a search or a filter, never for a select.
  */
 
-import { describe, expect, it, jest } from '@jest/globals';
+import { describe, expect, it, vi } from 'vitest';
 import { ApexLogTimeline } from '../optimised/ApexLogTimeline.js';
 
 /** What the emphasis was asked to do, in order: an eventIndex to mark, or 'clear'. */
@@ -28,7 +28,7 @@ function timelineWithSpy(): {
   let calls: EmphasisCall[] = [];
 
   internals['flamechart'] = {
-    locateByEventNodes: jest.fn(),
+    locateByEventNodes: vi.fn(),
     // The inspector's select re-enters handleSelect, as the real chart does.
     selectByEventNode: () => {
       handleSelect.call(timeline, null);

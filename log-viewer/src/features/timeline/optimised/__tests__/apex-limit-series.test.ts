@@ -1,7 +1,7 @@
 /*
  * Copyright (c) 2026 Certinia Inc. All rights reserved.
  */
-import { describe, expect, it } from '@jest/globals';
+import { describe, expect, it } from 'vitest';
 import type { ApexLog } from '@apexdevtools/apex-log-parser';
 
 import { emptyLimits } from '#test-helpers/limits.js';

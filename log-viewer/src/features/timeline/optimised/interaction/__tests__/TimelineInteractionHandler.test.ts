@@ -1,5 +1,5 @@
 /**
- * @jest-environment jsdom
+ * @vitest-environment jsdom
  */
 
 /*
@@ -19,7 +19,7 @@
  * - Alt/Shift+mousedown → area-zoom / measurement start, with Alt priority
  * - non-left button ignored; preventDefault on wheel
  */
-import { afterEach, beforeEach, describe, expect, it, jest } from '@jest/globals';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { TimelineViewport } from '../../TimelineViewport.js';
 import { wheelZoomFactor } from '../../ViewportUtils.js';
@@ -66,13 +66,13 @@ describe('TimelineInteractionHandler', () => {
   afterEach(() => {
     handler.destroy();
     document.body.removeChild(canvas);
-    jest.restoreAllMocks();
+    vi.restoreAllMocks();
   });
 
   describe('wheel zoom', () => {
     it('zooms in on scroll up (negative deltaY), anchored at the cursor', () => {
       handler = createHandler();
-      const setZoom = jest.spyOn(viewport, 'setZoom');
+      const setZoom = vi.spyOn(viewport, 'setZoom');
       const startZoom = viewport.getState().zoom;
 
       dispatchWheel({ deltaY: -10, clientX: 250 });
@@ -86,7 +86,7 @@ describe('TimelineInteractionHandler', () => {
 
     it('zooms out on scroll down (positive deltaY)', () => {
       handler = createHandler();
-      const setZoom = jest.spyOn(viewport, 'setZoom');
+      const setZoom = vi.spyOn(viewport, 'setZoom');
       const startZoom = viewport.getState().zoom;
 
       dispatchWheel({ deltaY: 10, clientX: 250 });
@@ -104,7 +104,7 @@ describe('TimelineInteractionHandler', () => {
 
     it('applies the shared wheelZoomFactor to the current zoom', () => {
       handler = createHandler();
-      const setZoom = jest.spyOn(viewport, 'setZoom');
+      const setZoom = vi.spyOn(viewport, 'setZoom');
       const startZoom = viewport.getState().zoom;
 
       dispatchWheel({ deltaY: -10, deltaMode: 0, clientX: 100 });
@@ -115,7 +115,7 @@ describe('TimelineInteractionHandler', () => {
 
     it('clamps a large delta so one event cannot produce a huge jump', () => {
       handler = createHandler();
-      const setZoom = jest.spyOn(viewport, 'setZoom');
+      const setZoom = vi.spyOn(viewport, 'setZoom');
       const startZoom = viewport.getState().zoom;
 
       // Windows fast-scroll / momentum: an unclamped linear factor would go
@@ -129,7 +129,7 @@ describe('TimelineInteractionHandler', () => {
 
     it('does not zoom when enableZoom is false', () => {
       handler = createHandler({ enableZoom: false });
-      const setZoom = jest.spyOn(viewport, 'setZoom');
+      const setZoom = vi.spyOn(viewport, 'setZoom');
 
       dispatchWheel({ deltaY: -10, clientX: 250 });
 
@@ -140,8 +140,8 @@ describe('TimelineInteractionHandler', () => {
   describe('wheel pan (never zoom)', () => {
     it('Shift+wheel pans vertically when deltaY dominates', () => {
       handler = createHandler();
-      const panBy = jest.spyOn(viewport, 'panBy');
-      const setZoom = jest.spyOn(viewport, 'setZoom');
+      const panBy = vi.spyOn(viewport, 'panBy');
+      const setZoom = vi.spyOn(viewport, 'setZoom');
 
       dispatchWheel({ deltaY: 40, deltaX: 0, shiftKey: true });
 
@@ -151,7 +151,7 @@ describe('TimelineInteractionHandler', () => {
 
     it('Shift+wheel pans horizontally when deltaX dominates', () => {
       handler = createHandler();
-      const panBy = jest.spyOn(viewport, 'panBy');
+      const panBy = vi.spyOn(viewport, 'panBy');
 
       dispatchWheel({ deltaX: 40, deltaY: 5, shiftKey: true });
 
@@ -160,8 +160,8 @@ describe('TimelineInteractionHandler', () => {
 
     it('Alt+wheel pans horizontally using -deltaY', () => {
       handler = createHandler();
-      const panBy = jest.spyOn(viewport, 'panBy');
-      const setZoom = jest.spyOn(viewport, 'setZoom');
+      const panBy = vi.spyOn(viewport, 'panBy');
+      const setZoom = vi.spyOn(viewport, 'setZoom');
 
       dispatchWheel({ deltaY: 40, altKey: true });
 
@@ -172,8 +172,8 @@ describe('TimelineInteractionHandler', () => {
 
   describe('mousedown modes', () => {
     it('Alt+mousedown starts area zoom at the cursor', () => {
-      const onAreaZoomStart = jest.fn<(screenX: number) => void>();
-      const onMeasureStart = jest.fn<(screenX: number) => void>();
+      const onAreaZoomStart = vi.fn<(screenX: number) => void>();
+      const onMeasureStart = vi.fn<(screenX: number) => void>();
       handler = createHandler({}, { onAreaZoomStart, onMeasureStart });
 
       dispatchMouseDown({ button: 0, altKey: true, clientX: 300 });
@@ -183,7 +183,7 @@ describe('TimelineInteractionHandler', () => {
     });
 
     it('Shift+mousedown starts measurement at the cursor', () => {
-      const onMeasureStart = jest.fn<(screenX: number) => void>();
+      const onMeasureStart = vi.fn<(screenX: number) => void>();
       handler = createHandler({}, { onMeasureStart });
 
       dispatchMouseDown({ button: 0, shiftKey: true, clientX: 300 });
@@ -192,8 +192,8 @@ describe('TimelineInteractionHandler', () => {
     });
 
     it('gives Alt priority over Shift when both are held', () => {
-      const onAreaZoomStart = jest.fn<(screenX: number) => void>();
-      const onMeasureStart = jest.fn<(screenX: number) => void>();
+      const onAreaZoomStart = vi.fn<(screenX: number) => void>();
+      const onMeasureStart = vi.fn<(screenX: number) => void>();
       handler = createHandler({}, { onAreaZoomStart, onMeasureStart });
 
       dispatchMouseDown({ button: 0, altKey: true, shiftKey: true, clientX: 300 });
@@ -203,8 +203,8 @@ describe('TimelineInteractionHandler', () => {
     });
 
     it('ignores non-left mouse buttons', () => {
-      const onAreaZoomStart = jest.fn<(screenX: number) => void>();
-      const onMeasureStart = jest.fn<(screenX: number) => void>();
+      const onAreaZoomStart = vi.fn<(screenX: number) => void>();
+      const onMeasureStart = vi.fn<(screenX: number) => void>();
       handler = createHandler({}, { onAreaZoomStart, onMeasureStart });
 
       dispatchMouseDown({ button: 2, altKey: true, clientX: 300 });

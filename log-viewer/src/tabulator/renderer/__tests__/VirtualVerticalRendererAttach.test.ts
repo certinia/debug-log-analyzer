@@ -1,10 +1,10 @@
 /**
- * @jest-environment jsdom
+ * @vitest-environment jsdom
  */
 /*
  * Copyright (c) 2026 Certinia Inc. All rights reserved.
  */
-import { describe, expect, it, jest } from '@jest/globals';
+import { afterEach, beforeEach, describe, expect, it, type Mock, vi } from 'vitest';
 
 import { VirtualVerticalRenderer } from '../VirtualVerticalRenderer';
 import { seedHeightIndex, type RowStubBase } from './rendererTestUtils';
@@ -17,8 +17,8 @@ import { seedHeightIndex, type RowStubBase } from './rendererTestUtils';
 
 // jsdom stub: real elements, with spied initialize/rendered.
 interface AttachRowStub extends RowStubBase<HTMLElement> {
-  initialize: jest.Mock;
-  rendered: jest.Mock;
+  initialize: Mock;
+  rendered: Mock;
 }
 
 interface AttachRendererInternals {
@@ -48,13 +48,13 @@ function makeAttachSetup(rowCount: number): {
       heightInitialized: true,
       // Mirrors real Tabulator Row.initialize, which flips `initialized` —
       // the idle pre-warm walker relies on it to make progress.
-      initialize: jest.fn(() => {
+      initialize: vi.fn(() => {
         row.initialized = true;
       }),
       calcHeight: () => {},
       setCellHeight: () => {},
       clearCellHeight: () => {},
-      rendered: jest.fn(),
+      rendered: vi.fn(),
       getElement: () => el,
       getHeight: () => 30,
       data: {},
@@ -233,18 +233,18 @@ describe('VirtualVerticalRenderer render-virtual-fill dispatch (stock contract)'
   interface RenderInternals {
     _renderWindow: () => void;
     inScrollDrivenRender: boolean;
-    table: { rowManager: { element: { scrollTop: number } }; eventBus: { dispatch: jest.Mock } };
+    table: { rowManager: { element: { scrollTop: number } }; eventBus: { dispatch: Mock } };
   }
 
-  function makeRenderSetup(rowCount: number): { rr: RenderInternals; dispatched: jest.Mock } {
+  function makeRenderSetup(rowCount: number): { rr: RenderInternals; dispatched: Mock } {
     const { r } = makeAttachSetup(rowCount);
     const rr = r as unknown as RenderInternals;
-    const dispatched = jest.fn();
+    const dispatched = vi.fn();
     rr.table.eventBus.dispatch = dispatched;
     return { rr, dispatched };
   }
 
-  const fillCalls = (dispatched: jest.Mock) =>
+  const fillCalls = (dispatched: Mock) =>
     dispatched.mock.calls.filter((c) => c[0] === 'render-virtual-fill').length;
 
   it('dispatches after structural renders, including empty ones', () => {
@@ -279,7 +279,7 @@ describe('VirtualVerticalRenderer render-virtual-fill dispatch (stock contract)'
 
 describe('VirtualVerticalRenderer render-virtual-attach dispatch', () => {
   interface AttachDispatchInternals extends AttachRendererInternals {
-    table: { rowManager: { element: { scrollTop: number } }; eventBus: { dispatch: jest.Mock } };
+    table: { rowManager: { element: { scrollTop: number } }; eventBus: { dispatch: Mock } };
     _renderWindow: () => void;
   }
 
@@ -291,7 +291,7 @@ describe('VirtualVerticalRenderer render-virtual-attach dispatch', () => {
   } {
     const { r, rows } = makeAttachSetup(rowCount);
     const rr = r as AttachDispatchInternals;
-    const dispatched = jest.fn();
+    const dispatched = vi.fn();
     rr.table.eventBus.dispatch = dispatched;
     const calls = (event: string) => () =>
       dispatched.mock.calls.filter((c) => c[0] === event).length;
@@ -337,11 +337,11 @@ describe('VirtualVerticalRenderer PseudoRow (group row) tolerance', () => {
     // deinitializeHeight/data do not exist.
     const pseudoEl = document.createElement('div');
     const pseudo = {
-      initialize: jest.fn(),
+      initialize: vi.fn(),
       calcHeight: () => {},
       setCellHeight: () => {},
       clearCellHeight: () => {},
-      rendered: jest.fn(),
+      rendered: vi.fn(),
       getElement: () => pseudoEl,
       getHeight: () => undefined,
     } as unknown as AttachRowStub;

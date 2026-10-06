@@ -1,7 +1,7 @@
 /*
  * Copyright (c) 2026 Certinia Inc. All rights reserved.
  */
-import { describe, expect, it, jest } from '@jest/globals';
+import { describe, expect, it, vi } from 'vitest';
 
 import { framesOf } from '#test-helpers/timeline.js';
 import { buildTimelineFrames } from '../../../utils/timeline-frames.js';
@@ -68,7 +68,7 @@ describe('EventMatcher', () => {
 
   it('builds a match event only when it is read', () => {
     const { frames } = framesOf(LOG);
-    const node = jest.spyOn(frames, 'node');
+    const node = vi.spyOn(frames, 'node');
     const cursor = new EventMatcher(frames).search(textPredicate('ns.'));
     const ids = cursor.getMatchedEventIds();
     const info = cursor.getMatchedEventsInfo();

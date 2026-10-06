@@ -1,8 +1,6 @@
 /*
  * Copyright (c) 2026 Certinia Inc. All rights reserved.
  */
-import { TextEncoder } from 'node:util';
-
 /**
  * jsdom implements no layout, so it ships no `ResizeObserver` either. Components that observe
  * their own size construct one on connect, so without this every such suite throws before it can
@@ -18,13 +16,12 @@ if (!('ResizeObserver' in globalThis)) {
   (globalThis as unknown as Record<string, unknown>).ResizeObserver = NoopResizeObserver;
 }
 
-/**
- * jsdom ships no `TextEncoder`, which the parser uses to size a log in UTF-8 bytes. Node's is the
- * same WHATWG class, so handing it over costs nothing.
- */
-if (!('TextEncoder' in globalThis)) {
-  (globalThis as unknown as Record<string, unknown>).TextEncoder = TextEncoder;
-}
+// Retired: vitest's jsdom env copies node's `TextEncoder` onto the window. Re-add this (and the
+// `node:util` declaration in `declarations.d.ts`) for a DOM env that does not; the parser needs it.
+// import { TextEncoder } from 'node:util';
+// if (!('TextEncoder' in globalThis)) {
+//   (globalThis as unknown as Record<string, unknown>).TextEncoder = TextEncoder;
+// }
 
 /**
  * jsdom paces frames at 60 Hz, so every awaited frame costs 16 ms of real time. This keeps its

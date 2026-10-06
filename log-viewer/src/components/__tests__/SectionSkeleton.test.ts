@@ -1,9 +1,9 @@
 /*
  * Copyright (c) 2026 Certinia Inc. All rights reserved.
  *
- * @jest-environment jsdom
+ * @vitest-environment jsdom
  */
-import { describe, expect, it } from '@jest/globals';
+import { describe, expect, it } from 'vitest';
 
 import type { LogStatus } from '../../core/log/logStatus.js';
 import { NO_GOVERNOR_USAGE_TEXT, NO_LOG_TEXT } from '../governorCopy.js';

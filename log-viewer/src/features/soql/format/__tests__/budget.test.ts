@@ -1,7 +1,7 @@
 /*
  * Copyright (c) 2026 Certinia Inc. All rights reserved.
  */
-import { describe, expect, it } from '@jest/globals';
+import { describe, expect, it } from 'vitest';
 
 import { budgetedChunks, type SoqlBudget } from '../budget.js';
 import { countLeaves, parseConditions, splitClauses } from '../clauses.js';

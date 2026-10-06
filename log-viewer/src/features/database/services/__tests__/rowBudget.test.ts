@@ -1,7 +1,7 @@
 /*
  * Copyright (c) 2026 Certinia Inc. All rights reserved.
  */
-import { beforeEach, describe, expect, it } from '@jest/globals';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { ApexLog, Limits } from '@apexdevtools/apex-log-parser';
 
 import { emptyLimits, limitValue } from '#test-helpers/limits.js';
@@ -17,15 +17,15 @@ import {
 let overview: DatabaseOverview;
 let peaks: Limits;
 
-jest.mock('../databaseOverview.js', () => ({
-  ...jest.requireActual('../databaseOverview.js'),
+vi.mock('../databaseOverview.js', async (importOriginal) => ({
+  ...(await importOriginal()),
   databaseOverview: () => overview,
 }));
-jest.mock('../../../timeline/optimised/apex-limit-series.js', () => ({
+vi.mock('../../../timeline/optimised/apex-limit-series.js', () => ({
   apexLimitTimeSeries: () => ({ events: [] }),
 }));
-jest.mock('../../../../components/logOverviewMetrics.js', () => ({
-  ...jest.requireActual('../../../../components/logOverviewMetrics.js'),
+vi.mock('../../../../components/logOverviewMetrics.js', async (importOriginal) => ({
+  ...(await importOriginal()),
   limitTotals: () => peaks,
 }));
 

@@ -1,7 +1,7 @@
 /*
  * Copyright (c) 2026 Certinia Inc. All rights reserved.
  */
-import { describe, expect, it } from '@jest/globals';
+import { describe, expect, it } from 'vitest';
 
 import { TimelineViewport } from '../optimised/TimelineViewport.js';
 import { revealTarget, toDetailSelection } from '../utils/detail-selection-sync.js';

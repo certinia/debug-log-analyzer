@@ -1,11 +1,12 @@
 /*
  * Copyright (c) 2025 Certinia Inc. All rights reserved.
  */
+import { beforeEach, describe, expect, it, type Mock } from 'vitest';
 import { RelativePattern, type Uri, workspace } from 'vscode';
 import { SfdxProject } from '../SfdxProject';
 
 const fileUri = (path: string): Uri => ({ path, fsPath: path }) as Uri;
-const mockFindFiles = workspace.findFiles as jest.Mock;
+const mockFindFiles = workspace.findFiles as Mock;
 
 function createProject(packageDirUris: Uri[]): SfdxProject {
   return new SfdxProject(

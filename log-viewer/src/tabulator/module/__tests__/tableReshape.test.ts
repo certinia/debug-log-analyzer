@@ -1,7 +1,7 @@
 /*
  * Copyright (c) 2026 Certinia Inc. All rights reserved.
  */
-import { describe, expect, it, jest } from '@jest/globals';
+import { describe, expect, it, vi } from 'vitest';
 import type { SorterFromTable, Tabulator } from 'tabulator-tables';
 
 import { onTableReshaped } from '../tableReshape.js';
@@ -13,7 +13,7 @@ function setup() {
       handlers.set(event, handler);
     },
   } as unknown as Tabulator;
-  const changed = jest.fn();
+  const changed = vi.fn();
   onTableReshaped(table, changed);
   return {
     changed,

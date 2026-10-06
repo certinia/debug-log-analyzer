@@ -1,11 +1,11 @@
 /*
  * Copyright (c) 2025 Certinia Inc. All rights reserved.
  */
-import { beforeEach, describe, expect, it, jest } from '@jest/globals';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { ApexVisitor, type ApexNode } from '../ApexParser/ApexVisitor';
 
-jest.mock('@apexdevtools/apex-parser', () => ({ ApexParserBaseVisitor: class {} }));
+vi.mock('@apexdevtools/apex-parser', () => ({ ApexParserBaseVisitor: class {} }));
 
 type ClassDeclarationCtx = Parameters<ApexVisitor['visitClassDeclaration']>[0];
 type MethodDeclarationCtx = Parameters<ApexVisitor['visitMethodDeclaration']>[0];
@@ -86,7 +86,7 @@ describe('ApexVisitor', () => {
 
   /** Declarations take their children from visitChildren, which has its own tests below. */
   const stubVisitChildren = () => {
-    visitor.visitChildren = jest
+    visitor.visitChildren = vi
       .fn<typeof visitor.visitChildren>()
       .mockReturnValue({ children: [visited] });
   };
@@ -186,7 +186,7 @@ describe('ApexVisitor', () => {
     });
 
     it('delegates to the context', () => {
-      const accept = jest.fn().mockReturnValue({ nature: 'Method', name: 'test' });
+      const accept = vi.fn().mockReturnValue({ nature: 'Method', name: 'test' });
 
       expect(visitor.visit({ accept } as unknown as VisitCtx)).toEqual({
         nature: 'Method',

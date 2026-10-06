@@ -25,7 +25,7 @@ Always use pnpm.
 - `pnpm test` — run tests (before committing)
 - `pnpm lint` — oxlint + `prettier --check` + `tsc -b`, run concurrently. The single
   pre-commit gate, so `typecheck` on top of it is wasted.
-- `pnpm exec jest --selectProjects <log-viewer|lana>` — scoped tests,
+- `pnpm exec vitest run --project <log-viewer|lana>` — scoped tests,
   matching what CI runs per runner.
 - `pnpm format` — auto-format
 

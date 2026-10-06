@@ -1,12 +1,12 @@
 /*
  * Copyright (c) 2026 Certinia Inc. All rights reserved.
  */
-import { describe, expect, it, jest } from '@jest/globals';
+import { describe, expect, it, vi } from 'vitest';
 
 import { initialisedRows, type TreeRow, type TreeTable } from '../initialisedRows.js';
 
 function tableOf(rows: TreeRow[], dataTree: boolean) {
-  const initializeRow = jest.fn((row: TreeRow) => {
+  const initializeRow = vi.fn((row: TreeRow) => {
     row.modules.dataTree = { index: 0 };
   });
   return {

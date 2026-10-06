@@ -2,7 +2,7 @@
  * Copyright (c) 2026 Certinia Inc. All rights reserved.
  */
 import type { ApexLog, LogEvent } from '@apexdevtools/apex-log-parser';
-import { describe, expect, it } from '@jest/globals';
+import { describe, expect, it } from 'vitest';
 
 import { storeOf } from '#test-helpers/apexLog.js';
 import { buildLogIndex, type LogIndex, NO_ROW } from '../LogIndex.js';

@@ -1,7 +1,7 @@
 /*
  * Copyright (c) 2026 Certinia Inc. All rights reserved.
  */
-import { describe, expect, it } from '@jest/globals';
+import { describe, expect, it } from 'vitest';
 
 import { NAMESPACE_COLORS, logNamespacePalette, namespacePalette } from '../namespacePalette.js';
 import { log } from './fixtures/logEvents.js';

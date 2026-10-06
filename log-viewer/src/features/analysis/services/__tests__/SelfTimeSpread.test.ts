@@ -1,7 +1,7 @@
 /*
  * Copyright (c) 2026 Certinia Inc. All rights reserved.
  */
-import { beforeEach, describe, expect, it } from '@jest/globals';
+import { beforeEach, describe, expect, it } from 'vitest';
 import type { ApexLog, LogEvent } from '@apexdevtools/apex-log-parser';
 
 import { computeSelfTimeSpread, getSelfTimeSpread } from '../SelfTimeSpread.js';

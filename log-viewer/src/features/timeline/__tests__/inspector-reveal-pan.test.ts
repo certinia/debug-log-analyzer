@@ -1,5 +1,5 @@
 /**
- * @jest-environment jsdom
+ * @vitest-environment jsdom
  */
 
 /*
@@ -12,7 +12,7 @@
  * works out reach the chart, and a frame needing no move asks for none.
  */
 
-import { describe, expect, it, jest } from '@jest/globals';
+import { describe, expect, it, vi } from 'vitest';
 import { ApexLogTimeline } from '../optimised/ApexLogTimeline.js';
 import type { ViewportBounds, ViewportPanAxes } from '../types/flamechart.types.js';
 
@@ -41,7 +41,7 @@ function timelineWith(...events: Frame[]): {
   let selected = 0;
 
   internals['flamechart'] = {
-    locateByEventNodes: jest.fn(),
+    locateByEventNodes: vi.fn(),
     selectByEventNode: () => {
       selected++;
       return true;

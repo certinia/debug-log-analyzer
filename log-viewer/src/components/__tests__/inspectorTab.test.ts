@@ -1,7 +1,7 @@
 /*
  * Copyright (c) 2026 Certinia Inc. All rights reserved.
  */
-import { afterEach, describe, expect, it } from '@jest/globals';
+import { afterEach, describe, expect, it } from 'vitest';
 
 import { eventBus } from '../../core/events/EventBus.js';
 import { InspectorEmphasis } from '../inspectorEmphasis.js';

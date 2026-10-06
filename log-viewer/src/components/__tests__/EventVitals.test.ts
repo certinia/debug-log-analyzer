@@ -1,16 +1,16 @@
 /*
  * Copyright (c) 2026 Certinia Inc. All rights reserved.
  *
- * @jest-environment jsdom
+ * @vitest-environment jsdom
  */
-import { beforeAll, describe, expect, it } from '@jest/globals';
+import { beforeAll, describe, expect, it, vi } from 'vitest';
 import { parse } from '@apexdevtools/apex-log-parser';
 
 import { logStoreFor, type LogStore } from '../../core/log/LogStore.js';
 
 // Avoid the heavy CodeBlock import chain (the soql formatter); the
 // field order is expressed by the `.label` spans, not the code preview.
-jest.mock('../CodeBlock.js', () => ({}));
+vi.mock('../CodeBlock.js', () => ({}));
 
 import type { EventVitals } from '../EventVitals.js';
 import '../EventVitals.js';

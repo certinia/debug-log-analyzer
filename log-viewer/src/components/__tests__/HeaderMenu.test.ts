@@ -1,9 +1,9 @@
 /*
  * Copyright (c) 2026 Certinia Inc. All rights reserved.
  *
- * @jest-environment jsdom
+ * @vitest-environment jsdom
  */
-import { describe, expect, it } from '@jest/globals';
+import { describe, expect, it, vi } from 'vitest';
 
 import type { HeaderMenu } from '../HeaderMenu.js';
 import '../HeaderMenu.js';
@@ -77,7 +77,7 @@ describe('HeaderMenu', () => {
     const popover = el.shadowRoot?.querySelector('anchored-popover') as unknown as {
       close: () => void;
     };
-    const close = jest.fn();
+    const close = vi.fn();
     popover.close = close;
 
     // Chrome alone among the panel's contents: a click on it commands nothing.
