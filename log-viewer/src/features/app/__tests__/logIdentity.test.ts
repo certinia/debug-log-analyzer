@@ -20,6 +20,23 @@ function transaction(codeUnitStarted: string, prefix = USER_INFO_LINE): string {
   );
 }
 
+/** A transaction around any number of code units. */
+function execution(units: string): string {
+  return (
+    USER_INFO_LINE +
+    '09:18:22.6 (6574780)|EXECUTION_STARTED\n' +
+    units +
+    '09:18:22.6 (2000000000)|EXECUTION_FINISHED\n'
+  );
+}
+
+function unit(name: string, startNs: number, endNs: number): string {
+  return (
+    `09:18:22.6 (${startNs})|CODE_UNIT_STARTED|[EXTERNAL]|${name}\n` +
+    `09:18:22.6 (${endNs})|CODE_UNIT_FINISHED|${name}\n`
+  );
+}
+
 function identity(rawLog: string) {
   return deriveLogIdentity(parse(rawLog));
 }
@@ -58,6 +75,41 @@ describe('entry point', () => {
     );
 
     expect(identity(log).entryPoint?.label).toBe('Trigger MyTrigger');
+  });
+
+  it('names the longest of several entry points, listing them longest first', () => {
+    const log = execution(
+      unit('FutureHandler - state load', 7_000_000, 9_000_000) +
+        unit('execute_anonymous_apex', 10_000_000, 1_210_000_000),
+    );
+
+    expect(identity(log).entryPoint).toEqual({
+      label: 'Anonymous Apex',
+      detail:
+        '2 entry points, longest first: Anonymous Apex (1.2 s) · FutureHandler - state load (2 ms)',
+      count: 1,
+    });
+  });
+
+  it('lists only the five longest entry points', () => {
+    const units = [1, 2, 3, 4, 5, 6, 7].map((n) =>
+      unit(`Unit${n}`, n * 10_000_000, n * 11_000_000),
+    );
+
+    expect(identity(execution(units.join(''))).entryPoint).toEqual({
+      label: 'Unit7',
+      detail:
+        '7 entry points, longest first: Unit7 (7 ms) · Unit6 (6 ms) · Unit5 (5 ms) · Unit4 (4 ms) · Unit3 (3 ms) · +2 more',
+      count: 6,
+    });
+  });
+
+  it('names the first entry point when two are equally long', () => {
+    const log = execution(
+      unit('First', 7_000_000, 9_000_000) + unit('Second', 10_000_000, 12_000_000),
+    );
+
+    expect(identity(log).entryPoint?.label).toBe('First');
   });
 
   it('is null when the log has no code unit', () => {

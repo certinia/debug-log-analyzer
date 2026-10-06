@@ -14,6 +14,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - 🌊 **Flows**: names drop the `FLOW_START_INTERVIEWS :` and `WF_CRITERIA :` prefixes.
 - 📚 **Multiple logs**: a file holding several logs shows the first and flags the rest.
 - 🪪 **Call tree**: the `USER_INFO` line shows as a row.
+- 🎯 **Entry point**: the header names the longest and counts the rest, and its tooltip lists the top five.
 
 ### Removed
 

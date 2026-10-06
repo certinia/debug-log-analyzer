@@ -1,6 +1,6 @@
 {
   "compilerOptions": {
-    "lib": ["ES2022", "dom", "DOM.Iterable"],
+    "lib": ["ES2023", "dom", "DOM.Iterable"],
 
     "esModuleInterop": true,
     "skipLibCheck": true,
