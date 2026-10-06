@@ -1,28 +1,27 @@
 /*
  * Copyright (c) 2026 Certinia Inc. All rights reserved.
  */
-import { type ApexLog, LOG_CATEGORY, type LogCategory } from '@apexdevtools/apex-log-parser';
+import { LOG_CATEGORY, type LogCategory } from '@apexdevtools/apex-log-parser';
 
-import { walkEvents } from '../../../core/utility/EventTree.js';
+import type { LogIndex } from '../../../core/log/LogIndex.js';
 
 import type { TimelineKeyEntry } from '../components/TimelineKey.js';
 
 /**
- * Sums self time (ns) per category across the whole event tree. Self time partitions
- * the wall clock, so the sums add up to the log duration with no double counting.
- * Iterative walk — deep logs would overflow a recursive one.
+ * Self time (ns) per category name, `''` for uncategorised, from one pass over the
+ * index's columns. Self time partitions the wall clock, so the sums add up to the
+ * log duration with no double counting.
  */
-export function categorySelfTimes(root: ApexLog): Map<LogCategory, number> {
-  const totals = new Map<LogCategory, number>();
-  for (const node of walkEvents([root])) {
-    if (node.category) {
-      totals.set(node.category, (totals.get(node.category) ?? 0) + node.duration.self);
-    }
+export function selfTimeByCategory(index: LogIndex): Map<string, number> {
+  const sums = new Float64Array(index.categoryNames.length);
+  const { categoryId, self } = index;
+  for (let row = 0; row < index.rowCount; row++) {
+    sums[categoryId[row]!]! += self[row]!;
   }
-  return totals;
+  return new Map(index.categoryNames.map((name, id) => [name, sums[id]!]));
 }
 
-/** Legend order; the labels double as the `LogCategory` keys `categorySelfTimes` sums by. */
+/** Legend order; the labels double as the `LogCategory` keys `selfTimeByCategory` sums by. */
 const KEY_CATEGORIES: readonly LogCategory[] = [
   LOG_CATEGORY.Apex,
   LOG_CATEGORY.CodeUnit,
@@ -40,7 +39,7 @@ const KEY_CATEGORIES: readonly LogCategory[] = [
  */
 export function toTimelineKeys(
   color: (category: string) => string,
-  selfTimes?: Map<LogCategory, number>,
+  selfTimes?: ReadonlyMap<string, number>,
 ): TimelineKeyEntry[] {
   return KEY_CATEGORIES.map((category) => ({
     category,

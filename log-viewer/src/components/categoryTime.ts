@@ -1,14 +1,14 @@
 /*
  * Copyright (c) 2026 Certinia Inc. All rights reserved.
  */
-import type { ApexLog } from '@apexdevtools/apex-log-parser';
 import { html, type ReactiveControllerHost, type TemplateResult } from 'lit';
 
 import { SubscriptionController } from '../core/events/SubscriptionController.js';
-import { walkEvents } from '../core/utility/EventTree.js';
+import type { LogIndex } from '../core/log/LogIndex.js';
 import { subscribeSettings, type LanaSettings } from '../features/settings/Settings.js';
 import { addCustomThemes, getTheme } from '../features/timeline/themes/ThemeSelector.js';
 import { CATEGORY_THEME_KEY, DEFAULT_THEME_NAME } from '../features/timeline/themes/Themes.js';
+import { selfTimeByCategory } from '../features/timeline/utils/category-self-time.js';
 
 /** The bucket for events the parser leaves uncategorised. */
 export const OTHER_CATEGORY = 'Other';
@@ -31,10 +31,6 @@ export function categoryLabel(category: string): TemplateResult {
  *  palette is data, so it does not follow the host theme. */
 const OTHER_COLOR = '#808080';
 
-/** Memo of {@link categorySelfTimes}: the chart re-renders on every hover, but
- *  the tree never changes after parse, so the walk runs once per log. */
-const selfTimesCache = new WeakMap<ApexLog, CategoryTime[]>();
-
 export interface CategoryTime {
   category: string;
   /** Summed self time (ns) — each nanosecond of the log lands in exactly one
@@ -45,24 +41,12 @@ export interface CategoryTime {
 /**
  * Self time per category over the whole log, largest first. Empty buckets are
  * dropped, and events with no category land in {@link OTHER_CATEGORY}.
- * Iterative: the tree's size is unbounded.
  */
-export function categorySelfTimes(root: ApexLog): CategoryTime[] {
-  const cached = selfTimesCache.get(root);
-  if (cached) {
-    return cached;
-  }
-  const totals = new Map<string, number>();
-  for (const event of walkEvents(root.children)) {
-    const category = categoryName(event.category);
-    totals.set(category, (totals.get(category) ?? 0) + event.duration.self);
-  }
-  const slices = [...totals]
+export function categorySelfTimes(index: LogIndex): CategoryTime[] {
+  return [...selfTimeByCategory(index)]
     .filter(([, selfTime]) => selfTime > 0)
-    .map(([category, selfTime]) => ({ category, selfTime }))
+    .map(([name, selfTime]) => ({ category: categoryName(name), selfTime }))
     .sort((a, b) => b.selfTime - a.selfTime);
-  selfTimesCache.set(root, slices);
-  return slices;
 }
 
 /**

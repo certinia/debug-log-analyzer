@@ -14,6 +14,7 @@ async function mount(props: {
   logStatus?: LogStatus;
   shape?: SkeletonShape;
   fallback?: string;
+  pending?: boolean;
 }): Promise<SectionSkeleton> {
   const el = document.createElement('section-skeleton') as SectionSkeleton;
   Object.assign(el, props);
@@ -83,6 +84,13 @@ describe('SectionSkeleton', () => {
 
     expect(note(el)).toBe(NO_GOVERNOR_USAGE_TEXT);
     expect(rowWidths(el)).toEqual([]);
+  });
+
+  it('keeps shimmering after the parse while the section is pending', async () => {
+    const el = await mount({ logStatus: 'ready', shape: 'bar', fallback: 'unused', pending: true });
+
+    expect(rowWidths(el)).toEqual([['100%']]);
+    expect(note(el)).toBeNull();
   });
 
   it('answers for the log rather than the section when none arrived', async () => {

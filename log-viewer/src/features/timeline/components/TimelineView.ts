@@ -7,8 +7,9 @@ import { LitElement, css, html, nothing, type PropertyValues } from 'lit';
 import { customElement, property, query, state } from 'lit/decorators.js';
 
 import { logStatusContext, type LogStatus } from '../../../core/log/logStatus.js';
+import { logStoreFor } from '../../../core/log/LogStore.js';
 
-import type { ApexLog, LogCategory } from '@apexdevtools/apex-log-parser';
+import type { ApexLog } from '@apexdevtools/apex-log-parser';
 import { categoryPalette } from '../../../components/categoryTime.js';
 import { SubscriptionController } from '../../../core/events/SubscriptionController.js';
 import { VSCodeExtensionMessenger } from '../../../core/messaging/VSCodeExtensionMessenger.js';
@@ -22,7 +23,7 @@ import {
 import { DEFAULT_THEME_NAME, sameColors, type TimelineColors } from '../themes/Themes.js';
 import { addCustomThemes } from '../themes/ThemeSelector.js';
 
-import { categorySelfTimes, toTimelineKeys } from '../utils/category-self-time.js';
+import { selfTimeByCategory, toTimelineKeys } from '../utils/category-self-time.js';
 import type { TimeDisplayMode } from '../types/flamechart.types.js';
 import type { TimelineFlameChart } from './TimelineFlameChart.js';
 import type { TimelineKeyEntry } from './TimelineKey.js';
@@ -70,7 +71,7 @@ export class TimelineView extends LitElement {
   private timelineKeys: TimelineKeyEntry[] = [];
 
   /** Per-category self time for the loaded log; drives the legend durations. */
-  private selfTimes?: Map<LogCategory, number>;
+  private selfTimes?: Map<string, number>;
 
   /** The timeline settings last pushed; the legend's palette is resolved from them. */
   private timelineSettings: LanaSettings['timeline'] | null = null;
@@ -234,7 +235,19 @@ export class TimelineView extends LitElement {
 
   protected willUpdate(changed: PropertyValues): void {
     if (changed.has('timelineRoot')) {
-      this.selfTimes = this.timelineRoot ? categorySelfTimes(this.timelineRoot) : undefined;
+      this.selfTimes = undefined;
+      this.rebuildTimelineKeys();
+      void this.loadSelfTimes(this.timelineRoot);
+    }
+  }
+
+  private async loadSelfTimes(root: ApexLog | null): Promise<void> {
+    if (!root) {
+      return;
+    }
+    const index = await logStoreFor(root).logIndex();
+    if (root === this.timelineRoot) {
+      this.selfTimes = selfTimeByCategory(index);
       this.rebuildTimelineKeys();
     }
   }

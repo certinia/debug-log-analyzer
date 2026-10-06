@@ -6,6 +6,7 @@
 import { describe, expect, it } from '@jest/globals';
 import type { ApexLog } from '@apexdevtools/apex-log-parser';
 
+import { indexTree } from '#test-helpers/apexLog.js';
 import type { LanaSettings } from '../../features/settings/Settings.js';
 import { DEFAULT_THEME_NAME } from '../../features/timeline/themes/Themes.js';
 import { getTheme } from '../../features/timeline/themes/ThemeSelector.js';
@@ -41,7 +42,7 @@ describe('categorySelfTimes', () => {
       categoryEvent('DML', 200, [categoryEvent('Apex', 25)]),
     ]);
 
-    expect(categorySelfTimes(root)).toEqual([
+    expect(categorySelfTimes(indexTree(root))).toEqual([
       { category: 'SOQL', selfTime: 500 },
       { category: 'DML', selfTime: 200 },
       { category: 'Apex', selfTime: 175 },
@@ -55,16 +56,10 @@ describe('categorySelfTimes', () => {
       categoryEvent('System', 10),
     ]);
 
-    expect(categorySelfTimes(root)).toEqual([
+    expect(categorySelfTimes(indexTree(root))).toEqual([
       { category: OTHER_CATEGORY, selfTime: 40 },
       { category: 'System', selfTime: 10 },
     ]);
-  });
-
-  it('memoises per log, returning the same array for the same tree', () => {
-    const root = log([categoryEvent('Apex', 100)]);
-
-    expect(categorySelfTimes(root)).toBe(categorySelfTimes(root));
   });
 });
 
