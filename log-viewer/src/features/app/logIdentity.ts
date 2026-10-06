@@ -1,7 +1,7 @@
 /*
  * Copyright (c) 2026 Certinia Inc. All rights reserved.
  */
-import type { ApexLog, CodeUnitStartedLine, LogTimezone } from '@apexdevtools/apex-log-parser';
+import type { ApexLog, CodeUnitStartedLine } from '@apexdevtools/apex-log-parser';
 
 import { formatWallClockTime } from '../../core/utility/Util.js';
 
@@ -30,7 +30,7 @@ export function deriveLogIdentity(log: ApexLog): LogIdentityData {
     user: userName ? { label: userName.split('@')[0] || userName, detail: userName } : null,
     // The timezone sits with the time, not the user: the log's timestamps are
     // rendered in that zone, so it qualifies the clock reading.
-    startTime: startTimeItem(log, userInfo?.timezone ? formatTimezone(userInfo.timezone) : ''),
+    startTime: startTimeItem(log, userInfo?.timezone?.text ?? ''),
   };
 }
 
@@ -54,23 +54,6 @@ function entryPointLabel(unit: CodeUnitStartedLine): string {
     default:
       return text;
   }
-}
-
-/**
- * Rebuilds the header's `(GMT±HH:MM) Label (IANA/Name)` wording from the parts the parser splits
- * it into. The offset reproduces exactly, but a log stating a bare label gains a prefix it never
- * carried, since nothing in `LogTimezone` says whether one was there. apex-log-parser#85 asks for
- * the source text, which would replace this.
- */
-function formatTimezone({ label, name, offsetMinutes }: LogTimezone): string {
-  const offset = offsetMinutes === null ? '' : `(GMT${gmtOffset(offsetMinutes)})`;
-  return [offset, label, name ? `(${name})` : ''].filter(Boolean).join(' ');
-}
-
-function gmtOffset(offsetMinutes: number): string {
-  const pad = (value: number): string => String(value).padStart(2, '0');
-  const absolute = Math.abs(offsetMinutes);
-  return `${offsetMinutes < 0 ? '-' : '+'}${pad(Math.floor(absolute / 60))}:${pad(absolute % 60)}`;
 }
 
 function startTimeItem(log: ApexLog, timezone: string): LogIdentityItem | null {

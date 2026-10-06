@@ -89,6 +89,15 @@ describe('user and start time', () => {
     expect(identity(log).startTime?.detail).toMatch(/^Started 09:18:22\S* \(GMT\+05:30\)$/);
   });
 
+  it('shows a bare timezone label as the log states it', () => {
+    const log = transaction(
+      anonymous,
+      '09:18:22.6 (6297619)|USER_INFO|[EXTERNAL]|005Ea00000R6orz|tina.owen@example.com|Pacific Standard Time|GMT-08:00\n',
+    );
+
+    expect(identity(log).startTime?.detail).toMatch(/^Started 09:18:22\S* Pacific Standard Time$/);
+  });
+
   it('omits the user when USER_INFO states no name, keeping its timezone', () => {
     const log = transaction(
       anonymous,
