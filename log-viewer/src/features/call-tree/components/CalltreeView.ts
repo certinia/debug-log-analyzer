@@ -17,6 +17,8 @@ import type { FindEventDetail, FindEventMap } from '../../find/findEvents.js';
 import { SelectionEchoGuard } from '../../../core/events/SelectionEchoGuard.js';
 import { SubscriptionController } from '../../../core/events/SubscriptionController.js';
 import { vscodeMessenger } from '../../../core/messaging/VSCodeExtensionMessenger.js';
+import type { LogIndex } from '../../../core/log/LogIndex.js';
+import { logStoreFor } from '../../../core/log/LogStore.js';
 import { eventByEventIndex } from '../../../core/utility/EventSearch.js';
 import { isVisible } from '../../../core/utility/Util.js';
 import { CALLTREE_GO_TO_ROW, type CalltreeNavigationEventMap } from '../navigation.js';
@@ -96,6 +98,17 @@ const CONTAINER_IDS: Record<ViewMode, string> = {
   'bottom-up': '#bottom-up-tree-table',
 };
 
+function typeNamesIn(index: LogIndex): string[] {
+  const types = new Set<string>();
+  for (let row = 0; row < index.rowCount; row++) {
+    const type = index.event(row).type;
+    if (type) {
+      types.add(type);
+    }
+  }
+  return [...types].sort();
+}
+
 const DEBUG_VALUE_TYPES: ReadonlySet<string> = new Set([
   'USER_DEBUG',
   'DATAWEAVE_USER_DEBUG',
@@ -118,6 +131,10 @@ export class CalltreeView extends LitElement {
 
   @state()
   viewMode: ViewMode = 'time-order';
+
+  @state()
+  private _types: readonly string[] = [];
+  private _typesFor: ApexLog | null = null;
 
   aggregatedTreeTable: Tabulator | null = null;
   bottomUpTreeTable: Tabulator | null = null;
@@ -221,6 +238,25 @@ export class CalltreeView extends LitElement {
     this._visibilityWait?.abort();
     this._visibilityWait = null;
     this._destroyCurrentTable();
+  }
+
+  willUpdate(): void {
+    // The view is mounted hidden, so a log whose call tree is never opened costs nothing.
+    if (this.isVisible && this.timelineRoot !== this._typesFor) {
+      this._typesFor = this.timelineRoot;
+      this._types = [];
+      void this._loadTypes(this.timelineRoot);
+    }
+  }
+
+  private async _loadTypes(root: ApexLog | null): Promise<void> {
+    if (!root) {
+      return;
+    }
+    const index = await logStoreFor(root).logIndex();
+    if (root === this._typesFor) {
+      this._types = typeNamesIn(index);
+    }
   }
 
   updated(changedProperties: PropertyValues): void {
@@ -375,7 +411,7 @@ export class CalltreeView extends LitElement {
                         ${
                           this.isVisible
                             ? repeat(
-                                this._getAllTypes(this.timelineRoot?.children ?? []),
+                                this._types,
                                 (type, _index) =>
                                   html`<vscode-option ?selected="${this.typeFilter === type}"
                                     >${type}</vscode-option
@@ -475,30 +511,6 @@ export class CalltreeView extends LitElement {
         ></context-menu>
       </div>
     `;
-  }
-
-  _getAllTypes(data: LogEvent[]): string[] {
-    const flattened = this._flatten(data);
-    const types = new Set<string>();
-    for (const line of flattened) {
-      types.add(line.type?.toString() ?? '');
-    }
-    return Array.from(types).sort();
-  }
-
-  _flat(arr: LogEvent[], target: LogEvent[]) {
-    for (const evt of arr) {
-      target.push(evt);
-      if (evt.children.length > 0) {
-        this._flat(evt.children, target);
-      }
-    }
-  }
-
-  _flatten(arr: LogEvent[]) {
-    const flattened: LogEvent[] = [];
-    this._flat(arr, flattened);
-    return flattened;
   }
 
   _handleShowDetailsChange() {
