@@ -131,9 +131,9 @@ export class ApexLogTimeline {
     // Derive categories from shared constant (ensures compile-time sync with color map)
     const categories = new Set<string>(BUCKET_CONSTANTS.CATEGORY_PRIORITY);
 
+    const index = await logStoreFor(apexLog).logIndex();
     // `exitStamp`, not `executionEndTime`: a trailing zero-duration event, such as the
     // FATAL_ERROR closing a truncated log, still ends the log.
-    const index = await logStoreFor(apexLog).logIndex();
     const frames = buildTimelineFrames(index, categories, this.apexLog.exitStamp);
 
     // Initialize FlameChart with Apex-specific callbacks
