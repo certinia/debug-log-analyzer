@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- ⚡ **Timeline**: a 100 MB log opens 2.7× faster with 34% less memory, and its minimap builds 3.9× faster.
 - ⚡ **Search**: the Timeline draws 7× faster on a search matching tens of thousands of frames.
 - ✂️ **Truncation**: each skipped section states how much of the log it dropped.
 

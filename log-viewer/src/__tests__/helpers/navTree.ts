@@ -3,8 +3,17 @@
  */
 import type { LogEvent } from '@apexdevtools/apex-log-parser';
 
-import type { EventNode, TreeNode } from '../../features/timeline/types/flamechart.types.js';
-import type { NavigationMaps } from '../../features/timeline/utils/tree-converter.js';
+import {
+  type EventNode,
+  NO_ROW,
+  type TimelineFrames,
+  type TreeNode,
+} from '../../features/timeline/types/flamechart.types.js';
+
+/** A frame laid out by hand, with the children {@link navFrames} reads it by. */
+export interface NavNode extends TreeNode<EventNode> {
+  children?: NavNode[];
+}
 
 /** A frame with its own stand-in for the parsed event, as the adapter attaches one. */
 export function navNode(
@@ -12,49 +21,71 @@ export function navNode(
   timestamp: number,
   duration: number,
   depth: number,
-  children?: TreeNode<EventNode>[],
-): TreeNode<EventNode> {
+  children?: NavNode[],
+): NavNode {
   const original = { id } as unknown as LogEvent;
   return {
     data: { id, timestamp, duration, type: 'METHOD_ENTRY', text: id, original },
     children,
     depth,
+    row: NO_ROW,
   };
 }
 
 /**
- * The maps the tree converters build, for a tree a test lays out by hand. Each depth list is
- * kept newest first, since the converters leave it unsorted and `TreeNavigator` sorts it.
+ * The frames for a tree a test lays out by hand, rows in pre-order. A frame is
+ * shown when it and every parent have a duration, as the timeline's own are.
+ * `node` hands back the test's own node, so a test can compare by identity.
  */
-export function navMaps(roots: TreeNode<EventNode>[]): NavigationMaps {
-  const maps: NavigationMaps = {
-    originalMap: new Map(),
-    nodeMap: new Map(),
-    parentMap: new Map(),
-    siblingMap: new Map(),
-    depthMap: new Map(),
-    depthLookup: new Map(),
+export function navFrames(roots: NavNode[]): TimelineFrames<EventNode> {
+  const nodes: NavNode[] = [];
+  const parents: number[] = [];
+  const ends: number[] = [];
+  const shown: boolean[] = [];
+  const visit = (node: NavNode, parent: number): void => {
+    const row = nodes.length;
+    node.row = row;
+    nodes.push(node);
+    parents.push(parent);
+    ends.push(row + 1);
+    shown.push(node.data.duration > 0 && (parent === NO_ROW || shown[parent]!));
+    node.children?.forEach((child) => visit(child, row));
+    ends[row] = nodes.length;
   };
+  roots.forEach((root) => visit(root, NO_ROW));
 
-  const visit = (
-    node: TreeNode<EventNode>,
-    parent: TreeNode<EventNode> | null,
-    siblings: TreeNode<EventNode>[],
-    index: number,
-  ): void => {
-    const depth = node.depth ?? 0;
-    const { id, original } = node.data;
-    maps.nodeMap.set(id, node);
-    maps.parentMap.set(id, parent);
-    maps.siblingMap.set(id, { index, siblings });
-    maps.depthLookup.set(id, depth);
-    maps.depthMap.set(depth, [node, ...(maps.depthMap.get(depth) ?? [])]);
-    maps.originalMap.set(original as LogEvent, node);
-    node.children?.forEach((child, i, all) => visit(child, node, all, i));
+  const start = Float64Array.from(nodes, (node) => node.data.timestamp);
+  const depth = Uint16Array.from(nodes, (node) => node.depth ?? 0);
+  const byDepth: number[][] = [];
+  nodes.forEach((_, row) => {
+    if (shown[row]) {
+      (byDepth[depth[row]!] ??= []).push(row);
+    }
+  });
+  const byOriginal = new Map(nodes.map((node, row) => [node.data.original, row]));
+
+  return {
+    rowCount: nodes.length,
+    maxDepth: Math.max(0, ...depth),
+    totalDuration: 0,
+    start,
+    total: Float64Array.from(nodes, (node) => node.data.duration),
+    depth,
+    parent: Int32Array.from(parents),
+    subtreeEnd: Int32Array.from(ends),
+    rectsByCategory: new Map(),
+    rectsByDepth: new Map(),
+    isVisible: (row) => shown[row] ?? false,
+    rowsAtDepth: (d) => Int32Array.from((byDepth[d] ?? []).sort((x, y) => start[x]! - start[y]!)),
+    node: (row) => nodes[row]!,
+    text: (row) => nodes[row]!.data.text,
+    type: (row) => nodes[row]!.data.type,
+    rowOfOriginal: (original) => {
+      const row = byOriginal.get(original) ?? NO_ROW;
+      return shown[row] ? row : NO_ROW;
+    },
+    rectOf: () => undefined,
   };
-  roots.forEach((root, i) => visit(root, null, roots, i));
-
-  return maps;
 }
 
 /**
@@ -76,7 +107,7 @@ export function navFixture() {
   const a = navNode('a', 0, 200, 0, [c, d]);
   const b = navNode('b', 300, 200, 0, [e, f]);
   const roots = [a, b];
-  return { roots, maps: navMaps(roots), nodes: { a, b, c, d, e, f, g } };
+  return { roots, frames: navFrames(roots), nodes: { a, b, c, d, e, f, g } };
 }
 
 export type NavName = keyof ReturnType<typeof navFixture>['nodes'];

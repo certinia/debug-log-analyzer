@@ -18,8 +18,12 @@
  * Selection is mutually exclusive: selecting a frame clears marker selection and vice versa.
  */
 
-import type { EventNode, TimelineMarker, TreeNode } from '../../types/flamechart.types.js';
-import type { NavigationMaps } from '../../utils/tree-converter.js';
+import type {
+  EventNode,
+  TimelineFrames,
+  TimelineMarker,
+  TreeNode,
+} from '../../types/flamechart.types.js';
 import type { FrameNavDirection } from '../interaction/KeyboardHandler.js';
 import { TreeNavigator } from './TreeNavigator.js';
 
@@ -47,13 +51,12 @@ export class SelectionNavigator<E extends EventNode> {
   private navigator: TreeNavigator;
 
   /**
-   * Create a SelectionNavigator from tree nodes and pre-built maps.
+   * Create a SelectionNavigator over the timeline's frames.
    *
-   * @param treeNodes - Root-level TreeNodes to navigate
-   * @param maps - Pre-built navigation maps from tree conversion
+   * @param frames - The frames to navigate
    */
-  constructor(treeNodes: TreeNode<E>[], maps: NavigationMaps) {
-    this.navigator = new TreeNavigator(treeNodes as TreeNode<EventNode>[], maps);
+  constructor(frames: TimelineFrames<E>) {
+    this.navigator = new TreeNavigator(frames as TimelineFrames<EventNode>);
   }
 
   /**
@@ -277,15 +280,5 @@ export class SelectionNavigator<E extends EventNode> {
       return null;
     }
     return this.navigator.findByOriginal(original) as TreeNode<E> | null;
-  }
-
-  /**
-   * Find a TreeNode by its event ID.
-   *
-   * @param id - Event ID to search for
-   * @returns The TreeNode, or null if not found
-   */
-  public findById(id: string): TreeNode<E> | null {
-    return this.navigator.findById(id) as TreeNode<E> | null;
   }
 }

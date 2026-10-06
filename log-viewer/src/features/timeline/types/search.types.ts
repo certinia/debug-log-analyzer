@@ -12,6 +12,9 @@
 import type { PrecomputedRect } from '../optimised/RectangleCache.js';
 import type { EventNode } from './flamechart.types.js';
 
+/** Tests a frame by its text and type, so a search reads strings rather than nodes. */
+export type FramePredicate = (text: string, type: string) => boolean;
+
 /**
  * Lightweight info about a matched event for bucket search highlighting.
  * Used instead of full SearchMatch to avoid exposing event details to renderers.

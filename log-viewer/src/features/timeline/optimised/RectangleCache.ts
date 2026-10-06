@@ -11,7 +11,6 @@
  * Responsibilities:
  * - Pre-compute all rectangles from event tree (once at initialization)
  * - Maintain spatial index (rectsByCategory) for efficient access
- * - Maintain event → rect mapping (rectMap) for search functionality
  * - Perform viewport culling on demand
  * - Provide culled rectangles to any consumer (renderers)
  *
@@ -36,7 +35,7 @@ import { TemporalSegmentTree } from './TemporalSegmentTree.js';
  * Stored once at construction to avoid recalculating every frame.
  */
 export interface PrecomputedRect extends RenderRectangle {
-  /** Unique ID for this rectangle (timestamp-depth-childIndex) */
+  /** Unique ID for this rectangle */
   id: string;
 
   /** Timestamp in nanoseconds (fixed) */
@@ -74,16 +73,13 @@ export interface PrecomputedRect extends RenderRectangle {
 }
 
 /**
- * Precomputed data from unified tree conversion (single-pass optimization).
+ * Rectangles built ahead, as `TimelineFrames` holds them.
  * When provided, RectangleCache skips its own flattenEvents traversal.
  */
 export interface PrecomputedRectData {
   rectsByCategory: Map<string, PrecomputedRect[]>;
-  rectMap: Map<LogEvent, PrecomputedRect>;
   /** Pre-grouped by depth for TemporalSegmentTree (optional - computed if not provided) */
   rectsByDepth?: Map<number, PrecomputedRect[]>;
-  /** Whether rectsByCategory arrays are pre-sorted by timeStart (skips sorting) */
-  preSorted?: boolean;
 }
 
 /**
@@ -99,12 +95,6 @@ export class RectangleCache {
   /** Spatial index: all rectangles grouped by category */
   private rectsByCategory: Map<string, PrecomputedRect[]> = new Map();
 
-  /** Map from LogEvent to RenderRectangle for search functionality */
-  private rectMap: Map<LogEvent, PrecomputedRect> = new Map();
-
-  /** Cached map from rect ID to PrecomputedRect (lazy-built on first access) */
-  private rectMapById: Map<string, PrecomputedRect> | null = null;
-
   /** Segment tree for O(log n) viewport culling */
   private segmentTree: TemporalSegmentTree;
 
@@ -113,19 +103,13 @@ export class RectangleCache {
    *
    * @param events - Event tree to pre-compute rectangles from
    * @param categories - Set of valid categories for spatial indexing
-   * @param precomputed - Optional precomputed rectangle data from unified conversion
+   * @param precomputed - Optional rectangles built ahead
    */
   constructor(events: LogEvent[], categories: Set<string>, precomputed?: PrecomputedRectData) {
     if (precomputed) {
-      // Use precomputed data from unified conversion (skips flattenEvents traversal)
       this.rectsByCategory = precomputed.rectsByCategory;
-      this.rectMap = precomputed.rectMap;
-
-      // PERF: Only sort if not already pre-sorted (~15-20ms saved)
-      if (!precomputed.preSorted) {
-        for (const rects of this.rectsByCategory.values()) {
-          rects.sort((a, b) => a.timeStart - b.timeStart);
-        }
+      for (const rects of this.rectsByCategory.values()) {
+        sortByStartIfNeeded(rects);
       }
     } else {
       // Legacy path: compute rectangles from events
@@ -154,35 +138,6 @@ export class RectangleCache {
     batchColors: Map<string, BatchColorInfo>,
   ): CulledRenderData {
     return this.segmentTree.query(viewport, batchColors);
-  }
-
-  /**
-   * Get map from LogEvent to PrecomputedRect for search functionality.
-   * Returns live references that update during each culling pass.
-   *
-   * @returns Map from LogEvent to PrecomputedRect (live references)
-   */
-  public getRectMap(): Map<LogEvent, PrecomputedRect> {
-    return this.rectMap;
-  }
-
-  /**
-   * Get map from rect ID to PrecomputedRect.
-   * Lazy-built on first access to avoid O(n) iteration at init time.
-   * Used by SearchOrchestrator for O(1) rect lookup by ID.
-   *
-   * PERF: Saves ~18ms by avoiding redundant map rebuild in SearchOrchestrator.init()
-   *
-   * @returns Map from rect ID string to PrecomputedRect
-   */
-  public getRectMapById(): Map<string, PrecomputedRect> {
-    if (!this.rectMapById) {
-      this.rectMapById = new Map();
-      for (const rect of this.rectMap.values()) {
-        this.rectMapById.set(rect.id, rect);
-      }
-    }
-    return this.rectMapById;
   }
 
   /**
@@ -291,9 +246,6 @@ export class RectangleCache {
               height: eventHeight,
             };
             rects.push(rect);
-
-            // Store live reference for search (will be updated during culling)
-            this.rectMap.set(event, rect);
           }
         }
 
@@ -304,6 +256,16 @@ export class RectangleCache {
           stackSize++;
         }
       }
+    }
+  }
+}
+
+// A check costs less than the sort, and the frames arrive sorted on a well-formed log.
+function sortByStartIfNeeded(rects: PrecomputedRect[]): void {
+  for (let i = 1; i < rects.length; i++) {
+    if (rects[i]!.timeStart < rects[i - 1]!.timeStart) {
+      rects.sort((a, b) => a.timeStart - b.timeStart);
+      return;
     }
   }
 }

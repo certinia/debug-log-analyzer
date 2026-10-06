@@ -45,6 +45,7 @@ import {
 } from '../types/flamechart.types.js';
 import type { SearchCursor } from '../types/search.types.js';
 import { InspectorEmphasis } from '../../../components/inspectorEmphasis.js';
+import { logStoreFor } from '../../../core/log/LogStore.js';
 import { wireInspectorTab } from '../../../components/inspectorTab.js';
 import {
   revealTarget,
@@ -53,7 +54,7 @@ import {
 } from '../utils/detail-selection-sync.js';
 import { extractExceptionMarkers, extractMarkers } from '../utils/marker-utils.js';
 import { seekWindow } from '../utils/navigate-window.js';
-import { logEventToTreeAndRects } from '../utils/tree-converter.js';
+import { buildTimelineFrames } from '../utils/timeline-frames.js';
 import { FlameChart } from './FlameChart.js';
 import { FrameTooltipRenderer, type TooltipAnchor } from './FrameTooltipRenderer.js';
 import { apexLimitTimeSeries } from './apex-limit-series.js';
@@ -129,33 +130,16 @@ export class ApexLogTimeline {
     // Derive categories from shared constant (ensures compile-time sync with color map)
     const categories = new Set<string>(BUCKET_CONSTANTS.CATEGORY_PRIORITY);
 
-    // Single-pass unified conversion: builds TreeNodes, navigation maps,
-    // PrecomputedRects, maxDepth, and totalDuration in one O(n) traversal.
-    // This eliminates redundant traversals previously done by:
-    // - logEventToTreeNode (tree + maps)
-    // - TimelineEventIndex.calculateMaxDepth
-    // - TimelineEventIndex.calculateTotalDuration
-    // - RectangleCache.flattenEvents
     // `exitStamp`, not `executionEndTime`: a trailing zero-duration event, such as the
     // FATAL_ERROR closing a truncated log, still ends the log.
-    const logEndTime = this.apexLog.exitStamp;
-    const {
-      treeNodes,
-      maps,
-      rectsByCategory,
-      rectsByDepth,
-      rectMap,
-      maxDepth,
-      totalDuration,
-      preSorted,
-    } = logEventToTreeAndRects(this.events, categories, logEndTime);
+    const index = await logStoreFor(apexLog).logIndex();
+    const frames = buildTimelineFrames(index, categories, this.apexLog.exitStamp);
 
-    // Initialize FlameChart with Apex-specific callbacks and precomputed data
+    // Initialize FlameChart with Apex-specific callbacks
     await this.flamechart.init(
       container,
       this.events,
-      treeNodes,
-      maps,
+      frames,
       markers,
       { ...options, enableSearch: true }, // Enable search via options
       {
@@ -201,8 +185,6 @@ export class ApexLogTimeline {
           copyToClipboard(marker.summary);
         },
       },
-      // Pass precomputed data to skip redundant O(n) traversals
-      { maxDepth, totalDuration, rectsByCategory, rectsByDepth, rectMap, preSorted },
     );
 
     // Create context menu Lit element (using constructor ensures custom element is registered)
@@ -1099,9 +1081,9 @@ export class ApexLogTimeline {
     // Convert search text to predicate function (thin facade)
     const caseSensitive = options.matchCase;
     const searchText = caseSensitive ? text : text.toLowerCase();
-    const predicate = (eventNode: EventNode) => {
-      const eventText = caseSensitive ? eventNode.text : eventNode.text.toLowerCase();
-      const eventType = caseSensitive ? eventNode.type : eventNode.type.toLowerCase();
+    const predicate = (text: string, type: string) => {
+      const eventText = caseSensitive ? text : text.toLowerCase();
+      const eventType = caseSensitive ? type : type.toLowerCase();
       return eventText.includes(searchText) || eventType.includes(searchText);
     };
 

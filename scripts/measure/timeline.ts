@@ -9,6 +9,7 @@
  */
 import type { ApexLog } from '@apexdevtools/apex-log-parser';
 
+import { buildLogIndex } from '../../log-viewer/src/core/log/LogIndex.js';
 import { apexLimitTimeSeries } from '../../log-viewer/src/features/timeline/optimised/apex-limit-series.js';
 import type { BatchColorInfo } from '../../log-viewer/src/features/timeline/optimised/BucketColorResolver.js';
 import { RectangleCache } from '../../log-viewer/src/features/timeline/optimised/RectangleCache.js';
@@ -21,7 +22,7 @@ import {
   type ViewportState,
 } from '../../log-viewer/src/features/timeline/types/flamechart.types.js';
 import { categorySelfTimes } from '../../log-viewer/src/features/timeline/utils/category-self-time.js';
-import { logEventToTreeAndRects } from '../../log-viewer/src/features/timeline/utils/tree-converter.js';
+import { buildTimelineFrames } from '../../log-viewer/src/features/timeline/utils/timeline-frames.js';
 import { heapMb, line, nowMs, time } from './harness.js';
 
 /** A word nearly every log holds many times, so the search walks and matches a lot. */
@@ -42,12 +43,12 @@ const DISPLAY_WIDTH = 1600;
 function build(log: ApexLog) {
   categorySelfTimes(log);
   const categories = new Set<string>(BUCKET_CONSTANTS.CATEGORY_PRIORITY);
-  const precomputed = logEventToTreeAndRects(log.children, categories, log.exitStamp);
-  const cache = new RectangleCache(log.children, categories, precomputed);
-  new TreeNavigator(precomputed.treeNodes, precomputed.maps);
-  const matcher = new EventMatcher<EventNode>(precomputed.treeNodes, cache.getRectMapById());
+  const frames = buildTimelineFrames(buildLogIndex(log), categories, log.exitStamp);
+  const cache = new RectangleCache(log.children, categories, frames);
+  new TreeNavigator(frames);
+  const matcher = new EventMatcher<EventNode>(frames);
   apexLimitTimeSeries(log);
-  return { precomputed, cache, matcher };
+  return { frames, cache, matcher };
 }
 
 function viewportFor(
@@ -67,8 +68,8 @@ function viewportFor(
 
 /** A CSV of what the timeline holds and draws, so two revisions can be diffed. */
 export function digestTimeline(log: ApexLog): void {
-  const { precomputed, cache } = build(log);
-  const { maxDepth, totalDuration, rectsByDepth } = precomputed;
+  const { frames, cache } = build(log);
+  const { maxDepth, totalDuration, rectsByDepth } = frames;
 
   console.log('section,key,a,b,c,d');
   console.log(`total,,${maxDepth},${totalDuration},,`);
@@ -103,20 +104,23 @@ export function digestTimeline(log: ApexLog): void {
 
 export async function measureTimeline(log: ApexLog): Promise<void> {
   const before = heapMb();
-  const { precomputed, cache, matcher } = await time('build to first frame', () => build(log));
-  line('frames', `${precomputed.rectMap.size}, maxDepth ${precomputed.maxDepth}`);
+  const { frames, cache, matcher } = await time('build to first frame', () => build(log));
+  let rects = 0;
+  for (const each of frames.rectsByCategory.values()) {
+    rects += each.length;
+  }
+  line('frames', `${rects}, maxDepth ${frames.maxDepth}`);
 
   const search = await time(`search "${SEARCH_TEXT}"`, () =>
     matcher.search(
-      (event) =>
-        event.text.toLowerCase().includes(SEARCH_TEXT) ||
-        event.type.toLowerCase().includes(SEARCH_TEXT),
+      (text, type) =>
+        text.toLowerCase().includes(SEARCH_TEXT) || type.toLowerCase().includes(SEARCH_TEXT),
     ),
   );
   line('matches', String(search.total));
 
   // The whole log in view is the worst cull: every depth, most of it bucketed.
-  const viewport = viewportFor(precomputed.totalDuration, precomputed.maxDepth, WHOLE_LOG);
+  const viewport = viewportFor(frames.totalDuration, frames.maxDepth, WHOLE_LOG);
   cache.getCulledRectangles(viewport, COLORS);
   const runs = 20;
   const start = nowMs();
