@@ -42,9 +42,20 @@ export class LogIdentity extends LitElement {
     css`
       /* The host's cap bounds the label; the tooltip carries the full value. */
       .item {
+        display: inline-flex;
+        gap: var(--lana-space-2xs);
+        min-width: 0;
         white-space: nowrap;
+      }
+
+      .label {
         overflow: hidden;
         text-overflow: ellipsis;
+      }
+
+      /* Outside the ellipsis, so a long label cannot hide how many more there are. */
+      .count {
+        flex: none;
       }
 
       .item.skeleton {
@@ -59,11 +70,14 @@ export class LogIdentity extends LitElement {
         ? html`<span class="item skeleton" style="width: ${this.skeletonWidth};"></span>`
         : nothing;
     }
+    const { label, detail, count } = this.item;
     return html`<span
       class="item"
       style="${this.cap ? `max-width: ${this.cap};` : ''}"
-      title="${this.item.detail}"
-      >${this.item.label}</span
+      title="${detail}"
+      ><span class="label">${label}</span>${
+        count ? html`<span class="count">+${count}</span>` : nothing
+      }</span
     >`;
   }
 }

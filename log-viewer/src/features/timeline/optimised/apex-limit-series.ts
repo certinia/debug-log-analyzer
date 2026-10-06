@@ -15,8 +15,9 @@ import type {
   HeapAllocateLine,
   LimitUsageLine,
   LogEvent,
+  LimitMetricUnit,
+  Limits,
 } from '@apexdevtools/apex-log-parser';
-import type { LimitMetricUnit, Limits } from '@apexdevtools/apex-log-parser/types';
 import { GOVERNOR_METRICS } from '../../../core/metrics/governorMetrics.js';
 import type { HeatStripMetric, HeatStripTimeSeries } from '../types/flamechart.types.js';
 import { extractMarkers, noDataSpans } from '../utils/marker-utils.js';
