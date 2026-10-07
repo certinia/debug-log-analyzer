@@ -35,9 +35,9 @@ Always use pnpm.
 `code-insiders --profile lana-dev $PWD/sample-app --extensionDevelopmentPath=$PWD/lana`, use the
 CLI of the launched editor, `code-insiders` or `code`
 
-**Compilers** — `typecheck` = native TS7 (`tsc`); `typecheck:tsc6` = classic 6.0 (`tsc6`).
-Keep the `@typescript/typescript6` alias + `tsc6`: Docusaurus needs the TS ≤6.0 API (lands in
-TS 7.1). Don't remove until Docusaurus supports TS7.
+**Compilers** — `typecheck` = native TS7 (`tsc`). `lana-docs/` alone keeps the
+`@typescript/typescript6` alias and `tsc6`: `@docusaurus/tsconfig` sets `baseUrl`, which TS7
+removed.
 
 ## Core principles
 
