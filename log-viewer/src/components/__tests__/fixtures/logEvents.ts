@@ -1,14 +1,14 @@
 /*
  * Copyright (c) 2026 Certinia Inc. All rights reserved.
  */
-import type { ApexLog, LogEvent } from '@apexdevtools/apex-log-parser';
+import type { ApexLog } from '@apexdevtools/apex-log-parser';
 
 interface Count {
   self: number;
   total: number;
 }
 
-/** Only the fields the namespace walk and the window index read. */
+/** Only the fields the namespace sums and the window index read. */
 export interface FakeEvent {
   eventIndex: number;
   namespace: string;
@@ -23,24 +23,18 @@ export interface FakeEvent {
   dmlRowCount: Count;
   soslCount: Count;
   children: FakeEvent[];
-  parent?: FakeEvent;
 }
 
 const count = (): Count => ({ self: 0, total: 0 });
 
-const registry: FakeEvent[] = [];
-
-/**
- * An event with its children's time folded into its total, registered so
- * {@link eventByIndex} finds it as the log's own map does.
- */
+/** An event with its children's time folded into its total; `indexTree` numbers it. */
 export function namespaceEvent(
   namespace: string,
   self: number,
   children: FakeEvent[] = [],
 ): FakeEvent {
-  const event: FakeEvent = {
-    eventIndex: registry.length,
+  return {
+    eventIndex: -1,
     namespace,
     category: 'Apex',
     duration: {
@@ -56,23 +50,7 @@ export function namespaceEvent(
     soslCount: count(),
     children,
   };
-  for (const child of children) {
-    child.parent = event;
-  }
-  registry.push(event);
-  return event;
 }
-
-/** Clears the registry, so each test's indexes start at zero. */
-export function resetEvents(): void {
-  registry.length = 0;
-}
-
-export function eventByIndex(index: number): FakeEvent | null {
-  return registry.find((event) => event.eventIndex === index) ?? null;
-}
-
-export const roots = (events: FakeEvent[]) => events as unknown as LogEvent[];
 
 /**
  * Lays `event` out from `start` and returns where it ends: its own time first,

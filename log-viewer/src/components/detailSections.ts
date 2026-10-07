@@ -297,9 +297,8 @@ export async function buildDetailSections(
  * same section, asked of the whole log or of a selection.
  *
  * A bar and a legend line per namespace, so it draws little and varies by a
- * line. Asked of the whole log it is worked out once, so it sizes to that;
- * asked of a selection it empties to one line of prose while each frame's
- * figures are added up, and a content-sized pane would flicker on every step.
+ * line. Asked of the whole log it sizes to that; asked of a selection each step
+ * can add or drop a legend line, and a content-sized pane would jump on every step.
  */
 function namespaceTimeSection(
   content: TemplateResult,

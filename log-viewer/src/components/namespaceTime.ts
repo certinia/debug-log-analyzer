@@ -1,39 +1,54 @@
 /*
  * Copyright (c) 2026 Certinia Inc. All rights reserved.
  */
-import type { LogEvent } from '@apexdevtools/apex-log-parser';
-
+import { type LogIndex, sumSelfBy } from '../core/log/LogIndex.js';
 import { DEFAULT_NAMESPACE } from '../core/utility/CallerNamespace.js';
-import { outermostEvents, walkEvents } from '../core/utility/EventTree.js';
-import { CHECK_EVERY, frameBudget, type FrameBudgetOptions } from '../core/utility/FrameBudget.js';
+import { CHECK_EVERY, frameBudget } from '../core/utility/FrameBudget.js';
 
 export interface NamespaceTime {
   namespace: string;
   selfTime: number;
 }
 
-/**
- * Self time per namespace over `roots` and everything below them, largest first.
- * A root inside another root is dropped, so summing every occurrence of an
- * aggregate cannot count a shared subtree twice.
- *
- * Returns null when the build is abandoned (see {@link FrameBudgetOptions}).
- */
-async function namespaceSelfTimes(
-  roots: readonly LogEvent[],
-  options: FrameBudgetOptions,
-): Promise<NamespaceTime[] | null> {
-  const tick = frameBudget(options);
-  const totals = new Map<string, number>();
-  let walked = 0;
-  for (const event of walkEvents(outermostEvents(roots))) {
-    if (walked++ % CHECK_EVERY === 0 && !(await tick())) {
-      return null;
+/** Each index row's namespace, as an index into `names`. */
+export interface NamespaceColumn {
+  ids: Uint16Array;
+  names: readonly string[];
+}
+
+/** The namespace of every row. Built in slices: the namespace lives on the event
+ *  objects, so this touches each one. */
+export async function namespaceColumn(index: LogIndex): Promise<NamespaceColumn> {
+  const tick = frameBudget({});
+  const ids = new Uint16Array(index.rowCount);
+  const lookup = new Map<string, number>();
+  for (let row = 0; row < index.rowCount; row++) {
+    if (row % CHECK_EVERY === 0) {
+      await tick();
     }
-    const namespace = event.namespace || DEFAULT_NAMESPACE;
-    totals.set(namespace, (totals.get(namespace) ?? 0) + event.duration.self);
+    const namespace = index.event(row).namespace || DEFAULT_NAMESPACE;
+    let id = lookup.get(namespace);
+    if (id === undefined) {
+      id = lookup.size;
+      lookup.set(namespace, id);
+    }
+    ids[row] = id;
   }
-  return toNamespaceTimes(totals);
+  return { ids, names: [...lookup.keys()] };
+}
+
+/** Self time per namespace over the subtrees of `rows`, largest first, or over the
+ *  whole log when `rows` is null. */
+export function namespaceSelfTimes(
+  index: LogIndex,
+  column: NamespaceColumn,
+  rows: readonly number[] | null,
+): NamespaceTime[] {
+  const sums = sumSelfBy(index, column.ids, column.names.length, rows);
+  return column.names
+    .map((namespace, id) => ({ namespace, selfTime: sums[id]! }))
+    .filter(({ selfTime }) => selfTime > 0)
+    .sort((a, b) => b.selfTime - a.selfTime);
 }
 
 /** Self time per namespace, ranked for display: empty buckets go, largest first. */
@@ -42,52 +57,4 @@ export function toNamespaceTimes(totals: ReadonlyMap<string, number>): Namespace
     .filter(([, selfTime]) => selfTime > 0)
     .map(([namespace, selfTime]) => ({ namespace, selfTime }))
     .sort((a, b) => b.selfTime - a.selfTime);
-}
-
-/** Memo of the walk: the tree never changes after parse, so each scope is walked
- *  once. A frame near the root is nearly the whole log, so the scoped walk needs
- *  this as much as the whole-log one.
- *
- *  Keyed by the log as well as the scope: a selection outlives the log it was
- *  made in, and its instances array then names other calls. */
-const selfTimesCache = new WeakMap<object, WeakMap<object, NamespaceTime[]>>();
-
-function walkedIn(log: object): WeakMap<object, NamespaceTime[]> {
-  const held = selfTimesCache.get(log);
-  if (held) {
-    return held;
-  }
-  const made = new WeakMap<object, NamespaceTime[]>();
-  selfTimesCache.set(log, made);
-  return made;
-}
-
-/** The memoised times for `scope` in `log`, or undefined if it has never been
- *  walked. Lets a caller render an already-walked scope without showing a
- *  placeholder first. */
-export function cachedNamespaceSelfTimes(log: object, scope: object): NamespaceTime[] | undefined {
-  return selfTimesCache.get(log)?.get(scope);
-}
-
-/**
- * {@link namespaceSelfTimes} memoised on `log` and `scope` — the log itself for
- * the whole log, the frame itself for one frame, or the caller's instances
- * array, which stays the same object while the selection does. An abandoned walk
- * is not memoised.
- */
-export async function scopedNamespaceSelfTimes(
-  log: object,
-  scope: object,
-  roots: readonly LogEvent[],
-  options: FrameBudgetOptions,
-): Promise<NamespaceTime[] | null> {
-  const cached = cachedNamespaceSelfTimes(log, scope);
-  if (cached) {
-    return cached;
-  }
-  const slices = await namespaceSelfTimes(roots, options);
-  if (slices) {
-    walkedIn(log).set(scope, slices);
-  }
-  return slices;
 }
