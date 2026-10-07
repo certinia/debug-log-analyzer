@@ -20,6 +20,7 @@ jest.mock('../../services/rowBudget.js', () => ({
 }));
 
 import '../DatabaseRowBudget.js';
+import { stubStore } from '#test-helpers/apexLog.js';
 import { settledNote } from '#test-helpers/sections.js';
 
 const full = (): RowBudgets => ({
@@ -69,10 +70,10 @@ const withBudgets = (...changes: Partial<RowBudget>[]): RowBudgets => {
 async function mount(): Promise<LitElement> {
   const element = document.createElement('database-rows');
   // No provider in the test, so the consumed store is assigned straight on.
-  (element as unknown as { logStore: LogStore }).logStore = {
-    log: apexLog,
-  } as unknown as LogStore;
+  (element as unknown as { logStore: LogStore }).logStore = stubStore(apexLog);
   document.body.append(element);
+  await element.updateComplete;
+  // The derived value lands a microtask after the render that asks for it.
   await element.updateComplete;
   return element;
 }

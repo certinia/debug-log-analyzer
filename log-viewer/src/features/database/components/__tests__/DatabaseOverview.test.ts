@@ -37,6 +37,7 @@ jest.mock('../../services/databaseOverview.js', () => ({
 
 import { databaseTreeRows, ownCodeTotal, type DatabaseTreeRow } from '../DatabaseTimeTree.js';
 import '../DatabaseOverview.js';
+import { stubStore } from '#test-helpers/apexLog.js';
 import { settledNote } from '#test-helpers/sections.js';
 
 const emptyOverview = (): DatabaseOverview => ({
@@ -198,10 +199,10 @@ async function mount<K extends keyof HTMLElementTagNameMap>(
 ): Promise<HTMLElementTagNameMap[K] & LitElement> {
   const element = document.createElement(tag);
   // No provider in the test, so the consumed store is assigned straight on.
-  (element as unknown as { logStore: LogStore }).logStore = {
-    log: apexLog,
-  } as unknown as LogStore;
+  (element as unknown as { logStore: LogStore }).logStore = stubStore(apexLog);
   document.body.append(element);
+  await (element as LitElement).updateComplete;
+  // The derived value lands a microtask after the render that asks for it.
   await (element as LitElement).updateComplete;
   return element as HTMLElementTagNameMap[K] & LitElement;
 }

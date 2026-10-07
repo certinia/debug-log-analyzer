@@ -1,13 +1,7 @@
 /*
  * Copyright (c) 2026 Certinia Inc. All rights reserved.
  */
-import {
-  type ApexLog,
-  DMLBeginLine,
-  type LogEvent,
-  SOQLExecuteBeginLine,
-  SOSLExecuteBeginLine,
-} from '@apexdevtools/apex-log-parser';
+import type { ApexLog, LogEvent } from '@apexdevtools/apex-log-parser';
 
 import { CHECK_EVERY, frameBudget, type FrameBudgetOptions } from '../utility/FrameBudget.js';
 import { KeyPathIds } from './keyPathIds.js';
@@ -22,13 +16,11 @@ export type Derivation<T> = (index: LogIndex, store: LogStore) => T | Promise<T>
  * A parsed log and the lookups every view takes from it.
  *
  * One store per log, so a store is immutable and a new log is a new value —
- * which is what lets a context consumer see the change. The statement lists come
- * from one walk of the whole tree, taken once and kept.
+ * which is what lets a context consumer see the change.
  */
 export class LogStore {
   readonly log: ApexLog;
 
-  private _statements: Statements | null = null;
   private _keyPathIds: KeyPathIds | null = null;
   private _logIndex: Promise<LogIndex> | null = null;
   private readonly _derived = new WeakMap<Derivation<unknown>, Promise<unknown>>();
@@ -85,21 +77,6 @@ export class LogStore {
     return stack.reverse();
   }
 
-  /** Every SOQL statement in the log, in log order. */
-  soqlLines(): SOQLExecuteBeginLine[] {
-    return this.statements().soql;
-  }
-
-  /** Every DML statement in the log, in log order. */
-  dmlLines(): DMLBeginLine[] {
-    return this.statements().dml;
-  }
-
-  /** Every SOSL statement in the log, in log order. */
-  soslLines(): SOSLExecuteBeginLine[] {
-    return this.statements().sosl;
-  }
-
   /** The interned keys and bucket paths of this log, shared by every view that
    *  marks a row whose occurrences are merged. */
   keyPathIds(): KeyPathIds {
@@ -140,16 +117,6 @@ export class LogStore {
     }
     return derived;
   }
-
-  private statements(): Statements {
-    return (this._statements ??= collectStatements(this.log));
-  }
-}
-
-interface Statements {
-  soql: SOQLExecuteBeginLine[];
-  dml: DMLBeginLine[];
-  sosl: SOSLExecuteBeginLine[];
 }
 
 async function buildInSlices(
@@ -164,31 +131,10 @@ async function buildInSlices(
   return builder.finish();
 }
 
-/** The three statement kinds below `root`, in log order, from one walk. */
-function collectStatements(root: LogEvent): Statements {
-  const found: Statements = { soql: [], dml: [], sosl: [] };
-  const walk = (event: LogEvent): void => {
-    for (const child of event.children) {
-      if (child instanceof SOQLExecuteBeginLine) {
-        found.soql.push(child);
-      } else if (child instanceof DMLBeginLine) {
-        found.dml.push(child);
-      } else if (child instanceof SOSLExecuteBeginLine) {
-        found.sosl.push(child);
-      }
-      if (child.isParent) {
-        walk(child);
-      }
-    }
-  };
-  walk(root);
-  return found;
-}
-
 const stores = new WeakMap<ApexLog, LogStore>();
 
-/** The store for a parsed log — the same store every time, so the walks it keeps
- *  are shared however the log is reached. */
+/** The store for a parsed log — the same store every time, so its index and
+ *  derived values are shared however the log is reached. */
 export function logStoreFor(log: ApexLog): LogStore {
   let store = stores.get(log);
   if (!store) {

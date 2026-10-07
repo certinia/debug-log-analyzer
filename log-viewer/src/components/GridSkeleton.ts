@@ -14,6 +14,10 @@ export class GridSkeleton extends LitElement {
   @property({ attribute: false })
   logStatus: LogStatus = 'parsing';
 
+  /** Keeps the rows after the parse, while the grid still derives its data. */
+  @property({ type: Boolean })
+  pending = false;
+
   static styles = [
     globalStyles,
     skeletonStyles,
@@ -50,7 +54,7 @@ export class GridSkeleton extends LitElement {
   }
 
   render() {
-    if (this.logStatus !== 'parsing') {
+    if (this.logStatus !== 'parsing' && !this.pending) {
       return nothing;
     }
     return html`<div class="skeleton-wrapper">

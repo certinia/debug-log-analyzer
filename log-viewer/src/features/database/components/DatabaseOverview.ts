@@ -14,6 +14,7 @@ import {
 import { logNamespacePalette } from '../../../components/namespacePalette.js';
 import '../../../components/StackedTimeBar.js';
 import { segmentsWithTail } from '../../../components/StackedTimeBar.js';
+import { DerivedValue } from '../../../core/log/DerivedValue.js';
 import { logContext } from '../../../core/log/logContext.js';
 import type { LogStore } from '../../../core/log/LogStore.js';
 import { nsToMs } from '../../../core/utility/Duration.js';
@@ -163,11 +164,16 @@ export class DatabaseConcentration extends LitElement {
     `,
   ];
 
+  private readonly _overview = new DerivedValue(this, databaseOverview);
+
   render() {
-    const log = this.logStore?.log;
-    const overview = log ? databaseOverview(log) : null;
+    const overview = this._overview.value;
     if (!overview?.ranked.length) {
-      return html`<section-skeleton shape="rows" fallback=${NO_STATEMENTS}></section-skeleton>`;
+      return html`<section-skeleton
+        shape="rows"
+        ?pending=${this._overview.pending}
+        fallback=${NO_STATEMENTS}
+      ></section-skeleton>`;
     }
     const { count, percent } = concentration(overview);
     const { shown, rest } = topRows(overview.ranked);
@@ -279,11 +285,17 @@ export class DatabaseNamespaces extends LitElement {
     `,
   ];
 
+  private readonly _overview = new DerivedValue(this, databaseOverview);
+
   render() {
     const log = this.logStore?.log;
-    const overview = log ? databaseOverview(log) : null;
+    const overview = this._overview.value;
     if (!overview?.askedBy.length || !log) {
-      return html`<section-skeleton shape="rows" fallback=${NO_STATEMENTS}></section-skeleton>`;
+      return html`<section-skeleton
+        shape="rows"
+        ?pending=${this._overview.pending}
+        fallback=${NO_STATEMENTS}
+      ></section-skeleton>`;
     }
     // The log's own palette, so a namespace that moves between the two bars is
     // followed by eye and reads the same on the Timeline's bar.

@@ -4,7 +4,7 @@
 import { parse, type ApexLog, type LogEvent, LOG_LEVEL } from '@apexdevtools/apex-log-parser';
 
 import { buildLogIndex, type LogIndex } from '../../core/log/LogIndex.js';
-import { logStoreFor, type LogStore } from '../../core/log/LogStore.js';
+import { logStoreFor, type Derivation, type LogStore } from '../../core/log/LogStore.js';
 
 /**
  * The header line, which decides what the log records. The level comes from the
@@ -48,6 +48,18 @@ export function storeOf(
 ): { log: ApexLog; store: LogStore } {
   const log = parse(logText(body, settings));
   return { log, store: logStoreFor(log) };
+}
+
+/**
+ * A store with no index, for a test that stubs every derivation it reaches: each
+ * one gets the store, so one derivation can still ask for another.
+ */
+export function stubStore(log: ApexLog): LogStore {
+  const store = {
+    log,
+    derive: async (fn: Derivation<unknown>) => fn(null as unknown as LogIndex, store),
+  } as unknown as LogStore;
+  return store;
 }
 
 /** The eventIndex of the frame or event whose log text is `text`. */

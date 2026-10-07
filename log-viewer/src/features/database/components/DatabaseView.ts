@@ -23,6 +23,7 @@ import { SelectionEchoGuard } from '../../../core/events/SelectionEchoGuard.js';
 import { formatInteger, isVisible } from '../../../core/utility/Util.js';
 import { soslRowsMetric } from '../limits.js';
 import { logStoreFor } from '../../../core/log/LogStore.js';
+import { statements } from '../../../core/log/statements.js';
 
 // styles
 import { globalStyles } from '../../../styles/global.styles.js';
@@ -184,10 +185,13 @@ export class DatabaseView extends LitElement {
     if (!visible || this.loaded) {
       return;
     }
-    const store = logStoreFor(root);
-    this.dmlLines = store.dmlLines();
-    this.soqlLines = store.soqlLines();
-    this.soslLines = store.soslLines();
+    const { dml, soql, sosl } = await logStoreFor(root).derive(statements);
+    if (root !== this.timelineRoot || this.loaded) {
+      return;
+    }
+    this.dmlLines = dml;
+    this.soqlLines = soql;
+    this.soslLines = sosl;
     // A full pass over every event: too costly to run from render().
     this._limits = limitTotals(apexLimitTimeSeries(root));
     this.loaded = true;
