@@ -24,11 +24,29 @@ concurrency:
 jobs:
   # Build job
   build:
+    # workflow_run fires on every completion; a failed stable publish has nothing to document.
+    if: github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success'
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
         uses: actions/checkout@v7
         with:
+          persist-credentials: false
+      # The docs come from main, so a text fix ships without a release. The live demo runs
+      # the latest stable release, so it never shows viewer code users cannot install yet.
+      - name: Find the latest stable release
+        id: release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          tag=$(gh release view --repo "$GITHUB_REPOSITORY" --json tagName --jq .tagName)
+          [[ "$tag" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || { echo "Unexpected release tag: $tag"; exit 1; }
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+      - name: Checkout the release
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ steps.release.outputs.tag }}
+          path: release
           persist-credentials: false
       # 👇 Build steps
       - name: pnpm setup
@@ -40,15 +58,30 @@ jobs:
         with:
           node-version: '24'
           cache: 'pnpm'
-      - name: Dependencies
-        run: pnpm run ci:install
-      # The homepage live demo runs the built log viewer.
-      - name: Build Log Viewer
-        run: pnpm run build:prod
+          cache-dependency-path: |
+            pnpm-lock.yaml
+            release/pnpm-lock.yaml
+      - parallel:
+          - name: Dependencies
+            run: pnpm run ci:install
+          - name: Release Dependencies
+            working-directory: release
+            run: pnpm run ci:install
+      # Not beside Dependencies: pnpm exec needs node_modules to find playwright.
+      - parallel:
+          - name: Install Chromium
+            run: pnpm exec playwright install --only-shell chromium
+          # build:prod is newer than some releases; build:dev with NODE_ENV works on every one.
+          - name: Build Release Log Viewer
+            working-directory: release
+            run: NODE_ENV=production pnpm run build:dev
       - name: Build Site
-        run: |
-          cd lana-docs
-          pnpm run build
+        env:
+          DEMO_VIEWER_ROOT: ${{ github.workspace }}/release
+        run: pnpm --filter docs-site build
+      # The demo host comes from main and the viewer from the release, so check they still agree.
+      - name: Test Live Demo
+        run: pnpm --filter docs-site test:demo
       # 👆 Build steps
       - name: Setup Pages
         uses: actions/configure-pages@v6

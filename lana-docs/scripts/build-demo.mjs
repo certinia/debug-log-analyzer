@@ -1,7 +1,14 @@
 // Copies the built log viewer, the demo host and the sample log into static/demo for the homepage live demo.
+//
+// DEMO_VIEWER_ROOT names another checkout to take the built viewer and its setting
+// defaults from, so the published demo can run the stable release while the docs come from main.
 import { copyFile, mkdir, readdir, readFile, rm, writeFile } from 'node:fs/promises';
+import { pathToFileURL } from 'node:url';
 
-const viewerOut = new URL('../../lana/out/', import.meta.url);
+const viewerRoot = process.env.DEMO_VIEWER_ROOT
+  ? pathToFileURL(`${process.env.DEMO_VIEWER_ROOT}/`)
+  : new URL('../../', import.meta.url);
+const viewerOut = new URL('lana/out/', viewerRoot);
 const demoSrc = new URL('../demo/', import.meta.url);
 const sampleLog = new URL('../../sample-app/debug-logs/sample-log.log', import.meta.url);
 const dest = new URL('../static/demo/', import.meta.url);
@@ -9,7 +16,9 @@ const BODY = '<body>';
 
 const built = await readdir(viewerOut).catch(() => []);
 if (!built.includes('bundle.js') || !built.includes('index.html')) {
-  console.error('build-demo: lana/out has no log viewer. Run "pnpm build" at the repo root first.');
+  console.error(
+    `build-demo: ${viewerOut.pathname} has no log viewer. Run "pnpm build" at the repo root first.`,
+  );
   process.exit(1);
 }
 
@@ -20,9 +29,7 @@ if (!html.includes(BODY)) {
 }
 
 // The getConfig reply, built from the setting defaults the way lana's AppConfig.getConfig builds it.
-const lanaPackage = JSON.parse(
-  await readFile(new URL('../../lana/package.json', import.meta.url), 'utf8'),
-);
+const lanaPackage = JSON.parse(await readFile(new URL('lana/package.json', viewerRoot), 'utf8'));
 const settings = {};
 for (const section of [lanaPackage.contributes.configuration].flat()) {
   for (const [key, { default: value }] of Object.entries(section.properties)) {
