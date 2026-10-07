@@ -10,7 +10,7 @@ import {
   cachedAggregateVariables,
   MAX_VALUES_PER_NAME,
 } from '../aggregateVariables.js';
-import { variableIndexFor } from '../frameVariables.js';
+import { variableIndex } from '../frameVariables.js';
 
 /** Resolves at once, so a test measures the walk rather than the frames it
  *  would leave to the next paint. */
@@ -36,7 +36,7 @@ const CALLS =
 /** The comparison of every `ns.Svc.run()` call, with the statics index built. */
 async function compare(body: string, text = 'ns.Svc.run()') {
   const { log, store } = storeOf(body);
-  const index = await variableIndexFor(log, { yieldSlice });
+  const index = await store.derive(variableIndex);
   const frames = indexesOf(log, text);
   const spread = await aggregateVariablesFor(store, frames, index, { yieldSlice });
   return { log, store, index, frames, spread };
@@ -174,7 +174,7 @@ describe('aggregateVariablesFor', () => {
 
   it('returns null for an abandoned walk, and never memoises it', async () => {
     const { log, store } = storeOf(CALLS);
-    const index = await variableIndexFor(log, { yieldSlice });
+    const index = await store.derive(variableIndex);
     const frames = indexesOf(log, 'ns.Svc.run()');
     // Only a spent slice yields, and only a yield reads the signal.
     const clock = jest.spyOn(performance, 'now');
@@ -241,7 +241,7 @@ describe('aggregateVariablesFor on this', () => {
         '09:18:22.6 (2010)|VARIABLE_ASSIGNMENT|[2]|count|1\n' +
         '09:18:22.6 (2020)|METHOD_EXIT|[1]|ns.Other.run()\n',
     );
-    const index = await variableIndexFor(log, { yieldSlice });
+    const index = await store.derive(variableIndex);
     const frames = [...indexesOf(log, 'ns.Svc.run()'), ...indexesOf(log, 'ns.Other.run()')];
 
     const spread = await aggregateVariablesFor(store, frames, index, { yieldSlice });
