@@ -37,8 +37,8 @@ interface Spec {
   soql?: number;
   dml?: number;
   children?: Built[];
-  /** An unclosed frame, as a truncated log leaves its last frames. */
-  unclosed?: boolean;
+  /** A leaf line, which the parser leaves with no exitStamp. */
+  leaf?: boolean;
 }
 
 function ev(timestamp: number, exitStamp: number, spec: Spec = {}): Built {
@@ -46,7 +46,7 @@ function ev(timestamp: number, exitStamp: number, spec: Spec = {}): Built {
     category: spec.category ?? 'Apex',
     namespace: spec.namespace ?? 'default',
     timestamp,
-    exitStamp: spec.unclosed ? null : exitStamp,
+    exitStamp: spec.leaf ? null : exitStamp,
     soqlCount: count(spec.soql ?? 0),
     soqlRowCount: count(0),
     dmlCount: count(spec.dml ?? 0),
@@ -195,15 +195,20 @@ describe('windowStats', () => {
     expect(stats.counts.soqlCount).toBe(0);
   });
 
-  it('holds an unclosed frame rather than dropping it', async () => {
-    const log = logOf([
-      ev(0, 0, { unclosed: true, children: [ev(400, 500, { category: 'SOQL', soql: 1 })] }),
-    ]);
+  // A leaf read as reaching forever broke the binary search, so an edge walked
+  // every sibling before the window.
+  it('reads a handful of siblings where leaf lines sit among them', async () => {
+    const children = Array.from({ length: 1_000 }, (_, i) => [
+      ev(i * 10, i * 10 + 5),
+      ev(i * 10 + 7, 0, { leaf: true }),
+    ]).flat();
+    const { log, visited, reset } = countingLog(children);
+    const index = await windowIndexFor(log, options);
+    reset();
 
-    const stats = await statsFor(log, { start: 300, end: 600 });
+    index.statsFor({ start: 9_901, end: 9_903 });
 
-    expect(stats.selfByCategory.get('SOQL')).toBeCloseTo(100, 3);
-    expect(stats.counts.soqlCount).toBe(1);
+    expect(visited()).toBeLessThan(100);
   });
 });
 

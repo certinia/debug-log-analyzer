@@ -181,7 +181,7 @@ export class WindowIndex {
     const stats: WindowStats = {
       selfByCategory: new Map(),
       selfByNamespace: new Map(),
-      counts: this._countsFor(window),
+      counts: this.countsFor(window),
     };
     const firstWhole = Math.max(0, Math.ceil((window.start - this._start) / this._width));
     const lastWhole = Math.min(
@@ -210,7 +210,10 @@ export class WindowIndex {
    * had finished before it opened. A statement the window cuts across is left
    * in, since it did run in the window.
    */
-  private _countsFor(window: TimeWindow): WindowCounts {
+  countsFor(window: TimeWindow): WindowCounts {
+    if (this._held && sameWindow(this._held.window, window)) {
+      return this._held.stats.counts;
+    }
     return byCounter((counter) => {
       const run = this._runs[counter];
       const started = firstIndexWhere(run.startedAt.length, (i) => run.startedAt[i]! > window.end);
@@ -416,8 +419,7 @@ function pushReached(stack: LogEvent[], children: readonly LogEvent[], window: T
  *
  * Siblings run one after another and never overlap, so both their starts and
  * their ends ascend and the run is contiguous: two binary searches find it,
- * where testing every child would read the whole log. An unclosed frame reads as
- * reaching forever, so a truncated log's last frames are walked, not dropped.
+ * where testing every child would read the whole log.
  */
 function reachedRun(
   children: readonly LogEvent[],
@@ -429,8 +431,9 @@ function reachedRun(
   };
 }
 
+// Only a leaf line has no exitStamp: the parser closes an unclosed frame itself.
 function endOf(event: LogEvent): number {
-  return event.exitStamp ?? Number.POSITIVE_INFINITY;
+  return event.exitStamp ?? event.timestamp;
 }
 
 /** The length of [start, end) that falls inside `window`. */
@@ -479,9 +482,7 @@ export class WindowStatsController {
   get counts(): { counts: WindowCounts; logCounts: WindowCounts } | null {
     const window = this._range.window;
     const index = window ? this._index() : null;
-    return index && window
-      ? { counts: index.statsFor(window).counts, logCounts: index.logCounts }
-      : null;
+    return index && window ? { counts: index.countsFor(window), logCounts: index.logCounts } : null;
   }
 
   /** True while a window is on screen and its stats are not ready yet. */

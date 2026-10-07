@@ -185,7 +185,9 @@ export class GovernorSummary extends LitElement {
       return html`<div class="gauge ${muted ? 'muted' : ''}" title=${NO_LIMIT_FOR_METRIC_TEXT}>
         <span class="gauge__label">${metric.label}</span>
         <span class="gauge__value"
-          >${format(metric.found)} <span class="gauge__na">seen</span></span
+          >${format(metric.found)}
+          <span class="gauge__na">seen</span>
+          ${metric.wholeLog ? html`<span class="gauge__scope">whole log</span>` : ''}</span
         >
         ${this._renderSpark(metric)}
       </div>`;

@@ -54,12 +54,13 @@ const SCOPE_OPTIONS: readonly ViewModeOption[] = [
  * timeline's own axis. The times say the scope on their own, so nothing labels
  * them further.
  */
-function windowLabel(window: TimeWindow, logStart: number): string {
+function windowLabel(window: TimeWindow): string {
   // Enough decimals to keep the two ends apart: a seek window is 2% of the log
   // and a deep zoom a few milliseconds, where "0.30s to 0.30s" says nothing.
   const width = Math.max(window.end - window.start, 1) / 1_000_000_000;
   const decimals = Math.min(6, Math.max(2, 2 - Math.floor(Math.log10(width))));
-  const seconds = (at: number) => ((at - logStart) / 1_000_000_000).toFixed(decimals);
+  // Raw, not less the log's first timestamp: the axis counts from 0.
+  const seconds = (at: number) => (at / 1_000_000_000).toFixed(decimals);
   return `${seconds(window.start)}s to ${seconds(window.end)}s`;
 }
 
@@ -300,7 +301,7 @@ export class LogInspector extends LitElement {
     return html`<view-mode-switch
       slot="actions-start"
       aria-label="Inspector scope"
-      title="Read what you selected, or this tab's summary of the whole log"
+      title="Read what you selected, or this tab's summary of the ${label ? 'window on screen' : 'whole log'}"
       .options=${options}
       value=${this._scope}
       @view-mode-change=${(e: CustomEvent<{ value: string }>) =>
@@ -312,11 +313,10 @@ export class LogInspector extends LitElement {
    *  Timeline scopes to a window, so only its own tab names one. */
   private _windowLabel(): string | null {
     const window = this._range.window;
-    const log = this.logStore?.log;
-    if (!window || !log || this._activeSource !== 'timeline') {
+    if (!window || this._activeSource !== 'timeline') {
       return null;
     }
-    return windowLabel(window, log.timestamp);
+    return windowLabel(window);
   }
 
   private get _activeSource(): DetailSource | undefined {
