@@ -88,12 +88,11 @@ export const apexLimitSeries: Derivation<HeatStripTimeSeries> = async (index, st
     }
   }
 
-  const granular: GranularObservation[] = [];
-  const granularRows: number[] = [];
+  const { categoryId, rowCount, subtreeEnd } = index;
+  const granular: { observation: GranularObservation; end: number }[] = [];
   let row = 0;
   const observe = (observation: GranularObservation): void => {
-    granular.push(observation);
-    granularRows.push(row);
+    granular.push({ observation, end: subtreeEnd[row]! }); // in range: `row` is a row of `index`
   };
   const pushDelta = (
     timestamp: number,
@@ -111,7 +110,6 @@ export const apexLimitSeries: Derivation<HeatStripTimeSeries> = async (index, st
   const soqlId = index.categoryNames.indexOf(LOG_CATEGORY.SOQL);
   const dmlId = index.categoryNames.indexOf(LOG_CATEGORY.DML);
   const calloutId = index.categoryNames.indexOf(LOG_CATEGORY.Callout);
-  const { categoryId, rowCount, subtreeEnd } = index;
   for (row = 0; row < rowCount; row++) {
     if (row % CHECK_EVERY === 0) {
       await tick();
@@ -183,21 +181,14 @@ export const apexLimitSeries: Derivation<HeatStripTimeSeries> = async (index, st
     }
   }
 
-  // Ties in time keep the order a last-child-first walk meets them in; in range: all pushed above.
-  const order = granular.map((_, at) => at);
-  order.sort(
-    (a, b) =>
-      granular[a]!.timestamp - granular[b]!.timestamp ||
-      subtreeEnd[granularRows[b]!]! - subtreeEnd[granularRows[a]!]! ||
-      granularRows[a]! - granularRows[b]! ||
-      a - b,
-  );
-  for (const at of order) {
-    observations.push(granular[at]!); // in range: `order` holds indexes of `granular`
+  // Ties in time keep the order a last-child-first walk meets them in; the sort is stable.
+  granular.sort((a, b) => a.observation.timestamp - b.observation.timestamp || b.end - a.end);
+  for (const { observation } of granular) {
+    observations.push(observation);
   }
 
   return {
-    ...buildGovernorTimeSeries(observations, metrics, metricLimits),
+    ...(await buildGovernorTimeSeries(observations, metrics, metricLimits, tick)),
     // On the series itself, not added by the Timeline alone: every surface drawing it has to
     // leave the spans the log recorded nothing in blank.
     gaps: noDataSpans(extractMarkers(apexLog)),

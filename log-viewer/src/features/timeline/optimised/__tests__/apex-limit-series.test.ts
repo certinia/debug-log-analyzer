@@ -55,6 +55,21 @@ describe('apexLimitSeries', () => {
     expect(last?.get('heapSize')?.used).toBe(40);
   });
 
+  it('folds readings tied in time in the order a last-child-first walk meets them', async () => {
+    // The statement is the later sibling, so its count lands before the block's own report.
+    const { store } = storeOf(
+      '09:18:22.6 (1000)|METHOD_ENTRY|[1]|01p|Outer.run()\n' +
+        '09:18:22.6 (1100)|LIMIT_USAGE|[2]|SOQL|5|100\n' +
+        '09:18:22.6 (1100)|SOQL_EXECUTE_BEGIN|[3]|Aggregations:0|SELECT Id FROM Account\n' +
+        '09:18:22.6 (1200)|SOQL_EXECUTE_END|[3]|Rows:0\n' +
+        '09:18:22.6 (1300)|METHOD_EXIT|[1]|Outer.run()\n',
+    );
+
+    const last = (await store.derive(apexLimitSeries)).events.at(-1)?.values;
+
+    expect(last?.get('soqlQueries')?.used).toBe(5);
+  });
+
   it('reports no gaps for a log that recorded throughout', async () => {
     expect((await seriesOf(aLog([]))).gaps).toEqual([]);
   });
