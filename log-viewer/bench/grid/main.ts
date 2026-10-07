@@ -3,12 +3,14 @@
  */
 
 /**
- * Grid bench. `index.html?c=<contender>`, then pick a log.
- * `window.bench.runAll()` returns medians per action; the page shows them too.
+ * Grid bench. `index.html?c=<contender>[&tree=bottom-up]`, then pick a log. The Time
+ * Order tree is the default. `window.bench.runAll()` returns medians per action; the
+ * page shows them too.
  */
 import { parse, type ApexLog, type LogEvent } from '@apexdevtools/apex-log-parser';
 
-import type { Contender } from './contender.js';
+import { LvGridBottomUp, TabulatorBottomUp } from './bottom-up-contenders.js';
+import type { BottomUpContender, Contender, Mounted } from './contender.js';
 import { GridContender } from './grid-contender.js';
 import { LvGridContender } from './lv-grid-contender.js';
 import { TabulatorContender } from './tabulator-contender.js';
@@ -18,13 +20,20 @@ const CONTENDERS: Record<string, () => Contender> = {
   tabulator: () => new TabulatorContender(),
   grid: () => new GridContender(),
   'lv-grid': () => new LvGridContender(),
+  'call-tree': () => new LvGridContender(true),
 };
 
-const name = new URLSearchParams(location.search).get('c') ?? 'tabulator';
-const make = CONTENDERS[name];
+const BOTTOM_UP_CONTENDERS: Record<string, () => BottomUpContender> = {
+  tabulator: () => new TabulatorBottomUp(),
+  'call-tree': () => new LvGridBottomUp(),
+};
+
+const params = new URLSearchParams(location.search);
+const name = params.get('c') ?? 'tabulator';
+const tree = params.get('tree') === 'bottom-up' ? 'bottom-up' : 'time-order';
 const status = document.getElementById('status') as HTMLPreElement;
 const host = document.getElementById('host') as HTMLDivElement;
-document.title = `grid bench: ${name}`;
+document.title = `grid bench: ${name} ${tree}`;
 
 const say = (text: string): void => {
   status.textContent += `${text}\n`;
@@ -73,10 +82,30 @@ const summarise = (runs: Timing[]): Summary => ({
   longestTaskMs: Math.round(Math.max(...runs.map((r) => r.longestTaskMs))),
 });
 
+let mounted: Mounted;
 let contender: Contender;
+let bottomUp: BottomUpContender;
 let log: ApexLog;
 let target: LogEvent;
-const results: Record<string, unknown> = { contender: name };
+const results: Record<string, unknown> = { contender: name, tree };
+
+/** Records a timing under `key`, and says it. */
+const recorder =
+  (runs: Record<string, Timing[]>) =>
+  (key: string, t: Timing): void => {
+    (runs[key] ??= []).push(t);
+    say(
+      `${key} ${Math.round(t.ms)}ms settled ${Math.round(t.settledMs)}ms longest task ${Math.round(t.longestTaskMs)}ms`,
+    );
+  };
+
+const frames = (list: FrameStats[]): FrameStats => ({
+  frames: list[0]?.frames ?? 0,
+  p50: Math.round(median(list.map((f) => f.p50)) * 10) / 10,
+  p95: Math.round(median(list.map((f) => f.p95)) * 10) / 10,
+  max: Math.round(Math.max(...list.map((f) => f.max))),
+  dropped: median(list.map((f) => f.dropped)),
+});
 
 async function load(text: string): Promise<void> {
   const t0 = performance.now();
@@ -87,20 +116,24 @@ async function load(text: string): Promise<void> {
   );
   await settled();
 
-  contender = make?.() ?? CONTENDERS.tabulator!();
+  if (tree === 'bottom-up') {
+    mounted = bottomUp = (BOTTOM_UP_CONTENDERS[name] ?? BOTTOM_UP_CONTENDERS.tabulator!)();
+  } else {
+    mounted = contender = (CONTENDERS[name] ?? CONTENDERS.tabulator!)();
+  }
   const heapBefore = heapMb();
-  const first = await timed(() => contender.mount(host, log));
+  const first = await timed(() => mounted.mount(host, log));
   await settled(10);
   results.firstRender = summarise([first]);
   results.heapBeforeMountMb = heapBefore;
   results.heapAfterMountMb = heapMb();
-  results.rowsAfterMount = contender.visibleRowCount();
+  results.rowsAfterMount = mounted.visibleRowCount();
   say(`first render ${JSON.stringify(results.firstRender)} heap ${heapBefore} -> ${heapMb()}MB`);
   bench.ready = true;
 }
 
 async function scrollStats(): Promise<{ fling: FrameStats; jumpEnd: Timing; jumpTop: Timing }> {
-  const scroller = contender.scroller();
+  const scroller = mounted.scroller();
   scroller.scrollTop = 0;
   await settled();
   const fling = frameStats(
@@ -118,15 +151,13 @@ async function scrollStats(): Promise<{ fling: FrameStats; jumpEnd: Timing; jump
 }
 
 async function runAll(reps = 5, skip: string[] = []): Promise<Record<string, unknown>> {
+  if (tree === 'bottom-up') {
+    return runBottomUp(reps, skip);
+  }
   const runs: Record<string, Timing[]> = {};
   const flings: FrameStats[] = [];
   const resizes: FrameStats[] = [];
-  const add = (key: string, t: Timing): void => {
-    (runs[key] ??= []).push(t);
-    say(
-      `${key} ${Math.round(t.ms)}ms settled ${Math.round(t.settledMs)}ms longest task ${Math.round(t.longestTaskMs)}ms`,
-    );
-  };
+  const add = recorder(runs);
   let findMatches = 0;
   let csvLength = 0;
 
@@ -164,15 +195,55 @@ async function runAll(reps = 5, skip: string[] = []): Promise<Record<string, unk
   for (const [key, list] of Object.entries(runs)) {
     results[key] = summarise(list);
   }
-  const frames = (list: FrameStats[]): FrameStats => ({
-    frames: list[0]?.frames ?? 0,
-    p50: Math.round(median(list.map((f) => f.p50)) * 10) / 10,
-    p95: Math.round(median(list.map((f) => f.p95)) * 10) / 10,
-    max: Math.round(Math.max(...list.map((f) => f.max))),
-    dropped: median(list.map((f) => f.dropped)),
-  });
   results.scrollFling = frames(flings);
   results.resizeNameColumn = frames(resizes);
+  results.findMatches = findMatches;
+  results.csvLength = csvLength;
+  results.heapAfterRunsMb = heapMb();
+  say(JSON.stringify(results, null, 1));
+  return results;
+}
+
+/** The Bottom-Up tab's actions: grouping, sorting, then the tree opened, searched and exported. */
+async function runBottomUp(reps: number, skip: string[]): Promise<Record<string, unknown>> {
+  const runs: Record<string, Timing[]> = {};
+  const flings: FrameStats[] = [];
+  const add = recorder(runs);
+  let findMatches = 0;
+  let csvLength = 0;
+
+  for (let rep = 0; rep < reps; rep++) {
+    add('sortTotalDesc', await timed(() => bottomUp.sortTotalDesc()));
+    add('clearSort', await timed(() => bottomUp.clearSort()));
+    add('expandAll', await timed(() => bottomUp.expandAll()));
+    results.rowsExpanded = bottomUp.visibleRowCount();
+    const scroll = await scrollStats();
+    flings.push(scroll.fling);
+    add('scrollJumpEnd', scroll.jumpEnd);
+    add('scrollJumpTop', scroll.jumpTop);
+    add('find', await timed(async () => (findMatches = await bottomUp.find('AccountService'))));
+    if (!skip.includes('exportCsv')) {
+      add('exportCsv', await timed(async () => (csvLength = await bottomUp.exportCsv())));
+    }
+    add('collapseAll', await timed(() => bottomUp.collapseAll()));
+    await settled();
+    say(`rep ${rep + 1}/${reps} done`);
+  }
+
+  // Last: Tabulator's Bottom-Up overflows the stack on an ungroup, so nothing may follow it.
+  for (let rep = 0; rep < reps; rep++) {
+    add('groupByType', await timed(() => bottomUp.groupBy('type')));
+    results.rowsGroupedByType = bottomUp.visibleRowCount();
+    add('groupByNamespace', await timed(() => bottomUp.groupBy('namespace')));
+  }
+  if (!skip.includes('ungroup')) {
+    add('ungroup', await timed(() => bottomUp.groupBy(null)));
+  }
+
+  for (const [key, list] of Object.entries(runs)) {
+    results[key] = summarise(list);
+  }
+  results.scrollFling = frames(flings);
   results.findMatches = findMatches;
   results.csvLength = csvLength;
   results.heapAfterRunsMb = heapMb();
@@ -199,8 +270,8 @@ const bench = {
   runAll,
   runOne,
   /** For profiling one action from outside, e.g. a fling after `expandAll`. */
-  get contender(): Contender {
-    return contender;
+  get contender(): Mounted {
+    return mounted;
   },
 };
 (window as unknown as { bench: typeof bench }).bench = bench;

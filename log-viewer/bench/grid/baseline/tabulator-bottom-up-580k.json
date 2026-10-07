@@ -1,0 +1,94 @@
+{
+  "tabulator": {
+    "contender": "tabulator",
+    "tree": "bottom-up",
+    "firstRender": {
+      "ms": 774,
+      "settledMs": 803,
+      "longestTaskMs": 508
+    },
+    "heapBeforeMountMb": 867,
+    "heapAfterMountMb": 881,
+    "rowsAfterMount": 136,
+    "rowsExpanded": 5332,
+    "rowsGroupedByType": 20,
+    "sortTotalDesc": {
+      "ms": 412,
+      "settledMs": 450,
+      "longestTaskMs": 426
+    },
+    "clearSort": {
+      "ms": 412,
+      "settledMs": 433,
+      "longestTaskMs": 417
+    },
+    "expandAll": {
+      "ms": 419,
+      "settledMs": 449,
+      "longestTaskMs": 433
+    },
+    "scrollJumpEnd": {
+      "ms": 28,
+      "settledMs": 66,
+      "longestTaskMs": 0
+    },
+    "scrollJumpTop": {
+      "ms": 17,
+      "settledMs": 67,
+      "longestTaskMs": 0
+    },
+    "find": {
+      "ms": 18,
+      "settledMs": 66,
+      "longestTaskMs": 181
+    },
+    "exportCsv": {
+      "ms": 565,
+      "settledMs": 583,
+      "longestTaskMs": 565
+    },
+    "collapseAll": {
+      "ms": 411,
+      "settledMs": 433,
+      "longestTaskMs": 418
+    },
+    "groupByType": {
+      "ms": 2784,
+      "settledMs": 2816,
+      "longestTaskMs": 2835
+    },
+    "groupByNamespace": {
+      "ms": 1576,
+      "settledMs": 1600,
+      "longestTaskMs": 1776
+    },
+    "scrollFling": {
+      "frames": 120,
+      "p50": 16.7,
+      "p95": 16.8,
+      "max": 17,
+      "dropped": 0
+    },
+    "findMatches": 916,
+    "csvLength": 60619,
+    "heapAfterRunsMb": 889,
+    "firstRenderRuns": [
+      {
+        "ms": 779,
+        "settledMs": 809,
+        "longestTaskMs": 499
+      },
+      {
+        "ms": 792,
+        "settledMs": 821,
+        "longestTaskMs": 537
+      },
+      {
+        "ms": 774,
+        "settledMs": 803,
+        "longestTaskMs": 508
+      }
+    ],
+    "firstRenderMedianMs": 779
+  }
+}

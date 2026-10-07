@@ -6,7 +6,8 @@
  * Runs the grid bench in Chromium for each contender and writes the results.
  *
  *   node scripts/grid-bench/make-log.mjs 5 <log>          the 580k-row log the baseline used
- *   pnpm bench:grid <log> <out.json> [contender...] [--loads N] [--reps N] [--only find|exportCsv]
+ *   pnpm bench:grid <log> <out.json> [contender...] [--tree time-order|bottom-up] [--loads N]
+ *                   [--reps N] [--only find|exportCsv]
  *   node scripts/grid-bench/compare.mjs <out.json>        the results against the Tabulator baseline
  */
 import { writeFileSync } from 'node:fs';
@@ -21,10 +22,18 @@ const { values, positionals } = parseArgs({
     loads: { type: 'string', default: '3' },
     reps: { type: 'string', default: '5' },
     only: { type: 'string' },
+    tree: { type: 'string', default: 'time-order' },
   },
 });
 const [logPath, outPath, ...names] = positionals;
 const contenders = names.length ? names : ['tabulator'];
+/**
+ * Tabulator's Time Order tree export is quadratic: hours at this size, measured on its own.
+ * Its Bottom-Up table overflows the stack on an ungroup after a group.
+ */
+const skipped = (name) =>
+  name !== 'tabulator' ? [] : values.tree === 'bottom-up' ? ['ungroup'] : ['exportCsv'];
+
 const page = `file://${path.resolve('log-viewer/bench/grid/index.html')}`;
 
 const browser = await chromium.launch({
@@ -43,7 +52,7 @@ for (const name of contenders) {
         console.log(`[${name}] ${m.text()}`);
       }
     });
-    await tab.goto(`${page}?c=${name}`);
+    await tab.goto(`${page}?c=${name}&tree=${values.tree}`);
     await tab.setInputFiles('#file', logPath);
     await tab.waitForFunction(() => window.bench?.ready, null, { timeout: 600_000, polling: 500 });
     const lastLoad = load === Number(values.loads) - 1;
@@ -52,8 +61,7 @@ for (const name of contenders) {
       : lastLoad
         ? await tab.evaluate(
             ([reps, skip]) => window.bench.runAll(reps, skip),
-            // Tabulator's tree export is quadratic: hours at this size, measured on its own.
-            [Number(values.reps), name === 'tabulator' ? ['exportCsv'] : []],
+            [Number(values.reps), skipped(name)],
           )
         : await tab.evaluate(() => window.bench.results);
     console.log(`${name} load ${load + 1}: first render ${JSON.stringify(result.firstRender)}`);

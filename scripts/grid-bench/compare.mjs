@@ -8,24 +8,43 @@
  *
  *   node scripts/grid-bench/compare.mjs [results.json...]
  *
- * The Tabulator baseline is always read first. `!` marks a figure worse than Tabulator's,
- * and a longest task over the 50ms budget.
+ * The Tabulator baseline of the tree the results are for is read first. `!` marks a
+ * figure worse than Tabulator's, and a longest task over the 50ms budget.
  */
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 
-const BASELINE = 'log-viewer/bench/grid/baseline/tabulator-580k.json';
+const BASELINES = {
+  'time-order': 'log-viewer/bench/grid/baseline/tabulator-580k.json',
+  'bottom-up': 'log-viewer/bench/grid/baseline/tabulator-bottom-up-580k.json',
+};
 const BUDGET_MS = 50;
 
-const results = Object.assign(
-  {},
-  ...[BASELINE, ...process.argv.slice(2)].map((f) => JSON.parse(readFileSync(f, 'utf8'))),
-);
+const files = process.argv.slice(2).map((f) => JSON.parse(readFileSync(f, 'utf8')));
+const tree = Object.values(files[0] ?? {})[0]?.tree ?? 'time-order';
+const baseline = existsSync(BASELINES[tree])
+  ? JSON.parse(readFileSync(BASELINES[tree], 'utf8'))
+  : {};
+const results = Object.assign({}, baseline, ...files);
 const names = Object.keys(results);
-const base = results.tabulator;
+const base = results.tabulator ?? {};
 const pad = (s, n = 30) => String(s).padEnd(n);
 const row = (label, cells) => console.log(pad(label, 32) + cells.map((c) => pad(c)).join(''));
 
-const ACTIONS = [
+const BOTTOM_UP_ACTIONS = [
+  'groupByType',
+  'groupByNamespace',
+  'ungroup',
+  'sortTotalDesc',
+  'clearSort',
+  'expandAll',
+  'find',
+  'exportCsv',
+  'collapseAll',
+  'scrollJumpEnd',
+  'scrollJumpTop',
+];
+
+const TIME_ORDER_ACTIONS = [
   'expandAll',
   'collapseAll',
   'sortSelfDesc',
@@ -41,10 +60,12 @@ const ACTIONS = [
   'scrollJumpTop',
 ];
 
+const ACTIONS = tree === 'bottom-up' ? BOTTOM_UP_ACTIONS : TIME_ORDER_ACTIONS;
+
 const worse = (value, baseline) => (baseline !== undefined && value > baseline ? '!' : ' ');
 const overBudget = (task) => (task > BUDGET_MS ? '!' : ' ');
 
-row('action  ms · longest task', names);
+row(`${tree}: ms · longest task`, names);
 row(
   'firstRender (median of loads)',
   names.map((n) => {
@@ -90,7 +111,13 @@ row(
       `${worse(added(results[n], 'heapAfterRunsMb'), added(base, 'heapAfterRunsMb'))}${added(results[n], 'heapAfterRunsMb')}`,
   ),
 );
-for (const k of ['rowsExpanded', 'rowsUnfiltered', 'findMatches']) {
+for (const k of [
+  'rowsGroupedByType',
+  'rowsExpanded',
+  'rowsUnfiltered',
+  'findMatches',
+  'csvLength',
+]) {
   row(
     k,
     names.map((n) => results[n][k] ?? '-'),
