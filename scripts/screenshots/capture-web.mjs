@@ -16,7 +16,8 @@
 // that has them, and add a shot: Call Tree, Memory view, sorted by Peak descending,
 // expanded 3 levels, inspector closed.
 import { execFileSync } from 'node:child_process';
-import { mkdir, readFile, rm } from 'node:fs/promises';
+import { existsSync } from 'node:fs';
+import { mkdir } from 'node:fs/promises';
 import { createRequire } from 'node:module';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -27,27 +28,22 @@ const OUT = path.resolve(process.argv[2] ?? path.join(REPO, 'lana/assets/1_22'))
 const ORIGIN = 'https://demo.lana';
 // The webview area of a 1920x1080 VS Code window, once the title and status bars are off.
 const VIEWPORT = { width: 1920, height: 1023 };
-const CONTENT_TYPES = { '.js': 'text/javascript', '.css': 'text/css', '.html': 'text/html' };
 
 const { chromium } = createRequire(path.join(REPO, 'package.json'))('playwright');
 
-await readFile(path.join(DEMO, 'viewer.html')).catch(() => {
+if (!existsSync(path.join(DEMO, 'viewer.html'))) {
   console.error(
     'capture-web: no demo build. Run "pnpm build && pnpm --filter docs-site build:demo".',
   );
   process.exit(1);
-});
+}
 await mkdir(OUT, { recursive: true });
 
 async function openViewer(browser, theme, deviceScaleFactor) {
   const page = await browser.newPage({ viewport: VIEWPORT, deviceScaleFactor });
-  await page.route(`${ORIGIN}/**`, async (route) => {
-    const file = path.join(DEMO, new URL(route.request().url()).pathname);
-    await route.fulfill({
-      body: await readFile(file),
-      contentType: CONTENT_TYPES[path.extname(file)],
-    });
-  });
+  await page.route(`${ORIGIN}/**`, (route) =>
+    route.fulfill({ path: path.join(DEMO, new URL(route.request().url()).pathname) }),
+  );
   await page.goto(`${ORIGIN}/viewer.html?theme=${theme}`);
   await page.locator('timeline-flame-chart').waitFor();
   await settle(page, 2000);
@@ -59,10 +55,8 @@ async function settle(page, ms = 600) {
   await page.waitForTimeout(ms);
 }
 
-const fileName = (name, theme) => (theme === 'dark' ? `${name}.png` : `${name}-light.png`);
-
 async function shoot(page, name, theme, options = {}) {
-  const file = path.join(OUT, fileName(name, theme));
+  const file = path.join(OUT, theme === 'dark' ? `${name}.png` : `${name}-light.png`);
   await page.screenshot({ path: file, ...options });
   console.log(`  ${path.basename(file)}`);
 }
@@ -117,14 +111,14 @@ async function closeFind(page) {
 }
 
 // Three views side by side at 750 px each, the width the docs show them at.
-async function stitch(browser, files, name, theme) {
+async function stitch(browser, images, name, theme) {
   const page = await browser.newPage({ viewport: { width: 2250, height: 400 } });
-  const images = await Promise.all(
-    files.map(async (file) => `data:image/png;base64,${(await readFile(file)).toString('base64')}`),
-  );
   await page.setContent(
     `<body style="margin:0;display:flex">${images
-      .map((src) => `<img src="${src}" style="width:750px;height:400px;display:block">`)
+      .map(
+        (png) =>
+          `<img src="data:image/png;base64,${png.toString('base64')}" style="width:750px;height:400px;display:block">`,
+      )
       .join('')}</body>`,
   );
   await shoot(page, name, theme);
@@ -151,21 +145,14 @@ async function fullShots(browser, theme) {
   // The three views get the full width, so the inspector stays closed until Analysis.
   await setInspector(page, false);
   const views = [];
-  for (const [label, file] of [
-    ['Time Order', 'calltree-time-order'],
-    ['Aggregated', 'calltree-aggregated'],
-    ['Bottom-Up', 'calltree-bottom-up'],
-  ]) {
+  for (const label of ['Time Order', 'Aggregated', 'Bottom-Up']) {
     await chooseView(page, label);
     if (label !== 'Time Order') {
       await expandLevels(page, 3);
     }
-    const temp = path.join(OUT, `.${file}-${theme}.png`);
-    await page.screenshot({ path: temp });
-    views.push(temp);
+    views.push(await page.screenshot());
   }
   await stitch(browser, views, 'calltree-combined', theme);
-  await Promise.all(views.map((file) => rm(file)));
   await chooseView(page, 'Time Order');
 
   await openTab(page, 'Analysis');
@@ -181,23 +168,31 @@ async function fullShots(browser, theme) {
 async function cropShots(browser, theme) {
   const page = await openViewer(browser, theme, 2);
   const chart = await page.locator('timeline-flame-chart').boundingBox();
-  // The chart's own layout: the minimap is its top tenth, then a 4 px gap, then the strip.
-  const minimapHeight = Math.max(60, Math.min(120, Math.round(chart.height * 0.1)));
-  const stripTop = chart.y + minimapHeight + 4;
+  // The chart's column: minimap, gap, governor strip, gap, flame chart.
+  const [minimap, , strip] = await page
+    .locator('timeline-flame-chart')
+    .evaluate((host) =>
+      [
+        ...[...host.shadowRoot.querySelectorAll('div')].find(
+          (div) => div.style.flexDirection === 'column' && div.children.length === 5,
+        ).children,
+      ].map((part) => part.getBoundingClientRect().toJSON()),
+    );
   const chartClip = (y, height) => ({ x: chart.x, y, width: chart.width, height });
+  const toggleStrip = async () => {
+    await page.keyboard.down('Shift');
+    await page.mouse.click(chart.x + chart.width / 2, strip.y + 7);
+    await page.keyboard.up('Shift');
+  };
 
-  await page.keyboard.down('Shift');
-  await page.mouse.click(chart.x + chart.width / 2, stripTop + 7);
-  await page.keyboard.up('Shift');
+  await toggleStrip();
   await settle(page);
-  await page.mouse.move(chart.x + chart.width * 0.75, stripTop + 50);
+  await page.mouse.move(chart.x + chart.width * 0.75, strip.y + 50);
   await page.waitForTimeout(800);
-  await shoot(page, 'timeline-gov-strip', theme, { clip: chartClip(stripTop - 2, 240) });
-  await page.keyboard.down('Shift');
-  await page.mouse.click(chart.x + chart.width / 2, stripTop + 7);
-  await page.keyboard.up('Shift');
+  await shoot(page, 'timeline-gov-strip', theme, { clip: chartClip(strip.y - 2, 240) });
+  await toggleStrip();
 
-  const minimapCentre = { x: chart.x + chart.width * 0.4, y: chart.y + minimapHeight / 2 + 8 };
+  const minimapCentre = { x: chart.x + chart.width * 0.4, y: minimap.y + minimap.height / 2 + 8 };
   await page.mouse.move(minimapCentre.x, minimapCentre.y);
   for (let i = 0; i < 4; i++) {
     await page.keyboard.press('w');
@@ -205,7 +200,7 @@ async function cropShots(browser, theme) {
   }
   await page.mouse.move(minimapCentre.x + 1, minimapCentre.y);
   await page.waitForTimeout(800);
-  await shoot(page, 'timeline-minimap', theme, { clip: chartClip(chart.y, minimapHeight) });
+  await shoot(page, 'timeline-minimap', theme, { clip: chartClip(minimap.y, minimap.height) });
   await page.keyboard.press('0');
   await settle(page);
 

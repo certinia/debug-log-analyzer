@@ -50,21 +50,14 @@ PROFILE=${PROFILE:-lana-dev} # the dev-host profile from AGENTS.md, so the shots
 WINDOW_MATCH=${WINDOW_MATCH:-sample-app}
 WINDOW_W=1920
 WINDOW_H=1080
-# The window is all editor once the profile hides the rest, so only the title bar
-# and the status bar are left to drop. The status bar carries the branch name, so
-# it must not reach a release image. Measure both from the first shot and set
-# these if the framing is off.
-TOP_CROP=${TOP_CROP:-35}
-BOTTOM_CROP=${BOTTOM_CROP:-22}
-# Both are ceilings, never targets: see the resize below.
-FULL_W=$WINDOW_W # a full view is the whole window, grabbed at 2x and halved
+# A ceiling, never a target: see the resize below.
 CROP_W=2400 # a crop keeps the pixels it was dragged at, up to this
 COUNTDOWN=${COUNTDOWN:-8} # seconds a region shot gives you before the select starts
 
-# name | full or crop | what to set up, one step per line
+# name | width the docs show it at | what to set up, one step per line
 #
-# full: the whole window. crop: a countdown to find what the shot is of, then you
-# drag the region. A hover held through the countdown survives into the drag.
+# Each shot gives a countdown to find what it is of, then you drag the region.
+# A hover held through the countdown survives into the drag.
 #
 # A crop keeps the pixels it was dragged at, and the screen is 2x, so a drag is
 # worth double its width in the file. Each crop below says the width the docs
@@ -76,10 +69,10 @@ COUNTDOWN=${COUNTDOWN:-8} # seconds a region shot gives you before the select st
 # and "which tab, what selected" is not recoverable from the old image.
 SHOTS=(
   # --- Editor, not the webview ---
-  "vscode/show-analysis-lens.png|crop|350|Open sample-log.log in the editor, so the Show Apex Log Analysis lens sits above line 1.
+  "vscode/show-analysis-lens.png|350|Open sample-log.log in the editor, so the Show Apex Log Analysis lens sits above line 1.
 Drag round the lens and the first line of the log under it."
 
-  "vscode/settings-custom-themes.png|crop|300|Open settings.json and define two themes under lana.timeline.customThemes, so the color chips show in the gutter.
+  "vscode/settings-custom-themes.png|300|Open settings.json and define two themes under lana.timeline.customThemes, so the color chips show in the gutter.
 Drag round the customThemes block alone."
 )
 
@@ -187,26 +180,16 @@ host_window >/dev/null || {
 echo "host window: $(host_window)"
 focus
 
-# Size it, then read back where it landed: the menu bar means the position
-# asked for is not the position given.
+# The same window size every release, so crops are dragged at the same scale.
 osascript -e "tell application \"System Events\" to tell process \"$APP\"
   set w to first window whose name contains \"$WINDOW_MATCH\"
   set size of w to {$WINDOW_W, $WINDOW_H}
   set position of w to {0, 0}
 end tell" >/dev/null
-read -r X Y W H < <(
-  osascript -e "tell application \"System Events\" to tell process \"$APP\" to get {position, size} of (first window whose name contains \"$WINDOW_MATCH\")" |
-    tr -d ' ' | tr ',' ' '
-)
-Y=$((Y + TOP_CROP))
-H=$((H - TOP_CROP - BOTTOM_CROP))
-echo "capturing ${W}x${H} at ${X},${Y}"
-[ "$W" -eq "$WINDOW_W" ] || echo "warning: window is ${W} wide, not ${WINDOW_W} - the display may be too small"
-echo "Set the window up before the first shot: side bar and activity bar closed,"
-echo "then open the log with 'Log: Show Apex Log Analysis'."
+echo "Set the window up before the first shot: side bar and activity bar closed."
 
 for shot in "${SHOTS[@]}"; do
-  IFS='|' read -r -d '' name mode shown setup <<<"$shot" || true
+  IFS='|' read -r -d '' name shown setup <<<"$shot" || true
   setup=${setup%$'\n'} # the here-string's own newline
   # What the docs render it at, doubled: anything under this is upscaled in the
   # page, which no amount of care in the capture can undo.
@@ -218,39 +201,27 @@ for shot in "${SHOTS[@]}"; do
     printf '\n%s\n' "$name"
     have "$name"
     printf '%s\n' "$setup" | sed 's/^/  /'
-    if [ "$mode" = full ]; then
-      printf '  [whole window] Enter to capture, s to skip: '
-    else
-      # The drag is in screen points and the display is 2x, so dragging the width
-      # the docs show it at is what lands the file at twice that.
-      printf '  [area select, %ss countdown] drag %spx+ across, to land %spx.\n' \
-        "$COUNTDOWN" "$shown" "$need"
-      printf '  Enter to capture, s to skip: '
-    fi
+    # The drag is in screen points and the display is 2x, so dragging the width
+    # the docs show it at is what lands the file at twice that.
+    printf '  [area select, %ss countdown] drag %spx+ across, to land %spx.\n' \
+      "$COUNTDOWN" "$shown" "$need"
+    printf '  Enter to capture, s to skip: '
     read -r key </dev/tty
     [ "$key" = "s" ] && break
 
-    if [ "$mode" = full ]; then
-      focus
-      sleep 1 # let the window come forward and any hover state settle
-      screencapture -x -R"$X,$Y,$W,$H" "$tmp/raw.png"
-      target=$FULL_W
-    else
-      # Enter was pressed in the terminal, so the terminal is what is in front.
-      # The countdown is to raise the window and find what the shot is of - and,
-      # where it needs a hover, to get the pointer onto it. The region select that
-      # follows takes the pointer off the window, so the app stops being told
-      # where it is and whatever is hovered stays up while you drag.
-      focus
-      for s in $(seq "$COUNTDOWN" -1 1); do
-        printf '\r  find what the shot is of - region select in %ss ' "$s"
-        sleep 1
-      done
-      printf '\r%*s\r' 52 ''
-      screencapture -i -s "$tmp/raw.png"
-      [ -f "$tmp/raw.png" ] || { echo "  cancelled"; continue; }
-      target=$CROP_W
-    fi
+    # Enter was pressed in the terminal, so the terminal is what is in front.
+    # The countdown is to raise the window and find what the shot is of - and,
+    # where it needs a hover, to get the pointer onto it. The region select that
+    # follows takes the pointer off the window, so the app stops being told
+    # where it is and whatever is hovered stays up while you drag.
+    focus
+    for s in $(seq "$COUNTDOWN" -1 1); do
+      printf '\r  find what the shot is of - region select in %ss ' "$s"
+      sleep 1
+    done
+    printf '\r%*s\r' 52 ''
+    screencapture -i -s "$tmp/raw.png"
+    [ -f "$tmp/raw.png" ] || { echo "  cancelled"; continue; }
 
     # `>` only ever shrinks. Without it a crop is forced to the target whatever it
     # was dragged at, so a wide drag is squeezed below 1x and the text goes to mush
@@ -261,7 +232,7 @@ for shot in "${SHOTS[@]}"; do
     # Written aside and only moved into place once it measures up, so a short
     # drag never overwrites a good shot from a previous run.
     pending="$tmp/pending.${name##*.}"
-    magick "$tmp/raw.png" -resize "${target}x>" -colorspace sRGB -strip "$pending"
+    magick "$tmp/raw.png" -resize "${CROP_W}x>" -colorspace sRGB -strip "$pending"
     rm -f "$tmp/raw.png"
     got=$(magick identify -format '%w' "$pending")
     if [ "$got" -lt "$need" ]; then
