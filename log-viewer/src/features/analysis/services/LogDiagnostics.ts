@@ -13,8 +13,8 @@ import type {
 import { limitTotals } from '../../../components/logOverviewMetrics.js';
 import { GOVERNOR_METRICS } from '../../../core/metrics/governorMetrics.js';
 import { formatByteSize, formatDuration, formatInteger } from '../../../core/utility/Util.js';
-import { getEventKey } from '../../../core/log/eventKeys.js';
-import { currentLogStore } from '../../../core/log/LogStore.js';
+import { idsBySelfTime, keySelfTimes, type KeySelfTimes } from '../../../core/log/keySelfTimes.js';
+import { currentLogStore, type LogStore } from '../../../core/log/LogStore.js';
 import { outermostEvents } from '../../../core/utility/EventTree.js';
 import { deriveSoqlObject } from '../../database/services/sobjectClassification.js';
 import type { Dialect } from '../../soql/format/tokenize.js';
@@ -204,23 +204,20 @@ interface HotSpot {
  * putting a second grid beside the one already on screen. Nothing is reported
  * when no signature stands out, because then there is nothing to point at.
  */
-function hotSpot(selfTime: Map<string, number>, totalSelf: number): HotSpot | null {
-  if (totalSelf <= 0) {
+function hotSpot(times: KeySelfTimes): HotSpot | null {
+  const [top] = idsBySelfTime(times);
+  if (top === undefined) {
     return null;
   }
-  let label = '';
-  let selfNs = 0;
-  for (const [key, self] of selfTime) {
-    if (self > selfNs) {
-      label = key;
-      selfNs = self;
-    }
-  }
+  const totalSelf = times.selfTime.reduce((sum, self) => sum + self, 0);
+  // In range: `top` is an id from `times`.
+  const selfNs = times.selfTime[top]!;
   const share = selfNs / totalSelf;
   if (share < HOT_SPOT_SHARE) {
     return null;
   }
   // `getEventKey` is `type|namespace|text`; only the text names the code.
+  const label = times.keys[top]!;
   return { label: label.slice(label.lastIndexOf('|') + 1), selfNs, share };
 }
 
@@ -800,12 +797,13 @@ let cached: { log: ApexLog; result: Promise<LogDiagnostics> } | null = null;
  * changes. {@link scopeDiagnostics} narrows this result instead.
  */
 export function computeLogDiagnostics(): Promise<LogDiagnostics> {
-  const log = currentLogStore()?.log;
-  if (!log) {
+  const store = currentLogStore();
+  if (!store) {
     return Promise.resolve(EMPTY);
   }
+  const log = store.log;
   if (cached?.log !== log) {
-    cached = { log, result: analyse(log) };
+    cached = { log, result: analyse(store) };
   }
   return cached.result;
 }
@@ -856,17 +854,12 @@ export function scopeDiagnostics(
  * source, so the findings are what ran, how often, and what the platform said
  * about it.
  */
-async function analyse(log: ApexLog): Promise<LogDiagnostics> {
+async function analyse(store: LogStore): Promise<LogDiagnostics> {
+  const log = store.log;
   const queries: SOQLExecuteBeginLine[] = [];
   const dml: DMLBeginLine[] = [];
   const debugLines: LogEvent[] = [];
-  const selfTime = new Map<string, number>();
-  let totalSelf = 0;
   for (const event of log.eventsById) {
-    // The log itself holds the gap time, and no call stands for it.
-    if (event === log) {
-      continue;
-    }
     switch (event.type) {
       case 'SOQL_EXECUTE_BEGIN':
         queries.push(event as SOQLExecuteBeginLine);
@@ -880,16 +873,14 @@ async function analyse(log: ApexLog): Promise<LogDiagnostics> {
       default:
         break;
     }
-    const self = event.duration.self;
-    if (self > 0) {
-      const key = getEventKey(event);
-      selfTime.set(key, (selfTime.get(key) ?? 0) + self);
-      totalSelf += self;
-    }
   }
 
   const plans = queryPlanDiagnostics(queries);
-  const lint = await soqlLintDiagnostics(queries);
+  // Together, so the key pass's slices run beside the lint's.
+  const [lint, times] = await Promise.all([
+    soqlLintDiagnostics(queries),
+    store.derive(keySelfTimes),
+  ]);
   // A `LimitException` belongs to its governor metric, not to the exception list.
   const isLimit = (event: LogEvent) => event.text.includes('System.LimitException');
   const limitExceptions = log.exceptions.filter(isLimit);
@@ -898,11 +889,7 @@ async function analyse(log: ApexLog): Promise<LogDiagnostics> {
     // The caveat leads: it says every figure under it may be an undercount.
     ...truncationDiagnostics(log),
     ...[
-      ...limitDiagnostics(
-        limitTotals(apexLimitTimeSeries(log)),
-        limitExceptions,
-        hotSpot(selfTime, totalSelf),
-      ),
+      ...limitDiagnostics(limitTotals(apexLimitTimeSeries(log)), limitExceptions, hotSpot(times)),
       ...logIssueDiagnostics(log),
       ...exceptionDiagnostics(others),
       ...plans.diagnostics,

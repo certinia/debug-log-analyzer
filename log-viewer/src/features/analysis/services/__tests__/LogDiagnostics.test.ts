@@ -4,13 +4,20 @@
 import type { ApexLog, LogEvent, GovernorLimits, Limits } from '@apexdevtools/apex-log-parser';
 import { beforeEach, describe, expect, it } from '@jest/globals';
 
+import { indexTree } from '#test-helpers/apexLog.js';
 import { emptyLimits, governorLimits, limitValue } from '#test-helpers/limits.js';
 
 let log: ApexLog | null = null;
 
-jest.mock('../../../../core/log/LogStore.js', () => ({
-  currentLogStore: () => (log ? { log, stackByEventIndex: () => [] } : null),
-}));
+jest.mock('../../../../core/log/LogStore.js', () => {
+  const { LogStore } = jest.requireActual<typeof import('../../../../core/log/LogStore.js')>(
+    '../../../../core/log/LogStore.js',
+  );
+  return {
+    currentLogStore: () =>
+      log ? Object.assign(new LogStore(log), { stackByEventIndex: () => [] }) : null,
+  };
+});
 
 import { computeLogDiagnostics, scopeDiagnostics } from '../LogDiagnostics.js';
 
@@ -579,11 +586,12 @@ describe('computeLogDiagnostics', () => {
     namespaceLimits.cpuTime = limitValue(15_163, 10_000);
     log = apexLog({
       namespaceLimits: { default: namespaceLimits },
-      eventsById: [
+      children: [
         event({ type: 'METHOD_ENTRY', text: 'Slow.run()', duration: { self: 9e9, total: 9e9 } }),
         event({ type: 'METHOD_ENTRY', text: 'Fast.run()', duration: { self: 1e9, total: 1e9 } }),
       ],
     });
+    indexTree(log);
 
     const { diagnostics } = await computeLogDiagnostics();
     expect(diagnostics[0]?.cause).toEqual({

@@ -10,7 +10,7 @@ import type { ExecutionHighlights } from '../../features/call-tree/utils/Executi
 
 let highlights: ExecutionHighlights | null = null;
 jest.mock('../../features/call-tree/utils/ExecutionHighlights.js', () => ({
-  getExecutionHighlights: () => highlights,
+  executionHighlights: () => highlights,
 }));
 
 import '../HotSpots.js';
@@ -36,8 +36,10 @@ const spotsOf = (): ExecutionHighlights => ({
 
 const hotSpots = async () => {
   const element = document.createElement('hot-spots');
-  element.logStore = { log: {} } as unknown as LogStore;
+  element.logStore = { log: {}, derive: async (fn: () => unknown) => fn() } as unknown as LogStore;
   document.body.append(element);
+  await element.updateComplete;
+  // The derived value lands a microtask after the render that asks for it.
   await element.updateComplete;
   return element;
 };
