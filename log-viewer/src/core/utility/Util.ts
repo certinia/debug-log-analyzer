@@ -95,6 +95,24 @@ export function sharePercent(part: number, whole: number): number {
   return whole > 0 ? (part / whole) * 100 : 0;
 }
 
+/** Whether two sets hold the same members, whatever their order. */
+export function sameMembers<T>(a: ReadonlySet<T>, b: ReadonlySet<T>): boolean {
+  if (a.size !== b.size) {
+    return false;
+  }
+  for (const member of a) {
+    if (!b.has(member)) {
+      return false;
+    }
+  }
+  return true;
+}
+
+/** A Lit `hasChanged` for a `Set` property: a new set with the same members is no change. */
+export function setChanged(value: unknown, oldValue: unknown): boolean {
+  return !(value instanceof Set && oldValue instanceof Set && sameMembers(value, oldValue));
+}
+
 /** Integer → thousand-separated string (e.g. 1572864 → "1,572,864"), for heap/byte values. */
 export function formatInteger(value: number): string {
   return Math.round(value).toLocaleString();
@@ -159,18 +177,42 @@ export function computeWallClockMs(
   return startTimeMs + (eventTimestampNs - firstTimestampNs) / 1_000_000;
 }
 
+/** The leftmost index below `length` where `holds` becomes true, or `length` if
+ *  it never does. `holds` must be false then true across the run. */
+export function firstIndexWhere(length: number, holds: (index: number) => boolean): number {
+  let low = 0;
+  let high = length;
+  while (low < high) {
+    const mid = (low + high) >>> 1;
+    if (holds(mid)) {
+      high = mid;
+    } else {
+      low = mid + 1;
+    }
+  }
+  return low;
+}
+
 export function debounce<T extends unknown[]>(callBack: (...args: T) => unknown) {
   let requestId: number = 0;
 
-  return (...args: T) => {
+  const cancel = (): void => {
     if (requestId) {
       window.cancelAnimationFrame(requestId);
+      requestId = 0;
     }
-
-    requestId = window.requestAnimationFrame(() => {
-      callBack(...args);
-    });
   };
+
+  return Object.assign(
+    (...args: T) => {
+      cancel();
+      requestId = window.requestAnimationFrame(() => {
+        requestId = 0;
+        callBack(...args);
+      });
+    },
+    { cancel },
+  );
 }
 
 /**

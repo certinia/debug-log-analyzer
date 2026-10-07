@@ -3,14 +3,17 @@
  */
 import '#vscode-elements/vscode-toolbar-button.js';
 import { consume } from '@lit/context';
+import { initialState, Task } from '@lit/task';
 import { LitElement, css, html, nothing, type PropertyValues } from 'lit';
 import { customElement, property, query, state } from 'lit/decorators.js';
 
 import { logStatusContext, type LogStatus } from '../../../core/log/logStatus.js';
+import { logStoreFor } from '../../../core/log/LogStore.js';
 
-import type { ApexLog, LogCategory } from '@apexdevtools/apex-log-parser';
+import type { ApexLog } from '@apexdevtools/apex-log-parser';
 import { categoryPalette } from '../../../components/categoryTime.js';
 import { SubscriptionController } from '../../../core/events/SubscriptionController.js';
+import { setChanged } from '../../../core/utility/Util.js';
 import { VSCodeExtensionMessenger } from '../../../core/messaging/VSCodeExtensionMessenger.js';
 import {
   settingsSettled,
@@ -22,10 +25,10 @@ import {
 import { DEFAULT_THEME_NAME, sameColors, type TimelineColors } from '../themes/Themes.js';
 import { addCustomThemes } from '../themes/ThemeSelector.js';
 
-import { categorySelfTimes, toTimelineKeys } from '../utils/category-self-time.js';
+import { selfTimeByCategory, toTimelineKeys } from '../utils/category-self-time.js';
 import type { TimeDisplayMode } from '../types/flamechart.types.js';
 import type { TimelineFlameChart } from './TimelineFlameChart.js';
-import type { TimelineKeyEntry } from './TimelineKey.js';
+import type { TimelineKeyEntry, Timelinekey } from './TimelineKey.js';
 
 // styles
 import { globalStyles } from '../../../styles/global.styles.js';
@@ -70,7 +73,16 @@ export class TimelineView extends LitElement {
   private timelineKeys: TimelineKeyEntry[] = [];
 
   /** Per-category self time for the loaded log; drives the legend durations. */
-  private selfTimes?: Map<LogCategory, number>;
+  private selfTimes?: ReadonlyMap<string, number>;
+
+  private readonly selfTimesTask = new Task(this, {
+    task: ([store]) => store?.derive(selfTimeByCategory) ?? initialState,
+    args: () => [this.timelineRoot && logStoreFor(this.timelineRoot)],
+    onComplete: (selfTimes) => {
+      this.selfTimes = selfTimes;
+      this.rebuildTimelineKeys();
+    },
+  });
 
   /** The timeline settings last pushed; the legend's palette is resolved from them. */
   private timelineSettings: LanaSettings['timeline'] | null = null;
@@ -91,8 +103,15 @@ export class TimelineView extends LitElement {
   @state()
   private showTooltip = true;
 
+  // Mirrors the legend, which owns the highlight; only its event sets this.
+  @state({ hasChanged: setChanged })
+  private litCategories: ReadonlySet<string> = new Set();
+
   @query('timeline-flame-chart')
   private flameChartRef!: TimelineFlameChart;
+
+  @query('timeline-key')
+  private timelineKeyRef?: Timelinekey;
 
   constructor() {
     super();
@@ -234,8 +253,9 @@ export class TimelineView extends LitElement {
 
   protected willUpdate(changed: PropertyValues): void {
     if (changed.has('timelineRoot')) {
-      this.selfTimes = this.timelineRoot ? categorySelfTimes(this.timelineRoot) : undefined;
+      this.selfTimes = undefined;
       this.rebuildTimelineKeys();
+      this.timelineKeyRef?.clear();
     }
   }
 
@@ -249,7 +269,10 @@ export class TimelineView extends LitElement {
     }
 
     const toolbar = html`<div class="timeline-toolbar">
-      <timeline-key .timelineKeys="${this.timelineKeys}"></timeline-key>
+      <timeline-key
+        .timelineKeys="${this.timelineKeys}"
+        @highlight-change=${this.onHighlightChange}
+      ></timeline-key>
       ${this.renderTimeDisplayToggle()} ${this.renderTooltipToggle()}
     </div>`;
 
@@ -260,7 +283,19 @@ export class TimelineView extends LitElement {
         .navigateToEventIndex=${this.navigateToEventIndex}
         .navigateToTimestamp=${this.navigateToTimestamp}
         .showTooltip=${this.showTooltip}
+        .dimCategories=${this.litCategories}
+        @category-highlight-clear=${this.onHighlightClear}
       ></timeline-flame-chart>`;
+  }
+
+  private onHighlightClear(event: Event): void {
+    if (this.timelineKeyRef?.clear()) {
+      event.preventDefault();
+    }
+  }
+
+  private onHighlightChange(event: CustomEvent<ReadonlySet<string>>): void {
+    this.litCategories = event.detail;
   }
 
   /** The elapsed/wall-clock switch. A log with no start time has no wall clock to show. */

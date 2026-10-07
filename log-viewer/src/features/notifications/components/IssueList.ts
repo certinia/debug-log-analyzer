@@ -6,7 +6,7 @@ import { LitElement, css, html, type PropertyValues, type TemplateResult } from 
 import { customElement, property, state } from 'lit/decorators.js';
 
 import { ResizeController } from '../../../core/events/ResizeController.js';
-import { formatDuration } from '../../../core/utility/Util.js';
+import { formatDuration, sameMembers } from '../../../core/utility/Util.js';
 import { markerColorCss } from '../../timeline/types/flamechart.types.js';
 import { SEVERITY_META, sortBySeverity, type LogIssue } from '../types.js';
 
@@ -210,7 +210,7 @@ export class IssueList extends LitElement {
       clipped.add(index);
     }
 
-    if (!sameSet(clipped, this._clipped)) {
+    if (!sameMembers(clipped, this._clipped)) {
       this._clipped = clipped;
     }
   }
@@ -367,8 +367,4 @@ function shadowSelection(root: ShadowRoot | null): Selection | null {
 
 function isCollapsed(selection: Selection | null): boolean {
   return !selection || selection.isCollapsed;
-}
-
-function sameSet(a: ReadonlySet<number>, b: ReadonlySet<number>): boolean {
-  return a.size === b.size && [...a].every((value) => b.has(value));
 }

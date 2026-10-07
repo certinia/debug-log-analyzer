@@ -159,8 +159,10 @@ export const globalStyles = [
       cursor: pointer;
     }
 
-    .filter-control:hover {
-      background-color: var(--lana-row-hover-bg);
+    /* Layered over the fill, not in place of it: the hover colour is translucent. */
+    .filter-control:hover,
+    .pill-toggle:hover {
+      background-image: linear-gradient(var(--lana-row-hover-bg), var(--lana-row-hover-bg));
     }
 
     .filter-control:focus-visible {
@@ -169,15 +171,14 @@ export const globalStyles = [
     }
 
     /* Toggle-button counterpart to the facet/range trigger pills — same
-     filter-control base, with an on/off state instead of a popover. ON uses
-     VS Code's own toggle triad (Find widget, VsIconCheckbox); OFF is just
-     the plain bordered pill, never dimmed. Binary toggles (Details/Debug
-     Only) get the full filled treatment — this is a real "state", not a
-     value-carrying filter. */
+     filter-control base, with an on/off state instead of a popover. ON takes
+     the accent fill and border; OFF is just the plain bordered pill, never
+     dimmed. Binary toggles (Details/Debug Only) get the full filled
+     treatment — this is a real "state", not a value-carrying filter. */
     .pill-toggle[aria-pressed='true'] {
-      background-color: var(--vscode-inputOption-activeBackground);
-      border-color: var(--vscode-inputOption-activeBorder, var(--lana-focus-border));
-      color: var(--vscode-inputOption-activeForeground, var(--lana-fg));
+      background-color: var(--lana-toggle-on-bg);
+      border-color: var(--lana-toggle-on-border);
+      color: var(--lana-fg);
     }
 
     /* Value-filter controls (facet/range triggers with a value, single-select
@@ -185,8 +186,8 @@ export const globalStyles = [
      distinguishes "a filter is applied" from the binary toggle's ON state
      above, while still reading as accented against the plain pill. */
     .filter-control--active {
-      border-color: var(--vscode-inputOption-activeBorder, var(--lana-focus-border));
-      color: var(--vscode-inputOption-activeForeground, var(--lana-fg));
+      border-color: var(--lana-toggle-on-border);
+      color: var(--lana-fg);
     }
 
     /* Shared base for every filter-bar popover (facet checklist, range inputs,

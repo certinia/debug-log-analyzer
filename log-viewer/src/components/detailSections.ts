@@ -33,7 +33,7 @@ import './VariablesDetail.js';
  * does: the shared **Overview**, plus the sections that tab can answer at log
  * scope. Analysis adds **Findings** and the **Self time spread**; the Database tab adds its whole-log
  * database figures; the Timeline adds its charts and the
- * whole-log call tree; the Call Tree adds the **Hot path** and **Hot spots** —
+ * call tree of its window; the Call Tree adds the **Hot path** and **Hot spots** —
  * clickable routes into the tree it sits beside.
  *
  * Precedence rule, binding on future scoping inputs such as a timeline time
@@ -65,7 +65,7 @@ export async function buildDetailSections(
         id: 'overview',
         title: 'Overview',
         fit: 'content',
-        content: html`<log-overview></log-overview>`,
+        content: html`<log-overview .wholeLog=${source !== 'timeline'}></log-overview>`,
       },
     ];
     if (source === 'calltree') {
@@ -288,9 +288,8 @@ export async function buildDetailSections(
  * same section, asked of the whole log or of a selection.
  *
  * A bar and a legend line per namespace, so it draws little and varies by a
- * line. Asked of the whole log it is worked out once, so it sizes to that;
- * asked of a selection it empties to one line of prose while each frame's
- * figures are added up, and a content-sized pane would flicker on every step.
+ * line. Asked of the whole log it sizes to that; asked of a selection each step
+ * can add or drop a legend line, and a content-sized pane would jump on every step.
  */
 function namespaceTimeSection(
   content: TemplateResult,

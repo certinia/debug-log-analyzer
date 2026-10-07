@@ -7,6 +7,7 @@ import { customElement, property, state } from 'lit/decorators.js';
 
 import { eventBus } from '../core/events/EventBus.js';
 import { logContext } from '../core/log/logContext.js';
+import { RangeScopeController } from '../core/log/rangeScope.js';
 import type { LogStore } from '../core/log/LogStore.js';
 import { formatDuration } from '../core/utility/Util.js';
 import {
@@ -171,6 +172,8 @@ export class GovernorTrends extends LitElement {
   @property({ attribute: false })
   logStore: LogStore | null = null;
 
+  private readonly _range = new RangeScopeController(this);
+
   static styles = [
     globalStyles,
     inspectorSectionStyles,
@@ -286,6 +289,11 @@ export class GovernorTrends extends LitElement {
         stroke-width: 1;
         vector-effect: non-scaling-stroke;
       }
+
+      .trend__window {
+        fill: currentColor;
+        opacity: 0.12;
+      }
     `,
   ];
 
@@ -310,6 +318,9 @@ export class GovernorTrends extends LitElement {
     const { line, area, guideY, x } = trendGeometry(series, logTotal);
     const cursor = this._cursorFor(series);
     const cursorX = cursor ? x(cursor.t).toFixed(2) : null;
+    // The whole log stays on screen and the window is marked on it: readings are
+    // sparse, so a chart clipped to a short window would draw nothing.
+    const window = this._range.window;
 
     // No reported limit: the denominator is the metric's own peak, so the figure is spelled "of"
     // rather than "/", and the guide and the tier colour — both distances from a cap — come off.
@@ -355,6 +366,11 @@ export class GovernorTrends extends LitElement {
           aria-hidden="true"
         >
           ${svg`
+            ${
+              window
+                ? svg`<rect class="trend__window" x=${x(window.start).toFixed(2)} y="0" width=${(x(window.end) - x(window.start)).toFixed(2)} height=${VIEW_H}></rect>`
+                : ''
+            }
             <path class="trend__area" d=${area}></path>
             <path class="trend__line" d=${line}></path>
             ${

@@ -11,7 +11,6 @@
     "@rollup/plugin-node-resolve": "^16.0.3",
     "@salesforce/playwright-vscode-ext": "^1.7.0",
     "@swc/core": "^1.16.13",
-    "@swc/helpers": "^0.5.23",
     "@swc/jest": "^0.2.39",
     "@types/jest": "^30.0.0",
     "@vscode/test-web": "^0.0.81",
@@ -29,8 +28,7 @@
     "rollup-plugin-polyfill-node": "^0.13.0",
     "rollup-plugin-swc3": "^0.12.1",
     "tsx": "^4.23.15",
-    "typescript": "npm:@typescript/typescript6@^6.0.2",
-    "typescript-7": "npm:typescript@^7.0.2"
+    "typescript": "^7.0.2"
   },
   "scripts": {
     "preinstall": "npx only-allow pnpm",
@@ -45,7 +43,6 @@
     "watch:rollup": "rm -rf lana/out log-viewer/out && rollup -w -c rollup.config.mjs",
     "copy:package-docs": "node ./scripts/copy-package-docs.mjs",
     "typecheck": "tsc -b && tsc -p scripts/tsconfig.json",
-    "typecheck:tsc6": "tsc6 -b",
     "measure": "rolldown -c scripts/measure/rolldown.config.ts && node --expose-gc --max-old-space-size=12288 scripts/measure/out/measure.mjs",
     "lint": "concurrently -r -g 'oxlint' 'prettier --cache **/*.{ts,css,md,mdx,scss} --check --experimental-cli' 'pnpm run typecheck'",
     "test": "jest",

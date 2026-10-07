@@ -228,3 +228,35 @@ export function buildLogIndex(log: ApexLog): LogIndex {
   builder.step(Infinity);
   return builder.finish();
 }
+
+/**
+ * Self time summed per id over the subtrees of `rows`, or over every row when `rows`
+ * is null. `ids[row]` is the row's id, below `idCount`. A row inside an earlier
+ * row's subtree is skipped, so a shared subtree is counted once.
+ */
+export function sumSelfBy(
+  index: LogIndex,
+  ids: ArrayLike<number>,
+  idCount: number,
+  rows: readonly number[] | null,
+): Float64Array {
+  const sums = new Float64Array(idCount);
+  const { self, subtreeEnd } = index;
+  const add = (from: number, to: number) => {
+    for (let row = from; row < to; row++) {
+      sums[ids[row]!]! += self[row]!;
+    }
+  };
+  if (!rows) {
+    add(0, index.rowCount);
+    return sums;
+  }
+  let end = 0;
+  for (const row of rows.toSorted((a, b) => a - b)) {
+    if (row >= end) {
+      end = subtreeEnd[row]!;
+      add(row, end);
+    }
+  }
+  return sums;
+}
