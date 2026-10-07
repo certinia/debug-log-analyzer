@@ -1,0 +1,300 @@
+/**
+ * @jest-environment jsdom
+ */
+/*
+ * Copyright (c) 2026 Certinia Inc. All rights reserved.
+ */
+import { GridStore, sum, type TreeSource } from '../../core/index.js';
+import type { GridColumn } from '../column.js';
+import '../lv-grid.js';
+import type {
+  GridFindDetail,
+  GridReshapeDetail,
+  GridRowDetail,
+  GridSelectDetail,
+  LvGrid,
+} from '../lv-grid.js';
+
+interface Node {
+  key: number;
+  name: string;
+  time: number;
+  kind: string;
+  children?: Node[];
+}
+
+const ROW = 20;
+
+/** Three roots; `b` holds two children. */
+const source = (): TreeSource<Node> => ({
+  roots: [
+    { key: 1, name: 'a', time: 3, kind: 'x' },
+    {
+      key: 2,
+      name: 'b',
+      time: 1,
+      kind: 'y',
+      children: [
+        { key: 21, name: 'b1', time: 5, kind: 'y' },
+        { key: 22, name: 'b2', time: 6, kind: 'y' },
+      ],
+    },
+    { key: 3, name: 'c', time: 2, kind: 'x' },
+  ],
+  children: (row) => row.children,
+  key: (row) => row.key,
+});
+
+const columns = (): GridColumn<Node>[] => [
+  { id: 'name', title: 'Name', cell: (row) => row.name, text: (row) => row.name },
+  {
+    id: 'time',
+    title: 'Time',
+    width: 80,
+    align: 'end',
+    cell: (row) => String(row.time),
+    text: (row) => String(row.time),
+    sort: { value: (row) => row.time },
+    sortFirst: 'desc',
+    calc: sum((row) => row.time),
+  },
+  { id: 'kind', title: 'Kind', cell: (row) => row.kind, sort: { value: (row) => row.kind } },
+];
+
+/** jsdom does no layout: every element is ROW high and the scroller has room for all rows. */
+function fakeLayout(): void {
+  jest.spyOn(HTMLElement.prototype, 'offsetHeight', 'get').mockReturnValue(10 * ROW);
+  jest.spyOn(HTMLElement.prototype, 'offsetWidth', 'get').mockReturnValue(500);
+  jest
+    .spyOn(HTMLElement.prototype, 'getBoundingClientRect')
+    .mockImplementation(() => ({ height: ROW, width: 500 }) as DOMRect);
+}
+
+const detail = <T>(e: Event): T => (e as CustomEvent<T>).detail;
+
+const flush = (): Promise<void> => new Promise((resolve) => setTimeout(resolve, 0));
+
+async function settle(grid: LvGrid<Node>): Promise<void> {
+  for (let i = 0; i < 3; i++) {
+    await grid.updateComplete;
+    await flush();
+  }
+}
+
+async function setup(props: Partial<LvGrid<Node>> = {}) {
+  fakeLayout();
+  const grid = document.createElement('lv-grid') as LvGrid<Node>;
+  Object.assign(grid, { columns: columns(), source: source(), ...props });
+  document.body.append(grid);
+  await settle(grid);
+  const root = grid.renderRoot as ShadowRoot;
+  const scroller = root.querySelector<HTMLElement>('.scroller');
+  const rows = (): HTMLElement[] =>
+    [...root.querySelectorAll<HTMLElement>('.body > [role="row"]')].filter((el) => !el.hidden);
+  const names = (): string[] =>
+    rows()
+      .sort((a, b) => Number(a.dataset.index) - Number(b.dataset.index))
+      .map((el) => el.querySelector('.cell')?.textContent?.trim() ?? '');
+  const header = (title: string): HTMLElement | undefined =>
+    [...root.querySelectorAll<HTMLElement>('[role="columnheader"]')].find(
+      (el) => el.textContent?.trim() === title,
+    );
+  const rowNamed = (name: string): HTMLElement | undefined =>
+    rows().find((el) => el.querySelector('.cell')?.textContent?.trim() === name);
+  const key = async (key: string, init: KeyboardEventInit = {}): Promise<void> => {
+    scroller?.dispatchEvent(new KeyboardEvent('keydown', { key, bubbles: true, ...init }));
+    await settle(grid);
+  };
+  return { grid, root, scroller, rows, names, header, rowNamed, key };
+}
+
+afterEach(() => {
+  jest.restoreAllMocks();
+  document.body.replaceChildren();
+});
+
+describe('lv-grid', () => {
+  it('paints the top-level rows under a header of the shown columns', async () => {
+    const { root, names } = await setup();
+    expect(names()).toEqual(['a', 'b', 'c']);
+    const titles = [...root.querySelectorAll('[role="columnheader"]')].map((el) =>
+      el.textContent?.trim(),
+    );
+    expect(titles).toEqual(['Name', 'Time', 'Kind']);
+  });
+
+  it('leaves a hidden column out of the header and the tracks', async () => {
+    const { grid, root } = await setup();
+    grid.columns = columns().map((column) =>
+      column.id === 'kind' ? { ...column, hidden: true } : column,
+    );
+    await settle(grid);
+    expect(root.querySelectorAll('[role="columnheader"]').length).toBe(2);
+    expect(grid.style.getPropertyValue('--grid-cols')).toBe('minmax(40px, 1fr) 80px');
+  });
+
+  it('shows each calc total in the footer', async () => {
+    const { root } = await setup();
+    const foot = [...root.querySelectorAll('.foot .cell')].map((el) => el.textContent?.trim());
+    // Top-level rows only: 3 + 1 + 2.
+    expect(foot).toEqual(['', '6', '']);
+  });
+
+  it('cycles a sort from its first direction, to the other, to none', async () => {
+    const { grid, header, names } = await setup();
+    const reshapes: string[] = [];
+    grid.addEventListener('lv-grid-reshape', (e) =>
+      reshapes.push(detail<GridReshapeDetail>(e).reason),
+    );
+    const time = header('Time');
+
+    time?.click();
+    await settle(grid);
+    expect(time?.getAttribute('aria-sort')).toBe('descending');
+    expect(names()).toEqual(['a', 'c', 'b']);
+
+    time?.click();
+    await settle(grid);
+    expect(time?.getAttribute('aria-sort')).toBe('ascending');
+    expect(names()).toEqual(['b', 'c', 'a']);
+
+    time?.click();
+    await settle(grid);
+    expect(time?.getAttribute('aria-sort')).toBe('none');
+    expect(names()).toEqual(['a', 'b', 'c']);
+    expect(reshapes).toEqual(['sort', 'sort', 'sort']);
+  });
+
+  it('does not sort from a header with no sort', async () => {
+    const { grid, header } = await setup();
+    const name = header('Name');
+    name?.click();
+    await settle(grid);
+    expect(name?.hasAttribute('aria-sort')).toBe(false);
+  });
+
+  it('does not sort again when a column is only hidden', async () => {
+    const shown = columns();
+    const { grid, header } = await setup({ columns: shown });
+    header('Time')?.click();
+    await settle(grid);
+    const setSort = jest.spyOn(GridStore.prototype, 'setSort');
+    grid.columns = shown.map((column) =>
+      column.id === 'kind' ? { ...column, hidden: true } : column,
+    );
+    await settle(grid);
+    expect(setSort).not.toHaveBeenCalled();
+  });
+
+  it('selects a clicked row, and clears it on a second click', async () => {
+    const { grid, rowNamed } = await setup();
+    const selected: GridSelectDetail<Node>[] = [];
+    grid.addEventListener('lv-grid-select', (e) =>
+      selected.push(detail<GridSelectDetail<Node>>(e)),
+    );
+
+    rowNamed('c')?.querySelector<HTMLElement>('.cell')?.click();
+    await settle(grid);
+    expect(rowNamed('c')?.ariaSelected).toBe('true');
+    expect(selected.at(-1)?.row?.name).toBe('c');
+
+    rowNamed('c')?.querySelector<HTMLElement>('.cell')?.click();
+    await settle(grid);
+    expect(rowNamed('c')?.ariaSelected).toBe('false');
+    expect(selected.at(-1)?.row).toBeNull();
+  });
+
+  it('opens a row from its twisty without selecting it', async () => {
+    const { grid, rowNamed, names } = await setup();
+    rowNamed('b')?.querySelector<HTMLElement>('[data-toggle]')?.click();
+    await settle(grid);
+    expect(names()).toEqual(['a', 'b', 'b1', 'b2', 'c']);
+    expect(rowNamed('b')?.ariaSelected).toBe('false');
+  });
+
+  it('moves, opens and closes rows from the keyboard', async () => {
+    const { rowNamed, names, key } = await setup();
+    await key('ArrowDown');
+    expect(rowNamed('a')?.ariaSelected).toBe('true');
+    await key('ArrowDown');
+    expect(rowNamed('b')?.ariaSelected).toBe('true');
+    await key('ArrowRight');
+    expect(names()).toEqual(['a', 'b', 'b1', 'b2', 'c']);
+    await key('ArrowRight');
+    expect(rowNamed('b1')?.ariaSelected).toBe('true');
+    await key('ArrowLeft');
+    expect(rowNamed('b')?.ariaSelected).toBe('true');
+    await key('ArrowLeft');
+    expect(names()).toEqual(['a', 'b', 'c']);
+    await key('End');
+    expect(rowNamed('c')?.ariaSelected).toBe('true');
+  });
+
+  it('copies every row that passes the filters, closed or not, on Ctrl+C', async () => {
+    const writeText = jest.fn<Promise<void>, [string]>().mockResolvedValue(undefined);
+    Object.defineProperty(navigator, 'clipboard', { value: { writeText }, configurable: true });
+    const { key } = await setup();
+    await key('c', { ctrlKey: true });
+    expect(writeText).toHaveBeenCalledWith('Name\tTime\na\t3\nb\t1\nb1\t5\nb2\t6\nc\t2');
+  });
+
+  it('reports the hovered row, and none on leave', async () => {
+    const { grid, root, rowNamed } = await setup();
+    const located: (string | null)[] = [];
+    grid.addEventListener('lv-grid-locate', (e) =>
+      located.push(detail<GridRowDetail<Node>>(e).row?.name ?? null),
+    );
+    rowNamed('a')?.dispatchEvent(new Event('pointerover', { bubbles: true }));
+    rowNamed('a')?.dispatchEvent(new Event('pointerover', { bubbles: true }));
+    root.querySelector('.body')?.dispatchEvent(new Event('pointerleave'));
+    expect(located).toEqual(['a', null]);
+  });
+
+  it('opens the path to a row, then selects it', async () => {
+    const { grid, rowNamed, names } = await setup();
+    expect(await grid.goTo([2, 22])).toBe(true);
+    await settle(grid);
+    expect(names()).toEqual(['a', 'b', 'b1', 'b2', 'c']);
+    expect(rowNamed('b2')?.ariaSelected).toBe('true');
+  });
+
+  it('counts find matches in closed rows too', async () => {
+    const { grid } = await setup();
+    const totals: number[] = [];
+    grid.addEventListener('lv-grid-find-results', (e) =>
+      totals.push(detail<GridFindDetail>(e).total),
+    );
+    expect(await grid.find({ text: 'b' })).toBe(3);
+    expect(totals).toEqual([3]);
+  });
+
+  it('shows group rows that toggle on click and select from the keyboard', async () => {
+    const { grid, names, rowNamed, key } = await setup({ groupBy: (row) => row.kind });
+    expect(names()).toEqual(['x (2)', 'y (1)']);
+    rowNamed('x (2)')?.querySelector<HTMLElement>('.cell')?.click();
+    await settle(grid);
+    expect(names()).toEqual(['x (2)', 'a', 'c', 'y (1)']);
+    await key('ArrowDown');
+    expect(rowNamed('x (2)')?.ariaSelected).toBe('true');
+  });
+
+  it('keeps its events inside the shadow root that holds it', async () => {
+    fakeLayout();
+    const host = document.createElement('div');
+    const shadow = host.attachShadow({ mode: 'open' });
+    const grid = document.createElement('lv-grid') as LvGrid<Node>;
+    Object.assign(grid, { columns: columns(), source: source() });
+    shadow.append(grid);
+    document.body.append(host);
+    await settle(grid);
+    const inShadow = jest.fn();
+    const inDocument = jest.fn();
+    shadow.addEventListener('lv-grid-select', inShadow);
+    document.addEventListener('lv-grid-select', inDocument);
+    grid.renderRoot.querySelector<HTMLElement>('.body [role="row"] .cell')?.click();
+    await settle(grid);
+    document.removeEventListener('lv-grid-select', inDocument);
+    expect(inShadow).toHaveBeenCalledTimes(1);
+    expect(inDocument).not.toHaveBeenCalled();
+  });
+});

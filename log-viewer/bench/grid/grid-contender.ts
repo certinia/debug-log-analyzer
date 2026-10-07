@@ -39,7 +39,7 @@ const ms = (ns: number): string => (ns / 1e6).toFixed(2);
 const count = (n: number): string => String(n);
 
 /** The Time Order grid's fifteen columns, as text. */
-const COLUMNS: Column[] = [
+export const COLUMNS: Column[] = [
   { field: 'text', title: 'Name', width: 'flex', text: (r) => r.text },
   { field: 'namespace', title: 'Namespace', width: 117, text: (r) => r.namespace },
   { field: 'dmlCount.total', title: 'DML Count', width: 70, text: (r) => count(r.dmlCount.total) },
@@ -120,7 +120,7 @@ const STYLE = `
   ::highlight(current-find-match) { background: #9e6a03; }
 `;
 
-const detail: RowFilter<TimeOrderRow> = { test: (r) => r._hasDetailsDeep };
+export const detail: RowFilter<TimeOrderRow> = { test: (r) => r._hasDetailsDeep };
 
 export class GridContender implements Contender {
   private store!: GridStore<TimeOrderRow>;

@@ -10,12 +10,14 @@ import { parse, type ApexLog, type LogEvent } from '@apexdevtools/apex-log-parse
 
 import type { Contender } from './contender.js';
 import { GridContender } from './grid-contender.js';
+import { LvGridContender } from './lv-grid-contender.js';
 import { TabulatorContender } from './tabulator-contender.js';
 import { frameStats, perFrame, settled, timed, type FrameStats, type Timing } from './timing.js';
 
 const CONTENDERS: Record<string, () => Contender> = {
   tabulator: () => new TabulatorContender(),
   grid: () => new GridContender(),
+  'lv-grid': () => new LvGridContender(),
 };
 
 const name = new URLSearchParams(location.search).get('c') ?? 'tabulator';
