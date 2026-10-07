@@ -3,18 +3,18 @@
  *
  * @jest-environment jsdom
  */
-import type { GovernorLimits } from '@apexdevtools/apex-log-parser';
+import type { ApexLog, GovernorLimits } from '@apexdevtools/apex-log-parser';
 import { beforeEach, describe, expect, it } from '@jest/globals';
 
-import type { LogStore } from '../../core/log/LogStore.js';
 import type { HeatStripTimeSeries } from '../../features/timeline/types/flamechart.types.js';
+import { stubStore } from '#test-helpers/apexLog.js';
 import { governorLimits, seriesEvent, timeSeries } from '#test-helpers/limits.js';
 
 // The metric strip's series, which the overview always reads its gauges from
 // so they match the timeline and the trend charts.
 let mockSeries: HeatStripTimeSeries = timeSeries();
 jest.mock('../../features/timeline/optimised/apex-limit-series.js', () => ({
-  apexLimitTimeSeries: () => mockSeries,
+  apexLimitSeries: () => mockSeries,
 }));
 
 import type { LogOverview } from '../LogOverview.js';
@@ -29,7 +29,9 @@ const overview = async () => {
 
 /** No provider in the test, so the consumed store is assigned straight on. */
 const loadLog = async (element: LogOverview, governorLimits: GovernorLimits) => {
-  element.logStore = { log: { governorLimits } } as unknown as LogStore;
+  element.logStore = stubStore({ governorLimits } as unknown as ApexLog);
+  await element.updateComplete;
+  // The derived value lands a microtask after the render that asks for it.
   await element.updateComplete;
 };
 

@@ -55,8 +55,8 @@ The metric strip visualization (governor limits) is rendered below the main time
 - `MetricStripOrchestrator` manages the metric strip lifecycle and interactions
 - `MetricStripRenderer` renders step charts for governor limit metrics
 - `MetricTierClassifier` processes `HeatStripTimeSeries` data and classifies metrics into tiers
-- `apex-limit-series.ts` transforms `ApexLog` (snapshots + event tree) → `HeatStripTimeSeries`;
-  `ApexLogTimeline` calls it during `init()`
+- `apex-limit-series.ts` derives `HeatStripTimeSeries` from the log's snapshots and its `LogIndex`
+  rows; `ApexLogTimeline` derives it during `init()`
 - Apex-specific display names, units, and priority order come from `core/metrics/governorMetrics.ts`
   and reach the strip ONLY through `apex-limit-series.ts`
 
