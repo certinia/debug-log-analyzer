@@ -291,6 +291,8 @@ describe('buildDetailSections', () => {
       'governor-trends',
       'calltree',
     ]);
+    // It follows the Timeline's window like the charts, so it needs no scope note.
+    expect(sections.find((s) => s.id === 'calltree')?.title).toBe('Call tree');
     // The whole-log tree soaks up the leftover space; the charts keep their own.
     expect(sections.find((s) => s.id === 'calltree')?.weight).toBe(4);
     expect(sections.find((s) => s.id === 'calltree')?.fit ?? 'fill').toBe('fill');

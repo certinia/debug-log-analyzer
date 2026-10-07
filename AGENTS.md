@@ -32,7 +32,7 @@ Always use pnpm.
 `DEVELOPING.md` covers the rest, including the `*:fast` rolldown variants and their caveats.
 
 **Dev host** — launch with
-`code-insiders --profile lana-dev $PWD/sample-app --extensionDevelopmentPath=$PWD/lana`, use the
+`code-insiders --profile lana-dev $PWD/sample-app $PWD/sample-app/debug-logs/sample-log.log --extensionDevelopmentPath=$PWD/lana`, use the
 CLI of the launched editor, `code-insiders` or `code`
 
 ## Core principles

@@ -19,8 +19,11 @@ The Find feature in Apex Debug Log Analyzer for Salesforce quickly searches, hig
 ## 🔍 Find
 
 - CMD/CTRL + f to open find
-- Any matching text is highlighted, the current match has a lighter hightlight.
+- Any matching text is highlighted, the current match has a lighter highlight.
 - Previous match, next match and case sensitive search all supported.
+- `Enter` goes to the next match and `Shift+Enter` to the previous match. Hold either key to step through the matches.
+- After you click the previous match button, `Enter` keeps going backwards until you type another key.
+- `Escape` closes find.
 
 ### Timeline
 
@@ -28,16 +31,8 @@ The Find feature in Apex Debug Log Analyzer for Salesforce quickly searches, hig
 - The find will match on Event Type or text in the event
 - The tooltip is shown for the current matching event, making it easy to view the event details such as Total or Self time.
 
-<img
-  src="https://raw.githubusercontent.com/certinia/debug-log-analyzer/main/lana/assets/1_22/timeline-find.png"
-  alt="Timeline screenshot showing highlighted search results and tooltip with event details"
-  style={{
-    width: '100%',
-    height: 'auto',
-    maxWidth: '600px',
-  }}
-  loading="lazy"
-/>
+![Timeline screenshot showing highlighted search results and tooltip with event details](https://raw.githubusercontent.com/certinia/debug-log-analyzer/main/lana/assets/1_22/timeline-find.png#gh-dark-mode-only)
+![Timeline screenshot showing highlighted search results and tooltip with event details](https://raw.githubusercontent.com/certinia/debug-log-analyzer/main/lana/assets/1_22/timeline-find-light.png#gh-light-mode-only)
 
 ### Call Tree
 

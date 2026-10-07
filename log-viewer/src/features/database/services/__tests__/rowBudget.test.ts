@@ -4,6 +4,7 @@
 import { beforeEach, describe, expect, it } from '@jest/globals';
 import type { ApexLog, Limits } from '@apexdevtools/apex-log-parser';
 
+import { stubStore } from '#test-helpers/apexLog.js';
 import { emptyLimits, limitValue } from '#test-helpers/limits.js';
 
 import {
@@ -22,7 +23,7 @@ jest.mock('../databaseOverview.js', () => ({
   databaseOverview: () => overview,
 }));
 jest.mock('../../../timeline/optimised/apex-limit-series.js', () => ({
-  apexLimitTimeSeries: () => ({ events: [] }),
+  apexLimitSeries: () => ({ events: [] }),
 }));
 jest.mock('../../../../components/logOverviewMetrics.js', () => ({
   ...jest.requireActual('../../../../components/logOverviewMetrics.js'),
@@ -30,6 +31,8 @@ jest.mock('../../../../components/logOverviewMetrics.js', () => ({
 }));
 
 import { rowBudgets } from '../rowBudget.js';
+
+const budgetsOf = (snapshots: number) => stubStore(logWith(snapshots)).derive(rowBudgets);
 
 const statement = (fields: Partial<DatabaseStatement>): DatabaseStatement => ({
   eventIndex: 1,
@@ -82,14 +85,14 @@ beforeEach(() => {
 });
 
 describe('rowBudgets', () => {
-  it('splits each row limit by the SObject that holds it, biggest first', () => {
+  it('splits each row limit by the SObject that holds it, biggest first', async () => {
     overview = overviewOf([
       statement({ rows: 100, maxRows: 100 }),
       statement({ rows: 200, maxRows: 200, sObject: 'Contact' }),
       statement({ rows: 40, maxRows: 20, kind: 'DML', sObject: 'Case' }),
     ]);
 
-    const { budgets } = rowBudgets(logWith(1));
+    const { budgets } = await budgetsOf(1);
 
     expect(budgets.map((budget) => [budget.kind, budget.limit, budget.used])).toEqual([
       ['SOQL', 50_000, 300],
@@ -102,121 +105,121 @@ describe('rowBudgets', () => {
     expect(budgets[1]?.groups).toEqual([{ sObject: 'Case', rows: 40, statements: 1 }]);
   });
 
-  it('gathers every statement on one SObject into one group', () => {
+  it('gathers every statement on one SObject into one group', async () => {
     overview = overviewOf([
       statement({ rows: 100, maxRows: 100 }),
       statement({ rows: 25, maxRows: 25, label: 'SELECT Name FROM Account' }),
     ]);
 
-    expect(rowBudgets(logWith(1)).budgets[0]?.groups).toEqual([
+    expect((await budgetsOf(1)).budgets[0]?.groups).toEqual([
       { sObject: 'Account', rows: 125, statements: 2 },
     ]);
   });
 
-  it('counts every run of a repeated statement, not the statement once', () => {
+  it('counts every run of a repeated statement, not the statement once', async () => {
     overview = overviewOf([statement({ rows: 40_000, maxRows: 200, repeats: 200 })]);
 
-    expect(rowBudgets(logWith(1)).budgets[0]?.groups).toEqual([
+    expect((await budgetsOf(1)).budgets[0]?.groups).toEqual([
       { sObject: 'Account', rows: 40_000, statements: 200 },
     ]);
   });
 
-  it('reports the rows the governor counted that no statement accounts for', () => {
+  it('reports the rows the governor counted that no statement accounts for', async () => {
     overview = overviewOf([statement({ rows: 100, maxRows: 100 })]);
 
-    const budget = rowBudgets(logWith(1)).budgets[0];
+    const budget = (await budgetsOf(1)).budgets[0];
 
     expect(budget).toMatchObject({ used: 300, observed: 100 });
   });
 
-  it('has no governor figure without a snapshot, so the observed rows answer', () => {
+  it('has no governor figure without a snapshot, so the observed rows answer', async () => {
     overview = overviewOf([statement({ rows: 100, maxRows: 100 })]);
 
-    const { budgets, hasLimits } = rowBudgets(logWith(0));
+    const { budgets, hasLimits } = await budgetsOf(0);
 
     expect(hasLimits).toBe(false);
     expect(budgets[0]).toMatchObject({ used: null, observed: 100 });
   });
 
-  it('counts the statements of every kind against its own limit', () => {
-    expect(rowBudgets(logWith(1)).counts).toEqual([
+  it('counts the statements of every kind against its own limit', async () => {
+    expect((await budgetsOf(1)).counts).toEqual([
       { label: 'SOQL', used: 2, limit: 100 },
       { label: 'DML', used: 1, limit: 150 },
       { label: 'SOSL', used: 1, limit: 20 },
     ]);
   });
 
-  it('counts the statements the tree held when the log captured no governor peak', () => {
+  it('counts the statements the tree held when the log captured no governor peak', async () => {
     overview = overviewOf([], { soql: 60, dml: 3, sosl: 0 });
 
-    expect(rowBudgets(logWith(0)).counts).toEqual([
+    expect((await budgetsOf(0)).counts).toEqual([
       { label: 'SOQL', used: 60, limit: 100 },
       { label: 'DML', used: 3, limit: 150 },
       { label: 'SOSL', used: 0, limit: 20 },
     ]);
   });
 
-  it('gives a search its per-query cap only, never a transaction total', () => {
+  it('gives a search its per-query cap only, never a transaction total', async () => {
     overview = overviewOf([
       statement({ kind: 'SOSL', sObject: null, rows: 900, maxRows: 600 }),
       statement({ kind: 'SOSL', sObject: null, rows: 40, maxRows: 40, label: 'FIND :other' }),
     ]);
 
-    const { budgets, worstSearch } = rowBudgets(logWith(1));
+    const { budgets, worstSearch } = await budgetsOf(1);
 
     expect(worstSearch).toEqual({ rows: 600, limit: 2000 });
     expect(budgets.every((budget) => budget.groups.length === 0)).toBe(true);
   });
 
-  it('names no worst search when the log holds none', () => {
-    expect(rowBudgets(logWith(1)).worstSearch).toBeNull();
+  it('names no worst search when the log holds none', async () => {
+    expect((await budgetsOf(1)).worstSearch).toBeNull();
   });
 
-  it('leaves out a statement that read or wrote no rows', () => {
+  it('leaves out a statement that read or wrote no rows', async () => {
     overview = overviewOf([statement({ rows: 0 })]);
 
-    expect(rowBudgets(logWith(1)).budgets[0]?.groups).toEqual([]);
+    expect((await budgetsOf(1)).budgets[0]?.groups).toEqual([]);
   });
 
-  it('holds the rows of a statement that names no SObject under the unknown label', () => {
+  it('holds the rows of a statement that names no SObject under the unknown label', async () => {
     overview = overviewOf([statement({ rows: 10, sObject: null })]);
 
-    expect(rowBudgets(logWith(1)).budgets[0]?.groups).toEqual([
+    expect((await budgetsOf(1)).budgets[0]?.groups).toEqual([
       { sObject: UNKNOWN_OBJECT, rows: 10, statements: 1 },
     ]);
   });
 
-  it('brings an SObject read and written together, biggest total first', () => {
+  it('brings an SObject read and written together, biggest total first', async () => {
     overview = overviewOf([
       statement({ rows: 100, maxRows: 100 }),
       statement({ rows: 40, kind: 'DML', sObject: 'Account', repeats: 3 }),
       statement({ rows: 60, maxRows: 60, sObject: 'Contact' }),
     ]);
 
-    expect(rowBudgets(logWith(1)).objects).toEqual([
+    expect((await budgetsOf(1)).objects).toEqual([
       { sObject: 'Account', rowsRead: 100, rowsWritten: 40, rows: 140 },
       { sObject: 'Contact', rowsRead: 60, rowsWritten: 0, rows: 60 },
     ]);
   });
 
-  it('leaves the split out while one limit holds every row, which is its own bar', () => {
+  it('leaves the split out while one limit holds every row, which is its own bar', async () => {
     overview = overviewOf([statement({ rows: 100, maxRows: 100 })]);
 
-    expect(rowBudgets(logWith(1)).objects).toEqual([]);
+    expect((await budgetsOf(1)).objects).toEqual([]);
   });
 
-  it('brings one SObject together when the two sides name it in a different case', () => {
+  it('brings one SObject together when the two sides name it in a different case', async () => {
     overview = overviewOf([
       statement({ rows: 100, maxRows: 100, sObject: 'account' }),
       statement({ rows: 5, kind: 'DML', sObject: 'Account' }),
     ]);
 
-    expect(rowBudgets(logWith(1)).objects).toEqual([
+    expect((await budgetsOf(1)).objects).toEqual([
       { sObject: 'account', rowsRead: 100, rowsWritten: 5, rows: 105 },
     ]);
   });
 
-  it('leaves the unknown label out of the split, a bucket of objects and not one', () => {
+  it('leaves the unknown label out of the split, a bucket of objects and not one', async () => {
     overview = overviewOf([
       statement({ rows: 100, sObject: null }),
       statement({ rows: 5, kind: 'DML', sObject: null }),
@@ -224,20 +227,20 @@ describe('rowBudgets', () => {
       statement({ rows: 2, kind: 'DML', sObject: 'Case' }),
     ]);
 
-    expect(rowBudgets(logWith(1)).objects).toEqual([
+    expect((await budgetsOf(1)).objects).toEqual([
       { sObject: 'Account', rowsRead: 10, rowsWritten: 0, rows: 10 },
       { sObject: 'Case', rowsRead: 0, rowsWritten: 2, rows: 2 },
     ]);
   });
 
-  it('leaves a search out of the SObject split, which holds rows against no total', () => {
+  it('leaves a search out of the SObject split, which holds rows against no total', async () => {
     overview = overviewOf([
       statement({ rows: 30, maxRows: 30, kind: 'SOSL', sObject: 'Lead' }),
       statement({ rows: 10, maxRows: 10 }),
       statement({ rows: 5, kind: 'DML', sObject: 'Case' }),
     ]);
 
-    expect(rowBudgets(logWith(1)).objects).toEqual([
+    expect((await budgetsOf(1)).objects).toEqual([
       { sObject: 'Account', rowsRead: 10, rowsWritten: 0, rows: 10 },
       { sObject: 'Case', rowsRead: 0, rowsWritten: 5, rows: 5 },
     ]);

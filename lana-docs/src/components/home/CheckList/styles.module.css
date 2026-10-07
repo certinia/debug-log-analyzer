@@ -1,0 +1,43 @@
+.list {
+  flex: 1;
+  margin: 0 0 1.25rem;
+  padding: 0;
+  list-style: none;
+  line-height: 1.5;
+}
+
+.list li {
+  position: relative;
+  padding-left: 1.6rem;
+}
+
+.list li + li {
+  margin-top: 0.5rem;
+}
+
+.list li::before {
+  content: '✓';
+  position: absolute;
+  left: 0;
+  top: 0.15em;
+  display: grid;
+  place-items: center;
+  width: 1.05rem;
+  height: 1.05rem;
+  border: 1px solid var(--lana-rule);
+  border-radius: 50%;
+  color: var(--ifm-color-primary);
+  font-size: 0.65rem;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.term {
+  padding: 0.05em 0.35em;
+  border-radius: 4px;
+  background: color-mix(in srgb, var(--ifm-color-primary) 12%, transparent);
+  color: var(--lana-accent-text);
+  font-family: var(--ifm-font-family-monospace);
+  font-size: 0.88em;
+  white-space: nowrap;
+}

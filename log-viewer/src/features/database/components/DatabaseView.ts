@@ -17,12 +17,13 @@ import { limitTotals } from '../../../components/logOverviewMetrics.js';
 import { DomListenerController } from '../../../core/events/DomListenerController.js';
 import { eventBus, type StatementType } from '../../../core/events/EventBus.js';
 import type { DbFindResultsEventDetail, FindEventMap } from '../../find/findEvents.js';
-import { apexLimitTimeSeries } from '../../timeline/optimised/apex-limit-series.js';
+import { apexLimitSeries } from '../../timeline/optimised/apex-limit-series.js';
 import { InspectorTabController } from '../../../components/InspectorTabController.js';
 import { SelectionEchoGuard } from '../../../core/events/SelectionEchoGuard.js';
 import { formatInteger, isVisible } from '../../../core/utility/Util.js';
 import { soslRowsMetric } from '../limits.js';
 import { logStoreFor } from '../../../core/log/LogStore.js';
+import { statements } from '../../../core/log/statements.js';
 
 // styles
 import { globalStyles } from '../../../styles/global.styles.js';
@@ -185,11 +186,17 @@ export class DatabaseView extends LitElement {
       return;
     }
     const store = logStoreFor(root);
-    this.dmlLines = store.dmlLines();
-    this.soqlLines = store.soqlLines();
-    this.soslLines = store.soslLines();
-    // A full pass over every event: too costly to run from render().
-    this._limits = limitTotals(apexLimitTimeSeries(root));
+    const [{ dml, soql, sosl }, series] = await Promise.all([
+      store.derive(statements),
+      store.derive(apexLimitSeries),
+    ]);
+    if (root !== this.timelineRoot || this.loaded) {
+      return;
+    }
+    this.dmlLines = dml;
+    this.soqlLines = soql;
+    this.soslLines = sosl;
+    this._limits = limitTotals(series);
     this.loaded = true;
     // Collapse types the transaction never touched (usually SOSL).
     this.collapsed = {

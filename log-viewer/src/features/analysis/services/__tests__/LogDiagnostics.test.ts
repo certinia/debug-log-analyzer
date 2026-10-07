@@ -4,15 +4,21 @@
 import type { ApexLog, LogEvent, GovernorLimits, Limits } from '@apexdevtools/apex-log-parser';
 import { beforeEach, describe, expect, it } from '@jest/globals';
 
+import { indexTree } from '#test-helpers/apexLog.js';
 import { emptyLimits, governorLimits, limitValue } from '#test-helpers/limits.js';
 
 let log: ApexLog | null = null;
 
-jest.mock('../../../../core/log/LogStore.js', () => ({
-  currentLogStore: () => (log ? { log, stackByEventIndex: () => [] } : null),
-}));
+import { LogStore } from '../../../../core/log/LogStore.js';
+import { logDiagnostics, scopeDiagnostics } from '../LogDiagnostics.js';
 
-import { computeLogDiagnostics, scopeDiagnostics } from '../LogDiagnostics.js';
+/** The findings for the log a test set up. */
+function diagnose() {
+  if (!log) {
+    throw new Error('no log set up');
+  }
+  return new LogStore(log).derive(logDiagnostics);
+}
 
 /** A parsed event, with only the fields the diagnostics read. */
 function event(fields: Partial<LogEvent>): LogEvent {
@@ -68,15 +74,9 @@ const soql = (fields: Partial<LogEvent>) => event({ type: 'SOQL_EXECUTE_BEGIN', 
 const dml = (fields: Partial<LogEvent> & { sObjectType?: string }) =>
   event({ type: 'DML_BEGIN', ...fields } as Partial<LogEvent>);
 
-describe('computeLogDiagnostics', () => {
+describe('logDiagnostics', () => {
   beforeEach(() => {
     log = null;
-  });
-
-  it('returns nothing while no log is parsed', async () => {
-    const result = await computeLogDiagnostics();
-    expect(result.diagnostics).toEqual([]);
-    expect(result.queryPlansKnown).toBe(false);
   });
 
   it('reports a governor limit that is reached, and one that is near', async () => {
@@ -85,7 +85,7 @@ describe('computeLogDiagnostics', () => {
     namespaceLimits.soqlQueries = limitValue(85, 100);
     log = apexLog({ namespaceLimits: { default: namespaceLimits } });
 
-    const { diagnostics } = await computeLogDiagnostics();
+    const { diagnostics } = await diagnose();
     expect(diagnostics.map((d) => [d.severity, d.summary, d.meta])).toEqual([
       ['Warning', 'CPU Time is at 100% of its limit', '10,000 ms / 10,000 ms'],
       ['Warning', 'SOQL is at 85% of its limit', '85 / 100'],
@@ -99,7 +99,7 @@ describe('computeLogDiagnostics', () => {
       ),
     });
 
-    const { diagnostics } = await computeLogDiagnostics();
+    const { diagnostics } = await diagnose();
     expect(diagnostics.some((d) => d.id.startsWith('limit|'))).toBe(false);
   });
 
@@ -108,7 +108,7 @@ describe('computeLogDiagnostics', () => {
     namespaceLimits.soqlQueries = limitValue(40, 100);
     log = apexLog({ namespaceLimits: { default: namespaceLimits } });
 
-    expect((await computeLogDiagnostics()).diagnostics).toEqual([]);
+    expect((await diagnose()).diagnostics).toEqual([]);
   });
 
   it('sums usage over every namespace, since a limit is shared unless a package is certified', async () => {
@@ -119,7 +119,7 @@ describe('computeLogDiagnostics', () => {
     };
     log = apexLog({ namespaceLimits: { default: forNamespace(14), pkg: forNamespace(173) } });
 
-    const { diagnostics } = await computeLogDiagnostics();
+    const { diagnostics } = await diagnose();
     // A summed share can pass 100% without a breach: a certified package has its
     // own limits. Only the log saying the governor stopped it makes that an error.
     expect(diagnostics.map((d) => [d.severity, d.summary, d.meta])).toEqual([
@@ -137,9 +137,7 @@ describe('computeLogDiagnostics', () => {
       ),
     });
 
-    const warnings = (await computeLogDiagnostics()).diagnostics.filter(
-      (d) => d.severity === 'Warning',
-    );
+    const warnings = (await diagnose()).diagnostics.filter((d) => d.severity === 'Warning');
     expect(warnings[0]?.id).toBe('limit|soqlQueries');
     expect(warnings.some((d) => d.count > 1)).toBe(true);
   });
@@ -152,7 +150,7 @@ describe('computeLogDiagnostics', () => {
       ),
     });
 
-    const { diagnostics } = await computeLogDiagnostics();
+    const { diagnostics } = await diagnose();
     const repeat = diagnostics.find((d) => d.id.startsWith('repeat-line|'));
     expect(repeat?.summary).toBe('6 SOQL statements from line 214');
     expect(repeat?.count).toBe(6);
@@ -166,7 +164,7 @@ describe('computeLogDiagnostics', () => {
       ),
     });
 
-    expect((await computeLogDiagnostics()).diagnostics).toEqual([]);
+    expect((await diagnose()).diagnostics).toEqual([]);
   });
 
   it('reports an identical statement that runs from several lines', async () => {
@@ -177,7 +175,7 @@ describe('computeLogDiagnostics', () => {
       ),
     });
 
-    const { diagnostics } = await computeLogDiagnostics();
+    const { diagnostics } = await diagnose();
     const repeat = diagnostics.find((d) => d.id.startsWith('repeat-text|'));
     expect(repeat?.summary).toBe('6 identical SOQL statements, from 6 lines');
     // Three from each of two lines would be under the per-line threshold, so the
@@ -198,7 +196,7 @@ describe('computeLogDiagnostics', () => {
       ),
     });
 
-    const { diagnostics } = await computeLogDiagnostics();
+    const { diagnostics } = await diagnose();
     // DML text is the operation and the object, so every repeat shares a text and
     // that rule already groups them.
     expect(diagnostics.map((d) => d.id)).toEqual(['repeat-text|DML|DML Op:Insert Type:Account']);
@@ -220,9 +218,7 @@ describe('computeLogDiagnostics', () => {
       ),
     });
 
-    const found = (await computeLogDiagnostics()).diagnostics.find((d) =>
-      d.id.startsWith('row-at-a-time|'),
-    );
+    const found = (await diagnose()).diagnostics.find((d) => d.id.startsWith('row-at-a-time|'));
     expect(found?.summary).toBe('5 Contact queries, one row at a time');
     expect(found?.message).toContain('IN :ids');
     // Each statement is listed, so the reader can open any of them in the grid.
@@ -242,9 +238,7 @@ describe('computeLogDiagnostics', () => {
       ),
     });
 
-    const found = (await computeLogDiagnostics()).diagnostics.find((d) =>
-      d.id.startsWith('row-at-a-time|'),
-    );
+    const found = (await diagnose()).diagnostics.find((d) => d.id.startsWith('row-at-a-time|'));
     expect(found?.count).toBe(12);
     expect(found?.evidence).toHaveLength(11);
     expect(found?.evidence?.[0]).toEqual({
@@ -306,7 +300,7 @@ describe('computeLogDiagnostics', () => {
       ),
     });
 
-    const { diagnostics } = await computeLogDiagnostics();
+    const { diagnostics } = await diagnose();
     const raised = ['repeat-line', 'repeat-text', 'row-at-a-time'].filter((rule) =>
       diagnostics.some((d) => d.id.startsWith(`${rule}|`)),
     );
@@ -341,7 +335,7 @@ describe('computeLogDiagnostics', () => {
     );
     log = apexLog({ eventsById: [root, ...frames, ...statements] });
 
-    const { diagnostics } = await computeLogDiagnostics();
+    const { diagnostics } = await diagnose();
     const repeats = diagnostics.filter((d) => d.id.startsWith('repeat-line|'));
     // Line 42 in two classes is two loops, not one finding of twelve.
     expect(repeats.map((d) => d.count)).toEqual([6, 6]);
@@ -362,7 +356,7 @@ describe('computeLogDiagnostics', () => {
       ),
     });
 
-    const { diagnostics, lintedQueries } = await computeLogDiagnostics();
+    const { diagnostics, lintedQueries } = await diagnose();
     const unbounded = diagnostics.find((d) => d.summary.startsWith('SOQL is unbounded'));
     expect(unbounded?.count).toBe(3);
     // The rule names a problem; the query it read is what ties it to the grid.
@@ -381,7 +375,7 @@ describe('computeLogDiagnostics', () => {
       ),
     });
 
-    const { diagnostics } = await computeLogDiagnostics();
+    const { diagnostics } = await diagnose();
     const unbounded = diagnostics.find((d) => d.summary.startsWith('SOQL is unbounded'));
     // The count is executions across all three, so the list is what reconciles it.
     expect(unbounded?.count).toBe(6);
@@ -404,7 +398,7 @@ describe('computeLogDiagnostics', () => {
       eventsById: [soql({ text: 'SELECT Id FROM Account LIMIT 1', children: [explain] })],
     });
 
-    const { diagnostics, queryPlansKnown } = await computeLogDiagnostics();
+    const { diagnostics, queryPlansKnown } = await diagnose();
     expect(queryPlansKnown).toBe(true);
     expect(diagnostics.map((d) => [d.summary, d.meta])).toEqual([
       ['Query is not selective.', 'Account'],
@@ -420,7 +414,7 @@ describe('computeLogDiagnostics', () => {
 
   it('says the plans are unknown when the log holds none', async () => {
     log = apexLog({ eventsById: [soql({ text: 'SELECT Id FROM Account LIMIT 1' })] });
-    expect((await computeLogDiagnostics()).queryPlansKnown).toBe(false);
+    expect((await diagnose()).queryPlansKnown).toBe(false);
   });
 
   it('heads the findings with a truncated log, ahead of the other issues', async () => {
@@ -435,7 +429,7 @@ describe('computeLogDiagnostics', () => {
       truncation: { regions: [{ kind: 'max-size', startTime: 0 }], totalSkippedBytes: 0 },
     });
 
-    const { diagnostics } = await computeLogDiagnostics();
+    const { diagnostics } = await diagnose();
     expect(diagnostics.map((d) => d.summary)).toEqual(['Log truncated', 'Unexpected-End']);
     expect(diagnostics[0]?.severity).toBe('Warning');
     expect(diagnostics[0]?.meta).toBeUndefined();
@@ -453,7 +447,7 @@ describe('computeLogDiagnostics', () => {
       },
     });
 
-    const { diagnostics } = await computeLogDiagnostics();
+    const { diagnostics } = await diagnose();
     expect(diagnostics[0]?.summary).toBe('Log truncated in 2 places');
     expect(diagnostics[0]?.meta).toBe('3 MB');
   });
@@ -465,7 +459,7 @@ describe('computeLogDiagnostics', () => {
       truncation: { regions: [{ kind: 'max-size', startTime: 0 }], totalSkippedBytes: 0 },
     });
 
-    const { diagnostics } = await computeLogDiagnostics();
+    const { diagnostics } = await diagnose();
     expect(diagnostics.map((d) => [d.summary, d.severity])).toEqual([
       ['Log truncated', 'Warning'],
       [text, 'Error'],
@@ -477,7 +471,7 @@ describe('computeLogDiagnostics', () => {
     const thrown = (eventIndex: number) => event({ type: 'EXCEPTION_THROWN', eventIndex, text });
     log = apexLog({ exceptions: [thrown(4), thrown(9)] });
 
-    const { diagnostics } = await computeLogDiagnostics();
+    const { diagnostics } = await diagnose();
     expect(diagnostics).toHaveLength(1);
     expect(diagnostics[0]?.count).toBe(2);
     expect(diagnostics[0]?.eventIndex).toBe(4);
@@ -487,10 +481,10 @@ describe('computeLogDiagnostics', () => {
   it('grades a caught exception below one that rolled the transaction back', async () => {
     const text = 'System.NullPointerException: Attempt to de-reference a null object';
     log = apexLog({ exceptions: [event({ type: 'EXCEPTION_THROWN', eventIndex: 4, text })] });
-    expect((await computeLogDiagnostics()).diagnostics[0]?.severity).toBe('Warning');
+    expect((await diagnose()).diagnostics[0]?.severity).toBe('Warning');
 
     log = apexLog({ exceptions: [event({ type: 'FATAL_ERROR', eventIndex: 4, text })] });
-    expect((await computeLogDiagnostics()).diagnostics[0]?.severity).toBe('Error');
+    expect((await diagnose()).diagnostics[0]?.severity).toBe('Error');
   });
 
   it('groups the same exception thrown from different places, and keeps the frame', async () => {
@@ -510,7 +504,7 @@ describe('computeLogDiagnostics', () => {
       ],
     });
 
-    const { diagnostics } = await computeLogDiagnostics();
+    const { diagnostics } = await diagnose();
     expect(diagnostics).toHaveLength(1);
     expect(diagnostics[0]?.summary).toBe(message);
     expect(diagnostics[0]?.count).toBe(2);
@@ -526,7 +520,7 @@ describe('computeLogDiagnostics', () => {
       ],
     });
 
-    const { diagnostics } = await computeLogDiagnostics();
+    const { diagnostics } = await diagnose();
     expect(diagnostics).toHaveLength(1);
     // One throw, reported once: the fatal error is that same throw escaping.
     expect(diagnostics[0]?.count).toBe(1);
@@ -549,7 +543,7 @@ describe('computeLogDiagnostics', () => {
       ],
     });
 
-    const { diagnostics } = await computeLogDiagnostics();
+    const { diagnostics } = await diagnose();
     expect(diagnostics).toHaveLength(1);
     expect(diagnostics[0]?.summary).toBe('CPU Time limit exceeded');
     expect(diagnostics[0]?.meta).toBe('15,163 ms / 10,000 ms');
@@ -568,7 +562,7 @@ describe('computeLogDiagnostics', () => {
       ],
     });
 
-    const { diagnostics } = await computeLogDiagnostics();
+    const { diagnostics } = await diagnose();
     expect(diagnostics.map((d) => [d.summary, d.meta])).toEqual([
       ['SOQL limit exceeded', undefined],
     ]);
@@ -579,13 +573,14 @@ describe('computeLogDiagnostics', () => {
     namespaceLimits.cpuTime = limitValue(15_163, 10_000);
     log = apexLog({
       namespaceLimits: { default: namespaceLimits },
-      eventsById: [
+      children: [
         event({ type: 'METHOD_ENTRY', text: 'Slow.run()', duration: { self: 9e9, total: 9e9 } }),
         event({ type: 'METHOD_ENTRY', text: 'Fast.run()', duration: { self: 1e9, total: 1e9 } }),
       ],
     });
+    indexTree(log);
 
-    const { diagnostics } = await computeLogDiagnostics();
+    const { diagnostics } = await diagnose();
     expect(diagnostics[0]?.cause).toEqual({
       label: 'Most time in',
       name: 'Slow.run()',
@@ -609,7 +604,7 @@ describe('computeLogDiagnostics', () => {
       ],
     });
 
-    const { diagnostics } = await computeLogDiagnostics();
+    const { diagnostics } = await diagnose();
     expect(diagnostics[0]?.eventIndex).toBe(2);
   });
 
@@ -617,10 +612,10 @@ describe('computeLogDiagnostics', () => {
     const debugLine = (index: number) =>
       event({ type: 'USER_DEBUG', eventIndex: index, text: 'DEBUG|hello' });
     log = apexLog({ eventsById: Array.from({ length: 49 }, (_, i) => debugLine(i)) });
-    expect((await computeLogDiagnostics()).diagnostics).toEqual([]);
+    expect((await diagnose()).diagnostics).toEqual([]);
 
     log = apexLog({ eventsById: Array.from({ length: 50 }, (_, i) => debugLine(i)) });
-    const { diagnostics } = await computeLogDiagnostics();
+    const { diagnostics } = await diagnose();
     expect(diagnostics[0]?.summary).toBe('50 debug statements ran');
     expect(diagnostics[0]?.severity).toBe('Info');
   });
@@ -636,7 +631,7 @@ describe('computeLogDiagnostics', () => {
       ),
     });
 
-    const { diagnostics } = await computeLogDiagnostics();
+    const { diagnostics } = await diagnose();
     expect(diagnostics.map((d) => d.severity)).toEqual(['Error', 'Warning', 'Info']);
   });
 
@@ -653,7 +648,7 @@ describe('computeLogDiagnostics', () => {
       ),
     });
 
-    const { diagnostics, logNs } = await computeLogDiagnostics();
+    const { diagnostics, logNs } = await diagnose();
     expect(logNs).toBe(1_000);
     expect(diagnostics.find((d) => d.id.startsWith('repeat-line|'))?.timeNs).toBe(300);
   });
@@ -675,7 +670,7 @@ describe('computeLogDiagnostics', () => {
     Object.assign(outer, { children: [nested], isParent: true });
     log = apexLog({ duration: { self: 0, total: 1_000 }, eventsById: dmls });
 
-    const { diagnostics } = await computeLogDiagnostics();
+    const { diagnostics } = await diagnose();
     expect(diagnostics.find((d) => d.id.startsWith('repeat-text|'))?.timeNs).toBe(400);
   });
 
@@ -686,7 +681,7 @@ describe('computeLogDiagnostics', () => {
       ),
     });
 
-    const { diagnostics } = await computeLogDiagnostics();
+    const { diagnostics } = await diagnose();
     expect(diagnostics[0]?.timeNs).toBeUndefined();
   });
 });
@@ -700,8 +695,9 @@ describe('scopeDiagnostics', () => {
       soql({ eventIndex: index + 1, lineNumber: 214, text, parent: method }),
     );
     method.children = queries;
-    log = apexLog({ eventsById: [method, ...queries] });
-    return await computeLogDiagnostics();
+    const made = apexLog({ eventsById: [method, ...queries] });
+    log = made;
+    return { log: made, result: await diagnose() };
   }
 
   beforeEach(() => {
@@ -710,10 +706,10 @@ describe('scopeDiagnostics', () => {
 
   // The log figures stay, so a scoped share still reads against the whole log.
   it('keeps a finding whose events are below the selection, and the log figures', async () => {
-    const result = await repeatsUnderAMethod();
+    const { log: scopedLog, result } = await repeatsUnderAMethod();
     expect(result.diagnostics.length).toBeGreaterThan(0);
 
-    const scoped = scopeDiagnostics(result, [0]);
+    const scoped = scopeDiagnostics(scopedLog, result, [0]);
     expect(scoped.diagnostics).toEqual(result.diagnostics);
     expect(scoped.logNs).toBe(result.logNs);
     expect(scoped.lintedQueries).toEqual(result.lintedQueries);
@@ -724,8 +720,8 @@ describe('scopeDiagnostics', () => {
     ['a selection the findings never reached', [42]],
     ['no occurrences', []],
   ])('scopes to nothing for %s', async (_name, occurrences) => {
-    const result = await repeatsUnderAMethod();
+    const { log: scopedLog, result } = await repeatsUnderAMethod();
 
-    expect(scopeDiagnostics(result, occurrences).diagnostics).toEqual([]);
+    expect(scopeDiagnostics(scopedLog, result, occurrences).diagnostics).toEqual([]);
   });
 });

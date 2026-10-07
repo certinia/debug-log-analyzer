@@ -3,11 +3,12 @@
  */
 import '#vscode-elements/vscode-icon.js';
 import { consume } from '@lit/context';
-import { LitElement, css, html, unsafeCSS, type PropertyValues } from 'lit';
+import { LitElement, css, html, unsafeCSS } from 'lit';
 import { customElement, property, state } from 'lit/decorators.js';
 
 import { dispatchInspectorReveal } from '../../../components/inspectorReveal.js';
 import { ResizeController } from '../../../core/events/ResizeController.js';
+import { DerivedValue } from '../../../core/log/DerivedValue.js';
 import { logContext } from '../../../core/log/logContext.js';
 import type { LogStore } from '../../../core/log/LogStore.js';
 import { formatDuration } from '../../../core/utility/Util.js';
@@ -19,7 +20,7 @@ import '../../../components/SectionSkeleton.js';
 import { bleedRowStyles } from '../../../styles/revealRow.styles.js';
 import { severityIcon, severityStyles } from '../../../styles/severity.styles.js';
 import {
-  computeLogDiagnostics,
+  logDiagnostics,
   scopeDiagnostics,
   type Diagnostic,
   type DiagnosticEvidence,
@@ -77,8 +78,7 @@ export class LogDiagnosticsView extends LitElement {
   logStore: LogStore | null = null;
 
   /** The whole log's findings, before any scoping. */
-  @state()
-  private _all: LogDiagnostics | null = null;
+  private readonly _findings = new DerivedValue(this, logDiagnostics);
 
   /** Which severities the roll-up bar is holding the list to. Empty is all. */
   @state()
@@ -92,7 +92,7 @@ export class LogDiagnosticsView extends LitElement {
   @state()
   private _open: ReadonlySet<string> = new Set();
 
-  /** {@link _all}, narrowed to {@link instances}. */
+  /** {@link _findings}, narrowed to {@link instances}. */
   private _result: LogDiagnostics | null = null;
 
   /** The occurrences {@link _result} was scoped to. See {@link willUpdate}. */
@@ -106,26 +106,26 @@ export class LogDiagnosticsView extends LitElement {
   private readonly _resize = new ResizeController(this, () => this._measure());
 
   override willUpdate() {
+    const all = this._findings.value ?? null;
     // Keyed on the occurrences themselves: the host builds the array in its own
     // render, so its identity changes even when the selection has not.
     const scope = this.instances?.join(',') ?? '';
-    if (scope === this._scope && this._all === this._scoped) {
+    if (scope === this._scope && all === this._scoped) {
       return;
     }
     // A new selection or a new log is a new list of findings, so a severity held
     // from the last one would hide findings the reader has not seen.
     this._scope = scope;
-    this._scoped = this._all;
+    this._scoped = all;
     this._filters = [];
     this._open = new Set();
     this._result =
-      this._all && this.instances ? scopeDiagnostics(this._all, this.instances) : this._all;
+      all && this.logStore && this.instances
+        ? scopeDiagnostics(this.logStore.log, all, this.instances)
+        : all;
   }
 
-  override updated(changed: PropertyValues) {
-    if (changed.has('logStore')) {
-      void this._analyse();
-    }
+  override updated() {
     this._measure();
   }
 
@@ -618,11 +618,6 @@ export class LogDiagnosticsView extends LitElement {
       );
     }
     return caveats;
-  }
-
-  private async _analyse(): Promise<void> {
-    this._all = null;
-    this._all = await computeLogDiagnostics();
   }
 }
 

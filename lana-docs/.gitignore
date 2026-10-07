@@ -6,6 +6,9 @@
 
 # Generated files
 .docusaurus
+/static/demo
+/playwright-report
+/test-results
 .cache-loader
 
 # Misc

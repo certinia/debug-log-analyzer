@@ -5,6 +5,9 @@ import type { LogEvent } from '@apexdevtools/apex-log-parser';
 
 import { currentLogStore, type LogStore } from '../core/log/LogStore.js';
 import { ROOT_PATH_ID, type KeyPathIds } from '../core/log/keyPathIds.js';
+import type { TimeWindow } from '../core/log/rangeScope.js';
+import { CallSpans, SpanIndex, frameIn, reaches } from '../core/log/windowedTime.js';
+import { endOf, overlapOf } from '../core/log/windowStats.js';
 import { outermostEvents } from '../core/utility/EventTree.js';
 import { EXCLUDED_DETAIL_TYPES } from '../features/call-tree/utils/DetailsFilter.js';
 import {
@@ -191,6 +194,36 @@ export interface ScopedCallTree {
   timeOrder(options: FrameBudgetOptions): Promise<ScopedRow[] | null>;
   aggregated(options: FrameBudgetOptions): Promise<ScopedRow[] | null>;
   bottomUp(options: FrameBudgetOptions): Promise<ScopedRow[] | null>;
+  /** Reads the rows inside a window of the log. Only the whole-log tree has it:
+   *  a selection is never cut by a window. */
+  liveWindow?(): LiveWindow;
+}
+
+/**
+ * The whole-log tree's rows following a window. The rows stay the same objects;
+ * a row is read into the window when it is admitted, so only the rows a table
+ * shows are ever worked out.
+ */
+export interface LiveWindow {
+  /**
+   * Reads ahead what `rows` need to follow a window, a slice at a time, so the
+   * first window costs no more than any other. False when abandoned. Until it
+   * lands, `set` counts the calls of the whole log.
+   */
+  prepare(rows: readonly ScopedRow[], options: FrameBudgetOptions): Promise<boolean>;
+  /** The figures the footer and the bars read for `window`, or the whole log on
+   *  null. `self` is the self time of every row, shown or not; null until
+   *  `prepare` lands. */
+  figures(window: TimeWindow | null): { rootTotal: number; calls: number; self: number | null };
+  /** Moves to `window`, or back to the whole log on null, and returns its {@link figures}. */
+  set(window: TimeWindow | null): ReturnType<LiveWindow['figures']>;
+  /** Writes the row's time and calls inside the window into it, and says
+   *  whether any of the row is there. A row of many calls not yet prepared,
+   *  once a filter pass has spent its time, keeps its figures and is listed by
+   *  {@link waiting}. */
+  admit(row: ScopedRow): boolean;
+  /** The rows `admit` left for `prepare` since the last call. */
+  waiting(): ScopedRow[];
 }
 
 /** A built subtree and the frames it kept, so the scope can be counted without a
@@ -470,6 +503,16 @@ interface CallTreeInput {
    *  which makes Time Order the same answer as Aggregated. The whole-log tree and
    *  a single occurrence keep their exact order. */
   mergeTimeOrder: boolean;
+  /** Filled by the bottom-up walk where the tree follows a window: see {@link Holes}. */
+  holes?: Holes;
+}
+
+// Each recursive frame's nested calls of itself, which bottom-up takes off its time.
+type Holes = Map<LogEvent, LogEvent[]>;
+
+// Time Order rows hold the window's figures once it is read, so the views built from them read the frame's.
+function wholeOf(row: ScopedRow): { total: number; self: number } {
+  return row.onPath ? row.duration : row.originalData.duration;
 }
 
 /**
@@ -502,7 +545,7 @@ function lazyCallTree(input: CallTreeInput): ScopedCallTree {
       return aggregatedRows;
     },
     async bottomUp(viewOptions) {
-      bottomUpRows ??= await buildBottomUp(input.bottomUp, store, viewOptions);
+      bottomUpRows ??= await buildBottomUp(input.bottomUp, store, viewOptions, input.holes);
       return bottomUpRows;
     },
   };
@@ -535,8 +578,9 @@ export async function buildWholeLogCallTree(
     return null;
   }
 
+  const holes: Holes = new Map();
   // Already the log's own event order, with real durations — no merging.
-  return lazyCallTree({
+  const tree = lazyCallTree({
     // Nothing is selected, so there is no path above anything.
     topDown: () => Promise.resolve(scope.roots),
     bottomUp: scope.roots,
@@ -545,7 +589,178 @@ export async function buildWholeLogCallTree(
     calls: scope.calls,
     store,
     mergeTimeOrder: false,
+    holes,
   });
+  tree.liveWindow = () => liveWindow(apexLog, scope, store, holes);
+  return tree;
+}
+
+// How long one filter pass may spend reading rows of many calls before it leaves them for prepare.
+const PASS_MS = 8;
+
+// Figures are written into the row itself, so the table's sort and footer read them unchanged.
+function liveWindow(
+  log: LogEvent,
+  scope: { roots: ScopedRow[]; calls: number },
+  store: LogStore,
+  holes: Holes,
+): LiveWindow {
+  let window: TimeWindow | null = null;
+  const indexes = new WeakMap<ScopedRow, SpanIndex>();
+  let spans: CallSpans | null = null;
+  // Every instant inside a root is one frame's self time, except inside a block the tree leaves out.
+  let selfCover: { roots: SpanIndex; cut: SpanIndex } | null = null;
+  const waiting = new Set<ScopedRow>();
+  // Shared, so two views reading ahead at once read the log once.
+  let readingLog: Promise<boolean> | null = null;
+  let passEnd: number | null = null;
+
+  // A filter pass is one task, so it ends at the next microtask.
+  const passHasTime = (): boolean => {
+    if (passEnd === null) {
+      passEnd = performance.now() + PASS_MS;
+      queueMicrotask(() => {
+        passEnd = null;
+      });
+    }
+    return performance.now() < passEnd;
+  };
+
+  const readLog = async (tick: Tick): Promise<boolean> => {
+    const walked = await framesOf(scope.roots, tick);
+    const built = walked && (await CallSpans.build(walked.frames, tick));
+    const roots = built && (await SpanIndex.build(walked.roots, undefined, tick));
+    const cut = roots && (await SpanIndex.build(walked.cut, undefined, tick));
+    if (!cut) {
+      return false;
+    }
+    spans = built;
+    selfCover = { roots, cut };
+    return true;
+  };
+
+  const figures = (at: TimeWindow | null) => {
+    const self = selfCover && selfCover.roots.in(at).total - selfCover.cut.in(at).total;
+    if (!at) {
+      return { rootTotal: log.duration.total, calls: scope.calls, self };
+    }
+    return {
+      rootTotal: overlapOf(log.timestamp, endOf(log), at),
+      calls: spans?.in(at) ?? scope.calls,
+      self,
+    };
+  };
+
+  const merges = (row: ScopedRow) => !!(row._seed || row.eventIndexes);
+  const occurrenceBound = (row: ScopedRow) =>
+    (row._seed?.eventIndexes ?? row.eventIndexes ?? []).length;
+  const occurrencesOf = (row: ScopedRow) =>
+    locatableEventIndexes(row).map((i) => store.eventByIndex(i)!); // ids from this log
+  const indexOf = (row: ScopedRow): SpanIndex => {
+    let index = indexes.get(row);
+    if (!index) {
+      index = SpanIndex.of(occurrencesOf(row), row._seed ? holes : undefined);
+      indexes.set(row, index);
+    }
+    return index;
+  };
+
+  return {
+    async prepare(rows, options) {
+      const tick = frameBudget(options);
+      if (!spans) {
+        readingLog ??= readLog(tick);
+        if (!(await readingLog)) {
+          readingLog = null;
+          return false;
+        }
+      }
+      for (const row of rows) {
+        if (!merges(row) || indexes.has(row)) {
+          continue;
+        }
+        if (!(await tick())) {
+          return false;
+        }
+        const index = await SpanIndex.build(
+          occurrencesOf(row),
+          row._seed ? holes : undefined,
+          tick,
+        );
+        if (!index) {
+          return false;
+        }
+        indexes.set(row, index);
+      }
+      return true;
+    },
+
+    figures,
+
+    set(next) {
+      window = next;
+      return figures(next);
+    },
+
+    waiting() {
+      const rows = [...waiting];
+      waiting.clear();
+      return rows;
+    },
+
+    admit(row) {
+      if (!merges(row)) {
+        const event = row.originalData;
+        const own = window ? frameIn(event, window) : event.duration;
+        row.duration.total = own.total;
+        row.duration.self = own.self;
+        return !window || reaches(event, window);
+      }
+      if (!indexes.has(row)) {
+        if (!window) {
+          return true; // never read into a window, so it still holds the whole log's figures
+        }
+        if (occurrenceBound(row) > CHECK_EVERY && !passHasTime()) {
+          waiting.add(row);
+          return true;
+        }
+      }
+      const held = indexOf(row).in(window);
+      row.duration.total = held.total;
+      // A caller row is a route to its seed's time; only the top-level row shares the seed's list.
+      row.duration.self = row._seed && row.eventIndexes !== row._seed.eventIndexes ? 0 : held.self;
+      row.callCount = held.calls;
+      return held.calls > 0;
+    },
+  };
+}
+
+async function framesOf(
+  roots: readonly ScopedRow[],
+  tick: Tick,
+): Promise<{ frames: LogEvent[]; roots: LogEvent[]; cut: LogEvent[] } | null> {
+  const frames: LogEvent[] = [];
+  const cut: LogEvent[] = [];
+  const stack = [...roots];
+  while (stack.length) {
+    if (frames.length % CHECK_EVERY === 0 && !(await tick())) {
+      return null;
+    }
+    const row = stack.pop()!; // non-empty: the loop condition just checked
+    const event = row.originalData;
+    frames.push(event);
+    for (const child of event.children) {
+      if (EXCLUDED_DETAIL_TYPES.has(child.type ?? '')) {
+        cut.push(child);
+      }
+    }
+    if (row._children) {
+      for (const child of row._children) {
+        stack.push(child);
+      }
+    }
+  }
+  return { frames, roots: roots.map((row) => row.originalData), cut };
 }
 
 /** Top-down aggregation: merge sibling frames sharing a key, summing metrics. */
@@ -594,8 +809,9 @@ async function aggregate(
         // A group holding one real call is not a route, so it stays closed.
         group.onPath = undefined;
       }
-      group.duration.total += row.duration.total;
-      group.duration.self += row.duration.self;
+      const own = wholeOf(row);
+      group.duration.total += own.total;
+      group.duration.self += own.self;
       group.callCount += row.callCount;
       // Every merged occurrence, so pointing at the group points at all of them.
       for (const index of locatableEventIndexes(row)) {
@@ -672,11 +888,14 @@ async function buildBottomUp(
   rows: ScopedRow[],
   store: LogStore,
   options: FrameBudgetOptions,
+  holes?: Holes,
 ): Promise<ScopedRow[] | null> {
   const paths = store.keyPathIds();
   const tick = frameBudget(options);
   let idSeq = 0;
   const nextId = () => (idSeq -= 1);
+  // An abandoned build left some behind.
+  holes?.clear();
   const nodeByPath = new Map<number, BottomUpNode>();
   const topOrder: BottomUpNode[] = [];
 
@@ -749,10 +968,19 @@ async function buildBottomUp(
       if (outer) {
         // Inside a call of the same frame, so this call's time is already part
         // of that one's.
-        outer.attributed -= row.duration.total;
+        outer.attributed -= wholeOf(row).total;
+        if (holes) {
+          const outerEvent = outer.row.originalData;
+          const held = holes.get(outerEvent);
+          if (held) {
+            held.push(row.originalData);
+          } else {
+            holes.set(outerEvent, [row.originalData]);
+          }
+        }
       }
       entry.outer = outer;
-      entry.attributed = row.duration.total;
+      entry.attributed = wholeOf(row).total;
       open.set(entry.stackId, entry);
       entry.leaving = true;
       stack.push(entry);
@@ -766,13 +994,14 @@ async function buildBottomUp(
 
     open.set(entry.stackId, entry.outer);
     const attributed = entry.attributed;
-    if (row.duration.self > 0) {
+    const ownSelf = wholeOf(row).self;
+    if (ownSelf > 0) {
       // The seed row, then its callers up to the root. The chain is already in
       // that order, so it is walked in place rather than copied and reversed.
       let pathId = paths.step(ROOT_PATH_ID, entry.keyId);
       const seed = ensure(null, row, pathId);
       seed.duration.total += attributed;
-      seed.duration.self += row.duration.self;
+      seed.duration.self += ownSelf;
       seed.callCount += 1;
       let node = seed;
       for (let link = callers; link; link = link.callers) {

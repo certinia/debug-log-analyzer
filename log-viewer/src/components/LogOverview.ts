@@ -5,10 +5,11 @@ import { consume } from '@lit/context';
 import { LitElement, css, html } from 'lit';
 import { customElement, property } from 'lit/decorators.js';
 
+import { DerivedValue } from '../core/log/DerivedValue.js';
 import { logContext } from '../core/log/logContext.js';
 import { WindowStatsController } from '../core/log/windowStats.js';
 import type { LogStore } from '../core/log/LogStore.js';
-import { apexLimitTimeSeries } from '../features/timeline/optimised/apex-limit-series.js';
+import { apexLimitSeries } from '../features/timeline/optimised/apex-limit-series.js';
 import { globalStyles } from '../styles/global.styles.js';
 import { NO_GOVERNOR_USAGE_TEXT } from './governorCopy.js';
 import { seriesGauges } from './logOverviewMetrics.js';
@@ -63,16 +64,21 @@ export class LogOverview extends LitElement {
     `,
   ];
 
+  private readonly _series = new DerivedValue(this, apexLimitSeries);
+
   render() {
-    const apexLog = this.logStore?.log;
-    if (!apexLog) {
-      return html`<section-skeleton shape="gauges"></section-skeleton>`;
+    const series = this._series.value;
+    if (!series) {
+      return html`<section-skeleton
+        shape="gauges"
+        ?pending=${this._series.pending}
+      ></section-skeleton>`;
     }
     if (!this.wholeLog && this._window.pending) {
       return html`<p class="note">Adding up the governor usage…</p>`;
     }
     const window = this.wholeLog ? null : this._window.counts;
-    const gauges = seriesGauges(apexLimitTimeSeries(apexLog), window ?? undefined);
+    const gauges = seriesGauges(series, window ?? undefined);
     if (!gauges.length) {
       return html`<p class="note">${NO_GOVERNOR_USAGE_TEXT}</p>`;
     }

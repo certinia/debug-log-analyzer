@@ -7,11 +7,12 @@ import { customElement, property } from 'lit/decorators.js';
 import { styleMap } from 'lit/directives/style-map.js';
 
 import '#vscode-elements/vscode-icon.js';
+import { DerivedValue } from '../core/log/DerivedValue.js';
 import { logContext } from '../core/log/logContext.js';
 import type { LogStore } from '../core/log/LogStore.js';
 import { formatDuration, sharePercent } from '../core/utility/Util.js';
 import {
-  getExecutionHighlights,
+  executionHighlights,
   type ExecutionHighlights,
   type HotPathEnd,
   type HotPathFrame,
@@ -57,6 +58,8 @@ export class HotPath extends LitElement {
 
   private readonly _palette = new CategoryPaletteController(this);
 
+  private readonly _highlights = new DerivedValue(this, executionHighlights);
+
   static styles = [
     globalStyles,
     inspectorSectionStyles,
@@ -97,11 +100,11 @@ export class HotPath extends LitElement {
   ];
 
   render() {
-    const log = this.logStore?.log;
-    const highlights = log && getExecutionHighlights(log);
-    if (!highlights || !highlights.hotPath.length) {
+    const highlights = this._highlights.value;
+    if (!highlights?.hotPath.length) {
       return html`<section-skeleton
         shape="rows"
+        ?pending=${this._highlights.pending}
         fallback=${NO_TIMED_CALLS_TEXT}
       ></section-skeleton>`;
     }

@@ -20,7 +20,8 @@ hide_title: true
 
 Analyze Salesforce debug logs with detailed metrics on method calls, including Self Time, Total Time, Count, Name, and Type. Easily sort, filter, and group log events by namespace or type, and export or copy results for efficient troubleshooting and performance optimization. The Analysis table uses a bottom-up caller grouping model, where each method is shown as a root with its direct callers as children.
 
-![Analysis view screenshot showing method call metrics such as Self Time, Total Time, Count, Name, and Type](https://raw.githubusercontent.com/certinia/debug-log-analyzer/main/lana/assets/1_22/analysis.png)
+![Analysis view screenshot showing method call metrics such as Self Time, Total Time, Count, Name, and Type](https://raw.githubusercontent.com/certinia/debug-log-analyzer/main/lana/assets/1_22/analysis.png#gh-dark-mode-only)
+![Analysis view screenshot showing method call metrics such as Self Time, Total Time, Count, Name, and Type](https://raw.githubusercontent.com/certinia/debug-log-analyzer/main/lana/assets/1_22/analysis-light.png#gh-light-mode-only)
 
 ### Sort
 

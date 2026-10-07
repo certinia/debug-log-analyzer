@@ -17,6 +17,8 @@ jest.mock('tabulator-tables', () => {
     on = jest.fn();
     getSelectedRows = jest.fn(() => []);
     selectRow = jest.fn();
+    setFilter = jest.fn();
+    refreshFilter = jest.fn();
     options: Record<string, unknown>;
     constructor(_element: HTMLElement, options: Record<string, unknown>) {
       this.options = options;
@@ -30,6 +32,7 @@ jest.mock('tabulator-tables', () => {
 // it yields a tree or nothing, and when.
 jest.mock('../scopedCallTree.js', () => ({
   buildScopedCallTree: jest.fn(() => Promise.resolve(null)),
+  buildWholeLogCallTree: jest.fn(() => Promise.resolve(null)),
   // Keep the real row readers: the hover test is about which rows name a frame.
   revealableEventIndex: jest.requireActual('../scopedCallTree.js').revealableEventIndex,
   locatableEventIndexes: jest.requireActual('../scopedCallTree.js').locatableEventIndexes,
@@ -41,7 +44,13 @@ import { Tabulator, type RowComponent } from 'tabulator-tables';
 
 import type { CallTreeDetail } from '../CallTreeDetail.js';
 import '../CallTreeDetail.js';
-import { buildScopedCallTree, type ScopedCallTree, type ScopedRow } from '../scopedCallTree.js';
+import {
+  buildScopedCallTree,
+  buildWholeLogCallTree,
+  type LiveWindow,
+  type ScopedCallTree,
+  type ScopedRow,
+} from '../scopedCallTree.js';
 import { INSPECTOR_LOCATE_EVENT, type InspectorLocateEvent } from '../inspectorReveal.js';
 import { eventBus, type DetailSelection } from '../../core/events/EventBus.js';
 import type { ProgressParams } from '../../tabulator/format/ProgressMS.js';
@@ -50,8 +59,10 @@ import type { ApexLog } from '@apexdevtools/apex-log-parser';
 
 import { logStoreFor, type LogStore } from '../../core/log/LogStore.js';
 import { ROOT_PATH_ID } from '../../core/log/keyPathIds.js';
+import { setRange, type TimeWindow } from '../../core/log/rangeScope.js';
 
 const build = jest.mocked(buildScopedCallTree);
+const wholeBuild = jest.mocked(buildWholeLogCallTree);
 
 interface StubTable {
   options: {
@@ -60,6 +71,8 @@ interface StubTable {
   };
   on: jest.Mock;
   setData: jest.Mock;
+  setFilter: jest.Mock;
+  refreshFilter: jest.Mock;
   redraw: jest.Mock;
   destroy: jest.Mock;
   selectRow: jest.Mock;
@@ -409,5 +422,237 @@ describe('CallTreeDetail scoped build', () => {
 
     document.removeEventListener(INSPECTOR_LOCATE_EVENT, located);
     expect(seen).toEqual([[8], [], [8, 12]]);
+  });
+});
+
+describe('CallTreeDetail whole-log tree following the window', () => {
+  /** Every window the tree was read in, in order. */
+  let readIn: Array<TimeWindow | null>;
+  /** How the next read-ahead lands; a test can hold it open. */
+  let prepare: jest.Mock<Promise<boolean>, Parameters<LiveWindow['prepare']>>;
+  /** Rows the next `waiting()` hands back. */
+  let waiting: ScopedRow[];
+
+  function liveTree(): ScopedCallTree {
+    const live: LiveWindow = {
+      prepare,
+      figures: (window) => ({
+        rootTotal: window ? window.end - window.start : 5000,
+        calls: 7,
+        self: 42,
+      }),
+      set: (window) => {
+        readIn.push(window);
+        return live.figures(window);
+      },
+      admit: () => true,
+      waiting: () => waiting.splice(0),
+    };
+    return { ...tree(5000), liveWindow: () => live };
+  }
+
+  beforeEach(() => {
+    document.body.replaceChildren();
+    wholeBuild.mockReset();
+    wholeBuild.mockImplementation(() => Promise.resolve(liveTree()));
+    tables.instances.length = 0;
+    readIn = [];
+    waiting = [];
+    prepare = jest.fn<Promise<boolean>, Parameters<LiveWindow['prepare']>>(() =>
+      Promise.resolve(true),
+    );
+  });
+
+  afterEach(() => {
+    setRange(null);
+  });
+
+  async function mountWholeLog(): Promise<CallTreeDetail> {
+    const el = document.createElement('call-tree-detail') as CallTreeDetail;
+    el.wholeLog = true;
+    // A picked view is remembered per log, so without one a pick does not hold.
+    el.logStore = { log: {} } as unknown as LogStore;
+    document.body.appendChild(el);
+    await frame(el);
+    return el;
+  }
+
+  function handler(table: StubTable, event: string): (() => void) | undefined {
+    return table.on.mock.calls.find((call) => call[0] === event)?.[1] as (() => void) | undefined;
+  }
+
+  it('filters its rows through the window once the table is built', async () => {
+    await mountWholeLog();
+    const table = tables.instances[0]!;
+
+    handler(table, 'tableBuilt')?.();
+
+    expect(table.setFilter).toHaveBeenCalledWith(expect.any(Function));
+  });
+
+  it('follows a moving window in the same rows, without walking the log again', async () => {
+    const el = await mountWholeLog();
+    const table = tables.instances[0]!;
+    wholeBuild.mockClear();
+
+    setRange({ start: 100, end: 300 });
+    await settle(el);
+
+    expect(wholeBuild).not.toHaveBeenCalled();
+    expect(table.setData).not.toHaveBeenCalled();
+    expect(table.refreshFilter).toHaveBeenCalledTimes(1);
+    expect(readIn.at(-1)).toEqual({ start: 100, end: 300 });
+    // The bars read against the window, through the params shared by reference.
+    expect(totalColumn(table).formatterParams.totalValue).toBe(200);
+  });
+
+  // The first window reads ahead in slices; until it lands the rows keep the
+  // whole log's figures rather than read themselves in one frame.
+  it('reads the rows ahead before the first window, then follows it', async () => {
+    let land: (ready: boolean) => void = () => {};
+    prepare.mockImplementation(() => new Promise<boolean>((resolve) => (land = resolve)));
+    const el = await mountWholeLog();
+    const table = tables.instances[0]!;
+
+    setRange({ start: 100, end: 300 });
+    await settle(el);
+    setRange({ start: 100, end: 400 });
+    await settle(el);
+
+    expect(prepare).toHaveBeenCalledTimes(1);
+    expect(table.refreshFilter).not.toHaveBeenCalled();
+
+    land(true);
+    await settle(el);
+
+    // Straight to the window on screen now, not the one that started the read.
+    // Until then it reads only the whole log.
+    expect(readIn.filter(Boolean)).toEqual([{ start: 100, end: 400 }]);
+    expect(table.refreshFilter).toHaveBeenCalledTimes(1);
+  });
+
+  it('builds the cells of the rows it drew again, so they show the new figures', async () => {
+    const el = await mountWholeLog();
+    const table = tables.instances[0] as unknown as {
+      options: { rowFormatter: (row: RowComponent) => void };
+    };
+    const drawn = {
+      _row: { initialized: true },
+      getData: () => ({ id: 1 }),
+      getElement: () => document.createElement('div'),
+    };
+    table.options.rowFormatter(drawn as unknown as RowComponent);
+
+    setRange({ start: 100, end: 300 });
+    await settle(el);
+
+    expect(drawn._row.initialized).toBe(false);
+  });
+
+  it('reads the whole log again once the window goes', async () => {
+    setRange({ start: 100, end: 300 });
+    const el = await mountWholeLog();
+    const table = tables.instances[0]!;
+
+    setRange(null);
+    await settle(el);
+
+    expect(readIn.at(-1)).toBeNull();
+    expect(totalColumn(table).formatterParams.totalValue).toBe(5000);
+    expect(wholeBuild).toHaveBeenCalledTimes(1);
+  });
+
+  it('catches a view up on the window it missed while hidden', async () => {
+    const el = await mountWholeLog();
+    const first = tables.instances[0]!;
+    const switcher = el.shadowRoot!.querySelector('view-mode-switch')!;
+    switcher.dispatchEvent(
+      new CustomEvent('view-mode-change', { detail: { value: 'aggregated' } }),
+    );
+    await frame(el);
+    first.refreshFilter.mockClear();
+
+    setRange({ start: 100, end: 300 });
+    await settle(el);
+    expect(first.refreshFilter).not.toHaveBeenCalled();
+
+    switcher.dispatchEvent(
+      new CustomEvent('view-mode-change', { detail: { value: 'time-order' } }),
+    );
+    await frame(el);
+
+    expect(first.refreshFilter).toHaveBeenCalledTimes(1);
+  });
+
+  it('totals Self from the window rather than reading every row into it', async () => {
+    const el = await mountWholeLog();
+    const table = tables.instances[0]!;
+    const self = table.options.columns.find((c) => c.field === 'duration.self') as unknown as {
+      bottomCalc: (values: number[], data: unknown[], params: unknown) => number;
+    };
+
+    setRange({ start: 100, end: 300 });
+    await settle(el);
+
+    expect(self.bottomCalc([], [], undefined)).toBe(42);
+  });
+
+  it('reads ahead the rows of many calls a window or an expand left waiting', async () => {
+    const el = await mountWholeLog();
+    const table = tables.instances[0]!;
+    setRange({ start: 100, end: 300 });
+    await settle(el);
+    const hot = { id: -1 } as unknown as ScopedRow;
+
+    waiting = [hot];
+    setRange({ start: 100, end: 400 });
+    await settle(el);
+    expect(prepare.mock.calls.at(-1)?.[0]).toEqual([hot]);
+
+    waiting = [hot];
+    handler(table, 'dataTreeRowExpanded')?.();
+    await settle(el);
+    expect(prepare).toHaveBeenCalledTimes(3);
+  });
+
+  it('keeps the whole log’s totals on a view still reading ahead', async () => {
+    const el = await mountWholeLog();
+    const switcher = el.shadowRoot!.querySelector('view-mode-switch')!;
+    const show = async (value: string) => {
+      switcher.dispatchEvent(new CustomEvent('view-mode-change', { detail: { value } }));
+      await frame(el);
+    };
+    await show('aggregated');
+    await show('time-order');
+    setRange({ start: 100, end: 300 });
+    await settle(el);
+    const table = tables.instances[0]!;
+    expect(totalColumn(table).formatterParams.totalValue).toBe(200);
+
+    prepare.mockImplementation(() => new Promise<boolean>(() => {}));
+    await show('aggregated');
+
+    expect(totalColumn(table).formatterParams.totalValue).toBe(5000);
+    // Back to the view that follows the window: its figures, and the window it reads.
+    await show('time-order');
+    expect(totalColumn(table).formatterParams.totalValue).toBe(200);
+    expect(readIn.at(-1)).toEqual({ start: 100, end: 300 });
+  });
+
+  it('reads ahead again for a new log, abandoning the old read', async () => {
+    prepare.mockImplementationOnce(() => new Promise<boolean>(() => {}));
+    const el = await mountWholeLog();
+    const table = tables.instances[0]!;
+    setRange({ start: 100, end: 300 });
+    await settle(el);
+
+    el.logStore = { log: {} } as unknown as LogStore;
+    await settle(el);
+    await frame(el);
+
+    expect(wholeBuild).toHaveBeenCalledTimes(2);
+    expect(prepare.mock.calls[0]?.[1].signal?.aborted).toBe(true);
+    expect(prepare).toHaveBeenCalledTimes(2);
+    expect(table.refreshFilter).toHaveBeenCalledTimes(1);
   });
 });

@@ -212,20 +212,10 @@ export class LogInspector extends LitElement {
       // the row without the table noticing.
       this._clearLocate();
       void this._rebuild();
-      return;
-    }
-    // A window appearing or going changes which sections are shown; a viewport
-    // moving inside one does not, because each section reads the window itself.
-    if ((this._range.window !== null) !== this._builtWithWindow) {
-      this._scheduleRebuild();
     }
   }
 
   private readonly _range = new RangeScopeController(this);
-
-  /** Whether the last build had a window. Only its appearing or going changes
-   *  what the sections are, so a moving viewport rebuilds nothing. */
-  private _builtWithWindow = false;
 
   static styles = [
     globalStyles,
@@ -460,7 +450,6 @@ export class LogInspector extends LitElement {
 
   private async _rebuild(): Promise<void> {
     const epoch = ++this._rebuildEpoch;
-    this._builtWithWindow = this._range.window !== null;
     const source = this._activeSource;
     const selection = source ? this._scopedSelection(source) : null;
     const key = source ? layoutKey(source, selection ? 'detail' : 'summary') : '';
@@ -473,7 +462,6 @@ export class LogInspector extends LitElement {
           selection,
           this._active.get(source) ?? null,
           this._sourceViews.get(source),
-          this._range.window,
           hidden,
         )
       : [];

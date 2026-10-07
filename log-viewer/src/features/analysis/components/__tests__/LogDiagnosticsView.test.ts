@@ -18,9 +18,12 @@ let result: LogDiagnostics = {
 let keep = (_id: string) => true;
 let askedAbout: readonly number[] = [];
 
+/** An analysis a test holds back, to land after a later one. */
+let held: Promise<LogDiagnostics> | null = null;
+
 jest.mock('../../services/LogDiagnostics.js', () => ({
-  computeLogDiagnostics: () => Promise.resolve(result),
-  scopeDiagnostics: (all: LogDiagnostics, instances: readonly number[]) => {
+  logDiagnostics: () => held ?? Promise.resolve(result),
+  scopeDiagnostics: (_log: unknown, all: LogDiagnostics, instances: readonly number[]) => {
     askedAbout = instances;
     return { ...all, diagnostics: all.diagnostics.filter((d) => keep(d.id)) };
   },
@@ -30,7 +33,15 @@ import type { LogStore } from '../../../../core/log/LogStore.js';
 import '../LogDiagnosticsView.js';
 
 const loadLog = (element: HTMLElementTagNameMap['log-diagnostics']) => {
-  element.logStore = { log: {} } as unknown as LogStore;
+  element.logStore = { log: {}, derive: async (fn: () => unknown) => fn() } as unknown as LogStore;
+};
+
+// The findings land a task after the render that asks for them.
+const settle = async (element: HTMLElementTagNameMap['log-diagnostics']) => {
+  for (let pass = 0; pass < 3; pass++) {
+    await element.updateComplete;
+    await new Promise((resolve) => setTimeout(resolve, 0));
+  }
 };
 
 const view = async (scope?: { instances: number[] }) => {
@@ -38,10 +49,9 @@ const view = async (scope?: { instances: number[] }) => {
   if (scope) {
     element.instances = scope.instances;
   }
+  loadLog(element);
   document.body.append(element);
-  await element.updateComplete;
-  // One more turn: the findings arrive from an async call in connectedCallback.
-  await element.updateComplete;
+  await settle(element);
   return element;
 };
 
@@ -72,6 +82,7 @@ describe('log-diagnostics', () => {
     };
     keep = () => true;
     askedAbout = [];
+    held = null;
   });
 
   it('says nothing is wrong, rather than showing an empty list', async () => {
@@ -289,8 +300,7 @@ describe('log-diagnostics', () => {
       },
     ];
     loadLog(element);
-    await element.updateComplete;
-    await element.updateComplete;
+    await settle(element);
     expect(text(element, '.title')).toEqual(['Later finding.']);
   });
 
@@ -394,9 +404,45 @@ describe('log-diagnostics', () => {
     // no roll-up to release it with, so the filter must not outlive the list.
     result = { ...result, diagnostics: [result.diagnostics[1]!] };
     loadLog(element);
-    await element.updateComplete;
-    await element.updateComplete;
+    await settle(element);
     expect(text(element, '.title')).toEqual(['Noted.']);
+  });
+
+  it("drops the last log's findings as soon as a new log arrives", async () => {
+    result.diagnostics = [
+      { id: 'a', severity: 'Warning', summary: 'Old.', message: '', count: 1, eventIndex: 1 },
+    ];
+    const element = await view();
+    held = new Promise(() => {});
+    loadLog(element);
+    await element.updateComplete;
+
+    expect(text(element, '.title')).toEqual([]);
+  });
+
+  it('keeps the findings of the log on screen when an older analysis lands late', async () => {
+    let land: (late: LogDiagnostics) => void = () => {};
+    held = new Promise((resolve) => {
+      land = resolve;
+    });
+    const element = await view();
+    held = null;
+    const finding = (summary: string) => ({
+      id: summary,
+      severity: 'Warning' as const,
+      summary,
+      message: '',
+      count: 1,
+      eventIndex: 1,
+    });
+    result = { ...result, diagnostics: [finding('Current.')] };
+    loadLog(element);
+    await settle(element);
+
+    land({ ...result, diagnostics: [finding('Stale.')] });
+    await settle(element);
+
+    expect(text(element, '.title')).toEqual(['Current.']);
   });
 
   it('opens the finding that was clicked when two share a summary', async () => {

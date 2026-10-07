@@ -10,15 +10,12 @@ import type { ApexLog, LogEvent } from '@apexdevtools/apex-log-parser';
 
 import { aggregateVariablesFor } from '../../log-viewer/src/core/log/aggregateVariables.js';
 import { getEventKey } from '../../log-viewer/src/core/log/eventKeys.js';
-import {
-  frameVariablesFor,
-  variableIndexFor,
-} from '../../log-viewer/src/core/log/frameVariables.js';
+import { frameVariablesFor, variableIndex } from '../../log-viewer/src/core/log/frameVariables.js';
 import { logStoreFor, setCurrentLog } from '../../log-viewer/src/core/log/LogStore.js';
 import { line, time } from './harness.js';
 
-// The walk slices itself against this; resolving at once measures the work
-// rather than the frames it would leave to the next paint.
+// The log index and the comparison slice themselves against this; resolving at
+// once measures the work rather than the frames it would leave to the next paint.
 const yieldSlice = () => Promise.resolve();
 
 /** Frames timed, spread across the log, so the figure is not one warm subtree. */
@@ -26,18 +23,18 @@ const SAMPLED_FRAMES = 100;
 
 export async function measureVariables(log: ApexLog): Promise<void> {
   setCurrentLog(log);
+  const store = logStoreFor(log);
+  // Built first so the times below are the variable index's own.
+  await store.logIndex({ yieldSlice });
 
-  const index = await time('variableIndexFor (first open)', () =>
-    variableIndexFor(log, { yieldSlice }),
-  );
-  await time('variableIndexFor (again)', () => variableIndexFor(log, { yieldSlice }));
+  const index = await time('variable index (first open)', () => store.derive(variableIndex));
+  await time('variable index (again)', () => store.derive(variableIndex));
   line(
     'statics',
     `sawAnyWrite=${index.sawAnyWrite}, capped=${index.capped}, ` +
       `${index.at(Number.MAX_SAFE_INTEGER).length} classes`,
   );
 
-  const store = logStoreFor(log);
   const frames = log.eventsById.filter((event) => event.isParent);
   const step = Math.max(1, Math.floor(frames.length / SAMPLED_FRAMES));
   const sampled = frames.filter((_, at) => at % step === 0).slice(0, SAMPLED_FRAMES);

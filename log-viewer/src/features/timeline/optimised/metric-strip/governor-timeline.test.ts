@@ -57,12 +57,12 @@ const build = (observations: LimitObservation[]) =>
   buildGovernorTimeSeries(observations, METRICS, LIMITS);
 
 describe('buildGovernorTimeSeries', () => {
-  it('returns no events for no observations', () => {
-    expect(build([]).events).toEqual([]);
+  it('returns no events for no observations', async () => {
+    expect((await build([])).events).toEqual([]);
   });
 
-  it('accumulates deltas onto the fixed limit', () => {
-    const series = build([delta(10, 'soqlQueries', 1), delta(20, 'soqlQueries', 1)]);
+  it('accumulates deltas onto the fixed limit', async () => {
+    const series = await build([delta(10, 'soqlQueries', 1), delta(20, 'soqlQueries', 1)]);
     expect(series.events.map((e) => e.values.get('soqlQueries')?.used)).toEqual([1, 2]);
     expect(series.events[0]?.values.get('soqlQueries')?.limit).toBe(100);
     expect(series.events.every((e) => e.values.get('soqlQueries')?.tracked === undefined)).toBe(
@@ -72,8 +72,8 @@ describe('buildGovernorTimeSeries', () => {
 
   // The log is the only source of a limit, so a metric it never gave one for still belongs on the
   // series — carrying limit 0, which its consumers read as "scale me by my own peak".
-  it('emits a metric the log reported no limit for, with limit 0', () => {
-    const series = buildGovernorTimeSeries(
+  it('emits a metric the log reported no limit for, with limit 0', async () => {
+    const series = await buildGovernorTimeSeries(
       [delta(10, 'soqlQueries', 1), delta(20, 'soqlQueries', 1)],
       METRICS,
       new Map(), // no limits
@@ -85,17 +85,17 @@ describe('buildGovernorTimeSeries', () => {
 
   // Without a limit to size the coalescing threshold from, the metric's own total magnitude does
   // it, so a high-frequency metric stays bounded instead of emitting a point per event.
-  it('bounds points from the observed magnitude when the log reported no limit', () => {
+  it('bounds points from the observed magnitude when the log reported no limit', async () => {
     const heapDeltas = Array.from({ length: 4000 }, (_, i) => delta(i + 1, 'heapSize', 1000));
-    const series = buildGovernorTimeSeries(heapDeltas, METRICS, new Map());
+    const series = await buildGovernorTimeSeries(heapDeltas, METRICS, new Map());
 
     expect(series.events.length).toBeLessThanOrEqual(POINT_BUDGET_CEILING);
     expect(series.events[series.events.length - 1]?.values.get('heapSize')?.used).toBe(4_000_000);
   });
 
-  it('corrects up to the cumulative snapshot and records the tracked divergence', () => {
+  it('corrects up to the cumulative snapshot and records the tracked divergence', async () => {
     // Tracked one query, but the snapshot reports 3 (log dropped 2 SOQL_EXECUTE_BEGIN events).
-    const series = build([
+    const series = await build([
       absolute(0, 'soqlQueries', 0),
       delta(10, 'soqlQueries', 1),
       absolute(20, 'soqlQueries', 3),
@@ -105,8 +105,8 @@ describe('buildGovernorTimeSeries', () => {
     expect(corrected?.tracked).toBe(1);
   });
 
-  it('follows the reported figure down when we counted more than the governor charged', () => {
-    const series = build([
+  it('follows the reported figure down when we counted more than the governor charged', async () => {
+    const series = await build([
       absolute(0, 'soqlQueries', 0),
       delta(10, 'soqlQueries', 5),
       absolute(20, 'soqlQueries', 2),
@@ -116,8 +116,8 @@ describe('buildGovernorTimeSeries', () => {
     expect(series.events[2]?.values.get('soqlQueries')?.tracked).toBeUndefined();
   });
 
-  it('never counts past the highest figure the log reported', () => {
-    const series = build([
+  it('never counts past the highest figure the log reported', async () => {
+    const series = await build([
       absolute(0, 'soqlQueries', 3),
       delta(10, 'soqlQueries', 1),
       delta(20, 'soqlQueries', 1),
@@ -125,8 +125,8 @@ describe('buildGovernorTimeSeries', () => {
     expect(series.events.map((e) => e.values.get('soqlQueries')?.used)).toEqual([3, 3, 3]);
   });
 
-  it('keeps counting past a scoped report, which measures one block only', () => {
-    const series = build([
+  it('keeps counting past a scoped report, which measures one block only', async () => {
+    const series = await build([
       scoped(0, 'soqlQueries', 0),
       delta(10, 'soqlQueries', 1),
       delta(20, 'soqlQueries', 1),
@@ -134,13 +134,13 @@ describe('buildGovernorTimeSeries', () => {
     expect(series.events.map((e) => e.values.get('soqlQueries')?.used)).toEqual([0, 1, 2]);
   });
 
-  it('never lets a scoped report pull a counted line down', () => {
-    const series = build([delta(10, 'soqlQueries', 5), scoped(20, 'soqlQueries', 2)]);
+  it('never lets a scoped report pull a counted line down', async () => {
+    const series = await build([delta(10, 'soqlQueries', 5), scoped(20, 'soqlQueries', 2)]);
     expect(series.events[1]?.values.get('soqlQueries')?.used).toBe(5);
   });
 
-  it('continues accumulating deltas after a corrective baseline', () => {
-    const series = build([
+  it('continues accumulating deltas after a corrective baseline', async () => {
+    const series = await build([
       absolute(0, 'soqlQueries', 0),
       delta(10, 'soqlQueries', 1),
       absolute(20, 'soqlQueries', 3),
@@ -150,32 +150,49 @@ describe('buildGovernorTimeSeries', () => {
     expect(series.events[3]?.values.get('soqlQueries')?.used).toBe(4);
   });
 
-  it('sums last-known values across namespaces (carry-forward)', () => {
-    const series = build([
+  it('sums last-known values across namespaces (carry-forward)', async () => {
+    const series = await build([
       delta(10, 'soqlQueries', 2, 'default'),
       delta(20, 'soqlQueries', 3, 'pkg'),
     ]);
     expect(series.events.at(-1)?.values.get('soqlQueries')?.used).toBe(5);
   });
 
-  it('never surfaces tracked for an absolute-only metric (e.g. CPU)', () => {
-    const series = build([absolute(0, 'cpuTime', 100), absolute(10, 'cpuTime', 500)]);
+  it('never surfaces tracked for an absolute-only metric (e.g. CPU)', async () => {
+    const series = await build([absolute(0, 'cpuTime', 100), absolute(10, 'cpuTime', 500)]);
     expect(series.events.every((e) => e.values.get('cpuTime')?.tracked === undefined)).toBe(true);
     expect(series.events[1]?.values.get('cpuTime')?.used).toBe(500);
   });
 
-  it('coalesces high-frequency deltas but preserves the running total', () => {
+  it('coalesces high-frequency deltas but preserves the running total', async () => {
     // queryRows threshold = floor(50000 / 500) = 100. 250 unit deltas → far fewer than 250 points.
     const observations = Array.from({ length: 250 }, (_, i) => delta(i + 1, 'queryRows', 1));
-    const series = build(observations);
+    const series = await build(observations);
     expect(series.events.length).toBeLessThan(10);
     expect(series.events.at(-1)?.values.get('queryRows')?.used).toBe(250);
   });
 
-  it('does not coalesce count metrics (threshold 1)', () => {
+  it('does not coalesce count metrics (threshold 1)', async () => {
     const observations = Array.from({ length: 5 }, (_, i) => delta(i + 1, 'soqlQueries', 1));
-    const series = build(observations);
+    const series = await build(observations);
     expect(series.events.length).toBe(5);
+  });
+
+  it('builds the same series when it hands the thread back between slices', async () => {
+    const observations = Array.from({ length: 2000 }, (_, i) =>
+      i % 100 === 0 ? absolute(i, 'heapSize', i * 500) : delta(i, 'heapSize', 13000),
+    );
+    let ticks = 0;
+    const yielding = () =>
+      new Promise<boolean>((resolve) => {
+        ticks++;
+        setTimeout(() => resolve(true));
+      });
+
+    const sliced = await buildGovernorTimeSeries(observations, METRICS, LIMITS, yielding);
+
+    expect(ticks).toBeGreaterThan(1);
+    expect(sliced).toEqual(await build(observations));
   });
 });
 
@@ -183,40 +200,40 @@ describe('buildGovernorTimeSeries', () => {
 // cumulative "Maximum heap size" correction is often the only source (FINE logs emit
 // no HEAP_ALLOCATE events).
 describe('buildGovernorTimeSeries — heap reconciliation', () => {
-  const heapUsed = (obs: LimitObservation[]) =>
-    build(obs).events.map((e) => e.values.get('heapSize')?.used);
-  const heapTracked = (obs: LimitObservation[]) =>
-    build(obs).events.map((e) => e.values.get('heapSize')?.tracked);
+  const heapUsed = async (obs: LimitObservation[]) =>
+    (await build(obs)).events.map((e) => e.values.get('heapSize')?.used);
+  const heapTracked = async (obs: LimitObservation[]) =>
+    (await build(obs)).events.map((e) => e.values.get('heapSize')?.tracked);
 
-  it('falls on a negative delta (deallocation via negative HEAP_ALLOCATE)', () => {
+  it('falls on a negative delta (deallocation via negative HEAP_ALLOCATE)', async () => {
     const obs = [
       delta(10, 'heapSize', 100000),
       delta(20, 'heapSize', 50000),
       delta(30, 'heapSize', -40000),
     ];
-    expect(heapUsed(obs)).toEqual([100000, 150000, 110000]);
-    expect(heapTracked(obs)).toEqual([undefined, undefined, undefined]);
+    expect(await heapUsed(obs)).toEqual([100000, 150000, 110000]);
+    expect(await heapTracked(obs)).toEqual([undefined, undefined, undefined]);
   });
 
-  it('re-baselines to the authoritative cumulative, then keeps tracking, flagging divergence', () => {
+  it('re-baselines to the authoritative cumulative, then keeps tracking, flagging divergence', async () => {
     const obs = [
       delta(10, 'heapSize', 50000),
       absolute(20, 'heapSize', 200000), // peak > tracked 50000: snaps up, then +30000
       delta(30, 'heapSize', 30000),
       absolute(40, 'heapSize', 240000), // a later peak, so the +30000 has room to show
     ];
-    expect(heapUsed(obs)).toEqual([50000, 200000, 230000, 240000]);
+    expect(await heapUsed(obs)).toEqual([50000, 200000, 230000, 240000]);
     // Our lower observed count is surfaced (grey) once cumulative-anchored.
-    expect(heapTracked(obs)).toEqual([undefined, 50000, 80000, 80000]);
+    expect(await heapTracked(obs)).toEqual([undefined, 50000, 80000, 80000]);
   });
 
-  it('steps to the cumulative with no divergence when there are no HEAP_ALLOCATE events (FINE log)', () => {
+  it('steps to the cumulative with no divergence when there are no HEAP_ALLOCATE events (FINE log)', async () => {
     const obs = [
       absolute(10, 'heapSize', 0),
       absolute(20, 'heapSize', 219591),
       absolute(30, 'heapSize', 219591),
     ];
-    expect(heapUsed(obs)).toEqual([0, 219591, 219591]);
-    expect(heapTracked(obs)).toEqual([undefined, undefined, undefined]);
+    expect(await heapUsed(obs)).toEqual([0, 219591, 219591]);
+    expect(await heapTracked(obs)).toEqual([undefined, undefined, undefined]);
   });
 });
