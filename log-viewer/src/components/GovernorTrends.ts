@@ -6,6 +6,7 @@ import { LitElement, css, html, svg, type PropertyValues } from 'lit';
 import { customElement, property, state } from 'lit/decorators.js';
 
 import { eventBus } from '../core/events/EventBus.js';
+import { DerivedValue } from '../core/log/DerivedValue.js';
 import { logContext } from '../core/log/logContext.js';
 import type { LogStore } from '../core/log/LogStore.js';
 import { formatDuration } from '../core/utility/Util.js';
@@ -13,7 +14,7 @@ import {
   GOVERNOR_WARN_PERCENT,
   governorTier,
 } from '../features/database/components/GovernorSummary.js';
-import { apexLimitTimeSeries } from '../features/timeline/optimised/apex-limit-series.js';
+import { apexLimitSeries } from '../features/timeline/optimised/apex-limit-series.js';
 import { recordedSegmentEnd } from '../features/timeline/optimised/markers/MarkerProcessor.js';
 import { SEEK_LOG_SHARE } from '../features/timeline/utils/navigate-window.js';
 import { globalStyles } from '../styles/global.styles.js';
@@ -289,12 +290,18 @@ export class GovernorTrends extends LitElement {
     `,
   ];
 
+  private readonly _limitSeries = new DerivedValue(this, apexLimitSeries);
+
   render() {
     const apexLog = this.logStore?.log;
-    if (!apexLog) {
-      return html`<section-skeleton shape="chart"></section-skeleton>`;
+    const limitSeries = this._limitSeries.value;
+    if (!apexLog || !limitSeries) {
+      return html`<section-skeleton
+        shape="chart"
+        ?pending=${this._limitSeries.pending}
+      ></section-skeleton>`;
     }
-    const series = governorTrendSeries(apexLimitTimeSeries(apexLog));
+    const series = governorTrendSeries(limitSeries);
     if (!series.length) {
       return html`<p class="note">${NO_GOVERNOR_USAGE_TEXT}</p>`;
     }

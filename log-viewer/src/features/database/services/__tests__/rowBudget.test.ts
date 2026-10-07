@@ -23,7 +23,7 @@ jest.mock('../databaseOverview.js', () => ({
   databaseOverview: () => overview,
 }));
 jest.mock('../../../timeline/optimised/apex-limit-series.js', () => ({
-  apexLimitTimeSeries: () => ({ events: [] }),
+  apexLimitSeries: () => ({ events: [] }),
 }));
 jest.mock('../../../../components/logOverviewMetrics.js', () => ({
   ...jest.requireActual('../../../../components/logOverviewMetrics.js'),

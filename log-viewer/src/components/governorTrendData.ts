@@ -53,7 +53,7 @@ const seriesCache = new WeakMap<HeatStripTimeSeries, TrendSeries[]>();
  * gauges always pick and order metrics identically. Points are then sampled
  * only for the metrics that made the cut.
  *
- * The input is the metric strip's own time series (see `apexLimitTimeSeries`),
+ * The input is the metric strip's own time series (see `apexLimitSeries`),
  * so the charts and the strip always show the same figures. The series is
  * dense — every emitted timestamp carries every known metric — so a single
  * observation is enough to draw. A leading zero point anchors every series at

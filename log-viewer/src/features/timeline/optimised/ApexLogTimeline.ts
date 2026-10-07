@@ -57,7 +57,7 @@ import { seekWindow } from '../utils/navigate-window.js';
 import { buildTimelineFrames } from '../utils/timeline-frames.js';
 import { FlameChart } from './FlameChart.js';
 import { FrameTooltipRenderer, type TooltipAnchor } from './FrameTooltipRenderer.js';
-import { apexLimitTimeSeries } from './apex-limit-series.js';
+import { apexLimitSeries } from './apex-limit-series.js';
 import { textPredicate } from './search/EventMatcher.js';
 
 interface ApexTimelineOptions extends TimelineOptions {
@@ -131,7 +131,11 @@ export class ApexLogTimeline {
     // Derive categories from shared constant (ensures compile-time sync with color map)
     const categories = new Set<string>(BUCKET_CONSTANTS.CATEGORY_PRIORITY);
 
-    const index = await logStoreFor(apexLog).logIndex();
+    const store = logStoreFor(apexLog);
+    const [index, heatStripSeries] = await Promise.all([
+      store.logIndex(),
+      store.derive(apexLimitSeries),
+    ]);
     // `exitStamp`, not `executionEndTime`: a trailing zero-duration event, such as the
     // FATAL_ERROR closing a truncated log, still ends the log.
     const frames = buildTimelineFrames(index, categories, this.apexLog.exitStamp);
@@ -204,9 +208,6 @@ export class ApexLogTimeline {
     // Wire up search event listeners
     this.enableSearch();
 
-    // The dense governor-limit series (cumulative snapshots + granular events),
-    // memoised per log and shared with the inspector's governor trend charts.
-    const heatStripSeries = apexLimitTimeSeries(this.apexLog);
     this.flamechart.setHeatStripTimeSeries(
       heatStripSeries.events.length > 0 ? heatStripSeries : null,
     );

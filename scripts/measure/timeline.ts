@@ -10,7 +10,8 @@
 import type { ApexLog } from '@apexdevtools/apex-log-parser';
 
 import { buildLogIndex } from '../../log-viewer/src/core/log/LogIndex.js';
-import { apexLimitTimeSeries } from '../../log-viewer/src/features/timeline/optimised/apex-limit-series.js';
+import type { LogStore } from '../../log-viewer/src/core/log/LogStore.js';
+import { apexLimitSeries } from '../../log-viewer/src/features/timeline/optimised/apex-limit-series.js';
 import type { BatchColorInfo } from '../../log-viewer/src/features/timeline/optimised/BucketColorResolver.js';
 import { RectangleCache } from '../../log-viewer/src/features/timeline/optimised/RectangleCache.js';
 import {
@@ -43,7 +44,7 @@ const WINDOWS = [WHOLE_LOG, { from: 0.5, share: 0.1 }, { from: 0.3, share: 0.001
 const DISPLAY_WIDTH = 1600;
 
 /** Everything the timeline builds before its first frame, in the order its init builds it. */
-function build(log: ApexLog) {
+async function build(log: ApexLog) {
   const index = buildLogIndex(log);
   selfTimeByCategory(index);
   const categories = new Set<string>(BUCKET_CONSTANTS.CATEGORY_PRIORITY);
@@ -51,7 +52,8 @@ function build(log: ApexLog) {
   const cache = new RectangleCache(log.children, categories, frames);
   new TreeNavigator(frames);
   const matcher = new EventMatcher<EventNode>(frames);
-  apexLimitTimeSeries(log);
+  // The series reads only the log off its store, and must read this index rather than build one.
+  await apexLimitSeries(index, { log } as unknown as LogStore);
   return { frames, cache, matcher };
 }
 
@@ -71,8 +73,8 @@ function viewportFor(
 }
 
 /** A CSV of what the timeline holds and draws, so two revisions can be diffed. */
-export function digestTimeline(log: ApexLog): void {
-  const { frames, cache } = build(log);
+export async function digestTimeline(log: ApexLog): Promise<void> {
+  const { frames, cache } = await build(log);
   const { maxDepth, totalDuration, rectsByDepth } = frames;
 
   console.log('section,key,a,b,c,d');
