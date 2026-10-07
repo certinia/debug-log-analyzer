@@ -5,6 +5,8 @@ import type { LogEvent } from '@apexdevtools/apex-log-parser';
 
 import type { Calc } from '../../../grid/index.js';
 
+const EVENTS_PER_YIELD = 1024;
+
 /**
  * Sums `valueOf` over the events every row stands for, counting an event only when none
  * of its ancestors is counted too. Bottom-up rows overlap, so a plain sum counts a nested
@@ -13,13 +15,31 @@ import type { Calc } from '../../../grid/index.js';
 export function outermostSum<R extends { instances: readonly LogEvent[] }>(
   valueOf: (event: LogEvent) => number,
 ): Calc<R> {
-  return { of: (rows) => outermost(rows, valueOf) };
+  return {
+    *of(rows) {
+      const events = yield* outermostOf(rows);
+      let total = 0;
+      for (let i = 0; i < events.length; i++) {
+        total += valueOf(events[i] as LogEvent);
+        if (i % EVENTS_PER_YIELD === EVENTS_PER_YIELD - 1) {
+          yield;
+        }
+      }
+      return total;
+    },
+  };
 }
 
-function* outermost<R extends { instances: readonly LogEvent[] }>(
-  rows: readonly R[],
-  valueOf: (event: LogEvent) => number,
-): Generator<void, number, void> {
+/** Held per row list: each total of one footer or group reads the same events. */
+const outermostCache = new WeakMap<readonly object[], readonly LogEvent[]>();
+
+function* outermostOf(
+  rows: readonly { instances: readonly LogEvent[] }[],
+): Generator<void, readonly LogEvent[], void> {
+  const cached = outermostCache.get(rows);
+  if (cached) {
+    return cached;
+  }
   const all = new Set<LogEvent>();
   for (const row of rows) {
     for (const event of row.instances) {
@@ -27,18 +47,43 @@ function* outermost<R extends { instances: readonly LogEvent[] }>(
       yield;
     }
   }
-  let total = 0;
-  for (const event of all) {
-    let enclosed = false;
-    for (let parent = event.parent; parent && !enclosed; parent = parent.parent) {
-      enclosed = all.has(parent);
+  // Whether an event has an ancestor in `all`, kept for each event a walk passes, so no
+  // stretch of the tree is walked twice.
+  const enclosed = new Map<LogEvent, boolean>();
+  const isEnclosed = (event: LogEvent): boolean => {
+    const passed: LogEvent[] = [];
+    let answer = false;
+    for (let node = event; ;) {
+      const parent = node.parent;
+      if (!parent) {
+        break;
+      }
+      if (all.has(parent)) {
+        answer = true;
+        break;
+      }
+      const known = enclosed.get(parent);
+      if (known !== undefined) {
+        answer = known;
+        break;
+      }
+      passed.push(parent);
+      node = parent;
     }
-    if (!enclosed) {
-      total += valueOf(event);
+    for (const node of passed) {
+      enclosed.set(node, answer);
+    }
+    return answer;
+  };
+  const outermost: LogEvent[] = [];
+  for (const event of all) {
+    if (!isEnclosed(event)) {
+      outermost.push(event);
     }
     yield;
   }
-  return total;
+  outermostCache.set(rows, outermost);
+  return outermost;
 }
 
 /**

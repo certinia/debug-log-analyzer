@@ -17,6 +17,7 @@ import { render } from 'lit';
 
 import { storeOf } from '#test-helpers/apexLog.js';
 import { NO_REPORTED_LIMITS_TEXT } from '../../../../components/governorCopy.js';
+import { formatInteger } from '../../../../core/utility/Util.js';
 import { LvGrid, type GridColumn } from '../../../../grid/index.js';
 import { logStoreFor } from '../../../../core/log/LogStore.js';
 import {
@@ -107,6 +108,13 @@ describe('timeOrderColumns', () => {
     expect(shown(gov.cell(row)).textContent).toBe('—');
     expect(gov.tooltip?.(row)).toBe(NO_REPORTED_LIMITS_TEXT);
     expect(shown(gov.total?.(total(gov.calc, [row]))).textContent).toBe('—');
+  });
+
+  it('writes heap bytes as formatInteger does', () => {
+    const heap = column(timeOrder, 'heapPeak');
+    for (const bytes of [0, 999, 1_572_864.4, -12_000_000]) {
+      expect(heap.text?.({ ...rows[0]!, heapPeak: bytes })).toBe(formatInteger(bytes));
+    }
   });
 
   it('writes time as milliseconds, which find and copy use', () => {

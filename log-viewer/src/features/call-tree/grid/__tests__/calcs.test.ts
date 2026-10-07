@@ -37,6 +37,54 @@ describe('outermostSum', () => {
     expect(total).toBe(13);
     expect(total).toBe(sumDurationTotalForRootEvents(rows.map((r) => r.instances)));
   });
+
+  it('looks past ancestors that are not counted, and gives every calc on one list the same events', () => {
+    const top = createEvent({ text: 'top', total: 20 });
+    const middle = createEvent({ text: 'middle', total: 15, parent: top });
+    const deep = createEvent({ text: 'deep', total: 5, parent: middle });
+    const deeper = createEvent({ text: 'deeper', total: 2, parent: deep });
+    const loose = createEvent({ text: 'loose', total: 1, parent: middle });
+    const rows = [{ instances: [deeper, loose] }, { instances: [deep, top] }];
+    expect(
+      run(
+        outermostSum((e) => e.duration.total),
+        rows,
+      ),
+    ).toBe(20);
+    const rest = [{ instances: [deeper, loose] }, { instances: [deep] }];
+    const groups = rest.map((r) => r.instances);
+    expect(
+      run(
+        outermostSum((e) => e.duration.total),
+        rest,
+      ),
+    ).toBe(sumDurationTotalForRootEvents(groups));
+    expect(
+      run(
+        outermostSum((e) => e.duration.self + 1),
+        rest,
+      ),
+    ).toBe(2);
+  });
+
+  it('yields while it sums a long list of events it already has', () => {
+    const rows = [
+      { instances: Array.from({ length: 3000 }, () => createEvent({ text: 'e', total: 1 })) },
+    ];
+    run(
+      outermostSum((e) => e.duration.total),
+      rows,
+    );
+    const out = outermostSum<{ instances: LogEvent[] }>((e) => e.duration.self).of(rows);
+    if (typeof out === 'number') {
+      throw new Error('expected a generator');
+    }
+    let yields = 0;
+    while (!out.next().done) {
+      yields++;
+    }
+    expect(yields).toBe(2);
+  });
 });
 
 describe('knownMax', () => {

@@ -6,7 +6,7 @@ import { html } from 'lit';
 import { unsafeHTML } from 'lit/directives/unsafe-html.js';
 
 import { NO_REPORTED_LIMITS_TEXT } from '../../../components/governorCopy.js';
-import { formatDuration, formatInteger, sharePercent } from '../../../core/utility/Util.js';
+import { formatDuration, sharePercent } from '../../../core/utility/Util.js';
 import { max, sum, type Calc, type GridColumn, type GridSort } from '../../../grid/index.js';
 import { NAMESPACE_WIDTH, TIME_WIDTH } from '../../../tabulator/ColumnWidths.js';
 import { soqlGroupHeader } from '../../soql/format/groupHeader.js';
@@ -63,7 +63,9 @@ const COUNT_MIN_WIDTH = 60;
 const ROWS_WIDTH = 63;
 const TIME_MIN_WIDTH = 120;
 
-const integer = (value: number): string => formatInteger(value);
+// formatInteger's toLocaleString builds a formatter per call: find over 500k rows is seconds.
+const integerFormat = new Intl.NumberFormat();
+const integer = (value: number): string => integerFormat.format(Math.round(value));
 
 function nameColumn<R extends MetricRow>(options: CallTreeColumnOptions): GridColumn<R> {
   return {
