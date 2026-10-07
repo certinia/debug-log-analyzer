@@ -2,6 +2,7 @@
  * Copyright (c) 2026 Certinia Inc. All rights reserved.
  */
 import { TextEncoder } from 'node:util';
+import { MessageChannel } from 'node:worker_threads';
 
 /**
  * jsdom implements no layout, so it ships no `ResizeObserver` either. Components that observe
@@ -24,6 +25,14 @@ if (!('ResizeObserver' in globalThis)) {
  */
 if (!('TextEncoder' in globalThis)) {
   (globalThis as unknown as Record<string, unknown>).TextEncoder = TextEncoder;
+}
+
+/**
+ * jsdom ships no `MessageChannel`, which a sliced build yields through once it overruns its slice.
+ * A loaded machine makes any build overrun, so without this a suite fails only some of the time.
+ */
+if (!('MessageChannel' in globalThis)) {
+  (globalThis as unknown as Record<string, unknown>).MessageChannel = MessageChannel;
 }
 
 /**

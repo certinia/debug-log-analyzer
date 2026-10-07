@@ -61,9 +61,17 @@ async function mount(store: LogStore, props: Partial<VariablesDetail>): Promise<
   await el.updateComplete;
   // The statics index is built on the first ask, so the first paint is a note.
   await el.updateComplete;
-  await new Promise((resolve) => setTimeout(resolve, 0));
-  await el.updateComplete;
+  await settled(el);
   return el;
+}
+
+/** Waits out the sliced reads behind a progress note, which on a loaded machine
+ *  span more than one task. */
+async function settled(el: VariablesDetail): Promise<void> {
+  do {
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    await el.updateComplete;
+  } while (notes(el).some((text) => text === 'Reading the log…' || text.startsWith('Comparing')));
 }
 
 /** The notes on screen. A shadow root's textContent also holds its styles. */
@@ -780,8 +788,7 @@ describe('VariablesDetail comparing a merged row', () => {
     const frames = indexesOf(store.log, 'ns.Svc.run()');
     const el = await mount(store, { eventIndex: frames[0]!, frames });
     // The comparison is a walk of its own, after the index it reads through.
-    await new Promise((resolve) => setTimeout(resolve, 0));
-    await el.updateComplete;
+    await settled(el);
     return el;
   }
 
