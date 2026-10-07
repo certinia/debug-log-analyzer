@@ -3,40 +3,30 @@
  *
  * @jest-environment jsdom
  */
-import { beforeEach, describe, expect, it } from '@jest/globals';
+import { beforeEach, describe, expect, it, jest } from '@jest/globals';
 import type { ApexLog } from '@apexdevtools/apex-log-parser';
 
 let apexLog: ApexLog | null = null;
 
-import type { LogStore } from '../../core/log/LogStore.js';
+import { indexTree } from '#test-helpers/apexLog.js';
+import { logStoreFor } from '../../core/log/LogStore.js';
 import type { NamespaceTimeBar } from '../NamespaceTimeBar.js';
 import { DEFAULT_MAX_SEGMENTS } from '../StackedTimeBar.js';
 import '../NamespaceTimeBar.js';
 import { logNamespacePalette } from '../namespacePalette.js';
-import {
-  namespaceEvent,
-  eventByIndex,
-  log,
-  resetEvents,
-  type FakeEvent,
-} from './fixtures/logEvents.js';
+import { namespaceEvent, log, type FakeEvent } from './fixtures/logEvents.js';
 
 const logOf = (children: FakeEvent[], namespaces: string[]) => {
   apexLog = log(children, namespaces);
+  indexTree(apexLog);
 };
 
 async function mount(props: Partial<Pick<NamespaceTimeBar, 'eventIndex' | 'instances'>> = {}) {
   const element = document.createElement('namespace-time-bar');
   // No provider in the test, so the consumed store is assigned straight on.
-  const store =
-    apexLog &&
-    ({
-      log: apexLog,
-      eventByIndex: (index: number) => eventByIndex(index),
-    } as unknown as LogStore);
-  Object.assign(element, { logStore: store }, props);
+  Object.assign(element, { logStore: apexLog && logStoreFor(apexLog) }, props);
   document.body.append(element);
-  // The first render only starts the walk; the result lands a task later.
+  // The first render only starts the index; the result lands a task later.
   for (let settle = 0; settle < 5; settle++) {
     await element.updateComplete;
     await new Promise((resolve) => setTimeout(resolve, 0));
@@ -53,7 +43,6 @@ const segments = (element: NamespaceTimeBar) => bar(element)?.segments ?? [];
 describe('namespace-time-bar', () => {
   beforeEach(() => {
     document.body.replaceChildren();
-    resetEvents();
     apexLog = null;
   });
 
@@ -99,7 +88,40 @@ describe('namespace-time-bar', () => {
     expect(shown.at(-1)).toMatchObject({ label: '2 others', value: 30 });
   });
 
-  // A missing frame and a missing log must answer at once rather than wait on a walk.
+  it('keeps its bar while a new scope in the same log adds up', async () => {
+    const first = namespaceEvent('pkg', 40);
+    const second = namespaceEvent('other', 10);
+    logOf([first, second], ['pkg', 'other']);
+    const element = await mount({ eventIndex: first.eventIndex });
+    const shown = bar(element);
+
+    element.eventIndex = second.eventIndex;
+    await element.updateComplete;
+    expect(bar(element)).toBe(shown);
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    await element.updateComplete;
+
+    expect(bar(element)).toBe(shown);
+    expect(segments(element).map(({ label }) => label)).toEqual(['other']);
+  });
+
+  it("drops the last log's bar when the log changes", async () => {
+    logOf([namespaceEvent('pkg', 40)], ['pkg']);
+    const element = await mount();
+    const next = log([namespaceEvent('other', 10)], ['other']);
+    indexTree(next);
+    const nextStore = logStoreFor(next);
+    // Held, so the new log's sum cannot land before the assertion.
+    jest.spyOn(nextStore, 'logIndex').mockReturnValue(new Promise(() => {}));
+
+    element.logStore = nextStore;
+    await element.updateComplete;
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    expect(bar(element)).toBeNull();
+    expect(element.shadowRoot?.querySelector('section-skeleton')).not.toBeNull();
+  });
+
   it.each([
     ['a scope with no recorded time', () => logOf([namespaceEvent('pkg', 0)], ['pkg']), {}],
     [
