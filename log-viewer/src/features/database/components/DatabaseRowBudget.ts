@@ -13,6 +13,7 @@ import {
 } from '../../../components/governorCopy.js';
 import '../../../components/StackedTimeBar.js';
 import { segmentsWithTail, type StackedSegment } from '../../../components/StackedTimeBar.js';
+import { DerivedValue } from '../../../core/log/DerivedValue.js';
 import { logContext } from '../../../core/log/logContext.js';
 import type { LogStore } from '../../../core/log/LogStore.js';
 import { formatInteger } from '../../../core/utility/Util.js';
@@ -109,11 +110,16 @@ export class DatabaseRowBudget extends LitElement {
     `,
   ];
 
+  private readonly _budgets = new DerivedValue(this, rowBudgets);
+
   render() {
-    const log = this.logStore?.log;
-    const budgets = log ? rowBudgets(log) : null;
+    const budgets = this._budgets.value;
     if (!budgets?.statements) {
-      return html`<section-skeleton shape="rows" fallback=${NO_STATEMENTS}></section-skeleton>`;
+      return html`<section-skeleton
+        shape="rows"
+        ?pending=${this._budgets.pending}
+        fallback=${NO_STATEMENTS}
+      ></section-skeleton>`;
     }
     const colors = kindColors(this._palette);
     const shown = budgets.budgets.filter((budget) => (budget.used ?? budget.observed) > 0);

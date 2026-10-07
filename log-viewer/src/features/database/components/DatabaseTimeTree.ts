@@ -3,7 +3,7 @@
  */
 import { consume } from '@lit/context';
 import { LitElement, css, html, unsafeCSS, type PropertyValues } from 'lit';
-import { customElement, property } from 'lit/decorators.js';
+import { customElement, property, state } from 'lit/decorators.js';
 import {
   type CellComponent,
   type ColumnDefinition,
@@ -160,6 +160,10 @@ export class DatabaseTime extends LitElement {
   /** The build in flight; a newer one aborts it, and so does a disconnect. */
   private _building: AbortController | null = null;
 
+  /** The store whose rows the grid holds; the skeleton shows until it is the one on screen. */
+  @state()
+  private _builtFor: LogStore | null = null;
+
   /** The log on screen, from the app root. */
   @consume({ context: logContext, subscribe: true })
   @property({ attribute: false })
@@ -207,6 +211,7 @@ export class DatabaseTime extends LitElement {
     this._table = null;
     this._rowsByEvent = null;
     this._rows = [];
+    this._builtFor = null;
   }
 
   firstUpdated(): void {
@@ -221,7 +226,7 @@ export class DatabaseTime extends LitElement {
 
   render() {
     return html`
-      ${this.logStore ? '' : html`<grid-skeleton></grid-skeleton>`}
+      <grid-skeleton ?pending=${this._builtFor !== this.logStore}></grid-skeleton>
       <div class="grid"></div>
       <context-menu
         @menu-select=${(e: CustomEvent<{ itemId: string }>) =>
@@ -264,10 +269,16 @@ export class DatabaseTime extends LitElement {
   }
 
   private async _build(): Promise<void> {
-    const log = this.logStore?.log;
-    const overview = log && databaseOverview(log);
+    const store = this.logStore;
     this._building?.abort();
     const { signal } = (this._building = new AbortController());
+    if (this._table) {
+      // The last log's rows: a hover on them while this one derives would locate in the wrong log.
+      this._rows = [];
+      this._rowsByEvent = null;
+      void this._table.clearData();
+    }
+    const overview = store && (await store.derive(databaseOverview));
     // Wait for the host to lay out before Tabulator measures column widths —
     // building against a zero-width host makes the columns overlap.
     await this.updateComplete;
@@ -284,6 +295,7 @@ export class DatabaseTime extends LitElement {
     this._selfBarParams.totalValue = this._ownCodeTotalNs;
     this._rowsByEvent = null;
     this._rows = rows;
+    this._builtFor = store;
 
     if (this._table) {
       void this._table.setData(rows);

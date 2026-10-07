@@ -4,6 +4,9 @@
 import { describe, expect, it } from '@jest/globals';
 import { parse } from '@apexdevtools/apex-log-parser';
 
+import { indexesOf } from '#test-helpers/apexLog.js';
+import { LogStore } from '../../../../core/log/LogStore.js';
+
 import {
   concentration,
   databaseOverview,
@@ -30,7 +33,8 @@ const sosl = (start: number, end: number, rows: number, line = 3) =>
   `09:18:22.6 (${start})|SOSL_EXECUTE_BEGIN|[${line}]|FIND :term RETURNING Account(Id)\n` +
   `09:18:22.6 (${end})|SOSL_EXECUTE_END|[${line}]|Rows:${rows}\n`;
 
-const overviewOf = (body: string) => databaseOverview(parse(HEAD + body + TAIL));
+const overviewOf = (body: string) =>
+  new LogStore(parse(HEAD + body + TAIL)).derive(databaseOverview);
 
 describe('dmlOperation', () => {
   it('reads the operation out of a DML line', () => {
@@ -43,8 +47,8 @@ describe('dmlOperation', () => {
 });
 
 describe('databaseOverview time', () => {
-  it('splits database time by statement kind and shares it against the log', () => {
-    const overview = overviewOf(
+  it('splits database time by statement kind and shares it against the log', async () => {
+    const overview = await overviewOf(
       soql(10_000_000, 30_000_000, 5, 'SELECT Id FROM Account') +
         dml(40_000_000, 50_000_000, 'Insert', 'Contact', 2) +
         sosl(60_000_000, 70_000_000, 3),
@@ -59,8 +63,8 @@ describe('databaseOverview time', () => {
     expect(overview.time.logNs).toBeGreaterThan(overview.time.timeNs);
   });
 
-  it('reports zeroes for a log with no statements', () => {
-    const overview = overviewOf('');
+  it('reports zeroes for a log with no statements', async () => {
+    const overview = await overviewOf('');
 
     expect(overview.time.timeNs).toEqual(0);
     expect(overview.time.percentOfLog).toEqual(0);
@@ -68,12 +72,6 @@ describe('databaseOverview time', () => {
     expect(overview.tree).toEqual([]);
     expect(overview.askedBy).toEqual([]);
     expect(overview.burnedIn).toEqual([]);
-  });
-
-  it('computes once per log', () => {
-    const apexLog = parse(HEAD + soql(10_000_000, 20_000_000, 1, 'SELECT Id FROM Account') + TAIL);
-
-    expect(databaseOverview(apexLog)).toBe(databaseOverview(apexLog));
   });
 });
 
@@ -83,8 +81,8 @@ describe('databaseOverview statements', () => {
     soql(12_000_000, 42_000_000, 90, 'SELECT Name FROM Contact') +
     dml(43_000_000, 45_000_000, 'Insert', 'Case', 3);
 
-  it('ranks every statement by its own time, longest first', () => {
-    const overview = overviewOf(body);
+  it('ranks every statement by its own time, longest first', async () => {
+    const overview = await overviewOf(body);
 
     expect(overview.ranked).toEqual([
       {
@@ -129,8 +127,8 @@ describe('databaseOverview statements', () => {
     ]);
   });
 
-  it('sums every occurrence of the same statement into one row', () => {
-    const overview = overviewOf(
+  it('sums every occurrence of the same statement into one row', async () => {
+    const overview = await overviewOf(
       soql(10_000_000, 12_000_000, 3, 'SELECT Id FROM Account') +
         soql(13_000_000, 15_000_000, 2, 'SELECT Id FROM Account', 4) +
         dml(16_000_000, 19_000_000, 'Insert', 'Case', 1),
@@ -151,8 +149,21 @@ describe('databaseOverview statements', () => {
     });
   });
 
-  it('names the SObject each statement touched, and none for a search', () => {
-    const overview = overviewOf(
+  it('reveals the last of equally slow occurrences, as the tree walk met them', async () => {
+    const log = parse(
+      HEAD +
+        soql(10_000_000, 12_000_000, 1, 'SELECT Id FROM Account') +
+        soql(13_000_000, 15_000_000, 1, 'SELECT Id FROM Account', 4) +
+        TAIL,
+    );
+    const [first, last] = indexesOf(log, 'SELECT Id FROM Account');
+    const overview = await new LogStore(log).derive(databaseOverview);
+
+    expect(overview.ranked[0]).toMatchObject({ eventIndex: last, eventIndexes: [last, first] });
+  });
+
+  it('names the SObject each statement touched, and none for a search', async () => {
+    const overview = await overviewOf(
       soql(10_000_000, 12_000_000, 3, 'SELECT Id FROM Account') +
         dml(13_000_000, 15_000_000, 'Insert', 'Case', 1) +
         sosl(16_000_000, 19_000_000, 2),
@@ -165,14 +176,14 @@ describe('databaseOverview statements', () => {
     ]);
   });
 
-  it('gives every statement its own event index, so a row can be revealed', () => {
-    const indexes = overviewOf(body).ranked.map((statement) => statement.eventIndex);
+  it('gives every statement its own event index, so a row can be revealed', async () => {
+    const indexes = (await overviewOf(body)).ranked.map((statement) => statement.eventIndex);
 
     expect(new Set(indexes).size).toEqual(indexes.length);
   });
 
-  it('labels DML the log gives no SObject for', () => {
-    const overview = overviewOf(
+  it('labels DML the log gives no SObject for', async () => {
+    const overview = await overviewOf(
       '09:18:22.6 (10000000)|DML_BEGIN|[2]|Op:Insert|Rows:1\n' +
         '09:18:22.6 (11000000)|DML_END|[2]\n',
     );
@@ -187,8 +198,8 @@ describe('databaseOverview tree', () => {
     body +
     `09:18:22.6 (${end})|METHOD_EXIT|[${line}]|01p|${name}\n`;
 
-  it('keeps only the paths that end in a statement, each carrying its time', () => {
-    const overview = overviewOf(
+  it('keeps only the paths that end in a statement, each carrying its time', async () => {
+    const overview = await overviewOf(
       method(
         9_000_000,
         45_000_000,
@@ -209,7 +220,7 @@ describe('databaseOverview tree', () => {
     });
   });
 
-  it('merges repeated frames into one node with a count and every occurrence', () => {
+  it('merges repeated frames into one node with a count and every occurrence', async () => {
     const call = (start: number, end: number, line: number) =>
       method(
         start,
@@ -217,7 +228,9 @@ describe('databaseOverview tree', () => {
         'Svc.load()',
         soql(start + 100_000, end - 100_000, 1, 'SELECT Id FROM Account', line),
       );
-    const overview = overviewOf(call(10_000_000, 20_000_000, 1) + call(21_000_000, 31_000_000, 2));
+    const overview = await overviewOf(
+      call(10_000_000, 20_000_000, 1) + call(21_000_000, 31_000_000, 2),
+    );
 
     const frame = overview.tree[0]?.children[0];
     expect(frame).toMatchObject({ label: 'Svc.load()', count: 2, timeNs: 19_600_000 });
@@ -225,8 +238,8 @@ describe('databaseOverview tree', () => {
     expect(frame?.children[0]?.eventIndexes).toHaveLength(2);
   });
 
-  it('sorts each level longest first', () => {
-    const overview = overviewOf(
+  it('sorts each level longest first', async () => {
+    const overview = await overviewOf(
       method(9_000_000, 12_000_000, 'Svc.fast()', soql(10_000_000, 11_000_000, 1, 'SELECT Id A')) +
         method(
           13_000_000,
@@ -242,8 +255,8 @@ describe('databaseOverview tree', () => {
     ]);
   });
 
-  it('splits a statement duration into its own time and its descendants', () => {
-    const overview = overviewOf(
+  it('splits a statement duration into its own time and its descendants', async () => {
+    const overview = await overviewOf(
       '09:18:22.6 (10000000)|DML_BEGIN|[2]|Op:Insert|Type:Case|Rows:3\n' +
         '09:18:22.6 (11000000)|CODE_UNIT_STARTED|[EXTERNAL]|01q000000000001|CaseTrigger\n' +
         soql(12_000_000, 13_000_000, 1, 'SELECT Id FROM Account', 9) +
@@ -257,8 +270,8 @@ describe('databaseOverview tree', () => {
     expect(insert).toMatchObject({ timeNs: 10_000_000, netNs: 9_000_000, selfNs: 3_000_000 });
   });
 
-  it('nests a statement inside the statement that holds it, on a total/self split', () => {
-    const overview = overviewOf(
+  it('nests a statement inside the statement that holds it, on a total/self split', async () => {
+    const overview = await overviewOf(
       '09:18:22.6 (10000000)|DML_BEGIN|[2]|Op:Insert|Type:Case|Rows:3\n' +
         soql(11_000_000, 12_000_000, 1, 'SELECT Id FROM Account', 9) +
         '09:18:22.6 (13000000)|DML_END|[2]\n',
@@ -290,8 +303,8 @@ describe('databaseOverview tree', () => {
     expect(overview.tree[0]?.selfNs).toBeGreaterThan(3_000_000);
   });
 
-  it('takes a frame own code from the frame, counted once per occurrence', () => {
-    const overview = overviewOf(
+  it('takes a frame own code from the frame, counted once per occurrence', async () => {
+    const overview = await overviewOf(
       method(
         10_000_000,
         20_000_000,
@@ -310,8 +323,8 @@ describe('databaseOverview tree', () => {
     });
   });
 
-  it('nets every nested statement off the one that holds them, and adds up', () => {
-    const overview = overviewOf(
+  it('nets every nested statement off the one that holds them, and adds up', async () => {
+    const overview = await overviewOf(
       '09:18:22.6 (10000000)|DML_BEGIN|[2]|Op:Insert|Type:Case|Rows:3\n' +
         soql(11_000_000, 13_000_000, 1, 'SELECT Id FROM Account', 9) +
         soql(14_000_000, 17_000_000, 1, 'SELECT Id FROM Contact', 10) +
@@ -329,8 +342,8 @@ describe('databaseOverview tree', () => {
 });
 
 describe('concentration', () => {
-  it('counts the statements it takes to cross the target share', () => {
-    const overview = overviewOf(
+  it('counts the statements it takes to cross the target share', async () => {
+    const overview = await overviewOf(
       soql(10_000_000, 40_000_000, 1, 'SELECT Id FROM Account') +
         soql(41_000_000, 46_000_000, 1, 'SELECT Id FROM Contact') +
         dml(47_000_000, 52_000_000, 'Insert', 'Case', 1),
@@ -339,8 +352,8 @@ describe('concentration', () => {
     expect(concentration(overview)).toEqual({ count: 1, percent: 75 });
   });
 
-  it('walks on when no single statement dominates', () => {
-    const overview = overviewOf(
+  it('walks on when no single statement dominates', async () => {
+    const overview = await overviewOf(
       soql(10_000_000, 20_000_000, 1, 'SELECT Id FROM Account') +
         soql(21_000_000, 31_000_000, 1, 'SELECT Id FROM Contact'),
     );
@@ -348,8 +361,8 @@ describe('concentration', () => {
     expect(concentration(overview)).toEqual({ count: 2, percent: 100 });
   });
 
-  it('takes a target of its own', () => {
-    const overview = overviewOf(
+  it('takes a target of its own', async () => {
+    const overview = await overviewOf(
       soql(10_000_000, 20_000_000, 1, 'SELECT Id FROM Account') +
         soql(21_000_000, 31_000_000, 1, 'SELECT Id FROM Contact'),
     );
@@ -357,14 +370,14 @@ describe('concentration', () => {
     expect(concentration(overview, 50)).toMatchObject({ count: 1, percent: 50 });
   });
 
-  it('reports nothing held for a log with no statements', () => {
-    expect(concentration(overviewOf(''))).toEqual({ count: 0, percent: 0 });
+  it('reports nothing held for a log with no statements', async () => {
+    expect(concentration(await overviewOf(''))).toEqual({ count: 0, percent: 0 });
   });
 });
 
 describe('databaseOverview namespaces', () => {
-  it('charges every kind to the namespace of the code that ran it', () => {
-    const overview = overviewOf(
+  it('charges every kind to the namespace of the code that ran it', async () => {
+    const overview = await overviewOf(
       soql(10_000_000, 30_000_000, 5, 'SELECT Id FROM Account') +
         dml(31_000_000, 41_000_000, 'Insert', 'Account', 8),
     );
@@ -385,8 +398,8 @@ describe('databaseOverview namespaces', () => {
     expect(overview.burnedIn).toEqual(overview.askedBy);
   });
 
-  it('counts a search as rows read for its caller namespace', () => {
-    const overview = overviewOf(sosl(10_000_000, 11_000_000, 7));
+  it('counts a search as rows read for its caller namespace', async () => {
+    const overview = await overviewOf(sosl(10_000_000, 11_000_000, 7));
 
     expect(overview.askedBy[0]).toMatchObject({
       key: 'pkg',
@@ -395,8 +408,8 @@ describe('databaseOverview namespaces', () => {
     });
   });
 
-  it('ranks namespaces by their database time', () => {
-    const overview = overviewOf(
+  it('ranks namespaces by their database time', async () => {
+    const overview = await overviewOf(
       soql(10_000_000, 12_000_000, 1, 'SELECT Id FROM Account') +
         '09:18:22.6 (13000000)|CODE_UNIT_STARTED|[EXTERNAL]|066d0000002m8ik|apex://other.Entry\n' +
         soql(14_000_000, 44_000_000, 1, 'SELECT Id FROM Contact') +
@@ -406,9 +419,9 @@ describe('databaseOverview namespaces', () => {
     expect(overview.askedBy.map((entry) => entry.key)).toEqual(['other', 'pkg']);
   });
 
-  it('charges the code beneath a DML to its own namespace', () => {
+  it('charges the code beneath a DML to its own namespace', async () => {
     // A trigger from another package fires on the caller's insert.
-    const overview = overviewOf(
+    const overview = await overviewOf(
       '09:18:22.6 (10000000)|DML_BEGIN|[2]|Op:Insert|Type:Case|Rows:1\n' +
         '09:18:22.6 (11000000)|CODE_UNIT_STARTED|[EXTERNAL]|01q|trig.CaseTrigger on Case trigger event BeforeInsert|__sfdc_trigger/trig/CaseTrigger\n' +
         '09:18:22.6 (17000000)|CODE_UNIT_FINISHED|trig.CaseTrigger on Case trigger event BeforeInsert\n' +
