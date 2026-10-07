@@ -29,6 +29,7 @@ export const gridStyles = css`
       --grid-indent: 9px;
       --grid-twisty: 16px;
       --grid-stroke: 1px;
+      --grid-resize: 6px;
 
       display: block;
       height: 100%;
@@ -60,9 +61,12 @@ export const gridStyles = css`
 
     .head,
     .foot {
+      --grid-row-bg: var(--grid-header-bg);
+
       position: sticky;
-      z-index: 1;
-      background: var(--grid-header-bg);
+      /* Above the frozen cells of the body rows. */
+      z-index: 2;
+      background: var(--grid-row-bg);
       font-weight: bold;
     }
 
@@ -80,21 +84,25 @@ export const gridStyles = css`
       position: relative;
 
       & .row {
+        --grid-row-bg: transparent;
+
         position: absolute;
         inset-block-start: 0;
         inset-inline-start: 0;
         width: 100%;
+        background: var(--grid-row-bg);
 
         &:hover {
-          background: var(--grid-hover-bg);
+          --grid-row-bg: var(--grid-hover-bg);
         }
 
         &.marked {
-          background: var(--grid-marked-bg);
+          --grid-row-bg: var(--grid-marked-bg);
         }
 
         &[aria-selected='true'] {
-          background: var(--grid-selected-bg);
+          --grid-row-bg: var(--grid-selected-bg);
+
           color: var(--grid-selected-fg);
         }
       }
@@ -125,7 +133,17 @@ export const gridStyles = css`
       }
     }
 
+    /* The row colour over the grid's own, so scrolled cells do not show through. */
+    :host([freeze-first]) .row > .cell:first-child {
+      position: sticky;
+      inset-inline-start: 0;
+      z-index: 1;
+      background: linear-gradient(var(--grid-row-bg), var(--grid-row-bg)), var(--grid-bg);
+      box-shadow: inset calc(-1 * var(--grid-stroke)) 0 var(--grid-border);
+    }
+
     .colhead {
+      position: relative;
       display: flex;
       align-items: end;
       gap: var(--grid-pad);
@@ -158,6 +176,19 @@ export const gridStyles = css`
       }
     }
 
+    .resize {
+      position: absolute;
+      inset-block: 0;
+      inset-inline-end: 0;
+      width: var(--grid-resize);
+      cursor: col-resize;
+      touch-action: none;
+
+      &:hover {
+        background: var(--grid-border);
+      }
+    }
+
     .twisty {
       display: inline-block;
       width: var(--grid-twisty);
@@ -182,7 +213,7 @@ export const gridStyles = css`
     .busy {
       position: sticky;
       top: 0;
-      z-index: 2;
+      z-index: 3;
       height: 2px;
       margin-block-end: -2px;
       background: var(--grid-focus);

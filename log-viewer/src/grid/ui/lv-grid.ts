@@ -4,6 +4,7 @@
 import { html, LitElement, nothing, type PropertyValues, type TemplateResult } from 'lit';
 import { customElement, property } from 'lit/decorators.js';
 import { createRef, ref } from 'lit/directives/ref.js';
+import { styleMap } from 'lit/directives/style-map.js';
 
 import {
   findPattern,
@@ -24,7 +25,7 @@ import {
   type SortDirection,
   type TreeSource,
 } from '../core/index.js';
-import { browserScheduler, GridView } from '../render/index.js';
+import { browserScheduler, fontOf, GridView, textWidth } from '../render/index.js';
 import type { CellContent, GridColumn } from './column.js';
 import { gridKey } from './keyboard.js';
 import { litPainter } from './painter.js';
@@ -62,6 +63,19 @@ export interface GridReshapeDetail {
   reason: 'sort';
 }
 
+export interface GridColumnDetail {
+  /** The column's `id`. */
+  column: string;
+}
+
+export interface GridHeaderContextDetail extends GridColumnDetail {
+  event: MouseEvent;
+}
+
+export interface GridColumnResizeDetail extends GridColumnDetail {
+  width: number;
+}
+
 declare global {
   interface HTMLElementTagNameMap {
     'lv-grid': LvGrid;
@@ -80,11 +94,28 @@ const sameTarget = <R>(a: RowTarget<R> | null, b: RowTarget<R>): boolean =>
 const total = <R>(column: GridColumn<R>, value: number | undefined): CellContent =>
   value === undefined ? '' : (column.total?.(value) ?? String(value));
 
+const MIN_WIDTH = 40;
+
+const minWidthOf = <R>(column: GridColumn<R>): number => column.minWidth ?? MIN_WIDTH;
+
+const px = (value: string): number => Number.parseFloat(value) || 0;
+
+/** The width a cell needs to show its text on one line, with its padding and twisty. */
+function naturalWidth(cell: HTMLElement): number {
+  const style = getComputedStyle(cell);
+  const twisty = cell.querySelector<HTMLElement>('[data-toggle]')?.offsetWidth ?? 0;
+  const text = textWidth([cell.textContent?.trim() ?? ''], fontOf(cell));
+  const padded = text + twisty + px(style.paddingInlineStart) + px(style.paddingInlineEnd);
+  // A template cell, such as a bar, may hold no text but still need room.
+  return Math.ceil(Math.max(padded, cell.scrollWidth));
+}
+
 /**
  * A virtualised tree grid. Set `columns` and `source`; it sorts from its header, and the
  * keyboard moves, opens and closes rows. Events bubble but stay inside the host's shadow
  * root: `lv-grid-select`, `lv-grid-locate` (hover), `lv-grid-context`,
- * `lv-grid-find-results` and `lv-grid-reshape`.
+ * `lv-grid-header-context`, `lv-grid-column-resize`, `lv-grid-find-results` and
+ * `lv-grid-reshape`.
  */
 @customElement('lv-grid')
 export class LvGrid<R extends object = object> extends LitElement {
@@ -126,6 +157,10 @@ export class LvGrid<R extends object = object> extends LitElement {
   @property({ attribute: false })
   sort: GridSort | null = null;
 
+  /** Keeps the first shown column in view on a horizontal scroll. */
+  @property({ type: Boolean, attribute: 'freeze-first', reflect: true })
+  freezeFirst = false;
+
   private store: GridStore<R> | null = null;
   private readonly data = new StoreController<R>(this);
   private view: GridView<R> | null = null;
@@ -139,6 +174,8 @@ export class LvGrid<R extends object = object> extends LitElement {
   private selectedAt = -1;
   private hovered = -1;
   private found: { result: FindResult<R>; pattern: RegExp; current: number } | null = null;
+  /** Widths the user set, by column id. They win over a column's own `width`. */
+  private readonly widths = new Map<string, number>();
   private readonly scrollerRef = createRef<HTMLDivElement>();
   private readonly bodyRef = createRef<HTMLDivElement>();
 
@@ -217,6 +254,18 @@ export class LvGrid<R extends object = object> extends LitElement {
     return (await this.store?.exportText(columns, options)) ?? null;
   }
 
+  /**
+   * Sets a column's width in pixels, no less than its `minWidth`, over its own `width`.
+   * Only the column tracks change: no row paints again.
+   */
+  setColumnWidth(id: string, width: number): void {
+    const column = this.columns.find((c) => c.id === id);
+    if (column) {
+      this.widths.set(id, Math.max(Math.round(width), minWidthOf(column)));
+      this.requestUpdate();
+    }
+  }
+
   /** Copies what `exportText` gives, tab-separated, as Ctrl/Cmd+C on the grid does. */
   async copy(): Promise<void> {
     const text = await this.exportText({ format: 'tsv', tree: this.copyTree });
@@ -240,9 +289,6 @@ export class LvGrid<R extends object = object> extends LitElement {
   }
 
   protected willUpdate(changed: PropertyValues): void {
-    if (changed.has('columns')) {
-      this.layoutColumns();
-    }
     const store = this.store;
     if (!store) {
       if (this.source) {
@@ -287,17 +333,21 @@ export class LvGrid<R extends object = object> extends LitElement {
     const columns = this.visibleColumns();
     const totals = this.data.snapshot?.totals ?? {};
     const footer = columns.some((column) => column.calc || column.footer !== undefined);
+    const size = this.data.snapshot?.rows.size ?? 0;
     return html`<div
       class="scroller"
       role="treegrid"
       tabindex="0"
-      aria-rowcount=${this.data.snapshot?.rows.size ?? 0}
+      aria-rowcount=${size + (footer ? 2 : 1)}
       aria-busy=${this.data.snapshot?.busy ?? false}
+      style=${styleMap(this.tracks(columns))}
       ${ref(this.scrollerRef)}
       @keydown=${this.onKey}
     >
       <div class="busy"></div>
-      <div class="row head" role="row">${columns.map((column) => this.headerCell(column))}</div>
+      <div class="row head" role="row" aria-rowindex="1">
+        ${columns.map((column) => this.headerCell(column))}
+      </div>
       <div
         class="body"
         ${ref(this.bodyRef)}
@@ -308,7 +358,7 @@ export class LvGrid<R extends object = object> extends LitElement {
       ></div>
       ${
         footer
-          ? html`<div class="row foot" role="row">
+          ? html`<div class="row foot" role="row" aria-rowindex=${size + 2}>
               ${columns.map(
                 (column) =>
                   html`<div class="cell ${column.align === 'end' ? 'end' : ''}" role="gridcell">
@@ -333,12 +383,77 @@ export class LvGrid<R extends object = object> extends LitElement {
     return html`<div
       class="cell colhead ${column.align === 'end' ? 'end' : ''}"
       role="columnheader"
+      title=${column.title}
       aria-sort=${ariaSort}
       ?data-sortable=${column.sort !== undefined}
-      @click=${() => this.cycleSort(column)}
+      @click=${(e: MouseEvent) => this.onHeaderClick(e, column)}
+      @contextmenu=${(e: MouseEvent) =>
+        this.emit<GridHeaderContextDetail>('lv-grid-header-context', {
+          column: column.id,
+          event: e,
+        })}
     >
       ${column.title}
+      ${
+        column.resizable === false
+          ? nothing
+          : html`<span
+              class="resize"
+              @pointerdown=${(e: PointerEvent) => this.startResize(e, column)}
+              @dblclick=${(e: MouseEvent) => this.fitColumn(e, column)}
+            ></span>`
+      }
     </div>`;
+  }
+
+  private onHeaderClick(e: MouseEvent, column: GridColumn<R>): void {
+    if (!(e.target as Element).closest('.resize')) {
+      this.cycleSort(column);
+    }
+  }
+
+  /** Drags the header edge; pointer capture keeps the drag on the handle off its column. */
+  private startResize(e: PointerEvent, column: GridColumn<R>): void {
+    const handle = e.currentTarget as HTMLElement;
+    const head = handle.parentElement;
+    if (e.button !== 0 || !head) {
+      return;
+    }
+    e.preventDefault();
+    const from = head.getBoundingClientRect().width;
+    const x = e.clientX;
+    handle.setPointerCapture(e.pointerId);
+    const move = (m: PointerEvent): void => this.setColumnWidth(column.id, from + m.clientX - x);
+    const end = (): void => {
+      handle.removeEventListener('pointermove', move);
+      handle.removeEventListener('pointerup', end);
+      handle.removeEventListener('pointercancel', end);
+      this.resized(column);
+    };
+    handle.addEventListener('pointermove', move);
+    handle.addEventListener('pointerup', end);
+    handle.addEventListener('pointercancel', end);
+  }
+
+  /** Sizes a column to the widest of its header and its painted cells. */
+  private fitColumn(e: MouseEvent, column: GridColumn<R>): void {
+    const head = (e.currentTarget as HTMLElement).parentElement;
+    const at = this.visibleColumns().indexOf(column);
+    const rows = [...(this.bodyRef.value?.children ?? [])] as HTMLElement[];
+    const cells = rows.flatMap((row) => {
+      const cell = row.hidden ? undefined : row.children[at];
+      return cell instanceof HTMLElement ? [cell] : [];
+    });
+    const widest = Math.max(...[head, ...cells].map((cell) => (cell ? naturalWidth(cell) : 0)));
+    this.setColumnWidth(column.id, widest);
+    this.resized(column);
+  }
+
+  private resized(column: GridColumn<R>): void {
+    const width = this.widths.get(column.id);
+    if (width !== undefined) {
+      this.emit<GridColumnResizeDetail>('lv-grid-column-resize', { column: column.id, width });
+    }
   }
 
   /** Off, then the column's first direction, then the other, then off again. */
@@ -414,22 +529,23 @@ export class LvGrid<R extends object = object> extends LitElement {
     return this.columns.filter((column) => !column.hidden);
   }
 
-  /** One track per shown column, on the host so header, rows and footer line up. */
-  private layoutColumns(): void {
-    const columns = this.visibleColumns();
-    const tracks = columns.map((column) => {
-      const min = column.minWidth ?? 40;
-      return column.width === undefined || column.width === 'flex'
-        ? `minmax(${min}px, 1fr)`
-        : `${Math.max(column.width, min)}px`;
+  /**
+   * One track per shown column, so header, rows and footer line up. They sit on the
+   * scroller, not the host: a host's inline style belongs to whoever places it.
+   */
+  private tracks(columns: readonly GridColumn<R>[]): Record<string, string> {
+    const widths = columns.map((column) => {
+      const width = this.widths.get(column.id) ?? column.width;
+      return typeof width === 'number' ? Math.max(width, minWidthOf(column)) : null;
     });
-    const minWidth = columns.reduce(
-      (sum, column) =>
-        sum + (typeof column.width === 'number' ? column.width : (column.minWidth ?? 40)),
-      0,
-    );
-    this.style.setProperty('--grid-cols', tracks.join(' '));
-    this.style.setProperty('--grid-min-width', `${minWidth}px`);
+    const tracks = columns.map((column, i) => {
+      const width = widths[i];
+      return width === null || width === undefined
+        ? `minmax(${minWidthOf(column)}px, 1fr)`
+        : `${width}px`;
+    });
+    const minWidth = columns.reduce((sum, column, i) => sum + (widths[i] ?? minWidthOf(column)), 0);
+    return { '--grid-cols': tracks.join(' '), '--grid-min-width': `${minWidth}px` };
   }
 
   private makeView(): void {
@@ -442,6 +558,7 @@ export class LvGrid<R extends object = object> extends LitElement {
       scroller,
       body,
       rowHeight: this.rowHeight,
+      rowIndexStart: 2,
       painter: litPainter(() => ({
         columns: this.columns,
         isSelected: (target) => sameTarget(this.selected, target),

@@ -28,6 +28,8 @@ export interface GridViewOptions<R> {
   rowHeight: number;
   /** Rows painted beyond each edge of the viewport. Default 10. */
   overscan?: number;
+  /** The `aria-rowindex` of the first row. Default 1; 2 under a header row. */
+  rowIndexStart?: number;
 }
 
 /** The find a view marks: its result, the pattern it counted with and the current match. */
@@ -242,7 +244,7 @@ export class GridView<R extends object> {
   private paint(el: HTMLElement, index: number, rows: RowView<R>): void {
     el.hidden = false;
     el.dataset.index = String(index);
-    el.ariaRowIndex = String(index + 1);
+    el.ariaRowIndex = String(index + (this.options.rowIndexStart ?? 1));
     el.ariaLevel = String(rows.depthAt(index) + 1);
     el.ariaExpanded = rows.hasChildrenAt(index) ? String(rows.isExpandedAt(index)) : null;
     this.options.painter.paint(el, index, rows);

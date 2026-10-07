@@ -96,9 +96,7 @@ export class LvGridContender implements Contender {
   }
 
   setNameWidth(px: number): void {
-    this.grid.columns = this.grid.columns.map((column) =>
-      column.id === 'text' ? { ...column, width: px } : column,
-    );
+    this.grid.setColumnWidth('text', px);
   }
 
   scroller(): HTMLElement {
@@ -106,6 +104,7 @@ export class LvGridContender implements Contender {
   }
 
   visibleRowCount(): number {
-    return Number(this.scroller().getAttribute('aria-rowcount'));
+    // aria-rowcount counts the header row; these columns have no footer.
+    return Number(this.scroller().getAttribute('aria-rowcount')) - 1;
   }
 }

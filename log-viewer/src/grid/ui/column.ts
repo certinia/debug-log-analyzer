@@ -22,6 +22,8 @@ export interface GridColumn<R> {
   /** `end` for numbers. Default `start`. */
   align?: 'start' | 'end';
   hidden?: boolean;
+  /** The user can drag its header edge, or double-click it to fit the shown rows. Default true. */
+  resizable?: boolean;
   /** The cell. In the first column, it follows the tree indent and the expand control. */
   cell(row: R): CellContent;
   /** The text the cell shows: find searches it, copy and export write it. */

@@ -8,7 +8,9 @@ import { GridStore, sum, type TreeSource } from '../../core/index.js';
 import type { GridColumn } from '../column.js';
 import '../lv-grid.js';
 import type {
+  GridColumnResizeDetail,
   GridFindDetail,
+  GridHeaderContextDetail,
   GridReshapeDetail,
   GridRowDetail,
   GridSelectDetail,
@@ -130,7 +132,8 @@ describe('lv-grid', () => {
     );
     await settle(grid);
     expect(root.querySelectorAll('[role="columnheader"]').length).toBe(2);
-    expect(grid.style.getPropertyValue('--grid-cols')).toBe('minmax(40px, 1fr) 80px');
+    const scroller = root.querySelector<HTMLElement>('.scroller');
+    expect(scroller?.style.getPropertyValue('--grid-cols')).toBe('minmax(40px, 1fr) 80px');
   });
 
   it('shows each calc total in the footer', async () => {
@@ -296,5 +299,132 @@ describe('lv-grid', () => {
     document.removeEventListener('lv-grid-select', inDocument);
     expect(inShadow).toHaveBeenCalledTimes(1);
     expect(inDocument).not.toHaveBeenCalled();
+  });
+});
+
+describe('lv-grid columns', () => {
+  const tracks = async (grid: LvGrid<Node>): Promise<string> => {
+    await grid.updateComplete;
+    return (
+      grid.renderRoot
+        .querySelector<HTMLElement>('.scroller')
+        ?.style.getPropertyValue('--grid-cols') ?? ''
+    );
+  };
+
+  const handle = (header: HTMLElement | undefined): HTMLElement | null | undefined =>
+    header?.querySelector<HTMLElement>('.resize');
+
+  const pointer = (type: string, clientX: number): MouseEvent =>
+    new MouseEvent(type, { clientX, button: 0, bubbles: true });
+
+  it('sets a width no less than the column minimum, and keeps it when columns change', async () => {
+    const shown = columns();
+    const { grid } = await setup({ columns: shown });
+    grid.setColumnWidth('time', 120);
+    expect(await tracks(grid)).toBe('minmax(40px, 1fr) 120px minmax(40px, 1fr)');
+    grid.setColumnWidth('time', 10);
+    expect(await tracks(grid)).toBe('minmax(40px, 1fr) 40px minmax(40px, 1fr)');
+    grid.setColumnWidth('time', 120);
+    grid.columns = shown.map((column) =>
+      column.id === 'kind' ? { ...column, hidden: true } : column,
+    );
+    await settle(grid);
+    expect(await tracks(grid)).toBe('minmax(40px, 1fr) 120px');
+  });
+
+  it('keeps its column tracks when the host style is replaced', async () => {
+    const { grid } = await setup();
+    grid.setColumnWidth('time', 120);
+    await grid.updateComplete;
+    grid.style.cssText = 'color: red';
+    expect(await tracks(grid)).toBe('minmax(40px, 1fr) 120px minmax(40px, 1fr)');
+  });
+
+  it('resizes a column from a drag on its header edge, then reports the width', async () => {
+    HTMLElement.prototype.setPointerCapture = jest.fn();
+    const { grid, header } = await setup();
+    const widths: GridColumnResizeDetail[] = [];
+    grid.addEventListener('lv-grid-column-resize', (e) =>
+      widths.push(detail<GridColumnResizeDetail>(e)),
+    );
+    const edge = handle(header('Name'));
+    // fakeLayout makes every element 500px wide.
+    edge?.dispatchEvent(pointer('pointerdown', 100));
+    edge?.dispatchEvent(pointer('pointermove', 120));
+    expect(await tracks(grid)).toBe('520px 80px minmax(40px, 1fr)');
+    edge?.dispatchEvent(pointer('pointermove', 130));
+    edge?.dispatchEvent(pointer('pointerup', 130));
+    edge?.dispatchEvent(pointer('pointermove', 400));
+    expect(await tracks(grid)).toBe('530px 80px minmax(40px, 1fr)');
+    expect(widths).toEqual([{ column: 'name', width: 530 }]);
+  });
+
+  it('does not sort from a click on the header edge', async () => {
+    const { grid, header } = await setup();
+    handle(header('Time'))?.click();
+    await settle(grid);
+    expect(header('Time')?.getAttribute('aria-sort')).toBe('none');
+  });
+
+  it('fits a column to the widest of its header and painted cells on a double-click', async () => {
+    const context = { font: '', measureText: (text: string) => ({ width: text.length * 10 }) };
+    jest
+      .spyOn(HTMLCanvasElement.prototype, 'getContext')
+      .mockImplementation((() => context) as unknown as HTMLCanvasElement['getContext']);
+    const long: TreeSource<Node> = {
+      ...source(),
+      roots: [...source().roots, { key: 4, name: 'abcdefghijkl', time: 0, kind: 'x' }],
+    };
+    const { grid, header } = await setup({ source: long });
+    jest.spyOn(HTMLElement.prototype, 'offsetWidth', 'get').mockImplementation(function (
+      this: HTMLElement,
+    ) {
+      return this.matches('[data-toggle]') ? 16 : 500;
+    });
+    const widths: GridColumnResizeDetail[] = [];
+    grid.addEventListener('lv-grid-column-resize', (e) =>
+      widths.push(detail<GridColumnResizeDetail>(e)),
+    );
+    handle(header('Name'))?.dispatchEvent(new MouseEvent('dblclick', { bubbles: true }));
+    // Twelve letters and the twisty.
+    expect(widths).toEqual([{ column: 'name', width: 136 }]);
+    handle(header('Kind'))?.dispatchEvent(new MouseEvent('dblclick', { bubbles: true }));
+    // The header is wider than any cell; 40 is also the minimum.
+    expect(widths.at(-1)).toEqual({ column: 'kind', width: 40 });
+  });
+
+  it('has no resize handle on a column that is not resizable', async () => {
+    const { header } = await setup({
+      columns: columns().map((column) =>
+        column.id === 'kind' ? { ...column, resizable: false } : column,
+      ),
+    });
+    expect(handle(header('Kind'))).toBeNull();
+    expect(handle(header('Time'))).not.toBeNull();
+  });
+
+  it('reports a right-click on a header, for the column menu', async () => {
+    const { grid, header } = await setup();
+    const opened: GridHeaderContextDetail[] = [];
+    grid.addEventListener('lv-grid-header-context', (e) =>
+      opened.push(detail<GridHeaderContextDetail>(e)),
+    );
+    header('Time')?.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true }));
+    expect(opened.map((d) => d.column)).toEqual(['time']);
+  });
+
+  it('counts the header and footer rows in its ARIA row numbers', async () => {
+    const { root, scroller, rows } = await setup();
+    expect(scroller?.getAttribute('aria-rowcount')).toBe('5');
+    expect(root.querySelector('.head')?.getAttribute('aria-rowindex')).toBe('1');
+    const first = rows().find((el) => el.dataset.index === '0');
+    expect(first?.ariaRowIndex).toBe('2');
+    expect(root.querySelector('.foot')?.getAttribute('aria-rowindex')).toBe('5');
+  });
+
+  it('reflects freeze-first, which the styles key the frozen column on', async () => {
+    const { grid } = await setup({ freezeFirst: true });
+    expect(grid.hasAttribute('freeze-first')).toBe(true);
   });
 });
