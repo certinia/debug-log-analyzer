@@ -6,4 +6,4 @@
  * The grid: a virtualised tree and grouped data grid, built as if it were an outside library.
  * This file is its public API; app code imports nothing else from `grid/`.
  */
-export {};
+export * from './core/index.js';
