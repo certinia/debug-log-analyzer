@@ -15,6 +15,9 @@ import { type LogIndex, LogIndexBuilder } from './LogIndex.js';
 
 export type Stack = LogEvent[];
 
+/** What {@link LogStore.derive} runs once per log. */
+export type Derivation<T> = (index: LogIndex, store: LogStore) => T | Promise<T>;
+
 /**
  * A parsed log and the lookups every view takes from it.
  *
@@ -28,7 +31,7 @@ export class LogStore {
   private _statements: Statements | null = null;
   private _keyPathIds: KeyPathIds | null = null;
   private _logIndex: Promise<LogIndex> | null = null;
-  private readonly _derived = new WeakMap<(index: LogIndex) => unknown, Promise<unknown>>();
+  private readonly _derived = new WeakMap<Derivation<unknown>, Promise<unknown>>();
 
   constructor(log: ApexLog) {
     this.log = log;
@@ -122,13 +125,13 @@ export class LogStore {
   /**
    * `fn` run once over this log's index, its result shared by every caller.
    * The function is the cache key, so pass a module-level one: an inline arrow is
-   * a new key on every call.
+   * a new key on every call. `fn` gets this store too, to derive from another `fn`.
    */
-  derive<T>(fn: (index: LogIndex) => T): Promise<T> {
+  derive<T>(fn: Derivation<T>): Promise<T> {
     let derived = this._derived.get(fn) as Promise<T> | undefined;
     if (!derived) {
       derived = this.logIndex()
-        .then(fn)
+        .then((index) => fn(index, this))
         .catch((error: unknown) => {
           this._derived.delete(fn);
           throw error;

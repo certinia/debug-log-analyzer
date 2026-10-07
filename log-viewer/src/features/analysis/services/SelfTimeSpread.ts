@@ -1,9 +1,11 @@
 /*
  * Copyright (c) 2026 Certinia Inc. All rights reserved.
  */
-import type { ApexLog, LogEvent, LogCategory } from '@apexdevtools/apex-log-parser';
+import type { LogCategory } from '@apexdevtools/apex-log-parser';
 
-import { getEventKey } from '../../../core/log/eventKeys.js';
+import { idsBySelfTime, keySelfTimes, type KeySelfTimes } from '../../../core/log/keySelfTimes.js';
+import type { LogIndex } from '../../../core/log/LogIndex.js';
+import type { Derivation } from '../../../core/log/LogStore.js';
 
 /** Signatures the spread draws a histogram for, the most self time first. */
 const LANE_COUNT = 5;
@@ -62,8 +64,8 @@ export interface SelfTimeSpread {
 
 /** What one signature's calls came to, before the values are bucketed. */
 interface Tally {
-  /** The signature the calls were grouped by, so the second pass can find them again. */
-  key: string;
+  /** The key id, so the second pass can find the calls again. */
+  id: number;
   text: string;
   category: LogCategory;
   eventIndex: number;
@@ -83,18 +85,18 @@ interface Tally {
  * often holds the most self time of all, so it is named beneath the lanes rather
  * than drawn as one: a histogram of a single call has no shape to read.
  *
- * Two flat passes over the log's events: the first ranks the signatures, the
- * second collects the values of the few that earned a lane. Nothing keeps a value
- * per call for the whole log.
+ * The signatures are ranked from `times`; one pass over the index then collects
+ * the values of the few that earned a lane. Nothing keeps a value per call for
+ * the whole log.
  */
-export function computeSelfTimeSpread(apexLog: ApexLog): SelfTimeSpread {
-  const tallies = tally(apexLog);
-  const ranked = [...tallies.values()].sort((a, b) => b.selfTime - a.selfTime);
+export function computeSelfTimeSpread(index: LogIndex, times: KeySelfTimes): SelfTimeSpread {
+  const ranked = idsBySelfTime(times).map((id) => tally(index, times, id));
   const lanes = ranked.filter((found) => found.count > 1).slice(0, LANE_COUNT);
-  const values = collect(apexLog.eventsById, lanes);
+  const values = collect(index, times.ids, lanes);
 
   return {
-    lanes: lanes.map((lane) => row(lane, values.get(lane.key) ?? [])),
+    // `collect` returns one list per lane.
+    lanes: lanes.map((lane, slot) => row(lane, values[slot]!)),
     singles: ranked
       .filter((found) => found.count === 1)
       .slice(0, SINGLE_COUNT)
@@ -108,54 +110,49 @@ export function computeSelfTimeSpread(apexLog: ApexLog): SelfTimeSpread {
   };
 }
 
-/** Sum, count and rank the timed calls of every signature in one pass. */
-function tally(apexLog: ApexLog): Map<string, Tally> {
-  const tallies = new Map<string, Tally>();
-  for (const event of apexLog.eventsById) {
-    const self = event.duration.self;
-    // The log itself holds the gap time, and no grid row stands for it.
-    if (self <= 0 || event === apexLog) {
-      continue;
-    }
-    const key = getEventKey(event);
-    const found = tallies.get(key);
-    if (!found) {
-      tallies.set(key, {
-        key,
-        text: event.text,
-        category: event.category,
-        eventIndex: event.eventIndex,
-        count: 1,
-        selfTime: self,
-        max: self,
-      });
-      continue;
-    }
-    found.count++;
-    found.selfTime += self;
-    if (self > found.max) {
-      found.max = self;
-      found.eventIndex = event.eventIndex;
-      found.category = event.category;
-    }
-  }
-  return tallies;
+/** {@link computeSelfTimeSpread}, once per log. */
+export const selfTimeSpread: Derivation<SelfTimeSpread> = async (index, store) =>
+  computeSelfTimeSpread(index, await store.derive(keySelfTimes));
+
+function tally(index: LogIndex, times: KeySelfTimes, id: number): Tally {
+  // In range: ids and rows come from the same index as `times`.
+  const worst = times.maxRow[id]!;
+  const event = index.event(worst);
+  return {
+    id,
+    text: event.text,
+    category: event.category,
+    eventIndex: index.eventIndex[worst]!,
+    count: times.timedCount[id]!,
+    selfTime: times.selfTime[id]!,
+    max: index.self[worst]!,
+  };
 }
 
-/** The self times of the signatures that earned a lane, ascending. */
-function collect(events: LogEvent[], lanes: Tally[]): Map<string, number[]> {
+/** The self times of the signatures that earned a lane, ascending, one list per lane. */
+function collect(index: LogIndex, ids: Uint32Array, lanes: Tally[]): number[][] {
+  const values = lanes.map((): number[] => []);
   if (!lanes.length) {
-    return new Map();
+    return values;
   }
-  const values = new Map<string, number[]>(lanes.map((lane) => [lane.key, []]));
-  for (const event of events) {
-    const self = event.duration.self;
-    if (self <= 0) {
+  // Read past its end for a key above every lane, which `?? -1` takes as no lane.
+  const slotOf = new Int8Array(Math.max(...lanes.map((lane) => lane.id)) + 1).fill(-1);
+  lanes.forEach((lane, slot) => {
+    slotOf[lane.id] = slot;
+  });
+  const { self, rowCount } = index;
+  // In range: every row is below rowCount, every slot below lanes.length.
+  for (let row = 0; row < rowCount; row++) {
+    const value = self[row]!;
+    if (value <= 0) {
       continue;
     }
-    values.get(getEventKey(event))?.push(self);
+    const slot = slotOf[ids[row]!] ?? -1;
+    if (slot >= 0) {
+      values[slot]!.push(value);
+    }
   }
-  for (const list of values.values()) {
+  for (const list of values) {
     list.sort((a, b) => a - b);
   }
   return values;
@@ -205,19 +202,6 @@ function concentrationOf(ranked: Tally[]): SelfTimeSpread['concentration'] {
     signatures++;
   }
   return { signatures, total: ranked.length };
-}
-
-/** Memo of the two passes: the tree is built once per log, the pane re-opens often. */
-const spreadCache = new WeakMap<ApexLog, SelfTimeSpread>();
-
-/** The memoised per-log entry point; the passes run once per parsed log. */
-export function getSelfTimeSpread(apexLog: ApexLog): SelfTimeSpread {
-  let spread = spreadCache.get(apexLog);
-  if (!spread) {
-    spread = computeSelfTimeSpread(apexLog);
-    spreadCache.set(apexLog, spread);
-  }
-  return spread;
 }
 
 /** The self times a bin covers, so a hovered bin can name its own range. */

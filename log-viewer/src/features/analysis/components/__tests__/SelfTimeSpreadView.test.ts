@@ -11,7 +11,7 @@ import type { SelfTimeSpread } from '../../services/SelfTimeSpread.js';
 let spread: SelfTimeSpread | null = null;
 jest.mock('../../services/SelfTimeSpread.js', () => ({
   ...jest.requireActual<object>('../../services/SelfTimeSpread.js'),
-  getSelfTimeSpread: () => spread,
+  selfTimeSpread: () => spread,
 }));
 
 import '../SelfTimeSpreadView.js';
@@ -41,8 +41,10 @@ const spreadOf = (overrides: Partial<SelfTimeSpread> = {}): SelfTimeSpread => ({
 
 const view = async () => {
   const element = document.createElement('self-time-spread');
-  element.logStore = { log: {} } as unknown as LogStore;
+  element.logStore = { log: {}, derive: async (fn: () => unknown) => fn() } as unknown as LogStore;
   document.body.append(element);
+  await element.updateComplete;
+  // The derived value lands a microtask after the render that asks for it.
   await element.updateComplete;
   return element;
 };
