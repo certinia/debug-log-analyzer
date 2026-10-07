@@ -23,6 +23,8 @@ jest.mock('../../../settings/Settings.js', () => ({
   subscribeSettings: () => () => {},
 }));
 
+import { storeOf } from '#test-helpers/apexLog.js';
+import { LogStore } from '../../../../core/log/LogStore.js';
 import { CalltreeView } from '../CalltreeView.js';
 
 /** Which table each build made, and which each teardown destroyed, in order. */
@@ -84,8 +86,18 @@ class AlwaysVisible {
   disconnect(): void {}
 }
 
+class NeverVisible {
+  observe(): void {}
+  disconnect(): void {}
+}
+
 function apexLog(): ApexLog {
-  return { children: [], namespaces: [], governorLimits: null } as unknown as ApexLog;
+  return {
+    children: [],
+    eventsById: [],
+    namespaces: [],
+    governorLimits: null,
+  } as unknown as ApexLog;
 }
 
 /** Let the build's promise chain run out: more turns than it takes, since the
@@ -212,5 +224,84 @@ describe('calltree-view table lifetime', () => {
     await settle();
 
     expect(built).toEqual(['time-order', 'bottom-up', 'bottom-up']);
+  });
+});
+
+describe('calltree-view type picker', () => {
+  const OUTER =
+    '09:18:22.6 (1000)|METHOD_ENTRY|[1]|01p|ns.Outer.run()\n' +
+    '09:18:22.6 (1100)|SOQL_EXECUTE_BEGIN|[2]|Aggregations:0|SELECT Id FROM Account\n' +
+    '09:18:22.6 (1200)|SOQL_EXECUTE_END|[2]|Rows:1\n' +
+    '09:18:22.6 (1800)|METHOD_EXIT|[1]|ns.Outer.run()\n';
+  const DML =
+    '09:18:22.6 (1000)|DML_BEGIN|[1]|Op:Insert|Type:Account|Rows:1\n' +
+    '09:18:22.6 (1100)|DML_END|[1]\n';
+
+  let view: CalltreeView;
+
+  beforeEach(() => {
+    globalThis.IntersectionObserver = AlwaysVisible as unknown as typeof IntersectionObserver;
+    view = new CalltreeView();
+    document.body.append(view);
+  });
+
+  afterEach(() => {
+    view.remove();
+    jest.restoreAllMocks();
+  });
+
+  async function typeOptions(): Promise<(string | undefined)[]> {
+    await view.updateComplete;
+    await settle();
+    await view.updateComplete;
+    return [...view.renderRoot.querySelectorAll('vs-select[label="Type"] vscode-option')]
+      .map((option) => option.textContent?.trim())
+      .slice(1);
+  }
+
+  it("lists the log's types once each, sorted, and no exit lines", async () => {
+    view.isVisible = true;
+    view.timelineRoot = storeOf(OUTER).log;
+    const types = await typeOptions();
+
+    expect(types).toEqual([...new Set(types)].sort());
+    expect(types).toEqual(expect.arrayContaining(['METHOD_ENTRY', 'SOQL_EXECUTE_BEGIN']));
+    expect(types).not.toContain('');
+    expect(types).not.toContain('METHOD_EXIT');
+  });
+
+  it('builds nothing for a log whose call tree is never shown', async () => {
+    view.remove();
+    globalThis.IntersectionObserver = NeverVisible as unknown as typeof IntersectionObserver;
+    view = new CalltreeView();
+    document.body.append(view);
+    const logIndex = jest.spyOn(LogStore.prototype, 'logIndex');
+    view.timelineRoot = storeOf(OUTER).log;
+    await typeOptions();
+
+    expect(logIndex).not.toHaveBeenCalled();
+  });
+
+  it('shows the types of the log it has now, not one it had before', async () => {
+    const before = storeOf(OUTER).log;
+    const logIndex = LogStore.prototype.logIndex;
+    let release = (): void => {};
+    const held = new Promise<void>((resolve) => (release = resolve));
+    // The earlier log's index lands last, as a slow build would.
+    jest.spyOn(LogStore.prototype, 'logIndex').mockImplementation(function (this: LogStore) {
+      const built = logIndex.call(this);
+      return this.log === before ? held.then(() => built) : built;
+    });
+
+    view.isVisible = true;
+    view.timelineRoot = before;
+    await view.updateComplete;
+    view.timelineRoot = storeOf(DML).log;
+    await typeOptions();
+    release();
+    const types = await typeOptions();
+
+    expect(types).toContain('DML_BEGIN');
+    expect(types).not.toContain('METHOD_ENTRY');
   });
 });

@@ -62,6 +62,8 @@ import { textPredicate } from './search/EventMatcher.js';
 
 interface ApexTimelineOptions extends TimelineOptions {
   themeName?: string | null;
+  /** Escape on the chart asks to drop the category highlight. Returns whether any was dropped. */
+  onCategoryDimClear?: () => boolean;
 }
 
 /** The flame chart already draws the subtree top down, so the inspector answers
@@ -155,6 +157,9 @@ export class ApexLogTimeline {
             options.onViewportChange(viewport);
           }
         },
+        onMeasurementChange: (measurement) => {
+          options.onMeasurementChange?.(measurement);
+        },
         onSearchNavigate: (event, screenX, screenY, depth) => {
           this.handleSearchNavigate(event, screenX, screenY, depth);
         },
@@ -185,6 +190,7 @@ export class ApexLogTimeline {
         onCopyMarker: (marker) => {
           copyToClipboard(marker.summary);
         },
+        onCategoryDimClear: options.onCategoryDimClear,
       },
     );
 
@@ -274,7 +280,7 @@ export class ApexLogTimeline {
    * none of them already. Never zooms - a full focus would be too disruptive.
    */
   private bringIntoView(frames: readonly FramePlacement[]): void {
-    const bounds = this.flamechart.getViewportManager()?.getBounds();
+    const bounds = this.flamechart.getViewportBounds();
     const target = bounds ? revealTarget(bounds, frames) : null;
     if (target) {
       const { timestamp, duration, depth } = target.frame;
@@ -342,8 +348,7 @@ export class ApexLogTimeline {
     // The frame only gives the depth to centre on; the window is the log's, and
     // padding 0 keeps the width asked for.
     const { start, width } = seekWindow(timestamp, this.apexLog?.duration.total ?? 0);
-    this.flamechart.getViewportManager()?.focusOnEvent(start, width, result?.depth ?? 0, 0);
-    this.flamechart.requestRender();
+    this.flamechart.focusOn(start, width, result?.depth ?? 0, 0);
   }
 
   private _reveal(result: { event: LogEvent; depth: number } | null): void {
@@ -353,8 +358,7 @@ export class ApexLogTimeline {
 
     this.flamechart.selectByEventNode(this.toEventNode(result));
     const { timestamp, duration } = result.event;
-    this.flamechart.getViewportManager()?.focusOnEvent(timestamp, duration.total, result.depth);
-    this.flamechart.requestRender();
+    this.flamechart.focusOn(timestamp, duration.total, result.depth);
   }
 
   private toEventNode(result: { event: LogEvent; depth: number }): EventNode {
@@ -388,6 +392,14 @@ export class ApexLogTimeline {
    */
   public setTooltipEnabled(enabled: boolean): void {
     this.tooltipRenderer?.setEnabled(enabled);
+  }
+
+  /**
+   * Keep every frame of these categories in colour and dim the rest.
+   * @param categories - Log categories; an empty set drops the highlight
+   */
+  public setCategoryDim(categories: ReadonlySet<string>): void {
+    this.flamechart.setCategoryDim(categories);
   }
 
   /**

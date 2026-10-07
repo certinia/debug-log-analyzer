@@ -163,8 +163,8 @@ export class LogDiagnosticsView extends LitElement {
         margin: var(--lana-space-2xs) 0 var(--lana-space-xs);
       }
 
-      /* Chrome stays neutral and colour stays on the glyph, so a pressed segment
-         reads as pressed rather than as a more severe one. */
+      /* Severity colour stays on the glyph and pressed takes the shared toggle-on
+         accent, so a pressed segment reads as pressed rather than as a more severe one. */
       .rollup__seg {
         display: flex;
         align-items: center;
@@ -183,16 +183,6 @@ export class LogDiagnosticsView extends LitElement {
         transition:
           background-color 0.15s ease-out,
           border-color 0.15s ease-out;
-      }
-
-      .rollup__seg:hover {
-        background-color: var(--lana-row-hover-bg);
-      }
-
-      .rollup__seg[aria-pressed='true'] {
-        border-color: var(--lana-fg-muted);
-        background-color: var(--lana-code-bg);
-        color: var(--lana-fg);
       }
 
       .rollup__seg:focus-visible {
@@ -515,7 +505,7 @@ export class LogDiagnosticsView extends LitElement {
       ${bands.map(({ severity, count }) => {
         const held = this._filters.includes(severity);
         return html`<button
-          class="rollup__seg"
+          class="rollup__seg pill-toggle"
           type="button"
           aria-pressed=${held}
           title=${`${count} ${severity} ${count === 1 ? 'finding' : 'findings'}`}

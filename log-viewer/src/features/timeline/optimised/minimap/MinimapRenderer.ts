@@ -26,7 +26,7 @@
  */
 
 import * as PIXI from 'pixi.js';
-import { formatDuration, formatTimeRange } from '../../../../core/utility/Util.js';
+import { formatDuration, formatTimeRange, sameMembers } from '../../../../core/utility/Util.js';
 import type { TimelineMarker } from '../../types/flamechart.types.js';
 import {
   MARKER_ALPHA_BY_TYPE,
@@ -37,6 +37,7 @@ import {
 } from '../../types/flamechart.types.js';
 import { layoutMarkerRects, type MarkerLayoutItem } from '../markers/MarkerProcessor.js';
 import { createRectangleShader } from '../RectangleShader.js';
+import { colorToGreyscale } from '../rendering/ColorUtils.js';
 import { MinimapAxisRenderer } from './MinimapAxisRenderer.js';
 import { MinimapBarGeometry } from './MinimapBarGeometry.js';
 import type { MinimapDensityData } from './MinimapDensityQuery.js';
@@ -112,6 +113,9 @@ export class MinimapRenderer {
 
   /** Flag indicating static content needs redraw. */
   private staticDirty = true;
+
+  // With any set, skyline columns topped by another category are greyed.
+  private litCategories: ReadonlySet<string> = new Set();
 
   /** Cached display width for invalidation detection. */
   private cachedDisplayWidth = 0;
@@ -292,6 +296,18 @@ export class MinimapRenderer {
    * Call this when minimap data, size, or theme changes.
    */
   public invalidateStatic(): void {
+    this.staticDirty = true;
+  }
+
+  /**
+   * Keep these categories in colour and grey the rest of the skyline. An empty set
+   * draws it normally.
+   */
+  public setLitCategories(categories: ReadonlySet<string>): void {
+    if (sameMembers(categories, this.litCategories)) {
+      return;
+    }
+    this.litCategories = categories;
     this.staticDirty = true;
   }
 
@@ -548,7 +564,11 @@ export class MinimapRenderer {
 
       // Get color from batch colors
       const colorInfo = batchColors.get(bucket.dominantCategory);
-      const color = colorInfo?.color ?? 0x808080;
+      const baseColor = colorInfo?.color ?? 0x808080;
+      const color =
+        this.litCategories.size && !this.litCategories.has(bucket.dominantCategory)
+          ? colorToGreyscale(baseColor)
+          : baseColor;
 
       // Write bar to geometry buffer
       this.skylineBarGeometry.writeBar(

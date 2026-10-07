@@ -3,17 +3,19 @@
  */
 import { describe, expect, it } from '@jest/globals';
 
-import type { FrameBudgetOptions } from '../../core/utility/FrameBudget.js';
-import { cachedNamespaceSelfTimes, scopedNamespaceSelfTimes } from '../namespaceTime.js';
-import { namespaceEvent, log, roots, type FakeEvent } from './fixtures/logEvents.js';
+import { indexTree } from '#test-helpers/apexLog.js';
+import { namespaceColumn, namespaceSelfTimes } from '../namespaceTime.js';
+import { namespaceEvent, log, type FakeEvent } from './fixtures/logEvents.js';
 
-const options: FrameBudgetOptions = { yieldSlice: () => Promise.resolve() };
-// A fresh scope per call, so each case walks rather than answering from the memo.
-const selfTimes = (events: FakeEvent[]) => scopedNamespaceSelfTimes({}, {}, roots(events), options);
+async function selfTimes(scope: FakeEvent[] | null, top: FakeEvent[] = scope ?? []) {
+  const index = indexTree(log(top));
+  const rows = scope?.map((event) => index.rowOf(event.eventIndex)) ?? null;
+  return namespaceSelfTimes(index, await namespaceColumn(index), rows);
+}
 
 describe('namespace self times', () => {
   it('sums self time per namespace over the whole tree, largest first', async () => {
-    const slices = await selfTimes([
+    const slices = await selfTimes(null, [
       namespaceEvent('default', 100, [namespaceEvent('pkg', 500), namespaceEvent('default', 50)]),
       namespaceEvent('other', 200, [namespaceEvent('pkg', 25)]),
     ]);
@@ -28,7 +30,7 @@ describe('namespace self times', () => {
   it('counts the roots themselves, so a frame scope includes its own self time', async () => {
     const frame = namespaceEvent('pkg', 40, [namespaceEvent('default', 10)]);
 
-    expect(await selfTimes([frame])).toEqual([
+    expect(await selfTimes([frame], [namespaceEvent('other', 5, [frame])])).toEqual([
       { namespace: 'pkg', selfTime: 40 },
       { namespace: 'default', selfTime: 10 },
     ]);
@@ -38,7 +40,7 @@ describe('namespace self times', () => {
     const first = namespaceEvent('pkg', 30);
     const second = namespaceEvent('pkg', 20, [namespaceEvent('default', 5)]);
 
-    expect(await selfTimes([first, second])).toEqual([
+    expect(await selfTimes([second, first])).toEqual([
       { namespace: 'pkg', selfTime: 50 },
       { namespace: 'default', selfTime: 5 },
     ]);
@@ -49,7 +51,7 @@ describe('namespace self times', () => {
     const outer = namespaceEvent('default', 10, [nested]);
 
     // Recursion puts two occurrences of one method on the same call chain.
-    expect(await selfTimes([outer, nested])).toEqual([
+    expect(await selfTimes([nested, outer], [outer])).toEqual([
       { namespace: 'pkg', selfTime: 20 },
       { namespace: 'default', selfTime: 10 },
     ]);
@@ -71,43 +73,11 @@ describe('namespace self times', () => {
   it('reports nothing for a scope with no recorded time', async () => {
     expect(await selfTimes([namespaceEvent('pkg', 0)])).toEqual([]);
   });
-});
 
-describe('scopedNamespaceSelfTimes', () => {
-  it('memoises per scope, returning the same array for the same log', async () => {
-    const apexLog = log([namespaceEvent('pkg', 100)]);
+  it('reports nothing for an empty scope, unlike the whole log', async () => {
+    const top = [namespaceEvent('pkg', 100)];
 
-    expect(await scopedNamespaceSelfTimes(apexLog, apexLog, apexLog.children, options)).toBe(
-      await scopedNamespaceSelfTimes(apexLog, apexLog, apexLog.children, options),
-    );
-  });
-
-  it('memoises a frame apart from the log it is in', async () => {
-    const frame = namespaceEvent('pkg', 100);
-    const apexLog = log([frame]);
-    const whole = await scopedNamespaceSelfTimes(apexLog, apexLog, apexLog.children, options);
-
-    expect(await scopedNamespaceSelfTimes(apexLog, frame, roots([frame]), options)).not.toBe(whole);
-  });
-
-  it('answers a walked scope synchronously, and an unwalked one not at all', async () => {
-    const apexLog = log([namespaceEvent('pkg', 100)]);
-
-    expect(cachedNamespaceSelfTimes(apexLog, apexLog)).toBeUndefined();
-    const slices = await scopedNamespaceSelfTimes(apexLog, apexLog, apexLog.children, options);
-    expect(cachedNamespaceSelfTimes(apexLog, apexLog)).toBe(slices);
-  });
-
-  it('walks again for the same scope in another log', async () => {
-    const instances = [0];
-    const first = log([namespaceEvent('pkg', 100)]);
-    const second = log([namespaceEvent('other', 400)]);
-
-    const before = await scopedNamespaceSelfTimes(first, instances, first.children, options);
-
-    expect(cachedNamespaceSelfTimes(second, instances)).toBeUndefined();
-    expect(await scopedNamespaceSelfTimes(second, instances, second.children, options)).not.toBe(
-      before,
-    );
+    expect(await selfTimes([], top)).toEqual([]);
+    expect(await selfTimes(null, top)).toEqual([{ namespace: 'pkg', selfTime: 100 }]);
   });
 });

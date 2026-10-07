@@ -34,7 +34,7 @@ function timelineWithSpy(): {
       handleSelect.call(timeline, null);
       return true;
     },
-    getViewportManager: () => null,
+    getViewportBounds: () => null,
   };
   internals['pickEmphasis'] = (eventIndex: number) => calls.push(eventIndex);
   internals['clearEmphasis'] = () => calls.push('clear');

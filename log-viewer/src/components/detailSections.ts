@@ -4,6 +4,7 @@
 import { html, type TemplateResult } from 'lit';
 
 import type { DetailSelection, DetailSource, SelectionView } from '../core/events/EventBus.js';
+import type { TimeWindow } from '../core/log/rangeScope.js';
 import { buildDatabaseSections } from '../features/database/components/databaseSections.js';
 import type { PaneSection } from './PaneView.js';
 
@@ -41,6 +42,10 @@ import './VariablesDetail.js';
  * ambient scope only applies when `selection` is `null`, so it belongs inside
  * the `!selection` branch — never above it.
  *
+ * `window` is the stretch of log the Timeline is showing, or null for all of it.
+ * Only the whole-log call tree reads it, to say that it alone is not narrowed;
+ * every other section follows the window itself.
+ *
  * `active` is what the user walked to inside the selection's own call stack:
  * one frame, or the calls a row counts where the view's rows merge occurrences.
  * Details and the call tree follow it; the call stack stays anchored to
@@ -55,6 +60,7 @@ export async function buildDetailSections(
   selection: DetailSelection | null,
   active: DetailSelection | null = null,
   sourceView?: SelectionView,
+  window: TimeWindow | null = null,
   hidden: ReadonlySet<string> = new Set(),
 ): Promise<PaneSection[]> {
   // Nothing selected: the whole log is the scope. `DetailDock`'s own empty
@@ -65,7 +71,7 @@ export async function buildDetailSections(
         id: 'overview',
         title: 'Overview',
         fit: 'content',
-        content: html`<log-overview></log-overview>`,
+        content: html`<log-overview .wholeLog=${source !== 'timeline'}></log-overview>`,
       },
     ];
     if (source === 'calltree') {
@@ -135,6 +141,9 @@ export async function buildDetailSections(
       );
     }
     if (source === 'timeline') {
+      // The four sections below read the window themselves; this one does not,
+      // so it says so rather than contradicting them in silence.
+      const scoped = window !== null;
       // The Timeline's whole-log analogue: where the time went (by category and
       // by frame) and how governor consumption built up across the log.
       sections.push(
@@ -156,7 +165,7 @@ export async function buildDetailSections(
           // section, asked at whole-log scope. Collapse and order are remembered
           // per list, so the two scopes still keep their own.
           id: 'calltree',
-          title: 'Call tree',
+          title: scoped ? 'Call tree · whole log' : 'Call tree',
           weight: 4,
           // The Timeline draws the whole log top down, so the tree answers with
           // where its time went. Time Order would open on two collapsed roots.
@@ -288,9 +297,8 @@ export async function buildDetailSections(
  * same section, asked of the whole log or of a selection.
  *
  * A bar and a legend line per namespace, so it draws little and varies by a
- * line. Asked of the whole log it is worked out once, so it sizes to that;
- * asked of a selection it empties to one line of prose while each frame's
- * figures are added up, and a content-sized pane would flicker on every step.
+ * line. Asked of the whole log it sizes to that; asked of a selection each step
+ * can add or drop a legend line, and a content-sized pane would jump on every step.
  */
 function namespaceTimeSection(
   content: TemplateResult,
