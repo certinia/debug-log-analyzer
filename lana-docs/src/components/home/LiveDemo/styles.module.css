@@ -1,0 +1,84 @@
+.demo {
+  margin: 3rem 0 0;
+  overflow: hidden;
+  border: 1px solid var(--lana-rule);
+  border-bottom: 0;
+  border-radius: 10px 10px 0 0;
+}
+
+.bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.5rem 0.75rem 0.5rem 1rem;
+  border-bottom: 1px solid var(--lana-rule);
+  background: var(--lana-surface);
+  font-size: 0.9rem;
+}
+
+.label {
+  color: var(--lana-muted);
+}
+
+.label strong {
+  color: var(--lana-ink);
+}
+
+.controls {
+  display: flex;
+  gap: 0.5rem;
+}
+
+/* The bottom fades into the page so the screenshot reads as a preview, not a framed image. */
+.poster {
+  position: relative;
+  cursor: pointer;
+}
+
+.poster::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(to bottom, transparent 70%, var(--ifm-background-color));
+  pointer-events: none;
+}
+
+.poster img {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+.live {
+  display: flex;
+  flex-direction: column;
+  height: min(85vh, 960px);
+  border-bottom: 1px solid var(--lana-rule);
+  border-radius: 10px;
+}
+
+.live iframe {
+  display: block;
+  flex: 1;
+  width: 100%;
+  border: 0;
+}
+
+.live:fullscreen {
+  height: 100vh;
+  border: 0;
+  border-radius: 0;
+}
+
+/* The viewer needs a desktop-sized window, so small screens keep the screenshot only. */
+@media (max-width: 768px) {
+  .bar {
+    display: none;
+  }
+
+  .poster {
+    cursor: auto;
+    pointer-events: none;
+  }
+}

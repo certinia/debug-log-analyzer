@@ -1,8 +1,8 @@
 import Link from '@docusaurus/Link';
 import GitHubStars from '@site/src/components/GitHubStars';
-import { ASSETS_URL } from '@site/src/constants';
 import type { ReactElement } from 'react';
 import InstallButtons from '../InstallButtons';
+import LiveDemo from '../LiveDemo';
 import styles from './styles.module.css';
 
 const RELEASES = [
@@ -56,15 +56,7 @@ export default function Hero(): ReactElement {
             <Link to="/community/changelog">All release notes</Link>
           </aside>
         </div>
-        <figure className={styles.preview}>
-          <img
-            src={`${ASSETS_URL}/timeline.png`}
-            alt="Apex Log Analyzer showing a 24.6 second transaction: the Timeline flame chart with its minimap and governor limits strip, beside the Inspector overview"
-            width={1920}
-            height={1023}
-            fetchPriority="high"
-          />
-        </figure>
+        <LiveDemo />
       </div>
     </header>
   );
