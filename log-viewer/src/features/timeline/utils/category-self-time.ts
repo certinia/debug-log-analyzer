@@ -3,7 +3,7 @@
  */
 import { LOG_CATEGORY, type LogCategory } from '@apexdevtools/apex-log-parser';
 
-import type { LogIndex } from '../../../core/log/LogIndex.js';
+import { type LogIndex, sumSelfBy } from '../../../core/log/LogIndex.js';
 
 import type { TimelineKeyEntry } from '../components/TimelineKey.js';
 
@@ -13,11 +13,7 @@ import type { TimelineKeyEntry } from '../components/TimelineKey.js';
  * log duration with no double counting.
  */
 export function selfTimeByCategory(index: LogIndex): ReadonlyMap<string, number> {
-  const sums = new Float64Array(index.categoryNames.length);
-  const { categoryId, self } = index;
-  for (let row = 0; row < index.rowCount; row++) {
-    sums[categoryId[row]!]! += self[row]!;
-  }
+  const sums = sumSelfBy(index, index.categoryId, index.categoryNames.length, null);
   return new Map(index.categoryNames.map((name, id) => [name, sums[id]!]));
 }
 
