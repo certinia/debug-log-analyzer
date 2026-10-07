@@ -13,6 +13,7 @@
 import type { LogEvent } from '@apexdevtools/apex-log-parser';
 import * as PIXI from 'pixi.js';
 
+import { DimState } from './DimState.js';
 import { HoverTracker } from './interaction/HoverTracker.js';
 import { HoverHighlightRenderer } from './rendering/HoverHighlightRenderer.js';
 import { createTimelineApp, destroyTimelineApp } from './rendering/pixiApp.js';
@@ -139,6 +140,8 @@ export interface FlameChartCallbacks {
   onCopyMarker?: (marker: TimelineMarker) => void;
   /** Called when measurement state changes (started, updated, finished, cleared). */
   onMeasurementChange?: (measurement: MeasurementSnapshot | null) => void;
+  /** Called when Escape asks to drop the category highlight. Returns whether the owner dropped any. */
+  onCategoryDimClear?: () => boolean;
 }
 
 export class FlameChart<E extends EventNode = EventNode> {
@@ -222,10 +225,7 @@ export class FlameChart<E extends EventNode = EventNode> {
   private cachedBuckets: Map<string, import('../types/flamechart.types.js').PixelBucket[]> | null =
     null;
 
-  // The frames the inspector points at: they keep their colour while the rest of
-  // the chart is dimmed. Empty means no emphasis, so the chart draws normally.
-  private emphasisIds = new Set<string>();
-  private emphasisInfo: MatchedEventInfo[] = [];
+  private readonly dimState = new DimState(() => this.searchOrchestrator?.hasCursor() ?? false);
 
   /**
    * Initialize the flamechart renderer.
@@ -1302,12 +1302,13 @@ export class FlameChart<E extends EventNode = EventNode> {
         this.notifyViewportChange();
       },
       onEscape: () => {
-        // Clear in order: measurement → selection → search
+        // Clear in order: measurement → selection → category highlight → search
         if (this.measurementOrchestrator?.hasMeasurement()) {
           this.measurementOrchestrator.clearMeasurement();
         } else if (this.selectionOrchestrator?.hasAnySelection()) {
           this.selectionOrchestrator.clearSelection();
-        } else {
+        } else if (!(this.dimState.legendShowing() && this.callbacks.onCategoryDimClear?.())) {
+          // Falls through when only a chip under the pointer lights the legend: nothing to drop.
           this.clearSearch();
         }
       },
@@ -2134,12 +2135,32 @@ export class FlameChart<E extends EventNode = EventNode> {
         category: rect.category,
       });
     }
-    if (ids.size === this.emphasisIds.size && [...ids].every((id) => this.emphasisIds.has(id))) {
+    if (this.dimState.setEmphasis(ids, info)) {
+      this.requestRender();
+    }
+  }
+
+  /**
+   * Keep every frame of these categories in colour and dim the rest, as the
+   * inspector emphasis does. Search and that emphasis outrank it. An empty set
+   * drops it.
+   *
+   * @param categories - Category names, as on `PrecomputedRect.category`
+   */
+  public setCategoryDim(categories: ReadonlySet<string>): void {
+    const wasShowing = this.dimState.legendShowing();
+    if (!this.dimState.setCategories(categories) || !this.state) {
       return;
     }
-    this.emphasisIds = ids;
-    this.emphasisInfo = info;
-    this.requestRender();
+    // Under a search or the inspector's emphasis, the change is not on screen.
+    if (!wasShowing && !this.dimState.legendShowing()) {
+      return;
+    }
+    // The culled frames stay valid: only their colour changes.
+    this.state.renderDirty.eventRendering = true;
+    this.state.renderDirty.minimap = true;
+    this.state.needsRender = true;
+    this.scheduleRender();
   }
 
   /**
@@ -2485,23 +2506,16 @@ export class FlameChart<E extends EventNode = EventNode> {
       buckets: typeof buckets;
     },
   ): void {
-    const hasActiveSearch = this.searchOrchestrator?.hasCursor() ?? false;
+    const dim = this.dimState.chart();
 
-    if (hasActiveSearch) {
+    if (dim === 'search') {
       // Search mode: render with desaturation
       this.searchOrchestrator!.renderStyledEvents(searchContext);
       this.searchOrchestrator!.renderStyledLabels(searchContext);
       this.batchRenderer?.clear();
-    } else if (this.emphasisIds.size && this.searchOrchestrator) {
-      // The inspector points at frames: same two tiers, driven by those frames
-      // rather than by search matches. A search outranks it — the user asked for
-      // that, and only one dim can be on screen.
-      this.searchOrchestrator.renderDimmedExcept(
-        searchContext,
-        this.emphasisIds,
-        this.emphasisInfo,
-      );
-      this.searchOrchestrator.renderLabelsDimmedExcept(searchContext, this.emphasisIds);
+    } else if (dim && this.searchOrchestrator) {
+      this.searchOrchestrator.renderDimmedExcept(searchContext, dim.ids, dim.info, dim.categories);
+      this.searchOrchestrator.renderLabelsDimmedExcept(searchContext, dim.ids, dim.categories);
       this.batchRenderer?.clear();
     } else {
       // Normal mode: render with original colors
@@ -2554,6 +2568,8 @@ export class FlameChart<E extends EventNode = EventNode> {
     if (!this.minimapOrchestrator || !this.viewport || !this.state) {
       return;
     }
+
+    this.minimapOrchestrator.setLitCategories(this.dimState.minimapCategories());
 
     const bounds = this.viewport.getBounds();
     this.minimapOrchestrator.render({
