@@ -88,10 +88,9 @@ export class Timelinekey extends LitElement {
         color: var(--lana-fg);
       }
 
-      /* Inset: the legend row clips anything outside the chip. */
       .chip:focus-visible {
         outline: var(--lana-focus-ring);
-        outline-offset: var(--lana-focus-inset);
+        outline-offset: var(--lana-focus-offset);
       }
 
       /* The time is the data: full foreground against the muted label, and figure

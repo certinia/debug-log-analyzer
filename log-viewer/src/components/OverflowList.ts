@@ -84,13 +84,15 @@ export class OverflowList extends LitElement {
         width: 100%;
       }
 
-      /* Items take the remaining space and clip; the toggle is pushed to the collapse end. */
+      /* Items take the remaining space and clip; the toggle is pushed to the collapse end.
+         The margin leaves room for an item's focus ring. */
       .items {
         display: flex;
         flex-wrap: nowrap;
         align-items: center;
         min-width: 0;
-        overflow: hidden;
+        overflow: clip;
+        overflow-clip-margin: calc(2 * var(--lana-stroke));
         flex: 1 1 auto;
       }
 
