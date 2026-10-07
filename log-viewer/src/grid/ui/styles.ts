@@ -125,11 +125,19 @@ export const gridStyles = css`
         font-variant-numeric: tabular-nums;
       }
 
+      /* A flex row, so a long name wraps beside the twisty, not under it. */
       &.tree {
+        display: flex;
+        align-items: baseline;
         padding-inline-start: calc(var(--grid-pad) + var(--grid-depth, 0) * var(--grid-indent));
         font-family: var(--grid-tree-font);
         white-space: normal;
         overflow-wrap: anywhere;
+
+        & .content {
+          flex: 1;
+          min-width: 0;
+        }
       }
     }
 
@@ -191,6 +199,7 @@ export const gridStyles = css`
 
     .twisty {
       display: inline-block;
+      flex: none;
       width: var(--grid-twisty);
       vertical-align: middle;
       cursor: pointer;
@@ -202,9 +211,9 @@ export const gridStyles = css`
         display: inline-block;
         border-block: 4px solid transparent;
         border-inline-start: 6px solid currentColor;
-        transition: rotate 0.1s;
       }
 
+      /* No transition: rows are recycled, so a reused row would animate on scroll. */
       &.open::before {
         rotate: 90deg;
       }

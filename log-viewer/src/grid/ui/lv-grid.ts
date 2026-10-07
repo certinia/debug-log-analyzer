@@ -383,7 +383,7 @@ export class LvGrid<R extends object = object> extends LitElement {
     return html`<div
       class="cell colhead ${column.align === 'end' ? 'end' : ''}"
       role="columnheader"
-      title=${column.title}
+      title=${column.description ?? column.title}
       aria-sort=${ariaSort}
       ?data-sortable=${column.sort !== undefined}
       @click=${(e: MouseEvent) => this.onHeaderClick(e, column)}

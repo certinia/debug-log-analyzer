@@ -404,6 +404,23 @@ describe('lv-grid columns', () => {
     expect(handle(header('Time'))).not.toBeNull();
   });
 
+  it('shows a column description as its header tooltip, else its title', async () => {
+    const { header } = await setup({
+      columns: columns().map((column) =>
+        column.id === 'time' ? { ...column, description: 'Time spent, in ms' } : column,
+      ),
+    });
+    expect(header('Time')?.title).toBe('Time spent, in ms');
+    expect(header('Kind')?.title).toBe('Kind');
+  });
+
+  it('keeps the twisty out of the wrapping content of a tree cell', async () => {
+    const { rowNamed } = await setup();
+    const cell = rowNamed('b')?.querySelector('.cell');
+    expect(cell?.firstElementChild?.matches('[data-toggle]')).toBe(true);
+    expect(cell?.querySelector('.content')?.textContent).toBe('b');
+  });
+
   it('reports a right-click on a header, for the column menu', async () => {
     const { grid, header } = await setup();
     const opened: GridHeaderContextDetail[] = [];

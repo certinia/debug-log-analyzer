@@ -39,7 +39,9 @@ function groupCells<R>(group: Group<R>, columns: readonly GridColumn<R>[], open:
       html`<div class=${cellClass(column, i === 0)} role="gridcell">
         ${
           i === 0
-            ? html`${twisty(true, open)}${column.groupCell?.(group) ?? `${group.key} (${group.rows.length})`}`
+            ? html`${twisty(true, open)}<span class="content"
+                  >${column.groupCell?.(group) ?? `${group.key} (${group.rows.length})`}</span
+                >`
             : column.calc
               ? total(column, group.totals[column.id])
               : nothing
@@ -65,7 +67,11 @@ function rowCells<R>(
         ?data-grid-find=${column.text !== undefined}
         style=${i === 0 ? `--grid-depth: ${depth}` : nothing}
       >
-        ${i === 0 ? twisty(kids, open) : nothing}${column.cell(row)}
+        ${
+          i === 0
+            ? html`${twisty(kids, open)}<span class="content">${column.cell(row)}</span>`
+            : column.cell(row)
+        }
       </div>`,
   );
 }

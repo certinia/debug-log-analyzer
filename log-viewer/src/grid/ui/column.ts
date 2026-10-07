@@ -15,6 +15,8 @@ export interface GridColumn<R> {
   /** Unique within the grid; names the column's total and its sort. */
   id: string;
   title: string;
+  /** The header tooltip. Default: the title. */
+  description?: string;
   /** Pixels, or `flex` to take the room the others leave. Default `flex`. */
   width?: number | 'flex';
   /** Smallest width in pixels. Default 40. */
