@@ -367,11 +367,13 @@ export class SearchOrchestrator<E extends EventNode = EventNode> {
    * @param eventIds - Rect ids to keep at full colour
    * @param eventsInfo - The same frames' time/depth/category, so a frame merged
    *   into a pixel bucket still lights
+   * @param litCategories - Categories kept at full colour whole (the legend highlight)
    */
   public renderDimmedExcept(
     context: SearchRenderContext,
     eventIds: ReadonlySet<string>,
     eventsInfo: ReadonlyArray<MatchedEventInfo>,
+    litCategories?: ReadonlySet<string>,
   ): void {
     this.ensureRenderersInitialized();
     this.searchStyleRenderer?.render(
@@ -380,6 +382,7 @@ export class SearchOrchestrator<E extends EventNode = EventNode> {
       context.buckets,
       context.viewportState,
       eventsInfo,
+      litCategories,
     );
   }
 
@@ -415,13 +418,20 @@ export class SearchOrchestrator<E extends EventNode = EventNode> {
    *
    * @param context - Render context with viewport state and visible rects
    * @param eventIds - Rect ids to keep at full strength
+   * @param litCategories - Categories kept at full strength whole
    */
   public renderLabelsDimmedExcept(
     context: SearchRenderContext,
     eventIds: ReadonlySet<string>,
+    litCategories?: ReadonlySet<string>,
   ): void {
     this.ensureRenderersInitialized();
-    this.searchTextLabelRenderer?.render(context.visibleRects, eventIds, context.viewportState);
+    this.searchTextLabelRenderer?.render(
+      context.visibleRects,
+      eventIds,
+      context.viewportState,
+      litCategories,
+    );
   }
 
   /**

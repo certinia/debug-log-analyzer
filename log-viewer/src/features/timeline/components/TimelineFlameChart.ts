@@ -15,6 +15,7 @@ import { customElement, property, query, state } from 'lit/decorators.js';
 import type { ApexLog } from '@apexdevtools/apex-log-parser';
 import { SubscriptionController } from '../../../core/events/SubscriptionController.js';
 import { themeObserver } from '../../../core/theme/ThemeObserver.js';
+import { setChanged } from '../../../core/utility/Util.js';
 import { ApexLogTimeline } from '../optimised/ApexLogTimeline.js';
 import { parseColorToHex } from '../optimised/rendering/ColorUtils.js';
 import type { EditorColors, TimelineOptions } from '../types/flamechart.types.js';
@@ -94,6 +95,13 @@ export class TimelineFlameChart extends LitElement {
   showTooltip = true;
 
   /**
+   * Categories kept in colour while the rest of the chart is dimmed; empty for none.
+   * A property, so the highlight survives a chart re-initialisation.
+   */
+  @property({ attribute: false, hasChanged: setChanged })
+  dimCategories: ReadonlySet<string> = new Set();
+
+  /**
    * Optional configuration options.
    */
   @state()
@@ -159,6 +167,9 @@ export class TimelineFlameChart extends LitElement {
     if (changedProperties.has('showTooltip')) {
       this.apexLogTimeline?.setTooltipEnabled(this.showTooltip);
     }
+    if (changedProperties.has('dimCategories')) {
+      this.apexLogTimeline?.setCategoryDim(this.dimCategories);
+    }
   }
 
   /**
@@ -201,6 +212,11 @@ export class TimelineFlameChart extends LitElement {
         ...this.options,
         themeName: this.themeName,
         editorColors: this.extractEditorColors(),
+        // The view cancels the event once the legend drops its picks.
+        onCategoryDimClear: () =>
+          !this.dispatchEvent(
+            new Event('category-highlight-clear', { bubbles: true, cancelable: true }),
+          ),
       };
 
       const epoch = this.initEpoch;
@@ -216,6 +232,7 @@ export class TimelineFlameChart extends LitElement {
       }
       this.apexLogTimeline = timeline;
       timeline.setTooltipEnabled(this.showTooltip);
+      timeline.setCategoryDim(this.dimCategories);
 
       // Navigate after initialization completes, preferring unique eventIndex.
       if (this.navigateToEventIndex !== undefined) {
