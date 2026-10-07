@@ -64,6 +64,13 @@ describe('GridStore.exportText', () => {
     expect(text?.split('\n')[2]).toBe('tab here\t');
   });
 
+  it('writes every line once, with no gap or join where its parts meet', async () => {
+    const roots = Array.from({ length: 10_000 }, (_, i) => n(`r${i}`, `row ${i}`, i, 'apex'));
+    const store = new GridStore(source(roots));
+    const text = await store.exportText(columns, { format: 'tsv' });
+    expect(text).toBe(['Name\tSelf', ...roots.map((r) => `${r.name}\t${r.self}`)].join('\n'));
+  });
+
   it('writes each group before its rows, and only top-level rows when asked', async () => {
     const store = new GridStore(source(tree()), { groupBy: (r) => r.kind });
     expect(await store.exportText(columns, { format: 'tsv', tree: false })).toBe(

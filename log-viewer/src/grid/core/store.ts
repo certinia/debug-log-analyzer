@@ -18,6 +18,8 @@ import type { Compare, ExpandPolicy, RowFilter, RowKey, TreeSource } from './typ
 const HAS_CHILDREN = 1;
 const EXPANDED = 2;
 const GROUP = 4;
+/** Export lines joined per slice: one join of the whole text is a long task at 500k rows. */
+const EXPORT_CHUNK = 4096;
 
 /** The rows on screen, in order. Immutable: a change publishes a new one. */
 export interface RowView<R> {
@@ -381,17 +383,25 @@ export class GridStore<R extends object> {
     await this.settled();
     const stale = (): boolean => this.running;
     const { format } = options;
-    const lines = [headerLine(columns, format)];
+    const chunks: string[] = [];
+    let lines = [headerLine(columns, format)];
     const done = await drive(
       this.eachRow(options.tree ?? true, (entry) => {
         lines.push(
           entry instanceof Group ? groupLine(entry.key, format) : rowLine(entry, columns, format),
         );
+        if (lines.length === EXPORT_CHUNK) {
+          chunks.push(lines.join('\n'));
+          lines = [];
+        }
       }),
       sliceTimer(this.scheduler, stale),
       stale,
     );
-    return done && !stale() ? lines.join('\n') : null;
+    if (lines.length) {
+      chunks.push(lines.join('\n'));
+    }
+    return done && !stale() ? chunks.join('\n') : null;
   }
 
   private reorder(): Promise<void> {
