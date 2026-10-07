@@ -1,0 +1,111 @@
+.hero {
+  padding: 4.5rem 0 0;
+  overflow: hidden;
+}
+
+.intro {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 20rem;
+  gap: 3rem;
+  align-items: end;
+}
+
+.title {
+  max-width: 14ch;
+  margin-bottom: 1.25rem;
+  font-size: clamp(2.6rem, 6.5vw, 4.75rem);
+  font-stretch: 80%;
+  font-weight: 700;
+  line-height: 0.98;
+  letter-spacing: -0.02em;
+}
+
+.lede {
+  max-width: 60ch;
+  margin-bottom: 2rem;
+  color: var(--lana-muted);
+  font-size: 1.25rem;
+  line-height: 1.5;
+}
+
+.note {
+  margin: 1.25rem 0 0;
+  color: var(--lana-muted);
+  font-size: 0.95rem;
+}
+
+.releases {
+  padding-left: 1.5rem;
+  border-left: 1px solid var(--lana-rule);
+}
+
+.releasesTitle {
+  margin-bottom: 0.75rem;
+  font-size: 1rem;
+}
+
+.releaseList {
+  margin: 0 0 1rem;
+  padding: 0;
+  list-style: none;
+}
+
+.releaseList li + li {
+  margin-top: 0.75rem;
+}
+
+.release {
+  display: grid;
+  grid-template-columns: 3.25rem 1fr;
+  gap: 0.5rem;
+  color: var(--lana-muted);
+  font-size: 0.95rem;
+  line-height: 1.4;
+}
+
+.version {
+  color: var(--lana-accent-text);
+  font-family: var(--ifm-font-family-monospace);
+  font-weight: 600;
+}
+
+/* The bottom fades into the page so the screenshot reads as a preview, not a framed image. */
+.preview {
+  position: relative;
+  margin: 3rem 0 0;
+}
+
+.preview::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(to bottom, transparent 70%, var(--ifm-background-color));
+  pointer-events: none;
+}
+
+.preview img {
+  display: block;
+  width: 100%;
+  height: auto;
+  border: 1px solid var(--lana-rule);
+  border-bottom: 0;
+  border-radius: 10px 10px 0 0;
+}
+
+@media (max-width: 996px) {
+  .intro {
+    grid-template-columns: 1fr;
+  }
+
+  .releases {
+    padding: 1.25rem 0 0;
+    border-top: 1px solid var(--lana-rule);
+    border-left: 0;
+  }
+}
+
+@media (max-width: 640px) {
+  .hero {
+    padding-top: 3rem;
+  }
+}
