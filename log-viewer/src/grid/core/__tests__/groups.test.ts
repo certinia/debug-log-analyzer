@@ -217,6 +217,8 @@ describe('GridStore totals', () => {
   });
 
   it('gives a max of 0 for no rows', () => {
-    expect(max(self).of([])).toBe(0);
+    const out = max(self).of([]);
+    const total = typeof out === 'number' ? out : out.next();
+    expect(total).toEqual({ value: 0, done: true });
   });
 });

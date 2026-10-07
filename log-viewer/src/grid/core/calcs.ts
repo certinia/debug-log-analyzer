@@ -20,26 +20,40 @@ export interface Calc<R> {
 export type Calcs<R> = Readonly<Record<string, Calc<R>>>;
 export type Totals = Readonly<Record<string, number>>;
 
+/**
+ * Rows a plain total reads between yields. A yield per row costs more than the sum, and an
+ * `all` scope can be every row of a large tree.
+ */
+const ROWS_PER_YIELD = 1024;
+
+/** Sums `value` over the rows, in slices. */
 export function sum<R>(value: (row: R) => number, scope?: Calc<R>['scope']): Calc<R> {
   return {
     scope,
-    of: (rows) => {
+    *of(rows) {
       let total = 0;
-      for (const row of rows) {
-        total += value(row);
+      for (let i = 0; i < rows.length; i++) {
+        total += value(rows[i] as R);
+        if (i % ROWS_PER_YIELD === ROWS_PER_YIELD - 1) {
+          yield;
+        }
       }
       return total;
     },
   };
 }
 
+/** The highest `value` over the rows, or 0 for none, in slices. */
 export function max<R>(value: (row: R) => number, scope?: Calc<R>['scope']): Calc<R> {
   return {
     scope,
-    of: (rows) => {
+    *of(rows) {
       let most = rows.length ? -Infinity : 0;
-      for (const row of rows) {
-        most = Math.max(most, value(row));
+      for (let i = 0; i < rows.length; i++) {
+        most = Math.max(most, value(rows[i] as R));
+        if (i % ROWS_PER_YIELD === ROWS_PER_YIELD - 1) {
+          yield;
+        }
       }
       return most;
     },
