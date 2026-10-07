@@ -1,0 +1,116 @@
+.performance {
+  padding: 3rem 0 0;
+}
+
+.performance .title {
+  margin-bottom: 0.75rem;
+}
+
+.lede {
+  max-width: 70ch;
+  color: var(--lana-muted);
+}
+
+.legend {
+  display: flex;
+  gap: 1.25rem;
+  margin: 1.5rem 0 0.5rem;
+  color: var(--lana-muted);
+  font-size: 0.875rem;
+}
+
+.legendItem {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.swatch {
+  width: 0.75rem;
+  height: 0.75rem;
+  border-radius: 2px;
+}
+
+.before {
+  background: var(--lana-series-before);
+}
+
+.after {
+  background: var(--lana-series-after);
+}
+
+.chart {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.row {
+  display: grid;
+  grid-template-columns: minmax(12rem, 17rem) 1fr 9rem 3.5rem;
+  grid-template-areas: 'task bars result version';
+  align-items: center;
+  gap: 1.5rem;
+  padding: 0.85rem 0;
+  border-top: 1px solid var(--lana-rule);
+}
+
+.task {
+  grid-area: task;
+  font-weight: 600;
+}
+
+.bars {
+  grid-area: bars;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.bar {
+  display: block;
+  width: 100%;
+  height: 10px;
+  border-radius: 0 4px 4px 0;
+}
+
+.bar.after {
+  width: calc(var(--share) * 100%);
+}
+
+.result {
+  grid-area: result;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.measured {
+  display: block;
+  color: var(--lana-muted);
+  font-size: 0.875rem;
+  font-weight: 400;
+}
+
+.version {
+  grid-area: version;
+  justify-self: end;
+  color: var(--lana-muted);
+  font-size: 0.875rem;
+  font-variant-numeric: tabular-nums;
+}
+
+@media (max-width: 640px) {
+  .row {
+    grid-template-columns: 1fr auto;
+    grid-template-areas:
+      'task version'
+      'bars bars'
+      'result result';
+    gap: 0.5rem 1rem;
+  }
+
+  .measured {
+    display: inline;
+    margin-left: 0.5rem;
+  }
+}

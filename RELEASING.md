@@ -52,7 +52,9 @@ A stable release is cut by hand. Do these steps in order:
 
 1. **Update the docs announcement bar.** Bump the version in the `announcementBar` content in
    [`lana-docs/docusaurus.config.ts`](./lana-docs/docusaurus.config.ts) (e.g. `v1.18` → `v1.20`)
-   so the docs site advertises the new release.
+   so the docs site advertises the new release. Update the `RELEASES` list in
+   [`lana-docs/src/components/home/Hero/index.tsx`](./lana-docs/src/components/home/Hero/index.tsx)
+   to match.
 
 1. **Bump the version.** Set `version` in [`lana/package.json`](./lana/package.json) to the new stable version. Use the **next even minor** (`1.18.x` → `1.20.0`) for a feature release, or a patch bump (`1.18.1` → `1.18.2`) for a fix-only release. Commit these changes to the selected release branch.
 1. **Create a GitHub Release.** Tag the release with a name that **exactly equals** the
@@ -103,8 +105,7 @@ At each stable feature release:
 2. Find/replace `assets/<old>` → `assets/<new>` across:
    - root `README.md` (**not** `lana/README.md` — it's a generated copy)
    - `lana-docs/docs/docs/**/*.md` (body references **and** `image:` frontmatter)
-   - `lana-docs/src/pages/index.mdx`
-   - `lana-docs/docusaurus.config.ts` (social card image)
+   - `lana-docs/src/constants.ts` (homepage screenshots and the social card image)
    - `scripts/screenshots/capture.sh` and `mov-to-gif.sh` — each defaults to the folder, and
      neither fails when it is stale
 3. Delete `lana/assets/<old>/`. The Marketplace only shows the latest README, so dropping old
