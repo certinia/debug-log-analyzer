@@ -1,0 +1,13 @@
+{
+  // Core is checked again without the DOM library, so any DOM use fails `pnpm lint`.
+  "extends": "../../../tsconfig.json",
+  "compilerOptions": {
+    "lib": ["ES2023"],
+    "types": [],
+    "composite": false,
+    "declarationMap": false,
+    "noEmit": true
+  },
+  "include": ["./**/*.ts"],
+  "exclude": ["./**/__tests__/**"]
+}
