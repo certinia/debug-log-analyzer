@@ -95,6 +95,24 @@ export function sharePercent(part: number, whole: number): number {
   return whole > 0 ? (part / whole) * 100 : 0;
 }
 
+/** Whether two sets hold the same members, whatever their order. */
+export function sameMembers<T>(a: ReadonlySet<T>, b: ReadonlySet<T>): boolean {
+  if (a.size !== b.size) {
+    return false;
+  }
+  for (const member of a) {
+    if (!b.has(member)) {
+      return false;
+    }
+  }
+  return true;
+}
+
+/** A Lit `hasChanged` for a `Set` property: a new set with the same members is no change. */
+export function setChanged(value: unknown, oldValue: unknown): boolean {
+  return !(value instanceof Set && oldValue instanceof Set && sameMembers(value, oldValue));
+}
+
 /** Integer → thousand-separated string (e.g. 1572864 → "1,572,864"), for heap/byte values. */
 export function formatInteger(value: number): string {
   return Math.round(value).toLocaleString();

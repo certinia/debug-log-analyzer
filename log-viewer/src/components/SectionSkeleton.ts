@@ -44,6 +44,10 @@ export class SectionSkeleton extends LitElement {
   @property()
   fallback = '';
 
+  /** Keeps the bars after the parse, while the section still derives its data. */
+  @property({ type: Boolean })
+  pending = false;
+
   static styles = [
     globalStyles,
     inspectorSectionStyles,
@@ -82,7 +86,7 @@ export class SectionSkeleton extends LitElement {
     if (this.logStatus === 'failed') {
       return html`<p class="note">${NO_LOG_TEXT}</p>`;
     }
-    if (this.logStatus === 'ready') {
+    if (this.logStatus === 'ready' && !this.pending) {
       return html`<p class="note">${this.fallback}</p>`;
     }
     // Decoration, not content: ten sections mount together and a live region

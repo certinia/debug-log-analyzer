@@ -28,6 +28,7 @@ export class LogStore {
   private _statements: Statements | null = null;
   private _keyPathIds: KeyPathIds | null = null;
   private _logIndex: Promise<LogIndex> | null = null;
+  private readonly _derived = new WeakMap<(index: LogIndex) => unknown, Promise<unknown>>();
 
   constructor(log: ApexLog) {
     this.log = log;
@@ -116,6 +117,25 @@ export class LogStore {
       this._logIndex = null;
       throw error;
     }));
+  }
+
+  /**
+   * `fn` run once over this log's index, its result shared by every caller.
+   * The function is the cache key, so pass a module-level one: an inline arrow is
+   * a new key on every call.
+   */
+  derive<T>(fn: (index: LogIndex) => T): Promise<T> {
+    let derived = this._derived.get(fn) as Promise<T> | undefined;
+    if (!derived) {
+      derived = this.logIndex()
+        .then(fn)
+        .catch((error: unknown) => {
+          this._derived.delete(fn);
+          throw error;
+        });
+      this._derived.set(fn, derived);
+    }
+    return derived;
   }
 
   private statements(): Statements {

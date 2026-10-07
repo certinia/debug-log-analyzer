@@ -122,3 +122,32 @@ export function resolveBucketSearchColor(
 
   return batchColors.get(winner)?.color ?? UNKNOWN_CATEGORY_COLOR;
 }
+
+/**
+ * Colour for a bucket holding a frame of a lit category, or `undefined` where it holds none.
+ * Several lit categories in one bucket: the one `CATEGORY_PRIORITY` ranks first wins.
+ */
+export function resolveBucketCategoryColor(
+  bucket: Pick<PixelBucket, 'categoryStats'>,
+  litCategories: ReadonlySet<string>,
+  batchColors: Map<string, BatchColorInfo>,
+): number | undefined {
+  let winner: string | undefined;
+  let winningPriority = Infinity;
+
+  for (const category of litCategories) {
+    if (!bucket.categoryStats.byCategory.has(category)) {
+      continue;
+    }
+    const priority = categoryPriority(category);
+    if (winner === undefined || priority < winningPriority) {
+      winner = category;
+      winningPriority = priority;
+    }
+  }
+
+  if (winner === undefined) {
+    return undefined;
+  }
+  return batchColors.get(winner)?.color ?? UNKNOWN_CATEGORY_COLOR;
+}

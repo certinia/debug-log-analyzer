@@ -29,6 +29,8 @@ import { isLightBackground } from '../rendering/ColorUtils.js';
 const DIMMED_DARK_THEME_COLOR = 0x6b6b6b; // Dimmed light text for dark backgrounds
 const DIMMED_LIGHT_THEME_COLOR = 0x9e9e9e; // Dimmed dark text for light backgrounds
 
+const NO_CATEGORIES: ReadonlySet<string> = new Set();
+
 /**
  * SearchTextLabelRenderer
  *
@@ -76,11 +78,13 @@ export class SearchTextLabelRenderer {
    * @param culledRects - Rectangles grouped by category (from RectangleCache)
    * @param matchedEventIds - Set of event IDs that match search
    * @param viewport - Current viewport state for sticky label positioning
+   * @param litCategories - Categories whose every label stays legible, as if matched
    */
   public render(
     culledRects: Map<string, PrecomputedRect[]>,
     matchedEventIds: ReadonlySet<string>,
     viewport: ViewportState,
+    litCategories: ReadonlySet<string> = NO_CATEGORIES,
   ): void {
     // Reset visibility for unmatched labels (managed by this renderer)
     for (const label of this.labels.values()) {
@@ -88,10 +92,10 @@ export class SearchTextLabelRenderer {
     }
 
     // Render unmatched events (dimmed) - managed by this renderer
-    this.renderUnmatchedLabels(culledRects, matchedEventIds, viewport);
+    this.renderUnmatchedLabels(culledRects, matchedEventIds, viewport, litCategories);
 
     // Filter to matched rects only, then delegate to TextLabelRenderer
-    const matchedRects = this.filterMatchedRects(culledRects, matchedEventIds);
+    const matchedRects = this.filterMatchedRects(culledRects, matchedEventIds, litCategories);
     this.textLabelRenderer.render(matchedRects, viewport);
   }
 
@@ -100,14 +104,23 @@ export class SearchTextLabelRenderer {
    *
    * @param culledRects - All visible rectangles grouped by category
    * @param matchedEventIds - Set of event IDs that match search
+   * @param litCategories - Categories kept whole
    * @returns Filtered map containing only matched rectangles
    */
   private filterMatchedRects(
     culledRects: Map<string, PrecomputedRect[]>,
     matchedEventIds: ReadonlySet<string>,
+    litCategories: ReadonlySet<string>,
   ): Map<string, PrecomputedRect[]> {
     const result = new Map<string, PrecomputedRect[]>();
     for (const [category, rects] of culledRects) {
+      if (litCategories.has(category)) {
+        result.set(category, rects);
+        continue;
+      }
+      if (matchedEventIds.size === 0) {
+        continue;
+      }
       const matched = rects.filter((r) => matchedEventIds.has(r.id));
       if (matched.length > 0) {
         result.set(category, matched);
@@ -122,11 +135,13 @@ export class SearchTextLabelRenderer {
    * @param culledRects - Rectangles grouped by category
    * @param matchedEventIds - Set of matched event IDs
    * @param viewport - Current viewport state
+   * @param litCategories - Categories skipped whole
    */
   private renderUnmatchedLabels(
     culledRects: Map<string, PrecomputedRect[]>,
     matchedEventIds: ReadonlySet<string>,
     viewport: ViewportState,
+    litCategories: ReadonlySet<string>,
   ): void {
     const viewportLeftEdge = viewport.offsetX;
     const stickyLeftX = viewportLeftEdge + TEXT_LABEL_CONSTANTS.PADDING_LEFT;
@@ -135,7 +150,10 @@ export class SearchTextLabelRenderer {
     const fontSize = TIMELINE_CONSTANTS.EVENT_HEIGHT - fontHeightAdjustment;
     const fontYPositionOffset = TIMELINE_CONSTANTS.EVENT_HEIGHT - fontHeightAdjustment / 2;
 
-    for (const rects of culledRects.values()) {
+    for (const [category, rects] of culledRects) {
+      if (litCategories.has(category)) {
+        continue;
+      }
       for (const rect of rects) {
         // Only process non-matched events
         if (matchedEventIds.has(rect.id)) {

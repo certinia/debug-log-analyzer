@@ -24,7 +24,7 @@ import {
   TIMELINE_CONSTANTS,
   type ViewportState,
 } from '../../log-viewer/src/features/timeline/types/flamechart.types.js';
-import { categorySelfTimes } from '../../log-viewer/src/features/timeline/utils/category-self-time.js';
+import { selfTimeByCategory } from '../../log-viewer/src/features/timeline/utils/category-self-time.js';
 import { buildTimelineFrames } from '../../log-viewer/src/features/timeline/utils/timeline-frames.js';
 import { heapMb, line, nowMs, time } from './harness.js';
 
@@ -44,9 +44,10 @@ const DISPLAY_WIDTH = 1600;
 
 /** Everything the timeline builds before its first frame, in the order its init builds it. */
 function build(log: ApexLog) {
-  categorySelfTimes(log);
+  const index = buildLogIndex(log);
+  selfTimeByCategory(index);
   const categories = new Set<string>(BUCKET_CONSTANTS.CATEGORY_PRIORITY);
-  const frames = buildTimelineFrames(buildLogIndex(log), categories, log.exitStamp);
+  const frames = buildTimelineFrames(index, categories, log.exitStamp);
   const cache = new RectangleCache(log.children, categories, frames);
   new TreeNavigator(frames);
   const matcher = new EventMatcher<EventNode>(frames);

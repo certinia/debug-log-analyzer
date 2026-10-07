@@ -133,6 +133,10 @@
   --lana-control-border: var(--vscode-settings-dropdownBorder, #3c3c3c);
   --lana-control-bg: var(--vscode-settings-dropdownBackground, #313131);
 
+  /* Not `inputOption-active*`: newer themes set those to our pill's own off colours. */
+  --lana-toggle-on-border: var(--lana-focus-border);
+  --lana-toggle-on-bg: color-mix(in srgb, var(--lana-focus-border) 25%, var(--lana-control-bg));
+
   --lana-shadow-popover: 0 4px 16px var(--vscode-widget-shadow, rgba(0, 0, 0, 0.36));
   --lana-shadow-overlay: 0 8px 24px var(--vscode-widget-shadow, rgba(0, 0, 0, 0.5));
 

@@ -4,7 +4,8 @@
 import { describe, expect, it } from '@jest/globals';
 import type { ApexLog, LogEvent, LogCategory } from '@apexdevtools/apex-log-parser';
 
-import { categorySelfTimes, toTimelineKeys } from '../utils/category-self-time.js';
+import { indexTree } from '#test-helpers/apexLog.js';
+import { selfTimeByCategory, toTimelineKeys } from '../utils/category-self-time.js';
 
 function node(category: LogCategory, self: number, children: LogEvent[] = []): LogEvent {
   return {
@@ -18,7 +19,7 @@ function log(children: LogEvent[]): ApexLog {
   return node('', 0, children) as ApexLog;
 }
 
-describe('categorySelfTimes', () => {
+describe('selfTimeByCategory', () => {
   it('sums self time per category across siblings and nesting', () => {
     const root = log([
       node('Apex', 10, [node('SOQL', 5), node('Apex', 3)]),
@@ -26,7 +27,7 @@ describe('categorySelfTimes', () => {
       node('Apex', 2),
     ]);
 
-    const totals = categorySelfTimes(root);
+    const totals = selfTimeByCategory(indexTree(root));
 
     expect(totals.get('Apex')).toBe(15);
     expect(totals.get('SOQL')).toBe(5);
@@ -36,29 +37,20 @@ describe('categorySelfTimes', () => {
   it('counts only self time, so a parent excludes its children', () => {
     const root = log([node('Apex', 10, [node('Apex', 4)])]);
 
-    expect(categorySelfTimes(root).get('Apex')).toBe(14);
+    expect(selfTimeByCategory(indexTree(root)).get('Apex')).toBe(14);
   });
 
-  it('skips uncategorised events but still walks their children', () => {
+  it("sums uncategorised events under '' apart from their children", () => {
     const root = log([node('', 100, [node('SOQL', 5)])]);
 
-    const totals = categorySelfTimes(root);
+    const totals = selfTimeByCategory(indexTree(root));
 
     expect(totals.get('SOQL')).toBe(5);
-    expect(totals.has('')).toBe(false);
+    expect(totals.get('')).toBe(100);
   });
 
-  it('returns an empty map for an empty log', () => {
-    expect(categorySelfTimes(log([])).size).toBe(0);
-  });
-
-  it('handles a 5000-deep chain without a stack overflow', () => {
-    let chain = node('Apex', 1);
-    for (let i = 0; i < 4999; i++) {
-      chain = node('Apex', 1, [chain]);
-    }
-
-    expect(categorySelfTimes(log([chain])).get('Apex')).toBe(5000);
+  it('holds a zero uncategorised sum for an empty log', () => {
+    expect(selfTimeByCategory(indexTree(log([]))).get('')).toBe(0);
   });
 });
 
