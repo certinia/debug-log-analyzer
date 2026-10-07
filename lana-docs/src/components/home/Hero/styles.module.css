@@ -69,28 +69,24 @@
   font-weight: 600;
 }
 
-/* Shows the top 72% of the screenshot: 60% clear, then a fade, so it reads as a preview. */
+/* The bottom fades into the page so the screenshot reads as a preview, not a framed image. */
 .preview {
   position: relative;
   margin: 3rem 0 0;
-  aspect-ratio: 1920 / 737;
-  overflow: hidden;
 }
 
 .preview::after {
   content: '';
   position: absolute;
   inset: 0;
-  background: linear-gradient(to bottom, transparent 83%, var(--ifm-background-color));
+  background: linear-gradient(to bottom, transparent 70%, var(--ifm-background-color));
   pointer-events: none;
 }
 
 .preview img {
   display: block;
   width: 100%;
-  height: 100%;
-  object-fit: cover;
-  object-position: top;
+  height: auto;
   border: 1px solid var(--lana-rule);
   border-bottom: 0;
   border-radius: 10px 10px 0 0;
