@@ -23,6 +23,8 @@ import {
   sortComparator,
   sum,
   type Calcs,
+  type CellText,
+  type ExportColumn,
   type RowFilter,
   type Scheduler,
 } from '../../log-viewer/src/grid/index.js';
@@ -122,6 +124,23 @@ async function measureTimeOrder(log: ApexLog): Promise<void> {
     keepAncestors: true,
   };
   const bySelf = sortComparator<TimeOrderRow>({ value: (r) => r.duration.self }, 'desc');
+  const msText = (ns: number): string => (ns / 1e6).toFixed(3);
+  // What the visible Time Order cells show: names as they are, times as formatted.
+  const cells: CellText<TimeOrderRow>[] = [
+    (r) => r.text,
+    (r) => r.namespace,
+    (r) => r.type,
+    (r) => msText(r.duration.total),
+    (r) => msText(r.duration.self),
+  ];
+  const columns: ExportColumn<TimeOrderRow>[] = [
+    { title: 'Name', value: (r) => r.text },
+    { title: 'Namespace', value: (r) => r.namespace },
+    { title: 'Type', value: (r) => r.type },
+    { title: 'Total Time (ms)', value: (r) => msText(r.duration.total) },
+    { title: 'Self Time (ms)', value: (r) => msText(r.duration.self) },
+  ];
+  let matches = 0;
 
   const base = heapMb();
   let store!: GridStore<TimeOrderRow>; // assigned by the first step, before any read
@@ -140,6 +159,15 @@ async function measureTimeOrder(log: ApexLog): Promise<void> {
   await step('detail filter on', () => store.setFilters([detail]));
   await step('SOQL filter, keep ancestors', () => store.setFilters([detail, soqlOnly]));
   await step('SOQL filter off', () => store.setFilters([detail]));
+  await step('find "account"', async () => {
+    matches = (await store.find({ text: 'account' }, cells))?.total ?? -1;
+  });
+  line('  matches', String(matches));
+  await step('find "e"', async () => {
+    matches = (await store.find({ text: 'e' }, cells))?.total ?? -1;
+  });
+  line('  matches', String(matches));
+  await step('export CSV, every row', () => store.exportText(columns, { format: 'csv' }));
   await step('collapse all', () => store.collapseAll());
   await step(`reveal deep row (depth ${path.length})`, () => store.reveal(path));
   await step('toggle first root open', () => store.toggle(store.snapshot().rows.keyAt(0), true));
@@ -209,6 +237,16 @@ async function measureBottomUp(log: ApexLog): Promise<void> {
   await step('sort rows and groups by self', () => store.setSort(bySelf, groupsBySelf));
   await step('open largest group', () => store.toggle(firstGroup(), true));
   await step('expand all', () => store.expandAll());
+  await step('export CSV, grouped, every row', () =>
+    store.exportText(
+      [
+        { title: 'Name', value: (r) => r.text },
+        { title: 'Calls', value: (r) => r.callCount },
+        { title: 'Self Time (ms)', value: (r) => r.totalSelfTime },
+      ],
+      { format: 'csv' },
+    ),
+  );
   await step('ungroup', () => store.setGroupBy(null));
   await heldHeap(store, base);
 }

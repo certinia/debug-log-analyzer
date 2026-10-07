@@ -2,6 +2,15 @@
  * Copyright (c) 2026 Certinia Inc. All rights reserved.
  */
 import { needsAll, totalsOf, type Calcs, type Totals } from './calcs.js';
+import { groupLine, headerLine, rowLine, type ExportColumn, type ExportOptions } from './export.js';
+import {
+  FindCollector,
+  findPattern,
+  FindResult,
+  type CellText,
+  type FindQuery,
+  type PathNode,
+} from './find.js';
 import { byCount, Group, type GroupBy } from './groups.js';
 import { CHECK_EVERY, immediateScheduler, sliceTimer, type Scheduler } from './schedule.js';
 import type { Compare, ExpandPolicy, RowFilter, RowKey, TreeSource } from './types.js';
@@ -140,6 +149,27 @@ function flip<K>(set: Set<K>, key: K): void {
 }
 
 /**
+ * Runs `work` to its end, checking the clock every {@link CHECK_EVERY} yields. Null once
+ * `stale` holds. Work resumes only while it is current, so the caches it writes stay true.
+ */
+async function drive<T>(
+  work: Generator<void, T, void>,
+  tick: () => Promise<boolean>,
+  stale: () => boolean,
+): Promise<{ value: T } | null> {
+  let count = 0;
+  for (;;) {
+    const step = work.next();
+    if (step.done) {
+      return { value: step.value };
+    }
+    if (++count % CHECK_EVERY === 0 && (!(await tick()) || stale())) {
+      return null;
+    }
+  }
+}
+
+/**
  * The grid's state and the one source of truth for the rows on screen.
  *
  * Sort and filter run on a sibling list only when that list is shown, and are cached
@@ -172,6 +202,8 @@ export class GridStore<R extends object> {
   private running = false;
   private dirty = false;
   private waiting: (() => void)[] = [];
+  /** Goes up with each find, so an older one sees it is stale. */
+  private findId = 0;
 
   constructor(source: TreeSource<R>, options: GridStoreOptions<R> = {}) {
     this.source = source;
@@ -306,6 +338,60 @@ export class GridStore<R extends object> {
     }
     await this.rebuild();
     return found === null ? -1 : this.current.rows.indexOf(found);
+  }
+
+  /**
+   * Counts `query` in each searched cell of every row that passes the filters, open or
+   * not, in display order. Group rows are not searched. Null when a newer find, or a
+   * change to the rows, lands while it runs.
+   */
+  async find(query: FindQuery, cells: readonly CellText<R>[]): Promise<FindResult<R> | null> {
+    const id = ++this.findId;
+    await this.settled();
+    const stale = (): boolean => id !== this.findId || this.running;
+    const key = (row: R): RowKey => this.source.key(row);
+    const pattern = findPattern(query);
+    if (stale()) {
+      return null;
+    }
+    if (!pattern) {
+      return new FindResult<R>([], new Uint32Array(0), [], new Map(), 0, key);
+    }
+    const found = new FindCollector(cells, pattern);
+    const done = await drive(
+      this.eachRow(true, (entry, up) => {
+        if (!(entry instanceof Group)) {
+          found.visit(entry, up);
+        }
+      }),
+      sliceTimer(this.scheduler, stale),
+      stale,
+    );
+    return done && !stale() ? found.result(key) : null;
+  }
+
+  /**
+   * Every row that passes the filters, open or not, in display order, under a header
+   * line. Null when a change to the rows lands while it runs.
+   */
+  async exportText(
+    columns: readonly ExportColumn<R>[],
+    options: ExportOptions,
+  ): Promise<string | null> {
+    await this.settled();
+    const stale = (): boolean => this.running;
+    const { format } = options;
+    const lines = [headerLine(columns, format)];
+    const done = await drive(
+      this.eachRow(options.tree ?? true, (entry) => {
+        lines.push(
+          entry instanceof Group ? groupLine(entry.key, format) : rowLine(entry, columns, format),
+        );
+      }),
+      sliceTimer(this.scheduler, stale),
+      stale,
+    );
+    return done && !stale() ? lines.join('\n') : null;
   }
 
   private reorder(): Promise<void> {
@@ -472,23 +558,10 @@ export class GridStore<R extends object> {
         this.deepPass.set(filter, set);
       }
     }
-    let count = 0;
-    const drive = async <T>(work: Generator<void, T, void>): Promise<{ value: T } | null> => {
-      for (;;) {
-        const step = work.next();
-        if (step.done) {
-          return { value: step.value };
-        }
-        // A step resumes only while the build is current, so the caches it writes stay true.
-        if (++count % CHECK_EVERY === 0 && (!(await tick()) || this.dirty)) {
-          return null;
-        }
-      }
-    };
-
+    const stale = (): boolean => this.dirty;
     const top = this.childrenOf(this.source.roots);
     if (!this.footer) {
-      const footer = await drive(this.totalsFor(top));
+      const footer = await drive(this.totalsFor(top), tick, stale);
       if (!footer || this.dirty) {
         return null;
       }
@@ -501,7 +574,7 @@ export class GridStore<R extends object> {
         ? { rows: this.pack(out), totals }
         : null;
     }
-    const groups = await drive(this.groupsOf(top, this.groupBy));
+    const groups = await drive(this.groupsOf(top, this.groupBy), tick, stale);
     if (!groups || this.dirty) {
       return null;
     }
@@ -515,6 +588,58 @@ export class GridStore<R extends object> {
       }
     }
     return this.dirty ? null : { rows: this.pack(out), totals };
+  }
+
+  /**
+   * Every row that passes the filters, open or not, in display order: each group, then its
+   * rows. With `tree` false, only the top-level rows. `up` is the row's parent chain.
+   */
+  private *eachRow(
+    tree: boolean,
+    visit: (entry: Entry<R>, up: PathNode | null) => void,
+  ): Generator<void, void, void> {
+    const top = this.childrenOf(this.source.roots);
+    if (!this.groupBy) {
+      yield* this.eachUnder(top, tree, visit);
+      return;
+    }
+    for (const group of yield* this.groupsOf(top, this.groupBy)) {
+      visit(group, null);
+      yield* this.eachUnder(group.rows, tree, visit);
+    }
+  }
+
+  private *eachUnder(
+    list: readonly R[],
+    tree: boolean,
+    visit: (row: R, up: PathNode | null) => void,
+  ): Generator<void, void, void> {
+    const lists: (readonly R[])[] = [list];
+    const at: number[] = [0];
+    const ups: (PathNode | null)[] = [null];
+    while (lists.length) {
+      const top = lists.length - 1;
+      const siblings = lists[top] as readonly R[];
+      const i = at[top] as number;
+      if (i === siblings.length) {
+        lists.pop();
+        at.pop();
+        ups.pop();
+        continue;
+      }
+      at[top] = i + 1;
+      const row = siblings[i] as R;
+      const up = ups[top] ?? null;
+      visit(row, up);
+      const children = tree ? this.source.children?.(row) : null;
+      const kids = children?.length ? this.childrenOf(children) : null;
+      if (kids?.length) {
+        lists.push(kids);
+        at.push(0);
+        ups.push({ key: this.source.key(row), up });
+      }
+      yield;
+    }
   }
 
   /** `top` split into groups, in group order, each with its totals. */
