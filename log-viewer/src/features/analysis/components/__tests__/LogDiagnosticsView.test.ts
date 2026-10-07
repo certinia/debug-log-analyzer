@@ -22,8 +22,8 @@ let askedAbout: readonly number[] = [];
 let held: Promise<LogDiagnostics> | null = null;
 
 jest.mock('../../services/LogDiagnostics.js', () => ({
-  computeLogDiagnostics: () => held ?? Promise.resolve(result),
-  scopeDiagnostics: (all: LogDiagnostics, instances: readonly number[]) => {
+  logDiagnostics: () => held ?? Promise.resolve(result),
+  scopeDiagnostics: (_log: unknown, all: LogDiagnostics, instances: readonly number[]) => {
     askedAbout = instances;
     return { ...all, diagnostics: all.diagnostics.filter((d) => keep(d.id)) };
   },
@@ -33,7 +33,7 @@ import type { LogStore } from '../../../../core/log/LogStore.js';
 import '../LogDiagnosticsView.js';
 
 const loadLog = (element: HTMLElementTagNameMap['log-diagnostics']) => {
-  element.logStore = { log: {} } as unknown as LogStore;
+  element.logStore = { log: {}, derive: async (fn: () => unknown) => fn() } as unknown as LogStore;
 };
 
 // The findings land a task after the render that asks for them.

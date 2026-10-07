@@ -2,13 +2,13 @@
  * Copyright (c) 2026 Certinia Inc. All rights reserved.
  */
 import { consume } from '@lit/context';
-import { initialState, Task, TaskStatus } from '@lit/task';
 import { LitElement, css, html, type PropertyValues, type TemplateResult } from 'lit';
 import { customElement, property, state } from 'lit/decorators.js';
 import { styleMap } from 'lit/directives/style-map.js';
 
 import { CategoryPaletteController, categoryName } from '../../../components/categoryTime.js';
 import { dispatchInspectorReveal } from '../../../components/inspectorReveal.js';
+import { DerivedValue } from '../../../core/log/DerivedValue.js';
 import { logContext } from '../../../core/log/logContext.js';
 import type { LogStore } from '../../../core/log/LogStore.js';
 import { formatDuration, formatInteger } from '../../../core/utility/Util.js';
@@ -51,10 +51,7 @@ export class SelfTimeSpreadView extends LitElement {
   /** The bin under the pointer, so the lane names what it is showing. */
   @state() private _hovered: { eventIndex: number; bin: number } | null = null;
 
-  private readonly _spread = new Task(this, {
-    task: ([store]) => store?.derive(selfTimeSpread) ?? initialState,
-    args: () => [this.logStore],
-  });
+  private readonly _spread = new DerivedValue(this, selfTimeSpread);
 
   /**
    * A lane is a histogram of one signature's calls: the bins run from no self
@@ -132,12 +129,11 @@ export class SelfTimeSpreadView extends LitElement {
   }
 
   render() {
-    const { status, value } = this._spread;
-    const spread = status === TaskStatus.COMPLETE ? value : undefined;
+    const spread = this._spread.value;
     if (!spread?.concentration) {
       return html`<section-skeleton
         shape="chart"
-        ?pending=${status === TaskStatus.PENDING}
+        ?pending=${this._spread.pending}
         fallback=${NO_TIMED_CALLS_TEXT}
       ></section-skeleton>`;
     }

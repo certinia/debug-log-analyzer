@@ -3,9 +3,8 @@
  */
 import type { LogCategory } from '@apexdevtools/apex-log-parser';
 
-import { idsBySelfTime, keySelfTimes, type KeySelfTimes } from '../../../core/log/keySelfTimes.js';
-import type { LogIndex } from '../../../core/log/LogIndex.js';
 import type { Derivation } from '../../../core/log/LogStore.js';
+import { type Signature, signatureTimes } from '../../../core/log/signatureTimes.js';
 
 /** Signatures the spread draws a histogram for, the most self time first. */
 const LANE_COUNT = 5;
@@ -62,18 +61,6 @@ export interface SelfTimeSpread {
   concentration: { signatures: number; total: number } | null;
 }
 
-/** What one signature's calls came to, before the values are bucketed. */
-interface Tally {
-  /** The key id, so the second pass can find the calls again. */
-  id: number;
-  text: string;
-  category: LogCategory;
-  eventIndex: number;
-  count: number;
-  selfTime: number;
-  max: number;
-}
-
 /**
  * The distribution behind the Analysis grid's averages. A signature's mean self
  * time hides its shape: 400 calls at 2 ms and 399 at 2 ms plus one at 900 ms
@@ -85,20 +72,20 @@ interface Tally {
  * often holds the most self time of all, so it is named beneath the lanes rather
  * than drawn as one: a histogram of a single call has no shape to read.
  *
- * The signatures are ranked from `times`; one pass over the index then collects
- * the values of the few that earned a lane. Nothing keeps a value per call for
- * the whole log.
+ * Only the few signatures that earned a lane have their values collected. Nothing
+ * keeps a value per call for the whole log.
  */
-export function computeSelfTimeSpread(index: LogIndex, times: KeySelfTimes): SelfTimeSpread {
-  const ranked = idsBySelfTime(times).map((id) => tally(index, times, id));
-  const lanes = ranked.filter((found) => found.count > 1).slice(0, LANE_COUNT);
-  const values = collect(index, times.ids, lanes);
+export const selfTimeSpread: Derivation<SelfTimeSpread> = async (_, store) => {
+  const times = await store.derive(signatureTimes);
+  const { ranked } = times;
+  const lanes = ranked.filter((found) => found.timedCount > 1).slice(0, LANE_COUNT);
+  const values = times.valuesOf(lanes);
 
   return {
-    // `collect` returns one list per lane.
+    // `valuesOf` returns one list per lane.
     lanes: lanes.map((lane, slot) => row(lane, values[slot]!)),
     singles: ranked
-      .filter((found) => found.count === 1)
+      .filter((found) => found.timedCount === 1)
       .slice(0, SINGLE_COUNT)
       .map(({ text, category, eventIndex, selfTime }) => ({
         text,
@@ -106,75 +93,27 @@ export function computeSelfTimeSpread(index: LogIndex, times: KeySelfTimes): Sel
         eventIndex,
         selfTime,
       })),
-    concentration: concentrationOf(ranked),
+    concentration: concentrationOf(ranked, times.totalSelf),
   };
-}
-
-/** {@link computeSelfTimeSpread}, once per log. */
-export const selfTimeSpread: Derivation<SelfTimeSpread> = async (index, store) =>
-  computeSelfTimeSpread(index, await store.derive(keySelfTimes));
-
-function tally(index: LogIndex, times: KeySelfTimes, id: number): Tally {
-  // In range: ids and rows come from the same index as `times`.
-  const worst = times.maxRow[id]!;
-  const event = index.event(worst);
-  return {
-    id,
-    text: event.text,
-    category: event.category,
-    eventIndex: index.eventIndex[worst]!,
-    count: times.timedCount[id]!,
-    selfTime: times.selfTime[id]!,
-    max: index.self[worst]!,
-  };
-}
-
-/** The self times of the signatures that earned a lane, ascending, one list per lane. */
-function collect(index: LogIndex, ids: Uint32Array, lanes: Tally[]): number[][] {
-  const values = lanes.map((): number[] => []);
-  if (!lanes.length) {
-    return values;
-  }
-  // Read past its end for a key above every lane, which `?? -1` takes as no lane.
-  const slotOf = new Int8Array(Math.max(...lanes.map((lane) => lane.id)) + 1).fill(-1);
-  lanes.forEach((lane, slot) => {
-    slotOf[lane.id] = slot;
-  });
-  const { self, rowCount } = index;
-  // In range: every row is below rowCount, every slot below lanes.length.
-  for (let row = 0; row < rowCount; row++) {
-    const value = self[row]!;
-    if (value <= 0) {
-      continue;
-    }
-    const slot = slotOf[ids[row]!] ?? -1;
-    if (slot >= 0) {
-      values[slot]!.push(value);
-    }
-  }
-  for (const list of values) {
-    list.sort((a, b) => a - b);
-  }
-  return values;
-}
+};
 
 /** One lane: the readings the row names, and the shape it draws. */
-function row(lane: Tally, sorted: number[]): SpreadRow {
+function row(lane: Signature, sorted: number[]): SpreadRow {
   const bins = new Array<number>(BIN_COUNT).fill(0);
   for (const value of sorted) {
     // The top value belongs to the last bin, not one past the end.
-    const index = Math.min(Math.floor((value / lane.max) * BIN_COUNT), BIN_COUNT - 1);
+    const index = Math.min(Math.floor((value / lane.maxSelf) * BIN_COUNT), BIN_COUNT - 1);
     bins[index]!++;
   }
   return {
     text: lane.text,
     category: lane.category,
     eventIndex: lane.eventIndex,
-    count: lane.count,
+    count: lane.timedCount,
     selfTime: lane.selfTime,
     median: percentile(sorted, 0.5),
     p95: percentile(sorted, 0.95),
-    max: lane.max,
+    max: lane.maxSelf,
     bins,
     heights: binHeights(bins),
   };
@@ -189,8 +128,10 @@ function percentile(sorted: number[], share: number): number {
 }
 
 /** How few signatures the log's self time comes down to. */
-function concentrationOf(ranked: Tally[]): SelfTimeSpread['concentration'] {
-  const total = ranked.reduce((sum, found) => sum + found.selfTime, 0);
+function concentrationOf(
+  ranked: readonly Signature[],
+  total: number,
+): SelfTimeSpread['concentration'] {
   if (total <= 0) {
     return null;
   }
