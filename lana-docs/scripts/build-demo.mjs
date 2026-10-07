@@ -53,7 +53,7 @@ await mkdir(dest, { recursive: true });
 const viewerFiles = built.filter(
   (file) => file === 'bundle.js' || file.startsWith('log-viewer-') || file.startsWith('codicon.'),
 );
-await Promise.all([
+const writes = [
   ...viewerFiles.map((file) => copyFile(new URL(file, viewerOut), new URL(file, dest))),
   ...['host.js', 'vscode-themes.js'].map((file) =>
     copyFile(new URL(file, demoSrc), new URL(file, dest)),
@@ -69,6 +69,7 @@ await Promise.all([
       `${BODY}\n    <script src="vscode-themes.js"></script>\n    <script src="host.js"></script>`,
     ),
   ),
-]);
+];
+await Promise.all(writes);
 
-console.log(`build-demo: copied ${viewerFiles.length + 5} files to static/demo`);
+console.log(`build-demo: copied ${writes.length} files to static/demo`);
