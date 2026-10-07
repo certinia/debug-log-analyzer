@@ -4,11 +4,9 @@
 import { html, type ReactiveControllerHost, type TemplateResult } from 'lit';
 
 import { SubscriptionController } from '../core/events/SubscriptionController.js';
-import type { LogIndex } from '../core/log/LogIndex.js';
 import { subscribeSettings, type LanaSettings } from '../features/settings/Settings.js';
 import { addCustomThemes, getTheme } from '../features/timeline/themes/ThemeSelector.js';
 import { CATEGORY_THEME_KEY, DEFAULT_THEME_NAME } from '../features/timeline/themes/Themes.js';
-import { selfTimeByCategory } from '../features/timeline/utils/category-self-time.js';
 
 /** The bucket for events the parser leaves uncategorised. */
 export const OTHER_CATEGORY = 'Other';
@@ -39,11 +37,11 @@ export interface CategoryTime {
 }
 
 /**
- * Self time per category over the whole log, largest first. Empty buckets are
- * dropped, and events with no category land in {@link OTHER_CATEGORY}.
+ * The log's self time per category name, as slices largest first. Empty buckets
+ * are dropped, and events with no category land in {@link OTHER_CATEGORY}.
  */
-export function categorySelfTimes(index: LogIndex): CategoryTime[] {
-  return [...selfTimeByCategory(index)]
+export function categorySelfTimes(selfTimes: ReadonlyMap<string, number>): CategoryTime[] {
+  return [...selfTimes]
     .filter(([, selfTime]) => selfTime > 0)
     .map(([name, selfTime]) => ({ category: categoryName(name), selfTime }))
     .sort((a, b) => b.selfTime - a.selfTime);

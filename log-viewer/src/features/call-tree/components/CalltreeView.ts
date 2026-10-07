@@ -5,6 +5,7 @@ import '#vscode-elements/vscode-button.js';
 import '#vscode-elements/vscode-option.js';
 import '#vscode-elements/vscode-toolbar-button.js';
 import '../../../components/VsSelect.js';
+import { initialState, Task } from '@lit/task';
 import { css, html, LitElement, unsafeCSS, type PropertyValues } from 'lit';
 import { customElement, property, state } from 'lit/decorators.js';
 import { repeat } from 'lit/directives/repeat.js';
@@ -132,9 +133,11 @@ export class CalltreeView extends LitElement {
   @state()
   viewMode: ViewMode = 'time-order';
 
-  @state()
-  private _types: readonly string[] = [];
-  private _typesFor: ApexLog | null = null;
+  // The view is mounted hidden, so a log whose call tree is never opened costs nothing.
+  private readonly _types = new Task(this, {
+    task: ([store]) => store?.derive(typeNamesIn) ?? initialState,
+    args: () => [this.isVisible && this.timelineRoot ? logStoreFor(this.timelineRoot) : null],
+  });
 
   aggregatedTreeTable: Tabulator | null = null;
   bottomUpTreeTable: Tabulator | null = null;
@@ -238,25 +241,6 @@ export class CalltreeView extends LitElement {
     this._visibilityWait?.abort();
     this._visibilityWait = null;
     this._destroyCurrentTable();
-  }
-
-  willUpdate(): void {
-    // The view is mounted hidden, so a log whose call tree is never opened costs nothing.
-    if (this.isVisible && this.timelineRoot !== this._typesFor) {
-      this._typesFor = this.timelineRoot;
-      this._types = [];
-      void this._loadTypes(this.timelineRoot);
-    }
-  }
-
-  private async _loadTypes(root: ApexLog | null): Promise<void> {
-    if (!root) {
-      return;
-    }
-    const index = await logStoreFor(root).logIndex();
-    if (root === this._typesFor) {
-      this._types = typeNamesIn(index);
-    }
   }
 
   updated(changedProperties: PropertyValues): void {
@@ -408,17 +392,16 @@ export class CalltreeView extends LitElement {
                         @change="${this._handleTypeFilter}"
                       >
                         <vscode-option ?selected="${this.typeFilter === 'All'}">All</vscode-option>
-                        ${
-                          this.isVisible
-                            ? repeat(
-                                this._types,
-                                (type, _index) =>
-                                  html`<vscode-option ?selected="${this.typeFilter === type}"
-                                    >${type}</vscode-option
-                                  >`,
-                              )
-                            : ''
-                        }
+                        ${this._types.render({
+                          complete: (types) =>
+                            repeat(
+                              types,
+                              (type, _index) =>
+                                html`<vscode-option ?selected="${this.typeFilter === type}"
+                                  >${type}</vscode-option
+                                >`,
+                            ),
+                        })}
                       </vs-select>
                     `
                   : ''

@@ -3,6 +3,7 @@
  */
 import '#vscode-elements/vscode-toolbar-button.js';
 import { consume } from '@lit/context';
+import { initialState, Task } from '@lit/task';
 import { LitElement, css, html, nothing, type PropertyValues } from 'lit';
 import { customElement, property, query, state } from 'lit/decorators.js';
 
@@ -71,7 +72,16 @@ export class TimelineView extends LitElement {
   private timelineKeys: TimelineKeyEntry[] = [];
 
   /** Per-category self time for the loaded log; drives the legend durations. */
-  private selfTimes?: Map<string, number>;
+  private selfTimes?: ReadonlyMap<string, number>;
+
+  private readonly selfTimesTask = new Task(this, {
+    task: ([store]) => store?.derive(selfTimeByCategory) ?? initialState,
+    args: () => [this.timelineRoot && logStoreFor(this.timelineRoot)],
+    onComplete: (selfTimes) => {
+      this.selfTimes = selfTimes;
+      this.rebuildTimelineKeys();
+    },
+  });
 
   /** The timeline settings last pushed; the legend's palette is resolved from them. */
   private timelineSettings: LanaSettings['timeline'] | null = null;
@@ -236,18 +246,6 @@ export class TimelineView extends LitElement {
   protected willUpdate(changed: PropertyValues): void {
     if (changed.has('timelineRoot')) {
       this.selfTimes = undefined;
-      this.rebuildTimelineKeys();
-      void this.loadSelfTimes(this.timelineRoot);
-    }
-  }
-
-  private async loadSelfTimes(root: ApexLog | null): Promise<void> {
-    if (!root) {
-      return;
-    }
-    const index = await logStoreFor(root).logIndex();
-    if (root === this.timelineRoot) {
-      this.selfTimes = selfTimeByCategory(index);
       this.rebuildTimelineKeys();
     }
   }

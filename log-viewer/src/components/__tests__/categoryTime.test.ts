@@ -10,6 +10,7 @@ import { indexTree } from '#test-helpers/apexLog.js';
 import type { LanaSettings } from '../../features/settings/Settings.js';
 import { DEFAULT_THEME_NAME } from '../../features/timeline/themes/Themes.js';
 import { getTheme } from '../../features/timeline/themes/ThemeSelector.js';
+import { selfTimeByCategory } from '../../features/timeline/utils/category-self-time.js';
 import { categoryPalette, categorySelfTimes, OTHER_CATEGORY } from '../categoryTime.js';
 
 interface FakeEvent {
@@ -42,7 +43,7 @@ describe('categorySelfTimes', () => {
       categoryEvent('DML', 200, [categoryEvent('Apex', 25)]),
     ]);
 
-    expect(categorySelfTimes(indexTree(root))).toEqual([
+    expect(categorySelfTimes(selfTimeByCategory(indexTree(root)))).toEqual([
       { category: 'SOQL', selfTime: 500 },
       { category: 'DML', selfTime: 200 },
       { category: 'Apex', selfTime: 175 },
@@ -56,7 +57,7 @@ describe('categorySelfTimes', () => {
       categoryEvent('System', 10),
     ]);
 
-    expect(categorySelfTimes(indexTree(root))).toEqual([
+    expect(categorySelfTimes(selfTimeByCategory(indexTree(root)))).toEqual([
       { category: OTHER_CATEGORY, selfTime: 40 },
       { category: 'System', selfTime: 10 },
     ]);

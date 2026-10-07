@@ -12,7 +12,7 @@ import type { TimelineKeyEntry } from '../components/TimelineKey.js';
  * index's columns. Self time partitions the wall clock, so the sums add up to the
  * log duration with no double counting.
  */
-export function selfTimeByCategory(index: LogIndex): Map<string, number> {
+export function selfTimeByCategory(index: LogIndex): ReadonlyMap<string, number> {
   const sums = new Float64Array(index.categoryNames.length);
   const { categoryId, self } = index;
   for (let row = 0; row < index.rowCount; row++) {
