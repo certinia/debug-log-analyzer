@@ -4,8 +4,7 @@
 import type { ApexLog, LogEvent, LogCategory } from '@apexdevtools/apex-log-parser';
 
 import { getEventKey } from '../../../core/log/eventKeys.js';
-import { keySelfTimes, type KeySelfTimes } from '../../../core/log/keySelfTimes.js';
-import type { LogIndex } from '../../../core/log/LogIndex.js';
+import { signatureTimes, type SignatureTimes } from '../../../core/log/signatureTimes.js';
 import type { Derivation } from '../../../core/log/LogStore.js';
 
 /** One frame on the hot path, entry point first. */
@@ -87,22 +86,15 @@ const HOT_SPOT_COUNT = 5;
  * time), and the truncation caveat that undermines both. Structure follows the
  * real tree, so every row resolves to a `LogEvent` the tabs can reveal.
  */
-export function computeExecutionHighlights(
-  apexLog: ApexLog,
-  index: LogIndex,
-  times: KeySelfTimes,
-): ExecutionHighlights {
+export const executionHighlights: Derivation<ExecutionHighlights> = async (_, store) => {
+  const apexLog = store.log;
   return {
     totalTime: apexLog.duration.total,
     ...computeHotPath(apexLog.children),
-    hotSpots: hotSpotsOf(index, times),
+    hotSpots: hotSpotsOf(await store.derive(signatureTimes)),
     truncation: truncationOf(apexLog),
   };
-}
-
-/** {@link computeExecutionHighlights}, once per log. */
-export const executionHighlights: Derivation<ExecutionHighlights> = async (index, store) =>
-  computeExecutionHighlights(store.log, index, await store.derive(keySelfTimes));
+};
 
 /** Same-signature siblings walked as one frame, the way every profiler's hot path merges. */
 interface FrameGroup {
@@ -212,28 +204,19 @@ function largestInstance(instances: LogEvent[]): LogEvent {
  * self time at all drop out. Total time counts the outermost instances only:
  * recursion nests the same wall time inside itself.
  */
-function hotSpotsOf(index: LogIndex, times: KeySelfTimes): HotSpotRow[] {
-  const { selfTime, count, maxRow, outerTotal } = times;
-  // In range: ids and rows come from the same index as `times`. Ids ascend in
-  // order of first row, so a tie keeps the signature the log ran first.
-  return [...selfTime.keys()]
-    .filter((id) => selfTime[id]! > 0)
-    .sort((a, b) => selfTime[b]! - selfTime[a]!)
+function hotSpotsOf(times: SignatureTimes): HotSpotRow[] {
+  return times.ranked
     .slice(0, HOT_SPOT_COUNT)
-    .map((id) => {
-      const worst = maxRow[id]!;
-      const event = index.event(worst);
-      return {
-        text: event.text,
-        eventIndex: index.eventIndex[worst]!,
-        selfTime: selfTime[id]!,
-        // Nothing timed the outermost instances of a signature whose nested ones
-        // were timed; the row still holds self time, so the total answers for both.
-        totalTime: Math.max(outerTotal[id]!, selfTime[id]!),
-        count: count[id]!,
-        category: event.category,
-      };
-    });
+    .map(({ text, eventIndex, selfTime, outerTotal, count, category }) => ({
+      text,
+      eventIndex,
+      selfTime,
+      // Nothing timed the outermost instances of a signature whose nested ones
+      // were timed; the row still holds self time, so the total answers for both.
+      totalTime: Math.max(outerTotal, selfTime),
+      count,
+      category,
+    }));
 }
 
 function truncationOf(apexLog: ApexLog): ExecutionHighlights['truncation'] {

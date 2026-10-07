@@ -3,12 +3,12 @@
  */
 import '#vscode-elements/vscode-icon.js';
 import { consume } from '@lit/context';
-import { initialState, Task } from '@lit/task';
 import { LitElement, css, html, unsafeCSS } from 'lit';
 import { customElement, property, state } from 'lit/decorators.js';
 
 import { dispatchInspectorReveal } from '../../../components/inspectorReveal.js';
 import { ResizeController } from '../../../core/events/ResizeController.js';
+import { DerivedValue } from '../../../core/log/DerivedValue.js';
 import { logContext } from '../../../core/log/logContext.js';
 import type { LogStore } from '../../../core/log/LogStore.js';
 import { formatDuration } from '../../../core/utility/Util.js';
@@ -20,7 +20,7 @@ import '../../../components/SectionSkeleton.js';
 import { bleedRowStyles } from '../../../styles/revealRow.styles.js';
 import { severityIcon, severityStyles } from '../../../styles/severity.styles.js';
 import {
-  computeLogDiagnostics,
+  logDiagnostics,
   scopeDiagnostics,
   type Diagnostic,
   type DiagnosticEvidence,
@@ -78,10 +78,7 @@ export class LogDiagnosticsView extends LitElement {
   logStore: LogStore | null = null;
 
   /** The whole log's findings, before any scoping. */
-  private readonly _findings = new Task(this, {
-    task: async ([store]) => (store ? { store, all: await computeLogDiagnostics() } : initialState),
-    args: () => [this.logStore],
-  });
+  private readonly _findings = new DerivedValue(this, logDiagnostics);
 
   /** Which severities the roll-up bar is holding the list to. Empty is all. */
   @state()
@@ -109,9 +106,7 @@ export class LogDiagnosticsView extends LitElement {
   private readonly _resize = new ResizeController(this, () => this._measure());
 
   override willUpdate() {
-    // Read before the task sees a new log, so the value is checked against it.
-    const { value } = this._findings;
-    const all = value?.store === this.logStore ? value.all : null;
+    const all = this._findings.value ?? null;
     // Keyed on the occurrences themselves: the host builds the array in its own
     // render, so its identity changes even when the selection has not.
     const scope = this.instances?.join(',') ?? '';
@@ -124,7 +119,10 @@ export class LogDiagnosticsView extends LitElement {
     this._scoped = all;
     this._filters = [];
     this._open = new Set();
-    this._result = all && this.instances ? scopeDiagnostics(all, this.instances) : all;
+    this._result =
+      all && this.logStore && this.instances
+        ? scopeDiagnostics(this.logStore.log, all, this.instances)
+        : all;
   }
 
   override updated() {

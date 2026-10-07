@@ -2,18 +2,21 @@
  * Copyright (c) 2026 Certinia Inc. All rights reserved.
  */
 import { consume } from '@lit/context';
-import { initialState, Task, TaskStatus } from '@lit/task';
 import { LitElement, html } from 'lit';
 import { customElement, property } from 'lit/decorators.js';
 
+import { DerivedValue } from '../core/log/DerivedValue.js';
 import { logContext } from '../core/log/logContext.js';
-import type { LogStore } from '../core/log/LogStore.js';
+import type { Derivation, LogStore } from '../core/log/LogStore.js';
 import { globalStyles } from '../styles/global.styles.js';
 import './SectionSkeleton.js';
 import { inspectorSectionStyles } from '../styles/inspectorSection.styles.js';
 import { selfTimeByCategory } from '../features/timeline/utils/category-self-time.js';
-import { CategoryPaletteController, categorySelfTimes } from './categoryTime.js';
+import { type CategoryTime, CategoryPaletteController, categorySelfTimes } from './categoryTime.js';
 import './StackedTimeBar.js';
+
+const categorySlices: Derivation<CategoryTime[]> = async (_, store) =>
+  categorySelfTimes(await store.derive(selfTimeByCategory));
 
 /**
  * The whole log's self time split by category, as one stacked bar in the flame
@@ -30,19 +33,16 @@ export class CategoryTimeBar extends LitElement {
   @property({ attribute: false })
   logStore: LogStore | null = null;
 
-  private readonly _slices = new Task(this, {
-    task: ([store]) => store?.derive(selfTimeByCategory).then(categorySelfTimes) ?? initialState,
-    args: () => [this.logStore],
-  });
+  private readonly _slices = new DerivedValue(this, categorySlices);
 
   static styles = [globalStyles, inspectorSectionStyles];
 
   render() {
-    const slices = this._slices.status === TaskStatus.COMPLETE ? this._slices.value : undefined;
+    const slices = this._slices.value;
     if (!slices?.length) {
       return html`<section-skeleton
         shape="bar"
-        ?pending=${this._slices.status === TaskStatus.PENDING}
+        ?pending=${this._slices.pending}
         fallback="No categorised time was recorded in this log."
       ></section-skeleton>`;
     }
