@@ -155,6 +155,9 @@ export class ApexLogTimeline {
             options.onViewportChange(viewport);
           }
         },
+        onMeasurementChange: (measurement) => {
+          options.onMeasurementChange?.(measurement);
+        },
         onSearchNavigate: (event, screenX, screenY, depth) => {
           this.handleSearchNavigate(event, screenX, screenY, depth);
         },

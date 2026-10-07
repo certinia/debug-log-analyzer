@@ -162,15 +162,23 @@ export function computeWallClockMs(
 export function debounce<T extends unknown[]>(callBack: (...args: T) => unknown) {
   let requestId: number = 0;
 
-  return (...args: T) => {
+  const cancel = (): void => {
     if (requestId) {
       window.cancelAnimationFrame(requestId);
+      requestId = 0;
     }
-
-    requestId = window.requestAnimationFrame(() => {
-      callBack(...args);
-    });
   };
+
+  return Object.assign(
+    (...args: T) => {
+      cancel();
+      requestId = window.requestAnimationFrame(() => {
+        requestId = 0;
+        callBack(...args);
+      });
+    },
+    { cancel },
+  );
 }
 
 /**
