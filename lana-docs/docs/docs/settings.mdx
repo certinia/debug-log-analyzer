@@ -19,13 +19,30 @@ The Timeline flame graph and the Call Tree Name column are colored by event cate
 
 ### Select a theme
 
-Use `lana.timeline.activeTheme` to pick one of the built-in themes - for example _50 Shades of Green_, _Catppuccin_, _Dracula_, _Nord_, or _Salesforce_ - or the name of a custom theme you have defined.
+Use `lana.timeline.activeTheme` to pick one of the 19 built-in themes, or the name of a custom theme you have defined. You can also select **Settings → Apex Log Analyzer → Timeline → Active Theme**.
 
-Or run **Log: Timeline Theme** from the Command Palette to switch theme without opening settings - the Timeline and Call Tree update instantly.
+Or run **Log: Timeline Theme** from the Command Palette to switch theme without opening settings. Use the arrow keys to preview each theme, then press `Enter` to keep it or `Esc` to go back to the previous theme. The Timeline and Call Tree update instantly.
+
+The built-in themes are **50 Shades of Green** (the default), 50 Shades of Green Bright, Botanical Twilight, Catppuccin, Chrome, Dracula, Dusty Aurora, Firefox, Flame, Forest Floor, Garish, Material, Modern, Monokai Pro, Nord, Nord Forest, Okabe-Ito, Salesforce and Solarized.
 
 ### Custom themes
 
-Define your own with `lana.timeline.customThemes`. Each key is a theme name and each value sets the eight category colors: `apex`, `codeUnit`, `system`, `automation`, `dml`, `soql`, `callout` and `validation`. Set `lana.timeline.activeTheme` to a custom theme's name to use it.
+Define your own with `lana.timeline.customThemes`, or in **Settings → Apex Log Analyzer → Timeline → Custom Themes**. Each key is a theme name, and each value sets the eight category colors in hex:
+
+- `apex` - Apex method entry and exit events
+- `codeUnit` - Code Unit events
+- `system` - System method calls
+- `automation` - Workflow, Flow and Process Builder events
+- `dml` - DML operations (insert, update, delete and more)
+- `soql` - SOQL queries
+- `callout` - HTTP callout events
+- `validation` - Validation rule events
+
+Custom themes show in the theme picker with the built-in themes. Set `lana.timeline.activeTheme` to a custom theme's name to use it.
+
+:::note
+A custom theme cannot replace a built-in theme. If a custom theme has the same name as a built-in theme, the built-in theme is used.
+:::
 
 <img
   src="https://raw.githubusercontent.com/certinia/debug-log-analyzer/main/lana/assets/1_22/vscode/settings-custom-themes.png"
@@ -80,4 +97,4 @@ The [inspector](./features/inspector.md) remembers where you dock it and how big
 
 Both update as you drag or re-dock the inspector, so you rarely need to edit them by hand.
 
-Collapsed sections, their sizes and whether the inspector is open are remembered too, but aren't settings you edit.
+Collapsed sections, their order, hidden sections and whether the inspector is open are remembered too, but aren't settings you edit. Section sizes are not remembered.

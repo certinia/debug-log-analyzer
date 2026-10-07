@@ -28,7 +28,7 @@ It docks to the **right**, **left** or **bottom**, resizes by dragging its edge,
 ### Sections
 
 - **Details** - timing, plus every governor metric the selection consumed as `used / limit`. For SOQL also selectivity, query plan and cardinality, with the query text highlighted and copyable.
-- **Variables** - what Apex could reach from the frame: its **Local** variables, `this` and its fields, and the **Static** variables assigned by that point, grouped by class. Every value reads as it stood at the frame, and a name the log declared but never wrote reads `not assigned`. An object opens into the fields the log recorded for it, wherever they were set, and a field that is itself an object opens again. Every row that opens previews what is inside it with a count beside it, and the hover says whether those parts were written on one line or assembled from writes of their own. An object the log recorded nothing for reads `{}` with nothing to open. Where the log wrote an address instead of a value, the object at that address is shown, or `no value recorded` where the log never wrote one. A statement owns no variables of its own, so it answers from the Apex frame that ran it. Pick a row that merges calls - Aggregated, Bottom-Up or any Analysis row - and the section compares those calls instead: the names that varied lead, each opening into every value it held, how many calls held it, and whether that was one unbroken run of calls or a value that came and went. A name every call agreed on reads as it does for one frame. Hover a value to light the calls that held it in the timeline and the grids, and click to keep them lit. An object opens into its fields as it does for one frame, read as the first call that held it recorded it. Statics are left out: a static lives for the whole transaction, so it moves for reasons the row does not own. Needs the log captured with Apex Code at **FINEST**.
+- **Variables** - the variables Apex could reach from the frame, or how they varied across the calls of a merged row. See [Variables](#variables). Needs the log captured with Apex Code at **FINEST**.
 - **Self time by namespace** - Timeline only: the self time under the selection split by the namespace whose code ran it, so you can see whose package burned it. Every namespace bar colours the six biggest and gathers the rest into one **others** segment, which names them on hover.
 - **Findings** - Analysis only: which of the log's findings name the selected method or anything it called, so you can tell whether the row you picked is one of the log's problems.
 - **Call stack** - the parent frames that led to the selection, outermost first, with total and self time.
@@ -40,6 +40,30 @@ Collapse a section by clicking its header. Drag a header to reorder the stack, o
 Sections that read the whole log size themselves to their content, and to no more than an equal share of the panel - they grow back towards their content only as far as the other sections leave room, and scroll inside past that, so no one section can crowd the rest down to its minimum. The ones that answer about a selection do not: **Details** and **Self time by namespace** keep a steady height, and **Variables**, **Call stack**, **Call tree** and **Findings** share what is left. Every one of those is a share of the panel, so docking wider or taller gives each section more room. So stepping from one frame to the next never resizes the stack - a section with more to say scrolls inside instead.
 
 Drag a divider to resize: the sections on the other side give up room in turn, each down to the same small minimum, and the divider follows the pointer until they are all there. A drag sets the size of every section, so the stack holds where you left it. Double-click a divider to hand back the sizes of the two sections beside it, or use **Reset Sections** for the whole stack. Sizes are not remembered: a size set for one log is the wrong one for the next.
+
+### Variables
+
+The section needs the log captured with Apex Code at **FINEST**.
+
+**One frame**
+
+- It shows what Apex could reach from the frame: its **Local** variables, `this` and its fields, and the **Static** variables assigned by that point, grouped by class.
+- Every value shows as it was at the frame. A name that the log declared but never wrote shows `not assigned`.
+- An object opens into the fields that the log recorded for it, wherever they were set. A field that is itself an object opens again.
+- Every row that opens shows a preview of its contents, with a count beside it. The hover tells you if those parts were written on one line or assembled from writes of their own.
+- An object that the log recorded nothing for shows `{}` and does not open.
+- Where the log wrote an address instead of a value, the section shows the object at that address. Where the log never wrote a value, it shows `no value recorded`.
+- A statement has no variables of its own, so the section shows those of the Apex frame that ran it.
+
+**A row that merges calls**
+
+Select a row that merges calls - an Aggregated or Bottom-Up row, or any Analysis row - and the section compares those calls:
+
+- The names that varied come first. Each opens into every value it held, how many calls held that value, and if those calls were one unbroken run or the value came and went.
+- A name that every call agreed on shows as it does for one frame.
+- Hover a value to highlight the calls that held it in the timeline and the grids. Click the value to keep them highlighted.
+- An object opens into its fields as it does for one frame, as recorded by the first call that held it.
+- Static variables are not shown. A static lives for the whole transaction, so it changes for reasons that the row does not control.
 
 ### Summary
 
