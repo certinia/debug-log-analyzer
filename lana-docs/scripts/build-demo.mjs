@@ -6,7 +6,7 @@ import { copyFile, mkdir, readdir, readFile, rm, writeFile } from 'node:fs/promi
 import { pathToFileURL } from 'node:url';
 
 const viewerRoot = process.env.DEMO_VIEWER_ROOT
-  ? pathToFileURL(`${process.env.DEMO_VIEWER_ROOT.replace(/\/$/, '')}/`)
+  ? pathToFileURL(`${process.env.DEMO_VIEWER_ROOT}/`)
   : new URL('../../', import.meta.url);
 const viewerOut = new URL('lana/out/', viewerRoot);
 const demoSrc = new URL('../demo/', import.meta.url);
