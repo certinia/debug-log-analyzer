@@ -96,7 +96,7 @@ The bar above the tabs summarizes the log at a glance:
 
 The Timeline view shows a live visualization of your Salesforce Apex log execution, including methods, SOQL queries, DML operations, workflows, flows, and more.
 
-- **⚡ Fast** - Zoom, pan and render smoothly even on massive logs (500k+ lines).
+- **⚡ Fast** - Zoom, pan and render smoothly even on 100 MB logs.
 - **🗺️ Minimap** - Bird's-eye view with skyline density overview, viewport lens, and instant teleport.
 - **📊 Governor Limits Strip** - At-a-glance limit usage with traffic light coloring, built from individual log events so every limit (heap included) updates as it's consumed, not just at cumulative snapshots. Expand for a detailed step chart.
 - **📏 Measure & Zoom** - `Shift+Drag` to measure durations, `Alt/Option+Drag` to area-zoom, precision keyboard controls.

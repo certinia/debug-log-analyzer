@@ -145,6 +145,7 @@ const config: Config = {
           position: 'left',
           items: [
             { to: '/docs/gettingstarted', label: 'Getting Started' },
+            { to: '/docs/guides/slow-transaction', label: 'Find a slow transaction' },
             { to: '/docs/features', label: 'Features' },
             { to: '/docs/settings', label: 'Settings' },
             { to: '/community/changelog', label: 'Changelog' },

@@ -14,7 +14,7 @@ keywords:
     salesforce log analysis,
     database insights,
     salesforce developer tools,
-    salesfroce query optimization,
+    salesforce query optimization,
   ]
 image: https://raw.githubusercontent.com/certinia/debug-log-analyzer/main/lana/assets/1_22/database.png
 hide_title: true
@@ -36,7 +36,7 @@ The tab has separate **DML**, **SOQL** and **SOSL** sections
 
 > Consumed figures need the Apex Profiling log category. Without it, sections show the tracked count and mark the limit _n/a_.
 
-The _Selectivity_ column will have a green tick if the query is selective, a red cross if it is not and will be blank if the selectivity could not be determine. Sorting on this column will sort the rows by relative query cost, this number can be seen by hovering the cell on the selectivity column.
+The _Selectivity_ column will have a green tick if the query is selective, a red cross if it is not and will be blank if the selectivity could not be determined. Sorting on this column will sort the rows by relative query cost, this number can be seen by hovering the cell on the selectivity column.
 
 ### Sort
 

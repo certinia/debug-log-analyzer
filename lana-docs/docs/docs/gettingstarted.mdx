@@ -18,9 +18,11 @@ image: https://raw.githubusercontent.com/certinia/debug-log-analyzer/main/lana/a
 
 ## Installation
 
-Install Apex Log Analyzer using whichever you prefer:
+Apex Log Analyzer needs VS Code 1.102 or later. It also runs in VS Code for the Web: vscode.dev, github.dev and the Salesforce Web Console.
 
-- **Extensions sidebar** - search for `Apex Log Analyzer` and click \*\*Install
+Install it in one of these ways:
+
+- **Extensions sidebar** - search for `Apex Log Analyzer` and click **Install**.
 - **Marketplace** - open the [VS Code Marketplace: Apex Log Analyzer](https://marketplace.visualstudio.com/items?itemName=financialforce.lana) and click **Install**.
 - **Command Palette** - press `Cmd/Ctrl+Shift+P` and run `ext install financialforce.lana`.
 - **Command line** - run from a terminal:
@@ -35,36 +37,32 @@ Click `Switch to Pre-Release Version` on the banner to get bleeding edge changes
 
 ## View Analysis
 
-Start the analysis either from a log you have already downloaded or by downloading a log from an org to view.
-On larger logs the analysis window may take a few seconds to appear.
+Open the analysis from a log you already have, or download a log from an org.
+On a large log, the analysis can take a few seconds to show.
 
 ### From an Open Log File
 
-With the `.log` file open in VSCode.
+Open the `.log` file in VS Code, then do one of these:
 
-1. Open command pallette (CMD/CTRL + Shift + P) -> 'Log: Show Apex Log Analysis'\
-   or
-1. Click the 'Log: Show Apex Log Analysis' code lens at the top of the file\
-   <img
-     src="https://raw.githubusercontent.com/certinia/debug-log-analyzer/main/lana/assets/1_22/vscode/show-analysis-lens.png"
-     alt="Screenshot showing the Log: Show Apex Log Analysis code lense in a log file"
-     style={{
-       width: '100%',
-       height: 'auto',
-       maxWidth: '350px',
-     }}
-     loading="lazy"
-   />
-   \ or
-1. Right click -> 'Log: Show Apex Log Analysis'
-   or
-1. Click editor 'Log: Show Apex Log Analysis' icon button at top of editor
-   or
-1. Right click editor tab -> 'Log: Show Apex Log Analysis'
+- Open the Command Palette (`Cmd/Ctrl+Shift+P`) and run **Log: Show Apex Log Analysis**.
+- Click the **Log: Show Apex Log Analysis** code lens at the top of the file.\
+  <img
+    src="https://raw.githubusercontent.com/certinia/debug-log-analyzer/main/lana/assets/1_22/vscode/show-analysis-lens.png"
+    alt="Screenshot showing the Log: Show Apex Log Analysis code lens in a log file"
+    style={{
+      width: '100%',
+      height: 'auto',
+      maxWidth: '350px',
+    }}
+    loading="lazy"
+  />
+- Right-click in the editor and select **Log: Show Apex Log Analysis**.
+- Click the **Log: Show Apex Log Analysis** button at the top of the editor.
+- Right-click the editor tab and select **Log: Show Apex Log Analysis**.
 
 ### Download a log
 
-1. Open command pallette (CMD/CTRL + Shift + P) -> 'Log: Retrieve Apex Log And Show Analysis
+Open the Command Palette (`Cmd/Ctrl+Shift+P`) and run **Log: Retrieve Apex Log And Show Analysis**.
 
 ## ⚙️ Recommended Debug Log Levels
 
@@ -72,3 +70,7 @@ With the `.log` file open in VSCode.
 - Be aware that higher debug levels introduce logging overhead, which can inflate recorded execution times.
 - Avoid truncated logs - they can result in incomplete or misleading analysis.
 - Recommended settings for a good balance of detail and performance: `APEX_CODE,FINE; APEX_PROFILING,FINE; CALLOUT,INFO; DB,FINEST; NBA,INFO; SYSTEM,DEBUG; VALIDATION,INFO; VISUALFORCE,FINE; WAVE,INFO; WORKFLOW,FINE`
+
+## Next steps
+
+To find what made a transaction slow, follow [Find out why a transaction is slow](./guides/slow-transaction.md).
