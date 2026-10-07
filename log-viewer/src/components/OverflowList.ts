@@ -85,14 +85,15 @@ export class OverflowList extends LitElement {
       }
 
       /* Items take the remaining space and clip; the toggle is pushed to the collapse end.
-         The margin leaves room for an item's focus ring. */
+         The margin leaves room for an item's focus ring. Chromium drops a calc() there,
+         so it takes a plain length that covers ring plus offset. */
       .items {
         display: flex;
         flex-wrap: nowrap;
         align-items: center;
         min-width: 0;
         overflow: clip;
-        overflow-clip-margin: calc(2 * var(--lana-stroke));
+        overflow-clip-margin: var(--lana-space-2xs);
         flex: 1 1 auto;
       }
 
