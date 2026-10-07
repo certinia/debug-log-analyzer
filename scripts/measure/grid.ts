@@ -3,18 +3,26 @@
  */
 
 /**
- * Times the grid's core steps on the Call Tree's Time Order rows, with the longest
- * slice each step held the thread for: the figure the 50ms budget is about.
+ * Times the grid's core steps on the Call Tree's Time Order and Bottom-Up rows, with the
+ * longest slice each step held the thread for: the figure the 50ms budget is about.
  */
 import type { ApexLog, LogEvent } from '@apexdevtools/apex-log-parser';
 
+import { LogStore } from '../../log-viewer/src/core/log/LogStore.js';
+import {
+  toBottomUpTree,
+  type BottomUpRow,
+} from '../../log-viewer/src/features/call-tree/utils/Aggregation.js';
 import {
   toTimeOrderTree,
   type TimeOrderRow,
 } from '../../log-viewer/src/features/call-tree/utils/TimeOrderTree.js';
 import {
+  Group,
   GridStore,
   sortComparator,
+  sum,
+  type Calcs,
   type RowFilter,
   type Scheduler,
 } from '../../log-viewer/src/grid/index.js';
@@ -70,23 +78,43 @@ function deepPath(log: ApexLog): number[] {
   return path.reverse();
 }
 
-export async function measureGrid(log: ApexLog): Promise<void> {
-  const roots = toTimeOrderTree(log.children, log.governorLimits) ?? [];
-  const scheduler = timedScheduler();
-  const path = deepPath(log);
+type Step = (label: string, body: () => Promise<unknown>) => Promise<void>;
 
-  const step = async (label: string, body: () => Promise<unknown>): Promise<void> => {
-    const before = heapMb();
+/**
+ * Times each step and prints it with the shown row count that `size` reads after it.
+ * No heap reading between steps: a forced GC drops V8's optimised code, so the next step
+ * would time a cold walk that the app never sees.
+ */
+function stepper(scheduler: ReturnType<typeof timedScheduler>, size: () => number): Step {
+  return async (label, body) => {
     scheduler.reset();
     const start = nowMs();
     await body();
     const took = nowMs() - start;
-    const rows = store.snapshot().rows.size;
     line(
       label,
-      `${ms(took)}ms  longest slice ${ms(scheduler.longest())}ms  ${String(rows).padStart(7)} rows  heap ${before} -> ${heapMb()}MB`,
+      `${ms(took)}ms  longest slice ${ms(scheduler.longest())}ms  ${String(size()).padStart(7)} rows`,
     );
   };
+}
+
+/** Heap the store holds with every row shown, over `base` taken before it was made. */
+async function heldHeap<R extends object>(store: GridStore<R>, base: number): Promise<void> {
+  await store.expandAll();
+  line('heap held, all rows shown', `+${heapMb() - base}MB  ${store.snapshot().rows.size} rows`);
+}
+
+export async function measureGrid(log: ApexLog): Promise<void> {
+  await measureTimeOrder(log);
+  console.log('');
+  await measureBottomUp(log);
+}
+
+async function measureTimeOrder(log: ApexLog): Promise<void> {
+  const roots = toTimeOrderTree(log.children, log.governorLimits) ?? [];
+  const scheduler = timedScheduler();
+  const path = deepPath(log);
+  const step = stepper(scheduler, () => store.snapshot().rows.size);
 
   const detail: RowFilter<TimeOrderRow> = { test: (r) => r._hasDetailsDeep };
   const soqlOnly: RowFilter<TimeOrderRow> = {
@@ -95,6 +123,7 @@ export async function measureGrid(log: ApexLog): Promise<void> {
   };
   const bySelf = sortComparator<TimeOrderRow>({ value: (r) => r.duration.self }, 'desc');
 
+  const base = heapMb();
   let store!: GridStore<TimeOrderRow>; // assigned by the first step, before any read
   await step('store: first build', () => {
     store = new GridStore<TimeOrderRow>(
@@ -115,4 +144,71 @@ export async function measureGrid(log: ApexLog): Promise<void> {
   await step(`reveal deep row (depth ${path.length})`, () => store.reveal(path));
   await step('toggle first root open', () => store.toggle(store.snapshot().rows.keyAt(0), true));
   await step('toggle first root shut', () => store.toggle(store.snapshot().rows.keyAt(0), false));
+  await heldHeap(store, base);
+}
+
+/**
+ * `sumDurationTotalForRootEvents` in slices. Run in one go it holds the thread for up to
+ * 330ms at 580k rows. Step 8 moves this into the Bottom-Up adapter.
+ */
+function* outermostTotal(rows: readonly BottomUpRow[]): Generator<void, number, void> {
+  const all = new Set<LogEvent>();
+  for (const row of rows) {
+    for (const event of row.instances) {
+      all.add(event);
+      yield;
+    }
+  }
+  let total = 0;
+  for (const event of all) {
+    let enclosed = false;
+    for (let parent = event.parent; parent && !enclosed; parent = parent.parent) {
+      enclosed = all.has(parent);
+    }
+    if (!enclosed) {
+      total += event.duration.total;
+    }
+    yield;
+  }
+  return total;
+}
+
+/** Grouping, with the footer and group totals the Bottom-Up tab shows. */
+async function measureBottomUp(log: ApexLog): Promise<void> {
+  const roots = toBottomUpTree(log.children, new LogStore(log).keyPathIds(), log.governorLimits);
+  const scheduler = timedScheduler();
+  const step = stepper(scheduler, () => store.snapshot().rows.size);
+  const calcs: Calcs<BottomUpRow> = {
+    totalSelfTime: sum((r) => r.totalSelfTime),
+    totalTime: { of: outermostTotal },
+  };
+  const bySelf = sortComparator<BottomUpRow>({ value: (r) => r.totalSelfTime }, 'desc');
+  const groupsBySelf = sortComparator<Group<BottomUpRow>>(
+    { value: (g) => g.totals.totalSelfTime },
+    'desc',
+  );
+  const firstGroup = (): Group<BottomUpRow> => {
+    const entry = store.snapshot().rows.rowAt(0);
+    if (!(entry instanceof Group)) {
+      throw new Error('not grouped');
+    }
+    return entry;
+  };
+
+  const base = heapMb();
+  let store!: GridStore<BottomUpRow>; // assigned by the first step, before any read
+  await step(`bottom-up: first build (${roots.length} roots)`, () => {
+    store = new GridStore<BottomUpRow>(
+      { roots, children: (r) => r._children, key: (r) => r.id },
+      { scheduler, calcs },
+    );
+    return store.setSort(bySelf);
+  });
+  await step('group by type', () => store.setGroupBy((r) => r.type));
+  await step('group by namespace', () => store.setGroupBy((r) => r.namespace));
+  await step('sort rows and groups by self', () => store.setSort(bySelf, groupsBySelf));
+  await step('open largest group', () => store.toggle(firstGroup(), true));
+  await step('expand all', () => store.expandAll());
+  await step('ungroup', () => store.setGroupBy(null));
+  await heldHeap(store, base);
 }

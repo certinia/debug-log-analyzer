@@ -1,29 +1,39 @@
 /*
  * Copyright (c) 2026 Certinia Inc. All rights reserved.
  */
+import { needsAll, totalsOf, type Calcs, type Totals } from './calcs.js';
+import { byCount, Group, type GroupBy } from './groups.js';
 import { CHECK_EVERY, immediateScheduler, sliceTimer, type Scheduler } from './schedule.js';
 import type { Compare, ExpandPolicy, RowFilter, RowKey, TreeSource } from './types.js';
 
 const HAS_CHILDREN = 1;
 const EXPANDED = 2;
+const GROUP = 4;
 
 /** The rows on screen, in order. Immutable: a change publishes a new one. */
 export interface RowView<R> {
   readonly size: number;
-  rowAt(index: number): R;
+  /** A data row, or a group's header row. */
+  rowAt(index: number): R | Group<R>;
   depthAt(index: number): number;
+  /** A data row's key, or a group row's group key. */
   keyAt(index: number): RowKey;
-  /** The row has children that pass the filters. */
+  /** The row has children that pass the filters. A group row always has. */
   hasChildrenAt(index: number): boolean;
   isExpandedAt(index: number): boolean;
-  /** Index of the row with `key`, or -1 when it is not shown. Linear in the row count. */
-  indexOf(key: RowKey): number;
+  /**
+   * Index of the data row with this key, or of the group row with this group's key; -1
+   * when it is not shown. Linear in the row count.
+   */
+  indexOf(target: RowKey | Group<R>): number;
 }
 
 export interface Snapshot<R> {
   /** Goes up by one on every change. */
   readonly version: number;
   readonly rows: RowView<R>;
+  /** The footer: each calc over the rows that pass the filters. */
+  readonly totals: Totals;
   /** A sliced step is running; `rows` is the last finished state. */
   readonly busy: boolean;
 }
@@ -32,15 +42,24 @@ export interface GridStoreOptions<R> {
   scheduler?: Scheduler;
   /** Which rows start expanded. Default: none. */
   expanded?: ExpandPolicy<R>;
+  calcs?: Calcs<R>;
+  groupBy?: GroupBy<R> | null;
 }
 
+type Entry<R> = R | Group<R>;
+
 class FlatRows<R extends object> implements RowView<R> {
-  readonly rows: readonly R[];
+  readonly rows: readonly Entry<R>[];
   readonly depths: Uint16Array;
   readonly flags: Uint8Array;
   private readonly key: (row: R) => RowKey;
 
-  constructor(rows: readonly R[], depths: Uint16Array, flags: Uint8Array, key: (row: R) => RowKey) {
+  constructor(
+    rows: readonly Entry<R>[],
+    depths: Uint16Array,
+    flags: Uint8Array,
+    key: (row: R) => RowKey,
+  ) {
     this.rows = rows;
     this.depths = depths;
     this.flags = flags;
@@ -51,8 +70,8 @@ class FlatRows<R extends object> implements RowView<R> {
     return this.rows.length;
   }
 
-  rowAt(index: number): R {
-    return this.rows[index] as R;
+  rowAt(index: number): Entry<R> {
+    return this.rows[index] as Entry<R>;
   }
 
   depthAt(index: number): number {
@@ -60,7 +79,8 @@ class FlatRows<R extends object> implements RowView<R> {
   }
 
   keyAt(index: number): RowKey {
-    return this.key(this.rowAt(index));
+    const entry = this.rowAt(index);
+    return entry instanceof Group ? entry.key : this.key(entry);
   }
 
   hasChildrenAt(index: number): boolean {
@@ -71,10 +91,14 @@ class FlatRows<R extends object> implements RowView<R> {
     return ((this.flags[index] ?? 0) & EXPANDED) !== 0;
   }
 
-  indexOf(key: RowKey): number {
+  indexOf(target: RowKey | Group<R>): number {
     const rows = this.rows;
+    if (target instanceof Group) {
+      return rows.findIndex((entry) => entry instanceof Group && entry.key === target.key);
+    }
     for (let i = 0; i < rows.length; i++) {
-      if (this.key(rows[i] as R) === key) {
+      const entry = rows[i] as Entry<R>;
+      if (!(entry instanceof Group) && this.key(entry) === target) {
         return i;
       }
     }
@@ -84,9 +108,35 @@ class FlatRows<R extends object> implements RowView<R> {
 
 /** A row list being built: parallel arrays, packed into a {@link FlatRows} once done. */
 interface Flat<R> {
-  rows: R[];
+  rows: Entry<R>[];
   depths: number[];
   flags: number[];
+}
+
+/** A depth-first walk in progress: a stack of sibling lists and the next index in each. */
+interface Walk<R> {
+  lists: (readonly R[])[];
+  at: number[];
+  /** Depth of the first list. */
+  depth: number;
+}
+
+/** A walk of `shown`, a sibling list already filtered and sorted, at `depth`. */
+const walkOf = <R>(shown: readonly R[], depth: number): Walk<R> => ({
+  lists: [shown],
+  at: [0],
+  depth,
+});
+
+interface Built<R extends object> {
+  rows: FlatRows<R>;
+  totals: Totals;
+}
+
+function flip<K>(set: Set<K>, key: K): void {
+  if (!set.delete(key)) {
+    set.add(key);
+  }
 }
 
 /**
@@ -108,6 +158,14 @@ export class GridStore<R extends object> {
   private ordered = new WeakMap<readonly R[], readonly R[]>();
   /** For each `keepAncestors` filter: the rows that pass or have a descendant that passes. */
   private deepPass = new WeakMap<RowFilter<R>, WeakSet<R>>();
+  private calcs: Calcs<R>;
+  private groupBy: GroupBy<R> | null;
+  private groupCompare: Compare<Group<R>> | null = null;
+  /** Groups start closed; these are open. */
+  private openGroups = new Set<string>();
+  /** Totals hold until the filters, source, calcs or grouping change; sort and expansion keep them. */
+  private footer: Totals | null = null;
+  private groupTotals = new Map<string, Totals>();
 
   private current: Snapshot<R>;
   private listeners = new Set<(snapshot: Snapshot<R>) => void>();
@@ -119,7 +177,14 @@ export class GridStore<R extends object> {
     this.source = source;
     this.scheduler = options.scheduler ?? immediateScheduler;
     this.expandBase = options.expanded ?? false;
-    this.current = { version: 0, rows: this.pack({ rows: [], depths: [], flags: [] }), busy: true };
+    this.calcs = options.calcs ?? {};
+    this.groupBy = options.groupBy ?? null;
+    this.current = {
+      version: 0,
+      rows: this.pack({ rows: [], depths: [], flags: [] }),
+      totals: {},
+      busy: true,
+    };
     void this.rebuild();
   }
 
@@ -140,18 +205,40 @@ export class GridStore<R extends object> {
   setSource(source: TreeSource<R>): Promise<void> {
     this.source = source;
     this.toggled.clear();
+    this.openGroups.clear();
     this.deepPass = new WeakMap();
+    this.dropTotals();
     return this.reorder();
   }
 
-  setSort(compare: Compare<R> | null): Promise<void> {
+  /**
+   * Sorts each sibling list by `compare`, and the groups by `groups`. Groups keep their
+   * default order, most rows first, where `groups` is absent or ties.
+   */
+  setSort(compare: Compare<R> | null, groups?: Compare<Group<R>> | null): Promise<void> {
     this.compare = compare;
+    this.groupCompare = groups ?? null;
     return this.reorder();
   }
 
   setFilters(filters: readonly RowFilter<R>[]): Promise<void> {
     this.filters = filters;
+    this.dropTotals();
     return this.reorder();
+  }
+
+  setCalcs(calcs: Calcs<R>): Promise<void> {
+    this.calcs = calcs;
+    this.dropTotals();
+    return this.rebuild();
+  }
+
+  /** Groups the top-level rows. Every group starts closed. */
+  setGroupBy(groupBy: GroupBy<R> | null): Promise<void> {
+    this.groupBy = groupBy;
+    this.openGroups.clear();
+    this.groupTotals.clear();
+    return this.rebuild();
   }
 
   expandAll(): Promise<void> {
@@ -169,12 +256,12 @@ export class GridStore<R extends object> {
   /**
    * Expands or collapses a shown row; `expanded` omitted flips it. The subtree is spliced
    * in or out at once, without a rebuild. A row that is not shown is left alone: use
-   * {@link reveal} to reach it.
+   * {@link reveal} to reach it. Takes a data row's key, or a group.
    */
-  async toggle(key: RowKey, expanded?: boolean): Promise<void> {
+  async toggle(target: RowKey | Group<R>, expanded?: boolean): Promise<void> {
     await this.settled();
     const rows = this.current.rows;
-    const index = rows.indexOf(key);
+    const index = rows.indexOf(target);
     if (index === -1 || !rows.hasChildrenAt(index)) {
       return;
     }
@@ -182,18 +269,23 @@ export class GridStore<R extends object> {
     if (expanded === was) {
       return;
     }
-    this.flip(key);
+    if (target instanceof Group) {
+      flip(this.openGroups, target.key);
+    } else {
+      flip(this.toggled, target);
+    }
     this.splice(index, !was);
   }
 
   /**
    * Expands each ancestor on `path` (root first, the target last) and returns the
    * target's index. Where a filter hides part of the path, it returns the deepest shown
-   * row on it instead, or -1 when none is shown.
+   * row on it instead, or -1 when none is shown. Opens the group the path starts in.
    */
   async reveal(path: readonly RowKey[]): Promise<number> {
     // Sibling lists are cached as they are read, so read them only once filters are ready.
     await this.settled();
+    const indent = this.groupBy ? 1 : 0;
     let list: readonly R[] = this.source.roots;
     let found: RowKey | null = null;
     for (const [depth, key] of path.entries()) {
@@ -202,9 +294,12 @@ export class GridStore<R extends object> {
         break;
       }
       found = key;
+      if (depth === 0 && this.groupBy) {
+        this.openGroups.add(this.groupBy(row));
+      }
       if (depth < path.length - 1) {
-        if (!this.isExpanded(row, depth)) {
-          this.flip(key);
+        if (!this.isExpanded(row, depth + indent)) {
+          flip(this.toggled, key);
         }
         list = this.source.children?.(row) ?? [];
       }
@@ -213,15 +308,14 @@ export class GridStore<R extends object> {
     return found === null ? -1 : this.current.rows.indexOf(found);
   }
 
-  private flip(key: RowKey): void {
-    if (!this.toggled.delete(key)) {
-      this.toggled.add(key);
-    }
-  }
-
   private reorder(): Promise<void> {
     this.ordered = new WeakMap();
     return this.rebuild();
+  }
+
+  private dropTotals(): void {
+    this.footer = null;
+    this.groupTotals.clear();
   }
 
   private isExpanded(row: R, depth: number): boolean {
@@ -256,13 +350,12 @@ export class GridStore<R extends object> {
   }
 
   /**
-   * Depth-first over the shown rows under `list`, which sits at `depth`. Yields after
-   * each row, so a caller can slice the walk; the row lands in `out` first.
+   * Moves up to `budget` shown rows of a depth-first walk into `out`; true once the walk
+   * is done. A plain loop, not a generator: a resume per row cost a third of expand all.
    */
-  private *walk(list: readonly R[], depth: number, out: Flat<R>): Generator<void> {
-    const lists: (readonly R[])[] = [this.childrenOf(list)];
-    const at: number[] = [0];
-    while (lists.length) {
+  private walkSome(walk: Walk<R>, out: Flat<R>, budget: number): boolean {
+    const { lists, at, depth } = walk;
+    while (lists.length && budget > 0) {
       const top = lists.length - 1;
       const siblings = lists[top] as readonly R[];
       const i = at[top] as number;
@@ -275,22 +368,38 @@ export class GridStore<R extends object> {
       const row = siblings[i] as R;
       const d = depth + top;
       const children = this.source.children?.(row);
-      const shown = children?.length ? this.childrenOf(children) : null;
-      const expanded = shown?.length ? this.isExpanded(row, d) : false;
+      const kids = children?.length ? this.childrenOf(children) : null;
+      const expanded = kids?.length ? this.isExpanded(row, d) : false;
       out.rows.push(row);
       out.depths.push(d);
-      out.flags.push(shown?.length ? HAS_CHILDREN | (expanded ? EXPANDED : 0) : 0);
+      out.flags.push(kids?.length ? HAS_CHILDREN | (expanded ? EXPANDED : 0) : 0);
       if (expanded) {
-        lists.push(shown as readonly R[]);
+        lists.push(kids as readonly R[]);
         at.push(0);
       }
-      yield;
+      budget--;
     }
+    return lists.length === 0;
+  }
+
+  /** Walks the whole of `walk` into `out`, checking the clock between batches. False when stale. */
+  private async walkAll(
+    walk: Walk<R>,
+    out: Flat<R>,
+    tick: () => Promise<boolean>,
+  ): Promise<boolean> {
+    while (!this.walkSome(walk, out, CHECK_EVERY)) {
+      if (!(await tick()) || this.dirty) {
+        return false;
+      }
+    }
+    return true;
   }
 
   /** Replaces the rows under `index` with its subtree, or with nothing, in one copy. */
   private splice(index: number, expand: boolean): void {
     const old = this.current.rows as FlatRows<R>;
+    const entry = old.rowAt(index);
     const depth = old.depthAt(index);
     let rest = index + 1;
     while (rest < old.size && old.depthAt(rest) > depth) {
@@ -298,13 +407,9 @@ export class GridStore<R extends object> {
     }
     const inserted: Flat<R> = { rows: [], depths: [], flags: [] };
     if (expand) {
-      for (const _ of this.walk(
-        this.source.children?.(old.rowAt(index)) ?? [],
-        depth + 1,
-        inserted,
-      )) {
-        // the walk fills `inserted`
-      }
+      const shown =
+        entry instanceof Group ? entry.rows : this.childrenOf(this.source.children?.(entry) ?? []);
+      this.walkSome(walkOf(shown, depth + 1), inserted, Infinity);
     }
     const head = index + 1;
     const tail = head + inserted.rows.length;
@@ -317,9 +422,15 @@ export class GridStore<R extends object> {
     flags.set(old.flags.subarray(0, head));
     flags.set(inserted.flags, head);
     flags.set(old.flags.subarray(rest), tail);
-    flags[index] = HAS_CHILDREN | (expand ? EXPANDED : 0);
+    flags[index] = ((old.flags[index] ?? 0) & GROUP) | HAS_CHILDREN | (expand ? EXPANDED : 0);
     const rows = old.rows.slice(0, head).concat(inserted.rows, old.rows.slice(rest));
-    this.publish(new FlatRows(rows, depths, flags, (row) => this.source.key(row)), false);
+    this.publish(
+      {
+        rows: new FlatRows(rows, depths, flags, (row) => this.source.key(row)),
+        totals: this.current.totals,
+      },
+      false,
+    );
   }
 
   /** Runs builds until no change is waiting, then publishes the last one. */
@@ -337,9 +448,9 @@ export class GridStore<R extends object> {
     this.publish(null, true);
     while (this.dirty) {
       this.dirty = false;
-      const rows = await this.build();
-      if (rows) {
-        this.publish(rows, this.dirty);
+      const built = await this.build();
+      if (built) {
+        this.publish(built, this.dirty);
       }
     }
     this.running = false;
@@ -349,26 +460,109 @@ export class GridStore<R extends object> {
     }
   }
 
-  /** The full row list, in slices. Null when a newer change made it stale. */
-  private async build(): Promise<FlatRows<R> | null> {
+  /** The full row list and footer, in slices. Null when a newer change made it stale. */
+  private async build(): Promise<Built<R> | null> {
     const tick = sliceTimer(this.scheduler, () => this.dirty);
     for (const filter of this.filters) {
       if (filter.keepAncestors && !this.deepPass.has(filter)) {
         const set = await this.deepPassOf(filter, tick);
-        if (!set) {
+        if (!set || this.dirty) {
           return null;
         }
         this.deepPass.set(filter, set);
       }
     }
-    const out: Flat<R> = { rows: [], depths: [], flags: [] };
     let count = 0;
-    for (const _ of this.walk(this.source.roots, 0, out)) {
-      if (++count % CHECK_EVERY === 0 && !(await tick())) {
+    const drive = async <T>(work: Generator<void, T, void>): Promise<{ value: T } | null> => {
+      for (;;) {
+        const step = work.next();
+        if (step.done) {
+          return { value: step.value };
+        }
+        // A step resumes only while the build is current, so the caches it writes stay true.
+        if (++count % CHECK_EVERY === 0 && (!(await tick()) || this.dirty)) {
+          return null;
+        }
+      }
+    };
+
+    const top = this.childrenOf(this.source.roots);
+    if (!this.footer) {
+      const footer = await drive(this.totalsFor(top));
+      if (!footer || this.dirty) {
+        return null;
+      }
+      this.footer = footer.value;
+    }
+    const totals = this.footer;
+    const out: Flat<R> = { rows: [], depths: [], flags: [] };
+    if (!this.groupBy) {
+      return (await this.walkAll(walkOf(top, 0), out, tick)) && !this.dirty
+        ? { rows: this.pack(out), totals }
+        : null;
+    }
+    const groups = await drive(this.groupsOf(top, this.groupBy));
+    if (!groups || this.dirty) {
+      return null;
+    }
+    for (const group of groups.value) {
+      const open = this.openGroups.has(group.key);
+      out.rows.push(group);
+      out.depths.push(0);
+      out.flags.push(GROUP | HAS_CHILDREN | (open ? EXPANDED : 0));
+      if (open && !(await this.walkAll(walkOf(group.rows, 1), out, tick))) {
         return null;
       }
     }
-    return this.pack(out);
+    return this.dirty ? null : { rows: this.pack(out), totals };
+  }
+
+  /** `top` split into groups, in group order, each with its totals. */
+  private *groupsOf(top: readonly R[], groupBy: GroupBy<R>): Generator<void, Group<R>[], void> {
+    const buckets = new Map<string, R[]>();
+    for (const row of top) {
+      const key = groupBy(row);
+      const bucket = buckets.get(key);
+      if (bucket) {
+        bucket.push(row);
+      } else {
+        buckets.set(key, [row]);
+      }
+      yield;
+    }
+    const groups: Group<R>[] = [];
+    for (const [key, rows] of buckets) {
+      let totals = this.groupTotals.get(key);
+      if (!totals) {
+        totals = yield* this.totalsFor(rows);
+        this.groupTotals.set(key, totals);
+      }
+      groups.push(new Group(key, rows, totals));
+    }
+    groups.sort(byCount);
+    // Array sort is stable, so groups that tie keep the default order.
+    return this.groupCompare ? groups.sort(this.groupCompare) : groups;
+  }
+
+  /** Each calc over `top`, or over every row under it that passes the filters. */
+  private *totalsFor(top: readonly R[]): Generator<void, Totals, void> {
+    if (!needsAll(this.calcs)) {
+      return yield* totalsOf(this.calcs, top, []);
+    }
+    const all: R[] = [];
+    const lists: (readonly R[])[] = [top];
+    while (lists.length) {
+      for (const row of lists.pop() as readonly R[]) {
+        all.push(row);
+        const children = this.source.children?.(row);
+        if (children?.length) {
+          // Filter only: order does not change a total, and sorting every list costs.
+          lists.push(this.filters.length ? children.filter((r) => this.passes(r)) : children);
+        }
+        yield;
+      }
+    }
+    return yield* totalsOf(this.calcs, top, all);
   }
 
   /** Rows that pass `filter` or have a descendant that does: one post-order walk of the tree. */
@@ -409,8 +603,13 @@ export class GridStore<R extends object> {
     );
   }
 
-  private publish(rows: FlatRows<R> | null, busy: boolean): void {
-    this.current = { version: this.current.version + 1, rows: rows ?? this.current.rows, busy };
+  private publish(built: Built<R> | null, busy: boolean): void {
+    this.current = {
+      version: this.current.version + 1,
+      rows: built?.rows ?? this.current.rows,
+      totals: built?.totals ?? this.current.totals,
+      busy,
+    };
     for (const listener of this.listeners) {
       listener(this.current);
     }
