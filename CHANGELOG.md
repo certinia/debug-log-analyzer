@@ -17,6 +17,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - 🪪 **Call tree**: the `USER_INFO` line shows as a row.
 - 🎯 **Entry point**: the header names the longest and counts the rest, and its tooltip lists the top five.
 
+### Added
+
+- 🔦 **Timeline legend**: hover a category to highlight frames in the timeline, select to keep. ([#917])
+
 ### Removed
 
 - 🪓 **Breaking**: the legacy Timeline and all its settings are dropped.
@@ -765,3 +769,4 @@ Skipped due to adopting odd numbering for pre releases and even number for relea
 [#235]: https://github.com/certinia/debug-log-analyzer/issues/235
 [#264]: https://github.com/certinia/debug-log-analyzer/issues/264
 [#1110]: https://github.com/certinia/debug-log-analyzer/issues/1110
+[#917]: https://github.com/certinia/debug-log-analyzer/issues/917

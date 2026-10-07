@@ -6,7 +6,11 @@ import { describe, expect, it } from '@jest/globals';
 import type { MatchedEventInfo } from '../../../types/search.types.js';
 import type { BatchColorInfo } from '../../BucketColorResolver.js';
 import { colorToGreyscale } from '../../rendering/ColorUtils.js';
-import { buildMatchIndex, resolveBucketSearchColor } from '../SearchBucketMatcher.js';
+import {
+  buildMatchIndex,
+  resolveBucketCategoryColor,
+  resolveBucketSearchColor,
+} from '../SearchBucketMatcher.js';
 
 const DML = 0xff0000;
 const SOQL = 0x00ff00;
@@ -119,5 +123,36 @@ describe('resolveBucketSearchColor', () => {
     expect(resolveBucketSearchColor(bucket(0, 100, 0), index, batchColors)).toBe(SOQL);
     expect(resolveBucketSearchColor(bucket(100, 200, 0), index, batchColors)).toBe(DML);
     expect(resolveBucketSearchColor(bucket(200, 300, 0), index, batchColors)).toBe(GREY);
+  });
+});
+
+describe('resolveBucketCategoryColor', () => {
+  function holding(...categories: string[]) {
+    return {
+      categoryStats: {
+        byCategory: new Map(
+          categories.map((category) => [category, { count: 1, totalDuration: 1 }]),
+        ),
+        dominantCategory: categories[0] ?? '',
+      },
+    };
+  }
+
+  it('answers nothing for a bucket holding no lit category', () => {
+    expect(
+      resolveBucketCategoryColor(holding('DML'), new Set(['SOQL']), batchColors),
+    ).toBeUndefined();
+  });
+
+  it('lights a bucket holding a lit category, even when another dominates it', () => {
+    expect(resolveBucketCategoryColor(holding('DML', 'SOQL'), new Set(['SOQL']), batchColors)).toBe(
+      SOQL,
+    );
+  });
+
+  it('takes the higher-priority category when several lit ones share a bucket', () => {
+    const lit = new Set(['SOQL', 'DML']);
+
+    expect(resolveBucketCategoryColor(holding('SOQL', 'DML'), lit, batchColors)).toBe(DML);
   });
 });

@@ -9,7 +9,31 @@ import {
   formatDuration,
   formatWallClockTime,
   isVisible,
+  sameMembers,
+  setChanged,
 } from '../Util.js';
+
+describe('sameMembers', () => {
+  it.each([
+    ['two empty sets', [], [], true],
+    ['the same members in another order', ['a', 'b'], ['b', 'a'], true],
+    ['a missing member', ['a', 'b'], ['a'], false],
+    ['a different member', ['a'], ['b'], false],
+  ])('answers %s', (_case, a, b, expected) => {
+    expect(sameMembers(new Set(a), new Set(b))).toBe(expected);
+  });
+});
+
+describe('setChanged', () => {
+  it('sees no change in a new set with the same members', () => {
+    expect(setChanged(new Set(['a']), new Set(['a']))).toBe(false);
+  });
+
+  it('sees a change in different members, or in the first value', () => {
+    expect(setChanged(new Set(['a']), new Set(['b']))).toBe(true);
+    expect(setChanged(new Set(), undefined)).toBe(true);
+  });
+});
 
 describe('formatWallClockTime', () => {
   it.each([

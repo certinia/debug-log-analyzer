@@ -62,6 +62,8 @@ import { textPredicate } from './search/EventMatcher.js';
 
 interface ApexTimelineOptions extends TimelineOptions {
   themeName?: string | null;
+  /** Escape on the chart asks to drop the category highlight. Returns whether any was dropped. */
+  onCategoryDimClear?: () => boolean;
 }
 
 /** The flame chart already draws the subtree top down, so the inspector answers
@@ -185,6 +187,7 @@ export class ApexLogTimeline {
         onCopyMarker: (marker) => {
           copyToClipboard(marker.summary);
         },
+        onCategoryDimClear: options.onCategoryDimClear,
       },
     );
 
@@ -388,6 +391,14 @@ export class ApexLogTimeline {
    */
   public setTooltipEnabled(enabled: boolean): void {
     this.tooltipRenderer?.setEnabled(enabled);
+  }
+
+  /**
+   * Keep every frame of these categories in colour and dim the rest.
+   * @param categories - Log categories; an empty set drops the highlight
+   */
+  public setCategoryDim(categories: ReadonlySet<string>): void {
+    this.flamechart.setCategoryDim(categories);
   }
 
   /**

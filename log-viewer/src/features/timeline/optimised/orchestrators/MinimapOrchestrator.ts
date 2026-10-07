@@ -309,6 +309,11 @@ export class MinimapOrchestrator {
     this.renderer?.invalidateStatic();
   }
 
+  /** Grey the skyline except where these categories top a column; empty restores it. */
+  public setLitCategories(categories: ReadonlySet<string>): void {
+    this.renderer?.setLitCategories(categories);
+  }
+
   /**
    * Update minimap colors (e.g., after theme change).
    *

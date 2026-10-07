@@ -27,7 +27,13 @@ import type { MatchedEventInfo } from '../../types/search.types.js';
 import type { PrecomputedRect } from '../RectangleCache.js';
 import { colorToGreyscale } from '../rendering/ColorUtils.js';
 import { MeshRectangleWriter } from '../rendering/MeshRectangleWriter.js';
-import { buildMatchIndex, resolveBucketSearchColor } from './SearchBucketMatcher.js';
+import {
+  buildMatchIndex,
+  resolveBucketCategoryColor,
+  resolveBucketSearchColor,
+} from './SearchBucketMatcher.js';
+
+const NO_CATEGORIES: ReadonlySet<string> = new Set();
 
 export class MeshSearchStyleRenderer extends MeshRectangleWriter {
   constructor(container: Container, batches: Map<string, RenderBatch>) {
@@ -46,6 +52,7 @@ export class MeshSearchStyleRenderer extends MeshRectangleWriter {
    * @param buckets - Aggregated pixel buckets grouped by category
    * @param viewport - Current viewport state for coordinate transforms
    * @param matchedEventsInfo - Lightweight info about matched events for bucket highlighting
+   * @param litCategories - Categories whose every frame keeps its colour, as if matched
    */
   public render(
     culledRects: Map<string, PrecomputedRect[]>,
@@ -53,6 +60,7 @@ export class MeshSearchStyleRenderer extends MeshRectangleWriter {
     buckets: Map<string, PixelBucket[]> = new Map(),
     viewport?: ViewportState,
     matchedEventsInfo: ReadonlyArray<MatchedEventInfo> = [],
+    litCategories: ReadonlySet<string> = NO_CATEGORIES,
   ): void {
     const viewportTransform = this.beginFrame(culledRects, buckets, viewport);
     if (!viewportTransform) {
@@ -74,9 +82,10 @@ export class MeshSearchStyleRenderer extends MeshRectangleWriter {
 
       const originalColor = batch.color;
       const greyColor = colorToGreyscale(originalColor);
+      const categoryLit = litCategories.has(category);
 
       for (const rect of rectangles) {
-        const color = matchedEventIds.has(rect.id) ? originalColor : greyColor;
+        const color = categoryLit || matchedEventIds.has(rect.id) ? originalColor : greyColor;
 
         const x = rect.x + halfGap;
         const y = rect.y + halfGap;
@@ -93,8 +102,14 @@ export class MeshSearchStyleRenderer extends MeshRectangleWriter {
     // A bucket's colour comes from the matches inside it, by time range: `eventRefs` is
     // empty on a memory-optimised bucket.
     const matchIndex = buildMatchIndex(matchedEventsInfo);
-    rectIndex = this.writeBuckets(buckets, rectIndex, viewportTransform, (bucket) =>
-      resolveBucketSearchColor(bucket, matchIndex, this.batches),
+    rectIndex = this.writeBuckets(
+      buckets,
+      rectIndex,
+      viewportTransform,
+      (bucket) =>
+        (litCategories.size
+          ? resolveBucketCategoryColor(bucket, litCategories, this.batches)
+          : undefined) ?? resolveBucketSearchColor(bucket, matchIndex, this.batches),
     );
 
     this.endFrame(rectIndex);
