@@ -1,6 +1,7 @@
 import type * as Preset from '@docusaurus/preset-classic';
 import type { Config } from '@docusaurus/types';
 import { themes as prismThemes } from 'prism-react-renderer';
+import { ASSETS_URL, MARKETPLACE_URL } from './src/constants';
 
 const organizationName = 'certinia';
 const projectName = 'debug-log-analyzer';
@@ -14,7 +15,7 @@ const config: Config = {
   },
   title: 'Apex Log Analyzer for Salesforce',
   tagline:
-    'fast VS Code extension for Salesforce developers. Visualize and debug Apex logs with interactive flame charts, dynamic call trees, and detailed SOQL/DML breakdowns. Identify performance bottlenecks, gain deep transaction insights and optimize slow Apex.',
+    'A fast VS Code extension for Salesforce developers. Visualize and debug Apex logs with interactive flame charts, dynamic call trees, and detailed SOQL/DML breakdowns. Identify performance bottlenecks, gain deep transaction insights and optimize slow Apex.',
   // Set the production url of your site here
   url: prodUrl,
   // Set the /<baseUrl>/ pathname under which your site is served
@@ -44,6 +45,10 @@ const config: Config = {
   // Multiple favicon formats for better compatibility
   // Google requires favicons to be at least 48x48 pixels
   headTags: [
+    {
+      tagName: 'link',
+      attributes: { rel: 'preconnect', href: 'https://raw.githubusercontent.com' },
+    },
     {
       tagName: 'link',
       attributes: {
@@ -106,13 +111,18 @@ const config: Config = {
     ],
   ],
   themeConfig: {
+    colorMode: {
+      respectPrefersColorScheme: true,
+    },
     announcementBar: {
       id: 'lana-1_22_0', // Unique ID to prevent showing again if dismissed
       content: `🎉️ <b><a href="/${projectName}/community/changelog">Apex Log Analyzer v1.22</a> is out!</b>`,
       isCloseable: true,
+      backgroundColor: 'var(--lana-surface)',
+      textColor: 'var(--lana-ink)',
     },
     // Replace with your project's social card
-    image: `https://raw.githubusercontent.com/${organizationName}/${projectName}/main/lana/assets/1_22/preview.gif`,
+    image: `${ASSETS_URL}/timeline.png`,
     metadata: [
       {
         name: 'keywords',
@@ -141,13 +151,25 @@ const config: Config = {
           ],
         },
         {
+          type: 'dropdown',
+          label: 'Ecosystem',
+          position: 'left',
+          items: [
+            { to: '/docs/features/mcp', label: 'Apex Log MCP Server' },
+            {
+              href: 'https://github.com/apex-dev-tools/apex-log-parser',
+              label: 'Apex Log Parser',
+            },
+          ],
+        },
+        {
           type: 'docSidebar',
           sidebarId: 'communitySidebar',
           position: 'left',
           label: 'Community',
         },
         {
-          href: 'https://marketplace.visualstudio.com/items?itemName=financialforce.lana',
+          href: MARKETPLACE_URL,
           position: 'right',
           label: 'Install',
           className: 'navbar-install-link',
@@ -206,6 +228,19 @@ const config: Config = {
             {
               label: 'Changelog',
               to: 'community/changelog',
+            },
+          ],
+        },
+        {
+          title: 'Ecosystem',
+          items: [
+            {
+              label: 'Apex Log MCP Server',
+              to: 'docs/features/mcp',
+            },
+            {
+              label: 'Apex Log Parser',
+              href: 'https://github.com/apex-dev-tools/apex-log-parser',
             },
           ],
         },

@@ -4,29 +4,73 @@
  * work well for content-centric websites.
  */
 
+@import '@fontsource-variable/instrument-sans/wdth.css';
+@import '@fontsource-variable/jetbrains-mono/index.css';
+
 /* You can override the default Infima variables here. */
 :root {
-  --ifm-color-primary: #2e8555;
-  --ifm-color-primary-dark: #29784c;
-  --ifm-color-primary-darker: #277148;
-  --ifm-color-primary-darkest: #205d3b;
-  --ifm-color-primary-light: #33925d;
-  --ifm-color-primary-lighter: #359962;
-  --ifm-color-primary-lightest: #3cad6e;
-  --ifm-code-font-size: 95%;
-  --docusaurus-highlighted-code-line-bg: rgba(0, 0, 0, 0.1);
+  /* Brand: the indigo at the centre of the logo gradient (favicon.svg). */
+  --lana-ink: #171b30;
+  --lana-paper: #f6f7fb;
+  --lana-surface: #ffffff;
+  --lana-rule: #dfe2ee;
+  --lana-muted: #4f5570;
+  --lana-footer: #12162a;
+  --lana-accent-text: #3e45b5;
+  --lana-series-before: #c4704f;
+  --lana-series-after: #4a52d1;
+  /* VS Code's dark editor background: the screenshots are dark in both site themes. */
+  --lana-product-bg: #181818;
+
+  --ifm-color-primary: #4a52d1;
+  --ifm-color-primary-dark: #424ac0;
+  --ifm-color-primary-darker: #3e45b5;
+  --ifm-color-primary-darkest: #333996;
+  --ifm-color-primary-light: #5c64d6;
+  --ifm-color-primary-lighter: #656cd8;
+  --ifm-color-primary-lightest: #7f85df;
+
+  --ifm-background-color: var(--lana-paper);
+  --ifm-background-surface-color: var(--lana-surface);
+  --ifm-font-color-base: var(--lana-ink);
+  --ifm-heading-color: var(--lana-ink);
+  --ifm-navbar-background-color: var(--lana-paper);
+  --ifm-toc-border-color: var(--lana-rule);
+
+  --ifm-font-family-base:
+    'Instrument Sans Variable', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  --ifm-heading-font-family: var(--ifm-font-family-base);
+  --ifm-font-family-monospace:
+    'JetBrains Mono Variable', ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  --ifm-heading-font-weight: 650;
+  --ifm-code-font-size: 92%;
+  --docusaurus-highlighted-code-line-bg: rgba(74, 82, 209, 0.12);
 }
 
-/* For readability concerns, you should choose a lighter palette in dark mode. */
 [data-theme='dark'] {
-  --ifm-color-primary: #25c2a0;
-  --ifm-color-primary-dark: #21af90;
-  --ifm-color-primary-darker: #1fa588;
-  --ifm-color-primary-darkest: #1a8870;
-  --ifm-color-primary-light: #29d5b0;
-  --ifm-color-primary-lighter: #32d8b4;
-  --ifm-color-primary-lightest: #4fddbf;
-  --docusaurus-highlighted-code-line-bg: rgba(0, 0, 0, 0.3);
+  --lana-ink: #e6e8f2;
+  --lana-paper: #0e1222;
+  --lana-surface: #161b30;
+  --lana-rule: #262c45;
+  --lana-muted: #a3a9c4;
+  --lana-footer: #090c18;
+  --lana-accent-text: #a6afff;
+  --lana-series-after: #7b86f2;
+
+  --ifm-color-primary: #a6afff;
+  --ifm-color-primary-dark: #8a95ff;
+  --ifm-color-primary-darker: #7c88ff;
+  --ifm-color-primary-darkest: #5362ff;
+  --ifm-color-primary-light: #c2c8ff;
+  --ifm-color-primary-lighter: #d0d5ff;
+  --ifm-color-primary-lightest: #f0f2ff;
+
+  --docusaurus-highlighted-code-line-bg: rgba(166, 175, 255, 0.16);
+}
+
+/* Infima's .footer--dark sets its own grey background variable, so override it at the class. */
+.footer--dark {
+  --ifm-footer-background-color: var(--lana-footer);
 }
 
 .header-github-link::before {
@@ -49,7 +93,7 @@ div[class^='announcementBar_'] {
 }
 
 /* Keep filled primary buttons readable on hover (Docusaurus Link buttons
-   otherwise inherit the green anchor link-hover color, hiding the text). */
+   otherwise inherit the primary anchor link-hover color, hiding the text). */
 .button--primary:hover {
   color: var(--ifm-button-color, #fff);
 }
@@ -66,8 +110,8 @@ div[class^='announcementBar_'] {
 }
 
 /* Higher specificity than Docusaurus's own .navbar__link:hover (which would
-   otherwise turn the text green on the green hover background). */
+   otherwise turn the text primary on the primary hover background). */
 .navbar__link.navbar-install-link:hover {
   background-color: var(--ifm-color-primary);
-  color: var(--ifm-button-color, #fff);
+  color: var(--ifm-font-color-base-inverse);
 }
