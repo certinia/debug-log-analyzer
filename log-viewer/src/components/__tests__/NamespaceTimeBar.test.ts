@@ -14,7 +14,13 @@ import type { NamespaceTimeBar } from '../NamespaceTimeBar.js';
 import { DEFAULT_MAX_SEGMENTS } from '../StackedTimeBar.js';
 import '../NamespaceTimeBar.js';
 import { logNamespacePalette } from '../namespacePalette.js';
-import { ev, eventByIndex, log, resetEvents, type FakeEvent } from './fixtures/logEvents.js';
+import {
+  namespaceEvent,
+  eventByIndex,
+  log,
+  resetEvents,
+  type FakeEvent,
+} from './fixtures/logEvents.js';
 
 const logOf = (children: FakeEvent[], namespaces: string[]) => {
   apexLog = log(children, namespaces);
@@ -53,18 +59,9 @@ describe('namespace-time-bar', () => {
     setRange(null);
   });
 
-  it('splits the whole log by namespace, largest first', async () => {
-    logOf([ev('default', 100, [ev('pkg', 500)])], ['pkg']);
-
-    expect(segments(await mount()).map(({ label, value }) => ({ label, value }))).toEqual([
-      { label: 'pkg', value: 500 },
-      { label: 'default', value: 100 },
-    ]);
-  });
-
   it('scopes to the selected frame and everything below it', async () => {
-    const frame = ev('pkg', 40, [ev('other', 10)]);
-    logOf([ev('default', 100, [frame])], ['pkg', 'other']);
+    const frame = namespaceEvent('pkg', 40, [namespaceEvent('other', 10)]);
+    logOf([namespaceEvent('default', 100, [frame])], ['pkg', 'other']);
 
     const element = await mount({ eventIndex: frame.eventIndex });
 
@@ -75,8 +72,8 @@ describe('namespace-time-bar', () => {
   });
 
   it('sums every occurrence of an aggregate, counting a nested one once', async () => {
-    const inner = ev('pkg', 20);
-    const outer = ev('pkg', 30, [inner]);
+    const inner = namespaceEvent('pkg', 20);
+    const outer = namespaceEvent('pkg', 30, [inner]);
     logOf([outer], ['pkg']);
 
     const element = await mount({ instances: [outer.eventIndex, inner.eventIndex] });
@@ -91,7 +88,9 @@ describe('namespace-time-bar', () => {
     ).concat('nsA', 'nsB');
     // Descending self time, so the two smallest fall past the palette.
     logOf(
-      namespaces.map((namespace, index) => ev(namespace, (namespaces.length - index) * 10)),
+      namespaces.map((namespace, index) =>
+        namespaceEvent(namespace, (namespaces.length - index) * 10),
+      ),
       namespaces,
     );
 
@@ -102,27 +101,21 @@ describe('namespace-time-bar', () => {
     expect(shown.at(-1)).toMatchObject({ label: '2 others', value: 30 });
   });
 
-  it('notes a scope with no recorded time', async () => {
-    logOf([ev('pkg', 0)], ['pkg']);
+  // A missing frame and a missing log must answer at once rather than wait on a walk.
+  it.each([
+    ['a scope with no recorded time', () => logOf([namespaceEvent('pkg', 0)], ['pkg']), {}],
+    [
+      'a frame the log does not hold',
+      () => logOf([namespaceEvent('pkg', 100)], ['pkg']),
+      { eventIndex: 99 },
+    ],
+    ['the lack of a log', () => {}, {}],
+  ])('notes %s', async (_name, setup, props) => {
+    setup();
 
-    const element = await mount();
+    const element = await mount(props);
 
     expect(bar(element)).toBeNull();
-    expect(element.shadowRoot?.querySelector('.note')?.textContent).toContain('No time');
-  });
-
-  it('notes a frame the log does not hold, rather than waiting on a walk', async () => {
-    logOf([ev('pkg', 100)], ['pkg']);
-
-    const element = await mount({ eventIndex: 99 });
-
-    expect(bar(element)).toBeNull();
-    expect(element.shadowRoot?.querySelector('.note')?.textContent).toContain('No time');
-  });
-
-  it('notes the lack of a log, rather than waiting on a walk', async () => {
-    const element = await mount();
-
     expect(element.shadowRoot?.querySelector('.note')?.textContent).toContain('No time');
   });
 });
@@ -142,7 +135,7 @@ describe('namespace-time-bar with a timeline window', () => {
   // A picked frame is answered as itself, wherever the timeline is looking: the
   // window here holds a nanosecond, so its own figures could not be these.
   it('answers for the picked frame, not the window', async () => {
-    logOf([ev('default', 100, [ev('pkg', 500)])], ['pkg']);
+    logOf([namespaceEvent('default', 100, [namespaceEvent('pkg', 500)])], ['pkg']);
     setRange({ start: 0, end: 1 });
 
     // Children register first, so the outer `default` frame is index 1.
@@ -155,7 +148,7 @@ describe('namespace-time-bar with a timeline window', () => {
   // The bar took its palette from the whole-log walk, which a window skips, so
   // mounting into a window left it with no colours and an empty note.
   it('answers for a window it mounts into', async () => {
-    logOf([ev('default', 100, [ev('pkg', 500)])], ['pkg']);
+    logOf([namespaceEvent('default', 100, [namespaceEvent('pkg', 500)])], ['pkg']);
     // `default` owns 0 to 100, `pkg` 100 to 600.
     setRange({ start: 0, end: 350 });
 

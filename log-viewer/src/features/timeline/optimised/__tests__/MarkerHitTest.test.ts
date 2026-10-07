@@ -6,271 +6,113 @@ import { describe, expect, it } from '@jest/globals';
 import type { TimelineMarker } from '../../types/flamechart.types.js';
 import { hitTestMarkers, type MarkerIndicator } from '../markers/MarkerHitTest.js';
 
-/**
- * Tests for MarkerHitTest - marker hit testing for hover detection.
- */
-
-// Helper to create marker
 function createMarker(
   id: string,
-  type: 'error' | 'skip' | 'unexpected',
-  startTime: number,
+  type: TimelineMarker['type'],
+  summary = `${type} marker`,
 ): TimelineMarker {
-  return {
-    id,
-    type,
-    summary: `${type} marker`,
-    startTime,
-  };
+  return { id, type, summary, startTime: 1000 };
 }
 
-// Helper to create indicator
-function createIndicator(
-  marker: TimelineMarker,
-  screenStartX: number,
-  screenEndX: number,
+function span(
+  id: string,
+  type: TimelineMarker['type'],
+  start: number,
+  end: number,
+  summary?: string,
 ): MarkerIndicator {
   return {
-    marker,
-    resolvedEndTime: marker.startTime + 1000,
-    screenStartX,
-    screenEndX,
-    screenWidth: screenEndX - screenStartX,
-    exactWidth: screenEndX - screenStartX,
+    marker: createMarker(id, type, summary),
+    resolvedEndTime: 2000,
+    screenStartX: start,
+    screenEndX: end,
+    screenWidth: end - start,
+    exactWidth: end - start,
     color: 0xff0000,
     alpha: 0.2,
     isVisible: true,
   };
 }
 
-describe('MarkerHitTest', () => {
-  describe('hitTestMarkers', () => {
-    describe('single marker', () => {
-      it('should return marker when click is within bounds', () => {
-        const marker = createMarker('m1', 'error', 1000);
-        const indicator = createIndicator(marker, 100, 200);
+const LAYOUTS = {
+  one: () => [span('m1', 'error', 100, 200)],
+  two: () => [span('m1', 'error', 100, 200), span('m2', 'skip', 300, 400)],
+  // Listed least severe first, so the pick is by severity, not by order.
+  stacked: () => [
+    span('skip', 'skip', 100, 300),
+    span('unexpected', 'unexpected', 100, 300),
+    span('error', 'error', 100, 300),
+  ],
+  noError: () => [span('skip', 'skip', 100, 300), span('unexpected', 'unexpected', 100, 300)],
+  partial: () => [span('error', 'error', 100, 200), span('skip', 'skip', 150, 300)],
+  far: () => [span('m1', 'error', 500, 600)],
+  huge: () => [span('m1', 'error', 1_000_000, 1_000_100)],
+  origin: () => [span('m1', 'error', 0, 100)],
+  zeroWidth: () => [span('m1', 'error', 100, 100)],
+  onePixel: () => [span('m1', 'error', 100, 101)],
+  empty: () => [],
+};
 
-        const result = hitTestMarkers(50, 100, [indicator]); // worldX = 150
+describe('hitTestMarkers', () => {
+  // The world x is screenX + offsetX.
+  it.each<[string, keyof typeof LAYOUTS, number, number, string | null]>([
+    ['inside the marker', 'one', 50, 100, 'm1'],
+    ['before the marker', 'one', 0, 50, null],
+    ['after the marker', 'one', 200, 50, null],
+    ['on the left edge', 'one', 0, 100, 'm1'],
+    ['on the right edge', 'one', 100, 100, 'm1'],
+    ['in the first of two', 'two', 50, 100, 'm1'],
+    ['in the second of two', 'two', 250, 100, 'm2'],
+    ['in the gap between two', 'two', 150, 100, null],
+    ['error over unexpected over skip', 'stacked', 100, 100, 'error'],
+    ['unexpected over skip', 'noError', 100, 100, 'unexpected'],
+    ['the more severe in a partial overlap', 'partial', 75, 100, 'error'],
+    ['the only marker past the overlap', 'partial', 150, 100, 'skip'],
+    ['the only marker before the overlap', 'partial', 20, 100, 'error'],
+    ['inside after a large offset', 'far', 150, 400, 'm1'],
+    ['before after a large offset', 'far', 50, 400, null],
+    ['before after a small offset', 'far', 350, 100, null],
+    ['inside after a small offset', 'far', 450, 100, 'm1'],
+    ['inside, far into the timeline', 'huge', 50, 1_000_000, 'm1'],
+    ['on the left edge, far into the timeline', 'huge', 0, 1_000_000, 'm1'],
+    ['after, far into the timeline', 'huge', 200, 1_000_000, null],
+    ['at the world origin', 'origin', 0, 0, 'm1'],
+    ['inside a marker at the origin', 'origin', 50, 0, 'm1'],
+    ['after a marker at the origin', 'origin', 150, 0, null],
+    ['on a zero-width marker', 'zeroWidth', 0, 100, 'm1'],
+    ['on the start of a 1px marker', 'onePixel', 0, 100, 'm1'],
+    ['on the end of a 1px marker', 'onePixel', 1, 100, 'm1'],
+    ['past a 1px marker', 'onePixel', 2, 100, null],
+    ['nothing with no markers', 'empty', 100, 0, null],
+  ])('hits %s', (_name, layout, screenX, offsetX, expected) => {
+    const indicators = LAYOUTS[layout]();
+    const marker = indicators.find((indicator) => indicator.marker.id === expected)?.marker;
 
-        expect(result).toBe(marker);
-      });
+    expect(hitTestMarkers(screenX, offsetX, indicators)).toBe(marker ?? null);
+  });
 
-      it('should return null when click is before marker', () => {
-        const marker = createMarker('m1', 'error', 1000);
-        const indicator = createIndicator(marker, 100, 200);
+  describe('exception aggregation', () => {
+    const exception = (id: string, summary: string, start: number, end: number) =>
+      span(id, 'exception', start, end, summary);
 
-        const result = hitTestMarkers(0, 50, [indicator]); // worldX = 50
+    it('aggregates overlapping exceptions into a count with the messages', () => {
+      const indicators = [
+        exception('e1', 'NullPointer', 100, 102),
+        exception('e2', 'LimitException', 100, 102),
+        exception('e3', 'DmlException', 101, 103),
+      ];
 
-        expect(result).toBeNull();
-      });
+      const result = hitTestMarkers(1, 100, indicators);
 
-      it('should return null when click is after marker', () => {
-        const marker = createMarker('m1', 'error', 1000);
-        const indicator = createIndicator(marker, 100, 200);
-
-        const result = hitTestMarkers(200, 50, [indicator]); // worldX = 250
-
-        expect(result).toBeNull();
-      });
-
-      it('should handle click exactly on left edge', () => {
-        const marker = createMarker('m1', 'error', 1000);
-        const indicator = createIndicator(marker, 100, 200);
-
-        const result = hitTestMarkers(0, 100, [indicator]); // worldX = 100
-
-        expect(result).toBe(marker);
-      });
-
-      it('should handle click exactly on right edge', () => {
-        const marker = createMarker('m1', 'error', 1000);
-        const indicator = createIndicator(marker, 100, 200);
-
-        const result = hitTestMarkers(100, 100, [indicator]); // worldX = 200
-
-        expect(result).toBe(marker);
-      });
+      expect(result?.summary).toBe('3 exceptions');
+      expect(result?.metadata).toContain('NullPointer');
+      expect(result?.metadata).toContain('DmlException');
     });
 
-    describe('multiple markers without overlap', () => {
-      it('should return correct marker for each region', () => {
-        const marker1 = createMarker('m1', 'error', 1000);
-        const marker2 = createMarker('m2', 'skip', 2000);
-        const indicators = [createIndicator(marker1, 100, 200), createIndicator(marker2, 300, 400)];
+    it('returns the single exception message when only one is hit', () => {
+      const result = hitTestMarkers(1, 100, [exception('e1', 'NullPointer', 100, 102)]);
 
-        expect(hitTestMarkers(50, 100, indicators)).toBe(marker1); // worldX = 150
-        expect(hitTestMarkers(250, 100, indicators)).toBe(marker2); // worldX = 350
-      });
-
-      it('should return null in gap between markers', () => {
-        const marker1 = createMarker('m1', 'error', 1000);
-        const marker2 = createMarker('m2', 'skip', 2000);
-        const indicators = [createIndicator(marker1, 100, 200), createIndicator(marker2, 300, 400)];
-
-        const result = hitTestMarkers(150, 100, indicators); // worldX = 250
-
-        expect(result).toBeNull();
-      });
-    });
-
-    describe('overlapping markers with severity', () => {
-      it('should return highest severity marker (error > unexpected > skip)', () => {
-        const errorMarker = createMarker('m1', 'error', 1000);
-        const skipMarker = createMarker('m2', 'skip', 1000);
-        const unexpectedMarker = createMarker('m3', 'unexpected', 1000);
-
-        const indicators = [
-          createIndicator(skipMarker, 100, 300),
-          createIndicator(unexpectedMarker, 100, 300),
-          createIndicator(errorMarker, 100, 300),
-        ];
-
-        const result = hitTestMarkers(100, 100, indicators); // worldX = 200
-
-        expect(result).toBe(errorMarker);
-      });
-
-      it('should return unexpected over skip when no error present', () => {
-        const skipMarker = createMarker('m1', 'skip', 1000);
-        const unexpectedMarker = createMarker('m2', 'unexpected', 1000);
-
-        const indicators = [
-          createIndicator(skipMarker, 100, 300),
-          createIndicator(unexpectedMarker, 100, 300),
-        ];
-
-        const result = hitTestMarkers(100, 100, indicators); // worldX = 200
-
-        expect(result).toBe(unexpectedMarker);
-      });
-
-      it('should handle partial overlap correctly', () => {
-        const errorMarker = createMarker('m1', 'error', 1000);
-        const skipMarker = createMarker('m2', 'skip', 1500);
-
-        const indicators = [
-          createIndicator(errorMarker, 100, 200),
-          createIndicator(skipMarker, 150, 300), // Overlaps 150-200
-        ];
-
-        // Click in overlap region - error wins
-        expect(hitTestMarkers(75, 100, indicators)).toBe(errorMarker); // worldX = 175
-
-        // Click in skip-only region
-        expect(hitTestMarkers(150, 100, indicators)).toBe(skipMarker); // worldX = 250
-
-        // Click in error-only region
-        expect(hitTestMarkers(20, 100, indicators)).toBe(errorMarker); // worldX = 120
-      });
-    });
-
-    describe('viewport offset handling', () => {
-      it('should correctly apply viewport offset', () => {
-        const marker = createMarker('m1', 'error', 1000);
-        const indicator = createIndicator(marker, 500, 600); // World coords
-
-        // With offset 400, screenX 150 -> worldX 550 (inside marker)
-        expect(hitTestMarkers(150, 400, [indicator])).toBe(marker);
-
-        // With offset 400, screenX 50 -> worldX 450 (before marker)
-        expect(hitTestMarkers(50, 400, [indicator])).toBeNull();
-
-        // With offset 100, screenX 350 -> worldX 450 (before marker)
-        expect(hitTestMarkers(350, 100, [indicator])).toBeNull();
-
-        // With offset 100, screenX 450 -> worldX 550 (inside marker)
-        expect(hitTestMarkers(450, 100, [indicator])).toBe(marker);
-      });
-    });
-
-    describe('edge cases', () => {
-      it('should return null for empty indicators array', () => {
-        const result = hitTestMarkers(100, 0, []);
-
-        expect(result).toBeNull();
-      });
-
-      it('should handle zero-width marker', () => {
-        const marker = createMarker('m1', 'error', 1000);
-        const indicator = createIndicator(marker, 100, 100); // Zero width
-
-        // Click exactly on the point
-        const result = hitTestMarkers(0, 100, [indicator]); // worldX = 100
-
-        expect(result).toBe(marker);
-      });
-
-      it('should handle very large offsetX values', () => {
-        const marker = createMarker('m1', 'error', 1000);
-        const indicator = createIndicator(marker, 1_000_000, 1_000_100); // Far into timeline
-
-        // With large offset, screenX 50 -> worldX = 1_000_050 (inside marker)
-        expect(hitTestMarkers(50, 1_000_000, [indicator])).toBe(marker);
-
-        // With large offset, screenX 0 -> worldX = 1_000_000 (on left edge)
-        expect(hitTestMarkers(0, 1_000_000, [indicator])).toBe(marker);
-
-        // Miss: screenX 200 -> worldX = 1_000_200 (after marker)
-        expect(hitTestMarkers(200, 1_000_000, [indicator])).toBeNull();
-      });
-
-      it('should handle markers at world coordinate zero', () => {
-        const marker = createMarker('m1', 'error', 0);
-        const indicator = createIndicator(marker, 0, 100); // Starts at world origin
-
-        // Click at world origin with no offset
-        expect(hitTestMarkers(0, 0, [indicator])).toBe(marker);
-
-        // Click inside marker
-        expect(hitTestMarkers(50, 0, [indicator])).toBe(marker);
-
-        // Click after marker
-        expect(hitTestMarkers(150, 0, [indicator])).toBeNull();
-      });
-
-      it('should handle single-pixel-wide marker', () => {
-        const marker = createMarker('m1', 'error', 1000);
-        const indicator = createIndicator(marker, 100, 101); // 1px wide
-
-        // Hit the marker
-        expect(hitTestMarkers(0, 100, [indicator])).toBe(marker); // worldX = 100
-        expect(hitTestMarkers(1, 100, [indicator])).toBe(marker); // worldX = 101
-
-        // Miss the marker
-        expect(hitTestMarkers(2, 100, [indicator])).toBeNull(); // worldX = 102
-      });
-    });
-
-    describe('exception aggregation', () => {
-      const exceptionMarker = (id: string, summary: string): TimelineMarker => ({
-        id,
-        type: 'exception',
-        summary,
-        startTime: 1000,
-      });
-
-      it('aggregates overlapping exceptions into a count with the messages', () => {
-        const indicators = [
-          createIndicator(exceptionMarker('e1', 'NullPointer'), 100, 102),
-          createIndicator(exceptionMarker('e2', 'LimitException'), 100, 102),
-          createIndicator(exceptionMarker('e3', 'DmlException'), 101, 103),
-        ];
-
-        const result = hitTestMarkers(1, 100, indicators); // worldX = 101, hits all three
-
-        expect(result?.summary).toBe('3 exceptions');
-        expect(result?.metadata).toContain('NullPointer');
-        expect(result?.metadata).toContain('DmlException');
-      });
-
-      it('returns the single exception message when only one is hit', () => {
-        const marker = exceptionMarker('e1', 'NullPointer');
-        const indicator = createIndicator(marker, 100, 102);
-
-        const result = hitTestMarkers(1, 100, [indicator]); // worldX = 101
-
-        expect(result?.summary).toBe('NullPointer');
-      });
+      expect(result?.summary).toBe('NullPointer');
     });
   });
 });

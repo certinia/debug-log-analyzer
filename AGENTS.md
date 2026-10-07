@@ -12,8 +12,7 @@ VS Code extension for analyzing Salesforce debug logs with interactive visualiza
 - `log-viewer/` — webview UI (TypeScript; lit / html / css)
 - The log parser is the `@apexdevtools/apex-log-parser` package, released from
   [apex-dev-tools/apex-log-parser](https://github.com/apex-dev-tools/apex-log-parser). Both
-  `lana/` and `log-viewer/` depend on it. Runtime lives on the root export, types and consts on
-  the `/types` subpath.
+  `lana/` and `log-viewer/` depend on it. Import everything from the root export.
 - `lana-docs/` — Docusaurus documentation
 - `sample-app/` — sample Salesforce app with test logs
 
@@ -24,11 +23,11 @@ Always use pnpm.
 - `pnpm watch` — dev build with hot reload
 - `pnpm build` — production build
 - `pnpm test` — run tests (before committing)
-- `pnpm lint` — eslint + `prettier --check` + `tsc -b`, run concurrently. The single
+- `pnpm lint` — oxlint + `prettier --check` + `tsc -b`, run concurrently. The single
   pre-commit gate, so `typecheck` on top of it is wasted.
 - `pnpm exec jest --selectProjects <log-viewer|lana>` — scoped tests,
   matching what CI runs per runner.
-- `pnpm prettier-format` — auto-format
+- `pnpm format` — auto-format
 
 `DEVELOPING.md` covers the rest, including the `*:fast` rolldown variants and their caveats.
 
@@ -37,12 +36,16 @@ Always use pnpm.
 CLI of the launched editor, `code-insiders` or `code`
 
 **Compilers** — `typecheck` = native TS7 (`tsc`); `typecheck:tsc6` = classic 6.0 (`tsc6`).
-Keep the `@typescript/typescript6` alias + `tsc6`: `typescript-eslint` and Docusaurus need
-the TS ≤6.0 API (lands in TS 7.1). Don't remove until typescript-eslint supports TS7.
+Keep the `@typescript/typescript6` alias + `tsc6`: Docusaurus needs the TS ≤6.0 API (lands in
+TS 7.1). Don't remove until Docusaurus supports TS7.
 
 ## Core principles
 
 - **Type safety** — strict TypeScript, no `any` (use `unknown` + justification if unavoidable).
+- **Naming** — not linted. camelCase by default; PascalCase types; variables may also be
+  UPPER_CASE or PascalCase (enum-like objects); `static readonly` class constants may be
+  UPPER_CASE. Object keys that mirror external data (Salesforce fields, log event names) keep
+  their source form.
 - **Modularity** — keep `lana/` and `log-viewer/` independent; cross-package contracts only.
 - **Performance** — handle large logs (50MB+, 500k+ lines) without blocking the UI.
 - **UX** — discoverable, accessible, actionable errors.
@@ -75,7 +78,7 @@ the TS ≤6.0 API (lands in TS 7.1). Don't remove until typescript-eslint suppor
 ### Surgical changes
 
 - Every changed line traces to the request. No drive-by reformatting or renaming, since
-  `pnpm prettier-format` owns style. A bug seen in passing is mentioned, not fixed.
+  `pnpm format` owns style. A bug seen in passing is mentioned, not fixed.
 - Never hand-edit the vendored `tabulator_esm.mjs` beyond the sanctioned documented patches.
 - The root `README.md`, `CHANGELOG.md` and `LICENSE.txt` are the sources of truth. The `lana/`
   copies are build output.

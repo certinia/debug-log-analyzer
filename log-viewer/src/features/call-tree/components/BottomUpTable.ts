@@ -6,9 +6,7 @@ import { Tabulator, type Options } from 'tabulator-tables';
 
 import { logStoreFor } from '../../../core/log/LogStore.js';
 import { vscodeMessenger } from '../../../core/messaging/VSCodeExtensionMessenger.js';
-import { formatDuration } from '../../../core/utility/Util.js';
-import { TIME_WIDTH } from '../../../tabulator/ColumnWidths.js';
-import { progressFormatterMS } from '../../../tabulator/format/ProgressMS.js';
+import { initialisedRowRange } from '../../../tabulator/module/initialisedRows.js';
 import {
   sumDurationTotalForRootEvents,
   sumTotalForRootEvents,
@@ -21,7 +19,9 @@ import {
   createCountColumn,
   createGovernorMetricColumns,
   createNamespaceColumns,
+  createTimeColumn,
   createTypeColumn,
+  downloadOptions,
   groupingOptions,
   headerSortElement,
   registerTableModules,
@@ -38,25 +38,6 @@ export type BottomUpTableOptions = Partial<Options> & {
 
 export interface BottomUpTableCallbacks extends TableCallbacks {
   showDetailsFilter?: (data: BottomUpRow) => boolean;
-}
-
-type VSCodeSaveFile = {
-  fileContent: string;
-  options: { defaultFileName: string };
-};
-
-function createDownloadEncoder(defaultFileName: string) {
-  return function (fileContents: string, mimeType: string) {
-    const vscodeHost = vscodeMessenger.getVsCodeAPI();
-    if (vscodeHost) {
-      vscodeMessenger.send<VSCodeSaveFile>('saveFile', {
-        fileContent: fileContents,
-        options: { defaultFileName },
-      });
-      return false;
-    }
-    return new Blob([fileContents], { type: mimeType });
-  };
 }
 
 export function createBottomUpTable(
@@ -96,18 +77,12 @@ export function createBottomUpTable(
   const clipboardAndDownloadOptions: Partial<Options> = enableClipboardAndDownload
     ? {
         ...clipboardCopyOptions,
+        clipboardCopyRowRange: initialisedRowRange,
         clipboardCopyConfig: {
           dataTree: false,
         },
-        downloadEncoder: createDownloadEncoder(exportFileName ?? 'analysis.csv'),
-        downloadRowRange: 'all',
-        downloadConfig: {
-          columnHeaders: true,
-          columnGroups: true,
-          rowGroups: true,
-          columnCalcs: false,
-          dataTree: true,
-        },
+        ...downloadOptions(exportFileName ?? 'analysis.csv'),
+        downloadRowRange: initialisedRowRange,
       }
     : {};
 
@@ -182,58 +157,24 @@ export function createBottomUpTable(
       createCountColumn({ title: 'Calls', field: 'callCount', width: 70 }),
       ...createGovernorMetricColumns(rootMethod, heapFooters),
       // Time columns sit at the far right of every call-tree table.
-      {
+      createTimeColumn({
         title: 'Total Time (ms)',
         field: 'totalTime',
-        sorter: 'number',
-        headerSortTristate: true,
-        width: TIME_WIDTH,
-        minWidth: 120,
-        hozAlign: 'right',
-        headerHozAlign: 'right',
-        formatter: progressFormatterMS,
-        formatterParams: {
-          precision: 2,
-          totalValue: rootMethod.duration.total,
-        },
-        bottomCalcFormatter: progressFormatterMS,
+        totalValue: rootMethod.duration.total,
         bottomCalc: totalTimeBottomCalc,
-        bottomCalcFormatterParams: { precision: 2, totalValue: rootMethod.duration.total },
-        tooltip: (_event, cell) => formatDuration(cell.getValue()),
-      },
-      {
+      }),
+      createTimeColumn({
         title: 'Self Time (ms)',
         field: 'totalSelfTime',
-        sorter: 'number',
-        headerSortTristate: true,
-        width: TIME_WIDTH,
-        minWidth: 120,
-        hozAlign: 'right',
-        headerHozAlign: 'right',
-        formatter: progressFormatterMS,
-        formatterParams: {
-          precision: 2,
-          totalValue: rootMethod.duration.total,
-        },
-        bottomCalcFormatter: progressFormatterMS,
+        totalValue: rootMethod.duration.total,
         bottomCalc: 'sum',
-        bottomCalcFormatterParams: { precision: 2, totalValue: rootMethod.duration.total },
-        tooltip: (_event, cell) => formatDuration(cell.getValue()),
-      },
-      {
+      }),
+      createTimeColumn({
         title: 'Avg Self Time (ms)',
         field: 'avgSelfTime',
-        sorter: 'number',
-        headerSortTristate: true,
-        width: TIME_WIDTH,
-        minWidth: 120,
-        hozAlign: 'right',
-        headerHozAlign: 'right',
+        totalValue: rootMethod.duration.total,
         visible: false,
-        formatter: progressFormatterMS,
-        formatterParams: { precision: 2, totalValue: rootMethod.duration.total },
-        tooltip: (_event, cell) => formatDuration(cell.getValue()),
-      },
+      }),
     ],
     ...tabulatorOptionOverrides,
   });

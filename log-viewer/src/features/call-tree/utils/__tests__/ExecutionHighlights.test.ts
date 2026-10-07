@@ -4,48 +4,14 @@
 import { describe, expect, it } from '@jest/globals';
 
 import type { ApexLog, LogEvent } from '@apexdevtools/apex-log-parser';
+import { createEvent } from '#test-helpers/events.js';
 import { computeExecutionHighlights, getExecutionHighlights } from '../ExecutionHighlights.js';
 
 // The parser takes 0 for the log itself, so real events start at 1.
 let nextEventIndex = 1;
-let nextStamp = 0;
 
-/**
- * The slice of `LogEvent` the highlights pass reads: the tree links, the
- * timings, the stamps that tell a nested instance from a later one, the identity
- * fields behind `getEventKey`, and the truncation flag. Stamps default to a
- * fresh non-overlapping span, so an event nests only where a test says so.
- */
-function createEvent(
-  options: {
-    text?: string;
-    type?: string;
-    category?: string;
-    namespace?: string;
-    self?: number;
-    total?: number;
-    timestamp?: number;
-    exitStamp?: number;
-    parent?: LogEvent;
-    isTruncated?: boolean;
-  } = {},
-): LogEvent {
-  const timestamp = options.timestamp ?? nextStamp++;
-  const event = {
-    text: options.text ?? 'event',
-    type: options.type ?? 'METHOD_ENTRY',
-    category: options.category ?? '',
-    namespace: options.namespace ?? 'default',
-    eventIndex: nextEventIndex++,
-    duration: { self: options.self ?? 0, total: options.total ?? 0 },
-    timestamp,
-    exitStamp: options.exitStamp ?? timestamp,
-    parent: options.parent ?? null,
-    children: [],
-    isTruncated: options.isTruncated ?? false,
-  } as unknown as LogEvent;
-  options.parent?.children.push(event);
-  return event;
+function highlightEvent(options: Parameters<typeof createEvent>[0]): LogEvent {
+  return createEvent({ category: '', ...options, eventIndex: nextEventIndex++ });
 }
 
 /**
@@ -73,12 +39,12 @@ function index(log: ApexLog, ...events: LogEvent[]): void {
 describe('computeExecutionHighlights hot path', () => {
   it('follows the largest-total child from the root down', () => {
     const log = createLog(1000);
-    const root = createEvent({ text: 'Root', total: 900 });
-    const small = createEvent({ text: 'Small', total: 100 });
+    const root = highlightEvent({ text: 'Root', total: 900 });
+    const small = highlightEvent({ text: 'Small', total: 100 });
     log.children.push(root, small);
-    const big = createEvent({ text: 'Big', total: 800, parent: root });
-    const side = createEvent({ text: 'Side', total: 90, parent: root });
-    const leaf = createEvent({ text: 'Leaf', total: 700, parent: big });
+    const big = highlightEvent({ text: 'Big', total: 800, parent: root });
+    const side = highlightEvent({ text: 'Side', total: 90, parent: root });
+    const leaf = highlightEvent({ text: 'Leaf', total: 700, parent: big });
     index(log, root, small, big, side, leaf);
 
     const { hotPath } = computeExecutionHighlights(log);
@@ -97,13 +63,13 @@ describe('computeExecutionHighlights hot path', () => {
 
   it('merges same-signature siblings into one frame and follows their sum', () => {
     const log = createLog(1000);
-    const root = createEvent({ text: 'Root', total: 1000 });
+    const root = highlightEvent({ text: 'Root', total: 1000 });
     log.children.push(root);
     // Each call alone is under the 0.4 follow share; merged (600) they are the
     // hot path. The frame points at the worst instance and carries the count.
-    createEvent({ text: 'Repeat', total: 250, parent: root });
-    const worst = createEvent({ text: 'Repeat', total: 350, parent: root });
-    createEvent({ text: 'Other', total: 300, parent: root });
+    highlightEvent({ text: 'Repeat', total: 250, parent: root });
+    const worst = highlightEvent({ text: 'Repeat', total: 350, parent: root });
+    highlightEvent({ text: 'Other', total: 300, parent: root });
 
     const { hotPath } = computeExecutionHighlights(log);
 
@@ -132,11 +98,11 @@ describe('computeExecutionHighlights hot path', () => {
 
   it('stops when the largest child falls below the follow share', () => {
     const log = createLog(1000);
-    const root = createEvent({ text: 'Root', total: 1000 });
+    const root = highlightEvent({ text: 'Root', total: 1000 });
     log.children.push(root);
     // 300 < 0.4 * 1000: the time has spread out, so the path ends at the root.
-    createEvent({ text: 'Spread', total: 300, parent: root });
-    createEvent({ text: 'Other', total: 250, parent: root });
+    highlightEvent({ text: 'Spread', total: 300, parent: root });
+    highlightEvent({ text: 'Other', total: 250, parent: root });
 
     const { hotPath } = computeExecutionHighlights(log);
 
@@ -145,11 +111,11 @@ describe('computeExecutionHighlights hot path', () => {
 
   it('stops when the frame itself outweighs its largest child', () => {
     const log = createLog(1000);
-    const root = createEvent({ text: 'Root', total: 1000, self: 550 });
+    const root = highlightEvent({ text: 'Root', total: 1000, self: 550 });
     log.children.push(root);
     // 450 clears the follow share, but the root's own work (550) is bigger:
     // the root is the hot spot, so the path ends there.
-    createEvent({ text: 'Child', total: 450, parent: root });
+    highlightEvent({ text: 'Child', total: 450, parent: root });
 
     const { hotPath } = computeExecutionHighlights(log);
 
@@ -158,10 +124,10 @@ describe('computeExecutionHighlights hot path', () => {
 
   it('carries the group self time and the worst instance category', () => {
     const log = createLog(1000);
-    const root = createEvent({ text: 'Root', category: 'Code Unit', total: 1000, self: 100 });
+    const root = highlightEvent({ text: 'Root', category: 'Code Unit', total: 1000, self: 100 });
     log.children.push(root);
-    createEvent({ text: 'Repeat', category: 'Apex', total: 300, self: 200, parent: root });
-    createEvent({ text: 'Repeat', category: 'Apex', total: 500, self: 400, parent: root });
+    highlightEvent({ text: 'Repeat', category: 'Apex', total: 300, self: 200, parent: root });
+    highlightEvent({ text: 'Repeat', category: 'Apex', total: 500, self: 400, parent: root });
 
     const { hotPath } = computeExecutionHighlights(log);
 
@@ -175,7 +141,7 @@ describe('computeExecutionHighlights hot path', () => {
     const log = createLog(1000);
     // A negative self on one instance drags the group's sum below zero; the
     // frame's own share of itself cannot sit outside its total.
-    const root = createEvent({ text: 'Root', total: 500, self: -100 });
+    const root = highlightEvent({ text: 'Root', total: 500, self: -100 });
     log.children.push(root);
 
     const { hotPath } = computeExecutionHighlights(log);
@@ -185,7 +151,7 @@ describe('computeExecutionHighlights hot path', () => {
 
   it('is empty when the log has no timed calls', () => {
     const log = createLog(0);
-    const root = createEvent({ text: 'Root', total: 0 });
+    const root = highlightEvent({ text: 'Root', total: 0 });
     log.children.push(root);
     index(log, root);
 
@@ -200,10 +166,10 @@ describe('computeExecutionHighlights hot path', () => {
 describe('computeExecutionHighlights hot path end', () => {
   it('names a last frame that keeps its own time as the hot spot', () => {
     const log = createLog(1000);
-    const root = createEvent({ text: 'Root', total: 1000 });
+    const root = highlightEvent({ text: 'Root', total: 1000 });
     log.children.push(root);
-    const big = createEvent({ text: 'Big', total: 900, self: 800, parent: root });
-    createEvent({ text: 'Small', total: 100, parent: big });
+    const big = highlightEvent({ text: 'Big', total: 900, self: 800, parent: root });
+    highlightEvent({ text: 'Small', total: 100, parent: big });
 
     const { hotPath, hotPathEnd, hotPathBranches } = computeExecutionHighlights(log);
 
@@ -215,14 +181,14 @@ describe('computeExecutionHighlights hot path end', () => {
 
   it('hands back the branches where the time fans out instead', () => {
     const log = createLog(1000);
-    const root = createEvent({ text: 'Root', total: 1000, self: 100 });
+    const root = highlightEvent({ text: 'Root', total: 1000, self: 100 });
     log.children.push(root);
     // No child holds the follow share, and the frame kept a tenth of its own
     // time, so the time fanned out here.
-    const alpha = createEvent({ text: 'Alpha', total: 380, parent: root });
-    createEvent({ text: 'Beta', total: 300, parent: root });
-    createEvent({ text: 'Gamma', total: 280, parent: root });
-    createEvent({ text: 'Tiny', total: 20, parent: root });
+    const alpha = highlightEvent({ text: 'Alpha', total: 380, parent: root });
+    highlightEvent({ text: 'Beta', total: 300, parent: root });
+    highlightEvent({ text: 'Gamma', total: 280, parent: root });
+    highlightEvent({ text: 'Tiny', total: 20, parent: root });
 
     const { hotPath, hotPathEnd, hotPathBranches } = computeExecutionHighlights(log);
 
@@ -243,11 +209,11 @@ describe('computeExecutionHighlights hot path end', () => {
 
   it('names no fan-out where the frame has no branch worth a row', () => {
     const log = createLog(1000);
-    const root = createEvent({ text: 'Root', total: 1000, self: 100 });
+    const root = highlightEvent({ text: 'Root', total: 1000, self: 100 });
     log.children.push(root);
     // The frame kept a tenth of its own time, but its one child is noise, so
     // there is nothing for a fan-out reading to point at.
-    createEvent({ text: 'Tiny', total: 20, parent: root });
+    highlightEvent({ text: 'Tiny', total: 20, parent: root });
 
     const { hotPathEnd, hotPathBranches } = computeExecutionHighlights(log);
 
@@ -257,11 +223,11 @@ describe('computeExecutionHighlights hot path end', () => {
 
   it('merges same-signature branches, and points at the worst instance', () => {
     const log = createLog(1000);
-    const root = createEvent({ text: 'Root', total: 1000, self: 100 });
+    const root = highlightEvent({ text: 'Root', total: 1000, self: 100 });
     log.children.push(root);
-    const first = createEvent({ text: 'Repeat', total: 100, parent: root });
-    createEvent({ text: 'Other', total: 300, parent: root });
-    const worst = createEvent({ text: 'Repeat', total: 200, parent: root });
+    const first = highlightEvent({ text: 'Repeat', total: 100, parent: root });
+    highlightEvent({ text: 'Other', total: 300, parent: root });
+    const worst = highlightEvent({ text: 'Repeat', total: 200, parent: root });
 
     const { hotPathEnd, hotPathBranches } = computeExecutionHighlights(log);
 
@@ -299,9 +265,9 @@ describe('computeExecutionHighlights hot path end', () => {
 describe('computeExecutionHighlights hot spots', () => {
   it('sums self time by signature and points at the most expensive instance', () => {
     const log = createLog(1000);
-    const first = createEvent({ text: 'MyClass.run()', self: 100 });
-    const worst = createEvent({ text: 'MyClass.run()', self: 300 });
-    const other = createEvent({ text: 'Other.go()', self: 50 });
+    const first = highlightEvent({ text: 'MyClass.run()', self: 100 });
+    const worst = highlightEvent({ text: 'MyClass.run()', self: 300 });
+    const other = highlightEvent({ text: 'Other.go()', self: 50 });
     index(log, first, worst, other);
 
     const { hotSpots } = computeExecutionHighlights(log);
@@ -330,9 +296,9 @@ describe('computeExecutionHighlights hot spots', () => {
 
   it('keeps same-named events with different types or namespaces apart', () => {
     const log = createLog(1000);
-    const method = createEvent({ text: 'run', type: 'METHOD_ENTRY', self: 10 });
-    const flow = createEvent({ text: 'run', type: 'FLOW_START_INTERVIEW_BEGIN', self: 20 });
-    const packaged = createEvent({ text: 'run', namespace: 'pkg', self: 30 });
+    const method = highlightEvent({ text: 'run', type: 'METHOD_ENTRY', self: 10 });
+    const flow = highlightEvent({ text: 'run', type: 'FLOW_START_INTERVIEW_BEGIN', self: 20 });
+    const packaged = highlightEvent({ text: 'run', namespace: 'pkg', self: 30 });
     index(log, method, flow, packaged);
 
     const { hotSpots } = computeExecutionHighlights(log);
@@ -343,7 +309,7 @@ describe('computeExecutionHighlights hot spots', () => {
   it('caps the list at five signatures, largest self time first', () => {
     const log = createLog(1000);
     for (let i = 1; i <= 7; i++) {
-      index(log, createEvent({ text: `M${i}`, self: i * 10 }));
+      index(log, highlightEvent({ text: `M${i}`, self: i * 10 }));
     }
 
     const { hotSpots } = computeExecutionHighlights(log);
@@ -353,8 +319,8 @@ describe('computeExecutionHighlights hot spots', () => {
 
   it('counts untimed instances of a timed signature, so the average holds', () => {
     const log = createLog(1000);
-    const timed = createEvent({ text: 'MyClass.run()', self: 60 });
-    const untimed = createEvent({ text: 'MyClass.run()', self: 0 });
+    const timed = highlightEvent({ text: 'MyClass.run()', self: 60 });
+    const untimed = highlightEvent({ text: 'MyClass.run()', self: 0 });
     index(log, timed, untimed);
 
     const { hotSpots } = computeExecutionHighlights(log);
@@ -374,8 +340,8 @@ describe('computeExecutionHighlights hot spots', () => {
 
   it('sums total time and takes the category from the worst instance', () => {
     const log = createLog(1000);
-    const cheap = createEvent({ text: 'MyClass.run()', category: 'Apex', self: 20, total: 100 });
-    const worst = createEvent({ text: 'MyClass.run()', category: 'SOQL', self: 80, total: 300 });
+    const cheap = highlightEvent({ text: 'MyClass.run()', category: 'Apex', self: 20, total: 100 });
+    const worst = highlightEvent({ text: 'MyClass.run()', category: 'SOQL', self: 80, total: 300 });
     index(log, cheap, worst);
 
     const { hotSpots } = computeExecutionHighlights(log);
@@ -386,14 +352,14 @@ describe('computeExecutionHighlights hot spots', () => {
 
   it('counts recursion total time once, over the outermost instance', () => {
     const log = createLog(1000);
-    const outer = createEvent({
+    const outer = highlightEvent({
       text: 'Recurse.go()',
       self: 40,
       total: 300,
       timestamp: 100,
       exitStamp: 400,
     });
-    const inner = createEvent({
+    const inner = highlightEvent({
       text: 'Recurse.go()',
       self: 60,
       total: 260,
@@ -401,7 +367,7 @@ describe('computeExecutionHighlights hot spots', () => {
       exitStamp: 400,
       parent: outer,
     });
-    const later = createEvent({
+    const later = highlightEvent({
       text: 'Recurse.go()',
       self: 20,
       total: 100,
@@ -423,8 +389,8 @@ describe('computeExecutionHighlights hot spots', () => {
     const log = createLog(1000);
     // The outer calls were never timed; only the nested one was, so the summed
     // self time (80) runs past the summed total (30).
-    const outer = createEvent({ text: 'Wrap.run()', self: 0, total: 30, timestamp: 0 });
-    const nested = createEvent({ text: 'Wrap.run()', self: 80, total: 0, parent: outer });
+    const outer = highlightEvent({ text: 'Wrap.run()', self: 0, total: 30, timestamp: 0 });
+    const nested = highlightEvent({ text: 'Wrap.run()', self: 80, total: 0, parent: outer });
     index(log, outer, nested);
 
     const { hotSpots } = computeExecutionHighlights(log);
@@ -434,7 +400,7 @@ describe('computeExecutionHighlights hot spots', () => {
 
   it('ignores events with no self time', () => {
     const log = createLog(1000);
-    index(log, createEvent({ text: 'Wrapper', self: 0, total: 500 }));
+    index(log, highlightEvent({ text: 'Wrapper', self: 0, total: 500 }));
 
     const { hotSpots } = computeExecutionHighlights(log);
 
@@ -445,7 +411,7 @@ describe('computeExecutionHighlights hot spots', () => {
     // A truncated log leaves most of its time unaccounted, so the pseudo-root
     // outweighs every real call. It is a container, not code.
     const log = createLog(1000, 900);
-    index(log, createEvent({ text: 'Work', self: 100, total: 100 }));
+    index(log, highlightEvent({ text: 'Work', self: 100, total: 100 }));
 
     const { hotSpots } = computeExecutionHighlights(log);
 
@@ -474,7 +440,11 @@ describe('computeExecutionHighlights truncation', () => {
   it('reports a truncation whose cut-off frames all hang off the log root', () => {
     const log = createLog(1000);
     log.isTruncated = true;
-    const cut = createEvent({ text: 'Cut', parent: log as unknown as LogEvent, isTruncated: true });
+    const cut = highlightEvent({
+      text: 'Cut',
+      parent: log as unknown as LogEvent,
+      isTruncated: true,
+    });
     index(log, cut);
     log.truncation = {
       regions: [{ kind: 'max-size', startTime: 10, eventIndex: cut.eventIndex }],
@@ -488,7 +458,7 @@ describe('computeExecutionHighlights truncation', () => {
 
   it('reports nothing for a log the platform did not truncate', () => {
     const log = createLog(1000);
-    index(log, createEvent({ text: 'Work', self: 100 }));
+    index(log, highlightEvent({ text: 'Work', self: 100 }));
 
     expect(computeExecutionHighlights(log).truncation).toBeNull();
   });
@@ -497,7 +467,7 @@ describe('computeExecutionHighlights truncation', () => {
 describe('getExecutionHighlights', () => {
   it('memoises per log', () => {
     const log = createLog(1000);
-    index(log, createEvent({ text: 'M', self: 10 }));
+    index(log, highlightEvent({ text: 'M', self: 10 }));
 
     expect(getExecutionHighlights(log)).toBe(getExecutionHighlights(log));
   });

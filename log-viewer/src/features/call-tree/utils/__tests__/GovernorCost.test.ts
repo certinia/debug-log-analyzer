@@ -2,16 +2,26 @@
  * Copyright (c) 2026 Certinia Inc. All rights reserved.
  */
 import { describe, expect, it } from '@jest/globals';
-import type { GovernorLimits } from '@apexdevtools/apex-log-parser/types';
+import type { GovernorLimits } from '@apexdevtools/apex-log-parser';
 
-import { governorLimits, limitValue } from '../../../../components/__tests__/limitsTestUtils.js';
+import { governorLimits, limitValue } from '#test-helpers/limits.js';
 
 import {
-  governorCost,
+  costLimitsOf,
   governorCostBreakdown,
-  governorCostMax,
+  setGovernorCost,
   type GovernorCostRow,
 } from '../GovernorCost.js';
+
+function governorCost(r: GovernorCostRow, l: GovernorLimits): number | null {
+  setGovernorCost(r, costLimitsOf(l));
+  return r.governorCost;
+}
+
+function governorCostMax(r: GovernorCostRow, l: GovernorLimits): number | null {
+  setGovernorCost(r, costLimitsOf(l));
+  return r.governorCostMax;
+}
 
 function limits(overrides: Record<string, number> = {}): GovernorLimits {
   return governorLimits({
@@ -43,7 +53,7 @@ function row(overrides: Partial<Record<string, number>> = {}): GovernorCostRow {
   };
 }
 
-// COST_METRICS has 6 entries (SOQL, DML, SOSL, SOQL Rows, DML Rows, Heap);
+// COST_METRICS has 6 entries (SOQL, DML, SOSL, SOQL Rows, DML Rows, Heap Size);
 // limits() reports a limit for all 6, so the divisor is 6 in these tests. SOSL
 // rows are excluded — they have no governor limit.
 const REPORTED_GOVERNORS = 6;
@@ -111,6 +121,34 @@ describe('governorCostMax', () => {
   });
 });
 
+describe('setGovernorCost', () => {
+  it('sets the average and the tightest governor from the limits read once', () => {
+    const r = row({ soql: 90, dml: 15, heap: 3000000 });
+    setGovernorCost(r, costLimitsOf(limits()));
+    expect(r.governorCost).toBeCloseTo(150 / REPORTED_GOVERNORS, 5);
+    expect(r.governorCostMax).toBeCloseTo(90, 5);
+  });
+
+  it('sets both to null when the log reported no limits', () => {
+    const r = row({ soql: 50 });
+    setGovernorCost(
+      r,
+      costLimitsOf(
+        limits({
+          soqlQueries: 0,
+          dmlStatements: 0,
+          soslQueries: 0,
+          queryRows: 0,
+          dmlRows: 0,
+          heapSize: 0,
+        }),
+      ),
+    );
+    expect(r.governorCost).toBeNull();
+    expect(r.governorCostMax).toBeNull();
+  });
+});
+
 describe('a log that reported no limits', () => {
   const noLimits = limits({
     soqlQueries: 0,
@@ -139,8 +177,14 @@ describe('a log that reported no limits', () => {
 describe('governorCostBreakdown', () => {
   it('lists each consumed metric, highest contribution first', () => {
     const breakdown = governorCostBreakdown(row({ soql: 90, dml: 15, heap: 3000000 }), limits());
-    expect(breakdown.map((m) => m.label)).toEqual(['SOQL', 'Heap', 'DML']);
-    expect(breakdown[0]).toEqual({ label: 'SOQL', used: 90, limit: 100, percent: 90 });
+    expect(breakdown.map((m) => m.label)).toEqual(['SOQL', 'Heap Size', 'DML']);
+    expect(breakdown[0]).toEqual({
+      label: 'SOQL',
+      unit: 'count',
+      used: 90,
+      limit: 100,
+      percent: 90,
+    });
   });
 
   it('omits metrics with no usage or no known limit', () => {

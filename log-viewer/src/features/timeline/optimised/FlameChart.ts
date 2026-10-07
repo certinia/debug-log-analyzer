@@ -22,6 +22,7 @@ import type {
   HeatStripTimeSeries,
   HoverCause,
   ModifierKeys,
+  TimelineFrames,
   TimelineMarker,
   TimelineOptions,
   TimelineState,
@@ -31,8 +32,12 @@ import type {
   ViewportState,
 } from '../types/flamechart.types.js';
 import { TIMELINE_CONSTANTS, TimelineError, TimelineErrorCode } from '../types/flamechart.types.js';
-import type { MatchedEventInfo, SearchCursor, SearchOptions } from '../types/search.types.js';
-import type { NavigationMaps } from '../utils/tree-converter.js';
+import type {
+  FramePredicate,
+  MatchedEventInfo,
+  SearchCursor,
+  SearchOptions,
+} from '../types/search.types.js';
 
 import { MeshMarkerRenderer } from './markers/MeshMarkerRenderer.js';
 import { MeshRectangleRenderer } from './MeshRectangleRenderer.js';
@@ -154,7 +159,7 @@ export class FlameChart<E extends EventNode = EventNode> {
 
   // Search orchestrator (owns search state and rendering)
   private searchOrchestrator: SearchOrchestrator<E> | null = null;
-  private treeNodes: TreeNode<E>[] | null = null;
+  private frames: TimelineFrames<E> | null = null;
 
   // Text label renderer (used in normal mode, shared with search orchestrator)
   private textLabelRenderer: TextLabelRenderer | null = null;
@@ -227,29 +232,18 @@ export class FlameChart<E extends EventNode = EventNode> {
    *
    * @param container - HTML element to render into
    * @param events - Array of LogEvent objects for rendering
-   * @param treeNodes - Pre-converted TreeNode structure for navigation/search (from logEventToTreeNode)
-   * @param maps - Pre-built navigation maps from tree conversion
+   * @param frames - The frames to draw, navigate and search
    * @param markers - Timeline markers (truncation regions, etc.)
    * @param options - Rendering options
    * @param callbacks - Event callbacks
-   * @param precomputed - Optional precomputed data from unified tree conversion
    */
   public async init(
     container: HTMLElement,
     events: LogEvent[],
-    treeNodes: TreeNode<E>[],
-    maps: NavigationMaps,
+    frames: TimelineFrames<E>,
     markers: TimelineMarker[] = [],
     options: TimelineOptions = {},
     callbacks: FlameChartCallbacks = {},
-    precomputed?: {
-      maxDepth: number;
-      totalDuration: number;
-      rectsByCategory: Map<string, PrecomputedRect[]>;
-      rectsByDepth?: Map<number, PrecomputedRect[]>;
-      rectMap: Map<LogEvent, PrecomputedRect>;
-      preSorted?: boolean;
-    },
   ): Promise<void> {
     // Validate inputs
     if (!container || !(container instanceof HTMLElement)) {
@@ -282,13 +276,10 @@ export class FlameChart<E extends EventNode = EventNode> {
 
     const { width, height } = await this.awaitContainerSize(container);
 
-    // Create event index (use precomputed metrics if available)
-    this.index = new TimelineEventIndex(
-      events,
-      precomputed
-        ? { maxDepth: precomputed.maxDepth, totalDuration: precomputed.totalDuration }
-        : undefined,
-    );
+    this.index = new TimelineEventIndex(events, {
+      maxDepth: frames.maxDepth,
+      totalDuration: frames.totalDuration,
+    });
 
     // Initialize PixiJS Application first - creates DOM and measures dimensions after RAF.
     // This ensures flex layout is computed before we measure mainDiv's actual height.
@@ -312,8 +303,7 @@ export class FlameChart<E extends EventNode = EventNode> {
     // Initialize state
     this.initializeState(events);
 
-    // Store pre-converted TreeNode structure for search and navigation
-    this.treeNodes = treeNodes;
+    this.frames = frames;
 
     // Initialize viewport animator for smooth transitions
     this.viewportAnimator = new ViewportAnimator();
@@ -344,18 +334,12 @@ export class FlameChart<E extends EventNode = EventNode> {
     }
 
     // Create RectangleCache (single source of truth for rectangle computation)
-    // Use precomputed rectangles if available (from unified tree conversion)
     if (this.state) {
       const categories = new Set(this.state.batches.keys());
-      const precomputedRects = precomputed
-        ? {
-            rectsByCategory: precomputed.rectsByCategory,
-            rectMap: precomputed.rectMap,
-            rectsByDepth: precomputed.rectsByDepth,
-            preSorted: precomputed.preSorted,
-          }
-        : undefined;
-      this.rectangleManager = new RectangleCache(events, categories, precomputedRects);
+      this.rectangleManager = new RectangleCache(events, categories, {
+        rectsByCategory: frames.rectsByCategory,
+        rectsByDepth: frames.rectsByDepth,
+      });
     }
 
     // Create batch renderer (pure rendering, receives rectangles from RectangleCache)
@@ -399,7 +383,7 @@ export class FlameChart<E extends EventNode = EventNode> {
     });
 
     // Initialize selection orchestrator (owns selection state and rendering)
-    this.setupSelection(treeNodes, maps);
+    this.setupSelection(frames);
 
     // Initialize measurement orchestrator (owns measurement and area zoom)
     this.setupMeasurement();
@@ -615,7 +599,7 @@ export class FlameChart<E extends EventNode = EventNode> {
   private setupSearch(): void {
     if (
       !this.rectangleManager ||
-      !this.treeNodes ||
+      !this.frames ||
       !this.worldContainer ||
       !this.state ||
       !this.textLabelRenderer ||
@@ -643,8 +627,7 @@ export class FlameChart<E extends EventNode = EventNode> {
     // Initialize the orchestrator
     this.searchOrchestrator.init(
       this.worldContainer,
-      this.treeNodes,
-      this.rectangleManager,
+      this.frames,
       this.state.batches,
       this.textLabelRenderer,
       this.viewport,
@@ -666,7 +649,7 @@ export class FlameChart<E extends EventNode = EventNode> {
    * @param options - Search options (caseSensitive, matchWholeWord)
    * @returns FlameChartCursor for navigating results, or null if search not enabled
    */
-  public search(predicate: (event: E) => boolean, options?: SearchOptions): SearchCursor<E> | null {
+  public search(predicate: FramePredicate, options?: SearchOptions): SearchCursor<E> | null {
     return this.searchOrchestrator?.search(predicate, options) ?? null;
   }
 
@@ -1602,7 +1585,7 @@ export class FlameChart<E extends EventNode = EventNode> {
   /**
    * Setup selection orchestrator for frame and marker selection.
    */
-  private setupSelection(treeNodes: TreeNode<E>[], maps: NavigationMaps): void {
+  private setupSelection(frames: TimelineFrames<E>): void {
     if (!this.worldContainer || !this.viewport || !this.index) {
       return;
     }
@@ -1660,8 +1643,7 @@ export class FlameChart<E extends EventNode = EventNode> {
     this.selectionOrchestrator.init(
       this.worldContainer,
       this.viewport,
-      treeNodes,
-      maps,
+      frames,
       this.markers,
       this.index.totalDuration,
       this.index.maxDepth,
@@ -2136,11 +2118,11 @@ export class FlameChart<E extends EventNode = EventNode> {
    * @param eventNodes - EventNodes carrying an original reference to find
    */
   public locateByEventNodes(eventNodes: readonly EventNode[]): void {
-    const rectMap = this.rectangleManager?.getRectMap();
+    const frames = this.frames;
     const ids = new Set<string>();
     const info: MatchedEventInfo[] = [];
     for (const node of eventNodes) {
-      const rect = node.original ? rectMap?.get(node.original as LogEvent) : undefined;
+      const rect = frames?.rectOf(frames.rowOfOriginal(node.original));
       if (!rect) {
         continue;
       }

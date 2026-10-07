@@ -16,7 +16,7 @@ jest.mock('../../features/settings/Settings.js', () => ({
 
 import { ColumnSettingsController } from '../ColumnSettingsController.js';
 import { getVisibleFields, type ColumnView } from '../../tabulator/ColumnViews.js';
-import { FakeHost } from './controllerHostStub.js';
+import { fakeHost, type FakeHost } from '#test-helpers/fakeHost.js';
 
 /** What the extension host would answer with. */
 let stored: object = {};
@@ -71,7 +71,7 @@ function fakeTable(laidOut = true): Tabulator {
 async function connected(
   table: Tabulator | null = fakeTable(),
 ): Promise<{ host: FakeHost; columns: ColumnSettingsController }> {
-  const host = new FakeHost();
+  const host = fakeHost();
   const columns = new ColumnSettingsController(host, {
     section: 'database.soql',
     read: (settings) => (settings as { database?: { soql?: object } }).database?.soql,

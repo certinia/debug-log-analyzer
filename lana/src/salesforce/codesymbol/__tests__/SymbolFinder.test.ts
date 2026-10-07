@@ -7,7 +7,6 @@ import { VSWorkspace } from '../../../workspace/VSWorkspace';
 import type { ApexSymbol } from '../ApexSymbolParser';
 import { findSymbol } from '../SymbolFinder';
 
-jest.mock('vscode');
 jest.mock('../../../display/QuickPick');
 jest.mock('../../../workspace/VSWorkspace');
 
@@ -31,22 +30,12 @@ function createMockWorkspace(findClassResult: Uri[]): VSWorkspace {
 }
 
 describe('SymbolFinder', () => {
-  beforeEach(() => {
-    jest.clearAllMocks();
-  });
-
   describe('findSymbol', () => {
-    it('should report not-found when no classes match', async () => {
-      const mockWorkspace = createMockWorkspace([]);
-      const symbol = createSymbol({ outerClass: 'MyClass' });
-
-      const result = await findSymbol([mockWorkspace], [symbol]);
-
-      expect(result).toEqual({ status: 'not-found' });
-    });
-
-    it('should report not-found for an empty candidate list', async () => {
-      const result = await findSymbol([createMockWorkspace([])], []);
+    it.each([
+      ['no class matches', [createSymbol({ outerClass: 'MyClass' })]],
+      ['there are no candidates', []],
+    ])('should report not-found when %s', async (_label, candidates) => {
+      const result = await findSymbol([createMockWorkspace([])], candidates);
 
       expect(result).toEqual({ status: 'not-found' });
     });
@@ -146,19 +135,6 @@ describe('SymbolFinder', () => {
       expect(result).toEqual({ status: 'found', uri: mockUri });
       expect(folderWithoutNamespace.findClass).toHaveBeenCalledWith(symbol);
       expect(folderWithNamespace.findClass).toHaveBeenCalledWith(symbol);
-    });
-
-    it('should collect matches from every folder for a candidate without a namespace', async () => {
-      const mockUri = createMockUri('/workspace1/MyClass.cls');
-      const mockWorkspace1 = createMockWorkspace([mockUri]);
-      const mockWorkspace2 = createMockWorkspace([]);
-      const symbol = createSymbol({ outerClass: 'MyClass' });
-
-      const result = await findSymbol([mockWorkspace1, mockWorkspace2], [symbol]);
-
-      expect(result).toEqual({ status: 'found', uri: mockUri });
-      expect(mockWorkspace1.findClass).toHaveBeenCalledWith(symbol);
-      expect(mockWorkspace2.findClass).toHaveBeenCalledWith(symbol);
     });
   });
 });

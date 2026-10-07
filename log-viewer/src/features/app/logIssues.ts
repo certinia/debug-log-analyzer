@@ -1,8 +1,7 @@
 /*
  * Copyright (c) 2026 Certinia Inc. All rights reserved.
  */
-import type { ApexLog } from '@apexdevtools/apex-log-parser';
-import type { LogIssue as ParsedLogIssue } from '@apexdevtools/apex-log-parser/types';
+import type { ApexLog, LogIssue as ParsedLogIssue } from '@apexdevtools/apex-log-parser';
 
 import { formatByteSize } from '../../core/utility/Util.js';
 import { goToCallTreeAction } from '../call-tree/navigation.js';

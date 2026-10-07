@@ -7,8 +7,7 @@
  */
 
 import { describe, expect, it } from '@jest/globals';
-import type { ApexLog, LogEvent } from '@apexdevtools/apex-log-parser';
-import type { LogIssue } from '@apexdevtools/apex-log-parser/types';
+import type { ApexLog, LogEvent, LogIssue } from '@apexdevtools/apex-log-parser';
 import type { TimelineMarker } from '../types/flamechart.types.js';
 import { extractExceptionMarkers, extractMarkers, noDataSpans } from '../utils/marker-utils.js';
 

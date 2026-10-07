@@ -15,7 +15,7 @@ jest.mock('../../services/SelfTimeSpread.js', () => ({
 }));
 
 import '../SelfTimeSpreadView.js';
-import { settledNote } from '../../../../components/__tests__/sectionTestUtils.js';
+import { settledNote } from '#test-helpers/sections.js';
 
 // Durations are nanoseconds, so the readings are set far enough apart to format apart.
 const rowOf = (overrides: Partial<SelfTimeSpread['lanes'][number]> = {}) => ({

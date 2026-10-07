@@ -7,6 +7,7 @@ import { window, type TextDocument, type TextEditor } from 'vscode';
 
 import {
   createMockApexLog,
+  asContext,
   createMockContext,
   createMockLogEvent,
 } from '../../__tests__/helpers/test-builders.js';
@@ -19,7 +20,6 @@ import {
   setOpenTabs,
 } from '../../__tests__/mocks/vscode.js';
 import { LogEventCache } from '../../cache/LogEventCache.js';
-import type { Context } from '../../Context.js';
 import { RawLogLineDecoration } from '../RawLogLineDecoration.js';
 
 jest.mock('../../cache/LogEventCache.js', () => ({
@@ -60,76 +60,44 @@ describe('RawLogLineDecoration', () => {
   let mockContext: ReturnType<typeof createMockContext>;
 
   beforeEach(() => {
-    jest.clearAllMocks();
     jest.useFakeTimers();
     // The class keeps one instance for the life of the extension host.
     (RawLogLineDecoration as unknown as { instance: unknown }).instance = null;
     setOpenTabs(new TabInputText(Uri.file(LOG_URI)));
     mockContext = createMockContext();
-    RawLogLineDecoration.apply(mockContext as unknown as Context);
+    RawLogLineDecoration.apply(asContext(mockContext));
   });
 
   afterEach(() => {
     jest.useRealTimers();
   });
 
-  describe('apply', () => {
-    it('registers a selection listener', () => {
-      expect(mockOnSelectionChange).toHaveBeenCalledTimes(1);
-    });
+  it('registers one selection listener, however many times it is applied', () => {
+    RawLogLineDecoration.apply(asContext(mockContext));
+    RawLogLineDecoration.apply(asContext(mockContext));
 
-    it('registers once, however many times it is applied', () => {
-      RawLogLineDecoration.apply(mockContext as unknown as Context);
-      RawLogLineDecoration.apply(mockContext as unknown as Context);
-
-      expect(mockOnSelectionChange).toHaveBeenCalledTimes(1);
-    });
+    expect(mockOnSelectionChange).toHaveBeenCalledTimes(1);
   });
 
-  describe('decorating the cursor line', () => {
-    it('shows the total duration of the event on that line', async () => {
-      const document = createMockTextDocument({ uri: LOG_URI, lines: [EXECUTION_STARTED] });
-      const editor = makeEditor(document);
-      mockGetApexLog.mockResolvedValue(createMockApexLog({}));
-      mockFindEvent.mockReturnValue({
-        event: createMockLogEvent({ duration: { total: 2_000_000, self: 2_000_000 } }),
-        depth: 0,
-      });
-
-      await selectIn(editor);
-
-      const decorations = (editor.setDecorations as jest.Mock).mock.calls[0]?.[1] as {
-        renderOptions: { after: { contentText: string } };
-      }[];
-      expect(decorations).toHaveLength(1);
-      expect(decorations[0]?.renderOptions.after.contentText).toBe('2.00ms');
+  it.each([
+    ['the total duration', 2_000_000, 2_000_000, '2.00ms'],
+    ['the self time when it differs from the total', 5_000_000, 1_000_000, '5.00ms (self: 1.00ms)'],
+  ])('decorates the cursor line with %s', async (_label, total, self, expected) => {
+    const document = createMockTextDocument({ uri: LOG_URI, lines: [EXECUTION_STARTED] });
+    const editor = makeEditor(document);
+    mockGetApexLog.mockResolvedValue(createMockApexLog({}));
+    mockFindEvent.mockReturnValue({
+      event: createMockLogEvent({ duration: { total, self } }),
+      depth: 0,
     });
 
-    it('names the self time when it differs from the total', async () => {
-      const document = createMockTextDocument({ uri: LOG_URI, lines: [EXECUTION_STARTED] });
-      const editor = makeEditor(document);
-      mockGetApexLog.mockResolvedValue(createMockApexLog({}));
-      mockFindEvent.mockReturnValue({
-        event: createMockLogEvent({ duration: { total: 5_000_000, self: 1_000_000 } }),
-        depth: 0,
-      });
+    await selectIn(editor);
 
-      await selectIn(editor);
-
-      const decorations = (editor.setDecorations as jest.Mock).mock.calls[0]?.[1] as {
-        renderOptions: { after: { contentText: string } };
-      }[];
-      expect(decorations[0]?.renderOptions.after.contentText).toBe('5.00ms (self: 1.00ms)');
-    });
-
-    it('reads the log through the reporter it was given', async () => {
-      const document = createMockTextDocument({ uri: LOG_URI, lines: [EXECUTION_STARTED] });
-      mockGetApexLog.mockResolvedValue(null);
-
-      await selectIn(makeEditor(document));
-
-      expect(mockGetApexLog).toHaveBeenCalledWith(document.uri, mockContext.display);
-    });
+    expect(mockGetApexLog).toHaveBeenCalledWith(document.uri, mockContext.display);
+    const decorations = (editor.setDecorations as jest.Mock).mock.calls[0]?.[1] as {
+      renderOptions: { after: { contentText: string } };
+    }[];
+    expect(decorations.map((d) => d.renderOptions.after.contentText)).toEqual([expected]);
   });
 
   describe('clearing the decoration', () => {

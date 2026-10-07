@@ -314,17 +314,17 @@
     "vscode:bundle": "pnpm -w run build"
   },
   "dependencies": {
-    "@apexdevtools/apex-log-parser": "0.1.1",
+    "@apexdevtools/apex-log-parser": "0.2.0",
     "@apexdevtools/apex-parser": "5.2.0",
-    "effect": "^3.22.0",
+    "effect": "^3.22.2",
     "vscode-uri": "^3.2.0"
   },
   "devDependencies": {
-    "@salesforce/vscode-services": "^67.18.2",
+    "@salesforce/vscode-services": "^67.20.0",
     "@types/jest": "^30.0.0",
     "@types/node": "~22.20.4",
     "@types/vscode": "~1.102.0",
-    "@vscode/vsce": "^3.9.2",
+    "@vscode/vsce": "^4.0.0",
     "typescript": "npm:@typescript/typescript6@^6.0.2"
   }
 }

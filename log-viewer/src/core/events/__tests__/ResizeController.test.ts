@@ -7,7 +7,7 @@
 import { afterEach, describe, expect, it, jest } from '@jest/globals';
 
 import { ResizeController } from '../ResizeController.js';
-import { fakeHost } from './fakeHost.js';
+import { fakeHost } from '#test-helpers/fakeHost.js';
 
 type Callback = (entries: ResizeObserverEntry[]) => void;
 

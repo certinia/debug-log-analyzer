@@ -2,10 +2,9 @@
  * Copyright (c) 2026 Certinia Inc. All rights reserved.
  */
 import { beforeEach, describe, expect, it } from '@jest/globals';
-import type { ApexLog } from '@apexdevtools/apex-log-parser';
-import type { Limits } from '@apexdevtools/apex-log-parser/types';
+import type { ApexLog, Limits } from '@apexdevtools/apex-log-parser';
 
-import { emptyLimits, limitValue } from '../../../../components/__tests__/limitsTestUtils.js';
+import { emptyLimits, limitValue } from '#test-helpers/limits.js';
 
 import {
   UNKNOWN_OBJECT,

@@ -2,7 +2,8 @@
  * Copyright (c) 2026 Certinia Inc. All rights reserved.
  */
 import { describe, expect, it } from '@jest/globals';
-import { type ApexLog, parse } from '@apexdevtools/apex-log-parser';
+
+import { SETTINGS, indexOf, storeOf } from '#test-helpers/apexLog.js';
 
 import {
   apexCodeLevel,
@@ -10,35 +11,6 @@ import {
   recordsVariables,
   variableIndexFor,
 } from '../frameVariables.js';
-import { logStoreFor, type LogStore } from '../LogStore.js';
-
-const SETTINGS = '64.0 APEX_CODE,FINEST;APEX_PROFILING,NONE;DB,NONE\n';
-
-/** Wraps `body` in the header and footer the parser needs to build a tree. */
-function logOf(body: string, settings = SETTINGS): string {
-  return (
-    settings +
-    '09:18:22.6 (100)|EXECUTION_STARTED\n' +
-    '09:18:22.6 (200)|CODE_UNIT_STARTED|[EXTERNAL]|066d0000002m8ij|apex://pkg.Entry\n' +
-    body +
-    '09:18:22.6 (900000)|CODE_UNIT_FINISHED|apex://pkg.Entry\n' +
-    '09:18:22.6 (901000)|EXECUTION_FINISHED\n'
-  );
-}
-
-function storeOf(body: string, settings = SETTINGS): { log: ApexLog; store: LogStore } {
-  const log = parse(logOf(body, settings));
-  return { log, store: logStoreFor(log) };
-}
-
-/** The eventIndex of the frame or event whose log text is `text`. */
-function indexOf(log: ApexLog, text: string): number {
-  const found = log.eventsById.find((event) => event.text === text);
-  if (!found) {
-    throw new Error(`no event with text ${text}`);
-  }
-  return found.eventIndex;
-}
 
 const OUTER =
   '09:18:22.6 (1000)|METHOD_ENTRY|[1]|01p|ns.Outer.run()\n' +
@@ -51,21 +23,20 @@ const OUTER =
   '09:18:22.6 (1700)|METHOD_EXIT|[1]|ns.Outer.run()\n';
 
 describe('apexCodeLevel', () => {
-  it('reads the level the log was captured at', () => {
-    expect(apexCodeLevel(storeOf('').log)).toBe('FINEST');
-    expect(recordsVariables(storeOf('').log)).toBe(true);
-  });
+  it.each([
+    ['FINEST', SETTINGS.finest, true],
+    ['FINE', SETTINGS.fine, false],
+  ])('reads %s and whether it records variables', (level, settings, records) => {
+    const { log } = storeOf('', settings);
 
-  it('tells a level that records no variables from one that does', () => {
-    const { log } = storeOf('', '64.0 APEX_CODE,FINE;APEX_PROFILING,NONE;DB,NONE\n');
-
-    expect(apexCodeLevel(log)).toBe('FINE');
-    expect(recordsVariables(log)).toBe(false);
+    expect(apexCodeLevel(log)).toBe(level);
+    expect(recordsVariables(log)).toBe(records);
   });
 });
 
 describe('frameVariablesFor', () => {
-  it('reads the locals a frame wrote', async () => {
+  // The value is what the frame left, so the later write wins.
+  it('reads the locals a frame wrote, with the last write it made', async () => {
     const { log, store } = storeOf(OUTER);
     const frame = frameVariablesFor(store, indexOf(log, 'ns.Outer.run()'), null);
 
@@ -82,39 +53,16 @@ describe('frameVariablesFor', () => {
     ]);
   });
 
-  // The value is what the frame left, so the later write wins.
-  it('shows the last write a frame made, not the first', () => {
-    const { log, store } = storeOf(OUTER);
-
-    const frame = frameVariablesFor(store, indexOf(log, 'ns.Outer.run()'), null);
-
-    expect(frame?.locals[0]?.value).toBe('2');
-  });
-
   // "Only the ones on stack and would be visible": a caller's local is on the
-  // stack but out of scope from the method it called.
+  // stack but out of scope from the method it called, and the callee records a
+  // variable of its own, so no climb to the caller happens.
   it('keeps a caller local out of the frame it called', () => {
     const { log, store } = storeOf(OUTER);
 
     const inner = frameVariablesFor(store, indexOf(log, 'ns.Inner.step()'), null);
 
     expect(inner?.locals.map((row) => row.name)).toEqual(['inner']);
-  });
-
-  it('reads an event inside a frame as the log reached it', () => {
-    const { log, store } = storeOf(OUTER);
-
-    // The inner call sits between the two writes to `total`.
-    const atInner = frameVariablesFor(store, indexOf(log, 'ns.Inner.step()'), null);
-    const outerIndex = indexOf(log, 'ns.Outer.run()');
-    const inner = log.eventsById.find((event) => event.text === 'ns.Inner.step()')!;
-    const fromParent = frameVariablesFor(store, outerIndex, null);
-
-    // Asked of the inner frame, the answer is the inner frame's own scope.
-    expect(atInner?.frameLabel).toBe('ns.Inner.step()');
-    // Asked of the outer frame, both of its writes are in.
-    expect(fromParent?.locals[0]?.value).toBe('2');
-    expect(inner.eventIndex).toBeGreaterThan(outerIndex);
+    expect(inner?.frameLabel).toBe('ns.Inner.step()');
   });
 
   it('splits instance fields out of the locals', () => {
@@ -272,14 +220,30 @@ describe('VariableIndex', () => {
     ]);
   });
 
-  // A static assigned after the frame ran was not visible from it.
-  it('holds back a static assigned after the frame', async () => {
+  // A static assigned or declared after the frame ran was not visible from it.
+  // Every static by that point is visible, whichever frame wrote it.
+  it.each([
+    [
+      'assigned',
+      '09:18:22.6 (1100)|VARIABLE_ASSIGNMENT|[2]|ns.Cache.hits|1\n',
+      '09:18:22.6 (1400)|VARIABLE_ASSIGNMENT|[10]|ns.Later.set|9\n',
+      ['ns.Cache'],
+      ['ns.Cache', 'ns.Later'],
+    ],
+    [
+      'declared',
+      '09:18:22.6 (1100)|VARIABLE_ASSIGNMENT|[2]|seen|1\n',
+      '09:18:22.6 (1400)|VARIABLE_SCOPE_BEGIN|[10]|ns.Late.field|Integer|true|true\n',
+      [],
+      ['ns.Late'],
+    ],
+  ])('holds back a static %s after the frame', async (_how, early, late, atFirst, atSecond) => {
     const { log, store } = storeOf(
       '09:18:22.6 (1000)|METHOD_ENTRY|[1]|01p|ns.First.run()\n' +
-        '09:18:22.6 (1100)|VARIABLE_ASSIGNMENT|[2]|ns.Cache.hits|1\n' +
+        early +
         '09:18:22.6 (1200)|METHOD_EXIT|[1]|ns.First.run()\n' +
         '09:18:22.6 (1300)|METHOD_ENTRY|[9]|01p|ns.Second.run()\n' +
-        '09:18:22.6 (1400)|VARIABLE_ASSIGNMENT|[10]|ns.Later.set|9\n' +
+        late +
         '09:18:22.6 (1500)|METHOD_EXIT|[9]|ns.Second.run()\n',
     );
     const statics = await variableIndexFor(log);
@@ -287,9 +251,8 @@ describe('VariableIndex', () => {
     const first = frameVariablesFor(store, indexOf(log, 'ns.First.run()'), statics);
     const second = frameVariablesFor(store, indexOf(log, 'ns.Second.run()'), statics);
 
-    expect(first?.statics.map((group) => group.className)).toEqual(['ns.Cache']);
-    // Every static assigned by this point is visible, whichever frame wrote it.
-    expect(second?.statics.map((group) => group.className)).toEqual(['ns.Cache', 'ns.Later']);
+    expect(first?.statics.map((group) => group.className)).toEqual(atFirst);
+    expect(second?.statics.map((group) => group.className)).toEqual(atSecond);
   });
 
   it('says whether the log recorded any write at all', async () => {
@@ -312,39 +275,12 @@ describe('VariableIndex', () => {
   });
 });
 
-// Where a value would not serialise the log writes a bare address, and reports
-// that same address beside a real value elsewhere, which is how nearly every
-// bare address resolves.
-// A frame can run with another instance of its own class on the stack. The class
-// alone cannot tell them apart; the object's address can.
 // Past the per-name cap the walk drops the oldest writes to a static, so a late
 // frame reads the true last value rather than a stale early one.
-describe('classAt does not leak the last declared class', () => {
-  // `this` is not redeclared on every call: the second frame here writes `this`
-  // with no scope declaration of its own, and must not borrow the first
-  // frame's class just because it was the last one the walk saw.
-  it('names no class for a this write its own frame never declared', async () => {
-    const { log } = storeOf(
-      '09:18:22.6 (1000)|METHOD_ENTRY|[1]|01p|ns.Outer.run()\n' +
-        '09:18:22.6 (1050)|CONSTRUCTOR_ENTRY|[2]|01p|<init>()|ns.First\n' +
-        '09:18:22.6 (1060)|VARIABLE_SCOPE_BEGIN|[9]|this|ns.First|true|false\n' +
-        '09:18:22.6 (1070)|VARIABLE_ASSIGNMENT|[9]|this|{}|0xaaa111\n' +
-        '09:18:22.6 (1080)|CONSTRUCTOR_EXIT|[2]|01p|<init>()|ns.First\n' +
-        '09:18:22.6 (1200)|METHOD_ENTRY|[3]|01p|ns.Second.run()\n' +
-        '09:18:22.6 (1250)|VARIABLE_ASSIGNMENT|[3]|this|{}|0xbbb222\n' +
-        '09:18:22.6 (1260)|METHOD_EXIT|[3]|ns.Second.run()\n' +
-        '09:18:22.6 (1900)|METHOD_EXIT|[1]|ns.Outer.run()\n',
-    );
-    const index = await variableIndexFor(log);
-
-    expect(index.classAt('0xaaa111', 99_999)).toBe('ns.First');
-    expect(index.classAt('0xbbb222', 99_999)).toBeNull();
-  });
-});
-
 describe('static write cap keeps recency, not insertion order', () => {
   it('answers with the most recent write, not the earliest', async () => {
     const lines: string[] = ['09:18:22.6 (300)|METHOD_ENTRY|[1]|01p|ns.Outer.run()'];
+    // pushCapped trims only past twice MAX_WRITES_PER_STATIC (10,000), so fewer never trims.
     const total = 20_005;
     for (let i = 0; i < total; i++) {
       lines.push(`09:18:22.6 (${400 + i})|VARIABLE_ASSIGNMENT|[2]|ns.Counter.total|${i}`);
@@ -468,6 +404,27 @@ describe('VariableIndex classAt', () => {
 
     expect(index.classAt('0x7b43a738', 99_999)).toBe('ns.BaseHandler');
   });
+
+  // `this` is not redeclared on every call: the second frame here writes `this`
+  // with no scope declaration of its own, and must not borrow the first
+  // frame's class just because it was the last one the walk saw.
+  it('names no class for a this write its own frame never declared', async () => {
+    const { log } = storeOf(
+      '09:18:22.6 (1000)|METHOD_ENTRY|[1]|01p|ns.Outer.run()\n' +
+        '09:18:22.6 (1050)|CONSTRUCTOR_ENTRY|[2]|01p|<init>()|ns.First\n' +
+        '09:18:22.6 (1060)|VARIABLE_SCOPE_BEGIN|[9]|this|ns.First|true|false\n' +
+        '09:18:22.6 (1070)|VARIABLE_ASSIGNMENT|[9]|this|{}|0xaaa111\n' +
+        '09:18:22.6 (1080)|CONSTRUCTOR_EXIT|[2]|01p|<init>()|ns.First\n' +
+        '09:18:22.6 (1200)|METHOD_ENTRY|[3]|01p|ns.Second.run()\n' +
+        '09:18:22.6 (1250)|VARIABLE_ASSIGNMENT|[3]|this|{}|0xbbb222\n' +
+        '09:18:22.6 (1260)|METHOD_EXIT|[3]|ns.Second.run()\n' +
+        '09:18:22.6 (1900)|METHOD_EXIT|[1]|ns.Outer.run()\n',
+    );
+    const index = await variableIndexFor(log);
+
+    expect(index.classAt('0xaaa111', 99_999)).toBe('ns.First');
+    expect(index.classAt('0xbbb222', 99_999)).toBeNull();
+  });
 });
 
 describe('VariableIndex address resolution', () => {
@@ -489,15 +446,19 @@ describe('VariableIndex address resolution', () => {
     expect(alias?.address).toBe('0xd854c6b');
     expect(alias?.value).toBe('0xd854c6b');
     expect(index.addressState('0xd854c6b', frame.cut).text).toBe('{"Id":"001"}');
+    // A value that is not an address is left alone.
+    expect(frame.locals.find((row) => row.name === 'held')?.address).toBeNull();
   });
 
-  it('leaves a value that is not an address alone', async () => {
+  // The frame answers before the index exists, so the section can show the
+  // scope while the walk runs. Only the log-wide statics wait for it.
+  it('answers the frame alone before the index is built', () => {
     const { log, store } = storeOf(ADDRESSED);
-    const index = await variableIndexFor(log);
 
-    const frame = frameVariablesFor(store, indexOf(log, 'ns.Outer.run()'), index);
+    const frame = frameVariablesFor(store, indexOf(log, 'ns.Outer.run()'), null);
 
-    expect(frame?.locals.find((row) => row.name === 'held')?.address).toBeNull();
+    expect(frame?.locals.find((row) => row.name === 'alias')?.address).toBe('0xd854c6b');
+    expect(frame?.statics).toEqual([]);
   });
 
   // The address names an object whose contents change, so answering with a
@@ -564,17 +525,6 @@ describe('VariableIndex address resolution', () => {
     const index = await variableIndexFor(log);
 
     expect(index.addressState('0xf1e2d3', 99_999).text).toBe('{"sortDir":"asc"}');
-  });
-
-  // The frame answers before the index exists, so the section can show the
-  // scope while the walk runs. Only the log-wide statics wait for it.
-  it('answers the frame alone before the index is built', () => {
-    const { log, store } = storeOf(ADDRESSED);
-
-    const frame = frameVariablesFor(store, indexOf(log, 'ns.Outer.run()'), null);
-
-    expect(frame?.locals.find((row) => row.name === 'alias')?.address).toBe('0xd854c6b');
-    expect(frame?.statics).toEqual([]);
   });
 });
 
@@ -656,24 +606,6 @@ describe('frameVariablesFor whole scope', () => {
       },
     ]);
   });
-
-  it('holds back a static declared after the frame ran', async () => {
-    const { log, store } = storeOf(
-      '09:18:22.6 (1000)|METHOD_ENTRY|[1]|01p|ns.First.run()\n' +
-        '09:18:22.6 (1050)|VARIABLE_ASSIGNMENT|[2]|seen|1\n' +
-        '09:18:22.6 (1100)|METHOD_EXIT|[1]|ns.First.run()\n' +
-        '09:18:22.6 (1200)|METHOD_ENTRY|[9]|01p|ns.Second.run()\n' +
-        '09:18:22.6 (1250)|VARIABLE_SCOPE_BEGIN|[10]|ns.Late.field|Integer|true|true\n' +
-        '09:18:22.6 (1300)|METHOD_EXIT|[9]|ns.Second.run()\n',
-    );
-    const index = await variableIndexFor(log);
-
-    const first = frameVariablesFor(store, indexOf(log, 'ns.First.run()'), index);
-    const second = frameVariablesFor(store, indexOf(log, 'ns.Second.run()'), index);
-
-    expect(first?.statics).toEqual([]);
-    expect(second?.statics.map((group) => group.className)).toEqual(['ns.Late']);
-  });
 });
 
 /**
@@ -702,23 +634,6 @@ describe('frameVariablesFor scope attribution', () => {
     expect(frame?.locals.map((row) => row.name)).toEqual(['compId', 'qry']);
     // The label names the frame the locals belong to, so it is never a guess.
     expect(frame?.frameLabel).toBe('ns.Outer.run()');
-  });
-
-  it('answers a frame that has its own variables with its own', () => {
-    const { log, store } = storeOf(
-      '09:18:22.6 (1000)|METHOD_ENTRY|[1]|01p|ns.Outer.run()\n' +
-        '09:18:22.6 (1050)|VARIABLE_ASSIGNMENT|[2]|outer|1\n' +
-        '09:18:22.6 (1100)|METHOD_ENTRY|[5]|01p|ns.Inner.step()\n' +
-        '09:18:22.6 (1150)|VARIABLE_ASSIGNMENT|[6]|inner|2\n' +
-        '09:18:22.6 (1200)|METHOD_EXIT|[5]|ns.Inner.step()\n' +
-        '09:18:22.6 (1250)|METHOD_EXIT|[1]|ns.Outer.run()\n',
-    );
-
-    const frame = frameVariablesFor(store, indexOf(log, 'ns.Inner.step()'), null);
-
-    // It records a variable of its own, so the climb stops there.
-    expect(frame?.locals.map((row) => row.name)).toEqual(['inner']);
-    expect(frame?.frameLabel).toBe('ns.Inner.step()');
   });
 
   it('reads the query scope as it stood when the query ran', () => {
@@ -802,12 +717,7 @@ describe('VariableIndex object fields', () => {
       { name: 'sObj', value: '"Account"' },
     ]);
     expect(index.fieldsAt('0xaaa', Number.MAX_SAFE_INTEGER)).toHaveLength(2);
-  });
-
-  it('holds nothing for an object whose fields the log never wrote', async () => {
-    const { log } = storeOf(BUILT);
-    const index = await variableIndexFor(log);
-
+    // Nothing for an object whose fields the log never wrote.
     expect(index.fieldsAt('0xbbb', Number.MAX_SAFE_INTEGER)).toEqual([]);
   });
 
@@ -932,13 +842,15 @@ describe('VariableIndex object fields', () => {
   });
 
   // Each field holds its own writes, so a field assigned once early survives a
-  // field assigned four thousand times.
-  it('keeps a field written once beside a field written past the cap', async () => {
+  // field assigned four thousand times. Past the cap the oldest writes go, so a
+  // late frame still reads the true last value rather than a stale early one.
+  it('keeps a field written once, and the newest writes of a field past the cap', async () => {
     let body =
       '09:18:22.6 (1000)|METHOD_ENTRY|[1]|01p|ns.Loop.run()\n' +
       '09:18:22.6 (1010)|VARIABLE_SCOPE_BEGIN|[1]|this|ns.Loop|true|false\n' +
       '09:18:22.6 (1020)|VARIABLE_ASSIGNMENT|[1]|this|{}|0xccc\n' +
       '09:18:22.6 (1030)|VARIABLE_ASSIGNMENT|[2]|this.keep|"important"|0xccc\n';
+    // pushCapped trims only past twice MAX_WRITES_PER_FIELD (2,000), so fewer never trims.
     for (let at = 1; at <= 4_100; at++) {
       body += `09:18:22.6 (${2000 + at})|VARIABLE_ASSIGNMENT|[3]|this.n|${at}|0xccc\n`;
     }
@@ -950,25 +862,7 @@ describe('VariableIndex object fields', () => {
       { name: 'keep', value: '"important"' },
       { name: 'n', value: '4100' },
     ]);
-  });
-
-  // Past the per-object cap the oldest writes are dropped, so a late frame still
-  // reads the true last value rather than a stale early one.
-  it('keeps the newest field writes when an object is written past the cap', async () => {
-    let body =
-      '09:18:22.6 (1000)|METHOD_ENTRY|[1]|01p|ns.Loop.run()\n' +
-      '09:18:22.6 (1010)|VARIABLE_SCOPE_BEGIN|[1]|this|ns.Loop|true|false\n' +
-      '09:18:22.6 (1020)|VARIABLE_ASSIGNMENT|[1]|this|{}|0xccc\n';
-    for (let at = 1; at <= 4_100; at++) {
-      body += `09:18:22.6 (${2000 + at})|VARIABLE_ASSIGNMENT|[2]|this.n|${at}|0xccc\n`;
-    }
-    body += '09:18:22.6 (7000)|METHOD_EXIT|[1]|ns.Loop.run()\n';
-    const { log } = storeOf(body);
-    const index = await variableIndexFor(log);
-
-    expect(index.fieldsAt('0xccc', Number.MAX_SAFE_INTEGER)).toMatchObject([
-      { name: 'n', value: '4100' },
-    ]);
+    // Dropping old writes to one field is not the log-wide cap.
     expect(index.capped).toBe(false);
   });
 });

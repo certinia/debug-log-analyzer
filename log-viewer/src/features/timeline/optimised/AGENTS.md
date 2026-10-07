@@ -43,6 +43,11 @@ When FlameChart needs to pass event data to callbacks:
 
 `LogEvent` is still used internally by data structures (`RectangleCache`, `TimelineEventIndex`, `PixelBucket`) for performance reasons. These types are imported through `flamechart.types.ts` which re-exports them from the parser package.
 
+### TimelineFrames
+
+- The chart reads the log only through `TimelineFrames`, built from `LogIndex`.
+- Work by row. No tree, no per-event Map. `node(row)` on demand only.
+
 ### Metric Strip Architecture
 
 The metric strip visualization (governor limits) is rendered below the main timeline and above the minimap:
@@ -52,7 +57,8 @@ The metric strip visualization (governor limits) is rendered below the main time
 - `MetricTierClassifier` processes `HeatStripTimeSeries` data and classifies metrics into tiers
 - `apex-limit-series.ts` transforms `ApexLog` (snapshots + event tree) → `HeatStripTimeSeries`;
   `ApexLogTimeline` calls it during `init()`
-- Apex-specific display names, units, and priority order are defined ONLY in `apex-limit-series.ts`
+- Apex-specific display names, units, and priority order come from `core/metrics/governorMetrics.ts`
+  and reach the strip ONLY through `apex-limit-series.ts`
 
 The metric strip supports collapsed (heat-style) and expanded (step chart) views, toggled via a chevron icon.
 
@@ -91,21 +97,21 @@ const events = rectangleCache.queryEventsInRegion(timeStart, timeEnd, depthStart
 ### ApexLogTimeline (Apex Adapter)
 
 - Apex-specific translation layer
-- Converts ApexLog to generic EventNode data
+- Builds `TimelineFrames`
 - Handles themes, tooltips, markers
 - Delegates rendering to FlameChart
 
 ### SelectionNavigator
 
 - Owns selection state (`selectedNode`)
-- Tree navigation logic (up/down/left/right)
+- Navigation (up/down/left/right)
 - Selection lifecycle (select, clear, navigate)
-- Maps hit test results to tree nodes
+- Maps hit test results to rows
 
 ### EventMatcher
 
 - Owns search state and cursor
-- Tree traversal with predicates
+- Scans shown rows with a `(text, type)` predicate
 - Match collection and navigation
 
 ### Renderers (\*Renderer classes)
@@ -265,7 +271,7 @@ optimised/
 ├── selection/
 │   ├── SelectionNavigator.ts   # Selection state and navigation
 │   ├── SelectionHighlightRenderer.ts  # Selection visuals
-│   └── TreeNavigator.ts       # Tree traversal (internal)
+│   └── TreeNavigator.ts       # Moves by row (internal)
 ├── search/
 │   ├── EventMatcher.ts         # Search state and matching
 │   ├── SearchHighlightRenderer.ts  # Search visuals
@@ -311,7 +317,7 @@ Tests should focus on the manager's API, not internal implementation.
    - Mesh-based rendering (RectangleGeometry + custom shader) for rectangles/filled shapes
    - Single draw call for many rectangles, much faster than Graphics
    - Keep Graphics for thin lines (step charts, dashed lines) - mesh overhead not justified
-   - See `MeshRectangleRenderer`, `MeshMetricStripRenderer` for examples
+   - See `rendering/rectangleMesh.ts` and `rendering/MeshRectangleWriter.ts` for examples
 
 5. **Profile before optimizing**
    - Use Chrome DevTools Performance tab

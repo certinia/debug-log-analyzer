@@ -8,7 +8,7 @@ import { parse } from '@apexdevtools/apex-log-parser';
 
 import { logStoreFor, type LogStore } from '../../core/log/LogStore.js';
 
-// Avoid the heavy CodeBlock import chain (vscode-elements, soql formatter); the
+// Avoid the heavy CodeBlock import chain (the soql formatter); the
 // field order is expressed by the `.label` spans, not the code preview.
 jest.mock('../CodeBlock.js', () => ({}));
 
@@ -177,7 +177,7 @@ describe('EventVitals', () => {
   it('omits fields with no value', async () => {
     const el = await mount(store, { eventIndex: dmlIndex, type: 'dml' });
     // A DML statement allocates no heap and throws nothing in this log.
-    expect(labels(el)).not.toContain('Heap net');
+    expect(labels(el)).not.toContain('Heap Net');
     expect(labels(el)).not.toContain('Throws');
   });
 

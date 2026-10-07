@@ -1,7 +1,7 @@
 /*
  * Copyright (c) 2026 Certinia Inc. All rights reserved.
  */
-import { beforeEach, describe, expect, it } from '@jest/globals';
+import { describe, expect, it } from '@jest/globals';
 
 import { createMockExtensionContext } from './mocks/vscode.js';
 import { Context } from '../Context.js';
@@ -22,10 +22,6 @@ const mockDisposeServices = disposeServices as jest.Mock;
 const mockInitServices = initServices as jest.Mock;
 
 describe('Main', () => {
-  beforeEach(() => {
-    jest.clearAllMocks();
-  });
-
   it('activates without initializing Salesforce Services', () => {
     const extensionContext = createMockExtensionContext();
 

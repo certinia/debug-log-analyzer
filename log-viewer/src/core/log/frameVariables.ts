@@ -1,8 +1,7 @@
 /*
  * Copyright (c) 2026 Certinia Inc. All rights reserved.
  */
-import type { ApexLog, LogEvent } from '@apexdevtools/apex-log-parser';
-import { LOG_LEVEL } from '@apexdevtools/apex-log-parser/types';
+import { type ApexLog, type LogEvent, LOG_LEVEL } from '@apexdevtools/apex-log-parser';
 
 import {
   CHECK_EVERY,

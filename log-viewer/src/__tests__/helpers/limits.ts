@@ -1,13 +1,13 @@
 /*
  * Copyright (c) 2026 Certinia Inc. All rights reserved.
  */
-import type { GovernorLimits, Limits } from '@apexdevtools/apex-log-parser/types';
+import type { GovernorLimits, Limits } from '@apexdevtools/apex-log-parser';
 
 import type {
   HeatStripEvent,
   HeatStripTimeSeries,
 } from '../../features/timeline/types/flamechart.types.js';
-import { limitValue } from '../logOverviewMetrics.js';
+import { limitValue } from '../../components/logOverviewMetrics.js';
 
 export { limitValue };
 

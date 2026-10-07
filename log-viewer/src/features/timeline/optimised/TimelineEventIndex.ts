@@ -13,7 +13,7 @@ import type { LogEvent } from '@apexdevtools/apex-log-parser';
 import type { ViewportBounds, ViewportState } from '../types/flamechart.types.js';
 
 /**
- * Precomputed metrics from unified tree conversion (single-pass optimization).
+ * Metrics the caller already holds, such as the timeline's frames.
  * When provided, TimelineEventIndex skips its own O(n) calculation methods.
  */
 export interface PrecomputedMetrics {

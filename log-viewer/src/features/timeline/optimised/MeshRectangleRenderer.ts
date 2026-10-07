@@ -8,12 +8,6 @@
  * Pure rectangle rendering for timeline events using PixiJS Mesh with custom geometry.
  * Receives pre-computed, culled rectangles and renders them with original colors.
  *
- * Performance optimizations:
- * - Single Mesh draw call for all rectangles
- * - Direct buffer updates (no scene graph overhead)
- * - Clip-space coordinates (no uniform binding overhead)
- * - Pre-computed colors applied per vertex
- *
  * Responsibilities:
  * - Render rectangles with their original colors
  * - Render buckets (sub-pixel aggregated events)
@@ -24,37 +18,17 @@
  * - Handle search logic (done by MeshSearchStyleRenderer)
  */
 
-import type { Container, Geometry, Mesh, Shader } from 'pixi.js';
+import type { Container } from 'pixi.js';
 import type { PixelBucket, RenderBatch, ViewportState } from '../types/flamechart.types.js';
-import { BUCKET_CONSTANTS, TIMELINE_CONSTANTS } from '../types/flamechart.types.js';
+import { TIMELINE_CONSTANTS } from '../types/flamechart.types.js';
 import type { PrecomputedRect } from './RectangleCache.js';
-import type { RectangleGeometry, ViewportTransform } from './RectangleGeometry.js';
-import { createRectangleMesh } from './rendering/rectangleMesh.js';
+import { MeshRectangleWriter } from './rendering/MeshRectangleWriter.js';
 
-export class MeshRectangleRenderer {
-  private batches: Map<string, RenderBatch>;
-  private parentContainer: Container;
-  private geometry: RectangleGeometry;
-  private mesh: Mesh<Geometry, Shader>;
-  private lastViewport: ViewportState | null = null;
+const ownColor = (bucket: PixelBucket): number => bucket.color;
 
+export class MeshRectangleRenderer extends MeshRectangleWriter {
   constructor(container: Container, batches: Map<string, RenderBatch>) {
-    this.batches = batches;
-    this.parentContainer = container;
-
-    const { geometry, mesh } = createRectangleMesh(container, 'MeshRectangleRenderer');
-    this.geometry = geometry;
-    this.mesh = mesh;
-  }
-
-  /**
-   * Set the stage container for clip-space rendering.
-   * NOTE: With clip-space coordinates, we don't need to move to stage root.
-   * The mesh outputs directly to gl_Position, bypassing all container transforms.
-   * We keep the mesh in worldContainer so it's part of the scene graph.
-   */
-  public setStageContainer(_stage: Container): void {
-    // No-op: Keep mesh in worldContainer. Clip-space shader bypasses transforms anyway.
+    super(container, batches, 'MeshRectangleRenderer');
   }
 
   /**
@@ -71,41 +45,10 @@ export class MeshRectangleRenderer {
     buckets: Map<string, PixelBucket[]>,
     viewport?: ViewportState,
   ): void {
-    // Use provided viewport or fall back to stored one
-    const vp = viewport || this.lastViewport;
-    if (!vp) {
+    const viewportTransform = this.beginFrame(culledRects, buckets, viewport);
+    if (!viewportTransform) {
       return;
     }
-    this.lastViewport = vp;
-
-    // Count total rectangles needed
-    let totalRects = 0;
-    for (const rectangles of culledRects.values()) {
-      totalRects += rectangles.length;
-    }
-    for (const categoryBuckets of buckets.values()) {
-      totalRects += categoryBuckets.length;
-    }
-
-    // Early exit if nothing to render
-    if (totalRects === 0) {
-      this.geometry.setDrawCount(0);
-      this.mesh.visible = false;
-      return;
-    }
-
-    // Ensure buffer capacity
-    this.geometry.ensureCapacity(totalRects);
-
-    // Create viewport transform for coordinate conversion
-    // No canvasYOffset needed - main timeline has its own canvas
-    const viewportTransform: ViewportTransform = {
-      offsetX: vp.offsetX,
-      offsetY: vp.offsetY,
-      displayWidth: vp.displayWidth,
-      displayHeight: vp.displayHeight,
-      canvasYOffset: 0,
-    };
 
     // Pre-calculate constants outside loops
     const gap = TIMELINE_CONSTANTS.RECT_GAP;
@@ -148,85 +91,9 @@ export class MeshRectangleRenderer {
       batch.isDirty = false;
     }
 
-    // Write all buckets
-    this.writeBuckets(buckets, rectIndex, viewportTransform);
-    rectIndex += this.countBuckets(buckets);
+    // Buckets have density-based colors (opacity pre-blended into the color).
+    rectIndex = this.writeBuckets(buckets, rectIndex, viewportTransform, ownColor);
 
-    // Set draw count and make visible
-    this.geometry.setDrawCount(rectIndex);
-    this.mesh.visible = true;
-  }
-
-  /**
-   * Clear all rendered content (hide the mesh).
-   * Called when switching to search mode.
-   */
-  public clear(): void {
-    this.geometry.setDrawCount(0);
-    this.mesh.visible = false;
-  }
-
-  /**
-   * Clean up resources.
-   */
-  public destroy(): void {
-    this.geometry.destroy();
-    this.mesh.destroy();
-  }
-
-  // ============================================================================
-  // PRIVATE HELPERS
-  // ============================================================================
-
-  /**
-   * Count total buckets across all categories.
-   */
-  private countBuckets(buckets: Map<string, PixelBucket[]>): number {
-    let count = 0;
-    for (const categoryBuckets of buckets.values()) {
-      count += categoryBuckets.length;
-    }
-    return count;
-  }
-
-  /**
-   * Write all buckets to geometry buffers.
-   *
-   * Buckets have density-based colors (opacity pre-blended into the color).
-   * Each bucket gets rendered as a rectangle with the appropriate color.
-   *
-   * @param buckets - Aggregated buckets grouped by category
-   * @param startIndex - Starting rectangle index in the buffer
-   * @param viewportTransform - Transform for coordinate conversion
-   */
-  private writeBuckets(
-    buckets: Map<string, PixelBucket[]>,
-    startIndex: number,
-    viewportTransform: ViewportTransform,
-  ): void {
-    // Pre-calculate constants outside loops
-    const gap = TIMELINE_CONSTANTS.RECT_GAP;
-    const halfGap = gap / 2;
-    const blockWidth = BUCKET_CONSTANTS.BUCKET_BLOCK_WIDTH;
-    const eventHeight = TIMELINE_CONSTANTS.EVENT_HEIGHT;
-    const gappedHeight = Math.max(0, eventHeight - gap);
-
-    let rectIndex = startIndex;
-
-    // Write all buckets from all categories
-    for (const categoryBuckets of buckets.values()) {
-      for (const bucket of categoryBuckets) {
-        this.geometry.writeRectangle(
-          rectIndex,
-          bucket.x + halfGap,
-          bucket.y + halfGap,
-          blockWidth,
-          gappedHeight,
-          bucket.color,
-          viewportTransform,
-        );
-        rectIndex++;
-      }
-    }
+    this.endFrame(rectIndex);
   }
 }

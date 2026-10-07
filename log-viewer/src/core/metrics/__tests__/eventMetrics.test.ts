@@ -3,7 +3,7 @@
  */
 import { describe, expect, it } from '@jest/globals';
 import type { LogEvent } from '@apexdevtools/apex-log-parser';
-import { governorLimits, limitValue } from '../../../components/__tests__/limitsTestUtils.js';
+import { governorLimits, limitValue } from '#test-helpers/limits.js';
 import { EVENT_METRICS, formatBytes, HEAP_PEAK, usageParts } from '../eventMetrics.js';
 
 const limits = governorLimits({
@@ -72,8 +72,8 @@ describe('EVENT_METRICS', () => {
     expect(undenominated.map((metric) => metric.label)).toEqual([
       'SOSL Rows',
       'Throws',
-      'Heap net',
-      'Heap alloc',
+      'Heap Net',
+      'Heap Alloc',
     ]);
   });
 
@@ -87,8 +87,8 @@ describe('EVENT_METRICS', () => {
       'SOSL',
       'SOSL Rows',
       'Throws',
-      'Heap net',
-      'Heap alloc',
+      'Heap Net',
+      'Heap Alloc',
     ]);
   });
 });

@@ -34,7 +34,11 @@ const registry: FakeEvent[] = [];
  * An event with its children's time folded into its total, registered so
  * {@link eventByIndex} finds it as the log's own map does.
  */
-export function ev(namespace: string, self: number, children: FakeEvent[] = []): FakeEvent {
+export function namespaceEvent(
+  namespace: string,
+  self: number,
+  children: FakeEvent[] = [],
+): FakeEvent {
   const event: FakeEvent = {
     eventIndex: registry.length,
     namespace,

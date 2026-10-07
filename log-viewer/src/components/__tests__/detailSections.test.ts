@@ -5,7 +5,7 @@
  */
 import { describe, expect, it } from '@jest/globals';
 
-// Avoid the heavy component import chains (Tabulator, scss, vscode-elements);
+// Avoid the heavy component import chains (Tabulator, scss);
 // this suite only exercises the section-assembly logic.
 jest.mock('../CallStackDetail.js', () => ({}));
 jest.mock('../CallTreeDetail.js', () => ({}));
@@ -56,6 +56,7 @@ function rendered(sections: PaneSection[], id: string, tag: string): Element {
 describe('buildDetailSections', () => {
   it('builds the shared trio for a timeline frame', async () => {
     const sections = await buildDetailSections('timeline', { kind: 'event', eventIndex: 4 });
+    // No findings: those belong to the Analysis tab.
     expect(sections.map((s) => s.id)).toEqual([
       'vitals',
       'variables',
@@ -73,6 +74,10 @@ describe('buildDetailSections', () => {
     // Asked of a frame it empties while the figures are added up, so it keeps a
     // steady height rather than flickering on every step.
     expect(sections.find((s) => s.id === 'namespace-time')?.height).toBe('sm');
+    // The user has not walked the stack, so the selection itself is active.
+    expect(
+      rendered(sections, 'callstack', 'call-stack-detail').getAttribute('activeEventIndex'),
+    ).toBe('4');
   });
 
   it('delegates a database statement to the richer database sections', async () => {
@@ -122,25 +127,29 @@ describe('buildDetailSections', () => {
     expect(
       rendered(sections, 'calltree', 'call-tree-detail').getAttribute('activeEventIndex'),
     ).toBe('2');
-  });
-
-  it('marks the selection itself active while the user has not walked the stack', async () => {
-    const sections = await buildDetailSections('timeline', { kind: 'event', eventIndex: 4 });
-
+    // The namespace split re-scopes to the frame being followed too.
     expect(
-      rendered(sections, 'callstack', 'call-stack-detail').getAttribute('activeEventIndex'),
-    ).toBe('4');
+      rendered(sections, 'namespace-time', 'namespace-time-bar').getAttribute('eventIndex'),
+    ).toBe('2');
   });
 
-  it('keeps the shared trio for a database selection that has no statement type', async () => {
-    databaseCalls.length = 0;
-    const sections = await buildDetailSections('database', { kind: 'event', eventIndex: 9 });
+  // A database row with no statement type keeps the shared trio, and only the
+  // timeline gets the namespace split.
+  it.each([
+    ['a database selection that has no statement type', 'database'],
+    ['a call tree selection', 'calltree'],
+  ] as const)(
+    'keeps the shared trio, without the namespace split, for %s',
+    async (_name, source) => {
+      databaseCalls.length = 0;
+      const sections = await buildDetailSections(source, { kind: 'event', eventIndex: 9 });
 
-    expect(databaseCalls).toEqual([]);
-    expect(sections.map((s) => s.id)).toEqual(['vitals', 'variables', 'callstack', 'calltree']);
-  });
+      expect(databaseCalls).toEqual([]);
+      expect(sections.map((s) => s.id)).toEqual(['vitals', 'variables', 'callstack', 'calltree']);
+    },
+  );
 
-  it('scopes an aggregate selection to its first occurrence', async () => {
+  it('scopes an aggregate selection, its findings and its Variables to every occurrence', async () => {
     const sections = await buildDetailSections('analysis', {
       kind: 'aggregate',
       instances: [11, 12, 13],
@@ -157,6 +166,20 @@ describe('buildDetailSections', () => {
       (rendered(sections, 'vitals', 'event-vitals') as HTMLElement & { instances: number[] | null })
         .instances,
     ).toEqual([11, 12, 13]);
+    // Where the row sits at the calls' own depth, Variables reads the calls themselves.
+    expect(
+      (
+        rendered(sections, 'variables', 'variables-detail') as HTMLElement & {
+          frames: number[] | null;
+        }
+      ).frames,
+    ).toEqual([11, 12, 13]);
+    const findings = rendered(sections, 'findings', 'log-diagnostics') as HTMLElement & {
+      instances: number[] | null;
+    };
+    expect(findings.instances).toEqual([11, 12, 13]);
+    // The verdict reads beside the tree rather than being crowded by it.
+    expect(sections.find((s) => s.id === 'findings')?.weight).toBe(3);
   });
 
   // A bottom-up caller row counts its callee's calls, so reading variables from
@@ -177,37 +200,6 @@ describe('buildDetailSections', () => {
     ).toEqual([4, 5, 6]);
   });
 
-  it('gives Variables the calls themselves where the row sits at their depth', async () => {
-    const sections = await buildDetailSections('analysis', {
-      kind: 'aggregate',
-      instances: [11, 12, 13],
-      frames: [11, 12, 13],
-    });
-
-    expect(
-      (
-        rendered(sections, 'variables', 'variables-detail') as HTMLElement & {
-          frames: number[] | null;
-        }
-      ).frames,
-    ).toEqual([11, 12, 13]);
-  });
-
-  it('asks the findings which of them name the selection', async () => {
-    const sections = await buildDetailSections('analysis', {
-      kind: 'aggregate',
-      instances: [11, 12, 13],
-      frames: [11, 12, 13],
-    });
-
-    const findings = rendered(sections, 'findings', 'log-diagnostics') as HTMLElement & {
-      instances: number[] | null;
-    };
-    expect(findings.instances).toEqual([11, 12, 13]);
-    // The verdict reads beside the tree rather than being crowded by it.
-    expect(sections.find((s) => s.id === 'findings')?.weight).toBe(3);
-  });
-
   it('scopes the findings to the frame being followed, not the aggregate it left', async () => {
     const sections = await buildDetailSections(
       'analysis',
@@ -221,32 +213,6 @@ describe('buildDetailSections', () => {
     expect(findings.instances).toEqual([8]);
   });
 
-  it('leaves the findings out for a selection from another tab', async () => {
-    const sections = await buildDetailSections('timeline', { kind: 'event', eventIndex: 4 });
-    expect(sections.map((s) => s.id)).toEqual([
-      'vitals',
-      'variables',
-      'namespace-time',
-      'callstack',
-      'calltree',
-    ]);
-  });
-
-  it('re-scopes the namespace split to the frame being followed', async () => {
-    const sections = await buildDetailSections(
-      'timeline',
-      { kind: 'event', eventIndex: 4 },
-      {
-        kind: 'event',
-        eventIndex: 2,
-      },
-    );
-
-    expect(
-      rendered(sections, 'namespace-time', 'namespace-time-bar').getAttribute('eventIndex'),
-    ).toBe('2');
-  });
-
   it('scopes the namespace split to every occurrence of an aggregate', async () => {
     const sections = await buildDetailSections('timeline', {
       kind: 'aggregate',
@@ -258,11 +224,6 @@ describe('buildDetailSections', () => {
       instances: number[] | null;
     };
     expect(bar.instances).toEqual([11, 12, 13]);
-  });
-
-  it('leaves the namespace split out for a selection from another tab', async () => {
-    const sections = await buildDetailSections('calltree', { kind: 'event', eventIndex: 4 });
-    expect(sections.map((s) => s.id)).toEqual(['vitals', 'variables', 'callstack', 'calltree']);
   });
 
   it('drops the aggregate once a single frame in its stack is the one being followed', async () => {
