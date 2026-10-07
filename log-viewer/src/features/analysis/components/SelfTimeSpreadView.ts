@@ -2,6 +2,7 @@
  * Copyright (c) 2026 Certinia Inc. All rights reserved.
  */
 import { consume } from '@lit/context';
+import { initialState, Task, TaskStatus } from '@lit/task';
 import { LitElement, css, html, type PropertyValues, type TemplateResult } from 'lit';
 import { customElement, property, state } from 'lit/decorators.js';
 import { styleMap } from 'lit/directives/style-map.js';
@@ -20,7 +21,7 @@ import {
   CONCENTRATION_PERCENT,
   binAt,
   binRange,
-  getSelfTimeSpread,
+  selfTimeSpread,
   type SingleRow,
   type SpreadRow,
 } from '../services/SelfTimeSpread.js';
@@ -49,6 +50,11 @@ export class SelfTimeSpreadView extends LitElement {
 
   /** The bin under the pointer, so the lane names what it is showing. */
   @state() private _hovered: { eventIndex: number; bin: number } | null = null;
+
+  private readonly _spread = new Task(this, {
+    task: ([store]) => store?.derive(selfTimeSpread) ?? initialState,
+    args: () => [this.logStore],
+  });
 
   /**
    * A lane is a histogram of one signature's calls: the bins run from no self
@@ -126,11 +132,12 @@ export class SelfTimeSpreadView extends LitElement {
   }
 
   render() {
-    const log = this.logStore?.log;
-    const spread = log && getSelfTimeSpread(log);
+    const { status, value } = this._spread;
+    const spread = status === TaskStatus.COMPLETE ? value : undefined;
     if (!spread?.concentration) {
       return html`<section-skeleton
         shape="chart"
+        ?pending=${status === TaskStatus.PENDING}
         fallback=${NO_TIMED_CALLS_TEXT}
       ></section-skeleton>`;
     }

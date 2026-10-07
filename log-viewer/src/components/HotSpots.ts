@@ -2,6 +2,7 @@
  * Copyright (c) 2026 Certinia Inc. All rights reserved.
  */
 import { consume } from '@lit/context';
+import { initialState, Task, TaskStatus } from '@lit/task';
 import { LitElement, html } from 'lit';
 import { customElement, property } from 'lit/decorators.js';
 import { styleMap } from 'lit/directives/style-map.js';
@@ -10,7 +11,7 @@ import { logContext } from '../core/log/logContext.js';
 import type { LogStore } from '../core/log/LogStore.js';
 import { formatDuration, sharePercent } from '../core/utility/Util.js';
 import {
-  getExecutionHighlights,
+  executionHighlights,
   type HotSpotRow,
 } from '../features/call-tree/utils/ExecutionHighlights.js';
 import { globalStyles } from '../styles/global.styles.js';
@@ -37,14 +38,20 @@ export class HotSpots extends LitElement {
 
   private readonly _palette = new CategoryPaletteController(this);
 
+  private readonly _highlights = new Task(this, {
+    task: ([store]) => store?.derive(executionHighlights) ?? initialState,
+    args: () => [this.logStore],
+  });
+
   static styles = [globalStyles, inspectorSectionStyles, revealRowStyles];
 
   render() {
-    const log = this.logStore?.log;
-    const highlights = log && getExecutionHighlights(log);
-    if (!highlights || !highlights.hotSpots.length) {
+    const { status, value } = this._highlights;
+    const highlights = status === TaskStatus.COMPLETE ? value : undefined;
+    if (!highlights?.hotSpots.length) {
       return html`<section-skeleton
         shape="rows"
+        ?pending=${status === TaskStatus.PENDING}
         fallback=${NO_TIMED_CALLS_TEXT}
       ></section-skeleton>`;
     }
