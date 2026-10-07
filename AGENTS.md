@@ -35,10 +35,6 @@ Always use pnpm.
 `code-insiders --profile lana-dev $PWD/sample-app --extensionDevelopmentPath=$PWD/lana`, use the
 CLI of the launched editor, `code-insiders` or `code`
 
-**Compilers** — `typecheck` = native TS7 (`tsc`). `lana-docs/` alone keeps the
-`@typescript/typescript6` alias and `tsc6`: `@docusaurus/tsconfig` sets `baseUrl`, which TS7
-removed.
-
 ## Core principles
 
 - **Type safety** — strict TypeScript, no `any` (use `unknown` + justification if unavoidable).
