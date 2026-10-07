@@ -11,6 +11,7 @@
     "@apexdevtools/apex-log-parser": "0.2.0",
     "@apexdevtools/apex-parser": "5.2.0",
     "@lit/context": "^1.1.6",
+    "@lit/task": "^1.0.3",
     "@vscode-elements/elements": "^2.5.1",
     "@vscode/codicons": "^0.0.45",
     "lit": "^3.3.3",

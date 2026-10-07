@@ -1,8 +1,9 @@
 /*
  * Copyright (c) 2026 Certinia Inc. All rights reserved.
  */
-import { parse, type ApexLog, LOG_LEVEL } from '@apexdevtools/apex-log-parser';
+import { parse, type ApexLog, type LogEvent, LOG_LEVEL } from '@apexdevtools/apex-log-parser';
 
+import { buildLogIndex, type LogIndex } from '../../core/log/LogIndex.js';
 import { logStoreFor, type LogStore } from '../../core/log/LogStore.js';
 
 /**
@@ -66,4 +67,18 @@ export function indexesOf(log: ApexLog, text: string): number[] {
   return log.eventsById
     .filter((event) => event.isParent && event.text === text)
     .map((event) => event.eventIndex);
+}
+
+/** The index of a tree a test lays out by hand, its events numbered and listed as the parser does. */
+export function indexTree(root: ApexLog): LogIndex {
+  const events: LogEvent[] = [];
+  const stack: LogEvent[] = [root];
+  while (stack.length) {
+    const event = stack.pop()!; // non-empty: the loop condition just checked
+    events.push(event);
+    stack.push(...event.children.toReversed());
+  }
+  events.forEach((event, eventIndex) => Object.assign(event, { eventIndex }));
+  Object.assign(root, { eventsById: events });
+  return buildLogIndex(root);
 }

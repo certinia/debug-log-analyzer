@@ -2,6 +2,7 @@
  * Copyright (c) 2026 Certinia Inc. All rights reserved.
  */
 import { consume } from '@lit/context';
+import { initialState, Task, TaskStatus } from '@lit/task';
 import { LitElement, html } from 'lit';
 import { customElement, property } from 'lit/decorators.js';
 
@@ -10,6 +11,7 @@ import type { LogStore } from '../core/log/LogStore.js';
 import { globalStyles } from '../styles/global.styles.js';
 import './SectionSkeleton.js';
 import { inspectorSectionStyles } from '../styles/inspectorSection.styles.js';
+import { selfTimeByCategory } from '../features/timeline/utils/category-self-time.js';
 import { CategoryPaletteController, categorySelfTimes } from './categoryTime.js';
 import './StackedTimeBar.js';
 
@@ -28,14 +30,19 @@ export class CategoryTimeBar extends LitElement {
   @property({ attribute: false })
   logStore: LogStore | null = null;
 
+  private readonly _slices = new Task(this, {
+    task: ([store]) => store?.derive(selfTimeByCategory).then(categorySelfTimes) ?? initialState,
+    args: () => [this.logStore],
+  });
+
   static styles = [globalStyles, inspectorSectionStyles];
 
   render() {
-    const apexLog = this.logStore?.log;
-    const slices = apexLog ? categorySelfTimes(apexLog) : [];
-    if (!slices.length) {
+    const slices = this._slices.status === TaskStatus.COMPLETE ? this._slices.value : undefined;
+    if (!slices?.length) {
       return html`<section-skeleton
         shape="bar"
+        ?pending=${this._slices.status === TaskStatus.PENDING}
         fallback="No categorised time was recorded in this log."
       ></section-skeleton>`;
     }
