@@ -69,29 +69,6 @@
   font-weight: 600;
 }
 
-/* The bottom fades into the page so the screenshot reads as a preview, not a framed image. */
-.preview {
-  position: relative;
-  margin: 3rem 0 0;
-}
-
-.preview::after {
-  content: '';
-  position: absolute;
-  inset: 0;
-  background: linear-gradient(to bottom, transparent 70%, var(--ifm-background-color));
-  pointer-events: none;
-}
-
-.preview img {
-  display: block;
-  width: 100%;
-  height: auto;
-  border: 1px solid var(--lana-rule);
-  border-bottom: 0;
-  border-radius: 10px 10px 0 0;
-}
-
 @media (max-width: 996px) {
   .intro {
     grid-template-columns: 1fr;
