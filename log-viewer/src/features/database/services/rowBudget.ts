@@ -1,11 +1,11 @@
 /*
  * Copyright (c) 2026 Certinia Inc. All rights reserved.
  */
-import type { ApexLog } from '@apexdevtools/apex-log-parser';
+import type { ApexLog, Limits } from '@apexdevtools/apex-log-parser';
 
 import { limitTotals } from '../../../components/logOverviewMetrics.js';
 import type { Derivation } from '../../../core/log/LogStore.js';
-import { apexLimitTimeSeries } from '../../timeline/optimised/apex-limit-series.js';
+import { apexLimitSeries } from '../../timeline/optimised/apex-limit-series.js';
 import { SOSL_ROWS_PER_QUERY_LIMIT } from '../limits.js';
 import {
   databaseOverview,
@@ -75,11 +75,15 @@ export interface RowBudgets {
  * statements do not account for are reported rather than scaled away. Without a
  * cumulative snapshot there is no peak, so the observed rows answer.
  */
-export const rowBudgets: Derivation<RowBudgets> = async (_, store) =>
-  build(store.log, await store.derive(databaseOverview));
+export const rowBudgets: Derivation<RowBudgets> = async (_, store) => {
+  const [overview, series] = await Promise.all([
+    store.derive(databaseOverview),
+    store.derive(apexLimitSeries),
+  ]);
+  return build(store.log, overview, limitTotals(series));
+};
 
-function build(log: ApexLog, overview: DatabaseOverview): RowBudgets {
-  const limits = limitTotals(apexLimitTimeSeries(log));
+function build(log: ApexLog, overview: DatabaseOverview, limits: Limits): RowBudgets {
   const hasLimits = log.governorLimits.snapshots.length > 0;
 
   const soql = new Map<string, RowGroup>();

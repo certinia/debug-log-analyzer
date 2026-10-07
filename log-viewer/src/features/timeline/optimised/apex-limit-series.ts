@@ -10,15 +10,17 @@
  * HeatStripTimeSeries this module produces.
  */
 
-import type {
-  ApexLog,
-  HeapAllocateLine,
-  LimitUsageLine,
-  LogEvent,
-  LimitMetricUnit,
-  Limits,
+import {
+  type HeapAllocateLine,
+  LOG_CATEGORY,
+  type LimitUsageLine,
+  type LimitMetricUnit,
+  type Limits,
 } from '@apexdevtools/apex-log-parser';
+import { UNCATEGORISED } from '../../../core/log/LogIndex.js';
+import type { Derivation } from '../../../core/log/LogStore.js';
 import { GOVERNOR_METRICS } from '../../../core/metrics/governorMetrics.js';
+import { CHECK_EVERY, frameBudget } from '../../../core/utility/FrameBudget.js';
 import type { HeatStripMetric, HeatStripTimeSeries } from '../types/flamechart.types.js';
 import { extractMarkers, noDataSpans } from '../utils/marker-utils.js';
 import {
@@ -38,37 +40,18 @@ const APEX_METRICS: Map<keyof Limits, HeatStripMetric> = new Map(
     ]),
 );
 
-/** Memo of {@link buildApexLimitTimeSeries} per log: the walk visits the full event
- *  tree, and the series feeds two surfaces — the metric strip and the inspector's
- *  governor trend charts — which must chart the same figures. */
-const seriesCache = new WeakMap<ApexLog, HeatStripTimeSeries>();
-
 /**
- * The log's governor-limit time series, built once per log (see
- * {@link buildApexLimitTimeSeries}) and shared by every consumer.
- */
-export function apexLimitTimeSeries(apexLog: ApexLog): HeatStripTimeSeries {
-  let series = seriesCache.get(apexLog);
-  if (!series) {
-    series = buildApexLimitTimeSeries(apexLog);
-    seriesCache.set(apexLog, series);
-  }
-  return series;
-}
-
-/**
- * Build the dense governor-limit time series for the metric strip.
+ * The dense governor-limit time series for the metric strip, built once per log
+ * and shared by every surface that charts it.
  *
  * Combines two sources into one stream of observations and folds them (see
  * governor-timeline.ts): cumulative `LIMIT_USAGE_FOR_NS` snapshots act as multi-metric
  * correctives, while detailed log events (SOQL/DML/SOSL/callout/heap and the single-line
  * `LIMIT_USAGE` / flow `*_LIMIT_USAGE` reports) add intermediate data points so the line
  * rises as usage happens rather than only at code-unit boundaries.
- *
- * @param apexLog - Parsed log providing cumulative snapshots, the limits they report and the
- * event tree, which is walked in full for granular deltas.
  */
-function buildApexLimitTimeSeries(apexLog: ApexLog): HeatStripTimeSeries {
+export const apexLimitSeries: Derivation<HeatStripTimeSeries> = async (index, store) => {
+  const apexLog = store.log;
   const metrics = new Map<string, HeatStripMetric>();
   for (const [key, metric] of APEX_METRICS) {
     metrics.set(key, metric);
@@ -105,6 +88,12 @@ function buildApexLimitTimeSeries(apexLog: ApexLog): HeatStripTimeSeries {
     }
   }
 
+  const { categoryId, rowCount, subtreeEnd } = index;
+  const granular: { observation: GranularObservation; end: number }[] = [];
+  let row = 0;
+  const observe = (observation: GranularObservation): void => {
+    granular.push({ observation, end: subtreeEnd[row]! }); // in range: `row` is a row of `index`
+  };
   const pushDelta = (
     timestamp: number,
     namespace: string,
@@ -112,24 +101,29 @@ function buildApexLimitTimeSeries(apexLog: ApexLog): HeatStripTimeSeries {
     delta: number,
   ): void => {
     if (delta) {
-      observations.push({ kind: 'delta', timestamp, namespace, metric, delta });
+      observe({ kind: 'delta', timestamp, namespace, metric, delta });
     }
   };
 
-  // Detailed events — granular deltas and finer-grained absolute reports. Walk the FULL tree:
-  // apexLog.children holds only top-level nodes, but SOQL/DML/heap events live deep in the call
-  // tree. Iterative DFS avoids stack overflow on large logs. Counts are read from the parser's
-  // per-event counters, each from its canonical owner event to avoid double-counting.
-  const stack: LogEvent[] = [...apexLog.children];
-  while (stack.length > 0) {
-    const event = stack.pop()!;
-    const children = event.children;
-    if (children) {
-      for (let i = 0; i < children.length; i++) {
-        stack.push(children[i]!);
-      }
+  // Each count is read once, from the event that owns it, so none is counted twice.
+  const tick = frameBudget({});
+  const soqlId = index.categoryNames.indexOf(LOG_CATEGORY.SOQL);
+  const dmlId = index.categoryNames.indexOf(LOG_CATEGORY.DML);
+  const calloutId = index.categoryNames.indexOf(LOG_CATEGORY.Callout);
+  for (row = 0; row < rowCount; row++) {
+    if (row % CHECK_EVERY === 0) {
+      await tick();
     }
-
+    const category = categoryId[row];
+    if (
+      category !== UNCATEGORISED &&
+      category !== soqlId &&
+      category !== dmlId &&
+      category !== calloutId
+    ) {
+      continue;
+    }
+    const event = index.event(row);
     const timestamp = event.timestamp;
     const namespace = event.namespace || 'default';
     switch (event.type) {
@@ -170,7 +164,7 @@ function buildApexLimitTimeSeries(apexLog: ApexLog): HeatStripTimeSeries {
           // These lines report a block's usage, but the limit they name is the transaction's, and
           // some logs carry them with no cumulative block at all.
           reportLimit(usage.metric, usage.limit);
-          observations.push({
+          observe({
             kind: 'absolute',
             timestamp,
             namespace,
@@ -187,10 +181,16 @@ function buildApexLimitTimeSeries(apexLog: ApexLog): HeatStripTimeSeries {
     }
   }
 
+  // Ties in time keep the order a last-child-first walk meets them in; the sort is stable.
+  granular.sort((a, b) => a.observation.timestamp - b.observation.timestamp || b.end - a.end);
+  for (const { observation } of granular) {
+    observations.push(observation);
+  }
+
   return {
-    ...buildGovernorTimeSeries(observations, metrics, metricLimits),
+    ...(await buildGovernorTimeSeries(observations, metrics, metricLimits, tick)),
     // On the series itself, not added by the Timeline alone: every surface drawing it has to
     // leave the spans the log recorded nothing in blank.
     gaps: noDataSpans(extractMarkers(apexLog)),
   };
-}
+};

@@ -29,6 +29,7 @@
  * cumulative snapshot still counted).
  */
 
+import { CHECK_EVERY, type Tick } from '../../../../core/utility/FrameBudget.js';
 import type {
   HeatStripEvent,
   HeatStripMetric,
@@ -78,6 +79,8 @@ interface MetricState {
 const displayedOf = (s: MetricState): number =>
   Math.min(s.baseline + (s.tracked - s.trackedAtBaseline), s.cap);
 
+const noTick: Tick = () => Promise.resolve(true);
+
 /** Target max emitted points per metric per namespace (drives the delta-coalescing threshold). */
 const POINT_BUDGET = 500;
 
@@ -97,14 +100,19 @@ function sortByTime(observations: LimitObservation[]): LimitObservation[] {
  * and sizing from that churn would set a threshold the curve never crosses, leaving a metric with a
  * handful of points instead of a shape. Observations must be time-sorted.
  */
-function coalescingThresholds(
+async function coalescingThresholds(
   sorted: LimitObservation[],
   limits: Map<string, number>,
-): Map<string, number> {
+  tick: Tick,
+): Promise<Map<string, number>> {
   const scales = new Map<string, number>(limits);
   // One entry per unlimited metric, mutated in place: this walks every heap allocation in the log.
   const levels = new Map<string, { running: number; peak: number }>();
-  for (const obs of sorted) {
+  for (let at = 0; at < sorted.length; at++) {
+    if (at % CHECK_EVERY === 0) {
+      await tick();
+    }
+    const obs = sorted[at]!; // in range: the loop condition just checked
     if (obs.kind === 'delta' && (limits.get(obs.metric) ?? 0) <= 0) {
       let level = levels.get(obs.metric);
       if (!level) {
@@ -133,11 +141,12 @@ function coalescingThresholds(
  * at end of stream. Counts (small scales → threshold 1) stay per-event; rows/heap coalesce. Absolutes
  * pass through untouched. Input must be time-sorted; output is re-sorted (the flush order can differ).
  */
-function coalesceDeltas(
+async function coalesceDeltas(
   sorted: LimitObservation[],
   limits: Map<string, number>,
-): LimitObservation[] {
-  const thresholds = coalescingThresholds(sorted, limits);
+  tick: Tick,
+): Promise<LimitObservation[]> {
+  const thresholds = await coalescingThresholds(sorted, limits, tick);
   const out: LimitObservation[] = [];
   // namespace -> metric -> accumulated delta + latest timestamp
   const pending = new Map<string, Map<string, { sum: number; ts: number }>>();
@@ -152,7 +161,11 @@ function coalesceDeltas(
     }
   };
 
-  for (const obs of sorted) {
+  for (let at = 0; at < sorted.length; at++) {
+    if (at % CHECK_EVERY === 0) {
+      await tick();
+    }
+    const obs = sorted[at]!; // in range: the loop condition just checked
     if (obs.kind === 'delta') {
       const threshold = thresholds.get(obs.metric) ?? 1;
       let byMetric = pending.get(obs.namespace);
@@ -214,19 +227,21 @@ function reportedCaps(observations: LimitObservation[]): Map<string, Map<string,
  *   caller from the cumulative snapshots so the total never changes across the series. A metric the
  *   log reported no limit for is emitted with `limit: 0`; its consumers scale it by its own peak
  *   instead. Nothing here substitutes a limit the log did not give.
+ * @param tick - Hands the thread back between slices of observations; never, by default.
  */
-export function buildGovernorTimeSeries(
+export async function buildGovernorTimeSeries(
   observations: LimitObservation[],
   metrics: Map<string, HeatStripMetric>,
   limits: Map<string, number>,
-): HeatStripTimeSeries {
+  tick: Tick = noTick,
+): Promise<HeatStripTimeSeries> {
   if (observations.length === 0) {
     return { metrics, events: [] };
   }
 
   // Stable sort by timestamp, then coalesce high-frequency deltas so one point isn't emitted per
   // heap allocation on huge logs (bounds points to ~POINT_BUDGET per metric per namespace).
-  const sorted = coalesceDeltas(sortByTime(observations), limits);
+  const sorted = await coalesceDeltas(sortByTime(observations), limits, tick);
 
   const caps = reportedCaps(sorted);
 
@@ -258,6 +273,9 @@ export function buildGovernorTimeSeries(
     const timestamp = sorted[idx]!.timestamp;
     // Apply every observation sharing this timestamp before emitting a point.
     while (idx < sorted.length && sorted[idx]!.timestamp === timestamp) {
+      if (idx % CHECK_EVERY === 0) {
+        await tick();
+      }
       const obs = sorted[idx]!;
       const s = getState(obs.namespace, obs.metric);
       if (obs.kind === 'delta') {

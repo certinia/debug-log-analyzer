@@ -37,7 +37,7 @@ const USAGE = 'usage: pnpm measure [area...] [--log <path>] [--digest]';
 interface Area {
   run(log: ApexLog): Promise<void>;
   /** Prints a CSV of what the area would draw. Absent where timings are all there is. */
-  digest?(log: ApexLog): void;
+  digest?(log: ApexLog): void | Promise<void>;
 }
 
 const AREAS: Record<string, Area> = {
@@ -97,7 +97,7 @@ const log = digest ? parse(text) : await time('parse', () => parse(text));
 for (const name of names) {
   const area = AREAS[name]!;
   if (digest && area.digest) {
-    area.digest(log);
+    await area.digest(log);
     continue;
   }
   console.log(`\n--- ${name} ---`);

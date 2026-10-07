@@ -10,8 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 
 - ⚡ **Timeline**: a 100 MB log opens 3× faster with 47% less memory, and its minimap builds 3.3× faster.
-- ⚡ **Call Tree**: redraws are up to 80 ms faster on large logs.
-- ⚡ **Inspector**: several sections appear faster, up to 80× faster on large logs. ([#63])
+- ⚡ **UI**: many components, including the tab views and Inspector sections, appear up to 80× faster on large logs. ([#63])
 - ✂️ **Truncation**: each skipped section states how much of the log it dropped.
 - 🌊 **Flows**: names drop the `FLOW_START_INTERVIEWS :` and `WF_CRITERIA :` prefixes.
 - 📚 **Multiple logs**: a file holding several logs shows the first and flags the rest.

@@ -6,6 +6,9 @@
 import { beforeEach, describe, expect, it } from '@jest/globals';
 import type { LitElement } from 'lit';
 
+import type { ApexLog } from '@apexdevtools/apex-log-parser';
+
+import { stubStore } from '#test-helpers/apexLog.js';
 import { eventBus } from '../../core/events/EventBus.js';
 import type { LogStore } from '../../core/log/LogStore.js';
 import type { NoDataSpan } from '../../features/timeline/types/flamechart.types.js';
@@ -19,7 +22,7 @@ jest.mock('../governorTrendData.js', () => ({
   governorTrendSeries: () => series,
 }));
 jest.mock('../../features/timeline/optimised/apex-limit-series.js', () => ({
-  apexLimitTimeSeries: () => ({ events: [] }),
+  apexLimitSeries: () => ({ events: [] }),
 }));
 
 import '../GovernorTrends.js';
@@ -43,13 +46,15 @@ const trend = (label = 'SOQL queries', gaps: NoDataSpan[] = []): TrendSeries => 
 // The Timeline draws 0 to `exitStamp`, so the charts measure by that. `duration.total` starts at
 // the first event instead, and is set apart here so a chart cannot pass on the wrong one.
 const aLog = () =>
-  ({ log: { exitStamp: LOG_NS, duration: { total: LOG_NS - 200 } } }) as unknown as LogStore;
+  stubStore({ exitStamp: LOG_NS, duration: { total: LOG_NS - 200 } } as unknown as ApexLog);
 
 async function mount(): Promise<LitElement> {
   const element = document.createElement('governor-trends');
   // No provider in the test, so the consumed store is assigned straight on.
   (element as unknown as { logStore: LogStore }).logStore = aLog();
   document.body.append(element);
+  await element.updateComplete;
+  // The derived value lands a microtask after the render that asks for it.
   await element.updateComplete;
   return element;
 }
@@ -263,6 +268,8 @@ describe('governor-trends', () => {
 
     press(chartOf(element), 'ArrowRight');
     (element as unknown as { logStore: LogStore }).logStore = aLog();
+    // The new log's series lands some microtasks after its render; a task outlasts them.
+    await new Promise((resolve) => setTimeout(resolve));
     await element.updateComplete;
     press(chartOf(element), 'Enter');
 

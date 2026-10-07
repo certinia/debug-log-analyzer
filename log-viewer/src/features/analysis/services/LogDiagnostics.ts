@@ -18,7 +18,7 @@ import { signatureTimes, type SignatureTimes } from '../../../core/log/signature
 import { outermostEvents } from '../../../core/utility/EventTree.js';
 import { deriveSoqlObject } from '../../database/services/sobjectClassification.js';
 import type { Dialect } from '../../soql/format/tokenize.js';
-import { apexLimitTimeSeries } from '../../timeline/optimised/apex-limit-series.js';
+import { apexLimitSeries } from '../../timeline/optimised/apex-limit-series.js';
 import {
   QueryPlanCostRule,
   SEVERITY_TYPES,
@@ -851,9 +851,10 @@ async function analyse(store: LogStore): Promise<LogDiagnostics> {
 
   const plans = queryPlanDiagnostics(queries);
   // Together, so the key pass's slices run beside the lint's.
-  const [lint, times] = await Promise.all([
+  const [lint, times, series] = await Promise.all([
     soqlLintDiagnostics(store, queries),
     store.derive(signatureTimes),
+    store.derive(apexLimitSeries),
   ]);
   // A `LimitException` belongs to its governor metric, not to the exception list.
   const isLimit = (event: LogEvent) => event.text.includes('System.LimitException');
@@ -863,7 +864,7 @@ async function analyse(store: LogStore): Promise<LogDiagnostics> {
     // The caveat leads: it says every figure under it may be an undercount.
     ...truncationDiagnostics(log),
     ...[
-      ...limitDiagnostics(limitTotals(apexLimitTimeSeries(log)), limitExceptions, hotSpot(times)),
+      ...limitDiagnostics(limitTotals(series), limitExceptions, hotSpot(times)),
       ...logIssueDiagnostics(log),
       ...exceptionDiagnostics(others),
       ...plans.diagnostics,
