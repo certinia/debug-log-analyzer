@@ -67,12 +67,14 @@ jobs:
           - name: Release Dependencies
             working-directory: release
             run: pnpm install --frozen-lockfile --prefer-offline --ignore-scripts
+      # Not beside Dependencies: pnpm exec needs node_modules to find playwright.
+      - parallel:
           - name: Install Chromium
             run: pnpm exec playwright install --only-shell chromium
-      # build:prod is newer than some releases; build:dev with NODE_ENV works on every one.
-      - name: Build Release Log Viewer
-        working-directory: release
-        run: NODE_ENV=production pnpm run build:dev
+          # build:prod is newer than some releases; build:dev with NODE_ENV works on every one.
+          - name: Build Release Log Viewer
+            working-directory: release
+            run: NODE_ENV=production pnpm run build:dev
       - name: Build Site
         env:
           DEMO_VIEWER_ROOT: ${{ github.workspace }}/release
