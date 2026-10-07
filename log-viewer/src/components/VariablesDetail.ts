@@ -18,7 +18,7 @@ import {
 import {
   frameVariablesFor,
   recordsVariables,
-  variableIndexFor,
+  variableIndex,
   type FrameVariables,
   type VariableIndex,
 } from '../core/log/frameVariables.js';
@@ -488,22 +488,21 @@ export class VariablesDetail extends LitElement {
     `;
   }
 
-  /** Builds the index, which is the only walk of the whole log. */
   private async _read(): Promise<void> {
-    const log = this.logStore?.log;
-    if (!log || !recordsVariables(log)) {
+    const store = this.logStore;
+    if (!store || !recordsVariables(store.log)) {
       return;
     }
     try {
-      const index = await variableIndexFor(log);
-      // The log may have changed while the walk ran.
-      if (this.logStore?.log === log) {
+      const index = await store.derive(variableIndex);
+      // The log may have changed while the index was built.
+      if (this.logStore === store) {
         this._index = index;
       }
     } catch {
       // Left "Reading the log…" forever otherwise, with no error shown and no
       // way to retry.
-      if (this.logStore?.log === log) {
+      if (this.logStore === store) {
         this._readError = true;
       }
     }
