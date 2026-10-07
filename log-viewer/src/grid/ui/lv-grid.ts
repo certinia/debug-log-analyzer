@@ -1,7 +1,14 @@
 /*
  * Copyright (c) 2026 Certinia Inc. All rights reserved.
  */
-import { html, LitElement, nothing, type PropertyValues, type TemplateResult } from 'lit';
+import {
+  html,
+  LitElement,
+  nothing,
+  type CSSResultGroup,
+  type PropertyValues,
+  type TemplateResult,
+} from 'lit';
 import { customElement, property } from 'lit/decorators.js';
 import { createRef, ref } from 'lit/directives/ref.js';
 import { styleMap } from 'lit/directives/style-map.js';
@@ -119,7 +126,7 @@ function naturalWidth(cell: HTMLElement): number {
  */
 @customElement('lv-grid')
 export class LvGrid<R extends object = object> extends LitElement {
-  static styles = gridStyles;
+  static styles: CSSResultGroup = gridStyles;
 
   @property({ attribute: false })
   source: TreeSource<R> | null = null;

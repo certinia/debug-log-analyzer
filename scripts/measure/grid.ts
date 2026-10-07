@@ -13,6 +13,7 @@ import {
   toBottomUpTree,
   type BottomUpRow,
 } from '../../log-viewer/src/features/call-tree/utils/Aggregation.js';
+import { outermostSum } from '../../log-viewer/src/features/call-tree/grid/calcs.js';
 import {
   toTimeOrderTree,
   type TimeOrderRow,
@@ -175,32 +176,6 @@ async function measureTimeOrder(log: ApexLog): Promise<void> {
   await heldHeap(store, base);
 }
 
-/**
- * `sumDurationTotalForRootEvents` in slices. Run in one go it holds the thread for up to
- * 330ms at 580k rows. Step 8 moves this into the Bottom-Up adapter.
- */
-function* outermostTotal(rows: readonly BottomUpRow[]): Generator<void, number, void> {
-  const all = new Set<LogEvent>();
-  for (const row of rows) {
-    for (const event of row.instances) {
-      all.add(event);
-      yield;
-    }
-  }
-  let total = 0;
-  for (const event of all) {
-    let enclosed = false;
-    for (let parent = event.parent; parent && !enclosed; parent = parent.parent) {
-      enclosed = all.has(parent);
-    }
-    if (!enclosed) {
-      total += event.duration.total;
-    }
-    yield;
-  }
-  return total;
-}
-
 /** Grouping, with the footer and group totals the Bottom-Up tab shows. */
 async function measureBottomUp(log: ApexLog): Promise<void> {
   const roots = toBottomUpTree(log.children, new LogStore(log).keyPathIds(), log.governorLimits);
@@ -208,7 +183,7 @@ async function measureBottomUp(log: ApexLog): Promise<void> {
   const step = stepper(scheduler, () => store.snapshot().rows.size);
   const calcs: Calcs<BottomUpRow> = {
     totalSelfTime: sum((r) => r.totalSelfTime),
-    totalTime: { of: outermostTotal },
+    totalTime: outermostSum((e) => e.duration.total),
   };
   const bySelf = sortComparator<BottomUpRow>({ value: (r) => r.totalSelfTime }, 'desc');
   const groupsBySelf = sortComparator<Group<BottomUpRow>>(
