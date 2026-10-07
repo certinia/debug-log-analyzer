@@ -40,7 +40,6 @@ jest.mock('../detailSections.js', () => ({
     selection: { eventIndex?: number } | null,
     active: { kind: string; eventIndex?: number; instances?: number[] } | null,
     sourceView?: string,
-    _window: unknown = null,
     hidden: ReadonlySet<string> = new Set(),
   ) => {
     builtHiding.push([...hidden]);

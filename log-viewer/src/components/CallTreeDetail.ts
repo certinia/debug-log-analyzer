@@ -15,6 +15,7 @@ import {
 import { eventBus, type DetailSource, type SelectionView } from '../core/events/EventBus.js';
 import { logContext } from '../core/log/logContext.js';
 import type { LogStore } from '../core/log/LogStore.js';
+import { RangeScopeController, sameWindow, type TimeWindow } from '../core/log/rangeScope.js';
 import { formatDuration, formatInteger } from '../core/utility/Util.js';
 import {
   commonColumnDefaults,
@@ -49,6 +50,7 @@ import {
   locatableEventIndexes,
   revealableEventIndex,
   rowIdsByPath,
+  type LiveWindow,
   type ScopedCallTree,
   type ScopedRow,
 } from './scopedCallTree.js';
@@ -73,6 +75,21 @@ function picksFor(store: LogStore): Map<DetailSource | undefined, ViewMode> {
     pickedViewMode.set(store, picks);
   }
   return picks;
+}
+
+interface TableSlot {
+  table: Tabulator;
+  stale: boolean;
+  /** The data the table was filled with. Never read it back with `getData()`:
+   *  that runs Tabulator's accessors, which deep-clone the row data, and our rows
+   *  hold the parsed log. */
+  rows: ScopedRow[];
+  // Rows with cells built since the window last moved.
+  drawn: Set<RowComponent>;
+  readAt: TimeWindow | null;
+  // True once the rows can follow a window without reading ahead first.
+  prepared: boolean;
+  preparing: AbortController | null;
 }
 
 /**
@@ -146,13 +163,7 @@ export class CallTreeDetail extends LitElement {
 
   /** A built table. `stale` means it holds a previous selection's rows, so it
    *  needs re-filling before it is shown again. */
-  private _tables: Record<
-    ViewMode,
-    /** `rows` is the data the table was filled with. Never read it back with
-     *  `getData()`: that runs Tabulator's accessors, which deep-clone the row
-     *  data, and our rows hold the parsed log. */
-    { table: Tabulator; stale: boolean; rows: ScopedRow[] } | null
-  > = {
+  private _tables: Record<ViewMode, TableSlot | null> = {
     'time-order': null,
     aggregated: null,
     'bottom-up': null,
@@ -174,10 +185,16 @@ export class CallTreeDetail extends LitElement {
   /** The scope's own call count, read by the Calls total. Retargeted per
    *  selection for the same reason `_barParams` is. */
   private _scopeCalls = 0;
+  // Set while the whole-log tree follows a window: summing the rows would read every one into it.
+  private _scopeSelf: number | null = null;
 
   // The scoped tree (all three representations) for the current eventIndex,
   // computed once per selection and shared across the mode tables.
   private _scoped: ScopedCallTree | null = null;
+
+  // The whole-log tree follows the Timeline's window every frame; a selection's tree never does.
+  private readonly _range = new RangeScopeController(this, () => this.wholeLog);
+  private _live: LiveWindow | null = null;
 
   // The build in flight; a newer view-switch aborts it, and so does a disconnect.
   private _switch: AbortController | null = null;
@@ -371,10 +388,80 @@ export class CallTreeDetail extends LitElement {
     }
     if (scopeChanged || changed.has('viewMode')) {
       void this._showActive();
-    } else if (changed.has('activeEventIndex')) {
+      return;
+    }
+    if (changed.has('activeEventIndex')) {
       // The anchor holds, so the rows are unchanged — only the mark moves.
       this._markActive();
     }
+    if (
+      this._live &&
+      !sameWindow(this._range.window, this._tables[this.viewMode]?.readAt ?? null)
+    ) {
+      this._followWindow();
+    }
+  }
+
+  // The rows stay put, so the selection and the marks hold.
+  private _followWindow(): void {
+    const slot = this._tables[this.viewMode];
+    const live = this._live;
+    if (!live || !slot || slot.stale) {
+      return;
+    }
+    if (!slot.prepared) {
+      if (this._range.window) {
+        void this._prepare(slot);
+      }
+      // Rows never read into a window still hold the whole log's figures.
+      this._showFigures(live.figures(null));
+      return;
+    }
+    slot.readAt = this._range.window;
+    this._showFigures(live.set(slot.readAt));
+    // The renderer keeps a built row's cells, so they would show the old window.
+    for (const row of slot.drawn) {
+      // @ts-expect-error _row is private, and only it says the cells must be built again
+      row._row.initialized = false;
+    }
+    slot.drawn.clear();
+    slot.table.refreshFilter();
+    this._prepareWaiting(slot);
+  }
+
+  private _showFigures({ rootTotal, calls, self }: ReturnType<LiveWindow['figures']>): void {
+    this._barParams.totalValue = rootTotal;
+    this._scopeCalls = calls;
+    this._scopeSelf = self;
+  }
+
+  // Rows of many calls opened since the read-ahead; they follow the window once read.
+  private _prepareWaiting(slot: TableSlot): void {
+    // The read-ahead in flight refilters when it lands, which lists them again.
+    if (slot.preparing) {
+      return;
+    }
+    const rows = this._live?.waiting() ?? [];
+    if (rows.length) {
+      void this._prepare(slot, rows);
+    }
+  }
+
+  private async _prepare(slot: TableSlot, rows: readonly ScopedRow[] = slot.rows): Promise<void> {
+    const live = this._live;
+    if (!live || slot.preparing) {
+      return;
+    }
+    const preparing = new AbortController();
+    slot.preparing = preparing;
+    const ready = await live.prepare(rows, { signal: preparing.signal });
+    // A new log, a refill or a disconnect aborts it.
+    if (!ready || preparing.signal.aborted) {
+      return;
+    }
+    slot.preparing = null;
+    slot.prepared = true;
+    this._followWindow();
   }
 
   /**
@@ -420,10 +507,13 @@ export class CallTreeDetail extends LitElement {
    */
   private _invalidateScope(): void {
     this._scoped = null;
+    this._live = null;
     for (const mode of Object.keys(this._tables) as ViewMode[]) {
       const slot = this._tables[mode];
       if (slot) {
         slot.stale = true;
+        slot.preparing?.abort();
+        slot.preparing = null;
       }
       this._rowsByPath[mode] = null;
     }
@@ -443,6 +533,7 @@ export class CallTreeDetail extends LitElement {
     // Rows go with their tables, so the mark can't outlive them.
     this._locatedRow.clear();
     for (const mode of Object.keys(this._tables) as ViewMode[]) {
+      this._tables[mode]?.preparing?.abort();
       this._tables[mode]?.table.destroy();
       this._tables[mode] = null;
       this._rowsByPath[mode] = null;
@@ -465,6 +556,7 @@ export class CallTreeDetail extends LitElement {
         return null;
       }
       this._scoped = scoped;
+      this._live = scoped?.liveWindow?.() ?? null;
     }
     const scoped = this._scoped;
     if (!scoped) {
@@ -497,6 +589,8 @@ export class CallTreeDetail extends LitElement {
     const built = this._tables[mode];
     if (built && !built.stale) {
       built.table.redraw(); // re-fit the layout for the now-visible host
+      // The footer and bar figures are shared, and a read-ahead may have landed while it was hidden.
+      this._followWindow();
       return;
     }
 
@@ -519,6 +613,7 @@ export class CallTreeDetail extends LitElement {
     // Percentages are relative to the selection, so retarget the shared params
     // the formatters read rather than rebuilding the columns around a new total.
     const scoped = this._scoped;
+    this._scopeSelf = null;
     this._barParams.totalValue = scoped?.rootTotal ?? 0;
     this._scopeCalls = scoped?.calls ?? 0;
 
@@ -526,11 +621,15 @@ export class CallTreeDetail extends LitElement {
     if (slot) {
       slot.stale = false;
       slot.rows = data;
+      slot.readAt = null;
+      slot.prepared = false;
+      slot.drawn.clear();
       this._rowsByPath[mode] = null;
       void slot.table.setData(data).then(() => {
         this._markActive();
         this._markLocated();
       });
+      this._followWindow();
       return;
     }
     if (!scoped) {
@@ -544,6 +643,8 @@ export class CallTreeDetail extends LitElement {
     }
 
     registerTableModules();
+    const drawn = new Set<RowComponent>();
+    const stampRow = rowIndexStamper('id');
     const table = new Tabulator(container, {
       data,
       index: 'id',
@@ -570,7 +671,12 @@ export class CallTreeDetail extends LitElement {
       rowKeyboardNavigation: true,
       selectableRows: 'highlight',
       // Lets the hover mark find a row by one DOM query.
-      rowFormatter: rowIndexStamper('id'),
+      rowFormatter: (row: RowComponent) => {
+        stampRow(row);
+        if (this._live) {
+          drawn.add(row);
+        }
+      },
       ...clipboardCopyOptions,
       headerSortElement,
       columnDefaults: commonColumnDefaults,
@@ -632,10 +738,31 @@ export class CallTreeDetail extends LitElement {
       dispatchInspectorLocate(this, []);
     });
     table.on('tableBuilt', () => {
+      if (this._live) {
+        // admit writes the figures that the sort and footer read; Tabulator filters before both.
+        table.setFilter((row: ScopedRow) =>
+          this._live && this._tables[mode]?.prepared ? this._live.admit(row) : true,
+        );
+      }
       this._markActive();
       this._markLocated();
     });
-    this._tables[mode] = { table, stale: false, rows: data };
+    table.on('dataTreeRowExpanded', () => {
+      const slot = this._tables[mode];
+      if (slot) {
+        this._prepareWaiting(slot);
+      }
+    });
+    this._tables[mode] = {
+      table,
+      stale: false,
+      rows: data,
+      drawn,
+      readAt: null,
+      prepared: false,
+      preparing: null,
+    };
+    this._followWindow();
   }
 
   /** Row right-click menu: reveal in the Call Tree tab, or copy the frame. */
@@ -668,6 +795,7 @@ export class CallTreeDetail extends LitElement {
   private _columns(mode: ViewMode, barWidth: number): ColumnDefinition[] {
     const isTimeOrder = mode === 'time-order';
     const barParams = this._barParams;
+    const sumSelf = makeSumSelfTimeAllVisible(() => this._tables[mode]?.table);
 
     const columns: ColumnDefinition[] = [
       {
@@ -707,7 +835,7 @@ export class CallTreeDetail extends LitElement {
         field: 'duration.self',
         barWidth,
         barParams,
-        bottomCalc: makeSumSelfTimeAllVisible(() => this._tables[mode]?.table),
+        bottomCalc: (...args: Parameters<typeof sumSelf>) => this._scopeSelf ?? sumSelf(...args),
       }),
     ];
 

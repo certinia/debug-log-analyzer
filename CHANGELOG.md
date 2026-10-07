@@ -16,7 +16,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - 📚 **Multiple logs**: a file holding several logs shows the first and flags the rest.
 - 🪪 **Call tree**: the `USER_INFO` line shows as a row.
 - 🎯 **Entry point**: the header names the longest and counts the rest, and its tooltip lists the top five.
-- 🔭 **Timeline inspector**: the summary changes to reflect what is currently visible. ([#875])
+- 🔭 **Timeline inspector**: the summary, call tree included, changes to reflect what is currently visible. ([#875])
 
 ### Removed
 

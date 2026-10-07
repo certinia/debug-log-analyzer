@@ -1,7 +1,10 @@
 /*
  * Copyright (c) 2026 Certinia Inc. All rights reserved.
  */
+import type { ReactiveController, ReactiveControllerHost } from 'lit';
+
 import {
+  RangeScopeController,
   currentRange,
   onRangeChange,
   setRange,
@@ -106,5 +109,44 @@ describe('windowFor', () => {
   it('reads a viewport with no numbers in it as no window', () => {
     expect(windowFor(Number.NaN, Number.NaN, LOG_START, LOG_END)).toBeNull();
     expect(windowFor(0, Number.POSITIVE_INFINITY, LOG_START, LOG_END)).toBeNull();
+  });
+});
+
+describe('RangeScopeController', () => {
+  afterEach(() => {
+    setRange(null);
+  });
+
+  function host(): ReactiveControllerHost & { updates: number } {
+    const fake = {
+      updates: 0,
+      addController: (controller: ReactiveController) => controller.hostConnected?.(),
+      removeController: () => {},
+      requestUpdate: () => {
+        fake.updates += 1;
+      },
+      updateComplete: Promise.resolve(true),
+    };
+    return fake;
+  }
+
+  it('updates its host when the window moves', () => {
+    const shown = host();
+    const range = new RangeScopeController(shown);
+
+    setRange({ start: 1, end: 2 });
+
+    expect(shown.updates).toBe(1);
+    expect(range.window).toEqual({ start: 1, end: 2 });
+  });
+
+  it('leaves a host that does not follow the window alone, but still knows the window', () => {
+    const still = host();
+    const range = new RangeScopeController(still, () => false);
+
+    setRange({ start: 1, end: 2 });
+
+    expect(still.updates).toBe(0);
+    expect(range.window).toEqual({ start: 1, end: 2 });
   });
 });
