@@ -12,6 +12,7 @@ export interface PaintState<R> {
   columns: readonly GridColumn<R>[];
   isSelected(target: RowKey | Group<R>): boolean;
   marked: ReadonlySet<RowKey>;
+  rowClass: ((row: R) => string | undefined) | null;
 }
 
 const total = <R>(column: GridColumn<R>, value: number | undefined): CellContent =>
@@ -80,7 +81,7 @@ function rowCells<R>(
 export function litPainter<R extends object>(state: () => PaintState<R>): RowPainter<R> {
   return {
     paint(el: HTMLElement, index: number, rows: RowView<R>): void {
-      const { columns, isSelected, marked } = state();
+      const { columns, isSelected, marked, rowClass } = state();
       const entry = rows.rowAt(index);
       const open = rows.isExpandedAt(index);
       const shown = columns.filter((column) => !column.hidden);
@@ -91,7 +92,8 @@ export function litPainter<R extends object>(state: () => PaintState<R>): RowPai
         return;
       }
       const key = rows.keyAt(index);
-      el.className = `row${marked.has(key) ? ' marked' : ''}`;
+      const extra = rowClass?.(entry);
+      el.className = `row${marked.has(key) ? ' marked' : ''}${extra ? ` ${extra}` : ''}`;
       el.ariaSelected = String(isSelected(key));
       render(rowCells(entry, shown, rows.depthAt(index), rows.hasChildrenAt(index), open), el);
     },

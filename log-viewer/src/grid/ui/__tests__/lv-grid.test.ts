@@ -281,6 +281,15 @@ describe('lv-grid', () => {
     expect(rowNamed('x (2)')?.ariaSelected).toBe('true');
   });
 
+  it('adds the classes rowClass gives to each data row, and repaints when it changes', async () => {
+    const { grid, rowNamed } = await setup({ rowClass: (row) => `kind-${row.kind}` });
+    expect(rowNamed('a')?.classList.contains('kind-x')).toBe(true);
+    expect(rowNamed('b')?.classList.contains('kind-y')).toBe(true);
+    grid.rowClass = null;
+    await settle(grid);
+    expect(rowNamed('a')?.className).toBe('row');
+  });
+
   it('keeps its events inside the shadow root that holds it', async () => {
     fakeLayout();
     const host = document.createElement('div');

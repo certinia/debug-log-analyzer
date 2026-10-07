@@ -148,6 +148,10 @@ export class LvGrid<R extends object = object> extends LitElement {
   @property({ attribute: false })
   marked: ReadonlySet<RowKey> = NOTHING_MARKED;
 
+  /** Extra classes for a data row, such as one a host style colours by. */
+  @property({ attribute: false })
+  rowClass: ((row: R) => string | undefined) | null = null;
+
   /** A row's height before it is measured. */
   @property({ type: Number, attribute: 'row-height' })
   rowHeight = 24;
@@ -331,7 +335,7 @@ export class LvGrid<R extends object = object> extends LitElement {
       this.shown = snapshot.rows;
       this.view.setRows(snapshot.rows, this.toggled);
       this.toggled = undefined;
-    } else if (changed.has('columns') || changed.has('marked')) {
+    } else if (changed.has('columns') || changed.has('marked') || changed.has('rowClass')) {
       this.view?.repaint();
     }
   }
@@ -570,6 +574,7 @@ export class LvGrid<R extends object = object> extends LitElement {
         columns: this.columns,
         isSelected: (target) => sameTarget(this.selected, target),
         marked: this.marked,
+        rowClass: this.rowClass,
       })),
     });
     this.view.setFind(this.found);

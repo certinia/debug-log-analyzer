@@ -25,7 +25,7 @@ import {
 } from '../../components/TableShared.js';
 import { toBottomUpTree } from '../../utils/Aggregation.js';
 import { toTimeOrderTree, type TimeOrderRow } from '../../utils/TimeOrderTree.js';
-import { CallTreeGrid } from '../CallTreeGrid.js';
+import { CallTreeGrid, categoryClass } from '../CallTreeGrid.js';
 import { nameCell } from '../cells.js';
 import { BOTTOM_UP_SORT, bottomUpColumns, timeOrderColumns } from '../columns.js';
 import { sumDurationTotalForRootEvents } from '../../../analysis/services/CallStackSum.js';
@@ -149,6 +149,14 @@ describe('bottomUpColumns', () => {
 });
 
 describe('lv-call-tree-grid', () => {
+  it('colours a row by the category of its event, and leaves others plain', () => {
+    expect(categoryClass({ originalData: { category: 'SOQL' } })).toBe('cat-soql');
+    expect(categoryClass({ originalData: { category: 'Code Unit' } })).toBe('cat-codeUnit');
+    expect(categoryClass({ originalData: { category: 'Unknown' } })).toBeUndefined();
+    expect(categoryClass({})).toBeUndefined();
+    expect(document.createElement('lv-call-tree-grid').rowClass).toBe(categoryClass);
+  });
+
   it('is an lv-grid', () => {
     expect(document.createElement('lv-call-tree-grid')).toBeInstanceOf(CallTreeGrid);
     expect(document.createElement('lv-call-tree-grid')).toBeInstanceOf(LvGrid);
