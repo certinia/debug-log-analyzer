@@ -6,6 +6,9 @@ import type { ApexLog, LogEvent } from '@apexdevtools/apex-log-parser';
 /** What {@link LogIndex.rowOf} answers for an event that is not in the tree. */
 export const NO_ROW = -1;
 
+/** The {@link LogIndex.categoryId} of an event the parser gives no category. */
+export const UNCATEGORISED = 0;
+
 interface Columns {
   /** The row's slot in `eventsById`. */
   eventIndex: Int32Array;
@@ -116,7 +119,7 @@ export class LogIndexBuilder {
   private readonly log: ApexLog;
   private columns: Columns;
   private rowCount = 0;
-  private readonly categoryIds = new Map<string, number>([['', 0]]);
+  private readonly categoryIds = new Map<string, number>([['', UNCATEGORISED]]);
 
   // One entry per open level: the children being read, the next one to read, and
   // the row that owns them. The stack index is the depth.

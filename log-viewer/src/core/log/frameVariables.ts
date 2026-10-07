@@ -3,14 +3,10 @@
  */
 import { type ApexLog, type LogEvent, LOG_LEVEL } from '@apexdevtools/apex-log-parser';
 
-import {
-  CHECK_EVERY,
-  frameBudget,
-  type FrameBudgetOptions,
-  type Tick,
-} from '../utility/FrameBudget.js';
+import { CHECK_EVERY, frameBudget, type Tick } from '../utility/FrameBudget.js';
 import { firstIndexWhere } from '../utility/Util.js';
-import type { LogStore, Stack } from './LogStore.js';
+import { type LogIndex, UNCATEGORISED } from './LogIndex.js';
+import type { Derivation, LogStore, Stack } from './LogStore.js';
 import {
   bareAddress,
   bareAddressOf,
@@ -91,12 +87,6 @@ export interface VariableRow {
    *  contributes none. */
   objectAddress: string | null;
 }
-
-/** What a whole-log walk takes.
- *
- *  Not the full {@link FrameBudgetOptions}: the walk cannot be abandoned, so it
- *  must not advertise a signal it would ignore. */
-type WalkOptions = Pick<FrameBudgetOptions, 'yieldSlice'>;
 
 /** What the log holds for one address, as a frame stood. */
 export interface AddressState {
@@ -204,8 +194,8 @@ export class VariableIndex {
   }
 
   /** Reads the log, yielding between slices so the UI keeps its frames. */
-  static async build(log: ApexLog, options: WalkOptions): Promise<VariableIndex> {
-    const tick = frameBudget(options);
+  static async build(index: LogIndex): Promise<VariableIndex> {
+    const tick = frameBudget({});
     const writes = new Map<string, LogEvent[]>();
     const declared = new Map<string, Declared>();
     // Only the addresses a value is ever written *as*. Every assignment reports
@@ -222,10 +212,13 @@ export class VariableIndex {
     const thisClassOf = new Map<LogEvent, string>();
     // Owner address to that object's fields, each name to its own writes.
     const fieldsByOwner = new Map<string, Map<string, LogEvent[]>>();
+    // The writes whose reported address can be the value they wrote, kept until
+    // every address wanted is known.
+    const valueWrites: LogEvent[] = [];
     let sawAnyWrite = false;
     let dropped = false;
 
-    await eachEvent(log, tick, (event) => {
+    await eachEvent(index, tick, (event) => {
       if (event.type === ASSIGNMENT) {
         sawAnyWrite = true;
         // The name only: the value is read when a row renders it.
@@ -273,6 +266,11 @@ export class VariableIndex {
           for (const nested of nestedAddressesOf(event.logLine)) {
             wanted.add(nested);
           }
+          // Only here: a line whose value *is* an address says nothing about it, and a
+          // `this.field` line reports its owner's address, not its value's.
+          if (name && !isFieldName(name)) {
+            valueWrites.push(event);
+          }
         }
       } else if (event.type === SCOPE_BEGIN) {
         const scope = parseVariableScope(event.logLine);
@@ -295,26 +293,15 @@ export class VariableIndex {
     });
 
     const byAddress = new Map<string, LogEvent[]>();
-    // A second read, and only where the first found an address to resolve.
-    if (wanted.size) {
-      await eachEvent(log, tick, (event) => {
-        if (event.type !== ASSIGNMENT) {
-          return;
-        }
-        // The reported address names the value only where the variable is that
-        // value. A `this.field` line reports the *owner*, so one such address
-        // usually carries two or more different values, and indexing it would
-        // answer about an object with one of its fields.
-        const name = variableNameOf(event.logLine);
-        if (!name || isFieldName(name)) {
-          return;
-        }
-        const address = reportedAddressOf(event.logLine);
-        // A line whose value *is* the address tells us nothing about it.
-        if (address && wanted.has(address) && !bareAddressOf(event.logLine)) {
-          push(byAddress, address, event);
-        }
-      });
+    for (let at = 0; wanted.size && at < valueWrites.length; at++) {
+      if (at % CHECK_EVERY === 0) {
+        await tick();
+      }
+      const event = valueWrites[at]!; // in range: the loop condition just checked
+      const address = reportedAddressOf(event.logLine);
+      if (address && wanted.has(address)) {
+        push(byAddress, address, event);
+      }
     }
 
     // Every read below searches by eventIndex, so every list has to be in it.
@@ -580,33 +567,13 @@ export function frameVariablesFor(
   };
 }
 
-const indexes = new WeakMap<ApexLog, VariableIndex>();
-const building = new WeakMap<ApexLog, Promise<VariableIndex>>();
-
 /**
- * The variable index for `log`, read once and then shared.
+ * The variable index for the log.
  *
- * Built on the first ask rather than at load: a 100MB log must not pay for a
+ * Derived on the first ask rather than at load: a 100MB log must not pay for a
  * section nobody opened.
  */
-export function variableIndexFor(log: ApexLog, options: WalkOptions = {}): Promise<VariableIndex> {
-  const held = indexes.get(log);
-  if (held) {
-    return Promise.resolve(held);
-  }
-  let inFlight = building.get(log);
-  if (!inFlight) {
-    inFlight = VariableIndex.build(log, options)
-      .then((index) => {
-        indexes.set(log, index);
-        return index;
-      })
-      // A failed build must not be cached, or nothing would ever retry.
-      .finally(() => building.delete(log));
-    building.set(log, inFlight);
-  }
-  return inFlight;
-}
+export const variableIndex: Derivation<VariableIndex> = (index) => VariableIndex.build(index);
 
 /** What one frame wrote and declared, up to `cut`. */
 interface FrameScan {
@@ -1035,23 +1002,19 @@ function unassignedRow(name: string, declared: Declared): VariableRow {
   };
 }
 
-/** Visits every event below `log`, handing the frame back between slices. */
+// The parser gives a variable line no category.
 async function eachEvent(
-  log: ApexLog,
+  index: LogIndex,
   tick: Tick,
   visit: (event: LogEvent) => void,
 ): Promise<void> {
-  const stack = [...log.children].reverse();
-  for (let walked = 0; stack.length; walked++) {
-    if (walked % CHECK_EVERY === 0) {
+  const { categoryId, rowCount } = index;
+  for (let row = 0; row < rowCount; row++) {
+    if (row % CHECK_EVERY === 0) {
       await tick();
     }
-    const event = stack.pop()!; // non-empty: the loop condition just checked
-    visit(event);
-    // Pushed back to front, so popping hands them over in log order: a line's
-    // meaning can depend on one above it, such as a declaration before a write.
-    for (let at = event.children.length; at--;) {
-      stack.push(event.children[at]!);
+    if (categoryId[row] === UNCATEGORISED) {
+      visit(index.event(row));
     }
   }
 }
