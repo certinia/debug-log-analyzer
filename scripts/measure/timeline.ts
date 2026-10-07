@@ -9,8 +9,7 @@
  */
 import type { ApexLog } from '@apexdevtools/apex-log-parser';
 
-import { buildLogIndex } from '../../log-viewer/src/core/log/LogIndex.js';
-import type { LogStore } from '../../log-viewer/src/core/log/LogStore.js';
+import { LogStore } from '../../log-viewer/src/core/log/LogStore.js';
 import { apexLimitSeries } from '../../log-viewer/src/features/timeline/optimised/apex-limit-series.js';
 import type { BatchColorInfo } from '../../log-viewer/src/features/timeline/optimised/BucketColorResolver.js';
 import { RectangleCache } from '../../log-viewer/src/features/timeline/optimised/RectangleCache.js';
@@ -43,17 +42,23 @@ const WINDOWS = [WHOLE_LOG, { from: 0.5, share: 0.1 }, { from: 0.3, share: 0.001
 
 const DISPLAY_WIDTH = 1600;
 
+// Resolving at once measures the index build's work rather than the frames it would yield.
+const yieldSlice = () => Promise.resolve();
+
 /** Everything the timeline builds before its first frame, in the order its init builds it. */
 async function build(log: ApexLog) {
-  const index = buildLogIndex(log);
+  // Its own store, so a second build in one run is not answered from the first one's cache.
+  const store = new LogStore(log);
+  const [index] = await Promise.all([
+    store.logIndex({ yieldSlice }),
+    store.derive(apexLimitSeries),
+  ]);
   selfTimeByCategory(index);
   const categories = new Set<string>(BUCKET_CONSTANTS.CATEGORY_PRIORITY);
   const frames = buildTimelineFrames(index, categories, log.exitStamp);
   const cache = new RectangleCache(log.children, categories, frames);
   new TreeNavigator(frames);
   const matcher = new EventMatcher<EventNode>(frames);
-  // The series reads only the log off its store, and must read this index rather than build one.
-  await apexLimitSeries(index, { log } as unknown as LogStore);
   return { frames, cache, matcher };
 }
 
