@@ -124,10 +124,48 @@ jobs:
       - name: Build VSCode Package
         run: pnpm --filter lana run build:vsix
 
+  docs:
+    name: Docs Site
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: pnpm/action-setup@v6.1.0
+        with:
+          version: 10
+      - name: Set up Node
+        uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+          cache: 'pnpm'
+      - name: Install Packages
+        run: pnpm run ci:install
+      - parallel:
+          # The live demo copies the built viewer into the site.
+          - name: Build Log Viewer
+            run: pnpm run build:prod
+          # As in the e2e job: the runner image already has Chromium's libraries.
+          - name: Install Chromium
+            run: pnpm exec playwright install --only-shell chromium
+      # onBrokenLinks is 'throw', so a broken link fails here and not at publish.
+      - name: Build Site
+        run: pnpm --filter docs-site build
+      - name: Test Live Demo
+        run: pnpm --filter docs-site test:demo
+      - name: Upload Playwright HTML report
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: playwright-report-docs
+          path: lana-docs/playwright-report
+          if-no-files-found: ignore
+          retention-days: 7
+
   gate:
     # The single required status check: the ruleset never needs updating when jobs change.
     name: CI Gate
-    needs: [verify_files, tests, e2e, build]
+    needs: [verify_files, tests, e2e, build, docs]
     if: always()
     runs-on: ubuntu-latest
     steps:
