@@ -98,7 +98,7 @@ export const selfTimeSpread: Derivation<SelfTimeSpread> = async (_, store) => {
 };
 
 /** One lane: the readings the row names, and the shape it draws. */
-function row(lane: Signature, sorted: number[]): SpreadRow {
+function row(lane: Signature, sorted: Float64Array): SpreadRow {
   const bins = new Array<number>(BIN_COUNT).fill(0);
   for (const value of sorted) {
     // The top value belongs to the last bin, not one past the end.
@@ -120,7 +120,7 @@ function row(lane: Signature, sorted: number[]): SpreadRow {
 }
 
 /** Nearest-rank percentile of an ascending list, the reading a histogram supports. */
-function percentile(sorted: number[], share: number): number {
+function percentile(sorted: Float64Array, share: number): number {
   if (!sorted.length) {
     return 0;
   }

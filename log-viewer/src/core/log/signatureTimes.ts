@@ -33,7 +33,7 @@ export interface SignatureTimes {
   /** Every signature with self time, the most first. A tie goes to the one timed first. */
   readonly ranked: readonly Signature[];
   /** The self times above zero of each signature's calls, ascending. */
-  valuesOf(signatures: readonly Signature[]): number[][];
+  valuesOf(signatures: readonly Signature[]): Float64Array[];
 }
 
 class Table implements SignatureTimes {
@@ -55,8 +55,11 @@ class Table implements SignatureTimes {
     this.totalSelf = this.ranked.reduce((sum, signature) => sum + signature.selfTime, 0);
   }
 
-  valuesOf(signatures: readonly Signature[]): number[][] {
-    const values = signatures.map((): number[] => []);
+  valuesOf(signatures: readonly Signature[]): Float64Array[] {
+    const values = signatures.map(
+      (signature) => new Float64Array(this.idOf.has(signature) ? signature.timedCount : 0),
+    );
+    const filled = new Array<number>(signatures.length).fill(0);
     const slots = new Int32Array(this.idCount).fill(-1);
     signatures.forEach((signature, slot) => {
       const id = this.idOf.get(signature);
@@ -74,11 +77,11 @@ class Table implements SignatureTimes {
       }
       const slot = slots[ids[row]!]!;
       if (slot >= 0) {
-        values[slot]!.push(value);
+        values[slot]![filled[slot]!++] = value;
       }
     }
     for (const list of values) {
-      list.sort((a, b) => a - b);
+      list.sort();
     }
     return values;
   }

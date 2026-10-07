@@ -3,9 +3,10 @@
  */
 import type { ApexLog, LogEvent, LogCategory } from '@apexdevtools/apex-log-parser';
 
-import { getEventKey } from '../../../core/log/eventKeys.js';
+import { type SignatureLookup, signatureSlot } from '../../../core/log/eventKeys.js';
 import { signatureTimes, type SignatureTimes } from '../../../core/log/signatureTimes.js';
 import type { Derivation } from '../../../core/log/LogStore.js';
+import { CHECK_EVERY, frameBudget, type Tick } from '../../../core/utility/FrameBudget.js';
 
 /** One frame on the hot path, entry point first. */
 export interface HotPathFrame {
@@ -88,10 +89,15 @@ const HOT_SPOT_COUNT = 5;
  */
 export const executionHighlights: Derivation<ExecutionHighlights> = async (_, store) => {
   const apexLog = store.log;
+  // Together, so the two sliced passes take turns.
+  const [hotPath, times] = await Promise.all([
+    computeHotPath(apexLog.children),
+    store.derive(signatureTimes),
+  ]);
   return {
     totalTime: apexLog.duration.total,
-    ...computeHotPath(apexLog.children),
-    hotSpots: hotSpotsOf(await store.derive(signatureTimes)),
+    ...hotPath,
+    hotSpots: hotSpotsOf(times),
     truncation: truncationOf(apexLog),
   };
 };
@@ -114,15 +120,20 @@ interface FrameGroup {
  * own time it is no hot spot, so its children come back as the branches the time
  * fanned out to.
  */
-function computeHotPath(
+async function computeHotPath(
   roots: LogEvent[],
-): Pick<ExecutionHighlights, 'hotPath' | 'hotPathEnd' | 'hotPathBranches'> {
+): Promise<Pick<ExecutionHighlights, 'hotPath' | 'hotPathEnd' | 'hotPathBranches'>> {
+  // A level can hold a loop's every call, so the grouping hands the thread back.
+  const tick = frameBudget({});
   const hotPath: HotPathFrame[] = [];
-  let current = sortedGroups(roots)[0];
+  let current = (await sortedGroups([roots], tick))[0];
   let children: FrameGroup[] = [];
   while (current && current.total > 0) {
     hotPath.push(frameOf(current));
-    children = sortedGroups(childrenOf(current.instances));
+    children = await sortedGroups(
+      current.instances.map((instance) => instance.children),
+      tick,
+    );
     const next = children[0];
     if (!next || next.total < HOT_PATH_FOLLOW_SHARE * current.total || current.self > next.total) {
       break;
@@ -159,32 +170,34 @@ function frameOf(group: FrameGroup): HotPathFrame {
   };
 }
 
-/** Every child of every instance, without materialising a flattened array per level. */
-function* childrenOf(parents: LogEvent[]): Generator<LogEvent> {
-  for (const parent of parents) {
-    yield* parent.children;
-  }
-}
-
-/** Merge the events by signature, biggest total time first. */
-function sortedGroups(events: Iterable<LogEvent>): FrameGroup[] {
-  const groups = new Map<string, FrameGroup>();
-  for (const event of events) {
-    const key = getEventKey(event);
-    const group = groups.get(key);
-    if (group) {
-      group.instances.push(event);
-      group.total += event.duration.total;
-      group.self += event.duration.self;
-    } else {
-      groups.set(key, {
-        instances: [event],
-        total: event.duration.total,
-        self: event.duration.self,
-      });
+/** Merge the events of every list by signature, biggest total time first. */
+async function sortedGroups(lists: readonly LogEvent[][], tick: Tick): Promise<FrameGroup[]> {
+  const lookup: SignatureLookup<FrameGroup> = new Map();
+  const groups: FrameGroup[] = [];
+  let seen = 0;
+  for (const events of lists) {
+    for (const event of events) {
+      if (++seen % CHECK_EVERY === 0) {
+        await tick();
+      }
+      const byText = signatureSlot(lookup, event);
+      const group = byText.get(event.text);
+      if (group) {
+        group.instances.push(event);
+        group.total += event.duration.total;
+        group.self += event.duration.self;
+      } else {
+        const made = {
+          instances: [event],
+          total: event.duration.total,
+          self: event.duration.self,
+        };
+        byText.set(event.text, made);
+        groups.push(made);
+      }
     }
   }
-  return [...groups.values()].sort((a, b) => b.total - a.total);
+  return groups.sort((a, b) => b.total - a.total);
 }
 
 function largestInstance(instances: LogEvent[]): LogEvent {
