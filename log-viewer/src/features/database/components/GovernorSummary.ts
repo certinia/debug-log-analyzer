@@ -28,6 +28,9 @@ export interface GaugeMetric {
    * limit to fill a bar against. Empty where there are too few readings to read as a shape.
    */
   spark?: readonly number[];
+  /** Set where the figure is the transaction's while its neighbours are a
+   *  window's, so no gauge lies about the scope it reports. */
+  wholeLog?: boolean;
 }
 
 /** Consumption percentage where a gauge or trend turns from safe to warn. */
@@ -100,6 +103,7 @@ export class GovernorSummary extends LitElement {
       }
 
       .gauge__limit,
+      .gauge__scope,
       .gauge__na {
         color: var(--lana-fg-muted);
       }
@@ -116,6 +120,7 @@ export class GovernorSummary extends LitElement {
         color: var(--lana-severity-error);
       }
 
+      .gauge__scope,
       .gauge__na {
         font-size: var(--lana-text-xs);
         font-style: italic;
@@ -180,7 +185,9 @@ export class GovernorSummary extends LitElement {
       return html`<div class="gauge ${muted ? 'muted' : ''}" title=${NO_LIMIT_FOR_METRIC_TEXT}>
         <span class="gauge__label">${metric.label}</span>
         <span class="gauge__value"
-          >${format(metric.found)} <span class="gauge__na">seen</span></span
+          >${format(metric.found)}
+          <span class="gauge__na">seen</span>
+          ${metric.wholeLog ? html`<span class="gauge__scope">whole log</span>` : ''}</span
         >
         ${this._renderSpark(metric)}
       </div>`;
@@ -196,7 +203,9 @@ export class GovernorSummary extends LitElement {
     >
       <span class="gauge__label">${metric.label}</span>
       <span class="gauge__value gauge__value--${governorTier(percent)}"
-        >${format(metric.used)} <span class="gauge__limit">/ ${format(metric.limit)}</span></span
+        >${format(metric.used)}
+        <span class="gauge__limit">/ ${format(metric.limit)}</span>
+        ${metric.wholeLog ? html`<span class="gauge__scope">whole log</span>` : ''}</span
       >
       <div class="gauge__track">
         <div

@@ -14,11 +14,14 @@ import { customElement, property, query, state } from 'lit/decorators.js';
 
 import type { ApexLog } from '@apexdevtools/apex-log-parser';
 import { SubscriptionController } from '../../../core/events/SubscriptionController.js';
+import { setRange, windowFor } from '../../../core/log/rangeScope.js';
+import { debounce, setChanged } from '../../../core/utility/Util.js';
 import { themeObserver } from '../../../core/theme/ThemeObserver.js';
-import { setChanged } from '../../../core/utility/Util.js';
 import { ApexLogTimeline } from '../optimised/ApexLogTimeline.js';
+import type { MeasurementSnapshot } from '../optimised/measurement/MeasurementState.js';
 import { parseColorToHex } from '../optimised/rendering/ColorUtils.js';
-import type { EditorColors, TimelineOptions } from '../types/flamechart.types.js';
+import { calculateViewportBounds } from '../optimised/ViewportUtils.js';
+import type { EditorColors, TimelineOptions, ViewportState } from '../types/flamechart.types.js';
 import { TimelineError } from '../types/flamechart.types.js';
 
 import { tokenStyles } from '../../../styles/tokens.styles.js';
@@ -212,6 +215,16 @@ export class TimelineFlameChart extends LitElement {
         ...this.options,
         themeName: this.themeName,
         editorColors: this.extractEditorColors(),
+        onViewportChange: (viewport: ViewportState) => {
+          this.options.onViewportChange?.(viewport);
+          this._viewport = viewport;
+          this._publishRange();
+        },
+        onMeasurementChange: (measurement: MeasurementSnapshot | null) => {
+          this.options.onMeasurementChange?.(measurement);
+          this._measurement = measurement;
+          this._publishRange();
+        },
         // The view cancels the event once the legend drops its picks.
         onCategoryDimClear: () =>
           !this.dispatchEvent(
@@ -302,12 +315,42 @@ export class TimelineFlameChart extends LitElement {
   // CLEANUP
   // ============================================================================
 
+  private _viewport: ViewportState | null = null;
+  private _measurement: MeasurementSnapshot | null = null;
+
+  /**
+   * Records the stretch of log the user is reading, for the inspector's
+   * sections: a measured range where there is one, else the viewport. The
+   * chart owns both, so it also decides when one is wide enough to be the
+   * whole log.
+   *
+   * Coalesced to one publish per frame: a drag reports a viewport per input
+   * event, and a frame can only show one of them.
+   */
+  private readonly _publishRange = debounce(() => {
+    const measurement = this._measurement;
+    // A Shift+click with no drag measures nothing, so the viewport still stands.
+    const span =
+      measurement && measurement.endTime > measurement.startTime
+        ? { timeStart: measurement.startTime, timeEnd: measurement.endTime }
+        : this._viewport && calculateViewportBounds(this._viewport);
+    const logStart = this.apexLog?.timestamp ?? 0;
+    const logEnd = this.apexLog?.exitStamp ?? logStart;
+    setRange(span ? windowFor(span.timeStart, span.timeEnd, logStart, logEnd) : null);
+  });
+
   /**
    * Clean up renderer and observers.
    */
   private cleanup(): void {
     // Supersede any in-flight `initializeTimeline`.
     this.initEpoch++;
+    // No chart, no window: the sections read the whole log again. A frame
+    // queued before the teardown must not put the window back.
+    this._publishRange.cancel();
+    this._viewport = null;
+    this._measurement = null;
+    setRange(null);
 
     // Destroy renderer
     if (this.apexLogTimeline) {

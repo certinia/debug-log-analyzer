@@ -13,6 +13,7 @@
 
 import type { LogEvent, LogCategory, LogIssue } from '@apexdevtools/apex-log-parser';
 import { formatDuration } from '../../../core/utility/Util.js';
+import type { MeasurementSnapshot } from '../optimised/measurement/MeasurementState.js';
 import type { PrecomputedRect } from '../optimised/RectangleCache.js';
 
 export { NO_ROW } from '../../../core/log/LogIndex.js';
@@ -349,6 +350,7 @@ export interface TimelineOptions {
   onEventClick?: (event: LogEvent) => void;
   onEventHover?: (event: LogEvent | null) => void;
   onViewportChange?: (viewport: ViewportState) => void;
+  onMeasurementChange?: (measurement: MeasurementSnapshot | null) => void;
 }
 
 // ============================================================================
