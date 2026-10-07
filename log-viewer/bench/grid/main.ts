@@ -9,11 +9,13 @@
 import { parse, type ApexLog, type LogEvent } from '@apexdevtools/apex-log-parser';
 
 import type { Contender } from './contender.js';
+import { GridContender } from './grid-contender.js';
 import { TabulatorContender } from './tabulator-contender.js';
 import { frameStats, perFrame, settled, timed, type FrameStats, type Timing } from './timing.js';
 
 const CONTENDERS: Record<string, () => Contender> = {
   tabulator: () => new TabulatorContender(),
+  grid: () => new GridContender(),
 };
 
 const name = new URLSearchParams(location.search).get('c') ?? 'tabulator';
@@ -189,7 +191,16 @@ async function runOne(action: 'exportCsv' | 'find'): Promise<Record<string, unkn
   return results;
 }
 
-const bench = { ready: false, results, runAll, runOne };
+const bench = {
+  ready: false,
+  results,
+  runAll,
+  runOne,
+  /** For profiling one action from outside, e.g. a fling after `expandAll`. */
+  get contender(): Contender {
+    return contender;
+  },
+};
 (window as unknown as { bench: typeof bench }).bench = bench;
 
 (document.getElementById('file') as HTMLInputElement).addEventListener('change', (e) => {

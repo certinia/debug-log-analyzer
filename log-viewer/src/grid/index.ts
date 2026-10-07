@@ -7,3 +7,4 @@
  * This file is its public API; app code imports nothing else from `grid/`.
  */
 export * from './core/index.js';
+export * from './render/index.js';
