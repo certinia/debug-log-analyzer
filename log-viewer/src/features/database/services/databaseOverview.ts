@@ -2,13 +2,15 @@
  * Copyright (c) 2026 Certinia Inc. All rights reserved.
  */
 import {
-  type ApexLog,
   DMLBeginLine,
   type LogEvent,
   SOQLExecuteBeginLine,
   SOSLExecuteBeginLine,
 } from '@apexdevtools/apex-log-parser';
 
+import type { LogIndex } from '../../../core/log/LogIndex.js';
+import type { Derivation } from '../../../core/log/LogStore.js';
+import { statements } from '../../../core/log/statements.js';
 import { DEFAULT_NAMESPACE, getCallerNamespace } from '../../../core/utility/CallerNamespace.js';
 import { sharePercent } from '../../../core/utility/Util.js';
 import { deriveSoqlObject } from './sobjectClassification.js';
@@ -165,19 +167,9 @@ export interface DatabaseOverview {
   burnedIn: DatabaseBreakdown[];
 }
 
-/** Memo per log: the tree never changes after parse, the sections re-render. */
-const cache = new WeakMap<ApexLog, DatabaseOverview>();
-
-/** {@link DatabaseOverview} for a parsed log, computed once. */
-export function databaseOverview(root: ApexLog): DatabaseOverview {
-  const cached = cache.get(root);
-  if (cached) {
-    return cached;
-  }
-  const overview = compute(root);
-  cache.set(root, overview);
-  return overview;
-}
+/** {@link DatabaseOverview} for the log. */
+export const databaseOverview: Derivation<DatabaseOverview> = async (index, store) =>
+  compute(store.log.duration.total, index, (await store.derive(statements)).rows);
 
 /** The DML operation from a `DML Op:Insert Type:Account` line. */
 export function dmlOperation(text: string): string {
@@ -256,8 +248,7 @@ function statementOf(event: LogEvent): StatementFacts | null {
   return null;
 }
 
-function compute(root: ApexLog): DatabaseOverview {
-  const logNs = root.duration.total;
+function compute(logNs: number, index: LogIndex, rows: readonly number[]): DatabaseOverview {
   const time: DatabaseTime = {
     timeNs: 0,
     logNs,
@@ -266,34 +257,38 @@ function compute(root: ApexLog): DatabaseOverview {
     dml: { timeNs: 0, statements: 0 },
     sosl: { timeNs: 0, statements: 0 },
   };
-  const found: { event: LogEvent; facts: StatementFacts; enclosing: LogEvent | null }[] = [];
+  const found: {
+    row: number;
+    event: LogEvent;
+    facts: StatementFacts;
+    enclosing: LogEvent | null;
+  }[] = [];
   /** Time a statement holds in the statements inside it, so self time can net it off. */
   const nested = new Map<LogEvent, number>();
   /** Every statement found, so the tree walk classifies each event only once. */
   const factsByEvent = new Map<LogEvent, StatementFacts>();
 
-  // Iterative: log depth is unbounded. Each frame carries the statement around
-  // it, so a nested statement is found without walking back up its parents.
-  const stack: { event: LogEvent; enclosing: LogEvent | null }[] = root.children.map((event) => ({
-    event,
-    enclosing: null,
-  }));
-  while (stack.length) {
-    const { event, enclosing } = stack.pop()!; // non-empty: the loop condition just checked
-    const facts = statementOf(event);
-    const inside = facts ? event : enclosing;
-    for (const child of event.children) {
-      stack.push({ event: child, enclosing: inside });
+  // The statements still open form a stack, so its top encloses the next one.
+  const { subtreeEnd } = index;
+  const open: number[] = [];
+  for (const row of rows) {
+    // In range: every row in `open` is a row of `index`.
+    while (open.length && subtreeEnd[open.at(-1)!]! <= row) {
+      open.pop();
     }
-    if (!facts) {
-      continue;
-    }
+    const event = index.event(row);
+    const facts = statementOf(event)!; // every row of `statements` is a statement
+    const outer = open.at(-1);
+    const enclosing = outer === undefined ? null : index.event(outer);
+    open.push(row);
     factsByEvent.set(event, facts);
-    found.push({ event, facts, enclosing });
+    found.push({ row, event, facts, enclosing });
     if (enclosing) {
       nested.set(enclosing, (nested.get(enclosing) ?? 0) + event.duration.total);
     }
   }
+  // The order a last-child-first walk meets them in, which a tie below keeps.
+  found.sort((a, b) => subtreeEnd[b.row]! - subtreeEnd[a.row]! || a.row - b.row);
 
   const statements = new Map<string, DatabaseStatement>();
   const askedBy = new Map<string, DatabaseBreakdown>();
