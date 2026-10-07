@@ -304,7 +304,7 @@ function bucketsFor(series: Map<string, Float64Array>, key: string): Float64Arra
  * the run can reach a window: every earlier child ends before it opens, so the
  * gaps among them do too.
  */
-function eachSelfGap(
+export function eachSelfGap(
   event: LogEvent,
   from: number,
   to: number,
@@ -421,7 +421,7 @@ function pushReached(stack: LogEvent[], children: readonly LogEvent[], window: T
  * their ends ascend and the run is contiguous: two binary searches find it,
  * where testing every child would read the whole log.
  */
-function reachedRun(
+export function reachedRun(
   children: readonly LogEvent[],
   window: TimeWindow,
 ): { from: number; to: number } {
@@ -431,13 +431,14 @@ function reachedRun(
   };
 }
 
-// Only a leaf line has no exitStamp: the parser closes an unclosed frame itself.
-function endOf(event: LogEvent): number {
+/** Where `event` ended. Only a leaf line has no exitStamp: the parser closes an
+ *  unclosed frame itself. */
+export function endOf(event: LogEvent): number {
   return event.exitStamp ?? event.timestamp;
 }
 
 /** The length of [start, end) that falls inside `window`. */
-function overlapOf(start: number, end: number, window: TimeWindow): number {
+export function overlapOf(start: number, end: number, window: TimeWindow): number {
   return Math.max(0, Math.min(end, window.end) - Math.max(start, window.start));
 }
 

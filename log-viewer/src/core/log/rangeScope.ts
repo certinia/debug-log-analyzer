@@ -91,13 +91,16 @@ export function onRangeChange(callback: (window: TimeWindow | null) => void): ()
 export class RangeScopeController {
   private _window = currentRange();
 
-  constructor(host: ReactiveControllerHost) {
+  /** @param follows - false skips the host's update for a window it does not show */
+  constructor(host: ReactiveControllerHost, follows: () => boolean = () => true) {
     new SubscriptionController(host, () => {
       this._window = currentRange();
       return [
         onRangeChange((window) => {
           this._window = window;
-          host.requestUpdate();
+          if (follows()) {
+            host.requestUpdate();
+          }
         }),
       ];
     });
