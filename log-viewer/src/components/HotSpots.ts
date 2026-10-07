@@ -2,11 +2,11 @@
  * Copyright (c) 2026 Certinia Inc. All rights reserved.
  */
 import { consume } from '@lit/context';
-import { initialState, Task, TaskStatus } from '@lit/task';
 import { LitElement, html } from 'lit';
 import { customElement, property } from 'lit/decorators.js';
 import { styleMap } from 'lit/directives/style-map.js';
 
+import { DerivedValue } from '../core/log/DerivedValue.js';
 import { logContext } from '../core/log/logContext.js';
 import type { LogStore } from '../core/log/LogStore.js';
 import { formatDuration, sharePercent } from '../core/utility/Util.js';
@@ -38,20 +38,16 @@ export class HotSpots extends LitElement {
 
   private readonly _palette = new CategoryPaletteController(this);
 
-  private readonly _highlights = new Task(this, {
-    task: ([store]) => store?.derive(executionHighlights) ?? initialState,
-    args: () => [this.logStore],
-  });
+  private readonly _highlights = new DerivedValue(this, executionHighlights);
 
   static styles = [globalStyles, inspectorSectionStyles, revealRowStyles];
 
   render() {
-    const { status, value } = this._highlights;
-    const highlights = status === TaskStatus.COMPLETE ? value : undefined;
+    const highlights = this._highlights.value;
     if (!highlights?.hotSpots.length) {
       return html`<section-skeleton
         shape="rows"
-        ?pending=${status === TaskStatus.PENDING}
+        ?pending=${this._highlights.pending}
         fallback=${NO_TIMED_CALLS_TEXT}
       ></section-skeleton>`;
     }

@@ -13,8 +13,8 @@ import type {
 import { limitTotals } from '../../../components/logOverviewMetrics.js';
 import { GOVERNOR_METRICS } from '../../../core/metrics/governorMetrics.js';
 import { formatByteSize, formatDuration, formatInteger } from '../../../core/utility/Util.js';
-import { idsBySelfTime, keySelfTimes, type KeySelfTimes } from '../../../core/log/keySelfTimes.js';
-import { currentLogStore, type LogStore } from '../../../core/log/LogStore.js';
+import type { Derivation, LogStore } from '../../../core/log/LogStore.js';
+import { signatureTimes, type SignatureTimes } from '../../../core/log/signatureTimes.js';
 import { outermostEvents } from '../../../core/utility/EventTree.js';
 import { deriveSoqlObject } from '../../database/services/sobjectClassification.js';
 import type { Dialect } from '../../soql/format/tokenize.js';
@@ -146,13 +146,6 @@ export interface LogDiagnostics {
   logNs: number;
 }
 
-const EMPTY: LogDiagnostics = {
-  diagnostics: [],
-  queryPlansKnown: false,
-  lintedQueries: { linted: 0, distinct: 0 },
-  logNs: 0,
-};
-
 /** A grouped set of events, keyed by whatever makes two of them the same finding. */
 interface Group {
   count: number;
@@ -204,21 +197,13 @@ interface HotSpot {
  * putting a second grid beside the one already on screen. Nothing is reported
  * when no signature stands out, because then there is nothing to point at.
  */
-function hotSpot(times: KeySelfTimes): HotSpot | null {
-  const [top] = idsBySelfTime(times);
-  if (top === undefined) {
+function hotSpot(times: SignatureTimes): HotSpot | null {
+  const [top] = times.ranked;
+  if (!top) {
     return null;
   }
-  const totalSelf = times.selfTime.reduce((sum, self) => sum + self, 0);
-  // In range: `top` is an id from `times`.
-  const selfNs = times.selfTime[top]!;
-  const share = selfNs / totalSelf;
-  if (share < HOT_SPOT_SHARE) {
-    return null;
-  }
-  // `getEventKey` is `type|namespace|text`; only the text names the code.
-  const label = times.keys[top]!;
-  return { label: label.slice(label.lastIndexOf('|') + 1), selfNs, share };
+  const share = top.selfTime / times.totalSelf;
+  return share < HOT_SPOT_SHARE ? null : { label: top.text, selfNs: top.selfTime, share };
 }
 
 /**
@@ -735,7 +720,10 @@ function debugDiagnostics(debugLines: LogEvent[]): Diagnostic[] {
  * first, so each distinct query is parsed once and its findings carry the count.
  * The stack of the first occurrence is what the stack-aware rules see.
  */
-async function soqlLintDiagnostics(queries: SOQLExecuteBeginLine[]): Promise<{
+async function soqlLintDiagnostics(
+  store: LogStore,
+  queries: SOQLExecuteBeginLine[],
+): Promise<{
   diagnostics: Diagnostic[];
   lintedQueries: { linted: number; distinct: number };
 }> {
@@ -744,11 +732,10 @@ async function soqlLintDiagnostics(queries: SOQLExecuteBeginLine[]): Promise<{
     .slice(0, MAX_LINTED_QUERIES);
 
   const linter = new SOQLLinter();
-  const store = currentLogStore();
   const grouped = new Map<string, Diagnostic>();
 
   for (const [text, group] of distinct) {
-    const stack = store?.stackByEventIndex(group.eventIndex).reverse() ?? [];
+    const stack = store.stackByEventIndex(group.eventIndex).reverse();
     for (const rule of await linter.lint(text, stack)) {
       const id = `soql|${rule.summary}`;
       const line = {
@@ -786,9 +773,6 @@ async function soqlLintDiagnostics(queries: SOQLExecuteBeginLine[]): Promise<{
   };
 }
 
-/** The findings for one log, kept so a selection re-scopes without re-analysing. */
-let cached: { log: ApexLog; result: Promise<LogDiagnostics> } | null = null;
-
 /**
  * Everything the log says about itself, as one ordered findings list.
  *
@@ -796,17 +780,7 @@ let cached: { log: ApexLog; result: Promise<LogDiagnostics> } | null = null;
  * parse per distinct query, which is too much to repeat every time the selection
  * changes. {@link scopeDiagnostics} narrows this result instead.
  */
-export function computeLogDiagnostics(): Promise<LogDiagnostics> {
-  const store = currentLogStore();
-  if (!store) {
-    return Promise.resolve(EMPTY);
-  }
-  const log = store.log;
-  if (cached?.log !== log) {
-    cached = { log, result: analyse(store) };
-  }
-  return cached.result;
-}
+export const logDiagnostics: Derivation<LogDiagnostics> = (_, store) => analyse(store);
 
 /**
  * The findings that name one selection: those raised inside the given events or
@@ -818,12 +792,12 @@ export function computeLogDiagnostics(): Promise<LogDiagnostics> {
  * since they say how far the problem reaches beyond what is selected.
  */
 export function scopeDiagnostics(
+  log: ApexLog,
   result: LogDiagnostics,
   instances: readonly number[],
 ): LogDiagnostics {
-  const log = currentLogStore()?.log;
   const within = new Set(instances);
-  if (!log || !within.size) {
+  if (!within.size) {
     return { ...result, diagnostics: [] };
   }
   // `eventsById` is indexed by `eventIndex`, so ancestry is a parent walk.
@@ -878,8 +852,8 @@ async function analyse(store: LogStore): Promise<LogDiagnostics> {
   const plans = queryPlanDiagnostics(queries);
   // Together, so the key pass's slices run beside the lint's.
   const [lint, times] = await Promise.all([
-    soqlLintDiagnostics(queries),
-    store.derive(keySelfTimes),
+    soqlLintDiagnostics(store, queries),
+    store.derive(signatureTimes),
   ]);
   // A `LimitException` belongs to its governor metric, not to the exception list.
   const isLimit = (event: LogEvent) => event.text.includes('System.LimitException');

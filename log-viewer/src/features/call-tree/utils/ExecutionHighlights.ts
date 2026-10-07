@@ -3,10 +3,10 @@
  */
 import type { ApexLog, LogEvent, LogCategory } from '@apexdevtools/apex-log-parser';
 
-import { getEventKey } from '../../../core/log/eventKeys.js';
-import { keySelfTimes, type KeySelfTimes } from '../../../core/log/keySelfTimes.js';
-import type { LogIndex } from '../../../core/log/LogIndex.js';
+import { type SignatureLookup, signatureSlot } from '../../../core/log/eventKeys.js';
+import { signatureTimes, type SignatureTimes } from '../../../core/log/signatureTimes.js';
 import type { Derivation } from '../../../core/log/LogStore.js';
+import { CHECK_EVERY, frameBudget, type Tick } from '../../../core/utility/FrameBudget.js';
 
 /** One frame on the hot path, entry point first. */
 export interface HotPathFrame {
@@ -87,22 +87,20 @@ const HOT_SPOT_COUNT = 5;
  * time), and the truncation caveat that undermines both. Structure follows the
  * real tree, so every row resolves to a `LogEvent` the tabs can reveal.
  */
-export function computeExecutionHighlights(
-  apexLog: ApexLog,
-  index: LogIndex,
-  times: KeySelfTimes,
-): ExecutionHighlights {
+export const executionHighlights: Derivation<ExecutionHighlights> = async (_, store) => {
+  const apexLog = store.log;
+  // Together, so the two sliced passes take turns.
+  const [hotPath, times] = await Promise.all([
+    computeHotPath(apexLog.children),
+    store.derive(signatureTimes),
+  ]);
   return {
     totalTime: apexLog.duration.total,
-    ...computeHotPath(apexLog.children),
-    hotSpots: hotSpotsOf(index, times),
+    ...hotPath,
+    hotSpots: hotSpotsOf(times),
     truncation: truncationOf(apexLog),
   };
-}
-
-/** {@link computeExecutionHighlights}, once per log. */
-export const executionHighlights: Derivation<ExecutionHighlights> = async (index, store) =>
-  computeExecutionHighlights(store.log, index, await store.derive(keySelfTimes));
+};
 
 /** Same-signature siblings walked as one frame, the way every profiler's hot path merges. */
 interface FrameGroup {
@@ -122,15 +120,20 @@ interface FrameGroup {
  * own time it is no hot spot, so its children come back as the branches the time
  * fanned out to.
  */
-function computeHotPath(
+async function computeHotPath(
   roots: LogEvent[],
-): Pick<ExecutionHighlights, 'hotPath' | 'hotPathEnd' | 'hotPathBranches'> {
+): Promise<Pick<ExecutionHighlights, 'hotPath' | 'hotPathEnd' | 'hotPathBranches'>> {
+  // A level can hold a loop's every call, so the grouping hands the thread back.
+  const tick = frameBudget({});
   const hotPath: HotPathFrame[] = [];
-  let current = sortedGroups(roots)[0];
+  let current = (await sortedGroups([roots], tick))[0];
   let children: FrameGroup[] = [];
   while (current && current.total > 0) {
     hotPath.push(frameOf(current));
-    children = sortedGroups(childrenOf(current.instances));
+    children = await sortedGroups(
+      current.instances.map((instance) => instance.children),
+      tick,
+    );
     const next = children[0];
     if (!next || next.total < HOT_PATH_FOLLOW_SHARE * current.total || current.self > next.total) {
       break;
@@ -167,32 +170,34 @@ function frameOf(group: FrameGroup): HotPathFrame {
   };
 }
 
-/** Every child of every instance, without materialising a flattened array per level. */
-function* childrenOf(parents: LogEvent[]): Generator<LogEvent> {
-  for (const parent of parents) {
-    yield* parent.children;
-  }
-}
-
-/** Merge the events by signature, biggest total time first. */
-function sortedGroups(events: Iterable<LogEvent>): FrameGroup[] {
-  const groups = new Map<string, FrameGroup>();
-  for (const event of events) {
-    const key = getEventKey(event);
-    const group = groups.get(key);
-    if (group) {
-      group.instances.push(event);
-      group.total += event.duration.total;
-      group.self += event.duration.self;
-    } else {
-      groups.set(key, {
-        instances: [event],
-        total: event.duration.total,
-        self: event.duration.self,
-      });
+/** Merge the events of every list by signature, biggest total time first. */
+async function sortedGroups(lists: readonly LogEvent[][], tick: Tick): Promise<FrameGroup[]> {
+  const lookup: SignatureLookup<FrameGroup> = new Map();
+  const groups: FrameGroup[] = [];
+  let seen = 0;
+  for (const events of lists) {
+    for (const event of events) {
+      if (++seen % CHECK_EVERY === 0) {
+        await tick();
+      }
+      const byText = signatureSlot(lookup, event);
+      const group = byText.get(event.text);
+      if (group) {
+        group.instances.push(event);
+        group.total += event.duration.total;
+        group.self += event.duration.self;
+      } else {
+        const made = {
+          instances: [event],
+          total: event.duration.total,
+          self: event.duration.self,
+        };
+        byText.set(event.text, made);
+        groups.push(made);
+      }
     }
   }
-  return [...groups.values()].sort((a, b) => b.total - a.total);
+  return groups.sort((a, b) => b.total - a.total);
 }
 
 function largestInstance(instances: LogEvent[]): LogEvent {
@@ -212,28 +217,19 @@ function largestInstance(instances: LogEvent[]): LogEvent {
  * self time at all drop out. Total time counts the outermost instances only:
  * recursion nests the same wall time inside itself.
  */
-function hotSpotsOf(index: LogIndex, times: KeySelfTimes): HotSpotRow[] {
-  const { selfTime, count, maxRow, outerTotal } = times;
-  // In range: ids and rows come from the same index as `times`. Ids ascend in
-  // order of first row, so a tie keeps the signature the log ran first.
-  return [...selfTime.keys()]
-    .filter((id) => selfTime[id]! > 0)
-    .sort((a, b) => selfTime[b]! - selfTime[a]!)
+function hotSpotsOf(times: SignatureTimes): HotSpotRow[] {
+  return times.ranked
     .slice(0, HOT_SPOT_COUNT)
-    .map((id) => {
-      const worst = maxRow[id]!;
-      const event = index.event(worst);
-      return {
-        text: event.text,
-        eventIndex: index.eventIndex[worst]!,
-        selfTime: selfTime[id]!,
-        // Nothing timed the outermost instances of a signature whose nested ones
-        // were timed; the row still holds self time, so the total answers for both.
-        totalTime: Math.max(outerTotal[id]!, selfTime[id]!),
-        count: count[id]!,
-        category: event.category,
-      };
-    });
+    .map(({ text, eventIndex, selfTime, outerTotal, count, category }) => ({
+      text,
+      eventIndex,
+      selfTime,
+      // Nothing timed the outermost instances of a signature whose nested ones
+      // were timed; the row still holds self time, so the total answers for both.
+      totalTime: Math.max(outerTotal, selfTime),
+      count,
+      category,
+    }));
 }
 
 function truncationOf(apexLog: ApexLog): ExecutionHighlights['truncation'] {

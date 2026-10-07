@@ -6,8 +6,8 @@ import { describe, expect, it } from '@jest/globals';
 import type { ApexLog, LogEvent } from '@apexdevtools/apex-log-parser';
 import { indexTree, storeOf } from '#test-helpers/apexLog.js';
 import { createEvent } from '#test-helpers/events.js';
-import { keySelfTimes } from '../../../../core/log/keySelfTimes.js';
-import { computeExecutionHighlights, executionHighlights } from '../ExecutionHighlights.js';
+import { LogStore } from '../../../../core/log/LogStore.js';
+import { executionHighlights } from '../ExecutionHighlights.js';
 
 // The parser takes 0 for the log itself, so real events start at 1.
 let nextEventIndex = 1;
@@ -42,12 +42,12 @@ function index(log: ApexLog, ...events: LogEvent[]): void {
   }
 }
 
-async function highlightsOf(log: ApexLog) {
-  const logIndex = indexTree(log);
-  return computeExecutionHighlights(log, logIndex, await keySelfTimes(logIndex));
+function highlightsOf(log: ApexLog) {
+  indexTree(log);
+  return new LogStore(log).derive(executionHighlights);
 }
 
-describe('computeExecutionHighlights hot path', () => {
+describe('executionHighlights hot path', () => {
   it('follows the largest-total child from the root down', async () => {
     const log = createLog(1000);
     const root = highlightEvent({ text: 'Root', total: 900 });
@@ -174,7 +174,7 @@ describe('computeExecutionHighlights hot path', () => {
   });
 });
 
-describe('computeExecutionHighlights hot path end', () => {
+describe('executionHighlights hot path end', () => {
   it('names a last frame that keeps its own time as the hot spot', async () => {
     const log = createLog(1000);
     const root = highlightEvent({ text: 'Root', total: 1000 });
@@ -273,7 +273,7 @@ describe('computeExecutionHighlights hot path end', () => {
   });
 });
 
-describe('computeExecutionHighlights hot spots', () => {
+describe('executionHighlights hot spots', () => {
   it('sums self time by signature and points at the most expensive instance', async () => {
     const log = createLog(1000);
     const first = highlightEvent({ text: 'MyClass.run()', self: 100 });
@@ -303,6 +303,20 @@ describe('computeExecutionHighlights hot spots', () => {
         category: '',
       },
     ]);
+  });
+
+  it('breaks a tie by the signature timed first, as the other panes do', async () => {
+    const log = createLog(1000);
+    index(
+      log,
+      highlightEvent({ text: 'B', self: 0 }),
+      highlightEvent({ text: 'A', self: 10 }),
+      highlightEvent({ text: 'B', self: 10 }),
+    );
+
+    const { hotSpots } = await highlightsOf(log);
+
+    expect(hotSpots.map((row) => row.text)).toEqual(['A', 'B']);
   });
 
   it('keeps same-named events with different types or namespaces apart', async () => {
@@ -430,7 +444,7 @@ describe('computeExecutionHighlights hot spots', () => {
   });
 });
 
-describe('computeExecutionHighlights truncation', () => {
+describe('executionHighlights truncation', () => {
   it('reports the regions the parser found, and where the first one starts', async () => {
     const log = createLog(1000);
     log.truncation = {

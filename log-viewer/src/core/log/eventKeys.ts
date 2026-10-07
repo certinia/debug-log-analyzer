@@ -33,3 +33,26 @@ export function eventKeyChain(event: LogEvent): string[] {
   }
   return keys;
 }
+
+/** Events by signature: type, then namespace, then text, as {@link getEventKey} joins them. */
+export type SignatureLookup<V> = Map<string, Map<string, Map<string, V>>>;
+
+/**
+ * The map from text to value that holds `event`'s signature, made if missing. A
+ * signature found this way builds no key string.
+ */
+export function signatureSlot<V>(lookup: SignatureLookup<V>, event: LogEvent): Map<string, V> {
+  const type = event.type ?? '';
+  let byNamespace = lookup.get(type);
+  if (!byNamespace) {
+    byNamespace = new Map();
+    lookup.set(type, byNamespace);
+  }
+  const namespace = `${event.namespace}`;
+  let byText = byNamespace.get(namespace);
+  if (!byText) {
+    byText = new Map();
+    byNamespace.set(namespace, byText);
+  }
+  return byText;
+}

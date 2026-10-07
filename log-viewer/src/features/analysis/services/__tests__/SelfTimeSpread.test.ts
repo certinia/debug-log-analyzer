@@ -5,8 +5,8 @@ import { describe, expect, it } from '@jest/globals';
 import type { ApexLog, LogEvent } from '@apexdevtools/apex-log-parser';
 
 import { indexTree, storeOf } from '#test-helpers/apexLog.js';
-import { keySelfTimes } from '../../../../core/log/keySelfTimes.js';
-import { computeSelfTimeSpread, selfTimeSpread } from '../SelfTimeSpread.js';
+import { LogStore } from '../../../../core/log/LogStore.js';
+import { selfTimeSpread } from '../SelfTimeSpread.js';
 
 /** One timed call of `text`, in the shape the index reads. */
 function call(text: string, self: number): LogEvent {
@@ -25,9 +25,9 @@ function logOf(events: LogEvent[]): ApexLog {
 }
 
 /** The spread of a log whose calls all hang off the root; the root is eventIndex 0. */
-async function spreadOf(log: ApexLog) {
-  const index = indexTree(log);
-  return computeSelfTimeSpread(index, await keySelfTimes(index));
+function spreadOf(log: ApexLog) {
+  indexTree(log);
+  return new LogStore(log).derive(selfTimeSpread);
 }
 
 /** `count` calls of `text`, each of `self`. */
@@ -35,7 +35,7 @@ function calls(text: string, count: number, self: number): LogEvent[] {
   return Array.from({ length: count }, () => call(text, self));
 }
 
-describe('computeSelfTimeSpread', () => {
+describe('selfTimeSpread', () => {
   it('gives no reading for a log that timed nothing', async () => {
     const spread = await spreadOf(logOf([call('A', 0), call('B', -5)]));
 
