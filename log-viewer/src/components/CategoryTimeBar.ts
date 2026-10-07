@@ -48,11 +48,7 @@ export class CategoryTimeBar extends LitElement {
     if (!slices.length) {
       return html`<section-skeleton
         shape="bar"
-        fallback=${
-          this._window.window
-            ? 'No categorised time was recorded in this range.'
-            : 'No categorised time was recorded in this log.'
-        }
+        fallback="No categorised time was recorded in this ${this._window.window ? 'range' : 'log'}."
       ></section-skeleton>`;
     }
 

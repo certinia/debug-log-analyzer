@@ -159,6 +159,22 @@ export function computeWallClockMs(
   return startTimeMs + (eventTimestampNs - firstTimestampNs) / 1_000_000;
 }
 
+/** The leftmost index below `length` where `holds` becomes true, or `length` if
+ *  it never does. `holds` must be false then true across the run. */
+export function firstIndexWhere(length: number, holds: (index: number) => boolean): number {
+  let low = 0;
+  let high = length;
+  while (low < high) {
+    const mid = (low + high) >>> 1;
+    if (holds(mid)) {
+      high = mid;
+    } else {
+      low = mid + 1;
+    }
+  }
+  return low;
+}
+
 export function debounce<T extends unknown[]>(callBack: (...args: T) => unknown) {
   let requestId: number = 0;
 

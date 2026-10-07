@@ -1,7 +1,9 @@
 /*
  * Copyright (c) 2026 Certinia Inc. All rights reserved.
  */
-import type { ReactiveController, ReactiveControllerHost } from 'lit';
+import type { ReactiveControllerHost } from 'lit';
+
+import { SubscriptionController } from '../events/SubscriptionController.js';
 
 /** A stretch of the log, in the nanosecond timestamps the parser reports. */
 export interface TimeWindow {
@@ -86,27 +88,19 @@ export function onRangeChange(callback: (window: TimeWindow | null) => void): ()
  * than an event: a section built after the last viewport change still opens on
  * the window the user is looking at.
  */
-export class RangeScopeController implements ReactiveController {
+export class RangeScopeController {
   private _window = currentRange();
-  private _release: (() => void) | null = null;
-  private readonly _host: ReactiveControllerHost;
 
   constructor(host: ReactiveControllerHost) {
-    this._host = host;
-    host.addController(this);
-  }
-
-  hostConnected(): void {
-    this._window = currentRange();
-    this._release = onRangeChange((window) => {
-      this._window = window;
-      this._host.requestUpdate();
+    new SubscriptionController(host, () => {
+      this._window = currentRange();
+      return [
+        onRangeChange((window) => {
+          this._window = window;
+          host.requestUpdate();
+        }),
+      ];
     });
-  }
-
-  hostDisconnected(): void {
-    this._release?.();
-    this._release = null;
   }
 
   /** The window on screen, or null for the whole log. */

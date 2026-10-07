@@ -5,7 +5,9 @@ import type { ApexLog, LogEvent } from '@apexdevtools/apex-log-parser';
 import type { ReactiveControllerHost } from 'lit';
 
 import { DEFAULT_NAMESPACE } from '../utility/CallerNamespace.js';
+import { walkEvents } from '../utility/EventTree.js';
 import { CHECK_EVERY, frameBudget, type FrameBudgetOptions } from '../utility/FrameBudget.js';
+import { firstIndexWhere } from '../utility/Util.js';
 import { RangeScopeController, sameWindow, type TimeWindow } from './rangeScope.js';
 
 /** The statement counters an event carries for itself. */
@@ -36,6 +38,13 @@ const COUNTERS: ReadonlyArray<keyof WindowCounts> = [
   'dmlRowCount',
   'soslCount',
 ];
+
+function byCounter<T>(value: (counter: keyof WindowCounts) => T): Record<keyof WindowCounts, T> {
+  return Object.fromEntries(COUNTERS.map((counter) => [counter, value(counter)])) as Record<
+    keyof WindowCounts,
+    T
+  >;
+}
 
 /** Buckets across the log's span. A window's whole buckets are read from a
  *  running total, so its width costs nothing; only the part bucket at each edge
@@ -86,6 +95,15 @@ export class WindowIndex {
   private readonly _selfByNamespace: ReadonlyMap<string, Float64Array>;
   private readonly _runs: CounterRuns;
 
+  /**
+   * The statements the whole log reports one by one.
+   *
+   * A counter reading zero here has no windowed value at all: the log names no
+   * statement for it, so a whole-log figure from the cumulative block cannot be
+   * cut into windows.
+   */
+  readonly logCounts: WindowCounts;
+
   private constructor(
     roots: readonly LogEvent[],
     start: number,
@@ -100,6 +118,7 @@ export class WindowIndex {
     this._selfByCategory = selfByCategory;
     this._selfByNamespace = selfByNamespace;
     this._runs = runs;
+    this.logCounts = byCounter((counter) => runs[counter].startedTotal.at(-1)!); // a run always holds the opening 0
   }
 
   /** Reads every event once, yielding between slices so the chart keeps its
@@ -112,13 +131,7 @@ export class WindowIndex {
     const width = logEnd > start ? (logEnd - start) / BUCKETS : 1;
     const selfByCategory = new Map<string, Float64Array>();
     const selfByNamespace = new Map<string, Float64Array>();
-    const gathered: Readonly<Record<keyof WindowCounts, Gathered>> = {
-      soqlCount: gatherer(),
-      soqlRowCount: gatherer(),
-      dmlCount: gatherer(),
-      dmlRowCount: gatherer(),
-      soslCount: gatherer(),
-    };
+    const gathered = byCounter(gatherer);
 
     // Reassigned per event, so the gap visitor below is allocated once for the
     // whole walk rather than once per event.
@@ -128,28 +141,23 @@ export class WindowIndex {
       spread(intoCategory, intoNamespace, from, to, start, width);
     };
 
-    const stack = [...log.children];
-    for (let walked = 0; stack.length; walked++) {
-      if (walked % CHECK_EVERY === 0) {
+    let walked = 0;
+    for (const event of walkEvents(log.children)) {
+      if (walked++ % CHECK_EVERY === 0) {
         await tick();
       }
-      const event = stack.pop()!; // non-empty: the loop condition just checked
       intoCategory = bucketsFor(selfByCategory, event.category);
       intoNamespace = bucketsFor(selfByNamespace, event.namespace || DEFAULT_NAMESPACE);
-      const children = event.children;
-      eachSelfGap(event, 0, children.length, bucket);
+      eachSelfGap(event, 0, event.children.length, bucket);
 
       const from = event.timestamp;
       const to = endOf(event);
+      // Spelt out, not looped over COUNTERS: a computed key per event costs the build ~18%.
       gather(gathered.soqlCount, from, to, event.soqlCount.self);
       gather(gathered.soqlRowCount, from, to, event.soqlRowCount.self);
       gather(gathered.dmlCount, from, to, event.dmlCount.self);
       gather(gathered.dmlRowCount, from, to, event.dmlRowCount.self);
       gather(gathered.soslCount, from, to, event.soslCount.self);
-
-      for (let i = 0; i < children.length; i++) {
-        stack.push(children[i]!);
-      }
     }
 
     for (const buckets of selfByCategory.values()) {
@@ -160,13 +168,7 @@ export class WindowIndex {
     }
     // The sorts scale with the statements in the log, so they yield too.
     await tick();
-    const runs: CounterRuns = {
-      soqlCount: runOf(gathered.soqlCount),
-      soqlRowCount: runOf(gathered.soqlRowCount),
-      dmlCount: runOf(gathered.dmlCount),
-      dmlRowCount: runOf(gathered.dmlRowCount),
-      soslCount: runOf(gathered.soslCount),
-    };
+    const runs = byCounter((counter) => runOf(gathered[counter]));
     return new WindowIndex(log.children, start, width, selfByCategory, selfByNamespace, runs);
   }
 
@@ -202,27 +204,6 @@ export class WindowIndex {
   }
 
   /**
-   * The statements the whole log reports one by one.
-   *
-   * A counter reading zero here has no windowed value at all: the log names no
-   * statement for it, so a whole-log figure from the cumulative block cannot be
-   * cut into windows.
-   */
-  get logCounts(): WindowCounts {
-    const total = (counter: keyof WindowCounts): number => {
-      const run = this._runs[counter];
-      return run.startedTotal[run.startedTotal.length - 1]!;
-    };
-    return {
-      soqlCount: total('soqlCount'),
-      soqlRowCount: total('soqlRowCount'),
-      dmlCount: total('dmlCount'),
-      dmlRowCount: total('dmlRowCount'),
-      soslCount: total('soslCount'),
-    };
-  }
-
-  /**
    * The statements `window` reaches any part of.
    *
    * Everything that had started by the end of the window, less everything that
@@ -230,20 +211,12 @@ export class WindowIndex {
    * in, since it did run in the window.
    */
   private _countsFor(window: TimeWindow): WindowCounts {
-    const counts: WindowCounts = {
-      soqlCount: 0,
-      soqlRowCount: 0,
-      dmlCount: 0,
-      dmlRowCount: 0,
-      soslCount: 0,
-    };
-    for (const counter of COUNTERS) {
+    return byCounter((counter) => {
       const run = this._runs[counter];
       const started = firstIndexWhere(run.startedAt.length, (i) => run.startedAt[i]! > window.end);
       const ended = firstIndexWhere(run.endedAt.length, (i) => run.endedAt[i]! >= window.start);
-      counts[counter] = run.startedTotal[started]! - run.endedTotal[ended]!;
-    }
-    return counts;
+      return run.startedTotal[started]! - run.endedTotal[ended]!;
+    });
   }
 }
 
@@ -456,22 +429,6 @@ function reachedRun(
   };
 }
 
-/** The leftmost index below `length` where `holds` becomes true, or `length` if
- *  it never does. `holds` must be false then true across the run. */
-function firstIndexWhere(length: number, holds: (index: number) => boolean): number {
-  let low = 0;
-  let high = length;
-  while (low < high) {
-    const mid = (low + high) >>> 1;
-    if (holds(mid)) {
-      high = mid;
-    } else {
-      low = mid + 1;
-    }
-  }
-  return low;
-}
-
 function endOf(event: LogEvent): number {
   return event.exitStamp ?? Number.POSITIVE_INFINITY;
 }
@@ -514,24 +471,14 @@ export class WindowStatsController {
    *  null where {@link window} is. */
   get stats(): WindowStats | null {
     const window = this._range.window;
-    const log = this._log();
-    if (!window || !log) {
-      return null;
-    }
-    const index = indexes.get(log);
-    if (index) {
-      return index.statsFor(window);
-    }
-    this._readLog(log);
-    return null;
+    return window ? (this._index()?.statsFor(window) ?? null) : null;
   }
 
   /** The window's statement counts beside the whole log's, or null where the
    *  whole log is the scope. */
   get counts(): { counts: WindowCounts; logCounts: WindowCounts } | null {
     const window = this._range.window;
-    const log = this._log();
-    const index = window && log ? indexes.get(log) : undefined;
+    const index = window ? this._index() : null;
     return index && window
       ? { counts: index.statsFor(window).counts, logCounts: index.logCounts }
       : null;
@@ -539,7 +486,21 @@ export class WindowStatsController {
 
   /** True while a window is on screen and its stats are not ready yet. */
   get pending(): boolean {
-    return this._range.window !== null && this.stats === null;
+    return this._range.window !== null && this._index() === null;
+  }
+
+  /** The log's index, or null while it builds; the first ask starts the build. */
+  private _index(): WindowIndex | null {
+    const log = this._log();
+    if (!log) {
+      return null;
+    }
+    const index = indexes.get(log);
+    if (index) {
+      return index;
+    }
+    this._readLog(log);
+    return null;
   }
 
   private _readLog(log: ApexLog): void {
@@ -550,6 +511,8 @@ export class WindowStatsController {
     void windowIndexFor(log)
       .then(() => {
         if (this._awaiting === log) {
+          // Cleared only on success, so a replaced log does not stay reachable.
+          this._awaiting = null;
           this._host.requestUpdate();
         }
       })
