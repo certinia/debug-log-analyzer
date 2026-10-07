@@ -1,6 +1,7 @@
 import Link from '@docusaurus/Link';
 import type { CSSProperties, ReactElement } from 'react';
 import { ASSETS_URL } from '@site/src/constants';
+import ThemedImage from '@theme/ThemedImage';
 import clsx from 'clsx';
 import CheckList from '../CheckList';
 import shared from '../shared.module.css';
@@ -12,6 +13,7 @@ interface Feature {
   summary: string;
   points: string[];
   doc: string;
+  // Base name in the assets folder; the light theme adds `-light`.
   image: string;
   alt: string;
   // CSS object-position: which part of the screenshot the panel crops to.
@@ -30,7 +32,7 @@ const FEATURES: Feature[] = [
       'A minimap and a governor limits strip',
     ],
     doc: '/docs/features/timeline',
-    image: 'timeline.png',
+    image: 'timeline',
     alt: 'Timeline tab: a flame chart of a 24.6 second transaction with its minimap, governor limits strip and the Inspector overview',
   },
   {
@@ -43,7 +45,7 @@ const FEATURES: Feature[] = [
       'Three views: `Time Order`, `Aggregated` and `Bottom-Up`',
     ],
     doc: '/docs/features/calltree',
-    image: 'calltree.png',
+    image: 'calltree',
     alt: 'Call Tree tab: nested methods with total time, self time, SOQL, DML and heap columns',
   },
   {
@@ -56,7 +58,7 @@ const FEATURES: Feature[] = [
       'Usage against each governor limit, as `used / limit`',
     ],
     doc: '/docs/features/database',
-    image: 'database.png',
+    image: 'database',
     alt: 'Database tab: SOQL and DML statements with timings, row counts, selectivity and governor usage',
   },
   {
@@ -69,7 +71,7 @@ const FEATURES: Feature[] = [
       'With nothing selected, the limits nearest their ceiling and the log findings',
     ],
     doc: '/docs/features/inspector',
-    image: 'inspector.png',
+    image: 'inspector',
     alt: 'Inspector reading the whole log: the governor metrics nearest a limit, the log findings, and how few signatures hold its self time',
     focus: 'top',
   },
@@ -84,7 +86,7 @@ const FEATURES: Feature[] = [
       'The call path that used each limit stands out in the Call Tree',
     ],
     doc: '/docs/features/governor-limits-heap',
-    image: 'timeline-gov-strip.png',
+    image: 'timeline-gov-strip',
     alt: 'Governor limits strip under the Timeline, with a tooltip listing CPU time at 94.4% of its limit, DML rows, SOQL queries and heap size',
     focus: '88% 50%',
   },
@@ -97,7 +99,7 @@ const FEATURES: Feature[] = [
       'Group by `caller namespace` to see whose package costs the time',
     ],
     doc: '/docs/features/analysis',
-    image: 'analysis.png',
+    image: 'analysis',
     alt: 'Analysis tab: methods ranked by self time and grouped by type',
   },
 ];
@@ -122,8 +124,11 @@ export default function Features(): ReactElement {
                 </Link>
               </div>
               <div className={styles.shot}>
-                <img
-                  src={`${ASSETS_URL}/${f.image}`}
+                <ThemedImage
+                  sources={{
+                    dark: `${ASSETS_URL}/${f.image}.png`,
+                    light: `${ASSETS_URL}/${f.image}-light.png`,
+                  }}
                   alt={f.alt}
                   loading="lazy"
                   style={{ '--focus': f.focus ?? 'center' } as CSSProperties}

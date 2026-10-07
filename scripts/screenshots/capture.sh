@@ -15,6 +15,9 @@
 #   --no-build   skip the build and reuse lana/out
 #   --keep       leave the host running afterwards
 #
+# Only the shots that need VS Code itself are here. capture-web.mjs beside this
+# takes the log viewer shots, in the dark and the light theme.
+#
 # preview.gif is recorded by hand, then converted by mov-to-gif.sh beside this.
 # A run lists it at the end.
 set -euo pipefail
@@ -56,9 +59,6 @@ BOTTOM_CROP=${BOTTOM_CROP:-22}
 # Both are ceilings, never targets: see the resize below.
 FULL_W=$WINDOW_W # a full view is the whole window, grabbed at 2x and halved
 CROP_W=2400 # a crop keeps the pixels it was dragged at, up to this
-# Three full views side by side make 5760, and the docs show them 750 wide. 2250
-# is 3x that, which is all a 3x display can use.
-COMBINED_W=2250
 COUNTDOWN=${COUNTDOWN:-8} # seconds a region shot gives you before the select starts
 
 # name | full or crop | what to set up, one step per line
@@ -75,90 +75,12 @@ COUNTDOWN=${COUNTDOWN:-8} # seconds a region shot gives you before the select st
 # Every step is here because the shot is reproduced from scratch each release
 # and "which tab, what selected" is not recoverable from the old image.
 SHOTS=(
-  # Grouped by tab, and ordered so each shot leaves the view close to what the
-  # next one needs. The four whole-log tab shots all keep the inspector docked
-  # right at about a third of the width: that is the state a log opens in, and
-  # each tab answers it differently. Keep that dock width identical across them.
-
-  # --- Timeline tab ---
-  "timeline.png|full|900|Timeline tab, zoomed out to the whole log (double-click the minimap to reset).
-Nothing selected - press Escape - so the inspector reads the whole log.
-Shows the Overview, time by category, Self time by namespace and the governor usage charts.
-Find closed. Pointer off both panes before Enter, so nothing is dimmed or hovered."
-
-  "timeline-gov-strip.png|crop|750|Timeline tab, still zoomed out, governor strip expanded.
-On the countdown, put the pointer on a point so the tooltip lists used / limit.
-Then drag round the strip, its tooltip, and the bottom of the flame chart above it."
-
-  "timeline-minimap.png|crop|750|Timeline tab, now zoomed in enough that the lens covers about a third of the minimap.
-On the countdown, put the pointer on the lens so it lights up and labels its range.
-Then drag round the minimap alone: its skyline, the lens, and the handles at each end."
-
-  # The next two both want Find open, so they sit together.
-  # Find pins the card on the current match, so no pointer holds it and the drag
-  # is free. Hovering would need the pointer in two places at once.
-  "timeline-tooltip.png|crop|600|Timeline tab. CMD+F, search for a SOQL term, step to a match whose card shows a fitted query with its WHERE.
-Move the pointer off the chart, and let the card settle.
-Drag round the card plus a little of the frame under it."
-
-  "timeline-find.png|crop|600|Timeline tab, Find still open. Search a term with several matches, step to one.
-Drag round the find bar and the highlighted match."
-
-  # --- Call Tree tab ---
-  "calltree.png|full|900|Call Tree tab, Time Order view, expanded 3 or 4 levels, scrolled to the top.
-Nothing selected - press Escape - so the inspector reads the whole log.
-Shows the Overview, the Hot path and the Hot spots; open all three.
-Pointer off both panes before Enter."
-
-  # The inspector closes here and stays closed for the rest of the tab.
-  "calltree-time-order.png|full|900|Call Tree tab, Time Order. First of three shots stitched side by side.
-Inspector closed, so the three tree views get the full width.
-Expand 3 levels. Keep the scroll position and column widths identical across all three."
-
-  "calltree-aggregated.png|full|900|Same tree, Aggregated view. Change only the view."
-
-  "calltree-bottom-up.png|full|900|Same tree, Bottom-Up view. Change only the view."
-
-  "calltree-soql-format.png|crop|750|Call Tree tab, inspector still closed. Find a row whose SOQL is long enough to be formatted.
-Drag round the Name column of that one row, where the query is, not the whole row:
-the columns to its right carry nothing the shot is about."
-
-  # --- Analysis tab ---
-  "analysis.png|full|900|Analysis tab, grouped by method, sorted by Self Time descending, scrolled to the top.
-Inspector docked right again, nothing selected - press Escape.
-Shows the Overview, Findings and Self time spread; open all three.
-Pointer off both panes before Enter."
-
-  "inspector.png|crop|600|The only shot of the panel alone, so the sections read at full size.
-Same Analysis tab, still nothing selected. Overview, Findings and Self time spread, all open,
-scrolled to the top - Findings and Self time spread are the Analysis tab's own, and no
-whole-window shot shows them large enough to read.
-Drag round the panel alone, its full height, at least 600px across."
-
-  # --- Database tab ---
-  "database.png|full|900|Database tab, SOQL section expanded so rows, timings and selectivity show.
-Nothing selected - press Escape - so the inspector reads the whole log.
-Shows the Overview, Namespace duration, Database duration and the call tree of paths
-that end in a query; open them all.
-Pointer off both panes before Enter."
-
   # --- Editor, not the webview ---
   "vscode/show-analysis-lens.png|crop|350|Open sample-log.log in the editor, so the Show Apex Log Analysis lens sits above line 1.
 Drag round the lens and the first line of the log under it."
 
   "vscode/settings-custom-themes.png|crop|300|Open settings.json and define two themes under lana.timeline.customThemes, so the color chips show in the gutter.
 Drag round the customThemes block alone."
-
-  # governor-heap.png is not in this list. Net, gross and peak are built from
-  # HEAP_ALLOCATE, which needs APEX_PROFILING at FINEST; sample-log.log is FINE
-  # and carries none, so the Memory view would shoot empty columns. Capture it
-  # against a log that has them:
-  #
-  #   LOG=/path/to/heap.log ./scripts/screenshots/capture.sh --no-build
-  #
-  # then add the entry back, in the Call Tree group:
-  #   "governor-heap.png|full|900|Call Tree tab, Memory view, Net, Gross and Peak with their
-  #    self variants. Sorted by Peak descending, expanded 3 or 4 levels. Inspector closed."
 )
 
 # Motion the script cannot drive, so these are recorded by hand and listed at the
@@ -353,15 +275,6 @@ for shot in "${SHOTS[@]}"; do
     break
   done
 done
-
-# The three Call Tree views side by side, as the docs show them.
-combined=("$OUT/calltree-time-order.png" "$OUT/calltree-aggregated.png" "$OUT/calltree-bottom-up.png")
-if [ -f "${combined[0]}" ] && [ -f "${combined[1]}" ] && [ -f "${combined[2]}" ]; then
-  magick "${combined[@]}" +append -resize "${COMBINED_W}x>" -colorspace sRGB -strip \
-    "$OUT/calltree-combined.png"
-  rm -f "${combined[@]}"
-  echo "combined -> $OUT/calltree-combined.png ($(magick identify -format '%wx%h' "$OUT/calltree-combined.png"))"
-fi
 
 # Each shot is stripped as it is written, so this only catches a file carried in
 # from an older assets folder. Dropping the chunk keeps the original pixels;

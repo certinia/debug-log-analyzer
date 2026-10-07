@@ -23,7 +23,8 @@ hide_title: true
 
 Use the Timeline to visualize code execution, event durations, and performance bottlenecks. Zoom, pan, navigate with the minimap overview, and interact with detailed tooltips for efficient Salesforce apex log analysis and debugging.
 
-![Timeline view screenshot showing a color-coded flame chart of Salesforce event types such as DB, Method, and SOQL, visualizing code execution duration and performance](https://raw.githubusercontent.com/certinia/debug-log-analyzer/main/lana/assets/1_22/timeline.png)
+![Timeline view screenshot showing a color-coded flame chart of Salesforce event types such as DB, Method, and SOQL, visualizing code execution duration and performance](https://raw.githubusercontent.com/certinia/debug-log-analyzer/main/lana/assets/1_22/timeline.png#gh-dark-mode-only)
+![Timeline view screenshot showing a color-coded flame chart of Salesforce event types such as DB, Method, and SOQL, visualizing code execution duration and performance](https://raw.githubusercontent.com/certinia/debug-log-analyzer/main/lana/assets/1_22/timeline-light.png#gh-light-mode-only)
 
 The timeline stays fast on large logs. It includes text labels on frames, fast zoom/pan operations, and a natural time axis scaling.
 
@@ -140,7 +141,17 @@ Release the mouse button to zoom the viewport to fit the selected area exactly.
 ## Tooltip
 
 <img
-  src="https://raw.githubusercontent.com/certinia/debug-log-analyzer/main/lana/assets/1_22/timeline-tooltip.png"
+  src="https://raw.githubusercontent.com/certinia/debug-log-analyzer/main/lana/assets/1_22/timeline-tooltip.png#gh-dark-mode-only"
+  alt="Tooltip showing detailed event information including event name, description, timestamps, duration, and row counts"
+  style={{
+    width: '100%',
+    height: 'auto',
+    maxWidth: '600px',
+  }}
+  loading="lazy"
+/>
+<img
+  src="https://raw.githubusercontent.com/certinia/debug-log-analyzer/main/lana/assets/1_22/timeline-tooltip-light.png#gh-light-mode-only"
   alt="Tooltip showing detailed event information including event name, description, timestamps, duration, and row counts"
   style={{
     width: '100%',
@@ -167,7 +178,17 @@ The tooltip provides the following information:
 The minimap gives you instant context of your entire log. Spot hotspots at a glance, jump anywhere with a click, and always know exactly where you are, all without scrolling.
 
 <img
-  src="https://raw.githubusercontent.com/certinia/debug-log-analyzer/main/lana/assets/1_22/timeline-minimap.png"
+  src="https://raw.githubusercontent.com/certinia/debug-log-analyzer/main/lana/assets/1_22/timeline-minimap.png#gh-dark-mode-only"
+  alt="The Timeline minimap: a density skyline of the whole log, with the viewport lens over the part the timeline is showing."
+  style={{
+    width: '100%',
+    height: 'auto',
+    maxWidth: '100%',
+  }}
+  loading="lazy"
+/>
+<img
+  src="https://raw.githubusercontent.com/certinia/debug-log-analyzer/main/lana/assets/1_22/timeline-minimap-light.png#gh-light-mode-only"
   alt="The Timeline minimap: a density skyline of the whole log, with the viewport lens over the part the timeline is showing."
   style={{
     width: '100%',
@@ -233,7 +254,17 @@ When hovering over the viewport lens or dragging, a label appears showing:
 The Governor Limits strip displays Salesforce governor limit usage over time, positioned below the main timeline. It provides instant visual feedback on limit consumption to help identify potential limit breaches.
 
 <img
-  src="https://raw.githubusercontent.com/certinia/debug-log-analyzer/main/lana/assets/1_22/timeline-gov-strip.png"
+  src="https://raw.githubusercontent.com/certinia/debug-log-analyzer/main/lana/assets/1_22/timeline-gov-strip.png#gh-dark-mode-only"
+  alt="The Governor Limits strip below the Timeline, showing limit usage over time with traffic-light coloring."
+  style={{
+    width: '100%',
+    height: 'auto',
+    maxWidth: '100%',
+  }}
+  loading="lazy"
+/>
+<img
+  src="https://raw.githubusercontent.com/certinia/debug-log-analyzer/main/lana/assets/1_22/timeline-gov-strip-light.png#gh-light-mode-only"
   alt="The Governor Limits strip below the Timeline, showing limit usage over time with traffic-light coloring."
   style={{
     width: '100%',

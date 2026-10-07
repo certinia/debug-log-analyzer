@@ -94,8 +94,11 @@ At each stable feature release:
 1. Create `lana/assets/<new>/` with the full screenshot set — re-capture the views that changed,
    copy unchanged images forward unchanged, and add any new assets for graduating features.
 
-   Run [`capture.sh`](./scripts/screenshots/capture.sh); it prompts for each shot in turn. Record
-   the hero gif by hand and convert it with
+   Run `pnpm build && pnpm --filter docs-site build:demo`, then
+   [`capture-web.mjs`](./scripts/screenshots/capture-web.mjs). It takes every log viewer shot
+   in the dark and the light theme, with no prompts. Then run
+   [`capture.sh`](./scripts/screenshots/capture.sh) for the editor shots; it prompts for each
+   shot in turn. Record the hero gif by hand and convert it with
    [`mov-to-gif.sh`](./scripts/screenshots/mov-to-gif.sh).
 
    By hand instead: real VS Code, dark theme, one window size, a rich log such as
@@ -106,8 +109,8 @@ At each stable feature release:
    - root `README.md` (**not** `lana/README.md` — it's a generated copy)
    - `lana-docs/docs/docs/**/*.md` (body references **and** `image:` frontmatter)
    - `lana-docs/src/constants.ts` (homepage screenshots and the social card image)
-   - `scripts/screenshots/capture.sh` and `mov-to-gif.sh` — each defaults to the folder, and
-     neither fails when it is stale
+   - `scripts/screenshots/capture.sh`, `capture-web.mjs` and `mov-to-gif.sh` — each defaults to
+     the folder, and none fails when it is stale
 3. Delete `lana/assets/<old>/`. The Marketplace only shows the latest README, so dropping old
    folders is safe; the only loss is images in tag-pinned READMEs on GitHub.
 4. Verify: `grep -rn "<old>" README.md lana-docs/ scripts/` returns nothing, and the hero GIF still

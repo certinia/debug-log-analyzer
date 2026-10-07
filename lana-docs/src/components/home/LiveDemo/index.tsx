@@ -1,6 +1,7 @@
 import useBaseUrl from '@docusaurus/useBaseUrl';
 import { useColorMode } from '@docusaurus/theme-common';
 import { ASSETS_URL } from '@site/src/constants';
+import ThemedImage from '@theme/ThemedImage';
 import clsx from 'clsx';
 import { useCallback, useEffect, useRef, useState, type ReactElement } from 'react';
 import styles from './styles.module.css';
@@ -74,8 +75,11 @@ export default function LiveDemo(): ReactElement {
       ) : (
         // A mouse shortcut only; the Open demo button is the keyboard and screen reader path.
         <div className={styles.poster} onClick={launch}>
-          <img
-            src={`${ASSETS_URL}/timeline.png`}
+          <ThemedImage
+            sources={{
+              dark: `${ASSETS_URL}/timeline.png`,
+              light: `${ASSETS_URL}/timeline-light.png`,
+            }}
             alt="Apex Log Analyzer showing a 24.6 second transaction: the Timeline flame chart with its minimap and governor limits strip, beside the Inspector overview"
             width={1920}
             height={1023}

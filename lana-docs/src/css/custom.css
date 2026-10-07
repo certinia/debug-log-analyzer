@@ -115,3 +115,9 @@ div[class^='announcementBar_'] {
   background-color: var(--ifm-color-primary);
   color: var(--ifm-font-color-base-inverse);
 }
+
+/* GitHub's image suffixes, so one dark and light pair works in the docs and on GitHub. */
+[data-theme='light'] img[src$='#gh-dark-mode-only'],
+[data-theme='dark'] img[src$='#gh-light-mode-only'] {
+  display: none;
+}
