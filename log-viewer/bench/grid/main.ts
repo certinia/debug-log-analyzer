@@ -1,0 +1,201 @@
+/*
+ * Copyright (c) 2026 Certinia Inc. All rights reserved.
+ */
+
+/**
+ * Grid bench. `index.html?c=<contender>`, then pick a log.
+ * `window.bench.runAll()` returns medians per action; the page shows them too.
+ */
+import { parse, type ApexLog, type LogEvent } from '@apexdevtools/apex-log-parser';
+
+import type { Contender } from './contender.js';
+import { TabulatorContender } from './tabulator-contender.js';
+import { frameStats, perFrame, settled, timed, type FrameStats, type Timing } from './timing.js';
+
+const CONTENDERS: Record<string, () => Contender> = {
+  tabulator: () => new TabulatorContender(),
+};
+
+const name = new URLSearchParams(location.search).get('c') ?? 'tabulator';
+const make = CONTENDERS[name];
+const status = document.getElementById('status') as HTMLPreElement;
+const host = document.getElementById('host') as HTMLDivElement;
+document.title = `grid bench: ${name}`;
+
+const say = (text: string): void => {
+  status.textContent += `${text}\n`;
+  // oxlint-disable-next-line no-console -- run-bench.mjs reads progress from the console
+  console.log(`[bench] ${text}`);
+};
+
+/** Heap in MB, after a collection when the runner exposes `gc`. Chrome only. */
+function heapMb(): number {
+  (window as unknown as { gc?: () => void }).gc?.();
+  const memory = (performance as unknown as { memory?: { usedJSHeapSize: number } }).memory;
+  return Math.round((memory?.usedJSHeapSize ?? 0) / 1048576);
+}
+
+/** The deepest event in the middle of the log: the worst `goTo` a user can ask for. */
+function deepTarget(log: ApexLog): LogEvent {
+  const all: { event: LogEvent; depth: number }[] = [];
+  const stack = log.children.map((event) => ({ event, depth: 0 }));
+  while (stack.length) {
+    const item = stack.pop() as { event: LogEvent; depth: number };
+    all.push(item);
+    for (const child of item.event.children) {
+      stack.push({ event: child, depth: item.depth + 1 });
+    }
+  }
+  all.sort((a, b) => a.event.eventIndex - b.event.eventIndex);
+  const middle = all.slice(Math.floor(all.length * 0.45), Math.floor(all.length * 0.55));
+  const best = middle.reduce((a, b) => (b.depth > a.depth ? b : a));
+  return best.event;
+}
+
+interface Summary {
+  ms: number;
+  settledMs: number;
+  longestTaskMs: number;
+}
+
+const median = (xs: number[]): number => {
+  const s = xs.toSorted((a, b) => a - b);
+  return s[Math.floor(s.length / 2)] ?? 0;
+};
+
+const summarise = (runs: Timing[]): Summary => ({
+  ms: Math.round(median(runs.map((r) => r.ms))),
+  settledMs: Math.round(median(runs.map((r) => r.settledMs))),
+  longestTaskMs: Math.round(Math.max(...runs.map((r) => r.longestTaskMs))),
+});
+
+let contender: Contender;
+let log: ApexLog;
+let target: LogEvent;
+const results: Record<string, unknown> = { contender: name };
+
+async function load(text: string): Promise<void> {
+  const t0 = performance.now();
+  log = parse(text);
+  target = deepTarget(log);
+  say(
+    `parsed in ${Math.round(performance.now() - t0)}ms; goTo target depth event ${target.eventIndex}`,
+  );
+  await settled();
+
+  contender = make?.() ?? CONTENDERS.tabulator!();
+  const heapBefore = heapMb();
+  const first = await timed(() => contender.mount(host, log));
+  await settled(10);
+  results.firstRender = summarise([first]);
+  results.heapBeforeMountMb = heapBefore;
+  results.heapAfterMountMb = heapMb();
+  results.rowsAfterMount = contender.visibleRowCount();
+  say(`first render ${JSON.stringify(results.firstRender)} heap ${heapBefore} -> ${heapMb()}MB`);
+  bench.ready = true;
+}
+
+async function scrollStats(): Promise<{ fling: FrameStats; jumpEnd: Timing; jumpTop: Timing }> {
+  const scroller = contender.scroller();
+  scroller.scrollTop = 0;
+  await settled();
+  const fling = frameStats(
+    await perFrame(120, () => {
+      scroller.scrollTop += 1500;
+    }),
+  );
+  const jumpEnd = await timed(() => {
+    scroller.scrollTop = scroller.scrollHeight;
+  });
+  const jumpTop = await timed(() => {
+    scroller.scrollTop = 0;
+  });
+  return { fling, jumpEnd, jumpTop };
+}
+
+async function runAll(reps = 5, skip: string[] = []): Promise<Record<string, unknown>> {
+  const runs: Record<string, Timing[]> = {};
+  const flings: FrameStats[] = [];
+  const resizes: FrameStats[] = [];
+  const add = (key: string, t: Timing): void => {
+    (runs[key] ??= []).push(t);
+    say(
+      `${key} ${Math.round(t.ms)}ms settled ${Math.round(t.settledMs)}ms longest task ${Math.round(t.longestTaskMs)}ms`,
+    );
+  };
+  let findMatches = 0;
+  let csvLength = 0;
+
+  for (let rep = 0; rep < reps; rep++) {
+    add('expandAll', await timed(() => contender.expandAll()));
+    results.rowsExpanded = contender.visibleRowCount();
+    const scroll = await scrollStats();
+    flings.push(scroll.fling);
+    add('scrollJumpEnd', scroll.jumpEnd);
+    add('scrollJumpTop', scroll.jumpTop);
+    add('sortSelfDesc', await timed(() => contender.sortSelfDesc()));
+    add('clearSort', await timed(() => contender.clearSort()));
+    add('filterOff', await timed(() => contender.setDetailFilter(false)));
+    results.rowsUnfiltered = contender.visibleRowCount();
+    add('filterOn', await timed(() => contender.setDetailFilter(true)));
+    add('find', await timed(async () => (findMatches = await contender.find('AccountService'))));
+    if (!skip.includes('exportCsv')) {
+      add('exportCsv', await timed(async () => (csvLength = await contender.exportCsv())));
+    }
+    add('hideColumn', await timed(() => contender.setColumnVisible('heapPeak', false)));
+    add('showColumn', await timed(() => contender.setColumnVisible('heapPeak', true)));
+    resizes.push(
+      frameStats(
+        await perFrame(60, (i) => {
+          contender.setNameWidth(300 + i * 3);
+        }),
+      ),
+    );
+    add('collapseAll', await timed(() => contender.collapseAll()));
+    add('goToDeepRow', await timed(() => contender.goTo(target)));
+    await settled();
+    say(`rep ${rep + 1}/${reps} done`);
+  }
+
+  for (const [key, list] of Object.entries(runs)) {
+    results[key] = summarise(list);
+  }
+  const frames = (list: FrameStats[]): FrameStats => ({
+    frames: list[0]?.frames ?? 0,
+    p50: Math.round(median(list.map((f) => f.p50)) * 10) / 10,
+    p95: Math.round(median(list.map((f) => f.p95)) * 10) / 10,
+    max: Math.round(Math.max(...list.map((f) => f.max))),
+    dropped: median(list.map((f) => f.dropped)),
+  });
+  results.scrollFling = frames(flings);
+  results.resizeNameColumn = frames(resizes);
+  results.findMatches = findMatches;
+  results.csvLength = csvLength;
+  results.heapAfterRunsMb = heapMb();
+  say(JSON.stringify(results, null, 1));
+  return results;
+}
+
+/** Times one action alone, after expanding everything so it sees every row. */
+async function runOne(action: 'exportCsv' | 'find'): Promise<Record<string, unknown>> {
+  await contender.expandAll();
+  await settled();
+  const t = await timed(() =>
+    action === 'find' ? contender.find('AccountService') : contender.exportCsv(),
+  );
+  results[action] = summarise([t]);
+  results.rowsExpanded = contender.visibleRowCount();
+  say(`${action} ${JSON.stringify(results[action])} over ${contender.visibleRowCount()} rows`);
+  return results;
+}
+
+const bench = { ready: false, results, runAll, runOne };
+(window as unknown as { bench: typeof bench }).bench = bench;
+
+(document.getElementById('file') as HTMLInputElement).addEventListener('change', (e) => {
+  const file = (e.target as HTMLInputElement).files?.[0];
+  if (file) {
+    say(`loading ${file.name} (${Math.round(file.size / 1048576)}MB) for ${name}`);
+    void file.text().then(load);
+  }
+});

@@ -44,6 +44,7 @@
     "copy:package-docs": "node ./scripts/copy-package-docs.mjs",
     "typecheck": "tsc -b && tsc -p scripts/tsconfig.json",
     "measure": "rolldown -c scripts/measure/rolldown.config.ts && node --expose-gc --max-old-space-size=12288 scripts/measure/out/measure.mjs",
+    "bench:grid": "rolldown -c log-viewer/bench/grid/rolldown.config.ts && node scripts/grid-bench/run-bench.mjs",
     "lint": "concurrently -r -g 'oxlint' 'prettier --cache **/*.{ts,css,md,mdx,scss} --check --experimental-cli' 'pnpm run typecheck'",
     "test": "jest",
     "test:ci": "jest --runInBand",
