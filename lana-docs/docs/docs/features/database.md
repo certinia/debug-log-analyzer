@@ -24,7 +24,8 @@ hide_title: true
 
 Database insights help Salesforce developers analyze DML, SOQL and SOSL operations, assess query selectivity, performance, and aggregations, and optimize Apex code using advanced sorting, grouping, filtering, call stack tracing, and CSV export tools.
 
-![Database view screenshot displaying DML, SOQL and SOSL operations with row counts, execution times, selectivity indicators, and aggregation details for Salesforce log analysis.](https://raw.githubusercontent.com/certinia/debug-log-analyzer/main/lana/assets/1_22/database.png)
+![Database view screenshot displaying DML, SOQL and SOSL operations with row counts, execution times, selectivity indicators, and aggregation details for Salesforce log analysis.](https://raw.githubusercontent.com/certinia/debug-log-analyzer/main/lana/assets/1_22/database.png#gh-dark-mode-only)
+![Database view screenshot displaying DML, SOQL and SOSL operations with row counts, execution times, selectivity indicators, and aggregation details for Salesforce log analysis.](https://raw.githubusercontent.com/certinia/debug-log-analyzer/main/lana/assets/1_22/database-light.png#gh-light-mode-only)
 
 The tab has separate **DML**, **SOQL** and **SOSL** sections
 

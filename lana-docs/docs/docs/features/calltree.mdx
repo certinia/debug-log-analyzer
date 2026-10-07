@@ -21,7 +21,8 @@ hide_title: true
 
 The Call Tree helps efficiently visualize and navigate the call stack in Salesforce Apex debug logs. Learn to expand and collapse method calls, sort and filter by execution metrics, and quickly jump to code locations in Visual Studio Code. Enhance your Salesforce debugging and performance analysis with detailed insights into DML, SOQL, and execution times.
 
-![Call Tree Screenshot displaying an expandable and collapsible call stack with event types, method signatures, timing metrics, and aggregated DML, SOQL, Throws, and Row counts.](https://raw.githubusercontent.com/certinia/debug-log-analyzer/main/lana/assets/1_22/calltree.png)
+![Call Tree Screenshot displaying an expandable and collapsible call stack with event types, method signatures, timing metrics, and aggregated DML, SOQL, Throws, and Row counts.](https://raw.githubusercontent.com/certinia/debug-log-analyzer/main/lana/assets/1_22/calltree.png#gh-dark-mode-only)
+![Call Tree Screenshot displaying an expandable and collapsible call stack with event types, method signatures, timing metrics, and aggregated DML, SOQL, Throws, and Row counts.](https://raw.githubusercontent.com/certinia/debug-log-analyzer/main/lana/assets/1_22/calltree-light.png#gh-light-mode-only)
 
 Each row shows event type, details such as method signature, self and total time as well as aggregated DML, SOQL, Throws and Row counts.
 
@@ -40,7 +41,8 @@ The Call Tree supports three separate views, toggled via the toolbar:
    In this view, roots are callees and expanded rows are caller context.
    Best when you want to find which methods are hogging the most time and see the different caller paths that led to them.
 
-![The Call Tree's three view modes side by side: Time Order, Aggregated and Bottom-Up.](https://raw.githubusercontent.com/certinia/debug-log-analyzer/main/lana/assets/1_22/calltree-combined.png)
+![The Call Tree's three view modes side by side: Time Order, Aggregated and Bottom-Up.](https://raw.githubusercontent.com/certinia/debug-log-analyzer/main/lana/assets/1_22/calltree-combined.png#gh-dark-mode-only)
+![The Call Tree's three view modes side by side: Time Order, Aggregated and Bottom-Up.](https://raw.githubusercontent.com/certinia/debug-log-analyzer/main/lana/assets/1_22/calltree-combined-light.png#gh-light-mode-only)
 
 ### Go to Code
 
@@ -80,16 +82,8 @@ The **Memory** view carries three heap metrics per call path - **net** (retained
 
 SOQL and SOSL query rows are reformatted onto multiple lines and syntax highlighted, so keywords, fields and bind variables are easy to read at a glance.
 
-<img
-  src="https://raw.githubusercontent.com/certinia/debug-log-analyzer/main/lana/assets/1_22/calltree-soql-format.png"
-  alt="A SOQL query in the Call Tree Name column, formatted across multiple lines with syntax-highlighted keywords, fields and bind variables."
-  style={{
-    width: '100%',
-    height: 'auto',
-    maxWidth: '100%',
-  }}
-  loading="lazy"
-/>
+![A SOQL query in the Call Tree Name column, formatted across multiple lines with syntax-highlighted keywords, fields and bind variables.](https://raw.githubusercontent.com/certinia/debug-log-analyzer/main/lana/assets/1_22/calltree-soql-format.png#gh-dark-mode-only)
+![A SOQL query in the Call Tree Name column, formatted across multiple lines with syntax-highlighted keywords, fields and bind variables.](https://raw.githubusercontent.com/certinia/debug-log-analyzer/main/lana/assets/1_22/calltree-soql-format-light.png#gh-light-mode-only)
 
 ### Keyboard Navigation
 
