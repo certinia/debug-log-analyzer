@@ -17,13 +17,13 @@
       "longestTaskMs": 655
     },
     "scrollJumpEnd": {
-      "ms": 29,
+      "ms": 33,
       "settledMs": 67,
       "longestTaskMs": 0
     },
     "scrollJumpTop": {
-      "ms": 16,
-      "settledMs": 82,
+      "ms": 42,
+      "settledMs": 83,
       "longestTaskMs": 0
     },
     "sortSelfDesc": {

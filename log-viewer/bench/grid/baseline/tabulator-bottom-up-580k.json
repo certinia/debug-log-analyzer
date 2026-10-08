@@ -28,13 +28,13 @@
       "longestTaskMs": 433
     },
     "scrollJumpEnd": {
-      "ms": 28,
-      "settledMs": 66,
+      "ms": 23,
+      "settledMs": 67,
       "longestTaskMs": 0
     },
     "scrollJumpTop": {
-      "ms": 17,
-      "settledMs": 67,
+      "ms": 41,
+      "settledMs": 83,
       "longestTaskMs": 0
     },
     "find": {

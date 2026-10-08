@@ -132,8 +132,21 @@ async function load(text: string): Promise<void> {
   bench.ready = true;
 }
 
+/** Body rows only: lv-grid's header and footer are rows too, and are always in view. */
+const BODY_ROW = '.tabulator-row, .body > .row:not([hidden])';
+
+/** Tabulator paints no rows on a jump of more than a viewport until the scroll stops. */
+function rowsInView(scroller: HTMLElement): boolean {
+  const box = scroller.getBoundingClientRect();
+  return [...scroller.querySelectorAll(BODY_ROW)].some((row) => {
+    const at = row.getBoundingClientRect();
+    return at.height > 0 && at.bottom > box.top && at.top < box.bottom;
+  });
+}
+
 async function scrollStats(): Promise<{ fling: FrameStats; jumpEnd: Timing; jumpTop: Timing }> {
   const scroller = mounted.scroller();
+  const shown = (): boolean => rowsInView(scroller);
   scroller.scrollTop = 0;
   await settled();
   const fling = frameStats(
@@ -143,10 +156,10 @@ async function scrollStats(): Promise<{ fling: FrameStats; jumpEnd: Timing; jump
   );
   const jumpEnd = await timed(() => {
     scroller.scrollTop = scroller.scrollHeight;
-  });
+  }, shown);
   const jumpTop = await timed(() => {
     scroller.scrollTop = 0;
-  });
+  }, shown);
   return { fling, jumpEnd, jumpTop };
 }
 

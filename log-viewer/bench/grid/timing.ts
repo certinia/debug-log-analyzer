@@ -21,7 +21,7 @@ export async function settled(frames = 3, limitMs = 5000): Promise<void> {
 }
 
 export interface Timing {
-  /** Start of the action to the first frame painted after it. */
+  /** Start of the action to the first frame painted after it, or, with `until`, the first one it holds for. */
   ms: number;
   /** Start of the action to the screen going quiet: deferred renders and idle work included. */
   settledMs: number;
@@ -29,8 +29,12 @@ export interface Timing {
   longestTaskMs: number;
 }
 
-/** Times `action` to its first paint and to settling, and records the longest task in that span. */
-export async function timed(action: () => unknown): Promise<Timing> {
+/**
+ * Times `action` to its first paint and to settling, and records the longest task in that span.
+ * With `until`, `ms` runs to the first painted frame that `until` holds for, so a grid that paints
+ * an empty frame first is not timed to that frame.
+ */
+export async function timed(action: () => unknown, until?: () => boolean): Promise<Timing> {
   const tasks: number[] = [];
   const observer = new PerformanceObserver((list) => {
     for (const entry of list.getEntries()) {
@@ -42,6 +46,9 @@ export async function timed(action: () => unknown): Promise<Timing> {
   const start = performance.now();
   await action();
   await nextPaint();
+  while (until && !until() && performance.now() - start < 5000) {
+    await nextPaint();
+  }
   const ms = performance.now() - start;
   await settled();
   const settledMs = performance.now() - start;
