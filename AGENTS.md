@@ -25,8 +25,7 @@ Always use pnpm.
 - `pnpm test` — run tests (before committing)
 - `pnpm lint` — oxlint + `prettier --check` + `tsc -b`, run concurrently. The single
   pre-commit gate, so `typecheck` on top of it is wasted.
-- `pnpm exec jest --selectProjects <log-viewer|lana>` — scoped tests,
-  matching what CI runs per runner.
+- `pnpm exec jest --selectProjects <log-viewer|lana>` — tests for one package only.
 - `pnpm format` — auto-format
 
 `DEVELOPING.md` covers the rest, including the `*:fast` rolldown variants and their caveats.
