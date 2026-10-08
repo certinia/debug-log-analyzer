@@ -26,7 +26,7 @@ const FEATURES: Feature[] = [
     title: 'See where the time went',
     summary: 'A flame chart of the whole transaction.',
     points: [
-      'A 100 MB log ready `3.1×` faster since v1.24',
+      'Large logs ready `3.1×` faster since v1.24',
       'Zoom and pan `7×` faster since v1.20',
       'Search up to `10×` faster since v1.20',
       'A minimap and a governor limits strip',

@@ -11,6 +11,8 @@ interface Measured {
   after: number;
   unit: string;
   gain: 'faster' | 'less';
+  // The log the figures were measured on; larger logs work too.
+  measuredOn: string;
 }
 
 // Older releases only published a speed-up factor, not the raw timings.
@@ -25,20 +27,22 @@ type Gain = Measured | Reported;
 
 const GAINS: Gain[] = [
   {
-    task: 'Timeline and minimap ready, 100 MB log',
+    task: 'Large log ready',
     version: '1.24',
     before: 1964,
     after: 637,
     unit: 'ms',
     gain: 'faster',
+    measuredOn: '100 MB log',
   },
   {
-    task: 'Memory after opening, 100 MB log',
+    task: 'Memory after opening a large log',
     version: '1.24',
     before: 503,
     after: 268,
     unit: 'MB',
     gain: 'less',
+    measuredOn: '100 MB log',
   },
   { task: 'Zoom and pan the Timeline', version: '1.20', factor: 7 },
   { task: 'Search a large log', version: '1.20', factor: 10, upTo: true },
@@ -63,7 +67,7 @@ export default function Performance(): ReactElement {
       <div className="container">
         <div className={clsx(shared.card, shared.cardBody)}>
           <h2 id="performance-title" className={clsx(shared.sectionTitle, styles.title)}>
-            Built for 100 MB logs
+            Built for large logs <span className={styles.size}>100 MB+</span>
           </h2>
           <p className={styles.lede}>
             Each row compares a release with the one before it. A shorter bar costs less.{' '}
@@ -95,7 +99,7 @@ export default function Performance(): ReactElement {
                   {'before' in g && (
                     <span className={styles.measured}>
                       {g.before.toLocaleString('en-US')} {g.unit} to{' '}
-                      {g.after.toLocaleString('en-US')} {g.unit}
+                      {g.after.toLocaleString('en-US')} {g.unit} on a {g.measuredOn}
                     </span>
                   )}
                 </span>

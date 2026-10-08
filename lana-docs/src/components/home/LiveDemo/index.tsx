@@ -43,10 +43,15 @@ export default function LiveDemo(): ReactElement {
   return (
     <figure ref={figure} className={clsx(styles.demo, launchTheme && styles.live)}>
       <div className={styles.bar}>
+        {!launchTheme && (
+          <button type="button" className="button button--primary" onClick={launch}>
+            Open demo
+          </button>
+        )}
         <span className={styles.label}>
           <strong>Live demo</strong> of a 20 MB sample log, in your browser
         </span>
-        {launchTheme ? (
+        {launchTheme && (
           <span className={styles.controls}>
             <button
               type="button"
@@ -59,10 +64,6 @@ export default function LiveDemo(): ReactElement {
               Close demo
             </button>
           </span>
-        ) : (
-          <button type="button" className="button button--primary button--sm" onClick={launch}>
-            Open demo
-          </button>
         )}
       </div>
       {launchTheme ? (
