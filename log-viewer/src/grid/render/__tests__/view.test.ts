@@ -28,8 +28,11 @@ const source = (count: number): TreeSource<Node> => ({
 /** The scroller's height; 0 is a hidden tab. */
 let viewport = VIEWPORT;
 
-/** jsdom does no layout: rows are ROW high, the scroller `viewport` high, and it scrolls. */
-function fakeLayout(scroller: HTMLElement): void {
+/**
+ * jsdom does no layout: rows are ROW high, the scroller `viewport` high, and it scrolls.
+ * Returns a move with no scroll event yet, as a script's scrollTop write in a frame is.
+ */
+function fakeLayout(scroller: HTMLElement): (top: number) => void {
   let top = 0;
   Object.defineProperties(scroller, {
     offsetHeight: { get: () => viewport },
@@ -56,6 +59,9 @@ function fakeLayout(scroller: HTMLElement): void {
   jest
     .spyOn(HTMLElement.prototype, 'getBoundingClientRect')
     .mockImplementation(() => ({ height: ROW, width: 500 }) as DOMRect);
+  return (value) => {
+    top = value;
+  };
 }
 
 const flush = (): Promise<void> => new Promise((resolve) => setTimeout(resolve, 0));
@@ -82,7 +88,6 @@ function fakeResizeObserver(): (target: Element, height: number) => void {
     }
   } as unknown as typeof ResizeObserver;
   return (target, height) => {
-    viewport = height;
     const entry = {
       target,
       contentRect: { height, width: 500 },
@@ -101,7 +106,7 @@ async function setup(count = 1000) {
   const body = document.createElement('div');
   scroller.append(body);
   document.body.append(scroller);
-  fakeLayout(scroller);
+  const moveQuietly = fakeLayout(scroller);
   const store = new GridStore(source(count));
   await store.settled();
   const painted: number[] = [];
@@ -121,7 +126,7 @@ async function setup(count = 1000) {
   await flush();
   const shown = (): HTMLElement[] =>
     [...body.children].filter((el): el is HTMLElement => !(el as HTMLElement).hidden);
-  return { scroller, body, store, view, painted, shown };
+  return { scroller, body, store, view, painted, shown, moveQuietly };
 }
 
 afterEach(() => {
@@ -183,11 +188,25 @@ describe('GridView', () => {
     expect(10 * ROW - scroller.scrollTop).toBe(40);
   });
 
+  it('keeps a scroll the virtualizer has not heard of when a row above the fold grows', async () => {
+    const resize = fakeResizeObserver();
+    const { scroller, body, moveQuietly } = await setup();
+    scroller.scrollTop = 300 * ROW;
+    await flush();
+    moveQuietly(600 * ROW);
+    // Row 298 is in the overscan above the fold, and grows to twice its height.
+    const row = body.querySelector('[data-index="298"]');
+    expect(row).not.toBeNull();
+    resize(row as Element, 2 * ROW);
+    expect(scroller.scrollTop).toBe(600 * ROW + ROW);
+  });
+
   it('paints nothing while hidden, and on show puts the user back where they were', async () => {
     const resize = fakeResizeObserver();
     const { scroller, store, view, painted, shown } = await setup();
     scroller.scrollTop = 300 * ROW;
     await flush();
+    viewport = 0;
     resize(scroller, 0);
     // The browser drops the scroll position with the box.
     scroller.scrollTop = 0;
@@ -200,6 +219,7 @@ describe('GridView', () => {
     await flush();
     expect(painted.length).toBe(before);
 
+    viewport = VIEWPORT;
     resize(scroller, VIEWPORT);
     await flush();
     expect(scroller.scrollTop).toBe(350 * ROW);
@@ -209,10 +229,12 @@ describe('GridView', () => {
   it('goes to a row asked for while hidden, once shown', async () => {
     const resize = fakeResizeObserver();
     const { scroller, view, shown } = await setup();
+    viewport = 0;
     resize(scroller, 0);
     view.scrollToIndex(500);
     expect(scroller.scrollTop).toBe(0);
 
+    viewport = VIEWPORT;
     resize(scroller, VIEWPORT);
     await flush();
     expect(shown().map((el) => el.textContent)).toContain('row 500');

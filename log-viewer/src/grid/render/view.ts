@@ -3,6 +3,7 @@
  */
 import {
   elementScroll,
+  measureElement,
   observeElementOffset,
   observeElementRect,
   Virtualizer,
@@ -68,6 +69,7 @@ export class GridView<R extends object> {
 
   constructor(options: GridViewOptions<R>) {
     this.options = options;
+    let syncOffset = (): void => {};
     this.virtualizer = new Virtualizer<HTMLElement, HTMLElement>({
       count: 0,
       getScrollElement: () => options.scroller,
@@ -75,7 +77,28 @@ export class GridView<R extends object> {
       overscan: options.overscan ?? 10,
       scrollToFn: elementScroll,
       observeElementRect,
-      observeElementOffset,
+      observeElementOffset: (instance, cb) => {
+        let seen = Number.NaN;
+        syncOffset = () => {
+          const top = options.scroller.scrollTop;
+          if (top === seen) {
+            return;
+          }
+          seen = top;
+          // Its own adjustments are known to it; each sync re-places every row after the change.
+          const known = (instance.scrollOffset ?? 0) + instance.scrollAdjustments;
+          if (Math.abs(top - known) >= 1.5) {
+            cb(top, instance.isScrolling);
+          }
+        };
+        return observeElementOffset(instance, cb);
+      },
+      // A row resized above the fold moves scrollTop by the change, from the offset of the
+      // last scroll event. A scrollTop write since then would be undone: give it the live one.
+      measureElement: (element, entry, instance) => {
+        syncOffset();
+        return measureElement(element, entry, instance);
+      },
       onChange: () => this.schedule(),
     });
     this.unmount = this.virtualizer._didMount();
