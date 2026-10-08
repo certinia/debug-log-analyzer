@@ -172,6 +172,10 @@ export class LvGrid<R extends object = object> extends LitElement {
   @property({ type: Boolean, attribute: 'freeze-first', reflect: true })
   freezeFirst = false;
 
+  /** Where the footer sits when the rows do not fill the grid: its bottom edge, or under the last row. */
+  @property({ attribute: 'footer-position', reflect: true })
+  footerPosition: 'bottom' | 'rows' = 'bottom';
+
   private store: GridStore<R> | null = null;
   private readonly data = new StoreController<R>(this);
   private view: GridView<R> | null = null;

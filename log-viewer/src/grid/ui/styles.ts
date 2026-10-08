@@ -42,6 +42,9 @@ export const gridStyles = css`
 
     .scroller {
       position: relative;
+      /* A column, so the body fills a short grid and the footer sits at the bottom. */
+      display: flex;
+      flex-direction: column;
       height: 100%;
       overflow: auto;
       contain: strict;
@@ -50,6 +53,11 @@ export const gridStyles = css`
 
       &:focus-visible {
         box-shadow: inset 0 0 0 var(--grid-stroke) var(--grid-focus);
+      }
+
+      /* The body holds only absolute rows: it would shrink to nothing. */
+      & > * {
+        flex-shrink: 0;
       }
     }
 
@@ -82,6 +90,11 @@ export const gridStyles = css`
 
     .body {
       position: relative;
+      flex-grow: 1;
+
+      :host([footer-position='rows']) & {
+        flex-grow: 0;
+      }
 
       & .row {
         --grid-row-bg: transparent;

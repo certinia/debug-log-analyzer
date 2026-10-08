@@ -471,6 +471,14 @@ describe('lv-grid columns', () => {
     expect(grid.hasAttribute('freeze-first')).toBe(true);
   });
 
+  it('reflects footer-position, which the styles key the footer place on', async () => {
+    const { grid } = await setup();
+    expect(grid.getAttribute('footer-position')).toBe('bottom');
+    grid.footerPosition = 'rows';
+    await settle(grid);
+    expect(grid.getAttribute('footer-position')).toBe('rows');
+  });
+
   it('keeps its rows when moved out and back, and shows what changed while away', async () => {
     const { grid, root, names } = await setup();
     const body = root.querySelector('.body');
