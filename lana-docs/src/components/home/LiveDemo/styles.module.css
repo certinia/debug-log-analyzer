@@ -9,7 +9,6 @@
 .bar {
   display: flex;
   align-items: center;
-  justify-content: space-between;
   gap: 1rem;
   padding: 0.5rem 0.75rem 0.5rem 1rem;
   border-bottom: 1px solid var(--lana-rule);
@@ -28,6 +27,7 @@
 .controls {
   display: flex;
   gap: 0.5rem;
+  margin-left: auto;
 }
 
 /* The bottom fades into the page so the screenshot reads as a preview, not a framed image. */

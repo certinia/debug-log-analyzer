@@ -71,6 +71,13 @@ Open the Command Palette (`Cmd/Ctrl+Shift+P`) and run **Log: Retrieve Apex Log A
 - Avoid truncated logs - they can result in incomplete or misleading analysis.
 - Recommended settings for a good balance of detail and performance: `APEX_CODE,FINE; APEX_PROFILING,FINE; CALLOUT,INFO; DB,FINEST; NBA,INFO; SYSTEM,DEBUG; VALIDATION,INFO; VISUALFORCE,FINE; WAVE,INFO; WORKFLOW,FINE`
 
+Some features need a higher level than the recommended settings:
+
+| Feature                                                                                             | Needs                           |
+| --------------------------------------------------------------------------------------------------- | ------------------------------- |
+| [Variables](./features/inspector.md#variables) in the inspector                                     | `APEX_CODE` at `FINEST`         |
+| [Flow and Process Builder usage](./features/governor-limits-heap.md#flow-and-process-builder-usage) | `WORKFLOW` at `FINER` or higher |
+
 ## Next steps
 
 To find what made a transaction slow, follow [Find out why a transaction is slow](./guides/slow-transaction.md).

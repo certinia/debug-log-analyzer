@@ -32,7 +32,7 @@ Open the log and start on the **Timeline**.
 
 ### 2. Find the methods that used the time
 
-Select a slow frame and use **Go to Call Tree**, or open the [Call Tree](../features/calltree.mdx) tab.
+Right-click a slow frame and select **Show in Call Tree** (or select it and press `J`), or open the [Call Tree](../features/calltree.mdx) tab.
 
 - **Total time** includes the calls a method made. **Self time** is the time in the method itself. A method with a high self time is slow itself. A method with a high total time and a low self time calls something slow.
 - Switch to the **Bottom-Up** view to rank methods by their self time, and expand a method to see which callers called it. See [View Modes](../features/calltree.mdx#view-modes).

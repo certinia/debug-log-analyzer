@@ -68,11 +68,12 @@ Select a row that merges calls - an Aggregated or Bottom-Up row, or any Analysis
 
 ### Summary
 
-Press **Summary** in the panel's header to read the whole log without giving up your selection, and **Detail** to go back to it. The switch appears as soon as something is selected, and any new selection returns the panel to it.
+Press **Summary** in the panel's header to read the tab's summary without giving up your selection, and **Detail** to go back to it. The switch appears as soon as something is selected, and any new selection returns the panel to it.
 
 With nothing selected the inspector reads the whole log. Every tab opens with an **Overview** - the six governor metrics closest to their limit - then adds what its own tab can answer at log scope:
 
-- **Timeline** - time by category, **self time by namespace**, governor usage over time, and the whole-log call tree, which opens on the frames holding the most self time. Click a point on a usage chart, or step the arrow keys across a focused chart and press `Enter`, to move the Timeline to that instant and zoom in on it. Nothing is selected, so the inspector keeps this whole-log reading.
+- **Timeline** - time by category, **self time by namespace**, governor usage over time, and a call tree that opens on the frames holding the most self time. Click a point on a usage chart, or step the arrow keys across a focused chart and press `Enter`, to move the Timeline to that instant and zoom in on it.
+  On the Timeline, the summary reads the part of the log on screen, not the whole log. It changes as you zoom and pan, and the Overview counts only the statements in that part. A measured range (`Shift+Drag`) replaces the area on screen until you clear it. CPU time and heap stay whole-log, because the log reports them only as totals. The usage charts show the whole log and shade the part on screen.
 - **Call Tree** - the **hot path** the log spent its time in, and the **hot spots** with the most self time.
 - **Database** - **Namespace duration**: **Called from namespace** - the namespace that issued the statement - and, when they differ, **Ran in namespace**, the namespaces of whatever ran beneath it, such as a package trigger firing on your DML. **Database duration**: how few statements hold the time, with cost per row, how often each ran, and its duration split into self time and descendants, so a DML that is cheap in itself but fires seven seconds of triggers reads as one. **Call tree**: every call path that ends in a query, DML or search, with **Total Time** - the database time at or below the row - beside **Self Time**, the row's own code. A row with all total and no self is waiting on the database; the reverse is the Apex around it.
 - **Analysis** - **Findings**: what is slow or wrong in the log, and what to do about it, led by the findings by severity - press any number of them to hold the list to those. A finding whose events the log times also shows how long they took and what that is of the log. Each finding lists the statements behind it, most repeated first; click one to reveal its row in the grid.
@@ -91,7 +92,7 @@ Right-click a row in the **Call stack** or **Call tree** for:
 | **Copy Details**      | Name, type, duration and governor metrics                       |
 | **Copy Call Stack**   | The whole parent chain, one frame per line                      |
 
-Press `Escape` to clear the selection on the tab you're on; the inspector returns to its whole-log view.
+Press `Escape` to clear the selection on the tab you're on; the inspector returns to the tab's summary.
 
 Clicking a row highlights the matching frame or row in the tab you're on, and never switches tab: the Timeline selects the frame and centers it when it's off screen, the Call Tree scrolls to it in every view, and the Database tab selects the statement. Rows in the Call tree's **Aggregated** and **Bottom-Up** views merge several occurrences, so clicking one marks every occurrence, goes to the first, and reads the details of the calls it counts. Focus stays in the inspector, so the arrow keys keep moving there. Arrow keys move between rows, and `CMD / CTRL + c` copies the table.
 

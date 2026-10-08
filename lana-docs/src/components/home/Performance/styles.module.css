@@ -6,6 +6,10 @@
   margin-bottom: 0.75rem;
 }
 
+.size {
+  color: var(--lana-accent-text);
+}
+
 .lede {
   max-width: 70ch;
   color: var(--lana-muted);

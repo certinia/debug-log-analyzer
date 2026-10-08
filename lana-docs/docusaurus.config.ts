@@ -263,7 +263,7 @@ const config: Config = {
           ],
         },
       ],
-      copyright: `Copyright © ${new Date().getFullYear()} Certinia inc. All rights reserved.`,
+      copyright: `Copyright © ${new Date().getFullYear()} Certinia Inc. All rights reserved.`,
     },
     prism: {
       theme: prismThemes.github,
