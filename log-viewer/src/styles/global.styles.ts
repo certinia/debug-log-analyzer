@@ -77,6 +77,11 @@ export const globalStyles = [
       background-color: var(--vscode-editor-findMatchHighlightBackground, yellow);
     }
 
+    /* The editor's selection lies under its current match; the inactive one is too faint. */
+    ::highlight(current-find-match-under) {
+      background-color: var(--vscode-editor-selectionBackground, Highlight);
+    }
+
     ::highlight(current-find-match) {
       color: var(--vscode-editor-findMatchForeground);
       background-color: var(--vscode-editor-findMatchBackground, #8b8000);

@@ -120,6 +120,58 @@ function findOver(columns: Array<{ field: string; visible: boolean; value: strin
   return find;
 }
 
+describe('Find marks the current match', () => {
+  // jsdom has no CSS Highlight API.
+  class FakeHighlight extends Set<Range> {
+    priority = 0;
+  }
+  const registry = new Map<string, FakeHighlight>();
+  const globals = globalThis as { Highlight?: unknown; CSS?: unknown };
+  const real = { Highlight: globals.Highlight, CSS: globals.CSS };
+
+  beforeAll(() => {
+    globals.Highlight = FakeHighlight;
+    globals.CSS = { highlights: registry };
+  });
+
+  afterAll(() => {
+    globals.Highlight = real.Highlight;
+    globals.CSS = real.CSS;
+    Find._findHighlight = null;
+    Find._underHighlight = null;
+    Find._currentHighlight = null;
+  });
+
+  it('lays the current match over a layer of its own, as the editor lays it over the selection', () => {
+    const cell = document.createElement('div');
+    cell.textContent = 'Decimal.compareTo(Decimal)';
+    const rowData = { highlightIndexes: [1, 2] };
+    const row = {
+      getData: () => rowData,
+      getCells: () => [{ getField: () => 'text', getElement: () => cell }],
+    };
+    const find = new Find({ on: () => {}, getRows: () => [row] } as never);
+    find._findArgs = { text: 'Decimal', count: 2, options: { matchCase: false } };
+    find._buildRegex(find._findArgs);
+    find._searchedFields = new Set(['text']);
+    find._currentMatchIndex = 2;
+
+    find._applyHighlights();
+
+    const texts = (name: string): string[] => [...(registry.get(name) ?? [])].map(String);
+    expect(texts('find-match')).toEqual(['Decimal']);
+    expect(texts('current-find-match')).toEqual(['Decimal']);
+    const [current] = registry.get('current-find-match') ?? [];
+    expect(registry.get('current-find-match-under')?.has(current as Range)).toBe(true);
+    const priority = (name: string): number => registry.get(name)?.priority ?? Number.NaN;
+    expect(priority('find-match')).toBeLessThan(priority('current-find-match-under'));
+    expect(priority('current-find-match-under')).toBeLessThan(priority('current-find-match'));
+
+    find._clearInstanceRanges();
+    expect(registry.get('current-find-match-under')?.size).toBe(0);
+  });
+});
+
 describe('Find counts what the table is showing', () => {
   const search = { text: 'default', count: 1, options: { matchCase: false } };
 

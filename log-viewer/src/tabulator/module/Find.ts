@@ -19,6 +19,8 @@ export class Find extends Module {
   // Shared across all Find instances — one per highlight type
   static _findHighlight: Highlight | null = null;
   static _currentHighlight: Highlight | null = null;
+  // Holds the current match too: the editor lays it over its selection.
+  static _underHighlight: Highlight | null = null;
 
   // Per-instance range tracking for cleanup without affecting other instances
   _myFindRanges: Range[] = [];
@@ -250,10 +252,16 @@ export class Find extends Module {
     }
     if (!Find._currentHighlight) {
       Find._currentHighlight = new Highlight();
+      Find._currentHighlight.priority = 2;
+    }
+    if (!Find._underHighlight) {
+      Find._underHighlight = new Highlight();
+      Find._underHighlight.priority = 1;
     }
 
     // Detach highlights during modification to prevent per-range style recalc
     CSS.highlights.delete('find-match');
+    CSS.highlights.delete('current-find-match-under');
     CSS.highlights.delete('current-find-match');
 
     // Clear this instance's old ranges from the shared Highlights
@@ -261,6 +269,7 @@ export class Find extends Module {
 
     if (!this._findArgs?.text) {
       CSS.highlights.set('find-match', Find._findHighlight);
+      CSS.highlights.set('current-find-match-under', Find._underHighlight);
       CSS.highlights.set('current-find-match', Find._currentHighlight);
       return;
     }
@@ -268,6 +277,7 @@ export class Find extends Module {
     const regex = this._cachedRegex;
     if (!regex) {
       CSS.highlights.set('find-match', Find._findHighlight);
+      CSS.highlights.set('current-find-match-under', Find._underHighlight);
       CSS.highlights.set('current-find-match', Find._currentHighlight);
       return;
     }
@@ -317,6 +327,7 @@ export class Find extends Module {
           }
 
           if (highlightIndex === this._currentMatchIndex) {
+            Find._underHighlight!.add(range);
             Find._currentHighlight!.add(range);
             this._myCurrentRanges.push(range);
           } else {
@@ -329,6 +340,7 @@ export class Find extends Module {
 
     // Re-attach highlights — browser applies all ranges in a single paint
     CSS.highlights.set('find-match', Find._findHighlight!);
+    CSS.highlights.set('current-find-match-under', Find._underHighlight!);
     CSS.highlights.set('current-find-match', Find._currentHighlight!);
   }
 
@@ -356,6 +368,7 @@ export class Find extends Module {
       Find._findHighlight?.delete(range);
     }
     for (const range of this._myCurrentRanges) {
+      Find._underHighlight?.delete(range);
       Find._currentHighlight?.delete(range);
     }
     this._myFindRanges = [];
