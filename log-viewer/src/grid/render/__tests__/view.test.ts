@@ -141,4 +141,23 @@ describe('GridView', () => {
     await flush();
     expect(10 * ROW - scroller.scrollTop).toBe(40);
   });
+
+  it('leaves the body empty when destroyed, so a new view on it paints the only rows', async () => {
+    const { scroller, body, store, view } = await setup();
+    view.repaint();
+    view.destroy();
+    await flush();
+    expect(body.childElementCount).toBe(0);
+
+    const next = new GridView<Node>({
+      scroller,
+      body,
+      rowHeight: ROW,
+      overscan: 2,
+      painter: { paint: () => {} },
+    });
+    next.setRows(store.snapshot().rows);
+    await flush();
+    expect(body.childElementCount).toBe(7);
+  });
 });

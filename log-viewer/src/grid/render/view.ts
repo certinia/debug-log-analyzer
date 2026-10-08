@@ -142,9 +142,15 @@ export class GridView<R extends object> {
     return this.painted.get(index);
   }
 
+  /** Stops the view and removes its rows; the body can take a new view. */
   destroy(): void {
     this.unmount();
     this.highlighter.clear();
+    this.rows = null;
+    this.painted.clear();
+    this.spare.length = 0;
+    this.stale.clear();
+    this.options.body.replaceChildren();
   }
 
   private layout(count: number): void {

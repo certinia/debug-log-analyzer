@@ -92,6 +92,11 @@ export const gridStyles = css`
         width: 100%;
         background: var(--grid-row-bg);
 
+        /* Spare rows in the pool; display: grid beats the browser's own [hidden] rule. */
+        &[hidden] {
+          display: none;
+        }
+
         &:hover {
           --grid-row-bg: var(--grid-hover-bg);
         }
