@@ -23,6 +23,8 @@ export async function createTimelineApp(
     roundPixels: true,
     autoDensity: true,
     autoStart: false,
+    // Pixi 8.22 made Tab anywhere in the page switch on its accessibility layer; we use none.
+    accessibilityOptions: { activateOnTab: false },
   });
   app.ticker.stop();
   app.stage.eventMode = 'none';
