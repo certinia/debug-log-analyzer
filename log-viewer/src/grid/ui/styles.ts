@@ -51,10 +51,6 @@ export const gridStyles = css`
       overflow-anchor: none;
       outline: none;
 
-      &:focus-visible {
-        box-shadow: inset 0 0 0 var(--grid-stroke) var(--grid-focus);
-      }
-
       /* The body holds only absolute rows: it would shrink to nothing. */
       & > * {
         flex-shrink: 0;
