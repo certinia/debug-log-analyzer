@@ -62,6 +62,25 @@ const cells = css`
     flex: none;
     margin-inline-start: var(--lana-space-xs);
   }
+
+  /* The codicon chevrons of the Tabulator trees. A glyph box, not text, so outside the type ramp. */
+  .twisty.closed::before,
+  .twisty.open::before {
+    border: none;
+    font-family: 'codicon';
+    font-size: 14px;
+    line-height: 16px;
+    vertical-align: top;
+  }
+
+  .twisty.closed::before {
+    content: '\\eab6';
+  }
+
+  .twisty.open::before {
+    content: '\\eab4';
+    rotate: none;
+  }
 `;
 
 const categoryKeys = [...new Set(Object.values(CATEGORY_THEME_KEY))];
