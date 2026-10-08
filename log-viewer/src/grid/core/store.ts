@@ -716,7 +716,10 @@ export class GridStore<R extends object> {
           // Filter only: order does not change a total, and sorting every list costs.
           lists.push(this.filters.length ? children.filter((r) => this.passes(r)) : children);
         }
-        yield;
+        // A yield per row costs more than the walk; drive reads the clock every CHECK_EVERY yields.
+        if (all.length % 64 === 0) {
+          yield;
+        }
       }
     }
     return yield* totalsOf(this.calcs, top, all);
