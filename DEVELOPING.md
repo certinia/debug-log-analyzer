@@ -124,7 +124,9 @@ tests against the same host.
 Commands that need a Salesforce org also need the Salesforce Services extension. The server serves
 your local copy of it, because a `localhost` page cannot fetch one from the marketplace CDN.
 Install the Salesforce Extension Pack in VS Code, or point `LANA_SERVICES_EXTENSION_PATH` at an
-unpacked copy. Without either, the log viewer still works but org commands do not.
+unpacked copy. Without either, the log viewer still works but org commands do not. The end-to-end
+tests do not need either: their browser turns off web security, so it loads Services from the
+marketplace.
 
 ## 🧪 Testing Your Changes
 

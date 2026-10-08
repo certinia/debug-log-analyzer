@@ -15,9 +15,9 @@ const start = async (): Promise<void> => {
   if (!servicesExtension) {
     // eslint-disable-next-line no-console -- a dev harness reports this on stderr
     console.warn(
-      'Salesforce Services not found locally, falling back to the gallery id — which a ' +
-        'localhost origin cannot fetch, so commands needing an org will not work. Install the ' +
-        'extension in VS Code, or set LANA_SERVICES_EXTENSION_PATH.',
+      'Salesforce Services not found locally, so using the gallery id. A normal browser on ' +
+        'localhost cannot load it, so org commands will not work there. Install the extension ' +
+        'in VS Code, or set LANA_SERVICES_EXTENSION_PATH.',
     );
   }
 
