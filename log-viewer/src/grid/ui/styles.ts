@@ -24,6 +24,7 @@ export const gridStyles = css`
       --grid-find-bg: color-mix(in srgb, Mark 55%, transparent);
       --grid-find-current-fg: currentColor;
       --grid-find-current-bg: Mark;
+      --grid-find-current-under-bg: transparent;
       --grid-font: inherit;
       --grid-font-size: inherit;
       --grid-tree-font: var(--grid-font);
@@ -277,6 +278,10 @@ export const gridStyles = css`
     ::highlight(lv-grid-find-match) {
       color: var(--grid-find-fg);
       background-color: var(--grid-find-bg);
+    }
+
+    ::highlight(lv-grid-current-find-match-under) {
+      background-color: var(--grid-find-current-under-bg);
     }
 
     ::highlight(lv-grid-current-find-match) {

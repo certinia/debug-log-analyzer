@@ -33,6 +33,8 @@ const theme = css`
     --grid-find-bg: var(--vscode-editor-findMatchHighlightBackground, yellow);
     --grid-find-current-fg: var(--vscode-editor-findMatchForeground, currentColor);
     --grid-find-current-bg: var(--vscode-editor-findMatchBackground, #8b8000);
+    /* The editor selects its current match, so the selection lies under it. */
+    --grid-find-current-under-bg: var(--vscode-editor-selectionBackground, Highlight);
     --grid-font: var(--lana-font-ui);
     --grid-font-size: var(--lana-text-base);
     --grid-tree-font: var(--lana-font-mono);

@@ -7,12 +7,21 @@ export const FIND_ATTR = 'data-grid-find';
 
 const MATCH = 'lv-grid-find-match';
 const CURRENT = 'lv-grid-current-find-match';
+const UNDER = 'lv-grid-current-find-match-under';
 
 /** The CSS Highlight API: Chromium 105, Safari 17.2, Firefox 140. Without it, no marks. */
 const supported = (): boolean => typeof CSS !== 'undefined' && 'highlights' in CSS;
 
 // One pair for the document: CSS.highlights is global, and every grid adds to it.
-let shared: { match: Highlight; current: Highlight } | null = null;
+let shared: { match: Highlight; under: Highlight; current: Highlight } | null = null;
+
+/** The current match lies over `under` too: the editor lays it over its selection. */
+function createShared(): NonNullable<typeof shared> {
+  const [match, under, current] = [new Highlight(), new Highlight(), new Highlight()];
+  under.priority = 1;
+  current.priority = 2;
+  return { match, under, current };
+}
 
 interface TextNodeAt {
   node: Text;
@@ -70,7 +79,7 @@ export class FindHighlighter {
     if (!pattern || first < 0) {
       return;
     }
-    shared ??= { match: new Highlight(), current: new Highlight() };
+    shared ??= createShared();
     const marked: Range[] = [];
     let n = first;
     for (const cell of row.querySelectorAll<HTMLElement>(`[${FIND_ATTR}]`)) {
@@ -80,7 +89,12 @@ export class FindHighlighter {
       for (let m = pattern.exec(text); m; m = pattern.exec(text)) {
         const range = rangeOver(nodes, m.index, m.index + m[0].length);
         if (range) {
-          (n === current ? shared.current : shared.match).add(range);
+          if (n === current) {
+            shared.under.add(range);
+            shared.current.add(range);
+          } else {
+            shared.match.add(range);
+          }
           marked.push(range);
         }
         n++;
@@ -90,6 +104,7 @@ export class FindHighlighter {
       this.ranges.set(row, marked);
     }
     CSS.highlights.set(MATCH, shared.match);
+    CSS.highlights.set(UNDER, shared.under);
     CSS.highlights.set(CURRENT, shared.current);
   }
 
@@ -100,6 +115,7 @@ export class FindHighlighter {
     }
     for (const range of ranges) {
       shared.match.delete(range);
+      shared.under.delete(range);
       shared.current.delete(range);
     }
     this.ranges.delete(row);
