@@ -32,6 +32,7 @@ import { eventLabel } from '../features/call-tree/utils/eventText.js';
 import { soqlInlineElement } from '../features/soql/format/inlineCell.js';
 import { SelectionEchoGuard } from '../core/events/SelectionEchoGuard.js';
 import { SubscriptionController } from '../core/events/SubscriptionController.js';
+import { TeardownController } from '../core/events/TeardownController.js';
 import { soqlSyntaxStyles } from '../features/soql/styles/soql-syntax.css.js';
 import { globalStyles } from '../styles/global.styles.js';
 import { progressColumnWidth } from '../tabulator/format/measureWidth.js';
@@ -196,7 +197,7 @@ export class CallTreeDetail extends LitElement {
   private readonly _range = new RangeScopeController(this, () => this.wholeLog);
   private _live: LiveWindow | null = null;
 
-  // The build in flight; a newer view-switch aborts it, and so does a disconnect.
+  // The build in flight; a newer view-switch aborts it, and so does a teardown.
   private _switch: AbortController | null = null;
 
   /** True while a scoped build is in flight. Read by the tables' placeholder,
@@ -519,11 +520,13 @@ export class CallTreeDetail extends LitElement {
     }
   }
 
-  disconnectedCallback(): void {
-    super.disconnectedCallback();
-    this._switch?.abort();
-    this._destroyTables();
-  }
+  private readonly _teardown = new TeardownController(this, {
+    teardown: () => {
+      this._switch?.abort();
+      this._destroyTables();
+    },
+    rebuild: () => void this._showActive(),
+  });
 
   private _tableHost(mode: ViewMode): HTMLDivElement | null {
     return this.renderRoot?.querySelector<HTMLDivElement>(`#${mode}-tree`) ?? null;
@@ -573,8 +576,8 @@ export class CallTreeDetail extends LitElement {
   }
 
   private async _showActive(): Promise<void> {
-    // A newer switch, or a disconnect, aborts this one: building into detached
-    // DOM that disconnectedCallback already ran past would leak the Tabulator.
+    // A newer switch, or a teardown, aborts this one: building into detached
+    // DOM that the teardown already ran past would leak the Tabulator.
     this._switch?.abort();
     const { signal } = (this._switch = new AbortController());
     // Wait for the now-visible host to lay out before Tabulator measures column
@@ -638,7 +641,8 @@ export class CallTreeDetail extends LitElement {
     }
 
     const container = this._tableHost(mode);
-    if (!container) {
+    // A detached host builds when it comes back, so nothing is left to leak here.
+    if (!container || !this.isConnected) {
       return;
     }
 

@@ -22,6 +22,7 @@ import {
   type FrameVariables,
   type VariableIndex,
 } from '../core/log/frameVariables.js';
+import { TeardownController } from '../core/events/TeardownController.js';
 import { logContext } from '../core/log/logContext.js';
 import type { LogStore } from '../core/log/LogStore.js';
 import { previewOf, RAW_CLAMP_CHARS, type VariableValue } from '../core/log/variableValue.js';
@@ -83,7 +84,7 @@ export class VariablesDetail extends LitElement {
   private _spreadKey?: readonly number[] | null;
 
   /** The comparison in flight; a new selection aborts it, and so does a
-   *  disconnect. */
+   *  teardown. */
   private _walk: AbortController | null = null;
 
   /** Which rows the user has opened or closed, by their stable id, so disclosure
@@ -384,11 +385,15 @@ export class VariablesDetail extends LitElement {
       (spread?.locals.some(partlyMarked) || spread?.fields.some(partlyMarked)) ?? false;
   }
 
-  disconnectedCallback(): void {
-    super.disconnectedCallback();
+  private readonly _teardown = new TeardownController(this, {
     // Comparing on into a detached host wastes frames and answers nobody.
-    this._walk?.abort();
-  }
+    teardown: () => this._walk?.abort(),
+    // The walk was abandoned, so the selection is compared again.
+    rebuild: () => {
+      this._spreadKey = undefined;
+      this.requestUpdate();
+    },
+  });
 
   /** The log bound to one point in it, held per point. */
   private _viewAt(cut: number): Lookups {

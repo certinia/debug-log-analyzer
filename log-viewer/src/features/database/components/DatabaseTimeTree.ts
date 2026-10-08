@@ -25,6 +25,7 @@ import { logContext } from '../../../core/log/logContext.js';
 import type { LogStore } from '../../../core/log/LogStore.js';
 import { SelectionEchoGuard } from '../../../core/events/SelectionEchoGuard.js';
 import { SubscriptionController } from '../../../core/events/SubscriptionController.js';
+import { TeardownController } from '../../../core/events/TeardownController.js';
 import { formatDuration, formatInteger } from '../../../core/utility/Util.js';
 import { globalStyles } from '../../../styles/global.styles.js';
 import { progressColumnWidth } from '../../../tabulator/format/measureWidth.js';
@@ -157,7 +158,7 @@ export class DatabaseTime extends LitElement {
    *  that runs Tabulator's accessors, which deep-clone every row. */
   private _rows: readonly DatabaseTreeRow[] = [];
 
-  /** The build in flight; a newer one aborts it, and so does a disconnect. */
+  /** The build in flight; a newer one aborts it, and so does a teardown. */
   private _building: AbortController | null = null;
 
   /** The store whose rows the grid holds; the skeleton shows until it is the one on screen. */
@@ -202,17 +203,19 @@ export class DatabaseTime extends LitElement {
     }),
   ]);
 
-  disconnectedCallback(): void {
-    super.disconnectedCallback();
-    this._building?.abort();
-    // Rows go with the table, so the mark can't outlive them.
-    this._locatedRow.clear();
-    this._table?.destroy();
-    this._table = null;
-    this._rowsByEvent = null;
-    this._rows = [];
-    this._builtFor = null;
-  }
+  private readonly _teardown = new TeardownController(this, {
+    teardown: () => {
+      this._building?.abort();
+      // Rows go with the table, so the mark can't outlive them.
+      this._locatedRow.clear();
+      this._table?.destroy();
+      this._table = null;
+      this._rowsByEvent = null;
+      this._rows = [];
+      this._builtFor = null;
+    },
+    rebuild: () => void this._build(),
+  });
 
   firstUpdated(): void {
     this._contextMenu = this.renderRoot.querySelector('context-menu');
@@ -284,7 +287,7 @@ export class DatabaseTime extends LitElement {
     await this.updateComplete;
     await waitForNextFrame();
     const container = this._host();
-    if (!container || signal.aborted) {
+    if (!container || signal.aborted || !this.isConnected) {
       return;
     }
 
