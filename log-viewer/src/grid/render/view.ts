@@ -65,7 +65,7 @@ export class GridView<R extends object> {
   private pending: { rows: RowView<R>; toggled?: RowKey | Group<R> } | null = null;
   private pendingScroll: { index: number; align: 'center' | 'auto' } | null = null;
   private readonly unobserve: () => void;
-  /** Not virtual-core's: it unobserves a row's old element, which the pool gave to another row. */
+  // Not virtual-core's: it unobserves a row's old element, which the pool gave to another row.
   private readonly rowObserver: ResizeObserver | null;
   private syncOffset = (): void => {};
 

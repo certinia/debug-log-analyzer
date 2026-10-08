@@ -15,7 +15,7 @@ const supported = (): boolean => typeof CSS !== 'undefined' && 'highlights' in C
 // One pair for the document: CSS.highlights is global, and every grid adds to it.
 let shared: { match: Highlight; under: Highlight; current: Highlight } | null = null;
 
-/** The current match lies over `under` too: the editor lays it over its selection. */
+// The current match lies over `under` too: the editor lays it over its selection.
 function createShared(): NonNullable<typeof shared> {
   const [match, under, current] = [new Highlight(), new Highlight(), new Highlight()];
   under.priority = 1;

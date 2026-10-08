@@ -6,15 +6,22 @@
  */
 import { FIND_ATTR, FindHighlighter } from '../highlight.js';
 
-/** jsdom has no CSS Highlight API. */
+// jsdom has no CSS Highlight API.
 class FakeHighlight extends Set<Range> {
   priority = 0;
 }
 const registry = new Map<string, FakeHighlight>();
+const globals = globalThis as { Highlight?: unknown; CSS?: unknown };
+const real = { Highlight: globals.Highlight, CSS: globals.CSS };
 
 beforeAll(() => {
-  (globalThis as { Highlight?: unknown }).Highlight = FakeHighlight;
-  (globalThis as { CSS?: unknown }).CSS = { highlights: registry };
+  globals.Highlight = FakeHighlight;
+  globals.CSS = { highlights: registry };
+});
+
+afterAll(() => {
+  globals.Highlight = real.Highlight;
+  globals.CSS = real.CSS;
 });
 
 function row(...cells: string[]): HTMLElement {
