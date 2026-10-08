@@ -1,8 +1,7 @@
 import { expect, type Page } from '@playwright/test';
 import {
-  activeQuickInputTextField,
+  executeCommandWithCommandPalette,
   hasContent,
-  QUICK_INPUT_WIDGET,
   webviewActiveFrame,
   WORKBENCH,
 } from '@salesforce/playwright-vscode-ext';
@@ -39,10 +38,5 @@ export const openLogAnalysis = async (page: Page): Promise<void> => {
     timeout: 60_000,
   });
 
-  await page.keyboard.press('F1');
-  await activeQuickInputTextField(page).fill(`>${SHOW_ANALYSIS}`);
-  await page
-    .locator(QUICK_INPUT_WIDGET)
-    .getByRole('option', { name: SHOW_ANALYSIS, exact: true })
-    .click();
+  await executeCommandWithCommandPalette(page, SHOW_ANALYSIS);
 };
