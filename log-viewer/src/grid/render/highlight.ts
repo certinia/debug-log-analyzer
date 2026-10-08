@@ -5,8 +5,8 @@
 /** Cells find searched carry this attribute, so marks land where the count came from. */
 export const FIND_ATTR = 'data-grid-find';
 
-const MATCH = 'find-match';
-const CURRENT = 'current-find-match';
+const MATCH = 'lv-grid-find-match';
+const CURRENT = 'lv-grid-current-find-match';
 
 /** The CSS Highlight API: Chromium 105, Safari 17.2, Firefox 140. Without it, no marks. */
 const supported = (): boolean => typeof CSS !== 'undefined' && 'highlights' in CSS;

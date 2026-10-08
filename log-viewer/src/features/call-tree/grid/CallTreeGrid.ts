@@ -29,6 +29,10 @@ const theme = css`
     --grid-selected-bg: var(--vscode-list-activeSelectionBackground, Highlight);
     --grid-selected-fg: var(--vscode-list-activeSelectionForeground, HighlightText);
     --grid-focus: var(--lana-focus-border);
+    --grid-find-fg: var(--vscode-editor-findMatchHighlightForeground, currentColor);
+    --grid-find-bg: var(--vscode-editor-findMatchHighlightBackground, yellow);
+    --grid-find-current-fg: var(--vscode-editor-findMatchForeground, currentColor);
+    --grid-find-current-bg: var(--vscode-editor-findMatchBackground, #8b8000);
     --grid-font: var(--lana-font-ui);
     --grid-font-size: var(--lana-text-base);
     --grid-tree-font: var(--lana-font-mono);

@@ -20,7 +20,9 @@ export const gridStyles = css`
       --grid-selected-fg: HighlightText;
       --grid-marked-bg: var(--grid-hover-bg);
       --grid-focus: Highlight;
+      --grid-find-fg: currentColor;
       --grid-find-bg: color-mix(in srgb, Mark 55%, transparent);
+      --grid-find-current-fg: currentColor;
       --grid-find-current-bg: Mark;
       --grid-font: inherit;
       --grid-font-size: inherit;
@@ -272,11 +274,13 @@ export const gridStyles = css`
       }
     }
 
-    ::highlight(find-match) {
+    ::highlight(lv-grid-find-match) {
+      color: var(--grid-find-fg);
       background-color: var(--grid-find-bg);
     }
 
-    ::highlight(current-find-match) {
+    ::highlight(lv-grid-current-find-match) {
+      color: var(--grid-find-current-fg);
       background-color: var(--grid-find-current-bg);
     }
   }
