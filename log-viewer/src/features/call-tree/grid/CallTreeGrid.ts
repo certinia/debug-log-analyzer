@@ -43,6 +43,11 @@ const cells = css`
   ${unsafeCSS(progressCss)}
   ${unsafeCSS(soqlSyntaxStyles)}
 
+  /* Log text keeps its line breaks, one variable per line in a STATIC_VARIABLE_LIST. */
+  .cell.tree .content {
+    white-space: pre-wrap;
+  }
+
   .soql-group-header {
     display: flex;
     min-width: 0;
