@@ -31,13 +31,13 @@ To demo another build, set `DEMO_VIEWER_ROOT` to a checkout that has a built `la
 ```sh
 pnpm --filter docs-site build
 pnpm --filter docs-site serve
-pnpm --filter docs-site test:demo
+pnpm --filter docs-site test
 ```
 
 - `build` fails on a broken link.
-- `test:demo` runs a Playwright check of the live demo against `build`, so build first. It needs Chromium: `pnpm exec playwright install chromium`.
+- `test` runs jest tests of the live demo: the homepage component, and `demo/host.js` against the commands the viewer sends. It needs no build or browser. Set `DEMO_VIEWER_ROOT` to check the host against another checkout's viewer.
 
-CI runs the build and the demo test on every pull request.
+CI runs the build and the tests on every pull request.
 
 ## Publish
 

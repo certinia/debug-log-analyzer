@@ -67,21 +67,20 @@ jobs:
           - name: Release Dependencies
             working-directory: release
             run: pnpm run ci:install
-      # Not beside Dependencies: pnpm exec needs node_modules to find playwright.
       - parallel:
-          - name: Install Chromium
-            run: pnpm exec playwright install --only-shell chromium
           # build:prod is newer than some releases; build:dev with NODE_ENV works on every one.
           - name: Build Release Log Viewer
             working-directory: release
             run: NODE_ENV=production pnpm run build:dev
+          # The demo host comes from main and the viewer from the release, so check they still agree.
+          - name: Test Demo Host
+            env:
+              DEMO_VIEWER_ROOT: ${{ github.workspace }}/release
+            run: pnpm --filter docs-site test
       - name: Build Site
         env:
           DEMO_VIEWER_ROOT: ${{ github.workspace }}/release
         run: pnpm --filter docs-site build
-      # The demo host comes from main and the viewer from the release, so check they still agree.
-      - name: Test Live Demo
-        run: pnpm --filter docs-site test:demo
       # 👆 Build steps
       - name: Setup Pages
         uses: actions/configure-pages@v6

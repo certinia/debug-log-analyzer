@@ -7,7 +7,7 @@
     "start": "docusaurus start",
     "build": "pnpm run build:demo && docusaurus build",
     "build:demo": "node scripts/build-demo.mjs",
-    "test:demo": "playwright test --tsconfig tsconfig.playwright.json",
+    "test": "jest --config ../jest.config.js --selectProjects docs",
     "swizzle": "docusaurus swizzle",
     "deploy": "docusaurus deploy",
     "clear": "docusaurus clear",
@@ -33,6 +33,7 @@
     "@docusaurus/module-type-aliases": "^3.10.2",
     "@docusaurus/tsconfig": "^3.10.2",
     "@docusaurus/types": "^3.10.2",
+    "@types/react-dom": "^19.3.0",
     "typescript": "^7.0.2"
   },
   "browserslist": {

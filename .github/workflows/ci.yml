@@ -152,22 +152,11 @@ jobs:
           # The live demo copies the built viewer into the site.
           - name: Build Log Viewer
             run: pnpm run build:prod
-          # As in the e2e job: the runner image already has Chromium's libraries.
-          - name: Install Chromium
-            run: pnpm exec playwright install --only-shell chromium
+          - name: Run Jest Tests
+            run: pnpm --filter docs-site test
       # onBrokenLinks is 'throw', so a broken link fails here and not at publish.
       - name: Build Site
         run: pnpm --filter docs-site build
-      - name: Test Live Demo
-        run: pnpm --filter docs-site test:demo
-      - name: Upload Playwright HTML report
-        if: failure()
-        uses: actions/upload-artifact@v7
-        with:
-          name: playwright-report-docs
-          path: lana-docs/playwright-report
-          if-no-files-found: ignore
-          retention-days: 7
 
   gate:
     # The single required status check: the ruleset never needs updating when jobs change.
