@@ -316,7 +316,7 @@ export class LvGrid<R extends object = object> extends LitElement {
     if (changed.has('groupBy')) {
       void store.setGroupBy(this.groupBy);
     }
-    if (changed.has('columns') && this.calcsChanged()) {
+    if ((changed.has('columns') || changed.has('sort')) && this.calcsChanged()) {
       void store.setCalcs(this.calcs);
     }
     if (changed.has('sort') || changed.has('columns')) {
@@ -520,11 +520,14 @@ export class LvGrid<R extends object = object> extends LitElement {
     }
   }
 
-  /** Collects the columns' calcs; true when any differs from the last set. */
+  /**
+   * Collects the calcs of the shown columns, and of the sorted one, which orders the groups;
+   * true when any differs from the last set. A hidden column's total is never read.
+   */
   private calcsChanged(): boolean {
     const next: Record<string, NonNullable<GridColumn<R>['calc']>> = {};
     for (const column of this.columns) {
-      if (column.calc) {
+      if (column.calc && (!column.hidden || column.id === this.sort?.column)) {
         next[column.id] = column.calc;
       }
     }

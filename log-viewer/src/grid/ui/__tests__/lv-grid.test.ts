@@ -143,6 +143,23 @@ describe('lv-grid', () => {
     expect(foot).toEqual(['', '6', '']);
   });
 
+  it('sums a hidden column only once it is shown', async () => {
+    let runs = 0;
+    const count = { of: (rows: readonly Node[]): number => (runs++, rows.length) };
+    const withCount = (hidden: boolean): GridColumn<Node>[] =>
+      columns().map((column) =>
+        column.id === 'kind' ? { ...column, calc: count, hidden } : column,
+      );
+    const { grid, root } = await setup({ columns: withCount(true) });
+    expect(runs).toBe(0);
+
+    grid.columns = withCount(false);
+    await settle(grid);
+    expect(runs).toBe(1);
+    const foot = [...root.querySelectorAll('.foot .cell')].map((el) => el.textContent?.trim());
+    expect(foot).toEqual(['', '6', '3']);
+  });
+
   it('cycles a sort from its first direction, to the other, to none', async () => {
     const { grid, header, names } = await setup();
     const reshapes: string[] = [];

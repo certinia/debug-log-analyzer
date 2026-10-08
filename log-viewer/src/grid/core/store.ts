@@ -1,7 +1,7 @@
 /*
  * Copyright (c) 2026 Certinia Inc. All rights reserved.
  */
-import { needsAll, totalsOf, type Calcs, type Totals } from './calcs.js';
+import { needsAll, totalsOf, type Calc, type Calcs, type Totals } from './calcs.js';
 import { groupLine, headerLine, rowLine, type ExportColumn, type ExportOptions } from './export.js';
 import {
   FindCollector,
@@ -58,6 +58,9 @@ export interface GridStoreOptions<R> {
 }
 
 type Entry<R> = R | Group<R>;
+
+/** Totals kept by the calc that made them. */
+type Held<R> = Map<Calc<R>, number>;
 
 class FlatRows<R extends object> implements RowView<R> {
   readonly rows: readonly Entry<R>[];
@@ -196,14 +199,17 @@ export class GridStore<R extends object> {
   /** Groups start closed; these are open. */
   private openGroups = new Set<string>();
   /**
-   * The footer for each set of filters, so a filter turned off and on again costs nothing.
-   * Totals hold until the source or calcs change; sort and expansion keep them.
+   * The footer for each set of filters, each calc's total kept by the calc, so a filter
+   * turned off and on again costs nothing and new calcs sum only themselves. Totals hold
+   * until the source changes; sort and expansion keep them.
    */
-  private footers = new Map<string, Totals>();
+  private footers = new Map<string, Held<R>>();
   private filterIds = new WeakMap<RowFilter<R>, number>();
   private nextFilterId = 0;
-  /** Group totals hold until the filters, source, calcs or grouping change. */
-  private groupTotals = new Map<string, Totals>();
+  /** Group totals, kept by calc, hold until the filters, source or grouping change. */
+  private groupTotals = new Map<string, Held<R>>();
+  /** The waiting build changes the totals only, so it keeps the rows on screen. */
+  private totalsOnly = false;
 
   private current: Snapshot<R>;
   private listeners = new Set<(snapshot: Snapshot<R>) => void>();
@@ -267,10 +273,11 @@ export class GridStore<R extends object> {
     return this.reorder();
   }
 
+  /** Sums only the calcs it has not summed before for the filters on. */
   setCalcs(calcs: Calcs<R>): Promise<void> {
     this.calcs = calcs;
-    this.dropTotals();
-    return this.rebuild();
+    // Groups carry their totals, so a grouped grid builds its rows again.
+    return this.rebuild(!this.groupBy);
   }
 
   /** Groups the top-level rows. Every group starts closed. */
@@ -549,8 +556,12 @@ export class GridStore<R extends object> {
     );
   }
 
-  /** Runs builds until no change is waiting, then publishes the last one. */
-  private rebuild(): Promise<void> {
+  /**
+   * Runs builds until no change is waiting, then publishes the last one. `totalsOnly` keeps
+   * the rows on screen; it holds only when no build is running, as one would go stale.
+   */
+  private rebuild(totalsOnly = false): Promise<void> {
+    this.totalsOnly = totalsOnly && !this.running;
     this.dirty = true;
     if (!this.running) {
       // run() marks itself running before its first await, so settled() below waits for it.
@@ -564,7 +575,9 @@ export class GridStore<R extends object> {
     this.publish(null, true);
     while (this.dirty) {
       this.dirty = false;
-      const built = await this.build();
+      const totalsOnly = this.totalsOnly;
+      this.totalsOnly = false;
+      const built = await this.build(totalsOnly);
       if (built) {
         this.publish(built, this.dirty);
       }
@@ -576,8 +589,11 @@ export class GridStore<R extends object> {
     }
   }
 
-  /** The full row list and footer, in slices. Null when a newer change made it stale. */
-  private async build(): Promise<Built<R> | null> {
+  /**
+   * The full row list and footer, in slices. Null when a newer change made it stale.
+   * With `totalsOnly`, the footer alone, beside the rows on screen.
+   */
+  private async build(totalsOnly: boolean): Promise<Built<R> | null> {
     const tick = sliceTimer(this.scheduler, () => this.dirty);
     for (const filter of this.filters) {
       if (filter.keepAncestors && !this.deepPass.has(filter)) {
@@ -591,14 +607,18 @@ export class GridStore<R extends object> {
     const stale = (): boolean => this.dirty;
     const top = this.childrenOf(this.source.roots);
     const key = this.filterKey();
-    let totals = this.footers.get(key);
-    if (!totals) {
-      const footer = await drive(this.totalsFor(top), tick, stale);
-      if (!footer || this.dirty) {
-        return null;
-      }
-      totals = footer.value;
-      this.footers.set(key, totals);
+    let held = this.footers.get(key);
+    if (!held) {
+      held = new Map();
+      this.footers.set(key, held);
+    }
+    const footer = await drive(this.totalsFor(top, held), tick, stale);
+    if (!footer || this.dirty) {
+      return null;
+    }
+    const totals = footer.value;
+    if (totalsOnly) {
+      return { rows: this.current.rows as FlatRows<R>, totals };
     }
     const out: Flat<R> = { rows: [], depths: [], flags: [] };
     if (!this.groupBy) {
@@ -689,23 +709,37 @@ export class GridStore<R extends object> {
     }
     const groups: Group<R>[] = [];
     for (const [key, rows] of buckets) {
-      let totals = this.groupTotals.get(key);
-      if (!totals) {
-        totals = yield* this.totalsFor(rows);
-        this.groupTotals.set(key, totals);
+      let held = this.groupTotals.get(key);
+      if (!held) {
+        held = new Map();
+        this.groupTotals.set(key, held);
       }
-      groups.push(new Group(key, rows, totals));
+      groups.push(new Group(key, rows, yield* this.totalsFor(rows, held)));
     }
     groups.sort(byCount);
     // Array sort is stable, so groups that tie keep the default order.
     return this.groupCompare ? groups.sort(this.groupCompare) : groups;
   }
 
-  /** Each calc over `top`, or over every row under it that passes the filters. */
-  private *totalsFor(top: readonly R[]): Generator<void, Totals, void> {
-    if (!needsAll(this.calcs)) {
-      return yield* totalsOf(this.calcs, top, []);
+  /**
+   * Each calc over `top`, or over every row under it that passes the filters. Only calcs
+   * missing from `held` run; their totals go into it.
+   */
+  private *totalsFor(top: readonly R[], held: Held<R>): Generator<void, Totals, void> {
+    const named = Object.entries(this.calcs);
+    const missing = Object.fromEntries(named.filter(([, calc]) => !held.has(calc)));
+    if (Object.keys(missing).length) {
+      const all = needsAll(missing) ? yield* this.allUnder(top) : [];
+      const made = yield* totalsOf(missing, top, all);
+      for (const [name, calc] of Object.entries(missing)) {
+        held.set(calc, made[name] as number);
+      }
     }
+    return Object.fromEntries(named.map(([name, calc]) => [name, held.get(calc) as number]));
+  }
+
+  /** Every row under `top` that passes the filters, at any depth, in no set order. */
+  private *allUnder(top: readonly R[]): Generator<void, R[], void> {
     const all: R[] = [];
     const lists: (readonly R[])[] = [top];
     while (lists.length) {
@@ -722,7 +756,7 @@ export class GridStore<R extends object> {
         }
       }
     }
-    return yield* totalsOf(this.calcs, top, all);
+    return all;
   }
 
   /** Rows that pass `filter` or have a descendant that does: one post-order walk of the tree. */

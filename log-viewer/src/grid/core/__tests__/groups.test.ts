@@ -215,7 +215,45 @@ describe('GridStore totals', () => {
     await store.setFilters([{ test: notB.test }]);
     expect(runs).toBe(before + 1);
     await store.setCalcs({ count: counted });
-    expect(runs).toBe(before + 2);
+    expect(runs).toBe(before + 1);
+  });
+
+  it('sums only the calcs it has not summed, and keeps the rows on screen', async () => {
+    const runs: string[] = [];
+    const counted = (name: string) => ({
+      scope: 'all' as const,
+      of: (rows: readonly Node[]): number => {
+        runs.push(name);
+        return rows.length;
+      },
+    });
+    const first = counted('first');
+    const second = counted('second');
+    const store = new GridStore(source(tree()), { calcs: { first } });
+    await store.settled();
+    const rows = store.snapshot().rows;
+
+    await store.setCalcs({ first, second });
+    expect(runs).toEqual(['first', 'second']);
+    expect(store.snapshot().totals).toEqual({ first: 6, second: 6 });
+    expect(store.snapshot().rows).toBe(rows);
+
+    await store.setCalcs({ second });
+    await store.setCalcs({ first, second });
+    expect(runs).toEqual(['first', 'second']);
+    expect(store.snapshot().totals).toEqual({ first: 6, second: 6 });
+  });
+
+  it('builds the groups again when the calcs change, with each total summed once', async () => {
+    let runs = 0;
+    const self = { of: (rows: readonly Node[]): number => (runs++, rows.length) };
+    const store = new GridStore(source(tree()), { groupBy: byKind });
+    await store.settled();
+    await store.setCalcs({ self });
+    expect(groupOf(store, 'apex').totals).toEqual({ self: 2 });
+    const after = runs;
+    await store.setCalcs({ self });
+    expect(runs).toBe(after);
   });
 
   it('runs a calc that yields in slices, for the footer and each group', async () => {
