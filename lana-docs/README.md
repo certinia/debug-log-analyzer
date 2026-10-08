@@ -24,7 +24,7 @@ pnpm --filter docs-site build:demo
 
 `build:demo` copies the viewer, `demo/host.js` and the sample log into `static/demo`, which git ignores. Run it again after each viewer build. The site `build` runs it for you.
 
-To demo another build, set `DEMO_VIEWER_ROOT` to a checkout that has a built `lana/out`.
+To demo another build, set `DEMO_VIEWER_ROOT` to a folder that has a built `lana/out` and its `lana/package.json`: a checkout, or a release vsix with its `extension` folder renamed to `lana`.
 
 ## Build and test
 
@@ -44,7 +44,7 @@ CI runs the build and the tests on every pull request.
 The **Publish GitHub Pages Site** workflow publishes the site. It runs after each successful stable release, and you can run it by hand from the Actions tab.
 
 - The docs come from `main`. To publish a text fix, merge it, then run the workflow by hand.
-- The live demo runs the latest stable release of the viewer, so it never shows unreleased viewer code.
+- The live demo runs the latest stable release of the viewer, so it never shows unreleased viewer code. The workflow downloads that release's vsix from Open VSX.
 
 ## Screenshots
 

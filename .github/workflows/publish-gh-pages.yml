@@ -42,12 +42,6 @@ jobs:
           tag=$(gh release view --repo "$GITHUB_REPOSITORY" --json tagName --jq .tagName)
           [[ "$tag" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || { echo "Unexpected release tag: $tag"; exit 1; }
           echo "tag=$tag" >> "$GITHUB_OUTPUT"
-      - name: Checkout the release
-        uses: actions/checkout@v7
-        with:
-          ref: ${{ steps.release.outputs.tag }}
-          path: release
-          persist-credentials: false
       # 👇 Build steps
       - name: pnpm setup
         uses: pnpm/action-setup@v6.1.0
@@ -58,28 +52,24 @@ jobs:
         with:
           node-version: '24'
           cache: 'pnpm'
-          cache-dependency-path: |
-            pnpm-lock.yaml
-            release/pnpm-lock.yaml
       - parallel:
           - name: Dependencies
             run: pnpm run ci:install
-          - name: Release Dependencies
-            working-directory: release
-            run: pnpm run ci:install
-      - parallel:
-          # build:prod is newer than some releases; build:dev with NODE_ENV works on every one.
-          - name: Build Release Log Viewer
-            working-directory: release
-            run: NODE_ENV=production pnpm run build:dev
-          # The demo host comes from main and the viewer from the release, so check they still agree.
-          - name: Test Demo Host
+          # The published vsix, so the demo runs the bytes users install. By version, since
+          # Open VSX's latest can be a pre-release.
+          - name: Download the release
             env:
-              DEMO_VIEWER_ROOT: ${{ github.workspace }}/release
-            run: pnpm --filter docs-site test
+              TAG: ${{ steps.release.outputs.tag }}
+            run: |
+              url=$(curl -fsS "https://open-vsx.org/api/FinancialForce/lana/$TAG" | jq -er .files.download)
+              curl -fsSL -o "$RUNNER_TEMP/lana.vsix" "$url"
+              unzip -q "$RUNNER_TEMP/lana.vsix" 'extension/*' -d "$RUNNER_TEMP/release"
+              mv "$RUNNER_TEMP/release/extension" "$RUNNER_TEMP/release/lana"
+      - name: Test Demo Host
+        run: pnpm --filter docs-site test
       - name: Build Site
         env:
-          DEMO_VIEWER_ROOT: ${{ github.workspace }}/release
+          DEMO_VIEWER_ROOT: ${{ runner.temp }}/release
         run: pnpm --filter docs-site build
       # 👆 Build steps
       - name: Setup Pages
