@@ -9,7 +9,7 @@ import {
 } from '@tanstack/virtual-core';
 
 import { Group, type FindResult, type RowKey, type RowView } from '../core/index.js';
-import { capture, restore, type ShownRow } from './anchor.js';
+import { capture, restore, type Restore, type ShownRow } from './anchor.js';
 import { FindHighlighter } from './highlight.js';
 
 /** Fills a row element. Render places it and sets its ARIA; the content is the caller's. */
@@ -64,6 +64,13 @@ export class GridView<R extends object> {
   private lastTop = 0;
   private pending: { rows: RowView<R>; toggled?: RowKey | Group<R> } | null = null;
   private pendingScroll: { index: number; align: 'center' | 'auto' } | null = null;
+  /**
+   * The place `setRows` kept, held while the rows around it are measured over the next
+   * frames, until the user scrolls. virtual-core corrects only rows above the viewport.
+   */
+  private pin: Restore = null;
+  /** The view's own last write to `scrollTop`; any other value is the user's scroll. */
+  private pinnedTop = Number.NaN;
   private readonly unobserve: () => void;
   // Not virtual-core's: it unobserves a row's old element, which the pool gave to another row.
   private readonly rowObserver: ResizeObserver | null;
@@ -149,17 +156,10 @@ export class GridView<R extends object> {
       // by row cost a key lookup per row on each measure, since virtual-core repositions
       // every row after a measured one: a fast scroll dropped half its frames.
       this.virtualizer.measure();
-      const target = before && restore(before, rows, toggled);
-      const { scroller } = this.options;
-      if (target && 'edge' in target) {
-        scroller.scrollTop =
-          target.edge === 'top' ? 0 : this.virtualizer.getTotalSize() - scroller.clientHeight;
-      } else if (target) {
-        const item = this.virtualizer.measurementsCache[target.index];
-        if (item) {
-          scroller.scrollTop = item.start - target.top;
-        }
-      }
+      this.setPin(before && restore(before, rows, toggled));
+      // Tall enough for the pinned place before the first paint, so the write is not clamped.
+      this.options.body.style.height = `${this.virtualizer.getTotalSize()}px`;
+      this.holdPin();
     } finally {
       this.drawing = false;
     }
@@ -188,6 +188,7 @@ export class GridView<R extends object> {
       this.pendingScroll = { index, align };
       return;
     }
+    this.setPin(null);
     this.virtualizer.scrollToIndex(index, { align });
   }
 
@@ -212,6 +213,7 @@ export class GridView<R extends object> {
     this.highlighter.clear();
     this.pending = null;
     this.pendingScroll = null;
+    this.setPin(null);
     this.rows = null;
     this.painted.clear();
     this.spare.length = 0;
@@ -318,10 +320,54 @@ export class GridView<R extends object> {
       do {
         this.again = false;
         this.drawOnce();
+        if (this.holdPin()) {
+          this.again = true;
+        }
       } while (this.again);
     } finally {
       this.drawing = false;
     }
+  }
+
+  private setPin(pin: GridView<R>['pin']): void {
+    this.pin = pin;
+    this.pinnedTop = this.options.scroller.scrollTop;
+    // While pinned, the pin is the one correction; two would move the rows twice.
+    this.virtualizer.shouldAdjustScrollPositionOnItemSizeChange = pin ? () => false : undefined;
+  }
+
+  /** Scrolls the pinned place back where it was. True if the scroll moved. */
+  private holdPin(): boolean {
+    const pin = this.pin;
+    if (!pin) {
+      return false;
+    }
+    const v = this.virtualizer;
+    const { scroller } = this.options;
+    // Read here, not on the scroll event: that comes after the frame, and a draw before it
+    // would undo the user's scroll.
+    if (Math.abs(scroller.scrollTop - this.pinnedTop) >= 1) {
+      this.setPin(null);
+      return false;
+    }
+    // Refreshes `measurementsCache` with the heights measured since the last draw.
+    v.getVirtualItems();
+    const top = !('edge' in pin)
+      ? (v.measurementsCache[pin.index]?.start ?? Number.NaN) - pin.top
+      : pin.edge === 'top'
+        ? 0
+        : v.getTotalSize() - scroller.clientHeight;
+    if (!Number.isFinite(top) || Math.abs(scroller.scrollTop - top) < 1) {
+      return false;
+    }
+    const was = scroller.scrollTop;
+    // Set first: the scroll event of the write must not read as the user's.
+    this.pinnedTop = top;
+    scroller.scrollTop = top;
+    this.pinnedTop = scroller.scrollTop;
+    this.syncOffset();
+    // A write past the end is clamped: unmoved, so drawing again would loop for ever.
+    return Math.abs(scroller.scrollTop - was) >= 1;
   }
 
   private drawOnce(): void {

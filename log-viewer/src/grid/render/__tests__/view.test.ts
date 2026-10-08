@@ -27,6 +27,8 @@ const source = (count: number): TreeSource<Node> => ({
 
 /** The scroller's height; 0 is a hidden tab. */
 let viewport = VIEWPORT;
+/** The furthest the scroller goes: the browser clamps a scroll past the end. */
+let maxScroll = Number.POSITIVE_INFINITY;
 
 /**
  * jsdom does no layout: rows are ROW high, the scroller `viewport` high, and it scrolls.
@@ -48,8 +50,12 @@ function fakeLayout(scroller: HTMLElement): (top: number) => void {
     scrollTop: {
       get: () => top,
       set: (value: number) => {
-        top = value;
-        scroller.dispatchEvent(new Event('scroll'));
+        const next = Math.min(value, maxScroll);
+        // As the browser: no scroll event when the position does not change.
+        if (next !== top) {
+          top = next;
+          scroller.dispatchEvent(new Event('scroll'));
+        }
       },
     },
   });
@@ -133,6 +139,7 @@ afterEach(() => {
   jest.restoreAllMocks();
   document.body.replaceChildren();
   viewport = VIEWPORT;
+  maxScroll = Number.POSITIVE_INFINITY;
   delete (globalThis as { ResizeObserver?: unknown }).ResizeObserver;
 });
 
@@ -186,6 +193,65 @@ describe('GridView', () => {
     view.setRows(store.snapshot().rows, 10);
     await flush();
     expect(10 * ROW - scroller.scrollTop).toBe(40);
+  });
+
+  it('keeps a toggled row in place while the rows above it are measured', async () => {
+    const resize = fakeResizeObserver();
+    const { scroller, store, view, body } = await setup();
+    scroller.scrollTop = 8 * ROW;
+    await flush();
+    await store.toggle(10);
+    view.setRows(store.snapshot().rows, 10);
+    await flush();
+    // Row 9 sits between the viewport top and row 10, and turns out twice as tall.
+    resize(body.querySelector('[data-index="9"]') as Element, 2 * ROW);
+    await flush();
+    expect(10 * ROW + ROW - scroller.scrollTop).toBe(40);
+  });
+
+  it('stops holding a kept row the scroller cannot reach', async () => {
+    const resize = fakeResizeObserver();
+    const { scroller, store, view, body } = await setup();
+    scroller.scrollTop = 8 * ROW;
+    await flush();
+    await store.toggle(10);
+    view.setRows(store.snapshot().rows, 10);
+    await flush();
+    // Row 9 grows, so row 10 would be kept one row further down than the end allows.
+    maxScroll = 8 * ROW;
+    resize(body.querySelector('[data-index="9"]') as Element, 2 * ROW);
+    await flush();
+    expect(scroller.scrollTop).toBe(8 * ROW);
+  });
+
+  it('lets the user scroll away from a kept row before the scroll event comes', async () => {
+    const resize = fakeResizeObserver();
+    const { scroller, store, view, body, moveQuietly } = await setup();
+    scroller.scrollTop = 8 * ROW;
+    await flush();
+    await store.toggle(10);
+    view.setRows(store.snapshot().rows, 10);
+    await flush();
+    moveQuietly(30 * ROW);
+    // A row measured in the same frame draws before the scroll event does.
+    resize(body.querySelector('[data-index="11"]') as Element, 2 * ROW);
+    await flush();
+    expect(scroller.scrollTop).toBe(30 * ROW);
+  });
+
+  it('lets the user scroll away from a kept row', async () => {
+    const resize = fakeResizeObserver();
+    const { scroller, store, view, body } = await setup();
+    scroller.scrollTop = 8 * ROW;
+    await flush();
+    await store.toggle(10);
+    view.setRows(store.snapshot().rows, 10);
+    await flush();
+    scroller.scrollTop = 30 * ROW;
+    await flush();
+    resize(body.querySelector('[data-index="31"]') as Element, 2 * ROW);
+    await flush();
+    expect(scroller.scrollTop).toBe(30 * ROW);
   });
 
   it('keeps a scroll the virtualizer has not heard of when a row above the fold grows', async () => {
