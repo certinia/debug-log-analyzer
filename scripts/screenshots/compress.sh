@@ -8,7 +8,7 @@
 # commands. Running them here lands an image in the repo at the size CI would
 # make it, so no optimize pull request comes back for work already done.
 #
-# capture.sh and mov-to-gif.sh both call this on what they have written. It
+# capture.sh, capture-web.mjs and mov-to-gif.sh all call this on what they have written. It
 # stays a script of its own because the gif is recorded by hand, long after
 # capture.sh has exited.
 #

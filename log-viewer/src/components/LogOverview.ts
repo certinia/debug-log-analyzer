@@ -7,6 +7,7 @@ import { customElement, property } from 'lit/decorators.js';
 
 import { DerivedValue } from '../core/log/DerivedValue.js';
 import { logContext } from '../core/log/logContext.js';
+import { WindowStatsController } from '../core/log/windowStats.js';
 import type { LogStore } from '../core/log/LogStore.js';
 import { apexLimitSeries } from '../features/timeline/optimised/apex-limit-series.js';
 import { globalStyles } from '../styles/global.styles.js';
@@ -18,9 +19,14 @@ import '../features/database/components/GovernorSummary.js';
 import './SectionSkeleton.js';
 
 /**
- * The inspector's whole-log section, shown while nothing is selected: the
- * governor metrics nearest a limit, read from the metric strip's series so the
- * figures always match the timeline and the trend charts.
+ * The inspector's unselected section: the governor metrics nearest a limit,
+ * read from the metric strip's series so the figures always match the timeline
+ * and the trend charts.
+ *
+ * On the Timeline tab, while the chart shows part of the log, the statements are
+ * counted for that window instead, from the events themselves. CPU time and heap
+ * have no windowed value and stay whole-log. Every other tab passes `wholeLog`,
+ * since a window is a Timeline idea.
  *
  * Log size and duration are deliberately absent — `LogMeta` heads the app with
  * both.
@@ -31,6 +37,13 @@ export class LogOverview extends LitElement {
   @consume({ context: logContext, subscribe: true })
   @property({ attribute: false })
   logStore: LogStore | null = null;
+
+  /** True keeps the whole-log figures whatever the Timeline is showing. The
+   *  window is a Timeline idea, and every other tab scopes by its own row. */
+  @property({ type: Boolean })
+  wholeLog = false;
+
+  private readonly _window = new WindowStatsController(this, () => this.logStore?.log ?? null);
 
   static styles = [
     globalStyles,
@@ -61,7 +74,11 @@ export class LogOverview extends LitElement {
         ?pending=${this._series.pending}
       ></section-skeleton>`;
     }
-    const gauges = seriesGauges(series);
+    if (!this.wholeLog && this._window.pending) {
+      return html`<p class="note">Adding up the governor usage…</p>`;
+    }
+    const window = this.wholeLog ? null : this._window.counts;
+    const gauges = seriesGauges(series, window ?? undefined);
     if (!gauges.length) {
       return html`<p class="note">${NO_GOVERNOR_USAGE_TEXT}</p>`;
     }

@@ -1,6 +1,6 @@
 ---
 id: mcp
-title: AI Assistant (MCP Server)
+title: Apex Log MCP Server
 description: The @certinia/apex-log-mcp MCP server lets GitHub Copilot Chat, Claude Code, Cursor and other AI assistants analyze Salesforce Apex debug logs.
 keywords:
   [

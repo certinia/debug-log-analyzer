@@ -17,7 +17,7 @@
     "**/.docusaurus/",
     "**/.vscode-test-web/",
     "**/playwright-report/",
-    // tsgolint rejects the `baseUrl` that @docusaurus/tsconfig sets
+    // not lint-clean: Docusaurus template code uses `require()` for SVGs
     "lana-docs/",
     // only TypeScript is linted
     "**/*.js",

@@ -50,3 +50,11 @@ export function namespaceSelfTimes(
     .filter(({ selfTime }) => selfTime > 0)
     .sort((a, b) => b.selfTime - a.selfTime);
 }
+
+/** Self time per namespace, ranked for display: empty buckets go, largest first. */
+export function toNamespaceTimes(totals: ReadonlyMap<string, number>): NamespaceTime[] {
+  return [...totals]
+    .filter(([, selfTime]) => selfTime > 0)
+    .map(([namespace, selfTime]) => ({ namespace, selfTime }))
+    .sort((a, b) => b.selfTime - a.selfTime);
+}

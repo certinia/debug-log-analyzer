@@ -16,6 +16,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - 📚 **Multiple logs**: a file holding several logs shows the first and flags the rest.
 - 🪪 **Call tree**: the `USER_INFO` line shows as a row.
 - 🎯 **Entry point**: the header names the longest and counts the rest, and its tooltip lists the top five.
+- 🔭 **Timeline inspector**: the summary, call tree included, changes to reflect what is currently visible. ([#875])
+
+### Added
+
+- 🔦 **Timeline legend**: hover a category to highlight frames in the timeline, select to keep. ([#917])
 
 ### Removed
 
@@ -582,6 +587,7 @@ Skipped due to adopting odd numbering for pre releases and even number for relea
 [#373]: https://github.com/certinia/debug-log-analyzer/issues/373
 [#298]: https://github.com/certinia/debug-log-analyzer/issues/298
 [#162]: https://github.com/certinia/debug-log-analyzer/issues/162
+[#875]: https://github.com/certinia/debug-log-analyzer/issues/875
 [#113]: https://github.com/certinia/debug-log-analyzer/issues/113
 [#63]: https://github.com/certinia/debug-log-analyzer/issues/63
 [#32]: https://github.com/certinia/debug-log-analyzer/issues/32
@@ -765,3 +771,4 @@ Skipped due to adopting odd numbering for pre releases and even number for relea
 [#235]: https://github.com/certinia/debug-log-analyzer/issues/235
 [#264]: https://github.com/certinia/debug-log-analyzer/issues/264
 [#1110]: https://github.com/certinia/debug-log-analyzer/issues/1110
+[#917]: https://github.com/certinia/debug-log-analyzer/issues/917

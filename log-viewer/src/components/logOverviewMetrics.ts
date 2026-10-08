@@ -3,6 +3,7 @@
  */
 import type { LimitValue, Limits } from '@apexdevtools/apex-log-parser';
 
+import type { WindowCounts } from '../core/log/windowStats.js';
 import { GOVERNOR_METRIC, GOVERNOR_METRICS } from '../core/metrics/governorMetrics.js';
 import { formatByteSize, formatInteger, sharePercent } from '../core/utility/Util.js';
 import type { GaugeMetric } from '../features/database/components/GovernorSummary.js';
@@ -96,6 +97,16 @@ export function rankedLimitMetrics(series: HeatStripTimeSeries, max: number): Ra
     .slice(0, max);
 }
 
+/** The governor metric each windowable statement counter consumes. A metric
+ *  absent here has no windowed value, so it keeps its whole-log figure. */
+const COUNTER_FOR: ReadonlyMap<keyof Limits, keyof WindowCounts> = new Map([
+  ['soqlQueries', 'soqlCount'],
+  ['queryRows', 'soqlRowCount'],
+  ['dmlStatements', 'dmlCount'],
+  ['dmlRows', 'dmlRowCount'],
+  ['soslQueries', 'soslCount'],
+]);
+
 /** Fewest points that read as a shape rather than a couple of dots. */
 const MIN_SPARK_POINTS = 5;
 
@@ -167,18 +178,41 @@ export function metricSparkline(series: HeatStripTimeSeries, key: keyof Limits):
 }
 
 /**
- * The whole-log gauges, capped at {@link MAX_GAUGES}. A gauge with no reported limit has no bar to
+ * The gauges, capped at {@link MAX_GAUGES}. A gauge with no reported limit has no bar to
  * fill, so it carries a sparkline of its own level instead.
+ *
+ * Given a `window`, the same metrics in the same order are re-read for it, so no
+ * row appears, vanishes or moves as the viewport does. A windowable metric then
+ * shows what the window ran, 0 included; the rest keep their whole-log figure
+ * and say so, since CPU time and heap are cumulative readings the log reports
+ * only in total and a user who narrowed the view still needs to know the
+ * transaction breached.
  */
-export function seriesGauges(series: HeatStripTimeSeries): GaugeMetric[] {
-  return rankedLimitMetrics(series, MAX_GAUGES).map(({ key, label, used, limit }) => ({
-    label,
-    found: used,
-    used,
-    limit,
-    spark: limit > 0 ? undefined : metricSparkline(series, key),
-    format: limitFormat(key),
-  }));
+export function seriesGauges(
+  series: HeatStripTimeSeries,
+  window?: { counts: WindowCounts; logCounts: WindowCounts },
+): GaugeMetric[] {
+  return rankedLimitMetrics(series, MAX_GAUGES).map(({ key, label, used, limit }) => {
+    const format = limitFormat(key);
+    const counter = window ? COUNTER_FOR.get(key) : undefined;
+    // A counter the log never reported statement by statement has no windowed
+    // value: its whole-log figure came from the cumulative block, which no
+    // window can cut. Reading 0 there would say no statements ran.
+    if (window && counter && window.logCounts[counter] > 0) {
+      const held = window.counts[counter];
+      // No sparkline: it would draw the whole log beside the window's count.
+      return { label, found: held, used: held, limit, format };
+    }
+    return {
+      label,
+      found: used,
+      used,
+      limit,
+      spark: limit > 0 ? undefined : metricSparkline(series, key),
+      ...(window ? { wholeLog: true } : {}),
+      format,
+    };
+  });
 }
 
 /** How a gauge or trend chart prints a metric's figures. */

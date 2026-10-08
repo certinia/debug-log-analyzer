@@ -7,6 +7,7 @@ import { customElement, property } from 'lit/decorators.js';
 
 import { DerivedValue } from '../core/log/DerivedValue.js';
 import { logContext } from '../core/log/logContext.js';
+import { WindowStatsController } from '../core/log/windowStats.js';
 import type { Derivation, LogStore } from '../core/log/LogStore.js';
 import { globalStyles } from '../styles/global.styles.js';
 import './SectionSkeleton.js';
@@ -19,14 +20,17 @@ const categorySlices: Derivation<CategoryTime[]> = async (_, store) =>
   categorySelfTimes(await store.derive(selfTimeByCategory));
 
 /**
- * The whole log's self time split by category, as one stacked bar in the flame
- * chart's own palette — the Inspector's answer to Chrome DevTools' Summary
- * donut. Self time, so every nanosecond lands in exactly one segment and the bar
- * always totals the log.
+ * Self time split by category, as one stacked bar in the flame chart's own
+ * palette. Self time, so every nanosecond lands in exactly one segment and the
+ * bar always totals its scope.
+ *
+ * The scope is the window the Timeline is showing, or the whole log when it
+ * shows all of it.
  */
 @customElement('category-time-bar')
 export class CategoryTimeBar extends LitElement {
   private readonly _palette = new CategoryPaletteController(this);
+  private readonly _window = new WindowStatsController(this, () => this.logStore?.log ?? null);
 
   /** The log on screen, from the app root. */
   @consume({ context: logContext, subscribe: true })
@@ -38,12 +42,16 @@ export class CategoryTimeBar extends LitElement {
   static styles = [globalStyles, inspectorSectionStyles];
 
   render() {
-    const slices = this._slices.value;
+    if (this._window.pending) {
+      return html`<p class="note">Adding up the self time…</p>`;
+    }
+    const windowed = this._window.stats;
+    const slices = windowed ? categorySelfTimes(windowed.selfByCategory) : this._slices.value;
     if (!slices?.length) {
       return html`<section-skeleton
         shape="bar"
-        ?pending=${this._slices.pending}
-        fallback="No categorised time was recorded in this log."
+        ?pending=${!windowed && this._slices.pending}
+        fallback="No categorised time was recorded in this ${this._window.window ? 'range' : 'log'}."
       ></section-skeleton>`;
     }
 

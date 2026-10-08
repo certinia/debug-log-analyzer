@@ -24,12 +24,24 @@ concurrency:
 jobs:
   # Build job
   build:
+    # workflow_run fires on every completion; a failed stable publish has nothing to document.
+    if: github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success'
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
         uses: actions/checkout@v7
         with:
           persist-credentials: false
+      # The docs come from main, so a text fix ships without a release. The live demo runs
+      # the latest stable release, so it never shows viewer code users cannot install yet.
+      - name: Find the latest stable release
+        id: release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          tag=$(gh release view --repo "$GITHUB_REPOSITORY" --json tagName --jq .tagName)
+          [[ "$tag" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || { echo "Unexpected release tag: $tag"; exit 1; }
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
       # 👇 Build steps
       - name: pnpm setup
         uses: pnpm/action-setup@v6.1.0
@@ -40,12 +52,25 @@ jobs:
         with:
           node-version: '24'
           cache: 'pnpm'
-      - name: Dependencies
-        run: pnpm run ci:install
+      - parallel:
+          - name: Dependencies
+            run: pnpm run ci:install
+          # The published vsix, so the demo runs the bytes users install. By version, since
+          # Open VSX's latest can be a pre-release.
+          - name: Download the release
+            env:
+              TAG: ${{ steps.release.outputs.tag }}
+            run: |
+              url=$(curl -fsS "https://open-vsx.org/api/FinancialForce/lana/$TAG" | jq -er .files.download)
+              curl -fsSL -o "$RUNNER_TEMP/lana.vsix" "$url"
+              unzip -q "$RUNNER_TEMP/lana.vsix" 'extension/*' -d "$RUNNER_TEMP/release"
+              mv "$RUNNER_TEMP/release/extension" "$RUNNER_TEMP/release/lana"
+      - name: Test Demo Host
+        run: pnpm --filter docs-site test
       - name: Build Site
-        run: |
-          cd lana-docs
-          pnpm run build
+        env:
+          DEMO_VIEWER_ROOT: ${{ runner.temp }}/release
+        run: pnpm --filter docs-site build
       # 👆 Build steps
       - name: Setup Pages
         uses: actions/configure-pages@v6

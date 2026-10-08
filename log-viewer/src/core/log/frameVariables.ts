@@ -4,6 +4,7 @@
 import { type ApexLog, type LogEvent, LOG_LEVEL } from '@apexdevtools/apex-log-parser';
 
 import { CHECK_EVERY, frameBudget, type Tick } from '../utility/FrameBudget.js';
+import { firstIndexWhere } from '../utility/Util.js';
 import { type LogIndex, UNCATEGORISED } from './LogIndex.js';
 import type { Derivation, LogStore, Stack } from './LogStore.js';
 import {
@@ -1062,22 +1063,6 @@ function classFromFrame(label: string): string | null {
 function lastAtOrBefore(writes: readonly LogEvent[], cut: number): LogEvent | null {
   const after = firstIndexWhere(writes.length, (index) => writes[index]!.eventIndex > cut);
   return after > 0 ? (writes[after - 1] ?? null) : null;
-}
-
-/** The leftmost index below `length` where `holds` becomes true, or `length` if
- *  it never does. `holds` must be false then true across the run. */
-function firstIndexWhere(length: number, holds: (index: number) => boolean): number {
-  let low = 0;
-  let high = length;
-  while (low < high) {
-    const mid = (low + high) >>> 1;
-    if (holds(mid)) {
-      high = mid;
-    } else {
-      low = mid + 1;
-    }
-  }
-  return low;
 }
 
 function byName(left: VariableRow, right: VariableRow): number {

@@ -77,6 +77,37 @@ export default {
         '<rootDir>/node_modules/(?!@?lit)',
       ],
     },
+    {
+      ...defaultConfig,
+      displayName: 'docs',
+      rootDir: '<rootDir>/lana-docs',
+      testEnvironment: 'jsdom',
+      testEnvironmentOptions: { url: 'http://localhost/debug-log-analyzer/demo/viewer.html' },
+      testMatch: ['**/__tests__/**/*.test.{ts,tsx}'],
+      testPathIgnorePatterns: [
+        '<rootDir>/node_modules/',
+        '<rootDir>/build/',
+        '<rootDir>/.docusaurus/',
+      ],
+      setupFilesAfterEnv: [],
+      moduleNameMapper: {
+        ...defaultConfig.moduleNameMapper,
+        '^@site/(.*)$': '<rootDir>/$1',
+        '\\.css$': '<rootDir>/src/__tests__/styleStub.ts',
+      },
+      transform: {
+        '^.+\\.(ts|tsx|js)$': [
+          '@swc/jest',
+          {
+            jsc: {
+              target: 'esnext',
+              parser: { syntax: 'typescript', tsx: true },
+              transform: { react: { runtime: 'automatic' } },
+            },
+          },
+        ],
+      },
+    },
   ],
   slowTestThreshold: 1,
 };

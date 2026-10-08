@@ -12,6 +12,7 @@
       "args": [
         "--profile=lana-dev",
         "${workspaceFolder}/sample-app",
+        "${workspaceFolder}/sample-app/debug-logs/sample-log.log",
         "--extensionDevelopmentPath=${workspaceFolder}/lana"
       ],
       "outFiles": ["${workspaceFolder}/lana/out/**/*.js"],
@@ -27,6 +28,7 @@
       "args": [
         "--profile=lana-dev",
         "${workspaceFolder}/${input:worktree}/sample-app",
+        "${workspaceFolder}/${input:worktree}/sample-app/debug-logs/sample-log.log",
         "--extensionDevelopmentPath=${workspaceFolder}/${input:worktree}/lana"
       ],
       "outFiles": ["${workspaceFolder}/${input:worktree}/lana/out/**/*.js"],

@@ -27,6 +27,7 @@ import { die, time } from './harness.js';
 import { digestMinimap, measureMinimap } from './minimap.js';
 import { digestTimeline, measureTimeline } from './timeline.js';
 import { measureVariables } from './variables.js';
+import { measureWindow } from './window.js';
 
 /** The one log every measurement runs over, so the numbers compare across branches. */
 const SAMPLE_LOG = 'sample-app/debug-logs/sample-log.log';
@@ -36,7 +37,7 @@ const USAGE = 'usage: pnpm measure [area...] [--log <path>] [--digest]';
 interface Area {
   run(log: ApexLog): Promise<void>;
   /** Prints a CSV of what the area would draw. Absent where timings are all there is. */
-  digest?(log: ApexLog): void;
+  digest?(log: ApexLog): void | Promise<void>;
 }
 
 const AREAS: Record<string, Area> = {
@@ -44,6 +45,7 @@ const AREAS: Record<string, Area> = {
   minimap: { run: measureMinimap, digest: digestMinimap },
   timeline: { run: measureTimeline, digest: digestTimeline },
   variables: { run: measureVariables },
+  window: { run: measureWindow },
 };
 
 const args = (() => {
@@ -95,7 +97,7 @@ const log = digest ? parse(text) : await time('parse', () => parse(text));
 for (const name of names) {
   const area = AREAS[name]!;
   if (digest && area.digest) {
-    area.digest(log);
+    await area.digest(log);
     continue;
   }
   console.log(`\n--- ${name} ---`);

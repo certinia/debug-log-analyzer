@@ -23,7 +23,8 @@ hide_title: true
 
 Use the Timeline to visualize code execution, event durations, and performance bottlenecks. Zoom, pan, navigate with the minimap overview, and interact with detailed tooltips for efficient Salesforce apex log analysis and debugging.
 
-![Timeline view screenshot showing a color-coded flame chart of Salesforce event types such as DB, Method, and SOQL, visualizing code execution duration and performance](https://raw.githubusercontent.com/certinia/debug-log-analyzer/main/lana/assets/1_22/timeline.png)
+![Timeline view screenshot showing a color-coded flame chart of Salesforce event types such as DB, Method, and SOQL, visualizing code execution duration and performance](https://raw.githubusercontent.com/certinia/debug-log-analyzer/main/lana/assets/1_22/timeline.png#gh-dark-mode-only)
+![Timeline view screenshot showing a color-coded flame chart of Salesforce event types such as DB, Method, and SOQL, visualizing code execution duration and performance](https://raw.githubusercontent.com/certinia/debug-log-analyzer/main/lana/assets/1_22/timeline-light.png#gh-light-mode-only)
 
 The timeline stays fast on large logs. It includes text labels on frames, fast zoom/pan operations, and a natural time axis scaling.
 
@@ -121,6 +122,8 @@ The measurement overlay displays:
 - The time duration of the selected range
 - A zoom icon to quickly zoom to fit the measured area
 
+While a measurement is on the timeline, the [inspector](./inspector.md) summary reads that range instead of the area on screen. Clear the measurement to go back to the area on screen.
+
 :::tip[Resize Handles]
 Hover near the edges of an existing measurement to see the resize cursor. Drag to adjust the measurement boundaries - edges can be dragged past each other to swap positions.
 :::
@@ -138,7 +141,17 @@ Release the mouse button to zoom the viewport to fit the selected area exactly.
 ## Tooltip
 
 <img
-  src="https://raw.githubusercontent.com/certinia/debug-log-analyzer/main/lana/assets/1_22/timeline-tooltip.png"
+  src="https://raw.githubusercontent.com/certinia/debug-log-analyzer/main/lana/assets/1_22/timeline-tooltip.png#gh-dark-mode-only"
+  alt="Tooltip showing detailed event information including event name, description, timestamps, duration, and row counts"
+  style={{
+    width: '100%',
+    height: 'auto',
+    maxWidth: '600px',
+  }}
+  loading="lazy"
+/>
+<img
+  src="https://raw.githubusercontent.com/certinia/debug-log-analyzer/main/lana/assets/1_22/timeline-tooltip-light.png#gh-light-mode-only"
   alt="Tooltip showing detailed event information including event name, description, timestamps, duration, and row counts"
   style={{
     width: '100%',
@@ -164,16 +177,8 @@ The tooltip provides the following information:
 
 The minimap gives you instant context of your entire log. Spot hotspots at a glance, jump anywhere with a click, and always know exactly where you are, all without scrolling.
 
-<img
-  src="https://raw.githubusercontent.com/certinia/debug-log-analyzer/main/lana/assets/1_22/timeline-minimap.png"
-  alt="The Timeline minimap: a density skyline of the whole log, with the viewport lens over the part the timeline is showing."
-  style={{
-    width: '100%',
-    height: 'auto',
-    maxWidth: '100%',
-  }}
-  loading="lazy"
-/>
+![The Timeline minimap: a density skyline of the whole log, with the viewport lens over the part the timeline is showing.](https://raw.githubusercontent.com/certinia/debug-log-analyzer/main/lana/assets/1_22/timeline-minimap.png#gh-dark-mode-only)
+![The Timeline minimap: a density skyline of the whole log, with the viewport lens over the part the timeline is showing.](https://raw.githubusercontent.com/certinia/debug-log-analyzer/main/lana/assets/1_22/timeline-minimap-light.png#gh-light-mode-only)
 
 ### What the Minimap Shows
 
@@ -230,16 +235,8 @@ When hovering over the viewport lens or dragging, a label appears showing:
 
 The Governor Limits strip displays Salesforce governor limit usage over time, positioned below the main timeline. It provides instant visual feedback on limit consumption to help identify potential limit breaches.
 
-<img
-  src="https://raw.githubusercontent.com/certinia/debug-log-analyzer/main/lana/assets/1_22/timeline-gov-strip.png"
-  alt="The Governor Limits strip below the Timeline, showing limit usage over time with traffic-light coloring."
-  style={{
-    width: '100%',
-    height: 'auto',
-    maxWidth: '100%',
-  }}
-  loading="lazy"
-/>
+![The Governor Limits strip below the Timeline, showing limit usage over time with traffic-light coloring.](https://raw.githubusercontent.com/certinia/debug-log-analyzer/main/lana/assets/1_22/timeline-gov-strip.png#gh-dark-mode-only)
+![The Governor Limits strip below the Timeline, showing limit usage over time with traffic-light coloring.](https://raw.githubusercontent.com/certinia/debug-log-analyzer/main/lana/assets/1_22/timeline-gov-strip-light.png#gh-light-mode-only)
 
 ### Display Modes
 
@@ -318,97 +315,4 @@ Click the clock icon button in the top-right corner of the timeline toolbar to t
 
 ## Themes
 
-The timeline supports multiple color themes for better visual clarity and personalization. The extension includes 19 built-in themes with improved contrast and readability.
-
-### Built-in Themes
-
-The following themes are available out of the box:
-
-- **50 Shades of Green** (default)
-- 50 Shades of Green Bright
-- Botanical Twilight
-- Catppuccin
-- Chrome
-- Dracula
-- Dusty Aurora
-- Firefox
-- Flame
-- Forest Floor
-- Garish
-- Material
-- Modern
-- Monokai Pro
-- Nord
-- Nord Forest
-- Okabe-Ito
-- Salesforce
-- Solarized
-
-### Switching Themes
-
-There are two ways to change the active timeline theme:
-
-#### Command Palette
-
-1. Open the Command Palette (`Cmd+Shift+P` on macOS or `Ctrl+Shift+P` on Windows/Linux)
-2. Type **"Log: Timeline Theme"**
-3. Select a theme from the list
-4. Preview themes by navigating through the options with arrow keys
-5. Press `Enter` to confirm, or `Esc` to revert to the previous theme
-
-#### Settings
-
-Navigate to **Settings → Apex Log Analyzer → Timeline → Active Theme** and select your preferred theme from the dropdown.
-
-### Custom Themes
-
-You can create custom color themes to match your preferences or specific use cases.
-
-#### Creating Custom Themes
-
-1. Navigate to **Settings → Apex Log Analyzer → Timeline → Custom Themes**
-2. Define your custom theme(s) using the following structure:
-
-```json
-"lana.timeline.customThemes": {
-  "Glacial Warmth": {
-    "apex": "#6882A6",
-    "codeUnit": "#7A9B6E",
-    "system": "#9E8E7C",
-    "automation": "#D98650",
-    "dml": "#C85A5A",
-    "soql": "#57A89A",
-    "callout": "#C9A64D",
-    "validation": "#8B7BAC"
-  },
-  "Orchid Slate": {
-    "apex": "#647C96",
-    "codeUnit": "#8872A8",
-    "system": "#8A7E7E",
-    "automation": "#C08545",
-    "dml": "#C94C6E",
-    "soql": "#5A9E85",
-    "callout": "#B5A044",
-    "validation": "#4EA6A6"
-  }
-}
-```
-
-#### Theme Color Properties
-
-Each theme requires the following color properties (in hex format):
-
-- **apex** - Apex method entry/exit events
-- **codeUnit** - Code Unit events
-- **system** - System method calls
-- **automation** - Workflow, Flow, and Process Builder events
-- **dml** - DML operations (insert, update, delete, etc.)
-- **soql** - SOQL queries
-- **callout** - HTTP callout events
-- **validation** - Validation rule events
-
-Custom themes will appear in the theme selector alongside built-in themes and can be switched using the Command Palette or settings.
-
-:::note
-Custom theme names cannot override built-in theme names. If you use the same name as a built-in theme, the built-in theme will take precedence.
-:::
+The timeline has 19 built-in color themes, and you can define your own. To change the theme, run **Log: Timeline Theme** from the Command Palette. For the full list of themes and how to create a custom theme, see [Settings → Timeline themes](../settings.mdx#timeline-themes).

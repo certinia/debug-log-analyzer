@@ -10,6 +10,7 @@ let apexLog: ApexLog | null = null;
 
 import { indexTree } from '#test-helpers/apexLog.js';
 import { logStoreFor } from '../../core/log/LogStore.js';
+import { setRange } from '../../core/log/rangeScope.js';
 import type { NamespaceTimeBar } from '../NamespaceTimeBar.js';
 import { DEFAULT_MAX_SEGMENTS } from '../StackedTimeBar.js';
 import '../NamespaceTimeBar.js';
@@ -44,6 +45,7 @@ describe('namespace-time-bar', () => {
   beforeEach(() => {
     document.body.replaceChildren();
     apexLog = null;
+    setRange(null);
   });
 
   it('scopes to the selected frame and everything below it', async () => {
@@ -137,5 +139,46 @@ describe('namespace-time-bar', () => {
 
     expect(bar(element)).toBeNull();
     expect(element.shadowRoot?.querySelector('.note')?.textContent).toContain('No time');
+  });
+});
+
+describe('namespace-time-bar with a timeline window', () => {
+  beforeEach(() => {
+    document.body.replaceChildren();
+    apexLog = null;
+    setRange(null);
+  });
+
+  afterEach(() => {
+    setRange(null);
+  });
+
+  // A picked frame is answered as itself, wherever the timeline is looking: the
+  // window here holds a nanosecond, so its own figures could not be these.
+  it('answers for the picked frame, not the window', async () => {
+    const frame = namespaceEvent('default', 100, [namespaceEvent('pkg', 500)]);
+    logOf([frame], ['pkg']);
+    setRange({ start: 0, end: 1 });
+
+    const element = await mount({ eventIndex: frame.eventIndex });
+
+    expect(segments(element).map((segment) => segment.label)).toEqual(['pkg', 'default']);
+    expect(segments(element).map((segment) => segment.value)).toEqual([500, 100]);
+  });
+
+  // The bar took its palette from the whole-log walk, which a window skips, so
+  // mounting into a window left it with no colours and an empty note.
+  it('answers for a window it mounts into', async () => {
+    logOf([namespaceEvent('default', 100, [namespaceEvent('pkg', 500)])], ['pkg']);
+    // `default` owns 0 to 100, `pkg` 100 to 600.
+    setRange({ start: 0, end: 350 });
+
+    const element = await mount();
+    const bars = segments(element);
+
+    expect(bars.map((segment) => segment.label)).toEqual(['pkg', 'default']);
+    expect(bars[0]?.value).toBeCloseTo(250, 3);
+    expect(bars[1]?.value).toBeCloseTo(100, 3);
+    expect(bars[0]?.color).toBe(logNamespacePalette(apexLog!)('pkg'));
   });
 });
