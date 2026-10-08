@@ -191,6 +191,33 @@ describe('GridStore totals', () => {
     expect(runs).toBeGreaterThan(before);
   });
 
+  it('keeps the footer of each set of filters, so turning a filter back on sums nothing', async () => {
+    let runs = 0;
+    const counted = {
+      scope: 'all' as const,
+      of: (rows: readonly Node[]): number => {
+        runs++;
+        return rows.length;
+      },
+    };
+    const notB = { test: (r: Node) => r.key !== 'b' };
+    const store = new GridStore(source(tree()), { calcs: { count: counted } });
+    await store.setFilters([notB]);
+    expect(store.snapshot().totals.count).toBe(5);
+    await store.setFilters([]);
+    expect(store.snapshot().totals.count).toBe(6);
+    const before = runs;
+    await store.setFilters([notB]);
+    expect(store.snapshot().totals.count).toBe(5);
+    await store.setFilters([]);
+    expect(store.snapshot().totals.count).toBe(6);
+    expect(runs).toBe(before);
+    await store.setFilters([{ test: notB.test }]);
+    expect(runs).toBe(before + 1);
+    await store.setCalcs({ count: counted });
+    expect(runs).toBe(before + 2);
+  });
+
   it('runs a calc that yields in slices, for the footer and each group', async () => {
     let yields = 0;
     const sliced = {

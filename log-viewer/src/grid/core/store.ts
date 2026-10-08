@@ -195,8 +195,14 @@ export class GridStore<R extends object> {
   private groupCompare: Compare<Group<R>> | null = null;
   /** Groups start closed; these are open. */
   private openGroups = new Set<string>();
-  /** Totals hold until the filters, source, calcs or grouping change; sort and expansion keep them. */
-  private footer: Totals | null = null;
+  /**
+   * The footer for each set of filters, so a filter turned off and on again costs nothing.
+   * Totals hold until the source or calcs change; sort and expansion keep them.
+   */
+  private footers = new Map<string, Totals>();
+  private filterIds = new WeakMap<RowFilter<R>, number>();
+  private nextFilterId = 0;
+  /** Group totals hold until the filters, source, calcs or grouping change. */
   private groupTotals = new Map<string, Totals>();
 
   private current: Snapshot<R>;
@@ -257,7 +263,7 @@ export class GridStore<R extends object> {
 
   setFilters(filters: readonly RowFilter<R>[]): Promise<void> {
     this.filters = filters;
-    this.dropTotals();
+    this.groupTotals.clear();
     return this.reorder();
   }
 
@@ -410,8 +416,22 @@ export class GridStore<R extends object> {
   }
 
   private dropTotals(): void {
-    this.footer = null;
+    this.footers.clear();
     this.groupTotals.clear();
+  }
+
+  /** Names the set of filters on, for {@link footers}. */
+  private filterKey(): string {
+    return this.filters
+      .map((filter) => {
+        let id = this.filterIds.get(filter);
+        if (id === undefined) {
+          id = this.nextFilterId++;
+          this.filterIds.set(filter, id);
+        }
+        return id;
+      })
+      .join(',');
   }
 
   private isExpanded(row: R, depth: number): boolean {
@@ -570,14 +590,16 @@ export class GridStore<R extends object> {
     }
     const stale = (): boolean => this.dirty;
     const top = this.childrenOf(this.source.roots);
-    if (!this.footer) {
+    const key = this.filterKey();
+    let totals = this.footers.get(key);
+    if (!totals) {
       const footer = await drive(this.totalsFor(top), tick, stale);
       if (!footer || this.dirty) {
         return null;
       }
-      this.footer = footer.value;
+      totals = footer.value;
+      this.footers.set(key, totals);
     }
-    const totals = this.footer;
     const out: Flat<R> = { rows: [], depths: [], flags: [] };
     if (!this.groupBy) {
       return (await this.walkAll(walkOf(top, 0), out, tick)) && !this.dirty
