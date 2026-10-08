@@ -25,13 +25,16 @@ const source = (count: number): TreeSource<Node> => ({
   key: (row) => row.key,
 });
 
-/** jsdom does no layout: rows are ROW high, the scroller VIEWPORT high, and it scrolls. */
+/** The scroller's height; 0 is a hidden tab. */
+let viewport = VIEWPORT;
+
+/** jsdom does no layout: rows are ROW high, the scroller `viewport` high, and it scrolls. */
 function fakeLayout(scroller: HTMLElement): void {
   let top = 0;
   Object.defineProperties(scroller, {
-    offsetHeight: { get: () => VIEWPORT },
+    offsetHeight: { get: () => viewport },
     offsetWidth: { get: () => 500 },
-    clientHeight: { get: () => VIEWPORT },
+    clientHeight: { get: () => viewport },
     scrollHeight: {
       get: () =>
         Number.parseFloat(
@@ -56,6 +59,42 @@ function fakeLayout(scroller: HTMLElement): void {
 }
 
 const flush = (): Promise<void> => new Promise((resolve) => setTimeout(resolve, 0));
+
+/**
+ * jsdom has no ResizeObserver. Returns a resize that gives the new height to each observer
+ * of the element it is given.
+ */
+function fakeResizeObserver(): (target: Element, height: number) => void {
+  const observers: { callback: ResizeObserverCallback; targets: Set<Element> }[] = [];
+  globalThis.ResizeObserver = class {
+    private readonly targets = new Set<Element>();
+    constructor(callback: ResizeObserverCallback) {
+      observers.push({ callback, targets: this.targets });
+    }
+    observe(target: Element): void {
+      this.targets.add(target);
+    }
+    unobserve(target: Element): void {
+      this.targets.delete(target);
+    }
+    disconnect(): void {
+      this.targets.clear();
+    }
+  } as unknown as typeof ResizeObserver;
+  return (target, height) => {
+    viewport = height;
+    const entry = {
+      target,
+      contentRect: { height, width: 500 },
+      borderBoxSize: [{ blockSize: height, inlineSize: 500 }],
+    } as unknown as ResizeObserverEntry;
+    for (const { callback, targets } of observers) {
+      if (targets.has(target)) {
+        callback([entry], {} as ResizeObserver);
+      }
+    }
+  };
+}
 
 async function setup(count = 1000) {
   const scroller = document.createElement('div');
@@ -88,6 +127,8 @@ async function setup(count = 1000) {
 afterEach(() => {
   jest.restoreAllMocks();
   document.body.replaceChildren();
+  viewport = VIEWPORT;
+  delete (globalThis as { ResizeObserver?: unknown }).ResizeObserver;
 });
 
 describe('GridView', () => {
@@ -140,6 +181,41 @@ describe('GridView', () => {
     view.setRows(store.snapshot().rows, 10);
     await flush();
     expect(10 * ROW - scroller.scrollTop).toBe(40);
+  });
+
+  it('paints nothing while hidden, and on show puts the user back where they were', async () => {
+    const resize = fakeResizeObserver();
+    const { scroller, store, view, painted, shown } = await setup();
+    scroller.scrollTop = 300 * ROW;
+    await flush();
+    resize(scroller, 0);
+    // The browser drops the scroll position with the box.
+    scroller.scrollTop = 0;
+    const before = painted.length;
+
+    // Row 10 opens above row 300, which moves to index 350.
+    await store.toggle(10);
+    view.setRows(store.snapshot().rows);
+    view.repaint();
+    await flush();
+    expect(painted.length).toBe(before);
+
+    resize(scroller, VIEWPORT);
+    await flush();
+    expect(scroller.scrollTop).toBe(350 * ROW);
+    expect(shown().map((el) => el.textContent)).toContain('row 300');
+  });
+
+  it('goes to a row asked for while hidden, once shown', async () => {
+    const resize = fakeResizeObserver();
+    const { scroller, view, shown } = await setup();
+    resize(scroller, 0);
+    view.scrollToIndex(500);
+    expect(scroller.scrollTop).toBe(0);
+
+    resize(scroller, VIEWPORT);
+    await flush();
+    expect(shown().map((el) => el.textContent)).toContain('row 500');
   });
 
   it('leaves the body empty when destroyed, so a new view on it paints the only rows', async () => {

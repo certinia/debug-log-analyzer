@@ -27,6 +27,12 @@ export class StoreController<R extends object> implements ReactiveController {
   }
 
   hostConnected(): void {
+    // Snapshots the store made while the host was away.
+    const latest = this.store?.snapshot() ?? null;
+    if (latest !== this.snapshot) {
+      this.snapshot = latest;
+      this.host.requestUpdate();
+    }
     this.subscribe();
   }
 

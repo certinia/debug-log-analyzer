@@ -58,6 +58,13 @@ export class GridView<R extends object> {
   private queued = false;
   private readonly highlighter = new FindHighlighter();
   private find: FindMarks<R> | null = null;
+  /** False while the scroller has no height: a hidden tab, or detached. Nothing draws. */
+  private visible = true;
+  /** The browser drops `scrollTop` when the scroller's box goes, so it is put back on show. */
+  private lastTop = 0;
+  private pending: { rows: RowView<R>; toggled?: RowKey | Group<R> } | null = null;
+  private pendingScroll: { index: number; align: 'center' | 'auto' } | null = null;
+  private readonly unobserve: () => void;
 
   constructor(options: GridViewOptions<R>) {
     this.options = options;
@@ -73,6 +80,23 @@ export class GridView<R extends object> {
     });
     this.unmount = this.virtualizer._didMount();
     this.virtualizer._willUpdate();
+
+    const { scroller } = options;
+    const onScroll = (): void => {
+      if (this.visible && scroller.clientHeight > 0) {
+        this.lastTop = scroller.scrollTop;
+      }
+    };
+    scroller.addEventListener('scroll', onScroll, { passive: true });
+    const observer =
+      typeof ResizeObserver === 'undefined'
+        ? null
+        : new ResizeObserver(([entry]) => this.setVisible((entry?.contentRect.height ?? 0) > 0));
+    observer?.observe(scroller);
+    this.unobserve = () => {
+      observer?.disconnect();
+      scroller.removeEventListener('scroll', onScroll);
+    };
   }
 
   /**
@@ -80,6 +104,10 @@ export class GridView<R extends object> {
    * was, else the row across the middle of the viewport or its nearest shown ancestor.
    */
   setRows(rows: RowView<R>, toggled?: RowKey | Group<R>): void {
+    if (!this.visible) {
+      this.pending = { rows, toggled: toggled ?? this.pending?.toggled };
+      return;
+    }
     const before = this.rows?.size ? this.captureNow(this.rows) : null;
     this.rows = rows;
     for (const el of this.painted.values()) {
@@ -128,11 +156,18 @@ export class GridView<R extends object> {
 
   /** Scrolls the row at `index` into view: to the middle, or only as far as it must. */
   scrollToIndex(index: number, align: 'center' | 'auto' = 'center'): void {
+    if (!this.visible) {
+      this.pendingScroll = { index, align };
+      return;
+    }
     this.virtualizer.scrollToIndex(index, { align });
   }
 
   /** Call when anything above the body, like the header, changes height. */
   remeasure(): void {
+    if (!this.visible) {
+      return;
+    }
     this.layout(this.rows?.size ?? 0);
     this.draw();
   }
@@ -145,7 +180,10 @@ export class GridView<R extends object> {
   /** Stops the view and removes its rows; the body can take a new view. */
   destroy(): void {
     this.unmount();
+    this.unobserve();
     this.highlighter.clear();
+    this.pending = null;
+    this.pendingScroll = null;
     this.rows = null;
     this.painted.clear();
     this.spare.length = 0;
@@ -162,19 +200,64 @@ export class GridView<R extends object> {
     }
   }
 
+  /**
+   * Reads the rows in view from the scroller, not from the virtualizer's window: on show
+   * the virtualizer has not yet seen the restored position or the new height.
+   */
   private captureNow(rows: RowView<R>) {
     const { scroller } = this.options;
     const scrollTop = scroller.scrollTop;
     const height = scroller.clientHeight;
-    const shown: ShownRow[] = this.virtualizer
-      .getVirtualItems()
-      .filter((item) => item.end > scrollTop && item.start < scrollTop + height)
-      .map((item) => ({ index: item.index, top: item.start - scrollTop, height: item.size }));
+    // Refreshes `measurementsCache` with the heights measured since the last draw.
+    this.virtualizer.getVirtualItems();
+    const items = this.virtualizer.measurementsCache;
+    let lo = 0;
+    let hi = items.length;
+    while (lo < hi) {
+      const mid = (lo + hi) >>> 1;
+      if ((items[mid]?.end ?? 0) > scrollTop) {
+        hi = mid;
+      } else {
+        lo = mid + 1;
+      }
+    }
+    const shown: ShownRow[] = [];
+    for (let i = lo; i < items.length; i++) {
+      const item = items[i];
+      if (!item || item.start >= scrollTop + height) {
+        break;
+      }
+      shown.push({ index: item.index, top: item.start - scrollTop, height: item.size });
+    }
     return capture(
       { scrollTop, maxScrollTop: scroller.scrollHeight - height, height },
       shown,
       rows,
     );
+  }
+
+  /** On show: puts back the scroll position, then shows the rows that came while hidden. */
+  private setVisible(visible: boolean): void {
+    if (visible === this.visible) {
+      return;
+    }
+    this.visible = visible;
+    if (!visible) {
+      return;
+    }
+    this.options.scroller.scrollTop = this.lastTop;
+    const pending = this.pending;
+    this.pending = null;
+    if (pending) {
+      this.setRows(pending.rows, pending.toggled);
+    } else {
+      this.remeasure();
+    }
+    const scroll = this.pendingScroll;
+    this.pendingScroll = null;
+    if (scroll) {
+      this.scrollToIndex(scroll.index, scroll.align);
+    }
   }
 
   /**
@@ -195,6 +278,9 @@ export class GridView<R extends object> {
 
   /** Paints the window. Measuring a row can move the window, so it loops until still. */
   private draw(): void {
+    if (!this.visible) {
+      return;
+    }
     if (this.drawing) {
       this.again = true;
       return;

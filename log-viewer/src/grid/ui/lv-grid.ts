@@ -285,20 +285,6 @@ export class LvGrid<R extends object = object> extends LitElement {
     }
   }
 
-  connectedCallback(): void {
-    super.connectedCallback();
-    if (this.hasUpdated && !this.view) {
-      this.makeView();
-    }
-  }
-
-  disconnectedCallback(): void {
-    super.disconnectedCallback();
-    this.view?.destroy();
-    this.view = null;
-    this.shown = null;
-  }
-
   protected willUpdate(changed: PropertyValues): void {
     const store = this.store;
     if (!store) {

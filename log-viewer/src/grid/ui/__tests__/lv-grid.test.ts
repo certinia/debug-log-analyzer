@@ -470,4 +470,17 @@ describe('lv-grid columns', () => {
     const { grid } = await setup({ freezeFirst: true });
     expect(grid.hasAttribute('freeze-first')).toBe(true);
   });
+
+  it('keeps its rows when moved out and back, and shows what changed while away', async () => {
+    const { grid, root, names } = await setup();
+    const body = root.querySelector('.body');
+    const elements = [...(body?.children ?? [])];
+    grid.remove();
+    grid.filters = [{ test: (row) => row.name !== 'b' }];
+    await settle(grid);
+    document.body.append(grid);
+    await settle(grid);
+    expect(names()).toEqual(['a', 'c']);
+    expect([...(body?.children ?? [])]).toEqual(elements);
+  });
 });
