@@ -89,8 +89,12 @@ const categories = css`
 
 /** The class that colours a row by the category of its event. */
 export function categoryClass(row: { originalData?: { category?: string } }): string | undefined {
-  const category = row.originalData?.category;
-  const key = category ? CATEGORY_THEME_KEY[category] : undefined;
+  return eventCategoryClass(row.originalData ?? {});
+}
+
+/** {@link categoryClass} for a row that is the event itself. */
+export function eventCategoryClass(event: { category?: string }): string | undefined {
+  const key = event.category ? CATEGORY_THEME_KEY[event.category] : undefined;
   return key ? `cat-${key}` : undefined;
 }
 

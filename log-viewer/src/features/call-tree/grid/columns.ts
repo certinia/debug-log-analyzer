@@ -6,42 +6,74 @@ import { html } from 'lit';
 import { unsafeHTML } from 'lit/directives/unsafe-html.js';
 
 import { NO_REPORTED_LIMITS_TEXT } from '../../../components/governorCopy.js';
+import { getCallerNamespace } from '../../../core/utility/CallerNamespace.js';
 import { formatDuration, sharePercent } from '../../../core/utility/Util.js';
-import { max, sum, type Calc, type GridColumn, type GridSort } from '../../../grid/index.js';
+import {
+  max,
+  sum,
+  type Calc,
+  type GridColumn,
+  type GridSort,
+  type RowFilter,
+  type TreeSource,
+} from '../../../grid/index.js';
 import { NAMESPACE_WIDTH, TIME_WIDTH } from '../../../tabulator/ColumnWidths.js';
 import { soqlGroupHeader } from '../../soql/format/groupHeader.js';
 import type { BottomUpRow } from '../utils/Aggregation.js';
 import {
+  costLimitsOf,
   governorCostBreakdown,
+  governorCostOf,
   type GovernorCostMetric,
   type GovernorCostRow,
+  type GovernorUsage,
 } from '../utils/GovernorCost.js';
-import type { TimeOrderRow } from '../utils/TimeOrderTree.js';
+import { isDetailEvent } from '../utils/TimeOrderTree.js';
 import { bar, msBar, msText, nameCell, nameText } from './cells.js';
 import { knownMax, outermostSum } from './calcs.js';
 
 /** What every call-tree row carries, whichever view built it. */
-type MetricRow = GovernorCostRow &
-  Pick<
-    TimeOrderRow,
-    | 'text'
-    | 'originalData'
-    | 'namespace'
-    | 'callerNamespace'
-    | 'type'
-    | 'dmlCount'
-    | 'soqlCount'
-    | 'soslCount'
-    | 'dmlRowCount'
-    | 'soqlRowCount'
-    | 'soslRowCount'
-    | 'thrownCount'
-    | 'heapAllocated'
-    | 'heapGross'
-    | 'heapPeak'
-    | 'governorCost'
-    | 'governorCostMax'
-  >;
+type MetricRow = GovernorUsage & { namespace: string; thrownCount: SelfTotal };
+
+/** The fields a row either holds, or works out from its event when a cell asks. */
+interface RowFields<R> {
+  event(row: R): LogEvent;
+  text(row: R): string;
+  callerNamespace(row: R): string;
+  type(row: R): string;
+  governorCost(row: R): number | null;
+  governorCostMax(row: R): number | null;
+}
+
+type HeldRow = GovernorCostRow & {
+  originalData: LogEvent;
+  text: string;
+  callerNamespace: string;
+  type: string;
+};
+
+function heldFields<R extends HeldRow>(): RowFields<R> {
+  return {
+    event: (row) => row.originalData,
+    text: (row) => row.text,
+    callerNamespace: (row) => row.callerNamespace,
+    type: (row) => row.type,
+    governorCost: (row) => row.governorCost,
+    governorCostMax: (row) => row.governorCostMax,
+  };
+}
+
+function eventFields(log: ApexLog): RowFields<LogEvent> {
+  const costLimits = costLimitsOf(log.governorLimits);
+  return {
+    event: (event) => event,
+    text: (event) => event.text,
+    callerNamespace: getCallerNamespace,
+    type: (event) => event.type ?? '',
+    governorCost: (event) => governorCostOf(event, costLimits)[0],
+    governorCostMax: (event) => governorCostOf(event, costLimits)[1],
+  };
+}
 
 export interface CallTreeColumnOptions {
   /** Opens a type in the editor, from a Name cell link. */
@@ -67,21 +99,21 @@ const TIME_MIN_WIDTH = 120;
 const integerFormat = new Intl.NumberFormat();
 const integer = (value: number): string => integerFormat.format(Math.round(value));
 
-function nameColumn<R extends MetricRow>(options: CallTreeColumnOptions): GridColumn<R> {
+function nameColumn<R>(fields: RowFields<R>, options: CallTreeColumnOptions): GridColumn<R> {
   return {
     id: 'text',
     title: 'Name',
     width: 'flex',
     minWidth: 200,
-    cell: (row) => nameCell(row.originalData, row.text, options.openType),
-    text: (row) => nameText(row.originalData, row.text),
-    sort: { value: (row) => row.text },
+    cell: (row) => nameCell(fields.event(row), fields.text(row), options.openType),
+    text: (row) => nameText(fields.event(row), fields.text(row)),
+    sort: { value: fields.text },
     sortFirst: 'desc',
     footer: 'Total',
   };
 }
 
-function namespaceColumns<R extends MetricRow>(): GridColumn<R>[] {
+function namespaceColumns<R extends MetricRow>(fields: RowFields<R>): GridColumn<R>[] {
   return [
     {
       id: 'namespace',
@@ -98,24 +130,24 @@ function namespaceColumns<R extends MetricRow>(): GridColumn<R>[] {
       title: 'Caller Namespace',
       width: NAMESPACE_WIDTH,
       hidden: true,
-      cell: (row) => row.callerNamespace,
-      text: (row) => row.callerNamespace,
-      sort: { value: (row) => row.callerNamespace },
+      cell: fields.callerNamespace,
+      text: fields.callerNamespace,
+      sort: { value: fields.callerNamespace },
       sortFirst: 'desc',
     },
   ];
 }
 
-function typeColumn<R extends MetricRow>(hidden: boolean): GridColumn<R> {
+function typeColumn<R>(fields: RowFields<R>, hidden: boolean): GridColumn<R> {
   return {
     id: 'type',
     title: 'Type',
     width: 150,
     hidden,
-    cell: (row) => row.type,
-    text: (row) => row.type,
-    tooltip: (row) => row.type,
-    sort: { value: (row) => row.type },
+    cell: fields.type,
+    text: fields.type,
+    tooltip: fields.type,
+    sort: { value: fields.type },
     sortFirst: 'asc',
   };
 }
@@ -191,14 +223,15 @@ function usedOfLimit({ unit, used, limit }: GovernorCostMetric): string {
 }
 
 /** A utilisation percentage as a bar, or `—` where the log reported no limits to measure. */
-function utilisationColumn<R extends MetricRow>(opts: {
+function utilisationColumn<R>(opts: {
   id: 'governorCost' | 'governorCostMax';
   title: string;
+  value: (row: R) => number | null;
   width: number;
   hidden?: boolean;
   tooltip: (row: R, value: number) => string;
 }): GridColumn<R> {
-  const value = (row: R): number | null => row[opts.id];
+  const { value } = opts;
   const shown = (v: number | null) =>
     v === null || Number.isNaN(v) ? '—' : bar(v, 100, { precision: 0, percent: false });
   return {
@@ -279,6 +312,7 @@ function timeColumn<R>(opts: {
 /** The governor, heap and utilisation block every call-tree table shares, in display order. */
 function governorMetricColumns<R extends MetricRow>(
   log: ApexLog,
+  fields: RowFields<R>,
   heap: HeapCalcs<R>,
 ): GridColumn<R>[] {
   const limits = log.governorLimits.final;
@@ -407,6 +441,7 @@ function governorMetricColumns<R extends MetricRow>(
     utilisationColumn({
       id: 'governorCost',
       title: 'Gov Avg %',
+      value: fields.governorCost,
       width: 71,
       tooltip: (row, value) => {
         const breakdown = governorCostBreakdown(row, log.governorLimits);
@@ -424,6 +459,7 @@ function governorMetricColumns<R extends MetricRow>(
     utilisationColumn({
       id: 'governorCostMax',
       title: 'Gov Peak %',
+      value: fields.governorCostMax,
       width: 78,
       hidden: true,
       tooltip: (row, value) => {
@@ -436,17 +472,26 @@ function governorMetricColumns<R extends MetricRow>(
   ];
 }
 
+/** Time Order rows are the parser's own events: nothing is built before the grid shows them. */
+export function timeOrderSource(log: ApexLog): TreeSource<LogEvent> {
+  return { roots: log.children, children: (event) => event.children, key: (e) => e.eventIndex };
+}
+
+/** Show Details on the Time Order tree. */
+export const TIME_ORDER_DETAILS: RowFilter<LogEvent> = { test: isDetailEvent, keepAncestors: true };
+
 /** The Time Order columns: the Tabulator table's, field for field. */
 export function timeOrderColumns(
   log: ApexLog,
   options: CallTreeColumnOptions,
-): GridColumn<TimeOrderRow>[] {
+): GridColumn<LogEvent>[] {
   const totalNs = log.duration.total;
+  const fields = eventFields(log);
   return [
-    nameColumn(options),
-    ...namespaceColumns(),
-    typeColumn(true),
-    ...governorMetricColumns<TimeOrderRow>(log, {
+    nameColumn(fields, options),
+    ...namespaceColumns(fields),
+    typeColumn(fields, true),
+    ...governorMetricColumns(log, fields, {
       netTotal: sum((r) => r.heapAllocated.total),
       grossTotal: sum((r) => r.heapGross.total),
       // Self never overlaps, so every row that passes the filters counts, open or not.
@@ -479,16 +524,17 @@ export function bottomUpColumns(
   options: CallTreeColumnOptions,
 ): GridColumn<BottomUpRow>[] {
   const totalNs = log.duration.total;
+  const fields = heldFields<BottomUpRow>();
   return [
     {
-      ...nameColumn<BottomUpRow>(options),
+      ...nameColumn(fields, options),
       groupCell: (group) => {
         const query = soqlGroupHeader(group.key, group.rows.length, group.rows);
         return query ? html`${unsafeHTML(query)}` : `${group.key} (${group.rows.length})`;
       },
     },
-    ...namespaceColumns<BottomUpRow>(),
-    typeColumn<BottomUpRow>(false),
+    ...namespaceColumns(fields),
+    typeColumn(fields, false),
     countColumn<BottomUpRow>({
       id: 'callCount',
       title: 'Calls',
@@ -496,7 +542,7 @@ export function bottomUpColumns(
       width: 70,
     }),
     // Bottom-up rows overlap, so totals count each call once; self never overlaps.
-    ...governorMetricColumns<BottomUpRow>(log, {
+    ...governorMetricColumns(log, fields, {
       netTotal: outermostSum((e) => e.heapAllocated.total),
       grossTotal: outermostSum((e) => e.heapGross.total),
       netSelf: sum((r) => r.heapAllocated.self),

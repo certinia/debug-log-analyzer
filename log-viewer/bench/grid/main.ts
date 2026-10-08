@@ -12,15 +12,15 @@ import { parse, type ApexLog, type LogEvent } from '@apexdevtools/apex-log-parse
 import { LvGridBottomUp, TabulatorBottomUp } from './bottom-up-contenders.js';
 import type { BottomUpContender, Contender, Mounted } from './contender.js';
 import { GridContender } from './grid-contender.js';
-import { LvGridContender } from './lv-grid-contender.js';
+import { callTreeContender, lvGridContender } from './lv-grid-contender.js';
 import { TabulatorContender } from './tabulator-contender.js';
 import { frameStats, perFrame, settled, timed, type FrameStats, type Timing } from './timing.js';
 
 const CONTENDERS: Record<string, () => Contender> = {
   tabulator: () => new TabulatorContender(),
   grid: () => new GridContender(),
-  'lv-grid': () => new LvGridContender(),
-  'call-tree': () => new LvGridContender(true),
+  'lv-grid': lvGridContender,
+  'call-tree': callTreeContender,
 };
 
 const BOTTOM_UP_CONTENDERS: Record<string, () => BottomUpContender> = {

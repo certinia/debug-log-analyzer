@@ -13,9 +13,11 @@ jest.mock('tabulator-tables', () => ({
 }));
 // The Tabulator column definitions are compared as data; no table is built.
 
+import type { ApexLog, LogEvent } from '@apexdevtools/apex-log-parser';
 import { render } from 'lit';
 
 import { storeOf } from '#test-helpers/apexLog.js';
+import { governorLimits, limitValue } from '#test-helpers/limits.js';
 import { NO_REPORTED_LIMITS_TEXT } from '../../../../components/governorCopy.js';
 import { formatInteger } from '../../../../core/utility/Util.js';
 import { LvGrid, type GridColumn } from '../../../../grid/index.js';
@@ -26,9 +28,15 @@ import {
 } from '../../components/TableShared.js';
 import { toBottomUpTree } from '../../utils/Aggregation.js';
 import { toTimeOrderTree, type TimeOrderRow } from '../../utils/TimeOrderTree.js';
-import { CallTreeGrid, categoryClass } from '../CallTreeGrid.js';
+import { CallTreeGrid, categoryClass, eventCategoryClass } from '../CallTreeGrid.js';
 import { nameCell } from '../cells.js';
-import { BOTTOM_UP_SORT, bottomUpColumns, timeOrderColumns } from '../columns.js';
+import {
+  BOTTOM_UP_SORT,
+  bottomUpColumns,
+  TIME_ORDER_DETAILS,
+  timeOrderColumns,
+  timeOrderSource,
+} from '../columns.js';
 import { sumDurationTotalForRootEvents } from '../../../analysis/services/CallStackSum.js';
 
 const { log } = storeOf(
@@ -39,7 +47,18 @@ const { log } = storeOf(
 );
 const options = { openType: jest.fn() };
 const timeOrder = timeOrderColumns(log, options);
-const rows = toTimeOrderTree(log.children, log.governorLimits) ?? [];
+const rows = log.children;
+
+/** `event` with one field changed, the rest read through to it. */
+function withField<K extends keyof LogEvent>(
+  event: LogEvent,
+  key: K,
+  value: LogEvent[K],
+): LogEvent {
+  const copy: LogEvent = Object.create(event);
+  Object.defineProperty(copy, key, { value });
+  return copy;
+}
 
 const column = <R>(columns: GridColumn<R>[], id: string): GridColumn<R> => {
   const found = columns.find((c) => c.id === id);
@@ -61,8 +80,11 @@ function total<R>(calc: GridColumn<R>['calc'], of: readonly R[]): number {
   return step.value;
 }
 
-const allRows = (roots: readonly TimeOrderRow[]): TimeOrderRow[] =>
-  roots.flatMap((r) => [r, ...allRows(r._children ?? [])]);
+const allRows = (roots: readonly LogEvent[]): LogEvent[] =>
+  roots.flatMap((r) => [r, ...allRows(r.children)]);
+
+const builtRows = (roots: readonly TimeOrderRow[]): TimeOrderRow[] =>
+  roots.flatMap((r) => [r, ...builtRows(r._children ?? [])]);
 
 const shown = (content: unknown): HTMLElement => {
   const host = document.createElement('div');
@@ -104,7 +126,7 @@ describe('timeOrderColumns', () => {
 
   it('shows an unknown utilisation as a dash, in the cell, the tooltip and the footer', () => {
     const gov = column(timeOrder, 'governorCost');
-    const row = { ...rows[0]!, governorCost: null };
+    const row = rows[0]!;
     expect(shown(gov.cell(row)).textContent).toBe('—');
     expect(gov.tooltip?.(row)).toBe(NO_REPORTED_LIMITS_TEXT);
     expect(shown(gov.total?.(total(gov.calc, [row]))).textContent).toBe('—');
@@ -113,30 +135,73 @@ describe('timeOrderColumns', () => {
   it('writes heap bytes as formatInteger does', () => {
     const heap = column(timeOrder, 'heapPeak');
     for (const bytes of [0, 999, 1_572_864.4, -12_000_000]) {
-      expect(heap.text?.({ ...rows[0]!, heapPeak: bytes })).toBe(formatInteger(bytes));
+      expect(heap.text?.(withField(rows[0]!, 'heapPeak', bytes))).toBe(formatInteger(bytes));
     }
   });
 
   it('writes time as milliseconds, which find and copy use', () => {
     const time = column(timeOrder, 'duration.total');
-    expect(time.text?.({ ...rows[0]!, duration: { total: 1_234_567, self: 0 } })).toBe('1.23');
+    const row = withField(rows[0]!, 'duration', { total: 1_234_567, self: 0 });
+    expect(time.text?.(row)).toBe('1.23');
+  });
+
+  it('shows on each event what the built Time Order row held', () => {
+    const limited: ApexLog = Object.create(log);
+    Object.defineProperty(limited, 'governorLimits', {
+      value: governorLimits({
+        soqlQueries: limitValue(0, 100),
+        queryRows: limitValue(0, 50_000),
+      }),
+    });
+    const columns = timeOrderColumns(limited, options);
+    const built = builtRows(toTimeOrderTree(log.children, limited.governorLimits) ?? []);
+    const events = allRows(rows);
+    expect(events.map((e) => e.eventIndex)).toEqual(built.map((r) => r.id));
+    const held: Record<string, (r: TimeOrderRow) => string | number | null> = {
+      callerNamespace: (r) => r.callerNamespace,
+      type: (r) => r.type,
+      governorCost: (r) => r.governorCost,
+      governorCostMax: (r) => r.governorCostMax,
+    };
+    for (const [id, value] of Object.entries(held)) {
+      const { text } = column(columns, id);
+      expect(events.map((e) => text?.(e))).toEqual(built.map((r) => String(value(r) ?? '—')));
+    }
+    expect(built.some((r) => (r.governorCost ?? 0) > 0)).toBe(true);
+  });
+});
+
+describe('timeOrderSource', () => {
+  it('reads the tree from the events, keyed by event index', () => {
+    const source = timeOrderSource(log);
+    const outer = rows[0]!;
+    expect(source.roots).toBe(log.children);
+    expect(source.children?.(outer)).toBe(outer.children);
+    expect(source.key(outer)).toBe(outer.eventIndex);
+  });
+
+  it('shows the details the built rows marked, keeping the parents of a detail', () => {
+    const built = builtRows(toTimeOrderTree(log.children, log.governorLimits) ?? []);
+    const deep = (e: LogEvent): boolean =>
+      TIME_ORDER_DETAILS.test(e) || e.children.some((c) => deep(c));
+    expect(TIME_ORDER_DETAILS.keepAncestors).toBe(true);
+    expect(allRows(rows).map(deep)).toEqual(built.map((r) => r._hasDetailsDeep));
   });
 });
 
 describe('nameCell', () => {
-  const named = (text: string): TimeOrderRow | undefined =>
-    allRows(rows).find((r) => r.originalData.text === text);
+  const named = (text: string): LogEvent | undefined => allRows(rows).find((r) => r.text === text);
   const outer = named('ns.Outer.run()');
   const query = named('SELECT Id FROM Account');
 
   it('opens the type of a method from its link', () => {
-    const cell = shown(nameCell(outer?.originalData, '', options.openType));
+    const cell = shown(nameCell(outer, '', options.openType));
     cell.querySelector('a')?.click();
     expect(options.openType).toHaveBeenCalledWith('ns.Outer.run()');
   });
 
   it('shows a query as highlighted SOQL', () => {
-    const cell = shown(nameCell(query?.originalData, '', options.openType));
+    const cell = shown(nameCell(query, '', options.openType));
     expect(cell.querySelector('.soql-block')?.textContent).toContain('SELECT');
   });
 });
@@ -162,6 +227,8 @@ describe('lv-call-tree-grid', () => {
     expect(categoryClass({ originalData: { category: 'Code Unit' } })).toBe('cat-codeUnit');
     expect(categoryClass({ originalData: { category: 'Unknown' } })).toBeUndefined();
     expect(categoryClass({})).toBeUndefined();
+    expect(eventCategoryClass({ category: 'SOQL' })).toBe('cat-soql');
+    expect(eventCategoryClass({})).toBeUndefined();
     expect(document.createElement('lv-call-tree-grid').rowClass).toBe(categoryClass);
   });
 
