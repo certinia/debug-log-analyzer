@@ -1,7 +1,7 @@
 /*
  * Copyright (c) 2026 Certinia Inc. All rights reserved.
  */
-import type * as Context from 'effect/Context';
+import * as Context from 'effect/Context';
 import * as Layer from 'effect/Layer';
 import * as ManagedRuntime from 'effect/ManagedRuntime';
 import { commands, extensions, window } from 'vscode';
@@ -82,15 +82,22 @@ export async function ensureServicesAvailable(): Promise<boolean> {
 export function isSalesforceServicesApi(value: unknown): value is SalesforceVSCodeServicesApi {
   const services = getProperty(value, 'services');
   const dependencies = getProperty(services, 'prebuiltServicesDependencies');
-  const apexLogService = getProperty(services, 'ApexLogService');
-  const fsService = getProperty(services, 'FsService');
+  if (!Context.isContext(dependencies)) {
+    return false;
+  }
+  // The tags are Effect accessor proxies that answer any method name, so check the instances.
+  const apexLogService = getService(dependencies, getProperty(services, 'ApexLogService'));
+  const fsService = getService(dependencies, getProperty(services, 'FsService'));
   return (
-    isObject(dependencies) &&
     typeof getProperty(apexLogService, 'listLogs') === 'function' &&
     typeof getProperty(apexLogService, 'getLogBody') === 'function' &&
     typeof getProperty(fsService, 'safeWriteFile') === 'function' &&
     typeof getProperty(fsService, 'fileOrFolderExists') === 'function'
   );
+}
+
+function getService(context: Context.Context<never>, tag: unknown): unknown {
+  return Context.isTag(tag) ? Context.getOrElse(context, tag, () => undefined) : undefined;
 }
 
 function getProperty(value: unknown, key: string): unknown {

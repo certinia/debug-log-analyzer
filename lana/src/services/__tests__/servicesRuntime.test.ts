@@ -3,6 +3,7 @@
  */
 import { afterEach, beforeEach, describe, expect, it } from '@jest/globals';
 import * as EffectContext from 'effect/Context';
+import * as Effect from 'effect/Effect';
 import { commands, extensions, window } from 'vscode';
 
 import {
@@ -15,20 +16,29 @@ const mockGetExtension = extensions.getExtension as jest.Mock;
 const mockShowErrorMessage = window.showErrorMessage as jest.Mock;
 const mockExecuteCommand = commands.executeCommand as jest.Mock;
 
-const validApi = () => ({
+class ApexLogService extends Effect.Service<ApexLogService>()('ApexLogService', {
+  succeed: {},
+  accessors: true,
+}) {}
+class FsService extends Effect.Service<FsService>()('FsService', {
+  succeed: {},
+  accessors: true,
+}) {}
+
+const fsService: object = { safeWriteFile: jest.fn(), fileOrFolderExists: jest.fn() };
+
+const apiWith = (apexLogService: object) => ({
   services: {
-    prebuiltServicesDependencies: EffectContext.empty(),
-    ApexLogService: {
-      listLogs: jest.fn(),
-      getLogBody: jest.fn(),
-    },
-    FsService: {
-      readFile: jest.fn(),
-      safeWriteFile: jest.fn(),
-      fileOrFolderExists: jest.fn(),
-    },
+    prebuiltServicesDependencies: EffectContext.make(
+      ApexLogService,
+      apexLogService as ApexLogService,
+    ).pipe(EffectContext.add(FsService, fsService as FsService)),
+    ApexLogService,
+    FsService,
   },
 });
+
+const validApi = () => apiWith({ listLogs: jest.fn(), getLogBody: jest.fn() });
 
 describe('servicesRuntime', () => {
   beforeEach(() => {
@@ -44,12 +54,20 @@ describe('servicesRuntime', () => {
     expect(isSalesforceServicesApi(validApi())).toBe(true);
   });
 
-  it.each([
-    undefined,
-    {},
-    { services: {} },
-    { services: { prebuiltServicesDependencies: {}, ApexLogService: {} } },
-  ])('rejects an incompatible API shape: %p', (api) => {
+  it.each([undefined, {}, { services: {} }, { services: { prebuiltServicesDependencies: {} } }])(
+    'rejects an incompatible API shape: %p',
+    (api) => {
+      expect(isSalesforceServicesApi(api)).toBe(false);
+    },
+  );
+
+  it('rejects a service instance that lacks a method its tag still answers to', () => {
+    expect(isSalesforceServicesApi(apiWith({ getLogBody: jest.fn() }))).toBe(false);
+  });
+
+  it('rejects a context that lacks one of the services', () => {
+    const { services } = validApi();
+    const api = { services: { ...services, prebuiltServicesDependencies: EffectContext.empty() } };
     expect(isSalesforceServicesApi(api)).toBe(false);
   });
 
