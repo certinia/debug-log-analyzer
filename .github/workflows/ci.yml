@@ -12,8 +12,83 @@ permissions:
 
 jobs:
   verify:
-    # One runner pays for setup once; independent checks run as background steps.
     name: Verify
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: pnpm/action-setup@v6.1.0
+        with:
+          version: 10
+      - name: Set up Node
+        uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+          cache: 'pnpm'
+      - name: Install Packages
+        run: pnpm run ci:install
+      # The live demo test runs in Chromium. As in the e2e job: the runner image already has its libraries.
+      - name: Install Chromium
+        id: chromium
+        background: true
+        run: pnpm exec playwright install --only-shell chromium
+      - name: Lint Files
+        id: lint
+        background: true
+        run: pnpm run lint
+      # vscode:prepublish runs `tsc -b`, which would race lint's on the shared .tsbuildinfo files.
+      - wait: lint
+      - name: Build VSCode Package
+        id: build
+        if: ${{ !cancelled() }}
+        run: pnpm --filter lana run build:vsix
+      # The live demo copies the viewer from the package build's lana/out.
+      # onBrokenLinks is 'throw', so a broken link fails here and not at publish.
+      - name: Build Site
+        id: docs_site
+        if: ${{ !cancelled() && steps.build.outcome == 'success' }}
+        run: pnpm --filter docs-site build
+      - wait: chromium
+      - name: Test Live Demo
+        if: ${{ !cancelled() && steps.docs_site.outcome == 'success' }}
+        run: pnpm --filter docs-site test:demo
+      - name: Upload Playwright HTML report
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: playwright-report-docs
+          path: lana-docs/playwright-report
+          if-no-files-found: ignore
+          retention-days: 7
+
+  unit_tests:
+    # One step per jest project, so the failed step names the project.
+    # Kept as --runInBand: on 2-vCPU runners the worker pool is slower than serial.
+    name: Unit Tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: pnpm/action-setup@v6.1.0
+        with:
+          version: 10
+      - name: Set up Node
+        uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+          cache: 'pnpm'
+      - name: Install Packages
+        run: pnpm run ci:install
+      - parallel:
+          - name: Test (log-viewer)
+            run: pnpm exec jest --selectProjects log-viewer --runInBand
+          - name: Test (lana)
+            run: pnpm exec jest --selectProjects lana --runInBand
+
+  e2e:
+    name: Test (web e2e)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
@@ -38,75 +113,17 @@ jobs:
           echo "LANA_SERVICES_EXTENSION_PATH=$RUNNER_TEMP/services/extension" >> "$GITHUB_ENV"
       - name: Install Packages
         run: pnpm run ci:install
-      # No browser cache: Playwright's CI docs say a restore takes about as long as the download.
-      # No --with-deps: the runner image has Chromium's libraries, and apt only adds unused fonts.
-      - name: Install Chromium
-        id: chromium
-        background: true
-        run: pnpm exec playwright install --only-shell chromium
-      - name: Lint Files
-        id: lint
-        background: true
-        run: pnpm run lint
-      # Kept as --runInBand: on 2-vCPU runners the worker pool is slower than serial.
-      - name: Test (log-viewer)
-        id: test_log_viewer
-        background: true
-        run: pnpm exec jest --selectProjects log-viewer --runInBand
-      - name: Test (lana)
-        id: test_lana
-        background: true
-        run: pnpm exec jest --selectProjects lana --runInBand
-      # vscode:prepublish runs `tsc -b`, which would race lint's on the shared .tsbuildinfo files.
-      - wait: lint
-      - name: Build VSCode Package
-        id: build
-        if: ${{ !cancelled() }}
-        run: pnpm --filter lana run build:vsix
-      # The live demo copies the viewer from the package build's lana/out.
-      # onBrokenLinks is 'throw', so a broken link fails here and not at publish.
-      - name: Build Site
-        id: docs_site
-        background: true
-        if: ${{ !cancelled() && steps.build.outcome == 'success' }}
-        run: pnpm --filter docs-site build
-      - wait: [chromium, services]
-      # Reuses the lana/out bundle from the package build; test:e2e:web would rebuild it.
-      - name: Test (web e2e)
-        id: e2e
-        background: true
-        if: ${{ !cancelled() && steps.build.outcome == 'success' }}
+      - parallel:
+          # No browser cache: Playwright's CI docs say a restore takes about as long as the download.
+          # No --with-deps: the runner image has Chromium's libraries, and apt only adds unused fonts.
+          - name: Install Chromium
+            run: pnpm exec playwright install --only-shell chromium
+          - name: Build Log Viewer
+            run: pnpm run build:prod
+      - wait: services
+      # Runs Playwright directly: test:e2e:web would rebuild what the step above built.
+      - name: Tests
         run: pnpm exec playwright test --config=lana/test/playwright/playwright.config.web.ts
-      - wait: docs_site
-      - name: Test Live Demo
-        id: demo
-        if: ${{ !cancelled() && steps.docs_site.outcome == 'success' }}
-        run: pnpm --filter docs-site test:demo
-      - wait-all:
-      # Background steps share one check, so name each failed area in the summary and annotations.
-      - name: Report results
-        if: ${{ !cancelled() }}
-        env:
-          LINT: ${{ steps.lint.outcome }}
-          TEST_LOG_VIEWER: ${{ steps.test_log_viewer.outcome }}
-          TEST_LANA: ${{ steps.test_lana.outcome }}
-          BUILD: ${{ steps.build.outcome }}
-          E2E: ${{ steps.e2e.outcome }}
-          DOCS_SITE: ${{ steps.docs_site.outcome }}
-          DEMO: ${{ steps.demo.outcome }}
-        run: |
-          report() {
-            echo "| $1 | $2 |" >> "$GITHUB_STEP_SUMMARY"
-            if [ "$2" != success ]; then echo "::error title=$1::$1: $2"; fi
-          }
-          printf '| Area | Result |\n| --- | --- |\n' >> "$GITHUB_STEP_SUMMARY"
-          report 'Lint' "$LINT"
-          report 'Test (log-viewer)' "$TEST_LOG_VIEWER"
-          report 'Test (lana)' "$TEST_LANA"
-          report 'Build VSCode Package' "$BUILD"
-          report 'Test (web e2e)' "$E2E"
-          report 'Build Site' "$DOCS_SITE"
-          report 'Test Live Demo' "$DEMO"
       - name: Upload Playwright HTML report
         if: failure()
         uses: actions/upload-artifact@v7
@@ -123,19 +140,11 @@ jobs:
           path: lana/test-results/web
           if-no-files-found: ignore
           retention-days: 7
-      - name: Upload docs Playwright HTML report
-        if: failure()
-        uses: actions/upload-artifact@v7
-        with:
-          name: playwright-report-docs
-          path: lana-docs/playwright-report
-          if-no-files-found: ignore
-          retention-days: 7
 
   gate:
     # The single required status check: the ruleset never needs updating when jobs change.
     name: CI Gate
-    needs: [verify]
+    needs: [verify, unit_tests, e2e]
     if: always()
     runs-on: ubuntu-latest
     steps:
