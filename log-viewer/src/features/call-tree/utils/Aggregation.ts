@@ -5,6 +5,11 @@
 import type { LogEvent, GovernorLimits, SelfTotal } from '@apexdevtools/apex-log-parser';
 import { ROOT_PATH_ID, type KeyPathIds } from '../../../core/log/keyPathIds.js';
 import { getCallerNamespace } from '../../../core/utility/CallerNamespace.js';
+import {
+  CHECK_EVERY,
+  frameBudget,
+  type FrameBudgetOptions,
+} from '../../../core/utility/FrameBudget.js';
 import { computeHasDetailsDeep } from './DetailsFilter.js';
 import { type CostLimits, costLimitsOf, setGovernorCost } from './GovernorCost.js';
 
@@ -370,12 +375,15 @@ type DfsEntry = {
  *
  * Zero-delta guards on the DML/SOQL/row/thrown accumulators avoid the no-op
  * `bucket.x += 0` writes that dominate logs without heavy DB work.
+ *
+ * Yields after every {@link CHECK_EVERY} events and rows, so a caller can hand
+ * the thread back between slices.
  */
-export function toBottomUpTree(
+function* bottomUpSteps(
   rootChildren: LogEvent[],
   paths: KeyPathIds,
   governorLimits?: GovernorLimits,
-): BottomUpRow[] {
+): Generator<void, BottomUpRow[], void> {
   if (rootChildren.length === 0) {
     return [];
   }
@@ -568,6 +576,7 @@ export function toBottomUpTree(
 
   // Drive one root tree to completion at a time. Each root is fully entered,
   // descended, and exited before the next begins.
+  let entered = 0;
   for (const root of rootChildren) {
     enter(root);
     while (dfs.length > 0) {
@@ -575,13 +584,52 @@ export function toBottomUpTree(
       if (cur.childIdx < cur.node.children.length) {
         const child = cur.node.children[cur.childIdx++]!;
         enter(child);
+        if (++entered % CHECK_EVERY === 0) {
+          yield;
+        }
       } else {
         exit();
       }
     }
   }
 
-  return finalizeBuckets(rootBuckets, governorLimits && costLimitsOf(governorLimits));
+  return yield* finalizeBuckets(rootBuckets, governorLimits && costLimitsOf(governorLimits));
+}
+
+/** {@link bottomUpSteps} run to the end in one task. */
+export function toBottomUpTree(
+  rootChildren: LogEvent[],
+  paths: KeyPathIds,
+  governorLimits?: GovernorLimits,
+): BottomUpRow[] {
+  const steps = bottomUpSteps(rootChildren, paths, governorLimits);
+  let step = steps.next();
+  while (!step.done) {
+    step = steps.next();
+  }
+  return step.value;
+}
+
+/**
+ * {@link toBottomUpTree} in slices that hand the thread back between them (see
+ * {@link FrameBudgetOptions}). Returns null once `options.signal` aborts.
+ */
+export async function buildBottomUpTree(
+  rootChildren: LogEvent[],
+  paths: KeyPathIds,
+  governorLimits?: GovernorLimits,
+  options: FrameBudgetOptions = {},
+): Promise<BottomUpRow[] | null> {
+  const tick = frameBudget(options);
+  const steps = bottomUpSteps(rootChildren, paths, governorLimits);
+  let step = steps.next();
+  while (!step.done) {
+    if (!(await tick())) {
+      return null;
+    }
+    step = steps.next();
+  }
+  return step.value;
 }
 
 /**
@@ -589,30 +637,41 @@ export function toBottomUpTree(
  * (primary metric total-self desc, then name asc) at every level. Empty child
  * arrays are collapsed to null so Tabulator's dataTree renders a leaf indicator.
  */
-function finalizeBuckets(
+function* finalizeBuckets(
   rootBuckets: Map<number, BottomUpRow>,
   costLimits?: CostLimits,
-): BottomUpRow[] {
+): Generator<void, BottomUpRow[], void> {
   const roots = Array.from(rootBuckets.values());
-  for (const row of roots) {
-    finalizeBucketRecursive(row, costLimits);
+  // Pre-order, so walking it backwards meets every row after its children:
+  // _hasDetailsDeep reads theirs.
+  const order: BottomUpRow[] = [];
+  const pending = roots.slice();
+  while (pending.length > 0) {
+    const row = pending.pop()!; // the loop guard keeps it non-empty
+    order.push(row);
+    for (const child of row._children ?? []) {
+      pending.push(child);
+    }
+    if (order.length % CHECK_EVERY === 0) {
+      yield;
+    }
+  }
+  for (let i = order.length - 1; i >= 0; i--) {
+    const row = order[i]!; // i is in range
+    calculateBottomUpAverages(row);
+    if (costLimits) {
+      setGovernorCost(row, costLimits);
+    }
+    if (row._children && row._children.length > 0) {
+      sortBuckets(row._children);
+    }
+    row._hasDetailsDeep = computeHasDetailsDeep(row, row.totalTime, row.type);
+    if (i % CHECK_EVERY === 0) {
+      yield;
+    }
   }
   sortBuckets(roots);
   return roots;
-}
-
-function finalizeBucketRecursive(row: BottomUpRow, costLimits?: CostLimits): void {
-  calculateBottomUpAverages(row);
-  if (costLimits) {
-    setGovernorCost(row, costLimits);
-  }
-  if (row._children && row._children.length > 0) {
-    for (const child of row._children) {
-      finalizeBucketRecursive(child, costLimits);
-    }
-    sortBuckets(row._children);
-  }
-  row._hasDetailsDeep = computeHasDetailsDeep(row, row.totalTime, row.type);
 }
 
 function sortBuckets(rows: BottomUpRow[]): void {

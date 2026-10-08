@@ -15,7 +15,7 @@ import '../../src/features/call-tree/grid/CallTreeGrid.js';
 import type { CallTreeGrid } from '../../src/features/call-tree/grid/CallTreeGrid.js';
 import { BOTTOM_UP_SORT, bottomUpColumns } from '../../src/features/call-tree/grid/columns.js';
 import {
-  toBottomUpTree,
+  buildBottomUpTree,
   type BottomUpRow,
 } from '../../src/features/call-tree/utils/Aggregation.js';
 import { groupedRowFormatter } from '../../src/features/call-tree/utils/CategoryColoring.js';
@@ -114,8 +114,12 @@ export class LvGridBottomUp implements BottomUpContender {
     this.grid.columns = bottomUpColumns(log, { openType: () => {} });
     this.grid.filters = [{ test: details }];
     this.grid.sort = BOTTOM_UP_SORT;
-    const roots = toBottomUpTree(log.children, logStoreFor(log).keyPathIds(), log.governorLimits);
-    this.grid.source = { roots, children: (r) => r._children, key: (r) => r.id };
+    const roots = await buildBottomUpTree(
+      log.children,
+      logStoreFor(log).keyPathIds(),
+      log.governorLimits,
+    );
+    this.grid.source = { roots: roots ?? [], children: (r) => r._children, key: (r) => r.id };
     host.append(this.grid);
     await this.grid.settled();
   }
