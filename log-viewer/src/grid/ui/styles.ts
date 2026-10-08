@@ -158,7 +158,7 @@ export const gridStyles = css`
     .colhead {
       position: relative;
       display: flex;
-      align-items: end;
+      align-items: start;
       gap: var(--grid-pad);
       white-space: normal;
 
@@ -171,21 +171,39 @@ export const gridStyles = css`
         cursor: pointer;
         user-select: none;
       }
+    }
 
-      &[aria-sort='ascending']::after,
-      &[aria-sort='descending']::after {
+    /* Inline after the last word, so a wrapped title keeps it beside the text. */
+    .sorter {
+      display: inline-flex;
+      flex-direction: column;
+      gap: var(--grid-stroke);
+      margin-inline-start: var(--grid-pad);
+      vertical-align: middle;
+
+      &::before,
+      &::after {
         content: '';
-        flex: none;
-        align-self: center;
         border-inline: 4px solid transparent;
+        opacity: 0.4;
       }
 
-      &[aria-sort='ascending']::after {
-        border-block-end: 6px solid currentColor;
+      &::before {
+        border-block-end: 5px solid currentColor;
       }
 
-      &[aria-sort='descending']::after {
-        border-block-start: 6px solid currentColor;
+      &::after {
+        border-block-start: 5px solid currentColor;
+      }
+
+      [aria-sort='ascending'] > .title > &::before,
+      [aria-sort='descending'] > .title > &::after {
+        opacity: 1;
+      }
+
+      [aria-sort='ascending'] > .title > &::after,
+      [aria-sort='descending'] > .title > &::before {
+        opacity: 0;
       }
     }
 

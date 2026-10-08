@@ -390,7 +390,11 @@ export class LvGrid<R extends object = object> extends LitElement {
           event: e,
         })}
     >
-      ${column.title}
+      <span class="title"
+        >${column.title}${
+          column.sort ? html`<span class="sorter" aria-hidden="true"></span>` : nothing
+        }</span
+      >
       ${
         column.resizable === false
           ? nothing
