@@ -201,6 +201,39 @@ describe('GridView', () => {
     expect(scroller.scrollTop).toBe(600 * ROW + ROW);
   });
 
+  it('measures a row element again after the pool gives it to another row', async () => {
+    const resize = fakeResizeObserver();
+    const { scroller, body, shown } = await setup();
+    // Each jump hands the elements to other rows.
+    for (const top of [300, 0, 300]) {
+      scroller.scrollTop = top * ROW;
+      await flush();
+    }
+    const before = Number.parseFloat(body.style.height);
+    const rows = shown();
+    for (const row of rows) {
+      resize(row, 2 * ROW);
+    }
+    await flush();
+    expect(Number.parseFloat(body.style.height)).toBe(before + rows.length * ROW);
+  });
+
+  it('keeps the height of a row whose element is hidden as a spare', async () => {
+    const resize = fakeResizeObserver();
+    const { scroller, body } = await setup();
+    scroller.scrollTop = 300 * ROW;
+    await flush();
+    // The top of the list has no overscan above it, so the pool has spares.
+    scroller.scrollTop = 0;
+    await flush();
+    const spare = [...body.children].find((el) => (el as HTMLElement).hidden);
+    expect(spare).toBeDefined();
+    const before = body.style.height;
+    resize(spare as Element, 0);
+    await flush();
+    expect(body.style.height).toBe(before);
+  });
+
   it('paints nothing while hidden, and on show puts the user back where they were', async () => {
     const resize = fakeResizeObserver();
     const { scroller, store, view, painted, shown } = await setup();

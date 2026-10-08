@@ -3,7 +3,6 @@
  */
 import {
   elementScroll,
-  measureElement,
   observeElementOffset,
   observeElementRect,
   Virtualizer,
@@ -66,10 +65,12 @@ export class GridView<R extends object> {
   private pending: { rows: RowView<R>; toggled?: RowKey | Group<R> } | null = null;
   private pendingScroll: { index: number; align: 'center' | 'auto' } | null = null;
   private readonly unobserve: () => void;
+  /** Not virtual-core's: it unobserves a row's old element, which the pool gave to another row. */
+  private readonly rowObserver: ResizeObserver | null;
+  private syncOffset = (): void => {};
 
   constructor(options: GridViewOptions<R>) {
     this.options = options;
-    let syncOffset = (): void => {};
     this.virtualizer = new Virtualizer<HTMLElement, HTMLElement>({
       count: 0,
       getScrollElement: () => options.scroller,
@@ -79,7 +80,7 @@ export class GridView<R extends object> {
       observeElementRect,
       observeElementOffset: (instance, cb) => {
         let seen = Number.NaN;
-        syncOffset = () => {
+        this.syncOffset = () => {
           const top = options.scroller.scrollTop;
           if (top === seen) {
             return;
@@ -92,12 +93,6 @@ export class GridView<R extends object> {
           }
         };
         return observeElementOffset(instance, cb);
-      },
-      // A row resized above the fold moves scrollTop by the change, from the offset of the
-      // last scroll event. A scrollTop write since then would be undone: give it the live one.
-      measureElement: (element, entry, instance) => {
-        syncOffset();
-        return measureElement(element, entry, instance);
       },
       onChange: () => this.schedule(),
     });
@@ -116,8 +111,18 @@ export class GridView<R extends object> {
         ? null
         : new ResizeObserver(([entry]) => this.setVisible((entry?.contentRect.height ?? 0) > 0));
     observer?.observe(scroller);
+    this.rowObserver =
+      typeof ResizeObserver === 'undefined'
+        ? null
+        : new ResizeObserver((entries) => {
+            for (const entry of entries) {
+              const el = entry.target as HTMLElement;
+              this.measure(el, Math.round(entry.borderBoxSize[0]?.blockSize ?? 0));
+            }
+          });
     this.unobserve = () => {
       observer?.disconnect();
+      this.rowObserver?.disconnect();
       scroller.removeEventListener('scroll', onScroll);
     };
   }
@@ -352,8 +357,26 @@ export class GridView<R extends object> {
     }
     this.options.body.style.height = `${v.getTotalSize()}px`;
     for (const el of fresh) {
-      v.measureElement(el);
+      // A new observation reports the size even when it did not change, as for a new row.
+      this.rowObserver?.unobserve(el);
+      this.rowObserver?.observe(el);
+      // While scrolling, a layout here on each draw cost frames; the observer's comes free.
+      if (!v.isScrolling) {
+        this.measure(el, Math.round(el.getBoundingClientRect().height));
+      }
     }
+  }
+
+  private measure(el: HTMLElement, size: number): void {
+    const index = Number(el.dataset.index);
+    // A spare row, or a hidden tab, has no box: 0 is no row's height.
+    if (size === 0 || this.painted.get(index) !== el) {
+      return;
+    }
+    // A row resized above the fold moves scrollTop by the change, from the offset of the
+    // last scroll event. A scrollTop write since then would be undone: give it the live one.
+    this.syncOffset();
+    this.virtualizer.resizeItem(index, size);
   }
 
   private paint(el: HTMLElement, index: number, rows: RowView<R>): void {
