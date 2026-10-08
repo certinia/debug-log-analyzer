@@ -1,7 +1,7 @@
 // Copies the built log viewer, the demo host and the sample log into static/demo for the homepage live demo.
 //
-// DEMO_VIEWER_ROOT names another checkout to take the built viewer and its setting
-// defaults from, so the published demo can run the stable release while the docs come from main.
+// DEMO_VIEWER_ROOT names another folder with a built lana/out and lana/package.json, such as an
+// unzipped release vsix, so the published demo can run the stable release while the docs come from main.
 import { copyFile, mkdir, readdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { pathToFileURL } from 'node:url';
 
