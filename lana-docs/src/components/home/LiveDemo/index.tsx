@@ -1,14 +1,26 @@
 import useBaseUrl from '@docusaurus/useBaseUrl';
 import { useColorMode } from '@docusaurus/theme-common';
-import { ASSETS_URL } from '@site/src/constants';
+import { ASSETS_URL, MARKETPLACE_URL } from '@site/src/constants';
 import ThemedImage from '@theme/ThemedImage';
 import clsx from 'clsx';
 import { useCallback, useEffect, useRef, useState, type ReactElement } from 'react';
 import styles from './styles.module.css';
 
+// A missing demo can still answer 200: the dev server falls back to the site's HTML page.
+async function isDemoBuilt(settingsUrl: string): Promise<boolean> {
+  try {
+    const response = await fetch(settingsUrl, { method: 'HEAD' });
+    return response.ok && (response.headers.get('content-type') ?? '').includes('json');
+  } catch {
+    return false;
+  }
+}
+
 export default function LiveDemo(): ReactElement {
   const { colorMode } = useColorMode();
-  const demoUrl = useBaseUrl('/demo/viewer');
+  const demoUrl = useBaseUrl('/demo/viewer.html');
+  const settingsUrl = useBaseUrl('/demo/settings.json');
+  const [missing, setMissing] = useState(false);
   const figure = useRef<HTMLElement>(null);
   const frame = useRef<HTMLIFrameElement>(null);
   // The theme at launch goes in the URL; later toggles are posted, so the frame never reloads.
@@ -30,7 +42,14 @@ export default function LiveDemo(): ReactElement {
     return () => document.removeEventListener('fullscreenchange', onChange);
   }, []);
 
-  const launch = () => setLaunchTheme(colorMode);
+  const launch = async () => {
+    const theme = colorMode;
+    const built = await isDemoBuilt(settingsUrl);
+    setMissing(!built);
+    if (built) {
+      setLaunchTheme(theme);
+    }
+  };
   const toggleFullscreen = () =>
     fullscreen ? void document.exitFullscreen() : void figure.current?.requestFullscreen();
   const close = () => {
@@ -43,14 +62,30 @@ export default function LiveDemo(): ReactElement {
   return (
     <figure ref={figure} className={clsx(styles.demo, launchTheme && styles.live)}>
       <div className={styles.bar}>
-        {!launchTheme && (
-          <button type="button" className="button button--primary" onClick={launch}>
+        {!launchTheme && !missing && (
+          <button type="button" className="button button--primary" onClick={() => void launch()}>
             Open demo
           </button>
         )}
-        <span className={styles.label}>
-          <strong>Live demo</strong> of a 20 MB sample log, in your browser
-        </span>
+        {missing ? (
+          <span role="status" className={styles.label}>
+            {process.env.NODE_ENV === 'development' ? (
+              <>
+                <strong>Demo not built.</strong> Run <code>pnpm build</code>, then{' '}
+                <code>pnpm --filter docs-site build:demo</code>, and reload.
+              </>
+            ) : (
+              <>
+                <strong>The live demo is not available right now.</strong>{' '}
+                <a href={MARKETPLACE_URL}>Install the extension</a> to try it on your own logs.
+              </>
+            )}
+          </span>
+        ) : (
+          <span className={styles.label}>
+            <strong>Live demo</strong> of a 20 MB sample log, in your browser
+          </span>
+        )}
         {launchTheme && (
           <span className={styles.controls}>
             <button
@@ -75,7 +110,7 @@ export default function LiveDemo(): ReactElement {
         />
       ) : (
         // A mouse shortcut only; the Open demo button is the keyboard and screen reader path.
-        <div className={styles.poster} onClick={launch}>
+        <div className={styles.poster} onClick={() => void launch()}>
           <ThemedImage
             sources={{
               dark: `${ASSETS_URL}/timeline.png`,

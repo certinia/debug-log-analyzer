@@ -48,7 +48,23 @@ function frame(): HTMLIFrameElement | null {
   return container.querySelector('iframe');
 }
 
+function status(): string | undefined {
+  return container.querySelector('[role="status"]')?.textContent ?? undefined;
+}
+
+async function click(target: HTMLElement | null | undefined): Promise<void> {
+  await act(async () => target?.click());
+}
+
+function mockDemo(contentType: string): void {
+  globalThis.fetch = jest.fn(async () => ({
+    ok: true,
+    headers: { get: () => contentType },
+  })) as unknown as typeof fetch;
+}
+
 beforeEach(() => {
+  mockDemo('application/json');
   mockColorMode = 'dark';
   container = document.createElement('div');
   document.body.append(container);
@@ -70,18 +86,18 @@ it('shows a poster and loads nothing from the demo before a click', () => {
 it.each([
   ['the Open demo button', () => button('Open demo')],
   ['the poster', () => container.querySelector('img')?.parentElement],
-])('opens the viewer in a frame from %s', (_, target) => {
+])('opens the viewer in a frame from %s', async (_, target) => {
   render();
 
-  act(() => target()?.click());
+  await click(target());
 
   expect(frame()?.title).toBe('Apex Log Analyzer live demo');
-  expect(frame()?.getAttribute('src')).toBe('/debug-log-analyzer/demo/viewer?theme=dark');
+  expect(frame()?.getAttribute('src')).toBe('/debug-log-analyzer/demo/viewer.html?theme=dark');
 });
 
-it('posts a theme change to the frame without reloading it', () => {
+it('posts a theme change to the frame without reloading it', async () => {
   render();
-  act(() => button('Open demo').click());
+  await click(button('Open demo'));
   const opened = frame();
   if (!opened?.contentWindow) {
     throw new Error('The demo frame has no window.');
@@ -92,19 +108,62 @@ it('posts a theme change to the frame without reloading it', () => {
   render();
 
   expect(frame()).toBe(opened);
-  expect(frame()?.getAttribute('src')).toBe('/debug-log-analyzer/demo/viewer?theme=dark');
+  expect(frame()?.getAttribute('src')).toBe('/debug-log-analyzer/demo/viewer.html?theme=dark');
   expect(post.mock.calls).toContainEqual([
     { type: 'lana-demo-theme', theme: 'light' },
     'http://localhost',
   ]);
 });
 
-it('closes the demo and shows the poster again', () => {
+it('closes the demo and shows the poster again', async () => {
   render();
-  act(() => button('Open demo').click());
+  await click(button('Open demo'));
 
   act(() => button('Close demo').click());
 
   expect(frame()).toBeNull();
   expect(button('Open demo')).toBeDefined();
+});
+
+it('keeps the poster and gives the build steps in dev when the demo is not built', async () => {
+  const env = process.env.NODE_ENV;
+  process.env.NODE_ENV = 'development';
+  mockDemo('text/html');
+  render();
+
+  try {
+    await click(button('Open demo'));
+  } finally {
+    process.env.NODE_ENV = env;
+  }
+
+  expect(frame()).toBeNull();
+  expect(container.querySelector('img')).not.toBeNull();
+  expect(status()).toMatch(
+    /^Demo not built\. Run pnpm build, then pnpm --filter docs-site build:demo/,
+  );
+});
+
+it.each([
+  ['the site answers with HTML', () => mockDemo('text/html')],
+  [
+    'the request fails',
+    () => {
+      globalThis.fetch = jest.fn(async () => {
+        throw new TypeError('Failed to fetch');
+      }) as unknown as typeof fetch;
+    },
+  ],
+])('keeps the poster and links to the Marketplace when %s', async (_, arrange) => {
+  arrange();
+  render();
+
+  await click(button('Open demo'));
+
+  expect(frame()).toBeNull();
+  expect(container.querySelector('img')).not.toBeNull();
+  expect(status()).toMatch(/^The live demo is not available right now\./);
+  expect(container.querySelector('[role="status"] a')?.getAttribute('href')).toMatch(
+    /marketplace\.visualstudio\.com/,
+  );
 });
