@@ -14,7 +14,12 @@ jest.mock('../../features/settings/Settings.js', () => ({
   updateSetting: (section: string, value: unknown) => written.push([section, value]),
 }));
 
-import { ColumnSettingsController } from '../ColumnSettingsController.js';
+import {
+  ColumnSettingsController,
+  gridColumnTarget,
+  type ColumnTarget,
+} from '../ColumnSettingsController.js';
+import type { LvGrid } from '../../grid/index.js';
 import { getVisibleFields, type ColumnView } from '../../tabulator/ColumnViews.js';
 import { fakeHost, type FakeHost } from '#test-helpers/fakeHost.js';
 
@@ -69,7 +74,7 @@ function fakeTable(laidOut = true): Tabulator {
 
 /** A connected controller over `table`, with settings already read. */
 async function connected(
-  table: Tabulator | null = fakeTable(),
+  table: Tabulator | ColumnTarget | null = fakeTable(),
 ): Promise<{ host: FakeHost; columns: ColumnSettingsController }> {
   const host = fakeHost();
   const columns = new ColumnSettingsController(host, {
@@ -190,5 +195,32 @@ describe('ColumnSettingsController', () => {
     expect(getVisibleFields(table)).toEqual(FIELDS);
     columns.applyTo(table);
     expect(getVisibleFields(table)).toEqual(['text', 'timeTaken']);
+  });
+
+  it('shows a view on an lv-grid, edits it from the grid, and lists its columns', async () => {
+    const grid = {
+      columns: FIELDS.map((field) => ({ id: field, title: `${field} title`, cell: () => '' })),
+    } as unknown as LvGrid<object>;
+    const shown = (): string[] =>
+      grid.columns.filter((column) => !column.hidden).map((column) => column.id);
+    const target = gridColumnTarget(grid);
+    const { columns } = await connected(target);
+
+    columns.choose('Timing');
+    expect(shown()).toEqual(['text', 'timeTaken']);
+
+    columns.toggle(target, 'namespace');
+    expect(shown()).toEqual(['text', 'namespace', 'timeTaken']);
+    expect(columns.editedViews).toEqual(['Timing']);
+
+    const toggles = columns
+      .menuItems(target)
+      .filter((item) => item.id.startsWith('col:'))
+      .map((item) => [item.id, item.label, item.checked]);
+    expect(toggles).toEqual([
+      ['col:namespace', 'namespace title', true],
+      ['col:rowCount', 'rowCount title', false],
+      ['col:timeTaken', 'timeTaken title', true],
+    ]);
   });
 });
