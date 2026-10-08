@@ -28,6 +28,27 @@ jest.mock('../../core/log/frameVariables.js', () => {
   };
 });
 
+// Holds a comparison open while it is set, so a test can act mid-walk. A walk this
+// small never reaches a slice check, so the gate abandons an aborted one itself.
+let walkGate: Promise<void> | null = null;
+jest.mock('../../core/log/aggregateVariables.js', () => {
+  const actual = jest.requireActual<typeof import('../../core/log/aggregateVariables.js')>(
+    '../../core/log/aggregateVariables.js',
+  );
+  return {
+    ...actual,
+    aggregateVariablesFor: async (...args: Parameters<typeof actual.aggregateVariablesFor>) => {
+      if (walkGate) {
+        await walkGate;
+        if (args[3].signal?.aborted) {
+          return null;
+        }
+      }
+      return actual.aggregateVariablesFor(...args);
+    },
+  };
+});
+
 let treeBuilds = 0;
 jest.mock('../variableTree.js', () => {
   const actual = jest.requireActual<typeof import('../variableTree.js')>('../variableTree.js');
@@ -784,6 +805,44 @@ describe('VariablesDetail comparing a merged row', () => {
     await el.updateComplete;
     return el;
   }
+
+  /** The section, mounted with its comparison held open until `release`. */
+  async function midWalk(): Promise<{ el: VariablesDetail; release: () => Promise<void> }> {
+    let open = (): void => {};
+    walkGate = new Promise((resolve) => (open = resolve));
+    const store = logOf(CALLS);
+    const frames = indexesOf(store.log, 'ns.Svc.run()');
+    const el = await mount(store, { eventIndex: frames[0]!, frames });
+    const release = async (): Promise<void> => {
+      walkGate = null;
+      open();
+      await new Promise((resolve) => setTimeout(resolve, 0));
+      await el.updateComplete;
+    };
+    return { el, release };
+  }
+
+  it('finishes the comparison through a move', async () => {
+    const { el, release } = await midWalk();
+
+    document.body.append(document.createElement('div'), el);
+    await release();
+
+    expect(rowNames(el)).toEqual(['retry', 'batchSize']);
+    document.body.replaceChildren();
+  });
+
+  it('compares again when a removed section comes back', async () => {
+    const { el, release } = await midWalk();
+
+    el.remove();
+    await Promise.resolve();
+    document.body.append(el);
+    await release();
+
+    expect(rowNames(el)).toEqual(['retry', 'batchSize']);
+    el.remove();
+  });
 
   it('lists every name the calls held, varying ones first, an agreed one as its value', async () => {
     const el = await compared();

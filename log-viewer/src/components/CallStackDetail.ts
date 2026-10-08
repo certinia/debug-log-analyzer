@@ -18,6 +18,7 @@ import { soqlSyntaxStyles } from '../features/soql/styles/soql-syntax.css.js';
 import { eventBus } from '../core/events/EventBus.js';
 import { SelectionEchoGuard } from '../core/events/SelectionEchoGuard.js';
 import { SubscriptionController } from '../core/events/SubscriptionController.js';
+import { TeardownController } from '../core/events/TeardownController.js';
 import { LocatedRowMarker, rowIndexStamper } from './locatedRow.js';
 import { globalStyles } from '../styles/global.styles.js';
 import { progressColumnWidth } from '../tabulator/format/measureWidth.js';
@@ -101,12 +102,15 @@ export class CallStackDetail extends LitElement {
     }
   }
 
-  disconnectedCallback(): void {
-    super.disconnectedCallback();
-    this._locatedRow.clear();
-    this._table?.destroy();
-    this._table = null;
-  }
+  private readonly _teardown = new TeardownController(this, {
+    teardown: () => {
+      this._locatedRow.clear();
+      this._table?.destroy();
+      this._table = null;
+    },
+    // After the render that re-attached it, so Tabulator measures a laid-out host.
+    rebuild: () => void this.updateComplete.then(() => this._rebuild()),
+  });
 
   private _tableHost(): HTMLElement | null {
     return this.renderRoot?.querySelector<HTMLElement>('#call-stack-table') ?? null;
@@ -114,7 +118,8 @@ export class CallStackDetail extends LitElement {
 
   private _rebuild() {
     const container = this._tableHost();
-    if (!container) {
+    // A detached host builds when it comes back, so nothing is left to leak here.
+    if (!container || !this.isConnected) {
       return;
     }
     // The table about to be destroyed can't report the pointer leaving its rows,

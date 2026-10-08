@@ -11,6 +11,7 @@ const built: Record<string, unknown>[] = [];
 const selected: number[][] = [];
 type TableHandler = (...args: unknown[]) => void;
 const handlers: Record<string, TableHandler> = {};
+let destroyed = 0;
 jest.mock('tabulator-tables', () => ({
   Tabulator: class {
     static registerModule() {}
@@ -20,7 +21,9 @@ jest.mock('tabulator-tables', () => ({
     on(event: string, handler: TableHandler) {
       handlers[event] = handler;
     }
-    destroy() {}
+    destroy() {
+      destroyed++;
+    }
     getSelectedRows() {
       return [];
     }
@@ -161,5 +164,34 @@ describe('CallStackDetail', () => {
     const shown = tooltip({}, cell, () => {}) as HTMLElement;
 
     expect(shown.textContent).toBe(signature);
+  });
+
+  it('keeps the table through a move', async () => {
+    const el = await mount(5);
+    const tables = built.length;
+    destroyed = 0;
+
+    document.body.append(document.createElement('div'), el);
+    await Promise.resolve();
+    await el.updateComplete;
+
+    expect([built.length, destroyed]).toEqual([tables, 0]);
+    document.body.replaceChildren();
+  });
+
+  it('rebuilds the table after a detach and a re-attach', async () => {
+    const el = await mount(5);
+    const tables = built.length;
+    destroyed = 0;
+
+    el.remove();
+    await Promise.resolve();
+    expect(destroyed).toBe(1);
+
+    document.body.append(el);
+    await el.updateComplete;
+
+    expect(built.length).toBe(tables + 1);
+    el.remove();
   });
 });

@@ -173,6 +173,33 @@ describe('CallTreeDetail scoped build', () => {
     expect(table.setData).toHaveBeenCalledTimes(2);
   });
 
+  it('keeps the table through a move', async () => {
+    build.mockImplementation((eventIndex) => Promise.resolve(tree(eventIndex * 1000)));
+    const el = await mount(5);
+    await frame(el);
+
+    document.body.append(document.createElement('div'), el);
+    await frame(el);
+
+    expect(tables.instances).toHaveLength(1);
+    expect(tables.instances[0]!.destroy).not.toHaveBeenCalled();
+  });
+
+  it('rebuilds the table after a detach and a re-attach', async () => {
+    build.mockImplementation((eventIndex) => Promise.resolve(tree(eventIndex * 1000)));
+    const el = await mount(5);
+    await frame(el);
+
+    el.remove();
+    await Promise.resolve();
+    expect(tables.instances[0]!.destroy).toHaveBeenCalled();
+
+    document.body.append(el);
+    await frame(el);
+
+    expect(tables.instances).toHaveLength(2);
+  });
+
   it('moves the mark without re-walking, since the anchor holds the scope', async () => {
     build.mockImplementation((eventIndex) => Promise.resolve(tree(eventIndex * 1000)));
     const el = await mount(5);
