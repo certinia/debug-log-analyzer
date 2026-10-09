@@ -285,7 +285,11 @@ export class CalltreeView extends LitElement {
   });
 
   private readonly _subscriptions = new SubscriptionController(this, () => [
-    wireCategoryColoring(this),
+    wireCategoryColoring(this, (on) => {
+      for (const grid of this._grids) {
+        grid.toggleAttribute('category-colorize', on);
+      }
+    }),
   ]);
 
   private readonly _inspector = new InspectorTabController(this, 'calltree', {
