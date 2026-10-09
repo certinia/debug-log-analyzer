@@ -293,9 +293,14 @@ describe('copy', () => {
   afterEach(() => document.body.replaceChildren());
 
   it.each([
-    ['time order', 'Name\tNamespace\tDML Count', ['EXECUTION_STARTED', 'ns.Outer.run()'], 4],
-    ['aggregated', 'Name\tNamespace\tCalls\tDML Count', ['EXECUTION_STARTED', 'ns.Outer.run()'], 4],
-    ['bottom up', 'Name\tNamespace\tType\tCalls', ['apex://pkg.Entry (code unit)'], 10],
+    ['time order', 'Level\tName\tNamespace\tDML Count', ['EXECUTION_STARTED', 'ns.Outer.run()'], 4],
+    [
+      'aggregated',
+      'Level\tName\tNamespace\tCalls\tDML Count',
+      ['EXECUTION_STARTED', 'ns.Outer.run()'],
+      4,
+    ],
+    ['bottom up', 'Level\tName\tNamespace\tType\tCalls', ['apex://pkg.Entry (code unit)'], 10],
   ] as const)(
     'copies %s: the shown columns, and every row, closed or not',
     async (view, header, first, lines) => {
@@ -312,7 +317,7 @@ describe('copy', () => {
       const [head, ...rows] = writeText.mock.calls[0]?.[0].split('\n') ?? [];
       expect(head).toMatch(new RegExp(`^${header}\t`));
       expect(rows).toHaveLength(lines);
-      expect(rows.map((r) => r.split('\t')[0])).toEqual(expect.arrayContaining([...first]));
+      expect(rows.map((r) => r.split('\t')[1])).toEqual(expect.arrayContaining([...first]));
     },
   );
 });

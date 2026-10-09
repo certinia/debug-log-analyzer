@@ -93,6 +93,8 @@ The Call Tree can be navigated with the keyboard. The up and down keys will move
 
 Click a row, then press `CMD / CTRL + c` to copy the table, in every view. The copy holds the shown columns, tab-separated, so it pastes into a spreadsheet. It holds every row that passes the filters, children included, open or not.
 
+When rows have children, the copy starts with a Level column. A top-level row is 1, its children are 2, and so on. In Bottom-Up with a group, the group is 1.
+
 ### Inspect a row
 
 Selecting a row fills the [inspector](./inspector.md) with that call path - its governor metrics, the stack that led to it, and a call tree scoped to just that row, which you can read in Time Order, Aggregated or Bottom-Up independently of the tab's own view mode.

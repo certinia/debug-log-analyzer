@@ -15,7 +15,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Sort, expand and filter take under 0.2 s, and the window stays responsive while they run.
   - Bottom-Up group by is 8× faster, and ungroup no longer fails.
   - Column resize is smooth, and Find no longer stalls on its first search.
-- 📋 **Call Tree copy**: `Cmd/Ctrl+C` copies every row that passes the filters, children included, in all three views.
+- 📋 **Call Tree copy**: `Cmd/Ctrl+C` copies every row that passes the filters, children included, in all three views, with a Level column that shows how deep each row is.
 - ✂️ **Truncation**: each skipped section states how much of the log it dropped.
 - 🌊 **Flows**: names drop the `FLOW_START_INTERVIEWS :` and `WF_CRITERIA :` prefixes.
 - 📚 **Multiple logs**: a file holding several logs shows the first and flags the rest.
