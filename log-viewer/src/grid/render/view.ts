@@ -26,6 +26,13 @@ export interface GridViewOptions<R> {
   painter: RowPainter<R>;
   /** A row's height before it is measured. */
   rowHeight: number;
+  /**
+   * A data row's lines of text. A row's height before it is measured is then the height
+   * of a 1-line row, learned from the rows measured, plus `lineHeight` per further line.
+   */
+  lines?: (row: R) => number;
+  /** The height a further line adds. Read once, when the first row is measured. */
+  lineHeight?: () => number;
   /** Rows painted beyond each edge of the viewport. Default 10. */
   overscan?: number;
   /** The `aria-rowindex` of the first row. Default 1; 2 under a header row. */
@@ -76,13 +83,21 @@ export class GridView<R extends object> {
   // Not virtual-core's: it unobserves a row's old element, which the pool gave to another row.
   private readonly rowObserver: ResizeObserver | null;
   private syncOffset = (): void => {};
+  /** The shortest 1-line row measured; `rowHeight` until one is. */
+  private base: number;
+  private baseMeasured = false;
+  /** The height a further line adds; NaN until read. */
+  private line = Number.NaN;
+  /** Each row's `lines`, by index; 0 until asked. virtual-core asks on every measure. */
+  private lineCounts = new Uint16Array(0);
 
   constructor(options: GridViewOptions<R>) {
     this.options = options;
+    this.base = options.rowHeight;
     this.virtualizer = new Virtualizer<HTMLElement, HTMLElement>({
       count: 0,
       getScrollElement: () => options.scroller,
-      estimateSize: () => options.rowHeight,
+      estimateSize: (index) => this.estimate(index),
       overscan: options.overscan ?? 10,
       scrollToFn: elementScroll,
       observeElementRect,
@@ -147,6 +162,7 @@ export class GridView<R extends object> {
     }
     const before = this.rows?.size ? this.captureNow(this.rows) : null;
     this.rows = rows;
+    this.lineCounts = new Uint16Array(this.options.lines ? rows.size : 0);
     for (const el of this.painted.values()) {
       this.stale.add(el);
     }
@@ -448,10 +464,73 @@ export class GridView<R extends object> {
     if (size === 0 || this.painted.get(index) !== el) {
       return;
     }
+    if (this.learn(index, size)) {
+      return;
+    }
     // A row resized above the fold moves scrollTop by the change, from the offset of the
     // last scroll event. A scrollTop write since then would be undone: give it the live one.
     this.syncOffset();
     this.virtualizer.resizeItem(index, size);
+  }
+
+  private estimate(index: number): number {
+    const lines = this.linesAt(index);
+    const line = this.line > 0 ? this.line : this.base;
+    return this.base + (lines - 1) * line;
+  }
+
+  private linesAt(index: number): number {
+    const lines = this.options.lines;
+    if (!lines) {
+      return 1;
+    }
+    let count = this.lineCounts[index] ?? 0;
+    if (count === 0) {
+      const entry = this.rows?.rowAt(index);
+      const asked = entry === undefined || entry instanceof Group ? 1 : lines(entry);
+      count = Math.min(Math.max(1, Math.round(asked)), 0xffff);
+      if (index < this.lineCounts.length) {
+        this.lineCounts[index] = count;
+      }
+    }
+    return count;
+  }
+
+  /**
+   * Learns the 1-line height from a measured 1-line row, and reads the line height. The
+   * first sets it, higher or lower than `rowHeight`; later ones only lower it, as a row
+   * the column width wraps is taller than its lines say. True when the estimates changed,
+   * and every row is then measured again.
+   */
+  private learn(index: number, size: number): boolean {
+    let changed = false;
+    if (Number.isNaN(this.line)) {
+      this.line = this.options.lineHeight?.() ?? 0;
+      // Until now a further line was taken as a row's height.
+      changed = this.line > 0 && this.line !== this.base;
+    }
+    if (this.linesAt(index) === 1 && (!this.baseMeasured || size < this.base - 0.5)) {
+      this.baseMeasured = true;
+      changed ||= size !== this.base;
+      this.base = size;
+    }
+    if (changed) {
+      this.reestimate();
+    }
+    return changed;
+  }
+
+  /** Drops every height known, so each row takes the new estimate until it is measured. */
+  private reestimate(): void {
+    this.virtualizer.measure();
+    for (const el of this.painted.values()) {
+      this.stale.add(el);
+    }
+    if (this.drawing) {
+      this.again = true;
+    } else {
+      this.schedule();
+    }
   }
 
   private paint(el: HTMLElement, index: number, rows: RowView<R>): void {

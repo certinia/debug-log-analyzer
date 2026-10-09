@@ -477,6 +477,32 @@ export function timeOrderSource(log: ApexLog): TreeSource<LogEvent> {
   return { roots: log.children, children: (event) => event.children, key: (e) => e.eventIndex };
 }
 
+function lineBreaks(text: string | null | undefined): number {
+  if (!text) {
+    return 0;
+  }
+  let count = 0;
+  for (let at = text.indexOf('\n'); at !== -1; at = text.indexOf('\n', at + 1)) {
+    count++;
+  }
+  return count;
+}
+
+/**
+ * The lines a Name shows: its label is the text and suffix, after a 1-line type at most.
+ * Read from the event, as no label is built for it. A query is counted as written,
+ * though its cell lays it out on more.
+ */
+function nameLines(event: LogEvent): number {
+  return 1 + lineBreaks(event.text) + lineBreaks(event.suffix);
+}
+
+/**
+ * A Bottom-Up row's lines, for the grid's `rowLines`. Time Order has none: at 580k rows the
+ * count cost a long task on each sort, filter and expand, and its rows are nearly all 1 line.
+ */
+export const bottomUpLines = (row: BottomUpRow): number => nameLines(row.originalData);
+
 /** Show Details on the Time Order tree. */
 export const TIME_ORDER_DETAILS: RowFilter<LogEvent> = { test: isDetailEvent, keepAncestors: true };
 

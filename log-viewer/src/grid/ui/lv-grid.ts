@@ -161,6 +161,10 @@ export class LvGrid<R extends object = object> extends LitElement {
   @property({ type: Number, attribute: 'row-height' })
   rowHeight = 24;
 
+  /** A data row's lines of text, so a tall row has its height before it is drawn. Read when the grid first shows. */
+  @property({ attribute: false })
+  rowLines: ((row: R) => number) | null = null;
+
   /** Copy writes each row's tree under it; off, top-level rows only. */
   @property({ type: Boolean, attribute: 'copy-tree' })
   copyTree = true;
@@ -594,6 +598,8 @@ export class LvGrid<R extends object = object> extends LitElement {
       scroller,
       body,
       rowHeight: this.rowHeight,
+      lines: this.rowLines ?? undefined,
+      lineHeight: () => this.treeLineHeight(),
       rowIndexStart: 2,
       painter: litPainter(() => ({
         columns: this.columns,
@@ -604,6 +610,24 @@ export class LvGrid<R extends object = object> extends LitElement {
     });
     this.view.setFind(this.found);
     this.requestUpdate();
+  }
+
+  /** The height a further line of tree cell text adds, from a hidden 1-line and 2-line cell. */
+  private treeLineHeight(): number {
+    const body = this.bodyRef.value;
+    if (!body) {
+      return 0;
+    }
+    const probe = document.createElement('div');
+    probe.className = 'cell tree';
+    probe.style.cssText = 'position: absolute; visibility: hidden; white-space: pre;';
+    probe.textContent = 'x';
+    body.append(probe);
+    const one = probe.getBoundingClientRect().height;
+    probe.textContent = 'x\nx';
+    const two = probe.getBoundingClientRect().height;
+    probe.remove();
+    return two - one;
   }
 
   private targetAt(index: number): RowTarget<R> | null {

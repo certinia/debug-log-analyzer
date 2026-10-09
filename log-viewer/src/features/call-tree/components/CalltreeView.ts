@@ -49,6 +49,7 @@ import { eventCategoryClass } from '../grid/CallTreeGrid.js';
 import {
   BOTTOM_UP_SORT,
   bottomUpColumns,
+  bottomUpLines,
   TIME_ORDER_DETAILS,
   timeOrderColumns,
   timeOrderSource,
@@ -1286,6 +1287,7 @@ export class CalltreeView extends LitElement {
     this.bottomUpGrid = grid;
     grid.columns = bottomUpColumns(rootMethod, { openType });
     grid.sort = BOTTOM_UP_SORT;
+    grid.rowLines = bottomUpLines;
     grid.groupBy = bottomUpGroupBy(this.bottomUpGroupBy);
     grid.filters = this._bottomUpFilters();
     this._columns.applyTo(gridColumnTarget(grid));

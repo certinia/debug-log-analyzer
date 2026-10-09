@@ -80,7 +80,8 @@ const cells = css`
     border: none;
     font-family: 'codicon';
     font-size: 14px;
-    line-height: 16px;
+    /* The text's line, so a row with a twisty is no taller than a leaf. */
+    line-height: 1lh;
     vertical-align: top;
   }
 
