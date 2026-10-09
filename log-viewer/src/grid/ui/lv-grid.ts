@@ -247,6 +247,11 @@ export class LvGrid<R extends object = object> extends LitElement {
     return true;
   }
 
+  /** Moves keyboard focus to the grid, so its keys and copy work. */
+  override focus(options?: FocusOptions): void {
+    this.scrollerRef.value?.focus(options);
+  }
+
   /** Clears the selection and reports it in `lv-grid-select`. Does nothing when no row is selected. */
   deselect(): void {
     if (this.selected !== null) {

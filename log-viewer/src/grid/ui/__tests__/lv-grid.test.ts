@@ -363,6 +363,12 @@ describe('lv-grid', () => {
     expect(located).toEqual(['a', null]);
   });
 
+  it('takes keyboard focus on its rows', async () => {
+    const { grid, root, scroller } = await setup();
+    grid.focus();
+    expect(root.activeElement).toBe(scroller);
+  });
+
   it('opens the path to a row, then selects it', async () => {
     const { grid, rowNamed, names } = await setup();
     expect(await grid.goTo([2, 22])).toBe(true);

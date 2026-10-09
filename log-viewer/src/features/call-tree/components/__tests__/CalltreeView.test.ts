@@ -308,6 +308,35 @@ describe('calltree-view category colorize', () => {
   });
 });
 
+describe('calltree-view go to row', () => {
+  let view: CalltreeView;
+
+  afterEach(() => {
+    view.remove();
+  });
+
+  it('puts keyboard focus on the grid, so its keys work at once', async () => {
+    globalThis.IntersectionObserver = AlwaysVisible as unknown as typeof IntersectionObserver;
+    view = new CalltreeView();
+    document.body.append(view);
+    view.isVisible = true;
+    const { log } = storeOf(
+      '09:18:22.6 (1000)|METHOD_ENTRY|[1]|01p|ns.Outer.run()\n' +
+        '09:18:22.6 (1800)|METHOD_EXIT|[1]|ns.Outer.run()\n',
+    );
+    view.timelineRoot = log;
+    await view.updateComplete;
+    await settle();
+    const all = (events: ApexLog['children']): ApexLog['children'] =>
+      events.flatMap((e) => [e, ...all(e.children)]);
+    const outer = all(log.children).find((e) => e.text === 'ns.Outer.run()');
+
+    await view._goToRow(outer?.eventIndex ?? -1);
+
+    expect((view.renderRoot as ShadowRoot).activeElement === view.timeOrderGrid).toBe(true);
+  });
+});
+
 describe('calltree-view type picker', () => {
   const OUTER =
     '09:18:22.6 (1000)|METHOD_ENTRY|[1]|01p|ns.Outer.run()\n' +

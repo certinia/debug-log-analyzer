@@ -940,7 +940,10 @@ export class CalltreeView extends LitElement {
     }
 
     await this._renderCallTree(this._callTreeTableWrapper, this.rootMethod);
-    await this.timeOrderGrid?.goTo(this._timeOrderPath(eventIndex));
+    const grid = this.timeOrderGrid;
+    if (grid && (await grid.goTo(this._timeOrderPath(eventIndex)))) {
+      grid.focus({ preventScroll: true });
+    }
   }
 
   /**
