@@ -125,6 +125,12 @@
       "rules": { "lana/no-tabulator-html-tooltip": "error" }
     },
     {
+      // The grid is built as if it were an outside library: see the rule for the layer map.
+      "files": ["log-viewer/**/*.ts"],
+      "jsPlugins": ["./scripts/oxlint-plugin-lana.mjs"],
+      "rules": { "lana/grid-boundary": "error" }
+    },
+    {
       "files": ["log-viewer/src/**/*.ts"],
       "excludeFiles": ["**/__tests__/**", "**/*.test.ts"],
       "rules": {

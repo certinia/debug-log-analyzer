@@ -11,7 +11,7 @@ type ProgressOptions = {
 // The fill is only useful once it's wide enough to see — below this, round up
 // to a hairline sliver rather than disappearing entirely (a real value like
 // 12/50,000 rows rounds to 0% but is still non-zero usage worth showing).
-const MIN_VISIBLE_PERCENT = 1;
+export const MIN_VISIBLE_PERCENT = 1;
 
 export function progressComponent(
   value: number,

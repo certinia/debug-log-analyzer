@@ -219,6 +219,32 @@ export function buildColumnMenuItems(
   alwaysVisible: string[],
   editedViewIds: string[],
 ): ContextMenuItem[] {
+  const columns = table.getColumns().map((column) => {
+    const field = column.getField();
+    return {
+      field,
+      title: String(column.getDefinition().title ?? field),
+      visible: column.isVisible(),
+    };
+  });
+  return columnMenuItems(columns, activeViewId, views, alwaysVisible, editedViewIds);
+}
+
+/** A column a menu lists: its field, its header title and whether it is shown. */
+export interface MenuColumn {
+  field: string;
+  title: string;
+  visible: boolean;
+}
+
+/** {@link buildColumnMenuItems} for any grid, from its columns in order. */
+export function columnMenuItems(
+  columns: readonly MenuColumn[],
+  activeViewId: string,
+  views: ColumnView[],
+  alwaysVisible: string[],
+  editedViewIds: string[],
+): ContextMenuItem[] {
   const items: ContextMenuItem[] = views.map((view) => ({
     id: `view:${view.id}`,
     label: `${activeViewId === view.id ? CHECKED : UNCHECKED}${view.id}`,
@@ -230,16 +256,14 @@ export function buildColumnMenuItems(
 
   items.push({ id: 'view-sep', label: '', separator: true });
 
-  for (const column of table.getColumns()) {
-    const field = column.getField();
+  for (const { field, title, visible } of columns) {
     if (!field || alwaysVisible.includes(field)) {
       continue;
     }
-    const title = String(column.getDefinition().title ?? field);
     items.push({
       id: `col:${field}`,
       label: title,
-      checked: column.isVisible(),
+      checked: visible,
       keepOpen: true,
     });
   }

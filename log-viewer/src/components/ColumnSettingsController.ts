@@ -6,15 +6,48 @@ import type { Tabulator } from 'tabulator-tables';
 
 import type { ContextMenuItem } from './ContextMenu.js';
 import { getSettings, updateSetting, type LanaSettings } from '../features/settings/Settings.js';
+import type { LvGrid } from '../grid/index.js';
 import {
   applyColumnView,
   buildColumnMenuItems,
+  columnMenuItems,
   getColumnView,
   getTableFields,
   resolveColumnView,
   toggleField,
   type ColumnView,
+  type MenuColumn,
 } from '../tabulator/ColumnViews.js';
+
+/** A grid other than a Tabulator table that a column view applies to. */
+export interface ColumnTarget {
+  /** Each column a view can name, in order. */
+  columns(): readonly MenuColumn[];
+  /** Shows only the fields in `visible`, or every column for null. */
+  show(visible: ReadonlySet<string> | null): void;
+}
+
+/** An lv-grid as a column view target: the view sets each column's `hidden`. */
+export function gridColumnTarget<R extends object>(grid: LvGrid<R>): ColumnTarget {
+  return {
+    columns: () =>
+      grid.columns.map((column) => ({
+        field: column.id,
+        title: column.title,
+        visible: !column.hidden,
+      })),
+    show: (visible) => {
+      grid.columns = grid.columns.map((column) => ({
+        ...column,
+        hidden: visible ? !visible.has(column.id) : false,
+      }));
+    },
+  };
+}
+
+type Target = Tabulator | ColumnTarget;
+
+const isTabulator = (target: Target): target is Tabulator => 'getColumns' in target;
 
 /** What a grid keeps in settings: the view on show, and the views the user edited. */
 export interface ColumnSettings {
@@ -32,7 +65,7 @@ export interface ColumnSettingsOptions {
   /** Fields shown whichever view is on, e.g. the Name column. */
   alwaysVisible: string[];
   /** Every built table the view applies to. The call tree has three. */
-  tables: () => Tabulator[];
+  tables: () => Target[];
 }
 
 /**
@@ -81,8 +114,13 @@ export class ColumnSettingsController implements ReactiveController {
   }
 
   /** Apply the view on show to a table that has just been built. */
-  applyTo(table: Tabulator): void {
-    applyColumnView(table, this.fieldsFor(this._view), this._options.alwaysVisible);
+  applyTo(table: Target): void {
+    const fields = this.fieldsFor(this._view);
+    if (isTabulator(table)) {
+      applyColumnView(table, fields, this._options.alwaysVisible);
+    } else {
+      table.show(fields === null ? null : new Set([...this._options.alwaysVisible, ...fields]));
+    }
   }
 
   /** Show `id` and remember it. */
@@ -92,10 +130,13 @@ export class ColumnSettingsController implements ReactiveController {
   }
 
   /** Add or remove one column from the view on show, and remember it. */
-  toggle(table: Tabulator, field: string): void {
+  toggle(table: Target, field: string): void {
+    const fields = isTabulator(table)
+      ? getTableFields(table)
+      : table.columns().map((column) => column.field);
     this._overrides = {
       ...this._overrides,
-      [this._view]: toggleField(this.fieldsFor(this._view), field, getTableFields(table)),
+      [this._view]: toggleField(this.fieldsFor(this._view), field, fields),
     };
     this._apply();
     this._host.requestUpdate();
@@ -117,14 +158,11 @@ export class ColumnSettingsController implements ReactiveController {
   }
 
   /** The column header menu for `table`, against the state now. */
-  menuItems(table: Tabulator): ContextMenuItem[] {
-    return buildColumnMenuItems(
-      table,
-      this._view,
-      this._options.views,
-      this._options.alwaysVisible,
-      this.editedViews,
-    );
+  menuItems(table: Target): ContextMenuItem[] {
+    const { views, alwaysVisible } = this._options;
+    return isTabulator(table)
+      ? buildColumnMenuItems(table, this._view, views, alwaysVisible, this.editedViews)
+      : columnMenuItems(table.columns(), this._view, views, alwaysVisible, this.editedViews);
   }
 
   private _adopt(settings: LanaSettings): void {
@@ -146,8 +184,8 @@ export class ColumnSettingsController implements ReactiveController {
    */
   private _apply(): void {
     for (const table of this._options.tables()) {
-      if (table.element?.clientHeight) {
-        applyColumnView(table, this.fieldsFor(this._view), this._options.alwaysVisible);
+      if (!isTabulator(table) || table.element?.clientHeight) {
+        this.applyTo(table);
       }
     }
   }

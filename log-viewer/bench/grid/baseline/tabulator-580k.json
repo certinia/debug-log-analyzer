@@ -1,0 +1,126 @@
+{
+  "tabulator": {
+    "contender": "tabulator",
+    "firstRender": {
+      "ms": 350,
+      "settledMs": 376,
+      "longestTaskMs": 324
+    },
+    "heapBeforeMountMb": 867,
+    "heapAfterMountMb": 945,
+    "rowsAfterMount": 6,
+    "rowsExpanded": 563090,
+    "rowsUnfiltered": 580091,
+    "expandAll": {
+      "ms": 254,
+      "settledMs": 299,
+      "longestTaskMs": 655
+    },
+    "scrollJumpEnd": {
+      "ms": 33,
+      "settledMs": 67,
+      "longestTaskMs": 0
+    },
+    "scrollJumpTop": {
+      "ms": 42,
+      "settledMs": 83,
+      "longestTaskMs": 0
+    },
+    "sortSelfDesc": {
+      "ms": 473,
+      "settledMs": 499,
+      "longestTaskMs": 525
+    },
+    "clearSort": {
+      "ms": 207,
+      "settledMs": 234,
+      "longestTaskMs": 215
+    },
+    "filterOff": {
+      "ms": 189,
+      "settledMs": 216,
+      "longestTaskMs": 212
+    },
+    "filterOn": {
+      "ms": 196,
+      "settledMs": 217,
+      "longestTaskMs": 224
+    },
+    "find": {
+      "ms": 641,
+      "settledMs": 668,
+      "longestTaskMs": 17639
+    },
+    "hideColumn": {
+      "ms": 289,
+      "settledMs": 317,
+      "longestTaskMs": 287
+    },
+    "showColumn": {
+      "ms": 278,
+      "settledMs": 299,
+      "longestTaskMs": 153
+    },
+    "collapseAll": {
+      "ms": 232,
+      "settledMs": 271,
+      "longestTaskMs": 235
+    },
+    "goToDeepRow": {
+      "ms": 151,
+      "settledMs": 199,
+      "longestTaskMs": 144
+    },
+    "scrollFling": {
+      "frames": 120,
+      "p50": 16.7,
+      "p95": 16.8,
+      "max": 17,
+      "dropped": 0
+    },
+    "resizeNameColumn": {
+      "frames": 60,
+      "p50": 133.3,
+      "p95": 150.1,
+      "max": 567,
+      "dropped": 60
+    },
+    "findMatches": 1534,
+    "csvLength": 0,
+    "heapAfterRunsMb": 1344,
+    "firstRenderRuns": [
+      {
+        "ms": 293,
+        "settledMs": 323,
+        "longestTaskMs": 315
+      },
+      {
+        "ms": 287,
+        "settledMs": 315,
+        "longestTaskMs": 308
+      },
+      {
+        "ms": 350,
+        "settledMs": 376,
+        "longestTaskMs": 324
+      }
+    ],
+    "firstRenderMedianMs": 293,
+    "log": "sample-log.log x5 (scripts/grid-bench/make-log.mjs 5): 94.8MB, 580,091 rows",
+    "runner": "Playwright headless Chromium 1400x900, 3 loads, 5 reps, 2026-10-07",
+    "exportCsvScaling": [
+      {
+        "rows": 4986,
+        "ms": 9061
+      },
+      {
+        "rows": 10878,
+        "ms": 38888
+      },
+      {
+        "rows": 21342,
+        "ms": 148184
+      }
+    ]
+  }
+}
