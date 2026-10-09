@@ -16,17 +16,17 @@ import { callTreeContender, lvGridContender } from './lv-grid-contender.js';
 import { TabulatorContender } from './tabulator-contender.js';
 import { frameStats, perFrame, settled, timed, type FrameStats, type Timing } from './timing.js';
 
-const CONTENDERS: Record<string, () => Contender> = {
-  tabulator: () => new TabulatorContender(),
-  grid: () => new GridContender(),
-  'lv-grid': lvGridContender,
-  'call-tree': callTreeContender,
-};
+const CONTENDERS = new Map<string, () => Contender>([
+  ['tabulator', () => new TabulatorContender()],
+  ['grid', () => new GridContender()],
+  ['lv-grid', lvGridContender],
+  ['call-tree', callTreeContender],
+]);
 
-const BOTTOM_UP_CONTENDERS: Record<string, () => BottomUpContender> = {
-  tabulator: () => new TabulatorBottomUp(),
-  'call-tree': () => new LvGridBottomUp(),
-};
+const BOTTOM_UP_CONTENDERS = new Map<string, () => BottomUpContender>([
+  ['tabulator', () => new TabulatorBottomUp()],
+  ['call-tree', () => new LvGridBottomUp()],
+]);
 
 const params = new URLSearchParams(location.search);
 const name = params.get('c') ?? 'tabulator';
@@ -117,9 +117,9 @@ async function load(text: string): Promise<void> {
   await settled();
 
   if (tree === 'bottom-up') {
-    mounted = bottomUp = (BOTTOM_UP_CONTENDERS[name] ?? BOTTOM_UP_CONTENDERS.tabulator!)();
+    mounted = bottomUp = (BOTTOM_UP_CONTENDERS.get(name) ?? (() => new TabulatorBottomUp()))();
   } else {
-    mounted = contender = (CONTENDERS[name] ?? CONTENDERS.tabulator!)();
+    mounted = contender = (CONTENDERS.get(name) ?? (() => new TabulatorContender()))();
   }
   const heapBefore = heapMb();
   const first = await timed(() => mounted.mount(host, log));
