@@ -13,7 +13,7 @@ import '../../src/features/call-tree/grid/CallTreeGrid.js';
 import type { CallTreeGrid } from '../../src/features/call-tree/grid/CallTreeGrid.js';
 import { aggregatedColumns, mergedLines } from '../../src/features/call-tree/grid/columns.js';
 import {
-  toAggregatedCallTree,
+  buildAggregatedTree,
   type AggregatedRow,
 } from '../../src/features/call-tree/utils/Aggregation.js';
 import type { MergedContender } from './contender.js';
@@ -28,12 +28,12 @@ export class LvGridAggregated implements MergedContender {
     this.grid.columns = aggregatedColumns(log, { openType: () => {} });
     this.grid.filters = [{ test: details }];
     this.grid.rowLines = mergedLines;
-    const roots = toAggregatedCallTree(
+    const roots = await buildAggregatedTree(
       log.children,
       logStoreFor(log).keyPathIds(),
       log.governorLimits,
     );
-    this.grid.source = { roots, children: (r) => r._children, key: (r) => r.id };
+    this.grid.source = { roots: roots ?? [], children: (r) => r._children, key: (r) => r.id };
     host.append(this.grid);
     await this.grid.settled();
   }

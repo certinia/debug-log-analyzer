@@ -6,7 +6,7 @@
 import { afterEach, beforeEach, describe, expect, it } from '@jest/globals';
 import type { ApexLog } from '@apexdevtools/apex-log-parser';
 
-import type { BottomUpRow } from '../../utils/Aggregation.js';
+import type { AggregatedRow, BottomUpRow } from '../../utils/Aggregation.js';
 
 // The columns read a parsed log, which the fake one is not.
 jest.mock('../../grid/columns.js', () => ({
@@ -26,7 +26,8 @@ jest.mock('../../grid/columns.js', () => ({
 }));
 jest.mock('../../utils/Aggregation.js', () => ({
   ...jest.requireActual<object>('../../utils/Aggregation.js'),
-  buildBottomUpTree: () => buildBottomUp(),
+  buildAggregatedTree: (...args: unknown[]) => heldBuild(args[3]),
+  buildBottomUpTree: (...args: unknown[]) => heldBuild(args[3]),
 }));
 // VsSelect extends vscode-single-select, whose setFormValue needs an
 // ElementInternals jsdom lacks; the render would upgrade it.
@@ -48,14 +49,18 @@ import { CalltreeView } from '../CalltreeView.js';
 
 /** Which view each build made, in order. */
 let built: string[] = [];
-/** Finishes the newest Bottom Up build, where a test drives one that is in flight. */
-let finishBuild: ((roots: BottomUpRow[]) => void) | null = null;
-/** Whether a Bottom Up build waits to be finished by hand. */
+/** Finishes the newest merged build, where a test drives one that is in flight. */
+let finishBuild: ((roots: object[]) => void) | null = null;
+/** Whether a merged build waits to be finished by hand. */
 let holdBuilds = false;
 /** Pushes settings to the view, as the extension does on a change. */
 let applySettings: (settings: object) => void = () => {};
 
-function buildBottomUp(): Promise<BottomUpRow[]> {
+/** The signals the merged builds were given, in order. */
+let buildSignals: (AbortSignal | undefined)[] = [];
+
+function heldBuild(options: unknown): Promise<object[]> {
+  buildSignals.push((options as { signal?: AbortSignal } | undefined)?.signal);
   if (!holdBuilds) {
     return Promise.resolve([]);
   }
@@ -121,6 +126,7 @@ describe('calltree-view table lifetime', () => {
 
   beforeEach(async () => {
     built = [];
+    buildSignals = [];
     finishBuild = null;
     holdBuilds = false;
     globalThis.IntersectionObserver = AlwaysVisible as unknown as typeof IntersectionObserver;
@@ -197,6 +203,42 @@ describe('calltree-view table lifetime', () => {
     expect(view.bottomUpGrid).toBe(newest);
     expect(newest?.source?.roots).toBe(rows);
     expect(first?.source).toBeNull();
+  });
+
+  it('leaves an aggregated build the detach overtook to the one that replaced it', async () => {
+    holdBuilds = true;
+    void view._setViewMode('aggregated');
+    await settle();
+    const overtaken = finishBuild!; // the held build set it
+    const first = view.aggregatedGrid;
+
+    view.remove();
+    holdBuilds = false;
+    document.body.append(view);
+    await settle();
+    expect(built).toEqual(['time-order', 'aggregated', 'aggregated']);
+    const newest = view.aggregatedGrid;
+    const rows = newest?.source?.roots;
+
+    overtaken([{ id: 1, _pathId: 1 } as AggregatedRow]);
+    await settle();
+
+    expect(view.aggregatedGrid).toBe(newest);
+    expect(newest?.source?.roots).toBe(rows);
+    expect(first?.source).toBeNull();
+  });
+
+  it('stops a build when a detach destroys its grid', async () => {
+    holdBuilds = true;
+    void view._setViewMode('bottom-up');
+    await settle();
+
+    view.remove();
+    holdBuilds = false;
+    document.body.append(view);
+    await settle();
+
+    expect(buildSignals.map((signal) => signal?.aborted)).toEqual([true, false]);
   });
 
   it('rebuilds bottom up grouped the way it was left', async () => {
