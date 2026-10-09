@@ -11,6 +11,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - ⚡ **Timeline**: large logs are ready 3.1× faster and use 47% less memory, measured on a 100 MB log.
 - ⚡ **UI**: many components, including the tab views and Inspector sections, appear up to 80× faster on large logs. ([#63])
+- ⚡ **Call Tree**: large logs respond up to 20× faster and use 93% less memory, measured on a 95 MB log.
+  - Sort, expand and filter take under 0.2 s, and the window stays responsive while they run.
+  - Bottom-Up group by is 8× faster, and ungroup no longer fails.
+  - Column resize is smooth, and Find no longer stalls on its first search.
 - 📋 **Call Tree copy**: `Cmd/Ctrl+C` copies every row that passes the filters, children included, in all three views.
 - ✂️ **Truncation**: each skipped section states how much of the log it dropped.
 - 🌊 **Flows**: names drop the `FLOW_START_INTERVIEWS :` and `WF_CRITERIA :` prefixes.
