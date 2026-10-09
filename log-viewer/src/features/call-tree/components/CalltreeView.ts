@@ -243,6 +243,8 @@ export class CalltreeView extends LitElement {
   totalMatches = 0;
 
   blockClearHighlights = true;
+  private _findsRunning = 0;
+  private _searches = 0;
   findArgs: { text: string; count: number; options: { matchCase: boolean } } = {
     text: '',
     count: 0,
@@ -1069,20 +1071,36 @@ export class CalltreeView extends LitElement {
       args.options.matchCase !== this.findArgs.options?.matchCase;
     this.findArgs = JSON.parse(JSON.stringify(args));
 
+    this._findsRunning++;
     this.blockClearHighlights = true;
-    if (newSearch) {
-      const total = await grid.find({ text: args.text, matchCase: args.options.matchCase });
-      this.totalMatches = Math.max(0, total);
-      if (isGridVisible) {
-        document.dispatchEvent(
-          new CustomEvent('lv-find-results', { detail: { totalMatches: this.totalMatches } }),
-        );
+    try {
+      if (newSearch) {
+        const search = ++this._searches;
+        const total = await grid.find({ text: args.text, matchCase: args.options.matchCase });
+        if (search !== this._searches) {
+          return;
+        }
+        if (total < 0) {
+          // A rebuild dropped it: show no matches and forget the query, so the next Enter searches.
+          this._resetFindWidget();
+          this._clearSearchHighlights();
+          return;
+        }
+        this.totalMatches = total;
+        if (isGridVisible) {
+          document.dispatchEvent(
+            new CustomEvent('lv-find-results', { detail: { totalMatches: this.totalMatches } }),
+          );
+        }
+      }
+      if (isGridVisible && this.totalMatches > 0 && args.count > 0) {
+        await grid.setCurrentMatch(args.count - 1);
+      }
+    } finally {
+      if (--this._findsRunning === 0) {
+        this.blockClearHighlights = false;
       }
     }
-    if (isGridVisible && this.totalMatches > 0 && args.count > 0) {
-      await grid.setCurrentMatch(args.count - 1);
-    }
-    this.blockClearHighlights = false;
   }
 
   private async _renderCallTree(
