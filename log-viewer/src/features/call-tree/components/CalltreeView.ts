@@ -24,8 +24,8 @@ import { eventByEventIndex } from '../../../core/utility/EventSearch.js';
 import { isVisible } from '../../../core/utility/Util.js';
 import { CALLTREE_GO_TO_ROW, type CalltreeNavigationEventMap } from '../navigation.js';
 import {
+  buildAggregatedTree,
   buildBottomUpTree,
-  toAggregatedCallTree,
   type AggregatedRow,
   type BottomUpRow,
 } from '../utils/Aggregation.js';
@@ -266,6 +266,8 @@ export class CalltreeView extends LitElement {
   private viewSwitchEpoch = 0;
   /** Drops a pending wait for the view to come on screen, once per attach. */
   private _visibilityWait: AbortController | null = null;
+  // Aborted with the grids, so their Aggregated or Bottom-Up build stops.
+  private _builds = new AbortController();
 
   get _callTreeTableWrapper(): HTMLDivElement | null {
     return (this.tableContainer = this.renderRoot?.querySelector('#call-tree-table') ?? null);
@@ -645,6 +647,8 @@ export class CalltreeView extends LitElement {
   }
 
   private _destroyCurrentTable(): void {
+    this._builds.abort();
+    this._builds = new AbortController();
     for (const grid of this._grids) {
       grid.remove();
     }
@@ -1070,11 +1074,16 @@ export class CalltreeView extends LitElement {
     grid.rowLines = mergedLines;
     grid.filters = this._aggregatedFilters();
     this._columns.applyTo(gridColumnTarget(grid));
-    const roots = toAggregatedCallTree(
+    const roots = await buildAggregatedTree(
       rootMethod.children,
       logStoreFor(rootMethod).keyPathIds(),
       rootMethod.governorLimits,
+      { signal: this._builds.signal },
     );
+    // A build can finish just before a detach, and a later one owns the container now.
+    if (!roots || this.aggregatedGrid !== grid) {
+      return;
+    }
     this._aggregatedLinks = linkRows(roots);
     grid.source = { roots, children: (row) => row._children, key: (row) => row.id };
     await grid.settled();
@@ -1098,15 +1107,14 @@ export class CalltreeView extends LitElement {
     grid.groupBy = bottomUpGroupBy(this.bottomUpGroupBy);
     grid.filters = this._bottomUpFilters();
     this._columns.applyTo(gridColumnTarget(grid));
-    const roots =
-      (await buildBottomUpTree(
-        rootMethod.children,
-        logStoreFor(rootMethod).keyPathIds(),
-        rootMethod.governorLimits,
-      )) ?? [];
-    if (this.bottomUpGrid !== grid) {
-      // A detach destroyed this build mid-flight, and a later one owns the
-      // container now.
+    const roots = await buildBottomUpTree(
+      rootMethod.children,
+      logStoreFor(rootMethod).keyPathIds(),
+      rootMethod.governorLimits,
+      { signal: this._builds.signal },
+    );
+    // A build can finish just before a detach, and a later one owns the container now.
+    if (!roots || this.bottomUpGrid !== grid) {
       return;
     }
     this._bottomUpLinks = linkRows(roots);

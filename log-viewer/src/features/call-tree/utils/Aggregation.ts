@@ -152,6 +152,57 @@ export function toAggregatedCallTree(
   paths: KeyPathIds,
   governorLimits?: GovernorLimits,
 ): AggregatedRow[] {
+  return runSteps(aggregatedSteps(rootChildren, paths, governorLimits));
+}
+
+/**
+ * {@link toAggregatedCallTree} in slices that hand the thread back between them
+ * (see {@link FrameBudgetOptions}). Returns null once `options.signal` aborts.
+ */
+export async function buildAggregatedTree(
+  rootChildren: LogEvent[],
+  paths: KeyPathIds,
+  governorLimits?: GovernorLimits,
+  options: FrameBudgetOptions = {},
+): Promise<AggregatedRow[] | null> {
+  return driveSteps(aggregatedSteps(rootChildren, paths, governorLimits), options);
+}
+
+function runSteps<T>(steps: Generator<void, T, void>): T {
+  let step = steps.next();
+  while (!step.done) {
+    step = steps.next();
+  }
+  return step.value;
+}
+
+async function driveSteps<T>(
+  steps: Generator<void, T, void>,
+  options: FrameBudgetOptions,
+): Promise<T | null> {
+  const tick = frameBudget(options);
+  let step = steps.next();
+  while (!step.done) {
+    if (!(await tick())) {
+      return null;
+    }
+    step = steps.next();
+  }
+  return step.value;
+}
+
+type AggregateFrame = {
+  // null on the frame that holds the roots.
+  row: AggregatedRow | null;
+  callees: AggregatedRow[];
+  next: number;
+};
+
+function* aggregatedSteps(
+  rootChildren: LogEvent[],
+  paths: KeyPathIds,
+  governorLimits?: GovernorLimits,
+): Generator<void, AggregatedRow[], void> {
   if (rootChildren.length === 0) {
     return [];
   }
@@ -161,40 +212,112 @@ export function toAggregatedCallTree(
   let next = 0;
   const idFor = (): number => ++next;
   const costLimits = governorLimits && costLimitsOf(governorLimits);
+  let budget = CHECK_EVERY;
 
-  // Group root-level events by signature with call stack tracking. Keyed by the
-  // log's interned ids: a bucket key is hashed once for the log rather than once
-  // per event, and the ids are the ones a mark matches rows on.
-  const rootMap = new Map<number, AggregatedRow>();
+  // The grouping loop runs outside the generator: run inside it, it is about 15% slower.
+  function* group(
+    calls: readonly { children: LogEvent[] }[],
+    pathId: number,
+    openStackId: number,
+  ): Generator<void, AggregatedRow[], void> {
+    const grouping: CalleeGrouping = {
+      calls,
+      pathId,
+      openStackId,
+      byKey: new Map(),
+      call: 0,
+      child: 0,
+    };
+    for (;;) {
+      budget -= groupCallees(grouping, paths, idFor, budget);
+      if (budget > 0) {
+        return Array.from(grouping.byKey.values());
+      }
+      yield;
+      budget = CHECK_EVERY;
+    }
+  }
 
-  for (const event of rootChildren) {
-    // Process every event so callCount/DML/SOQL/exception counts roll up even
-    // when the event has no timing contribution.
-    const keyId = paths.keyIdOf(event);
-    let row = rootMap.get(keyId);
-
-    if (!row) {
-      row = createEmptyAggregatedRow(
-        paths.keyText(keyId),
-        paths.step(ROOT_PATH_ID, keyId),
-        event,
-        idFor,
-      );
-      rootMap.set(keyId, row);
+  // Nothing is open above a root child, so no call of one is recursive here.
+  const roots = yield* group([{ children: rootChildren }], ROOT_PATH_ID, NO_STACK);
+  // Descend callees in grouping order, not sorted order: the row ids depend on it.
+  const stack: AggregateFrame[] = [{ row: null, callees: roots, next: 0 }];
+  while (stack.length > 0) {
+    const frame = stack[stack.length - 1]!; // the loop guard keeps it non-empty
+    if (frame.next < frame.callees.length) {
+      const row = frame.callees[frame.next++]!; // next is in range
+      // The row's own frame is open over its callees, so a call of it there is recursive.
+      const callees = yield* group(row.instances, row._pathId, paths.stackIdOf(row.originalData));
+      stack.push({ row, callees, next: 0 });
+      if (--budget === 0) {
+        yield;
+        budget = CHECK_EVERY;
+      }
+      continue;
     }
 
-    // Nothing is open above a root child, so no call of one is recursive here.
-    addEventToAggregatedRow(row, event, paths.stackIdOf(event, keyId), NO_STACK);
+    stack.pop();
+    if (frame.row) {
+      frame.row._children = frame.callees.length > 0 ? frame.callees.sort(byTotalTimeDesc) : null;
+      finaliseAggregatedRow(frame.row, costLimits);
+    }
   }
 
-  // Recursively aggregate children for each row
-  for (const row of rootMap.values()) {
-    row._children = aggregateChildrenRecursive(row, paths, idFor, costLimits);
-    finaliseAggregatedRow(row, costLimits);
-  }
+  return roots.sort(byTotalTimeDesc);
+}
 
-  // Sort by total time descending
-  return Array.from(rootMap.values()).sort((a, b) => b.totalTime - a.totalTime);
+type CalleeGrouping = {
+  calls: readonly { children: LogEvent[] }[];
+  pathId: number;
+  openStackId: number;
+  byKey: Map<number, AggregatedRow>;
+  call: number;
+  child: number;
+};
+
+// Returns how many callees it grouped, at most `budget`.
+function groupCallees(
+  grouping: CalleeGrouping,
+  paths: KeyPathIds,
+  idFor: () => number,
+  budget: number,
+): number {
+  const { calls, pathId, openStackId, byKey } = grouping;
+  let done = 0;
+  let i = grouping.call;
+  let j = grouping.child;
+  for (; i < calls.length; i++, j = 0) {
+    const children = calls[i]!.children; // i is in range
+    for (; j < children.length; j++) {
+      if (done === budget) {
+        grouping.call = i;
+        grouping.child = j;
+        return done;
+      }
+      // Keyed by interned ids: the ones a mark matches rows on, hashed once per log.
+      const event = children[j]!; // j is in range
+      const keyId = paths.keyIdOf(event);
+      let row = byKey.get(keyId);
+      if (!row) {
+        row = createEmptyAggregatedRow(
+          paths.keyText(keyId),
+          paths.step(pathId, keyId),
+          event,
+          idFor,
+        );
+        byKey.set(keyId, row);
+      }
+      addEventToAggregatedRow(row, event, paths.stackIdOf(event, keyId), openStackId);
+      done++;
+    }
+  }
+  grouping.call = i;
+  grouping.child = 0;
+  return done;
+}
+
+function byTotalTimeDesc(a: AggregatedRow, b: AggregatedRow): number {
+  return b.totalTime - a.totalTime;
 }
 
 /** No frame open above the level, so nothing in it can be a recursive call. */
@@ -207,54 +330,6 @@ function finaliseAggregatedRow(row: AggregatedRow, costLimits?: CostLimits): voi
     setGovernorCost(row, costLimits);
   }
   row._hasDetailsDeep = computeHasDetailsDeep(row, row.totalTime, row.originalData.type);
-}
-
-/**
- * Recursively aggregates children of all instances.
- * Tracks the parent key to detect recursive calls within the same aggregation context.
- */
-function aggregateChildrenRecursive(
-  parent: AggregatedRow,
-  paths: KeyPathIds,
-  idFor: () => number,
-  costLimits?: CostLimits,
-): AggregatedRow[] | null {
-  const childMap = new Map<number, AggregatedRow>();
-  // The parent's frame is open over every call in it, so a call of that same
-  // frame inside is recursive. `originalData` is the bucket's own first call.
-  const parentStackId = paths.stackIdOf(parent.originalData);
-
-  for (const instance of parent.instances) {
-    for (const child of instance.children) {
-      const keyId = paths.keyIdOf(child);
-      let row = childMap.get(keyId);
-
-      if (!row) {
-        row = createEmptyAggregatedRow(
-          paths.keyText(keyId),
-          paths.step(parent._pathId, keyId),
-          child,
-          idFor,
-        );
-        childMap.set(keyId, row);
-      }
-
-      addEventToAggregatedRow(row, child, paths.stackIdOf(child, keyId), parentStackId);
-    }
-  }
-
-  if (childMap.size === 0) {
-    return null;
-  }
-
-  // Recursively aggregate children using stack key for recursion tracking
-  for (const row of childMap.values()) {
-    row._children = aggregateChildrenRecursive(row, paths, idFor, costLimits);
-    finaliseAggregatedRow(row, costLimits);
-  }
-
-  // Sort by total time descending
-  return Array.from(childMap.values()).sort((a, b) => b.totalTime - a.totalTime);
 }
 
 /** Adds an event to an aggregated row, leaving `totalTime` alone where the call
@@ -602,12 +677,7 @@ export function toBottomUpTree(
   paths: KeyPathIds,
   governorLimits?: GovernorLimits,
 ): BottomUpRow[] {
-  const steps = bottomUpSteps(rootChildren, paths, governorLimits);
-  let step = steps.next();
-  while (!step.done) {
-    step = steps.next();
-  }
-  return step.value;
+  return runSteps(bottomUpSteps(rootChildren, paths, governorLimits));
 }
 
 /**
@@ -620,16 +690,7 @@ export async function buildBottomUpTree(
   governorLimits?: GovernorLimits,
   options: FrameBudgetOptions = {},
 ): Promise<BottomUpRow[] | null> {
-  const tick = frameBudget(options);
-  const steps = bottomUpSteps(rootChildren, paths, governorLimits);
-  let step = steps.next();
-  while (!step.done) {
-    if (!(await tick())) {
-      return null;
-    }
-    step = steps.next();
-  }
-  return step.value;
+  return driveSteps(bottomUpSteps(rootChildren, paths, governorLimits), options);
 }
 
 /**

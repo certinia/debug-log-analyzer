@@ -2,11 +2,13 @@
  * Copyright (c) 2026 Certinia Inc. All rights reserved.
  */
 import { describe, expect, it, jest } from '@jest/globals';
-import type { LogEvent } from '@apexdevtools/apex-log-parser';
+import type { ApexLog, LogEvent } from '@apexdevtools/apex-log-parser';
 
+import { storeOf } from '#test-helpers/apexLog.js';
 import { createEvent } from '#test-helpers/events.js';
 import { outermostEvents } from '../../../../core/utility/EventTree.js';
 import {
+  buildAggregatedTree,
   buildBottomUpTree,
   toAggregatedCallTree,
   toBottomUpTree,
@@ -1065,6 +1067,81 @@ describe('buildBottomUpTree', () => {
     let t = 0;
     const now = jest.spyOn(performance, 'now').mockImplementation(() => (t += 100));
     const sliced = await buildBottomUpTree(wideRoot().children, new KeyPathIds(2048), undefined, {
+      yieldSlice: () => Promise.resolve(),
+      signal: controller.signal,
+    });
+    now.mockRestore();
+
+    expect(sliced).toBeNull();
+  });
+});
+
+describe('buildAggregatedTree', () => {
+  /** Enough frames to cross a slice, nested so callees repeat. */
+  function wideLog(): ApexLog {
+    let body = '';
+    let t = 1000;
+    for (let i = 0; i < 400; i++) {
+      body += `09:18:22.6 (${(t += 10)})|METHOD_ENTRY|[1]|01p|ns.Outer${i % 4}.run()\n`;
+      for (let j = 0; j < 3; j++) {
+        body += `09:18:22.6 (${(t += 10)})|METHOD_ENTRY|[2]|01p|ns.Inner${j}.run()\n`;
+        body += `09:18:22.6 (${(t += 10)})|METHOD_EXIT|[2]|ns.Inner${j}.run()\n`;
+      }
+      body += `09:18:22.6 (${(t += 10)})|METHOD_EXIT|[1]|ns.Outer${i % 4}.run()\n`;
+    }
+    return storeOf(body).log;
+  }
+
+  /** Every field of every row, with events as their indexes: a diff of the parsed
+   *  events themselves runs jest out of memory. */
+  function shape(rows: AggregatedRow[] | null | undefined): unknown {
+    return rows?.map(({ instances, originalData, _children, ...row }) => ({
+      ...row,
+      instances: instances.map((event) => event.eventIndex),
+      originalData: originalData.eventIndex,
+      _children: shape(_children),
+    }));
+  }
+
+  it('builds the rows toAggregatedCallTree builds, handing the thread back between slices', async () => {
+    const log = wideLog();
+    const yieldSlice = jest.fn(() => Promise.resolve());
+    // Every clock read is past the slice, so every tick yields.
+    let t = 0;
+    const now = jest.spyOn(performance, 'now').mockImplementation(() => (t += 100));
+    const sliced = await buildAggregatedTree(
+      log.children,
+      new KeyPathIds(2048),
+      log.governorLimits,
+      { yieldSlice },
+    );
+    now.mockRestore();
+
+    expect(shape(sliced)).toEqual(
+      shape(toAggregatedCallTree(log.children, new KeyPathIds(2048), log.governorLimits)),
+    );
+    expect(yieldSlice.mock.calls.length).toBeGreaterThan(1);
+  });
+
+  it('groups every call once where a slice ends partway through a row', () => {
+    const log = wideLog();
+    const rows = (of: AggregatedRow[]): AggregatedRow[] =>
+      of.flatMap((row) => [row, ...rows(row._children ?? [])]);
+    const all = rows(toAggregatedCallTree(log.children, new KeyPathIds(2048)));
+
+    const counts = (prefix: string): number[] =>
+      all.filter((row) => row.text.startsWith(prefix)).map((row) => row.callCount);
+    expect(counts('ns.Outer')).toEqual([100, 100, 100, 100]);
+    expect(counts('ns.Inner')).toEqual(Array(12).fill(100));
+  });
+
+  it('returns null once the signal aborts', async () => {
+    const log = wideLog();
+    const controller = new AbortController();
+    controller.abort();
+    let t = 0;
+    const now = jest.spyOn(performance, 'now').mockImplementation(() => (t += 100));
+    const sliced = await buildAggregatedTree(log.children, new KeyPathIds(2048), undefined, {
       yieldSlice: () => Promise.resolve(),
       signal: controller.signal,
     });
