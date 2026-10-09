@@ -201,6 +201,7 @@ const DEBUG_ONLY: RowFilter<LogEvent> = {
 const deep = <R>(test: (row: R) => boolean): RowFilter<R> => ({ test, keepAncestors: true });
 
 const hasRange = (range: FilterRange): boolean => range.start !== null || range.end !== null;
+const rangeKey = (range: FilterRange): string => `${range.start}:${range.end}`;
 
 type ViewGrid = LvGrid<LogEvent> | LvGrid<AggregatedRow> | LvGrid<BottomUpRow>;
 
@@ -236,6 +237,7 @@ export class CalltreeView extends LitElement {
   typeFilter = 'All';
   namespaceSelected: string[] = [];
   totalTimeRange: FilterRange = { start: null, end: null };
+  private readonly _filterSlots = new Map<string, { input: string; filter: RowFilter<unknown> }>();
   selfTimeRange: FilterRange = { start: null, end: null };
 
   totalMatches = 0;
@@ -795,27 +797,54 @@ export class CalltreeView extends LitElement {
     }
   }
 
+  // The grid keeps its work per filter object, so an unchanged filter must keep its object.
+  private _filter<R>(slot: string, input: string, make: () => RowFilter<R>): RowFilter<R> {
+    const held = this._filterSlots.get(slot);
+    if (held?.input === input) {
+      return held.filter as RowFilter<R>;
+    }
+    const filter = make();
+    this._filterSlots.set(slot, { input, filter: filter as RowFilter<unknown> });
+    return filter;
+  }
+
   /** The filters of {@link _updateFiltering} for the Aggregated grid: Time Order's, on its rows. */
   private _aggregatedFilters(): RowFilter<AggregatedRow>[] {
     const namespaces = this.namespaceSelected;
     const filters: RowFilter<AggregatedRow>[] = [];
     if (namespaces.length) {
-      filters.push(deep((row) => namespaces.includes(row.namespace || '')));
+      filters.push(
+        this._filter('aggregated:namespace', namespaces.join('\n'), () =>
+          deep((row) => namespaces.includes(row.namespace || '')),
+        ),
+      );
     }
     if (hasRange(this.totalTimeRange)) {
       const range = this.totalTimeRange;
-      filters.push(deep((row) => inMsRange(range, row.totalTime)));
+      filters.push(
+        this._filter('aggregated:total', rangeKey(range), () =>
+          deep((row) => inMsRange(range, row.totalTime)),
+        ),
+      );
     }
     if (hasRange(this.selfTimeRange)) {
       const range = this.selfTimeRange;
-      filters.push(deep((row) => inMsRange(range, row.totalSelfTime)));
+      filters.push(
+        this._filter('aggregated:self', rangeKey(range), () =>
+          deep((row) => inMsRange(range, row.totalSelfTime)),
+        ),
+      );
     }
     const types = this.filterState.selectedTypes;
     if (this.filterState.debugOnly) {
       filters.push(AGGREGATED_DEBUG_ONLY);
     } else {
       if (types.size > 0 && !types.has('All')) {
-        filters.push(deep((row) => !!row.originalData.type && types.has(row.originalData.type)));
+        filters.push(
+          this._filter('aggregated:type', [...types].join('\n'), () =>
+            deep((row) => !!row.originalData.type && types.has(row.originalData.type)),
+          ),
+        );
       }
       if (!this.filterState.showDetails) {
         filters.push(AGGREGATED_DETAILS);
@@ -829,22 +858,38 @@ export class CalltreeView extends LitElement {
     const namespaces = this.namespaceSelected;
     const filters: RowFilter<LogEvent>[] = [];
     if (namespaces.length) {
-      filters.push(deep((e) => namespaces.includes(e.namespace || '')));
+      filters.push(
+        this._filter('time-order:namespace', namespaces.join('\n'), () =>
+          deep((e) => namespaces.includes(e.namespace || '')),
+        ),
+      );
     }
     if (hasRange(this.totalTimeRange)) {
       const range = this.totalTimeRange;
-      filters.push(deep((e) => inMsRange(range, e.duration.total)));
+      filters.push(
+        this._filter('time-order:total', rangeKey(range), () =>
+          deep((e) => inMsRange(range, e.duration.total)),
+        ),
+      );
     }
     if (hasRange(this.selfTimeRange)) {
       const range = this.selfTimeRange;
-      filters.push(deep((e) => inMsRange(range, e.duration.self)));
+      filters.push(
+        this._filter('time-order:self', rangeKey(range), () =>
+          deep((e) => inMsRange(range, e.duration.self)),
+        ),
+      );
     }
     const types = this.filterState.selectedTypes;
     if (this.filterState.debugOnly) {
       filters.push(DEBUG_ONLY);
     } else {
       if (types.size > 0 && !types.has('All')) {
-        filters.push(deep((e) => !!e.type && types.has(e.type)));
+        filters.push(
+          this._filter('time-order:type', [...types].join('\n'), () =>
+            deep((e) => !!e.type && types.has(e.type)),
+          ),
+        );
       }
       if (!this.filterState.showDetails) {
         filters.push(TIME_ORDER_DETAILS);
@@ -858,15 +903,27 @@ export class CalltreeView extends LitElement {
     const namespaces = this.namespaceSelected;
     const filters: RowFilter<BottomUpRow>[] = [];
     if (namespaces.length) {
-      filters.push(deep((row) => namespaces.includes(row.namespace || '')));
+      filters.push(
+        this._filter('bottom-up:namespace', namespaces.join('\n'), () =>
+          deep((row) => namespaces.includes(row.namespace || '')),
+        ),
+      );
     }
     if (hasRange(this.totalTimeRange)) {
       const range = this.totalTimeRange;
-      filters.push(deep((row) => inMsRange(range, row.totalTime)));
+      filters.push(
+        this._filter('bottom-up:total', rangeKey(range), () =>
+          deep((row) => inMsRange(range, row.totalTime)),
+        ),
+      );
     }
     if (hasRange(this.selfTimeRange)) {
       const range = this.selfTimeRange;
-      filters.push(deep((row) => inMsRange(range, row.totalSelfTime)));
+      filters.push(
+        this._filter('bottom-up:self', rangeKey(range), () =>
+          deep((row) => inMsRange(range, row.totalSelfTime)),
+        ),
+      );
     }
     if (!this.filterState.showDetails) {
       filters.push(BOTTOM_UP_DETAILS);

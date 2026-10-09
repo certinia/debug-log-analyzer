@@ -169,6 +169,22 @@ describe('calltree-view table lifetime', () => {
     expect(view.timeOrderGrid?.filters).toHaveLength(onShow!);
   });
 
+  it('keeps a filter that did not change, so the grid keeps its work for it', () => {
+    view.namespaceSelected = ['ns'];
+    view._updateFiltering();
+    const namespace = view.timeOrderGrid?.filters[0];
+    const before = view.timeOrderGrid?.filters;
+
+    view._updateFiltering();
+    expect(view.timeOrderGrid?.filters).toEqual(before);
+
+    view._handleTotalTimeRange(
+      new CustomEvent('range', { detail: { range: { start: 1, end: null } } }),
+    );
+    expect(view.timeOrderGrid?.filters[0] === namespace).toBe(true);
+    expect(view.timeOrderGrid?.filters).toHaveLength((before?.length ?? 0) + 1);
+  });
+
   it('builds nothing where the view goes before it is seen', async () => {
     view.remove();
     built = [];
