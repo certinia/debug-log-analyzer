@@ -336,25 +336,36 @@ export class GridStore<R extends object> {
     await this.settled();
     const indent = this.groupBy ? 1 : 0;
     let list: readonly R[] = this.source.roots;
-    let found: RowKey | null = null;
+    let found: R | null = null;
+    let opened = false;
     for (const [depth, key] of path.entries()) {
       const row = this.childrenOf(list).find((r) => this.source.key(r) === key);
       if (!row) {
         break;
       }
-      found = key;
+      found = row;
       if (depth === 0 && this.groupBy) {
-        this.openGroups.add(this.groupBy(row));
+        const group = this.groupBy(row);
+        opened = !this.openGroups.has(group);
+        this.openGroups.add(group);
       }
       if (depth < path.length - 1) {
         if (!this.isExpanded(row, depth + indent)) {
           flip(this.toggled, key);
+          opened = true;
         }
         list = this.source.children?.(row) ?? [];
       }
     }
+    if (found === null) {
+      return -1;
+    }
+    if (!opened) {
+      // The rows on screen hold the source's own objects: a native search beats a key per row.
+      return (this.current.rows as FlatRows<R>).rows.indexOf(found);
+    }
     await this.rebuild();
-    return found === null ? -1 : this.current.rows.indexOf(found);
+    return this.current.rows.indexOf(this.source.key(found));
   }
 
   /**

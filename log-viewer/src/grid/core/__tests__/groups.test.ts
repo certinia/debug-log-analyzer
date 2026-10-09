@@ -142,6 +142,9 @@ describe('GridStore groups', () => {
       'f@1',
       '[soql]-',
     ]);
+    const rows = store.snapshot().rows;
+    expect(await store.reveal(['a', 'c'])).toBe(3);
+    expect(store.snapshot().rows).toBe(rows);
   });
 
   it('ungroups', async () => {

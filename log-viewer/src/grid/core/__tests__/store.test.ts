@@ -148,6 +148,14 @@ describe('GridStore', () => {
     expect(await store.reveal(['zz'])).toBe(-1);
   });
 
+  it('reveals a row on an open path without building the rows again', async () => {
+    const store = new GridStore(source(tree()));
+    await store.reveal(['a', 'b', 'c']);
+    const rows = store.snapshot().rows;
+    expect(await store.reveal(['a', 'x'])).toBe(3);
+    expect(store.snapshot().rows).toBe(rows);
+  });
+
   it('gives the error a step throws to its callers, then stays usable', async () => {
     const store = new GridStore(source(tree()));
     await store.settled();
