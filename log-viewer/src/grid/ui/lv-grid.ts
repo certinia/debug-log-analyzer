@@ -33,9 +33,9 @@ import {
   type TreeSource,
 } from '../core/index.js';
 import { browserScheduler, fontOf, GridView, textWidth } from '../render/index.js';
-import type { CellContent, GridColumn } from './column.js';
+import type { GridColumn } from './column.js';
 import { gridKey } from './keyboard.js';
-import { litPainter } from './painter.js';
+import { litPainter, total } from './painter.js';
 import { StoreController } from './store-controller.js';
 import { gridStyles } from './styles.js';
 
@@ -105,9 +105,6 @@ const shownIds = <R>(columns: readonly GridColumn<R>[] | undefined): string[] =>
 
 const sameTarget = <R>(a: RowTarget<R> | null, b: RowTarget<R>): boolean =>
   a instanceof Group ? b instanceof Group && a.key === b.key : !(b instanceof Group) && a === b;
-
-const total = <R>(column: GridColumn<R>, value: number | undefined): CellContent =>
-  value === undefined ? '' : (column.total?.(value) ?? String(value));
 
 const MIN_WIDTH = 40;
 

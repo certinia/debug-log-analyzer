@@ -15,7 +15,8 @@ export interface PaintState<R> {
   rowClass: ((row: R) => string | undefined) | null;
 }
 
-const total = <R>(column: GridColumn<R>, value: number | undefined): CellContent =>
+/** A footer or group total, as its column shows it. */
+export const total = <R>(column: GridColumn<R>, value: number | undefined): CellContent =>
   value === undefined ? '' : (column.total?.(value) ?? String(value));
 
 function cellClass<R>(column: GridColumn<R>, first: boolean): string {
