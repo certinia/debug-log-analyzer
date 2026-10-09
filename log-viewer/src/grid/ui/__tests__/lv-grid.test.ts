@@ -239,6 +239,24 @@ describe('lv-grid', () => {
     expect(selected.at(-1)?.row).toBeNull();
   });
 
+  it('clears the selection on deselect, and reports nothing when none is selected', async () => {
+    const { grid, rowNamed } = await setup();
+    const selected: GridSelectDetail<Node>[] = [];
+    grid.addEventListener('lv-grid-select', (e) =>
+      selected.push(detail<GridSelectDetail<Node>>(e)),
+    );
+    rowNamed('c')?.querySelector<HTMLElement>('.cell')?.click();
+    await settle(grid);
+
+    grid.deselect();
+    await settle(grid);
+    expect(rowNamed('c')?.ariaSelected).toBe('false');
+    expect(selected.map((s) => s.row?.name ?? null)).toEqual(['c', null]);
+
+    grid.deselect();
+    expect(selected).toHaveLength(2);
+  });
+
   it('opens a row from its twisty without selecting it', async () => {
     const { grid, rowNamed, names } = await setup();
     rowNamed('b')?.querySelector<HTMLElement>('[data-toggle]')?.click();

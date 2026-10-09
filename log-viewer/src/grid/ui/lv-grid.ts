@@ -237,6 +237,13 @@ export class LvGrid<R extends object = object> extends LitElement {
     return true;
   }
 
+  /** Clears the selection and reports it in `lv-grid-select`. Does nothing when no row is selected. */
+  deselect(): void {
+    if (this.selected !== null) {
+      this.select(null);
+    }
+  }
+
   /**
    * Searches the text of every shown column with a `text`, over every row that passes the
    * filters, open or not. Marks the matches and reports the total in `lv-grid-find-results`.
