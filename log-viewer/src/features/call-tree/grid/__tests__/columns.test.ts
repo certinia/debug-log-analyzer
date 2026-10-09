@@ -272,6 +272,52 @@ describe('mergedLines', () => {
   });
 });
 
+describe('copy', () => {
+  const pathIds = logStoreFor(log).keyPathIds();
+  const merged = <R extends { id: number; _children?: R[] | null }>(roots: R[]) => ({
+    roots,
+    children: (r: R) => r._children ?? undefined,
+    key: (r: R) => r.id,
+  });
+  const views = {
+    'time order': () => ({ columns: timeOrder, source: timeOrderSource(log) }),
+    aggregated: () => ({
+      columns: aggregatedColumns(log, options),
+      source: merged(toAggregatedCallTree(log.children, pathIds, log.governorLimits)),
+    }),
+    'bottom up': () => ({
+      columns: bottomUpColumns(log, options),
+      source: merged(toBottomUpTree(log.children, pathIds, log.governorLimits)),
+    }),
+  };
+
+  afterEach(() => document.body.replaceChildren());
+
+  it.each([
+    ['time order', 'Name\tNamespace\tDML Count', ['EXECUTION_STARTED', 'ns.Outer.run()'], 4],
+    ['aggregated', 'Name\tNamespace\tCalls\tDML Count', ['EXECUTION_STARTED', 'ns.Outer.run()'], 4],
+    ['bottom up', 'Name\tNamespace\tType\tCalls', ['apex://pkg.Entry (code unit)'], 10],
+  ] as const)(
+    'copies %s: the shown columns, and every row, closed or not',
+    async (view, header, first, lines) => {
+      const writeText = jest.fn<Promise<void>, [string]>().mockResolvedValue(undefined);
+      Object.defineProperty(navigator, 'clipboard', { value: { writeText }, configurable: true });
+      const grid = document.createElement('lv-call-tree-grid') as CallTreeGrid;
+      Object.assign(grid, views[view]());
+      document.body.append(grid);
+      await grid.updateComplete;
+      await grid.settled();
+
+      await grid.copy();
+
+      const [head, ...rows] = writeText.mock.calls[0]?.[0].split('\n') ?? [];
+      expect(head).toMatch(new RegExp(`^${header}\t`));
+      expect(rows).toHaveLength(lines);
+      expect(rows.map((r) => r.split('\t')[0])).toEqual(expect.arrayContaining([...first]));
+    },
+  );
+});
+
 describe('lv-call-tree-grid', () => {
   it('colours a row by the category of its event, and leaves others plain', () => {
     expect(categoryClass({ originalData: { category: 'SOQL' } })).toBe('cat-soql');
