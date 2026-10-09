@@ -9,14 +9,15 @@
  */
 import { parse, type ApexLog, type LogEvent } from '@apexdevtools/apex-log-parser';
 
-import { LvGridAggregated, TabulatorAggregated } from './aggregated-contenders.js';
+import { LvGridAggregated } from './aggregated-contenders.js';
 import { LvGridBottomUp, TabulatorBottomUp } from './bottom-up-contenders.js';
 import type { BottomUpContender, Contender, MergedContender, Mounted } from './contender.js';
 import { GridContender } from './grid-contender.js';
 import { callTreeContender, lvGridContender } from './lv-grid-contender.js';
-import { TabulatorContender } from './tabulator-contender.js';
 import { frameStats, perFrame, settled, timed, type FrameStats, type Timing } from './timing.js';
 
+// Time Order and Aggregated have no Tabulator contender: their tables are gone, and
+// `baseline/` holds the figures they last gave.
 // A switch, not a lookup: CodeQL flags any call through a value found by a URL name.
 function contenderFor(name: string): Contender {
   switch (name) {
@@ -24,25 +25,19 @@ function contenderFor(name: string): Contender {
       return new GridContender();
     case 'lv-grid':
       return lvGridContender();
-    case 'call-tree':
-      return callTreeContender();
     default:
-      return new TabulatorContender();
+      return callTreeContender();
   }
 }
 
 function bottomUpContenderFor(name: string): BottomUpContender {
-  return name === 'call-tree' ? new LvGridBottomUp() : new TabulatorBottomUp();
-}
-
-function aggregatedContenderFor(name: string): MergedContender {
-  return name === 'call-tree' ? new LvGridAggregated() : new TabulatorAggregated();
+  return name === 'tabulator' ? new TabulatorBottomUp() : new LvGridBottomUp();
 }
 
 const TREES = ['time-order', 'aggregated', 'bottom-up'] as const;
 
 const params = new URLSearchParams(location.search);
-const name = params.get('c') ?? 'tabulator';
+const name = params.get('c') ?? 'call-tree';
 const tree = TREES.find((t) => t === params.get('tree')) ?? 'time-order';
 const status = document.getElementById('status') as HTMLPreElement;
 const host = document.getElementById('host') as HTMLDivElement;
@@ -135,7 +130,7 @@ async function load(text: string): Promise<void> {
     grouped = bottomUpContenderFor(name);
     mounted = bottomUp = grouped;
   } else if (tree === 'aggregated') {
-    mounted = bottomUp = aggregatedContenderFor(name);
+    mounted = bottomUp = new LvGridAggregated();
   } else {
     mounted = contender = contenderFor(name);
   }

@@ -22,10 +22,7 @@ import { NO_REPORTED_LIMITS_TEXT } from '../../../../components/governorCopy.js'
 import { formatInteger } from '../../../../core/utility/Util.js';
 import { LvGrid, type GridColumn } from '../../../../grid/index.js';
 import { logStoreFor } from '../../../../core/log/LogStore.js';
-import {
-  createGovernorMetricColumns,
-  createSelfSumHeapFooters,
-} from '../../components/TableShared.js';
+import { createGovernorMetricColumns } from '../../components/TableShared.js';
 import {
   toAggregatedCallTree,
   toBottomUpTree,
@@ -100,10 +97,12 @@ const shown = (content: unknown): HTMLElement => {
 
 describe('timeOrderColumns', () => {
   it('has the Tabulator columns, in their order, shown and hidden as they were', () => {
-    const tabulator = createGovernorMetricColumns(
-      log,
-      createSelfSumHeapFooters(() => undefined),
-    );
+    const tabulator = createGovernorMetricColumns(log, {
+      netTotal: 'sum',
+      netSelf: 'sum',
+      grossTotal: 'sum',
+      grossSelf: 'sum',
+    });
     const fields = tabulator.map((c) => c.field);
     const ours = timeOrder.filter((c) => fields.includes(c.id));
     expect(ours.map((c) => [c.id, c.title, c.width, c.hidden ?? false])).toEqual(

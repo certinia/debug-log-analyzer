@@ -26,13 +26,9 @@ const { values, positionals } = parseArgs({
   },
 });
 const [logPath, outPath, ...names] = positionals;
-const contenders = names.length ? names : ['tabulator'];
-/**
- * Tabulator's Time Order tree export is quadratic: hours at this size, measured on its own.
- * Its Bottom-Up table overflows the stack on an ungroup after a group. Its Aggregated table has no export.
- */
-const skipped = (name) =>
-  name !== 'tabulator' ? [] : values.tree === 'bottom-up' ? ['ungroup'] : ['exportCsv'];
+const contenders = names.length ? names : ['call-tree'];
+/** Tabulator's Bottom-Up table overflows the stack on an ungroup after a group. */
+const skipped = (name) => (name === 'tabulator' ? ['ungroup'] : []);
 
 const page = `file://${path.resolve('log-viewer/bench/grid/index.html')}`;
 

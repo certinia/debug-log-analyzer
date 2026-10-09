@@ -27,7 +27,6 @@ import { Find } from '../../../tabulator/module/Find.js';
 import { RowKeyboardNavigation } from '../../../tabulator/module/RowKeyboardNavigation.js';
 import { RowNavigation } from '../../../tabulator/module/RowNavigation.js';
 import { VirtualVerticalRenderer } from '../../../tabulator/renderer/VirtualVerticalRenderer.js';
-import { makeSumFieldAllVisible } from '../utils/BottomCalcs.js';
 import {
   governorCostBreakdown,
   type GovernorCostMetric,
@@ -494,21 +493,6 @@ export interface HeapFooterCalcs {
   netSelf: ColumnDefinition['bottomCalc'];
   grossTotal: ColumnDefinition['bottomCalc'];
   grossSelf: ColumnDefinition['bottomCalc'];
-}
-
-/**
- * Heap footers for the top-down tables (aggregated, time-order): totals are a plain
- * `'sum'` (top-level rows are the non-overlapping call-stack roots), self sums every
- * visible row (self never overlaps). Bottom-up needs call-stack dedup for its totals,
- * so it builds its own footers instead.
- */
-export function createSelfSumHeapFooters(getTable: () => Tabulator | undefined): HeapFooterCalcs {
-  return {
-    netTotal: 'sum',
-    grossTotal: 'sum',
-    netSelf: makeSumFieldAllVisible(getTable, (row) => row.heapAllocated.self),
-    grossSelf: makeSumFieldAllVisible(getTable, (row) => row.heapGross.self),
-  };
 }
 
 export function createGovernorMetricColumns(
