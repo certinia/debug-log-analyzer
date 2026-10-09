@@ -5,6 +5,12 @@
 /** Cells find searched carry this attribute, so marks land where the count came from. */
 export const FIND_ATTR = 'data-grid-find';
 
+/**
+ * Marks the element in a cell that shows its `text`, where the cell shows more, such as a
+ * percent after a value. Find marks only that element. Without one, it marks the whole cell.
+ */
+export const FIND_TEXT_ATTR = 'data-grid-find-text';
+
 const MATCH = 'lv-grid-find-match';
 const CURRENT = 'lv-grid-current-find-match';
 const UNDER = 'lv-grid-current-find-match-under';
@@ -83,7 +89,7 @@ export class FindHighlighter {
     const marked: Range[] = [];
     let n = first;
     for (const cell of row.querySelectorAll<HTMLElement>(`[${FIND_ATTR}]`)) {
-      const nodes = textNodes(cell, []);
+      const nodes = textNodes(cell.querySelector(`[${FIND_TEXT_ATTR}]`) ?? cell, []);
       const text = nodes.map((t) => t.node.textContent ?? '').join('');
       pattern.lastIndex = 0;
       for (let m = pattern.exec(text); m; m = pattern.exec(text)) {

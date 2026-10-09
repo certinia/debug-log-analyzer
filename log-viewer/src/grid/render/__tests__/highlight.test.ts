@@ -4,7 +4,7 @@
 /*
  * Copyright (c) 2026 Certinia Inc. All rights reserved.
  */
-import { FIND_ATTR, FindHighlighter } from '../highlight.js';
+import { FIND_ATTR, FIND_TEXT_ATTR, FindHighlighter } from '../highlight.js';
 
 // jsdom has no CSS Highlight API.
 class FakeHighlight extends Set<Range> {
@@ -59,5 +59,21 @@ describe('FindHighlighter', () => {
     highlighter.unmark(el);
     expect(registry.get('lv-grid-current-find-match-under')?.size).toBe(0);
     expect(registry.get('lv-grid-current-find-match')?.size).toBe(0);
+  });
+
+  it('searches only the part of a cell marked as its find text', () => {
+    const highlighter = new FindHighlighter();
+    const el = row('');
+    el.firstElementChild?.replaceChildren(
+      Object.assign(document.createElement('span'), { textContent: '12.5' }),
+      Object.assign(document.createElement('span'), { textContent: '(5.00%)' }),
+    );
+    el.querySelector('span')?.setAttribute(FIND_TEXT_ATTR, '');
+    highlighter.mark(el, 0, /5/g, 1);
+
+    expect(texts('lv-grid-find-match')).toEqual(['5']);
+    expect(registry.get('lv-grid-find-match')?.size).toBe(1);
+    expect(registry.get('lv-grid-current-find-match')?.size).toBe(0);
+    highlighter.clear();
   });
 });

@@ -110,9 +110,23 @@ async function setup(props: Partial<LvGrid<Node>> = {}) {
   return { grid, root, scroller, rows, names, header, rowNamed, key };
 }
 
+const globals = globalThis as { Highlight?: unknown; CSS?: unknown };
+const realHighlights = { Highlight: globals.Highlight, CSS: globals.CSS };
+
+/** Stands in for the CSS Highlight API, which jsdom lacks. Lists the text of each mark. */
+function fakeHighlights(): () => string[] {
+  const registry = new Map<string, Set<Range>>();
+  globals.Highlight = class extends Set<Range> {
+    priority = 0;
+  };
+  globals.CSS = { highlights: registry };
+  return () => [...new Set([...registry.values()].flatMap((marks) => [...marks]))].map(String);
+}
+
 afterEach(() => {
   jest.restoreAllMocks();
   document.body.replaceChildren();
+  Object.assign(globals, realHighlights);
 });
 
 describe('lv-grid', () => {
@@ -322,6 +336,16 @@ describe('lv-grid', () => {
     );
     expect(await grid.find({ text: 'b' })).toBe(3);
     expect(totals).toEqual([3]);
+  });
+
+  it('marks the matches find counted, and none in the space around a cell', async () => {
+    const marked = fakeHighlights();
+    const { grid } = await setup({
+      source: { ...source(), roots: [{ key: 1, name: 'a a', time: 3, kind: 'x' }] },
+    });
+    expect(await grid.find({ text: ' ' })).toBe(1);
+    await grid.setCurrentMatch(0);
+    expect(marked()).toEqual([' ']);
   });
 
   it('shows group rows that toggle on click and select from the keyboard', async () => {

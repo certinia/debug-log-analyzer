@@ -52,6 +52,7 @@ function groupCells<R>(group: Group<R>, columns: readonly GridColumn<R>[], open:
 }
 
 // `data-grid-find` is render's FIND_ATTR: template attribute names have to be literal.
+// No space around the content: find marks the cell's text, so a space would be a match.
 function rowCells<R>(
   row: R,
   columns: readonly GridColumn<R>[],
@@ -67,13 +68,12 @@ function rowCells<R>(
         title=${column.tooltip?.(row) ?? nothing}
         ?data-grid-find=${column.text !== undefined}
         style=${i === 0 ? `--grid-depth: ${depth}` : nothing}
-      >
-        ${
+        >${
           i === 0
             ? html`${twisty(kids, open)}<span class="content">${column.cell(row)}</span>`
             : column.cell(row)
-        }
-      </div>`,
+        }</div
+      >`,
   );
 }
 
