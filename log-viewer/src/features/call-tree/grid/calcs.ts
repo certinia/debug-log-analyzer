@@ -3,9 +3,7 @@
  */
 import type { LogEvent } from '@apexdevtools/apex-log-parser';
 
-import type { Calc } from '../../../grid/index.js';
-
-const EVENTS_PER_YIELD = 1024;
+import { ROWS_PER_YIELD, type Calc } from '../../../grid/index.js';
 
 /**
  * Sums `valueOf` over the events every row stands for, counting an event only when none
@@ -21,7 +19,7 @@ export function outermostSum<R extends { instances: readonly LogEvent[] }>(
       let total = 0;
       for (let i = 0; i < events.length; i++) {
         total += valueOf(events[i] as LogEvent);
-        if (i % EVENTS_PER_YIELD === EVENTS_PER_YIELD - 1) {
+        if (i % ROWS_PER_YIELD === ROWS_PER_YIELD - 1) {
           yield;
         }
       }

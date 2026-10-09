@@ -284,6 +284,21 @@ describe('GridStore totals', () => {
     expect(yields).toBe(6);
   });
 
+  it('sums and maxes in slices of 32 rows, as the store reads the clock once per 256 yields', () => {
+    const rows = Array.from({ length: 3000 }, (_, i) => n(`r${i}`, 'apex', 1));
+    for (const calc of [sum(self), max(self)]) {
+      const out = calc.of(rows);
+      if (typeof out === 'number') {
+        throw new Error('expected a generator');
+      }
+      let yields = 0;
+      while (!out.next().done) {
+        yields++;
+      }
+      expect(yields).toBe(Math.floor(3000 / 32));
+    }
+  });
+
   it('gives a max of 0 for no rows', () => {
     const out = max(self).of([]);
     const total = typeof out === 'number' ? out : out.next();

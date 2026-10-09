@@ -67,7 +67,7 @@ describe('outermostSum', () => {
     ).toBe(2);
   });
 
-  it('yields while it sums a long list of events it already has', () => {
+  it('yields every 32 events while it sums a long list it already has, as the grid reads the clock once per 256 yields', () => {
     const rows = [
       { instances: Array.from({ length: 3000 }, () => createEvent({ text: 'e', total: 1 })) },
     ];
@@ -83,7 +83,7 @@ describe('outermostSum', () => {
     while (!out.next().done) {
       yields++;
     }
-    expect(yields).toBe(2);
+    expect(yields).toBe(Math.floor(3000 / 32));
   });
 });
 

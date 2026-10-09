@@ -11,7 +11,8 @@ export interface Calc<R> {
   scope?: 'top' | 'all';
   /**
    * The total, or a generator that yields between small pieces of work and returns it, so
-   * a long total runs in slices. Must not depend on row order: totals are kept across a sort.
+   * a long total runs in slices. The clock is read once per 256 yields, so yield every few
+   * dozen items. Must not depend on row order: totals are kept across a sort.
    */
   of(rows: readonly R[]): number | Generator<void, number, void>;
 }
@@ -20,11 +21,8 @@ export interface Calc<R> {
 export type Calcs<R> = Readonly<Record<string, Calc<R>>>;
 export type Totals = Readonly<Record<string, number>>;
 
-/**
- * Rows a plain total reads between yields. A yield per row costs more than the sum, and an
- * `all` scope can be every row of a large tree.
- */
-const ROWS_PER_YIELD = 1024;
+/** Items a cheap `Calc.of` step reads between yields, sized to the grid's clock checks. */
+export const ROWS_PER_YIELD = 32;
 
 /** Sums `value` over the rows, in slices. */
 export function sum<R>(value: (row: R) => number, scope?: Calc<R>['scope']): Calc<R> {

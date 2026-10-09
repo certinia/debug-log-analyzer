@@ -3,7 +3,7 @@
  */
 
 /** Table logic: rows, groups, columns, totals, find, export and navigation. No DOM. */
-export { max, sum, type Calc, type Calcs, type Totals } from './calcs.js';
+export { max, ROWS_PER_YIELD, sum, type Calc, type Calcs, type Totals } from './calcs.js';
 export type { ExportColumn, ExportOptions } from './export.js';
 export { findPattern, type CellText, type FindQuery, type FindResult } from './find.js';
 export { Group, type GroupBy } from './groups.js';
