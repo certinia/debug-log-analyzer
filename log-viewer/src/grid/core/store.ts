@@ -409,12 +409,19 @@ export class GridStore<R extends object> {
     await this.settled();
     const stale = (): boolean => this.running;
     const { format } = options;
+    const tree = options.tree ?? true;
+    // Every group or top-level row is on screen, open or not, so its flag tells if any row is deeper.
+    const levels =
+      tree && (this.current.rows as FlatRows<R>).flags.some((flag) => (flag & HAS_CHILDREN) !== 0);
     const chunks: string[] = [];
-    let lines = [headerLine(columns, format)];
+    let lines = [headerLine(columns, format, levels)];
     const done = await drive(
-      this.eachRow(options.tree ?? true, (entry) => {
+      this.eachRow(tree, (entry, _up, depth) => {
+        const level = levels ? depth + 1 : undefined;
         lines.push(
-          entry instanceof Group ? groupLine(entry.key, format) : rowLine(entry, columns, format),
+          entry instanceof Group
+            ? groupLine(entry.key, format, level)
+            : rowLine(entry, columns, format, level),
         );
         if (lines.length === EXPORT_CHUNK) {
           chunks.push(lines.join('\n'));
@@ -668,26 +675,28 @@ export class GridStore<R extends object> {
   /**
    * Every row that passes the filters, open or not, in display order: each group, then its
    * rows. With `tree` false, only the top-level rows. `up` is the row's parent chain.
+   * `depth` is 0 for a group or a top-level row; the rows of a group start at 1.
    */
   private *eachRow(
     tree: boolean,
-    visit: (entry: Entry<R>, up: PathNode | null) => void,
+    visit: (entry: Entry<R>, up: PathNode | null, depth: number) => void,
   ): Generator<void, void, void> {
     const top = this.childrenOf(this.source.roots);
     if (!this.groupBy) {
-      yield* this.eachUnder(top, tree, visit);
+      yield* this.eachUnder(top, tree, 0, visit);
       return;
     }
     for (const group of yield* this.groupsOf(top, this.groupBy)) {
-      visit(group, null);
-      yield* this.eachUnder(group.rows, tree, visit);
+      visit(group, null, 0);
+      yield* this.eachUnder(group.rows, tree, 1, visit);
     }
   }
 
   private *eachUnder(
     list: readonly R[],
     tree: boolean,
-    visit: (row: R, up: PathNode | null) => void,
+    depth: number,
+    visit: (row: R, up: PathNode | null, depth: number) => void,
   ): Generator<void, void, void> {
     const lists: (readonly R[])[] = [list];
     const at: number[] = [0];
@@ -705,7 +714,7 @@ export class GridStore<R extends object> {
       at[top] = i + 1;
       const row = siblings[i] as R;
       const up = ups[top] ?? null;
-      visit(row, up);
+      visit(row, up, depth + top);
       const children = tree ? this.source.children?.(row) : null;
       const kids = children?.length ? this.childrenOf(children) : null;
       if (kids?.length) {

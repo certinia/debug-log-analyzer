@@ -318,7 +318,9 @@ describe('lv-grid', () => {
     Object.defineProperty(navigator, 'clipboard', { value: { writeText }, configurable: true });
     const { key } = await setup();
     await key('c', { ctrlKey: true });
-    expect(writeText).toHaveBeenCalledWith('Name\tTime\na\t3\nb\t1\nb1\t5\nb2\t6\nc\t2');
+    expect(writeText).toHaveBeenCalledWith(
+      'Level\tName\tTime\n1\ta\t3\n1\tb\t1\n2\tb1\t5\n2\tb2\t6\n1\tc\t2',
+    );
   });
 
   it('exports a column by its export text where it has one, and by its text where not', async () => {
