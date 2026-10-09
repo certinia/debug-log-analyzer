@@ -431,3 +431,77 @@ describe('calltree-view type picker', () => {
     expect(types).not.toContain('METHOD_ENTRY');
   });
 });
+
+describe('calltree-view find', () => {
+  let view: CalltreeView;
+  const results: number[] = [];
+  const onResults = (e: Event): void => {
+    results.push((e as CustomEvent<{ totalMatches: number }>).detail.totalMatches);
+  };
+
+  beforeEach(async () => {
+    built = [];
+    holdBuilds = false;
+    globalThis.IntersectionObserver = AlwaysVisible as unknown as typeof IntersectionObserver;
+    view = await mountView();
+    results.length = 0;
+    document.addEventListener('lv-find-results', onResults);
+  });
+
+  afterEach(() => {
+    document.removeEventListener('lv-find-results', onResults);
+    view.remove();
+  });
+
+  function startFind(text: string): void {
+    const detail = { text, count: 1, options: { matchCase: false } };
+    document.dispatchEvent(new CustomEvent('lv-find', { detail }));
+  }
+
+  async function find(text: string): Promise<void> {
+    startFind(text);
+    await settle();
+  }
+
+  function shownGrid(): NonNullable<CalltreeView['timeOrderGrid']> {
+    const grid = view.timeOrderGrid;
+    if (!grid) {
+      throw new Error('no grid');
+    }
+    // jsdom does no layout, and find skips a grid that is not on screen.
+    Object.defineProperty(grid, 'clientHeight', { value: 100 });
+    jest.spyOn(grid, 'setCurrentMatch').mockResolvedValue();
+    return grid;
+  }
+
+  it('shows no matches for a find a rebuild dropped, and searches again on the next Enter', async () => {
+    const grid = shownGrid();
+    const gridFind = jest.spyOn(grid, 'find').mockResolvedValueOnce(-1).mockResolvedValueOnce(2);
+
+    await find('foo');
+    expect(results).toEqual([0]);
+
+    await find('foo');
+    expect(gridFind).toHaveBeenCalledTimes(2);
+    expect(results).toEqual([0, 2]);
+  });
+
+  it('ignores a find a newer one replaced, and keeps its guard until the last find ends', async () => {
+    const grid = shownGrid();
+    let finishFirst: (total: number) => void = () => {};
+    jest
+      .spyOn(grid, 'find')
+      .mockImplementationOnce(() => new Promise((resolve) => (finishFirst = resolve)))
+      .mockResolvedValueOnce(3);
+
+    startFind('foo');
+    await find('food');
+    expect(results).toEqual([3]);
+    expect(view.blockClearHighlights).toBe(true);
+
+    finishFirst(-1);
+    await settle();
+    expect(results).toEqual([3]);
+    expect(view.blockClearHighlights).toBe(false);
+  });
+});
