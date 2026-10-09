@@ -580,3 +580,39 @@ describe('lv-grid columns', () => {
     expect([...(body?.children ?? [])]).toEqual(elements);
   });
 });
+
+describe('lv-grid find marks', () => {
+  // jsdom has no CSS Highlight API.
+  const registry = new Map<string, Set<Range>>();
+  const globals = globalThis as { Highlight?: unknown; CSS?: unknown };
+  const real = { Highlight: globals.Highlight, CSS: globals.CSS };
+  const marks = (): number => [...registry.values()].reduce((count, set) => count + set.size, 0);
+
+  beforeAll(() => {
+    globals.Highlight = class extends Set<Range> {
+      priority = 0;
+    };
+    globals.CSS = { highlights: registry };
+  });
+
+  afterAll(() => {
+    globals.Highlight = real.Highlight;
+    globals.CSS = real.CSS;
+  });
+
+  it('lets go of its marks when removed, and marks again when put back', async () => {
+    const { grid, names } = await setup();
+    await grid.find({ text: 'b' });
+    expect(marks()).toBe(1);
+
+    grid.remove();
+    expect(marks()).toBe(0);
+    await grid.find({ text: 'b' });
+    expect(marks()).toBe(0);
+
+    document.body.append(grid);
+    await settle(grid);
+    expect(marks()).toBe(1);
+    expect(names()).toEqual(['a', 'b', 'c']);
+  });
+});

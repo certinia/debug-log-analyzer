@@ -72,6 +72,7 @@ export class GridView<R extends object> {
   /** The view's own last write to `scrollTop`; any other value is the user's scroll. */
   private pinnedTop = Number.NaN;
   private readonly unobserve: () => void;
+  private readonly observer: ResizeObserver | null;
   // Not virtual-core's: it unobserves a row's old element, which the pool gave to another row.
   private readonly rowObserver: ResizeObserver | null;
   private syncOffset = (): void => {};
@@ -118,6 +119,7 @@ export class GridView<R extends object> {
         ? null
         : new ResizeObserver(([entry]) => this.setVisible((entry?.contentRect.height ?? 0) > 0));
     observer?.observe(scroller);
+    this.observer = observer;
     this.rowObserver =
       typeof ResizeObserver === 'undefined'
         ? null
@@ -177,6 +179,10 @@ export class GridView<R extends object> {
   /** Marks find matches in the rows on screen, and in each row painted after. */
   setFind(find: FindMarks<R> | null): void {
     this.find = find;
+    // CSS.highlights is global: a mark in a detached grid would keep the grid alive.
+    if (!this.options.body.isConnected) {
+      return;
+    }
     for (const el of this.painted.values()) {
       this.markFind(el);
     }
@@ -204,6 +210,29 @@ export class GridView<R extends object> {
   /** The element painting the row at `index`, while it is on screen. */
   elementAt(index: number): HTMLElement | undefined {
     return this.painted.get(index);
+  }
+
+  /**
+   * Lets go of what holds the view while its elements are out of the document: observers,
+   * scroll listeners and find marks. The rows stay, for {@link connect}.
+   */
+  disconnect(): void {
+    this.setVisible(false);
+    this.unmount();
+    this.observer?.disconnect();
+    this.rowObserver?.disconnect();
+    this.highlighter.clear();
+  }
+
+  /** Takes back what {@link disconnect} let go. The rows show once the scroller has a height. */
+  connect(): void {
+    this.virtualizer._willUpdate();
+    for (const el of this.painted.values()) {
+      this.rowObserver?.observe(el);
+    }
+    this.setFind(this.find);
+    this.observer?.observe(this.options.scroller);
+    this.setVisible(this.options.scroller.offsetHeight > 0);
   }
 
   /** Stops the view and removes its rows; the body can take a new view. */

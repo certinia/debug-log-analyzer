@@ -339,6 +339,22 @@ describe('GridView', () => {
     expect(shown().map((el) => el.textContent)).toContain('row 500');
   });
 
+  it('hears no resize while disconnected, and shows the rows that came meanwhile on connect', async () => {
+    const resize = fakeResizeObserver();
+    const { scroller, body, store, view } = await setup();
+    view.disconnect();
+    const height = body.style.height;
+    await store.toggle(10);
+    view.setRows(store.snapshot().rows);
+    resize(scroller, VIEWPORT);
+    await flush();
+    expect(body.style.height).toBe(height);
+
+    view.connect();
+    await flush();
+    expect(body.style.height).toBe(`${1050 * ROW}px`);
+  });
+
   it('leaves the body empty when destroyed, so a new view on it paints the only rows', async () => {
     const { scroller, body, store, view } = await setup();
     view.repaint();

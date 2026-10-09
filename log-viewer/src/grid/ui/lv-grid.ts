@@ -202,6 +202,14 @@ export class LvGrid<R extends object = object> extends LitElement {
   private readonly scrollerRef = createRef<HTMLDivElement>();
   private readonly bodyRef = createRef<HTMLDivElement>();
 
+  constructor() {
+    super();
+    this.addController({
+      hostConnected: () => this.view?.connect(),
+      hostDisconnected: () => this.view?.disconnect(),
+    });
+  }
+
   /** Resolves once every step started so far has run and its rows are shown. */
   async settled(): Promise<void> {
     await this.store?.settled();
