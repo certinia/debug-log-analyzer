@@ -123,7 +123,7 @@ Explore nested method calls with performance metrics:
 - **Click to go to Code** - Jump to the source method in your project
 - **[Inspector](#-inspector)** - Select a row to inspect just that call path
 
-![Call Tree](https://raw.githubusercontent.com/certinia/debug-log-analyzer/main/lana/assets/1_22/calltree.png)
+![Call Tree](https://raw.githubusercontent.com/certinia/debug-log-analyzer/main/lana/assets/1_24/calltree.png)
 
 ## 🧭 Inspector
 

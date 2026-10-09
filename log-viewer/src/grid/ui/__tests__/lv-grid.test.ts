@@ -239,6 +239,24 @@ describe('lv-grid', () => {
     expect(selected.at(-1)?.row).toBeNull();
   });
 
+  it('clears the selection on deselect, and reports nothing when none is selected', async () => {
+    const { grid, rowNamed } = await setup();
+    const selected: GridSelectDetail<Node>[] = [];
+    grid.addEventListener('lv-grid-select', (e) =>
+      selected.push(detail<GridSelectDetail<Node>>(e)),
+    );
+    rowNamed('c')?.querySelector<HTMLElement>('.cell')?.click();
+    await settle(grid);
+
+    grid.deselect();
+    await settle(grid);
+    expect(rowNamed('c')?.ariaSelected).toBe('false');
+    expect(selected.map((s) => s.row?.name ?? null)).toEqual(['c', null]);
+
+    grid.deselect();
+    expect(selected).toHaveLength(2);
+  });
+
   it('opens a row from its twisty without selecting it', async () => {
     const { grid, rowNamed, names } = await setup();
     rowNamed('b')?.querySelector<HTMLElement>('[data-toggle]')?.click();
@@ -345,12 +363,47 @@ describe('lv-grid', () => {
     expect(located).toEqual(['a', null]);
   });
 
+  it('takes keyboard focus on its rows', async () => {
+    const { grid, root, scroller } = await setup();
+    grid.focus();
+    expect(root.activeElement).toBe(scroller);
+  });
+
   it('opens the path to a row, then selects it', async () => {
     const { grid, rowNamed, names } = await setup();
     expect(await grid.goTo([2, 22])).toBe(true);
     await settle(grid);
     expect(names()).toEqual(['a', 'b', 'b1', 'b2', 'c']);
     expect(rowNamed('b2')?.ariaSelected).toBe('true');
+  });
+
+  it('keeps the scroll for a row in view whole, when asked to', async () => {
+    const { grid } = await setup();
+    let lastTop = 2 * ROW;
+    // Header to 20, totals from 180; row `index` from 20 + index * 20, the last from `lastTop`.
+    jest.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(function (
+      this: HTMLElement,
+    ) {
+      const at = (top: number, height = ROW): DOMRect =>
+        ({ top, bottom: top + height, height, width: 500 }) as DOMRect;
+      const index = Number(this.dataset.index ?? Number.NaN);
+      return this.classList.contains('foot')
+        ? at(9 * ROW)
+        : this.classList.contains('scroller')
+          ? at(0, 10 * ROW)
+          : index === 2
+            ? at(ROW + lastTop)
+            : at(Number.isNaN(index) ? 0 : ROW + index * ROW);
+    });
+    const scroll = jest.spyOn(GridView.prototype, 'scrollToIndex');
+
+    await grid.goTo([3], { scrollIfVisible: false });
+    expect(scroll).not.toHaveBeenCalled();
+    await grid.goTo([3]);
+    expect(scroll).toHaveBeenCalledTimes(1);
+    lastTop = 8 * ROW + 1;
+    await grid.goTo([3], { scrollIfVisible: false });
+    expect(scroll).toHaveBeenCalledTimes(2);
   });
 
   it('counts find matches in closed rows too', async () => {
@@ -371,6 +424,34 @@ describe('lv-grid', () => {
     expect(await grid.find({ text: ' ' })).toBe(1);
     await grid.setCurrentMatch(0);
     expect(marked()).toEqual([' ']);
+  });
+
+  it('keeps the scroll for a current match in view whole, and centres one out of view', async () => {
+    const { grid } = await setup();
+    let lastTop = 2 * ROW;
+    // Header to 20, totals from 180; row `index` from 20 + index * 20, the last from `lastTop`.
+    jest.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(function (
+      this: HTMLElement,
+    ) {
+      const at = (top: number, height = ROW): DOMRect =>
+        ({ top, bottom: top + height, height, width: 500 }) as DOMRect;
+      const index = Number(this.dataset.index ?? Number.NaN);
+      return this.classList.contains('foot')
+        ? at(9 * ROW)
+        : this.classList.contains('scroller')
+          ? at(0, 10 * ROW)
+          : index === 2
+            ? at(ROW + lastTop)
+            : at(Number.isNaN(index) ? 0 : ROW + index * ROW);
+    });
+    const scroll = jest.spyOn(GridView.prototype, 'scrollToIndex');
+
+    expect(await grid.find({ text: 'c' })).toBe(1);
+    await grid.setCurrentMatch(0);
+    expect(scroll).not.toHaveBeenCalled();
+    lastTop = 8 * ROW + 1;
+    await grid.setCurrentMatch(0);
+    expect(scroll).toHaveBeenCalledWith(2);
   });
 
   it('reports a reshape when its shown columns change, and not when they stay the same', async () => {

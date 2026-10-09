@@ -6,7 +6,7 @@
  * Runs the grid bench in Chromium for each contender and writes the results.
  *
  *   node scripts/grid-bench/make-log.mjs 5 <log>          the 580k-row log the baseline used
- *   pnpm bench:grid <log> <out.json> [contender...] [--tree time-order|bottom-up] [--loads N]
+ *   pnpm bench:grid <log> <out.json> [contender...] [--tree time-order|aggregated|bottom-up] [--loads N]
  *                   [--reps N] [--only find|exportCsv]
  *   node scripts/grid-bench/compare.mjs <out.json>        the results against the Tabulator baseline
  */
@@ -26,13 +26,9 @@ const { values, positionals } = parseArgs({
   },
 });
 const [logPath, outPath, ...names] = positionals;
-const contenders = names.length ? names : ['tabulator'];
-/**
- * Tabulator's Time Order tree export is quadratic: hours at this size, measured on its own.
- * Its Bottom-Up table overflows the stack on an ungroup after a group.
- */
-const skipped = (name) =>
-  name !== 'tabulator' ? [] : values.tree === 'bottom-up' ? ['ungroup'] : ['exportCsv'];
+const contenders = names.length ? names : ['call-tree'];
+/** Tabulator's Bottom-Up table overflows the stack on an ungroup after a group. */
+const skipped = (name) => (name === 'tabulator' ? ['ungroup'] : []);
 
 const page = `file://${path.resolve('log-viewer/bench/grid/index.html')}`;
 

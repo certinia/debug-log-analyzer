@@ -20,19 +20,22 @@ import { storeOf } from '#test-helpers/apexLog.js';
 import { governorLimits, limitValue } from '#test-helpers/limits.js';
 import { NO_REPORTED_LIMITS_TEXT } from '../../../../components/governorCopy.js';
 import { formatInteger } from '../../../../core/utility/Util.js';
-import { LvGrid, type GridColumn } from '../../../../grid/index.js';
+import { FIND_TEXT_ATTR, LvGrid, type GridColumn } from '../../../../grid/index.js';
 import { logStoreFor } from '../../../../core/log/LogStore.js';
+import { createGovernorMetricColumns } from '../../components/TableShared.js';
 import {
-  createGovernorMetricColumns,
-  createSelfSumHeapFooters,
-} from '../../components/TableShared.js';
-import { toBottomUpTree } from '../../utils/Aggregation.js';
+  toAggregatedCallTree,
+  toBottomUpTree,
+  type AggregatedRow,
+} from '../../utils/Aggregation.js';
 import { toTimeOrderTree, type TimeOrderRow } from '../../utils/TimeOrderTree.js';
 import { CallTreeGrid, categoryClass, eventCategoryClass } from '../CallTreeGrid.js';
 import { nameCell } from '../cells.js';
 import {
+  aggregatedColumns,
   BOTTOM_UP_SORT,
   bottomUpColumns,
+  mergedLines,
   TIME_ORDER_DETAILS,
   timeOrderColumns,
   timeOrderSource,
@@ -94,10 +97,12 @@ const shown = (content: unknown): HTMLElement => {
 
 describe('timeOrderColumns', () => {
   it('has the Tabulator columns, in their order, shown and hidden as they were', () => {
-    const tabulator = createGovernorMetricColumns(
-      log,
-      createSelfSumHeapFooters(() => undefined),
-    );
+    const tabulator = createGovernorMetricColumns(log, {
+      netTotal: 'sum',
+      netSelf: 'sum',
+      grossTotal: 'sum',
+      grossSelf: 'sum',
+    });
     const fields = tabulator.map((c) => c.field);
     const ours = timeOrder.filter((c) => fields.includes(c.id));
     expect(ours.map((c) => [c.id, c.title, c.width, c.hidden ?? false])).toEqual(
@@ -160,8 +165,8 @@ describe('timeOrderColumns', () => {
     const held: Record<string, (r: TimeOrderRow) => string | number | null> = {
       callerNamespace: (r) => r.callerNamespace,
       type: (r) => r.type,
-      governorCost: (r) => r.governorCost,
-      governorCostMax: (r) => r.governorCostMax,
+      governorCost: (r) => r.governorCost?.toFixed(0) ?? null,
+      governorCostMax: (r) => r.governorCostMax?.toFixed(0) ?? null,
     };
     for (const [id, value] of Object.entries(held)) {
       const { text } = column(columns, id);
@@ -218,6 +223,161 @@ describe('bottomUpColumns', () => {
 
   it('opens sorted by a column it has', () => {
     expect(column(columns, BOTTOM_UP_SORT.column).sort).toBeDefined();
+  });
+});
+
+describe('aggregatedColumns', () => {
+  const columns = aggregatedColumns(log, options);
+  const roots = toAggregatedCallTree(
+    log.children,
+    logStoreFor(log).keyPathIds(),
+    log.governorLimits,
+  );
+  const all = (of: readonly AggregatedRow[]): AggregatedRow[] =>
+    of.flatMap((r) => [r, ...all(r._children ?? [])]);
+
+  it('has the Tabulator columns, in their order, with Type and Avg Self Time hidden', () => {
+    const ids = columns.map((c) => c.id);
+    expect(ids.slice(0, 5)).toEqual(['text', 'namespace', 'callerNamespace', 'type', 'callCount']);
+    expect(ids.slice(-3)).toEqual(['totalTime', 'totalSelfTime', 'avgSelfTime']);
+    expect(column(columns, 'type').hidden).toBe(true);
+    expect(column(columns, 'avgSelfTime').hidden).toBe(true);
+  });
+
+  it('sums total time over top-level rows, and self time over every row', () => {
+    expect(total(column(columns, 'totalTime').calc, roots)).toBe(
+      roots.reduce((sum, r) => sum + r.totalTime, 0),
+    );
+    expect(column(columns, 'totalSelfTime').calc?.scope).toBe('all');
+    expect(total(column(columns, 'totalSelfTime').calc, all(roots))).toBe(
+      all(roots).reduce((sum, r) => sum + r.totalSelfTime, 0),
+    );
+  });
+});
+
+describe('mergedLines', () => {
+  it('counts the lines of the text and suffix of the row event', () => {
+    const event = rows[0]!;
+    expect(mergedLines({ originalData: event })).toBe(1);
+    expect(mergedLines({ originalData: withField(event, 'text', 'a\nb\nc') })).toBe(3);
+    expect(
+      mergedLines({
+        originalData: withField(withField(event, 'text', 'a\nb'), 'suffix', ' (x)\ny'),
+      }),
+    ).toBe(3);
+    expect(
+      mergedLines({ originalData: withField(event, 'suffix', null as unknown as string) }),
+    ).toBe(1);
+  });
+});
+
+describe('copy', () => {
+  const pathIds = logStoreFor(log).keyPathIds();
+  const merged = <R extends { id: number; _children?: R[] | null }>(roots: R[]) => ({
+    roots,
+    children: (r: R) => r._children ?? undefined,
+    key: (r: R) => r.id,
+  });
+  const views = {
+    'time order': () => ({ columns: timeOrder, source: timeOrderSource(log) }),
+    aggregated: () => ({
+      columns: aggregatedColumns(log, options),
+      source: merged(toAggregatedCallTree(log.children, pathIds, log.governorLimits)),
+    }),
+    'bottom up': () => ({
+      columns: bottomUpColumns(log, options),
+      source: merged(toBottomUpTree(log.children, pathIds, log.governorLimits)),
+    }),
+  };
+
+  afterEach(() => document.body.replaceChildren());
+
+  it.each([
+    ['time order', 'Level\tName\tNamespace\tDML Count', ['EXECUTION_STARTED', 'ns.Outer.run()'], 4],
+    [
+      'aggregated',
+      'Level\tName\tNamespace\tCalls\tDML Count',
+      ['EXECUTION_STARTED', 'ns.Outer.run()'],
+      4,
+    ],
+    ['bottom up', 'Level\tName\tNamespace\tType\tCalls', ['apex://pkg.Entry (code unit)'], 10],
+  ] as const)(
+    'copies %s: the shown columns, and every row, closed or not',
+    async (view, header, first, lines) => {
+      const writeText = jest.fn<Promise<void>, [string]>().mockResolvedValue(undefined);
+      Object.defineProperty(navigator, 'clipboard', { value: { writeText }, configurable: true });
+      const grid = document.createElement('lv-call-tree-grid') as CallTreeGrid;
+      Object.assign(grid, views[view]());
+      document.body.append(grid);
+      await grid.updateComplete;
+      await grid.settled();
+
+      await grid.copy();
+
+      const [head, ...rows] = writeText.mock.calls[0]?.[0].split('\n') ?? [];
+      expect(head).toMatch(new RegExp(`^${header}\t`));
+      expect(rows).toHaveLength(lines);
+      expect(rows.map((r) => r.split('\t')[1])).toEqual(expect.arrayContaining([...first]));
+    },
+  );
+});
+
+describe('find text', () => {
+  const limited: ApexLog = Object.create(log);
+  Object.defineProperty(limited, 'governorLimits', {
+    value: governorLimits({ soqlQueries: limitValue(0, 100), queryRows: limitValue(0, 50_000) }),
+  });
+  const pathIds = logStoreFor(log).keyPathIds();
+  const flat = <R extends { _children?: R[] | null }>(roots: readonly R[]): R[] =>
+    roots.flatMap((r) => [r, ...flat(r._children ?? [])]);
+  /** What the highlighter searches in a painted cell: its marked find text, or all of it. */
+  const searched = (content: unknown): string | null => {
+    const cell = shown(content);
+    return (cell.querySelector(`[${FIND_TEXT_ATTR}]`) ?? cell).textContent;
+  };
+  const check = <R>(columns: GridColumn<R>[], of: readonly R[]): void => {
+    const searchable = columns.filter((c) => c.text);
+    const painted = of.flatMap((row) => searchable.map((c) => [c.id, searched(c.cell(row))]));
+    const counted = of.flatMap((row) => searchable.map((c) => [c.id, c.text?.(row)]));
+    expect(painted).toEqual(counted);
+  };
+
+  it('is what each searched Time Order cell shows', () => {
+    check(timeOrderColumns(limited, options), allRows(rows));
+  });
+
+  it('is what each searched Aggregated cell shows', () => {
+    const roots = toAggregatedCallTree(log.children, pathIds, limited.governorLimits);
+    check(aggregatedColumns(limited, options), flat(roots));
+  });
+
+  it('is what each searched Bottom-Up cell shows', () => {
+    const roots = toBottomUpTree(log.children, pathIds, limited.governorLimits);
+    check(bottomUpColumns(limited, options), flat(roots));
+  });
+});
+
+describe('export text', () => {
+  const columns = aggregatedColumns(log, options);
+
+  it('writes a query as the log has it, where the cell shows it formatted', () => {
+    const all = (of: readonly AggregatedRow[]): AggregatedRow[] =>
+      of.flatMap((r) => [r, ...all(r._children ?? [])]);
+    const roots = toAggregatedCallTree(log.children, logStoreFor(log).keyPathIds());
+    const query = all(roots).find((r) => r.originalData.type === 'SOQL_EXECUTE_BEGIN');
+    const name = columns.find((c) => c.id === 'text');
+    if (!query || !name) {
+      throw new Error('no query row or Name column');
+    }
+    expect(name.exportText?.(query)).toBe('SELECT Id FROM Account');
+    expect(name.text?.(query)).not.toBe('SELECT Id FROM Account');
+  });
+
+  it('writes a governor percentage in full, where the cell shows it rounded', () => {
+    const cost = columns.find((c) => c.id === 'governorCost');
+    const row = { governorCost: 33.375 } as unknown as AggregatedRow;
+    expect(cost?.exportText?.(row)).toBe('33.375');
+    expect(cost?.text?.(row)).toBe('33');
   });
 });
 

@@ -6,7 +6,11 @@ import { html, nothing, type TemplateResult } from 'lit';
 
 import { nsToMs } from '../../../core/utility/Duration.js';
 import { sharePercent } from '../../../core/utility/Util.js';
-import { formatSOQLToTemplate } from '../../soql/format/formatter.js';
+import {
+  formatSOQLToTemplate,
+  formatSOQLToText,
+  type FormatOptions,
+} from '../../soql/format/formatter.js';
 import { MIN_VISIBLE_PERCENT } from '../../../tabulator/format/ProgressComponent.js';
 import { eventLabel, eventName } from '../utils/eventText.js';
 
@@ -20,6 +24,7 @@ export interface BarOptions {
 export function bar(value: number, total: number, options: BarOptions = {}): TemplateResult {
   const { precision = 2, percent = true } = options;
   const share = sharePercent(value, total);
+  // `data-grid-find-text` is the grid's FIND_TEXT_ATTR: find marks the value, not the percent.
   return html`<div class="progress-wrapper">
     ${
       value > 0 && total > 0
@@ -30,7 +35,7 @@ export function bar(value: number, total: number, options: BarOptions = {}): Tem
         : nothing
     }
     <div class="progress-bar__text">
-      <span>${(value || 0).toFixed(precision)}</span>${
+      <span data-grid-find-text>${(value || 0).toFixed(precision)}</span>${
         percent
           ? html`<span class="progress-bar__text__percent"
               >(${Math.round(share).toFixed(2)}%)</span
@@ -51,15 +56,33 @@ export const msText = (ns: number): string => nsToMs(ns).toFixed(2);
 const isQuery = (node: LogEvent): boolean =>
   node.type === 'SOQL_EXECUTE_BEGIN' || node.type === 'SOSL_EXECUTE_BEGIN';
 
+const queryFormat = (node: LogEvent): FormatOptions => ({
+  mode: 'pretty',
+  dialect: node.type === 'SOSL_EXECUTE_BEGIN' ? 'sosl' : 'soql',
+});
+
+// Find and copy read every row, and formatting a query on each read is slow.
+const prettyQueries = new WeakMap<LogEvent, string>();
+
 /** What a Name cell shows, as text. */
 export function nameText(node: LogEvent | undefined, fallback: string): string {
   if (!node) {
     return fallback;
   }
   if (isQuery(node)) {
-    return node.text;
+    let text = prettyQueries.get(node);
+    if (text === undefined) {
+      text = formatSOQLToText(node.text, queryFormat(node));
+      prettyQueries.set(node, text);
+    }
+    return text;
   }
   return node.hasValidSymbols ? eventName(node) : eventLabel(node);
+}
+
+/** What copy and export write for a Name cell: a query as the log has it. */
+export function nameExportText(node: LogEvent | undefined, fallback: string): string {
+  return node && isQuery(node) ? node.text : nameText(node, fallback);
 }
 
 /**
@@ -75,9 +98,8 @@ export function nameCell(
     return fallback;
   }
   if (isQuery(node)) {
-    const dialect = node.type === 'SOSL_EXECUTE_BEGIN' ? 'sosl' : 'soql';
     return html`<span class="soql-block"
-      >${formatSOQLToTemplate(node.text, { mode: 'pretty', dialect })}</span
+      >${formatSOQLToTemplate(node.text, queryFormat(node))}</span
     >`;
   }
   if (node.hasValidSymbols) {

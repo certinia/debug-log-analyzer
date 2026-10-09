@@ -29,6 +29,8 @@ const source = (count: number): TreeSource<Node> => ({
 let viewport = VIEWPORT;
 /** The furthest the scroller goes: the browser clamps a scroll past the end. */
 let maxScroll = Number.POSITIVE_INFINITY;
+/** A painted row's laid-out height. */
+let heightOf = (_row: HTMLElement): number => ROW;
 
 /**
  * jsdom does no layout: rows are ROW high, the scroller `viewport` high, and it scrolls.
@@ -62,9 +64,11 @@ function fakeLayout(scroller: HTMLElement): (top: number) => void {
   scroller.scrollTo = ((options: ScrollToOptions) => {
     scroller.scrollTop = options.top ?? top;
   }) as typeof scroller.scrollTo;
-  jest
-    .spyOn(HTMLElement.prototype, 'getBoundingClientRect')
-    .mockImplementation(() => ({ height: ROW, width: 500 }) as DOMRect);
+  jest.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(function (
+    this: HTMLElement,
+  ) {
+    return { height: heightOf(this), width: 500 } as DOMRect;
+  });
   return (value) => {
     top = value;
   };
@@ -107,7 +111,7 @@ function fakeResizeObserver(): (target: Element, height: number) => void {
   };
 }
 
-async function setup(count = 1000) {
+async function setup(count = 1000, lines?: (row: Node) => number, lineHeight?: () => number) {
   const scroller = document.createElement('div');
   const body = document.createElement('div');
   scroller.append(body);
@@ -120,6 +124,8 @@ async function setup(count = 1000) {
     scroller,
     body,
     rowHeight: ROW,
+    lines,
+    lineHeight,
     overscan: 2,
     painter: {
       paint: (el: HTMLElement, index: number, rows: RowView<Node>) => {
@@ -140,6 +146,7 @@ afterEach(() => {
   document.body.replaceChildren();
   viewport = VIEWPORT;
   maxScroll = Number.POSITIVE_INFINITY;
+  heightOf = () => ROW;
   delete (globalThis as { ResizeObserver?: unknown }).ResizeObserver;
 });
 
@@ -182,6 +189,31 @@ describe('GridView', () => {
     expect(painted.length).toBe(first);
     view.repaint();
     expect(painted.length).toBe(first * 2);
+  });
+
+  it('gives a row its lines before it is measured, at the line height it is given', async () => {
+    const LINE = 12;
+    const lines = (row: Node): number =>
+      row.key === 2 ? 5 : row.key === 500 || row.key === 900 ? 3 : 1;
+    heightOf = (row) => (row.textContent === 'row 2' ? ROW + 4 * LINE : ROW);
+    const { scroller } = await setup(1000, lines, () => LINE);
+    await flush();
+    // Row 2 is measured; rows 500 and 900 are not, and take 2 lines more each.
+    expect(scroller.scrollHeight).toBe(997 * ROW + (ROW + 4 * LINE) + 2 * (ROW + 2 * LINE));
+  });
+
+  it('takes a 1-line row height from the rows it measures', async () => {
+    heightOf = () => 16;
+    const { scroller } = await setup(1000, () => 1);
+    await flush();
+    expect(scroller.scrollHeight).toBe(1000 * 16);
+  });
+
+  it('keeps the 1-line height when a row the width wraps is measured taller', async () => {
+    heightOf = (row) => (row.textContent === 'row 3' ? 2 * ROW : ROW);
+    const { scroller } = await setup(1000, () => 1);
+    await flush();
+    expect(scroller.scrollHeight).toBe(999 * ROW + 2 * ROW);
   });
 
   it('keeps a toggled row where it was on screen', async () => {

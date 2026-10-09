@@ -13,7 +13,11 @@ import { logStoreFor } from '../../src/core/log/LogStore.js';
 import { createBottomUpTable } from '../../src/features/call-tree/components/BottomUpTable.js';
 import '../../src/features/call-tree/grid/CallTreeGrid.js';
 import type { CallTreeGrid } from '../../src/features/call-tree/grid/CallTreeGrid.js';
-import { BOTTOM_UP_SORT, bottomUpColumns } from '../../src/features/call-tree/grid/columns.js';
+import {
+  BOTTOM_UP_SORT,
+  bottomUpColumns,
+  mergedLines,
+} from '../../src/features/call-tree/grid/columns.js';
 import {
   buildBottomUpTree,
   type BottomUpRow,
@@ -114,6 +118,7 @@ export class LvGridBottomUp implements BottomUpContender {
     this.grid.columns = bottomUpColumns(log, { openType: () => {} });
     this.grid.filters = [{ test: details }];
     this.grid.sort = BOTTOM_UP_SORT;
+    this.grid.rowLines = mergedLines;
     const roots = await buildBottomUpTree(
       log.children,
       logStoreFor(log).keyPathIds(),

@@ -19,7 +19,7 @@ import {
 } from '../../../grid/index.js';
 import { NAMESPACE_WIDTH, TIME_WIDTH } from '../../../tabulator/ColumnWidths.js';
 import { soqlGroupHeader } from '../../soql/format/groupHeader.js';
-import type { BottomUpRow } from '../utils/Aggregation.js';
+import type { AggregatedRow, BottomUpRow } from '../utils/Aggregation.js';
 import {
   costLimitsOf,
   governorCostBreakdown,
@@ -29,7 +29,7 @@ import {
   type GovernorUsage,
 } from '../utils/GovernorCost.js';
 import { isDetailEvent } from '../utils/TimeOrderTree.js';
-import { bar, msBar, msText, nameCell, nameText } from './cells.js';
+import { bar, msBar, msText, nameCell, nameExportText, nameText } from './cells.js';
 import { knownMax, outermostSum } from './calcs.js';
 
 /** What every call-tree row carries, whichever view built it. */
@@ -107,6 +107,7 @@ function nameColumn<R>(fields: RowFields<R>, options: CallTreeColumnOptions): Gr
     minWidth: 200,
     cell: (row) => nameCell(fields.event(row), fields.text(row), options.openType),
     text: (row) => nameText(fields.event(row), fields.text(row)),
+    exportText: (row) => nameExportText(fields.event(row), fields.text(row)),
     sort: { value: fields.text },
     sortFirst: 'desc',
     footer: 'Total',
@@ -232,8 +233,9 @@ function utilisationColumn<R>(opts: {
   tooltip: (row: R, value: number) => string;
 }): GridColumn<R> {
   const { value } = opts;
+  const present = (v: number | null): v is number => v !== null && !Number.isNaN(v);
   const shown = (v: number | null) =>
-    v === null || Number.isNaN(v) ? '—' : bar(v, 100, { precision: 0, percent: false });
+    present(v) ? bar(v, 100, { precision: 0, percent: false }) : '—';
   return {
     id: opts.id,
     title: opts.title,
@@ -242,7 +244,14 @@ function utilisationColumn<R>(opts: {
     align: 'end',
     hidden: opts.hidden,
     cell: (row) => shown(value(row)),
-    text: (row) => String(value(row) ?? '—'),
+    text: (row) => {
+      const v = value(row);
+      return present(v) ? v.toFixed(0) : '—';
+    },
+    exportText: (row) => {
+      const v = value(row);
+      return present(v) ? String(v) : '';
+    },
     tooltip: (row) => {
       const v = value(row);
       return v === null ? NO_REPORTED_LIMITS_TEXT : opts.tooltip(row, v);
@@ -477,6 +486,33 @@ export function timeOrderSource(log: ApexLog): TreeSource<LogEvent> {
   return { roots: log.children, children: (event) => event.children, key: (e) => e.eventIndex };
 }
 
+function lineBreaks(text: string | null | undefined): number {
+  if (!text) {
+    return 0;
+  }
+  let count = 0;
+  for (let at = text.indexOf('\n'); at !== -1; at = text.indexOf('\n', at + 1)) {
+    count++;
+  }
+  return count;
+}
+
+/**
+ * The lines a Name shows: its label is the text and suffix, after a 1-line type at most.
+ * Read from the event, as no label is built for it. A query is counted as written,
+ * though its cell lays it out on more.
+ */
+function nameLines(event: LogEvent): number {
+  return 1 + lineBreaks(event.text) + lineBreaks(event.suffix);
+}
+
+/**
+ * An Aggregated or Bottom-Up row's lines, for the grid's `rowLines`. Time Order has none: at
+ * 580k rows the count cost a long task on each sort, filter and expand, and its rows are
+ * nearly all 1 line.
+ */
+export const mergedLines = (row: { originalData: LogEvent }): number => nameLines(row.originalData);
+
 /** Show Details on the Time Order tree. */
 export const TIME_ORDER_DETAILS: RowFilter<LogEvent> = { test: isDetailEvent, keepAncestors: true };
 
@@ -563,6 +599,54 @@ export function bottomUpColumns(
       calc: sum((r) => r.totalSelfTime),
     }),
     timeColumn<BottomUpRow>({
+      id: 'avgSelfTime',
+      title: 'Avg Self Time (ms)',
+      value: (r) => r.avgSelfTime,
+      totalNs,
+      hidden: true,
+    }),
+  ];
+}
+
+/** The Aggregated columns: the Tabulator table's, field for field. */
+export function aggregatedColumns(
+  log: ApexLog,
+  options: CallTreeColumnOptions,
+): GridColumn<AggregatedRow>[] {
+  const totalNs = log.duration.total;
+  const fields = heldFields<AggregatedRow>();
+  return [
+    nameColumn(fields, options),
+    ...namespaceColumns(fields),
+    typeColumn(fields, true),
+    countColumn<AggregatedRow>({
+      id: 'callCount',
+      title: 'Calls',
+      value: (r) => r.callCount,
+      width: 70,
+    }),
+    // A callee row sits inside its caller's total; self never overlaps.
+    ...governorMetricColumns(log, fields, {
+      netTotal: sum((r) => r.heapAllocated.total),
+      grossTotal: sum((r) => r.heapGross.total),
+      netSelf: sum((r) => r.heapAllocated.self, 'all'),
+      grossSelf: sum((r) => r.heapGross.self, 'all'),
+    }),
+    timeColumn<AggregatedRow>({
+      id: 'totalTime',
+      title: 'Total Time (ms)',
+      value: (r) => r.totalTime,
+      totalNs,
+      calc: sum((r) => r.totalTime),
+    }),
+    timeColumn<AggregatedRow>({
+      id: 'totalSelfTime',
+      title: 'Self Time (ms)',
+      value: (r) => r.totalSelfTime,
+      totalNs,
+      calc: sum((r) => r.totalSelfTime, 'all'),
+    }),
+    timeColumn<AggregatedRow>({
       id: 'avgSelfTime',
       title: 'Avg Self Time (ms)',
       value: (r) => r.avgSelfTime,

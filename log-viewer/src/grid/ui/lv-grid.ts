@@ -161,6 +161,10 @@ export class LvGrid<R extends object = object> extends LitElement {
   @property({ type: Number, attribute: 'row-height' })
   rowHeight = 24;
 
+  /** A data row's lines of text, so a tall row has its height before it is drawn. Read when the grid first shows. */
+  @property({ attribute: false })
+  rowLines: ((row: R) => number) | null = null;
+
   /** Copy writes each row's tree under it; off, top-level rows only. */
   @property({ type: Boolean, attribute: 'copy-tree' })
   copyTree = true;
@@ -224,17 +228,35 @@ export class LvGrid<R extends object = object> extends LitElement {
 
   /**
    * Opens each ancestor on `path` (keys from the root down), then scrolls the row to the
-   * middle and selects it. False when no row on the path is shown.
+   * middle and selects it. False when no row on the path is shown. With `scrollIfVisible`
+   * false, a row already in view whole stays where it is.
    */
-  async goTo(path: readonly RowKey[]): Promise<boolean> {
+  async goTo(
+    path: readonly RowKey[],
+    { scrollIfVisible = true }: { scrollIfVisible?: boolean } = {},
+  ): Promise<boolean> {
     const index = (await this.store?.reveal(path)) ?? -1;
     if (index < 0) {
       return false;
     }
     await this.updateComplete;
-    this.view?.scrollToIndex(index);
+    if (scrollIfVisible || !this.inView(index)) {
+      this.view?.scrollToIndex(index);
+    }
     this.select(this.targetAt(index), index);
     return true;
+  }
+
+  /** Moves keyboard focus to the grid, so its keys and copy work. */
+  override focus(options?: FocusOptions): void {
+    this.scrollerRef.value?.focus(options);
+  }
+
+  /** Clears the selection and reports it in `lv-grid-select`. Does nothing when no row is selected. */
+  deselect(): void {
+    if (this.selected !== null) {
+      this.select(null);
+    }
   }
 
   /**
@@ -254,7 +276,10 @@ export class LvGrid<R extends object = object> extends LitElement {
     return result.total;
   }
 
-  /** Opens the way to match `match` (numbered from 0), scrolls to it and marks it current. */
+  /**
+   * Opens the way to match `match` (numbered from 0) and marks it current. A row out of
+   * view whole scrolls to the middle; one in view stays where it is.
+   */
   async setCurrentMatch(match: number): Promise<void> {
     const found = this.found;
     if (!found || match < 0 || match >= found.result.total) {
@@ -263,7 +288,7 @@ export class LvGrid<R extends object = object> extends LitElement {
     found.current = match;
     const index = (await this.store?.reveal(found.result.pathOf(match))) ?? -1;
     await this.updateComplete;
-    if (index >= 0) {
+    if (index >= 0 && !this.inView(index)) {
       this.view?.scrollToIndex(index);
     }
     this.view?.setFind(found);
@@ -587,6 +612,8 @@ export class LvGrid<R extends object = object> extends LitElement {
       scroller,
       body,
       rowHeight: this.rowHeight,
+      lines: this.rowLines ?? undefined,
+      lineHeight: () => this.treeLineHeight(),
       rowIndexStart: 2,
       painter: litPainter(() => ({
         columns: this.columns,
@@ -597,6 +624,24 @@ export class LvGrid<R extends object = object> extends LitElement {
     });
     this.view.setFind(this.found);
     this.requestUpdate();
+  }
+
+  /** The height a further line of tree cell text adds, from a hidden 1-line and 2-line cell. */
+  private treeLineHeight(): number {
+    const body = this.bodyRef.value;
+    if (!body) {
+      return 0;
+    }
+    const probe = document.createElement('div');
+    probe.className = 'cell tree';
+    probe.style.cssText = 'position: absolute; visibility: hidden; white-space: pre;';
+    probe.textContent = 'x';
+    body.append(probe);
+    const one = probe.getBoundingClientRect().height;
+    probe.textContent = 'x\nx';
+    const two = probe.getBoundingClientRect().height;
+    probe.remove();
+    return two - one;
   }
 
   private targetAt(index: number): RowTarget<R> | null {
@@ -641,6 +686,22 @@ export class LvGrid<R extends object = object> extends LitElement {
     }
     this.toggled = target;
     await this.store?.toggle(target, expanded);
+  }
+
+  /** Whether the painted row at `index` shows whole, between the header and the totals. */
+  private inView(index: number): boolean {
+    const scroller = this.scrollerRef.value;
+    const row = this.bodyRef.value?.querySelector<HTMLElement>(
+      `:scope > [data-index="${index}"]:not([hidden])`,
+    );
+    if (!scroller || !row) {
+      return false;
+    }
+    const box = row.getBoundingClientRect();
+    const frame = scroller.getBoundingClientRect();
+    const top = scroller.querySelector(':scope > .head')?.getBoundingClientRect().bottom;
+    const bottom = scroller.querySelector(':scope > .foot')?.getBoundingClientRect().top;
+    return box.top >= (top ?? frame.top) && box.bottom <= (bottom ?? frame.bottom);
   }
 
   /** The index of the row element an event came from, or -1. */

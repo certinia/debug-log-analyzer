@@ -46,6 +46,20 @@ export function formatSOQLToTemplate(text: string, opts: FormatOptions): Templat
   }
 }
 
+/** The text {@link formatSOQLToTemplate} shows, without its markup. */
+export function formatSOQLToText(text: string, opts: FormatOptions): string {
+  if (!text) {
+    return '';
+  }
+  try {
+    return chunksFor(text, opts)
+      .map((c) => (typeof c === 'string' ? c : c.text))
+      .join('');
+  } catch {
+    return text;
+  }
+}
+
 function chunksFor(text: string, opts: FormatOptions): (Token | string)[] {
   const tokens = tokenize(text, resolveDialect(text, opts));
   if (opts.mode !== 'pretty') {
