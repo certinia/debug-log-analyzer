@@ -19,7 +19,7 @@ import {
 } from '../../../grid/index.js';
 import { NAMESPACE_WIDTH, TIME_WIDTH } from '../../../tabulator/ColumnWidths.js';
 import { soqlGroupHeader } from '../../soql/format/groupHeader.js';
-import type { BottomUpRow } from '../utils/Aggregation.js';
+import type { AggregatedRow, BottomUpRow } from '../utils/Aggregation.js';
 import {
   costLimitsOf,
   governorCostBreakdown,
@@ -498,10 +498,11 @@ function nameLines(event: LogEvent): number {
 }
 
 /**
- * A Bottom-Up row's lines, for the grid's `rowLines`. Time Order has none: at 580k rows the
- * count cost a long task on each sort, filter and expand, and its rows are nearly all 1 line.
+ * An Aggregated or Bottom-Up row's lines, for the grid's `rowLines`. Time Order has none: at
+ * 580k rows the count cost a long task on each sort, filter and expand, and its rows are
+ * nearly all 1 line.
  */
-export const bottomUpLines = (row: BottomUpRow): number => nameLines(row.originalData);
+export const mergedLines = (row: { originalData: LogEvent }): number => nameLines(row.originalData);
 
 /** Show Details on the Time Order tree. */
 export const TIME_ORDER_DETAILS: RowFilter<LogEvent> = { test: isDetailEvent, keepAncestors: true };
@@ -589,6 +590,54 @@ export function bottomUpColumns(
       calc: sum((r) => r.totalSelfTime),
     }),
     timeColumn<BottomUpRow>({
+      id: 'avgSelfTime',
+      title: 'Avg Self Time (ms)',
+      value: (r) => r.avgSelfTime,
+      totalNs,
+      hidden: true,
+    }),
+  ];
+}
+
+/** The Aggregated columns: the Tabulator table's, field for field. */
+export function aggregatedColumns(
+  log: ApexLog,
+  options: CallTreeColumnOptions,
+): GridColumn<AggregatedRow>[] {
+  const totalNs = log.duration.total;
+  const fields = heldFields<AggregatedRow>();
+  return [
+    nameColumn(fields, options),
+    ...namespaceColumns(fields),
+    typeColumn(fields, true),
+    countColumn<AggregatedRow>({
+      id: 'callCount',
+      title: 'Calls',
+      value: (r) => r.callCount,
+      width: 70,
+    }),
+    // A callee row sits inside its caller's total; self never overlaps.
+    ...governorMetricColumns(log, fields, {
+      netTotal: sum((r) => r.heapAllocated.total),
+      grossTotal: sum((r) => r.heapGross.total),
+      netSelf: sum((r) => r.heapAllocated.self, 'all'),
+      grossSelf: sum((r) => r.heapGross.self, 'all'),
+    }),
+    timeColumn<AggregatedRow>({
+      id: 'totalTime',
+      title: 'Total Time (ms)',
+      value: (r) => r.totalTime,
+      totalNs,
+      calc: sum((r) => r.totalTime),
+    }),
+    timeColumn<AggregatedRow>({
+      id: 'totalSelfTime',
+      title: 'Self Time (ms)',
+      value: (r) => r.totalSelfTime,
+      totalNs,
+      calc: sum((r) => r.totalSelfTime, 'all'),
+    }),
+    timeColumn<AggregatedRow>({
       id: 'avgSelfTime',
       title: 'Avg Self Time (ms)',
       value: (r) => r.avgSelfTime,

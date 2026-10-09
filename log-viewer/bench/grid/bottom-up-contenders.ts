@@ -16,7 +16,7 @@ import type { CallTreeGrid } from '../../src/features/call-tree/grid/CallTreeGri
 import {
   BOTTOM_UP_SORT,
   bottomUpColumns,
-  bottomUpLines,
+  mergedLines,
 } from '../../src/features/call-tree/grid/columns.js';
 import {
   buildBottomUpTree,
@@ -118,7 +118,7 @@ export class LvGridBottomUp implements BottomUpContender {
     this.grid.columns = bottomUpColumns(log, { openType: () => {} });
     this.grid.filters = [{ test: details }];
     this.grid.sort = BOTTOM_UP_SORT;
-    this.grid.rowLines = bottomUpLines;
+    this.grid.rowLines = mergedLines;
     const roots = await buildBottomUpTree(
       log.children,
       logStoreFor(log).keyPathIds(),

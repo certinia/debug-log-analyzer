@@ -6,14 +6,14 @@ import '#vscode-elements/vscode-option.js';
 import '#vscode-elements/vscode-toolbar-button.js';
 import '../../../components/VsSelect.js';
 import { initialState, Task } from '@lit/task';
-import { css, html, LitElement, unsafeCSS, type PropertyValues } from 'lit';
+import { css, html, LitElement, type PropertyValues } from 'lit';
 import { customElement, property, state } from 'lit/decorators.js';
 import { repeat } from 'lit/directives/repeat.js';
-import type { RowComponent, Tabulator } from 'tabulator-tables';
+import type { RowComponent } from 'tabulator-tables';
 
 import type { ApexLog, LogEvent } from '@apexdevtools/apex-log-parser';
 import { DomListenerController } from '../../../core/events/DomListenerController.js';
-import { eventBus, type DetailSource } from '../../../core/events/EventBus.js';
+import { eventBus, type SelectionView } from '../../../core/events/EventBus.js';
 import type { FindEventDetail, FindEventMap } from '../../find/findEvents.js';
 import { SelectionEchoGuard } from '../../../core/events/SelectionEchoGuard.js';
 import { SubscriptionController } from '../../../core/events/SubscriptionController.js';
@@ -23,16 +23,13 @@ import { logStoreFor } from '../../../core/log/LogStore.js';
 import { eventByEventIndex } from '../../../core/utility/EventSearch.js';
 import { isVisible } from '../../../core/utility/Util.js';
 import { CALLTREE_GO_TO_ROW, type CalltreeNavigationEventMap } from '../navigation.js';
-import { buildBottomUpTree, type AggregatedRow, type BottomUpRow } from '../utils/Aggregation.js';
-import { findBucketRow } from '../utils/bucketRows.js';
 import {
-  categoryColoringStyles,
-  groupedRowFormatter,
-  wireCategoryColoring,
-} from '../utils/CategoryColoring.js';
-import { deepFilter } from '../utils/DetailsFilter.js';
-import { expandCollapseAll } from '../utils/ExpandCollapse.js';
-import type { TimeOrderRow } from '../utils/TimeOrderTree.js';
+  buildBottomUpTree,
+  toAggregatedCallTree,
+  type AggregatedRow,
+  type BottomUpRow,
+} from '../utils/Aggregation.js';
+import { wireCategoryColoring } from '../utils/CategoryColoring.js';
 import { waitForNextFrame } from '../../../core/utility/FrameBudget.js';
 import type {
   GridContextDetail,
@@ -47,23 +44,19 @@ import type {
 import '../grid/CallTreeGrid.js';
 import { eventCategoryClass } from '../grid/CallTreeGrid.js';
 import {
+  aggregatedColumns,
   BOTTOM_UP_SORT,
   bottomUpColumns,
-  bottomUpLines,
+  mergedLines,
   TIME_ORDER_DETAILS,
   timeOrderColumns,
   timeOrderSource,
 } from '../grid/columns.js';
 
 import { inMsRange, type FilterRange } from '../../../tabulator/filters/MinMax.js';
-import { onTableReshaped } from '../../../tabulator/module/tableReshape.js';
-import { tableHolder } from '../../../tabulator/module/tableHolder.js';
-
-import dataGridStyles from '../../../tabulator/style/DataGrid.scss';
 
 // styles
 import { globalStyles } from '../../../styles/global.styles.js';
-import { soqlSyntaxStyles } from '../../soql/styles/soql-syntax.css.js';
 
 // web components
 import '../../../components/ContextMenu.js';
@@ -76,20 +69,13 @@ import '../../../components/datagrid-filter-bar.js';
 import '../../../components/datagrid-range-filter.js';
 import '../../../components/OverflowList.js';
 
-// Table creation functions
-import { createAggregatedTable } from './AggregatedTable.js';
 import {
   ColumnSettingsController,
   gridColumnTarget,
   type ColumnTarget,
 } from '../../../components/ColumnSettingsController.js';
 import { CALL_TREE_VIEWS } from '../../../tabulator/ColumnViews.js';
-import {
-  LocatedRowIds,
-  LocatedRowMarker,
-  rowDetailSelection,
-  rowFrames,
-} from '../../../components/locatedRow.js';
+import { LocatedRowIds, rowDetailSelection, rowFrames } from '../../../components/locatedRow.js';
 import { InspectorTabController } from '../../../components/InspectorTabController.js';
 import { revealFirstOf } from '../../../components/inspectorTab.js';
 
@@ -123,16 +109,23 @@ function rowStandIn<R>(
   } as unknown as RowComponent;
 }
 
-/** The parent of each Bottom Up row, and each row by its path id: the rows have neither. */
-interface BottomUpLinks {
-  parents: Map<BottomUpRow, BottomUpRow>;
-  byPath: Map<number, BottomUpRow>;
+/** A row of a merged view: Aggregated or Bottom-Up. */
+interface MergedRow<R> {
+  id: number;
+  _pathId: number;
+  _children?: R[] | null;
 }
 
-function linkBottomUp(roots: readonly BottomUpRow[]): BottomUpLinks {
-  const parents = new Map<BottomUpRow, BottomUpRow>();
-  const byPath = new Map<number, BottomUpRow>();
-  const walk = (row: BottomUpRow): void => {
+/** The parent of each merged row, and each row by its path id: the rows have neither. */
+interface MergedLinks<R> {
+  parents: Map<R, R>;
+  byPath: Map<number, R>;
+}
+
+function linkRows<R extends MergedRow<R>>(roots: readonly R[]): MergedLinks<R> {
+  const parents = new Map<R, R>();
+  const byPath = new Map<number, R>();
+  const walk = (row: R): void => {
     byPath.set(row._pathId, row);
     for (const child of row._children ?? []) {
       parents.set(child, row);
@@ -143,7 +136,29 @@ function linkBottomUp(roots: readonly BottomUpRow[]): BottomUpLinks {
   return { parents, byPath };
 }
 
+/** The keys from a top-level row down to the first row that `pathIds` name. */
+function mergedPath<R extends MergedRow<R>>(
+  links: MergedLinks<R> | null,
+  pathIds: readonly number[],
+): RowKey[] {
+  const path: RowKey[] = [];
+  const [first] = pathIds;
+  for (
+    let row = first === undefined ? undefined : links?.byPath.get(first);
+    row;
+    row = links?.parents.get(row)
+  ) {
+    path.unshift(row.id);
+  }
+  return path;
+}
+
 const BOTTOM_UP_DETAILS: RowFilter<BottomUpRow> = { test: (row) => row._hasDetailsDeep };
+const AGGREGATED_DETAILS: RowFilter<AggregatedRow> = { test: (row) => row._hasDetailsDeep };
+const AGGREGATED_DEBUG_ONLY: RowFilter<AggregatedRow> = {
+  test: (row) => !!row.originalData.type && DEBUG_VALUE_TYPES.has(row.originalData.type),
+  keepAncestors: true,
+};
 
 const openType = (text: string): void => vscodeMessenger.send<string>('openType', text);
 
@@ -187,6 +202,8 @@ const deep = <R>(test: (row: R) => boolean): RowFilter<R> => ({ test, keepAncest
 
 const hasRange = (range: FilterRange): boolean => range.start !== null || range.end !== null;
 
+type ViewGrid = LvGrid<LogEvent> | LvGrid<AggregatedRow> | LvGrid<BottomUpRow>;
+
 @customElement('call-tree-view')
 export class CalltreeView extends LitElement {
   @property()
@@ -205,9 +222,10 @@ export class CalltreeView extends LitElement {
   });
 
   timeOrderGrid: LvGrid<LogEvent> | null = null;
-  aggregatedTreeTable: Tabulator | null = null;
+  aggregatedGrid: LvGrid<AggregatedRow> | null = null;
   bottomUpGrid: LvGrid<BottomUpRow> | null = null;
-  private _bottomUpLinks: BottomUpLinks | null = null;
+  private _aggregatedLinks: MergedLinks<AggregatedRow> | null = null;
+  private _bottomUpLinks: MergedLinks<BottomUpRow> | null = null;
 
   filterState: { showDetails: boolean; debugOnly: boolean; selectedTypes: Set<string> } = {
     showDetails: false,
@@ -219,13 +237,7 @@ export class CalltreeView extends LitElement {
   namespaceSelected: string[] = [];
   totalTimeRange: FilterRange = { start: null, end: null };
   selfTimeRange: FilterRange = { start: null, end: null };
-  debugOnlyFilterCache = new Map<number, boolean>();
-  typeFilterCache = new Map<number, boolean>();
-  namespaceFilterCache = new Map<number, boolean>();
-  totalTimeFilterCache = new Map<number, boolean>();
-  selfTimeFilterCache = new Map<number, boolean>();
 
-  findMap: { [key: number]: RowComponent } = {};
   totalMatches = 0;
 
   blockClearHighlights = true;
@@ -244,13 +256,13 @@ export class CalltreeView extends LitElement {
     views: CALL_TREE_VIEWS,
     alwaysVisible: ALWAYS_VISIBLE,
     // All three, so a mode the user has not switched back to is already right.
-    tables: () => [...this._tables, ...this._gridTargets],
+    tables: () => this._gridTargets,
   });
 
   private contextMenu: ContextMenu | null = null;
   private contextMenuRow: LogEvent | null = null;
-  /** The table whose header was right-clicked (for column-toggle actions). */
-  private contextMenuTable: Tabulator | ColumnTarget | null = null;
+  /** The grid whose header was right-clicked (for column-toggle actions). */
+  private contextMenuTable: ColumnTarget | null = null;
   private viewSwitchEpoch = 0;
   /** Drops a pending wait for the view to come on screen, once per attach. */
   private _visibilityWait: AbortController | null = null;
@@ -261,7 +273,6 @@ export class CalltreeView extends LitElement {
 
   /** Guards the programmatic select made on the inspector's behalf. */
   private _echoGuard = new SelectionEchoGuard();
-  private _locatedRow = new LocatedRowMarker();
   private _locateIds = new LocatedRowIds();
 
   private readonly _documentBus = new DomListenerController<
@@ -281,10 +292,7 @@ export class CalltreeView extends LitElement {
     mark: (eventIndexes) => this._markLocated(eventIndexes),
     reveal: (eventIndex, signal) => this._revealEventIndex(eventIndex, signal),
     clear: () => {
-      // The table reports the clear itself, which is what reaches the inspector.
-      for (const table of this._tables) {
-        table.deselectRow();
-      }
+      // The grid reports the clear itself, which is what reaches the inspector.
       for (const grid of this._grids) {
         grid.deselect();
       }
@@ -327,8 +335,6 @@ export class CalltreeView extends LitElement {
   }
 
   static styles = [
-    unsafeCSS(dataGridStyles),
-    unsafeCSS(soqlSyntaxStyles),
     globalStyles,
     css`
       :host {
@@ -391,7 +397,6 @@ export class CalltreeView extends LitElement {
         pointer-events: none;
       }
     `,
-    categoryColoringStyles,
   ];
 
   render() {
@@ -584,16 +589,10 @@ export class CalltreeView extends LitElement {
 
     // Reset search when switching views
     if (this.totalMatches > 0 || this.findArgs.text !== '') {
-      const oldTable = this._getActiveTable();
       this._resetFindWidget();
-      if (oldTable) {
-        //@ts-expect-error This is a custom function added in by Find custom module
-        oldTable.clearFindHighlights();
-      }
       this._activeGrid()?.clearFind();
       this.findArgs.text = '';
       this.findArgs.count = 0;
-      this.findMap = {};
       this.totalMatches = 0;
     }
 
@@ -642,17 +641,13 @@ export class CalltreeView extends LitElement {
   }
 
   private _destroyCurrentTable(): void {
-    // The marker holds row elements that go with the table.
-    this._locatedRow.clear();
-    if (this.aggregatedTreeTable) {
-      this.aggregatedTreeTable.destroy();
-      this.aggregatedTreeTable = null;
-    }
     for (const grid of this._grids) {
       grid.remove();
     }
     this.timeOrderGrid = null;
+    this.aggregatedGrid = null;
     this.bottomUpGrid = null;
+    this._aggregatedLinks = null;
     this._bottomUpLinks = null;
   }
 
@@ -670,12 +665,10 @@ export class CalltreeView extends LitElement {
     this._columns.choose((event.target as HTMLInputElement).value || 'General');
   }
 
-  private get _tables(): Tabulator[] {
-    return this.aggregatedTreeTable ? [this.aggregatedTreeTable] : [];
-  }
-
-  private get _grids(): (LvGrid<LogEvent> | LvGrid<BottomUpRow>)[] {
-    return [this.timeOrderGrid, this.bottomUpGrid].filter((grid) => grid !== null);
+  private get _grids(): ViewGrid[] {
+    return [this.timeOrderGrid, this.aggregatedGrid, this.bottomUpGrid].filter(
+      (grid) => grid !== null,
+    );
   }
 
   private get _gridTargets(): ColumnTarget[] {
@@ -683,39 +676,28 @@ export class CalltreeView extends LitElement {
     if (this.timeOrderGrid) {
       targets.push(gridColumnTarget(this.timeOrderGrid));
     }
+    if (this.aggregatedGrid) {
+      targets.push(gridColumnTarget(this.aggregatedGrid));
+    }
     if (this.bottomUpGrid) {
       targets.push(gridColumnTarget(this.bottomUpGrid));
     }
     return targets;
   }
 
-  /** The grid of the view on show; Aggregated is still a Tabulator table. */
-  private _activeGrid(): LvGrid<LogEvent> | LvGrid<BottomUpRow> | null {
+  /** The grid of the view on show, once built. */
+  private _activeGrid(): ViewGrid | null {
     switch (this.viewMode) {
       case 'time-order':
         return this.timeOrderGrid;
+      case 'aggregated':
+        return this.aggregatedGrid;
       case 'bottom-up':
         return this.bottomUpGrid;
-      default:
-        return null;
     }
   }
 
-  /** Applies the active view and wires the header menu once a table is built. */
-  private _initTableColumns(table: Tabulator) {
-    this._columns.applyTo(table);
-    const header = table.element.querySelector<HTMLElement>('.tabulator-header');
-    header?.addEventListener('contextmenu', (event) => {
-      event.preventDefault();
-      this._showHeaderContextMenu(table, event.clientX, event.clientY);
-    });
-  }
-
-  private _showHeaderContextMenu(
-    table: Tabulator | ColumnTarget,
-    clientX: number,
-    clientY: number,
-  ) {
+  private _showHeaderContextMenu(table: ColumnTarget, clientX: number, clientY: number) {
     if (!this.contextMenu) {
       return;
     }
@@ -724,14 +706,14 @@ export class CalltreeView extends LitElement {
     this.contextMenu.show(this._columns.menuItems(table), clientX, clientY);
   }
 
-  private _activeColumnTarget(): Tabulator | ColumnTarget | null {
+  private _activeColumnTarget(): ColumnTarget | null {
     switch (this.viewMode) {
       case 'time-order':
         return this.timeOrderGrid && gridColumnTarget(this.timeOrderGrid);
+      case 'aggregated':
+        return this.aggregatedGrid && gridColumnTarget(this.aggregatedGrid);
       case 'bottom-up':
         return this.bottomUpGrid && gridColumnTarget(this.bottomUpGrid);
-      default:
-        return this._getActiveTable();
     }
   }
 
@@ -794,57 +776,44 @@ export class CalltreeView extends LitElement {
       this.timeOrderGrid.filters = this._timeOrderFilters();
       return;
     }
+    if (this.aggregatedGrid && this.viewMode === 'aggregated') {
+      this._dropSearch();
+      this.aggregatedGrid.filters = this._aggregatedFilters();
+      return;
+    }
     if (this.bottomUpGrid && this.viewMode === 'bottom-up') {
       this._dropSearch();
       this.bottomUpGrid.filters = this._bottomUpFilters();
-      return;
     }
-    const activeTable = this._getActiveTable();
-    if (!activeTable) {
-      return;
+  }
+
+  /** The filters of {@link _updateFiltering} for the Aggregated grid: Time Order's, on its rows. */
+  private _aggregatedFilters(): RowFilter<AggregatedRow>[] {
+    const namespaces = this.namespaceSelected;
+    const filters: RowFilter<AggregatedRow>[] = [];
+    if (namespaces.length) {
+      filters.push(deep((row) => namespaces.includes(row.namespace || '')));
     }
-
-    this._dropSearch();
-    this._clearFilterCaches();
-
-    const filtersToAdd = [];
-
-    if (this.namespaceSelected.length > 0) {
-      filtersToAdd.push(this._namespaceBarFilter);
+    if (hasRange(this.totalTimeRange)) {
+      const range = this.totalTimeRange;
+      filters.push(deep((row) => inMsRange(range, row.totalTime)));
     }
-
-    if (this.totalTimeRange.start !== null || this.totalTimeRange.end !== null) {
-      filtersToAdd.push(this._totalTimeBarFilter);
+    if (hasRange(this.selfTimeRange)) {
+      const range = this.selfTimeRange;
+      filters.push(deep((row) => inMsRange(range, row.totalSelfTime)));
     }
-
-    if (this.selfTimeRange.start !== null || this.selfTimeRange.end !== null) {
-      filtersToAdd.push(this._selfTimeBarFilter);
-    }
-
-    const isBottomUp = this.viewMode === 'bottom-up';
-
-    if (!isBottomUp && this.filterState.debugOnly) {
-      filtersToAdd.push(this._debugFilter);
+    const types = this.filterState.selectedTypes;
+    if (this.filterState.debugOnly) {
+      filters.push(AGGREGATED_DEBUG_ONLY);
     } else {
-      if (
-        !isBottomUp &&
-        this.filterState.selectedTypes.size > 0 &&
-        !this.filterState.selectedTypes.has('All')
-      ) {
-        filtersToAdd.push(this._typeFilter);
+      if (types.size > 0 && !types.has('All')) {
+        filters.push(deep((row) => !!row.originalData.type && types.has(row.originalData.type)));
       }
-
       if (!this.filterState.showDetails) {
-        filtersToAdd.push(this._showDetailsFilter);
+        filters.push(AGGREGATED_DETAILS);
       }
     }
-
-    activeTable.blockRedraw();
-    activeTable.clearFilter(false);
-    filtersToAdd.forEach((filter) => {
-      activeTable.addFilter(filter);
-    });
-    activeTable.restoreRedraw();
+    return filters;
   }
 
   /** The filters of {@link _updateFiltering} for the Time Order grid. */
@@ -908,57 +877,29 @@ export class CalltreeView extends LitElement {
       this.timeOrderGrid.marked = new Set(eventIndexes);
       return;
     }
-    if (this.bottomUpGrid && this.viewMode === 'bottom-up') {
-      const ids = this._locateIds.idsFor(this.rootMethod, eventIndexes, directionOf(this.viewMode));
-      const byPath = this._bottomUpLinks?.byPath;
-      this.bottomUpGrid.marked = new Set(ids.flatMap((id) => byPath?.get(id)?.id ?? []));
-      return;
+    const ids = (byPath: Map<number, { id: number }> | undefined): Set<number> =>
+      new Set(
+        this._locateIds
+          .idsFor(this.rootMethod, eventIndexes, directionOf(this.viewMode))
+          .flatMap((id) => byPath?.get(id)?.id ?? []),
+      );
+    if (this.aggregatedGrid && this.viewMode === 'aggregated') {
+      this.aggregatedGrid.marked = ids(this._aggregatedLinks?.byPath);
+    } else if (this.bottomUpGrid && this.viewMode === 'bottom-up') {
+      this.bottomUpGrid.marked = ids(this._bottomUpLinks?.byPath);
     }
-    const direction = this.viewMode === 'time-order' ? undefined : directionOf(this.viewMode);
-    this._locatedRow.mark(
-      this._getActiveTable()?.element ?? null,
-      this._locateIds.idsFor(this.rootMethod, eventIndexes, direction),
-    );
-  }
-
-  private _getActiveTable(): Tabulator | null {
-    return this.viewMode === 'aggregated' ? this.aggregatedTreeTable : null;
   }
 
   _expandButtonClick() {
-    const grid = this._activeGrid();
-    if (grid) {
-      void grid.expandAll();
-      return;
-    }
-    const table = this._getActiveTable();
-    if (!table?.modules?.dataTree) {
-      return;
-    }
-    table.blockRedraw();
-    expandCollapseAll(table.getRows(), true);
-    tableHolder(table.element)?.focus();
-    table.restoreRedraw();
+    void this._activeGrid()?.expandAll();
   }
 
   _collapseButtonClick() {
-    const grid = this._activeGrid();
-    if (grid) {
-      void grid.collapseAll();
-      return;
-    }
-    const table = this._getActiveTable();
-    if (!table?.modules?.dataTree) {
-      return;
-    }
-    table.blockRedraw();
-    expandCollapseAll(table.getRows(), false);
-    tableHolder(table.element)?.focus();
-    table.restoreRedraw();
+    void this._activeGrid()?.collapseAll();
   }
 
   _appendTableWhenVisible() {
-    if (this._getActiveTable() || this._activeGrid()) {
+    if (this._activeGrid()) {
       return;
     }
 
@@ -1001,30 +942,26 @@ export class CalltreeView extends LitElement {
    */
   private async _revealEventIndex(eventIndex: number, signal: AbortSignal): Promise<void> {
     const grid = this._activeGrid();
-    if (grid) {
-      const path =
-        grid === this.timeOrderGrid
-          ? this._timeOrderPath(eventIndex)
-          : this._bottomUpPath(eventIndex);
-      if (!signal.aborted) {
-        await this._echoGuard.runAsync(() => grid.goTo(path));
-      }
+    if (!grid || signal.aborted) {
       return;
     }
-    const table = this._getActiveTable();
-    if (!table) {
-      return;
-    }
+    const path = this._pathTo(eventIndex);
+    await this._echoGuard.runAsync(() => grid.goTo(path));
+  }
 
-    const treeRow = await this._findRowFor(table, eventIndex);
-    if (!treeRow || signal.aborted) {
-      return;
+  /** The keys from a top-level row down to the row of the view on show for `eventIndex`. */
+  private _pathTo(eventIndex: number): RowKey[] {
+    const direction: SelectionView = directionOf(this.viewMode);
+    const pathIds = (): readonly number[] =>
+      this._locateIds.idsFor(this.rootMethod, [eventIndex], direction);
+    switch (this.viewMode) {
+      case 'time-order':
+        return this._timeOrderPath(eventIndex);
+      case 'aggregated':
+        return mergedPath(this._aggregatedLinks, pathIds());
+      case 'bottom-up':
+        return mergedPath(this._bottomUpLinks, pathIds());
     }
-
-    await this._echoGuard.runAsync(() =>
-      //@ts-expect-error This is a custom function added in by RowNavigation custom module
-      table.goToRow(treeRow, { scrollIfVisible: false, focusRow: false }),
-    );
   }
 
   /** The keys from a top-level row down to the Time Order row for `eventIndex`. */
@@ -1042,97 +979,12 @@ export class CalltreeView extends LitElement {
     return path;
   }
 
-  /** The keys from a top-level row down to the first Bottom-Up row for `eventIndex`. */
-  private _bottomUpPath(eventIndex: number): RowKey[] {
-    const links = this._bottomUpLinks;
-    if (!links) {
-      return [];
-    }
-    const [first] = this._locateIds.idsFor(this.rootMethod, [eventIndex], directionOf('bottom-up'));
-    const path: RowKey[] = [];
-    for (
-      let row = first === undefined ? undefined : links.byPath.get(first);
-      row;
-      row = links.parents.get(row)
-    ) {
-      path.unshift(row.id);
-    }
-    return path;
-  }
-
-  /**
-   * The row holding `eventIndex` in Aggregated, with the path to it
-   * materialised. A grouped view finds the bucket.
-   */
-  private async _findRowFor(table: Tabulator, eventIndex: number): Promise<RowComponent | null> {
-    if (!this.rootMethod) {
-      return null;
-    }
-    const event = eventByEventIndex(this.rootMethod, eventIndex);
-    if (!event) {
-      return null;
-    }
-    return findBucketRow(table.getRows(), event, directionOf(this.viewMode), () =>
-      this._waitForTableRender(),
-    );
-  }
-
+  /** The find widget counts matches from 1, the grid from 0. */
   async _find(e: CustomEvent<FindEventDetail>) {
     const grid = this._activeGrid();
-    if (grid) {
-      await this._findInGrid(grid, e);
+    if (!grid) {
       return;
     }
-    const activeTable = this._getActiveTable();
-    const isTableVisible = !!activeTable?.element?.clientHeight;
-    if (!isTableVisible && !this.totalMatches) {
-      return;
-    }
-
-    const newFindArgs = JSON.parse(JSON.stringify(e.detail));
-    const newSearch =
-      newFindArgs.text !== this.findArgs.text ||
-      newFindArgs.options.matchCase !== this.findArgs.options?.matchCase;
-    this.findArgs = newFindArgs;
-
-    const clearHighlights = e.type === 'lv-find-close';
-    if (clearHighlights) {
-      newFindArgs.text = '';
-    }
-
-    if (newSearch || clearHighlights) {
-      this.blockClearHighlights = true;
-      //@ts-expect-error This is a custom function added in by Find custom module
-      const result = await activeTable.find(this.findArgs);
-      this.blockClearHighlights = false;
-      this.totalMatches = result.totalMatches;
-      this.findMap = result.matchIndexes;
-
-      if (!clearHighlights && isTableVisible) {
-        document.dispatchEvent(
-          new CustomEvent('lv-find-results', { detail: { totalMatches: result.totalMatches } }),
-        );
-      }
-    }
-
-    if (this.totalMatches <= 0 || !isTableVisible) {
-      return;
-    }
-    this.blockClearHighlights = true;
-    const currentRow = this.findMap[this.findArgs.count];
-    //@ts-expect-error This is a custom function added in by Find custom module
-    await activeTable.setCurrentMatch(this.findArgs.count, currentRow, {
-      scrollIfVisible: false,
-      focusRow: false,
-    });
-    this.blockClearHighlights = false;
-  }
-
-  /** {@link _find} on a grid. The find widget counts matches from 1, the grid from 0. */
-  private async _findInGrid(
-    grid: LvGrid<LogEvent> | LvGrid<BottomUpRow>,
-    e: CustomEvent<FindEventDetail>,
-  ): Promise<void> {
     const isGridVisible = grid.clientHeight > 0;
     if (!isGridVisible && !this.totalMatches) {
       return;
@@ -1164,58 +1016,6 @@ export class CalltreeView extends LitElement {
     }
     this.blockClearHighlights = false;
   }
-
-  // Show-Details predicate is precomputed at tree-build time (see
-  // `_hasDetailsDeep` in TimeOrderTree/Aggregation), so the Tabulator filter
-  // is a single boolean read — no per-toggle tree walk, no cache.
-  _showDetailsFilter = (data: TimeOrderRow | AggregatedRow | BottomUpRow): boolean =>
-    data._hasDetailsDeep;
-
-  _debugFilter = (data: TimeOrderRow | AggregatedRow | BottomUpRow): boolean =>
-    deepFilter<TimeOrderRow | AggregatedRow | BottomUpRow>(
-      data,
-      (row) => !!(row.originalData.type && DEBUG_VALUE_TYPES.has(row.originalData.type)),
-      this.debugOnlyFilterCache,
-    );
-
-  _typeFilter = (data: TimeOrderRow | AggregatedRow | BottomUpRow): boolean =>
-    deepFilter<TimeOrderRow | AggregatedRow | BottomUpRow>(
-      data,
-      (row) => {
-        const type = row.originalData.type;
-        if (!type) {
-          return false;
-        }
-        return this.filterState.selectedTypes.has(type);
-      },
-      this.typeFilterCache,
-    );
-
-  _namespaceBarFilter = (data: TimeOrderRow | AggregatedRow | BottomUpRow): boolean =>
-    deepFilter<TimeOrderRow | AggregatedRow | BottomUpRow>(
-      data,
-      (row) => this.namespaceSelected.includes(row.namespace || ''),
-      this.namespaceFilterCache,
-    );
-
-  _totalTimeBarFilter = (data: TimeOrderRow | AggregatedRow | BottomUpRow): boolean =>
-    deepFilter<TimeOrderRow | AggregatedRow | BottomUpRow>(
-      data,
-      (row) =>
-        inMsRange(this.totalTimeRange, 'totalTime' in row ? row.totalTime : row.duration.total),
-      this.totalTimeFilterCache,
-    );
-
-  _selfTimeBarFilter = (data: TimeOrderRow | AggregatedRow | BottomUpRow): boolean =>
-    deepFilter<TimeOrderRow | AggregatedRow | BottomUpRow>(
-      data,
-      (row) =>
-        inMsRange(
-          this.selfTimeRange,
-          'totalSelfTime' in row ? row.totalSelfTime : row.duration.self,
-        ),
-      this.selfTimeFilterCache,
-    );
 
   private async _renderCallTree(
     callTreeTableContainer: HTMLDivElement,
@@ -1251,26 +1051,29 @@ export class CalltreeView extends LitElement {
     container: HTMLDivElement,
     rootMethod: ApexLog,
   ): Promise<void> {
-    if (this.aggregatedTreeTable) {
+    if (this.aggregatedGrid) {
       await waitForNextFrame();
       return;
     }
 
-    const { table, tableBuilt } = createAggregatedTable(container, rootMethod, {
-      showDetailsFilter: this._showDetailsFilter,
-      rowFormatter: groupedRowFormatter,
-    });
-    this.aggregatedTreeTable = table;
-    this._watchTable(table, true);
-    await tableBuilt;
-    if (this.aggregatedTreeTable !== table) {
-      // A detach destroyed this build mid-flight, and a later one owns the
-      // container now.
-      return;
-    }
-    this._initTableColumns(table);
-    this._emitDetailSelection(table);
-    this._emitDetailLocate(table);
+    const grid = this._mountGrid<AggregatedRow>(
+      container,
+      (row) => row,
+      (row) => this._aggregatedLinks?.parents.get(row),
+    );
+    this.aggregatedGrid = grid;
+    grid.columns = aggregatedColumns(rootMethod, { openType });
+    grid.rowLines = mergedLines;
+    grid.filters = this._aggregatedFilters();
+    this._columns.applyTo(gridColumnTarget(grid));
+    const roots = toAggregatedCallTree(
+      rootMethod.children,
+      logStoreFor(rootMethod).keyPathIds(),
+      rootMethod.governorLimits,
+    );
+    this._aggregatedLinks = linkRows(roots);
+    grid.source = { roots, children: (row) => row._children, key: (row) => row.id };
+    await grid.settled();
   }
 
   private async _renderBottomUpTree(container: HTMLDivElement, rootMethod: ApexLog): Promise<void> {
@@ -1287,7 +1090,7 @@ export class CalltreeView extends LitElement {
     this.bottomUpGrid = grid;
     grid.columns = bottomUpColumns(rootMethod, { openType });
     grid.sort = BOTTOM_UP_SORT;
-    grid.rowLines = bottomUpLines;
+    grid.rowLines = mergedLines;
     grid.groupBy = bottomUpGroupBy(this.bottomUpGroupBy);
     grid.filters = this._bottomUpFilters();
     this._columns.applyTo(gridColumnTarget(grid));
@@ -1302,7 +1105,7 @@ export class CalltreeView extends LitElement {
       // container now.
       return;
     }
-    this._bottomUpLinks = linkBottomUp(roots);
+    this._bottomUpLinks = linkRows(roots);
     grid.source = { roots, children: (row) => row._children, key: (row) => row.id };
     await grid.settled();
   }
@@ -1355,78 +1158,6 @@ export class CalltreeView extends LitElement {
     return grid;
   }
 
-  /**
-   * Feed the inspector off row selection. A Time Order row is a
-   * single event; an Aggregated/Bottom-Up row merges many calls, so it scopes to
-   * every call it counts.
-   */
-  private _emitDetailSelection(table: Tabulator, source: DetailSource = 'calltree'): void {
-    table.on('rowSelectionChanged', (_data, rows) => {
-      if (this._echoGuard.suppressed) {
-        return;
-      }
-      const selection = rowDetailSelection(rows[0], this.rootMethod, directionOf(this.viewMode));
-      if (!selection) {
-        // The selection went with it, and so does a mark a picked inspector row
-        // left here — it was never a selection of this table.
-        this._inspector.dropPick();
-      }
-      eventBus.emit('detail:select', {
-        source,
-        selection,
-        view: directionOf(this.viewMode),
-      });
-    });
-  }
-
-  /**
-   * Tell the inspector which frames the pointer is over, so it can mark the rows
-   * that stand for them. Nothing is picked and nothing moves.
-   *
-   * The direction is read as the pointer arrives: which way the table reads is
-   * what decides whether a merged row names its own frames or the calls they
-   * conducted.
-   */
-  private _emitDetailLocate(table: Tabulator, source: DetailSource = 'calltree'): void {
-    table.on('rowMouseEnter', (_e, row) => {
-      eventBus.emit('detail:locate', {
-        source,
-        eventIndexes: rowFrames(row, this.rootMethod, directionOf(this.viewMode)),
-      });
-    });
-    table.on('rowMouseLeave', () => {
-      eventBus.emit('detail:locate', { source, eventIndexes: [] });
-    });
-  }
-
-  // Resolve once Tabulator has rendered (e.g. after a treeExpand puts new rows
-  // in the DOM), with a two-frame fallback in case the expand triggers no
-  // redraw. A single rAF can race the virtual renderer and leave getTreeChildren
-  // empty mid-descent.
-  // A pending-render flag is no use here: Tabulator dispatches `renderStarted`
-  // and `renderComplete` in one synchronous call, so the flag always reads false
-  // by the time this is awaited.
-  private _waitForTableRender(): Promise<void> {
-    const table = this._getActiveTable();
-    if (!table) {
-      return waitForNextFrame();
-    }
-
-    return new Promise<void>((resolve) => {
-      let settled = false;
-      const finish = () => {
-        if (settled) {
-          return;
-        }
-        settled = true;
-        table.off('renderComplete', finish);
-        resolve();
-      };
-      table.on('renderComplete', finish);
-      requestAnimationFrame(() => requestAnimationFrame(finish));
-    });
-  }
-
   private _resetFindWidget() {
     document.dispatchEvent(new CustomEvent('lv-find-results', { detail: { totalMatches: 0 } }));
   }
@@ -1439,41 +1170,10 @@ export class CalltreeView extends LitElement {
     }
   }
 
-  /**
-   * Watch `table` for what a view has to answer per render.
-   *
-   * The filter caches are cleared once per render rather than on `dataFiltered`:
-   * row ids are unique within a build, so a cached `deepFilter` result stays
-   * valid across the cascaded filter passes Tabulator runs for each expanded
-   * subtree, which would otherwise fire `dataFiltered` several times per user
-   * action and defeat the cache.
-   *
-   * @param clearsFilterCaches - Bottom Up reads the caches but has never cleared
-   * them per render, so it keeps that behaviour here.
-   */
-  private _watchTable(table: Tabulator, clearsFilterCaches: boolean) {
-    onTableReshaped(table, () => this._dropSearch());
-    if (clearsFilterCaches) {
-      table.on('renderStarted', () => this._clearFilterCaches());
-    }
-  }
-
-  private _clearFilterCaches() {
-    this.debugOnlyFilterCache.clear();
-    this.typeFilterCache.clear();
-    this.namespaceFilterCache.clear();
-    this.totalTimeFilterCache.clear();
-    this.selfTimeFilterCache.clear();
-  }
-
   private _clearSearchHighlights() {
     this.findArgs.text = '';
     this.findArgs.count = 0;
-    const activeTable = this._getActiveTable();
-    //@ts-expect-error This is a custom function added in by Find custom module
-    activeTable?.clearFindHighlights();
     this._activeGrid()?.clearFind();
-    this.findMap = {};
     this.totalMatches = 0;
   }
 

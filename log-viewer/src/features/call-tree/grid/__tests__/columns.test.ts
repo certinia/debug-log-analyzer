@@ -26,13 +26,19 @@ import {
   createGovernorMetricColumns,
   createSelfSumHeapFooters,
 } from '../../components/TableShared.js';
-import { toBottomUpTree } from '../../utils/Aggregation.js';
+import {
+  toAggregatedCallTree,
+  toBottomUpTree,
+  type AggregatedRow,
+} from '../../utils/Aggregation.js';
 import { toTimeOrderTree, type TimeOrderRow } from '../../utils/TimeOrderTree.js';
 import { CallTreeGrid, categoryClass, eventCategoryClass } from '../CallTreeGrid.js';
 import { nameCell } from '../cells.js';
 import {
+  aggregatedColumns,
   BOTTOM_UP_SORT,
   bottomUpColumns,
+  mergedLines,
   TIME_ORDER_DETAILS,
   timeOrderColumns,
   timeOrderSource,
@@ -218,6 +224,51 @@ describe('bottomUpColumns', () => {
 
   it('opens sorted by a column it has', () => {
     expect(column(columns, BOTTOM_UP_SORT.column).sort).toBeDefined();
+  });
+});
+
+describe('aggregatedColumns', () => {
+  const columns = aggregatedColumns(log, options);
+  const roots = toAggregatedCallTree(
+    log.children,
+    logStoreFor(log).keyPathIds(),
+    log.governorLimits,
+  );
+  const all = (of: readonly AggregatedRow[]): AggregatedRow[] =>
+    of.flatMap((r) => [r, ...all(r._children ?? [])]);
+
+  it('has the Tabulator columns, in their order, with Type and Avg Self Time hidden', () => {
+    const ids = columns.map((c) => c.id);
+    expect(ids.slice(0, 5)).toEqual(['text', 'namespace', 'callerNamespace', 'type', 'callCount']);
+    expect(ids.slice(-3)).toEqual(['totalTime', 'totalSelfTime', 'avgSelfTime']);
+    expect(column(columns, 'type').hidden).toBe(true);
+    expect(column(columns, 'avgSelfTime').hidden).toBe(true);
+  });
+
+  it('sums total time over top-level rows, and self time over every row', () => {
+    expect(total(column(columns, 'totalTime').calc, roots)).toBe(
+      roots.reduce((sum, r) => sum + r.totalTime, 0),
+    );
+    expect(column(columns, 'totalSelfTime').calc?.scope).toBe('all');
+    expect(total(column(columns, 'totalSelfTime').calc, all(roots))).toBe(
+      all(roots).reduce((sum, r) => sum + r.totalSelfTime, 0),
+    );
+  });
+});
+
+describe('mergedLines', () => {
+  it('counts the lines of the text and suffix of the row event', () => {
+    const event = rows[0]!;
+    expect(mergedLines({ originalData: event })).toBe(1);
+    expect(mergedLines({ originalData: withField(event, 'text', 'a\nb\nc') })).toBe(3);
+    expect(
+      mergedLines({
+        originalData: withField(withField(event, 'text', 'a\nb'), 'suffix', ' (x)\ny'),
+      }),
+    ).toBe(3);
+    expect(
+      mergedLines({ originalData: withField(event, 'suffix', null as unknown as string) }),
+    ).toBe(1);
   });
 });
 
