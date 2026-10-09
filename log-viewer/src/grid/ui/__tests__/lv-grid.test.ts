@@ -5,6 +5,7 @@
  * Copyright (c) 2026 Certinia Inc. All rights reserved.
  */
 import { GridStore, sum, type TreeSource } from '../../core/index.js';
+import { GridView } from '../../render/index.js';
 import type { GridColumn } from '../column.js';
 import '../lv-grid.js';
 import type {
@@ -244,6 +245,18 @@ describe('lv-grid', () => {
     await settle(grid);
     expect(names()).toEqual(['a', 'b', 'b1', 'b2', 'c']);
     expect(rowNamed('b')?.ariaSelected).toBe('false');
+  });
+
+  it('selects a row with no children from its twisty, and keeps no toggle for later rows', async () => {
+    const { grid, rowNamed } = await setup();
+    const setRows = jest.spyOn(GridView.prototype, 'setRows');
+    rowNamed('c')?.querySelector<HTMLElement>('.twisty')?.click();
+    await settle(grid);
+    expect(rowNamed('c')?.ariaSelected).toBe('true');
+
+    await grid.expandAll();
+    await settle(grid);
+    expect(setRows).toHaveBeenLastCalledWith(expect.anything(), undefined);
   });
 
   it('opens a row from its twisty while text is selected, but selects no row', async () => {
@@ -494,7 +507,7 @@ describe('lv-grid columns', () => {
     jest.spyOn(HTMLElement.prototype, 'offsetWidth', 'get').mockImplementation(function (
       this: HTMLElement,
     ) {
-      return this.matches('[data-toggle]') ? 16 : 500;
+      return this.matches('.twisty') ? 16 : 500;
     });
     const widths: GridColumnResizeDetail[] = [];
     grid.addEventListener('lv-grid-column-resize', (e) =>

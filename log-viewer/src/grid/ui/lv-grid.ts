@@ -118,7 +118,7 @@ const px = (value: string): number => Number.parseFloat(value) || 0;
 /** The width a cell needs to show its text on one line, with its padding and twisty. */
 function naturalWidth(cell: HTMLElement): number {
   const style = getComputedStyle(cell);
-  const twisty = cell.querySelector<HTMLElement>('[data-toggle]')?.offsetWidth ?? 0;
+  const twisty = cell.querySelector<HTMLElement>('.twisty')?.offsetWidth ?? 0;
   const text = textWidth([cell.textContent?.trim() ?? ''], fontOf(cell));
   const padded = text + twisty + px(style.paddingInlineStart) + px(style.paddingInlineEnd);
   // A template cell, such as a bar, may hold no text but still need room.
@@ -657,14 +657,16 @@ export class LvGrid<R extends object = object> extends LitElement {
     return entry === undefined || entry instanceof Group ? null : entry;
   }
 
-  private isToggle(e: Event, target: RowTarget<R> | null): boolean {
-    return target instanceof Group || !!(e.target as Element).closest('[data-toggle]');
+  private isToggle(e: Event, index: number): boolean {
+    return (
+      this.targetAt(index) instanceof Group || !!(e.target as Element).closest('[data-toggle]')
+    );
   }
 
   /** A second press on a twisty is another toggle, not a word to select. */
   private readonly onMouseDown = (e: MouseEvent): void => {
     const index = this.indexFrom(e);
-    if (e.detail > 1 && index >= 0 && this.isToggle(e, this.targetAt(index))) {
+    if (e.detail > 1 && index >= 0 && this.isToggle(e, index)) {
       e.preventDefault();
     }
   };
@@ -678,7 +680,7 @@ export class LvGrid<R extends object = object> extends LitElement {
     if (target === null) {
       return;
     }
-    if (this.isToggle(e, target)) {
+    if (this.isToggle(e, index)) {
       void this.toggleAt(index);
     } else if (window.getSelection()?.type === 'Range') {
       // A drag that selected text is a copy in the making, not a click on a row.

@@ -237,8 +237,12 @@ export const gridStyles = css`
       flex: none;
       width: var(--grid-twisty);
       vertical-align: middle;
-      cursor: pointer;
       text-align: center;
+
+      &.closed,
+      &.open {
+        cursor: pointer;
+      }
 
       &.closed::before,
       &.open::before {

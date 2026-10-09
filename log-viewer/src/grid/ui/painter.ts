@@ -31,7 +31,7 @@ function cellClass<R>(column: GridColumn<R>, first: boolean): string {
 const twisty = (expandable: boolean, expanded: boolean): TemplateResult =>
   html`<span
     class="twisty ${expandable ? (expanded ? 'open' : 'closed') : ''}"
-    data-toggle
+    ?data-toggle=${expandable}
   ></span>`;
 
 function groupCells<R>(group: Group<R>, columns: readonly GridColumn<R>[], open: boolean) {
