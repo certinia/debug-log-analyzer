@@ -276,7 +276,10 @@ export class LvGrid<R extends object = object> extends LitElement {
     return result.total;
   }
 
-  /** Opens the way to match `match` (numbered from 0), scrolls to it and marks it current. */
+  /**
+   * Opens the way to match `match` (numbered from 0) and marks it current. A row out of
+   * view whole scrolls to the middle; one in view stays where it is.
+   */
   async setCurrentMatch(match: number): Promise<void> {
     const found = this.found;
     if (!found || match < 0 || match >= found.result.total) {
@@ -285,7 +288,7 @@ export class LvGrid<R extends object = object> extends LitElement {
     found.current = match;
     const index = (await this.store?.reveal(found.result.pathOf(match))) ?? -1;
     await this.updateComplete;
-    if (index >= 0) {
+    if (index >= 0 && !this.inView(index)) {
       this.view?.scrollToIndex(index);
     }
     this.view?.setFind(found);

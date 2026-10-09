@@ -426,6 +426,34 @@ describe('lv-grid', () => {
     expect(marked()).toEqual([' ']);
   });
 
+  it('keeps the scroll for a current match in view whole, and centres one out of view', async () => {
+    const { grid } = await setup();
+    let lastTop = 2 * ROW;
+    // Header to 20, totals from 180; row `index` from 20 + index * 20, the last from `lastTop`.
+    jest.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(function (
+      this: HTMLElement,
+    ) {
+      const at = (top: number, height = ROW): DOMRect =>
+        ({ top, bottom: top + height, height, width: 500 }) as DOMRect;
+      const index = Number(this.dataset.index ?? Number.NaN);
+      return this.classList.contains('foot')
+        ? at(9 * ROW)
+        : this.classList.contains('scroller')
+          ? at(0, 10 * ROW)
+          : index === 2
+            ? at(ROW + lastTop)
+            : at(Number.isNaN(index) ? 0 : ROW + index * ROW);
+    });
+    const scroll = jest.spyOn(GridView.prototype, 'scrollToIndex');
+
+    expect(await grid.find({ text: 'c' })).toBe(1);
+    await grid.setCurrentMatch(0);
+    expect(scroll).not.toHaveBeenCalled();
+    lastTop = 8 * ROW + 1;
+    await grid.setCurrentMatch(0);
+    expect(scroll).toHaveBeenCalledWith(2);
+  });
+
   it('reports a reshape when its shown columns change, and not when they stay the same', async () => {
     const { grid } = await setup();
     const reshapes: string[] = [];
