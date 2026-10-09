@@ -94,7 +94,7 @@ Right-click a row in the **Call stack** or **Call tree** for:
 
 Press `Escape` to clear the selection on the tab you're on; the inspector returns to the tab's summary.
 
-Clicking a row highlights the matching frame or row in the tab you're on, and never switches tab: the Timeline selects the frame and centers it when it's off screen, the Call Tree scrolls to it in every view, and the Database tab selects the statement. Rows in the Call tree's **Aggregated** and **Bottom-Up** views merge several occurrences, so clicking one marks every occurrence, goes to the first, and reads the details of the calls it counts. Focus stays in the inspector, so the arrow keys keep moving there. Arrow keys move between rows, and `CMD / CTRL + c` copies the table.
+Clicking a row highlights the matching frame or row in the tab you're on, and never switches tab: the Timeline selects the frame and centers it when it's off screen, the Call Tree selects it in every view and scrolls only when it's off screen, and the Database tab selects the statement. Rows in the Call tree's **Aggregated** and **Bottom-Up** views merge several occurrences, so clicking one marks every occurrence, goes to the first, and reads the details of the calls it counts. Focus stays in the inspector, so the arrow keys keep moving there. Arrow keys move between rows, and `CMD / CTRL + c` copies the table.
 
 Hovering works both ways and moves nothing - no selection, no scroll, no pan:
 

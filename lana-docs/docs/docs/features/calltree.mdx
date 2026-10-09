@@ -87,7 +87,11 @@ SOQL and SOSL query rows are reformatted onto multiple lines and syntax highligh
 
 ### Keyboard Navigation
 
-The Call Tree can be navigated with the keyboard. The up and down keys will move between rows, the left and right keys will expand and collapse a parent within the tree.
+The Call Tree can be navigated with the keyboard. The up and down keys will move between rows, the left and right keys will expand and collapse a parent within the tree. On an open row, right moves to its first child. On a closed row, left moves to its parent. `Home` and `End` go to the first and last row.
+
+### Copy
+
+Click a row, then press `CMD / CTRL + c` to copy the table, in every view. The copy holds the shown columns, tab-separated, so it pastes into a spreadsheet. It holds every row that passes the filters, children included, open or not.
 
 ### Inspect a row
 
