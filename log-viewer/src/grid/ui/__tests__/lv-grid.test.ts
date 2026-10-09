@@ -5,6 +5,7 @@
  * Copyright (c) 2026 Certinia Inc. All rights reserved.
  */
 import { sum, type TreeSource } from '../../core/index.js';
+import { GridView } from '../../render/index.js';
 import { fakeHighlights, flush, type FakeHighlights } from '../../render/__tests__/fakes.js';
 import type { GridColumn } from '../column.js';
 import '../lv-grid.js';
@@ -342,6 +343,35 @@ describe('lv-grid', () => {
     await settle(grid);
     expect(names()).toEqual(['a', 'b', 'b1', 'b2', 'c']);
     expect(rowNamed('b2')?.ariaSelected).toBe('true');
+  });
+
+  it('keeps the scroll for a row in view whole, when asked to', async () => {
+    const { grid } = await setup();
+    let lastTop = 2 * ROW;
+    // Header to 20, totals from 180; row `index` from 20 + index * 20, the last from `lastTop`.
+    jest.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(function (
+      this: HTMLElement,
+    ) {
+      const at = (top: number, height = ROW): DOMRect =>
+        ({ top, bottom: top + height, height, width: 500 }) as DOMRect;
+      const index = Number(this.dataset.index ?? Number.NaN);
+      return this.classList.contains('foot')
+        ? at(9 * ROW)
+        : this.classList.contains('scroller')
+          ? at(0, 10 * ROW)
+          : index === 2
+            ? at(ROW + lastTop)
+            : at(Number.isNaN(index) ? 0 : ROW + index * ROW);
+    });
+    const scroll = jest.spyOn(GridView.prototype, 'scrollToIndex');
+
+    await grid.goTo([3], { scrollIfVisible: false });
+    expect(scroll).not.toHaveBeenCalled();
+    await grid.goTo([3]);
+    expect(scroll).toHaveBeenCalledTimes(1);
+    lastTop = 8 * ROW + 1;
+    await grid.goTo([3], { scrollIfVisible: false });
+    expect(scroll).toHaveBeenCalledTimes(2);
   });
 
   it('reports the find total', async () => {
