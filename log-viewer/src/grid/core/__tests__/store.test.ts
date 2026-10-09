@@ -148,6 +148,44 @@ describe('GridStore', () => {
     expect(await store.reveal(['zz'])).toBe(-1);
   });
 
+  it('gives the error a step throws to its callers, then stays usable', async () => {
+    const store = new GridStore(source(tree()));
+    await store.settled();
+    const boom = new Error('boom');
+    const failing = store.setFilters([
+      {
+        test: () => {
+          throw boom;
+        },
+      },
+    ]);
+    const waiting = store.settled();
+    await expect(failing).rejects.toBe(boom);
+    await expect(waiting).rejects.toBe(boom);
+    expect(store.snapshot().busy).toBe(false);
+    await store.setFilters([]);
+    await store.expandAll();
+    expect(shown(store.snapshot().rows)).toEqual(['a+@0', 'b+@1', 'c@2', 'x@1', 'd+@0', 'e@1']);
+  });
+
+  it('builds a change that came while a step threw, and gives no one the replaced error', async () => {
+    const store = new GridStore(source(tree()));
+    await store.settled();
+    let newer: Promise<void> | null = null;
+    const failing = store.setFilters([
+      {
+        test: () => {
+          newer ??= store.setFilters([]);
+          throw new Error('boom');
+        },
+      },
+    ]);
+    await expect(failing).resolves.toBeUndefined();
+    await expect(newer).resolves.toBeUndefined();
+    await store.expandAll();
+    expect(shown(store.snapshot().rows)).toEqual(['a+@0', 'b+@1', 'c@2', 'x@1', 'd+@0', 'e@1']);
+  });
+
   it('gives the same rows when every step is sliced', async () => {
     const store = new GridStore(source(tree()), { scheduler: everyCheck() });
     await store.expandAll();

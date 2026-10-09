@@ -215,7 +215,7 @@ export class GridStore<R extends object> {
   private listeners = new Set<(snapshot: Snapshot<R>) => void>();
   private running = false;
   private dirty = false;
-  private waiting: (() => void)[] = [];
+  private waiting: { resolve: () => void; reject: (error: unknown) => void }[] = [];
   /** Goes up with each find, so an older one sees it is stale. */
   private findId = 0;
 
@@ -243,9 +243,11 @@ export class GridStore<R extends object> {
     return () => this.listeners.delete(listener);
   }
 
-  /** Resolves once no step is running. */
+  /** Resolves once no step is running; rejects with the error a running step threw. */
   settled(): Promise<void> {
-    return this.running ? new Promise((resolve) => this.waiting.push(resolve)) : Promise.resolve();
+    return this.running
+      ? new Promise((resolve, reject) => this.waiting.push({ resolve, reject }))
+      : Promise.resolve();
   }
 
   setSource(source: TreeSource<R>): Promise<void> {
@@ -573,19 +575,29 @@ export class GridStore<R extends object> {
   private async run(): Promise<void> {
     this.running = true;
     this.publish(null, true);
+    let failed: { error: unknown } | null = null;
     while (this.dirty) {
       this.dirty = false;
       const totalsOnly = this.totalsOnly;
       this.totalsOnly = false;
-      const built = await this.build(totalsOnly);
-      if (built) {
-        this.publish(built, this.dirty);
+      try {
+        const built = await this.build(totalsOnly);
+        if (built) {
+          this.publish(built, this.dirty);
+        }
+        failed = null;
+      } catch (error) {
+        failed = { error };
       }
     }
     this.running = false;
     this.publish(null, false);
-    for (const resolve of this.waiting.splice(0)) {
-      resolve();
+    for (const waiter of this.waiting.splice(0)) {
+      if (failed) {
+        waiter.reject(failed.error);
+      } else {
+        waiter.resolve();
+      }
     }
   }
 
