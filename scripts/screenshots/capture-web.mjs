@@ -24,7 +24,7 @@ import { fileURLToPath } from 'node:url';
 
 const REPO = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 const DEMO = path.join(REPO, 'lana-docs/static/demo');
-const OUT = path.resolve(process.argv[2] ?? path.join(REPO, 'lana/assets/1_22'));
+const OUT = path.resolve(process.argv[2] ?? path.join(REPO, 'lana/assets/1_24'));
 const ORIGIN = 'https://demo.lana';
 // The webview area of a 1920x1080 VS Code window, once the title and status bars are off.
 const VIEWPORT = { width: 1920, height: 1023 };
@@ -76,17 +76,22 @@ async function setInspector(page, open) {
 
 // Expands the visible tree one level per pass, so the top of the tree shows its first levels.
 async function expandLevels(page, levels) {
-  const toggles = page.locator('call-tree-view .tabulator-data-tree-control-expand');
+  const toggles = page.locator('call-tree-view .twisty.closed');
   for (let level = 0; level < levels; level++) {
-    const count = await toggles.count();
-    for (let i = count - 1; i >= 0; i--) {
-      if (await toggles.nth(i).isVisible()) {
-        await toggles.nth(i).click();
-      }
+    const indexes = await toggles.evaluateAll((twisties) =>
+      twisties
+        .filter((twisty) => twisty.checkVisibility({ visibilityProperty: true }))
+        .map((twisty) => Number(twisty.closest('.row').dataset.index)),
+    );
+    // Bottom row first: opening a row moves only the rows below it.
+    for (const index of indexes.sort((a, b) => b - a)) {
+      await page
+        .locator(`call-tree-view .row[data-index="${index}"] .twisty.closed:visible`)
+        .click();
     }
     await page.waitForTimeout(300);
   }
-  // A toggle click also selects its row, and the inspector should read the whole log.
+  // The inspector should read the whole log.
   await page.keyboard.press('Escape');
   await settle(page);
 }
@@ -225,9 +230,9 @@ async function cropShots(browser, theme) {
   await find(page, 'core_pkg__Plugin__mdt');
   await closeFind(page);
   const row = page
-    .locator('call-tree-view .tabulator-row')
+    .locator('call-tree-view .row:not([hidden])')
     .filter({ hasText: 'core_pkg__Plugin__mdt' });
-  const name = await row.first().locator('.tabulator-cell').first().boundingBox();
+  const name = await row.first().locator('.cell').first().boundingBox();
   await shoot(page, 'calltree-soql-format', theme, {
     clip: { x: name.x, y: name.y - 4, width: Math.min(name.width, 700), height: name.height + 8 },
   });
