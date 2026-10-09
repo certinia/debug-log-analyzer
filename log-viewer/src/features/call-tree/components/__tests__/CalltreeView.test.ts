@@ -36,7 +36,10 @@ jest.mock('../../../../components/VsSelect.js', () => ({}));
 jest.mock('../../../settings/Settings.js', () => ({
   ...jest.requireActual<object>('../../../settings/Settings.js'),
   getSettings: () => Promise.resolve({}),
-  subscribeSettings: () => () => {},
+  subscribeSettings: (apply: (settings: object) => void) => {
+    applySettings = apply;
+    return () => {};
+  },
 }));
 
 import { storeOf } from '#test-helpers/apexLog.js';
@@ -49,6 +52,8 @@ let built: string[] = [];
 let finishBuild: ((roots: BottomUpRow[]) => void) | null = null;
 /** Whether a Bottom Up build waits to be finished by hand. */
 let holdBuilds = false;
+/** Pushes settings to the view, as the extension does on a change. */
+let applySettings: (settings: object) => void = () => {};
 
 function buildBottomUp(): Promise<BottomUpRow[]> {
   if (!holdBuilds) {
@@ -230,6 +235,34 @@ describe('calltree-view table lifetime', () => {
     expect(grids(view)).toContain(view.aggregatedGrid);
     // The namespace chip, and Show Details off.
     expect(view.aggregatedGrid?.filters).toHaveLength(2);
+  });
+});
+
+describe('calltree-view category colorize', () => {
+  let view: CalltreeView;
+  const colorize = (on: boolean): void =>
+    applySettings({ timeline: { customThemes: {} }, callTree: { categoryColorize: on } });
+
+  beforeEach(async () => {
+    globalThis.IntersectionObserver = AlwaysVisible as unknown as typeof IntersectionObserver;
+    view = await mountView();
+  });
+
+  afterEach(() => {
+    view.remove();
+  });
+
+  it('tints the open grids when the setting changes, and grids built after', async () => {
+    colorize(true);
+    expect(view.timeOrderGrid?.hasAttribute('category-colorize')).toBe(true);
+
+    await view._setViewMode('bottom-up');
+    await settle();
+    expect(view.bottomUpGrid?.hasAttribute('category-colorize')).toBe(true);
+
+    colorize(false);
+    expect(view.timeOrderGrid?.hasAttribute('category-colorize')).toBe(false);
+    expect(view.bottomUpGrid?.hasAttribute('category-colorize')).toBe(false);
   });
 });
 
