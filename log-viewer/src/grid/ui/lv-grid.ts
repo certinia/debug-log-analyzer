@@ -66,8 +66,10 @@ export interface GridSort {
   dir: SortDirection;
 }
 
+/** The rows or shown columns changed, so find's match numbers no longer hold. */
 export interface GridReshapeDetail {
-  reason: 'sort';
+  /** `sort` from the header; `columns` when the shown columns change. */
+  reason: 'sort' | 'columns';
 }
 
 export interface GridColumnDetail {
@@ -94,6 +96,12 @@ const NOTHING_MARKED: ReadonlySet<RowKey> = new Set();
 /** Whether a list property holds other items, so the same items in a new array do nothing. */
 const itemsChanged = (next: readonly unknown[], prev: readonly unknown[] | undefined): boolean =>
   !prev || next.length !== prev.length || next.some((item, i) => item !== prev[i]);
+
+const shown = <R>(columns: readonly GridColumn<R>[]): GridColumn<R>[] =>
+  columns.filter((column) => !column.hidden);
+
+const shownIds = <R>(columns: readonly GridColumn<R>[] | undefined): string[] =>
+  shown(columns ?? []).map((column) => column.id);
 
 const sameTarget = <R>(a: RowTarget<R> | null, b: RowTarget<R>): boolean =>
   a instanceof Group ? b instanceof Group && a.key === b.key : !(b instanceof Group) && a === b;
@@ -312,6 +320,12 @@ export class LvGrid<R extends object = object> extends LitElement {
     }
     if (changed.has('sort') || changed.has('columns')) {
       void this.applySort();
+    }
+    if (
+      changed.has('columns') &&
+      itemsChanged(shownIds(this.columns), shownIds(changed.get('columns')))
+    ) {
+      this.emit<GridReshapeDetail>('lv-grid-reshape', { reason: 'columns' });
     }
   }
 
@@ -536,7 +550,7 @@ export class LvGrid<R extends object = object> extends LitElement {
   }
 
   private visibleColumns(): GridColumn<R>[] {
-    return this.columns.filter((column) => !column.hidden);
+    return shown(this.columns);
   }
 
   /**

@@ -358,6 +358,24 @@ describe('lv-grid', () => {
     expect(marked()).toEqual([' ']);
   });
 
+  it('reports a reshape when its shown columns change, and not when they stay the same', async () => {
+    const { grid } = await setup();
+    const reshapes: string[] = [];
+    grid.addEventListener('lv-grid-reshape', (e) =>
+      reshapes.push(detail<GridReshapeDetail>(e).reason),
+    );
+    const hideKind = (): GridColumn<Node>[] =>
+      columns().map((column) => (column.id === 'kind' ? { ...column, hidden: true } : column));
+
+    grid.columns = hideKind();
+    await settle(grid);
+    grid.columns = hideKind();
+    await settle(grid);
+    grid.columns = columns();
+    await settle(grid);
+    expect(reshapes).toEqual(['columns', 'columns']);
+  });
+
   it('shows group rows that toggle on click and select from the keyboard', async () => {
     const { grid, names, rowNamed, key } = await setup({ groupBy: (row) => row.kind });
     expect(names()).toEqual(['x (2)', 'y (1)']);
