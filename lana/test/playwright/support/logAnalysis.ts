@@ -28,7 +28,9 @@ export const assertLogAnalysisRenders = async (page: Page): Promise<void> => {
   await analysis.locator('vscode-tab-header').filter({ hasText: 'Call Tree' }).click();
   const callTree = analysis.locator('call-tree-view');
   await expect(callTree).toBeVisible();
-  await expect(callTree.locator('.tabulator-row').first()).toBeVisible({ timeout: 30_000 });
+  await expect(callTree.locator('[role="row"][data-index]:not([hidden])').first()).toBeVisible({
+    timeout: 30_000,
+  });
 };
 
 export const openLogAnalysis = async (page: Page): Promise<void> => {
