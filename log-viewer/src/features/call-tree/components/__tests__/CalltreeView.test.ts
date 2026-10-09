@@ -7,11 +7,27 @@ import { afterEach, beforeEach, describe, expect, it } from '@jest/globals';
 import type { ApexLog } from '@apexdevtools/apex-log-parser';
 import type { Tabulator } from 'tabulator-tables';
 
-// The grids bring tabulator and its module registrations, which don't load under
-// jest; this suite drives only which table the view builds, and when.
-jest.mock('../TimeOrderTable.js', () => ({ createTimeOrderTable: () => build('time-order') }));
+import type { BottomUpRow } from '../../utils/Aggregation.js';
+
+// Aggregated brings tabulator and its module registrations, which don't load under
+// jest; this suite drives only which grid the view builds, and when.
 jest.mock('../AggregatedTable.js', () => ({ createAggregatedTable: () => build('aggregated') }));
-jest.mock('../BottomUpTable.js', () => ({ createBottomUpTable: () => build('bottom-up') }));
+// The columns read a parsed log, which the fake one is not.
+jest.mock('../../grid/columns.js', () => ({
+  ...jest.requireActual<object>('../../grid/columns.js'),
+  timeOrderColumns: () => {
+    built.push('time-order');
+    return [];
+  },
+  bottomUpColumns: () => {
+    built.push('bottom-up');
+    return [];
+  },
+}));
+jest.mock('../../utils/Aggregation.js', () => ({
+  ...jest.requireActual<object>('../../utils/Aggregation.js'),
+  buildBottomUpTree: () => buildBottomUp(),
+}));
 // VsSelect extends vscode-single-select, whose setFormValue needs an
 // ElementInternals jsdom lacks; the render would upgrade it.
 jest.mock('../../../../components/VsSelect.js', () => ({}));
@@ -27,46 +43,40 @@ import { storeOf } from '#test-helpers/apexLog.js';
 import { LogStore } from '../../../../core/log/LogStore.js';
 import { CalltreeView } from '../CalltreeView.js';
 
-/** Which table each build made, and which each teardown destroyed, in order. */
+/** Which view each build made, in order. */
 let built: string[] = [];
-let destroyed: string[] = [];
-/** The filters the newest table was given, so a rebuild can be told from a reset. */
-let filtered: unknown[] = [];
-/** Which tables had their columns applied, which is the tail of a build. */
-let wired: string[] = [];
-/** What Bottom Up was told to group on, per build. */
-let groupedBy: string[] = [];
-/** Finishes the newest build, where a test drives one that is in flight. */
-let finishBuild: (() => void) | null = null;
-/** Whether a build waits to be finished by hand. */
+/** Finishes the newest Bottom Up build, where a test drives one that is in flight. */
+let finishBuild: ((roots: BottomUpRow[]) => void) | null = null;
+/** Whether a Bottom Up build waits to be finished by hand. */
 let holdBuilds = false;
+
+function buildBottomUp(): Promise<BottomUpRow[]> {
+  if (!holdBuilds) {
+    return Promise.resolve([]);
+  }
+  return new Promise((resolve) => (finishBuild = resolve));
+}
 
 function build(kind: string): { table: Tabulator; tableBuilt: Promise<void> } {
   built.push(kind);
-  // A new table carries no filters of its own, so the record starts over with it.
-  filtered = [];
   const table = {
     element: document.createElement('div'),
     on: () => {},
-    getColumns: () => {
-      wired.push(kind);
-      return [];
-    },
+    getColumns: () => [],
     redraw: () => {},
     blockRedraw: () => {},
     restoreRedraw: () => {},
-    clearFilter: () => {
-      filtered = [];
-    },
-    addFilter: (filter: unknown) => filtered.push(filter),
+    clearFilter: () => {},
+    addFilter: () => {},
     clearFindHighlights: () => {},
-    setSortedGroupBy: (field: string) => groupedBy.push(field),
-    destroy: () => destroyed.push(kind),
+    destroy: () => {},
   } as unknown as Tabulator;
-  if (!holdBuilds) {
-    return { table, tableBuilt: Promise.resolve() };
-  }
-  return { table, tableBuilt: new Promise<void>((resolve) => (finishBuild = resolve)) };
+  return { table, tableBuilt: Promise.resolve() };
+}
+
+/** The grids in the view's DOM. */
+function grids(view: CalltreeView): Element[] {
+  return [...view.renderRoot.querySelectorAll('lv-call-tree-grid')];
 }
 
 /** jsdom has no IntersectionObserver, and the build waits on one. */
@@ -123,10 +133,6 @@ describe('calltree-view table lifetime', () => {
 
   beforeEach(async () => {
     built = [];
-    destroyed = [];
-    filtered = [];
-    wired = [];
-    groupedBy = [];
     finishBuild = null;
     holdBuilds = false;
     globalThis.IntersectionObserver = AlwaysVisible as unknown as typeof IntersectionObserver;
@@ -137,32 +143,36 @@ describe('calltree-view table lifetime', () => {
     view.remove();
   });
 
-  it('builds the table for the log it is given', () => {
+  it('builds the grid for the log it is given', () => {
     expect(built).toEqual(['time-order']);
+    expect(grids(view)).toEqual([view.timeOrderGrid]);
   });
 
-  it('rebuilds the table after a detach and a re-attach', async () => {
+  it('rebuilds the grid after a detach and a re-attach', async () => {
+    const before = view.timeOrderGrid;
     view.remove();
-    expect(destroyed).toEqual(['time-order']);
+    expect(view.timeOrderGrid).toBeNull();
+    expect(before?.isConnected).toBe(false);
 
     document.body.append(view);
     await settle();
 
     expect(built).toEqual(['time-order', 'time-order']);
+    expect(grids(view)).toEqual([view.timeOrderGrid]);
   });
 
   it('rebuilds under the filters the view was left with', async () => {
     view.namespaceSelected = ['ns'];
     view._updateFiltering();
-    const onShow = filtered.length;
+    const onShow = view.timeOrderGrid?.filters.length;
     expect(onShow).toBeGreaterThan(0);
 
     view.remove();
     document.body.append(view);
     await settle();
 
-    // The chip still reads as on, so the rebuilt table has to read the same way.
-    expect(filtered).toHaveLength(onShow);
+    // The chip still reads as on, so the rebuilt grid has to read the same way.
+    expect(view.timeOrderGrid?.filters).toHaveLength(onShow!);
   });
 
   it('builds nothing where the view goes before it is seen', async () => {
@@ -177,41 +187,43 @@ describe('calltree-view table lifetime', () => {
   });
 
   it('leaves a build the detach overtook to the one that replaced it', async () => {
-    view.remove();
-    wired = [];
     holdBuilds = true;
-    document.body.append(view);
+    void view._setViewMode('bottom-up');
     await settle();
-    expect(built).toEqual(['time-order', 'time-order']);
-
-    // Gone and back while the first build is still waiting on its table.
     const overtaken = finishBuild!;
+    const first = view.bottomUpGrid;
+
+    // Gone and back while the first build is still waiting on its tree.
     view.remove();
     holdBuilds = false;
     document.body.append(view);
     await settle();
-    expect(built).toHaveLength(3);
+    expect(built).toEqual(['time-order', 'bottom-up', 'bottom-up']);
+    const newest = view.bottomUpGrid;
+    const rows = newest?.source?.roots;
 
-    wired = [];
-    overtaken();
+    overtaken([{ id: 1, _pathId: 1 } as BottomUpRow]);
     await settle();
 
-    // The container holds the newest table now, so the overtaken build must not
-    // read a header that is no longer its own.
-    expect(wired).toEqual([]);
+    // The view holds the newest grid now, so the overtaken build must not fill it.
+    expect(view.bottomUpGrid).toBe(newest);
+    expect(newest?.source?.roots).toBe(rows);
+    expect(first?.source).toBeNull();
   });
 
   it('rebuilds bottom up grouped the way it was left', async () => {
     await view._setViewMode('bottom-up');
     view._handleBottomUpGroupBy({ target: { value: 'Namespace' } } as unknown as Event);
     await settle();
-    expect(groupedBy).toEqual(['namespace']);
+    const namespaceOf = (grid: CalltreeView['bottomUpGrid']) =>
+      grid?.groupBy?.({ namespace: 'ns' } as BottomUpRow);
+    expect(namespaceOf(view.bottomUpGrid)).toBe('ns');
 
     view.remove();
     document.body.append(view);
     await settle();
 
-    expect(groupedBy).toEqual(['namespace', 'namespace']);
+    expect(namespaceOf(view.bottomUpGrid)).toBe('ns');
   });
 
   it('rebuilds the view on show, not the one the log opened on', async () => {
