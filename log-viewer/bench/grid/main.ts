@@ -3,14 +3,15 @@
  */
 
 /**
- * Grid bench. `index.html?c=<contender>[&tree=bottom-up]`, then pick a log. The Time
+ * Grid bench. `index.html?c=<contender>[&tree=aggregated|bottom-up]`, then pick a log. The Time
  * Order tree is the default. `window.bench.runAll()` returns medians per action; the
  * page shows them too.
  */
 import { parse, type ApexLog, type LogEvent } from '@apexdevtools/apex-log-parser';
 
+import { LvGridAggregated, TabulatorAggregated } from './aggregated-contenders.js';
 import { LvGridBottomUp, TabulatorBottomUp } from './bottom-up-contenders.js';
-import type { BottomUpContender, Contender, Mounted } from './contender.js';
+import type { BottomUpContender, Contender, MergedContender, Mounted } from './contender.js';
 import { GridContender } from './grid-contender.js';
 import { callTreeContender, lvGridContender } from './lv-grid-contender.js';
 import { TabulatorContender } from './tabulator-contender.js';
@@ -34,9 +35,15 @@ function bottomUpContenderFor(name: string): BottomUpContender {
   return name === 'call-tree' ? new LvGridBottomUp() : new TabulatorBottomUp();
 }
 
+function aggregatedContenderFor(name: string): MergedContender {
+  return name === 'call-tree' ? new LvGridAggregated() : new TabulatorAggregated();
+}
+
+const TREES = ['time-order', 'aggregated', 'bottom-up'] as const;
+
 const params = new URLSearchParams(location.search);
 const name = params.get('c') ?? 'tabulator';
-const tree = params.get('tree') === 'bottom-up' ? 'bottom-up' : 'time-order';
+const tree = TREES.find((t) => t === params.get('tree')) ?? 'time-order';
 const status = document.getElementById('status') as HTMLPreElement;
 const host = document.getElementById('host') as HTMLDivElement;
 document.title = `grid bench: ${name} ${tree}`;
@@ -90,7 +97,9 @@ const summarise = (runs: Timing[]): Summary => ({
 
 let mounted: Mounted;
 let contender: Contender;
-let bottomUp: BottomUpContender;
+/** The Aggregated or Bottom-Up table; Bottom-Up is `grouped` too. */
+let bottomUp: MergedContender;
+let grouped: BottomUpContender | null = null;
 let log: ApexLog;
 let target: LogEvent;
 const results: Record<string, unknown> = { contender: name, tree };
@@ -123,7 +132,10 @@ async function load(text: string): Promise<void> {
   await settled();
 
   if (tree === 'bottom-up') {
-    mounted = bottomUp = bottomUpContenderFor(name);
+    grouped = bottomUpContenderFor(name);
+    mounted = bottomUp = grouped;
+  } else if (tree === 'aggregated') {
+    mounted = bottomUp = aggregatedContenderFor(name);
   } else {
     mounted = contender = contenderFor(name);
   }
@@ -170,7 +182,7 @@ async function scrollStats(): Promise<{ fling: FrameStats; jumpEnd: Timing; jump
 }
 
 async function runAll(reps = 5, skip: string[] = []): Promise<Record<string, unknown>> {
-  if (tree === 'bottom-up') {
+  if (tree !== 'time-order') {
     return runBottomUp(reps, skip);
   }
   const runs: Record<string, Timing[]> = {};
@@ -223,7 +235,7 @@ async function runAll(reps = 5, skip: string[] = []): Promise<Record<string, unk
   return results;
 }
 
-/** The Bottom-Up tab's actions: grouping, sorting, then the tree opened, searched and exported. */
+/** The Aggregated or Bottom-Up tab's actions: sorting, the tree opened, searched and exported, then Bottom-Up grouping. */
 async function runBottomUp(reps: number, skip: string[]): Promise<Record<string, unknown>> {
   const runs: Record<string, Timing[]> = {};
   const flings: FrameStats[] = [];
@@ -250,13 +262,15 @@ async function runBottomUp(reps: number, skip: string[]): Promise<Record<string,
   }
 
   // Last: Tabulator's Bottom-Up overflows the stack on an ungroup, so nothing may follow it.
-  for (let rep = 0; rep < reps; rep++) {
-    add('groupByType', await timed(() => bottomUp.groupBy('type')));
-    results.rowsGroupedByType = bottomUp.visibleRowCount();
-    add('groupByNamespace', await timed(() => bottomUp.groupBy('namespace')));
+  for (let rep = 0; grouped && rep < reps; rep++) {
+    const table = grouped;
+    add('groupByType', await timed(() => table.groupBy('type')));
+    results.rowsGroupedByType = table.visibleRowCount();
+    add('groupByNamespace', await timed(() => table.groupBy('namespace')));
   }
-  if (!skip.includes('ungroup')) {
-    add('ungroup', await timed(() => bottomUp.groupBy(null)));
+  if (grouped && !skip.includes('ungroup')) {
+    const table = grouped;
+    add('ungroup', await timed(() => table.groupBy(null)));
   }
 
   for (const [key, list] of Object.entries(runs)) {

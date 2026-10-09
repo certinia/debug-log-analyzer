@@ -15,6 +15,7 @@ import { existsSync, readFileSync } from 'node:fs';
 
 const BASELINES = {
   'time-order': 'log-viewer/bench/grid/baseline/tabulator-580k.json',
+  aggregated: 'log-viewer/bench/grid/baseline/tabulator-aggregated-580k.json',
   'bottom-up': 'log-viewer/bench/grid/baseline/tabulator-bottom-up-580k.json',
 };
 const BUDGET_MS = 50;
@@ -60,7 +61,11 @@ const TIME_ORDER_ACTIONS = [
   'scrollJumpTop',
 ];
 
-const ACTIONS = tree === 'bottom-up' ? BOTTOM_UP_ACTIONS : TIME_ORDER_ACTIONS;
+const ACTIONS =
+  {
+    'bottom-up': BOTTOM_UP_ACTIONS,
+    aggregated: BOTTOM_UP_ACTIONS.filter((a) => !/group/i.test(a)),
+  }[tree] ?? TIME_ORDER_ACTIONS;
 
 const worse = (value, baseline) => (baseline !== undefined && value > baseline ? '!' : ' ');
 const overBudget = (task) => (task > BUDGET_MS ? '!' : ' ');

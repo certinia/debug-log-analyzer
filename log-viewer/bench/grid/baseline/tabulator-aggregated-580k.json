@@ -1,0 +1,78 @@
+{
+  "tabulator": {
+    "contender": "tabulator",
+    "tree": "aggregated",
+    "firstRender": {
+      "ms": 176,
+      "settledMs": 200,
+      "longestTaskMs": 324
+    },
+    "heapBeforeMountMb": 867,
+    "heapAfterMountMb": 876,
+    "rowsAfterMount": 2,
+    "rowsExpanded": 965,
+    "sortTotalDesc": {
+      "ms": 17,
+      "settledMs": 66,
+      "longestTaskMs": 0
+    },
+    "clearSort": {
+      "ms": 18,
+      "settledMs": 66,
+      "longestTaskMs": 0
+    },
+    "expandAll": {
+      "ms": 21,
+      "settledMs": 66,
+      "longestTaskMs": 0
+    },
+    "scrollJumpEnd": {
+      "ms": 17,
+      "settledMs": 67,
+      "longestTaskMs": 0
+    },
+    "scrollJumpTop": {
+      "ms": 47,
+      "settledMs": 83,
+      "longestTaskMs": 0
+    },
+    "find": {
+      "ms": 19,
+      "settledMs": 67,
+      "longestTaskMs": 0
+    },
+    "collapseAll": {
+      "ms": 17,
+      "settledMs": 67,
+      "longestTaskMs": 0
+    },
+    "scrollFling": {
+      "frames": 120,
+      "p50": 16.7,
+      "p95": 16.8,
+      "max": 17,
+      "dropped": 0
+    },
+    "findMatches": 10,
+    "csvLength": 0,
+    "heapAfterRunsMb": 878,
+    "firstRenderRuns": [
+      {
+        "ms": 180,
+        "settledMs": 203,
+        "longestTaskMs": 334
+      },
+      {
+        "ms": 174,
+        "settledMs": 204,
+        "longestTaskMs": 318
+      },
+      {
+        "ms": 176,
+        "settledMs": 200,
+        "longestTaskMs": 324
+      }
+    ],
+    "firstRenderMedianMs": 176
+  }
+}

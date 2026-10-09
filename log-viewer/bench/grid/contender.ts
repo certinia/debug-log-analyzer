@@ -29,9 +29,13 @@ export interface Contender extends Mounted {
 }
 
 /** One Bottom-Up table under test, driven the way the Call Tree's Bottom-Up tab drives it. */
-export interface BottomUpContender extends Mounted {
+export interface BottomUpContender extends MergedContender {
   /** Groups by a row field, or ungroups. */
   groupBy(field: 'type' | 'namespace' | null): void | Promise<void>;
+}
+
+/** One Aggregated or Bottom-Up table under test: the actions both tabs have. */
+export interface MergedContender extends Mounted {
   sortTotalDesc(): void | Promise<void>;
   clearSort(): void | Promise<void>;
   expandAll(): void | Promise<void>;
