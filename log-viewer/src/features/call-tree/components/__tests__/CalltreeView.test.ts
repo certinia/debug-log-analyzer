@@ -5,18 +5,18 @@
  */
 import { afterEach, beforeEach, describe, expect, it } from '@jest/globals';
 import type { ApexLog } from '@apexdevtools/apex-log-parser';
-import type { Tabulator } from 'tabulator-tables';
 
 import type { BottomUpRow } from '../../utils/Aggregation.js';
 
-// Aggregated brings tabulator and its module registrations, which don't load under
-// jest; this suite drives only which grid the view builds, and when.
-jest.mock('../AggregatedTable.js', () => ({ createAggregatedTable: () => build('aggregated') }));
 // The columns read a parsed log, which the fake one is not.
 jest.mock('../../grid/columns.js', () => ({
   ...jest.requireActual<object>('../../grid/columns.js'),
   timeOrderColumns: () => {
     built.push('time-order');
+    return [];
+  },
+  aggregatedColumns: () => {
+    built.push('aggregated');
     return [];
   },
   bottomUpColumns: () => {
@@ -55,23 +55,6 @@ function buildBottomUp(): Promise<BottomUpRow[]> {
     return Promise.resolve([]);
   }
   return new Promise((resolve) => (finishBuild = resolve));
-}
-
-function build(kind: string): { table: Tabulator; tableBuilt: Promise<void> } {
-  built.push(kind);
-  const table = {
-    element: document.createElement('div'),
-    on: () => {},
-    getColumns: () => [],
-    redraw: () => {},
-    blockRedraw: () => {},
-    restoreRedraw: () => {},
-    clearFilter: () => {},
-    addFilter: () => {},
-    clearFindHighlights: () => {},
-    destroy: () => {},
-  } as unknown as Tabulator;
-  return { table, tableBuilt: Promise.resolve() };
 }
 
 /** The grids in the view's DOM. */
@@ -236,6 +219,17 @@ describe('calltree-view table lifetime', () => {
     await settle();
 
     expect(built).toEqual(['time-order', 'bottom-up', 'bottom-up']);
+  });
+
+  it('builds aggregated as a grid, under the filters in force', async () => {
+    view.namespaceSelected = ['ns'];
+    await view._setViewMode('aggregated');
+    await settle();
+
+    expect(built).toEqual(['time-order', 'aggregated']);
+    expect(grids(view)).toContain(view.aggregatedGrid);
+    // The namespace chip, and Show Details off.
+    expect(view.aggregatedGrid?.filters).toHaveLength(2);
   });
 });
 
