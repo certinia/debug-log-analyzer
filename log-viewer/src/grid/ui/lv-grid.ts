@@ -228,15 +228,21 @@ export class LvGrid<R extends object = object> extends LitElement {
 
   /**
    * Opens each ancestor on `path` (keys from the root down), then scrolls the row to the
-   * middle and selects it. False when no row on the path is shown.
+   * middle and selects it. False when no row on the path is shown. With `scrollIfVisible`
+   * false, a row already in view whole stays where it is.
    */
-  async goTo(path: readonly RowKey[]): Promise<boolean> {
+  async goTo(
+    path: readonly RowKey[],
+    { scrollIfVisible = true }: { scrollIfVisible?: boolean } = {},
+  ): Promise<boolean> {
     const index = (await this.store?.reveal(path)) ?? -1;
     if (index < 0) {
       return false;
     }
     await this.updateComplete;
-    this.view?.scrollToIndex(index);
+    if (scrollIfVisible || !this.inView(index)) {
+      this.view?.scrollToIndex(index);
+    }
     this.select(this.targetAt(index), index);
     return true;
   }
@@ -672,6 +678,22 @@ export class LvGrid<R extends object = object> extends LitElement {
     }
     this.toggled = target;
     await this.store?.toggle(target, expanded);
+  }
+
+  /** Whether the painted row at `index` shows whole, between the header and the totals. */
+  private inView(index: number): boolean {
+    const scroller = this.scrollerRef.value;
+    const row = this.bodyRef.value?.querySelector<HTMLElement>(
+      `:scope > [data-index="${index}"]:not([hidden])`,
+    );
+    if (!scroller || !row) {
+      return false;
+    }
+    const box = row.getBoundingClientRect();
+    const frame = scroller.getBoundingClientRect();
+    const top = scroller.querySelector(':scope > .head')?.getBoundingClientRect().bottom;
+    const bottom = scroller.querySelector(':scope > .foot')?.getBoundingClientRect().top;
+    return box.top >= (top ?? frame.top) && box.bottom <= (bottom ?? frame.bottom);
   }
 
   /** The index of the row element an event came from, or -1. */

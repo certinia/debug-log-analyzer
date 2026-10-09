@@ -950,7 +950,7 @@ export class CalltreeView extends LitElement {
       return;
     }
     const path = this._pathTo(eventIndex);
-    await this._echoGuard.runAsync(() => grid.goTo(path));
+    await this._echoGuard.runAsync(() => grid.goTo(path, { scrollIfVisible: false }));
   }
 
   /** The keys from a top-level row down to the row of the view on show for `eventIndex`. */
