@@ -80,7 +80,7 @@ The **Memory** view carries three heap metrics per call path - **net** (retained
 
 ### SOQL Formatting
 
-SOQL and SOSL query rows are reformatted onto multiple lines and syntax highlighted, so keywords, fields and bind variables are easy to read at a glance.
+SOQL and SOSL query rows are reformatted onto multiple lines and syntax highlighted, so keywords, fields and bind variables are easy to read at a glance. Find searches the query as shown, and a space in the search also matches a line break.
 
 ![A SOQL query in the Call Tree Name column, formatted across multiple lines with syntax-highlighted keywords, fields and bind variables.](https://raw.githubusercontent.com/certinia/debug-log-analyzer/main/lana/assets/1_24/calltree-soql-format.png#gh-dark-mode-only)
 ![A SOQL query in the Call Tree Name column, formatted across multiple lines with syntax-highlighted keywords, fields and bind variables.](https://raw.githubusercontent.com/certinia/debug-log-analyzer/main/lana/assets/1_24/calltree-soql-format-light.png#gh-light-mode-only)
@@ -92,6 +92,8 @@ The Call Tree can be navigated with the keyboard. The up and down keys will move
 ### Copy
 
 Click a row, then press `CMD / CTRL + c` to copy the table, in every view. The copy holds the shown columns, tab-separated, so it pastes into a spreadsheet. It holds every row that passes the filters, children included, open or not.
+
+The copy holds the values, not the display: a query as the log has it, on one line, and Gov Avg % and Gov Peak % in full.
 
 When rows have children, the copy starts with a Level column. A top-level row is 1, its children are 2, and so on. In Bottom-Up with a group, the group is 1.
 

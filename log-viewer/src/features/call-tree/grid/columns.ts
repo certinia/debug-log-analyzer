@@ -29,7 +29,7 @@ import {
   type GovernorUsage,
 } from '../utils/GovernorCost.js';
 import { isDetailEvent } from '../utils/TimeOrderTree.js';
-import { bar, msBar, msText, nameCell, nameText } from './cells.js';
+import { bar, msBar, msText, nameCell, nameExportText, nameText } from './cells.js';
 import { knownMax, outermostSum } from './calcs.js';
 
 /** What every call-tree row carries, whichever view built it. */
@@ -107,6 +107,7 @@ function nameColumn<R>(fields: RowFields<R>, options: CallTreeColumnOptions): Gr
     minWidth: 200,
     cell: (row) => nameCell(fields.event(row), fields.text(row), options.openType),
     text: (row) => nameText(fields.event(row), fields.text(row)),
+    exportText: (row) => nameExportText(fields.event(row), fields.text(row)),
     sort: { value: fields.text },
     sortFirst: 'desc',
     footer: 'Total',
@@ -232,8 +233,9 @@ function utilisationColumn<R>(opts: {
   tooltip: (row: R, value: number) => string;
 }): GridColumn<R> {
   const { value } = opts;
+  const present = (v: number | null): v is number => v !== null && !Number.isNaN(v);
   const shown = (v: number | null) =>
-    v === null || Number.isNaN(v) ? '—' : bar(v, 100, { precision: 0, percent: false });
+    present(v) ? bar(v, 100, { precision: 0, percent: false }) : '—';
   return {
     id: opts.id,
     title: opts.title,
@@ -242,7 +244,14 @@ function utilisationColumn<R>(opts: {
     align: 'end',
     hidden: opts.hidden,
     cell: (row) => shown(value(row)),
-    text: (row) => String(value(row) ?? '—'),
+    text: (row) => {
+      const v = value(row);
+      return present(v) ? v.toFixed(0) : '—';
+    },
+    exportText: (row) => {
+      const v = value(row);
+      return present(v) ? String(v) : '';
+    },
     tooltip: (row) => {
       const v = value(row);
       return v === null ? NO_REPORTED_LIMITS_TEXT : opts.tooltip(row, v);

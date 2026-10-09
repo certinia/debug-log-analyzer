@@ -20,7 +20,7 @@ import { storeOf } from '#test-helpers/apexLog.js';
 import { governorLimits, limitValue } from '#test-helpers/limits.js';
 import { NO_REPORTED_LIMITS_TEXT } from '../../../../components/governorCopy.js';
 import { formatInteger } from '../../../../core/utility/Util.js';
-import { LvGrid, type GridColumn } from '../../../../grid/index.js';
+import { FIND_TEXT_ATTR, LvGrid, type GridColumn } from '../../../../grid/index.js';
 import { logStoreFor } from '../../../../core/log/LogStore.js';
 import { createGovernorMetricColumns } from '../../components/TableShared.js';
 import {
@@ -165,8 +165,8 @@ describe('timeOrderColumns', () => {
     const held: Record<string, (r: TimeOrderRow) => string | number | null> = {
       callerNamespace: (r) => r.callerNamespace,
       type: (r) => r.type,
-      governorCost: (r) => r.governorCost,
-      governorCostMax: (r) => r.governorCostMax,
+      governorCost: (r) => r.governorCost?.toFixed(0) ?? null,
+      governorCostMax: (r) => r.governorCostMax?.toFixed(0) ?? null,
     };
     for (const [id, value] of Object.entries(held)) {
       const { text } = column(columns, id);
@@ -320,6 +320,65 @@ describe('copy', () => {
       expect(rows.map((r) => r.split('\t')[1])).toEqual(expect.arrayContaining([...first]));
     },
   );
+});
+
+describe('find text', () => {
+  const limited: ApexLog = Object.create(log);
+  Object.defineProperty(limited, 'governorLimits', {
+    value: governorLimits({ soqlQueries: limitValue(0, 100), queryRows: limitValue(0, 50_000) }),
+  });
+  const pathIds = logStoreFor(log).keyPathIds();
+  const flat = <R extends { _children?: R[] | null }>(roots: readonly R[]): R[] =>
+    roots.flatMap((r) => [r, ...flat(r._children ?? [])]);
+  /** What the highlighter searches in a painted cell: its marked find text, or all of it. */
+  const searched = (content: unknown): string | null => {
+    const cell = shown(content);
+    return (cell.querySelector(`[${FIND_TEXT_ATTR}]`) ?? cell).textContent;
+  };
+  const check = <R>(columns: GridColumn<R>[], of: readonly R[]): void => {
+    const searchable = columns.filter((c) => c.text);
+    const painted = of.flatMap((row) => searchable.map((c) => [c.id, searched(c.cell(row))]));
+    const counted = of.flatMap((row) => searchable.map((c) => [c.id, c.text?.(row)]));
+    expect(painted).toEqual(counted);
+  };
+
+  it('is what each searched Time Order cell shows', () => {
+    check(timeOrderColumns(limited, options), allRows(rows));
+  });
+
+  it('is what each searched Aggregated cell shows', () => {
+    const roots = toAggregatedCallTree(log.children, pathIds, limited.governorLimits);
+    check(aggregatedColumns(limited, options), flat(roots));
+  });
+
+  it('is what each searched Bottom-Up cell shows', () => {
+    const roots = toBottomUpTree(log.children, pathIds, limited.governorLimits);
+    check(bottomUpColumns(limited, options), flat(roots));
+  });
+});
+
+describe('export text', () => {
+  const columns = aggregatedColumns(log, options);
+
+  it('writes a query as the log has it, where the cell shows it formatted', () => {
+    const all = (of: readonly AggregatedRow[]): AggregatedRow[] =>
+      of.flatMap((r) => [r, ...all(r._children ?? [])]);
+    const roots = toAggregatedCallTree(log.children, logStoreFor(log).keyPathIds());
+    const query = all(roots).find((r) => r.originalData.type === 'SOQL_EXECUTE_BEGIN');
+    const name = columns.find((c) => c.id === 'text');
+    if (!query || !name) {
+      throw new Error('no query row or Name column');
+    }
+    expect(name.exportText?.(query)).toBe('SELECT Id FROM Account');
+    expect(name.text?.(query)).not.toBe('SELECT Id FROM Account');
+  });
+
+  it('writes a governor percentage in full, where the cell shows it rounded', () => {
+    const cost = columns.find((c) => c.id === 'governorCost');
+    const row = { governorCost: 33.375 } as unknown as AggregatedRow;
+    expect(cost?.exportText?.(row)).toBe('33.375');
+    expect(cost?.text?.(row)).toBe('33');
+  });
 });
 
 describe('lv-call-tree-grid', () => {
