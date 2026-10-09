@@ -28,8 +28,14 @@ export interface GridColumn<R> {
   resizable?: boolean;
   /** The cell. In the first column, it follows the tree indent and the expand control. */
   cell(row: R): CellContent;
-  /** The text the cell shows: find searches it, copy and export write it. */
+  /**
+   * The text the cell shows: find searches it, and copy and export write it unless
+   * `exportText` is set. A cell that shows more marks the element that holds this text
+   * with `FIND_TEXT_ATTR`.
+   */
   text?(row: R): string;
+  /** The value copy and export write, where the cell shows it formatted. Default: `text`. */
+  exportText?(row: R): string;
   /** Plain text shown on hover. Never markup. */
   tooltip?(row: R): string;
   /** Sorts by this value, or by this ascending compare. No sort: the header does not sort. */

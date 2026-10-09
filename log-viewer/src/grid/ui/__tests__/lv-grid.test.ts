@@ -308,6 +308,16 @@ describe('lv-grid', () => {
     expect(writeText).toHaveBeenCalledWith('Name\tTime\na\t3\nb\t1\nb1\t5\nb2\t6\nc\t2');
   });
 
+  it('exports a column by its export text where it has one, and by its text where not', async () => {
+    const withExport = columns().map((column) =>
+      column.id === 'time' ? { ...column, exportText: (row: Node) => `${row.time}.0` } : column,
+    );
+    const { grid } = await setup({ columns: withExport });
+    expect(await grid.exportText({ format: 'tsv', tree: false })).toBe(
+      'Name\tTime\na\t3.0\nb\t1.0\nc\t2.0',
+    );
+  });
+
   it('reports the hovered row, and none on leave', async () => {
     const { grid, root, rowNamed } = await setup();
     const located: (string | null)[] = [];

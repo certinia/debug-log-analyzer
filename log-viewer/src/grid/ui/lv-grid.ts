@@ -263,9 +263,10 @@ export class LvGrid<R extends object = object> extends LitElement {
 
   /** The shown columns' text for every row that passes the filters, open or not. */
   async exportText(options: ExportOptions): Promise<string | null> {
-    const columns = this.visibleColumns().flatMap((column) =>
-      column.text ? [{ title: column.title, value: column.text }] : [],
-    );
+    const columns = this.visibleColumns().flatMap((column) => {
+      const value = column.exportText ?? column.text;
+      return value ? [{ title: column.title, value }] : [];
+    });
     return (await this.store?.exportText(columns, options)) ?? null;
   }
 
