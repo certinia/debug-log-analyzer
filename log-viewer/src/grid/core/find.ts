@@ -18,14 +18,18 @@ export interface PathNode {
 }
 
 /**
- * The pattern find counts with, matching `text` literally. Render highlights with the
- * same pattern, so its marks and the count agree. Null for empty text.
+ * The pattern find counts with, matching `text` literally, except that a run of whitespace
+ * matches any run, so a search goes across a line break. Render highlights with the same
+ * pattern, so its marks and the count agree. Null for empty text.
  */
 export function findPattern(query: FindQuery): RegExp | null {
   if (!query.text) {
     return null;
   }
-  const literal = query.text.replaceAll(/[.*+?^${}()|[\]\\-]/g, '\\$&');
+  const literal = query.text
+    .split(/\s+/)
+    .map((part) => part.replaceAll(/[.*+?^${}()|[\]\\-]/g, '\\$&'))
+    .join('\\s+');
   return new RegExp(literal, query.matchCase ? 'g' : 'gi');
 }
 

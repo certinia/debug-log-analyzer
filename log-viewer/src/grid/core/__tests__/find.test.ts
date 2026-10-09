@@ -72,6 +72,12 @@ describe('GridStore.find', () => {
     expect((await store.find({ text: 'a(' }, [name]))?.total).toBe(0);
   });
 
+  it('matches a space in the text to any run of whitespace, so a search goes across a line break', async () => {
+    const store = new GridStore(source([n('q', 'SELECT Id\n  FROM Account', '', 'soql')]));
+    expect((await store.find({ text: 'id from' }, [name]))?.total).toBe(1);
+    expect((await store.find({ text: 'idfrom' }, [name]))?.total).toBe(0);
+  });
+
   it('searches only the cells it is given, so a hidden column adds nothing', async () => {
     const store = new GridStore(source(tree()));
     expect((await store.find({ text: 'account' }, [name]))?.total).toBe(5);
