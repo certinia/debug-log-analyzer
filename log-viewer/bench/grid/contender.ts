@@ -30,8 +30,11 @@ export interface Contender extends Table {
   setNameWidth(px: number): void;
 }
 
-export interface BottomUpContender extends Table {
+export interface BottomUpContender extends MergedContender {
   /** Groups by a row field, or ungroups. */
   groupBy(field: 'type' | 'namespace' | null): void | Promise<void>;
+}
+
+export interface MergedContender extends Table {
   sortTotalDesc(): void | Promise<void>;
 }
