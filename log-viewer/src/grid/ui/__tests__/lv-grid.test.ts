@@ -232,6 +232,42 @@ describe('lv-grid', () => {
     expect(rowNamed('b')?.ariaSelected).toBe('false');
   });
 
+  it('opens a row from its twisty while text is selected, but selects no row', async () => {
+    const { grid, rowNamed, names } = await setup();
+    // The second press of a double-click selects a word.
+    const text = document.createElement('p');
+    text.textContent = 'some text';
+    document.body.append(text);
+    getSelection()?.selectAllChildren(text);
+
+    rowNamed('b')?.querySelector<HTMLElement>('[data-toggle]')?.click();
+    await settle(grid);
+    expect(names()).toEqual(['a', 'b', 'b1', 'b2', 'c']);
+
+    rowNamed('c')?.querySelector<HTMLElement>('.cell')?.click();
+    await settle(grid);
+    expect(rowNamed('c')?.ariaSelected).toBe('false');
+    text.remove();
+  });
+
+  it('keeps a double-click on a twisty from selecting a word, and not on text', async () => {
+    const { rowNamed } = await setup();
+    const press = (el: Element | null | undefined): boolean =>
+      !(
+        el?.dispatchEvent(
+          new MouseEvent('mousedown', {
+            bubbles: true,
+            cancelable: true,
+            composed: true,
+            detail: 2,
+          }),
+        ) ?? true
+      );
+
+    expect(press(rowNamed('b')?.querySelector('[data-toggle]'))).toBe(true);
+    expect(press(rowNamed('c')?.querySelector('.cell'))).toBe(false);
+  });
+
   it('moves, opens and closes rows from the keyboard', async () => {
     const { rowNamed, names, key } = await setup();
     await key('ArrowDown');

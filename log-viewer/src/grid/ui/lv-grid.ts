@@ -352,6 +352,7 @@ export class LvGrid<R extends object = object> extends LitElement {
       <div
         class="body"
         ${ref(this.bodyRef)}
+        @mousedown=${this.onMouseDown}
         @click=${this.onClick}
         @contextmenu=${this.onContextMenu}
         @pointerover=${this.onHover}
@@ -633,11 +634,19 @@ export class LvGrid<R extends object = object> extends LitElement {
     return entry === undefined || entry instanceof Group ? null : entry;
   }
 
-  private readonly onClick = (e: MouseEvent): void => {
-    // A drag that selected text is a copy in the making, not a click on a row.
-    if (window.getSelection()?.type === 'Range') {
-      return;
+  private isToggle(e: Event, target: RowTarget<R> | null): boolean {
+    return target instanceof Group || !!(e.target as Element).closest('[data-toggle]');
+  }
+
+  /** A second press on a twisty is another toggle, not a word to select. */
+  private readonly onMouseDown = (e: MouseEvent): void => {
+    const index = this.indexFrom(e);
+    if (e.detail > 1 && index >= 0 && this.isToggle(e, this.targetAt(index))) {
+      e.preventDefault();
     }
+  };
+
+  private readonly onClick = (e: MouseEvent): void => {
     const index = this.indexFrom(e);
     if (index < 0) {
       return;
@@ -646,8 +655,11 @@ export class LvGrid<R extends object = object> extends LitElement {
     if (target === null) {
       return;
     }
-    if (target instanceof Group || (e.target as Element).closest('[data-toggle]')) {
+    if (this.isToggle(e, target)) {
       void this.toggleAt(index);
+    } else if (window.getSelection()?.type === 'Range') {
+      // A drag that selected text is a copy in the making, not a click on a row.
+      return;
     } else if (sameTarget(this.selected, target)) {
       this.select(null);
     } else {
