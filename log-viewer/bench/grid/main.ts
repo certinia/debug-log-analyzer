@@ -16,17 +16,23 @@ import { callTreeContender, lvGridContender } from './lv-grid-contender.js';
 import { TabulatorContender } from './tabulator-contender.js';
 import { frameStats, perFrame, settled, timed, type FrameStats, type Timing } from './timing.js';
 
-const CONTENDERS = new Map<string, () => Contender>([
-  ['tabulator', () => new TabulatorContender()],
-  ['grid', () => new GridContender()],
-  ['lv-grid', lvGridContender],
-  ['call-tree', callTreeContender],
-]);
+// A switch, not a lookup: CodeQL flags any call through a value found by a URL name.
+function contenderFor(name: string): Contender {
+  switch (name) {
+    case 'grid':
+      return new GridContender();
+    case 'lv-grid':
+      return lvGridContender();
+    case 'call-tree':
+      return callTreeContender();
+    default:
+      return new TabulatorContender();
+  }
+}
 
-const BOTTOM_UP_CONTENDERS = new Map<string, () => BottomUpContender>([
-  ['tabulator', () => new TabulatorBottomUp()],
-  ['call-tree', () => new LvGridBottomUp()],
-]);
+function bottomUpContenderFor(name: string): BottomUpContender {
+  return name === 'call-tree' ? new LvGridBottomUp() : new TabulatorBottomUp();
+}
 
 const params = new URLSearchParams(location.search);
 const name = params.get('c') ?? 'tabulator';
@@ -117,9 +123,9 @@ async function load(text: string): Promise<void> {
   await settled();
 
   if (tree === 'bottom-up') {
-    mounted = bottomUp = (BOTTOM_UP_CONTENDERS.get(name) ?? (() => new TabulatorBottomUp()))();
+    mounted = bottomUp = bottomUpContenderFor(name);
   } else {
-    mounted = contender = (CONTENDERS.get(name) ?? (() => new TabulatorContender()))();
+    mounted = contender = contenderFor(name);
   }
   const heapBefore = heapMb();
   const first = await timed(() => mounted.mount(host, log));
