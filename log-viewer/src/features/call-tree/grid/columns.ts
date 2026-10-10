@@ -2,8 +2,6 @@
  * Copyright (c) 2026 Certinia Inc. All rights reserved.
  */
 import type { ApexLog, LogEvent, SelfTotal } from '@apexdevtools/apex-log-parser';
-import { html } from 'lit';
-import { unsafeHTML } from 'lit/directives/unsafe-html.js';
 
 import { bar } from '../../../components/grid/cells.js';
 import { COUNT_MIN_WIDTH, countColumn, timeColumn } from '../../../components/grid/columns.js';
@@ -20,7 +18,7 @@ import {
   type TreeSource,
 } from '../../../grid/index.js';
 import { NAMESPACE_WIDTH } from '../../../tabulator/ColumnWidths.js';
-import { soqlGroupHeader } from '../../soql/format/groupHeader.js';
+import { soqlGroupCell } from '../../soql/format/groupHeader.js';
 import type { AggregatedRow, BottomUpRow } from '../utils/Aggregation.js';
 import {
   costLimitsOf,
@@ -515,10 +513,7 @@ export function bottomUpColumns(
   return [
     {
       ...nameColumn(fields, options),
-      groupCell: (group) => {
-        const query = soqlGroupHeader(group.key, group.rows.length, group.rows);
-        return query ? html`${unsafeHTML(query)}` : `${group.key} (${group.rows.length})`;
-      },
+      groupCell: soqlGroupCell,
     },
     ...namespaceColumns(fields),
     typeColumn(fields, false),
