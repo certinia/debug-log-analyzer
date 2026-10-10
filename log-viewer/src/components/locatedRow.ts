@@ -3,12 +3,17 @@
  */
 
 import type { ApexLog, LogEvent } from '@apexdevtools/apex-log-parser';
-import type { RowComponent } from 'tabulator-tables';
 
 import type { DetailSelection, SelectionView } from '../core/events/EventBus.js';
 import { ROOT_PATH_ID } from '../core/log/keyPathIds.js';
 import { logStoreFor } from '../core/log/LogStore.js';
 import { eventByEventIndex } from '../core/utility/EventSearch.js';
+
+/** A row of a merged or Time Order view, and the way up its tree. */
+export interface RowView {
+  getData(): object;
+  getTreeParent(): RowView | false;
+}
 
 /** A row of a merged view: `key` is the bucket it stands for, `instances` the
  *  occurrences it holds, which a bottom-up caller bucket has none of. */
@@ -21,7 +26,7 @@ interface CallRow {
   originalData?: LogEvent;
 }
 
-const rowCallData = (row: RowComponent): CallRow => row.getData() as CallRow;
+const rowCallData = (row: RowView): CallRow => row.getData() as CallRow;
 
 /** Held per row: a pointer sweep re-enters rows and the click that follows a
  *  hover asks again, but deriving reads every occurrence the root bucket holds. */
@@ -33,7 +38,7 @@ const NO_CALLS: LogEvent[] = [];
  * The root bucket a derived row reads its calls from, or null where the walk
  * leaves the merged rows and the row stands for nothing.
  */
-function rootBucketOf(row: RowComponent, data: CallRow): CallRow | null {
+function rootBucketOf(row: RowView, data: CallRow): CallRow | null {
   let node = data;
   for (let parent = row.getTreeParent(); parent; parent = parent.getTreeParent()) {
     const parentData = rowCallData(parent);
@@ -48,31 +53,10 @@ function rootBucketOf(row: RowComponent, data: CallRow): CallRow | null {
 }
 
 /**
- * What tells a merged row apart from a same-named row under a different parent:
- * the bucket path its builder stamped on it. A single key does not, because a
- * bucket map is allocated per parent, so one method holds a row under every
- * caller it has.
- *
- * Undefined on a row that stands for one frame, which its event index identifies.
- */
-export function rowPathId(row: RowComponent): number | undefined {
-  return rowCallData(row)._pathId;
-}
-
-/** A `rowFormatter` for a view whose rows merge occurrences, stamping the path id
- *  on the row element. */
-export function stampRowPath(row: RowComponent): void {
-  const id = rowPathId(row);
-  if (id !== undefined) {
-    row.getElement()?.setAttribute('data-row-index', String(id));
-  }
-}
-
-/**
  * The calls a row stands for. A bottom-up caller row holds none of its own, so it
  * is derived from its root bucket and the chain that reaches it.
  */
-function rowCallOccurrences(row: RowComponent, root: ApexLog | null): LogEvent[] {
+function rowCallOccurrences(row: RowView, root: ApexLog | null): LogEvent[] {
   const data = rowCallData(row);
   if (data.instances?.length) {
     return data.instances;
@@ -106,7 +90,7 @@ const derivedRows = new WeakMap<CallRow, DerivedRow>();
  * The table is the log's that built the rows: a path id is minted per log, so
  * another log's table would answer about a path of its own.
  */
-function derivedRowOf(row: RowComponent, data: CallRow, root: ApexLog | null): DerivedRow {
+function derivedRowOf(row: RowView, data: CallRow, root: ApexLog | null): DerivedRow {
   const cached = derivedRows.get(data);
   if (cached) {
     return cached;
@@ -174,7 +158,7 @@ function pathIdsForEvents(
 /** The calls a row stands for, as the event indexes the mark works in.
  *
  * @param root - the log the row was built from, which its path id belongs to */
-export function rowOccurrences(row: RowComponent, root: ApexLog | null): number[] {
+export function rowOccurrences(row: RowView, root: ApexLog | null): number[] {
   const data = rowCallData(row);
   const cached = derivedIndexes.get(data);
   if (cached) {
@@ -202,11 +186,7 @@ export function rowOccurrences(row: RowComponent, root: ApexLog | null): number[
  *
  * @param direction - the way the row's own table reads the tree
  */
-export function rowFrames(
-  row: RowComponent,
-  root: ApexLog | null,
-  direction: SelectionView,
-): number[] {
+export function rowFrames(row: RowView, root: ApexLog | null, direction: SelectionView): number[] {
   const data = rowCallData(row);
   const pathId = data._pathId;
   if (direction !== 'callers' || !root || pathId === undefined) {
@@ -227,7 +207,7 @@ export function rowFrames(
  * @param direction - the way the row's own table reads the tree
  */
 export function rowDetailSelection(
-  row: RowComponent | undefined,
+  row: RowView | undefined,
   root: ApexLog | null,
   direction: SelectionView,
 ): DetailSelection | null {

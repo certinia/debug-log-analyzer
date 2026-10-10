@@ -12,12 +12,11 @@ type SoqlishRow = {
 };
 
 /**
- * Tabulator `groupHeader` renderer that formats SOQL/SOSL group keys.
+ * Formats a SOQL/SOSL group key for a group header row.
  *
  * Returns the HTML to use as the first-cell content of a group header row,
- * or an empty string when the group does not look like SOQL/SOSL (so the host's
- * default header rendering is used instead — `GroupCalcs` treats empty as a
- * no-op).
+ * or an empty string when the group does not look like SOQL/SOSL (so the
+ * caller shows the plain key instead).
  *
  * Detection precedence:
  *  - `data[0].originalData.type === 'SOQL_EXECUTE_BEGIN'` → soql
@@ -43,7 +42,7 @@ export function soqlGroupHeader(value: unknown, count: number, data: unknown): s
   }
   const inner = formatSOQL(value, { mode: 'inline', dialect });
   // Query truncates (single-line ellipsis) but the count is pinned so it stays
-  // visible — see the `.soql-group-header*` rules in DataGrid.scss.
+  // visible — see the `.soql-group-header*` rules in components/grid/AppGrid.ts.
   return `<span class="soql-group-header"><span class="soql-group-header__q soql-block soql-inline">${inner}</span><span class="soql-group-header__count">(${count})</span></span>`;
 }
 

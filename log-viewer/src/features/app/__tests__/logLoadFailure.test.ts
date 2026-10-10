@@ -5,7 +5,7 @@
  */
 import { describe, expect, it } from '@jest/globals';
 
-// The header and the inspector pull in every grid, and Tabulator needs a real DOM.
+// The header and the inspector pull in every grid, which this suite does not need.
 jest.mock('../AppHeader.js', () => ({}));
 jest.mock('../../../components/LogInspector.js', () => ({}));
 jest.mock('../../../core/messaging/VSCodeExtensionMessenger.js', () => ({

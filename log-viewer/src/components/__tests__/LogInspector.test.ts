@@ -22,7 +22,7 @@ jest.mock('../../features/settings/Settings.js', () => ({
   updateSetting: (section: string, value: unknown) => written.push({ section, value }),
 }));
 
-// The real builders mount Tabulator tables; only the section ids matter here.
+// The real builders mount grids; only the section ids matter here.
 // `detailEmptyText.js` is deliberately left unmocked so the assertions below
 // exercise the real copy LogInspector renders.
 //

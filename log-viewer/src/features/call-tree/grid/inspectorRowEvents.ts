@@ -2,9 +2,8 @@
  * Copyright (c) 2026 Certinia Inc. All rights reserved.
  */
 import type { ApexLog } from '@apexdevtools/apex-log-parser';
-import type { RowComponent } from 'tabulator-tables';
 
-import { rowDetailSelection, rowFrames } from '../../../components/locatedRow.js';
+import { rowDetailSelection, rowFrames, type RowView } from '../../../components/locatedRow.js';
 import { eventBus, type DetailSource, type SelectionView } from '../../../core/events/EventBus.js';
 import type { SelectionEchoGuard } from '../../../core/events/SelectionEchoGuard.js';
 import type { GridRowDetail, GridSelectDetail } from '../../../grid/index.js';
@@ -29,7 +28,7 @@ export function inspectorRowEvents<R>(opts: InspectorRowEventsOptions<R>): {
   locate: (e: Event) => void;
 } {
   const parentOf = opts.parentOf ?? (() => undefined);
-  const standIn = (row: R): RowComponent => rowStandIn(row, opts.data, parentOf);
+  const standIn = (row: R): RowView => rowStandIn(row, opts.data, parentOf);
   return {
     select: (e) => {
       if (opts.echoGuard.suppressed) {
@@ -55,17 +54,17 @@ export function inspectorRowEvents<R>(opts: InspectorRowEventsOptions<R>): {
   };
 }
 
-/** The Tabulator row shape `locatedRow` reads, for a row of an lv-grid. */
+/** The row shape `locatedRow` reads, for a row of an lv-grid. */
 function rowStandIn<R>(
   row: R,
   data: (row: R) => object,
   parentOf: (row: R) => R | undefined,
-): RowComponent {
+): RowView {
   return {
     getData: () => data(row),
     getTreeParent: () => {
       const parent = parentOf(row);
       return parent ? rowStandIn(parent, data, parentOf) : false;
     },
-  } as unknown as RowComponent;
+  };
 }

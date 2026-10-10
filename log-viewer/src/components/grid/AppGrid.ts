@@ -6,7 +6,7 @@ import { customElement } from 'lit/decorators.js';
 
 import { gridStyles, LvGrid } from '../../grid/index.js';
 import { globalStyles } from '../../styles/global.styles.js';
-import progressCss from '../../tabulator/format/Progress.css';
+import progressCss from './Progress.css';
 import { soqlSyntaxStyles } from '../../features/soql/styles/soql-syntax.css.js';
 
 declare global {

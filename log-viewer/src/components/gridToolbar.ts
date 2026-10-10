@@ -3,7 +3,7 @@
  */
 import { html, type TemplateResult } from 'lit';
 
-import type { ColumnView } from '../tabulator/ColumnViews.js';
+import type { ColumnView } from './grid/ColumnViews.js';
 import type { ColumnSettingsController } from './ColumnSettingsController.js';
 import type { GridColumnMenuController } from './GridColumnMenuController.js';
 

@@ -1,15 +1,13 @@
 /*
  * Copyright (c) 2026 Certinia Inc. All rights reserved.
  */
-import type { Tabulator } from 'tabulator-tables';
-
 import type { GridHeaderContextDetail } from '../grid/index.js';
-import type { ColumnSettingsController, Target } from './ColumnSettingsController.js';
+import type { ColumnSettingsController, ColumnTarget } from './ColumnSettingsController.js';
 import type { ContextMenu } from './ContextMenu.js';
 
 export interface GridColumnMenuOptions {
   /** The grid the menu acts on, read late: the table is built after the host connects. */
-  table: () => Target | null;
+  table: () => ColumnTarget | null;
   /** The host's `<context-menu>`, looked up per use so no first-update hook is needed. */
   menu: () => ContextMenu | null;
   /** The column state the menu shows and edits. */
@@ -45,16 +43,6 @@ export class GridColumnMenuController {
   resetView = (event: CustomEvent<{ value: string }>): void => {
     this._options.columns.reset(event.detail.value);
   };
-
-  /** Applies the view on show and wires the header's right-click, once the table is built. */
-  initTable(table: Tabulator): void {
-    this._options.columns.applyTo(table);
-    const header = table.element.querySelector<HTMLElement>('.tabulator-header');
-    header?.addEventListener('contextmenu', (event) => {
-      event.preventDefault();
-      this.showAt(event.clientX, event.clientY);
-    });
-  }
 
   /** `lv-grid-header-context` on an lv-grid: the header's right-click. */
   headerContext = (e: Event): void => {

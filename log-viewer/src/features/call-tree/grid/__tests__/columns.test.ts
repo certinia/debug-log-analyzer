@@ -4,15 +4,6 @@
 /*
  * Copyright (c) 2026 Certinia Inc. All rights reserved.
  */
-jest.mock('tabulator-tables', () => ({
-  Tabulator: class {
-    static registerModule() {}
-  },
-  Module: class {},
-  Renderer: class {},
-}));
-// The Tabulator column definitions are compared as data; no table is built.
-
 import type { ApexLog, LogEvent } from '@apexdevtools/apex-log-parser';
 import { render } from 'lit';
 
@@ -23,7 +14,6 @@ import { NO_REPORTED_LIMITS_TEXT } from '../../../../components/governorCopy.js'
 import { formatInteger } from '../../../../core/utility/Util.js';
 import { FIND_TEXT_ATTR, type GridColumn } from '../../../../grid/index.js';
 import { logStoreFor } from '../../../../core/log/LogStore.js';
-import { createGovernorMetricColumns } from '../../components/TableShared.js';
 import {
   toAggregatedCallTree,
   toBottomUpTree,
@@ -85,26 +75,16 @@ const shown = (content: unknown): HTMLElement => {
 };
 
 describe('timeOrderColumns', () => {
-  it('has the Tabulator columns, in their order, shown and hidden as they were', () => {
-    const tabulator = createGovernorMetricColumns(log, {
-      netTotal: 'sum',
-      netSelf: 'sum',
-      grossTotal: 'sum',
-      grossSelf: 'sum',
-    });
-    const fields = tabulator.map((c) => c.field);
-    const ours = timeOrder.filter((c) => fields.includes(c.id));
-    expect(ours.map((c) => [c.id, c.title, c.width, c.hidden ?? false])).toEqual(
-      tabulator.map((c) => [c.field, c.title, c.width, c.visible === false]),
-    );
-    expect(timeOrder.map((c) => c.id).filter((id) => !fields.includes(id))).toEqual([
+  it('has the name, namespace, type and time columns, in their order', () => {
+    const named = [
       'text',
       'namespace',
       'callerNamespace',
       'type',
       'duration.total',
       'duration.self',
-    ]);
+    ];
+    expect(timeOrder.map((c) => c.id).filter((id) => named.includes(id))).toEqual(named);
   });
 
   it('sums total time over top-level rows, and self time over every row', () => {
@@ -219,7 +199,7 @@ describe('aggregatedColumns', () => {
   const all = (of: readonly AggregatedRow[]): AggregatedRow[] =>
     of.flatMap((r) => [r, ...all(r._children ?? [])]);
 
-  it('has the Tabulator columns, in their order, with Type and Avg Self Time hidden', () => {
+  it('has its columns in order, with Type and Avg Self Time hidden', () => {
     const ids = columns.map((c) => c.id);
     expect(ids.slice(0, 5)).toEqual(['text', 'namespace', 'callerNamespace', 'type', 'callCount']);
     expect(ids.slice(-3)).toEqual(['totalTime', 'totalSelfTime', 'avgSelfTime']);

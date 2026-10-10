@@ -49,7 +49,7 @@ import {
 import { inspectorRowEvents } from '../grid/inspectorRowEvents.js';
 import { MergedTree } from '../grid/mergedRows.js';
 
-import { inMsRange, type FilterRange } from '../../../tabulator/filters/MinMax.js';
+import { inMsRange, type FilterRange } from '../../../components/grid/MinMax.js';
 
 // styles
 import { globalStyles } from '../../../styles/global.styles.js';
@@ -70,7 +70,7 @@ import {
   gridColumnTarget,
   type ColumnTarget,
 } from '../../../components/ColumnSettingsController.js';
-import { CALL_TREE_VIEWS } from '../../../tabulator/ColumnViews.js';
+import { CALL_TREE_VIEWS } from '../../../components/grid/ColumnViews.js';
 import { LocatedRowIds } from '../../../components/locatedRow.js';
 import { InspectorTabController } from '../../../components/InspectorTabController.js';
 import { LvGridFindController } from '../../../components/grid/LvGridFindController.js';

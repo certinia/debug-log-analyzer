@@ -8,7 +8,7 @@ import { customElement, property, state } from 'lit/decorators.js';
 
 import { anchoredPopoverStyles } from '../styles/anchoredPopover.styles.js';
 import { globalStyles } from '../styles/global.styles.js';
-import type { FilterRange } from '../tabulator/filters/MinMax.js';
+import type { FilterRange } from './grid/MinMax.js';
 
 let nextId = 0;
 

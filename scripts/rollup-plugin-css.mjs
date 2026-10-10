@@ -14,7 +14,7 @@
  * `document.body` (light DOM) when no `popupContainer` is set, so those popups are only styled
  * by the document-level <style>, not by the shadow-root `unsafeCSS` copy.
  *
- * SCSS resolves bare `node_modules` specifiers (e.g. `tabulator-tables/...`) via `loadPaths`.
+ * SCSS resolves bare `node_modules` specifiers via `loadPaths`.
  */
 import { readFile } from 'node:fs/promises';
 import path from 'node:path';

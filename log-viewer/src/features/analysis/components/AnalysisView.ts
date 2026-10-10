@@ -27,7 +27,7 @@ import { LvGridFindController } from '../../../components/grid/LvGridFindControl
 import { GridColumnMenuController } from '../../../components/GridColumnMenuController.js';
 import { columnViewSelect, gridToolbarActions } from '../../../components/gridToolbar.js';
 import type { GridColumn, GroupBy, RowKey, TreeSource } from '../../../grid/index.js';
-import { CALL_TREE_VIEWS } from '../../../tabulator/ColumnViews.js';
+import { CALL_TREE_VIEWS } from '../../../components/grid/ColumnViews.js';
 import '../../call-tree/grid/CallTreeGrid.js';
 import type { CallTreeGrid } from '../../call-tree/grid/CallTreeGrid.js';
 import {

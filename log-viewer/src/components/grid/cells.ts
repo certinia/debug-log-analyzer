@@ -5,7 +5,9 @@ import { html, nothing, type TemplateResult } from 'lit';
 
 import { nsToMs } from '../../core/utility/Duration.js';
 import { sharePercent } from '../../core/utility/Util.js';
-import { MIN_VISIBLE_PERCENT } from '../../tabulator/format/ProgressComponent.js';
+
+// A real share that rounds to 0% still shows, as a hairline.
+const MIN_VISIBLE_PERCENT = 1;
 
 export interface BarOptions {
   precision?: number;
@@ -13,7 +15,7 @@ export interface BarOptions {
   percent?: boolean;
 }
 
-/** A value with a bar for its share of `total`: the template twin of `progressComponent`. */
+/** A value with a bar for its share of `total`. */
 export function bar(value: number, total: number, options: BarOptions = {}): TemplateResult {
   const { precision = 2, percent = true } = options;
   const share = sharePercent(value, total);

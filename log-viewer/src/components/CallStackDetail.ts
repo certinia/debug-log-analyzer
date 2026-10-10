@@ -9,7 +9,7 @@ import { createRef, ref } from 'lit/directives/ref.js';
 import { max, sum, type GridColumn, type TreeSource } from '../grid/index.js';
 import { queryDialect } from '../features/call-tree/grid/cells.js';
 import { globalStyles } from '../styles/global.styles.js';
-import { progressColumnWidth } from '../tabulator/format/measureWidth.js';
+import { progressColumnWidth } from './grid/measureWidth.js';
 import { buildCallStackData, type CallStackRow } from './callStackData.js';
 import type { AppGrid } from './grid/AppGrid.js';
 import { inlineQueryColumn, timeColumn } from './grid/columns.js';

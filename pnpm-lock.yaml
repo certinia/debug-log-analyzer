@@ -218,16 +218,10 @@ importers:
       pixi.js:
         specifier: ^8.22.0
         version: 8.22.0
-      tabulator-tables:
-        specifier: ^6.6.1
-        version: 6.6.1
     devDependencies:
       '@types/jest':
         specifier: ^30.0.0
         version: 30.0.0
-      '@types/tabulator-tables':
-        specifier: ^6.3.6
-        version: 6.3.6
       lightningcss:
         specifier: ^1.33.0
         version: 1.33.0
@@ -3882,9 +3876,6 @@ packages:
 
   '@types/stack-utils@2.0.3':
     resolution: {integrity: sha512-9aEbYZ3TbYMznPdcdr3SmIrLXwC/AKZXQeCf9Pgao5CKb8CyHuEX5jzWPTkvregvhRJHcpRO6BFoGW9ycaOkYw==}
-
-  '@types/tabulator-tables@6.3.6':
-    resolution: {integrity: sha512-H4xtYl8Dy/g4SrNnZx+oEK/N5+FLLEGTuU3MM7bpUUk3gtYy5aYqSjxQ1pqITnQ/PKHqV1aD4Zd5xels9AnPSA==}
 
   '@types/tough-cookie@4.0.5':
     resolution: {integrity: sha512-/Ad8+nIOV7Rl++6f1BdKxFSMgmoqEoYbHRpPcx3JEfv8VRsQe9Z4mCXeJBzxs7mbHY/XOZZuXlRNfhpVPbs6ZA==}
@@ -8979,9 +8970,6 @@ packages:
   synckit@0.11.13:
     resolution: {integrity: sha512-eNRKgb3z66Yp3D2CixVujOUvXLFUTij/zVnV8KRyvFdQwpz7I5DS8UfRkTeLzb64u+dkzDSdelE24izu+zSSUg==}
     engines: {node: ^14.18.0 || >=16.0.0}
-
-  tabulator-tables@6.6.1:
-    resolution: {integrity: sha512-8A77aN30vJS34w1P5h4HtgEajB7vX2v0AD1fXFIKxp6SxplpGGfKn0Y4ouY91+6gdGK8/quqXoCA2LkrhBVE3A==}
 
   tapable@2.3.3:
     resolution: {integrity: sha512-uxc/zpqFg6x7C8vOE7lh6Lbda8eEL9zmVm/PLeTPBRhh1xCgdWaQ+J1CUieGpIfm2HdtsUpRv+HshiasBMcc6A==}
@@ -14258,8 +14246,6 @@ snapshots:
       '@types/node': 26.6.4
 
   '@types/stack-utils@2.0.3': {}
-
-  '@types/tabulator-tables@6.3.6': {}
 
   '@types/tough-cookie@4.0.5': {}
 
@@ -20344,8 +20330,6 @@ snapshots:
   synckit@0.11.13:
     dependencies:
       '@pkgr/core': 0.3.6
-
-  tabulator-tables@6.6.1: {}
 
   tapable@2.3.3: {}
 

@@ -3,8 +3,7 @@
  */
 
 /**
- * Minified and gzipped size of each table option, and of the whole webview with and
- * without Tabulator.
+ * Minified and gzipped size of each table option, and of the whole webview.
  *
  *   node scripts/grid-bench/size.mjs
  */
@@ -40,10 +39,6 @@ async function measure(label, input, external = []) {
 }
 
 console.log('Libraries alone');
-await measure(
-  'tabulator-tables (core + registered modules)',
-  path.join(sizeDir, 'lib-tabulator.ts'),
-);
 await measure('@tanstack/virtual-core', path.join(sizeDir, 'lib-virtual.ts'));
 console.log('\nTable layer (lit and parser excluded)');
 const grid = path.resolve('log-viewer/src/grid/index.ts');
@@ -52,6 +47,3 @@ if (existsSync(grid)) {
 }
 console.log('\nWhole webview (log-viewer/src/Main.ts)');
 await measure('as shipped', path.resolve('log-viewer/src/Main.ts'));
-await measure('with tabulator-tables left out', path.resolve('log-viewer/src/Main.ts'), [
-  /^tabulator-tables/,
-]);

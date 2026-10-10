@@ -8,8 +8,8 @@ import type { SOQLExecuteBeginLine } from '@apexdevtools/apex-log-parser';
 import { countColumn, textColumn } from '../../../components/grid/columns.js';
 import { getCallerNamespace } from '../../../core/utility/CallerNamespace.js';
 import type { GridColumn } from '../../../grid/index.js';
-import { SOQL_VIEWS } from '../../../tabulator/ColumnViews.js';
-import { NAMESPACE_WIDTH } from '../../../tabulator/ColumnWidths.js';
+import { SOQL_VIEWS } from '../../../components/grid/ColumnViews.js';
+import { NAMESPACE_WIDTH } from '../../../components/grid/ColumnWidths.js';
 import { deriveSoqlObject } from '../services/sobjectClassification.js';
 import {
   rowCountColumn,

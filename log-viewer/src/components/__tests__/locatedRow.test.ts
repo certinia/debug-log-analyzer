@@ -4,64 +4,17 @@
  * @jest-environment jsdom
  */
 import { describe, expect, it } from '@jest/globals';
-import type { RowComponent } from 'tabulator-tables';
 
 import type { ApexLog, LogEvent } from '@apexdevtools/apex-log-parser';
 
 import { callFrame } from '#test-helpers/events.js';
 import { logStoreFor } from '../../core/log/LogStore.js';
-import { KeyPathIds, ROOT_PATH_ID } from '../../core/log/keyPathIds.js';
-import {
-  LocatedRowIds,
-  rowDetailSelection,
-  rowFrames,
-  rowPathId,
-  stampRowPath,
-} from '../locatedRow.js';
+import { ROOT_PATH_ID } from '../../core/log/keyPathIds.js';
+import { LocatedRowIds, rowDetailSelection, rowFrames, type RowView } from '../locatedRow.js';
 
-function rowComponent(
-  element: HTMLElement,
-  data: Record<string, unknown>,
-  parent: RowComponent | false = false,
-): RowComponent {
-  return {
-    getElement: () => element,
-    getData: () => data,
-    getTreeParent: () => parent,
-  } as unknown as RowComponent;
+function rowView(data: Record<string, unknown>, parent: RowView | false = false): RowView {
+  return { getData: () => data, getTreeParent: () => parent };
 }
-
-/** A bucket row as its builder leaves it: the key it merges, and the path that
- *  tells it from a same-named row under another caller. */
-function bucketRow(ids: KeyPathIds, ...keys: string[]): RowComponent {
-  let pathId = ROOT_PATH_ID;
-  for (const key of keys) {
-    pathId = ids.step(pathId, ids.keyId(key));
-  }
-  return rowComponent(document.createElement('div'), {
-    key: keys[keys.length - 1],
-    _pathId: pathId,
-  });
-}
-
-describe('stampRowPath', () => {
-  it('stamps a row apart from its namesake under another parent', () => {
-    const ids = new KeyPathIds(0);
-    const rows = [bucketRow(ids, 'Trigger1', 'Util.log'), bucketRow(ids, 'Trigger2', 'Util.log')];
-
-    rows.forEach(stampRowPath);
-
-    const stamps = rows.map((row) => row.getElement().getAttribute('data-row-index'));
-    expect(stamps[0]).not.toBeNull();
-    expect(stamps[0]).not.toBe(stamps[1]);
-  });
-});
-
-describe('rowPathId', () => {
-  it('leaves a row that stands for one frame unnamed, as its index names it', () => {
-    expect(rowPathId(rowComponent(document.createElement('div'), { id: 7 }))).toBeUndefined();
-  });
-});
 
 describe('rowFrames', () => {
   /** exec -> m1 -> soql, with the indexes the log answers about. */
@@ -80,13 +33,12 @@ describe('rowFrames', () => {
   function rows(apexLog: ApexLog, soql: LogEvent) {
     const paths = logStoreFor(apexLog).keyPathIds();
     const bucketPath = paths.step(ROOT_PATH_ID, paths.keyIdOf(soql));
-    const bucket = rowComponent(document.createElement('div'), {
+    const bucket = rowView({
       key: 'soql',
       _pathId: bucketPath,
       instances: [soql],
     });
-    const caller = rowComponent(
-      document.createElement('div'),
+    const caller = rowView(
       { key: 'm1', _pathId: paths.step(bucketPath, paths.keyIdOf(soql.parent!)) },
       bucket,
     );
@@ -125,15 +77,14 @@ describe('rowDetailSelection', () => {
     const apexLog = { eventsById: { 1: exec, 3: m1, 5: soql } } as unknown as ApexLog;
     const paths = logStoreFor(apexLog).keyPathIds();
     const bucketPath = paths.step(ROOT_PATH_ID, paths.keyIdOf(soql));
-    const bucket = rowComponent(document.createElement('div'), {
+    const bucket = rowView({
       key: 'soql',
       _pathId: bucketPath,
       instances: [soql],
       originalData: soql,
       text: 'soql',
     });
-    const caller = rowComponent(
-      document.createElement('div'),
+    const caller = rowView(
       {
         key: 'm1',
         _pathId: paths.step(bucketPath, paths.keyIdOf(m1)),
@@ -179,7 +130,7 @@ describe('rowDetailSelection', () => {
 
   it('names the one call a Time Order row is', () => {
     const soql = callFrame('soql', null, 5);
-    const row = rowComponent(document.createElement('div'), { originalData: soql });
+    const row = rowView({ originalData: soql });
 
     expect(rowDetailSelection(row, null, 'callees')).toEqual({ kind: 'event', eventIndex: 5 });
   });
