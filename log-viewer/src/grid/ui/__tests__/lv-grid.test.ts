@@ -697,6 +697,18 @@ describe('lv-grid find marks', () => {
     expect(highlights.marks()).toEqual([' ']);
   });
 
+  it('marks no match current at -1, and keeps the other matches', async () => {
+    const { grid } = await setup();
+    const current = (): number => highlights.marks('lv-grid-current-find-match').length;
+    await grid.find({ text: 'b' });
+    await grid.setCurrentMatch(0);
+    expect(current()).toBe(1);
+
+    await grid.setCurrentMatch(-1);
+    expect(current()).toBe(0);
+    expect(highlights.marks()).toEqual(['b']);
+  });
+
   it('lets go of its marks when removed, and marks again when put back', async () => {
     const { grid, names } = await setup();
     await grid.find({ text: 'b' });
