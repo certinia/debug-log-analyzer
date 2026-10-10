@@ -27,9 +27,9 @@ export interface LvGridFindOptions {
 export class LvGridFindController {
   private readonly _options: LvGridFindOptions;
   private _query: FindQuery | null = null;
-  /** The grids the last search ran over, with each one's count. */
+  // The grids the last search ran over, with each one's count.
   private _found: { grid: FindableGrid; total: number }[] = [];
-  /** Goes up with each search and clear, so an older search sees it is stale. */
+  // Goes up with each search and clear, so an older search sees it is stale.
   private _searches = 0;
 
   constructor(host: ReactiveControllerHost, options: LvGridFindOptions) {
@@ -46,12 +46,13 @@ export class LvGridFindController {
   }
 
   async find(e: CustomEvent<FindEventDetail>): Promise<void> {
-    const shown = this._options.grids().filter((grid) => grid.clientHeight > 0);
-    if (!shown.length && !this.totalMatches) {
-      return;
-    }
     if (e.type === 'lv-find-close') {
       this._drop();
+      return;
+    }
+    const shown = this._shown();
+    // A hidden host answers nothing; a new query searches it on the next Enter once shown.
+    if (!shown.length) {
       return;
     }
     const { text, options, count } = e.detail;
@@ -77,10 +78,12 @@ export class LvGridFindController {
     await this._markCurrent(count);
   }
 
-  /** Drops the search, in the grids and in the widget. */
+  /** Drops the search in the grids, and in the widget while a grid is shown. */
   clear(): void {
     this._drop();
-    report(0);
+    if (this._shown().length) {
+      report(0);
+    }
   }
 
   /** A sort, filter, grouping or view switch moves the matches, so their numbers no longer hold. */
@@ -90,7 +93,7 @@ export class LvGridFindController {
     }
   }
 
-  /** Marks match `count`, counted from 1 across the grids as the widget counts; 0 marks none. */
+  // `count` is from 1 across the grids, as the widget counts; 0 marks none.
   private async _markCurrent(count: number): Promise<void> {
     let before = 0;
     for (const { grid, total } of this._found) {
@@ -100,11 +103,15 @@ export class LvGridFindController {
     }
   }
 
+  private _shown(): FindableGrid[] {
+    return this._options.grids().filter((grid) => grid.clientHeight > 0);
+  }
+
   private _drop(): void {
     this._searches++;
     this._query = null;
     this._found = [];
-    // Every grid, not only those the last search ended on: a stale search marks too.
+    // Every grid, not only those the last search ended on: it stops a search still running.
     for (const grid of this._options.grids()) {
       grid.clearFind();
     }

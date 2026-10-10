@@ -78,12 +78,22 @@ describe('LvGridFindController', () => {
     expect(grids[0]?.find).toHaveBeenCalledTimes(searches);
   });
 
-  it('answers nothing while no grid is shown and it has no matches', async () => {
-    grids = [gridStub(3, 0)];
-    await finder.find(findEvent('lv-find', 'update'));
+  it('answers nothing while no grid is shown, and searches a new query once shown', async () => {
+    await finder.find(findEvent('lv-find', 'foo'));
+    const grid = grids[0];
+    Object.assign(grid ?? {}, { clientHeight: 0 });
+    await finder.find(findEvent('lv-find', 'bar'));
+    await finder.find(findEvent('lv-find-match', 'bar', { count: 2 }));
+    finder.dropOnReshape();
 
-    expect(grids[0]?.find).not.toHaveBeenCalled();
-    expect(reported).toEqual([]);
+    expect(grid?.find).toHaveBeenCalledTimes(1);
+    expect(grid?.setCurrentMatch).toHaveBeenCalledTimes(1);
+    expect(reported).toEqual([3]);
+
+    Object.assign(grid ?? {}, { clientHeight: 20 });
+    await finder.find(findEvent('lv-find', 'bar'));
+    expect(grid?.find).toHaveBeenLastCalledWith({ text: 'bar', matchCase: false });
+    expect(reported).toEqual([3, 3]);
   });
 
   it('marks the widget count current, from 1, in the grid that holds it', async () => {
