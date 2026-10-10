@@ -136,6 +136,15 @@ describe('GridStore', () => {
     expect(shown(store.snapshot().rows)).toEqual(['a+@0', 'b+@1', 'c@2', 'd@0']);
   });
 
+  it('says whether a toggle opened the row', async () => {
+    const store = new GridStore(source(tree()));
+    await store.settled();
+    expect(await store.toggle('a')).toBe(true);
+    expect(await store.toggle('a')).toBe(false);
+    expect(await store.toggle('a', false)).toBe(false);
+    expect(await store.toggle('x')).toBe(false);
+  });
+
   it('runs a filter again on refresh, and keeps open rows open', async () => {
     const store = new GridStore(source(tree()));
     await store.expandAll();

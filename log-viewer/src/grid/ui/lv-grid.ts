@@ -712,13 +712,13 @@ export class LvGrid<R extends object = object> extends LitElement {
     if (target === null) {
       return;
     }
-    const rows = this.shown;
-    const opens = expanded !== false && rows?.hasChildrenAt(index) && !rows.isExpandedAt(index);
-    const row = opens ? this.dataRow(index) : null;
     this.toggled = target;
-    await this.store?.toggle(target, expanded);
-    if (row) {
-      this.emit<GridRowDetail<R>>('lv-grid-expand', { row });
+    const opened = (await this.store?.toggle(target, expanded)) ?? false;
+    // Read the row after the toggle: the rows on screen can be older than the store's.
+    const rows = this.store?.snapshot().rows;
+    const entry = opened && rows ? rows.rowAt(rows.indexOf(target)) : undefined;
+    if (entry !== undefined && !(entry instanceof Group)) {
+      this.emit<GridRowDetail<R>>('lv-grid-expand', { row: entry });
     }
   }
 
