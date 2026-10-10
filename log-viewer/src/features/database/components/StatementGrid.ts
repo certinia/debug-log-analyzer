@@ -211,9 +211,6 @@ export abstract class StatementGrid<R extends StatementRow, L> extends LitElemen
 
   private readonly _gridMounted = (el?: Element): void => {
     this._grid = (el as AppGrid<R> | undefined) ?? null;
-    if (this._grid) {
-      this._menus.initGrid(this._grid);
-    }
   };
 
   render(): TemplateResult {
@@ -286,6 +283,7 @@ export abstract class StatementGrid<R extends StatementRow, L> extends LitElemen
         @lv-grid-locate="${this._onLocate}"
         @lv-grid-context="${this._onContext}"
         @lv-grid-reshape="${this._onReshape}"
+        @lv-grid-header-context="${this._menus.headerContext}"
       ></lv-app-grid>
       <context-menu @menu-select="${this._onMenuSelect}"></context-menu>
     `;

@@ -320,15 +320,13 @@ export class AnalysisView extends LitElement {
         @lv-grid-select="${this._rowEvents.select}"
         @lv-grid-locate="${this._rowEvents.locate}"
         @lv-grid-reshape="${() => this._finder.dropOnReshape()}"
+        @lv-grid-header-context="${this._menus.headerContext}"
       ></lv-call-tree-grid>
     `;
   }
 
   private readonly _gridMounted = (el?: Element): void => {
     this.grid = (el as CallTreeGrid<BottomUpRow> | undefined) ?? null;
-    if (this.grid) {
-      this._menus.initGrid(this.grid);
-    }
   };
 
   private _buildWhenVisible(): void {

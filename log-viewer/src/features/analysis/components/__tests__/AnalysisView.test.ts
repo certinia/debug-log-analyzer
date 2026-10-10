@@ -340,6 +340,21 @@ describe('analysis-view', () => {
     expect(shown()).toContain('text');
   });
 
+  it('opens the column menu once for a header right-click, after the view is moved', async () => {
+    const menu = view.renderRoot.querySelector('context-menu') as HTMLElement & {
+      show: (...args: unknown[]) => void;
+    };
+    const show = jest.spyOn(menu, 'show').mockImplementation(() => {});
+    view.remove();
+    document.body.append(view);
+    await view.updateComplete;
+
+    const event = new MouseEvent('contextmenu', { cancelable: true });
+    fireOnGrid('lv-grid-header-context', { column: 'text', event });
+
+    expect(show).toHaveBeenCalledTimes(1);
+  });
+
   it('tints the Name cells when category colouring is on', async () => {
     applySettings({ timeline: { customThemes: {} }, callTree: { categoryColorize: true } });
     await view.updateComplete;
