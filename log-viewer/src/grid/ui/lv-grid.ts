@@ -185,7 +185,7 @@ export class LvGrid<R extends object = object> extends LitElement {
   @property({ attribute: 'footer-position', reflect: true })
   footerPosition: 'bottom' | 'rows' = 'bottom';
 
-  /** What the body shows when no row passes the filters, such as "No SOQL queries found". */
+  /** What the body shows when no row passes the filters and no build runs, such as "No SOQL queries found". */
   @property({ attribute: false })
   placeholder: string | null = null;
 
@@ -418,7 +418,7 @@ export class LvGrid<R extends object = object> extends LitElement {
         ${columns.map((column) => this.headerCell(column))}
       </div>
       ${
-        size === 0 && this.placeholder !== null
+        size === 0 && !this.data.snapshot?.busy && this.placeholder !== null
           ? html`<div class="placeholder" role="status">${this.placeholder}</div>`
           : nothing
       }

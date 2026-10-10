@@ -579,6 +579,32 @@ describe('lv-grid', () => {
     expect(foot).toEqual(['', '4', '']);
   });
 
+  it('shows no placeholder while the first build runs', async () => {
+    let release: () => void = () => undefined;
+    const held = new Promise<void>((resolve) => (release = resolve));
+    let clock = 0;
+    const { root, grid } = await setup({
+      placeholder: 'Nothing here',
+      // The build checks its clock every 256 rows, so it needs more rows than that to yield.
+      source: {
+        roots: Array.from({ length: 600 }, (_, i) => ({
+          key: i,
+          name: `n${i}`,
+          time: 1,
+          kind: 'x',
+        })),
+        key: (row: Node) => row.key,
+      },
+      filters: [{ test: () => false, keepAncestors: true }],
+      scheduler: { now: () => (clock += 100), yield: () => held },
+    });
+    expect(root.querySelector('.placeholder')).toBeNull();
+
+    release();
+    await settle(grid);
+    expect(root.querySelector('.placeholder')?.textContent?.trim()).toBe('Nothing here');
+  });
+
   it('shows no placeholder when it has none', async () => {
     const { root } = await setup({ filters: [{ test: () => false }] });
     expect(root.querySelector('.placeholder')).toBeNull();
