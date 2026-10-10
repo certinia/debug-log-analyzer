@@ -252,18 +252,18 @@ export class GridStore<R extends object> {
   /**
    * Expands or collapses a shown row; `expanded` omitted flips it. The subtree is spliced
    * in or out at once, without a rebuild. A row that is not shown is left alone: use
-   * {@link reveal} to reach it. Takes a data row's key, or a group.
+   * {@link reveal} to reach it. Takes a data row's key, or a group. True when it opened the row.
    */
-  async toggle(target: RowTarget<R>, expanded?: boolean): Promise<void> {
+  async toggle(target: RowTarget<R>, expanded?: boolean): Promise<boolean> {
     await this.settled();
     const rows = this.current.rows;
     const index = rows.indexOf(target);
     if (index === -1 || !rows.hasChildrenAt(index)) {
-      return;
+      return false;
     }
     const was = rows.isExpandedAt(index);
     if (expanded === was) {
-      return;
+      return false;
     }
     if (target instanceof Group) {
       flip(this.openGroups, target.key);
@@ -274,6 +274,7 @@ export class GridStore<R extends object> {
       this.toggledTarget = target;
       await this.rebuild();
     }
+    return !was;
   }
 
   /**
