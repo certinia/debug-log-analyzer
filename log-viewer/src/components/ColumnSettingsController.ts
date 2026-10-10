@@ -6,7 +6,7 @@ import type { Tabulator } from 'tabulator-tables';
 
 import type { ContextMenuItem } from './ContextMenu.js';
 import { getSettings, updateSetting, type LanaSettings } from '../features/settings/Settings.js';
-import type { LvGrid } from '../grid/index.js';
+import type { GridColumn, LvGrid } from '../grid/index.js';
 import {
   applyColumnView,
   buildColumnMenuItems,
@@ -29,18 +29,31 @@ export interface ColumnTarget {
 
 /** An lv-grid as a column view target: the view sets each column's `hidden`. */
 export function gridColumnTarget<R extends object>(grid: LvGrid<R>): ColumnTarget {
+  return heldColumnTarget(
+    () => grid.columns,
+    (columns) => (grid.columns = columns),
+  );
+}
+
+/** {@link gridColumnTarget} for columns a host holds and binds to its grid, which a render would set back. */
+export function heldColumnTarget<R>(
+  read: () => readonly GridColumn<R>[],
+  write: (columns: GridColumn<R>[]) => void,
+): ColumnTarget {
   return {
     columns: () =>
-      grid.columns.map((column) => ({
+      read().map((column) => ({
         field: column.id,
         title: column.title,
         visible: !column.hidden,
       })),
     show: (visible) => {
-      grid.columns = grid.columns.map((column) => ({
-        ...column,
-        hidden: visible ? !visible.has(column.id) : false,
-      }));
+      write(
+        read().map((column) => ({
+          ...column,
+          hidden: visible ? !visible.has(column.id) : false,
+        })),
+      );
     },
   };
 }
