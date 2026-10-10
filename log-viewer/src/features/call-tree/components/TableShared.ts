@@ -20,7 +20,7 @@ import {
   progressFormatter,
   type ProgressParams as ProgressBarParams,
 } from '../../../tabulator/format/Progress.js';
-import { type ProgressParams, progressFormatterMS } from '../../../tabulator/format/ProgressMS.js';
+import { progressFormatterMS } from '../../../tabulator/format/ProgressMS.js';
 import { AnchoringPolicy } from '../../../tabulator/module/AnchoringPolicy.js';
 import * as CommonModules from '../../../tabulator/module/CommonModules.js';
 import { Find } from '../../../tabulator/module/Find.js';
@@ -111,38 +111,6 @@ export const virtualScrollOptions = {
   renderVertical: VirtualVerticalRenderer,
   anchoringPolicy: true,
 } satisfies Partial<Options>;
-
-/**
- * A right-aligned duration column rendered as a `progressFormatterMS` bar
- * (value + percent), fixed to `barWidth`, with a matching bottom-calc. Shared by
- * the side-panel Call stack / Call tree tables so their Total/Self columns match.
- */
-export function createDurationBarColumn(opts: {
-  title: string;
-  field: string;
-  barWidth: number;
-  barParams: ProgressParams;
-  bottomCalc: ColumnDefinition['bottomCalc'];
-  tooltip?: ColumnDefinition['tooltip'];
-}): ColumnDefinition {
-  return {
-    title: opts.title,
-    field: opts.field,
-    sorter: 'number',
-    hozAlign: 'right',
-    headerHozAlign: 'right',
-    width: opts.barWidth,
-    minWidth: opts.barWidth,
-    widthGrow: 0,
-    widthShrink: 0,
-    formatter: progressFormatterMS,
-    formatterParams: opts.barParams,
-    bottomCalc: opts.bottomCalc,
-    bottomCalcFormatter: progressFormatterMS,
-    bottomCalcFormatterParams: opts.barParams,
-    ...(opts.tooltip ? { tooltip: opts.tooltip } : {}),
-  };
-}
 
 /**
  * A tooltip that shows `text` and nothing else. Tabulator writes a string
