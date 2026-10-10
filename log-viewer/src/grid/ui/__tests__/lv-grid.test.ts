@@ -444,10 +444,15 @@ describe('lv-grid', () => {
       reshapes.push(detail<GridReshapeDetail>(e).reason),
     );
 
+    await grid.refresh();
+    expect(reshapes).toEqual([]);
+
     grid.filters = [{ test: () => true }];
     await settle(grid);
     await grid.refresh();
-    expect(reshapes).toEqual(['filter', 'filter']);
+    grid.groupBy = (row) => row.kind;
+    await settle(grid);
+    expect(reshapes).toEqual(['filter', 'filter', 'group']);
   });
 
   it('shows group rows that toggle on click and select from the keyboard', async () => {
