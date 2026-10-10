@@ -9,10 +9,10 @@ import { ROOT_PATH_ID } from '../core/log/keyPathIds.js';
 import { logStoreFor } from '../core/log/LogStore.js';
 import { eventByEventIndex } from '../core/utility/EventSearch.js';
 
-/** A row of a merged or Time Order view, and the way up its tree. */
-export interface RowView {
-  getData(): object;
-  getTreeParent(): RowView | false;
+/** How the inspector reads a grid's row: its data, and the row above it. */
+export interface RowReader<R> {
+  data: (row: R) => object;
+  parentOf: (row: R) => R | undefined;
 }
 
 /** A row of a merged view: `key` is the bucket it stands for, `instances` the
@@ -26,7 +26,7 @@ interface CallRow {
   originalData?: LogEvent;
 }
 
-const rowCallData = (row: RowView): CallRow => row.getData() as CallRow;
+const rowCallData = <R>(row: R, read: RowReader<R>): CallRow => read.data(row) as CallRow;
 
 /** Held per row: a pointer sweep re-enters rows and the click that follows a
  *  hover asks again, but deriving reads every occurrence the root bucket holds. */
@@ -38,10 +38,10 @@ const NO_CALLS: LogEvent[] = [];
  * The root bucket a derived row reads its calls from, or null where the walk
  * leaves the merged rows and the row stands for nothing.
  */
-function rootBucketOf(row: RowView, data: CallRow): CallRow | null {
+function rootBucketOf<R>(row: R, read: RowReader<R>, data: CallRow): CallRow | null {
   let node = data;
-  for (let parent = row.getTreeParent(); parent; parent = parent.getTreeParent()) {
-    const parentData = rowCallData(parent);
+  for (let parent = read.parentOf(row); parent; parent = read.parentOf(parent)) {
+    const parentData = rowCallData(parent, read);
     if (parentData.key === undefined) {
       return null;
     }
@@ -56,15 +56,15 @@ function rootBucketOf(row: RowView, data: CallRow): CallRow | null {
  * The calls a row stands for. A bottom-up caller row holds none of its own, so it
  * is derived from its root bucket and the chain that reaches it.
  */
-function rowCallOccurrences(row: RowView, root: ApexLog | null): LogEvent[] {
-  const data = rowCallData(row);
+function rowCallOccurrences<R>(row: R, read: RowReader<R>, root: ApexLog | null): LogEvent[] {
+  const data = rowCallData(row, read);
   if (data.instances?.length) {
     return data.instances;
   }
   if (data.key === undefined) {
     return data.originalData ? [data.originalData] : NO_CALLS;
   }
-  return derivedRowOf(row, data, root).calls;
+  return derivedRowOf(row, read, data, root).calls;
 }
 
 /** What a derived row's bucket answers: the calls whose chain runs through the
@@ -90,7 +90,12 @@ const derivedRows = new WeakMap<CallRow, DerivedRow>();
  * The table is the log's that built the rows: a path id is minted per log, so
  * another log's table would answer about a path of its own.
  */
-function derivedRowOf(row: RowView, data: CallRow, root: ApexLog | null): DerivedRow {
+function derivedRowOf<R>(
+  row: R,
+  read: RowReader<R>,
+  data: CallRow,
+  root: ApexLog | null,
+): DerivedRow {
   const cached = derivedRows.get(data);
   if (cached) {
     return cached;
@@ -100,7 +105,7 @@ function derivedRowOf(row: RowView, data: CallRow, root: ApexLog | null): Derive
     return NOTHING_DERIVED;
   }
   const paths = logStoreFor(root).keyPathIds();
-  const instances = rootBucketOf(row, data)?.instances;
+  const instances = rootBucketOf(row, read, data)?.instances;
   if (!instances?.length) {
     return NOTHING_DERIVED;
   }
@@ -158,13 +163,13 @@ function pathIdsForEvents(
 /** The calls a row stands for, as the event indexes the mark works in.
  *
  * @param root - the log the row was built from, which its path id belongs to */
-export function rowOccurrences(row: RowView, root: ApexLog | null): number[] {
-  const data = rowCallData(row);
+function rowOccurrences<R>(row: R, read: RowReader<R>, root: ApexLog | null): number[] {
+  const data = rowCallData(row, read);
   const cached = derivedIndexes.get(data);
   if (cached) {
     return cached;
   }
-  const indexes = rowCallOccurrences(row, root).map((event) => event.eventIndex);
+  const indexes = rowCallOccurrences(row, read, root).map((event) => event.eventIndex);
   if (indexes.length) {
     // Not kept where nothing derived: the calls are read through the log on
     // screen, so an answer of none can be that log not being set yet.
@@ -186,17 +191,22 @@ export function rowOccurrences(row: RowView, root: ApexLog | null): number[] {
  *
  * @param direction - the way the row's own table reads the tree
  */
-export function rowFrames(row: RowView, root: ApexLog | null, direction: SelectionView): number[] {
-  const data = rowCallData(row);
+export function rowFrames<R>(
+  row: R,
+  read: RowReader<R>,
+  root: ApexLog | null,
+  direction: SelectionView,
+): number[] {
+  const data = rowCallData(row, read);
   const pathId = data._pathId;
   if (direction !== 'callers' || !root || pathId === undefined) {
-    return rowOccurrences(row, root);
+    return rowOccurrences(row, read, root);
   }
   if (logStoreFor(root).keyPathIds().parentOf(pathId) === ROOT_PATH_ID) {
     // A row at the depth of its own calls stands for them.
-    return rowOccurrences(row, root);
+    return rowOccurrences(row, read, root);
   }
-  return derivedRowOf(row, data, root).frames;
+  return derivedRowOf(row, read, data, root).frames;
 }
 
 /**
@@ -206,15 +216,16 @@ export function rowFrames(row: RowView, root: ApexLog | null, direction: Selecti
  * @param root - the log the row was built from, which its path id belongs to
  * @param direction - the way the row's own table reads the tree
  */
-export function rowDetailSelection(
-  row: RowView | undefined,
+export function rowDetailSelection<R>(
+  row: R | null,
+  read: RowReader<R>,
   root: ApexLog | null,
   direction: SelectionView,
 ): DetailSelection | null {
   if (!row) {
     return null;
   }
-  const data = rowCallData(row);
+  const data = rowCallData(row, read);
   const event = data.originalData;
   if (!event) {
     return null;
@@ -228,8 +239,8 @@ export function rowDetailSelection(
   // its own calls, so nothing reached them but it.
   return {
     kind: 'aggregate',
-    instances: rowOccurrences(row, root),
-    frames: rowFrames(row, root, direction),
+    instances: rowOccurrences(row, read, root),
+    frames: rowFrames(row, read, root, direction),
     calledBy: data.instances?.length ? undefined : data.text,
   };
 }

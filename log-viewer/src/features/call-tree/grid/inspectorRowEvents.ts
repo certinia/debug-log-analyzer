@@ -3,7 +3,7 @@
  */
 import type { ApexLog } from '@apexdevtools/apex-log-parser';
 
-import { rowDetailSelection, rowFrames, type RowView } from '../../../components/locatedRow.js';
+import { rowDetailSelection, rowFrames, type RowReader } from '../../../components/locatedRow.js';
 import { eventBus, type DetailSource, type SelectionView } from '../../../core/events/EventBus.js';
 import type { SelectionEchoGuard } from '../../../core/events/SelectionEchoGuard.js';
 import type { GridRowDetail, GridSelectDetail } from '../../../grid/index.js';
@@ -27,8 +27,7 @@ export function inspectorRowEvents<R>(opts: InspectorRowEventsOptions<R>): {
   select: (e: Event) => void;
   locate: (e: Event) => void;
 } {
-  const parentOf = opts.parentOf ?? (() => undefined);
-  const standIn = (row: R): RowView => rowStandIn(row, opts.data, parentOf);
+  const read: RowReader<R> = { data: opts.data, parentOf: opts.parentOf ?? (() => undefined) };
   return {
     select: (e) => {
       if (opts.echoGuard.suppressed) {
@@ -36,7 +35,7 @@ export function inspectorRowEvents<R>(opts: InspectorRowEventsOptions<R>): {
       }
       const { row } = (e as CustomEvent<GridSelectDetail<R>>).detail;
       const view = opts.view();
-      const selection = rowDetailSelection(row ? standIn(row) : undefined, opts.root(), view);
+      const selection = rowDetailSelection(row, read, opts.root(), view);
       if (!selection) {
         // The selection went with it, and so does a mark a picked inspector row
         // left here — it was never a selection of this grid.
@@ -48,23 +47,9 @@ export function inspectorRowEvents<R>(opts: InspectorRowEventsOptions<R>): {
       const { row } = (e as CustomEvent<GridRowDetail<R>>).detail;
       eventBus.emit('detail:locate', {
         source: opts.source,
-        eventIndexes: row ? rowFrames(standIn(row), opts.root(), opts.view()) : [],
+        eventIndexes: row ? rowFrames(row, read, opts.root(), opts.view()) : [],
       });
     },
   };
 }
 
-/** The row shape `locatedRow` reads, for a row of an lv-grid. */
-function rowStandIn<R>(
-  row: R,
-  data: (row: R) => object,
-  parentOf: (row: R) => R | undefined,
-): RowView {
-  return {
-    getData: () => data(row),
-    getTreeParent: () => {
-      const parent = parentOf(row);
-      return parent ? rowStandIn(parent, data, parentOf) : false;
-    },
-  };
-}
