@@ -14,6 +14,7 @@ import {
   type Calc,
   type GridColumn,
   type GridSort,
+  type GroupBy,
   type RowFilter,
   type TreeSource,
 } from '../../../grid/index.js';
@@ -454,6 +455,22 @@ function nameLines(event: LogEvent): number {
 export const mergedLines = (row: { originalData: LogEvent }): number => nameLines(row.originalData);
 
 export const TIME_ORDER_DETAILS: RowFilter<LogEvent> = { test: isDetailEvent, keepAncestors: true };
+
+/** Show Details on the Bottom-Up tree. */
+export const BOTTOM_UP_DETAILS: RowFilter<BottomUpRow> = { test: (row) => row._hasDetailsDeep };
+
+/** The Bottom-Up row field each group-by picker value groups on; None has none. */
+const GROUP_FIELDS: Record<string, 'namespace' | 'callerNamespace' | 'type'> = {
+  Namespace: 'namespace',
+  'Caller Namespace': 'callerNamespace',
+  Type: 'type',
+};
+
+/** The Bottom-Up grouping for a group-by picker value, or null for none. */
+export function bottomUpGroupBy(value: string): GroupBy<BottomUpRow> | null {
+  const field = GROUP_FIELDS[value];
+  return field ? (row) => row[field] ?? '' : null;
+}
 
 /** The Time Order columns. */
 export function timeOrderColumns(
