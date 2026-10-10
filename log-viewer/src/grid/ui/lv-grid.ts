@@ -182,6 +182,8 @@ export class LvGrid<R extends object = object> extends LitElement {
   private selectedAt = -1;
   private hovered = -1;
   private found: FindMarks<R> | null = null;
+  // Goes up with each find and clear, so a find still running sees it is stale.
+  private searches = 0;
   /** Widths the user set, by column id. They win over a column's own `width`. */
   private readonly widths = new Map<string, number>();
   private readonly scrollerRef = createRef<HTMLDivElement>();
@@ -258,8 +260,9 @@ export class LvGrid<R extends object = object> extends LitElement {
    */
   async find(query: FindQuery): Promise<number> {
     const cells = this.visibleColumns().flatMap((column) => (column.text ? [column.text] : []));
+    const search = ++this.searches;
     const result = await this.store?.find(query, cells);
-    if (!result) {
+    if (!result || search !== this.searches) {
       return -1;
     }
     this.found = result.pattern ? { result, current: -1 } : null;
@@ -292,6 +295,7 @@ export class LvGrid<R extends object = object> extends LitElement {
   }
 
   clearFind(): void {
+    this.searches++;
     this.found = null;
     this.view?.setFind(null);
   }

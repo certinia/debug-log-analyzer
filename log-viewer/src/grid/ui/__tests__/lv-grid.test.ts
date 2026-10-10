@@ -722,6 +722,15 @@ describe('lv-grid find marks', () => {
     expect(highlights.marks()).toEqual(['b']);
   });
 
+  it('paints no marks for a find that a clear made stale', async () => {
+    const { grid } = await setup();
+    const running = grid.find({ text: 'b' });
+    grid.clearFind();
+
+    expect(await running).toBe(-1);
+    expect(highlights.marks()).toEqual([]);
+  });
+
   it('lets go of its marks when removed, and marks again when put back', async () => {
     const { grid, names } = await setup();
     await grid.find({ text: 'b' });
