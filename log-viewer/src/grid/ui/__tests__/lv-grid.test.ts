@@ -787,6 +787,32 @@ describe('lv-grid columns', () => {
     expect(grid.getAttribute('footer-position')).toBe('rows');
   });
 
+  it('reflects fit-rows, which the styles key the fitted height on', async () => {
+    const { grid } = await setup();
+    expect(grid.hasAttribute('fit-rows')).toBe(false);
+    grid.fitRows = true;
+    await settle(grid);
+    expect(grid.hasAttribute('fit-rows')).toBe(true);
+  });
+
+  it('brings a fitted grid row into the page view, which its own scroller cannot see', async () => {
+    const { grid } = await setup();
+    const into: Element[] = [];
+    // jsdom has no scrollIntoView.
+    HTMLElement.prototype.scrollIntoView = function (this: HTMLElement) {
+      into.push(this);
+    };
+
+    await grid.goTo([3], { scrollIfVisible: false });
+    expect(into).toEqual([]);
+
+    grid.fitRows = true;
+    await settle(grid);
+    await grid.goTo([3], { scrollIfVisible: false });
+    expect(into.map((el) => (el as HTMLElement).dataset.index)).toEqual(['2']);
+    delete (HTMLElement.prototype as Partial<HTMLElement>).scrollIntoView;
+  });
+
   it('keeps its rows when moved out and back, and shows what changed while away', async () => {
     const { grid, root, names } = await setup();
     const body = root.querySelector('.body');

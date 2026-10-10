@@ -11,6 +11,8 @@ import type { DatabaseOverview } from '../../services/databaseOverview.js';
 // Tables built and destroyed.
 let built = 0;
 let destroyed = 0;
+// The last table's handlers, by event.
+const handlers: Record<string, (...args: unknown[]) => void> = {};
 
 jest.mock('tabulator-tables', () => ({
   Tabulator: class {
@@ -18,7 +20,9 @@ jest.mock('tabulator-tables', () => ({
     constructor() {
       built++;
     }
-    on() {}
+    on(name: string, handler: (...args: unknown[]) => void) {
+      handlers[name] = handler;
+    }
     destroy() {
       destroyed++;
     }
@@ -46,6 +50,7 @@ jest.mock('../../services/databaseOverview.js', () => ({
 
 import { stubStore } from '#test-helpers/apexLog.js';
 import { waitForNextFrame } from '../../../../core/utility/FrameBudget.js';
+import { INSPECTOR_LOCATE_EVENT } from '../../../../components/inspectorReveal.js';
 import type { DatabaseTime } from '../DatabaseTimeTree.js';
 import '../DatabaseTimeTree.js';
 
@@ -93,5 +98,16 @@ describe('database-time', () => {
 
     expect(built).toBe(2);
     expect(element.shadowRoot?.querySelector('grid-skeleton')?.hasAttribute('pending')).toBe(false);
+  });
+
+  it('marks nothing for the pointer over the totals row, which names no statement', () => {
+    const located: unknown[] = [];
+    element.addEventListener(INSPECTOR_LOCATE_EVENT, (e) =>
+      located.push((e as CustomEvent<{ eventIndexes: unknown }>).detail.eventIndexes),
+    );
+
+    handlers.rowMouseEnter?.(new MouseEvent('mouseenter'), { getData: () => ({ name: 'Total' }) });
+
+    expect(located).toEqual([[]]);
   });
 });

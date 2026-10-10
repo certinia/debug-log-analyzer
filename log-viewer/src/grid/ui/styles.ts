@@ -33,6 +33,8 @@ export const gridStyles = css`
       --grid-twisty: 16px;
       --grid-stroke: 1px;
       --grid-resize: 6px;
+      /* A percentage of a parent with no set height is no limit, so every row would render. */
+      --grid-max-height: 100vh;
 
       display: block;
       height: 100%;
@@ -41,6 +43,10 @@ export const gridStyles = css`
       background: var(--grid-bg);
       font-family: var(--grid-font);
       font-size: var(--grid-font-size);
+    }
+
+    :host([fit-rows]) {
+      height: auto;
     }
 
     .scroller {
@@ -53,6 +59,13 @@ export const gridStyles = css`
       contain: strict;
       overflow-anchor: none;
       outline: none;
+
+      /* Size containment would hold it at no height, so only layout and paint are contained. */
+      :host([fit-rows]) & {
+        height: auto;
+        max-height: var(--grid-max-height);
+        contain: content;
+      }
 
       /* The body holds only absolute rows: it would shrink to nothing. */
       & > * {

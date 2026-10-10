@@ -18,7 +18,6 @@ const EVERY_NAME: (keyof FindEventMap)[] = [
   'lv-find-match',
   'lv-find-close',
   'lv-find-results',
-  'db-find-results',
 ];
 
 function find(name: keyof FindEventMap, detail: unknown = DETAIL): void {
@@ -70,16 +69,16 @@ describe('DomListenerController', () => {
     const results: CustomEvent[] = [];
     new DomListenerController<FindEventMap>(host, document, {
       'lv-find': (e) => void finds.push(e),
-      'db-find-results': (e) => void results.push(e),
+      'lv-find-results': (e) => void results.push(e),
     });
     host.connect();
 
     for (const name of EVERY_NAME) {
-      find(name, name === 'db-find-results' ? { totalMatches: 3, type: 'soql' } : DETAIL);
+      find(name, name === 'lv-find-results' ? { totalMatches: 3 } : DETAIL);
     }
 
     expect(finds.map((e) => e.type)).toEqual(['lv-find']);
-    expect(results.map((e) => e.detail)).toEqual([{ totalMatches: 3, type: 'soql' }]);
+    expect(results.map((e) => e.detail)).toEqual([{ totalMatches: 3 }]);
   });
 
   it('hands the event through untouched', () => {

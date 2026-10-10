@@ -9,14 +9,16 @@ import { msBar, msText } from './cells.js';
 export const COUNT_MIN_WIDTH = 60;
 const TIME_MIN_WIDTH = 120;
 
-/** A right-aligned integer with a summed footer, for a count with no limit to draw against. */
+/** A right-aligned number, empty where the row has none, with a summed footer unless `summed` is false. */
 export function countColumn<R>(opts: {
   id: string;
   title: string;
-  value: (row: R) => number;
+  value: (row: R) => number | null | undefined;
   width: number;
   hidden?: boolean;
+  summed?: boolean;
 }): GridColumn<R> {
+  const text = (row: R) => String(opts.value(row) ?? '');
   return {
     id: opts.id,
     title: opts.title,
@@ -24,11 +26,11 @@ export function countColumn<R>(opts: {
     minWidth: COUNT_MIN_WIDTH,
     align: 'end',
     hidden: opts.hidden,
-    cell: (row) => String(opts.value(row)),
-    text: (row) => String(opts.value(row)),
+    cell: text,
+    text,
     sort: { value: opts.value },
     sortFirst: 'desc',
-    calc: sum(opts.value),
+    calc: opts.summed === false ? undefined : sum((row) => opts.value(row) ?? 0),
   };
 }
 
@@ -56,5 +58,29 @@ export function timeColumn<R>(opts: {
     sortFirst: 'desc',
     calc: opts.calc,
     total: (value) => msBar(value, opts.totalNs),
+  };
+}
+
+/** A plain text column, empty where the row has no value; `hoverText` shows it on hover. */
+export function textColumn<R>(opts: {
+  id: string;
+  title: string;
+  value: (row: R) => string | null | undefined;
+  width: number;
+  hidden?: boolean;
+  hoverText?: boolean;
+  empty?: string;
+}): GridColumn<R> {
+  const text = (row: R) => opts.value(row) ?? '';
+  return {
+    id: opts.id,
+    title: opts.title,
+    width: opts.width,
+    hidden: opts.hidden,
+    cell: (row) => opts.value(row) ?? opts.empty ?? '',
+    text,
+    tooltip: opts.hoverText ? text : undefined,
+    sort: { value: opts.value },
+    sortFirst: 'desc',
   };
 }
