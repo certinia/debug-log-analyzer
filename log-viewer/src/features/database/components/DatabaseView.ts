@@ -14,11 +14,10 @@ import type {
 } from '@apexdevtools/apex-log-parser';
 
 import { limitTotals } from '../../../components/logOverviewMetrics.js';
-import { DomListenerController } from '../../../core/events/DomListenerController.js';
 import { eventBus, type StatementType } from '../../../core/events/EventBus.js';
-import type { DbFindResultsEventDetail, FindEventMap } from '../../find/findEvents.js';
 import { apexLimitSeries } from '../../timeline/optimised/apex-limit-series.js';
 import { InspectorTabController } from '../../../components/InspectorTabController.js';
+import { LvGridFindController } from '../../../components/grid/LvGridFindController.js';
 import { SelectionEchoGuard } from '../../../core/events/SelectionEchoGuard.js';
 import { formatInteger, isVisible } from '../../../core/utility/Util.js';
 import { soslRowsMetric } from '../limits.js';
@@ -36,12 +35,11 @@ import type { SOSLView } from './SOSLView.js';
 import './DMLView.js';
 import './DatabaseSection.js';
 import type { DatabaseMetric } from './DatabaseMetricCard.js';
-import type { GridLocateEvent } from './gridLocate.js';
-import type { GridSelectionEvent } from './gridSelection.js';
 import './GovernorSummary.js';
 import type { GaugeMetric } from './GovernorSummary.js';
 import './SOQLView.js';
 import './SOSLView.js';
+import type { GridLocateEvent, GridSelectionEvent } from './StatementGrid.js';
 
 /** A section is one statement type, so the two names are the same set. */
 type SectionKind = StatementType;
@@ -67,46 +65,27 @@ export class DatabaseView extends LitElement {
   @state()
   private collapsed: Record<SectionKind, boolean> = { dml: false, soql: false, sosl: false };
 
-  // Match totals per table, routing the shared find widget's current match to the
-  // right table, accumulated in view order: DML, then SOQL, then SOSL.
-  dmlMatches = 0;
-  soqlMatches = 0;
-  soslMatches = 0;
-
-  @state()
-  dmlHighlightIndex = 0;
-  @state()
-  soqlHighlightIndex = 0;
-  @state()
-  soslHighlightIndex = 0;
-
-  findArgs: { text: string; count: number; options: { matchCase: boolean } } = {
-    text: '',
-    count: 0,
-    options: { matchCase: false },
-  };
-  findMap = {};
-
   /** Guards the selects this view makes on the inspector's behalf. */
   private _echoGuard = new SelectionEchoGuard();
 
-  private readonly _findBus = new DomListenerController<FindEventMap>(this, document, {
-    'lv-find': (e) => this._find(e.detail.count),
-    'lv-find-match': (e) => this._find(e.detail.count),
-    'db-find-results': (e) => this._findResults(e),
+  // The widget counts the three grids' matches as one list, in view order.
+  private readonly _finder = new LvGridFindController(this, {
+    grids: () => this._views.flatMap((view) => (view?.grid ? [view.grid] : [])),
   });
 
   private readonly _inspector = new InspectorTabController(this, 'database', {
     mark: (eventIndexes) => this._markLocated(eventIndexes),
-    // The eventIndex belongs to exactly one grid, so each is offered it in turn
-    // until one owns it.
+    // The eventIndex belongs to exactly one grid.
     reveal: (eventIndex) => {
       const views = this._views;
-      this._echoGuard.run(() => {
-        const owner = views.find((view) => view?.selectByEventIndex(eventIndex));
-        if (owner) {
-          views.filter((view) => view !== owner).forEach((view) => view?.deselectRows());
-        }
+      const owner = views.find((view) => view?.owns(eventIndex));
+      if (!owner) {
+        return;
+      }
+      void this._echoGuard.runAsync(async () => {
+        // The owner too: a filter can hide the row, and its old pick must not stay.
+        views.forEach((view) => view?.deselectRows());
+        await owner.selectByEventIndex(eventIndex);
       });
     },
     clear: () => {
@@ -158,6 +137,7 @@ export class DatabaseView extends LitElement {
     this.renderRoot.addEventListener('grid-selection', (event) =>
       this._onGridSelection(event as GridSelectionEvent),
     );
+    this.renderRoot.addEventListener('grid-reshape', () => this._finder.dropOnReshape());
     // The same for the pointer, which marks rather than picks.
     this.renderRoot.addEventListener('grid-locate', (event) =>
       eventBus.emit('detail:locate', {
@@ -317,59 +297,18 @@ export class DatabaseView extends LitElement {
   private _renderTable(kind: SectionKind) {
     switch (kind) {
       case 'dml':
-        return html`<dml-view
-          .timelineRoot="${this.timelineRoot}"
-          .lines="${this.dmlLines}"
-          .highlightIndex="${this.dmlHighlightIndex}"
-        ></dml-view>`;
+        return html`<dml-view .lines="${this.dmlLines}"></dml-view>`;
       case 'soql':
-        return html`<soql-view
-          .timelineRoot="${this.timelineRoot}"
-          .lines="${this.soqlLines}"
-          .highlightIndex="${this.soqlHighlightIndex}"
-        ></soql-view>`;
+        return html`<soql-view .lines="${this.soqlLines}"></soql-view>`;
       case 'sosl':
-        return html`<sosl-view
-          .timelineRoot="${this.timelineRoot}"
-          .lines="${this.soslLines}"
-          .highlightIndex="${this.soslHighlightIndex}"
-        ></sosl-view>`;
+        return html`<sosl-view .lines="${this.soslLines}"></sosl-view>`;
     }
   }
 
   private _toggle(kind: SectionKind) {
-    const collapsing = !this.collapsed[kind];
-    this.collapsed = { ...this.collapsed, [kind]: collapsing };
-    if (collapsing) {
-      this._dropMatches(kind);
-    }
-  }
-
-  /**
-   * A collapsed section takes its grid with it, so the matches that grid reported
-   * can no longer be reached: drop them, and report the total the widget can.
-   */
-  private _dropMatches(kind: SectionKind): void {
-    if (kind === 'dml') {
-      this.dmlMatches = 0;
-      this.dmlHighlightIndex = 0;
-    } else if (kind === 'soql') {
-      this.soqlMatches = 0;
-      this.soqlHighlightIndex = 0;
-    } else {
-      this.soslMatches = 0;
-      this.soslHighlightIndex = 0;
-    }
-    this._reportTotal();
-  }
-
-  /** The three grids' matches read as one count in the find widget. */
-  private _reportTotal(): void {
-    document.dispatchEvent(
-      new CustomEvent('lv-find-results', {
-        detail: { totalMatches: this.dmlMatches + this.soqlMatches + this.soslMatches },
-      }),
-    );
+    this.collapsed = { ...this.collapsed, [kind]: !this.collapsed[kind] };
+    // A section takes its grid with it or brings a new one, so the widget's numbering no longer holds.
+    this._finder.dropOnReshape();
   }
 
   /** Cumulative limits are only present when the log recorded a usage snapshot. */
@@ -472,35 +411,6 @@ export class DatabaseView extends LitElement {
     add('DML Rows', this._rows('dml'), limits?.dmlRows ?? z);
     add('SOQL Rows', this._rows('soql'), limits?.queryRows ?? z);
     return gauges;
-  }
-
-  _find(matchIndex: number) {
-    if (matchIndex <= this.dmlMatches) {
-      this.dmlHighlightIndex = matchIndex;
-      this.soqlHighlightIndex = 0;
-      this.soslHighlightIndex = 0;
-    } else if (matchIndex <= this.dmlMatches + this.soqlMatches) {
-      this.soqlHighlightIndex = matchIndex - this.dmlMatches;
-      this.dmlHighlightIndex = 0;
-      this.soslHighlightIndex = 0;
-    } else {
-      this.soslHighlightIndex = matchIndex - this.dmlMatches - this.soqlMatches;
-      this.dmlHighlightIndex = 0;
-      this.soqlHighlightIndex = 0;
-    }
-  }
-
-  _findResults(e: CustomEvent<DbFindResultsEventDetail>) {
-    if (e.detail.type === 'dml') {
-      this.dmlMatches = e.detail.totalMatches;
-    } else if (e.detail.type === 'soql') {
-      this.soqlMatches = e.detail.totalMatches;
-    } else if (e.detail.type === 'sosl') {
-      this.soslMatches = e.detail.totalMatches;
-    }
-
-    this._find(1);
-    this._reportTotal();
   }
 }
 

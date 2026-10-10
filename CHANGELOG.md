@@ -15,7 +15,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Sort, expand and filter take under 0.2 s.
   - Bottom-Up group by is 8× faster.
   - Column resize is smooth, and Find has no delay.
-- 📋 **Call Tree copy**: `Cmd/Ctrl+C` copies the filtered rows and their depth in all three views. ([#1169])
+- 📋 **Copy**: `Cmd/Ctrl+C` copies the filtered rows and their depth in the Call Tree's three views and the Database tables. ([#1169])
+- 🗄️ **Database**: a long SOQL, DML or SOSL list scrolls inside its table, so the sections below stay in reach. ([#1169])
+- 🎯 **Database**: selecting a statement in the Inspector scrolls its row into view when it is hidden. ([#1169])
 - ✂️ **Truncation**: each skipped section states how much of the log it dropped.
 - 🌊 **Flows**: names drop the `FLOW_START_INTERVIEWS :` and `WF_CRITERIA :` prefixes.
 - 📚 **Multiple logs**: a file holding several logs shows the first and flags the rest.

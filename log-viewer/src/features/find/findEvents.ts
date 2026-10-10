@@ -1,16 +1,12 @@
 /*
  * Copyright (c) 2026 Certinia Inc. All rights reserved.
  */
-import type { StatementType } from '../../core/metrics/eventMetrics.js';
-
 /**
  * The find bus: the `document` CustomEvents that connect {@link FindWidget} to
  * every searchable view.
  *
  * The widget produces `lv-find`, `lv-find-match` and `lv-find-close`; each view
- * answers with `lv-find-results`. The three database grids report their own
- * totals to `DatabaseView` through `db-find-results`, which rolls them up into
- * one `lv-find-results`.
+ * answers with `lv-find-results`.
  */
 
 /** Payload for `lv-find`, `lv-find-match` and `lv-find-close`. */
@@ -34,16 +30,10 @@ export interface FindResultsEventDetail {
   totalMatches: number;
 }
 
-/** Payload for `db-find-results`, one grid's count on the way to `DatabaseView`. */
-export interface DbFindResultsEventDetail extends FindResultsEventDetail {
-  type: StatementType;
-}
-
 /** Every find event, so a listener's payload follows the name it subscribed to. */
 export interface FindEventMap {
   'lv-find': CustomEvent<FindEventDetail>;
   'lv-find-match': CustomEvent<FindEventDetail>;
   'lv-find-close': CustomEvent<FindEventDetail>;
   'lv-find-results': CustomEvent<FindResultsEventDetail>;
-  'db-find-results': CustomEvent<DbFindResultsEventDetail>;
 }
