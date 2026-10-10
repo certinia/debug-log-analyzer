@@ -472,6 +472,22 @@ describe('lv-grid', () => {
     expect(scroll).toHaveBeenCalledWith(2);
   });
 
+  it('marks no match current at -1, and keeps the other matches', async () => {
+    const all = fakeHighlights();
+    const { grid } = await setup();
+    const current = (): number | undefined =>
+      (globals.CSS as { highlights: Map<string, Set<Range>> }).highlights.get(
+        'lv-grid-current-find-match',
+      )?.size;
+    await grid.find({ text: 'b' });
+    await grid.setCurrentMatch(0);
+    expect(current()).toBe(1);
+
+    await grid.setCurrentMatch(-1);
+    expect(current()).toBe(0);
+    expect(all()).toEqual(['b']);
+  });
+
   it('reports a reshape when its shown columns change, and not when they stay the same', async () => {
     const { grid } = await setup();
     const reshapes: string[] = [];
