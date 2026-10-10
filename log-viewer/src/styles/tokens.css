@@ -18,8 +18,8 @@
  * (`styles/tokens.styles.ts`), so a component that reads a token also carries its
  * definition instead of relying on the app shell to have provided one. The
  * document copy, injected into `document.head` by the build's CSS plugin, is what
- * styles the popups tabulator appends to `document.body` — they are outside every
- * shadow root, so nothing adopts a sheet for them. Each selector is inert on the
+ * a component that reads a token without adopting the tokens inherits, as custom
+ * properties inherit into shadow roots. Each selector is inert on the
  * other side: `:host` matches nothing in a document, `:root` matches nothing in a
  * shadow root.
  */

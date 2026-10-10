@@ -4,8 +4,8 @@
 import { html, render } from 'lit';
 
 // Components adopt the --lana-* tokens themselves (styles/tokens.styles.ts); this
-// import guarantees the document-level copy, which styles the popups tabulator
-// appends to document.body.
+// import guarantees the document-level copy, which a component that reads a token
+// without adopting them inherits.
 import './styles/tokens.css';
 
 // web components

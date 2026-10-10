@@ -34,6 +34,10 @@ const TREES = ['time-order', 'aggregated', 'bottom-up'] as const;
 
 const params = new URLSearchParams(location.search);
 const name = params.get('c') ?? 'call-tree';
+if (name === 'tabulator') {
+  // Its figures would be filed as Tabulator's and replace the baseline compare.mjs reads.
+  throw new Error('Tabulator is removed: baseline/ holds the figures it last gave.');
+}
 const tree = TREES.find((t) => t === params.get('tree')) ?? 'time-order';
 const status = document.getElementById('status') as HTMLPreElement;
 const host = document.getElementById('host') as HTMLDivElement;
@@ -161,9 +165,9 @@ async function scrollStats(): Promise<{ fling: FrameStats; jumpEnd: Timing; jump
   return { fling: flung, jumpEnd, jumpTop };
 }
 
-async function runAll(reps = 5, skip: string[] = []): Promise<Record<string, unknown>> {
+async function runAll(reps = 5): Promise<Record<string, unknown>> {
   if (tree !== 'time-order') {
-    return runBottomUp(reps, skip);
+    return runBottomUp(reps);
   }
   const runs: Record<string, Timing[]> = {};
   const flings: FrameStats[] = [];
@@ -185,9 +189,7 @@ async function runAll(reps = 5, skip: string[] = []): Promise<Record<string, unk
     results.rowsUnfiltered = contender.visibleRowCount();
     add('filterOn', await timed(() => contender.setDetailFilter(true)));
     add('find', await timed(async () => (findMatches = await contender.find('AccountService'))));
-    if (!skip.includes('exportCsv')) {
-      add('exportCsv', await timed(async () => (csvLength = await contender.exportCsv())));
-    }
+    add('exportCsv', await timed(async () => (csvLength = await contender.exportCsv())));
     add('hideColumn', await timed(() => contender.setColumnVisible('heapPeak', false)));
     add('showColumn', await timed(() => contender.setColumnVisible('heapPeak', true)));
     resizes.push(
@@ -216,7 +218,7 @@ async function runAll(reps = 5, skip: string[] = []): Promise<Record<string, unk
 }
 
 /** The Aggregated or Bottom-Up tab's actions: sorting, the tree opened, searched and exported, then Bottom-Up grouping. */
-async function runBottomUp(reps: number, skip: string[]): Promise<Record<string, unknown>> {
+async function runBottomUp(reps: number): Promise<Record<string, unknown>> {
   const runs: Record<string, Timing[]> = {};
   const flings: FrameStats[] = [];
   const add = recorder(runs);
@@ -233,9 +235,7 @@ async function runBottomUp(reps: number, skip: string[]): Promise<Record<string,
     add('scrollJumpEnd', scroll.jumpEnd);
     add('scrollJumpTop', scroll.jumpTop);
     add('find', await timed(async () => (findMatches = await bottomUp.find('AccountService'))));
-    if (!skip.includes('exportCsv')) {
-      add('exportCsv', await timed(async () => (csvLength = await bottomUp.exportCsv())));
-    }
+    add('exportCsv', await timed(async () => (csvLength = await bottomUp.exportCsv())));
     add('collapseAll', await timed(() => bottomUp.collapseAll()));
     await settled();
     say(`rep ${rep + 1}/${reps} done`);
@@ -248,7 +248,7 @@ async function runBottomUp(reps: number, skip: string[]): Promise<Record<string,
     results.rowsGroupedByType = table.visibleRowCount();
     add('groupByNamespace', await timed(() => table.groupBy('namespace')));
   }
-  if (grouped && !skip.includes('ungroup')) {
+  if (grouped) {
     const table = grouped;
     add('ungroup', await timed(() => table.groupBy(null)));
   }

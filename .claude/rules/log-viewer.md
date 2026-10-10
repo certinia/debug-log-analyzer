@@ -64,7 +64,7 @@ Lit. Public API is `@property`, internal state is `@state`, styles are `static s
 - Data palettes stay literal: they show meaning, not chrome (`timeline/themes/Themes.ts`,
   `metric-strip/metric-strip-colors.ts`).
 - A component naming a token must carry the tokens: `globalStyles`, or `tokenStyles`
-  (`styles/tokens.styles.ts`) without it. The document copy styles only tabulator's body popups.
+  (`styles/tokens.styles.ts`) without it. The document copy is only a fallback it inherits.
 
 ## Key paths
 
