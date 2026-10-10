@@ -21,7 +21,10 @@ export async function exportCsv(grid: Pick<LvGrid, 'exportText'>, fileName: stri
     const link = document.createElement('a');
     link.href = URL.createObjectURL(new Blob([content], { type: 'text/csv' }));
     link.download = fileName;
+    // Some browsers ignore a click on a link outside the page, or a URL revoked at once.
+    document.body.append(link);
     link.click();
-    URL.revokeObjectURL(link.href);
+    link.remove();
+    setTimeout(() => URL.revokeObjectURL(link.href));
   }
 }
