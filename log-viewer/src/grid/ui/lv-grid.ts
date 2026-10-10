@@ -231,6 +231,14 @@ export class LvGrid<R extends object = object> extends LitElement {
   }
 
   /**
+   * Runs the filters and column calcs again, for a filter or calc that reads state that
+   * changed, such as a time window. Find's match numbers no longer hold after it.
+   */
+  async refresh(): Promise<void> {
+    await this.store?.refresh();
+  }
+
+  /**
    * Opens each ancestor on `path` (keys from the root down), then scrolls the row to the
    * middle and selects it. False when no row on the path is shown. With `scrollIfVisible`
    * false, a row already in view whole stays where it is.

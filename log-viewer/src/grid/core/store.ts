@@ -275,6 +275,16 @@ export class GridStore<R extends object> {
     return this.reorder();
   }
 
+  /**
+   * Runs the filters and the calcs again, for a host whose filter or calc reads state
+   * that changed, such as a time window. Open rows stay open.
+   */
+  refresh(): Promise<void> {
+    this.deepPass = new WeakMap();
+    this.dropTotals();
+    return this.reorder();
+  }
+
   /** Sums only the calcs it has not summed before for the filters on. */
   setCalcs(calcs: Calcs<R>): Promise<void> {
     this.calcs = calcs;

@@ -507,6 +507,21 @@ describe('lv-grid', () => {
     expect(placeholder()).toBeUndefined();
   });
 
+  it('filters and totals again on refresh', async () => {
+    let hidden = 'a';
+    const { grid, root, names } = await setup({
+      filters: [{ test: (row: Node) => row.name !== hidden }],
+    });
+    expect(names()).toEqual(['b', 'c']);
+
+    hidden = 'c';
+    await grid.refresh();
+    await settle(grid);
+    expect(names()).toEqual(['a', 'b']);
+    const foot = [...root.querySelectorAll('.foot .cell')].map((el) => el.textContent?.trim());
+    expect(foot).toEqual(['', '4', '']);
+  });
+
   it('shows no placeholder when it has none', async () => {
     const { root } = await setup({ filters: [{ test: () => false }] });
     expect(root.querySelector('.placeholder')).toBeNull();
