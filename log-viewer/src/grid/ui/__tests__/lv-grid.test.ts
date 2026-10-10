@@ -519,6 +519,16 @@ describe('lv-grid', () => {
     expect(reshapes).toEqual(['filter', 'filter']);
   });
 
+  it('paints no marks for a find that a clear made stale', async () => {
+    const all = fakeHighlights();
+    const { grid } = await setup();
+    const running = grid.find({ text: 'b' });
+    grid.clearFind();
+
+    expect(await running).toBe(-1);
+    expect(all()).toEqual([]);
+  });
+
   it('shows group rows that toggle on click and select from the keyboard', async () => {
     const { grid, names, rowNamed, key } = await setup({ groupBy: (row) => row.kind });
     expect(names()).toEqual(['x (2)', 'y (1)']);
