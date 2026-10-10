@@ -187,7 +187,7 @@ export class LvGrid<R extends object = object> extends LitElement {
 
   /** What the body shows when no row passes the filters, such as "No SOQL queries found". */
   @property({ attribute: false })
-  placeholder: string | TemplateResult | null = null;
+  placeholder: string | null = null;
 
   private store: GridStore<R> | null = null;
   private readonly data = new StoreController<R>(this);
@@ -709,11 +709,7 @@ export class LvGrid<R extends object = object> extends LitElement {
       return;
     }
     const rows = this.shown;
-    const opens =
-      !(target instanceof Group) &&
-      !!rows?.hasChildrenAt(index) &&
-      !rows.isExpandedAt(index) &&
-      expanded !== false;
+    const opens = expanded !== false && rows?.hasChildrenAt(index) && !rows.isExpandedAt(index);
     const row = opens ? this.dataRow(index) : null;
     this.toggled = target;
     await this.store?.toggle(target, expanded);

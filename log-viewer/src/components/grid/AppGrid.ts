@@ -68,7 +68,7 @@ const cells = css`
     margin-inline-start: var(--lana-space-xs);
   }
 
-  /* The codicon chevrons of the Tabulator trees. A glyph box, not text, so outside the type ramp. */
+  /* The codicon chevrons VS Code's own trees draw. A glyph box, not text, so outside the type ramp. */
   .twisty.closed::before,
   .twisty.open::before {
     border: none;
