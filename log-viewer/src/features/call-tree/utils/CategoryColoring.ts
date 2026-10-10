@@ -1,7 +1,6 @@
 /*
  * Copyright (c) 2025 Certinia Inc. All rights reserved.
  */
-import { css } from 'lit';
 import type { RowComponent } from 'tabulator-tables';
 
 import { stampRowPath } from '../../../components/locatedRow.js';
@@ -18,16 +17,6 @@ import { addCustomThemes, getTheme } from '../../timeline/themes/ThemeSelector.j
  * property, so a theme switch only updates the host vars and rows re-resolve in place —
  * no Tabulator reformat, no scroll shift.
  */
-
-export const categoryColoringStyles = css`
-  .tabulator-row .datagrid-code-text {
-    border-left: 6px solid var(--row-cat-color, transparent);
-  }
-  :host(.category-colorize) .tabulator-row .datagrid-code-text {
-    background-color: color-mix(in srgb, var(--row-cat-color, transparent) 10%, transparent);
-    color: var(--row-cat-color, inherit);
-  }
-`;
 
 /**
  * Tabulator `rowFormatter`: points a row at its category's host theme var. A row element

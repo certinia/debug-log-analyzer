@@ -62,7 +62,8 @@ export class GridColumnMenuController {
 
   /** {@link initTable} for an lv-grid, whose header reports its right-click. */
   initGrid<R extends object>(grid: LvGrid<R>): void {
-    this._options.columns.applyTo(gridColumnTarget(grid));
+    // The host's target, not the grid: a host that binds its columns would have them set back.
+    this._options.columns.applyTo(this._options.table() ?? gridColumnTarget(grid));
     grid.addEventListener('lv-grid-header-context', (e) => {
       const { event } = (e as CustomEvent<GridHeaderContextDetail>).detail;
       event.preventDefault();

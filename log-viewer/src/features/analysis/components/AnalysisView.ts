@@ -5,50 +5,54 @@ import '#vscode-elements/vscode-button.js';
 import '#vscode-elements/vscode-option.js';
 import '../../../components/VsSelect.js';
 import '#vscode-elements/vscode-toolbar-button.js';
-import { LitElement, css, html, unsafeCSS, type PropertyValues } from 'lit';
-import { customElement, property } from 'lit/decorators.js';
-import { repeat } from 'lit/directives/repeat.js';
-import type { RowComponent, Tabulator } from 'tabulator-tables';
+import { LitElement, css, html, type PropertyValues } from 'lit';
+import { customElement, property, state } from 'lit/decorators.js';
+import { ref } from 'lit/directives/ref.js';
 
 import type { ApexLog } from '@apexdevtools/apex-log-parser';
 import '../../../components/ContextMenu.js';
-import { DomListenerController } from '../../../core/events/DomListenerController.js';
-import { eventBus } from '../../../core/events/EventBus.js';
-import type { FindEventDetail, FindEventMap } from '../../find/findEvents.js';
-import {
-  LocatedRowIds,
-  LocatedRowMarker,
-  rowDetailSelection,
-  rowFrames,
-} from '../../../components/locatedRow.js';
+import type { ContextMenu } from '../../../components/ContextMenu.js';
+import { LocatedRowIds } from '../../../components/locatedRow.js';
 import { InspectorTabController } from '../../../components/InspectorTabController.js';
 import { revealFirstOf } from '../../../components/inspectorTab.js';
 import { SelectionEchoGuard } from '../../../core/events/SelectionEchoGuard.js';
 import { SubscriptionController } from '../../../core/events/SubscriptionController.js';
-import { eventByEventIndex } from '../../../core/utility/EventSearch.js';
+import { vscodeMessenger } from '../../../core/messaging/VSCodeExtensionMessenger.js';
+import { logStoreFor } from '../../../core/log/LogStore.js';
 import { isVisible } from '../../../core/utility/Util.js';
-import { createBottomUpTable } from '../../call-tree/components/BottomUpTable.js';
-import { ColumnSettingsController } from '../../../components/ColumnSettingsController.js';
-import { GridColumnMenuController } from '../../../components/GridColumnMenuController.js';
-import { gridToolbarActions } from '../../../components/gridToolbar.js';
-import { CALL_TREE_VIEWS } from '../../../tabulator/ColumnViews.js';
-import type { BottomUpRow } from '../../call-tree/utils/Aggregation.js';
-import { findRootBucket } from '../../call-tree/utils/bucketRows.js';
 import {
-  categoryColoringStyles,
-  groupedRowFormatter,
-  wireCategoryColoring,
-} from '../../call-tree/utils/CategoryColoring.js';
-import { expandCollapseAll } from '../../call-tree/utils/ExpandCollapse.js';
-
-import { onTableReshaped } from '../../../tabulator/module/tableReshape.js';
-import { tableHolder } from '../../../tabulator/module/tableHolder.js';
-
-import dataGridStyles from '../../../tabulator/style/DataGrid.scss';
+  ColumnSettingsController,
+  heldColumnTarget,
+} from '../../../components/ColumnSettingsController.js';
+import { exportCsv } from '../../../components/grid/exportCsv.js';
+import { LvGridFindController } from '../../../components/grid/LvGridFindController.js';
+import { GridColumnMenuController } from '../../../components/GridColumnMenuController.js';
+import { columnViewSelect, gridToolbarActions } from '../../../components/gridToolbar.js';
+import type { GridColumn, GroupBy, TreeSource } from '../../../grid/index.js';
+import { CALL_TREE_VIEWS } from '../../../tabulator/ColumnViews.js';
+import '../../call-tree/grid/CallTreeGrid.js';
+import type { CallTreeGrid } from '../../call-tree/grid/CallTreeGrid.js';
+import {
+  BOTTOM_UP_DETAILS,
+  BOTTOM_UP_SORT,
+  bottomUpColumns,
+  bottomUpGroupBy,
+  mergedLines,
+} from '../../call-tree/grid/columns.js';
+import { inspectorRowEvents } from '../../call-tree/grid/inspectorRowEvents.js';
+import {
+  linkRows,
+  markedIds,
+  mergedPath,
+  mergedRow,
+  rowStandIn,
+  type MergedLinks,
+} from '../../call-tree/grid/mergedRows.js';
+import { buildBottomUpTree, type BottomUpRow } from '../../call-tree/utils/Aggregation.js';
+import { wireCategoryColoring } from '../../call-tree/utils/CategoryColoring.js';
 
 // styles
 import { globalStyles } from '../../../styles/global.styles.js';
-import { soqlSyntaxStyles } from '../../soql/styles/soql-syntax.css.js';
 
 // Components
 import '../../../components/datagrid-filter-bar.js';
@@ -57,11 +61,11 @@ import '../../../components/GridSkeleton.js';
 /** The Name column is always shown in the analysis table. */
 const ALWAYS_VISIBLE = ['text'];
 
+const openType = (text: string): void => vscodeMessenger.send<string>('openType', text);
+
 @customElement('analysis-view')
 export class AnalysisView extends LitElement {
   static styles = [
-    unsafeCSS(dataGridStyles),
-    unsafeCSS(soqlSyntaxStyles),
     globalStyles,
     css`
       :host {
@@ -88,12 +92,6 @@ export class AnalysisView extends LitElement {
         min-width: 0;
       }
 
-      #analysis-table {
-        display: inline-block;
-        height: 100%;
-        width: 100%;
-      }
-
       .filter-container {
         display: flex;
         gap: 4px;
@@ -109,55 +107,58 @@ export class AnalysisView extends LitElement {
         font-size: var(--filter-control-font-size);
       }
     `,
-    categoryColoringStyles,
   ];
 
   @property()
   timelineRoot: ApexLog | null = null;
 
-  analysisTable: Tabulator | null = null;
+  @state()
+  private _source: TreeSource<BottomUpRow> | null = null;
+  @state()
+  private _columns: GridColumn<BottomUpRow>[] = [];
+  @state()
+  private _groupBy: GroupBy<BottomUpRow> | null = null;
+  @state()
+  private _marked: ReadonlySet<number> = new Set();
+  @state()
+  private _colorize = false;
+  @state()
+  private _showDetails = false;
 
-  private readonly _columns = new ColumnSettingsController(this, {
+  grid: CallTreeGrid<BottomUpRow> | null = null;
+  private _links: MergedLinks<BottomUpRow> | null = null;
+  private _built: Promise<void> | null = null;
+
+  // A render binds `_columns` to the grid again, so the column view writes there, not to the grid.
+  private readonly _columnTarget = heldColumnTarget<BottomUpRow>(
+    () => this._columns,
+    (columns) => (this._columns = columns),
+  );
+  private readonly _settings = new ColumnSettingsController(this, {
     section: 'callTree',
     read: (settings) => settings.callTree,
     views: CALL_TREE_VIEWS,
     alwaysVisible: ALWAYS_VISIBLE,
-    tables: () => (this.analysisTable ? [this.analysisTable] : []),
+    tables: () => [this._columnTarget],
   });
   private readonly _menus = new GridColumnMenuController({
-    table: () => this.analysisTable,
-    menu: () => this.renderRoot.querySelector('context-menu'),
-    columns: this._columns,
+    table: () => this._columnTarget,
+    menu: () => this.renderRoot.querySelector<ContextMenu>('context-menu'),
+    columns: this._settings,
   });
-  tableContainer: HTMLDivElement | null = null;
-  findMap: { [key: number]: RowComponent } = {};
-  findArgs: { text: string; count: number; options: { matchCase: boolean } } = {
-    text: '',
-    count: 0,
-    options: { matchCase: false },
-  };
-  totalMatches = 0;
-  blockClearHighlights = true;
-
-  filterState = { showDetails: false };
-
-  // Precomputed at tree-build time on each BottomUpRow; the filter is a
-  // single boolean read with no walk and no cache.
-  _showDetailsFilter = (data: BottomUpRow): boolean => data._hasDetailsDeep;
 
   /** Guards the programmatic select made on the inspector's behalf. */
   private _echoGuard = new SelectionEchoGuard();
-  private _locatedRow = new LocatedRowMarker();
   private _locateIds = new LocatedRowIds();
+  // Its own memo: one shared with the mark would drop the picked frames on each reveal.
+  private _revealIds = new LocatedRowIds();
 
-  private readonly _findBus = new DomListenerController<FindEventMap>(this, document, {
-    'lv-find': (e) => void this._find(e),
-    'lv-find-match': (e) => void this._find(e),
-    'lv-find-close': (e) => void this._find(e),
+  private readonly _finder = new LvGridFindController(this, {
+    grids: () => (this.grid ? [this.grid] : []),
   });
 
   private readonly _subscriptions = new SubscriptionController(this, () => [
-    wireCategoryColoring(this),
+    wireCategoryColoring(this, (on) => (this._colorize = on)),
   ]);
 
   private readonly _inspector = new InspectorTabController(this, 'analysis', {
@@ -167,28 +168,23 @@ export class AnalysisView extends LitElement {
     // An inspector finding names one event; the grid holds it in the bucket for
     // its method, so that bucket is what gets revealed.
     reveal: (eventIndex, signal) => this._revealEventIndex(eventIndex, signal),
-    clear: () => {
-      // The table reports the clear itself, which is what reaches the inspector.
-      this.analysisTable?.deselectRow();
-    },
+    // The grid reports the clear itself, which is what reaches the inspector.
+    clear: () => this.grid?.deselect(),
     // A row buckets calls, so a merged pick moves to the first of them.
     revealMerged: revealFirstOf((eventIndex, signal) => this._revealEventIndex(eventIndex, signal)),
   });
-
-  disconnectedCallback(): void {
-    super.disconnectedCallback();
-    this._locatedRow.clear();
-  }
 
   /**
    * Mark the buckets that hold `eventIndexes`. The grid ranks methods and expands
    * to their callers, so one frame heads a row at every caller depth it sits in.
    */
   private _markLocated(eventIndexes: readonly number[]): void {
-    this._locatedRow.mark(
-      this.analysisTable?.element ?? null,
-      this._locateIds.idsFor(this.timelineRoot, eventIndexes, 'callers'),
-    );
+    const pathIds = this._locateIds.idsFor(this.timelineRoot, eventIndexes, 'callers');
+    const marked = markedIds(this._links, pathIds);
+    // A new set repaints the rows, and most pointer moves leave the mark as it was.
+    if (marked.size !== this._marked.size || [...marked].some((id) => !this._marked.has(id))) {
+      this._marked = marked;
+    }
   }
 
   /**
@@ -197,27 +193,18 @@ export class AnalysisView extends LitElement {
    * the row it just asked for.
    */
   private async _revealEventIndex(eventIndex: number, signal: AbortSignal): Promise<void> {
-    const table = this.analysisTable;
-    const root = this.timelineRoot;
-    if (!table || !root) {
-      return;
-    }
-    const event = eventByEventIndex(root, eventIndex);
-    if (!event) {
-      return;
-    }
-    // The grid is bottom-up, so the frame heads a top-level bucket its own key
-    // finds, without reading what any bucket holds.
-    const match = findRootBucket(table.getRows(), event);
-    if (!match) {
+    const grid = this.grid;
+    const pathIds = this._revealIds.idsFor(this.timelineRoot, [eventIndex], 'callers');
+    const row = mergedRow(this._links, pathIds);
+    if (!grid || !row) {
       return;
     }
 
     // Show Details keeps only rows with a duration, so the buckets for debug
     // lines, thrown exceptions and query plans are filtered out — exactly the
     // events a finding points at. Turn the filter off rather than reveal nothing.
-    if (!this.filterState.showDetails && !this._showDetailsFilter(match.getData() as BottomUpRow)) {
-      this._handleShowDetailsChange();
+    if (!this._showDetails && !BOTTOM_UP_DETAILS.test(row)) {
+      this._showDetails = true;
       await this.updateComplete;
     }
 
@@ -226,9 +213,14 @@ export class AnalysisView extends LitElement {
     }
 
     await this._echoGuard.runAsync(() =>
-      //@ts-expect-error This is a custom function added in by RowNavigation custom module
-      table.goToRow(match, { scrollIfVisible: false, focusRow: false }),
+      grid.goTo(mergedPath(this._links, pathIds), { scrollIfVisible: false }),
     );
+  }
+
+  disconnectedCallback(): void {
+    super.disconnectedCallback();
+    // The inspector stops reporting on detach, so the empty mark of a pointer leaving may never come.
+    this._marked = new Set();
   }
 
   updated(changedProperties: PropertyValues): void {
@@ -237,13 +229,11 @@ export class AnalysisView extends LitElement {
       changedProperties.has('timelineRoot') &&
       !changedProperties.get('timelineRoot')
     ) {
-      this._appendTableWhenVisible();
+      this._buildWhenVisible();
     }
   }
 
   render() {
-    const skeleton = !this.timelineRoot ? html`<grid-skeleton></grid-skeleton>` : '';
-
     return html`
       <div class="analysis-view">
         <datagrid-filter-bar>
@@ -252,46 +242,31 @@ export class AnalysisView extends LitElement {
               secondary
               aria-label="Expand all"
               title="Expand all"
-              @click=${this._expandButtonClick}
+              @click=${() => void this._expandAll(true)}
               >Expand</vscode-button
             >
             <vscode-button
               secondary
               aria-label="Collapse all"
               title="Collapse all"
-              @click=${this._collapseButtonClick}
+              @click=${() => void this._expandAll(false)}
               >Collapse</vscode-button
             >
-
-            <vs-select
-              dense
-              id="column-view"
-              prefix="Columns"
-              label="Column view"
-              @change="${this._menus.chooseView}"
-              @vs-reset-option="${this._menus.resetView}"
-              .value="${this._columns.view}"
-              .resettableValues="${this._columns.editedViews}"
-            >
-              ${repeat(
-                CALL_TREE_VIEWS,
-                (view) => view.id,
-                (view) =>
-                  html`<vscode-option
-                    value="${view.id}"
-                    ?selected="${this._columns.view === view.id}"
-                    >${view.id}</vscode-option
-                  >`,
-              )}
-            </vs-select>
           </div>
+
+          ${columnViewSelect({
+            id: 'column-view',
+            views: CALL_TREE_VIEWS,
+            columns: this._settings,
+            menus: this._menus,
+          })}
 
           <div slot="filters" class="filter-container">
             <button
               type="button"
               class="filter-control pill-toggle"
-              aria-pressed="${this.filterState.showDetails}"
-              @click="${this._handleShowDetailsChange}"
+              aria-pressed="${this._showDetails}"
+              @click="${() => (this._showDetails = !this._showDetails)}"
             >
               Details
             </button>
@@ -303,7 +278,8 @@ export class AnalysisView extends LitElement {
             id="groupby-dropdown"
             prefix="Group"
             label="Group by"
-            @change="${this._groupBy}"
+            @change="${(e: Event) =>
+              (this._groupBy = bottomUpGroupBy((e.target as HTMLInputElement).value))}"
           >
             <vscode-option>None</vscode-option>
             <vscode-option>Namespace</vscode-option>
@@ -313,219 +289,90 @@ export class AnalysisView extends LitElement {
 
           ${gridToolbarActions({
             menus: this._menus,
-            exportToCSV: () => this._exportToCSV(),
-            copyToClipboard: () => this._copyToClipboard(),
+            exportToCSV: () => void (this.grid && exportCsv(this.grid, 'analysis.csv')),
+            copyToClipboard: () => void this.grid?.copy(),
           })}
         </datagrid-filter-bar>
 
         <div id="analysis-table-container">
-          ${skeleton}
-          <div id="analysis-table"></div>
+          ${this._source ? this._renderGrid() : html`<grid-skeleton></grid-skeleton>`}
         </div>
-        <context-menu @menu-select="${this._handleColumnMenuSelect}"></context-menu>
+        <context-menu
+          @menu-select="${(e: CustomEvent<{ itemId: string }>) => this._menus.select(e.detail.itemId)}"
+        ></context-menu>
       </div>
     `;
   }
 
-  private _handleColumnMenuSelect(e: CustomEvent<{ itemId: string }>) {
-    this._menus.select(e.detail.itemId);
+  private _renderGrid() {
+    return html`
+      <lv-call-tree-grid
+        ${ref(this._gridMounted)}
+        ?category-colorize="${this._colorize}"
+        .placeholder="${'No Analysis Available'}"
+        .source="${this._source}"
+        .columns="${this._columns}"
+        .filters="${this._showDetails ? [] : [BOTTOM_UP_DETAILS]}"
+        .sort="${BOTTOM_UP_SORT}"
+        .rowLines="${mergedLines}"
+        .groupBy="${this._groupBy}"
+        .marked="${this._marked}"
+        @lv-grid-select="${this._rowEvents.select}"
+        @lv-grid-locate="${this._rowEvents.locate}"
+        @lv-grid-reshape="${() => this._finder.dropOnReshape()}"
+      ></lv-call-tree-grid>
+    `;
   }
 
-  _copyToClipboard() {
-    // No range: an argument wins over `clipboardCopyRowRange`, which is what fills the
-    // tree state in.
-    this.analysisTable?.copyToClipboard();
-  }
-
-  _exportToCSV() {
-    this.analysisTable?.download('csv', 'analysis.csv', { bom: true, delimiter: ',' });
-  }
-
-  get _tableWrapper(): HTMLDivElement | null | undefined {
-    return (this.tableContainer ??= this.renderRoot?.querySelector('#analysis-table'));
-  }
-
-  _groupBy(event: Event) {
-    const target = event.target as HTMLInputElement;
-    // Grouping renumbers the matches both ways round, and `dataGrouped` reports
-    // only the way that leaves the table grouped.
-    this._dropSearch();
-    const fieldName =
-      target.value === 'Caller Namespace' ? 'callerNamespace' : target.value.toLowerCase();
-    if (this.analysisTable) {
-      //@ts-expect-error This is a custom function added in the GroupSort custom module
-      this.analysisTable?.setSortedGroupBy(fieldName !== 'none' ? fieldName : '');
+  private readonly _gridMounted = (el?: Element): void => {
+    this.grid = (el as CallTreeGrid<BottomUpRow> | undefined) ?? null;
+    if (this.grid) {
+      this._menus.initGrid(this.grid);
     }
-  }
+  };
 
-  _handleShowDetailsChange() {
-    this.filterState.showDetails = !this.filterState.showDetails;
-    this.requestUpdate();
-    this._updateFiltering();
-  }
-
-  _updateFiltering() {
-    const table = this.analysisTable;
-    if (!table) {
-      return;
-    }
-    this._dropSearch();
-    table.blockRedraw();
-    table.clearFilter(false);
-    if (!this.filterState.showDetails) {
-      table.addFilter(this._showDetailsFilter);
-    }
-    table.restoreRedraw();
-  }
-
-  _expandButtonClick() {
-    this._expandCollapseAll(true);
-  }
-
-  _collapseButtonClick() {
-    this._expandCollapseAll(false);
-  }
-
-  _expandCollapseAll(expand: boolean) {
-    const table = this.analysisTable;
-    if (!table?.modules?.dataTree) {
-      return;
-    }
-    table.blockRedraw();
-    expandCollapseAll(table.getRows(), expand);
-    tableHolder(table.element)?.focus();
-    table.restoreRedraw();
-  }
-
-  _appendTableWhenVisible() {
-    if (this.analysisTable) {
-      return;
-    }
-
-    void isVisible(this).then((isVisible) => {
-      if (this.timelineRoot && isVisible) {
-        void this._renderAnalysis(this.timelineRoot);
+  private _buildWhenVisible(): void {
+    void isVisible(this).then((visible) => {
+      const root = this.timelineRoot;
+      if (root && visible) {
+        this._built ??= this._build(root);
       }
     });
   }
 
-  async _find(e: CustomEvent<FindEventDetail>) {
-    const isTableVisible = !!this.analysisTable?.element?.clientHeight;
-    if (!isTableVisible && !this.totalMatches) {
-      return;
-    }
-
-    const newFindArgs = JSON.parse(JSON.stringify(e.detail));
-    const newSearch =
-      newFindArgs.text !== this.findArgs.text ||
-      newFindArgs.options.matchCase !== this.findArgs.options?.matchCase;
-    this.findArgs = newFindArgs;
-
-    const clearHighlights = e.type === 'lv-find-close';
-    if (clearHighlights) {
-      newFindArgs.text = '';
-    }
-    if (newSearch || clearHighlights) {
-      this.blockClearHighlights = true;
-      // @ts-expect-error This is a custom function added in by Find custom module
-      const result = await this.analysisTable?.find(this.findArgs);
-      this.blockClearHighlights = false;
-      this.totalMatches = result.totalMatches;
-      this.findMap = result.matchIndexes;
-
-      if (!clearHighlights && isTableVisible) {
-        document.dispatchEvent(
-          new CustomEvent('lv-find-results', { detail: { totalMatches: result.totalMatches } }),
-        );
-      }
-    }
-
-    if (this.totalMatches <= 0 || !isTableVisible) {
-      return;
-    }
-    this.blockClearHighlights = true;
-    const currentRow = this.findMap[this.findArgs.count];
-    //@ts-expect-error This is a custom function added in by Find custom module
-    await this.analysisTable.setCurrentMatch(this.findArgs.count, currentRow, {
-      scrollIfVisible: false,
-      focusRow: false,
-    });
-    this.blockClearHighlights = false;
-  }
-
-  async _renderAnalysis(rootMethod: ApexLog) {
-    if (!this._tableWrapper) {
-      return;
-    }
-
-    const { table, tableBuilt } = createBottomUpTable(
-      this._tableWrapper,
-      rootMethod,
-      {
-        showDetailsFilter: this._showDetailsFilter,
-        rowFormatter: groupedRowFormatter,
-      },
-      {
-        placeholder: 'No Analysis Available',
-        selectableRows: 'highlight',
-        enableClipboardAndDownload: true,
-        exportFileName: 'analysis.csv',
-      },
+  private async _build(root: ApexLog): Promise<void> {
+    const roots = await buildBottomUpTree(
+      root.children,
+      logStoreFor(root).keyPathIds(),
+      root.governorLimits,
     );
-    this.analysisTable = table;
-
-    onTableReshaped(this.analysisTable, () => this._dropSearch());
-
-    // Feed the inspector. Analysis rows merge many calls, so they
-    // scope to every call they count.
-    this.analysisTable.on('rowSelectionChanged', (_data, rows) => {
-      if (this._echoGuard.suppressed) {
-        return;
-      }
-      eventBus.emit('detail:select', {
-        source: 'analysis',
-        selection: rowDetailSelection(rows[0], this.timelineRoot, 'callers'),
-        // The grid ranks methods by self time and expands to their callers, so
-        // the inspector opens on the forward view instead.
-        view: 'callers',
-      });
-    });
-
-    // Tell the inspector which frames the pointer is over, so it can mark the
-    // rows that stand for them. A row under a bucket is one of its callers, so it
-    // names that caller rather than the calls it conducted.
-    this.analysisTable.on('rowMouseEnter', (_e, row) => {
-      eventBus.emit('detail:locate', {
-        source: 'analysis',
-        eventIndexes: rowFrames(row, this.timelineRoot, 'callers'),
-      });
-    });
-    this.analysisTable.on('rowMouseLeave', () => {
-      eventBus.emit('detail:locate', { source: 'analysis', eventIndexes: [] });
-    });
-
-    await tableBuilt;
-    this._menus.initTable(this.analysisTable);
-  }
-
-  _resetFindWidget() {
-    document.dispatchEvent(new CustomEvent('lv-find-results', { detail: { totalMatches: 0 } }));
-  }
-
-  /** Drop the search where its match numbering no longer describes the table. */
-  _dropSearch() {
-    if (!this.blockClearHighlights && this.totalMatches > 0) {
-      this._resetFindWidget();
-      this._clearSearchHighlights();
+    if (!roots) {
+      return;
     }
+    this._links = linkRows(roots);
+    this._columns = bottomUpColumns(root, { openType });
+    this._settings.applyTo(this._columnTarget);
+    this._source = { roots, children: (row) => row._children, key: (row) => row.id };
   }
 
-  _clearSearchHighlights() {
-    this.findArgs.text = '';
-    this.findArgs.count = 0;
-    //@ts-expect-error This is a custom function added in by Find custom module
-    this.analysisTable.clearFindHighlights();
-    this.findMap = {};
-    this.totalMatches = 0;
+  private async _expandAll(open: boolean): Promise<void> {
+    await (open ? this.grid?.expandAll() : this.grid?.collapseAll());
+    // The keys and copy act on the grid, not on the button that was clicked.
+    this.grid?.focus({ preventScroll: true });
   }
+
+  // A row ranks a method by self time and opens to its callers, so the inspector reads it as callers.
+  private readonly _rowEvents = inspectorRowEvents<BottomUpRow>({
+    source: 'analysis',
+    root: () => this.timelineRoot,
+    view: () => 'callers',
+    standIn: (row) =>
+      rowStandIn(
+        row,
+        (r) => r,
+        (r) => this._links?.parents.get(r),
+      ),
+    echoGuard: this._echoGuard,
+    dropPick: () => this._inspector.dropPick(),
+  });
 }
