@@ -185,6 +185,10 @@ export class LvGrid<R extends object = object> extends LitElement {
   @property({ attribute: 'footer-position', reflect: true })
   footerPosition: 'bottom' | 'rows' = 'bottom';
 
+  /** What the body shows when no row passes the filters, such as "No SOQL queries found". */
+  @property({ attribute: false })
+  placeholder: string | TemplateResult | null = null;
+
   private store: GridStore<R> | null = null;
   private readonly data = new StoreController<R>(this);
   private view: GridView<R> | null = null;
@@ -394,6 +398,11 @@ export class LvGrid<R extends object = object> extends LitElement {
       <div class="row head" role="row" aria-rowindex="1">
         ${columns.map((column) => this.headerCell(column))}
       </div>
+      ${
+        size === 0 && this.placeholder !== null
+          ? html`<div class="placeholder" role="status">${this.placeholder}</div>`
+          : nothing
+      }
       <div
         class="body"
         ${ref(this.bodyRef)}

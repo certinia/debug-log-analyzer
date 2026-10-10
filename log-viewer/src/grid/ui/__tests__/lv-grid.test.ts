@@ -491,6 +491,27 @@ describe('lv-grid', () => {
     expect(rowNamed('a')?.className).toBe('row');
   });
 
+  it('shows the placeholder only while no row passes the filters', async () => {
+    const { grid, root } = await setup({ placeholder: 'Nothing here' });
+    const placeholder = (): string | undefined =>
+      root.querySelector('.placeholder')?.textContent?.trim();
+    expect(placeholder()).toBeUndefined();
+
+    const none = [{ test: () => false }];
+    grid.filters = none;
+    await settle(grid);
+    expect(placeholder()).toBe('Nothing here');
+
+    grid.filters = [];
+    await settle(grid);
+    expect(placeholder()).toBeUndefined();
+  });
+
+  it('shows no placeholder when it has none', async () => {
+    const { root } = await setup({ filters: [{ test: () => false }] });
+    expect(root.querySelector('.placeholder')).toBeNull();
+  });
+
   it('keeps its events inside the shadow root that holds it', async () => {
     fakeLayout();
     const host = document.createElement('div');
