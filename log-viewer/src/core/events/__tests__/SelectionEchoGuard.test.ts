@@ -33,6 +33,23 @@ describe('SelectionEchoGuard', () => {
     expect(guard.suppressed).toBe(false);
   });
 
+  it('suppresses until the last of two overlapping async selects settles', async () => {
+    const guard = new SelectionEchoGuard();
+    const settles: Array<() => void> = [];
+    const select = () =>
+      guard.runAsync(() => new Promise<void>((resolve) => settles.push(resolve)));
+
+    const first = select();
+    const second = select();
+    settles[0]?.();
+    await first;
+    expect(guard.suppressed).toBe(true);
+
+    settles[1]?.();
+    await second;
+    expect(guard.suppressed).toBe(false);
+  });
+
   it('stops suppressing when the select throws', () => {
     const guard = new SelectionEchoGuard();
 
