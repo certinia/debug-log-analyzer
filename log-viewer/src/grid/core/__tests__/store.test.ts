@@ -157,8 +157,11 @@ describe('GridStore', () => {
     expect(store.snapshot().totals.total).toBe(4);
 
     scale = 10;
+    const rows = store.snapshot().rows;
     await store.refresh();
     expect(store.snapshot().totals.total).toBe(40);
+    // No filter is on, so the rows on screen stay as they are.
+    expect(store.snapshot().rows).toBe(rows);
   });
 
   it('reveals a deep row by expanding its ancestors', async () => {

@@ -282,7 +282,8 @@ export class GridStore<R extends object> {
   refresh(): Promise<void> {
     this.deepPass = new WeakMap();
     this.dropTotals();
-    return this.reorder();
+    // With no filter the rows cannot change, and a re-sort of a large tree is not free.
+    return this.filters.length ? this.reorder() : this.rebuild(!this.groupBy);
   }
 
   /** Sums only the calcs it has not summed before for the filters on. */
