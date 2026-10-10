@@ -68,8 +68,8 @@ export interface GridSort {
 
 /** The rows or shown columns changed, so find's match numbers no longer hold. */
 export interface GridReshapeDetail {
-  /** `sort` from the header; `columns` when the shown columns change. */
-  reason: 'sort' | 'columns';
+  /** `sort` from the header; `columns` when the shown columns change; `filter` on new filters or a refresh. */
+  reason: 'sort' | 'columns' | 'filter';
 }
 
 export interface GridColumnDetail {
@@ -232,9 +232,10 @@ export class LvGrid<R extends object = object> extends LitElement {
 
   /**
    * Runs the filters and column calcs again, for a filter or calc that reads state that
-   * changed, such as a time window. Find's match numbers no longer hold after it.
+   * changed, such as a time window.
    */
   async refresh(): Promise<void> {
+    this.emit<GridReshapeDetail>('lv-grid-reshape', { reason: 'filter' });
     await this.store?.refresh();
   }
 
@@ -358,6 +359,7 @@ export class LvGrid<R extends object = object> extends LitElement {
     }
     if (changed.has('filters')) {
       void store.setFilters(this.filters);
+      this.emit<GridReshapeDetail>('lv-grid-reshape', { reason: 'filter' });
     }
     if (changed.has('groupBy')) {
       void store.setGroupBy(this.groupBy);

@@ -506,6 +506,19 @@ describe('lv-grid', () => {
     expect(reshapes).toEqual(['columns', 'columns']);
   });
 
+  it('reports a reshape on new filters and on a refresh', async () => {
+    const { grid } = await setup();
+    const reshapes: string[] = [];
+    grid.addEventListener('lv-grid-reshape', (e) =>
+      reshapes.push(detail<GridReshapeDetail>(e).reason),
+    );
+
+    grid.filters = [{ test: () => true }];
+    await settle(grid);
+    await grid.refresh();
+    expect(reshapes).toEqual(['filter', 'filter']);
+  });
+
   it('shows group rows that toggle on click and select from the keyboard', async () => {
     const { grid, names, rowNamed, key } = await setup({ groupBy: (row) => row.kind });
     expect(names()).toEqual(['x (2)', 'y (1)']);
