@@ -6,7 +6,8 @@
 export interface Calc<R> {
   /**
    * Which rows `of` gets. `top` (the default): the top-level rows that pass the filters.
-   * `all`: every row that passes the filters, at any depth, expanded or not.
+   * `all`: every row that passes the filters, at any depth, expanded or not. Read on each
+   * run, so a getter may change it; call the grid's `refresh` after it does.
    */
   scope?: 'top' | 'all';
   /**

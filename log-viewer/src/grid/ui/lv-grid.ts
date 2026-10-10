@@ -237,6 +237,8 @@ export class LvGrid<R extends object = object> extends LitElement {
     path: readonly RowKey[],
     { scrollIfVisible = true }: { scrollIfVisible?: boolean } = {},
   ): Promise<boolean> {
+    // A source set in the same turn reaches the store only in this element's update.
+    await this.updateComplete;
     const index = (await this.store?.reveal(path)) ?? -1;
     if (index < 0) {
       return false;
@@ -252,11 +254,16 @@ export class LvGrid<R extends object = object> extends LitElement {
     this.scrollerRef.value?.focus(options);
   }
 
-  /** Clears the selection and reports it in `lv-grid-select`. Does nothing when no row is selected. */
-  deselect(): void {
-    if (this.selected !== null) {
-      this.select(null);
+  /**
+   * Clears the selection and reports it in `lv-grid-select`. Does nothing when no row is
+   * selected. True when it cleared one.
+   */
+  deselect(): boolean {
+    if (this.selected === null) {
+      return false;
     }
+    this.select(null);
+    return true;
   }
 
   /**
@@ -291,6 +298,7 @@ export class LvGrid<R extends object = object> extends LitElement {
       this.view?.setFind(found);
       return;
     }
+    await this.updateComplete;
     const index = (await this.store?.reveal(found.result.pathOf(match))) ?? -1;
     await this.updateComplete;
     if (index >= 0) {
