@@ -25,7 +25,7 @@ async function measure(label, input, external = []) {
     input,
     platform: 'browser',
     external,
-    moduleTypes: { '.css': 'js', '.scss': 'js' },
+    moduleTypes: { '.css': 'js' },
     tsconfig: path.resolve('log-viewer/tsconfig.json'),
     plugins: [nodePolyfills(), css({ minify: true })],
     logLevel: 'silent',
