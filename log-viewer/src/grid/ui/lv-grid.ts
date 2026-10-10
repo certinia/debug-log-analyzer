@@ -126,8 +126,8 @@ function naturalWidth(cell: HTMLElement): number {
  * A virtualised tree grid. Set `columns` and `source`; it sorts from its header, and the
  * keyboard moves, opens and closes rows. Events bubble but stay inside the host's shadow
  * root: `lv-grid-select`, `lv-grid-locate` (hover), `lv-grid-context`,
- * `lv-grid-header-context`, `lv-grid-column-resize`, `lv-grid-find-results` and
- * `lv-grid-reshape`.
+ * `lv-grid-header-context`, `lv-grid-column-resize`, `lv-grid-find-results`,
+ * `lv-grid-reshape` and `lv-grid-expand` (a data row the user opened).
  */
 @customElement('lv-grid')
 export class LvGrid<R extends object = object> extends LitElement {
@@ -701,8 +701,18 @@ export class LvGrid<R extends object = object> extends LitElement {
     if (target === null) {
       return;
     }
+    const rows = this.shown;
+    const opens =
+      !(target instanceof Group) &&
+      !!rows?.hasChildrenAt(index) &&
+      !rows.isExpandedAt(index) &&
+      expanded !== false;
+    const row = opens ? this.dataRow(index) : null;
     this.toggled = target;
     await this.store?.toggle(target, expanded);
+    if (row) {
+      this.emit<GridRowDetail<R>>('lv-grid-expand', { row });
+    }
   }
 
   /** Whether the painted row at `index` shows whole, between the header and the totals. */
