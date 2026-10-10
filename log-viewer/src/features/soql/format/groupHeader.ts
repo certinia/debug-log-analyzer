@@ -1,6 +1,9 @@
 /*
  * Copyright (c) 2026 Certinia Inc. All rights reserved.
  */
+import { html, type TemplateResult } from 'lit';
+import { unsafeHTML } from 'lit/directives/unsafe-html.js';
+
 import { formatSOQL } from './formatter.js';
 
 type SoqlishRow = {
@@ -42,4 +45,13 @@ export function soqlGroupHeader(value: unknown, count: number, data: unknown): s
   // Query truncates (single-line ellipsis) but the count is pinned so it stays
   // visible — see the `.soql-group-header*` rules in DataGrid.scss.
   return `<span class="soql-group-header"><span class="soql-group-header__q soql-block soql-inline">${inner}</span><span class="soql-group-header__count">(${count})</span></span>`;
+}
+
+/** An lv-grid group cell: the key highlighted when it is a query, else the key and its count. */
+export function soqlGroupCell(group: {
+  key: string;
+  rows: readonly unknown[];
+}): TemplateResult | string {
+  const query = soqlGroupHeader(group.key, group.rows.length, group.rows);
+  return query ? html`${unsafeHTML(query)}` : `${group.key} (${group.rows.length})`;
 }
