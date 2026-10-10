@@ -351,7 +351,8 @@ export class DatabaseTime extends LitElement {
       }
     });
     table.on('rowMouseEnter', (_e, row) => {
-      dispatchInspectorLocate(this, (row.getData() as DatabaseTreeRow).eventIndexes);
+      // The totals row is a row too, with no statements.
+      dispatchInspectorLocate(this, (row.getData() as Partial<DatabaseTreeRow>).eventIndexes ?? []);
     });
     table.on('rowMouseLeave', () => {
       dispatchInspectorLocate(this, []);
