@@ -275,6 +275,17 @@ export class GridStore<R extends object> {
     return this.reorder();
   }
 
+  /**
+   * Runs the filters and the calcs again, for a host whose filter or calc reads state
+   * that changed, such as a time window. Open rows stay open.
+   */
+  refresh(): Promise<void> {
+    this.deepPass = new WeakMap();
+    this.dropTotals();
+    // With no filter the rows cannot change, and a re-sort of a large tree is not free.
+    return this.filters.length ? this.reorder() : this.rebuild(!this.groupBy);
+  }
+
   /** Sums only the calcs it has not summed before for the filters on. */
   setCalcs(calcs: Calcs<R>): Promise<void> {
     this.calcs = calcs;
@@ -305,18 +316,18 @@ export class GridStore<R extends object> {
   /**
    * Expands or collapses a shown row; `expanded` omitted flips it. The subtree is spliced
    * in or out at once, without a rebuild. A row that is not shown is left alone: use
-   * {@link reveal} to reach it. Takes a data row's key, or a group.
+   * {@link reveal} to reach it. Takes a data row's key, or a group. True when it opened the row.
    */
-  async toggle(target: RowKey | Group<R>, expanded?: boolean): Promise<void> {
+  async toggle(target: RowKey | Group<R>, expanded?: boolean): Promise<boolean> {
     await this.settled();
     const rows = this.current.rows;
     const index = rows.indexOf(target);
     if (index === -1 || !rows.hasChildrenAt(index)) {
-      return;
+      return false;
     }
     const was = rows.isExpandedAt(index);
     if (expanded === was) {
-      return;
+      return false;
     }
     if (target instanceof Group) {
       flip(this.openGroups, target.key);
@@ -324,6 +335,7 @@ export class GridStore<R extends object> {
       flip(this.toggled, target);
     }
     this.splice(index, !was);
+    return !was;
   }
 
   /**

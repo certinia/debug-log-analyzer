@@ -14,7 +14,6 @@ import type { RowComponent } from 'tabulator-tables';
 import type { ApexLog, LogEvent } from '@apexdevtools/apex-log-parser';
 import { DomListenerController } from '../../../core/events/DomListenerController.js';
 import { eventBus, type SelectionView } from '../../../core/events/EventBus.js';
-import type { FindEventDetail, FindEventMap } from '../../find/findEvents.js';
 import { SelectionEchoGuard } from '../../../core/events/SelectionEchoGuard.js';
 import { SubscriptionController } from '../../../core/events/SubscriptionController.js';
 import { vscodeMessenger } from '../../../core/messaging/VSCodeExtensionMessenger.js';
@@ -77,6 +76,7 @@ import {
 import { CALL_TREE_VIEWS } from '../../../tabulator/ColumnViews.js';
 import { LocatedRowIds, rowDetailSelection, rowFrames } from '../../../components/locatedRow.js';
 import { InspectorTabController } from '../../../components/InspectorTabController.js';
+import { LvGridFindController } from '../../../components/grid/LvGridFindController.js';
 import { revealFirstOf } from '../../../components/inspectorTab.js';
 
 /** The Name column is always shown in the call-tree tables. */
@@ -240,17 +240,6 @@ export class CalltreeView extends LitElement {
   private readonly _filterSlots = new Map<string, { input: string; filter: RowFilter<unknown> }>();
   selfTimeRange: FilterRange = { start: null, end: null };
 
-  totalMatches = 0;
-
-  blockClearHighlights = true;
-  private _findsRunning = 0;
-  private _searches = 0;
-  findArgs: { text: string; count: number; options: { matchCase: boolean } } = {
-    text: '',
-    count: 0,
-    options: { matchCase: false },
-  };
-
   tableContainer: HTMLDivElement | null = null;
   rootMethod: ApexLog | null = null;
 
@@ -281,13 +270,17 @@ export class CalltreeView extends LitElement {
   private _echoGuard = new SelectionEchoGuard();
   private _locateIds = new LocatedRowIds();
 
-  private readonly _documentBus = new DomListenerController<
-    FindEventMap & CalltreeNavigationEventMap
-  >(this, document, {
-    [CALLTREE_GO_TO_ROW]: (e) => void this._goToRow(e.detail.eventIndex),
-    'lv-find': (e) => void this._find(e),
-    'lv-find-match': (e) => void this._find(e),
-    'lv-find-close': (e) => void this._find(e),
+  private readonly _documentBus = new DomListenerController<CalltreeNavigationEventMap>(
+    this,
+    document,
+    { [CALLTREE_GO_TO_ROW]: (e) => void this._goToRow(e.detail.eventIndex) },
+  );
+
+  private readonly _finder = new LvGridFindController(this, {
+    grids: () => {
+      const grid = this._activeGrid();
+      return grid ? [grid] : [];
+    },
   });
 
   private readonly _subscriptions = new SubscriptionController(this, () => [
@@ -597,14 +590,7 @@ export class CalltreeView extends LitElement {
       return;
     }
 
-    // Reset search when switching views
-    if (this.totalMatches > 0 || this.findArgs.text !== '') {
-      this._resetFindWidget();
-      this._activeGrid()?.clearFind();
-      this.findArgs.text = '';
-      this.findArgs.count = 0;
-      this.totalMatches = 0;
-    }
+    this._finder.dropOnReshape();
 
     const switchEpoch = ++this.viewSwitchEpoch;
     this.viewMode = newMode;
@@ -666,8 +652,6 @@ export class CalltreeView extends LitElement {
   _handleBottomUpGroupBy(event: Event) {
     const target = event.target as HTMLInputElement;
     this.bottomUpGroupBy = target.value;
-    // Grouping renumbers the matches both ways round.
-    this._dropSearch();
     if (this.bottomUpGrid) {
       this.bottomUpGrid.groupBy = bottomUpGroupBy(target.value);
     }
@@ -784,17 +768,14 @@ export class CalltreeView extends LitElement {
 
   _updateFiltering() {
     if (this.timeOrderGrid && this.viewMode === 'time-order') {
-      this._dropSearch();
       this.timeOrderGrid.filters = this._timeOrderFilters();
       return;
     }
     if (this.aggregatedGrid && this.viewMode === 'aggregated') {
-      this._dropSearch();
       this.aggregatedGrid.filters = this._aggregatedFilters();
       return;
     }
     if (this.bottomUpGrid && this.viewMode === 'bottom-up') {
-      this._dropSearch();
       this.bottomUpGrid.filters = this._bottomUpFilters();
     }
   }
@@ -1049,60 +1030,6 @@ export class CalltreeView extends LitElement {
     return path;
   }
 
-  /** The find widget counts matches from 1, the grid from 0. */
-  async _find(e: CustomEvent<FindEventDetail>) {
-    const grid = this._activeGrid();
-    if (!grid) {
-      return;
-    }
-    const isGridVisible = grid.clientHeight > 0;
-    if (!isGridVisible && !this.totalMatches) {
-      return;
-    }
-    if (e.type === 'lv-find-close') {
-      grid.clearFind();
-      this.findArgs = { text: '', count: 0, options: { matchCase: false } };
-      this.totalMatches = 0;
-      return;
-    }
-    const args = e.detail;
-    const newSearch =
-      args.text !== this.findArgs.text ||
-      args.options.matchCase !== this.findArgs.options?.matchCase;
-    this.findArgs = JSON.parse(JSON.stringify(args));
-
-    this._findsRunning++;
-    this.blockClearHighlights = true;
-    try {
-      if (newSearch) {
-        const search = ++this._searches;
-        const total = await grid.find({ text: args.text, matchCase: args.options.matchCase });
-        if (search !== this._searches) {
-          return;
-        }
-        if (total < 0) {
-          // A rebuild dropped it: show no matches and forget the query, so the next Enter searches.
-          this._resetFindWidget();
-          this._clearSearchHighlights();
-          return;
-        }
-        this.totalMatches = total;
-        if (isGridVisible) {
-          document.dispatchEvent(
-            new CustomEvent('lv-find-results', { detail: { totalMatches: this.totalMatches } }),
-          );
-        }
-      }
-      if (isGridVisible && this.totalMatches > 0 && args.count > 0) {
-        await grid.setCurrentMatch(args.count - 1);
-      }
-    } finally {
-      if (--this._findsRunning === 0) {
-        this.blockClearHighlights = false;
-      }
-    }
-  }
-
   private async _renderCallTree(
     callTreeTableContainer: HTMLDivElement,
     rootMethod: ApexLog,
@@ -1219,7 +1146,7 @@ export class CalltreeView extends LitElement {
       event.preventDefault();
       this._showHeaderContextMenu(gridColumnTarget(grid), event.clientX, event.clientY);
     });
-    grid.addEventListener('lv-grid-reshape', () => this._dropSearch());
+    grid.addEventListener('lv-grid-reshape', () => this._finder.dropOnReshape());
     grid.addEventListener('lv-grid-select', (e) => {
       if (this._echoGuard.suppressed) {
         return;
@@ -1246,25 +1173,6 @@ export class CalltreeView extends LitElement {
 
     container.replaceChildren(grid);
     return grid;
-  }
-
-  private _resetFindWidget() {
-    document.dispatchEvent(new CustomEvent('lv-find-results', { detail: { totalMatches: 0 } }));
-  }
-
-  /** Drop the search where its match numbering no longer describes the table. */
-  private _dropSearch() {
-    if (!this.blockClearHighlights && this.totalMatches > 0) {
-      this._resetFindWidget();
-      this._clearSearchHighlights();
-    }
-  }
-
-  private _clearSearchHighlights() {
-    this.findArgs.text = '';
-    this.findArgs.count = 0;
-    this._activeGrid()?.clearFind();
-    this.totalMatches = 0;
   }
 
   private _showRowContextMenu(event: LogEvent, clientX: number, clientY: number): void {

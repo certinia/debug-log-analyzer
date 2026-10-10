@@ -68,8 +68,8 @@ export interface GridSort {
 
 /** The rows or shown columns changed, so find's match numbers no longer hold. */
 export interface GridReshapeDetail {
-  /** `sort` from the header; `columns` when the shown columns change. */
-  reason: 'sort' | 'columns';
+  /** `sort` from the header; `columns` when the shown columns change; `filter` on new filters or a refresh; `group` on a new grouping. */
+  reason: 'sort' | 'columns' | 'filter' | 'group';
 }
 
 export interface GridColumnDetail {
@@ -126,8 +126,8 @@ function naturalWidth(cell: HTMLElement): number {
  * A virtualised tree grid. Set `columns` and `source`; it sorts from its header, and the
  * keyboard moves, opens and closes rows. Events bubble but stay inside the host's shadow
  * root: `lv-grid-select`, `lv-grid-locate` (hover), `lv-grid-context`,
- * `lv-grid-header-context`, `lv-grid-column-resize`, `lv-grid-find-results` and
- * `lv-grid-reshape`.
+ * `lv-grid-header-context`, `lv-grid-column-resize`, `lv-grid-find-results`,
+ * `lv-grid-reshape` and `lv-grid-expand` (a data row the user opened).
  */
 @customElement('lv-grid')
 export class LvGrid<R extends object = object> extends LitElement {
@@ -185,6 +185,10 @@ export class LvGrid<R extends object = object> extends LitElement {
   @property({ attribute: 'footer-position', reflect: true })
   footerPosition: 'bottom' | 'rows' = 'bottom';
 
+  /** What the body shows when no row passes the filters and no build runs, such as "No SOQL queries found". */
+  @property({ attribute: false })
+  placeholder: string | null = null;
+
   private store: GridStore<R> | null = null;
   private readonly data = new StoreController<R>(this);
   private view: GridView<R> | null = null;
@@ -198,6 +202,8 @@ export class LvGrid<R extends object = object> extends LitElement {
   private selectedAt = -1;
   private hovered = -1;
   private found: { result: FindResult<R>; pattern: RegExp; current: number } | null = null;
+  // Goes up with each find and clear, so a find still running sees it is stale.
+  private searches = 0;
   /** Widths the user set, by column id. They win over a column's own `width`. */
   private readonly widths = new Map<string, number>();
   private readonly scrollerRef = createRef<HTMLDivElement>();
@@ -224,6 +230,18 @@ export class LvGrid<R extends object = object> extends LitElement {
 
   async collapseAll(): Promise<void> {
     await this.store?.collapseAll();
+  }
+
+  /**
+   * Runs the filters and column calcs again, for a filter or calc that reads state that
+   * changed, such as a time window.
+   */
+  async refresh(): Promise<void> {
+    // Only a filter or a group order by a total can move rows; with neither, matches hold.
+    if (this.filters.length || this.groupBy) {
+      this.emit<GridReshapeDetail>('lv-grid-reshape', { reason: 'filter' });
+    }
+    await this.store?.refresh();
   }
 
   /**
@@ -265,9 +283,10 @@ export class LvGrid<R extends object = object> extends LitElement {
    */
   async find(query: FindQuery): Promise<number> {
     const cells = this.visibleColumns().flatMap((column) => (column.text ? [column.text] : []));
+    const search = ++this.searches;
     const result = await this.store?.find(query, cells);
     const pattern = findPattern(query);
-    if (!result) {
+    if (!result || search !== this.searches) {
       return -1;
     }
     this.found = pattern ? { result, pattern, current: -1 } : null;
@@ -278,14 +297,19 @@ export class LvGrid<R extends object = object> extends LitElement {
 
   /**
    * Opens the way to match `match` (numbered from 0) and marks it current. A row out of
-   * view whole scrolls to the middle; one in view stays where it is.
+   * view whole scrolls to the middle; one in view stays where it is. -1 marks no match
+   * current, as when the current match is in another grid.
    */
   async setCurrentMatch(match: number): Promise<void> {
     const found = this.found;
-    if (!found || match < 0 || match >= found.result.total) {
+    if (!found || match < -1 || match >= found.result.total) {
       return;
     }
     found.current = match;
+    if (match < 0) {
+      this.view?.setFind(found);
+      return;
+    }
     const index = (await this.store?.reveal(found.result.pathOf(match))) ?? -1;
     await this.updateComplete;
     if (index >= 0 && !this.inView(index)) {
@@ -295,6 +319,7 @@ export class LvGrid<R extends object = object> extends LitElement {
   }
 
   clearFind(): void {
+    this.searches++;
     this.found = null;
     this.view?.setFind(null);
   }
@@ -341,9 +366,11 @@ export class LvGrid<R extends object = object> extends LitElement {
     }
     if (changed.has('filters')) {
       void store.setFilters(this.filters);
+      this.emit<GridReshapeDetail>('lv-grid-reshape', { reason: 'filter' });
     }
     if (changed.has('groupBy')) {
       void store.setGroupBy(this.groupBy);
+      this.emit<GridReshapeDetail>('lv-grid-reshape', { reason: 'group' });
     }
     if ((changed.has('columns') || changed.has('sort')) && this.calcsChanged()) {
       void store.setCalcs(this.calcs);
@@ -394,6 +421,11 @@ export class LvGrid<R extends object = object> extends LitElement {
       <div class="row head" role="row" aria-rowindex="1">
         ${columns.map((column) => this.headerCell(column))}
       </div>
+      ${
+        size === 0 && !this.data.snapshot?.busy && this.placeholder !== null
+          ? html`<div class="placeholder" role="status">${this.placeholder}</div>`
+          : nothing
+      }
       <div
         class="body"
         ${ref(this.bodyRef)}
@@ -685,7 +717,13 @@ export class LvGrid<R extends object = object> extends LitElement {
       return;
     }
     this.toggled = target;
-    await this.store?.toggle(target, expanded);
+    const opened = (await this.store?.toggle(target, expanded)) ?? false;
+    // Read the row after the toggle: the rows on screen can be older than the store's.
+    const rows = this.store?.snapshot().rows;
+    const entry = opened && rows ? rows.rowAt(rows.indexOf(target)) : undefined;
+    if (entry !== undefined && !(entry instanceof Group)) {
+      this.emit<GridRowDetail<R>>('lv-grid-expand', { row: entry });
+    }
   }
 
   /** Whether the painted row at `index` shows whole, between the header and the totals. */

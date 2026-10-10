@@ -4,6 +4,7 @@
 import {
   GridStore,
   sortComparator,
+  sum,
   type RowView,
   type Scheduler,
   type TreeSource,
@@ -133,6 +134,43 @@ describe('GridStore', () => {
       { test: (r) => r.key !== 'x' },
     ]);
     expect(shown(store.snapshot().rows)).toEqual(['a+@0', 'b+@1', 'c@2', 'd@0']);
+  });
+
+  it('says whether a toggle opened the row', async () => {
+    const store = new GridStore(source(tree()));
+    await store.settled();
+    expect(await store.toggle('a')).toBe(true);
+    expect(await store.toggle('a')).toBe(false);
+    expect(await store.toggle('a', false)).toBe(false);
+    expect(await store.toggle('x')).toBe(false);
+  });
+
+  it('runs a filter again on refresh, and keeps open rows open', async () => {
+    const store = new GridStore(source(tree()));
+    await store.expandAll();
+    let hidden = 'c';
+    await store.setFilters([{ test: (r) => r.key !== hidden, keepAncestors: true }]);
+    expect(shown(store.snapshot().rows)).toEqual(['a+@0', 'b@1', 'x@1', 'd+@0', 'e@1']);
+
+    hidden = 'e';
+    await store.refresh();
+    expect(shown(store.snapshot().rows)).toEqual(['a+@0', 'b+@1', 'c@2', 'x@1', 'd@0']);
+  });
+
+  it('sums the calcs again on refresh', async () => {
+    let scale = 1;
+    const store = new GridStore(source(tree()), {
+      calcs: { total: sum((r: Node) => r.value * scale) },
+    });
+    await store.settled();
+    expect(store.snapshot().totals.total).toBe(4);
+
+    scale = 10;
+    const rows = store.snapshot().rows;
+    await store.refresh();
+    expect(store.snapshot().totals.total).toBe(40);
+    // No filter is on, so the rows on screen stay as they are.
+    expect(store.snapshot().rows).toBe(rows);
   });
 
   it('reveals a deep row by expanding its ancestors', async () => {

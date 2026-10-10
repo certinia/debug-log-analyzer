@@ -45,7 +45,8 @@ export function gridColumnTarget<R extends object>(grid: LvGrid<R>): ColumnTarge
   };
 }
 
-type Target = Tabulator | ColumnTarget;
+/** A grid a column view applies to. */
+export type Target = Tabulator | ColumnTarget;
 
 const isTabulator = (target: Target): target is Tabulator => 'getColumns' in target;
 
