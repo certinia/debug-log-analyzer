@@ -68,8 +68,8 @@ export interface GridSort {
 
 /** The rows or shown columns changed, so find's match numbers no longer hold. */
 export interface GridReshapeDetail {
-  /** `sort` from the header; `columns` when the shown columns change; `filter` on new filters or a refresh. */
-  reason: 'sort' | 'columns' | 'filter';
+  /** `sort` from the header; `columns` when the shown columns change; `filter` on new filters or a refresh; `group` on a new grouping. */
+  reason: 'sort' | 'columns' | 'filter' | 'group';
 }
 
 export interface GridColumnDetail {
@@ -237,7 +237,10 @@ export class LvGrid<R extends object = object> extends LitElement {
    * changed, such as a time window.
    */
   async refresh(): Promise<void> {
-    this.emit<GridReshapeDetail>('lv-grid-reshape', { reason: 'filter' });
+    // Only a filter or a group order by a total can move rows; with neither, matches hold.
+    if (this.filters.length || this.groupBy) {
+      this.emit<GridReshapeDetail>('lv-grid-reshape', { reason: 'filter' });
+    }
     await this.store?.refresh();
   }
 
@@ -367,6 +370,7 @@ export class LvGrid<R extends object = object> extends LitElement {
     }
     if (changed.has('groupBy')) {
       void store.setGroupBy(this.groupBy);
+      this.emit<GridReshapeDetail>('lv-grid-reshape', { reason: 'group' });
     }
     if ((changed.has('columns') || changed.has('sort')) && this.calcsChanged()) {
       void store.setCalcs(this.calcs);
