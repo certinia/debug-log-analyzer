@@ -652,8 +652,6 @@ export class CalltreeView extends LitElement {
   _handleBottomUpGroupBy(event: Event) {
     const target = event.target as HTMLInputElement;
     this.bottomUpGroupBy = target.value;
-    // Grouping renumbers the matches both ways round.
-    this._finder.dropOnReshape();
     if (this.bottomUpGrid) {
       this.bottomUpGrid.groupBy = bottomUpGroupBy(target.value);
     }
@@ -770,17 +768,14 @@ export class CalltreeView extends LitElement {
 
   _updateFiltering() {
     if (this.timeOrderGrid && this.viewMode === 'time-order') {
-      this._finder.dropOnReshape();
       this.timeOrderGrid.filters = this._timeOrderFilters();
       return;
     }
     if (this.aggregatedGrid && this.viewMode === 'aggregated') {
-      this._finder.dropOnReshape();
       this.aggregatedGrid.filters = this._aggregatedFilters();
       return;
     }
     if (this.bottomUpGrid && this.viewMode === 'bottom-up') {
-      this._finder.dropOnReshape();
       this.bottomUpGrid.filters = this._bottomUpFilters();
     }
   }
