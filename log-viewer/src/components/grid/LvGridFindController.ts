@@ -11,83 +11,106 @@ import type { FindQuery, LvGrid } from '../../grid/index.js';
 export type FindableGrid = Pick<LvGrid, 'find' | 'setCurrentMatch' | 'clearFind' | 'clientHeight'>;
 
 export interface LvGridFindOptions {
-  /** The grid to search, read late: the grid is made well after the host connects. */
-  grid: () => FindableGrid | null;
-  /** Hands the count to whatever shows it. */
-  report: (totalMatches: number) => void;
+  /**
+   * The grids to search, in the order the widget counts their matches. Read late: grids
+   * are made well after the host connects. One that is not shown is not searched.
+   */
+  grids: () => readonly FindableGrid[];
 }
 
 /**
- * Owns one lv-grid's half of the find widget: the search, marking a match current, and
- * dropping both when the grid is reshaped under them. `lv-find` is app-wide, so a grid
- * that is not shown answers nothing.
+ * The find widget's search over a host's lv-grids: it searches, reports the total in
+ * `lv-find-results`, marks the widget's current match in the grid that holds it, and
+ * drops the search when a grid is reshaped under it. A host with no grid shown answers
+ * nothing, which keeps the hidden tabs quiet.
  */
 export class LvGridFindController {
-  totalMatches = 0;
-
   private readonly _options: LvGridFindOptions;
   private _query: FindQuery | null = null;
-  /** Goes up with each search, so an older one sees it is stale. */
+  /** The grids the last search ran over, with each one's count. */
+  private _found: { grid: FindableGrid; total: number }[] = [];
+  /** Goes up with each search and clear, so an older search sees it is stale. */
   private _searches = 0;
 
   constructor(host: ReactiveControllerHost, options: LvGridFindOptions) {
     this._options = options;
     new DomListenerController<FindEventMap>(host, document, {
       'lv-find': (e) => void this.find(e),
+      'lv-find-match': (e) => void this.find(e),
       'lv-find-close': (e) => void this.find(e),
     });
   }
 
+  get totalMatches(): number {
+    return this._found.reduce((sum, { total }) => sum + total, 0);
+  }
+
   async find(e: CustomEvent<FindEventDetail>): Promise<void> {
-    const grid = this._options.grid();
-    if (!grid || (!grid.clientHeight && !this.totalMatches)) {
+    const shown = this._options.grids().filter((grid) => grid.clientHeight > 0);
+    if (!shown.length && !this.totalMatches) {
       return;
     }
     if (e.type === 'lv-find-close') {
-      this._query = null;
-      this.totalMatches = 0;
-      grid.clearFind();
+      this._drop();
       return;
     }
-    const { text, options } = e.detail;
-    if (text === this._query?.text && options.matchCase === this._query.matchCase) {
-      return;
+    const { text, options, count } = e.detail;
+    if (text !== this._query?.text || options.matchCase !== this._query.matchCase) {
+      const query = { text, matchCase: options.matchCase };
+      this._query = query;
+      const search = ++this._searches;
+      const totals: number[] = [];
+      for (const grid of shown) {
+        totals.push(await grid.find(query));
+        if (search !== this._searches) {
+          return;
+        }
+      }
+      if (totals.some((total) => total < 0)) {
+        // A rebuild dropped it: show no matches and forget the query, so the next Enter searches.
+        this.clear();
+        return;
+      }
+      this._found = shown.map((grid, i) => ({ grid, total: totals[i] ?? 0 }));
+      report(this.totalMatches);
     }
-    this._query = { text, matchCase: options.matchCase };
-    const search = ++this._searches;
-    const total = await grid.find(this._query);
-    if (search !== this._searches) {
-      return;
-    }
-    if (total < 0) {
-      // A rebuild dropped it: show no matches and forget the query, so the next Enter searches.
-      this.clear();
-      return;
-    }
-    this.totalMatches = total;
-    this._options.report(total);
+    await this._markCurrent(count);
   }
 
-  /** Marks match `index` current, counted from 1 as the widget counts; 0 marks none. */
-  async highlight(index: number): Promise<void> {
-    const grid = this._options.grid();
-    if (grid?.clientHeight) {
-      await grid.setCurrentMatch(index - 1);
-    }
-  }
-
-  /** Drops the search, in the grid and in the widget. */
+  /** Drops the search, in the grids and in the widget. */
   clear(): void {
-    this._query = null;
-    this.totalMatches = 0;
-    this._options.grid()?.clearFind();
-    this._options.report(0);
+    this._drop();
+    report(0);
   }
 
-  /** A sort or column change moves the matches, so their numbers no longer hold. */
+  /** A sort, filter, grouping or view switch moves the matches, so their numbers no longer hold. */
   dropOnReshape(): void {
-    if (this.totalMatches > 0) {
+    if (this._query) {
       this.clear();
     }
   }
+
+  /** Marks match `count`, counted from 1 across the grids as the widget counts; 0 marks none. */
+  private async _markCurrent(count: number): Promise<void> {
+    let before = 0;
+    for (const { grid, total } of this._found) {
+      const match = count - 1 - before;
+      await grid.setCurrentMatch(match >= 0 && match < total ? match : -1);
+      before += total;
+    }
+  }
+
+  private _drop(): void {
+    this._searches++;
+    this._query = null;
+    this._found = [];
+    // Every grid, not only those the last search ended on: a stale search marks too.
+    for (const grid of this._options.grids()) {
+      grid.clearFind();
+    }
+  }
+}
+
+function report(totalMatches: number): void {
+  document.dispatchEvent(new CustomEvent('lv-find-results', { detail: { totalMatches } }));
 }
