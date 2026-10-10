@@ -268,6 +268,24 @@ describe('lv-grid', () => {
     expect(rowNamed('b')?.ariaSelected).toBe('false');
   });
 
+  it('reports a row the user opens, and not one the user closes', async () => {
+    const { grid, rowNamed, key } = await setup();
+    const opened: string[] = [];
+    grid.addEventListener('lv-grid-expand', (e) => {
+      opened.push(detail<GridRowDetail<Node>>(e).row?.name ?? '');
+    });
+    rowNamed('b')?.querySelector<HTMLElement>('[data-toggle]')?.click();
+    await settle(grid);
+    rowNamed('b')?.querySelector<HTMLElement>('[data-toggle]')?.click();
+    await settle(grid);
+    expect(opened).toEqual(['b']);
+
+    rowNamed('b')?.click();
+    await key('ArrowRight');
+    await key('ArrowLeft');
+    expect(opened).toEqual(['b', 'b']);
+  });
+
   it('selects a row with no children from its twisty', async () => {
     const { grid, rowNamed } = await setup();
     rowNamed('c')?.querySelector<HTMLElement>('.twisty')?.click();
