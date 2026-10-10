@@ -185,6 +185,10 @@ export class LvGrid<R extends object = object> extends LitElement {
   @property({ attribute: 'footer-position', reflect: true })
   footerPosition: 'bottom' | 'rows' = 'bottom';
 
+  /** Takes the height of its rows, up to `--grid-max-height`; past it the rows scroll inside. */
+  @property({ type: Boolean, attribute: 'fit-rows', reflect: true })
+  fitRows = false;
+
   /** What the body shows when no row passes the filters and no build runs, such as "No SOQL queries found". */
   @property({ attribute: false })
   placeholder: string | null = null;
@@ -258,9 +262,7 @@ export class LvGrid<R extends object = object> extends LitElement {
       return false;
     }
     await this.updateComplete;
-    if (scrollIfVisible || !this.inView(index)) {
-      this.view?.scrollToIndex(index);
-    }
+    this.bringIntoView(index, scrollIfVisible);
     this.select(this.targetAt(index), index);
     return true;
   }
@@ -312,8 +314,8 @@ export class LvGrid<R extends object = object> extends LitElement {
     }
     const index = (await this.store?.reveal(found.result.pathOf(match))) ?? -1;
     await this.updateComplete;
-    if (index >= 0 && !this.inView(index)) {
-      this.view?.scrollToIndex(index);
+    if (index >= 0) {
+      this.bringIntoView(index, false);
     }
     this.view?.setFind(found);
   }
@@ -726,12 +728,28 @@ export class LvGrid<R extends object = object> extends LitElement {
     }
   }
 
+  private bringIntoView(index: number, always: boolean): void {
+    if (always || !this.inView(index)) {
+      this.view?.scrollToIndex(index);
+    }
+    if (this.fitRows) {
+      // A fitted grid scrolls with the page, which its scroller cannot see; the host stands in for an unpainted row.
+      (this.paintedRow(index) ?? this).scrollIntoView({ block: 'nearest' });
+    }
+  }
+
+  private paintedRow(index: number): HTMLElement | null {
+    return (
+      this.bodyRef.value?.querySelector<HTMLElement>(
+        `:scope > [data-index="${index}"]:not([hidden])`,
+      ) ?? null
+    );
+  }
+
   /** Whether the painted row at `index` shows whole, between the header and the totals. */
   private inView(index: number): boolean {
     const scroller = this.scrollerRef.value;
-    const row = this.bodyRef.value?.querySelector<HTMLElement>(
-      `:scope > [data-index="${index}"]:not([hidden])`,
-    );
+    const row = this.paintedRow(index);
     if (!scroller || !row) {
       return false;
     }
