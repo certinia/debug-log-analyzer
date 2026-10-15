@@ -1,7 +1,7 @@
 /*
  * Copyright (c) 2026 Certinia Inc. All rights reserved.
  */
-import type { RowView } from './store.js';
+import { parentIndex, type RowView } from './rows.js';
 
 export type NavKey = 'up' | 'down' | 'left' | 'right' | 'home' | 'end';
 
@@ -41,13 +41,8 @@ export function navigate<R>(rows: RowView<R>, index: number, key: NavKey): NavIn
       if (rows.isExpandedAt(index)) {
         return { kind: 'collapse', index };
       }
-      const depth = rows.depthAt(index);
-      for (let i = index - 1; i >= 0; i--) {
-        if (rows.depthAt(i) < depth) {
-          return { kind: 'select', index: i };
-        }
-      }
-      return null;
+      const parent = parentIndex(rows, index);
+      return parent === -1 ? null : { kind: 'select', index: parent };
     }
   }
 }

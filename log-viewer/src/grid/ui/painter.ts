@@ -3,14 +3,14 @@
  */
 import { html, nothing, render, type TemplateResult } from 'lit';
 
-import { Group, type RowKey, type RowView } from '../core/index.js';
+import { Group, type RowKey, type RowTarget, type RowView } from '../core/index.js';
 import type { RowPainter } from '../render/index.js';
 import type { CellContent, GridColumn } from './column.js';
 
 /** What a row's look depends on beyond its data. Read on each paint. */
 export interface PaintState<R> {
   columns: readonly GridColumn<R>[];
-  isSelected(target: RowKey | Group<R>): boolean;
+  isSelected(target: RowTarget<R>): boolean;
   marked: ReadonlySet<RowKey>;
   rowClass: ((row: R) => string | undefined) | null;
 }

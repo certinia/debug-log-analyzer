@@ -11,36 +11,32 @@ import {
   type FindQuery,
   type PathNode,
 } from './find.js';
-import { byCount, Group, type GroupBy } from './groups.js';
+import {
+  emptyFlat,
+  EXPANDED,
+  GROUP,
+  HAS_CHILDREN,
+  pack,
+  spliceRows,
+  type Flat,
+  type FlatRows,
+  type RowView,
+} from './rows.js';
 import { CHECK_EVERY, immediateScheduler, sliceTimer, type Scheduler } from './schedule.js';
 import { sortRows, type Sort } from './sort.js';
-import type { ExpandPolicy, RowFilter, RowKey, TreeSource } from './types.js';
-
-const HAS_CHILDREN = 1;
-const EXPANDED = 2;
-const GROUP = 4;
+import {
+  Group,
+  type ExpandPolicy,
+  type GroupBy,
+  type RowFilter,
+  type RowKey,
+  type RowTarget,
+  type TreeSource,
+} from './types.js';
 /** Export lines joined per slice: one join of the whole text is a long task at 500k rows. */
 const EXPORT_CHUNK = 4096;
 /** Rows a toggle walks in one task; a larger subtree is built in slices. */
 const SPLICE_LIMIT = 4096;
-
-/** The rows on screen, in order. Immutable: a change publishes a new one. */
-export interface RowView<R> {
-  readonly size: number;
-  /** A data row, or a group's header row. */
-  rowAt(index: number): R | Group<R>;
-  depthAt(index: number): number;
-  /** A data row's key, or a group row's group key. */
-  keyAt(index: number): RowKey;
-  /** The row has children that pass the filters. A group row always has. */
-  hasChildrenAt(index: number): boolean;
-  isExpandedAt(index: number): boolean;
-  /**
-   * Index of the data row with this key, or of the group row with this group's key; -1
-   * when it is not shown. Linear in the row count.
-   */
-  indexOf(target: RowKey | Group<R>): number;
-}
 
 export interface Snapshot<R> {
   /** Goes up by one on every change. */
@@ -51,7 +47,7 @@ export interface Snapshot<R> {
   /** A sliced step is running; `rows` is the last finished state. */
   readonly busy: boolean;
   /** The row a toggle came from, while the rows are the ones that toggle made. */
-  readonly toggled?: RowKey | Group<R>;
+  readonly toggled?: RowTarget<R>;
 }
 
 export interface GridStoreOptions<R> {
@@ -64,73 +60,12 @@ export interface GridStoreOptions<R> {
 
 type Entry<R> = R | Group<R>;
 
+/** Most rows first, then by key: the order before any sort, and the tie-break under one. */
+const byCount = <R>(a: Group<R>, b: Group<R>): number =>
+  b.rows.length - a.rows.length || a.key.localeCompare(b.key);
+
 /** Totals kept by the calc that made them. */
 type Held<R> = Map<Calc<R>, number>;
-
-class FlatRows<R extends object> implements RowView<R> {
-  readonly rows: readonly Entry<R>[];
-  readonly depths: Uint16Array;
-  readonly flags: Uint8Array;
-  private readonly key: (row: R) => RowKey;
-
-  constructor(
-    rows: readonly Entry<R>[],
-    depths: Uint16Array,
-    flags: Uint8Array,
-    key: (row: R) => RowKey,
-  ) {
-    this.rows = rows;
-    this.depths = depths;
-    this.flags = flags;
-    this.key = key;
-  }
-
-  get size(): number {
-    return this.rows.length;
-  }
-
-  rowAt(index: number): Entry<R> {
-    return this.rows[index] as Entry<R>;
-  }
-
-  depthAt(index: number): number {
-    return this.depths[index] ?? 0;
-  }
-
-  keyAt(index: number): RowKey {
-    const entry = this.rowAt(index);
-    return entry instanceof Group ? entry.key : this.key(entry);
-  }
-
-  hasChildrenAt(index: number): boolean {
-    return ((this.flags[index] ?? 0) & HAS_CHILDREN) !== 0;
-  }
-
-  isExpandedAt(index: number): boolean {
-    return ((this.flags[index] ?? 0) & EXPANDED) !== 0;
-  }
-
-  indexOf(target: RowKey | Group<R>): number {
-    const rows = this.rows;
-    if (target instanceof Group) {
-      return rows.findIndex((entry) => entry instanceof Group && entry.key === target.key);
-    }
-    for (let i = 0; i < rows.length; i++) {
-      const entry = rows[i] as Entry<R>;
-      if (!(entry instanceof Group) && this.key(entry) === target) {
-        return i;
-      }
-    }
-    return -1;
-  }
-}
-
-/** A row list being built: parallel arrays, packed into a {@link FlatRows} once done. */
-interface Flat<R> {
-  rows: Entry<R>[];
-  depths: number[];
-  flags: number[];
-}
 
 /** A depth-first walk in progress: a stack of sibling lists and the next index in each. */
 interface Walk<R> {
@@ -150,7 +85,7 @@ const walkOf = <R>(shown: readonly R[], depth: number): Walk<R> => ({
 interface Built<R extends object> {
   rows: FlatRows<R>;
   totals: Totals;
-  toggled?: RowKey | Group<R>;
+  toggled?: RowTarget<R>;
 }
 
 function flip<K>(set: Set<K>, key: K): void {
@@ -189,6 +124,7 @@ async function drive<T>(
  */
 export class GridStore<R extends object> {
   private source: TreeSource<R>;
+  private readonly key = (row: R): RowKey => this.source.key(row);
   private readonly scheduler: Scheduler;
   private expandBase: ExpandPolicy<R>;
   /** Rows whose expansion differs from `expandBase`. */
@@ -226,7 +162,7 @@ export class GridStore<R extends object> {
   private findId = 0;
   /** Goes up when the rows a find or export walks change. */
   private generation = 0;
-  private toggledTarget: RowKey | Group<R> | undefined;
+  private toggledTarget: RowTarget<R> | undefined;
 
   constructor(source: TreeSource<R>, options: GridStoreOptions<R> = {}) {
     this.source = source;
@@ -236,7 +172,7 @@ export class GridStore<R extends object> {
     this.groupBy = options.groupBy ?? null;
     this.current = {
       version: 0,
-      rows: this.pack({ rows: [], depths: [], flags: [] }),
+      rows: pack(emptyFlat(), this.key),
       totals: {},
       busy: true,
     };
@@ -317,7 +253,7 @@ export class GridStore<R extends object> {
    * in or out at once, without a rebuild. A row that is not shown is left alone: use
    * {@link reveal} to reach it. Takes a data row's key, or a group.
    */
-  async toggle(target: RowKey | Group<R>, expanded?: boolean): Promise<void> {
+  async toggle(target: RowTarget<R>, expanded?: boolean): Promise<void> {
     await this.settled();
     const rows = this.current.rows;
     const index = rows.indexOf(target);
@@ -352,7 +288,7 @@ export class GridStore<R extends object> {
     let found: R | null = null;
     let opened = false;
     for (const [depth, key] of path.entries()) {
-      const row = this.childrenOf(list).find((r) => this.source.key(r) === key);
+      const row = this.childrenOf(list).find((r) => this.key(r) === key);
       if (!row) {
         break;
       }
@@ -378,7 +314,7 @@ export class GridStore<R extends object> {
       return (this.current.rows as FlatRows<R>).rows.indexOf(found);
     }
     await this.rebuild();
-    return this.current.rows.indexOf(this.source.key(found));
+    return this.current.rows.indexOf(this.key(found));
   }
 
   /**
@@ -391,13 +327,12 @@ export class GridStore<R extends object> {
     await this.settled();
     const generation = this.generation;
     const stale = (): boolean => id !== this.findId || generation !== this.generation;
-    const key = (row: R): RowKey => this.source.key(row);
     const pattern = findPattern(query);
     if (stale()) {
       return null;
     }
     if (!pattern) {
-      return new FindResult<R>([], new Uint32Array(0), [], new Map(), 0, key);
+      return new FindResult<R>([], new Uint32Array(0), [], new Map(), 0, this.key);
     }
     const found = new FindCollector(cells, pattern);
     const done = await drive(
@@ -409,7 +344,7 @@ export class GridStore<R extends object> {
       sliceTimer(this.scheduler, stale),
       stale,
     );
-    return done && !stale() ? found.result(key) : null;
+    return done && !stale() ? found.result(this.key) : null;
   }
 
   /**
@@ -480,7 +415,7 @@ export class GridStore<R extends object> {
   private isExpanded(row: R, depth: number): boolean {
     const base =
       typeof this.expandBase === 'function' ? this.expandBase(row, depth) : this.expandBase;
-    return base !== this.toggled.has(this.source.key(row));
+    return base !== this.toggled.has(this.key(row));
   }
 
   private passes(row: R): boolean {
@@ -559,38 +494,21 @@ export class GridStore<R extends object> {
    * Replaces the rows under `index` with its subtree, or with nothing, in one copy. False,
    * with nothing changed, when the subtree is too large to walk in one task.
    */
-  private splice(index: number, expand: boolean, target: RowKey | Group<R>): boolean {
+  private splice(index: number, expand: boolean, target: RowTarget<R>): boolean {
     const old = this.current.rows as FlatRows<R>;
     const entry = old.rowAt(index);
-    const depth = old.depthAt(index);
-    let rest = index + 1;
-    while (rest < old.size && old.depthAt(rest) > depth) {
-      rest++;
-    }
-    const inserted: Flat<R> = { rows: [], depths: [], flags: [] };
+    let inserted: Flat<R> | null = null;
     if (expand) {
+      inserted = emptyFlat();
       const shown =
         entry instanceof Group ? entry.rows : this.childrenOf(this.source.children?.(entry) ?? []);
-      if (!this.walkSome(walkOf(shown, depth + 1), inserted, SPLICE_LIMIT)) {
+      if (!this.walkSome(walkOf(shown, old.depthAt(index) + 1), inserted, SPLICE_LIMIT)) {
         return false;
       }
     }
-    const head = index + 1;
-    const tail = head + inserted.rows.length;
-    const size = tail + (old.size - rest);
-    const depths = new Uint16Array(size);
-    const flags = new Uint8Array(size);
-    depths.set(old.depths.subarray(0, head));
-    depths.set(inserted.depths, head);
-    depths.set(old.depths.subarray(rest), tail);
-    flags.set(old.flags.subarray(0, head));
-    flags.set(inserted.flags, head);
-    flags.set(old.flags.subarray(rest), tail);
-    flags[index] = ((old.flags[index] ?? 0) & GROUP) | HAS_CHILDREN | (expand ? EXPANDED : 0);
-    const rows = old.rows.slice(0, head).concat(inserted.rows, old.rows.slice(rest));
     this.publish(
       {
-        rows: new FlatRows(rows, depths, flags, (row) => this.source.key(row)),
+        rows: spliceRows(old, index, inserted, this.key),
         totals: this.current.totals,
         toggled: target,
       },
@@ -674,10 +592,10 @@ export class GridStore<R extends object> {
     if (totalsOnly) {
       return { rows: this.current.rows as FlatRows<R>, totals };
     }
-    const out: Flat<R> = { rows: [], depths: [], flags: [] };
+    const out = emptyFlat<R>();
     if (!this.groupBy) {
       return (await this.walkAll(walkOf(top, 0), out, tick)) && !this.dirty
-        ? { rows: this.pack(out), totals }
+        ? { rows: pack(out, this.key), totals }
         : null;
     }
     const groups = await drive(this.groupsOf(top, this.groupBy), tick, stale);
@@ -693,7 +611,7 @@ export class GridStore<R extends object> {
         return null;
       }
     }
-    return this.dirty ? null : { rows: this.pack(out), totals };
+    return this.dirty ? null : { rows: pack(out, this.key), totals };
   }
 
   /**
@@ -744,7 +662,7 @@ export class GridStore<R extends object> {
       if (kids?.length) {
         lists.push(kids);
         at.push(0);
-        ups.push({ key: this.source.key(row), up });
+        ups.push({ key: this.key(row), up });
       }
       yield;
     }
@@ -842,15 +760,6 @@ export class GridStore<R extends object> {
       }
     }
     return pass;
-  }
-
-  private pack(flat: Flat<R>): FlatRows<R> {
-    return new FlatRows(
-      flat.rows,
-      Uint16Array.from(flat.depths),
-      Uint8Array.from(flat.flags),
-      (row) => this.source.key(row),
-    );
   }
 
   private publish(built: Built<R> | null, busy: boolean): void {

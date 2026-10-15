@@ -15,6 +15,5 @@ export {
   type GridRowDetail,
   type GridSelectDetail,
   type GridSort,
-  type RowTarget,
 } from './lv-grid.js';
 export { gridStyles } from './styles.js';

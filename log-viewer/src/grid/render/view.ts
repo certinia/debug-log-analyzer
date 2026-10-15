@@ -8,7 +8,7 @@ import {
   Virtualizer,
 } from '@tanstack/virtual-core';
 
-import { Group, type FindResult, type RowKey, type RowView } from '../core/index.js';
+import { Group, type FindResult, type RowTarget, type RowView } from '../core/index.js';
 import { capture, restore, type Restore, type ShownRow } from './anchor.js';
 import { FindHighlighter } from './highlight.js';
 
@@ -62,7 +62,7 @@ export class GridView<R extends object> {
   private visible = true;
   /** The browser drops `scrollTop` when the scroller's box goes, so it is put back on show. */
   private lastTop = 0;
-  private pending: { rows: RowView<R>; toggled?: RowKey | Group<R> } | null = null;
+  private pending: { rows: RowView<R>; toggled?: RowTarget<R> } | null = null;
   private pendingScroll: { index: number; align: 'center' | 'auto' } | null = null;
   /**
    * The place `setRows` kept, held while the rows around it are measured over the next
@@ -140,7 +140,7 @@ export class GridView<R extends object> {
    * Shows `rows`. The user's place is kept: an edge they were at, else `toggled` where it
    * was, else the row across the middle of the viewport or its nearest shown ancestor.
    */
-  setRows(rows: RowView<R>, toggled?: RowKey | Group<R>): void {
+  setRows(rows: RowView<R>, toggled?: RowTarget<R>): void {
     if (!this.visible) {
       this.pending = { rows, toggled: toggled ?? this.pending?.toggled };
       return;

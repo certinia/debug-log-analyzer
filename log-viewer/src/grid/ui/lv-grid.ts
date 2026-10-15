@@ -18,6 +18,7 @@ import {
   GridStore,
   Group,
   navigate,
+  sameTarget,
   type Calcs,
   type ExpandPolicy,
   type ExportOptions,
@@ -26,6 +27,7 @@ import {
   type GroupBy,
   type RowFilter,
   type RowKey,
+  type RowTarget,
   type RowView,
   type Scheduler,
   type SortDirection,
@@ -37,9 +39,6 @@ import { gridKey } from './keyboard.js';
 import { litPainter, total } from './painter.js';
 import { StoreController } from './store-controller.js';
 import { gridStyles } from './styles.js';
-
-/** A data row's key, or a group: what can be selected, toggled or found again. */
-export type RowTarget<R> = RowKey | Group<R>;
 
 export interface GridSelectDetail<R> {
   /** The selected data row; null for a group row or no selection. */
@@ -101,9 +100,6 @@ const shown = <R>(columns: readonly GridColumn<R>[]): GridColumn<R>[] =>
 
 const shownIds = <R>(columns: readonly GridColumn<R>[] | undefined): string[] =>
   shown(columns ?? []).map((column) => column.id);
-
-const sameTarget = <R>(a: RowTarget<R> | null, b: RowTarget<R>): boolean =>
-  a instanceof Group ? b instanceof Group && a.key === b.key : !(b instanceof Group) && a === b;
 
 const MIN_WIDTH = 40;
 
@@ -597,11 +593,7 @@ export class LvGrid<R extends object = object> extends LitElement {
 
   private targetAt(index: number): RowTarget<R> | null {
     const rows = this.shown;
-    if (!rows || index < 0 || index >= rows.size) {
-      return null;
-    }
-    const entry = rows.rowAt(index);
-    return entry instanceof Group ? entry : rows.keyAt(index);
+    return rows && index >= 0 && index < rows.size ? rows.targetAt(index) : null;
   }
 
   private indexOfSelected(): number {
