@@ -28,7 +28,7 @@ import {
 } from '../../components/TableShared.js';
 import { toBottomUpTree } from '../../utils/Aggregation.js';
 import { toTimeOrderTree, type TimeOrderRow } from '../../utils/TimeOrderTree.js';
-import { CallTreeGrid, categoryClass, eventCategoryClass } from '../CallTreeGrid.js';
+import { CallTreeGrid, categoryClass } from '../CallTreeGrid.js';
 import { nameCell } from '../cells.js';
 import {
   BOTTOM_UP_SORT,
@@ -227,8 +227,7 @@ describe('lv-call-tree-grid', () => {
     expect(categoryClass({ originalData: { category: 'Code Unit' } })).toBe('cat-codeUnit');
     expect(categoryClass({ originalData: { category: 'Unknown' } })).toBeUndefined();
     expect(categoryClass({})).toBeUndefined();
-    expect(eventCategoryClass({ category: 'SOQL' })).toBe('cat-soql');
-    expect(eventCategoryClass({})).toBeUndefined();
+    expect(categoryClass({ category: 'SOQL' })).toBe('cat-soql');
     expect(document.createElement('lv-call-tree-grid').rowClass).toBe(categoryClass);
   });
 

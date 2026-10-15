@@ -117,14 +117,13 @@ const categories = css`
   }
 `;
 
-/** The class that colours a row by the category of its event. */
-export function categoryClass(row: { originalData?: { category?: string } }): string | undefined {
-  return eventCategoryClass(row.originalData ?? {});
-}
+/** A row that is an event, or that holds one in `originalData`. */
+type CategoryRow = { category?: string; originalData?: { category?: string } };
 
-/** {@link categoryClass} for a row that is the event itself. */
-export function eventCategoryClass(event: { category?: string }): string | undefined {
-  const key = event.category ? CATEGORY_THEME_KEY[event.category] : undefined;
+/** The class that colours a row by the category of its event. */
+export function categoryClass(row: CategoryRow): string | undefined {
+  const { category } = row.originalData ?? row;
+  const key = category ? CATEGORY_THEME_KEY[category] : undefined;
   return key ? `cat-${key}` : undefined;
 }
 
@@ -133,9 +132,7 @@ export function eventCategoryClass(event: { category?: string }): string | undef
  * its shadow root.
  */
 @customElement('lv-call-tree-grid')
-export class CallTreeGrid<
-  R extends { originalData?: { category?: string } } = { originalData?: { category?: string } },
-> extends LvGrid<R> {
+export class CallTreeGrid<R extends CategoryRow = CategoryRow> extends LvGrid<R> {
   static styles = [globalStyles, gridStyles, theme, cells, categories];
 
   /** Tints the Name cell with its category colour, as the `callTree.categoryColorize` setting asks. */
