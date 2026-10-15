@@ -5,9 +5,12 @@ import '#vscode-elements/vscode-button.js';
 import '#vscode-elements/vscode-option.js';
 import '../../../components/VsSelect.js';
 import '#vscode-elements/vscode-toolbar-button.js';
+import { consume } from '@lit/context';
 import { LitElement, css, html, type PropertyValues } from 'lit';
 import { customElement, property, state } from 'lit/decorators.js';
 import { ref } from 'lit/directives/ref.js';
+import { logContext } from '../../../core/log/logContext.js';
+import type { LogStore } from '../../../core/log/LogStore.js';
 
 import type { ApexLog } from '@apexdevtools/apex-log-parser';
 import '../../../components/ContextMenu.js';
@@ -97,8 +100,14 @@ export class AnalysisView extends LitElement {
     `,
   ];
 
-  @property()
-  timelineRoot: ApexLog | null = null;
+  /** The log on screen, from the app root. */
+  @consume({ context: logContext, subscribe: true })
+  @property({ attribute: false })
+  logStore: LogStore | null = null;
+
+  private get timelineRoot(): ApexLog | null {
+    return this.logStore?.log ?? null;
+  }
 
   @state()
   private _source: TreeSource<BottomUpRow> | null = null;
@@ -207,8 +216,8 @@ export class AnalysisView extends LitElement {
   updated(changedProperties: PropertyValues): void {
     if (
       this.timelineRoot &&
-      changedProperties.has('timelineRoot') &&
-      !changedProperties.get('timelineRoot')
+      changedProperties.has('logStore') &&
+      !changedProperties.get('logStore')
     ) {
       this._buildWhenVisible();
     }

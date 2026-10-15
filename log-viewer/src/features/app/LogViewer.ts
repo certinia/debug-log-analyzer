@@ -10,7 +10,7 @@ import type { VscTabsSelectEvent } from '@vscode-elements/elements/dist/vscode-t
 import { LitElement, css, html } from 'lit';
 import { customElement, property, state } from 'lit/decorators.js';
 
-import { parse, type ApexLog } from '@apexdevtools/apex-log-parser';
+import { parse } from '@apexdevtools/apex-log-parser';
 import { TAB_TO_SOURCE, eventBus } from '../../core/events/EventBus.js';
 import { logContext } from '../../core/log/logContext.js';
 import { logStatusContext, type LogStatus } from '../../core/log/logStatus.js';
@@ -66,9 +66,6 @@ export class LogViewer extends LitElement {
   /** Transaction identity for the header. `null` until the first log is parsed. */
   @property({ attribute: false })
   logIdentity: LogIdentityData | null = null;
-  @property()
-  timelineRoot: ApexLog | null = null;
-
   /** The log every view reads. A new log is a new store, so consumers re-render. */
   @provide({ context: logContext })
   @state()
@@ -188,7 +185,6 @@ export class LogViewer extends LitElement {
         .logProblems=${this.logProblems}
         .notifications=${this.notifications}
         .logIdentity=${this.logIdentity}
-        .timelineRoot=${this.timelineRoot}
       ></app-header>
 
       <log-inspector .activeTab=${this._selectedTab}>
@@ -213,19 +209,18 @@ export class LogViewer extends LitElement {
 
           <vscode-tab-panel>
             <timeline-view
-              .timelineRoot="${this.timelineRoot}"
               .navigateToEventIndex="${this._navigateToEventIndex}"
               .navigateToTimestamp="${this._navigateToTimestamp}"
             ></timeline-view>
           </vscode-tab-panel>
           <vscode-tab-panel>
-            <call-tree-view .timelineRoot="${this.timelineRoot}"></call-tree-view>
+            <call-tree-view></call-tree-view>
           </vscode-tab-panel>
           <vscode-tab-panel>
-            <analysis-view .timelineRoot="${this.timelineRoot}"> </analysis-view>
+            <analysis-view></analysis-view>
           </vscode-tab-panel>
           <vscode-tab-panel>
-            <database-view .timelineRoot="${this.timelineRoot}"></database-view>
+            <database-view></database-view>
           </vscode-tab-panel> </vscode-tabs
       ></log-inspector>`;
   }
@@ -293,7 +288,6 @@ export class LogViewer extends LitElement {
     this._logStatus = 'ready';
 
     this.logSize = apexLog.size;
-    this.timelineRoot = apexLog;
     this.logDuration = apexLog.duration.total;
     this.logIdentity = deriveLogIdentity(apexLog);
 

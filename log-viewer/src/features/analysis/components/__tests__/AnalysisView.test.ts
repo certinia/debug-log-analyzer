@@ -29,6 +29,7 @@ import {
   type DetailSource,
 } from '../../../../core/events/EventBus.js';
 import { exportCsv } from '../../../../components/grid/exportCsv.js';
+import { logStoreFor } from '../../../../core/log/LogStore.js';
 import type { BottomUpRow } from '../../../call-tree/utils/Aggregation.js';
 import { AnalysisView } from '../AnalysisView.js';
 
@@ -127,7 +128,7 @@ describe('analysis-view', () => {
     view = new AnalysisView();
     document.body.append(view);
     await view.updateComplete;
-    view.timelineRoot = log;
+    view.logStore = logStoreFor(log);
     await view.updateComplete;
     await settle();
     await view.updateComplete;
@@ -391,7 +392,7 @@ describe('analysis-view before it is seen', () => {
     const view = new AnalysisView();
     document.body.append(view);
     await view.updateComplete;
-    view.timelineRoot = recursiveLog();
+    view.logStore = logStoreFor(recursiveLog());
     await view.updateComplete;
     await settle();
 
