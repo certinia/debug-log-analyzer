@@ -18,7 +18,6 @@ import {
   GridStore,
   Group,
   navigate,
-  sortComparator,
   type Calcs,
   type ExpandPolicy,
   type ExportOptions,
@@ -513,9 +512,9 @@ export class LvGrid<R extends object = object> extends LitElement {
       return this.store?.setSort(null);
     }
     const groups = column.calc
-      ? sortComparator<Group<R>>({ value: (group) => group.totals[column.id] }, sort.dir)
+      ? { value: (group: Group<R>) => group.totals[column.id], dir: sort.dir }
       : null;
-    return this.store?.setSort(sortComparator(column.sort, sort.dir), groups);
+    return this.store?.setSort({ ...column.sort, dir: sort.dir }, groups);
   }
 
   private createStore(source: TreeSource<R>): void {

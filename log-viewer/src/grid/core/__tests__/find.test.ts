@@ -1,7 +1,7 @@
 /*
  * Copyright (c) 2026 Certinia Inc. All rights reserved.
  */
-import { GridStore, sortComparator, type Scheduler, type TreeSource } from '../index.js';
+import { GridStore, type Scheduler, type TreeSource } from '../index.js';
 
 interface Node {
   key: string;
@@ -87,7 +87,7 @@ describe('GridStore.find', () => {
   it('numbers matches in display order, under the sort and filters', async () => {
     const roots = tree();
     const store = new GridStore(source(roots));
-    await store.setSort(sortComparator<Node>({ value: (r) => r.key }, 'desc'));
+    await store.setSort({ value: (r) => r.key, dir: 'desc' });
     await store.setFilters([{ test: (r) => r.key !== 'c' }]);
     const result = await store.find({ text: 'account' }, [name]);
     expect(holders(result)).toEqual(['d', 'e', 'e', 'a']);

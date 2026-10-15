@@ -1,7 +1,7 @@
 /*
  * Copyright (c) 2026 Certinia Inc. All rights reserved.
  */
-import { GridStore, sortComparator, type ExportColumn, type TreeSource } from '../index.js';
+import { GridStore, type ExportColumn, type TreeSource } from '../index.js';
 
 interface Node {
   key: string;
@@ -56,7 +56,7 @@ describe('GridStore.exportText', () => {
 
   it('writes the rows in display order, under the sort and filters', async () => {
     const store = new GridStore(source(tree()));
-    await store.setSort(sortComparator<Node>({ value: (r) => r.self }, 'asc'));
+    await store.setSort({ value: (r) => r.self, dir: 'asc' });
     await store.setFilters([{ test: (r) => r.key !== 'b' }]);
     expect(await store.exportText(columns, { format: 'tsv' })).toBe(
       ['Name\tSelf', 'query\t1', 'say "hi"\t3'].join('\n'),

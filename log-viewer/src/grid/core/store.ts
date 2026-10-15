@@ -13,7 +13,8 @@ import {
 } from './find.js';
 import { byCount, Group, type GroupBy } from './groups.js';
 import { CHECK_EVERY, immediateScheduler, sliceTimer, type Scheduler } from './schedule.js';
-import type { Compare, ExpandPolicy, RowFilter, RowKey, TreeSource } from './types.js';
+import { sortRows, type Sort } from './sort.js';
+import type { ExpandPolicy, RowFilter, RowKey, TreeSource } from './types.js';
 
 const HAS_CHILDREN = 1;
 const EXPANDED = 2;
@@ -187,7 +188,7 @@ export class GridStore<R extends object> {
   private expandBase: ExpandPolicy<R>;
   /** Rows whose expansion differs from `expandBase`. */
   private toggled = new Set<RowKey>();
-  private compare: Compare<R> | null = null;
+  private sort: Sort<R> | null = null;
   private filters: readonly RowFilter<R>[] = [];
   /** Each sibling list after filter and sort, built when the list is first shown. */
   private ordered = new WeakMap<readonly R[], readonly R[]>();
@@ -195,7 +196,7 @@ export class GridStore<R extends object> {
   private deepPass = new WeakMap<RowFilter<R>, WeakSet<R>>();
   private calcs: Calcs<R>;
   private groupBy: GroupBy<R> | null;
-  private groupCompare: Compare<Group<R>> | null = null;
+  private groupSort: Sort<Group<R>> | null = null;
   /** Groups start closed; these are open. */
   private openGroups = new Set<string>();
   /**
@@ -260,12 +261,12 @@ export class GridStore<R extends object> {
   }
 
   /**
-   * Sorts each sibling list by `compare`, and the groups by `groups`. Groups keep their
+   * Sorts each sibling list by `sort`, and the groups by `groups`. Groups keep their
    * default order, most rows first, where `groups` is absent or ties.
    */
-  setSort(compare: Compare<R> | null, groups?: Compare<Group<R>> | null): Promise<void> {
-    this.compare = compare;
-    this.groupCompare = groups ?? null;
+  setSort(sort: Sort<R> | null, groups?: Sort<Group<R>> | null): Promise<void> {
+    this.sort = sort;
+    this.groupSort = groups ?? null;
     return this.reorder();
   }
 
@@ -484,8 +485,8 @@ export class GridStore<R extends object> {
     let out = this.ordered.get(list);
     if (!out) {
       out = this.filters.length ? list.filter((r) => this.passes(r)) : list;
-      if (this.compare) {
-        out = out === list ? list.toSorted(this.compare) : (out as R[]).sort(this.compare);
+      if (this.sort) {
+        out = sortRows(out, this.sort);
       }
       this.ordered.set(list, out);
     }
@@ -750,7 +751,7 @@ export class GridStore<R extends object> {
     }
     groups.sort(byCount);
     // Array sort is stable, so groups that tie keep the default order.
-    return this.groupCompare ? groups.sort(this.groupCompare) : groups;
+    return this.groupSort ? sortRows(groups, this.groupSort) : groups;
   }
 
   /**

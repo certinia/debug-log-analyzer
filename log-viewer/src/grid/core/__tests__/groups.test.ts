@@ -1,15 +1,7 @@
 /*
  * Copyright (c) 2026 Certinia Inc. All rights reserved.
  */
-import {
-  Group,
-  GridStore,
-  max,
-  sortComparator,
-  sum,
-  type RowView,
-  type TreeSource,
-} from '../index.js';
+import { Group, GridStore, max, sum, type RowView, type TreeSource } from '../index.js';
 
 interface Node {
   key: string;
@@ -116,10 +108,7 @@ describe('GridStore groups', () => {
     });
     await store.settled();
     await store.toggle(groupOf(store, 'apex'));
-    await store.setSort(
-      sortComparator<Node>({ value: self }, 'asc'),
-      sortComparator<Group<Node>>({ value: (g) => g.totals.self }, 'desc'),
-    );
+    await store.setSort({ value: self, dir: 'asc' }, { value: (g) => g.totals.self, dir: 'desc' });
     // soql totals 20, apex 11.
     expect(shown(store.snapshot().rows)).toEqual(['[soql]-', '[apex]+', 'f@1', 'a-@1']);
   });
@@ -127,7 +116,7 @@ describe('GridStore groups', () => {
   it('keeps the default order for groups whose totals tie', async () => {
     const roots = [n('p', 'x', 1), n('q', 'y', 1), n('r', 'y', 0)];
     const store = new GridStore(source(roots), { groupBy: byKind, calcs: { self: sum(self) } });
-    await store.setSort(null, sortComparator<Group<Node>>({ value: (g) => g.totals.self }, 'asc'));
+    await store.setSort(null, { value: (g) => g.totals.self, dir: 'asc' });
     expect(shown(store.snapshot().rows)).toEqual(['[y]-', '[x]-']);
   });
 
@@ -186,7 +175,7 @@ describe('GridStore totals', () => {
     const store = new GridStore(source(tree()), { groupBy: byKind, calcs: { count: counted } });
     await store.settled();
     const before = runs;
-    await store.setSort(sortComparator<Node>({ value: self }, 'desc'));
+    await store.setSort({ value: self, dir: 'desc' });
     await store.toggle(groupOf(store, 'apex'));
     await store.expandAll();
     expect(runs).toBe(before);

@@ -3,12 +3,10 @@
  */
 import type { TemplateResult } from 'lit';
 
-import type { Calc, Compare, Group, SortDirection } from '../core/index.js';
+import type { Calc, Group, SortBy, SortDirection } from '../core/index.js';
 
 /** What a cell shows: text, or a template the grid renders. */
 export type CellContent = TemplateResult | string;
-
-type SortValue = number | string | boolean | null | undefined;
 
 /** One column of an `<lv-grid>`. Only `id`, `title` and `cell` are required. */
 export interface GridColumn<R> {
@@ -39,7 +37,7 @@ export interface GridColumn<R> {
   /** Plain text shown on hover. Never markup. */
   tooltip?(row: R): string;
   /** Sorts by this value, or by this ascending compare. No sort: the header does not sort. */
-  sort?: { value: (row: R) => SortValue } | { compare: Compare<R> };
+  sort?: SortBy<R>;
   /** The direction a first click sorts. Default `asc`. */
   sortFirst?: SortDirection;
   /** The footer and group total. Sorting the column orders groups by it. */

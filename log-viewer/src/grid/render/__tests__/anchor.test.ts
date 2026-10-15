@@ -1,13 +1,7 @@
 /*
  * Copyright (c) 2026 Certinia Inc. All rights reserved.
  */
-import {
-  Group,
-  GridStore,
-  sortComparator,
-  type RowView,
-  type TreeSource,
-} from '../../core/index.js';
+import { Group, GridStore, type RowView, type TreeSource } from '../../core/index.js';
 import { capture, restore, type ShownRow } from '../anchor.js';
 
 interface Node {
@@ -65,7 +59,7 @@ describe('anchoring', () => {
     const before = await rowsOf(store);
     // r2..r6 on screen; the middle (50px) is r4.
     const cap = capture(viewport(200), shownRows(2, 6), before);
-    await store.setSort(sortComparator<Node>({ value: (r) => r.v }, 'desc'));
+    await store.setSort({ value: (r) => r.v, dir: 'desc' });
     const after = store.snapshot().rows;
     expect(restore(cap, after)).toEqual({ index: after.indexOf('r4'), top: 40 });
   });

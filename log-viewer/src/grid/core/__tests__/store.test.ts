@@ -1,13 +1,7 @@
 /*
  * Copyright (c) 2026 Certinia Inc. All rights reserved.
  */
-import {
-  GridStore,
-  sortComparator,
-  type RowView,
-  type Scheduler,
-  type TreeSource,
-} from '../index.js';
+import { GridStore, sortRows, type RowView, type Scheduler, type TreeSource } from '../index.js';
 
 interface Node {
   key: string;
@@ -104,7 +98,7 @@ describe('GridStore', () => {
   it('sorts each sibling list and keeps expansion', async () => {
     const store = new GridStore(source(tree()));
     await store.expandAll();
-    await store.setSort(sortComparator<Node>({ value: (r) => r.value }, 'desc'));
+    await store.setSort({ value: (r) => r.value, dir: 'desc' });
     expect(shown(store.snapshot().rows)).toEqual(['a+@0', 'x@1', 'b+@1', 'c@2', 'd+@0', 'e@1']);
     await store.setSort(null);
     expect(shown(store.snapshot().rows)).toEqual(['a+@0', 'b+@1', 'c@2', 'x@1', 'd+@0', 'e@1']);
@@ -197,7 +191,7 @@ describe('GridStore', () => {
   it('gives the same rows when every step is sliced', async () => {
     const store = new GridStore(source(tree()), { scheduler: everyCheck() });
     await store.expandAll();
-    await store.setSort(sortComparator<Node>({ value: (r) => r.value }, 'asc'));
+    await store.setSort({ value: (r) => r.value, dir: 'asc' });
     expect(shown(store.snapshot().rows)).toEqual(['d+@0', 'e@1', 'a+@0', 'b+@1', 'c@2', 'x@1']);
   });
 
@@ -226,12 +220,10 @@ describe('GridStore', () => {
   });
 });
 
-describe('sortComparator', () => {
+describe('sortRows', () => {
   const rows = (...values: (number | null)[]): { v: number | null }[] => values.map((v) => ({ v }));
   const order = (dir: 'asc' | 'desc'): (number | null)[] =>
-    rows(2, null, 3, 1, null)
-      .sort(sortComparator<{ v: number | null }>({ value: (r) => r.v }, dir))
-      .map((r) => r.v);
+    sortRows(rows(2, null, 3, 1, null), { value: (r) => r.v, dir }).map((r) => r.v);
 
   it('puts empty values last in both directions', () => {
     expect(order('asc')).toEqual([1, 2, 3, null, null]);
@@ -240,12 +232,11 @@ describe('sortComparator', () => {
 
   it('compares text naturally, numbers in text included', () => {
     const names = ['item10', 'Item2', 'item1'].map((v) => ({ v }));
-    names.sort(sortComparator<{ v: string }>({ value: (r) => r.v }, 'asc'));
-    expect(names.map((r) => r.v)).toEqual(['item1', 'Item2', 'item10']);
+    const sorted = sortRows(names, { value: (r) => r.v, dir: 'asc' });
+    expect(sorted.map((r) => r.v)).toEqual(['item1', 'Item2', 'item10']);
   });
 
   it('reverses a custom compare for descending', () => {
-    const custom = sortComparator<number>({ compare: (a, b) => a - b }, 'desc');
-    expect([1, 3, 2].sort(custom)).toEqual([3, 2, 1]);
+    expect(sortRows([1, 3, 2], { compare: (a, b) => a - b, dir: 'desc' })).toEqual([3, 2, 1]);
   });
 });

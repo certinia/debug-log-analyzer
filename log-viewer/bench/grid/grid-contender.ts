@@ -19,7 +19,6 @@ import {
   GridStore,
   GridView,
   Group,
-  sortComparator,
   type CellText,
   type RowFilter,
   type RowPainter,
@@ -237,9 +236,7 @@ export class GridContender implements Contender {
   }
 
   async sortSelfDesc(): Promise<void> {
-    await this.store.setSort(
-      sortComparator<TimeOrderRow>({ value: (r) => r.duration.self }, 'desc'),
-    );
+    await this.store.setSort({ value: (r) => r.duration.self, dir: 'desc' });
     this.show();
   }
 

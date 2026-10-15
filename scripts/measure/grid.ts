@@ -21,13 +21,13 @@ import {
 import {
   Group,
   GridStore,
-  sortComparator,
   sum,
   type Calcs,
   type CellText,
   type ExportColumn,
   type RowFilter,
   type Scheduler,
+  type Sort,
 } from '../../log-viewer/src/grid/index.js';
 import { heapMb, line, ms, nowMs } from './harness.js';
 
@@ -124,7 +124,7 @@ async function measureTimeOrder(log: ApexLog): Promise<void> {
     test: (r) => r.type === 'SOQL_EXECUTE_BEGIN',
     keepAncestors: true,
   };
-  const bySelf = sortComparator<TimeOrderRow>({ value: (r) => r.duration.self }, 'desc');
+  const bySelf: Sort<TimeOrderRow> = { value: (r) => r.duration.self, dir: 'desc' };
   const msText = (ns: number): string => (ns / 1e6).toFixed(3);
   // What the visible Time Order cells show: names as they are, times as formatted.
   const cells: CellText<TimeOrderRow>[] = [
@@ -185,11 +185,11 @@ async function measureBottomUp(log: ApexLog): Promise<void> {
     totalSelfTime: sum((r) => r.totalSelfTime),
     totalTime: outermostSum((e) => e.duration.total),
   };
-  const bySelf = sortComparator<BottomUpRow>({ value: (r) => r.totalSelfTime }, 'desc');
-  const groupsBySelf = sortComparator<Group<BottomUpRow>>(
-    { value: (g) => g.totals.totalSelfTime },
-    'desc',
-  );
+  const bySelf: Sort<BottomUpRow> = { value: (r) => r.totalSelfTime, dir: 'desc' };
+  const groupsBySelf: Sort<Group<BottomUpRow>> = {
+    value: (g) => g.totals.totalSelfTime,
+    dir: 'desc',
+  };
   const firstGroup = (): Group<BottomUpRow> => {
     const entry = store.snapshot().rows.rowAt(0);
     if (!(entry instanceof Group)) {

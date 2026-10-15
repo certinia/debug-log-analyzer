@@ -9,6 +9,6 @@ export { findPattern, type CellText, type FindQuery, type FindResult } from './f
 export { Group, type GroupBy } from './groups.js';
 export { navigate, type NavIntent, type NavKey } from './navigation.js';
 export { immediateScheduler, type Scheduler } from './schedule.js';
-export { sortComparator, type SortDirection } from './sort.js';
+export { sortRows, type Sort, type SortBy, type SortDirection, type SortValue } from './sort.js';
 export { GridStore, type GridStoreOptions, type RowView, type Snapshot } from './store.js';
 export type { Compare, ExpandPolicy, RowFilter, RowKey, TreeSource } from './types.js';
