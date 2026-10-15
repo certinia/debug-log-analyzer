@@ -186,8 +186,6 @@ export class LvGrid<R extends object = object> extends LitElement {
   private shown: RowView<R> | null = null;
   private calcs: Calcs<R> = {};
   private sortedBy: { sort: unknown; calc: unknown; dir: SortDirection } | null = null;
-  /** The row a toggle came from, kept in place when the new rows show. */
-  private toggled: RowTarget<R> | undefined;
   private selected: RowTarget<R> | null = null;
   /** Where the selection was last seen, to skip a search of every row. */
   private selectedAt = -1;
@@ -342,8 +340,7 @@ export class LvGrid<R extends object = object> extends LitElement {
     this.toggleAttribute('busy', snapshot?.busy ?? false);
     if (this.view && snapshot && snapshot.rows !== this.shown) {
       this.shown = snapshot.rows;
-      this.view.setRows(snapshot.rows, this.toggled);
-      this.toggled = undefined;
+      this.view.setRows(snapshot.rows, snapshot.toggled);
     } else if (changed.has('columns') || changed.has('marked') || changed.has('rowClass')) {
       this.view?.repaint();
     }
@@ -638,7 +635,6 @@ export class LvGrid<R extends object = object> extends LitElement {
     if (target === null) {
       return;
     }
-    this.toggled = target;
     await this.store?.toggle(target, expanded);
   }
 

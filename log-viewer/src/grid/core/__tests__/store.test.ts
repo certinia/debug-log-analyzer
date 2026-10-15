@@ -85,6 +85,15 @@ describe('GridStore', () => {
     expect(shown(store.snapshot().rows)).toEqual(['a+@0', 'b+@1', 'c@2', 'x@1', 'd-@0']);
   });
 
+  it('names the toggled row until the rows change again', async () => {
+    const store = new GridStore(source(tree()));
+    await store.settled();
+    await store.toggle('a');
+    expect(store.snapshot().toggled).toBe('a');
+    await store.expandAll();
+    expect(store.snapshot().toggled).toBeUndefined();
+  });
+
   it('leaves a row alone when it is not shown, has no children or is already in that state', async () => {
     const store = new GridStore(source(tree()));
     await store.settled();

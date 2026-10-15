@@ -48,6 +48,8 @@ export interface Snapshot<R> {
   readonly totals: Totals;
   /** A sliced step is running; `rows` is the last finished state. */
   readonly busy: boolean;
+  /** The row a toggle came from, while the rows are the ones that toggle made. */
+  readonly toggled?: RowKey | Group<R>;
 }
 
 export interface GridStoreOptions<R> {
@@ -146,6 +148,7 @@ const walkOf = <R>(shown: readonly R[], depth: number): Walk<R> => ({
 interface Built<R extends object> {
   rows: FlatRows<R>;
   totals: Totals;
+  toggled?: RowKey | Group<R>;
 }
 
 function flip<K>(set: Set<K>, key: K): void {
@@ -327,7 +330,7 @@ export class GridStore<R extends object> {
     } else {
       flip(this.toggled, target);
     }
-    this.splice(index, !was);
+    this.splice(index, !was, target);
   }
 
   /**
@@ -547,7 +550,7 @@ export class GridStore<R extends object> {
   }
 
   /** Replaces the rows under `index` with its subtree, or with nothing, in one copy. */
-  private splice(index: number, expand: boolean): void {
+  private splice(index: number, expand: boolean, target: RowKey | Group<R>): void {
     const old = this.current.rows as FlatRows<R>;
     const entry = old.rowAt(index);
     const depth = old.depthAt(index);
@@ -578,6 +581,7 @@ export class GridStore<R extends object> {
       {
         rows: new FlatRows(rows, depths, flags, (row) => this.source.key(row)),
         totals: this.current.totals,
+        toggled: target,
       },
       false,
     );
@@ -842,6 +846,7 @@ export class GridStore<R extends object> {
       rows: built?.rows ?? this.current.rows,
       totals: built?.totals ?? this.current.totals,
       busy,
+      toggled: built ? built.toggled : this.current.toggled,
     };
     for (const listener of this.listeners) {
       listener(this.current);
