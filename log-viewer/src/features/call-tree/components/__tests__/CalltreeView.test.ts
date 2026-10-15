@@ -24,7 +24,7 @@ jest.mock('../../../settings/Settings.js', () => ({
 }));
 
 import { storeOf } from '#test-helpers/apexLog.js';
-import { LogStore } from '../../../../core/log/LogStore.js';
+import { LogStore, logStoreFor } from '../../../../core/log/LogStore.js';
 import { CalltreeView } from '../CalltreeView.js';
 
 /** Which table each build made, and which each teardown destroyed, in order. */
@@ -112,7 +112,7 @@ async function mountView(): Promise<CalltreeView> {
   const view = new CalltreeView();
   document.body.append(view);
   await view.updateComplete;
-  view.timelineRoot = apexLog();
+  view.logStore = logStoreFor(apexLog());
   await view.updateComplete;
   await settle();
   return view;
@@ -261,7 +261,7 @@ describe('calltree-view type picker', () => {
 
   it("lists the log's types once each, sorted, and no exit lines", async () => {
     view.isVisible = true;
-    view.timelineRoot = storeOf(OUTER).log;
+    view.logStore = storeOf(OUTER).store;
     const types = await typeOptions();
 
     expect(types).toEqual([...new Set(types)].sort());
@@ -276,7 +276,7 @@ describe('calltree-view type picker', () => {
     view = new CalltreeView();
     document.body.append(view);
     const logIndex = jest.spyOn(LogStore.prototype, 'logIndex');
-    view.timelineRoot = storeOf(OUTER).log;
+    view.logStore = storeOf(OUTER).store;
     await typeOptions();
 
     expect(logIndex).not.toHaveBeenCalled();
@@ -294,9 +294,9 @@ describe('calltree-view type picker', () => {
     });
 
     view.isVisible = true;
-    view.timelineRoot = before;
+    view.logStore = logStoreFor(before);
     await view.updateComplete;
-    view.timelineRoot = storeOf(DML).log;
+    view.logStore = storeOf(DML).store;
     await typeOptions();
     release();
     const types = await typeOptions();

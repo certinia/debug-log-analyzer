@@ -2,6 +2,7 @@
  * Copyright (c) 2022 Certinia Inc. All rights reserved.
  */
 
+import { consume } from '@lit/context';
 import { LitElement, css, html, nothing, type PropertyValues } from 'lit';
 import { customElement, property, state } from 'lit/decorators.js';
 
@@ -22,7 +23,8 @@ import { InspectorTabController } from '../../../components/InspectorTabControll
 import { SelectionEchoGuard } from '../../../core/events/SelectionEchoGuard.js';
 import { formatInteger, isVisible } from '../../../core/utility/Util.js';
 import { soslRowsMetric } from '../limits.js';
-import { logStoreFor } from '../../../core/log/LogStore.js';
+import { logStoreFor, type LogStore } from '../../../core/log/LogStore.js';
+import { logContext } from '../../../core/log/logContext.js';
 import { statements } from '../../../core/log/statements.js';
 
 // styles
@@ -51,8 +53,14 @@ type DatabaseGrid = DMLView | SOQLView | SOSLView;
 
 @customElement('database-view')
 export class DatabaseView extends LitElement {
-  @property()
-  timelineRoot: ApexLog | null = null;
+  /** The log on screen, from the app root. */
+  @consume({ context: logContext, subscribe: true })
+  @property({ attribute: false })
+  logStore: LogStore | null = null;
+
+  private get timelineRoot(): ApexLog | null {
+    return this.logStore?.log ?? null;
+  }
 
   @state()
   private dmlLines: DMLBeginLine[] = [];
@@ -168,7 +176,7 @@ export class DatabaseView extends LitElement {
   }
 
   updated(changed: PropertyValues): void {
-    if (this.timelineRoot && changed.has('timelineRoot') && !this.loaded) {
+    if (this.timelineRoot && changed.has('logStore') && !this.loaded) {
       void this._loadData();
     }
   }
@@ -318,19 +326,16 @@ export class DatabaseView extends LitElement {
     switch (kind) {
       case 'dml':
         return html`<dml-view
-          .timelineRoot="${this.timelineRoot}"
           .lines="${this.dmlLines}"
           .highlightIndex="${this.dmlHighlightIndex}"
         ></dml-view>`;
       case 'soql':
         return html`<soql-view
-          .timelineRoot="${this.timelineRoot}"
           .lines="${this.soqlLines}"
           .highlightIndex="${this.soqlHighlightIndex}"
         ></soql-view>`;
       case 'sosl':
         return html`<sosl-view
-          .timelineRoot="${this.timelineRoot}"
           .lines="${this.soslLines}"
           .highlightIndex="${this.soslHighlightIndex}"
         ></sosl-view>`;

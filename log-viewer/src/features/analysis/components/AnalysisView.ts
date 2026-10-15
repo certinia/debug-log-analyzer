@@ -5,8 +5,11 @@ import '#vscode-elements/vscode-button.js';
 import '#vscode-elements/vscode-option.js';
 import '../../../components/VsSelect.js';
 import '#vscode-elements/vscode-toolbar-button.js';
+import { consume } from '@lit/context';
 import { LitElement, css, html, unsafeCSS, type PropertyValues } from 'lit';
 import { customElement, property } from 'lit/decorators.js';
+import { logContext } from '../../../core/log/logContext.js';
+import type { LogStore } from '../../../core/log/LogStore.js';
 import { repeat } from 'lit/directives/repeat.js';
 import type { RowComponent, Tabulator } from 'tabulator-tables';
 
@@ -112,8 +115,14 @@ export class AnalysisView extends LitElement {
     categoryColoringStyles,
   ];
 
-  @property()
-  timelineRoot: ApexLog | null = null;
+  /** The log on screen, from the app root. */
+  @consume({ context: logContext, subscribe: true })
+  @property({ attribute: false })
+  logStore: LogStore | null = null;
+
+  private get timelineRoot(): ApexLog | null {
+    return this.logStore?.log ?? null;
+  }
 
   analysisTable: Tabulator | null = null;
 
@@ -234,8 +243,8 @@ export class AnalysisView extends LitElement {
   updated(changedProperties: PropertyValues): void {
     if (
       this.timelineRoot &&
-      changedProperties.has('timelineRoot') &&
-      !changedProperties.get('timelineRoot')
+      changedProperties.has('logStore') &&
+      !changedProperties.get('logStore')
     ) {
       this._appendTableWhenVisible();
     }

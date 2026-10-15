@@ -119,7 +119,7 @@ function findRow(rows: BottomUpRow[], text: string): BottomUpRow {
 /**
  * A view with its table rendered against `log`.
  *
- * The app hands the log down as a property, and a row's calls are read through
+ * The app hands the log down through the log context, and a row's calls are read through
  * the table that built it.
  */
 async function mountView(log: ApexLog): Promise<AnalysisView> {
@@ -128,10 +128,10 @@ async function mountView(log: ApexLog): Promise<AnalysisView> {
   const view = new AnalysisView();
   document.body.append(view);
   await view.updateComplete;
-  // `timelineRoot` only after the first update, and `_renderAnalysis` in the same
+  // `logStore` only after the first update, and `_renderAnalysis` in the same
   // tick: the `updated()` it triggers reaches `isVisible`, and jsdom has no
   // IntersectionObserver. Assigning the table first makes that path return early.
-  view.timelineRoot = log;
+  view.logStore = logStoreFor(log);
   void view._renderAnalysis(log);
   return view;
 }

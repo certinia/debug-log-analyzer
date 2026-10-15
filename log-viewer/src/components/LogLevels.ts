@@ -14,7 +14,9 @@ import './VsChip.js';
 
 // styles
 import { globalStyles } from '../styles/global.styles.js';
+import { logContext } from '../core/log/logContext.js';
 import { logStatusContext, type LogStatus } from '../core/log/logStatus.js';
+import type { LogStore } from '../core/log/LogStore.js';
 import { skeletonStyles } from '../styles/skeleton.styles.js';
 
 /** The token the log's settings line names each category by; `DebugLevels` keys them in camelCase. */
@@ -54,8 +56,10 @@ export class LogLevels extends LitElement {
   @property({ attribute: false })
   logStatus: LogStatus = 'parsing';
 
-  @property()
-  logSettings: DebugLevels | null = null;
+  /** The log on screen, from the app root. */
+  @consume({ context: logContext, subscribe: true })
+  @property({ attribute: false })
+  logStore: LogStore | null = null;
 
   static styles = [
     globalStyles,
@@ -82,7 +86,8 @@ export class LogLevels extends LitElement {
   ];
 
   render() {
-    if (!this.logSettings) {
+    const levels = this.logStore?.log.debugLevels;
+    if (!levels) {
       if (this.logStatus !== 'parsing') {
         return nothing;
       }
@@ -97,7 +102,7 @@ export class LogLevels extends LitElement {
 
     return html`<overflow-list menu-heading="Log levels">
       ${repeat(
-        Object.entries(this.logSettings) as [keyof DebugLevels, LogLevel][],
+        Object.entries(levels) as [keyof DebugLevels, LogLevel][],
         ([category]) => category,
         ([category, level]) =>
           html`<vs-chip><span slot="lead">${LOG_TOKEN[category]}</span>${level}</vs-chip>`,
