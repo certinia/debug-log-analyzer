@@ -165,6 +165,7 @@ export class LvGrid<R extends object = object> extends LitElement {
   private view: GridView<R> | null = null;
   private shown: RowView<R> | null = null;
   private calcs: Calcs<R> = {};
+  private shownColumns: { from: readonly GridColumn<R>[]; shown: GridColumn<R>[] } | null = null;
   private sortedBy: { sort: unknown; calc: unknown; dir: SortDirection } | null = null;
   private selected: RowTarget<R> | null = null;
   /** Where the selection was last seen, to skip a search of every row. */
@@ -530,7 +531,10 @@ export class LvGrid<R extends object = object> extends LitElement {
   }
 
   private visibleColumns(): GridColumn<R>[] {
-    return shown(this.columns);
+    if (this.shownColumns?.from !== this.columns) {
+      this.shownColumns = { from: this.columns, shown: shown(this.columns) };
+    }
+    return this.shownColumns.shown;
   }
 
   private makeView(): void {
@@ -545,7 +549,7 @@ export class LvGrid<R extends object = object> extends LitElement {
       rowHeight: this.rowHeight,
       rowIndexStart: 2,
       painter: litPainter(() => ({
-        columns: this.columns,
+        columns: this.visibleColumns(),
         isSelected: (target) => sameTarget(this.selected, target),
         marked: this.marked,
         rowClass: this.rowClass,

@@ -9,6 +9,7 @@ import type { CellContent, GridColumn } from './column.js';
 
 /** What a row's look depends on beyond its data. Read on each paint. */
 export interface PaintState<R> {
+  /** The shown columns. */
   columns: readonly GridColumn<R>[];
   isSelected(target: RowTarget<R>): boolean;
   marked: ReadonlySet<RowKey>;
@@ -85,18 +86,17 @@ export function litPainter<R extends object>(state: () => PaintState<R>): RowPai
       const { columns, isSelected, marked, rowClass } = state();
       const entry = rows.rowAt(index);
       const open = rows.isExpandedAt(index);
-      const shown = columns.filter((column) => !column.hidden);
       if (entry instanceof Group) {
         el.className = 'row group';
         el.ariaSelected = String(isSelected(entry));
-        render(groupCells(entry, shown, open), el);
+        render(groupCells(entry, columns, open), el);
         return;
       }
       const key = rows.keyAt(index);
       const extra = rowClass?.(entry);
       el.className = `row${marked.has(key) ? ' marked' : ''}${extra ? ` ${extra}` : ''}`;
       el.ariaSelected = String(isSelected(key));
-      render(rowCells(entry, shown, rows.depthAt(index), rows.hasChildrenAt(index), open), el);
+      render(rowCells(entry, columns, rows.depthAt(index), rows.hasChildrenAt(index), open), el);
     },
   };
 }
