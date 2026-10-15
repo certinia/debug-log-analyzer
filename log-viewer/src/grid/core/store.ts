@@ -73,13 +73,26 @@ interface Walk<R> {
   at: number[];
   /** Depth of the first list. */
   depth: number;
+  /** Each list's parent chain, kept only by a walk that reports it. */
+  ups: (PathNode | null)[] | null;
+  /** Visit the first list only. */
+  flat: boolean;
 }
 
+/** Called for each row a walk passes, with its shown children; true walks into them. */
+type Visit<R> = (row: R, depth: number, kids: readonly R[] | null, up: PathNode | null) => boolean;
+
 /** A walk of `shown`, a sibling list already filtered and sorted, at `depth`. */
-const walkOf = <R>(shown: readonly R[], depth: number): Walk<R> => ({
+const walkOf = <R>(
+  shown: readonly R[],
+  depth: number,
+  options: { paths?: boolean; flat?: boolean } = {},
+): Walk<R> => ({
   lists: [shown],
   at: [0],
   depth,
+  ups: options.paths ? [null] : null,
+  flat: options.flat ?? false,
 });
 
 interface Built<R extends object> {
@@ -96,12 +109,11 @@ function flip<K>(set: Set<K>, key: K): void {
 
 /**
  * Runs `work` to its end, checking the clock every {@link CHECK_EVERY} yields. Null once
- * `stale` holds. Work resumes only while it is current, so the caches it writes stay true.
+ * `tick` reports the step stale, so the caches the work writes stay true.
  */
 async function drive<T>(
   work: Generator<void, T, void>,
   tick: () => Promise<boolean>,
-  stale: () => boolean,
 ): Promise<{ value: T } | null> {
   let count = 0;
   for (;;) {
@@ -109,7 +121,7 @@ async function drive<T>(
     if (step.done) {
       return { value: step.value };
     }
-    if (++count % CHECK_EVERY === 0 && (!(await tick()) || stale())) {
+    if (++count % CHECK_EVERY === 0 && !(await tick())) {
       return null;
     }
   }
@@ -335,14 +347,14 @@ export class GridStore<R extends object> {
       return new FindResult<R>([], new Uint32Array(0), [], new Map(), 0, this.key);
     }
     const found = new FindCollector(cells, pattern);
-    const done = await drive(
-      this.eachRow(true, (entry, up) => {
+    const done = await this.eachRow(
+      true,
+      sliceTimer(this.scheduler, stale),
+      (entry, _depth, up) => {
         if (!(entry instanceof Group)) {
           found.visit(entry, up);
         }
-      }),
-      sliceTimer(this.scheduler, stale),
-      stale,
+      },
     );
     return done && !stale() ? found.result(this.key) : null;
   }
@@ -365,22 +377,18 @@ export class GridStore<R extends object> {
       tree && (this.current.rows as FlatRows<R>).flags.some((flag) => (flag & HAS_CHILDREN) !== 0);
     const chunks: string[] = [];
     let lines = [headerLine(columns, format, levels)];
-    const done = await drive(
-      this.eachRow(tree, (entry, _up, depth) => {
-        const level = levels ? depth + 1 : undefined;
-        lines.push(
-          entry instanceof Group
-            ? groupLine(entry.key, format, level)
-            : rowLine(entry, columns, format, level),
-        );
-        if (lines.length === EXPORT_CHUNK) {
-          chunks.push(lines.join('\n'));
-          lines = [];
-        }
-      }),
-      sliceTimer(this.scheduler, stale),
-      stale,
-    );
+    const done = await this.eachRow(tree, sliceTimer(this.scheduler, stale), (entry, depth) => {
+      const level = levels ? depth + 1 : undefined;
+      lines.push(
+        entry instanceof Group
+          ? groupLine(entry.key, format, level)
+          : rowLine(entry, columns, format, level),
+      );
+      if (lines.length === EXPORT_CHUNK) {
+        chunks.push(lines.join('\n'));
+        lines = [];
+      }
+    });
     if (lines.length) {
       chunks.push(lines.join('\n'));
     }
@@ -444,11 +452,11 @@ export class GridStore<R extends object> {
   }
 
   /**
-   * Moves up to `budget` shown rows of a depth-first walk into `out`; true once the walk
-   * is done. A plain loop, not a generator: a resume per row cost a third of expand all.
+   * Visits up to `budget` rows of a depth-first walk; true once the walk is done. A plain
+   * loop, not a generator: a resume per row cost a third of expand all.
    */
-  private walkSome(walk: Walk<R>, out: Flat<R>, budget: number): boolean {
-    const { lists, at, depth } = walk;
+  private walk(walk: Walk<R>, budget: number, visit: Visit<R>): boolean {
+    const { lists, at, ups, depth, flat } = walk;
     while (lists.length && budget > 0) {
       const top = lists.length - 1;
       const siblings = lists[top] as readonly R[];
@@ -456,38 +464,47 @@ export class GridStore<R extends object> {
       if (i === siblings.length) {
         lists.pop();
         at.pop();
+        ups?.pop();
         continue;
       }
       at[top] = i + 1;
       const row = siblings[i] as R;
-      const d = depth + top;
-      const children = this.source.children?.(row);
+      const up = ups?.[top] ?? null;
+      const children = flat ? null : this.source.children?.(row);
       const kids = children?.length ? this.childrenOf(children) : null;
-      const expanded = kids?.length ? this.isExpanded(row, d) : false;
-      out.rows.push(row);
-      out.depths.push(d);
-      out.flags.push(kids?.length ? HAS_CHILDREN | (expanded ? EXPANDED : 0) : 0);
-      if (expanded) {
-        lists.push(kids as readonly R[]);
+      if (visit(row, depth + top, kids?.length ? kids : null, up) && kids?.length) {
+        lists.push(kids);
         at.push(0);
+        ups?.push({ key: this.key(row), up });
       }
       budget--;
     }
     return lists.length === 0;
   }
 
-  /** Walks the whole of `walk` into `out`, checking the clock between batches. False when stale. */
+  /** {@link walk} to its end, checking the clock between batches. False once stale. */
   private async walkAll(
     walk: Walk<R>,
-    out: Flat<R>,
     tick: () => Promise<boolean>,
+    visit: Visit<R>,
   ): Promise<boolean> {
-    while (!this.walkSome(walk, out, CHECK_EVERY)) {
-      if (!(await tick()) || this.dirty) {
+    while (!this.walk(walk, CHECK_EVERY, visit)) {
+      if (!(await tick())) {
         return false;
       }
     }
     return true;
+  }
+
+  /** A visit that writes each row into `out`, and walks into the open ones. */
+  private intoRows(out: Flat<R>): Visit<R> {
+    return (row, depth, kids) => {
+      const expanded = kids ? this.isExpanded(row, depth) : false;
+      out.rows.push(row);
+      out.depths.push(depth);
+      out.flags.push(kids ? HAS_CHILDREN | (expanded ? EXPANDED : 0) : 0);
+      return expanded;
+    };
   }
 
   /**
@@ -502,7 +519,9 @@ export class GridStore<R extends object> {
       inserted = emptyFlat();
       const shown =
         entry instanceof Group ? entry.rows : this.childrenOf(this.source.children?.(entry) ?? []);
-      if (!this.walkSome(walkOf(shown, old.depthAt(index) + 1), inserted, SPLICE_LIMIT)) {
+      if (
+        !this.walk(walkOf(shown, old.depthAt(index) + 1), SPLICE_LIMIT, this.intoRows(inserted))
+      ) {
         return false;
       }
     }
@@ -576,7 +595,6 @@ export class GridStore<R extends object> {
         this.deepPass.set(filter, set);
       }
     }
-    const stale = (): boolean => this.dirty;
     const top = this.childrenOf(this.source.roots);
     const key = this.filterKey();
     let held = this.footers.get(key);
@@ -584,7 +602,7 @@ export class GridStore<R extends object> {
       held = new Map();
       this.footers.set(key, held);
     }
-    const footer = await drive(this.totalsFor(top, held), tick, stale);
+    const footer = await drive(this.totalsFor(top, held), tick);
     if (!footer || this.dirty) {
       return null;
     }
@@ -593,12 +611,13 @@ export class GridStore<R extends object> {
       return { rows: this.current.rows as FlatRows<R>, totals };
     }
     const out = emptyFlat<R>();
+    const intoRows = this.intoRows(out);
     if (!this.groupBy) {
-      return (await this.walkAll(walkOf(top, 0), out, tick)) && !this.dirty
+      return (await this.walkAll(walkOf(top, 0), tick, intoRows)) && !this.dirty
         ? { rows: pack(out, this.key), totals }
         : null;
     }
-    const groups = await drive(this.groupsOf(top, this.groupBy), tick, stale);
+    const groups = await drive(this.groupsOf(top, this.groupBy), tick);
     if (!groups || this.dirty) {
       return null;
     }
@@ -607,7 +626,7 @@ export class GridStore<R extends object> {
       out.rows.push(group);
       out.depths.push(0);
       out.flags.push(GROUP | HAS_CHILDREN | (open ? EXPANDED : 0));
-      if (open && !(await this.walkAll(walkOf(group.rows, 1), out, tick))) {
+      if (open && !(await this.walkAll(walkOf(group.rows, 1), tick, intoRows))) {
         return null;
       }
     }
@@ -615,57 +634,36 @@ export class GridStore<R extends object> {
   }
 
   /**
-   * Every row that passes the filters, open or not, in display order: each group, then its
-   * rows. With `tree` false, only the top-level rows. `up` is the row's parent chain.
-   * `depth` is 0 for a group or a top-level row; the rows of a group start at 1.
+   * Visits every row that passes the filters, open or not, in display order: each group,
+   * then its rows. With `tree` false, only the top-level rows. `depth` is 0 for a group or
+   * a top-level row; the rows of a group start at 1. False once stale.
    */
-  private *eachRow(
+  private async eachRow(
     tree: boolean,
-    visit: (entry: Entry<R>, up: PathNode | null, depth: number) => void,
-  ): Generator<void, void, void> {
+    tick: () => Promise<boolean>,
+    visit: (entry: Entry<R>, depth: number, up: PathNode | null) => void,
+  ): Promise<boolean> {
     const top = this.childrenOf(this.source.roots);
+    const each: Visit<R> = (row, depth, _kids, up) => {
+      visit(row, depth, up);
+      return true;
+    };
+    const walk = (list: readonly R[], depth: number): Promise<boolean> =>
+      this.walkAll(walkOf(list, depth, { paths: true, flat: !tree }), tick, each);
     if (!this.groupBy) {
-      yield* this.eachUnder(top, tree, 0, visit);
-      return;
+      return walk(top, 0);
     }
-    for (const group of yield* this.groupsOf(top, this.groupBy)) {
-      visit(group, null, 0);
-      yield* this.eachUnder(group.rows, tree, 1, visit);
+    const groups = await drive(this.groupsOf(top, this.groupBy), tick);
+    if (!groups) {
+      return false;
     }
-  }
-
-  private *eachUnder(
-    list: readonly R[],
-    tree: boolean,
-    depth: number,
-    visit: (row: R, up: PathNode | null, depth: number) => void,
-  ): Generator<void, void, void> {
-    const lists: (readonly R[])[] = [list];
-    const at: number[] = [0];
-    const ups: (PathNode | null)[] = [null];
-    while (lists.length) {
-      const top = lists.length - 1;
-      const siblings = lists[top] as readonly R[];
-      const i = at[top] as number;
-      if (i === siblings.length) {
-        lists.pop();
-        at.pop();
-        ups.pop();
-        continue;
+    for (const group of groups.value) {
+      visit(group, 0, null);
+      if (!(await walk(group.rows, 1))) {
+        return false;
       }
-      at[top] = i + 1;
-      const row = siblings[i] as R;
-      const up = ups[top] ?? null;
-      visit(row, up, depth + top);
-      const children = tree ? this.source.children?.(row) : null;
-      const kids = children?.length ? this.childrenOf(children) : null;
-      if (kids?.length) {
-        lists.push(kids);
-        at.push(0);
-        ups.push({ key: this.key(row), up });
-      }
-      yield;
     }
+    return true;
   }
 
   /** `top` split into groups, in group order, each with its totals. */
