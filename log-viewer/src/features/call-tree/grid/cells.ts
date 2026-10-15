@@ -45,9 +45,6 @@ export function bar(value: number, total: number, options: BarOptions = {}): Tem
 export const msBar = (ns: number, totalNs: number): TemplateResult =>
   bar(nsToMs(ns), nsToMs(totalNs));
 
-/** The text of a time cell, which find searches and copy writes. */
-export const msText = (ns: number): string => nsToMs(ns).toFixed(2);
-
 const isQuery = (node: LogEvent): boolean =>
   node.type === 'SOQL_EXECUTE_BEGIN' || node.type === 'SOSL_EXECUTE_BEGIN';
 

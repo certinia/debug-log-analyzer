@@ -8,6 +8,7 @@
  */
 import type { ApexLog, LogEvent } from '@apexdevtools/apex-log-parser';
 
+import { formatNsAsMs } from '../../src/core/utility/Duration.js';
 import {
   toTimeOrderTree,
   type TimeOrderRow,
@@ -31,7 +32,6 @@ interface Column {
   text: CellText<TimeOrderRow>;
 }
 
-const ms = (ns: number): string => (ns / 1e6).toFixed(2);
 const count = (n: number): string => String(n);
 
 /** The Time Order grid's fifteen columns, as text. */
@@ -98,9 +98,14 @@ export const COLUMNS: Column[] = [
     field: 'duration.total',
     title: 'Total Time (ms)',
     width: 140,
-    text: (r) => ms(r.duration.total),
+    text: (r) => formatNsAsMs(r.duration.total),
   },
-  { field: 'duration.self', title: 'Self Time (ms)', width: 140, text: (r) => ms(r.duration.self) },
+  {
+    field: 'duration.self',
+    title: 'Self Time (ms)',
+    width: 140,
+    text: (r) => formatNsAsMs(r.duration.self),
+  },
 ];
 
 const STYLE = `

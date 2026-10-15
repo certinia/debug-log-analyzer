@@ -9,6 +9,7 @@
 import type { ApexLog, LogEvent } from '@apexdevtools/apex-log-parser';
 
 import { LogStore } from '../../log-viewer/src/core/log/LogStore.js';
+import { formatNsAsMs } from '../../log-viewer/src/core/utility/Duration.js';
 import {
   toBottomUpTree,
   type BottomUpRow,
@@ -125,21 +126,20 @@ async function measureTimeOrder(log: ApexLog): Promise<void> {
     keepAncestors: true,
   };
   const bySelf: Sort<TimeOrderRow> = { value: (r) => r.duration.self, dir: 'desc' };
-  const msText = (ns: number): string => (ns / 1e6).toFixed(3);
   // What the visible Time Order cells show: names as they are, times as formatted.
   const cells: CellText<TimeOrderRow>[] = [
     (r) => r.text,
     (r) => r.namespace,
     (r) => r.type,
-    (r) => msText(r.duration.total),
-    (r) => msText(r.duration.self),
+    (r) => formatNsAsMs(r.duration.total, 3),
+    (r) => formatNsAsMs(r.duration.self, 3),
   ];
   const columns: ExportColumn<TimeOrderRow>[] = [
     { title: 'Name', value: (r) => r.text },
     { title: 'Namespace', value: (r) => r.namespace },
     { title: 'Type', value: (r) => r.type },
-    { title: 'Total Time (ms)', value: (r) => msText(r.duration.total) },
-    { title: 'Self Time (ms)', value: (r) => msText(r.duration.self) },
+    { title: 'Total Time (ms)', value: (r) => formatNsAsMs(r.duration.total, 3) },
+    { title: 'Self Time (ms)', value: (r) => formatNsAsMs(r.duration.self, 3) },
   ];
   let matches = 0;
 

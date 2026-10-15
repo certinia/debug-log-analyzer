@@ -113,9 +113,12 @@ export function setChanged(value: unknown, oldValue: unknown): boolean {
   return !(value instanceof Set && oldValue instanceof Set && sameMembers(value, oldValue));
 }
 
+const integerFormat = new Intl.NumberFormat();
+
 /** Integer → thousand-separated string (e.g. 1572864 → "1,572,864"), for heap/byte values. */
 export function formatInteger(value: number): string {
-  return Math.round(value).toLocaleString();
+  // toLocaleString makes a formatter per call: a find over 500k rows took seconds.
+  return integerFormat.format(Math.round(value));
 }
 
 /**

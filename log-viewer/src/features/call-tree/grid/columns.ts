@@ -7,7 +7,8 @@ import { unsafeHTML } from 'lit/directives/unsafe-html.js';
 
 import { NO_REPORTED_LIMITS_TEXT } from '../../../components/governorCopy.js';
 import { getCallerNamespace } from '../../../core/utility/CallerNamespace.js';
-import { formatDuration, sharePercent } from '../../../core/utility/Util.js';
+import { formatNsAsMs } from '../../../core/utility/Duration.js';
+import { formatDuration, formatInteger, sharePercent } from '../../../core/utility/Util.js';
 import {
   max,
   sum,
@@ -29,7 +30,7 @@ import {
   type GovernorUsage,
 } from '../utils/GovernorCost.js';
 import { isDetailEvent } from '../utils/TimeOrderTree.js';
-import { bar, msBar, msText, nameCell, nameText } from './cells.js';
+import { bar, msBar, nameCell, nameText } from './cells.js';
 import { knownMax, outermostSum } from './calcs.js';
 
 /** What every call-tree row carries, whichever view built it. */
@@ -94,10 +95,6 @@ export const BOTTOM_UP_SORT: GridSort = { column: 'totalSelfTime', dir: 'desc' }
 const COUNT_MIN_WIDTH = 60;
 const ROWS_WIDTH = 63;
 const TIME_MIN_WIDTH = 120;
-
-// formatInteger's toLocaleString builds a formatter per call: find over 500k rows is seconds.
-const integerFormat = new Intl.NumberFormat();
-const integer = (value: number): string => integerFormat.format(Math.round(value));
 
 function nameColumn<R>(fields: RowFields<R>, options: CallTreeColumnOptions): GridColumn<R> {
   return {
@@ -204,10 +201,10 @@ function governorColumn<R extends MetricRow>(opts: {
       const v = value(row);
       const share =
         total > 0
-          ? `${integer(v)} of ${integer(total)} (${sharePercent(v, total).toFixed(1)}% of log)`
-          : integer(v);
+          ? `${formatInteger(v)} of ${formatInteger(total)} (${sharePercent(v, total).toFixed(1)}% of log)`
+          : formatInteger(v);
       return limit > 0
-        ? `${share} · ${sharePercent(v, limit).toFixed(1)}% of the ${integer(limit)} limit`
+        ? `${share} · ${sharePercent(v, limit).toFixed(1)}% of the ${formatInteger(limit)} limit`
         : share;
     },
     sort: { value },
@@ -218,7 +215,7 @@ function governorColumn<R extends MetricRow>(opts: {
 }
 
 function usedOfLimit({ unit, used, limit }: GovernorCostMetric): string {
-  const figure = (value: number): string => (unit === 'byte' ? integer(value) : `${value}`);
+  const figure = (value: number): string => (unit === 'byte' ? formatInteger(value) : `${value}`);
   return `${figure(used)}/${figure(limit)}`;
 }
 
@@ -264,7 +261,7 @@ function heapColumn<R extends MetricRow>(opts: {
   width: number;
   hidden?: boolean;
 }): GridColumn<R> {
-  const text = (row: R): string => integer(opts.value(row));
+  const text = (row: R): string => formatInteger(opts.value(row));
   return {
     id: opts.id,
     title: opts.title,
@@ -279,7 +276,7 @@ function heapColumn<R extends MetricRow>(opts: {
     sort: { value: opts.value },
     sortFirst: 'desc',
     calc: opts.calc,
-    total: integer,
+    total: formatInteger,
   };
 }
 
@@ -300,7 +297,7 @@ function timeColumn<R>(opts: {
     align: 'end',
     hidden: opts.hidden,
     cell: (row) => msBar(opts.value(row), opts.totalNs),
-    text: (row) => msText(opts.value(row)),
+    text: (row) => formatNsAsMs(opts.value(row)),
     tooltip: (row) => formatDuration(opts.value(row)),
     sort: { value: opts.value },
     sortFirst: 'desc',
