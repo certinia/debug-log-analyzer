@@ -10,8 +10,10 @@ import type { VscTabsSelectEvent } from '@vscode-elements/elements/dist/vscode-t
 import { LitElement, css, html } from 'lit';
 import { customElement, property, state } from 'lit/decorators.js';
 
-import { parse } from '@apexdevtools/apex-log-parser';
+import { parse, type ApexLog, type DebugLevels } from '@apexdevtools/apex-log-parser';
+import type { LogLevelsChange } from '../../components/LogLevels.js';
 import { TAB_TO_SOURCE, eventBus } from '../../core/events/EventBus.js';
+import { filterByLevels } from '../../core/log/levelFilter.js';
 import { logContext } from '../../core/log/logContext.js';
 import { logStatusContext, type LogStatus } from '../../core/log/logStatus.js';
 import { setCurrentLog, type LogStore } from '../../core/log/LogStore.js';
@@ -86,6 +88,17 @@ export class LogViewer extends LitElement {
 
   @state()
   private _navigateToTimestamp: number | undefined = undefined;
+
+  // The store holds this log, or a copy filtered to `_chosenLevels`.
+  @state()
+  private _capturedLog: ApexLog | null = null;
+
+  @state()
+  private _levelsBusy = false;
+
+  // Set on each pick before its build ends, so a quick second pick keeps the first.
+  private _chosenLevels: DebugLevels = {};
+  private _levelsBuild: AbortController | null = null;
 
   /** A live region is read when its text changes, not when it arrives holding some. */
   @state()
@@ -185,6 +198,9 @@ export class LogViewer extends LitElement {
         .logProblems=${this.logProblems}
         .notifications=${this.notifications}
         .logIdentity=${this.logIdentity}
+        .capturedLevels=${this._capturedLog?.debugLevels ?? null}
+        .levelsBusy=${this._levelsBusy}
+        @log-levels-change=${this._onLogLevelsChange}
       ></app-header>
 
       <log-inspector .activeTab=${this._selectedTab}>
@@ -286,6 +302,9 @@ export class LogViewer extends LitElement {
     // whichever one loads first.
     this._logStore = setCurrentLog(apexLog);
     this._logStatus = 'ready';
+    this._levelsBuild?.abort();
+    this._capturedLog = apexLog;
+    this._chosenLevels = { ...apexLog.debugLevels };
 
     this.logSize = apexLog.size;
     this.logDuration = apexLog.duration.total;
@@ -302,6 +321,38 @@ export class LogViewer extends LitElement {
       this._showTab('timeline-tab');
       this._navigateToEventIndex = data.navigateToEventIndex;
       this._navigateToTimestamp = data.navigateToTimestamp;
+    }
+  }
+
+  private async _onLogLevelsChange(event: CustomEvent<LogLevelsChange>): Promise<void> {
+    const captured = this._capturedLog;
+    if (!captured) {
+      return;
+    }
+    const { category, level } = event.detail;
+    this._chosenLevels = { ...this._chosenLevels, [category]: level };
+
+    this._levelsBuild?.abort();
+    const build = new AbortController();
+    this._levelsBuild = build;
+    const busy = setTimeout(() => {
+      this._levelsBusy = true;
+    }, 100);
+    try {
+      const shown = await filterByLevels(captured, this._chosenLevels, { signal: build.signal });
+      if (shown && !build.signal.aborted) {
+        this._logStore = setCurrentLog(shown);
+      }
+    } catch (err: unknown) {
+      // The log on screen did not change, so neither did the levels it shows.
+      this._chosenLevels = { ...(this._logStore?.log ?? captured).debugLevels };
+      this.notifications = [...this.notifications, loadFailure('Could not apply log levels', err)];
+    } finally {
+      clearTimeout(busy);
+      if (this._levelsBuild === build) {
+        this._levelsBuild = null;
+        this._levelsBusy = false;
+      }
     }
   }
 

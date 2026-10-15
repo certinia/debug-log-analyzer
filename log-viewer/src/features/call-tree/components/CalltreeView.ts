@@ -267,13 +267,51 @@ export class CalltreeView extends LitElement {
   }
 
   updated(changedProperties: PropertyValues): void {
-    if (
-      this.timelineRoot &&
-      changedProperties.has('logStore') &&
-      !changedProperties.get('logStore')
-    ) {
+    if (!this.timelineRoot || !changedProperties.has('logStore')) {
+      return;
+    }
+    if (changedProperties.get('logStore')) {
+      void this._replaceLog(this.timelineRoot);
+    } else {
       this._appendTableWhenVisible();
     }
+  }
+
+  private async _replaceLog(log: ApexLog): Promise<void> {
+    this.rootMethod = log;
+    // `rootMethod` is not reactive, and the Namespace filter lists its namespaces.
+    this.requestUpdate();
+    // A build still running reads the old log.
+    this._builds.abort();
+    this._builds = new AbortController();
+    // Each grid keeps its sort, widths, group and filters. Its selection and mark named rows of the old log.
+    for (const grid of this._grids) {
+      grid.marked = new Set();
+      grid.deselect();
+    }
+    const replaced: Promise<void>[] = [];
+    if (this.timeOrderGrid) {
+      const grid = this.timeOrderGrid;
+      grid.columns = timeOrderColumns(log, { openType });
+      this._columns.applyTo(gridColumnTarget(grid));
+      grid.source = timeOrderSource(log);
+      replaced.push(grid.settled());
+    }
+    if (this.aggregatedGrid) {
+      const grid = this.aggregatedGrid;
+      grid.columns = aggregatedColumns(log, { openType });
+      this._columns.applyTo(gridColumnTarget(grid));
+      this._aggregatedBuild = this._fillAggregatedTree(grid, log);
+      replaced.push(this._aggregatedBuild);
+    }
+    if (this.bottomUpGrid) {
+      const grid = this.bottomUpGrid;
+      grid.columns = bottomUpColumns(log, { openType });
+      this._columns.applyTo(gridColumnTarget(grid));
+      this._bottomUpBuild = this._fillBottomUpTree(grid, log);
+      replaced.push(this._bottomUpBuild);
+    }
+    await Promise.all(replaced);
   }
 
   firstUpdated(): void {

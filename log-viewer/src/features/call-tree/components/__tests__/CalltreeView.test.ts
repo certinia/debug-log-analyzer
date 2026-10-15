@@ -114,6 +114,23 @@ describe('calltree-view table lifetime', () => {
     expect(grids(view)).toEqual([view.timeOrderGrid]);
   });
 
+  it('gives the grid it has the rows of a new log, and keeps its filters', async () => {
+    view.namespaceSelected = ['ns'];
+    view._updateFiltering();
+    const grid = view.timeOrderGrid;
+    const filters = [...(grid?.filters ?? [])];
+    const source = grid?.source;
+
+    view.logStore = logStoreFor(apexLog());
+    await view.updateComplete;
+    await settle();
+
+    expect(view.timeOrderGrid).toBe(grid);
+    expect(grids(view)).toEqual([grid]);
+    expect(grid?.source).not.toBe(source);
+    expect(grid?.filters).toEqual(filters);
+  });
+
   it('rebuilds the grid after a detach and a re-attach', async () => {
     const before = view.timeOrderGrid;
     view.remove();

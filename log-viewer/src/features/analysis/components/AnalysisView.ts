@@ -214,12 +214,16 @@ export class AnalysisView extends LitElement {
   }
 
   updated(changedProperties: PropertyValues): void {
-    if (
-      this.timelineRoot &&
-      changedProperties.has('logStore') &&
-      !changedProperties.get('logStore')
-    ) {
+    if (!this.timelineRoot || !changedProperties.has('logStore')) {
+      return;
+    }
+    if (!changedProperties.get('logStore')) {
       this._buildWhenVisible();
+    } else if (this._built) {
+      // The grid keeps its sort, widths, group and filters. Its selection and mark named rows of the old log.
+      this._marked = new Set();
+      this.grid?.deselect();
+      this._built = this._build(this.timelineRoot);
     }
   }
 
@@ -328,7 +332,7 @@ export class AnalysisView extends LitElement {
 
   private async _build(root: ApexLog): Promise<void> {
     const tree = await MergedTree.bottomUp(root);
-    if (!tree) {
+    if (!tree || root !== this.timelineRoot) {
       return;
     }
     this._tree = tree;
