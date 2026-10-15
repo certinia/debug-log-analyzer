@@ -17,3 +17,4 @@ export {
   type GridSort,
 } from './lv-grid.js';
 export { gridStyles } from './styles.js';
+export { browserScheduler } from './yield.js';

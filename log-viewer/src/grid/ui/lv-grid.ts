@@ -31,12 +31,14 @@ import {
   type SortDirection,
   type TreeSource,
 } from '../core/index.js';
-import { browserScheduler, fontOf, GridView, textWidth, type FindMarks } from '../render/index.js';
+import { GridView, type FindMarks } from '../render/index.js';
 import type { GridColumn } from './column.js';
 import { gridKey } from './keyboard.js';
 import { litPainter, total } from './painter.js';
+import { columnTracks, minWidthOf, naturalWidth } from './sizing.js';
 import { StoreController } from './store-controller.js';
 import { gridStyles } from './styles.js';
+import { browserScheduler } from './yield.js';
 
 export interface GridSelectDetail<R> {
   /** The selected data row; null for a group row or no selection. */
@@ -98,22 +100,6 @@ const shown = <R>(columns: readonly GridColumn<R>[]): GridColumn<R>[] =>
 
 const shownIds = <R>(columns: readonly GridColumn<R>[] | undefined): string[] =>
   shown(columns ?? []).map((column) => column.id);
-
-const MIN_WIDTH = 40;
-
-const minWidthOf = <R>(column: GridColumn<R>): number => column.minWidth ?? MIN_WIDTH;
-
-const px = (value: string): number => Number.parseFloat(value) || 0;
-
-/** The width a cell needs to show its text on one line, with its padding and twisty. */
-function naturalWidth(cell: HTMLElement): number {
-  const style = getComputedStyle(cell);
-  const twisty = cell.querySelector<HTMLElement>('.twisty')?.offsetWidth ?? 0;
-  const text = textWidth([cell.textContent?.trim() ?? ''], fontOf(cell));
-  const padded = text + twisty + px(style.paddingInlineStart) + px(style.paddingInlineEnd);
-  // A template cell, such as a bar, may hold no text but still need room.
-  return Math.ceil(Math.max(padded, cell.scrollWidth));
-}
 
 /**
  * A virtualised tree grid. Set `columns` and `source`; it sorts from its header, and the
@@ -350,7 +336,7 @@ export class LvGrid<R extends object = object> extends LitElement {
       tabindex="0"
       aria-rowcount=${size + (footer ? 2 : 1)}
       aria-busy=${this.data.snapshot?.busy ?? false}
-      style=${styleMap(this.tracks(columns))}
+      style=${styleMap(columnTracks(columns, this.widths))}
       ${ref(this.scrollerRef)}
       @keydown=${this.onKey}
     >
@@ -545,25 +531,6 @@ export class LvGrid<R extends object = object> extends LitElement {
 
   private visibleColumns(): GridColumn<R>[] {
     return shown(this.columns);
-  }
-
-  /**
-   * One track per shown column, so header, rows and footer line up. They sit on the
-   * scroller, not the host: a host's inline style belongs to whoever places it.
-   */
-  private tracks(columns: readonly GridColumn<R>[]): Record<string, string> {
-    const widths = columns.map((column) => {
-      const width = this.widths.get(column.id) ?? column.width;
-      return typeof width === 'number' ? Math.max(width, minWidthOf(column)) : null;
-    });
-    const tracks = columns.map((column, i) => {
-      const width = widths[i];
-      return width === null || width === undefined
-        ? `minmax(${minWidthOf(column)}px, 1fr)`
-        : `${width}px`;
-    });
-    const minWidth = columns.reduce((sum, column, i) => sum + (widths[i] ?? minWidthOf(column)), 0);
-    return { '--grid-cols': tracks.join(' '), '--grid-min-width': `${minWidth}px` };
   }
 
   private makeView(): void {

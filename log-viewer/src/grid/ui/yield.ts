@@ -13,7 +13,10 @@ const native = (globalThis as { scheduler?: YieldingScheduler }).scheduler;
 function macrotask(): Promise<void> {
   return new Promise((resolve) => {
     const channel = new MessageChannel();
-    channel.port1.onmessage = () => resolve();
+    channel.port1.onmessage = () => {
+      channel.port1.close();
+      resolve();
+    };
     channel.port2.postMessage(null);
   });
 }
