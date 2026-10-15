@@ -6,9 +6,10 @@
  * Times the grid's core steps on the Call Tree's Time Order and Bottom-Up rows, with the
  * longest slice each step held the thread for: the figure the 50ms budget is about.
  */
-import type { ApexLog, LogEvent } from '@apexdevtools/apex-log-parser';
+import type { ApexLog } from '@apexdevtools/apex-log-parser';
 
 import { LogStore } from '../../log-viewer/src/core/log/LogStore.js';
+import { deepEvent, pathOf, timeOrderDetails } from '../../log-viewer/bench/grid/targets.js';
 import { formatNsAsMs } from '../../log-viewer/src/core/utility/Duration.js';
 import {
   toBottomUpTree,
@@ -55,33 +56,6 @@ function timedScheduler(): Scheduler & { longest(): number; reset(): void } {
   };
 }
 
-/** The deepest event in the middle of the log: the worst go-to-row a user can ask for. */
-function deepPath(log: ApexLog): number[] {
-  let best: LogEvent | null = null;
-  let bestDepth = -1;
-  const stack = log.children.map((event) => ({ event, depth: 0 }));
-  const all: { event: LogEvent; depth: number }[] = [];
-  while (stack.length) {
-    const item = stack.pop()!; // the loop guard keeps the stack non-empty
-    all.push(item);
-    for (const child of item.event.children) {
-      stack.push({ event: child, depth: item.depth + 1 });
-    }
-  }
-  all.sort((a, b) => a.event.eventIndex - b.event.eventIndex);
-  for (const item of all.slice(Math.floor(all.length * 0.45), Math.floor(all.length * 0.55))) {
-    if (item.depth > bestDepth) {
-      best = item.event;
-      bestDepth = item.depth;
-    }
-  }
-  const path: number[] = [];
-  for (let e: LogEvent | null = best; e?.parent; e = e.parent) {
-    path.push(e.eventIndex);
-  }
-  return path.reverse();
-}
-
 type Step = (label: string, body: () => Promise<unknown>) => Promise<void>;
 
 /**
@@ -117,10 +91,9 @@ export async function measureGrid(log: ApexLog): Promise<void> {
 async function measureTimeOrder(log: ApexLog): Promise<void> {
   const roots = toTimeOrderTree(log.children, log.governorLimits) ?? [];
   const scheduler = timedScheduler();
-  const path = deepPath(log);
+  const path = pathOf(deepEvent(log));
   const step = stepper(scheduler, () => store.snapshot().rows.size);
 
-  const detail: RowFilter<TimeOrderRow> = { test: (r) => r._hasDetailsDeep };
   const soqlOnly: RowFilter<TimeOrderRow> = {
     test: (r) => r.type === 'SOQL_EXECUTE_BEGIN',
     keepAncestors: true,
@@ -152,14 +125,14 @@ async function measureTimeOrder(log: ApexLog): Promise<void> {
     );
     return store.settled();
   });
-  await step('detail filter on', () => store.setFilters([detail]));
+  await step('detail filter on', () => store.setFilters([timeOrderDetails]));
   await step('expand all', () => store.expandAll());
   await step('sort by self time', () => store.setSort(bySelf));
   await step('clear sort', () => store.setSort(null));
   await step('detail filter off', () => store.setFilters([]));
-  await step('detail filter on', () => store.setFilters([detail]));
-  await step('SOQL filter, keep ancestors', () => store.setFilters([detail, soqlOnly]));
-  await step('SOQL filter off', () => store.setFilters([detail]));
+  await step('detail filter on', () => store.setFilters([timeOrderDetails]));
+  await step('SOQL filter, keep ancestors', () => store.setFilters([timeOrderDetails, soqlOnly]));
+  await step('SOQL filter off', () => store.setFilters([timeOrderDetails]));
   await step('find "account"', async () => {
     matches = (await store.find({ text: 'account' }, cells))?.total ?? -1;
   });

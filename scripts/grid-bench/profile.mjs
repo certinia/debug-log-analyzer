@@ -37,23 +37,7 @@ if (action === 'fling') {
   await page.evaluate(() => window.bench.contender.expandAll());
   await cdp.send('Profiler.start');
 }
-const frames =
-  action !== 'fling'
-    ? []
-    : await page.evaluate(async () => {
-        const scroller = window.bench.contender.scroller();
-        scroller.scrollTop = 0;
-        const times = [];
-        let last = performance.now();
-        for (let i = 0; i < 120; i++) {
-          scroller.scrollTop += 1500;
-          await new Promise((resolve) => requestAnimationFrame(resolve));
-          const now = performance.now();
-          times.push(now - last);
-          last = now;
-        }
-        return times;
-      });
+const frames = action === 'fling' ? await page.evaluate(() => window.bench.fling()) : null;
 const { profile } = await cdp.send('Profiler.stop');
 
 const byId = new Map(profile.nodes.map((n) => [n.id, n]));
@@ -63,10 +47,9 @@ profile.samples.forEach((id, i) => {
   const key = `${f.functionName || '(anon)'} ${f.url.split('/').pop()}:${f.lineNumber + 1}`;
   self.set(key, (self.get(key) ?? 0) + (profile.timeDeltas[i + 1] ?? 0));
 });
-if (frames.length) {
-  const sorted = frames.toSorted((a, b) => a - b);
+if (frames) {
   console.log(
-    `frames p50 ${sorted[60].toFixed(1)}ms p95 ${sorted[114].toFixed(1)}ms, ${frames.filter((t) => t > 25).length} of 120 over 25ms`,
+    `frames p50 ${frames.p50.toFixed(1)}ms p95 ${frames.p95.toFixed(1)}ms, ${frames.dropped} of ${frames.frames} over 25ms`,
   );
 }
 for (const [key, us] of [...self].sort((a, b) => b[1] - a[1]).slice(0, 18)) {

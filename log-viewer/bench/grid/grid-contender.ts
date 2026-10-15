@@ -13,16 +13,11 @@ import {
   toTimeOrderTree,
   type TimeOrderRow,
 } from '../../src/features/call-tree/utils/TimeOrderTree.js';
-import {
-  GridStore,
-  Group,
-  type CellText,
-  type RowFilter,
-  type RowView,
-} from '../../src/grid/core/index.js';
+import { GridStore, Group, type CellText, type RowView } from '../../src/grid/core/index.js';
 import { FIND_ATTR, GridView, type RowPainter } from '../../src/grid/render/index.js';
 import { browserScheduler } from '../../src/grid/ui/index.js';
 import type { Contender } from './contender.js';
+import { pathOf, timeOrderDetails } from './targets.js';
 
 interface Column {
   field: string;
@@ -121,8 +116,6 @@ const STYLE = `
   ::highlight(current-find-match) { background: #9e6a03; }
 `;
 
-export const detail: RowFilter<TimeOrderRow> = { test: (r) => r._hasDetailsDeep };
-
 export class GridContender implements Contender {
   private store!: GridStore<TimeOrderRow>;
   private view!: GridView<TimeOrderRow>;
@@ -159,7 +152,7 @@ export class GridContender implements Contender {
       painter: this.painter(),
       rowHeight: 24,
     });
-    await this.store.setFilters([detail]);
+    await this.store.setFilters([timeOrderDetails]);
     this.show();
   }
 
@@ -248,16 +241,12 @@ export class GridContender implements Contender {
   }
 
   async setDetailFilter(on: boolean): Promise<void> {
-    await this.store.setFilters(on ? [detail] : []);
+    await this.store.setFilters(on ? [timeOrderDetails] : []);
     this.show();
   }
 
   async goTo(target: LogEvent): Promise<void> {
-    const path: number[] = [];
-    for (let e: LogEvent | null = target; e?.parent; e = e.parent) {
-      path.push(e.eventIndex);
-    }
-    const index = await this.store.reveal(path.reverse());
+    const index = await this.store.reveal(pathOf(target));
     this.show();
     if (index >= 0) {
       this.view.scrollToIndex(index);

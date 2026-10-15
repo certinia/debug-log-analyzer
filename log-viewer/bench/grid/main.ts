@@ -14,6 +14,7 @@ import type { BottomUpContender, Contender, Mounted } from './contender.js';
 import { GridContender } from './grid-contender.js';
 import { callTreeContender, lvGridContender } from './lv-grid-contender.js';
 import { TabulatorContender } from './tabulator-contender.js';
+import { deepEvent } from './targets.js';
 import { frameStats, perFrame, settled, timed, type FrameStats, type Timing } from './timing.js';
 
 // A switch, not a lookup: CodeQL flags any call through a value found by a URL name.
@@ -52,23 +53,6 @@ function heapMb(): number {
   (window as unknown as { gc?: () => void }).gc?.();
   const memory = (performance as unknown as { memory?: { usedJSHeapSize: number } }).memory;
   return Math.round((memory?.usedJSHeapSize ?? 0) / 1048576);
-}
-
-/** The deepest event in the middle of the log: the worst `goTo` a user can ask for. */
-function deepTarget(log: ApexLog): LogEvent {
-  const all: { event: LogEvent; depth: number }[] = [];
-  const stack = log.children.map((event) => ({ event, depth: 0 }));
-  while (stack.length) {
-    const item = stack.pop() as { event: LogEvent; depth: number };
-    all.push(item);
-    for (const child of item.event.children) {
-      stack.push({ event: child, depth: item.depth + 1 });
-    }
-  }
-  all.sort((a, b) => a.event.eventIndex - b.event.eventIndex);
-  const middle = all.slice(Math.floor(all.length * 0.45), Math.floor(all.length * 0.55));
-  const best = middle.reduce((a, b) => (b.depth > a.depth ? b : a));
-  return best.event;
 }
 
 interface Summary {
@@ -116,7 +100,7 @@ const frames = (list: FrameStats[]): FrameStats => ({
 async function load(text: string): Promise<void> {
   const t0 = performance.now();
   log = parse(text);
-  target = deepTarget(log);
+  target = deepEvent(log);
   say(
     `parsed in ${Math.round(performance.now() - t0)}ms; goTo target depth event ${target.eventIndex}`,
   );
@@ -150,23 +134,29 @@ function rowsInView(scroller: HTMLElement): boolean {
   });
 }
 
-async function scrollStats(): Promise<{ fling: FrameStats; jumpEnd: Timing; jumpTop: Timing }> {
+/** Scrolls from the top 1500px a frame for 120 frames. */
+async function fling(): Promise<FrameStats> {
   const scroller = mounted.scroller();
-  const shown = (): boolean => rowsInView(scroller);
   scroller.scrollTop = 0;
   await settled();
-  const fling = frameStats(
+  return frameStats(
     await perFrame(120, () => {
       scroller.scrollTop += 1500;
     }),
   );
+}
+
+async function scrollStats(): Promise<{ fling: FrameStats; jumpEnd: Timing; jumpTop: Timing }> {
+  const scroller = mounted.scroller();
+  const shown = (): boolean => rowsInView(scroller);
+  const flung = await fling();
   const jumpEnd = await timed(() => {
     scroller.scrollTop = scroller.scrollHeight;
   }, shown);
   const jumpTop = await timed(() => {
     scroller.scrollTop = 0;
   }, shown);
-  return { fling, jumpEnd, jumpTop };
+  return { fling: flung, jumpEnd, jumpTop };
 }
 
 async function runAll(reps = 5, skip: string[] = []): Promise<Record<string, unknown>> {
@@ -288,6 +278,7 @@ const bench = {
   results,
   runAll,
   runOne,
+  fling,
   /** For profiling one action from outside, e.g. a fling after `expandAll`. */
   get contender(): Mounted {
     return mounted;

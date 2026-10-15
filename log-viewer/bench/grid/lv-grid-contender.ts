@@ -22,7 +22,8 @@ import {
 } from '../../src/features/call-tree/grid/columns.js';
 import type { GridColumn, LvGrid, RowFilter } from '../../src/grid/index.js';
 import type { Contender } from './contender.js';
-import { COLUMNS, detail } from './grid-contender.js';
+import { COLUMNS } from './grid-contender.js';
+import { pathOf, timeOrderDetails } from './targets.js';
 
 const SORTED = 'duration.self';
 
@@ -48,7 +49,7 @@ const plain: Setup<TimeOrderRow> = (log) => {
   grid.columns = plainColumns();
   const roots = toTimeOrderTree(log.children, log.governorLimits) ?? [];
   grid.source = { roots, children: (r) => r._children, key: (r) => r.id };
-  return { grid, details: detail };
+  return { grid, details: timeOrderDetails };
 };
 
 const app: Setup<LogEvent> = (log) => {
@@ -58,18 +59,11 @@ const app: Setup<LogEvent> = (log) => {
   return { grid, details: TIME_ORDER_DETAILS };
 };
 
-class LvGridContender<R extends object> implements Contender {
-  private grid!: LvGrid<R>;
-  private details!: RowFilter<R>;
+/** The actions every lv-grid contender takes the same way. */
+export abstract class LvGridBench<R extends object> {
+  protected grid!: LvGrid<R>;
 
-  constructor(private readonly setup: Setup<R>) {}
-
-  async mount(host: HTMLElement, log: ApexLog): Promise<void> {
-    ({ grid: this.grid, details: this.details } = this.setup(log));
-    this.grid.filters = [this.details];
-    host.append(this.grid);
-    await this.grid.settled();
-  }
+  abstract mount(host: HTMLElement, log: ApexLog): Promise<void>;
 
   async expandAll(): Promise<void> {
     await this.grid.expandAll();
@@ -81,30 +75,9 @@ class LvGridContender<R extends object> implements Contender {
     await this.grid.settled();
   }
 
-  async sortSelfDesc(): Promise<void> {
-    this.grid.sort = { column: SORTED, dir: 'desc' };
-    await this.grid.updateComplete;
-    await this.grid.settled();
-  }
-
   async clearSort(): Promise<void> {
     this.grid.sort = null;
-    await this.grid.updateComplete;
-    await this.grid.settled();
-  }
-
-  async setDetailFilter(on: boolean): Promise<void> {
-    this.grid.filters = on ? [this.details] : [];
-    await this.grid.updateComplete;
-    await this.grid.settled();
-  }
-
-  async goTo(target: LogEvent): Promise<void> {
-    const path: number[] = [];
-    for (let e: LogEvent | null = target; e?.parent; e = e.parent) {
-      path.push(e.eventIndex);
-    }
-    await this.grid.goTo(path.reverse());
+    await this.settle();
   }
 
   find(text: string): Promise<number> {
@@ -116,6 +89,50 @@ class LvGridContender<R extends object> implements Contender {
     return text?.length ?? -1;
   }
 
+  scroller(): HTMLElement {
+    return this.grid.renderRoot.querySelector<HTMLElement>('.scroller') as HTMLElement;
+  }
+
+  visibleRowCount(): number {
+    // aria-rowcount counts the header row, and the footer row where there is one.
+    const footer = this.scroller().querySelector('.foot') ? 1 : 0;
+    return Number(this.scroller().getAttribute('aria-rowcount')) - 1 - footer;
+  }
+
+  protected async settle(): Promise<void> {
+    await this.grid.updateComplete;
+    await this.grid.settled();
+  }
+}
+
+class LvGridContender<R extends object> extends LvGridBench<R> implements Contender {
+  private details!: RowFilter<R>;
+
+  constructor(private readonly setup: Setup<R>) {
+    super();
+  }
+
+  async mount(host: HTMLElement, log: ApexLog): Promise<void> {
+    ({ grid: this.grid, details: this.details } = this.setup(log));
+    this.grid.filters = [this.details];
+    host.append(this.grid);
+    await this.grid.settled();
+  }
+
+  async sortSelfDesc(): Promise<void> {
+    this.grid.sort = { column: SORTED, dir: 'desc' };
+    await this.settle();
+  }
+
+  async setDetailFilter(on: boolean): Promise<void> {
+    this.grid.filters = on ? [this.details] : [];
+    await this.settle();
+  }
+
+  async goTo(target: LogEvent): Promise<void> {
+    await this.grid.goTo(pathOf(target));
+  }
+
   async setColumnVisible(field: string, visible: boolean): Promise<void> {
     this.grid.columns = this.grid.columns.map((column) =>
       column.id === field ? { ...column, hidden: !visible } : column,
@@ -125,16 +142,6 @@ class LvGridContender<R extends object> implements Contender {
 
   setNameWidth(px: number): void {
     this.grid.setColumnWidth('text', px);
-  }
-
-  scroller(): HTMLElement {
-    return this.grid.renderRoot.querySelector<HTMLElement>('.scroller') as HTMLElement;
-  }
-
-  visibleRowCount(): number {
-    // aria-rowcount counts the header row, and the footer row where there is one.
-    const footer = this.scroller().querySelector('.foot') ? 1 : 0;
-    return Number(this.scroller().getAttribute('aria-rowcount')) - 1 - footer;
   }
 }
 

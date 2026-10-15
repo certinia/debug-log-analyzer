@@ -30,37 +30,16 @@ const base = results.tabulator ?? {};
 const pad = (s, n = 30) => String(s).padEnd(n);
 const row = (label, cells) => console.log(pad(label, 32) + cells.map((c) => pad(c)).join(''));
 
-const BOTTOM_UP_ACTIONS = [
-  'groupByType',
-  'groupByNamespace',
-  'ungroup',
-  'sortTotalDesc',
-  'clearSort',
-  'expandAll',
-  'find',
-  'exportCsv',
-  'collapseAll',
-  'scrollJumpEnd',
-  'scrollJumpTop',
+const isAction = (key, value) => key !== 'firstRender' && typeof value?.longestTaskMs === 'number';
+const ACTIONS = [
+  ...new Set(
+    names.flatMap((n) =>
+      Object.entries(results[n])
+        .filter(([key, value]) => isAction(key, value))
+        .map(([key]) => key),
+    ),
+  ),
 ];
-
-const TIME_ORDER_ACTIONS = [
-  'expandAll',
-  'collapseAll',
-  'sortSelfDesc',
-  'clearSort',
-  'filterOff',
-  'filterOn',
-  'goToDeepRow',
-  'find',
-  'exportCsv',
-  'hideColumn',
-  'showColumn',
-  'scrollJumpEnd',
-  'scrollJumpTop',
-];
-
-const ACTIONS = tree === 'bottom-up' ? BOTTOM_UP_ACTIONS : TIME_ORDER_ACTIONS;
 
 const worse = (value, baseline) => (baseline !== undefined && value > baseline ? '!' : ' ');
 const overBudget = (task) => (task > BUDGET_MS ? '!' : ' ');

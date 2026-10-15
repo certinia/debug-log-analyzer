@@ -23,6 +23,7 @@ import { expandCollapseAll } from '../../src/features/call-tree/utils/ExpandColl
 import { initialisedRowRange } from '../../src/tabulator/module/initialisedRows.js';
 import dataGridStyles from '../../src/tabulator/style/DataGrid.scss';
 import type { BottomUpContender } from './contender.js';
+import { LvGridBench } from './lv-grid-contender.js';
 
 const details = (row: BottomUpRow): boolean => row._hasDetailsDeep;
 
@@ -106,22 +107,21 @@ export class TabulatorBottomUp implements BottomUpContender {
   }
 }
 
-export class LvGridBottomUp implements BottomUpContender {
-  private grid!: CallTreeGrid<BottomUpRow>;
-
+export class LvGridBottomUp extends LvGridBench<BottomUpRow> implements BottomUpContender {
   async mount(host: HTMLElement, log: ApexLog): Promise<void> {
-    this.grid = document.createElement('lv-call-tree-grid') as CallTreeGrid<BottomUpRow>;
-    this.grid.columns = bottomUpColumns(log, { openType: () => {} });
-    this.grid.filters = [{ test: details }];
-    this.grid.sort = BOTTOM_UP_SORT;
+    const grid = document.createElement('lv-call-tree-grid') as CallTreeGrid<BottomUpRow>;
+    grid.columns = bottomUpColumns(log, { openType: () => {} });
+    grid.filters = [{ test: details }];
+    grid.sort = BOTTOM_UP_SORT;
     const roots = await buildBottomUpTree(
       log.children,
       logStoreFor(log).keyPathIds(),
       log.governorLimits,
     );
-    this.grid.source = { roots: roots ?? [], children: (r) => r._children, key: (r) => r.id };
-    host.append(this.grid);
-    await this.grid.settled();
+    grid.source = { roots: roots ?? [], children: (r) => r._children, key: (r) => r.id };
+    this.grid = grid;
+    host.append(grid);
+    await grid.settled();
   }
 
   async groupBy(field: 'type' | 'namespace' | null): Promise<void> {
@@ -132,43 +132,5 @@ export class LvGridBottomUp implements BottomUpContender {
   async sortTotalDesc(): Promise<void> {
     this.grid.sort = { column: 'totalTime', dir: 'desc' };
     await this.settle();
-  }
-
-  async clearSort(): Promise<void> {
-    this.grid.sort = null;
-    await this.settle();
-  }
-
-  async expandAll(): Promise<void> {
-    await this.grid.expandAll();
-    await this.grid.settled();
-  }
-
-  async collapseAll(): Promise<void> {
-    await this.grid.collapseAll();
-    await this.grid.settled();
-  }
-
-  find(text: string): Promise<number> {
-    return this.grid.find({ text });
-  }
-
-  async exportCsv(): Promise<number> {
-    const text = await this.grid.exportText({ format: 'csv' });
-    return text?.length ?? -1;
-  }
-
-  scroller(): HTMLElement {
-    return this.grid.renderRoot.querySelector<HTMLElement>('.scroller') as HTMLElement;
-  }
-
-  visibleRowCount(): number {
-    // aria-rowcount counts the header and footer rows.
-    return Number(this.scroller().getAttribute('aria-rowcount')) - 2;
-  }
-
-  private async settle(): Promise<void> {
-    await this.grid.updateComplete;
-    await this.grid.settled();
   }
 }
