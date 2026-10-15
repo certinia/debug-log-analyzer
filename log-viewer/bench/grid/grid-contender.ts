@@ -15,7 +15,6 @@ import {
 import {
   browserScheduler,
   FIND_ATTR,
-  findPattern,
   GridStore,
   GridView,
   Group,
@@ -266,9 +265,9 @@ export class GridContender implements Contender {
     const query = { text };
     const shown = COLUMNS.filter((c) => !this.hidden.has(c.field)).map((c) => c.text);
     const result = await this.store.find(query, shown);
-    const pattern = findPattern(query);
-    if (result && pattern) {
-      this.view.setFind({ result, pattern, current: 0 });
+
+    if (result?.pattern) {
+      this.view.setFind({ result, current: 0 });
     }
     return result?.total ?? -1;
   }

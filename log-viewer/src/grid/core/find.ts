@@ -36,6 +36,8 @@ export function findPattern(query: FindQuery): RegExp | null {
 /** The matches of one search, numbered from 0 in display order: row by row, then column. */
 export class FindResult<R> {
   readonly total: number;
+  /** What the matches were counted with; null for an empty search. */
+  readonly pattern: RegExp | null;
   /** Rows with a match, in display order. */
   private readonly rows: readonly R[];
   /** The number of each row's first match. */
@@ -51,6 +53,7 @@ export class FindResult<R> {
     paths: readonly (PathNode | null)[],
     at: ReadonlyMap<R, number>,
     total: number,
+    pattern: RegExp | null,
     key: (row: R) => RowKey,
   ) {
     this.rows = rows;
@@ -58,6 +61,7 @@ export class FindResult<R> {
     this.paths = paths;
     this.at = at;
     this.total = total;
+    this.pattern = pattern;
     this.key = key;
   }
 
@@ -108,7 +112,7 @@ export class FindResult<R> {
 /** Collects matches as rows are visited, then packs them into a {@link FindResult}. */
 export class FindCollector<R> {
   private readonly cells: readonly CellText<R>[];
-  private readonly pattern: RegExp;
+  private readonly pattern: RegExp | null;
   private readonly rows: R[] = [];
   private readonly starts: number[] = [];
   private readonly paths: (PathNode | null)[] = [];
@@ -116,12 +120,19 @@ export class FindCollector<R> {
   private readonly at = new Map<R, number>();
   private total = 0;
 
-  constructor(cells: readonly CellText<R>[], pattern: RegExp) {
+  constructor(cells: readonly CellText<R>[], pattern: RegExp | null) {
     this.cells = cells;
     this.pattern = pattern;
   }
 
+  get searches(): boolean {
+    return this.pattern !== null;
+  }
+
   visit(row: R, up: PathNode | null): void {
+    if (!this.pattern) {
+      return;
+    }
     let count = 0;
     for (const cell of this.cells) {
       const text = cell(row);
@@ -149,6 +160,7 @@ export class FindCollector<R> {
       this.paths,
       this.at,
       this.total,
+      this.pattern,
       key,
     );
   }

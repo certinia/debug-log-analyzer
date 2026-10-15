@@ -6,9 +6,9 @@ import { groupLine, headerLine, rowLine, type ExportColumn, type ExportOptions }
 import {
   FindCollector,
   findPattern,
-  FindResult,
   type CellText,
   type FindQuery,
+  type FindResult,
   type PathNode,
 } from './find.js';
 import {
@@ -339,14 +339,13 @@ export class GridStore<R extends object> {
     await this.settled();
     const generation = this.generation;
     const stale = (): boolean => id !== this.findId || generation !== this.generation;
-    const pattern = findPattern(query);
     if (stale()) {
       return null;
     }
-    if (!pattern) {
-      return new FindResult<R>([], new Uint32Array(0), [], new Map(), 0, this.key);
+    const found = new FindCollector(cells, findPattern(query));
+    if (!found.searches) {
+      return found.result(this.key);
     }
-    const found = new FindCollector(cells, pattern);
     const done = await this.eachRow(
       true,
       sliceTimer(this.scheduler, stale),

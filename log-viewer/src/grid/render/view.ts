@@ -32,10 +32,9 @@ export interface GridViewOptions<R> {
   rowIndexStart?: number;
 }
 
-/** The find a view marks: its result, the pattern it counted with and the current match. */
+/** The find a view marks: its result and the current match. */
 export interface FindMarks<R> {
   result: FindResult<R>;
-  pattern: RegExp;
   current: number;
 }
 
@@ -472,7 +471,7 @@ export class GridView<R extends object> {
       find && entry !== undefined && !(entry instanceof Group)
         ? find.result.firstMatchIn(entry)
         : -1;
-    this.highlighter.mark(el, first, find?.pattern ?? null, find?.current ?? -1);
+    this.highlighter.mark(el, first, find?.result.pattern ?? null, find?.current ?? -1);
   }
 
   private newRow(): HTMLElement {

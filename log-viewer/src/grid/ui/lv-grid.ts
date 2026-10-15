@@ -14,7 +14,6 @@ import { createRef, ref } from 'lit/directives/ref.js';
 import { styleMap } from 'lit/directives/style-map.js';
 
 import {
-  findPattern,
   GridStore,
   Group,
   navigate,
@@ -23,7 +22,6 @@ import {
   type ExpandPolicy,
   type ExportOptions,
   type FindQuery,
-  type FindResult,
   type GroupBy,
   type RowFilter,
   type RowKey,
@@ -33,7 +31,7 @@ import {
   type SortDirection,
   type TreeSource,
 } from '../core/index.js';
-import { browserScheduler, fontOf, GridView, textWidth } from '../render/index.js';
+import { browserScheduler, fontOf, GridView, textWidth, type FindMarks } from '../render/index.js';
 import type { GridColumn } from './column.js';
 import { gridKey } from './keyboard.js';
 import { litPainter, total } from './painter.js';
@@ -186,7 +184,7 @@ export class LvGrid<R extends object = object> extends LitElement {
   /** Where the selection was last seen, to skip a search of every row. */
   private selectedAt = -1;
   private hovered = -1;
-  private found: { result: FindResult<R>; pattern: RegExp; current: number } | null = null;
+  private found: FindMarks<R> | null = null;
   /** Widths the user set, by column id. They win over a column's own `width`. */
   private readonly widths = new Map<string, number>();
   private readonly scrollerRef = createRef<HTMLDivElement>();
@@ -237,11 +235,10 @@ export class LvGrid<R extends object = object> extends LitElement {
   async find(query: FindQuery): Promise<number> {
     const cells = this.visibleColumns().flatMap((column) => (column.text ? [column.text] : []));
     const result = await this.store?.find(query, cells);
-    const pattern = findPattern(query);
     if (!result) {
       return -1;
     }
-    this.found = pattern ? { result, pattern, current: -1 } : null;
+    this.found = result.pattern ? { result, current: -1 } : null;
     this.view?.setFind(this.found);
     this.emit<GridFindDetail>('lv-grid-find-results', { total: result.total });
     return result.total;
