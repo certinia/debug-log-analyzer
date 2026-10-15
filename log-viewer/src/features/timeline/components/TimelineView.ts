@@ -6,6 +6,8 @@ import { consume } from '@lit/context';
 import { initialState, Task } from '@lit/task';
 import { LitElement, css, html, nothing, type PropertyValues } from 'lit';
 import { customElement, property, query, state } from 'lit/decorators.js';
+import { logContext } from '../../../core/log/logContext.js';
+import type { LogStore } from '../../../core/log/LogStore.js';
 
 import { logStatusContext, type LogStatus } from '../../../core/log/logStatus.js';
 import { logStoreFor } from '../../../core/log/LogStore.js';
@@ -57,8 +59,14 @@ export class TimelineView extends LitElement {
   @property({ attribute: false })
   logStatus: LogStatus = 'parsing';
 
-  @property()
-  timelineRoot: ApexLog | null = null;
+  /** The log on screen, from the app root. */
+  @consume({ context: logContext, subscribe: true })
+  @property({ attribute: false })
+  logStore: LogStore | null = null;
+
+  private get timelineRoot(): ApexLog | null {
+    return this.logStore?.log ?? null;
+  }
 
   @property({ type: Number })
   navigateToTimestamp: number | undefined = undefined;
@@ -252,7 +260,7 @@ export class TimelineView extends LitElement {
   }
 
   protected willUpdate(changed: PropertyValues): void {
-    if (changed.has('timelineRoot')) {
+    if (changed.has('logStore')) {
       this.selfTimes = undefined;
       this.rebuildTimelineKeys();
       this.timelineKeyRef?.clear();

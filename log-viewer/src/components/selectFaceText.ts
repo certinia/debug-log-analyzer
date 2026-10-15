@@ -17,10 +17,12 @@ export function selectFaceText(opts: {
   placeholder: string;
   value: string;
   emptyValue: string;
+  /** Text after the prefix; `:` unless given. */
+  separator?: string;
 }): FaceText {
-  const { prefix, placeholder, value, emptyValue } = opts;
+  const { prefix, placeholder, value, emptyValue, separator = ':' } = opts;
   const active = !!value && value !== emptyValue;
   return active
-    ? { prefixText: prefix ? `${prefix}:` : '', valueText: value, active: true }
+    ? { prefixText: prefix ? `${prefix}${separator}` : '', valueText: value, active: true }
     : { prefixText: '', valueText: placeholder, active: false };
 }

@@ -552,6 +552,18 @@ export class FlameChart<E extends EventNode = EventNode> {
   }
 
   /**
+   * Show `zoom` and the pan offsets, clamped to this chart's bounds.
+   */
+  public setViewport(zoom: number, offsetX: number, offsetY: number): void {
+    if (!this.viewport) {
+      return;
+    }
+    this.viewport.setZoom(zoom);
+    this.viewport.setPan(offsetX, offsetY);
+    this.notifyViewportChange();
+  }
+
+  /**
    * Depth of the row under a container-relative screen Y.
    */
   public containerYToDepth(containerY: number): number {

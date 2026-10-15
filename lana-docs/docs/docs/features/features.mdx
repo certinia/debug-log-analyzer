@@ -37,7 +37,12 @@ If the parser meets a log event it doesn't recognize, a notification card carrie
 
 ## 🎚️ Debug levels
 
-A row of chips shows the debug levels the log was captured with, one per category (`CATEGORY LEVEL`, e.g. `APEX_CODE FINE`). This is a read-only display of what was captured - it doesn't filter the log.
+A row of dropdowns shows the debug levels the log was captured with, one per category (e.g. `APEX_CODE: FINE`). Choose a lower level to see every tab as if the log had been captured at that level. For example, set `APEX_CODE` to `DEBUG` to hide method entries and keep `USER_DEBUG` lines and queries.
+
+- An event finer than its category's level is hidden. Its own time is added to the nearest event that stays, so totals do not change.
+- A level finer than the log captured is greyed out: the log does not hold that detail.
+- Filters, columns, sort and the Timeline zoom stay as they were.
+- Choose the captured level again to see the whole log.
 
 ## ••• Menu
 

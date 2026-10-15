@@ -40,6 +40,15 @@ export interface BottomUpTableCallbacks extends TableCallbacks {
   showDetailsFilter?: (data: BottomUpRow) => boolean;
 }
 
+/** The rows of the table for `rootMethod`: what a build starts with and a new log replaces. */
+export function bottomUpRows(rootMethod: ApexLog): BottomUpRow[] {
+  return toBottomUpTree(
+    rootMethod.children,
+    logStoreFor(rootMethod).keyPathIds(),
+    rootMethod.governorLimits,
+  );
+}
+
 export function createBottomUpTable(
   container: HTMLDivElement,
   rootMethod: ApexLog,
@@ -86,11 +95,7 @@ export function createBottomUpTable(
       }
     : {};
 
-  const tableData = toBottomUpTree(
-    rootMethod.children,
-    logStoreFor(rootMethod).keyPathIds(),
-    rootMethod.governorLimits,
-  );
+  const tableData = bottomUpRows(rootMethod);
 
   const tabulatorOptions = {
     data: tableData,

@@ -5,8 +5,11 @@ import '#vscode-elements/vscode-button.js';
 import '#vscode-elements/vscode-option.js';
 import '../../../components/VsSelect.js';
 import '#vscode-elements/vscode-toolbar-button.js';
+import { consume } from '@lit/context';
 import { LitElement, css, html, unsafeCSS, type PropertyValues } from 'lit';
 import { customElement, property } from 'lit/decorators.js';
+import { logContext } from '../../../core/log/logContext.js';
+import type { LogStore } from '../../../core/log/LogStore.js';
 import { repeat } from 'lit/directives/repeat.js';
 import type { RowComponent, Tabulator } from 'tabulator-tables';
 
@@ -18,6 +21,7 @@ import type { FindEventDetail, FindEventMap } from '../../find/findEvents.js';
 import {
   LocatedRowIds,
   LocatedRowMarker,
+  replaceRows,
   rowDetailSelection,
   rowFrames,
 } from '../../../components/locatedRow.js';
@@ -27,7 +31,7 @@ import { SelectionEchoGuard } from '../../../core/events/SelectionEchoGuard.js';
 import { SubscriptionController } from '../../../core/events/SubscriptionController.js';
 import { eventByEventIndex } from '../../../core/utility/EventSearch.js';
 import { isVisible } from '../../../core/utility/Util.js';
-import { createBottomUpTable } from '../../call-tree/components/BottomUpTable.js';
+import { bottomUpRows, createBottomUpTable } from '../../call-tree/components/BottomUpTable.js';
 import { ColumnSettingsController } from '../../../components/ColumnSettingsController.js';
 import { GridColumnMenuController } from '../../../components/GridColumnMenuController.js';
 import { gridToolbarActions } from '../../../components/gridToolbar.js';
@@ -112,8 +116,14 @@ export class AnalysisView extends LitElement {
     categoryColoringStyles,
   ];
 
-  @property()
-  timelineRoot: ApexLog | null = null;
+  /** The log on screen, from the app root. */
+  @consume({ context: logContext, subscribe: true })
+  @property({ attribute: false })
+  logStore: LogStore | null = null;
+
+  private get timelineRoot(): ApexLog | null {
+    return this.logStore?.log ?? null;
+  }
 
   analysisTable: Tabulator | null = null;
 
@@ -232,12 +242,13 @@ export class AnalysisView extends LitElement {
   }
 
   updated(changedProperties: PropertyValues): void {
-    if (
-      this.timelineRoot &&
-      changedProperties.has('timelineRoot') &&
-      !changedProperties.get('timelineRoot')
-    ) {
+    if (!this.timelineRoot || !changedProperties.has('logStore')) {
+      return;
+    }
+    if (!changedProperties.get('logStore')) {
       this._appendTableWhenVisible();
+    } else if (this.analysisTable) {
+      void replaceRows(this.analysisTable, bottomUpRows(this.timelineRoot), this._locatedRow);
     }
   }
 
