@@ -21,6 +21,8 @@ const EXPANDED = 2;
 const GROUP = 4;
 /** Export lines joined per slice: one join of the whole text is a long task at 500k rows. */
 const EXPORT_CHUNK = 4096;
+/** Rows a toggle walks in one task; a larger subtree is built in slices. */
+const SPLICE_LIMIT = 4096;
 
 /** The rows on screen, in order. Immutable: a change publishes a new one. */
 export interface RowView<R> {
@@ -224,6 +226,7 @@ export class GridStore<R extends object> {
   private findId = 0;
   /** Goes up when the rows a find or export walks change. */
   private generation = 0;
+  private toggledTarget: RowKey | Group<R> | undefined;
 
   constructor(source: TreeSource<R>, options: GridStoreOptions<R> = {}) {
     this.source = source;
@@ -330,7 +333,10 @@ export class GridStore<R extends object> {
     } else {
       flip(this.toggled, target);
     }
-    this.splice(index, !was, target);
+    if (!this.splice(index, !was, target)) {
+      this.toggledTarget = target;
+      await this.rebuild();
+    }
   }
 
   /**
@@ -549,8 +555,11 @@ export class GridStore<R extends object> {
     return true;
   }
 
-  /** Replaces the rows under `index` with its subtree, or with nothing, in one copy. */
-  private splice(index: number, expand: boolean, target: RowKey | Group<R>): void {
+  /**
+   * Replaces the rows under `index` with its subtree, or with nothing, in one copy. False,
+   * with nothing changed, when the subtree is too large to walk in one task.
+   */
+  private splice(index: number, expand: boolean, target: RowKey | Group<R>): boolean {
     const old = this.current.rows as FlatRows<R>;
     const entry = old.rowAt(index);
     const depth = old.depthAt(index);
@@ -562,7 +571,9 @@ export class GridStore<R extends object> {
     if (expand) {
       const shown =
         entry instanceof Group ? entry.rows : this.childrenOf(this.source.children?.(entry) ?? []);
-      this.walkSome(walkOf(shown, depth + 1), inserted, Infinity);
+      if (!this.walkSome(walkOf(shown, depth + 1), inserted, SPLICE_LIMIT)) {
+        return false;
+      }
     }
     const head = index + 1;
     const tail = head + inserted.rows.length;
@@ -585,6 +596,7 @@ export class GridStore<R extends object> {
       },
       false,
     );
+    return true;
   }
 
   /**
@@ -612,7 +624,8 @@ export class GridStore<R extends object> {
       try {
         const built = await this.build(totalsOnly);
         if (built) {
-          this.publish(built, this.dirty);
+          this.publish({ ...built, toggled: this.toggledTarget }, this.dirty);
+          this.toggledTarget = undefined;
         }
         failed = null;
       } catch (error) {

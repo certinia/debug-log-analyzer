@@ -94,6 +94,18 @@ describe('GridStore', () => {
     expect(store.snapshot().toggled).toBeUndefined();
   });
 
+  it('opens a subtree too large for one task in slices', async () => {
+    const wide = n('root', 0, ...Array.from({ length: 5000 }, (_, i) => n(`c${i}`, i)));
+    const store = new GridStore(source([wide]), { scheduler: everyCheck() });
+    await store.settled();
+    const busy: boolean[] = [];
+    store.subscribe((s) => busy.push(s.busy));
+    await store.toggle('root');
+    expect(busy).toContain(true);
+    expect(store.snapshot().rows.size).toBe(5001);
+    expect(store.snapshot().toggled).toBe('root');
+  });
+
   it('leaves a row alone when it is not shown, has no children or is already in that state', async () => {
     const store = new GridStore(source(tree()));
     await store.settled();
