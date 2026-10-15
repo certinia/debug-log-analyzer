@@ -9,7 +9,6 @@
 export {
   Group,
   max,
-  ROWS_PER_YIELD,
   sum,
   type Calc,
   type FindQuery,
