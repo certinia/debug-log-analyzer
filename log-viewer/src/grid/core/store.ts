@@ -219,6 +219,8 @@ export class GridStore<R extends object> {
   private waiting: { resolve: () => void; reject: (error: unknown) => void }[] = [];
   /** Goes up with each find, so an older one sees it is stale. */
   private findId = 0;
+  /** Goes up when the rows a find or export walks change. */
+  private generation = 0;
 
   constructor(source: TreeSource<R>, options: GridStoreOptions<R> = {}) {
     this.source = source;
@@ -286,6 +288,7 @@ export class GridStore<R extends object> {
   /** Groups the top-level rows. Every group starts closed. */
   setGroupBy(groupBy: GroupBy<R> | null): Promise<void> {
     this.groupBy = groupBy;
+    this.generation++;
     this.openGroups.clear();
     this.groupTotals.clear();
     return this.rebuild();
@@ -377,7 +380,8 @@ export class GridStore<R extends object> {
   async find(query: FindQuery, cells: readonly CellText<R>[]): Promise<FindResult<R> | null> {
     const id = ++this.findId;
     await this.settled();
-    const stale = (): boolean => id !== this.findId || this.running;
+    const generation = this.generation;
+    const stale = (): boolean => id !== this.findId || generation !== this.generation;
     const key = (row: R): RowKey => this.source.key(row);
     const pattern = findPattern(query);
     if (stale()) {
@@ -408,7 +412,8 @@ export class GridStore<R extends object> {
     options: ExportOptions,
   ): Promise<string | null> {
     await this.settled();
-    const stale = (): boolean => this.running;
+    const generation = this.generation;
+    const stale = (): boolean => generation !== this.generation;
     const { format } = options;
     const tree = options.tree ?? true;
     // Every group or top-level row is on screen, open or not, so its flag tells if any row is deeper.
@@ -440,6 +445,7 @@ export class GridStore<R extends object> {
 
   private reorder(): Promise<void> {
     this.ordered = new WeakMap();
+    this.generation++;
     return this.rebuild();
   }
 

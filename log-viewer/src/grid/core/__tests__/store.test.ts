@@ -206,6 +206,26 @@ describe('GridStore', () => {
     expect(store.snapshot().busy).toBe(false);
   });
 
+  it('drops a find or export when the rows change between its slices', async () => {
+    let frozen = false;
+    let t = 0;
+    const scheduler: Scheduler = {
+      now: () => (frozen ? t : (t += 100)),
+      yield: () => new Promise((r) => setTimeout(r, 0)),
+    };
+    const roots = Array.from({ length: 2000 }, (_, i) => n(`r${i}`, i));
+    const store = new GridStore(source(roots), { scheduler });
+    await store.settled();
+    const exporting = store.exportText([{ title: 'Key', value: (r) => r.key }], { format: 'csv' });
+    const finding = store.find({ text: 'r' }, [(r) => r.key]);
+    await new Promise((r) => setTimeout(r, 0));
+    frozen = true;
+    await store.setSort({ value: (r) => r.value, dir: 'desc' });
+    frozen = false;
+    expect(await exporting).toBeNull();
+    expect(await finding).toBeNull();
+  });
+
   it('tells subscribers about each new snapshot', async () => {
     const store = new GridStore(source(tree()));
     await store.settled();
