@@ -1,7 +1,8 @@
 /*
  * Copyright (c) 2026 Certinia Inc. All rights reserved.
  */
-import { GridStore, sortRows, type RowView, type Scheduler, type TreeSource } from '../index.js';
+import { GridStore, type RowView, type Scheduler, type TreeSource } from '../index.js';
+import { sortRows } from '../sort.js';
 
 interface Node {
   key: string;

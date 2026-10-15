@@ -125,8 +125,8 @@
       "rules": { "lana/no-tabulator-html-tooltip": "error" }
     },
     {
-      // The grid is built as if it were an outside library: see the rule for the layer map.
-      "files": ["log-viewer/**/*.ts"],
+      // The grid is built as an outside library (see the rule); the bench measures its layers.
+      "files": ["log-viewer/src/**/*.ts"],
       "jsPlugins": ["./scripts/oxlint-plugin-lana.mjs"],
       "rules": { "lana/grid-boundary": "error" }
     },

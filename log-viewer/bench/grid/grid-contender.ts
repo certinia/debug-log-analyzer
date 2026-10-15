@@ -13,16 +13,14 @@ import {
   type TimeOrderRow,
 } from '../../src/features/call-tree/utils/TimeOrderTree.js';
 import {
-  browserScheduler,
-  FIND_ATTR,
   GridStore,
-  GridView,
   Group,
   type CellText,
   type RowFilter,
-  type RowPainter,
   type RowView,
-} from '../../src/grid/index.js';
+} from '../../src/grid/core/index.js';
+import { FIND_ATTR, GridView, type RowPainter } from '../../src/grid/render/index.js';
+import { browserScheduler } from '../../src/grid/ui/index.js';
 import type { Contender } from './contender.js';
 
 interface Column {

@@ -28,7 +28,7 @@ import {
   type RowFilter,
   type Scheduler,
   type Sort,
-} from '../../log-viewer/src/grid/index.js';
+} from '../../log-viewer/src/grid/core/index.js';
 import { heapMb, line, ms, nowMs } from './harness.js';
 
 /** A Node scheduler that records the longest run between yields. */
