@@ -21,6 +21,7 @@ import type { FindEventDetail, FindEventMap } from '../../find/findEvents.js';
 import {
   LocatedRowIds,
   LocatedRowMarker,
+  replaceRows,
   rowDetailSelection,
   rowFrames,
 } from '../../../components/locatedRow.js';
@@ -30,7 +31,7 @@ import { SelectionEchoGuard } from '../../../core/events/SelectionEchoGuard.js';
 import { SubscriptionController } from '../../../core/events/SubscriptionController.js';
 import { eventByEventIndex } from '../../../core/utility/EventSearch.js';
 import { isVisible } from '../../../core/utility/Util.js';
-import { createBottomUpTable } from '../../call-tree/components/BottomUpTable.js';
+import { bottomUpRows, createBottomUpTable } from '../../call-tree/components/BottomUpTable.js';
 import { ColumnSettingsController } from '../../../components/ColumnSettingsController.js';
 import { GridColumnMenuController } from '../../../components/GridColumnMenuController.js';
 import { gridToolbarActions } from '../../../components/gridToolbar.js';
@@ -241,12 +242,13 @@ export class AnalysisView extends LitElement {
   }
 
   updated(changedProperties: PropertyValues): void {
-    if (
-      this.timelineRoot &&
-      changedProperties.has('logStore') &&
-      !changedProperties.get('logStore')
-    ) {
+    if (!this.timelineRoot || !changedProperties.has('logStore')) {
+      return;
+    }
+    if (!changedProperties.get('logStore')) {
       this._appendTableWhenVisible();
+    } else if (this.analysisTable) {
+      void replaceRows(this.analysisTable, bottomUpRows(this.timelineRoot), this._locatedRow);
     }
   }
 

@@ -66,7 +66,9 @@ export function findEventByTimestamp(
  * which costs one walk per event: use this wherever the depth is not read.
  */
 export function eventByEventIndex(apexLog: ApexLog, eventIndex: number): LogEvent | null {
-  return apexLog.eventsById[eventIndex] ?? null;
+  const event = apexLog.eventsById[eventIndex] ?? null;
+  // A log filtered by level fills a hidden event's slot with itself.
+  return event === apexLog && eventIndex !== apexLog.eventIndex ? null : event;
 }
 
 /**
@@ -77,7 +79,7 @@ export function findEventByEventIndex(
   apexLog: ApexLog,
   eventIndex: number,
 ): EventSearchResult | null {
-  const event = apexLog.eventsById[eventIndex];
+  const event = eventByEventIndex(apexLog, eventIndex);
   if (!event) {
     return null;
   }

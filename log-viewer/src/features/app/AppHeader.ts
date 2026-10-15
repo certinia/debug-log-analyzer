@@ -1,9 +1,11 @@
 /*
  * Copyright (c) 2023 Certinia Inc. All rights reserved.
  */
-import { LitElement, css, html } from 'lit';
+import '#vscode-elements/vscode-progress-bar.js';
+import { LitElement, css, html, nothing } from 'lit';
 import { customElement, property } from 'lit/decorators.js';
 
+import type { DebugLevels } from '@apexdevtools/apex-log-parser';
 import type { LogIssue } from '../notifications/types.js';
 import type { LogIdentityData } from './logIdentity.js';
 
@@ -35,6 +37,11 @@ export class AppHeader extends LitElement {
   notifications: readonly LogIssue[] = [];
   @property({ attribute: false })
   logIdentity: LogIdentityData | null = null;
+  /** The levels the log was captured at; the log on screen states the levels shown. */
+  @property({ attribute: false })
+  capturedLevels: DebugLevels | null = null;
+  @property({ type: Boolean })
+  levelsBusy = false;
 
   static styles = [
     globalStyles,
@@ -48,6 +55,12 @@ export class AppHeader extends LitElement {
         /* Match the tabs' box inset (LogViewer 8px + this 8px == tabs' 8px + their internal
            8px) so the log-title, first level chip, and first tab share one left/right guide. */
         padding: 0 var(--lana-space-sm);
+        position: relative;
+      }
+
+      vscode-progress-bar {
+        position: absolute;
+        inset: auto 0 0;
       }
     `,
   ];
@@ -63,7 +76,12 @@ export class AppHeader extends LitElement {
         .notifications=${this.notifications}
         .logIdentity=${this.logIdentity}
       ></nav-bar>
-      <log-levels></log-levels>
+      <log-levels .captured=${this.capturedLevels}></log-levels>
+      ${
+        this.levelsBusy
+          ? html`<vscode-progress-bar aria-label="Applying log levels"></vscode-progress-bar>`
+          : nothing
+      }
       <find-widget></find-widget>
     `;
   }

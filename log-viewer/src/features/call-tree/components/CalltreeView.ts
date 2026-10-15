@@ -62,20 +62,21 @@ import '../../../components/datagrid-range-filter.js';
 import '../../../components/OverflowList.js';
 
 // Table creation functions
-import { createAggregatedTable } from './AggregatedTable.js';
-import { createBottomUpTable } from './BottomUpTable.js';
+import { aggregatedRows, createAggregatedTable } from './AggregatedTable.js';
+import { bottomUpRows, createBottomUpTable } from './BottomUpTable.js';
 import { ColumnSettingsController } from '../../../components/ColumnSettingsController.js';
 import { CALL_TREE_VIEWS } from '../../../tabulator/ColumnViews.js';
 import {
   LocatedRowIds,
   LocatedRowMarker,
+  replaceRows,
   rowDetailSelection,
   rowIndexStamper,
   rowFrames,
 } from '../../../components/locatedRow.js';
 import { InspectorTabController } from '../../../components/InspectorTabController.js';
 import { revealFirstOf } from '../../../components/inspectorTab.js';
-import { createTimeOrderTable } from './TimeOrderTable.js';
+import { createTimeOrderTable, timeOrderRows } from './TimeOrderTable.js';
 
 /** Time Order keys its rows by event index; the grouped views key theirs by the
  *  path of buckets that reaches them, since one method holds a row under every
@@ -253,13 +254,33 @@ export class CalltreeView extends LitElement {
   }
 
   updated(changedProperties: PropertyValues): void {
-    if (
-      this.timelineRoot &&
-      changedProperties.has('logStore') &&
-      !changedProperties.get('logStore')
-    ) {
+    if (!this.timelineRoot || !changedProperties.has('logStore')) {
+      return;
+    }
+    if (changedProperties.get('logStore')) {
+      void this._replaceLog(this.timelineRoot);
+    } else {
       this._appendTableWhenVisible();
     }
+  }
+
+  private async _replaceLog(log: ApexLog): Promise<void> {
+    this.rootMethod = log;
+    // `rootMethod` is not reactive, and the Namespace filter lists its namespaces.
+    this.requestUpdate();
+    // Bottom Up keys its rows by a counter, so a cached result can name a row of the old log.
+    this._clearFilterCaches();
+    const replaced: Promise<void>[] = [];
+    if (this.calltreeTable) {
+      replaced.push(replaceRows(this.calltreeTable, timeOrderRows(log), this._locatedRow));
+    }
+    if (this.aggregatedTreeTable) {
+      replaced.push(replaceRows(this.aggregatedTreeTable, aggregatedRows(log), this._locatedRow));
+    }
+    if (this.bottomUpTreeTable) {
+      replaced.push(replaceRows(this.bottomUpTreeTable, bottomUpRows(log), this._locatedRow));
+    }
+    await Promise.all(replaced);
   }
 
   firstUpdated(): void {

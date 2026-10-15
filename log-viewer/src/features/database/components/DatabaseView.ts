@@ -176,7 +176,13 @@ export class DatabaseView extends LitElement {
   }
 
   updated(changed: PropertyValues): void {
-    if (this.timelineRoot && changed.has('logStore') && !this.loaded) {
+    if (!this.timelineRoot || !changed.has('logStore')) {
+      return;
+    }
+    if (this.loaded) {
+      // The grids stay and take the new statements; the sections keep their state.
+      void this._readLog(this.timelineRoot);
+    } else {
       void this._loadData();
     }
   }
@@ -185,26 +191,15 @@ export class DatabaseView extends LitElement {
   private _limits: Limits | undefined;
 
   private async _loadData(): Promise<void> {
-    const root = this.timelineRoot;
-    if (!root) {
-      return;
-    }
     const visible = await isVisible(this);
-    if (!visible || this.loaded) {
+    // Read after the wait: a level change during it publishes a newer log.
+    const root = this.timelineRoot;
+    if (!visible || this.loaded || !root) {
       return;
     }
-    const store = logStoreFor(root);
-    const [{ dml, soql, sosl }, series] = await Promise.all([
-      store.derive(statements),
-      store.derive(apexLimitSeries),
-    ]);
-    if (root !== this.timelineRoot || this.loaded) {
+    if (!(await this._readLog(root)) || this.loaded) {
       return;
     }
-    this.dmlLines = dml;
-    this.soqlLines = soql;
-    this.soslLines = sosl;
-    this._limits = limitTotals(series);
     this.loaded = true;
     // Collapse types the transaction never touched (usually SOSL).
     this.collapsed = {
@@ -212,6 +207,23 @@ export class DatabaseView extends LitElement {
       soql: this._isEmpty('soql'),
       sosl: this._isEmpty('sosl'),
     };
+  }
+
+  /** False when a newer log replaced `root` during the read. */
+  private async _readLog(root: ApexLog): Promise<boolean> {
+    const store = logStoreFor(root);
+    const [{ dml, soql, sosl }, series] = await Promise.all([
+      store.derive(statements),
+      store.derive(apexLimitSeries),
+    ]);
+    if (root !== this.timelineRoot) {
+      return false;
+    }
+    this.dmlLines = dml;
+    this.soqlLines = soql;
+    this.soslLines = sosl;
+    this._limits = limitTotals(series);
+    return true;
   }
 
   static styles = [

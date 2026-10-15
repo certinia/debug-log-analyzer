@@ -3,6 +3,7 @@
  */
 import type { ApexLog, LogEvent } from '@apexdevtools/apex-log-parser';
 
+import { eventByEventIndex } from '../utility/EventSearch.js';
 import { CHECK_EVERY, frameBudget, type FrameBudgetOptions } from '../utility/FrameBudget.js';
 import { KeyPathIds } from './keyPathIds.js';
 import { type LogIndex, LogIndexBuilder } from './LogIndex.js';
@@ -31,7 +32,7 @@ export class LogStore {
 
   /** The parser event for an eventIndex, or null if the log has no such event. */
   eventByIndex(eventIndex: number): LogEvent | null {
-    return this.log.eventsById[eventIndex] ?? null;
+    return eventByEventIndex(this.log, eventIndex);
   }
 
   /**

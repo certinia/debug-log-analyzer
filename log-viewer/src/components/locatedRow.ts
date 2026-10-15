@@ -3,7 +3,7 @@
  */
 
 import type { ApexLog, LogEvent } from '@apexdevtools/apex-log-parser';
-import type { RowComponent } from 'tabulator-tables';
+import type { RowComponent, Tabulator } from 'tabulator-tables';
 
 import type { DetailSelection, SelectionView } from '../core/events/EventBus.js';
 import { ROOT_PATH_ID } from '../core/log/keyPathIds.js';
@@ -528,4 +528,18 @@ export class LocatedRowMarker {
   public clear(): void {
     this.mark(this.host, []);
   }
+}
+
+/**
+ * Gives `table` the rows of a new log in place, so its columns, sort, grouping
+ * and filters stay. Its selection and mark go: the rows they named may be gone.
+ */
+export function replaceRows(
+  table: Tabulator,
+  rows: object[] | undefined,
+  marker: LocatedRowMarker,
+): Promise<void> {
+  marker.clear();
+  table.deselectRow();
+  return table.replaceData(rows);
 }

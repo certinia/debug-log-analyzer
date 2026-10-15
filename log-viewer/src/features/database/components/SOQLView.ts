@@ -25,7 +25,7 @@ import { soqlGroupHeader } from '../../soql/format/groupHeader.js';
 import { soqlInlineElement } from '../../soql/format/inlineCell.js';
 import { soqlSyntaxStyles } from '../../soql/styles/soql-syntax.css.js';
 
-import { LocatedRowMarker } from '../../../components/locatedRow.js';
+import { LocatedRowMarker, replaceRows } from '../../../components/locatedRow.js';
 import { reportGridLocate, stampGridEventIndex } from './gridLocate.js';
 import { reportGridSelection } from './gridSelection.js';
 import { selectRowByEventIndex } from './revealRow.js';
@@ -44,7 +44,7 @@ import {
 import NumberAccessor from '../../../tabulator/dataaccessor/Number.js';
 import { tableHolder } from '../../../tabulator/module/tableHolder.js';
 import { inCountRange, inMsRange, type FilterRange } from '../../../tabulator/filters/MinMax.js';
-import { progressFormatter } from '../../../tabulator/format/Progress.js';
+import { progressFormatter, type ProgressParams } from '../../../tabulator/format/Progress.js';
 import { progressFormatterMS } from '../../../tabulator/format/ProgressMS.js';
 import dataGridStyles from '../../../tabulator/style/DataGrid.scss';
 import {
@@ -151,8 +151,22 @@ export class SOQLView extends LitElement {
     return this.renderRoot.querySelector('context-menu');
   }
 
+  // Mutated in place per log: Tabulator reads `formatterParams` by reference, so new rows keep the columns.
+  private readonly _rowCountBar: ProgressParams = {
+    precision: 0,
+    totalValue: 0,
+    showPercentageText: false,
+  };
+  private readonly _timeTakenBar: ProgressParams = {
+    precision: 2,
+    totalValue: 0,
+    showPercentageText: false,
+  };
+
   updated(changedProperties: PropertyValues): void {
-    if (
+    if (this.soqlTable && changedProperties.get('lines')) {
+      void replaceRows(this.soqlTable, this._rows(this.lines), this._locatedRow);
+    } else if (
       this.timelineRoot &&
       (changedProperties.has('lines') || changedProperties.has('logStore'))
     ) {
@@ -349,14 +363,14 @@ export class SOQLView extends LitElement {
 
     void isVisible(this).then((isVisible) => {
       const tableWrapper = this._soqlTableWrapper;
-      if (tableWrapper && this.timelineRoot && isVisible) {
+      if (tableWrapper && this.timelineRoot && isVisible && !this.soqlTable) {
         registerTableModules({ grouping: true });
         this._renderSOQLTable(tableWrapper, this.lines);
       }
     });
   }
 
-  _renderSOQLTable(soqlTableContainer: HTMLElement, soqlLines: SOQLExecuteBeginLine[]) {
+  private _rows(soqlLines: SOQLExecuteBeginLine[]): GridSOQLData[] {
     let nextRowId = 0;
 
     const soqlData: GridSOQLData[] = [];
@@ -392,9 +406,13 @@ export class SOQLView extends LitElement {
     ].sort();
 
     // Bars fill relative to this grid's own totals (the Total row's sum), not a governor limit.
-    const soqlRowCountTotal = soqlData.reduce((sum, row) => sum + (row.rowCount ?? 0), 0);
-    const soqlTimeTakenTotal = soqlData.reduce((sum, row) => sum + (row.timeTaken ?? 0), 0);
+    this._rowCountBar.totalValue = soqlData.reduce((sum, row) => sum + (row.rowCount ?? 0), 0);
+    this._timeTakenBar.totalValue = soqlData.reduce((sum, row) => sum + (row.timeTaken ?? 0), 0);
+    return soqlData;
+  }
 
+  _renderSOQLTable(soqlTableContainer: HTMLElement, soqlLines: SOQLExecuteBeginLine[]) {
+    const soqlData = this._rows(soqlLines);
     this.soqlTable = new Tabulator(soqlTableContainer, {
       index: 'id',
       height: '100%',
@@ -518,20 +536,14 @@ export class SOQLView extends LitElement {
           hozAlign: 'right',
           headerHozAlign: 'right',
           formatter: progressFormatter,
-          formatterParams: {
-            precision: 0,
-            totalValue: soqlRowCountTotal,
-            showPercentageText: false,
-          },
+          formatterParams: this._rowCountBar,
           bottomCalc: 'sum',
           bottomCalcFormatter: progressFormatter,
-          bottomCalcFormatterParams: {
-            precision: 0,
-            totalValue: soqlRowCountTotal,
-            showPercentageText: false,
+          bottomCalcFormatterParams: this._rowCountBar,
+          tooltip: (_e, cell) => {
+            const total = this._rowCountBar.totalValue ?? 0;
+            return cell.getValue() + (total > 0 ? '/' + total : '');
           },
-          tooltip: (_e, cell) =>
-            cell.getValue() + (soqlRowCountTotal > 0 ? '/' + soqlRowCountTotal : ''),
         },
         {
           title: 'Aggregations',
@@ -607,19 +619,11 @@ export class SOQLView extends LitElement {
           hozAlign: 'right',
           headerHozAlign: 'right',
           formatter: progressFormatterMS,
-          formatterParams: {
-            precision: 2,
-            totalValue: soqlTimeTakenTotal,
-            showPercentageText: false,
-          },
+          formatterParams: this._timeTakenBar,
           accessorDownload: NumberAccessor,
           bottomCalc: 'sum',
           bottomCalcFormatter: progressFormatterMS,
-          bottomCalcFormatterParams: {
-            precision: 2,
-            totalValue: soqlTimeTakenTotal,
-            showPercentageText: false,
-          },
+          bottomCalcFormatterParams: this._timeTakenBar,
         },
       ],
     });

@@ -15,7 +15,7 @@ import type { ApexLog, DMLBeginLine } from '@apexdevtools/apex-log-parser';
 import { getCallerNamespace } from '../../../core/utility/CallerNamespace.js';
 import { goToRow } from '../../call-tree/navigation.js';
 import { isVisible } from '../../../core/utility/Util.js';
-import { LocatedRowMarker } from '../../../components/locatedRow.js';
+import { LocatedRowMarker, replaceRows } from '../../../components/locatedRow.js';
 import { reportGridLocate, stampGridEventIndex } from './gridLocate.js';
 import { reportGridSelection } from './gridSelection.js';
 import { selectRowByEventIndex } from './revealRow.js';
@@ -34,7 +34,7 @@ import {
 import NumberAccessor from '../../../tabulator/dataaccessor/Number.js';
 import { tableHolder } from '../../../tabulator/module/tableHolder.js';
 import { inCountRange, inMsRange, type FilterRange } from '../../../tabulator/filters/MinMax.js';
-import { progressFormatter } from '../../../tabulator/format/Progress.js';
+import { progressFormatter, type ProgressParams } from '../../../tabulator/format/Progress.js';
 import { progressFormatterMS } from '../../../tabulator/format/ProgressMS.js';
 import dataGridStyles from '../../../tabulator/style/DataGrid.scss';
 import {
@@ -125,13 +125,26 @@ export class DMLView extends LitElement {
   private objectSelected: string[] = [];
   private rowCountRange: FilterRange = { start: null, end: null };
   private timeTakenRange: FilterRange = { start: null, end: null };
+  // Mutated in place per log: Tabulator reads `formatterParams` by reference, so new rows keep the columns.
+  private readonly _rowCountBar: ProgressParams = {
+    precision: 0,
+    totalValue: 0,
+    showPercentageText: false,
+  };
+  private readonly _timeTakenBar: ProgressParams = {
+    precision: 2,
+    totalValue: 0,
+    showPercentageText: false,
+  };
 
   private get _contextMenu(): ContextMenu | null {
     return this.renderRoot.querySelector('context-menu');
   }
 
   updated(changedProperties: PropertyValues): void {
-    if (
+    if (this.dmlTable && changedProperties.get('lines')) {
+      void replaceRows(this.dmlTable, this._rows(this.lines), this._locatedRow);
+    } else if (
       this.timelineRoot &&
       (changedProperties.has('lines') || changedProperties.has('logStore'))
     ) {
@@ -329,14 +342,14 @@ export class DMLView extends LitElement {
 
     void isVisible(this).then((isVisible) => {
       const tableWrapper = this._dmlTableWrapper;
-      if (tableWrapper && this.timelineRoot && isVisible) {
+      if (tableWrapper && this.timelineRoot && isVisible && !this.dmlTable) {
         registerTableModules({ grouping: true });
         this._renderDMLTable(tableWrapper, this.lines);
       }
     });
   }
 
-  _renderDMLTable(dmlTableContainer: HTMLElement, dmlLines: DMLBeginLine[]) {
+  private _rows(dmlLines: DMLBeginLine[]): DMLRow[] {
     const dmlData: DMLRow[] = [];
     let nextRowId = 0;
     if (dmlLines) {
@@ -355,8 +368,8 @@ export class DMLView extends LitElement {
     }
 
     // Bars fill relative to this grid's own totals (the Total row's sum), not a governor limit.
-    const dmlRowCountTotal = dmlData.reduce((sum, row) => sum + (row.rowCount ?? 0), 0);
-    const dmlTimeTakenTotal = dmlData.reduce((sum, row) => sum + (row.timeTaken ?? 0), 0);
+    this._rowCountBar.totalValue = dmlData.reduce((sum, row) => sum + (row.rowCount ?? 0), 0);
+    this._timeTakenBar.totalValue = dmlData.reduce((sum, row) => sum + (row.timeTaken ?? 0), 0);
 
     this.callerNamespaces = [
       ...new Set(dmlData.map((row) => row.callerNamespace).filter((v): v is string => !!v)),
@@ -364,7 +377,11 @@ export class DMLView extends LitElement {
     this.objects = [
       ...new Set(dmlData.map((row) => row.objectType).filter((v): v is string => !!v)),
     ].sort();
+    return dmlData;
+  }
 
+  _renderDMLTable(dmlTableContainer: HTMLElement, dmlLines: DMLBeginLine[]) {
+    const dmlData = this._rows(dmlLines);
     this.dmlTable = new Tabulator(dmlTableContainer, {
       index: 'id',
       height: '100%',
@@ -425,20 +442,14 @@ export class DMLView extends LitElement {
           hozAlign: 'right',
           headerHozAlign: 'right',
           formatter: progressFormatter,
-          formatterParams: {
-            precision: 0,
-            totalValue: dmlRowCountTotal,
-            showPercentageText: false,
-          },
+          formatterParams: this._rowCountBar,
           bottomCalc: 'sum',
           bottomCalcFormatter: progressFormatter,
-          bottomCalcFormatterParams: {
-            precision: 0,
-            totalValue: dmlRowCountTotal,
-            showPercentageText: false,
+          bottomCalcFormatterParams: this._rowCountBar,
+          tooltip: (_e, cell) => {
+            const total = this._rowCountBar.totalValue ?? 0;
+            return cell.getValue() + (total > 0 ? '/' + total : '');
           },
-          tooltip: (_e, cell) =>
-            cell.getValue() + (dmlRowCountTotal > 0 ? '/' + dmlRowCountTotal : ''),
         },
         {
           title: 'Time Taken (ms)',
@@ -449,19 +460,11 @@ export class DMLView extends LitElement {
           hozAlign: 'right',
           headerHozAlign: 'right',
           formatter: progressFormatterMS,
-          formatterParams: {
-            precision: 2,
-            totalValue: dmlTimeTakenTotal,
-            showPercentageText: false,
-          },
+          formatterParams: this._timeTakenBar,
           accessorDownload: NumberAccessor,
           bottomCalc: 'sum',
           bottomCalcFormatter: progressFormatterMS,
-          bottomCalcFormatterParams: {
-            precision: 2,
-            totalValue: dmlTimeTakenTotal,
-            showPercentageText: false,
-          },
+          bottomCalcFormatterParams: this._timeTakenBar,
         },
       ],
     });

@@ -27,6 +27,15 @@ export interface AggregatedTableCallbacks extends TableCallbacks {
   showDetailsFilter?: (data: AggregatedRow) => boolean;
 }
 
+/** The rows of the table for `rootMethod`: what a build starts with and a new log replaces. */
+export function aggregatedRows(rootMethod: ApexLog): AggregatedRow[] {
+  return toAggregatedCallTree(
+    rootMethod.children,
+    logStoreFor(rootMethod).keyPathIds(),
+    rootMethod.governorLimits,
+  );
+}
+
 export function createAggregatedTable(
   container: HTMLDivElement,
   rootMethod: ApexLog,
@@ -40,11 +49,7 @@ export function createAggregatedTable(
   const selfTimeBottomCalc = makeSumSelfTimeAllVisible(() => tableRef.current);
   const heapFooters = createSelfSumHeapFooters(() => tableRef.current);
 
-  const tableData = toAggregatedCallTree(
-    rootMethod.children,
-    logStoreFor(rootMethod).keyPathIds(),
-    rootMethod.governorLimits,
-  );
+  const tableData = aggregatedRows(rootMethod);
 
   const table = new Tabulator(container, {
     data: tableData,

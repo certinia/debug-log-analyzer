@@ -26,6 +26,11 @@ export interface TimeOrderCallbacks extends TableCallbacks {
   onContextMenu: (e: UIEvent, row: RowComponent) => void;
 }
 
+/** The rows of the table for `rootMethod`: what a build starts with and a new log replaces. */
+export function timeOrderRows(rootMethod: ApexLog): TimeOrderRow[] | undefined {
+  return toTimeOrderTree(rootMethod.children, rootMethod.governorLimits);
+}
+
 export function createTimeOrderTable(
   container: HTMLDivElement,
   rootMethod: ApexLog,
@@ -33,9 +38,7 @@ export function createTimeOrderTable(
 ): { table: Tabulator; tableBuilt: Promise<void> } {
   registerTableModules();
 
-  const governorLimits = rootMethod.governorLimits;
-
-  const tableData = toTimeOrderTree(rootMethod.children, governorLimits);
+  const tableData = timeOrderRows(rootMethod);
   const nameFormatter = createCalltreeNameFormatter();
 
   const tableRef: { current: Tabulator | undefined } = { current: undefined };

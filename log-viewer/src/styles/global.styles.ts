@@ -18,6 +18,7 @@ export const globalStyles = [
       /* For a control in the inspector's action bar, which is shorter than a filter bar. */
       --filter-control-height-dense: 20px;
       --filter-control-font-size: var(--lana-text-base);
+      --filter-control-line-height: 1.4;
       --filter-control-padding: 0 var(--lana-space-sm);
       --filter-control-radius: var(--lana-radius-sm);
 
@@ -159,7 +160,7 @@ export const globalStyles = [
       color: var(--lana-fg);
       font: inherit;
       font-size: var(--filter-control-font-size);
-      line-height: 1.4;
+      line-height: var(--filter-control-line-height);
       white-space: nowrap;
       cursor: pointer;
     }

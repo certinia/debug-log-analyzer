@@ -118,6 +118,7 @@ export class TimelineFlameChart extends LitElement {
   private errorMessage: string | null = null;
 
   private apexLogTimeline: ApexLogTimeline | null = null;
+  private pendingViewport: ViewportState | null = null;
 
   @query('.timeline-container')
   private containerRef!: HTMLElement;
@@ -156,7 +157,8 @@ export class TimelineFlameChart extends LitElement {
       (changedProperties.has('apexLog') || changedProperties.has('options')) &&
       this.containerRef
     ) {
-      void this.initializeTimeline();
+      // A log replacing a log is the same transaction filtered, so the reader keeps their place.
+      void this.initializeTimeline(!!changedProperties.get('apexLog'));
     } else if (changedProperties.has('themeName')) {
       // `else`: opening a log lands both properties in one update, and
       // `initializeTimeline` already reads the current appearance. Only the
@@ -195,11 +197,16 @@ export class TimelineFlameChart extends LitElement {
   /**
    * Initialize PixiJS timeline renderer.
    */
-  private async initializeTimeline(): Promise<void> {
+  private async initializeTimeline(keepViewport = false): Promise<void> {
     if (!this.containerRef || !this.apexLog) {
       return;
     }
 
+    // A re-init still in flight has no timeline yet, so it hands on the place it was given.
+    const viewport = keepViewport
+      ? (this.apexLogTimeline?.getViewport() ?? this.pendingViewport)
+      : null;
+    this.pendingViewport = viewport;
     // Clean up existing renderer
     this.cleanup();
 
@@ -244,11 +251,14 @@ export class TimelineFlameChart extends LitElement {
         return;
       }
       this.apexLogTimeline = timeline;
+      this.pendingViewport = null;
       timeline.setTooltipEnabled(this.showTooltip);
       timeline.setCategoryDim(this.dimCategories);
 
       // Navigate after initialization completes, preferring unique eventIndex.
-      if (this.navigateToEventIndex !== undefined) {
+      if (viewport) {
+        timeline.setViewport(viewport);
+      } else if (this.navigateToEventIndex !== undefined) {
         timeline.navigateToEventIndex(this.navigateToEventIndex);
       } else if (this.navigateToTimestamp !== undefined) {
         timeline.navigateToTimestamp(this.navigateToTimestamp);

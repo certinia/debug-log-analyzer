@@ -441,6 +441,13 @@ export class ApexLogTimeline {
   }
 
   /**
+   * Show a viewport taken with {@link getViewport}, clamped to this log.
+   */
+  public setViewport({ zoom, offsetX, offsetY }: ViewportState): void {
+    this.flamechart.setViewport(zoom, offsetX, offsetY);
+  }
+
+  /**
    * Request a re-render.
    */
   public requestRender(): void {

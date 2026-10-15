@@ -22,6 +22,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - 🔦 **Timeline legend**: hover a category to highlight frames in the timeline, select to keep. ([#917])
 
+### Added
+
+- 🎚️ **Log levels**: lower a category's level in the header to see every tab as if the log was captured at that level. ([#530])
+  - **Kept in place**: filters, columns, sort and the Timeline zoom stay as they were.
+  - **Captured levels**: a level finer than the log recorded is greyed out.
+
 ### Removed
 
 - 🪓 **Breaking**: the legacy Timeline and all its settings are dropped.
@@ -773,3 +779,4 @@ Skipped due to adopting odd numbering for pre releases and even number for relea
 [#264]: https://github.com/certinia/debug-log-analyzer/issues/264
 [#1110]: https://github.com/certinia/debug-log-analyzer/issues/1110
 [#917]: https://github.com/certinia/debug-log-analyzer/issues/917
+[#530]: https://github.com/certinia/debug-log-analyzer/issues/530

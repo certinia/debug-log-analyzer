@@ -9,9 +9,18 @@ import type { Tabulator } from 'tabulator-tables';
 
 // The grids bring tabulator and its module registrations, which don't load under
 // jest; this suite drives only which table the view builds, and when.
-jest.mock('../TimeOrderTable.js', () => ({ createTimeOrderTable: () => build('time-order') }));
-jest.mock('../AggregatedTable.js', () => ({ createAggregatedTable: () => build('aggregated') }));
-jest.mock('../BottomUpTable.js', () => ({ createBottomUpTable: () => build('bottom-up') }));
+jest.mock('../TimeOrderTable.js', () => ({
+  createTimeOrderTable: () => build('time-order'),
+  timeOrderRows: () => [],
+}));
+jest.mock('../AggregatedTable.js', () => ({
+  createAggregatedTable: () => build('aggregated'),
+  aggregatedRows: () => [],
+}));
+jest.mock('../BottomUpTable.js', () => ({
+  createBottomUpTable: () => build('bottom-up'),
+  bottomUpRows: () => [],
+}));
 // VsSelect extends vscode-single-select, whose setFormValue needs an
 // ElementInternals jsdom lacks; the render would upgrade it.
 jest.mock('../../../../components/VsSelect.js', () => ({}));
@@ -40,6 +49,8 @@ let groupedBy: string[] = [];
 let finishBuild: (() => void) | null = null;
 /** Whether a build waits to be finished by hand. */
 let holdBuilds = false;
+/** Which tables were given new rows in place. */
+let replaced: string[] = [];
 
 function build(kind: string): { table: Tabulator; tableBuilt: Promise<void> } {
   built.push(kind);
@@ -62,6 +73,11 @@ function build(kind: string): { table: Tabulator; tableBuilt: Promise<void> } {
     clearFindHighlights: () => {},
     setSortedGroupBy: (field: string) => groupedBy.push(field),
     destroy: () => destroyed.push(kind),
+    deselectRow: () => {},
+    replaceData: () => {
+      replaced.push(kind);
+      return Promise.resolve();
+    },
   } as unknown as Tabulator;
   if (!holdBuilds) {
     return { table, tableBuilt: Promise.resolve() };
@@ -129,6 +145,7 @@ describe('calltree-view table lifetime', () => {
     groupedBy = [];
     finishBuild = null;
     holdBuilds = false;
+    replaced = [];
     globalThis.IntersectionObserver = AlwaysVisible as unknown as typeof IntersectionObserver;
     view = await mountView();
   });
@@ -139,6 +156,19 @@ describe('calltree-view table lifetime', () => {
 
   it('builds the table for the log it is given', () => {
     expect(built).toEqual(['time-order']);
+  });
+
+  it('gives the table it has the rows of a new log, and keeps its filters', async () => {
+    const filters = [...filtered];
+
+    view.logStore = logStoreFor(apexLog());
+    await view.updateComplete;
+    await settle();
+
+    expect(replaced).toEqual(['time-order']);
+    expect(built).toEqual(['time-order']);
+    expect(destroyed).toEqual([]);
+    expect(filtered).toEqual(filters);
   });
 
   it('rebuilds the table after a detach and a re-attach', async () => {

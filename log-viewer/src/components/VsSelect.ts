@@ -4,7 +4,8 @@
 import '#vscode-elements/vscode-icon.js';
 
 import { VscodeSingleSelect } from '#vscode-elements/vscode-single-select.js';
-import { css, html, nothing, type TemplateResult } from 'lit';
+import { OPT_HEIGHT } from '@vscode-elements/elements/dist/includes/vscode-select/vscode-select-base.js';
+import { css, html, nothing, unsafeCSS, type TemplateResult } from 'lit';
 import { customElement, property } from 'lit/decorators.js';
 import { classMap } from 'lit/directives/class-map.js';
 import { ifDefined } from 'lit/directives/if-defined.js';
@@ -104,8 +105,10 @@ export const selectSizingStyles = css`
     gap: 6px;
     box-sizing: border-box;
     font-size: var(--filter-popover-row-font-size);
-    padding: var(--filter-popover-row-padding);
-    height: auto;
+    /* The vendor sizes the list and scrolls to a row by OPT_HEIGHT each: a taller
+       row scrolls a short list and puts the scrollbar over the labels. */
+    height: ${unsafeCSS(OPT_HEIGHT)}px;
+    padding: 0 var(--lana-space-sm);
     line-height: normal;
     min-height: 0;
     overflow: visible;
@@ -244,6 +247,10 @@ export class VsSelect extends VscodeSingleSelect {
   @property({ type: String })
   prefix = '';
 
+  /** Text between `prefix` and the value on the face. */
+  @property({ type: String })
+  prefixSeparator = ':';
+
   /** Value treated as "no selection" — renders the placeholder rather than an active value. */
   @property({ type: String })
   emptyValue = 'None';
@@ -286,6 +293,7 @@ export class VsSelect extends VscodeSingleSelect {
       placeholder: this.label ?? '',
       value: this.value,
       emptyValue: this.emptyValue,
+      separator: this.prefixSeparator,
     });
     const marker = this.resettableValues.includes(this.value) ? ' •' : '';
     return html`${prefixText ? html`<span class="face-prefix">${prefixText}</span>` : ''}<span
@@ -333,6 +341,7 @@ export class VsSelect extends VscodeSingleSelect {
             };
             return html`
               <li
+                aria-disabled=${ifDefined(op.disabled ? 'true' : undefined)}
                 aria-selected=${selected ? 'true' : 'false'}
                 class=${classMap(optionClasses)}
                 data-index=${op.index}
@@ -370,6 +379,7 @@ export class VsSelect extends VscodeSingleSelect {
       placeholder: this.label ?? '',
       value: this.value,
       emptyValue: this.emptyValue,
+      separator: this.prefixSeparator,
     });
     return html`
       <div
@@ -402,6 +412,7 @@ export class VsSelect extends VscodeSingleSelect {
       placeholder: this.label ?? '',
       value: this.value,
       emptyValue: this.emptyValue,
+      separator: this.prefixSeparator,
     });
     return html`
       <div

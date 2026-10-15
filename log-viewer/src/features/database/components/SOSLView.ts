@@ -15,7 +15,7 @@ import type { ApexLog, SOSLExecuteBeginLine } from '@apexdevtools/apex-log-parse
 import { getCallerNamespace } from '../../../core/utility/CallerNamespace.js';
 import { goToRow } from '../../call-tree/navigation.js';
 import { isVisible } from '../../../core/utility/Util.js';
-import { LocatedRowMarker } from '../../../components/locatedRow.js';
+import { LocatedRowMarker, replaceRows } from '../../../components/locatedRow.js';
 import { reportGridLocate, stampGridEventIndex } from './gridLocate.js';
 import { reportGridSelection } from './gridSelection.js';
 import { selectRowByEventIndex } from './revealRow.js';
@@ -36,7 +36,7 @@ import {
 import NumberAccessor from '../../../tabulator/dataaccessor/Number.js';
 import { tableHolder } from '../../../tabulator/module/tableHolder.js';
 import { inCountRange, inMsRange, type FilterRange } from '../../../tabulator/filters/MinMax.js';
-import { progressFormatter } from '../../../tabulator/format/Progress.js';
+import { progressFormatter, type ProgressParams } from '../../../tabulator/format/Progress.js';
 import { progressFormatterMS } from '../../../tabulator/format/ProgressMS.js';
 import dataGridStyles from '../../../tabulator/style/DataGrid.scss';
 import {
@@ -123,13 +123,26 @@ export class SOSLView extends LitElement {
   private namespaceSelected: string[] = [];
   private rowCountRange: FilterRange = { start: null, end: null };
   private timeTakenRange: FilterRange = { start: null, end: null };
+  // Mutated in place per log: Tabulator reads `formatterParams` by reference, so new rows keep the columns.
+  private readonly _rowCountBar: ProgressParams = {
+    precision: 0,
+    totalValue: 0,
+    showPercentageText: false,
+  };
+  private readonly _timeTakenBar: ProgressParams = {
+    precision: 2,
+    totalValue: 0,
+    showPercentageText: false,
+  };
 
   private get _contextMenu(): ContextMenu | null {
     return this.renderRoot.querySelector('context-menu');
   }
 
   updated(changedProperties: PropertyValues): void {
-    if (
+    if (this.soslTable && changedProperties.get('lines')) {
+      void replaceRows(this.soslTable, this._rows(this.lines), this._locatedRow);
+    } else if (
       this.timelineRoot &&
       (changedProperties.has('lines') || changedProperties.has('logStore'))
     ) {
@@ -298,14 +311,14 @@ export class SOSLView extends LitElement {
 
     void isVisible(this).then((isVisible) => {
       const tableWrapper = this._soslTableWrapper;
-      if (tableWrapper && this.timelineRoot && isVisible) {
+      if (tableWrapper && this.timelineRoot && isVisible && !this.soslTable) {
         registerTableModules({ grouping: true });
         this._renderSOSLTable(tableWrapper, this.lines);
       }
     });
   }
 
-  _renderSOSLTable(soslTableContainer: HTMLElement, soslLines: SOSLExecuteBeginLine[]) {
+  private _rows(soslLines: SOSLExecuteBeginLine[]): SOSLRow[] {
     const soslData: SOSLRow[] = [];
     let nextRowId = 0;
     if (soslLines) {
@@ -327,9 +340,13 @@ export class SOSLView extends LitElement {
     ].sort();
 
     // Bars fill relative to this grid's own totals (the Total row's sum), not a governor limit.
-    const soslRowCountTotal = soslData.reduce((sum, row) => sum + (row.rowCount ?? 0), 0);
-    const soslTimeTakenTotal = soslData.reduce((sum, row) => sum + (row.timeTaken ?? 0), 0);
+    this._rowCountBar.totalValue = soslData.reduce((sum, row) => sum + (row.rowCount ?? 0), 0);
+    this._timeTakenBar.totalValue = soslData.reduce((sum, row) => sum + (row.timeTaken ?? 0), 0);
+    return soslData;
+  }
 
+  _renderSOSLTable(soslTableContainer: HTMLElement, soslLines: SOSLExecuteBeginLine[]) {
+    const soslData = this._rows(soslLines);
     this.soslTable = new Tabulator(soslTableContainer, {
       index: 'id',
       height: '100%',
@@ -382,20 +399,14 @@ export class SOSLView extends LitElement {
           hozAlign: 'right',
           headerHozAlign: 'right',
           formatter: progressFormatter,
-          formatterParams: {
-            precision: 0,
-            totalValue: soslRowCountTotal,
-            showPercentageText: false,
-          },
+          formatterParams: this._rowCountBar,
           bottomCalc: 'sum',
           bottomCalcFormatter: progressFormatter,
-          bottomCalcFormatterParams: {
-            precision: 0,
-            totalValue: soslRowCountTotal,
-            showPercentageText: false,
+          bottomCalcFormatterParams: this._rowCountBar,
+          tooltip: (_e, cell) => {
+            const total = this._rowCountBar.totalValue ?? 0;
+            return cell.getValue() + (total > 0 ? '/' + total : '');
           },
-          tooltip: (_e, cell) =>
-            cell.getValue() + (soslRowCountTotal > 0 ? '/' + soslRowCountTotal : ''),
         },
         {
           title: 'Time Taken (ms)',
@@ -406,19 +417,11 @@ export class SOSLView extends LitElement {
           hozAlign: 'right',
           headerHozAlign: 'right',
           formatter: progressFormatterMS,
-          formatterParams: {
-            precision: 2,
-            totalValue: soslTimeTakenTotal,
-            showPercentageText: false,
-          },
+          formatterParams: this._timeTakenBar,
           accessorDownload: NumberAccessor,
           bottomCalc: 'sum',
           bottomCalcFormatter: progressFormatterMS,
-          bottomCalcFormatterParams: {
-            precision: 2,
-            totalValue: soslTimeTakenTotal,
-            showPercentageText: false,
-          },
+          bottomCalcFormatterParams: this._timeTakenBar,
         },
       ],
     });

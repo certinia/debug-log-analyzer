@@ -1,6 +1,7 @@
 /*
  * Copyright (c) 2023 Certinia Inc. All rights reserved.
  */
+import '#vscode-elements/vscode-option.js';
 import { consume } from '@lit/context';
 import { LitElement, css, html, nothing } from 'lit';
 import { customElement, property } from 'lit/decorators.js';
@@ -10,10 +11,11 @@ import type { DebugLevels, LogLevel } from '@apexdevtools/apex-log-parser';
 
 // web components
 import './OverflowList.js';
-import './VsChip.js';
+import './VsSelect.js';
 
 // styles
 import { globalStyles } from '../styles/global.styles.js';
+import { LEVEL_ORDER, levelRank, sameLevels } from '../core/log/levelFilter.js';
 import { logContext } from '../core/log/logContext.js';
 import { logStatusContext, type LogStatus } from '../core/log/logStatus.js';
 import type { LogStore } from '../core/log/LogStore.js';
@@ -34,21 +36,19 @@ const LOG_TOKEN: Record<keyof DebugLevels, string> = {
   workflow: 'WORKFLOW',
 };
 
+export interface LogLevelsChange {
+  category: keyof DebugLevels;
+  level: LogLevel;
+}
+
+const levelsChanged = (value: DebugLevels | null, old: DebugLevels | null): boolean =>
+  !value || !old ? value !== old : !sameLevels(value, old);
+
 /**
- * Read-only display of the log's captured debug levels in the app header: one chip per
- * category (`CATEGORY LEVEL`), styled as a VS Code dropdown face. A thin adapter — the
- * responsive overflow-into-a-menu behaviour lives in `<overflow-list>` and the chip face
- * in `<vs-chip>`.
- *
- * MIGRATION TO FILTERS: each chip is read-only display. To make levels filterable, this
- * template is the single seam that changes:
- *   1. swap `<vs-chip>` for `<vs-select compact>` (chevron returns);
- *   2. reintroduce level ordering + ceiling helpers (removed `logLevelsFormat.ts`:
- *      `LEVEL_ORDER`/`rankOf`/`ceilingHint`) and the `VsSelect` compact + disabled-option
- *      tooltip additions;
- *   3. add a `filters` Map (per-category chosen level) + a `@change` handler that emits
- *      `log-levels-change`, and have views subscribe to hide events above the threshold.
- * `<overflow-list>` measures whatever it's given, so overflow + alignment are unaffected.
+ * The log's debug levels in the app header: one dropdown per category. A level
+ * finer than the log captured is disabled. Choosing a level emits
+ * `log-levels-change`; the host owns the chosen levels and publishes the log they make.
+ * The responsive overflow-into-a-menu behaviour lives in `<overflow-list>`.
  */
 @customElement('log-levels')
 export class LogLevels extends LitElement {
@@ -56,10 +56,14 @@ export class LogLevels extends LitElement {
   @property({ attribute: false })
   logStatus: LogStatus = 'parsing';
 
-  /** The log on screen, from the app root. */
+  /** The log on screen, from the app root. Its levels are the ones shown. */
   @consume({ context: logContext, subscribe: true })
   @property({ attribute: false })
   logStore: LogStore | null = null;
+
+  /** The levels the log was captured at: the finest each dropdown offers. */
+  @property({ attribute: false, hasChanged: levelsChanged })
+  captured: DebugLevels | null = null;
 
   static styles = [
     globalStyles,
@@ -69,6 +73,17 @@ export class LogLevels extends LitElement {
         display: block;
         min-width: 0;
         font-size: var(--lana-text-sm);
+      }
+
+      /* The face of a resting chip, not a filter-bar pill: the
+         row reads as the log's settings line. */
+      vs-select {
+        --filter-control-height: auto;
+        --filter-control-padding: var(--lana-space-3xs) var(--lana-space-xs);
+        --filter-control-font-size: var(--lana-text-xs);
+        --filter-control-line-height: normal;
+
+        font-family: var(--lana-font-mono);
       }
 
       .skeletons {
@@ -86,8 +101,8 @@ export class LogLevels extends LitElement {
   ];
 
   render() {
-    const levels = this.logStore?.log.debugLevels;
-    if (!levels) {
+    const shown = this.logStore?.log.debugLevels;
+    if (!this.captured || !shown) {
       if (this.logStatus !== 'parsing') {
         return nothing;
       }
@@ -102,11 +117,44 @@ export class LogLevels extends LitElement {
 
     return html`<overflow-list menu-heading="Log levels">
       ${repeat(
-        Object.entries(levels) as [keyof DebugLevels, LogLevel][],
+        Object.entries(this.captured) as [keyof DebugLevels, LogLevel][],
         ([category]) => category,
-        ([category, level]) =>
-          html`<vs-chip><span slot="lead">${LOG_TOKEN[category]}</span>${level}</vs-chip>`,
+        ([category, captured]) => {
+          const token = LOG_TOKEN[category];
+          const level = shown[category] ?? captured;
+          return html`<vs-select
+            dense
+            emptyValue=""
+            label=${token}
+            prefix=${token}
+            prefixSeparator=""
+            .value=${level}
+            @change=${(event: Event) => this._onChange(category, event)}
+          >
+            ${LEVEL_ORDER.map((option) => {
+              const uncaptured = levelRank(option) > levelRank(captured);
+              return html`<vscode-option
+                value=${option}
+                ?selected=${option === level}
+                ?disabled=${uncaptured}
+                >${option}</vscode-option
+              >`;
+            })}
+          </vs-select>`;
+        },
       )}
     </overflow-list>`;
+  }
+
+  private _onChange(category: keyof DebugLevels, event: Event): void {
+    const level = (event.target as HTMLInputElement).value as LogLevel;
+    // Leaves the app header's shadow root for the log viewer, which owns the levels.
+    this.dispatchEvent(
+      new CustomEvent<LogLevelsChange>('log-levels-change', {
+        detail: { category, level },
+        bubbles: true,
+        composed: true,
+      }),
+    );
   }
 }
