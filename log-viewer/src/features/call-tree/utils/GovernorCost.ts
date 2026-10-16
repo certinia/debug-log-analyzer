@@ -134,15 +134,22 @@ export function governorCostBreakdown(
  * the same pass that builds the tree (no separate traversal).
  */
 export function setGovernorCost(row: GovernorCostRow, costLimits: CostLimits): void {
+  [row.governorCost, row.governorCostMax] = governorCostOf(row, costLimits);
+}
+
+/** {@link GovernorCostRow.governorCost} and {@link GovernorCostRow.governorCostMax} of `usage`. */
+export function governorCostOf(
+  usage: GovernorUsage,
+  costLimits: CostLimits,
+): [average: number | null, max: number | null] {
   let total = 0;
   let max: number | null = null;
   for (const { used, limit } of costLimits) {
-    const percent = sharePercent(used(row), limit);
+    const percent = sharePercent(used(usage), limit);
     total += percent;
     if (max === null || percent > max) {
       max = percent;
     }
   }
-  row.governorCost = costLimits.length > 0 ? total / costLimits.length : null;
-  row.governorCostMax = max;
+  return [costLimits.length > 0 ? total / costLimits.length : null, max];
 }

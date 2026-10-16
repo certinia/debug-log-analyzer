@@ -25,16 +25,50 @@ export function* walkEvents(roots: Iterable<LogEvent>): Generator<LogEvent> {
  * summed or walked from these, nothing inside a kept subtree is counted twice.
  */
 export function outermostEvents(events: Iterable<LogEvent>): LogEvent[] {
-  const all = new Set(events);
+  const steps = outermostEventsSteps(events);
+  let step = steps.next();
+  while (!step.done) {
+    step = steps.next();
+  }
+  return step.value;
+}
+
+/** {@link outermostEvents}, yielding after each event so a caller can run it in slices. */
+export function* outermostEventsSteps(
+  events: Iterable<LogEvent>,
+): Generator<void, LogEvent[], void> {
+  const all = new Set<LogEvent>();
+  for (const event of events) {
+    all.add(event);
+    yield;
+  }
+  const enclosed = new Map<LogEvent, boolean>();
+  const isEnclosed = (event: LogEvent): boolean => {
+    const passed: LogEvent[] = [];
+    let answer = false;
+    for (let parent = event.parent; parent; parent = parent.parent) {
+      if (all.has(parent)) {
+        answer = true;
+        break;
+      }
+      const known = enclosed.get(parent);
+      if (known !== undefined) {
+        answer = known;
+        break;
+      }
+      passed.push(parent);
+    }
+    for (const node of passed) {
+      enclosed.set(node, answer);
+    }
+    return answer;
+  };
   const outermost: LogEvent[] = [];
   for (const event of all) {
-    let enclosed = false;
-    for (let parent = event.parent; parent && !enclosed; parent = parent.parent) {
-      enclosed = all.has(parent);
-    }
-    if (!enclosed) {
+    if (!isEnclosed(event)) {
       outermost.push(event);
     }
+    yield;
   }
   return outermost;
 }

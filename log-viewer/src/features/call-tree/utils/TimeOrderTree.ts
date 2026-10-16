@@ -46,6 +46,17 @@ export interface TimeOrderRow {
   _hasDetailsDeep: boolean;
 }
 
+/** Whether the Show Details filter shows `event` for itself, before its descendants count. */
+export function isDetailEvent(event: LogEvent): boolean {
+  const { type } = event;
+  return (
+    event.isParent ||
+    event.duration.total > 0 ||
+    event.discontinuity ||
+    !!(type && EXCLUDED_DETAIL_TYPES.has(type))
+  );
+}
+
 /**
  * Builds the time-order view: one row per LogEvent at every level. Row ids
  * use parser-assigned eventIndex values, which are globally unique within
@@ -77,12 +88,8 @@ export function toTimeOrderTree(
         }
       }
     }
-    const { duration, isParent, discontinuity, type } = event;
-    const selfIsDetail =
-      isParent ||
-      duration.total > 0 ||
-      discontinuity ||
-      !!(type && EXCLUDED_DETAIL_TYPES.has(type));
+    const { type } = event;
+    const selfIsDetail = isDetailEvent(event);
     const row: TimeOrderRow = {
       id,
       originalData: event,

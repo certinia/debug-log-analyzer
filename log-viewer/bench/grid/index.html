@@ -1,0 +1,36 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>grid bench</title>
+    <style>
+      html,
+      body {
+        margin: 0;
+        height: 100%;
+        background: #1e1e1e;
+        color: #ccc;
+        font-family: sans-serif;
+      }
+      body {
+        display: grid;
+        grid-template-rows: auto 1fr 160px;
+      }
+      #host {
+        min-height: 0;
+        height: 100%;
+      }
+      #status {
+        margin: 0;
+        overflow: auto;
+        font-size: 11px;
+      }
+    </style>
+  </head>
+  <body>
+    <input id="file" type="file" />
+    <div id="host"></div>
+    <pre id="status"></pre>
+    <script src="out/main.js"></script>
+  </body>
+</html>

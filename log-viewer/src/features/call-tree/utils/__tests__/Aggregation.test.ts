@@ -1,12 +1,13 @@
 /**
  * Copyright (c) 2026 Certinia Inc. All rights reserved.
  */
-import { describe, expect, it } from '@jest/globals';
+import { describe, expect, it, jest } from '@jest/globals';
 import type { LogEvent } from '@apexdevtools/apex-log-parser';
 
 import { createEvent } from '#test-helpers/events.js';
 import { outermostEvents } from '../../../../core/utility/EventTree.js';
 import {
+  buildBottomUpTree,
   toAggregatedCallTree,
   toBottomUpTree,
   type AggregatedRow,
@@ -1026,6 +1027,50 @@ describe('bottom-up caller row scope', () => {
       expect(row.totalTime).toBeCloseTo(totalTime, 6);
       expect(row.totalSelfTime).toBeCloseTo(selfTime, 6);
     }
+  });
+});
+
+describe('buildBottomUpTree', () => {
+  /** Enough frames to cross a slice, nested so callers repeat. */
+  function wideRoot(): LogEvent {
+    const root = createEvent({ text: 'LOG_ROOT', self: 0, total: 0, type: 'EXECUTION_STARTED' });
+    for (let i = 0; i < 40; i++) {
+      const outer = createEvent({ text: `Outer${i % 4}`, self: 1, total: 31, parent: root });
+      for (let j = 0; j < 10; j++) {
+        const inner = createEvent({ text: `Inner${j % 3}`, self: 2, total: 3, parent: outer });
+        createEvent({ text: 'Leaf', self: 1, total: 1, parent: inner });
+      }
+    }
+    return root;
+  }
+
+  it('builds the rows toBottomUpTree builds, handing the thread back between slices', async () => {
+    const root = wideRoot();
+    const yieldSlice = jest.fn(() => Promise.resolve());
+    // Every clock read is past the slice, so every tick yields.
+    let t = 0;
+    const now = jest.spyOn(performance, 'now').mockImplementation(() => (t += 100));
+    const sliced = await buildBottomUpTree(root.children, new KeyPathIds(2048), undefined, {
+      yieldSlice,
+    });
+    now.mockRestore();
+
+    expect(sliced).toEqual(toBottomUpTree(root.children, new KeyPathIds(2048)));
+    expect(yieldSlice.mock.calls.length).toBeGreaterThan(1);
+  });
+
+  it('returns null once the signal aborts', async () => {
+    const controller = new AbortController();
+    controller.abort();
+    let t = 0;
+    const now = jest.spyOn(performance, 'now').mockImplementation(() => (t += 100));
+    const sliced = await buildBottomUpTree(wideRoot().children, new KeyPathIds(2048), undefined, {
+      yieldSlice: () => Promise.resolve(),
+      signal: controller.signal,
+    });
+    now.mockRestore();
+
+    expect(sliced).toBeNull();
   });
 });
 

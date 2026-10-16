@@ -23,6 +23,7 @@ import { parseArgs } from 'node:util';
 import { type ApexLog, parse } from '@apexdevtools/apex-log-parser';
 
 import { measureCallTree } from './call-tree.js';
+import { measureGrid } from './grid.js';
 import { die, time } from './harness.js';
 import { digestMinimap, measureMinimap } from './minimap.js';
 import { digestTimeline, measureTimeline } from './timeline.js';
@@ -42,6 +43,7 @@ interface Area {
 
 const AREAS: Record<string, Area> = {
   'call-tree': { run: measureCallTree },
+  grid: { run: measureGrid },
   minimap: { run: measureMinimap, digest: digestMinimap },
   timeline: { run: measureTimeline, digest: digestTimeline },
   variables: { run: measureVariables },
