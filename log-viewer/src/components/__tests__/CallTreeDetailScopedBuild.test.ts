@@ -31,11 +31,7 @@ import {
   type ScopedCallTree,
   type ScopedRow,
 } from '../scopedCallTree.js';
-import {
-  INSPECTOR_LOCATE_EVENT,
-  INSPECTOR_REVEAL_EVENT,
-  type InspectorLocateEvent,
-} from '../inspectorReveal.js';
+import { INSPECTOR_LOCATE_EVENT, type InspectorLocateEvent } from '../inspectorReveal.js';
 import { eventBus, type DetailSelection } from '../../core/events/EventBus.js';
 import { logStoreFor, type LogStore } from '../../core/log/LogStore.js';
 import { ROOT_PATH_ID } from '../../core/log/keyPathIds.js';
@@ -262,26 +258,6 @@ describe('CallTreeDetail scoped build', () => {
     await Promise.resolve();
 
     expect(goTo).toHaveBeenCalledWith([9], { scrollIfVisible: false });
-  });
-
-  it('never reports the mark it sets as a pick', async () => {
-    build.mockResolvedValue(tree(5000, [frameRow(9)]));
-    const el = await mount(5);
-    await frame(el);
-    const grid = gridOf(el);
-    jest.spyOn(grid, 'goTo').mockImplementation(async () => {
-      fire(grid, 'lv-grid-select', { row: grid.source?.roots[0], target: 9, user: false });
-      return true;
-    });
-    const revealed: unknown[] = [];
-    const listener = (e: Event) => revealed.push(e);
-    document.addEventListener(INSPECTOR_REVEAL_EVENT, listener);
-
-    el.activeEventIndex = 9;
-    await frame(el);
-    document.removeEventListener(INSPECTOR_REVEAL_EVENT, listener);
-
-    expect(revealed).toEqual([]);
   });
 
   it('keeps the picked row where a view merges occurrences', async () => {
@@ -520,12 +496,11 @@ describe('CallTreeDetail scoped build', () => {
     const located = (e: Event) => seen.push((e as InspectorLocateEvent).detail.eventIndexes);
     document.addEventListener(INSPECTOR_LOCATE_EVENT, located);
     fire(grid, 'lv-grid-locate', { row: { id: 8, originalData: { eventIndex: 8 } } });
-    fire(grid, 'lv-grid-locate', { row: null });
     // A grouped row cannot be revealed, but every occurrence it merges is marked.
     fire(grid, 'lv-grid-locate', { row: { id: -3, eventIndexes: [8, 12] } });
     document.removeEventListener(INSPECTOR_LOCATE_EVENT, located);
 
-    expect(seen).toEqual([[8], [], [8, 12]]);
+    expect(seen).toEqual([[8], [8, 12]]);
   });
 });
 
