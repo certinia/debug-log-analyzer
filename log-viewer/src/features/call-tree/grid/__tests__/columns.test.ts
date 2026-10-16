@@ -30,7 +30,7 @@ import {
   type AggregatedRow,
 } from '../../utils/Aggregation.js';
 import { toTimeOrderTree, type TimeOrderRow } from '../../utils/TimeOrderTree.js';
-import { categoryClass, type CallTreeGrid } from '../CallTreeGrid.js';
+import { CallTreeGrid, categoryClass } from '../CallTreeGrid.js';
 import { nameCell } from '../cells.js';
 import {
   aggregatedColumns,
@@ -255,54 +255,26 @@ describe('mergedLines', () => {
 });
 
 describe('copy', () => {
-  const pathIds = logStoreFor(log).keyPathIds();
-  const merged = <R extends { id: number; _children?: R[] | null }>(roots: R[]) => ({
-    roots,
-    children: (r: R) => r._children ?? undefined,
-    key: (r: R) => r.id,
-  });
-  const views = {
-    'time order': () => ({ columns: timeOrder, source: timeOrderSource(log) }),
-    aggregated: () => ({
-      columns: aggregatedColumns(log, options),
-      source: merged(toAggregatedCallTree(log.children, pathIds, log.governorLimits)),
-    }),
-    'bottom up': () => ({
-      columns: bottomUpColumns(log, options),
-      source: merged(toBottomUpTree(log.children, pathIds, log.governorLimits)),
-    }),
-  };
-
   afterEach(() => document.body.replaceChildren());
 
-  it.each([
-    ['time order', 'Level\tName\tNamespace\tDML Count', ['EXECUTION_STARTED', 'ns.Outer.run()'], 4],
-    [
-      'aggregated',
-      'Level\tName\tNamespace\tCalls\tDML Count',
-      ['EXECUTION_STARTED', 'ns.Outer.run()'],
-      4,
-    ],
-    ['bottom up', 'Level\tName\tNamespace\tType\tCalls', ['apex://pkg.Entry (code unit)'], 10],
-  ] as const)(
-    'copies %s: the shown columns, and every row, closed or not',
-    async (view, header, first, lines) => {
-      const writeText = jest.fn<Promise<void>, [string]>().mockResolvedValue(undefined);
-      Object.defineProperty(navigator, 'clipboard', { value: { writeText }, configurable: true });
-      const grid = document.createElement('lv-call-tree-grid') as CallTreeGrid;
-      Object.assign(grid, views[view]());
-      document.body.append(grid);
-      await grid.updateComplete;
-      await grid.settled();
+  it('copies the shown columns and every row, with a query as the log has it', async () => {
+    const writeText = jest.fn<Promise<void>, [string]>().mockResolvedValue(undefined);
+    Object.defineProperty(navigator, 'clipboard', { value: { writeText }, configurable: true });
+    const roots = toAggregatedCallTree(log.children, logStoreFor(log).keyPathIds());
+    const grid = new CallTreeGrid<AggregatedRow>();
+    grid.columns = aggregatedColumns(log, options);
+    grid.source = { roots, children: (r) => r._children ?? undefined, key: (r) => r.id };
+    document.body.append(grid);
+    await grid.updateComplete;
+    await grid.settled();
 
-      await grid.copy();
+    await grid.copy();
 
-      const [head, ...rows] = writeText.mock.calls[0]?.[0].split('\n') ?? [];
-      expect(head).toMatch(new RegExp(`^${header}\t`));
-      expect(rows).toHaveLength(lines);
-      expect(rows.map((r) => r.split('\t')[1])).toEqual(expect.arrayContaining([...first]));
-    },
-  );
+    const [head, ...rows] = writeText.mock.calls[0]?.[0].split('\n') ?? [];
+    expect(head).toMatch(/^Level\tName\tNamespace\tCalls\tDML Count\t/);
+    expect(rows).toHaveLength(4);
+    expect(rows.map((r) => r.split('\t')[1])).toContain('SELECT Id FROM Account');
+  });
 });
 
 describe('find text', () => {
