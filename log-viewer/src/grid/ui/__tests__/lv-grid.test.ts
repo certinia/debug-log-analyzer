@@ -6,7 +6,12 @@
  */
 import { sum, type TreeSource } from '../../core/index.js';
 import { GridView } from '../../render/index.js';
-import { fakeHighlights, flush, type FakeHighlights } from '../../render/__tests__/fakes.js';
+import {
+  fakeHighlights,
+  fakeRowBoxes,
+  flush,
+  type FakeHighlights,
+} from '../../render/__tests__/fakes.js';
 import type { GridColumn } from '../column.js';
 import '../lv-grid.js';
 import type {
@@ -361,29 +366,14 @@ describe('lv-grid', () => {
 
   it('keeps the scroll for a row in view whole, when asked to', async () => {
     const { grid } = await setup();
-    let lastTop = 2 * ROW;
-    // Header to 20, totals from 180; row `index` from 20 + index * 20, the last from `lastTop`.
-    jest.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(function (
-      this: HTMLElement,
-    ) {
-      const at = (top: number, height = ROW): DOMRect =>
-        ({ top, bottom: top + height, height, width: 500 }) as DOMRect;
-      const index = Number(this.dataset.index ?? Number.NaN);
-      return this.classList.contains('foot')
-        ? at(9 * ROW)
-        : this.classList.contains('scroller')
-          ? at(0, 10 * ROW)
-          : index === 2
-            ? at(ROW + lastTop)
-            : at(Number.isNaN(index) ? 0 : ROW + index * ROW);
-    });
+    const last = fakeRowBoxes(ROW, 2);
     const scroll = jest.spyOn(GridView.prototype, 'scrollToIndex');
 
     await grid.goTo([3], { scrollIfVisible: false });
     expect(scroll).not.toHaveBeenCalled();
     await grid.goTo([3]);
     expect(scroll).toHaveBeenCalledTimes(1);
-    lastTop = 8 * ROW + 1;
+    last.moveTo(8 * ROW + 1);
     await grid.goTo([3], { scrollIfVisible: false });
     expect(scroll).toHaveBeenCalledTimes(2);
   });
@@ -400,28 +390,13 @@ describe('lv-grid', () => {
 
   it('keeps the scroll for a current match in view whole, and centres one out of view', async () => {
     const { grid } = await setup();
-    let lastTop = 2 * ROW;
-    // Header to 20, totals from 180; row `index` from 20 + index * 20, the last from `lastTop`.
-    jest.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(function (
-      this: HTMLElement,
-    ) {
-      const at = (top: number, height = ROW): DOMRect =>
-        ({ top, bottom: top + height, height, width: 500 }) as DOMRect;
-      const index = Number(this.dataset.index ?? Number.NaN);
-      return this.classList.contains('foot')
-        ? at(9 * ROW)
-        : this.classList.contains('scroller')
-          ? at(0, 10 * ROW)
-          : index === 2
-            ? at(ROW + lastTop)
-            : at(Number.isNaN(index) ? 0 : ROW + index * ROW);
-    });
+    const last = fakeRowBoxes(ROW, 2);
     const scroll = jest.spyOn(GridView.prototype, 'scrollToIndex');
 
     expect(await grid.find({ text: 'c' })).toBe(1);
     await grid.setCurrentMatch(0);
     expect(scroll).not.toHaveBeenCalled();
-    lastTop = 8 * ROW + 1;
+    last.moveTo(8 * ROW + 1);
     await grid.setCurrentMatch(0);
     expect(scroll).toHaveBeenCalledWith(2);
   });
