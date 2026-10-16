@@ -6,6 +6,7 @@ export type { GridColumn } from './column.js';
 export {
   LvGrid,
   type GridColumnResizeDetail,
+  type GridErrorDetail,
   type GridContextDetail,
   type GridFindDetail,
   type GridHeaderContextDetail,

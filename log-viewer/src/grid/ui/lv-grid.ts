@@ -9,7 +9,7 @@ import {
   type PropertyValues,
   type TemplateResult,
 } from 'lit';
-import { customElement, property } from 'lit/decorators.js';
+import { customElement, property, state } from 'lit/decorators.js';
 import { createRef, ref } from 'lit/directives/ref.js';
 import { styleMap } from 'lit/directives/style-map.js';
 
@@ -31,7 +31,7 @@ import {
   type SortDirection,
   type TreeSource,
 } from '../core/index.js';
-import { GridView, type FindMarks } from '../render/index.js';
+import { GridView, rowId, type FindMarks } from '../render/index.js';
 import type { GridColumn } from './column.js';
 import { gridKey } from './keyboard.js';
 import { litPainter, total } from './painter.js';
@@ -39,6 +39,10 @@ import { columnTracks, minWidthOf, naturalWidth } from './sizing.js';
 import { StoreController } from './store-controller.js';
 import { gridStyles } from './styles.js';
 import { browserScheduler } from './yield.js';
+
+const RESIZE_STEP = 16;
+
+const headId = (index: number): string => `head-${index}`;
 
 export interface GridSelectDetail<R> {
   /** The selected data row; null for a group row or no selection. */
@@ -69,6 +73,15 @@ export interface GridSort {
 /** The rows or shown columns changed, so find's match numbers no longer hold. */
 export interface GridReshapeDetail {
   reason: 'sort' | 'columns' | 'filter' | 'group';
+}
+
+/**
+ * An error from work the grid started itself, which no caller can catch. Cancel the event
+ * once the error is shown or logged; an error left uncancelled is thrown uncaught.
+ */
+export interface GridErrorDetail {
+  error: unknown;
+  action: 'build' | 'toggle' | 'copy';
 }
 
 export interface GridColumnDetail {
@@ -106,7 +119,8 @@ const shownIds = <R>(columns: readonly GridColumn<R>[] | undefined): string[] =>
  * keyboard moves, opens and closes rows. Events bubble but stay inside the host's shadow
  * root: `lv-grid-select`, `lv-grid-locate` (hover), `lv-grid-context`,
  * `lv-grid-header-context`, `lv-grid-column-resize`, `lv-grid-find-results`,
- * `lv-grid-reshape` and `lv-grid-expand` (a data row the user opened).
+ * `lv-grid-reshape`, `lv-grid-expand` (a data row the user opened) and `lv-grid-error`.
+ * When a build throws, the grid shows an alert in place of its rows until a build succeeds.
  */
 @customElement('lv-grid')
 export class LvGrid<R extends object = object> extends LitElement {
@@ -176,6 +190,10 @@ export class LvGrid<R extends object = object> extends LitElement {
   @property({ attribute: false })
   placeholder: string | null = null;
 
+  /** The alert shown in place of the rows while a build fails. */
+  @property({ attribute: false })
+  errorText = 'The table could not be updated.';
+
   private store: GridStore<R> | null = null;
   private readonly data = new StoreController<R>(this);
   private view: GridView<R> | null = null;
@@ -188,7 +206,15 @@ export class LvGrid<R extends object = object> extends LitElement {
   private selections = 0;
   /** Where the selection was last seen, to skip a search of every row. */
   private selectedAt = -1;
+  /** The rows the selection was last not found in: rows do not change, so neither does that. */
+  private missedIn: RowView<R> | null = null;
   private hovered = -1;
+  private failure: { readonly error: unknown } | undefined;
+  /** The header the keyboard is on, by shown-column index; -1 while it is on the rows. */
+  @state()
+  private activeHead = -1;
+  /** Enter clicks a row's link; that click must not reach the row as a select. */
+  private followingLink = false;
   private found: FindMarks<R> | null = null;
   // Goes up with each find and clear, so a find still running sees it is stale.
   private searches = 0;
@@ -360,27 +386,28 @@ export class LvGrid<R extends object = object> extends LitElement {
       return;
     }
     if (changed.has('source') && this.source) {
-      void store.setSource(this.source);
+      this.background(store.setSource(this.source), 'build');
     }
     if (changed.has('filters')) {
-      void store.setFilters(this.filters);
+      this.background(store.setFilters(this.filters), 'build');
       this.emit<GridReshapeDetail>('lv-grid-reshape', { reason: 'filter' });
     }
     if (changed.has('groupBy')) {
-      void store.setGroupBy(this.groupBy);
+      this.background(store.setGroupBy(this.groupBy), 'build');
       this.emit<GridReshapeDetail>('lv-grid-reshape', { reason: 'group' });
     }
     if ((changed.has('columns') || changed.has('sort')) && this.calcsChanged()) {
-      void store.setCalcs(this.calcs);
+      this.background(store.setCalcs(this.calcs), 'build');
     }
     if (changed.has('sort') || changed.has('columns')) {
-      void this.applySort();
+      this.background(this.applySort(), 'build');
     }
     if (
       changed.has('columns') &&
       itemsChanged(shownIds(this.columns), shownIds(changed.get('columns')))
     ) {
       this.emit<GridReshapeDetail>('lv-grid-reshape', { reason: 'columns' });
+      this.activeHead = Math.min(this.activeHead, shownIds(this.columns).length - 1);
     }
   }
 
@@ -391,11 +418,22 @@ export class LvGrid<R extends object = object> extends LitElement {
   protected updated(changed: PropertyValues): void {
     const snapshot = this.data.snapshot;
     this.toggleAttribute('busy', snapshot?.busy ?? false);
+    if (snapshot?.failed !== this.failure) {
+      this.failure = snapshot?.failed;
+      if (this.failure) {
+        this.report(this.failure.error, 'build');
+      }
+      this.syncActive();
+    }
     if (this.view && snapshot && snapshot.rows !== this.shown) {
       this.shown = snapshot.rows;
       this.view.setRows(snapshot.rows, snapshot.toggled);
+      this.syncActive();
     } else if (changed.has('columns') || changed.has('marked') || changed.has('rowClass')) {
       this.view?.repaint();
+    }
+    if (changed.has('columns')) {
+      this.syncActive();
     }
   }
 
@@ -404,28 +442,38 @@ export class LvGrid<R extends object = object> extends LitElement {
     const totals = this.data.snapshot?.totals ?? {};
     const footer = columns.some((column) => column.calc || column.footer !== undefined);
     const size = this.data.snapshot?.rows.size ?? 0;
+    const failed = this.data.snapshot?.failed !== undefined;
+    const notice = this.notice();
+    const foot = footer && !failed;
+    const rowCount = 1 + (failed ? 0 : size) + (notice ? 1 : 0) + (foot ? 1 : 0);
     return html`<div
       class="scroller"
       role="treegrid"
       aria-label=${this.label ?? nothing}
       tabindex="0"
-      aria-rowcount=${size + (footer ? 2 : 1)}
+      aria-rowcount=${rowCount}
       aria-busy=${this.data.snapshot?.busy ?? false}
       style=${styleMap(columnTracks(columns, this.widths))}
       ${ref(this.scrollerRef)}
       @keydown=${this.onKey}
+      @contextmenu=${this.onKeyMenu}
     >
       <div class="busy"></div>
       <div class="row head" role="row" aria-rowindex="1">
-        ${columns.map((column) => this.headerCell(column))}
+        ${columns.map((column, i) => this.headerCell(column, i))}
       </div>
       ${
-        size === 0 && !this.data.snapshot?.busy && this.placeholder !== null
-          ? html`<div class="placeholder" role="status">${this.placeholder}</div>`
+        notice
+          ? html`<div class="placeholder" role="row" aria-rowindex="2">
+              <div role="gridcell" aria-colspan=${columns.length}>
+                <span role=${notice.role}>${notice.text}</span>
+              </div>
+            </div>`
           : nothing
       }
       <div
         class="body"
+        ?hidden=${failed}
         ${ref(this.bodyRef)}
         @mousedown=${this.onMouseDown}
         @click=${this.onClick}
@@ -434,8 +482,8 @@ export class LvGrid<R extends object = object> extends LitElement {
         @pointerleave=${this.onLeave}
       ></div>
       ${
-        footer
-          ? html`<div class="row foot" role="row" aria-rowindex=${size + 2}>
+        foot
+          ? html`<div class="row foot" role="row" aria-rowindex=${rowCount}>
               ${columns.map(
                 (column) =>
                   html`<div class="cell ${column.align === 'end' ? 'end' : ''}" role="gridcell">
@@ -448,7 +496,19 @@ export class LvGrid<R extends object = object> extends LitElement {
     </div>`;
   }
 
-  private headerCell(column: GridColumn<R>): TemplateResult {
+  /** The alert while a build fails, else the placeholder while no row shows. */
+  private notice(): { role: 'alert' | 'status'; text: string } | null {
+    const snapshot = this.data.snapshot;
+    if (snapshot?.failed) {
+      return { role: 'alert', text: this.errorText };
+    }
+    if (!snapshot?.rows.size && !snapshot?.busy && this.placeholder !== null) {
+      return { role: 'status', text: this.placeholder };
+    }
+    return null;
+  }
+
+  private headerCell(column: GridColumn<R>, index: number): TemplateResult {
     const dir = this.sort?.column === column.id ? this.sort.dir : null;
     const ariaSort = !column.sort
       ? nothing
@@ -458,17 +518,15 @@ export class LvGrid<R extends object = object> extends LitElement {
           ? 'descending'
           : 'none';
     return html`<div
-      class="cell colhead ${column.align === 'end' ? 'end' : ''}"
+      class="cell colhead ${column.align === 'end' ? 'end' : ''} ${index === this.activeHead ? 'active' : ''}"
+      id=${headId(index)}
       role="columnheader"
       title=${column.description ?? column.title}
       aria-sort=${ariaSort}
+      aria-keyshortcuts=${column.resizable === false ? nothing : 'Shift+ArrowLeft Shift+ArrowRight'}
       ?data-sortable=${column.sort !== undefined}
       @click=${(e: MouseEvent) => this.onHeaderClick(e, column)}
-      @contextmenu=${(e: MouseEvent) =>
-        this.emit<GridHeaderContextDetail>('lv-grid-header-context', {
-          column: column.id,
-          event: e,
-        })}
+      @contextmenu=${(e: MouseEvent) => this.headerMenu(column.id, e)}
     >
       <span class="title"
         >${column.title}${
@@ -583,10 +641,10 @@ export class LvGrid<R extends object = object> extends LitElement {
     });
     this.data.follow(this.store);
     if (this.filters.length) {
-      void this.store.setFilters(this.filters);
+      this.background(this.store.setFilters(this.filters), 'build');
     }
     if (this.sort) {
-      void this.applySort();
+      this.background(this.applySort(), 'build');
     }
   }
 
@@ -629,6 +687,7 @@ export class LvGrid<R extends object = object> extends LitElement {
       lines: this.rowLines ?? undefined,
       lineHeight: () => this.treeLineHeight(),
       rowIndexStart: 2,
+      onDraw: () => this.syncActive(),
       painter: litPainter(() => ({
         columns: this.visibleColumns(),
         isSelected: (target) => sameTarget(this.selected, target),
@@ -674,7 +733,11 @@ export class LvGrid<R extends object = object> extends LitElement {
     if (there !== null && sameTarget(selected, there)) {
       return at;
     }
+    if (this.missedIn === rows) {
+      return -1;
+    }
     this.selectedAt = rows.indexOf(selected);
+    this.missedIn = this.selectedAt < 0 ? rows : null;
     return this.selectedAt;
   }
 
@@ -682,13 +745,36 @@ export class LvGrid<R extends object = object> extends LitElement {
     this.selections++;
     this.selected = target;
     this.selectedAt = index;
+    this.missedIn = null;
+    this.activeHead = -1;
     this.view?.repaint();
+    this.syncActive();
     const entry = index >= 0 ? this.shown?.rowAt(index) : undefined;
     this.emit<GridSelectDetail<R>>('lv-grid-select', {
       row: entry !== undefined && !(entry instanceof Group) ? entry : null,
       target,
       user,
     });
+  }
+
+  /**
+   * Points `aria-activedescendant` at the active header, or at the selected row once it is
+   * painted, so a screen reader follows the keys. A reader reads a change to it, not the
+   * row's later arrival.
+   */
+  private syncActive(): void {
+    const scroller = this.scrollerRef.value;
+    const at = this.indexOfSelected();
+    const id = at >= 0 && !this.failure ? rowId(at) : null;
+    if (this.activeHead >= 0) {
+      scroller?.setAttribute('aria-activedescendant', headId(this.activeHead));
+    } else if (id !== null && (this.renderRoot as ShadowRoot).getElementById(id)) {
+      if (scroller?.getAttribute('aria-activedescendant') !== id) {
+        scroller?.setAttribute('aria-activedescendant', id);
+      }
+    } else {
+      scroller?.removeAttribute('aria-activedescendant');
+    }
   }
 
   private async toggleAt(index: number, expanded?: boolean): Promise<void> {
@@ -763,6 +849,9 @@ export class LvGrid<R extends object = object> extends LitElement {
   };
 
   private readonly onClick = (e: MouseEvent): void => {
+    if (this.followingLink) {
+      return;
+    }
     const index = this.indexFrom(e);
     if (index < 0) {
       return;
@@ -772,7 +861,7 @@ export class LvGrid<R extends object = object> extends LitElement {
       return;
     }
     if (this.isToggle(e, index)) {
-      void this.toggleAt(index);
+      this.background(this.toggleAt(index), 'toggle');
     } else if (window.getSelection()?.type === 'Range') {
       // A drag that selected text is a copy in the making, not a click on a row.
       return;
@@ -791,36 +880,187 @@ export class LvGrid<R extends object = object> extends LitElement {
     }
     const key = gridKey(e);
     const rows = this.shown;
-    if (!key || !rows) {
+    if (!key || !rows || this.failure) {
       return;
     }
     e.preventDefault();
     if (key === 'copy') {
-      void this.copy();
+      this.background(this.copy(), 'copy');
+      return;
+    }
+    if (this.activeHead >= 0) {
+      this.onHeadKey(key, e.shiftKey);
       return;
     }
     const at = this.indexOfSelected();
-    if (at < 0) {
-      if (rows.size > 0 && key !== 'left' && key !== 'right') {
-        const index = key === 'up' || key === 'end' ? rows.size - 1 : 0;
-        this.select(this.targetAt(index), index, true);
-        this.view?.scrollToIndex(index, 'auto');
+    const toHead = rows.size === 0 ? key === 'up' || key === 'home' : key === 'up' && at === 0;
+    if (toHead) {
+      if (this.visibleColumns().length > 0) {
+        this.moveHead(0);
       }
       return;
     }
-    const intent = navigate(rows, at, key);
+    if (key === 'activate' || key === 'toggle') {
+      if (at >= 0) {
+        this.activate(at, key);
+      }
+      return;
+    }
+    if (at < 0) {
+      if (rows.size > 0 && key !== 'left' && key !== 'right') {
+        this.selectAndShow(key === 'up' || key === 'pageUp' || key === 'end' ? rows.size - 1 : 0);
+      }
+      return;
+    }
+    const intent = navigate(rows, at, key, this.pageSize());
     if (intent?.kind === 'select') {
-      this.select(this.targetAt(intent.index), intent.index, true);
-      this.view?.scrollToIndex(intent.index, 'auto');
+      this.selectAndShow(intent.index);
     } else if (intent) {
-      void this.toggleAt(intent.index, intent.kind === 'expand');
+      this.background(this.toggleAt(intent.index, intent.kind === 'expand'), 'toggle');
     }
   };
+
+  /** Keys on the header row: move along it, sort, resize, or go back down to the rows. */
+  private onHeadKey(key: NonNullable<ReturnType<typeof gridKey>>, shift: boolean): void {
+    const columns = this.visibleColumns();
+    const column = columns[this.activeHead];
+    if (!column) {
+      return;
+    }
+    if (shift && (key === 'left' || key === 'right')) {
+      if (column.resizable !== false) {
+        const width =
+          this.widths.get(column.id) ??
+          this.headCell(this.activeHead)?.getBoundingClientRect().width ??
+          0;
+        this.setColumnWidth(column.id, width + (key === 'right' ? RESIZE_STEP : -RESIZE_STEP));
+        if (this.widths.get(column.id) !== width) {
+          this.resized(column);
+        }
+      }
+      return;
+    }
+    switch (key) {
+      case 'left':
+        this.moveHead(Math.max(0, this.activeHead - 1));
+        break;
+      case 'right':
+        this.moveHead(Math.min(columns.length - 1, this.activeHead + 1));
+        break;
+      case 'home':
+        this.moveHead(0);
+        break;
+      case 'end':
+        this.moveHead(columns.length - 1);
+        break;
+      case 'activate':
+      case 'toggle':
+        this.cycleSort(column);
+        break;
+      case 'down':
+      case 'pageDown':
+        this.moveHead(-1);
+        if (this.indexOfSelected() < 0 && (this.shown?.size ?? 0) > 0) {
+          this.selectAndShow(0);
+        }
+        break;
+      default:
+    }
+  }
+
+  private moveHead(index: number): void {
+    this.activeHead = index;
+    this.syncActive();
+  }
+
+  private headCell(index: number): HTMLElement | null {
+    return (this.renderRoot as ShadowRoot).getElementById(headId(index));
+  }
+
+  /**
+   * The menu key or Shift+F10 fires `contextmenu` on the focused treegrid itself: opens the
+   * menu of the active header, or of the selected row, placed under it. A host that shows
+   * its menu cancels the event it is given, and so the browser's.
+   */
+  private readonly onKeyMenu = (e: MouseEvent): void => {
+    // Chromium gives a key's menu button -1, and a click's (as on the scrollbar) 2.
+    if (e.target !== this.scrollerRef.value || e.button >= 0) {
+      return;
+    }
+    const at = this.indexOfSelected();
+    let cell =
+      this.activeHead >= 0 ? this.headCell(this.activeHead) : at >= 0 ? this.paintedRow(at) : null;
+    if (!cell && this.activeHead < 0 && at >= 0) {
+      // The row is scrolled away: bring it back, with the menu under the header meanwhile.
+      this.view?.scrollToIndex(at, 'auto');
+      cell = this.scrollerRef.value?.querySelector<HTMLElement>(':scope > .head') ?? null;
+    }
+    if (!cell) {
+      return;
+    }
+    const box = cell.getBoundingClientRect();
+    const event = new MouseEvent('contextmenu', {
+      clientX: box.left,
+      clientY: box.bottom,
+      cancelable: true,
+    });
+    const column = this.visibleColumns()[this.activeHead];
+    if (column) {
+      this.headerMenu(column.id, event);
+    } else {
+      this.rowMenu(at, event);
+    }
+    if (event.defaultPrevented) {
+      e.preventDefault();
+    }
+  };
+
+  private selectAndShow(index: number): void {
+    this.select(this.targetAt(index), index, true);
+    this.view?.scrollToIndex(index, 'auto');
+  }
+
+  private headerMenu(column: string, event: MouseEvent): void {
+    this.emit<GridHeaderContextDetail>('lv-grid-header-context', { column, event });
+  }
+
+  private rowMenu(index: number, event: MouseEvent): void {
+    this.emit<GridContextDetail<R>>('lv-grid-context', { row: this.dataRow(index), event });
+  }
+
+  /** Enter follows the row's link where it has one; else Enter and Space open or close it. */
+  private activate(index: number, key: 'activate' | 'toggle'): void {
+    const link = key === 'activate' ? this.paintedRow(index)?.querySelector('a[href]') : null;
+    if (link instanceof HTMLElement) {
+      this.followingLink = true;
+      link.click();
+      this.followingLink = false;
+    } else if (this.shown?.hasChildrenAt(index)) {
+      this.background(this.toggleAt(index), 'toggle');
+    }
+  }
+
+  /** The rows that fit between the header and the totals, in the part of the grid on screen. */
+  private pageSize(): number {
+    const scroller = this.scrollerRef.value;
+    if (!scroller) {
+      return 1;
+    }
+    const frame = scroller.getBoundingClientRect();
+    const onScreen = Math.min(frame.bottom, window.innerHeight) - Math.max(frame.top, 0);
+    const edges = [':scope > .head', ':scope > .foot'].reduce(
+      (sum, selector) =>
+        sum + (scroller.querySelector(selector)?.getBoundingClientRect().height ?? 0),
+      0,
+    );
+    const height = Math.min(scroller.clientHeight, onScreen) - edges;
+    return Math.max(1, Math.floor(height / this.rowHeight) - 1);
+  }
 
   private readonly onContextMenu = (e: MouseEvent): void => {
     const index = this.indexFrom(e);
     if (index >= 0) {
-      this.emit<GridContextDetail<R>>('lv-grid-context', { row: this.dataRow(index), event: e });
+      this.rowMenu(index, e);
     }
   };
 
@@ -837,8 +1077,28 @@ export class LvGrid<R extends object = object> extends LitElement {
     this.emit<GridRowDetail<R>>('lv-grid-locate', { row: null });
   };
 
-  /** Bubbles, but is not composed: it stays inside the host's shadow root. */
-  private emit<T>(type: string, detail: T): void {
-    this.dispatchEvent(new CustomEvent<T>(type, { detail, bubbles: true }));
+  /** A build's error is reported from its snapshot, once, so its rejections are not. */
+  private background(work: Promise<unknown> | undefined, action: GridErrorDetail['action']): void {
+    work?.catch((error: unknown) => {
+      if (error !== this.store?.snapshot().failed?.error) {
+        this.report(error, action);
+      }
+    });
+  }
+
+  private report(error: unknown, action: GridErrorDetail['action']): void {
+    if (this.emit<GridErrorDetail>('lv-grid-error', { error, action }, true)) {
+      queueMicrotask(() => {
+        throw error;
+      });
+    }
+  }
+
+  /**
+   * Bubbles, but is not composed: it stays inside the host's shadow root. False when a
+   * listener cancelled it.
+   */
+  private emit<T>(type: string, detail: T, cancelable = false): boolean {
+    return this.dispatchEvent(new CustomEvent<T>(type, { detail, bubbles: true, cancelable }));
   }
 }

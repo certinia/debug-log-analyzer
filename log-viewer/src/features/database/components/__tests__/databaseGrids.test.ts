@@ -138,6 +138,10 @@ describe.each(GRIDS)('%s', (_name, spec) => {
     jest.restoreAllMocks();
   });
 
+  it('names the grid for a screen reader by its statement type', () => {
+    expect(grid().label).toBe(`${spec.type.toUpperCase()} statements`);
+  });
+
   it('shows one row per statement, keyed by its event', () => {
     expect(rows().map((row) => grid().source?.key(row))).toEqual([1, 2]);
     expect(rows().map((row) => row.rowCount)).toEqual([5, 15]);

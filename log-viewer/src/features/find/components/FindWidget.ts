@@ -136,7 +136,7 @@ export class FindWidget extends LitElement {
           ></vs-icon-checkbox>
         </section>
       </vscode-textfield>
-      <div class="matches-count">${this._getMatchesText()}</div>
+      <div class="matches-count" role="status">${this._getMatchesText()}</div>
 
       <div class="find-actions">
         <vscode-toolbar-button

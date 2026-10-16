@@ -24,6 +24,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- ♿ **Accessibility**: screen readers name each table, follow the selected row and read the find match count, and Enter, Space and Page Up/Down work in every table. Sort, resize and open a column's menu from the keyboard. ([#1169])
 - 🔦 **Timeline legend**: hover a category to highlight frames in the timeline, select to keep. ([#917])
 
 ### Removed

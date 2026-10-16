@@ -59,7 +59,12 @@ import '../../../components/ContextMenu.js';
 import type { ContextMenu } from '../../../components/ContextMenu.js';
 import '../../../components/GridSkeleton.js';
 import '../../../components/ViewModeSwitch.js';
-import { VIEW_MODES, directionOf, type ViewMode } from '../../../components/callTreeViewModes.js';
+import {
+  VIEW_MODES,
+  callTreeLabel,
+  directionOf,
+  type ViewMode,
+} from '../../../components/callTreeViewModes.js';
 import '../../../components/datagrid-facet-filter.js';
 import '../../../components/datagrid-filter-bar.js';
 import '../../../components/datagrid-range-filter.js';
@@ -1035,7 +1040,7 @@ export class CalltreeView extends LitElement {
     parentOf: (row: R) => R | undefined = () => undefined,
   ): LvGrid<R> {
     const grid = document.createElement('lv-call-tree-grid') as unknown as LvGrid<R>;
-    grid.label = `Call Tree, ${VIEW_MODES.find((option) => option.value === mode)?.label}`;
+    grid.label = callTreeLabel(mode);
     grid.toggleAttribute('category-colorize', this._colorize);
     const inspector = inspectorRowEvents<R>({
       source: 'calltree',

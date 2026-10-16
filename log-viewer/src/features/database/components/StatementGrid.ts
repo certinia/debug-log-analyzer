@@ -273,6 +273,7 @@ export abstract class StatementGrid<R extends StatementRow, L> extends LitElemen
         ${ref(this._gridMounted)}
         fit-rows
         footer-position="rows"
+        label="${spec.type.toUpperCase()} statements"
         .placeholder="${spec.placeholder}"
         .source="${this._source}"
         .columns="${this._columns}"
