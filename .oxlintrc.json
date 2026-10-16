@@ -120,11 +120,6 @@
   },
   "overrides": [
     {
-      "files": ["log-viewer/src/**/*.ts"],
-      "jsPlugins": ["./scripts/oxlint-plugin-lana.mjs"],
-      "rules": { "lana/no-tabulator-html-tooltip": "error" }
-    },
-    {
       // The grid is built as an outside library (see the rule); the bench measures its layers.
       "files": ["log-viewer/src/**/*.ts"],
       "jsPlugins": ["./scripts/oxlint-plugin-lana.mjs"],

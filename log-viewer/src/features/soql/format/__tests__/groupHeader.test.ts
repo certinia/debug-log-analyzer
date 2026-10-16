@@ -1,52 +1,63 @@
+/**
+ * @jest-environment jsdom
+ */
 /*
  * Copyright (c) 2026 Certinia Inc. All rights reserved.
  */
 import { describe, expect, it } from '@jest/globals';
+import { render } from 'lit';
 
-import { soqlGroupHeader } from '../groupHeader.js';
+import { soqlGroupCell } from '../groupHeader.js';
 
-describe('soqlGroupHeader', () => {
-  it('returns null when value is missing or empty', () => {
-    expect(soqlGroupHeader('', 3, [])).toBe('');
-    expect(soqlGroupHeader(undefined, 3, [])).toBe('');
+const shown = (key: string, rows: unknown[]): HTMLElement => {
+  const host = document.createElement('div');
+  render(soqlGroupCell({ key, rows }), host);
+  return host;
+};
+
+const soqlRow = { originalData: { type: 'SOQL_EXECUTE_BEGIN' } };
+
+describe('soqlGroupCell', () => {
+  it('shows an empty key as it is, with its count', () => {
+    expect(soqlGroupCell({ key: '', rows: [soqlRow] })).toBe(' (1)');
   });
 
-  it('returns null for non-SOQL rows', () => {
-    const data = [{ originalData: { type: 'METHOD_ENTRY' } }];
-    expect(soqlGroupHeader('SomeMethod', 5, data)).toBe('');
+  it('shows a key whose rows are no query as the key and its count', () => {
+    const rows = [{ originalData: { type: 'METHOD_ENTRY' } }];
+    expect(soqlGroupCell({ key: 'SomeMethod', rows })).toBe('SomeMethod (1)');
   });
 
-  it('formats SOQL when first row is SOQL_EXECUTE_BEGIN', () => {
-    const data = [{ originalData: { type: 'SOQL_EXECUTE_BEGIN' } }];
-    const html = soqlGroupHeader('SELECT Id FROM Account', 2, data);
-    expect(html).toContain('soql-block');
-    // single-line so the group-header cell ellipsizes instead of wrapping
-    expect(html).toContain('soql-inline');
-    expect(html).toContain('<span class="soql-tok-keyword">SELECT</span>');
-    // count is pinned in its own element so it stays visible when the query truncates
-    expect(html).toContain('soql-group-header__count');
-    expect(html).toContain('(2)');
+  it('highlights SOQL when the first row is SOQL_EXECUTE_BEGIN', () => {
+    const cell = shown('SELECT Id FROM Account', [soqlRow, soqlRow]);
+
+    // Single-line, so the group-header cell ellipsizes instead of wrapping.
+    const query = cell.querySelector('.soql-group-header__q.soql-block.soql-inline');
+    expect(query?.querySelector('.soql-tok-keyword')?.textContent).toBe('SELECT');
+    // The count is pinned in its own element, so it stays visible when the query truncates.
+    expect(cell.querySelector('.soql-group-header__count')?.textContent).toBe('(2)');
   });
 
-  it('formats SOSL when first row is SOSL_EXECUTE_BEGIN', () => {
-    const data = [{ originalData: { type: 'SOSL_EXECUTE_BEGIN' } }];
-    const html = soqlGroupHeader('FIND {acme} RETURNING Account', 1, data);
-    expect(html).toContain('<span class="soql-tok-keyword">FIND</span>');
-    expect(html).toContain('<span class="soql-tok-keyword">RETURNING</span>');
+  it('highlights SOSL when the first row is SOSL_EXECUTE_BEGIN', () => {
+    const cell = shown('FIND {acme} RETURNING Account', [
+      { originalData: { type: 'SOSL_EXECUTE_BEGIN' } },
+    ]);
+
+    const keywords = [...cell.querySelectorAll('.soql-tok-keyword')].map((k) => k.textContent);
+    expect(keywords).toEqual(expect.arrayContaining(['FIND', 'RETURNING']));
   });
 
-  it('formats when first row has matching soql field (SOQLView path)', () => {
+  it('highlights a key the first row names as its soql (SOQLView rows)', () => {
     const key = 'SELECT Id FROM Account';
-    const data = [{ soql: key }];
-    const html = soqlGroupHeader(key, 4, data);
-    expect(html).toContain('soql-tok-keyword');
-    expect(html).toContain('(4)');
+    const cell = shown(key, [{ soql: key }, { soql: key }, { soql: key }, { soql: key }]);
+
+    expect(cell.querySelector('.soql-tok-keyword')).not.toBeNull();
+    expect(cell.querySelector('.soql-group-header__count')?.textContent).toBe('(4)');
   });
 
   it('escapes html in identifiers', () => {
-    const data = [{ originalData: { type: 'SOQL_EXECUTE_BEGIN' } }];
-    const html = soqlGroupHeader('SELECT a<b> FROM x', 1, data);
-    expect(html).not.toContain('<b>');
-    expect(html).toContain('&lt;');
+    const cell = shown('SELECT a<b> FROM x', [soqlRow]);
+
+    expect(cell.querySelector('b')).toBeNull();
+    expect(cell.textContent).toContain('a<b>');
   });
 });

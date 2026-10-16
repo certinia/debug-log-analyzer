@@ -26,7 +26,7 @@ import {
   SOQL_VIEWS,
   SOSL_VIEWS,
   type ColumnView,
-} from '../../../../tabulator/ColumnViews.js';
+} from '../../../../components/grid/ColumnViews.js';
 import { goToRow } from '../../../call-tree/navigation.js';
 import { DMLView } from '../DMLView.js';
 import { SOQLView } from '../SOQLView.js';

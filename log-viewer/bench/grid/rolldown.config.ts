@@ -22,7 +22,7 @@ export default defineConfig({
     sourcemap: false,
   },
   platform: 'browser',
-  moduleTypes: { '.css': 'js', '.scss': 'js' },
+  moduleTypes: { '.css': 'js' },
   tsconfig: path.join(here, '../../tsconfig.json'),
   plugins: [nodePolyfills(), css({ minify: true })],
 });

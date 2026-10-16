@@ -6,8 +6,8 @@ import { customElement } from 'lit/decorators.js';
 import type { SOSLExecuteBeginLine } from '@apexdevtools/apex-log-parser';
 import { getCallerNamespace } from '../../../core/utility/CallerNamespace.js';
 import type { GridColumn } from '../../../grid/index.js';
-import { SOSL_VIEWS } from '../../../tabulator/ColumnViews.js';
-import { NAMESPACE_WIDTH } from '../../../tabulator/ColumnWidths.js';
+import { SOSL_VIEWS } from '../../../components/grid/ColumnViews.js';
+import { NAMESPACE_WIDTH } from '../../../components/grid/ColumnWidths.js';
 import { textColumn } from '../../../components/grid/columns.js';
 import {
   rowCountColumn,

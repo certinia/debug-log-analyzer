@@ -1,15 +1,13 @@
 /*
  * Copyright (c) 2026 Certinia Inc. All rights reserved.
  */
-import type { Tabulator } from 'tabulator-tables';
-
-import type { ContextMenuItem } from '../components/ContextMenu.js';
+import type { GridColumn } from '../../grid/index.js';
+import type { ContextMenuItem } from '../ContextMenu.js';
 
 /**
- * A preconfigured set of columns tailored to a kind of investigation. Column
- * membership is keyed by Tabulator `field`. Presets list every applicable field
- * name; fields absent from a given table are ignored by {@link applyColumnView},
- * so one preset works across differently-shaped tables (e.g. the three call-tree
+ * A preconfigured set of columns tailored to a kind of investigation. Its fields
+ * are column ids. Presets list every applicable id; ids absent from a given grid
+ * are ignored, so one preset works across differently-shaped grids (e.g. the three call-tree
  * modes name equivalent columns differently: `duration.total` vs `totalTime`).
  */
 export interface ColumnView {
@@ -133,53 +131,6 @@ export function resolveColumnView(views: ColumnView[], id: string | undefined): 
 }
 
 /**
- * Shows/hides table columns to match `fields`. `null` shows every column
- * (the General view). `alwaysVisible` fields are shown regardless. Fields that
- * don't exist in this table are ignored, so one preset works across tables with
- * differing column sets.
- */
-export function applyColumnView(
-  table: Tabulator,
-  fields: string[] | null,
-  alwaysVisible: string[],
-): void {
-  const visible = fields === null ? null : new Set([...alwaysVisible, ...fields]);
-  for (const column of table.getColumns()) {
-    const field = column.getField();
-    if (!field) {
-      continue;
-    }
-    if (visible === null || visible.has(field)) {
-      column.show();
-    } else {
-      column.hide();
-    }
-  }
-  // Stock tabulator: column.show()/hide() flip cell visibility but do NOT re-run
-  // the fitColumns width distribution or normalizeHeight — the flex (Name) column
-  // wouldn't reclaim space freed by hidden columns and wrapped-row heights would
-  // go stale. redraw() runs layoutRefresh (widths + heights) and re-renders the
-  // visible window. Required — do not remove.
-  table.redraw();
-}
-
-/** The field names of every column in the table, in column order. */
-export function getTableFields(table: Tabulator): string[] {
-  return table
-    .getColumns()
-    .map((column) => column.getField())
-    .filter((field): field is string => !!field);
-}
-
-/** The fields currently visible in the table. */
-export function getVisibleFields(table: Tabulator): string[] {
-  return table
-    .getColumns()
-    .filter((column) => column.isVisible() && column.getField())
-    .map((column) => column.getField());
-}
-
-/**
  * Toggles `field` within a view's effective field list, returning the new
  * explicit list. A `null` list (show-all) is first materialised to every table
  * field so the toggle removes exactly one column. Operating on the field list
@@ -207,36 +158,14 @@ export function toggleField(
 const CHECKED = '✓ ';
 const UNCHECKED = '  ';
 
+/** The part of a grid column the menu reads. */
+export type MenuColumn = Pick<GridColumn<never>, 'id' | 'title' | 'hidden'>;
+
 /**
- * Builds the column-header context menu: the preset views (active one ticked,
- * edited ones carrying an inline reset icon), then a per-column visibility
- * toggle for every column except the always-visible ones.
+ * Builds the column-header context menu from a grid's columns in order: the preset
+ * views (active one ticked, edited ones carrying an inline reset icon), then a
+ * per-column visibility toggle for every column except the always-visible ones.
  */
-export function buildColumnMenuItems(
-  table: Tabulator,
-  activeViewId: string,
-  views: ColumnView[],
-  alwaysVisible: string[],
-  editedViewIds: string[],
-): ContextMenuItem[] {
-  const columns = table.getColumns().map((column) => {
-    const field = column.getField();
-    return {
-      field,
-      title: String(column.getDefinition().title ?? field),
-      visible: column.isVisible(),
-    };
-  });
-  return columnMenuItems(columns, activeViewId, views, alwaysVisible, editedViewIds);
-}
-
-export interface MenuColumn {
-  field: string;
-  title: string;
-  visible: boolean;
-}
-
-/** {@link buildColumnMenuItems} for any grid, from its columns in order. */
 export function columnMenuItems(
   columns: readonly MenuColumn[],
   activeViewId: string,
@@ -255,14 +184,14 @@ export function columnMenuItems(
 
   items.push({ id: 'view-sep', label: '', separator: true });
 
-  for (const { field, title, visible } of columns) {
-    if (!field || alwaysVisible.includes(field)) {
+  for (const { id, title, hidden } of columns) {
+    if (alwaysVisible.includes(id)) {
       continue;
     }
     items.push({
-      id: `col:${field}`,
+      id: `col:${id}`,
       label: title,
-      checked: visible,
+      checked: !hidden,
       keepOpen: true,
     });
   }

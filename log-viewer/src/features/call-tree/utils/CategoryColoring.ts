@@ -1,43 +1,19 @@
 /*
  * Copyright (c) 2025 Certinia Inc. All rights reserved.
  */
-import type { RowComponent } from 'tabulator-tables';
-
-import { stampRowPath } from '../../../components/locatedRow.js';
 import { VSCodeExtensionMessenger } from '../../../core/messaging/VSCodeExtensionMessenger.js';
 import { subscribeSettings, type LanaSettings } from '../../settings/Settings.js';
-import { CATEGORY_THEME_KEY, DEFAULT_THEME_NAME } from '../../timeline/themes/Themes.js';
+import { DEFAULT_THEME_NAME } from '../../timeline/themes/Themes.js';
 import { addCustomThemes, getTheme } from '../../timeline/themes/ThemeSelector.js';
 
 /**
  * Single source of truth for the category colour strip. The Call Tree and Analysis views
- * share `wireCategoryColoring`; the Tabulator row formatters serve only the grid bench's
- * Tabulator contender.
+ * share `wireCategoryColoring`.
  *
  * Each row points at one host theme var via the inherited `--row-cat-color` custom
  * property, so a theme switch only updates the host vars and rows re-resolve in place —
- * no Tabulator reformat, no scroll shift.
+ * no row rebuild, no scroll shift.
  */
-
-/**
- * Tabulator `rowFormatter`: points a row at its category's host theme var. A row element
- * is bound to one data row for its lifetime, so the category never changes once set.
- */
-export const categoryRowFormatter = (row: RowComponent): void => {
-  const data = row.getData() as { originalData?: { category?: string } };
-  const category = data.originalData?.category;
-  const themeKey = category ? CATEGORY_THEME_KEY[category] : undefined;
-  if (themeKey) {
-    row.getElement().style.setProperty('--row-cat-color', `var(--ct-color-${themeKey})`);
-  }
-};
-
-/** The `rowFormatter` for a view whose rows merge occurrences: the colour strip,
- *  plus the path id stamp. */
-export const groupedRowFormatter = (row: RowComponent): void => {
-  categoryRowFormatter(row);
-  stampRowPath(row);
-};
 
 function applyCategoryTheme(host: HTMLElement, themeName: string): void {
   const theme = getTheme(themeName);

@@ -54,6 +54,6 @@ export function rowLine<R>(
   );
 }
 
-/** A group's line: its key, alone, as Tabulator writes one, after its `level` if given. */
+/** A group's line: its key alone, after its `level` if given. */
 export const groupLine = (key: string, format: ExportOptions['format'], level?: number): string =>
   lead(level, format) + cell(key, format);

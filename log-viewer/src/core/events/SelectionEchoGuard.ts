@@ -9,8 +9,8 @@
  * would send back the very selection it asked for, or a grid cleared because a
  * sibling grid was picked, whose null would arrive after the pick and undo it.
  *
- * Needed because neither consumer offers a silent select: tabulator fires
- * `rowSelectionChanged` for a programmatic `row.select()`, and the flame chart
+ * Needed because neither consumer offers a silent select: lv-grid fires
+ * `lv-grid-select` for a programmatic `goTo` or `deselect`, and the flame chart
  * re-emits through `SelectionOrchestrator.selectFrame`.
  */
 export class SelectionEchoGuard {

@@ -2,22 +2,18 @@
  * Copyright (c) 2026 Certinia Inc. All rights reserved.
  */
 import type { ReactiveController, ReactiveControllerHost } from 'lit';
-import type { Tabulator } from 'tabulator-tables';
 
 import type { ContextMenuItem } from './ContextMenu.js';
 import { getSettings, updateSetting, type LanaSettings } from '../features/settings/Settings.js';
 import type { GridColumn, LvGrid } from '../grid/index.js';
 import {
-  applyColumnView,
-  buildColumnMenuItems,
   columnMenuItems,
   getColumnView,
-  getTableFields,
   resolveColumnView,
   toggleField,
   type ColumnView,
   type MenuColumn,
-} from '../tabulator/ColumnViews.js';
+} from './grid/ColumnViews.js';
 
 export interface ColumnTarget {
   /** Each column a view can name, in order. */
@@ -40,12 +36,7 @@ export function heldColumnTarget<R>(
   write: (columns: GridColumn<R>[]) => void,
 ): ColumnTarget {
   return {
-    columns: () =>
-      read().map((column) => ({
-        field: column.id,
-        title: column.title,
-        visible: !column.hidden,
-      })),
+    columns: read,
     show: (visible) => {
       write(
         read().map((column) => ({
@@ -56,11 +47,6 @@ export function heldColumnTarget<R>(
     },
   };
 }
-
-/** A grid a column view applies to. */
-export type Target = Tabulator | ColumnTarget;
-
-const isTabulator = (target: Target): target is Tabulator => 'getColumns' in target;
 
 /** What a grid keeps in settings: the view on show, and the views the user edited. */
 export interface ColumnSettings {
@@ -77,8 +63,8 @@ export interface ColumnSettingsOptions {
   views: ColumnView[];
   /** Fields shown whichever view is on, e.g. the Name column. */
   alwaysVisible: string[];
-  /** Every built table the view applies to. The call tree has three. */
-  tables: () => Target[];
+  /** Every grid's columns the view applies to. The call tree has three. */
+  targets: () => ColumnTarget[];
 }
 
 /**
@@ -126,14 +112,10 @@ export class ColumnSettingsController implements ReactiveController {
     return this._overrides[id] ?? getColumnView(this._options.views, id)?.fields ?? null;
   }
 
-  /** Apply the view on show to a table that has just been built. */
-  applyTo(table: Target): void {
+  /** Apply the view on show to `target`. */
+  applyTo(target: ColumnTarget): void {
     const fields = this.fieldsFor(this._view);
-    if (isTabulator(table)) {
-      applyColumnView(table, fields, this._options.alwaysVisible);
-    } else {
-      table.show(fields === null ? null : new Set([...this._options.alwaysVisible, ...fields]));
-    }
+    target.show(fields === null ? null : new Set([...this._options.alwaysVisible, ...fields]));
   }
 
   /** Show `id` and remember it. */
@@ -143,10 +125,8 @@ export class ColumnSettingsController implements ReactiveController {
   }
 
   /** Add or remove one column from the view on show, and remember it. */
-  toggle(table: Target, field: string): void {
-    const fields = isTabulator(table)
-      ? getTableFields(table)
-      : table.columns().map((column) => column.field);
+  toggle(target: ColumnTarget, field: string): void {
+    const fields = target.columns().map((column) => column.id);
     this._overrides = {
       ...this._overrides,
       [this._view]: toggleField(this.fieldsFor(this._view), field, fields),
@@ -170,12 +150,10 @@ export class ColumnSettingsController implements ReactiveController {
     updateSetting(`${this._options.section}.columnOverrides`, this._overrides);
   }
 
-  /** The column header menu for `table`, against the state now. */
-  menuItems(table: Target): ContextMenuItem[] {
+  /** The column header menu for `target`, against the state now. */
+  menuItems(target: ColumnTarget): ContextMenuItem[] {
     const { views, alwaysVisible } = this._options;
-    return isTabulator(table)
-      ? buildColumnMenuItems(table, this._view, views, alwaysVisible, this.editedViews)
-      : columnMenuItems(table.columns(), this._view, views, alwaysVisible, this.editedViews);
+    return columnMenuItems(target.columns(), this._view, views, alwaysVisible, this.editedViews);
   }
 
   private _adopt(settings: LanaSettings): void {
@@ -190,16 +168,9 @@ export class ColumnSettingsController implements ReactiveController {
     this._host.requestUpdate();
   }
 
-  /**
-   * A table that has never been laid out throws on the redraw this ends in, and a
-   * hidden tab leaves one that way. Such a table takes the view on its next build
-   * instead, through {@link applyTo}.
-   */
   private _apply(): void {
-    for (const table of this._options.tables()) {
-      if (!isTabulator(table) || table.element?.clientHeight) {
-        this.applyTo(table);
-      }
+    for (const target of this._options.targets()) {
+      this.applyTo(target);
     }
   }
 }

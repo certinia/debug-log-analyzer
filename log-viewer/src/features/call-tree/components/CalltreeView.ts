@@ -49,7 +49,7 @@ import {
 import { inspectorRowEvents } from '../grid/inspectorRowEvents.js';
 import { MergedTree } from '../grid/mergedRows.js';
 
-import { inMsRange, type FilterRange } from '../../../tabulator/filters/MinMax.js';
+import { inMsRange, type FilterRange } from '../../../components/grid/MinMax.js';
 
 // styles
 import { globalStyles } from '../../../styles/global.styles.js';
@@ -70,8 +70,8 @@ import {
   gridColumnTarget,
   type ColumnTarget,
 } from '../../../components/ColumnSettingsController.js';
-import { CALL_TREE_VIEWS } from '../../../tabulator/ColumnViews.js';
-import { LocatedRowIds } from '../../../components/locatedRow.js';
+import { CALL_TREE_VIEWS } from '../../../components/grid/ColumnViews.js';
+import { LocatedRowIds, type RowData } from '../../../components/locatedRow.js';
 import { InspectorTabController } from '../../../components/InspectorTabController.js';
 import { LvGridFindController } from '../../../components/grid/LvGridFindController.js';
 import { revealFirstOf } from '../../../components/inspectorTab.js';
@@ -176,13 +176,13 @@ export class CalltreeView extends LitElement {
   private readonly _columns = new ColumnSettingsController(this, {
     ...CALL_TREE_COLUMN_SETTINGS,
     // All three, so a mode the user has not switched back to is already right.
-    tables: () => this._gridTargets,
+    targets: () => this._gridTargets,
   });
 
   private contextMenu: ContextMenu | null = null;
   private contextMenuRow: LogEvent | null = null;
   /** The grid whose header was right-clicked (for column-toggle actions). */
-  private contextMenuTable: ColumnTarget | null = null;
+  private contextMenuTarget: ColumnTarget | null = null;
   private viewSwitchEpoch = 0;
   /** Drops a pending wait for the view to come on screen, once per attach. */
   private _visibilityWait: AbortController | null = null;
@@ -623,13 +623,13 @@ export class CalltreeView extends LitElement {
     }
   }
 
-  private _showHeaderContextMenu(table: ColumnTarget, clientX: number, clientY: number) {
+  private _showHeaderContextMenu(target: ColumnTarget, clientX: number, clientY: number) {
     if (!this.contextMenu) {
       return;
     }
     this.contextMenuRow = null;
-    this.contextMenuTable = table;
-    this.contextMenu.show(this._columns.menuItems(table), clientX, clientY);
+    this.contextMenuTarget = target;
+    this.contextMenu.show(this._columns.menuItems(target), clientX, clientY);
   }
 
   private _activeColumnTarget(): ColumnTarget | null {
@@ -654,14 +654,14 @@ export class CalltreeView extends LitElement {
 
   /** Rebuilds the open column menu so checkmarks/reset icons reflect current state. */
   private _refreshColumnMenu() {
-    if (!this.contextMenu?.isVisible() || !this.contextMenuTable) {
+    if (!this.contextMenu?.isVisible() || !this.contextMenuTarget) {
       return;
     }
-    this.contextMenu.items = this._columns.menuItems(this.contextMenuTable);
+    this.contextMenu.items = this._columns.menuItems(this.contextMenuTarget);
   }
 
   private _onColumnMenuClose() {
-    this.contextMenuTable = null;
+    this.contextMenuTarget = null;
     this.contextMenuRow = null;
   }
 
@@ -1031,7 +1031,7 @@ export class CalltreeView extends LitElement {
   private _mountGrid<R extends object>(
     container: HTMLElement,
     mode: ViewMode,
-    data: (row: R) => object,
+    data: (row: R) => RowData,
     parentOf: (row: R) => R | undefined = () => undefined,
   ): LvGrid<R> {
     const grid = document.createElement('lv-call-tree-grid') as unknown as LvGrid<R>;
@@ -1091,7 +1091,7 @@ export class CalltreeView extends LitElement {
     const { itemId } = e.detail;
 
     // Column-header menu actions (see _showHeaderContextMenu). These keep the menu
-    // open (keepOpen), so refresh its items live and leave contextMenuTable set —
+    // open (keepOpen), so refresh its items live and leave contextMenuTarget set —
     // it's cleared on menu-close.
     if (itemId.startsWith('view:')) {
       this._columns.choose(itemId.slice('view:'.length));
@@ -1099,8 +1099,8 @@ export class CalltreeView extends LitElement {
       return;
     }
     if (itemId.startsWith('col:')) {
-      if (this.contextMenuTable) {
-        this._columns.toggle(this.contextMenuTable, itemId.slice('col:'.length));
+      if (this.contextMenuTarget) {
+        this._columns.toggle(this.contextMenuTarget, itemId.slice('col:'.length));
         this._refreshColumnMenu();
       }
       return;

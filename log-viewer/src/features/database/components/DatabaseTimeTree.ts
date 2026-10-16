@@ -28,7 +28,7 @@ import { logContext } from '../../../core/log/logContext.js';
 import type { LogStore } from '../../../core/log/LogStore.js';
 import { sum, type GridColumn, type TreeSource } from '../../../grid/index.js';
 import { globalStyles } from '../../../styles/global.styles.js';
-import { progressColumnWidth } from '../../../tabulator/format/measureWidth.js';
+import { progressColumnWidth } from '../../../components/grid/measureWidth.js';
 import {
   type DatabaseCallNode,
   databaseOverview,

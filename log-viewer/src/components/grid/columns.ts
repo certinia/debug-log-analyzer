@@ -9,7 +9,7 @@ import { formatDuration } from '../../core/utility/Util.js';
 import { formatSOQL, formatSOQLToText } from '../../features/soql/format/formatter.js';
 import type { Dialect } from '../../features/soql/format/tokenize.js';
 import { sum, type Calc, type GridColumn } from '../../grid/index.js';
-import { TIME_WIDTH } from '../../tabulator/ColumnWidths.js';
+import { TIME_WIDTH } from './ColumnWidths.js';
 import { msBar } from './cells.js';
 
 export const COUNT_MIN_WIDTH = 60;

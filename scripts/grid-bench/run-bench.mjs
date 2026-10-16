@@ -27,12 +27,15 @@ const { values, positionals } = parseArgs({
 });
 const [logPath, outPath, ...names] = positionals;
 const contenders = names.length ? names : ['call-tree'];
-if (values.tree !== 'bottom-up' && contenders.includes('tabulator')) {
-  console.error(`No Tabulator ${values.tree} table is left: its figures are in baseline/.`);
+const unknown = contenders.filter((name) => !['grid', 'lv-grid', 'call-tree'].includes(name));
+if (unknown.length) {
+  // The page throws before it is ready, which would leave the wait below to time out.
+  console.error(
+    `Unknown contender ${unknown.join(', ')}: use grid, lv-grid or call-tree. ` +
+      'Tabulator is removed: log-viewer/bench/grid/baseline/ holds the figures it last gave.',
+  );
   process.exit(1);
 }
-/** Tabulator's Bottom-Up table overflows the stack on an ungroup after a group. */
-const skipped = (name) => (name === 'tabulator' ? ['ungroup'] : []);
 
 const page = `file://${path.resolve('log-viewer/bench/grid/index.html')}`;
 
@@ -59,10 +62,7 @@ for (const name of contenders) {
     const result = values.only
       ? await tab.evaluate((only) => window.bench.runOne(only), values.only)
       : lastLoad
-        ? await tab.evaluate(
-            ([reps, skip]) => window.bench.runAll(reps, skip),
-            [Number(values.reps), skipped(name)],
-          )
+        ? await tab.evaluate((reps) => window.bench.runAll(reps), Number(values.reps))
         : await tab.evaluate(() => window.bench.results);
     console.log(`${name} load ${load + 1}: first render ${JSON.stringify(result.firstRender)}`);
     loads.push(structuredClone(result));
