@@ -497,6 +497,9 @@ describe('lv-grid', () => {
     expect(root.querySelector('[role="alert"]')?.textContent).toBe(
       'The table could not be updated.',
     );
+    grid.errorText = 'Clear the filter.';
+    await settle(grid);
+    expect(root.querySelector('[role="alert"]')?.textContent).toBe('Clear the filter.');
     expect(root.querySelector<HTMLElement>('.body')?.hidden).toBe(true);
     expect(errors).toEqual([{ error: boom, action: 'build' }]);
     await key('ArrowDown');

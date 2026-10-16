@@ -186,6 +186,10 @@ export class LvGrid<R extends object = object> extends LitElement {
   @property({ attribute: false })
   placeholder: string | null = null;
 
+  /** The alert shown in place of the rows while a build fails. */
+  @property({ attribute: false })
+  errorText = 'The table could not be updated.';
+
   private store: GridStore<R> | null = null;
   private readonly data = new StoreController<R>(this);
   private view: GridView<R> | null = null;
@@ -439,7 +443,7 @@ export class LvGrid<R extends object = object> extends LitElement {
       </div>
       ${
         failed
-          ? html`<div class="placeholder" role="alert">The table could not be updated.</div>`
+          ? html`<div class="placeholder" role="alert">${this.errorText}</div>`
           : size === 0 && !this.data.snapshot?.busy && this.placeholder !== null
             ? html`<div class="placeholder" role="status">${this.placeholder}</div>`
             : nothing
