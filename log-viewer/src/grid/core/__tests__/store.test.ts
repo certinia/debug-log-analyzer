@@ -229,6 +229,26 @@ describe('GridStore', () => {
     expect(shown(store.snapshot().rows)).toEqual(['a+@0', 'b+@1', 'c@2', 'x@1', 'd+@0', 'e@1']);
   });
 
+  it('keeps the error when a row opens on the rows from before it', async () => {
+    const store = new GridStore(source(tree()));
+    await store.settled();
+    const boom = new Error('boom');
+    const failing = store.setFilters([
+      {
+        test: (row) => {
+          if (row.key === 'x') {
+            throw boom;
+          }
+          return true;
+        },
+      },
+    ]);
+    await expect(failing).rejects.toBe(boom);
+    expect(await store.toggle('d')).toBe(true);
+    expect(shown(store.snapshot().rows)).toEqual(['a-@0', 'd+@0', 'e@1']);
+    expect(store.snapshot().failed?.error).toBe(boom);
+  });
+
   it('builds a change that came while a step threw, and gives no one the replaced error', async () => {
     const store = new GridStore(source(tree()));
     await store.settled();
@@ -243,6 +263,7 @@ describe('GridStore', () => {
     ]);
     await expect(failing).resolves.toBeUndefined();
     await expect(newer).resolves.toBeUndefined();
+    expect(store.snapshot().failed).toBeUndefined();
     await store.expandAll();
     expect(shown(store.snapshot().rows)).toEqual(['a+@0', 'b+@1', 'c@2', 'x@1', 'd+@0', 'e@1']);
   });
