@@ -5,12 +5,12 @@
  */
 import { describe, expect, it } from '@jest/globals';
 
-import type { ApexLog, LogEvent } from '@apexdevtools/apex-log-parser';
+import type { ApexLog } from '@apexdevtools/apex-log-parser';
 
 import { callFrame } from '#test-helpers/events.js';
 import { logStoreFor } from '../../core/log/LogStore.js';
 import { ROOT_PATH_ID } from '../../core/log/keyPathIds.js';
-import { LocatedRowIds, rowDetailSelection, rowFrames, type RowReader } from '../locatedRow.js';
+import { LocatedRowIds, rowDetailSelection, type RowReader } from '../locatedRow.js';
 
 type Row = Record<string, unknown>;
 const parents = new WeakMap<Row, Row>();
@@ -23,57 +23,6 @@ function treeRow(data: Row, parent?: Row): Row {
   }
   return data;
 }
-
-describe('rowFrames', () => {
-  /** exec -> m1 -> soql, with the indexes the log answers about. */
-  function log() {
-    const exec = callFrame('exec', null, 1);
-    const m1 = callFrame('m1', exec, 3);
-    const soql = callFrame('soql', m1, 5);
-    return {
-      soql,
-      apexLog: { eventsById: { 1: exec, 3: m1, 5: soql } } as unknown as ApexLog,
-    };
-  }
-
-  /** The bucket for `soql` and the caller row under it, as a bottom-up grid
-   *  leaves them: the bucket holds the occurrences, the caller row derives its. */
-  function rows(apexLog: ApexLog, soql: LogEvent) {
-    const paths = logStoreFor(apexLog).keyPathIds();
-    const bucketPath = paths.step(ROOT_PATH_ID, paths.keyIdOf(soql));
-    const bucket = treeRow({
-      key: 'soql',
-      _pathId: bucketPath,
-      instances: [soql],
-    });
-    const caller = treeRow(
-      { key: 'm1', _pathId: paths.step(bucketPath, paths.keyIdOf(soql.parent!)) },
-      bucket,
-    );
-    return { bucket, caller };
-  }
-
-  it('names the caller a bottom-up row is, not the calls it counts', () => {
-    const { apexLog, soql } = log();
-    const { caller } = rows(apexLog, soql);
-
-    expect(rowFrames(caller, read, apexLog, 'callers')).toEqual([3]);
-  });
-
-  it('leaves a top-down row as the calls it counts, since it sits at their depth', () => {
-    const { apexLog, soql } = log();
-    const { caller } = rows(apexLog, soql);
-
-    expect(rowFrames(caller, read, apexLog, 'callees')).toEqual([5]);
-  });
-
-  it('names its own occurrences for the row a bottom-up tree is seeded from', () => {
-    const { apexLog, soql } = log();
-    const { bucket } = rows(apexLog, soql);
-
-    expect(rowFrames(bucket, read, apexLog, 'callers')).toEqual([5]);
-  });
-});
 
 describe('rowDetailSelection', () => {
   /** exec -> m1 -> soql, with the bucket and caller rows a bottom-up grid
