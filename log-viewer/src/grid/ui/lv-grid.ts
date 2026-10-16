@@ -9,7 +9,7 @@ import {
   type PropertyValues,
   type TemplateResult,
 } from 'lit';
-import { customElement, property } from 'lit/decorators.js';
+import { customElement, property, state } from 'lit/decorators.js';
 import { createRef, ref } from 'lit/directives/ref.js';
 import { styleMap } from 'lit/directives/style-map.js';
 
@@ -39,6 +39,10 @@ import { columnTracks, minWidthOf, naturalWidth } from './sizing.js';
 import { StoreController } from './store-controller.js';
 import { gridStyles } from './styles.js';
 import { browserScheduler } from './yield.js';
+
+const RESIZE_STEP = 16;
+
+const headId = (index: number): string => `head-${index}`;
 
 export interface GridSelectDetail<R> {
   /** The selected data row; null for a group row or no selection. */
@@ -206,6 +210,9 @@ export class LvGrid<R extends object = object> extends LitElement {
   private missedIn: RowView<R> | null = null;
   private hovered = -1;
   private failure: { readonly error: unknown } | undefined;
+  /** The header the keyboard is on, by shown-column index; -1 while it is on the rows. */
+  @state()
+  private activeHead = -1;
   /** Enter clicks a row's link; that click must not reach the row as a select. */
   private followingLink = false;
   private found: FindMarks<R> | null = null;
@@ -400,6 +407,7 @@ export class LvGrid<R extends object = object> extends LitElement {
       itemsChanged(shownIds(this.columns), shownIds(changed.get('columns')))
     ) {
       this.emit<GridReshapeDetail>('lv-grid-reshape', { reason: 'columns' });
+      this.activeHead = Math.min(this.activeHead, shownIds(this.columns).length - 1);
     }
   }
 
@@ -424,6 +432,9 @@ export class LvGrid<R extends object = object> extends LitElement {
     } else if (changed.has('columns') || changed.has('marked') || changed.has('rowClass')) {
       this.view?.repaint();
     }
+    if (changed.has('columns')) {
+      this.syncActive();
+    }
   }
 
   protected render(): TemplateResult {
@@ -445,10 +456,11 @@ export class LvGrid<R extends object = object> extends LitElement {
       style=${styleMap(columnTracks(columns, this.widths))}
       ${ref(this.scrollerRef)}
       @keydown=${this.onKey}
+      @contextmenu=${this.onKeyMenu}
     >
       <div class="busy"></div>
       <div class="row head" role="row" aria-rowindex="1">
-        ${columns.map((column) => this.headerCell(column))}
+        ${columns.map((column, i) => this.headerCell(column, i))}
       </div>
       ${
         notice
@@ -496,7 +508,7 @@ export class LvGrid<R extends object = object> extends LitElement {
     return null;
   }
 
-  private headerCell(column: GridColumn<R>): TemplateResult {
+  private headerCell(column: GridColumn<R>, index: number): TemplateResult {
     const dir = this.sort?.column === column.id ? this.sort.dir : null;
     const ariaSort = !column.sort
       ? nothing
@@ -506,17 +518,15 @@ export class LvGrid<R extends object = object> extends LitElement {
           ? 'descending'
           : 'none';
     return html`<div
-      class="cell colhead ${column.align === 'end' ? 'end' : ''}"
+      class="cell colhead ${column.align === 'end' ? 'end' : ''} ${index === this.activeHead ? 'active' : ''}"
+      id=${headId(index)}
       role="columnheader"
       title=${column.description ?? column.title}
       aria-sort=${ariaSort}
+      aria-keyshortcuts=${column.resizable === false ? nothing : 'Shift+ArrowLeft Shift+ArrowRight'}
       ?data-sortable=${column.sort !== undefined}
       @click=${(e: MouseEvent) => this.onHeaderClick(e, column)}
-      @contextmenu=${(e: MouseEvent) =>
-        this.emit<GridHeaderContextDetail>('lv-grid-header-context', {
-          column: column.id,
-          event: e,
-        })}
+      @contextmenu=${(e: MouseEvent) => this.headerMenu(column.id, e)}
     >
       <span class="title"
         >${column.title}${
@@ -736,6 +746,7 @@ export class LvGrid<R extends object = object> extends LitElement {
     this.selected = target;
     this.selectedAt = index;
     this.missedIn = null;
+    this.activeHead = -1;
     this.view?.repaint();
     this.syncActive();
     const entry = index >= 0 ? this.shown?.rowAt(index) : undefined;
@@ -747,14 +758,17 @@ export class LvGrid<R extends object = object> extends LitElement {
   }
 
   /**
-   * Points `aria-activedescendant` at the selected row once it is painted, so a screen
-   * reader follows the keys. A reader reads a change to it, not the row's later arrival.
+   * Points `aria-activedescendant` at the active header, or at the selected row once it is
+   * painted, so a screen reader follows the keys. A reader reads a change to it, not the
+   * row's later arrival.
    */
   private syncActive(): void {
     const scroller = this.scrollerRef.value;
     const at = this.indexOfSelected();
     const id = at >= 0 && !this.failure ? rowId(at) : null;
-    if (id !== null && (this.renderRoot as ShadowRoot).getElementById(id)) {
+    if (this.activeHead >= 0) {
+      scroller?.setAttribute('aria-activedescendant', headId(this.activeHead));
+    } else if (id !== null && (this.renderRoot as ShadowRoot).getElementById(id)) {
       if (scroller?.getAttribute('aria-activedescendant') !== id) {
         scroller?.setAttribute('aria-activedescendant', id);
       }
@@ -874,7 +888,18 @@ export class LvGrid<R extends object = object> extends LitElement {
       this.background(this.copy(), 'copy');
       return;
     }
+    if (this.activeHead >= 0) {
+      this.onHeadKey(key, e.shiftKey);
+      return;
+    }
     const at = this.indexOfSelected();
+    const toHead = rows.size === 0 ? key === 'up' || key === 'home' : key === 'up' && at === 0;
+    if (toHead) {
+      if (this.visibleColumns().length > 0) {
+        this.moveHead(0);
+      }
+      return;
+    }
     if (key === 'activate' || key === 'toggle') {
       if (at >= 0) {
         this.activate(at, key);
@@ -883,20 +908,125 @@ export class LvGrid<R extends object = object> extends LitElement {
     }
     if (at < 0) {
       if (rows.size > 0 && key !== 'left' && key !== 'right') {
-        const index = key === 'up' || key === 'pageUp' || key === 'end' ? rows.size - 1 : 0;
-        this.select(this.targetAt(index), index, true);
-        this.view?.scrollToIndex(index, 'auto');
+        this.selectAndShow(key === 'up' || key === 'pageUp' || key === 'end' ? rows.size - 1 : 0);
       }
       return;
     }
     const intent = navigate(rows, at, key, this.pageSize());
     if (intent?.kind === 'select') {
-      this.select(this.targetAt(intent.index), intent.index, true);
-      this.view?.scrollToIndex(intent.index, 'auto');
+      this.selectAndShow(intent.index);
     } else if (intent) {
       this.background(this.toggleAt(intent.index, intent.kind === 'expand'), 'toggle');
     }
   };
+
+  /** Keys on the header row: move along it, sort, resize, or go back down to the rows. */
+  private onHeadKey(key: NonNullable<ReturnType<typeof gridKey>>, shift: boolean): void {
+    const columns = this.visibleColumns();
+    const column = columns[this.activeHead];
+    if (!column) {
+      return;
+    }
+    if (shift && (key === 'left' || key === 'right')) {
+      if (column.resizable !== false) {
+        const width =
+          this.widths.get(column.id) ??
+          this.headCell(this.activeHead)?.getBoundingClientRect().width ??
+          0;
+        this.setColumnWidth(column.id, width + (key === 'right' ? RESIZE_STEP : -RESIZE_STEP));
+        if (this.widths.get(column.id) !== width) {
+          this.resized(column);
+        }
+      }
+      return;
+    }
+    switch (key) {
+      case 'left':
+        this.moveHead(Math.max(0, this.activeHead - 1));
+        break;
+      case 'right':
+        this.moveHead(Math.min(columns.length - 1, this.activeHead + 1));
+        break;
+      case 'home':
+        this.moveHead(0);
+        break;
+      case 'end':
+        this.moveHead(columns.length - 1);
+        break;
+      case 'activate':
+      case 'toggle':
+        this.cycleSort(column);
+        break;
+      case 'down':
+      case 'pageDown':
+        this.moveHead(-1);
+        if (this.indexOfSelected() < 0 && (this.shown?.size ?? 0) > 0) {
+          this.selectAndShow(0);
+        }
+        break;
+      default:
+    }
+  }
+
+  private moveHead(index: number): void {
+    this.activeHead = index;
+    this.syncActive();
+  }
+
+  private headCell(index: number): HTMLElement | null {
+    return (this.renderRoot as ShadowRoot).getElementById(headId(index));
+  }
+
+  /**
+   * The menu key or Shift+F10 fires `contextmenu` on the focused treegrid itself: opens the
+   * menu of the active header, or of the selected row, placed under it. A host that shows
+   * its menu cancels the event it is given, and so the browser's.
+   */
+  private readonly onKeyMenu = (e: MouseEvent): void => {
+    // Chromium gives a key's menu button -1, and a click's (as on the scrollbar) 2.
+    if (e.target !== this.scrollerRef.value || e.button >= 0) {
+      return;
+    }
+    const at = this.indexOfSelected();
+    let cell =
+      this.activeHead >= 0 ? this.headCell(this.activeHead) : at >= 0 ? this.paintedRow(at) : null;
+    if (!cell && this.activeHead < 0 && at >= 0) {
+      // The row is scrolled away: bring it back, with the menu under the header meanwhile.
+      this.view?.scrollToIndex(at, 'auto');
+      cell = this.scrollerRef.value?.querySelector<HTMLElement>(':scope > .head') ?? null;
+    }
+    if (!cell) {
+      return;
+    }
+    const box = cell.getBoundingClientRect();
+    const event = new MouseEvent('contextmenu', {
+      clientX: box.left,
+      clientY: box.bottom,
+      cancelable: true,
+    });
+    const column = this.visibleColumns()[this.activeHead];
+    if (column) {
+      this.headerMenu(column.id, event);
+    } else {
+      this.rowMenu(at, event);
+    }
+    if (event.defaultPrevented) {
+      e.preventDefault();
+    }
+  };
+
+  private selectAndShow(index: number): void {
+    this.select(this.targetAt(index), index, true);
+    this.view?.scrollToIndex(index, 'auto');
+  }
+
+  private headerMenu(column: string, event: MouseEvent): void {
+    this.emit<GridHeaderContextDetail>('lv-grid-header-context', { column, event });
+  }
+
+  private rowMenu(index: number, event: MouseEvent): void {
+    this.emit<GridContextDetail<R>>('lv-grid-context', { row: this.dataRow(index), event });
+  }
 
   /** Enter follows the row's link where it has one; else Enter and Space open or close it. */
   private activate(index: number, key: 'activate' | 'toggle'): void {
@@ -930,7 +1060,7 @@ export class LvGrid<R extends object = object> extends LitElement {
   private readonly onContextMenu = (e: MouseEvent): void => {
     const index = this.indexFrom(e);
     if (index >= 0) {
-      this.emit<GridContextDetail<R>>('lv-grid-context', { row: this.dataRow(index), event: e });
+      this.rowMenu(index, e);
     }
   };
 

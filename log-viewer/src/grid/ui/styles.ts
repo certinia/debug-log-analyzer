@@ -180,6 +180,11 @@ export const gridStyles = css`
       box-shadow: inset calc(-1 * var(--grid-stroke)) 0 var(--grid-border);
     }
 
+    .scroller:focus .colhead.active {
+      outline: var(--grid-stroke) solid var(--grid-focus);
+      outline-offset: calc(var(--grid-stroke) * -1);
+    }
+
     .colhead {
       position: relative;
       display: flex;

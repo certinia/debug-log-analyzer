@@ -18,6 +18,7 @@ import type { GridColumn } from '../column.js';
 import '../lv-grid.js';
 import type {
   GridColumnResizeDetail,
+  GridContextDetail,
   GridErrorDetail,
   GridFindDetail,
   GridHeaderContextDetail,
@@ -442,6 +443,160 @@ describe('lv-grid', () => {
     scroller?.dispatchEvent(new Event('scroll'));
     await settle(grid);
     expect(key).not.toHaveBeenCalled();
+  });
+
+  it('reaches the headers from the keyboard, to sort, resize and open their menu', async () => {
+    const { grid, root, scroller, header, rowNamed, key } = await setup();
+    const resized: GridColumnResizeDetail[] = [];
+    const menus: string[] = [];
+    grid.addEventListener('lv-grid-column-resize', (e) =>
+      resized.push(detail<GridColumnResizeDetail>(e)),
+    );
+    grid.addEventListener('lv-grid-header-context', (e) =>
+      menus.push(detail<GridHeaderContextDetail>(e).column),
+    );
+    const active = (): string | null | undefined => scroller?.getAttribute('aria-activedescendant');
+
+    await key('ArrowDown');
+    await key('ArrowUp');
+    expect(active()).toBe(header('Name')?.id);
+    await key('ArrowRight');
+    expect(active()).toBe(header('Time')?.id);
+
+    await key('Enter');
+    expect(grid.sort).toEqual({ column: 'time', dir: 'desc' });
+    await key('ArrowRight', { shiftKey: true });
+    // fakeLayout makes every element 500px wide.
+    expect(resized).toEqual([{ column: 'time', width: 516 }]);
+    scroller?.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, button: -1 }));
+    expect(menus).toEqual(['time']);
+
+    await key('ArrowDown');
+    expect(root.getElementById(active() ?? '')).toBe(rowNamed('a'));
+  });
+
+  it('moves along the header row within its ends, and stays on it as columns hide', async () => {
+    const { grid, scroller, header, rowNamed, key } = await setup();
+    const active = (): string | null | undefined => scroller?.getAttribute('aria-activedescendant');
+    grid.filters = [{ test: () => false }];
+    await settle(grid);
+    await key('ArrowUp');
+    await key('ArrowLeft');
+    expect(active()).toBe(header('Name')?.id);
+    await key('End');
+    expect(active()).toBe(header('Kind')?.id);
+    await key('ArrowRight');
+    expect(active()).toBe(header('Kind')?.id);
+
+    grid.columns = columns().map((column) =>
+      column.id === 'kind' ? { ...column, hidden: true } : column,
+    );
+    await settle(grid);
+    expect(active()).toBe(header('Time')?.id);
+    await key('Home');
+    expect(active()).toBe(header('Name')?.id);
+
+    grid.filters = [];
+    await settle(grid);
+    await key('ArrowDown');
+    expect(rowNamed('a')?.ariaSelected).toBe('true');
+  });
+
+  it('opens no menu for a right-click on the grid outside its rows and headers', async () => {
+    const { grid, scroller, key } = await setup();
+    const menus: unknown[] = [];
+    grid.addEventListener('lv-grid-context', (e) => menus.push(e));
+    await key('ArrowDown');
+    const click = new MouseEvent('contextmenu', { bubbles: true, cancelable: true, button: 2 });
+    scroller?.dispatchEvent(click);
+    expect(menus).toEqual([]);
+    expect(click.defaultPrevented).toBe(false);
+  });
+
+  it('opens the selected row menu from the keyboard, and leaves the browser menu to a host that shows none', async () => {
+    const { grid, scroller, key } = await setup();
+    const rows: (Node | null)[] = [];
+    let shows = false;
+    grid.addEventListener('lv-grid-context', (e) => {
+      rows.push(detail<GridContextDetail<Node>>(e).row);
+      if (shows) {
+        detail<GridContextDetail<Node>>(e).event.preventDefault();
+      }
+    });
+    const menuKey = (): MouseEvent => {
+      const event = new MouseEvent('contextmenu', { bubbles: true, cancelable: true, button: -1 });
+      scroller?.dispatchEvent(event);
+      return event;
+    };
+    expect(menuKey().defaultPrevented).toBe(false);
+    expect(rows).toEqual([]);
+
+    await key('ArrowDown');
+    expect(menuKey().defaultPrevented).toBe(false);
+    shows = true;
+    expect(menuKey().defaultPrevented).toBe(true);
+    expect(rows.map((row) => row?.name)).toEqual(['a', 'a']);
+  });
+
+  it('opens the menu of a selected row that is scrolled away, and scrolls it back', async () => {
+    const many: TreeSource<Node> = {
+      roots: Array.from({ length: 100 }, (_, i) => ({ key: i, name: `r${i}`, time: i, kind: 'x' })),
+      key: (row) => row.key,
+    };
+    const { grid, scroller, rowNamed, key } = await setup({ source: many });
+    const rows: (Node | null)[] = [];
+    grid.addEventListener('lv-grid-context', (e) =>
+      rows.push(detail<GridContextDetail<Node>>(e).row),
+    );
+    await key('End', { ctrlKey: true });
+    expect(rowNamed('r99')).toBeUndefined();
+    const scroll = jest.spyOn(GridView.prototype, 'scrollToIndex');
+    scroller?.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, button: -1 }));
+    expect(rows.map((row) => row?.name)).toEqual(['r99']);
+    expect(scroll).toHaveBeenCalledWith(99, 'auto');
+  });
+
+  it('steps a column width from the keyboard, and reports only a width that changed', async () => {
+    const { grid, key } = await setup();
+    const resized: GridColumnResizeDetail[] = [];
+    grid.addEventListener('lv-grid-column-resize', (e) =>
+      resized.push(detail<GridColumnResizeDetail>(e)),
+    );
+    grid.setColumnWidth('time', 40);
+    await key('ArrowDown');
+    await key('ArrowUp');
+    await key('ArrowRight');
+    await key('ArrowLeft', { shiftKey: true });
+    expect(resized).toEqual([]);
+    await key('ArrowRight', { shiftKey: true });
+    await key('ArrowRight', { shiftKey: true });
+    expect(resized).toEqual([
+      { column: 'time', width: 56 },
+      { column: 'time', width: 72 },
+    ]);
+  });
+
+  it('names the resize keys on a header that resizes', async () => {
+    const { header } = await setup({
+      columns: columns().map((column) =>
+        column.id === 'kind' ? { ...column, resizable: false } : column,
+      ),
+    });
+    expect(header('Time')?.getAttribute('aria-keyshortcuts')).toBe(
+      'Shift+ArrowLeft Shift+ArrowRight',
+    );
+    expect(header('Kind')?.hasAttribute('aria-keyshortcuts')).toBe(false);
+  });
+
+  it('reaches the headers from the keyboard when no row shows', async () => {
+    const { grid, scroller, header, key } = await setup();
+    grid.filters = [{ test: () => false }];
+    await settle(grid);
+    await key('ArrowUp');
+    expect(scroller?.getAttribute('aria-activedescendant')).toBe(header('Name')?.id);
+    await key('ArrowDown');
+    await key('Home');
+    expect(scroller?.getAttribute('aria-activedescendant')).toBe(header('Name')?.id);
   });
 
   it('follows the link of a row on Enter, and opens a row with none', async () => {
