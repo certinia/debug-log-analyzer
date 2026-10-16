@@ -973,7 +973,8 @@ export class LvGrid<R extends object = object> extends LitElement {
 
   /**
    * The menu key or Shift+F10 fires `contextmenu` on the focused treegrid itself: opens the
-   * menu of the active header, or of the selected row, placed under it.
+   * menu of the active header, or of the selected row, placed under it. A host that shows
+   * its menu cancels the event it is given, and so the browser's.
    */
   private readonly onKeyMenu = (e: MouseEvent): void => {
     // Chromium gives a key's menu button -1, and a click's (as on the scrollbar) 2.
@@ -986,14 +987,20 @@ export class LvGrid<R extends object = object> extends LitElement {
     if (!cell) {
       return;
     }
-    e.preventDefault();
     const box = cell.getBoundingClientRect();
-    const event = new MouseEvent('contextmenu', { clientX: box.left, clientY: box.bottom });
+    const event = new MouseEvent('contextmenu', {
+      clientX: box.left,
+      clientY: box.bottom,
+      cancelable: true,
+    });
     const column = this.visibleColumns()[this.activeHead];
     if (column) {
       this.headerMenu(column.id, event);
     } else {
       this.rowMenu(at, event);
+    }
+    if (event.defaultPrevented) {
+      e.preventDefault();
     }
   };
 

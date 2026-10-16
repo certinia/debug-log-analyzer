@@ -18,6 +18,7 @@ import type { GridColumn } from '../column.js';
 import '../lv-grid.js';
 import type {
   GridColumnResizeDetail,
+  GridContextDetail,
   GridErrorDetail,
   GridFindDetail,
   GridHeaderContextDetail,
@@ -483,6 +484,31 @@ describe('lv-grid', () => {
     scroller?.dispatchEvent(click);
     expect(menus).toEqual([]);
     expect(click.defaultPrevented).toBe(false);
+  });
+
+  it('opens the selected row menu from the keyboard, and leaves the browser menu to a host that shows none', async () => {
+    const { grid, scroller, key } = await setup();
+    const rows: (Node | null)[] = [];
+    let shows = false;
+    grid.addEventListener('lv-grid-context', (e) => {
+      rows.push(detail<GridContextDetail<Node>>(e).row);
+      if (shows) {
+        detail<GridContextDetail<Node>>(e).event.preventDefault();
+      }
+    });
+    const menuKey = (): MouseEvent => {
+      const event = new MouseEvent('contextmenu', { bubbles: true, cancelable: true, button: -1 });
+      scroller?.dispatchEvent(event);
+      return event;
+    };
+    expect(menuKey().defaultPrevented).toBe(false);
+    expect(rows).toEqual([]);
+
+    await key('ArrowDown');
+    expect(menuKey().defaultPrevented).toBe(false);
+    shows = true;
+    expect(menuKey().defaultPrevented).toBe(true);
+    expect(rows.map((row) => row?.name)).toEqual(['a', 'a']);
   });
 
   it('reaches the headers from the keyboard when no row shows', async () => {
