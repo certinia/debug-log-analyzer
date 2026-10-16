@@ -367,6 +367,42 @@ describe('lv-grid', () => {
     expect(root.getElementById(active() ?? '')).toBe(rowNamed('r99'));
   });
 
+  it('pages by the rows between the header and the totals that are on screen', async () => {
+    const many: TreeSource<Node> = {
+      roots: Array.from({ length: 100 }, (_, i) => ({ key: i, name: `r${i}`, time: i, kind: 'x' })),
+      key: (row) => row.key,
+    };
+    const { grid, scroller, key } = await setup({ source: many, rowHeight: ROW });
+    const selected: (Node | null)[] = [];
+    grid.addEventListener('lv-grid-select', (e) =>
+      selected.push(detail<GridSelectDetail<Node>>(e).row),
+    );
+    let bottom = 10 * ROW;
+    jest.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(function (
+      this: HTMLElement,
+    ) {
+      return (this === scroller ? { top: 0, bottom, height: bottom } : { height: ROW }) as DOMRect;
+    });
+    Object.defineProperty(scroller, 'clientHeight', { get: () => bottom, configurable: true });
+    await key('Home');
+    // 10 rows high, less the header and the totals, less 1 row kept in view.
+    await key('PageDown');
+    expect(selected.at(-1)?.name).toBe('r7');
+
+    grid.fitRows = true;
+    bottom = 30 * ROW;
+    const innerHeight = window.innerHeight;
+    Object.defineProperty(window, 'innerHeight', { value: 10 * ROW, configurable: true });
+    try {
+      await key('PageDown');
+      expect(selected.at(-1)?.name).toBe('r14');
+      await key('PageUp');
+      expect(selected.at(-1)?.name).toBe('r7');
+    } finally {
+      Object.defineProperty(window, 'innerHeight', { value: innerHeight, configurable: true });
+    }
+  });
+
   it('looks for a hidden selected row once, not on every draw and key', async () => {
     const plain = source();
     const key = jest.fn(plain.key);

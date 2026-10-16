@@ -909,8 +909,20 @@ export class LvGrid<R extends object = object> extends LitElement {
     }
   }
 
+  /** The rows that fit between the header and the totals, in the part of the grid on screen. */
   private pageSize(): number {
-    const height = this.scrollerRef.value?.clientHeight ?? 0;
+    const scroller = this.scrollerRef.value;
+    if (!scroller) {
+      return 1;
+    }
+    const frame = scroller.getBoundingClientRect();
+    const onScreen = Math.min(frame.bottom, window.innerHeight) - Math.max(frame.top, 0);
+    const edges = [':scope > .head', ':scope > .foot'].reduce(
+      (sum, selector) =>
+        sum + (scroller.querySelector(selector)?.getBoundingClientRect().height ?? 0),
+      0,
+    );
+    const height = Math.min(scroller.clientHeight, onScreen) - edges;
     return Math.max(1, Math.floor(height / this.rowHeight) - 1);
   }
 
