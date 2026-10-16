@@ -411,6 +411,50 @@ describe('calltree-view merged filters', () => {
   });
 });
 
+describe('calltree-view inspector reveal', () => {
+  // Outer calls Inner, so Outer heads its own bucket and is Inner's caller row too.
+  const { log } = storeOf(
+    '09:18:22.6 (1000)|METHOD_ENTRY|[1]|01p|ns.Outer.run()\n' +
+      '09:18:22.6 (2000)|METHOD_ENTRY|[2]|01p|ns.Inner.go()\n' +
+      '09:18:22.6 (3000)|METHOD_EXIT|[2]|ns.Inner.go()\n' +
+      '09:18:22.6 (5001000)|METHOD_EXIT|[1]|ns.Outer.run()\n',
+  );
+  let view: CalltreeView;
+
+  beforeEach(async () => {
+    globalThis.IntersectionObserver = AlwaysVisible as unknown as typeof IntersectionObserver;
+    holdBuilds = true;
+    view = await mountView(log);
+  });
+
+  afterEach(() => {
+    holdBuilds = false;
+    view.remove();
+  });
+
+  it('reveals the Bottom-Up bucket a frame heads, not a caller row it sits in', async () => {
+    const switched = view._setViewMode('bottom-up');
+    await settle();
+    const roots = toBottomUpTree(log.children, logStoreFor(log).keyPathIds());
+    finishBuild?.(roots);
+    await switched;
+    const grid = view.bottomUpGrid;
+    if (!grid) {
+      throw new Error('no bottom-up grid');
+    }
+    const goTo = jest.spyOn(grid, 'goTo').mockResolvedValue(true);
+    const all = (events: ApexLog['children']): ApexLog['children'] =>
+      events.flatMap((e) => [e, ...all(e.children)]);
+    const outer = all(log.children).find((e) => e.text === 'ns.Outer.run()');
+
+    eventBus.emit('inspector:reveal', { source: 'calltree', eventIndex: outer?.eventIndex ?? -1 });
+    await settle();
+
+    const bucket = roots.find((row) => row.text === 'ns.Outer.run()');
+    expect(goTo).toHaveBeenCalledWith([bucket?.id], { scrollIfVisible: false });
+  });
+});
+
 describe('calltree-view go to row', () => {
   let view: CalltreeView;
 
