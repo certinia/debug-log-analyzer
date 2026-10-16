@@ -318,5 +318,40 @@ export const gridStyles = css`
       color: var(--grid-find-current-fg);
       background-color: var(--grid-find-current-bg);
     }
+
+    /* Forced colours turn a host's colours to Canvas and draw borders and text backplates. */
+    @media (forced-colors: active) {
+      .body .row[aria-selected='true'] {
+        forced-color-adjust: none;
+        --grid-row-bg: Highlight;
+
+        &,
+        & * {
+          color: HighlightText;
+        }
+      }
+
+      /* The triangles are borders, of which forced colours would paint every side. */
+      .sorter::before,
+      .sorter::after,
+      .twisty::before {
+        forced-color-adjust: none;
+      }
+
+      .busy {
+        background: Highlight;
+      }
+
+      ::highlight(lv-grid-find-match) {
+        color: MarkText;
+        background-color: Mark;
+      }
+
+      ::highlight(lv-grid-current-find-match-under),
+      ::highlight(lv-grid-current-find-match) {
+        color: HighlightText;
+        background-color: Highlight;
+      }
+    }
   }
 `;
