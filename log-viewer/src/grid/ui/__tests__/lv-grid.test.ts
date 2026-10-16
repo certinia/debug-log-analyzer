@@ -529,6 +529,26 @@ describe('lv-grid', () => {
     expect(scroll).toHaveBeenCalledWith(99, 'auto');
   });
 
+  it('steps a column width from the keyboard, and reports only a width that changed', async () => {
+    const { grid, key } = await setup();
+    const resized: GridColumnResizeDetail[] = [];
+    grid.addEventListener('lv-grid-column-resize', (e) =>
+      resized.push(detail<GridColumnResizeDetail>(e)),
+    );
+    grid.setColumnWidth('time', 40);
+    await key('ArrowDown');
+    await key('ArrowUp');
+    await key('ArrowRight');
+    await key('ArrowLeft', { shiftKey: true });
+    expect(resized).toEqual([]);
+    await key('ArrowRight', { shiftKey: true });
+    await key('ArrowRight', { shiftKey: true });
+    expect(resized).toEqual([
+      { column: 'time', width: 56 },
+      { column: 'time', width: 72 },
+    ]);
+  });
+
   it('reaches the headers from the keyboard when no row shows', async () => {
     const { grid, scroller, header, key } = await setup();
     grid.filters = [{ test: () => false }];

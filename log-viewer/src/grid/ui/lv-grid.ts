@@ -928,9 +928,14 @@ export class LvGrid<R extends object = object> extends LitElement {
     }
     if (shift && (key === 'left' || key === 'right')) {
       if (column.resizable !== false) {
-        const width = this.headCell(this.activeHead)?.getBoundingClientRect().width ?? 0;
+        const width =
+          this.widths.get(column.id) ??
+          this.headCell(this.activeHead)?.getBoundingClientRect().width ??
+          0;
         this.setColumnWidth(column.id, width + (key === 'right' ? RESIZE_STEP : -RESIZE_STEP));
-        this.resized(column);
+        if (this.widths.get(column.id) !== width) {
+          this.resized(column);
+        }
       }
       return;
     }
