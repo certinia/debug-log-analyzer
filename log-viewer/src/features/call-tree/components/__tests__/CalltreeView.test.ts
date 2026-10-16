@@ -505,8 +505,9 @@ describe('calltree-view find', () => {
     expect(results).toEqual([0, 2]);
   });
 
-  it('ignores a find a newer one replaced, and keeps its guard until the last find ends', async () => {
+  it('ignores a find a newer one replaced, and keeps the matches through a reshape until the last find ends', async () => {
     const grid = shownGrid();
+    const reshape = (): boolean => grid.dispatchEvent(new CustomEvent('lv-grid-reshape'));
     let finishFirst: (total: number) => void = () => {};
     jest
       .spyOn(grid, 'find')
@@ -515,12 +516,13 @@ describe('calltree-view find', () => {
 
     startFind('foo');
     await find('food');
+    reshape();
     expect(results).toEqual([3]);
-    expect(view.blockClearHighlights).toBe(true);
 
     finishFirst(-1);
     await settle();
     expect(results).toEqual([3]);
-    expect(view.blockClearHighlights).toBe(false);
+    reshape();
+    expect(results).toEqual([3, 0]);
   });
 });
