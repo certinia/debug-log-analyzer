@@ -60,7 +60,8 @@ Lit. Public API is `@property`, internal state is `@state`, styles are `static s
 - Mono is for text whose alignment carries meaning — stacks, code, log text. Prose takes the UI font.
 - An all-caps run takes `--lana-text-caps` and `--lana-text-caps-tracking`, one step down: every
   glyph reaches cap height, so caps read a size larger.
-- One type exemption: a PIXI `fontSize` is a number and cannot read a var.
+- Two type exemptions: a PIXI `fontSize` is a number and cannot read a var, and the codicon rules in
+  `components/grid/AppGrid.ts` size a glyph box, not text.
 - Data palettes stay literal: they show meaning, not chrome (`timeline/themes/Themes.ts`,
   `metric-strip/metric-strip-colors.ts`).
 - A component naming a token must carry the tokens: `globalStyles`, or `tokenStyles`
