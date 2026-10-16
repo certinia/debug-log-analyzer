@@ -5,6 +5,7 @@
 !out/
 !syntaxes/
 !package.json
+!package.nls.json
 !CHANGELOG.md
 !README.md
 !LICENSE.txt
