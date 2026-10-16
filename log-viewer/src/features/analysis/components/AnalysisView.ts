@@ -294,6 +294,7 @@ export class AnalysisView extends LitElement {
       <lv-call-tree-grid
         ${ref(this._gridMounted)}
         ?category-colorize="${this._colorize}"
+        .label="${'Analysis'}"
         .placeholder="${'No Analysis Available'}"
         .source="${this._source}"
         .columns="${this._columns}"

@@ -175,6 +175,10 @@ describe('analysis-view', () => {
     expect(grid().filters.every((filter) => filter.test(debug))).toBe(false);
   });
 
+  it('names the grid for a screen reader', () => {
+    expect(grid().label).toBe('Analysis');
+  });
+
   it('scopes a root row to every call it counts', () => {
     const rootRow = findRow(roots(), 'A');
 
