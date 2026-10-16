@@ -22,14 +22,14 @@ jest.mock('../../../settings/Settings.js', () => ({
 jest.mock('../../../../components/grid/exportCsv.js', () => ({ exportCsv: jest.fn() }));
 
 import { governorLimits } from '#test-helpers/limits.js';
+import { AlwaysVisible, NeverVisible, settle } from '#test-helpers/visibility.js';
 import {
   eventBus,
   type DetailSelection,
   type DetailSource,
 } from '../../../../core/events/EventBus.js';
 import { exportCsv } from '../../../../components/grid/exportCsv.js';
-import { logStoreFor } from '../../../../core/log/LogStore.js';
-import { toBottomUpTree, type BottomUpRow } from '../../../call-tree/utils/Aggregation.js';
+import type { BottomUpRow } from '../../../call-tree/utils/Aggregation.js';
 import { AnalysisView } from '../AnalysisView.js';
 
 /** Pushes settings to the view, as the extension does on a change. */
@@ -94,30 +94,6 @@ function recursiveLog(): ApexLog {
 /** The index of the debug line `recursiveLog` ends with. */
 const DEBUG_LINE = 7;
 
-/** jsdom has no IntersectionObserver, and the build waits on one. */
-class AlwaysVisible {
-  private _callback: IntersectionObserverCallback;
-
-  constructor(callback: IntersectionObserverCallback) {
-    this._callback = callback;
-  }
-
-  observe(element: Element): void {
-    this._callback(
-      [{ isIntersecting: true, target: element } as IntersectionObserverEntry],
-      this as unknown as IntersectionObserver,
-    );
-  }
-  disconnect(): void {}
-}
-
-/** Let the build's promise chain run out. */
-async function settle(): Promise<void> {
-  for (let i = 0; i < 4; i++) {
-    await new Promise((resolve) => setTimeout(resolve, 0));
-  }
-}
-
 function findRow(rows: readonly BottomUpRow[], text: string): BottomUpRow {
   const row = rows.find((candidate) => candidate.text === text);
   if (!row) {
@@ -167,9 +143,15 @@ describe('analysis-view', () => {
   });
 
   it('shows the bottom-up tree of the log, ranked by self time, without rows that have no details', () => {
-    expect(roots().map((row) => row.text)).toEqual(
-      toBottomUpTree(log.children, logStoreFor(log).keyPathIds()).map((row) => row.text),
+    expect(roots().map((row) => [row.text, row.totalSelfTime])).toEqual(
+      expect.arrayContaining([
+        ['A', 115],
+        ['B', 20],
+        ['C', 15],
+        ['debug', 0],
+      ]),
     );
+    expect(roots()).toHaveLength(4);
     expect(grid().sort).toEqual({ column: 'totalSelfTime', dir: 'desc' });
     const debug = findRow(roots(), 'debug');
     expect(grid().filters.every((filter) => filter.test(debug))).toBe(false);
@@ -278,7 +260,9 @@ describe('analysis-view', () => {
     eventBus.emit('inspector:locate', { source: 'analysis', eventIndexes: [2], sticky: false });
     await settle();
     expect(goTo).not.toHaveBeenCalled();
-    expect([...grid().marked]).toContain(bucketB);
+    // Frame 2 heads bucket B, and is the B caller row under the A it called.
+    const callerB = findRow(findRow(roots(), 'A')._children ?? [], 'B').id;
+    expect(grid().marked).toEqual(new Set([bucketB, callerB]));
 
     eventBus.emit('inspector:locate', { source: 'analysis', eventIndexes: [2], sticky: true });
     await settle();
@@ -365,11 +349,17 @@ describe('analysis-view', () => {
     expect(show).toHaveBeenCalledTimes(1);
   });
 
-  it('tints the Name cells when category colouring is on', async () => {
-    applySettings({ timeline: { customThemes: {} }, callTree: { categoryColorize: true } });
-    await view.updateComplete;
+  it('tints the Name cells while category colouring is on', async () => {
+    const colorize = async (on: boolean) => {
+      applySettings({ timeline: { customThemes: {} }, callTree: { categoryColorize: on } });
+      await view.updateComplete;
+    };
 
+    await colorize(true);
     expect(grid().hasAttribute('category-colorize')).toBe(true);
+
+    await colorize(false);
+    expect(grid().hasAttribute('category-colorize')).toBe(false);
   });
 
   it('drops the search when the grid is reshaped under it', async () => {
@@ -391,5 +381,22 @@ describe('analysis-view', () => {
     document.removeEventListener('lv-find-results', heard);
 
     expect(totals).toEqual([2, 0]);
+  });
+});
+
+describe('analysis-view before it is seen', () => {
+  it('builds nothing while the tab is hidden', async () => {
+    globalThis.IntersectionObserver = NeverVisible as unknown as typeof IntersectionObserver;
+    byEventIndex = [];
+    const view = new AnalysisView();
+    document.body.append(view);
+    await view.updateComplete;
+    view.timelineRoot = recursiveLog();
+    await view.updateComplete;
+    await settle();
+
+    expect(view.grid).toBeNull();
+    expect(view.renderRoot.querySelector('grid-skeleton')).not.toBeNull();
+    view.remove();
   });
 });

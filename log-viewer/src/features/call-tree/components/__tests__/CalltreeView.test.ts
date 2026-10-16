@@ -44,6 +44,7 @@ jest.mock('../../../settings/Settings.js', () => ({
 }));
 
 import { storeOf } from '#test-helpers/apexLog.js';
+import { AlwaysVisible, NeverVisible, settle } from '#test-helpers/visibility.js';
 import { eventBus } from '../../../../core/events/EventBus.js';
 import { LogStore, logStoreFor } from '../../../../core/log/LogStore.js';
 import { CalltreeView } from '../CalltreeView.js';
@@ -73,28 +74,6 @@ function grids(view: CalltreeView): Element[] {
   return [...view.renderRoot.querySelectorAll('lv-call-tree-grid')];
 }
 
-/** jsdom has no IntersectionObserver, and the build waits on one. */
-class AlwaysVisible {
-  private _callback: IntersectionObserverCallback;
-
-  constructor(callback: IntersectionObserverCallback) {
-    this._callback = callback;
-  }
-
-  observe(element: Element): void {
-    this._callback(
-      [{ isIntersecting: true, target: element } as IntersectionObserverEntry],
-      this as unknown as IntersectionObserver,
-    );
-  }
-  disconnect(): void {}
-}
-
-class NeverVisible {
-  observe(): void {}
-  disconnect(): void {}
-}
-
 function apexLog(): ApexLog {
   return {
     children: [],
@@ -102,14 +81,6 @@ function apexLog(): ApexLog {
     namespaces: [],
     governorLimits: null,
   } as unknown as ApexLog;
-}
-
-/** Let the build's promise chain run out: more turns than it takes, since the
- *  count of them is not what any test is about. */
-async function settle(): Promise<void> {
-  for (let i = 0; i < 4; i++) {
-    await new Promise((resolve) => setTimeout(resolve, 0));
-  }
 }
 
 async function mountView(log: ApexLog = apexLog()): Promise<CalltreeView> {

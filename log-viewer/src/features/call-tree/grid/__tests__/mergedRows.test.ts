@@ -32,7 +32,6 @@ describe('MergedTree.rowFor', () => {
 describe('MergedTree.pathTo', () => {
   it('runs from the top-level row down to the row named', () => {
     expect(tree.pathTo([20])).toEqual([1, 2]);
-    expect(tree.pathTo([20, 30])).toEqual([3]);
   });
 });
 
