@@ -474,6 +474,17 @@ describe('lv-grid', () => {
     expect(active()).not.toBe(header('Time')?.id);
   });
 
+  it('reaches the headers from the keyboard when no row shows', async () => {
+    const { grid, scroller, header, key } = await setup();
+    grid.filters = [{ test: () => false }];
+    await settle(grid);
+    await key('ArrowUp');
+    expect(scroller?.getAttribute('aria-activedescendant')).toBe(header('Name')?.id);
+    await key('ArrowDown');
+    await key('Home');
+    expect(scroller?.getAttribute('aria-activedescendant')).toBe(header('Name')?.id);
+  });
+
   it('follows the link of a row on Enter, and opens a row with none', async () => {
     const clicks: string[] = [];
     const linked = columns().map((column) =>

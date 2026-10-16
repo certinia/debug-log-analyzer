@@ -896,8 +896,11 @@ export class LvGrid<R extends object = object> extends LitElement {
       return;
     }
     const at = this.indexOfSelected();
-    if (key === 'up' && at === 0) {
-      this.moveHead(0);
+    const toHead = rows.size === 0 ? key === 'up' || key === 'home' : key === 'up' && at === 0;
+    if (toHead) {
+      if (this.visibleColumns().length > 0) {
+        this.moveHead(0);
+      }
       return;
     }
     if (key === 'activate' || key === 'toggle') {
