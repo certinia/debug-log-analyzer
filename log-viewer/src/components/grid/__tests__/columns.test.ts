@@ -1,7 +1,13 @@
 /*
  * Copyright (c) 2026 Certinia Inc. All rights reserved.
+ *
+ * @jest-environment jsdom
  */
-import { countColumn, textColumn } from '../columns.js';
+import { render } from 'lit';
+
+import { formatSOQLToText } from '../../../features/soql/format/formatter.js';
+import { msBar } from '../cells.js';
+import { countColumn, inlineQueryColumn, textColumn, timeColumn } from '../columns.js';
 
 interface Row {
   n: number | null;
@@ -51,5 +57,55 @@ describe('textColumn', () => {
   it('shows the value on hover only when asked', () => {
     expect(column().tooltip).toBeUndefined();
     expect(column(true).tooltip?.(ROWS[0] as Row)).toBe('a');
+  });
+});
+
+describe('timeColumn', () => {
+  it('reads a total given as a getter at each paint', () => {
+    let totalNs = 100;
+    const column = timeColumn<{ ns: number }>({
+      id: 't',
+      title: 'T',
+      value: (row) => row.ns,
+      totalNs: () => totalNs,
+    });
+
+    totalNs = 200;
+
+    expect(column.cell({ ns: 50 })).toEqual(msBar(50, 200));
+    expect(column.total?.(50)).toEqual(msBar(50, 200));
+  });
+});
+
+describe('inlineQueryColumn', () => {
+  interface QueryRow {
+    text: string;
+    dialect: 'soql' | null;
+  }
+  const column = inlineQueryColumn<QueryRow>({
+    id: 'q',
+    title: 'Q',
+    value: (row) => row.text,
+    dialect: (row) => row.dialect,
+  });
+  const query: QueryRow = { text: 'select id from account', dialect: 'soql' };
+  const frame: QueryRow = { text: 'Account.load()', dialect: null };
+
+  it('shows a query highlighted, finds it as it shows it, and copies and hovers it raw', () => {
+    const cell = document.createElement('div');
+    render(column.cell(query), cell);
+
+    expect(cell.querySelector('.soql-block.soql-inline')?.textContent).toBe(column.text?.(query));
+    expect(column.text?.(query)).toBe(
+      formatSOQLToText(query.text, { mode: 'inline', dialect: 'soql' }),
+    );
+    expect(column.exportText?.(query)).toBe(query.text);
+    expect(column.tooltip?.(query)).toBe(query.text);
+  });
+
+  it('shows, finds and copies a row that is no query as it is', () => {
+    expect(column.cell(frame)).toBe(frame.text);
+    expect(column.text?.(frame)).toBe(frame.text);
+    expect(column.exportText?.(frame)).toBe(frame.text);
   });
 });
