@@ -466,12 +466,23 @@ describe('lv-grid', () => {
     expect(grid.sort).toEqual({ column: 'time', dir: 'desc' });
     await key('ArrowRight', { shiftKey: true });
     expect(resized).toEqual([{ column: 'time', width: 516 }]);
-    scroller?.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true }));
+    scroller?.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, button: -1 }));
     expect(menus).toEqual(['time']);
 
     await key('ArrowDown');
     expect(names()).toEqual(['a', 'c', 'b']);
     expect(active()).not.toBe(header('Time')?.id);
+  });
+
+  it('opens no menu for a right-click on the grid outside its rows and headers', async () => {
+    const { grid, scroller, key } = await setup();
+    const menus: unknown[] = [];
+    grid.addEventListener('lv-grid-context', (e) => menus.push(e));
+    await key('ArrowDown');
+    const click = new MouseEvent('contextmenu', { bubbles: true, cancelable: true, button: 2 });
+    scroller?.dispatchEvent(click);
+    expect(menus).toEqual([]);
+    expect(click.defaultPrevented).toBe(false);
   });
 
   it('reaches the headers from the keyboard when no row shows', async () => {

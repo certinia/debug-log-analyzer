@@ -976,7 +976,8 @@ export class LvGrid<R extends object = object> extends LitElement {
    * menu of the active header, or of the selected row, placed under it.
    */
   private readonly onKeyMenu = (e: MouseEvent): void => {
-    if (e.target !== this.scrollerRef.value) {
+    // Chromium gives a key's menu button -1, and a click's (as on the scrollbar) 2.
+    if (e.target !== this.scrollerRef.value || e.button >= 0) {
       return;
     }
     const at = this.indexOfSelected();
