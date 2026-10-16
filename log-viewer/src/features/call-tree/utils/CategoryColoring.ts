@@ -11,7 +11,8 @@ import { addCustomThemes, getTheme } from '../../timeline/themes/ThemeSelector.j
 
 /**
  * Single source of truth for the category colour strip. The Call Tree and Analysis views
- * share `wireCategoryColoring`; the Tabulator styles and row formatters serve Analysis only.
+ * share `wireCategoryColoring`; the Tabulator row formatters serve only the grid bench's
+ * Tabulator contender.
  *
  * Each row points at one host theme var via the inherited `--row-cat-color` custom
  * property, so a theme switch only updates the host vars and rows re-resolve in place —
@@ -47,13 +48,12 @@ function applyCategoryTheme(host: HTMLElement, themeName: string): void {
 
 /**
  * Wire category colouring onto a host element: seed the theme vars, follow live theme
- * switches, and toggle the colorize tint from settings. Call from `connectedCallback`
- * and call the returned function from `disconnectedCallback`. `onColorize` hears each
- * tint change, for content the host's class does not reach.
+ * switches, and report the colorize tint from settings to `onColorize`. Call from
+ * `connectedCallback` and call the returned function from `disconnectedCallback`.
  */
 export function wireCategoryColoring(
   host: HTMLElement,
-  onColorize?: (on: boolean) => void,
+  onColorize: (on: boolean) => void,
 ): () => void {
   applyCategoryTheme(host, DEFAULT_THEME_NAME);
 
@@ -68,9 +68,7 @@ export function wireCategoryColoring(
     const { timeline, callTree } = settings;
     addCustomThemes(timeline.customThemes);
     applyCategoryTheme(host, timeline.activeTheme ?? DEFAULT_THEME_NAME);
-    const on = callTree?.categoryColorize ?? false;
-    host.classList.toggle('category-colorize', on);
-    onColorize?.(on);
+    onColorize(callTree?.categoryColorize ?? false);
   };
 
   const stopSettings = subscribeSettings(apply);
