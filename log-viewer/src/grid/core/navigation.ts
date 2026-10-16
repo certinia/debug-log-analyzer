@@ -3,7 +3,7 @@
  */
 import { parentIndex, type RowView } from './rows.js';
 
-export type NavKey = 'up' | 'down' | 'left' | 'right' | 'home' | 'end';
+export type NavKey = 'up' | 'down' | 'pageUp' | 'pageDown' | 'left' | 'right' | 'home' | 'end';
 
 export type NavIntent =
   | { kind: 'select'; index: number }
@@ -13,10 +13,15 @@ export type NavIntent =
 /**
  * The model change a key asks for, from the selected row at `index`. Right opens a
  * closed row and steps into an open one; left closes an open row and steps out of a
- * closed one, to its parent row or group. Null when the key does nothing there, or when
- * no row is selected.
+ * closed one, to its parent row or group. Page keys move `page` rows. Null when the key
+ * does nothing there, or when no row is selected.
  */
-export function navigate<R>(rows: RowView<R>, index: number, key: NavKey): NavIntent | null {
+export function navigate<R>(
+  rows: RowView<R>,
+  index: number,
+  key: NavKey,
+  page = 1,
+): NavIntent | null {
   if (index < 0 || index >= rows.size) {
     return null;
   }
@@ -25,6 +30,12 @@ export function navigate<R>(rows: RowView<R>, index: number, key: NavKey): NavIn
       return index > 0 ? { kind: 'select', index: index - 1 } : null;
     case 'down':
       return index < rows.size - 1 ? { kind: 'select', index: index + 1 } : null;
+    case 'pageUp':
+      return index > 0 ? { kind: 'select', index: Math.max(0, index - page) } : null;
+    case 'pageDown':
+      return index < rows.size - 1
+        ? { kind: 'select', index: Math.min(rows.size - 1, index + page) }
+        : null;
     case 'home':
       return index > 0 ? { kind: 'select', index: 0 } : null;
     case 'end':

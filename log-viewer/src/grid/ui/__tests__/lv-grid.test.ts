@@ -4,6 +4,8 @@
 /*
  * Copyright (c) 2026 Certinia Inc. All rights reserved.
  */
+import { html } from 'lit';
+
 import { sum, type TreeSource } from '../../core/index.js';
 import { GridView } from '../../render/index.js';
 import {
@@ -330,12 +332,49 @@ describe('lv-grid', () => {
     expect(press(rowNamed('c')?.querySelector('.cell'))).toBe(false);
   });
 
-  it('moves and opens rows from the keyboard', async () => {
-    const { rowNamed, names, key } = await setup();
+  it('moves and opens rows from the keyboard, and points a screen reader at the selected row', async () => {
+    const { root, scroller, rowNamed, names, key } = await setup({ label: 'Calls' });
+    expect(scroller?.getAttribute('aria-label')).toBe('Calls');
     await key('ArrowDown');
     await key('ArrowDown');
     expect(rowNamed('b')?.ariaSelected).toBe('true');
+    const active = scroller?.getAttribute('aria-activedescendant') ?? '';
+    expect(root.getElementById(active)).toBe(rowNamed('b'));
     await key('ArrowRight');
+    expect(names()).toEqual(['a', 'b', 'b1', 'b2', 'c']);
+    await key(' ');
+    expect(names()).toEqual(['a', 'b', 'c']);
+    await key('End', { ctrlKey: true });
+    expect(rowNamed('c')?.ariaSelected).toBe('true');
+  });
+
+  it('follows the link of a row on Enter, and opens a row with none', async () => {
+    const clicks: string[] = [];
+    const linked = columns().map((column) =>
+      column.id === 'name'
+        ? {
+            ...column,
+            cell: (row: Node) =>
+              row.name === 'a'
+                ? html`<a
+                    href="#!"
+                    tabindex="-1"
+                    @click=${(e: Event) => {
+                      e.preventDefault();
+                      clicks.push(row.name);
+                    }}
+                    >a</a
+                  >`
+                : row.name,
+          }
+        : column,
+    );
+    const { names, key } = await setup({ columns: linked });
+    await key('ArrowDown');
+    await key('Enter');
+    expect(clicks).toEqual(['a']);
+    await key('ArrowDown');
+    await key('Enter');
     expect(names()).toEqual(['a', 'b', 'b1', 'b2', 'c']);
   });
 

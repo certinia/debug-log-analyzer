@@ -13,6 +13,9 @@ import { capture, restore, type Restore, type ShownRow } from './anchor.js';
 import { FindHighlighter } from './highlight.js';
 
 /** Fills a row element. Render places it and sets its ARIA; the content is the caller's. */
+/** The `id` of the painted row at `index`, for `aria-activedescendant`. */
+export const rowId = (index: number): string => `row-${index}`;
+
 export interface RowPainter<R> {
   /** Paints the row at `index` into `el`, which may still hold another row's content. */
   paint(el: HTMLElement, index: number, rows: RowView<R>): void;
@@ -421,6 +424,7 @@ export class GridView<R extends object> {
         this.painted.delete(index);
         this.highlighter.unmark(el);
         el.hidden = true;
+        el.removeAttribute('id');
         this.spare.push(el);
       }
     }
@@ -528,6 +532,7 @@ export class GridView<R extends object> {
 
   private paint(el: HTMLElement, index: number, rows: RowView<R>): void {
     el.hidden = false;
+    el.id = rowId(index);
     el.dataset.index = String(index);
     el.ariaRowIndex = String(index + (this.options.rowIndexStart ?? 1));
     el.ariaLevel = String(rows.depthAt(index) + 1);

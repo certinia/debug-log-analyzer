@@ -23,7 +23,10 @@ export interface GridColumn<R> {
   hidden?: boolean;
   /** The user can drag its header edge, or double-click it to fit the shown rows. Default true. */
   resizable?: boolean;
-  /** The cell. In the first column, it follows the tree indent and the expand control. */
+  /**
+   * The cell. In the first column, it follows the tree indent and the expand control. Give a
+   * link `tabindex="-1"`: the grid is one Tab stop, and Enter on the row follows its link.
+   */
   cell(row: R): CellContent;
   /**
    * The text the cell shows: find searches it, and copy and export write it unless
