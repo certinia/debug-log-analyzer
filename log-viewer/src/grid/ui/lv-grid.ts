@@ -674,6 +674,7 @@ export class LvGrid<R extends object = object> extends LitElement {
       lines: this.rowLines ?? undefined,
       lineHeight: () => this.treeLineHeight(),
       rowIndexStart: 2,
+      onDraw: () => this.syncActive(),
       painter: litPainter(() => ({
         columns: this.visibleColumns(),
         isSelected: (target) => sameTarget(this.selected, target),
@@ -737,13 +738,20 @@ export class LvGrid<R extends object = object> extends LitElement {
     });
   }
 
-  /** Points `aria-activedescendant` at the selected row, so a screen reader follows the keys. */
+  /**
+   * Points `aria-activedescendant` at the selected row once it is painted, so a screen
+   * reader follows the keys. A reader reads a change to it, not the row's later arrival.
+   */
   private syncActive(): void {
+    const scroller = this.scrollerRef.value;
     const at = this.indexOfSelected();
-    if (at < 0) {
-      this.scrollerRef.value?.removeAttribute('aria-activedescendant');
+    const id = at >= 0 ? rowId(at) : null;
+    if (id !== null && (this.renderRoot as ShadowRoot).getElementById(id)) {
+      if (scroller?.getAttribute('aria-activedescendant') !== id) {
+        scroller?.setAttribute('aria-activedescendant', id);
+      }
     } else {
-      this.scrollerRef.value?.setAttribute('aria-activedescendant', rowId(at));
+      scroller?.removeAttribute('aria-activedescendant');
     }
   }
 

@@ -36,6 +36,8 @@ export interface GridViewOptions<R> {
   lineHeight?: () => number;
   overscan?: number;
   rowIndexStart?: number;
+  /** Runs after each draw, once the rows on screen are painted. */
+  onDraw?: () => void;
 }
 
 export interface FindMarks<R> {
@@ -368,6 +370,7 @@ export class GridView<R extends object> {
     } finally {
       this.drawing = false;
     }
+    this.options.onDraw?.();
   }
 
   private setPin(pin: GridView<R>['pin']): void {

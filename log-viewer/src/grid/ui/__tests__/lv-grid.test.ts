@@ -348,6 +348,25 @@ describe('lv-grid', () => {
     expect(rowNamed('c')?.ariaSelected).toBe('true');
   });
 
+  it('points a screen reader at the selected row only once it is painted', async () => {
+    const many: TreeSource<Node> = {
+      roots: Array.from({ length: 100 }, (_, i) => ({ key: i, name: `r${i}`, time: i, kind: 'x' })),
+      key: (row) => row.key,
+    };
+    const { grid, root, scroller, rowNamed, key } = await setup({ source: many });
+    let top = 0;
+    Object.defineProperty(scroller, 'scrollTop', { get: () => top, configurable: true });
+    const active = (): string | null => scroller?.getAttribute('aria-activedescendant') ?? null;
+    await key('End', { ctrlKey: true });
+    expect(rowNamed('r99')).toBeUndefined();
+    expect(active()).toBeNull();
+
+    top = 99 * ROW;
+    scroller?.dispatchEvent(new Event('scroll'));
+    await settle(grid);
+    expect(root.getElementById(active() ?? '')).toBe(rowNamed('r99'));
+  });
+
   it('follows the link of a row on Enter, and opens a row with none', async () => {
     const clicks: string[] = [];
     const linked = columns().map((column) =>
