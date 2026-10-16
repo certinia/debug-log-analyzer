@@ -12,10 +12,10 @@ import { Group, type FindResult, type RowTarget, type RowView } from '../core/in
 import { capture, restore, type Restore, type ShownRow } from './anchor.js';
 import { FindHighlighter } from './highlight.js';
 
-/** Fills a row element. Render places it and sets its ARIA; the content is the caller's. */
 /** The `id` of the painted row at `index`, for `aria-activedescendant`. */
 export const rowId = (index: number): string => `row-${index}`;
 
+/** Fills a row element. Render places it and sets its ARIA; the content is the caller's. */
 export interface RowPainter<R> {
   /** Paints the row at `index` into `el`, which may still hold another row's content. */
   paint(el: HTMLElement, index: number, rows: RowView<R>): void;
