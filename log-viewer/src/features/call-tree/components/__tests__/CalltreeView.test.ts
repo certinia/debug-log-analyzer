@@ -6,7 +6,7 @@
 import { afterEach, beforeEach, describe, expect, it } from '@jest/globals';
 import type { ApexLog } from '@apexdevtools/apex-log-parser';
 
-import type { AggregatedRow, BottomUpRow } from '../../utils/Aggregation.js';
+import type { BottomUpRow } from '../../utils/Aggregation.js';
 
 // The columns read a parsed log, which the fake one is not.
 jest.mock('../../grid/columns.js', () => ({
@@ -197,53 +197,36 @@ describe('calltree-view table lifetime', () => {
     expect(built).toEqual([]);
   });
 
-  it('leaves a build the detach overtook to the one that replaced it', async () => {
-    holdBuilds = true;
-    void view._setViewMode('bottom-up');
-    await settle();
-    const overtaken = finishBuild!;
-    const first = view.bottomUpGrid;
+  it.each([
+    ['bottom-up', 'bottomUpGrid'],
+    ['aggregated', 'aggregatedGrid'],
+  ] as const)(
+    'leaves a %s build the detach overtook to the one that replaced it',
+    async (mode, field) => {
+      holdBuilds = true;
+      void view._setViewMode(mode);
+      await settle();
+      const overtaken = finishBuild!; // the held build set it
+      const first = view[field];
 
-    // Gone and back while the first build is still waiting on its tree.
-    view.remove();
-    holdBuilds = false;
-    document.body.append(view);
-    await settle();
-    expect(built).toEqual(['time-order', 'bottom-up', 'bottom-up']);
-    const newest = view.bottomUpGrid;
-    const rows = newest?.source?.roots;
+      // Gone and back while the first build is still waiting on its tree.
+      view.remove();
+      holdBuilds = false;
+      document.body.append(view);
+      await settle();
+      expect(built).toEqual(['time-order', mode, mode]);
+      const newest = view[field];
+      const rows = newest?.source?.roots;
 
-    overtaken([{ id: 1, _pathId: 1 } as BottomUpRow]);
-    await settle();
+      overtaken([{ id: 1, _pathId: 1 }]);
+      await settle();
 
-    // The view holds the newest grid now, so the overtaken build must not fill it.
-    expect(view.bottomUpGrid).toBe(newest);
-    expect(newest?.source?.roots).toBe(rows);
-    expect(first?.source).toBeNull();
-  });
-
-  it('leaves an aggregated build the detach overtook to the one that replaced it', async () => {
-    holdBuilds = true;
-    void view._setViewMode('aggregated');
-    await settle();
-    const overtaken = finishBuild!; // the held build set it
-    const first = view.aggregatedGrid;
-
-    view.remove();
-    holdBuilds = false;
-    document.body.append(view);
-    await settle();
-    expect(built).toEqual(['time-order', 'aggregated', 'aggregated']);
-    const newest = view.aggregatedGrid;
-    const rows = newest?.source?.roots;
-
-    overtaken([{ id: 1, _pathId: 1 } as AggregatedRow]);
-    await settle();
-
-    expect(view.aggregatedGrid).toBe(newest);
-    expect(newest?.source?.roots).toBe(rows);
-    expect(first?.source).toBeNull();
-  });
+      // The view holds the newest grid now, so the overtaken build must not fill it.
+      expect(view[field]).toBe(newest);
+      expect(newest?.source?.roots).toBe(rows);
+      expect(first?.source).toBeNull();
+    },
+  );
 
   it.each(['aggregated', 'bottom-up'] as const)(
     'tells the inspector of %s, switched back to mid-build, once its rows are in',
