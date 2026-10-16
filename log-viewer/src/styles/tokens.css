@@ -17,9 +17,9 @@
  * document. Components adopt the `:host` copy through `tokenStyles`
  * (`styles/tokens.styles.ts`), so a component that reads a token also carries its
  * definition instead of relying on the app shell to have provided one. The
- * document copy, injected into `document.head` by the build's CSS plugin, is what
- * a component that reads a token without adopting the tokens inherits, as custom
- * properties inherit into shadow roots. Each selector is inert on the
+ * document copy, injected into `document.head` by the build's CSS plugin, is only
+ * a fallback that custom properties inherit into shadow roots; a component that
+ * names a token still adopts the tokens. Each selector is inert on the
  * other side: `:host` matches nothing in a document, `:root` matches nothing in a
  * shadow root.
  */

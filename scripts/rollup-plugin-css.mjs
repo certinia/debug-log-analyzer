@@ -9,8 +9,8 @@
  *   - `export default`s the compiled CSS string (for Lit `unsafeCSS(styles)` shadow styles), and
  *   - injects a <style> into `document.head`.
  *
- * The head injection is load-bearing for `styles/tokens.css`: its `:root` copy is what a
- * component that reads a `--lana-*` token without adopting the tokens inherits.
+ * The head injection serves `styles/tokens.css`: its `:root` copy is the fallback a shadow
+ * root inherits. A component that names a `--lana-*` token still adopts the tokens.
  */
 import { readFile } from 'node:fs/promises';
 
