@@ -1,7 +1,7 @@
 /*
  * Copyright (c) 2026 Certinia Inc. All rights reserved.
  */
-import { GridStore, type Scheduler, type TreeSource } from '../index.js';
+import { GridStore, sum, type Scheduler, type TreeSource } from '../index.js';
 import { sortRows } from '../sort.js';
 import { shown, slowScheduler, source } from './fixtures.js';
 
@@ -38,6 +38,24 @@ describe('GridStore', () => {
   it('shows a flat list as it is', async () => {
     const flat: TreeSource<Node> = { roots: [n('p', 1), n('q', 2)], key: (r) => r.key };
     expect(await ready(new GridStore(flat))).toEqual(['p@0', 'q@0']);
+  });
+
+  it('shows no rows, a zero total and only a header row for no data', async () => {
+    const store = new GridStore(source<Node>([]), { calcs: { value: sum((r) => r.value) } });
+    expect(await ready(store)).toEqual([]);
+    expect(store.snapshot().totals).toEqual({ value: 0 });
+    expect(await store.exportText([{ title: 'Key', value: (r) => r.key }], { format: 'csv' })).toBe(
+      '"Key"',
+    );
+  });
+
+  it('starts a new source with every row closed, under the same sort and calcs', async () => {
+    const store = new GridStore(source(tree()), { calcs: { value: sum((r) => r.value) } });
+    await store.setSort({ value: (r) => r.value, dir: 'asc' });
+    await store.toggle('a');
+    await store.setSource(source([...tree(), n('z', 7)]));
+    expect(shown(store.snapshot().rows)).toEqual(['d-@0', 'a-@0', 'z@0']);
+    expect(store.snapshot().totals).toEqual({ value: 11 });
   });
 
   it('starts expanded where the policy says so', async () => {
