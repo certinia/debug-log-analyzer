@@ -476,9 +476,14 @@ describe('lv-grid', () => {
 
   it('shows an alert in place of its rows while a build throws, and reports the error once', async () => {
     const { grid, root, names } = await setup();
-    const errors: unknown[] = [];
-    grid.addEventListener('lv-grid-error', (e) => errors.push(detail<GridErrorDetail>(e).error));
+    const errors: GridErrorDetail[] = [];
+    grid.addEventListener('lv-grid-error', (e) => {
+      e.preventDefault();
+      errors.push(detail<GridErrorDetail>(e));
+    });
     const boom = new Error('boom');
+    // Two steps in one turn: both reject with the same error.
+    grid.sort = { column: 'time', dir: 'desc' };
     grid.filters = [
       {
         test: () => {
@@ -491,12 +496,36 @@ describe('lv-grid', () => {
       'The table could not be updated.',
     );
     expect(root.querySelector<HTMLElement>('.body')?.hidden).toBe(true);
-    expect(errors).toEqual([boom]);
+    expect(errors).toEqual([{ error: boom, action: 'build' }]);
 
     grid.filters = [];
     await settle(grid);
     expect(root.querySelector('[role="alert"]')).toBeNull();
-    expect(names()).toEqual(['a', 'b', 'c']);
+    expect(names()).toEqual(['a', 'c', 'b']);
+
+    grid.filters = [
+      {
+        test: () => {
+          throw boom;
+        },
+      },
+    ];
+    await settle(grid);
+    expect(errors).toHaveLength(2);
+  });
+
+  it('reports a failed copy, and throws an error no listener cancels', async () => {
+    const boom = new Error('denied');
+    const writeText = jest.fn<Promise<void>, [string]>().mockRejectedValue(boom);
+    Object.defineProperty(navigator, 'clipboard', { value: { writeText }, configurable: true });
+    const { grid, key } = await setup();
+    const thrown = jest.spyOn(globalThis, 'queueMicrotask').mockImplementation(() => {});
+    const errors: GridErrorDetail[] = [];
+    grid.addEventListener('lv-grid-error', (e) => errors.push(detail<GridErrorDetail>(e)));
+    await key('c', { ctrlKey: true });
+    await grid.settled();
+    expect(errors).toEqual([{ error: boom, action: 'copy' }]);
+    expect(() => thrown.mock.calls[0]?.[0]()).toThrow(boom);
   });
 
   it('reports a reshape when its shown columns change, and not when they stay the same', async () => {

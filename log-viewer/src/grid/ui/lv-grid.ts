@@ -71,9 +71,13 @@ export interface GridReshapeDetail {
   reason: 'sort' | 'columns' | 'filter' | 'group';
 }
 
-/** An error from work the grid started itself, which no caller can catch. */
+/**
+ * An error from work the grid started itself, which no caller can catch. Cancel the event
+ * once the error is shown or logged; an error left uncancelled is thrown uncaught.
+ */
 export interface GridErrorDetail {
   error: unknown;
+  action: 'build' | 'toggle' | 'copy';
 }
 
 export interface GridColumnDetail {
@@ -195,7 +199,7 @@ export class LvGrid<R extends object = object> extends LitElement {
   /** Where the selection was last seen, to skip a search of every row. */
   private selectedAt = -1;
   private hovered = -1;
-  private reported: { error: unknown } | null = null;
+  private failure: { readonly error: unknown } | undefined;
   private found: FindMarks<R> | null = null;
   // Goes up with each find and clear, so a find still running sees it is stale.
   private searches = 0;
@@ -367,21 +371,21 @@ export class LvGrid<R extends object = object> extends LitElement {
       return;
     }
     if (changed.has('source') && this.source) {
-      this.background(store.setSource(this.source));
+      this.background(store.setSource(this.source), 'build');
     }
     if (changed.has('filters')) {
-      this.background(store.setFilters(this.filters));
+      this.background(store.setFilters(this.filters), 'build');
       this.emit<GridReshapeDetail>('lv-grid-reshape', { reason: 'filter' });
     }
     if (changed.has('groupBy')) {
-      this.background(store.setGroupBy(this.groupBy));
+      this.background(store.setGroupBy(this.groupBy), 'build');
       this.emit<GridReshapeDetail>('lv-grid-reshape', { reason: 'group' });
     }
     if ((changed.has('columns') || changed.has('sort')) && this.calcsChanged()) {
-      this.background(store.setCalcs(this.calcs));
+      this.background(store.setCalcs(this.calcs), 'build');
     }
     if (changed.has('sort') || changed.has('columns')) {
-      this.background(this.applySort());
+      this.background(this.applySort(), 'build');
     }
     if (
       changed.has('columns') &&
@@ -398,6 +402,12 @@ export class LvGrid<R extends object = object> extends LitElement {
   protected updated(changed: PropertyValues): void {
     const snapshot = this.data.snapshot;
     this.toggleAttribute('busy', snapshot?.busy ?? false);
+    if (snapshot?.failed !== this.failure) {
+      this.failure = snapshot?.failed;
+      if (this.failure) {
+        this.report(this.failure.error, 'build');
+      }
+    }
     if (this.view && snapshot && snapshot.rows !== this.shown) {
       this.shown = snapshot.rows;
       this.view.setRows(snapshot.rows, snapshot.toggled);
@@ -594,10 +604,10 @@ export class LvGrid<R extends object = object> extends LitElement {
     });
     this.data.follow(this.store);
     if (this.filters.length) {
-      this.background(this.store.setFilters(this.filters));
+      this.background(this.store.setFilters(this.filters), 'build');
     }
     if (this.sort) {
-      this.background(this.applySort());
+      this.background(this.applySort(), 'build');
     }
   }
 
@@ -783,7 +793,7 @@ export class LvGrid<R extends object = object> extends LitElement {
       return;
     }
     if (this.isToggle(e, index)) {
-      this.background(this.toggleAt(index));
+      this.background(this.toggleAt(index), 'toggle');
     } else if (window.getSelection()?.type === 'Range') {
       // A drag that selected text is a copy in the making, not a click on a row.
       return;
@@ -807,7 +817,7 @@ export class LvGrid<R extends object = object> extends LitElement {
     }
     e.preventDefault();
     if (key === 'copy') {
-      this.background(this.copy());
+      this.background(this.copy(), 'copy');
       return;
     }
     const at = this.indexOfSelected();
@@ -824,7 +834,7 @@ export class LvGrid<R extends object = object> extends LitElement {
       this.select(this.targetAt(intent.index), intent.index, true);
       this.view?.scrollToIndex(intent.index, 'auto');
     } else if (intent) {
-      this.background(this.toggleAt(intent.index, intent.kind === 'expand'));
+      this.background(this.toggleAt(intent.index, intent.kind === 'expand'), 'toggle');
     }
   };
 
@@ -848,17 +858,28 @@ export class LvGrid<R extends object = object> extends LitElement {
     this.emit<GridRowDetail<R>>('lv-grid-locate', { row: null });
   };
 
-  private background(work: Promise<unknown> | undefined): void {
+  /** A build's error is reported from its snapshot, once, so its rejections are not. */
+  private background(work: Promise<unknown> | undefined, action: GridErrorDetail['action']): void {
     work?.catch((error: unknown) => {
-      if (this.reported?.error !== error) {
-        this.reported = { error };
-        this.emit<GridErrorDetail>('lv-grid-error', { error });
+      if (error !== this.store?.snapshot().failed?.error) {
+        this.report(error, action);
       }
     });
   }
 
-  /** Bubbles, but is not composed: it stays inside the host's shadow root. */
-  private emit<T>(type: string, detail: T): void {
-    this.dispatchEvent(new CustomEvent<T>(type, { detail, bubbles: true }));
+  private report(error: unknown, action: GridErrorDetail['action']): void {
+    if (this.emit<GridErrorDetail>('lv-grid-error', { error, action }, true)) {
+      queueMicrotask(() => {
+        throw error;
+      });
+    }
+  }
+
+  /**
+   * Bubbles, but is not composed: it stays inside the host's shadow root. False when a
+   * listener cancelled it.
+   */
+  private emit<T>(type: string, detail: T, cancelable = false): boolean {
+    return this.dispatchEvent(new CustomEvent<T>(type, { detail, bubbles: true, cancelable }));
   }
 }
