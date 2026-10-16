@@ -16,6 +16,7 @@ import type { GridColumn } from '../column.js';
 import '../lv-grid.js';
 import type {
   GridColumnResizeDetail,
+  GridErrorDetail,
   GridFindDetail,
   GridHeaderContextDetail,
   GridReshapeDetail,
@@ -471,6 +472,31 @@ describe('lv-grid', () => {
     last.moveTo(8 * ROW + 1);
     await grid.setCurrentMatch(0);
     expect(scroll).toHaveBeenCalledWith(2);
+  });
+
+  it('shows an alert in place of its rows while a build throws, and reports the error once', async () => {
+    const { grid, root, names } = await setup();
+    const errors: unknown[] = [];
+    grid.addEventListener('lv-grid-error', (e) => errors.push(detail<GridErrorDetail>(e).error));
+    const boom = new Error('boom');
+    grid.filters = [
+      {
+        test: () => {
+          throw boom;
+        },
+      },
+    ];
+    await settle(grid);
+    expect(root.querySelector('[role="alert"]')?.textContent).toBe(
+      'The table could not be updated.',
+    );
+    expect(root.querySelector<HTMLElement>('.body')?.hidden).toBe(true);
+    expect(errors).toEqual([boom]);
+
+    grid.filters = [];
+    await settle(grid);
+    expect(root.querySelector('[role="alert"]')).toBeNull();
+    expect(names()).toEqual(['a', 'b', 'c']);
   });
 
   it('reports a reshape when its shown columns change, and not when they stay the same', async () => {

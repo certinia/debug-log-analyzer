@@ -71,6 +71,11 @@ export interface GridReshapeDetail {
   reason: 'sort' | 'columns' | 'filter' | 'group';
 }
 
+/** An error from work the grid started itself, which no caller can catch. */
+export interface GridErrorDetail {
+  error: unknown;
+}
+
 export interface GridColumnDetail {
   column: string;
 }
@@ -106,7 +111,8 @@ const shownIds = <R>(columns: readonly GridColumn<R>[] | undefined): string[] =>
  * keyboard moves, opens and closes rows. Events bubble but stay inside the host's shadow
  * root: `lv-grid-select`, `lv-grid-locate` (hover), `lv-grid-context`,
  * `lv-grid-header-context`, `lv-grid-column-resize`, `lv-grid-find-results`,
- * `lv-grid-reshape` and `lv-grid-expand` (a data row the user opened).
+ * `lv-grid-reshape`, `lv-grid-expand` (a data row the user opened) and `lv-grid-error`.
+ * When a build throws, the grid shows an alert in place of its rows until a build succeeds.
  */
 @customElement('lv-grid')
 export class LvGrid<R extends object = object> extends LitElement {
@@ -189,6 +195,7 @@ export class LvGrid<R extends object = object> extends LitElement {
   /** Where the selection was last seen, to skip a search of every row. */
   private selectedAt = -1;
   private hovered = -1;
+  private reported: { error: unknown } | null = null;
   private found: FindMarks<R> | null = null;
   // Goes up with each find and clear, so a find still running sees it is stale.
   private searches = 0;
@@ -360,21 +367,21 @@ export class LvGrid<R extends object = object> extends LitElement {
       return;
     }
     if (changed.has('source') && this.source) {
-      void store.setSource(this.source);
+      this.background(store.setSource(this.source));
     }
     if (changed.has('filters')) {
-      void store.setFilters(this.filters);
+      this.background(store.setFilters(this.filters));
       this.emit<GridReshapeDetail>('lv-grid-reshape', { reason: 'filter' });
     }
     if (changed.has('groupBy')) {
-      void store.setGroupBy(this.groupBy);
+      this.background(store.setGroupBy(this.groupBy));
       this.emit<GridReshapeDetail>('lv-grid-reshape', { reason: 'group' });
     }
     if ((changed.has('columns') || changed.has('sort')) && this.calcsChanged()) {
-      void store.setCalcs(this.calcs);
+      this.background(store.setCalcs(this.calcs));
     }
     if (changed.has('sort') || changed.has('columns')) {
-      void this.applySort();
+      this.background(this.applySort());
     }
     if (
       changed.has('columns') &&
@@ -404,6 +411,7 @@ export class LvGrid<R extends object = object> extends LitElement {
     const totals = this.data.snapshot?.totals ?? {};
     const footer = columns.some((column) => column.calc || column.footer !== undefined);
     const size = this.data.snapshot?.rows.size ?? 0;
+    const failed = this.data.snapshot?.failed !== undefined;
     return html`<div
       class="scroller"
       role="treegrid"
@@ -420,12 +428,15 @@ export class LvGrid<R extends object = object> extends LitElement {
         ${columns.map((column) => this.headerCell(column))}
       </div>
       ${
-        size === 0 && !this.data.snapshot?.busy && this.placeholder !== null
-          ? html`<div class="placeholder" role="status">${this.placeholder}</div>`
-          : nothing
+        failed
+          ? html`<div class="placeholder" role="alert">The table could not be updated.</div>`
+          : size === 0 && !this.data.snapshot?.busy && this.placeholder !== null
+            ? html`<div class="placeholder" role="status">${this.placeholder}</div>`
+            : nothing
       }
       <div
         class="body"
+        ?hidden=${failed}
         ${ref(this.bodyRef)}
         @mousedown=${this.onMouseDown}
         @click=${this.onClick}
@@ -434,7 +445,7 @@ export class LvGrid<R extends object = object> extends LitElement {
         @pointerleave=${this.onLeave}
       ></div>
       ${
-        footer
+        footer && !failed
           ? html`<div class="row foot" role="row" aria-rowindex=${size + 2}>
               ${columns.map(
                 (column) =>
@@ -583,10 +594,10 @@ export class LvGrid<R extends object = object> extends LitElement {
     });
     this.data.follow(this.store);
     if (this.filters.length) {
-      void this.store.setFilters(this.filters);
+      this.background(this.store.setFilters(this.filters));
     }
     if (this.sort) {
-      void this.applySort();
+      this.background(this.applySort());
     }
   }
 
@@ -772,7 +783,7 @@ export class LvGrid<R extends object = object> extends LitElement {
       return;
     }
     if (this.isToggle(e, index)) {
-      void this.toggleAt(index);
+      this.background(this.toggleAt(index));
     } else if (window.getSelection()?.type === 'Range') {
       // A drag that selected text is a copy in the making, not a click on a row.
       return;
@@ -796,7 +807,7 @@ export class LvGrid<R extends object = object> extends LitElement {
     }
     e.preventDefault();
     if (key === 'copy') {
-      void this.copy();
+      this.background(this.copy());
       return;
     }
     const at = this.indexOfSelected();
@@ -813,7 +824,7 @@ export class LvGrid<R extends object = object> extends LitElement {
       this.select(this.targetAt(intent.index), intent.index, true);
       this.view?.scrollToIndex(intent.index, 'auto');
     } else if (intent) {
-      void this.toggleAt(intent.index, intent.kind === 'expand');
+      this.background(this.toggleAt(intent.index, intent.kind === 'expand'));
     }
   };
 
@@ -836,6 +847,15 @@ export class LvGrid<R extends object = object> extends LitElement {
     this.hovered = -1;
     this.emit<GridRowDetail<R>>('lv-grid-locate', { row: null });
   };
+
+  private background(work: Promise<unknown> | undefined): void {
+    work?.catch((error: unknown) => {
+      if (this.reported?.error !== error) {
+        this.reported = { error };
+        this.emit<GridErrorDetail>('lv-grid-error', { error });
+      }
+    });
+  }
 
   /** Bubbles, but is not composed: it stays inside the host's shadow root. */
   private emit<T>(type: string, detail: T): void {

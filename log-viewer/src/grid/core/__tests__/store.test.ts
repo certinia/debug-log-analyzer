@@ -206,7 +206,7 @@ describe('GridStore', () => {
     expect(store.snapshot().rows).toBe(rows);
   });
 
-  it('gives the error a step throws to its callers, then stays usable', async () => {
+  it('gives the error a step throws to its callers and the snapshot, then stays usable', async () => {
     const store = new GridStore(source(tree()));
     await store.settled();
     const boom = new Error('boom');
@@ -221,7 +221,10 @@ describe('GridStore', () => {
     await expect(failing).rejects.toBe(boom);
     await expect(waiting).rejects.toBe(boom);
     expect(store.snapshot().busy).toBe(false);
+    expect(store.snapshot().failed?.error).toBe(boom);
+    expect(shown(store.snapshot().rows)).toEqual(['a-@0', 'd-@0']);
     await store.setFilters([]);
+    expect(store.snapshot().failed).toBeUndefined();
     await store.expandAll();
     expect(shown(store.snapshot().rows)).toEqual(['a+@0', 'b+@1', 'c@2', 'x@1', 'd+@0', 'e@1']);
   });

@@ -24,6 +24,7 @@ export {
   LvGrid,
   type GridColumn,
   type GridColumnResizeDetail,
+  type GridErrorDetail,
   type GridContextDetail,
   type GridFindDetail,
   type GridHeaderContextDetail,
