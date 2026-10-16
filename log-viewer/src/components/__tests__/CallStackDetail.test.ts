@@ -111,7 +111,7 @@ describe('CallStackDetail', () => {
 
     expect(
       collect(INSPECTOR_REVEAL_EVENT, revealed, () =>
-        fire(el, 'lv-grid-select', { row, target: 4 }),
+        fire(el, 'lv-grid-select', { row, target: 4, user: true }),
       ),
     ).toEqual([4]);
   });
@@ -123,6 +123,7 @@ describe('CallStackDetail', () => {
       fire(el, 'lv-grid-select', {
         row: grid.source!.roots.find((r) => r.eventIndex === key),
         target: key,
+        user: false,
       });
       return true;
     });
@@ -142,16 +143,28 @@ describe('CallStackDetail', () => {
     expect(built).toEqual([]);
   });
 
+  it('hears a click made while the active frame is still being selected', async () => {
+    const el = await mount(9);
+    jest.spyOn(gridOf(el), 'goTo').mockReturnValue(new Promise(() => {}));
+    el.activeEventIndex = 4;
+    await el.updateComplete;
+    const row = gridOf(el).source!.roots[0];
+
+    expect(
+      collect(INSPECTOR_REVEAL_EVENT, revealed, () =>
+        fire(el, 'lv-grid-select', { row, target: row?.eventIndex, user: true }),
+      ),
+    ).toEqual([row?.eventIndex]);
+  });
+
   it('marks the active frame again when a click clears its row', async () => {
     const el = await mount(9);
     const goTo = jest.spyOn(gridOf(el), 'goTo').mockResolvedValue(true);
     el.activeEventIndex = 4;
     await el.updateComplete;
-    // The mark's select must settle, or its guard hides the click.
-    await new Promise((resolve) => setTimeout(resolve));
     goTo.mockClear();
 
-    fire(el, 'lv-grid-select', { row: null, target: null });
+    fire(el, 'lv-grid-select', { row: null, target: null, user: true });
     await Promise.resolve();
 
     expect(goTo).toHaveBeenCalledWith([4], { scrollIfVisible: false });

@@ -258,7 +258,7 @@ describe('CallTreeDetail scoped build', () => {
     await frame(el);
     goTo.mockClear();
 
-    fire(gridOf(el), 'lv-grid-select', { row: null, target: null });
+    fire(gridOf(el), 'lv-grid-select', { row: null, target: null, user: true });
     await Promise.resolve();
 
     expect(goTo).toHaveBeenCalledWith([9], { scrollIfVisible: false });
@@ -270,7 +270,7 @@ describe('CallTreeDetail scoped build', () => {
     await frame(el);
     const grid = gridOf(el);
     jest.spyOn(grid, 'goTo').mockImplementation(async () => {
-      fire(grid, 'lv-grid-select', { row: grid.source?.roots[0], target: 9 });
+      fire(grid, 'lv-grid-select', { row: grid.source?.roots[0], target: 9, user: false });
       return true;
     });
     const revealed: unknown[] = [];
@@ -442,7 +442,7 @@ describe('CallTreeDetail scoped build', () => {
     const located = (e: Event) => seen.push((e as InspectorLocateEvent).detail.selection);
     document.addEventListener(INSPECTOR_LOCATE_EVENT, located);
     for (const row of [seed, depth2, a]) {
-      fire(grid, 'lv-grid-select', { row, target: row.id });
+      fire(grid, 'lv-grid-select', { row, target: row.id, user: true });
     }
     document.removeEventListener(INSPECTOR_LOCATE_EVENT, located);
 
@@ -458,7 +458,7 @@ describe('CallTreeDetail scoped build', () => {
     await frame(el);
     // The view on screen still holds a pick, though another view cleared its own since.
     const deselect = jest.spyOn(gridOf(el, 'bottom-up'), 'deselect').mockReturnValue(true);
-    fire(gridOf(el, 'time-order'), 'lv-grid-select', { row: null, target: null });
+    fire(gridOf(el, 'time-order'), 'lv-grid-select', { row: null, target: null, user: true });
 
     const seen: Array<{ eventIndexes: readonly number[]; sticky: boolean }> = [];
     const located = (e: Event) => seen.push((e as InspectorLocateEvent).detail);

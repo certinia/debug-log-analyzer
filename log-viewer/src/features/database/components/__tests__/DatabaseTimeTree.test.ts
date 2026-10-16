@@ -152,8 +152,8 @@ describe('database-time', () => {
     const query = roots()[0]?._children?.[0];
     const merged = roots()[1];
 
-    fire('lv-grid-select', { row: query, target: query?.id });
-    fire('lv-grid-select', { row: merged, target: merged?.id });
+    fire('lv-grid-select', { row: query, target: query?.id, user: true });
+    fire('lv-grid-select', { row: merged, target: merged?.id, user: true });
 
     expect(events).toEqual([
       { type: INSPECTOR_REVEAL_EVENT, detail: { eventIndex: 2 } },

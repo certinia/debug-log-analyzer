@@ -5,7 +5,6 @@ import '../ContextMenu.js';
 import { css, html, type LitElement, type ReactiveController, type TemplateResult } from 'lit';
 
 import { eventBus } from '../../core/events/EventBus.js';
-import { SelectionEchoGuard } from '../../core/events/SelectionEchoGuard.js';
 import { SubscriptionController } from '../../core/events/SubscriptionController.js';
 import type {
   GridContextDetail,
@@ -58,7 +57,6 @@ export class InspectorGridController<R extends object> implements ReactiveContro
 
   private readonly _host: LitElement;
   private readonly _options: InspectorGridOptions<R>;
-  private readonly _echoGuard = new SelectionEchoGuard();
   private _located: readonly number[] = [];
   private _menuFrame = -1;
 
@@ -94,10 +92,10 @@ export class InspectorGridController<R extends object> implements ReactiveContro
   async markActive(path: readonly RowKey[] | null): Promise<void> {
     const grid = this._options.grid();
     if (!path?.length) {
-      this._echoGuard.run(() => grid?.deselect());
+      grid?.deselect();
       return;
     }
-    await this._echoGuard.runAsync(async () => grid?.goTo(path, { scrollIfVisible: false }));
+    await grid?.goTo(path, { scrollIfVisible: false });
   }
 
   /** The row menu, which the host renders once. */
@@ -109,7 +107,7 @@ export class InspectorGridController<R extends object> implements ReactiveContro
   }
 
   readonly onSelect = (e: CustomEvent<GridSelectDetail<R>>): void => {
-    if (!this._echoGuard.suppressed) {
+    if (e.detail.user) {
       this._options.pick(e.detail.row);
     }
   };
@@ -134,7 +132,7 @@ export class InspectorGridController<R extends object> implements ReactiveContro
 
   private _dropPick(): void {
     const grid = this._options.grid();
-    if (this._echoGuard.run(() => grid?.deselect())) {
+    if (grid?.deselect()) {
       dispatchInspectorLocate(this._host, [], true);
     }
   }
