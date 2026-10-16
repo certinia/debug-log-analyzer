@@ -600,6 +600,19 @@ describe('lv-grid', () => {
     grid.filters = none;
     await settle(grid);
     expect(placeholder()).toBe('Nothing here');
+    const rowIndexes = [...root.querySelectorAll('.scroller > *')].map((el) => [
+      el.getAttribute('role'),
+      el.getAttribute('aria-rowindex'),
+    ]);
+    expect(rowIndexes.filter(([role]) => role !== null)).toEqual([
+      ['row', '1'],
+      ['row', '2'],
+      ['row', '3'],
+    ]);
+    expect(root.querySelector('.scroller')?.getAttribute('aria-rowcount')).toBe('3');
+    expect(root.querySelector('[role="gridcell"] > [role="status"]')?.textContent).toBe(
+      'Nothing here',
+    );
 
     grid.filters = [];
     await settle(grid);
