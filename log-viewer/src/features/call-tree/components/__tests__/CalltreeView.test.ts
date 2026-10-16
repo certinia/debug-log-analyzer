@@ -6,7 +6,7 @@
 import { afterEach, beforeEach, describe, expect, it } from '@jest/globals';
 import type { ApexLog } from '@apexdevtools/apex-log-parser';
 
-import type { BottomUpRow } from '../../utils/Aggregation.js';
+import { toAggregatedCallTree, toBottomUpTree, type BottomUpRow } from '../../utils/Aggregation.js';
 
 // The columns read a parsed log, which the fake one is not.
 jest.mock('../../grid/columns.js', () => ({
@@ -45,7 +45,7 @@ jest.mock('../../../settings/Settings.js', () => ({
 
 import { storeOf } from '#test-helpers/apexLog.js';
 import { eventBus } from '../../../../core/events/EventBus.js';
-import { LogStore } from '../../../../core/log/LogStore.js';
+import { LogStore, logStoreFor } from '../../../../core/log/LogStore.js';
 import { CalltreeView } from '../CalltreeView.js';
 
 /** Which view each build made, in order. */
@@ -345,6 +345,69 @@ describe('calltree-view category colorize', () => {
     colorize(false);
     expect(view.timeOrderGrid?.hasAttribute('category-colorize')).toBe(false);
     expect(view.bottomUpGrid?.hasAttribute('category-colorize')).toBe(false);
+  });
+});
+
+describe('calltree-view merged filters', () => {
+  // Outer runs 5 ms; its query and debug line take next to none.
+  const { log } = storeOf(
+    '09:18:22.6 (1000)|METHOD_ENTRY|[1]|01p|ns.Outer.run()\n' +
+      '09:18:22.6 (2000)|SOQL_EXECUTE_BEGIN|[2]|Aggregations:0|SELECT Id FROM Account\n' +
+      '09:18:22.6 (3000)|SOQL_EXECUTE_END|[2]|Rows:1\n' +
+      '09:18:22.6 (4000)|USER_DEBUG|[3]|DEBUG|hello\n' +
+      '09:18:22.6 (5001000)|METHOD_EXIT|[1]|ns.Outer.run()\n',
+  );
+  const paths = (): ReturnType<LogStore['keyPathIds']> => logStoreFor(log).keyPathIds();
+  const all = <R extends { _children?: R[] | null }>(of: readonly R[]): R[] =>
+    of.flatMap((row) => [row, ...all(row._children ?? [])]);
+  const rowsOf = {
+    aggregated: () => all(toAggregatedCallTree(log.children, paths())),
+    'bottom-up': () => all(toBottomUpTree(log.children, paths())),
+  };
+  const gridOf = (view: CalltreeView, mode: keyof typeof rowsOf) =>
+    mode === 'aggregated' ? view.aggregatedGrid : view.bottomUpGrid;
+  /** The rows each filter passes on its own; ancestors kept for a match are the grid's job. */
+  const passing = (view: CalltreeView, mode: keyof typeof rowsOf): string[] => {
+    const filters = (gridOf(view, mode)?.filters ?? []) as { test: (row: object) => boolean }[];
+    return rowsOf[mode]()
+      .filter((row) => filters.every((filter) => filter.test(row)))
+      .map((row) => row.text);
+  };
+
+  let view: CalltreeView;
+
+  beforeEach(async () => {
+    globalThis.IntersectionObserver = AlwaysVisible as unknown as typeof IntersectionObserver;
+    view = await mountView(log);
+    view.filterState.showDetails = true;
+  });
+
+  afterEach(() => {
+    view.remove();
+  });
+
+  it.each(['aggregated', 'bottom-up'] as const)(
+    'filters %s rows on their own total time and namespace',
+    async (mode) => {
+      await view._setViewMode(mode);
+      view._handleTotalTimeRange(
+        new CustomEvent('range', { detail: { range: { start: 1, end: null } } }),
+      );
+      expect(passing(view, mode)).toContain('ns.Outer.run()');
+      expect(passing(view, mode)).not.toContain('SELECT Id FROM Account');
+
+      view._handleNamespaceFacet(new CustomEvent('facet', { detail: { selected: ['other'] } }));
+      expect(passing(view, mode)).toEqual([]);
+    },
+  );
+
+  it('filters aggregated rows on their type, and on debug only', async () => {
+    await view._setViewMode('aggregated');
+    view._handleTypeFilter({ target: { value: 'SOQL_EXECUTE_BEGIN' } } as unknown as Event);
+    expect(passing(view, 'aggregated')).toEqual(['SELECT Id FROM Account']);
+
+    view._handleDebugOnlyChange();
+    expect(passing(view, 'aggregated')).toEqual(['DEBUG | hello']);
   });
 });
 
