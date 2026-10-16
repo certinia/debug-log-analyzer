@@ -291,8 +291,10 @@ export class CalltreeView extends LitElement {
     'lv-find-close': (e) => void this._find(e),
   });
 
+  private _colorize = false;
   private readonly _subscriptions = new SubscriptionController(this, () => [
     wireCategoryColoring(this, (on) => {
+      this._colorize = on;
       for (const grid of this._grids) {
         grid.toggleAttribute('category-colorize', on);
       }
@@ -1236,7 +1238,7 @@ export class CalltreeView extends LitElement {
   ): LvGrid<R> {
     const grid = document.createElement('lv-call-tree-grid') as unknown as LvGrid<R>;
     grid.label = `Call Tree, ${VIEW_MODES.find((option) => option.value === mode)?.label}`;
-    grid.toggleAttribute('category-colorize', this.classList.contains('category-colorize'));
+    grid.toggleAttribute('category-colorize', this._colorize);
     const standIn = (row: R): RowComponent => rowStandIn(row, data, parentOf);
 
     grid.addEventListener('lv-grid-header-context', (e) => {
