@@ -960,12 +960,16 @@ export class CalltreeView extends LitElement {
     }
   }
 
-  _expandButtonClick() {
-    void this._activeGrid()?.expandAll();
+  async _expandButtonClick(): Promise<void> {
+    const grid = this._activeGrid();
+    await grid?.expandAll();
+    grid?.focus({ preventScroll: true });
   }
 
-  _collapseButtonClick() {
-    void this._activeGrid()?.collapseAll();
+  async _collapseButtonClick(): Promise<void> {
+    const grid = this._activeGrid();
+    await grid?.collapseAll();
+    grid?.focus({ preventScroll: true });
   }
 
   _appendTableWhenVisible() {

@@ -308,6 +308,15 @@ describe('calltree-view table lifetime', () => {
     expect(built).toEqual(['time-order', 'bottom-up', 'bottom-up']);
   });
 
+  it.each(['_expandButtonClick', '_collapseButtonClick'] as const)(
+    'gives keyboard focus back to the grid after %s',
+    async (click) => {
+      await view[click]();
+
+      expect((view.renderRoot as ShadowRoot).activeElement).toBe(view.timeOrderGrid);
+    },
+  );
+
   it('builds aggregated as a grid, under the filters in force', async () => {
     view.namespaceSelected = ['ns'];
     await view._setViewMode('aggregated');
