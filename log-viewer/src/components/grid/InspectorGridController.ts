@@ -6,6 +6,7 @@ import { css, html, type LitElement, type ReactiveController, type TemplateResul
 
 import { eventBus } from '../../core/events/EventBus.js';
 import { SubscriptionController } from '../../core/events/SubscriptionController.js';
+import { sameMembers } from '../../core/utility/Util.js';
 import type {
   GridContextDetail,
   GridRowDetail,
@@ -151,21 +152,12 @@ export class InspectorGridController<R extends object> implements ReactiveContro
 
   private _setMarked(marked: ReadonlySet<RowKey>): void {
     // A new set repaints the rows, and most pointer moves leave the mark as it was.
-    if (marked.size === this.marked.size && sameKeys(marked, this.marked)) {
+    if (sameMembers(marked, this.marked)) {
       return;
     }
     this.marked = marked;
     this._host.requestUpdate();
   }
-}
-
-function sameKeys(a: ReadonlySet<RowKey>, b: ReadonlySet<RowKey>): boolean {
-  for (const key of a) {
-    if (!b.has(key)) {
-      return false;
-    }
-  }
-  return true;
 }
 
 function listen<D>(
