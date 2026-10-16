@@ -6,6 +6,10 @@
  */
 import { FindWidget } from '../FindWidget.js';
 
+afterEach(() => {
+  document.body.replaceChildren();
+});
+
 describe('FindWidget', () => {
   it('announces the match count as a status', async () => {
     const widget = new FindWidget();
@@ -15,6 +19,5 @@ describe('FindWidget', () => {
     await widget.updateComplete;
     const status = widget.renderRoot.querySelector('[role="status"]');
     expect(status?.textContent).toBe('2 of 5');
-    widget.remove();
   });
 });

@@ -36,7 +36,9 @@ describe('navigate', () => {
     expect(navigate(rows, 0, 'pageDown', 2)).toEqual({ kind: 'select', index: 2 });
     expect(navigate(rows, 2, 'pageDown', 5)).toEqual({ kind: 'select', index: 3 });
     expect(navigate(rows, 3, 'pageUp', 2)).toEqual({ kind: 'select', index: 1 });
+    expect(navigate(rows, 1, 'pageUp', 5)).toEqual({ kind: 'select', index: 0 });
     expect(navigate(rows, 0, 'pageUp', 2)).toBeNull();
+    expect(navigate(rows, 3, 'pageDown', 2)).toBeNull();
     expect(navigate(rows, 2, 'home')).toEqual({ kind: 'select', index: 0 });
     expect(navigate(rows, 0, 'end')).toEqual({ kind: 'select', index: 3 });
   });
