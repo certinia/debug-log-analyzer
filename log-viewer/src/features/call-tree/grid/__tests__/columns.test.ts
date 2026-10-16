@@ -11,6 +11,7 @@ import { storeOf } from '#test-helpers/apexLog.js';
 import { runCalc as total } from '#test-helpers/calcs.js';
 import { governorLimits, limitValue } from '#test-helpers/limits.js';
 import { NO_REPORTED_LIMITS_TEXT } from '../../../../components/governorCopy.js';
+import { CALL_TREE_VIEWS } from '../../../../components/grid/ColumnViews.js';
 import { formatInteger } from '../../../../core/utility/Util.js';
 import { FIND_TEXT_ATTR, type GridColumn } from '../../../../grid/index.js';
 import { logStoreFor } from '../../../../core/log/LogStore.js';
@@ -136,6 +137,19 @@ describe('timeOrderColumns', () => {
       expect(events.map((e) => text?.(e))).toEqual(built.map((r) => String(value(r) ?? '—')));
     }
     expect(built.some((r) => (r.governorCost ?? 0) > 0)).toBe(true);
+  });
+});
+
+describe('CALL_TREE_VIEWS', () => {
+  it('names only columns a call-tree grid has, so no view loses a column to a rename', () => {
+    const ids = new Set(
+      [timeOrder, aggregatedColumns(log, options), bottomUpColumns(log, options)].flatMap(
+        (columns) => columns.map((c) => c.id),
+      ),
+    );
+    const named = CALL_TREE_VIEWS.flatMap((view) => view.fields ?? []);
+
+    expect(named.filter((field) => !ids.has(field))).toEqual([]);
   });
 });
 
