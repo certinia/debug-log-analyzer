@@ -13,11 +13,13 @@ can move to its own package without change.
 | Layer     | Holds                                                          | May import                                 |
 | --------- | -------------------------------------------------------------- | ------------------------------------------ |
 | `core/`   | rows, groups, columns, totals, find, export, navigation, store | `core/` only. No packages, no DOM.         |
-| `render/` | virtual row window, row elements, highlights, measuring        | `core/`, `@tanstack/virtual-core`. No Lit. |
-| `ui/`     | `<lv-grid>`, header, footer, keyboard, styles                  | `core/`, `render/`, `lit`.                 |
+| `render/` | virtual row window, row elements, highlights, anchoring        | `core/`, `@tanstack/virtual-core`. No Lit. |
+| `ui/`     | `<lv-grid>`, header, footer, keyboard, column sizing, styles   | `core/`, `render/`, `lit`.                 |
 
 `lana/grid-boundary` in `scripts/oxlint-plugin-lana.mjs` enforces the imports.
 `core/tsconfig.json` type-checks core without the DOM library.
+
+Tests share `core/__tests__/fixtures.ts` and `render/__tests__/fakes.ts`. Add to them; do not copy.
 
 ## Performance
 
