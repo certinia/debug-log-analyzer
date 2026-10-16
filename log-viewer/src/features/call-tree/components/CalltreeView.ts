@@ -37,6 +37,7 @@ import {
   BOTTOM_UP_DETAILS,
   BOTTOM_UP_SORT,
   bottomUpColumns,
+  BOTTOM_UP_GROUPS,
   bottomUpGroupBy,
   CALL_TREE_COLUMN_SETTINGS,
   mergedLines,
@@ -461,10 +462,9 @@ export class CalltreeView extends LitElement {
                       @change="${this._handleBottomUpGroupBy}"
                       .value="${this.bottomUpGroupBy}"
                     >
-                      <vscode-option>None</vscode-option>
-                      <vscode-option>Namespace</vscode-option>
-                      <vscode-option>Caller Namespace</vscode-option>
-                      <vscode-option>Type</vscode-option>
+                      ${BOTTOM_UP_GROUPS.map(
+                        ({ label }) => html`<vscode-option>${label}</vscode-option>`,
+                      )}
                     </vs-select>
                   `
                 : ''

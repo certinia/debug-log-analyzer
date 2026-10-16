@@ -32,6 +32,7 @@ import '../../call-tree/grid/CallTreeGrid.js';
 import type { CallTreeGrid } from '../../call-tree/grid/CallTreeGrid.js';
 import {
   BOTTOM_UP_DETAILS,
+  BOTTOM_UP_GROUPS,
   BOTTOM_UP_SORT,
   CALL_TREE_COLUMN_SETTINGS,
   bottomUpColumns,
@@ -262,10 +263,7 @@ export class AnalysisView extends LitElement {
             @change="${(e: Event) =>
               (this._groupBy = bottomUpGroupBy((e.target as HTMLInputElement).value))}"
           >
-            <vscode-option>None</vscode-option>
-            <vscode-option>Namespace</vscode-option>
-            <vscode-option>Caller Namespace</vscode-option>
-            <vscode-option>Type</vscode-option>
+            ${BOTTOM_UP_GROUPS.map(({ label }) => html`<vscode-option>${label}</vscode-option>`)}
           </vs-select>
 
           ${gridToolbarActions({

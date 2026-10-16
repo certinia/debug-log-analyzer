@@ -473,16 +473,20 @@ export const CALL_TREE_COLUMN_SETTINGS: Omit<ColumnSettingsOptions, 'tables'> = 
 /** Show Details on the Bottom-Up tree. */
 export const BOTTOM_UP_DETAILS: RowFilter<BottomUpRow> = { test: (row) => row._hasDetailsDeep };
 
-/** The Bottom-Up row field each group-by picker value groups on; None has none. */
-const GROUP_FIELDS: Record<string, 'namespace' | 'callerNamespace' | 'type'> = {
-  Namespace: 'namespace',
-  'Caller Namespace': 'callerNamespace',
-  Type: 'type',
-};
+/** The Bottom-Up group-by picker's options, in order, and the row field each groups on. */
+export const BOTTOM_UP_GROUPS: readonly {
+  label: string;
+  field: 'namespace' | 'callerNamespace' | 'type' | null;
+}[] = [
+  { label: 'None', field: null },
+  { label: 'Namespace', field: 'namespace' },
+  { label: 'Caller Namespace', field: 'callerNamespace' },
+  { label: 'Type', field: 'type' },
+];
 
-/** The Bottom-Up grouping for a group-by picker value, or null for none. */
-export function bottomUpGroupBy(value: string): GroupBy<BottomUpRow> | null {
-  const field = GROUP_FIELDS[value];
+/** The Bottom-Up grouping for a {@link BOTTOM_UP_GROUPS} label, or null for none. */
+export function bottomUpGroupBy(label: string): GroupBy<BottomUpRow> | null {
+  const field = BOTTOM_UP_GROUPS.find((group) => group.label === label)?.field;
   return field ? (row) => row[field] ?? '' : null;
 }
 

@@ -285,7 +285,12 @@ describe('analysis-view', () => {
     expect(goTo).toHaveBeenCalledWith([bucketB], { scrollIfVisible: false });
   });
 
-  it('groups by the picked field, and ungroups for None', async () => {
+  it.each([
+    ['Namespace', { namespace: 'ns' }, 'ns'],
+    ['Caller Namespace', { callerNamespace: 'caller' }, 'caller'],
+    ['Type', { type: 'METHOD_ENTRY' }, 'METHOD_ENTRY'],
+  ])('groups by %s, and ungroups for None', async (option, row, group) => {
+    const options = [...view.renderRoot.querySelectorAll('#groupby-dropdown vscode-option')];
     const pick = async (value: string) => {
       const picker = view.renderRoot.querySelector('#groupby-dropdown') as HTMLElement & {
         value: string;
@@ -295,8 +300,9 @@ describe('analysis-view', () => {
       await view.updateComplete;
     };
 
-    await pick('Caller Namespace');
-    expect(grid().groupBy?.({ callerNamespace: 'ns' } as BottomUpRow)).toBe('ns');
+    await pick(option);
+    expect(options.map((el) => el.textContent)).toContain(option);
+    expect(grid().groupBy?.(row as BottomUpRow)).toBe(group);
 
     await pick('None');
     expect(grid().groupBy).toBeNull();
