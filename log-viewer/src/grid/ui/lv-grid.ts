@@ -523,6 +523,7 @@ export class LvGrid<R extends object = object> extends LitElement {
       role="columnheader"
       title=${column.description ?? column.title}
       aria-sort=${ariaSort}
+      aria-keyshortcuts=${column.resizable === false ? nothing : 'Shift+ArrowLeft Shift+ArrowRight'}
       ?data-sortable=${column.sort !== undefined}
       @click=${(e: MouseEvent) => this.onHeaderClick(e, column)}
       @contextmenu=${(e: MouseEvent) => this.headerMenu(column.id, e)}

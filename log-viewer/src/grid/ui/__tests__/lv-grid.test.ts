@@ -549,6 +549,18 @@ describe('lv-grid', () => {
     ]);
   });
 
+  it('names the resize keys on a header that resizes', async () => {
+    const { header } = await setup({
+      columns: columns().map((column) =>
+        column.id === 'kind' ? { ...column, resizable: false } : column,
+      ),
+    });
+    expect(header('Time')?.getAttribute('aria-keyshortcuts')).toBe(
+      'Shift+ArrowLeft Shift+ArrowRight',
+    );
+    expect(header('Kind')?.hasAttribute('aria-keyshortcuts')).toBe(false);
+  });
+
   it('reaches the headers from the keyboard when no row shows', async () => {
     const { grid, scroller, header, key } = await setup();
     grid.filters = [{ test: () => false }];
