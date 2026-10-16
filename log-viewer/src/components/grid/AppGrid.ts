@@ -6,7 +6,6 @@ import { customElement } from 'lit/decorators.js';
 
 import { gridStyles, LvGrid } from '../../grid/index.js';
 import { globalStyles } from '../../styles/global.styles.js';
-import progressCss from './Progress.css';
 import { soqlSyntaxStyles } from '../../features/soql/styles/soql-syntax.css.js';
 
 declare global {
@@ -45,7 +44,27 @@ const theme = css`
 
 /** What the app's cells draw: bars, queries and their group headers. */
 const cells = css`
-  ${unsafeCSS(progressCss)}
+  .progress-wrapper {
+    position: relative;
+    font-variant-numeric: tabular-nums;
+  }
+  .progress-bar {
+    position: absolute;
+    height: 100%;
+    opacity: 0.3;
+    right: 0;
+    /* charts.orange keeps the bar distinct from the blue selected row; the literal is
+       the pre-token colour, for hosts that inject no \`--vscode-*\`. */
+    background: var(--vscode-charts-orange, #a97d0f);
+  }
+  .progress-bar__text {
+    position: relative;
+    white-space: pre;
+    display: inline-flex;
+  }
+  .progress-bar__text__percent {
+    width: 9ch;
+  }
   ${unsafeCSS(soqlSyntaxStyles)}
 
   .soql-group-header {
