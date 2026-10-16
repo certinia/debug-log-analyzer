@@ -78,6 +78,16 @@ function rowCells<R>(
   );
 }
 
+/** What a cell can hold that Tab would stop on. */
+const TAB_STOPS = 'a[href], button, input, select, textarea';
+
+/** The grid is one Tab stop: its keys reach a row's controls. */
+function untab(el: HTMLElement): void {
+  for (const control of el.querySelectorAll<HTMLElement>(TAB_STOPS)) {
+    control.tabIndex = -1;
+  }
+}
+
 /** Paints rows with lit-html: a reused row element keeps its template and updates only its values. */
 export function litPainter<R extends object>(state: () => PaintState<R>): RowPainter<R> {
   return {
@@ -89,6 +99,7 @@ export function litPainter<R extends object>(state: () => PaintState<R>): RowPai
         el.className = 'row group';
         el.ariaSelected = String(isSelected(entry));
         render(groupCells(entry, columns, open), el);
+        untab(el);
         return;
       }
       const key = rows.keyAt(index);
@@ -96,6 +107,7 @@ export function litPainter<R extends object>(state: () => PaintState<R>): RowPai
       el.className = `row${marked.has(key) ? ' marked' : ''}${extra ? ` ${extra}` : ''}`;
       el.ariaSelected = String(isSelected(key));
       render(rowCells(entry, columns, rows.depthAt(index), rows.hasChildrenAt(index), open), el);
+      untab(el);
     },
   };
 }

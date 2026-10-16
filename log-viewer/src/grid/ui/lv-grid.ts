@@ -31,7 +31,7 @@ import {
   type SortDirection,
   type TreeSource,
 } from '../core/index.js';
-import { GridView, type FindMarks } from '../render/index.js';
+import { GridView, rowId, type FindMarks } from '../render/index.js';
 import type { GridColumn } from './column.js';
 import { gridKey } from './keyboard.js';
 import { litPainter, total } from './painter.js';
@@ -202,8 +202,12 @@ export class LvGrid<R extends object = object> extends LitElement {
   private selections = 0;
   /** Where the selection was last seen, to skip a search of every row. */
   private selectedAt = -1;
+  /** The rows the selection was last not found in: rows do not change, so neither does that. */
+  private missedIn: RowView<R> | null = null;
   private hovered = -1;
   private failure: { readonly error: unknown } | undefined;
+  /** Enter clicks a row's link; that click must not reach the row as a select. */
+  private followingLink = false;
   private found: FindMarks<R> | null = null;
   // Goes up with each find and clear, so a find still running sees it is stale.
   private searches = 0;
@@ -411,10 +415,12 @@ export class LvGrid<R extends object = object> extends LitElement {
       if (this.failure) {
         this.report(this.failure.error, 'build');
       }
+      this.syncActive();
     }
     if (this.view && snapshot && snapshot.rows !== this.shown) {
       this.shown = snapshot.rows;
       this.view.setRows(snapshot.rows, snapshot.toggled);
+      this.syncActive();
     } else if (changed.has('columns') || changed.has('marked') || changed.has('rowClass')) {
       this.view?.repaint();
     }
@@ -671,6 +677,7 @@ export class LvGrid<R extends object = object> extends LitElement {
       lines: this.rowLines ?? undefined,
       lineHeight: () => this.treeLineHeight(),
       rowIndexStart: 2,
+      onDraw: () => this.syncActive(),
       painter: litPainter(() => ({
         columns: this.visibleColumns(),
         isSelected: (target) => sameTarget(this.selected, target),
@@ -716,7 +723,11 @@ export class LvGrid<R extends object = object> extends LitElement {
     if (there !== null && sameTarget(selected, there)) {
       return at;
     }
+    if (this.missedIn === rows) {
+      return -1;
+    }
     this.selectedAt = rows.indexOf(selected);
+    this.missedIn = this.selectedAt < 0 ? rows : null;
     return this.selectedAt;
   }
 
@@ -724,13 +735,32 @@ export class LvGrid<R extends object = object> extends LitElement {
     this.selections++;
     this.selected = target;
     this.selectedAt = index;
+    this.missedIn = null;
     this.view?.repaint();
+    this.syncActive();
     const entry = index >= 0 ? this.shown?.rowAt(index) : undefined;
     this.emit<GridSelectDetail<R>>('lv-grid-select', {
       row: entry !== undefined && !(entry instanceof Group) ? entry : null,
       target,
       user,
     });
+  }
+
+  /**
+   * Points `aria-activedescendant` at the selected row once it is painted, so a screen
+   * reader follows the keys. A reader reads a change to it, not the row's later arrival.
+   */
+  private syncActive(): void {
+    const scroller = this.scrollerRef.value;
+    const at = this.indexOfSelected();
+    const id = at >= 0 && !this.failure ? rowId(at) : null;
+    if (id !== null && (this.renderRoot as ShadowRoot).getElementById(id)) {
+      if (scroller?.getAttribute('aria-activedescendant') !== id) {
+        scroller?.setAttribute('aria-activedescendant', id);
+      }
+    } else {
+      scroller?.removeAttribute('aria-activedescendant');
+    }
   }
 
   private async toggleAt(index: number, expanded?: boolean): Promise<void> {
@@ -805,6 +835,9 @@ export class LvGrid<R extends object = object> extends LitElement {
   };
 
   private readonly onClick = (e: MouseEvent): void => {
+    if (this.followingLink) {
+      return;
+    }
     const index = this.indexFrom(e);
     if (index < 0) {
       return;
@@ -842,15 +875,21 @@ export class LvGrid<R extends object = object> extends LitElement {
       return;
     }
     const at = this.indexOfSelected();
+    if (key === 'activate' || key === 'toggle') {
+      if (at >= 0) {
+        this.activate(at, key);
+      }
+      return;
+    }
     if (at < 0) {
       if (rows.size > 0 && key !== 'left' && key !== 'right') {
-        const index = key === 'up' || key === 'end' ? rows.size - 1 : 0;
+        const index = key === 'up' || key === 'pageUp' || key === 'end' ? rows.size - 1 : 0;
         this.select(this.targetAt(index), index, true);
         this.view?.scrollToIndex(index, 'auto');
       }
       return;
     }
-    const intent = navigate(rows, at, key);
+    const intent = navigate(rows, at, key, this.pageSize());
     if (intent?.kind === 'select') {
       this.select(this.targetAt(intent.index), intent.index, true);
       this.view?.scrollToIndex(intent.index, 'auto');
@@ -858,6 +897,35 @@ export class LvGrid<R extends object = object> extends LitElement {
       this.background(this.toggleAt(intent.index, intent.kind === 'expand'), 'toggle');
     }
   };
+
+  /** Enter follows the row's link where it has one; else Enter and Space open or close it. */
+  private activate(index: number, key: 'activate' | 'toggle'): void {
+    const link = key === 'activate' ? this.paintedRow(index)?.querySelector('a[href]') : null;
+    if (link instanceof HTMLElement) {
+      this.followingLink = true;
+      link.click();
+      this.followingLink = false;
+    } else if (this.shown?.hasChildrenAt(index)) {
+      this.background(this.toggleAt(index), 'toggle');
+    }
+  }
+
+  /** The rows that fit between the header and the totals, in the part of the grid on screen. */
+  private pageSize(): number {
+    const scroller = this.scrollerRef.value;
+    if (!scroller) {
+      return 1;
+    }
+    const frame = scroller.getBoundingClientRect();
+    const onScreen = Math.min(frame.bottom, window.innerHeight) - Math.max(frame.top, 0);
+    const edges = [':scope > .head', ':scope > .foot'].reduce(
+      (sum, selector) =>
+        sum + (scroller.querySelector(selector)?.getBoundingClientRect().height ?? 0),
+      0,
+    );
+    const height = Math.min(scroller.clientHeight, onScreen) - edges;
+    return Math.max(1, Math.floor(height / this.rowHeight) - 1);
+  }
 
   private readonly onContextMenu = (e: MouseEvent): void => {
     const index = this.indexFrom(e);

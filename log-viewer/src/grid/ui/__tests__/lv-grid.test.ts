@@ -4,6 +4,8 @@
 /*
  * Copyright (c) 2026 Certinia Inc. All rights reserved.
  */
+import { html } from 'lit';
+
 import { sum, type TreeSource } from '../../core/index.js';
 import { GridView } from '../../render/index.js';
 import {
@@ -330,12 +332,146 @@ describe('lv-grid', () => {
     expect(press(rowNamed('c')?.querySelector('.cell'))).toBe(false);
   });
 
-  it('moves and opens rows from the keyboard', async () => {
-    const { rowNamed, names, key } = await setup();
+  it('moves and opens rows from the keyboard, and points a screen reader at the selected row', async () => {
+    const { root, scroller, rowNamed, names, key } = await setup();
     await key('ArrowDown');
     await key('ArrowDown');
     expect(rowNamed('b')?.ariaSelected).toBe('true');
+    const active = scroller?.getAttribute('aria-activedescendant') ?? '';
+    expect(root.getElementById(active)).toBe(rowNamed('b'));
     await key('ArrowRight');
+    expect(names()).toEqual(['a', 'b', 'b1', 'b2', 'c']);
+    await key(' ');
+    expect(names()).toEqual(['a', 'b', 'c']);
+    await key('End', { ctrlKey: true });
+    expect(rowNamed('c')?.ariaSelected).toBe('true');
+  });
+
+  it('keeps the screen reader on the selected row as it moves, and off when none is', async () => {
+    const { grid, root, scroller, rowNamed, names, key } = await setup();
+    const active = (): Element | null =>
+      root.getElementById(scroller?.getAttribute('aria-activedescendant') ?? '');
+    await key('Enter');
+    await key(' ');
+    expect(active()).toBeNull();
+    expect(names()).toEqual(['a', 'b', 'c']);
+
+    await key('PageUp');
+    expect(active()).toBe(rowNamed('c'));
+    await key(' ');
+    expect(names()).toEqual(['a', 'b', 'c']);
+
+    grid.sort = { column: 'time', dir: 'desc' };
+    await settle(grid);
+    expect(names()).toEqual(['a', 'c', 'b']);
+    expect(active()).toBe(rowNamed('c'));
+
+    grid.deselect();
+    expect(scroller?.hasAttribute('aria-activedescendant')).toBe(false);
+  });
+
+  it('points a screen reader at the selected row only once it is painted', async () => {
+    const many: TreeSource<Node> = {
+      roots: Array.from({ length: 100 }, (_, i) => ({ key: i, name: `r${i}`, time: i, kind: 'x' })),
+      key: (row) => row.key,
+    };
+    const { grid, root, scroller, rowNamed, key } = await setup({ source: many });
+    let top = 0;
+    Object.defineProperty(scroller, 'scrollTop', { get: () => top, configurable: true });
+    const active = (): string | null => scroller?.getAttribute('aria-activedescendant') ?? null;
+    await key('End', { ctrlKey: true });
+    expect(rowNamed('r99')).toBeUndefined();
+    expect(active()).toBeNull();
+
+    top = 99 * ROW;
+    scroller?.dispatchEvent(new Event('scroll'));
+    await settle(grid);
+    expect(root.getElementById(active() ?? '')).toBe(rowNamed('r99'));
+  });
+
+  it('pages by the rows between the header and the totals that are on screen', async () => {
+    const many: TreeSource<Node> = {
+      roots: Array.from({ length: 100 }, (_, i) => ({ key: i, name: `r${i}`, time: i, kind: 'x' })),
+      key: (row) => row.key,
+    };
+    const { grid, scroller, key } = await setup({ source: many, rowHeight: ROW });
+    const selected: (Node | null)[] = [];
+    grid.addEventListener('lv-grid-select', (e) =>
+      selected.push(detail<GridSelectDetail<Node>>(e).row),
+    );
+    let bottom = 10 * ROW;
+    jest.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(function (
+      this: HTMLElement,
+    ) {
+      return (this === scroller ? { top: 0, bottom, height: bottom } : { height: ROW }) as DOMRect;
+    });
+    Object.defineProperty(scroller, 'clientHeight', { get: () => bottom, configurable: true });
+    await key('Home');
+    // 10 rows high, less the header and the totals, less 1 row kept in view.
+    await key('PageDown');
+    expect(selected.at(-1)?.name).toBe('r7');
+
+    grid.fitRows = true;
+    bottom = 30 * ROW;
+    const innerHeight = window.innerHeight;
+    Object.defineProperty(window, 'innerHeight', { value: 10 * ROW, configurable: true });
+    try {
+      await key('PageDown');
+      expect(selected.at(-1)?.name).toBe('r14');
+      await key('PageUp');
+      expect(selected.at(-1)?.name).toBe('r7');
+    } finally {
+      Object.defineProperty(window, 'innerHeight', { value: innerHeight, configurable: true });
+    }
+  });
+
+  it('looks for a hidden selected row once, not on every draw and key', async () => {
+    const plain = source();
+    const key = jest.fn(plain.key);
+    const { grid, scroller, key: press } = await setup({ source: { ...plain, key } });
+    await press('ArrowDown');
+    await press('ArrowDown');
+    await press('ArrowRight');
+    await press('ArrowDown');
+    grid.filters = [{ test: (row: Node) => row.name !== 'b1' }];
+    await settle(grid);
+    expect(scroller?.getAttribute('aria-activedescendant')).toBeNull();
+    key.mockClear();
+    await press('ArrowRight');
+    await press('ArrowRight');
+    scroller?.dispatchEvent(new Event('scroll'));
+    await settle(grid);
+    expect(key).not.toHaveBeenCalled();
+  });
+
+  it('follows the link of a row on Enter, and opens a row with none', async () => {
+    const clicks: string[] = [];
+    const linked = columns().map((column) =>
+      column.id === 'name'
+        ? {
+            ...column,
+            cell: (row: Node) =>
+              row.name === 'a'
+                ? html`<a
+                    href="#!"
+                    @click=${(e: Event) => {
+                      e.preventDefault();
+                      clicks.push(row.name);
+                    }}
+                    >a</a
+                  >`
+                : row.name,
+          }
+        : column,
+    );
+    const { names, rowNamed, key } = await setup({ columns: linked });
+    expect(rowNamed('a')?.querySelector('a')?.tabIndex).toBe(-1);
+    await key('ArrowDown');
+    await key('Enter');
+    expect(clicks).toEqual(['a']);
+    expect(rowNamed('a')?.ariaSelected).toBe('true');
+    await key('ArrowDown');
+    await key('Enter');
     expect(names()).toEqual(['a', 'b', 'b1', 'b2', 'c']);
   });
 
@@ -472,6 +608,27 @@ describe('lv-grid', () => {
     last.moveTo(8 * ROW + 1);
     await grid.setCurrentMatch(0);
     expect(scroll).toHaveBeenCalledWith(2);
+  });
+
+  it('points a screen reader at no row while the alert hides them', async () => {
+    const { grid, root, scroller, rowNamed, key } = await setup();
+    grid.addEventListener('lv-grid-error', (e) => e.preventDefault());
+    const active = (): Element | null =>
+      root.getElementById(scroller?.getAttribute('aria-activedescendant') ?? '');
+    await key('ArrowDown');
+    expect(active()).toBe(rowNamed('a'));
+    grid.filters = [
+      {
+        test: () => {
+          throw new Error('boom');
+        },
+      },
+    ];
+    await settle(grid);
+    expect(scroller?.hasAttribute('aria-activedescendant')).toBe(false);
+    grid.filters = [];
+    await settle(grid);
+    expect(active()).toBe(rowNamed('a'));
   });
 
   it('shows an alert in place of its rows while a build throws, and reports the error once', async () => {

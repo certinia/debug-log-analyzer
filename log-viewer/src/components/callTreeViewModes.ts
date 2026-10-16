@@ -17,6 +17,11 @@ export function isViewMode(value: unknown): value is ViewMode {
   return VIEW_MODES.some((option) => option.value === value);
 }
 
+/** The name a screen reader gives the call tree grid of `mode`. */
+export function callTreeLabel(mode: ViewMode): string {
+  return `Call tree, ${VIEW_MODES.find((option) => option.value === mode)?.label ?? mode}`;
+}
+
 /** Bottom-Up reads a call tree from its leaves upwards, so it shows callers. The
  *  other two read it downwards. */
 export function directionOf(mode: ViewMode): SelectionView {

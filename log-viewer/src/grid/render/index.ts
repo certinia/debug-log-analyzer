@@ -3,4 +3,4 @@
  */
 
 export { FIND_ATTR, FIND_TEXT_ATTR } from './highlight.js';
-export { GridView, type FindMarks, type RowPainter } from './view.js';
+export { GridView, rowId, type FindMarks, type RowPainter } from './view.js';

@@ -27,7 +27,13 @@ import {
 } from '../grid/index.js';
 import { globalStyles } from '../styles/global.styles.js';
 import { progressColumnWidth } from './grid/measureWidth.js';
-import { VIEW_MODES, defaultViewMode, isViewMode, type ViewMode } from './callTreeViewModes.js';
+import {
+  VIEW_MODES,
+  callTreeLabel,
+  defaultViewMode,
+  isViewMode,
+  type ViewMode,
+} from './callTreeViewModes.js';
 import type { AppGrid } from './grid/AppGrid.js';
 import { COUNT_MIN_WIDTH, countColumn, inlineQueryColumn, timeColumn } from './grid/columns.js';
 import {
@@ -281,7 +287,7 @@ export class CallTreeDetail extends LitElement {
     return html`<lv-app-grid
       class=${shown ? '' : 'is-hidden'}
       ${ref(this._grids[mode])}
-      .label=${`Call tree, ${VIEW_MODES.find((option) => option.value === mode)?.label}`}
+      .label=${callTreeLabel(mode)}
       .placeholder=${this._pending ? 'Building the call tree…' : 'No call tree available'}
       .source=${slot?.source ?? null}
       .columns=${slot?.columns ?? []}
