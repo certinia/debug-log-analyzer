@@ -44,6 +44,7 @@ jest.mock('../../../settings/Settings.js', () => ({
 }));
 
 import { storeOf } from '#test-helpers/apexLog.js';
+import { AlwaysVisible, NeverVisible, settle } from '#test-helpers/visibility.js';
 import { eventBus } from '../../../../core/events/EventBus.js';
 import { LogStore, logStoreFor } from '../../../../core/log/LogStore.js';
 import { CalltreeView } from '../CalltreeView.js';
@@ -73,28 +74,6 @@ function grids(view: CalltreeView): Element[] {
   return [...view.renderRoot.querySelectorAll('lv-call-tree-grid')];
 }
 
-/** jsdom has no IntersectionObserver, and the build waits on one. */
-class AlwaysVisible {
-  private _callback: IntersectionObserverCallback;
-
-  constructor(callback: IntersectionObserverCallback) {
-    this._callback = callback;
-  }
-
-  observe(element: Element): void {
-    this._callback(
-      [{ isIntersecting: true, target: element } as IntersectionObserverEntry],
-      this as unknown as IntersectionObserver,
-    );
-  }
-  disconnect(): void {}
-}
-
-class NeverVisible {
-  observe(): void {}
-  disconnect(): void {}
-}
-
 function apexLog(): ApexLog {
   return {
     children: [],
@@ -102,14 +81,6 @@ function apexLog(): ApexLog {
     namespaces: [],
     governorLimits: null,
   } as unknown as ApexLog;
-}
-
-/** Let the build's promise chain run out: more turns than it takes, since the
- *  count of them is not what any test is about. */
-async function settle(): Promise<void> {
-  for (let i = 0; i < 4; i++) {
-    await new Promise((resolve) => setTimeout(resolve, 0));
-  }
 }
 
 async function mountView(log: ApexLog = apexLog()): Promise<CalltreeView> {
@@ -408,6 +379,50 @@ describe('calltree-view merged filters', () => {
 
     view._handleDebugOnlyChange();
     expect(passing(view, 'aggregated')).toEqual(['DEBUG | hello']);
+  });
+});
+
+describe('calltree-view inspector reveal', () => {
+  // Outer calls Inner, so Outer heads its own bucket and is Inner's caller row too.
+  const { log } = storeOf(
+    '09:18:22.6 (1000)|METHOD_ENTRY|[1]|01p|ns.Outer.run()\n' +
+      '09:18:22.6 (2000)|METHOD_ENTRY|[2]|01p|ns.Inner.go()\n' +
+      '09:18:22.6 (3000)|METHOD_EXIT|[2]|ns.Inner.go()\n' +
+      '09:18:22.6 (5001000)|METHOD_EXIT|[1]|ns.Outer.run()\n',
+  );
+  let view: CalltreeView;
+
+  beforeEach(async () => {
+    globalThis.IntersectionObserver = AlwaysVisible as unknown as typeof IntersectionObserver;
+    holdBuilds = true;
+    view = await mountView(log);
+  });
+
+  afterEach(() => {
+    holdBuilds = false;
+    view.remove();
+  });
+
+  it('reveals the Bottom-Up bucket a frame heads, not a caller row it sits in', async () => {
+    const switched = view._setViewMode('bottom-up');
+    await settle();
+    const roots = toBottomUpTree(log.children, logStoreFor(log).keyPathIds());
+    finishBuild?.(roots);
+    await switched;
+    const grid = view.bottomUpGrid;
+    if (!grid) {
+      throw new Error('no bottom-up grid');
+    }
+    const goTo = jest.spyOn(grid, 'goTo').mockResolvedValue(true);
+    const all = (events: ApexLog['children']): ApexLog['children'] =>
+      events.flatMap((e) => [e, ...all(e.children)]);
+    const outer = all(log.children).find((e) => e.text === 'ns.Outer.run()');
+
+    eventBus.emit('inspector:reveal', { source: 'calltree', eventIndex: outer?.eventIndex ?? -1 });
+    await settle();
+
+    const bucket = roots.find((row) => row.text === 'ns.Outer.run()');
+    expect(goTo).toHaveBeenCalledWith([bucket?.id], { scrollIfVisible: false });
   });
 });
 

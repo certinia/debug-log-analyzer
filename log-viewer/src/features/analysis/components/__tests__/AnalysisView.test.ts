@@ -5,62 +5,50 @@
  */
 import { afterEach, beforeEach, describe, expect, it } from '@jest/globals';
 import type { ApexLog, LogEvent } from '@apexdevtools/apex-log-parser';
-import type { RowComponent, Tabulator } from 'tabulator-tables';
 
-// The grid brings tabulator and its module registrations, which don't load under
-// jest; this suite drives only the selection the view reports to the inspector.
-jest.mock('../../../call-tree/components/BottomUpTable.js', () => ({
-  createBottomUpTable: () => ({
-    table: {
-      on: (name: string, handler: unknown) => handlers.set(name, handler),
-      getRows: (...args: unknown[]) => {
-        stub.getRowsArgs.push(args);
-        return stub.rows;
-      },
-      goToRow: (row: RowComponent) => stub.revealed.push(row),
-      clearFindHighlights: () => {},
-      blockRedraw: () => {},
-      restoreRedraw: () => {},
-      clearFilter: () => {},
-      addFilter: () => {},
-      setSortedGroupBy: () => {},
-    },
-    // Left pending: the columns are applied on build, and none are set up here.
-    tableBuilt: new Promise<Tabulator>(() => {}),
-  }),
-}));
 // VsSelect extends vscode-single-select, whose setFormValue needs an
 // ElementInternals jsdom lacks; the render would upgrade it.
 jest.mock('../../../../components/VsSelect.js', () => ({}));
-// Connecting the view reads settings twice: firstUpdated loads the column view,
-// and category colouring subscribes. This suite has no extension host to answer.
+// Connecting the view reads settings twice: the column view loads, and category
+// colouring subscribes. This suite has no extension host to answer.
 jest.mock('../../../settings/Settings.js', () => ({
   ...jest.requireActual<object>('../../../settings/Settings.js'),
   getSettings: () => Promise.resolve({}),
-  subscribeSettings: () => () => {},
+  subscribeSettings: (apply: (settings: object) => void) => {
+    applySettings = apply;
+    return () => {};
+  },
 }));
+jest.mock('../../../../components/grid/exportCsv.js', () => ({ exportCsv: jest.fn() }));
 
+import { governorLimits } from '#test-helpers/limits.js';
+import { AlwaysVisible, NeverVisible, settle } from '#test-helpers/visibility.js';
 import {
   eventBus,
   type DetailSelection,
   type DetailSource,
 } from '../../../../core/events/EventBus.js';
-import { toBottomUpTree, type BottomUpRow } from '../../../call-tree/utils/Aggregation.js';
-import { logStoreFor } from '../../../../core/log/LogStore.js';
+import { exportCsv } from '../../../../components/grid/exportCsv.js';
+import type { BottomUpRow } from '../../../call-tree/utils/Aggregation.js';
 import { AnalysisView } from '../AnalysisView.js';
 
-const handlers = new Map<string, unknown>();
-/** The stub table's state, so a reveal's reads can be counted. */
-let stub: { rows: RowComponent[]; getRowsArgs: unknown[][]; revealed: RowComponent[] };
+/** Pushes settings to the view, as the extension does on a change. */
+let applySettings: (settings: object) => void = () => {};
 
 /** The log's own index, which a reveal resolves its frame through, and which the
  *  fixture's event indexes count off. */
 let byEventIndex: LogEvent[] = [];
 
-function frame(text: string, self: number, total: number, parent: LogEvent | null): LogEvent {
+function frame(
+  text: string,
+  self: number,
+  total: number,
+  parent: LogEvent | null,
+  type = 'METHOD_ENTRY',
+): LogEvent {
   const event = {
     eventIndex: byEventIndex.length,
-    type: 'METHOD_ENTRY',
+    type,
     namespace: 'default',
     text,
     parent,
@@ -83,12 +71,9 @@ function frame(text: string, self: number, total: number, parent: LogEvent | nul
 }
 
 /**
- * A -> B -> A on one branch, A -> C -> A on the other, under a log root as the
- * parser leaves it: a bottom-up chain runs out to the root and stops there, so a
- * top-level frame with no parent above it would name no row for its own callees.
- *
- * A derived row's calls come from the log's own key table, so the view must read
- * the log the rows were built from.
+ * A -> B -> A on one branch, A -> C -> A on the other, and a debug line with no
+ * time, under a log root as the parser leaves it: a bottom-up chain runs out to
+ * the root and stops there.
  */
 function recursiveLog(): ApexLog {
   const root = frame('LOG_ROOT', 0, 150, null);
@@ -98,17 +83,18 @@ function recursiveLog(): ApexLog {
   const outer2 = frame('A', 5, 50, root);
   const c1 = frame('C', 15, 45, outer2);
   frame('A', 30, 30, c1);
-  return Object.assign(root, { eventsById: byEventIndex }) as unknown as ApexLog;
+  frame('debug', 0, 0, root, 'USER_DEBUG');
+  return Object.assign(root, {
+    eventsById: byEventIndex,
+    namespaces: [],
+    governorLimits: governorLimits(),
+  }) as unknown as ApexLog;
 }
 
-function rowComponent(data: BottomUpRow, treeParent?: RowComponent): RowComponent {
-  return {
-    getData: () => data,
-    getTreeParent: () => treeParent ?? false,
-  } as unknown as RowComponent;
-}
+/** The index of the debug line `recursiveLog` ends with. */
+const DEBUG_LINE = 7;
 
-function findRow(rows: BottomUpRow[], text: string): BottomUpRow {
+function findRow(rows: readonly BottomUpRow[], text: string): BottomUpRow {
   const row = rows.find((candidate) => candidate.text === text);
   if (!row) {
     throw new Error(`Unable to find row for ${text}`);
@@ -116,38 +102,35 @@ function findRow(rows: BottomUpRow[], text: string): BottomUpRow {
   return row;
 }
 
-/**
- * A view with its table rendered against `log`.
- *
- * The app hands the log down as a property, and a row's calls are read through
- * the table that built it.
- */
-async function mountView(log: ApexLog): Promise<AnalysisView> {
-  handlers.clear();
-  stub = { rows: [], getRowsArgs: [], revealed: [] };
-  const view = new AnalysisView();
-  document.body.append(view);
-  await view.updateComplete;
-  // `timelineRoot` only after the first update, and `_renderAnalysis` in the same
-  // tick: the `updated()` it triggers reaches `isVisible`, and jsdom has no
-  // IntersectionObserver. Assigning the table first makes that path return early.
-  view.timelineRoot = log;
-  void view._renderAnalysis(log);
-  return view;
-}
-
-describe('analysis-view selection', () => {
+describe('analysis-view', () => {
   let view: AnalysisView;
   let log: ApexLog;
-  let roots: BottomUpRow[];
   let seen: Array<{ source: DetailSource; selection: DetailSelection | null }>;
   let off: () => void;
 
+  const grid = () => {
+    const found = view.grid;
+    if (!found) {
+      throw new Error('grid not shown');
+    }
+    return found;
+  };
+  const roots = (): readonly BottomUpRow[] => grid().source?.roots ?? [];
+  const fireOnGrid = (type: string, detail: object) =>
+    grid().dispatchEvent(new CustomEvent(type, { detail, bubbles: true }));
+  const select = (row: BottomUpRow | null) => fireOnGrid('lv-grid-select', { row, target: row });
+
   beforeEach(async () => {
+    globalThis.IntersectionObserver = AlwaysVisible as unknown as typeof IntersectionObserver;
     byEventIndex = [];
     log = recursiveLog();
-    roots = toBottomUpTree(log.children, logStoreFor(log).keyPathIds());
-    view = await mountView(log);
+    view = new AnalysisView();
+    document.body.append(view);
+    await view.updateComplete;
+    view.timelineRoot = log;
+    await view.updateComplete;
+    await settle();
+    await view.updateComplete;
     seen = [];
     off = eventBus.on('detail:select', (detail) => seen.push(detail));
   });
@@ -155,18 +138,33 @@ describe('analysis-view selection', () => {
   afterEach(() => {
     off();
     view.remove();
+    jest.clearAllMocks();
+    jest.restoreAllMocks();
   });
 
-  function select(row: RowComponent): void {
-    (handlers.get('rowSelectionChanged') as (data: unknown, rows: RowComponent[]) => void)(null, [
-      row,
-    ]);
-  }
+  it('shows the bottom-up tree of the log, ranked by self time, without rows that have no details', () => {
+    expect(roots().map((row) => [row.text, row.totalSelfTime])).toEqual(
+      expect.arrayContaining([
+        ['A', 115],
+        ['B', 20],
+        ['C', 15],
+        ['debug', 0],
+      ]),
+    );
+    expect(roots()).toHaveLength(4);
+    expect(grid().sort).toEqual({ column: 'totalSelfTime', dir: 'desc' });
+    const debug = findRow(roots(), 'debug');
+    expect(grid().filters.every((filter) => filter.test(debug))).toBe(false);
+  });
+
+  it('names the grid for a screen reader', () => {
+    expect(grid().label).toBe('Analysis');
+  });
 
   it('scopes a root row to every call it counts', () => {
-    const rootRow = findRow(roots, 'A');
+    const rootRow = findRow(roots(), 'A');
 
-    select(rowComponent(rootRow));
+    select(rootRow);
 
     expect(seen).toEqual([
       {
@@ -184,13 +182,12 @@ describe('analysis-view selection', () => {
   });
 
   it('scopes a caller row to the calls it holds, and names the row they were reached through', () => {
-    const rootRow = findRow(roots, 'A');
+    const rootRow = findRow(roots(), 'A');
     const throughB = findRow(rootRow._children ?? [], 'B');
     const throughBA = findRow(throughB._children ?? [], 'A');
-    const throughBComponent = rowComponent(throughB, rowComponent(rootRow));
 
-    select(throughBComponent);
-    select(rowComponent(throughBA, throughBComponent));
+    select(throughB);
+    select(throughBA);
 
     const derived = rootRow.instances.filter((event) => event.parent?.text === 'B');
     expect(derived).toHaveLength(1);
@@ -213,105 +210,193 @@ describe('analysis-view selection', () => {
     ]);
   });
 
-  it('reveals a bucket by its key, reading no occurrence', async () => {
-    // The grid lists root buckets; a dataTree hands only those back.
-    stub.rows = roots.map((data) => rowComponent(data));
-
-    // Frame 2 is the log's own `B` call, which the `B` bucket heads.
-    eventBus.emit('inspector:reveal', { source: 'analysis', eventIndex: 2 });
-    await new Promise((resolve) => setTimeout(resolve, 0));
-
-    expect(stub.revealed.map((row) => row.getData())).toEqual([findRow(roots, 'B')]);
-    // One read of the top-level rows, and never `getRows('active')`: listing the
-    // active rows, or reading a bucket's occurrences, walked the whole log.
-    expect(stub.getRowsArgs).toEqual([[]]);
-  });
-
-  it('moves to the bucket a picked inspector row names', async () => {
-    stub.rows = roots.map((data) => rowComponent(data));
-
-    eventBus.emit('inspector:locate', { source: 'analysis', eventIndexes: [2], sticky: true });
-    await new Promise((resolve) => setTimeout(resolve, 0));
-
-    // A hover only marks; a pick moves the grid, as it does in every other view.
-    expect(stub.revealed.map((row) => row.getData())).toEqual([findRow(roots, 'B')]);
-  });
-
-  it('only marks for a row under the pointer', async () => {
-    stub.rows = roots.map((data) => rowComponent(data));
-
-    eventBus.emit('inspector:locate', { source: 'analysis', eventIndexes: [2], sticky: false });
-    await new Promise((resolve) => setTimeout(resolve, 0));
-
-    expect(stub.revealed).toEqual([]);
-  });
-
   it('clears the inspector when the selection goes', () => {
-    (handlers.get('rowSelectionChanged') as (data: unknown, rows: RowComponent[]) => void)(
-      null,
-      [],
-    );
+    select(null);
 
     expect(seen).toEqual([{ source: 'analysis', selection: null, view: 'callers' }]);
   });
+
+  it('tells the inspector which calls the pointer is over', () => {
+    const located: number[][] = [];
+    const stop = eventBus.on('detail:locate', ({ eventIndexes }) =>
+      located.push([...eventIndexes]),
+    );
+
+    fireOnGrid('lv-grid-locate', { row: findRow(roots(), 'B') });
+    fireOnGrid('lv-grid-locate', { row: null });
+    stop();
+
+    expect(located).toEqual([[2], []]);
+  });
+
+  it('reveals the bucket a frame heads, without echoing the select', async () => {
+    const goTo = jest.spyOn(grid(), 'goTo').mockImplementation(async () => {
+      select(findRow(roots(), 'B'));
+      return true;
+    });
+
+    // Frame 2 is the log's own `B` call, which the `B` bucket heads.
+    eventBus.emit('inspector:reveal', { source: 'analysis', eventIndex: 2 });
+    await settle();
+
+    expect(goTo).toHaveBeenCalledWith([findRow(roots(), 'B').id], { scrollIfVisible: false });
+    expect(seen).toEqual([]);
+  });
+
+  it('turns Details on to reveal a bucket the filter hides', async () => {
+    const goTo = jest.spyOn(grid(), 'goTo').mockResolvedValue(true);
+
+    eventBus.emit('inspector:reveal', { source: 'analysis', eventIndex: DEBUG_LINE });
+    await settle();
+
+    expect(grid().filters).toEqual([]);
+    expect(goTo).toHaveBeenCalledWith([findRow(roots(), 'debug').id], { scrollIfVisible: false });
+  });
+
+  it('moves to the bucket a picked inspector row names, and only marks for a hover', async () => {
+    const goTo = jest.spyOn(grid(), 'goTo').mockResolvedValue(true);
+    const bucketB = findRow(roots(), 'B').id;
+
+    eventBus.emit('inspector:locate', { source: 'analysis', eventIndexes: [2], sticky: false });
+    await settle();
+    expect(goTo).not.toHaveBeenCalled();
+    // Frame 2 heads bucket B, and is the B caller row under the A it called.
+    const callerB = findRow(findRow(roots(), 'A')._children ?? [], 'B').id;
+    expect(grid().marked).toEqual(new Set([bucketB, callerB]));
+
+    eventBus.emit('inspector:locate', { source: 'analysis', eventIndexes: [2], sticky: true });
+    await settle();
+    expect(goTo).toHaveBeenCalledWith([bucketB], { scrollIfVisible: false });
+  });
+
+  it.each([
+    ['Namespace', { namespace: 'ns' }, 'ns'],
+    ['Caller Namespace', { callerNamespace: 'caller' }, 'caller'],
+    ['Type', { type: 'METHOD_ENTRY' }, 'METHOD_ENTRY'],
+  ])('groups by %s, and ungroups for None', async (option, row, group) => {
+    const options = [...view.renderRoot.querySelectorAll('#groupby-dropdown vscode-option')];
+    const pick = async (value: string) => {
+      const picker = view.renderRoot.querySelector('#groupby-dropdown') as HTMLElement & {
+        value: string;
+      };
+      picker.value = value;
+      picker.dispatchEvent(new Event('change'));
+      await view.updateComplete;
+    };
+
+    await pick(option);
+    expect(options.map((el) => el.textContent)).toContain(option);
+    expect(grid().groupBy?.(row as BottomUpRow)).toBe(group);
+
+    await pick('None');
+    expect(grid().groupBy).toBeNull();
+  });
+
+  it('shows the rows with no details when Details is on', async () => {
+    view.renderRoot.querySelector<HTMLButtonElement>('button.pill-toggle')?.click();
+    await view.updateComplete;
+
+    expect(grid().filters).toEqual([]);
+  });
+
+  it('exports analysis.csv and copies from the grid', () => {
+    const copy = jest.spyOn(grid(), 'copy').mockResolvedValue(undefined);
+    const click = (label: string) =>
+      view.renderRoot
+        .querySelector<HTMLElement>(`vscode-toolbar-button[label="${label}"]`)
+        ?.click();
+
+    click('Export to CSV');
+    click('Copy to clipboard');
+
+    expect(exportCsv).toHaveBeenCalledWith(grid(), 'analysis.csv');
+    expect(copy).toHaveBeenCalled();
+  });
+
+  it('keeps a picked column view across renders', async () => {
+    const shown = () =>
+      grid()
+        .columns.filter((column) => !column.hidden)
+        .map((column) => column.id);
+    const before = shown();
+
+    const picker = view.renderRoot.querySelector('#column-view') as HTMLElement & {
+      value: string;
+    };
+    picker.value = 'Governor Limits';
+    picker.dispatchEvent(new Event('change'));
+    await view.updateComplete;
+    // Any later render binds the columns again.
+    view.requestUpdate();
+    await view.updateComplete;
+
+    expect(shown()).not.toEqual(before);
+    expect(shown()).toContain('text');
+  });
+
+  it('opens the column menu once for a header right-click, after the view is moved', async () => {
+    const menu = view.renderRoot.querySelector('context-menu') as HTMLElement & {
+      show: (...args: unknown[]) => void;
+    };
+    const show = jest.spyOn(menu, 'show').mockImplementation(() => {});
+    view.remove();
+    document.body.append(view);
+    await view.updateComplete;
+
+    const event = new MouseEvent('contextmenu', { cancelable: true });
+    fireOnGrid('lv-grid-header-context', { column: 'text', event });
+
+    expect(show).toHaveBeenCalledTimes(1);
+  });
+
+  it('tints the Name cells while category colouring is on', async () => {
+    const colorize = async (on: boolean) => {
+      applySettings({ timeline: { customThemes: {} }, callTree: { categoryColorize: on } });
+      await view.updateComplete;
+    };
+
+    await colorize(true);
+    expect(grid().hasAttribute('category-colorize')).toBe(true);
+
+    await colorize(false);
+    expect(grid().hasAttribute('category-colorize')).toBe(false);
+  });
+
+  it('drops the search when the grid is reshaped under it', async () => {
+    jest.spyOn(grid(), 'clientHeight', 'get').mockReturnValue(100);
+    jest.spyOn(grid(), 'find').mockResolvedValue(2);
+    jest.spyOn(grid(), 'setCurrentMatch').mockResolvedValue(undefined);
+    const totals: number[] = [];
+    const heard = (e: Event) =>
+      totals.push((e as CustomEvent<{ totalMatches: number }>).detail.totalMatches);
+    document.addEventListener('lv-find-results', heard);
+
+    document.dispatchEvent(
+      new CustomEvent('lv-find', {
+        detail: { text: 'A', count: 1, options: { matchCase: false } },
+      }),
+    );
+    await settle();
+    fireOnGrid('lv-grid-reshape', { reason: 'filter' });
+    document.removeEventListener('lv-find-results', heard);
+
+    expect(totals).toEqual([2, 0]);
+  });
 });
 
-describe('analysis-view search lifetime', () => {
-  let view: AnalysisView;
-
-  beforeEach(async () => {
+describe('analysis-view before it is seen', () => {
+  it('builds nothing while the tab is hidden', async () => {
+    globalThis.IntersectionObserver = NeverVisible as unknown as typeof IntersectionObserver;
     byEventIndex = [];
-    view = await mountView(recursiveLog());
-    // What a finished search leaves behind: matches, and nothing of its own in
-    // flight to guard against.
-    view.totalMatches = 3;
-    view.blockClearHighlights = false;
-  });
+    const view = new AnalysisView();
+    document.body.append(view);
+    await view.updateComplete;
+    view.timelineRoot = recursiveLog();
+    await view.updateComplete;
+    await settle();
 
-  afterEach(() => {
+    expect(view.grid).toBeNull();
+    expect(view.renderRoot.querySelector('grid-skeleton')).not.toBeNull();
     view.remove();
-  });
-
-  /** What Tabulator reports, which an expand repeats with the sort in force. */
-  function sorted(dir: string): void {
-    (handlers.get('dataSorting') as (sorters: unknown[]) => void)([{ field: 'selfTime', dir }]);
-  }
-
-  it('drops the search where a sort renumbers the matches', () => {
-    sorted('desc');
-
-    expect(view.totalMatches).toBe(0);
-  });
-
-  it('drops the search where a column goes off show, which it counted over', () => {
-    (handlers.get('columnVisibilityChanged') as () => void)();
-
-    expect(view.totalMatches).toBe(0);
-  });
-
-  it('drops the search where grouping is turned off, which reports no grouping', () => {
-    // Tabulator's dataGrouped fires only while the table stays grouped, so this
-    // is the way round it never reports.
-    view._groupBy({ target: { value: 'None' } } as unknown as Event);
-
-    expect(view.totalMatches).toBe(0);
-  });
-
-  it('keeps the search where an expand orders the children it opened', () => {
-    sorted('desc');
-    view.totalMatches = 3;
-
-    // Expanding sorts each opened subtree through the same call, so the event
-    // arrives again with the sort the table already had.
-    sorted('desc');
-    sorted('desc');
-
-    expect(view.totalMatches).toBe(3);
-  });
-
-  it('drops the search where a filter changes which rows there are', () => {
-    view._handleShowDetailsChange();
-
-    expect(view.totalMatches).toBe(0);
   });
 });

@@ -9,7 +9,6 @@ import { initialState, Task } from '@lit/task';
 import { css, html, LitElement, type PropertyValues } from 'lit';
 import { customElement, property, state } from 'lit/decorators.js';
 import { repeat } from 'lit/directives/repeat.js';
-import type { RowComponent } from 'tabulator-tables';
 
 import type { ApexLog, LogEvent } from '@apexdevtools/apex-log-parser';
 import { DomListenerController } from '../../../core/events/DomListenerController.js';
@@ -22,20 +21,12 @@ import { logStoreFor } from '../../../core/log/LogStore.js';
 import { eventByEventIndex } from '../../../core/utility/EventSearch.js';
 import { isVisible } from '../../../core/utility/Util.js';
 import { CALLTREE_GO_TO_ROW, type CalltreeNavigationEventMap } from '../navigation.js';
-import {
-  buildAggregatedTree,
-  buildBottomUpTree,
-  type AggregatedRow,
-  type BottomUpRow,
-} from '../utils/Aggregation.js';
+import type { AggregatedRow, BottomUpRow } from '../utils/Aggregation.js';
 import { wireCategoryColoring } from '../utils/CategoryColoring.js';
 import { waitForNextFrame } from '../../../core/utility/FrameBudget.js';
 import type {
   GridContextDetail,
   GridHeaderContextDetail,
-  GridRowDetail,
-  GridSelectDetail,
-  GroupBy,
   LvGrid,
   RowFilter,
   RowKey,
@@ -43,13 +34,20 @@ import type {
 import '../grid/CallTreeGrid.js';
 import {
   aggregatedColumns,
+  BOTTOM_UP_DETAILS,
   BOTTOM_UP_SORT,
   bottomUpColumns,
+  BOTTOM_UP_GROUPS,
+  bottomUpGroupBy,
+  CALL_TREE_COLUMN_SETTINGS,
   mergedLines,
+  openType,
   TIME_ORDER_DETAILS,
   timeOrderColumns,
   timeOrderSource,
 } from '../grid/columns.js';
+import { inspectorRowEvents } from '../grid/inspectorRowEvents.js';
+import { MergedTree } from '../grid/mergedRows.js';
 
 import { inMsRange, type FilterRange } from '../../../tabulator/filters/MinMax.js';
 
@@ -73,93 +71,16 @@ import {
   type ColumnTarget,
 } from '../../../components/ColumnSettingsController.js';
 import { CALL_TREE_VIEWS } from '../../../tabulator/ColumnViews.js';
-import { LocatedRowIds, rowDetailSelection, rowFrames } from '../../../components/locatedRow.js';
+import { LocatedRowIds } from '../../../components/locatedRow.js';
 import { InspectorTabController } from '../../../components/InspectorTabController.js';
 import { LvGridFindController } from '../../../components/grid/LvGridFindController.js';
 import { revealFirstOf } from '../../../components/inspectorTab.js';
 
-/** The Name column is always shown in the call-tree tables. */
-const ALWAYS_VISIBLE = ['text'];
-
-/** The Bottom Up row field each group-by picker value groups on; None has none. */
-const GROUP_FIELDS: Record<string, 'namespace' | 'callerNamespace' | 'type'> = {
-  Namespace: 'namespace',
-  'Caller Namespace': 'callerNamespace',
-  Type: 'type',
-};
-
-function bottomUpGroupBy(value: string): GroupBy<BottomUpRow> | null {
-  const field = GROUP_FIELDS[value];
-  return field ? (row) => row[field] ?? '' : null;
-}
-
-/** The Tabulator row shape `locatedRow` reads, for a row of an lv-grid. */
-function rowStandIn<R>(
-  row: R,
-  data: (row: R) => object,
-  parentOf: (row: R) => R | undefined,
-): RowComponent {
-  return {
-    getData: () => data(row),
-    getTreeParent: () => {
-      const parent = parentOf(row);
-      return parent ? rowStandIn(parent, data, parentOf) : false;
-    },
-  } as unknown as RowComponent;
-}
-
-/** A row of a merged view: Aggregated or Bottom-Up. */
-interface MergedRow<R> {
-  id: number;
-  _pathId: number;
-  _children?: R[] | null;
-}
-
-/** The parent of each merged row, and each row by its path id: the rows have neither. */
-interface MergedLinks<R> {
-  parents: Map<R, R>;
-  byPath: Map<number, R>;
-}
-
-function linkRows<R extends MergedRow<R>>(roots: readonly R[]): MergedLinks<R> {
-  const parents = new Map<R, R>();
-  const byPath = new Map<number, R>();
-  const walk = (row: R): void => {
-    byPath.set(row._pathId, row);
-    for (const child of row._children ?? []) {
-      parents.set(child, row);
-      walk(child);
-    }
-  };
-  roots.forEach(walk);
-  return { parents, byPath };
-}
-
-/** The keys from a top-level row down to the first row that `pathIds` name. */
-function mergedPath<R extends MergedRow<R>>(
-  links: MergedLinks<R> | null,
-  pathIds: readonly number[],
-): RowKey[] {
-  const path: RowKey[] = [];
-  const [first] = pathIds;
-  for (
-    let row = first === undefined ? undefined : links?.byPath.get(first);
-    row;
-    row = links?.parents.get(row)
-  ) {
-    path.unshift(row.id);
-  }
-  return path;
-}
-
-const BOTTOM_UP_DETAILS: RowFilter<BottomUpRow> = { test: (row) => row._hasDetailsDeep };
 const AGGREGATED_DETAILS: RowFilter<AggregatedRow> = { test: (row) => row._hasDetailsDeep };
 const AGGREGATED_DEBUG_ONLY: RowFilter<AggregatedRow> = {
   test: (row) => !!row.originalData.type && DEBUG_VALUE_TYPES.has(row.originalData.type),
   keepAncestors: true,
 };
-
-const openType = (text: string): void => vscodeMessenger.send<string>('openType', text);
 
 /** Where each view builds its table. */
 const CONTAINER_IDS: Record<ViewMode, string> = {
@@ -232,8 +153,8 @@ export class CalltreeView extends LitElement {
   timeOrderGrid: LvGrid<LogEvent> | null = null;
   aggregatedGrid: LvGrid<AggregatedRow> | null = null;
   bottomUpGrid: LvGrid<BottomUpRow> | null = null;
-  private _aggregatedLinks: MergedLinks<AggregatedRow> | null = null;
-  private _bottomUpLinks: MergedLinks<BottomUpRow> | null = null;
+  private _aggregatedTree: MergedTree<AggregatedRow> | null = null;
+  private _bottomUpTree: MergedTree<BottomUpRow> | null = null;
   private _aggregatedBuild: Promise<void> | null = null;
   private _bottomUpBuild: Promise<void> | null = null;
 
@@ -253,10 +174,7 @@ export class CalltreeView extends LitElement {
   rootMethod: ApexLog | null = null;
 
   private readonly _columns = new ColumnSettingsController(this, {
-    section: 'callTree',
-    read: (settings) => settings.callTree,
-    views: CALL_TREE_VIEWS,
-    alwaysVisible: ALWAYS_VISIBLE,
+    ...CALL_TREE_COLUMN_SETTINGS,
     // All three, so a mode the user has not switched back to is already right.
     tables: () => this._gridTargets,
   });
@@ -544,10 +462,9 @@ export class CalltreeView extends LitElement {
                       @change="${this._handleBottomUpGroupBy}"
                       .value="${this.bottomUpGroupBy}"
                     >
-                      <vscode-option>None</vscode-option>
-                      <vscode-option>Namespace</vscode-option>
-                      <vscode-option>Caller Namespace</vscode-option>
-                      <vscode-option>Type</vscode-option>
+                      ${BOTTOM_UP_GROUPS.map(
+                        ({ label }) => html`<vscode-option>${label}</vscode-option>`,
+                      )}
                     </vs-select>
                   `
                 : ''
@@ -656,8 +573,8 @@ export class CalltreeView extends LitElement {
     this.timeOrderGrid = null;
     this.aggregatedGrid = null;
     this.bottomUpGrid = null;
-    this._aggregatedLinks = null;
-    this._bottomUpLinks = null;
+    this._aggregatedTree = null;
+    this._bottomUpTree = null;
     this._aggregatedBuild = null;
     this._bottomUpBuild = null;
   }
@@ -895,16 +812,15 @@ export class CalltreeView extends LitElement {
       this.timeOrderGrid.marked = new Set(eventIndexes);
       return;
     }
-    const ids = (byPath: Map<number, { id: number }> | undefined): Set<number> =>
-      new Set(
-        this._locateIds
-          .idsFor(this.rootMethod, eventIndexes, directionOf(this.viewMode))
-          .flatMap((id) => byPath?.get(id)?.id ?? []),
-      );
+    const pathIds = this._locateIds.idsFor(
+      this.rootMethod,
+      eventIndexes,
+      directionOf(this.viewMode),
+    );
     if (this.aggregatedGrid && this.viewMode === 'aggregated') {
-      this.aggregatedGrid.marked = ids(this._aggregatedLinks?.byPath);
+      this.aggregatedGrid.marked = this._aggregatedTree?.marked(pathIds) ?? new Set();
     } else if (this.bottomUpGrid && this.viewMode === 'bottom-up') {
-      this.bottomUpGrid.marked = ids(this._bottomUpLinks?.byPath);
+      this.bottomUpGrid.marked = this._bottomUpTree?.marked(pathIds) ?? new Set();
     }
   }
 
@@ -983,9 +899,9 @@ export class CalltreeView extends LitElement {
       case 'time-order':
         return this._timeOrderPath(eventIndex);
       case 'aggregated':
-        return mergedPath(this._aggregatedLinks, pathIds());
+        return this._aggregatedTree?.pathTo(pathIds()) ?? [];
       case 'bottom-up':
-        return mergedPath(this._bottomUpLinks, pathIds());
+        return this._bottomUpTree?.pathTo(pathIds()) ?? [];
     }
   }
 
@@ -1047,7 +963,7 @@ export class CalltreeView extends LitElement {
       container,
       'aggregated',
       (row) => row,
-      (row) => this._aggregatedLinks?.parents.get(row),
+      (row) => this._aggregatedTree?.parentOf(row),
     );
     this.aggregatedGrid = grid;
     grid.columns = aggregatedColumns(rootMethod, { openType });
@@ -1062,18 +978,13 @@ export class CalltreeView extends LitElement {
     grid: LvGrid<AggregatedRow>,
     rootMethod: ApexLog,
   ): Promise<void> {
-    const roots = await buildAggregatedTree(
-      rootMethod.children,
-      logStoreFor(rootMethod).keyPathIds(),
-      rootMethod.governorLimits,
-      { signal: this._builds.signal },
-    );
+    const tree = await MergedTree.aggregated(rootMethod, { signal: this._builds.signal });
     // A build can finish just before a detach, and a later one owns the container now.
-    if (!roots || this.aggregatedGrid !== grid) {
+    if (!tree || this.aggregatedGrid !== grid) {
       return;
     }
-    this._aggregatedLinks = linkRows(roots);
-    grid.source = { roots, children: (row) => row._children, key: (row) => row.id };
+    this._aggregatedTree = tree;
+    grid.source = tree.source;
     await grid.settled();
   }
 
@@ -1088,7 +999,7 @@ export class CalltreeView extends LitElement {
       container,
       'bottom-up',
       (row) => row,
-      (row) => this._bottomUpLinks?.parents.get(row),
+      (row) => this._bottomUpTree?.parentOf(row),
     );
     this.bottomUpGrid = grid;
     grid.columns = bottomUpColumns(rootMethod, { openType });
@@ -1102,18 +1013,13 @@ export class CalltreeView extends LitElement {
   }
 
   private async _fillBottomUpTree(grid: LvGrid<BottomUpRow>, rootMethod: ApexLog): Promise<void> {
-    const roots = await buildBottomUpTree(
-      rootMethod.children,
-      logStoreFor(rootMethod).keyPathIds(),
-      rootMethod.governorLimits,
-      { signal: this._builds.signal },
-    );
+    const tree = await MergedTree.bottomUp(rootMethod, { signal: this._builds.signal });
     // A build can finish just before a detach, and a later one owns the container now.
-    if (!roots || this.bottomUpGrid !== grid) {
+    if (!tree || this.bottomUpGrid !== grid) {
       return;
     }
-    this._bottomUpLinks = linkRows(roots);
-    grid.source = { roots, children: (row) => row._children, key: (row) => row.id };
+    this._bottomUpTree = tree;
+    grid.source = tree.source;
     await grid.settled();
   }
 
@@ -1131,7 +1037,15 @@ export class CalltreeView extends LitElement {
     const grid = document.createElement('lv-call-tree-grid') as unknown as LvGrid<R>;
     grid.label = `Call Tree, ${VIEW_MODES.find((option) => option.value === mode)?.label}`;
     grid.toggleAttribute('category-colorize', this._colorize);
-    const standIn = (row: R): RowComponent => rowStandIn(row, data, parentOf);
+    const inspector = inspectorRowEvents<R>({
+      source: 'calltree',
+      root: () => this.rootMethod,
+      view: () => directionOf(this.viewMode),
+      data,
+      parentOf,
+      echoGuard: this._echoGuard,
+      dropPick: () => this._inspector.dropPick(),
+    });
 
     grid.addEventListener('lv-grid-header-context', (e) => {
       const { event } = (e as CustomEvent<GridHeaderContextDetail>).detail;
@@ -1139,29 +1053,8 @@ export class CalltreeView extends LitElement {
       this._showHeaderContextMenu(gridColumnTarget(grid), event.clientX, event.clientY);
     });
     grid.addEventListener('lv-grid-reshape', () => this._finder.dropOnReshape());
-    grid.addEventListener('lv-grid-select', (e) => {
-      if (this._echoGuard.suppressed) {
-        return;
-      }
-      const { row } = (e as CustomEvent<GridSelectDetail<R>>).detail;
-      const view = directionOf(this.viewMode);
-      const selection = rowDetailSelection(row ? standIn(row) : undefined, this.rootMethod, view);
-      if (!selection) {
-        // The selection went with it, and so does a mark a picked inspector row
-        // left here — it was never a selection of this grid.
-        this._inspector.dropPick();
-      }
-      eventBus.emit('detail:select', { source: 'calltree', selection, view });
-    });
-    grid.addEventListener('lv-grid-locate', (e) => {
-      const { row } = (e as CustomEvent<GridRowDetail<R>>).detail;
-      eventBus.emit('detail:locate', {
-        source: 'calltree',
-        eventIndexes: row
-          ? rowFrames(standIn(row), this.rootMethod, directionOf(this.viewMode))
-          : [],
-      });
-    });
+    grid.addEventListener('lv-grid-select', inspector.select);
+    grid.addEventListener('lv-grid-locate', inspector.locate);
 
     container.replaceChildren(grid);
     return grid;

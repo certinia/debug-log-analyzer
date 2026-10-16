@@ -3,12 +3,8 @@
  */
 import type { Tabulator } from 'tabulator-tables';
 
-import type { GridHeaderContextDetail, LvGrid } from '../grid/index.js';
-import {
-  gridColumnTarget,
-  type ColumnSettingsController,
-  type Target,
-} from './ColumnSettingsController.js';
+import type { GridHeaderContextDetail } from '../grid/index.js';
+import type { ColumnSettingsController, Target } from './ColumnSettingsController.js';
 import type { ContextMenu } from './ContextMenu.js';
 
 export interface GridColumnMenuOptions {
@@ -60,15 +56,12 @@ export class GridColumnMenuController {
     });
   }
 
-  /** {@link initTable} for an lv-grid, whose header reports its right-click. */
-  initGrid<R extends object>(grid: LvGrid<R>): void {
-    this._options.columns.applyTo(gridColumnTarget(grid));
-    grid.addEventListener('lv-grid-header-context', (e) => {
-      const { event } = (e as CustomEvent<GridHeaderContextDetail>).detail;
-      event.preventDefault();
-      this.showAt(event.clientX, event.clientY);
-    });
-  }
+  /** `lv-grid-header-context` on an lv-grid: the header's right-click. */
+  headerContext = (e: Event): void => {
+    const { event } = (e as CustomEvent<GridHeaderContextDetail>).detail;
+    event.preventDefault();
+    this.showAt(event.clientX, event.clientY);
+  };
 
   /** `click` on the toolbar's Columns button, which opens under it. */
   open = (event: Event): void => {
