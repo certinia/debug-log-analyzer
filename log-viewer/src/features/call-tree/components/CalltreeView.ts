@@ -196,7 +196,6 @@ const DEBUG_ONLY: RowFilter<LogEvent> = {
   keepAncestors: true,
 };
 
-/** A filter that keeps a matching row's ancestors, as Tabulator's `deepFilter` does. */
 const deep = <R>(test: (row: R) => boolean): RowFilter<R> => ({ test, keepAncestors: true });
 
 const hasRange = (range: FilterRange): boolean => range.start !== null || range.end !== null;

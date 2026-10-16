@@ -11,8 +11,8 @@ import { CATEGORY_THEME_KEY, DEFAULT_THEME_NAME } from '../../timeline/themes/Th
 import { addCustomThemes, getTheme } from '../../timeline/themes/ThemeSelector.js';
 
 /**
- * Single source of truth for the call-tree category colour strip, shared by every
- * view that renders the bottom-up/aggregated tables (Call Tree tabs + Analysis view).
+ * Single source of truth for the category colour strip. The Call Tree and Analysis views
+ * share `wireCategoryColoring`; the Tabulator styles and row formatters serve Analysis only.
  *
  * Each row points at one host theme var via the inherited `--row-cat-color` custom
  * property, so a theme switch only updates the host vars and rows re-resolve in place —

@@ -507,7 +507,7 @@ export const mergedLines = (row: { originalData: LogEvent }): number => nameLine
 
 export const TIME_ORDER_DETAILS: RowFilter<LogEvent> = { test: isDetailEvent, keepAncestors: true };
 
-/** The Time Order columns: the Tabulator table's, field for field. */
+/** The Time Order columns. */
 export function timeOrderColumns(
   log: ApexLog,
   options: CallTreeColumnOptions,
@@ -598,7 +598,7 @@ export function bottomUpColumns(
   ];
 }
 
-/** The Aggregated columns: the Tabulator table's, field for field. */
+/** The Aggregated columns. */
 export function aggregatedColumns(
   log: ApexLog,
   options: CallTreeColumnOptions,
