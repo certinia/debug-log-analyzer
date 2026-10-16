@@ -145,26 +145,44 @@ describe('database-time', () => {
     eventBus.emit('detail:locate', { source: 'database', eventIndexes: [6] });
     await settle(element);
 
-    expect([...grid().marked]).toEqual([roots()[1]?.id]);
+    expect([...grid().marked]).toEqual([2]);
+  });
+
+  it('drops its marks on a detach, since the reports stop', async () => {
+    eventBus.emit('detail:locate', { source: 'database', eventIndexes: [6] });
+    await element.updateComplete;
+    expect([...grid().marked]).toEqual([2]);
+
+    element.remove();
+    document.body.append(element);
+    await settle(element);
+
+    expect([...grid().marked]).toEqual([]);
   });
 
   it('names the grid for a screen reader', () => {
     expect(grid().label).toBe('Database call tree');
   });
 
-  it('reveals a picked statement, and holds a mark on every occurrence of a merged one', () => {
-    const query = roots()[0]?._children?.[0];
+  it('reveals a picked statement, and holds a mark on the frames of any other row', () => {
+    const method = roots()[0];
+    const query = method?._children?.[0];
     const merged = roots()[1];
 
     fire('lv-grid-select', { row: query, target: query?.id, user: true });
     fire('lv-grid-select', { row: merged, target: merged?.id, user: true });
+    fire('lv-grid-select', { row: method, target: method?.id, user: true });
+    fire('lv-grid-select', { row: null, target: null, user: true });
 
+    const held = (eventIndexes: number[]) => ({
+      type: INSPECTOR_LOCATE_EVENT,
+      detail: { eventIndexes, sticky: true, selection: null },
+    });
     expect(events).toEqual([
       { type: INSPECTOR_REVEAL_EVENT, detail: { eventIndex: 2 } },
-      {
-        type: INSPECTOR_LOCATE_EVENT,
-        detail: { eventIndexes: [5, 6], sticky: true, selection: null },
-      },
+      held([5, 6]),
+      held([1]),
+      held([]),
     ]);
   });
 
@@ -199,7 +217,6 @@ describe('database-time', () => {
     eventBus.emit('detail:locate', { source: 'database', eventIndexes: [2, 6] });
     await element.updateComplete;
 
-    const ids = [roots()[0]?._children?.[0]?.id, roots()[1]?.id];
-    expect([...grid().marked].sort()).toEqual(ids.sort());
+    expect([...grid().marked].sort()).toEqual([1, 2]);
   });
 });

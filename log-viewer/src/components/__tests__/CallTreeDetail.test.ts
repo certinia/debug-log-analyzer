@@ -5,13 +5,11 @@
  */
 import { describe, expect, it } from '@jest/globals';
 
-// This suite exercises the view-mode toggle and the column set; no tree is
-// built (eventIndex -1).
+// This suite exercises the view-mode toggle; no tree is built (eventIndex -1).
 
 import type { LogStore } from '../../core/log/LogStore.js';
 import type { CallTreeDetail } from '../CallTreeDetail.js';
 import '../CallTreeDetail.js';
-import type { ScopedRow } from '../scopedCallTree.js';
 
 const MODES = ['time-order', 'aggregated', 'bottom-up'];
 
@@ -27,15 +25,6 @@ function switchEl(el: CallTreeDetail): Element {
     throw new Error('view-mode-switch not rendered');
   }
   return found;
-}
-
-/** The Name column's tooltip, read off the column set the component builds. */
-function nameTooltip(el: CallTreeDetail, node: { text: string; type: string }): string {
-  const name = el['_columns']('time-order', 100).find((column) => column.id === 'text');
-  if (!name?.tooltip) {
-    throw new Error('Name column has no tooltip');
-  }
-  return name.tooltip({ originalData: node, type: node.type } as unknown as ScopedRow);
 }
 
 /** Two logs, so a pick can be shown to belong to the one it was made in. */
@@ -113,22 +102,5 @@ describe('CallTreeDetail view mode', () => {
     // Another tab never sees it, so it opens on its own default.
     const database = await mount({ source: 'database', sourceView: 'callees' });
     expect(switchEl(database).getAttribute('value')).toBe('bottom-up');
-  });
-
-  it('hovers a truncated name with the label the cell shows', async () => {
-    const el = await mount();
-
-    // `eventLabel` prefixes the type where the text cannot stand alone, which is
-    // what the cell renders — the raw `text` field alone would say only "true".
-    expect(nameTooltip(el, { text: 'true', type: 'STATEMENT_EXECUTE' })).toBe(
-      'STATEMENT_EXECUTE: true',
-    );
-  });
-
-  it('keeps the generics in a signature the hover has to show', async () => {
-    const el = await mount();
-
-    const signature = 'ContactTriggerHandler.handleAfterUpdate(List<Contact>, Map<Id,Contact>)';
-    expect(nameTooltip(el, { text: signature, type: 'METHOD_ENTRY' })).toBe(signature);
   });
 });

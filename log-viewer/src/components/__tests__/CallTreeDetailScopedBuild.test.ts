@@ -85,6 +85,15 @@ function gridOf(el: CallTreeDetail, mode = 'time-order'): AppGrid<ScopedRow> {
   return grid as AppGrid<ScopedRow>;
 }
 
+/** The Name column's tooltip, read off the grid. */
+function nameTooltip(el: CallTreeDetail, node: { text: string; type: string }): string {
+  const name = gridOf(el).columns.find((column) => column.id === 'text');
+  if (!name?.tooltip) {
+    throw new Error('Name column has no tooltip');
+  }
+  return name.tooltip({ originalData: node, type: node.type } as unknown as ScopedRow);
+}
+
 /** The footer a column's calc gives over the grid's rows. */
 function footer(grid: AppGrid<ScopedRow>, id: string): number | undefined {
   const calc = grid.columns.find((column) => column.id === id)?.calc;
@@ -429,6 +438,27 @@ describe('CallTreeDetail scoped build', () => {
     expect([...grid.marked]).toEqual([-3]);
   });
 
+  it('hovers a truncated name with the label the cell shows', async () => {
+    build.mockResolvedValue(tree(5000, [frameRow(5)]));
+    const el = await mount(5);
+    await frame(el);
+
+    // `eventLabel` prefixes the type where the text cannot stand alone, which is
+    // what the cell renders — the raw `text` field alone would say only "true".
+    expect(nameTooltip(el, { text: 'true', type: 'STATEMENT_EXECUTE' })).toBe(
+      'STATEMENT_EXECUTE: true',
+    );
+  });
+
+  it('keeps the generics in a signature the hover has to show', async () => {
+    build.mockResolvedValue(tree(5000, [frameRow(5)]));
+    const el = await mount(5);
+    await frame(el);
+
+    const signature = 'ContactTriggerHandler.handleAfterUpdate(List<Contact>, Map<Id,Contact>)';
+    expect(nameTooltip(el, { text: signature, type: 'METHOD_ENTRY' })).toBe(signature);
+  });
+
   it('names each grid by its view for a screen reader', async () => {
     build.mockResolvedValue(tree(5000, [frameRow(5)]));
     const el = await mount(5);
@@ -462,6 +492,27 @@ describe('CallTreeDetail scoped build', () => {
     expect(
       seen.map((selection) => (selection?.kind === 'aggregate' ? selection.calledBy : null)),
     ).toEqual([undefined, 'B', 'A']);
+  });
+
+  it('holds a mark on every frame a picked merged row stands for', async () => {
+    const merged = { ...frameRow(-3), eventIndexes: [8, 12] };
+    build.mockResolvedValue(tree(5000, [merged]));
+    const el = await mount(5, 'callees');
+    await frame(el);
+
+    const seen: unknown[] = [];
+    const located = (e: Event) => seen.push((e as InspectorLocateEvent).detail);
+    document.addEventListener(INSPECTOR_LOCATE_EVENT, located);
+    fire(gridOf(el, 'bottom-up'), 'lv-grid-select', { row: merged, target: -3, user: true });
+    document.removeEventListener(INSPECTOR_LOCATE_EVENT, located);
+
+    expect(seen).toEqual([
+      {
+        eventIndexes: [8, 12],
+        sticky: true,
+        selection: { kind: 'aggregate', instances: [8, 12], frames: [8, 12], calledBy: undefined },
+      },
+    ]);
   });
 
   it('drops on Escape the row picked in the view on screen, whichever view last picked', async () => {

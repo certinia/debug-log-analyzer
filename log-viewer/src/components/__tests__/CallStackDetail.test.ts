@@ -199,19 +199,41 @@ describe('CallStackDetail', () => {
     const el = await mount(9);
     const menu = el.shadowRoot!.querySelector<ContextMenu>('context-menu')!;
     const show = jest.spyOn(menu, 'show').mockImplementation(() => {});
+    const goTo = jest.spyOn(gridOf(el), 'goTo');
     const event = new MouseEvent('contextmenu', { clientX: 3, clientY: 7, cancelable: true });
 
-    fire(el, 'lv-grid-context', { row: gridOf(el).source!.roots[1], event });
+    const reveals = collect(INSPECTOR_REVEAL_EVENT, revealed, () =>
+      fire(el, 'lv-grid-context', { row: gridOf(el).source!.roots[1], event }),
+    );
     menu.dispatchEvent(new CustomEvent('menu-select', { detail: { itemId: 'copy-name' } }));
 
     expect(show).toHaveBeenCalledWith(expect.any(Array), 3, 7);
     expect(event.defaultPrevented).toBe(true);
     expect(runPanelRowAction).toHaveBeenCalledWith('copy-name', 4);
+    expect(reveals).toEqual([]);
+    expect(goTo).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ['off the rows', () => null],
+    ['over selected text', (el: CallStackDetail) => gridOf(el).source!.roots[1]],
+  ])('leaves the browser its own menu %s', async (_, rowOf) => {
+    const el = await mount(9);
+    const show = jest.spyOn(el.shadowRoot!.querySelector<ContextMenu>('context-menu')!, 'show');
+    const row = rowOf(el);
+    if (row) {
+      jest.spyOn(window, 'getSelection').mockReturnValue({ type: 'Range' } as Selection);
+    }
+    const event = new MouseEvent('contextmenu', { cancelable: true });
+
+    fire(el, 'lv-grid-context', { row, event });
+
+    expect(event.defaultPrevented).toBe(false);
+    expect(show).not.toHaveBeenCalled();
   });
 
   it('builds new rows for a new anchor, dropping the mark the old rows held', async () => {
     const el = await mount(9);
-    const source = gridOf(el).source;
     const seen: Array<readonly number[]> = [];
     const listener = (e: Event) => seen.push(located(e));
     document.addEventListener(INSPECTOR_LOCATE_EVENT, listener);
@@ -221,6 +243,6 @@ describe('CallStackDetail', () => {
     document.removeEventListener(INSPECTOR_LOCATE_EVENT, listener);
 
     expect(seen).toEqual([[]]);
-    expect(gridOf(el).source).not.toBe(source);
+    expect(built).toEqual([9, 4]);
   });
 });
