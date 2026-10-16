@@ -87,6 +87,31 @@ const cells = css`
     content: '\\eab4';
     rotate: none;
   }
+
+  .tick,
+  .cross {
+    display: block;
+    text-align: center;
+  }
+
+  /* Codicon glyph boxes, not text, so outside the type ramp. */
+  .tick::before,
+  .cross::before {
+    font-family: 'codicon';
+    font-size: 14px;
+    line-height: 1lh;
+    vertical-align: top;
+  }
+
+  .tick::before {
+    content: '\\eab2';
+    color: var(--lana-severity-ok);
+  }
+
+  .cross::before {
+    content: '\\ea76';
+    color: var(--lana-severity-error);
+  }
 `;
 
 /** `<lv-grid>` with the app theme and the styles of the shared cells in its shadow root. */

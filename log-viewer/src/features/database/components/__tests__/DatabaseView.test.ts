@@ -12,8 +12,8 @@ import {
   type StatementType,
 } from '../../../../core/events/EventBus.js';
 
-// The three grids and the summary bring tabulator and its stylesheets with them;
-// this suite only drives the selection contract between them and DatabaseView.
+// The three grids and the summary bring lv-grid and its stylesheets with them;
+// this suite only drives the selection and find contracts between them and DatabaseView.
 jest.mock('../DMLView.js', () => ({}));
 jest.mock('../SOQLView.js', () => ({}));
 jest.mock('../SOSLView.js', () => ({}));
@@ -22,25 +22,52 @@ jest.mock('../DatabaseSection.js', () => ({}));
 
 import '../DatabaseView.js';
 
+/** The lv-grid slice find drives. */
+interface FakeLvGrid {
+  matches: number;
+  clientHeight: number;
+  current: number[];
+  cleared: number;
+  find(): Promise<number>;
+  setCurrentMatch(index: number): Promise<void>;
+  clearFind(): void;
+}
+
 /** The slice of a grid DatabaseView drives, standing in for the real element. */
 interface FakeGrid extends HTMLElement {
   deselects: number;
-  owns: number | null;
+  ownedIndex: number | null;
   marked: readonly number[][];
+  grid: FakeLvGrid;
+}
+
+function fakeLvGrid(matches = 0): FakeLvGrid {
+  const grid: FakeLvGrid = {
+    matches,
+    clientHeight: 10,
+    current: [],
+    cleared: 0,
+    find: async () => grid.matches,
+    setCurrentMatch: async (index) => void grid.current.push(index),
+    clearFind: () => void (grid.cleared += 1),
+  };
+  return grid;
 }
 
 /**
  * The grids render only once a log is loaded, so stand-ins are placed in the
  * shadow root the same way: one element per statement type, found by tag.
  */
-function fakeGrid(tag: string, owns: number | null = null): FakeGrid {
+function fakeGrid(tag: string, ownedIndex: number | null = null): FakeGrid {
   const grid = document.createElement(tag) as FakeGrid;
   grid.deselects = 0;
-  grid.owns = owns;
+  grid.ownedIndex = ownedIndex;
   grid.marked = [];
+  grid.grid = fakeLvGrid();
   Object.assign(grid, {
     deselectRows: () => (grid.deselects += 1),
-    selectByEventIndex: (eventIndex: number) => eventIndex === grid.owns,
+    owns: (eventIndex: number) => eventIndex === grid.ownedIndex,
+    selectByEventIndex: async (eventIndex: number) => eventIndex === grid.ownedIndex,
     markLocated: (eventIndexes: readonly number[]) => {
       grid.marked = [...grid.marked, [...eventIndexes]];
     },
@@ -104,14 +131,29 @@ describe('database-view selection', () => {
     expect(seen).toEqual([{ source: 'database', selection: null }]);
   });
 
-  it('says nothing for the select the inspector asked for', () => {
-    // The revealed grid reports the selection it was just given.
-    grids.soql.addEventListener('grid-selection', () => report('soql', 42));
+  it('says nothing for the select the inspector asked for', async () => {
+    // The revealed grid reports the selection it was just given, after its scroll settles.
+    Object.assign(grids.soql, {
+      selectByEventIndex: async () => {
+        await Promise.resolve();
+        report('soql', 42);
+        return true;
+      },
+    });
 
     eventBus.emit('inspector:reveal', { source: 'database', eventIndex: 42 });
+    await new Promise((resolve) => setTimeout(resolve));
 
     expect(seen).toEqual([]);
-    expect([grids.dml.deselects, grids.sosl.deselects]).toEqual([1, 1]);
+    // The owner is cleared too, so a pick a filter now hides does not stay.
+    expect([grids.dml.deselects, grids.soql.deselects, grids.sosl.deselects]).toEqual([1, 1, 1]);
+  });
+
+  it('reveals nothing for a statement no grid holds', async () => {
+    eventBus.emit('inspector:reveal', { source: 'database', eventIndex: 99 });
+    await new Promise((resolve) => setTimeout(resolve));
+
+    expect([grids.dml.deselects, grids.soql.deselects, grids.sosl.deselects]).toEqual([0, 0, 0]);
   });
 
   it('drops every grid selection on an app-wide clear', () => {
@@ -180,33 +222,41 @@ describe('database-view selection', () => {
   });
 });
 
-describe('database-view find totals', () => {
+describe('database-view find', () => {
   let view: HTMLElement & { updateComplete: Promise<unknown> };
+  let grids: [FakeGrid, FakeGrid, FakeGrid];
 
   beforeEach(async () => {
     document.body.replaceChildren();
     view = document.createElement('database-view') as typeof view;
     document.body.append(view);
     await view.updateComplete;
+    grids = [fakeGrid('dml-view'), fakeGrid('soql-view'), fakeGrid('sosl-view')];
+    view.shadowRoot?.append(...grids);
   });
 
   afterEach(() => {
     document.body.replaceChildren();
   });
 
-  /** The totals DatabaseView rolls up to the find widget while `run` happens. */
-  function rollUps(run: () => void): number[] {
+  /** The totals DatabaseView reports to the find widget while `run` settles. */
+  async function rollUps(run: () => void): Promise<number[]> {
     const seen: number[] = [];
     const probe = (e: Event) =>
       void seen.push((e as CustomEvent<{ totalMatches: number }>).detail.totalMatches);
     document.addEventListener('lv-find-results', probe);
     run();
+    await new Promise((resolve) => setTimeout(resolve));
     document.removeEventListener('lv-find-results', probe);
     return seen;
   }
 
-  const report = (type: StatementType, totalMatches: number) =>
-    document.dispatchEvent(new CustomEvent('db-find-results', { detail: { totalMatches, type } }));
+  const search = (count = 1) =>
+    document.dispatchEvent(
+      new CustomEvent('lv-find', {
+        detail: { text: 'update', count, options: { matchCase: false } },
+      }),
+    );
 
   /** Sections render in view order: DML, SOQL, SOSL. */
   const collapse = (index: number) =>
@@ -214,25 +264,54 @@ describe('database-view find totals', () => {
       ?.querySelectorAll('database-section')
       [index]?.dispatchEvent(new CustomEvent('section-toggle'));
 
-  it('rolls a grid count up to the find widget', () => {
-    expect(rollUps(() => report('soql', 3))).toEqual([3]);
+  it("reports the three grids' matches as one total", async () => {
+    grids.forEach((grid, i) => (grid.grid.matches = i + 1));
+
+    expect(await rollUps(() => search())).toEqual([6]);
   });
 
-  it('keeps rolling up after a detach and re-attach', async () => {
+  it('marks the current match in the grid that holds it, counting in view order', async () => {
+    grids.forEach((grid) => (grid.grid.matches = 2));
+
+    await rollUps(() => search(3));
+
+    expect(grids.map((grid) => grid.grid.current)).toEqual([[-1], [0], [-1]]);
+  });
+
+  it('skips a grid that is not shown', async () => {
+    grids.forEach((grid) => (grid.grid.matches = 2));
+    grids[1].grid.clientHeight = 0;
+
+    expect(await rollUps(() => search())).toEqual([4]);
+  });
+
+  it('keeps reporting after a detach and re-attach', async () => {
+    grids[0].grid.matches = 3;
     view.remove();
     document.body.append(view);
     await view.updateComplete;
 
-    expect(rollUps(() => report('soql', 3))).toEqual([3]);
+    expect(await rollUps(() => search())).toEqual([3]);
   });
 
-  it('drops a section count when the section collapses', async () => {
-    report('soql', 3);
+  it('drops the search when a grid reshapes', async () => {
+    grids.forEach((grid) => (grid.grid.matches = 1));
+    await rollUps(() => search());
 
-    // Collapsing removes the grid, so its matches can no longer be reached.
-    const totals = rollUps(() => collapse(1));
-    await view.updateComplete;
+    const totals = await rollUps(() =>
+      grids[2].dispatchEvent(new CustomEvent('grid-reshape', { detail: null, bubbles: true })),
+    );
 
     expect(totals).toEqual([0]);
+    expect(grids.map((grid) => grid.grid.cleared)).toEqual([1, 1, 1]);
+  });
+
+  it('drops the search when a section collapses or expands', async () => {
+    grids.forEach((grid) => (grid.grid.matches = 1));
+    await rollUps(() => search());
+    expect(await rollUps(() => collapse(1))).toEqual([0]);
+
+    await rollUps(() => search());
+    expect(await rollUps(() => collapse(1))).toEqual([0]);
   });
 });
