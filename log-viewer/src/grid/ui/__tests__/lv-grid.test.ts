@@ -444,6 +444,36 @@ describe('lv-grid', () => {
     expect(key).not.toHaveBeenCalled();
   });
 
+  it('reaches the headers from the keyboard, to sort, resize and open their menu', async () => {
+    const { grid, scroller, header, names, key } = await setup();
+    const resized: GridColumnResizeDetail[] = [];
+    const menus: string[] = [];
+    grid.addEventListener('lv-grid-column-resize', (e) =>
+      resized.push(detail<GridColumnResizeDetail>(e)),
+    );
+    grid.addEventListener('lv-grid-header-context', (e) =>
+      menus.push(detail<GridHeaderContextDetail>(e).column),
+    );
+    const active = (): string | null | undefined => scroller?.getAttribute('aria-activedescendant');
+
+    await key('ArrowDown');
+    await key('ArrowUp');
+    expect(active()).toBe(header('Name')?.id);
+    await key('ArrowRight');
+    expect(active()).toBe(header('Time')?.id);
+
+    await key('Enter');
+    expect(grid.sort).toEqual({ column: 'time', dir: 'desc' });
+    await key('ArrowRight', { shiftKey: true });
+    expect(resized).toEqual([{ column: 'time', width: 516 }]);
+    scroller?.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true }));
+    expect(menus).toEqual(['time']);
+
+    await key('ArrowDown');
+    expect(names()).toEqual(['a', 'c', 'b']);
+    expect(active()).not.toBe(header('Time')?.id);
+  });
+
   it('follows the link of a row on Enter, and opens a row with none', async () => {
     const clicks: string[] = [];
     const linked = columns().map((column) =>
