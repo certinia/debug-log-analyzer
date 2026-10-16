@@ -2,10 +2,6 @@
  * Copyright (c) 2026 Certinia Inc. All rights reserved.
  */
 
-/**
- * The Call Tree's Time Order grid exactly as the app builds it, driven the way
- * `CalltreeView` drives it.
- */
 import type { ApexLog, LogEvent } from '@apexdevtools/apex-log-parser';
 import type { RowComponent, Tabulator } from 'tabulator-tables';
 
@@ -24,7 +20,6 @@ import { nextPaint } from './timing.js';
 const showDetailsFilter = (data: TimeOrderRow): boolean => data._hasDetailsDeep;
 const stampIndex = rowIndexStamper('id');
 
-/** Extension functions the app's own modules add to a table. */
 interface Extended {
   find(args: { text: string; count: number; options: { matchCase: boolean } }): Promise<{
     totalMatches: number;

@@ -7,7 +7,6 @@ import { Group, type RowKey, type RowTarget, type RowView } from '../core/index.
 import type { RowPainter } from '../render/index.js';
 import type { CellContent, GridColumn } from './column.js';
 
-/** What a row's look depends on beyond its data. Read on each paint. */
 export interface PaintState<R> {
   /** The shown columns. */
   columns: readonly GridColumn<R>[];

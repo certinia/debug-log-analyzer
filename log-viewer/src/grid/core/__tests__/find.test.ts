@@ -51,7 +51,6 @@ describe('GridStore.find', () => {
   it('counts every match in every row that passes the filters, open or not', async () => {
     const store = new GridStore(source(tree()));
     const result = await store.find({ text: 'account' }, [name]);
-    // a, c, d and two in e; nothing is expanded.
     expect(holders(result)).toEqual(['a', 'c', 'd', 'e', 'e']);
   });
 

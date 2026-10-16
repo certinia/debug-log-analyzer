@@ -16,7 +16,6 @@ declare global {
   }
 }
 
-/** The grid's `--grid-*` properties from the app's `--lana-*` tokens. */
 const theme = css`
   :host {
     --grid-bg: var(--lana-editor-bg);
@@ -44,7 +43,6 @@ const theme = css`
   }
 `;
 
-/** What the call-tree cells draw: bars, queries and their group headers. */
 const cells = css`
   ${unsafeCSS(progressCss)}
   ${unsafeCSS(soqlSyntaxStyles)}
@@ -117,7 +115,6 @@ const categories = css`
   }
 `;
 
-/** A row that is an event, or that holds one in `originalData`. */
 type CategoryRow = { category?: string; originalData?: { category?: string } };
 
 /** The class that colours a row by the category of its event. */

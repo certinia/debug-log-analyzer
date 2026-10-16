@@ -3,7 +3,6 @@
  */
 import type { ApexLog, LogEvent } from '@apexdevtools/apex-log-parser';
 
-/** What every bench page needs of a table. */
 export interface Mounted {
   mount(host: HTMLElement, log: ApexLog): Promise<void>;
   scroller(): HTMLElement;
@@ -22,7 +21,6 @@ interface Table extends Mounted {
   exportCsv(): Promise<number>;
 }
 
-/** One Time Order table under test. */
 export interface Contender extends Table {
   sortSelfDesc(): void | Promise<void>;
   setDetailFilter(on: boolean): void | Promise<void>;
@@ -32,7 +30,6 @@ export interface Contender extends Table {
   setNameWidth(px: number): void;
 }
 
-/** One Bottom-Up table under test, driven the way the Call Tree's Bottom-Up tab drives it. */
 export interface BottomUpContender extends Table {
   /** Groups by a row field, or ungroups. */
   groupBy(field: 'type' | 'namespace' | null): void | Promise<void>;

@@ -33,10 +33,8 @@ import { isDetailEvent } from '../utils/TimeOrderTree.js';
 import { bar, msBar, nameCell, nameText } from './cells.js';
 import { knownMax, outermostSum } from './calcs.js';
 
-/** What every call-tree row carries, whichever view built it. */
 type MetricRow = GovernorUsage & { namespace: string; thrownCount: SelfTotal };
 
-/** The fields a row either holds, or works out from its event when a cell asks. */
 interface RowFields<R> {
   event(row: R): LogEvent;
   text(row: R): string;
@@ -77,11 +75,9 @@ function eventFields(log: ApexLog): RowFields<LogEvent> {
 }
 
 export interface CallTreeColumnOptions {
-  /** Opens a type in the editor, from a Name cell link. */
   openType: (text: string) => void;
 }
 
-/** Footer and group totals of the heap columns: each table counts them its own way. */
 export interface HeapCalcs<R> {
   netTotal: Calc<R>;
   netSelf: Calc<R>;
@@ -89,7 +85,6 @@ export interface HeapCalcs<R> {
   grossSelf: Calc<R>;
 }
 
-/** Bottom-Up opens sorted by self time, largest first. */
 export const BOTTOM_UP_SORT: GridSort = { column: 'totalSelfTime', dir: 'desc' };
 
 const COUNT_MIN_WIDTH = 60;
@@ -474,7 +469,6 @@ export function timeOrderSource(log: ApexLog): TreeSource<LogEvent> {
   return { roots: log.children, children: (event) => event.children, key: (e) => e.eventIndex };
 }
 
-/** Show Details on the Time Order tree. */
 export const TIME_ORDER_DETAILS: RowFilter<LogEvent> = { test: isDetailEvent, keepAncestors: true };
 
 /** The Time Order columns: the Tabulator table's, field for field. */
@@ -495,7 +489,6 @@ export function timeOrderColumns(
       netSelf: sum((r) => r.heapAllocated.self, 'all'),
       grossSelf: sum((r) => r.heapGross.self, 'all'),
     }),
-    // Time columns sit at the far right of every call-tree table.
     timeColumn({
       id: 'duration.total',
       title: 'Total Time (ms)',

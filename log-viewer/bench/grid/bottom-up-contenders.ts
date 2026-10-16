@@ -2,10 +2,6 @@
  * Copyright (c) 2026 Certinia Inc. All rights reserved.
  */
 
-/**
- * The Call Tree's Bottom-Up table, as Tabulator and as `<lv-call-tree-grid>`, each built
- * with the options `CalltreeView` gives it.
- */
 import type { ApexLog } from '@apexdevtools/apex-log-parser';
 import type { Tabulator } from 'tabulator-tables';
 
@@ -27,7 +23,6 @@ import { LvGridBench } from './lv-grid-contender.js';
 
 const details = (row: BottomUpRow): boolean => row._hasDetailsDeep;
 
-/** Extension functions the app's own modules add to a table. */
 interface Extended {
   find(args: { text: string; count: number; options: { matchCase: boolean } }): Promise<{
     totalMatches: number;

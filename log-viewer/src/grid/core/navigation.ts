@@ -5,7 +5,6 @@ import { parentIndex, type RowView } from './rows.js';
 
 export type NavKey = 'up' | 'down' | 'left' | 'right' | 'home' | 'end';
 
-/** What a key asks for. The caller selects, expands or collapses the row at `index`. */
 export type NavIntent =
   | { kind: 'select'; index: number }
   | { kind: 'expand'; index: number }

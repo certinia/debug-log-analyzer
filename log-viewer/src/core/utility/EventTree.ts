@@ -42,7 +42,6 @@ export function* outermostEventsSteps(
     all.add(event);
     yield;
   }
-  // Each ancestor's answer is kept, so no stretch of the tree is walked twice.
   const enclosed = new Map<LogEvent, boolean>();
   const isEnclosed = (event: LogEvent): boolean => {
     const passed: LogEvent[] = [];

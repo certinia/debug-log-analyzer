@@ -42,7 +42,6 @@ function gridBoundary(context) {
     const target = relative ? path.resolve(path.dirname(file), spec).replace(/\.js$/, '') : null;
 
     if (layer === null) {
-      // Outside the grid: only the public entry point.
       if (inLogViewer && target && gridLayerOf(target) !== null) {
         const entry =
           file.slice(0, file.indexOf(`${path.sep}log-viewer${path.sep}`)) +

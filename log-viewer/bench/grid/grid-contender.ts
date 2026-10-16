@@ -22,14 +22,12 @@ import { pathOf, timeOrderDetails } from './targets.js';
 interface Column {
   field: string;
   title: string;
-  /** Pixels; the Name column takes the rest. */
   width: number | 'flex';
   text: CellText<TimeOrderRow>;
 }
 
 const count = (n: number): string => String(n);
 
-/** The Time Order grid's fifteen columns, as text. */
 export const COLUMNS: Column[] = [
   { field: 'text', title: 'Name', width: 'flex', text: (r) => r.text },
   { field: 'namespace', title: 'Namespace', width: 117, text: (r) => r.namespace },

@@ -2,7 +2,6 @@
  * Copyright (c) 2026 Certinia Inc. All rights reserved.
  */
 
-/** The Lit layer: the `<lv-grid>` element, its column type and its styles. */
 export type { GridColumn } from './column.js';
 export {
   LvGrid,

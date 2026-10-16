@@ -6,7 +6,6 @@ import type { LogEvent, ApexLog } from '@apexdevtools/apex-log-parser';
 import type { TimeOrderRow } from '../../src/features/call-tree/utils/TimeOrderTree.js';
 import type { RowFilter } from '../../src/grid/core/index.js';
 
-/** Show Details on the built Time Order rows. */
 export const timeOrderDetails: RowFilter<TimeOrderRow> = { test: (r) => r._hasDetailsDeep };
 
 /** The deepest event in the middle of the log: the worst go-to-row a user can ask for. */

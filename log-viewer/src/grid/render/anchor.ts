@@ -3,10 +3,8 @@
  */
 import { parentIndex, sameTarget, type RowTarget, type RowView } from '../core/index.js';
 
-/** A row on screen at capture, with where its top sat in the viewport. */
 export interface ShownRow {
   index: number;
-  /** Its top, from the top of the viewport. */
   top: number;
   height: number;
 }
@@ -17,20 +15,17 @@ export interface Viewport {
   height: number;
 }
 
-/** Where the user was before a sort, filter or toggle. */
 export interface Capture<R> {
   edge: 'top' | 'bottom' | null;
   /** The row across the middle of the viewport, then its ancestors, nearest first. */
   middle: readonly RowTarget<R>[];
   middleTop: number;
-  /** The viewport top of each data row and group on screen. */
   tops: ReadonlyMap<RowTarget<R>, number>;
 }
 
 /** Where to put the viewport after the change. Null: leave the scroll position as it is. */
 export type Restore = { edge: 'top' | 'bottom' } | { index: number; top: number } | null;
 
-/** Within this many pixels of an edge, the user is at that edge. */
 const EDGE_PX = 10;
 
 export function capture<R>(

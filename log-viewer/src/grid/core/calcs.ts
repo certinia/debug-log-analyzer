@@ -17,11 +17,9 @@ export interface Calc<R> {
   of(rows: readonly R[]): number | Generator<void, number, void>;
 }
 
-/** Totals by name, one per column that has a calc. */
 export type Calcs<R> = Readonly<Record<string, Calc<R>>>;
 export type Totals = Readonly<Record<string, number>>;
 
-/** Items a cheap `Calc.of` step reads between yields, sized to the grid's clock checks. */
 export const ROWS_PER_YIELD = 32;
 
 /** Sums `value` over the rows, in slices. */

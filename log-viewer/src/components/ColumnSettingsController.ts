@@ -19,7 +19,6 @@ import {
   type MenuColumn,
 } from '../tabulator/ColumnViews.js';
 
-/** A grid other than a Tabulator table that a column view applies to. */
 export interface ColumnTarget {
   /** Each column a view can name, in order. */
   columns(): readonly MenuColumn[];

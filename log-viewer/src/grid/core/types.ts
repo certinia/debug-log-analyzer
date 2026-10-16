@@ -22,7 +22,6 @@ export interface RowFilter<R> {
   keepAncestors?: boolean;
 }
 
-/** Whether a row starts expanded: one answer for every row, or one per row. */
 export type ExpandPolicy<R> = boolean | ((row: R, depth: number) => boolean);
 
 /** The group a top-level row falls in. */

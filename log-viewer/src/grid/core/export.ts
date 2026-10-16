@@ -2,14 +2,12 @@
  * Copyright (c) 2026 Certinia Inc. All rights reserved.
  */
 
-/** A column as export writes it: its header and the value of each row. */
 export interface ExportColumn<R> {
   title: string;
   value(row: R): string | number | boolean | null | undefined;
 }
 
 export interface ExportOptions {
-  /** `csv` quotes every value; `tsv` is what the clipboard takes. */
   format: 'csv' | 'tsv';
   /**
    * Write each row's descendants under it. Default true; false writes top-level rows only.

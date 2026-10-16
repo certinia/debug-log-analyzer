@@ -39,7 +39,6 @@ const plainColumns = (): GridColumn<TimeOrderRow>[] =>
     sortFirst: 'desc',
   }));
 
-/** Builds the grid for a log, and gives the Show Details filter it uses. */
 type Setup<R extends object> = (log: ApexLog) => { grid: LvGrid<R>; details: RowFilter<R> };
 
 const plain: Setup<TimeOrderRow> = (log) => {

@@ -35,24 +35,18 @@ import {
 } from './types.js';
 /** Export lines joined per slice: one join of the whole text is a long task at 500k rows. */
 const EXPORT_CHUNK = 4096;
-/** Rows a toggle walks in one task; a larger subtree is built in slices. */
 const SPLICE_LIMIT = 4096;
 
 export interface Snapshot<R> {
-  /** Goes up by one on every change. */
   readonly version: number;
   readonly rows: RowView<R>;
-  /** The footer: each calc over the rows that pass the filters. */
   readonly totals: Totals;
-  /** A sliced step is running; `rows` is the last finished state. */
   readonly busy: boolean;
-  /** The row a toggle came from, while the rows are the ones that toggle made. */
   readonly toggled?: RowTarget<R>;
 }
 
 export interface GridStoreOptions<R> {
   scheduler?: Scheduler;
-  /** Which rows start expanded. Default: none. */
   expanded?: ExpandPolicy<R>;
   calcs?: Calcs<R>;
   groupBy?: GroupBy<R> | null;
@@ -64,18 +58,13 @@ type Entry<R> = R | Group<R>;
 const byCount = <R>(a: Group<R>, b: Group<R>): number =>
   b.rows.length - a.rows.length || a.key.localeCompare(b.key);
 
-/** Totals kept by the calc that made them. */
 type Held<R> = Map<Calc<R>, number>;
 
-/** A depth-first walk in progress: a stack of sibling lists and the next index in each. */
 interface Walk<R> {
   lists: (readonly R[])[];
   at: number[];
-  /** Depth of the first list. */
   depth: number;
-  /** Each list's parent chain, kept only by a walk that reports it. */
   ups: (PathNode | null)[] | null;
-  /** Visit the first list only. */
   flat: boolean;
 }
 
@@ -143,26 +132,17 @@ export class GridStore<R extends object> {
   private toggled = new Set<RowKey>();
   private sort: Sort<R> | null = null;
   private filters: readonly RowFilter<R>[] = [];
-  /** Each sibling list after filter and sort, built when the list is first shown. */
   private ordered = new WeakMap<readonly R[], readonly R[]>();
-  /** For each `keepAncestors` filter: the rows that pass or have a descendant that passes. */
   private deepPass = new WeakMap<RowFilter<R>, WeakSet<R>>();
   private calcs: Calcs<R>;
   private groupBy: GroupBy<R> | null;
   private groupSort: Sort<Group<R>> | null = null;
-  /** Groups start closed; these are open. */
   private openGroups = new Set<string>();
-  /**
-   * The footer for each set of filters, each calc's total kept by the calc, so a filter
-   * turned off and on again costs nothing and new calcs sum only themselves. Totals hold
-   * until the source changes; sort and expansion keep them.
-   */
+  /** Footer totals per filter set and calc; only a new source drops them. */
   private footers = new Map<string, Held<R>>();
   private filterIds = new WeakMap<RowFilter<R>, number>();
   private nextFilterId = 0;
-  /** Group totals, kept by calc, hold until the filters, source or grouping change. */
   private groupTotals = new Map<string, Held<R>>();
-  /** The waiting build changes the totals only, so it keeps the rows on screen. */
   private totalsOnly = false;
 
   private current: Snapshot<R>;
@@ -170,9 +150,7 @@ export class GridStore<R extends object> {
   private running = false;
   private dirty = false;
   private waiting: { resolve: () => void; reject: (error: unknown) => void }[] = [];
-  /** Goes up with each find, so an older one sees it is stale. */
   private findId = 0;
-  /** Goes up when the rows a find or export walks change. */
   private generation = 0;
   private toggledTarget: RowTarget<R> | undefined;
 
@@ -688,7 +666,6 @@ export class GridStore<R extends object> {
       groups.push(new Group(key, rows, yield* this.totalsFor(rows, held)));
     }
     groups.sort(byCount);
-    // Array sort is stable, so groups that tie keep the default order.
     return this.groupSort ? sortRows(groups, this.groupSort) : groups;
   }
 

@@ -21,18 +21,13 @@ export interface RowPainter<R> {
 export interface GridViewOptions<R> {
   /** The element that scrolls. Its first rows may be a sticky header. */
   scroller: HTMLElement;
-  /** Holds the rows. Render sets its height and positions rows inside it. */
   body: HTMLElement;
   painter: RowPainter<R>;
-  /** A row's height before it is measured. */
   rowHeight: number;
-  /** Rows painted beyond each edge of the viewport. Default 10. */
   overscan?: number;
-  /** The `aria-rowindex` of the first row. Default 1; 2 under a header row. */
   rowIndexStart?: number;
 }
 
-/** The find a view marks: its result and the current match. */
 export interface FindMarks<R> {
   result: FindResult<R>;
   current: number;
@@ -48,7 +43,6 @@ export class GridView<R extends object> {
   private readonly virtualizer: Virtualizer<HTMLElement, HTMLElement>;
   private readonly unmount: () => void;
   private rows: RowView<R> | null = null;
-  /** Painted rows by index; repainted only when the rows change or `repaint` asks. */
   private readonly painted = new Map<number, HTMLElement>();
   private readonly spare: HTMLElement[] = [];
   private stale = new Set<HTMLElement>();

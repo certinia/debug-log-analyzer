@@ -2,7 +2,6 @@
  * Copyright (c) 2026 Certinia Inc. All rights reserved.
  */
 
-/** Work slice before the thread is handed back: half a 60fps frame. */
 const SLICE_MS = 8;
 
 /** Items between clock reads. Reading the clock per item costs more than the odd overrun. */
@@ -17,7 +16,6 @@ export interface Scheduler {
   yield(): Promise<void>;
 }
 
-/** Never yields: every step finishes in one go. For tests and small grids. */
 export const immediateScheduler: Scheduler = {
   now: () => 0,
   yield: () => Promise.resolve(),

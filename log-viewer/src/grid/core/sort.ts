@@ -7,7 +7,6 @@ export type SortDirection = 'asc' | 'desc';
 
 export type SortValue = number | string | boolean | null | undefined;
 
-/** Sort by a value, or by an ascending compare. */
 export type SortBy<R> = { value: (row: R) => SortValue } | { compare: Compare<R> };
 
 export type Sort<R> = SortBy<R> & { dir: SortDirection };

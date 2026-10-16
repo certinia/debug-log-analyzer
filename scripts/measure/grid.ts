@@ -99,7 +99,6 @@ async function measureTimeOrder(log: ApexLog): Promise<void> {
     keepAncestors: true,
   };
   const bySelf: Sort<TimeOrderRow> = { value: (r) => r.duration.self, dir: 'desc' };
-  // What the visible Time Order cells show: names as they are, times as formatted.
   const cells: CellText<TimeOrderRow>[] = [
     (r) => r.text,
     (r) => r.namespace,

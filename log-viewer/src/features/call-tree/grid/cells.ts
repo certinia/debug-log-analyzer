@@ -12,7 +12,6 @@ import { eventLabel, eventName } from '../utils/eventText.js';
 
 export interface BarOptions {
   precision?: number;
-  /** Show the share of `total` after the value. Default true. */
   percent?: boolean;
 }
 

@@ -8,10 +8,8 @@ export interface FindQuery {
   matchCase?: boolean;
 }
 
-/** The text a cell shows, which is what find searches. One per searched column. */
 export type CellText<R> = (row: R) => string;
 
-/** A row's parent chain as a walk passes it: shared by siblings, kept only for matches. */
 export interface PathNode {
   readonly key: RowKey;
   readonly up: PathNode | null;
@@ -36,15 +34,11 @@ export function findPattern(query: FindQuery): RegExp | null {
 /** The matches of one search, numbered from 0 in display order: row by row, then column. */
 export class FindResult<R> {
   readonly total: number;
-  /** What the matches were counted with; null for an empty search. */
   readonly pattern: RegExp | null;
-  /** Rows with a match, in display order. */
   private readonly rows: readonly R[];
-  /** The number of each row's first match. */
   private readonly starts: Uint32Array;
   private readonly paths: readonly (PathNode | null)[];
   private readonly key: (row: R) => RowKey;
-  /** Each row's slot in `rows`. */
   private readonly at: ReadonlyMap<R, number>;
 
   constructor(

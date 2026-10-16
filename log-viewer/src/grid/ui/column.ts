@@ -5,7 +5,6 @@ import type { TemplateResult } from 'lit';
 
 import type { Calc, Group, SortBy, SortDirection } from '../core/index.js';
 
-/** What a cell shows: text, or a template the grid renders. */
 export type CellContent = TemplateResult | string;
 
 /** One column of an `<lv-grid>`. Only `id`, `title` and `cell` are required. */

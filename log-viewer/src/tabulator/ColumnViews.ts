@@ -230,7 +230,6 @@ export function buildColumnMenuItems(
   return columnMenuItems(columns, activeViewId, views, alwaysVisible, editedViewIds);
 }
 
-/** A column a menu lists: its field, its header title and whether it is shown. */
 export interface MenuColumn {
   field: string;
   title: string;

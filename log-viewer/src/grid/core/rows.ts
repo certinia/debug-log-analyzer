@@ -97,7 +97,6 @@ export class FlatRows<R extends object> implements RowView<R> {
   }
 }
 
-/** A row list being built: parallel arrays, packed into a {@link FlatRows} once done. */
 export interface Flat<R> {
   rows: (R | Group<R>)[];
   depths: number[];

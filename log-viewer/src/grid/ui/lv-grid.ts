@@ -66,12 +66,10 @@ export interface GridSort {
 
 /** The rows or shown columns changed, so find's match numbers no longer hold. */
 export interface GridReshapeDetail {
-  /** `sort` from the header; `columns` when the shown columns change. */
   reason: 'sort' | 'columns';
 }
 
 export interface GridColumnDetail {
-  /** The column's `id`. */
   column: string;
 }
 
