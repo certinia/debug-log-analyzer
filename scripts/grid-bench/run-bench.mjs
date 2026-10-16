@@ -27,6 +27,15 @@ const { values, positionals } = parseArgs({
 });
 const [logPath, outPath, ...names] = positionals;
 const contenders = names.length ? names : ['call-tree'];
+const unknown = contenders.filter((name) => !['grid', 'lv-grid', 'call-tree'].includes(name));
+if (unknown.length) {
+  // The page throws before it is ready, which would leave the wait below to time out.
+  console.error(
+    `Unknown contender ${unknown.join(', ')}: use grid, lv-grid or call-tree. ` +
+      'Tabulator is removed: log-viewer/bench/grid/baseline/ holds the figures it last gave.',
+  );
+  process.exit(1);
+}
 
 const page = `file://${path.resolve('log-viewer/bench/grid/index.html')}`;
 

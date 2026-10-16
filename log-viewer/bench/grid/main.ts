@@ -25,8 +25,10 @@ function contenderFor(name: string): Contender {
       return new GridContender();
     case 'lv-grid':
       return lvGridContender();
-    default:
+    case 'call-tree':
       return callTreeContender();
+    default:
+      throw new Error(`Unknown contender ${name}: use grid, lv-grid or call-tree.`);
   }
 }
 
@@ -34,10 +36,6 @@ const TREES = ['time-order', 'aggregated', 'bottom-up'] as const;
 
 const params = new URLSearchParams(location.search);
 const name = params.get('c') ?? 'call-tree';
-if (name === 'tabulator') {
-  // Its figures would be filed as Tabulator's and replace the baseline compare.mjs reads.
-  throw new Error('Tabulator is removed: baseline/ holds the figures it last gave.');
-}
 const tree = TREES.find((t) => t === params.get('tree')) ?? 'time-order';
 const status = document.getElementById('status') as HTMLPreElement;
 const host = document.getElementById('host') as HTMLDivElement;
