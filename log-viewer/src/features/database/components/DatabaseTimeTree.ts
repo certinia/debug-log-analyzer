@@ -116,7 +116,7 @@ export class DatabaseTime extends LitElement {
         dispatchInspectorLocate(this, row?.eventIndexes ?? [], true);
       }
     },
-    menuFrame: (row) => row.eventIndexes[0] ?? -1,
+    menuFrame: (row) => row.eventIndexes[0] ?? null,
     keysFor: (eventIndexes) => this._rowIdsFor(eventIndexes),
     dropOnClear: true,
   });

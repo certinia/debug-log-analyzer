@@ -190,6 +190,14 @@ describe('database-time', () => {
     ]);
   });
 
+  it('leaves the browser its own menu on a row with no frame', () => {
+    const event = new MouseEvent('contextmenu', { cancelable: true });
+
+    fire('lv-grid-context', { row: { ...roots()[0], eventIndexes: [] }, event });
+
+    expect(event.defaultPrevented).toBe(false);
+  });
+
   it('marks every row that names a statement under the pointer in the grid beside', async () => {
     eventBus.emit('detail:locate', { source: 'database', eventIndexes: [2, 6] });
     await element.updateComplete;

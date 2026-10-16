@@ -25,8 +25,8 @@ export interface InspectorGridOptions<R extends object> {
   frames: (row: R) => readonly number[];
   /** What picking a row does: reveal its frame, or hold a mark on the frames it merges. */
   pick: (row: R | null) => void;
-  /** The frame the row menu acts on; -1 shows no menu. */
-  menuFrame: (row: R) => number;
+  /** The frame the row menu acts on; null leaves the browser's own menu. */
+  menuFrame: (row: R) => number | null;
   /** The keys of the rows that stand for the frames under the pointer in the tab on screen. */
   keysFor: (eventIndexes: readonly number[]) => Iterable<RowKey>;
   /** Escape drops a picked row, and the mark it holds in the tab on screen. */
@@ -132,15 +132,14 @@ export class InspectorGridController<R extends object> implements ReactiveContro
 
   private readonly _onContext = (e: CustomEvent<GridContextDetail<R>>): void => {
     const { row, event } = e.detail;
+    const frame = row ? this._options.menuFrame(row) : null;
     const menu = this._host.renderRoot.querySelector<ContextMenu>('context-menu');
-    if (!row || !menu || window.getSelection()?.type === 'Range') {
+    if (frame === null || !menu || window.getSelection()?.type === 'Range') {
       return;
     }
     event.preventDefault();
-    this._menuFrame = this._options.menuFrame(row);
-    if (this._menuFrame >= 0) {
-      menu.show(PANEL_ROW_MENU_ITEMS, event.clientX, event.clientY);
-    }
+    this._menuFrame = frame;
+    menu.show(PANEL_ROW_MENU_ITEMS, event.clientX, event.clientY);
   };
 
   private _dropPick(): void {
