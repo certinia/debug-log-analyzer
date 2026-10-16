@@ -3,7 +3,13 @@
  */
 import { describe, expect, it } from '@jest/globals';
 
-import { defaultViewMode, directionOf, isViewMode } from '../callTreeViewModes.js';
+import { callTreeLabel, defaultViewMode, directionOf, isViewMode } from '../callTreeViewModes.js';
+
+describe('callTreeLabel', () => {
+  it('names the grid by its mode, as the switch does', () => {
+    expect(callTreeLabel('bottom-up')).toBe('Call tree, Bottom-Up');
+  });
+});
 
 describe('directionOf', () => {
   it('reads Bottom-Up as the callers direction and the rest as callees', () => {

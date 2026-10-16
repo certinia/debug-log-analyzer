@@ -266,8 +266,8 @@ describe('calltree-view table lifetime', () => {
     await view._setViewMode('bottom-up');
     await settle();
 
-    expect(view.timeOrderGrid?.label).toBe('Call Tree, Time Order');
-    expect(view.bottomUpGrid?.label).toBe('Call Tree, Bottom-Up');
+    expect(view.timeOrderGrid?.label).toBe('Call tree, Time Order');
+    expect(view.bottomUpGrid?.label).toBe('Call tree, Bottom-Up');
   });
 
   it.each(['_expandButtonClick', '_collapseButtonClick'] as const)(
