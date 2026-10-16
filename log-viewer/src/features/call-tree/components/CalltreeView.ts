@@ -203,6 +203,15 @@ const rangeKey = (range: FilterRange): string => `${range.start}:${range.end}`;
 
 type ViewGrid = LvGrid<LogEvent> | LvGrid<AggregatedRow> | LvGrid<BottomUpRow>;
 
+/** What the filters read from a view's rows. Bottom-Up has no type or debug filter. */
+interface FilterFields<R> {
+  namespace: (row: R) => string | null | undefined;
+  total: (row: R) => number;
+  self: (row: R) => number;
+  type?: { of: (row: R) => string | null | undefined; debugOnly: RowFilter<R> };
+  details: RowFilter<R>;
+}
+
 @customElement('call-tree-view')
 export class CalltreeView extends LitElement {
   @property()
@@ -816,123 +825,80 @@ export class CalltreeView extends LitElement {
 
   /** The filters of {@link _updateFiltering} for the Aggregated grid: Time Order's, on its rows. */
   private _aggregatedFilters(): RowFilter<AggregatedRow>[] {
-    const namespaces = this.namespaceSelected;
-    const filters: RowFilter<AggregatedRow>[] = [];
-    if (namespaces.length) {
-      filters.push(
-        this._filter('aggregated:namespace', namespaces.join('\n'), () =>
-          deep((row) => namespaces.includes(row.namespace || '')),
-        ),
-      );
-    }
-    if (hasRange(this.totalTimeRange)) {
-      const range = this.totalTimeRange;
-      filters.push(
-        this._filter('aggregated:total', rangeKey(range), () =>
-          deep((row) => inMsRange(range, row.totalTime)),
-        ),
-      );
-    }
-    if (hasRange(this.selfTimeRange)) {
-      const range = this.selfTimeRange;
-      filters.push(
-        this._filter('aggregated:self', rangeKey(range), () =>
-          deep((row) => inMsRange(range, row.totalSelfTime)),
-        ),
-      );
-    }
-    const types = this.filterState.selectedTypes;
-    if (this.filterState.debugOnly) {
-      filters.push(AGGREGATED_DEBUG_ONLY);
-    } else {
-      if (types.size > 0 && !types.has('All')) {
-        filters.push(
-          this._filter('aggregated:type', [...types].join('\n'), () =>
-            deep((row) => !!row.originalData.type && types.has(row.originalData.type)),
-          ),
-        );
-      }
-      if (!this.filterState.showDetails) {
-        filters.push(AGGREGATED_DETAILS);
-      }
-    }
-    return filters;
+    return this._viewFilters<AggregatedRow>('aggregated', {
+      namespace: (row) => row.namespace,
+      total: (row) => row.totalTime,
+      self: (row) => row.totalSelfTime,
+      type: { of: (row) => row.originalData.type, debugOnly: AGGREGATED_DEBUG_ONLY },
+      details: AGGREGATED_DETAILS,
+    });
   }
 
   /** The filters of {@link _updateFiltering} for the Time Order grid. */
   private _timeOrderFilters(): RowFilter<LogEvent>[] {
-    const namespaces = this.namespaceSelected;
-    const filters: RowFilter<LogEvent>[] = [];
-    if (namespaces.length) {
-      filters.push(
-        this._filter('time-order:namespace', namespaces.join('\n'), () =>
-          deep((e) => namespaces.includes(e.namespace || '')),
-        ),
-      );
-    }
-    if (hasRange(this.totalTimeRange)) {
-      const range = this.totalTimeRange;
-      filters.push(
-        this._filter('time-order:total', rangeKey(range), () =>
-          deep((e) => inMsRange(range, e.duration.total)),
-        ),
-      );
-    }
-    if (hasRange(this.selfTimeRange)) {
-      const range = this.selfTimeRange;
-      filters.push(
-        this._filter('time-order:self', rangeKey(range), () =>
-          deep((e) => inMsRange(range, e.duration.self)),
-        ),
-      );
-    }
-    const types = this.filterState.selectedTypes;
-    if (this.filterState.debugOnly) {
-      filters.push(DEBUG_ONLY);
-    } else {
-      if (types.size > 0 && !types.has('All')) {
-        filters.push(
-          this._filter('time-order:type', [...types].join('\n'), () =>
-            deep((e) => !!e.type && types.has(e.type)),
-          ),
-        );
-      }
-      if (!this.filterState.showDetails) {
-        filters.push(TIME_ORDER_DETAILS);
-      }
-    }
-    return filters;
+    return this._viewFilters<LogEvent>('time-order', {
+      namespace: (e) => e.namespace,
+      total: (e) => e.duration.total,
+      self: (e) => e.duration.self,
+      type: { of: (e) => e.type, debugOnly: DEBUG_ONLY },
+      details: TIME_ORDER_DETAILS,
+    });
   }
 
   /** The filters of {@link _updateFiltering} for the Bottom-Up grid: no type or debug filter. */
   private _bottomUpFilters(): RowFilter<BottomUpRow>[] {
+    return this._viewFilters<BottomUpRow>('bottom-up', {
+      namespace: (row) => row.namespace,
+      total: (row) => row.totalTime,
+      self: (row) => row.totalSelfTime,
+      details: BOTTOM_UP_DETAILS,
+    });
+  }
+
+  private _viewFilters<R>(view: ViewMode, fields: FilterFields<R>): RowFilter<R>[] {
     const namespaces = this.namespaceSelected;
-    const filters: RowFilter<BottomUpRow>[] = [];
+    const filters: RowFilter<R>[] = [];
     if (namespaces.length) {
       filters.push(
-        this._filter('bottom-up:namespace', namespaces.join('\n'), () =>
-          deep((row) => namespaces.includes(row.namespace || '')),
+        this._filter(`${view}:namespace`, namespaces.join('\n'), () =>
+          deep((row) => namespaces.includes(fields.namespace(row) || '')),
         ),
       );
     }
     if (hasRange(this.totalTimeRange)) {
       const range = this.totalTimeRange;
       filters.push(
-        this._filter('bottom-up:total', rangeKey(range), () =>
-          deep((row) => inMsRange(range, row.totalTime)),
+        this._filter(`${view}:total`, rangeKey(range), () =>
+          deep((row) => inMsRange(range, fields.total(row))),
         ),
       );
     }
     if (hasRange(this.selfTimeRange)) {
       const range = this.selfTimeRange;
       filters.push(
-        this._filter('bottom-up:self', rangeKey(range), () =>
-          deep((row) => inMsRange(range, row.totalSelfTime)),
+        this._filter(`${view}:self`, rangeKey(range), () =>
+          deep((row) => inMsRange(range, fields.self(row))),
+        ),
+      );
+    }
+    const { type } = fields;
+    if (type && this.filterState.debugOnly) {
+      filters.push(type.debugOnly);
+      return filters;
+    }
+    const types = this.filterState.selectedTypes;
+    if (type && types.size > 0 && !types.has('All')) {
+      filters.push(
+        this._filter(`${view}:type`, [...types].join('\n'), () =>
+          deep((row) => {
+            const of = type.of(row);
+            return !!of && types.has(of);
+          }),
         ),
       );
     }
     if (!this.filterState.showDetails) {
-      filters.push(BOTTOM_UP_DETAILS);
+      filters.push(fields.details);
     }
     return filters;
   }
