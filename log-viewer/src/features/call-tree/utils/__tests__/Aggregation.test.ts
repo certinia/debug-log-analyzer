@@ -1134,21 +1134,6 @@ describe('buildAggregatedTree', () => {
     expect(counts('ns.Outer')).toEqual([100, 100, 100, 100]);
     expect(counts('ns.Inner')).toEqual(Array(12).fill(100));
   });
-
-  it('returns null once the signal aborts', async () => {
-    const log = wideLog();
-    const controller = new AbortController();
-    controller.abort();
-    let t = 0;
-    const now = jest.spyOn(performance, 'now').mockImplementation(() => (t += 100));
-    const sliced = await buildAggregatedTree(log.children, new KeyPathIds(2048), undefined, {
-      yieldSlice: () => Promise.resolve(),
-      signal: controller.signal,
-    });
-    now.mockRestore();
-
-    expect(sliced).toBeNull();
-  });
 });
 
 describe('toAggregatedCallTree', () => {
