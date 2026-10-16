@@ -43,6 +43,8 @@ export interface Snapshot<R> {
   readonly totals: Totals;
   readonly busy: boolean;
   readonly toggled?: RowTarget<R>;
+  /** The last build threw; `rows` and `totals` are from before it. Only a good build clears it. */
+  readonly failed?: { readonly error: unknown };
 }
 
 export interface GridStoreOptions<R> {
@@ -521,6 +523,7 @@ export class GridStore<R extends object> {
         toggled: target,
       },
       false,
+      this.current.failed,
     );
     return true;
   }
@@ -559,7 +562,7 @@ export class GridStore<R extends object> {
       }
     }
     this.running = false;
-    this.publish(null, false);
+    this.publish(null, false, failed ?? undefined);
     for (const waiter of this.waiting.splice(0)) {
       if (failed) {
         waiter.reject(failed.error);
@@ -748,13 +751,14 @@ export class GridStore<R extends object> {
     return pass;
   }
 
-  private publish(built: Built<R> | null, busy: boolean): void {
+  private publish(built: Built<R> | null, busy: boolean, failed?: { error: unknown }): void {
     this.current = {
       version: this.current.version + 1,
       rows: built?.rows ?? this.current.rows,
       totals: built?.totals ?? this.current.totals,
       busy,
       toggled: built ? built.toggled : this.current.toggled,
+      failed: failed ?? (built ? undefined : this.current.failed),
     };
     for (const listener of this.listeners) {
       listener(this.current);

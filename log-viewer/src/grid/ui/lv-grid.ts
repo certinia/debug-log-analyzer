@@ -71,6 +71,15 @@ export interface GridReshapeDetail {
   reason: 'sort' | 'columns' | 'filter' | 'group';
 }
 
+/**
+ * An error from work the grid started itself, which no caller can catch. Cancel the event
+ * once the error is shown or logged; an error left uncancelled is thrown uncaught.
+ */
+export interface GridErrorDetail {
+  error: unknown;
+  action: 'build' | 'toggle' | 'copy';
+}
+
 export interface GridColumnDetail {
   column: string;
 }
@@ -106,7 +115,8 @@ const shownIds = <R>(columns: readonly GridColumn<R>[] | undefined): string[] =>
  * keyboard moves, opens and closes rows. Events bubble but stay inside the host's shadow
  * root: `lv-grid-select`, `lv-grid-locate` (hover), `lv-grid-context`,
  * `lv-grid-header-context`, `lv-grid-column-resize`, `lv-grid-find-results`,
- * `lv-grid-reshape` and `lv-grid-expand` (a data row the user opened).
+ * `lv-grid-reshape`, `lv-grid-expand` (a data row the user opened) and `lv-grid-error`.
+ * When a build throws, the grid shows an alert in place of its rows until a build succeeds.
  */
 @customElement('lv-grid')
 export class LvGrid<R extends object = object> extends LitElement {
@@ -176,6 +186,10 @@ export class LvGrid<R extends object = object> extends LitElement {
   @property({ attribute: false })
   placeholder: string | null = null;
 
+  /** The alert shown in place of the rows while a build fails. */
+  @property({ attribute: false })
+  errorText = 'The table could not be updated.';
+
   private store: GridStore<R> | null = null;
   private readonly data = new StoreController<R>(this);
   private view: GridView<R> | null = null;
@@ -189,6 +203,7 @@ export class LvGrid<R extends object = object> extends LitElement {
   /** Where the selection was last seen, to skip a search of every row. */
   private selectedAt = -1;
   private hovered = -1;
+  private failure: { readonly error: unknown } | undefined;
   private found: FindMarks<R> | null = null;
   // Goes up with each find and clear, so a find still running sees it is stale.
   private searches = 0;
@@ -360,21 +375,21 @@ export class LvGrid<R extends object = object> extends LitElement {
       return;
     }
     if (changed.has('source') && this.source) {
-      void store.setSource(this.source);
+      this.background(store.setSource(this.source), 'build');
     }
     if (changed.has('filters')) {
-      void store.setFilters(this.filters);
+      this.background(store.setFilters(this.filters), 'build');
       this.emit<GridReshapeDetail>('lv-grid-reshape', { reason: 'filter' });
     }
     if (changed.has('groupBy')) {
-      void store.setGroupBy(this.groupBy);
+      this.background(store.setGroupBy(this.groupBy), 'build');
       this.emit<GridReshapeDetail>('lv-grid-reshape', { reason: 'group' });
     }
     if ((changed.has('columns') || changed.has('sort')) && this.calcsChanged()) {
-      void store.setCalcs(this.calcs);
+      this.background(store.setCalcs(this.calcs), 'build');
     }
     if (changed.has('sort') || changed.has('columns')) {
-      void this.applySort();
+      this.background(this.applySort(), 'build');
     }
     if (
       changed.has('columns') &&
@@ -391,6 +406,12 @@ export class LvGrid<R extends object = object> extends LitElement {
   protected updated(changed: PropertyValues): void {
     const snapshot = this.data.snapshot;
     this.toggleAttribute('busy', snapshot?.busy ?? false);
+    if (snapshot?.failed !== this.failure) {
+      this.failure = snapshot?.failed;
+      if (this.failure) {
+        this.report(this.failure.error, 'build');
+      }
+    }
     if (this.view && snapshot && snapshot.rows !== this.shown) {
       this.shown = snapshot.rows;
       this.view.setRows(snapshot.rows, snapshot.toggled);
@@ -404,12 +425,16 @@ export class LvGrid<R extends object = object> extends LitElement {
     const totals = this.data.snapshot?.totals ?? {};
     const footer = columns.some((column) => column.calc || column.footer !== undefined);
     const size = this.data.snapshot?.rows.size ?? 0;
+    const failed = this.data.snapshot?.failed !== undefined;
+    const notice = this.notice();
+    const foot = footer && !failed;
+    const rowCount = 1 + (failed ? 0 : size) + (notice ? 1 : 0) + (foot ? 1 : 0);
     return html`<div
       class="scroller"
       role="treegrid"
       aria-label=${this.label ?? nothing}
       tabindex="0"
-      aria-rowcount=${size + (footer ? 2 : 1)}
+      aria-rowcount=${rowCount}
       aria-busy=${this.data.snapshot?.busy ?? false}
       style=${styleMap(columnTracks(columns, this.widths))}
       ${ref(this.scrollerRef)}
@@ -420,12 +445,17 @@ export class LvGrid<R extends object = object> extends LitElement {
         ${columns.map((column) => this.headerCell(column))}
       </div>
       ${
-        size === 0 && !this.data.snapshot?.busy && this.placeholder !== null
-          ? html`<div class="placeholder" role="status">${this.placeholder}</div>`
+        notice
+          ? html`<div class="placeholder" role="row" aria-rowindex="2">
+              <div role="gridcell" aria-colspan=${columns.length}>
+                <span role=${notice.role}>${notice.text}</span>
+              </div>
+            </div>`
           : nothing
       }
       <div
         class="body"
+        ?hidden=${failed}
         ${ref(this.bodyRef)}
         @mousedown=${this.onMouseDown}
         @click=${this.onClick}
@@ -434,8 +464,8 @@ export class LvGrid<R extends object = object> extends LitElement {
         @pointerleave=${this.onLeave}
       ></div>
       ${
-        footer
-          ? html`<div class="row foot" role="row" aria-rowindex=${size + 2}>
+        foot
+          ? html`<div class="row foot" role="row" aria-rowindex=${rowCount}>
               ${columns.map(
                 (column) =>
                   html`<div class="cell ${column.align === 'end' ? 'end' : ''}" role="gridcell">
@@ -446,6 +476,18 @@ export class LvGrid<R extends object = object> extends LitElement {
           : nothing
       }
     </div>`;
+  }
+
+  /** The alert while a build fails, else the placeholder while no row shows. */
+  private notice(): { role: 'alert' | 'status'; text: string } | null {
+    const snapshot = this.data.snapshot;
+    if (snapshot?.failed) {
+      return { role: 'alert', text: this.errorText };
+    }
+    if (!snapshot?.rows.size && !snapshot?.busy && this.placeholder !== null) {
+      return { role: 'status', text: this.placeholder };
+    }
+    return null;
   }
 
   private headerCell(column: GridColumn<R>): TemplateResult {
@@ -583,10 +625,10 @@ export class LvGrid<R extends object = object> extends LitElement {
     });
     this.data.follow(this.store);
     if (this.filters.length) {
-      void this.store.setFilters(this.filters);
+      this.background(this.store.setFilters(this.filters), 'build');
     }
     if (this.sort) {
-      void this.applySort();
+      this.background(this.applySort(), 'build');
     }
   }
 
@@ -772,7 +814,7 @@ export class LvGrid<R extends object = object> extends LitElement {
       return;
     }
     if (this.isToggle(e, index)) {
-      void this.toggleAt(index);
+      this.background(this.toggleAt(index), 'toggle');
     } else if (window.getSelection()?.type === 'Range') {
       // A drag that selected text is a copy in the making, not a click on a row.
       return;
@@ -791,12 +833,12 @@ export class LvGrid<R extends object = object> extends LitElement {
     }
     const key = gridKey(e);
     const rows = this.shown;
-    if (!key || !rows) {
+    if (!key || !rows || this.failure) {
       return;
     }
     e.preventDefault();
     if (key === 'copy') {
-      void this.copy();
+      this.background(this.copy(), 'copy');
       return;
     }
     const at = this.indexOfSelected();
@@ -813,7 +855,7 @@ export class LvGrid<R extends object = object> extends LitElement {
       this.select(this.targetAt(intent.index), intent.index, true);
       this.view?.scrollToIndex(intent.index, 'auto');
     } else if (intent) {
-      void this.toggleAt(intent.index, intent.kind === 'expand');
+      this.background(this.toggleAt(intent.index, intent.kind === 'expand'), 'toggle');
     }
   };
 
@@ -837,8 +879,28 @@ export class LvGrid<R extends object = object> extends LitElement {
     this.emit<GridRowDetail<R>>('lv-grid-locate', { row: null });
   };
 
-  /** Bubbles, but is not composed: it stays inside the host's shadow root. */
-  private emit<T>(type: string, detail: T): void {
-    this.dispatchEvent(new CustomEvent<T>(type, { detail, bubbles: true }));
+  /** A build's error is reported from its snapshot, once, so its rejections are not. */
+  private background(work: Promise<unknown> | undefined, action: GridErrorDetail['action']): void {
+    work?.catch((error: unknown) => {
+      if (error !== this.store?.snapshot().failed?.error) {
+        this.report(error, action);
+      }
+    });
+  }
+
+  private report(error: unknown, action: GridErrorDetail['action']): void {
+    if (this.emit<GridErrorDetail>('lv-grid-error', { error, action }, true)) {
+      queueMicrotask(() => {
+        throw error;
+      });
+    }
+  }
+
+  /**
+   * Bubbles, but is not composed: it stays inside the host's shadow root. False when a
+   * listener cancelled it.
+   */
+  private emit<T>(type: string, detail: T, cancelable = false): boolean {
+    return this.dispatchEvent(new CustomEvent<T>(type, { detail, bubbles: true, cancelable }));
   }
 }
