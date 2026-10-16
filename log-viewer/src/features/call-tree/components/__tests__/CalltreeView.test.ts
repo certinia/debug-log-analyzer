@@ -308,6 +308,14 @@ describe('calltree-view table lifetime', () => {
     expect(built).toEqual(['time-order', 'bottom-up', 'bottom-up']);
   });
 
+  it('names each grid by its view', async () => {
+    await view._setViewMode('bottom-up');
+    await settle();
+
+    expect(view.timeOrderGrid?.label).toBe('Call Tree, Time Order');
+    expect(view.bottomUpGrid?.label).toBe('Call Tree, Bottom-Up');
+  });
+
   it.each(['_expandButtonClick', '_collapseButtonClick'] as const)(
     'gives keyboard focus back to the grid after %s',
     async (click) => {

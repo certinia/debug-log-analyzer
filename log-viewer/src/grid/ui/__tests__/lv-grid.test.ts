@@ -125,6 +125,14 @@ describe('lv-grid', () => {
     expect(titles).toEqual(['Name', 'Time', 'Kind']);
   });
 
+  it('names the treegrid by its label, and leaves it unnamed without one', async () => {
+    const { grid, scroller } = await setup();
+    expect(scroller?.hasAttribute('aria-label')).toBe(false);
+    grid.label = 'Call Tree, Time Order';
+    await settle(grid);
+    expect(scroller?.getAttribute('aria-label')).toBe('Call Tree, Time Order');
+  });
+
   it('leaves a hidden column out of the header and the tracks', async () => {
     const { grid, root } = await setup();
     grid.columns = columns().map((column) =>

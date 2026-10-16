@@ -134,6 +134,10 @@ export class LvGrid<R extends object = object> extends LitElement {
   @property({ attribute: false })
   rowClass: ((row: R) => string | undefined) | null = null;
 
+  /** The treegrid's accessible name. */
+  @property()
+  label: string | null = null;
+
   /** A row's height before it is measured. */
   @property({ type: Number, attribute: 'row-height' })
   rowHeight = 24;
@@ -357,6 +361,7 @@ export class LvGrid<R extends object = object> extends LitElement {
     return html`<div
       class="scroller"
       role="treegrid"
+      aria-label=${this.label ?? nothing}
       tabindex="0"
       aria-rowcount=${size + (footer ? 2 : 1)}
       aria-busy=${this.data.snapshot?.busy ?? false}

@@ -1119,7 +1119,7 @@ export class CalltreeView extends LitElement {
       return;
     }
 
-    const grid = this._mountGrid<LogEvent>(callTreeTableContainer, (event) => ({
+    const grid = this._mountGrid<LogEvent>(callTreeTableContainer, 'time-order', (event) => ({
       originalData: event,
       text: event.text,
     }));
@@ -1151,6 +1151,7 @@ export class CalltreeView extends LitElement {
 
     const grid = this._mountGrid<AggregatedRow>(
       container,
+      'aggregated',
       (row) => row,
       (row) => this._aggregatedLinks?.parents.get(row),
     );
@@ -1191,6 +1192,7 @@ export class CalltreeView extends LitElement {
 
     const grid = this._mountGrid<BottomUpRow>(
       container,
+      'bottom-up',
       (row) => row,
       (row) => this._bottomUpLinks?.parents.get(row),
     );
@@ -1228,10 +1230,12 @@ export class CalltreeView extends LitElement {
    */
   private _mountGrid<R extends object>(
     container: HTMLElement,
+    mode: ViewMode,
     data: (row: R) => object,
     parentOf: (row: R) => R | undefined = () => undefined,
   ): LvGrid<R> {
     const grid = document.createElement('lv-call-tree-grid') as unknown as LvGrid<R>;
+    grid.label = `Call Tree, ${VIEW_MODES.find((option) => option.value === mode)?.label}`;
     grid.toggleAttribute('category-colorize', this.classList.contains('category-colorize'));
     const standIn = (row: R): RowComponent => rowStandIn(row, data, parentOf);
 
