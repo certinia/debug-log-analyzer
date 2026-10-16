@@ -61,9 +61,8 @@ export class AnalysisView extends LitElement {
         height: 100%;
         width: 100%;
         display: flex;
-        gap: 1rem;
         /* inset previously provided by the tab panel's padding */
-        padding: 10px 6px;
+        padding: var(--lana-space-md) var(--lana-space-xs);
         box-sizing: border-box;
       }
 
@@ -83,7 +82,7 @@ export class AnalysisView extends LitElement {
 
       .filter-container {
         display: flex;
-        gap: 4px;
+        gap: var(--lana-space-2xs);
         align-items: flex-end;
       }
 
