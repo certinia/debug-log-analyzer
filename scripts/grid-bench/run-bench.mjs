@@ -27,6 +27,10 @@ const { values, positionals } = parseArgs({
 });
 const [logPath, outPath, ...names] = positionals;
 const contenders = names.length ? names : ['call-tree'];
+if (values.tree !== 'bottom-up' && contenders.includes('tabulator')) {
+  console.error(`No Tabulator ${values.tree} table is left: its figures are in baseline/.`);
+  process.exit(1);
+}
 /** Tabulator's Bottom-Up table overflows the stack on an ungroup after a group. */
 const skipped = (name) => (name === 'tabulator' ? ['ungroup'] : []);
 
