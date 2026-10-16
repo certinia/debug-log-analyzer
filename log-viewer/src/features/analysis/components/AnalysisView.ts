@@ -124,7 +124,7 @@ export class AnalysisView extends LitElement {
   );
   private readonly _settings = new ColumnSettingsController(this, {
     ...CALL_TREE_COLUMN_SETTINGS,
-    tables: () => [this._columnTarget],
+    targets: () => [this._columnTarget],
   });
   private readonly _menus = new GridColumnMenuController({
     target: this._columnTarget,

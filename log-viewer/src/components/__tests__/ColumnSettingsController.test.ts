@@ -59,7 +59,7 @@ async function connected(
     read: (settings) => (settings as { database?: { soql?: object } }).database?.soql,
     views: VIEWS,
     alwaysVisible: ALWAYS_VISIBLE,
-    tables: () => (table ? [table] : []),
+    targets: () => (table ? [table] : []),
   });
   host.connect();
   await Promise.resolve();

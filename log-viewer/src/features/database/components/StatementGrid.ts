@@ -135,7 +135,7 @@ export abstract class StatementGrid<R extends StatementRow, L> extends LitElemen
       read: (settings) => settings.database?.[spec.type],
       views: spec.views,
       alwaysVisible: [spec.type],
-      tables: () => [this._columnTarget],
+      targets: () => [this._columnTarget],
     });
     this._menus = new GridColumnMenuController({
       target: this._columnTarget,

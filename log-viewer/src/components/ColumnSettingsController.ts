@@ -68,8 +68,8 @@ export interface ColumnSettingsOptions {
   views: ColumnView[];
   /** Fields shown whichever view is on, e.g. the Name column. */
   alwaysVisible: string[];
-  /** Every built table the view applies to. The call tree has three. */
-  tables: () => ColumnTarget[];
+  /** Every grid's columns the view applies to. The call tree has three. */
+  targets: () => ColumnTarget[];
 }
 
 /**
@@ -117,10 +117,10 @@ export class ColumnSettingsController implements ReactiveController {
     return this._overrides[id] ?? getColumnView(this._options.views, id)?.fields ?? null;
   }
 
-  /** Apply the view on show to a table that has just been built. */
-  applyTo(table: ColumnTarget): void {
+  /** Apply the view on show to `target`. */
+  applyTo(target: ColumnTarget): void {
     const fields = this.fieldsFor(this._view);
-    table.show(fields === null ? null : new Set([...this._options.alwaysVisible, ...fields]));
+    target.show(fields === null ? null : new Set([...this._options.alwaysVisible, ...fields]));
   }
 
   /** Show `id` and remember it. */
@@ -130,8 +130,8 @@ export class ColumnSettingsController implements ReactiveController {
   }
 
   /** Add or remove one column from the view on show, and remember it. */
-  toggle(table: ColumnTarget, field: string): void {
-    const fields = table.columns().map((column) => column.field);
+  toggle(target: ColumnTarget, field: string): void {
+    const fields = target.columns().map((column) => column.field);
     this._overrides = {
       ...this._overrides,
       [this._view]: toggleField(this.fieldsFor(this._view), field, fields),
@@ -155,10 +155,10 @@ export class ColumnSettingsController implements ReactiveController {
     updateSetting(`${this._options.section}.columnOverrides`, this._overrides);
   }
 
-  /** The column header menu for `table`, against the state now. */
-  menuItems(table: ColumnTarget): ContextMenuItem[] {
+  /** The column header menu for `target`, against the state now. */
+  menuItems(target: ColumnTarget): ContextMenuItem[] {
     const { views, alwaysVisible } = this._options;
-    return columnMenuItems(table.columns(), this._view, views, alwaysVisible, this.editedViews);
+    return columnMenuItems(target.columns(), this._view, views, alwaysVisible, this.editedViews);
   }
 
   private _adopt(settings: LanaSettings): void {
@@ -174,8 +174,8 @@ export class ColumnSettingsController implements ReactiveController {
   }
 
   private _apply(): void {
-    for (const table of this._options.tables()) {
-      this.applyTo(table);
+    for (const target of this._options.targets()) {
+      this.applyTo(target);
     }
   }
 }
