@@ -509,6 +509,25 @@ describe('buildWholeLogCallTree', () => {
       clock.mockRestore();
     }
   });
+  it('leaves out a top-level line with no duration, as the Inspector does for any row', async () => {
+    const userInfo = timedFrame(600, 'USER_INFO', '005Ea00000R6orz', { total: 0, self: 0 });
+    userInfo.parent = root;
+    root.children.unshift(userInfo);
+    byId.set(userInfo.eventIndex, userInfo);
+    try {
+      const tree = (await buildWholeLogCallTree(options))!;
+
+      expect((await tree.timeOrder(options))!.map((row) => row.type)).toEqual([
+        'CODE_UNIT_STARTED',
+      ]);
+      // The four frames under `exec`; the empty line is no call.
+      expect(tree.calls).toBe(4);
+    } finally {
+      root.children.shift();
+      byId.delete(userInfo.eventIndex);
+    }
+  });
+
   it('leaves out a profiling block the log left at the top level', async () => {
     const profiling = timedFrame(500, 'CUMULATIVE_PROFILING_BEGIN', 'profiling', {
       total: 2,

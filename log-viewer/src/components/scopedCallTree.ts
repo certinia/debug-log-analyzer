@@ -372,10 +372,12 @@ async function pathRoots(
 }
 
 /** Each event's real subtree as a root row, with the frames they hold between
- *  them; null when the walk is abandoned. */
+ *  them; null when the walk is abandoned. `dropEmpty` leaves out a root with no
+ *  duration and nothing kept below it, as the prune does for any other row. */
 async function subtreeRoots(
   events: readonly LogEvent[],
   tick: Tick,
+  { dropEmpty = false }: { dropEmpty?: boolean } = {},
 ): Promise<{ roots: ScopedRow[]; calls: number } | null> {
   const roots: ScopedRow[] = [];
   let calls = 0;
@@ -383,6 +385,9 @@ async function subtreeRoots(
     const subtree = await realSubtree(event, tick);
     if (!subtree) {
       return null;
+    }
+    if (dropEmpty && subtree.row.duration.total <= 0 && !subtree.row._children) {
+      continue;
     }
     roots.push(subtree.row);
     calls += subtree.calls;
@@ -573,7 +578,7 @@ export async function buildWholeLogCallTree(
   // A profiling block sits after EXECUTION_FINISHED, so it is a root here rather
   // than a descendant `realSubtree` would skip.
   const roots = apexLog.children.filter((child) => !EXCLUDED_DETAIL_TYPES.has(child.type ?? ''));
-  const scope = await subtreeRoots(roots, tick);
+  const scope = await subtreeRoots(roots, tick, { dropEmpty: true });
   if (!scope) {
     return null;
   }
