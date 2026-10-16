@@ -24,8 +24,8 @@ const theme = css`
     --grid-header-bg: var(--lana-editor-bg);
     --grid-hover-bg: var(--lana-row-hover-bg);
     --grid-marked-bg: var(--lana-row-hover-bg);
-    --grid-selected-bg: var(--vscode-list-activeSelectionBackground, Highlight);
-    --grid-selected-fg: var(--vscode-list-activeSelectionForeground, var(--lana-editor-fg));
+    --grid-selected-bg: var(--lana-row-selected-bg);
+    --grid-selected-fg: var(--lana-row-selected-fg);
     --grid-focus: var(--lana-focus-border);
     --grid-find-fg: var(--vscode-editor-findMatchHighlightForeground, currentColor);
     --grid-find-bg: var(--vscode-editor-findMatchHighlightBackground, yellow);
