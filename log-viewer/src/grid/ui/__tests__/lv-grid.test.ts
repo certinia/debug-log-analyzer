@@ -446,7 +446,7 @@ describe('lv-grid', () => {
   });
 
   it('reaches the headers from the keyboard, to sort, resize and open their menu', async () => {
-    const { grid, scroller, header, names, key } = await setup();
+    const { grid, root, scroller, header, rowNamed, key } = await setup();
     const resized: GridColumnResizeDetail[] = [];
     const menus: string[] = [];
     grid.addEventListener('lv-grid-column-resize', (e) =>
@@ -466,13 +466,40 @@ describe('lv-grid', () => {
     await key('Enter');
     expect(grid.sort).toEqual({ column: 'time', dir: 'desc' });
     await key('ArrowRight', { shiftKey: true });
+    // fakeLayout makes every element 500px wide.
     expect(resized).toEqual([{ column: 'time', width: 516 }]);
     scroller?.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, button: -1 }));
     expect(menus).toEqual(['time']);
 
     await key('ArrowDown');
-    expect(names()).toEqual(['a', 'c', 'b']);
-    expect(active()).not.toBe(header('Time')?.id);
+    expect(root.getElementById(active() ?? '')).toBe(rowNamed('a'));
+  });
+
+  it('moves along the header row within its ends, and stays on it as columns hide', async () => {
+    const { grid, scroller, header, rowNamed, key } = await setup();
+    const active = (): string | null | undefined => scroller?.getAttribute('aria-activedescendant');
+    grid.filters = [{ test: () => false }];
+    await settle(grid);
+    await key('ArrowUp');
+    await key('ArrowLeft');
+    expect(active()).toBe(header('Name')?.id);
+    await key('End');
+    expect(active()).toBe(header('Kind')?.id);
+    await key('ArrowRight');
+    expect(active()).toBe(header('Kind')?.id);
+
+    grid.columns = columns().map((column) =>
+      column.id === 'kind' ? { ...column, hidden: true } : column,
+    );
+    await settle(grid);
+    expect(active()).toBe(header('Time')?.id);
+    await key('Home');
+    expect(active()).toBe(header('Name')?.id);
+
+    grid.filters = [];
+    await settle(grid);
+    await key('ArrowDown');
+    expect(rowNamed('a')?.ariaSelected).toBe('true');
   });
 
   it('opens no menu for a right-click on the grid outside its rows and headers', async () => {
