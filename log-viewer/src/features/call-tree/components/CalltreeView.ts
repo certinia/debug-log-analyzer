@@ -71,7 +71,7 @@ import {
   type ColumnTarget,
 } from '../../../components/ColumnSettingsController.js';
 import { CALL_TREE_VIEWS } from '../../../components/grid/ColumnViews.js';
-import { LocatedRowIds } from '../../../components/locatedRow.js';
+import { LocatedRowIds, type RowData } from '../../../components/locatedRow.js';
 import { InspectorTabController } from '../../../components/InspectorTabController.js';
 import { LvGridFindController } from '../../../components/grid/LvGridFindController.js';
 import { revealFirstOf } from '../../../components/inspectorTab.js';
@@ -1031,7 +1031,7 @@ export class CalltreeView extends LitElement {
   private _mountGrid<R extends object>(
     container: HTMLElement,
     mode: ViewMode,
-    data: (row: R) => object,
+    data: (row: R) => RowData,
     parentOf: (row: R) => R | undefined = () => undefined,
   ): LvGrid<R> {
     const grid = document.createElement('lv-call-tree-grid') as unknown as LvGrid<R>;

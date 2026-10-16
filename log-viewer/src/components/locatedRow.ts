@@ -11,13 +11,13 @@ import { eventByEventIndex } from '../core/utility/EventSearch.js';
 
 /** How the inspector reads a grid's row: its data, and the row above it. */
 export interface RowReader<R> {
-  data: (row: R) => object;
+  data: (row: R) => RowData;
   parentOf: (row: R) => R | undefined;
 }
 
-/** A row of a merged view: `key` is the bucket it stands for, `instances` the
- *  occurrences it holds, which a bottom-up caller bucket has none of. */
-interface CallRow {
+/** What the inspector reads off a row. A merged row's `key` is the bucket it stands for,
+ *  `instances` the occurrences it holds, which a bottom-up caller bucket has none of. */
+export interface RowData {
   key?: string;
   /** The interned bucket path the row's builder stamped on it. */
   _pathId?: number;
@@ -26,11 +26,11 @@ interface CallRow {
   originalData?: LogEvent;
 }
 
-const rowCallData = <R>(row: R, read: RowReader<R>): CallRow => read.data(row) as CallRow;
+const rowCallData = <R>(row: R, read: RowReader<R>): RowData => read.data(row);
 
 /** Held per row: a pointer sweep re-enters rows and the click that follows a
  *  hover asks again, but deriving reads every occurrence the root bucket holds. */
-const derivedIndexes = new WeakMap<CallRow, number[]>();
+const derivedIndexes = new WeakMap<RowData, number[]>();
 
 const NO_CALLS: LogEvent[] = [];
 
@@ -38,7 +38,7 @@ const NO_CALLS: LogEvent[] = [];
  * The root bucket a derived row reads its calls from, or null where the walk
  * leaves the merged rows and the row stands for nothing.
  */
-function rootBucketOf<R>(row: R, read: RowReader<R>, data: CallRow): CallRow | null {
+function rootBucketOf<R>(row: R, read: RowReader<R>, data: RowData): RowData | null {
   let node = data;
   for (let parent = read.parentOf(row); parent; parent = read.parentOf(parent)) {
     const parentData = rowCallData(parent, read);
@@ -78,7 +78,7 @@ const NOTHING_DERIVED: DerivedRow = { calls: NO_CALLS, frames: [] };
 
 /** Held per row: a pointer sweep re-enters rows and the click that follows a
  *  hover asks again, but deriving reads every occurrence the root bucket holds. */
-const derivedRows = new WeakMap<CallRow, DerivedRow>();
+const derivedRows = new WeakMap<RowData, DerivedRow>();
 
 /**
  * The root bucket's calls whose own chain runs through the row, and the frames
@@ -93,7 +93,7 @@ const derivedRows = new WeakMap<CallRow, DerivedRow>();
 function derivedRowOf<R>(
   row: R,
   read: RowReader<R>,
-  data: CallRow,
+  data: RowData,
   root: ApexLog | null,
 ): DerivedRow {
   const cached = derivedRows.get(data);
