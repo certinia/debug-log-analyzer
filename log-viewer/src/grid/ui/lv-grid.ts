@@ -308,7 +308,6 @@ export class LvGrid<R extends object = object> extends LitElement {
       this.view?.setFind(found);
       return;
     }
-    await this.updateComplete;
     const index = (await this.store?.reveal(found.result.pathOf(match))) ?? -1;
     await this.updateComplete;
     if (index >= 0) {
