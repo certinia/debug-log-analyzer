@@ -399,6 +399,31 @@ describe('CallTreeDetail scoped build', () => {
     expect([...gridOf(el, 'bottom-up').marked]).toEqual([-3]);
   });
 
+  it('moves the marks to the rows of the view switched to', async () => {
+    const { log, pathId } = samePathLog();
+    const merged = [
+      { ...frameRow(-3), eventIndexes: [8, 12], _pathId: pathId },
+    ] as unknown as ScopedRow[];
+    build.mockResolvedValue({
+      ...tree(5000, [frameRow(8)]),
+      bottomUp: () => Promise.resolve(merged),
+    });
+    const el = await mount(5);
+    el.logStore = { log } as unknown as LogStore;
+    await frame(el);
+    eventBus.emit('detail:locate', { source: 'timeline', eventIndexes: [8] });
+    await el.updateComplete;
+    expect([...gridOf(el).marked]).toEqual([8]);
+
+    el.shadowRoot
+      ?.querySelector('view-mode-switch')
+      ?.dispatchEvent(new CustomEvent('view-mode-change', { detail: { value: 'bottom-up' } }));
+    await frame(el);
+
+    expect([...gridOf(el).marked]).toEqual([]);
+    expect([...gridOf(el, 'bottom-up').marked]).toEqual([-3]);
+  });
+
   it('leaves a frame the scope does not hold unmarked, path or no path', async () => {
     // The scoped views hold only the selection's own calls, but a merged row is
     // named by its bucket path — which a second call of the same method

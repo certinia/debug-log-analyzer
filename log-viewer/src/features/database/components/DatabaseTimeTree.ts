@@ -100,6 +100,7 @@ export class DatabaseTime extends LitElement {
 
   private readonly _inspector = new InspectorGridController<DatabaseTreeRow>(this, {
     grid: () => this._grid.value ?? null,
+    source: () => this._source,
     frames: (row) => row.eventIndexes,
     // A frame or a merged row has no one statement to reveal, so its pick holds a mark on all of them.
     pick: (row) => {
@@ -180,7 +181,6 @@ export class DatabaseTime extends LitElement {
   private _setRows(rows: readonly DatabaseTreeRow[]): void {
     this._rowsByEvent = null;
     this._source = { roots: rows, children: (row) => row._children, key: (row) => row.id };
-    this._inspector.remark();
   }
 }
 

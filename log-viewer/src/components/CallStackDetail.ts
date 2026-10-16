@@ -46,6 +46,7 @@ export class CallStackDetail extends LitElement {
 
   private readonly _inspector = new InspectorGridController<CallStackRow>(this, {
     grid: () => this._grid.value ?? null,
+    source: () => this._source,
     frames: (row) => [row.eventIndex],
     // Selecting a frame makes it the active one and reveals it in the tab on
     // screen; the inspector adds the source, since only it knows which tab that is.
@@ -75,7 +76,6 @@ export class CallStackDetail extends LitElement {
       this._columns = callStackColumns(rootTotal);
       this._frames = new Set(rows.map((row) => row.eventIndex));
       this._source = { roots: rows, key: (row) => row.eventIndex };
-      this._inspector.remark();
     }
   }
 

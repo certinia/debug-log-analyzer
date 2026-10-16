@@ -19,6 +19,8 @@ import { PANEL_ROW_MENU_ITEMS, runPanelRowAction } from '../panelRowMenu.js';
 
 export interface InspectorGridOptions<R extends object> {
   grid: () => LvGrid<R> | null;
+  /** The rows on screen; a new one marks the rows again. */
+  source: () => unknown;
   /** The frames a row stands for, which hovering it marks in the tab on screen. */
   frames: (row: R) => readonly number[];
   /** What picking a row does: reveal its frame, or hold a mark on the frames it merges. */
@@ -59,6 +61,7 @@ export class InspectorGridController<R extends object> implements ReactiveContro
   private readonly _options: InspectorGridOptions<R>;
   private _located: readonly number[] = [];
   private _menuFrame = -1;
+  private _source: unknown = null;
 
   constructor(host: LitElement, options: InspectorGridOptions<R>) {
     this._host = host;
@@ -69,7 +72,7 @@ export class InspectorGridController<R extends object> implements ReactiveContro
         // The tab reports the same list again each time the pointer leaves one of its rows.
         if (eventIndexes !== this._located) {
           this._located = eventIndexes;
-          this.remark();
+          this._remark();
         }
       }),
       ...(options.dropOnClear ? [eventBus.on('selection:clear', () => this._dropPick())] : []),
@@ -79,14 +82,21 @@ export class InspectorGridController<R extends object> implements ReactiveContro
     ]);
   }
 
+  hostUpdate(): void {
+    const source = this._options.source();
+    if (source !== this._source) {
+      this._source = source;
+      this._remark();
+    }
+  }
+
   hostDisconnected(): void {
     // Reports stop while detached, so the last one is out of date.
     this._located = [];
     this._setMarked(NOTHING_MARKED);
   }
 
-  /** Marks the rows for the frames last located again, as when the rows change. */
-  remark(): void {
+  private _remark(): void {
     const keys = this._located.length ? new Set(this._options.keysFor(this._located)) : null;
     this._setMarked(keys?.size ? keys : NOTHING_MARKED);
   }

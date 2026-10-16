@@ -180,6 +180,7 @@ export class CallTreeDetail extends LitElement {
 
   private readonly _inspector = new InspectorGridController<ScopedRow>(this, {
     grid: () => this._grids[this.viewMode].value ?? null,
+    source: () => this._slots[this.viewMode]?.source,
     frames: frameEventIndexes,
     pick: (row) => this._pick(row),
     // A merged row's `originalData` is its first occurrence, so the action lands there.
@@ -241,10 +242,6 @@ export class CallTreeDetail extends LitElement {
       changed.has('instances');
     if (scopeChanged) {
       this._invalidateScope();
-    }
-    if (changed.has('viewMode')) {
-      // The marked rows belong to the mode being left.
-      this._inspector.remark();
     }
     if (scopeChanged || changed.has('viewMode')) {
       void this._showActive();
@@ -547,7 +544,6 @@ export class CallTreeDetail extends LitElement {
       this._followWindow();
       // The active frame may have moved while another view was on screen.
       this._selectActive();
-      this._inspector.remark();
       return;
     }
 
@@ -576,7 +572,6 @@ export class CallTreeDetail extends LitElement {
     this._followWindow();
     await this.updateComplete;
     this._selectActive();
-    this._inspector.remark();
   }
 
   private _newSlot(mode: ViewMode, logTotal: number): GridSlot {
