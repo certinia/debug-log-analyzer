@@ -44,6 +44,8 @@ export interface GridSelectDetail<R> {
   /** The selected data row; null for a group row or no selection. */
   row: R | null;
   target: RowTarget<R> | null;
+  /** True when a click or a key made it; false for {@link LvGrid.goTo} and {@link LvGrid.deselect}. */
+  user: boolean;
 }
 
 export interface GridRowDetail<R> {
@@ -182,6 +184,8 @@ export class LvGrid<R extends object = object> extends LitElement {
   private shownColumns: { from: readonly GridColumn<R>[]; shown: GridColumn<R>[] } | null = null;
   private sortedBy: { sort: unknown; calc: unknown; dir: SortDirection } | null = null;
   private selected: RowTarget<R> | null = null;
+  /** Counts selections and goTo calls, so a goTo can tell one was made while it waited. */
+  private selections = 0;
   /** Where the selection was last seen, to skip a search of every row. */
   private selectedAt = -1;
   private hovered = -1;
@@ -230,13 +234,16 @@ export class LvGrid<R extends object = object> extends LitElement {
 
   /**
    * Opens each ancestor on `path` (keys from the root down), then scrolls the row to the
-   * middle and selects it. False when no row on the path is shown. With `scrollIfVisible`
-   * false, a row already in view whole stays where it is.
+   * middle and selects it. False when no row on the path is shown, or when a selection made
+   * while the path opens, by a newer `goTo`, {@link deselect}, a click or a key, wins. Finds
+   * rows of a `source` set earlier in the same turn. With `scrollIfVisible` false, a row
+   * already in view whole stays where it is.
    */
   async goTo(
     path: readonly RowKey[],
     { scrollIfVisible = true }: { scrollIfVisible?: boolean } = {},
   ): Promise<boolean> {
+    const selection = ++this.selections;
     // A source set in the same turn reaches the store only in this element's update.
     await this.updateComplete;
     const index = (await this.store?.reveal(path)) ?? -1;
@@ -244,6 +251,9 @@ export class LvGrid<R extends object = object> extends LitElement {
       return false;
     }
     await this.updateComplete;
+    if (selection !== this.selections) {
+      return false;
+    }
     this.bringIntoView(index, scrollIfVisible);
     this.select(this.targetAt(index), index);
     return true;
@@ -669,7 +679,8 @@ export class LvGrid<R extends object = object> extends LitElement {
     return this.selectedAt;
   }
 
-  private select(target: RowTarget<R> | null, index = -1): void {
+  private select(target: RowTarget<R> | null, index = -1, user = false): void {
+    this.selections++;
     this.selected = target;
     this.selectedAt = index;
     this.view?.repaint();
@@ -677,6 +688,7 @@ export class LvGrid<R extends object = object> extends LitElement {
     this.emit<GridSelectDetail<R>>('lv-grid-select', {
       row: entry !== undefined && !(entry instanceof Group) ? entry : null,
       target,
+      user,
     });
   }
 
@@ -766,9 +778,9 @@ export class LvGrid<R extends object = object> extends LitElement {
       // A drag that selected text is a copy in the making, not a click on a row.
       return;
     } else if (sameTarget(this.selected, target)) {
-      this.select(null);
+      this.select(null, -1, true);
     } else {
-      this.select(target, index);
+      this.select(target, index, true);
     }
     this.scrollerRef.value?.focus({ preventScroll: true });
   };
@@ -792,14 +804,14 @@ export class LvGrid<R extends object = object> extends LitElement {
     if (at < 0) {
       if (rows.size > 0 && key !== 'left' && key !== 'right') {
         const index = key === 'up' || key === 'end' ? rows.size - 1 : 0;
-        this.select(this.targetAt(index), index);
+        this.select(this.targetAt(index), index, true);
         this.view?.scrollToIndex(index, 'auto');
       }
       return;
     }
     const intent = navigate(rows, at, key);
     if (intent?.kind === 'select') {
-      this.select(this.targetAt(intent.index), intent.index);
+      this.select(this.targetAt(intent.index), intent.index, true);
       this.view?.scrollToIndex(intent.index, 'auto');
     } else if (intent) {
       void this.toggleAt(intent.index, intent.kind === 'expand');

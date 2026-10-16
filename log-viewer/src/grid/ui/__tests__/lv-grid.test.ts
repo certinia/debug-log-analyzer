@@ -394,6 +394,48 @@ describe('lv-grid', () => {
     expect(rowNamed('z')?.ariaSelected).toBe('true');
   });
 
+  it('says which selections the user made', async () => {
+    const { grid, rowNamed, key } = await setup();
+    const users: boolean[] = [];
+    grid.addEventListener('lv-grid-select', (e) =>
+      users.push(detail<GridSelectDetail<Node>>(e).user),
+    );
+
+    await grid.goTo([3]);
+    rowNamed('a')?.querySelector<HTMLElement>('.cell')?.click();
+    await key('ArrowDown');
+    grid.deselect();
+
+    expect(users).toEqual([false, true, true, false]);
+  });
+
+  it.each([
+    ['a deselect', (grid: LvGrid<Node>) => void grid.deselect()],
+    ['a newer goTo', (grid: LvGrid<Node>) => void grid.goTo([1])],
+  ])('gives way to %s made while it opens the path', async (_, other) => {
+    const { grid, rowNamed } = await setup();
+    rowNamed('c')?.querySelector<HTMLElement>('.cell')?.click();
+    await settle(grid);
+
+    const stale = grid.goTo([2, 22]);
+    other(grid);
+
+    expect(await stale).toBe(false);
+    await settle(grid);
+    expect(rowNamed('b2')?.ariaSelected).not.toBe('true');
+  });
+
+  it('gives way to a click made while it opens the path', async () => {
+    const { grid, rowNamed } = await setup();
+
+    const stale = grid.goTo([2, 22]);
+    rowNamed('a')?.querySelector<HTMLElement>('.cell')?.click();
+
+    expect(await stale).toBe(false);
+    await settle(grid);
+    expect(rowNamed('a')?.ariaSelected).toBe('true');
+  });
+
   it('keeps the scroll for a row in view whole, when asked to', async () => {
     const { grid } = await setup();
     const last = fakeRowBoxes(ROW, 2);
