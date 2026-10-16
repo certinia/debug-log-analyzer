@@ -73,6 +73,9 @@ export class InspectorGridController<R extends object> implements ReactiveContro
         }
       }),
       ...(options.dropOnClear ? [eventBus.on('selection:clear', () => this._dropPick())] : []),
+      listen(host.renderRoot, 'lv-grid-select', this._onSelect),
+      listen(host.renderRoot, 'lv-grid-locate', this._onLocate),
+      listen(host.renderRoot, 'lv-grid-context', this._onContext),
     ]);
   }
 
@@ -106,18 +109,18 @@ export class InspectorGridController<R extends object> implements ReactiveContro
     ></context-menu>`;
   }
 
-  readonly onSelect = (e: CustomEvent<GridSelectDetail<R>>): void => {
+  private readonly _onSelect = (e: CustomEvent<GridSelectDetail<R>>): void => {
     if (e.detail.user) {
       this._options.pick(e.detail.row);
     }
   };
 
-  readonly onLocate = (e: CustomEvent<GridRowDetail<R>>): void => {
+  private readonly _onLocate = (e: CustomEvent<GridRowDetail<R>>): void => {
     const { row } = e.detail;
     dispatchInspectorLocate(this._host, row ? this._options.frames(row) : []);
   };
 
-  readonly onContext = (e: CustomEvent<GridContextDetail<R>>): void => {
+  private readonly _onContext = (e: CustomEvent<GridContextDetail<R>>): void => {
     const { row, event } = e.detail;
     const menu = this._host.renderRoot.querySelector<ContextMenu>('context-menu');
     if (!row || !menu || window.getSelection()?.type === 'Range') {
@@ -154,4 +157,14 @@ function sameKeys(a: ReadonlySet<RowKey>, b: ReadonlySet<RowKey>): boolean {
     }
   }
   return true;
+}
+
+function listen<D>(
+  target: EventTarget,
+  type: string,
+  handler: (e: CustomEvent<D>) => void,
+): () => void {
+  const listener = (e: Event) => handler(e as CustomEvent<D>);
+  target.addEventListener(type, listener);
+  return () => target.removeEventListener(type, listener);
 }

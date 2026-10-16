@@ -96,9 +96,6 @@ export class CallStackDetail extends LitElement {
         .source=${this._source}
         .columns=${this._columns}
         .marked=${this._inspector.marked}
-        @lv-grid-select=${this._inspector.onSelect}
-        @lv-grid-locate=${this._inspector.onLocate}
-        @lv-grid-context=${this._inspector.onContext}
       ></lv-app-grid>
       ${this._inspector.menu()}`;
   }

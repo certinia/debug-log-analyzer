@@ -292,9 +292,6 @@ export class CallTreeDetail extends LitElement {
       .sort=${MODE_SORT[mode]}
       .expanded=${onPath}
       .marked=${shown ? this._inspector.marked : NOTHING_MARKED}
-      @lv-grid-select=${this._inspector.onSelect}
-      @lv-grid-locate=${this._inspector.onLocate}
-      @lv-grid-context=${this._inspector.onContext}
       @lv-grid-expand=${() => this._prepareWaiting(mode)}
     ></lv-app-grid>`;
   }
