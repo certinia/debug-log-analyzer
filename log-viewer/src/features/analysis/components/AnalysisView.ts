@@ -17,7 +17,7 @@ import { InspectorTabController } from '../../../components/InspectorTabControll
 import { revealFirstOf } from '../../../components/inspectorTab.js';
 import { SelectionEchoGuard } from '../../../core/events/SelectionEchoGuard.js';
 import { SubscriptionController } from '../../../core/events/SubscriptionController.js';
-import { isVisible } from '../../../core/utility/Util.js';
+import { isVisible, setChanged } from '../../../core/utility/Util.js';
 import {
   ColumnSettingsController,
   heldColumnTarget,
@@ -106,7 +106,7 @@ export class AnalysisView extends LitElement {
   private _columns: GridColumn<BottomUpRow>[] = [];
   @state()
   private _groupBy: GroupBy<BottomUpRow> | null = null;
-  @state()
+  @state({ hasChanged: setChanged })
   private _marked: ReadonlySet<RowKey> = new Set();
   @state()
   private _colorize = false;
@@ -165,11 +165,7 @@ export class AnalysisView extends LitElement {
    */
   private _markLocated(eventIndexes: readonly number[]): void {
     const pathIds = this._locateIds.idsFor(this.timelineRoot, eventIndexes, 'callers');
-    const marked = this._tree?.marked(pathIds) ?? new Set<RowKey>();
-    // A new set repaints the rows, and most pointer moves leave the mark as it was.
-    if (marked.size !== this._marked.size || [...marked].some((id) => !this._marked.has(id))) {
-      this._marked = marked;
-    }
+    this._marked = this._tree?.marked(pathIds) ?? new Set();
   }
 
   /**
