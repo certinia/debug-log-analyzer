@@ -201,6 +201,15 @@ describe('GridView', () => {
     expect(scroller.scrollHeight).toBe(997 * ROW + (ROW + 4 * LINE) + 2 * (ROW + 2 * LINE));
   });
 
+  it('reads no line height, and paints once, for rows with no lines', async () => {
+    const lineHeight = jest.fn(() => 12);
+    const { painted } = await setup(1000, undefined, lineHeight);
+    const first = painted.length;
+    await flush();
+    expect(lineHeight).not.toHaveBeenCalled();
+    expect(painted.length).toBe(first);
+  });
+
   it('takes a 1-line row height from the rows it measures', async () => {
     heightOf = () => 16;
     const { scroller } = await setup(1000, () => 1);

@@ -497,7 +497,7 @@ export class GridView<R extends object> {
    */
   private learn(index: number, size: number): boolean {
     let changed = false;
-    if (Number.isNaN(this.line)) {
+    if (this.options.lines && Number.isNaN(this.line)) {
       this.line = this.options.lineHeight?.() ?? 0;
       // Until now a further line was taken as a row's height.
       changed = this.line > 0 && this.line !== this.base;
