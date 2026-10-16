@@ -105,6 +105,10 @@ describe('CallStackDetail', () => {
     expect(footer(grid, 'duration.self')).toBe(100);
   });
 
+  it('names the grid for a screen reader', async () => {
+    expect(gridOf(await mount(9)).label).toBe('Call stack');
+  });
+
   it('asks the inspector to reveal the frame the selection landed on', async () => {
     const el = await mount(9);
     const row = gridOf(el).source!.roots[1];

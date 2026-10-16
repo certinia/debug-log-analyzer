@@ -148,6 +148,10 @@ describe('database-time', () => {
     expect([...grid().marked]).toEqual([roots()[1]?.id]);
   });
 
+  it('names the grid for a screen reader', () => {
+    expect(grid().label).toBe('Database call tree');
+  });
+
   it('reveals a picked statement, and holds a mark on every occurrence of a merged one', () => {
     const query = roots()[0]?._children?.[0];
     const merged = roots()[1];

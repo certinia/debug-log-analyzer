@@ -91,6 +91,7 @@ export class CallStackDetail extends LitElement {
   render() {
     return html`<lv-app-grid
         ${ref(this._grid)}
+        .label=${'Call stack'}
         .placeholder=${'No call stack available'}
         .source=${this._source}
         .columns=${this._columns}

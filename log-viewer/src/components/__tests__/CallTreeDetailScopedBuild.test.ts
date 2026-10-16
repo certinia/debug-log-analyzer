@@ -428,6 +428,17 @@ describe('CallTreeDetail scoped build', () => {
     expect([...grid.marked]).toEqual([-3]);
   });
 
+  it('names each grid by its view for a screen reader', async () => {
+    build.mockResolvedValue(tree(5000, [frameRow(5)]));
+    const el = await mount(5);
+
+    expect(MODES.map((mode) => gridOf(el, mode).label)).toEqual([
+      'Call tree, Time Order',
+      'Call tree, Aggregated',
+      'Call tree, Bottom-Up',
+    ]);
+  });
+
   it('names the picked bottom-up row, so one caller depth reads apart from the next', async () => {
     // A seed row and the two caller depths above it, which hold the same call.
     const a = { ...frameRow(-3), text: 'A', eventIndexes: [8] };
