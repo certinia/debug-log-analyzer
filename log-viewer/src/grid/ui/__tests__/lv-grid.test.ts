@@ -367,6 +367,25 @@ describe('lv-grid', () => {
     expect(root.getElementById(active() ?? '')).toBe(rowNamed('r99'));
   });
 
+  it('looks for a hidden selected row once, not on every draw and key', async () => {
+    const plain = source();
+    const key = jest.fn(plain.key);
+    const { grid, scroller, key: press } = await setup({ source: { ...plain, key } });
+    await press('ArrowDown');
+    await press('ArrowDown');
+    await press('ArrowRight');
+    await press('ArrowDown');
+    grid.filters = [{ test: (row: Node) => row.name !== 'b1' }];
+    await settle(grid);
+    expect(scroller?.getAttribute('aria-activedescendant')).toBeNull();
+    key.mockClear();
+    await press('ArrowRight');
+    await press('ArrowRight');
+    scroller?.dispatchEvent(new Event('scroll'));
+    await settle(grid);
+    expect(key).not.toHaveBeenCalled();
+  });
+
   it('follows the link of a row on Enter, and opens a row with none', async () => {
     const clicks: string[] = [];
     const linked = columns().map((column) =>
