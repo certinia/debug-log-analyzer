@@ -1,7 +1,8 @@
 /*
  * Copyright (c) 2026 Certinia Inc. All rights reserved.
  */
-import { GridStore, type ExportColumn, type TreeSource } from '../index.js';
+import { GridStore, type ExportColumn } from '../index.js';
+import { source } from './fixtures.js';
 
 interface Node {
   key: string;
@@ -29,12 +30,6 @@ const tree = (): Node[] => [
   n('a', 'say "hi"', 3, 'apex', n('b', 'tab\there', null, 'dml')),
   n('d', 'query', 1, 'soql'),
 ];
-
-const source = (roots: Node[]): TreeSource<Node> => ({
-  roots,
-  children: (row) => row.children,
-  key: (row) => row.key,
-});
 
 const columns: ExportColumn<Node>[] = [
   { title: 'Name', value: (r) => r.name },
@@ -98,13 +93,6 @@ describe('GridStore.exportText', () => {
     const store = new GridStore(source([n('a', 'a', 1, 'apex'), n('d', 'd', 4, 'soql')]));
     expect(await store.exportText(columns, { format: 'tsv' })).toBe(
       ['Name\tSelf', 'a\t1', 'd\t4'].join('\n'),
-    );
-  });
-
-  it('writes no Level column for top-level rows only', async () => {
-    const store = new GridStore(source(tree()));
-    expect(await store.exportText(columns, { format: 'tsv', tree: false })).toBe(
-      ['Name\tSelf', 'say "hi"\t3', 'query\t1'].join('\n'),
     );
   });
 

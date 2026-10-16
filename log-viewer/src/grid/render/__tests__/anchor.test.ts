@@ -1,8 +1,9 @@
 /*
  * Copyright (c) 2026 Certinia Inc. All rights reserved.
  */
-import { Group, GridStore, type RowView, type TreeSource } from '../../core/index.js';
+import { GridStore } from '../../core/index.js';
 import { capture, restore, type ShownRow } from '../anchor.js';
+import { groupOf, rowsOf, source } from '../../core/__tests__/fixtures.js';
 
 interface Node {
   key: string;
@@ -26,12 +27,6 @@ const tree = (): Node[] =>
       : n(`r${i}`, i, i % 2 ? 'odd' : 'even'),
   );
 
-const source = (roots: Node[]): TreeSource<Node> => ({
-  roots,
-  children: (row) => row.children,
-  key: (row) => row.key,
-});
-
 const ROW = 20;
 
 /** Rows `from`..`to` on screen, each ROW high, the first `scrolled` px above the viewport. */
@@ -47,11 +42,6 @@ const viewport = (scrollTop: number, maxScrollTop = 1000, height = 100) => ({
   maxScrollTop,
   height,
 });
-
-async function rowsOf(store: GridStore<Node>): Promise<RowView<Node>> {
-  await store.settled();
-  return store.snapshot().rows;
-}
 
 describe('anchoring', () => {
   it('sort or filter: keeps the middle row at its place', async () => {
@@ -125,10 +115,8 @@ describe('anchoring', () => {
 
   it('a row in a group: its group takes its place when the group closes', async () => {
     const store = new GridStore(source(tree()), { groupBy: (r) => r.kind });
-    const even = (await rowsOf(store)).rowAt(0);
-    if (!(even instanceof Group)) {
-      throw new Error('not grouped');
-    }
+    await store.settled();
+    const even = groupOf(store, 'even');
     await store.toggle(even);
     // [even]+ r0 r2 r4 r6 r8 [odd]-: from index 2, r6 spans the middle.
     const rows = store.snapshot().rows;

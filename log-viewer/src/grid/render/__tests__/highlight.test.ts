@@ -5,24 +5,12 @@
  * Copyright (c) 2026 Certinia Inc. All rights reserved.
  */
 import { FIND_ATTR, FIND_TEXT_ATTR, FindHighlighter } from '../highlight.js';
+import { fakeHighlights } from './fakes.js';
 
-// jsdom has no CSS Highlight API.
-class FakeHighlight extends Set<Range> {
-  priority = 0;
-}
-const registry = new Map<string, FakeHighlight>();
-const globals = globalThis as { Highlight?: unknown; CSS?: unknown };
-const real = { Highlight: globals.Highlight, CSS: globals.CSS };
+const highlights = fakeHighlights();
+const { registry, marks: texts } = highlights;
 
-beforeAll(() => {
-  globals.Highlight = FakeHighlight;
-  globals.CSS = { highlights: registry };
-});
-
-afterAll(() => {
-  globals.Highlight = real.Highlight;
-  globals.CSS = real.CSS;
-});
+afterAll(() => highlights.restore());
 
 function row(...cells: string[]): HTMLElement {
   const el = document.createElement('div');
@@ -34,8 +22,6 @@ function row(...cells: string[]): HTMLElement {
   }
   return el;
 }
-
-const texts = (name: string): string[] => [...(registry.get(name) ?? [])].map(String);
 
 describe('FindHighlighter', () => {
   it('lays the current match over a layer of its own, as the editor lays it over the selection', () => {

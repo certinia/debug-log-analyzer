@@ -1,7 +1,8 @@
 /*
  * Copyright (c) 2026 Certinia Inc. All rights reserved.
  */
-import { Group, GridStore, navigate, type TreeSource } from '../index.js';
+import { GridStore, navigate } from '../index.js';
+import { groupOf, rowsOf as settledRows, source } from './fixtures.js';
 
 interface Node {
   key: string;
@@ -18,17 +19,8 @@ const n = (key: string, kind: string, ...children: Node[]): Node => ({
 /** a ─ b ─ c, then d; every row open. Shown: a@0 b@1 c@2 d@0 */
 const tree = (): Node[] => [n('a', 'x', n('b', 'x', n('c', 'x'))), n('d', 'y')];
 
-const source = (roots: Node[]): TreeSource<Node> => ({
-  roots,
-  children: (row) => row.children,
-  key: (row) => row.key,
-});
-
-async function rowsOf(options: ConstructorParameters<typeof GridStore<Node>>[1] = {}) {
-  const store = new GridStore(source(tree()), { expanded: true, ...options });
-  await store.settled();
-  return store.snapshot().rows;
-}
+const rowsOf = (options: ConstructorParameters<typeof GridStore<Node>>[1] = {}) =>
+  settledRows(new GridStore(source(tree()), { expanded: true, ...options }));
 
 describe('navigate', () => {
   it('moves the selection down and up, and stops at either end', async () => {
@@ -63,11 +55,7 @@ describe('navigate', () => {
   it('treats a group row as the parent of its rows', async () => {
     const store = new GridStore(source(tree()), { groupBy: (r) => r.kind });
     await store.settled();
-    const first = store.snapshot().rows.rowAt(0);
-    if (!(first instanceof Group)) {
-      throw new Error('not grouped');
-    }
-    await store.toggle(first);
+    await store.toggle(groupOf(store, 'x'));
     const rows = store.snapshot().rows;
     // [x]+ a- [y]-
     expect(navigate(rows, 1, 'left')).toEqual({ kind: 'select', index: 0 });

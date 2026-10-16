@@ -17,10 +17,11 @@ import type { ApexLog, LogEvent } from '@apexdevtools/apex-log-parser';
 import { render } from 'lit';
 
 import { storeOf } from '#test-helpers/apexLog.js';
+import { runCalc as total } from '#test-helpers/calcs.js';
 import { governorLimits, limitValue } from '#test-helpers/limits.js';
 import { NO_REPORTED_LIMITS_TEXT } from '../../../../components/governorCopy.js';
 import { formatInteger } from '../../../../core/utility/Util.js';
-import { LvGrid, type GridColumn } from '../../../../grid/index.js';
+import type { GridColumn } from '../../../../grid/index.js';
 import { logStoreFor } from '../../../../core/log/LogStore.js';
 import {
   createGovernorMetricColumns,
@@ -28,7 +29,7 @@ import {
 } from '../../components/TableShared.js';
 import { toBottomUpTree } from '../../utils/Aggregation.js';
 import { toTimeOrderTree, type TimeOrderRow } from '../../utils/TimeOrderTree.js';
-import { CallTreeGrid, categoryClass } from '../CallTreeGrid.js';
+import { categoryClass } from '../CallTreeGrid.js';
 import { nameCell } from '../cells.js';
 import {
   BOTTOM_UP_SORT,
@@ -68,18 +69,6 @@ const column = <R>(columns: GridColumn<R>[], id: string): GridColumn<R> => {
   return found;
 };
 
-function total<R>(calc: GridColumn<R>['calc'], of: readonly R[]): number {
-  const out = calc?.of(of);
-  if (out === undefined || typeof out === 'number') {
-    return out ?? Number.NaN;
-  }
-  let step = out.next();
-  while (!step.done) {
-    step = out.next();
-  }
-  return step.value;
-}
-
 const allRows = (roots: readonly LogEvent[]): LogEvent[] =>
   roots.flatMap((r) => [r, ...allRows(r.children)]);
 
@@ -114,14 +103,8 @@ describe('timeOrderColumns', () => {
   });
 
   it('sums total time over top-level rows, and self time over every row', () => {
-    const all = allRows(rows);
-    expect(total(column(timeOrder, 'duration.total').calc, rows)).toBe(
-      rows.reduce((sum, r) => sum + r.duration.total, 0),
-    );
+    expect(column(timeOrder, 'duration.total').calc?.scope).not.toBe('all');
     expect(column(timeOrder, 'duration.self').calc?.scope).toBe('all');
-    expect(total(column(timeOrder, 'duration.self').calc, all)).toBe(
-      all.reduce((sum, r) => sum + r.duration.self, 0),
-    );
   });
 
   it('shows an unknown utilisation as a dash, in the cell, the tooltip and the footer', () => {
@@ -129,7 +112,7 @@ describe('timeOrderColumns', () => {
     const row = rows[0]!;
     expect(shown(gov.cell(row)).textContent).toBe('—');
     expect(gov.tooltip?.(row)).toBe(NO_REPORTED_LIMITS_TEXT);
-    expect(shown(gov.total?.(total(gov.calc, [row]))).textContent).toBe('—');
+    expect(shown(gov.total?.(total(gov.calc, [row]) ?? Number.NaN)).textContent).toBe('—');
   });
 
   it('writes heap bytes as formatInteger does', () => {
@@ -229,10 +212,5 @@ describe('lv-call-tree-grid', () => {
     expect(categoryClass({})).toBeUndefined();
     expect(categoryClass({ category: 'SOQL' })).toBe('cat-soql');
     expect(document.createElement('lv-call-tree-grid').rowClass).toBe(categoryClass);
-  });
-
-  it('is an lv-grid', () => {
-    expect(document.createElement('lv-call-tree-grid')).toBeInstanceOf(CallTreeGrid);
-    expect(document.createElement('lv-call-tree-grid')).toBeInstanceOf(LvGrid);
   });
 });

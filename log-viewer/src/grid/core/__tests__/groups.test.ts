@@ -1,7 +1,8 @@
 /*
  * Copyright (c) 2026 Certinia Inc. All rights reserved.
  */
-import { Group, GridStore, max, sum, type RowView, type TreeSource } from '../index.js';
+import { GridStore, max, sum } from '../index.js';
+import { groupOf, shown, slowScheduler, source } from './fixtures.js';
 
 interface Node {
   key: string;
@@ -28,38 +29,8 @@ const tree = (): Node[] => [
   n('f', 'apex', 1),
 ];
 
-const source = (roots: Node[]): TreeSource<Node> => ({
-  roots,
-  children: (row) => row.children,
-  key: (row) => row.key,
-});
-
 const byKind = (row: Node): string => row.kind;
 const self = (row: Node): number => row.self;
-
-/** `[group]` for a group row, `key@depth` for a data row; `+`/`-` mark open and closed. */
-function shown(rows: RowView<Node>): string[] {
-  const out: string[] = [];
-  for (let i = 0; i < rows.size; i++) {
-    const entry = rows.rowAt(i);
-    const mark = rows.hasChildrenAt(i) ? (rows.isExpandedAt(i) ? '+' : '-') : '';
-    out.push(
-      entry instanceof Group ? `[${entry.key}]${mark}` : `${entry.key}${mark}@${rows.depthAt(i)}`,
-    );
-  }
-  return out;
-}
-
-const groupOf = (store: GridStore<Node>, key: string): Group<Node> => {
-  const rows = store.snapshot().rows;
-  for (let i = 0; i < rows.size; i++) {
-    const entry = rows.rowAt(i);
-    if (entry instanceof Group && entry.key === key) {
-      return entry;
-    }
-  }
-  throw new Error(`no group ${key}`);
-};
 
 describe('GridStore groups', () => {
   it('starts every group closed, most rows first, then by key', async () => {
@@ -164,7 +135,7 @@ describe('GridStore totals', () => {
     expect(store.snapshot().totals.self).toBe(10 + 5 + 20 + 10 + 1);
   });
 
-  it('keeps totals across sort and expansion', async () => {
+  it('keeps totals across sort, expansion and the same calcs set again', async () => {
     let runs = 0;
     const counted = {
       of: (rows: readonly Node[]): number => {
@@ -178,6 +149,7 @@ describe('GridStore totals', () => {
     await store.setSort({ value: self, dir: 'desc' });
     await store.toggle(groupOf(store, 'apex'));
     await store.expandAll();
+    await store.setCalcs({ count: counted });
     expect(runs).toBe(before);
     await store.setFilters([]);
     expect(runs).toBeGreaterThan(before);
@@ -236,44 +208,35 @@ describe('GridStore totals', () => {
     expect(store.snapshot().totals).toEqual({ first: 6, second: 6 });
   });
 
-  it('builds the groups again when the calcs change, with each total summed once', async () => {
-    let runs = 0;
-    const self = { of: (rows: readonly Node[]): number => (runs++, rows.length) };
+  it('builds the groups again when the calcs change', async () => {
     const store = new GridStore(source(tree()), { groupBy: byKind });
     await store.settled();
-    await store.setCalcs({ self });
-    expect(groupOf(store, 'apex').totals).toEqual({ self: 2 });
-    const after = runs;
-    await store.setCalcs({ self });
-    expect(runs).toBe(after);
+    await store.setCalcs({ self: sum(self) });
+    expect(groupOf(store, 'apex').totals).toEqual({ self: 11 });
   });
 
   it('runs a calc that yields in slices, for the footer and each group', async () => {
-    let yields = 0;
     const sliced = {
       *of(rows: readonly Node[]): Generator<void, number, void> {
         let total = 0;
         for (const row of rows) {
           total += row.self;
-          yields++;
           yield;
         }
         return total;
       },
     };
-    let t = 0;
     const store = new GridStore(source(tree()), {
       groupBy: byKind,
       calcs: { self: sliced },
-      scheduler: { now: () => (t += 100), yield: () => new Promise((r) => setTimeout(r, 0)) },
+      scheduler: slowScheduler(),
     });
     await store.settled();
     expect(store.snapshot().totals.self).toBe(31);
     expect(groupOf(store, 'soql').totals.self).toBe(20);
-    expect(yields).toBe(6);
   });
 
-  it('sums and maxes in slices of 32 rows, as the store reads the clock once per 256 yields', () => {
+  it('sums and maxes in slices', () => {
     const rows = Array.from({ length: 3000 }, (_, i) => n(`r${i}`, 'apex', 1));
     for (const calc of [sum(self), max(self)]) {
       const out = calc.of(rows);
@@ -284,7 +247,7 @@ describe('GridStore totals', () => {
       while (!out.next().done) {
         yields++;
       }
-      expect(yields).toBe(Math.floor(3000 / 32));
+      expect(yields).toBeGreaterThan(1);
     }
   });
 

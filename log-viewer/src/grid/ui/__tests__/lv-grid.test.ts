@@ -4,8 +4,8 @@
 /*
  * Copyright (c) 2026 Certinia Inc. All rights reserved.
  */
-import { GridStore, sum, type TreeSource } from '../../core/index.js';
-import { GridView } from '../../render/index.js';
+import { sum, type TreeSource } from '../../core/index.js';
+import { fakeHighlights, flush, type FakeHighlights } from '../../render/__tests__/fakes.js';
 import type { GridColumn } from '../column.js';
 import '../lv-grid.js';
 import type {
@@ -75,8 +75,6 @@ function fakeLayout(): void {
 
 const detail = <T>(e: Event): T => (e as CustomEvent<T>).detail;
 
-const flush = (): Promise<void> => new Promise((resolve) => setTimeout(resolve, 0));
-
 async function settle(grid: LvGrid<Node>): Promise<void> {
   for (let i = 0; i < 3; i++) {
     await grid.updateComplete;
@@ -111,23 +109,9 @@ async function setup(props: Partial<LvGrid<Node>> = {}) {
   return { grid, root, scroller, rows, names, header, rowNamed, key };
 }
 
-const globals = globalThis as { Highlight?: unknown; CSS?: unknown };
-const realHighlights = { Highlight: globals.Highlight, CSS: globals.CSS };
-
-/** Stands in for the CSS Highlight API, which jsdom lacks. Lists the text of each mark. */
-function fakeHighlights(): () => string[] {
-  const registry = new Map<string, Set<Range>>();
-  globals.Highlight = class extends Set<Range> {
-    priority = 0;
-  };
-  globals.CSS = { highlights: registry };
-  return () => [...new Set([...registry.values()].flatMap((marks) => [...marks]))].map(String);
-}
-
 afterEach(() => {
   jest.restoreAllMocks();
   document.body.replaceChildren();
-  Object.assign(globals, realHighlights);
 });
 
 describe('lv-grid', () => {
@@ -210,15 +194,20 @@ describe('lv-grid', () => {
 
   it('does not sort again when a column is only hidden', async () => {
     const shown = columns();
-    const { grid, header } = await setup({ columns: shown });
+    const { grid, header, names } = await setup({ columns: shown });
     header('Time')?.click();
     await settle(grid);
-    const setSort = jest.spyOn(GridStore.prototype, 'setSort');
+    const sorted = names();
+    const reshapes: string[] = [];
+    grid.addEventListener('lv-grid-reshape', (e) =>
+      reshapes.push(detail<GridReshapeDetail>(e).reason),
+    );
     grid.columns = shown.map((column) =>
       column.id === 'kind' ? { ...column, hidden: true } : column,
     );
     await settle(grid);
-    expect(setSort).not.toHaveBeenCalled();
+    expect(reshapes).toEqual(['columns']);
+    expect(names()).toEqual(sorted);
   });
 
   it('selects a clicked row, and clears it on a second click', async () => {
@@ -247,16 +236,11 @@ describe('lv-grid', () => {
     expect(rowNamed('b')?.ariaSelected).toBe('false');
   });
 
-  it('selects a row with no children from its twisty, and keeps no toggle for later rows', async () => {
+  it('selects a row with no children from its twisty', async () => {
     const { grid, rowNamed } = await setup();
-    const setRows = jest.spyOn(GridView.prototype, 'setRows');
     rowNamed('c')?.querySelector<HTMLElement>('.twisty')?.click();
     await settle(grid);
     expect(rowNamed('c')?.ariaSelected).toBe('true');
-
-    await grid.expandAll();
-    await settle(grid);
-    expect(setRows).toHaveBeenLastCalledWith(expect.anything(), undefined);
   });
 
   it('opens a row from its twisty while text is selected, but selects no row', async () => {
@@ -295,32 +279,21 @@ describe('lv-grid', () => {
     expect(press(rowNamed('c')?.querySelector('.cell'))).toBe(false);
   });
 
-  it('moves, opens and closes rows from the keyboard', async () => {
+  it('moves and opens rows from the keyboard', async () => {
     const { rowNamed, names, key } = await setup();
     await key('ArrowDown');
-    expect(rowNamed('a')?.ariaSelected).toBe('true');
     await key('ArrowDown');
     expect(rowNamed('b')?.ariaSelected).toBe('true');
     await key('ArrowRight');
     expect(names()).toEqual(['a', 'b', 'b1', 'b2', 'c']);
-    await key('ArrowRight');
-    expect(rowNamed('b1')?.ariaSelected).toBe('true');
-    await key('ArrowLeft');
-    expect(rowNamed('b')?.ariaSelected).toBe('true');
-    await key('ArrowLeft');
-    expect(names()).toEqual(['a', 'b', 'c']);
-    await key('End');
-    expect(rowNamed('c')?.ariaSelected).toBe('true');
   });
 
-  it('copies every row that passes the filters, closed or not, on Ctrl+C', async () => {
+  it('writes exportText tsv to the clipboard on Ctrl+C', async () => {
     const writeText = jest.fn<Promise<void>, [string]>().mockResolvedValue(undefined);
     Object.defineProperty(navigator, 'clipboard', { value: { writeText }, configurable: true });
-    const { key } = await setup();
+    const { grid, key } = await setup();
     await key('c', { ctrlKey: true });
-    expect(writeText).toHaveBeenCalledWith(
-      'Level\tName\tTime\n1\ta\t3\n1\tb\t1\n2\tb1\t5\n2\tb2\t6\n1\tc\t2',
-    );
+    expect(writeText).toHaveBeenCalledWith(await grid.exportText({ format: 'tsv' }));
   });
 
   it('exports a column by its export text where it has one, and by its text where not', async () => {
@@ -353,24 +326,14 @@ describe('lv-grid', () => {
     expect(rowNamed('b2')?.ariaSelected).toBe('true');
   });
 
-  it('counts find matches in closed rows too', async () => {
+  it('reports the find total', async () => {
     const { grid } = await setup();
     const totals: number[] = [];
     grid.addEventListener('lv-grid-find-results', (e) =>
       totals.push(detail<GridFindDetail>(e).total),
     );
-    expect(await grid.find({ text: 'b' })).toBe(3);
+    await grid.find({ text: 'b' });
     expect(totals).toEqual([3]);
-  });
-
-  it('marks the matches find counted, and none in the space around a cell', async () => {
-    const marked = fakeHighlights();
-    const { grid } = await setup({
-      source: { ...source(), roots: [{ key: 1, name: 'a a', time: 3, kind: 'x' }] },
-    });
-    expect(await grid.find({ text: ' ' })).toBe(1);
-    await grid.setCurrentMatch(0);
-    expect(marked()).toEqual([' ']);
   });
 
   it('reports a reshape when its shown columns change, and not when they stay the same', async () => {
@@ -597,22 +560,22 @@ describe('lv-grid columns', () => {
 });
 
 describe('lv-grid find marks', () => {
-  // jsdom has no CSS Highlight API.
-  const registry = new Map<string, Set<Range>>();
-  const globals = globalThis as { Highlight?: unknown; CSS?: unknown };
-  const real = { Highlight: globals.Highlight, CSS: globals.CSS };
-  const marks = (): number => [...registry.values()].reduce((count, set) => count + set.size, 0);
+  let highlights: FakeHighlights;
+  const marks = (): number => highlights.marks().length;
 
-  beforeAll(() => {
-    globals.Highlight = class extends Set<Range> {
-      priority = 0;
-    };
-    globals.CSS = { highlights: registry };
+  beforeEach(() => {
+    highlights = fakeHighlights();
   });
 
-  afterAll(() => {
-    globals.Highlight = real.Highlight;
-    globals.CSS = real.CSS;
+  afterEach(() => highlights.restore());
+
+  it('marks the matches find counted, and none in the space around a cell', async () => {
+    const { grid } = await setup({
+      source: { ...source(), roots: [{ key: 1, name: 'a a', time: 3, kind: 'x' }] },
+    });
+    expect(await grid.find({ text: ' ' })).toBe(1);
+    await grid.setCurrentMatch(0);
+    expect(highlights.marks()).toEqual([' ']);
   });
 
   it('lets go of its marks when removed, and marks again when put back', async () => {

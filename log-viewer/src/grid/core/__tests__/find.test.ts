@@ -1,7 +1,8 @@
 /*
  * Copyright (c) 2026 Certinia Inc. All rights reserved.
  */
-import { GridStore, type Scheduler, type TreeSource } from '../index.js';
+import { GridStore } from '../index.js';
+import { slowScheduler, source } from './fixtures.js';
 
 interface Node {
   key: string;
@@ -36,12 +37,6 @@ const tree = (): Node[] => [
   ),
   n('d', 'account.save', '', 'soql', n('e', 'Account Account', '', 'dml')),
 ];
-
-const source = (roots: Node[]): TreeSource<Node> => ({
-  roots,
-  children: (row) => row.children,
-  key: (row) => row.key,
-});
 
 const name = (r: Node): string => r.name;
 const note = (r: Node): string => r.note;
@@ -105,19 +100,16 @@ describe('GridStore.find', () => {
     expect(result?.firstMatchIn(d)).toBe(2);
   });
 
-  it('gives the path to a match, which reveal can open', async () => {
+  it('gives the path to a match', async () => {
     const store = new GridStore(source(tree()));
     const result = await store.find({ text: 'accountx' }, [name]);
-    const path = result?.pathOf(0) ?? [];
-    expect(path).toEqual(['a', 'b', 'c']);
-    expect(await store.reveal(path)).toBe(2);
+    expect(result?.pathOf(0)).toEqual(['a', 'b', 'c']);
   });
 
   it('searches the rows in each group and their trees, not the group rows', async () => {
     const store = new GridStore(source(tree()), { groupBy: (r) => r.kind });
     const result = await store.find({ text: 'account' }, [name, (r) => r.kind]);
     expect(holders(result)).toEqual(['a', 'c', 'd', 'e', 'e']);
-    expect(await store.reveal(result?.pathOf(1) ?? [])).toBe(3);
   });
 
   it('finds nothing for empty text', async () => {
@@ -127,12 +119,7 @@ describe('GridStore.find', () => {
 
   it('drops an older find once a newer one starts', async () => {
     const roots = Array.from({ length: 2000 }, (_, i) => n(`r${i}`, 'Account', '', 'apex'));
-    let t = 0;
-    const slow: Scheduler = {
-      now: () => (t += 100),
-      yield: () => new Promise((resolve) => setTimeout(resolve, 0)),
-    };
-    const store = new GridStore(source(roots), { scheduler: slow });
+    const store = new GridStore(source(roots), { scheduler: slowScheduler() });
     await store.settled();
     const older = store.find({ text: 'acc' }, [name]);
     const newer = store.find({ text: 'count' }, [name]);

@@ -6,6 +6,7 @@
  */
 import { GridStore, type RowView, type TreeSource } from '../../core/index.js';
 import { GridView } from '../view.js';
+import { flush } from './fakes.js';
 
 interface Node {
   key: number;
@@ -69,8 +70,6 @@ function fakeLayout(scroller: HTMLElement): (top: number) => void {
     top = value;
   };
 }
-
-const flush = (): Promise<void> => new Promise((resolve) => setTimeout(resolve, 0));
 
 /**
  * jsdom has no ResizeObserver. Returns a resize that gives the new height to each observer

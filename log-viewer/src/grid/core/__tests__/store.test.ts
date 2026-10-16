@@ -1,8 +1,9 @@
 /*
  * Copyright (c) 2026 Certinia Inc. All rights reserved.
  */
-import { GridStore, type RowView, type Scheduler, type TreeSource } from '../index.js';
+import { GridStore, type Scheduler, type TreeSource } from '../index.js';
 import { sortRows } from '../sort.js';
+import { shown, slowScheduler, source } from './fixtures.js';
 
 interface Node {
   key: string;
@@ -24,32 +25,10 @@ const n = (key: string, value: number, ...children: Node[]): Node => ({
  */
 const tree = (): Node[] => [n('a', 3, n('b', 2, n('c', 1)), n('x', 5)), n('d', 1, n('e', 9))];
 
-const source = (roots: Node[]): TreeSource<Node> => ({
-  roots,
-  children: (row) => row.children,
-  key: (row) => row.key,
-});
-
-/** `key@depth` for each row, with `+` for expanded and `-` for collapsed parents. */
-function shown(rows: RowView<Node>): string[] {
-  const out: string[] = [];
-  for (let i = 0; i < rows.size; i++) {
-    const mark = rows.hasChildrenAt(i) ? (rows.isExpandedAt(i) ? '+' : '-') : '';
-    out.push(`${rows.keyAt(i)}${mark}@${rows.depthAt(i)}`);
-  }
-  return out;
-}
-
 async function ready(store: GridStore<Node>): Promise<string[]> {
   await store.settled();
   return shown(store.snapshot().rows);
 }
-
-/** Yields on every check, so each sliced step takes many turns of the event loop. */
-const everyCheck = (): Scheduler => {
-  let t = 0;
-  return { now: () => (t += 100), yield: () => new Promise((r) => setTimeout(r, 0)) };
-};
 
 describe('GridStore', () => {
   it('shows only the roots of a tree at first', async () => {
@@ -97,7 +76,7 @@ describe('GridStore', () => {
 
   it('opens a subtree too large for one task in slices', async () => {
     const wide = n('root', 0, ...Array.from({ length: 5000 }, (_, i) => n(`c${i}`, i)));
-    const store = new GridStore(source([wide]), { scheduler: everyCheck() });
+    const store = new GridStore(source([wide]), { scheduler: slowScheduler() });
     await store.settled();
     const busy: boolean[] = [];
     store.subscribe((s) => busy.push(s.busy));
@@ -211,7 +190,7 @@ describe('GridStore', () => {
   });
 
   it('gives the same rows when every step is sliced', async () => {
-    const store = new GridStore(source(tree()), { scheduler: everyCheck() });
+    const store = new GridStore(source(tree()), { scheduler: slowScheduler() });
     await store.expandAll();
     await store.setSort({ value: (r) => r.value, dir: 'asc' });
     expect(shown(store.snapshot().rows)).toEqual(['d+@0', 'e@1', 'a+@0', 'b+@1', 'c@2', 'x@1']);
@@ -219,7 +198,7 @@ describe('GridStore', () => {
 
   it('lets the newest change win while a step runs, and resolves every caller', async () => {
     const roots = Array.from({ length: 2000 }, (_, i) => n(`r${i}`, i, n(`c${i}`, i)));
-    const store = new GridStore(source(roots), { scheduler: everyCheck() });
+    const store = new GridStore(source(roots), { scheduler: slowScheduler() });
     await store.settled();
     const expanding = store.expandAll();
     const collapsing = store.collapseAll();
