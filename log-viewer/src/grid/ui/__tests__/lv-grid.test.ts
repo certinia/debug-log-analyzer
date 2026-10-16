@@ -475,7 +475,9 @@ describe('lv-grid', () => {
   });
 
   it('shows an alert in place of its rows while a build throws, and reports the error once', async () => {
-    const { grid, root, names } = await setup();
+    const { grid, root, names, key } = await setup();
+    const selects: unknown[] = [];
+    grid.addEventListener('lv-grid-select', (e) => selects.push(detail<GridSelectDetail<Node>>(e)));
     const errors: GridErrorDetail[] = [];
     grid.addEventListener('lv-grid-error', (e) => {
       e.preventDefault();
@@ -497,6 +499,8 @@ describe('lv-grid', () => {
     );
     expect(root.querySelector<HTMLElement>('.body')?.hidden).toBe(true);
     expect(errors).toEqual([{ error: boom, action: 'build' }]);
+    await key('ArrowDown');
+    expect(selects).toEqual([]);
 
     grid.filters = [];
     await settle(grid);
