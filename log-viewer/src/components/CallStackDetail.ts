@@ -54,7 +54,7 @@ export class CallStackDetail extends LitElement {
         dispatchInspectorReveal(this, row.eventIndex);
       } else {
         // A click on the selected row clears it, but its frame is still the active one.
-        void this._inspector.markActive(
+        void this._inspector.selectActive(
           this.activeEventIndex >= 0 ? [this.activeEventIndex] : null,
         );
       }
@@ -82,7 +82,9 @@ export class CallStackDetail extends LitElement {
   updated(changed: PropertyValues): void {
     // The anchor holds when only the active frame moves, so the rows are unchanged: only the mark moves.
     if (changed.has('eventIndex') || changed.has('activeEventIndex')) {
-      void this._inspector.markActive(this.activeEventIndex >= 0 ? [this.activeEventIndex] : null);
+      void this._inspector.selectActive(
+        this.activeEventIndex >= 0 ? [this.activeEventIndex] : null,
+      );
     }
   }
 

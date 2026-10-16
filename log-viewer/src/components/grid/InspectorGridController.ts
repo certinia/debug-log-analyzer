@@ -89,7 +89,7 @@ export class InspectorGridController<R extends object> implements ReactiveContro
   }
 
   /** Selects the row at `path`, or clears the selection on null, without calling it a pick. */
-  async markActive(path: readonly RowKey[] | null): Promise<void> {
+  async selectActive(path: readonly RowKey[] | null): Promise<void> {
     const grid = this._options.grid();
     if (!path?.length) {
       grid?.deselect();

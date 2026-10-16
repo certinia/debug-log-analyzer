@@ -252,7 +252,7 @@ export class CallTreeDetail extends LitElement {
     }
     if (changed.has('activeEventIndex')) {
       // The anchor holds, so the rows are unchanged — only the mark moves.
-      this._markActive();
+      this._selectActive();
     }
     if (this._live && !sameWindow(this._range.window, this._slots[this.viewMode]?.readAt ?? null)) {
       this._followWindow();
@@ -323,7 +323,7 @@ export class CallTreeDetail extends LitElement {
     });
     if (!row) {
       // A click on the selected row clears it, but the active frame is still the active one.
-      this._markActive();
+      this._selectActive();
     }
   }
 
@@ -436,12 +436,12 @@ export class CallTreeDetail extends LitElement {
   }
 
   /**
-   * Marks the active frame, without reporting it as a new pick. Only rows keyed
+   * Selects the active frame, without reporting it as a new pick. Only rows keyed
    * by event can be selected by index, so a view whose rows merge occurrences
    * keeps the row the user picked: clearing it would take away the row the
    * keyboard moves from.
    */
-  private _markActive(): void {
+  private _selectActive(): void {
     const slot = this._slots['time-order'];
     if (!slot || this.viewMode !== 'time-order' || this._scoped?.timeOrderMerged) {
       return;
@@ -450,7 +450,7 @@ export class CallTreeDetail extends LitElement {
       this.activeEventIndex >= 0
         ? this._timeOrderPath(slot.source.roots, this.activeEventIndex)
         : null;
-    void this._inspector.markActive(path);
+    void this._inspector.selectActive(path);
   }
 
   /** The keys from a top-level row down to `eventIndex`, or null where the rows do not hold it. */
@@ -548,7 +548,7 @@ export class CallTreeDetail extends LitElement {
       // The footer and bar figures are shared, and a read-ahead may have landed while it was hidden.
       this._followWindow();
       // The active frame may have moved while another view was on screen.
-      this._markActive();
+      this._selectActive();
       this._inspector.remark();
       return;
     }
@@ -577,7 +577,7 @@ export class CallTreeDetail extends LitElement {
     this.requestUpdate();
     this._followWindow();
     await this.updateComplete;
-    this._markActive();
+    this._selectActive();
     this._inspector.remark();
   }
 
