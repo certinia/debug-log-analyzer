@@ -10,166 +10,6 @@ import { ROOT_PATH_ID } from '../core/log/keyPathIds.js';
 import { logStoreFor } from '../core/log/LogStore.js';
 import { eventByEventIndex } from '../core/utility/EventSearch.js';
 
-/** Class the marked row carries. Styled once, in `tabulator/style/DataGrid.scss`,
- *  which spells the name out: rename it here and the mark stops painting. */
-export const LOCATED_ROW_CLASS = 'located-row';
-
-/** Attribute holding a row's index, so the mark can find its element. */
-const ROW_INDEX_ATTRIBUTE = 'data-row-index';
-
-/** Nothing wanted, shared so a cleared table costs no allocation. */
-const NOTHING_WANTED: ReadonlySet<string> = new Set();
-
-/**
- * The stamped ids each marked table wants lit.
- *
- * Held per host rather than on the marker so a row can light itself as it enters
- * the DOM. Tabulator builds a row's element on its first render, so a sweep of
- * what is rendered cannot reach a row that has never been on screen: one below
- * the viewport, or a tree child built after the mark was set.
- */
-const wantedByHost = new WeakMap<HTMLElement, ReadonlySet<string>>();
-
-/**
- * What each table's mark has lit.
- *
- * A sweep can only reach the rows a table has attached, and the renderer keeps
- * the element of a row scrolled out of view without running the formatter again
- * when it comes back. So an element lit while on screen has to be remembered to
- * be un-lit, or the old mark returns with it.
- */
-const litByHost = new WeakMap<HTMLElement, Set<HTMLElement>>();
-
-/** Lights `element`, and remembers it as `host`'s until the mark moves. */
-function light(host: HTMLElement, element: HTMLElement): void {
-  element.classList.add(LOCATED_ROW_CLASS);
-  (litByHost.get(host) ?? litByHost.set(host, new Set()).get(host)!).add(element);
-}
-
-/** Drops `host`'s mark from every element it lit, attached or not. */
-function unlight(host: HTMLElement): void {
-  const lit = litByHost.get(host);
-  if (!lit) {
-    return;
-  }
-  for (const element of lit) {
-    element.classList.remove(LOCATED_ROW_CLASS);
-  }
-  lit.clear();
-}
-
-/**
- * The row-holding element each marked table is watched through.
- *
- * Held per host so a table rebuilt into the same container is watched again: the
- * element belongs to the Tabulator instance, not to the container, and several
- * views destroy and rebuild a table in place.
- */
-const watchedByHost = new WeakMap<HTMLElement, { rows: Element; observer: MutationObserver }>();
-
-/**
- * Sweeps `host` again whenever rows enter its table, so a row coming back into
- * view carries the mark as it stands.
- *
- * The renderer re-attaches a row it has already built without running the
- * formatter again, so a row detached before the mark named it is out of reach of
- * both halves: the sweep could not see it and the stamp will not run for it. That
- * happens on a scroll and equally on a structural render, which fires no scroll
- * event at all.
- *
- * Watched is the arrival itself, which is a child of the row-holding element and
- * so cannot be missed. A signal read from the renderer's own bookkeeping can be:
- * a scroll fires no event on a sort, and the virtual spacers are written with the
- * value they already hold whenever the window does not move, which reports
- * nothing at all.
- */
-function watchRenders(host: HTMLElement): void {
-  const watching = watchedByHost.get(host);
-  const rows = host.querySelector('.tabulator-table');
-  if (watching?.rows === rows) {
-    return;
-  }
-  watching?.observer.disconnect();
-  if (!rows) {
-    watchedByHost.delete(host);
-    return;
-  }
-  const observer = new MutationObserver(() => {
-    const wanted = wantedByHost.get(host);
-    if (wanted?.size) {
-      // Only ever touches a class, so it cannot report itself back here.
-      sweep(host, wanted);
-    }
-  });
-  observer.observe(rows, { childList: true });
-  watchedByHost.set(host, { rows, observer });
-}
-
-/** Lights the rows a table has rendered that `wanted` names. */
-function sweep(host: HTMLElement, wanted: ReadonlySet<string>): void {
-  for (const element of host.querySelectorAll<HTMLElement>(
-    `.tabulator-row[${ROW_INDEX_ATTRIBUTE}]`,
-  )) {
-    if (wanted.has(element.getAttribute(ROW_INDEX_ATTRIBUTE)!)) {
-      light(host, element);
-    }
-  }
-}
-
-/**
- * Stamps what identifies `row` in its table, and lights it where the mark wants
- * that id.
- *
- * The walk up is short, a row sitting a handful of nodes below its table, and it
- * is what lets the mark be a property of the table rather than of the elements
- * that happened to be rendered when it was set. A row in a table nothing has
- * marked is left as it is.
- */
-function stamp(row: RowComponent, id: number | string): void {
-  const element = row.getElement();
-  if (!element) {
-    return;
-  }
-  const stamped = String(id);
-  element.setAttribute(ROW_INDEX_ATTRIBUTE, stamped);
-  for (let node: HTMLElement | null = element; node; node = node.parentElement) {
-    const wanted = wantedByHost.get(node);
-    if (wanted) {
-      if (wanted.has(stamped)) {
-        light(node, element);
-      } else {
-        element.classList.remove(LOCATED_ROW_CLASS);
-      }
-      return;
-    }
-  }
-}
-
-/**
- * Builds a Tabulator `rowFormatter` that stamps what identifies the row in its
- * own table: an event index where every row is one frame.
- *
- * The mark then finds a row with one DOM query. Asking Tabulator instead
- * (`getRows('visible')`) wraps every row in the table in a component, which the
- * pointer moves that drive the mark cannot afford on a large log.
- *
- * The index is read from the data rather than `getIndex()`: Tabulator runs the
- * formatter for its calc rows too, and those carry no index.
- *
- * A view whose rows merge occurrences stamps {@link stampRowPath} instead, as a
- * bucket has no event of its own.
- *
- * @param indexField - the table's `index` option
- */
-export function rowIndexStamper(indexField: string): (row: RowComponent) => void {
-  return (row) => {
-    const index = (row.getData() as Record<string, unknown>)[indexField];
-    if (typeof index === 'number' || typeof index === 'string') {
-      stamp(row, index);
-    }
-  };
-}
-
 /** A row of a merged view: `key` is the bucket it stands for, `instances` the
  *  occurrences it holds, which a bottom-up caller bucket has none of. */
 interface CallRow {
@@ -208,18 +48,6 @@ function rootBucketOf(row: RowComponent, data: CallRow): CallRow | null {
 }
 
 /**
- * A row's own index value, read from the data.
- *
- * Never `RowComponent.getIndex()`: that routes through Tabulator's accessor,
- * which deep-clones the row data. Our rows hold the parsed log, so one call
- * walks the whole event graph and blocks the UI for minutes.
- */
-export function rowId(row: RowComponent | undefined): number | undefined {
-  const id = (row?.getData() as { id?: unknown } | undefined)?.id;
-  return typeof id === 'number' ? id : undefined;
-}
-
-/**
  * What tells a merged row apart from a same-named row under a different parent:
  * the bucket path its builder stamped on it. A single key does not, because a
  * bucket map is allocated per parent, so one method holds a row under every
@@ -232,11 +60,11 @@ export function rowPathId(row: RowComponent): number | undefined {
 }
 
 /** A `rowFormatter` for a view whose rows merge occurrences, stamping the path id
- *  so the mark finds the row with the same one DOM query. */
+ *  on the row element. */
 export function stampRowPath(row: RowComponent): void {
   const id = rowPathId(row);
   if (id !== undefined) {
-    stamp(row, id);
+    row.getElement()?.setAttribute('data-row-index', String(id));
   }
 }
 
@@ -479,53 +307,5 @@ export class LocatedRowIds {
     this.lastDirection = direction;
     this.lastIds = pathIdsForEvents(root, eventIndexes, direction);
     return this.lastIds;
-  }
-}
-
-/**
- * Marks the rows for the events under the pointer elsewhere, so the two sides of
- * the inspector point at the same thing. A merged row stands for many events, so
- * a mark can land on several rows at once.
- *
- * The mark is not a selection: it only styles the row elements, so nothing
- * scrolls, expands or re-sorts. It belongs to the table rather than to the rows
- * rendered when it was set, so a row scrolled back into view lights itself.
- *
- * The table must stamp its rows: {@link rowIndexStamper} where a row is one
- * frame, {@link stampRowPath} where rows merge occurrences.
- */
-export class LocatedRowMarker {
-  private host: HTMLElement | null = null;
-
-  /**
-   * Move the mark to the rows `ids` name, or drop it with an empty list. Only the
-   * rendered rows are swept, so the cost follows the viewport rather than the
-   * table; callers still only call this when the target changes.
-   *
-   * @param host - Element the table is mounted in
-   * @param ids - What the table stamps for the rows to mark, empty to clear
-   */
-  public mark(host: HTMLElement | null, ids: readonly (number | string)[]): void {
-    if (this.host && this.host !== host) {
-      // A view that switches tables would leave the one it left marked.
-      wantedByHost.delete(this.host);
-      unlight(this.host);
-    }
-    this.host = host;
-    if (!host) {
-      return;
-    }
-    unlight(host);
-    const wanted = ids.length ? new Set(ids.map(String)) : NOTHING_WANTED;
-    wantedByHost.set(host, wanted);
-    sweep(host, wanted);
-    if (wanted.size) {
-      watchRenders(host);
-    }
-  }
-
-  /** Drop the mark, if one is set. */
-  public clear(): void {
-    this.mark(this.host, []);
   }
 }

@@ -9,14 +9,19 @@ import {
   formatSOQLToText,
   type FormatOptions,
 } from '../../soql/format/formatter.js';
+import type { Dialect } from '../../soql/format/tokenize.js';
 import { eventLabel, eventName } from '../utils/eventText.js';
 
-const isQuery = (node: LogEvent): boolean =>
-  node.type === 'SOQL_EXECUTE_BEGIN' || node.type === 'SOSL_EXECUTE_BEGIN';
+/** The query language of an event of `type`, or null for an event that runs no query. */
+export function queryDialect(type: string | null | undefined): Dialect | null {
+  return type === 'SOQL_EXECUTE_BEGIN' ? 'soql' : type === 'SOSL_EXECUTE_BEGIN' ? 'sosl' : null;
+}
+
+const isQuery = (node: LogEvent): boolean => queryDialect(node.type) !== null;
 
 const queryFormat = (node: LogEvent): FormatOptions => ({
   mode: 'pretty',
-  dialect: node.type === 'SOSL_EXECUTE_BEGIN' ? 'sosl' : 'soql',
+  dialect: queryDialect(node.type) ?? 'soql',
 });
 
 // Find and copy read every row, and formatting a query on each read is slow.

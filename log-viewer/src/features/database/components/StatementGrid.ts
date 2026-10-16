@@ -12,7 +12,6 @@ import '../../../components/grid/AppGrid.js';
 import { css, html, LitElement, type PropertyValues, type TemplateResult } from 'lit';
 import { property, state } from 'lit/decorators.js';
 import { ref } from 'lit/directives/ref.js';
-import { unsafeHTML } from 'lit/directives/unsafe-html.js';
 
 import {
   ColumnSettingsController,
@@ -23,6 +22,7 @@ import type { ContextMenu } from '../../../components/ContextMenu.js';
 import { ContextMenuBuilder } from '../../../components/ContextMenuBuilder.js';
 import type { AppGrid } from '../../../components/grid/AppGrid.js';
 import { bar } from '../../../components/grid/cells.js';
+import { inlineQueryColumn } from '../../../components/grid/columns.js';
 import { exportCsv } from '../../../components/grid/exportCsv.js';
 import { GridColumnMenuController } from '../../../components/GridColumnMenuController.js';
 import { columnViewSelect, gridToolbarActions } from '../../../components/gridToolbar.js';
@@ -44,8 +44,8 @@ import { DB_ROW_COUNT_WIDTH, DB_TIME_WIDTH } from '../../../tabulator/ColumnWidt
 import { inCountRange, inMsRange, type FilterRange } from '../../../tabulator/filters/MinMax.js';
 import { globalStyles } from '../../../styles/global.styles.js';
 import { goToRow } from '../../call-tree/navigation.js';
-import { formatSOQL, formatSOQLToText } from '../../soql/format/formatter.js';
 import { soqlGroupCell } from '../../soql/format/groupHeader.js';
+import type { Dialect } from '../../soql/format/tokenize.js';
 
 /** What every statement row carries, whatever its type. Its key is its `eventIndex`. */
 export interface StatementRow {
@@ -423,35 +423,14 @@ export function statementColumn<R extends object>(opts: {
   id: string;
   title: string;
   value: (row: R) => string;
-  dialect: 'soql' | 'sosl' | null;
+  dialect: Dialect | null;
   sortFirst?: 'asc' | 'desc';
 }): GridColumn<R> {
-  const { dialect, value } = opts;
-  const format = { mode: 'inline', dialect: dialect ?? 'soql' } as const;
-  // Keyed by query, not row: a log repeats a few queries many times, and find, copy and paint all format.
-  const inlineHtml = new Map<string, string>();
-  const inlineText = new Map<string, string>();
   // One per key: a filter changes the counts, and the old cell is not wanted again.
   const groupCells = new Map<string, { count: number; cell: ReturnType<typeof soqlGroupCell> }>();
   return {
-    id: opts.id,
-    title: opts.title,
-    minWidth: 140,
-    cell: (row) =>
-      dialect
-        ? html`<span class="soql-block soql-inline"
-            >${unsafeHTML(cached(inlineHtml, value(row), (query) => formatSOQL(query, format)))}</span
-          >`
-        : value(row),
-    text: (row) =>
-      dialect
-        ? cached(inlineText, value(row), (query) => formatSOQLToText(query, format))
-        : value(row),
-    exportText: value,
-    tooltip: value,
-    sort: { value },
+    ...inlineQueryColumn({ ...opts, dialect: () => opts.dialect }),
     sortFirst: opts.sortFirst ?? 'desc',
-    footer: 'Total',
     groupCell: (group) => {
       let held = groupCells.get(group.key);
       if (held?.count !== group.rows.length) {
@@ -461,13 +440,4 @@ export function statementColumn<R extends object>(opts: {
       return held.cell;
     },
   };
-}
-
-function cached<T>(cache: Map<string, T>, key: string, make: (key: string) => T): T {
-  let value = cache.get(key);
-  if (value === undefined) {
-    value = make(key);
-    cache.set(key, value);
-  }
-  return value;
 }

@@ -6,108 +6,217 @@
 import { afterEach, beforeEach, describe, expect, it } from '@jest/globals';
 import type { ApexLog } from '@apexdevtools/apex-log-parser';
 
-import type { DatabaseOverview } from '../../services/databaseOverview.js';
+import type { DatabaseCallNode, DatabaseOverview } from '../../services/databaseOverview.js';
 
-// Tables built and destroyed.
-let built = 0;
-let destroyed = 0;
-// The last table's handlers, by event.
-const handlers: Record<string, (...args: unknown[]) => void> = {};
+const node = (
+  label: string,
+  kind: DatabaseCallNode['kind'],
+  eventIndexes: number[],
+  children: DatabaseCallNode[] = [],
+): DatabaseCallNode =>
+  ({
+    label,
+    kind,
+    timeNs: 10,
+    selfNs: 4,
+    count: eventIndexes.length,
+    eventIndexes,
+    children,
+  }) as DatabaseCallNode;
 
-jest.mock('tabulator-tables', () => ({
-  Tabulator: class {
-    static registerModule() {}
-    constructor() {
-      built++;
-    }
-    on(name: string, handler: (...args: unknown[]) => void) {
-      handlers[name] = handler;
-    }
-    destroy() {
-      destroyed++;
-    }
-  },
-  Module: class {},
-  Renderer: class {},
-}));
+// A method that ran one query, and a query run twice from one line, merged.
+const TREE = [
+  node('Account.load()', null, [1], [node('SELECT Id FROM Account', 'SOQL', [2])]),
+  node('SELECT Id FROM Contact', 'SOQL', [5, 6]),
+];
+
+let derived = 0;
 jest.mock('../../services/databaseOverview.js', () => ({
   ...jest.requireActual('../../services/databaseOverview.js'),
-  databaseOverview: (): DatabaseOverview => ({
-    time: {
-      timeNs: 0,
-      logNs: 1_000_000_000,
-      percentOfLog: 0,
-      soql: { timeNs: 0, statements: 0 },
-      dml: { timeNs: 0, statements: 0 },
-      sosl: { timeNs: 0, statements: 0 },
-    },
-    ranked: [],
-    tree: [],
-    askedBy: [],
-    burnedIn: [],
-  }),
+  databaseOverview: (): DatabaseOverview => {
+    derived++;
+    return {
+      time: {
+        timeNs: 30,
+        logNs: 1_000_000_000,
+        percentOfLog: 0,
+        soql: { timeNs: 0, statements: 0 },
+        dml: { timeNs: 0, statements: 0 },
+        sosl: { timeNs: 0, statements: 0 },
+      },
+      ranked: [],
+      tree: TREE,
+      askedBy: [],
+      burnedIn: [],
+    };
+  },
 }));
 
 import { stubStore } from '#test-helpers/apexLog.js';
-import { waitForNextFrame } from '../../../../core/utility/FrameBudget.js';
-import { INSPECTOR_LOCATE_EVENT } from '../../../../components/inspectorReveal.js';
-import type { DatabaseTime } from '../DatabaseTimeTree.js';
+import type { AppGrid } from '../../../../components/grid/AppGrid.js';
+import {
+  INSPECTOR_LOCATE_EVENT,
+  INSPECTOR_REVEAL_EVENT,
+} from '../../../../components/inspectorReveal.js';
+import { eventBus } from '../../../../core/events/EventBus.js';
+import type { DatabaseTime, DatabaseTreeRow } from '../DatabaseTimeTree.js';
 import '../DatabaseTimeTree.js';
 
 const settle = async (element: DatabaseTime): Promise<void> => {
   await element.updateComplete;
   await new Promise((resolve) => setTimeout(resolve));
-  await waitForNextFrame();
   await element.updateComplete;
 };
 
 describe('database-time', () => {
   let element: DatabaseTime;
+  let events: Array<{ type: string; detail: unknown }>;
+  const record = (e: Event) => events.push({ type: e.type, detail: (e as CustomEvent).detail });
+
+  const grid = (): AppGrid<DatabaseTreeRow> => {
+    const found = element.shadowRoot?.querySelector('lv-app-grid');
+    if (!found) {
+      throw new Error('No grid');
+    }
+    return found as AppGrid<DatabaseTreeRow>;
+  };
+  const roots = (): readonly DatabaseTreeRow[] => grid().source?.roots ?? [];
+  const fire = (type: string, detail: object): void => {
+    grid().dispatchEvent(new CustomEvent(type, { detail, bubbles: true }));
+  };
 
   beforeEach(async () => {
-    built = 0;
-    destroyed = 0;
+    derived = 0;
+    events = [];
     element = document.createElement('database-time');
     element.logStore = stubStore({} as ApexLog);
     document.body.append(element);
     await settle(element);
+    document.addEventListener(INSPECTOR_LOCATE_EVENT, record);
+    document.addEventListener(INSPECTOR_REVEAL_EVENT, record);
   });
 
   afterEach(() => {
+    document.removeEventListener(INSPECTOR_LOCATE_EVENT, record);
+    document.removeEventListener(INSPECTOR_REVEAL_EVENT, record);
     document.body.replaceChildren();
   });
 
-  it('builds the table for the log it is given', () => {
-    expect(built).toBe(1);
+  it('shows the paths to the database for the log it is given, closed', () => {
+    expect(roots().map((row) => row.label)).toEqual(['Account.load()', 'SELECT Id FROM Contact']);
+    expect(grid().expanded).toBe(false);
+    expect(element.shadowRoot?.querySelector('grid-skeleton')?.hasAttribute('pending')).toBe(false);
   });
 
-  it('keeps the table through a move', async () => {
+  it('totals self time over every row, children included', () => {
+    const self = grid().columns.find((column) => column.id === 'selfNs')?.calc;
+
+    // Three rows of 4 ns each, one of them a child.
+    expect(self?.of(roots())).toBe(12);
+  });
+
+  it('keeps its rows through a move', async () => {
+    const source = grid().source;
+
     document.body.append(document.createElement('div'), element);
     await settle(element);
 
-    expect([built, destroyed]).toEqual([1, 0]);
+    expect(derived).toBe(1);
+    expect(grid().source).toBe(source);
   });
 
-  it('rebuilds the table after a detach and a re-attach', async () => {
+  it('lets go of its rows on a detach, and builds them again on a re-attach', async () => {
     element.remove();
     await Promise.resolve();
-    expect(destroyed).toBe(1);
+    await element.updateComplete;
+    expect(grid().source).toBeNull();
 
     document.body.append(element);
     await settle(element);
 
-    expect(built).toBe(2);
-    expect(element.shadowRoot?.querySelector('grid-skeleton')?.hasAttribute('pending')).toBe(false);
+    expect(derived).toBe(2);
+    expect(roots()).toHaveLength(2);
   });
 
-  it('marks nothing for the pointer over the totals row, which names no statement', () => {
-    const located: unknown[] = [];
-    element.addEventListener(INSPECTOR_LOCATE_EVENT, (e) =>
-      located.push((e as CustomEvent<{ eventIndexes: unknown }>).detail.eventIndexes),
-    );
+  it('marks the frames located before its rows were built', async () => {
+    element.remove();
+    await Promise.resolve();
+    document.body.append(element);
+    eventBus.emit('detail:locate', { source: 'database', eventIndexes: [6] });
+    await settle(element);
 
-    handlers.rowMouseEnter?.(new MouseEvent('mouseenter'), { getData: () => ({ name: 'Total' }) });
+    expect([...grid().marked]).toEqual([2]);
+  });
 
-    expect(located).toEqual([[]]);
+  it('drops its marks on a detach, since the reports stop', async () => {
+    eventBus.emit('detail:locate', { source: 'database', eventIndexes: [6] });
+    await element.updateComplete;
+    expect([...grid().marked]).toEqual([2]);
+
+    element.remove();
+    document.body.append(element);
+    await settle(element);
+
+    expect([...grid().marked]).toEqual([]);
+  });
+
+  it('names the grid for a screen reader', () => {
+    expect(grid().label).toBe('Database call tree');
+  });
+
+  it('reveals a picked statement, and holds a mark on the frames of any other row', () => {
+    const method = roots()[0];
+    const query = method?._children?.[0];
+    const merged = roots()[1];
+
+    fire('lv-grid-select', { row: query, target: query?.id, user: true });
+    fire('lv-grid-select', { row: merged, target: merged?.id, user: true });
+    fire('lv-grid-select', { row: method, target: method?.id, user: true });
+    fire('lv-grid-select', { row: null, target: null, user: true });
+
+    const held = (eventIndexes: number[]) => ({
+      type: INSPECTOR_LOCATE_EVENT,
+      detail: { eventIndexes, sticky: true, selection: null },
+    });
+    expect(events).toEqual([
+      { type: INSPECTOR_REVEAL_EVENT, detail: { eventIndex: 2 } },
+      held([5, 6]),
+      held([1]),
+      held([]),
+    ]);
+  });
+
+  it('drops a pick when the tab clears its selection', () => {
+    // The grid holds a pick, so a deselect clears one.
+    jest.spyOn(grid(), 'deselect').mockReturnValue(true);
+
+    eventBus.emit('selection:clear', { source: 'database' });
+
+    expect(events).toEqual([
+      { type: INSPECTOR_LOCATE_EVENT, detail: { eventIndexes: [], sticky: true, selection: null } },
+    ]);
+  });
+
+  it('locates the statements under the pointer', () => {
+    fire('lv-grid-locate', { row: roots()[1] });
+
+    expect(events.map((e) => (e.detail as { eventIndexes: unknown }).eventIndexes)).toEqual([
+      [5, 6],
+    ]);
+  });
+
+  it('leaves the browser its own menu on a row with no frame', () => {
+    const event = new MouseEvent('contextmenu', { cancelable: true });
+
+    fire('lv-grid-context', { row: { ...roots()[0], eventIndexes: [] }, event });
+
+    expect(event.defaultPrevented).toBe(false);
+  });
+
+  it('marks every row that names a statement under the pointer in the grid beside', async () => {
+    eventBus.emit('detail:locate', { source: 'database', eventIndexes: [2, 6] });
+    await element.updateComplete;
+
+    expect([...grid().marked].sort()).toEqual([1, 2]);
   });
 });

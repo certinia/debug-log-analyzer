@@ -33,7 +33,7 @@ export const categoryRowFormatter = (row: RowComponent): void => {
 };
 
 /** The `rowFormatter` for a view whose rows merge occurrences: the colour strip,
- *  plus the path id the inspector's mark finds the row by. */
+ *  plus the path id stamp. */
 export const groupedRowFormatter = (row: RowComponent): void => {
   categoryRowFormatter(row);
   stampRowPath(row);

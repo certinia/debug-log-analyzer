@@ -3,51 +3,46 @@
  *
  * @jest-environment jsdom
  */
-import { describe, expect, it } from '@jest/globals';
+import { afterEach, describe, expect, it } from '@jest/globals';
 
-// Capture the options the component hands to Tabulator. The real ESM build (and
-// its module registrations) doesn't load under jest.
-const built: Record<string, unknown>[] = [];
-const selected: number[][] = [];
-type TableHandler = (...args: unknown[]) => void;
-const handlers: Record<string, TableHandler> = {};
-let destroyed = 0;
-jest.mock('tabulator-tables', () => ({
-  Tabulator: class {
-    static registerModule() {}
-    constructor(_el: HTMLElement, options: Record<string, unknown>) {
-      built.push(options);
-    }
-    on(event: string, handler: TableHandler) {
-      handlers[event] = handler;
-    }
-    destroy() {
-      destroyed++;
-    }
-    getSelectedRows() {
-      return [];
-    }
-    selectRow(indexes: number[]) {
-      selected.push(indexes);
-    }
-  },
-  Module: class {},
-  Renderer: class {},
-}));
+import type { CallStackRow } from '../callStackData.js';
 
-// No log store in the test, so the stack is empty.
+const frameRow = (eventIndex: number, total: number, self: number): CallStackRow => ({
+  eventIndex,
+  type: 'METHOD_ENTRY',
+  text: `m${eventIndex}`,
+  duration: { total, self },
+});
+
+// No log store in the test, so the stack is stubbed: frame 1 called 4, which called 9.
+const built: number[] = [];
 jest.mock('../callStackData.js', () => ({
-  buildCallStackData: () => ({ rows: [], rootTotal: 0 }),
+  buildCallStackData: (eventIndex: number) => {
+    built.push(eventIndex);
+    return {
+      rows: [frameRow(1, 100, 20), frameRow(4, 80, 30), frameRow(9, 50, 50)],
+      rootTotal: 100,
+    };
+  },
+}));
+jest.mock('../panelRowMenu.js', () => ({
+  ...jest.requireActual<object>('../panelRowMenu.js'),
+  runPanelRowAction: jest.fn(),
 }));
 
+import { runCalc } from '#test-helpers/calcs.js';
+import { eventBus } from '../../core/events/EventBus.js';
 import type { CallStackDetail } from '../CallStackDetail.js';
 import '../CallStackDetail.js';
+import type { ContextMenu } from '../ContextMenu.js';
+import type { AppGrid } from '../grid/AppGrid.js';
 import {
   INSPECTOR_LOCATE_EVENT,
   INSPECTOR_REVEAL_EVENT,
   type InspectorLocateEvent,
   type InspectorRevealEvent,
 } from '../inspectorReveal.js';
+import { runPanelRowAction } from '../panelRowMenu.js';
 
 async function mount(eventIndex: number): Promise<CallStackDetail> {
   const el = document.createElement('call-stack-detail') as CallStackDetail;
@@ -57,141 +52,197 @@ async function mount(eventIndex: number): Promise<CallStackDetail> {
   return el;
 }
 
+function gridOf(el: CallStackDetail): AppGrid<CallStackRow> {
+  const grid = el.shadowRoot?.querySelector('lv-app-grid');
+  if (!grid) {
+    throw new Error('No grid');
+  }
+  return grid as AppGrid<CallStackRow>;
+}
+
+function fire(el: CallStackDetail, type: string, detail: object): void {
+  gridOf(el).dispatchEvent(new CustomEvent(type, { detail, bubbles: true }));
+}
+
+/** Every event of `type` the component raises while `run` runs. */
+function collect<T>(type: string, read: (e: Event) => T, run: () => void): T[] {
+  const seen: T[] = [];
+  const listener = (e: Event) => seen.push(read(e));
+  document.addEventListener(type, listener);
+  run();
+  document.removeEventListener(type, listener);
+  return seen;
+}
+
+function footer(grid: AppGrid<CallStackRow>, id: string): number | undefined {
+  const calc = grid.columns.find((column) => column.id === id)?.calc;
+  return runCalc(calc, grid.source?.roots ?? []);
+}
+
+const revealed = (e: Event) => (e as InspectorRevealEvent).detail.eventIndex;
+const located = (e: Event) => (e as InspectorLocateEvent).detail.eventIndexes;
+
 describe('CallStackDetail', () => {
-  it('renders the table host and a context menu for the row actions', async () => {
-    const el = await mount(1);
-    expect(el.shadowRoot?.querySelector('#call-stack-table')).not.toBeNull();
-    expect(el.shadowRoot?.querySelector('context-menu')).not.toBeNull();
+  afterEach(() => {
+    document.body.replaceChildren();
+    built.length = 0;
+    jest.restoreAllMocks();
   });
 
-  it('copies to the clipboard and navigates by keyboard, as the main grids do', async () => {
-    built.length = 0;
-    await mount(2);
+  it('shows the stack as Frame, Total and Self, with the root frame as the whole', async () => {
+    const el = await mount(9);
+    const grid = gridOf(el);
 
-    const options = built.at(-1);
-    expect(options?.clipboard).toBe(true);
-    expect(options?.clipboardCopyRowRange).toBe('all');
-    // Ctrl/Cmd+C, so the keyboard shortcut matches every other grid.
-    expect(options?.keybindings).toEqual({ copyToClipboard: ['ctrl + 67', 'meta + 67'] });
-    // A single row stays selected, so the inspector follows keyboard navigation.
-    expect(options?.selectableRows).toBe('highlight');
-    expect(options?.rowKeyboardNavigation).toBe(true);
+    expect(grid.source?.roots.map((row) => row.eventIndex)).toEqual([1, 4, 9]);
+    expect(grid.columns.map((column) => column.title)).toEqual([
+      'Frame',
+      'Total (ms)',
+      'Self (ms)',
+    ]);
+    expect(grid.placeholder).toBe('No call stack available');
+    // The outermost frame's total is the stack root; a sum would count the nested chain twice.
+    expect(footer(grid, 'duration.total')).toBe(100);
+    expect(footer(grid, 'duration.self')).toBe(100);
+  });
+
+  it('names the grid for a screen reader', async () => {
+    expect(gridOf(await mount(9)).label).toBe('Call stack');
   });
 
   it('asks the inspector to reveal the frame the selection landed on', async () => {
-    const el = await mount(4);
+    const el = await mount(9);
+    const row = gridOf(el).source!.roots[1];
 
-    const seen: number[] = [];
-    document.addEventListener(INSPECTOR_REVEAL_EVENT, (e) => {
-      seen.push((e as InspectorRevealEvent).detail.eventIndex);
-    });
-    handlers.rowSelectionChanged?.([], [{ getData: () => ({ eventIndex: 11 }) }]);
-
-    expect(seen).toEqual([11]);
-    el.remove();
+    expect(
+      collect(INSPECTOR_REVEAL_EVENT, revealed, () =>
+        fire(el, 'lv-grid-select', { row, target: 4, user: true }),
+      ),
+    ).toEqual([4]);
   });
 
-  it('marks the active frame once the table is built, without calling it a pick', async () => {
-    const el = await mount(4);
+  it('marks the active frame without calling it a pick, and moves the mark without a rebuild', async () => {
+    const el = await mount(9);
+    const grid = gridOf(el);
+    const goTo = jest.spyOn(grid, 'goTo').mockImplementation(async ([key]) => {
+      fire(el, 'lv-grid-select', {
+        row: grid.source!.roots.find((r) => r.eventIndex === key),
+        target: key,
+        user: false,
+      });
+      return true;
+    });
+    built.length = 0;
+
+    const reveals: number[] = [];
+    const listener = (e: Event) => reveals.push(revealed(e));
+    document.addEventListener(INSPECTOR_REVEAL_EVENT, listener);
     el.activeEventIndex = 4;
     await el.updateComplete;
-    // The rows arrive with `tableBuilt`, so the mark made before it is the one
-    // under test here.
-    selected.length = 0;
-
-    const seen: number[] = [];
-    const listener = (e: Event) => seen.push((e as InspectorRevealEvent).detail.eventIndex);
-    document.addEventListener(INSPECTOR_REVEAL_EVENT, listener);
-    handlers.tableBuilt?.();
+    await grid.updateComplete;
+    await Promise.resolve();
     document.removeEventListener(INSPECTOR_REVEAL_EVENT, listener);
 
-    expect(selected).toEqual([[4]]);
-    expect(seen).toEqual([]);
-    el.remove();
+    expect(goTo).toHaveBeenCalledWith([4], { scrollIfVisible: false });
+    expect(reveals).toEqual([]);
+    expect(built).toEqual([]);
+  });
+
+  it('hears a click made while the active frame is still being selected', async () => {
+    const el = await mount(9);
+    jest.spyOn(gridOf(el), 'goTo').mockReturnValue(new Promise(() => {}));
+    el.activeEventIndex = 4;
+    await el.updateComplete;
+    const row = gridOf(el).source!.roots[0];
+
+    expect(
+      collect(INSPECTOR_REVEAL_EVENT, revealed, () =>
+        fire(el, 'lv-grid-select', { row, target: row?.eventIndex, user: true }),
+      ),
+    ).toEqual([row?.eventIndex]);
+  });
+
+  it('marks the active frame again when a click clears its row', async () => {
+    const el = await mount(9);
+    const goTo = jest.spyOn(gridOf(el), 'goTo').mockResolvedValue(true);
+    el.activeEventIndex = 4;
+    await el.updateComplete;
+    goTo.mockClear();
+
+    fire(el, 'lv-grid-select', { row: null, target: null, user: true });
+    await Promise.resolve();
+
+    expect(goTo).toHaveBeenCalledWith([4], { scrollIfVisible: false });
   });
 
   it('locates the hovered frame, and drops the mark when the pointer leaves', async () => {
-    const el = await mount(4);
-    selected.length = 0;
+    const el = await mount(9);
+    const row = gridOf(el).source!.roots[2];
 
-    const seen: Array<readonly number[]> = [];
-    const located = (e: Event) => seen.push((e as InspectorLocateEvent).detail.eventIndexes);
-    const picked: number[] = [];
-    const revealed = (e: Event) => picked.push((e as InspectorRevealEvent).detail.eventIndex);
-    document.addEventListener(INSPECTOR_LOCATE_EVENT, located);
-    document.addEventListener(INSPECTOR_REVEAL_EVENT, revealed);
-
-    handlers.rowMouseEnter?.({}, { getData: () => ({ eventIndex: 9 }) });
-    handlers.rowMouseLeave?.({}, { getData: () => ({ eventIndex: 9 }) });
-
-    document.removeEventListener(INSPECTOR_LOCATE_EVENT, located);
-    document.removeEventListener(INSPECTOR_REVEAL_EVENT, revealed);
+    const seen = collect(INSPECTOR_LOCATE_EVENT, located, () => {
+      fire(el, 'lv-grid-locate', { row });
+      fire(el, 'lv-grid-locate', { row: null });
+    });
 
     expect(seen).toEqual([[9], []]);
-    // Hovering never picks a frame.
-    expect(picked).toEqual([]);
-    expect(selected).toEqual([]);
-    el.remove();
   });
 
-  it('moves the mark without rebuilding, since the anchor holds the rows', async () => {
-    const el = await mount(4);
-    handlers.tableBuilt?.();
-    built.length = 0;
-    selected.length = 0;
+  it('marks the frames under the pointer in the tab on screen', async () => {
+    const el = await mount(9);
 
-    el.activeEventIndex = 12;
+    eventBus.emit('detail:locate', { source: 'calltree', eventIndexes: [4] });
     await el.updateComplete;
 
-    expect(selected).toEqual([[12]]);
-    expect(built).toEqual([]);
-    el.remove();
+    expect([...gridOf(el).marked]).toEqual([4]);
   });
 
-  it('keeps the generics in a frame the hover has to show', async () => {
-    built.length = 0;
-    await mount(5);
+  it('runs the row menu against the frame it was opened on', async () => {
+    const el = await mount(9);
+    const menu = el.shadowRoot!.querySelector<ContextMenu>('context-menu')!;
+    const show = jest.spyOn(menu, 'show').mockImplementation(() => {});
+    const goTo = jest.spyOn(gridOf(el), 'goTo');
+    const event = new MouseEvent('contextmenu', { clientX: 3, clientY: 7, cancelable: true });
 
-    const columns = built.at(-1)?.columns as { field?: string; tooltip?: unknown }[];
-    const tooltip = columns.find((column) => column.field === 'text')?.tooltip;
-    if (typeof tooltip !== 'function') {
-      throw new Error('Frame column has no tooltip');
+    const reveals = collect(INSPECTOR_REVEAL_EVENT, revealed, () =>
+      fire(el, 'lv-grid-context', { row: gridOf(el).source!.roots[1], event }),
+    );
+    menu.dispatchEvent(new CustomEvent('menu-select', { detail: { itemId: 'copy-name' } }));
+
+    expect(show).toHaveBeenCalledWith(expect.any(Array), 3, 7);
+    expect(event.defaultPrevented).toBe(true);
+    expect(runPanelRowAction).toHaveBeenCalledWith('copy-name', 4);
+    expect(reveals).toEqual([]);
+    expect(goTo).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ['off the rows', () => null],
+    ['over selected text', (el: CallStackDetail) => gridOf(el).source!.roots[1]],
+  ])('leaves the browser its own menu %s', async (_, rowOf) => {
+    const el = await mount(9);
+    const show = jest.spyOn(el.shadowRoot!.querySelector<ContextMenu>('context-menu')!, 'show');
+    const row = rowOf(el);
+    if (row) {
+      jest.spyOn(window, 'getSelection').mockReturnValue({ type: 'Range' } as Selection);
     }
+    const event = new MouseEvent('contextmenu', { cancelable: true });
 
-    const signature = 'ContactTriggerHandler.handleAfterUpdate(List<Contact>, Map<Id,Contact>)';
-    const cell = { getValue: () => signature };
-    // An element, not a string: Tabulator writes a string tooltip with `innerHTML`.
-    const shown = tooltip({}, cell, () => {}) as HTMLElement;
+    fire(el, 'lv-grid-context', { row, event });
 
-    expect(shown.textContent).toBe(signature);
+    expect(event.defaultPrevented).toBe(false);
+    expect(show).not.toHaveBeenCalled();
   });
 
-  it('keeps the table through a move', async () => {
-    const el = await mount(5);
-    const tables = built.length;
-    destroyed = 0;
+  it('builds new rows for a new anchor, dropping the mark the old rows held', async () => {
+    const el = await mount(9);
+    const seen: Array<readonly number[]> = [];
+    const listener = (e: Event) => seen.push(located(e));
+    document.addEventListener(INSPECTOR_LOCATE_EVENT, listener);
 
-    document.body.append(document.createElement('div'), el);
-    await Promise.resolve();
+    el.eventIndex = 4;
     await el.updateComplete;
+    document.removeEventListener(INSPECTOR_LOCATE_EVENT, listener);
 
-    expect([built.length, destroyed]).toEqual([tables, 0]);
-    document.body.replaceChildren();
-  });
-
-  it('rebuilds the table after a detach and a re-attach', async () => {
-    const el = await mount(5);
-    const tables = built.length;
-    destroyed = 0;
-
-    el.remove();
-    await Promise.resolve();
-    expect(destroyed).toBe(1);
-
-    document.body.append(el);
-    await el.updateComplete;
-
-    expect(built.length).toBe(tables + 1);
-    el.remove();
+    expect(seen).toEqual([[]]);
+    expect(built).toEqual([9, 4]);
   });
 });

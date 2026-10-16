@@ -1,49 +1,42 @@
 /*
  * Copyright (c) 2026 Certinia Inc. All rights reserved.
  */
+import './GridSkeleton.js';
+import './ViewModeSwitch.js';
+import './grid/AppGrid.js';
 import { consume } from '@lit/context';
-import type { LogEvent } from '@apexdevtools/apex-log-parser';
-import { LitElement, css, html, unsafeCSS, type PropertyValues } from 'lit';
+import { LitElement, css, html, type PropertyValues } from 'lit';
 import { customElement, property, state } from 'lit/decorators.js';
-import {
-  type CellComponent,
-  type ColumnDefinition,
-  type RowComponent,
-  Tabulator,
-} from 'tabulator-tables';
+import { createRef, ref, type Ref } from 'lit/directives/ref.js';
 
-import { eventBus, type DetailSource, type SelectionView } from '../core/events/EventBus.js';
+import type { DetailSource, SelectionView } from '../core/events/EventBus.js';
+import { TeardownController } from '../core/events/TeardownController.js';
 import { logContext } from '../core/log/logContext.js';
 import type { LogStore } from '../core/log/LogStore.js';
 import { RangeScopeController, sameWindow, type TimeWindow } from '../core/log/rangeScope.js';
-import { formatDuration, formatInteger } from '../core/utility/Util.js';
-import {
-  commonColumnDefaults,
-  createDurationBarColumn,
-  headerSortElement,
-  clipboardCopyOptions,
-  registerTableModules,
-  textTooltip,
-  virtualScrollOptions,
-} from '../features/call-tree/components/TableShared.js';
 import { waitForNextFrame, type FrameBudgetOptions } from '../core/utility/FrameBudget.js';
-import { makeSumSelfTimeAllVisible } from '../features/call-tree/utils/BottomCalcs.js';
+import { queryDialect } from '../features/call-tree/grid/cells.js';
 import { eventLabel } from '../features/call-tree/utils/eventText.js';
-import { soqlInlineElement } from '../features/soql/format/inlineCell.js';
-import { SelectionEchoGuard } from '../core/events/SelectionEchoGuard.js';
-import { SubscriptionController } from '../core/events/SubscriptionController.js';
-import { TeardownController } from '../core/events/TeardownController.js';
-import { soqlSyntaxStyles } from '../features/soql/styles/soql-syntax.css.js';
+import {
+  sum,
+  type Calc,
+  type GridColumn,
+  type GridSort,
+  type RowFilter,
+  type TreeSource,
+} from '../grid/index.js';
 import { globalStyles } from '../styles/global.styles.js';
 import { progressColumnWidth } from '../tabulator/format/measureWidth.js';
-import type { ProgressParams } from '../tabulator/format/ProgressMS.js';
-import { tableHolder } from '../tabulator/module/tableHolder.js';
-import dataGridStyles from '../tabulator/style/DataGrid.scss';
-import './ContextMenu.js';
-import type { ContextMenu } from './ContextMenu.js';
+import { VIEW_MODES, defaultViewMode, isViewMode, type ViewMode } from './callTreeViewModes.js';
+import type { AppGrid } from './grid/AppGrid.js';
+import { COUNT_MIN_WIDTH, countColumn, inlineQueryColumn, timeColumn } from './grid/columns.js';
+import {
+  InspectorGridController,
+  inspectorGridStyles,
+  NOTHING_MARKED,
+} from './grid/InspectorGridController.js';
 import { dispatchInspectorLocate, dispatchInspectorReveal } from './inspectorReveal.js';
-import { LocatedRowIds, LocatedRowMarker, rowId, rowIndexStamper } from './locatedRow.js';
-import { PANEL_ROW_MENU_ITEMS, runPanelRowAction } from './panelRowMenu.js';
+import { LocatedRowIds } from './locatedRow.js';
 import {
   buildScopedCallTree,
   buildWholeLogCallTree,
@@ -55,9 +48,6 @@ import {
   type ScopedCallTree,
   type ScopedRow,
 } from './scopedCallTree.js';
-import './GridSkeleton.js';
-import './ViewModeSwitch.js';
-import { VIEW_MODES, defaultViewMode, isViewMode, type ViewMode } from './callTreeViewModes.js';
 
 /**
  * The mode picked per source tab, shared by every instance: the pane is torn
@@ -78,15 +68,28 @@ function picksFor(store: LogStore): Map<DetailSource | undefined, ViewMode> {
   return picks;
 }
 
-interface TableSlot {
-  table: Tabulator;
+const MODES = VIEW_MODES.map((option) => option.value);
+
+// Time Order stays chronological, which is what the mode is for. The grouped modes lead with their ranking metric.
+const MODE_SORT: Record<ViewMode, GridSort | null> = {
+  'time-order': null,
+  aggregated: { column: 'duration.total', dir: 'desc' },
+  'bottom-up': { column: 'duration.self', dir: 'desc' },
+};
+
+// Open the callers above the selection so it is on screen, and leave what ran inside it closed.
+const onPath = (row: ScopedRow): boolean => row.onPath === true;
+
+interface GridSlot {
+  source: TreeSource<ScopedRow>;
+  columns: GridColumn<ScopedRow>[];
+  // Empty until the rows are read ahead: till then the window filter would keep every row.
+  filters: RowFilter<ScopedRow>[];
+  admit: RowFilter<ScopedRow>;
+  // Built on the first mark of a fill: only a pointer in the tab's own view needs it.
+  rowsByPath: Map<number, number> | null;
+  // Needs filling for the new scope before it is shown again.
   stale: boolean;
-  /** The data the table was filled with. Never read it back with `getData()`:
-   *  that runs Tabulator's accessors, which deep-clone the row data, and our rows
-   *  hold the parsed log. */
-  rows: ScopedRow[];
-  // Rows with cells built since the window last moved.
-  drawn: Set<RowComponent>;
   readAt: TimeWindow | null;
   // True once the rows can follow a window without reading ahead first.
   prepared: boolean;
@@ -94,41 +97,10 @@ interface TableSlot {
 }
 
 /**
- * Compact dataTree name cell: tree indent + single-line (inline) SOQL/SOSL +
- * the frame's label. Unlike the Call Tree tab's formatter it renders SOQL
- * inline (not pretty) and no `<a>` link, so cells truncate cleanly and the row
- * click alone drives navigation.
- */
-function compactNameFormatter(cell: CellComponent): HTMLElement {
-  const row = cell.getRow();
-  // @ts-expect-error this.table is bound by tabulator but missing from the types
-  const childIndent: number = this.table?.options?.dataTreeChildIndent ?? 9;
-  // @ts-expect-error _row is private but is the only way to read the tree level
-  const treeLevel: number = row._row.modules.dataTree?.index ?? 0;
-  const treeIndent = treeLevel * childIndent;
-  if (treeIndent) {
-    const el = cell.getElement();
-    el.style.paddingLeft = `calc(${treeIndent + 4}px + var(--lana-group-indent, 0px))`;
-  }
-
-  const { originalData: node } = cell.getData() as { originalData?: LogEvent };
-  const text = node?.text ?? (cell.getValue() as string) ?? '';
-  const type = node?.type;
-  const isSoql = type === 'SOQL_EXECUTE_BEGIN';
-  const isSosl = type === 'SOSL_EXECUTE_BEGIN';
-  if ((isSoql || isSosl) && text) {
-    return soqlInlineElement(text, isSosl ? 'sosl' : 'soql');
-  }
-
-  return document.createTextNode(node ? eventLabel(node) : text) as unknown as HTMLElement;
-}
-
-/**
  * The scoped call tree for the selected statement, switchable between Time Order
- * / Aggregated / Bottom-Up (Chrome-perf style). Reuses the Call Tree tab's data
- * transforms, name formatter and bottom-calc helpers with a compact
- * Name / Total / Self (+ Calls) column set; tables build lazily per mode and
- * rebuild when the selection changes.
+ * / Aggregated / Bottom-Up (Chrome-perf style), with a compact Name / Total /
+ * Self (+ Calls) column set. Grids fill lazily per mode, and fill again when the
+ * selection changes.
  */
 @customElement('call-tree-detail')
 export class CallTreeDetail extends LitElement {
@@ -159,38 +131,37 @@ export class CallTreeDetail extends LitElement {
   @property({ attribute: false })
   sourceView?: SelectionView;
 
+  // The log on screen, from the app root.
+  @consume({ context: logContext, subscribe: true })
+  @property({ attribute: false })
+  logStore: LogStore | null = null;
+
   @state()
   private viewMode: ViewMode = 'time-order';
 
-  /** A built table. `stale` means it holds a previous selection's rows, so it
-   *  needs re-filling before it is shown again. */
-  private _tables: Record<ViewMode, TableSlot | null> = {
+  @state()
+  private _pending = false;
+
+  private _slots: Record<ViewMode, GridSlot | null> = {
     'time-order': null,
     aggregated: null,
     'bottom-up': null,
   };
 
-  /**
-   * The bar/percentage params, shared by every column of every mode table and
-   * mutated in place per selection. Tabulator reads `formatterParams` by
-   * reference at render time, so this keeps the column definitions
-   * selection-independent — which is what lets a new selection re-fill a table
-   * with `setData` instead of rebuilding it.
-   */
-  private readonly _barParams: ProgressParams = {
-    precision: 2,
-    totalValue: 0,
-    showPercentageText: true,
+  private readonly _grids: Record<ViewMode, Ref<AppGrid<ScopedRow>>> = {
+    'time-order': createRef(),
+    aggregated: createRef(),
+    'bottom-up': createRef(),
   };
 
-  /** The scope's own call count, read by the Calls total. Retargeted per
-   *  selection for the same reason `_barParams` is. */
+  // The bars' denominator and the Total footer, in ns.
+  private _rootTotal = 0;
   private _scopeCalls = 0;
   // Set while the whole-log tree follows a window: summing the rows would read every one into it.
   private _scopeSelf: number | null = null;
 
   // The scoped tree (all three representations) for the current eventIndex,
-  // computed once per selection and shared across the mode tables.
+  // computed once per selection and shared across the mode grids.
   private _scoped: ScopedCallTree | null = null;
 
   // The whole-log tree follows the Timeline's window every frame; a selection's tree never does.
@@ -200,67 +171,155 @@ export class CallTreeDetail extends LitElement {
   // The build in flight; a newer view-switch aborts it, and so does a teardown.
   private _switch: AbortController | null = null;
 
-  /** True while a scoped build is in flight. Read by the tables' placeholder,
-   *  which Tabulator re-evaluates every time it shows one. */
-  private _pending = false;
-
-  private _contextMenu: ContextMenu | null = null;
-  /** eventIndex of the row whose context menu is open. */
-  private _menuEventIndex = -1;
-
-  /** Guards the mark this component sets itself, so it is never read as a pick. */
-  private _echoGuard = new SelectionEchoGuard();
-
-  /** Marks the row for the frame under the pointer in the tab's own view. */
-  private _locatedRow = new LocatedRowMarker();
-  /** Translates the reported frames into bucket paths, memoised on the report:
-   *  the tab re-reports the same list every time the pointer leaves a row. */
+  // The tab re-reports the same list every time the pointer leaves a row.
   private _locateIds = new LocatedRowIds();
   // The last report and the frames of it this scope stands for, so the filter
   // runs once per report rather than once per pointer move.
   private _reported: readonly number[] = [];
   private _reportedInScope: readonly number[] = [];
-  // The frames the tab on screen last reported under its pointer, so a table
-  // that finishes building after the report still marks them.
-  private _locatedEvents: readonly number[] = [];
 
-  private readonly _subscriptions = new SubscriptionController(this, () => [
-    eventBus.on('detail:locate', ({ eventIndexes }) => {
-      this._locatedEvents = eventIndexes;
-      this._markLocated();
-    }),
-    // Escape clears the selection of the tab on screen. A picked row here is no
-    // selection of that view, so this table drops its own.
-    eventBus.on('selection:clear', () => {
-      this._dropPick();
-    }),
-  ]);
+  private readonly _inspector = new InspectorGridController<ScopedRow>(this, {
+    grid: () => this._grids[this.viewMode].value ?? null,
+    source: () => this._slots[this.viewMode]?.source,
+    frames: frameEventIndexes,
+    pick: (row) => this._pick(row),
+    // A merged row's `originalData` is its first occurrence, so the action lands there.
+    menuFrame: (row) => row.originalData.eventIndex,
+    keysFor: (eventIndexes) => this._rowIdsFor(this.viewMode, eventIndexes),
+    dropOnClear: true,
+  });
 
-  /**
-   * Bucket path to the ids of the rows that stand for it, per grouped mode. Built
-   * on the first mark of a scope, since only a pointer in the tab's own view
-   * needs it, and dropped with the rows it describes.
-   */
-  private _rowsByPath: Record<ViewMode, Map<number, number> | null> = {
-    'time-order': null,
-    aggregated: null,
-    'bottom-up': null,
-  };
+  private readonly _teardown = new TeardownController(this, {
+    teardown: () => {
+      this._switch?.abort();
+      this._abortPrepares();
+      // The grids let go of their rows; the scoped tree stays, so a rebuild needs no walk.
+      this._slots = { 'time-order': null, aggregated: null, 'bottom-up': null };
+      this.requestUpdate();
+    },
+    rebuild: () => void this._showActive(),
+  });
 
-  /** The log on screen, from the app root. */
-  @consume({ context: logContext, subscribe: true })
-  @property({ attribute: false })
-  logStore: LogStore | null = null;
+  static styles = [
+    globalStyles,
+    inspectorGridStyles,
+    css`
+      .toolbar {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: var(--lana-space-sm);
+        padding-bottom: var(--lana-space-2xs);
+        flex: 0 0 auto;
+      }
+      .grids {
+        position: relative;
+        flex: 1 1 auto;
+        min-height: 0;
+      }
+      lv-app-grid {
+        position: absolute;
+        inset: 0;
+      }
+      lv-app-grid.is-hidden {
+        display: none;
+      }
+    `,
+  ];
 
   willUpdate() {
     // Idempotent: a pick is written to the map before the mode is set, so
     // recomputing it here always lands on the same answer.
     const picked = this.logStore && pickedViewMode.get(this.logStore)?.get(this.source);
-    this._applyViewMode(picked || defaultViewMode(this.sourceView, !!this.instances?.length));
+    this.viewMode = picked || defaultViewMode(this.sourceView, !!this.instances?.length);
   }
 
-  firstUpdated(): void {
-    this._contextMenu = this.renderRoot.querySelector('context-menu');
+  updated(changed: PropertyValues) {
+    // Only the whole-log tree can mount before a parse, so there a new log is a new scope.
+    const scopeChanged =
+      (changed.has('logStore') && this.wholeLog) ||
+      changed.has('eventIndex') ||
+      changed.has('instances');
+    if (scopeChanged) {
+      this._invalidateScope();
+    }
+    if (scopeChanged || changed.has('viewMode')) {
+      void this._showActive();
+      return;
+    }
+    if (changed.has('activeEventIndex')) {
+      // The anchor holds, so the rows are unchanged — only the mark moves.
+      this._selectActive();
+    }
+    if (this._live && !sameWindow(this._range.window, this._slots[this.viewMode]?.readAt ?? null)) {
+      this._followWindow();
+    }
+  }
+
+  render() {
+    return html`
+      <div class="toolbar">
+        <view-mode-switch
+          aria-label="Call tree view mode"
+          .options=${VIEW_MODES}
+          value=${this.viewMode}
+          @view-mode-change=${(e: CustomEvent<{ value: string }>) =>
+            this._setViewMode(e.detail.value)}
+        ></view-mode-switch>
+      </div>
+      <div class="grids">
+        ${this.logStore ? '' : html`<grid-skeleton></grid-skeleton>`}
+        ${MODES.map((mode) => this._renderGrid(mode))}
+      </div>
+      ${this._inspector.menu()}
+    `;
+  }
+
+  private _renderGrid(mode: ViewMode) {
+    const slot = this._slots[mode];
+    const shown = mode === this.viewMode;
+    return html`<lv-app-grid
+      class=${shown ? '' : 'is-hidden'}
+      ${ref(this._grids[mode])}
+      .label=${`Call tree, ${VIEW_MODES.find((option) => option.value === mode)?.label}`}
+      .placeholder=${this._pending ? 'Building the call tree…' : 'No call tree available'}
+      .source=${slot?.source ?? null}
+      .columns=${slot?.columns ?? []}
+      .filters=${slot?.filters ?? []}
+      .sort=${MODE_SORT[mode]}
+      .expanded=${onPath}
+      .marked=${shown ? this._inspector.marked : NOTHING_MARKED}
+      @lv-grid-expand=${() => this._prepareWaiting(mode)}
+    ></lv-app-grid>`;
+  }
+
+  // A merged row would misname which occurrence was clicked, so its pick holds a mark on every
+  // frame it stands for, as the Chrome DevTools performance panel keeps a picked group's frames lit.
+  private _pick(row: ScopedRow | null): void {
+    const eventIndex = revealableEventIndex(row ?? undefined);
+    if (eventIndex !== null) {
+      dispatchInspectorReveal(this, eventIndex);
+      return;
+    }
+    // The same aggregate a merged row in the tab itself reports, so Details
+    // reads the same either way. Built from the row: a scoped row carries no
+    // key, which is what the tab's own rows are read through.
+    const frames = frameEventIndexes(row ?? undefined);
+    // A top-level bottom-up row names its own calls; a caller row was reached through its own frame.
+    const isCaller =
+      this.viewMode === 'bottom-up' &&
+      !!row &&
+      !this._slots['bottom-up']?.source.roots.includes(row);
+    dispatchInspectorLocate(this, frames, true, {
+      kind: 'aggregate',
+      instances: locatableEventIndexes(row ?? undefined),
+      frames,
+      calledBy: isCaller ? row.text : undefined,
+    });
+    if (!row) {
+      // A click on the selected row clears it, but the active frame is still the active one.
+      this._selectActive();
+    }
   }
 
   /**
@@ -270,37 +329,23 @@ export class CallTreeDetail extends LitElement {
    * grouped row merges occurrences behind a synthetic id, so it is found by the
    * bucket path it stands for.
    */
-  private _markLocated(): void {
-    this._locatedRow.mark(
-      this._tableHost(this.viewMode),
-      this._rowIdsFor(this.viewMode, this._locatedEvents),
-    );
-  }
-
   private _rowIdsFor(mode: ViewMode, eventIndexes: readonly number[]): readonly number[] {
-    if ((mode === 'time-order' && !this._scoped?.timeOrderMerged) || !eventIndexes.length) {
-      return eventIndexes;
+    if (mode === 'time-order' && !this._scoped?.timeOrderMerged) {
+      return this._inScope(eventIndexes);
     }
-    const rows = this._tables[mode]?.rows ?? [];
-    if (!rows.length) {
+    const slot = this._slots[mode];
+    if (!slot || slot.stale || !slot.source.roots.length) {
       // Still building. Caching the map now would hold an empty one for the life
       // of the scope, since only a new scope clears it.
       return [];
     }
-    const byPath = (this._rowsByPath[mode] ??= rowIdsByPath(rows));
+    const byPath = (slot.rowsByPath ??= rowIdsByPath(slot.source.roots));
     const pathIds = this._locateIds.idsFor(
       this.logStore?.log ?? null,
       this._inScope(eventIndexes),
       mode === 'bottom-up' ? 'callers' : 'callees',
     );
-    const ids: number[] = [];
-    for (const pathId of pathIds) {
-      const id = byPath.get(pathId);
-      if (id !== undefined) {
-        ids.push(id);
-      }
-    }
-    return ids;
+    return pathIds.flatMap((pathId) => byPath.get(pathId) ?? []);
   }
 
   /**
@@ -320,92 +365,9 @@ export class CallTreeDetail extends LitElement {
     return this._reportedInScope;
   }
 
-  /**
-   * Drops a picked row — its selection here, and the mark it holds in the tab on
-   * screen. A grouped row's pick moves nothing, so nothing else would drop it.
-   */
-  private _dropPick(): void {
-    const selected = this._tables[this.viewMode]?.table.getSelectedRows() ?? [];
-    if (!selected.length) {
-      return;
-    }
-    this._echoGuard.run(() => {
-      for (const row of selected) {
-        row.deselect();
-      }
-    });
-    dispatchInspectorLocate(this, [], true);
-  }
-
-  static styles = [
-    globalStyles,
-    unsafeCSS(dataGridStyles),
-    unsafeCSS(soqlSyntaxStyles),
-    css`
-      :host {
-        display: flex;
-        flex-direction: column;
-        height: 100%;
-        min-height: 0;
-      }
-      .toolbar {
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        gap: var(--lana-space-sm);
-        padding-bottom: var(--lana-space-2xs);
-        flex: 0 0 auto;
-      }
-      .tables {
-        position: relative;
-        flex: 1 1 auto;
-        min-height: 0;
-      }
-      .table-host {
-        position: absolute;
-        inset: 0;
-      }
-      .table-host.is-hidden {
-        display: none;
-      }
-      /* Tabulator mounts into this inner div, whose class Lit never rewrites.
-         Binding a class on the mount element itself would clobber the tabulator
-         classes Tabulator adds imperatively on every re-render, breaking the
-         header layout. */
-      .grid {
-        height: 100%;
-      }
-    `,
-  ];
-
-  updated(changed: PropertyValues) {
-    // Only the whole-log tree can mount before a parse, so there a new log is a new scope.
-    const scopeChanged =
-      (changed.has('logStore') && this.wholeLog) ||
-      changed.has('eventIndex') ||
-      changed.has('instances');
-    if (scopeChanged) {
-      this._invalidateScope();
-    }
-    if (scopeChanged || changed.has('viewMode')) {
-      void this._showActive();
-      return;
-    }
-    if (changed.has('activeEventIndex')) {
-      // The anchor holds, so the rows are unchanged — only the mark moves.
-      this._markActive();
-    }
-    if (
-      this._live &&
-      !sameWindow(this._range.window, this._tables[this.viewMode]?.readAt ?? null)
-    ) {
-      this._followWindow();
-    }
-  }
-
   // The rows stay put, so the selection and the marks hold.
   private _followWindow(): void {
-    const slot = this._tables[this.viewMode];
+    const slot = this._slots[this.viewMode];
     const live = this._live;
     if (!live || !slot || slot.stale) {
       return;
@@ -420,26 +382,21 @@ export class CallTreeDetail extends LitElement {
     }
     slot.readAt = this._range.window;
     this._showFigures(live.set(slot.readAt));
-    // The renderer keeps a built row's cells, so they would show the old window.
-    for (const row of slot.drawn) {
-      // @ts-expect-error _row is private, and only it says the cells must be built again
-      row._row.initialized = false;
-    }
-    slot.drawn.clear();
-    slot.table.refreshFilter();
-    this._prepareWaiting(slot);
+    const mode = this.viewMode;
+    void this._grids[mode].value?.refresh().then(() => this._prepareWaiting(mode));
   }
 
   private _showFigures({ rootTotal, calls, self }: ReturnType<LiveWindow['figures']>): void {
-    this._barParams.totalValue = rootTotal;
+    this._rootTotal = rootTotal;
     this._scopeCalls = calls;
     this._scopeSelf = self;
   }
 
   // Rows of many calls opened since the read-ahead; they follow the window once read.
-  private _prepareWaiting(slot: TableSlot): void {
+  private _prepareWaiting(mode: ViewMode): void {
+    const slot = this._slots[mode];
     // The read-ahead in flight refilters when it lands, which lists them again.
-    if (slot.preparing) {
+    if (!slot || slot.preparing) {
       return;
     }
     const rows = this._live?.waiting() ?? [];
@@ -448,7 +405,10 @@ export class CallTreeDetail extends LitElement {
     }
   }
 
-  private async _prepare(slot: TableSlot, rows: readonly ScopedRow[] = slot.rows): Promise<void> {
+  private async _prepare(
+    slot: GridSlot,
+    rows: readonly ScopedRow[] = slot.source.roots,
+  ): Promise<void> {
     const live = this._live;
     if (!live || slot.preparing) {
       return;
@@ -462,84 +422,74 @@ export class CallTreeDetail extends LitElement {
     }
     slot.preparing = null;
     slot.prepared = true;
+    // A new filter object refilters every row, and the refresh below already does.
+    if (!slot.filters.length) {
+      slot.filters = [slot.admit];
+      this.requestUpdate();
+    }
     this._followWindow();
   }
 
   /**
-   * Marks the active frame, without reporting it as a new pick. Only rows keyed
+   * Selects the active frame, without reporting it as a new pick. Only rows keyed
    * by event can be selected by index, so a view whose rows merge occurrences
    * keeps the row the user picked: clearing it would take away the row the
    * keyboard moves from.
    */
-  private _markActive(): void {
-    const table = this._tables[this.viewMode]?.table;
-    if (!table || this.viewMode !== 'time-order' || this._scoped?.timeOrderMerged) {
+  private _selectActive(): void {
+    const slot = this._slots['time-order'];
+    if (!slot || this.viewMode !== 'time-order' || this._scoped?.timeOrderMerged) {
       return;
     }
-    const selected = table.getSelectedRows();
-    // Already where it belongs, which is the usual case: the row the walk
-    // reports is the row the user just picked here. Selecting it again re-renders
-    // it, and tabulator's row re-render takes the table's focus with it.
-    if (selected.length === 1 && rowId(selected[0]) === this.activeEventIndex) {
-      return;
+    const path =
+      this.activeEventIndex >= 0
+        ? this._timeOrderPath(slot.source.roots, this.activeEventIndex)
+        : null;
+    void this._inspector.selectActive(path);
+  }
+
+  /** The keys from a top-level row down to `eventIndex`, or null where the rows do not hold it. */
+  private _timeOrderPath(roots: readonly ScopedRow[], eventIndex: number): number[] | null {
+    const lineage = (this.logStore?.stackByEventIndex(eventIndex) ?? []).map((e) => e.eventIndex);
+    if (lineage.at(-1) !== eventIndex) {
+      lineage.push(eventIndex);
     }
-    const holder = tableHolder(this._tableHost(this.viewMode));
-    const root = holder?.getRootNode();
-    const hadFocus = root instanceof ShadowRoot && root.activeElement === holder;
-    this._echoGuard.run(() => {
-      for (const row of selected) {
-        row.deselect();
+    const path: number[] = [];
+    let list = roots;
+    for (const id of lineage) {
+      const row = list.find((r) => r.id === id);
+      if (row) {
+        path.push(id);
+        list = row._children ?? [];
       }
-      if (this.activeEventIndex >= 0) {
-        table.selectRow([this.activeEventIndex]);
-      }
-    });
-    // The re-render above drops focus, so the keyboard keeps its place here.
-    if (hadFocus) {
-      holder?.focus({ preventScroll: true });
     }
+    return path.at(-1) === eventIndex ? path : null;
   }
 
   /**
-   * The scoped root changed — mark every built table stale so each is re-filled
-   * on demand, rather than destroyed and rebuilt. `_scoped` is only invalidated
-   * here and only rebuilt in `_showActive`, past its paint yield — never
-   * before it.
+   * The scoped root changed: every grid lets go of its rows, which describe the old scope,
+   * and fills again when shown. `_scoped` is only rebuilt in `_showActive`, past its paint yield.
    */
   private _invalidateScope(): void {
     this._scoped = null;
     this._live = null;
-    for (const mode of Object.keys(this._tables) as ViewMode[]) {
-      const slot = this._tables[mode];
+    this._abortPrepares();
+    for (const slot of Object.values(this._slots)) {
       if (slot) {
         slot.stale = true;
+        slot.source = { ...slot.source, roots: [] };
+        slot.rowsByPath = null;
+      }
+    }
+    this.requestUpdate();
+  }
+
+  private _abortPrepares(): void {
+    for (const slot of Object.values(this._slots)) {
+      if (slot) {
         slot.preparing?.abort();
         slot.preparing = null;
       }
-      this._rowsByPath[mode] = null;
-    }
-  }
-
-  private readonly _teardown = new TeardownController(this, {
-    teardown: () => {
-      this._switch?.abort();
-      this._destroyTables();
-    },
-    rebuild: () => void this._showActive(),
-  });
-
-  private _tableHost(mode: ViewMode): HTMLDivElement | null {
-    return this.renderRoot?.querySelector<HTMLDivElement>(`#${mode}-tree`) ?? null;
-  }
-
-  private _destroyTables() {
-    // Rows go with their tables, so the mark can't outlive them.
-    this._locatedRow.clear();
-    for (const mode of Object.keys(this._tables) as ViewMode[]) {
-      this._tables[mode]?.preparing?.abort();
-      this._tables[mode]?.table.destroy();
-      this._tables[mode] = null;
-      this._rowsByPath[mode] = null;
     }
   }
 
@@ -576,12 +526,11 @@ export class CallTreeDetail extends LitElement {
   }
 
   private async _showActive(): Promise<void> {
-    // A newer switch, or a teardown, aborts this one: building into detached
-    // DOM that the teardown already ran past would leak the Tabulator.
+    // A newer switch, or a teardown, aborts this one.
     this._switch?.abort();
     const { signal } = (this._switch = new AbortController());
-    // Wait for the now-visible host to lay out before Tabulator measures column
-    // widths — building against a hidden/zero-width host makes columns overlap.
+    // So the selection highlight and the rest of the panel paint before the walk
+    // starts; the walk then slices itself, so it never blocks a frame either.
     await this.updateComplete;
     await waitForNextFrame();
     if (signal.aborted) {
@@ -589,313 +538,115 @@ export class CallTreeDetail extends LitElement {
     }
 
     const mode = this.viewMode;
-    const built = this._tables[mode];
+    const built = this._slots[mode];
     if (built && !built.stale) {
-      built.table.redraw(); // re-fit the layout for the now-visible host
       // The footer and bar figures are shared, and a read-ahead may have landed while it was hidden.
       this._followWindow();
+      // The active frame may have moved while another view was on screen.
+      this._selectActive();
       return;
     }
 
-    // Started here, after the yield above, so the selection highlight and the
-    // rest of the panel paint before the walk does anything; the walk then
-    // slices itself, so it never blocks a frame either.
     this._pending = true;
-    if (built) {
-      // Those rows belong to the previous selection and the build below spans
-      // several frames — clear them rather than leave them standing under a
-      // selection they don't describe.
-      built.rows = [];
-      void built.table.setData([]);
-    }
     const data = await this._rows(mode, { signal });
     if (!data || signal.aborted) {
       return;
     }
     this._pending = false;
-    // Percentages are relative to the selection, so retarget the shared params
-    // the formatters read rather than rebuilding the columns around a new total.
     const scoped = this._scoped;
-    this._scopeSelf = null;
-    this._barParams.totalValue = scoped?.rootTotal ?? 0;
-    this._scopeCalls = scoped?.calls ?? 0;
-
-    const slot = this._tables[mode];
-    if (slot) {
-      slot.stale = false;
-      slot.rows = data;
-      slot.readAt = null;
-      slot.prepared = false;
-      slot.drawn.clear();
-      this._rowsByPath[mode] = null;
-      void slot.table.setData(data).then(() => {
-        this._markActive();
-        this._markLocated();
-      });
-      this._followWindow();
+    if (!built && !scoped) {
+      // Nothing in scope, so there is nothing to size a new grid against.
       return;
     }
-    if (!scoped) {
-      // Nothing in scope, so there is nothing to size a new table against.
-      return;
-    }
+    this._showFigures({ rootTotal: scoped?.rootTotal ?? 0, calls: scoped?.calls ?? 0, self: null });
 
-    const container = this._tableHost(mode);
-    // A detached host builds when it comes back, so nothing is left to leak here.
-    if (!container || !this.isConnected) {
-      return;
-    }
+    const slot = built ?? this._newSlot(mode, scoped?.logTotal ?? 0);
+    slot.stale = false;
+    slot.readAt = null;
+    slot.prepared = false;
+    slot.filters = [];
+    slot.rowsByPath = null;
+    slot.source = { roots: data, children: (row) => row._children, key: (row) => row.id };
+    this._slots[mode] = slot;
+    this.requestUpdate();
+    this._followWindow();
+    await this.updateComplete;
+    this._selectActive();
+  }
 
-    registerTableModules();
-    const drawn = new Set<RowComponent>();
-    const stampRow = rowIndexStamper('id');
-    const table = new Tabulator(container, {
-      data,
-      index: 'id',
-      layout: 'fitColumns',
-      height: '100%',
-      maxHeight: '100%',
-      // Re-evaluated every time Tabulator shows the placeholder, so the pending
-      // text tracks the build without a second empty-state element.
-      placeholder: () => (this._pending ? 'Building the call tree…' : 'No call tree available'),
-      // A scoped subtree is unbounded, so only the visible rows are rendered —
-      // the same deal the Call Tree tab's tables get. The build in
-      // `scopedCallTree` is still eager; this bounds the paint, not the walk.
-      ...virtualScrollOptions,
-      dataTree: true,
-      dataTreeChildField: '_children',
-      // Open the callers above the selection so it is on screen, and leave what
-      // ran inside it closed.
-      dataTreeStartExpanded: (row: RowComponent) =>
-        (row.getData() as Partial<ScopedRow>).onPath === true,
-      dataTreeChildColumnCalcs: false,
-      dataTreeBranchElement: '<span/>',
-      columnCalcs: 'table',
-      // Arrow-key row navigation, matching the Call Tree tab.
-      rowKeyboardNavigation: true,
-      selectableRows: 'highlight',
-      // Lets the hover mark find a row by one DOM query.
-      rowFormatter: (row: RowComponent) => {
-        stampRow(row);
-        if (this._live) {
-          drawn.add(row);
-        }
-      },
-      ...clipboardCopyOptions,
-      headerSortElement,
-      columnDefaults: commonColumnDefaults,
-      columns: this._columns(mode, progressColumnWidth(scoped.logTotal)),
-      // Time Order stays chronological — that's what the mode is for. The
-      // grouped modes lead with their ranking metric, as the Call Tree tab's
-      // Bottom-Up does; either way the headers stay sortable.
-      ...(mode === 'time-order'
-        ? {}
-        : {
-            initialSort: [
-              {
-                column: mode === 'bottom-up' ? 'duration.self' : 'duration.total',
-                dir: 'desc' as const,
-              },
-            ],
-          }),
-    });
-    // No rowClick handler: a click only picks the row (RowKeyboardNavigation).
-    // Expanding is the tree-control arrow's own job — doing both on one click
-    // moved the row the user was aiming at. Jumping to the main Call Tree tab is
-    // an explicit right-click action.
-    table.on('rowContext', (e, row) => {
-      this._showRowMenu(e as MouseEvent, row, table);
-    });
-    // Selecting a real frame reveals it in the tab on screen. Aggregated and
-    // bottom-up rows merge occurrences behind a synthetic negative id, so
-    // revealing one would misname which occurrence was clicked; the pick marks
-    // every frame the row stands for instead, and holds until it is dropped, as
-    // the Chrome DevTools performance panel keeps a selected group's frames lit.
-    table.on('rowSelectionChanged', (_data, rows) => {
-      if (this._echoGuard.suppressed) {
-        return;
-      }
-      const data = rows[0]?.getData() as Partial<ScopedRow> | undefined;
-      const eventIndex = revealableEventIndex(data);
-      if (eventIndex !== null) {
-        dispatchInspectorReveal(this, eventIndex);
-      } else {
-        // The same aggregate a merged row in the tab itself reports, so Details
-        // reads the same either way. Built from the row: a scoped row carries no
-        // key, which is what the tab's own rows are read through.
-        const frames = frameEventIndexes(data);
-        dispatchInspectorLocate(this, frames, true, {
-          kind: 'aggregate',
-          instances: locatableEventIndexes(data),
-          frames,
-          calledBy: this.viewMode === 'bottom-up' ? callerOfRow(rows[0]) : undefined,
-        });
-      }
-    });
-    // Hovering a row marks it in the tab on screen, so the user can see where it
-    // sits before deciding to pick it. A grouped row cannot be revealed - there is
-    // no one frame to jump to - but every frame it stands for can be marked.
-    table.on('rowMouseEnter', (_e, row) => {
-      dispatchInspectorLocate(this, frameEventIndexes(row.getData() as Partial<ScopedRow>));
-    });
-    table.on('rowMouseLeave', () => {
-      dispatchInspectorLocate(this, []);
-    });
-    table.on('tableBuilt', () => {
-      if (this._live) {
-        // admit writes the figures that the sort and footer read; Tabulator filters before both.
-        table.setFilter((row: ScopedRow) =>
-          this._live && this._tables[mode]?.prepared ? this._live.admit(row) : true,
-        );
-      }
-      this._markActive();
-      this._markLocated();
-    });
-    table.on('dataTreeRowExpanded', () => {
-      const slot = this._tables[mode];
-      if (slot) {
-        this._prepareWaiting(slot);
-      }
-    });
-    this._tables[mode] = {
-      table,
+  private _newSlot(mode: ViewMode, logTotal: number): GridSlot {
+    return {
+      source: { roots: [], key: (row) => row.id },
+      // Sized from the whole log rather than the selection, so the bar columns keep one width as the selection changes.
+      columns: this._columns(mode, progressColumnWidth(logTotal)),
+      filters: [],
+      // Admit writes the figures that the sort and footer read; the grid filters before both.
+      admit: { test: (row) => this._live?.admit(row) ?? true },
+      rowsByPath: null,
       stale: false,
-      rows: data,
-      drawn,
       readAt: null,
       prepared: false,
       preparing: null,
     };
-    this._followWindow();
   }
 
-  /** Row right-click menu: reveal in the Call Tree tab, or copy the frame. */
-  private _showRowMenu(event: MouseEvent, row: RowComponent, table: Tabulator) {
-    if (!this._contextMenu || window.getSelection()?.type === 'Range') {
-      return;
-    }
-    event.preventDefault();
-
-    for (const selected of table.getSelectedRows()) {
-      selected.deselect();
-    }
-    row.select();
-
-    // Aggregated/bottom-up rows merge occurrences; `originalData` is the
-    // representative frame, so the action lands on that occurrence.
-    const { originalData } = row.getData() as { originalData?: LogEvent };
-    this._menuEventIndex = originalData?.eventIndex ?? -1;
-    if (this._menuEventIndex < 0) {
-      return;
-    }
-    this._contextMenu.show(PANEL_ROW_MENU_ITEMS, event.clientX, event.clientY);
-  }
-
-  /**
-   * `barWidth` is sized from the whole log rather than the selection, so the bar
-   * columns keep one width as the selection changes — and never have to grow for
-   * a wider total.
-   */
-  private _columns(mode: ViewMode, barWidth: number): ColumnDefinition[] {
-    const isTimeOrder = mode === 'time-order';
-    const barParams = this._barParams;
-    const sumSelf = makeSumSelfTimeAllVisible(() => this._tables[mode]?.table);
-
-    const columns: ColumnDefinition[] = [
-      {
-        title: 'Name',
-        field: 'text',
-        // Name absorbs the slack and shrinks + truncates first; the numeric
-        // columns hold a fixed content width. Below Name's minWidth the table
-        // scrolls horizontally.
-        formatter: compactNameFormatter,
-        // Not `tooltip: true`: that answers with the raw `text` field, not the
-        // label the formatter renders.
-        tooltip: (_e, cell: CellComponent) => {
-          const { originalData } = cell.getData() as { originalData?: LogEvent };
-          return textTooltip(originalData ? eventLabel(originalData) : (cell.getValue() as string));
-        },
-        cssClass: 'datagrid-code-text',
-        sorter: 'string',
-        widthGrow: 1,
-        widthShrink: 1,
-        minWidth: 140,
-        bottomCalc: () => 'Total',
+  private _columns(mode: ViewMode, width: number): GridColumn<ScopedRow>[] {
+    const totalNs = () => this._rootTotal;
+    const scopeSelf = () => this._scopeSelf;
+    const allSelf = sum<ScopedRow>((row) => row.duration.self, 'all');
+    const self: Calc<ScopedRow> = {
+      // Read on each run: once the window knows the self time, a sum of every row would read each one into it.
+      get scope() {
+        return scopeSelf() === null ? 'all' : 'top';
       },
-      createDurationBarColumn({
+      of: (rows) => scopeSelf() ?? allSelf.of(rows),
+    };
+    const columns = [
+      {
+        ...inlineQueryColumn<ScopedRow>({
+          id: 'text',
+          title: 'Name',
+          value: ({ originalData: node }) =>
+            queryDialect(node.type) ? node.text : eventLabel(node),
+          dialect: ({ type }) => queryDialect(type),
+        }),
+        // The raw text, as the Call Tree sorts: a label is built on each compare.
+        sort: { value: (row: ScopedRow) => row.text },
+      },
+      // The grid sums the top level only, which is the whole scope in the grouped
+      // modes and overlapping rows in Bottom-Up. The scope's own total answers in every mode.
+      timeColumn<ScopedRow>({
+        id: 'duration.total',
         title: 'Total (ms)',
-        field: 'duration.total',
-        barWidth,
-        barParams,
-        // Tabulator sums the top level only, which is the whole scope in the
-        // grouped modes and overlapping rows in Bottom-Up. The scope's own total
-        // answers in every mode, through `barParams`, which is retargeted per
-        // selection.
-        bottomCalc: () => barParams.totalValue,
-        tooltip: (_e, cell: CellComponent) => formatDuration(cell.getValue()),
+        value: (row) => row.duration.total,
+        totalNs,
+        calc: { of: totalNs },
+        width,
       }),
-      createDurationBarColumn({
+      timeColumn<ScopedRow>({
+        id: 'duration.self',
         title: 'Self (ms)',
-        field: 'duration.self',
-        barWidth,
-        barParams,
-        bottomCalc: (...args: Parameters<typeof sumSelf>) => this._scopeSelf ?? sumSelf(...args),
+        value: (row) => row.duration.self,
+        totalNs,
+        calc: self,
+        width,
       }),
     ];
-
-    // Time Order rows are single calls, so a count only makes sense once frames
-    // are grouped (aggregated / bottom-up). The column set is built once per mode
-    // and re-filled per selection, so it cannot depend on the selection.
-    if (!isTimeOrder) {
+    // Time Order rows are single calls, so a count only makes sense once frames are grouped.
+    if (mode !== 'time-order') {
+      // Aggregated counts a call at its own depth and Bottom-Up counts it in
+      // its leaf row, so neither top level holds them all. The scope does.
       columns.push({
-        title: 'Calls',
-        field: 'callCount',
-        sorter: 'number',
-        hozAlign: 'right',
-        headerHozAlign: 'right',
-        width: 56,
-        minWidth: 56,
-        widthGrow: 0,
-        widthShrink: 0,
-        cssClass: 'number-cell',
-        formatter: (cell: CellComponent) => formatInteger(cell.getValue()),
-        // Aggregated counts a call at its own depth and Bottom-Up counts it in
-        // its leaf row, so neither top level holds them all. The scope does.
-        bottomCalc: () => this._scopeCalls,
+        ...countColumn<ScopedRow>({
+          id: 'callCount',
+          title: 'Calls',
+          value: (row) => row.callCount,
+          width: COUNT_MIN_WIDTH,
+        }),
+        calc: { of: () => this._scopeCalls },
       });
     }
-
     return columns;
-  }
-
-  render() {
-    return html`
-      <div class="toolbar">
-        <view-mode-switch
-          aria-label="Call tree view mode"
-          .options=${VIEW_MODES}
-          value=${this.viewMode}
-          @view-mode-change=${(e: CustomEvent<{ value: string }>) =>
-            this._setViewMode(e.detail.value)}
-        ></view-mode-switch>
-      </div>
-      <div class="tables">
-        ${this.logStore ? '' : html`<grid-skeleton></grid-skeleton>`}
-        <div class="table-host ${this.viewMode === 'time-order' ? '' : 'is-hidden'}">
-          <div id="time-order-tree" class="grid"></div>
-        </div>
-        <div class="table-host ${this.viewMode === 'aggregated' ? '' : 'is-hidden'}">
-          <div id="aggregated-tree" class="grid"></div>
-        </div>
-        <div class="table-host ${this.viewMode === 'bottom-up' ? '' : 'is-hidden'}">
-          <div id="bottom-up-tree" class="grid"></div>
-        </div>
-      </div>
-      <context-menu
-        @menu-select=${(e: CustomEvent<{ itemId: string }>) =>
-          runPanelRowAction(e.detail.itemId, this._menuEventIndex)}
-      ></context-menu>
-    `;
   }
 
   private _setViewMode(mode: string) {
@@ -905,24 +656,6 @@ export class CallTreeDetail extends LitElement {
     if (this.logStore) {
       picksFor(this.logStore).set(this.source, mode);
     }
-    this._applyViewMode(mode);
-  }
-
-  private _applyViewMode(mode: ViewMode): void {
-    if (mode === this.viewMode) {
-      return;
-    }
-    // The marked row belongs to the mode being left.
-    this._locatedRow.clear();
     this.viewMode = mode;
   }
-}
-
-/** What a picked bottom-up row's calls were reached through: the row's own frame,
- *  or nothing on a top-level row, which names its own calls. */
-function callerOfRow(row: RowComponent | undefined): string | undefined {
-  if (!row?.getTreeParent()) {
-    return undefined;
-  }
-  return (row.getData() as Partial<ScopedRow>).text;
 }

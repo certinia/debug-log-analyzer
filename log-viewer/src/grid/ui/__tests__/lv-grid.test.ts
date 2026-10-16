@@ -251,12 +251,12 @@ describe('lv-grid', () => {
     rowNamed('c')?.querySelector<HTMLElement>('.cell')?.click();
     await settle(grid);
 
-    grid.deselect();
+    expect(grid.deselect()).toBe(true);
     await settle(grid);
     expect(rowNamed('c')?.ariaSelected).toBe('false');
     expect(selected.map((s) => s.row?.name ?? null)).toEqual(['c', null]);
 
-    grid.deselect();
+    expect(grid.deselect()).toBe(false);
     expect(selected).toHaveLength(2);
   });
 
@@ -380,6 +380,60 @@ describe('lv-grid', () => {
     await settle(grid);
     expect(names()).toEqual(['a', 'b', 'b1', 'b2', 'c']);
     expect(rowNamed('b2')?.ariaSelected).toBe('true');
+  });
+
+  it('finds a row of a source set in the same turn', async () => {
+    const { grid, rowNamed } = await setup();
+    grid.source = {
+      roots: [{ key: 9, name: 'z', time: 1, kind: 'x' }],
+      key: (row) => row.key,
+    };
+
+    expect(await grid.goTo([9])).toBe(true);
+    await settle(grid);
+    expect(rowNamed('z')?.ariaSelected).toBe('true');
+  });
+
+  it('says which selections the user made', async () => {
+    const { grid, rowNamed, key } = await setup();
+    const users: boolean[] = [];
+    grid.addEventListener('lv-grid-select', (e) =>
+      users.push(detail<GridSelectDetail<Node>>(e).user),
+    );
+
+    await grid.goTo([3]);
+    rowNamed('a')?.querySelector<HTMLElement>('.cell')?.click();
+    await key('ArrowDown');
+    grid.deselect();
+
+    expect(users).toEqual([false, true, true, false]);
+  });
+
+  it.each([
+    ['a deselect', (grid: LvGrid<Node>) => void grid.deselect()],
+    ['a newer goTo', (grid: LvGrid<Node>) => void grid.goTo([1])],
+  ])('gives way to %s made while it opens the path', async (_, other) => {
+    const { grid, rowNamed } = await setup();
+    rowNamed('c')?.querySelector<HTMLElement>('.cell')?.click();
+    await settle(grid);
+
+    const stale = grid.goTo([2, 22]);
+    other(grid);
+
+    expect(await stale).toBe(false);
+    await settle(grid);
+    expect(rowNamed('b2')?.ariaSelected).not.toBe('true');
+  });
+
+  it('gives way to a click made while it opens the path', async () => {
+    const { grid, rowNamed } = await setup();
+
+    const stale = grid.goTo([2, 22]);
+    rowNamed('a')?.querySelector<HTMLElement>('.cell')?.click();
+
+    expect(await stale).toBe(false);
+    await settle(grid);
+    expect(rowNamed('a')?.ariaSelected).toBe('true');
   });
 
   it('keeps the scroll for a row in view whole, when asked to', async () => {

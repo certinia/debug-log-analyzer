@@ -1,48 +1,34 @@
 /*
  * Copyright (c) 2026 Certinia Inc. All rights reserved.
  */
+import '../../../components/GridSkeleton.js';
+import '../../../components/grid/AppGrid.js';
 import { consume } from '@lit/context';
-import { LitElement, css, html, unsafeCSS, type PropertyValues } from 'lit';
+import { LitElement, html, type PropertyValues } from 'lit';
 import { customElement, property, state } from 'lit/decorators.js';
-import {
-  type CellComponent,
-  type ColumnDefinition,
-  type RowComponent,
-  Tabulator,
-} from 'tabulator-tables';
+import { createRef, ref } from 'lit/directives/ref.js';
 
-import '../../../components/ContextMenu.js';
-import type { ContextMenu } from '../../../components/ContextMenu.js';
+import type { AppGrid } from '../../../components/grid/AppGrid.js';
+import {
+  COUNT_MIN_WIDTH,
+  countColumn,
+  inlineQueryColumn,
+  timeColumn,
+} from '../../../components/grid/columns.js';
+import {
+  InspectorGridController,
+  inspectorGridStyles,
+} from '../../../components/grid/InspectorGridController.js';
 import {
   dispatchInspectorLocate,
   dispatchInspectorReveal,
 } from '../../../components/inspectorReveal.js';
-import { LocatedRowMarker, rowIndexStamper } from '../../../components/locatedRow.js';
-import '../../../components/GridSkeleton.js';
-import { PANEL_ROW_MENU_ITEMS, runPanelRowAction } from '../../../components/panelRowMenu.js';
-import { eventBus } from '../../../core/events/EventBus.js';
+import { TeardownController } from '../../../core/events/TeardownController.js';
 import { logContext } from '../../../core/log/logContext.js';
 import type { LogStore } from '../../../core/log/LogStore.js';
-import { SelectionEchoGuard } from '../../../core/events/SelectionEchoGuard.js';
-import { SubscriptionController } from '../../../core/events/SubscriptionController.js';
-import { TeardownController } from '../../../core/events/TeardownController.js';
-import { formatDuration, formatInteger } from '../../../core/utility/Util.js';
+import { sum, type GridColumn, type TreeSource } from '../../../grid/index.js';
 import { globalStyles } from '../../../styles/global.styles.js';
 import { progressColumnWidth } from '../../../tabulator/format/measureWidth.js';
-import type { ProgressParams } from '../../../tabulator/format/ProgressMS.js';
-import dataGridStyles from '../../../tabulator/style/DataGrid.scss';
-import {
-  clipboardCopyOptions,
-  commonColumnDefaults,
-  createDurationBarColumn,
-  headerSortElement,
-  registerTableModules,
-  textCellTooltip,
-  virtualScrollOptions,
-} from '../../call-tree/components/TableShared.js';
-import { waitForNextFrame } from '../../../core/utility/FrameBudget.js';
-import { soqlInlineElement } from '../../soql/format/inlineCell.js';
-import { soqlSyntaxStyles } from '../../soql/styles/soql-syntax.css.js';
 import {
   type DatabaseCallNode,
   databaseOverview,
@@ -65,7 +51,7 @@ export interface DatabaseTreeRow {
   _children: DatabaseTreeRow[] | null;
 }
 
-/** The tree as Tabulator rows, ids assigned depth first. */
+/** The tree as grid rows, ids assigned depth first. */
 export function databaseTreeRows(tree: readonly DatabaseCallNode[]): DatabaseTreeRow[] {
   let nextId = 0;
   const map = (nodes: readonly DatabaseCallNode[]): DatabaseTreeRow[] =>
@@ -83,28 +69,6 @@ export function databaseTreeRows(tree: readonly DatabaseCallNode[]): DatabaseTre
 }
 
 /**
- * Tree indent + the label: a query or a search renders as single-line (inline)
- * SOQL, so it truncates cleanly; every other frame is plain text.
- */
-function nameFormatter(cell: CellComponent): HTMLElement {
-  const row = cell.getRow();
-  // @ts-expect-error this.table is bound by tabulator but missing from the types
-  const childIndent: number = this.table?.options?.dataTreeChildIndent ?? 9;
-  // @ts-expect-error _row is private but is the only way to read the tree level
-  const treeLevel: number = row._row.modules.dataTree?.index ?? 0;
-  const treeIndent = treeLevel * childIndent;
-  if (treeIndent) {
-    cell.getElement().style.paddingLeft = `calc(${treeIndent + 4}px + var(--lana-group-indent, 0px))`;
-  }
-
-  const { label, kind } = cell.getData() as DatabaseTreeRow;
-  if (kind === 'SOQL' || kind === 'SOSL') {
-    return soqlInlineElement(label, kind === 'SOSL' ? 'sosl' : 'soql');
-  }
-  return document.createTextNode(label) as unknown as HTMLElement;
-}
-
-/**
  * Where the database time was spent, as the call paths that reach it: only the
  * branches that end in a query, a DML or a search, each carrying the database
  * time beneath it. The grids name the statements; this names the code that ran
@@ -119,107 +83,55 @@ function nameFormatter(cell: CellComponent): HTMLElement {
  */
 @customElement('database-time')
 export class DatabaseTime extends LitElement {
-  private _table: Tabulator | null = null;
-  private _contextMenu: ContextMenu | null = null;
-  /** eventIndex of the row whose context menu is open. */
-  private _menuEventIndex = -1;
-
-  /** The self-time footer: every row's own code, child rows included, since a
-   *  tree footer sums only the roots. No filters here, so all of it counts. */
-  private _ownCodeTotalNs = 0;
-
-  /** Total-time bars: a share of the database time. Retargeted per log. */
-  private readonly _timeBarParams: ProgressParams = {
-    precision: 2,
-    totalValue: 0,
-    showPercentageText: true,
-  };
-
-  /**
-   * Own-code bars: a share of the own-code total, not of the database time. A
-   * frame's own code is Apex, which the database total does not bound, so sharing
-   * one denominator lets a compute-heavy frame read past 100%.
-   */
-  private readonly _selfBarParams: ProgressParams = {
-    precision: 2,
-    totalValue: 0,
-    showPercentageText: true,
-  };
-
-  /** Guards the mark this component sets itself, so it is never read as a pick. */
-  private _echoGuard = new SelectionEchoGuard();
-
-  /** Marks the row for the statement under the pointer in the grid beside. */
-  private _locatedRow = new LocatedRowMarker();
-
-  /** eventIndex to the ids of the rows that name it, built on the first mark. */
-  private _rowsByEvent: Map<number, number[]> | null = null;
-  /** The rows the table was filled with. Never read them back with `getData()`:
-   *  that runs Tabulator's accessors, which deep-clone every row. */
-  private _rows: readonly DatabaseTreeRow[] = [];
-
-  /** The build in flight; a newer one aborts it, and so does a teardown. */
-  private _building: AbortController | null = null;
-
-  /** The store whose rows the grid holds; the skeleton shows until it is the one on screen. */
+  // The store whose rows the grid holds; the skeleton shows until it is the one on screen.
   @state()
   private _builtFor: LogStore | null = null;
+  @state()
+  private _source: TreeSource<DatabaseTreeRow> | null = null;
+  @state()
+  private _columns: GridColumn<DatabaseTreeRow>[] = [];
 
-  /** The log on screen, from the app root. */
+  // The log on screen, from the app root.
   @consume({ context: logContext, subscribe: true })
   @property({ attribute: false })
   logStore: LogStore | null = null;
 
-  static styles = [
-    globalStyles,
-    unsafeCSS(dataGridStyles),
-    unsafeCSS(soqlSyntaxStyles),
-    css`
-      :host {
-        display: flex;
-        flex-direction: column;
-        height: 100%;
-        min-height: 0;
-      }
-      /* Tabulator mounts into this inner div, whose class Lit never rewrites.
-         Binding a class on the mount element itself would clobber the tabulator
-         classes Tabulator adds imperatively on every re-render, breaking the
-         header layout. */
-      .grid {
-        flex: 1 1 auto;
-        min-height: 0;
-      }
-    `,
-  ];
+  private readonly _grid = createRef<AppGrid<DatabaseTreeRow>>();
 
-  private readonly _subscriptions = new SubscriptionController(this, () => [
-    eventBus.on('detail:locate', ({ eventIndexes }) => {
-      this._locatedRow.mark(this._host(), this._rowIdsFor(eventIndexes));
-    }),
-    // Escape clears the tab's selection; a picked row here is no selection of
-    // the grid, so this table drops its own.
-    eventBus.on('selection:clear', () => {
-      this._dropPick();
-    }),
-  ]);
+  // Built on the first mark: only a pointer in the grid beside needs it.
+  private _rowsByEvent: Map<number, number[]> | null = null;
+  // A newer build aborts it, and so does a teardown.
+  private _building: AbortController | null = null;
+
+  private readonly _inspector = new InspectorGridController<DatabaseTreeRow>(this, {
+    grid: () => this._grid.value ?? null,
+    source: () => this._source,
+    frames: (row) => row.eventIndexes,
+    // A frame or a merged row has no one statement to reveal, so its pick holds a mark on all of them.
+    pick: (row) => {
+      const eventIndex = revealable(row);
+      if (eventIndex !== null) {
+        dispatchInspectorReveal(this, eventIndex);
+      } else {
+        dispatchInspectorLocate(this, row?.eventIndexes ?? [], true);
+      }
+    },
+    menuFrame: (row) => row.eventIndexes[0] ?? null,
+    keysFor: (eventIndexes) => this._rowIdsFor(eventIndexes),
+    dropOnClear: true,
+  });
 
   private readonly _teardown = new TeardownController(this, {
     teardown: () => {
       this._building?.abort();
-      // Rows go with the table, so the mark can't outlive them.
-      this._locatedRow.clear();
-      this._table?.destroy();
-      this._table = null;
+      this._source = null;
       this._rowsByEvent = null;
-      this._rows = [];
       this._builtFor = null;
     },
     rebuild: () => void this._build(),
   });
 
-  firstUpdated(): void {
-    this._contextMenu = this.renderRoot.querySelector('context-menu');
-  }
+  static styles = [globalStyles, inspectorGridStyles];
 
   updated(changed: PropertyValues): void {
     if (changed.has('logStore')) {
@@ -230,211 +142,94 @@ export class DatabaseTime extends LitElement {
   render() {
     return html`
       <grid-skeleton ?pending=${this._builtFor !== this.logStore}></grid-skeleton>
-      <div class="grid"></div>
-      <context-menu
-        @menu-select=${(e: CustomEvent<{ itemId: string }>) =>
-          runPanelRowAction(e.detail.itemId, this._menuEventIndex)}
-      ></context-menu>
+      <lv-app-grid
+        ${ref(this._grid)}
+        .label=${'Database call tree'}
+        .placeholder=${NO_STATEMENTS}
+        .source=${this._source}
+        .columns=${this._columns}
+        .marked=${this._inspector.marked}
+      ></lv-app-grid>
+      ${this._inspector.menu()}
     `;
   }
 
-  private _host(): HTMLDivElement | null {
-    return this.renderRoot?.querySelector<HTMLDivElement>('.grid') ?? null;
-  }
-
-  /** The ids of the rows that name `eventIndexes`; one frame names several. */
+  // One frame names several rows.
   private _rowIdsFor(eventIndexes: readonly number[]): number[] {
-    if (!eventIndexes.length || !this._rows.length) {
-      return [];
-    }
-    const byEvent = (this._rowsByEvent ??= rowIdsByEventIndex(this._rows));
-    const ids = new Set<number>();
-    for (const eventIndex of eventIndexes) {
-      for (const id of byEvent.get(eventIndex) ?? []) {
-        ids.add(id);
-      }
-    }
-    return [...ids];
-  }
-
-  /** Drops a picked row, and the mark it holds in the grid beside. */
-  private _dropPick(): void {
-    const selected = this._table?.getSelectedRows() ?? [];
-    if (!selected.length) {
-      return;
-    }
-    this._echoGuard.run(() => {
-      for (const row of selected) {
-        row.deselect();
-      }
-    });
-    dispatchInspectorLocate(this, [], true);
+    const byEvent = (this._rowsByEvent ??= rowIdsByEventIndex(this._source?.roots ?? []));
+    return eventIndexes.flatMap((eventIndex) => byEvent.get(eventIndex) ?? []);
   }
 
   private async _build(): Promise<void> {
     const store = this.logStore;
     this._building?.abort();
     const { signal } = (this._building = new AbortController());
-    if (this._table) {
+    if (this._source?.roots.length) {
       // The last log's rows: a hover on them while this one derives would locate in the wrong log.
-      this._rows = [];
-      this._rowsByEvent = null;
-      void this._table.clearData();
+      this._setRows([]);
     }
     const overview = store && (await store.derive(databaseOverview));
-    // Wait for the host to lay out before Tabulator measures column widths —
-    // building against a zero-width host makes the columns overlap.
-    await this.updateComplete;
-    await waitForNextFrame();
-    const container = this._host();
-    if (!container || signal.aborted || !this.isConnected) {
+    if (signal.aborted) {
       return;
     }
-
     const rows = overview ? databaseTreeRows(overview.tree) : [];
-    this._ownCodeTotalNs = ownCodeTotal(rows);
-    // Each column is a share of its own footer, so both read 100% there.
-    this._timeBarParams.totalValue = overview?.time.timeNs ?? 0;
-    this._selfBarParams.totalValue = this._ownCodeTotalNs;
-    this._rowsByEvent = null;
-    this._rows = rows;
+    this._columns = databaseColumns(
+      overview?.time.timeNs ?? 0,
+      ownCodeTotal(rows),
+      // From the whole log, so the bars keep one width whatever share of it the database holds.
+      progressColumnWidth(overview?.time.logNs ?? 0),
+    );
+    this._setRows(rows);
     this._builtFor = store;
-
-    if (this._table) {
-      void this._table.setData(rows);
-      return;
-    }
-    if (!overview) {
-      // No log yet, so there is nothing to size a new table against.
-      return;
-    }
-
-    registerTableModules();
-    const table = new Tabulator(container, {
-      data: rows,
-      index: 'id',
-      layout: 'fitColumns',
-      height: '100%',
-      maxHeight: '100%',
-      placeholder: NO_STATEMENTS,
-      ...virtualScrollOptions,
-      dataTree: true,
-      dataTreeChildField: '_children',
-      dataTreeChildColumnCalcs: false,
-      dataTreeBranchElement: '<span/>',
-      columnCalcs: 'table',
-      rowKeyboardNavigation: true,
-      selectableRows: 'highlight',
-      // Lets the hover mark find a row by one DOM query.
-      rowFormatter: rowIndexStamper('id'),
-      ...clipboardCopyOptions,
-      headerSortElement,
-      columnDefaults: commonColumnDefaults,
-      columns: this._columns(progressColumnWidth(overview.time.logNs)),
-    });
-    table.on('rowContext', (e, row) => {
-      this._showRowMenu(e as MouseEvent, row, table);
-    });
-    // A statement row is one frame, so picking it reveals it in the grid; a
-    // merged row and a frame have no one statement to jump to, so the pick marks
-    // every occurrence instead and holds until it is dropped.
-    table.on('rowSelectionChanged', (_data, rows) => {
-      if (this._echoGuard.suppressed) {
-        return;
-      }
-      const row = rows[0]?.getData() as DatabaseTreeRow | undefined;
-      const eventIndex = revealable(row);
-      if (eventIndex !== null) {
-        dispatchInspectorReveal(this, eventIndex);
-      } else {
-        dispatchInspectorLocate(this, row?.eventIndexes ?? [], true);
-      }
-    });
-    table.on('rowMouseEnter', (_e, row) => {
-      // The totals row is a row too, with no statements.
-      dispatchInspectorLocate(this, (row.getData() as Partial<DatabaseTreeRow>).eventIndexes ?? []);
-    });
-    table.on('rowMouseLeave', () => {
-      dispatchInspectorLocate(this, []);
-    });
-    this._table = table;
   }
 
-  /** Row right-click menu: reveal in the Call Tree tab, or copy the frame. */
-  private _showRowMenu(event: MouseEvent, row: RowComponent, table: Tabulator): void {
-    if (!this._contextMenu || window.getSelection()?.type === 'Range') {
-      return;
-    }
-    event.preventDefault();
-
-    for (const selected of table.getSelectedRows()) {
-      selected.deselect();
-    }
-    row.select();
-
-    const { eventIndexes } = row.getData() as DatabaseTreeRow;
-    this._menuEventIndex = eventIndexes[0] ?? -1;
-    if (this._menuEventIndex < 0) {
-      return;
-    }
-    this._contextMenu.show(PANEL_ROW_MENU_ITEMS, event.clientX, event.clientY);
-  }
-
-  /**
-   * `barWidth` is sized from the whole log, so the bar columns keep one width
-   * whatever share of it the database holds.
-   */
-  private _columns(barWidth: number): ColumnDefinition[] {
-    const self = createDurationBarColumn({
-      title: 'Self Time',
-      field: 'selfNs',
-      barWidth,
-      barParams: this._selfBarParams,
-      bottomCalc: () => this._ownCodeTotalNs,
-    });
-
-    return [
-      {
-        title: 'Name',
-        field: 'label',
-        // Name absorbs the slack and truncates first; the numeric columns hold a
-        // fixed content width.
-        formatter: nameFormatter,
-        tooltip: textCellTooltip,
-        cssClass: 'datagrid-code-text',
-        sorter: 'string',
-        widthGrow: 1,
-        widthShrink: 1,
-        minWidth: 140,
-        bottomCalc: () => 'Total',
-      },
-      createDurationBarColumn({
-        title: 'Total Time',
-        field: 'timeNs',
-        barWidth,
-        barParams: this._timeBarParams,
-        bottomCalc: 'sum',
-        tooltip: (_e, cell: CellComponent) => formatDuration(cell.getValue()),
-      }),
-      self,
-      {
-        title: 'Calls',
-        field: 'count',
-        sorter: 'number',
-        hozAlign: 'right',
-        headerHozAlign: 'right',
-        width: 56,
-        minWidth: 56,
-        widthGrow: 0,
-        widthShrink: 0,
-        cssClass: 'number-cell',
-        formatter: (cell: CellComponent) => formatInteger(cell.getValue()),
-      },
-    ];
+  private _setRows(rows: readonly DatabaseTreeRow[]): void {
+    this._rowsByEvent = null;
+    this._source = { roots: rows, children: (row) => row._children, key: (row) => row.id };
   }
 }
 
-/** Own code across the whole tree — a Tabulator tree footer sums only roots. */
+// Own code is a share of its own total: it is Apex, which the database time does not bound.
+function databaseColumns(
+  timeNs: number,
+  ownCodeNs: number,
+  width: number,
+): GridColumn<DatabaseTreeRow>[] {
+  return [
+    inlineQueryColumn({
+      id: 'label',
+      title: 'Name',
+      value: (row) => row.label,
+      dialect: (row) => (row.kind === 'SOQL' ? 'soql' : row.kind === 'SOSL' ? 'sosl' : null),
+    }),
+    timeColumn({
+      id: 'timeNs',
+      title: 'Total Time',
+      value: (row) => row.timeNs,
+      totalNs: timeNs,
+      calc: sum((row) => row.timeNs),
+      width,
+    }),
+    // Every row, child rows included: no row's own code overlaps another's.
+    timeColumn({
+      id: 'selfNs',
+      title: 'Self Time',
+      value: (row) => row.selfNs,
+      totalNs: ownCodeNs,
+      calc: { of: () => ownCodeNs },
+      width,
+    }),
+    countColumn({
+      id: 'count',
+      title: 'Calls',
+      value: (row) => row.count,
+      width: COUNT_MIN_WIDTH,
+      summed: false,
+    }),
+  ];
+}
+
+/** Own code across the whole tree, every row counted once. */
 export function ownCodeTotal(rows: readonly DatabaseTreeRow[]): number {
   let total = 0;
   const stack = [...rows];
@@ -449,7 +244,7 @@ export function ownCodeTotal(rows: readonly DatabaseTreeRow[]): number {
 }
 
 /** The statement a row reveals, or null when it is a frame or merges several. */
-function revealable(row: DatabaseTreeRow | undefined): number | null {
+function revealable(row: DatabaseTreeRow | null): number | null {
   return row?.kind && row.eventIndexes.length === 1 ? (row.eventIndexes[0] ?? null) : null;
 }
 

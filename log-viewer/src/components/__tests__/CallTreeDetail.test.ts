@@ -5,29 +5,18 @@
  */
 import { describe, expect, it } from '@jest/globals';
 
-jest.mock('tabulator-tables', () => ({
-  Tabulator: class {
-    static registerModule() {}
-  },
-  Module: class {},
-  Renderer: class {},
-}));
-// This suite exercises the view-mode toggle and the column set; no table is
-// built (eventIndex -1).
-
-import type { CellComponent } from 'tabulator-tables';
+// This suite exercises the view-mode toggle; no tree is built (eventIndex -1).
 
 import type { LogStore } from '../../core/log/LogStore.js';
 import type { CallTreeDetail } from '../CallTreeDetail.js';
 import '../CallTreeDetail.js';
 
-// Tabulator mounts into the inner `#${id}` grid; the `is-hidden` visibility
-// toggle lives on its `.table-host` wrapper (keeps Lit off the mount's class).
-function hidden(el: CallTreeDetail, id: string): boolean {
-  return !!el.shadowRoot
-    ?.querySelector(`#${id}`)
-    ?.closest('.table-host')
-    ?.classList.contains('is-hidden');
+const MODES = ['time-order', 'aggregated', 'bottom-up'];
+
+// One grid per mode, in the switch's order.
+function hidden(el: CallTreeDetail, mode: string): boolean {
+  const grids = el.shadowRoot?.querySelectorAll('lv-app-grid');
+  return !!grids?.[MODES.indexOf(mode)]?.classList.contains('is-hidden');
 }
 
 function switchEl(el: CallTreeDetail): Element {
@@ -36,22 +25,6 @@ function switchEl(el: CallTreeDetail): Element {
     throw new Error('view-mode-switch not rendered');
   }
   return found;
-}
-
-/** The Name column's tooltip, read off the column set the component builds. */
-function nameTooltip(
-  el: CallTreeDetail,
-  row: { originalData?: { text: string; type: string } },
-  value: string,
-): string {
-  const name = el['_columns']('time-order', 100).find((column) => column.field === 'text');
-  const tooltip = name?.tooltip;
-  if (typeof tooltip !== 'function') {
-    throw new Error('Name column has no tooltip');
-  }
-  const cell = { getData: () => row, getValue: () => value } as unknown as CellComponent;
-  // An element, not a string: Tabulator writes a string tooltip with `innerHTML`.
-  return (tooltip({} as MouseEvent, cell, () => {}) as HTMLElement).textContent ?? '';
 }
 
 /** Two logs, so a pick can be shown to belong to the one it was made in. */
@@ -82,8 +55,8 @@ describe('CallTreeDetail view mode', () => {
     const el = await mount();
 
     expect(switchEl(el).getAttribute('value')).toBe('time-order');
-    expect(hidden(el, 'time-order-tree')).toBe(false);
-    expect(hidden(el, 'bottom-up-tree')).toBe(true);
+    expect(hidden(el, 'time-order')).toBe(false);
+    expect(hidden(el, 'bottom-up')).toBe(true);
   });
 
   it('switches on view-mode-change', async () => {
@@ -92,8 +65,8 @@ describe('CallTreeDetail view mode', () => {
     await pick(el, 'aggregated');
 
     expect(switchEl(el).getAttribute('value')).toBe('aggregated');
-    expect(hidden(el, 'aggregated-tree')).toBe(false);
-    expect(hidden(el, 'time-order-tree')).toBe(true);
+    expect(hidden(el, 'aggregated')).toBe(false);
+    expect(hidden(el, 'time-order')).toBe(true);
   });
 
   it('shares the picked mode with a pane mounted later', async () => {
@@ -102,7 +75,7 @@ describe('CallTreeDetail view mode', () => {
     const el = await mount();
 
     expect(switchEl(el).getAttribute('value')).toBe('aggregated');
-    expect(hidden(el, 'aggregated-tree')).toBe(false);
+    expect(hidden(el, 'aggregated')).toBe(false);
   });
 
   it('leaves a pick behind with the log it was made in', async () => {
@@ -129,30 +102,5 @@ describe('CallTreeDetail view mode', () => {
     // Another tab never sees it, so it opens on its own default.
     const database = await mount({ source: 'database', sourceView: 'callees' });
     expect(switchEl(database).getAttribute('value')).toBe('bottom-up');
-  });
-
-  it('hovers a truncated name with the label the cell shows', async () => {
-    const el = await mount();
-
-    // `eventLabel` prefixes the type where the text cannot stand alone, which is
-    // what the cell renders — the raw `text` field alone would say only "true".
-    expect(
-      nameTooltip(el, { originalData: { text: 'true', type: 'STATEMENT_EXECUTE' } }, 'true'),
-    ).toBe('STATEMENT_EXECUTE: true');
-  });
-
-  it('keeps the generics in a signature the hover has to show', async () => {
-    const el = await mount();
-
-    const signature = 'ContactTriggerHandler.handleAfterUpdate(List<Contact>, Map<Id,Contact>)';
-    expect(
-      nameTooltip(el, { originalData: { text: signature, type: 'METHOD_ENTRY' } }, signature),
-    ).toBe(signature);
-  });
-
-  it('falls back to the cell value where a row carries no frame', async () => {
-    const el = await mount();
-
-    expect(nameTooltip(el, {}, 'Total')).toBe('Total');
   });
 });
