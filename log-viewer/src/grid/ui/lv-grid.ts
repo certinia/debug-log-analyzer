@@ -415,6 +415,7 @@ export class LvGrid<R extends object = object> extends LitElement {
       if (this.failure) {
         this.report(this.failure.error, 'build');
       }
+      this.syncActive();
     }
     if (this.view && snapshot && snapshot.rows !== this.shown) {
       this.shown = snapshot.rows;
@@ -752,7 +753,7 @@ export class LvGrid<R extends object = object> extends LitElement {
   private syncActive(): void {
     const scroller = this.scrollerRef.value;
     const at = this.indexOfSelected();
-    const id = at >= 0 ? rowId(at) : null;
+    const id = at >= 0 && !this.failure ? rowId(at) : null;
     if (id !== null && (this.renderRoot as ShadowRoot).getElementById(id)) {
       if (scroller?.getAttribute('aria-activedescendant') !== id) {
         scroller?.setAttribute('aria-activedescendant', id);

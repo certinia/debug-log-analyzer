@@ -610,6 +610,27 @@ describe('lv-grid', () => {
     expect(scroll).toHaveBeenCalledWith(2);
   });
 
+  it('points a screen reader at no row while the alert hides them', async () => {
+    const { grid, root, scroller, rowNamed, key } = await setup();
+    grid.addEventListener('lv-grid-error', (e) => e.preventDefault());
+    const active = (): Element | null =>
+      root.getElementById(scroller?.getAttribute('aria-activedescendant') ?? '');
+    await key('ArrowDown');
+    expect(active()).toBe(rowNamed('a'));
+    grid.filters = [
+      {
+        test: () => {
+          throw new Error('boom');
+        },
+      },
+    ];
+    await settle(grid);
+    expect(scroller?.hasAttribute('aria-activedescendant')).toBe(false);
+    grid.filters = [];
+    await settle(grid);
+    expect(active()).toBe(rowNamed('a'));
+  });
+
   it('shows an alert in place of its rows while a build throws, and reports the error once', async () => {
     const { grid, root, names, key } = await setup();
     const selects: unknown[] = [];
