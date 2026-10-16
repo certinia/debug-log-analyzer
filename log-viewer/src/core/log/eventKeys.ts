@@ -22,18 +22,6 @@ export function getStackKey(event: LogEvent): string {
   return `${event.namespace}|${event.text}`;
 }
 
-/**
- * The bucket keys from `event` out to its outermost frame, innermost first. The
- * log root heads no row in any view, so the walk stops below it.
- */
-export function eventKeyChain(event: LogEvent): string[] {
-  const keys: string[] = [];
-  for (let node: LogEvent | null = event; node?.parent; node = node.parent) {
-    keys.push(getEventKey(node));
-  }
-  return keys;
-}
-
 /** Events by signature: type, then namespace, then text, as {@link getEventKey} joins them. */
 export type SignatureLookup<V> = Map<string, Map<string, Map<string, V>>>;
 
