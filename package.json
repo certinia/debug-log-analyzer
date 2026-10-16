@@ -45,15 +45,15 @@
     "typecheck": "tsc -b && tsc -p scripts/tsconfig.json && tsc -p log-viewer/src/grid/core/tsconfig.json",
     "measure": "rolldown -c scripts/measure/rolldown.config.ts && node --expose-gc --max-old-space-size=12288 scripts/measure/out/measure.mjs",
     "bench:grid": "rolldown -c log-viewer/bench/grid/rolldown.config.ts && node scripts/grid-bench/run-bench.mjs",
-    "lint": "concurrently -r -g 'oxlint' 'prettier --cache **/*.{ts,css,md,mdx,scss} --check --experimental-cli' 'pnpm run typecheck'",
+    "lint": "concurrently -r -g 'oxlint' 'prettier --cache **/*.{ts,css,md,mdx} --check --experimental-cli' 'pnpm run typecheck'",
     "test": "jest",
     "test:ci": "jest --runInBand",
     "test:e2e:web": "node --run build:prod && playwright test --config=lana/test/playwright/playwright.config.web.ts",
     "serve:web": "pnpm build && tsx lana/test/playwright/web/headlessServer.ts",
     "ci:install": "pnpm install --frozen-lockfile --prefer-offline --ignore-scripts",
-    "format": "prettier '**/*.{ts,css,md,mdx,scss}' --cache --write --experimental-cli"
+    "format": "prettier '**/*.{ts,css,md,mdx}' --cache --write --experimental-cli"
   },
   "lint-staged": {
-    "*.{ts,css,md,mdx,scss}": "prettier --cache --write --experimental-cli"
+    "*.{ts,css,md,mdx}": "prettier --cache --write --experimental-cli"
   }
 }
