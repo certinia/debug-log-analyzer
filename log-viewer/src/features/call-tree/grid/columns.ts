@@ -5,10 +5,11 @@ import type { ApexLog, LogEvent, SelfTotal } from '@apexdevtools/apex-log-parser
 import { html } from 'lit';
 import { unsafeHTML } from 'lit/directives/unsafe-html.js';
 
+import { bar } from '../../../components/grid/cells.js';
+import { COUNT_MIN_WIDTH, countColumn, timeColumn } from '../../../components/grid/columns.js';
 import { NO_REPORTED_LIMITS_TEXT } from '../../../components/governorCopy.js';
 import { getCallerNamespace } from '../../../core/utility/CallerNamespace.js';
-import { formatNsAsMs } from '../../../core/utility/Duration.js';
-import { formatDuration, formatInteger, sharePercent } from '../../../core/utility/Util.js';
+import { formatInteger, sharePercent } from '../../../core/utility/Util.js';
 import {
   max,
   sum,
@@ -18,7 +19,7 @@ import {
   type RowFilter,
   type TreeSource,
 } from '../../../grid/index.js';
-import { NAMESPACE_WIDTH, TIME_WIDTH } from '../../../tabulator/ColumnWidths.js';
+import { NAMESPACE_WIDTH } from '../../../tabulator/ColumnWidths.js';
 import { soqlGroupHeader } from '../../soql/format/groupHeader.js';
 import type { AggregatedRow, BottomUpRow } from '../utils/Aggregation.js';
 import {
@@ -30,7 +31,7 @@ import {
   type GovernorUsage,
 } from '../utils/GovernorCost.js';
 import { isDetailEvent } from '../utils/TimeOrderTree.js';
-import { bar, msBar, nameCell, nameExportText, nameText } from './cells.js';
+import { nameCell, nameExportText, nameText } from './cells.js';
 import { knownMax, outermostSum } from './calcs.js';
 
 type MetricRow = GovernorUsage & { namespace: string; thrownCount: SelfTotal };
@@ -87,9 +88,7 @@ export interface HeapCalcs<R> {
 
 export const BOTTOM_UP_SORT: GridSort = { column: 'totalSelfTime', dir: 'desc' };
 
-const COUNT_MIN_WIDTH = 60;
 const ROWS_WIDTH = 63;
-const TIME_MIN_WIDTH = 120;
 
 function nameColumn<R>(fields: RowFields<R>, options: CallTreeColumnOptions): GridColumn<R> {
   return {
@@ -142,29 +141,6 @@ function typeColumn<R>(fields: RowFields<R>, hidden: boolean): GridColumn<R> {
     tooltip: fields.type,
     sort: { value: fields.type },
     sortFirst: 'asc',
-  };
-}
-
-/** A right-aligned integer with a summed footer, for a count with no limit to draw against. */
-function countColumn<R>(opts: {
-  id: string;
-  title: string;
-  value: (row: R) => number;
-  width: number;
-  hidden?: boolean;
-}): GridColumn<R> {
-  return {
-    id: opts.id,
-    title: opts.title,
-    width: opts.width,
-    minWidth: COUNT_MIN_WIDTH,
-    align: 'end',
-    hidden: opts.hidden,
-    cell: (row) => String(opts.value(row)),
-    text: (row) => String(opts.value(row)),
-    sort: { value: opts.value },
-    sortFirst: 'desc',
-    calc: sum(opts.value),
   };
 }
 
@@ -281,32 +257,6 @@ function heapColumn<R extends MetricRow>(opts: {
     sortFirst: 'desc',
     calc: opts.calc,
     total: formatInteger,
-  };
-}
-
-/** A time in nanoseconds, as milliseconds with a bar for its share of the whole log. */
-function timeColumn<R>(opts: {
-  id: string;
-  title: string;
-  value: (row: R) => number;
-  totalNs: number;
-  calc?: Calc<R>;
-  hidden?: boolean;
-}): GridColumn<R> {
-  return {
-    id: opts.id,
-    title: opts.title,
-    width: TIME_WIDTH,
-    minWidth: TIME_MIN_WIDTH,
-    align: 'end',
-    hidden: opts.hidden,
-    cell: (row) => msBar(opts.value(row), opts.totalNs),
-    text: (row) => formatNsAsMs(opts.value(row)),
-    tooltip: (row) => formatDuration(opts.value(row)),
-    sort: { value: opts.value },
-    sortFirst: 'desc',
-    calc: opts.calc,
-    total: (value) => msBar(value, opts.totalNs),
   };
 }
 

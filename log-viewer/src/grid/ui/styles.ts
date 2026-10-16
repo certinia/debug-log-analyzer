@@ -258,6 +258,14 @@ export const gridStyles = css`
       }
     }
 
+    .placeholder {
+      position: sticky;
+      inset-inline-start: 0;
+      padding: calc(var(--grid-pad) * 4) var(--grid-pad);
+      color: var(--grid-muted-fg);
+      text-align: center;
+    }
+
     .busy {
       position: sticky;
       top: 0;

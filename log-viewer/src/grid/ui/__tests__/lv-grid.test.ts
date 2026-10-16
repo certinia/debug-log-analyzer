@@ -268,6 +268,24 @@ describe('lv-grid', () => {
     expect(rowNamed('b')?.ariaSelected).toBe('false');
   });
 
+  it('reports a row the user opens, and not one the user closes', async () => {
+    const { grid, rowNamed, key } = await setup();
+    const opened: string[] = [];
+    grid.addEventListener('lv-grid-expand', (e) => {
+      opened.push(detail<GridRowDetail<Node>>(e).row?.name ?? '');
+    });
+    rowNamed('b')?.querySelector<HTMLElement>('[data-toggle]')?.click();
+    await settle(grid);
+    rowNamed('b')?.querySelector<HTMLElement>('[data-toggle]')?.click();
+    await settle(grid);
+    expect(opened).toEqual(['b']);
+
+    rowNamed('b')?.click();
+    await key('ArrowRight');
+    await key('ArrowLeft');
+    expect(opened).toEqual(['b', 'b']);
+  });
+
   it('selects a row with no children from its twisty', async () => {
     const { grid, rowNamed } = await setup();
     rowNamed('c')?.querySelector<HTMLElement>('.twisty')?.click();
@@ -419,6 +437,24 @@ describe('lv-grid', () => {
     expect(reshapes).toEqual(['columns', 'columns']);
   });
 
+  it('reports a reshape on new filters and on a refresh', async () => {
+    const { grid } = await setup();
+    const reshapes: string[] = [];
+    grid.addEventListener('lv-grid-reshape', (e) =>
+      reshapes.push(detail<GridReshapeDetail>(e).reason),
+    );
+
+    await grid.refresh();
+    expect(reshapes).toEqual([]);
+
+    grid.filters = [{ test: () => true }];
+    await settle(grid);
+    await grid.refresh();
+    grid.groupBy = (row) => row.kind;
+    await settle(grid);
+    expect(reshapes).toEqual(['filter', 'filter', 'group']);
+  });
+
   it('shows group rows that toggle on click and select from the keyboard', async () => {
     const { grid, names, rowNamed, key } = await setup({ groupBy: (row) => row.kind });
     expect(names()).toEqual(['x (2)', 'y (1)']);
@@ -436,6 +472,68 @@ describe('lv-grid', () => {
     grid.rowClass = null;
     await settle(grid);
     expect(rowNamed('a')?.className).toBe('row');
+  });
+
+  it('shows the placeholder only while no row passes the filters', async () => {
+    const { grid, root } = await setup({ placeholder: 'Nothing here' });
+    const placeholder = (): string | undefined =>
+      root.querySelector('.placeholder')?.textContent?.trim();
+    expect(placeholder()).toBeUndefined();
+
+    const none = [{ test: () => false }];
+    grid.filters = none;
+    await settle(grid);
+    expect(placeholder()).toBe('Nothing here');
+
+    grid.filters = [];
+    await settle(grid);
+    expect(placeholder()).toBeUndefined();
+  });
+
+  it('filters and totals again on refresh', async () => {
+    let hidden = 'a';
+    const { grid, root, names } = await setup({
+      filters: [{ test: (row: Node) => row.name !== hidden }],
+    });
+    expect(names()).toEqual(['b', 'c']);
+
+    hidden = 'c';
+    await grid.refresh();
+    await settle(grid);
+    expect(names()).toEqual(['a', 'b']);
+    const foot = [...root.querySelectorAll('.foot .cell')].map((el) => el.textContent?.trim());
+    expect(foot).toEqual(['', '4', '']);
+  });
+
+  it('shows no placeholder while the first build runs', async () => {
+    let release: () => void = () => undefined;
+    const held = new Promise<void>((resolve) => (release = resolve));
+    let clock = 0;
+    const { root, grid } = await setup({
+      placeholder: 'Nothing here',
+      // The build checks its clock every 256 rows, so it needs more rows than that to yield.
+      source: {
+        roots: Array.from({ length: 600 }, (_, i) => ({
+          key: i,
+          name: `n${i}`,
+          time: 1,
+          kind: 'x',
+        })),
+        key: (row: Node) => row.key,
+      },
+      filters: [{ test: () => false, keepAncestors: true }],
+      scheduler: { now: () => (clock += 100), yield: () => held },
+    });
+    expect(root.querySelector('.placeholder')).toBeNull();
+
+    release();
+    await settle(grid);
+    expect(root.querySelector('.placeholder')?.textContent?.trim()).toBe('Nothing here');
+  });
+
+  it('shows no placeholder when it has none', async () => {
+    const { root } = await setup({ filters: [{ test: () => false }] });
+    expect(root.querySelector('.placeholder')).toBeNull();
   });
 
   it('keeps its events inside the shadow root that holds it', async () => {
@@ -641,6 +739,27 @@ describe('lv-grid find marks', () => {
     expect(await grid.find({ text: ' ' })).toBe(1);
     await grid.setCurrentMatch(0);
     expect(highlights.marks()).toEqual([' ']);
+  });
+
+  it('marks no match current at -1, and keeps the other matches', async () => {
+    const { grid } = await setup();
+    const current = (): number => highlights.marks('lv-grid-current-find-match').length;
+    await grid.find({ text: 'b' });
+    await grid.setCurrentMatch(0);
+    expect(current()).toBe(1);
+
+    await grid.setCurrentMatch(-1);
+    expect(current()).toBe(0);
+    expect(highlights.marks()).toEqual(['b']);
+  });
+
+  it('paints no marks for a find that a clear made stale', async () => {
+    const { grid } = await setup();
+    const running = grid.find({ text: 'b' });
+    grid.clearFind();
+
+    expect(await running).toBe(-1);
+    expect(highlights.marks()).toEqual([]);
   });
 
   it('lets go of its marks when removed, and marks again when put back', async () => {
