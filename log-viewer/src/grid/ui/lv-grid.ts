@@ -982,8 +982,13 @@ export class LvGrid<R extends object = object> extends LitElement {
       return;
     }
     const at = this.indexOfSelected();
-    const cell =
+    let cell =
       this.activeHead >= 0 ? this.headCell(this.activeHead) : at >= 0 ? this.paintedRow(at) : null;
+    if (!cell && this.activeHead < 0 && at >= 0) {
+      // The row is scrolled away: bring it back, with the menu under the header meanwhile.
+      this.view?.scrollToIndex(at, 'auto');
+      cell = this.scrollerRef.value?.querySelector<HTMLElement>(':scope > .head') ?? null;
+    }
     if (!cell) {
       return;
     }

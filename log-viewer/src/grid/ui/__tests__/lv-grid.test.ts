@@ -511,6 +511,24 @@ describe('lv-grid', () => {
     expect(rows.map((row) => row?.name)).toEqual(['a', 'a']);
   });
 
+  it('opens the menu of a selected row that is scrolled away, and scrolls it back', async () => {
+    const many: TreeSource<Node> = {
+      roots: Array.from({ length: 100 }, (_, i) => ({ key: i, name: `r${i}`, time: i, kind: 'x' })),
+      key: (row) => row.key,
+    };
+    const { grid, scroller, rowNamed, key } = await setup({ source: many });
+    const rows: (Node | null)[] = [];
+    grid.addEventListener('lv-grid-context', (e) =>
+      rows.push(detail<GridContextDetail<Node>>(e).row),
+    );
+    await key('End', { ctrlKey: true });
+    expect(rowNamed('r99')).toBeUndefined();
+    const scroll = jest.spyOn(GridView.prototype, 'scrollToIndex');
+    scroller?.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, button: -1 }));
+    expect(rows.map((row) => row?.name)).toEqual(['r99']);
+    expect(scroll).toHaveBeenCalledWith(99, 'auto');
+  });
+
   it('reaches the headers from the keyboard when no row shows', async () => {
     const { grid, scroller, header, key } = await setup();
     grid.filters = [{ test: () => false }];
