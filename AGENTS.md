@@ -59,7 +59,8 @@ CLI of the launched editor, `code-insiders` or `code`
 - Read the code beside yours first. Navigate with LSP, `ast-grep` or `rg`; read a whole file last,
   and only the range you need.
 - Most "new" helpers already exist. Look in `log-viewer/src/core/utility/`,
-  `log-viewer/src/components/`, `log-viewer/src/tabulator/` and `log-viewer/src/features/*/services/`.
+  `log-viewer/src/components/` (grid helpers in `components/grid/`) and
+  `log-viewer/src/features/*/services/`.
 - Where two modules share state, name one source of truth. Do not give each half the job.
 - State a plan first for anything that crosses the `lana/` to `log-viewer/` boundary, or that
   changes the message contract.
@@ -75,7 +76,6 @@ CLI of the launched editor, `code-insiders` or `code`
 
 - Every changed line traces to the request. No drive-by reformatting or renaming, since
   `pnpm format` owns style. A bug seen in passing is mentioned, not fixed.
-- Never hand-edit the vendored `tabulator_esm.mjs` beyond the sanctioned documented patches.
 - The root `README.md`, `CHANGELOG.md` and `LICENSE.txt` are the sources of truth. The `lana/`
   copies are build output.
 

@@ -4,116 +4,25 @@
  * @jest-environment jsdom
  */
 import { describe, expect, it } from '@jest/globals';
-import type { RowComponent } from 'tabulator-tables';
 
-import type { ApexLog, LogEvent } from '@apexdevtools/apex-log-parser';
+import type { ApexLog } from '@apexdevtools/apex-log-parser';
 
 import { callFrame } from '#test-helpers/events.js';
 import { logStoreFor } from '../../core/log/LogStore.js';
-import { KeyPathIds, ROOT_PATH_ID } from '../../core/log/keyPathIds.js';
-import {
-  LocatedRowIds,
-  rowDetailSelection,
-  rowFrames,
-  rowPathId,
-  stampRowPath,
-} from '../locatedRow.js';
+import { ROOT_PATH_ID } from '../../core/log/keyPathIds.js';
+import { LocatedRowIds, rowDetailSelection, type RowReader } from '../locatedRow.js';
 
-function rowComponent(
-  element: HTMLElement,
-  data: Record<string, unknown>,
-  parent: RowComponent | false = false,
-): RowComponent {
-  return {
-    getElement: () => element,
-    getData: () => data,
-    getTreeParent: () => parent,
-  } as unknown as RowComponent;
+type Row = Record<string, unknown>;
+const parents = new WeakMap<Row, Row>();
+/** The rows are their own data, with the parent each was built under. */
+const read: RowReader<Row> = { data: (row) => row, parentOf: (row) => parents.get(row) };
+
+function treeRow(data: Row, parent?: Row): Row {
+  if (parent) {
+    parents.set(data, parent);
+  }
+  return data;
 }
-
-/** A bucket row as its builder leaves it: the key it merges, and the path that
- *  tells it from a same-named row under another caller. */
-function bucketRow(ids: KeyPathIds, ...keys: string[]): RowComponent {
-  let pathId = ROOT_PATH_ID;
-  for (const key of keys) {
-    pathId = ids.step(pathId, ids.keyId(key));
-  }
-  return rowComponent(document.createElement('div'), {
-    key: keys[keys.length - 1],
-    _pathId: pathId,
-  });
-}
-
-describe('stampRowPath', () => {
-  it('stamps a row apart from its namesake under another parent', () => {
-    const ids = new KeyPathIds(0);
-    const rows = [bucketRow(ids, 'Trigger1', 'Util.log'), bucketRow(ids, 'Trigger2', 'Util.log')];
-
-    rows.forEach(stampRowPath);
-
-    const stamps = rows.map((row) => row.getElement().getAttribute('data-row-index'));
-    expect(stamps[0]).not.toBeNull();
-    expect(stamps[0]).not.toBe(stamps[1]);
-  });
-});
-
-describe('rowPathId', () => {
-  it('leaves a row that stands for one frame unnamed, as its index names it', () => {
-    expect(rowPathId(rowComponent(document.createElement('div'), { id: 7 }))).toBeUndefined();
-  });
-});
-
-describe('rowFrames', () => {
-  /** exec -> m1 -> soql, with the indexes the log answers about. */
-  function log() {
-    const exec = callFrame('exec', null, 1);
-    const m1 = callFrame('m1', exec, 3);
-    const soql = callFrame('soql', m1, 5);
-    return {
-      soql,
-      apexLog: { eventsById: { 1: exec, 3: m1, 5: soql } } as unknown as ApexLog,
-    };
-  }
-
-  /** The bucket for `soql` and the caller row under it, as a bottom-up grid
-   *  leaves them: the bucket holds the occurrences, the caller row derives its. */
-  function rows(apexLog: ApexLog, soql: LogEvent) {
-    const paths = logStoreFor(apexLog).keyPathIds();
-    const bucketPath = paths.step(ROOT_PATH_ID, paths.keyIdOf(soql));
-    const bucket = rowComponent(document.createElement('div'), {
-      key: 'soql',
-      _pathId: bucketPath,
-      instances: [soql],
-    });
-    const caller = rowComponent(
-      document.createElement('div'),
-      { key: 'm1', _pathId: paths.step(bucketPath, paths.keyIdOf(soql.parent!)) },
-      bucket,
-    );
-    return { bucket, caller };
-  }
-
-  it('names the caller a bottom-up row is, not the calls it counts', () => {
-    const { apexLog, soql } = log();
-    const { caller } = rows(apexLog, soql);
-
-    expect(rowFrames(caller, apexLog, 'callers')).toEqual([3]);
-  });
-
-  it('leaves a top-down row as the calls it counts, since it sits at their depth', () => {
-    const { apexLog, soql } = log();
-    const { caller } = rows(apexLog, soql);
-
-    expect(rowFrames(caller, apexLog, 'callees')).toEqual([5]);
-  });
-
-  it('names its own occurrences for the row a bottom-up tree is seeded from', () => {
-    const { apexLog, soql } = log();
-    const { bucket } = rows(apexLog, soql);
-
-    expect(rowFrames(bucket, apexLog, 'callers')).toEqual([5]);
-  });
-});
 
 describe('rowDetailSelection', () => {
   /** exec -> m1 -> soql, with the bucket and caller rows a bottom-up grid
@@ -125,15 +34,14 @@ describe('rowDetailSelection', () => {
     const apexLog = { eventsById: { 1: exec, 3: m1, 5: soql } } as unknown as ApexLog;
     const paths = logStoreFor(apexLog).keyPathIds();
     const bucketPath = paths.step(ROOT_PATH_ID, paths.keyIdOf(soql));
-    const bucket = rowComponent(document.createElement('div'), {
+    const bucket = treeRow({
       key: 'soql',
       _pathId: bucketPath,
       instances: [soql],
       originalData: soql,
       text: 'soql',
     });
-    const caller = rowComponent(
-      document.createElement('div'),
+    const caller = treeRow(
       {
         key: 'm1',
         _pathId: paths.step(bucketPath, paths.keyIdOf(m1)),
@@ -149,7 +57,7 @@ describe('rowDetailSelection', () => {
   it('names the frames a bottom-up caller row is, beside the calls it counts', () => {
     const { apexLog, caller } = rows();
 
-    expect(rowDetailSelection(caller, apexLog, 'callers')).toEqual({
+    expect(rowDetailSelection(caller, read, apexLog, 'callers')).toEqual({
       kind: 'aggregate',
       instances: [5],
       frames: [3],
@@ -160,7 +68,7 @@ describe('rowDetailSelection', () => {
   it('gives a root bucket its own calls, as it stands at their depth', () => {
     const { apexLog, bucket } = rows();
 
-    expect(rowDetailSelection(bucket, apexLog, 'callers')).toEqual({
+    expect(rowDetailSelection(bucket, read, apexLog, 'callers')).toEqual({
       kind: 'aggregate',
       instances: [5],
       frames: [5],
@@ -171,7 +79,7 @@ describe('rowDetailSelection', () => {
   it('gives a top-down row its own calls, as it sits at their depth', () => {
     const { apexLog, caller } = rows();
 
-    expect(rowDetailSelection(caller, apexLog, 'callees')).toMatchObject({
+    expect(rowDetailSelection(caller, read, apexLog, 'callees')).toMatchObject({
       instances: [5],
       frames: [5],
     });
@@ -179,9 +87,12 @@ describe('rowDetailSelection', () => {
 
   it('names the one call a Time Order row is', () => {
     const soql = callFrame('soql', null, 5);
-    const row = rowComponent(document.createElement('div'), { originalData: soql });
+    const row = treeRow({ originalData: soql });
 
-    expect(rowDetailSelection(row, null, 'callees')).toEqual({ kind: 'event', eventIndex: 5 });
+    expect(rowDetailSelection(row, read, null, 'callees')).toEqual({
+      kind: 'event',
+      eventIndex: 5,
+    });
   });
 });
 

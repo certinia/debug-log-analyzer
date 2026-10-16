@@ -696,7 +696,7 @@ export async function buildBottomUpTree(
 /**
  * Walks the bucket trie computing averages and applying deterministic ordering
  * (primary metric total-self desc, then name asc) at every level. Empty child
- * arrays are collapsed to null so Tabulator's dataTree renders a leaf indicator.
+ * arrays are collapsed to null so a row with no children reads as a leaf.
  */
 function* finalizeBuckets(
   rootBuckets: Map<number, BottomUpRow>,

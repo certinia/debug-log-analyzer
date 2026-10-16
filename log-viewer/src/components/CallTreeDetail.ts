@@ -26,7 +26,7 @@ import {
   type TreeSource,
 } from '../grid/index.js';
 import { globalStyles } from '../styles/global.styles.js';
-import { progressColumnWidth } from '../tabulator/format/measureWidth.js';
+import { progressColumnWidth } from './grid/measureWidth.js';
 import { VIEW_MODES, defaultViewMode, isViewMode, type ViewMode } from './callTreeViewModes.js';
 import type { AppGrid } from './grid/AppGrid.js';
 import { COUNT_MIN_WIDTH, countColumn, inlineQueryColumn, timeColumn } from './grid/columns.js';

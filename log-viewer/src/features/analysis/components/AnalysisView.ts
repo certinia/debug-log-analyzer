@@ -27,7 +27,7 @@ import { LvGridFindController } from '../../../components/grid/LvGridFindControl
 import { GridColumnMenuController } from '../../../components/GridColumnMenuController.js';
 import { columnViewSelect, gridToolbarActions } from '../../../components/gridToolbar.js';
 import type { GridColumn, GroupBy, RowKey, TreeSource } from '../../../grid/index.js';
-import { CALL_TREE_VIEWS } from '../../../tabulator/ColumnViews.js';
+import { CALL_TREE_VIEWS } from '../../../components/grid/ColumnViews.js';
 import '../../call-tree/grid/CallTreeGrid.js';
 import type { CallTreeGrid } from '../../call-tree/grid/CallTreeGrid.js';
 import {
@@ -124,10 +124,10 @@ export class AnalysisView extends LitElement {
   );
   private readonly _settings = new ColumnSettingsController(this, {
     ...CALL_TREE_COLUMN_SETTINGS,
-    tables: () => [this._columnTarget],
+    targets: () => [this._columnTarget],
   });
   private readonly _menus = new GridColumnMenuController({
-    table: () => this._columnTarget,
+    target: this._columnTarget,
     menu: () => this.renderRoot.querySelector<ContextMenu>('context-menu'),
     columns: this._settings,
   });

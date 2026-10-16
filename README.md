@@ -311,6 +311,6 @@ Copyright &copy; Certinia Inc. All rights reserved.
 
 ## 🙏 Acknowledgments
 
-This project uses [Tabulator Tables](http://tabulator.info/), an open-source table library, under the MIT license. Tabulator is a powerful and flexible table library that helped with the interactive table features in the Apex Log Analyzer extension.
+Earlier versions of this project used [Tabulator Tables](http://tabulator.info/), an open-source table library, under the MIT license. It helped build the interactive tables in the Apex Log Analyzer extension.
 
-Additionally, the timeline color themes in Apex Log Analyzer draw inspiration from several open-source color palettes, editor themes, and UIs, including Salesforce UI, Chrome DevTools, and Firefox DevTools. We are grateful to the creators and maintainers of Catppuccin, Dracula, Nord, Solarized, Monokai Pro, Okabe–Ito, Material Design, and the broader theme communities whose work influenced the presets included in our timeline themes.
+The timeline color themes in Apex Log Analyzer draw inspiration from several open-source color palettes, editor themes, and UIs, including Salesforce UI, Chrome DevTools, and Firefox DevTools. We are grateful to the creators and maintainers of Catppuccin, Dracula, Nord, Solarized, Monokai Pro, Okabe–Ito, Material Design, and the broader theme communities whose work influenced the presets included in our timeline themes.

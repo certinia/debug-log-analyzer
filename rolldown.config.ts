@@ -71,7 +71,6 @@ export default defineConfig([
     platform: 'browser',
     moduleTypes: {
       '.css': 'js',
-      '.scss': 'js',
     },
     tsconfig: production ? './log-viewer/tsconfig.json' : './log-viewer/tsconfig-dev.json',
     plugins: [

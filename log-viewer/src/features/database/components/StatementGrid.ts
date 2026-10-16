@@ -39,9 +39,9 @@ import {
   type RowFilter,
   type TreeSource,
 } from '../../../grid/index.js';
-import type { ColumnView } from '../../../tabulator/ColumnViews.js';
-import { DB_ROW_COUNT_WIDTH, DB_TIME_WIDTH } from '../../../tabulator/ColumnWidths.js';
-import { inCountRange, inMsRange, type FilterRange } from '../../../tabulator/filters/MinMax.js';
+import type { ColumnView } from '../../../components/grid/ColumnViews.js';
+import { DB_ROW_COUNT_WIDTH, DB_TIME_WIDTH } from '../../../components/grid/ColumnWidths.js';
+import { inCountRange, inMsRange, type FilterRange } from '../../../components/grid/MinMax.js';
 import { globalStyles } from '../../../styles/global.styles.js';
 import { goToRow } from '../../call-tree/navigation.js';
 import { soqlGroupCell } from '../../soql/format/groupHeader.js';
@@ -135,10 +135,10 @@ export abstract class StatementGrid<R extends StatementRow, L> extends LitElemen
       read: (settings) => settings.database?.[spec.type],
       views: spec.views,
       alwaysVisible: [spec.type],
-      tables: () => [this._columnTarget],
+      targets: () => [this._columnTarget],
     });
     this._menus = new GridColumnMenuController({
-      table: () => this._columnTarget,
+      target: this._columnTarget,
       menu: () => this.renderRoot.querySelector<ContextMenu>('context-menu'),
       columns: this._settings,
     });

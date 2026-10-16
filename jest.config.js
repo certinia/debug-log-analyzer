@@ -46,7 +46,7 @@ export default {
         '^#test-helpers/(.*)\\.js$': '<rootDir>/src/__tests__/helpers/$1',
         // Stylesheet imports have no transform here; the `.js` rule above runs first, so the
         // `*.css.ts` style modules are unaffected.
-        '\\.s?css$': '<rootDir>/src/__tests__/mocks/styleStub.ts',
+        '\\.css$': '<rootDir>/src/__tests__/mocks/styleStub.ts',
         // `vscode-single-select` is excluded because `components/VsSelect.ts` extends the real
         // class, and an empty module would make that `extends undefined` at load. A mapper
         // beats `jest.requireActual`, so no suite can ask for a real element back.

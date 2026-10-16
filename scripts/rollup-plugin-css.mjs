@@ -3,28 +3,20 @@
  */
 
 /**
- * Minimal CSS/SCSS plugin for Rollup and Rolldown, built on modern primitives:
- * `sass` (modern compileString API — no legacy JS API) and `lightningcss` (minify).
+ * Minimal CSS plugin for Rollup and Rolldown, which minifies with `lightningcss`.
  *
- * Each `.scss`/`.css` import both:
+ * Each `.css` import both:
  *   - `export default`s the compiled CSS string (for Lit `unsafeCSS(styles)` shadow styles), and
  *   - injects a <style> into `document.head`.
  *
- * The head injection is load-bearing: tabulator appends tooltips and edit-list popups to
- * `document.body` (light DOM) when no `popupContainer` is set, so those popups are only styled
- * by the document-level <style>, not by the shadow-root `unsafeCSS` copy.
- *
- * SCSS resolves bare `node_modules` specifiers (e.g. `tabulator-tables/...`) via `loadPaths`.
+ * The head injection serves `styles/tokens.css`: its `:root` copy is the fallback a shadow
+ * root inherits. A component that names a `--lana-*` token still adopts the tokens.
  */
 import { readFile } from 'node:fs/promises';
-import path from 'node:path';
-import { fileURLToPath, pathToFileURL } from 'node:url';
 
 import { transform as lightningTransform } from 'lightningcss';
-import { compileStringAsync } from 'sass';
 
-const FILTER = /\.(scss|css)$/;
-const nodeModules = path.resolve('node_modules');
+const FILTER = /\.css$/;
 
 const STYLE_INJECT =
   'function __inject(css){' +
@@ -46,21 +38,6 @@ export default function css({ minify = false } = {}) {
       const source = await readFile(id, 'utf8');
 
       let cssText = source;
-      if (id.endsWith('.scss')) {
-        const result = await compileStringAsync(source, {
-          syntax: 'scss',
-          url: pathToFileURL(id),
-          loadPaths: [nodeModules],
-          style: 'expanded',
-        });
-        cssText = result.css;
-        // keep watch mode aware of @use/@forward/meta.load-css dependencies
-        for (const url of result.loadedUrls) {
-          if (url.protocol === 'file:') {
-            this.addWatchFile(fileURLToPath(url));
-          }
-        }
-      }
 
       if (minify) {
         const { code } = lightningTransform({

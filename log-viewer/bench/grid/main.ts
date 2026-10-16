@@ -10,15 +10,14 @@
 import { parse, type ApexLog, type LogEvent } from '@apexdevtools/apex-log-parser';
 
 import { LvGridAggregated } from './aggregated-contenders.js';
-import { LvGridBottomUp, TabulatorBottomUp } from './bottom-up-contenders.js';
+import { LvGridBottomUp } from './bottom-up-contenders.js';
 import type { BottomUpContender, Contender, MergedContender, Mounted } from './contender.js';
 import { GridContender } from './grid-contender.js';
 import { callTreeContender, lvGridContender } from './lv-grid-contender.js';
 import { deepEvent } from './targets.js';
 import { frameStats, perFrame, settled, timed, type FrameStats, type Timing } from './timing.js';
 
-// Time Order and Aggregated have no Tabulator contender: their tables are gone, and
-// `baseline/` holds the figures they last gave.
+// No contender runs Tabulator: it is gone, and `baseline/` holds the figures it last gave.
 // A switch, not a lookup: CodeQL flags any call through a value found by a URL name.
 function contenderFor(name: string): Contender {
   switch (name) {
@@ -26,13 +25,11 @@ function contenderFor(name: string): Contender {
       return new GridContender();
     case 'lv-grid':
       return lvGridContender();
-    default:
+    case 'call-tree':
       return callTreeContender();
+    default:
+      throw new Error(`Unknown contender ${name}: use grid, lv-grid or call-tree.`);
   }
-}
-
-function bottomUpContenderFor(name: string): BottomUpContender {
-  return name === 'tabulator' ? new TabulatorBottomUp() : new LvGridBottomUp();
 }
 
 const TREES = ['time-order', 'aggregated', 'bottom-up'] as const;
@@ -111,7 +108,7 @@ async function load(text: string): Promise<void> {
   await settled();
 
   if (tree === 'bottom-up') {
-    grouped = bottomUpContenderFor(name);
+    grouped = new LvGridBottomUp();
     mounted = bottomUp = grouped;
   } else if (tree === 'aggregated') {
     mounted = bottomUp = new LvGridAggregated();
@@ -130,9 +127,9 @@ async function load(text: string): Promise<void> {
 }
 
 /** Body rows only: lv-grid's header and footer are rows too, and are always in view. */
-const BODY_ROW = '.tabulator-row, .body > .row:not([hidden])';
+const BODY_ROW = '.body > .row:not([hidden])';
 
-/** Tabulator paints no rows on a jump of more than a viewport until the scroll stops. */
+/** Whether a jump has painted rows yet, so its timing ends when they show. */
 function rowsInView(scroller: HTMLElement): boolean {
   const box = scroller.getBoundingClientRect();
   return [...scroller.querySelectorAll(BODY_ROW)].some((row) => {
@@ -166,9 +163,9 @@ async function scrollStats(): Promise<{ fling: FrameStats; jumpEnd: Timing; jump
   return { fling: flung, jumpEnd, jumpTop };
 }
 
-async function runAll(reps = 5, skip: string[] = []): Promise<Record<string, unknown>> {
+async function runAll(reps = 5): Promise<Record<string, unknown>> {
   if (tree !== 'time-order') {
-    return runBottomUp(reps, skip);
+    return runBottomUp(reps);
   }
   const runs: Record<string, Timing[]> = {};
   const flings: FrameStats[] = [];
@@ -190,9 +187,7 @@ async function runAll(reps = 5, skip: string[] = []): Promise<Record<string, unk
     results.rowsUnfiltered = contender.visibleRowCount();
     add('filterOn', await timed(() => contender.setDetailFilter(true)));
     add('find', await timed(async () => (findMatches = await contender.find('AccountService'))));
-    if (!skip.includes('exportCsv')) {
-      add('exportCsv', await timed(async () => (csvLength = await contender.exportCsv())));
-    }
+    add('exportCsv', await timed(async () => (csvLength = await contender.exportCsv())));
     add('hideColumn', await timed(() => contender.setColumnVisible('heapPeak', false)));
     add('showColumn', await timed(() => contender.setColumnVisible('heapPeak', true)));
     resizes.push(
@@ -221,7 +216,7 @@ async function runAll(reps = 5, skip: string[] = []): Promise<Record<string, unk
 }
 
 /** The Aggregated or Bottom-Up tab's actions: sorting, the tree opened, searched and exported, then Bottom-Up grouping. */
-async function runBottomUp(reps: number, skip: string[]): Promise<Record<string, unknown>> {
+async function runBottomUp(reps: number): Promise<Record<string, unknown>> {
   const runs: Record<string, Timing[]> = {};
   const flings: FrameStats[] = [];
   const add = recorder(runs);
@@ -238,22 +233,20 @@ async function runBottomUp(reps: number, skip: string[]): Promise<Record<string,
     add('scrollJumpEnd', scroll.jumpEnd);
     add('scrollJumpTop', scroll.jumpTop);
     add('find', await timed(async () => (findMatches = await bottomUp.find('AccountService'))));
-    if (!skip.includes('exportCsv')) {
-      add('exportCsv', await timed(async () => (csvLength = await bottomUp.exportCsv())));
-    }
+    add('exportCsv', await timed(async () => (csvLength = await bottomUp.exportCsv())));
     add('collapseAll', await timed(() => bottomUp.collapseAll()));
     await settled();
     say(`rep ${rep + 1}/${reps} done`);
   }
 
-  // Last: Tabulator's Bottom-Up overflows the stack on an ungroup, so nothing may follow it.
+  // Last, as the Tabulator baseline ran them, so the figures compare.
   for (let rep = 0; grouped && rep < reps; rep++) {
     const table = grouped;
     add('groupByType', await timed(() => table.groupBy('type')));
     results.rowsGroupedByType = table.visibleRowCount();
     add('groupByNamespace', await timed(() => table.groupBy('namespace')));
   }
-  if (grouped && !skip.includes('ungroup')) {
+  if (grouped) {
     const table = grouped;
     add('ungroup', await timed(() => table.groupBy(null)));
   }
