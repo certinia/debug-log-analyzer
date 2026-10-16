@@ -5,7 +5,13 @@
  * Copyright (c) 2026 Certinia Inc. All rights reserved.
  */
 import { sum, type TreeSource } from '../../core/index.js';
-import { fakeHighlights, flush, type FakeHighlights } from '../../render/__tests__/fakes.js';
+import { GridView } from '../../render/index.js';
+import {
+  fakeHighlights,
+  fakeRowBoxes,
+  flush,
+  type FakeHighlights,
+} from '../../render/__tests__/fakes.js';
 import type { GridColumn } from '../column.js';
 import '../lv-grid.js';
 import type {
@@ -124,6 +130,14 @@ describe('lv-grid', () => {
     expect(titles).toEqual(['Name', 'Time', 'Kind']);
   });
 
+  it('names the treegrid by its label, and leaves it unnamed without one', async () => {
+    const { grid, scroller } = await setup();
+    expect(scroller?.hasAttribute('aria-label')).toBe(false);
+    grid.label = 'Call Tree, Time Order';
+    await settle(grid);
+    expect(scroller?.getAttribute('aria-label')).toBe('Call Tree, Time Order');
+  });
+
   it('leaves a hidden column out of the header and the tracks', async () => {
     const { grid, root } = await setup();
     grid.columns = columns().map((column) =>
@@ -228,6 +242,24 @@ describe('lv-grid', () => {
     expect(selected.at(-1)?.row).toBeNull();
   });
 
+  it('clears the selection on deselect, and reports nothing when none is selected', async () => {
+    const { grid, rowNamed } = await setup();
+    const selected: GridSelectDetail<Node>[] = [];
+    grid.addEventListener('lv-grid-select', (e) =>
+      selected.push(detail<GridSelectDetail<Node>>(e)),
+    );
+    rowNamed('c')?.querySelector<HTMLElement>('.cell')?.click();
+    await settle(grid);
+
+    grid.deselect();
+    await settle(grid);
+    expect(rowNamed('c')?.ariaSelected).toBe('false');
+    expect(selected.map((s) => s.row?.name ?? null)).toEqual(['c', null]);
+
+    grid.deselect();
+    expect(selected).toHaveLength(2);
+  });
+
   it('opens a row from its twisty without selecting it', async () => {
     const { grid, rowNamed, names } = await setup();
     rowNamed('b')?.querySelector<HTMLElement>('[data-toggle]')?.click();
@@ -318,12 +350,32 @@ describe('lv-grid', () => {
     expect(located).toEqual(['a', null]);
   });
 
+  it('takes keyboard focus on its rows', async () => {
+    const { grid, root, scroller } = await setup();
+    grid.focus();
+    expect(root.activeElement).toBe(scroller);
+  });
+
   it('opens the path to a row, then selects it', async () => {
     const { grid, rowNamed, names } = await setup();
     expect(await grid.goTo([2, 22])).toBe(true);
     await settle(grid);
     expect(names()).toEqual(['a', 'b', 'b1', 'b2', 'c']);
     expect(rowNamed('b2')?.ariaSelected).toBe('true');
+  });
+
+  it('keeps the scroll for a row in view whole, when asked to', async () => {
+    const { grid } = await setup();
+    const last = fakeRowBoxes(ROW, 2);
+    const scroll = jest.spyOn(GridView.prototype, 'scrollToIndex');
+
+    await grid.goTo([3], { scrollIfVisible: false });
+    expect(scroll).not.toHaveBeenCalled();
+    await grid.goTo([3]);
+    expect(scroll).toHaveBeenCalledTimes(1);
+    last.moveTo(8 * ROW + 1);
+    await grid.goTo([3], { scrollIfVisible: false });
+    expect(scroll).toHaveBeenCalledTimes(2);
   });
 
   it('reports the find total', async () => {
@@ -334,6 +386,19 @@ describe('lv-grid', () => {
     );
     await grid.find({ text: 'b' });
     expect(totals).toEqual([3]);
+  });
+
+  it('keeps the scroll for a current match in view whole, and centres one out of view', async () => {
+    const { grid } = await setup();
+    const last = fakeRowBoxes(ROW, 2);
+    const scroll = jest.spyOn(GridView.prototype, 'scrollToIndex');
+
+    expect(await grid.find({ text: 'c' })).toBe(1);
+    await grid.setCurrentMatch(0);
+    expect(scroll).not.toHaveBeenCalled();
+    last.moveTo(8 * ROW + 1);
+    await grid.setCurrentMatch(0);
+    expect(scroll).toHaveBeenCalledWith(2);
   });
 
   it('reports a reshape when its shown columns change, and not when they stay the same', async () => {

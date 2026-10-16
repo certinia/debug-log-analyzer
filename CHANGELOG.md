@@ -10,7 +10,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 
 - ⚡ **Timeline**: large logs are ready 3.1× faster and use 47% less memory, measured on a 100 MB log.
-- ⚡ **UI**: many components, including the tab views and Inspector sections, appear up to 80× faster on large logs. ([#63])
+- ⚡ **UI**: many components, including the tab views and Inspector sections, appear up to 80× faster on large logs.
+- ⚡ **Call Tree**: large logs respond up to 20× faster and use 93% less memory. ([#1169])
+  - Sort, expand and filter take under 0.2 s.
+  - Bottom-Up group by is 8× faster.
+  - Column resize is smooth, and Find has no delay.
+- 📋 **Call Tree copy**: `Cmd/Ctrl+C` copies the filtered rows and their depth in all three views. ([#1169])
 - ✂️ **Truncation**: each skipped section states how much of the log it dropped.
 - 🌊 **Flows**: names drop the `FLOW_START_INTERVIEWS :` and `WF_CRITERIA :` prefixes.
 - 📚 **Multiple logs**: a file holding several logs shows the first and flags the rest.
@@ -574,6 +579,13 @@ Skipped due to adopting odd numbering for pre releases and even number for relea
 - Add explorer menu item.
 - Provide more information when selecting log to download.
 
+<!-- Unreleased -->
+
+[#1169]: https://github.com/certinia/debug-log-analyzer/issues/1169
+[#1110]: https://github.com/certinia/debug-log-analyzer/issues/1110
+[#917]: https://github.com/certinia/debug-log-analyzer/issues/917
+[#875]: https://github.com/certinia/debug-log-analyzer/issues/875
+
 <!-- 1.22.0 -->
 
 [#873]: https://github.com/certinia/debug-log-analyzer/issues/873
@@ -588,9 +600,7 @@ Skipped due to adopting odd numbering for pre releases and even number for relea
 [#373]: https://github.com/certinia/debug-log-analyzer/issues/373
 [#298]: https://github.com/certinia/debug-log-analyzer/issues/298
 [#162]: https://github.com/certinia/debug-log-analyzer/issues/162
-[#875]: https://github.com/certinia/debug-log-analyzer/issues/875
 [#113]: https://github.com/certinia/debug-log-analyzer/issues/113
-[#63]: https://github.com/certinia/debug-log-analyzer/issues/63
 [#32]: https://github.com/certinia/debug-log-analyzer/issues/32
 
 <!-- v1.20.1 -->
@@ -771,5 +781,3 @@ Skipped due to adopting odd numbering for pre releases and even number for relea
 [#242]: https://github.com/certinia/debug-log-analyzer/issues/242
 [#235]: https://github.com/certinia/debug-log-analyzer/issues/235
 [#264]: https://github.com/certinia/debug-log-analyzer/issues/264
-[#1110]: https://github.com/certinia/debug-log-analyzer/issues/1110
-[#917]: https://github.com/certinia/debug-log-analyzer/issues/917

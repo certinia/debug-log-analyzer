@@ -11,8 +11,8 @@ import { CATEGORY_THEME_KEY, DEFAULT_THEME_NAME } from '../../timeline/themes/Th
 import { addCustomThemes, getTheme } from '../../timeline/themes/ThemeSelector.js';
 
 /**
- * Single source of truth for the call-tree category colour strip, shared by every
- * view that renders the bottom-up/aggregated tables (Call Tree tabs + Analysis view).
+ * Single source of truth for the category colour strip. The Call Tree and Analysis views
+ * share `wireCategoryColoring`; the Tabulator styles and row formatters serve Analysis only.
  *
  * Each row points at one host theme var via the inherited `--row-cat-color` custom
  * property, so a theme switch only updates the host vars and rows re-resolve in place —
@@ -59,9 +59,13 @@ function applyCategoryTheme(host: HTMLElement, themeName: string): void {
 /**
  * Wire category colouring onto a host element: seed the theme vars, follow live theme
  * switches, and toggle the colorize tint from settings. Call from `connectedCallback`
- * and call the returned function from `disconnectedCallback`.
+ * and call the returned function from `disconnectedCallback`. `onColorize` hears each
+ * tint change, for content the host's class does not reach.
  */
-export function wireCategoryColoring(host: HTMLElement): () => void {
+export function wireCategoryColoring(
+  host: HTMLElement,
+  onColorize?: (on: boolean) => void,
+): () => void {
   applyCategoryTheme(host, DEFAULT_THEME_NAME);
 
   const stopThemePreview = VSCodeExtensionMessenger.listen<{ activeTheme: string }>((event) => {
@@ -75,7 +79,9 @@ export function wireCategoryColoring(host: HTMLElement): () => void {
     const { timeline, callTree } = settings;
     addCustomThemes(timeline.customThemes);
     applyCategoryTheme(host, timeline.activeTheme ?? DEFAULT_THEME_NAME);
-    host.classList.toggle('category-colorize', callTree?.categoryColorize ?? false);
+    const on = callTree?.categoryColorize ?? false;
+    host.classList.toggle('category-colorize', on);
+    onColorize?.(on);
   };
 
   const stopSettings = subscribeSettings(apply);

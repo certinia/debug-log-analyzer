@@ -45,12 +45,7 @@ await measure(
   path.join(sizeDir, 'lib-tabulator.ts'),
 );
 await measure('@tanstack/virtual-core', path.join(sizeDir, 'lib-virtual.ts'));
-console.log('\nTime Order table layer (lit and parser excluded)');
-await measure(
-  'today: Tabulator + our modules + styles',
-  path.join(sizeDir, 'layer-tabulator.ts'),
-  shared,
-);
+console.log('\nTable layer (lit and parser excluded)');
 const grid = path.resolve('log-viewer/src/grid/index.ts');
 if (existsSync(grid)) {
   await measure('lv-grid: grid/index.ts', grid, shared);

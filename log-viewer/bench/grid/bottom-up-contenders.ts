@@ -9,7 +9,11 @@ import { logStoreFor } from '../../src/core/log/LogStore.js';
 import { createBottomUpTable } from '../../src/features/call-tree/components/BottomUpTable.js';
 import '../../src/features/call-tree/grid/CallTreeGrid.js';
 import type { CallTreeGrid } from '../../src/features/call-tree/grid/CallTreeGrid.js';
-import { BOTTOM_UP_SORT, bottomUpColumns } from '../../src/features/call-tree/grid/columns.js';
+import {
+  BOTTOM_UP_SORT,
+  bottomUpColumns,
+  mergedLines,
+} from '../../src/features/call-tree/grid/columns.js';
 import {
   buildBottomUpTree,
   type BottomUpRow,
@@ -108,6 +112,7 @@ export class LvGridBottomUp extends LvGridBench<BottomUpRow> implements BottomUp
     grid.columns = bottomUpColumns(log, { openType: () => {} });
     grid.filters = [{ test: details }];
     grid.sort = BOTTOM_UP_SORT;
+    grid.rowLines = mergedLines;
     const roots = await buildBottomUpTree(
       log.children,
       logStoreFor(log).keyPathIds(),

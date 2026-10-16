@@ -15,6 +15,7 @@ import { existsSync, readFileSync } from 'node:fs';
 
 const BASELINES = {
   'time-order': 'log-viewer/bench/grid/baseline/tabulator-580k.json',
+  aggregated: 'log-viewer/bench/grid/baseline/tabulator-aggregated-580k.json',
   'bottom-up': 'log-viewer/bench/grid/baseline/tabulator-bottom-up-580k.json',
 };
 const BUDGET_MS = 50;

@@ -5,13 +5,30 @@
  */
 import { afterEach, beforeEach, describe, expect, it } from '@jest/globals';
 import type { ApexLog } from '@apexdevtools/apex-log-parser';
-import type { Tabulator } from 'tabulator-tables';
 
-// The grids bring tabulator and its module registrations, which don't load under
-// jest; this suite drives only which table the view builds, and when.
-jest.mock('../TimeOrderTable.js', () => ({ createTimeOrderTable: () => build('time-order') }));
-jest.mock('../AggregatedTable.js', () => ({ createAggregatedTable: () => build('aggregated') }));
-jest.mock('../BottomUpTable.js', () => ({ createBottomUpTable: () => build('bottom-up') }));
+import { toAggregatedCallTree, toBottomUpTree, type BottomUpRow } from '../../utils/Aggregation.js';
+
+// The columns read a parsed log, which the fake one is not.
+jest.mock('../../grid/columns.js', () => ({
+  ...jest.requireActual<object>('../../grid/columns.js'),
+  timeOrderColumns: () => {
+    built.push('time-order');
+    return [];
+  },
+  aggregatedColumns: () => {
+    built.push('aggregated');
+    return [];
+  },
+  bottomUpColumns: () => {
+    built.push('bottom-up');
+    return [];
+  },
+}));
+jest.mock('../../utils/Aggregation.js', () => ({
+  ...jest.requireActual<object>('../../utils/Aggregation.js'),
+  buildAggregatedTree: (...args: unknown[]) => heldBuild(args[3]),
+  buildBottomUpTree: (...args: unknown[]) => heldBuild(args[3]),
+}));
 // VsSelect extends vscode-single-select, whose setFormValue needs an
 // ElementInternals jsdom lacks; the render would upgrade it.
 jest.mock('../../../../components/VsSelect.js', () => ({}));
@@ -20,53 +37,40 @@ jest.mock('../../../../components/VsSelect.js', () => ({}));
 jest.mock('../../../settings/Settings.js', () => ({
   ...jest.requireActual<object>('../../../settings/Settings.js'),
   getSettings: () => Promise.resolve({}),
-  subscribeSettings: () => () => {},
+  subscribeSettings: (apply: (settings: object) => void) => {
+    applySettings = apply;
+    return () => {};
+  },
 }));
 
 import { storeOf } from '#test-helpers/apexLog.js';
-import { LogStore } from '../../../../core/log/LogStore.js';
+import { eventBus } from '../../../../core/events/EventBus.js';
+import { LogStore, logStoreFor } from '../../../../core/log/LogStore.js';
 import { CalltreeView } from '../CalltreeView.js';
 
-/** Which table each build made, and which each teardown destroyed, in order. */
+/** Which view each build made, in order. */
 let built: string[] = [];
-let destroyed: string[] = [];
-/** The filters the newest table was given, so a rebuild can be told from a reset. */
-let filtered: unknown[] = [];
-/** Which tables had their columns applied, which is the tail of a build. */
-let wired: string[] = [];
-/** What Bottom Up was told to group on, per build. */
-let groupedBy: string[] = [];
-/** Finishes the newest build, where a test drives one that is in flight. */
-let finishBuild: (() => void) | null = null;
-/** Whether a build waits to be finished by hand. */
+/** Finishes the newest merged build, where a test drives one that is in flight. */
+let finishBuild: ((roots: object[]) => void) | null = null;
+/** Whether a merged build waits to be finished by hand. */
 let holdBuilds = false;
+/** Pushes settings to the view, as the extension does on a change. */
+let applySettings: (settings: object) => void = () => {};
 
-function build(kind: string): { table: Tabulator; tableBuilt: Promise<void> } {
-  built.push(kind);
-  // A new table carries no filters of its own, so the record starts over with it.
-  filtered = [];
-  const table = {
-    element: document.createElement('div'),
-    on: () => {},
-    getColumns: () => {
-      wired.push(kind);
-      return [];
-    },
-    redraw: () => {},
-    blockRedraw: () => {},
-    restoreRedraw: () => {},
-    clearFilter: () => {
-      filtered = [];
-    },
-    addFilter: (filter: unknown) => filtered.push(filter),
-    clearFindHighlights: () => {},
-    setSortedGroupBy: (field: string) => groupedBy.push(field),
-    destroy: () => destroyed.push(kind),
-  } as unknown as Tabulator;
+/** The signals the merged builds were given, in order. */
+let buildSignals: (AbortSignal | undefined)[] = [];
+
+function heldBuild(options: unknown): Promise<object[]> {
+  buildSignals.push((options as { signal?: AbortSignal } | undefined)?.signal);
   if (!holdBuilds) {
-    return { table, tableBuilt: Promise.resolve() };
+    return Promise.resolve([]);
   }
-  return { table, tableBuilt: new Promise<void>((resolve) => (finishBuild = resolve)) };
+  return new Promise((resolve) => (finishBuild = resolve));
+}
+
+/** The grids in the view's DOM. */
+function grids(view: CalltreeView): Element[] {
+  return [...view.renderRoot.querySelectorAll('lv-call-tree-grid')];
 }
 
 /** jsdom has no IntersectionObserver, and the build waits on one. */
@@ -108,11 +112,11 @@ async function settle(): Promise<void> {
   }
 }
 
-async function mountView(): Promise<CalltreeView> {
+async function mountView(log: ApexLog = apexLog()): Promise<CalltreeView> {
   const view = new CalltreeView();
   document.body.append(view);
   await view.updateComplete;
-  view.timelineRoot = apexLog();
+  view.timelineRoot = log;
   await view.updateComplete;
   await settle();
   return view;
@@ -123,10 +127,7 @@ describe('calltree-view table lifetime', () => {
 
   beforeEach(async () => {
     built = [];
-    destroyed = [];
-    filtered = [];
-    wired = [];
-    groupedBy = [];
+    buildSignals = [];
     finishBuild = null;
     holdBuilds = false;
     globalThis.IntersectionObserver = AlwaysVisible as unknown as typeof IntersectionObserver;
@@ -137,32 +138,52 @@ describe('calltree-view table lifetime', () => {
     view.remove();
   });
 
-  it('builds the table for the log it is given', () => {
+  it('builds the grid for the log it is given', () => {
     expect(built).toEqual(['time-order']);
+    expect(grids(view)).toEqual([view.timeOrderGrid]);
   });
 
-  it('rebuilds the table after a detach and a re-attach', async () => {
+  it('rebuilds the grid after a detach and a re-attach', async () => {
+    const before = view.timeOrderGrid;
     view.remove();
-    expect(destroyed).toEqual(['time-order']);
+    expect(view.timeOrderGrid).toBeNull();
+    expect(before?.isConnected).toBe(false);
 
     document.body.append(view);
     await settle();
 
     expect(built).toEqual(['time-order', 'time-order']);
+    expect(grids(view)).toEqual([view.timeOrderGrid]);
   });
 
   it('rebuilds under the filters the view was left with', async () => {
     view.namespaceSelected = ['ns'];
     view._updateFiltering();
-    const onShow = filtered.length;
+    const onShow = view.timeOrderGrid?.filters.length;
     expect(onShow).toBeGreaterThan(0);
 
     view.remove();
     document.body.append(view);
     await settle();
 
-    // The chip still reads as on, so the rebuilt table has to read the same way.
-    expect(filtered).toHaveLength(onShow);
+    // The chip still reads as on, so the rebuilt grid has to read the same way.
+    expect(view.timeOrderGrid?.filters).toHaveLength(onShow!);
+  });
+
+  it('keeps a filter that did not change, so the grid keeps its work for it', () => {
+    view.namespaceSelected = ['ns'];
+    view._updateFiltering();
+    const before = [...(view.timeOrderGrid?.filters ?? [])];
+
+    view._updateFiltering();
+    expect(view.timeOrderGrid?.filters).toEqual(before);
+
+    view._handleTotalTimeRange(
+      new CustomEvent('range', { detail: { range: { start: 1, end: null } } }),
+    );
+    // Equal filters share their test function, so this holds only for the same objects.
+    expect(view.timeOrderGrid?.filters).toEqual(expect.arrayContaining(before));
+    expect(view.timeOrderGrid?.filters).toHaveLength(before.length + 1);
   });
 
   it('builds nothing where the view goes before it is seen', async () => {
@@ -176,42 +197,86 @@ describe('calltree-view table lifetime', () => {
     expect(built).toEqual([]);
   });
 
-  it('leaves a build the detach overtook to the one that replaced it', async () => {
-    view.remove();
-    wired = [];
-    holdBuilds = true;
-    document.body.append(view);
-    await settle();
-    expect(built).toEqual(['time-order', 'time-order']);
+  it.each([
+    ['bottom-up', 'bottomUpGrid'],
+    ['aggregated', 'aggregatedGrid'],
+  ] as const)(
+    'leaves a %s build the detach overtook to the one that replaced it',
+    async (mode, field) => {
+      holdBuilds = true;
+      void view._setViewMode(mode);
+      await settle();
+      const overtaken = finishBuild!; // the held build set it
+      const first = view[field];
 
-    // Gone and back while the first build is still waiting on its table.
-    const overtaken = finishBuild!;
+      // Gone and back while the first build is still waiting on its tree.
+      view.remove();
+      holdBuilds = false;
+      document.body.append(view);
+      await settle();
+      expect(built).toEqual(['time-order', mode, mode]);
+      const newest = view[field];
+      const rows = newest?.source?.roots;
+
+      overtaken([{ id: 1, _pathId: 1 }]);
+      await settle();
+
+      // The view holds the newest grid now, so the overtaken build must not fill it.
+      expect(view[field]).toBe(newest);
+      expect(newest?.source?.roots).toBe(rows);
+      expect(first?.source).toBeNull();
+    },
+  );
+
+  it.each(['aggregated', 'bottom-up'] as const)(
+    'tells the inspector of %s, switched back to mid-build, once its rows are in',
+    async (mode) => {
+      holdBuilds = true;
+      void view._setViewMode(mode);
+      await settle();
+      const finish = finishBuild!; // the held build set it
+      await view._setViewMode('time-order');
+
+      const hasRows: boolean[] = [];
+      const off = eventBus.on('detail:view', () =>
+        hasRows.push(!!view[mode === 'aggregated' ? 'aggregatedGrid' : 'bottomUpGrid']?.source),
+      );
+      const back = view._setViewMode(mode);
+      await settle();
+      finish([{ id: 1, _pathId: 1 }]);
+      await back;
+      off();
+
+      expect(hasRows).toEqual([true]);
+    },
+  );
+
+  it('stops a build when a detach destroys its grid', async () => {
+    holdBuilds = true;
+    void view._setViewMode('bottom-up');
+    await settle();
+
     view.remove();
     holdBuilds = false;
     document.body.append(view);
     await settle();
-    expect(built).toHaveLength(3);
 
-    wired = [];
-    overtaken();
-    await settle();
-
-    // The container holds the newest table now, so the overtaken build must not
-    // read a header that is no longer its own.
-    expect(wired).toEqual([]);
+    expect(buildSignals.map((signal) => signal?.aborted)).toEqual([true, false]);
   });
 
   it('rebuilds bottom up grouped the way it was left', async () => {
     await view._setViewMode('bottom-up');
     view._handleBottomUpGroupBy({ target: { value: 'Namespace' } } as unknown as Event);
     await settle();
-    expect(groupedBy).toEqual(['namespace']);
+    const namespaceOf = (grid: CalltreeView['bottomUpGrid']) =>
+      grid?.groupBy?.({ namespace: 'ns' } as BottomUpRow);
+    expect(namespaceOf(view.bottomUpGrid)).toBe('ns');
 
     view.remove();
     document.body.append(view);
     await settle();
 
-    expect(groupedBy).toEqual(['namespace', 'namespace']);
+    expect(namespaceOf(view.bottomUpGrid)).toBe('ns');
   });
 
   it('rebuilds the view on show, not the one the log opened on', async () => {
@@ -224,6 +289,149 @@ describe('calltree-view table lifetime', () => {
     await settle();
 
     expect(built).toEqual(['time-order', 'bottom-up', 'bottom-up']);
+  });
+
+  it('names each grid by its view', async () => {
+    await view._setViewMode('bottom-up');
+    await settle();
+
+    expect(view.timeOrderGrid?.label).toBe('Call Tree, Time Order');
+    expect(view.bottomUpGrid?.label).toBe('Call Tree, Bottom-Up');
+  });
+
+  it.each(['_expandButtonClick', '_collapseButtonClick'] as const)(
+    'gives keyboard focus back to the grid after %s',
+    async (click) => {
+      await view[click]();
+
+      expect((view.renderRoot as ShadowRoot).activeElement).toBe(view.timeOrderGrid);
+    },
+  );
+
+  it('builds aggregated as a grid, under the filters in force', async () => {
+    view.namespaceSelected = ['ns'];
+    await view._setViewMode('aggregated');
+    await settle();
+
+    expect(built).toEqual(['time-order', 'aggregated']);
+    expect(grids(view)).toContain(view.aggregatedGrid);
+    // The namespace chip, and Show Details off.
+    expect(view.aggregatedGrid?.filters).toHaveLength(2);
+  });
+});
+
+describe('calltree-view category colorize', () => {
+  let view: CalltreeView;
+  const colorize = (on: boolean): void =>
+    applySettings({ timeline: { customThemes: {} }, callTree: { categoryColorize: on } });
+
+  beforeEach(async () => {
+    globalThis.IntersectionObserver = AlwaysVisible as unknown as typeof IntersectionObserver;
+    view = await mountView();
+  });
+
+  afterEach(() => {
+    view.remove();
+  });
+
+  it('tints the open grids when the setting changes, and grids built after', async () => {
+    colorize(true);
+    expect(view.timeOrderGrid?.hasAttribute('category-colorize')).toBe(true);
+
+    await view._setViewMode('bottom-up');
+    await settle();
+    expect(view.bottomUpGrid?.hasAttribute('category-colorize')).toBe(true);
+
+    colorize(false);
+    expect(view.timeOrderGrid?.hasAttribute('category-colorize')).toBe(false);
+    expect(view.bottomUpGrid?.hasAttribute('category-colorize')).toBe(false);
+  });
+});
+
+describe('calltree-view merged filters', () => {
+  // Outer runs 5 ms; its query and debug line take next to none.
+  const { log } = storeOf(
+    '09:18:22.6 (1000)|METHOD_ENTRY|[1]|01p|ns.Outer.run()\n' +
+      '09:18:22.6 (2000)|SOQL_EXECUTE_BEGIN|[2]|Aggregations:0|SELECT Id FROM Account\n' +
+      '09:18:22.6 (3000)|SOQL_EXECUTE_END|[2]|Rows:1\n' +
+      '09:18:22.6 (4000)|USER_DEBUG|[3]|DEBUG|hello\n' +
+      '09:18:22.6 (5001000)|METHOD_EXIT|[1]|ns.Outer.run()\n',
+  );
+  const paths = (): ReturnType<LogStore['keyPathIds']> => logStoreFor(log).keyPathIds();
+  const all = <R extends { _children?: R[] | null }>(of: readonly R[]): R[] =>
+    of.flatMap((row) => [row, ...all(row._children ?? [])]);
+  const rowsOf = {
+    aggregated: () => all(toAggregatedCallTree(log.children, paths())),
+    'bottom-up': () => all(toBottomUpTree(log.children, paths())),
+  };
+  const gridOf = (view: CalltreeView, mode: keyof typeof rowsOf) =>
+    mode === 'aggregated' ? view.aggregatedGrid : view.bottomUpGrid;
+  /** The rows each filter passes on its own; ancestors kept for a match are the grid's job. */
+  const passing = (view: CalltreeView, mode: keyof typeof rowsOf): string[] => {
+    const filters = (gridOf(view, mode)?.filters ?? []) as { test: (row: object) => boolean }[];
+    return rowsOf[mode]()
+      .filter((row) => filters.every((filter) => filter.test(row)))
+      .map((row) => row.text);
+  };
+
+  let view: CalltreeView;
+
+  beforeEach(async () => {
+    globalThis.IntersectionObserver = AlwaysVisible as unknown as typeof IntersectionObserver;
+    view = await mountView(log);
+    view.filterState.showDetails = true;
+  });
+
+  afterEach(() => {
+    view.remove();
+  });
+
+  it.each(['aggregated', 'bottom-up'] as const)(
+    'filters %s rows on their own total time and namespace',
+    async (mode) => {
+      await view._setViewMode(mode);
+      view._handleTotalTimeRange(
+        new CustomEvent('range', { detail: { range: { start: 1, end: null } } }),
+      );
+      expect(passing(view, mode)).toContain('ns.Outer.run()');
+      expect(passing(view, mode)).not.toContain('SELECT Id FROM Account');
+
+      view._handleNamespaceFacet(new CustomEvent('facet', { detail: { selected: ['other'] } }));
+      expect(passing(view, mode)).toEqual([]);
+    },
+  );
+
+  it('filters aggregated rows on their type, and on debug only', async () => {
+    await view._setViewMode('aggregated');
+    view._handleTypeFilter({ target: { value: 'SOQL_EXECUTE_BEGIN' } } as unknown as Event);
+    expect(passing(view, 'aggregated')).toEqual(['SELECT Id FROM Account']);
+
+    view._handleDebugOnlyChange();
+    expect(passing(view, 'aggregated')).toEqual(['DEBUG | hello']);
+  });
+});
+
+describe('calltree-view go to row', () => {
+  let view: CalltreeView;
+
+  afterEach(() => {
+    view.remove();
+  });
+
+  it('puts keyboard focus on the grid, so its keys work at once', async () => {
+    globalThis.IntersectionObserver = AlwaysVisible as unknown as typeof IntersectionObserver;
+    const { log } = storeOf(
+      '09:18:22.6 (1000)|METHOD_ENTRY|[1]|01p|ns.Outer.run()\n' +
+        '09:18:22.6 (1800)|METHOD_EXIT|[1]|ns.Outer.run()\n',
+    );
+    view = await mountView(log);
+    const all = (events: ApexLog['children']): ApexLog['children'] =>
+      events.flatMap((e) => [e, ...all(e.children)]);
+    const outer = all(log.children).find((e) => e.text === 'ns.Outer.run()');
+
+    await view._goToRow(outer?.eventIndex ?? -1);
+
+    expect((view.renderRoot as ShadowRoot).activeElement === view.timeOrderGrid).toBe(true);
   });
 });
 
@@ -303,5 +511,81 @@ describe('calltree-view type picker', () => {
 
     expect(types).toContain('DML_BEGIN');
     expect(types).not.toContain('METHOD_ENTRY');
+  });
+});
+
+describe('calltree-view find', () => {
+  let view: CalltreeView;
+  const results: number[] = [];
+  const onResults = (e: Event): void => {
+    results.push((e as CustomEvent<{ totalMatches: number }>).detail.totalMatches);
+  };
+
+  beforeEach(async () => {
+    built = [];
+    holdBuilds = false;
+    globalThis.IntersectionObserver = AlwaysVisible as unknown as typeof IntersectionObserver;
+    view = await mountView();
+    results.length = 0;
+    document.addEventListener('lv-find-results', onResults);
+  });
+
+  afterEach(() => {
+    document.removeEventListener('lv-find-results', onResults);
+    view.remove();
+  });
+
+  function startFind(text: string): void {
+    const detail = { text, count: 1, options: { matchCase: false } };
+    document.dispatchEvent(new CustomEvent('lv-find', { detail }));
+  }
+
+  async function find(text: string): Promise<void> {
+    startFind(text);
+    await settle();
+  }
+
+  function shownGrid(): NonNullable<CalltreeView['timeOrderGrid']> {
+    const grid = view.timeOrderGrid;
+    if (!grid) {
+      throw new Error('no grid');
+    }
+    // jsdom does no layout, and find skips a grid that is not on screen.
+    Object.defineProperty(grid, 'clientHeight', { value: 100 });
+    jest.spyOn(grid, 'setCurrentMatch').mockResolvedValue();
+    return grid;
+  }
+
+  it('shows no matches for a find a rebuild dropped, and searches again on the next Enter', async () => {
+    const grid = shownGrid();
+    const gridFind = jest.spyOn(grid, 'find').mockResolvedValueOnce(-1).mockResolvedValueOnce(2);
+
+    await find('foo');
+    expect(results).toEqual([0]);
+
+    await find('foo');
+    expect(gridFind).toHaveBeenCalledTimes(2);
+    expect(results).toEqual([0, 2]);
+  });
+
+  it('ignores a find a newer one replaced, and keeps the matches through a reshape until the last find ends', async () => {
+    const grid = shownGrid();
+    const reshape = (): boolean => grid.dispatchEvent(new CustomEvent('lv-grid-reshape'));
+    let finishFirst: (total: number) => void = () => {};
+    jest
+      .spyOn(grid, 'find')
+      .mockImplementationOnce(() => new Promise((resolve) => (finishFirst = resolve)))
+      .mockResolvedValueOnce(3);
+
+    startFind('foo');
+    await find('food');
+    reshape();
+    expect(results).toEqual([3]);
+
+    finishFirst(-1);
+    await settle();
+    expect(results).toEqual([3]);
+    reshape();
+    expect(results).toEqual([3, 0]);
   });
 });
