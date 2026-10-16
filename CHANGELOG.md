@@ -11,7 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - ⚡ **Timeline**: large logs are ready 3.1× faster and use 47% less memory, measured on a 100 MB log.
 - ⚡ **UI**: many components, including the tab views and Inspector sections, appear up to 80× faster on large logs.
-- ⚡ **Tables**: the Call Tree, Analysis and Database tables respond up to 30× faster on large logs and use 93% less memory. ([#1169])
+- ⚡ **Tables**: the Call Tree, Analysis, Database and Inspector tables respond up to 30× faster on large logs and use 93% less memory. ([#1169])
   - Sort, expand and filter take under 0.2 s, and group by is up to 9× faster.
   - Column resize is smooth, and Find has no delay.
   - `Cmd/Ctrl+C` copies the filtered rows and their depth in each table, and the Analysis CSV export holds the same rows.
