@@ -3,9 +3,11 @@
  */
 import type { ApexLog, LogEvent, SelfTotal } from '@apexdevtools/apex-log-parser';
 
+import type { ColumnSettingsOptions } from '../../../components/ColumnSettingsController.js';
 import { bar } from '../../../components/grid/cells.js';
 import { COUNT_MIN_WIDTH, countColumn, timeColumn } from '../../../components/grid/columns.js';
 import { NO_REPORTED_LIMITS_TEXT } from '../../../components/governorCopy.js';
+import { vscodeMessenger } from '../../../core/messaging/VSCodeExtensionMessenger.js';
 import { getCallerNamespace } from '../../../core/utility/CallerNamespace.js';
 import { formatInteger, sharePercent } from '../../../core/utility/Util.js';
 import {
@@ -18,6 +20,7 @@ import {
   type RowFilter,
   type TreeSource,
 } from '../../../grid/index.js';
+import { CALL_TREE_VIEWS } from '../../../tabulator/ColumnViews.js';
 import { NAMESPACE_WIDTH } from '../../../tabulator/ColumnWidths.js';
 import { soqlGroupCell } from '../../soql/format/groupHeader.js';
 import type { AggregatedRow, BottomUpRow } from '../utils/Aggregation.js';
@@ -455,6 +458,17 @@ function nameLines(event: LogEvent): number {
 export const mergedLines = (row: { originalData: LogEvent }): number => nameLines(row.originalData);
 
 export const TIME_ORDER_DETAILS: RowFilter<LogEvent> = { test: isDetailEvent, keepAncestors: true };
+
+/** Opens the type a Name cell links to. */
+export const openType = (text: string): void => vscodeMessenger.send<string>('openType', text);
+
+/** The column view every Call Tree grid shares, the Analysis tab's included. */
+export const CALL_TREE_COLUMN_SETTINGS: Omit<ColumnSettingsOptions, 'tables'> = {
+  section: 'callTree',
+  read: (settings) => settings.callTree,
+  views: CALL_TREE_VIEWS,
+  alwaysVisible: ['text'],
+};
 
 /** Show Details on the Bottom-Up tree. */
 export const BOTTOM_UP_DETAILS: RowFilter<BottomUpRow> = { test: (row) => row._hasDetailsDeep };

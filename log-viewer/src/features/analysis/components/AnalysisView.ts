@@ -17,8 +17,6 @@ import { InspectorTabController } from '../../../components/InspectorTabControll
 import { revealFirstOf } from '../../../components/inspectorTab.js';
 import { SelectionEchoGuard } from '../../../core/events/SelectionEchoGuard.js';
 import { SubscriptionController } from '../../../core/events/SubscriptionController.js';
-import { vscodeMessenger } from '../../../core/messaging/VSCodeExtensionMessenger.js';
-import { logStoreFor } from '../../../core/log/LogStore.js';
 import { isVisible } from '../../../core/utility/Util.js';
 import {
   ColumnSettingsController,
@@ -28,27 +26,22 @@ import { exportCsv } from '../../../components/grid/exportCsv.js';
 import { LvGridFindController } from '../../../components/grid/LvGridFindController.js';
 import { GridColumnMenuController } from '../../../components/GridColumnMenuController.js';
 import { columnViewSelect, gridToolbarActions } from '../../../components/gridToolbar.js';
-import type { GridColumn, GroupBy, TreeSource } from '../../../grid/index.js';
+import type { GridColumn, GroupBy, RowKey, TreeSource } from '../../../grid/index.js';
 import { CALL_TREE_VIEWS } from '../../../tabulator/ColumnViews.js';
 import '../../call-tree/grid/CallTreeGrid.js';
 import type { CallTreeGrid } from '../../call-tree/grid/CallTreeGrid.js';
 import {
   BOTTOM_UP_DETAILS,
   BOTTOM_UP_SORT,
+  CALL_TREE_COLUMN_SETTINGS,
   bottomUpColumns,
   bottomUpGroupBy,
   mergedLines,
+  openType,
 } from '../../call-tree/grid/columns.js';
 import { inspectorRowEvents } from '../../call-tree/grid/inspectorRowEvents.js';
-import {
-  linkRows,
-  markedIds,
-  mergedPath,
-  mergedRow,
-  rowStandIn,
-  type MergedLinks,
-} from '../../call-tree/grid/mergedRows.js';
-import { buildBottomUpTree, type BottomUpRow } from '../../call-tree/utils/Aggregation.js';
+import { MergedTree } from '../../call-tree/grid/mergedRows.js';
+import type { BottomUpRow } from '../../call-tree/utils/Aggregation.js';
 import { wireCategoryColoring } from '../../call-tree/utils/CategoryColoring.js';
 
 // styles
@@ -57,11 +50,6 @@ import { globalStyles } from '../../../styles/global.styles.js';
 // Components
 import '../../../components/datagrid-filter-bar.js';
 import '../../../components/GridSkeleton.js';
-
-/** The Name column is always shown in the analysis table. */
-const ALWAYS_VISIBLE = ['text'];
-
-const openType = (text: string): void => vscodeMessenger.send<string>('openType', text);
 
 @customElement('analysis-view')
 export class AnalysisView extends LitElement {
@@ -119,14 +107,14 @@ export class AnalysisView extends LitElement {
   @state()
   private _groupBy: GroupBy<BottomUpRow> | null = null;
   @state()
-  private _marked: ReadonlySet<number> = new Set();
+  private _marked: ReadonlySet<RowKey> = new Set();
   @state()
   private _colorize = false;
   @state()
   private _showDetails = false;
 
   grid: CallTreeGrid<BottomUpRow> | null = null;
-  private _links: MergedLinks<BottomUpRow> | null = null;
+  private _tree: MergedTree<BottomUpRow> | null = null;
   private _built: Promise<void> | null = null;
 
   // A render binds `_columns` to the grid again, so the column view writes there, not to the grid.
@@ -135,10 +123,7 @@ export class AnalysisView extends LitElement {
     (columns) => (this._columns = columns),
   );
   private readonly _settings = new ColumnSettingsController(this, {
-    section: 'callTree',
-    read: (settings) => settings.callTree,
-    views: CALL_TREE_VIEWS,
-    alwaysVisible: ALWAYS_VISIBLE,
+    ...CALL_TREE_COLUMN_SETTINGS,
     tables: () => [this._columnTarget],
   });
   private readonly _menus = new GridColumnMenuController({
@@ -180,7 +165,7 @@ export class AnalysisView extends LitElement {
    */
   private _markLocated(eventIndexes: readonly number[]): void {
     const pathIds = this._locateIds.idsFor(this.timelineRoot, eventIndexes, 'callers');
-    const marked = markedIds(this._links, pathIds);
+    const marked = this._tree?.marked(pathIds) ?? new Set<RowKey>();
     // A new set repaints the rows, and most pointer moves leave the mark as it was.
     if (marked.size !== this._marked.size || [...marked].some((id) => !this._marked.has(id))) {
       this._marked = marked;
@@ -193,10 +178,10 @@ export class AnalysisView extends LitElement {
    * the row it just asked for.
    */
   private async _revealEventIndex(eventIndex: number, signal: AbortSignal): Promise<void> {
-    const grid = this.grid;
+    const { grid, _tree: tree } = this;
     const pathIds = this._revealIds.idsFor(this.timelineRoot, [eventIndex], 'callers');
-    const row = mergedRow(this._links, pathIds);
-    if (!grid || !row) {
+    const row = tree?.rowFor(pathIds);
+    if (!grid || !tree || !row) {
       return;
     }
 
@@ -213,7 +198,7 @@ export class AnalysisView extends LitElement {
     }
 
     await this._echoGuard.runAsync(() =>
-      grid.goTo(mergedPath(this._links, pathIds), { scrollIfVisible: false }),
+      grid.goTo(tree.pathTo(pathIds), { scrollIfVisible: false }),
     );
   }
 
@@ -339,18 +324,14 @@ export class AnalysisView extends LitElement {
   }
 
   private async _build(root: ApexLog): Promise<void> {
-    const roots = await buildBottomUpTree(
-      root.children,
-      logStoreFor(root).keyPathIds(),
-      root.governorLimits,
-    );
-    if (!roots) {
+    const tree = await MergedTree.bottomUp(root);
+    if (!tree) {
       return;
     }
-    this._links = linkRows(roots);
+    this._tree = tree;
     this._columns = bottomUpColumns(root, { openType });
     this._settings.applyTo(this._columnTarget);
-    this._source = { roots, children: (row) => row._children, key: (row) => row.id };
+    this._source = tree.source;
   }
 
   private async _expandAll(open: boolean): Promise<void> {
@@ -364,12 +345,8 @@ export class AnalysisView extends LitElement {
     source: 'analysis',
     root: () => this.timelineRoot,
     view: () => 'callers',
-    standIn: (row) =>
-      rowStandIn(
-        row,
-        (r) => r,
-        (r) => this._links?.parents.get(r),
-      ),
+    data: (row) => row,
+    parentOf: (row) => this._tree?.parentOf(row),
     echoGuard: this._echoGuard,
     dropPick: () => this._inspector.dropPick(),
   });

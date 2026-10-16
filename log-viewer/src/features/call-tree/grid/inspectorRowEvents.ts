@@ -15,8 +15,9 @@ export interface InspectorRowEventsOptions<R> {
   root: () => ApexLog | null;
   /** The direction the grid's rows read in. */
   view: () => SelectionView;
-  /** The Tabulator row shape the inspector reads a row by. */
-  standIn: (row: R) => RowComponent;
+  /** The fields the inspector reads off a row: the event itself, or a bucket's `originalData`. */
+  data: (row: R) => object;
+  parentOf?: (row: R) => R | undefined;
   echoGuard: SelectionEchoGuard;
   /** Drops the mark a picked inspector row left in the grid. */
   dropPick: () => void;
@@ -27,6 +28,8 @@ export function inspectorRowEvents<R>(opts: InspectorRowEventsOptions<R>): {
   select: (e: Event) => void;
   locate: (e: Event) => void;
 } {
+  const parentOf = opts.parentOf ?? (() => undefined);
+  const standIn = (row: R): RowComponent => rowStandIn(row, opts.data, parentOf);
   return {
     select: (e) => {
       if (opts.echoGuard.suppressed) {
@@ -34,7 +37,7 @@ export function inspectorRowEvents<R>(opts: InspectorRowEventsOptions<R>): {
       }
       const { row } = (e as CustomEvent<GridSelectDetail<R>>).detail;
       const view = opts.view();
-      const selection = rowDetailSelection(row ? opts.standIn(row) : undefined, opts.root(), view);
+      const selection = rowDetailSelection(row ? standIn(row) : undefined, opts.root(), view);
       if (!selection) {
         // The selection went with it, and so does a mark a picked inspector row
         // left here — it was never a selection of this grid.
@@ -46,8 +49,23 @@ export function inspectorRowEvents<R>(opts: InspectorRowEventsOptions<R>): {
       const { row } = (e as CustomEvent<GridRowDetail<R>>).detail;
       eventBus.emit('detail:locate', {
         source: opts.source,
-        eventIndexes: row ? rowFrames(opts.standIn(row), opts.root(), opts.view()) : [],
+        eventIndexes: row ? rowFrames(standIn(row), opts.root(), opts.view()) : [],
       });
     },
   };
+}
+
+/** The Tabulator row shape `locatedRow` reads, for a row of an lv-grid. */
+function rowStandIn<R>(
+  row: R,
+  data: (row: R) => object,
+  parentOf: (row: R) => R | undefined,
+): RowComponent {
+  return {
+    getData: () => data(row),
+    getTreeParent: () => {
+      const parent = parentOf(row);
+      return parent ? rowStandIn(parent, data, parentOf) : false;
+    },
+  } as unknown as RowComponent;
 }

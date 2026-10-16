@@ -1,88 +1,101 @@
 /*
  * Copyright (c) 2026 Certinia Inc. All rights reserved.
  */
-import type { RowComponent } from 'tabulator-tables';
+import type { ApexLog } from '@apexdevtools/apex-log-parser';
 
-import type { RowKey } from '../../../grid/index.js';
-
-/** The Tabulator row shape `locatedRow` reads, for a row of an lv-grid. */
-export function rowStandIn<R>(
-  row: R,
-  data: (row: R) => object,
-  parentOf: (row: R) => R | undefined,
-): RowComponent {
-  return {
-    getData: () => data(row),
-    getTreeParent: () => {
-      const parent = parentOf(row);
-      return parent ? rowStandIn(parent, data, parentOf) : false;
-    },
-  } as unknown as RowComponent;
-}
+import { logStoreFor } from '../../../core/log/LogStore.js';
+import type { RowKey, TreeSource } from '../../../grid/index.js';
+import {
+  buildAggregatedTree,
+  buildBottomUpTree,
+  type AggregatedRow,
+  type BottomUpRow,
+} from '../utils/Aggregation.js';
 
 /** A row of a merged view: Aggregated or Bottom-Up. */
-interface MergedRow<R> {
+export interface MergedRowShape<R> {
   id: number;
   _pathId: number;
   _children?: R[] | null;
 }
 
-/** The parent of each merged row, and each row by its path id: the rows have neither. */
-export interface MergedLinks<R> {
-  parents: Map<R, R>;
-  byPath: Map<number, R>;
-}
-
-/** Indexes the rows under `roots` by parent and by path id. */
-export function linkRows<R extends MergedRow<R>>(roots: readonly R[]): MergedLinks<R> {
-  const parents = new Map<R, R>();
-  const byPath = new Map<number, R>();
-  const walk = (row: R): void => {
-    byPath.set(row._pathId, row);
-    for (const child of row._children ?? []) {
-      parents.set(child, row);
-      walk(child);
-    }
-  };
-  roots.forEach(walk);
-  return { parents, byPath };
-}
-
 /**
- * The row `pathIds` name nearest the top. A frame heads the bucket for its own
- * method and also names the caller rows it sits under in other buckets.
+ * A built Aggregated or Bottom-Up tree, with the parent and path-id lookups its rows
+ * lack. The inspector names rows by path id, the grid by row key.
  */
-export function mergedRow<R extends MergedRow<R>>(
-  links: MergedLinks<R> | null,
-  pathIds: readonly number[],
-): R | undefined {
-  let nearest: R | undefined;
-  for (const id of pathIds) {
-    const row = links?.byPath.get(id);
-    if (row && !links?.parents.has(row)) {
-      return row;
+export class MergedTree<R extends MergedRowShape<R>> {
+  readonly source: TreeSource<R>;
+  private readonly _parents = new Map<R, R>();
+  private readonly _byPath = new Map<number, R>();
+
+  /** The Bottom-Up tree of `log`, or null when `signal` aborts the build. */
+  static async bottomUp(
+    log: ApexLog,
+    options: { signal?: AbortSignal } = {},
+  ): Promise<MergedTree<BottomUpRow> | null> {
+    const roots = await buildBottomUpTree(
+      log.children,
+      logStoreFor(log).keyPathIds(),
+      log.governorLimits,
+      options,
+    );
+    return roots ? new MergedTree(roots) : null;
+  }
+
+  /** The Aggregated tree of `log`, or null when `signal` aborts the build. */
+  static async aggregated(
+    log: ApexLog,
+    options: { signal?: AbortSignal } = {},
+  ): Promise<MergedTree<AggregatedRow> | null> {
+    const roots = await buildAggregatedTree(
+      log.children,
+      logStoreFor(log).keyPathIds(),
+      log.governorLimits,
+      options,
+    );
+    return roots ? new MergedTree(roots) : null;
+  }
+
+  constructor(roots: readonly R[]) {
+    const walk = (row: R): void => {
+      this._byPath.set(row._pathId, row);
+      for (const child of row._children ?? []) {
+        this._parents.set(child, row);
+        walk(child);
+      }
+    };
+    roots.forEach(walk);
+    this.source = { roots, children: (row) => row._children, key: (row) => row.id };
+  }
+
+  parentOf(row: R): R | undefined {
+    return this._parents.get(row);
+  }
+
+  /** The keys of every row `pathIds` name. */
+  marked(pathIds: readonly number[]): Set<RowKey> {
+    return new Set(pathIds.flatMap((id) => this._byPath.get(id)?.id ?? []));
+  }
+
+  /** The row `pathIds` name nearest the top: a frame heads its own bucket and sits under callers in others. */
+  rowFor(pathIds: readonly number[]): R | undefined {
+    let nearest: R | undefined;
+    for (const id of pathIds) {
+      const row = this._byPath.get(id);
+      if (row && !this._parents.has(row)) {
+        return row;
+      }
+      nearest ??= row;
     }
-    nearest ??= row;
+    return nearest;
   }
-  return nearest;
-}
 
-/** The keys from a top-level row down to the {@link mergedRow} of `pathIds`. */
-export function mergedPath<R extends MergedRow<R>>(
-  links: MergedLinks<R> | null,
-  pathIds: readonly number[],
-): RowKey[] {
-  const path: RowKey[] = [];
-  for (let row = mergedRow(links, pathIds); row; row = links?.parents.get(row)) {
-    path.unshift(row.id);
+  /** The keys from a top-level row down to the {@link rowFor} of `pathIds`. */
+  pathTo(pathIds: readonly number[]): RowKey[] {
+    const path: RowKey[] = [];
+    for (let row = this.rowFor(pathIds); row; row = this._parents.get(row)) {
+      path.unshift(row.id);
+    }
+    return path;
   }
-  return path;
-}
-
-/** The keys of every row `pathIds` name. */
-export function markedIds<R extends MergedRow<R>>(
-  links: MergedLinks<R> | null,
-  pathIds: readonly number[],
-): Set<number> {
-  return new Set(pathIds.flatMap((id) => links?.byPath.get(id)?.id ?? []));
 }
