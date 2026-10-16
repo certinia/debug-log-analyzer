@@ -226,6 +226,8 @@ export class CalltreeView extends LitElement {
   bottomUpGrid: LvGrid<BottomUpRow> | null = null;
   private _aggregatedLinks: MergedLinks<AggregatedRow> | null = null;
   private _bottomUpLinks: MergedLinks<BottomUpRow> | null = null;
+  private _aggregatedBuild: Promise<void> | null = null;
+  private _bottomUpBuild: Promise<void> | null = null;
 
   filterState: { showDetails: boolean; debugOnly: boolean; selectedTypes: Set<string> } = {
     showDetails: false,
@@ -660,6 +662,8 @@ export class CalltreeView extends LitElement {
     this.bottomUpGrid = null;
     this._aggregatedLinks = null;
     this._bottomUpLinks = null;
+    this._aggregatedBuild = null;
+    this._bottomUpBuild = null;
   }
 
   _handleBottomUpGroupBy(event: Event) {
@@ -1136,6 +1140,7 @@ export class CalltreeView extends LitElement {
     rootMethod: ApexLog,
   ): Promise<void> {
     if (this.aggregatedGrid) {
+      await this._aggregatedBuild;
       await waitForNextFrame();
       return;
     }
@@ -1150,6 +1155,14 @@ export class CalltreeView extends LitElement {
     grid.rowLines = mergedLines;
     grid.filters = this._aggregatedFilters();
     this._columns.applyTo(gridColumnTarget(grid));
+    this._aggregatedBuild = this._fillAggregatedTree(grid, rootMethod);
+    await this._aggregatedBuild;
+  }
+
+  private async _fillAggregatedTree(
+    grid: LvGrid<AggregatedRow>,
+    rootMethod: ApexLog,
+  ): Promise<void> {
     const roots = await buildAggregatedTree(
       rootMethod.children,
       logStoreFor(rootMethod).keyPathIds(),
@@ -1167,6 +1180,7 @@ export class CalltreeView extends LitElement {
 
   private async _renderBottomUpTree(container: HTMLDivElement, rootMethod: ApexLog): Promise<void> {
     if (this.bottomUpGrid) {
+      await this._bottomUpBuild;
       await waitForNextFrame();
       return;
     }
@@ -1183,6 +1197,11 @@ export class CalltreeView extends LitElement {
     grid.groupBy = bottomUpGroupBy(this.bottomUpGroupBy);
     grid.filters = this._bottomUpFilters();
     this._columns.applyTo(gridColumnTarget(grid));
+    this._bottomUpBuild = this._fillBottomUpTree(grid, rootMethod);
+    await this._bottomUpBuild;
+  }
+
+  private async _fillBottomUpTree(grid: LvGrid<BottomUpRow>, rootMethod: ApexLog): Promise<void> {
     const roots = await buildBottomUpTree(
       rootMethod.children,
       logStoreFor(rootMethod).keyPathIds(),

@@ -44,6 +44,7 @@ jest.mock('../../../settings/Settings.js', () => ({
 }));
 
 import { storeOf } from '#test-helpers/apexLog.js';
+import { eventBus } from '../../../../core/events/EventBus.js';
 import { LogStore } from '../../../../core/log/LogStore.js';
 import { CalltreeView } from '../CalltreeView.js';
 
@@ -243,6 +244,29 @@ describe('calltree-view table lifetime', () => {
     expect(newest?.source?.roots).toBe(rows);
     expect(first?.source).toBeNull();
   });
+
+  it.each(['aggregated', 'bottom-up'] as const)(
+    'tells the inspector of %s, switched back to mid-build, once its rows are in',
+    async (mode) => {
+      holdBuilds = true;
+      void view._setViewMode(mode);
+      await settle();
+      const finish = finishBuild!; // the held build set it
+      await view._setViewMode('time-order');
+
+      const hasRows: boolean[] = [];
+      const off = eventBus.on('detail:view', () =>
+        hasRows.push(!!view[mode === 'aggregated' ? 'aggregatedGrid' : 'bottomUpGrid']?.source),
+      );
+      const back = view._setViewMode(mode);
+      await settle();
+      finish([{ id: 1, _pathId: 1 }]);
+      await back;
+      off();
+
+      expect(hasRows).toEqual([true]);
+    },
+  );
 
   it('stops a build when a detach destroys its grid', async () => {
     holdBuilds = true;
