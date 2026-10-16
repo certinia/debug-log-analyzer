@@ -41,7 +41,7 @@ function fakeTable(): ColumnTarget & { visible(): string[] } {
   let shown: ReadonlySet<string> | null = null;
   const isShown = (field: string) => !shown || shown.has(field);
   return {
-    columns: () => FIELDS.map((field) => ({ field, title: field, visible: isShown(field) })),
+    columns: () => FIELDS.map((field) => ({ id: field, title: field, hidden: !isShown(field) })),
     show: (visible) => {
       shown = visible;
     },

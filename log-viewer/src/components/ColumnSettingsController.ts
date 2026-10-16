@@ -36,12 +36,7 @@ export function heldColumnTarget<R>(
   write: (columns: GridColumn<R>[]) => void,
 ): ColumnTarget {
   return {
-    columns: () =>
-      read().map((column) => ({
-        field: column.id,
-        title: column.title,
-        visible: !column.hidden,
-      })),
+    columns: read,
     show: (visible) => {
       write(
         read().map((column) => ({
@@ -131,7 +126,7 @@ export class ColumnSettingsController implements ReactiveController {
 
   /** Add or remove one column from the view on show, and remember it. */
   toggle(target: ColumnTarget, field: string): void {
-    const fields = target.columns().map((column) => column.field);
+    const fields = target.columns().map((column) => column.id);
     this._overrides = {
       ...this._overrides,
       [this._view]: toggleField(this.fieldsFor(this._view), field, fields),

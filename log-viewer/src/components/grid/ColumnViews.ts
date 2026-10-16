@@ -1,13 +1,13 @@
 /*
  * Copyright (c) 2026 Certinia Inc. All rights reserved.
  */
+import type { GridColumn } from '../../grid/index.js';
 import type { ContextMenuItem } from '../ContextMenu.js';
 
 /**
- * A preconfigured set of columns tailored to a kind of investigation. Column
- * membership is keyed by column id. Presets list every applicable field
- * name; fields absent from a given table are ignored,
- * so one preset works across differently-shaped tables (e.g. the three call-tree
+ * A preconfigured set of columns tailored to a kind of investigation. Its fields
+ * are column ids. Presets list every applicable id; ids absent from a given grid
+ * are ignored, so one preset works across differently-shaped grids (e.g. the three call-tree
  * modes name equivalent columns differently: `duration.total` vs `totalTime`).
  */
 export interface ColumnView {
@@ -158,11 +158,8 @@ export function toggleField(
 const CHECKED = '✓ ';
 const UNCHECKED = '  ';
 
-export interface MenuColumn {
-  field: string;
-  title: string;
-  visible: boolean;
-}
+/** The part of a grid column the menu reads. */
+export type MenuColumn = Pick<GridColumn<never>, 'id' | 'title' | 'hidden'>;
 
 /**
  * Builds the column-header context menu from a grid's columns in order: the preset
@@ -187,14 +184,14 @@ export function columnMenuItems(
 
   items.push({ id: 'view-sep', label: '', separator: true });
 
-  for (const { field, title, visible } of columns) {
-    if (!field || alwaysVisible.includes(field)) {
+  for (const { id, title, hidden } of columns) {
+    if (alwaysVisible.includes(id)) {
       continue;
     }
     items.push({
-      id: `col:${field}`,
+      id: `col:${id}`,
       label: title,
-      checked: visible,
+      checked: !hidden,
       keepOpen: true,
     });
   }

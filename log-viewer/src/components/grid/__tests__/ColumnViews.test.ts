@@ -17,7 +17,7 @@ import {
 } from '../ColumnViews.js';
 
 const menuColumns = (fields: string[]): MenuColumn[] =>
-  fields.map((field) => ({ field, title: field, visible: true }));
+  fields.map((field) => ({ id: field, title: field }));
 
 const ALWAYS_VISIBLE = ['text'];
 
