@@ -5,7 +5,7 @@ import { html } from 'lit';
 import { unsafeHTML } from 'lit/directives/unsafe-html.js';
 
 import { formatNsAsMs } from '../../core/utility/Duration.js';
-import { formatDuration, formatInteger } from '../../core/utility/Util.js';
+import { formatDuration } from '../../core/utility/Util.js';
 import { formatSOQL, formatSOQLToText } from '../../features/soql/format/formatter.js';
 import type { Dialect } from '../../features/soql/format/tokenize.js';
 import { sum, type Calc, type GridColumn } from '../../grid/index.js';
@@ -37,28 +37,6 @@ export function countColumn<R>(opts: {
     sort: { value: opts.value },
     sortFirst: 'desc',
     calc: opts.summed === false ? undefined : sum((row) => opts.value(row) ?? 0),
-  };
-}
-
-/** A count of calls, with thousands separators, totalled by `calc` when given. */
-export function callsColumn<R>(opts: {
-  id: string;
-  value: (row: R) => number;
-  calc?: Calc<R>;
-}): GridColumn<R> {
-  const text = (row: R) => formatInteger(opts.value(row));
-  return {
-    id: opts.id,
-    title: 'Calls',
-    width: 56,
-    minWidth: 56,
-    align: 'end',
-    cell: text,
-    text,
-    sort: { value: opts.value },
-    sortFirst: 'desc',
-    calc: opts.calc,
-    total: formatInteger,
   };
 }
 

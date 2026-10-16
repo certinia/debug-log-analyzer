@@ -9,7 +9,12 @@ import { customElement, property, state } from 'lit/decorators.js';
 import { createRef, ref } from 'lit/directives/ref.js';
 
 import type { AppGrid } from '../../../components/grid/AppGrid.js';
-import { callsColumn, inlineQueryColumn, timeColumn } from '../../../components/grid/columns.js';
+import {
+  COUNT_MIN_WIDTH,
+  countColumn,
+  inlineQueryColumn,
+  timeColumn,
+} from '../../../components/grid/columns.js';
 import {
   InspectorGridController,
   inspectorGridStyles,
@@ -214,7 +219,13 @@ function databaseColumns(
       calc: { of: () => ownCodeNs },
       width,
     }),
-    callsColumn({ id: 'count', value: (row) => row.count }),
+    countColumn({
+      id: 'count',
+      title: 'Calls',
+      value: (row) => row.count,
+      width: COUNT_MIN_WIDTH,
+      summed: false,
+    }),
   ];
 }
 

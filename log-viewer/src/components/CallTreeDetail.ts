@@ -29,7 +29,7 @@ import { globalStyles } from '../styles/global.styles.js';
 import { progressColumnWidth } from '../tabulator/format/measureWidth.js';
 import { VIEW_MODES, defaultViewMode, isViewMode, type ViewMode } from './callTreeViewModes.js';
 import type { AppGrid } from './grid/AppGrid.js';
-import { callsColumn, inlineQueryColumn, timeColumn } from './grid/columns.js';
+import { COUNT_MIN_WIDTH, countColumn, inlineQueryColumn, timeColumn } from './grid/columns.js';
 import {
   InspectorGridController,
   inspectorGridStyles,
@@ -636,13 +636,15 @@ export class CallTreeDetail extends LitElement {
     if (mode !== 'time-order') {
       // Aggregated counts a call at its own depth and Bottom-Up counts it in
       // its leaf row, so neither top level holds them all. The scope does.
-      columns.push(
-        callsColumn<ScopedRow>({
+      columns.push({
+        ...countColumn<ScopedRow>({
           id: 'callCount',
+          title: 'Calls',
           value: (row) => row.callCount,
-          calc: { of: () => this._scopeCalls },
+          width: COUNT_MIN_WIDTH,
         }),
-      );
+        calc: { of: () => this._scopeCalls },
+      });
     }
     return columns;
   }
