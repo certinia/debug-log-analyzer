@@ -127,7 +127,7 @@ export class AnalysisView extends LitElement {
     tables: () => [this._columnTarget],
   });
   private readonly _menus = new GridColumnMenuController({
-    table: () => this._columnTarget,
+    target: this._columnTarget,
     menu: () => this.renderRoot.querySelector<ContextMenu>('context-menu'),
     columns: this._settings,
   });

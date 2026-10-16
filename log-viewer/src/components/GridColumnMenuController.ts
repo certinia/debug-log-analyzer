@@ -6,8 +6,8 @@ import type { ColumnSettingsController, ColumnTarget } from './ColumnSettingsCon
 import type { ContextMenu } from './ContextMenu.js';
 
 export interface GridColumnMenuOptions {
-  /** The grid the menu acts on, read late: the table is built after the host connects. */
-  table: () => ColumnTarget | null;
+  /** The grid's columns the menu acts on. */
+  target: ColumnTarget;
   /** The host's `<context-menu>`, looked up per use so no first-update hook is needed. */
   menu: () => ContextMenu | null;
   /** The column state the menu shows and edits. */
@@ -58,12 +58,7 @@ export class GridColumnMenuController {
   };
 
   showAt(x: number, y: number): void {
-    const table = this._options.table();
-    const menu = this._options.menu();
-    if (!menu || !table) {
-      return;
-    }
-    menu.show(this._options.columns.menuItems(table), x, y);
+    this._options.menu()?.show(this._options.columns.menuItems(this._options.target), x, y);
   }
 
   /**
@@ -71,15 +66,10 @@ export class GridColumnMenuController {
    * anything else to the host — the database grids add their own row items.
    */
   select(itemId: string): boolean {
-    const table = this._options.table();
-    if (!table) {
-      return false;
-    }
-
     if (itemId.startsWith('view:')) {
       this._options.columns.choose(itemId.slice('view:'.length));
     } else if (itemId.startsWith('col:')) {
-      this._options.columns.toggle(table, itemId.slice('col:'.length));
+      this._options.columns.toggle(this._options.target, itemId.slice('col:'.length));
     } else if (itemId.startsWith('reset:')) {
       this._options.columns.reset(itemId.slice('reset:'.length));
     } else {
@@ -92,11 +82,9 @@ export class GridColumnMenuController {
 
   /** Rebuilds an open menu so its checkmarks and reset icons follow the state. */
   private _refresh(): void {
-    const table = this._options.table();
     const menu = this._options.menu();
-    if (!menu?.isVisible() || !table) {
-      return;
+    if (menu?.isVisible()) {
+      menu.items = this._options.columns.menuItems(this._options.target);
     }
-    menu.items = this._options.columns.menuItems(table);
   }
 }

@@ -20,7 +20,7 @@ describe('GridColumnMenuController on an lv-grid', () => {
     const columns = { menuItems: jest.fn(() => items) };
     const show = jest.fn();
     const controller = new GridColumnMenuController({
-      table: () => gridColumnTarget(grid),
+      target: gridColumnTarget(grid),
       menu: () => ({ show }) as unknown as ContextMenu,
       columns: columns as unknown as ColumnSettingsController,
     });

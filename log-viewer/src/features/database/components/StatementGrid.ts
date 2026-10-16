@@ -138,7 +138,7 @@ export abstract class StatementGrid<R extends StatementRow, L> extends LitElemen
       tables: () => [this._columnTarget],
     });
     this._menus = new GridColumnMenuController({
-      table: () => this._columnTarget,
+      target: this._columnTarget,
       menu: () => this.renderRoot.querySelector<ContextMenu>('context-menu'),
       columns: this._settings,
     });
