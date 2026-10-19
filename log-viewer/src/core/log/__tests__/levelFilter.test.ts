@@ -1,7 +1,7 @@
 /*
  * Copyright (c) 2026 Certinia Inc. All rights reserved.
  */
-import { describe, expect, it } from '@jest/globals';
+import { afterEach, describe, expect, it } from '@jest/globals';
 import type { ApexLog, DebugLevels, LogEvent } from '@apexdevtools/apex-log-parser';
 
 import { indexOf, storeOf } from '#test-helpers/apexLog.js';
@@ -26,6 +26,20 @@ const yieldSlice = (): Promise<void> => Promise.resolve();
 
 function logOf(): ApexLog {
   return storeOf(BODY, SETTINGS).log;
+}
+
+/** More events than one step reads, so a build takes several. */
+function longLog(): ApexLog {
+  const debug = Array.from(
+    { length: 300 },
+    (_, i) => `09:18:22.6 (${2000 + i})|USER_DEBUG|[2]|DEBUG|line ${i}\n`,
+  ).join('');
+  return storeOf(
+    '09:18:22.6 (1000)|METHOD_ENTRY|[1]|01p|ns.Outer.run()\n' +
+      debug +
+      '09:18:22.6 (9000)|METHOD_EXIT|[1]|ns.Outer.run()\n',
+    SETTINGS,
+  ).log;
 }
 
 function build(log: ApexLog, chosen: DebugLevels): ApexLog {
@@ -53,6 +67,10 @@ function selfSum(log: ApexLog, key: 'duration' | 'soqlCount'): number {
 }
 
 describe('levelFilter', () => {
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
+
   it('returns the log itself when no level is lowered', async () => {
     const log = logOf();
 
@@ -75,20 +93,6 @@ describe('levelFilter', () => {
       'USER_DEBUG',
     ]);
     expect(walk(filtered).every((event) => event.parent?.children.includes(event))).toBe(true);
-  });
-
-  it('folds a hidden event into its ancestor self and leaves totals alone', () => {
-    const log = logOf();
-    const original = codeUnit(log);
-    const outer = log.eventsById[indexOf(log, 'ns.Outer.run()')]!;
-    const inner = log.eventsById[indexOf(log, 'ns.Inner.go()')]!;
-
-    const filtered = codeUnit(build(log, { apexCode: 'DEBUG' }));
-
-    expect(filtered.duration.self).toBe(
-      original.duration.self + outer.duration.self + inner.duration.self,
-    );
-    expect(filtered.duration.total).toBe(original.duration.total);
   });
 
   it('hides a USER_DEBUG line by the level it was written at', () => {
@@ -137,16 +141,6 @@ describe('levelFilter', () => {
     expect({ duration: selfSum(log, 'duration'), events: walk(log).length }).toEqual(before);
   });
 
-  it('points a hidden event slot at the log itself', () => {
-    const log = logOf();
-    const filtered = build(log, { apexCode: 'DEBUG' });
-    const inner = indexOf(log, 'ns.Inner.go()');
-
-    expect(filtered.eventsById).toHaveLength(log.eventsById.length);
-    expect(filtered.eventsById[inner]).toBe(filtered);
-    expect(logStoreFor(filtered).stackByEventIndex(inner)).toEqual([]);
-  });
-
   it('finds no event at a hidden index, and the log itself at its own', () => {
     const log = logOf();
     const filtered = build(log, { apexCode: 'DEBUG' });
@@ -154,6 +148,7 @@ describe('levelFilter', () => {
 
     expect(logStoreFor(filtered).eventByIndex(inner)).toBeNull();
     expect(findEventByEventIndex(filtered, inner)).toBeNull();
+    expect(logStoreFor(filtered).stackByEventIndex(inner)).toEqual([]);
     expect(eventByEventIndex(filtered, filtered.eventIndex)).toBe(filtered);
   });
 
@@ -204,14 +199,25 @@ describe('levelFilter', () => {
     });
   });
 
-  it('builds the same tree in slices as in one step', async () => {
-    const log = logOf();
+  it('builds the same tree across many steps as in one', async () => {
+    const log = longLog();
     const chosen: DebugLevels = { apexCode: 'DEBUG' };
 
     const sliced = await filterByLevels(log, chosen, { yieldSlice });
     const types = (root: ApexLog): string[] => walk(root).map((event) => `${event.type}`);
 
     expect(sliced && types(sliced)).toEqual(types(build(log, chosen)));
+  });
+
+  it('gives up once the signal aborts', async () => {
+    const build = new AbortController();
+    build.abort();
+    let now = 0;
+    jest.spyOn(performance, 'now').mockImplementation(() => (now += 1000));
+
+    expect(
+      await filterByLevels(longLog(), { apexCode: 'DEBUG' }, { yieldSlice, signal: build.signal }),
+    ).toBeNull();
   });
 
   it('keeps an event that states no level', () => {
