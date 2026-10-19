@@ -232,6 +232,12 @@ export const selectSizingStyles = css`
   .option-reset {
     margin-left: auto;
   }
+
+  .option-hint {
+    margin-left: auto;
+    padding-left: var(--lana-space-md);
+    color: var(--lana-fg-muted);
+  }
 `;
 
 /** vscode-single-select where the control fits the selected value and the popup its widest option. */
@@ -261,6 +267,14 @@ export class VsSelect extends VscodeSingleSelect {
    */
   @property({ attribute: false })
   resettableValues: string[] = [];
+
+  /** Muted text at the trailing edge of the option whose value is `hintValue`. */
+  @property({ type: String })
+  hint = '';
+
+  /** The option that shows `hint`. */
+  @property({ type: String })
+  hintValue = '';
 
   /**
    * Marks this as a filter control (e.g. the Type dropdown) rather than a view
@@ -352,6 +366,11 @@ export class VsSelect extends VscodeSingleSelect {
               >
                 <span class="option-check">${selected ? checkIcon : nothing}</span>
                 <span class="option-label">${op.label}${edited ? ' •' : ''}</span>
+                ${
+                  this.hint && op.value === this.hintValue
+                    ? html`<span class="option-hint">${this.hint}</span>`
+                    : nothing
+                }
                 ${
                   edited
                     ? html`<vscode-icon

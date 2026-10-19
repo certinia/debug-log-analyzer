@@ -200,6 +200,7 @@ export class LogViewer extends LitElement {
         .chosenLevels=${this._levels.chosen}
         .levelsBusy=${this._levels.busy}
         @log-levels-change=${this._onLogLevelsChange}
+        @log-levels-reset=${this._onLogLevelsReset}
       ></app-header>
 
       <log-inspector .activeTab=${this._selectedTab}>
@@ -323,6 +324,10 @@ export class LogViewer extends LitElement {
 
   private _onLogLevelsChange(event: CustomEvent<LogLevelsChange>): void {
     void this._levels.choose(event.detail.category, event.detail.level);
+  }
+
+  private _onLogLevelsReset(): void {
+    this._levels.reset();
   }
 
   private _failLoad(problem: LogIssue) {

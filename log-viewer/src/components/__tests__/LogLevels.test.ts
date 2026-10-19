@@ -103,4 +103,33 @@ describe('log-levels', () => {
 
     expect(asked).toEqual([{ category: 'apexCode', level: 'INFO' }]);
   });
+
+  it('offers a reset only once a level is lowered', async () => {
+    const el = await mount({ apexCode: 'FINE' }, { apexCode: 'FINE' });
+    const reset = el.shadowRoot?.querySelector<HTMLButtonElement>('button.reset');
+    expect(reset?.disabled).toBe(true);
+
+    el.chosen = { apexCode: 'DEBUG' };
+    await el.updateComplete;
+
+    expect(reset?.disabled).toBe(false);
+    expect(reset?.getAttribute('aria-label')).toBe('Reset 1 lowered level to logged');
+  });
+
+  it('asks for the captured levels back', async () => {
+    const el = await mount({ apexCode: 'FINE' }, { apexCode: 'DEBUG' });
+    let asked = 0;
+    document.addEventListener('log-levels-reset', () => asked++);
+
+    el.shadowRoot?.querySelector<HTMLElement>('button.reset')?.click();
+
+    expect(asked).toBe(1);
+  });
+
+  it('names the captured level in each dropdown', async () => {
+    const el = await mount({ apexCode: 'FINE' }, { apexCode: 'DEBUG' });
+
+    expect(select(el).getAttribute('hint')).toBe('logged');
+    expect(select(el).getAttribute('hintValue')).toBe('FINE');
+  });
 });

@@ -2,6 +2,7 @@
  * Copyright (c) 2023 Certinia Inc. All rights reserved.
  */
 import '#vscode-elements/vscode-option.js';
+import '#vscode-elements/vscode-icon.js';
 import { consume } from '@lit/context';
 import { LitElement, css, html, nothing } from 'lit';
 import { customElement, property } from 'lit/decorators.js';
@@ -46,7 +47,8 @@ const levelsChanged = (value: DebugLevels | null, old: DebugLevels | null): bool
 /**
  * The log's debug levels in the app header: one dropdown per category. A level
  * finer than the log captured is disabled. Choosing a level emits
- * `log-levels-change`; the host owns the chosen levels and publishes the log they make.
+ * `log-levels-change`, and the reset button, live once a level is lowered, emits
+ * `log-levels-reset`; the host owns the chosen levels and publishes the log they make.
  * The responsive overflow-into-a-menu behaviour lives in `<overflow-list>`.
  */
 @customElement('log-levels')
@@ -84,6 +86,45 @@ export class LogLevels extends LitElement {
         font-family: var(--lana-font-mono);
       }
 
+      /* Always in the row, so lowering a level moves nothing. */
+      .reset {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        align-self: stretch;
+        flex: 0 0 auto;
+        aspect-ratio: 1;
+        padding: 0;
+        border: none;
+        border-radius: var(--filter-control-radius);
+        background: none;
+        color: var(--lana-fg);
+        cursor: pointer;
+        transition:
+          opacity 120ms ease-out,
+          background-color 120ms ease-out;
+      }
+
+      .reset:hover:not(:disabled) {
+        background-color: var(--lana-toolbar-hover-bg);
+      }
+
+      .reset:focus-visible {
+        outline: var(--lana-stroke) solid var(--vscode-focusBorder);
+        outline-offset: calc(-1 * var(--lana-stroke));
+      }
+
+      .reset:disabled {
+        opacity: 0.35;
+        cursor: default;
+      }
+
+      @media (prefers-reduced-motion: reduce) {
+        .reset {
+          transition: none;
+        }
+      }
+
       .skeletons {
         display: flex;
         gap: 6px;
@@ -113,6 +154,23 @@ export class LogLevels extends LitElement {
       </div>`;
     }
 
+    const lowered = (Object.entries(this.captured) as [keyof DebugLevels, LogLevel][]).filter(
+      ([category, captured]) => levelRank(shown[category] ?? captured) < levelRank(captured),
+    ).length;
+    const resetLabel = lowered
+      ? `Reset ${lowered} lowered ${lowered === 1 ? 'level' : 'levels'} to logged`
+      : 'All levels as logged';
+    const reset = html`<button
+      slot="end"
+      class="reset"
+      type="button"
+      aria-label=${resetLabel}
+      title=${resetLabel}
+      ?disabled=${!lowered}
+      @click=${this._onReset}
+    >
+      <vscode-icon name="discard"></vscode-icon>
+    </button>`;
     return html`<overflow-list menu-heading="Log levels">
       ${repeat(
         Object.entries(this.captured) as [keyof DebugLevels, LogLevel][],
@@ -125,6 +183,8 @@ export class LogLevels extends LitElement {
             label=${token}
             prefix=${token}
             prefixSeparator=""
+            hint="logged"
+            hintValue=${captured}
             .value=${live(level)}
             .filterActive=${levelRank(level) < levelRank(captured)}
             @change=${(event: Event) => this._onChange(category, event)}
@@ -141,6 +201,7 @@ export class LogLevels extends LitElement {
           </vs-select>`;
         },
       )}
+      ${reset}
     </overflow-list>`;
   }
 
@@ -154,5 +215,9 @@ export class LogLevels extends LitElement {
         composed: true,
       }),
     );
+  }
+
+  private _onReset(): void {
+    this.dispatchEvent(new CustomEvent('log-levels-reset', { bubbles: true, composed: true }));
   }
 }

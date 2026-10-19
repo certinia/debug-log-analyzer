@@ -6,6 +6,7 @@ import type { ApexLog, DebugLevels } from '@apexdevtools/apex-log-parser';
 import type { ReactiveController, ReactiveControllerHost } from 'lit';
 
 jest.mock('../../../core/log/levelFilter.js', () => ({
+  ...jest.requireActual<object>('../../../core/log/levelFilter.js'),
   filterByLevels: (log: ApexLog, chosen: DebugLevels, options: { signal: AbortSignal }) =>
     new Promise((resolve, reject) => builds.push({ log, chosen, options, resolve, reject })),
 }));
@@ -134,5 +135,31 @@ describe('LogLevelsController', () => {
     controllers[0]!.hostDisconnected?.();
 
     expect(builds[0]!.options.signal.aborted).toBe(true);
+  });
+
+  it('puts the captured log back on screen on reset', async () => {
+    const { levels, published } = setUp();
+    levels.open(captured);
+    const filtered = {} as ApexLog;
+    const done = levels.choose('apexCode', 'DEBUG');
+    builds[0]!.resolve(filtered);
+    await done;
+
+    levels.reset();
+
+    expect(levels.chosen).toEqual({ apexCode: 'FINE', database: 'FINE' });
+    expect(published).toEqual([filtered, captured]);
+  });
+
+  it('stops a running build on reset, and keeps the log on screen', () => {
+    const { levels, published } = setUp();
+    levels.open(captured);
+
+    void levels.choose('apexCode', 'DEBUG');
+    levels.reset();
+
+    expect(builds[0]!.options.signal.aborted).toBe(true);
+    expect(levels.chosen).toEqual({ apexCode: 'FINE', database: 'FINE' });
+    expect(published).toEqual([]);
   });
 });

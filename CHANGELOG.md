@@ -24,9 +24,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- 🎚️ **Log levels**: lower a category's level in the header to see every tab as if the log was captured at that level. ([#530])
-  - **Kept in place**: filters, columns, sort and the Timeline zoom stay as they were.
-  - **Captured levels**: a level finer than the log recorded is greyed out.
+- 🎚️ **Log levels**: filter the log to a lower debug level per category from the header. ([#530])
 - ♿ **Accessibility**: screen readers name each table, follow the selected row and read the find match count, and Enter, Space and Page Up/Down work in every table. Sort, resize and open a column's menu from the keyboard. ([#1169])
 - 🔦 **Timeline legend**: hover a category to highlight frames in the timeline, select to keep. ([#917])
 

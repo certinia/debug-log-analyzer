@@ -4,7 +4,7 @@
 import type { ReactiveController, ReactiveControllerHost } from 'lit';
 
 import type { ApexLog, DebugLevels, LogLevel } from '@apexdevtools/apex-log-parser';
-import { filterByLevels } from '../../core/log/levelFilter.js';
+import { filterByLevels, sameLevels } from '../../core/log/levelFilter.js';
 
 /** How long a level change runs before the header shows it is busy. */
 const BUSY_AFTER_MS = 100;
@@ -82,6 +82,21 @@ export class LogLevelsController implements ReactiveController {
         this._setBusy(false);
       }
     }
+  }
+
+  /** Shows the log at the levels it was captured at. */
+  reset(): void {
+    const captured = this.captured;
+    if (!captured) {
+      return;
+    }
+    this._stop();
+    this.chosen = { ...captured.debugLevels };
+    if (!sameLevels(this._applied, this.chosen)) {
+      this._log.publish(captured);
+    }
+    this._applied = this.chosen;
+    this._host.requestUpdate();
   }
 
   private _stop(): void {
