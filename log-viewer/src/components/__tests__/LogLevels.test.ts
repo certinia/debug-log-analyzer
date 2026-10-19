@@ -113,7 +113,7 @@ describe('log-levels', () => {
     await el.updateComplete;
 
     expect(reset?.disabled).toBe(false);
-    expect(reset?.getAttribute('aria-label')).toBe('Reset 1 lowered level to logged');
+    expect(reset?.getAttribute('aria-label')).toBe('Reset to logged levels');
   });
 
   it('asks for the captured levels back', async () => {
