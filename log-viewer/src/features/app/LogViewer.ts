@@ -97,6 +97,7 @@ export class LogViewer extends LitElement {
   private _levelsBusy = false;
 
   // Set on each pick before its build ends, so a quick second pick keeps the first.
+  @state()
   private _chosenLevels: DebugLevels = {};
   private _levelsBuild: AbortController | null = null;
 
@@ -199,6 +200,7 @@ export class LogViewer extends LitElement {
         .notifications=${this.notifications}
         .logIdentity=${this.logIdentity}
         .capturedLevels=${this._capturedLog?.debugLevels ?? null}
+        .chosenLevels=${this._chosenLevels}
         .levelsBusy=${this._levelsBusy}
         @log-levels-change=${this._onLogLevelsChange}
       ></app-header>

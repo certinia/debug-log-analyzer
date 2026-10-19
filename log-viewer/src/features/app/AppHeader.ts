@@ -40,6 +40,8 @@ export class AppHeader extends LitElement {
   /** The levels the log was captured at; the log on screen states the levels shown. */
   @property({ attribute: false })
   capturedLevels: DebugLevels | null = null;
+  @property({ attribute: false })
+  chosenLevels: DebugLevels | null = null;
   @property({ type: Boolean })
   levelsBusy = false;
 
@@ -76,7 +78,7 @@ export class AppHeader extends LitElement {
         .notifications=${this.notifications}
         .logIdentity=${this.logIdentity}
       ></nav-bar>
-      <log-levels .captured=${this.capturedLevels}></log-levels>
+      <log-levels .captured=${this.capturedLevels} .chosen=${this.chosenLevels}></log-levels>
       ${
         this.levelsBusy
           ? html`<vscode-progress-bar aria-label="Applying log levels"></vscode-progress-bar>`

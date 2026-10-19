@@ -4,27 +4,20 @@
  * @jest-environment jsdom
  */
 import { describe, expect, it } from '@jest/globals';
-import { ContextProvider } from '@lit/context';
-import type { ApexLog, DebugLevels } from '@apexdevtools/apex-log-parser';
+import type { DebugLevels } from '@apexdevtools/apex-log-parser';
 
 // VsSelect extends vscode-single-select, whose setFormValue needs an
 // ElementInternals jsdom lacks; the render would upgrade it.
 jest.mock('../VsSelect.js', () => ({}));
 
-import { logContext } from '../../core/log/logContext.js';
-import { logStoreFor } from '../../core/log/LogStore.js';
 import type { LogLevels, LogLevelsChange } from '../LogLevels.js';
 import '../LogLevels.js';
 
-async function mount(captured: DebugLevels, shown: DebugLevels): Promise<LogLevels> {
-  const host = document.createElement('div');
-  const log = { debugLevels: shown } as ApexLog;
-  new ContextProvider(host, { context: logContext, initialValue: logStoreFor(log) });
-  document.body.appendChild(host);
-
+async function mount(captured: DebugLevels, chosen: DebugLevels): Promise<LogLevels> {
   const el = document.createElement('log-levels') as LogLevels;
   el.captured = captured;
-  host.appendChild(el);
+  el.chosen = chosen;
+  document.body.appendChild(el);
   await el.updateComplete;
   return el;
 }
@@ -65,13 +58,24 @@ describe('log-levels', () => {
     expect(disabled.map((option) => option.getAttribute('value'))).toEqual(['FINER', 'FINEST']);
   });
 
-  it('shows the level of the log on screen', async () => {
+  it('shows the level chosen', async () => {
     const el = await mount({ apexCode: 'FINE' }, { apexCode: 'DEBUG' });
 
     expect(select(el).value).toBe('DEBUG');
     expect(options(el).find((option) => option.hasAttribute('selected'))?.textContent).toBe(
       'DEBUG',
     );
+  });
+
+  it('shows the chosen level again when a pick is undone', async () => {
+    const el = await mount({ apexCode: 'FINE' }, { apexCode: 'FINE' });
+    select(el).value = 'INFO';
+
+    el.chosen = { apexCode: 'FINE' };
+    el.requestUpdate();
+    await el.updateComplete;
+
+    expect(select(el).value).toBe('FINE');
   });
 
   it('asks for the level chosen', async () => {

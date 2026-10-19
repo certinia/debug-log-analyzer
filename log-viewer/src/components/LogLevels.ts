@@ -5,6 +5,7 @@ import '#vscode-elements/vscode-option.js';
 import { consume } from '@lit/context';
 import { LitElement, css, html, nothing } from 'lit';
 import { customElement, property } from 'lit/decorators.js';
+import { live } from 'lit/directives/live.js';
 import { repeat } from 'lit/directives/repeat.js';
 
 import type { DebugLevels, LogLevel } from '@apexdevtools/apex-log-parser';
@@ -16,9 +17,7 @@ import './VsSelect.js';
 // styles
 import { globalStyles } from '../styles/global.styles.js';
 import { LEVEL_ORDER, levelRank, sameLevels } from '../core/log/levelFilter.js';
-import { logContext } from '../core/log/logContext.js';
 import { logStatusContext, type LogStatus } from '../core/log/logStatus.js';
-import type { LogStore } from '../core/log/LogStore.js';
 import { skeletonStyles } from '../styles/skeleton.styles.js';
 
 /** The token the log's settings line names each category by; `DebugLevels` keys them in camelCase. */
@@ -56,14 +55,13 @@ export class LogLevels extends LitElement {
   @property({ attribute: false })
   logStatus: LogStatus = 'parsing';
 
-  /** The log on screen, from the app root. Its levels are the ones shown. */
-  @consume({ context: logContext, subscribe: true })
-  @property({ attribute: false })
-  logStore: LogStore | null = null;
-
   /** The levels the log was captured at: the finest each dropdown offers. */
   @property({ attribute: false, hasChanged: levelsChanged })
   captured: DebugLevels | null = null;
+
+  /** The levels chosen, which the log on screen is filtered to. */
+  @property({ attribute: false, hasChanged: levelsChanged })
+  chosen: DebugLevels | null = null;
 
   static styles = [
     globalStyles,
@@ -101,8 +99,8 @@ export class LogLevels extends LitElement {
   ];
 
   render() {
-    const shown = this.logStore?.log.debugLevels;
-    if (!this.captured || !shown) {
+    const shown = this.chosen ?? {};
+    if (!this.captured) {
       if (this.logStatus !== 'parsing') {
         return nothing;
       }
@@ -128,7 +126,7 @@ export class LogLevels extends LitElement {
             label=${token}
             prefix=${token}
             prefixSeparator=""
-            .value=${level}
+            .value=${live(level)}
             @change=${(event: Event) => this._onChange(category, event)}
           >
             ${LEVEL_ORDER.map((option) => {
