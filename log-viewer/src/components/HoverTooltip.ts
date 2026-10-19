@@ -6,10 +6,9 @@ import { customElement } from 'lit/decorators.js';
 
 import { tokenStyles } from '../styles/tokens.styles.js';
 
-/** Space between the tooltip and the element it names (px). */
-const GAP = 4;
-/** Closest the tooltip comes to the window edge (px). */
-const EDGE = 8;
+// px, as numbers: the placement maths runs in JS and cannot read a `--lana-space-*` var.
+const GAP_PX = 4;
+const EDGE_PX = 8;
 
 /**
  * The one tooltip the app shows, in the top layer so no clip or stacking context hides it.
@@ -24,7 +23,7 @@ export class HoverTooltip extends LitElement {
         position: fixed;
         inset: auto;
         box-sizing: border-box;
-        max-width: min(360px, calc(100vw - ${unsafeCSS(2 * EDGE)}px));
+        max-width: min(360px, calc(100vw - ${unsafeCSS(2 * EDGE_PX)}px));
         margin: 0;
         padding: var(--lana-space-2xs) var(--lana-space-sm);
         border: var(--lana-stroke) solid var(--lana-hover-border);
@@ -74,20 +73,24 @@ export class HoverTooltip extends LitElement {
     return html`<slot></slot>`;
   }
 
-  /** Shows `text` below `anchor`, or above it when there is no room below. */
-  show(anchor: DOMRect, text: string): void {
+  /** Shows `text` below `anchorRect`, or above it when there is no room below. */
+  show(anchorRect: DOMRect, text: string): void {
     this.textContent = text;
+    // Measured at the origin: at the last tooltip's place near an edge it would wrap narrow.
+    this.style.top = '0px';
+    this.style.left = '0px';
     if (!this._open) {
       this.showPopover();
       this._open = true;
     }
     const { width, height } = this.getBoundingClientRect();
-    const below = anchor.bottom + GAP;
-    const top = below + height > window.innerHeight - EDGE ? anchor.top - GAP - height : below;
-    const centred = anchor.left + anchor.width / 2 - width / 2;
-    const left = Math.min(Math.max(centred, EDGE), window.innerWidth - width - EDGE);
-    this.style.top = `${Math.max(top, EDGE)}px`;
-    this.style.left = `${Math.max(left, EDGE)}px`;
+    const below = anchorRect.bottom + GAP_PX;
+    const top =
+      below + height > window.innerHeight - EDGE_PX ? anchorRect.top - GAP_PX - height : below;
+    const centred = anchorRect.left + anchorRect.width / 2 - width / 2;
+    const left = Math.min(Math.max(centred, EDGE_PX), window.innerWidth - width - EDGE_PX);
+    this.style.top = `${Math.max(top, EDGE_PX)}px`;
+    this.style.left = `${Math.max(left, EDGE_PX)}px`;
   }
 
   hide(): void {

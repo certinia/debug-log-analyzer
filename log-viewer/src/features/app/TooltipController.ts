@@ -6,36 +6,36 @@ import type { ReactiveController, ReactiveControllerHost } from 'lit';
 import '../../components/HoverTooltip.js';
 import type { HoverTooltip } from '../../components/HoverTooltip.js';
 
-/** How long the pointer rests on an element before its tooltip shows. */
 const SHOW_DELAY_MS = 500;
-/** A tooltip that follows another this soon shows at once, as the pointer scans a toolbar. */
+// A tooltip that follows another this soon shows at once, as the pointer scans a toolbar.
 const SKIP_DELAY_MS = 300;
-/** How long a tooltip outlives the pointer, so the pointer can cross onto it. */
+// Long enough for the pointer to cross the gap onto the tooltip.
 const LEAVE_DELAY_MS = 100;
 
 const MODIFIER_KEYS = new Set(['Shift', 'Control', 'Alt', 'Meta']);
 
 interface Stripped {
-  /** The element's own title, or null once the app removed it. */
+  // Null once the app removed the title, so it is not put back.
   title: string | null;
-  /** The attribute added so the element keeps its accessible name or description. */
   added: 'aria-label' | 'aria-description' | null;
 }
 
 /**
- * Shows every `title` in the app as one styled tooltip. A webview shows native `title`
- * tooltips only some of the time, so while the pointer or keyboard focus rests on an
- * element its `title` is emptied, which also stops an ancestor's, and its text moves to
- * `aria-label` (or `aria-description` when the element has text). Both come back when it
- * leaves. A title the app changes meanwhile is the one that comes back.
+ * Shows every `title` in the app as one styled tooltip. VS Code shows this panel's native
+ * `title` tooltips only some of the time, depending on where focus is, so while the
+ * pointer rests on an element its `title` is emptied, which also stops an ancestor's,
+ * and its text moves to `aria-label` (or `aria-description` when the element has text).
+ * Both come back when the pointer leaves. A title the app changes meanwhile is the one
+ * that comes back.
  */
 export class TooltipController implements ReactiveController {
   private readonly _tip: HoverTooltip = document.createElement('hover-tooltip');
   private readonly _observer = new MutationObserver((records) => this._onTitleChange(records));
   private _listeners: AbortController | null = null;
   private _anchor: Element | null = null;
-  private _source: 'pointer' | 'focus' = 'pointer';
   private _stripped = new Map<Element, Stripped>();
+  // Elements whose title we just emptied again, so their record is ours, not the app's.
+  private _ownWrites = new Set<Element>();
   private _showTimer: ReturnType<typeof setTimeout> | undefined;
   private _leaveTimer: ReturnType<typeof setTimeout> | undefined;
   private _hiddenAt = Number.NEGATIVE_INFINITY;
@@ -51,9 +51,7 @@ export class TooltipController implements ReactiveController {
     const options = { capture: true, passive: true, signal };
     // A webview frame does not always send `pointerover`, so the target is read from every move.
     document.addEventListener('pointermove', this._onPointerMove, options);
-    document.addEventListener('focusin', this._onFocusIn, options);
-    document.addEventListener('focusout', this._onFocusOut, options);
-    // Not passive: an Escape that closes a tooltip is consumed, so it does not also deselect.
+    // Not passive: an Escape that closes a tooltip is consumed, so the tables do not also deselect.
     document.addEventListener('keydown', this._onKeyDown, { capture: true, signal });
     // The pointer is still on the element after these, so its title stays away until it leaves.
     for (const type of ['pointerdown', 'wheel', 'scroll']) {
@@ -70,7 +68,7 @@ export class TooltipController implements ReactiveController {
     this._tip.remove();
   }
 
-  /** The elements on `path` with a title, the ones emptied for a tooltip included, innermost first. */
+  // Emptied titles count, so a move within a titled ancestor keeps its tooltip.
   private _titled(path: EventTarget[]): Element[] {
     return path.filter((node): node is Element => {
       if (!(node instanceof Element)) {
@@ -84,43 +82,21 @@ export class TooltipController implements ReactiveController {
   private readonly _onPointerMove = (event: Event): void => {
     const path = event.composedPath();
     if (path.includes(this._tip)) {
-      clearTimeout(this._leaveTimer);
+      this._stay();
       return;
     }
     const titled = this._titled(path);
-    const [inner] = titled;
-    if (inner && inner === this._anchor) {
-      clearTimeout(this._leaveTimer);
+    const [anchor] = titled;
+    if (!anchor) {
+      this._leave();
       return;
     }
-    if (!inner) {
-      if (this._anchor && this._source === 'pointer') {
-        clearTimeout(this._leaveTimer);
-        this._leaveTimer = setTimeout(this._end, LEAVE_DELAY_MS);
-      }
+    if (anchor === this._anchor) {
+      this._stay();
       return;
     }
     this._end();
-    this._begin(titled, 'pointer');
-  };
-
-  private readonly _onFocusIn = (event: Event): void => {
-    const path = event.composedPath();
-    const target = path[0];
-    if (!(target instanceof Element) || !target.matches(':focus-visible')) {
-      return;
-    }
-    const titled = this._titled(path);
-    if (titled.length) {
-      this._end();
-      this._begin(titled, 'focus');
-    }
-  };
-
-  private readonly _onFocusOut = (): void => {
-    if (this._source === 'focus') {
-      this._end();
-    }
+    this._begin(anchor, titled);
   };
 
   private readonly _onPointerLeave = (event: Event): void => {
@@ -141,15 +117,31 @@ export class TooltipController implements ReactiveController {
     this._dismiss();
   };
 
-  private _begin(titled: Element[], source: 'pointer' | 'focus'): void {
+  private _begin(anchor: Element, titled: Element[]): void {
     for (const el of titled) {
       this._stripped.set(el, strip(el));
       this._observer.observe(el, { attributes: true, attributeFilter: ['title'] });
     }
-    this._anchor = titled[0] ?? null;
-    this._source = source;
+    this._anchor = anchor;
     const warm = performance.now() - this._hiddenAt < SKIP_DELAY_MS;
     this._showTimer = setTimeout(() => this._show(), warm ? 0 : SHOW_DELAY_MS);
+  }
+
+  private _stay(): void {
+    clearTimeout(this._leaveTimer);
+    this._leaveTimer = undefined;
+  }
+
+  private _leave(): void {
+    if (!this._anchor) {
+      return;
+    }
+    // Nothing on screen to cross onto, so a pending tooltip ends now.
+    if (!this._tip.open) {
+      this._end();
+    } else if (this._leaveTimer === undefined) {
+      this._leaveTimer = setTimeout(this._end, LEAVE_DELAY_MS);
+    }
   }
 
   private _show(): void {
@@ -164,49 +156,42 @@ export class TooltipController implements ReactiveController {
     for (const { target } of records) {
       const el = target as Element;
       const stripped = this._stripped.get(el);
-      const title = el.getAttribute('title');
-      // Our own emptying.
-      if (!stripped || title === '') {
+      if (!stripped || this._ownWrites.delete(el)) {
         continue;
       }
-      stripped.title = title;
-      if (stripped.added) {
-        if (title === null) {
-          el.removeAttribute(stripped.added);
-        } else {
-          el.setAttribute(stripped.added, title);
-        }
-      }
+      const title = el.getAttribute('title');
+      retitle(el, stripped, title);
       if (title !== null) {
+        this._ownWrites.add(el);
         el.setAttribute('title', '');
       }
       if (el === this._anchor && this._tip.open) {
-        if (title === null) {
-          this._dismiss();
-        } else {
+        if (title) {
           this._show();
+        } else {
+          this._dismiss();
         }
       }
     }
   }
 
-  /** Hides the tooltip but keeps the titles away, so no native tooltip takes its place. */
+  // Hides the tooltip but keeps the titles away, so no native tooltip takes its place.
   private readonly _dismiss = (): void => {
     clearTimeout(this._showTimer);
-    clearTimeout(this._leaveTimer);
+    this._stay();
     if (this._tip.open) {
       this._tip.hide();
       this._hiddenAt = performance.now();
     }
   };
 
-  /** Hides the tooltip and gives the titles back. */
   private readonly _end = (): void => {
     this._dismiss();
     this._onTitleChange(this._observer.takeRecords());
     this._observer.disconnect();
     this._stripped.forEach((stripped, el) => restore(el, stripped));
     this._stripped.clear();
+    this._ownWrites.clear();
     this._anchor = null;
   };
 }
@@ -221,6 +206,18 @@ function strip(el: Element): Stripped {
     el.setAttribute(added, title);
   }
   return { title, added };
+}
+
+function retitle(el: Element, stripped: Stripped, title: string | null): void {
+  stripped.title = title;
+  if (!stripped.added) {
+    return;
+  }
+  if (title) {
+    el.setAttribute(stripped.added, title);
+  } else {
+    el.removeAttribute(stripped.added);
+  }
 }
 
 function restore(el: Element, { title, added }: Stripped): void {

@@ -73,19 +73,40 @@ describe('TooltipController', () => {
     expect(shown()).toBe('Reset levels');
   });
 
-  it('keeps the native tooltip away and the accessible name while it shows', () => {
-    const icon = make('<button title="Reset levels"></button>');
-    const text = make('<span title="Full path">apex.log</span>');
-    const named = make('<button title="Copy" aria-label="Copy rows"></button>');
+  it('keeps the native tooltip away while it shows', () => {
+    const button = make('<button title="Reset levels"></button>');
 
-    move(icon);
-    expect(icon.getAttribute('title')).toBe('');
-    expect(icon.getAttribute('aria-label')).toBe('Reset levels');
-    move(text);
-    expect(text.getAttribute('aria-description')).toBe('Full path');
-    move(named);
-    expect(named.getAttribute('aria-label')).toBe('Copy rows');
-    expect(named.hasAttribute('aria-description')).toBe(false);
+    move(button);
+
+    expect(button.getAttribute('title')).toBe('');
+  });
+
+  it.each([
+    ['an icon names itself by the title', '<button title="T"></button>', 'aria-label', 'T'],
+    [
+      'text keeps its name and is described by the title',
+      '<span title="T">a</span>',
+      'aria-description',
+      'T',
+    ],
+    [
+      'an aria-label is kept',
+      '<button title="T" aria-label="Copy rows"></button>',
+      'aria-label',
+      'Copy rows',
+    ],
+    [
+      'an aria-labelledby is kept',
+      '<button title="T" aria-labelledby="x"></button>',
+      'aria-label',
+      null,
+    ],
+  ])('while it shows, %s', (_, html, attribute, value) => {
+    const el = make(html);
+
+    move(el);
+
+    expect(el.getAttribute(attribute)).toBe(value);
   });
 
   it('gives the title back once the pointer has left', () => {
@@ -101,6 +122,46 @@ describe('TooltipController', () => {
     expect(shown()).toBeNull();
     expect(button.getAttribute('title')).toBe('Reset levels');
     expect(button.hasAttribute('aria-label')).toBe(false);
+  });
+
+  it('ends once the pointer has left, however much it keeps moving', () => {
+    const button = make('<button title="Reset levels"></button>');
+    move(button);
+    jest.advanceTimersByTime(500);
+
+    move(away);
+    for (let i = 0; i < 5; i++) {
+      jest.advanceTimersByTime(20);
+      move(away);
+    }
+
+    expect(shown()).toBeNull();
+    expect(button.getAttribute('title')).toBe('Reset levels');
+  });
+
+  it('stays when the pointer comes back before the leave delay ends', () => {
+    const button = make('<button title="Reset levels"></button>');
+    move(button);
+    jest.advanceTimersByTime(500);
+
+    move(away);
+    jest.advanceTimersByTime(50);
+    move(button);
+    jest.advanceTimersByTime(1000);
+
+    expect(shown()).toBe('Reset levels');
+  });
+
+  it('never shows a pending tooltip once the pointer has left', () => {
+    const button = make('<button title="Reset levels"></button>');
+    move(button);
+    jest.advanceTimersByTime(450);
+
+    move(away);
+    jest.advanceTimersByTime(60);
+
+    expect(shown()).toBeNull();
+    expect(button.getAttribute('title')).toBe('Reset levels');
   });
 
   it('stays while the pointer moves over the element children or onto the tooltip', () => {
@@ -127,6 +188,37 @@ describe('TooltipController', () => {
 
     expect(shown()).toBe('Export to CSV');
     expect(first.getAttribute('title')).toBe('Columns');
+  });
+
+  it('waits again once the last tooltip hid more than a moment ago', () => {
+    const first = make('<button title="Columns"></button>');
+    const second = make('<button title="Export to CSV"></button>');
+    move(first);
+    jest.advanceTimersByTime(500);
+    move(away);
+    jest.advanceTimersByTime(100);
+
+    jest.advanceTimersByTime(300);
+    move(second);
+    jest.advanceTimersByTime(499);
+    expect(shown()).toBeNull();
+    jest.advanceTimersByTime(1);
+
+    expect(shown()).toBe('Export to CSV');
+  });
+
+  it('waits for a tooltip after one that never showed', () => {
+    const first = make('<button title="Columns"></button>');
+    const second = make('<button title="Export to CSV"></button>');
+    move(first);
+    jest.advanceTimersByTime(200);
+
+    move(second);
+    jest.advanceTimersByTime(499);
+    expect(shown()).toBeNull();
+    jest.advanceTimersByTime(1);
+
+    expect(shown()).toBe('Export to CSV');
   });
 
   it('shows the innermost title and keeps every title on the path away', () => {
@@ -234,6 +326,19 @@ describe('TooltipController', () => {
     expect(button.getAttribute('title')).toBe('New');
   });
 
+  it('gives back an empty title the app set while it showed', async () => {
+    const button = make('<button title="Old"></button>');
+    move(button);
+    jest.advanceTimersByTime(500);
+
+    button.setAttribute('title', '');
+    await flush();
+    move(away);
+    jest.advanceTimersByTime(100);
+
+    expect(button.getAttribute('title')).toBe('');
+  });
+
   it('does not give back a title the app removed while it showed', async () => {
     const button = make('<button title="Old"></button>');
     move(button);
@@ -246,32 +351,6 @@ describe('TooltipController', () => {
     move(away);
     jest.advanceTimersByTime(100);
     expect(button.hasAttribute('title')).toBe(false);
-  });
-
-  it('shows the title when the keyboard focuses the element, and hides when focus leaves', () => {
-    const button = make('<button title="Reset levels"></button>');
-
-    button.focus();
-    jest.advanceTimersByTime(500);
-    expect(shown()).toBe('Reset levels');
-    move(away);
-    jest.advanceTimersByTime(1000);
-    expect(shown()).toBe('Reset levels');
-
-    button.blur();
-    expect(button.getAttribute('title')).toBe('Reset levels');
-  });
-
-  it('keeps a pointer tooltip when focus moves elsewhere', () => {
-    const button = make('<button title="Reset levels"></button>');
-    const other = make('<button></button>');
-    move(button);
-    jest.advanceTimersByTime(500);
-
-    other.focus();
-    other.blur();
-
-    expect(shown()).toBe('Reset levels');
   });
 
   it('finds a title inside a shadow root', () => {

@@ -90,7 +90,6 @@ export class LogViewer extends LitElement {
   @state()
   private _navigateToTimestamp: number | undefined = undefined;
 
-  // Held only so the controller lives as long as the viewer.
   private readonly _tooltips = new TooltipController(this);
 
   private readonly _levels = new LogLevelsController(this, {
