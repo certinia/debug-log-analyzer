@@ -37,7 +37,6 @@ export class HoverTooltip extends LitElement {
         line-height: 1.4;
         white-space: pre-line;
         overflow-wrap: anywhere;
-        pointer-events: none;
       }
 
       :host(:popover-open) {
@@ -59,6 +58,11 @@ export class HoverTooltip extends LitElement {
   ];
 
   private _open = false;
+
+  /** Whether the tooltip is on screen. */
+  get open(): boolean {
+    return this._open;
+  }
 
   connectedCallback(): void {
     super.connectedCallback();

@@ -6,10 +6,8 @@
 import { afterEach, beforeEach, describe, expect, it } from '@jest/globals';
 import type { ReactiveController, ReactiveControllerHost } from 'lit';
 
+import type { HoverTooltip } from '../../../components/HoverTooltip.js';
 import { TooltipController } from '../TooltipController.js';
-
-let shown: string[] = [];
-let hides = 0;
 
 function setUp(): ReactiveController {
   let controller: ReactiveController | undefined;
@@ -32,8 +30,18 @@ function make(html: string): HTMLElement {
   return el;
 }
 
-const over = (el: Element) =>
+const tip = (): HoverTooltip | null => document.querySelector('hover-tooltip');
+const shown = (): string | null => (tip()?.open ? (tip()?.textContent ?? '') : null);
+
+const move = (el: Element) =>
   el.dispatchEvent(new MouseEvent('pointermove', { bubbles: true, composed: true }));
+const key = (k: string) => {
+  const event = new KeyboardEvent('keydown', { key: k, cancelable: true, bubbles: true });
+  document.dispatchEvent(event);
+  return event;
+};
+// MutationObserver callbacks run as microtasks.
+const flush = () => Promise.resolve();
 
 describe('TooltipController', () => {
   let controller: ReactiveController;
@@ -41,14 +49,9 @@ describe('TooltipController', () => {
 
   beforeEach(() => {
     jest.useFakeTimers();
-    shown = [];
-    hides = 0;
-    HTMLElement.prototype.showPopover = function (this: HTMLElement) {
-      shown.push(this.textContent ?? '');
-    };
-    HTMLElement.prototype.hidePopover = () => {
-      hides++;
-    };
+    // jsdom has no popover API.
+    HTMLElement.prototype.showPopover = () => {};
+    HTMLElement.prototype.hidePopover = () => {};
     controller = setUp();
     away = make('<div></div>');
   });
@@ -62,12 +65,12 @@ describe('TooltipController', () => {
   it('shows the title once the pointer rests on the element', () => {
     const button = make('<button title="Reset levels"></button>');
 
-    over(button);
+    move(button);
     jest.advanceTimersByTime(499);
-    expect(shown).toEqual([]);
+    expect(shown()).toBeNull();
     jest.advanceTimersByTime(1);
 
-    expect(shown).toEqual(['Reset levels']);
+    expect(shown()).toBe('Reset levels');
   });
 
   it('keeps the native tooltip away and the accessible name while it shows', () => {
@@ -75,69 +78,174 @@ describe('TooltipController', () => {
     const text = make('<span title="Full path">apex.log</span>');
     const named = make('<button title="Copy" aria-label="Copy rows"></button>');
 
-    over(icon);
-    expect(icon.hasAttribute('title')).toBe(false);
+    move(icon);
+    expect(icon.getAttribute('title')).toBe('');
     expect(icon.getAttribute('aria-label')).toBe('Reset levels');
-    over(text);
+    move(text);
     expect(text.getAttribute('aria-description')).toBe('Full path');
-    over(named);
+    move(named);
     expect(named.getAttribute('aria-label')).toBe('Copy rows');
     expect(named.hasAttribute('aria-description')).toBe(false);
   });
 
-  it('gives the title back when the pointer leaves', () => {
+  it('gives the title back once the pointer has left', () => {
     const button = make('<button title="Reset levels"></button>');
-    over(button);
+    move(button);
     jest.advanceTimersByTime(500);
 
-    over(away);
+    move(away);
+    jest.advanceTimersByTime(99);
+    expect(shown()).toBe('Reset levels');
+    jest.advanceTimersByTime(1);
 
+    expect(shown()).toBeNull();
     expect(button.getAttribute('title')).toBe('Reset levels');
     expect(button.hasAttribute('aria-label')).toBe(false);
-    expect(hides).toBe(1);
   });
 
-  it('keeps showing while the pointer moves over the element children', () => {
+  it('stays while the pointer moves over the element children or onto the tooltip', () => {
     const button = make('<button title="Reset levels"><span>↺</span></button>');
-    over(button);
+    move(button);
     jest.advanceTimersByTime(500);
 
-    over(button.querySelector('span') as Element);
+    move(button.querySelector('span') as Element);
+    move(away);
+    move(tip() as Element);
+    jest.advanceTimersByTime(1000);
 
-    expect(hides).toBe(0);
+    expect(shown()).toBe('Reset levels');
   });
 
   it('shows the next tooltip at once while the pointer scans a toolbar', () => {
     const first = make('<button title="Columns"></button>');
     const second = make('<button title="Export to CSV"></button>');
-    over(first);
+    move(first);
     jest.advanceTimersByTime(500);
 
-    over(second);
+    move(second);
     jest.advanceTimersByTime(0);
 
-    expect(shown).toEqual(['Columns', 'Export to CSV']);
+    expect(shown()).toBe('Export to CSV');
+    expect(first.getAttribute('title')).toBe('Columns');
   });
 
-  it('hides on a click, and keeps the title away until the pointer leaves', () => {
+  it('shows the innermost title and keeps every title on the path away', () => {
+    const outer = make('<div title="Outer"><span title="Inner">a</span><i>b</i></div>');
+    const inner = outer.querySelector('span') as Element;
+    move(inner);
+    jest.advanceTimersByTime(500);
+    expect(shown()).toBe('Inner');
+    expect([outer.getAttribute('title'), inner.getAttribute('title')]).toEqual(['', '']);
+
+    move(outer.querySelector('i') as Element);
+    jest.advanceTimersByTime(0);
+    expect(shown()).toBe('Outer');
+    expect(outer.getAttribute('title')).toBe('');
+
+    move(away);
+    jest.advanceTimersByTime(100);
+    expect([outer.getAttribute('title'), inner.getAttribute('title')]).toEqual(['Outer', 'Inner']);
+  });
+
+  it.each(['pointerdown', 'wheel', 'scroll'])(
+    'hides on %s, and keeps the title away until the pointer leaves',
+    (type) => {
+      const button = make('<button title="Reset levels"></button>');
+      move(button);
+      jest.advanceTimersByTime(500);
+
+      button.dispatchEvent(new Event(type, { bubbles: true }));
+
+      expect(shown()).toBeNull();
+      expect(button.getAttribute('title')).toBe('');
+    },
+  );
+
+  it('hides on a key, as a key can scroll a grid', () => {
     const button = make('<button title="Reset levels"></button>');
-    over(button);
+    move(button);
     jest.advanceTimersByTime(500);
 
-    button.dispatchEvent(new MouseEvent('pointerdown', { bubbles: true }));
+    key('Shift');
+    expect(shown()).toBe('Reset levels');
+    key('ArrowDown');
 
-    expect(hides).toBe(1);
+    expect(shown()).toBeNull();
+  });
+
+  it('takes the Escape that closes a tooltip, and only that one', () => {
+    const button = make('<button title="Reset levels"></button>');
+    move(button);
+    jest.advanceTimersByTime(500);
+
+    expect(key('Escape').defaultPrevented).toBe(true);
+    expect(key('Escape').defaultPrevented).toBe(false);
+  });
+
+  it.each([
+    ['the window loses focus', () => window.dispatchEvent(new Event('blur'))],
+    [
+      'the pointer leaves the page',
+      () => document.documentElement.dispatchEvent(new MouseEvent('pointerleave')),
+    ],
+  ])('ends when %s', (_, leave) => {
+    const button = make('<button title="Reset levels"></button>');
+    move(button);
+    jest.advanceTimersByTime(500);
+
+    leave();
+
+    expect(shown()).toBeNull();
+    expect(button.getAttribute('title')).toBe('Reset levels');
+  });
+
+  it('stays when the pointer leaves an element inside the page', () => {
+    const button = make('<button title="Reset levels"></button>');
+    move(button);
+    jest.advanceTimersByTime(500);
+
+    away.dispatchEvent(new MouseEvent('pointerleave'));
+
+    expect(shown()).toBe('Reset levels');
+  });
+
+  it('shows nothing for an element removed before the delay ends', () => {
+    const button = make('<button title="Reset levels"></button>');
+    move(button);
+
+    button.remove();
+    jest.advanceTimersByTime(500);
+
+    expect(shown()).toBeNull();
+  });
+
+  it('shows and gives back a title the app changed while it showed', async () => {
+    const button = make('<button title="Old"></button>');
+    move(button);
+    jest.advanceTimersByTime(500);
+
+    button.setAttribute('title', 'New');
+    await flush();
+    expect(shown()).toBe('New');
+    expect(button.getAttribute('title')).toBe('');
+
+    move(away);
+    jest.advanceTimersByTime(100);
+    expect(button.getAttribute('title')).toBe('New');
+  });
+
+  it('does not give back a title the app removed while it showed', async () => {
+    const button = make('<button title="Old"></button>');
+    move(button);
+    jest.advanceTimersByTime(500);
+
+    button.removeAttribute('title');
+    await flush();
+    expect(shown()).toBeNull();
+
+    move(away);
+    jest.advanceTimersByTime(100);
     expect(button.hasAttribute('title')).toBe(false);
-  });
-
-  it('hides on Escape', () => {
-    const button = make('<button title="Reset levels"></button>');
-    over(button);
-    jest.advanceTimersByTime(500);
-
-    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }));
-
-    expect(hides).toBe(1);
   });
 
   it('shows the title when the keyboard focuses the element, and hides when focus leaves', () => {
@@ -145,10 +253,25 @@ describe('TooltipController', () => {
 
     button.focus();
     jest.advanceTimersByTime(500);
-    expect(shown).toEqual(['Reset levels']);
+    expect(shown()).toBe('Reset levels');
+    move(away);
+    jest.advanceTimersByTime(1000);
+    expect(shown()).toBe('Reset levels');
 
     button.blur();
     expect(button.getAttribute('title')).toBe('Reset levels');
+  });
+
+  it('keeps a pointer tooltip when focus moves elsewhere', () => {
+    const button = make('<button title="Reset levels"></button>');
+    const other = make('<button></button>');
+    move(button);
+    jest.advanceTimersByTime(500);
+
+    other.focus();
+    other.blur();
+
+    expect(shown()).toBe('Reset levels');
   });
 
   it('finds a title inside a shadow root', () => {
@@ -156,21 +279,20 @@ describe('TooltipController', () => {
     const root = host.attachShadow({ mode: 'open' });
     root.innerHTML = '<button title="Show 2 more"></button>';
 
-    over(root.querySelector('button') as Element);
+    move(root.querySelector('button') as Element);
     jest.advanceTimersByTime(500);
 
-    expect(shown).toEqual(['Show 2 more']);
+    expect(shown()).toBe('Show 2 more');
   });
 
   it('gives every title back when the viewer goes', () => {
     const button = make('<button title="Reset levels"></button>');
-    over(button);
+    move(button);
 
     controller.hostDisconnected?.();
     jest.advanceTimersByTime(500);
 
     expect(button.getAttribute('title')).toBe('Reset levels');
-    expect(shown).toEqual([]);
-    expect(document.querySelector('hover-tooltip')).toBeNull();
+    expect(tip()).toBeNull();
   });
 });
