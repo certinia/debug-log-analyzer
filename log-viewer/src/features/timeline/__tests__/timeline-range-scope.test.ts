@@ -21,12 +21,14 @@ jest.mock('../optimised/ApexLogTimeline.js', () => ({
       return Promise.resolve();
     }
     setTooltipEnabled(): void {}
+    setCategoryDim(): void {}
     destroy(): void {}
   },
 }));
 
 import { currentRange, setRange } from '../../../core/log/rangeScope.js';
 import { makeViewport } from '#test-helpers/viewport.js';
+import { AlwaysVisible, settle } from '#test-helpers/visibility.js';
 import '../components/TimelineFlameChart.js';
 
 const LOG = { timestamp: 0, exitStamp: 1000, duration: { total: 1000 } } as unknown as ApexLog;
@@ -45,14 +47,15 @@ async function mount(): Promise<void> {
   Object.assign(element, { apexLog: LOG });
   document.body.append(element);
   await (element as unknown as { updateComplete: Promise<boolean> }).updateComplete;
-  // `init` resolves a microtask after the first update.
-  await Promise.resolve();
+  await settle();
 }
 
 describe('timeline-flame-chart publishes the range the user reads', () => {
   const realRaf = window.requestAnimationFrame;
 
   beforeEach(() => {
+    // jsdom lays nothing out, so the chart waits to be seen before it builds.
+    globalThis.IntersectionObserver = AlwaysVisible as unknown as typeof IntersectionObserver;
     // One publish per frame; running the frame at once lets a test read the result.
     window.requestAnimationFrame = (callback: FrameRequestCallback) => {
       callback(0);

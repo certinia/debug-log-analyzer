@@ -15,7 +15,7 @@ import { customElement, property, query, state } from 'lit/decorators.js';
 import type { ApexLog } from '@apexdevtools/apex-log-parser';
 import { SubscriptionController } from '../../../core/events/SubscriptionController.js';
 import { setRange, windowFor } from '../../../core/log/rangeScope.js';
-import { debounce, setChanged } from '../../../core/utility/Util.js';
+import { debounce, isVisible, setChanged } from '../../../core/utility/Util.js';
 import { themeObserver } from '../../../core/theme/ThemeObserver.js';
 import { ApexLogTimeline } from '../optimised/ApexLogTimeline.js';
 import type { MeasurementSnapshot } from '../optimised/measurement/MeasurementState.js';
@@ -125,6 +125,7 @@ export class TimelineFlameChart extends LitElement {
 
   /** Bumped by every `cleanup()`, so an in-flight `init` can tell it was superseded. */
   private initEpoch = 0;
+  private visibilityWait: AbortController | null = null;
 
   private readonly subscriptions = new SubscriptionController(this, () => [
     themeObserver.on(() => {
@@ -146,6 +147,7 @@ export class TimelineFlameChart extends LitElement {
     // Lit can drop this element while the panel stays open, so the Pixi app has to go
     // with it or its WebGL context leaks.
     super.disconnectedCallback();
+    this.visibilityWait?.abort();
     this.cleanup();
   }
 
@@ -200,6 +202,15 @@ export class TimelineFlameChart extends LitElement {
   private async initializeTimeline(keepViewport = false): Promise<void> {
     if (!this.containerRef || !this.apexLog) {
       return;
+    }
+    this.visibilityWait?.abort();
+    // A hidden tab has no size to draw in, so a log that arrives there waits until the tab shows.
+    if (!this.containerRef.getBoundingClientRect().width) {
+      const wait = new AbortController();
+      this.visibilityWait = wait;
+      if (!(await isVisible(this.containerRef, undefined, wait.signal))) {
+        return;
+      }
     }
 
     // A re-init still in flight has no timeline yet, so it hands on the place it was given.
