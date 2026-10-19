@@ -5,6 +5,9 @@
  */
 import { afterEach, beforeEach, describe, expect, it } from '@jest/globals';
 
+import { storeOf } from '#test-helpers/apexLog.js';
+import { AlwaysVisible, settle } from '#test-helpers/visibility.js';
+
 import {
   eventBus,
   type DetailSelection,
@@ -313,5 +316,44 @@ describe('database-view find', () => {
 
     await rollUps(() => search());
     expect(await rollUps(() => collapse(1))).toEqual([0]);
+  });
+});
+
+describe('database-view on a new log', () => {
+  const soql = (n: number): string =>
+    Array.from(
+      { length: n },
+      (_, i) =>
+        `09:18:22.6 (${1000 + i * 10})|SOQL_EXECUTE_BEGIN|[1]|Aggregations:0|SELECT Id FROM A${i}\n` +
+        `09:18:22.6 (${1005 + i * 10})|SOQL_EXECUTE_END|[1]|Rows:1\n`,
+    ).join('');
+  type View = HTMLElement & {
+    logStore: unknown;
+    updateComplete: Promise<unknown>;
+  };
+  const shownLines = (view: View): unknown[] =>
+    (view.shadowRoot?.querySelector('soql-view') as (HTMLElement & { lines?: unknown[] }) | null)
+      ?.lines ?? [];
+
+  afterEach(() => {
+    document.body.replaceChildren();
+  });
+
+  it('gives the grid it has the statements of a new log', async () => {
+    globalThis.IntersectionObserver = AlwaysVisible as unknown as typeof IntersectionObserver;
+    const view = document.createElement('database-view') as View;
+    document.body.append(view);
+    view.logStore = storeOf(soql(2)).store;
+    await settle();
+    await view.updateComplete;
+    const grid = view.shadowRoot?.querySelector('soql-view');
+    expect(shownLines(view)).toHaveLength(2);
+
+    view.logStore = storeOf(soql(1)).store;
+    await settle();
+    await view.updateComplete;
+
+    expect(view.shadowRoot?.querySelector('soql-view')).toBe(grid);
+    expect(shownLines(view)).toHaveLength(1);
   });
 });
