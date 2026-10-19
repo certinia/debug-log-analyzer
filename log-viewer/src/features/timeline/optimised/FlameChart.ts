@@ -552,9 +552,9 @@ export class FlameChart<E extends EventNode = EventNode> {
   }
 
   /**
-   * Show `zoom` and the pan offsets, clamped to this chart's bounds.
+   * Show a viewport taken with {@link getViewport}, clamped to this chart's bounds.
    */
-  public setViewport(zoom: number, offsetX: number, offsetY: number): void {
+  public setViewport({ zoom, offsetX, offsetY }: ViewportState): void {
     if (!this.viewport) {
       return;
     }
