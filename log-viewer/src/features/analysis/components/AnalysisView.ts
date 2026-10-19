@@ -125,6 +125,7 @@ export class AnalysisView extends LitElement {
   grid: CallTreeGrid<BottomUpRow> | null = null;
   private _tree: MergedTree<BottomUpRow> | null = null;
   private _built: Promise<void> | null = null;
+  private _builds = new AbortController();
 
   // A render binds `_columns` to the grid again, so the column view writes there, not to the grid.
   private readonly _columnTarget = heldColumnTarget<BottomUpRow>(
@@ -223,6 +224,8 @@ export class AnalysisView extends LitElement {
       // The grid keeps its sort, widths, group and filters. Its selection and mark named rows of the old log.
       this._marked = new Set();
       this.grid?.deselect();
+      this._builds.abort();
+      this._builds = new AbortController();
       this._built = this._build(this.timelineRoot);
     }
   }
@@ -331,8 +334,8 @@ export class AnalysisView extends LitElement {
   }
 
   private async _build(root: ApexLog): Promise<void> {
-    const tree = await MergedTree.bottomUp(root);
-    if (!tree || root !== this.timelineRoot) {
+    const tree = await MergedTree.bottomUp(root, { signal: this._builds.signal });
+    if (!tree) {
       return;
     }
     this._tree = tree;

@@ -30,6 +30,7 @@ import {
 } from '../../../../core/events/EventBus.js';
 import { exportCsv } from '../../../../components/grid/exportCsv.js';
 import { logStoreFor } from '../../../../core/log/LogStore.js';
+import { MergedTree } from '../../../call-tree/grid/mergedRows.js';
 import type { BottomUpRow } from '../../../call-tree/utils/Aggregation.js';
 import { AnalysisView } from '../AnalysisView.js';
 
@@ -298,6 +299,19 @@ describe('analysis-view', () => {
     await view.updateComplete;
 
     expect(grid().filters).toEqual([]);
+  });
+
+  it('stops a rebuild that a newer log overtook', async () => {
+    const bottomUp = jest.spyOn(MergedTree, 'bottomUp');
+
+    view.logStore = logStoreFor(recursiveLog());
+    await view.updateComplete;
+    view.logStore = logStoreFor(recursiveLog());
+    await view.updateComplete;
+    await settle();
+
+    const signals = bottomUp.mock.calls.map(([, options]) => options?.signal?.aborted);
+    expect(signals).toEqual([true, false]);
   });
 
   it('gives the grid it has the rows of a new log, and keeps Details on', async () => {
