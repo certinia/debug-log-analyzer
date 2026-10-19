@@ -300,6 +300,23 @@ describe('analysis-view', () => {
     expect(grid().filters).toEqual([]);
   });
 
+  it('gives the grid it has the rows of a new log, and keeps Details on', async () => {
+    view.renderRoot.querySelector<HTMLButtonElement>('button.pill-toggle')?.click();
+    await view.updateComplete;
+    const shownGrid = grid();
+    const before = roots();
+
+    view.logStore = logStoreFor(recursiveLog());
+    await view.updateComplete;
+    await settle();
+    await view.updateComplete;
+
+    expect(grid()).toBe(shownGrid);
+    expect(roots()).not.toBe(before);
+    expect(roots().map((row) => row.text)).toEqual(before.map((row) => row.text));
+    expect(grid().filters).toEqual([]);
+  });
+
   it('exports analysis.csv and copies from the grid', () => {
     const copy = jest.spyOn(grid(), 'copy').mockResolvedValue(undefined);
     const click = (label: string) =>
