@@ -15,6 +15,7 @@ import { customElement, property, query, state } from 'lit/decorators.js';
 import type { ApexLog } from '@apexdevtools/apex-log-parser';
 import { SubscriptionController } from '../../../core/events/SubscriptionController.js';
 import { setRange, windowFor } from '../../../core/log/rangeScope.js';
+import { waitForNextFrame } from '../../../core/utility/FrameBudget.js';
 import { debounce, isVisible, setChanged } from '../../../core/utility/Util.js';
 import { themeObserver } from '../../../core/theme/ThemeObserver.js';
 import { ApexLogTimeline } from '../optimised/ApexLogTimeline.js';
@@ -44,6 +45,11 @@ export class TimelineFlameChart extends LitElement {
         width: 100%;
         height: 100%;
         position: relative;
+      }
+
+      .timeline-layer {
+        position: absolute;
+        inset: 0;
       }
 
       .error-message {
@@ -118,6 +124,8 @@ export class TimelineFlameChart extends LitElement {
   private errorMessage: string | null = null;
 
   private apexLogTimeline: ApexLogTimeline | null = null;
+  /** The element {@link apexLogTimeline} draws in. */
+  private timelineLayer: HTMLElement | null = null;
   private pendingViewport: ViewportState | null = null;
 
   @query('.timeline-container')
@@ -218,14 +226,19 @@ export class TimelineFlameChart extends LitElement {
       ? (this.apexLogTimeline?.getViewport() ?? this.pendingViewport)
       : null;
     this.pendingViewport = viewport;
-    // Clean up existing renderer
-    this.cleanup();
 
     if (this.apexLog.duration.total === 0) {
+      this.cleanup();
       this.errorMessage = 'Nothing to show';
       return;
     }
 
+    // The chart on screen stays until the new one has drawn, so a level change does not blank it.
+    const epoch = ++this.initEpoch;
+    const layer = document.createElement('div');
+    layer.className = 'timeline-layer';
+    layer.style.visibility = 'hidden';
+    this.containerRef.append(layer);
     try {
       this.errorMessage = null;
 
@@ -250,19 +263,8 @@ export class TimelineFlameChart extends LitElement {
           ),
       };
 
-      const epoch = this.initEpoch;
       const timeline = new ApexLogTimeline();
-      await timeline.init(this.containerRef, this.apexLog, optionsWithTheme);
-
-      // `init` is async, so a second re-init (or a disconnect) can land while it
-      // runs. The later one owns the container — drop this Pixi app instead of
-      // leaking it over the top.
-      if (epoch !== this.initEpoch) {
-        timeline.destroy();
-        return;
-      }
-      this.apexLogTimeline = timeline;
-      this.pendingViewport = null;
+      await timeline.init(layer, this.apexLog, optionsWithTheme);
       timeline.setTooltipEnabled(this.showTooltip);
       timeline.setCategoryDim(this.dimCategories);
 
@@ -274,8 +276,28 @@ export class TimelineFlameChart extends LitElement {
       } else if (this.navigateToTimestamp !== undefined) {
         timeline.navigateToTimestamp(this.navigateToTimestamp);
       }
+      // The move above draws on the next frame; showing the layer sooner would flash the default view.
+      await waitForNextFrame();
+
+      // `init` is async, so a second re-init (or a disconnect) can land while it
+      // runs. The later one owns the container — drop this Pixi app instead of
+      // leaking it over the top.
+      if (epoch !== this.initEpoch) {
+        timeline.destroy();
+        layer.remove();
+        return;
+      }
+      this.cleanup();
+      layer.style.visibility = '';
+      this.apexLogTimeline = timeline;
+      this.timelineLayer = layer;
+      this.pendingViewport = null;
     } catch (error) {
-      this.handleError(error);
+      layer.remove();
+      if (epoch === this.initEpoch) {
+        this.cleanup();
+        this.handleError(error);
+      }
     }
   }
 
@@ -378,6 +400,8 @@ export class TimelineFlameChart extends LitElement {
       this.apexLogTimeline.destroy();
       this.apexLogTimeline = null;
     }
+    this.timelineLayer?.remove();
+    this.timelineLayer = null;
   }
 
   // ============================================================================

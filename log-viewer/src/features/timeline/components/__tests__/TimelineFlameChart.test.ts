@@ -9,11 +9,17 @@ import type { ApexLog } from '@apexdevtools/apex-log-parser';
 // The chart needs WebGL, which jsdom lacks; this suite drives only when it is built.
 jest.mock('../../optimised/ApexLogTimeline.js', () => ({
   ApexLogTimeline: class {
+    private log: ApexLog | null = null;
     init(_container: HTMLElement, log: ApexLog): Promise<void> {
+      this.log = log;
       built.push(log);
-      return Promise.resolve();
+      return holdInit ? new Promise((resolve) => (finishInit = resolve)) : Promise.resolve();
     }
-    destroy(): void {}
+    destroy(): void {
+      if (this.log) {
+        destroyed.push(this.log);
+      }
+    }
     getViewport(): null {
       return null;
     }
@@ -25,11 +31,16 @@ jest.mock('../../optimised/ApexLogTimeline.js', () => ({
   },
 }));
 
-import { settle } from '#test-helpers/visibility.js';
+import { AlwaysVisible, settle } from '#test-helpers/visibility.js';
 import '../TimelineFlameChart.js';
 
 /** The logs the chart was built for, in order. */
 let built: ApexLog[] = [];
+/** The logs whose chart was destroyed, in order. */
+let destroyed: ApexLog[] = [];
+/** Whether a build waits to be finished by hand. */
+let holdInit = false;
+let finishInit: () => void = () => {};
 /** Reports every observed element in view, as a tab coming back on screen does. */
 let show: () => void = () => {};
 
@@ -90,5 +101,39 @@ describe('timeline-flame-chart in a hidden tab', () => {
     await settle();
 
     expect(built).toEqual([newest]);
+  });
+});
+
+describe('timeline-flame-chart on a new log', () => {
+  let chart: HTMLElement & { apexLog: ApexLog | null; updateComplete: Promise<unknown> };
+
+  beforeEach(async () => {
+    built = [];
+    destroyed = [];
+    holdInit = false;
+    globalThis.IntersectionObserver = AlwaysVisible as unknown as typeof IntersectionObserver;
+    chart = document.createElement('timeline-flame-chart') as typeof chart;
+    document.body.append(chart);
+    chart.apexLog = logOf();
+    await chart.updateComplete;
+    await settle();
+  });
+
+  afterEach(() => {
+    chart.remove();
+  });
+
+  it('keeps the chart on screen until the chart for the new log is built', async () => {
+    const [first] = built;
+    holdInit = true;
+
+    chart.apexLog = logOf();
+    await chart.updateComplete;
+    await settle();
+    expect(destroyed).toEqual([]);
+
+    finishInit();
+    await settle();
+    expect(destroyed).toEqual([first]);
   });
 });
