@@ -25,6 +25,17 @@ export function levelRank(level: LogLevel | undefined): number {
   return level ? (RANK.get(level) ?? -1) : -1;
 }
 
+// The parser gives every USER_DEBUG line DEBUG, but Salesforce filters it by the level it was written at.
+function levelOf(event: LogEvent): LogLevel {
+  if (event.type === 'USER_DEBUG') {
+    const written = event.text.split(' | ', 1)[0] as Level;
+    if (RANK.has(written)) {
+      return written;
+    }
+  }
+  return event.debugLevel;
+}
+
 /** True when `event` is finer than the level chosen for its category. */
 export function isHidden(event: LogEvent, chosen: DebugLevels): boolean {
   const { debugCategory, debugLevel } = event;
@@ -32,7 +43,7 @@ export function isHidden(event: LogEvent, chosen: DebugLevels): boolean {
     return false;
   }
   const limit = chosen[debugCategory];
-  return limit !== undefined && levelRank(debugLevel) > levelRank(limit);
+  return limit !== undefined && levelRank(levelOf(event)) > levelRank(limit);
 }
 
 export function sameLevels(a: DebugLevels, b: DebugLevels): boolean {

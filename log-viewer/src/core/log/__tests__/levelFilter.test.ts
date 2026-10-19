@@ -85,6 +85,22 @@ describe('levelFilter', () => {
     expect(filtered.duration.total).toBe(original.duration.total);
   });
 
+  it('hides a USER_DEBUG line by the level it was written at', () => {
+    const log = storeOf(
+      '09:18:22.6 (1000)|USER_DEBUG|[1]|ERROR|kept\n' +
+        '09:18:22.6 (2000)|USER_DEBUG|[2]|FINEST|hidden\n',
+      SETTINGS,
+    ).log;
+
+    const filtered = build(log, { apexCode: 'INFO' });
+
+    expect(
+      walk(filtered)
+        .filter((event) => event.type === 'USER_DEBUG')
+        .map((event) => event.text),
+    ).toEqual(['ERROR | kept']);
+  });
+
   it('keeps the self sum of the tree', () => {
     const log = logOf();
 
