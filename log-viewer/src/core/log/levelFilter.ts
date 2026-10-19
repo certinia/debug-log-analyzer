@@ -86,6 +86,7 @@ export class LevelFilterBuilder {
   private readonly slots: LogEvent[];
   private readonly ownCounters = new Set<LogEvent>();
   private readonly namespaces = new Set<string>();
+  private hidden = 0;
 
   // One entry per open level: the children being read, the next one to read, and
   // the kept copy that takes them.
@@ -124,6 +125,7 @@ export class LevelFilterBuilder {
       const keeper = levelKept[level]!;
       let next = keeper;
       if (isHidden(event, this.chosen)) {
+        this.hidden++;
         this.fold(keeper, event);
         this.slots[event.eventIndex] = this.root;
       } else {
@@ -151,11 +153,16 @@ export class LevelFilterBuilder {
       if (!slots[index]) {
         const hidden = isHidden(event, this.chosen);
         slots[index] = hidden ? root : event;
-        if (!hidden) {
+        if (hidden) {
+          this.hidden++;
+        } else {
           this.namespaces.add(event.namespace);
         }
       }
     });
+    if (!this.hidden) {
+      return original;
+    }
 
     root.eventsById = slots;
     root.debugLevels = { ...original.debugLevels, ...this.chosen };

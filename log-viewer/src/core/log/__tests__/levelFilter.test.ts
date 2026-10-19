@@ -59,6 +59,12 @@ describe('levelFilter', () => {
     expect(await filterByLevels(log, { ...log.debugLevels }, { yieldSlice })).toBe(log);
   });
 
+  it('returns the log itself when a lowered level hides nothing', async () => {
+    const log = logOf();
+
+    expect(await filterByLevels(log, { apexCode: 'FINER' }, { yieldSlice })).toBe(log);
+  });
+
   it('hoists kept events to the nearest kept ancestor, in log order', () => {
     const filtered = build(logOf(), { apexCode: 'DEBUG' });
 
