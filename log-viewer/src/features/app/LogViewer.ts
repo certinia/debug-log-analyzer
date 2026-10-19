@@ -26,6 +26,7 @@ import { LogLevelsController } from './LogLevelsController.js';
 import { deriveLogIdentity, type LogIdentityData } from './logIdentity.js';
 import { toLogIssues } from './logIssues.js';
 import { parserIssuesToNotifications } from './parserNotifications.js';
+import { TooltipController } from './TooltipController.js';
 
 // styles
 import { globalStyles } from '../../styles/global.styles.js';
@@ -88,6 +89,9 @@ export class LogViewer extends LitElement {
 
   @state()
   private _navigateToTimestamp: number | undefined = undefined;
+
+  // Held only so the controller lives as long as the viewer.
+  private readonly _tooltips = new TooltipController(this);
 
   private readonly _levels = new LogLevelsController(this, {
     publish: (log) => (this._logStore = setCurrentLog(log)),
