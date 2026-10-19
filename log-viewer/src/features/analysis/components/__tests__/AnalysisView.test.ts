@@ -29,6 +29,8 @@ import {
   type DetailSource,
 } from '../../../../core/events/EventBus.js';
 import { exportCsv } from '../../../../components/grid/exportCsv.js';
+import { logStoreFor } from '../../../../core/log/LogStore.js';
+import { MergedTree } from '../../../call-tree/grid/mergedRows.js';
 import type { BottomUpRow } from '../../../call-tree/utils/Aggregation.js';
 import { AnalysisView } from '../AnalysisView.js';
 
@@ -127,7 +129,7 @@ describe('analysis-view', () => {
     view = new AnalysisView();
     document.body.append(view);
     await view.updateComplete;
-    view.timelineRoot = log;
+    view.logStore = logStoreFor(log);
     await view.updateComplete;
     await settle();
     await view.updateComplete;
@@ -299,6 +301,36 @@ describe('analysis-view', () => {
     expect(grid().filters).toEqual([]);
   });
 
+  it('stops a rebuild that a newer log overtook', async () => {
+    const bottomUp = jest.spyOn(MergedTree, 'bottomUp');
+
+    view.logStore = logStoreFor(recursiveLog());
+    await view.updateComplete;
+    view.logStore = logStoreFor(recursiveLog());
+    await view.updateComplete;
+    await settle();
+
+    const signals = bottomUp.mock.calls.map(([, options]) => options?.signal?.aborted);
+    expect(signals).toEqual([true, false]);
+  });
+
+  it('gives the grid it has the rows of a new log, and keeps Details on', async () => {
+    view.renderRoot.querySelector<HTMLButtonElement>('button.pill-toggle')?.click();
+    await view.updateComplete;
+    const shownGrid = grid();
+    const before = roots();
+
+    view.logStore = logStoreFor(recursiveLog());
+    await view.updateComplete;
+    await settle();
+    await view.updateComplete;
+
+    expect(grid()).toBe(shownGrid);
+    expect(roots()).not.toBe(before);
+    expect(roots().map((row) => row.text)).toEqual(before.map((row) => row.text));
+    expect(grid().filters).toEqual([]);
+  });
+
   it('exports analysis.csv and copies from the grid', () => {
     const copy = jest.spyOn(grid(), 'copy').mockResolvedValue(undefined);
     const click = (label: string) =>
@@ -391,7 +423,7 @@ describe('analysis-view before it is seen', () => {
     const view = new AnalysisView();
     document.body.append(view);
     await view.updateComplete;
-    view.timelineRoot = recursiveLog();
+    view.logStore = logStoreFor(recursiveLog());
     await view.updateComplete;
     await settle();
 

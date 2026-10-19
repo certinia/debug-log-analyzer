@@ -87,7 +87,7 @@ async function mountView(log: ApexLog = apexLog()): Promise<CalltreeView> {
   const view = new CalltreeView();
   document.body.append(view);
   await view.updateComplete;
-  view.timelineRoot = log;
+  view.logStore = logStoreFor(log);
   await view.updateComplete;
   await settle();
   return view;
@@ -112,6 +112,23 @@ describe('calltree-view table lifetime', () => {
   it('builds the grid for the log it is given', () => {
     expect(built).toEqual(['time-order']);
     expect(grids(view)).toEqual([view.timeOrderGrid]);
+  });
+
+  it('gives the grid it has the rows of a new log, and keeps its filters', async () => {
+    view.namespaceSelected = ['ns'];
+    view._updateFiltering();
+    const grid = view.timeOrderGrid;
+    const filters = [...(grid?.filters ?? [])];
+    const source = grid?.source;
+
+    view.logStore = logStoreFor(apexLog());
+    await view.updateComplete;
+    await settle();
+
+    expect(view.timeOrderGrid).toBe(grid);
+    expect(grids(view)).toEqual([grid]);
+    expect(grid?.source).not.toBe(source);
+    expect(grid?.filters).toEqual(filters);
   });
 
   it('rebuilds the grid after a detach and a re-attach', async () => {
@@ -484,7 +501,7 @@ describe('calltree-view type picker', () => {
 
   it("lists the log's types once each, sorted, and no exit lines", async () => {
     view.isVisible = true;
-    view.timelineRoot = storeOf(OUTER).log;
+    view.logStore = storeOf(OUTER).store;
     const types = await typeOptions();
 
     expect(types).toEqual([...new Set(types)].sort());
@@ -499,7 +516,7 @@ describe('calltree-view type picker', () => {
     view = new CalltreeView();
     document.body.append(view);
     const logIndex = jest.spyOn(LogStore.prototype, 'logIndex');
-    view.timelineRoot = storeOf(OUTER).log;
+    view.logStore = storeOf(OUTER).store;
     await typeOptions();
 
     expect(logIndex).not.toHaveBeenCalled();
@@ -517,9 +534,9 @@ describe('calltree-view type picker', () => {
     });
 
     view.isVisible = true;
-    view.timelineRoot = before;
+    view.logStore = logStoreFor(before);
     await view.updateComplete;
-    view.timelineRoot = storeOf(DML).log;
+    view.logStore = storeOf(DML).store;
     await typeOptions();
     release();
     const types = await typeOptions();

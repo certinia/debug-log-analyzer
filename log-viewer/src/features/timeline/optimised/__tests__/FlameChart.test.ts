@@ -9,6 +9,7 @@
 import { afterEach, describe, expect, it, jest } from '@jest/globals';
 import { makeViewport } from '#test-helpers/viewport.js';
 import { FlameChart } from '../FlameChart.js';
+import { TimelineViewport } from '../TimelineViewport.js';
 
 const HIT_NODE = { id: '0-0', timestamp: 0, duration: 10, depth: 0, original: { eventIndex: 1 } };
 
@@ -287,5 +288,37 @@ describe('FlameChart.resize', () => {
     expect(cancel).toHaveBeenCalledWith(7);
     expect(appRender).toHaveBeenCalledTimes(1);
     expect(internals['renderLoopId']).toBeNull();
+  });
+});
+
+describe('FlameChart.setViewport', () => {
+  function chartWithViewport() {
+    const chart = new FlameChart();
+    const onViewportChange = jest.fn();
+    const internals = chart as unknown as Record<string, unknown>;
+    internals['viewport'] = new TimelineViewport(400, 300, 1e9, 5);
+    internals['callbacks'] = { onViewportChange };
+    internals['requestRender'] = jest.fn();
+    return { chart, onViewportChange };
+  }
+
+  it('shows the viewport it is given, and reports it', () => {
+    const { chart, onViewportChange } = chartWithViewport();
+    const before = chart.getViewport()!;
+    const wanted = { ...before, zoom: before.zoom * 4, offsetX: 100 };
+
+    chart.setViewport(wanted);
+
+    expect(chart.getViewport()).toMatchObject({ zoom: wanted.zoom, offsetX: 100 });
+    expect(onViewportChange).toHaveBeenCalledWith(chart.getViewport());
+  });
+
+  it("keeps a viewport from a longer log inside this chart's bounds", () => {
+    const { chart } = chartWithViewport();
+    const before = chart.getViewport()!;
+
+    chart.setViewport({ ...before, zoom: before.zoom * 4, offsetX: 1e9 });
+
+    expect(chart.getViewport()!.offsetX).toBeLessThan(1e9);
   });
 });

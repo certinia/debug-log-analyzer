@@ -37,4 +37,16 @@ describe('selectFaceText', () => {
       selectFaceText({ prefix: '', placeholder: 'Type', value: 'Apex Code', emptyValue: 'None' }),
     ).toEqual({ prefixText: '', valueText: 'Apex Code', active: true });
   });
+
+  it('puts the separator it is given after the prefix', () => {
+    expect(
+      selectFaceText({
+        prefix: 'APEX_CODE',
+        placeholder: 'APEX_CODE',
+        value: 'FINE',
+        emptyValue: '',
+        separator: '',
+      }),
+    ).toEqual({ prefixText: 'APEX_CODE', valueText: 'FINE', active: true });
+  });
 });

@@ -5,9 +5,12 @@ import '#vscode-elements/vscode-button.js';
 import '#vscode-elements/vscode-option.js';
 import '#vscode-elements/vscode-toolbar-button.js';
 import '../../../components/VsSelect.js';
+import { consume } from '@lit/context';
 import { initialState, Task } from '@lit/task';
 import { css, html, LitElement, type PropertyValues } from 'lit';
 import { customElement, property, state } from 'lit/decorators.js';
+import { logContext } from '../../../core/log/logContext.js';
+import type { LogStore } from '../../../core/log/LogStore.js';
 import { repeat } from 'lit/directives/repeat.js';
 
 import type { ApexLog, LogEvent } from '@apexdevtools/apex-log-parser';
@@ -17,7 +20,6 @@ import { SelectionEchoGuard } from '../../../core/events/SelectionEchoGuard.js';
 import { SubscriptionController } from '../../../core/events/SubscriptionController.js';
 import { vscodeMessenger } from '../../../core/messaging/VSCodeExtensionMessenger.js';
 import type { LogIndex } from '../../../core/log/LogIndex.js';
-import { logStoreFor } from '../../../core/log/LogStore.js';
 import { eventByEventIndex } from '../../../core/utility/EventSearch.js';
 import { isVisible } from '../../../core/utility/Util.js';
 import { CALLTREE_GO_TO_ROW, type CalltreeNavigationEventMap } from '../navigation.js';
@@ -140,8 +142,14 @@ interface FilterFields<R> {
 
 @customElement('call-tree-view')
 export class CalltreeView extends LitElement {
-  @property()
-  timelineRoot: ApexLog | null = null;
+  /** The log on screen, from the app root. */
+  @consume({ context: logContext, subscribe: true })
+  @property({ attribute: false })
+  logStore: LogStore | null = null;
+
+  private get timelineRoot(): ApexLog | null {
+    return this.logStore?.log ?? null;
+  }
 
   @state()
   isVisible = false;
@@ -152,7 +160,7 @@ export class CalltreeView extends LitElement {
   // The view is mounted hidden, so a log whose call tree is never opened costs nothing.
   private readonly _types = new Task(this, {
     task: ([store]) => store?.derive(typeNamesIn) ?? initialState,
-    args: () => [this.isVisible && this.timelineRoot ? logStoreFor(this.timelineRoot) : null],
+    args: () => [this.isVisible ? this.logStore : null],
   });
 
   timeOrderGrid: LvGrid<LogEvent> | null = null;
@@ -258,13 +266,33 @@ export class CalltreeView extends LitElement {
   }
 
   updated(changedProperties: PropertyValues): void {
-    if (
-      this.timelineRoot &&
-      changedProperties.has('timelineRoot') &&
-      !changedProperties.get('timelineRoot')
-    ) {
+    if (!this.timelineRoot || !changedProperties.has('logStore')) {
+      return;
+    }
+    if (changedProperties.get('logStore')) {
+      void this._replaceLog(this.timelineRoot);
+    } else {
       this._appendTableWhenVisible();
     }
+  }
+
+  private async _replaceLog(log: ApexLog): Promise<void> {
+    this.rootMethod = log;
+    // `rootMethod` is not reactive, and the Namespace filter lists its namespaces.
+    this.requestUpdate();
+    // A build still running reads the old log.
+    this._builds.abort();
+    this._builds = new AbortController();
+    // Each grid keeps its sort, widths, group and filters. Its selection and mark named rows of the old log.
+    for (const grid of this._grids) {
+      grid.marked = new Set();
+      grid.deselect();
+    }
+    await Promise.all([
+      this.timeOrderGrid && this._loadTimeOrder(this.timeOrderGrid, log),
+      this.aggregatedGrid && this._loadAggregated(this.aggregatedGrid, log),
+      this.bottomUpGrid && this._loadBottomUp(this.bottomUpGrid, log),
+    ]);
   }
 
   firstUpdated(): void {
@@ -939,7 +967,6 @@ export class CalltreeView extends LitElement {
       text: event.text,
     }));
     this.timeOrderGrid = grid;
-    grid.columns = timeOrderColumns(rootMethod, { openType });
     grid.filters = this._timeOrderFilters();
     grid.addEventListener('lv-grid-context', (e) => {
       const { row, event } = (e as CustomEvent<GridContextDetail<LogEvent>>).detail;
@@ -949,9 +976,14 @@ export class CalltreeView extends LitElement {
       event.preventDefault();
       this._showRowContextMenu(row, event.clientX, event.clientY);
     });
+    await this._loadTimeOrder(grid, rootMethod);
+  }
+
+  private _loadTimeOrder(grid: LvGrid<LogEvent>, log: ApexLog): Promise<void> {
+    grid.columns = timeOrderColumns(log, { openType });
     this._columns.applyTo(gridColumnTarget(grid));
-    grid.source = timeOrderSource(rootMethod);
-    await grid.settled();
+    grid.source = timeOrderSource(log);
+    return grid.settled();
   }
 
   private async _renderAggregatedTree(
@@ -971,12 +1003,16 @@ export class CalltreeView extends LitElement {
       (row) => this._aggregatedTree?.parentOf(row),
     );
     this.aggregatedGrid = grid;
-    grid.columns = aggregatedColumns(rootMethod, { openType });
     grid.rowLines = mergedLines;
     grid.filters = this._aggregatedFilters();
+    await this._loadAggregated(grid, rootMethod);
+  }
+
+  private _loadAggregated(grid: LvGrid<AggregatedRow>, log: ApexLog): Promise<void> {
+    grid.columns = aggregatedColumns(log, { openType });
     this._columns.applyTo(gridColumnTarget(grid));
-    this._aggregatedBuild = this._fillAggregatedTree(grid, rootMethod);
-    await this._aggregatedBuild;
+    this._aggregatedBuild = this._fillAggregatedTree(grid, log);
+    return this._aggregatedBuild;
   }
 
   private async _fillAggregatedTree(
@@ -1007,14 +1043,18 @@ export class CalltreeView extends LitElement {
       (row) => this._bottomUpTree?.parentOf(row),
     );
     this.bottomUpGrid = grid;
-    grid.columns = bottomUpColumns(rootMethod, { openType });
     grid.sort = BOTTOM_UP_SORT;
     grid.rowLines = mergedLines;
     grid.groupBy = bottomUpGroupBy(this.bottomUpGroupBy);
     grid.filters = this._bottomUpFilters();
+    await this._loadBottomUp(grid, rootMethod);
+  }
+
+  private _loadBottomUp(grid: LvGrid<BottomUpRow>, log: ApexLog): Promise<void> {
+    grid.columns = bottomUpColumns(log, { openType });
     this._columns.applyTo(gridColumnTarget(grid));
-    this._bottomUpBuild = this._fillBottomUpTree(grid, rootMethod);
-    await this._bottomUpBuild;
+    this._bottomUpBuild = this._fillBottomUpTree(grid, log);
+    return this._bottomUpBuild;
   }
 
   private async _fillBottomUpTree(grid: LvGrid<BottomUpRow>, rootMethod: ApexLog): Promise<void> {

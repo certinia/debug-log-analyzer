@@ -34,6 +34,16 @@ export class LogStore {
     return this.log.eventsById[eventIndex] ?? null;
   }
 
+  /** Every event of the log, the log itself included, in eventIndex order. */
+  *events(): Generator<LogEvent> {
+    // A log filtered by level leaves a hidden event's slot empty.
+    for (const event of this.log.eventsById) {
+      if (event) {
+        yield event;
+      }
+    }
+  }
+
   /**
    * The distinct frames `levels` parents above each of `eventIndexes`: what a
    * merged row standing for its callers is, since a row at path depth D sits

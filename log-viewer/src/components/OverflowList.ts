@@ -1,7 +1,7 @@
 /*
  * Copyright (c) 2026 Certinia Inc. All rights reserved.
  */
-import { LitElement, css, html, type PropertyValues } from 'lit';
+import { LitElement, css, html, unsafeCSS, type PropertyValues } from 'lit';
 import { customElement, property, state } from 'lit/decorators.js';
 
 // web components
@@ -18,6 +18,8 @@ import { computeVisibleCount } from './overflowFit.js';
 const OVERFLOW_RESERVE = 56;
 /** Shared by the toggle's `popovertarget`/`aria-controls` and the panel's `id` — must match. */
 const PANEL_ID = 'overflow-list-panel';
+/** Gap between the items, the toggle and the `end` slot (px). */
+const BAR_GAP = 6;
 
 /**
  * Slot-based responsive overflow row (a.k.a. Priority+ navigation): renders slotted children
@@ -29,6 +31,9 @@ const PANEL_ID = 'overflow-list-panel';
  * the menu shows exactly the hidden items. How-many-fit is computed synchronously from cached
  * child widths (measured once, all inline), so the row updates live during a drag with no
  * reflow loop.
+ *
+ * Children with `slot="end"` never collapse: they sit after the toggle, and the items no
+ * longer stretch, so the toggle and those controls follow the last visible item.
  *
  * API mirrors Blueprint/Mantine `OverflowList`: `collapse-from`, `min-visible`, `menu-heading`.
  * `part="toggle"`/`part="menu"` expose the control + panel for external styling.
@@ -60,6 +65,9 @@ export class OverflowList extends LitElement {
   @state()
   private visibleCount = Number.POSITIVE_INFINITY;
 
+  @state()
+  private hasEnd = false;
+
   private resizeObserver?: ResizeObserver;
   private childResizeObserver?: ResizeObserver;
   private mutationObserver?: MutationObserver;
@@ -80,7 +88,7 @@ export class OverflowList extends LitElement {
       .bar {
         display: flex;
         align-items: center;
-        gap: 6px;
+        gap: ${unsafeCSS(BAR_GAP)}px;
         width: 100%;
       }
 
@@ -95,6 +103,15 @@ export class OverflowList extends LitElement {
         overflow: clip;
         overflow-clip-margin: var(--lana-space-2xs);
         flex: 1 1 auto;
+      }
+
+      /* With trailing controls, the toggle and those controls follow the last item. */
+      .bar.has-end .items {
+        flex: 0 1 auto;
+      }
+
+      ::slotted([slot='end']) {
+        flex: 0 0 auto;
       }
 
       /* Short rule separating the items from the interactive toggle. */
@@ -196,7 +213,7 @@ export class OverflowList extends LitElement {
       this.requestUpdate();
     });
     this.resizeObserver = new ResizeObserver((entries) => {
-      const width = entries[0]?.contentRect.width ?? 0;
+      const width = (entries[0]?.contentRect.width ?? 0) - this._endWidth();
       if (width === this.lastWidth) {
         return;
       }
@@ -217,7 +234,7 @@ export class OverflowList extends LitElement {
       if (!this.itemWidths) {
         return;
       }
-      const children = [...this.children] as HTMLElement[];
+      const children = this._items();
       const stale = children.some(
         (el, i) =>
           el.getAttribute('slot') !== 'overflow' &&
@@ -254,11 +271,23 @@ export class OverflowList extends LitElement {
     }
   }
 
+  /** The children that collapse: every child but the `end` slot's. */
+  private _items(): HTMLElement[] {
+    return ([...this.children] as HTMLElement[]).filter((el) => el.slot !== 'end');
+  }
+
+  /** The `end` slot's width plus the gap before it. */
+  private _endWidth(): number {
+    return ([...this.children] as HTMLElement[])
+      .filter((el) => el.slot === 'end')
+      .reduce((sum, el) => sum + el.offsetWidth + BAR_GAP, 0);
+  }
+
   /** Drop cached widths and show every item, so the next render can re-measure them. */
   private _resetMeasurement(): void {
     this.itemWidths = null;
     this.visibleCount = Number.POSITIVE_INFINITY;
-    for (const child of this.children) {
+    for (const child of this._items()) {
       child.removeAttribute('slot'); // all inline for the re-measure pass
     }
   }
@@ -266,7 +295,7 @@ export class OverflowList extends LitElement {
   protected updated(changed: PropertyValues): void {
     // The MutationObserver reset is async; if a reactive update lands first after a child
     // add/remove, drop the now-stale width cache here so this pass re-measures.
-    if (this.itemWidths && this.itemWidths.length !== this.childElementCount) {
+    if (this.itemWidths && this.itemWidths.length !== this._items().length) {
       this.itemWidths = null;
     }
     if (!this.itemWidths) {
@@ -279,7 +308,7 @@ export class OverflowList extends LitElement {
   /** Measure every item's natural width (all inline), cache it, then compute the fit. */
   private _measure(): void {
     const items = this.renderRoot.querySelector<HTMLElement>('.items');
-    const children = [...this.children] as HTMLElement[];
+    const children = this._items();
     if (!items || !children.length) {
       return;
     }
@@ -312,12 +341,16 @@ export class OverflowList extends LitElement {
     this._applyOverflow();
   }
 
+  private _onEndChange(event: Event): void {
+    this.hasEnd = (event.target as HTMLSlotElement).assignedElements().length > 0;
+  }
+
   /** Move the hidden children into the overflow slot; keep the visible ones inline. */
   private _applyOverflow(): void {
-    const total = this.childElementCount;
+    const children = this._items();
+    const total = children.length;
     const visible = Math.min(this.visibleCount, total);
     const hidden = total - visible;
-    const children = [...this.children];
     children.forEach((child, i) => {
       const isHidden = this.collapseFrom === 'end' ? i >= visible : i < hidden;
       if (isHidden) {
@@ -329,7 +362,7 @@ export class OverflowList extends LitElement {
   }
 
   render() {
-    const total = this.childElementCount;
+    const total = this._items().length;
     const hiddenCount = total - Math.min(this.visibleCount, total);
     const fromStart = this.collapseFrom === 'start';
     const sep = html`<divider-line orientation="vertical" class="sep"></divider-line>`;
@@ -353,10 +386,11 @@ export class OverflowList extends LitElement {
       hiddenCount > 0 ? (fromStart ? html`${button}${sep}` : html`${sep}${button}`) : '';
 
     return html`<div class="container ${this.collapseFrom}">
-      <div class="bar">
+      <div class="bar ${this.hasEnd ? 'has-end' : ''}">
         ${fromStart ? toggle : ''}
         <div class="items" style="gap: ${this.gap}px"><slot></slot></div>
         ${fromStart ? '' : toggle}
+        <slot name="end" @slotchange=${this._onEndChange}></slot>
       </div>
       ${
         hiddenCount > 0

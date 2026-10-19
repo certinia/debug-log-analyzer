@@ -10,7 +10,8 @@ import type { VscTabsSelectEvent } from '@vscode-elements/elements/dist/vscode-t
 import { LitElement, css, html } from 'lit';
 import { customElement, property, state } from 'lit/decorators.js';
 
-import { parse, type ApexLog } from '@apexdevtools/apex-log-parser';
+import { parse } from '@apexdevtools/apex-log-parser';
+import type { LogLevelsChange } from '../../components/LogLevels.js';
 import { TAB_TO_SOURCE, eventBus } from '../../core/events/EventBus.js';
 import { logContext } from '../../core/log/logContext.js';
 import { logStatusContext, type LogStatus } from '../../core/log/logStatus.js';
@@ -21,6 +22,7 @@ import {
 } from '../../core/messaging/VSCodeExtensionMessenger.js';
 import type { LogIssue } from '../notifications/types.js';
 import { installEscapeDeselect } from './escapeDeselect.js';
+import { LogLevelsController } from './LogLevelsController.js';
 import { deriveLogIdentity, type LogIdentityData } from './logIdentity.js';
 import { toLogIssues } from './logIssues.js';
 import { parserIssuesToNotifications } from './parserNotifications.js';
@@ -66,9 +68,6 @@ export class LogViewer extends LitElement {
   /** Transaction identity for the header. `null` until the first log is parsed. */
   @property({ attribute: false })
   logIdentity: LogIdentityData | null = null;
-  @property()
-  timelineRoot: ApexLog | null = null;
-
   /** The log every view reads. A new log is a new store, so consumers re-render. */
   @provide({ context: logContext })
   @state()
@@ -89,6 +88,15 @@ export class LogViewer extends LitElement {
 
   @state()
   private _navigateToTimestamp: number | undefined = undefined;
+
+  private readonly _levels = new LogLevelsController(this, {
+    publish: (log) => (this._logStore = setCurrentLog(log)),
+    fail: (err) =>
+      (this.notifications = [
+        ...this.notifications,
+        loadFailure('Could not apply log levels', err),
+      ]),
+  });
 
   /** A live region is read when its text changes, not when it arrives holding some. */
   @state()
@@ -188,7 +196,11 @@ export class LogViewer extends LitElement {
         .logProblems=${this.logProblems}
         .notifications=${this.notifications}
         .logIdentity=${this.logIdentity}
-        .timelineRoot=${this.timelineRoot}
+        .capturedLevels=${this._levels.captured?.debugLevels ?? null}
+        .chosenLevels=${this._levels.chosen}
+        .levelsBusy=${this._levels.busy}
+        @log-levels-change=${this._onLogLevelsChange}
+        @log-levels-reset=${this._onLogLevelsReset}
       ></app-header>
 
       <log-inspector .activeTab=${this._selectedTab}>
@@ -213,19 +225,18 @@ export class LogViewer extends LitElement {
 
           <vscode-tab-panel>
             <timeline-view
-              .timelineRoot="${this.timelineRoot}"
               .navigateToEventIndex="${this._navigateToEventIndex}"
               .navigateToTimestamp="${this._navigateToTimestamp}"
             ></timeline-view>
           </vscode-tab-panel>
           <vscode-tab-panel>
-            <call-tree-view .timelineRoot="${this.timelineRoot}"></call-tree-view>
+            <call-tree-view></call-tree-view>
           </vscode-tab-panel>
           <vscode-tab-panel>
-            <analysis-view .timelineRoot="${this.timelineRoot}"> </analysis-view>
+            <analysis-view></analysis-view>
           </vscode-tab-panel>
           <vscode-tab-panel>
-            <database-view .timelineRoot="${this.timelineRoot}"></database-view>
+            <database-view></database-view>
           </vscode-tab-panel> </vscode-tabs
       ></log-inspector>`;
   }
@@ -291,9 +302,9 @@ export class LogViewer extends LitElement {
     // whichever one loads first.
     this._logStore = setCurrentLog(apexLog);
     this._logStatus = 'ready';
+    this._levels.open(apexLog);
 
     this.logSize = apexLog.size;
-    this.timelineRoot = apexLog;
     this.logDuration = apexLog.duration.total;
     this.logIdentity = deriveLogIdentity(apexLog);
 
@@ -309,6 +320,14 @@ export class LogViewer extends LitElement {
       this._navigateToEventIndex = data.navigateToEventIndex;
       this._navigateToTimestamp = data.navigateToTimestamp;
     }
+  }
+
+  private _onLogLevelsChange(event: CustomEvent<LogLevelsChange>): void {
+    void this._levels.choose(event.detail.category, event.detail.level);
+  }
+
+  private _onLogLevelsReset(): void {
+    this._levels.reset();
   }
 
   private _failLoad(problem: LogIssue) {
