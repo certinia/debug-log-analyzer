@@ -122,11 +122,11 @@ export class LogLevels extends LitElement {
           const level = shown[category] ?? captured;
           return html`<vs-select
             dense
-            emptyValue=""
             label=${token}
             prefix=${token}
             prefixSeparator=""
             .value=${live(level)}
+            .filterActive=${levelRank(level) < levelRank(captured)}
             @change=${(event: Event) => this._onChange(category, event)}
           >
             ${LEVEL_ORDER.map((option) => {

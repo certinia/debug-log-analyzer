@@ -67,6 +67,18 @@ describe('log-levels', () => {
     );
   });
 
+  it('marks a category shown below the level it was captured at', async () => {
+    const el = await mount(
+      { apexCode: 'FINE', database: 'FINE' },
+      { apexCode: 'DEBUG', database: 'FINE' },
+    );
+
+    const marked = [...(el.shadowRoot?.querySelectorAll('vs-select') ?? [])].map(
+      (found) => (found as HTMLElement & { filterActive: boolean }).filterActive,
+    );
+    expect(marked).toEqual([true, false]);
+  });
+
   it('shows the chosen level again when a pick is undone', async () => {
     const el = await mount({ apexCode: 'FINE' }, { apexCode: 'FINE' });
     select(el).value = 'INFO';
