@@ -22,7 +22,7 @@ import { LvGridFindController } from '../../../components/grid/LvGridFindControl
 import { SelectionEchoGuard } from '../../../core/events/SelectionEchoGuard.js';
 import { formatInteger, isVisible } from '../../../core/utility/Util.js';
 import { soslRowsMetric } from '../limits.js';
-import { logStoreFor, type LogStore } from '../../../core/log/LogStore.js';
+import type { LogStore } from '../../../core/log/LogStore.js';
 import { logContext } from '../../../core/log/logContext.js';
 import { statements } from '../../../core/log/statements.js';
 
@@ -156,12 +156,12 @@ export class DatabaseView extends LitElement {
   }
 
   updated(changed: PropertyValues): void {
-    if (!this.timelineRoot || !changed.has('logStore')) {
+    if (!this.logStore || !changed.has('logStore')) {
       return;
     }
     if (this.loaded) {
       // The grids stay and take the new statements; the sections keep their state.
-      void this._readLog(this.timelineRoot);
+      void this._readLog(this.logStore);
     } else {
       void this._loadData();
     }
@@ -173,11 +173,11 @@ export class DatabaseView extends LitElement {
   private async _loadData(): Promise<void> {
     const visible = await isVisible(this);
     // Read after the wait: a level change during it publishes a newer log.
-    const root = this.timelineRoot;
-    if (!visible || this.loaded || !root) {
+    const store = this.logStore;
+    if (!visible || this.loaded || !store) {
       return;
     }
-    if (!(await this._readLog(root)) || this.loaded) {
+    if (!(await this._readLog(store)) || this.loaded) {
       return;
     }
     this.loaded = true;
@@ -189,14 +189,13 @@ export class DatabaseView extends LitElement {
     };
   }
 
-  /** False when a newer log replaced `root` during the read. */
-  private async _readLog(root: ApexLog): Promise<boolean> {
-    const store = logStoreFor(root);
+  /** False when a newer log replaced `store` during the read. */
+  private async _readLog(store: LogStore): Promise<boolean> {
     const [{ dml, soql, sosl }, series] = await Promise.all([
       store.derive(statements),
       store.derive(apexLimitSeries),
     ]);
-    if (root !== this.timelineRoot) {
+    if (store !== this.logStore) {
       return false;
     }
     this.dmlLines = dml;

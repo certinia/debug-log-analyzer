@@ -10,7 +10,6 @@ import { logContext } from '../../../core/log/logContext.js';
 import type { LogStore } from '../../../core/log/LogStore.js';
 
 import { logStatusContext, type LogStatus } from '../../../core/log/logStatus.js';
-import { logStoreFor } from '../../../core/log/LogStore.js';
 
 import type { ApexLog } from '@apexdevtools/apex-log-parser';
 import { categoryPalette } from '../../../components/categoryTime.js';
@@ -85,7 +84,7 @@ export class TimelineView extends LitElement {
 
   private readonly selfTimesTask = new Task(this, {
     task: ([store]) => store?.derive(selfTimeByCategory) ?? initialState,
-    args: () => [this.timelineRoot && logStoreFor(this.timelineRoot)],
+    args: () => [this.logStore],
     onComplete: (selfTimes) => {
       this.selfTimes = selfTimes;
       this.rebuildTimelineKeys();
