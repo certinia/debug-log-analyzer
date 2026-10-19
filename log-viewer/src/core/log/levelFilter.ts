@@ -176,7 +176,7 @@ export class LevelFilterBuilder {
   private kept(events: LogEvent[]): LogEvent[] {
     return events
       .map((event) => this.slots[event.eventIndex]!)
-      .filter((event, i) => event.eventIndex === events[i]!.eventIndex);
+      .filter((event) => event !== this.root);
   }
 
   private fold(keeper: LogEvent, hidden: LogEvent): void {
