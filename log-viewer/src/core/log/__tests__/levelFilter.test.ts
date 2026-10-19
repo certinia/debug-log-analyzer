@@ -152,6 +152,17 @@ describe('levelFilter', () => {
     expect(eventByEventIndex(filtered, filtered.eventIndex)).toBe(filtered);
   });
 
+  it('lists every kept event and none that is hidden', () => {
+    const log = logOf();
+    const filtered = build(log, { apexCode: 'DEBUG' });
+    const inner = indexOf(log, 'ns.Inner.go()');
+
+    const listed = [...logStoreFor(filtered).events()];
+
+    expect(listed.map((event) => event.eventIndex)).not.toContain(inner);
+    expect(listed).toEqual(expect.arrayContaining([filtered, ...walk(filtered)]));
+  });
+
   it('gives each kept event one slot, besides the log itself', () => {
     const log = logOf();
     const filtered = build(log, { apexCode: 'DEBUG' });

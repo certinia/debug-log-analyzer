@@ -4,12 +4,13 @@
 import type { ApexLog, LogEvent, GovernorLimits, Limits } from '@apexdevtools/apex-log-parser';
 import { beforeEach, describe, expect, it } from '@jest/globals';
 
-import { indexTree } from '#test-helpers/apexLog.js';
+import { indexTree, storeOf } from '#test-helpers/apexLog.js';
 import { emptyLimits, governorLimits, limitValue } from '#test-helpers/limits.js';
 
 let log: ApexLog | null = null;
 
-import { LogStore } from '../../../../core/log/LogStore.js';
+import { filterByLevels } from '../../../../core/log/levelFilter.js';
+import { LogStore, logStoreFor } from '../../../../core/log/LogStore.js';
 import { logDiagnostics, scopeDiagnostics } from '../LogDiagnostics.js';
 
 /** The findings for the log a test set up. */
@@ -723,5 +724,22 @@ describe('scopeDiagnostics', () => {
     const { log: scopedLog, result } = await repeatsUnderAMethod();
 
     expect(scopeDiagnostics(scopedLog, result, occurrences).diagnostics).toEqual([]);
+  });
+});
+
+describe('diagnostics of a log filtered by level', () => {
+  it('reads past the events the filter hid', async () => {
+    const { log } = storeOf(
+      '09:18:22.6 (1000)|METHOD_ENTRY|[1]|01p|ns.Outer.run()\n' +
+        '09:18:22.6 (2000)|SOQL_EXECUTE_BEGIN|[2]|Aggregations:0|SELECT Id FROM Account\n' +
+        '09:18:22.6 (3000)|SOQL_EXECUTE_END|[2]|Rows:1\n' +
+        '09:18:22.6 (4000)|METHOD_EXIT|[1]|ns.Outer.run()\n',
+    );
+    const filtered = await filterByLevels(log, { apexCode: 'ERROR' });
+    if (!filtered || filtered === log) {
+      throw new Error('the filter hid nothing');
+    }
+
+    await expect(logStoreFor(filtered).derive(logDiagnostics)).resolves.toBeDefined();
   });
 });

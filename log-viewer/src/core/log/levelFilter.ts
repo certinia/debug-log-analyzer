@@ -127,7 +127,6 @@ export class LevelFilterBuilder {
       if (isHidden(event, this.chosen)) {
         this.hidden++;
         this.fold(keeper, event);
-        this.slots[event.eventIndex] = this.root;
       } else {
         next = copyOf(event);
         next.parent = keeper;
@@ -147,17 +146,16 @@ export class LevelFilterBuilder {
 
   finish(): ApexLog {
     const { original, root, slots } = this;
-    // A hidden slot holds the root, which every loop over the slots already skips.
-    // Exit lines and merged events are not in the tree: a kept one stays as it is.
+    // A hidden slot stays empty. Exit lines and merged events are not in the tree: a kept one stays as it is.
     original.eventsById.forEach((event, index) => {
-      if (!slots[index]) {
-        const hidden = isHidden(event, this.chosen);
-        slots[index] = hidden ? root : event;
-        if (hidden) {
-          this.hidden++;
-        } else {
-          this.namespaces.add(event.namespace);
-        }
+      if (slots[index]) {
+        return;
+      }
+      if (isHidden(event, this.chosen)) {
+        this.hidden++;
+      } else {
+        slots[index] = event;
+        this.namespaces.add(event.namespace);
       }
     });
     if (!this.hidden) {
@@ -175,8 +173,8 @@ export class LevelFilterBuilder {
 
   private kept(events: LogEvent[]): LogEvent[] {
     return events
-      .map((event) => this.slots[event.eventIndex]!)
-      .filter((event) => event !== this.root);
+      .map((event) => this.slots[event.eventIndex])
+      .filter((event) => event !== undefined);
   }
 
   private fold(keeper: LogEvent, hidden: LogEvent): void {

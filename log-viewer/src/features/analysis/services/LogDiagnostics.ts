@@ -833,7 +833,7 @@ async function analyse(store: LogStore): Promise<LogDiagnostics> {
   const queries: SOQLExecuteBeginLine[] = [];
   const dml: DMLBeginLine[] = [];
   const debugLines: LogEvent[] = [];
-  for (const event of log.eventsById) {
+  for (const event of store.events()) {
     switch (event.type) {
       case 'SOQL_EXECUTE_BEGIN':
         queries.push(event as SOQLExecuteBeginLine);
