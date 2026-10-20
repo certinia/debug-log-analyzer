@@ -37,6 +37,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - 📤 **Copy and export**: both work on Analysis and Bottom-Up. ([#1110])
 - 🔦 **Find**: in the tables, the current match stands out from the other matches, as it does in the editor.
 - 🐛 **Go to Code**: errors for methods not found in the file are shown correctly.
+- 🗄️ **Database**: the `limit n/a` tooltip names `APEX_PROFILING`, not `DB`, as the level to raise. ([#259])
 - 🌊 **Flow errors**: multi-line errors show their message.
 
 ## [1.22.1] - 2026-09-18
