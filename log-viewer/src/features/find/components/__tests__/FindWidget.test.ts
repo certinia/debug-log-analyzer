@@ -64,6 +64,17 @@ describe('FindWidget', () => {
     expect(seen).toEqual(searches);
   });
 
+  it('keeps its count on a refresh until the view reports', async () => {
+    const { widget, shownText } = await shown();
+    widget.isVisble = true;
+    Object.assign(widget.inputbox ?? {}, { value: 'foo' });
+    results({ totalMatches: 5, currentMatch: 2 });
+    document.dispatchEvent(new CustomEvent('lv-find-refresh', { detail: null }));
+    await widget.updateComplete;
+
+    expect(shownText()).toBe('2 of 5');
+  });
+
   it.each([
     ['Enter goes to the first', false, 1],
     ['Shift+Enter goes to the last', true, 5],

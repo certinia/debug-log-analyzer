@@ -314,7 +314,6 @@ export class FindWidget extends LitElement {
     if (!this.isVisble || !this._getMatchValue()) {
       return;
     }
-    this._resetCounts();
     const findEvt = this._getFindEvent();
     findEvt.detail.count = 0;
     document.dispatchEvent(new CustomEvent('lv-find', findEvt));
