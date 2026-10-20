@@ -93,8 +93,8 @@ export class LvGridFindController {
   /**
    * Searches again after a sort, filter, grouping or view switch moved the matches, and
    * reports the new total with the current match kept on its row, or none when that row
-   * has no match now. Neither scrolls nor opens a row. Call it once the grids to search
-   * are rendered. A host with no grid shown clears its marks, and keeps the query.
+   * has no match now. A kept match out of view scrolls into it. Call it once the grids to
+   * search are rendered. A host with no grid shown clears its marks, and keeps the query.
    */
   async rerun(): Promise<void> {
     const query = this._query;
@@ -112,8 +112,13 @@ export class LvGridFindController {
       .forEach((grid) => grid.clearFind());
     this._reruns++;
     const found = await this._search(query, shown).finally(() => this._reruns--);
-    if (found) {
-      report(this.totalMatches, currentMatchOf(found));
+    if (!found) {
+      return;
+    }
+    const currentMatch = currentMatchOf(found);
+    report(this.totalMatches, currentMatch);
+    if (currentMatch) {
+      await this._markCurrent(currentMatch);
     }
   }
 

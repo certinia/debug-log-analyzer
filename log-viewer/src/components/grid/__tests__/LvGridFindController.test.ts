@@ -180,7 +180,7 @@ describe('LvGridFindController', () => {
       expect(reported).toEqual([]);
     });
 
-    it('searches again and reports the current match where its grid kept it', async () => {
+    it('searches again, reports the current match where its grid kept it, and brings it into view', async () => {
       grids = [gridStub(2), gridStub(3)];
       await finder.find(findEvent('lv-find', 'update', { count: 1, matchCase: true }));
       grids[0]?.find.mockResolvedValueOnce({ total: 4, current: -1 });
@@ -191,6 +191,7 @@ describe('LvGridFindController', () => {
       expect(reported).toEqual([5, 5]);
       expect(positions).toEqual([1, 5]);
       expect(finder.totalMatches).toBe(5);
+      expect(grids[1]?.setCurrentMatch.mock.calls.at(-1)).toEqual([0]);
     });
 
     it('reports no current match when no grid kept one', async () => {
@@ -198,6 +199,7 @@ describe('LvGridFindController', () => {
       await finder.rerun();
 
       expect(positions).toEqual([1, 0]);
+      expect(grids[0]?.setCurrentMatch.mock.calls).toEqual([[0]]);
     });
 
     it('clears a grid no longer shown, and drops the search when none is', async () => {
