@@ -80,7 +80,7 @@ import {
 import { CALL_TREE_VIEWS } from '../../../components/grid/ColumnViews.js';
 import { LocatedRowIds, type RowData } from '../../../components/locatedRow.js';
 import { InspectorTabController } from '../../../components/InspectorTabController.js';
-import { LvGridFindController } from '../../../components/grid/LvGridFindController.js';
+import { FindController } from '../../find/FindController.js';
 import { revealFirstOf } from '../../../components/inspectorTab.js';
 
 const AGGREGATED_DETAILS: RowFilter<AggregatedRow> = { test: (row) => row._hasDetailsDeep };
@@ -216,8 +216,8 @@ export class CalltreeView extends LitElement {
     { [CALLTREE_GO_TO_ROW]: (e) => void this._goToRow(e.detail.eventIndex) },
   );
 
-  private readonly _finder = new LvGridFindController(this, {
-    grids: () => {
+  private readonly _finder = new FindController(this, {
+    targets: () => {
       const grid = this._activeGrid();
       return grid ? [grid] : [];
     },

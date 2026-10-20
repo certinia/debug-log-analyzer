@@ -8,7 +8,7 @@
 import { afterEach, beforeEach, describe, expect, it, jest } from '@jest/globals';
 
 import { fakeHost, type FakeHost } from '#test-helpers/fakeHost.js';
-import { LvGridFindController, type FindableGrid } from '../LvGridFindController.js';
+import { FindController, type FindTarget } from '../FindController.js';
 
 function gridStub(total = 3) {
   return {
@@ -29,14 +29,14 @@ const findEvent = (
   { count = 0, matchCase = false } = {},
 ) => new CustomEvent(type, { detail: { text, count, options: { matchCase } } });
 
-describe('LvGridFindController', () => {
+describe('FindController', () => {
   let host: FakeHost & HTMLElement;
   let height: number;
   let grids: Stub[];
   let reported: number[];
   // The widget's current match each report gave, from 1; 0 for none.
   let positions: number[];
-  let finder: LvGridFindController;
+  let finder: FindController;
   const onResults = (e: Event): void => {
     const { totalMatches, currentMatch } = (
       e as CustomEvent<{ totalMatches: number; currentMatch: number }>
@@ -52,8 +52,8 @@ describe('LvGridFindController', () => {
     grids = [gridStub()];
     reported = [];
     positions = [];
-    finder = new LvGridFindController(host, {
-      grids: () => grids as unknown as FindableGrid[],
+    finder = new FindController(host, {
+      targets: () => grids as unknown as FindTarget[],
     });
     host.connect();
     document.addEventListener('lv-find-results', onResults);
@@ -255,7 +255,7 @@ describe('LvGridFindController', () => {
     let calls: string[];
     // An unfold of the second grid waits on this while it is set.
     let held: Promise<void> | null;
-    let folded: LvGridFindController;
+    let folded: FindController;
 
     beforeEach(() => {
       calls = [];
@@ -266,8 +266,8 @@ describe('LvGridFindController', () => {
           calls.push(`mark ${i}:${match}`);
         }),
       );
-      folded = new LvGridFindController(host, {
-        grids: () => grids as unknown as FindableGrid[],
+      folded = new FindController(host, {
+        targets: () => grids as unknown as FindTarget[],
         unfold: async (grid) => {
           const i = grids.indexOf(grid as unknown as Stub);
           calls.push(`unfold ${i}`);

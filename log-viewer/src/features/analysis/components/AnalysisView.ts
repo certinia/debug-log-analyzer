@@ -26,7 +26,7 @@ import {
   heldColumnTarget,
 } from '../../../components/ColumnSettingsController.js';
 import { exportCsv } from '../../../components/grid/exportCsv.js';
-import { LvGridFindController } from '../../../components/grid/LvGridFindController.js';
+import { FindController } from '../../find/FindController.js';
 import { GridColumnMenuController } from '../../../components/GridColumnMenuController.js';
 import { columnViewSelect, gridToolbarActions } from '../../../components/gridToolbar.js';
 import type { GridColumn, GroupBy, RowKey, TreeSource } from '../../../grid/index.js';
@@ -148,8 +148,8 @@ export class AnalysisView extends LitElement {
   // Its own memo: one shared with the mark would drop the picked frames on each reveal.
   private _revealIds = new LocatedRowIds();
 
-  private readonly _finder = new LvGridFindController(this, {
-    grids: () => (this.grid ? [this.grid] : []),
+  private readonly _finder = new FindController(this, {
+    targets: () => (this.grid ? [this.grid] : []),
   });
 
   private readonly _subscriptions = new SubscriptionController(this, () => [

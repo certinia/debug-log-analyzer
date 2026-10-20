@@ -18,7 +18,7 @@ import { limitTotals } from '../../../components/logOverviewMetrics.js';
 import { eventBus, type StatementType } from '../../../core/events/EventBus.js';
 import { apexLimitSeries } from '../../timeline/optimised/apex-limit-series.js';
 import { InspectorTabController } from '../../../components/InspectorTabController.js';
-import { LvGridFindController } from '../../../components/grid/LvGridFindController.js';
+import { FindController } from '../../find/FindController.js';
 import { SelectionEchoGuard } from '../../../core/events/SelectionEchoGuard.js';
 import { formatInteger, isVisible } from '../../../core/utility/Util.js';
 import { soslRowsMetric } from '../limits.js';
@@ -77,8 +77,8 @@ export class DatabaseView extends LitElement {
   private _echoGuard = new SelectionEchoGuard();
 
   // The widget counts the three grids' matches as one list, in view order.
-  private readonly _finder = new LvGridFindController(this, {
-    grids: () => this._views.flatMap((view) => (view?.grid ? [view.grid] : [])),
+  private readonly _finder = new FindController(this, {
+    targets: () => this._views.flatMap((view) => (view?.grid ? [view.grid] : [])),
     unfold: async (grid) => {
       const kind = this._gridsByKind.find(([, view]) => view?.grid === grid)?.[0];
       if (kind && this.collapsed[kind]) {

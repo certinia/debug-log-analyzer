@@ -4,35 +4,44 @@
 import type { ReactiveControllerHost } from 'lit';
 
 import { DomListenerController } from '../../core/events/DomListenerController.js';
-import type { FindEventDetail, FindEventMap } from '../../features/find/findEvents.js';
-import type { FindQuery, GridFindDetail, LvGrid } from '../../grid/index.js';
+import type { FindEventDetail, FindEventMap } from './findEvents.js';
+import type { FindQuery, GridFindDetail } from '../../grid/index.js';
 
-/** The part of an lv-grid that find drives. */
-export type FindableGrid = Pick<LvGrid, 'find' | 'setCurrentMatch' | 'clearFind'>;
-
-type Found = (GridFindDetail & { grid: FindableGrid })[];
-
-export interface LvGridFindOptions {
+/** A view that find searches: an lv-grid, or the Timeline through its adapter. */
+export interface FindTarget {
   /**
-   * The grids to search, in the order the widget counts their matches. Read late: grids
-   * are made well after the host connects. Folded grids are searched too.
+   * Marks the matches for `query` and gives their total. The same query again keeps the
+   * current match on its row or frame, else none is current (-1). Null when replaced.
    */
-  grids: () => readonly FindableGrid[];
-  /** Shows a folded grid before a step marks a match in it. Give it if the host can fold one. */
-  unfold?: (grid: FindableGrid) => Promise<void>;
+  find(query: FindQuery): Promise<GridFindDetail | null>;
+  /** Marks match `match` (from 0) current and brings it into view; -1 marks none. */
+  setCurrentMatch(match: number): Promise<void>;
+  clearFind(): void;
+}
+
+type Found = (GridFindDetail & { target: FindTarget })[];
+
+export interface FindOptions {
+  /**
+   * The targets to search, in the order the widget counts their matches. Read late: they
+   * are made well after the host connects. Folded ones are searched too.
+   */
+  targets: () => readonly FindTarget[];
+  /** Shows a folded target before a step marks a match in it. Give it if the host can fold one. */
+  unfold?: (target: FindTarget) => Promise<void>;
 }
 
 /**
- * The find widget's search over a host's lv-grids: it searches, reports the total in
- * `lv-find-results`, marks the widget's current match in the grid that holds it, and
- * searches again when a grid is reshaped under it. A host off screen answers nothing,
+ * The find widget's search over a host's views: it searches, reports the total in
+ * `lv-find-results`, marks the widget's current match in the target that holds it, and
+ * searches again when a target is reshaped under it. A host off screen answers nothing,
  * which keeps the hidden tabs quiet, but keeps the query to search once shown.
  */
-export class LvGridFindController {
+export class FindController {
   private readonly _host: HTMLElement;
-  private readonly _options: LvGridFindOptions;
+  private readonly _options: FindOptions;
   private _query: FindQuery | null = null;
-  // The grids the last search ran over, with each one's count.
+  // The targets the last search ran over, with each one's count.
   private _found: Found = [];
   // Goes up with each search and clear, so an older search sees it is stale.
   private _searches = 0;
@@ -41,7 +50,7 @@ export class LvGridFindController {
   // Goes up with each step, so a step that waited on an unfold sees a newer one replaced it.
   private _steps = 0;
 
-  constructor(host: ReactiveControllerHost & HTMLElement, options: LvGridFindOptions) {
+  constructor(host: ReactiveControllerHost & HTMLElement, options: FindOptions) {
     this._host = host;
     this._options = options;
     new DomListenerController<FindEventMap>(host, document, {
@@ -88,7 +97,7 @@ export class LvGridFindController {
     await this._step(count);
   }
 
-  /** Drops the search in the grids, and in the widget while the host is on screen. */
+  /** Drops the search in the targets, and in the widget while the host is on screen. */
   clear(): void {
     this._drop();
     if (this._shown().length) {
@@ -99,7 +108,7 @@ export class LvGridFindController {
   /**
    * Searches again after a sort, filter, grouping or view switch moved the matches, and
    * reports the new total with the current match kept on its row, or none when that row
-   * has no match now. A kept match out of view scrolls into it. Call it once the grids to
+   * has no match now. A kept match out of view scrolls into it. Call it once the targets to
    * search are rendered. A host off screen clears its marks, and keeps the query.
    */
   async rerun(): Promise<void> {
@@ -124,12 +133,12 @@ export class LvGridFindController {
     }
   }
 
-  // Null when a newer search replaced this one, or a grid's rebuild did, which clears the search.
-  private async _search(query: FindQuery, shown: readonly FindableGrid[]): Promise<Found | null> {
+  // Null when a newer search replaced this one, or a target's rebuild did, which clears the search.
+  private async _search(query: FindQuery, shown: readonly FindTarget[]): Promise<Found | null> {
     const search = ++this._searches;
     const found: Found = [];
-    for (const grid of shown) {
-      const result = await grid.find(query);
+    for (const target of shown) {
+      const result = await target.find(query);
       if (search !== this._searches) {
         return null;
       }
@@ -138,13 +147,13 @@ export class LvGridFindController {
         this.clear();
         return null;
       }
-      found.push({ grid, ...result });
+      found.push({ target, ...result });
     }
     this._found = found;
     return found;
   }
 
-  // A move to match `count`: unfolds the grid that holds it, then marks it.
+  // A move to match `count`: unfolds the target that holds it, then marks it.
   private async _step(count: number): Promise<void> {
     const step = ++this._steps;
     const search = this._searches;
@@ -158,18 +167,18 @@ export class LvGridFindController {
     await this._markCurrent(count);
   }
 
-  // `count` is from 1 across the grids, as the widget counts; 0 marks none.
+  // `count` is from 1 across the targets, as the widget counts; 0 marks none.
   private async _markCurrent(count: number): Promise<void> {
     let before = 0;
-    for (const { grid, total } of this._found) {
+    for (const { target, total } of this._found) {
       const match = count - 1 - before;
-      await grid.setCurrentMatch(match >= 0 && match < total ? match : -1);
+      await target.setCurrentMatch(match >= 0 && match < total ? match : -1);
       before += total;
     }
   }
 
-  private _shown(): readonly FindableGrid[] {
-    return this._host.clientHeight > 0 ? this._options.grids() : [];
+  private _shown(): readonly FindTarget[] {
+    return this._host.clientHeight > 0 ? this._options.targets() : [];
   }
 
   private _drop(): void {
@@ -177,30 +186,30 @@ export class LvGridFindController {
     this._forget();
   }
 
-  // Clears the grids but keeps the query, as for a host hidden until it searches again.
+  // Clears the targets but keeps the query, as for a host hidden until it searches again.
   private _forget(): void {
     this._searches++;
     this._found = [];
-    // Every grid, not only those the last search ended on: it stops a search still running.
-    for (const grid of this._options.grids()) {
-      grid.clearFind();
+    // Every target, not only those the last search ended on: it stops a search still running.
+    for (const target of this._options.targets()) {
+      target.clearFind();
     }
   }
 }
 
-/** The grid that holds match `count`, from 1 across the grids. */
-function holderOf(found: Found, count: number): FindableGrid | undefined {
+/** The target that holds match `count`, from 1 across the targets. */
+function holderOf(found: Found, count: number): FindTarget | undefined {
   let before = 0;
-  for (const { grid, total } of found) {
+  for (const { target, total } of found) {
     if (count - before <= total) {
-      return count > before ? grid : undefined;
+      return count > before ? target : undefined;
     }
     before += total;
   }
   return undefined;
 }
 
-/** The match a grid holds current, from 1 across the grids, as the widget counts; 0 for none. */
+/** The match a target holds current, from 1 across the targets, as the widget counts; 0 for none. */
 function currentMatchOf(found: Found): number {
   let before = 0;
   for (const { total, current } of found) {
