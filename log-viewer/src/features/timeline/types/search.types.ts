@@ -59,7 +59,7 @@ export interface SearchCursor<E extends EventNode> {
   /** All search matches in traversal order */
   readonly matches: ReadonlyArray<SearchMatch<E>>;
 
-  /** Current position in matches array (0-indexed, -1 if empty) */
+  /** Current position in matches array (0-indexed), -1 until a step moves to one */
   readonly currentIndex: number;
 
   /** Total number of matches */
@@ -78,7 +78,7 @@ export interface SearchCursor<E extends EventNode> {
   /** Jump to last match, returns match or null if empty */
   last(): SearchMatch<E> | null;
 
-  /** Seek to specific index, returns match or null if out of bounds */
+  /** Seek to specific index, returns match or null if out of bounds; -1 makes none current */
   seek(index: number): SearchMatch<E> | null;
 
   // Query methods

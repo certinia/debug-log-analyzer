@@ -76,7 +76,7 @@ export class FindController {
     // A hidden host answers nothing, but keeps the query, so it searches once shown.
     if (!shown.length) {
       if (isNew) {
-        this._forget();
+        this.forget();
         this._query = query;
       }
       return;
@@ -118,7 +118,7 @@ export class FindController {
     }
     const shown = this._shown();
     if (!shown.length) {
-      this._forget();
+      this.forget();
       return;
     }
     this._reruns++;
@@ -183,11 +183,14 @@ export class FindController {
 
   private _drop(): void {
     this._query = null;
-    this._forget();
+    this.forget();
   }
 
-  // Clears the targets but keeps the query, as for a host hidden until it searches again.
-  private _forget(): void {
+  /**
+   * Clears the targets and lets go of them, but keeps the query to search again: for a host
+   * hidden, or one about to replace its targets.
+   */
+  forget(): void {
     this._searches++;
     this._found = [];
     // Every target, not only those the last search ended on: it stops a search still running.

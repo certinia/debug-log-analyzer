@@ -10,6 +10,7 @@ import type { ApexLog } from '@apexdevtools/apex-log-parser';
 jest.mock('../../optimised/ApexLogTimeline.js', () => ({
   ApexLogTimeline: class {
     private log: ApexLog | null = null;
+    findTarget = { find: async () => null, setCurrentMatch: async () => {}, clearFind: () => {} };
     init(_container: HTMLElement, log: ApexLog): Promise<void> {
       this.log = log;
       built.push(log);

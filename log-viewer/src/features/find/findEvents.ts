@@ -41,4 +41,6 @@ export interface FindEventMap {
   'lv-find-results': CustomEvent<FindResultsEventDetail>;
   /** The shown view changed: the widget searches its text again, if it is open. */
   'lv-find-refresh': CustomEvent<null>;
+  /** A view dropped the search itself, as on Escape: the widget closes, if it is open. */
+  'lv-find-dismiss': CustomEvent<null>;
 }

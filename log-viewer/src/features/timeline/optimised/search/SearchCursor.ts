@@ -20,7 +20,8 @@ export class SearchCursorImpl<E extends EventNode> implements SearchCursor<E> {
 
   constructor(matches: SearchMatch<E>[]) {
     this._matches = matches;
-    this._currentIndex = matches.length > 0 ? 0 : -1;
+    // None is current until a step: a search alone does not move the reader.
+    this._currentIndex = -1;
   }
 
   get matches(): ReadonlyArray<SearchMatch<E>> {
@@ -68,6 +69,10 @@ export class SearchCursorImpl<E extends EventNode> implements SearchCursor<E> {
   }
 
   seek(index: number): SearchMatch<E> | null {
+    if (index === -1) {
+      this._currentIndex = -1;
+      return null;
+    }
     if (index >= 0 && index < this._matches.length) {
       this._currentIndex = index;
       return this._matches[index] ?? null;

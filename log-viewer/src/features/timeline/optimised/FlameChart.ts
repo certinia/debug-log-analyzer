@@ -142,6 +142,8 @@ export interface FlameChartCallbacks {
   onMeasurementChange?: (measurement: MeasurementSnapshot | null) => void;
   /** Called when Escape asks to drop the category highlight. Returns whether the owner dropped any. */
   onCategoryDimClear?: () => boolean;
+  /** Called, in place of clearing, when Escape drops a search: the find that made it owns it. */
+  onSearchClear?: () => void;
 }
 
 export class FlameChart<E extends EventNode = EventNode> {
@@ -1321,7 +1323,11 @@ export class FlameChart<E extends EventNode = EventNode> {
           this.selectionOrchestrator.clearSelection();
         } else if (!(this.dimState.legendShowing() && this.callbacks.onCategoryDimClear?.())) {
           // Falls through when only a chip under the pointer lights the legend: nothing to drop.
-          this.clearSearch();
+          if (this.callbacks.onSearchClear && this.searchOrchestrator?.hasCursor()) {
+            this.callbacks.onSearchClear();
+          } else {
+            this.clearSearch();
+          }
         }
       },
       onMarkerNav: (direction: MarkerNavDirection) => {

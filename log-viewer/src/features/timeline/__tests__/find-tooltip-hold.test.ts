@@ -31,7 +31,7 @@ type Tooltip = { show: jest.Mock; showTruncation: jest.Mock; hide: jest.Mock };
 function timeline(): {
   navigateToMatch: () => void;
   hover: (eventNode: EventNode | null, cause: HoverCause) => void;
-  closeFind: () => void;
+  closeFind: () => Promise<void>;
   deselect: () => void;
   tooltip: Tooltip;
 } {
@@ -64,13 +64,15 @@ function timeline(): {
     marker: TimelineMarker | null,
     cause: HoverCause,
   ) => void;
-  const findClose = internals['handleFindClose'] as () => void;
   const select = internals['handleSelect'] as (eventNode: EventNode | null) => void;
 
   return {
     navigateToMatch: () => navigate.call(chart, MATCH, 200, 100, 0),
     hover: (eventNode, cause) => mouseMove.call(chart, 50, 60, eventNode, null, cause),
-    closeFind: () => findClose.call(chart),
+    closeFind: async () => {
+      await chart.findTarget.find({ text: 'Match', matchCase: false });
+      chart.findTarget.clearFind();
+    },
     deselect: () => select.call(chart, null),
     tooltip,
   };
@@ -103,8 +105,8 @@ describe('the panel on a find match', () => {
     expect(chart.tooltip.hide).toHaveBeenCalledTimes(1);
   });
 
-  it('goes when the find closes', () => {
-    chart.closeFind();
+  it('goes when the find closes', async () => {
+    await chart.closeFind();
 
     expect(chart.tooltip.hide).toHaveBeenCalledTimes(1);
   });

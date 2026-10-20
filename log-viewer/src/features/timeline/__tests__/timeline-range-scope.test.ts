@@ -16,6 +16,7 @@ let reported: TimelineOptions = {};
 // drives only what the chart publishes from the renderer's reports.
 jest.mock('../optimised/ApexLogTimeline.js', () => ({
   ApexLogTimeline: class {
+    findTarget = { find: async () => null, setCurrentMatch: async () => {}, clearFind: () => {} };
     init(_container: HTMLElement, _log: ApexLog, options: TimelineOptions): Promise<void> {
       reported = options;
       return Promise.resolve();

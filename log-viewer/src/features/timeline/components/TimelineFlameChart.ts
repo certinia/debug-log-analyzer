@@ -18,6 +18,7 @@ import { setRange, windowFor } from '../../../core/log/rangeScope.js';
 import { waitForNextFrame } from '../../../core/utility/FrameBudget.js';
 import { debounce, isVisible, setChanged } from '../../../core/utility/Util.js';
 import { themeObserver } from '../../../core/theme/ThemeObserver.js';
+import { FindController } from '../../find/FindController.js';
 import { ApexLogTimeline } from '../optimised/ApexLogTimeline.js';
 import type { MeasurementSnapshot } from '../optimised/measurement/MeasurementState.js';
 import { parseColorToHex } from '../optimised/rendering/ColorUtils.js';
@@ -134,6 +135,10 @@ export class TimelineFlameChart extends LitElement {
   /** Bumped by every `cleanup()`, so an in-flight `init` can tell it was superseded. */
   private initEpoch = 0;
   private visibilityWait: AbortController | null = null;
+
+  private readonly finder = new FindController(this, {
+    targets: () => (this.apexLogTimeline ? [this.apexLogTimeline.findTarget] : []),
+  });
 
   private readonly subscriptions = new SubscriptionController(this, () => [
     themeObserver.on(() => {
@@ -290,6 +295,8 @@ export class TimelineFlameChart extends LitElement {
       this.cleanup();
       layer.style.visibility = '';
       this.apexLogTimeline = timeline;
+      // A new log has new frames: the open search runs again over them.
+      void this.finder.rerun();
       this.timelineLayer = layer;
       this.pendingViewport = null;
     } catch (error) {
@@ -397,6 +404,8 @@ export class TimelineFlameChart extends LitElement {
 
     // Destroy renderer
     if (this.apexLogTimeline) {
+      // Before the destroy: the finder would otherwise hold the old chart until the next search.
+      this.finder.forget();
       this.apexLogTimeline.destroy();
       this.apexLogTimeline = null;
     }
