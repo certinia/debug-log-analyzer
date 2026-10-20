@@ -551,8 +551,6 @@ export class CalltreeView extends LitElement {
       return;
     }
 
-    // The controller sees only the shown grid, so the one left behind would keep its marks.
-    this._activeGrid()?.clearFind();
     const switchEpoch = ++this.viewSwitchEpoch;
     this.viewMode = newMode;
     await this.updateComplete;
@@ -568,6 +566,10 @@ export class CalltreeView extends LitElement {
       return;
     }
     void this._finder.rerun();
+    // After the rerun starts, so a search still running on a grid left behind ends stale, not dropped.
+    [this.timeOrderGrid, this.aggregatedGrid, this.bottomUpGrid]
+      .filter((grid) => grid !== this._activeGrid())
+      .forEach((grid) => grid?.clearFind());
 
     // The selection is untouched, but the direction this tab shows is not, and
     // that is what the inspector opens on the other side of.

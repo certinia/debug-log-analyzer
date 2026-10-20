@@ -658,4 +658,27 @@ describe('calltree-view find', () => {
       gridFind.mockRestore();
     }
   });
+
+  it('keeps a search still running when the view switches, and searches the view it shows', async () => {
+    const timeOrder = shownGrid();
+    let finish: (result: null) => void = () => undefined;
+    jest.spyOn(timeOrder, 'find').mockReturnValue(new Promise((resolve) => (finish = resolve)));
+    // A clear ends a running grid search with null, as lv-grid does.
+    jest.spyOn(timeOrder, 'clearFind').mockImplementation(() => finish(null));
+    startFind('foo');
+    const height = jest.spyOn(Element.prototype, 'clientHeight', 'get').mockReturnValue(100);
+    const gridFind = jest
+      .spyOn(Object.getPrototypeOf(timeOrder) as typeof timeOrder, 'find')
+      .mockResolvedValue({ total: 1, current: -1 });
+    try {
+      await view._setViewMode('bottom-up');
+      await settle();
+
+      expect(results).not.toContain(0);
+      expect(results.at(-1)).toBe(1);
+    } finally {
+      height.mockRestore();
+      gridFind.mockRestore();
+    }
+  });
 });
