@@ -10,12 +10,20 @@ import { TimelineFind } from '../TimelineFind.js';
 
 const query = (text: string, matchCase = false) => ({ text, matchCase });
 
+/** A chart whose search owns the cursor, as the real one does. */
 function setup(total = 3) {
   const matches = Array.from({ length: total }, () => ({}) as SearchMatch<EventNode>);
+  let cursor: SearchCursorImpl<EventNode> | undefined;
   const chart = {
-    search: jest.fn((_predicate: FramePredicate) => new SearchCursorImpl(matches)),
-    clearSearch: jest.fn(),
-    requestRender: jest.fn(),
+    search: jest.fn((_predicate: FramePredicate) => {
+      cursor = new SearchCursorImpl(matches);
+      return total;
+    }),
+    seekMatch: jest.fn((index: number) => void cursor?.seek(index)),
+    getSearchCursor: () => cursor,
+    clearSearch: jest.fn(() => {
+      cursor = undefined;
+    }),
   };
   const onClear = jest.fn();
   return { chart, onClear, find: new TimelineFind(chart, onClear) };
@@ -39,6 +47,16 @@ describe('TimelineFind', () => {
     expect(chart.search).toHaveBeenCalledTimes(1);
   });
 
+  it('searches again when the chart dropped its search', async () => {
+    const { chart, find } = setup();
+    await find.find(query('foo'));
+    await find.setCurrentMatch(1);
+    chart.clearSearch();
+
+    expect(await find.find(query('foo'))).toEqual({ total: 3, current: -1 });
+    expect(chart.search).toHaveBeenCalledTimes(2);
+  });
+
   it.each([
     ['other text', query('bar')],
     ['the case option', query('foo', true)],
@@ -59,30 +77,21 @@ describe('TimelineFind', () => {
     expect(chart.search).not.toHaveBeenCalled();
   });
 
-  it('makes no match current for -1, and draws again', async () => {
-    const { chart, find } = setup();
+  it('makes no match current for -1', async () => {
+    const { find } = setup();
     await find.find(query('foo'));
     await find.setCurrentMatch(2);
     await find.setCurrentMatch(-1);
 
     expect(await find.find(query('foo'))).toEqual({ total: 3, current: -1 });
-    expect(chart.requestRender).toHaveBeenCalledTimes(1);
   });
 
-  it('draws nothing to make none current when none was', async () => {
+  it('leaves the chart alone for -1 when none is current', async () => {
     const { chart, find } = setup();
     await find.find(query('foo'));
     await find.setCurrentMatch(-1);
 
-    expect(chart.requestRender).not.toHaveBeenCalled();
-  });
-
-  it('clears nothing when it holds no search', () => {
-    const { chart, onClear, find } = setup();
-    find.clearFind();
-
-    expect(chart.clearSearch).not.toHaveBeenCalled();
-    expect(onClear).not.toHaveBeenCalled();
+    expect(chart.seekMatch).not.toHaveBeenCalled();
   });
 
   it('clears the chart and searches the same query afresh after a clear', async () => {
@@ -94,5 +103,13 @@ describe('TimelineFind', () => {
     expect(onClear).toHaveBeenCalled();
     await find.find(query('foo'));
     expect(chart.search).toHaveBeenCalledTimes(2);
+  });
+
+  it('clears nothing when it holds no search', () => {
+    const { chart, onClear, find } = setup();
+    find.clearFind();
+
+    expect(chart.clearSearch).not.toHaveBeenCalled();
+    expect(onClear).not.toHaveBeenCalled();
   });
 });

@@ -656,15 +656,21 @@ export class FlameChart<E extends EventNode = EventNode> {
   }
 
   /**
-   * Search events using predicate function.
-   * Returns FlameChartCursor that automatically handles centering, tooltips, and rendering.
+   * Search events using predicate function, with no match current.
    *
    * @param predicate - Function to test each event
    * @param options - Search options (caseSensitive, matchWholeWord)
-   * @returns FlameChartCursor for navigating results, or null if search not enabled
+   * @returns The number of matches, or null if search not enabled
    */
-  public search(predicate: FramePredicate, options?: SearchOptions): SearchCursor<E> | null {
+  public search(predicate: FramePredicate, options?: SearchOptions): number | null {
     return this.searchOrchestrator?.search(predicate, options) ?? null;
+  }
+
+  /**
+   * Make match `index` (from 0) current: centre on it and show its panel. -1 makes none current.
+   */
+  public seekMatch(index: number): void {
+    this.searchOrchestrator?.seekMatch(index);
   }
 
   /**

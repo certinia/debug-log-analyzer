@@ -6,12 +6,11 @@ import type { FindTarget } from '../../find/FindController.js';
 import type { FlameChart } from '../optimised/FlameChart.js';
 import { textPredicate } from '../optimised/search/EventMatcher.js';
 import type { EventNode } from '../types/flamechart.types.js';
-import type { SearchCursor } from '../types/search.types.js';
 
-/** The part of the chart find drives. */
+/** The part of the chart find drives. The chart's search owns the matches and the current one. */
 export type FindableChart<E extends EventNode> = Pick<
   FlameChart<E>,
-  'search' | 'clearSearch' | 'requestRender'
+  'search' | 'seekMatch' | 'getSearchCursor' | 'clearSearch'
 >;
 
 /**
@@ -21,7 +20,6 @@ export type FindableChart<E extends EventNode> = Pick<
 export class TimelineFind<E extends EventNode> implements FindTarget {
   private readonly chart: FindableChart<E>;
   private readonly onClear: () => void;
-  private cursor: SearchCursor<E> | null = null;
   private query: FindQuery | null = null;
 
   /** @param onClear - Runs when the search is dropped, as for the panel a step opened. */
@@ -31,7 +29,7 @@ export class TimelineFind<E extends EventNode> implements FindTarget {
   }
 
   async find(query: FindQuery): Promise<GridFindDetail> {
-    const { cursor } = this;
+    const cursor = this.chart.getSearchCursor();
     if (cursor && query.text === this.query?.text && query.matchCase === this.query.matchCase) {
       return { total: cursor.total, current: cursor.currentIndex };
     }
@@ -40,19 +38,14 @@ export class TimelineFind<E extends EventNode> implements FindTarget {
       return { total: 0, current: -1 };
     }
     this.query = query;
-    this.cursor = this.chart.search(textPredicate(query.text, query.matchCase));
-    return { total: this.cursor?.total ?? 0, current: -1 };
+    const total = this.chart.search(textPredicate(query.text, query.matchCase)) ?? 0;
+    return { total, current: -1 };
   }
 
   async setCurrentMatch(match: number): Promise<void> {
-    const cursor = this.cursor;
-    if (!cursor) {
-      return;
-    }
-    const had = cursor.currentIndex >= 0;
-    cursor.seek(match);
-    if (match < 0 && had) {
-      this.chart.requestRender();
+    const current = this.chart.getSearchCursor()?.currentIndex ?? -1;
+    if (this.query && !(match < 0 && current < 0)) {
+      this.chart.seekMatch(match);
     }
   }
 
@@ -60,7 +53,6 @@ export class TimelineFind<E extends EventNode> implements FindTarget {
     if (!this.query) {
       return;
     }
-    this.cursor = null;
     this.query = null;
     this.chart.clearSearch();
     this.onClear();

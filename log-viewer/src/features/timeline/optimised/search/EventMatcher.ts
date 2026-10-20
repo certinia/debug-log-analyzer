@@ -54,14 +54,6 @@ export class EventMatcher<E extends EventNode> {
   }
 
   /**
-   * Set the current cursor. Used to restore cursor after it was cleared.
-   * @param cursor - The cursor to restore
-   */
-  setCursor(cursor: SearchCursorImpl<E>): void {
-    this.currentCursor = cursor;
-  }
-
-  /**
    * Get current search cursor (if any).
    *
    * @returns Current cursor or undefined if no active search
