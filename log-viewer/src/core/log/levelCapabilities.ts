@@ -12,8 +12,8 @@ export interface Capability {
   readonly event: string;
   readonly category: keyof DebugLevels;
   readonly level: LogLevel;
-  /** False where the header's level filter keeps the data whatever level is chosen. */
-  readonly filterable?: false;
+  /** Where the header's filter hides the data, if not below `level`; null where it never does. */
+  readonly filteredBelow?: LogLevel | null;
 }
 
 // The parser sets each event's level per instance, so it is restated here; a test holds the two together.
@@ -35,13 +35,14 @@ export const CAPABILITIES = {
     event: 'SOQL_EXECUTE_EXPLAIN',
     category: 'database',
     level: 'FINEST',
+    filteredBelow: 'INFO',
   },
   limits: {
     label: 'Governor limits',
     event: 'CUMULATIVE_LIMIT_USAGE',
     category: 'apexProfiling',
     level: 'INFO',
-    filterable: false,
+    filteredBelow: null,
   },
 } as const satisfies Record<string, Capability>;
 
@@ -54,7 +55,7 @@ export type LevelGap =
 
 /**
  * Whether the levels could keep `id`'s events off screen: the log was captured
- * below its level, or a level chosen in the header is below it. Null when neither.
+ * below its level, or a level chosen in the header hides them. Null when neither.
  * A gap is not proof the events are missing, so a caller checks its data first.
  */
 export function findLevelGap(
@@ -73,10 +74,12 @@ export function findLevelGap(
     return { kind: 'notCaptured', capability, logged: loggedLevel };
   }
   const chosenLevel = chosen[capability.category];
+  const filteredBelow =
+    capability.filteredBelow === undefined ? capability.level : capability.filteredBelow;
   if (
-    capability.filterable !== false &&
+    filteredBelow !== null &&
     chosenLevel !== undefined &&
-    levelRank(chosenLevel) < needed
+    levelRank(chosenLevel) < levelRank(filteredBelow)
   ) {
     return { kind: 'filtered', capability, logged: loggedLevel, chosen: chosenLevel };
   }

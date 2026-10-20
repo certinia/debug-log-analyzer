@@ -2,15 +2,17 @@
  * Copyright (c) 2026 Certinia Inc. All rights reserved.
  */
 import { describe, expect, it } from '@jest/globals';
-import type { DebugLevels } from '@apexdevtools/apex-log-parser';
+import type { DebugLevels, LogLevel } from '@apexdevtools/apex-log-parser';
 
 import { storeOf } from '#test-helpers/apexLog.js';
 import {
   CAPABILITIES,
+  type Capability,
   type CapabilityId,
   describeLevelGap,
   findLevelGap,
 } from '../levelCapabilities.js';
+import { filterByLevels, LEVEL_ORDER, levelRank } from '../levelFilter.js';
 
 const SETTINGS = '64.0 APEX_CODE,FINEST;APEX_PROFILING,FINEST;DB,FINEST\n';
 
@@ -39,6 +41,21 @@ describe('CAPABILITIES', () => {
         category: cap.category,
         level: cap.level,
       });
+    },
+  );
+
+  it.each(Object.entries<Capability>(CAPABILITIES).filter(([, cap]) => cap.filteredBelow !== null))(
+    '%s is hidden by the header filter where the map says',
+    async (_, cap: Capability) => {
+      const at = cap.filteredBelow ?? cap.level;
+      const below = LEVEL_ORDER[levelRank(at) - 1]!; // every capability needs more than NONE
+      const has = async (level: LogLevel) =>
+        (await filterByLevels(log, { [cap.category]: level }))?.eventsById.some(
+          (event) => event?.type === cap.event,
+        );
+
+      expect(await has(at)).toBe(true);
+      expect(await has(below)).toBe(false);
     },
   );
 });
@@ -71,20 +88,33 @@ describe('findLevelGap', () => {
   });
 
   it('reports a level lowered in the header as filtered', () => {
-    expect(gap('queryPlans', { database: 'FINEST' }, { database: 'INFO' })).toEqual({
+    expect(gap('queries', { database: 'FINEST' }, { database: 'WARN' })).toEqual({
       kind: 'filtered',
-      capability: CAPABILITIES.queryPlans,
+      capability: CAPABILITIES.queries,
       logged: 'FINEST',
-      chosen: 'INFO',
+      chosen: 'WARN',
     });
   });
 
-  it('does not blame the header for data its filter keeps', () => {
-    expect(gap('limits', { apexProfiling: 'INFO' }, { apexProfiling: 'NONE' })).toBeNull();
+  it.each([
+    ['limits', { apexProfiling: 'INFO' }, { apexProfiling: 'NONE' }],
+    ['queryPlans', { database: 'FINEST' }, { database: 'INFO' }],
+  ] as [CapabilityId, DebugLevels, DebugLevels][])(
+    'does not blame the header for %s, which its filter keeps',
+    (id, logged, chosen) => {
+      expect(gap(id, logged, chosen)).toBeNull();
+    },
+  );
+
+  it('blames the header for query plans it hides with their queries', () => {
+    expect(gap('queryPlans', { database: 'FINEST' }, { database: 'WARN' })).toMatchObject({
+      kind: 'filtered',
+      chosen: 'WARN',
+    });
   });
 
   it('reports not captured over filtered, since raising the level cannot help', () => {
-    expect(gap('queryPlans', { database: 'FINE' }, { database: 'INFO' })).toMatchObject({
+    expect(gap('variables', { apexCode: 'FINE' }, { apexCode: 'DEBUG' })).toMatchObject({
       kind: 'notCaptured',
     });
   });
@@ -115,10 +145,10 @@ describe('describeLevelGap', () => {
       'Governor limits need a new log with APEX_PROFILING at INFO or higher (logged: NONE).',
     ],
     [
-      'queryPlans',
+      'queries',
       { database: 'FINEST' },
-      { database: 'INFO' },
-      'Query plans hidden: DB is set to INFO in the header (logged: FINEST).',
+      { database: 'WARN' },
+      'Database statements hidden: DB is set to WARN in the header (logged: FINEST).',
     ],
   ] as [CapabilityId, DebugLevels, DebugLevels, string][])(
     '%s, %j chosen as %j, reads "%s"',

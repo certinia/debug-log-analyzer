@@ -111,6 +111,49 @@ describe('levelFilter', () => {
     ).toEqual(['ERROR | kept']);
   });
 
+  it.each([
+    ['keeps', 'INFO', ['SOQL_EXECUTE_BEGIN', 'SOQL_EXECUTE_EXPLAIN']],
+    ['hides', 'NONE', []],
+  ] as const)('%s a query plan with its query, at DB %s', (_verb, database, kept) => {
+    const log = storeOf(
+      '09:18:22.6 (1000)|METHOD_ENTRY|[1]|01p|ns.Outer.run()\n' +
+        '09:18:22.6 (2000)|SOQL_EXECUTE_BEGIN|[2]|Aggregations:0|SELECT Id FROM Account\n' +
+        '09:18:22.6 (2100)|SOQL_EXECUTE_EXPLAIN|[2]|Index on Account : [Id], cardinality: 1, sobjectCardinality: 10, relativeCost 0.1\n' +
+        '09:18:22.6 (3000)|SOQL_EXECUTE_END|[2]|Rows:1\n' +
+        '09:18:22.6 (4000)|METHOD_EXIT|[1]|ns.Outer.run()\n',
+      SETTINGS,
+    ).log;
+
+    const filtered = build(log, { apexCode: 'DEBUG', database });
+
+    expect(
+      walk(filtered)
+        .map((event) => event.type)
+        .filter((type) => type?.startsWith('SOQL')),
+    ).toEqual(kept);
+  });
+
+  it('keeps namespace limit usage with its limit block, and only there', () => {
+    const log = storeOf(
+      '09:18:22.6 (1000)|TESTING_LIMITS\n' +
+        '09:18:22.6 (1100)|LIMIT_USAGE_FOR_NS|(default)|\n' +
+        '  Number of SOQL queries: 2 out of 100\n' +
+        '09:18:22.6 (3000)|CUMULATIVE_LIMIT_USAGE\n' +
+        '09:18:22.6 (3100)|LIMIT_USAGE_FOR_NS|(default)|\n' +
+        '  Number of SOQL queries: 1 out of 100\n' +
+        '09:18:22.6 (3200)|CUMULATIVE_LIMIT_USAGE_END\n',
+      '64.0 APEX_CODE,FINEST;APEX_PROFILING,FINEST;DB,FINEST\n',
+    ).log;
+
+    const filtered = build(log, { apexProfiling: 'INFO' });
+
+    expect(
+      walk(filtered)
+        .filter((event) => event.type === 'LIMIT_USAGE_FOR_NS')
+        .map((event) => event.parent?.type),
+    ).toEqual(['CUMULATIVE_LIMIT_USAGE']);
+  });
+
   it('keeps the self sum of the tree', () => {
     const log = logOf();
 

@@ -58,8 +58,18 @@ function levelOf(event: LogEvent): LogLevel {
   return event.debugLevel;
 }
 
+// A detail line inside its block shows while the block shows, whatever its own level.
+const BLOCK_OF: Readonly<Record<string, string>> = {
+  SOQL_EXECUTE_EXPLAIN: 'SOQL_EXECUTE_BEGIN',
+  LIMIT_USAGE_FOR_NS: 'CUMULATIVE_LIMIT_USAGE',
+};
+
 /** True when `event` is finer than the level chosen for its category. */
 export function isHidden(event: LogEvent, chosen: DebugLevels): boolean {
+  const { parent } = event;
+  if (parent && event.type && parent.type === BLOCK_OF[event.type]) {
+    return isHidden(parent, chosen);
+  }
   const { debugCategory, debugLevel } = event;
   if (!debugCategory || !debugLevel) {
     return false;
