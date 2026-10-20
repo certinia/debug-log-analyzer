@@ -169,7 +169,7 @@ export class FindWidget extends LitElement {
       return 'No Matches';
     }
 
-    return (this.totalMatches ? this.currentMatch : '?') + ' of ' + this.totalMatches;
+    return (this.currentMatch || '?') + ' of ' + this.totalMatches;
   }
 
   _matchCase() {
@@ -239,8 +239,7 @@ export class FindWidget extends LitElement {
 
   _updateCounts(e: CustomEvent<FindResultsEventDetail>) {
     this.totalMatches = e.detail.totalMatches;
-    // A view reports totals, never a position, so a fresh count starts at the first match.
-    this.currentMatch = 1;
+    this.currentMatch = e.detail.currentMatch ?? 1;
   }
 
   _resetCounts() {

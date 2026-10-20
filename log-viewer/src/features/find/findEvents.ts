@@ -28,6 +28,11 @@ export interface FindEventDetail {
 /** Payload for `lv-find-results`, a view's answer to a search. */
 export interface FindResultsEventDetail {
   totalMatches: number;
+  /**
+   * The match the view holds as current, from 1; 0 when it holds none, as after a re-run
+   * lost the current row. Left out, the widget starts at the first match.
+   */
+  currentMatch?: number;
 }
 
 /** Every find event, so a listener's payload follows the name it subscribed to. */
