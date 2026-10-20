@@ -314,7 +314,7 @@ export class AnalysisView extends LitElement {
         .marked="${this._marked}"
         @lv-grid-select="${this._rowEvents.select}"
         @lv-grid-locate="${this._rowEvents.locate}"
-        @lv-grid-reshape="${() => this._finder.dropOnReshape()}"
+        @lv-grid-reshape="${() => void this._finder.rerun()}"
         @lv-grid-header-context="${this._menus.headerContext}"
       ></lv-call-tree-grid>
     `;

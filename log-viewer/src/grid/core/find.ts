@@ -1,7 +1,7 @@
 /*
  * Copyright (c) 2026 Certinia Inc. All rights reserved.
  */
-import type { RowKey } from './types.js';
+import { Group, type RowKey } from './types.js';
 
 export interface FindQuery {
   text: string;
@@ -31,21 +31,25 @@ export function findPattern(query: FindQuery): RegExp | null {
   return new RegExp(literal, query.matchCase ? 'g' : 'gi');
 }
 
+/** A row find can match: a data row, or a group row by its key. */
+export type Findable<R> = R | Group<R>;
+
 /** The matches of one search, numbered from 0 in display order: row by row, then column. */
 export class FindResult<R> {
   readonly total: number;
   readonly pattern: RegExp | null;
-  private readonly rows: readonly R[];
+  private readonly rows: readonly Findable<R>[];
   private readonly starts: Uint32Array;
   private readonly paths: readonly (PathNode | null)[];
   private readonly key: (row: R) => RowKey;
-  private readonly at: ReadonlyMap<R, number>;
+  // Groups by key: each build makes its groups again.
+  private readonly at: ReadonlyMap<R | string, number>;
 
   constructor(
-    rows: readonly R[],
+    rows: readonly Findable<R>[],
     starts: Uint32Array,
     paths: readonly (PathNode | null)[],
-    at: ReadonlyMap<R, number>,
+    at: ReadonlyMap<R | string, number>,
     total: number,
     pattern: RegExp | null,
     key: (row: R) => RowKey,
@@ -60,24 +64,25 @@ export class FindResult<R> {
   }
 
   /** The row that holds match `match`, or undefined past the end. */
-  rowOf(match: number): R | undefined {
+  rowOf(match: number): Findable<R> | undefined {
     const i = this.slotOf(match);
     return i === -1 ? undefined : this.rows[i];
   }
 
   /** The number of the first match in `row`, or -1 when it has none. */
-  firstMatchIn(row: R): number {
-    const i = this.at.get(row);
+  firstMatchIn(row: Findable<R>): number {
+    const i = this.at.get(row instanceof Group ? row.key : row);
     return i === undefined ? -1 : (this.starts[i] as number);
   }
 
-  /** Keys from the root down to the row that holds `match`, for `GridStore.reveal`. */
+  /** Keys from the root down to the row that holds `match`, for `GridStore.reveal`; empty for a group. */
   pathOf(match: number): RowKey[] {
     const i = this.slotOf(match);
-    if (i === -1) {
+    const row = this.rows[i];
+    if (i === -1 || row === undefined || row instanceof Group) {
       return [];
     }
-    const path = [this.key(this.rows[i] as R)];
+    const path = [this.key(row)];
     for (let node = this.paths[i] ?? null; node; node = node.up) {
       path.push(node.key);
     }
@@ -107,11 +112,11 @@ export class FindResult<R> {
 export class FindCollector<R> {
   private readonly cells: readonly CellText<R>[];
   private readonly pattern: RegExp | null;
-  private readonly rows: R[] = [];
+  private readonly rows: Findable<R>[] = [];
   private readonly starts: number[] = [];
   private readonly paths: (PathNode | null)[] = [];
   // Filled as rows are visited, which is sliced: built at the end it held the thread 45ms.
-  private readonly at = new Map<R, number>();
+  private readonly at = new Map<R | string, number>();
   private total = 0;
 
   constructor(cells: readonly CellText<R>[], pattern: RegExp | null) {
@@ -123,23 +128,21 @@ export class FindCollector<R> {
     return this.pattern !== null;
   }
 
-  visit(row: R, up: PathNode | null): void {
+  visit(row: Findable<R>, up: PathNode | null): void {
     if (!this.pattern) {
       return;
     }
     let count = 0;
-    for (const cell of this.cells) {
-      const text = cell(row);
-      if (!text) {
-        continue;
-      }
-      this.pattern.lastIndex = 0;
-      while (this.pattern.exec(text)) {
-        count++;
+    // A group row shows its key, not the columns' text.
+    if (row instanceof Group) {
+      count = countIn(this.pattern, row.key);
+    } else {
+      for (const cell of this.cells) {
+        count += countIn(this.pattern, cell(row));
       }
     }
     if (count) {
-      this.at.set(row, this.rows.length);
+      this.at.set(row instanceof Group ? row.key : row, this.rows.length);
       this.rows.push(row);
       this.starts.push(this.total);
       this.paths.push(up);
@@ -158,4 +161,13 @@ export class FindCollector<R> {
       key,
     );
   }
+}
+
+function countIn(pattern: RegExp, text: string): number {
+  let count = 0;
+  pattern.lastIndex = 0;
+  while (text && pattern.exec(text)) {
+    count++;
+  }
+  return count;
 }

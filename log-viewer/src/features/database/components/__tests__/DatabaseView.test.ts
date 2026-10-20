@@ -31,7 +31,9 @@ interface FakeLvGrid {
   clientHeight: number;
   current: number[];
   cleared: number;
-  find(): Promise<number>;
+  /** The match a find keeps current, or -1. */
+  kept: number;
+  find(): Promise<{ total: number; current: number }>;
   setCurrentMatch(index: number): Promise<void>;
   clearFind(): void;
 }
@@ -50,7 +52,8 @@ function fakeLvGrid(matches = 0): FakeLvGrid {
     clientHeight: 10,
     current: [],
     cleared: 0,
-    find: async () => grid.matches,
+    kept: -1,
+    find: async () => ({ total: grid.matches, current: grid.kept }),
     setCurrentMatch: async (index) => void grid.current.push(index),
     clearFind: () => void (grid.cleared += 1),
   };
@@ -297,25 +300,29 @@ describe('database-view find', () => {
     expect(await rollUps(() => search())).toEqual([3]);
   });
 
-  it('drops the search when a grid reshapes', async () => {
+  it('searches again when a grid reshapes', async () => {
     grids.forEach((grid) => (grid.grid.matches = 1));
     await rollUps(() => search());
+    grids[2].grid.matches = 3;
 
     const totals = await rollUps(() =>
       grids[2].dispatchEvent(new CustomEvent('grid-reshape', { detail: null, bubbles: true })),
     );
 
-    expect(totals).toEqual([0]);
-    expect(grids.map((grid) => grid.grid.cleared)).toEqual([1, 1, 1]);
+    expect(totals).toEqual([5]);
+    expect(grids.map((grid) => grid.grid.cleared)).toEqual([0, 0, 0]);
   });
 
-  it('drops the search when a section collapses or expands', async () => {
+  it('searches again over the shown grids when a section collapses or expands', async () => {
     grids.forEach((grid) => (grid.grid.matches = 1));
     await rollUps(() => search());
-    expect(await rollUps(() => collapse(1))).toEqual([0]);
+    grids[1].grid.clientHeight = 0;
 
-    await rollUps(() => search());
-    expect(await rollUps(() => collapse(1))).toEqual([0]);
+    expect(await rollUps(() => collapse(1))).toEqual([2]);
+    expect(grids[1].grid.cleared).toBe(1);
+
+    grids[1].grid.clientHeight = 10;
+    expect(await rollUps(() => collapse(1))).toEqual([3]);
   });
 });
 

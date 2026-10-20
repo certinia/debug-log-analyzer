@@ -16,6 +16,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Screen reader and full keyboard support.
   - `Cmd/Ctrl+C` copies the filtered rows and their depth in each table, and the Analysis CSV export holds the same rows.
 - ⚡ **Parser performance**: logs parse 28% faster and use 27% less memory, down from 1.0 s to 0.78 s and 1.1 GB to 0.8 GB on a 100 MB log.
+- 🔍 **Find**: a search in the tables stays after a sort, filter, group by, column change, log level change, view switch, tab switch or section collapse, and keeps your place. ([#986])
 - ✂️ **Truncation**: each skipped section states how much of the log it dropped.
 - 🌊 **Flows**: names drop the `FLOW_START_INTERVIEWS :` and `WF_CRITERIA :` prefixes.
 - 📚 **Multiple logs**: a file holding several logs shows the first and flags the rest.
@@ -27,6 +28,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - 🎚️ **Log levels**: filter the log to a lower debug level per category from the header. ([#530])
 - 🔦 **Timeline legend**: hover a category to highlight frames in the timeline, select to keep. ([#917])
+- 🔍 **Find**: in the tables, find matches the group header text too.
 
 ### Removed
 
@@ -583,6 +585,7 @@ Skipped due to adopting odd numbering for pre releases and even number for relea
 <!-- Unreleased -->
 
 [#1169]: https://github.com/certinia/debug-log-analyzer/issues/1169
+[#986]: https://github.com/certinia/debug-log-analyzer/issues/986
 [#1110]: https://github.com/certinia/debug-log-analyzer/issues/1110
 [#917]: https://github.com/certinia/debug-log-analyzer/issues/917
 [#875]: https://github.com/certinia/debug-log-analyzer/issues/875

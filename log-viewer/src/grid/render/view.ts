@@ -548,10 +548,7 @@ export class GridView<R extends object> {
     const find = this.find;
     const index = Number(el.dataset.index);
     const entry = this.rows?.rowAt(index);
-    const first =
-      find && entry !== undefined && !(entry instanceof Group)
-        ? find.result.firstMatchIn(entry)
-        : -1;
+    const first = find && entry !== undefined ? find.result.firstMatchIn(entry) : -1;
     this.highlighter.mark(el, first, find?.result.pattern ?? null, find?.current ?? -1);
   }
 

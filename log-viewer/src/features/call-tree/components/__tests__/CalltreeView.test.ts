@@ -590,7 +590,10 @@ describe('calltree-view find', () => {
 
   it('shows no matches for a find a rebuild dropped, and searches again on the next Enter', async () => {
     const grid = shownGrid();
-    const gridFind = jest.spyOn(grid, 'find').mockResolvedValueOnce(-1).mockResolvedValueOnce(2);
+    const gridFind = jest
+      .spyOn(grid, 'find')
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce({ total: 2, current: -1 });
 
     await find('foo');
     expect(results).toEqual([0]);
@@ -602,18 +605,80 @@ describe('calltree-view find', () => {
 
   it('ignores a find a newer one replaced', async () => {
     const grid = shownGrid();
-    let finishFirst: (total: number) => void = () => {};
+    let finishFirst: (result: null) => void = () => {};
     jest
       .spyOn(grid, 'find')
       .mockImplementationOnce(() => new Promise((resolve) => (finishFirst = resolve)))
-      .mockResolvedValueOnce(3);
+      .mockResolvedValueOnce({ total: 3, current: -1 });
 
     startFind('foo');
     await find('food');
     expect(results).toEqual([3]);
 
-    finishFirst(-1);
+    finishFirst(null);
     await settle();
     expect(results).toEqual([3]);
+  });
+
+  it('searches again when the grid is reshaped under it', async () => {
+    const grid = shownGrid();
+    const gridFind = jest
+      .spyOn(grid, 'find')
+      .mockResolvedValueOnce({ total: 2, current: -1 })
+      .mockResolvedValueOnce({ total: 1, current: -1 });
+
+    await find('foo');
+    grid.dispatchEvent(new CustomEvent('lv-grid-reshape', { detail: { reason: 'sort' } }));
+    await settle();
+
+    expect(gridFind).toHaveBeenLastCalledWith({ text: 'foo', matchCase: false });
+    expect(results).toEqual([2, 1]);
+  });
+
+  it('clears the view it leaves, and searches the one it shows', async () => {
+    const timeOrder = shownGrid();
+    jest.spyOn(timeOrder, 'find').mockResolvedValue({ total: 2, current: -1 });
+    const cleared = jest.spyOn(timeOrder, 'clearFind');
+    await find('foo');
+    // The new view's grid is made during the switch, so only its class can be stubbed.
+    const height = jest.spyOn(Element.prototype, 'clientHeight', 'get').mockReturnValue(100);
+    const gridFind = jest
+      .spyOn(Object.getPrototypeOf(timeOrder) as typeof timeOrder, 'find')
+      .mockResolvedValue({ total: 1, current: -1 });
+    try {
+      await view._setViewMode('bottom-up');
+      await settle();
+
+      expect(cleared).toHaveBeenCalled();
+      expect(gridFind.mock.contexts).toContain(view.bottomUpGrid);
+      expect(results[0]).toBe(2);
+      expect(results.at(-1)).toBe(1);
+    } finally {
+      height.mockRestore();
+      gridFind.mockRestore();
+    }
+  });
+
+  it('keeps a search still running when the view switches, and searches the view it shows', async () => {
+    const timeOrder = shownGrid();
+    let finish: (result: null) => void = () => undefined;
+    jest.spyOn(timeOrder, 'find').mockReturnValue(new Promise((resolve) => (finish = resolve)));
+    // A clear ends a running grid search with null, as lv-grid does.
+    jest.spyOn(timeOrder, 'clearFind').mockImplementation(() => finish(null));
+    startFind('foo');
+    const height = jest.spyOn(Element.prototype, 'clientHeight', 'get').mockReturnValue(100);
+    const gridFind = jest
+      .spyOn(Object.getPrototypeOf(timeOrder) as typeof timeOrder, 'find')
+      .mockResolvedValue({ total: 1, current: -1 });
+    try {
+      await view._setViewMode('bottom-up');
+      await settle();
+
+      expect(results).not.toContain(0);
+      expect(results.at(-1)).toBe(1);
+    } finally {
+      height.mockRestore();
+      gridFind.mockRestore();
+    }
   });
 });

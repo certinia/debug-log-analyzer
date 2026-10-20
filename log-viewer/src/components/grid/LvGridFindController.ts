@@ -5,10 +5,12 @@ import type { ReactiveControllerHost } from 'lit';
 
 import { DomListenerController } from '../../core/events/DomListenerController.js';
 import type { FindEventDetail, FindEventMap } from '../../features/find/findEvents.js';
-import type { FindQuery, LvGrid } from '../../grid/index.js';
+import type { FindQuery, GridFindDetail, LvGrid } from '../../grid/index.js';
 
 /** The part of an lv-grid that find drives. */
 export type FindableGrid = Pick<LvGrid, 'find' | 'setCurrentMatch' | 'clearFind' | 'clientHeight'>;
+
+type Found = (GridFindDetail & { grid: FindableGrid })[];
 
 export interface LvGridFindOptions {
   /**
@@ -21,16 +23,18 @@ export interface LvGridFindOptions {
 /**
  * The find widget's search over a host's lv-grids: it searches, reports the total in
  * `lv-find-results`, marks the widget's current match in the grid that holds it, and
- * drops the search when a grid is reshaped under it. A host with no grid shown answers
- * nothing, which keeps the hidden tabs quiet.
+ * searches again when a grid is reshaped under it. A host with no grid shown answers
+ * nothing, which keeps the hidden tabs quiet, but keeps the query to search once shown.
  */
 export class LvGridFindController {
   private readonly _options: LvGridFindOptions;
   private _query: FindQuery | null = null;
   // The grids the last search ran over, with each one's count.
-  private _found: { grid: FindableGrid; total: number }[] = [];
+  private _found: Found = [];
   // Goes up with each search and clear, so an older search sees it is stale.
   private _searches = 0;
+  // A move to a match is ignored while these run: it would count by the totals they replace.
+  private _reruns = 0;
 
   constructor(host: ReactiveControllerHost, options: LvGridFindOptions) {
     this._options = options;
@@ -50,31 +54,31 @@ export class LvGridFindController {
       this._drop();
       return;
     }
+    const { text, options, count } = e.detail;
+    const query = { text, matchCase: options.matchCase };
+    const isNew = text !== this._query?.text || options.matchCase !== this._query.matchCase;
     const shown = this._shown();
-    // A hidden host answers nothing; a new query searches it on the next Enter once shown.
+    // A hidden host answers nothing, but keeps the query, so it searches once shown.
     if (!shown.length) {
+      if (isNew) {
+        this._forget();
+        this._query = query;
+      }
       return;
     }
-    const { text, options, count } = e.detail;
-    if (text !== this._query?.text || options.matchCase !== this._query.matchCase) {
-      const query = { text, matchCase: options.matchCase };
-      this._query = query;
-      const search = ++this._searches;
-      const totals: number[] = [];
-      for (const grid of shown) {
-        totals.push(await grid.find(query));
-        if (search !== this._searches) {
-          return;
-        }
+    if (!isNew) {
+      if (e.type === 'lv-find') {
+        await this.rerun();
+      } else if (!this._reruns) {
+        await this._markCurrent(count);
       }
-      if (totals.some((total) => total < 0)) {
-        // A rebuild dropped it: show no matches and forget the query, so the next Enter searches.
-        this.clear();
-        return;
-      }
-      this._found = shown.map((grid, i) => ({ grid, total: totals[i] ?? 0 }));
-      report(this.totalMatches);
+      return;
     }
+    this._query = query;
+    if (!(await this._search(query, shown))) {
+      return;
+    }
+    report(this.totalMatches, count ? Math.min(1, this.totalMatches) : 0);
     await this._markCurrent(count);
   }
 
@@ -82,15 +86,60 @@ export class LvGridFindController {
   clear(): void {
     this._drop();
     if (this._shown().length) {
-      report(0);
+      report(0, 0);
     }
   }
 
-  /** A sort, filter, grouping or view switch moves the matches, so their numbers no longer hold. */
-  dropOnReshape(): void {
-    if (this._query) {
-      this.clear();
+  /**
+   * Searches again after a sort, filter, grouping or view switch moved the matches, and
+   * reports the new total with the current match kept on its row, or none when that row
+   * has no match now. A kept match out of view scrolls into it. Call it once the grids to
+   * search are rendered. A host with no grid shown clears its marks, and keeps the query.
+   */
+  async rerun(): Promise<void> {
+    const query = this._query;
+    if (!query) {
+      return;
     }
+    const shown = this._shown();
+    if (!shown.length) {
+      this._forget();
+      return;
+    }
+    this._options
+      .grids()
+      .filter((grid) => !shown.includes(grid))
+      .forEach((grid) => grid.clearFind());
+    this._reruns++;
+    const found = await this._search(query, shown).finally(() => this._reruns--);
+    if (!found) {
+      return;
+    }
+    const currentMatch = currentMatchOf(found);
+    report(this.totalMatches, currentMatch);
+    if (currentMatch) {
+      await this._markCurrent(currentMatch);
+    }
+  }
+
+  // Null when a newer search replaced this one, or a grid's rebuild did, which clears the search.
+  private async _search(query: FindQuery, shown: readonly FindableGrid[]): Promise<Found | null> {
+    const search = ++this._searches;
+    const found: Found = [];
+    for (const grid of shown) {
+      const result = await grid.find(query);
+      if (search !== this._searches) {
+        return null;
+      }
+      if (!result) {
+        // Forgets the query, so the next Enter searches again.
+        this.clear();
+        return null;
+      }
+      found.push({ grid, ...result });
+    }
+    this._found = found;
+    return found;
   }
 
   // `count` is from 1 across the grids, as the widget counts; 0 marks none.
@@ -108,8 +157,13 @@ export class LvGridFindController {
   }
 
   private _drop(): void {
-    this._searches++;
     this._query = null;
+    this._forget();
+  }
+
+  // Clears the grids but keeps the query, as for a host hidden until it searches again.
+  private _forget(): void {
+    this._searches++;
     this._found = [];
     // Every grid, not only those the last search ended on: it stops a search still running.
     for (const grid of this._options.grids()) {
@@ -118,6 +172,20 @@ export class LvGridFindController {
   }
 }
 
-function report(totalMatches: number): void {
-  document.dispatchEvent(new CustomEvent('lv-find-results', { detail: { totalMatches } }));
+/** The match a grid holds current, from 1 across the grids, as the widget counts; 0 for none. */
+function currentMatchOf(found: Found): number {
+  let before = 0;
+  for (const { total, current } of found) {
+    if (current >= 0) {
+      return before + current + 1;
+    }
+    before += total;
+  }
+  return 0;
+}
+
+function report(totalMatches: number, currentMatch: number): void {
+  document.dispatchEvent(
+    new CustomEvent('lv-find-results', { detail: { totalMatches, currentMatch } }),
+  );
 }

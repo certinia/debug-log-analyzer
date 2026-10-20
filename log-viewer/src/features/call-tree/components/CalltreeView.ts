@@ -551,8 +551,6 @@ export class CalltreeView extends LitElement {
       return;
     }
 
-    this._finder.dropOnReshape();
-
     const switchEpoch = ++this.viewSwitchEpoch;
     this.viewMode = newMode;
     await this.updateComplete;
@@ -567,6 +565,11 @@ export class CalltreeView extends LitElement {
     if (switchEpoch !== this.viewSwitchEpoch) {
       return;
     }
+    void this._finder.rerun();
+    // After the rerun starts, so a search still running on a grid left behind ends stale, not dropped.
+    [this.timeOrderGrid, this.aggregatedGrid, this.bottomUpGrid]
+      .filter((grid) => grid !== this._activeGrid())
+      .forEach((grid) => grid?.clearFind());
 
     // The selection is untouched, but the direction this tab shows is not, and
     // that is what the inspector opens on the other side of.
@@ -1097,7 +1100,7 @@ export class CalltreeView extends LitElement {
       event.preventDefault();
       this._showHeaderContextMenu(gridColumnTarget(grid), event.clientX, event.clientY);
     });
-    grid.addEventListener('lv-grid-reshape', () => this._finder.dropOnReshape());
+    grid.addEventListener('lv-grid-reshape', () => void this._finder.rerun());
     grid.addEventListener('lv-grid-select', inspector.select);
     grid.addEventListener('lv-grid-locate', inspector.locate);
 

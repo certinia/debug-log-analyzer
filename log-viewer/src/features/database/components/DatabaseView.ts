@@ -145,7 +145,7 @@ export class DatabaseView extends LitElement {
     this.renderRoot.addEventListener('grid-selection', (event) =>
       this._onGridSelection(event as GridSelectionEvent),
     );
-    this.renderRoot.addEventListener('grid-reshape', () => this._finder.dropOnReshape());
+    this.renderRoot.addEventListener('grid-reshape', () => void this._finder.rerun());
     // The same for the pointer, which marks rather than picks.
     this.renderRoot.addEventListener('grid-locate', (event) =>
       eventBus.emit('detail:locate', {
@@ -324,10 +324,11 @@ export class DatabaseView extends LitElement {
     }
   }
 
-  private _toggle(kind: SectionKind) {
+  private async _toggle(kind: SectionKind) {
     this.collapsed = { ...this.collapsed, [kind]: !this.collapsed[kind] };
-    // A section takes its grid with it or brings a new one, so the widget's numbering no longer holds.
-    this._finder.dropOnReshape();
+    // A section takes its grid with it, or brings a new one in the next render.
+    await this.updateComplete;
+    void this._finder.rerun();
   }
 
   /** Cumulative limits are only present when the log recorded a usage snapshot. */

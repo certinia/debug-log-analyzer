@@ -1093,7 +1093,7 @@ export class ApexLogTimeline {
     }
 
     const customEvent = event as CustomEvent<FindEventDetail>;
-    const { text, options } = customEvent.detail;
+    const { text, options, count } = customEvent.detail;
     if (!text) {
       this.handleFindClose();
       return;
@@ -1110,11 +1110,15 @@ export class ApexLogTimeline {
     }
 
     // Dispatch results
+    // The cursor starts on the first match, moved to or not.
     this.dispatchFindResults(this.searchCursor.total);
 
     // Navigate to first match (cursor handles centering, tooltip, and render)
-    if (this.searchCursor.total > 0) {
+    if (this.searchCursor.total > 0 && count) {
       this.searchCursor.first();
+    } else if (this.searchCursor.total > 0) {
+      // A selected frame hides the search marks; moving to a match would have cleared it.
+      this.flamechart.clearSelection();
     }
   };
 
@@ -1158,7 +1162,9 @@ export class ApexLogTimeline {
     // Clear search state (FlameChart handles render)
     this.flamechart.clearSearch();
 
-    document.dispatchEvent(new CustomEvent('lv-find-results', { detail: { totalMatches: 0 } }));
+    document.dispatchEvent(
+      new CustomEvent('lv-find-results', { detail: { totalMatches: 0, currentMatch: 0 } }),
+    );
   };
 
   /**
@@ -1178,7 +1184,10 @@ export class ApexLogTimeline {
    * Dispatch lv-find-results event with match count.
    */
   private dispatchFindResults(totalMatches: number): void {
-    const detail: FindResultsEventDetail = { totalMatches };
+    const detail: FindResultsEventDetail = {
+      totalMatches,
+      currentMatch: Math.min(1, totalMatches),
+    };
     const event = new CustomEvent('lv-find-results', {
       detail,
       bubbles: true,
