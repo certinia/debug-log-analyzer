@@ -349,6 +349,8 @@ export class LvGrid<R extends object = object> extends LitElement {
     }
     found.current = match;
     if (match < 0) {
+      // A scroll held while hidden would bring back a match no longer current.
+      this.view?.cancelScroll();
       this.view?.setFind(found);
       return;
     }

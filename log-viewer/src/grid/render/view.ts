@@ -212,6 +212,11 @@ export class GridView<R extends object> {
     this.virtualizer.scrollToIndex(index, { align });
   }
 
+  /** Drops a scroll asked for while hidden, so showing the view does not go there. */
+  cancelScroll(): void {
+    this.pendingScroll = null;
+  }
+
   /** Call when anything above the body, like the header, changes height. */
   remeasure(): void {
     if (!this.visible) {
