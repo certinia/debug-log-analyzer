@@ -320,6 +320,31 @@ export class LvGrid<R extends object = object> extends LitElement {
   }
 
   /**
+   * Searches again, as {@link find} does, after the rows or columns changed, and keeps the
+   * current match on its row: the same match in that row, else the row's first. It marks it
+   * without opening or scrolling to it. `current` is -1 when the row has no match now, or no
+   * match was current. Null when a newer find, a clear or a rebuild replaced the search.
+   */
+  async refind(query: FindQuery): Promise<{ total: number; current: number } | null> {
+    const last = this.found;
+    const row = last && last.current >= 0 ? last.result.rowOf(last.current) : undefined;
+    const offset = last && row ? last.current - last.result.firstMatchIn(row) : 0;
+    const total = await this.find(query);
+    if (total < 0) {
+      return null;
+    }
+    const found = this.found;
+    const first = found && row ? found.result.firstMatchIn(row) : -1;
+    const current =
+      first >= 0 && found?.result.rowOf(first + offset) === row ? first + offset : first;
+    if (found && current >= 0) {
+      found.current = current;
+      this.view?.setFind(found);
+    }
+    return { total, current };
+  }
+
+  /**
    * Opens the way to match `match` (numbered from 0) and marks it current. A row out of
    * view whole scrolls to the middle; one in view stays where it is. -1 marks no match
    * current, as when the current match is in another grid.

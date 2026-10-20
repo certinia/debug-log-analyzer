@@ -8,7 +8,10 @@ import type { FindEventDetail, FindEventMap } from '../../features/find/findEven
 import type { FindQuery, LvGrid } from '../../grid/index.js';
 
 /** The part of an lv-grid that find drives. */
-export type FindableGrid = Pick<LvGrid, 'find' | 'setCurrentMatch' | 'clearFind' | 'clientHeight'>;
+export type FindableGrid = Pick<
+  LvGrid,
+  'find' | 'refind' | 'setCurrentMatch' | 'clearFind' | 'clientHeight'
+>;
 
 export interface LvGridFindOptions {
   /**
@@ -21,10 +24,11 @@ export interface LvGridFindOptions {
 /**
  * The find widget's search over a host's lv-grids: it searches, reports the total in
  * `lv-find-results`, marks the widget's current match in the grid that holds it, and
- * drops the search when a grid is reshaped under it. A host with no grid shown answers
+ * searches again when a grid is reshaped under it. A host with no grid shown answers
  * nothing, which keeps the hidden tabs quiet.
  */
 export class LvGridFindController {
+  private readonly _host: ReactiveControllerHost;
   private readonly _options: LvGridFindOptions;
   private _query: FindQuery | null = null;
   // The grids the last search ran over, with each one's count.
@@ -33,6 +37,7 @@ export class LvGridFindController {
   private _searches = 0;
 
   constructor(host: ReactiveControllerHost, options: LvGridFindOptions) {
+    this._host = host;
     this._options = options;
     new DomListenerController<FindEventMap>(host, document, {
       'lv-find': (e) => void this.find(e),
@@ -86,11 +91,54 @@ export class LvGridFindController {
     }
   }
 
-  /** A sort, filter, grouping or view switch moves the matches, so their numbers no longer hold. */
-  dropOnReshape(): void {
-    if (this._query) {
-      this.clear();
+  /**
+   * Searches again after a sort, filter, grouping or view switch moved the matches, and
+   * reports the new total with the current match kept on its row, or none when that row
+   * has no match now. Neither scrolls nor opens a row. A host with no grid shown drops it.
+   */
+  async rerun(): Promise<void> {
+    const query = this._query;
+    if (!query) {
+      return;
     }
+    const search = ++this._searches;
+    // A section toggle or view switch brings its grid in the host's next render.
+    await this._host.updateComplete;
+    if (search !== this._searches) {
+      return;
+    }
+    const shown = this._shown();
+    if (!shown.length) {
+      this._drop();
+      return;
+    }
+    for (const grid of this._options.grids()) {
+      if (!shown.includes(grid)) {
+        grid.clearFind();
+      }
+    }
+    const found: { grid: FindableGrid; total: number; current: number }[] = [];
+    for (const grid of shown) {
+      const result = await grid.refind(query);
+      if (search !== this._searches) {
+        return;
+      }
+      if (!result) {
+        this.clear();
+        return;
+      }
+      found.push({ grid, ...result });
+    }
+    this._found = found.map(({ grid, total }) => ({ grid, total }));
+    let before = 0;
+    let currentMatch = 0;
+    for (const { total, current } of found) {
+      if (current >= 0 && !currentMatch) {
+        currentMatch = before + current + 1;
+      }
+      before += total;
+    }
+    report(this.totalMatches, currentMatch);
   }
 
   // `count` is from 1 across the grids, as the widget counts; 0 marks none.
@@ -118,6 +166,8 @@ export class LvGridFindController {
   }
 }
 
-function report(totalMatches: number): void {
-  document.dispatchEvent(new CustomEvent('lv-find-results', { detail: { totalMatches } }));
+function report(totalMatches: number, currentMatch?: number): void {
+  document.dispatchEvent(
+    new CustomEvent('lv-find-results', { detail: { totalMatches, currentMatch } }),
+  );
 }

@@ -1229,6 +1229,62 @@ describe('lv-grid find marks', () => {
     expect(highlights.marks()).toEqual([]);
   });
 
+  describe('refind', () => {
+    const current = (): string[] => highlights.marks('lv-grid-current-find-match');
+
+    it('keeps the current match on its row across a sort, and does not scroll to it', async () => {
+      const { grid } = await setup();
+      await grid.find({ text: 'b' });
+      await grid.setCurrentMatch(1);
+      const scroll = jest.spyOn(GridView.prototype, 'scrollToIndex');
+
+      grid.sort = { column: 'time', dir: 'desc' };
+      // b, then its children by time: b2, b1.
+      expect(await grid.refind({ text: 'b' })).toEqual({ total: 3, current: 2 });
+      await settle(grid);
+      expect(scroll).not.toHaveBeenCalled();
+      expect(current()).toEqual(['b']);
+    });
+
+    it('keeps the match within its row', async () => {
+      const { grid } = await setup({
+        source: {
+          ...source(),
+          roots: [
+            { key: 1, name: 'bb', time: 1, kind: 'x' },
+            { key: 2, name: 'b', time: 2, kind: 'x' },
+          ],
+        },
+      });
+      await grid.find({ text: 'b' });
+      await grid.setCurrentMatch(1);
+
+      grid.sort = { column: 'time', dir: 'desc' };
+      expect(await grid.refind({ text: 'b' })).toEqual({ total: 3, current: 2 });
+    });
+
+    it('holds no current match when its row is filtered out', async () => {
+      const { grid } = await setup();
+      await grid.find({ text: 'b' });
+      await grid.setCurrentMatch(1);
+
+      grid.filters = [{ test: (row: Node) => row.name !== 'b1' }];
+      expect(await grid.refind({ text: 'b' })).toEqual({ total: 2, current: -1 });
+      await settle(grid);
+      expect(current()).toEqual([]);
+      expect(highlights.marks().length).toBe(2);
+    });
+
+    it('answers null for a search a clear replaced', async () => {
+      const { grid } = await setup();
+      await grid.find({ text: 'b' });
+      const running = grid.refind({ text: 'b' });
+      grid.clearFind();
+
+      expect(await running).toBeNull();
+    });
+  });
+
   it('lets go of its marks when removed, and marks again when put back', async () => {
     const { grid, names } = await setup();
     await grid.find({ text: 'b' });

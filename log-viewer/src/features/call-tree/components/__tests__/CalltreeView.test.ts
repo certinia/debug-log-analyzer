@@ -616,4 +616,17 @@ describe('calltree-view find', () => {
     await settle();
     expect(results).toEqual([3]);
   });
+
+  it('searches again when the grid is reshaped under it', async () => {
+    const grid = shownGrid();
+    jest.spyOn(grid, 'find').mockResolvedValue(2);
+    jest.spyOn(grid, 'refind').mockResolvedValue({ total: 1, current: -1 });
+
+    await find('foo');
+    grid.dispatchEvent(new CustomEvent('lv-grid-reshape', { detail: { reason: 'sort' } }));
+    await settle();
+
+    expect(grid.refind).toHaveBeenCalledWith({ text: 'foo', matchCase: false });
+    expect(results).toEqual([2, 1]);
+  });
 });
