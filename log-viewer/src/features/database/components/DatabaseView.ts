@@ -79,6 +79,13 @@ export class DatabaseView extends LitElement {
   // The widget counts the three grids' matches as one list, in view order.
   private readonly _finder = new LvGridFindController(this, {
     grids: () => this._views.flatMap((view) => (view?.grid ? [view.grid] : [])),
+    unfold: async (grid) => {
+      const kind = this._gridsByKind.find(([, view]) => view?.grid === grid)?.[0];
+      if (kind && this.collapsed[kind]) {
+        this.collapsed = { ...this.collapsed, [kind]: false };
+        await this.updateComplete;
+      }
+    },
   });
 
   private readonly _inspector = new InspectorTabController(this, 'database', {
@@ -309,26 +316,23 @@ export class DatabaseView extends LitElement {
         .metrics="${this._sectionMetrics(kind)}"
         @section-toggle="${() => this._toggle(kind)}"
       ></database-section>
-      ${collapsed || !this.loaded ? nothing : this._renderTable(kind)}
+      ${this.loaded ? this._renderTable(kind, collapsed) : nothing}
     </div>`;
   }
 
-  private _renderTable(kind: SectionKind) {
+  private _renderTable(kind: SectionKind, hidden: boolean) {
     switch (kind) {
       case 'dml':
-        return html`<dml-view .lines="${this.dmlLines}"></dml-view>`;
+        return html`<dml-view ?hidden="${hidden}" .lines="${this.dmlLines}"></dml-view>`;
       case 'soql':
-        return html`<soql-view .lines="${this.soqlLines}"></soql-view>`;
+        return html`<soql-view ?hidden="${hidden}" .lines="${this.soqlLines}"></soql-view>`;
       case 'sosl':
-        return html`<sosl-view .lines="${this.soslLines}"></sosl-view>`;
+        return html`<sosl-view ?hidden="${hidden}" .lines="${this.soslLines}"></sosl-view>`;
     }
   }
 
-  private async _toggle(kind: SectionKind) {
+  private _toggle(kind: SectionKind) {
     this.collapsed = { ...this.collapsed, [kind]: !this.collapsed[kind] };
-    // A section takes its grid with it, or brings a new one in the next render.
-    await this.updateComplete;
-    void this._finder.rerun();
   }
 
   /** Cumulative limits are only present when the log recorded a usage snapshot. */

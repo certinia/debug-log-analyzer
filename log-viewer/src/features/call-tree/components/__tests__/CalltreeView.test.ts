@@ -582,8 +582,8 @@ describe('calltree-view find', () => {
     if (!grid) {
       throw new Error('no grid');
     }
-    // jsdom does no layout, and find skips a grid that is not on screen.
-    Object.defineProperty(grid, 'clientHeight', { value: 100 });
+    // jsdom does no layout, and find answers nothing for a view that is not on screen.
+    Object.defineProperty(view, 'clientHeight', { configurable: true, value: 100 });
     jest.spyOn(grid, 'setCurrentMatch').mockResolvedValue();
     return grid;
   }
@@ -641,7 +641,6 @@ describe('calltree-view find', () => {
     const cleared = jest.spyOn(timeOrder, 'clearFind');
     await find('foo');
     // The new view's grid is made during the switch, so only its class can be stubbed.
-    const height = jest.spyOn(Element.prototype, 'clientHeight', 'get').mockReturnValue(100);
     const gridFind = jest
       .spyOn(Object.getPrototypeOf(timeOrder) as typeof timeOrder, 'find')
       .mockResolvedValue({ total: 1, current: -1 });
@@ -654,7 +653,6 @@ describe('calltree-view find', () => {
       expect(results[0]).toBe(2);
       expect(results.at(-1)).toBe(1);
     } finally {
-      height.mockRestore();
       gridFind.mockRestore();
     }
   });

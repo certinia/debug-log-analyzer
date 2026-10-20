@@ -10,9 +10,8 @@ import { afterEach, beforeEach, describe, expect, it, jest } from '@jest/globals
 import { fakeHost, type FakeHost } from '#test-helpers/fakeHost.js';
 import { LvGridFindController, type FindableGrid } from '../LvGridFindController.js';
 
-function gridStub(total = 3, clientHeight = 20) {
+function gridStub(total = 3) {
   return {
-    clientHeight,
     find: jest.fn(async (_query: unknown): Promise<{ total: number; current: number } | null> => ({
       total,
       current: -1,
@@ -31,7 +30,8 @@ const findEvent = (
 ) => new CustomEvent(type, { detail: { text, count, options: { matchCase } } });
 
 describe('LvGridFindController', () => {
-  let host: FakeHost;
+  let host: FakeHost & HTMLElement;
+  let height: number;
   let grids: Stub[];
   let reported: number[];
   // The widget's current match each report gave, from 1; 0 for none.
@@ -46,7 +46,9 @@ describe('LvGridFindController', () => {
   };
 
   beforeEach(() => {
-    host = fakeHost();
+    host = fakeHost(document.createElement('div'));
+    height = 20;
+    Object.defineProperty(host, 'clientHeight', { get: () => height });
     grids = [gridStub()];
     reported = [];
     positions = [];
@@ -88,31 +90,26 @@ describe('LvGridFindController', () => {
     expect(grids[0]?.find).toHaveBeenCalledTimes(searches);
   });
 
-  it('answers nothing while no grid is shown, and searches a new query once shown', async () => {
+  it('answers nothing while the host is off screen', async () => {
     await finder.find(findEvent('lv-find', 'foo'));
     const grid = grids[0];
-    Object.assign(grid ?? {}, { clientHeight: 0 });
+    height = 0;
     await finder.find(findEvent('lv-find', 'bar'));
     await finder.find(findEvent('lv-find-match', 'bar', { count: 2 }));
 
     expect(grid?.find).toHaveBeenCalledTimes(1);
     expect(grid?.setCurrentMatch).toHaveBeenCalledTimes(1);
     expect(reported).toEqual([3]);
-
-    Object.assign(grid ?? {}, { clientHeight: 20 });
-    await finder.find(findEvent('lv-find', 'bar'));
-    expect(grid?.find).toHaveBeenLastCalledWith({ text: 'bar', matchCase: false });
-    expect(reported).toEqual([3, 3]);
   });
 
-  it('keeps the newest query while no grid is shown, and searches it once one is', async () => {
+  it('keeps the newest query while the host is off screen, and searches it once shown', async () => {
     await finder.find(findEvent('lv-find', 'foo'));
     const grid = grids[0];
-    Object.assign(grid ?? {}, { clientHeight: 0 });
+    height = 0;
     await finder.find(findEvent('lv-find', 'bar'));
     expect(grid?.clearFind).toHaveBeenCalledTimes(1);
 
-    Object.assign(grid ?? {}, { clientHeight: 20 });
+    height = 20;
     await finder.rerun();
     expect(grid?.find).toHaveBeenLastCalledWith({ text: 'bar', matchCase: false });
     expect(reported).toEqual([3, 3]);
@@ -202,19 +199,15 @@ describe('LvGridFindController', () => {
       expect(grids[0]?.setCurrentMatch.mock.calls).toEqual([[0]]);
     });
 
-    it('clears a grid no longer shown, and drops the search when none is', async () => {
+    it('clears every grid when the host is off screen', async () => {
       grids = [gridStub(), gridStub()];
       await finder.find(findEvent('lv-find', 'update'));
-      Object.assign(grids[1] ?? {}, { clientHeight: 0 });
+      height = 0;
       await finder.rerun();
-      expect(grids[1]?.clearFind).toHaveBeenCalledTimes(1);
-      expect(reported).toEqual([6, 3]);
 
-      Object.assign(grids[0] ?? {}, { clientHeight: 0 });
-      await finder.rerun();
-      expect(grids[0]?.clearFind).toHaveBeenCalledTimes(1);
+      expect(grids.map((grid) => grid.clearFind.mock.calls.length)).toEqual([1, 1]);
       expect(finder.totalMatches).toBe(0);
-      expect(reported).toEqual([6, 3]);
+      expect(reported).toEqual([6]);
     });
 
     it('clears the search when a rebuild replaced it', async () => {
@@ -255,6 +248,73 @@ describe('LvGridFindController', () => {
       await running;
 
       expect(reported).not.toContain(9);
+    });
+  });
+
+  describe('with folded grids', () => {
+    let calls: string[];
+    // An unfold of the second grid waits on this while it is set.
+    let held: Promise<void> | null;
+    let folded: LvGridFindController;
+
+    beforeEach(() => {
+      calls = [];
+      held = null;
+      grids = [gridStub(2), gridStub(3)];
+      grids.forEach((grid, i) =>
+        grid.setCurrentMatch.mockImplementation(async (match) => {
+          calls.push(`mark ${i}:${match}`);
+        }),
+      );
+      folded = new LvGridFindController(host, {
+        grids: () => grids as unknown as FindableGrid[],
+        unfold: async (grid) => {
+          const i = grids.indexOf(grid as unknown as Stub);
+          calls.push(`unfold ${i}`);
+          if (i === 1 && held) {
+            await held;
+          }
+        },
+      });
+    });
+
+    it('unfolds the grid that holds a match before a step marks it', async () => {
+      await folded.find(findEvent('lv-find', 'update', { count: 1 }));
+      calls = [];
+      await folded.find(findEvent('lv-find-match', 'update', { count: 4 }));
+
+      expect(calls.indexOf('unfold 1')).toBeGreaterThanOrEqual(0);
+      expect(calls.indexOf('unfold 1')).toBeLessThan(calls.indexOf('mark 1:1'));
+    });
+
+    it('unfolds the grid of the first match for a new search', async () => {
+      grids[0]?.find.mockResolvedValueOnce({ total: 0, current: -1 });
+      await folded.find(findEvent('lv-find', 'update', { count: 1 }));
+
+      expect(calls).toContain('unfold 1');
+    });
+
+    it('marks the kept match on a rerun without unfolding its grid', async () => {
+      await folded.find(findEvent('lv-find', 'update'));
+      grids[1]?.find.mockResolvedValueOnce({ total: 3, current: 1 });
+      calls = [];
+      await folded.rerun();
+
+      expect(calls).toContain('mark 1:1');
+      expect(calls.filter((call) => call.startsWith('unfold'))).toEqual([]);
+    });
+
+    it('marks nothing for a step a newer one replaced while it unfolded', async () => {
+      await folded.find(findEvent('lv-find', 'update', { count: 1 }));
+      let open: () => void = () => undefined;
+      held = new Promise((resolve) => (open = resolve));
+      const slow = folded.find(findEvent('lv-find-match', 'update', { count: 4 }));
+      await folded.find(findEvent('lv-find-match', 'update', { count: 2 }));
+      open();
+      await slow;
+
+      expect(grids[1]?.setCurrentMatch.mock.calls.at(-1)).toEqual([-1]);
+      expect(grids[0]?.setCurrentMatch.mock.calls.at(-1)).toEqual([1]);
     });
   });
 });

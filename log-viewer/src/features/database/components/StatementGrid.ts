@@ -188,6 +188,10 @@ export abstract class StatementGrid<R extends StatementRow, L> extends LitElemen
         width: 100%;
       }
 
+      :host([hidden]) {
+        display: none;
+      }
+
       lv-app-grid {
         --grid-max-height: 70vh;
 

@@ -395,7 +395,7 @@ describe('analysis-view', () => {
   });
 
   it('searches again when the grid is reshaped under it', async () => {
-    jest.spyOn(grid(), 'clientHeight', 'get').mockReturnValue(100);
+    Object.defineProperty(view, 'clientHeight', { configurable: true, value: 100 });
     jest
       .spyOn(grid(), 'find')
       .mockResolvedValueOnce({ total: 2, current: -1 })
