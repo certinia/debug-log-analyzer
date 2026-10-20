@@ -323,7 +323,7 @@ export class GridStore<R extends object> {
 
   /**
    * Counts `query` in each searched cell of every row that passes the filters, open or
-   * not, in display order. Group rows are not searched. Null when a newer find, or a
+   * not, in display order, and in each group row's key. Null when a newer find, or a
    * change to the rows, lands while it runs.
    */
   async find(query: FindQuery, cells: readonly CellText<R>[]): Promise<FindResult<R> | null> {
@@ -338,14 +338,8 @@ export class GridStore<R extends object> {
     if (!found.searches) {
       return found.result(this.key);
     }
-    const done = await this.eachRow(
-      true,
-      sliceTimer(this.scheduler, stale),
-      (entry, _depth, up) => {
-        if (!(entry instanceof Group)) {
-          found.visit(entry, up);
-        }
-      },
+    const done = await this.eachRow(true, sliceTimer(this.scheduler, stale), (entry, _depth, up) =>
+      found.visit(entry, up),
     );
     return done && !stale() ? found.result(this.key) : null;
   }

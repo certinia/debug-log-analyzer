@@ -327,7 +327,9 @@ export class LvGrid<R extends object = object> extends LitElement {
       last?.result.pattern?.flags === result.pattern?.flags;
     const first = row && same ? result.firstMatchIn(row) : -1;
     const kept = first + offset;
-    const current = first >= 0 && result.rowOf(kept) === row ? kept : first;
+    const keptRow = result.rowOf(kept);
+    const inRow = keptRow !== undefined && result.firstMatchIn(keptRow) === first;
+    const current = first >= 0 && inRow ? kept : first;
     this.found = result.pattern ? { result, current } : null;
     this.view?.setFind(this.found);
     const detail = { total: result.total, current };
@@ -350,7 +352,12 @@ export class LvGrid<R extends object = object> extends LitElement {
       this.view?.setFind(found);
       return;
     }
-    const index = (await this.store?.reveal(found.result.pathOf(match))) ?? -1;
+    const row = found.result.rowOf(match);
+    // A group row is always on screen: there is no path to open.
+    const index =
+      row instanceof Group
+        ? (this.shown?.indexOf(row) ?? -1)
+        : ((await this.store?.reveal(found.result.pathOf(match))) ?? -1);
     await this.updateComplete;
     if (index >= 0) {
       this.bringIntoView(index, false);

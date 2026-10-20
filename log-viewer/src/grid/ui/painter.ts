@@ -38,11 +38,14 @@ const twisty = (expandable: boolean, expanded: boolean): TemplateResult =>
 function groupCells<R>(group: Group<R>, columns: readonly GridColumn<R>[], open: boolean) {
   return columns.map(
     (column, i) =>
-      html`<div class=${cellClass(column, i === 0)} role="gridcell">
+      html`<div class=${cellClass(column, i === 0)} role="gridcell" ?data-grid-find=${i === 0}>
         ${
           i === 0
             ? html`${twisty(true, open)}<span class="content"
-                  >${column.groupCell?.(group) ?? `${group.key} (${group.rows.length})`}</span
+                  >${
+                    column.groupCell?.(group) ??
+                    html`<span data-grid-find-text>${group.key}</span> (${group.rows.length})`
+                  }</span
                 >`
             : column.calc
               ? total(column, group.totals[column.id])

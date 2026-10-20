@@ -1241,6 +1241,21 @@ describe('lv-grid find marks', () => {
     expect(highlights.marks()).toEqual([]);
   });
 
+  it("finds and marks a group row's key, not its count", async () => {
+    const { grid } = await setup({ groupBy: (row) => row.kind });
+    const current = (): string[] => highlights.marks('lv-grid-current-find-match');
+
+    expect((await grid.find({ text: 'x' }))?.total).toBe(1);
+    expect((await grid.find({ text: '(' }))?.total).toBe(0);
+    await grid.find({ text: 'x' });
+    await grid.setCurrentMatch(0);
+    await settle(grid);
+    expect(current()).toEqual(['x']);
+
+    grid.sort = { column: 'time', dir: 'desc' };
+    expect(await grid.find({ text: 'x' })).toEqual({ total: 1, current: 0 });
+  });
+
   describe('a search again', () => {
     const current = (): string[] => highlights.marks('lv-grid-current-find-match');
 
