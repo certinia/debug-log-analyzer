@@ -24,6 +24,7 @@ import {
   dispatchInspectorReveal,
 } from '../../../components/inspectorReveal.js';
 import { TeardownController } from '../../../core/events/TeardownController.js';
+import { describeLevelGap } from '../../../core/log/levelCapabilities.js';
 import { logContext } from '../../../core/log/logContext.js';
 import type { LogStore } from '../../../core/log/LogStore.js';
 import { sum, type GridColumn, type TreeSource } from '../../../grid/index.js';
@@ -145,7 +146,7 @@ export class DatabaseTime extends LitElement {
       <lv-app-grid
         ${ref(this._grid)}
         .label=${'Database call tree'}
-        .placeholder=${NO_STATEMENTS}
+        .placeholder=${describeLevelGap(this.logStore?.levelGap('queries'), NO_STATEMENTS)}
         .source=${this._source}
         .columns=${this._columns}
         .marked=${this._inspector.marked}

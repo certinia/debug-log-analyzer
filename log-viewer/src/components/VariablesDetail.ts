@@ -17,12 +17,12 @@ import {
 } from '../core/log/aggregateVariables.js';
 import {
   frameVariablesFor,
-  recordsVariables,
   variableIndex,
   type FrameVariables,
   type VariableIndex,
 } from '../core/log/frameVariables.js';
 import { TeardownController } from '../core/events/TeardownController.js';
+import { describeLevelGap } from '../core/log/levelCapabilities.js';
 import { logContext } from '../core/log/logContext.js';
 import type { LogStore } from '../core/log/LogStore.js';
 import { previewOf, RAW_CLAMP_CHARS, type VariableValue } from '../core/log/variableValue.js';
@@ -430,8 +430,9 @@ export class VariablesDetail extends LitElement {
     if (!log) {
       return nothing;
     }
-    if (!recordsVariables(log)) {
-      return note('Variables available with the Apex Code log level at FINEST.');
+    const gap = this.logStore?.levelGap('variables');
+    if (gap) {
+      return note(describeLevelGap(gap));
     }
     if (this._readError) {
       return note('Could not read the log for variables.');
@@ -495,7 +496,7 @@ export class VariablesDetail extends LitElement {
 
   private async _read(): Promise<void> {
     const store = this.logStore;
-    if (!store || !recordsVariables(store.log)) {
+    if (!store || store.levelGap('variables')) {
       return;
     }
     try {

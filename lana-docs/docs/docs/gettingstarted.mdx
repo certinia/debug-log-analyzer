@@ -67,16 +67,20 @@ Open the Command Palette (`Cmd/Ctrl+Shift+P`) and run **Log: Retrieve Apex Log A
 ## ⚙️ Recommended Debug Log Levels
 
 - Set `APEX_CODE` level to `FINE` or higher - lower levels may omit important execution details.
-- Be aware that higher debug levels introduce logging overhead, which can inflate recorded execution times.
+- Timing overhead increases with log level. All logging adds some, and short methods show it most. Compare timings inside one log, not between logs captured at different levels.
 - Avoid truncated logs - they can result in incomplete or misleading analysis.
 - Recommended settings for a good balance of detail and performance: `APEX_CODE,FINE; APEX_PROFILING,FINE; CALLOUT,INFO; DB,FINEST; NBA,INFO; SYSTEM,DEBUG; VALIDATION,INFO; VISUALFORCE,FINE; WAVE,INFO; WORKFLOW,FINE`
+- For the most detail, with more timing overhead: `APEX_CODE,FINEST; APEX_PROFILING,FINEST; CALLOUT,INFO; DB,FINEST; NBA,INFO; SYSTEM,DEBUG; VALIDATION,INFO; VISUALFORCE,FINE; WAVE,INFO; WORKFLOW,FINER`
 
 Some features need a higher level than the recommended settings:
 
-| Feature                                                                                             | Needs                           |
-| --------------------------------------------------------------------------------------------------- | ------------------------------- |
-| [Variables](./features/inspector.md#variables) in the inspector                                     | `APEX_CODE` at `FINEST`         |
-| [Flow and Process Builder usage](./features/governor-limits-heap.md#flow-and-process-builder-usage) | `WORKFLOW` at `FINER` or higher |
+| Feature                                                                                             | Needs                            |
+| --------------------------------------------------------------------------------------------------- | -------------------------------- |
+| [Variables](./features/inspector.md#variables) in the inspector                                     | `APEX_CODE` at `FINEST`          |
+| [Heap per allocation](./features/governor-limits-heap.md#heap-net-gross-and-peak)                   | `APEX_CODE` at `FINER` or higher |
+| [Flow and Process Builder usage](./features/governor-limits-heap.md#flow-and-process-builder-usage) | `WORKFLOW` at `FINER` or higher  |
+
+When a level is why a section or a value is empty, the section or its tooltip names the level it needs.
 
 ## Next steps
 

@@ -7,6 +7,7 @@ import { LitElement, css, html, type TemplateResult } from 'lit';
 import { customElement, property } from 'lit/decorators.js';
 import { ifDefined } from 'lit/directives/if-defined.js';
 
+import { describeLevelGap } from '../core/log/levelCapabilities.js';
 import { logContext } from '../core/log/logContext.js';
 import type { LogStore } from '../core/log/LogStore.js';
 import {
@@ -210,7 +211,9 @@ export class EventVitals extends LitElement {
     if (this.type !== 'soql' || !(event instanceof SOQLExecuteBeginLine)) {
       return;
     }
-    const explain = event.children[0];
+    // The plan the log holds, which a DB level lowered in the header would hide.
+    const captured = this.logStore?.captured.eventByIndex(event.eventIndex);
+    const explain = (captured instanceof SOQLExecuteBeginLine ? captured : event).children[0];
     this._row(rows, 'Selective', this._selectivityPill(explain?.relativeCost ?? null));
     if (explain) {
       const plan = [
@@ -325,7 +328,8 @@ export class EventVitals extends LitElement {
 
   private _selectivityPill(relativeCost: number | null) {
     if (relativeCost === null || relativeCost === undefined) {
-      return html`<span class="value">Unknown</span>`;
+      const why = describeLevelGap(this.logStore?.captured.levelGap('queryPlans'));
+      return html`<span class="value" title=${ifDefined(why || undefined)}>Unknown</span>`;
     }
     const cost = qualifier(`cost ${relativeCost}`);
     return relativeCost <= 1

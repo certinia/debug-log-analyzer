@@ -18,11 +18,33 @@ type Level = Exclude<LogLevel, ''>;
 /** Coarsest first, as the parser declares them: a level shows every event at its own rank or below. */
 export const LEVEL_ORDER: readonly Level[] = Object.values(LOG_LEVEL);
 
+/** The token the log's settings line names each category by; `DebugLevels` keys them in camelCase. */
+export const LOG_TOKEN: Record<keyof DebugLevels, string> = {
+  apexCode: 'APEX_CODE',
+  apexProfiling: 'APEX_PROFILING',
+  callout: 'CALLOUT',
+  dataAccess: 'DATA_ACCESS',
+  database: 'DB',
+  nba: 'NBA',
+  system: 'SYSTEM',
+  validation: 'VALIDATION',
+  visualforce: 'VISUALFORCE',
+  wave: 'WAVE',
+  workflow: 'WORKFLOW',
+};
+
 const RANK = new Map<Level, number>(LEVEL_ORDER.map((level, rank) => [level, rank]));
 
 /** The position of `level` in {@link LEVEL_ORDER}, or -1 for a level the log did not state. */
 export function levelRank(level: LogLevel | undefined): number {
   return level ? (RANK.get(level) ?? -1) : -1;
+}
+
+const capturedFrom = new WeakMap<ApexLog, ApexLog>();
+
+/** The log `log` was filtered from by {@link filterByLevels}, or `log` itself. */
+export function capturedOf(log: ApexLog): ApexLog {
+  return capturedFrom.get(log) ?? log;
 }
 
 // The parser gives every USER_DEBUG line DEBUG, but Salesforce filters it by the level it was written at.
@@ -168,6 +190,7 @@ export class LevelFilterBuilder {
     root.exceptions = this.kept(original.exceptions);
     root.entryPoints = this.kept(original.entryPoints) as CodeUnitStartedLine[];
     root.truncatedEvents = this.kept(original.truncatedEvents);
+    capturedFrom.set(root, original);
     return root;
   }
 

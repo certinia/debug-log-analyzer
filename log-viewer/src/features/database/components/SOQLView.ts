@@ -6,6 +6,8 @@ import { customElement } from 'lit/decorators.js';
 
 import type { SOQLExecuteBeginLine } from '@apexdevtools/apex-log-parser';
 import { countColumn, textColumn } from '../../../components/grid/columns.js';
+import { describeLevelGap } from '../../../core/log/levelCapabilities.js';
+import { currentLogStore } from '../../../core/log/LogStore.js';
 import { getCallerNamespace } from '../../../core/utility/CallerNamespace.js';
 import type { GridColumn } from '../../../grid/index.js';
 import { SOQL_VIEWS } from '../../../components/grid/ColumnViews.js';
@@ -35,6 +37,13 @@ interface SOQLRow extends StatementRow {
   fields: string | null;
 }
 
+function noPlanNote(): string {
+  const why = describeLevelGap(currentLogStore()?.levelGap('queryPlans'));
+  return why
+    ? `Selectivity could not be determined. ${why}`
+    : 'Selectivity could not be determined.';
+}
+
 function selectiveColumn(): GridColumn<SOQLRow> {
   return {
     id: 'isSelective',
@@ -46,7 +55,7 @@ function selectiveColumn(): GridColumn<SOQLRow> {
     tooltip: ({ isSelective, relativeCost }) => {
       const title =
         isSelective === null
-          ? 'Selectivity could not be determined.'
+          ? noPlanNote()
           : isSelective
             ? 'Query is selective.'
             : 'Query is not selective.';

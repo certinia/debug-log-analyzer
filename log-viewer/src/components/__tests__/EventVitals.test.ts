@@ -6,6 +6,8 @@
 import { beforeAll, describe, expect, it } from '@jest/globals';
 import { parse } from '@apexdevtools/apex-log-parser';
 
+import { describeLevelGap } from '../../core/log/levelCapabilities.js';
+import { filterByLevels } from '../../core/log/levelFilter.js';
 import { logStoreFor, type LogStore } from '../../core/log/LogStore.js';
 
 // Avoid the heavy CodeBlock import chain (the soql formatter); the
@@ -172,6 +174,60 @@ describe('EventVitals', () => {
       [selective, notSelective].map((el) => el.shadowRoot?.querySelector('.pill')?.className),
     ).toEqual(['pill pill--yes', 'pill pill--no']);
     expect(notSelective.shadowRoot?.querySelector('.pill')?.textContent).toBe('Not selective');
+  });
+
+  it('names the DB level that would give an unknown selectivity its verdict', async () => {
+    const unexplained = parse(
+      '64.0 APEX_CODE,FINE;APEX_PROFILING,NONE;DB,INFO\n' +
+        '09:18:22.6 (6574780)|EXECUTION_STARTED\n' +
+        '17:33:36.2 (1672655920)|SOQL_EXECUTE_BEGIN|[198]|Aggregations:0|SELECT Id FROM Account\n' +
+        '17:33:36.2 (1680000000)|SOQL_EXECUTE_END|[198]|Rows:1\n' +
+        '09:18:22.6 (7400000)|EXECUTION_FINISHED\n',
+    );
+    const unexplainedStore = logStoreFor(unexplained);
+    const el = await mount(unexplainedStore, {
+      eventIndex: unexplained.eventsById.find((e) => e.text === 'SELECT Id FROM Account')!
+        .eventIndex,
+      type: 'soql',
+    });
+
+    // The row wraps the value in a `.value` of its own, so the verdict is the inner one.
+    const unknown = el.shadowRoot?.querySelector('.value .value');
+    expect(unknown?.textContent?.trim()).toBe('Unknown');
+    expect(unknown?.getAttribute('title')).toBe(
+      describeLevelGap(unexplainedStore.levelGap('queryPlans')),
+    );
+  });
+
+  it('gives an unknown selectivity no reason when the DB level is not to blame', async () => {
+    const unexplained = parse(
+      '64.0 APEX_CODE,FINE;APEX_PROFILING,NONE;DB,FINEST\n' +
+        '17:33:36.2 (1672655920)|SOQL_EXECUTE_BEGIN|[198]|Aggregations:0|SELECT Id FROM Account\n' +
+        '17:33:36.2 (1680000000)|SOQL_EXECUTE_END|[198]|Rows:1\n',
+    );
+    const el = await mount(logStoreFor(unexplained), {
+      eventIndex: unexplained.eventsById.find((e) => e.text === 'SELECT Id FROM Account')!
+        .eventIndex,
+      type: 'soql',
+    });
+
+    expect(el.shadowRoot?.querySelector('.value .value')?.getAttribute('title')).toBeNull();
+  });
+
+  it('keeps the query plan the log holds when the DB level is lowered', async () => {
+    const explained = parse(
+      '64.0 APEX_CODE,FINE;APEX_PROFILING,NONE;DB,FINEST\n' +
+        '17:33:36.2 (1672655920)|SOQL_EXECUTE_BEGIN|[198]|Aggregations:0|SELECT Id FROM Account\n' +
+        '17:33:36.2 (1672700000)|SOQL_EXECUTE_EXPLAIN|[198]|Index on Account : [Id], cardinality: 1, sobjectCardinality: 1, relativeCost 0.65\n' +
+        '17:33:36.2 (1680000000)|SOQL_EXECUTE_END|[198]|Rows:1\n',
+    );
+    const shown = await filterByLevels(explained, { database: 'INFO' });
+    const el = await mount(logStoreFor(shown!), {
+      eventIndex: explained.eventsById.find((e) => e.text === 'SELECT Id FROM Account')!.eventIndex,
+      type: 'soql',
+    });
+
+    expect(valueFor(el, 'Query plan')).toBe('Index on Account [Id]');
   });
 
   it('omits fields with no value', async () => {

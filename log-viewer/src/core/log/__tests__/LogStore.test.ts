@@ -4,6 +4,7 @@
 import { afterEach, describe, expect, it, jest } from '@jest/globals';
 
 import { indexesOf, storeOf } from '#test-helpers/apexLog.js';
+import { filterByLevels } from '../levelFilter.js';
 import type { LogIndex } from '../LogIndex.js';
 import { currentLogStore, LogStore, logStoreFor, setCurrentLog } from '../LogStore.js';
 
@@ -27,6 +28,22 @@ describe('LogStore', () => {
     expect(logStoreFor(log)).toBe(logStoreFor(log));
     expect(setCurrentLog(log)).toBe(currentLogStore());
     expect(currentLogStore()?.log).toBe(log);
+  });
+
+  it('links a log filtered by level to the store of the log as captured', async () => {
+    const { log, store } = storeOf(
+      '09:18:22.6 (1000)|SOQL_EXECUTE_BEGIN|[2]|Aggregations:0|SELECT Id FROM Account\n' +
+        '09:18:22.6 (1100)|SOQL_EXECUTE_EXPLAIN|[2]|Index on Account : [Id], cardinality: 1, sobjectCardinality: 10, relativeCost 0.1\n' +
+        '09:18:22.6 (1200)|SOQL_EXECUTE_END|[2]|Rows:1\n',
+      '64.0 APEX_CODE,FINEST;APEX_PROFILING,NONE;DB,FINEST\n',
+    );
+    const shown = await filterByLevels(log, { database: 'INFO' });
+    const filtered = logStoreFor(shown!); // non-null: no signal, so the build cannot abort
+
+    expect(store.captured).toBe(store);
+    expect(filtered.captured).toBe(store);
+    expect(store.levelGap('queryPlans')).toBeNull();
+    expect(filtered.levelGap('queryPlans')).toMatchObject({ kind: 'filtered', chosen: 'INFO' });
   });
 });
 
