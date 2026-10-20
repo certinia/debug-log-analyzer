@@ -1110,11 +1110,15 @@ export class ApexLogTimeline {
     }
 
     // Dispatch results
-    this.dispatchFindResults(this.searchCursor.total, count ? 1 : 0);
+    // The cursor starts on the first match, moved to or not.
+    this.dispatchFindResults(this.searchCursor.total);
 
     // Navigate to first match (cursor handles centering, tooltip, and render)
     if (this.searchCursor.total > 0 && count) {
       this.searchCursor.first();
+    } else if (this.searchCursor.total > 0) {
+      // A selected frame hides the search marks; moving to a match would have cleared it.
+      this.flamechart.clearSelection();
     }
   };
 
@@ -1179,10 +1183,10 @@ export class ApexLogTimeline {
   /**
    * Dispatch lv-find-results event with match count.
    */
-  private dispatchFindResults(totalMatches: number, start: number): void {
+  private dispatchFindResults(totalMatches: number): void {
     const detail: FindResultsEventDetail = {
       totalMatches,
-      currentMatch: Math.min(start, totalMatches),
+      currentMatch: Math.min(1, totalMatches),
     };
     const event = new CustomEvent('lv-find-results', {
       detail,
