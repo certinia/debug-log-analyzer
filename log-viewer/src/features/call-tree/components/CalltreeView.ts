@@ -551,6 +551,8 @@ export class CalltreeView extends LitElement {
       return;
     }
 
+    // The controller sees only the shown grid, so the one left behind would keep its marks.
+    this._activeGrid()?.clearFind();
     const switchEpoch = ++this.viewSwitchEpoch;
     this.viewMode = newMode;
     await this.updateComplete;

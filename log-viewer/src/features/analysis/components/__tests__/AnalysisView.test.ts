@@ -396,8 +396,10 @@ describe('analysis-view', () => {
 
   it('searches again when the grid is reshaped under it', async () => {
     jest.spyOn(grid(), 'clientHeight', 'get').mockReturnValue(100);
-    jest.spyOn(grid(), 'find').mockResolvedValue(2);
-    jest.spyOn(grid(), 'refind').mockResolvedValue({ total: 1, current: -1 });
+    jest
+      .spyOn(grid(), 'find')
+      .mockResolvedValueOnce({ total: 2, current: -1 })
+      .mockResolvedValueOnce({ total: 1, current: -1 });
     jest.spyOn(grid(), 'setCurrentMatch').mockResolvedValue(undefined);
     const totals: number[] = [];
     const heard = (e: Event) =>

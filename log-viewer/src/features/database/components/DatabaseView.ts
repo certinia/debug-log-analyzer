@@ -324,9 +324,10 @@ export class DatabaseView extends LitElement {
     }
   }
 
-  private _toggle(kind: SectionKind) {
+  private async _toggle(kind: SectionKind) {
     this.collapsed = { ...this.collapsed, [kind]: !this.collapsed[kind] };
-    // A section takes its grid with it or brings a new one, so the widget's numbering no longer holds.
+    // A section takes its grid with it, or brings a new one in the next render.
+    await this.updateComplete;
     void this._finder.rerun();
   }
 

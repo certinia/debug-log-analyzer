@@ -136,7 +136,10 @@ export class FindWidget extends LitElement {
           ></vs-icon-checkbox>
         </section>
       </vscode-textfield>
-      <div class="matches-count" role="status">${this._getMatchesText()}</div>
+      <div class="matches-count">
+        <span aria-hidden="true">${this._getMatchesText()}</span>
+        <span class="sr-only" role="status">${this._getMatchesSpoken()}</span>
+      </div>
 
       <div class="find-actions">
         <vscode-toolbar-button
@@ -170,6 +173,14 @@ export class FindWidget extends LitElement {
     }
 
     return (this.currentMatch || '?') + ' of ' + this.totalMatches;
+  }
+
+  // A reader says "?" as "question mark".
+  _getMatchesSpoken() {
+    if (this.totalMatches && !this.currentMatch) {
+      return `${this.totalMatches} ${this.totalMatches === 1 ? 'match' : 'matches'}`;
+    }
+    return this._getMatchesText();
   }
 
   _matchCase() {
@@ -239,7 +250,7 @@ export class FindWidget extends LitElement {
 
   _updateCounts(e: CustomEvent<FindResultsEventDetail>) {
     this.totalMatches = e.detail.totalMatches;
-    this.currentMatch = e.detail.currentMatch ?? 1;
+    this.currentMatch = e.detail.currentMatch;
   }
 
   _resetCounts() {

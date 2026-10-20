@@ -1158,7 +1158,9 @@ export class ApexLogTimeline {
     // Clear search state (FlameChart handles render)
     this.flamechart.clearSearch();
 
-    document.dispatchEvent(new CustomEvent('lv-find-results', { detail: { totalMatches: 0 } }));
+    document.dispatchEvent(
+      new CustomEvent('lv-find-results', { detail: { totalMatches: 0, currentMatch: 0 } }),
+    );
   };
 
   /**
@@ -1178,7 +1180,10 @@ export class ApexLogTimeline {
    * Dispatch lv-find-results event with match count.
    */
   private dispatchFindResults(totalMatches: number): void {
-    const detail: FindResultsEventDetail = { totalMatches };
+    const detail: FindResultsEventDetail = {
+      totalMatches,
+      currentMatch: Math.min(1, totalMatches),
+    };
     const event = new CustomEvent('lv-find-results', {
       detail,
       bubbles: true,

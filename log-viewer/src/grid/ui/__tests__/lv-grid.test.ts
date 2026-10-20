@@ -757,7 +757,7 @@ describe('lv-grid', () => {
     const last = fakeRowBoxes(ROW, 2);
     const scroll = jest.spyOn(GridView.prototype, 'scrollToIndex');
 
-    expect(await grid.find({ text: 'c' })).toBe(1);
+    expect((await grid.find({ text: 'c' }))?.total).toBe(1);
     await grid.setCurrentMatch(0);
     expect(scroll).not.toHaveBeenCalled();
     last.moveTo(8 * ROW + 1);
@@ -1203,7 +1203,7 @@ describe('lv-grid find marks', () => {
     const { grid } = await setup({
       source: { ...source(), roots: [{ key: 1, name: 'a a', time: 3, kind: 'x' }] },
     });
-    expect(await grid.find({ text: ' ' })).toBe(1);
+    expect((await grid.find({ text: ' ' }))?.total).toBe(1);
     await grid.setCurrentMatch(0);
     expect(highlights.marks()).toEqual([' ']);
   });
@@ -1225,11 +1225,11 @@ describe('lv-grid find marks', () => {
     const running = grid.find({ text: 'b' });
     grid.clearFind();
 
-    expect(await running).toBe(-1);
+    expect(await running).toBeNull();
     expect(highlights.marks()).toEqual([]);
   });
 
-  describe('refind', () => {
+  describe('a search again', () => {
     const current = (): string[] => highlights.marks('lv-grid-current-find-match');
 
     it('keeps the current match on its row across a sort, and does not scroll to it', async () => {
@@ -1240,7 +1240,7 @@ describe('lv-grid find marks', () => {
 
       grid.sort = { column: 'time', dir: 'desc' };
       // b, then its children by time: b2, b1.
-      expect(await grid.refind({ text: 'b' })).toEqual({ total: 3, current: 2 });
+      expect(await grid.find({ text: 'b' })).toEqual({ total: 3, current: 2 });
       await settle(grid);
       expect(scroll).not.toHaveBeenCalled();
       expect(current()).toEqual(['b']);
@@ -1260,7 +1260,7 @@ describe('lv-grid find marks', () => {
       await grid.setCurrentMatch(1);
 
       grid.sort = { column: 'time', dir: 'desc' };
-      expect(await grid.refind({ text: 'b' })).toEqual({ total: 3, current: 2 });
+      expect(await grid.find({ text: 'b' })).toEqual({ total: 3, current: 2 });
     });
 
     it('holds no current match when its row is filtered out', async () => {
@@ -1269,19 +1269,40 @@ describe('lv-grid find marks', () => {
       await grid.setCurrentMatch(1);
 
       grid.filters = [{ test: (row: Node) => row.name !== 'b1' }];
-      expect(await grid.refind({ text: 'b' })).toEqual({ total: 2, current: -1 });
+      expect(await grid.find({ text: 'b' })).toEqual({ total: 2, current: -1 });
       await settle(grid);
       expect(current()).toEqual([]);
       expect(highlights.marks().length).toBe(2);
     });
 
-    it('answers null for a search a clear replaced', async () => {
+    it('keeps the current match on its row across a group by', async () => {
       const { grid } = await setup();
       await grid.find({ text: 'b' });
-      const running = grid.refind({ text: 'b' });
-      grid.clearFind();
+      await grid.setCurrentMatch(1);
 
-      expect(await running).toBeNull();
+      grid.groupBy = (row) => row.kind;
+      expect(await grid.find({ text: 'b' })).toEqual({ total: 3, current: 1 });
+    });
+
+    it("moves to the row's first match when a hidden column takes the one it was on", async () => {
+      const { grid } = await setup({
+        source: { ...source(), roots: [{ key: 1, name: 'a1', time: 1, kind: 'x' }] },
+      });
+      await grid.find({ text: '1' });
+      await grid.setCurrentMatch(1);
+
+      grid.columns = columns().map((column) =>
+        column.id === 'name' ? { ...column, hidden: true } : column,
+      );
+      expect(await grid.find({ text: '1' })).toEqual({ total: 1, current: 0 });
+    });
+
+    it('keeps no current match for a new query', async () => {
+      const { grid } = await setup();
+      await grid.find({ text: 'b' });
+      await grid.setCurrentMatch(1);
+
+      expect(await grid.find({ text: 'b1' })).toEqual({ total: 1, current: -1 });
     });
   });
 

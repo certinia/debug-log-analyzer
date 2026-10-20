@@ -31,10 +31,9 @@ interface FakeLvGrid {
   clientHeight: number;
   current: number[];
   cleared: number;
-  /** The match a refind keeps current, or -1. */
+  /** The match a find keeps current, or -1. */
   kept: number;
-  find(): Promise<number>;
-  refind(): Promise<{ total: number; current: number }>;
+  find(): Promise<{ total: number; current: number }>;
   setCurrentMatch(index: number): Promise<void>;
   clearFind(): void;
 }
@@ -54,8 +53,7 @@ function fakeLvGrid(matches = 0): FakeLvGrid {
     current: [],
     cleared: 0,
     kept: -1,
-    find: async () => grid.matches,
-    refind: async () => ({ total: grid.matches, current: grid.kept }),
+    find: async () => ({ total: grid.matches, current: grid.kept }),
     setCurrentMatch: async (index) => void grid.current.push(index),
     clearFind: () => void (grid.cleared += 1),
   };
@@ -315,13 +313,16 @@ describe('database-view find', () => {
     expect(grids.map((grid) => grid.grid.cleared)).toEqual([0, 0, 0]);
   });
 
-  it('searches again over the shown grids when a section collapses', async () => {
+  it('searches again over the shown grids when a section collapses or expands', async () => {
     grids.forEach((grid) => (grid.grid.matches = 1));
     await rollUps(() => search());
     grids[1].grid.clientHeight = 0;
 
     expect(await rollUps(() => collapse(1))).toEqual([2]);
     expect(grids[1].grid.cleared).toBe(1);
+
+    grids[1].grid.clientHeight = 10;
+    expect(await rollUps(() => collapse(1))).toEqual([3]);
   });
 });
 

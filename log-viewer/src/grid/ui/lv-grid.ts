@@ -63,6 +63,8 @@ export interface GridContextDetail<R> extends GridRowDetail<R> {
 
 export interface GridFindDetail {
   total: number;
+  /** The current match, from 0; -1 for none. */
+  current: number;
 }
 
 export interface GridSort {
@@ -305,43 +307,32 @@ export class LvGrid<R extends object = object> extends LitElement {
   /**
    * Searches the text of every shown column with a `text`, over every row that passes the
    * filters, open or not. Marks the matches and reports the total in `lv-grid-find-results`.
+   * Searching the same query again, as after a sort or a filter, keeps the current match on
+   * its row: the same match in that row, else the row's first, marked without opening or
+   * scrolling to it. `current` is -1 when that row has no match now, or none was current.
+   * Null when a newer find, a clear or a rebuild replaced the search.
    */
-  async find(query: FindQuery): Promise<number> {
+  async find(query: FindQuery): Promise<GridFindDetail | null> {
     const cells = this.visibleColumns().flatMap((column) => (column.text ? [column.text] : []));
     const search = ++this.searches;
-    const result = await this.store?.find(query, cells);
-    if (!result || search !== this.searches) {
-      return -1;
-    }
-    this.found = result.pattern ? { result, current: -1 } : null;
-    this.view?.setFind(this.found);
-    this.emit<GridFindDetail>('lv-grid-find-results', { total: result.total });
-    return result.total;
-  }
-
-  /**
-   * Searches again, as {@link find} does, after the rows or columns changed, and keeps the
-   * current match on its row: the same match in that row, else the row's first. It marks it
-   * without opening or scrolling to it. `current` is -1 when the row has no match now, or no
-   * match was current. Null when a newer find, a clear or a rebuild replaced the search.
-   */
-  async refind(query: FindQuery): Promise<{ total: number; current: number } | null> {
     const last = this.found;
     const row = last && last.current >= 0 ? last.result.rowOf(last.current) : undefined;
     const offset = last && row ? last.current - last.result.firstMatchIn(row) : 0;
-    const total = await this.find(query);
-    if (total < 0) {
+    const result = await this.store?.find(query, cells);
+    if (!result || search !== this.searches) {
       return null;
     }
-    const found = this.found;
-    const first = found && row ? found.result.firstMatchIn(row) : -1;
-    const current =
-      first >= 0 && found?.result.rowOf(first + offset) === row ? first + offset : first;
-    if (found && current >= 0) {
-      found.current = current;
-      this.view?.setFind(found);
-    }
-    return { total, current };
+    const same =
+      last?.result.pattern?.source === result.pattern?.source &&
+      last?.result.pattern?.flags === result.pattern?.flags;
+    const first = row && same ? result.firstMatchIn(row) : -1;
+    const kept = first + offset;
+    const current = first >= 0 && result.rowOf(kept) === row ? kept : first;
+    this.found = result.pattern ? { result, current } : null;
+    this.view?.setFind(this.found);
+    const detail = { total: result.total, current };
+    this.emit<GridFindDetail>('lv-grid-find-results', detail);
+    return detail;
   }
 
   /**
