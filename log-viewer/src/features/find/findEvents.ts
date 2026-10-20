@@ -16,7 +16,8 @@ export interface FindEventDetail {
 
   /**
    * Match index for navigation (1-based).
-   * - `lv-find`: always 1 (start at the first match)
+   * - `lv-find`: 1 to start at the first match; 0 to search without moving, as when a
+   *   view is shown again
    * - `lv-find-match`: the current match number (1 to totalMatches)
    * - `lv-find-close`: always 0 (no active match)
    */
@@ -38,4 +39,6 @@ export interface FindEventMap {
   'lv-find-match': CustomEvent<FindEventDetail>;
   'lv-find-close': CustomEvent<FindEventDetail>;
   'lv-find-results': CustomEvent<FindResultsEventDetail>;
+  /** The shown view changed: the widget searches its text again, if it is open. */
+  'lv-find-refresh': CustomEvent<null>;
 }

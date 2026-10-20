@@ -1093,7 +1093,7 @@ export class ApexLogTimeline {
     }
 
     const customEvent = event as CustomEvent<FindEventDetail>;
-    const { text, options } = customEvent.detail;
+    const { text, options, count } = customEvent.detail;
     if (!text) {
       this.handleFindClose();
       return;
@@ -1110,10 +1110,10 @@ export class ApexLogTimeline {
     }
 
     // Dispatch results
-    this.dispatchFindResults(this.searchCursor.total);
+    this.dispatchFindResults(this.searchCursor.total, count ? 1 : 0);
 
     // Navigate to first match (cursor handles centering, tooltip, and render)
-    if (this.searchCursor.total > 0) {
+    if (this.searchCursor.total > 0 && count) {
       this.searchCursor.first();
     }
   };
@@ -1179,10 +1179,10 @@ export class ApexLogTimeline {
   /**
    * Dispatch lv-find-results event with match count.
    */
-  private dispatchFindResults(totalMatches: number): void {
+  private dispatchFindResults(totalMatches: number, start: number): void {
     const detail: FindResultsEventDetail = {
       totalMatches,
-      currentMatch: Math.min(1, totalMatches),
+      currentMatch: Math.min(start, totalMatches),
     };
     const event = new CustomEvent('lv-find-results', {
       detail,

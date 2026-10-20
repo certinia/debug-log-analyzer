@@ -24,7 +24,7 @@ export interface LvGridFindOptions {
  * The find widget's search over a host's lv-grids: it searches, reports the total in
  * `lv-find-results`, marks the widget's current match in the grid that holds it, and
  * searches again when a grid is reshaped under it. A host with no grid shown answers
- * nothing, which keeps the hidden tabs quiet.
+ * nothing, which keeps the hidden tabs quiet, but keeps the query to search once shown.
  */
 export class LvGridFindController {
   private readonly _options: LvGridFindOptions;
@@ -55,25 +55,30 @@ export class LvGridFindController {
       return;
     }
     const { text, options, count } = e.detail;
+    const query = { text, matchCase: options.matchCase };
     const isNew = text !== this._query?.text || options.matchCase !== this._query.matchCase;
     const shown = this._shown();
-    // A hidden host answers nothing, and forgets an older query, so a later rerun can't revive it.
+    // A hidden host answers nothing, but keeps the query, so it searches once shown.
     if (!shown.length) {
-      if (isNew && this._query) {
-        this._drop();
+      if (isNew) {
+        this._forget();
+        this._query = query;
       }
       return;
     }
-    if (isNew) {
-      const query = { text, matchCase: options.matchCase };
-      this._query = query;
-      if (!(await this._search(query, shown))) {
-        return;
+    if (!isNew) {
+      if (e.type === 'lv-find') {
+        await this.rerun();
+      } else if (!this._reruns) {
+        await this._markCurrent(count);
       }
-      report(this.totalMatches, Math.min(1, this.totalMatches));
-    } else if (this._reruns) {
       return;
     }
+    this._query = query;
+    if (!(await this._search(query, shown))) {
+      return;
+    }
+    report(this.totalMatches, count ? Math.min(1, this.totalMatches) : 0);
     await this._markCurrent(count);
   }
 
@@ -89,7 +94,7 @@ export class LvGridFindController {
    * Searches again after a sort, filter, grouping or view switch moved the matches, and
    * reports the new total with the current match kept on its row, or none when that row
    * has no match now. Neither scrolls nor opens a row. Call it once the grids to search
-   * are rendered. A host with no grid shown drops it.
+   * are rendered. A host with no grid shown clears its marks, and keeps the query.
    */
   async rerun(): Promise<void> {
     const query = this._query;
@@ -98,7 +103,7 @@ export class LvGridFindController {
     }
     const shown = this._shown();
     if (!shown.length) {
-      this._drop();
+      this._forget();
       return;
     }
     this._options
@@ -147,8 +152,13 @@ export class LvGridFindController {
   }
 
   private _drop(): void {
-    this._searches++;
     this._query = null;
+    this._forget();
+  }
+
+  // Clears the grids but keeps the query, as for a host hidden until it searches again.
+  private _forget(): void {
+    this._searches++;
     this._found = [];
     // Every grid, not only those the last search ended on: it stops a search still running.
     for (const grid of this._options.grids()) {

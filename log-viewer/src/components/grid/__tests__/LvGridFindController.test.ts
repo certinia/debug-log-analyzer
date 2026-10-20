@@ -78,7 +78,7 @@ describe('LvGridFindController', () => {
   });
 
   it.each([
-    ['does not search again for the same text and case option', 'update', false, 1],
+    ['searches the same query again, as when its view is shown again', 'update', false, 2],
     ['searches again when only the case option changed', 'update', true, 2],
     ['searches again when the text changed', 'insert', false, 2],
   ])('%s', async (_name, text, matchCase, searches) => {
@@ -105,17 +105,27 @@ describe('LvGridFindController', () => {
     expect(reported).toEqual([3, 3]);
   });
 
-  it('forgets an older query a new one replaced while no grid was shown', async () => {
+  it('keeps the newest query while no grid is shown, and searches it once one is', async () => {
     await finder.find(findEvent('lv-find', 'foo'));
     const grid = grids[0];
     Object.assign(grid ?? {}, { clientHeight: 0 });
     await finder.find(findEvent('lv-find', 'bar'));
+    expect(grid?.clearFind).toHaveBeenCalledTimes(1);
+
     Object.assign(grid ?? {}, { clientHeight: 20 });
     await finder.rerun();
+    expect(grid?.find).toHaveBeenLastCalledWith({ text: 'bar', matchCase: false });
+    expect(reported).toEqual([3, 3]);
+  });
 
-    expect(grid?.find).toHaveBeenCalledTimes(1);
-    expect(grid?.clearFind).toHaveBeenCalledTimes(1);
-    expect(reported).toEqual([3]);
+  it.each([
+    ['starts at the first match', 1, 1, [[0]]],
+    ['searches without moving', 0, 0, [[-1]]],
+  ])('for a new query, %s', async (_name, count, position, marks) => {
+    await finder.find(findEvent('lv-find', 'update', { count }));
+
+    expect(positions).toEqual([position]);
+    expect(grids[0]?.setCurrentMatch.mock.calls).toEqual(marks);
   });
 
   it('marks the widget count current, from 1, in the grid that holds it', async () => {
@@ -172,7 +182,7 @@ describe('LvGridFindController', () => {
 
     it('searches again and reports the current match where its grid kept it', async () => {
       grids = [gridStub(2), gridStub(3)];
-      await finder.find(findEvent('lv-find', 'update', { matchCase: true }));
+      await finder.find(findEvent('lv-find', 'update', { count: 1, matchCase: true }));
       grids[0]?.find.mockResolvedValueOnce({ total: 4, current: -1 });
       grids[1]?.find.mockResolvedValueOnce({ total: 1, current: 0 });
       await finder.rerun();
@@ -184,7 +194,7 @@ describe('LvGridFindController', () => {
     });
 
     it('reports no current match when no grid kept one', async () => {
-      await finder.find(findEvent('lv-find', 'update'));
+      await finder.find(findEvent('lv-find', 'update', { count: 1 }));
       await finder.rerun();
 
       expect(positions).toEqual([1, 0]);

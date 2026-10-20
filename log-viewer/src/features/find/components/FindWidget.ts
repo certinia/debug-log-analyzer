@@ -25,6 +25,7 @@ export class FindWidget extends LitElement {
 
   private readonly _findBus = new DomListenerController<FindEventMap>(this, document, {
     'lv-find-results': (e) => this._updateCounts(e),
+    'lv-find-refresh': () => this._refresh(),
   });
 
   private readonly _keyBus = new DomListenerController<WindowEventMap>(this, window, {
@@ -307,6 +308,16 @@ export class FindWidget extends LitElement {
         this.nextMatchDirection = true;
         break;
     }
+  }
+
+  _refresh() {
+    if (!this.isVisble || !this._getMatchValue()) {
+      return;
+    }
+    this._resetCounts();
+    const findEvt = this._getFindEvent();
+    findEvt.detail.count = 0;
+    document.dispatchEvent(new CustomEvent('lv-find', findEvt));
   }
 
   _triggerFind() {

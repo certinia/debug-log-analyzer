@@ -74,7 +74,7 @@ export interface GridSort {
 
 /** The rows or shown columns changed, so find's match numbers no longer hold. */
 export interface GridReshapeDetail {
-  reason: 'sort' | 'columns' | 'filter' | 'group';
+  reason: 'sort' | 'columns' | 'filter' | 'group' | 'source';
 }
 
 /**
@@ -432,6 +432,10 @@ export class LvGrid<R extends object = object> extends LitElement {
   }
 
   protected updated(changed: PropertyValues): void {
+    // After the render, so a new grid has its height when a listener asks which grids show.
+    if (changed.has('source') && this.source) {
+      this.emit<GridReshapeDetail>('lv-grid-reshape', { reason: 'source' });
+    }
     const snapshot = this.data.snapshot;
     this.toggleAttribute('busy', snapshot?.busy ?? false);
     if (snapshot?.failed !== this.failure) {

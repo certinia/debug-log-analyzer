@@ -15,7 +15,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Sort, expand and filter take under 0.2 s, group by is up to 9× faster, column resize is smooth and Find has no delay.
   - Screen reader and full keyboard support.
   - `Cmd/Ctrl+C` copies the filtered rows and their depth in each table, and the Analysis CSV export holds the same rows.
-- 🔍 **Find**: a search in the tables stays after a sort, filter, group by, column change, view switch or section collapse, and keeps your place. ([#986])
+- 🔍 **Find**: a search in the tables stays after a sort, filter, group by, column change, log level change, view switch, tab switch or section collapse, and keeps your place. ([#986])
 - ✂️ **Truncation**: each skipped section states how much of the log it dropped.
 - 🌊 **Flows**: names drop the `FLOW_START_INTERVIEWS :` and `WF_CRITERIA :` prefixes.
 - 📚 **Multiple logs**: a file holding several logs shows the first and flags the rest.

@@ -883,6 +883,18 @@ describe('lv-grid', () => {
     expect(reshapes).toEqual(['filter', 'filter', 'group']);
   });
 
+  it('reports a reshape on a new source', async () => {
+    const { grid } = await setup();
+    const reshapes: string[] = [];
+    grid.addEventListener('lv-grid-reshape', (e) =>
+      reshapes.push(detail<GridReshapeDetail>(e).reason),
+    );
+
+    grid.source = source();
+    await settle(grid);
+    expect(reshapes).toEqual(['source']);
+  });
+
   it('shows group rows that toggle on click and select from the keyboard', async () => {
     const { grid, names, rowNamed, key } = await setup({ groupBy: (row) => row.kind });
     expect(names()).toEqual(['x (2)', 'y (1)']);

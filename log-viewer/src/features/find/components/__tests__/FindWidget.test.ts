@@ -46,6 +46,25 @@ describe('FindWidget', () => {
   });
 
   it.each([
+    ['searches its text again without moving, when open', true, [{ text: 'foo', count: 0 }]],
+    ['does nothing when closed', false, []],
+  ])('on a refresh, %s', async (_name, open, searches) => {
+    const { widget } = await shown();
+    widget.isVisble = open;
+    Object.assign(widget.inputbox ?? {}, { value: 'foo' });
+    const seen: { text: string; count: number }[] = [];
+    const onFind = (e: Event): void => {
+      const { text, count } = (e as CustomEvent<{ text: string; count: number }>).detail;
+      seen.push({ text, count });
+    };
+    document.addEventListener('lv-find', onFind);
+    document.dispatchEvent(new CustomEvent('lv-find-refresh', { detail: null }));
+    document.removeEventListener('lv-find', onFind);
+
+    expect(seen).toEqual(searches);
+  });
+
+  it.each([
     ['Enter goes to the first', false, 1],
     ['Shift+Enter goes to the last', true, 5],
   ])('from no position, %s match', async (_name, shiftKey, match) => {
