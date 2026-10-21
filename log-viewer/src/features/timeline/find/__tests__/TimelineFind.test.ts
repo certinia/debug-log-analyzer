@@ -19,7 +19,7 @@ function setup(total = 3) {
       cursor = new SearchCursorImpl(matches);
       return total;
     }),
-    seekMatch: jest.fn((index: number) => void cursor?.seek(index)),
+    setCurrentMatch: jest.fn((index: number) => void cursor?.seek(index)),
     getSearchCursor: () => cursor,
     clearSearch: jest.fn(() => {
       cursor = undefined;
@@ -91,7 +91,7 @@ describe('TimelineFind', () => {
     await find.find(query('foo'));
     await find.setCurrentMatch(-1);
 
-    expect(chart.seekMatch).not.toHaveBeenCalled();
+    expect(chart.setCurrentMatch).not.toHaveBeenCalled();
   });
 
   it('leaves the chart still for a match a search again kept', async () => {
@@ -100,7 +100,7 @@ describe('TimelineFind', () => {
     await find.setCurrentMatch(1);
     await find.setCurrentMatch(1, true);
 
-    expect(chart.seekMatch).toHaveBeenCalledTimes(1);
+    expect(chart.setCurrentMatch).toHaveBeenCalledTimes(1);
   });
 
   it('clears the chart and searches the same query afresh after a clear', async () => {

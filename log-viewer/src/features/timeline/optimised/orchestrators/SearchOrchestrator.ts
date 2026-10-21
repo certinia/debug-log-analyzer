@@ -318,13 +318,34 @@ export class SearchOrchestrator<E extends EventNode = EventNode> {
   /**
    * Make match `index` (from 0) current: centre on it and show its panel. -1 makes none current.
    */
-  public seekMatch(index: number): void {
+  public setCurrentMatch(index: number): void {
     const match = this.eventMatcher?.getCursor()?.seek(index);
-    if (match) {
-      this.handleSearchNavigation(match);
-    } else {
+    if (!match) {
       this.callbacks.requestRender();
+      return;
     }
+    if (!this.viewport) {
+      return;
+    }
+
+    // Clear selection so search highlight shows
+    this.callbacks.onClearSelection();
+
+    // Center viewport on the match
+    this.callbacks.onCenterOnMatch(match.event.timestamp, match.event.duration, match.depth);
+
+    // Calculate screen coordinates for tooltip positioning
+    const screenX = this.viewport.calculateVisibleCenterX(
+      match.event.timestamp,
+      match.event.duration,
+    );
+    const screenY = this.viewport.depthToScreenY(match.depth) + this.mainTimelineYOffset;
+
+    // Notify callback for tooltip
+    this.callbacks.onSearchNavigate(match.event, screenX, screenY, match.depth);
+
+    // Request render to show updated highlight
+    this.callbacks.requestRender();
   }
 
   /**
@@ -471,41 +492,5 @@ export class SearchOrchestrator<E extends EventNode = EventNode> {
    */
   public clearHighlight(): void {
     this.searchHighlightRenderer?.clear();
-  }
-
-  // ============================================================================
-  // PRIVATE - NAVIGATION
-  // ============================================================================
-
-  /**
-   * Handle search navigation side effects:
-   * - Clear selection so search highlight shows
-   * - Center viewport on match
-   * - Call onSearchNavigate callback for application-specific logic (e.g., tooltips)
-   * - Request render
-   */
-  private handleSearchNavigation(match: { event: E; depth: number }): void {
-    if (!this.viewport) {
-      return;
-    }
-
-    // Clear selection so search highlight shows
-    this.callbacks.onClearSelection();
-
-    // Center viewport on the match
-    this.callbacks.onCenterOnMatch(match.event.timestamp, match.event.duration, match.depth);
-
-    // Calculate screen coordinates for tooltip positioning
-    const screenX = this.viewport.calculateVisibleCenterX(
-      match.event.timestamp,
-      match.event.duration,
-    );
-    const screenY = this.viewport.depthToScreenY(match.depth) + this.mainTimelineYOffset;
-
-    // Notify callback for tooltip
-    this.callbacks.onSearchNavigate(match.event, screenX, screenY, match.depth);
-
-    // Request render to show updated highlight
-    this.callbacks.requestRender();
   }
 }

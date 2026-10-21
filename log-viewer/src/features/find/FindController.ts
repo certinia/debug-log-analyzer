@@ -5,7 +5,9 @@ import type { ReactiveControllerHost } from 'lit';
 
 import { DomListenerController } from '../../core/events/DomListenerController.js';
 import type { FindEventDetail, FindEventMap } from './findEvents.js';
-import type { FindQuery, GridFindDetail } from '../../grid/index.js';
+import type { FindQuery, GridFindDetail as FindCount } from '../../grid/index.js';
+
+export type { FindCount, FindQuery };
 
 /** A view that find searches: an lv-grid, or the Timeline through its adapter. */
 export interface FindTarget {
@@ -13,7 +15,7 @@ export interface FindTarget {
    * Marks the matches for `query` and gives their total. The same query again keeps the
    * current match on its row or frame, else none is current (-1). Null when replaced.
    */
-  find(query: FindQuery): Promise<GridFindDetail | null>;
+  find(query: FindQuery): Promise<FindCount | null>;
   /**
    * Marks match `match` (from 0) current and brings it into view; -1 marks none. `kept` is
    * true when a search again kept it current: a target may leave its view alone.
@@ -22,7 +24,7 @@ export interface FindTarget {
   clearFind(): void;
 }
 
-type Found = (GridFindDetail & { target: FindTarget })[];
+type Found = (FindCount & { target: FindTarget })[];
 
 export interface FindOptions {
   /**

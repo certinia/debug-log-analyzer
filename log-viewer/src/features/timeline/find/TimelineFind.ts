@@ -1,8 +1,7 @@
 /*
  * Copyright (c) 2026 Certinia Inc. All rights reserved.
  */
-import type { FindQuery, GridFindDetail } from '../../../grid/index.js';
-import type { FindTarget } from '../../find/FindController.js';
+import type { FindCount, FindQuery, FindTarget } from '../../find/FindController.js';
 import type { FlameChart } from '../optimised/FlameChart.js';
 import { textPredicate } from '../optimised/search/EventMatcher.js';
 import type { EventNode } from '../types/flamechart.types.js';
@@ -10,7 +9,7 @@ import type { EventNode } from '../types/flamechart.types.js';
 /** The part of the chart find drives. The chart's search owns the matches and the current one. */
 export type FindableChart<E extends EventNode> = Pick<
   FlameChart<E>,
-  'search' | 'seekMatch' | 'getSearchCursor' | 'clearSearch'
+  'search' | 'setCurrentMatch' | 'getSearchCursor' | 'clearSearch'
 >;
 
 /**
@@ -28,7 +27,7 @@ export class TimelineFind<E extends EventNode> implements FindTarget {
     this.onClear = onClear;
   }
 
-  async find(query: FindQuery): Promise<GridFindDetail> {
+  async find(query: FindQuery): Promise<FindCount> {
     const cursor = this.chart.getSearchCursor();
     if (cursor && query.text === this.query?.text && query.matchCase === this.query.matchCase) {
       return { total: cursor.total, current: cursor.currentIndex };
@@ -46,7 +45,7 @@ export class TimelineFind<E extends EventNode> implements FindTarget {
   async setCurrentMatch(match: number, kept = false): Promise<void> {
     const current = this.chart.getSearchCursor()?.currentIndex ?? -1;
     if (this.query && !kept && !(match < 0 && current < 0)) {
-      this.chart.seekMatch(match);
+      this.chart.setCurrentMatch(match);
     }
   }
 

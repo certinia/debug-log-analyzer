@@ -663,8 +663,8 @@ export class FlameChart<E extends EventNode = EventNode> {
   /**
    * Make match `index` (from 0) current: centre on it and show its panel. -1 makes none current.
    */
-  public seekMatch(index: number): void {
-    this.searchOrchestrator?.seekMatch(index);
+  public setCurrentMatch(index: number): void {
+    this.searchOrchestrator?.setCurrentMatch(index);
   }
 
   /**
