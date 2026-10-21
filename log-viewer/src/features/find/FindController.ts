@@ -51,7 +51,7 @@ export class FindController {
   // Goes up with each search and clear, so an older search sees it is stale.
   private _searches = 0;
   // A move to a match is ignored while these run: it would count by the totals they replace.
-  private _reruns = 0;
+  private _running = 0;
   // Goes up with each step, so a step that waited on an unfold sees a newer one replaced it.
   private _steps = 0;
 
@@ -89,13 +89,14 @@ export class FindController {
     if (!isNew) {
       if (e.type === 'lv-find') {
         await this.rerun();
-      } else if (!this._reruns) {
+      } else if (!this._running) {
         await this._step(count);
       }
       return;
     }
     this._query = query;
-    if (!(await this._search(query, shown))) {
+    this._running++;
+    if (!(await this._search(query, shown).finally(() => this._running--))) {
       return;
     }
     report(this.totalMatches, count ? Math.min(1, this.totalMatches) : 0);
@@ -126,8 +127,8 @@ export class FindController {
       this.forget();
       return;
     }
-    this._reruns++;
-    const found = await this._search(query, shown).finally(() => this._reruns--);
+    this._running++;
+    const found = await this._search(query, shown).finally(() => this._running--);
     if (!found) {
       return;
     }

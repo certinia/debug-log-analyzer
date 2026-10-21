@@ -4,6 +4,7 @@ import type { VscodeTextfield } from '#vscode-elements/vscode-textfield.js';
 import { LitElement, css, html } from 'lit';
 import { customElement, state } from 'lit/decorators.js';
 
+import { DelayController } from '../../../core/events/DelayController.js';
 import { DomListenerController } from '../../../core/events/DomListenerController.js';
 import type { FindEventMap, FindResultsEventDetail } from '../findEvents.js';
 
@@ -12,6 +13,8 @@ import { globalStyles } from '../../../styles/global.styles.js';
 
 // web components
 import '../../../components/VsIconCheckbox.js';
+
+const LIVE_FIND_MS = 150;
 
 @customElement('find-widget')
 export class FindWidget extends LitElement {
@@ -32,6 +35,8 @@ export class FindWidget extends LitElement {
   private readonly _keyBus = new DomListenerController<WindowEventMap>(this, window, {
     keydown: (e) => this._keyPress(e),
   });
+
+  private readonly _live = new DelayController(this, LIVE_FIND_MS);
 
   static styles = [
     globalStyles,
@@ -127,6 +132,7 @@ export class FindWidget extends LitElement {
         label="Find"
         class="find-input-box"
         @click=${this._findInputClick}
+        @input=${this._onInput}
       >
         <section slot="content-after" class="find-input__controls">
           <vs-icon-checkbox
@@ -186,6 +192,7 @@ export class FindWidget extends LitElement {
   }
 
   _matchCase() {
+    this._live.cancel();
     this._resetCounts();
     this.matchCase = !this.matchCase;
     this.nextMatchDirection = true; // Reset to forward direction
@@ -193,6 +200,7 @@ export class FindWidget extends LitElement {
   }
 
   _closeFind() {
+    this._live.cancel();
     this.isVisble = false;
     this._resetCounts();
     const findEvt = this._getFindEvent();
@@ -292,6 +300,7 @@ export class FindWidget extends LitElement {
 
       case 'Enter': {
         e.preventDefault(); // Prevent double-firing from input field
+        this._live.cancel();
         if (this._hasMatchValueChanged() || !this.totalMatches) {
           this._triggerFind();
         } else if (e.shiftKey) {
@@ -313,6 +322,20 @@ export class FindWidget extends LitElement {
 
   _refresh() {
     if (!this.isVisble || !this._getMatchValue()) {
+      return;
+    }
+    const findEvt = this._getFindEvent();
+    findEvt.detail.count = 0;
+    document.dispatchEvent(new CustomEvent('lv-find', findEvt));
+  }
+
+  _onInput() {
+    this._live.schedule(() => this._liveFind());
+  }
+
+  // A typed key searches without moving: only Enter steps.
+  _liveFind() {
+    if (!this._hasMatchValueChanged()) {
       return;
     }
     const findEvt = this._getFindEvent();

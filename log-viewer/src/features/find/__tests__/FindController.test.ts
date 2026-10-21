@@ -175,6 +175,21 @@ describe('FindController', () => {
     expect(finder.totalMatches).toBe(3);
   });
 
+  it('ignores a move to a match while a new search runs, as the move counts by the old totals', async () => {
+    grids = [gridStub(2), gridStub(3)];
+    await finder.find(findEvent('lv-find', 'update', { count: 1 }));
+    let finish: (result: { total: number; current: number }) => void = () => undefined;
+    grids[1]?.find.mockReturnValueOnce(new Promise((resolve) => (finish = resolve)));
+    const running = finder.find(findEvent('lv-find', 'insert'));
+    await Promise.resolve();
+    await finder.find(findEvent('lv-find-match', 'insert', { count: 2 }));
+    finish({ total: 3, current: -1 });
+    await running;
+
+    expect(grids[0]?.setCurrentMatch.mock.calls).not.toContainEqual([1, false]);
+    expect(positions).toEqual([1, 0]);
+  });
+
   describe('rerun', () => {
     it('does nothing with no search', async () => {
       await finder.rerun();

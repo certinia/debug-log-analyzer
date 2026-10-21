@@ -90,6 +90,62 @@ describe('FindWidget', () => {
     expect(widget.isVisble).toBe(false);
   });
 
+  describe('as you type', () => {
+    let listening: AbortController;
+
+    beforeEach(() => {
+      jest.useFakeTimers();
+      listening = new AbortController();
+    });
+
+    afterEach(() => {
+      listening.abort();
+      jest.useRealTimers();
+    });
+
+    async function typed() {
+      const { widget } = await shown();
+      const box = widget.inputbox;
+      Object.assign(box ?? {}, { tabIndex: 0 });
+      box?.focus();
+      const searches: { text: string; count: number }[] = [];
+      document.addEventListener(
+        'lv-find',
+        (e) => {
+          const { text, count } = (e as CustomEvent<{ text: string; count: number }>).detail;
+          searches.push({ text, count });
+        },
+        { signal: listening.signal },
+      );
+      const type = (value: string): void => {
+        Object.assign(box ?? {}, { value });
+        box?.dispatchEvent(new Event('input'));
+      };
+      return { searches, type };
+    }
+
+    it('searches once the typing pauses, without moving', async () => {
+      const { searches, type } = await typed();
+      type('f');
+      jest.advanceTimersByTime(100);
+      type('fo');
+      jest.advanceTimersByTime(149);
+      expect(searches).toEqual([]);
+
+      jest.advanceTimersByTime(1);
+      expect(searches).toEqual([{ text: 'fo', count: 0 }]);
+    });
+
+    it('runs a waiting search at once on Enter, and moves to the first match', async () => {
+      const { searches, type } = await typed();
+      type('fo');
+      window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter' }));
+      jest.advanceTimersByTime(150);
+
+      expect(searches).toEqual([{ text: 'fo', count: 1 }]);
+    });
+  });
+
   it.each([
     ['Enter goes to the first', false, 1],
     ['Shift+Enter goes to the last', true, 5],
