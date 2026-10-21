@@ -33,12 +33,7 @@ import type {
   ViewportState,
 } from '../types/flamechart.types.js';
 import { TIMELINE_CONSTANTS, TimelineError, TimelineErrorCode } from '../types/flamechart.types.js';
-import type {
-  FramePredicate,
-  MatchedEventInfo,
-  SearchCursor,
-  SearchOptions,
-} from '../types/search.types.js';
+import type { FramePredicate, MatchedEventInfo, SearchCursor } from '../types/search.types.js';
 
 import { MeshMarkerRenderer } from './markers/MeshMarkerRenderer.js';
 import { MeshRectangleRenderer } from './MeshRectangleRenderer.js';
@@ -659,11 +654,10 @@ export class FlameChart<E extends EventNode = EventNode> {
    * Search events using predicate function, with no match current.
    *
    * @param predicate - Function to test each event
-   * @param options - Search options (caseSensitive, matchWholeWord)
    * @returns The number of matches, or null if search not enabled
    */
-  public search(predicate: FramePredicate, options?: SearchOptions): number | null {
-    return this.searchOrchestrator?.search(predicate, options) ?? null;
+  public search(predicate: FramePredicate): number | null {
+    return this.searchOrchestrator?.search(predicate) ?? null;
   }
 
   /**

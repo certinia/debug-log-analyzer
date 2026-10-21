@@ -33,12 +33,7 @@ import type {
   TimelineFrames,
   ViewportState,
 } from '../../types/flamechart.types.js';
-import type {
-  FramePredicate,
-  MatchedEventInfo,
-  SearchCursor,
-  SearchOptions,
-} from '../../types/search.types.js';
+import type { FramePredicate, MatchedEventInfo, SearchCursor } from '../../types/search.types.js';
 import { createHighlightColors } from '../rendering/HighlightRenderer.js';
 import type { PrecomputedRect } from '../RectangleCache.js';
 import { EventMatcher } from '../search/EventMatcher.js';
@@ -298,10 +293,9 @@ export class SearchOrchestrator<E extends EventNode = EventNode> {
    * Search events using predicate function, with no match current.
    *
    * @param predicate - Function to test each event
-   * @param options - Search options (caseSensitive, matchWholeWord)
    * @returns The number of matches, or null if search not initialized
    */
-  public search(predicate: FramePredicate, options?: SearchOptions): number | null {
+  public search(predicate: FramePredicate): number | null {
     if (!this.eventMatcher) {
       return null;
     }
@@ -312,7 +306,7 @@ export class SearchOrchestrator<E extends EventNode = EventNode> {
     // Clear selection when starting a new search to show search highlights
     this.callbacks.onClearSelection();
 
-    const cursor = this.eventMatcher.search(predicate, options);
+    const cursor = this.eventMatcher.search(predicate);
 
     // Request render to update display with new search state
     // (especially important when search returns 0 results to clear old highlights)
