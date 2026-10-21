@@ -311,7 +311,7 @@ export class DatabaseView extends LitElement {
     const collapsed = this.collapsed[kind];
     return html`<div class="db-panel db-panel--${kind}">
       <database-section
-        title="${SECTION_META[kind].title}"
+        heading="${SECTION_META[kind].title}"
         ?collapsed="${collapsed}"
         .metrics="${this._sectionMetrics(kind)}"
         @section-toggle="${() => this._toggle(kind)}"

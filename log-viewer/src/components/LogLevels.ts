@@ -139,18 +139,15 @@ export class LogLevels extends LitElement {
       </div>`;
     }
 
-    const lowered = (Object.entries(this.captured) as [keyof DebugLevels, LogLevel][]).filter(
+    const lowered = (Object.entries(this.captured) as [keyof DebugLevels, LogLevel][]).some(
       ([category, captured]) => levelRank(shown[category] ?? captured) < levelRank(captured),
-    ).length;
-    const resetLabel = lowered
-      ? `Reset ${lowered} lowered ${lowered === 1 ? 'level' : 'levels'} to logged`
-      : 'All levels as logged';
+    );
     const reset = html`<button
       slot="end"
       class="reset"
       type="button"
-      aria-label=${resetLabel}
-      title=${resetLabel}
+      aria-label="Reset to logged levels"
+      title="Reset to logged levels"
       ?disabled=${!lowered}
       @click=${this._onReset}
     >
