@@ -44,6 +44,17 @@ describe('EventMatcher', () => {
     ]);
   });
 
+  it('makes no match current until a seek, and none again for -1', () => {
+    const { frames } = framesOf(LOG);
+    const cursor = new EventMatcher(frames).search(textPredicate('ns.'));
+    expect(cursor.currentIndex).toBe(-1);
+    expect(cursor.getCurrent()).toBeNull();
+
+    expect(cursor.seek(1)?.event.text).toBe('ns.Inner.First()');
+    expect(cursor.seek(-1)).toBeNull();
+    expect(cursor.currentIndex).toBe(-1);
+  });
+
   it('skips a frame with no duration', () => {
     const { frames } = framesOf(
       LOG +

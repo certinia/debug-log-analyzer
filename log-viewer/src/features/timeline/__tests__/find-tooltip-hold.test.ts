@@ -44,7 +44,6 @@ function timeline(): {
     containerYToDepth: () => 0,
     getFrameRect: () => ({ x: 10, y: 20, width: 30, height: 15 }),
     getChartTopY: () => 40,
-    clearSearch: jest.fn(),
     locateByEventNodes: jest.fn(),
   };
   const container = document.createElement('div');

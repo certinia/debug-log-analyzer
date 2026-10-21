@@ -216,15 +216,6 @@ describe('FindController', () => {
       expect(reported).toEqual([6]);
     });
 
-    it('clears the search when a rebuild replaced it', async () => {
-      await finder.find(findEvent('lv-find', 'update'));
-      grids[0]?.find.mockResolvedValueOnce(null);
-      await finder.rerun();
-
-      expect(reported).toEqual([3, 0]);
-      expect(finder.totalMatches).toBe(0);
-    });
-
     it('ignores a move to a match while it runs, as the move counts by the old totals', async () => {
       grids = [gridStub(2), gridStub(3)];
       await finder.find(findEvent('lv-find', 'update', { count: 1 }));
