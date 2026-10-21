@@ -14,8 +14,11 @@ export interface FindTarget {
    * current match on its row or frame, else none is current (-1). Null when replaced.
    */
   find(query: FindQuery): Promise<GridFindDetail | null>;
-  /** Marks match `match` (from 0) current and brings it into view; -1 marks none. */
-  setCurrentMatch(match: number): Promise<void>;
+  /**
+   * Marks match `match` (from 0) current and brings it into view; -1 marks none. `kept` is
+   * true when a search again kept it current: a target may leave its view alone.
+   */
+  setCurrentMatch(match: number, kept?: boolean): Promise<void>;
   clearFind(): void;
 }
 
@@ -129,7 +132,7 @@ export class FindController {
     const currentMatch = currentMatchOf(found);
     report(this.totalMatches, currentMatch);
     if (currentMatch) {
-      await this._markCurrent(currentMatch);
+      await this._markCurrent(currentMatch, true);
     }
   }
 
@@ -168,11 +171,11 @@ export class FindController {
   }
 
   // `count` is from 1 across the targets, as the widget counts; 0 marks none.
-  private async _markCurrent(count: number): Promise<void> {
+  private async _markCurrent(count: number, kept = false): Promise<void> {
     let before = 0;
     for (const { target, total } of this._found) {
       const match = count - 1 - before;
-      await target.setCurrentMatch(match >= 0 && match < total ? match : -1);
+      await target.setCurrentMatch(match >= 0 && match < total ? match : -1, kept);
       before += total;
     }
   }

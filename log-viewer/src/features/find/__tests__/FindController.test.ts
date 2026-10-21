@@ -116,8 +116,8 @@ describe('FindController', () => {
   });
 
   it.each([
-    ['starts at the first match', 1, 1, [[0]]],
-    ['searches without moving', 0, 0, [[-1]]],
+    ['starts at the first match', 1, 1, [[0, false]]],
+    ['searches without moving', 0, 0, [[-1, false]]],
   ])('for a new query, %s', async (_name, count, position, marks) => {
     await finder.find(findEvent('lv-find', 'update', { count }));
 
@@ -131,8 +131,14 @@ describe('FindController', () => {
     await finder.find(findEvent('lv-find-match', 'update', { count: 4 }));
 
     expect(reported).toEqual([5]);
-    expect(grids[0]?.setCurrentMatch.mock.calls).toEqual([[0], [-1]]);
-    expect(grids[1]?.setCurrentMatch.mock.calls).toEqual([[-1], [1]]);
+    expect(grids[0]?.setCurrentMatch.mock.calls).toEqual([
+      [0, false],
+      [-1, false],
+    ]);
+    expect(grids[1]?.setCurrentMatch.mock.calls).toEqual([
+      [-1, false],
+      [1, false],
+    ]);
   });
 
   it('clears every grid and searches again after the widget closes', async () => {
@@ -177,7 +183,7 @@ describe('FindController', () => {
       expect(reported).toEqual([]);
     });
 
-    it('searches again, reports the current match where its grid kept it, and brings it into view', async () => {
+    it('searches again, reports the current match where its grid kept it, and marks it kept', async () => {
       grids = [gridStub(2), gridStub(3)];
       await finder.find(findEvent('lv-find', 'update', { count: 1, matchCase: true }));
       grids[0]?.find.mockResolvedValueOnce({ total: 4, current: -1 });
@@ -188,7 +194,7 @@ describe('FindController', () => {
       expect(reported).toEqual([5, 5]);
       expect(positions).toEqual([1, 5]);
       expect(finder.totalMatches).toBe(5);
-      expect(grids[1]?.setCurrentMatch.mock.calls.at(-1)).toEqual([0]);
+      expect(grids[1]?.setCurrentMatch.mock.calls.at(-1)).toEqual([0, true]);
     });
 
     it('reports no current match when no grid kept one', async () => {
@@ -196,7 +202,7 @@ describe('FindController', () => {
       await finder.rerun();
 
       expect(positions).toEqual([1, 0]);
-      expect(grids[0]?.setCurrentMatch.mock.calls).toEqual([[0]]);
+      expect(grids[0]?.setCurrentMatch.mock.calls).toEqual([[0, false]]);
     });
 
     it('clears every grid when the host is off screen', async () => {
@@ -230,7 +236,7 @@ describe('FindController', () => {
       finish({ total: 3, current: -1 });
       await running;
 
-      expect(grids[0]?.setCurrentMatch.mock.calls).toEqual([[0]]);
+      expect(grids[0]?.setCurrentMatch.mock.calls).toEqual([[0, false]]);
       expect(positions).toEqual([1, 0]);
     });
 
@@ -313,8 +319,8 @@ describe('FindController', () => {
       open();
       await slow;
 
-      expect(grids[1]?.setCurrentMatch.mock.calls.at(-1)).toEqual([-1]);
-      expect(grids[0]?.setCurrentMatch.mock.calls.at(-1)).toEqual([1]);
+      expect(grids[1]?.setCurrentMatch.mock.calls.at(-1)).toEqual([-1, false]);
+      expect(grids[0]?.setCurrentMatch.mock.calls.at(-1)).toEqual([1, false]);
     });
   });
 });

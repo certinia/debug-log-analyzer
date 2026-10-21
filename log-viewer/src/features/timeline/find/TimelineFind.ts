@@ -42,9 +42,10 @@ export class TimelineFind<E extends EventNode> implements FindTarget {
     return { total, current: -1 };
   }
 
-  async setCurrentMatch(match: number): Promise<void> {
+  // A kept match leaves the chart still: a step clears the selection and centres the chart.
+  async setCurrentMatch(match: number, kept = false): Promise<void> {
     const current = this.chart.getSearchCursor()?.currentIndex ?? -1;
-    if (this.query && !(match < 0 && current < 0)) {
+    if (this.query && !kept && !(match < 0 && current < 0)) {
       this.chart.seekMatch(match);
     }
   }

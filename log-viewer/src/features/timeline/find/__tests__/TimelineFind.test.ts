@@ -94,6 +94,15 @@ describe('TimelineFind', () => {
     expect(chart.seekMatch).not.toHaveBeenCalled();
   });
 
+  it('leaves the chart still for a match a search again kept', async () => {
+    const { chart, find } = setup();
+    await find.find(query('foo'));
+    await find.setCurrentMatch(1);
+    await find.setCurrentMatch(1, true);
+
+    expect(chart.seekMatch).toHaveBeenCalledTimes(1);
+  });
+
   it('clears the chart and searches the same query afresh after a clear', async () => {
     const { chart, onClear, find } = setup();
     await find.find(query('foo'));
