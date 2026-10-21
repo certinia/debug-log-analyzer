@@ -379,6 +379,20 @@ describe('GridView', () => {
     expect(shown().map((el) => el.textContent)).toContain('row 500');
   });
 
+  it('stays put once shown when a row asked for while hidden was cancelled', async () => {
+    const resize = fakeResizeObserver();
+    const { scroller, view } = await setup();
+    viewport = 0;
+    resize(scroller, 0);
+    view.scrollToIndex(500);
+    view.cancelScroll();
+
+    viewport = VIEWPORT;
+    resize(scroller, VIEWPORT);
+    await flush();
+    expect(scroller.scrollTop).toBe(0);
+  });
+
   it('hears no resize while disconnected, and shows the rows that came meanwhile on connect', async () => {
     const resize = fakeResizeObserver();
     const { scroller, body, store, view } = await setup();

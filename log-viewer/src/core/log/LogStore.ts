@@ -5,6 +5,8 @@ import type { ApexLog, LogEvent } from '@apexdevtools/apex-log-parser';
 
 import { CHECK_EVERY, frameBudget, type FrameBudgetOptions } from '../utility/FrameBudget.js';
 import { KeyPathIds } from './keyPathIds.js';
+import { type CapabilityId, findLevelGap, type LevelGap } from './levelCapabilities.js';
+import { capturedOf } from './levelFilter.js';
 import { type LogIndex, LogIndexBuilder } from './LogIndex.js';
 
 export type Stack = LogEvent[];
@@ -27,6 +29,16 @@ export class LogStore {
 
   constructor(log: ApexLog) {
     this.log = log;
+  }
+
+  /** The store of the log as captured: this store, unless `log` is filtered by level. */
+  get captured(): LogStore {
+    return logStoreFor(capturedOf(this.log));
+  }
+
+  /** Whether the debug levels could keep `id`'s events off screen, and why. */
+  levelGap(id: CapabilityId): LevelGap | null {
+    return findLevelGap(id, capturedOf(this.log).debugLevels, this.log.debugLevels);
   }
 
   /** The parser event for an eventIndex, or null if the log has no such event. */

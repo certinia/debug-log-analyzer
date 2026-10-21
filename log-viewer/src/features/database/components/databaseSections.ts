@@ -9,6 +9,7 @@ import { computeSoqlIssues } from '../../soql/components/SOQLLinterIssues.js';
 
 // web components
 import '../../../components/CallStackDetail.js';
+import '../../../components/CapturedLogScope.js';
 import '../../../components/CallTreeDetail.js';
 import '../../../components/EventVitals.js';
 import '../../../components/VariablesDetail.js';
@@ -61,7 +62,9 @@ export async function buildDatabaseSections(
       // No natural size — a frame has none or hundreds — so it takes a share of
       // the panel and scrolls, rather than a slot that could crowd the grids.
       weight: 3,
-      content: html`<variables-detail eventIndex=${active}></variables-detail>`,
+      content: html`<captured-log-scope>
+        <variables-detail eventIndex=${active}></variables-detail>
+      </captured-log-scope>`,
     },
     {
       id: 'callstack',

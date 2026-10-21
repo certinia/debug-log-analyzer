@@ -212,6 +212,11 @@ export class GridView<R extends object> {
     this.virtualizer.scrollToIndex(index, { align });
   }
 
+  /** Drops a scroll asked for while hidden, so showing the view does not go there. */
+  cancelScroll(): void {
+    this.pendingScroll = null;
+  }
+
   /** Call when anything above the body, like the header, changes height. */
   remeasure(): void {
     if (!this.visible) {
@@ -548,10 +553,7 @@ export class GridView<R extends object> {
     const find = this.find;
     const index = Number(el.dataset.index);
     const entry = this.rows?.rowAt(index);
-    const first =
-      find && entry !== undefined && !(entry instanceof Group)
-        ? find.result.firstMatchIn(entry)
-        : -1;
+    const first = find && entry !== undefined ? find.result.firstMatchIn(entry) : -1;
     this.highlighter.mark(el, first, find?.result.pattern ?? null, find?.current ?? -1);
   }
 

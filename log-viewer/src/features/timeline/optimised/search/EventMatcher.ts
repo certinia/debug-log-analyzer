@@ -17,12 +17,7 @@
 
 import type { PrecomputedRect } from '../RectangleCache.js';
 import type { EventNode, TimelineFrames } from '../../types/flamechart.types.js';
-import type {
-  FramePredicate,
-  SearchCursor,
-  SearchMatch,
-  SearchOptions,
-} from '../../types/search.types.js';
+import type { FramePredicate, SearchCursor, SearchMatch } from '../../types/search.types.js';
 import { SearchCursorImpl } from './SearchCursor.js';
 
 export class EventMatcher<E extends EventNode> {
@@ -37,10 +32,9 @@ export class EventMatcher<E extends EventNode> {
    * Search events using predicate function.
    *
    * @param predicate - Function to test each event
-   * @param options - Search options (caseSensitive, matchWholeWord)
    * @returns SearchCursor for navigating results
    */
-  search(predicate: FramePredicate, _options: SearchOptions = {}): SearchCursor<E> {
+  search(predicate: FramePredicate): SearchCursor<E> {
     const matches = this.scan(predicate);
     this.currentCursor = new SearchCursorImpl(matches);
     return this.currentCursor;
@@ -51,14 +45,6 @@ export class EventMatcher<E extends EventNode> {
    */
   clear(): void {
     this.currentCursor = undefined;
-  }
-
-  /**
-   * Set the current cursor. Used to restore cursor after it was cleared.
-   * @param cursor - The cursor to restore
-   */
-  setCursor(cursor: SearchCursorImpl<E>): void {
-    this.currentCursor = cursor;
   }
 
   /**

@@ -20,10 +20,7 @@ type SoqlishRow = {
  *  - `rows[0].originalData.type === 'SOSL_EXECUTE_BEGIN'` → sosl
  *  - `rows[0].soql === key`                               → soql (SOQLView rows)
  */
-export function soqlGroupCell(group: {
-  key: string;
-  rows: readonly unknown[];
-}): TemplateResult | string {
+export function soqlGroupCell(group: { key: string; rows: readonly unknown[] }): TemplateResult {
   const { key, rows } = group;
   const first = rows[0] as SoqlishRow | undefined;
   const type = first?.originalData?.type;
@@ -36,12 +33,12 @@ export function soqlGroupCell(group: {
     dialect = 'soql';
   }
   if (!key || !dialect) {
-    return `${key} (${rows.length})`;
+    return html`<span data-grid-find-text>${key}</span> (${rows.length})`;
   }
   // Query truncates (single-line ellipsis) but the count is pinned so it stays
   // visible — see the `.soql-group-header*` rules in components/grid/AppGrid.ts.
   return html`<span class="soql-group-header"
-    ><span class="soql-group-header__q soql-block soql-inline"
+    ><span class="soql-group-header__q soql-block soql-inline" data-grid-find-text
       >${unsafeHTML(formatSOQL(key, { mode: 'inline', dialect }))}</span
     ><span class="soql-group-header__count">(${rows.length})</span></span
   >`;

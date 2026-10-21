@@ -28,10 +28,11 @@ import '../DatabaseView.js';
 /** The lv-grid slice find drives. */
 interface FakeLvGrid {
   matches: number;
-  clientHeight: number;
   current: number[];
   cleared: number;
-  find(): Promise<number>;
+  /** The match a find keeps current, or -1. */
+  kept: number;
+  find(): Promise<{ total: number; current: number }>;
   setCurrentMatch(index: number): Promise<void>;
   clearFind(): void;
 }
@@ -47,10 +48,10 @@ interface FakeGrid extends HTMLElement {
 function fakeLvGrid(matches = 0): FakeLvGrid {
   const grid: FakeLvGrid = {
     matches,
-    clientHeight: 10,
     current: [],
     cleared: 0,
-    find: async () => grid.matches,
+    kept: -1,
+    find: async () => ({ total: grid.matches, current: grid.kept }),
     setCurrentMatch: async (index) => void grid.current.push(index),
     clearFind: () => void (grid.cleared += 1),
   };
@@ -232,6 +233,8 @@ describe('database-view find', () => {
   beforeEach(async () => {
     document.body.replaceChildren();
     view = document.createElement('database-view') as typeof view;
+    // jsdom lays nothing out; a tab on screen has height.
+    Object.defineProperty(view, 'clientHeight', { configurable: true, value: 10 });
     document.body.append(view);
     await view.updateComplete;
     grids = [fakeGrid('dml-view'), fakeGrid('soql-view'), fakeGrid('sosl-view')];
@@ -254,9 +257,9 @@ describe('database-view find', () => {
     return seen;
   }
 
-  const search = (count = 1) =>
+  const search = (count = 1, type: 'lv-find' | 'lv-find-match' = 'lv-find') =>
     document.dispatchEvent(
-      new CustomEvent('lv-find', {
+      new CustomEvent(type, {
         detail: { text: 'update', count, options: { matchCase: false } },
       }),
     );
@@ -281,13 +284,6 @@ describe('database-view find', () => {
     expect(grids.map((grid) => grid.grid.current)).toEqual([[-1], [0], [-1]]);
   });
 
-  it('skips a grid that is not shown', async () => {
-    grids.forEach((grid) => (grid.grid.matches = 2));
-    grids[1].grid.clientHeight = 0;
-
-    expect(await rollUps(() => search())).toEqual([4]);
-  });
-
   it('keeps reporting after a detach and re-attach', async () => {
     grids[0].grid.matches = 3;
     view.remove();
@@ -297,25 +293,42 @@ describe('database-view find', () => {
     expect(await rollUps(() => search())).toEqual([3]);
   });
 
-  it('drops the search when a grid reshapes', async () => {
+  it('searches again when a grid reshapes', async () => {
     grids.forEach((grid) => (grid.grid.matches = 1));
     await rollUps(() => search());
+    grids[2].grid.matches = 3;
 
     const totals = await rollUps(() =>
       grids[2].dispatchEvent(new CustomEvent('grid-reshape', { detail: null, bubbles: true })),
     );
 
-    expect(totals).toEqual([0]);
-    expect(grids.map((grid) => grid.grid.cleared)).toEqual([1, 1, 1]);
+    expect(totals).toEqual([5]);
+    expect(grids.map((grid) => grid.grid.cleared)).toEqual([0, 0, 0]);
   });
 
-  it('drops the search when a section collapses or expands', async () => {
+  it('keeps the search when a section collapses', async () => {
     grids.forEach((grid) => (grid.grid.matches = 1));
     await rollUps(() => search());
-    expect(await rollUps(() => collapse(1))).toEqual([0]);
 
+    expect(await rollUps(() => collapse(1))).toEqual([]);
+    expect(grids[1].grid.cleared).toBe(0);
+  });
+
+  it('opens a collapsed section when a step goes to its match', async () => {
+    grids.forEach((grid) => (grid.grid.matches = 1));
+    collapse(1);
+    await view.updateComplete;
     await rollUps(() => search());
-    expect(await rollUps(() => collapse(1))).toEqual([0]);
+    const section = () => view.shadowRoot?.querySelectorAll('database-section')[1];
+    expect(section()?.hasAttribute('collapsed')).toBe(true);
+
+    await rollUps(() => search(2, 'lv-find-match'));
+
+    expect(section()?.hasAttribute('collapsed')).toBe(false);
+    expect(grids[1].grid.current.at(-1)).toBe(0);
+
+    await rollUps(() => search(2, 'lv-find-match'));
+    expect(section()?.hasAttribute('collapsed')).toBe(false);
   });
 });
 
@@ -355,5 +368,23 @@ describe('database-view on a new log', () => {
 
     expect(view.shadowRoot?.querySelector('soql-view')).toBe(grid);
     expect(shownLines(view)).toHaveLength(1);
+  });
+
+  it('keeps the grid of a collapsed section, hidden, so find still searches it', async () => {
+    globalThis.IntersectionObserver = AlwaysVisible as unknown as typeof IntersectionObserver;
+    const view = document.createElement('database-view') as View;
+    document.body.append(view);
+    view.logStore = storeOf(soql(2)).store;
+    await settle();
+    await view.updateComplete;
+    const grid = view.shadowRoot?.querySelector('soql-view');
+
+    view.shadowRoot
+      ?.querySelectorAll('database-section')[1]
+      ?.dispatchEvent(new CustomEvent('section-toggle'));
+    await view.updateComplete;
+
+    expect(view.shadowRoot?.querySelector('soql-view')).toBe(grid);
+    expect(grid?.hasAttribute('hidden')).toBe(true);
   });
 });

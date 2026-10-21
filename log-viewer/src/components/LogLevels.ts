@@ -17,24 +17,9 @@ import './VsSelect.js';
 
 // styles
 import { globalStyles } from '../styles/global.styles.js';
-import { LEVEL_ORDER, levelRank, sameLevels } from '../core/log/levelFilter.js';
+import { LEVEL_ORDER, LOG_TOKEN, levelRank, sameLevels } from '../core/log/levelFilter.js';
 import { logStatusContext, type LogStatus } from '../core/log/logStatus.js';
 import { skeletonStyles } from '../styles/skeleton.styles.js';
-
-/** The token the log's settings line names each category by; `DebugLevels` keys them in camelCase. */
-const LOG_TOKEN: Record<keyof DebugLevels, string> = {
-  apexCode: 'APEX_CODE',
-  apexProfiling: 'APEX_PROFILING',
-  callout: 'CALLOUT',
-  dataAccess: 'DATA_ACCESS',
-  database: 'DB',
-  nba: 'NBA',
-  system: 'SYSTEM',
-  validation: 'VALIDATION',
-  visualforce: 'VISUALFORCE',
-  wave: 'WAVE',
-  workflow: 'WORKFLOW',
-};
 
 export interface LogLevelsChange {
   category: keyof DebugLevels;

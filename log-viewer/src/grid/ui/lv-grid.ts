@@ -63,6 +63,8 @@ export interface GridContextDetail<R> extends GridRowDetail<R> {
 
 export interface GridFindDetail {
   total: number;
+  /** The current match, from 0; -1 for none. */
+  current: number;
 }
 
 export interface GridSort {
@@ -72,7 +74,7 @@ export interface GridSort {
 
 /** The rows or shown columns changed, so find's match numbers no longer hold. */
 export interface GridReshapeDetail {
-  reason: 'sort' | 'columns' | 'filter' | 'group';
+  reason: 'sort' | 'columns' | 'filter' | 'group' | 'source';
 }
 
 /**
@@ -305,18 +307,34 @@ export class LvGrid<R extends object = object> extends LitElement {
   /**
    * Searches the text of every shown column with a `text`, over every row that passes the
    * filters, open or not. Marks the matches and reports the total in `lv-grid-find-results`.
+   * Searching the same query again, as after a sort or a filter, keeps the current match on
+   * its row: the same match in that row, else the row's first, marked without opening or
+   * scrolling to it. `current` is -1 when that row has no match now, or none was current.
+   * Null when a newer find, a clear or a rebuild replaced the search.
    */
-  async find(query: FindQuery): Promise<number> {
+  async find(query: FindQuery): Promise<GridFindDetail | null> {
     const cells = this.visibleColumns().flatMap((column) => (column.text ? [column.text] : []));
     const search = ++this.searches;
+    const last = this.found;
+    const row = last && last.current >= 0 ? last.result.rowOf(last.current) : undefined;
+    const offset = last && row ? last.current - last.result.firstMatchIn(row) : 0;
     const result = await this.store?.find(query, cells);
     if (!result || search !== this.searches) {
-      return -1;
+      return null;
     }
-    this.found = result.pattern ? { result, current: -1 } : null;
+    const same =
+      last?.result.pattern?.source === result.pattern?.source &&
+      last?.result.pattern?.flags === result.pattern?.flags;
+    const first = row && same ? result.firstMatchIn(row) : -1;
+    const kept = first + offset;
+    const keptRow = result.rowOf(kept);
+    const inRow = keptRow !== undefined && result.firstMatchIn(keptRow) === first;
+    const current = first >= 0 && inRow ? kept : first;
+    this.found = result.pattern ? { result, current } : null;
     this.view?.setFind(this.found);
-    this.emit<GridFindDetail>('lv-grid-find-results', { total: result.total });
-    return result.total;
+    const detail = { total: result.total, current };
+    this.emit<GridFindDetail>('lv-grid-find-results', detail);
+    return detail;
   }
 
   /**
@@ -331,10 +349,17 @@ export class LvGrid<R extends object = object> extends LitElement {
     }
     found.current = match;
     if (match < 0) {
+      // A scroll held while hidden would bring back a match no longer current.
+      this.view?.cancelScroll();
       this.view?.setFind(found);
       return;
     }
-    const index = (await this.store?.reveal(found.result.pathOf(match))) ?? -1;
+    const row = found.result.rowOf(match);
+    // A group row is always on screen: there is no path to open.
+    const index =
+      row instanceof Group
+        ? (this.shown?.indexOf(row) ?? -1)
+        : ((await this.store?.reveal(found.result.pathOf(match))) ?? -1);
     await this.updateComplete;
     if (index >= 0) {
       this.bringIntoView(index, false);
@@ -416,6 +441,10 @@ export class LvGrid<R extends object = object> extends LitElement {
   }
 
   protected updated(changed: PropertyValues): void {
+    // After the render, so a new grid has its height when a listener asks which grids show.
+    if (changed.has('source') && this.source) {
+      this.emit<GridReshapeDetail>('lv-grid-reshape', { reason: 'source' });
+    }
     const snapshot = this.data.snapshot;
     this.toggleAttribute('busy', snapshot?.busy ?? false);
     if (snapshot?.failed !== this.failure) {

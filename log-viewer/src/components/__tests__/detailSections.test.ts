@@ -71,6 +71,10 @@ describe('buildDetailSections', () => {
     expect(sections.find((s) => s.id === 'vitals')?.height).toBe('md');
     // The variables have no natural size, so they take a share and scroll.
     expect(sections.find((s) => s.id === 'variables')?.weight).toBe(3);
+    // A level lowered in the header must not hide the variables the log holds.
+    expect(
+      rendered(sections, 'variables', 'variables-detail').closest('captured-log-scope'),
+    ).not.toBeNull();
     // Asked of a frame it empties while the figures are added up, so it keeps a
     // steady height rather than flickering on every step.
     expect(sections.find((s) => s.id === 'namespace-time')?.height).toBe('sm');

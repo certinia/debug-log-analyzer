@@ -43,7 +43,7 @@ const note = (r: Node): string => r.note;
 
 /** The key of the row that holds each match, in match order. */
 const holders = (
-  result: { total: number; rowOf(match: number): Node | undefined } | null,
+  result: { total: number; rowOf(match: number): { key: string } | undefined } | null,
 ): string[] =>
   result ? Array.from({ length: result.total }, (_, i) => result.rowOf(i)?.key ?? '?') : [];
 

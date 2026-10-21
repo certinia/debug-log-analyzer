@@ -13,6 +13,7 @@ import '../features/analysis/components/SelfTimeSpreadView.js';
 import '../features/database/components/DatabaseOverview.js';
 import '../features/database/components/DatabaseTimeTree.js';
 import './CallStackDetail.js';
+import './CapturedLogScope.js';
 import './CallTreeDetail.js';
 import './CategoryTimeBar.js';
 import './EventVitals.js';
@@ -226,10 +227,9 @@ export async function buildDetailSections(
       // No natural size — a frame has none or hundreds — so it takes a share of
       // the panel and scrolls, rather than a slot that could crowd the grids.
       weight: 3,
-      content: html`<variables-detail
-        eventIndex=${activeIndex}
-        .frames=${scopeFrames}
-      ></variables-detail>`,
+      content: html`<captured-log-scope>
+        <variables-detail eventIndex=${activeIndex} .frames=${scopeFrames}></variables-detail>
+      </captured-log-scope>`,
     },
   ];
   if (source === 'timeline') {

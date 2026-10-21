@@ -13,6 +13,7 @@ import { customElement, property, state } from 'lit/decorators.js';
 import { parse } from '@apexdevtools/apex-log-parser';
 import type { LogLevelsChange } from '../../components/LogLevels.js';
 import { TAB_TO_SOURCE, eventBus } from '../../core/events/EventBus.js';
+import { waitForNextFrame } from '../../core/utility/FrameBudget.js';
 import { logContext } from '../../core/log/logContext.js';
 import { logStatusContext, type LogStatus } from '../../core/log/logStatus.js';
 import { setCurrentLog, type LogStore } from '../../core/log/LogStore.js';
@@ -269,16 +270,15 @@ export class LogViewer extends LitElement {
         this._selectedIndex = index;
       }
 
-      // Not really happy this is here, find needs a refactor
-      const findEvt = {
-        detail: {
-          text: '',
-          count: 0,
-          options: { matchCase: false },
-        },
-      };
-      document.dispatchEvent(new CustomEvent('lv-find', findEvt));
+      void this._refreshFind();
     }
+  }
+
+  // The new tab's panel shows only once the tabs have rendered too.
+  private async _refreshFind(): Promise<void> {
+    await this.updateComplete;
+    await waitForNextFrame();
+    document.dispatchEvent(new CustomEvent('lv-find-refresh', { detail: null }));
   }
 
   async _handleLogFetch(data: LogDataEvent) {

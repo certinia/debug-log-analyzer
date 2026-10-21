@@ -29,11 +29,22 @@ jest.mock('../../services/LogDiagnostics.js', () => ({
   },
 }));
 
+import {
+  describeLevelGap,
+  findLevelGap,
+  type LevelGap,
+} from '../../../../core/log/levelCapabilities.js';
 import type { LogStore } from '../../../../core/log/LogStore.js';
 import '../LogDiagnosticsView.js';
 
+let gap: LevelGap | null = null;
+
 const loadLog = (element: HTMLElementTagNameMap['log-diagnostics']) => {
-  element.logStore = { log: {}, derive: async (fn: () => unknown) => fn() } as unknown as LogStore;
+  element.logStore = {
+    log: {},
+    derive: async (fn: () => unknown) => fn(),
+    levelGap: () => gap,
+  } as unknown as LogStore;
 };
 
 // The findings land a task after the render that asks for them.
@@ -83,6 +94,7 @@ describe('log-diagnostics', () => {
     keep = () => true;
     askedAbout = [];
     held = null;
+    gap = null;
   });
 
   it('says nothing is wrong, rather than showing an empty list', async () => {
@@ -278,7 +290,14 @@ describe('log-diagnostics', () => {
   it('reports absent query plans rather than leaving the queries looking clean', async () => {
     result.queryPlansKnown = false;
     const element = await view();
-    expect(text(element, '.note').join(' ')).toContain('Database log level at FINEST');
+    expect(text(element, '.note').join(' ')).toContain('The log has no query plans.');
+  });
+
+  it('names the level a log was captured below when it has no query plans', async () => {
+    result.queryPlansKnown = false;
+    gap = findLevelGap('queryPlans', { database: 'FINE' }, { database: 'FINE' });
+    const element = await view();
+    expect(text(element, '.note')).toContain(describeLevelGap(gap));
   });
 
   it('reports how much of the log the SOQL rules covered when they were capped', async () => {
@@ -508,6 +527,6 @@ describe('log-diagnostics', () => {
   it('keeps a whole-log caveat out of the scoped list, which it does not describe', async () => {
     result.queryPlansKnown = false;
     const element = await view({ instances: [1] });
-    expect(text(element, '.note').join(' ')).not.toContain('Database log level at FINEST');
+    expect(text(element, '.note').join(' ')).not.toContain('The log has no query plans.');
   });
 });

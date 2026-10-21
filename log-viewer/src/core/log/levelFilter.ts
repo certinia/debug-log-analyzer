@@ -18,11 +18,33 @@ type Level = Exclude<LogLevel, ''>;
 /** Coarsest first, as the parser declares them: a level shows every event at its own rank or below. */
 export const LEVEL_ORDER: readonly Level[] = Object.values(LOG_LEVEL);
 
+/** The token the log's settings line names each category by; `DebugLevels` keys them in camelCase. */
+export const LOG_TOKEN: Record<keyof DebugLevels, string> = {
+  apexCode: 'APEX_CODE',
+  apexProfiling: 'APEX_PROFILING',
+  callout: 'CALLOUT',
+  dataAccess: 'DATA_ACCESS',
+  database: 'DB',
+  nba: 'NBA',
+  system: 'SYSTEM',
+  validation: 'VALIDATION',
+  visualforce: 'VISUALFORCE',
+  wave: 'WAVE',
+  workflow: 'WORKFLOW',
+};
+
 const RANK = new Map<Level, number>(LEVEL_ORDER.map((level, rank) => [level, rank]));
 
 /** The position of `level` in {@link LEVEL_ORDER}, or -1 for a level the log did not state. */
 export function levelRank(level: LogLevel | undefined): number {
   return level ? (RANK.get(level) ?? -1) : -1;
+}
+
+const capturedFrom = new WeakMap<ApexLog, ApexLog>();
+
+/** The log `log` was filtered from by {@link filterByLevels}, or `log` itself. */
+export function capturedOf(log: ApexLog): ApexLog {
+  return capturedFrom.get(log) ?? log;
 }
 
 // The parser gives every USER_DEBUG line DEBUG, but Salesforce filters it by the level it was written at.
@@ -36,8 +58,18 @@ function levelOf(event: LogEvent): LogLevel {
   return event.debugLevel;
 }
 
+// A detail line inside its block shows while the block shows, whatever its own level.
+const BLOCK_OF: Readonly<Record<string, string>> = {
+  SOQL_EXECUTE_EXPLAIN: 'SOQL_EXECUTE_BEGIN',
+  LIMIT_USAGE_FOR_NS: 'CUMULATIVE_LIMIT_USAGE',
+};
+
 /** True when `event` is finer than the level chosen for its category. */
 export function isHidden(event: LogEvent, chosen: DebugLevels): boolean {
+  const { parent } = event;
+  if (parent && event.type && parent.type === BLOCK_OF[event.type]) {
+    return isHidden(parent, chosen);
+  }
   const { debugCategory, debugLevel } = event;
   if (!debugCategory || !debugLevel) {
     return false;
@@ -168,6 +200,7 @@ export class LevelFilterBuilder {
     root.exceptions = this.kept(original.exceptions);
     root.entryPoints = this.kept(original.entryPoints) as CodeUnitStartedLine[];
     root.truncatedEvents = this.kept(original.truncatedEvents);
+    capturedFrom.set(root, original);
     return root;
   }
 

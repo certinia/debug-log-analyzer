@@ -26,6 +26,7 @@ import {
   type TrendPoint,
   type TrendSeries,
 } from './governorTrendData.js';
+import { describeLevelGap } from '../core/log/levelCapabilities.js';
 import { NO_GOVERNOR_USAGE_TEXT } from './governorCopy.js';
 import './SectionSkeleton.js';
 
@@ -311,7 +312,8 @@ export class GovernorTrends extends LitElement {
     }
     const series = governorTrendSeries(limitSeries);
     if (!series.length) {
-      return html`<p class="note">${NO_GOVERNOR_USAGE_TEXT}</p>`;
+      const text = describeLevelGap(this.logStore?.levelGap('limits'), NO_GOVERNOR_USAGE_TEXT);
+      return html`<p class="note">${text}</p>`;
     }
 
     // `exitStamp`, not `duration.total`: readings carry the log's own timestamps, and the Timeline

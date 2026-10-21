@@ -29,7 +29,6 @@ import {
   findEventByTimestamp,
   type EventSearchResult,
 } from '../../../core/utility/EventSearch.js';
-import type { FindEventDetail, FindResultsEventDetail } from '../../find/findEvents.js';
 import { goToRow } from '../../call-tree/navigation.js';
 import { formatCallStack, formatEventDetails } from '../../call-tree/utils/eventText.js';
 import { getTheme } from '../themes/ThemeSelector.js';
@@ -43,7 +42,6 @@ import {
   type TimelineOptions,
   type ViewportState,
 } from '../types/flamechart.types.js';
-import type { SearchCursor } from '../types/search.types.js';
 import { InspectorEmphasis } from '../../../components/inspectorEmphasis.js';
 import { logStoreFor } from '../../../core/log/LogStore.js';
 import { wireInspectorTab } from '../../../components/inspectorTab.js';
@@ -58,7 +56,7 @@ import { buildTimelineFrames } from '../utils/timeline-frames.js';
 import { FlameChart } from './FlameChart.js';
 import { FrameTooltipRenderer, type TooltipAnchor } from './FrameTooltipRenderer.js';
 import { apexLimitSeries } from './apex-limit-series.js';
-import { textPredicate } from './search/EventMatcher.js';
+import { TimelineFind } from '../find/TimelineFind.js';
 
 interface ApexTimelineOptions extends TimelineOptions {
   themeName?: string | null;
@@ -87,7 +85,6 @@ export class ApexLogTimeline {
   private options: TimelineOptions = {};
   private container: HTMLElement | null = null;
   private events: LogEvent[] = [];
-  private searchCursor: SearchCursor<EventNode> | null = null;
   private selectedEventForContextMenu: EventNode | null = null;
   private selectedMarkerForContextMenu: TimelineMarker | null = null;
   private eventBusUnsubscribe: (() => void) | null = null;
@@ -101,8 +98,17 @@ export class ApexLogTimeline {
   /** The frames kept in colour while the rest of the chart is dimmed. */
   private emphasis = new InspectorEmphasis();
 
+  readonly findTarget: TimelineFind<EventNode>;
+
   constructor() {
     this.flamechart = new FlameChart();
+    // The panel belongs to the match a step opened it on, so it closes with the find.
+    this.findTarget = new TimelineFind(this.flamechart, () => {
+      if (this.navigationTooltip) {
+        this.navigationTooltip = false;
+        this.tooltipRenderer?.hide();
+      }
+    });
   }
 
   /**
@@ -195,6 +201,8 @@ export class ApexLogTimeline {
           copyToClipboard(marker.summary);
         },
         onCategoryDimClear: options.onCategoryDimClear,
+        onSearchClear: () =>
+          document.dispatchEvent(new CustomEvent('lv-find-dismiss', { detail: null })),
       },
     );
 
@@ -210,9 +218,6 @@ export class ApexLogTimeline {
       this.selectedEventForContextMenu = null;
       this.selectedMarkerForContextMenu = null;
     });
-
-    // Wire up search event listeners
-    this.enableSearch();
 
     this.flamechart.setHeatStripTimeSeries(
       heatStripSeries.events.length > 0 ? heatStripSeries : null,
@@ -407,11 +412,6 @@ export class ApexLogTimeline {
    * Clean up resources.
    */
   public destroy(): void {
-    // Remove event listeners from document
-    document.removeEventListener('lv-find', this.handleFind);
-    document.removeEventListener('lv-find-match', this.handleFindMatch);
-    document.removeEventListener('lv-find-close', this.handleFindClose);
-
     // Unsubscribe from EventBus
     if (this.eventBusUnsubscribe) {
       this.eventBusUnsubscribe();
@@ -1072,96 +1072,6 @@ export class ApexLogTimeline {
   // ============================================================================
 
   /**
-   * Wire up search event listeners.
-   * Search is enabled via FlameChart options.
-   */
-  private enableSearch(): void {
-    // Wire up event listeners on document (FindWidget dispatches on document)
-    document.addEventListener('lv-find', this.handleFind);
-    document.addEventListener('lv-find-match', this.handleFindMatch);
-    document.addEventListener('lv-find-close', this.handleFindClose);
-  }
-
-  /**
-   * Handle lv-find event (new search initiated).
-   * Thin facade: converts search text to predicate function.
-   */
-  private handleFind = (event: Event): void => {
-    // Only process if this timeline instance is active
-    if (!this.container || !this.container.isConnected || !this.container.clientHeight) {
-      return;
-    }
-
-    const customEvent = event as CustomEvent<FindEventDetail>;
-    const { text, options } = customEvent.detail;
-    if (!text) {
-      this.handleFindClose();
-      return;
-    }
-
-    const caseSensitive = options.matchCase;
-    const predicate = textPredicate(text, caseSensitive);
-
-    // Perform search using new API (map matchCase to caseSensitive)
-    this.searchCursor = this.flamechart.search(predicate, { caseSensitive });
-
-    if (!this.searchCursor) {
-      return;
-    }
-
-    // Dispatch results
-    this.dispatchFindResults(this.searchCursor.total);
-
-    // Navigate to first match (cursor handles centering, tooltip, and render)
-    if (this.searchCursor.total > 0) {
-      this.searchCursor.first();
-    }
-  };
-
-  /**
-   * Handle lv-find-match event (navigate to specific match).
-   */
-  private handleFindMatch = (event: Event): void => {
-    // Only process if this timeline instance is active
-    if (!this.container || !this.container.isConnected) {
-      return;
-    }
-
-    const customEvent = event as CustomEvent<FindEventDetail>;
-    const { count } = customEvent.detail;
-
-    // count is 1-based, convert to 0-based index
-    const index = count - 1;
-
-    // Cursor handles centering, tooltip, and render
-    this.searchCursor?.seek(index);
-  };
-
-  /**
-   * Handle lv-find-close event (clear search).
-   */
-  private handleFindClose = (): void => {
-    // Only process if this timeline instance is active
-    if (!this.container || !this.container.isConnected) {
-      return;
-    }
-
-    // Clear search cursor reference
-    this.searchCursor = null;
-
-    // The panel belongs to the match, so it closes with the find.
-    if (this.navigationTooltip) {
-      this.navigationTooltip = false;
-      this.tooltipRenderer?.hide();
-    }
-
-    // Clear search state (FlameChart handles render)
-    this.flamechart.clearSearch();
-
-    document.dispatchEvent(new CustomEvent('lv-find-results', { detail: { totalMatches: 0 } }));
-  };
-
-  /**
    * Handle search navigation callback from FlameChart.
    * Shows tooltip for the current search match, as keyboard navigation does for a frame.
    */
@@ -1172,19 +1082,5 @@ export class ApexLogTimeline {
     _depth: number,
   ): void {
     this.handleFrameNavigate(eventNode, screenX, screenY);
-  }
-
-  /**
-   * Dispatch lv-find-results event with match count.
-   */
-  private dispatchFindResults(totalMatches: number): void {
-    const detail: FindResultsEventDetail = { totalMatches };
-    const event = new CustomEvent('lv-find-results', {
-      detail,
-      bubbles: true,
-      composed: true,
-    });
-
-    document.dispatchEvent(event);
   }
 }

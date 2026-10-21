@@ -19,12 +19,13 @@ const soqlRow = { originalData: { type: 'SOQL_EXECUTE_BEGIN' } };
 
 describe('soqlGroupCell', () => {
   it('shows an empty key as it is, with its count', () => {
-    expect(soqlGroupCell({ key: '', rows: [soqlRow] })).toBe(' (1)');
+    expect(shown('', [soqlRow]).textContent).toBe(' (1)');
   });
 
-  it('shows a key whose rows are no query as the key and its count', () => {
-    const rows = [{ originalData: { type: 'METHOD_ENTRY' } }];
-    expect(soqlGroupCell({ key: 'SomeMethod', rows })).toBe('SomeMethod (1)');
+  it('shows a key whose rows are no query as the key and its count, marking the key for find', () => {
+    const cell = shown('SomeMethod', [{ originalData: { type: 'METHOD_ENTRY' } }]);
+    expect(cell.textContent).toBe('SomeMethod (1)');
+    expect(cell.querySelector('[data-grid-find-text]')?.textContent).toBe('SomeMethod');
   });
 
   it('highlights SOQL when the first row is SOQL_EXECUTE_BEGIN', () => {

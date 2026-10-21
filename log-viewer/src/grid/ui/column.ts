@@ -45,7 +45,11 @@ export interface GridColumn<R> {
   total?(value: number): CellContent;
   /** The footer cell of a column with no `calc`, such as a "Total" label. */
   footer?: CellContent;
-  /** A group row's cell, in the first column. Default: its key and row count. */
+  /**
+   * A group row's cell, in the first column. Default: its key and row count. Find searches
+   * the key: mark the element that shows it with `data-grid-find-text`, or the marks land on
+   * the whole cell.
+   */
   groupCell?(group: Group<R>): CellContent;
   /** Extra classes on every cell of the column. */
   className?: string;

@@ -18,6 +18,9 @@ jest.mock('../../../../components/grid/exportCsv.js', () => ({ exportCsv: jest.f
 jest.mock('../../../call-tree/navigation.js', () => ({ goToRow: jest.fn() }));
 
 import type { AppGrid } from '../../../../components/grid/AppGrid.js';
+import { parse } from '@apexdevtools/apex-log-parser';
+import { describeLevelGap } from '../../../../core/log/levelCapabilities.js';
+import { setCurrentLog } from '../../../../core/log/LogStore.js';
 import { ContextMenu } from '../../../../components/ContextMenu.js';
 import { exportCsv } from '../../../../components/grid/exportCsv.js';
 import { Group } from '../../../../grid/index.js';
@@ -393,5 +396,35 @@ describe.each(GRIDS)('%s', (_name, spec) => {
 
       expect(goToRow).toHaveBeenCalledWith({ eventIndex: 2 });
     });
+  });
+});
+
+describe('SOQLView selectivity', () => {
+  const captured = (db: string) => parse(`64.0 APEX_CODE,FINE;APEX_PROFILING,NONE;DB,${db}\n`);
+
+  const tooltip = async (): Promise<string | undefined> => {
+    const view = new SOQLView() as unknown as View;
+    view.lines = [{ ...line(1, 5, 'ns1', 'Account'), children: [] }];
+    document.body.append(view);
+    await view.updateComplete;
+    const grid = view.grid!; // shown: the view has lines
+    const column = grid.columns.find((candidate) => candidate.id === 'isSelective');
+    const tip = column?.tooltip?.(grid.source?.roots[0] as Row);
+    view.remove();
+    return tip as string | undefined;
+  };
+
+  it('names the DB level a log was captured below', async () => {
+    const store = setCurrentLog(captured('FINE'));
+    const why = describeLevelGap(store.levelGap('queryPlans'));
+
+    expect(why).not.toBe('');
+    expect(await tooltip()).toBe(`Selectivity could not be determined. ${why}`);
+  });
+
+  it('names no level when the levels are not why a query has no plan', async () => {
+    setCurrentLog(captured('FINEST'));
+
+    expect(await tooltip()).toBe('Selectivity could not be determined.');
   });
 });

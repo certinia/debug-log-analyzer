@@ -5,8 +5,8 @@
 /**
  * Search-related type definitions for timeline search functionality.
  *
- * Provides generic interfaces for search matches, cursor navigation,
- * and search options, decoupled from specific event implementations.
+ * Provides generic interfaces for search matches and cursor navigation,
+ * decoupled from specific event implementations.
  */
 
 import type { PrecomputedRect } from '../optimised/RectangleCache.js';
@@ -59,37 +59,19 @@ export interface SearchCursor<E extends EventNode> {
   /** All search matches in traversal order */
   readonly matches: ReadonlyArray<SearchMatch<E>>;
 
-  /** Current position in matches array (0-indexed, -1 if empty) */
+  /** Current position in matches array (0-indexed), -1 until a step moves to one */
   readonly currentIndex: number;
 
   /** Total number of matches */
   readonly total: number;
 
   // Navigation methods
-  /** Move to next match, returns match or null if at end */
-  next(): SearchMatch<E> | null;
-
-  /** Move to previous match, returns match or null if at start */
-  prev(): SearchMatch<E> | null;
-
-  /** Jump to first match, returns match or null if empty */
-  first(): SearchMatch<E> | null;
-
-  /** Jump to last match, returns match or null if empty */
-  last(): SearchMatch<E> | null;
-
-  /** Seek to specific index, returns match or null if out of bounds */
+  /** Seek to specific index, returns match or null if out of bounds; -1 makes none current */
   seek(index: number): SearchMatch<E> | null;
 
   // Query methods
   /** Get current match without moving cursor */
   getCurrent(): SearchMatch<E> | null;
-
-  /** Check if there's a next match */
-  hasNext(): boolean;
-
-  /** Check if there's a previous match */
-  hasPrev(): boolean;
 
   // Rendering support
   /** Get set of matched event IDs for desaturation rendering */
@@ -97,15 +79,4 @@ export interface SearchCursor<E extends EventNode> {
 
   /** Get lightweight info about matched events for bucket search highlighting */
   getMatchedEventsInfo(): ReadonlyArray<MatchedEventInfo>;
-}
-
-/**
- * Options for search behavior.
- */
-export interface SearchOptions {
-  /** Enable case-sensitive search (default: false) */
-  caseSensitive?: boolean;
-
-  /** Match whole words only (default: false) */
-  matchWholeWord?: boolean;
 }

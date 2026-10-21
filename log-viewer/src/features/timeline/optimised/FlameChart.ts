@@ -33,12 +33,7 @@ import type {
   ViewportState,
 } from '../types/flamechart.types.js';
 import { TIMELINE_CONSTANTS, TimelineError, TimelineErrorCode } from '../types/flamechart.types.js';
-import type {
-  FramePredicate,
-  MatchedEventInfo,
-  SearchCursor,
-  SearchOptions,
-} from '../types/search.types.js';
+import type { FramePredicate, MatchedEventInfo, SearchCursor } from '../types/search.types.js';
 
 import { MeshMarkerRenderer } from './markers/MeshMarkerRenderer.js';
 import { MeshRectangleRenderer } from './MeshRectangleRenderer.js';
@@ -142,6 +137,8 @@ export interface FlameChartCallbacks {
   onMeasurementChange?: (measurement: MeasurementSnapshot | null) => void;
   /** Called when Escape asks to drop the category highlight. Returns whether the owner dropped any. */
   onCategoryDimClear?: () => boolean;
+  /** Called, in place of clearing, when Escape drops a search: the find that made it owns it. */
+  onSearchClear?: () => void;
 }
 
 export class FlameChart<E extends EventNode = EventNode> {
@@ -654,15 +651,20 @@ export class FlameChart<E extends EventNode = EventNode> {
   }
 
   /**
-   * Search events using predicate function.
-   * Returns FlameChartCursor that automatically handles centering, tooltips, and rendering.
+   * Search events using predicate function, with no match current.
    *
    * @param predicate - Function to test each event
-   * @param options - Search options (caseSensitive, matchWholeWord)
-   * @returns FlameChartCursor for navigating results, or null if search not enabled
+   * @returns The number of matches, or null if search not enabled
    */
-  public search(predicate: FramePredicate, options?: SearchOptions): SearchCursor<E> | null {
-    return this.searchOrchestrator?.search(predicate, options) ?? null;
+  public search(predicate: FramePredicate): number | null {
+    return this.searchOrchestrator?.search(predicate) ?? null;
+  }
+
+  /**
+   * Make match `index` (from 0) current: centre on it and show its panel. -1 makes none current.
+   */
+  public setCurrentMatch(index: number): void {
+    this.searchOrchestrator?.setCurrentMatch(index);
   }
 
   /**
@@ -1321,7 +1323,7 @@ export class FlameChart<E extends EventNode = EventNode> {
           this.selectionOrchestrator.clearSelection();
         } else if (!(this.dimState.legendShowing() && this.callbacks.onCategoryDimClear?.())) {
           // Falls through when only a chip under the pointer lights the legend: nothing to drop.
-          this.clearSearch();
+          this.callbacks.onSearchClear?.();
         }
       },
       onMarkerNav: (direction: MarkerNavDirection) => {
