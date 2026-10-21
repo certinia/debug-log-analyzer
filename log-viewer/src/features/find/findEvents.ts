@@ -6,7 +6,8 @@
  * every searchable view.
  *
  * The widget produces `lv-find`, `lv-find-match` and `lv-find-close`; each view
- * answers with `lv-find-results`.
+ * answers with `lv-find-results`. A view that drops the search itself, as the
+ * Timeline on Escape, sends `lv-find-dismiss`.
  */
 
 /** Payload for `lv-find`, `lv-find-match` and `lv-find-close`. */
@@ -41,4 +42,6 @@ export interface FindEventMap {
   'lv-find-results': CustomEvent<FindResultsEventDetail>;
   /** The shown view changed: the widget searches its text again, if it is open. */
   'lv-find-refresh': CustomEvent<null>;
+  /** A view dropped the search itself, as on Escape: the widget closes, if it is open. */
+  'lv-find-dismiss': CustomEvent<null>;
 }

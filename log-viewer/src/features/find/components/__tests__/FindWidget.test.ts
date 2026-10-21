@@ -76,6 +76,21 @@ describe('FindWidget', () => {
   });
 
   it.each([
+    ['closes, and asks the views to drop the search, when open', true, 1],
+    ['does nothing when closed', false, 0],
+  ])('on a dismiss, %s', async (_name, open, closes) => {
+    const { widget } = await shown();
+    widget.isVisble = open;
+    const onClose = jest.fn();
+    document.addEventListener('lv-find-close', onClose);
+    document.dispatchEvent(new CustomEvent('lv-find-dismiss', { detail: null }));
+    document.removeEventListener('lv-find-close', onClose);
+
+    expect(onClose).toHaveBeenCalledTimes(closes);
+    expect(widget.isVisble).toBe(false);
+  });
+
+  it.each([
     ['Enter goes to the first', false, 1],
     ['Shift+Enter goes to the last', true, 5],
   ])('from no position, %s match', async (_name, shiftKey, match) => {

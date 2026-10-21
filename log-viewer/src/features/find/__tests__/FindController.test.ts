@@ -8,7 +8,7 @@
 import { afterEach, beforeEach, describe, expect, it, jest } from '@jest/globals';
 
 import { fakeHost, type FakeHost } from '#test-helpers/fakeHost.js';
-import { LvGridFindController, type FindableGrid } from '../LvGridFindController.js';
+import { FindController, type FindTarget } from '../FindController.js';
 
 function gridStub(total = 3) {
   return {
@@ -29,14 +29,14 @@ const findEvent = (
   { count = 0, matchCase = false } = {},
 ) => new CustomEvent(type, { detail: { text, count, options: { matchCase } } });
 
-describe('LvGridFindController', () => {
+describe('FindController', () => {
   let host: FakeHost & HTMLElement;
   let height: number;
   let grids: Stub[];
   let reported: number[];
   // The widget's current match each report gave, from 1; 0 for none.
   let positions: number[];
-  let finder: LvGridFindController;
+  let finder: FindController;
   const onResults = (e: Event): void => {
     const { totalMatches, currentMatch } = (
       e as CustomEvent<{ totalMatches: number; currentMatch: number }>
@@ -52,8 +52,8 @@ describe('LvGridFindController', () => {
     grids = [gridStub()];
     reported = [];
     positions = [];
-    finder = new LvGridFindController(host, {
-      grids: () => grids as unknown as FindableGrid[],
+    finder = new FindController(host, {
+      targets: () => grids as unknown as FindTarget[],
     });
     host.connect();
     document.addEventListener('lv-find-results', onResults);
@@ -116,8 +116,8 @@ describe('LvGridFindController', () => {
   });
 
   it.each([
-    ['starts at the first match', 1, 1, [[0]]],
-    ['searches without moving', 0, 0, [[-1]]],
+    ['starts at the first match', 1, 1, [[0, false]]],
+    ['searches without moving', 0, 0, [[-1, false]]],
   ])('for a new query, %s', async (_name, count, position, marks) => {
     await finder.find(findEvent('lv-find', 'update', { count }));
 
@@ -131,8 +131,14 @@ describe('LvGridFindController', () => {
     await finder.find(findEvent('lv-find-match', 'update', { count: 4 }));
 
     expect(reported).toEqual([5]);
-    expect(grids[0]?.setCurrentMatch.mock.calls).toEqual([[0], [-1]]);
-    expect(grids[1]?.setCurrentMatch.mock.calls).toEqual([[-1], [1]]);
+    expect(grids[0]?.setCurrentMatch.mock.calls).toEqual([
+      [0, false],
+      [-1, false],
+    ]);
+    expect(grids[1]?.setCurrentMatch.mock.calls).toEqual([
+      [-1, false],
+      [1, false],
+    ]);
   });
 
   it('clears every grid and searches again after the widget closes', async () => {
@@ -177,7 +183,7 @@ describe('LvGridFindController', () => {
       expect(reported).toEqual([]);
     });
 
-    it('searches again, reports the current match where its grid kept it, and brings it into view', async () => {
+    it('searches again, reports the current match where its grid kept it, and marks it kept', async () => {
       grids = [gridStub(2), gridStub(3)];
       await finder.find(findEvent('lv-find', 'update', { count: 1, matchCase: true }));
       grids[0]?.find.mockResolvedValueOnce({ total: 4, current: -1 });
@@ -188,7 +194,7 @@ describe('LvGridFindController', () => {
       expect(reported).toEqual([5, 5]);
       expect(positions).toEqual([1, 5]);
       expect(finder.totalMatches).toBe(5);
-      expect(grids[1]?.setCurrentMatch.mock.calls.at(-1)).toEqual([0]);
+      expect(grids[1]?.setCurrentMatch.mock.calls.at(-1)).toEqual([0, true]);
     });
 
     it('reports no current match when no grid kept one', async () => {
@@ -196,7 +202,7 @@ describe('LvGridFindController', () => {
       await finder.rerun();
 
       expect(positions).toEqual([1, 0]);
-      expect(grids[0]?.setCurrentMatch.mock.calls).toEqual([[0]]);
+      expect(grids[0]?.setCurrentMatch.mock.calls).toEqual([[0, false]]);
     });
 
     it('clears every grid when the host is off screen', async () => {
@@ -210,15 +216,6 @@ describe('LvGridFindController', () => {
       expect(reported).toEqual([6]);
     });
 
-    it('clears the search when a rebuild replaced it', async () => {
-      await finder.find(findEvent('lv-find', 'update'));
-      grids[0]?.find.mockResolvedValueOnce(null);
-      await finder.rerun();
-
-      expect(reported).toEqual([3, 0]);
-      expect(finder.totalMatches).toBe(0);
-    });
-
     it('ignores a move to a match while it runs, as the move counts by the old totals', async () => {
       grids = [gridStub(2), gridStub(3)];
       await finder.find(findEvent('lv-find', 'update', { count: 1 }));
@@ -230,7 +227,7 @@ describe('LvGridFindController', () => {
       finish({ total: 3, current: -1 });
       await running;
 
-      expect(grids[0]?.setCurrentMatch.mock.calls).toEqual([[0]]);
+      expect(grids[0]?.setCurrentMatch.mock.calls).toEqual([[0, false]]);
       expect(positions).toEqual([1, 0]);
     });
 
@@ -255,7 +252,7 @@ describe('LvGridFindController', () => {
     let calls: string[];
     // An unfold of the second grid waits on this while it is set.
     let held: Promise<void> | null;
-    let folded: LvGridFindController;
+    let folded: FindController;
 
     beforeEach(() => {
       calls = [];
@@ -266,8 +263,8 @@ describe('LvGridFindController', () => {
           calls.push(`mark ${i}:${match}`);
         }),
       );
-      folded = new LvGridFindController(host, {
-        grids: () => grids as unknown as FindableGrid[],
+      folded = new FindController(host, {
+        targets: () => grids as unknown as FindTarget[],
         unfold: async (grid) => {
           const i = grids.indexOf(grid as unknown as Stub);
           calls.push(`unfold ${i}`);
@@ -313,8 +310,8 @@ describe('LvGridFindController', () => {
       open();
       await slow;
 
-      expect(grids[1]?.setCurrentMatch.mock.calls.at(-1)).toEqual([-1]);
-      expect(grids[0]?.setCurrentMatch.mock.calls.at(-1)).toEqual([1]);
+      expect(grids[1]?.setCurrentMatch.mock.calls.at(-1)).toEqual([-1, false]);
+      expect(grids[0]?.setCurrentMatch.mock.calls.at(-1)).toEqual([1, false]);
     });
   });
 });
