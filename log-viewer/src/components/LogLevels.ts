@@ -6,6 +6,7 @@ import '#vscode-elements/vscode-icon.js';
 import { consume } from '@lit/context';
 import { LitElement, css, html, nothing } from 'lit';
 import { customElement, property } from 'lit/decorators.js';
+import { ifDefined } from 'lit/directives/if-defined.js';
 import { live } from 'lit/directives/live.js';
 import { repeat } from 'lit/directives/repeat.js';
 
@@ -17,6 +18,7 @@ import './VsSelect.js';
 
 // styles
 import { globalStyles } from '../styles/global.styles.js';
+import { LEVEL_ADDS } from '../core/log/levelContents.js';
 import { LEVEL_ORDER, levelRank, sameLevels } from '../core/log/levelFilter.js';
 import { logStatusContext, type LogStatus } from '../core/log/logStatus.js';
 import { skeletonStyles } from '../styles/skeleton.styles.js';
@@ -193,6 +195,7 @@ export class LogLevels extends LitElement {
               const uncaptured = levelRank(option) > levelRank(captured);
               return html`<vscode-option
                 value=${option}
+                description=${ifDefined(LEVEL_ADDS[category][option])}
                 ?selected=${option === level}
                 ?disabled=${uncaptured}
                 >${option}</vscode-option

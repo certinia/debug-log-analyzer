@@ -238,6 +238,12 @@ export const selectSizingStyles = css`
     padding-left: var(--lana-space-md);
     color: var(--lana-fg-muted);
   }
+
+  /* The popup hugs its widest option, so the description wraps to that width rather than set it. */
+  .description {
+    contain: inline-size;
+    font-size: var(--filter-popover-row-font-size);
+  }
 `;
 
 /** vscode-single-select where the control fits the selected value and the popup its widest option. */

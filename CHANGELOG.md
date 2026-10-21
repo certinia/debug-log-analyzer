@@ -26,7 +26,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- 🎚️ **Log levels**: filter the log to a lower debug level per category from the header. ([#530])
+- 🎚️ **Log levels**: filter the log to a lower debug level per category from the header, and see what each level adds. ([#530])
 - 🔦 **Timeline legend**: hover a category to highlight frames in the timeline, select to keep. ([#917])
 - 🔍 **Find**: in the tables, find matches the group header text too.
 
