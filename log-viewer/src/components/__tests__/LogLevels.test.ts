@@ -126,6 +126,20 @@ describe('log-levels', () => {
     expect(asked).toBe(1);
   });
 
+  it('says what each level adds', async () => {
+    const el = await mount({ apexCode: 'FINE' }, { apexCode: 'FINE' });
+
+    const finest = options(el).find((option) => option.getAttribute('value') === 'FINEST');
+    expect(finest?.getAttribute('description')).toBe('Variables');
+  });
+
+  it('says nothing for a level that adds nothing', async () => {
+    const el = await mount({ apexCode: 'FINE' }, { apexCode: 'FINE' });
+
+    const warn = options(el).find((option) => option.getAttribute('value') === 'WARN');
+    expect(warn?.hasAttribute('description')).toBe(false);
+  });
+
   it('names the captured level in each dropdown', async () => {
     const el = await mount({ apexCode: 'FINE' }, { apexCode: 'DEBUG' });
 
