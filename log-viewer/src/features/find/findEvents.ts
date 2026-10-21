@@ -25,6 +25,12 @@ export interface FindEventDetail {
   count: number;
 
   options: { matchCase: boolean };
+
+  /**
+   * Set on `lv-find` and `lv-find-match` when no match is current: the views move to the
+   * match nearest the screen that way, and `count` is 0.
+   */
+  from?: 'next' | 'prev';
 }
 
 /** Payload for `lv-find-results`, a view's answer to a search. */

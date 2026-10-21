@@ -17,6 +17,7 @@ function gridStub(total = 3) {
       current: -1,
     })),
     setCurrentMatch: jest.fn(async (_match: number) => undefined),
+    nearView: jest.fn((_from: 'next' | 'prev') => -1),
     clearFind: jest.fn(),
   };
 }
@@ -26,8 +27,8 @@ type Stub = ReturnType<typeof gridStub>;
 const findEvent = (
   type: 'lv-find' | 'lv-find-match' | 'lv-find-close',
   text: string,
-  { count = 0, matchCase = false } = {},
-) => new CustomEvent(type, { detail: { text, count, options: { matchCase } } });
+  { count = 0, matchCase = false, from = undefined as 'next' | 'prev' | undefined } = {},
+) => new CustomEvent(type, { detail: { text, count, options: { matchCase }, from } });
 
 describe('FindController', () => {
   let host: FakeHost & HTMLElement;
@@ -188,6 +189,33 @@ describe('FindController', () => {
 
     expect(grids[0]?.setCurrentMatch.mock.calls).not.toContainEqual([1, false]);
     expect(positions).toEqual([1, 0]);
+  });
+
+  describe('from the screen', () => {
+    // Two grids of 2 and 3 matches; each gives its match nearest the screen, or -1.
+    it.each([
+      ['the first grid with one, for next', 'next', [-1, 1], 4, [-1, 1]],
+      ['the last grid with one, for prev', 'prev', [1, 0], 3, [-1, 0]],
+      ['the first match, when none is that way', 'next', [-1, -1], 1, [0, -1]],
+      ['the last match, when none is that way', 'prev', [-1, -1], 5, [-1, 2]],
+    ] as const)('moves to %s', async (_name, from, near, position, marks) => {
+      grids = [gridStub(2), gridStub(3)];
+      grids.forEach((grid, i) => grid.nearView.mockReturnValue(near[i] as number));
+      await finder.find(findEvent('lv-find', 'update'));
+      await finder.find(findEvent('lv-find-match', 'update', { from }));
+
+      expect(positions).toEqual([0, position]);
+      expect(grids.map((grid) => grid.setCurrentMatch.mock.calls.at(-1)?.[0])).toEqual(marks);
+    });
+
+    it('moves to the match nearest the screen after a new search', async () => {
+      grids = [gridStub(2), gridStub(3)];
+      grids[1]?.nearView.mockReturnValue(2);
+      await finder.find(findEvent('lv-find', 'update', { from: 'next' }));
+
+      expect(positions).toEqual([5]);
+      expect(grids[1]?.setCurrentMatch.mock.calls.at(-1)?.[0]).toBe(2);
+    });
   });
 
   describe('rerun', () => {

@@ -79,7 +79,7 @@ export class FindController {
       this._drop();
       return;
     }
-    const { text, options, count } = e.detail;
+    const { text, options, count, from } = e.detail;
     const query = { text, matchCase: options.matchCase };
     const isNew = text !== this._query?.text || options.matchCase !== this._query.matchCase;
     const shown = this._shown();
@@ -95,13 +95,17 @@ export class FindController {
       if (e.type === 'lv-find') {
         await this.rerun();
       } else if (!this._running) {
-        await this._step(count);
+        await this._step(from ? this._reportNearView(from) : count);
       }
       return;
     }
     this._query = query;
     this._running++;
     if (!(await this._search(query, shown).finally(() => this._running--))) {
+      return;
+    }
+    if (from) {
+      await this._step(this._reportNearView(from));
       return;
     }
     report(this.totalMatches, count ? Math.min(1, this.totalMatches) : 0);
@@ -162,6 +166,29 @@ export class FindController {
     }
     this._found = found;
     return found;
+  }
+
+  /**
+   * Reports the match nearest the screen that way, from 1 across the targets, and gives it:
+   * the first target in order that has one for `next`, the last for `prev`. With none that
+   * way, it wraps to the first or last match.
+   */
+  private _reportNearView(from: 'next' | 'prev'): number {
+    const total = this.totalMatches;
+    let count = from === 'next' ? Math.min(1, total) : total;
+    let before = 0;
+    for (const { target, total: held } of this._found) {
+      const match = held ? target.nearView(from) : -1;
+      if (match >= 0) {
+        count = before + match + 1;
+        if (from === 'next') {
+          break;
+        }
+      }
+      before += held;
+    }
+    report(total, count);
+    return count;
   }
 
   // A move to match `count`: unfolds the target that holds it, then marks it.

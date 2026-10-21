@@ -108,12 +108,14 @@ describe('FindWidget', () => {
       const box = widget.inputbox;
       Object.assign(box ?? {}, { tabIndex: 0 });
       box?.focus();
-      const searches: { text: string; count: number }[] = [];
+      const searches: { text: string; count: number; from?: string }[] = [];
       document.addEventListener(
         'lv-find',
         (e) => {
-          const { text, count } = (e as CustomEvent<{ text: string; count: number }>).detail;
-          searches.push({ text, count });
+          const { text, count, from } = (
+            e as CustomEvent<{ text: string; count: number; from?: string }>
+          ).detail;
+          searches.push(from ? { text, count, from } : { text, count });
         },
         { signal: listening.signal },
       );
@@ -136,20 +138,20 @@ describe('FindWidget', () => {
       expect(searches).toEqual([{ text: 'fo', count: 0 }]);
     });
 
-    it('runs a waiting search at once on Enter, and moves to the first match', async () => {
+    it('runs a waiting search at once on Enter, and moves to the match nearest the screen', async () => {
       const { searches, type } = await typed();
       type('fo');
       window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter' }));
       jest.advanceTimersByTime(150);
 
-      expect(searches).toEqual([{ text: 'fo', count: 1 }]);
+      expect(searches).toEqual([{ text: 'fo', count: 0, from: 'next' }]);
     });
   });
 
   it.each([
-    ['Enter goes to the first', false, 1],
-    ['Shift+Enter goes to the last', true, 5],
-  ])('from no position, %s match', async (_name, shiftKey, match) => {
+    ['Enter asks for the next', false, 'next'],
+    ['Shift+Enter asks for the previous', true, 'prev'],
+  ])('from no position, %s match nearest the screen', async (_name, shiftKey, from) => {
     const { widget } = await shown();
     const box = widget.inputbox;
     // jsdom focuses only an element with a tabindex; a browser focuses the textfield's input.
@@ -159,14 +161,15 @@ describe('FindWidget', () => {
       void window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', ...init }));
     press();
     results({ totalMatches: 5, currentMatch: 0 });
-    const counts: number[] = [];
+    const steps: { count: number; from?: string }[] = [];
     const onMatch = (e: Event): void => {
-      counts.push((e as CustomEvent<{ count: number }>).detail.count);
+      const { count, from } = (e as CustomEvent<{ count: number; from?: string }>).detail;
+      steps.push({ count, from });
     };
     document.addEventListener('lv-find-match', onMatch);
     press({ shiftKey });
     document.removeEventListener('lv-find-match', onMatch);
 
-    expect(counts).toEqual([match]);
+    expect(steps).toEqual([{ count: 0, from }]);
   });
 });

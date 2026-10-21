@@ -223,6 +223,13 @@ export class FindWidget extends LitElement {
    * @param setDirection - If true, remembers this direction for Enter key. Button clicks pass true, Shift+Enter passes false.
    */
   _previousMatch(setDirection = true) {
+    if (!this.currentMatch && this.totalMatches) {
+      if (setDirection) {
+        this.nextMatchDirection = false;
+      }
+      this._stepFromView('prev');
+      return;
+    }
     if (this.currentMatch !== null) {
       this.currentMatch--;
       if (setDirection) {
@@ -241,6 +248,13 @@ export class FindWidget extends LitElement {
    * @param setDirection - If true, remembers this direction for Enter key. Button clicks pass true, Enter key passes false.
    */
   _nextMatch(setDirection = true) {
+    if (!this.currentMatch && this.totalMatches) {
+      if (setDirection) {
+        this.nextMatchDirection = true;
+      }
+      this._stepFromView('next');
+      return;
+    }
     if (this.currentMatch !== null) {
       this.currentMatch++;
       if (setDirection) {
@@ -302,7 +316,7 @@ export class FindWidget extends LitElement {
         e.preventDefault(); // Prevent double-firing from input field
         this._live.cancel();
         if (this._hasMatchValueChanged() || !this.totalMatches) {
-          this._triggerFind();
+          this._triggerFind(e.shiftKey || !this.nextMatchDirection ? 'prev' : 'next');
         } else if (e.shiftKey) {
           this._previousMatch(false); // Shift+Enter → always previous, don't change remembered direction
         } else if (this.nextMatchDirection) {
@@ -343,9 +357,19 @@ export class FindWidget extends LitElement {
     document.dispatchEvent(new CustomEvent('lv-find', findEvt));
   }
 
-  _triggerFind() {
+  // Searches without moving, or, with `from`, moves to the match nearest the screen that way.
+  _triggerFind(from?: 'next' | 'prev') {
     this._resetCounts();
-    document.dispatchEvent(new CustomEvent('lv-find', this._getFindEvent()));
+    const { detail } = this._getFindEvent();
+    document.dispatchEvent(new CustomEvent('lv-find', { detail: { ...detail, count: 0, from } }));
+  }
+
+  // No match is current, so the views pick the one nearest the screen.
+  _stepFromView(from: 'next' | 'prev') {
+    const { detail } = this._getFindEvent();
+    document.dispatchEvent(
+      new CustomEvent('lv-find-match', { detail: { ...detail, count: 0, from } }),
+    );
   }
 
   _getMatchValue() {
