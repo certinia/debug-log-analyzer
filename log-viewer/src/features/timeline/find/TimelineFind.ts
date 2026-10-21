@@ -9,7 +9,7 @@ import type { EventNode } from '../types/flamechart.types.js';
 /** The part of the chart find drives. The chart's search owns the matches and the current one. */
 export type FindableChart<E extends EventNode> = Pick<
   FlameChart<E>,
-  'search' | 'setCurrentMatch' | 'getSearchCursor' | 'clearSearch'
+  'search' | 'setCurrentMatch' | 'getSearchCursor' | 'clearSearch' | 'getViewportBounds'
 >;
 
 /** The Timeline's frames as a find target. A step centres the chart on its frame. */
@@ -46,6 +46,19 @@ export class TimelineFind<E extends EventNode> implements FindTarget {
     }
   }
 
+  nearView(direction: 'next' | 'prev'): number {
+    const matches = this.chart.getSearchCursor()?.matches;
+    const bounds = this.chart.getViewportBounds();
+    if (!this.query || !matches?.length || !bounds) {
+      return -1;
+    }
+    if (direction === 'next') {
+      const match = firstStartingFrom(matches, bounds.timeStart);
+      return match < matches.length ? match : -1;
+    }
+    return firstStartingFrom(matches, bounds.timeEnd) - 1;
+  }
+
   clearFind(): void {
     if (!this.query) {
       return;
@@ -54,4 +67,22 @@ export class TimelineFind<E extends EventNode> implements FindTarget {
     this.chart.clearSearch();
     this.onClear();
   }
+}
+
+// The matches are in log order, which is by start time.
+function firstStartingFrom(
+  matches: readonly { rect: { timeStart: number } }[],
+  time: number,
+): number {
+  let lo = 0;
+  let hi = matches.length;
+  while (lo < hi) {
+    const mid = (lo + hi) >>> 1;
+    if ((matches[mid]?.rect.timeStart ?? Infinity) < time) {
+      lo = mid + 1;
+    } else {
+      hi = mid;
+    }
+  }
+  return lo;
 }

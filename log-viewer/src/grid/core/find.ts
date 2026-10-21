@@ -1,6 +1,7 @@
 /*
  * Copyright (c) 2026 Certinia Inc. All rights reserved.
  */
+import type { RowView } from './rows.js';
 import { Group, type RowKey } from './types.js';
 
 export interface FindQuery {
@@ -41,6 +42,8 @@ export class FindResult<R> {
   private readonly rows: readonly Findable<R>[];
   private readonly starts: Uint32Array;
   private readonly paths: readonly (PathNode | null)[];
+  // The group each row sits in, as a path leaves it out.
+  private readonly groups: readonly (string | null)[];
   private readonly key: (row: R) => RowKey;
   // Groups by key: each build makes its groups again.
   private readonly at: ReadonlyMap<R | string, number>;
@@ -49,6 +52,7 @@ export class FindResult<R> {
     rows: readonly Findable<R>[],
     starts: Uint32Array,
     paths: readonly (PathNode | null)[],
+    groups: readonly (string | null)[],
     at: ReadonlyMap<R | string, number>,
     total: number,
     pattern: RegExp | null,
@@ -57,6 +61,7 @@ export class FindResult<R> {
     this.rows = rows;
     this.starts = starts;
     this.paths = paths;
+    this.groups = groups;
     this.at = at;
     this.total = total;
     this.pattern = pattern;
@@ -89,6 +94,59 @@ export class FindResult<R> {
     return path.reverse();
   }
 
+  /**
+   * The first match at or after shown row `index` of `rows`, where a match in a collapsed
+   * row counts at the shown row above it; `total` when none is.
+   */
+  firstMatchFrom(rows: RowView<R>, index: number): number {
+    const rowKeys = new Set<RowKey>();
+    const groupKeys = new Set<string>();
+    let bound = this.total;
+    for (let i = index; i < rows.size; i++) {
+      const row = rows.rowAt(i);
+      const own = this.firstMatchIn(row);
+      if (own >= 0) {
+        bound = own;
+        break;
+      }
+      if (row instanceof Group) {
+        groupKeys.add(row.key);
+      } else {
+        rowKeys.add(rows.keyAt(i));
+      }
+    }
+    // Before `bound`, the matches from `index` on are the last ones: those hidden under a row passed over.
+    let lo = 0;
+    let hi = bound;
+    while (lo < hi) {
+      const mid = (lo + hi) >>> 1;
+      if (this.isUnder(mid, rowKeys, groupKeys)) {
+        hi = mid;
+      } else {
+        lo = mid + 1;
+      }
+    }
+    return lo;
+  }
+
+  private isUnder(
+    match: number,
+    rowKeys: ReadonlySet<RowKey>,
+    groupKeys: ReadonlySet<string>,
+  ): boolean {
+    const i = this.slotOf(match);
+    const group = this.groups[i];
+    if (typeof group === 'string' && groupKeys.has(group)) {
+      return true;
+    }
+    for (let node = this.paths[i] ?? null; node; node = node.up) {
+      if (rowKeys.has(node.key)) {
+        return true;
+      }
+    }
+    return false;
+  }
+
   /** Binary search: the last row whose first match is at or before `match`. */
   private slotOf(match: number): number {
     if (match < 0 || match >= this.total) {
@@ -115,6 +173,8 @@ export class FindCollector<R> {
   private readonly rows: Findable<R>[] = [];
   private readonly starts: number[] = [];
   private readonly paths: (PathNode | null)[] = [];
+  private readonly groups: (string | null)[] = [];
+  private group: string | null = null;
   // Filled as rows are visited, which is sliced: built at the end it held the thread 45ms.
   private readonly at = new Map<R | string, number>();
   private total = 0;
@@ -135,6 +195,7 @@ export class FindCollector<R> {
     let count = 0;
     // A group row shows its key, not the columns' text.
     if (row instanceof Group) {
+      this.group = row.key;
       count = countIn(this.pattern, row.key);
     } else {
       for (const cell of this.cells) {
@@ -146,6 +207,7 @@ export class FindCollector<R> {
       this.rows.push(row);
       this.starts.push(this.total);
       this.paths.push(up);
+      this.groups.push(row instanceof Group ? null : this.group);
       this.total += count;
     }
   }
@@ -155,6 +217,7 @@ export class FindCollector<R> {
       this.rows,
       Uint32Array.from(this.starts),
       this.paths,
+      this.groups,
       this.at,
       this.total,
       this.pattern,

@@ -35,6 +35,7 @@ import { GridView, rowId, type FindMarks } from '../render/index.js';
 import type { GridColumn } from './column.js';
 import { gridKey } from './keyboard.js';
 import { litPainter, total } from './painter.js';
+import { sightOf } from './sight.js';
 import { columnTracks, minWidthOf, naturalWidth } from './sizing.js';
 import { StoreController } from './store-controller.js';
 import { gridStyles } from './styles.js';
@@ -335,6 +336,36 @@ export class LvGrid<R extends object = object> extends LitElement {
     const detail = { total: result.total, current };
     this.emit<GridFindDetail>('lv-grid-find-results', detail);
     return detail;
+  }
+
+  /**
+   * The match nearest what the reader can see: for `next` the first at or below the top
+   * row in sight, for `prev` the last at or above the bottom one. -1 when none lies that way.
+   */
+  nearView(direction: 'next' | 'prev'): number {
+    const scroller = this.scrollerRef.value;
+    const result = this.found?.result;
+    if (!scroller || !result?.total || !this.shown) {
+      return -1;
+    }
+    const last = result.total - 1;
+    const painted =
+      this.bodyRef.value?.querySelectorAll<HTMLElement>(':scope > [data-index]:not([hidden])') ??
+      [];
+    const sight = sightOf(scroller, painted);
+    switch (sight) {
+      case 'above':
+        return direction === 'next' ? -1 : last;
+      case 'below':
+        return direction === 'next' ? 0 : -1;
+      case 'folded':
+        return direction === 'next' ? 0 : last;
+    }
+    if (direction === 'next') {
+      const match = result.firstMatchFrom(this.shown, sight.first);
+      return match > last ? -1 : match;
+    }
+    return result.firstMatchFrom(this.shown, sight.last + 1) - 1;
   }
 
   /**

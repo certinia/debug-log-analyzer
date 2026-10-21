@@ -21,6 +21,11 @@ export interface FindTarget {
    * true when a search again kept it current: a target may leave its view alone.
    */
   setCurrentMatch(match: number, kept?: boolean): Promise<void>;
+  /**
+   * The match nearest what the reader can see: for `next` the first at or after the top of
+   * the view, for `prev` the last at or before its end. -1 when none lies that way.
+   */
+  nearView(direction: 'next' | 'prev'): number;
   clearFind(): void;
 }
 

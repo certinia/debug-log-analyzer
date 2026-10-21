@@ -10,8 +10,13 @@ import { TimelineFind } from '../TimelineFind.js';
 
 const query = (text: string, matchCase = false) => ({ text, matchCase });
 
+// Match i starts at i * 10.
 function setup(total = 3) {
-  const matches = Array.from({ length: total }, () => ({}) as SearchMatch<EventNode>);
+  const matches = Array.from(
+    { length: total },
+    (_, i) => ({ rect: { timeStart: i * 10 } }) as SearchMatch<EventNode>,
+  );
+  let bounds = { timeStart: 0, timeEnd: 100, depthStart: 0, depthEnd: 10 };
   let cursor: SearchCursorImpl<EventNode> | undefined;
   const chart = {
     search: jest.fn(async (_predicate: FramePredicate) => {
@@ -23,9 +28,13 @@ function setup(total = 3) {
     clearSearch: jest.fn(() => {
       cursor = undefined;
     }),
+    getViewportBounds: () => bounds,
+  };
+  const view = (timeStart: number, timeEnd: number): void => {
+    bounds = { ...bounds, timeStart, timeEnd };
   };
   const onClear = jest.fn();
-  return { chart, onClear, find: new TimelineFind(chart, onClear) };
+  return { chart, onClear, view, find: new TimelineFind(chart, onClear) };
 }
 
 describe('TimelineFind', () => {
@@ -100,6 +109,19 @@ describe('TimelineFind', () => {
     await find.setCurrentMatch(1, true);
 
     expect(chart.setCurrentMatch).toHaveBeenCalledTimes(1);
+  });
+
+  it.each([
+    ['the first starting in the view, for next', 'next', 15, 25, 2],
+    ['the last starting in the view, for prev', 'prev', 5, 25, 2],
+    ['none past the last, for next', 'next', 25, 40, -1],
+    ['none before the first, for prev', 'prev', -10, 0, -1],
+  ] as const)('gives %s', async (_name, direction, start, end, match) => {
+    const { find, view } = setup();
+    await find.find(query('foo'));
+    view(start, end);
+
+    expect(find.nearView(direction)).toBe(match);
   });
 
   it('clears the chart and searches the same query afresh after a clear', async () => {
