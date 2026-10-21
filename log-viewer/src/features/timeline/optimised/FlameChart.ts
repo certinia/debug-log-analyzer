@@ -654,10 +654,10 @@ export class FlameChart<E extends EventNode = EventNode> {
    * Search events using predicate function, with no match current.
    *
    * @param predicate - Function to test each event
-   * @returns The number of matches, or null if search not enabled
+   * @returns The number of matches, or null if search not enabled or a newer search stopped it
    */
-  public search(predicate: FramePredicate): number | null {
-    return this.searchOrchestrator?.search(predicate) ?? null;
+  public async search(predicate: FramePredicate): Promise<number | null> {
+    return (await this.searchOrchestrator?.search(predicate)) ?? null;
   }
 
   /**

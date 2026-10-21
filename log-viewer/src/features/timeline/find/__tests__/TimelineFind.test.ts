@@ -14,7 +14,7 @@ function setup(total = 3) {
   const matches = Array.from({ length: total }, () => ({}) as SearchMatch<EventNode>);
   let cursor: SearchCursorImpl<EventNode> | undefined;
   const chart = {
-    search: jest.fn((_predicate: FramePredicate) => {
+    search: jest.fn(async (_predicate: FramePredicate) => {
       cursor = new SearchCursorImpl(matches);
       return total;
     }),

@@ -19,7 +19,7 @@ const LOG =
   '09:18:22.6 (1800)|METHOD_EXIT|[1]|ns.Outer.run()\n';
 
 // The renderers need WebGL, which jsdom lacks, so this sets only what a step reads.
-function searched() {
+async function searched() {
   const callbacks = {
     onSearchNavigate: jest.fn(),
     onCenterOnMatch: jest.fn(),
@@ -28,7 +28,7 @@ function searched() {
   };
   const orchestrator = new SearchOrchestrator(callbacks);
   const matcher = new EventMatcher(framesOf(LOG).frames);
-  matcher.search(textPredicate('ns.'));
+  await matcher.search(textPredicate('ns.'));
   const internals = orchestrator as unknown as Record<string, unknown>;
   internals['eventMatcher'] = matcher;
   internals['viewport'] = new TimelineViewport(400, 300, 1e9, 5);
@@ -36,8 +36,8 @@ function searched() {
 }
 
 describe('SearchOrchestrator.setCurrentMatch', () => {
-  it('centres on the match, opens its panel and drops the selection', () => {
-    const { orchestrator, callbacks } = searched();
+  it('centres on the match, opens its panel and drops the selection', async () => {
+    const { orchestrator, callbacks } = await searched();
     orchestrator.setCurrentMatch(1);
 
     const match = orchestrator.getCursor()?.getCurrent();
@@ -51,8 +51,8 @@ describe('SearchOrchestrator.setCurrentMatch', () => {
     expect(callbacks.onSearchNavigate).toHaveBeenCalledTimes(1);
   });
 
-  it('makes none current for -1, and leaves the view alone', () => {
-    const { orchestrator, callbacks } = searched();
+  it('makes none current for -1, and leaves the view alone', async () => {
+    const { orchestrator, callbacks } = await searched();
     orchestrator.setCurrentMatch(1);
     jest.clearAllMocks();
     orchestrator.setCurrentMatch(-1);

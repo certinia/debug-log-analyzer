@@ -24,7 +24,7 @@ export class TimelineFind<E extends EventNode> implements FindTarget {
     this.onClear = onClear;
   }
 
-  async find(query: FindQuery): Promise<FindCount> {
+  async find(query: FindQuery): Promise<FindCount | null> {
     const cursor = this.chart.getSearchCursor();
     if (cursor && query.text === this.query?.text && query.matchCase === this.query.matchCase) {
       return { total: cursor.total, current: cursor.currentIndex };
@@ -34,8 +34,8 @@ export class TimelineFind<E extends EventNode> implements FindTarget {
       return { total: 0, current: -1 };
     }
     this.query = query;
-    const total = this.chart.search(textPredicate(query.text, query.matchCase)) ?? 0;
-    return { total, current: -1 };
+    const total = await this.chart.search(textPredicate(query.text, query.matchCase));
+    return total === null ? null : { total, current: -1 };
   }
 
   // A kept match leaves the chart still: a step clears the selection and centres the chart.
