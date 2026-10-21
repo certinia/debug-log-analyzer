@@ -191,10 +191,7 @@ export class FindController {
     this.forget();
   }
 
-  /**
-   * Clears the targets and lets go of them, but keeps the query to search again: for a host
-   * hidden, or one about to replace its targets.
-   */
+  /** Clears the targets but keeps the query: for a hidden host, or one replacing its targets. */
   forget(): void {
     this._searches++;
     this._found = [];

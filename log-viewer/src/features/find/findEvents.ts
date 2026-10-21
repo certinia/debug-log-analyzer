@@ -6,7 +6,8 @@
  * every searchable view.
  *
  * The widget produces `lv-find`, `lv-find-match` and `lv-find-close`; each view
- * answers with `lv-find-results`.
+ * answers with `lv-find-results`. A view that drops the search itself, as the
+ * Timeline on Escape, sends `lv-find-dismiss`.
  */
 
 /** Payload for `lv-find`, `lv-find-match` and `lv-find-close`. */

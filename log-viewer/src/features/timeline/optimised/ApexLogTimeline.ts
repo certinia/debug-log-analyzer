@@ -98,7 +98,6 @@ export class ApexLogTimeline {
   /** The frames kept in colour while the rest of the chart is dimmed. */
   private emphasis = new InspectorEmphasis();
 
-  /** The frames find searches. */
   readonly findTarget: TimelineFind<EventNode>;
 
   constructor() {

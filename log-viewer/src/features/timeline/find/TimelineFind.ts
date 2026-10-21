@@ -12,10 +12,7 @@ export type FindableChart<E extends EventNode> = Pick<
   'search' | 'setCurrentMatch' | 'getSearchCursor' | 'clearSearch'
 >;
 
-/**
- * The Timeline's frames as a find target. A new query marks its matches with none current;
- * the same query again keeps the current one. A step centres the chart on its frame.
- */
+/** The Timeline's frames as a find target. A step centres the chart on its frame. */
 export class TimelineFind<E extends EventNode> implements FindTarget {
   private readonly chart: FindableChart<E>;
   private readonly onClear: () => void;

@@ -10,7 +10,6 @@ import { TimelineFind } from '../TimelineFind.js';
 
 const query = (text: string, matchCase = false) => ({ text, matchCase });
 
-/** A chart whose search owns the cursor, as the real one does. */
 function setup(total = 3) {
   const matches = Array.from({ length: total }, () => ({}) as SearchMatch<EventNode>);
   let cursor: SearchCursorImpl<EventNode> | undefined;

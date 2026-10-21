@@ -295,7 +295,6 @@ export class TimelineFlameChart extends LitElement {
       this.cleanup();
       layer.style.visibility = '';
       this.apexLogTimeline = timeline;
-      // A new log has new frames: the open search runs again over them.
       void this.finder.rerun();
       this.timelineLayer = layer;
       this.pendingViewport = null;
