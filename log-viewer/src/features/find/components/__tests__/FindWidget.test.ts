@@ -28,21 +28,44 @@ describe('FindWidget', () => {
   }
 
   it.each([
-    ['shows the match the view holds', { totalMatches: 5, currentMatch: 4 }, '4 of 5', '4 of 5'],
+    [
+      'shows the match the view holds',
+      { totalMatches: 5, currentMatch: 4 },
+      '4 of 5',
+      "4 of 5 found for 'Handler'",
+    ],
     [
       'shows no position when the view holds none',
       { totalMatches: 5, currentMatch: 0 },
       '? of 5',
-      '5 matches',
+      "5 matches found for 'Handler'",
     ],
-    ['shows no matches', { totalMatches: 0, currentMatch: 0 }, 'No Matches', 'No Matches'],
+    [
+      'shows no matches',
+      { totalMatches: 0, currentMatch: 0 },
+      'No Matches',
+      "No results for 'Handler'",
+    ],
   ])('%s', async (_name, detail, text, spokenText) => {
     const { widget, shownText, spoken } = await shown();
+    widget.lastMatch = 'Handler';
     results(detail);
     await widget.updateComplete;
 
     expect(shownText()).toBe(text);
     expect(spoken()).toBe(spokenText);
+  });
+
+  it('names a new term it found nothing for, when the count stays at none', async () => {
+    const { widget, spoken } = await shown();
+    widget.lastMatch = 'foo';
+    results({ totalMatches: 0, currentMatch: 0 });
+    await widget.updateComplete;
+    widget.lastMatch = 'bar';
+    results({ totalMatches: 0, currentMatch: 0 });
+    await widget.updateComplete;
+
+    expect(spoken()).toBe("No results for 'bar'");
   });
 
   it.each([

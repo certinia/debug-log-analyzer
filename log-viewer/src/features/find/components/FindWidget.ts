@@ -23,7 +23,7 @@ export class FindWidget extends LitElement {
   @state() isVisble = false;
   @state() matchCase = false;
 
-  lastMatch: string | null = null;
+  @state() lastMatch: string | null = null;
   nextMatchDirection = true; // Remembers last direction: true=next, false=previous
 
   private readonly _findBus = new DomListenerController<FindEventMap>(this, document, {
@@ -183,12 +183,20 @@ export class FindWidget extends LitElement {
     return (this.currentMatch || '?') + ' of ' + this.totalMatches;
   }
 
-  // A reader says "?" as "question mark".
+  // A reader says "?" as "question mark", and hears no term in "3 of 28".
   _getMatchesSpoken() {
-    if (this.totalMatches && !this.currentMatch) {
-      return `${this.totalMatches} ${this.totalMatches === 1 ? 'match' : 'matches'}`;
+    const text = this.lastMatch;
+    if (!text) {
+      return this._getMatchesText();
     }
-    return this._getMatchesText();
+    if (!this.totalMatches) {
+      return `No results for '${text}'`;
+    }
+    if (!this.currentMatch) {
+      const matches = this.totalMatches === 1 ? 'match' : 'matches';
+      return `${this.totalMatches} ${matches} found for '${text}'`;
+    }
+    return `${this.currentMatch} of ${this.totalMatches} found for '${text}'`;
   }
 
   _matchCase() {
