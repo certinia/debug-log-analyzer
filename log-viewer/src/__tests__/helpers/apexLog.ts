@@ -58,6 +58,11 @@ export function stubStore(log: ApexLog): LogStore {
   const store = {
     log,
     derive: async (fn: Derivation<unknown>) => fn(null as unknown as LogIndex, store),
+    // A stub is not filtered and blames no level, so a section says what it said before.
+    get captured() {
+      return store;
+    },
+    levelGap: () => null,
   } as unknown as LogStore;
   return store;
 }

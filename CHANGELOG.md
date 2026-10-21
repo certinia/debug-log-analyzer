@@ -27,6 +27,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - 🎚️ **Log levels**: filter the log to a lower debug level per category from the header. ([#530])
+- 💡 **Log level hints**: a section that a debug level leaves empty names the level it needs. ([#259])
 - 🔦 **Timeline legend**: hover a category to highlight frames in the timeline, select to keep. ([#917])
 - 🔍 **Find**: in the tables, find matches the group header text too.
 
@@ -590,6 +591,7 @@ Skipped due to adopting odd numbering for pre releases and even number for relea
 [#917]: https://github.com/certinia/debug-log-analyzer/issues/917
 [#875]: https://github.com/certinia/debug-log-analyzer/issues/875
 [#530]: https://github.com/certinia/debug-log-analyzer/issues/530
+[#259]: https://github.com/certinia/debug-log-analyzer/issues/259
 
 <!-- 1.22.0 -->
 

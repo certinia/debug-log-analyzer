@@ -3,14 +3,9 @@
  */
 import { describe, expect, it } from '@jest/globals';
 
-import { SETTINGS, indexOf, storeOf } from '#test-helpers/apexLog.js';
+import { indexOf, storeOf } from '#test-helpers/apexLog.js';
 
-import {
-  apexCodeLevel,
-  frameVariablesFor,
-  recordsVariables,
-  variableIndex,
-} from '../frameVariables.js';
+import { frameVariablesFor, variableIndex } from '../frameVariables.js';
 
 const OUTER =
   '09:18:22.6 (1000)|METHOD_ENTRY|[1]|01p|ns.Outer.run()\n' +
@@ -21,18 +16,6 @@ const OUTER =
   '09:18:22.6 (1500)|METHOD_EXIT|[5]|ns.Inner.step()\n' +
   '09:18:22.6 (1600)|VARIABLE_ASSIGNMENT|[8]|total|2\n' +
   '09:18:22.6 (1700)|METHOD_EXIT|[1]|ns.Outer.run()\n';
-
-describe('apexCodeLevel', () => {
-  it.each([
-    ['FINEST', SETTINGS.finest, true],
-    ['FINE', SETTINGS.fine, false],
-  ])('reads %s and whether it records variables', (level, settings, records) => {
-    const { log } = storeOf('', settings);
-
-    expect(apexCodeLevel(log)).toBe(level);
-    expect(recordsVariables(log)).toBe(records);
-  });
-});
 
 describe('frameVariablesFor', () => {
   // The value is what the frame left, so the later write wins.

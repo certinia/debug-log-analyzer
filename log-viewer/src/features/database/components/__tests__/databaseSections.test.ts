@@ -61,6 +61,10 @@ describe('buildDatabaseSections', () => {
     // stack from one statement to the next; the variables take a share.
     expect(sections.find((s) => s.id === 'vitals')?.height).toBe('md');
     expect(sections.find((s) => s.id === 'variables')?.weight).toBe(3);
+    // A level lowered in the header must not hide the variables the log holds.
+    expect(
+      rendered(sections, 'variables', 'variables-detail').closest('captured-log-scope'),
+    ).not.toBeNull();
   });
 
   it('skips the lint for a hidden issues section, but still offers it', async () => {

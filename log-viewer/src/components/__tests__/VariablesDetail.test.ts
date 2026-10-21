@@ -7,6 +7,7 @@ import { describe, expect, it } from '@jest/globals';
 
 import { MAX_MARKED_PER_VALUE } from '../../core/log/aggregateVariables.js';
 import { SETTINGS, indexOf, indexesOf, storeOf } from '#test-helpers/apexLog.js';
+import { describeLevelGap, findLevelGap } from '../../core/log/levelCapabilities.js';
 import type { LogStore } from '../../core/log/LogStore.js';
 
 // Avoid the heavy CodeBlock import chain (the soql formatter). The raw value it
@@ -193,7 +194,7 @@ describe('VariablesDetail empty states', () => {
       'names the log level that would fill it',
       FRAME,
       SETTINGS.fine,
-      'Variables available with the Apex Code log level at FINEST.',
+      describeLevelGap(findLevelGap('variables', { apexCode: 'FINE' }, { apexCode: 'FINE' })),
     ],
     [
       'says a FINEST log recorded no write at all',
@@ -206,6 +207,7 @@ describe('VariablesDetail empty states', () => {
 
     const el = await mount(store, { eventIndex: indexOf(store.log, 'ns.Outer.run()') });
 
+    expect(note).not.toBe('');
     expect(notes(el)).toEqual([note]);
   });
 

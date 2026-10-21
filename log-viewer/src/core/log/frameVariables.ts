@@ -1,7 +1,7 @@
 /*
  * Copyright (c) 2026 Certinia Inc. All rights reserved.
  */
-import { type ApexLog, type LogEvent, LOG_LEVEL } from '@apexdevtools/apex-log-parser';
+import type { LogEvent } from '@apexdevtools/apex-log-parser';
 
 import { CHECK_EVERY, frameBudget, type Tick } from '../utility/FrameBudget.js';
 import { firstIndexWhere } from '../utility/Util.js';
@@ -129,16 +129,6 @@ export interface FrameVariables {
 interface Declared {
   declaredType: string;
   eventIndex: number;
-}
-
-/** The Apex Code log level this log was captured at, or null if it says none. */
-export function apexCodeLevel(log: ApexLog): string | null {
-  return log.debugLevels.apexCode ?? null;
-}
-
-/** True where the log was captured at the only level that records variables. */
-export function recordsVariables(log: ApexLog): boolean {
-  return apexCodeLevel(log) === LOG_LEVEL.Finest;
 }
 
 /**
