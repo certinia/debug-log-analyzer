@@ -202,10 +202,8 @@ export class ApexLogTimeline {
           copyToClipboard(marker.summary);
         },
         onCategoryDimClear: options.onCategoryDimClear,
-        onSearchClear: () => {
-          this.findTarget.clearFind();
-          document.dispatchEvent(new CustomEvent('lv-find-dismiss', { detail: null }));
-        },
+        onSearchClear: () =>
+          document.dispatchEvent(new CustomEvent('lv-find-dismiss', { detail: null })),
       },
     );
 

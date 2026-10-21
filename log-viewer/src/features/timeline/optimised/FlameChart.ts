@@ -1323,11 +1323,7 @@ export class FlameChart<E extends EventNode = EventNode> {
           this.selectionOrchestrator.clearSelection();
         } else if (!(this.dimState.legendShowing() && this.callbacks.onCategoryDimClear?.())) {
           // Falls through when only a chip under the pointer lights the legend: nothing to drop.
-          if (this.callbacks.onSearchClear && this.searchOrchestrator?.hasCursor()) {
-            this.callbacks.onSearchClear();
-          } else {
-            this.clearSearch();
-          }
+          this.callbacks.onSearchClear?.();
         }
       },
       onMarkerNav: (direction: MarkerNavDirection) => {
