@@ -162,7 +162,8 @@ export class RetrieveLogFile {
 
   private static placeholder({ alias, username }: TargetOrg): string {
     const org = alias ?? username;
-    return org ? `Select or search for a log (${org})` : 'Select or search for a log';
+    const prompt = 'Select a log, or type 3+ characters to search inside logs';
+    return org ? `${prompt} (${org})` : prompt;
   }
 
   private static assertRetrievedLog(logId: string, logData: string): void {

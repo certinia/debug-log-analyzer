@@ -419,10 +419,13 @@ describe('RetrieveLogFile', () => {
   it.each([
     [
       { orgId: '00Dorg', alias: 'myorg', username: 'me@x.com' },
-      'Select or search for a log (myorg)',
+      'Select a log, or type 3+ characters to search inside logs (myorg)',
     ],
-    [{ orgId: '00Dorg', username: 'me@x.com' }, 'Select or search for a log (me@x.com)'],
-    [{}, 'Select or search for a log'],
+    [
+      { orgId: '00Dorg', username: 'me@x.com' },
+      'Select a log, or type 3+ characters to search inside logs (me@x.com)',
+    ],
+    [{}, 'Select a log, or type 3+ characters to search inside logs'],
   ])('names the org in the placeholder: %j', async (targetOrg, placeholder) => {
     mockGetTargetOrg.mockResolvedValue(targetOrg);
     const { running } = await run([log('a')]);
