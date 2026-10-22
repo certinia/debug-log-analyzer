@@ -1,7 +1,6 @@
 /*
  * Copyright (c) 2022 Certinia Inc. All rights reserved.
  */
-import '#vscode-elements/vscode-button.js';
 import '#vscode-elements/vscode-option.js';
 import '#vscode-elements/vscode-toolbar-button.js';
 import '../../../components/VsSelect.js';
@@ -71,6 +70,7 @@ import '../../../components/datagrid-facet-filter.js';
 import '../../../components/datagrid-filter-bar.js';
 import '../../../components/datagrid-range-filter.js';
 import '../../../components/OverflowList.js';
+import '../../../components/TreeExpandButton.js';
 
 import {
   ColumnSettingsController,
@@ -163,8 +163,12 @@ export class CalltreeView extends LitElement {
     args: () => [this.isVisible ? this.logStore : null],
   });
 
+  // State, so the expand button follows the grid on show once it is built.
+  @state()
   timeOrderGrid: LvGrid<LogEvent> | null = null;
+  @state()
   aggregatedGrid: LvGrid<AggregatedRow> | null = null;
+  @state()
   bottomUpGrid: LvGrid<BottomUpRow> | null = null;
   private _aggregatedTree: MergedTree<AggregatedRow> | null = null;
   private _bottomUpTree: MergedTree<BottomUpRow> | null = null;
@@ -332,15 +336,6 @@ export class CalltreeView extends LitElement {
         align-items: flex-end;
       }
 
-      .filter-container vscode-button {
-        height: var(--filter-control-height);
-      }
-
-      .filter-container vscode-button::part(base) {
-        padding: var(--filter-control-padding);
-        font-size: var(--filter-control-font-size);
-      }
-
       #call-tree-table,
       #aggregated-tree-table,
       #bottom-up-tree-table {
@@ -382,11 +377,6 @@ export class CalltreeView extends LitElement {
             ></view-mode-switch>
 
             <div slot="table-actions" class="filter-container">
-              <vscode-button secondary @click="${this._expandButtonClick}">Expand</vscode-button>
-              <vscode-button secondary @click="${this._collapseButtonClick}"
-                >Collapse</vscode-button
-              >
-
               <vs-select
                 dense
                 id="column-view"
@@ -483,25 +473,27 @@ export class CalltreeView extends LitElement {
               }
             </overflow-list>
 
-            ${
-              this.viewMode === 'bottom-up'
-                ? html`
-                    <vs-select
-                      dense
-                      slot="group"
-                      id="bottomup-groupby"
-                      prefix="Group"
-                      label="Group by"
-                      @change="${this._handleBottomUpGroupBy}"
-                      .value="${this.bottomUpGroupBy}"
-                    >
-                      ${BOTTOM_UP_GROUPS.map(
-                        ({ label }) => html`<vscode-option>${label}</vscode-option>`,
-                      )}
-                    </vs-select>
-                  `
-                : ''
-            }
+            <div slot="group" class="filter-container">
+              ${
+                this.viewMode === 'bottom-up'
+                  ? html`
+                      <vs-select
+                        dense
+                        id="bottomup-groupby"
+                        prefix="Group"
+                        label="Group by"
+                        @change="${this._handleBottomUpGroupBy}"
+                        .value="${this.bottomUpGroupBy}"
+                      >
+                        ${BOTTOM_UP_GROUPS.map(
+                          ({ label }) => html`<vscode-option>${label}</vscode-option>`,
+                        )}
+                      </vs-select>
+                    `
+                  : ''
+              }
+              <tree-expand-button .grid=${this._activeGrid()}></tree-expand-button>
+            </div>
 
             <div slot="actions">
               <vscode-toolbar-button
@@ -858,18 +850,6 @@ export class CalltreeView extends LitElement {
     } else if (this.bottomUpGrid && this.viewMode === 'bottom-up') {
       this.bottomUpGrid.marked = this._bottomUpTree?.marked(pathIds) ?? new Set();
     }
-  }
-
-  async _expandButtonClick(): Promise<void> {
-    const grid = this._activeGrid();
-    await grid?.expandAll();
-    grid?.focus({ preventScroll: true });
-  }
-
-  async _collapseButtonClick(): Promise<void> {
-    const grid = this._activeGrid();
-    await grid?.collapseAll();
-    grid?.focus({ preventScroll: true });
   }
 
   _appendTableWhenVisible() {
