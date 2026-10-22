@@ -9,8 +9,8 @@ export type DomListeners<M> = {
 };
 
 /**
- * Listens on a target outside the host's own tree — `document` or `window` —
- * for exactly as long as the host is connected.
+ * Listens on a target outside the host's own tree — `document`, `window` or
+ * another element — for exactly as long as the host is connected.
  *
  * Wiring a global listener in a constructor and removing it in
  * `disconnectedCallback` leaves the host deaf after a re-attach, because the
@@ -26,10 +26,15 @@ export type DomListeners<M> = {
 export class DomListenerController<
   M extends { [K in keyof M]: Event },
 > implements ReactiveController {
-  private readonly _target: EventTarget;
+  private _target: EventTarget | null;
+  private _connected = false;
   private readonly _entries: [string, EventListener][];
 
-  constructor(host: ReactiveControllerHost, target: EventTarget, listeners: DomListeners<M>) {
+  constructor(
+    host: ReactiveControllerHost,
+    target: EventTarget | null,
+    listeners: DomListeners<M>,
+  ) {
     this._target = target;
     this._entries = Object.entries(listeners) as [string, EventListener][];
     for (const [name, handler] of this._entries) {
@@ -42,15 +47,33 @@ export class DomListenerController<
     host.addController(this);
   }
 
+  get target(): EventTarget | null {
+    return this._target;
+  }
+
+  /** Moves the listeners to `target`; null listens nowhere. */
+  set target(target: EventTarget | null) {
+    const connected = this._connected;
+    if (target !== this._target) {
+      this.hostDisconnected();
+      this._target = target;
+      if (connected) {
+        this.hostConnected();
+      }
+    }
+  }
+
   hostConnected(): void {
+    this._connected = true;
     for (const [name, handler] of this._entries) {
-      this._target.addEventListener(name, handler);
+      this._target?.addEventListener(name, handler);
     }
   }
 
   hostDisconnected(): void {
+    this._connected = false;
     for (const [name, handler] of this._entries) {
-      this._target.removeEventListener(name, handler);
+      this._target?.removeEventListener(name, handler);
     }
   }
 }
