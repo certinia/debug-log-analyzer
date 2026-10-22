@@ -258,6 +258,28 @@ export class GridView<R extends object> {
     this.draw();
   }
 
+  /**
+   * How many rows past `index`, down or up, fit whole in `height`, by their measured heights
+   * or, for a row not yet measured, its estimate.
+   */
+  pageRows(index: number, height: number, down: boolean): number {
+    const v = this.virtualizer;
+    // Refreshes `measurementsCache` with the heights measured since the last draw.
+    v.getVirtualItems();
+    const items = v.measurementsCache;
+    const step = down ? 1 : -1;
+    let count = 0;
+    let used = 0;
+    for (let i = index + step; i >= 0 && i < items.length; i += step) {
+      used += items[i]?.size ?? 0;
+      if (used > height) {
+        break;
+      }
+      count++;
+    }
+    return count;
+  }
+
   /** The element painting the row at `index`, while it is on screen. */
   elementAt(index: number): HTMLElement | undefined {
     return this.painted.get(index);
