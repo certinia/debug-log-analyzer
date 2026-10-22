@@ -600,6 +600,34 @@ describe('RetrieveLogFile', () => {
       expect(listPicker.title).toBe('Searched 7 logs · 0 matches');
     });
 
+    it('names logs it could not download, shows why, and retries them on the next press', async () => {
+      mockGetLogBody.mockImplementation(async (id: string) => {
+        if (id === 'log-6') {
+          throw new Error('REQUEST_LIMIT_EXCEEDED');
+        }
+        return 'clean';
+      });
+      const { context } = await searchFor('fatal_error', sevenLogs());
+
+      listPicker.accept(listPicker.items[0]);
+      await settleSearch();
+
+      expect(listPicker.title).toBe(
+        'Searched 4 logs · 0 matches · 1 failed, see Output · 3 older not searched',
+      );
+      expect(context.display.output).toHaveBeenCalledWith(
+        expect.stringContaining('Apex log log-6: REQUEST_LIMIT_EXCEEDED'),
+        true,
+      );
+
+      mockGetLogBody.mockResolvedValue('clean');
+      listPicker.accept(listPicker.items[0]);
+      await settleSearch();
+
+      expect(mockGetLogBody.mock.calls.filter(([id]) => id === 'log-6')).toHaveLength(2);
+      expect(listPicker.title).toBe('Searched 7 logs · 0 matches');
+    });
+
     describe('while logs download', () => {
       let release: () => void;
 

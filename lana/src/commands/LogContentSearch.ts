@@ -31,7 +31,8 @@ export interface LogSearchOptions {
   signal: AbortSignal;
   onMatch(match: ContentMatch): void;
   onProgress(done: number, total: number): void;
-  onError(logId: string, error: unknown): void;
+  /** `searched` is false when the log could not be read or downloaded. */
+  onError(logId: string, error: unknown, searched: boolean): void;
 }
 
 /**
@@ -63,16 +64,19 @@ export async function searchLogContent(
     }
   };
   await runWithinBudget(queue, options.signal, async ({ Id: logId }) => {
+    let searched = false;
     try {
       if (cachedIds.has(logId)) {
         report(logId, findSnippetInBytes(await store.read(logId), term));
+        searched = true;
       } else {
         const body = await store.download(logId);
         report(logId, findSnippet(body, term));
+        searched = true;
         await store.write(logId, body);
       }
     } catch (error: unknown) {
-      options.onError(logId, error);
+      options.onError(logId, error, searched);
     }
     options.onProgress(++done, queue.length);
   });

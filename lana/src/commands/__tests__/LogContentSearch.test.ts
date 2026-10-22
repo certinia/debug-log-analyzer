@@ -40,14 +40,20 @@ function fakeStore(cached: Record<string, string>, remote: Record<string, string
 function options(overrides: Partial<LogSearchOptions> = {}) {
   const matches: ContentMatch[] = [];
   const errors: string[] = [];
+  const unsearched: string[] = [];
   const opts: LogSearchOptions = {
     signal: new AbortController().signal,
     onMatch: (match) => matches.push(match),
     onProgress: () => undefined,
-    onError: (logId) => errors.push(logId),
+    onError: (logId, _error, searched) => {
+      errors.push(logId);
+      if (!searched) {
+        unsearched.push(logId);
+      }
+    },
     ...overrides,
   };
-  return { opts, matches, errors };
+  return { opts, matches, errors, unsearched };
 }
 
 describe('findSnippet', () => {
@@ -209,7 +215,7 @@ describe('searchLogContent', () => {
     expect(matches).toEqual([]);
   });
 
-  it('reports a failed log and carries on with the rest', async () => {
+  it('reports a log it could not download as not searched, and carries on with the rest', async () => {
     const { store } = fakeStore({}, { ok: 'term' });
     store.download = async (id) => {
       if (id === 'denied') {
@@ -217,11 +223,11 @@ describe('searchLogContent', () => {
       }
       return 'term';
     };
-    const { opts, matches, errors } = options();
+    const { opts, matches, unsearched } = options();
 
     await searchLogContent([log('denied'), log('ok')], 'term', store, opts);
 
-    expect(errors).toEqual(['denied']);
+    expect(unsearched).toEqual(['denied']);
     expect(matches.map((m) => m.logId)).toEqual(['ok']);
   });
 
@@ -237,17 +243,18 @@ describe('searchLogContent', () => {
     expect(progress).toEqual(['0/2', '1/2', '2/2']);
   });
 
-  it('reports a downloaded match even when the cache write fails', async () => {
+  it('reports a downloaded match, as searched, even when the cache write fails', async () => {
     const { store } = fakeStore({}, { a: 'term' });
     store.write = async () => {
       throw new Error('read-only workspace');
     };
-    const { opts, matches, errors } = options();
+    const { opts, matches, errors, unsearched } = options();
 
     await searchLogContent([log('a')], 'term', store, opts);
 
     expect(matches.map((m) => m.logId)).toEqual(['a']);
     expect(errors).toEqual(['a']);
+    expect(unsearched).toEqual([]);
   });
 
   it('runs at most 8 logs at once', async () => {

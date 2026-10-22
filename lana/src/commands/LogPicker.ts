@@ -38,7 +38,7 @@ export interface LogPickerOptions {
     /** Asks first; resolves true when the cache was cleared. */
     clear(): Promise<boolean>;
   };
-  output(message: string): void;
+  output(message: string, show?: boolean): void;
 }
 
 class DebugLogItem extends Item {
@@ -76,6 +76,8 @@ interface TermSearch {
   newestToDownload: number;
   searched: number;
   matches: number;
+  /** Logs that could not be read or downloaded, until the next press retries them. */
+  failed: Set<string>;
   running: number;
   /** Logs in the download batch now running; 0 when none runs. */
   downloading: number;
@@ -181,6 +183,7 @@ export function pickLog(options: LogPickerOptions): Promise<string | undefined> 
 
   const status = (current: TermSearch) =>
     ` · ${plural(current.matches, 'match', 'matches')}` +
+    (current.failed.size > 0 ? ` · ${current.failed.size} failed, see Output` : '') +
     (current.unsearched.length > 0 ? ` · ${current.unsearched.length} older not searched` : '');
 
   const runSearch = (current: TermSearch, toSearch: PickerLog[], downloads: boolean) => {
@@ -199,17 +202,24 @@ export function pickLog(options: LogPickerOptions): Promise<string | undefined> 
           picker.title = `Searching ${before + done}/${before + total}${status(current)}`;
         }
       },
-      onError: (logId, error) =>
+      onError: (logId, error, searched) => {
         options.output(
           `Log content search could not read or cache Apex log ${logId}: ${errorMessage(error)}`,
-        ),
+          !searched && current.failed.size === 0,
+        );
+        if (!searched) {
+          current.failed.add(logId);
+        }
+      },
     })
       .then(() => {
         current.running--;
         if (current.cancellation.signal.aborted) {
           return;
         }
-        current.searched += toSearch.length;
+        const failed = toSearch.filter((log) => current.failed.has(log.Id));
+        current.searched += toSearch.length - failed.length;
+        current.unsearched = newestFirst([...current.unsearched, ...failed]);
         if (downloads) {
           current.downloading = 0;
         }
@@ -242,6 +252,7 @@ export function pickLog(options: LogPickerOptions): Promise<string | undefined> 
         newestToDownload: unsearched.filter((log) => newestIds.has(log.Id)).length,
         searched: 0,
         matches: 0,
+        failed: new Set(),
         running: 0,
         downloading: 0,
       };
@@ -260,6 +271,7 @@ export function pickLog(options: LogPickerOptions): Promise<string | undefined> 
       return;
     }
     const next = nextDownloads(current);
+    next.forEach((log) => current.failed.delete(log.Id));
     current.unsearched = current.unsearched.slice(next.length);
     current.newestToDownload = 0;
     current.downloading = next.length;

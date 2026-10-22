@@ -100,7 +100,7 @@ export class RetrieveLogFile {
             return true;
           },
         },
-        output: (message) => context.display.output(message),
+        output: (message, show) => context.display.output(message, show),
       });
       if (logFileId) {
         const logUri = store.openedUri(logFileId);
