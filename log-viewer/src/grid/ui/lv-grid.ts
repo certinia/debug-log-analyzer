@@ -393,6 +393,10 @@ export class LvGrid<R extends object = object> extends LitElement {
         ? (this.shown?.indexOf(row) ?? -1)
         : ((await this.store?.reveal(found.result.pathOf(match))) ?? -1);
     await this.updateComplete;
+    // A close or a newer search while the row opened replaced this match.
+    if (this.found !== found) {
+      return;
+    }
     if (index >= 0) {
       this.bringIntoView(index, false);
     }

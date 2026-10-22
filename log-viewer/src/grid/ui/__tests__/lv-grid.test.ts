@@ -1272,6 +1272,18 @@ describe('lv-grid find marks', () => {
     expect(highlights.marks()).toEqual([]);
   });
 
+  it('neither scrolls to nor marks a match that a clear made stale while it opened', async () => {
+    const { grid } = await setup();
+    await grid.find({ text: 'b' });
+    const scroll = jest.spyOn(GridView.prototype, 'scrollToIndex');
+    const stepping = grid.setCurrentMatch(1);
+    grid.clearFind();
+    await stepping;
+
+    expect(scroll).not.toHaveBeenCalled();
+    expect(highlights.marks()).toEqual([]);
+  });
+
   it("finds and marks a group row's key, not its count", async () => {
     const { grid } = await setup({ groupBy: (row) => row.kind });
     const current = (): string[] => highlights.marks('lv-grid-current-find-match');
