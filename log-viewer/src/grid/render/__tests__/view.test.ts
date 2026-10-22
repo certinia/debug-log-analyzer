@@ -457,8 +457,8 @@ describe('GridView', () => {
       resize(el, 2 * ROW);
     }
     await flush();
-    expect(view.pageRows(0, VIEWPORT, true)).toBe(2);
-    expect(view.pageRows(4, VIEWPORT, false)).toBe(2);
+    expect(view.pageRows(0, VIEWPORT, 'pageDown')).toBe(1);
+    expect(view.pageRows(4, VIEWPORT, 'pageUp')).toBe(1);
   });
 
   it('stays put once shown when a row asked for while hidden was cancelled', async () => {

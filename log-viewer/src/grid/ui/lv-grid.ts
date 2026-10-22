@@ -977,7 +977,8 @@ export class LvGrid<R extends object = object> extends LitElement {
       }
       return;
     }
-    const intent = navigate(rows, at, key, this.pageSize(at, key === 'pageDown'));
+    const page = key === 'pageUp' || key === 'pageDown' ? this.pageSize(at, key) : 1;
+    const intent = navigate(rows, at, key, page);
     if (intent?.kind === 'select') {
       this.selectAndShow(intent.index);
     } else if (intent) {
@@ -1106,10 +1107,10 @@ export class LvGrid<R extends object = object> extends LitElement {
   }
 
   /**
-   * The rows past `at`, down or up, that fit between the header and the totals, in the part
-   * of the grid on screen.
+   * How many rows a page key moves from `at`, so the rows it passes fit between the header
+   * and the totals, in the part of the grid on screen.
    */
-  private pageSize(at: number, down: boolean): number {
+  private pageSize(at: number, key: 'pageUp' | 'pageDown'): number {
     const scroller = this.scrollerRef.value;
     if (!scroller) {
       return 1;
@@ -1122,8 +1123,7 @@ export class LvGrid<R extends object = object> extends LitElement {
       0,
     );
     const height = Math.min(scroller.clientHeight, onScreen) - edges;
-    const fit = this.view?.pageRows(at, height, down) ?? Math.floor(height / this.rowHeight);
-    return Math.max(1, fit - 1);
+    return Math.max(1, this.view?.pageRows(at, height, key) ?? 1);
   }
 
   private readonly onContextMenu = (e: MouseEvent): void => {
