@@ -111,6 +111,7 @@ const events = rectangleCache.queryEventsInRegion(timeStart, timeEnd, depthStart
 ### EventMatcher
 
 - Owns search state and cursor
+- The cursor holds the current match; `../find/TimelineFind.ts` adapts it for the find widget, whose `FindController` owns the query
 - Scans shown rows with a `(text, type)` predicate
 - Match collection and navigation
 

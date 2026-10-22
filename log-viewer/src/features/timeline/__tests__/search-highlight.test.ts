@@ -90,14 +90,8 @@ describe('SearchHighlightRenderer', () => {
       matches,
       currentIndex,
       total: matches.length,
-      next: jest.fn<() => SearchMatch<EventNode> | null>(),
-      prev: jest.fn<() => SearchMatch<EventNode> | null>(),
-      first: jest.fn<() => SearchMatch<EventNode> | null>(),
-      last: jest.fn<() => SearchMatch<EventNode> | null>(),
       seek: jest.fn<(index: number) => SearchMatch<EventNode> | null>(),
       getCurrent: jest.fn<() => SearchMatch<EventNode> | null>(() => matches[currentIndex] ?? null),
-      hasNext: jest.fn<() => boolean>(() => currentIndex < matches.length - 1),
-      hasPrev: jest.fn<() => boolean>(() => currentIndex > 0),
       getMatchedEventIds: jest.fn(() => new Set(matches.map((m) => m.event.id))),
       getMatchedEventsInfo: jest.fn(() =>
         matches.map((m) => ({

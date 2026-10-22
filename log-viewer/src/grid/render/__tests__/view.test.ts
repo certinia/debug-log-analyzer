@@ -110,6 +110,13 @@ function fakeResizeObserver(): (target: Element, height: number) => void {
   };
 }
 
+/** A ROW-high sticky footer after the body, added after the rows are set. */
+function addFooter(scroller: HTMLElement): void {
+  const foot = document.createElement('div');
+  Object.defineProperty(foot, 'offsetHeight', { get: () => ROW });
+  scroller.append(foot);
+}
+
 async function setup(count = 1000, lines?: (row: Node) => number, lineHeight?: () => number) {
   const scroller = document.createElement('div');
   const body = document.createElement('div');
@@ -377,6 +384,84 @@ describe('GridView', () => {
     resize(scroller, VIEWPORT);
     await flush();
     expect(shown().map((el) => el.textContent)).toContain('row 500');
+  });
+
+  it('keeps a row it scrolled to in view when the rows around it are measured taller', async () => {
+    const resize = fakeResizeObserver();
+    const { scroller, view, shown } = await setup();
+    view.scrollToIndex(500);
+    await flush();
+    const above = shown().filter((el) => Number(el.dataset.index) < 500).length;
+    // The browser reports a scroll's new rows in one batch.
+    for (const el of shown()) {
+      resize(el, 2 * ROW);
+    }
+    await flush();
+    expect((500 + above) * ROW - scroller.scrollTop).toBe(40);
+  });
+
+  it('scrolls a row below the fold to sit on the footer, not under it', async () => {
+    const { scroller, view } = await setup();
+    addFooter(scroller);
+    view.scrollToIndex(500, 'auto');
+    await flush();
+    expect(501 * ROW - scroller.scrollTop).toBe(VIEWPORT - ROW);
+  });
+
+  it('centres a row between the header and the footer', async () => {
+    const { scroller, body, view } = await setup();
+    Object.defineProperty(body, 'offsetTop', { get: () => ROW });
+    addFooter(scroller);
+    view.scrollToIndex(500);
+    await flush();
+    // The row starts ROW down the scroller, below the header.
+    expect(ROW + 500 * ROW - scroller.scrollTop).toBe(ROW + (VIEWPORT - 2 * ROW - ROW) / 2);
+  });
+
+  it('shows the top of a row taller than the view', async () => {
+    const resize = fakeResizeObserver();
+    const { scroller, view } = await setup();
+    view.scrollToIndex(500);
+    await flush();
+    resize(view.elementAt(500) as Element, 2 * VIEWPORT);
+    await flush();
+    view.scrollToIndex(500);
+    await flush();
+    expect(500 * ROW - scroller.scrollTop).toBe(0);
+  });
+
+  it('keeps the bottom of a row scrolled up from below in view when it is measured taller', async () => {
+    const resize = fakeResizeObserver();
+    const { scroller, view } = await setup();
+    view.scrollToIndex(500, 'auto');
+    await flush();
+    resize(view.elementAt(500) as Element, 2 * ROW);
+    await flush();
+    expect(502 * ROW - scroller.scrollTop).toBe(VIEWPORT);
+  });
+
+  it('shows the top of a row scrolled up from below when it grows taller than the view', async () => {
+    const resize = fakeResizeObserver();
+    const { scroller, view } = await setup();
+    view.scrollToIndex(500, 'auto');
+    await flush();
+    resize(view.elementAt(500) as Element, 2 * VIEWPORT);
+    await flush();
+    expect(500 * ROW - scroller.scrollTop).toBe(0);
+  });
+
+  it('stays put once shown when a row asked for while hidden was cancelled', async () => {
+    const resize = fakeResizeObserver();
+    const { scroller, view } = await setup();
+    viewport = 0;
+    resize(scroller, 0);
+    view.scrollToIndex(500);
+    view.cancelScroll();
+
+    viewport = VIEWPORT;
+    resize(scroller, VIEWPORT);
+    await flush();
+    expect(scroller.scrollTop).toBe(0);
   });
 
   it('hears no resize while disconnected, and shows the rows that came meanwhile on connect', async () => {

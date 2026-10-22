@@ -205,7 +205,7 @@ Seamlessly navigate between the visual analysis and your raw `.log` files:
 
 ## 🤖 AI Assistant (MCP Server)
 
-Ask your AI assistant what's slow in a Salesforce Apex debug log. [`@certinia/apex-log-mcp`](https://www.npmjs.com/package/@certinia/apex-log-mcp) is an MCP server for GitHub Copilot Chat, Claude Code, Cursor or any MCP client. It uses the same log parser as this extension ([source on GitHub](https://github.com/certinia/debug-log-analyzer-mcp)).
+Ask your AI assistant what's slow in a Salesforce Apex debug log. [`@certinia/apex-log-mcp`](https://www.npmjs.com/package/@certinia/apex-log-mcp) is an MCP server for GitHub Copilot Chat, Claude Code, Cursor or any MCP client. It uses the same [Apex log parser](https://github.com/apex-dev-tools/apex-log-parser) as this extension ([source on GitHub](https://github.com/certinia/debug-log-analyzer-mcp)).
 
 Your assistant can:
 

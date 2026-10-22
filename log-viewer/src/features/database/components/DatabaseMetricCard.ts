@@ -1,9 +1,13 @@
 /*
  * Copyright (c) 2026 Certinia Inc. All rights reserved.
  */
+import { consume } from '@lit/context';
 import { LitElement, css, html, nothing } from 'lit';
 import { customElement, property } from 'lit/decorators.js';
 
+import { describeLevelGap } from '../../../core/log/levelCapabilities.js';
+import { logContext } from '../../../core/log/logContext.js';
+import type { LogStore } from '../../../core/log/LogStore.js';
 import { globalStyles } from '../../../styles/global.styles.js';
 
 const integer = new Intl.NumberFormat(undefined, { maximumFractionDigits: 0 });
@@ -45,6 +49,11 @@ function tier(percent: number): 'safe' | 'warn' | 'danger' {
 export class DatabaseMetricCard extends LitElement {
   @property({ attribute: false })
   metric: DatabaseMetric | null = null;
+
+  /** The log on screen, from the app root. */
+  @consume({ context: logContext, subscribe: true })
+  @property({ attribute: false })
+  logStore: LogStore | null = null;
 
   static styles = [
     globalStyles,
@@ -155,11 +164,11 @@ export class DatabaseMetricCard extends LitElement {
 
   private _renderConsumed(metric: DatabaseMetric) {
     if (metric.used === null) {
-      return html`<span
-        class="stat__used na"
-        title="The consumed figure needs cumulative limit usage in the log. Raise the database log level to FINE or above."
-        >limit n/a</span
-      >`;
+      const why = describeLevelGap(
+        this.logStore?.levelGap('limits'),
+        'The consumed figure needs cumulative limit usage in the log.',
+      );
+      return html`<span class="stat__used na" title=${why}>limit n/a</span>`;
     }
 
     const delta = metric.found - metric.used;

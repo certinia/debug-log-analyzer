@@ -33,18 +33,11 @@ import type {
   TimelineFrames,
   ViewportState,
 } from '../../types/flamechart.types.js';
-import type {
-  FramePredicate,
-  MatchedEventInfo,
-  SearchCursor,
-  SearchOptions,
-} from '../../types/search.types.js';
+import type { FramePredicate, MatchedEventInfo, SearchCursor } from '../../types/search.types.js';
 import { createHighlightColors } from '../rendering/HighlightRenderer.js';
 import type { PrecomputedRect } from '../RectangleCache.js';
 import { EventMatcher } from '../search/EventMatcher.js';
-import { FlameChartCursor } from '../search/FlameChartCursor.js';
 import { MeshSearchStyleRenderer } from '../search/MeshSearchStyleRenderer.js';
-import type { SearchCursorImpl } from '../search/SearchCursor.js';
 import { SearchHighlightRenderer } from '../search/SearchHighlightRenderer.js';
 import { SearchTextLabelRenderer } from '../search/SearchTextLabelRenderer.js';
 import type { TextLabelRenderer } from '../TextLabelRenderer.js';
@@ -297,14 +290,12 @@ export class SearchOrchestrator<E extends EventNode = EventNode> {
   }
 
   /**
-   * Search events using predicate function.
-   * Returns FlameChartCursor that automatically handles centering, tooltips, and rendering.
+   * Search events using predicate function, with no match current.
    *
    * @param predicate - Function to test each event
-   * @param options - Search options (caseSensitive, matchWholeWord)
-   * @returns FlameChartCursor for navigating results, or null if search not initialized
+   * @returns The number of matches, or null if search not initialized or a newer search stopped it
    */
-  public search(predicate: FramePredicate, options?: SearchOptions): SearchCursor<E> | null {
+  public async search(predicate: FramePredicate): Promise<number | null> {
     if (!this.eventMatcher) {
       return null;
     }
@@ -315,20 +306,49 @@ export class SearchOrchestrator<E extends EventNode = EventNode> {
     // Clear selection when starting a new search to show search highlights
     this.callbacks.onClearSelection();
 
-    const innerCursor = this.eventMatcher.search(predicate, options);
+    const cursor = await this.eventMatcher.search(predicate);
+    if (!cursor) {
+      return null;
+    }
 
     // Request render to update display with new search state
     // (especially important when search returns 0 results to clear old highlights)
     this.callbacks.requestRender();
 
-    // Wrap with FlameChartCursor to add automatic side effects
-    return new FlameChartCursor(innerCursor, (match) => {
-      // Restore cursor if it was cleared (e.g., by Escape key)
-      if (!this.eventMatcher?.getCursor()) {
-        this.eventMatcher?.setCursor(innerCursor as SearchCursorImpl<E>);
-      }
-      this.handleSearchNavigation(match);
-    });
+    return cursor.total;
+  }
+
+  /**
+   * Make match `index` (from 0) current: centre on it and show its panel. -1 makes none current.
+   */
+  public setCurrentMatch(index: number): void {
+    const match = this.eventMatcher?.getCursor()?.seek(index);
+    if (!match) {
+      this.callbacks.requestRender();
+      return;
+    }
+    if (!this.viewport) {
+      return;
+    }
+
+    // Clear selection so search highlight shows
+    this.callbacks.onClearSelection();
+
+    // Center viewport on the match
+    this.callbacks.onCenterOnMatch(match.event.timestamp, match.event.duration, match.depth);
+
+    // Calculate screen coordinates for tooltip positioning
+    const screenX = this.viewport.calculateVisibleCenterX(
+      match.event.timestamp,
+      match.event.duration,
+    );
+    const screenY = this.viewport.depthToScreenY(match.depth) + this.mainTimelineYOffset;
+
+    // Notify callback for tooltip
+    this.callbacks.onSearchNavigate(match.event, screenX, screenY, match.depth);
+
+    // Request render to show updated highlight
+    this.callbacks.requestRender();
   }
 
   /**
@@ -475,41 +495,5 @@ export class SearchOrchestrator<E extends EventNode = EventNode> {
    */
   public clearHighlight(): void {
     this.searchHighlightRenderer?.clear();
-  }
-
-  // ============================================================================
-  // PRIVATE - NAVIGATION
-  // ============================================================================
-
-  /**
-   * Handle search navigation side effects:
-   * - Clear selection so search highlight shows
-   * - Center viewport on match
-   * - Call onSearchNavigate callback for application-specific logic (e.g., tooltips)
-   * - Request render
-   */
-  private handleSearchNavigation(match: { event: E; depth: number }): void {
-    if (!this.viewport) {
-      return;
-    }
-
-    // Clear selection so search highlight shows
-    this.callbacks.onClearSelection();
-
-    // Center viewport on the match
-    this.callbacks.onCenterOnMatch(match.event.timestamp, match.event.duration, match.depth);
-
-    // Calculate screen coordinates for tooltip positioning
-    const screenX = this.viewport.calculateVisibleCenterX(
-      match.event.timestamp,
-      match.event.duration,
-    );
-    const screenY = this.viewport.depthToScreenY(match.depth) + this.mainTimelineYOffset;
-
-    // Notify callback for tooltip
-    this.callbacks.onSearchNavigate(match.event, screenX, screenY, match.depth);
-
-    // Request render to show updated highlight
-    this.callbacks.requestRender();
   }
 }

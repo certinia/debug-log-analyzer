@@ -6,8 +6,13 @@
  * every searchable view.
  *
  * The widget produces `lv-find`, `lv-find-match` and `lv-find-close`; each view
- * answers with `lv-find-results`.
+ * answers with `lv-find-results`. A view that drops the search itself, as the
+ * Timeline on Escape, sends `lv-find-dismiss`.
  */
+
+import type { FindDirection } from '../../grid/index.js';
+
+export type { FindDirection };
 
 /** Payload for `lv-find`, `lv-find-match` and `lv-find-close`. */
 export interface FindEventDetail {
@@ -16,18 +21,27 @@ export interface FindEventDetail {
 
   /**
    * Match index for navigation (1-based).
-   * - `lv-find`: always 1 (start at the first match)
-   * - `lv-find-match`: the current match number (1 to totalMatches)
+   * - `lv-find`: always 0; without `direction` the views search without moving
+   * - `lv-find-match`: the current match number (1 to totalMatches), or 0 with `direction`
    * - `lv-find-close`: always 0 (no active match)
    */
   count: number;
 
   options: { matchCase: boolean };
+
+  /**
+   * The views move to the match nearest the screen that way. On `lv-find`, set when the
+   * search moves, absent when it keeps its place; on `lv-find-match`, set when no match is
+   * current.
+   */
+  direction?: FindDirection;
 }
 
 /** Payload for `lv-find-results`, a view's answer to a search. */
 export interface FindResultsEventDetail {
   totalMatches: number;
+  /** The match the view holds as current, from 1; 0 when it holds none. */
+  currentMatch: number;
 }
 
 /** Every find event, so a listener's payload follows the name it subscribed to. */
@@ -36,4 +50,8 @@ export interface FindEventMap {
   'lv-find-match': CustomEvent<FindEventDetail>;
   'lv-find-close': CustomEvent<FindEventDetail>;
   'lv-find-results': CustomEvent<FindResultsEventDetail>;
+  /** The shown view changed: the widget searches its text again, if it is open. */
+  'lv-find-refresh': CustomEvent<null>;
+  /** A view dropped the search itself, as on Escape: the widget closes, if it is open. */
+  'lv-find-dismiss': CustomEvent<null>;
 }

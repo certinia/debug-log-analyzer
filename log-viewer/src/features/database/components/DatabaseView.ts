@@ -18,7 +18,7 @@ import { limitTotals } from '../../../components/logOverviewMetrics.js';
 import { eventBus, type StatementType } from '../../../core/events/EventBus.js';
 import { apexLimitSeries } from '../../timeline/optimised/apex-limit-series.js';
 import { InspectorTabController } from '../../../components/InspectorTabController.js';
-import { LvGridFindController } from '../../../components/grid/LvGridFindController.js';
+import { FindController } from '../../find/FindController.js';
 import { SelectionEchoGuard } from '../../../core/events/SelectionEchoGuard.js';
 import { formatInteger, isVisible } from '../../../core/utility/Util.js';
 import { soslRowsMetric } from '../limits.js';
@@ -77,8 +77,15 @@ export class DatabaseView extends LitElement {
   private _echoGuard = new SelectionEchoGuard();
 
   // The widget counts the three grids' matches as one list, in view order.
-  private readonly _finder = new LvGridFindController(this, {
-    grids: () => this._views.flatMap((view) => (view?.grid ? [view.grid] : [])),
+  private readonly _finder = new FindController(this, {
+    targets: () => this._views.flatMap((view) => (view?.grid ? [view.grid] : [])),
+    unfold: async (grid) => {
+      const kind = this._gridsByKind.find(([, view]) => view?.grid === grid)?.[0];
+      if (kind && this.collapsed[kind]) {
+        this.collapsed = { ...this.collapsed, [kind]: false };
+        await this.updateComplete;
+      }
+    },
   });
 
   private readonly _inspector = new InspectorTabController(this, 'database', {
@@ -145,7 +152,7 @@ export class DatabaseView extends LitElement {
     this.renderRoot.addEventListener('grid-selection', (event) =>
       this._onGridSelection(event as GridSelectionEvent),
     );
-    this.renderRoot.addEventListener('grid-reshape', () => this._finder.dropOnReshape());
+    this.renderRoot.addEventListener('grid-reshape', () => void this._finder.rerun());
     // The same for the pointer, which marks rather than picks.
     this.renderRoot.addEventListener('grid-locate', (event) =>
       eventBus.emit('detail:locate', {
@@ -309,25 +316,23 @@ export class DatabaseView extends LitElement {
         .metrics="${this._sectionMetrics(kind)}"
         @section-toggle="${() => this._toggle(kind)}"
       ></database-section>
-      ${collapsed || !this.loaded ? nothing : this._renderTable(kind)}
+      ${this.loaded ? this._renderTable(kind, collapsed) : nothing}
     </div>`;
   }
 
-  private _renderTable(kind: SectionKind) {
+  private _renderTable(kind: SectionKind, hidden: boolean) {
     switch (kind) {
       case 'dml':
-        return html`<dml-view .lines="${this.dmlLines}"></dml-view>`;
+        return html`<dml-view ?hidden="${hidden}" .lines="${this.dmlLines}"></dml-view>`;
       case 'soql':
-        return html`<soql-view .lines="${this.soqlLines}"></soql-view>`;
+        return html`<soql-view ?hidden="${hidden}" .lines="${this.soqlLines}"></soql-view>`;
       case 'sosl':
-        return html`<sosl-view .lines="${this.soslLines}"></sosl-view>`;
+        return html`<sosl-view ?hidden="${hidden}" .lines="${this.soslLines}"></sosl-view>`;
     }
   }
 
   private _toggle(kind: SectionKind) {
     this.collapsed = { ...this.collapsed, [kind]: !this.collapsed[kind] };
-    // A section takes its grid with it or brings a new one, so the widget's numbering no longer holds.
-    this._finder.dropOnReshape();
   }
 
   /** Cumulative limits are only present when the log recorded a usage snapshot. */

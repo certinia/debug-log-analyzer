@@ -15,6 +15,7 @@ import {
   type FakeHighlights,
 } from '../../render/__tests__/fakes.js';
 import type { GridColumn } from '../column.js';
+import type { Sight } from '../sight.js';
 import '../lv-grid.js';
 import type {
   GridColumnResizeDetail,
@@ -37,6 +38,10 @@ interface Node {
 }
 
 const ROW = 20;
+
+// jsdom lays nothing out, so what the reader sees is set by hand; `sight.test.ts` covers the real one.
+let mockSight: Sight = 'below';
+jest.mock('../sight.js', () => ({ sightOf: () => mockSight }));
 
 /** Three roots; `b` holds two children. */
 const source = (): TreeSource<Node> => ({
@@ -76,7 +81,11 @@ const columns = (): GridColumn<Node>[] => [
 
 /** jsdom does no layout: every element is ROW high and the scroller has room for all rows. */
 function fakeLayout(): void {
-  jest.spyOn(HTMLElement.prototype, 'offsetHeight', 'get').mockReturnValue(10 * ROW);
+  jest.spyOn(HTMLElement.prototype, 'offsetHeight', 'get').mockImplementation(function (
+    this: HTMLElement,
+  ) {
+    return this.classList.contains('scroller') ? 10 * ROW : ROW;
+  });
   jest.spyOn(HTMLElement.prototype, 'offsetWidth', 'get').mockReturnValue(500);
   jest
     .spyOn(HTMLElement.prototype, 'getBoundingClientRect')
@@ -426,6 +435,34 @@ describe('lv-grid', () => {
     }
   });
 
+  it('pages by the measured heights of wrapped rows, so no row is passed unseen', async () => {
+    const many: TreeSource<Node> = {
+      roots: Array.from({ length: 100 }, (_, i) => ({ key: i, name: `r${i}`, time: i, kind: 'x' })),
+      key: (row) => row.key,
+    };
+    const { grid, scroller, key } = await setup({ source: many, rowHeight: ROW });
+    const selected: (Node | null)[] = [];
+    grid.addEventListener('lv-grid-select', (e) =>
+      selected.push(detail<GridSelectDetail<Node>>(e).row),
+    );
+    jest.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(function (
+      this: HTMLElement,
+    ) {
+      const height = this === scroller ? 10 * ROW : this.dataset.index ? 2 * ROW : ROW;
+      return { top: 0, bottom: height, height } as DOMRect;
+    });
+    Object.defineProperty(scroller, 'clientHeight', { get: () => 10 * ROW, configurable: true });
+    // A new source paints, and so measures, every row again.
+    grid.source = { ...many };
+    await settle(grid);
+    await key('Home');
+    // 8 rows of room between the header and the totals hold r0 to r3.
+    await key('PageDown');
+    expect(selected.at(-1)?.name).toBe('r3');
+    await key('PageUp');
+    expect(selected.at(-1)?.name).toBe('r0');
+  });
+
   it('looks for a hidden selected row once, not on every draw and key', async () => {
     const plain = source();
     const key = jest.fn(plain.key);
@@ -757,7 +794,7 @@ describe('lv-grid', () => {
     const last = fakeRowBoxes(ROW, 2);
     const scroll = jest.spyOn(GridView.prototype, 'scrollToIndex');
 
-    expect(await grid.find({ text: 'c' })).toBe(1);
+    expect((await grid.find({ text: 'c' }))?.total).toBe(1);
     await grid.setCurrentMatch(0);
     expect(scroll).not.toHaveBeenCalled();
     last.moveTo(8 * ROW + 1);
@@ -881,6 +918,18 @@ describe('lv-grid', () => {
     grid.groupBy = (row) => row.kind;
     await settle(grid);
     expect(reshapes).toEqual(['filter', 'filter', 'group']);
+  });
+
+  it('reports a reshape on a new source', async () => {
+    const { grid } = await setup();
+    const reshapes: string[] = [];
+    grid.addEventListener('lv-grid-reshape', (e) =>
+      reshapes.push(detail<GridReshapeDetail>(e).reason),
+    );
+
+    grid.source = source();
+    await settle(grid);
+    expect(reshapes).toEqual(['source']);
   });
 
   it('shows group rows that toggle on click and select from the keyboard', async () => {
@@ -1189,6 +1238,32 @@ describe('lv-grid columns', () => {
   });
 });
 
+describe('lv-grid nearView', () => {
+  // Rows a, b, c in sight order; `b` matches, and so do its folded children b1 and b2.
+  it.each([
+    ['the first match from the top row in sight, for next', { first: 0, last: 2 }, 'next', 0],
+    [
+      'the last match up to the bottom row, folded ones too, for prev',
+      { first: 2, last: 2 },
+      'prev',
+      2,
+    ],
+    ['none below the rows in sight, for next', { first: 2, last: 2 }, 'next', -1],
+    ['none above the rows in sight, for prev', { first: 0, last: 0 }, 'prev', -1],
+    ['none for next with the grid above the view', 'above', 'next', -1],
+    ['the last for prev with the grid above the view', 'above', 'prev', 2],
+    ['the first for next with the grid below the view', 'below', 'next', 0],
+    ['none for prev with the grid below the view', 'below', 'prev', -1],
+    ['the first for next in a folded section', 'folded', 'next', 0],
+  ] as const)('gives %s', async (_name, sight, direction, match) => {
+    const { grid } = await setup();
+    await grid.find({ text: 'b' });
+    mockSight = sight;
+
+    expect(grid.nearView(direction)).toBe(match);
+  });
+});
+
 describe('lv-grid find marks', () => {
   let highlights: FakeHighlights;
   const marks = (): number => highlights.marks().length;
@@ -1203,7 +1278,7 @@ describe('lv-grid find marks', () => {
     const { grid } = await setup({
       source: { ...source(), roots: [{ key: 1, name: 'a a', time: 3, kind: 'x' }] },
     });
-    expect(await grid.find({ text: ' ' })).toBe(1);
+    expect((await grid.find({ text: ' ' }))?.total).toBe(1);
     await grid.setCurrentMatch(0);
     expect(highlights.marks()).toEqual([' ']);
   });
@@ -1225,8 +1300,124 @@ describe('lv-grid find marks', () => {
     const running = grid.find({ text: 'b' });
     grid.clearFind();
 
-    expect(await running).toBe(-1);
+    expect(await running).toBeNull();
     expect(highlights.marks()).toEqual([]);
+  });
+
+  it('neither scrolls to nor marks a match that a clear made stale while it opened', async () => {
+    const { grid } = await setup();
+    await grid.find({ text: 'b' });
+    const scroll = jest.spyOn(GridView.prototype, 'scrollToIndex');
+    const stepping = grid.setCurrentMatch(1);
+    grid.clearFind();
+    await stepping;
+
+    expect(scroll).not.toHaveBeenCalled();
+    expect(highlights.marks()).toEqual([]);
+  });
+
+  it('does not scroll to a match that a newer step replaced while it opened', async () => {
+    const { grid } = await setup();
+    await grid.find({ text: 'b' });
+    const scroll = jest.spyOn(GridView.prototype, 'scrollToIndex');
+    // b1 must open b first; b is already shown.
+    const opening = grid.setCurrentMatch(1);
+    await grid.setCurrentMatch(0);
+    await opening;
+
+    expect(scroll.mock.calls.map(([index]) => index)).toEqual([1]);
+  });
+
+  it("finds and marks a group row's key, not its count", async () => {
+    const { grid } = await setup({ groupBy: (row) => row.kind });
+    const current = (): string[] => highlights.marks('lv-grid-current-find-match');
+
+    expect((await grid.find({ text: 'x' }))?.total).toBe(1);
+    expect((await grid.find({ text: '(' }))?.total).toBe(0);
+    await grid.find({ text: 'x' });
+    await grid.setCurrentMatch(0);
+    await settle(grid);
+    expect(current()).toEqual(['x']);
+
+    grid.sort = { column: 'time', dir: 'desc' };
+    expect(await grid.find({ text: 'x' })).toEqual({ total: 1, current: 0 });
+  });
+
+  describe('a search again', () => {
+    const current = (): string[] => highlights.marks('lv-grid-current-find-match');
+
+    it('keeps the current match on its row across a sort, and does not scroll to it', async () => {
+      const { grid } = await setup();
+      await grid.find({ text: 'b' });
+      await grid.setCurrentMatch(1);
+      const scroll = jest.spyOn(GridView.prototype, 'scrollToIndex');
+
+      grid.sort = { column: 'time', dir: 'desc' };
+      // b, then its children by time: b2, b1.
+      expect(await grid.find({ text: 'b' })).toEqual({ total: 3, current: 2 });
+      await settle(grid);
+      expect(scroll).not.toHaveBeenCalled();
+      expect(current()).toEqual(['b']);
+    });
+
+    it('keeps the match within its row', async () => {
+      const { grid } = await setup({
+        source: {
+          ...source(),
+          roots: [
+            { key: 1, name: 'bb', time: 1, kind: 'x' },
+            { key: 2, name: 'b', time: 2, kind: 'x' },
+          ],
+        },
+      });
+      await grid.find({ text: 'b' });
+      await grid.setCurrentMatch(1);
+
+      grid.sort = { column: 'time', dir: 'desc' };
+      expect(await grid.find({ text: 'b' })).toEqual({ total: 3, current: 2 });
+    });
+
+    it('holds no current match when its row is filtered out', async () => {
+      const { grid } = await setup();
+      await grid.find({ text: 'b' });
+      await grid.setCurrentMatch(1);
+
+      grid.filters = [{ test: (row: Node) => row.name !== 'b1' }];
+      expect(await grid.find({ text: 'b' })).toEqual({ total: 2, current: -1 });
+      await settle(grid);
+      expect(current()).toEqual([]);
+      expect(highlights.marks().length).toBe(2);
+    });
+
+    it('keeps the current match on its row across a group by', async () => {
+      const { grid } = await setup();
+      await grid.find({ text: 'b' });
+      await grid.setCurrentMatch(1);
+
+      grid.groupBy = (row) => row.kind;
+      expect(await grid.find({ text: 'b' })).toEqual({ total: 3, current: 1 });
+    });
+
+    it("moves to the row's first match when a hidden column takes the one it was on", async () => {
+      const { grid } = await setup({
+        source: { ...source(), roots: [{ key: 1, name: 'a1', time: 1, kind: 'x' }] },
+      });
+      await grid.find({ text: '1' });
+      await grid.setCurrentMatch(1);
+
+      grid.columns = columns().map((column) =>
+        column.id === 'name' ? { ...column, hidden: true } : column,
+      );
+      expect(await grid.find({ text: '1' })).toEqual({ total: 1, current: 0 });
+    });
+
+    it('keeps no current match for a new query', async () => {
+      const { grid } = await setup();
+      await grid.find({ text: 'b' });
+      await grid.setCurrentMatch(1);
+
+      expect(await grid.find({ text: 'b1' })).toEqual({ total: 1, current: -1 });
+    });
   });
 
   it('lets go of its marks when removed, and marks again when put back', async () => {

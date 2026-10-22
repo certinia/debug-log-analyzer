@@ -322,3 +322,21 @@ describe('FlameChart.setViewport', () => {
     expect(chart.getViewport()!.offsetX).toBeLessThan(1e9);
   });
 });
+
+describe('Escape in the chart', () => {
+  it('hands the search to the find that owns it, which closes the widget', () => {
+    const chart = new FlameChart();
+    const onSearchClear = jest.fn();
+    const container = document.createElement('div');
+    const internals = chart as unknown as Record<string, unknown>;
+    internals['container'] = container;
+    internals['viewport'] = new TimelineViewport(400, 300, 1e9, 5);
+    internals['app'] = { canvas: document.createElement('canvas') };
+    internals['callbacks'] = { onSearchClear };
+    (internals['setupKeyboardHandler'] as () => void).call(chart);
+
+    container.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }));
+
+    expect(onSearchClear).toHaveBeenCalledTimes(1);
+  });
+});

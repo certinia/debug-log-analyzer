@@ -22,7 +22,10 @@ export interface RowPainter<R> {
 }
 
 export interface GridViewOptions<R> {
-  /** The element that scrolls. Its first rows may be a sticky header. */
+  /**
+   * The element that scrolls. Its rows before the body may be a sticky header, and every
+   * element after the body is taken as a sticky footer.
+   */
   scroller: HTMLElement;
   body: HTMLElement;
   painter: RowPainter<R>;
@@ -70,10 +73,11 @@ export class GridView<R extends object> {
   private pending: { rows: RowView<R>; toggled?: RowTarget<R> } | null = null;
   private pendingScroll: { index: number; align: 'center' | 'auto' } | null = null;
   /**
-   * The place `setRows` kept, held while the rows around it are measured over the next
-   * frames, until the user scrolls. virtual-core corrects only rows above the viewport.
+   * The place `setRows` kept or `scrollToIndex` went to, held while the rows around it are
+   * measured over the next frames, until the user scrolls. virtual-core corrects nothing
+   * while it holds.
    */
-  private pin: Restore = null;
+  private pin: Restore | { index: number; bottom: number } = null;
   /** The view's own last write to `scrollTop`; any other value is the user's scroll. */
   private pinnedTop = Number.NaN;
   private readonly unobserve: () => void;
@@ -202,23 +206,78 @@ export class GridView<R extends object> {
     }
   }
 
-  /** Scrolls the row at `index` into view: to the middle, or only as far as it must. */
+  /**
+   * Scrolls the row at `index` into view: to the middle, or only as far as it must. The row
+   * is held there until the user scrolls.
+   */
   scrollToIndex(index: number, align: 'center' | 'auto' = 'center'): void {
     if (!this.visible) {
       this.pendingScroll = { index, align };
       return;
     }
-    this.setPin(null);
-    this.virtualizer.scrollToIndex(index, { align });
+    // A header or footer may have changed height since the rows were last set.
+    this.layout(this.rows?.size ?? 0);
+    const v = this.virtualizer;
+    // Refreshes `measurementsCache` with the heights measured since the last draw.
+    v.getVirtualItems();
+    const item = v.measurementsCache[index];
+    const target = v.getOffsetForIndex(index, align);
+    if (!item || !target) {
+      return;
+    }
+    const side = target[1];
+    let offset = target[0];
+    if (align === 'center') {
+      // virtual-core centres in the whole scroller, so the header and footer pushed the row low.
+      const { scrollPaddingStart: head, scrollPaddingEnd: foot } = v.options;
+      const gap = this.options.scroller.clientHeight - head - foot;
+      offset = v.getOffsetForAlignment(
+        item.start - head - Math.max(0, (gap - item.size) / 2),
+        'start',
+      );
+    }
+    // Pinned, not virtual-core's scrollToIndex: rows that measure taller would push the row out.
+    // A row brought up from below keeps its bottom edge, so growing leaves it above the footer.
+    this.setPin(
+      side === 'end' ? { index, bottom: item.end - offset } : { index, top: item.start - offset },
+    );
+    this.draw();
   }
 
-  /** Call when anything above the body, like the header, changes height. */
+  /** Drops a scroll asked for while hidden, so showing the view does not go there. */
+  cancelScroll(): void {
+    this.pendingScroll = null;
+  }
+
+  /** Call when anything above or below the body, like the header, changes height. */
   remeasure(): void {
     if (!this.visible) {
       return;
     }
     this.layout(this.rows?.size ?? 0);
     this.draw();
+  }
+
+  /**
+   * How many rows a page key moves from `index`: the rows past it that fit whole in `height`
+   * with `index` itself, which stays on screen. Rows not yet measured count at their estimate.
+   */
+  pageRows(index: number, height: number, key: 'pageUp' | 'pageDown'): number {
+    const v = this.virtualizer;
+    // Refreshes `measurementsCache` with the heights measured since the last draw.
+    v.getVirtualItems();
+    const items = v.measurementsCache;
+    const step = key === 'pageDown' ? 1 : -1;
+    let count = 0;
+    let used = 0;
+    for (let i = index; i >= 0 && i < items.length; i += step) {
+      used += items[i]?.size ?? 0;
+      if (used > height) {
+        break;
+      }
+      count++;
+    }
+    return count - 1;
   }
 
   /** The element painting the row at `index`, while it is on screen. */
@@ -267,9 +326,23 @@ export class GridView<R extends object> {
   private layout(count: number): void {
     const { body } = this.options;
     const margin = body.offsetTop;
+    let end = 0;
+    for (let el = body.nextElementSibling; el; el = el.nextElementSibling) {
+      end += (el as HTMLElement).offsetHeight;
+    }
     const v = this.virtualizer;
-    if (v.options.count !== count || v.options.scrollMargin !== margin) {
-      v.setOptions({ ...v.options, count, scrollMargin: margin, scrollPaddingStart: margin });
+    if (
+      v.options.count !== count ||
+      v.options.scrollMargin !== margin ||
+      v.options.scrollPaddingEnd !== end
+    ) {
+      v.setOptions({
+        ...v.options,
+        count,
+        scrollMargin: margin,
+        scrollPaddingStart: margin,
+        scrollPaddingEnd: end,
+      });
     }
   }
 
@@ -396,11 +469,18 @@ export class GridView<R extends object> {
     }
     // Refreshes `measurementsCache` with the heights measured since the last draw.
     v.getVirtualItems();
-    const top = !('edge' in pin)
-      ? (v.measurementsCache[pin.index]?.start ?? Number.NaN) - pin.top
-      : pin.edge === 'top'
-        ? 0
-        : v.getTotalSize() - scroller.clientHeight;
+    let top = Number.NaN;
+    if ('edge' in pin) {
+      top = pin.edge === 'top' ? 0 : v.getTotalSize() - scroller.clientHeight;
+    } else {
+      const item = v.measurementsCache[pin.index];
+      if (item && 'bottom' in pin) {
+        // Never past the row's top: a row taller than the view shows its top.
+        top = Math.min(item.end - pin.bottom, item.start - v.options.scrollPaddingStart);
+      } else if (item && 'top' in pin) {
+        top = item.start - pin.top;
+      }
+    }
     if (!Number.isFinite(top) || Math.abs(scroller.scrollTop - top) < 1) {
       return false;
     }
@@ -548,10 +628,7 @@ export class GridView<R extends object> {
     const find = this.find;
     const index = Number(el.dataset.index);
     const entry = this.rows?.rowAt(index);
-    const first =
-      find && entry !== undefined && !(entry instanceof Group)
-        ? find.result.firstMatchIn(entry)
-        : -1;
+    const first = find && entry !== undefined ? find.result.firstMatchIn(entry) : -1;
     this.highlighter.mark(el, first, find?.result.pattern ?? null, find?.current ?? -1);
   }
 

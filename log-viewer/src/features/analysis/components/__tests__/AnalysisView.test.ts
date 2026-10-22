@@ -394,9 +394,12 @@ describe('analysis-view', () => {
     expect(grid().hasAttribute('category-colorize')).toBe(false);
   });
 
-  it('drops the search when the grid is reshaped under it', async () => {
-    jest.spyOn(grid(), 'clientHeight', 'get').mockReturnValue(100);
-    jest.spyOn(grid(), 'find').mockResolvedValue(2);
+  it('searches again when the grid is reshaped under it', async () => {
+    Object.defineProperty(view, 'clientHeight', { configurable: true, value: 100 });
+    jest
+      .spyOn(grid(), 'find')
+      .mockResolvedValueOnce({ total: 2, current: -1 })
+      .mockResolvedValueOnce({ total: 1, current: -1 });
     jest.spyOn(grid(), 'setCurrentMatch').mockResolvedValue(undefined);
     const totals: number[] = [];
     const heard = (e: Event) =>
@@ -410,9 +413,10 @@ describe('analysis-view', () => {
     );
     await settle();
     fireOnGrid('lv-grid-reshape', { reason: 'filter' });
+    await settle();
     document.removeEventListener('lv-find-results', heard);
 
-    expect(totals).toEqual([2, 0]);
+    expect(totals).toEqual([2, 1]);
   });
 });
 

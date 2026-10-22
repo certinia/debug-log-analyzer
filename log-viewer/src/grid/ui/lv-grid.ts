@@ -21,6 +21,7 @@ import {
   type Calcs,
   type ExpandPolicy,
   type ExportOptions,
+  type FindDirection,
   type FindQuery,
   type GroupBy,
   type RowFilter,
@@ -35,6 +36,7 @@ import { GridView, rowId, type FindMarks } from '../render/index.js';
 import type { GridColumn } from './column.js';
 import { gridKey } from './keyboard.js';
 import { litPainter, total } from './painter.js';
+import { sightOf } from './sight.js';
 import { columnTracks, minWidthOf, naturalWidth } from './sizing.js';
 import { StoreController } from './store-controller.js';
 import { gridStyles } from './styles.js';
@@ -63,6 +65,8 @@ export interface GridContextDetail<R> extends GridRowDetail<R> {
 
 export interface GridFindDetail {
   total: number;
+  /** The current match, from 0; -1 for none. */
+  current: number;
 }
 
 export interface GridSort {
@@ -72,7 +76,7 @@ export interface GridSort {
 
 /** The rows or shown columns changed, so find's match numbers no longer hold. */
 export interface GridReshapeDetail {
-  reason: 'sort' | 'columns' | 'filter' | 'group';
+  reason: 'sort' | 'columns' | 'filter' | 'group' | 'source';
 }
 
 /**
@@ -305,18 +309,64 @@ export class LvGrid<R extends object = object> extends LitElement {
   /**
    * Searches the text of every shown column with a `text`, over every row that passes the
    * filters, open or not. Marks the matches and reports the total in `lv-grid-find-results`.
+   * Searching the same query again, as after a sort or a filter, keeps the current match on
+   * its row: the same match in that row, else the row's first, marked without opening or
+   * scrolling to it. `current` is -1 when that row has no match now, or none was current.
+   * Null when a newer find, a clear or a rebuild replaced the search.
    */
-  async find(query: FindQuery): Promise<number> {
+  async find(query: FindQuery): Promise<GridFindDetail | null> {
     const cells = this.visibleColumns().flatMap((column) => (column.text ? [column.text] : []));
     const search = ++this.searches;
+    const last = this.found;
+    const row = last && last.current >= 0 ? last.result.rowOf(last.current) : undefined;
+    const offset = last && row ? last.current - last.result.firstMatchIn(row) : 0;
     const result = await this.store?.find(query, cells);
     if (!result || search !== this.searches) {
+      return null;
+    }
+    const same =
+      last?.result.pattern?.source === result.pattern?.source &&
+      last?.result.pattern?.flags === result.pattern?.flags;
+    const first = row && same ? result.firstMatchIn(row) : -1;
+    const kept = first + offset;
+    const keptRow = result.rowOf(kept);
+    const inRow = keptRow !== undefined && result.firstMatchIn(keptRow) === first;
+    const current = first >= 0 && inRow ? kept : first;
+    this.found = result.pattern ? { result, current } : null;
+    this.view?.setFind(this.found);
+    const detail = { total: result.total, current };
+    this.emit<GridFindDetail>('lv-grid-find-results', detail);
+    return detail;
+  }
+
+  /**
+   * The match nearest the rows in sight: for `next` the first at or after the top one, for
+   * `prev` the last at or before the bottom one. -1 when none lies that way.
+   */
+  nearView(direction: FindDirection): number {
+    const scroller = this.scrollerRef.value;
+    const result = this.found?.result;
+    if (!scroller || !result?.total || !this.shown) {
       return -1;
     }
-    this.found = result.pattern ? { result, current: -1 } : null;
-    this.view?.setFind(this.found);
-    this.emit<GridFindDetail>('lv-grid-find-results', { total: result.total });
-    return result.total;
+    const last = result.total - 1;
+    const painted =
+      this.bodyRef.value?.querySelectorAll<HTMLElement>(':scope > [data-index]:not([hidden])') ??
+      [];
+    const sight = sightOf(scroller, painted);
+    switch (sight) {
+      case 'above':
+        return direction === 'next' ? -1 : last;
+      case 'below':
+        return direction === 'next' ? 0 : -1;
+      case 'folded':
+        return direction === 'next' ? 0 : last;
+    }
+    if (direction === 'next') {
+      const match = result.firstMatchFrom(this.shown, sight.first);
+      return match > last ? -1 : match;
+    }
+    return result.firstMatchFrom(this.shown, sight.last + 1) - 1;
   }
 
   /**
@@ -331,11 +381,22 @@ export class LvGrid<R extends object = object> extends LitElement {
     }
     found.current = match;
     if (match < 0) {
+      // A scroll held while hidden would bring back a match no longer current.
+      this.view?.cancelScroll();
       this.view?.setFind(found);
       return;
     }
-    const index = (await this.store?.reveal(found.result.pathOf(match))) ?? -1;
+    const row = found.result.rowOf(match);
+    // A group row is always on screen: there is no path to open.
+    const index =
+      row instanceof Group
+        ? (this.shown?.indexOf(row) ?? -1)
+        : ((await this.store?.reveal(found.result.pathOf(match))) ?? -1);
     await this.updateComplete;
+    // A close, a newer search or a newer step while the row opened replaced this match.
+    if (this.found !== found || found.current !== match) {
+      return;
+    }
     if (index >= 0) {
       this.bringIntoView(index, false);
     }
@@ -416,6 +477,10 @@ export class LvGrid<R extends object = object> extends LitElement {
   }
 
   protected updated(changed: PropertyValues): void {
+    // After the render, so a new grid has its height when a listener asks which grids show.
+    if (changed.has('source') && this.source) {
+      this.emit<GridReshapeDetail>('lv-grid-reshape', { reason: 'source' });
+    }
     const snapshot = this.data.snapshot;
     this.toggleAttribute('busy', snapshot?.busy ?? false);
     if (snapshot?.failed !== this.failure) {
@@ -912,7 +977,8 @@ export class LvGrid<R extends object = object> extends LitElement {
       }
       return;
     }
-    const intent = navigate(rows, at, key, this.pageSize());
+    const page = key === 'pageUp' || key === 'pageDown' ? this.pageSize(at, key) : 1;
+    const intent = navigate(rows, at, key, page);
     if (intent?.kind === 'select') {
       this.selectAndShow(intent.index);
     } else if (intent) {
@@ -1040,8 +1106,11 @@ export class LvGrid<R extends object = object> extends LitElement {
     }
   }
 
-  /** The rows that fit between the header and the totals, in the part of the grid on screen. */
-  private pageSize(): number {
+  /**
+   * How many rows a page key moves from `at`, so the rows it passes fit between the header
+   * and the totals, in the part of the grid on screen.
+   */
+  private pageSize(at: number, key: 'pageUp' | 'pageDown'): number {
     const scroller = this.scrollerRef.value;
     if (!scroller) {
       return 1;
@@ -1054,7 +1123,7 @@ export class LvGrid<R extends object = object> extends LitElement {
       0,
     );
     const height = Math.min(scroller.clientHeight, onScreen) - edges;
-    return Math.max(1, Math.floor(height / this.rowHeight) - 1);
+    return Math.max(1, this.view?.pageRows(at, height, key) ?? 1);
   }
 
   private readonly onContextMenu = (e: MouseEvent): void => {

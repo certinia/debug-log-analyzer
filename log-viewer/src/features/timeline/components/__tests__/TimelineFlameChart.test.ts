@@ -10,6 +10,21 @@ import type { ApexLog } from '@apexdevtools/apex-log-parser';
 jest.mock('../../optimised/ApexLogTimeline.js', () => ({
   ApexLogTimeline: class {
     private log: ApexLog | null = null;
+    findTarget = {
+      queries: [] as unknown[],
+      clears: 0,
+      async find(query: unknown) {
+        this.queries.push(query);
+        return { total: 1, current: -1 };
+      },
+      setCurrentMatch: async () => {},
+      clearFind() {
+        this.clears++;
+      },
+    };
+    constructor() {
+      targets.push(this.findTarget);
+    }
     init(_container: HTMLElement, log: ApexLog): Promise<void> {
       this.log = log;
       built.push(log);
@@ -41,6 +56,8 @@ let destroyed: ApexLog[] = [];
 /** Whether a build waits to be finished by hand. */
 let holdInit = false;
 let finishInit: () => void = () => {};
+/** Each chart's find target, in the order the charts were made. */
+let targets: { queries: unknown[]; clears: number }[] = [];
 /** Reports every observed element in view, as a tab coming back on screen does. */
 let show: () => void = () => {};
 
@@ -135,5 +152,64 @@ describe('timeline-flame-chart on a new log', () => {
     finishInit();
     await settle();
     expect(destroyed).toEqual([first]);
+  });
+});
+
+describe('timeline-flame-chart find', () => {
+  let chart: HTMLElement & { apexLog: ApexLog | null; updateComplete: Promise<unknown> };
+  let height: number;
+
+  const search = (text: string): void => {
+    document.dispatchEvent(
+      new CustomEvent('lv-find', { detail: { text, count: 0, options: { matchCase: false } } }),
+    );
+  };
+
+  beforeEach(async () => {
+    targets = [];
+    holdInit = false;
+    height = 20;
+    globalThis.IntersectionObserver = AlwaysVisible as unknown as typeof IntersectionObserver;
+    chart = document.createElement('timeline-flame-chart') as typeof chart;
+    Object.defineProperty(chart, 'clientHeight', { get: () => height });
+    document.body.append(chart);
+    await chart.updateComplete;
+  });
+
+  afterEach(() => {
+    chart.remove();
+  });
+
+  it('searches the chart for a new log with the open query', async () => {
+    search('foo');
+    chart.apexLog = logOf();
+    await chart.updateComplete;
+    await settle();
+
+    expect(targets[0]?.queries).toEqual([{ text: 'foo', matchCase: false }]);
+  });
+
+  it('answers no search while the tab is hidden', async () => {
+    chart.apexLog = logOf();
+    await chart.updateComplete;
+    await settle();
+    height = 0;
+    search('foo');
+    await settle();
+
+    expect(targets[0]?.queries).toEqual([]);
+  });
+
+  it('clears the old chart before it goes', async () => {
+    chart.apexLog = logOf();
+    await chart.updateComplete;
+    await settle();
+    search('foo');
+    await settle();
+    chart.apexLog = logOf();
+    await chart.updateComplete;
+    await settle();
+
+    expect(targets[0]?.clears).toBeGreaterThan(0);
   });
 });

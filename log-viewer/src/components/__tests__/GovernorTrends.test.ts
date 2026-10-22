@@ -10,8 +10,10 @@ import type { ApexLog } from '@apexdevtools/apex-log-parser';
 
 import { stubStore } from '#test-helpers/apexLog.js';
 import { eventBus } from '../../core/events/EventBus.js';
+import { describeLevelGap, findLevelGap } from '../../core/log/levelCapabilities.js';
 import type { LogStore } from '../../core/log/LogStore.js';
 import type { NoDataSpan } from '../../features/timeline/types/flamechart.types.js';
+import { NO_GOVERNOR_USAGE_TEXT } from '../governorCopy.js';
 import type { TrendSeries } from '../governorTrendData.js';
 
 // The charts are driven from one stub series, so the seek is the only logic
@@ -48,10 +50,10 @@ const trend = (label = 'SOQL queries', gaps: NoDataSpan[] = []): TrendSeries => 
 const aLog = () =>
   stubStore({ exitStamp: LOG_NS, duration: { total: LOG_NS - 200 } } as unknown as ApexLog);
 
-async function mount(): Promise<LitElement> {
+async function mount(store: LogStore = aLog()): Promise<LitElement> {
   const element = document.createElement('governor-trends');
   // No provider in the test, so the consumed store is assigned straight on.
-  (element as unknown as { logStore: LogStore }).logStore = aLog();
+  (element as unknown as { logStore: LogStore }).logStore = store;
   document.body.append(element);
   await element.updateComplete;
   // The derived value lands a microtask after the render that asks for it.
@@ -358,5 +360,26 @@ describe('governor-trends', () => {
     it('takes none where the log reported no limit', async () => {
       expect(await tierOf(90, 0)).toBeNull();
     });
+  });
+});
+
+describe('governor-trends with no usage', () => {
+  beforeEach(() => {
+    document.body.replaceChildren();
+    series = [];
+  });
+
+  const note = (element: LitElement) => element.shadowRoot?.querySelector('.note')?.textContent;
+
+  it('says the log recorded no governor usage', async () => {
+    expect(note(await mount())).toBe(NO_GOVERNOR_USAGE_TEXT);
+  });
+
+  it('names the level that would record it when the log was captured below it', async () => {
+    const gap = findLevelGap('limits', { apexProfiling: 'NONE' }, { apexProfiling: 'NONE' });
+
+    expect(note(await mount(Object.assign(aLog(), { levelGap: () => gap })))).toBe(
+      describeLevelGap(gap),
+    );
   });
 });

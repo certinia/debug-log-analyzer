@@ -126,7 +126,7 @@ export async function measureTimeline(log: ApexLog): Promise<void> {
   const search = await time(`search "${SEARCH_TEXT}"`, () =>
     matcher.search(textPredicate(SEARCH_TEXT)),
   );
-  line('matches', String(search.total));
+  line('matches', String(search?.total));
 
   // The whole log in view is the worst cull: every depth, most of it bucketed.
   const viewport = viewportFor(frames.totalDuration, frames.maxDepth, WHOLE_LOG);

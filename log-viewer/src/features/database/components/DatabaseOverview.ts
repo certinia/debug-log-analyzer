@@ -15,6 +15,7 @@ import { logNamespacePalette } from '../../../components/namespacePalette.js';
 import '../../../components/StackedTimeBar.js';
 import { segmentsWithTail } from '../../../components/StackedTimeBar.js';
 import { DerivedValue } from '../../../core/log/DerivedValue.js';
+import { describeLevelGap } from '../../../core/log/levelCapabilities.js';
 import { logContext } from '../../../core/log/logContext.js';
 import type { LogStore } from '../../../core/log/LogStore.js';
 import { nsToMs } from '../../../core/utility/Duration.js';
@@ -172,7 +173,7 @@ export class DatabaseConcentration extends LitElement {
       return html`<section-skeleton
         shape="rows"
         ?pending=${this._overview.pending}
-        fallback=${NO_STATEMENTS}
+        fallback=${describeLevelGap(this.logStore?.levelGap('queries'), NO_STATEMENTS)}
       ></section-skeleton>`;
     }
     const { count, percent } = concentration(overview);
@@ -294,7 +295,7 @@ export class DatabaseNamespaces extends LitElement {
       return html`<section-skeleton
         shape="rows"
         ?pending=${this._overview.pending}
-        fallback=${NO_STATEMENTS}
+        fallback=${describeLevelGap(this.logStore?.levelGap('queries'), NO_STATEMENTS)}
       ></section-skeleton>`;
     }
     // The log's own palette, so a namespace that moves between the two bars is

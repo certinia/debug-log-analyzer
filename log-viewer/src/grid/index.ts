@@ -11,6 +11,7 @@ export {
   max,
   sum,
   type Calc,
+  type FindDirection,
   type FindQuery,
   type GroupBy,
   type RowFilter,

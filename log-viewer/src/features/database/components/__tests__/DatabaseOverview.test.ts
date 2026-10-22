@@ -32,6 +32,7 @@ import { databaseTreeRows, ownCodeTotal, type DatabaseTreeRow } from '../Databas
 import '../DatabaseOverview.js';
 import { stubStore } from '#test-helpers/apexLog.js';
 import { settledNote } from '#test-helpers/sections.js';
+import { describeLevelGap, findLevelGap } from '../../../../core/log/levelCapabilities.js';
 
 const emptyOverview = (): DatabaseOverview => ({
   time: {
@@ -189,10 +190,11 @@ const namespaceSplit = (): DatabaseBreakdown[] => [
 
 async function mount<K extends keyof HTMLElementTagNameMap>(
   tag: K,
+  store: LogStore = stubStore(apexLog),
 ): Promise<HTMLElementTagNameMap[K] & LitElement> {
   const element = document.createElement(tag);
   // No provider in the test, so the consumed store is assigned straight on.
-  (element as unknown as { logStore: LogStore }).logStore = stubStore(apexLog);
+  (element as unknown as { logStore: LogStore }).logStore = store;
   document.body.append(element);
   await (element as LitElement).updateComplete;
   // The derived value lands a microtask after the render that asks for it.
@@ -490,4 +492,15 @@ describe('database-namespaces', () => {
       'no database statements',
     );
   });
+
+  it.each(['database-namespaces', 'database-concentration'] as const)(
+    '%s names the DB level a log was captured below',
+    async (tag) => {
+      overview = emptyOverview();
+      const gap = findLevelGap('queries', { database: 'NONE' }, { database: 'NONE' });
+      const store = Object.assign(stubStore(apexLog), { levelGap: () => gap });
+
+      expect(await settledNote(await mount(tag, store))).toBe(describeLevelGap(gap));
+    },
+  );
 });

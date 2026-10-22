@@ -9,6 +9,7 @@ import { customElement, property, state } from 'lit/decorators.js';
 import { dispatchInspectorReveal } from '../../../components/inspectorReveal.js';
 import { ResizeController } from '../../../core/events/ResizeController.js';
 import { DerivedValue } from '../../../core/log/DerivedValue.js';
+import { describeLevelGap } from '../../../core/log/levelCapabilities.js';
 import { logContext } from '../../../core/log/logContext.js';
 import type { LogStore } from '../../../core/log/LogStore.js';
 import { formatDuration } from '../../../core/utility/Util.js';
@@ -608,7 +609,7 @@ export class LogDiagnosticsView extends LitElement {
     const caveats: string[] = [];
     if (!result.queryPlansKnown) {
       caveats.push(
-        'To see query plan findings, re-run the log with the Database log level at FINEST.',
+        describeLevelGap(this.logStore?.levelGap('queryPlans'), 'The log has no query plans.'),
       );
     }
     const { linted, distinct } = result.lintedQueries;
