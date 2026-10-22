@@ -183,13 +183,12 @@ export function pickLog(options: LogPickerOptions): Promise<string | undefined> 
     ` · ${plural(current.matches, 'match', 'matches')}` +
     (current.unsearched.length > 0 ? ` · ${current.unsearched.length} older not searched` : '');
 
-  const runSearch = (current: TermSearch, toSearch: PickerLog[], maxDownloads: number) => {
+  const runSearch = (current: TermSearch, toSearch: PickerLog[], downloads: boolean) => {
     const before = current.searched;
     current.running++;
     picker.busy = true;
     searchLogContent(toSearch, current.term, store, {
       signal: current.cancellation.signal,
-      maxDownloads,
       onMatch: ({ logId, snippet }) => {
         current.matches++;
         itemsById.get(logId)?.showMatch(snippet);
@@ -205,13 +204,13 @@ export function pickLog(options: LogPickerOptions): Promise<string | undefined> 
           `Log content search could not read or cache Apex log ${logId}: ${errorMessage(error)}`,
         ),
     })
-      .then((rest) => {
+      .then(() => {
         current.running--;
         if (current.cancellation.signal.aborted) {
           return;
         }
-        current.searched += toSearch.length - rest.length;
-        if (maxDownloads > 0) {
+        current.searched += toSearch.length;
+        if (downloads) {
           current.downloading = 0;
         }
         picker.busy = current.running > 0;
@@ -250,7 +249,7 @@ export function pickLog(options: LogPickerOptions): Promise<string | undefined> 
       updateSearchRow(current);
       const cached = logs.filter((log) => store.has(log.Id));
       if (cached.length > 0) {
-        delay = setTimeout(() => runSearch(current, cached, 0), SEARCH_DELAY_MS);
+        delay = setTimeout(() => runSearch(current, cached, false), SEARCH_DELAY_MS);
       }
     }
     refresh();
@@ -266,7 +265,7 @@ export function pickLog(options: LogPickerOptions): Promise<string | undefined> 
     current.downloading = next.length;
     updateSearchRow(current);
     refresh();
-    runSearch(current, next, Infinity);
+    runSearch(current, next, true);
   };
 
   return new Promise((resolve) => {

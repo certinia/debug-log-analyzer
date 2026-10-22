@@ -42,7 +42,6 @@ function options(overrides: Partial<LogSearchOptions> = {}) {
   const errors: string[] = [];
   const opts: LogSearchOptions = {
     signal: new AbortController().signal,
-    maxDownloads: Infinity,
     onMatch: (match) => matches.push(match),
     onProgress: () => undefined,
     onError: (logId) => errors.push(logId),
@@ -128,33 +127,6 @@ describe('searchLogContent', () => {
       'download:mid',
       'download:old-small',
     ]);
-  });
-
-  it('downloads only the newest logs up to the limit and returns the rest, newest first', async () => {
-    const { store, calls } = fakeStore({ cached: 'term' });
-    const { opts, matches } = options({ maxDownloads: 1 });
-    const logs = [
-      log('cached'),
-      log('c', 10, '2024-01-01T00:00:00.000Z'),
-      log('a', 10, '2024-03-01T00:00:00.000Z'),
-      log('b', 10, '2024-02-01T00:00:00.000Z'),
-    ];
-
-    const pending = await searchLogContent(logs, 'term', store, opts);
-
-    expect(matches.map((m) => m.logId)).toEqual(['cached']);
-    expect(calls).toEqual(['read:cached', 'download:a']);
-    expect(pending.map((l) => l.Id)).toEqual(['b', 'c']);
-  });
-
-  it('downloads nothing with a limit of 0', async () => {
-    const { store, calls } = fakeStore({ cached: 'term' });
-    const { opts } = options({ maxDownloads: 0 });
-
-    const pending = await searchLogContent([log('cached'), log('a')], 'term', store, opts);
-
-    expect(calls).toEqual(['read:cached']);
-    expect(pending.map((l) => l.Id)).toEqual(['a']);
   });
 
   it.each([

@@ -29,8 +29,6 @@ export interface ContentMatch {
 
 export interface LogSearchOptions {
   signal: AbortSignal;
-  /** How many uncached logs this search may download, newest first. */
-  maxDownloads: number;
   onMatch(match: ContentMatch): void;
   onProgress(done: number, total: number): void;
   onError(logId: string, error: unknown): void;
@@ -39,26 +37,23 @@ export interface LogSearchOptions {
 /**
  * Searches log bodies for `term`, case-insensitive, and reports the first match in each log.
  *
- * Cached logs are searched first, as they cost no API call. Then the newest `maxDownloads`
- * uncached logs download; the rest are returned unsearched, newest first, so the caller can ask
- * before downloading them. At most 8 logs and 100 MB of logs are in flight at once.
+ * Cached logs are searched first, as they cost no API call, then the rest download newest
+ * first. At most 8 logs and 100 MB of logs are in flight at once.
  *
  * After `signal` aborts, no new log starts and no match is reported. A download already
  * running still finishes and is cached, because the request cannot be cancelled.
  */
-export async function searchLogContent<T extends SearchableLog>(
-  logs: T[],
+export async function searchLogContent(
+  logs: SearchableLog[],
   term: string,
   store: LogStore,
   options: LogSearchOptions,
-): Promise<T[]> {
+): Promise<void> {
   const cached = newestFirst(logs.filter((log) => store.has(log.Id)));
   const cachedIds = new Set(cached.map((log) => log.Id));
   const uncached = newestFirst(logs.filter((log) => !cachedIds.has(log.Id)));
-  const downloads = uncached.slice(0, options.maxDownloads);
-  const pending = uncached.slice(downloads.length);
 
-  const queue = [...cached, ...downloads];
+  const queue = [...cached, ...uncached];
   let done = 0;
   options.onProgress(done, queue.length);
 
@@ -81,8 +76,6 @@ export async function searchLogContent<T extends SearchableLog>(
     }
     options.onProgress(++done, queue.length);
   });
-
-  return pending;
 }
 
 /**
