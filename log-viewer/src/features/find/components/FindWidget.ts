@@ -369,14 +369,15 @@ export class FindWidget extends LitElement {
     this._live.schedule(() => this._liveFind());
   }
 
-  // A typed key searches without moving: only Enter steps.
+  // Counts stay until the views report, so each key does not flash "No results".
   _liveFind() {
     if (!this._hasMatchValueChanged()) {
       return;
     }
-    const findEvt = this._getFindEvent();
-    findEvt.detail.count = 0;
-    document.dispatchEvent(new CustomEvent('lv-find', findEvt));
+    const { detail } = this._getFindEvent();
+    document.dispatchEvent(
+      new CustomEvent('lv-find', { detail: { ...detail, count: 0, from: 'next' } }),
+    );
   }
 
   // Searches without moving, or, with `from`, moves to the match nearest the screen that way.

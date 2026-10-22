@@ -171,7 +171,7 @@ describe('FindWidget', () => {
       return { searches, type };
     }
 
-    it('searches once the typing pauses, without moving', async () => {
+    it('searches once the typing pauses, and moves to the match nearest the screen', async () => {
       const { searches, type } = await typed();
       type('f');
       jest.advanceTimersByTime(100);
@@ -180,7 +180,7 @@ describe('FindWidget', () => {
       expect(searches).toEqual([]);
 
       jest.advanceTimersByTime(1);
-      expect(searches).toEqual([{ text: 'fo', count: 0 }]);
+      expect(searches).toEqual([{ text: 'fo', count: 0, from: 'next' }]);
     });
 
     it('runs a waiting search at once on Enter, and moves to the match nearest the screen', async () => {
