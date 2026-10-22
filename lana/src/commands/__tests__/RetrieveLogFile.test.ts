@@ -3,6 +3,7 @@
  */
 import { afterEach, beforeEach, describe, expect, it } from '@jest/globals';
 import { Uri, window, workspace } from 'vscode';
+import { memoryFs } from '../../__tests__/helpers/memoryFs.js';
 import {
   asContext,
   createMockContext,
@@ -39,6 +40,7 @@ const mockFs = workspace.fs as unknown as Record<
 >;
 const OPENED = '/test/workspace/.sfdx/tools/debug/logs/00Dorg';
 const SEARCH_CACHE = '/test/storage/apex-logs/00Dorg';
+const OTHER_ORG_LOG = '/test/storage/apex-logs/00Dother/other.log';
 
 /** Lays out cached logs by folder path: `{ [folder]: { [logId]: body } }`. */
 function cachedLogs(folders: Record<string, Record<string, string>>) {
@@ -322,10 +324,11 @@ describe('RetrieveLogFile', () => {
     expect(mockFs.delete).not.toHaveBeenCalled();
   });
 
-  it('deletes searched logs the org no longer has, but never a log the user opened', async () => {
+  it('deletes searched logs the org no longer has, but never a log the user opened or another org', async () => {
     cachedLogs({
       [OPENED]: { 'opened-gone': '' },
       [SEARCH_CACHE]: { kept: '', gone: '' },
+      '/test/storage/apex-logs/00Dother': { other: '' },
     });
     const { running } = await run([log('kept')]);
     await running;
@@ -432,6 +435,19 @@ describe('RetrieveLogFile', () => {
     await running;
 
     expect(listPicker.placeholder).toBe(placeholder);
+  });
+
+  it('opens the list without an org name when the default org cannot be read', async () => {
+    mockGetTargetOrg.mockRejectedValue(new Error('no default org'));
+    const { context, running } = await run([log('a')]);
+    await running;
+
+    expect(context.display.output).toHaveBeenCalledWith(
+      'Unable to read the default org: no default org',
+    );
+    expect(listPicker.placeholder).toBe(
+      'Select a log, or type 3+ characters to search inside logs',
+    );
   });
 
   it('filters rows on their metadata as the user types', async () => {
@@ -631,15 +647,71 @@ describe('RetrieveLogFile', () => {
       expect(listPicker.title).toBe('Searched 7 logs · 0 matches');
     });
 
+    it('reports an access-denied body found by search and does not cache it', async () => {
+      mockGetLogBody.mockResolvedValue('AccessDenied');
+      const { context } = await searchFor('fatal_error', [log('denied')]);
+
+      listPicker.accept(listPicker.items[0]);
+      await settleSearch();
+
+      expect(mockFs.writeFile).not.toHaveBeenCalled();
+      expect(context.display.output).toHaveBeenCalledWith(
+        expect.stringContaining('Salesforce denied access to the body of Apex log denied'),
+        true,
+      );
+    });
+
     describe('while logs download', () => {
-      let release: () => void;
+      let release: (body?: string) => void;
 
       beforeEach(() => {
-        const waiting: Array<() => void> = [];
+        const waiting: Array<(body: string) => void> = [];
         mockGetLogBody.mockImplementation(
-          () => new Promise<string>((resolve) => waiting.push(() => resolve('clean'))),
+          () => new Promise<string>((resolve) => waiting.push(resolve)),
         );
-        release = () => waiting.splice(0).forEach((resolve) => resolve());
+        release = (body = 'clean') => waiting.splice(0).forEach((resolve) => resolve(body));
+      });
+
+      it('shows progress in the title, counting on from the last press', async () => {
+        await searchFor('fatal_error', sevenLogs());
+
+        listPicker.accept(listPicker.items[0]);
+        expect(listPicker.title).toBe('Searching 0/5 · 0 matches · 2 older not searched');
+        release();
+        await settleSearch();
+
+        listPicker.accept(listPicker.items[0]);
+        expect(listPicker.title).toBe('Searching 5/7 · 0 matches');
+        release();
+        await settleSearch();
+      });
+
+      it('ignores a match for the old term that arrives after the term changes', async () => {
+        await searchFor('fatal_error', sevenLogs());
+        listPicker.accept(listPicker.items[0]);
+
+        await typeAndSettle('other_term');
+        release('FATAL_ERROR');
+        await settleSearch();
+        jest.advanceTimersByTime(100);
+
+        expect(listPicker.items.filter((item) => item.logId && item.alwaysShow)).toEqual([]);
+      });
+
+      it('still caches a running download when the list closes', async () => {
+        const { running } = await searchFor('fatal_error', sevenLogs());
+        listPicker.accept(listPicker.items[0]);
+
+        listPicker.dismiss();
+        await running;
+        release();
+        await settleSearch();
+
+        expect(mockCreateView).not.toHaveBeenCalled();
+        expect(mockFs.writeFile).toHaveBeenCalledWith(
+          expect.objectContaining({ path: `${SEARCH_CACHE}/log-7.log` }),
+          expect.any(Uint8Array),
+        );
       });
 
       it('downloads each log once when the term changes', async () => {
@@ -759,7 +831,10 @@ describe('RetrieveLogFile', () => {
     ])(
       'clears the org search cache from the title button only when confirmed: %s',
       async (answer, cleared) => {
-        cachedLogs({ [SEARCH_CACHE]: { a: '', b: '' } });
+        const fs = memoryFs();
+        fs.put(`${SEARCH_CACHE}/a.log`, '');
+        fs.put(`${SEARCH_CACHE}/b.log`, '');
+        fs.put(OTHER_ORG_LOG, '');
         (window.showWarningMessage as jest.Mock).mockResolvedValue(answer);
         const { running } = await openList([
           log('a', day(1), 100, 2 * MB),
@@ -774,10 +849,11 @@ describe('RetrieveLogFile', () => {
           { modal: true },
           'Delete',
         );
-        const deletedFolder = mockFs.delete.mock.calls.some(
-          ([uri]) => (uri as Uri).path === SEARCH_CACHE,
+        expect(fs.paths()).toEqual(
+          cleared
+            ? [OTHER_ORG_LOG]
+            : [`${SEARCH_CACHE}/a.log`, `${SEARCH_CACHE}/b.log`, OTHER_ORG_LOG],
         );
-        expect(deletedFolder).toBe(cleared);
         expect(listPicker.buttons).toHaveLength(cleared ? 0 : 1);
         listPicker.dismiss();
         await running;

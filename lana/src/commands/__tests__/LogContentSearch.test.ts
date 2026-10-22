@@ -177,27 +177,6 @@ describe('searchLogContent', () => {
     expect(peak).toBe(expectedPeak);
   });
 
-  it('runs small logs in parallel', async () => {
-    let inFlight = 0;
-    let peak = 0;
-    const store: LogStore = {
-      has: () => false,
-      read: async () => new Uint8Array(),
-      download: async () => {
-        peak = Math.max(peak, ++inFlight);
-        await new Promise((resolve) => setImmediate(resolve));
-        inFlight--;
-        return '';
-      },
-      write: async () => undefined,
-    };
-    const { opts } = options();
-
-    await searchLogContent([log('a'), log('b'), log('c')], 'term', store, opts);
-
-    expect(peak).toBe(3);
-  });
-
   it('starts no new log and reports no match after an abort, but caches a running download', async () => {
     const cancellation = new AbortController();
     let release: (body: string) => void = () => undefined;

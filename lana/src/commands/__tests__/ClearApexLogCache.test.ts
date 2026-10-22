@@ -2,8 +2,9 @@
  * Copyright (c) 2026 Certinia Inc. All rights reserved.
  */
 import { beforeEach, describe, expect, it } from '@jest/globals';
-import { FileType, window, workspace, type Uri } from 'vscode';
+import { window } from 'vscode';
 
+import { memoryFs } from '../../__tests__/helpers/memoryFs.js';
 import {
   asContext,
   createMockContext,
@@ -11,43 +12,32 @@ import {
 } from '../../__tests__/helpers/test-builders.js';
 import { ClearApexLogCache } from '../ClearApexLogCache.js';
 
-const mockFs = workspace.fs as unknown as Record<'readDirectory' | 'stat' | 'delete', jest.Mock>;
 const ROOT = '/test/storage/apex-logs';
+const MB = 1048576;
 
 describe('ClearApexLogCache', () => {
+  let fs: ReturnType<typeof memoryFs>;
+
   beforeEach(() => {
-    mockFs.readDirectory.mockRejectedValue(new Error('no folder'));
-    mockFs.delete.mockResolvedValue(undefined);
+    fs = memoryFs();
     ClearApexLogCache.apply(asContext(createMockContext()));
   });
 
-  function cacheHolds(sizes: number[]) {
-    mockFs.readDirectory.mockImplementation(async (uri: Uri) => {
-      if (uri.path === ROOT) {
-        return [['00Dorg', FileType.Directory]];
-      }
-      return sizes.map((_, i) => [`07L${i}.log`, FileType.File]);
-    });
-    mockFs.stat.mockImplementation(async (uri: Uri) => ({
-      size: sizes[Number(uri.path.match(/07L(\d+)/)?.[1])] ?? 0,
-      mtime: Date.now(),
-    }));
-  }
-
-  it('says the cache is empty and deletes nothing', async () => {
+  it('says the cache is empty', async () => {
     await lastRegisteredCommand()();
 
     expect(window.showInformationMessage).toHaveBeenCalledWith('The Apex log cache is empty.');
-    expect(mockFs.delete).not.toHaveBeenCalled();
+    expect(window.showWarningMessage).not.toHaveBeenCalled();
   });
 
   it.each([
-    ['Delete', 1],
-    [undefined, 0],
+    ['Delete', []],
+    [undefined, [`${ROOT}/00Da/1.log`, `${ROOT}/00Db/2.log`]],
   ])(
-    'shows the size and deletes the whole cache only when confirmed: %s',
-    async (answer, deletes) => {
-      cacheHolds([2 * 1048576, 1048576]);
+    'shows the size of every org and clears them all only when confirmed: %s',
+    async (answer, left) => {
+      fs.put(`${ROOT}/00Da/1.log`, 'a'.repeat(2 * MB));
+      fs.put(`${ROOT}/00Db/2.log`, 'b'.repeat(MB));
       (window.showWarningMessage as jest.Mock).mockResolvedValue(answer);
 
       await lastRegisteredCommand()();
@@ -57,12 +47,7 @@ describe('ClearApexLogCache', () => {
         { modal: true },
         'Delete',
       );
-      expect(mockFs.delete).toHaveBeenCalledTimes(deletes);
-      if (deletes) {
-        expect(mockFs.delete).toHaveBeenCalledWith(expect.objectContaining({ path: ROOT }), {
-          recursive: true,
-        });
-      }
+      expect(fs.paths()).toEqual(left);
     },
   );
 });
