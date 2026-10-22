@@ -451,7 +451,11 @@ export class GridView<R extends object> {
           ? 0
           : v.getTotalSize() - scroller.clientHeight
         : 'bottom' in pin
-          ? (v.measurementsCache[pin.index]?.end ?? Number.NaN) - pin.bottom
+          ? // Never past the row's top: a row taller than the view shows its top.
+            Math.min(
+              (v.measurementsCache[pin.index]?.end ?? Number.NaN) - pin.bottom,
+              (v.measurementsCache[pin.index]?.start ?? Number.NaN) - v.options.scrollPaddingStart,
+            )
           : (v.measurementsCache[pin.index]?.start ?? Number.NaN) - pin.top;
     if (!Number.isFinite(top) || Math.abs(scroller.scrollTop - top) < 1) {
       return false;

@@ -436,6 +436,16 @@ describe('GridView', () => {
     expect(502 * ROW - scroller.scrollTop).toBe(VIEWPORT);
   });
 
+  it('shows the top of a row scrolled up from below when it grows taller than the view', async () => {
+    const resize = fakeResizeObserver();
+    const { scroller, view } = await setup();
+    view.scrollToIndex(500, 'auto');
+    await flush();
+    resize(view.elementAt(500) as Element, 2 * VIEWPORT);
+    await flush();
+    expect(500 * ROW - scroller.scrollTop).toBe(0);
+  });
+
   it('stays put once shown when a row asked for while hidden was cancelled', async () => {
     const resize = fakeResizeObserver();
     const { scroller, view } = await setup();
