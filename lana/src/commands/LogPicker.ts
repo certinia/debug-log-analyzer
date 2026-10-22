@@ -73,8 +73,10 @@ interface TermSearch {
   /** How many of `unsearched` belong to the newest logs; 0 once those are searched. */
   newestToDownload: number;
   searched: number;
+  matches: number;
   running: number;
-  downloading: boolean;
+  /** Logs in the download batch now running; 0 when none runs. */
+  downloading: number;
 }
 
 /**
@@ -97,9 +99,10 @@ export function pickLog(options: LogPickerOptions): Promise<string | undefined> 
   );
   const itemsById = new Map(items.map((item) => [item.logId, item]));
   // Labelled with the exact term, so VS Code's prefix sort keeps it above every log row.
+  const downloadIcon = new ThemeIcon('cloud-download');
   const searchRow: QuickPickItem = {
     label: '',
-    iconPath: new ThemeIcon('cloud-download'),
+    iconPath: downloadIcon,
     alwaysShow: true,
   };
   const newest = Math.min(FIRST_DOWNLOADS, logs.length);
@@ -120,7 +123,7 @@ export function pickLog(options: LogPickerOptions): Promise<string | undefined> 
   picker.keepScrollPosition = true;
 
   const showsSearchRow = () =>
-    search !== undefined && search.unsearched.length > 0 && !search.downloading;
+    search !== undefined && (search.unsearched.length > 0 || search.downloading > 0);
 
   const refresh = () => {
     clearTimeout(queuedRefresh);
@@ -140,6 +143,13 @@ export function pickLog(options: LogPickerOptions): Promise<string | undefined> 
       : current.unsearched;
 
   const updateSearchRow = (current: TermSearch) => {
+    searchRow.label = current.term;
+    if (current.downloading > 0) {
+      searchRow.iconPath = new ThemeIcon('loading~spin');
+      searchRow.description = `- Searching ${plural(current.downloading, 'log')}…`;
+      return;
+    }
+    searchRow.iconPath = downloadIcon;
     const next = nextDownloads(current);
     const size =
       current.newestToDownload > 0 && next.length < newest
@@ -149,7 +159,6 @@ export function pickLog(options: LogPickerOptions): Promise<string | undefined> 
       current.newestToDownload > 0
         ? `Search newest ${plural(newest, 'log')}`
         : `Search ${plural(next.length, 'older log')}`;
-    searchRow.label = current.term;
     searchRow.description = `- ${action} (${size}) · Downloads from the org`;
   };
 
@@ -165,8 +174,9 @@ export function pickLog(options: LogPickerOptions): Promise<string | undefined> 
     picker.buttons = clearButton ? [clearButton] : [];
   };
 
-  const remaining = (current: TermSearch) =>
-    current.unsearched.length > 0 ? ` · ${current.unsearched.length} older not searched` : '';
+  const status = (current: TermSearch) =>
+    ` · ${plural(current.matches, 'match', 'matches')}` +
+    (current.unsearched.length > 0 ? ` · ${current.unsearched.length} older not searched` : '');
 
   const runSearch = (current: TermSearch, toSearch: PickerLog[], maxDownloads: number) => {
     const before = current.searched;
@@ -176,12 +186,13 @@ export function pickLog(options: LogPickerOptions): Promise<string | undefined> 
       signal: current.cancellation.signal,
       maxDownloads,
       onMatch: ({ logId, snippet }) => {
+        current.matches++;
         itemsById.get(logId)?.showMatch(snippet);
         queueRefresh();
       },
       onProgress: (done, total) => {
         if (!current.cancellation.signal.aborted) {
-          picker.title = `Searching ${before + done}/${before + total}${remaining(current)}`;
+          picker.title = `Searching ${before + done}/${before + total}${status(current)}`;
         }
       },
       onError: (logId, error) =>
@@ -195,9 +206,11 @@ export function pickLog(options: LogPickerOptions): Promise<string | undefined> 
           return;
         }
         current.searched += toSearch.length - rest.length;
-        current.downloading &&= maxDownloads === 0;
+        if (maxDownloads > 0) {
+          current.downloading = 0;
+        }
         picker.busy = current.running > 0;
-        picker.title = `Searched ${plural(current.searched, 'log')}${remaining(current)}`;
+        picker.title = `Searched ${plural(current.searched, 'log')}${status(current)}`;
         updateSearchRow(current);
         updateClearButton();
         refresh();
@@ -224,8 +237,9 @@ export function pickLog(options: LogPickerOptions): Promise<string | undefined> 
         unsearched,
         newestToDownload: unsearched.filter((log) => newestIds.has(log.Id)).length,
         searched: 0,
+        matches: 0,
         running: 0,
-        downloading: false,
+        downloading: 0,
       };
       search = current;
       updateSearchRow(current);
@@ -238,13 +252,13 @@ export function pickLog(options: LogPickerOptions): Promise<string | undefined> 
   };
 
   const searchNext = (current: TermSearch) => {
-    if (current.downloading) {
+    if (current.downloading > 0) {
       return;
     }
     const next = nextDownloads(current);
     current.unsearched = current.unsearched.slice(next.length);
     current.newestToDownload = 0;
-    current.downloading = true;
+    current.downloading = next.length;
     updateSearchRow(current);
     refresh();
     runSearch(current, next, Infinity);
@@ -282,8 +296,8 @@ export function pickLog(options: LogPickerOptions): Promise<string | undefined> 
   });
 }
 
-function plural(count: number, noun: string): string {
-  return `${count} ${noun}${count === 1 ? '' : 's'}`;
+function plural(count: number, noun: string, nouns = `${noun}s`): string {
+  return `${count} ${count === 1 ? noun : nouns}`;
 }
 
 function megabytes(logs: SearchableLog[]): string {

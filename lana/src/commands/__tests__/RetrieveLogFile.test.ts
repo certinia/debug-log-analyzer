@@ -482,7 +482,7 @@ describe('RetrieveLogFile', () => {
       expect(row?.detail).toBe('line one FATAL_ERROR System.LimitException');
       expect(row?.description).toContain('Success - cached');
       expect(listPicker.busy).toBe(false);
-      expect(listPicker.title).toBe('Searched 1 log · 1 older not searched');
+      expect(listPicker.title).toBe('Searched 1 log · 1 match · 1 older not searched');
     });
 
     it('puts a search row first, labelled with the term, offering the newest 5 logs', async () => {
@@ -545,7 +545,23 @@ describe('RetrieveLogFile', () => {
       expect(listPicker.items[0]?.description).toBe(
         '- Search 2 older logs (4.0 MB) · Downloads from the org',
       );
-      expect(listPicker.title).toBe('Searched 5 logs · 2 older not searched');
+      expect(listPicker.title).toBe('Searched 5 logs · 1 match · 2 older not searched');
+    });
+
+    it('keeps the search row, with a spinner, while it downloads', async () => {
+      await searchFor('fatal_error', sevenLogs());
+
+      listPicker.accept(listPicker.items[0]);
+      expect(listPicker.items[0]).toMatchObject({
+        label: 'fatal_error',
+        description: '- Searching 5 logs…',
+        iconPath: { id: 'loading~spin' },
+      });
+      listPicker.accept(listPicker.items[0]);
+      await settleSearch();
+
+      expect(mockGetLogBody).toHaveBeenCalledTimes(5);
+      expect(listPicker.items[0]).toMatchObject({ iconPath: { id: 'cloud-download' } });
     });
 
     it('searches the rest when the row is picked again, then drops the row', async () => {
@@ -558,7 +574,7 @@ describe('RetrieveLogFile', () => {
 
       expect(mockGetLogBody).toHaveBeenCalledTimes(7);
       expect(listPicker.items[0]?.logId).toBe('log-7');
-      expect(listPicker.title).toBe('Searched 7 logs');
+      expect(listPicker.title).toBe('Searched 7 logs · 0 matches');
     });
 
     it('offers no search under three characters', async () => {
