@@ -70,8 +70,9 @@ export class GridView<R extends object> {
   private pending: { rows: RowView<R>; toggled?: RowTarget<R> } | null = null;
   private pendingScroll: { index: number; align: 'center' | 'auto' } | null = null;
   /**
-   * The place `setRows` kept, held while the rows around it are measured over the next
-   * frames, until the user scrolls. virtual-core corrects only rows above the viewport.
+   * The place `setRows` kept or `scrollToIndex` went to, held while the rows around it are
+   * measured over the next frames, until the user scrolls. virtual-core corrects nothing
+   * while it holds.
    */
   private pin: Restore = null;
   /** The view's own last write to `scrollTop`; any other value is the user's scroll. */
@@ -202,14 +203,26 @@ export class GridView<R extends object> {
     }
   }
 
-  /** Scrolls the row at `index` into view: to the middle, or only as far as it must. */
+  /**
+   * Scrolls the row at `index` into view: to the middle, or only as far as it must. The row
+   * is held there until the user scrolls.
+   */
   scrollToIndex(index: number, align: 'center' | 'auto' = 'center'): void {
     if (!this.visible) {
       this.pendingScroll = { index, align };
       return;
     }
-    this.setPin(null);
-    this.virtualizer.scrollToIndex(index, { align });
+    const v = this.virtualizer;
+    // Refreshes `measurementsCache` with the heights measured since the last draw.
+    v.getVirtualItems();
+    const start = v.measurementsCache[index]?.start;
+    const offset = v.getOffsetForIndex(index, align)?.[0];
+    if (start === undefined || offset === undefined) {
+      return;
+    }
+    // Not virtual-core's scrollToIndex: rows measured taller after it settles push the row out.
+    this.setPin({ index, top: start - offset });
+    this.draw();
   }
 
   /** Drops a scroll asked for while hidden, so showing the view does not go there. */
