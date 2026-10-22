@@ -17,6 +17,8 @@ const SEARCH_DELAY_MS = 400;
 const MIN_SEARCH_LENGTH = 3;
 const REFRESH_DELAY_MS = 100;
 const FIRST_DOWNLOADS = 5;
+// Each log is one API call against the org's daily limit, so one press never costs more.
+const MORE_DOWNLOADS = 50;
 
 /** The fields of an Apex log list row the picker shows. */
 export interface PickerLog extends SearchableLog {
@@ -84,7 +86,7 @@ interface TermSearch {
  *
  * Cached logs are also searched for the typed text after a pause. Nothing downloads until the
  * user picks the top row, which downloads whichever of the newest 5 logs are not cached, then
- * offers the rest. Resolves with the picked log Id, or undefined when dismissed.
+ * offers older logs 50 at a time. Resolves with the picked log Id, or undefined when dismissed.
  */
 export function pickLog(options: LogPickerOptions): Promise<string | undefined> {
   const { logs, store } = options;
@@ -138,9 +140,10 @@ export function pickLog(options: LogPickerOptions): Promise<string | undefined> 
   };
 
   const nextDownloads = (current: TermSearch) =>
-    current.newestToDownload > 0
-      ? current.unsearched.slice(0, current.newestToDownload)
-      : current.unsearched;
+    current.unsearched.slice(
+      0,
+      current.newestToDownload > 0 ? current.newestToDownload : MORE_DOWNLOADS,
+    );
 
   const updateSearchRow = (current: TermSearch) => {
     searchRow.label = current.term;
@@ -158,7 +161,9 @@ export function pickLog(options: LogPickerOptions): Promise<string | undefined> 
     const action =
       current.newestToDownload > 0
         ? `Search newest ${plural(newest, 'log')}`
-        : `Search ${plural(next.length, 'older log')}`;
+        : next.length < current.unsearched.length
+          ? `Search next ${plural(next.length, 'older log')}`
+          : `Search ${plural(next.length, 'older log')}`;
     searchRow.description = `- ${action} (${size}) · Downloads from the org`;
   };
 

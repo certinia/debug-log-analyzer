@@ -548,6 +548,27 @@ describe('RetrieveLogFile', () => {
       expect(listPicker.title).toBe('Searched 5 logs · 1 match · 2 older not searched');
     });
 
+    it('searches older logs 50 at a time', async () => {
+      const minute = Date.UTC(2024, 0, 1);
+      const logs = Array.from({ length: 57 }, (_, i) =>
+        log(`log-${i + 1}`, new Date(minute + i * 60_000).toISOString(), 100, 2 * MB),
+      );
+      await searchFor('fatal_error', logs);
+      listPicker.accept(listPicker.items[0]);
+      await settleSearch();
+
+      expect(listPicker.items[0]?.description).toBe(
+        '- Search next 50 older logs (100.0 MB) · Downloads from the org',
+      );
+      listPicker.accept(listPicker.items[0]);
+      await settleSearch();
+
+      expect(mockGetLogBody).toHaveBeenCalledTimes(55);
+      expect(listPicker.items[0]?.description).toBe(
+        '- Search 2 older logs (4.0 MB) · Downloads from the org',
+      );
+    });
+
     it('keeps the search row, with a spinner, while it downloads', async () => {
       await searchFor('fatal_error', sevenLogs());
 

@@ -25,7 +25,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - 🔍 **Retrieve Apex Log**: search the contents of org logs from the log list, with the first match shown under each log that has it. ([#594])
-  - Logs you already have are searched as you type; nothing downloads until you pick the search row, which searches the newest 5 logs, then the rest.
+  - Logs you already have are searched as you type; nothing downloads until you pick the search row, which searches the newest 5 logs, then older logs 50 at a time.
   - The list names the org it is connected to.
   - **Log: Clear Apex Log Cache** frees the space searched logs use, and they are deleted on their own once the org drops them or after 7 days.
 - 🎚️ **Log levels**: filter the log to a lower debug level per category from the header. ([#530])
