@@ -77,10 +77,13 @@ export class ApexLogCache {
     return { count: files.length, bytes: files.reduce((total, file) => total + file.size, 0) };
   }
 
-  /** Deletes the cached logs of one org, or of every org when `orgId` is omitted. */
-  async clear(orgId?: string): Promise<void> {
-    const target = orgId === undefined ? this.root : this.folder(orgId);
-    await workspace.fs.delete(target, { recursive: true }).then(undefined, () => undefined);
+  /** Deletes the cached logs of one org; `undefined` is the folder for logs of an unknown org. */
+  async clear(orgId: string | undefined): Promise<void> {
+    await deleteFolder(this.folder(orgId));
+  }
+
+  async clearAll(): Promise<void> {
+    await deleteFolder(this.root);
   }
 
   async pruneByAge(now = Date.now()): Promise<void> {
@@ -124,6 +127,10 @@ export async function logIdsIn(folder: Uri): Promise<string[]> {
 
 async function entries(folder: Uri): Promise<[string, FileType][]> {
   return workspace.fs.readDirectory(folder).then(undefined, () => []);
+}
+
+async function deleteFolder(uri: Uri): Promise<void> {
+  await workspace.fs.delete(uri, { recursive: true }).then(undefined, () => undefined);
 }
 
 async function deleteQuietly(uri: Uri): Promise<void> {

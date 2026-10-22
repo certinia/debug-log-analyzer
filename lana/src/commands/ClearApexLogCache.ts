@@ -41,7 +41,7 @@ export class ClearApexLogCache {
       return;
     }
     if (await ClearApexLogCache.confirm(size, 'for this workspace')) {
-      await cache.clear();
+      await cache.clearAll();
     }
   }
 }

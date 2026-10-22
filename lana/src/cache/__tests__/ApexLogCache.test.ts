@@ -104,14 +104,18 @@ describe('ApexLogCache', () => {
     expect(await cache.size()).toEqual({ count: 2, bytes: 5 });
   });
 
-  it('clears one org, or every org', async () => {
+  it('clears one org, the unknown org alone, or every org', async () => {
     fs.put(`${root}/00Da/1.log`, 'a');
     fs.put(`${root}/00Db/2.log`, 'b');
+    fs.put(`${root}/no-org/3.log`, 'c');
 
     await cache.clear('00Da');
+    expect([...fs.files.keys()].sort()).toEqual([`${root}/00Db/2.log`, `${root}/no-org/3.log`]);
+
+    await cache.clear(undefined);
     expect([...fs.files.keys()]).toEqual([`${root}/00Db/2.log`]);
 
-    await cache.clear();
+    await cache.clearAll();
     expect(fs.files.size).toBe(0);
   });
 
