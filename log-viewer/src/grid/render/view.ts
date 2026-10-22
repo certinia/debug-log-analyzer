@@ -208,8 +208,19 @@ export class GridView<R extends object> {
       this.pendingScroll = { index, align };
       return;
     }
-    this.setPin(null);
-    this.virtualizer.scrollToIndex(index, { align });
+    const v = this.virtualizer;
+    // Refreshes `measurementsCache` with the heights measured since the last draw.
+    v.getVirtualItems();
+    const start = v.measurementsCache[index]?.start;
+    const offset = v.getOffsetForIndex(index, align)?.[0];
+    if (start === undefined || offset === undefined) {
+      return;
+    }
+    // Pinned, not virtual-core's scrollToIndex: it stops after one frame, and its correction for
+    // a batch of rows measured taller then pushes the row out of view.
+    this.setPin({ index, top: start - offset });
+    this.holdPin();
+    this.draw();
   }
 
   /** Drops a scroll asked for while hidden, so showing the view does not go there. */

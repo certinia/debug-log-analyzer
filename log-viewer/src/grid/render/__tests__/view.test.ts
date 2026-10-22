@@ -379,6 +379,22 @@ describe('GridView', () => {
     expect(shown().map((el) => el.textContent)).toContain('row 500');
   });
 
+  it('keeps a row it scrolled to in view when the rows around it are measured taller', async () => {
+    const resize = fakeResizeObserver();
+    const { scroller, body, view, shown } = await setup();
+    view.scrollToIndex(500);
+    await flush();
+    // As the browser does after a scroll: one batch, each row there first measured taller.
+    for (const el of shown()) {
+      resize(el, 2 * ROW);
+    }
+    await flush();
+    const row = body.querySelector<HTMLElement>('[data-index="500"]:not([hidden])');
+    const top = Number(row?.style.transform.match(/translateY\(([-\d.]+)px\)/)?.[1]);
+    expect(top).toBeGreaterThanOrEqual(scroller.scrollTop);
+    expect(top + 2 * ROW).toBeLessThanOrEqual(scroller.scrollTop + VIEWPORT);
+  });
+
   it('stays put once shown when a row asked for while hidden was cancelled', async () => {
     const resize = fakeResizeObserver();
     const { scroller, view } = await setup();
