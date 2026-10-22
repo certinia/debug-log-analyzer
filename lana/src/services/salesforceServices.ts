@@ -1,6 +1,8 @@
 /*
  * Copyright (c) 2026 Certinia Inc. All rights reserved.
  */
+import * as Effect from 'effect/Effect';
+import * as SubscriptionRef from 'effect/SubscriptionRef';
 import type { Uri } from 'vscode';
 
 import { getRuntime, getServicesApi } from './servicesRuntime.js';
@@ -28,6 +30,19 @@ export function listLogs(
   return getRuntime().runPromise(ApexLogService.listLogs(limit), { signal });
 }
 
+export interface TargetOrg {
+  orgId?: string;
+  username?: string;
+  alias?: string;
+}
+
+/** The default org Salesforce Services is connected to. Fields are unset until it connects. */
+export function getTargetOrg(): Promise<TargetOrg> {
+  const { TargetOrgRef } = getServicesApi().services;
+  const targetOrgRef: Effect.Effect<SubscriptionRef.SubscriptionRef<TargetOrg>> = TargetOrgRef();
+  return getRuntime().runPromise(Effect.flatMap(targetOrgRef, SubscriptionRef.get));
+}
+
 export function getLogBody(logId: string): Promise<string> {
   const { ApexLogService } = getServicesApi().services;
   return getRuntime().runPromise(ApexLogService.getLogBody(logId));
@@ -36,9 +51,4 @@ export function getLogBody(logId: string): Promise<string> {
 export function writeFile(uri: Uri | string, content: string): Promise<void> {
   const { FsService } = getServicesApi().services;
   return getRuntime().runPromise(FsService.safeWriteFile(uri, content));
-}
-
-export function fileOrFolderExists(uri: Uri | string): Promise<boolean> {
-  const { FsService } = getServicesApi().services;
-  return getRuntime().runPromise(FsService.fileOrFolderExists(uri));
 }

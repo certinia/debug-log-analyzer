@@ -1,44 +1,68 @@
 /*
  * Copyright (c) 2026 Certinia Inc. All rights reserved.
  */
-import { beforeEach, describe, expect, it } from '@jest/globals';
+import { afterEach, beforeEach, describe, expect, it } from '@jest/globals';
 import { Uri, window, workspace } from 'vscode';
 import {
   asContext,
   createMockContext,
   lastRegisteredCommand,
 } from '../../__tests__/helpers/test-builders.js';
-import { QuickPick } from '../../display/QuickPick.js';
 import {
   ensureServicesAvailable,
-  fileOrFolderExists,
   getLogBody,
+  getTargetOrg,
   listLogs,
   writeFile,
 } from '../../services/salesforceServices.js';
 import { LogView } from '../LogView.js';
 import { RetrieveLogFile } from '../RetrieveLogFile.js';
 
-jest.mock('../../display/QuickPick.js', () => ({
-  ...jest.requireActual<object>('../../display/QuickPick.js'),
-  QuickPick: { pick: jest.fn() },
-}));
 jest.mock('../../services/salesforceServices.js', () => ({
   ensureServicesAvailable: jest.fn(),
-  fileOrFolderExists: jest.fn(),
   getLogBody: jest.fn(),
+  getTargetOrg: jest.fn(),
   listLogs: jest.fn(),
   writeFile: jest.fn(),
 }));
 jest.mock('../LogView.js', () => ({ LogView: { createView: jest.fn() } }));
 
-const mockPick = QuickPick.pick as jest.Mock;
 const mockEnsureServicesAvailable = ensureServicesAvailable as jest.Mock;
-const mockFileOrFolderExists = fileOrFolderExists as jest.Mock;
 const mockListLogs = listLogs as jest.Mock;
 const mockGetLogBody = getLogBody as jest.Mock;
+const mockGetTargetOrg = getTargetOrg as jest.Mock;
 const mockWriteFile = writeFile as jest.Mock;
 const mockCreateView = LogView.createView as jest.Mock;
+const mockFs = workspace.fs as unknown as Record<
+  'readDirectory' | 'readFile' | 'writeFile' | 'delete',
+  jest.Mock
+>;
+const OPENED = '/test/workspace/.sfdx/tools/debug/logs/00Dorg';
+const SEARCH_CACHE = '/test/storage/apex-logs/00Dorg';
+
+/** Lays out cached logs by folder path: `{ [folder]: { [logId]: body } }`. */
+function cachedLogs(folders: Record<string, Record<string, string>>) {
+  const split = (path: string) =>
+    [
+      path.slice(0, path.lastIndexOf('/')),
+      path.slice(path.lastIndexOf('/') + 1, -'.log'.length),
+    ] as const;
+  mockFs.readDirectory.mockImplementation(async (uri: Uri) => {
+    const logs = folders[uri.path];
+    if (!logs) {
+      throw new Error('no folder');
+    }
+    return Object.keys(logs).map((logId) => [`${logId}.log`, 1]);
+  });
+  mockFs.readFile.mockImplementation(async (uri: Uri) => {
+    const [folder, logId] = split(uri.path);
+    const body = folders[folder]?.[logId];
+    if (body === undefined) {
+      throw new Error('no file');
+    }
+    return new TextEncoder().encode(body);
+  });
+}
 const mockWorkspace = workspace as unknown as {
   workspaceFolders: Array<{
     uri: ReturnType<typeof Uri.file>;
@@ -47,55 +71,191 @@ const mockWorkspace = workspace as unknown as {
   }>;
 };
 
-const log = (id: string, startTime = '2024-01-01T00:00:00.000Z', durationMilliseconds = 100) => ({
+const MB = 1024 * 1024;
+/** Leaves the log list open, so a case can type into it. */
+const KEEP_OPEN = Symbol('keep open');
+
+const log = (
+  id: string,
+  startTime = '2024-01-01T00:00:00.000Z',
+  durationMilliseconds = 100,
+  logLength = 1024,
+) => ({
   Id: id,
   LogUser: { Name: 'User' },
   Operation: 'Op',
-  LogLength: 1024,
+  LogLength: logLength,
   DurationMilliseconds: durationMilliseconds,
   StartTime: startTime,
   Status: 'Success',
 });
 
-/** The deferred retrieve handed to LogView.createView as its beforeSendLog promise. */
-function retrieveLogPromise(): Promise<string | void> {
-  return mockCreateView.mock.calls[0]?.[1] as Promise<string | void>;
+interface PickerItem {
+  label: string;
+  description?: string;
+  detail?: string;
+  alwaysShow?: boolean;
+  logId?: string;
 }
 
+interface PickerButton {
+  tooltip?: string;
+}
+
+const makePicker = () => {
+  const on: {
+    hide?: () => void;
+    accept?: () => void;
+    change?: (value: string) => void;
+    button?: (button: PickerButton) => Promise<void>;
+  } = {};
+  const picker = {
+    buttons: [] as PickerButton[],
+    busy: false,
+    enabled: true,
+    placeholder: '',
+    title: undefined as string | undefined,
+    value: '',
+    matchOnDescription: false,
+    matchOnDetail: false,
+    keepScrollPosition: false,
+    shownItems: [] as PickerItem[],
+    // As in VS Code, new items clear the highlighted row.
+    get items(): PickerItem[] {
+      return picker.shownItems;
+    },
+    set items(items: PickerItem[]) {
+      picker.shownItems = items;
+      picker.activeItems = [];
+    },
+    activeItems: [] as PickerItem[],
+    selectedItems: [] as PickerItem[],
+    show: jest.fn(),
+    dispose: jest.fn(),
+    hide: jest.fn(() => on.hide?.()),
+    onDidHide: jest.fn((listener: () => void) => {
+      on.hide = listener;
+      return { dispose: jest.fn() };
+    }),
+    onDidAccept: jest.fn((listener: () => void) => {
+      on.accept = listener;
+      return { dispose: jest.fn() };
+    }),
+    onDidChangeValue: jest.fn((listener: (value: string) => void) => {
+      on.change = listener;
+      return { dispose: jest.fn() };
+    }),
+    onDidTriggerButton: jest.fn((listener: (button: PickerButton) => Promise<void>) => {
+      on.button = listener;
+      return { dispose: jest.fn() };
+    }),
+    async press(button: PickerButton | undefined) {
+      if (button) {
+        await on.button?.(button);
+      }
+    },
+    accept(item: PickerItem | undefined) {
+      picker.selectedItems = item ? [item] : [];
+      on.accept?.();
+    },
+    type(value: string) {
+      picker.value = value;
+      on.change?.(value);
+    },
+    dismiss() {
+      on.hide?.();
+    },
+    item(logId: string) {
+      return picker.items.find((item) => item.logId === logId);
+    },
+  };
+  return picker;
+};
+
 describe('RetrieveLogFile', () => {
+  let loadingPicker: ReturnType<typeof makePicker>;
+  let listPicker: ReturnType<typeof makePicker>;
+  let pickOnShow: string | null | typeof KEEP_OPEN;
+
   beforeEach(() => {
     mockEnsureServicesAvailable.mockResolvedValue(true);
-    mockFileOrFolderExists.mockResolvedValue(false);
     mockWorkspace.workspaceFolders = [
       { uri: Uri.file('/test/workspace'), name: 'workspace', index: 0 },
     ];
     mockListLogs.mockResolvedValue([]);
-    mockPick.mockResolvedValue([]);
     mockGetLogBody.mockResolvedValue('log body');
+    mockGetTargetOrg.mockResolvedValue({ orgId: '00Dorg', alias: 'myorg', username: 'me@x.com' });
     mockWriteFile.mockResolvedValue(undefined);
-    dismissPicker = () => undefined;
-    picker = makePicker();
-    (window.createQuickPick as jest.Mock).mockReturnValue(picker);
+    mockFs.readDirectory.mockRejectedValue(new Error('no folder'));
+    mockFs.readFile.mockResolvedValue(new Uint8Array());
+    mockFs.writeFile.mockResolvedValue(undefined);
+    mockFs.delete.mockResolvedValue(undefined);
+
+    pickOnShow = null;
+    loadingPicker = makePicker();
+    listPicker = makePicker();
+    listPicker.show.mockImplementation(() => {
+      if (pickOnShow === null) {
+        listPicker.dismiss();
+      } else if (pickOnShow !== KEEP_OPEN) {
+        listPicker.accept(listPicker.item(pickOnShow));
+      }
+    });
+    const pickers = [loadingPicker, listPicker];
+    (window.createQuickPick as jest.Mock).mockImplementation(() => pickers.shift());
   });
 
-  const makePicker = () => ({
-    busy: false,
-    enabled: true,
-    placeholder: '',
-    show: jest.fn(),
-    dispose: jest.fn(),
-    onDidHide: jest.fn((listener: () => void) => {
-      dismissPicker = listener;
-      return { dispose: jest.fn() };
-    }),
+  afterEach(() => {
+    jest.useRealTimers();
   });
-
-  let picker: ReturnType<typeof makePicker>;
-  let dismissPicker: () => void;
 
   const settle = () => new Promise((resolve) => setImmediate(resolve));
 
   const command = lastRegisteredCommand;
+
+  async function run(
+    logs: ReturnType<typeof log>[],
+    pick: string | null | typeof KEEP_OPEN = null,
+  ) {
+    mockListLogs.mockResolvedValue(logs);
+    pickOnShow = pick;
+    const context = createMockContext();
+    RetrieveLogFile.apply(asContext(context));
+    const running = command()();
+    return { context, running };
+  }
+
+  /** The deferred retrieve handed to LogView.createView as its beforeSendLog promise. */
+  function retrieveLogPromise(): Promise<string | void> {
+    return mockCreateView.mock.calls[0]?.[1] as Promise<string | void>;
+  }
+
+  /** Lets a running content search download, match and finish. */
+  async function settleSearch() {
+    for (let i = 0; i < 5; i++) {
+      await settle();
+    }
+  }
+
+  async function openList(logs: ReturnType<typeof log>[]) {
+    jest.useFakeTimers({ doNotFake: ['setImmediate'] });
+    const started = await run(logs, KEEP_OPEN);
+    await settle();
+    return started;
+  }
+
+  /** Types a term, then waits out the search delay and the search. */
+  async function typeAndSettle(term: string) {
+    listPicker.type(term);
+    jest.advanceTimersByTime(400);
+    await settleSearch();
+  }
+
+  async function searchFor(term: string, logs: ReturnType<typeof log>[]) {
+    const started = await openList(logs);
+    await typeAndSettle(term);
+    return started;
+  }
 
   it('closes the loading picker and says so when Salesforce cannot list the logs', async () => {
     mockListLogs.mockRejectedValue(new Error('no org connection'));
@@ -104,7 +264,7 @@ describe('RetrieveLogFile', () => {
 
     await command()();
 
-    expect(picker.dispose).toHaveBeenCalled();
+    expect(loadingPicker.dispose).toHaveBeenCalled();
     expect(context.display.showErrorMessage).toHaveBeenCalledWith(
       'Error loading logfile: no org connection',
     );
@@ -120,36 +280,71 @@ describe('RetrieveLogFile', () => {
     const signal = mockListLogs.mock.calls[0]?.[0] as AbortSignal;
     expect(signal.aborted).toBe(false);
 
-    dismissPicker();
+    loadingPicker.dismiss();
     await running;
 
     expect(signal.aborted).toBe(true);
-    expect(picker.dispose).toHaveBeenCalled();
+    expect(loadingPicker.dispose).toHaveBeenCalled();
     expect(context.display.showErrorMessage).not.toHaveBeenCalled();
-    expect(mockPick).not.toHaveBeenCalled();
+    expect(listPicker.show).not.toHaveBeenCalled();
   });
 
-  it('retrieves and caches an uncached log', async () => {
-    mockListLogs.mockResolvedValue([log('selected-log')]);
-    mockPick.mockResolvedValue([{ logId: 'selected-log' }]);
-    const context = createMockContext();
-    RetrieveLogFile.apply(asContext(context));
-    await command()();
+  it('retrieves and caches an uncached log in the org folder', async () => {
+    const { context, running } = await run([log('selected-log')], 'selected-log');
+    await running;
 
+    const cachePath = '/test/workspace/.sfdx/tools/debug/logs/00Dorg/selected-log.log';
     expect(mockCreateView).toHaveBeenCalledWith(
       context,
       expect.any(Promise),
-      expect.objectContaining({ path: expect.stringContaining('selected-log.log') }),
+      expect.objectContaining({ path: cachePath }),
     );
     // A cached log is streamed from disk, so the body is never sent to the webview.
     await expect(retrieveLogPromise()).resolves.toBeUndefined();
     expect(mockGetLogBody).toHaveBeenCalledWith('selected-log');
-    expect(mockFileOrFolderExists).toHaveBeenCalledWith(
-      expect.objectContaining({ path: expect.stringContaining('selected-log.log') }),
-    );
     expect(mockWriteFile).toHaveBeenCalledWith(
-      expect.objectContaining({ path: expect.stringContaining('selected-log.log') }),
+      expect.objectContaining({ path: cachePath }),
       'log body',
+    );
+  });
+
+  it('caches in the flat log folder and deletes nothing when the org Id is unknown', async () => {
+    mockGetTargetOrg.mockResolvedValue({});
+    mockFs.readDirectory.mockResolvedValue([['gone.log', 1]]);
+    const { running } = await run([log('selected-log')], 'selected-log');
+    await running;
+
+    expect(mockWriteFile).toHaveBeenCalledWith(
+      expect.objectContaining({ path: '/test/workspace/.sfdx/tools/debug/logs/selected-log.log' }),
+      'log body',
+    );
+    expect(mockFs.delete).not.toHaveBeenCalled();
+  });
+
+  it('deletes searched logs the org no longer has, but never a log the user opened', async () => {
+    cachedLogs({
+      [OPENED]: { 'opened-gone': '' },
+      [SEARCH_CACHE]: { kept: '', gone: '' },
+    });
+    const { running } = await run([log('kept')]);
+    await running;
+
+    expect(mockFs.delete).toHaveBeenCalledTimes(1);
+    expect(mockFs.delete).toHaveBeenCalledWith(
+      expect.objectContaining({ path: `${SEARCH_CACHE}/gone.log` }),
+    );
+  });
+
+  it('opens a log found by search from the search cache, without downloading it', async () => {
+    cachedLogs({ [SEARCH_CACHE]: { searched: 'searched body' } });
+    const { running } = await run([log('searched')], 'searched');
+    await running;
+
+    await expect(retrieveLogPromise()).resolves.toBeUndefined();
+    expect(mockGetLogBody).not.toHaveBeenCalled();
+    expect(mockWriteFile).toHaveBeenCalledWith(
+      expect.objectContaining({ path: `${OPENED}/searched.log` }),
+      'searched body',
     );
   });
 
@@ -158,12 +353,8 @@ describe('RetrieveLogFile', () => {
       { uri: Uri.file('/test/first-workspace'), name: 'first', index: 0 },
       { uri: Uri.file('/test/second-workspace'), name: 'second', index: 1 },
     ];
-    mockListLogs.mockResolvedValue([log('selected-log')]);
-    mockPick.mockResolvedValue([{ logId: 'selected-log' }]);
-    const context = createMockContext();
-    RetrieveLogFile.apply(asContext(context));
-
-    await command()();
+    const { running } = await run([log('selected-log')], 'selected-log');
+    await running;
 
     expect(mockWriteFile).toHaveBeenCalledWith(
       expect.objectContaining({ path: expect.stringContaining('/test/first-workspace') }),
@@ -176,12 +367,9 @@ describe('RetrieveLogFile', () => {
   });
 
   it('opens a cached log without downloading it again', async () => {
-    mockListLogs.mockResolvedValue([log('cached-log')]);
-    mockPick.mockResolvedValue([{ logId: 'cached-log' }]);
-    mockFileOrFolderExists.mockResolvedValue(true);
-    const context = createMockContext();
-    RetrieveLogFile.apply(asContext(context));
-    await command()();
+    mockFs.readDirectory.mockResolvedValue([['cached-log.log', 1]]);
+    const { context, running } = await run([log('cached-log')], 'cached-log');
+    await running;
 
     expect(mockGetLogBody).not.toHaveBeenCalled();
     expect(mockWriteFile).not.toHaveBeenCalled();
@@ -204,12 +392,9 @@ describe('RetrieveLogFile', () => {
   });
 
   it('sends the log body inline when cache writing fails', async () => {
-    mockListLogs.mockResolvedValue([log('selected-log')]);
-    mockPick.mockResolvedValue([{ logId: 'selected-log' }]);
     mockWriteFile.mockRejectedValue(new Error('read-only workspace'));
-    const context = createMockContext();
-    RetrieveLogFile.apply(asContext(context));
-    await command()();
+    const { context, running } = await run([log('selected-log')], 'selected-log');
+    await running;
 
     expect(mockCreateView).toHaveBeenCalled();
     await expect(retrieveLogPromise()).resolves.toBe('log body');
@@ -220,19 +405,37 @@ describe('RetrieveLogFile', () => {
   });
 
   it('sorts logs newest first before presenting them', async () => {
-    mockListLogs.mockResolvedValue([
+    const { running } = await run([
       log('old', '2024-01-01T00:00:00.000Z'),
       log('new', '2024-01-03T00:00:00.000Z'),
     ]);
-    let items: Array<{ logId: string }> = [];
-    mockPick.mockImplementation((picked) => {
-      items = picked;
-      return Promise.resolve([]);
-    });
-    const context = createMockContext();
-    RetrieveLogFile.apply(asContext(context));
-    await command()();
-    expect(items.map((item) => item.logId)).toEqual(['new', 'old']);
+    await running;
+
+    expect(listPicker.items.map((item) => item.logId)).toEqual(['new', 'old']);
+  });
+
+  it.each([
+    [
+      { orgId: '00Dorg', alias: 'myorg', username: 'me@x.com' },
+      'Select or search for a log (myorg)',
+    ],
+    [{ orgId: '00Dorg', username: 'me@x.com' }, 'Select or search for a log (me@x.com)'],
+    [{}, 'Select or search for a log'],
+  ])('names the org in the placeholder: %j', async (targetOrg, placeholder) => {
+    mockGetTargetOrg.mockResolvedValue(targetOrg);
+    const { running } = await run([log('a')]);
+    await running;
+
+    expect(listPicker.placeholder).toBe(placeholder);
+  });
+
+  it('filters rows on their metadata as the user types', async () => {
+    const { running } = await run([log('a')]);
+    await running;
+
+    expect(listPicker.matchOnDescription).toBe(true);
+    expect(listPicker.matchOnDetail).toBe(true);
+    expect(listPicker.item('a')?.alwaysShow).toBe(false);
   });
 
   it.each([
@@ -246,28 +449,211 @@ describe('RetrieveLogFile', () => {
     [150000, '2m 30s'],
     [125500, '2m 5.5s'],
   ])('formats %s milliseconds as %s', async (durationMilliseconds, expectedDuration) => {
-    mockListLogs.mockResolvedValue([log('duration', undefined, durationMilliseconds)]);
-    let description = '';
-    mockPick.mockImplementation((items) => {
-      description = items[0]?.description ?? '';
-      return Promise.resolve([]);
-    });
-    const context = createMockContext();
-    RetrieveLogFile.apply(asContext(context));
-    await command()();
-    expect(description).toContain(expectedDuration);
+    const { running } = await run([log('duration', undefined, durationMilliseconds)]);
+    await running;
+
+    expect(listPicker.item('duration')?.description).toContain(expectedDuration);
   });
 
   it.each(['AccessDenied', 'Access denied', ' ACCESS   DENIED '])(
     'reports an access-denied log response: %s',
     async (response) => {
-      mockListLogs.mockResolvedValue([log('denied')]);
-      mockPick.mockResolvedValue([{ logId: 'denied' }]);
       mockGetLogBody.mockResolvedValue(response);
-      const context = createMockContext();
-      RetrieveLogFile.apply(asContext(context));
-      await command()();
+      const { running } = await run([log('denied')], 'denied');
+      await running;
+
       await expect(retrieveLogPromise()).rejects.toThrow('Salesforce denied access');
     },
   );
+
+  describe('content search', () => {
+    const day = (n: number) => `2024-01-${String(n).padStart(2, '0')}T00:00:00.000Z`;
+    /** Seven uncached 2 MB logs, `log-7` the newest. */
+    const sevenLogs = () =>
+      Array.from({ length: 7 }, (_, i) => log(`log-${i + 1}`, day(i + 1), 100, 2 * MB));
+
+    it('searches cached logs as the user types, without downloading anything', async () => {
+      cachedLogs({ [SEARCH_CACHE]: { cached: 'line one\nFATAL_ERROR System.LimitException' } });
+      await searchFor('fatal_error', [log('cached', day(1)), log('remote', day(2))]);
+
+      const row = listPicker.item('cached');
+      expect(mockGetLogBody).not.toHaveBeenCalled();
+      expect(row?.alwaysShow).toBe(true);
+      expect(row?.detail).toBe('line one FATAL_ERROR System.LimitException');
+      expect(row?.description).toContain('Success - cached');
+      expect(listPicker.busy).toBe(false);
+      expect(listPicker.title).toBe('Searched 1 log · 1 older not searched');
+    });
+
+    it('puts a search row first, labelled with the term, offering the newest 5 logs', async () => {
+      await searchFor('fatal_error', sevenLogs());
+
+      expect(listPicker.items[0]).toMatchObject({
+        label: 'fatal_error',
+        description: '- Search newest 5 logs (10.0 MB) · Downloads from the org',
+        alwaysShow: true,
+      });
+      expect(mockGetLogBody).not.toHaveBeenCalled();
+    });
+
+    it('downloads only the newest 5 logs not already cached', async () => {
+      cachedLogs({ [SEARCH_CACHE]: { 'log-7': 'clean', 'log-5': 'clean' } });
+      await searchFor('fatal_error', sevenLogs());
+
+      expect(listPicker.items[0]?.description).toBe(
+        '- Search newest 5 logs (download 3, 6.0 MB) · Downloads from the org',
+      );
+      listPicker.accept(listPicker.items[0]);
+      await settleSearch();
+
+      expect(mockGetLogBody.mock.calls.map(([id]) => id)).toEqual(['log-6', 'log-4', 'log-3']);
+    });
+
+    it('offers the older logs straight away when the newest 5 are cached', async () => {
+      cachedLogs({
+        [SEARCH_CACHE]: { 'log-7': 'a', 'log-6': 'a', 'log-5': 'a', 'log-4': 'a', 'log-3': 'a' },
+      });
+      await searchFor('fatal_error', sevenLogs());
+
+      expect(listPicker.items[0]?.description).toBe(
+        '- Search 2 older logs (4.0 MB) · Downloads from the org',
+      );
+    });
+
+    it('downloads the newest 5 into the search cache when the row is picked, then offers the rest', async () => {
+      mockGetLogBody.mockImplementation(async (id: string) =>
+        id === 'log-6' ? 'FATAL_ERROR here' : 'clean',
+      );
+      await searchFor('fatal_error', sevenLogs());
+
+      listPicker.accept(listPicker.items[0]);
+      await settleSearch();
+
+      expect(mockGetLogBody.mock.calls.map(([id]) => id)).toEqual([
+        'log-7',
+        'log-6',
+        'log-5',
+        'log-4',
+        'log-3',
+      ]);
+      expect(mockFs.writeFile).toHaveBeenCalledWith(
+        expect.objectContaining({ path: `${SEARCH_CACHE}/log-7.log` }),
+        expect.any(Uint8Array),
+      );
+      expect(mockWriteFile).not.toHaveBeenCalled();
+      expect(listPicker.item('log-6')?.alwaysShow).toBe(true);
+      expect(listPicker.items[0]?.description).toBe(
+        '- Search 2 older logs (4.0 MB) · Downloads from the org',
+      );
+      expect(listPicker.title).toBe('Searched 5 logs · 2 older not searched');
+    });
+
+    it('searches the rest when the row is picked again, then drops the row', async () => {
+      await searchFor('fatal_error', sevenLogs());
+      listPicker.accept(listPicker.items[0]);
+      await settleSearch();
+
+      listPicker.accept(listPicker.items[0]);
+      await settleSearch();
+
+      expect(mockGetLogBody).toHaveBeenCalledTimes(7);
+      expect(listPicker.items[0]?.logId).toBe('log-7');
+      expect(listPicker.title).toBe('Searched 7 logs');
+    });
+
+    it('offers no search under three characters', async () => {
+      cachedLogs({ [SEARCH_CACHE]: { cached: 'ab' } });
+      await searchFor('ab', [log('cached'), log('remote')]);
+
+      expect(listPicker.items[0]?.logId).toBeDefined();
+      expect(mockFs.readFile).not.toHaveBeenCalled();
+    });
+
+    it('waits for a pause in typing before it searches cached logs', async () => {
+      cachedLogs({ [SEARCH_CACHE]: { cached: 'fatal' } });
+      const { running } = await openList([log('cached')]);
+
+      listPicker.type('fatal');
+      jest.advanceTimersByTime(399);
+      await settle();
+      expect(mockFs.readFile).not.toHaveBeenCalled();
+
+      jest.advanceTimersByTime(1);
+      await settle();
+      expect(mockFs.readFile).toHaveBeenCalled();
+
+      listPicker.dismiss();
+      await running;
+    });
+
+    it('clears earlier matches when the term changes', async () => {
+      cachedLogs({ [SEARCH_CACHE]: { match: 'FATAL_ERROR' } });
+      await searchFor('fatal_error', [log('match')]);
+      expect(listPicker.item('match')?.alwaysShow).toBe(true);
+
+      listPicker.type('other');
+
+      expect(listPicker.item('match')?.alwaysShow).toBe(false);
+      expect(listPicker.item('match')?.detail).toContain('Success - match');
+    });
+
+    it('stops a waiting search when the list closes', async () => {
+      cachedLogs({ [SEARCH_CACHE]: { cached: 'fatal' } });
+      const { running } = await openList([log('cached')]);
+
+      listPicker.type('fatal');
+      listPicker.dismiss();
+      jest.advanceTimersByTime(400);
+      await settle();
+      await running;
+
+      expect(mockFs.readFile).not.toHaveBeenCalled();
+    });
+
+    it('keeps the highlighted row when matches arrive', async () => {
+      cachedLogs({ [SEARCH_CACHE]: { first: 'FATAL_ERROR', second: 'FATAL_ERROR' } });
+      const { running } = await openList([log('first'), log('second')]);
+      const highlighted = listPicker.item('second');
+      listPicker.activeItems = highlighted ? [highlighted] : [];
+
+      await typeAndSettle('fatal_error');
+      jest.advanceTimersByTime(100);
+
+      expect(listPicker.activeItems).toEqual([highlighted]);
+      expect(listPicker.keepScrollPosition).toBe(true);
+      listPicker.dismiss();
+      await running;
+    });
+
+    it.each([
+      ['Delete', true],
+      [undefined, false],
+    ])(
+      'clears the org search cache from the title button only when confirmed: %s',
+      async (answer, cleared) => {
+        cachedLogs({ [SEARCH_CACHE]: { a: '', b: '' } });
+        (window.showWarningMessage as jest.Mock).mockResolvedValue(answer);
+        const { running } = await openList([
+          log('a', day(1), 100, 2 * MB),
+          log('b', day(2), 100, 3 * MB),
+        ]);
+        expect(listPicker.buttons[0]?.tooltip).toBe('Clear 2 cached logs (5.0 MB)');
+
+        await listPicker.press(listPicker.buttons[0]);
+
+        expect(window.showWarningMessage).toHaveBeenCalledWith(
+          'Delete 2 cached Apex logs (5.0 MB) for myorg? Logs you opened in .sfdx are kept.',
+          { modal: true },
+          'Delete',
+        );
+        const deletedFolder = mockFs.delete.mock.calls.some(
+          ([uri]) => (uri as Uri).path === SEARCH_CACHE,
+        );
+        expect(deletedFolder).toBe(cleared);
+        expect(listPicker.buttons).toHaveLength(cleared ? 0 : 1);
+        listPicker.dismiss();
+        await running;
+      },
+    );
+  });
 });

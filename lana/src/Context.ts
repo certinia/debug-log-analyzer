@@ -3,8 +3,10 @@
  */
 import type { ExtensionContext } from 'vscode';
 
+import { ApexLogCache } from './cache/ApexLogCache.js';
 import { LogEventCache } from './cache/LogEventCache.js';
 import { ShowAnalysisCodeLens } from './codelenses/ShowAnalysisCodeLens.js';
+import { ClearApexLogCache } from './commands/ClearApexLogCache.js';
 import { RetrieveLogFile } from './commands/RetrieveLogFile.js';
 import { ShowInLogAnalysis } from './commands/ShowInLogAnalysis.js';
 import { ShowLogAnalysis } from './commands/ShowLogAnalysis.js';
@@ -29,7 +31,9 @@ export class Context {
 
     ApexLogLanguageDetector.apply(this);
     LogEventCache.apply(this);
+    ApexLogCache.apply(this);
     RetrieveLogFile.apply(this);
+    ClearApexLogCache.apply(this);
     ShowLogAnalysis.apply(this);
     ShowInLogAnalysis.apply(this);
     SwitchTimelineTheme.apply(this);

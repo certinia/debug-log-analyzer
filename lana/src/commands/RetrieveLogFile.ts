@@ -12,28 +12,17 @@ import {
 import { Utils } from 'vscode-uri';
 
 import { appName } from '../AppSettings.js';
+import { ApexLogCache, logIdsIn } from '../cache/ApexLogCache.js';
 import type { Context } from '../Context.js';
-import { Item, Options, QuickPick } from '../display/QuickPick.js';
-import type { ApexLogListItem } from '../services/salesforceServices.js';
+import type { TargetOrg } from '../services/salesforceServices.js';
 import { errorMessage } from '../tryCatch.js';
+import { ClearApexLogCache } from './ClearApexLogCache.js';
 import { Command } from './Command.js';
+import type { LogStore } from './LogContentSearch.js';
+import { pickLog } from './LogPicker.js';
 import { LogView } from './LogView.js';
 
-class DebugLogItem extends Item {
-  logId: string;
-
-  constructor(
-    name: string,
-    desc: string,
-    details: string,
-    logId: string,
-    sticky = true,
-    selected = false,
-  ) {
-    super(name, desc, details, sticky, selected);
-    this.logId = logId;
-  }
-}
+type SalesforceServices = typeof import('../services/salesforceServices.js');
 
 export class RetrieveLogFile {
   private static servicesDisposalRegistered = false;
@@ -78,25 +67,79 @@ export class RetrieveLogFile {
       if (logFiles === undefined) {
         return;
       }
-      const logFileId = await RetrieveLogFile.getLogFile(logFiles);
-      if (logFileId) {
-        const logUri = Utils.joinPath(
-          workspaceFolder.uri,
-          '.sfdx',
-          'tools',
-          'debug',
-          'logs',
-          `${logFileId}.log`,
+      const targetOrg = await RetrieveLogFile.targetOrg(context, salesforceServices);
+      const orgId = targetOrg.orgId || undefined;
+      const openedFolder = Utils.joinPath(
+        workspaceFolder.uri,
+        '.sfdx',
+        'tools',
+        'debug',
+        'logs',
+        ...(orgId ? [orgId] : []),
+      );
+      const openedUri = (logId: string) => Utils.joinPath(openedFolder, `${logId}.log`);
+      const inOrg = new Set(logFiles.map((log) => log.Id));
+      const cache = ApexLogCache.for(context);
+      cache
+        .pruneByAge()
+        .catch((error: unknown) =>
+          context.display.output(`Unable to prune the Apex log cache: ${errorMessage(error)}`),
         );
-        if (await salesforceServices.fileOrFolderExists(logUri)) {
+      const [openedIds, searchIds] = await Promise.all([
+        logIdsIn(openedFolder).then((ids) => new Set(ids.filter((logId) => inOrg.has(logId)))),
+        cache.logIds(orgId, orgId ? inOrg : undefined),
+      ]);
+
+      const store: LogStore = {
+        has: (logId) => openedIds.has(logId) || searchIds.has(logId),
+        read: async (logId) =>
+          openedIds.has(logId) ? workspace.fs.readFile(openedUri(logId)) : cache.read(orgId, logId),
+        download: async (logId) => {
+          const body = await salesforceServices.getLogBody(logId);
+          RetrieveLogFile.assertRetrievedLog(logId, body);
+          return body;
+        },
+        write: async (logId, body) => {
+          await cache.write(orgId, logId, body);
+          searchIds.add(logId);
+        },
+      };
+      const logLengths = new Map(logFiles.map((log) => [log.Id, log.LogLength]));
+      const searchCacheSize = () => ({
+        count: searchIds.size,
+        bytes: [...searchIds].reduce((total, logId) => total + (logLengths.get(logId) ?? 0), 0),
+      });
+
+      const logFileId = await pickLog({
+        logs: logFiles,
+        store,
+        placeholder: RetrieveLogFile.placeholder(targetOrg),
+        cache: {
+          size: searchCacheSize,
+          clear: async () => {
+            const org = targetOrg.alias ?? targetOrg.username ?? 'this org';
+            if (!(await ClearApexLogCache.confirm(searchCacheSize(), `for ${org}`))) {
+              return false;
+            }
+            await cache.clear(orgId);
+            searchIds.clear();
+            return true;
+          },
+        },
+        output: (message) => context.display.output(message),
+      });
+      if (logFileId) {
+        const logUri = openedUri(logFileId);
+        if (openedIds.has(logFileId)) {
           return LogView.createView(context, Promise.resolve(), logUri);
         }
 
         // Open the panel first and retrieve behind it. The body only crosses the webview
         // message channel when it could not be cached, so the webview streams it from disk.
         const retrieveLog = (async (): Promise<string | void> => {
-          const logData = await salesforceServices.getLogBody(logFileId);
-          RetrieveLogFile.assertRetrievedLog(logFileId, logData);
+          const logData = searchIds.has(logFileId)
+            ? new TextDecoder().decode(await cache.read(orgId, logFileId))
+            : await store.download(logFileId);
           try {
             await salesforceServices.writeFile(logUri, logData);
           } catch (error: unknown) {
@@ -139,71 +182,21 @@ export class RetrieveLogFile {
     return Promise.race([work(cancellation.signal), dismissed]).finally(() => hidden?.dispose());
   }
 
-  private static async getLogFile(files: ApexLogListItem[]): Promise<string | null> {
-    const items = files
-      .sort((a, b) => {
-        const aDate = Date.parse(a.StartTime);
-        const bDate = Date.parse(b.StartTime);
-        return bDate - aDate;
-      })
-      .map((r) => {
-        const name = `${r.LogUser?.Name ?? 'Unknown user'} - ${r.Operation ?? 'Unknown operation'}`;
-        const description = `${(r.LogLength / 1024).toFixed(2)} KB ${this.formatDuration(r.DurationMilliseconds ?? 0)}`;
-        const detail = `${new Date(r.StartTime).toLocaleString()} - ${r.Status} - ${r.Id}`;
-        return new DebugLogItem(name, description, detail, r.Id);
-      });
-
-    const [selectedLog] = await QuickPick.pick(items, new Options('Select a logfile'));
-    return selectedLog?.logId || null;
+  private static async targetOrg(
+    context: Context,
+    salesforceServices: SalesforceServices,
+  ): Promise<TargetOrg> {
+    try {
+      return await salesforceServices.getTargetOrg();
+    } catch (error: unknown) {
+      context.display.output(`Unable to read the default org: ${errorMessage(error)}`);
+      return {};
+    }
   }
 
-  /**
-   * Formats a duration in milliseconds into a human-readable string.
-   *
-   * The function automatically selects the most appropriate unit (milliseconds, seconds, or minutes)
-   * based on the duration value and applies appropriate precision rounding.
-   *
-   * @param ms - The duration in milliseconds to format
-   * @returns A formatted string representing the duration with appropriate units:
-   *   - Values < 1000ms: returns in milliseconds (e.g., "1.23 ms", "45.6 ms", "789 ms")
-   *   - Values < 60s: returns in seconds (e.g., "1.23 s", "45.6 s")
-   *   - Values >= 60s: returns in minutes and seconds (e.g., "2m", "2m 30s", "5m 15.5s")
-   *
-   * @example
-   * formatDuration(500)      // "500 ms"
-   * formatDuration(1500)     // "1.5 s"
-   * formatDuration(120000)   // "2m"
-   * formatDuration(150000)   // "2m 30s"
-   */
-  private static formatDuration(ms: number) {
-    if (!ms) {
-      return '0 ms';
-    }
-
-    if (ms < 1000) {
-      const precision = ms < 10 ? 100 : ms < 100 ? 10 : 1;
-      return `${this._round(ms, precision)} ms`;
-    }
-
-    const s = ms / 1000;
-    if (s < 60) {
-      const precision = s < 10 ? 100 : s < 100 ? 10 : 1;
-      return `${this._round(s, precision)} s`;
-    }
-
-    const m = Math.floor(s / 60);
-    const sec = s % 60;
-
-    if (sec === 0) {
-      return `${m}m`;
-    }
-
-    const secStr = sec === Math.floor(sec) ? `${sec}s` : `${this._round(sec, 10)}s`;
-    return `${m}m ${secStr}`;
-  }
-
-  private static _round(value: number, precision: number): number {
-    return Math.round(value * precision) / precision;
+  private static placeholder({ alias, username }: TargetOrg): string {
+    const org = alias ?? username;
+    return org ? `Select or search for a log (${org})` : 'Select or search for a log';
   }
 
   private static assertRetrievedLog(logId: string, logData: string): void {

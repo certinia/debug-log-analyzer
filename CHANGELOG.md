@@ -24,6 +24,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- 🔍 **Retrieve Apex Log**: search the contents of org logs from the log list, with the first match shown under each log that has it. ([#594])
+  - Logs you already have are searched as you type; nothing downloads until you pick the search row, which searches the newest 5 logs, then the rest.
+  - The list names the org it is connected to.
+  - **Log: Clear Apex Log Cache** frees the space searched logs use, and they are deleted on their own once the org drops them or after 7 days.
 - 🎚️ **Log levels**: filter the log to a lower debug level per category from the header. ([#530])
 - 🔦 **Timeline legend**: hover a category to highlight frames in the timeline, select to keep. ([#917])
 
@@ -33,6 +37,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- 🔎 **Retrieve Apex Log**: typing in the log list filters the logs. ([#594])
 - 📤 **Copy and export**: both work on Analysis and Bottom-Up. ([#1110])
 - 🔦 **Find**: in the tables, the current match stands out from the other matches, as it does in the editor.
 - 🐛 **Go to Code**: errors for methods not found in the file are shown correctly.
@@ -585,6 +590,7 @@ Skipped due to adopting odd numbering for pre releases and even number for relea
 [#1110]: https://github.com/certinia/debug-log-analyzer/issues/1110
 [#917]: https://github.com/certinia/debug-log-analyzer/issues/917
 [#875]: https://github.com/certinia/debug-log-analyzer/issues/875
+[#594]: https://github.com/certinia/debug-log-analyzer/issues/594
 [#530]: https://github.com/certinia/debug-log-analyzer/issues/530
 
 <!-- 1.22.0 -->

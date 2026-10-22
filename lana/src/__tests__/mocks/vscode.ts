@@ -422,6 +422,22 @@ export class Hover {
   }
 }
 
+export const FileType = {
+  Unknown: 0,
+  File: 1,
+  Directory: 2,
+  SymbolicLink: 64,
+} as const;
+export type FileType = (typeof FileType)[keyof typeof FileType];
+
+export class ThemeIcon {
+  readonly id: string;
+
+  constructor(id: string) {
+    this.id = id;
+  }
+}
+
 // Mock MarkdownString
 export class MarkdownString {
   value: string;

@@ -69,6 +69,11 @@
         "icon": "./certinia-icon-color.png"
       },
       {
+        "command": "lana.clearApexLogCache",
+        "title": "Log: Clear Apex Log Cache",
+        "icon": "./certinia-icon-color.png"
+      },
+      {
         "command": "lana.showLogAnalysis",
         "title": "Log: Show Apex Log Analysis",
         "icon": "./certinia-icon-color.png"
