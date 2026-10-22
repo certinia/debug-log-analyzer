@@ -52,6 +52,7 @@ export class TimelineFind<E extends EventNode> implements FindTarget {
     if (!this.query || !matches?.length || !bounds) {
       return -1;
     }
+    // By start, not overlap: a parent that spans the view, such as the root, would pull every step back to it.
     if (direction === 'next') {
       const match = firstStartingFrom(matches, bounds.timeStart);
       return match < matches.length ? match : -1;
