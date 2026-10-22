@@ -50,29 +50,31 @@ export class FindWidget extends LitElement {
         top: 0;
         right: 28px;
         max-width: 420px;
-        border: 1px solid var(--vscode-contrastBorder);
         color: var(--vscode-editorWidget-foreground);
         background: var(--lana-popover-bg);
         z-index: 1;
         display: flex;
-        border-bottom: 1px solid var(--lana-surface-border);
-        border-bottom-left-radius: 4px;
-        border-bottom-right-radius: 4px;
-        border-left: 1px solid var(--lana-surface-border);
-        border-right: 1px solid var(--lana-surface-border);
+        border: var(--lana-stroke) solid var(--lana-surface-border);
+        border-radius: var(--lana-radius-lg);
         box-sizing: border-box;
-        margin-top: 3px;
+        margin-top: var(--lana-space-2xs);
         align-items: center;
         overflow: hidden;
-        padding: 3px 4px;
-        position: absolute;
-        transform: translateY(calc(-100% - 10px));
+        padding: var(--lana-space-2xs) var(--lana-space-2xs) var(--lana-space-2xs)
+          var(--lana-space-sm);
+        transform: translateY(calc(-100% - var(--lana-space-sm)));
         transition: transform 0.2s linear;
       }
 
       .visible {
         transform: translateY(0);
-        box-shadow: 0 0 8px 2px var(--vscode-widget-shadow);
+        box-shadow: var(--lana-shadow-popover);
+      }
+
+      @media (prefers-reduced-motion: reduce) {
+        .wrapper {
+          transition: none;
+        }
       }
 
       .find-input__controls {
@@ -84,6 +86,13 @@ export class FindWidget extends LitElement {
         width: 197px;
         vertical-align: middle;
         box-sizing: border-box;
+      }
+
+      /* The field's square input paints over its rounded border's corners; a ring on top, as VS Code draws its own. */
+      .find-input-box[focused] {
+        border-radius: var(--lana-radius-sm);
+        outline: var(--lana-focus-ring);
+        outline-offset: var(--lana-focus-inset);
       }
 
       .find-control {
@@ -99,16 +108,10 @@ export class FindWidget extends LitElement {
         align-items: center;
       }
 
-      .find-button:focus-within {
-        color: var(--vscode-inputOption-activeForeground);
-        border: 1px solid var(--vscode-inputOption-activeBorder);
-        cursor: pointer;
-        user-select: none;
-        -webkit-user-select: none;
-        justify-content: center;
-        box-sizing: border-box;
-        width: 22px;
-        height: 22px;
+      /* VS Code's action bar greys a disabled action the same way: the icon's colour is the button's own. */
+      .find-button.disabled {
+        opacity: 0.4;
+        pointer-events: none;
       }
 
       .matches-count {
@@ -122,11 +125,19 @@ export class FindWidget extends LitElement {
         text-align: center;
         vertical-align: middle;
       }
+
+      .no-results .matches-count {
+        color: var(--vscode-errorForeground);
+      }
     `,
   ];
 
   render() {
-    return html`<div class="wrapper ${this.isVisble ? 'visible' : ''}">
+    const cannotStep = !this.lastMatch || !this.totalMatches;
+    const noResults = !!this.lastMatch && !this.totalMatches;
+    return html`<div
+      class="wrapper ${this.isVisble ? 'visible' : ''} ${noResults ? 'no-results' : ''}"
+    >
       <vscode-textfield
         placeholder="Find"
         label="Find"
@@ -154,14 +165,14 @@ export class FindWidget extends LitElement {
           icon="arrow-up"
           label="Previous Match"
           title="Previous Match"
-          class="find-button"
+          class="find-button ${cannotStep ? 'disabled' : ''}"
           @click=${this._previousMatch}
         ></vscode-toolbar-button>
         <vscode-toolbar-button
           icon="arrow-down"
           label="Next Match"
           title="Next Match"
-          class="find-button"
+          class="find-button ${cannotStep ? 'disabled' : ''}"
           @click=${this._nextMatch}
         ></vscode-toolbar-button>
         <vscode-toolbar-button
@@ -177,7 +188,7 @@ export class FindWidget extends LitElement {
 
   _getMatchesText() {
     if (this.totalMatches === 0) {
-      return 'No Matches';
+      return 'No results';
     }
 
     return (this.currentMatch || '?') + ' of ' + this.totalMatches;
@@ -186,11 +197,8 @@ export class FindWidget extends LitElement {
   // A reader says "?" as "question mark", and hears no term in "3 of 28".
   _getMatchesSpoken() {
     const text = this.lastMatch;
-    if (!text) {
-      return this._getMatchesText();
-    }
     if (!this.totalMatches) {
-      return `No results for '${text}'`;
+      return text ? `No results found for '${text}'` : 'No results found';
     }
     if (!this.currentMatch) {
       const matches = this.totalMatches === 1 ? 'match' : 'matches';
@@ -231,7 +239,10 @@ export class FindWidget extends LitElement {
    * @param setDirection - If true, remembers this direction for Enter key. Button clicks pass true, Shift+Enter passes false.
    */
   _previousMatch(setDirection = true) {
-    if (!this.currentMatch && this.totalMatches) {
+    if (!this.totalMatches) {
+      return;
+    }
+    if (!this.currentMatch) {
       if (setDirection) {
         this.nextMatchDirection = false;
       }
@@ -256,7 +267,10 @@ export class FindWidget extends LitElement {
    * @param setDirection - If true, remembers this direction for Enter key. Button clicks pass true, Enter key passes false.
    */
   _nextMatch(setDirection = true) {
-    if (!this.currentMatch && this.totalMatches) {
+    if (!this.totalMatches) {
+      return;
+    }
+    if (!this.currentMatch) {
       if (setDirection) {
         this.nextMatchDirection = true;
       }

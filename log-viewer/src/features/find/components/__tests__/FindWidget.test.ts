@@ -43,8 +43,8 @@ describe('FindWidget', () => {
     [
       'shows no matches',
       { totalMatches: 0, currentMatch: 0 },
-      'No Matches',
-      "No results for 'Handler'",
+      'No results',
+      "No results found for 'Handler'",
     ],
   ])('%s', async (_name, detail, text, spokenText) => {
     const { widget, shownText, spoken } = await shown();
@@ -65,8 +65,30 @@ describe('FindWidget', () => {
     results({ totalMatches: 0, currentMatch: 0 });
     await widget.updateComplete;
 
-    expect(spoken()).toBe("No results for 'bar'");
+    expect(spoken()).toBe("No results found for 'bar'");
   });
+
+  it.each([
+    ['an empty box', null, 0, false, true],
+    ['a term with no match', 'foo', 0, true, true],
+    ['a term with matches', 'foo', 3, false, false],
+  ])(
+    'with %s, marks no results and disables the steps as VS Code does',
+    async (_name, term, total, red, disabled) => {
+      const { widget } = await shown();
+      widget.lastMatch = term;
+      results({ totalMatches: total, currentMatch: 0 });
+      await widget.updateComplete;
+      const root = widget.renderRoot;
+      const steps = [...root.querySelectorAll('.find-button')].slice(0, 2);
+
+      expect(root.querySelector('.wrapper')?.classList.contains('no-results')).toBe(red);
+      expect(steps.map((step) => step.classList.contains('disabled'))).toEqual([
+        disabled,
+        disabled,
+      ]);
+    },
+  );
 
   it.each([
     ['searches its text again without moving, when open', true, [{ text: 'foo', count: 0 }]],
