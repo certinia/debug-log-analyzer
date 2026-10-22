@@ -6,6 +6,7 @@ import { window } from 'vscode';
 import { appName } from '../AppSettings.js';
 import { ApexLogCache, type CacheSize } from '../cache/ApexLogCache.js';
 import type { Context } from '../Context.js';
+import { megabytes, plural } from '../display/format.js';
 import { Command } from './Command.js';
 
 const DELETE = 'Delete';
@@ -24,9 +25,8 @@ export class ClearApexLogCache {
 
   /** Asks before deleting; resolves true when the user agreed. */
   static async confirm({ count, bytes }: CacheSize, scope: string): Promise<boolean> {
-    const megabytes = (bytes / 1048576).toFixed(1);
     const answer = await window.showWarningMessage(
-      `Delete ${count} cached Apex ${count === 1 ? 'log' : 'logs'} (${megabytes} MB) ${scope}? Logs you opened in .sfdx are kept.`,
+      `Delete ${plural(count, 'cached Apex log')} (${megabytes(bytes)}) ${scope}? Logs you opened in .sfdx are kept.`,
       { modal: true },
       DELETE,
     );

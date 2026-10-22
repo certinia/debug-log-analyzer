@@ -4,6 +4,7 @@
 import { ThemeIcon, window, type QuickInputButton, type QuickPickItem } from 'vscode';
 
 import type { CacheSize } from '../cache/ApexLogCache.js';
+import { megabytes, plural } from '../display/format.js';
 import { Item } from '../display/QuickPick.js';
 import { errorMessage } from '../tryCatch.js';
 import {
@@ -28,7 +29,7 @@ export interface PickerLog extends SearchableLog {
   DurationMilliseconds?: number;
 }
 
-export interface LogPickerOptions {
+interface LogPickerOptions {
   logs: PickerLog[];
   store: LogStore;
   placeholder: string;
@@ -92,7 +93,8 @@ interface TermSearch {
  */
 export function pickLog(options: LogPickerOptions): Promise<string | undefined> {
   const { logs, store } = options;
-  const items = newestFirst(logs).map(
+  const sorted = newestFirst(logs);
+  const items = sorted.map(
     (log) =>
       new DebugLogItem(
         `${log.LogUser?.Name ?? 'Unknown user'} - ${log.Operation ?? 'Unknown operation'}`,
@@ -110,11 +112,7 @@ export function pickLog(options: LogPickerOptions): Promise<string | undefined> 
     alwaysShow: true,
   };
   const newest = Math.min(FIRST_DOWNLOADS, logs.length);
-  const newestIds = new Set(
-    newestFirst(logs)
-      .slice(0, newest)
-      .map((log) => log.Id),
-  );
+  const newestIds = new Set(sorted.slice(0, newest).map((log) => log.Id));
   let clearButton: QuickInputButton | undefined;
   let search: TermSearch | undefined;
   let delay: ReturnType<typeof setTimeout> | undefined;
@@ -158,8 +156,8 @@ export function pickLog(options: LogPickerOptions): Promise<string | undefined> 
     const next = nextDownloads(current);
     const size =
       current.newestToDownload > 0 && next.length < newest
-        ? `download ${next.length}, ${megabytes(next)}`
-        : megabytes(next);
+        ? `download ${next.length}, ${totalSize(next)}`
+        : totalSize(next);
     const action =
       current.newestToDownload > 0
         ? `Search newest ${plural(newest, 'log')}`
@@ -175,7 +173,7 @@ export function pickLog(options: LogPickerOptions): Promise<string | undefined> 
       count > 0
         ? {
             iconPath: new ThemeIcon('trash'),
-            tooltip: `Clear ${plural(count, 'cached log')} (${(bytes / 1048576).toFixed(1)} MB)`,
+            tooltip: `Clear ${plural(count, 'cached log')} (${megabytes(bytes)})`,
           }
         : undefined;
     picker.buttons = clearButton ? [clearButton] : [];
@@ -314,12 +312,8 @@ export function pickLog(options: LogPickerOptions): Promise<string | undefined> 
   });
 }
 
-function plural(count: number, noun: string, nouns = `${noun}s`): string {
-  return `${count} ${count === 1 ? noun : nouns}`;
-}
-
-function megabytes(logs: SearchableLog[]): string {
-  return `${(logs.reduce((total, log) => total + log.LogLength, 0) / 1048576).toFixed(1)} MB`;
+function totalSize(logs: SearchableLog[]): string {
+  return megabytes(logs.reduce((total, log) => total + log.LogLength, 0));
 }
 
 /**
