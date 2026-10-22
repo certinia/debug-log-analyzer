@@ -38,7 +38,7 @@ const mockFs = workspace.fs as unknown as Record<
   'readDirectory' | 'readFile' | 'writeFile' | 'delete',
   jest.Mock
 >;
-const OPENED = '/test/workspace/.sfdx/tools/debug/logs/00Dorg';
+const OPENED = '/test/workspace/.sfdx/tools/debug/logs';
 const SEARCH_CACHE = '/test/storage/apex-logs/00Dorg';
 const OTHER_ORG_LOG = '/test/storage/apex-logs/00Dother/other.log';
 
@@ -291,11 +291,11 @@ describe('RetrieveLogFile', () => {
     expect(listPicker.show).not.toHaveBeenCalled();
   });
 
-  it('retrieves and caches an uncached log in the org folder', async () => {
+  it('retrieves and caches an uncached log in the log folder the Salesforce extensions use', async () => {
     const { context, running } = await run([log('selected-log')], 'selected-log');
     await running;
 
-    const cachePath = '/test/workspace/.sfdx/tools/debug/logs/00Dorg/selected-log.log';
+    const cachePath = `${OPENED}/selected-log.log`;
     expect(mockCreateView).toHaveBeenCalledWith(
       context,
       expect.any(Promise),
@@ -310,7 +310,7 @@ describe('RetrieveLogFile', () => {
     );
   });
 
-  it('caches in the flat log folder and deletes nothing when the org Id is unknown', async () => {
+  it('deletes no cached log when the org Id is unknown', async () => {
     mockGetTargetOrg.mockResolvedValue({});
     mockFs.readDirectory.mockResolvedValue([['gone.log', 1]]);
     const { running } = await run([log('selected-log')], 'selected-log');
@@ -318,7 +318,7 @@ describe('RetrieveLogFile', () => {
     await retrieveLogPromise();
 
     expect(mockWriteFile).toHaveBeenCalledWith(
-      expect.objectContaining({ path: '/test/workspace/.sfdx/tools/debug/logs/selected-log.log' }),
+      expect.objectContaining({ path: `${OPENED}/selected-log.log` }),
       'log body',
     );
     expect(mockFs.delete).not.toHaveBeenCalled();

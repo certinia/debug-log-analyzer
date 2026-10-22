@@ -47,14 +47,8 @@ export class OrgLogStore implements LogStore {
 
   static async open(options: OrgLogStoreOptions): Promise<OrgLogStore> {
     const { cache, orgId, logs } = options;
-    const openedFolder = Utils.joinPath(
-      options.workspaceFolder,
-      '.sfdx',
-      'tools',
-      'debug',
-      'logs',
-      ...(orgId ? [orgId] : []),
-    );
+    // Shared with the Salesforce extensions, which save logs flat here, so each reuses the other's.
+    const openedFolder = Utils.joinPath(options.workspaceFolder, '.sfdx', 'tools', 'debug', 'logs');
     const inOrg = new Set(logs.map((log) => log.Id));
     if (orgId) {
       // Not awaited: deleting many large logs must not hold back the list.
