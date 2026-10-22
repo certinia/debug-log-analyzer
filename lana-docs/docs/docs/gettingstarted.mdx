@@ -64,6 +64,14 @@ Open the `.log` file in VS Code, then do one of these:
 
 Open the Command Palette (`Cmd/Ctrl+Shift+P`) and run **Log: Retrieve Apex Log And Show Analysis**.
 
+#### Search inside logs
+
+To find a log by the text in it, type 3 or more characters in the list. Logs you already downloaded are searched as you type, and each match shows the first line that contains the text.
+
+Select the top row to download and search the newest 5 logs. Select it again to search 50 older logs each time. Each log is one API call to your org.
+
+Logs downloaded only for search are kept in VS Code storage, not in your project. They are deleted when the org no longer has them, or after 7 days. To delete them now, run **Log: Clear Apex Log Cache**, or select the trash button in the list.
+
 ## ⚙️ Recommended Debug Log Levels
 
 - Set `APEX_CODE` level to `FINE` or higher - lower levels may omit important execution details.
