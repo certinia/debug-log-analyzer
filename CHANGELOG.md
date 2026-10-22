@@ -12,11 +12,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - ⚡ **Timeline**: large logs are ready 3.1× faster and use 47% less memory, measured on a 100 MB log.
 - ⚡ **UI**: many components, including the tab views and Inspector sections, appear up to 80× faster on large logs.
 - ⚡ **Tables**: the Call Tree, Analysis, Database and Inspector tables respond up to 30× faster on large logs and use 93% less memory. ([#1169])
-  - Sort, expand and filter take under 0.2 s, group by is up to 9× faster, column resize is smooth and Find has no delay.
+  - Sort, expand and filter take under 0.2 s, group by is up to 9× faster, column resize is smooth and Find never freezes the table.
   - Screen reader and full keyboard support.
   - `Cmd/Ctrl+C` copies the filtered rows and their depth in each table, and the Analysis CSV export holds the same rows.
 - ⚡ **Parser performance**: logs parse 28% faster and use 27% less memory, down from 1.0 s to 0.78 s and 1.1 GB to 0.8 GB on a 100 MB log.
-- 🔍 **Find**: a search in the tables persists after a sort, filter, group by, column change, log level change, view switch or tab switch. ([#986])
+- 🔍 **Find**: a more consistent and natural find experience. ([#986])
+  - Search matches highlight as you type.
+  - Typing goes to the nearest visible match.
+  - Searches persist after a sort, filter, group by, column change or view switch.
 - ✂️ **Truncation**: each skipped section states how much of the log it dropped.
 - 🌊 **Flows**: names drop the `FLOW_START_INTERVIEWS :` and `WF_CRITERIA :` prefixes.
 - 📚 **Multiple logs**: a file holding several logs shows the first and flags the rest.

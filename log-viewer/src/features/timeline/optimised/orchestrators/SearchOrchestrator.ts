@@ -293,9 +293,9 @@ export class SearchOrchestrator<E extends EventNode = EventNode> {
    * Search events using predicate function, with no match current.
    *
    * @param predicate - Function to test each event
-   * @returns The number of matches, or null if search not initialized
+   * @returns The number of matches, or null if search not initialized or a newer search stopped it
    */
-  public search(predicate: FramePredicate): number | null {
+  public async search(predicate: FramePredicate): Promise<number | null> {
     if (!this.eventMatcher) {
       return null;
     }
@@ -306,7 +306,10 @@ export class SearchOrchestrator<E extends EventNode = EventNode> {
     // Clear selection when starting a new search to show search highlights
     this.callbacks.onClearSelection();
 
-    const cursor = this.eventMatcher.search(predicate);
+    const cursor = await this.eventMatcher.search(predicate);
+    if (!cursor) {
+      return null;
+    }
 
     // Request render to update display with new search state
     // (especially important when search returns 0 results to clear old highlights)
