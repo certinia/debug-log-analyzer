@@ -403,6 +403,29 @@ describe('GridView', () => {
     expect(501 * ROW - scroller.scrollTop).toBe(VIEWPORT - ROW);
   });
 
+  it('centres a row between the header and the footer', async () => {
+    const { scroller, view } = await setup();
+    const foot = document.createElement('div');
+    Object.defineProperty(foot, 'offsetHeight', { get: () => ROW });
+    scroller.append(foot);
+    view.scrollToIndex(500);
+    await flush();
+    expect(500 * ROW - scroller.scrollTop).toBe((VIEWPORT - ROW - ROW) / 2);
+  });
+
+  it('shows the top of a row taller than the view', async () => {
+    const resize = fakeResizeObserver();
+    const { scroller, view } = await setup();
+    view.scrollToIndex(500);
+    await flush();
+    resize(view.elementAt(500) as Element, 2 * VIEWPORT);
+    scroller.scrollTop = 0;
+    await flush();
+    view.scrollToIndex(500);
+    await flush();
+    expect(500 * ROW - scroller.scrollTop).toBe(0);
+  });
+
   it('keeps the bottom of a row scrolled up from below in view when it is measured taller', async () => {
     const resize = fakeResizeObserver();
     const { scroller, view } = await setup();

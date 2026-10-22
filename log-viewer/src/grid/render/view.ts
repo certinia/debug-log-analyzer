@@ -223,7 +223,18 @@ export class GridView<R extends object> {
     if (!item || !target) {
       return;
     }
-    const [offset, side] = target;
+    const side = target[1];
+    let offset = target[0];
+    if (side === 'center') {
+      // virtual-core centres in the whole scroller, so the header and footer pushed the row low.
+      const { scrollPaddingStart: head, scrollPaddingEnd: foot } = v.options;
+      const gap = this.options.scroller.clientHeight - head - foot;
+      // A row taller than the gap shows its top.
+      offset = v.getOffsetForAlignment(
+        item.start - head - Math.max(0, (gap - item.size) / 2),
+        'start',
+      );
+    }
     // A row brought up from below keeps its bottom edge, so growing leaves it above the footer.
     this.setPin(
       side === 'end' ? { index, bottom: item.end - offset } : { index, top: item.start - offset },
