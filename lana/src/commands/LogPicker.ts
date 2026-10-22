@@ -184,7 +184,9 @@ export function pickLog(options: LogPickerOptions): Promise<string | undefined> 
   const status = (current: TermSearch) =>
     ` · ${plural(current.matches, 'match', 'matches')}` +
     (current.failed.size > 0 ? ` · ${current.failed.size} failed, see Output` : '') +
-    (current.unsearched.length > 0 ? ` · ${current.unsearched.length} older not searched` : '');
+    (current.unsearched.length > 0
+      ? ` · ${current.unsearched.length} ${current.newestToDownload > 0 ? '' : 'older '}not searched`
+      : '');
 
   const runSearch = (current: TermSearch, toSearch: PickerLog[], downloads: boolean) => {
     const before = current.searched;

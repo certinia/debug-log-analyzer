@@ -484,7 +484,7 @@ describe('RetrieveLogFile', () => {
       expect(row?.detail).toBe('line one FATAL_ERROR System.LimitException');
       expect(row?.description).toContain('Success - cached');
       expect(listPicker.busy).toBe(false);
-      expect(listPicker.title).toBe('Searched 1 log · 1 match · 1 older not searched');
+      expect(listPicker.title).toBe('Searched 1 log · 1 match · 1 not searched');
     });
 
     it('puts a search row first, labelled with the term, offering the newest 5 logs', async () => {
