@@ -73,9 +73,8 @@ describe('ApexLogCache', () => {
     fs.put(`${root}/00Dorg/gone.log`, 'b');
     fs.put(`${root}/00Dother/gone.log`, 'c');
 
-    const ids = await cache.logIds('00Dorg', new Set(['kept']));
+    await cache.pruneNotIn('00Dorg', new Set(['kept']));
 
-    expect(ids).toEqual(new Set(['kept']));
     expect([...fs.files.keys()].sort()).toEqual([
       `${root}/00Dorg/kept.log`,
       `${root}/00Dother/gone.log`,

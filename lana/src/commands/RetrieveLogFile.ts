@@ -9,16 +9,15 @@ import {
   type QuickPickItem,
   type WebviewPanel,
 } from 'vscode';
-import { Utils } from 'vscode-uri';
 
 import { appName } from '../AppSettings.js';
-import { ApexLogCache, logIdsIn } from '../cache/ApexLogCache.js';
+import { ApexLogCache } from '../cache/ApexLogCache.js';
+import { OrgLogStore } from '../cache/OrgLogStore.js';
 import type { Context } from '../Context.js';
 import type { TargetOrg } from '../services/salesforceServices.js';
 import { errorMessage } from '../tryCatch.js';
 import { ClearApexLogCache } from './ClearApexLogCache.js';
 import { Command } from './Command.js';
-import type { LogStore } from './LogContentSearch.js';
 import { pickLog } from './LogPicker.js';
 import { LogView } from './LogView.js';
 
@@ -68,46 +67,22 @@ export class RetrieveLogFile {
         return;
       }
       const targetOrg = await RetrieveLogFile.targetOrg(context, salesforceServices);
-      const orgId = targetOrg.orgId || undefined;
-      const openedFolder = Utils.joinPath(
-        workspaceFolder.uri,
-        '.sfdx',
-        'tools',
-        'debug',
-        'logs',
-        ...(orgId ? [orgId] : []),
-      );
-      const openedUri = (logId: string) => Utils.joinPath(openedFolder, `${logId}.log`);
-      const inOrg = new Set(logFiles.map((log) => log.Id));
       const cache = ApexLogCache.for(context);
       cache
         .pruneByAge()
         .catch((error: unknown) =>
           context.display.output(`Unable to prune the Apex log cache: ${errorMessage(error)}`),
         );
-      const [openedIds, searchIds] = await Promise.all([
-        logIdsIn(openedFolder).then((ids) => new Set(ids.filter((logId) => inOrg.has(logId)))),
-        cache.logIds(orgId, orgId ? inOrg : undefined),
-      ]);
-
-      const store: LogStore = {
-        has: (logId) => openedIds.has(logId) || searchIds.has(logId),
-        read: async (logId) =>
-          openedIds.has(logId) ? workspace.fs.readFile(openedUri(logId)) : cache.read(orgId, logId),
+      const store = await OrgLogStore.open({
+        cache,
+        orgId: targetOrg.orgId || undefined,
+        workspaceFolder: workspaceFolder.uri,
+        logs: logFiles,
         download: async (logId) => {
           const body = await salesforceServices.getLogBody(logId);
           RetrieveLogFile.assertRetrievedLog(logId, body);
           return body;
         },
-        write: async (logId, body) => {
-          await cache.write(orgId, logId, body);
-          searchIds.add(logId);
-        },
-      };
-      const logLengths = new Map(logFiles.map((log) => [log.Id, log.LogLength]));
-      const searchCacheSize = () => ({
-        count: searchIds.size,
-        bytes: [...searchIds].reduce((total, logId) => total + (logLengths.get(logId) ?? 0), 0),
       });
 
       const logFileId = await pickLog({
@@ -115,31 +90,28 @@ export class RetrieveLogFile {
         store,
         placeholder: RetrieveLogFile.placeholder(targetOrg),
         cache: {
-          size: searchCacheSize,
+          size: () => store.size(),
           clear: async () => {
             const org = targetOrg.alias ?? targetOrg.username ?? 'this org';
-            if (!(await ClearApexLogCache.confirm(searchCacheSize(), `for ${org}`))) {
+            if (!(await ClearApexLogCache.confirm(store.size(), `for ${org}`))) {
               return false;
             }
-            await cache.clear(orgId);
-            searchIds.clear();
+            await store.clear();
             return true;
           },
         },
         output: (message) => context.display.output(message),
       });
       if (logFileId) {
-        const logUri = openedUri(logFileId);
-        if (openedIds.has(logFileId)) {
+        const logUri = store.openedUri(logFileId);
+        if (store.isOpened(logFileId)) {
           return LogView.createView(context, Promise.resolve(), logUri);
         }
 
         // Open the panel first and retrieve behind it. The body only crosses the webview
         // message channel when it could not be cached, so the webview streams it from disk.
         const retrieveLog = (async (): Promise<string | void> => {
-          const logData = searchIds.has(logFileId)
-            ? new TextDecoder().decode(await cache.read(orgId, logFileId))
-            : await store.download(logFileId);
+          const logData = await store.body(logFileId);
           try {
             await salesforceServices.writeFile(logUri, logData);
           } catch (error: unknown) {

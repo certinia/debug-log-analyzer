@@ -5,6 +5,7 @@ import { FileType, workspace, type Uri } from 'vscode';
 import { Utils } from 'vscode-uri';
 
 import type { Context } from '../Context.js';
+import { writeFileText } from '../fs/workspaceFs.js';
 import { errorMessage } from '../tryCatch.js';
 
 // The longest an org keeps any log (monitoring logs); a cached copy past it has no source.
@@ -49,24 +50,22 @@ export class ApexLogCache {
     return Utils.joinPath(this.folder(orgId), `${logId}.log`);
   }
 
-  /**
-   * The cached log Ids for an org. With `inOrg`, a cached log the org no longer lists is
-   * deleted and left out.
-   */
-  async logIds(orgId: string | undefined, inOrg?: Set<string>): Promise<Set<string>> {
+  async logIds(orgId: string | undefined): Promise<Set<string>> {
+    return new Set(await logIdsIn(this.folder(orgId)));
+  }
+
+  /** Deletes the cached logs of an org that it no longer lists. */
+  async pruneNotIn(orgId: string, inOrg: Set<string>): Promise<void> {
     const cachedIds = await logIdsIn(this.folder(orgId));
-    if (!inOrg) {
-      return new Set(cachedIds);
-    }
-    // Not awaited: deleting many large logs must not hold back the list.
-    cachedIds
-      .filter((logId) => !inOrg.has(logId))
-      .forEach((logId) => void deleteQuietly(this.uri(orgId, logId)));
-    return new Set(cachedIds.filter((logId) => inOrg.has(logId)));
+    await Promise.all(
+      cachedIds
+        .filter((logId) => !inOrg.has(logId))
+        .map((logId) => deleteQuietly(this.uri(orgId, logId))),
+    );
   }
 
   async write(orgId: string | undefined, logId: string, body: string): Promise<void> {
-    await workspace.fs.writeFile(this.uri(orgId, logId), new TextEncoder().encode(body));
+    await writeFileText(this.uri(orgId, logId), body);
   }
 
   async read(orgId: string | undefined, logId: string): Promise<Uint8Array> {
