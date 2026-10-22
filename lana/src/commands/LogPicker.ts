@@ -235,6 +235,11 @@ export function pickLog(options: LogPickerOptions): Promise<string | undefined> 
   };
 
   const startTerm = (value: string) => {
+    const trimmed = value.trim();
+    const term = trimmed.length >= MIN_SEARCH_LENGTH ? trimmed : undefined;
+    if (term === search?.term) {
+      return;
+    }
     clearTimeout(delay);
     search?.cancellation.abort();
     search = undefined;
@@ -242,9 +247,8 @@ export function pickLog(options: LogPickerOptions): Promise<string | undefined> 
     picker.title = undefined;
     picker.busy = false;
 
-    const term = value.trim();
-    if (term.length >= MIN_SEARCH_LENGTH) {
-      const unsearched = newestFirst(logs.filter((log) => !store.has(log.Id)));
+    if (term !== undefined) {
+      const unsearched = sorted.filter((log) => !store.has(log.Id));
       const current: TermSearch = {
         term,
         cancellation: new AbortController(),
@@ -258,7 +262,7 @@ export function pickLog(options: LogPickerOptions): Promise<string | undefined> 
       };
       search = current;
       updateSearchRow(current);
-      const cached = logs.filter((log) => store.has(log.Id));
+      const cached = sorted.filter((log) => store.has(log.Id));
       if (cached.length > 0) {
         delay = setTimeout(() => runSearch(current, cached, false), SEARCH_DELAY_MS);
       }
@@ -296,6 +300,8 @@ export function pickLog(options: LogPickerOptions): Promise<string | undefined> 
     picker.onDidTriggerButton(async (button) => {
       if (button === clearButton && (await options.cache.clear())) {
         updateClearButton();
+        search?.cancellation.abort();
+        search = undefined;
         startTerm(picker.value);
       }
     });

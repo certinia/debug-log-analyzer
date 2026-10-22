@@ -711,6 +711,17 @@ describe('RetrieveLogFile', () => {
       expect(listPicker.item('match')?.detail).toContain('Success - match');
     });
 
+    it('keeps the search when only spaces around the term change', async () => {
+      cachedLogs({ [SEARCH_CACHE]: { match: 'FATAL_ERROR' } });
+      await searchFor('fatal_error', [log('match')]);
+      const reads = mockFs.readFile.mock.calls.length;
+
+      await typeAndSettle('fatal_error ');
+
+      expect(listPicker.item('match')?.alwaysShow).toBe(true);
+      expect(mockFs.readFile).toHaveBeenCalledTimes(reads);
+    });
+
     it('stops a waiting search when the list closes', async () => {
       cachedLogs({ [SEARCH_CACHE]: { cached: 'fatal' } });
       const { running } = await openList([log('cached')]);
