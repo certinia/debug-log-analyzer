@@ -88,9 +88,10 @@ export async function searchLogContent(
  */
 export function findSnippet(text: string, term: string): string | undefined {
   const match = matcher(term).exec(text);
-  if (!match) {
-    return undefined;
-  }
+  return match ? snippetAt(text, match) : undefined;
+}
+
+function snippetAt(text: string, match: RegExpExecArray): string {
   const start = Math.max(0, match.index - SNIPPET_CONTEXT);
   const end = Math.min(text.length, match.index + match[0].length + SNIPPET_CONTEXT);
   const line = text.slice(start, end).replace(/[\r\n\t]+/g, ' ');
@@ -100,16 +101,19 @@ export function findSnippet(text: string, term: string): string | undefined {
 /** Decodes in chunks, so a large cached file is never held as bytes and a full string at once. */
 function findSnippetInBytes(bytes: Uint8Array, term: string): string | undefined {
   const decoder = new TextDecoder();
-  const overlap = term.length - 1 + SNIPPET_CONTEXT;
+  const pattern = matcher(term);
+  // Room for a match and its context each side, so a match at a chunk end is found whole next.
+  const overlap = term.length + 2 * SNIPPET_CONTEXT;
   let carry = '';
   for (let start = 0; start < bytes.length; start += CHUNK_BYTES) {
     const end = Math.min(start + CHUNK_BYTES, bytes.length);
-    const text = carry + decoder.decode(bytes.subarray(start, end), { stream: end < bytes.length });
-    const snippet = findSnippet(text, term);
-    if (snippet !== undefined) {
-      return snippet;
+    const last = end === bytes.length;
+    const text = carry + decoder.decode(bytes.subarray(start, end), { stream: !last });
+    const match = pattern.exec(text);
+    if (match && (last || match.index + match[0].length + SNIPPET_CONTEXT <= text.length)) {
+      return snippetAt(text, match);
     }
-    carry = overlap > 0 ? text.slice(-overlap) : '';
+    carry = text.slice(-overlap);
   }
   return undefined;
 }

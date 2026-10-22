@@ -114,6 +114,18 @@ describe('searchLogContent', () => {
     ]);
   });
 
+  it('keeps the full context of a match that ends just before a decode chunk ends', async () => {
+    const body = `${'x'.repeat(4 * MB - 10)}NEEDLE${'y'.repeat(100)}`;
+    const { store } = fakeStore({ big: body });
+    const { opts, matches } = options();
+
+    await searchLogContent([log('big', body.length)], 'needle', store, opts);
+
+    expect(matches).toEqual([
+      { logId: 'big', snippet: `…${'x'.repeat(40)}NEEDLE${'y'.repeat(40)}…` },
+    ]);
+  });
+
   // A log with an error in it is often larger, so a size order would search it last.
   it('searches cached logs first, then the rest newest first whatever their size', async () => {
     const { store, calls } = fakeStore({ cached: '' });
