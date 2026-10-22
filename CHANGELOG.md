@@ -18,7 +18,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - ⚡ **Parser performance**: logs parse 28% faster and use 27% less memory, down from 1.0 s to 0.78 s and 1.1 GB to 0.8 GB on a 100 MB log.
 - 🔍 **Find**: a more efficient and natural find experience. ([#986])
   - Search matches highlight as you type.
-  - Enter goes to the nearest visible match.
+  - Typing goes to the nearest visible match.
   - Searches persist after state changes (sort, filter, group by etc).
 - ✂️ **Truncation**: each skipped section states how much of the log it dropped.
 - 🌊 **Flows**: names drop the `FLOW_START_INTERVIEWS :` and `WF_CRITERIA :` prefixes.
