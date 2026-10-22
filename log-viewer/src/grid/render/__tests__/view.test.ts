@@ -450,17 +450,6 @@ describe('GridView', () => {
     expect(500 * ROW - scroller.scrollTop).toBe(0);
   });
 
-  it('counts the rows in a page by their measured heights', async () => {
-    const resize = fakeResizeObserver();
-    const { view, shown } = await setup();
-    for (const el of shown()) {
-      resize(el, 2 * ROW);
-    }
-    await flush();
-    expect(view.pageRows(0, VIEWPORT, 'pageDown')).toBe(1);
-    expect(view.pageRows(4, VIEWPORT, 'pageUp')).toBe(1);
-  });
-
   it('stays put once shown when a row asked for while hidden was cancelled', async () => {
     const resize = fakeResizeObserver();
     const { scroller, view } = await setup();

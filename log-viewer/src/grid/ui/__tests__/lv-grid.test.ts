@@ -435,6 +435,34 @@ describe('lv-grid', () => {
     }
   });
 
+  it('pages by the measured heights of wrapped rows, so no row is passed unseen', async () => {
+    const many: TreeSource<Node> = {
+      roots: Array.from({ length: 100 }, (_, i) => ({ key: i, name: `r${i}`, time: i, kind: 'x' })),
+      key: (row) => row.key,
+    };
+    const { grid, scroller, key } = await setup({ source: many, rowHeight: ROW });
+    const selected: (Node | null)[] = [];
+    grid.addEventListener('lv-grid-select', (e) =>
+      selected.push(detail<GridSelectDetail<Node>>(e).row),
+    );
+    jest.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(function (
+      this: HTMLElement,
+    ) {
+      const height = this === scroller ? 10 * ROW : this.dataset.index ? 2 * ROW : ROW;
+      return { top: 0, bottom: height, height } as DOMRect;
+    });
+    Object.defineProperty(scroller, 'clientHeight', { get: () => 10 * ROW, configurable: true });
+    // A new source paints, and so measures, every row again.
+    grid.source = { ...many };
+    await settle(grid);
+    await key('Home');
+    // 8 rows of room between the header and the totals hold r0 to r3.
+    await key('PageDown');
+    expect(selected.at(-1)?.name).toBe('r3');
+    await key('PageUp');
+    expect(selected.at(-1)?.name).toBe('r0');
+  });
+
   it('looks for a hidden selected row once, not on every draw and key', async () => {
     const plain = source();
     const key = jest.fn(plain.key);
