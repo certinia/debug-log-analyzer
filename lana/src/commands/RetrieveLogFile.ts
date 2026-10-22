@@ -67,14 +67,8 @@ export class RetrieveLogFile {
         return;
       }
       const targetOrg = await RetrieveLogFile.targetOrg(context, salesforceServices);
-      const cache = ApexLogCache.for(context);
-      cache
-        .pruneByAge()
-        .catch((error: unknown) =>
-          context.display.output(`Unable to prune the Apex log cache: ${errorMessage(error)}`),
-        );
       const store = await OrgLogStore.open({
-        cache,
+        cache: ApexLogCache.for(context),
         orgId: targetOrg.orgId || undefined,
         workspaceFolder: workspaceFolder.uri,
         logs: logFiles,

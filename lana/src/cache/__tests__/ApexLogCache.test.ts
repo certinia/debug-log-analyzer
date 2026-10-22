@@ -1,9 +1,10 @@
 /*
  * Copyright (c) 2026 Certinia Inc. All rights reserved.
  */
-import { beforeEach, describe, expect, it } from '@jest/globals';
+import { afterEach, beforeEach, describe, expect, it } from '@jest/globals';
 import { FileType, Uri, workspace } from 'vscode';
 
+import { asContext, createMockContext } from '../../__tests__/helpers/test-builders.js';
 import { ApexLogCache } from '../ApexLogCache.js';
 
 const DAY = 24 * 60 * 60 * 1000;
@@ -117,6 +118,39 @@ describe('ApexLogCache', () => {
 
     await cache.clearAll();
     expect(fs.files.size).toBe(0);
+  });
+
+  describe('at start-up', () => {
+    const flush = async () => {
+      for (let i = 0; i < 5; i++) {
+        await new Promise((resolve) => setImmediate(resolve));
+      }
+    };
+
+    afterEach(() => {
+      jest.useRealTimers();
+    });
+
+    it.each([
+      [false, []],
+      [true, ['/test/storage/apex-logs/00Da/old.log']],
+    ])(
+      'deletes logs older than 7 days 10 s after activation, unless disposed first: %s',
+      async (disposed, left) => {
+        jest.useFakeTimers({ now: NOW, doNotFake: ['setImmediate'] });
+        fs.put('/test/storage/apex-logs/00Da/old.log', 'a', 8);
+        const context = createMockContext();
+        ApexLogCache.apply(asContext(context));
+
+        if (disposed) {
+          context.context.subscriptions.forEach((subscription) => subscription.dispose());
+        }
+        jest.advanceTimersByTime(10_000);
+        await flush();
+
+        expect([...fs.files.keys()]).toEqual(left);
+      },
+    );
   });
 
   it('treats a cache that was never written as empty', async () => {
