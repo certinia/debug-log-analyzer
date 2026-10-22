@@ -19,7 +19,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - 🔍 **Find**: a more consistent and natural find experience. ([#986])
   - Search matches highlight as you type.
   - Typing goes to the nearest visible match.
-  - Searches persist after state changes (sort, filter, group by, etc.).
+  - Searches persist after a sort, filter, group by, column change or view switch.
 - ✂️ **Truncation**: each skipped section states how much of the log it dropped.
 - 🌊 **Flows**: names drop the `FLOW_START_INTERVIEWS :` and `WF_CRITERIA :` prefixes.
 - 📚 **Multiple logs**: a file holding several logs shows the first and flags the rest.
