@@ -9,6 +9,9 @@ export interface FindQuery {
   matchCase?: boolean;
 }
 
+/** The way a step moves: to a later match, or an earlier one. */
+export type FindDirection = 'next' | 'prev';
+
 export type CellText<R> = (row: R) => string;
 
 export interface PathNode {

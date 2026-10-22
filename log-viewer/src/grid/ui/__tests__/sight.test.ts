@@ -48,6 +48,16 @@ describe('sightOf', () => {
     expect(sightOf(scroller, rows)).toEqual({ first: 1, last: 4 });
   });
 
+  it('leaves out a row under the totals row', () => {
+    const { scroller, rows } = page(50);
+    const foot = document.createElement('div');
+    foot.className = 'foot';
+    place(foot, 150, 20);
+    scroller.append(foot);
+
+    expect(sightOf(scroller, rows)).toEqual({ first: 1, last: 3 });
+  });
+
   it.each([
     ['above', -200],
     ['below', 400],

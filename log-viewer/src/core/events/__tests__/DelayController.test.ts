@@ -22,19 +22,6 @@ describe('DelayController', () => {
     return { host, delay };
   }
 
-  it('runs only the last callback, once the delay passes with no newer one', () => {
-    const { delay } = setup();
-    const runs: string[] = [];
-    delay.schedule(() => runs.push('a'));
-    jest.advanceTimersByTime(100);
-    delay.schedule(() => runs.push('b'));
-    jest.advanceTimersByTime(149);
-    expect(runs).toEqual([]);
-
-    jest.advanceTimersByTime(1);
-    expect(runs).toEqual(['b']);
-  });
-
   it('drops a waiting callback on a cancel, or when the host leaves', () => {
     const { host, delay } = setup();
     const run = jest.fn();

@@ -35,7 +35,7 @@ export class EventMatcher<E extends EventNode> {
    * stops it, and it then gives null.
    *
    * @param predicate - Function to test each event
-   * @returns SearchCursor for navigating results
+   * @returns The cursor, or null when a newer search or a clear stopped it
    */
   async search(predicate: FramePredicate): Promise<SearchCursor<E> | null> {
     this.running?.abort();

@@ -10,6 +10,10 @@
  * Timeline on Escape, sends `lv-find-dismiss`.
  */
 
+import type { FindDirection } from '../../grid/index.js';
+
+export type { FindDirection };
+
 /** Payload for `lv-find`, `lv-find-match` and `lv-find-close`. */
 export interface FindEventDetail {
   /** Search query text. */
@@ -17,9 +21,8 @@ export interface FindEventDetail {
 
   /**
    * Match index for navigation (1-based).
-   * - `lv-find`: 1 to start at the first match; 0 to search without moving, as when a
-   *   view is shown again
-   * - `lv-find-match`: the current match number (1 to totalMatches)
+   * - `lv-find`: always 0; without `direction` the views search without moving
+   * - `lv-find-match`: the current match number (1 to totalMatches), or 0 with `direction`
    * - `lv-find-close`: always 0 (no active match)
    */
   count: number;
@@ -27,10 +30,11 @@ export interface FindEventDetail {
   options: { matchCase: boolean };
 
   /**
-   * Set on `lv-find` and `lv-find-match` when no match is current: the views move to the
-   * match nearest the screen that way, and `count` is 0.
+   * The views move to the match nearest the screen that way. On `lv-find`, set when the
+   * search moves, absent when it keeps its place; on `lv-find-match`, set when no match is
+   * current.
    */
-  from?: 'next' | 'prev';
+  direction?: FindDirection;
 }
 
 /** Payload for `lv-find-results`, a view's answer to a search. */

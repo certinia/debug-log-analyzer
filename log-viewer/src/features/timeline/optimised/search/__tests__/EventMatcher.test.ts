@@ -79,7 +79,7 @@ describe('EventMatcher', () => {
   });
 
   describe('a search that runs past one slice', () => {
-    // Enough frames to reach a deadline check, and a clock that runs out at the first one.
+    // Enough frames to reach a deadline check.
     const many = Array.from(
       { length: 300 },
       (_, i) =>
@@ -94,17 +94,26 @@ describe('EventMatcher', () => {
     it.each([
       ['a newer search', (matcher: EventMatcher<EventNode>) => void matcher.search(() => false)],
       ['a clear', (matcher: EventMatcher<EventNode>) => matcher.clear()],
-    ])('is stopped by %s, and gives null', async (_name, stop) => {
+    ])('is stopped by %s while it scans, and gives null', async (_name, stop) => {
       const matcher = new EventMatcher(framesOf(LOG + many).frames);
+      // A clock that runs out at the first deadline check, so the scan yields and sees the stop.
       jest.spyOn(performance, 'now').mockReturnValueOnce(0).mockReturnValue(100);
-      const first = matcher.search(textPredicate('ns.'));
-      stop(matcher);
+      const matches = textPredicate('ns.');
+      let checked = 0;
+      const first = matcher.search((text, type) => {
+        if (++checked === 1) {
+          stop(matcher);
+        }
+        return matches(text, type);
+      });
 
       expect(await first).toBeNull();
+      expect(checked).toBeLessThan(300);
     });
 
     it('finds every match once it finishes', async () => {
       const matcher = new EventMatcher(framesOf(LOG + many).frames);
+      // A clock that runs out at the first deadline check, so the scan yields once.
       jest.spyOn(performance, 'now').mockReturnValueOnce(0).mockReturnValue(100);
 
       expect((await matcher.search(textPredicate('ns.')))?.total).toBe(302);

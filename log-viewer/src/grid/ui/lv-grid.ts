@@ -21,6 +21,7 @@ import {
   type Calcs,
   type ExpandPolicy,
   type ExportOptions,
+  type FindDirection,
   type FindQuery,
   type GroupBy,
   type RowFilter,
@@ -339,10 +340,10 @@ export class LvGrid<R extends object = object> extends LitElement {
   }
 
   /**
-   * The match nearest what the reader can see: for `next` the first at or below the top
-   * row in sight, for `prev` the last at or above the bottom one. -1 when none lies that way.
+   * The match nearest the rows in sight: for `next` the first at or after the top one, for
+   * `prev` the last at or before the bottom one. -1 when none lies that way.
    */
-  nearView(direction: 'next' | 'prev'): number {
+  nearView(direction: FindDirection): number {
     const scroller = this.scrollerRef.value;
     const result = this.found?.result;
     if (!scroller || !result?.total || !this.shown) {

@@ -15,6 +15,7 @@ import {
   type FakeHighlights,
 } from '../../render/__tests__/fakes.js';
 import type { GridColumn } from '../column.js';
+import type { Sight } from '../sight.js';
 import '../lv-grid.js';
 import type {
   GridColumnResizeDetail,
@@ -37,6 +38,10 @@ interface Node {
 }
 
 const ROW = 20;
+
+// jsdom lays nothing out, so what the reader sees is set by hand; `sight.test.ts` covers the real one.
+let mockSight: Sight = 'below';
+jest.mock('../sight.js', () => ({ sightOf: () => mockSight }));
 
 /** Three roots; `b` holds two children. */
 const source = (): TreeSource<Node> => ({
@@ -1198,6 +1203,32 @@ describe('lv-grid columns', () => {
     await settle(grid);
     expect(names()).toEqual(['a', 'c']);
     expect([...(body?.children ?? [])]).toEqual(elements);
+  });
+});
+
+describe('lv-grid nearView', () => {
+  // Rows a, b, c in sight order; `b` matches, and so do its folded children b1 and b2.
+  it.each([
+    ['the first match from the top row in sight, for next', { first: 0, last: 2 }, 'next', 0],
+    [
+      'the last match up to the bottom row, folded ones too, for prev',
+      { first: 2, last: 2 },
+      'prev',
+      2,
+    ],
+    ['none below the rows in sight, for next', { first: 2, last: 2 }, 'next', -1],
+    ['none above the rows in sight, for prev', { first: 0, last: 0 }, 'prev', -1],
+    ['none for next with the grid above the view', 'above', 'next', -1],
+    ['the last for prev with the grid above the view', 'above', 'prev', 2],
+    ['the first for next with the grid below the view', 'below', 'next', 0],
+    ['none for prev with the grid below the view', 'below', 'prev', -1],
+    ['the first for next in a folded section', 'folded', 'next', 0],
+  ] as const)('gives %s', async (_name, sight, direction, match) => {
+    const { grid } = await setup();
+    await grid.find({ text: 'b' });
+    mockSight = sight;
+
+    expect(grid.nearView(direction)).toBe(match);
   });
 });
 
