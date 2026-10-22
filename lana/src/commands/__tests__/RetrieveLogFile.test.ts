@@ -313,6 +313,7 @@ describe('RetrieveLogFile', () => {
     mockFs.readDirectory.mockResolvedValue([['gone.log', 1]]);
     const { running } = await run([log('selected-log')], 'selected-log');
     await running;
+    await retrieveLogPromise();
 
     expect(mockWriteFile).toHaveBeenCalledWith(
       expect.objectContaining({ path: '/test/workspace/.sfdx/tools/debug/logs/selected-log.log' }),
@@ -355,6 +356,7 @@ describe('RetrieveLogFile', () => {
     ];
     const { running } = await run([log('selected-log')], 'selected-log');
     await running;
+    await retrieveLogPromise();
 
     expect(mockWriteFile).toHaveBeenCalledWith(
       expect.objectContaining({ path: expect.stringContaining('/test/first-workspace') }),
@@ -596,6 +598,53 @@ describe('RetrieveLogFile', () => {
       expect(mockGetLogBody).toHaveBeenCalledTimes(7);
       expect(listPicker.items[0]?.logId).toBe('log-7');
       expect(listPicker.title).toBe('Searched 7 logs · 0 matches');
+    });
+
+    describe('while logs download', () => {
+      let release: () => void;
+
+      beforeEach(() => {
+        const waiting: Array<() => void> = [];
+        mockGetLogBody.mockImplementation(
+          () => new Promise<string>((resolve) => waiting.push(() => resolve('clean'))),
+        );
+        release = () => waiting.splice(0).forEach((resolve) => resolve());
+      });
+
+      it('downloads each log once when the term changes', async () => {
+        await searchFor('fatal_error', sevenLogs());
+        listPicker.accept(listPicker.items[0]);
+        await typeAndSettle('other_term');
+        listPicker.accept(listPicker.items[0]);
+        release();
+        await settleSearch();
+
+        expect(mockGetLogBody).toHaveBeenCalledTimes(5);
+      });
+
+      it('opens a log still downloading for search without a second download', async () => {
+        await searchFor('fatal_error', sevenLogs());
+        listPicker.accept(listPicker.items[0]);
+        listPicker.accept(listPicker.item('log-7'));
+        release();
+        await settleSearch();
+
+        expect(mockGetLogBody).toHaveBeenCalledTimes(5);
+        await expect(retrieveLogPromise()).resolves.toBeUndefined();
+      });
+
+      it('writes nothing back to a search cache cleared during a download', async () => {
+        cachedLogs({ [SEARCH_CACHE]: { cached: '' } });
+        (window.showWarningMessage as jest.Mock).mockResolvedValue('Delete');
+        await searchFor('fatal_error', [...sevenLogs(), log('cached')]);
+        listPicker.accept(listPicker.items[0]);
+
+        await listPicker.press(listPicker.buttons[0]);
+        release();
+        await settleSearch();
+
+        expect(mockFs.writeFile).not.toHaveBeenCalled();
+      });
     });
 
     it('offers no search under three characters', async () => {

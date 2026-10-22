@@ -27,6 +27,10 @@ export class OrgLogStore implements LogStore {
   private readonly openedIds: Set<string>;
   private readonly searchIds: Set<string>;
   private readonly logLengths: Map<string, number>;
+  private readonly downloads = new Map<string, Promise<string>>();
+  // A download that started before a clear must not write its log back.
+  private clears = 0;
+  private readonly clearsAtDownload = new Map<string, number>();
 
   private constructor(
     options: OrgLogStoreOptions,
@@ -75,11 +79,22 @@ export class OrgLogStore implements LogStore {
       : this.options.cache.read(this.options.orgId, logId);
   }
 
+  /** Shares a download already running for the log, so each log costs one API call. */
   download(logId: string): Promise<string> {
-    return this.options.download(logId);
+    const running = this.downloads.get(logId);
+    if (running) {
+      return running;
+    }
+    this.clearsAtDownload.set(logId, this.clears);
+    const body = this.options.download(logId).finally(() => this.downloads.delete(logId));
+    this.downloads.set(logId, body);
+    return body;
   }
 
   async write(logId: string, body: string): Promise<void> {
+    if (this.searchIds.has(logId) || this.clearsAtDownload.get(logId) !== this.clears) {
+      return;
+    }
     await this.options.cache.write(this.options.orgId, logId, body);
     this.searchIds.add(logId);
   }
@@ -112,6 +127,7 @@ export class OrgLogStore implements LogStore {
   }
 
   async clear(): Promise<void> {
+    this.clears++;
     await this.options.cache.clear(this.options.orgId);
     this.searchIds.clear();
   }
