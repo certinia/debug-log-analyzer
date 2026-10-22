@@ -81,7 +81,11 @@ const columns = (): GridColumn<Node>[] => [
 
 /** jsdom does no layout: every element is ROW high and the scroller has room for all rows. */
 function fakeLayout(): void {
-  jest.spyOn(HTMLElement.prototype, 'offsetHeight', 'get').mockReturnValue(10 * ROW);
+  jest.spyOn(HTMLElement.prototype, 'offsetHeight', 'get').mockImplementation(function (
+    this: HTMLElement,
+  ) {
+    return this.classList.contains('scroller') ? 10 * ROW : ROW;
+  });
   jest.spyOn(HTMLElement.prototype, 'offsetWidth', 'get').mockReturnValue(500);
   jest
     .spyOn(HTMLElement.prototype, 'getBoundingClientRect')

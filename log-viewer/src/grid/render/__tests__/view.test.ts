@@ -110,6 +110,13 @@ function fakeResizeObserver(): (target: Element, height: number) => void {
   };
 }
 
+/** A ROW-high sticky footer after the body, added after the rows are set. */
+function addFooter(scroller: HTMLElement): void {
+  const foot = document.createElement('div');
+  Object.defineProperty(foot, 'offsetHeight', { get: () => ROW });
+  scroller.append(foot);
+}
+
 async function setup(count = 1000, lines?: (row: Node) => number, lineHeight?: () => number) {
   const scroller = document.createElement('div');
   const body = document.createElement('div');
@@ -395,22 +402,20 @@ describe('GridView', () => {
 
   it('scrolls a row below the fold to sit on the footer, not under it', async () => {
     const { scroller, view } = await setup();
-    const foot = document.createElement('div');
-    Object.defineProperty(foot, 'offsetHeight', { get: () => ROW });
-    scroller.append(foot);
+    addFooter(scroller);
     view.scrollToIndex(500, 'auto');
     await flush();
     expect(501 * ROW - scroller.scrollTop).toBe(VIEWPORT - ROW);
   });
 
   it('centres a row between the header and the footer', async () => {
-    const { scroller, view } = await setup();
-    const foot = document.createElement('div');
-    Object.defineProperty(foot, 'offsetHeight', { get: () => ROW });
-    scroller.append(foot);
+    const { scroller, body, view } = await setup();
+    Object.defineProperty(body, 'offsetTop', { get: () => ROW });
+    addFooter(scroller);
     view.scrollToIndex(500);
     await flush();
-    expect(500 * ROW - scroller.scrollTop).toBe((VIEWPORT - ROW - ROW) / 2);
+    // The row starts ROW down the scroller, below the header.
+    expect(ROW + 500 * ROW - scroller.scrollTop).toBe(ROW + (VIEWPORT - 2 * ROW - ROW) / 2);
   });
 
   it('shows the top of a row taller than the view', async () => {
@@ -419,7 +424,6 @@ describe('GridView', () => {
     view.scrollToIndex(500);
     await flush();
     resize(view.elementAt(500) as Element, 2 * VIEWPORT);
-    scroller.scrollTop = 0;
     await flush();
     view.scrollToIndex(500);
     await flush();
