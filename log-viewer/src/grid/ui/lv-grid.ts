@@ -14,12 +14,14 @@ import { createRef, ref } from 'lit/directives/ref.js';
 import { styleMap } from 'lit/directives/style-map.js';
 
 import {
+  expansionOf,
   GridStore,
   Group,
   navigate,
   sameTarget,
   type Calcs,
   type ExpandPolicy,
+  type GridExpansion,
   type ExportOptions,
   type FindDirection,
   type FindQuery,
@@ -79,6 +81,12 @@ export interface GridReshapeDetail {
   reason: 'sort' | 'columns' | 'filter' | 'group' | 'source';
 }
 
+/** Before the first rows, or when no row has children. */
+const NO_EXPANSION: GridExpansion = Object.freeze({
+  canExpand: false,
+  canCollapse: false,
+});
+
 /**
  * An error from work the grid started itself, which no caller can catch. Cancel the event
  * once the error is shown or logged; an error left uncancelled is thrown uncaught.
@@ -123,7 +131,8 @@ const shownIds = <R>(columns: readonly GridColumn<R>[] | undefined): string[] =>
  * keyboard moves, opens and closes rows. Events bubble but stay inside the host's shadow
  * root: `lv-grid-select`, `lv-grid-locate` (hover), `lv-grid-context`,
  * `lv-grid-header-context`, `lv-grid-column-resize`, `lv-grid-find-results`,
- * `lv-grid-reshape`, `lv-grid-expand` (a data row the user opened) and `lv-grid-error`.
+ * `lv-grid-reshape`, `lv-grid-expand` (a data row the user opened), `lv-grid-expansion-change`
+ * (whether a row can still open or close changed) and `lv-grid-error`.
  * When a build throws, the grid shows an alert in place of its rows until a build succeeds.
  */
 @customElement('lv-grid')
@@ -198,6 +207,13 @@ export class LvGrid<R extends object = object> extends LitElement {
   @property({ attribute: false })
   errorText = 'The table could not be updated.';
 
+  /** Whether a shown row can be opened, and whether one can be closed. */
+  get expansion(): GridExpansion {
+    return this.lastExpansion;
+  }
+
+  private lastExpansion = NO_EXPANSION;
+
   private store: GridStore<R> | null = null;
   private readonly data = new StoreController<R>(this);
   private view: GridView<R> | null = null;
@@ -241,13 +257,24 @@ export class LvGrid<R extends object = object> extends LitElement {
     await this.updateComplete;
   }
 
-  /** Opens every row. Groups stay as they are. */
+  /** Opens every row and every group. */
   async expandAll(): Promise<void> {
     await this.store?.expandAll();
   }
 
+  /** Closes every row and every group. */
   async collapseAll(): Promise<void> {
     await this.store?.collapseAll();
+  }
+
+  /** Opens the shallowest level that has a closed row. A group is the top level. */
+  async expandLevel(): Promise<void> {
+    await this.store?.expandLevel();
+  }
+
+  /** Closes the deepest level that has an open row. A group is the top level. */
+  async collapseLevel(): Promise<void> {
+    await this.store?.collapseLevel();
   }
 
   /**
@@ -494,6 +521,7 @@ export class LvGrid<R extends object = object> extends LitElement {
       this.shown = snapshot.rows;
       this.view.setRows(snapshot.rows, snapshot.toggled);
       this.syncActive();
+      this.syncExpansion(snapshot.rows);
     } else if (changed.has('columns') || changed.has('marked') || changed.has('rowClass')) {
       this.view?.repaint();
     }
@@ -839,6 +867,17 @@ export class LvGrid<R extends object = object> extends LitElement {
       }
     } else {
       scroller?.removeAttribute('aria-activedescendant');
+    }
+  }
+
+  private syncExpansion(rows: RowView<R>): void {
+    const next = expansionOf(rows);
+    if (
+      next.canExpand !== this.lastExpansion.canExpand ||
+      next.canCollapse !== this.lastExpansion.canCollapse
+    ) {
+      this.lastExpansion = next;
+      this.emit<GridExpansion>('lv-grid-expansion-change', next);
     }
   }
 

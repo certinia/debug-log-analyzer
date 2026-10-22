@@ -56,14 +56,32 @@ describe('GridStore groups', () => {
     expect(shown(store.snapshot().rows)).toEqual(['[apex]-', '[soql]-']);
   });
 
-  it('leaves groups as they are on expand all and collapse all', async () => {
+  it('opens and closes the groups too on expand all and collapse all', async () => {
     const store = new GridStore(source(tree()), { groupBy: byKind });
-    await store.settled();
-    await store.toggle(groupOf(store, 'soql'));
     await store.expandAll();
-    expect(shown(store.snapshot().rows)).toEqual(['[apex]-', '[soql]+', 'd+@1', 'e@2']);
+    expect(shown(store.snapshot().rows)).toEqual([
+      '[apex]+',
+      'a+@1',
+      'b@2',
+      'c@2',
+      'f@1',
+      '[soql]+',
+      'd+@1',
+      'e@2',
+    ]);
     await store.collapseAll();
-    expect(shown(store.snapshot().rows)).toEqual(['[apex]-', '[soql]+', 'd-@1']);
+    expect(shown(store.snapshot().rows)).toEqual(['[apex]-', '[soql]-']);
+  });
+
+  it('steps through the groups as the top level', async () => {
+    const store = new GridStore(source(tree()), { groupBy: byKind });
+    await store.expandLevel();
+    expect(shown(store.snapshot().rows)).toEqual(['[apex]+', 'a-@1', 'f@1', '[soql]+', 'd-@1']);
+    await store.expandLevel();
+    await store.collapseLevel();
+    expect(shown(store.snapshot().rows)).toEqual(['[apex]+', 'a-@1', 'f@1', '[soql]+', 'd-@1']);
+    await store.collapseLevel();
+    expect(shown(store.snapshot().rows)).toEqual(['[apex]-', '[soql]-']);
   });
 
   it('drops a group when the filters leave it empty', async () => {
@@ -105,6 +123,23 @@ describe('GridStore groups', () => {
     const rows = store.snapshot().rows;
     expect(await store.reveal(['a', 'c'])).toBe(3);
     expect(store.snapshot().rows).toBe(rows);
+  });
+
+  it('closes a group by hand after expand all, and starts a new grouping closed', async () => {
+    const store = new GridStore(source(tree()), { groupBy: byKind });
+    await store.expandAll();
+    await store.toggle(groupOf(store, 'apex'));
+    expect(shown(store.snapshot().rows)).toEqual(['[apex]-', '[soql]+', 'd+@1', 'e@2']);
+    expect(await store.reveal(['a', 'c'])).toBe(3);
+    await store.setGroupBy(byKind);
+    expect(shown(store.snapshot().rows)).toEqual(['[apex]-', '[soql]-']);
+  });
+
+  it('puts every row back closed on ungroup after expand all', async () => {
+    const store = new GridStore(source(tree()), { groupBy: byKind });
+    await store.expandAll();
+    await store.setGroupBy(null);
+    expect(shown(store.snapshot().rows)).toEqual(['a-@0', 'd-@0', 'f@0']);
   });
 
   it('ungroups', async () => {

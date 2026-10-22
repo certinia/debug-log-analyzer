@@ -6,7 +6,7 @@
  */
 import { html } from 'lit';
 
-import { sum, type TreeSource } from '../../core/index.js';
+import { sum, type GridExpansion, type TreeSource } from '../../core/index.js';
 import { GridView } from '../../render/index.js';
 import {
   fakeHighlights,
@@ -293,6 +293,23 @@ describe('lv-grid', () => {
     await key('ArrowRight');
     await key('ArrowLeft');
     expect(opened).toEqual(['b', 'b']);
+  });
+
+  it('reports when a level step leaves no row to open, or to close', async () => {
+    const { grid } = await setup();
+    expect(grid.expansion).toEqual({ canExpand: true, canCollapse: false });
+    const sent: GridExpansion[] = [];
+    grid.addEventListener('lv-grid-expansion-change', (e) => sent.push(detail<GridExpansion>(e)));
+    await grid.expandLevel();
+    await settle(grid);
+    await grid.collapseLevel();
+    await settle(grid);
+    await grid.collapseLevel();
+    await settle(grid);
+    expect(sent).toEqual([
+      { canExpand: false, canCollapse: true },
+      { canExpand: true, canCollapse: false },
+    ]);
   });
 
   it('selects a row with no children from its twisty', async () => {
