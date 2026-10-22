@@ -393,6 +393,26 @@ describe('GridView', () => {
     expect((500 + above) * ROW - scroller.scrollTop).toBe(40);
   });
 
+  it('scrolls a row below the fold to sit on the footer, not under it', async () => {
+    const { scroller, view } = await setup();
+    const foot = document.createElement('div');
+    Object.defineProperty(foot, 'offsetHeight', { get: () => ROW });
+    scroller.append(foot);
+    view.scrollToIndex(500, 'auto');
+    await flush();
+    expect(501 * ROW - scroller.scrollTop).toBe(VIEWPORT - ROW);
+  });
+
+  it('keeps the bottom of a row scrolled up from below in view when it is measured taller', async () => {
+    const resize = fakeResizeObserver();
+    const { scroller, view } = await setup();
+    view.scrollToIndex(500, 'auto');
+    await flush();
+    resize(view.elementAt(500) as Element, 2 * ROW);
+    await flush();
+    expect(502 * ROW - scroller.scrollTop).toBe(VIEWPORT);
+  });
+
   it('stays put once shown when a row asked for while hidden was cancelled', async () => {
     const resize = fakeResizeObserver();
     const { scroller, view } = await setup();
