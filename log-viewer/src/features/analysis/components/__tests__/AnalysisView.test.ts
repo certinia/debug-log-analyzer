@@ -159,10 +159,8 @@ describe('analysis-view', () => {
     expect(grid().filters.every((filter) => filter.test(debug))).toBe(false);
   });
 
-  it('gives the expand button, beside Group, the grid once it mounts', () => {
-    const button = view.shadowRoot
-      ?.querySelector('[slot="group"]')
-      ?.querySelector('tree-expand-button');
+  it('gives the expand button the grid once it mounts', () => {
+    const button = view.shadowRoot?.querySelector('tree-expand-button');
     expect(button?.grid).toBe(grid());
   });
 

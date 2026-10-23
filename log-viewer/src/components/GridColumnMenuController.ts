@@ -15,9 +15,8 @@ export interface GridColumnMenuOptions {
 }
 
 /**
- * Drives one grid's column menu: the `Columns` select, the same list again on
- * the header's right-click and on the toolbar button, and the view, column and
- * reset items all three raise.
+ * Drives one grid's column menu, opened from the header's right-click or the toolbar
+ * button, and the view, column and reset items it raises.
  *
  * The handlers are arrow fields so a template can bind them straight, where a
  * plain method would arrive with the host as `this`.
@@ -33,16 +32,6 @@ export class GridColumnMenuController {
   constructor(options: GridColumnMenuOptions) {
     this._options = options;
   }
-
-  /** `change` on the column-view select. */
-  chooseView = (event: Event): void => {
-    this._options.columns.choose((event.target as HTMLInputElement).value || 'General');
-  };
-
-  /** `vs-reset-option` on the column-view select. */
-  resetView = (event: CustomEvent<{ value: string }>): void => {
-    this._options.columns.reset(event.detail.value);
-  };
 
   /** `lv-grid-header-context` on an lv-grid: the header's right-click. */
   headerContext = (e: Event): void => {

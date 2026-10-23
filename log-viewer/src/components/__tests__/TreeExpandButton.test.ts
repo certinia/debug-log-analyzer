@@ -91,6 +91,20 @@ describe('TreeExpandButton', () => {
     expect(grid.calls).toEqual(['expand', 'expand', 'collapse', 'collapse']);
   });
 
+  it('opens and closes the whole tree, with no menu, when the tree is one level deep', async () => {
+    const grid = fakeGrid(true, false);
+    const el = await mount(grid);
+    el.wholeTree = true;
+    await el.updateComplete;
+    expect([more(el), el.shadowRoot?.querySelector('#menu')]).toEqual([null, null]);
+    expect(main(el).getAttribute('aria-label')).toBe('Expand All');
+    main(el).click();
+    await grid.send(false, true);
+    expect(main(el).getAttribute('aria-label')).toBe('Collapse All');
+    main(el).click();
+    expect(grid.calls).toEqual(['expand', 'collapse']);
+  });
+
   it('keeps each grid its own direction', async () => {
     const grid = fakeGrid(true, false);
     const el = await mount(grid);

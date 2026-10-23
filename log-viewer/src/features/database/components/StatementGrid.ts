@@ -1,13 +1,11 @@
 /*
  * Copyright (c) 2026 Certinia Inc. All rights reserved.
  */
-import '#vscode-elements/vscode-option.js';
 import '../../../components/ContextMenu.js';
 import '../../../components/datagrid-facet-filter.js';
 import '../../../components/datagrid-filter-bar.js';
 import '../../../components/datagrid-range-filter.js';
 import '../../../components/OverflowList.js';
-import '../../../components/VsSelect.js';
 import '../../../components/grid/AppGrid.js';
 import { css, html, LitElement, type PropertyValues, type TemplateResult } from 'lit';
 import { property, state } from 'lit/decorators.js';
@@ -25,7 +23,11 @@ import { bar } from '../../../components/grid/cells.js';
 import { inlineQueryColumn } from '../../../components/grid/columns.js';
 import { exportCsv } from '../../../components/grid/exportCsv.js';
 import { GridColumnMenuController } from '../../../components/GridColumnMenuController.js';
-import { columnViewSelect, gridToolbarActions } from '../../../components/gridToolbar.js';
+import {
+  columnViewSelect,
+  gridGroupControls,
+  gridToolbarActions,
+} from '../../../components/gridToolbar.js';
 import type { StatementType } from '../../../core/events/EventBus.js';
 import { formatNsAsMs, nsToMs } from '../../../core/utility/Duration.js';
 import {
@@ -116,6 +118,8 @@ export abstract class StatementGrid<R extends StatementRow, L> extends LitElemen
   private readonly _filterSlots = new Map<string, RowFilter<R>>();
   private _eventIndexes: ReadonlySet<number> = new Set();
   private _menuEventIndex: number | null = null;
+  // State, so the expand button follows the grid once it mounts.
+  @state()
   private _grid: AppGrid<R> | null = null;
   private readonly _columnTarget: ColumnTarget;
   private readonly _settings: ColumnSettingsController;
@@ -252,22 +256,18 @@ export abstract class StatementGrid<R extends StatementRow, L> extends LitElemen
           id: `${spec.type}-column-view`,
           views: spec.views,
           columns: this._settings,
-          menus: this._menus,
         })}
-
-        <vs-select
-          dense
-          slot="group"
-          id="${spec.type}-groupby-dropdown"
-          prefix="Group"
-          label="Group by"
-          @change="${this._groupChanged}"
-        >
-          ${spec.groups.map((group) => html`<vscode-option>${group.label}</vscode-option>`)}
-        </vs-select>
-
+        ${gridGroupControls({
+          grid: this._grid,
+          wholeTree: true,
+          group: {
+            id: `${spec.type}-groupby-dropdown`,
+            labels: spec.groups.map((group) => group.label),
+            onChange: (label) => this._groupChanged(label),
+          },
+        })}
         ${gridToolbarActions({
-          menus: this._menus,
+          openColumns: this._menus.open,
           exportToCSV: () => void this._exportCsv(),
           copyToClipboard: () => void this.grid?.copy(),
         })}
@@ -320,8 +320,7 @@ export abstract class StatementGrid<R extends StatementRow, L> extends LitElemen
     this._filters = [...this._filterSlots.values()];
   }
 
-  private _groupChanged(event: Event): void {
-    const label = (event.target as HTMLInputElement).value;
+  private _groupChanged(label: string): void {
     this._groupBy = this.spec.groups.find((group) => group.label === label)?.value ?? null;
   }
 

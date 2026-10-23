@@ -14,7 +14,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - ⚡ **Tables**: the Call Tree, Analysis, Database and Inspector tables respond up to 30× faster on large logs and use 93% less memory. ([#1169])
   - Sort, expand and filter take under 0.2 s, group by is up to 9× faster, column resize is smooth and Find never freezes the table.
   - Screen reader and full keyboard support.
-  - `Cmd/Ctrl+C` copies the filtered rows and their depth in each table, and the Analysis CSV export holds the same rows.
+  - `Cmd/Ctrl+C` copies the filtered rows and their depth in each table, and the Call Tree, Analysis and Database toolbars copy them or export them to CSV.
 - ⚡ **Parser performance**: logs parse 28% faster and use 27% less memory, down from 1.0 s to 0.78 s and 1.1 GB to 0.8 GB on a 100 MB log.
 - 🔍 **Find**: a more consistent and natural find experience. ([#986])
   - Search matches highlight as you type.
@@ -34,8 +34,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - The search row downloads the newest 5 logs from the org, then 50 more per press.
   - **Log: Clear Apex Log Cache** frees the space. Logs downloaded but not opened are kept in workspace storage and cleaned up on their own.
 - 🎚️ **Log levels**: filter the log to a lower debug level per category from the header. ([#530])
-- 🪜 **Expand and collapse**: the Call Tree and Analysis tables open or close one level per click, like VS Code trees. ([#1204])
-  - The menu next to the button has Expand All and Collapse All, which include the groups.
+- 🪜 **Expand and collapse**: the Call Tree and Analysis tables open or close one level per click, like VS Code trees, and the Database tables open or close all groups. ([#1204])
+  - The Call Tree and Analysis menu next to the button has Expand All and Collapse All, which include the groups.
 - 💡 **Log level hints**: a section that a debug level leaves empty names the level it needs. ([#259])
 - 🔦 **Timeline legend**: hover a category to highlight frames in the timeline, select to keep. ([#917])
 - 🔍 **Find**: in the tables, find matches the group header text too.

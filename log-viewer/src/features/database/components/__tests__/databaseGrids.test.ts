@@ -269,6 +269,44 @@ describe.each(GRIDS)('%s', (_name, spec) => {
       expect(select?.parentElement).toBe(bar());
     });
 
+    it('resets an edited view from its select', async () => {
+      const shown = () =>
+        grid()
+          .columns.filter((column) => !column.hidden)
+          .map((column) => column.id);
+      const before = shown();
+      const hide = before.find((id) => id !== spec.type);
+      await fire(
+        'context-menu',
+        new CustomEvent('menu-select', { detail: { itemId: `col:${hide}` } }),
+      );
+      await grid().updateComplete;
+      expect(shown()).not.toContain(hide);
+
+      const select = view.renderRoot.querySelector(`#${spec.type}-column-view`) as HTMLElement & {
+        resettableValues: string[];
+      };
+      const [edited] = select.resettableValues;
+      expect(edited).toBe(spec.views[0]?.id);
+      await fire(
+        `#${spec.type}-column-view`,
+        new CustomEvent('vs-reset-option', { detail: { value: edited } }),
+      );
+      await grid().updateComplete;
+
+      expect(shown()).toEqual(before);
+    });
+
+    it('slots the group picker, then a whole-tree expand button with its grid, into the bar', () => {
+      const select = view.renderRoot.querySelector(`#${spec.type}-groupby-dropdown`);
+      const button = view.renderRoot.querySelector('tree-expand-button');
+
+      expect([select?.getAttribute('slot'), button?.slot]).toEqual(['group', 'group']);
+      expect(button?.parentElement).toBe(bar());
+      expect(button?.grid).toBe(grid());
+      expect(button?.wholeTree).toBe(true);
+    });
+
     it('slots the action buttons into the bar', () => {
       const actions = view.renderRoot.querySelector('div[slot="actions"]');
 
