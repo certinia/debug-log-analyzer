@@ -52,7 +52,7 @@ describe('GridStore', () => {
   it('starts a new source with every row closed, under the same sort and calcs', async () => {
     const store = new GridStore(source(tree()), { calcs: { value: sum((r) => r.value) } });
     await store.setSort({ value: (r) => r.value, dir: 'asc' });
-    await store.toggle('a');
+    await store.expandAll();
     await store.setSource(source([...tree(), n('z', 7)]));
     expect(shown(store.snapshot().rows)).toEqual(['d-@0', 'a-@0', 'z@0']);
     expect(store.snapshot().totals).toEqual({ value: 11 });
@@ -68,6 +68,75 @@ describe('GridStore', () => {
     await store.expandAll();
     expect(shown(store.snapshot().rows)).toEqual(['a+@0', 'b+@1', 'c@2', 'x@1', 'd+@0', 'e@1']);
     await store.collapseAll();
+    expect(shown(store.snapshot().rows)).toEqual(['a-@0', 'd-@0']);
+  });
+
+  it('opens one level at a time, then does nothing once every row is open', async () => {
+    const store = new GridStore(source(tree()));
+    await store.expandLevel();
+    expect(shown(store.snapshot().rows)).toEqual(['a+@0', 'b-@1', 'x@1', 'd+@0', 'e@1']);
+    await store.expandLevel();
+    const open = ['a+@0', 'b+@1', 'c@2', 'x@1', 'd+@0', 'e@1'];
+    expect(shown(store.snapshot().rows)).toEqual(open);
+    await store.expandLevel();
+    expect(shown(store.snapshot().rows)).toEqual(open);
+  });
+
+  it('opens the shallowest closed level and leaves a row opened by hand open', async () => {
+    const store = new GridStore(source(tree()));
+    await store.settled();
+    await store.toggle('a');
+    await store.toggle('b');
+    await store.expandLevel();
+    expect(shown(store.snapshot().rows)).toEqual(['a+@0', 'b+@1', 'c@2', 'x@1', 'd+@0', 'e@1']);
+  });
+
+  it('keeps a row the policy opened when a step moves past it', async () => {
+    const store = new GridStore(source(tree()), {
+      expanded: (row) => row.key === 'a' || row.key === 'b',
+    });
+    await store.expandLevel();
+    expect(shown(store.snapshot().rows)).toEqual(['a+@0', 'b+@1', 'c@2', 'x@1', 'd+@0', 'e@1']);
+  });
+
+  it('opens a row a filter hid only to the level the steps reached', async () => {
+    const store = new GridStore(source(tree()));
+    await store.setFilters([{ test: (r) => r.key !== 'c' }]);
+    await store.expandLevel();
+    await store.expandLevel();
+    await store.setFilters([]);
+    expect(shown(store.snapshot().rows)).toEqual(['a+@0', 'b-@1', 'x@1', 'd+@0', 'e@1']);
+  });
+
+  it('keeps a row the policy closed when a collapse step moves past it', async () => {
+    const store = new GridStore(source(tree()), {
+      expanded: (row) => row.key === 'a' || row.key === 'b',
+    });
+    await store.collapseLevel();
+    expect(shown(store.snapshot().rows)).toEqual(['a+@0', 'b-@1', 'x@1', 'd-@0']);
+  });
+
+  it('reopens a row closed by hand without closing the level below it', async () => {
+    const store = new GridStore(source(tree()));
+    await store.expandLevel();
+    await store.expandLevel();
+    await store.toggle('a');
+    await store.expandLevel();
+    expect(shown(store.snapshot().rows)).toEqual(['a+@0', 'b+@1', 'c@2', 'x@1', 'd+@0', 'e@1']);
+  });
+
+  it('opens one level per call when the calls queue behind a build', async () => {
+    const store = new GridStore(source(tree()));
+    await Promise.all([store.expandLevel(), store.expandLevel()]);
+    expect(shown(store.snapshot().rows)).toEqual(['a+@0', 'b+@1', 'c@2', 'x@1', 'd+@0', 'e@1']);
+  });
+
+  it('closes the deepest open level first', async () => {
+    const store = new GridStore(source(tree()));
+    await store.expandAll();
+    await store.collapseLevel();
+    expect(shown(store.snapshot().rows)).toEqual(['a+@0', 'b-@1', 'x@1', 'd+@0', 'e@1']);
+    await store.collapseLevel();
     expect(shown(store.snapshot().rows)).toEqual(['a-@0', 'd-@0']);
   });
 

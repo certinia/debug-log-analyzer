@@ -159,6 +159,13 @@ describe('analysis-view', () => {
     expect(grid().filters.every((filter) => filter.test(debug))).toBe(false);
   });
 
+  it('gives the expand button, beside Group, the grid once it mounts', () => {
+    const button = view.shadowRoot
+      ?.querySelector('[slot="group"]')
+      ?.querySelector('tree-expand-button');
+    expect(button?.grid).toBe(grid());
+  });
+
   it('names the grid for a screen reader', () => {
     expect(grid().label).toBe('Analysis');
   });

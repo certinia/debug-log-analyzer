@@ -1,7 +1,6 @@
 /*
  * Copyright (c) 2022 Certinia Inc. All rights reserved.
  */
-import '#vscode-elements/vscode-button.js';
 import '#vscode-elements/vscode-option.js';
 import '../../../components/VsSelect.js';
 import '#vscode-elements/vscode-toolbar-button.js';
@@ -54,6 +53,7 @@ import { globalStyles } from '../../../styles/global.styles.js';
 // Components
 import '../../../components/datagrid-filter-bar.js';
 import '../../../components/GridSkeleton.js';
+import '../../../components/TreeExpandButton.js';
 
 @customElement('analysis-view')
 export class AnalysisView extends LitElement {
@@ -88,15 +88,6 @@ export class AnalysisView extends LitElement {
         gap: var(--lana-space-2xs);
         align-items: flex-end;
       }
-
-      .filter-container vscode-button {
-        height: var(--filter-control-height);
-      }
-
-      .filter-container vscode-button::part(base) {
-        padding: var(--filter-control-padding);
-        font-size: var(--filter-control-font-size);
-      }
     `,
   ];
 
@@ -122,6 +113,8 @@ export class AnalysisView extends LitElement {
   @state()
   private _showDetails = false;
 
+  // State, so the expand button follows the grid once it mounts.
+  @state()
   grid: CallTreeGrid<BottomUpRow> | null = null;
   private _tree: MergedTree<BottomUpRow> | null = null;
   private _built: Promise<void> | null = null;
@@ -234,23 +227,6 @@ export class AnalysisView extends LitElement {
     return html`
       <div class="analysis-view">
         <datagrid-filter-bar>
-          <div slot="table-actions" class="filter-container">
-            <vscode-button
-              secondary
-              aria-label="Expand all"
-              title="Expand all"
-              @click=${() => void this._expandAll(true)}
-              >Expand</vscode-button
-            >
-            <vscode-button
-              secondary
-              aria-label="Collapse all"
-              title="Collapse all"
-              @click=${() => void this._expandAll(false)}
-              >Collapse</vscode-button
-            >
-          </div>
-
           ${columnViewSelect({
             id: 'column-view',
             views: CALL_TREE_VIEWS,
@@ -269,17 +245,19 @@ export class AnalysisView extends LitElement {
             </button>
           </div>
 
-          <vs-select
-            dense
-            slot="group"
-            id="groupby-dropdown"
-            prefix="Group"
-            label="Group by"
-            @change="${(e: Event) =>
-              (this._groupBy = bottomUpGroupBy((e.target as HTMLInputElement).value))}"
-          >
-            ${BOTTOM_UP_GROUPS.map(({ label }) => html`<vscode-option>${label}</vscode-option>`)}
-          </vs-select>
+          <div slot="group" class="filter-container">
+            <vs-select
+              dense
+              id="groupby-dropdown"
+              prefix="Group"
+              label="Group by"
+              @change="${(e: Event) =>
+                (this._groupBy = bottomUpGroupBy((e.target as HTMLInputElement).value))}"
+            >
+              ${BOTTOM_UP_GROUPS.map(({ label }) => html`<vscode-option>${label}</vscode-option>`)}
+            </vs-select>
+            <tree-expand-button .grid=${this.grid}></tree-expand-button>
+          </div>
 
           ${gridToolbarActions({
             menus: this._menus,
@@ -342,12 +320,6 @@ export class AnalysisView extends LitElement {
     this._columns = bottomUpColumns(root, { openType });
     this._settings.applyTo(this._columnTarget);
     this._source = tree.source;
-  }
-
-  private async _expandAll(open: boolean): Promise<void> {
-    await (open ? this.grid?.expandAll() : this.grid?.collapseAll());
-    // The keys and copy act on the grid, not on the button that was clicked.
-    this.grid?.focus({ preventScroll: true });
   }
 
   // A row ranks a method by self time and opens to its callers, so the inspector reads it as callers.

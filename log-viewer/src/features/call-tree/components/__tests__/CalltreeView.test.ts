@@ -287,14 +287,17 @@ describe('calltree-view table lifetime', () => {
     expect(view.bottomUpGrid?.label).toBe('Call tree, Bottom-Up');
   });
 
-  it.each(['_expandButtonClick', '_collapseButtonClick'] as const)(
-    'gives keyboard focus back to the grid after %s',
-    async (click) => {
-      await view[click]();
+  it('gives the expand button, beside Group, the grid on show', async () => {
+    const button = view.shadowRoot
+      ?.querySelector('[slot="group"]')
+      ?.querySelector('tree-expand-button');
+    expect(button?.grid).toBe(view.timeOrderGrid);
 
-      expect((view.renderRoot as ShadowRoot).activeElement).toBe(view.timeOrderGrid);
-    },
-  );
+    await view._setViewMode('bottom-up');
+    await settle();
+
+    expect(button?.grid).toBe(view.bottomUpGrid);
+  });
 
   it('builds aggregated as a grid, under the filters in force', async () => {
     view.namespaceSelected = ['ns'];

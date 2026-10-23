@@ -28,6 +28,10 @@ Analyze Salesforce debug logs with detailed metrics on method calls, including S
 By default the Analysis table is sorted with the events that took the longest by Self Time at the top.\
 Each column can be sorted by clicking the column header, this will sort the rows ascending or descending.
 
+### Expand and Collapse
+
+The expand button in the toolbar opens or closes one level per click, and its menu has **Expand All** and **Collapse All**. With a group on, the groups are the top level. See [Call Tree](./calltree.mdx#expand-and-collapse).
+
 ### Filtering
 
 1. **Details** - events with 0 time are hidden by default; toggle to show them from the **filters** .

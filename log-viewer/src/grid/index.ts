@@ -13,6 +13,7 @@ export {
   type Calc,
   type FindDirection,
   type FindQuery,
+  type GridExpansion,
   type GroupBy,
   type RowFilter,
   type RowKey,

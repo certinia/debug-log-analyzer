@@ -102,6 +102,25 @@ describe('DomListenerController', () => {
     expect(seen).toEqual([]);
   });
 
+  it('moves its listeners to a new target, and listens on it only while connected', () => {
+    const host = fakeHost();
+    const other = new EventTarget();
+    const seen: Event[] = [];
+    const bus = new DomListenerController<FindEventMap>(host, document, {
+      'lv-find': (e) => void seen.push(e),
+    });
+    host.connect();
+    bus.target = other;
+    find('lv-find');
+    other.dispatchEvent(new CustomEvent('lv-find'));
+    host.disconnect();
+    other.dispatchEvent(new CustomEvent('lv-find'));
+    bus.target = null;
+    host.connect();
+
+    expect(seen.map((e) => e.target)).toEqual([other]);
+  });
+
   it('hears again after the element is detached and re-attached', async () => {
     const el = new FindBusTestHost();
     document.body.append(el);

@@ -114,7 +114,7 @@ export class ContextMenu extends LitElement {
       }
 
       .menu-item.disabled {
-        color: var(--vscode-disabledForeground, #6e6e6e);
+        color: var(--lana-fg-disabled);
         cursor: default;
       }
 
@@ -321,6 +321,7 @@ export class ContextMenu extends LitElement {
       <div
         class="menu-item ${item.disabled ? 'disabled' : ''}"
         role="menuitem"
+        aria-disabled="${item.disabled ? 'true' : 'false'}"
         data-id="${item.id}"
         @click="${() => this.handleItemClick(item)}"
       >
