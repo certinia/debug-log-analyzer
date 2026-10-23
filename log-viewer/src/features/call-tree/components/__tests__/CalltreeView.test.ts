@@ -440,12 +440,17 @@ describe('calltree-view merged filters', () => {
   });
 
   it.each(['aggregated', 'bottom-up'] as const)(
-    'filters %s rows on their own total time and namespace',
+    'filters %s rows on their own total time, self time and namespace',
     async (mode) => {
+      const range = (start: number | null) =>
+        new CustomEvent('range', { detail: { range: { start, end: null } } });
       await view._setViewMode(mode);
-      view._handleTotalTimeRange(
-        new CustomEvent('range', { detail: { range: { start: 1, end: null } } }),
-      );
+      view._handleTotalTimeRange(range(1));
+      expect(passing(view, mode)).toContain('ns.Outer.run()');
+      expect(passing(view, mode)).not.toContain('SELECT Id FROM Account');
+
+      view._handleTotalTimeRange(range(null));
+      view._handleSelfTimeRange(range(1));
       expect(passing(view, mode)).toContain('ns.Outer.run()');
       expect(passing(view, mode)).not.toContain('SELECT Id FROM Account');
 

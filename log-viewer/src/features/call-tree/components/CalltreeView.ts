@@ -49,7 +49,14 @@ import {
 import { inspectorRowEvents } from '../grid/inspectorRowEvents.js';
 import { MergedTree } from '../grid/mergedRows.js';
 
-import { inMsRange, type FilterRange } from '../../../components/grid/MinMax.js';
+import type { FilterRange } from '../../../components/grid/MinMax.js';
+import {
+  BOTTOM_UP_MEASURES,
+  deep,
+  measureFilters,
+  RowFilterCache,
+  type MeasureFields,
+} from '../grid/rowFilters.js';
 
 // styles
 import { globalStyles } from '../../../styles/global.styles.js';
@@ -128,18 +135,10 @@ const DEBUG_ONLY: RowFilter<LogEvent> = {
   keepAncestors: true,
 };
 
-const deep = <R>(test: (row: R) => boolean): RowFilter<R> => ({ test, keepAncestors: true });
-
-const hasRange = (range: FilterRange): boolean => range.start !== null || range.end !== null;
-const rangeKey = (range: FilterRange): string => `${range.start}:${range.end}`;
-
 type ViewGrid = LvGrid<LogEvent> | LvGrid<AggregatedRow> | LvGrid<BottomUpRow>;
 
 /** What the filters read from a view's rows. Bottom-Up has no type or debug filter. */
-interface FilterFields<R> {
-  namespace: (row: R) => string | null | undefined;
-  total: (row: R) => number;
-  self: (row: R) => number;
+interface FilterFields<R> extends MeasureFields<R> {
   type?: { of: (row: R) => string | null | undefined; debugOnly: RowFilter<R> };
   details: RowFilter<R>;
 }
@@ -188,7 +187,7 @@ export class CalltreeView extends LitElement {
   typeFilter = 'All';
   namespaceSelected: string[] = [];
   totalTimeRange: FilterRange = { start: null, end: null };
-  private readonly _filterSlots = new Map<string, { input: string; filter: RowFilter<unknown> }>();
+  private readonly _filterCache = new RowFilterCache();
   selfTimeRange: FilterRange = { start: null, end: null };
 
   tableContainer: HTMLDivElement | null = null;
@@ -699,17 +698,6 @@ export class CalltreeView extends LitElement {
     }
   }
 
-  // The grid keeps its work per filter object, so an unchanged filter must keep its object.
-  private _filter<R>(slot: string, input: string, make: () => RowFilter<R>): RowFilter<R> {
-    const held = this._filterSlots.get(slot);
-    if (held?.input === input) {
-      return held.filter as RowFilter<R>;
-    }
-    const filter = make();
-    this._filterSlots.set(slot, { input, filter: filter as RowFilter<unknown> });
-    return filter;
-  }
-
   /** The filters of {@link _updateFiltering} for the Aggregated grid: Time Order's, on its rows. */
   private _aggregatedFilters(): RowFilter<AggregatedRow>[] {
     return this._viewFilters<AggregatedRow>('aggregated', {
@@ -735,39 +723,18 @@ export class CalltreeView extends LitElement {
   /** The filters of {@link _updateFiltering} for the Bottom-Up grid: no type or debug filter. */
   private _bottomUpFilters(): RowFilter<BottomUpRow>[] {
     return this._viewFilters<BottomUpRow>('bottom-up', {
-      namespace: (row) => row.namespace,
-      total: (row) => row.totalTime,
-      self: (row) => row.totalSelfTime,
+      ...BOTTOM_UP_MEASURES,
       details: BOTTOM_UP_DETAILS,
     });
   }
 
   private _viewFilters<R>(view: ViewMode, fields: FilterFields<R>): RowFilter<R>[] {
-    const namespaces = this.namespaceSelected;
-    const filters: RowFilter<R>[] = [];
-    if (namespaces.length) {
-      filters.push(
-        this._filter(`${view}:namespace`, namespaces.join('\n'), () =>
-          deep((row) => namespaces.includes(fields.namespace(row) || '')),
-        ),
-      );
-    }
-    if (hasRange(this.totalTimeRange)) {
-      const range = this.totalTimeRange;
-      filters.push(
-        this._filter(`${view}:total`, rangeKey(range), () =>
-          deep((row) => inMsRange(range, fields.total(row))),
-        ),
-      );
-    }
-    if (hasRange(this.selfTimeRange)) {
-      const range = this.selfTimeRange;
-      filters.push(
-        this._filter(`${view}:self`, rangeKey(range), () =>
-          deep((row) => inMsRange(range, fields.self(row))),
-        ),
-      );
-    }
+    const filters = measureFilters(
+      { namespaces: this.namespaceSelected, total: this.totalTimeRange, self: this.selfTimeRange },
+      fields,
+      this._filterCache,
+      view,
+    );
     const { type } = fields;
     if (type && this.filterState.debugOnly) {
       filters.push(type.debugOnly);
@@ -776,7 +743,7 @@ export class CalltreeView extends LitElement {
     const types = this.filterState.selectedTypes;
     if (type && types.size > 0 && !types.has('All')) {
       filters.push(
-        this._filter(`${view}:type`, [...types].join('\n'), () =>
+        this._filterCache.reuse(`${view}:type`, [...types].join('\n'), () =>
           deep((row) => {
             const of = type.of(row);
             return !!of && types.has(of);
