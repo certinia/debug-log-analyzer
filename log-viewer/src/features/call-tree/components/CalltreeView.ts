@@ -2,7 +2,6 @@
  * Copyright (c) 2022 Certinia Inc. All rights reserved.
  */
 import '#vscode-elements/vscode-option.js';
-import '#vscode-elements/vscode-toolbar-button.js';
 import '../../../components/VsSelect.js';
 import { consume } from '@lit/context';
 import { initialState, Task } from '@lit/task';
@@ -70,7 +69,6 @@ import '../../../components/datagrid-facet-filter.js';
 import '../../../components/datagrid-filter-bar.js';
 import '../../../components/datagrid-range-filter.js';
 import '../../../components/OverflowList.js';
-import '../../../components/TreeExpandButton.js';
 
 import {
   ColumnSettingsController,
@@ -78,6 +76,12 @@ import {
   type ColumnTarget,
 } from '../../../components/ColumnSettingsController.js';
 import { CALL_TREE_VIEWS } from '../../../components/grid/ColumnViews.js';
+import { exportCsv } from '../../../components/grid/exportCsv.js';
+import {
+  columnViewSelect,
+  gridGroupControls,
+  gridToolbarActions,
+} from '../../../components/gridToolbar.js';
 import { LocatedRowIds, type RowData } from '../../../components/locatedRow.js';
 import { InspectorTabController } from '../../../components/InspectorTabController.js';
 import { FindController } from '../../find/FindController.js';
@@ -330,12 +334,6 @@ export class CalltreeView extends LitElement {
         position: relative;
       }
 
-      .filter-container {
-        display: flex;
-        gap: 4px;
-        align-items: flex-end;
-      }
-
       #call-tree-table,
       #aggregated-tree-table,
       #bottom-up-tree-table {
@@ -376,29 +374,7 @@ export class CalltreeView extends LitElement {
                 this._setViewMode(e.detail.value as ViewMode)}
             ></view-mode-switch>
 
-            <div slot="table-actions" class="filter-container">
-              <vs-select
-                dense
-                id="column-view"
-                prefix="Columns"
-                label="Column view"
-                @change="${this._handleColumnViewChange}"
-                @vs-reset-option="${this._onResetOption}"
-                .value="${this._columns.view}"
-                .resettableValues="${this._columns.editedViews}"
-              >
-                ${repeat(
-                  CALL_TREE_VIEWS,
-                  (view) => view.id,
-                  (view) =>
-                    html`<vscode-option
-                      value="${view.id}"
-                      ?selected="${this._columns.view === view.id}"
-                      >${view.id}</vscode-option
-                    >`,
-                )}
-              </vs-select>
-            </div>
+            ${columnViewSelect({ id: 'column-view', views: CALL_TREE_VIEWS, columns: this._columns })}
 
             <overflow-list slot="filters" menu-heading="Filters" icon="filter">
               <datagrid-facet-filter
@@ -473,36 +449,23 @@ export class CalltreeView extends LitElement {
               }
             </overflow-list>
 
-            <div slot="group" class="filter-container">
-              ${
+            ${gridGroupControls({
+              grid: this._activeGrid(),
+              group:
                 this.viewMode === 'bottom-up'
-                  ? html`
-                      <vs-select
-                        dense
-                        id="bottomup-groupby"
-                        prefix="Group"
-                        label="Group by"
-                        @change="${this._handleBottomUpGroupBy}"
-                        .value="${this.bottomUpGroupBy}"
-                      >
-                        ${BOTTOM_UP_GROUPS.map(
-                          ({ label }) => html`<vscode-option>${label}</vscode-option>`,
-                        )}
-                      </vs-select>
-                    `
-                  : ''
-              }
-              <tree-expand-button .grid=${this._activeGrid()}></tree-expand-button>
-            </div>
-
-            <div slot="actions">
-              <vscode-toolbar-button
-                icon="list-selection"
-                label="Columns"
-                title="Columns"
-                @click="${this._openColumnMenu}"
-              ></vscode-toolbar-button>
-            </div>
+                  ? {
+                      id: 'bottomup-groupby',
+                      labels: BOTTOM_UP_GROUPS.map(({ label }) => label),
+                      value: this.bottomUpGroupBy,
+                      onChange: (label: string) => this._handleBottomUpGroupBy(label),
+                    }
+                  : undefined,
+            })}
+            ${gridToolbarActions({
+              openColumns: (event: Event) => this._openColumnMenu(event),
+              exportToCSV: () => void this._exportCsv(),
+              copyToClipboard: () => void this._activeGrid()?.copy(),
+            })}
           </datagrid-filter-bar>
         </div>
 
@@ -607,16 +570,11 @@ export class CalltreeView extends LitElement {
     this._bottomUpBuild = null;
   }
 
-  _handleBottomUpGroupBy(event: Event) {
-    const target = event.target as HTMLInputElement;
-    this.bottomUpGroupBy = target.value;
+  _handleBottomUpGroupBy(label: string) {
+    this.bottomUpGroupBy = label;
     if (this.bottomUpGrid) {
-      this.bottomUpGrid.groupBy = bottomUpGroupBy(target.value);
+      this.bottomUpGrid.groupBy = bottomUpGroupBy(label);
     }
-  }
-
-  private _handleColumnViewChange(event: Event) {
-    this._columns.choose((event.target as HTMLInputElement).value || 'General');
   }
 
   private get _grids(): ViewGrid[] {
@@ -648,6 +606,13 @@ export class CalltreeView extends LitElement {
         return this.aggregatedGrid;
       case 'bottom-up':
         return this.bottomUpGrid;
+    }
+  }
+
+  private async _exportCsv(): Promise<void> {
+    const grid = this._activeGrid();
+    if (grid) {
+      await exportCsv(grid, `call-tree-${this.viewMode}.csv`);
     }
   }
 
@@ -691,10 +656,6 @@ export class CalltreeView extends LitElement {
   private _onColumnMenuClose() {
     this.contextMenuTarget = null;
     this.contextMenuRow = null;
-  }
-
-  private _onResetOption(event: CustomEvent<{ value: string }>) {
-    this._columns.reset(event.detail.value);
   }
 
   _handleTypeFilter(event: Event) {

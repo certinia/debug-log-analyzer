@@ -21,6 +21,7 @@ import type { AppGrid } from '../../../../components/grid/AppGrid.js';
 import { parse } from '@apexdevtools/apex-log-parser';
 import { describeLevelGap } from '../../../../core/log/levelCapabilities.js';
 import { setCurrentLog } from '../../../../core/log/LogStore.js';
+import { ColumnSettingsController } from '../../../../components/ColumnSettingsController.js';
 import { ContextMenu } from '../../../../components/ContextMenu.js';
 import { exportCsv } from '../../../../components/grid/exportCsv.js';
 import { Group } from '../../../../grid/index.js';
@@ -267,6 +268,25 @@ describe.each(GRIDS)('%s', (_name, spec) => {
 
       expect(select?.getAttribute('slot')).toBe('table-actions');
       expect(select?.parentElement).toBe(bar());
+    });
+
+    it('resets the view its select offers to reset', () => {
+      const reset = jest.spyOn(ColumnSettingsController.prototype, 'reset');
+      const select = view.renderRoot.querySelector(`#${spec.type}-column-view`);
+      select?.dispatchEvent(new CustomEvent('vs-reset-option', { detail: { value: 'General' } }));
+
+      expect(reset).toHaveBeenCalledWith('General');
+      reset.mockRestore();
+    });
+
+    it('slots the group picker, then a whole-tree expand button with its grid, into the bar', () => {
+      const select = view.renderRoot.querySelector(`#${spec.type}-groupby-dropdown`);
+      const button = view.renderRoot.querySelector('tree-expand-button');
+
+      expect([select?.getAttribute('slot'), button?.slot]).toEqual(['group', 'group']);
+      expect(button?.parentElement).toBe(bar());
+      expect(button?.grid).toBe(grid());
+      expect(button?.wholeTree).toBe(true);
     });
 
     it('slots the action buttons into the bar', () => {

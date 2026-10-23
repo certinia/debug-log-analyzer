@@ -42,9 +42,11 @@ jest.mock('../../../settings/Settings.js', () => ({
     return () => {};
   },
 }));
+jest.mock('../../../../components/grid/exportCsv.js', () => ({ exportCsv: jest.fn() }));
 
 import { storeOf } from '#test-helpers/apexLog.js';
 import { AlwaysVisible, NeverVisible, settle } from '#test-helpers/visibility.js';
+import { exportCsv } from '../../../../components/grid/exportCsv.js';
 import { eventBus } from '../../../../core/events/EventBus.js';
 import { LogStore, logStoreFor } from '../../../../core/log/LogStore.js';
 import { CalltreeView } from '../CalltreeView.js';
@@ -252,9 +254,36 @@ describe('calltree-view table lifetime', () => {
     expect(buildSignals.map((signal) => signal?.aborted)).toEqual([true, false]);
   });
 
+  it('offers Group only in bottom up', async () => {
+    const picker = () => view.renderRoot.querySelector('#bottomup-groupby');
+    expect(picker()).toBeNull();
+
+    await view._setViewMode('bottom-up');
+    await settle();
+
+    expect(picker()?.getAttribute('slot')).toBe('group');
+  });
+
+  it('keeps the column view picked from its select', async () => {
+    const picker = () =>
+      view.renderRoot.querySelector('#column-view') as HTMLElement & { value: string };
+    picker().value = 'Governor Limits';
+    picker().dispatchEvent(new Event('change'));
+    await view.updateComplete;
+
+    expect(picker().querySelector('vscode-option[selected]')?.getAttribute('value')).toBe(
+      'Governor Limits',
+    );
+  });
+
   it('rebuilds bottom up grouped the way it was left', async () => {
     await view._setViewMode('bottom-up');
-    view._handleBottomUpGroupBy({ target: { value: 'Namespace' } } as unknown as Event);
+    await settle();
+    const picker = view.renderRoot.querySelector('#bottomup-groupby') as HTMLElement & {
+      value: string;
+    };
+    picker.value = 'Namespace';
+    picker.dispatchEvent(new Event('change'));
     await settle();
     const namespaceOf = (grid: CalltreeView['bottomUpGrid']) =>
       grid?.groupBy?.({ namespace: 'ns' } as BottomUpRow);
@@ -287,16 +316,34 @@ describe('calltree-view table lifetime', () => {
     expect(view.bottomUpGrid?.label).toBe('Call tree, Bottom-Up');
   });
 
-  it('gives the expand button, beside Group, the grid on show', async () => {
-    const button = view.shadowRoot
-      ?.querySelector('[slot="group"]')
-      ?.querySelector('tree-expand-button');
+  it('gives the expand button the grid on show', async () => {
+    const button = view.shadowRoot?.querySelector('tree-expand-button');
     expect(button?.grid).toBe(view.timeOrderGrid);
 
     await view._setViewMode('bottom-up');
     await settle();
 
     expect(button?.grid).toBe(view.bottomUpGrid);
+  });
+
+  it('exports and copies the grid on show, naming the file for the view', async () => {
+    const click = (label: string) =>
+      view.renderRoot
+        .querySelector<HTMLElement>(`vscode-toolbar-button[label="${label}"]`)
+        ?.click();
+
+    await view._setViewMode('bottom-up');
+    await settle();
+    const grid = view.bottomUpGrid;
+    if (!grid) {
+      throw new Error('no bottom-up grid');
+    }
+    const copy = jest.spyOn(grid, 'copy').mockResolvedValue(undefined);
+    click('Export to CSV');
+    click('Copy to clipboard');
+
+    expect(exportCsv).toHaveBeenCalledWith(grid, 'call-tree-bottom-up.csv');
+    expect(copy).toHaveBeenCalled();
   });
 
   it('builds aggregated as a grid, under the filters in force', async () => {

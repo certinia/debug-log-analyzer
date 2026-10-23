@@ -5,11 +5,12 @@ import { html, type TemplateResult } from 'lit';
 
 import type { ColumnView } from './grid/ColumnViews.js';
 import type { ColumnSettingsController } from './ColumnSettingsController.js';
-import type { GridColumnMenuController } from './GridColumnMenuController.js';
+import type { ExpandableGrid } from './TreeExpandButton.js';
 
 // web components
 import '#vscode-elements/vscode-option.js';
 import '#vscode-elements/vscode-toolbar-button.js';
+import './TreeExpandButton.js';
 import './VsSelect.js';
 
 /**
@@ -21,9 +22,8 @@ export function columnViewSelect(opts: {
   id: string;
   views: ColumnView[];
   columns: ColumnSettingsController;
-  menus: GridColumnMenuController;
 }): TemplateResult {
-  const { columns, menus } = opts;
+  const { columns } = opts;
   return html`
     <vs-select
       dense
@@ -31,8 +31,10 @@ export function columnViewSelect(opts: {
       id="${opts.id}"
       prefix="Columns"
       label="Column view"
-      @change="${menus.chooseView}"
-      @vs-reset-option="${menus.resetView}"
+      @change="${(event: Event) =>
+        columns.choose((event.target as HTMLInputElement).value || 'General')}"
+      @vs-reset-option="${(event: CustomEvent<{ value: string }>) =>
+        columns.reset(event.detail.value)}"
       .value="${columns.view}"
       .resettableValues="${columns.editedViews}"
     >
@@ -46,9 +48,51 @@ export function columnViewSelect(opts: {
   `;
 }
 
+/**
+ * A tree grid's group controls: the `Group` picker when the grid groups, then the
+ * expand button. The button comes last, so it keeps its place when the picker hides.
+ */
+export function gridGroupControls(opts: {
+  grid: ExpandableGrid | null;
+  /** The tree is one level deep, so the button opens or closes it whole, with no menu. */
+  wholeTree?: boolean;
+  group?: {
+    /** Per grid, since several share one document. */
+    id: string;
+    labels: readonly string[];
+    /** The label on show; the first one when absent. */
+    value?: string;
+    onChange: (label: string) => void;
+  };
+}): TemplateResult {
+  const { group } = opts;
+  return html`
+    ${
+      group
+        ? html`<vs-select
+            dense
+            slot="group"
+            id="${group.id}"
+            prefix="Group"
+            label="Group by"
+            .value="${group.value ?? group.labels[0]}"
+            @change="${(event: Event) => group.onChange((event.target as HTMLInputElement).value)}"
+          >
+            ${group.labels.map((label) => html`<vscode-option>${label}</vscode-option>`)}
+          </vs-select>`
+        : ''
+    }
+    <tree-expand-button
+      slot="group"
+      .grid=${opts.grid}
+      ?whole-tree=${opts.wholeTree}
+    ></tree-expand-button>
+  `;
+}
+
 /** A grid's toolbar: open the column menu, export the rows, copy the rows. */
 export function gridToolbarActions(opts: {
-  menus: GridColumnMenuController;
+  openColumns: (event: Event) => void;
   exportToCSV: () => void;
   copyToClipboard: () => void;
 }): TemplateResult {
@@ -58,7 +102,7 @@ export function gridToolbarActions(opts: {
         icon="list-selection"
         label="Columns"
         title="Columns"
-        @click=${opts.menus.open}
+        @click=${opts.openColumns}
       ></vscode-toolbar-button>
       <vscode-toolbar-button
         icon="desktop-download"

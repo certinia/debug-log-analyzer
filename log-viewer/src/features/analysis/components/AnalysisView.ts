@@ -1,8 +1,6 @@
 /*
  * Copyright (c) 2022 Certinia Inc. All rights reserved.
  */
-import '#vscode-elements/vscode-option.js';
-import '../../../components/VsSelect.js';
 import '#vscode-elements/vscode-toolbar-button.js';
 import { consume } from '@lit/context';
 import { LitElement, css, html, type PropertyValues } from 'lit';
@@ -27,7 +25,11 @@ import {
 import { exportCsv } from '../../../components/grid/exportCsv.js';
 import { FindController } from '../../find/FindController.js';
 import { GridColumnMenuController } from '../../../components/GridColumnMenuController.js';
-import { columnViewSelect, gridToolbarActions } from '../../../components/gridToolbar.js';
+import {
+  columnViewSelect,
+  gridGroupControls,
+  gridToolbarActions,
+} from '../../../components/gridToolbar.js';
 import type { GridColumn, GroupBy, RowKey, TreeSource } from '../../../grid/index.js';
 import { CALL_TREE_VIEWS } from '../../../components/grid/ColumnViews.js';
 import '../../call-tree/grid/CallTreeGrid.js';
@@ -53,7 +55,6 @@ import { globalStyles } from '../../../styles/global.styles.js';
 // Components
 import '../../../components/datagrid-filter-bar.js';
 import '../../../components/GridSkeleton.js';
-import '../../../components/TreeExpandButton.js';
 
 @customElement('analysis-view')
 export class AnalysisView extends LitElement {
@@ -231,7 +232,6 @@ export class AnalysisView extends LitElement {
             id: 'column-view',
             views: CALL_TREE_VIEWS,
             columns: this._settings,
-            menus: this._menus,
           })}
 
           <div slot="filters" class="filter-container">
@@ -245,22 +245,16 @@ export class AnalysisView extends LitElement {
             </button>
           </div>
 
-          <div slot="group" class="filter-container">
-            <vs-select
-              dense
-              id="groupby-dropdown"
-              prefix="Group"
-              label="Group by"
-              @change="${(e: Event) =>
-                (this._groupBy = bottomUpGroupBy((e.target as HTMLInputElement).value))}"
-            >
-              ${BOTTOM_UP_GROUPS.map(({ label }) => html`<vscode-option>${label}</vscode-option>`)}
-            </vs-select>
-            <tree-expand-button .grid=${this.grid}></tree-expand-button>
-          </div>
-
+          ${gridGroupControls({
+            grid: this.grid,
+            group: {
+              id: 'groupby-dropdown',
+              labels: BOTTOM_UP_GROUPS.map(({ label }) => label),
+              onChange: (label: string) => (this._groupBy = bottomUpGroupBy(label)),
+            },
+          })}
           ${gridToolbarActions({
-            menus: this._menus,
+            openColumns: this._menus.open,
             exportToCSV: () => void (this.grid && exportCsv(this.grid, 'analysis.csv')),
             copyToClipboard: () => void this.grid?.copy(),
           })}

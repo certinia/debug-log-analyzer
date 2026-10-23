@@ -1,7 +1,7 @@
 /*
  * Copyright (c) 2026 Certinia Inc. All rights reserved.
  */
-import { LitElement, css, html, type PropertyValues } from 'lit';
+import { LitElement, css, html, nothing, type PropertyValues } from 'lit';
 import { customElement, property, query, state } from 'lit/decorators.js';
 
 import { DomListenerController } from '../core/events/DomListenerController.js';
@@ -30,6 +30,10 @@ export class TreeExpandButton extends LitElement {
   /** The grid to act on; null disables the button. */
   @property({ attribute: false })
   grid: ExpandableGrid | null = null;
+
+  /** Each click opens or closes the whole tree, with no menu: for a tree one level deep. */
+  @property({ type: Boolean, attribute: 'whole-tree' })
+  wholeTree = false;
 
   @state()
   private expanding = true;
@@ -145,7 +149,10 @@ export class TreeExpandButton extends LitElement {
 
   render() {
     const { canExpand, canCollapse } = this.expansion;
-    const label = this.expanding ? 'Expand One Level' : 'Collapse One Level';
+    const [expandLabel, collapseLabel] = this.wholeTree
+      ? ['Expand All', 'Collapse All']
+      : ['Expand One Level', 'Collapse One Level'];
+    const label = this.expanding ? expandLabel : collapseLabel;
     const disabled = !canExpand && !canCollapse;
     return html`<span class="filter-control split">
         <button
@@ -153,58 +160,73 @@ export class TreeExpandButton extends LitElement {
           title=${label}
           aria-label=${label}
           ?disabled=${disabled}
-          @click=${() =>
-            void (this.expanding ? this.grid?.expandLevel() : this.grid?.collapseLevel())}
+          @click=${() => void this.step()}
         >
           <vscode-icon name=${this.expanding ? 'expand-all' : 'collapse-all'}></vscode-icon>
         </button>
-        <button
-          class="header-control more"
-          title="More Expand and Collapse Actions"
-          aria-label="More Expand and Collapse Actions"
-          aria-haspopup="menu"
-          aria-controls="menu"
-          aria-expanded=${String(this.menuOpen)}
-          popovertarget="menu"
-          ?disabled=${disabled}
-          @click=${this.noteOpener}
-          @keydown=${this.onMoreKey}
-        >
-          <vscode-icon name="chevron-down"></vscode-icon>
-        </button>
+        ${this.wholeTree ? nothing : this.renderMore(disabled)}
       </span>
-      <div
-        id="menu"
-        class="filter-popover popover-anchored"
-        popover
+      ${this.wholeTree ? nothing : this.renderMenu(canExpand)}`;
+  }
+
+  private renderMore(disabled: boolean) {
+    return html`<button
+      class="header-control more"
+      title="More Expand and Collapse Actions"
+      aria-label="More Expand and Collapse Actions"
+      aria-haspopup="menu"
+      aria-controls="menu"
+      aria-expanded=${String(this.menuOpen)}
+      popovertarget="menu"
+      ?disabled=${disabled}
+      @click=${this.noteOpener}
+      @keydown=${this.onMoreKey}
+    >
+      <vscode-icon name="chevron-down"></vscode-icon>
+    </button>`;
+  }
+
+  private renderMenu(canExpand: boolean) {
+    return html`<div
+      id="menu"
+      class="filter-popover popover-anchored"
+      popover
+      tabindex="-1"
+      role="menu"
+      aria-label="Expand and collapse"
+      @toggle=${this.onToggle}
+      @keydown=${this.onMenuKey}
+    >
+      <button
+        class="filter-popover-row menu-row"
+        role="menuitem"
         tabindex="-1"
-        role="menu"
-        aria-label="Expand and collapse"
-        @toggle=${this.onToggle}
-        @keydown=${this.onMenuKey}
+        aria-disabled=${String(!canExpand)}
+        @click=${() => {
+          if (canExpand) {
+            void this.all(true);
+          }
+        }}
       >
-        <button
-          class="filter-popover-row menu-row"
-          role="menuitem"
-          tabindex="-1"
-          aria-disabled=${String(!canExpand)}
-          @click=${() => {
-            if (canExpand) {
-              void this.all(true);
-            }
-          }}
-        >
-          <vscode-icon name="expand-all"></vscode-icon><span>Expand All</span>
-        </button>
-        <button
-          class="filter-popover-row menu-row"
-          role="menuitem"
-          tabindex="-1"
-          @click=${() => void this.all(false)}
-        >
-          <vscode-icon name="collapse-all"></vscode-icon><span>Collapse All</span>
-        </button>
-      </div>`;
+        <vscode-icon name="expand-all"></vscode-icon><span>Expand All</span>
+      </button>
+      <button
+        class="filter-popover-row menu-row"
+        role="menuitem"
+        tabindex="-1"
+        @click=${() => void this.all(false)}
+      >
+        <vscode-icon name="collapse-all"></vscode-icon><span>Collapse All</span>
+      </button>
+    </div>`;
+  }
+
+  private step(): Promise<unknown> | undefined {
+    const grid = this.grid;
+    if (this.wholeTree) {
+      return this.expanding ? grid?.expandAll() : grid?.collapseAll();
+    }
+    return this.expanding ? grid?.expandLevel() : grid?.collapseLevel();
   }
 
   /** Runs before `popovertarget` opens the menu. Enter or Space clicks with a detail of 0. */
