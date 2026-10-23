@@ -28,6 +28,9 @@ export class DatagridFilterBar extends LitElement {
         display: flex;
         flex-direction: column;
         flex: 1;
+        /* The grid below is positioned, so it would paint over a focus ring that reaches past the bar. */
+        position: relative;
+        z-index: 1;
       }
 
       .filter-bar {
@@ -62,9 +65,8 @@ export class DatagridFilterBar extends LitElement {
         display: flex;
         align-items: flex-end;
         gap: 4px;
-        /* Shrinkable so the filters section can hand its overflow-list a
-           bounded width (min-width:auto would keep it at content size). */
-        min-width: 0;
+        /* Only the filters section shrinks: its overflow-list collapses before any control truncates. */
+        flex-shrink: 0;
       }
 
       /* Filters section takes the left cluster's slack and passes it to its
@@ -72,6 +74,8 @@ export class DatagridFilterBar extends LitElement {
          available and can re-expand collapsed items when the bar widens. */
       .section--grow {
         flex: 1 1 auto;
+        /* Lets the section hand its overflow-list a bounded width (min-width:auto would keep it at content size). */
+        min-width: 0;
       }
 
       .section--grow ::slotted([slot='filters']) {
