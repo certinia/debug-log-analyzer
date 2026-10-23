@@ -75,6 +75,8 @@ You can analyze logs in two ways:
 
 Use `Log: Retrieve Apex Log And Show Analysis` from the Command Palette.
 
+To find a log by the text in it, type 3 or more characters in the list. Logs you already downloaded are searched as you type. Select the top row to download and search the newest 5 logs, then 50 more each time. `Log: Clear Apex Log Cache` deletes the logs downloaded only for search.
+
 ## ⚙️ Recommended Debug Log Levels
 
 - Set `APEX_CODE` level to `FINE` or higher - lower levels may omit important execution details.

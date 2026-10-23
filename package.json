@@ -50,6 +50,7 @@
     "test:ci": "jest --runInBand",
     "test:e2e:web": "node --run build:prod && playwright test --config=lana/test/playwright/playwright.config.web.ts",
     "serve:web": "pnpm build && tsx lana/test/playwright/web/headlessServer.ts",
+    "shots:web": "node --run build:prod && playwright test --config=lana/test/playwright/playwright.config.shots.ts",
     "ci:install": "pnpm install --frozen-lockfile --prefer-offline --ignore-scripts",
     "format": "prettier '**/*.{ts,css,md,mdx}' --cache --write --experimental-cli"
   },
