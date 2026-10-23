@@ -250,7 +250,7 @@ export class AnalysisView extends LitElement {
             group: {
               id: 'groupby-dropdown',
               labels: BOTTOM_UP_GROUPS.map(({ label }) => label),
-              onChange: (label: string) => (this._groupBy = bottomUpGroupBy(label)),
+              onChange: (label) => (this._groupBy = bottomUpGroupBy(label)),
             },
           })}
           ${gridToolbarActions({

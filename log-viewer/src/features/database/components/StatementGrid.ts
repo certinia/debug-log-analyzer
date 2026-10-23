@@ -263,7 +263,7 @@ export abstract class StatementGrid<R extends StatementRow, L> extends LitElemen
           group: {
             id: `${spec.type}-groupby-dropdown`,
             labels: spec.groups.map((group) => group.label),
-            onChange: (label: string) => this._groupChanged(label),
+            onChange: (label) => this._groupChanged(label),
           },
         })}
         ${gridToolbarActions({

@@ -35,7 +35,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - **Log: Clear Apex Log Cache** frees the space. Logs downloaded but not opened are kept in workspace storage and cleaned up on their own.
 - 🎚️ **Log levels**: filter the log to a lower debug level per category from the header. ([#530])
 - 🪜 **Expand and collapse**: the Call Tree and Analysis tables open or close one level per click, like VS Code trees, and the Database tables open or close all groups. ([#1204])
-  - The menu next to the button has Expand All and Collapse All, which include the groups.
+  - The Call Tree and Analysis menu next to the button has Expand All and Collapse All, which include the groups.
 - 💡 **Log level hints**: a section that a debug level leaves empty names the level it needs. ([#259])
 - 🔦 **Timeline legend**: hover a category to highlight frames in the timeline, select to keep. ([#917])
 - 🔍 **Find**: in the tables, find matches the group header text too.

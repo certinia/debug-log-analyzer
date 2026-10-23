@@ -457,12 +457,12 @@ export class CalltreeView extends LitElement {
                       id: 'bottomup-groupby',
                       labels: BOTTOM_UP_GROUPS.map(({ label }) => label),
                       value: this.bottomUpGroupBy,
-                      onChange: (label: string) => this._handleBottomUpGroupBy(label),
+                      onChange: (label) => this._handleBottomUpGroupBy(label),
                     }
                   : undefined,
             })}
             ${gridToolbarActions({
-              openColumns: (event: Event) => this._openColumnMenu(event),
+              openColumns: (event) => this._openColumnMenu(event),
               exportToCSV: () => void this._exportCsv(),
               copyToClipboard: () => void this._activeGrid()?.copy(),
             })}

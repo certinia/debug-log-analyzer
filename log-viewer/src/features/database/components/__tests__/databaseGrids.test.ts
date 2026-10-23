@@ -21,7 +21,6 @@ import type { AppGrid } from '../../../../components/grid/AppGrid.js';
 import { parse } from '@apexdevtools/apex-log-parser';
 import { describeLevelGap } from '../../../../core/log/levelCapabilities.js';
 import { setCurrentLog } from '../../../../core/log/LogStore.js';
-import { ColumnSettingsController } from '../../../../components/ColumnSettingsController.js';
 import { ContextMenu } from '../../../../components/ContextMenu.js';
 import { exportCsv } from '../../../../components/grid/exportCsv.js';
 import { Group } from '../../../../grid/index.js';
@@ -270,13 +269,32 @@ describe.each(GRIDS)('%s', (_name, spec) => {
       expect(select?.parentElement).toBe(bar());
     });
 
-    it('resets the view its select offers to reset', () => {
-      const reset = jest.spyOn(ColumnSettingsController.prototype, 'reset');
-      const select = view.renderRoot.querySelector(`#${spec.type}-column-view`);
-      select?.dispatchEvent(new CustomEvent('vs-reset-option', { detail: { value: 'General' } }));
+    it('resets an edited view from its select', async () => {
+      const shown = () =>
+        grid()
+          .columns.filter((column) => !column.hidden)
+          .map((column) => column.id);
+      const before = shown();
+      const hide = before.find((id) => id !== spec.type);
+      await fire(
+        'context-menu',
+        new CustomEvent('menu-select', { detail: { itemId: `col:${hide}` } }),
+      );
+      await grid().updateComplete;
+      expect(shown()).not.toContain(hide);
 
-      expect(reset).toHaveBeenCalledWith('General');
-      reset.mockRestore();
+      const select = view.renderRoot.querySelector(`#${spec.type}-column-view`) as HTMLElement & {
+        resettableValues: string[];
+      };
+      const [edited] = select.resettableValues;
+      expect(edited).toBe(spec.views[0]?.id);
+      await fire(
+        `#${spec.type}-column-view`,
+        new CustomEvent('vs-reset-option', { detail: { value: edited } }),
+      );
+      await grid().updateComplete;
+
+      expect(shown()).toEqual(before);
     });
 
     it('slots the group picker, then a whole-tree expand button with its grid, into the bar', () => {

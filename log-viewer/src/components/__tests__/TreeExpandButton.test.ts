@@ -102,7 +102,7 @@ describe('TreeExpandButton', () => {
     await grid.send(false, true);
     expect(main(el).getAttribute('aria-label')).toBe('Collapse All');
     main(el).click();
-    expect(grid.calls).toEqual(['expand all', 'collapse all']);
+    expect(grid.calls).toEqual(['expand', 'collapse']);
   });
 
   it('keeps each grid its own direction', async () => {

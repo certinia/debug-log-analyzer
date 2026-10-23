@@ -326,24 +326,39 @@ describe('calltree-view table lifetime', () => {
     expect(button?.grid).toBe(view.bottomUpGrid);
   });
 
-  it('exports and copies the grid on show, naming the file for the view', async () => {
-    const click = (label: string) =>
-      view.renderRoot
-        .querySelector<HTMLElement>(`vscode-toolbar-button[label="${label}"]`)
-        ?.click();
+  const toolbarClick = (label: string) =>
+    view.renderRoot.querySelector<HTMLElement>(`vscode-toolbar-button[label="${label}"]`)?.click();
 
-    await view._setViewMode('bottom-up');
-    await settle();
-    const grid = view.bottomUpGrid;
-    if (!grid) {
-      throw new Error('no bottom-up grid');
-    }
-    const copy = jest.spyOn(grid, 'copy').mockResolvedValue(undefined);
-    click('Export to CSV');
-    click('Copy to clipboard');
+  it.each([
+    ['time-order', 'timeOrderGrid'],
+    ['aggregated', 'aggregatedGrid'],
+    ['bottom-up', 'bottomUpGrid'],
+  ] as const)(
+    'exports and copies the %s grid, naming the file for the view',
+    async (mode, field) => {
+      await view._setViewMode(mode);
+      await settle();
+      const grid = view[field];
+      if (!grid) {
+        throw new Error(`no ${mode} grid`);
+      }
+      const copy = jest.spyOn(grid, 'copy').mockResolvedValue(undefined);
+      toolbarClick('Export to CSV');
+      toolbarClick('Copy to clipboard');
 
-    expect(exportCsv).toHaveBeenCalledWith(grid, 'call-tree-bottom-up.csv');
-    expect(copy).toHaveBeenCalled();
+      expect(exportCsv).toHaveBeenCalledWith(grid, `call-tree-${mode}.csv`);
+      expect(copy).toHaveBeenCalled();
+    },
+  );
+
+  it('opens the column menu from the toolbar', () => {
+    const menu = view.renderRoot.querySelector('context-menu') as HTMLElement & {
+      show: (...args: unknown[]) => void;
+    };
+    const show = jest.spyOn(menu, 'show').mockImplementation(() => {});
+    toolbarClick('Columns');
+
+    expect(show).toHaveBeenCalledTimes(1);
   });
 
   it('builds aggregated as a grid, under the filters in force', async () => {

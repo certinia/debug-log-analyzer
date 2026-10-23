@@ -23,7 +23,7 @@ export type ExpandableGrid = HTMLElement &
 /**
  * A tree grid's expand and collapse control, like the one on a VS Code tree view. Each
  * click opens one level until no row is closed, then closes one level until no row is
- * open. Its menu opens or closes the whole tree.
+ * open. Its menu opens or closes the whole tree, unless `wholeTree` drops it.
  */
 @customElement('tree-expand-button')
 export class TreeExpandButton extends LitElement {
@@ -31,7 +31,7 @@ export class TreeExpandButton extends LitElement {
   @property({ attribute: false })
   grid: ExpandableGrid | null = null;
 
-  /** Each click opens or closes the whole tree, with no menu: for a tree one level deep. */
+  /** For a tree one level deep: drops the menu and labels the button All. A click still steps one level. */
   @property({ type: Boolean, attribute: 'whole-tree' })
   wholeTree = false;
 
@@ -149,10 +149,7 @@ export class TreeExpandButton extends LitElement {
 
   render() {
     const { canExpand, canCollapse } = this.expansion;
-    const [expandLabel, collapseLabel] = this.wholeTree
-      ? ['Expand All', 'Collapse All']
-      : ['Expand One Level', 'Collapse One Level'];
-    const label = this.expanding ? expandLabel : collapseLabel;
+    const label = `${this.expanding ? 'Expand' : 'Collapse'} ${this.wholeTree ? 'All' : 'One Level'}`;
     const disabled = !canExpand && !canCollapse;
     return html`<span class="filter-control split">
         <button
@@ -160,7 +157,8 @@ export class TreeExpandButton extends LitElement {
           title=${label}
           aria-label=${label}
           ?disabled=${disabled}
-          @click=${() => void this.step()}
+          @click=${() =>
+            void (this.expanding ? this.grid?.expandLevel() : this.grid?.collapseLevel())}
         >
           <vscode-icon name=${this.expanding ? 'expand-all' : 'collapse-all'}></vscode-icon>
         </button>
@@ -219,14 +217,6 @@ export class TreeExpandButton extends LitElement {
         <vscode-icon name="collapse-all"></vscode-icon><span>Collapse All</span>
       </button>
     </div>`;
-  }
-
-  private step(): Promise<unknown> | undefined {
-    const grid = this.grid;
-    if (this.wholeTree) {
-      return this.expanding ? grid?.expandAll() : grid?.collapseAll();
-    }
-    return this.expanding ? grid?.expandLevel() : grid?.collapseLevel();
   }
 
   /** Runs before `popovertarget` opens the menu. Enter or Space clicks with a detail of 0. */

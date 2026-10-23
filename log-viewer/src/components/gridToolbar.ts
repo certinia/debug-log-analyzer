@@ -1,7 +1,7 @@
 /*
  * Copyright (c) 2026 Certinia Inc. All rights reserved.
  */
-import { html, type TemplateResult } from 'lit';
+import { html, nothing, type TemplateResult } from 'lit';
 
 import type { ColumnView } from './grid/ColumnViews.js';
 import type { ColumnSettingsController } from './ColumnSettingsController.js';
@@ -54,7 +54,7 @@ export function columnViewSelect(opts: {
  */
 export function gridGroupControls(opts: {
   grid: ExpandableGrid | null;
-  /** The tree is one level deep, so the button opens or closes it whole, with no menu. */
+  /** For a tree one level deep: drops the menu and labels the button All. A click still steps one level. */
   wholeTree?: boolean;
   group?: {
     /** Per grid, since several share one document. */
@@ -80,7 +80,7 @@ export function gridGroupControls(opts: {
           >
             ${group.labels.map((label) => html`<vscode-option>${label}</vscode-option>`)}
           </vs-select>`
-        : ''
+        : nothing
     }
     <tree-expand-button
       slot="group"
