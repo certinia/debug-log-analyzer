@@ -30,7 +30,14 @@ import {
   gridGroupControls,
   gridToolbarActions,
 } from '../../../components/gridToolbar.js';
-import type { GridColumn, GroupBy, RowKey, TreeSource } from '../../../grid/index.js';
+import type { GridColumn, GroupBy, RowFilter, RowKey, TreeSource } from '../../../grid/index.js';
+import type { FilterRange } from '../../../components/grid/MinMax.js';
+import {
+  BOTTOM_UP_MEASURES,
+  measureFilters,
+  RowFilterCache,
+  type MeasureFilterInputs,
+} from '../../call-tree/grid/rowFilters.js';
 import { CALL_TREE_VIEWS } from '../../../components/grid/ColumnViews.js';
 import '../../call-tree/grid/CallTreeGrid.js';
 import type { CallTreeGrid } from '../../call-tree/grid/CallTreeGrid.js';
@@ -53,7 +60,10 @@ import { wireCategoryColoring } from '../../call-tree/utils/CategoryColoring.js'
 import { globalStyles } from '../../../styles/global.styles.js';
 
 // Components
+import '../../../components/datagrid-facet-filter.js';
 import '../../../components/datagrid-filter-bar.js';
+import '../../../components/datagrid-range-filter.js';
+import '../../../components/OverflowList.js';
 import '../../../components/GridSkeleton.js';
 
 @customElement('analysis-view')
@@ -83,12 +93,6 @@ export class AnalysisView extends LitElement {
         min-height: 0;
         min-width: 0;
       }
-
-      .filter-container {
-        display: flex;
-        gap: var(--lana-space-2xs);
-        align-items: flex-end;
-      }
     `,
   ];
 
@@ -113,6 +117,13 @@ export class AnalysisView extends LitElement {
   private _colorize = false;
   @state()
   private _showDetails = false;
+  @state()
+  private _measures: MeasureFilterInputs = {
+    namespaces: [],
+    total: { start: null, end: null },
+    self: { start: null, end: null },
+  };
+  private readonly _filterCache = new RowFilterCache();
 
   // State, so the expand button follows the grid once it mounts.
   @state()
@@ -234,7 +245,25 @@ export class AnalysisView extends LitElement {
             columns: this._settings,
           })}
 
-          <div slot="filters" class="filter-container">
+          <overflow-list slot="filters" menu-heading="Filters" icon="filter">
+            <datagrid-facet-filter
+              label="Namespace"
+              .values="${this.timelineRoot?.namespaces ?? []}"
+              @datagrid-facet-change="${(e: CustomEvent<{ selected: string[] }>) =>
+                (this._measures = { ...this._measures, namespaces: e.detail.selected })}"
+            ></datagrid-facet-filter>
+            <datagrid-range-filter
+              label="Total Time"
+              unit="ms"
+              @datagrid-range-change="${(e: CustomEvent<{ range: FilterRange }>) =>
+                (this._measures = { ...this._measures, total: e.detail.range })}"
+            ></datagrid-range-filter>
+            <datagrid-range-filter
+              label="Self Time"
+              unit="ms"
+              @datagrid-range-change="${(e: CustomEvent<{ range: FilterRange }>) =>
+                (this._measures = { ...this._measures, self: e.detail.range })}"
+            ></datagrid-range-filter>
             <button
               type="button"
               class="filter-control pill-toggle"
@@ -243,7 +272,7 @@ export class AnalysisView extends LitElement {
             >
               Details
             </button>
-          </div>
+          </overflow-list>
 
           ${gridGroupControls({
             grid: this.grid,
@@ -279,7 +308,7 @@ export class AnalysisView extends LitElement {
         .placeholder="${'No Analysis Available'}"
         .source="${this._source}"
         .columns="${this._columns}"
-        .filters="${this._showDetails ? [] : [BOTTOM_UP_DETAILS]}"
+        .filters="${this._filters()}"
         .sort="${BOTTOM_UP_SORT}"
         .rowLines="${mergedLines}"
         .groupBy="${this._groupBy}"
@@ -290,6 +319,16 @@ export class AnalysisView extends LitElement {
         @lv-grid-header-context="${this._menus.headerContext}"
       ></lv-call-tree-grid>
     `;
+  }
+
+  private _filters(): RowFilter<BottomUpRow>[] {
+    const filters = measureFilters(
+      this._measures,
+      BOTTOM_UP_MEASURES,
+      this._filterCache,
+      'analysis',
+    );
+    return this._showDetails ? filters : [...filters, BOTTOM_UP_DETAILS];
   }
 
   private readonly _gridMounted = (el?: Element): void => {

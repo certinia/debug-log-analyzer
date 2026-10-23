@@ -30,6 +30,7 @@ import {
 } from '../../../../core/events/EventBus.js';
 import { exportCsv } from '../../../../components/grid/exportCsv.js';
 import { logStoreFor } from '../../../../core/log/LogStore.js';
+import { BOTTOM_UP_DETAILS } from '../../../call-tree/grid/columns.js';
 import { MergedTree } from '../../../call-tree/grid/mergedRows.js';
 import type { BottomUpRow } from '../../../call-tree/utils/Aggregation.js';
 import { AnalysisView } from '../AnalysisView.js';
@@ -274,6 +275,74 @@ describe('analysis-view', () => {
     eventBus.emit('inspector:locate', { source: 'analysis', eventIndexes: [2], sticky: true });
     await settle();
     expect(goTo).toHaveBeenCalledWith([bucketB], { scrollIfVisible: false });
+  });
+
+  describe('filters', () => {
+    const MS = 1_000_000;
+    const row = (namespace: string, totalMs: number, selfMs: number, details = true) =>
+      ({
+        namespace,
+        totalTime: totalMs * MS,
+        totalSelfTime: selfMs * MS,
+        _hasDetailsDeep: details,
+      }) as unknown as BottomUpRow;
+    const kept = (rows: BottomUpRow[]) =>
+      rows.filter((r) => grid().filters.every((filter) => filter.test(r)));
+    /** The filters this toolbar adds, apart from Details. */
+    const added = () => grid().filters.filter((filter) => filter !== BOTTOM_UP_DETAILS);
+    const fire = async (selector: string, type: string, detail: object) => {
+      view.renderRoot
+        .querySelector(selector)
+        ?.dispatchEvent(new CustomEvent(type, { detail, bubbles: true }));
+      await view.updateComplete;
+    };
+    const pickNamespaces = (selected: string[]) =>
+      fire('datagrid-facet-filter[label="Namespace"]', 'datagrid-facet-change', { selected });
+
+    it('offers the namespaces of the log', () => {
+      const facet = view.renderRoot.querySelector('datagrid-facet-filter[label="Namespace"]') as
+        (HTMLElement & { values: unknown }) | null;
+
+      expect(facet?.values).toBe(log.namespaces);
+    });
+
+    it('keeps the rows in the picked namespaces, with their callers, and Details still applies', async () => {
+      const [ns1, ns2, noDetails] = [row('ns1', 1, 1), row('ns2', 1, 1), row('ns1', 1, 1, false)];
+      await pickNamespaces(['ns1']);
+
+      expect(kept([ns1, ns2, noDetails])).toEqual([ns1]);
+      expect(added().map((filter) => filter.keepAncestors)).toEqual([true]);
+    });
+
+    it.each([
+      ['Total Time', row('ns', 3, 1), row('ns', 1, 3)],
+      ['Self Time', row('ns', 1, 3), row('ns', 3, 1)],
+    ])(
+      'keeps the rows inside the %s range, with their callers, until cleared',
+      async (label, inside, outside) => {
+        const setRange = (start: number | null) =>
+          fire(`datagrid-range-filter[label="${label}"]`, 'datagrid-range-change', {
+            range: { start, end: null },
+          });
+        await setRange(2);
+        expect(kept([inside, outside])).toEqual([inside]);
+        expect(added().map((filter) => filter.keepAncestors)).toEqual([true]);
+
+        await setRange(null);
+        expect(added()).toEqual([]);
+      },
+    );
+
+    it('keeps each filter object while its input is unchanged', async () => {
+      await pickNamespaces(['ns1']);
+      const [namespace] = added();
+      [...view.renderRoot.querySelectorAll<HTMLElement>('button.pill-toggle')]
+        .find((button) => button.textContent?.trim() === 'Details')
+        ?.click();
+      await view.updateComplete;
+
+      expect(added()[0]).toBe(namespace);
+    });
   });
 
   it.each([
