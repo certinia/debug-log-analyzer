@@ -25,7 +25,7 @@ class FsService extends Effect.Service<FsService>()('FsService', {
   accessors: true,
 }) {}
 
-const fsService: object = { safeWriteFile: jest.fn(), fileOrFolderExists: jest.fn() };
+const fsService: object = { safeWriteFile: jest.fn() };
 
 const apiWith = (apexLogService: object) => ({
   services: {
