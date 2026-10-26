@@ -125,6 +125,18 @@ describe('buildGovernorTimeSeries', () => {
     expect(series.events.map((e) => e.values.get('soqlQueries')?.used)).toEqual([3, 3, 3]);
   });
 
+  it('keeps each row count on the statement that made it, though rows coalesce', async () => {
+    // 40 then 70 rows: both under the queryRows threshold of 100.
+    const series = await build([
+      delta(10, 'soqlQueries', 1),
+      delta(10, 'queryRows', 40),
+      delta(20, 'soqlQueries', 1),
+      delta(20, 'queryRows', 70),
+    ]);
+
+    expect(series.events.map((e) => e.values.get('queryRows')?.used)).toEqual([40, 110]);
+  });
+
   it('keeps counting past a scoped report, which measures one block only', async () => {
     const series = await build([
       scoped(0, 'soqlQueries', 0),

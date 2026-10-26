@@ -137,8 +137,9 @@ async function coalescingThresholds(
 /**
  * Coalesce consecutive same-`(namespace, metric)` deltas: accumulate and emit a single delta only
  * once `|pending| ≥ max(1, floor(scale / POINT_BUDGET))`, on the triggering event's timestamp.
- * Pending deltas are flushed before any absolute for the same key (so the correction sees them) and
- * at end of stream. Counts (small scales → threshold 1) stay per-event; rows/heap coalesce. Absolutes
+ * Pending deltas are flushed before any absolute for the same key (so the correction sees them), at
+ * a timestamp that emits a point anyway (a row count lands on the statement that made it), and at
+ * end of stream. Counts (small scales → threshold 1) stay per-event; rows/heap coalesce. Absolutes
  * pass through untouched. Input must be time-sorted; output is re-sorted (the flush order can differ).
  */
 async function coalesceDeltas(
@@ -147,6 +148,12 @@ async function coalesceDeltas(
   tick: Tick,
 ): Promise<LimitObservation[]> {
   const thresholds = await coalescingThresholds(sorted, limits, tick);
+  const pointTimes = new Set<number>();
+  for (const obs of sorted) {
+    if (obs.kind === 'absolute' || (thresholds.get(obs.metric) ?? 1) <= 1) {
+      pointTimes.add(obs.timestamp);
+    }
+  }
   const out: LimitObservation[] = [];
   // namespace -> metric -> accumulated delta + latest timestamp
   const pending = new Map<string, Map<string, { sum: number; ts: number }>>();
@@ -180,7 +187,7 @@ async function coalesceDeltas(
       }
       p.sum += obs.delta;
       p.ts = obs.timestamp;
-      if (Math.abs(p.sum) >= threshold) {
+      if (Math.abs(p.sum) >= threshold || pointTimes.has(obs.timestamp)) {
         flush(obs.namespace, obs.metric);
       }
     } else {
