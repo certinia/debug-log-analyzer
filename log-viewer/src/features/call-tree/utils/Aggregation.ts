@@ -12,6 +12,13 @@ import {
 } from '../../../core/utility/FrameBudget.js';
 import { computeHasDetailsDeep } from './DetailsFilter.js';
 import { type CostLimits, costLimitsOf, setGovernorCost } from './GovernorCost.js';
+import {
+  addReported,
+  emptyReported,
+  type ReportedCounts,
+  type ReportedUsage,
+  WHOLE_LOG,
+} from './reportedUsage.js';
 
 /**
  * Represents a row in the aggregated call tree view.
@@ -64,6 +71,8 @@ export interface AggregatedRow {
   governorCost: number | null;
   /** The single tightest governor consumed on this path (0–100+%). */
   governorCostMax: number | null;
+  /** What these calls used of each limit, counted as the Seen totals are. */
+  reported: ReportedCounts;
   /** Aggregated children (callees grouped by signature) */
   _children?: AggregatedRow[] | null;
   /** References to original events for drill-down */
@@ -128,6 +137,8 @@ export interface BottomUpRow {
   governorCost: number | null;
   /** The single tightest governor consumed on this path (0–100+%). */
   governorCostMax: number | null;
+  /** What these calls used of each limit, counted as the Seen totals are. */
+  reported: ReportedCounts;
   /** Callers (parent functions) as children - lazy loaded */
   _children?: BottomUpRow[] | null;
   /**
@@ -151,8 +162,9 @@ export function toAggregatedCallTree(
   rootChildren: LogEvent[],
   paths: KeyPathIds,
   governorLimits?: GovernorLimits,
+  reported: ReportedUsage | null = null,
 ): AggregatedRow[] {
-  return runSteps(aggregatedSteps(rootChildren, paths, governorLimits));
+  return runSteps(aggregatedSteps(rootChildren, paths, governorLimits, reported));
 }
 
 /**
@@ -164,8 +176,9 @@ export async function buildAggregatedTree(
   paths: KeyPathIds,
   governorLimits?: GovernorLimits,
   options: FrameBudgetOptions = {},
+  reported: ReportedUsage | null = null,
 ): Promise<AggregatedRow[] | null> {
-  return driveSteps(aggregatedSteps(rootChildren, paths, governorLimits), options);
+  return driveSteps(aggregatedSteps(rootChildren, paths, governorLimits, reported), options);
 }
 
 function runSteps<T>(steps: Generator<void, T, void>): T {
@@ -201,7 +214,8 @@ type AggregateFrame = {
 function* aggregatedSteps(
   rootChildren: LogEvent[],
   paths: KeyPathIds,
-  governorLimits?: GovernorLimits,
+  governorLimits: GovernorLimits | undefined,
+  reported: ReportedUsage | null,
 ): Generator<void, AggregatedRow[], void> {
   if (rootChildren.length === 0) {
     return [];
@@ -216,7 +230,7 @@ function* aggregatedSteps(
 
   // The grouping loop runs outside the generator: run inside it, it is about 15% slower.
   function* group(
-    calls: readonly { children: LogEvent[] }[],
+    calls: readonly CalleeCall[],
     pathId: number,
     openStackId: number,
   ): Generator<void, AggregatedRow[], void> {
@@ -224,6 +238,7 @@ function* aggregatedSteps(
       calls,
       pathId,
       openStackId,
+      reported,
       byKey: new Map(),
       call: 0,
       child: 0,
@@ -239,7 +254,7 @@ function* aggregatedSteps(
   }
 
   // Nothing is open above a root child, so no call of one is recursive here.
-  const roots = yield* group([{ children: rootChildren }], ROOT_PATH_ID, NO_STACK);
+  const roots = yield* group([{ ...WHOLE_LOG, children: rootChildren }], ROOT_PATH_ID, NO_STACK);
   // Descend callees in grouping order, not sorted order: the row ids depend on it.
   const stack: AggregateFrame[] = [{ row: null, callees: roots, next: 0 }];
   while (stack.length > 0) {
@@ -266,10 +281,13 @@ function* aggregatedSteps(
   return roots.sort(byTotalTimeDesc);
 }
 
+type CalleeCall = Pick<LogEvent, 'children' | 'timestamp' | 'exitStamp'>;
+
 type CalleeGrouping = {
-  calls: readonly { children: LogEvent[] }[];
+  calls: readonly CalleeCall[];
   pathId: number;
   openStackId: number;
+  reported: ReportedUsage | null;
   byKey: Map<number, AggregatedRow>;
   call: number;
   child: number;
@@ -282,12 +300,15 @@ function groupCallees(
   idFor: () => number,
   budget: number,
 ): number {
-  const { calls, pathId, openStackId, byKey } = grouping;
+  const { calls, pathId, openStackId, reported, byKey } = grouping;
   let done = 0;
   let i = grouping.call;
   let j = grouping.child;
   for (; i < calls.length; i++, j = 0) {
-    const children = calls[i]!.children; // i is in range
+    const call = calls[i]!; // i is in range
+    const children = call.children;
+    // A callee's span sits inside its call's, so a call that holds no point skips the search.
+    const usage = children.length > 0 && reported?.span(call) ? reported : null;
     for (; j < children.length; j++) {
       if (done === budget) {
         grouping.call = i;
@@ -307,7 +328,7 @@ function groupCallees(
         );
         byKey.set(keyId, row);
       }
-      addEventToAggregatedRow(row, event, paths.stackIdOf(event, keyId), openStackId);
+      addEventToAggregatedRow(row, event, paths.stackIdOf(event, keyId), openStackId, usage);
       done++;
     }
   }
@@ -339,6 +360,7 @@ function addEventToAggregatedRow(
   event: LogEvent,
   stackId: number,
   openStackId: number,
+  reported: ReportedUsage | null,
 ): void {
   row.callCount++;
   row.totalSelfTime += event.duration.self; // Always add self time
@@ -369,6 +391,10 @@ function addEventToAggregatedRow(
   row.heapGross.total += event.heapGross.total;
   // Peak live heap aggregates by max (the worst single call), not sum.
   row.heapPeak = Math.max(row.heapPeak, event.heapPeak);
+  const span = reported?.span(event);
+  if (span) {
+    addReported(row.reported, span);
+  }
   row.instances.push(event);
 }
 
@@ -423,6 +449,8 @@ type FrameContext = {
   thrownTotal: number;
   heapTotal: number;
   heapGrossTotal: number;
+  /** Null where the span holds no reported point, or the log has no reported usage. */
+  reported: ReportedCounts | null;
 };
 
 type DfsEntry = {
@@ -457,7 +485,8 @@ type DfsEntry = {
 function* bottomUpSteps(
   rootChildren: LogEvent[],
   paths: KeyPathIds,
-  governorLimits?: GovernorLimits,
+  governorLimits: GovernorLimits | undefined,
+  reported: ReportedUsage | null,
 ): Generator<void, BottomUpRow[], void> {
   if (rootChildren.length === 0) {
     return [];
@@ -479,6 +508,9 @@ function* bottomUpSteps(
 
     const stackId = paths.stackIdOf(node, keyId);
     const prior = activeByStack.get(stackId);
+    const parent = dfs[dfs.length - 1];
+    // A span sits inside its parent's, so under a parent that holds no point the search is skipped.
+    const usage = !parent || parent.ctx.reported ? reported : null;
     const ctx: FrameContext = {
       frame: node,
       stackId,
@@ -493,6 +525,7 @@ function* bottomUpSteps(
       thrownTotal: node.thrownCount.total,
       heapTotal: node.heapAllocated.total,
       heapGrossTotal: node.heapGross.total,
+      reported: usage?.span(node) ?? null,
     };
 
     if (prior) {
@@ -506,6 +539,9 @@ function* bottomUpSteps(
       prior.thrownTotal -= node.thrownCount.total;
       prior.heapTotal -= node.heapAllocated.total;
       prior.heapGrossTotal -= node.heapGross.total;
+      if (prior.reported && ctx.reported) {
+        addReported(prior.reported, ctx.reported, -1);
+      }
     }
     activeByStack.set(stackId, ctx);
     dfs.push({ node, childIdx: 0, ctx });
@@ -539,6 +575,7 @@ function* bottomUpSteps(
     const thrownTotal = ctx.thrownTotal;
     const heapTotal = ctx.heapTotal;
     const heapGrossTotal = ctx.heapGrossTotal;
+    const frameReported = ctx.reported;
 
     // Closure captures the hoisted locals; zero-delta guards skip no-op writes
     // for logs without heavy DB work.
@@ -602,6 +639,9 @@ function* bottomUpSteps(
       }
       if (heapPeak > b.heapPeak) {
         b.heapPeak = heapPeak;
+      }
+      if (frameReported) {
+        addReported(b.reported, frameReported);
       }
     };
 
@@ -676,8 +716,9 @@ export function toBottomUpTree(
   rootChildren: LogEvent[],
   paths: KeyPathIds,
   governorLimits?: GovernorLimits,
+  reported: ReportedUsage | null = null,
 ): BottomUpRow[] {
-  return runSteps(bottomUpSteps(rootChildren, paths, governorLimits));
+  return runSteps(bottomUpSteps(rootChildren, paths, governorLimits, reported));
 }
 
 /**
@@ -689,8 +730,9 @@ export async function buildBottomUpTree(
   paths: KeyPathIds,
   governorLimits?: GovernorLimits,
   options: FrameBudgetOptions = {},
+  reported: ReportedUsage | null = null,
 ): Promise<BottomUpRow[] | null> {
-  return driveSteps(bottomUpSteps(rootChildren, paths, governorLimits), options);
+  return driveSteps(bottomUpSteps(rootChildren, paths, governorLimits, reported), options);
 }
 
 /**
@@ -775,6 +817,7 @@ function createEmptyAggregatedRow(
     heapPeak: 0,
     governorCost: 0,
     governorCostMax: 0,
+    reported: emptyReported(),
     _children: null,
     instances: [],
     originalData: event,
@@ -814,6 +857,7 @@ function createEmptyBottomUpRow(
     heapPeak: 0,
     governorCost: 0,
     governorCostMax: 0,
+    reported: emptyReported(),
     _children: null,
     instances: [],
     originalData: event,

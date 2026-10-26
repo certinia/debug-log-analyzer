@@ -51,6 +51,7 @@ import {
   mergedLines,
   openType,
 } from '../../call-tree/grid/columns.js';
+import { reportedUsageOf } from '../../call-tree/utils/reportedUsage.js';
 import { inspectorRowEvents } from '../../call-tree/grid/inspectorRowEvents.js';
 import { MergedTree } from '../../call-tree/grid/mergedRows.js';
 import type { BottomUpRow } from '../../call-tree/utils/Aggregation.js';
@@ -350,7 +351,8 @@ export class AnalysisView extends LitElement {
       return;
     }
     this._tree = tree;
-    this._columns = bottomUpColumns(root, { openType });
+    // Ready by now: the tree build waited for it.
+    this._columns = bottomUpColumns(root, { openType, reported: await reportedUsageOf(root) });
     this._settings.applyTo(this._columnTarget);
     this._source = tree.source;
   }

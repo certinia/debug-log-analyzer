@@ -835,6 +835,12 @@ export interface HeatStripMetricValue {
    * Undefined means no divergence / metric has no granular source.
    */
   tracked?: number;
+  /**
+   * `used` before the ceiling of the highest cumulative report, set only where that ceiling held
+   * `used` below it. Our count stands until the next report corrects it, so a reader that gives
+   * usage to rows reads this, not `used`.
+   */
+  uncapped?: number;
 }
 
 /**

@@ -22,6 +22,7 @@
  * A cumulative figure is also a ceiling. Counting can only fall short of what the governor charged —
  * a truncated log drops events the report still counted — so `displayed` never passes the highest
  * cumulative report for the same namespace and metric, and the strip agrees with those totals.
+ * `uncapped` keeps the value before that ceiling, where the two differ.
  *
  * At each observation timestamp a single combined point is emitted, summing the last-known
  * per-namespace values (carry-forward step merge). `tracked` is surfaced on the emitted value only
@@ -76,8 +77,9 @@ interface MetricState {
   cap: number;
 }
 
-const displayedOf = (s: MetricState): number =>
-  Math.min(s.baseline + (s.tracked - s.trackedAtBaseline), s.cap);
+const uncappedOf = (s: MetricState): number => s.baseline + (s.tracked - s.trackedAtBaseline);
+
+const displayedOf = (s: MetricState): number => Math.min(uncappedOf(s), s.cap);
 
 const noTick: Tick = () => Promise.resolve(true);
 
@@ -137,8 +139,9 @@ async function coalescingThresholds(
 /**
  * Coalesce consecutive same-`(namespace, metric)` deltas: accumulate and emit a single delta only
  * once `|pending| ≥ max(1, floor(scale / POINT_BUDGET))`, on the triggering event's timestamp.
- * Pending deltas are flushed before any absolute for the same key (so the correction sees them) and
- * at end of stream. Counts (small scales → threshold 1) stay per-event; rows/heap coalesce. Absolutes
+ * Pending deltas are flushed before any absolute for the same key (so the correction sees them), at
+ * a timestamp that emits a point anyway (a row count lands on the statement that made it), and at
+ * end of stream. Counts (small scales → threshold 1) stay per-event; rows/heap coalesce. Absolutes
  * pass through untouched. Input must be time-sorted; output is re-sorted (the flush order can differ).
  */
 async function coalesceDeltas(
@@ -147,6 +150,12 @@ async function coalesceDeltas(
   tick: Tick,
 ): Promise<LimitObservation[]> {
   const thresholds = await coalescingThresholds(sorted, limits, tick);
+  const pointTimes = new Set<number>();
+  for (const obs of sorted) {
+    if (obs.kind === 'absolute' || (thresholds.get(obs.metric) ?? 1) <= 1) {
+      pointTimes.add(obs.timestamp);
+    }
+  }
   const out: LimitObservation[] = [];
   // namespace -> metric -> accumulated delta + latest timestamp
   const pending = new Map<string, Map<string, { sum: number; ts: number }>>();
@@ -180,7 +189,7 @@ async function coalesceDeltas(
       }
       p.sum += obs.delta;
       p.ts = obs.timestamp;
-      if (Math.abs(p.sum) >= threshold) {
+      if (Math.abs(p.sum) >= threshold || pointTimes.has(obs.timestamp)) {
         flush(obs.namespace, obs.metric);
       }
     } else {
@@ -284,7 +293,7 @@ export async function buildGovernorTimeSeries(
       } else {
         // A cumulative total is authoritative; a scoped report only ever raises the line, since
         // it measures one block and may read below the transaction total.
-        s.baseline = obs.scope === 'cumulative' ? obs.used : Math.max(obs.used, displayedOf(s));
+        s.baseline = obs.scope === 'cumulative' ? obs.used : Math.max(obs.used, uncappedOf(s));
         s.trackedAtBaseline = s.tracked;
       }
       idx++;
@@ -304,17 +313,21 @@ function emitPoint(
   state: Map<string, Map<string, MetricState>>,
   limits: Map<string, number>,
 ): HeatStripEvent {
-  const agg = new Map<string, { used: number; trackedSum: number; anyDelta: boolean }>();
+  const agg = new Map<
+    string,
+    { used: number; uncapped: number; trackedSum: number; anyDelta: boolean }
+  >();
 
   for (const byMetric of state.values()) {
     for (const [metric, s] of byMetric) {
       const disp = displayedOf(s);
       let a = agg.get(metric);
       if (!a) {
-        a = { used: 0, trackedSum: 0, anyDelta: false };
+        a = { used: 0, uncapped: 0, trackedSum: 0, anyDelta: false };
         agg.set(metric, a);
       }
       a.used += disp;
+      a.uncapped += uncappedOf(s);
       // Namespaces without a granular source contribute their displayed value so they
       // don't manufacture a divergence for the combined metric.
       a.trackedSum += s.sawDelta ? s.tracked : disp;
@@ -328,6 +341,9 @@ function emitPoint(
     const value: HeatStripMetricValue = { used: a.used, limit: limits.get(metric) ?? 0 };
     if (a.anyDelta && a.trackedSum < a.used) {
       value.tracked = a.trackedSum;
+    }
+    if (a.uncapped !== a.used) {
+      value.uncapped = a.uncapped;
     }
     values.set(metric, value);
   }

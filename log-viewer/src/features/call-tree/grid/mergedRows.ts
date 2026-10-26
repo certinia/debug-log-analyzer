@@ -11,6 +11,7 @@ import {
   type AggregatedRow,
   type BottomUpRow,
 } from '../utils/Aggregation.js';
+import { reportedUsageOf } from '../utils/reportedUsage.js';
 
 /** A row of a merged view: Aggregated or Bottom-Up. */
 export interface MergedRowShape<R> {
@@ -38,6 +39,7 @@ export class MergedTree<R extends MergedRowShape<R>> {
       logStoreFor(log).keyPathIds(),
       log.governorLimits,
       options,
+      await reportedUsageOf(log),
     );
     return roots ? new MergedTree(roots) : null;
   }
@@ -52,6 +54,7 @@ export class MergedTree<R extends MergedRowShape<R>> {
       logStoreFor(log).keyPathIds(),
       log.governorLimits,
       options,
+      await reportedUsageOf(log),
     );
     return roots ? new MergedTree(roots) : null;
   }

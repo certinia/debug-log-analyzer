@@ -16,9 +16,10 @@ jest.mock('../../features/settings/Settings.js', () => ({
 import {
   ColumnSettingsController,
   gridColumnTarget,
+  heldColumnTarget,
   type ColumnTarget,
 } from '../ColumnSettingsController.js';
-import type { LvGrid } from '../../grid/index.js';
+import type { GridColumn, LvGrid } from '../../grid/index.js';
 import type { ColumnView } from '../grid/ColumnViews.js';
 import { fakeHost, type FakeHost } from '#test-helpers/fakeHost.js';
 
@@ -187,5 +188,39 @@ describe('ColumnSettingsController', () => {
       ['col:rowCount', 'rowCount title', false],
       ['col:timeTaken', 'timeTaken title', true],
     ]);
+  });
+});
+
+describe('Seen and Reported titles', () => {
+  it('name each figure while both show, and go back once Reported is hidden', async () => {
+    let columns: GridColumn<object>[] = [
+      { id: 'text', title: 'Name', cell: () => '' },
+      { id: 'soqlCount.total', title: 'SOQL', cell: () => '' },
+      { id: 'soqlCount.reported', title: 'SOQL (used)', hidden: true, cell: () => '' },
+    ];
+    const target = heldColumnTarget(
+      () => columns,
+      (next) => (columns = next),
+    );
+    const host = fakeHost();
+    const settings = new ColumnSettingsController(host, {
+      section: 'callTree',
+      read: () => undefined,
+      views: [{ id: 'General', fields: ['soqlCount.total'] }],
+      alwaysVisible: ['text'],
+      pairs: [{ seen: 'soqlCount.total', reported: 'soqlCount.reported', label: 'SOQL' }],
+      targets: () => [target],
+    });
+    host.connect();
+    await Promise.resolve();
+    const titles = (): string[] => columns.filter((c) => !c.hidden).map((c) => c.title);
+
+    expect(titles()).toEqual(['Name', 'SOQL']);
+
+    settings.toggle(target, 'soqlCount.reported');
+    expect(titles()).toEqual(['Name', 'SOQL (seen)', 'SOQL (used)']);
+
+    settings.toggle(target, 'soqlCount.reported');
+    expect(titles()).toEqual(['Name', 'SOQL']);
   });
 });
