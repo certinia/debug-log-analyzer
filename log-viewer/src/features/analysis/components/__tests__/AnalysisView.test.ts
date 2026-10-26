@@ -388,6 +388,26 @@ describe('analysis-view', () => {
     expect(signals).toEqual([true, false]);
   });
 
+  it('drops a build a newer log overtook while it read the limit usage', async () => {
+    // The newer log lands after this tree resolves but before its usage read does.
+    const olderTree = await MergedTree.bottomUp(recursiveLog());
+    let finish: (tree: typeof olderTree) => void = () => {};
+    jest
+      .spyOn(MergedTree, 'bottomUp')
+      .mockImplementationOnce(() => new Promise((resolve) => (finish = resolve)))
+      .mockImplementationOnce(() => new Promise(() => {}));
+
+    view.logStore = logStoreFor(recursiveLog());
+    await view.updateComplete;
+    finish(olderTree);
+    view.logStore = logStoreFor(recursiveLog());
+    await view.updateComplete;
+    await settle();
+    await view.updateComplete;
+
+    expect(roots()).not.toBe(olderTree?.source.roots);
+  });
+
   it('gives the grid it has the rows of a new log, and keeps Details on', async () => {
     view.renderRoot.querySelector<HTMLButtonElement>('button.pill-toggle')?.click();
     await view.updateComplete;
