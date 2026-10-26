@@ -1,12 +1,8 @@
 /*
  * Copyright (c) 2026 Certinia Inc. All rights reserved.
  */
-import { CLAUSE_KEYWORDS as MAJOR_CLAUSE, COND_JOIN, INDENT, isPunct } from './clauses.js';
+import { COND_JOIN, INDENT, isKeyword, isPunct, opensClause } from './clauses.js';
 import type { Token } from './tokenize.js';
-
-function isKeyword(t: Token | undefined, name: string): boolean {
-  return !!t && (t.kind === 'keyword' || t.kind === 'function') && t.text.toUpperCase() === name;
-}
 
 /**
  * Walk the token stream and emit a flat sequence of chunks for pretty-print
@@ -65,8 +61,7 @@ export function prettyChunks(tokens: Token[]): (Token | string)[] {
 
     // major clause start
     const upper = t.text.toUpperCase();
-    const isMajor = (t.kind === 'keyword' || t.kind === 'function') && MAJOR_CLAUSE.has(upper);
-    if (isMajor) {
+    if (opensClause(t, upper, next)) {
       if (!atLineStart && out.length > 0) {
         newline(depth);
       }
