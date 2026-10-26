@@ -16,7 +16,7 @@ import { MinimapDensityQuery } from '../../log-viewer/src/features/timeline/opti
 import { RectangleCache } from '../../log-viewer/src/features/timeline/optimised/RectangleCache.js';
 import { BUCKET_CONSTANTS } from '../../log-viewer/src/features/timeline/types/flamechart.types.js';
 import { buildTimelineFrames } from '../../log-viewer/src/features/timeline/utils/timeline-frames.js';
-import { heapMb, line, ms, nowMs, time } from './harness.js';
+import { heapMb, line, ms, nowMs, print, time } from './harness.js';
 
 /** The widths the digest samples: odd and even, and either side of a 1536px panel. */
 const DIGEST_WIDTHS = [97, 800, 1000, 1536, 1601];
@@ -59,14 +59,12 @@ function build(log: ApexLog): Subject {
 /** A CSV row per bucket, so two revisions can be diffed to show the picture held. */
 export function digestMinimap(log: ApexLog): void {
   const { query } = build(log);
-  console.log('width,bucket,eventCount,maxDepth,dominantCategory');
+  print('width,bucket,eventCount,maxDepth,dominantCategory');
   for (const width of DIGEST_WIDTHS) {
     const { buckets } = query.query(width);
     for (let b = 0; b < buckets.length; b++) {
       const bucket = buckets[b]!;
-      console.log(
-        `${width},${b},${bucket.eventCount},${bucket.maxDepth},${bucket.dominantCategory}`,
-      );
+      print(`${width},${b},${bucket.eventCount},${bucket.maxDepth},${bucket.dominantCategory}`);
     }
   }
 }
@@ -75,15 +73,13 @@ export async function measureMinimap(log: ApexLog): Promise<void> {
   // Timed: the rectangles and the tree are built during timeline init, so this and
   // the cold query below are one bill the user pays before the first frame appears.
   const { query, frames, maxDepth } = await time('build rects + tree', () => build(log));
-  console.log(`${frames} frames, maxDepth ${maxDepth}`);
+  print(`${frames} frames, maxDepth ${maxDepth}`);
 
   // The first query builds the skyline, so its own line carries the build's cost.
   await time(`cold query(${COLD_WIDTH})`, () => query.query(COLD_WIDTH));
   const stats = query.stats();
   const perFrame = (stats.segmentCount / frames).toFixed(2);
-  console.log(
-    `  ${stats.segmentCount} segments (${perFrame}/frame), ${stats.violations} violations`,
-  );
+  print(`  ${stats.segmentCount} segments (${perFrame}/frame), ${stats.violations} violations`);
 
   query.query(WARM_WIDTH);
   const drag: number[] = [];

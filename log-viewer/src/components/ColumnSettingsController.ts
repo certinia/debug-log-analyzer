@@ -9,17 +9,22 @@ import type { GridColumn, LvGrid } from '../grid/index.js';
 import {
   columnMenuItems,
   getColumnView,
+  pairedTitle,
   resolveColumnView,
   toggleField,
   type ColumnView,
   type MenuColumn,
+  type SeenReportedPair,
 } from './grid/ColumnViews.js';
+import { columnWidthItems, type ColumnWidthGrid } from './grid/columnWidthMenu.js';
 
 export interface ColumnTarget {
   /** Each column a view can name, in order. */
   columns(): readonly MenuColumn[];
-  /** Shows only the fields in `visible`, or every column for null. */
-  show(visible: ReadonlySet<string> | null): void;
+  /** Shows only the fields in `visible`, or every column for null, and titles each pair to match. */
+  show(visible: ReadonlySet<string> | null, pairs?: readonly SeenReportedPair[]): void;
+  /** The grid the width items act on. Without one, the menu has no width items. */
+  grid?(): ColumnWidthGrid | null;
 }
 
 /** An lv-grid as a column view target: the view sets each column's `hidden`. */
@@ -27,6 +32,7 @@ export function gridColumnTarget<R extends object>(grid: LvGrid<R>): ColumnTarge
   return heldColumnTarget(
     () => grid.columns,
     (columns) => (grid.columns = columns),
+    () => grid,
   );
 }
 
@@ -34,14 +40,18 @@ export function gridColumnTarget<R extends object>(grid: LvGrid<R>): ColumnTarge
 export function heldColumnTarget<R>(
   read: () => readonly GridColumn<R>[],
   write: (columns: GridColumn<R>[]) => void,
+  grid?: () => ColumnWidthGrid | null,
 ): ColumnTarget {
   return {
     columns: read,
-    show: (visible) => {
+    grid,
+    show: (visible, pairs = []) => {
+      const isShown = (id: string): boolean => !visible || visible.has(id);
       write(
         read().map((column) => ({
           ...column,
-          hidden: visible ? !visible.has(column.id) : false,
+          hidden: !isShown(column.id),
+          title: pairedTitle(column.id, pairs, isShown) ?? column.title,
         })),
       );
     },
@@ -63,6 +73,8 @@ export interface ColumnSettingsOptions {
   views: ColumnView[];
   /** Fields shown whichever view is on, e.g. the Name column. */
   alwaysVisible: string[];
+  /** Seen and Reported columns whose titles change when both show. */
+  pairs?: readonly SeenReportedPair[];
   /** Every grid's columns the view applies to. The call tree has three. */
   targets: () => ColumnTarget[];
 }
@@ -115,7 +127,10 @@ export class ColumnSettingsController implements ReactiveController {
   /** Apply the view on show to `target`. */
   applyTo(target: ColumnTarget): void {
     const fields = this.fieldsFor(this._view);
-    target.show(fields === null ? null : new Set([...this._options.alwaysVisible, ...fields]));
+    target.show(
+      fields === null ? null : new Set([...this._options.alwaysVisible, ...fields]),
+      this._options.pairs,
+    );
   }
 
   /** Show `id` and remember it. */
@@ -150,10 +165,23 @@ export class ColumnSettingsController implements ReactiveController {
     updateSetting(`${this._options.section}.columnOverrides`, this._overrides);
   }
 
-  /** The column header menu for `target`, against the state now. */
-  menuItems(target: ColumnTarget): ContextMenuItem[] {
-    const { views, alwaysVisible } = this._options;
-    return columnMenuItems(target.columns(), this._view, views, alwaysVisible, this.editedViews);
+  /** The column header menu for `target` now; `column` is the header it opened from. */
+  menuItems(target: ColumnTarget, column: string | null = null): ContextMenuItem[] {
+    const { views, alwaysVisible, pairs } = this._options;
+    const items = columnMenuItems(
+      target.columns(),
+      this._view,
+      views,
+      alwaysVisible,
+      this.editedViews,
+      pairs,
+    );
+    if (!target.grid) {
+      return items;
+    }
+    // After the views, so the width items show without a scroll past every column toggle.
+    const afterViews = items.findIndex((item) => item.separator) + 1;
+    return [...items.slice(0, afterViews), ...columnWidthItems(column), ...items.slice(afterViews)];
   }
 
   private _adopt(settings: LanaSettings): void {

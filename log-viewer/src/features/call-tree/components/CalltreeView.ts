@@ -1,9 +1,7 @@
 /*
  * Copyright (c) 2022 Certinia Inc. All rights reserved.
  */
-import '#vscode-elements/vscode-button.js';
 import '#vscode-elements/vscode-option.js';
-import '#vscode-elements/vscode-toolbar-button.js';
 import '../../../components/VsSelect.js';
 import { consume } from '@lit/context';
 import { initialState, Task } from '@lit/task';
@@ -51,7 +49,14 @@ import {
 import { inspectorRowEvents } from '../grid/inspectorRowEvents.js';
 import { MergedTree } from '../grid/mergedRows.js';
 
-import { inMsRange, type FilterRange } from '../../../components/grid/MinMax.js';
+import type { FilterRange } from '../../../components/grid/MinMax.js';
+import {
+  BOTTOM_UP_MEASURES,
+  deep,
+  measureFilters,
+  RowFilterCache,
+  type MeasureFields,
+} from '../grid/rowFilters.js';
 
 // styles
 import { globalStyles } from '../../../styles/global.styles.js';
@@ -78,6 +83,14 @@ import {
   type ColumnTarget,
 } from '../../../components/ColumnSettingsController.js';
 import { CALL_TREE_VIEWS } from '../../../components/grid/ColumnViews.js';
+import { exportCsv } from '../../../components/grid/exportCsv.js';
+import {
+  columnViewSelect,
+  gridGroupControls,
+  gridToolbarActions,
+} from '../../../components/gridToolbar.js';
+import { reportedUsageOf } from '../utils/reportedUsage.js';
+import { selectColumnWidthItem } from '../../../components/grid/columnWidthMenu.js';
 import { LocatedRowIds, type RowData } from '../../../components/locatedRow.js';
 import { InspectorTabController } from '../../../components/InspectorTabController.js';
 import { FindController } from '../../find/FindController.js';
@@ -124,18 +137,10 @@ const DEBUG_ONLY: RowFilter<LogEvent> = {
   keepAncestors: true,
 };
 
-const deep = <R>(test: (row: R) => boolean): RowFilter<R> => ({ test, keepAncestors: true });
-
-const hasRange = (range: FilterRange): boolean => range.start !== null || range.end !== null;
-const rangeKey = (range: FilterRange): string => `${range.start}:${range.end}`;
-
 type ViewGrid = LvGrid<LogEvent> | LvGrid<AggregatedRow> | LvGrid<BottomUpRow>;
 
 /** What the filters read from a view's rows. Bottom-Up has no type or debug filter. */
-interface FilterFields<R> {
-  namespace: (row: R) => string | null | undefined;
-  total: (row: R) => number;
-  self: (row: R) => number;
+interface FilterFields<R> extends MeasureFields<R> {
   type?: { of: (row: R) => string | null | undefined; debugOnly: RowFilter<R> };
   details: RowFilter<R>;
 }
@@ -163,8 +168,12 @@ export class CalltreeView extends LitElement {
     args: () => [this.isVisible ? this.logStore : null],
   });
 
+  // State, so the expand button follows the grid on show once it is built.
+  @state()
   timeOrderGrid: LvGrid<LogEvent> | null = null;
+  @state()
   aggregatedGrid: LvGrid<AggregatedRow> | null = null;
+  @state()
   bottomUpGrid: LvGrid<BottomUpRow> | null = null;
   private _aggregatedTree: MergedTree<AggregatedRow> | null = null;
   private _bottomUpTree: MergedTree<BottomUpRow> | null = null;
@@ -180,7 +189,7 @@ export class CalltreeView extends LitElement {
   typeFilter = 'All';
   namespaceSelected: string[] = [];
   totalTimeRange: FilterRange = { start: null, end: null };
-  private readonly _filterSlots = new Map<string, { input: string; filter: RowFilter<unknown> }>();
+  private readonly _filterCache = new RowFilterCache();
   selfTimeRange: FilterRange = { start: null, end: null };
 
   tableContainer: HTMLDivElement | null = null;
@@ -196,6 +205,8 @@ export class CalltreeView extends LitElement {
   private contextMenuRow: LogEvent | null = null;
   /** The grid whose header was right-clicked (for column-toggle actions). */
   private contextMenuTarget: ColumnTarget | null = null;
+  /** The header the column menu opened from; null from the toolbar. */
+  private contextMenuColumn: string | null = null;
   private viewSwitchEpoch = 0;
   /** Drops a pending wait for the view to come on screen, once per attach. */
   private _visibilityWait: AbortController | null = null;
@@ -326,21 +337,6 @@ export class CalltreeView extends LitElement {
         position: relative;
       }
 
-      .filter-container {
-        display: flex;
-        gap: 4px;
-        align-items: flex-end;
-      }
-
-      .filter-container vscode-button {
-        height: var(--filter-control-height);
-      }
-
-      .filter-container vscode-button::part(base) {
-        padding: var(--filter-control-padding);
-        font-size: var(--filter-control-font-size);
-      }
-
       #call-tree-table,
       #aggregated-tree-table,
       #bottom-up-tree-table {
@@ -381,34 +377,7 @@ export class CalltreeView extends LitElement {
                 this._setViewMode(e.detail.value as ViewMode)}
             ></view-mode-switch>
 
-            <div slot="table-actions" class="filter-container">
-              <vscode-button secondary @click="${this._expandButtonClick}">Expand</vscode-button>
-              <vscode-button secondary @click="${this._collapseButtonClick}"
-                >Collapse</vscode-button
-              >
-
-              <vs-select
-                dense
-                id="column-view"
-                prefix="Columns"
-                label="Column view"
-                @change="${this._handleColumnViewChange}"
-                @vs-reset-option="${this._onResetOption}"
-                .value="${this._columns.view}"
-                .resettableValues="${this._columns.editedViews}"
-              >
-                ${repeat(
-                  CALL_TREE_VIEWS,
-                  (view) => view.id,
-                  (view) =>
-                    html`<vscode-option
-                      value="${view.id}"
-                      ?selected="${this._columns.view === view.id}"
-                      >${view.id}</vscode-option
-                    >`,
-                )}
-              </vs-select>
-            </div>
+            ${columnViewSelect({ id: 'column-view', views: CALL_TREE_VIEWS, columns: this._columns })}
 
             <overflow-list slot="filters" menu-heading="Filters" icon="filter">
               <datagrid-facet-filter
@@ -483,34 +452,23 @@ export class CalltreeView extends LitElement {
               }
             </overflow-list>
 
-            ${
-              this.viewMode === 'bottom-up'
-                ? html`
-                    <vs-select
-                      dense
-                      slot="group"
-                      id="bottomup-groupby"
-                      prefix="Group"
-                      label="Group by"
-                      @change="${this._handleBottomUpGroupBy}"
-                      .value="${this.bottomUpGroupBy}"
-                    >
-                      ${BOTTOM_UP_GROUPS.map(
-                        ({ label }) => html`<vscode-option>${label}</vscode-option>`,
-                      )}
-                    </vs-select>
-                  `
-                : ''
-            }
-
-            <div slot="actions">
-              <vscode-toolbar-button
-                icon="list-selection"
-                label="Columns"
-                title="Columns"
-                @click="${this._openColumnMenu}"
-              ></vscode-toolbar-button>
-            </div>
+            ${gridGroupControls({
+              grid: this._activeGrid(),
+              group:
+                this.viewMode === 'bottom-up'
+                  ? {
+                      id: 'bottomup-groupby',
+                      labels: BOTTOM_UP_GROUPS.map(({ label }) => label),
+                      value: this.bottomUpGroupBy,
+                      onChange: (label) => this._handleBottomUpGroupBy(label),
+                    }
+                  : undefined,
+            })}
+            ${gridToolbarActions({
+              openColumns: (event) => this._openColumnMenu(event),
+              exportToCSV: () => void this._exportCsv(),
+              copyToClipboard: () => void this._activeGrid()?.copy(),
+            })}
           </datagrid-filter-bar>
         </div>
 
@@ -615,16 +573,11 @@ export class CalltreeView extends LitElement {
     this._bottomUpBuild = null;
   }
 
-  _handleBottomUpGroupBy(event: Event) {
-    const target = event.target as HTMLInputElement;
-    this.bottomUpGroupBy = target.value;
+  _handleBottomUpGroupBy(label: string) {
+    this.bottomUpGroupBy = label;
     if (this.bottomUpGrid) {
-      this.bottomUpGrid.groupBy = bottomUpGroupBy(target.value);
+      this.bottomUpGrid.groupBy = bottomUpGroupBy(label);
     }
-  }
-
-  private _handleColumnViewChange(event: Event) {
-    this._columns.choose((event.target as HTMLInputElement).value || 'General');
   }
 
   private get _grids(): ViewGrid[] {
@@ -659,13 +612,26 @@ export class CalltreeView extends LitElement {
     }
   }
 
-  private _showHeaderContextMenu(target: ColumnTarget, clientX: number, clientY: number) {
+  private async _exportCsv(): Promise<void> {
+    const grid = this._activeGrid();
+    if (grid) {
+      await exportCsv(grid, `call-tree-${this.viewMode}.csv`);
+    }
+  }
+
+  private _showHeaderContextMenu(
+    target: ColumnTarget,
+    clientX: number,
+    clientY: number,
+    column: string | null = null,
+  ) {
     if (!this.contextMenu) {
       return;
     }
     this.contextMenuRow = null;
     this.contextMenuTarget = target;
-    this.contextMenu.show(this._columns.menuItems(target), clientX, clientY);
+    this.contextMenuColumn = column;
+    this.contextMenu.show(this._columns.menuItems(target, column), clientX, clientY);
   }
 
   private _activeColumnTarget(): ColumnTarget | null {
@@ -693,16 +659,16 @@ export class CalltreeView extends LitElement {
     if (!this.contextMenu?.isVisible() || !this.contextMenuTarget) {
       return;
     }
-    this.contextMenu.items = this._columns.menuItems(this.contextMenuTarget);
+    this.contextMenu.items = this._columns.menuItems(
+      this.contextMenuTarget,
+      this.contextMenuColumn,
+    );
   }
 
   private _onColumnMenuClose() {
     this.contextMenuTarget = null;
+    this.contextMenuColumn = null;
     this.contextMenuRow = null;
-  }
-
-  private _onResetOption(event: CustomEvent<{ value: string }>) {
-    this._columns.reset(event.detail.value);
   }
 
   _handleTypeFilter(event: Event) {
@@ -746,17 +712,6 @@ export class CalltreeView extends LitElement {
     }
   }
 
-  // The grid keeps its work per filter object, so an unchanged filter must keep its object.
-  private _filter<R>(slot: string, input: string, make: () => RowFilter<R>): RowFilter<R> {
-    const held = this._filterSlots.get(slot);
-    if (held?.input === input) {
-      return held.filter as RowFilter<R>;
-    }
-    const filter = make();
-    this._filterSlots.set(slot, { input, filter: filter as RowFilter<unknown> });
-    return filter;
-  }
-
   /** The filters of {@link _updateFiltering} for the Aggregated grid: Time Order's, on its rows. */
   private _aggregatedFilters(): RowFilter<AggregatedRow>[] {
     return this._viewFilters<AggregatedRow>('aggregated', {
@@ -782,39 +737,18 @@ export class CalltreeView extends LitElement {
   /** The filters of {@link _updateFiltering} for the Bottom-Up grid: no type or debug filter. */
   private _bottomUpFilters(): RowFilter<BottomUpRow>[] {
     return this._viewFilters<BottomUpRow>('bottom-up', {
-      namespace: (row) => row.namespace,
-      total: (row) => row.totalTime,
-      self: (row) => row.totalSelfTime,
+      ...BOTTOM_UP_MEASURES,
       details: BOTTOM_UP_DETAILS,
     });
   }
 
   private _viewFilters<R>(view: ViewMode, fields: FilterFields<R>): RowFilter<R>[] {
-    const namespaces = this.namespaceSelected;
-    const filters: RowFilter<R>[] = [];
-    if (namespaces.length) {
-      filters.push(
-        this._filter(`${view}:namespace`, namespaces.join('\n'), () =>
-          deep((row) => namespaces.includes(fields.namespace(row) || '')),
-        ),
-      );
-    }
-    if (hasRange(this.totalTimeRange)) {
-      const range = this.totalTimeRange;
-      filters.push(
-        this._filter(`${view}:total`, rangeKey(range), () =>
-          deep((row) => inMsRange(range, fields.total(row))),
-        ),
-      );
-    }
-    if (hasRange(this.selfTimeRange)) {
-      const range = this.selfTimeRange;
-      filters.push(
-        this._filter(`${view}:self`, rangeKey(range), () =>
-          deep((row) => inMsRange(range, fields.self(row))),
-        ),
-      );
-    }
+    const filters = measureFilters(
+      { namespaces: this.namespaceSelected, total: this.totalTimeRange, self: this.selfTimeRange },
+      fields,
+      this._filterCache,
+      view,
+    );
     const { type } = fields;
     if (type && this.filterState.debugOnly) {
       filters.push(type.debugOnly);
@@ -823,7 +757,7 @@ export class CalltreeView extends LitElement {
     const types = this.filterState.selectedTypes;
     if (type && types.size > 0 && !types.has('All')) {
       filters.push(
-        this._filter(`${view}:type`, [...types].join('\n'), () =>
+        this._filterCache.reuse(`${view}:type`, [...types].join('\n'), () =>
           deep((row) => {
             const of = type.of(row);
             return !!of && types.has(of);
@@ -858,18 +792,6 @@ export class CalltreeView extends LitElement {
     } else if (this.bottomUpGrid && this.viewMode === 'bottom-up') {
       this.bottomUpGrid.marked = this._bottomUpTree?.marked(pathIds) ?? new Set();
     }
-  }
-
-  async _expandButtonClick(): Promise<void> {
-    const grid = this._activeGrid();
-    await grid?.expandAll();
-    grid?.focus({ preventScroll: true });
-  }
-
-  async _collapseButtonClick(): Promise<void> {
-    const grid = this._activeGrid();
-    await grid?.collapseAll();
-    grid?.focus({ preventScroll: true });
   }
 
   _appendTableWhenVisible() {
@@ -982,8 +904,13 @@ export class CalltreeView extends LitElement {
     await this._loadTimeOrder(grid, rootMethod);
   }
 
-  private _loadTimeOrder(grid: LvGrid<LogEvent>, log: ApexLog): Promise<void> {
-    grid.columns = timeOrderColumns(log, { openType });
+  private async _loadTimeOrder(grid: LvGrid<LogEvent>, log: ApexLog): Promise<void> {
+    const reported = await reportedUsageOf(log);
+    // A newer log can load while this one waits.
+    if (this.rootMethod !== log) {
+      return;
+    }
+    grid.columns = timeOrderColumns(log, { openType, reported });
     this._columns.applyTo(gridColumnTarget(grid));
     grid.source = timeOrderSource(log);
     return grid.settled();
@@ -1012,8 +939,6 @@ export class CalltreeView extends LitElement {
   }
 
   private _loadAggregated(grid: LvGrid<AggregatedRow>, log: ApexLog): Promise<void> {
-    grid.columns = aggregatedColumns(log, { openType });
-    this._columns.applyTo(gridColumnTarget(grid));
     this._aggregatedBuild = this._fillAggregatedTree(grid, log);
     return this._aggregatedBuild;
   }
@@ -1022,6 +947,12 @@ export class CalltreeView extends LitElement {
     grid: LvGrid<AggregatedRow>,
     rootMethod: ApexLog,
   ): Promise<void> {
+    const reported = await reportedUsageOf(rootMethod);
+    if (this.rootMethod !== rootMethod || this.aggregatedGrid !== grid) {
+      return;
+    }
+    grid.columns = aggregatedColumns(rootMethod, { openType, reported });
+    this._columns.applyTo(gridColumnTarget(grid));
     const tree = await MergedTree.aggregated(rootMethod, { signal: this._builds.signal });
     // A build can finish just before a detach, and a later one owns the container now.
     if (!tree || this.aggregatedGrid !== grid) {
@@ -1054,13 +985,17 @@ export class CalltreeView extends LitElement {
   }
 
   private _loadBottomUp(grid: LvGrid<BottomUpRow>, log: ApexLog): Promise<void> {
-    grid.columns = bottomUpColumns(log, { openType });
-    this._columns.applyTo(gridColumnTarget(grid));
     this._bottomUpBuild = this._fillBottomUpTree(grid, log);
     return this._bottomUpBuild;
   }
 
   private async _fillBottomUpTree(grid: LvGrid<BottomUpRow>, rootMethod: ApexLog): Promise<void> {
+    const reported = await reportedUsageOf(rootMethod);
+    if (this.rootMethod !== rootMethod || this.bottomUpGrid !== grid) {
+      return;
+    }
+    grid.columns = bottomUpColumns(rootMethod, { openType, reported });
+    this._columns.applyTo(gridColumnTarget(grid));
     const tree = await MergedTree.bottomUp(rootMethod, { signal: this._builds.signal });
     // A build can finish just before a detach, and a later one owns the container now.
     if (!tree || this.bottomUpGrid !== grid) {
@@ -1096,9 +1031,9 @@ export class CalltreeView extends LitElement {
     });
 
     grid.addEventListener('lv-grid-header-context', (e) => {
-      const { event } = (e as CustomEvent<GridHeaderContextDetail>).detail;
+      const { column, event } = (e as CustomEvent<GridHeaderContextDetail>).detail;
       event.preventDefault();
-      this._showHeaderContextMenu(gridColumnTarget(grid), event.clientX, event.clientY);
+      this._showHeaderContextMenu(gridColumnTarget(grid), event.clientX, event.clientY, column);
     });
     grid.addEventListener('lv-grid-reshape', () => void this._finder.rerun());
     grid.addEventListener('lv-grid-select', inspector.select);
@@ -1156,6 +1091,9 @@ export class CalltreeView extends LitElement {
     if (itemId.startsWith('reset:')) {
       this._columns.reset(itemId.slice('reset:'.length));
       this._refreshColumnMenu();
+      return;
+    }
+    if (selectColumnWidthItem(this.contextMenuTarget?.grid?.() ?? null, itemId)) {
       return;
     }
 

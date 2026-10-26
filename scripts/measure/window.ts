@@ -8,7 +8,7 @@
 import type { ApexLog } from '@apexdevtools/apex-log-parser';
 
 import { windowIndexFor } from '../../log-viewer/src/core/log/windowStats.js';
-import { time } from './harness.js';
+import { print, time } from './harness.js';
 
 // The build slices itself against this; resolving at once measures the work
 // rather than the frames it would hand back on screen.
@@ -41,7 +41,7 @@ export async function measureWindow(log: ApexLog): Promise<void> {
     const window = at(share === 1 ? 0 : 0.05, share);
     const stats = await time(`statsFor ${label}`, () => index.statsFor(window));
     const self = [...stats.selfByCategory.values()].reduce((sum, held) => sum + held, 0);
-    console.log(
+    print(
       `  ${stats.selfByCategory.size} categories, ${stats.selfByNamespace.size} namespaces, ` +
         `${Math.round(self / 1_000_000)}ms self, ${stats.counts.soqlCount} SOQL`,
     );

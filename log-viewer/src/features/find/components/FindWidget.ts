@@ -4,14 +4,24 @@ import type { VscodeTextfield } from '#vscode-elements/vscode-textfield.js';
 import { LitElement, css, html } from 'lit';
 import { customElement, state } from 'lit/decorators.js';
 
+import { DelayController } from '../../../core/events/DelayController.js';
 import { DomListenerController } from '../../../core/events/DomListenerController.js';
-import type { FindEventMap, FindResultsEventDetail } from '../findEvents.js';
+import type { FindDirection, FindEventMap, FindResultsEventDetail } from '../findEvents.js';
 
 // styles
 import { globalStyles } from '../../../styles/global.styles.js';
 
 // web components
 import '../../../components/VsIconCheckbox.js';
+
+const LIVE_FIND_MS = 150;
+
+// The field's input is square and opaque, so it paints over the rounded border's corners; VS Code's find input is see-through too.
+const seeThroughInput = css`
+  input {
+    background-color: transparent;
+  }
+`.styleSheet;
 
 @customElement('find-widget')
 export class FindWidget extends LitElement {
@@ -20,8 +30,9 @@ export class FindWidget extends LitElement {
   @state() isVisble = false;
   @state() matchCase = false;
 
-  lastMatch: string | null = null;
-  nextMatchDirection = true; // Remembers last direction: true=next, false=previous
+  _sentTerm: string | null = null;
+  // The term the counts are for: a search sent for a newer one keeps the old counts until it reports.
+  @state() private _countedTerm: string | null = null;
 
   private readonly _findBus = new DomListenerController<FindEventMap>(this, document, {
     'lv-find-results': (e) => this._updateCounts(e),
@@ -33,6 +44,8 @@ export class FindWidget extends LitElement {
     keydown: (e) => this._keyPress(e),
   });
 
+  private readonly _live = new DelayController(this, LIVE_FIND_MS);
+
   static styles = [
     globalStyles,
     css`
@@ -43,31 +56,34 @@ export class FindWidget extends LitElement {
       .wrapper {
         position: absolute;
         top: 0;
+        /* VS Code's own find widget geometry, not spacing. */
         right: 28px;
         max-width: 420px;
-        border: 1px solid var(--vscode-contrastBorder);
         color: var(--vscode-editorWidget-foreground);
         background: var(--lana-popover-bg);
         z-index: 1;
         display: flex;
-        border-bottom: 1px solid var(--lana-surface-border);
-        border-bottom-left-radius: 4px;
-        border-bottom-right-radius: 4px;
-        border-left: 1px solid var(--lana-surface-border);
-        border-right: 1px solid var(--lana-surface-border);
+        border: var(--lana-stroke) solid var(--lana-surface-border);
+        border-radius: var(--lana-radius-lg);
         box-sizing: border-box;
-        margin-top: 3px;
+        margin-top: var(--lana-space-2xs);
         align-items: center;
         overflow: hidden;
-        padding: 3px 4px;
-        position: absolute;
-        transform: translateY(calc(-100% - 10px));
+        padding: var(--lana-space-2xs) var(--lana-space-2xs) var(--lana-space-2xs)
+          var(--lana-space-sm);
+        transform: translateY(calc(-100% - var(--lana-space-sm)));
         transition: transform 0.2s linear;
       }
 
       .visible {
         transform: translateY(0);
-        box-shadow: 0 0 8px 2px var(--vscode-widget-shadow);
+        box-shadow: var(--lana-shadow-popover);
+      }
+
+      @media (prefers-reduced-motion: reduce) {
+        .wrapper {
+          transition: none;
+        }
       }
 
       .find-input__controls {
@@ -84,7 +100,7 @@ export class FindWidget extends LitElement {
       .find-control {
         box-sizing: border-box;
         align-items: center;
-        margin-left: 3px;
+        margin-left: var(--lana-space-2xs);
         height: 20px;
         width: 20px;
       }
@@ -94,16 +110,10 @@ export class FindWidget extends LitElement {
         align-items: center;
       }
 
-      .find-button:focus-within {
-        color: var(--vscode-inputOption-activeForeground);
-        border: 1px solid var(--vscode-inputOption-activeBorder);
-        cursor: pointer;
-        user-select: none;
-        -webkit-user-select: none;
-        justify-content: center;
-        box-sizing: border-box;
-        width: 22px;
-        height: 22px;
+      /* The button colours its icon from this var; VS Code's find widget greys a disabled action so. */
+      .find-button.disabled {
+        --vscode-foreground: var(--vscode-disabledForeground);
+        pointer-events: none;
       }
 
       .matches-count {
@@ -112,21 +122,30 @@ export class FindWidget extends LitElement {
         display: flex;
         flex: initial;
         align-items: center;
-        margin: 0 0 0 3px;
-        padding-left: 2px;
+        margin: 0 0 0 var(--lana-space-2xs);
+        padding-left: var(--lana-space-3xs);
         text-align: center;
         vertical-align: middle;
+      }
+
+      .no-results .matches-count {
+        color: var(--vscode-errorForeground);
       }
     `,
   ];
 
   render() {
-    return html`<div class="wrapper ${this.isVisble ? 'visible' : ''}">
+    const cannotStep = !this.totalMatches;
+    const noResults = !!this._countedTerm && !this.totalMatches;
+    return html`<div
+      class="wrapper ${this.isVisble ? 'visible' : ''} ${noResults ? 'no-results' : ''}"
+    >
       <vscode-textfield
         placeholder="Find"
         label="Find"
         class="find-input-box"
         @click=${this._findInputClick}
+        @input=${this._onInput}
       >
         <section slot="content-after" class="find-input__controls">
           <vs-icon-checkbox
@@ -148,15 +167,15 @@ export class FindWidget extends LitElement {
           icon="arrow-up"
           label="Previous Match"
           title="Previous Match"
-          class="find-button"
-          @click=${this._previousMatch}
+          class="find-button ${cannotStep ? 'disabled' : ''}"
+          @click=${() => this._step('prev')}
         ></vscode-toolbar-button>
         <vscode-toolbar-button
           icon="arrow-down"
           label="Next Match"
           title="Next Match"
-          class="find-button"
-          @click=${this._nextMatch}
+          class="find-button ${cannotStep ? 'disabled' : ''}"
+          @click=${() => this._step('next')}
         ></vscode-toolbar-button>
         <vscode-toolbar-button
           icon="close"
@@ -171,91 +190,82 @@ export class FindWidget extends LitElement {
 
   _getMatchesText() {
     if (this.totalMatches === 0) {
-      return 'No Matches';
+      return 'No results';
     }
 
     return (this.currentMatch || '?') + ' of ' + this.totalMatches;
   }
 
-  // A reader says "?" as "question mark".
+  // A reader says "?" as "question mark", and hears no term in "3 of 28".
   _getMatchesSpoken() {
-    if (this.totalMatches && !this.currentMatch) {
-      return `${this.totalMatches} ${this.totalMatches === 1 ? 'match' : 'matches'}`;
+    const text = this._countedTerm;
+    if (!this.totalMatches) {
+      return text ? `No results found for '${text}'` : 'No results found';
     }
-    return this._getMatchesText();
+    if (!this.currentMatch) {
+      const matches = this.totalMatches === 1 ? 'match' : 'matches';
+      return `${this.totalMatches} ${matches} found for '${text}'`;
+    }
+    return `${this.currentMatch} of ${this.totalMatches} found for '${text}'`;
   }
 
   _matchCase() {
-    this._resetCounts();
+    this._live.cancel();
     this.matchCase = !this.matchCase;
-    this.nextMatchDirection = true; // Reset to forward direction
-    this._triggerFind();
+    this._send('lv-find', 'next');
   }
 
   _closeFind() {
+    this._live.cancel();
     this.isVisble = false;
     this._resetCounts();
-    const findEvt = this._getFindEvent();
-    findEvt.detail.text = '';
-    document.dispatchEvent(new CustomEvent('lv-find-close', findEvt));
+    this._send('lv-find-close');
   }
 
   _findInputClick() {
     const inputBox = this.inputbox;
     if (inputBox) {
       this.isVisble = true;
-      this.nextMatchDirection = true; // Reset to forward direction
       inputBox.focus();
       inputBox.wrappedElement?.select();
     }
   }
 
-  /**
-   * Navigate to previous match.
-   * @param setDirection - If true, remembers this direction for Enter key. Button clicks pass true, Shift+Enter passes false.
-   */
-  _previousMatch(setDirection = true) {
-    if (this.currentMatch !== null) {
-      this.currentMatch--;
-      if (setDirection) {
-        this.nextMatchDirection = false;
-      }
-      if (this.currentMatch < 1) {
-        this.currentMatch = this.totalMatches;
-      }
-
-      document.dispatchEvent(new CustomEvent('lv-find-match', this._getFindEvent()));
+  // New text, or nothing to step through, searches first: the views have no matches for it yet.
+  _step(direction: FindDirection) {
+    this._live.cancel();
+    if (this._hasMatchValueChanged() || !this.totalMatches) {
+      this._send('lv-find', direction);
+      return;
     }
-  }
-
-  /**
-   * Navigate to next match.
-   * @param setDirection - If true, remembers this direction for Enter key. Button clicks pass true, Enter key passes false.
-   */
-  _nextMatch(setDirection = true) {
-    if (this.currentMatch !== null) {
-      this.currentMatch++;
-      if (setDirection) {
-        this.nextMatchDirection = true;
-      }
-      if (this.currentMatch > this.totalMatches) {
-        this.currentMatch = 1;
-      }
-
-      document.dispatchEvent(new CustomEvent('lv-find-match', this._getFindEvent()));
+    if (!this.currentMatch) {
+      this._send('lv-find-match', direction);
+      return;
     }
+    const by = direction === 'next' ? 1 : -1;
+    this.currentMatch = ((this.currentMatch - 1 + by + this.totalMatches) % this.totalMatches) + 1;
+    document.dispatchEvent(new CustomEvent('lv-find-match', this._getFindEvent()));
   }
 
   get inputbox() {
     return this.shadowRoot?.querySelector<VscodeTextfield>('.find-input-box');
   }
 
+  firstUpdated() {
+    const field = this.inputbox?.shadowRoot;
+    if (field && seeThroughInput) {
+      field.adoptedStyleSheets = [...field.adoptedStyleSheets, seeThroughInput];
+    }
+  }
+
   _updateCounts(e: CustomEvent<FindResultsEventDetail>) {
+    this._countedTerm = this._sentTerm;
     this.totalMatches = e.detail.totalMatches;
     this.currentMatch = e.detail.currentMatch;
   }
 
   _resetCounts() {
+    this._countedTerm = null;
     this.totalMatches = 0;
     this.currentMatch = 1;
   }
@@ -268,10 +278,8 @@ export class FindWidget extends LitElement {
 
     if (e.key === 'f' && (e.metaKey || e.ctrlKey) && !e.shiftKey) {
       e.preventDefault();
-      this.nextMatchDirection = true; // Reset to forward direction
-
       if (!this.isVisble && !this.totalMatches) {
-        this._triggerFind();
+        this._send('lv-find');
       }
       this._findInputClick();
       return;
@@ -286,28 +294,14 @@ export class FindWidget extends LitElement {
 
     switch (e.key) {
       case 'Escape':
-        this.nextMatchDirection = true; // Reset to forward direction
         this._closeFind();
         break;
 
       case 'Enter': {
         e.preventDefault(); // Prevent double-firing from input field
-        if (this._hasMatchValueChanged() || !this.totalMatches) {
-          this._triggerFind();
-        } else if (e.shiftKey) {
-          this._previousMatch(false); // Shift+Enter → always previous, don't change remembered direction
-        } else if (this.nextMatchDirection) {
-          this._nextMatch(false); // Enter → next (default direction)
-        } else {
-          this._previousMatch(false); // Enter → previous (if Prev button was last clicked)
-        }
+        this._step(e.shiftKey ? 'prev' : 'next');
         break;
       }
-
-      default:
-        // Any other key resets direction to forward
-        this.nextMatchDirection = true;
-        break;
     }
   }
 
@@ -315,14 +309,24 @@ export class FindWidget extends LitElement {
     if (!this.isVisble || !this._getMatchValue()) {
       return;
     }
-    const findEvt = this._getFindEvent();
-    findEvt.detail.count = 0;
-    document.dispatchEvent(new CustomEvent('lv-find', findEvt));
+    this._send('lv-find');
   }
 
-  _triggerFind() {
-    this._resetCounts();
-    document.dispatchEvent(new CustomEvent('lv-find', this._getFindEvent()));
+  _onInput() {
+    this._live.schedule(() => this._liveFind());
+  }
+
+  _liveFind() {
+    if (!this._hasMatchValueChanged()) {
+      return;
+    }
+    this._send('lv-find', 'next');
+  }
+
+  // Counts stay until the views report, so a new search does not flash "No results".
+  _send(type: 'lv-find' | 'lv-find-match' | 'lv-find-close', direction?: FindDirection) {
+    const { detail } = this._getFindEvent();
+    document.dispatchEvent(new CustomEvent(type, { detail: { ...detail, count: 0, direction } }));
   }
 
   _getMatchValue() {
@@ -330,11 +334,11 @@ export class FindWidget extends LitElement {
   }
 
   _hasMatchValueChanged() {
-    return this.lastMatch !== this._getMatchValue();
+    return this._sentTerm !== this._getMatchValue();
   }
 
   _getFindEvent() {
-    this.lastMatch = this._getMatchValue();
+    this._sentTerm = this._getMatchValue();
     return {
       detail: {
         text: this._getMatchValue(),

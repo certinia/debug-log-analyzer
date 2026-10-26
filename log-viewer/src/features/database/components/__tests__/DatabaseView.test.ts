@@ -257,7 +257,7 @@ describe('database-view find', () => {
     return seen;
   }
 
-  const search = (count = 1, type: 'lv-find' | 'lv-find-match' = 'lv-find') =>
+  const search = (count = 0, type: 'lv-find' | 'lv-find-match' = 'lv-find') =>
     document.dispatchEvent(
       new CustomEvent(type, {
         detail: { text: 'update', count, options: { matchCase: false } },
@@ -279,9 +279,10 @@ describe('database-view find', () => {
   it('marks the current match in the grid that holds it, counting in view order', async () => {
     grids.forEach((grid) => (grid.grid.matches = 2));
 
-    await rollUps(() => search(3));
+    await rollUps(() => search());
+    await rollUps(() => search(3, 'lv-find-match'));
 
-    expect(grids.map((grid) => grid.grid.current)).toEqual([[-1], [0], [-1]]);
+    expect(grids.map((grid) => grid.grid.current.at(-1))).toEqual([-1, 0, -1]);
   });
 
   it('keeps reporting after a detach and re-attach', async () => {

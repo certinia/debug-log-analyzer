@@ -21,6 +21,7 @@ import {
   type AggregatedRow,
 } from '../../utils/Aggregation.js';
 import { toTimeOrderTree, type TimeOrderRow } from '../../utils/TimeOrderTree.js';
+import { reportedUsage } from '../../utils/reportedUsage.js';
 import { CallTreeGrid, categoryClass } from '../CallTreeGrid.js';
 import { nameCell } from '../cells.js';
 import {
@@ -198,6 +199,12 @@ describe('bottomUpColumns', () => {
     );
   });
 
+  it('counts each query and its rows once in the footer, though the method and query rows both hold them', () => {
+    // One query of 3 rows, inside ns.Outer.run(): both are top-level Bottom-Up rows.
+    expect(total(column(columns, 'soqlCount.total').calc, roots)).toBe(1);
+    expect(total(column(columns, 'soqlRowCount.total').calc, roots)).toBe(3);
+  });
+
   it('opens sorted by a column it has', () => {
     expect(column(columns, BOTTOM_UP_SORT.column).sort).toBeDefined();
   });
@@ -265,7 +272,7 @@ describe('copy', () => {
     await grid.copy();
 
     const [head, ...rows] = writeText.mock.calls[0]?.[0].split('\n') ?? [];
-    expect(head).toMatch(/^Level\tName\tNamespace\tCalls\tDML Count\t/);
+    expect(head).toMatch(/^Level\tName\tNamespace\tCalls\tDML\t/);
     expect(rows).toHaveLength(4);
     expect(rows.map((r) => r.split('\t')[1])).toContain('SELECT Id FROM Account');
   });
@@ -338,5 +345,123 @@ describe('lv-call-tree-grid', () => {
     expect(categoryClass({})).toBeUndefined();
     expect(categoryClass({ category: 'SOQL' })).toBe('cat-soql');
     expect(document.createElement('lv-call-tree-grid').rowClass).toBe(categoryClass);
+  });
+});
+
+describe('Reported columns', () => {
+  // The cumulative block says 5 queries ran by then; the method's events show 1.
+  const { log: reportedLog, store } = storeOf(
+    '09:18:22.6 (1000)|METHOD_ENTRY|[1]|01p|Outer.run()\n' +
+      '09:18:22.6 (2000)|SOQL_EXECUTE_BEGIN|[2]|Aggregations:0|SELECT Id FROM Account\n' +
+      '09:18:22.6 (3000)|SOQL_EXECUTE_END|[2]|Rows:3\n' +
+      '09:18:22.6 (4000)|CUMULATIVE_LIMIT_USAGE\n' +
+      '09:18:22.6 (4000)|LIMIT_USAGE_FOR_NS|(default)|\n' +
+      '  Number of SOQL queries: 5 out of 100\n' +
+      '09:18:22.6 (4000)|CUMULATIVE_LIMIT_USAGE_END\n' +
+      '09:18:22.6 (5000)|METHOD_EXIT|[1]|Outer.run()\n',
+  );
+  const outer = (): LogEvent => {
+    const found = allRows(reportedLog.children).find((e) => e.text === 'Outer.run()');
+    if (!found) {
+      throw new Error('no Outer.run()');
+    }
+    return found;
+  };
+
+  it('sits after its Seen column, hidden until a view or the user shows it', async () => {
+    const columns = timeOrderColumns(reportedLog, {
+      ...options,
+      reported: await store.derive(reportedUsage),
+    });
+    const ids = columns.map((c) => c.id);
+
+    expect(ids.indexOf('soqlCount.reported')).toBe(ids.indexOf('soqlCount.total') + 1);
+    expect(column(columns, 'soqlCount.reported').hidden).toBe(true);
+  });
+
+  it('tints a row where Salesforce reported a different count, and states both', async () => {
+    const reported = column(
+      timeOrderColumns(reportedLog, { ...options, reported: await store.derive(reportedUsage) }),
+      'soqlCount.reported',
+    );
+
+    expect(reported.text?.(outer())).toBe('5');
+    expect(reported.tooltip?.(outer())).toBe('Used 5 · Seen 1');
+    expect(shown(reported.cell(outer())).querySelector('.reported-differs')).not.toBeNull();
+  });
+
+  it('keeps two alike queries alike, and puts the correction on the row that holds the report', async () => {
+    // Two queries seen, then Salesforce reports it charged one.
+    const { log, store: twoStore } = storeOf(
+      '09:18:22.6 (1000)|METHOD_ENTRY|[1]|01p|Outer.run()\n' +
+        '09:18:22.6 (2000)|SOQL_EXECUTE_BEGIN|[2]|Aggregations:0|SELECT Id FROM Plugin__mdt\n' +
+        '09:18:22.6 (3000)|SOQL_EXECUTE_END|[2]|Rows:1\n' +
+        '09:18:22.6 (4000)|SOQL_EXECUTE_BEGIN|[3]|Aggregations:0|SELECT Id FROM Plugin__mdt\n' +
+        '09:18:22.6 (5000)|SOQL_EXECUTE_END|[3]|Rows:1\n' +
+        '09:18:22.6 (6000)|CUMULATIVE_LIMIT_USAGE\n' +
+        '09:18:22.6 (6000)|LIMIT_USAGE_FOR_NS|(default)|\n' +
+        '  Number of SOQL queries: 1 out of 100\n' +
+        '09:18:22.6 (6000)|CUMULATIVE_LIMIT_USAGE_END\n' +
+        '09:18:22.6 (7000)|METHOD_EXIT|[1]|Outer.run()\n',
+    );
+    const reported = column(
+      timeOrderColumns(log, { ...options, reported: await twoStore.derive(reportedUsage) }),
+      'soqlCount.reported',
+    );
+    const rows = allRows(log.children);
+    const queries = rows.filter((e) => e.type === 'SOQL_EXECUTE_BEGIN');
+    const method = rows.find((e) => e.text === 'Outer.run()');
+
+    expect(queries.map((e) => reported.text?.(e))).toEqual(['1', '1']);
+    expect(method && reported.text?.(method)).toBe('1');
+    // Used equals Seen on each query, so neither is tinted.
+    expect(queries.map((e) => shown(reported.cell(e)).querySelector('.reported-differs'))).toEqual([
+      null,
+      null,
+    ]);
+  });
+
+  it('reads Used from a Bottom-Up row, which holds its own sum', async () => {
+    const usage = await store.derive(reportedUsage);
+    const roots = toBottomUpTree(reportedLog.children, store.keyPathIds(), undefined, usage);
+    const row = roots.find((r) => r.text === 'Outer.run()');
+    const reported = column(
+      bottomUpColumns(reportedLog, { ...options, reported: usage }),
+      'soqlCount.reported',
+    );
+
+    expect(row && reported.text?.(row)).toBe('5');
+  });
+
+  it('counts the usage once in the Bottom-Up footer, though nested rows hold it too', async () => {
+    const usage = await store.derive(reportedUsage);
+    const roots = toBottomUpTree(reportedLog.children, store.keyPathIds(), undefined, usage);
+    const reported = column(
+      bottomUpColumns(reportedLog, { ...options, reported: usage }),
+      'soqlCount.reported',
+    );
+
+    // The log used 5 in all, whichever rows hold it.
+    expect(total(reported.calc, roots)).toBe(5);
+  });
+
+  it('gives the lines that report a limit none of it: the method around them used it', async () => {
+    const reported = column(
+      timeOrderColumns(reportedLog, { ...options, reported: await store.derive(reportedUsage) }),
+      'soqlCount.reported',
+    );
+    const reporters = allRows(reportedLog.children).filter((e) =>
+      ['CUMULATIVE_LIMIT_USAGE', 'LIMIT_USAGE_FOR_NS'].includes(e.type ?? ''),
+    );
+
+    expect(reporters).not.toHaveLength(0);
+    expect(reporters.map((e) => reported.text?.(e))).toEqual(reporters.map(() => '0'));
+  });
+
+  it('shows — where the log reported no usage', () => {
+    const reported = column(timeOrderColumns(reportedLog, options), 'soqlCount.reported');
+
+    expect(reported.text?.(outer())).toBe('—');
+    expect(shown(reported.cell(outer())).querySelector('.reported-differs')).toBeNull();
   });
 });

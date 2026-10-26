@@ -17,7 +17,7 @@ const LABEL_WIDTH = 32;
 const MS_WIDTH = 7;
 
 if (!gc) {
-  console.warn('no --expose-gc: heap figures include uncollected litter\n');
+  process.stderr.write('no --expose-gc: heap figures include uncollected litter\n\n');
 }
 
 /** Heap after a collection, so a figure is what the step retained, not its litter. */
@@ -44,9 +44,14 @@ export const nowMs = (): number => Number(process.hrtime.bigint()) / 1e6;
 /** Two decimals, in `report`'s number column: a cached query lands under 0.1ms. */
 export const ms = (value: number): string => value.toFixed(2).padStart(MS_WIDTH);
 
+/** One line of a script's output. */
+export function print(text: string): void {
+  process.stdout.write(`${text}\n`);
+}
+
 /** One reported line, in the same label column as `report`. */
 export function line(label: string, text: string): void {
-  console.log(`${label.padEnd(LABEL_WIDTH)} ${text}`);
+  print(`${label.padEnd(LABEL_WIDTH)} ${text}`);
 }
 
 export function report(label: string, milliseconds: number, before: number): void {
@@ -71,6 +76,6 @@ export async function time<T>(label: string, body: () => T | Promise<T>): Promis
 
 /** Report a usage error the way every other bad input is reported, and stop. */
 export function die(message: string): never {
-  console.error(message);
+  process.stderr.write(`${message}\n`);
   process.exit(1);
 }

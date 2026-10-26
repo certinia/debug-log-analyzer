@@ -75,6 +75,21 @@ describe('columnMenuItems', () => {
     expect(items.some((i) => i.id === 'reset')).toBe(false);
   });
 
+  it('names the figure each column of a Seen and Used pair holds, while Used is hidden', () => {
+    // The Seen header reads plain `SOQL` while Used is hidden; the menu still names both figures.
+    const columns = [
+      { id: 'soqlCount.total', title: 'SOQL' },
+      { id: 'soqlCount.reported', title: 'SOQL (used)', hidden: true },
+    ];
+    const pair = { seen: 'soqlCount.total', reported: 'soqlCount.reported', label: 'SOQL' };
+
+    const labels = columnMenuItems(columns, 'General', CALL_TREE_VIEWS, ALWAYS_VISIBLE, [], [pair])
+      .filter((item) => item.id.startsWith('col:'))
+      .map((item) => item.label);
+
+    expect(labels.map((label) => label.trim())).toEqual(['SOQL (seen)', 'SOQL (used)']);
+  });
+
   it('adds an inline reset action only to edited view rows', () => {
     const columns = menuColumns(['text', 'namespace']);
     const items = columnMenuItems(columns, 'Time', CALL_TREE_VIEWS, ALWAYS_VISIBLE, ['Time']);
@@ -120,6 +135,19 @@ describe('view sets', () => {
     // SOSL is near-always-zero, so it stays out of the everyday overview.
     expect(general).not.toContain('soslCount.total');
     expect(general).not.toContain('soslRowCount.total');
+  });
+
+  it('shows the Reported columns in Governor Limits alone', () => {
+    for (const id of [
+      'dmlCount.reported',
+      'soqlCount.reported',
+      'soslCount.reported',
+      'dmlRowCount.reported',
+      'soqlRowCount.reported',
+    ]) {
+      const owning = CALL_TREE_VIEWS.filter((v) => v.fields?.includes(id));
+      expect(owning.map((v) => v.id)).toEqual(['Governor Limits']);
+    }
   });
 
   it('governorCost belongs to the Governor Limits view alone', () => {

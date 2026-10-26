@@ -16,9 +16,10 @@ jest.mock('../../features/settings/Settings.js', () => ({
 import {
   ColumnSettingsController,
   gridColumnTarget,
+  heldColumnTarget,
   type ColumnTarget,
 } from '../ColumnSettingsController.js';
-import type { LvGrid } from '../../grid/index.js';
+import type { GridColumn, LvGrid } from '../../grid/index.js';
 import type { ColumnView } from '../grid/ColumnViews.js';
 import { fakeHost, type FakeHost } from '#test-helpers/fakeHost.js';
 
@@ -187,5 +188,69 @@ describe('ColumnSettingsController', () => {
       ['col:rowCount', 'rowCount title', false],
       ['col:timeTaken', 'timeTaken title', true],
     ]);
+  });
+
+  it('adds the width items only for a grid, and Autosize Column only from a header', async () => {
+    const table = fakeTable();
+    const { columns } = await connected(table);
+    const WIDTH_LABELS = ['Autosize Column', 'Autosize All Columns', 'Reset Column Widths'];
+    const labels = (target: ColumnTarget, column?: string): string[] =>
+      columns.menuItems(target, column).map((item) => item.label.trim());
+    const widthLabels = (target: ColumnTarget, column?: string): string[] =>
+      labels(target, column).filter((label) => WIDTH_LABELS.includes(label));
+    const grid = {
+      autosizeColumn: jest.fn(),
+      autosizeColumns: jest.fn(),
+      resetColumnWidths: jest.fn(),
+    };
+
+    expect(widthLabels(table)).toEqual([]);
+    expect(widthLabels({ ...table, grid: () => grid }, 'namespace')).toEqual([
+      'Autosize Column',
+      'Autosize All Columns',
+      'Reset Column Widths',
+    ]);
+    expect(widthLabels({ ...table, grid: () => grid })).toEqual([
+      'Autosize All Columns',
+      'Reset Column Widths',
+    ]);
+    // Above the column toggles, so a long list does not push them out of view.
+    const menu = labels({ ...table, grid: () => grid });
+    expect(menu.indexOf('Reset Column Widths')).toBeLessThan(menu.indexOf('namespace'));
+    expect(menu.indexOf('Autosize All Columns')).toBeGreaterThan(menu.indexOf('Timing'));
+  });
+});
+
+describe('Seen and Reported titles', () => {
+  it('name each figure while both show, and go back once Reported is hidden', async () => {
+    let columns: GridColumn<object>[] = [
+      { id: 'text', title: 'Name', cell: () => '' },
+      { id: 'soqlCount.total', title: 'SOQL', cell: () => '' },
+      { id: 'soqlCount.reported', title: 'SOQL (used)', hidden: true, cell: () => '' },
+    ];
+    const target = heldColumnTarget(
+      () => columns,
+      (next) => (columns = next),
+    );
+    const host = fakeHost();
+    const settings = new ColumnSettingsController(host, {
+      section: 'callTree',
+      read: () => undefined,
+      views: [{ id: 'General', fields: ['soqlCount.total'] }],
+      alwaysVisible: ['text'],
+      pairs: [{ seen: 'soqlCount.total', reported: 'soqlCount.reported', label: 'SOQL' }],
+      targets: () => [target],
+    });
+    host.connect();
+    await Promise.resolve();
+    const titles = (): string[] => columns.filter((c) => !c.hidden).map((c) => c.title);
+
+    expect(titles()).toEqual(['Name', 'SOQL']);
+
+    settings.toggle(target, 'soqlCount.reported');
+    expect(titles()).toEqual(['Name', 'SOQL (seen)', 'SOQL (used)']);
+
+    settings.toggle(target, 'soqlCount.reported');
+    expect(titles()).toEqual(['Name', 'SOQL']);
   });
 });

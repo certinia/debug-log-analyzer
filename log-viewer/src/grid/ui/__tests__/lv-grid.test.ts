@@ -6,7 +6,7 @@
  */
 import { html } from 'lit';
 
-import { sum, type TreeSource } from '../../core/index.js';
+import { sum, type GridExpansion, type TreeSource } from '../../core/index.js';
 import { GridView } from '../../render/index.js';
 import {
   fakeHighlights,
@@ -15,6 +15,7 @@ import {
   type FakeHighlights,
 } from '../../render/__tests__/fakes.js';
 import type { GridColumn } from '../column.js';
+import type { Sight } from '../sight.js';
 import '../lv-grid.js';
 import type {
   GridColumnResizeDetail,
@@ -37,6 +38,10 @@ interface Node {
 }
 
 const ROW = 20;
+
+// jsdom lays nothing out, so what the reader sees is set by hand; `sight.test.ts` covers the real one.
+let mockSight: Sight = 'below';
+jest.mock('../sight.js', () => ({ sightOf: () => mockSight }));
 
 /** Three roots; `b` holds two children. */
 const source = (): TreeSource<Node> => ({
@@ -76,7 +81,14 @@ const columns = (): GridColumn<Node>[] => [
 
 /** jsdom does no layout: every element is ROW high and the scroller has room for all rows. */
 function fakeLayout(): void {
-  jest.spyOn(HTMLElement.prototype, 'offsetHeight', 'get').mockReturnValue(10 * ROW);
+  jest.spyOn(HTMLElement.prototype, 'offsetHeight', 'get').mockImplementation(function (
+    this: HTMLElement,
+  ) {
+    return this.classList.contains('scroller') ? 10 * ROW : ROW;
+  });
+  jest.spyOn(Element.prototype, 'clientHeight', 'get').mockImplementation(function (this: Element) {
+    return this.classList.contains('scroller') ? 10 * ROW : 0;
+  });
   jest.spyOn(HTMLElement.prototype, 'offsetWidth', 'get').mockReturnValue(500);
   jest
     .spyOn(HTMLElement.prototype, 'getBoundingClientRect')
@@ -92,8 +104,8 @@ async function settle(grid: LvGrid<Node>): Promise<void> {
   }
 }
 
-async function setup(props: Partial<LvGrid<Node>> = {}) {
-  fakeLayout();
+async function setup(props: Partial<LvGrid<Node>> = {}, layout: () => void = fakeLayout) {
+  layout();
   const grid = document.createElement('lv-grid') as LvGrid<Node>;
   Object.assign(grid, { columns: columns(), source: source(), ...props });
   document.body.append(grid);
@@ -290,6 +302,23 @@ describe('lv-grid', () => {
     expect(opened).toEqual(['b', 'b']);
   });
 
+  it('reports when a level step leaves no row to open, or to close', async () => {
+    const { grid } = await setup();
+    expect(grid.expansion).toEqual({ canExpand: true, canCollapse: false });
+    const sent: GridExpansion[] = [];
+    grid.addEventListener('lv-grid-expansion-change', (e) => sent.push(detail<GridExpansion>(e)));
+    await grid.expandLevel();
+    await settle(grid);
+    await grid.collapseLevel();
+    await settle(grid);
+    await grid.collapseLevel();
+    await settle(grid);
+    expect(sent).toEqual([
+      { canExpand: false, canCollapse: true },
+      { canExpand: true, canCollapse: false },
+    ]);
+  });
+
   it('selects a row with no children from its twisty', async () => {
     const { grid, rowNamed } = await setup();
     rowNamed('c')?.querySelector<HTMLElement>('.twisty')?.click();
@@ -424,6 +453,34 @@ describe('lv-grid', () => {
     } finally {
       Object.defineProperty(window, 'innerHeight', { value: innerHeight, configurable: true });
     }
+  });
+
+  it('pages by the measured heights of wrapped rows, so no row is passed unseen', async () => {
+    const many: TreeSource<Node> = {
+      roots: Array.from({ length: 100 }, (_, i) => ({ key: i, name: `r${i}`, time: i, kind: 'x' })),
+      key: (row) => row.key,
+    };
+    const { grid, scroller, key } = await setup({ source: many, rowHeight: ROW });
+    const selected: (Node | null)[] = [];
+    grid.addEventListener('lv-grid-select', (e) =>
+      selected.push(detail<GridSelectDetail<Node>>(e).row),
+    );
+    jest.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(function (
+      this: HTMLElement,
+    ) {
+      const height = this === scroller ? 10 * ROW : this.dataset.index ? 2 * ROW : ROW;
+      return { top: 0, bottom: height, height } as DOMRect;
+    });
+    Object.defineProperty(scroller, 'clientHeight', { get: () => 10 * ROW, configurable: true });
+    // A new source paints, and so measures, every row again.
+    grid.source = { ...many };
+    await settle(grid);
+    await key('Home');
+    // 8 rows of room between the header and the totals hold r0 to r3.
+    await key('PageDown');
+    expect(selected.at(-1)?.name).toBe('r3');
+    await key('PageUp');
+    expect(selected.at(-1)?.name).toBe('r0');
   });
 
   it('looks for a hidden selected row once, not on every draw and key', async () => {
@@ -1075,31 +1132,172 @@ describe('lv-grid columns', () => {
     expect(header('Time')?.getAttribute('aria-sort')).toBe('none');
   });
 
-  it('fits a column to the widest of its header and painted cells on a double-click', async () => {
-    const context = { font: '', measureText: (text: string) => ({ width: text.length * 10 }) };
+  /** Text is 10px a character; a twisty is 16px and a sort arrow 10px; other boxes 500px. */
+  const fakeText = (): {
+    measureText: (text: string) => { width: number };
+    layoutReads: number;
+    measures: number;
+  } => {
+    fakeLayout();
+    const context = {
+      font: '',
+      layoutReads: 0,
+      measures: 0,
+      measureText: (text: string) => {
+        context.measures++;
+        return { width: text.length * 10 };
+      },
+    };
     jest
       .spyOn(HTMLCanvasElement.prototype, 'getContext')
       .mockImplementation((() => context) as unknown as HTMLCanvasElement['getContext']);
-    const long: TreeSource<Node> = {
-      ...source(),
-      roots: [...source().roots, { key: 4, name: 'abcdefghijkl', time: 0, kind: 'x' }],
-    };
-    const { grid, header } = await setup({ source: long });
     jest.spyOn(HTMLElement.prototype, 'offsetWidth', 'get').mockImplementation(function (
       this: HTMLElement,
     ) {
+      if (this.matches('.scroller')) {
+        context.layoutReads++;
+      }
       return this.matches('.twisty') ? 16 : 500;
     });
+    jest.spyOn(window, 'getComputedStyle').mockImplementation(() => {
+      context.layoutReads++;
+      return { font: '', paddingInlineStart: '0', paddingInlineEnd: '0' } as CSSStyleDeclaration;
+    });
+    jest.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(function (
+      this: HTMLElement,
+    ) {
+      return { height: ROW, width: this.matches('.sorter') ? 10 : 500 } as DOMRect;
+    });
+    return context;
+  };
+
+  const withRoot = (root: Partial<Node>): TreeSource<Node> => ({
+    ...source(),
+    roots: [...source().roots, { key: 4, name: 'd', time: 0, kind: 'x', ...root }],
+  });
+
+  const contentColumns = (): GridColumn<Node>[] =>
+    columns().map((column) =>
+      column.id === 'name'
+        ? column
+        : { ...column, title: `Total ${column.title}s`, width: 'content' },
+    );
+
+  it('fits a double-clicked column to the widest of its header and painted cells', async () => {
+    const { grid, header } = await setup({ source: withRoot({ name: 'abcdefghijkl' }) });
+    fakeText();
     const widths: GridColumnResizeDetail[] = [];
     grid.addEventListener('lv-grid-column-resize', (e) =>
       widths.push(detail<GridColumnResizeDetail>(e)),
     );
     handle(header('Name'))?.dispatchEvent(new MouseEvent('dblclick', { bubbles: true }));
+    await settle(grid);
     // Twelve letters and the twisty.
     expect(widths).toEqual([{ column: 'name', width: 136 }]);
-    handle(header('Kind'))?.dispatchEvent(new MouseEvent('dblclick', { bubbles: true }));
-    // The header is wider than any cell; 40 is also the minimum.
-    expect(widths.at(-1)).toEqual({ column: 'kind', width: 40 });
+  });
+
+  it('can make a column narrower when it autosizes', async () => {
+    const { grid } = await setup();
+    fakeText();
+    grid.setColumnWidth('time', 300);
+    grid.autosizeColumn('time');
+    await settle(grid);
+    // "Time" and its arrow beat the one- and two-digit cells and total.
+    expect(await tracks(grid)).toBe('minmax(40px, 1fr) 50px minmax(40px, 1fr)');
+  });
+
+  it('sizes a content column to at least its header, on two lines, and its footer total', async () => {
+    const { grid } = await setup(
+      { columns: contentColumns(), source: withRoot({ time: 123456789 }) },
+      fakeText,
+    );
+    // Times: the 9-digit footer total. Kinds: "Total" over "Kinds" and its arrow, not one line.
+    expect(await tracks(grid)).toBe('minmax(40px, 1fr) 90px 60px');
+  });
+
+  it('measures content once per source, not again on a repaint', async () => {
+    let text = fakeText();
+    const { grid } = await setup({ columns: contentColumns() }, () => (text = fakeText()));
+    grid.source = withRoot({ kind: 'a much longer kind' });
+    await settle(grid);
+    // Eighteen characters; the headers beat the one- and two-digit times.
+    expect(await tracks(grid)).toBe('minmax(40px, 1fr) 60px 180px');
+    text.measureText = (t: string) => ({ width: t.length * 20 });
+    grid.marked = new Set([1]);
+    grid.rowClass = () => 'wider';
+    await settle(grid);
+    expect(await tracks(grid)).toBe('minmax(40px, 1fr) 60px 180px');
+  });
+
+  it('reads no layout on a repaint once its columns are measured', async () => {
+    let text = fakeText();
+    const { grid } = await setup({ columns: contentColumns() }, () => (text = fakeText()));
+    text.layoutReads = 0;
+    grid.marked = new Set([1]);
+    await settle(grid);
+    expect(text.layoutReads).toBe(0);
+  });
+
+  it('measures nothing while hidden, and its content once it shows', async () => {
+    let text = fakeText();
+    const { grid } = await setup({ columns: contentColumns() }, () => {
+      text = fakeText();
+      jest.spyOn(HTMLElement.prototype, 'offsetHeight', 'get').mockReturnValue(0);
+    });
+    expect(text.measures).toBe(0);
+    jest.spyOn(HTMLElement.prototype, 'offsetHeight', 'get').mockReturnValue(10 * ROW);
+    grid.remove();
+    document.body.append(grid);
+    await settle(grid);
+    expect(await tracks(grid)).toBe('minmax(40px, 1fr) 60px 60px');
+  });
+
+  it('keeps pixel tracks while rows build, so the header and footer line up with them', async () => {
+    let release: () => void = () => undefined;
+    const held = new Promise<void>((resolve) => (release = resolve));
+    let clock = 0;
+    const { grid } = await setup(
+      {
+        columns: contentColumns(),
+        // The build checks its clock every 256 rows, so it needs more rows than that to yield.
+        source: {
+          roots: Array.from({ length: 600 }, (_, i) => ({
+            key: i,
+            name: `n${i}`,
+            time: 1,
+            kind: 'x',
+          })),
+          key: (row: Node) => row.key,
+        },
+        scheduler: { now: () => (clock += 100), yield: () => held },
+      },
+      fakeText,
+    );
+    expect(await tracks(grid)).toBe('minmax(40px, 1fr) 40px 40px');
+    release();
+    await settle(grid);
+    // The 3-digit footer total is under "Total" over "Times" and its arrow.
+    expect(await tracks(grid)).toBe('minmax(40px, 1fr) 60px 60px');
+  });
+
+  it('autosizes every column, the flex one back to filling, and a reset gives back the content widths', async () => {
+    const { grid } = await setup({ columns: contentColumns() }, fakeText);
+    const content = await tracks(grid);
+    grid.setColumnWidth('name', 300);
+    grid.setColumnWidth('time', 300);
+    grid.setColumnWidth('kind', 300);
+    const widths: GridColumnResizeDetail[] = [];
+    grid.addEventListener('lv-grid-column-resize', (e) =>
+      widths.push(detail<GridColumnResizeDetail>(e)),
+    );
+    grid.autosizeColumns();
+    await settle(grid);
+    expect(widths.map((w) => w.column).sort()).toEqual(['kind', 'time']);
+    // A Name the user fixed would leave the last column stretched over the free room.
+    expect(await tracks(grid)).toBe(content);
+    grid.setColumnWidth('time', 300);
+    grid.resetColumnWidths();
+    expect(await tracks(grid)).toBe(content);
   });
 
   it('has no resize handle on a column that is not resizable', async () => {
@@ -1201,6 +1399,32 @@ describe('lv-grid columns', () => {
   });
 });
 
+describe('lv-grid nearView', () => {
+  // Rows a, b, c in sight order; `b` matches, and so do its folded children b1 and b2.
+  it.each([
+    ['the first match from the top row in sight, for next', { first: 0, last: 2 }, 'next', 0],
+    [
+      'the last match up to the bottom row, folded ones too, for prev',
+      { first: 2, last: 2 },
+      'prev',
+      2,
+    ],
+    ['none below the rows in sight, for next', { first: 2, last: 2 }, 'next', -1],
+    ['none above the rows in sight, for prev', { first: 0, last: 0 }, 'prev', -1],
+    ['none for next with the grid above the view', 'above', 'next', -1],
+    ['the last for prev with the grid above the view', 'above', 'prev', 2],
+    ['the first for next with the grid below the view', 'below', 'next', 0],
+    ['none for prev with the grid below the view', 'below', 'prev', -1],
+    ['the first for next in a folded section', 'folded', 'next', 0],
+  ] as const)('gives %s', async (_name, sight, direction, match) => {
+    const { grid } = await setup();
+    await grid.find({ text: 'b' });
+    mockSight = sight;
+
+    expect(grid.nearView(direction)).toBe(match);
+  });
+});
+
 describe('lv-grid find marks', () => {
   let highlights: FakeHighlights;
   const marks = (): number => highlights.marks().length;
@@ -1239,6 +1463,30 @@ describe('lv-grid find marks', () => {
 
     expect(await running).toBeNull();
     expect(highlights.marks()).toEqual([]);
+  });
+
+  it('neither scrolls to nor marks a match that a clear made stale while it opened', async () => {
+    const { grid } = await setup();
+    await grid.find({ text: 'b' });
+    const scroll = jest.spyOn(GridView.prototype, 'scrollToIndex');
+    const stepping = grid.setCurrentMatch(1);
+    grid.clearFind();
+    await stepping;
+
+    expect(scroll).not.toHaveBeenCalled();
+    expect(highlights.marks()).toEqual([]);
+  });
+
+  it('does not scroll to a match that a newer step replaced while it opened', async () => {
+    const { grid } = await setup();
+    await grid.find({ text: 'b' });
+    const scroll = jest.spyOn(GridView.prototype, 'scrollToIndex');
+    // b1 must open b first; b is already shown.
+    const opening = grid.setCurrentMatch(1);
+    await grid.setCurrentMatch(0);
+    await opening;
+
+    expect(scroll.mock.calls.map(([index]) => index)).toEqual([1]);
   });
 
   it("finds and marks a group row's key, not its count", async () => {

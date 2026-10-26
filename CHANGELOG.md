@@ -12,24 +12,37 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - ⚡ **Timeline**: large logs are ready 3.1× faster and use 47% less memory, measured on a 100 MB log.
 - ⚡ **UI**: many components, including the tab views and Inspector sections, appear up to 80× faster on large logs.
 - ⚡ **Tables**: the Call Tree, Analysis, Database and Inspector tables respond up to 30× faster on large logs and use 93% less memory. ([#1169])
-  - Sort, expand and filter take under 0.2 s, group by is up to 9× faster, column resize is smooth and Find has no delay.
+  - Sort, expand and filter take under 0.2 s, group by is up to 9× faster, column resize is smooth and Find never freezes the table.
   - Screen reader and full keyboard support.
-  - `Cmd/Ctrl+C` copies the filtered rows and their depth in each table, and the Analysis CSV export holds the same rows.
+  - `Cmd/Ctrl+C` copies the filtered rows and their depth in each table, and the Call Tree, Analysis and Database toolbars copy them or export them to CSV.
 - ⚡ **Parser performance**: logs parse 28% faster and use 27% less memory, down from 1.0 s to 0.78 s and 1.1 GB to 0.8 GB on a 100 MB log.
-- 🔍 **Find**: a search in the tables persists after a sort, filter, group by, column change, log level change, view switch or tab switch. ([#986])
+- 🔍 **Find**: a more consistent and natural find experience. ([#986])
+  - Search matches highlight as you type.
+  - Typing goes to the nearest visible match.
+  - Searches persist after a sort, filter, group by, column change or view switch.
 - ✂️ **Truncation**: each skipped section states how much of the log it dropped.
 - 🌊 **Flows**: names drop the `FLOW_START_INTERVIEWS :` and `WF_CRITERIA :` prefixes.
 - 📚 **Multiple logs**: a file holding several logs shows the first and flags the rest.
 - 🪪 **Call tree**: the `USER_INFO` line shows as a row.
 - 🎯 **Entry point**: the header names the longest and counts the rest, and its tooltip lists the top five.
 - 🔭 **Timeline inspector**: the summary, call tree included, changes to reflect what is currently visible. ([#875])
+- 🧮 **Limit strip**: the tooltip always shows the seen count when it differs from the usage Salesforce reported, not only where it is lower.
 
 ### Added
 
+- 🔍 **Retrieve Apex Log**: search for text inside org logs from the log list. ([#594])
+  - Logs you already downloaded are searched as you type.
+  - The search row downloads the newest 5 logs from the org, then 50 more per press.
+  - **Log: Clear Apex Log Cache** frees the space. Logs downloaded but not opened are kept in workspace storage and cleaned up on their own.
 - 🎚️ **Log levels**: filter the log to a lower debug level per category from the header. ([#530])
+- 🪜 **Expand and collapse**: the Call Tree and Analysis tables open or close one level per click, like VS Code trees, and the Database tables open or close all groups. ([#1204])
+  - The Call Tree and Analysis menu next to the button has Expand All and Collapse All, which include the groups.
+- 🔎 **Analysis filters**: filter the Analysis table by namespace, total time and self time, as in the Call Tree Bottom-Up view. ([#1209])
 - 💡 **Log level hints**: a section that a debug level leaves empty names the level it needs. ([#259])
+- 🧮 **New limit columns**: show the SOQL, DML and SOSL usage Salesforce reported beside the counts we actually saw in the Call Tree and Analysis tables.
 - 🔦 **Timeline legend**: hover a category to highlight frames in the timeline, select to keep. ([#917])
 - 🔍 **Find**: in the tables, find matches the group header text too.
+- ↔️ **Table columns**: columns fit their content and fill the table, and the column menu can autosize or reset them.
 
 ### Removed
 
@@ -37,6 +50,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- 🔎 **Retrieve Apex Log**: typing in the log list filters the logs. ([#594])
 - 📤 **Copy and export**: both work on Analysis and Bottom-Up. ([#1110])
 - 🔦 **Find**: in the tables, the current match stands out from the other matches, as it does in the editor.
 - 🐛 **Go to Code**: errors for methods not found in the file are shown correctly.
@@ -590,8 +604,11 @@ Skipped due to adopting odd numbering for pre releases and even number for relea
 [#1110]: https://github.com/certinia/debug-log-analyzer/issues/1110
 [#917]: https://github.com/certinia/debug-log-analyzer/issues/917
 [#875]: https://github.com/certinia/debug-log-analyzer/issues/875
+[#594]: https://github.com/certinia/debug-log-analyzer/issues/594
 [#530]: https://github.com/certinia/debug-log-analyzer/issues/530
 [#259]: https://github.com/certinia/debug-log-analyzer/issues/259
+[#1204]: https://github.com/certinia/debug-log-analyzer/issues/1204
+[#1209]: https://github.com/certinia/debug-log-analyzer/issues/1209
 
 <!-- 1.22.0 -->
 

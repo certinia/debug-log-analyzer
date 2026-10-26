@@ -317,10 +317,9 @@ export class MetricStripTooltipRenderer extends BaseTooltipRenderer {
                 metric.unit,
                 denominator.kind === 'limit' ? '/' : 'of',
               ),
-        // Only where the count tracked from detailed events falls below the corrective
-        // cumulative total — the log dropped events Salesforce still counted.
+        // Only where the count from detailed events differs from what Salesforce charged.
         ghost:
-          rawValue && rawValue.tracked !== undefined && rawValue.tracked < rawValue.used
+          rawValue && rawValue.tracked !== undefined && rawValue.tracked !== rawValue.used
             ? ` (${formatNumber(Math.round(rawValue.tracked))} seen)`
             : '',
       };

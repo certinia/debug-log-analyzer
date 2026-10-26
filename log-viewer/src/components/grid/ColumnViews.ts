@@ -22,6 +22,14 @@ export interface ColumnView {
 // (heap) or a user override.
 const LIMIT_COUNT_TOTALS = ['dmlCount.total', 'soqlCount.total', 'soslCount.total'];
 const LIMIT_ROW_TOTALS = ['dmlRowCount.total', 'soqlRowCount.total', 'soslRowCount.total'];
+// What each row used beside its Seen count, so the Governor Limits view shows where they differ.
+const LIMIT_REPORTED = [
+  'dmlCount.reported',
+  'soqlCount.reported',
+  'soslCount.reported',
+  'dmlRowCount.reported',
+  'soqlRowCount.reported',
+];
 
 // Both naming variants of the total/self time columns: `totalTime`/`totalSelfTime`
 // (aggregated & bottom-up) and `duration.*` (time-order). Listing both lets one
@@ -62,6 +70,7 @@ export const CALL_TREE_VIEWS: ColumnView[] = [
       'namespace',
       ...LIMIT_COUNT_TOTALS,
       ...LIMIT_ROW_TOTALS,
+      ...LIMIT_REPORTED,
       'thrownCount.total',
       'heapPeak',
       'governorCost',
@@ -116,6 +125,26 @@ export const SOSL_VIEWS: ColumnView[] = [
   { id: 'General', fields: ['namespace', 'callerNamespace', 'rowCount', 'timeTaken'] },
   { id: 'Timing', fields: ['rowCount', 'timeTaken'] },
 ];
+
+/**
+ * A Seen column and its Used column. The Seen column is titled `label` on its own, and
+ * `label (seen)` while the Used column shows, so the two headers say which figure is which.
+ */
+export interface SeenReportedPair {
+  seen: string;
+  reported: string;
+  label: string;
+}
+
+/** A Seen column's title for the columns `isShown` keeps, or undefined for any other column. */
+export function pairedTitle(
+  id: string,
+  pairs: readonly SeenReportedPair[],
+  isShown: (id: string) => boolean,
+): string | undefined {
+  const pair = pairs.find((candidate) => candidate.seen === id);
+  return pair && (isShown(pair.reported) ? `${pair.label} (seen)` : pair.label);
+}
 
 export function getColumnView(views: ColumnView[], id: string): ColumnView | undefined {
   return views.find((view) => view.id === id);
@@ -172,6 +201,7 @@ export function columnMenuItems(
   views: ColumnView[],
   alwaysVisible: string[],
   editedViewIds: string[],
+  pairs: readonly SeenReportedPair[] = [],
 ): ContextMenuItem[] {
   const items: ContextMenuItem[] = views.map((view) => ({
     id: `view:${view.id}`,
@@ -190,7 +220,8 @@ export function columnMenuItems(
     }
     items.push({
       id: `col:${id}`,
-      label: title,
+      // The menu names both figures whichever columns show.
+      label: pairedTitle(id, pairs, () => true) ?? title,
       checked: !hidden,
       keepOpen: true,
     });

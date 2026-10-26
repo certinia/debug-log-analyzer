@@ -31,7 +31,7 @@ import {
   type Scheduler,
   type Sort,
 } from '../../log-viewer/src/grid/core/index.js';
-import { heapMb, line, ms, nowMs } from './harness.js';
+import { heapMb, line, ms, nowMs, print } from './harness.js';
 
 /** A Node scheduler that records the longest run between yields. */
 function timedScheduler(): Scheduler & { longest(): number; reset(): void } {
@@ -84,7 +84,7 @@ async function heldHeap<R extends object>(store: GridStore<R>, base: number): Pr
 
 export async function measureGrid(log: ApexLog): Promise<void> {
   await measureTimeOrder(log);
-  console.log('');
+  print('');
   await measureBottomUp(log);
 }
 

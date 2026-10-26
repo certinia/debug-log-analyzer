@@ -24,7 +24,7 @@ import { type ApexLog, parse } from '@apexdevtools/apex-log-parser';
 
 import { measureCallTree } from './call-tree.js';
 import { measureGrid } from './grid.js';
-import { die, time } from './harness.js';
+import { die, print, time } from './harness.js';
 import { digestMinimap, measureMinimap } from './minimap.js';
 import { digestTimeline, measureTimeline } from './timeline.js';
 import { measureVariables } from './variables.js';
@@ -92,7 +92,7 @@ try {
   die(`${(error as Error).message}\n${USAGE}`);
 }
 if (!digest) {
-  console.log(`log ${Math.round(text.length / 1048576)}MB, ${text.split('\n').length} lines\n`);
+  print(`log ${Math.round(text.length / 1048576)}MB, ${text.split('\n').length} lines\n`);
 }
 const log = digest ? parse(text) : await time('parse', () => parse(text));
 
@@ -102,6 +102,6 @@ for (const name of names) {
     await area.digest(log);
     continue;
   }
-  console.log(`\n--- ${name} ---`);
+  print(`\n--- ${name} ---`);
   await area.run(log);
 }

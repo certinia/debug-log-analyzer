@@ -4,7 +4,7 @@
 import type { ReactiveControllerHost } from 'lit';
 
 import { DomListenerController } from '../../core/events/DomListenerController.js';
-import type { FindEventDetail, FindEventMap } from './findEvents.js';
+import type { FindDirection, FindEventDetail, FindEventMap } from './findEvents.js';
 import type { FindQuery, GridFindDetail as FindCount } from '../../grid/index.js';
 
 export type { FindCount, FindQuery };
@@ -21,6 +21,12 @@ export interface FindTarget {
    * true when a search again kept it current: a target may leave its view alone.
    */
   setCurrentMatch(match: number, kept?: boolean): Promise<void>;
+  /**
+   * The match nearest what the reader can see: for `next` the first at or after the start
+   * of the view (its top row, or its left edge in time), for `prev` the last at or before
+   * its end. -1 when none lies that way.
+   */
+  nearView(direction: FindDirection): number;
   clearFind(): void;
 }
 
@@ -50,8 +56,8 @@ export class FindController {
   private _found: Found = [];
   // Goes up with each search and clear, so an older search sees it is stale.
   private _searches = 0;
-  // A move to a match is ignored while these run: it would count by the totals they replace.
-  private _reruns = 0;
+  // A move to a match is ignored while a search runs: it would count by the totals it replaces.
+  private _running = 0;
   // Goes up with each step, so a step that waited on an unfold sees a newer one replaced it.
   private _steps = 0;
 
@@ -74,7 +80,7 @@ export class FindController {
       this._drop();
       return;
     }
-    const { text, options, count } = e.detail;
+    const { text, options, count, direction } = e.detail;
     const query = { text, matchCase: options.matchCase };
     const isNew = text !== this._query?.text || options.matchCase !== this._query.matchCase;
     const shown = this._shown();
@@ -88,9 +94,9 @@ export class FindController {
     }
     if (!isNew) {
       if (e.type === 'lv-find') {
-        await this.rerun();
-      } else if (!this._reruns) {
-        await this._step(count);
+        await this.rerun(direction);
+      } else if (!this._running) {
+        await this._step(direction ? this._reportNearView(direction) : count);
       }
       return;
     }
@@ -98,8 +104,12 @@ export class FindController {
     if (!(await this._search(query, shown))) {
       return;
     }
-    report(this.totalMatches, count ? Math.min(1, this.totalMatches) : 0);
-    await this._step(count);
+    if (direction) {
+      await this._step(this._reportNearView(direction));
+    } else {
+      report(this.totalMatches, 0);
+      await this._step(0);
+    }
   }
 
   /** Drops the search in the targets, and in the widget while the host is on screen. */
@@ -115,8 +125,9 @@ export class FindController {
    * reports the new total with the current match kept on its row, or none when that row
    * has no match now. A kept match out of view scrolls into it. Call it once the targets to
    * search are rendered. A host off screen clears its marks, and keeps the query.
+   * @param direction - With none kept current, moves to the match nearest the screen that way.
    */
-  async rerun(): Promise<void> {
+  async rerun(direction?: FindDirection): Promise<void> {
     const query = this._query;
     if (!query) {
       return;
@@ -126,12 +137,15 @@ export class FindController {
       this.forget();
       return;
     }
-    this._reruns++;
-    const found = await this._search(query, shown).finally(() => this._reruns--);
+    const found = await this._search(query, shown);
     if (!found) {
       return;
     }
     const currentMatch = currentMatchOf(found);
+    if (!currentMatch && direction) {
+      await this._step(this._reportNearView(direction));
+      return;
+    }
     report(this.totalMatches, currentMatch);
     if (currentMatch) {
       await this._markCurrent(currentMatch, true);
@@ -142,20 +156,48 @@ export class FindController {
   private async _search(query: FindQuery, shown: readonly FindTarget[]): Promise<Found | null> {
     const search = ++this._searches;
     const found: Found = [];
-    for (const target of shown) {
-      const result = await target.find(query);
-      if (search !== this._searches) {
-        return null;
+    this._running++;
+    try {
+      for (const target of shown) {
+        const result = await target.find(query);
+        if (search !== this._searches) {
+          return null;
+        }
+        if (!result) {
+          // Forgets the query, so the next Enter searches again.
+          this.clear();
+          return null;
+        }
+        found.push({ target, ...result });
       }
-      if (!result) {
-        // Forgets the query, so the next Enter searches again.
-        this.clear();
-        return null;
-      }
-      found.push({ target, ...result });
+    } finally {
+      this._running--;
     }
     this._found = found;
     return found;
+  }
+
+  /**
+   * Reports the match nearest the screen that way, from 1 across the targets, and gives it:
+   * the first target in order that has one for `next`, the last for `prev`. With none that
+   * way, it wraps to the first or last match.
+   */
+  private _reportNearView(direction: FindDirection): number {
+    const total = this.totalMatches;
+    let count = direction === 'next' ? Math.min(1, total) : total;
+    let before = 0;
+    for (const { target, total: held } of this._found) {
+      const match = target.nearView(direction);
+      if (match >= 0) {
+        count = before + match + 1;
+        if (direction === 'next') {
+          break;
+        }
+      }
+      before += held;
+    }
+    report(total, count);
+    return count;
   }
 
   // A move to match `count`: unfolds the target that holds it, then marks it.

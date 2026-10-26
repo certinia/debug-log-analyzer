@@ -16,6 +16,7 @@ import {
   type BottomUpRow,
 } from '../Aggregation.js';
 import { KeyPathIds } from '../../../../core/log/keyPathIds.js';
+import { reportedUsage } from '../reportedUsage.js';
 
 /** A table per build: the fixtures below reuse event indexes for different
  *  frames, so one frame's key must not be read back for another. */
@@ -1279,5 +1280,92 @@ describe('SOSL rollup', () => {
     const callee = findRowByText(rows, 'Callee');
     expect(callee.soslCount.self).toBe(1);
     expect(callee.soslRowCount.total).toBe(7);
+  });
+});
+
+describe('reported usage', () => {
+  const soql = (at: number): string =>
+    `09:18:22.6 (${at})|SOQL_EXECUTE_BEGIN|[2]|Aggregations:0|SELECT Id FROM Account\n` +
+    `09:18:22.6 (${at + 50})|SOQL_EXECUTE_END|[2]|Rows:1\n`;
+  const entry = (at: number, name: string): string =>
+    `09:18:22.6 (${at})|METHOD_ENTRY|[1]|01p|${name}\n`;
+  const exit = (at: number, name: string): string => `09:18:22.6 (${at})|METHOD_EXIT|[1]|${name}\n`;
+
+  // The log's lines sit inside the code unit `storeOf` wraps them in.
+  function findDeep(rows: AggregatedRow[], text: string): AggregatedRow {
+    const pending = [...rows];
+    for (let row = pending.pop(); row; row = pending.pop()) {
+      if (row.text === text) {
+        return row;
+      }
+      pending.push(...(row._children ?? []));
+    }
+    throw new Error(`Unable to find row for ${text}`);
+  }
+
+  async function built(
+    text: string,
+  ): Promise<{ bottomUp: BottomUpRow[]; aggregated: AggregatedRow[] }> {
+    const { log, store } = storeOf(text);
+    const usage = await store.derive(reportedUsage);
+    return {
+      bottomUp: toBottomUpTree(log.children, store.keyPathIds(), undefined, usage),
+      aggregated: toAggregatedCallTree(log.children, store.keyPathIds(), undefined, usage),
+    };
+  }
+
+  it('counts the queries of a recursive method once, not again for the inner call', async () => {
+    const { bottomUp } = await built(
+      entry(1000, 'ns.A.run()') +
+        soql(1100) +
+        entry(1300, 'ns.A.run()') +
+        soql(1400) +
+        exit(1600, 'ns.A.run()') +
+        exit(1700, 'ns.A.run()'),
+    );
+
+    // Two queries ran in all; summing both calls of A would say 3.
+    expect(findRowByText(bottomUp, 'ns.A.run()').reported.soqlQueries).toBe(2);
+  });
+
+  it('splits a method across the callers that ran it', async () => {
+    const { bottomUp, aggregated } = await built(
+      entry(1000, 'ns.A.run()') +
+        entry(1100, 'ns.B.run()') +
+        soql(1200) +
+        exit(1300, 'ns.B.run()') +
+        exit(1400, 'ns.A.run()') +
+        entry(2000, 'ns.C.run()') +
+        entry(2100, 'ns.B.run()') +
+        soql(2200) +
+        soql(2300) +
+        exit(2400, 'ns.B.run()') +
+        exit(2500, 'ns.C.run()'),
+    );
+
+    const b = findRowByText(bottomUp, 'ns.B.run()');
+    expect(b.reported.soqlQueries).toBe(3);
+    expect(findRowByText(b._children ?? [], 'ns.A.run()').reported.soqlQueries).toBe(1);
+    expect(findRowByText(b._children ?? [], 'ns.C.run()').reported.soqlQueries).toBe(2);
+    const underC = findRowByText(findDeep(aggregated, 'ns.C.run()')._children ?? [], 'ns.B.run()');
+    expect(underC.reported.soqlQueries).toBe(2);
+  });
+
+  it('adds up every call of a method an aggregated row groups', async () => {
+    const { aggregated } = await built(
+      entry(1000, 'ns.A.run()') +
+        entry(1100, 'ns.B.run()') +
+        soql(1200) +
+        exit(1300, 'ns.B.run()') +
+        entry(1400, 'ns.B.run()') +
+        soql(1500) +
+        soql(1600) +
+        exit(1700, 'ns.B.run()') +
+        exit(1800, 'ns.A.run()'),
+    );
+
+    // A called B twice: once with one query, once with two.
+    const underA = findRowByText(findDeep(aggregated, 'ns.A.run()')._children ?? [], 'ns.B.run()');
+    expect(underA.reported.soqlQueries).toBe(3);
   });
 });

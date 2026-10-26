@@ -111,9 +111,9 @@ describe('buildGovernorTimeSeries', () => {
       delta(10, 'soqlQueries', 5),
       absolute(20, 'soqlQueries', 2),
     ]);
-    // The report is what the governor charged, so it wins over our count.
+    // The report is what the governor charged, so it wins over our count, which stays readable.
     expect(series.events[2]?.values.get('soqlQueries')?.used).toBe(2);
-    expect(series.events[2]?.values.get('soqlQueries')?.tracked).toBeUndefined();
+    expect(series.events[2]?.values.get('soqlQueries')?.tracked).toBe(5);
   });
 
   it('never counts past the highest figure the log reported', async () => {
@@ -123,6 +123,45 @@ describe('buildGovernorTimeSeries', () => {
       delta(20, 'soqlQueries', 1),
     ]);
     expect(series.events.map((e) => e.values.get('soqlQueries')?.used)).toEqual([3, 3, 3]);
+  });
+
+  it('keeps the count the ceiling held back, until a report corrects it', async () => {
+    const series = await build([
+      absolute(0, 'soqlQueries', 1),
+      delta(10, 'soqlQueries', 1),
+      delta(20, 'soqlQueries', 1),
+      absolute(30, 'soqlQueries', 2),
+    ]);
+    const soql = series.events.map((e) => e.values.get('soqlQueries'));
+
+    // The line stops at the highest report, 2; the count goes on to 3, and the report sets both.
+    expect(soql.map((v) => v?.used)).toEqual([1, 2, 2, 2]);
+    expect(soql.map((v) => v?.uncapped)).toEqual([undefined, undefined, 3, undefined]);
+  });
+
+  it('never lets a scoped report pull the count the ceiling held back down', async () => {
+    const series = await build([
+      absolute(10, 'soqlQueries', 1),
+      delta(20, 'soqlQueries', 1),
+      delta(30, 'soqlQueries', 1),
+      scoped(40, 'soqlQueries', 2),
+    ]);
+    const atScoped = series.events.find((e) => e.timestamp === 40)?.values.get('soqlQueries');
+
+    // Three counted; a block's report of 2 does not undo one of them.
+    expect(atScoped?.uncapped).toBe(3);
+  });
+
+  it('keeps each row count on the statement that made it, though rows coalesce', async () => {
+    // 40 then 70 rows: both under the queryRows threshold of 100.
+    const series = await build([
+      delta(10, 'soqlQueries', 1),
+      delta(10, 'queryRows', 40),
+      delta(20, 'soqlQueries', 1),
+      delta(20, 'queryRows', 70),
+    ]);
+
+    expect(series.events.map((e) => e.values.get('queryRows')?.used)).toEqual([40, 110]);
   });
 
   it('keeps counting past a scoped report, which measures one block only', async () => {

@@ -21,7 +21,7 @@ const ROWS: Row[] = [
 
 describe('countColumn', () => {
   const column = (summed?: boolean) =>
-    countColumn<Row>({ id: 'n', title: 'N', value: (row) => row.n, width: 80, summed });
+    countColumn<Row>({ id: 'n', title: 'N', value: (row) => row.n, summed });
 
   it('shows a row with no value as empty', () => {
     expect(ROWS.map((row) => column().text?.(row))).toEqual(['2', '']);
@@ -44,7 +44,6 @@ describe('textColumn', () => {
       id: 's',
       title: 'S',
       value: (row) => row.s,
-      width: 80,
       empty: '—',
       hoverText,
     });

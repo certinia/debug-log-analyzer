@@ -1,9 +1,6 @@
 /*
  * Copyright (c) 2022 Certinia Inc. All rights reserved.
  */
-import '#vscode-elements/vscode-button.js';
-import '#vscode-elements/vscode-option.js';
-import '../../../components/VsSelect.js';
 import '#vscode-elements/vscode-toolbar-button.js';
 import { consume } from '@lit/context';
 import { LitElement, css, html, type PropertyValues } from 'lit';
@@ -28,8 +25,19 @@ import {
 import { exportCsv } from '../../../components/grid/exportCsv.js';
 import { FindController } from '../../find/FindController.js';
 import { GridColumnMenuController } from '../../../components/GridColumnMenuController.js';
-import { columnViewSelect, gridToolbarActions } from '../../../components/gridToolbar.js';
-import type { GridColumn, GroupBy, RowKey, TreeSource } from '../../../grid/index.js';
+import {
+  columnViewSelect,
+  gridGroupControls,
+  gridToolbarActions,
+} from '../../../components/gridToolbar.js';
+import type { GridColumn, GroupBy, RowFilter, RowKey, TreeSource } from '../../../grid/index.js';
+import type { FilterRange } from '../../../components/grid/MinMax.js';
+import {
+  BOTTOM_UP_MEASURES,
+  measureFilters,
+  RowFilterCache,
+  type MeasureFilterInputs,
+} from '../../call-tree/grid/rowFilters.js';
 import { CALL_TREE_VIEWS } from '../../../components/grid/ColumnViews.js';
 import '../../call-tree/grid/CallTreeGrid.js';
 import type { CallTreeGrid } from '../../call-tree/grid/CallTreeGrid.js';
@@ -43,6 +51,7 @@ import {
   mergedLines,
   openType,
 } from '../../call-tree/grid/columns.js';
+import { reportedUsageOf } from '../../call-tree/utils/reportedUsage.js';
 import { inspectorRowEvents } from '../../call-tree/grid/inspectorRowEvents.js';
 import { MergedTree } from '../../call-tree/grid/mergedRows.js';
 import type { BottomUpRow } from '../../call-tree/utils/Aggregation.js';
@@ -52,7 +61,10 @@ import { wireCategoryColoring } from '../../call-tree/utils/CategoryColoring.js'
 import { globalStyles } from '../../../styles/global.styles.js';
 
 // Components
+import '../../../components/datagrid-facet-filter.js';
 import '../../../components/datagrid-filter-bar.js';
+import '../../../components/datagrid-range-filter.js';
+import '../../../components/OverflowList.js';
 import '../../../components/GridSkeleton.js';
 
 @customElement('analysis-view')
@@ -82,21 +94,6 @@ export class AnalysisView extends LitElement {
         min-height: 0;
         min-width: 0;
       }
-
-      .filter-container {
-        display: flex;
-        gap: var(--lana-space-2xs);
-        align-items: flex-end;
-      }
-
-      .filter-container vscode-button {
-        height: var(--filter-control-height);
-      }
-
-      .filter-container vscode-button::part(base) {
-        padding: var(--filter-control-padding);
-        font-size: var(--filter-control-font-size);
-      }
     `,
   ];
 
@@ -121,7 +118,16 @@ export class AnalysisView extends LitElement {
   private _colorize = false;
   @state()
   private _showDetails = false;
+  @state()
+  private _measures: MeasureFilterInputs = {
+    namespaces: [],
+    total: { start: null, end: null },
+    self: { start: null, end: null },
+  };
+  private readonly _filterCache = new RowFilterCache();
 
+  // State, so the expand button follows the grid once it mounts.
+  @state()
   grid: CallTreeGrid<BottomUpRow> | null = null;
   private _tree: MergedTree<BottomUpRow> | null = null;
   private _built: Promise<void> | null = null;
@@ -131,6 +137,7 @@ export class AnalysisView extends LitElement {
   private readonly _columnTarget = heldColumnTarget<BottomUpRow>(
     () => this._columns,
     (columns) => (this._columns = columns),
+    () => this.grid,
   );
   private readonly _settings = new ColumnSettingsController(this, {
     ...CALL_TREE_COLUMN_SETTINGS,
@@ -234,31 +241,31 @@ export class AnalysisView extends LitElement {
     return html`
       <div class="analysis-view">
         <datagrid-filter-bar>
-          <div slot="table-actions" class="filter-container">
-            <vscode-button
-              secondary
-              aria-label="Expand all"
-              title="Expand all"
-              @click=${() => void this._expandAll(true)}
-              >Expand</vscode-button
-            >
-            <vscode-button
-              secondary
-              aria-label="Collapse all"
-              title="Collapse all"
-              @click=${() => void this._expandAll(false)}
-              >Collapse</vscode-button
-            >
-          </div>
-
           ${columnViewSelect({
             id: 'column-view',
             views: CALL_TREE_VIEWS,
             columns: this._settings,
-            menus: this._menus,
           })}
 
-          <div slot="filters" class="filter-container">
+          <overflow-list slot="filters" menu-heading="Filters" icon="filter">
+            <datagrid-facet-filter
+              label="Namespace"
+              .values="${this.timelineRoot?.namespaces ?? []}"
+              @datagrid-facet-change="${(e: CustomEvent<{ selected: string[] }>) =>
+                (this._measures = { ...this._measures, namespaces: e.detail.selected })}"
+            ></datagrid-facet-filter>
+            <datagrid-range-filter
+              label="Total Time"
+              unit="ms"
+              @datagrid-range-change="${(e: CustomEvent<{ range: FilterRange }>) =>
+                (this._measures = { ...this._measures, total: e.detail.range })}"
+            ></datagrid-range-filter>
+            <datagrid-range-filter
+              label="Self Time"
+              unit="ms"
+              @datagrid-range-change="${(e: CustomEvent<{ range: FilterRange }>) =>
+                (this._measures = { ...this._measures, self: e.detail.range })}"
+            ></datagrid-range-filter>
             <button
               type="button"
               class="filter-control pill-toggle"
@@ -267,22 +274,18 @@ export class AnalysisView extends LitElement {
             >
               Details
             </button>
-          </div>
+          </overflow-list>
 
-          <vs-select
-            dense
-            slot="group"
-            id="groupby-dropdown"
-            prefix="Group"
-            label="Group by"
-            @change="${(e: Event) =>
-              (this._groupBy = bottomUpGroupBy((e.target as HTMLInputElement).value))}"
-          >
-            ${BOTTOM_UP_GROUPS.map(({ label }) => html`<vscode-option>${label}</vscode-option>`)}
-          </vs-select>
-
+          ${gridGroupControls({
+            grid: this.grid,
+            group: {
+              id: 'groupby-dropdown',
+              labels: BOTTOM_UP_GROUPS.map(({ label }) => label),
+              onChange: (label) => (this._groupBy = bottomUpGroupBy(label)),
+            },
+          })}
           ${gridToolbarActions({
-            menus: this._menus,
+            openColumns: this._menus.open,
             exportToCSV: () => void (this.grid && exportCsv(this.grid, 'analysis.csv')),
             copyToClipboard: () => void this.grid?.copy(),
           })}
@@ -307,7 +310,7 @@ export class AnalysisView extends LitElement {
         .placeholder="${'No Analysis Available'}"
         .source="${this._source}"
         .columns="${this._columns}"
-        .filters="${this._showDetails ? [] : [BOTTOM_UP_DETAILS]}"
+        .filters="${this._filters()}"
         .sort="${BOTTOM_UP_SORT}"
         .rowLines="${mergedLines}"
         .groupBy="${this._groupBy}"
@@ -318,6 +321,16 @@ export class AnalysisView extends LitElement {
         @lv-grid-header-context="${this._menus.headerContext}"
       ></lv-call-tree-grid>
     `;
+  }
+
+  private _filters(): RowFilter<BottomUpRow>[] {
+    const filters = measureFilters(
+      this._measures,
+      BOTTOM_UP_MEASURES,
+      this._filterCache,
+      'analysis',
+    );
+    return this._showDetails ? filters : [...filters, BOTTOM_UP_DETAILS];
   }
 
   private readonly _gridMounted = (el?: Element): void => {
@@ -334,20 +347,17 @@ export class AnalysisView extends LitElement {
   }
 
   private async _build(root: ApexLog): Promise<void> {
-    const tree = await MergedTree.bottomUp(root, { signal: this._builds.signal });
-    if (!tree) {
+    const { signal } = this._builds;
+    const tree = await MergedTree.bottomUp(root, { signal });
+    const reported = await reportedUsageOf(root);
+    // A newer log can load while the usage resolves.
+    if (!tree || signal.aborted) {
       return;
     }
     this._tree = tree;
-    this._columns = bottomUpColumns(root, { openType });
+    this._columns = bottomUpColumns(root, { openType, reported });
     this._settings.applyTo(this._columnTarget);
     this._source = tree.source;
-  }
-
-  private async _expandAll(open: boolean): Promise<void> {
-    await (open ? this.grid?.expandAll() : this.grid?.collapseAll());
-    // The keys and copy act on the grid, not on the button that was clicked.
-    this.grid?.focus({ preventScroll: true });
   }
 
   // A row ranks a method by self time and opens to its callers, so the inspector reads it as callers.
