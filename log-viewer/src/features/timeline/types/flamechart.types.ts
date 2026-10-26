@@ -831,8 +831,9 @@ export interface HeatStripMetricValue {
   limit: number;
   /**
    * Increment-only total from detailed events, set only for delta-tracked metrics and only
-   * when it diverges below `used` (i.e. the log dropped events the cumulative snapshot counted).
-   * Undefined means no divergence / metric has no granular source.
+   * when it differs from `used`: below, the log dropped events the cumulative snapshot counted;
+   * above, Salesforce did not charge everything we saw. Undefined means the two agree, or the
+   * metric has no granular source.
    */
   tracked?: number;
   /**
@@ -920,7 +921,7 @@ export interface MetricStripRawValue {
   used: number;
   /** The limit the log reported for this metric; 0 when the log reported none. */
   limit: number;
-  /** Increment-only tracked total, present only when it diverges below `used`. See HeatStripMetricValue.tracked. */
+  /** Increment-only tracked total, present only when it differs from `used`. See HeatStripMetricValue.tracked. */
   tracked?: number;
 }
 

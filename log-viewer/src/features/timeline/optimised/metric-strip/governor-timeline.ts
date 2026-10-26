@@ -26,8 +26,8 @@
  *
  * At each observation timestamp a single combined point is emitted, summing the last-known
  * per-namespace values (carry-forward step merge). `tracked` is surfaced on the emitted value only
- * for delta-tracked metrics and only when it diverges below `used` (the log dropped events the
- * cumulative snapshot still counted).
+ * for delta-tracked metrics and only when it differs from `used`: below it, the log dropped events
+ * the cumulative snapshot still counted; above it, Salesforce did not charge everything we saw.
  */
 
 import { CHECK_EVERY, type Tick } from '../../../../core/utility/FrameBudget.js';
@@ -339,7 +339,7 @@ function emitPoint(
   for (const [metric, a] of agg) {
     // 0 means the log reported no limit — the value still belongs on the series.
     const value: HeatStripMetricValue = { used: a.used, limit: limits.get(metric) ?? 0 };
-    if (a.anyDelta && a.trackedSum < a.used) {
+    if (a.anyDelta && a.trackedSum !== a.used) {
       value.tracked = a.trackedSum;
     }
     if (a.uncapped !== a.used) {

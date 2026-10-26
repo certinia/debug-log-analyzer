@@ -26,6 +26,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - 🪪 **Call tree**: the `USER_INFO` line shows as a row.
 - 🎯 **Entry point**: the header names the longest and counts the rest, and its tooltip lists the top five.
 - 🔭 **Timeline inspector**: the summary, call tree included, changes to reflect what is currently visible. ([#875])
+- 🧮 **Limit strip**: the tooltip always shows the seen count when it differs from the usage Salesforce reported, not only where it is lower.
 
 ### Added
 
