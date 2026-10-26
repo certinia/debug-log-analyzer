@@ -7,7 +7,6 @@ import type { DMLBeginLine } from '@apexdevtools/apex-log-parser';
 import { getCallerNamespace } from '../../../core/utility/CallerNamespace.js';
 import type { GridColumn } from '../../../grid/index.js';
 import { DML_VIEWS } from '../../../components/grid/ColumnViews.js';
-import { NAMESPACE_WIDTH } from '../../../components/grid/ColumnWidths.js';
 import { textColumn } from '../../../components/grid/columns.js';
 import {
   rowCountColumn,
@@ -29,13 +28,11 @@ function dmlColumns(rows: readonly DMLRow[]): GridColumn<DMLRow>[] {
       id: 'callerNamespace',
       title: 'Caller Namespace',
       value: (row) => row.callerNamespace,
-      width: NAMESPACE_WIDTH,
     }),
     textColumn({
       id: 'objectType',
       title: 'Object',
       value: (row) => row.objectType,
-      width: 110,
       hidden: true,
       hoverText: true,
       empty: '—',
@@ -44,7 +41,6 @@ function dmlColumns(rows: readonly DMLRow[]): GridColumn<DMLRow>[] {
       id: 'namespace',
       title: 'Namespace',
       value: (row) => row.namespace,
-      width: NAMESPACE_WIDTH,
       hidden: true,
     }),
     rowCountColumn(rows),

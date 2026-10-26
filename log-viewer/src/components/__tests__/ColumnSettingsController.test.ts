@@ -189,6 +189,36 @@ describe('ColumnSettingsController', () => {
       ['col:timeTaken', 'timeTaken title', true],
     ]);
   });
+
+  it('adds the width items only for a grid, and Autosize Column only from a header', async () => {
+    const table = fakeTable();
+    const { columns } = await connected(table);
+    const WIDTH_LABELS = ['Autosize Column', 'Autosize All Columns', 'Reset Column Widths'];
+    const labels = (target: ColumnTarget, column?: string): string[] =>
+      columns.menuItems(target, column).map((item) => item.label.trim());
+    const widthLabels = (target: ColumnTarget, column?: string): string[] =>
+      labels(target, column).filter((label) => WIDTH_LABELS.includes(label));
+    const grid = {
+      autosizeColumn: jest.fn(),
+      autosizeColumns: jest.fn(),
+      resetColumnWidths: jest.fn(),
+    };
+
+    expect(widthLabels(table)).toEqual([]);
+    expect(widthLabels({ ...table, grid: () => grid }, 'namespace')).toEqual([
+      'Autosize Column',
+      'Autosize All Columns',
+      'Reset Column Widths',
+    ]);
+    expect(widthLabels({ ...table, grid: () => grid })).toEqual([
+      'Autosize All Columns',
+      'Reset Column Widths',
+    ]);
+    // Above the column toggles, so a long list does not push them out of view.
+    const menu = labels({ ...table, grid: () => grid });
+    expect(menu.indexOf('Reset Column Widths')).toBeLessThan(menu.indexOf('namespace'));
+    expect(menu.indexOf('Autosize All Columns')).toBeGreaterThan(menu.indexOf('Timing'));
+  });
 });
 
 describe('Seen and Reported titles', () => {

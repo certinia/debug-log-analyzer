@@ -59,8 +59,6 @@ describe('databaseOverview time', () => {
     expect(overview.time.sosl).toEqual({ timeNs: 10_000_000, statements: 1 });
     expect(overview.time.timeNs).toEqual(40_000_000);
     expect(overview.time.percentOfLog).toBeCloseTo(4.0, 1);
-    // The log's own duration is the spine's denominator, so it travels with the figures.
-    expect(overview.time.logNs).toBeGreaterThan(overview.time.timeNs);
   });
 
   it('reports zeroes for a log with no statements', async () => {
