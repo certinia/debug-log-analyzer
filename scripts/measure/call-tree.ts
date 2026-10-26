@@ -19,7 +19,7 @@ import {
   toBottomUpTree,
 } from '../../log-viewer/src/features/call-tree/utils/Aggregation.js';
 import { reportedUsage } from '../../log-viewer/src/features/call-tree/utils/reportedUsage.js';
-import { line, time } from './harness.js';
+import { line, print, time } from './harness.js';
 
 // The builds slice themselves against this; resolving at once measures the work
 // rather than the frames it would hand back on screen.
@@ -79,19 +79,19 @@ export async function measureCallTree(log: ApexLog): Promise<void> {
 
   const byPathBottomUp = await time('rowIdsByPath bottom-up', () => rowIdsByPath(bottomUp));
   const byPathAggregated = await time('rowIdsByPath aggregated', () => rowIdsByPath(aggregated));
-  console.log(`map entries: bottom-up ${byPathBottomUp.size}, aggregated ${byPathAggregated.size}`);
+  print(`map entries: bottom-up ${byPathBottomUp.size}, aggregated ${byPathAggregated.size}`);
 
   // The mark, on the worst row there is: the frames a picked bucket counts,
   // translated into the ids of every row they name.
   const picked = shape.fattest?.eventIndexes ?? [];
-  console.log(`\nfattest row: ${picked.length} occurrences of "${shape.fattest?.text ?? ''}"`);
+  print(`\nfattest row: ${picked.length} occurrences of "${shape.fattest?.text ?? ''}"`);
   const ids = new LocatedRowIds();
   await time('mark callers (first)', () => ids.idsFor(log, picked, 'callers'));
   await time('mark callers (same pick)', () => ids.idsFor(log, picked, 'callers'));
   await time('mark callees', () => new LocatedRowIds().idsFor(log, picked, 'callees'));
 
   // The Call Tree tab's own grouped builds, for comparison with the inspector's.
-  console.log('');
+  print('');
   // A store of its own, so the inspector's builds above have not warmed the key
   // table. Only the first build below is cold; the second reads what the first
   // interned, as it does on screen where every view shares one table.

@@ -26,7 +26,7 @@ import {
 } from '../../log-viewer/src/features/timeline/types/flamechart.types.js';
 import { selfTimeByCategory } from '../../log-viewer/src/features/timeline/utils/category-self-time.js';
 import { buildTimelineFrames } from '../../log-viewer/src/features/timeline/utils/timeline-frames.js';
-import { heapMb, line, nowMs, time } from './harness.js';
+import { heapMb, line, nowMs, print, time } from './harness.js';
 
 /** A word nearly every log holds many times, so the search walks and matches a lot. */
 const SEARCH_TEXT = 'method';
@@ -82,8 +82,8 @@ export async function digestTimeline(log: ApexLog): Promise<void> {
   const { frames, cache } = await build(log);
   const { maxDepth, totalDuration, rectsByDepth } = frames;
 
-  console.log('section,key,a,b,c,d');
-  console.log(`total,,${maxDepth},${totalDuration},,`);
+  print('section,key,a,b,c,d');
+  print(`total,,${maxDepth},${totalDuration},,`);
   const depths = [...rectsByDepth.keys()].sort((a, b) => a - b);
   for (const depth of depths) {
     const rects = rectsByDepth.get(depth)!;
@@ -93,7 +93,7 @@ export async function digestTimeline(log: ApexLog): Promise<void> {
       start += rect.timeStart;
       self += rect.selfDuration;
     }
-    console.log(`depth,${depth},${rects.length},${start},${self},`);
+    print(`depth,${depth},${rects.length},${start},${self},`);
   }
 
   for (const window of WINDOWS) {
@@ -108,7 +108,7 @@ export async function digestTimeline(log: ApexLog): Promise<void> {
         events += bucket.eventCount;
         colors += bucket.color;
       }
-      console.log(`cull,${key}:${category},${rects.length},${buckets.length},${events},${colors}`);
+      print(`cull,${key}:${category},${rects.length},${buckets.length},${events},${colors}`);
     }
   }
 }
