@@ -86,6 +86,9 @@ function fakeLayout(): void {
   ) {
     return this.classList.contains('scroller') ? 10 * ROW : ROW;
   });
+  jest.spyOn(Element.prototype, 'clientHeight', 'get').mockImplementation(function (this: Element) {
+    return this.classList.contains('scroller') ? 10 * ROW : 0;
+  });
   jest.spyOn(HTMLElement.prototype, 'offsetWidth', 'get').mockReturnValue(500);
   jest
     .spyOn(HTMLElement.prototype, 'getBoundingClientRect')
