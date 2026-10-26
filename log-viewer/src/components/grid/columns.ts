@@ -9,18 +9,13 @@ import { formatDuration } from '../../core/utility/Util.js';
 import { formatSOQL, formatSOQLToText } from '../../features/soql/format/formatter.js';
 import type { Dialect } from '../../features/soql/format/tokenize.js';
 import { sum, type Calc, type GridColumn } from '../../grid/index.js';
-import { TIME_WIDTH } from './ColumnWidths.js';
 import { msBar } from './cells.js';
-
-export const COUNT_MIN_WIDTH = 60;
-const TIME_MIN_WIDTH = 120;
 
 /** A right-aligned number, empty where the row has none, with a summed footer unless `summed` is false. */
 export function countColumn<R>(opts: {
   id: string;
   title: string;
   value: (row: R) => number | null | undefined;
-  width: number;
   hidden?: boolean;
   summed?: boolean;
 }): GridColumn<R> {
@@ -28,8 +23,7 @@ export function countColumn<R>(opts: {
   return {
     id: opts.id,
     title: opts.title,
-    width: opts.width,
-    minWidth: COUNT_MIN_WIDTH,
+    width: 'content',
     align: 'end',
     hidden: opts.hidden,
     cell: text,
@@ -48,6 +42,7 @@ export function timeColumn<R>(opts: {
   totalNs: number | (() => number);
   calc?: Calc<R>;
   hidden?: boolean;
+  /** Pixels. Default `content`. */
   width?: number;
 }): GridColumn<R> {
   const { totalNs } = opts;
@@ -55,8 +50,7 @@ export function timeColumn<R>(opts: {
   return {
     id: opts.id,
     title: opts.title,
-    width: opts.width ?? TIME_WIDTH,
-    minWidth: TIME_MIN_WIDTH,
+    width: opts.width ?? 'content',
     align: 'end',
     hidden: opts.hidden,
     cell: (row) => msBar(opts.value(row), total()),
@@ -74,7 +68,6 @@ export function textColumn<R>(opts: {
   id: string;
   title: string;
   value: (row: R) => string | null | undefined;
-  width: number;
   hidden?: boolean;
   hoverText?: boolean;
   empty?: string;
@@ -83,7 +76,7 @@ export function textColumn<R>(opts: {
   return {
     id: opts.id,
     title: opts.title,
-    width: opts.width,
+    width: 'content',
     hidden: opts.hidden,
     cell: (row) => opts.value(row) ?? opts.empty ?? '',
     text,

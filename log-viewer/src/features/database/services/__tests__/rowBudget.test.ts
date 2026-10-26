@@ -55,7 +55,6 @@ const overviewOf = (
 ): DatabaseOverview => ({
   time: {
     timeNs: 0,
-    logNs: 1_000_000_000,
     percentOfLog: 0,
     soql: { timeNs: 0, statements: counts.soql },
     dml: { timeNs: 0, statements: counts.dml },

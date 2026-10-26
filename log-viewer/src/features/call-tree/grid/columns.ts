@@ -6,7 +6,7 @@ import { html } from 'lit';
 
 import type { ColumnSettingsOptions } from '../../../components/ColumnSettingsController.js';
 import { bar } from '../../../components/grid/cells.js';
-import { COUNT_MIN_WIDTH, countColumn, timeColumn } from '../../../components/grid/columns.js';
+import { countColumn, timeColumn } from '../../../components/grid/columns.js';
 import { NO_REPORTED_LIMITS_TEXT } from '../../../components/governorCopy.js';
 import { vscodeMessenger } from '../../../core/messaging/VSCodeExtensionMessenger.js';
 import { getCallerNamespace } from '../../../core/utility/CallerNamespace.js';
@@ -22,7 +22,6 @@ import {
   type TreeSource,
 } from '../../../grid/index.js';
 import { CALL_TREE_VIEWS, type SeenReportedPair } from '../../../components/grid/ColumnViews.js';
-import { NAMESPACE_WIDTH } from '../../../components/grid/ColumnWidths.js';
 import { soqlGroupCell } from '../../soql/format/groupHeader.js';
 import type { AggregatedRow, BottomUpRow } from '../utils/Aggregation.js';
 import {
@@ -117,8 +116,6 @@ export interface HeapCalcs<R> {
 
 export const BOTTOM_UP_SORT: GridSort = { column: 'totalSelfTime', dir: 'desc' };
 
-const ROWS_WIDTH = 63;
-
 function nameColumn<R>(fields: RowFields<R>, options: CallTreeColumnOptions): GridColumn<R> {
   return {
     id: 'text',
@@ -139,8 +136,7 @@ function namespaceColumns<R extends MetricRow>(fields: RowFields<R>): GridColumn
     {
       id: 'namespace',
       title: 'Namespace',
-      width: NAMESPACE_WIDTH,
-      minWidth: 80,
+      width: 'content',
       cell: (row) => row.namespace,
       text: (row) => row.namespace,
       sort: { value: (row) => row.namespace },
@@ -149,7 +145,7 @@ function namespaceColumns<R extends MetricRow>(fields: RowFields<R>): GridColumn
     {
       id: 'callerNamespace',
       title: 'Caller Namespace',
-      width: NAMESPACE_WIDTH,
+      width: 'content',
       hidden: true,
       cell: fields.callerNamespace,
       text: fields.callerNamespace,
@@ -163,7 +159,7 @@ function typeColumn<R>(fields: RowFields<R>, hidden: boolean): GridColumn<R> {
   return {
     id: 'type',
     title: 'Type',
-    width: 150,
+    width: 'content',
     hidden,
     cell: fields.type,
     text: fields.type,
@@ -184,7 +180,6 @@ function governorColumn<R extends MetricRow>(opts: {
   part: 'total' | 'self';
   total: number;
   limit: number;
-  width?: number;
   description?: string;
 }): GridColumn<R> {
   const { total, limit } = opts;
@@ -194,8 +189,7 @@ function governorColumn<R extends MetricRow>(opts: {
     id: opts.id,
     title: opts.title,
     description: opts.description,
-    width: opts.width ?? 70,
-    minWidth: COUNT_MIN_WIDTH,
+    width: 'content',
     align: 'end',
     hidden: opts.part === 'self',
     cell: (row) => shown(value(row)),
@@ -228,7 +222,6 @@ function reportedColumn<R extends MetricRow>(opts: {
   seen: (row: R) => number;
   /** The whole log's reported change, which the bar measures against; null for no usage. */
   total: number | null;
-  width?: number;
 }): GridColumn<R> {
   const { value, seen, total } = opts;
   const shown = (v: number) =>
@@ -237,8 +230,7 @@ function reportedColumn<R extends MetricRow>(opts: {
     id: opts.id,
     title: opts.title,
     description: REPORTED_DESCRIPTION,
-    width: opts.width ?? 70,
-    minWidth: COUNT_MIN_WIDTH,
+    width: 'content',
     align: 'end',
     hidden: true,
     cell: (row) => {
@@ -271,7 +263,6 @@ function utilisationColumn<R>(opts: {
   id: 'governorCost' | 'governorCostMax';
   title: string;
   value: (row: R) => number | null;
-  width: number;
   hidden?: boolean;
   tooltip: (row: R, value: number) => string;
 }): GridColumn<R> {
@@ -282,8 +273,7 @@ function utilisationColumn<R>(opts: {
   return {
     id: opts.id,
     title: opts.title,
-    width: opts.width,
-    minWidth: opts.width,
+    width: 'content',
     align: 'end',
     hidden: opts.hidden,
     cell: (row) => shown(value(row)),
@@ -313,7 +303,6 @@ function heapColumn<R extends MetricRow>(opts: {
   description: string;
   value: (row: R) => number;
   calc: Calc<R>;
-  width: number;
   hidden?: boolean;
 }): GridColumn<R> {
   const text = (row: R): string => formatInteger(opts.value(row));
@@ -321,8 +310,7 @@ function heapColumn<R extends MetricRow>(opts: {
     id: opts.id,
     title: opts.title,
     description: opts.description,
-    width: opts.width,
-    minWidth: 70,
+    width: 'content',
     align: 'end',
     hidden: opts.hidden,
     cell: text,
@@ -348,7 +336,6 @@ function governorMetricColumns<R extends MetricRow>(
     of: (row: R) => SelfTotal,
     total: number,
     limit: number,
-    width?: number,
   ): GridColumn<R>[] => [
     governorColumn({
       id: `${id}.total`,
@@ -357,7 +344,6 @@ function governorMetricColumns<R extends MetricRow>(
       part: 'total',
       total,
       limit,
-      width,
       description: SEEN_DESCRIPTION,
     }),
     reportedColumn({
@@ -366,7 +352,6 @@ function governorMetricColumns<R extends MetricRow>(
       value: (row) => fields.reported(row, REPORTED_PAIRS[id].metric),
       seen: (row) => of(row).total,
       total: usage?.delta(REPORTED_PAIRS[id].metric, WHOLE_LOG) ?? null,
-      width,
     }),
     governorColumn({
       id: `${id}.self`,
@@ -375,46 +360,34 @@ function governorMetricColumns<R extends MetricRow>(
       part: 'self',
       total,
       limit,
-      width,
     }),
   ];
   return [
     ...metric('dmlCount', (r) => r.dmlCount, log.dmlCount.total, limits.dmlStatements.limit),
     ...metric('soqlCount', (r) => r.soqlCount, log.soqlCount.total, limits.soqlQueries.limit),
     ...metric('soslCount', (r) => r.soslCount, log.soslCount.total, limits.soslQueries.limit),
-    // 77 is the narrowest width that doesn't clip "Throws"; 60 did.
     countColumn({
       id: 'thrownCount.total',
       title: 'Throws Count',
       value: (r) => r.thrownCount.total,
-      width: 77,
     }),
-    ...metric(
-      'dmlRowCount',
-      (r) => r.dmlRowCount,
-      log.dmlRowCount.total,
-      limits.dmlRows.limit,
-      ROWS_WIDTH,
-    ),
+    ...metric('dmlRowCount', (r) => r.dmlRowCount, log.dmlRowCount.total, limits.dmlRows.limit),
     ...metric(
       'soqlRowCount',
       (r) => r.soqlRowCount,
       log.soqlRowCount.total,
       limits.queryRows.limit,
-      ROWS_WIDTH,
     ),
     // SOSL rows have no governor limit, so they are plain counts rather than bars.
     countColumn({
       id: 'soslRowCount.total',
       title: 'SOSL Rows',
       value: (r) => r.soslRowCount.total,
-      width: ROWS_WIDTH,
     }),
     countColumn({
       id: 'soslRowCount.self',
       title: 'SOSL Rows (self)',
       value: (r) => r.soslRowCount.self,
-      width: ROWS_WIDTH,
       hidden: true,
     }),
     heapColumn({
@@ -423,7 +396,6 @@ function governorMetricColumns<R extends MetricRow>(
       description: 'Net bytes retained on this path (alloc − free); may be negative',
       value: (r) => r.heapAllocated.total,
       calc: heap.netTotal,
-      width: 92,
     }),
     heapColumn({
       id: 'heapAllocated.self',
@@ -432,7 +404,6 @@ function governorMetricColumns<R extends MetricRow>(
         'Net bytes retained directly by this node (excluding sub-methods); may be negative',
       value: (r) => r.heapAllocated.self,
       calc: heap.netSelf,
-      width: 121,
       hidden: true,
     }),
     heapColumn({
@@ -441,7 +412,6 @@ function governorMetricColumns<R extends MetricRow>(
       description: 'Peak live heap on this path (matches the "Maximum heap size" governor)',
       value: (r) => r.heapPeak,
       calc: max((r) => r.heapPeak),
-      width: 100,
     }),
     heapColumn({
       id: 'heapGross.total',
@@ -449,7 +419,6 @@ function governorMetricColumns<R extends MetricRow>(
       description: 'Total bytes allocated on this path (ignores frees; churn)',
       value: (r) => r.heapGross.total,
       calc: heap.grossTotal,
-      width: 107,
       hidden: true,
     }),
     heapColumn({
@@ -458,14 +427,12 @@ function governorMetricColumns<R extends MetricRow>(
       description: 'Bytes allocated directly by this node (excluding sub-methods; ignores frees)',
       value: (r) => r.heapGross.self,
       calc: heap.grossSelf,
-      width: 121,
       hidden: true,
     }),
     utilisationColumn({
       id: 'governorCost',
       title: 'Gov Avg %',
       value: fields.governorCost,
-      width: 71,
       tooltip: (row, value) => {
         const breakdown = governorCostBreakdown(row, log.governorLimits);
         if (!breakdown.length) {
@@ -483,7 +450,6 @@ function governorMetricColumns<R extends MetricRow>(
       id: 'governorCostMax',
       title: 'Gov Peak %',
       value: fields.governorCostMax,
-      width: 78,
       hidden: true,
       tooltip: (row, value) => {
         const [top] = governorCostBreakdown(row, log.governorLimits);
@@ -625,7 +591,6 @@ export function bottomUpColumns(
       id: 'callCount',
       title: 'Calls',
       value: (r) => r.callCount,
-      width: 70,
     }),
     // Bottom-up rows overlap, so totals count each call once; self never overlaps.
     ...governorMetricColumns(
@@ -678,7 +643,6 @@ export function aggregatedColumns(
       id: 'callCount',
       title: 'Calls',
       value: (r) => r.callCount,
-      width: 70,
     }),
     // A callee row sits inside its caller's total; self never overlaps.
     ...governorMetricColumns(

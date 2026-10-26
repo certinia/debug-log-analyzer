@@ -9,7 +9,6 @@ import { createRef, ref } from 'lit/directives/ref.js';
 import { max, sum, type GridColumn, type TreeSource } from '../grid/index.js';
 import { queryDialect } from '../features/call-tree/grid/cells.js';
 import { globalStyles } from '../styles/global.styles.js';
-import { progressColumnWidth } from './grid/measureWidth.js';
 import { buildCallStackData, type CallStackRow } from './callStackData.js';
 import type { AppGrid } from './grid/AppGrid.js';
 import { inlineQueryColumn, timeColumn } from './grid/columns.js';
@@ -102,7 +101,6 @@ export class CallStackDetail extends LitElement {
 }
 
 function callStackColumns(rootTotal: number): GridColumn<CallStackRow>[] {
-  const width = progressColumnWidth(rootTotal);
   return [
     inlineQueryColumn({
       id: 'text',
@@ -117,7 +115,6 @@ function callStackColumns(rootTotal: number): GridColumn<CallStackRow>[] {
       value: (row) => row.duration.total,
       totalNs: rootTotal,
       calc: max((row) => row.duration.total),
-      width,
     }),
     timeColumn({
       id: 'duration.self',
@@ -125,7 +122,6 @@ function callStackColumns(rootTotal: number): GridColumn<CallStackRow>[] {
       value: (row) => row.duration.self,
       totalNs: rootTotal,
       calc: sum((row) => row.duration.self),
-      width,
     }),
   ];
 }

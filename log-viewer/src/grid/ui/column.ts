@@ -14,10 +14,15 @@ export interface GridColumn<R> {
   title: string;
   /** The header tooltip. Default: the title. */
   description?: string;
-  /** Pixels, or `flex` to take the room the others leave. Default `flex`. */
-  width?: number | 'flex';
+  /**
+   * Pixels; `flex` to take the room the others leave; or `content` to fit the header, the
+   * footer and the first rows painted for each `source`. Default `flex`.
+   */
+  width?: number | 'flex' | 'content';
   /** Smallest width in pixels. Default 40. */
   minWidth?: number;
+  /** Largest width a `content` column is measured to. A width the user sets can pass it. */
+  maxWidth?: number;
   /** `end` for numbers. Default `start`. */
   align?: 'start' | 'end';
   hidden?: boolean;

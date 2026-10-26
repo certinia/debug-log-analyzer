@@ -201,6 +201,11 @@ export const gridStyles = css`
         cursor: pointer;
         user-select: none;
       }
+
+      /* Room for the resize grip, so an end-aligned title does not touch it. */
+      &:has(> .resize) {
+        padding-inline-end: calc(var(--grid-pad) * 2);
+      }
     }
 
     /* Inline after the last word, so a wrapped title keeps it beside the text. */
@@ -245,8 +250,18 @@ export const gridStyles = css`
       cursor: col-resize;
       touch-action: none;
 
-      &:hover {
-        background: var(--grid-border);
+      /* Short, not full height, so it reads as a handle, not a column border. */
+      &::after {
+        content: '';
+        position: absolute;
+        inset-block: 30%;
+        inset-inline-end: var(--grid-stroke);
+        border-inline-end: var(--grid-stroke) solid var(--grid-border);
+      }
+
+      &:hover::after,
+      &:active::after {
+        border-color: var(--grid-focus);
       }
     }
 
@@ -340,6 +355,13 @@ export const gridStyles = css`
 
       .busy {
         background: Highlight;
+      }
+
+      /* Forced colours would paint the handle one system colour, at rest and on hover alike. */
+      .resize:hover::after,
+      .resize:active::after {
+        forced-color-adjust: none;
+        border-color: Highlight;
       }
 
       ::highlight(lv-grid-find-match) {

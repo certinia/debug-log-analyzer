@@ -7,7 +7,6 @@ import type { SOSLExecuteBeginLine } from '@apexdevtools/apex-log-parser';
 import { getCallerNamespace } from '../../../core/utility/CallerNamespace.js';
 import type { GridColumn } from '../../../grid/index.js';
 import { SOSL_VIEWS } from '../../../components/grid/ColumnViews.js';
-import { NAMESPACE_WIDTH } from '../../../components/grid/ColumnWidths.js';
 import { textColumn } from '../../../components/grid/columns.js';
 import {
   rowCountColumn,
@@ -28,13 +27,11 @@ function soslColumns(rows: readonly SOSLRow[]): GridColumn<SOSLRow>[] {
       id: 'namespace',
       title: 'Namespace',
       value: (row) => row.namespace,
-      width: NAMESPACE_WIDTH,
     }),
     textColumn({
       id: 'callerNamespace',
       title: 'Caller Namespace',
       value: (row) => row.callerNamespace,
-      width: NAMESPACE_WIDTH,
       hidden: true,
     }),
     rowCountColumn(rows),
