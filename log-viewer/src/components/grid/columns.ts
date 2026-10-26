@@ -18,6 +18,8 @@ export function countColumn<R>(opts: {
   value: (row: R) => number | null | undefined;
   hidden?: boolean;
   summed?: boolean;
+  /** The footer in place of a sum of `value`. */
+  calc?: Calc<R>;
 }): GridColumn<R> {
   const text = (row: R) => String(opts.value(row) ?? '');
   return {
@@ -30,7 +32,7 @@ export function countColumn<R>(opts: {
     text,
     sort: { value: opts.value },
     sortFirst: 'desc',
-    calc: opts.summed === false ? undefined : sum((row) => opts.value(row) ?? 0),
+    calc: opts.summed === false ? undefined : (opts.calc ?? sum((row) => opts.value(row) ?? 0)),
   };
 }
 

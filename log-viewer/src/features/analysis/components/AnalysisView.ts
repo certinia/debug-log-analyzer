@@ -347,13 +347,15 @@ export class AnalysisView extends LitElement {
   }
 
   private async _build(root: ApexLog): Promise<void> {
-    const tree = await MergedTree.bottomUp(root, { signal: this._builds.signal });
-    if (!tree) {
+    const { signal } = this._builds;
+    const tree = await MergedTree.bottomUp(root, { signal });
+    const reported = await reportedUsageOf(root);
+    // A newer log can load while the usage resolves.
+    if (!tree || signal.aborted) {
       return;
     }
     this._tree = tree;
-    // Ready by now: the tree build waited for it.
-    this._columns = bottomUpColumns(root, { openType, reported: await reportedUsageOf(root) });
+    this._columns = bottomUpColumns(root, { openType, reported });
     this._settings.applyTo(this._columnTarget);
     this._source = tree.source;
   }
