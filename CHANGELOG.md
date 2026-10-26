@@ -42,6 +42,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - 🧮 **New limit columns**: show the SOQL, DML and SOSL usage Salesforce reported beside the counts we actually saw in the Call Tree and Analysis tables.
 - 🔦 **Timeline legend**: hover a category to highlight frames in the timeline, select to keep. ([#917])
 - 🔍 **Find**: in the tables, find matches the group header text too.
+- ↔️ **Table columns**: columns fit their content and fill the table, and the column menu can autosize or reset them.
 
 ### Removed
 

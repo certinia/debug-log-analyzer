@@ -37,7 +37,6 @@ import { describeLevelGap, findLevelGap } from '../../../../core/log/levelCapabi
 const emptyOverview = (): DatabaseOverview => ({
   time: {
     timeNs: 0,
-    logNs: 1_000_000_000,
     percentOfLog: 0,
     soql: { timeNs: 0, statements: 0 },
     dml: { timeNs: 0, statements: 0 },
@@ -151,7 +150,6 @@ const tree = (): DatabaseCallNode[] => [
 const fullOverview = (): DatabaseOverview => ({
   time: {
     timeNs: 300_000_000,
-    logNs: 1_000_000_000,
     percentOfLog: 30,
     soql: { timeNs: 200_000_000, statements: 2 },
     dml: { timeNs: 100_000_000, statements: 1 },

@@ -38,7 +38,6 @@ jest.mock('../../services/databaseOverview.js', () => ({
     return {
       time: {
         timeNs: 30,
-        logNs: 1_000_000_000,
         percentOfLog: 0,
         soql: { timeNs: 0, statements: 0 },
         dml: { timeNs: 0, statements: 0 },

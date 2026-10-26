@@ -137,6 +137,7 @@ export class AnalysisView extends LitElement {
   private readonly _columnTarget = heldColumnTarget<BottomUpRow>(
     () => this._columns,
     (columns) => (this._columns = columns),
+    () => this.grid,
   );
   private readonly _settings = new ColumnSettingsController(this, {
     ...CALL_TREE_COLUMN_SETTINGS,

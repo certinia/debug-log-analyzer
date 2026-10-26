@@ -9,12 +9,7 @@ import { customElement, property, state } from 'lit/decorators.js';
 import { createRef, ref } from 'lit/directives/ref.js';
 
 import type { AppGrid } from '../../../components/grid/AppGrid.js';
-import {
-  COUNT_MIN_WIDTH,
-  countColumn,
-  inlineQueryColumn,
-  timeColumn,
-} from '../../../components/grid/columns.js';
+import { countColumn, inlineQueryColumn, timeColumn } from '../../../components/grid/columns.js';
 import {
   InspectorGridController,
   inspectorGridStyles,
@@ -29,7 +24,6 @@ import { logContext } from '../../../core/log/logContext.js';
 import type { LogStore } from '../../../core/log/LogStore.js';
 import { sum, type GridColumn, type TreeSource } from '../../../grid/index.js';
 import { globalStyles } from '../../../styles/global.styles.js';
-import { progressColumnWidth } from '../../../components/grid/measureWidth.js';
 import {
   type DatabaseCallNode,
   databaseOverview,
@@ -174,12 +168,7 @@ export class DatabaseTime extends LitElement {
       return;
     }
     const rows = overview ? databaseTreeRows(overview.tree) : [];
-    this._columns = databaseColumns(
-      overview?.time.timeNs ?? 0,
-      ownCodeTotal(rows),
-      // From the whole log, so the bars keep one width whatever share of it the database holds.
-      progressColumnWidth(overview?.time.logNs ?? 0),
-    );
+    this._columns = databaseColumns(overview?.time.timeNs ?? 0, ownCodeTotal(rows));
     this._setRows(rows);
     this._builtFor = store;
   }
@@ -191,11 +180,7 @@ export class DatabaseTime extends LitElement {
 }
 
 // Own code is a share of its own total: it is Apex, which the database time does not bound.
-function databaseColumns(
-  timeNs: number,
-  ownCodeNs: number,
-  width: number,
-): GridColumn<DatabaseTreeRow>[] {
+function databaseColumns(timeNs: number, ownCodeNs: number): GridColumn<DatabaseTreeRow>[] {
   return [
     inlineQueryColumn({
       id: 'label',
@@ -209,7 +194,6 @@ function databaseColumns(
       value: (row) => row.timeNs,
       totalNs: timeNs,
       calc: sum((row) => row.timeNs),
-      width,
     }),
     // Every row, child rows included: no row's own code overlaps another's.
     timeColumn({
@@ -218,13 +202,11 @@ function databaseColumns(
       value: (row) => row.selfNs,
       totalNs: ownCodeNs,
       calc: { of: () => ownCodeNs },
-      width,
     }),
     countColumn({
       id: 'count',
       title: 'Calls',
       value: (row) => row.count,
-      width: COUNT_MIN_WIDTH,
       summed: false,
     }),
   ];

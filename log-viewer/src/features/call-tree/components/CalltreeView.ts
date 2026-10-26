@@ -90,6 +90,7 @@ import {
   gridToolbarActions,
 } from '../../../components/gridToolbar.js';
 import { reportedUsageOf } from '../utils/reportedUsage.js';
+import { selectColumnWidthItem } from '../../../components/grid/columnWidthMenu.js';
 import { LocatedRowIds, type RowData } from '../../../components/locatedRow.js';
 import { InspectorTabController } from '../../../components/InspectorTabController.js';
 import { FindController } from '../../find/FindController.js';
@@ -204,6 +205,8 @@ export class CalltreeView extends LitElement {
   private contextMenuRow: LogEvent | null = null;
   /** The grid whose header was right-clicked (for column-toggle actions). */
   private contextMenuTarget: ColumnTarget | null = null;
+  /** The header the column menu opened from; null from the toolbar. */
+  private contextMenuColumn: string | null = null;
   private viewSwitchEpoch = 0;
   /** Drops a pending wait for the view to come on screen, once per attach. */
   private _visibilityWait: AbortController | null = null;
@@ -616,13 +619,19 @@ export class CalltreeView extends LitElement {
     }
   }
 
-  private _showHeaderContextMenu(target: ColumnTarget, clientX: number, clientY: number) {
+  private _showHeaderContextMenu(
+    target: ColumnTarget,
+    clientX: number,
+    clientY: number,
+    column: string | null = null,
+  ) {
     if (!this.contextMenu) {
       return;
     }
     this.contextMenuRow = null;
     this.contextMenuTarget = target;
-    this.contextMenu.show(this._columns.menuItems(target), clientX, clientY);
+    this.contextMenuColumn = column;
+    this.contextMenu.show(this._columns.menuItems(target, column), clientX, clientY);
   }
 
   private _activeColumnTarget(): ColumnTarget | null {
@@ -650,11 +659,15 @@ export class CalltreeView extends LitElement {
     if (!this.contextMenu?.isVisible() || !this.contextMenuTarget) {
       return;
     }
-    this.contextMenu.items = this._columns.menuItems(this.contextMenuTarget);
+    this.contextMenu.items = this._columns.menuItems(
+      this.contextMenuTarget,
+      this.contextMenuColumn,
+    );
   }
 
   private _onColumnMenuClose() {
     this.contextMenuTarget = null;
+    this.contextMenuColumn = null;
     this.contextMenuRow = null;
   }
 
@@ -1018,9 +1031,9 @@ export class CalltreeView extends LitElement {
     });
 
     grid.addEventListener('lv-grid-header-context', (e) => {
-      const { event } = (e as CustomEvent<GridHeaderContextDetail>).detail;
+      const { column, event } = (e as CustomEvent<GridHeaderContextDetail>).detail;
       event.preventDefault();
-      this._showHeaderContextMenu(gridColumnTarget(grid), event.clientX, event.clientY);
+      this._showHeaderContextMenu(gridColumnTarget(grid), event.clientX, event.clientY, column);
     });
     grid.addEventListener('lv-grid-reshape', () => void this._finder.rerun());
     grid.addEventListener('lv-grid-select', inspector.select);
@@ -1078,6 +1091,9 @@ export class CalltreeView extends LitElement {
     if (itemId.startsWith('reset:')) {
       this._columns.reset(itemId.slice('reset:'.length));
       this._refreshColumnMenu();
+      return;
+    }
+    if (selectColumnWidthItem(this.contextMenuTarget?.grid?.() ?? null, itemId)) {
       return;
     }
 

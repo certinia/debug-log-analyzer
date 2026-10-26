@@ -16,12 +16,15 @@ import {
   type MenuColumn,
   type SeenReportedPair,
 } from './grid/ColumnViews.js';
+import { columnWidthItems, type ColumnWidthGrid } from './grid/columnWidthMenu.js';
 
 export interface ColumnTarget {
   /** Each column a view can name, in order. */
   columns(): readonly MenuColumn[];
   /** Shows only the fields in `visible`, or every column for null, and titles each pair to match. */
   show(visible: ReadonlySet<string> | null, pairs?: readonly SeenReportedPair[]): void;
+  /** The grid the width items act on. Without one, the menu has no width items. */
+  grid?(): ColumnWidthGrid | null;
 }
 
 /** An lv-grid as a column view target: the view sets each column's `hidden`. */
@@ -29,6 +32,7 @@ export function gridColumnTarget<R extends object>(grid: LvGrid<R>): ColumnTarge
   return heldColumnTarget(
     () => grid.columns,
     (columns) => (grid.columns = columns),
+    () => grid,
   );
 }
 
@@ -36,9 +40,11 @@ export function gridColumnTarget<R extends object>(grid: LvGrid<R>): ColumnTarge
 export function heldColumnTarget<R>(
   read: () => readonly GridColumn<R>[],
   write: (columns: GridColumn<R>[]) => void,
+  grid?: () => ColumnWidthGrid | null,
 ): ColumnTarget {
   return {
     columns: read,
+    grid,
     show: (visible, pairs = []) => {
       const isShown = (id: string): boolean => !visible || visible.has(id);
       write(
@@ -159,10 +165,10 @@ export class ColumnSettingsController implements ReactiveController {
     updateSetting(`${this._options.section}.columnOverrides`, this._overrides);
   }
 
-  /** The column header menu for `target`, against the state now. */
-  menuItems(target: ColumnTarget): ContextMenuItem[] {
+  /** The column header menu for `target` now; `column` is the header it opened from. */
+  menuItems(target: ColumnTarget, column: string | null = null): ContextMenuItem[] {
     const { views, alwaysVisible, pairs } = this._options;
-    return columnMenuItems(
+    const items = columnMenuItems(
       target.columns(),
       this._view,
       views,
@@ -170,6 +176,12 @@ export class ColumnSettingsController implements ReactiveController {
       this.editedViews,
       pairs,
     );
+    if (!target.grid) {
+      return items;
+    }
+    // After the views, so the width items show without a scroll past every column toggle.
+    const afterViews = items.findIndex((item) => item.separator) + 1;
+    return [...items.slice(0, afterViews), ...columnWidthItems(column), ...items.slice(afterViews)];
   }
 
   private _adopt(settings: LanaSettings): void {
