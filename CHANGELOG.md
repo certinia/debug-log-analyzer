@@ -55,6 +55,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - 🔦 **Find**: in the tables, the current match stands out from the other matches, as it does in the editor.
 - 🐛 **Go to Code**: errors for methods not found in the file are shown correctly.
 - 🌊 **Flow errors**: multi-line errors show their message.
+- 🗃️ **SOQL and SOSL**: every keyword in the current syntax is highlighted, and `SET OPTIONS` and `UPDATE TRACKING` start their own line when a query is pretty-printed.
 
 ## [1.22.1] - 2026-09-18
 
