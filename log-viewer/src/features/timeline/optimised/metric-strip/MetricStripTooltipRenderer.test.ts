@@ -203,6 +203,34 @@ describe('MetricStripTooltipRenderer', () => {
     expect(text).toContain('(0 / 10,000)');
   });
 
+  describe('our own count beside the charged one', () => {
+    const soql = [metric('soqlQueries', 'SOQL Queries', 0.06)];
+    const reading = (used: number, tracked?: number): MetricStripDataPoint => ({
+      timestamp: 0,
+      values: new Map([['soqlQueries', used / 100]]),
+      rawValues: new Map([['soqlQueries', { used, limit: 100, tracked }]]),
+      tier3Max: 0,
+    });
+
+    it('shows the count we saw where Salesforce charged less', () => {
+      renderer.show(0, 0, reading(4, 6), soql, 60);
+
+      expect(panel().textContent).toContain('(4 / 100) (6 seen)');
+    });
+
+    it('shows the count we saw where the log dropped events Salesforce charged', () => {
+      renderer.show(0, 0, reading(4, 2), soql, 60);
+
+      expect(panel().textContent).toContain('(4 / 100) (2 seen)');
+    });
+
+    it('says nothing more where the two agree', () => {
+      renderer.show(0, 0, reading(4, 4), soql, 60);
+
+      expect(panel().textContent).not.toContain('seen');
+    });
+  });
+
   describe('a log that reported no limits', () => {
     // Peak 1,240: the reading is a share of the log's own peak, not of a cap.
     const metrics = [metric('queryRows', 'Query Rows', 1, { kind: 'peak', value: 1240 })];

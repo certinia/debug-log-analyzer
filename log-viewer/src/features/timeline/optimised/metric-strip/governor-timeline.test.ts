@@ -111,9 +111,9 @@ describe('buildGovernorTimeSeries', () => {
       delta(10, 'soqlQueries', 5),
       absolute(20, 'soqlQueries', 2),
     ]);
-    // The report is what the governor charged, so it wins over our count.
+    // The report is what the governor charged, so it wins over our count, which stays readable.
     expect(series.events[2]?.values.get('soqlQueries')?.used).toBe(2);
-    expect(series.events[2]?.values.get('soqlQueries')?.tracked).toBeUndefined();
+    expect(series.events[2]?.values.get('soqlQueries')?.tracked).toBe(5);
   });
 
   it('never counts past the highest figure the log reported', async () => {
