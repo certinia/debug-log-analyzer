@@ -89,6 +89,7 @@ import {
   gridGroupControls,
   gridToolbarActions,
 } from '../../../components/gridToolbar.js';
+import { reportedUsageOf } from '../utils/reportedUsage.js';
 import { LocatedRowIds, type RowData } from '../../../components/locatedRow.js';
 import { InspectorTabController } from '../../../components/InspectorTabController.js';
 import { FindController } from '../../find/FindController.js';
@@ -890,8 +891,13 @@ export class CalltreeView extends LitElement {
     await this._loadTimeOrder(grid, rootMethod);
   }
 
-  private _loadTimeOrder(grid: LvGrid<LogEvent>, log: ApexLog): Promise<void> {
-    grid.columns = timeOrderColumns(log, { openType });
+  private async _loadTimeOrder(grid: LvGrid<LogEvent>, log: ApexLog): Promise<void> {
+    const reported = await reportedUsageOf(log);
+    // A newer log can load while this one waits.
+    if (this.rootMethod !== log) {
+      return;
+    }
+    grid.columns = timeOrderColumns(log, { openType, reported });
     this._columns.applyTo(gridColumnTarget(grid));
     grid.source = timeOrderSource(log);
     return grid.settled();
@@ -920,8 +926,6 @@ export class CalltreeView extends LitElement {
   }
 
   private _loadAggregated(grid: LvGrid<AggregatedRow>, log: ApexLog): Promise<void> {
-    grid.columns = aggregatedColumns(log, { openType });
-    this._columns.applyTo(gridColumnTarget(grid));
     this._aggregatedBuild = this._fillAggregatedTree(grid, log);
     return this._aggregatedBuild;
   }
@@ -930,6 +934,12 @@ export class CalltreeView extends LitElement {
     grid: LvGrid<AggregatedRow>,
     rootMethod: ApexLog,
   ): Promise<void> {
+    const reported = await reportedUsageOf(rootMethod);
+    if (this.rootMethod !== rootMethod || this.aggregatedGrid !== grid) {
+      return;
+    }
+    grid.columns = aggregatedColumns(rootMethod, { openType, reported });
+    this._columns.applyTo(gridColumnTarget(grid));
     const tree = await MergedTree.aggregated(rootMethod, { signal: this._builds.signal });
     // A build can finish just before a detach, and a later one owns the container now.
     if (!tree || this.aggregatedGrid !== grid) {
@@ -962,13 +972,17 @@ export class CalltreeView extends LitElement {
   }
 
   private _loadBottomUp(grid: LvGrid<BottomUpRow>, log: ApexLog): Promise<void> {
-    grid.columns = bottomUpColumns(log, { openType });
-    this._columns.applyTo(gridColumnTarget(grid));
     this._bottomUpBuild = this._fillBottomUpTree(grid, log);
     return this._bottomUpBuild;
   }
 
   private async _fillBottomUpTree(grid: LvGrid<BottomUpRow>, rootMethod: ApexLog): Promise<void> {
+    const reported = await reportedUsageOf(rootMethod);
+    if (this.rootMethod !== rootMethod || this.bottomUpGrid !== grid) {
+      return;
+    }
+    grid.columns = bottomUpColumns(rootMethod, { openType, reported });
+    this._columns.applyTo(gridColumnTarget(grid));
     const tree = await MergedTree.bottomUp(rootMethod, { signal: this._builds.signal });
     // A build can finish just before a detach, and a later one owns the container now.
     if (!tree || this.bottomUpGrid !== grid) {

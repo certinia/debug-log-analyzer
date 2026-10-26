@@ -18,6 +18,7 @@ import {
   toAggregatedCallTree,
   toBottomUpTree,
 } from '../../log-viewer/src/features/call-tree/utils/Aggregation.js';
+import { reportedUsage } from '../../log-viewer/src/features/call-tree/utils/reportedUsage.js';
 import { line, time } from './harness.js';
 
 // The builds slice themselves against this; resolving at once measures the work
@@ -94,7 +95,13 @@ export async function measureCallTree(log: ApexLog): Promise<void> {
   // A store of its own, so the inspector's builds above have not warmed the key
   // table. Only the first build below is cold; the second reads what the first
   // interned, as it does on screen where every view shares one table.
-  const gridPaths = new LogStore(log).keyPathIds();
-  await time('grid toAggregatedCallTree', () => toAggregatedCallTree(log.children, gridPaths));
-  await time('grid toBottomUpTree', () => toBottomUpTree(log.children, gridPaths));
+  const gridStore = new LogStore(log);
+  const gridPaths = gridStore.keyPathIds();
+  const usage = await time('grid reportedUsage', () => gridStore.derive(reportedUsage));
+  await time('grid toAggregatedCallTree', () =>
+    toAggregatedCallTree(log.children, gridPaths, undefined, usage),
+  );
+  await time('grid toBottomUpTree', () =>
+    toBottomUpTree(log.children, gridPaths, undefined, usage),
+  );
 }

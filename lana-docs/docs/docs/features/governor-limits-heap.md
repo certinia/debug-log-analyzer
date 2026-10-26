@@ -76,3 +76,12 @@ Because a path can consume several limits at once, the Call Tree and Analysis ta
 Sorting by **Gov Peak** is the fastest way to find the call path that is closest to breaching something, regardless of _which_ limit it is.
 
 These two are where headroom is answered, so they are the columns measured against the limits. The DML, SOQL, SOSL and row columns beside them answer contribution instead: each bar is that path's share of what the whole transaction consumed, so it is comparable with the time bars in the same row and reads the same whether or not the log reported a limit. The limit still names itself in each cell's tooltip. Where the log reported none, **Gov Avg %** and **Gov Peak %** read `—` and sort last.
+
+### Seen and used
+
+Each DML, SOQL and SOSL count and row column has a **used** partner, shown in the **Governor Limits** view. While both show, the headers read `SOQL (seen)` and `SOQL (used)`.
+
+- **Seen** counts the statements in the log events.
+- **Used** is the same count, corrected to the limit usage Salesforce reported in the log. Salesforce reports a running total only at points in the transaction, such as the end of a code unit. Between those points, Used follows the seen count. At each report, Used moves to the reported total, and the row that holds the report takes the difference.
+
+A cell where the two differ is tinted, and its tooltip gives both. A query Salesforce did not charge, or usage the log does not show, appears on the row around the report. Where the log has no limit usage report, Used reads `—`.
