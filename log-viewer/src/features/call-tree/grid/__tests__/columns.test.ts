@@ -199,6 +199,12 @@ describe('bottomUpColumns', () => {
     );
   });
 
+  it('counts each query and its rows once in the footer, though the method and query rows both hold them', () => {
+    // One query of 3 rows, inside ns.Outer.run(): both are top-level Bottom-Up rows.
+    expect(total(column(columns, 'soqlCount.total').calc, roots)).toBe(1);
+    expect(total(column(columns, 'soqlRowCount.total').calc, roots)).toBe(3);
+  });
+
   it('opens sorted by a column it has', () => {
     expect(column(columns, BOTTOM_UP_SORT.column).sort).toBeDefined();
   });
@@ -425,6 +431,18 @@ describe('Reported columns', () => {
     );
 
     expect(row && reported.text?.(row)).toBe('5');
+  });
+
+  it('counts the usage once in the Bottom-Up footer, though nested rows hold it too', async () => {
+    const usage = await store.derive(reportedUsage);
+    const roots = toBottomUpTree(reportedLog.children, store.keyPathIds(), undefined, usage);
+    const reported = column(
+      bottomUpColumns(reportedLog, { ...options, reported: usage }),
+      'soqlCount.reported',
+    );
+
+    // The log used 5 in all, whichever rows hold it.
+    expect(total(reported.calc, roots)).toBe(5);
   });
 
   it('gives the lines that report a limit none of it: the method around them used it', async () => {
