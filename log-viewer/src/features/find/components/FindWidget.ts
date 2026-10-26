@@ -151,7 +151,7 @@ export class FindWidget extends LitElement {
           <vs-icon-checkbox
             icon="case-sensitive"
             showSelected="true"
-            title="Match Case"
+            label="Match Case"
             class="find-control"
             @click=${this._matchCase}
           ></vs-icon-checkbox>

@@ -20,7 +20,7 @@ import { globalStyles } from '../../../styles/global.styles.js';
 export class DatabaseSection extends LitElement {
   /** Short section name, e.g. `DML`. */
   @property({ type: String })
-  title = '';
+  heading = '';
 
   @property({ type: Boolean, reflect: true })
   collapsed = false;
@@ -107,7 +107,7 @@ export class DatabaseSection extends LitElement {
         >
           <path d="M4 6l4 4 4-4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" />
         </svg>
-        <span class="title">${this.title}</span>
+        <span class="title">${this.heading}</span>
       </span>
       <span class="metrics"
         >${this.metrics.map(
