@@ -101,8 +101,8 @@ async function settle(grid: LvGrid<Node>): Promise<void> {
   }
 }
 
-async function setup(props: Partial<LvGrid<Node>> = {}) {
-  fakeLayout();
+async function setup(props: Partial<LvGrid<Node>> = {}, layout: () => void = fakeLayout) {
+  layout();
   const grid = document.createElement('lv-grid') as LvGrid<Node>;
   Object.assign(grid, { columns: columns(), source: source(), ...props });
   document.body.append(grid);
@@ -1129,31 +1129,172 @@ describe('lv-grid columns', () => {
     expect(header('Time')?.getAttribute('aria-sort')).toBe('none');
   });
 
-  it('fits a column to the widest of its header and painted cells on a double-click', async () => {
-    const context = { font: '', measureText: (text: string) => ({ width: text.length * 10 }) };
+  /** Text is 10px a character; a twisty is 16px and a sort arrow 10px; other boxes 500px. */
+  const fakeText = (): {
+    measureText: (text: string) => { width: number };
+    layoutReads: number;
+    measures: number;
+  } => {
+    fakeLayout();
+    const context = {
+      font: '',
+      layoutReads: 0,
+      measures: 0,
+      measureText: (text: string) => {
+        context.measures++;
+        return { width: text.length * 10 };
+      },
+    };
     jest
       .spyOn(HTMLCanvasElement.prototype, 'getContext')
       .mockImplementation((() => context) as unknown as HTMLCanvasElement['getContext']);
-    const long: TreeSource<Node> = {
-      ...source(),
-      roots: [...source().roots, { key: 4, name: 'abcdefghijkl', time: 0, kind: 'x' }],
-    };
-    const { grid, header } = await setup({ source: long });
     jest.spyOn(HTMLElement.prototype, 'offsetWidth', 'get').mockImplementation(function (
       this: HTMLElement,
     ) {
+      if (this.matches('.scroller')) {
+        context.layoutReads++;
+      }
       return this.matches('.twisty') ? 16 : 500;
     });
+    jest.spyOn(window, 'getComputedStyle').mockImplementation(() => {
+      context.layoutReads++;
+      return { font: '', paddingInlineStart: '0', paddingInlineEnd: '0' } as CSSStyleDeclaration;
+    });
+    jest.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(function (
+      this: HTMLElement,
+    ) {
+      return { height: ROW, width: this.matches('.sorter') ? 10 : 500 } as DOMRect;
+    });
+    return context;
+  };
+
+  const withRoot = (root: Partial<Node>): TreeSource<Node> => ({
+    ...source(),
+    roots: [...source().roots, { key: 4, name: 'd', time: 0, kind: 'x', ...root }],
+  });
+
+  const contentColumns = (): GridColumn<Node>[] =>
+    columns().map((column) =>
+      column.id === 'name'
+        ? column
+        : { ...column, title: `Total ${column.title}s`, width: 'content' },
+    );
+
+  it('fits a double-clicked column to the widest of its header and painted cells', async () => {
+    const { grid, header } = await setup({ source: withRoot({ name: 'abcdefghijkl' }) });
+    fakeText();
     const widths: GridColumnResizeDetail[] = [];
     grid.addEventListener('lv-grid-column-resize', (e) =>
       widths.push(detail<GridColumnResizeDetail>(e)),
     );
     handle(header('Name'))?.dispatchEvent(new MouseEvent('dblclick', { bubbles: true }));
+    await settle(grid);
     // Twelve letters and the twisty.
     expect(widths).toEqual([{ column: 'name', width: 136 }]);
-    handle(header('Kind'))?.dispatchEvent(new MouseEvent('dblclick', { bubbles: true }));
-    // The header is wider than any cell; 40 is also the minimum.
-    expect(widths.at(-1)).toEqual({ column: 'kind', width: 40 });
+  });
+
+  it('can make a column narrower when it autosizes', async () => {
+    const { grid } = await setup();
+    fakeText();
+    grid.setColumnWidth('time', 300);
+    grid.autosizeColumn('time');
+    await settle(grid);
+    // "Time" and its arrow beat the one- and two-digit cells and total.
+    expect(await tracks(grid)).toBe('minmax(40px, 1fr) 50px minmax(40px, 1fr)');
+  });
+
+  it('sizes a content column to at least its header, on two lines, and its footer total', async () => {
+    const { grid } = await setup(
+      { columns: contentColumns(), source: withRoot({ time: 123456789 }) },
+      fakeText,
+    );
+    // Times: the 9-digit footer total. Kinds: "Total" over "Kinds" and its arrow, not one line.
+    expect(await tracks(grid)).toBe('minmax(40px, 1fr) 90px 60px');
+  });
+
+  it('measures content once per source, not again on a repaint', async () => {
+    let text = fakeText();
+    const { grid } = await setup({ columns: contentColumns() }, () => (text = fakeText()));
+    grid.source = withRoot({ kind: 'a much longer kind' });
+    await settle(grid);
+    // Eighteen characters; the headers beat the one- and two-digit times.
+    expect(await tracks(grid)).toBe('minmax(40px, 1fr) 60px 180px');
+    text.measureText = (t: string) => ({ width: t.length * 20 });
+    grid.marked = new Set([1]);
+    grid.rowClass = () => 'wider';
+    await settle(grid);
+    expect(await tracks(grid)).toBe('minmax(40px, 1fr) 60px 180px');
+  });
+
+  it('reads no layout on a repaint once its columns are measured', async () => {
+    let text = fakeText();
+    const { grid } = await setup({ columns: contentColumns() }, () => (text = fakeText()));
+    text.layoutReads = 0;
+    grid.marked = new Set([1]);
+    await settle(grid);
+    expect(text.layoutReads).toBe(0);
+  });
+
+  it('measures nothing while hidden, and its content once it shows', async () => {
+    let text = fakeText();
+    const { grid } = await setup({ columns: contentColumns() }, () => {
+      text = fakeText();
+      jest.spyOn(HTMLElement.prototype, 'offsetHeight', 'get').mockReturnValue(0);
+    });
+    expect(text.measures).toBe(0);
+    jest.spyOn(HTMLElement.prototype, 'offsetHeight', 'get').mockReturnValue(10 * ROW);
+    grid.remove();
+    document.body.append(grid);
+    await settle(grid);
+    expect(await tracks(grid)).toBe('minmax(40px, 1fr) 60px 60px');
+  });
+
+  it('keeps pixel tracks while rows build, so the header and footer line up with them', async () => {
+    let release: () => void = () => undefined;
+    const held = new Promise<void>((resolve) => (release = resolve));
+    let clock = 0;
+    const { grid } = await setup(
+      {
+        columns: contentColumns(),
+        // The build checks its clock every 256 rows, so it needs more rows than that to yield.
+        source: {
+          roots: Array.from({ length: 600 }, (_, i) => ({
+            key: i,
+            name: `n${i}`,
+            time: 1,
+            kind: 'x',
+          })),
+          key: (row: Node) => row.key,
+        },
+        scheduler: { now: () => (clock += 100), yield: () => held },
+      },
+      fakeText,
+    );
+    expect(await tracks(grid)).toBe('minmax(40px, 1fr) 40px 40px');
+    release();
+    await settle(grid);
+    // The 3-digit footer total is under "Total" over "Times" and its arrow.
+    expect(await tracks(grid)).toBe('minmax(40px, 1fr) 60px 60px');
+  });
+
+  it('autosizes every column, the flex one back to filling, and a reset gives back the content widths', async () => {
+    const { grid } = await setup({ columns: contentColumns() }, fakeText);
+    const content = await tracks(grid);
+    grid.setColumnWidth('name', 300);
+    grid.setColumnWidth('time', 300);
+    grid.setColumnWidth('kind', 300);
+    const widths: GridColumnResizeDetail[] = [];
+    grid.addEventListener('lv-grid-column-resize', (e) =>
+      widths.push(detail<GridColumnResizeDetail>(e)),
+    );
+    grid.autosizeColumns();
+    await settle(grid);
+    expect(widths.map((w) => w.column).sort()).toEqual(['kind', 'time']);
+    // A Name the user fixed would leave the last column stretched over the free room.
+    expect(await tracks(grid)).toBe(content);
+    grid.setColumnWidth('time', 300);
+    grid.resetColumnWidths();
+    expect(await tracks(grid)).toBe(content);
   });
 
   it('has no resize handle on a column that is not resizable', async () => {
