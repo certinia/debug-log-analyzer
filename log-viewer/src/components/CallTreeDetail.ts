@@ -35,7 +35,7 @@ import {
   type ViewMode,
 } from './callTreeViewModes.js';
 import type { AppGrid } from './grid/AppGrid.js';
-import { COUNT_MIN_WIDTH, countColumn, inlineQueryColumn, timeColumn } from './grid/columns.js';
+import { countColumn, inlineQueryColumn, timeColumn } from './grid/columns.js';
 import {
   InspectorGridController,
   inspectorGridStyles,
@@ -647,7 +647,6 @@ export class CallTreeDetail extends LitElement {
           id: 'callCount',
           title: 'Calls',
           value: (row) => row.callCount,
-          width: COUNT_MIN_WIDTH,
         }),
         calc: { of: () => this._scopeCalls },
       });

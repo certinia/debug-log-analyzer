@@ -4,6 +4,7 @@
 import type { GridHeaderContextDetail } from '../grid/index.js';
 import type { ColumnSettingsController, ColumnTarget } from './ColumnSettingsController.js';
 import type { ContextMenu } from './ContextMenu.js';
+import { selectColumnWidthItem } from './grid/columnWidthMenu.js';
 
 export interface GridColumnMenuOptions {
   /** The grid's columns the menu acts on. */
@@ -28,6 +29,8 @@ export interface GridColumnMenuOptions {
  */
 export class GridColumnMenuController {
   private readonly _options: GridColumnMenuOptions;
+  /** The header the open menu came from; null from the toolbar. */
+  private _column: string | null = null;
 
   constructor(options: GridColumnMenuOptions) {
     this._options = options;
@@ -35,9 +38,9 @@ export class GridColumnMenuController {
 
   /** `lv-grid-header-context` on an lv-grid: the header's right-click. */
   headerContext = (e: Event): void => {
-    const { event } = (e as CustomEvent<GridHeaderContextDetail>).detail;
+    const { column, event } = (e as CustomEvent<GridHeaderContextDetail>).detail;
     event.preventDefault();
-    this.showAt(event.clientX, event.clientY);
+    this.showAt(event.clientX, event.clientY, column);
   };
 
   /** `click` on the toolbar's Columns button, which opens under it. */
@@ -46,12 +49,13 @@ export class GridColumnMenuController {
     this.showAt(rect.left, rect.bottom);
   };
 
-  showAt(x: number, y: number): void {
-    this._options.menu()?.show(this._options.columns.menuItems(this._options.target), x, y);
+  showAt(x: number, y: number, column: string | null = null): void {
+    this._column = column;
+    this._options.menu()?.show(this._options.columns.menuItems(this._options.target, column), x, y);
   }
 
   /**
-   * Acts on a `view:`, `col:` or `reset:` item and says whether it did, leaving
+   * Acts on a `view:`, `col:`, `reset:` or width item and says whether it did, leaving
    * anything else to the host — the database grids add their own row items.
    */
   select(itemId: string): boolean {
@@ -62,7 +66,7 @@ export class GridColumnMenuController {
     } else if (itemId.startsWith('reset:')) {
       this._options.columns.reset(itemId.slice('reset:'.length));
     } else {
-      return false;
+      return selectColumnWidthItem(this._options.target.grid?.() ?? null, itemId);
     }
 
     this._refresh();
@@ -73,7 +77,7 @@ export class GridColumnMenuController {
   private _refresh(): void {
     const menu = this._options.menu();
     if (menu?.isVisible()) {
-      menu.items = this._options.columns.menuItems(this._options.target);
+      menu.items = this._options.columns.menuItems(this._options.target, this._column);
     }
   }
 }

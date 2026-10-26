@@ -153,6 +153,11 @@ export class GridView<R extends object> {
     };
   }
 
+  /** False while the scroller has no height, as in a hidden tab: nothing is painted to measure. */
+  get isVisible(): boolean {
+    return this.visible;
+  }
+
   /**
    * Shows `rows`. The user's place is kept: an edge they were at, else `toggled` where it
    * was, else the row across the middle of the viewport or its nearest shown ancestor.

@@ -39,8 +39,6 @@ export interface StatementKindTime {
 /** Where the transaction's database time went, by statement kind. */
 export interface DatabaseTime {
   timeNs: number;
-  /** The log's own duration (ns) — the denominator the total is a share of. */
-  logNs: number;
   /** Database time as a share of the log's own duration, 0-100. */
   percentOfLog: number;
   soql: StatementKindTime;
@@ -251,7 +249,6 @@ function statementOf(event: LogEvent): StatementFacts | null {
 function compute(logNs: number, index: LogIndex, rows: readonly number[]): DatabaseOverview {
   const time: DatabaseTime = {
     timeNs: 0,
-    logNs,
     percentOfLog: 0,
     soql: { timeNs: 0, statements: 0 },
     dml: { timeNs: 0, statements: 0 },

@@ -39,7 +39,7 @@ import type { GridColumn } from './column.js';
 import { gridKey } from './keyboard.js';
 import { litPainter, total } from './painter.js';
 import { sightOf } from './sight.js';
-import { columnTracks, minWidthOf, naturalWidth } from './sizing.js';
+import { columnTracks, headerWidth, minWidthOf, naturalWidth } from './sizing.js';
 import { StoreController } from './store-controller.js';
 import { gridStyles } from './styles.js';
 import { browserScheduler } from './yield.js';
@@ -115,6 +115,7 @@ declare global {
 }
 
 const NOTHING_MARKED: ReadonlySet<RowKey> = new Set();
+const NOTHING_TO_MEASURE: ReadonlySet<string> = new Set();
 
 /** Whether a list property holds other items, so the same items in a new array do nothing. */
 const itemsChanged = (next: readonly unknown[], prev: readonly unknown[] | undefined): boolean =>
@@ -240,6 +241,14 @@ export class LvGrid<R extends object = object> extends LitElement {
   private searches = 0;
   /** Widths the user set, by column id. They win over a column's own `width`. */
   private readonly widths = new Map<string, number>();
+  /** `content` widths measured for this `source`, by column id. */
+  private readonly measured = new Map<string, number>();
+  /** Columns to autosize at the next measure; each keeps its width until then. */
+  private readonly pending = new Set<string>();
+  /** The rows shown when `source` last changed: the old source's, not yet replaced. */
+  private rowsBeforeSource: RowView<R> | undefined;
+  /** The columns this render gives a `max-content` track, so the next draw measures them. */
+  private measuring: ReadonlySet<string> = NOTHING_TO_MEASURE;
   private readonly scrollerRef = createRef<HTMLDivElement>();
   private readonly bodyRef = createRef<HTMLDivElement>();
 
@@ -453,8 +462,34 @@ export class LvGrid<R extends object = object> extends LitElement {
     const column = this.columns.find((c) => c.id === id);
     if (column) {
       this.widths.set(id, Math.max(Math.round(width), minWidthOf(column)));
+      this.pending.delete(id);
       this.requestUpdate();
     }
+  }
+
+  /**
+   * Fits a shown column to the widest of its header, its footer and its painted cells, as a
+   * double-click on its header edge does, then reports the width in `lv-grid-column-resize`.
+   */
+  autosizeColumn(id: string): void {
+    this.autosize(this.visibleColumns().filter((column) => column.id === id));
+  }
+
+  /** {@link autosizeColumn} for each shown column; a `flex` one drops its user width and takes the free room again. */
+  autosizeColumns(): void {
+    const columns = this.visibleColumns();
+    const flex = (column: GridColumn<R>): boolean => (column.width ?? 'flex') === 'flex';
+    for (const column of columns.filter(flex)) {
+      this.widths.delete(column.id);
+    }
+    this.autosize(columns.filter((column) => !flex(column)));
+  }
+
+  /** Drops every width the user set, so each column goes back to its own `width`. */
+  resetColumnWidths(): void {
+    this.widths.clear();
+    this.pending.clear();
+    this.requestUpdate();
   }
 
   /** Copies what `exportText` gives, tab-separated, as Ctrl/Cmd+C on the grid does. */
@@ -466,6 +501,11 @@ export class LvGrid<R extends object = object> extends LitElement {
   }
 
   protected willUpdate(changed: PropertyValues): void {
+    if (changed.has('source')) {
+      this.measured.clear();
+      this.rowsBeforeSource = this.data.snapshot?.rows;
+    }
+    this.measuring = this.toMeasure();
     const store = this.store;
     if (!store) {
       if (this.source) {
@@ -528,6 +568,7 @@ export class LvGrid<R extends object = object> extends LitElement {
     if (changed.has('columns')) {
       this.syncActive();
     }
+    this.fitColumns();
   }
 
   protected render(): TemplateResult {
@@ -546,7 +587,7 @@ export class LvGrid<R extends object = object> extends LitElement {
       tabindex="0"
       aria-rowcount=${rowCount}
       aria-busy=${this.data.snapshot?.busy ?? false}
-      style=${styleMap(columnTracks(columns, this.widths))}
+      style=${styleMap(columnTracks(columns, this.widths, this.measured, this.measuring))}
       ${ref(this.scrollerRef)}
       @keydown=${this.onKey}
       @contextmenu=${this.onKeyMenu}
@@ -632,7 +673,7 @@ export class LvGrid<R extends object = object> extends LitElement {
           : html`<span
               class="resize"
               @pointerdown=${(e: PointerEvent) => this.startResize(e, column)}
-              @dblclick=${(e: MouseEvent) => this.fitColumn(e, column)}
+              @dblclick=${() => this.autosize([column])}
             ></span>`
       }
     </div>`;
@@ -667,18 +708,80 @@ export class LvGrid<R extends object = object> extends LitElement {
     handle.addEventListener('pointercancel', end);
   }
 
-  /** Sizes a column to the widest of its header and its painted cells. */
-  private fitColumn(e: MouseEvent, column: GridColumn<R>): void {
-    const head = (e.currentTarget as HTMLElement).parentElement;
-    const at = this.visibleColumns().indexOf(column);
-    const rows = [...(this.bodyRef.value?.children ?? [])] as HTMLElement[];
-    const cells = rows.flatMap((row) => {
-      const cell = row.hidden ? undefined : row.children[at];
-      return cell instanceof HTMLElement ? [cell] : [];
+  /** Fits each column again at the next measure. A width the user set holds until then. */
+  private autosize(columns: readonly GridColumn<R>[]): void {
+    for (const column of columns) {
+      if (column.resizable !== false) {
+        this.pending.add(column.id);
+      }
+    }
+    this.requestUpdate();
+  }
+
+  /**
+   * The shown columns to measure next: each `content` column not yet measured for
+   * this `source`, and each being autosized. Only once the build is done, so a column keeps
+   * a pixel track while rows build, and the header and footer stay lined up with them.
+   */
+  private toMeasure(): ReadonlySet<string> {
+    const snapshot = this.data.snapshot;
+    const ids =
+      snapshot && !snapshot.busy && snapshot.rows !== this.rowsBeforeSource
+        ? this.visibleColumns()
+            .filter(
+              (column) =>
+                this.pending.has(column.id) ||
+                (column.width === 'content' &&
+                  !this.widths.has(column.id) &&
+                  !this.measured.has(column.id)),
+            )
+            .map((column) => column.id)
+        : [];
+    return ids.length ? new Set(ids) : NOTHING_TO_MEASURE;
+  }
+
+  /**
+   * Measures the columns the last render gave a `max-content` track, so a cell is as wide as
+   * its content: the header, the footer and the painted rows. With none, it reads no layout,
+   * so a scroll frame costs nothing; columns measure once per `source`, so they do not move.
+   */
+  private fitColumns(): void {
+    if (!this.measuring.size) {
+      return;
+    }
+    const snapshot = this.data.snapshot;
+    const scroller = this.scrollerRef.value;
+    // A hidden grid has painted nothing; it measures once it shows and draws.
+    if (!scroller || !this.view?.isVisible || snapshot?.rows !== this.shown) {
+      return;
+    }
+    const rows = [...(this.bodyRef.value?.children ?? [])].filter(
+      (row): row is HTMLElement => row instanceof HTMLElement && !row.hidden,
+    );
+    const foot = scroller.querySelector<HTMLElement>(':scope > .foot');
+    this.visibleColumns().forEach((column, at) => {
+      if (!this.measuring.has(column.id)) {
+        return;
+      }
+      const head = this.headCell(at);
+      const cells = [foot, ...rows].flatMap((row) => {
+        const cell = row?.children[at];
+        return cell instanceof HTMLElement ? [naturalWidth(cell)] : [];
+      });
+      const width = Math.max(
+        Math.round(Math.max(head ? headerWidth(head) : 0, ...cells)),
+        minWidthOf(column),
+      );
+      if (column.width === 'content') {
+        this.measured.set(column.id, Math.min(width, column.maxWidth ?? width));
+      }
+      if (this.pending.delete(column.id)) {
+        this.widths.set(column.id, width);
+        this.resized(column);
+      }
     });
-    const widest = Math.max(...[head, ...cells].map((cell) => (cell ? naturalWidth(cell) : 0)));
-    this.setColumnWidth(column.id, widest);
-    this.resized(column);
+    this.measuring = NOTHING_TO_MEASURE;
+    this.requestUpdate();
   }
 
   private resized(column: GridColumn<R>): void {
@@ -780,7 +883,10 @@ export class LvGrid<R extends object = object> extends LitElement {
       lines: this.rowLines ?? undefined,
       lineHeight: () => this.treeLineHeight(),
       rowIndexStart: 2,
-      onDraw: () => this.syncActive(),
+      onDraw: () => {
+        this.fitColumns();
+        this.syncActive();
+      },
       painter: litPainter(() => ({
         columns: this.visibleColumns(),
         isSelected: (target) => sameTarget(this.selected, target),

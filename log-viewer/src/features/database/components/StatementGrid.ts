@@ -42,7 +42,6 @@ import {
   type TreeSource,
 } from '../../../grid/index.js';
 import type { ColumnView } from '../../../components/grid/ColumnViews.js';
-import { DB_ROW_COUNT_WIDTH, DB_TIME_WIDTH } from '../../../components/grid/ColumnWidths.js';
 import { inCountRange, inMsRange, type FilterRange } from '../../../components/grid/MinMax.js';
 import { globalStyles } from '../../../styles/global.styles.js';
 import { goToRow } from '../../call-tree/navigation.js';
@@ -133,6 +132,7 @@ export abstract class StatementGrid<R extends StatementRow, L> extends LitElemen
     this._columnTarget = heldColumnTarget<R>(
       () => this._columns,
       (columns) => (this._columns = columns),
+      () => this.grid,
     );
     this._settings = new ColumnSettingsController(this, {
       section: `database.${spec.type}`,
@@ -388,7 +388,7 @@ export function rowCountColumn<R extends StatementRow>(rows: readonly R[]): Grid
   return {
     id: 'rowCount',
     title: 'Row Count',
-    width: DB_ROW_COUNT_WIDTH,
+    width: 'content',
     align: 'end',
     cell: (row) => cell(row.rowCount),
     text: (row) => String(row.rowCount),
@@ -407,7 +407,7 @@ export function timeTakenColumn<R extends StatementRow>(rows: readonly R[]): Gri
   return {
     id: 'timeTaken',
     title: 'Time Taken (ms)',
-    width: DB_TIME_WIDTH,
+    width: 'content',
     align: 'end',
     cell: (row) => cell(row.timeTaken),
     text: (row) => formatNsAsMs(row.timeTaken),
