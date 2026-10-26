@@ -9,10 +9,10 @@
   },
   "dependencies": {
     "@apexdevtools/apex-log-parser": "0.3.0",
-    "@apexdevtools/apex-parser": "5.2.0",
+    "@apexdevtools/apex-parser": "5.3.0",
     "@lit/context": "^1.1.6",
     "@lit/task": "^1.0.3",
-    "@tanstack/virtual-core": "^3.17.11",
+    "@tanstack/virtual-core": "^3.19.6",
     "@vscode-elements/elements": "^2.5.1",
     "@vscode/codicons": "^0.0.45",
     "lit": "^3.3.3",
