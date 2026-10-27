@@ -344,11 +344,9 @@ export class PaneView extends LitElement {
       .pane-header--button {
         cursor: pointer;
       }
-      /* Keyboard focus only, as VS Code; positioned so the bar's separator does not cover it. */
+      /* Positioned so the bar's separator does not cover the global focus ring. */
       .pane-header:focus-visible {
         position: relative;
-        outline: var(--lana-focus-ring);
-        outline-offset: var(--lana-focus-inset);
       }
       .pane-header vscode-icon {
         color: var(--lana-icon-fg);

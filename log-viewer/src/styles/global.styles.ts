@@ -150,8 +150,8 @@ export const globalStyles = [
       mask-size: 70%;
     }
 
-    /* Else Chromium rings a focusable scroller in the OS accent colour. Inset, as most are full-bleed. */
-    :focus-visible {
+    /* Else Chromium rings a scroller in the OS accent colour; the excluded hosts draw their own ring. */
+    :focus-visible:not(vscode-button, vscode-tab-header, vscode-tab-panel, vscode-textfield) {
       outline: var(--lana-focus-ring);
       outline-offset: var(--lana-focus-inset);
     }
