@@ -99,11 +99,6 @@ export class TreeExpandButton extends LitElement {
         cursor: pointer;
       }
 
-      button.header-control:focus-visible {
-        outline: var(--lana-focus-ring);
-        outline-offset: var(--lana-focus-inset);
-      }
-
       button.header-control:disabled {
         color: var(--lana-fg-disabled);
         cursor: default;

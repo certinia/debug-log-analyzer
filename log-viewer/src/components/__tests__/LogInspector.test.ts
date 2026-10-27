@@ -353,6 +353,28 @@ describe('LogInspector', () => {
     expect(builtHiding.at(-1)).toEqual(['callstack']);
   });
 
+  // The press that closes it is also a press outside the menu, which once closed it and reopened it.
+  it('opens the section menu from More actions, and a second press closes it', async () => {
+    const el = await mount('timeline-tab');
+    select('timeline', 1);
+    await flush(el);
+    const more = dockLayout(el)
+      .shadowRoot?.querySelector('detail-dock')
+      ?.shadowRoot?.querySelector<HTMLElement>('vscode-icon[title="More actions"]');
+    const press = (): void => {
+      more?.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, composed: true }));
+      more?.click();
+    };
+
+    press();
+    expect(sectionMenu(el).isVisible()).toBe(true);
+
+    // The menu starts listening for a press outside it on the next frame.
+    await flush(el);
+    press();
+    expect(sectionMenu(el).isVisible()).toBe(false);
+  });
+
   it('offers a hidden section back in the menu', async () => {
     settings.inspector = inspectorSettings({
       hiddenSections: { 'timeline:detail:callstack': true },

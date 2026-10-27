@@ -30,11 +30,6 @@ export const bleedRowStyles = css`
   .bleed-row:hover {
     background-color: var(--lana-row-hover-bg);
   }
-
-  .bleed-row:focus-visible {
-    outline: var(--lana-focus-ring);
-    outline-offset: var(--lana-focus-inset);
-  }
 `;
 
 /**
