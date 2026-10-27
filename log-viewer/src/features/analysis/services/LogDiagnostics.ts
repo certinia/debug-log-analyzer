@@ -852,7 +852,8 @@ async function analyse(store: LogStore): Promise<LogDiagnostics> {
   const { soql: queries, dml } = await store.derive(statements);
   const debugLines: number[] = [];
   const { type } = log.columns;
-  for (let id = 1; id <= log.eventCount; id++) {
+  const last = log.eventCount;
+  for (let id = 1; id <= last; id++) {
     if (type[id] === DEBUG_TYPE && store.isShown(id)) {
       debugLines.push(id);
     }

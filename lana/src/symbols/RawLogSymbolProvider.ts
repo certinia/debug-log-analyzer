@@ -57,7 +57,8 @@ class RawLogSymbolProvider implements DocumentSymbolProvider {
     const { parent, text, type, durationTotal } = apexLog.columns;
     const symbols = new Map<number, DocumentSymbol>();
     const roots: DocumentSymbol[] = [];
-    for (let id = 1; id <= apexLog.eventCount; id++) {
+    const last = apexLog.eventCount;
+    for (let id = 1; id <= last; id++) {
       const startLine = start[id]!;
       const endLine = end[id]!;
       if (endLine <= startLine) {

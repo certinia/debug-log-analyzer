@@ -78,7 +78,8 @@ export class LogStore {
 
   /** Every shown event, in id order: a new object each, so read columns for a pass over all. */
   *events(): Generator<ApexEvent> {
-    for (let id = 1; id <= this.log.eventCount; id++) {
+    const last = this.log.eventCount;
+    for (let id = 1; id <= last; id++) {
       if (!this.hidden?.[id]) {
         yield this.log.event(id)!; // in range
       }
@@ -108,7 +109,8 @@ export class LogStore {
     if (!this._namespaces) {
       const { ids, values } = this.log.columns.namespace;
       const stated = new Uint8Array(values.length);
-      for (let id = 1; id <= this.log.eventCount; id++) {
+      const last = this.log.eventCount;
+      for (let id = 1; id <= last; id++) {
         const at = ids[id]!;
         if (at >= 0 && !this.hidden[id]) {
           stated[at] = 1;

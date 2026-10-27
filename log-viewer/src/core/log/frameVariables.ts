@@ -208,7 +208,8 @@ function rowOf(variable: Variable): VariableRow {
 function hasAnyWrite(log: ApexLog): boolean {
   const assignment = eventType('VARIABLE_ASSIGNMENT')?.typeId;
   const { type } = log.columns;
-  for (let id = 1; id <= log.eventCount; id++) {
+  const last = log.eventCount;
+  for (let id = 1; id <= last; id++) {
     if (type[id] === assignment) {
       return true;
     }
