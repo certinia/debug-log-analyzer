@@ -883,7 +883,7 @@ export class CalltreeView extends LitElement {
     }
   }
 
-  /** Clears every filter, so the row a go-to found hidden shows, then goes to it. */
+  /** Clears the filters that can hide a go-to's row, then goes to it. */
   private async _clearFiltersAndGo(): Promise<void> {
     const eventIndex = this._hiddenByFilters;
     if (eventIndex === null) {
@@ -895,7 +895,8 @@ export class CalltreeView extends LitElement {
       filter.clear();
     }
     this.typeFilter = 'All';
-    this.filterState = { showDetails: true, debugOnly: false, selectedTypes: new Set() };
+    // Details stays as chosen: every go-to names a frame, a timed row or an exception, which it never hides.
+    this.filterState = { ...this.filterState, debugOnly: false, selectedTypes: new Set() };
     this.requestUpdate();
     this._updateFiltering();
     await this._goToRow(eventIndex);

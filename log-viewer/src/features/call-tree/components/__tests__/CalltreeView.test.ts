@@ -579,6 +579,8 @@ describe('calltree-view go to row', () => {
       await view.updateComplete;
 
       expect(view.filterState.debugOnly).toBe(false);
+      // No go-to names a row Details hides, so Clear leaves it as chosen.
+      expect(view.filterState.showDetails).toBe(false);
       expect(view.timeOrderGrid?.selectedKey).toBe(inner);
       expect(note()).toBeNull();
     });
