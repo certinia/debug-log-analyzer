@@ -959,6 +959,20 @@ describe('PaneView', () => {
       expect(stack(el).hasAttribute('data-maximized')).toBe(false);
     });
 
+    // VS Code shows a view's actions only while it is expanded.
+    it('offers maximize on expanded sections only', async () => {
+      const el = await mount('vertical');
+
+      headerOf(el, 'b').click();
+      await el.updateComplete;
+      expect(action(el, 'b')).toBeNull();
+      expect(action(el, 'a')).not.toBeNull();
+
+      headerOf(el, 'b').click();
+      await el.updateComplete;
+      expect(action(el, 'b')).not.toBeNull();
+    });
+
     it('offers no maximize for a single section', async () => {
       const el = await mountSections(sections.slice(0, 1), { maximized: 'a' });
 

@@ -560,7 +560,7 @@ export class PaneView extends LitElement {
           <span class="pane-header__title">${section.title}</span>
           ${section.badge ? html`<vscode-badge>${section.badge}</vscode-badge>` : nothing}
         </div>
-        ${this._canMaximize ? this._renderMaximize(section.id, maximized) : nothing}
+        ${this._canMaximize && open ? this._renderMaximize(section.id, maximized) : nothing}
       </div>
       ${open ? html`<div class="pane-body">${section.content}</div>` : nothing}
     </div>`;
