@@ -97,8 +97,8 @@ export function childRows(index: LogIndex, row: number, into: number[] = []): nu
   return into;
 }
 
-// Fewer children than this are quicker to walk again than to hold.
-const HELD_FANOUT = 64;
+/** A row with more children than this is wide: its child list, and what is built over it, is kept. */
+export const WIDE_ROW = 64;
 const heldChildren = new WeakMap<LogIndex, Map<number, readonly number[]>>();
 
 /**
@@ -112,7 +112,7 @@ export function sharedChildRows(index: LogIndex, row: number): readonly number[]
     return held;
   }
   const children = childRows(index, row);
-  if (children.length > HELD_FANOUT) {
+  if (children.length > WIDE_ROW) {
     if (!byRow) {
       byRow = new Map();
       heldChildren.set(index, byRow);

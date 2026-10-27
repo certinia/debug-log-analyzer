@@ -3,7 +3,7 @@
  */
 import { CHECK_EVERY, type Tick } from '../utility/FrameBudget.js';
 import { firstIndexWhere } from '../utility/Util.js';
-import { type LogIndex, sharedChildRows } from './LogIndex.js';
+import { type LogIndex, sharedChildRows, WIDE_ROW } from './LogIndex.js';
 import type { TimeWindow } from './rangeScope.js';
 import { eachSelfGap, overlapOf, reachedRun } from './windowStats.js';
 
@@ -17,10 +17,7 @@ export interface WindowedTime {
 /** By event id: the nested calls of the same frame, whose time the outer call does not count. */
 export type Holes = ReadonlyMap<number, readonly number[]>;
 
-// Below this many children in a window, summing them beats a prefix lookup.
-const WIDE = 64;
-
-// Made for a wide parent row the first time a window cuts it.
+// Made for a wide parent row the first time a window cuts more than WIDE_ROW of its children.
 const childTotals = new WeakMap<LogIndex, Map<number, Float64Array>>();
 
 /**
@@ -44,7 +41,8 @@ function rowIn(index: LogIndex, row: number, window: TimeWindow): { total: numbe
   }
   const children = sharedChildRows(index, row);
   const { from, to } = reachedRun(index, children, window);
-  if (to - from > WIDE) {
+  // Fewer children in the window are quicker to sum than to keep a prefix for.
+  if (to - from > WIDE_ROW) {
     return { total, self: total - wideChildTimeIn(index, row, children, from, to, window) };
   }
   let self = 0;
@@ -64,7 +62,7 @@ function wideChildTimeIn(
 ): number {
   const { start, end } = index;
   // Siblings never overlap, so only the first and last of the run can be cut.
-  const first = children[from]!; // the run is wider than WIDE, so both ends exist
+  const first = children[from]!; // the run is wider than WIDE_ROW, so both ends exist
   const last = children[to - 1]!;
   const totals = totalsOf(index, row, children);
   return (
