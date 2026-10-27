@@ -22,6 +22,7 @@ jest.mock('../../optimised/ApexLogTimeline.js', () => ({
         this.clears++;
       },
     };
+    private readonly chart = ++charts;
     constructor() {
       targets.push(this.findTarget);
     }
@@ -35,12 +36,15 @@ jest.mock('../../optimised/ApexLogTimeline.js', () => ({
         destroyed.push(this.log);
       }
     }
-    getViewport(): null {
-      return null;
+    getViewport(): string {
+      return KEPT_PLACE;
     }
-    setViewport(): void {}
+    setViewport(viewport: string): void {
+      restored.push(viewport);
+    }
     navigateToEventIndex(eventIndex: number): void {
       navigated.push(eventIndex);
+      movedCharts.push(this.chart);
     }
     setTooltipEnabled(): void {}
     setCategoryDim(): void {}
@@ -58,6 +62,13 @@ let built: LogStore[] = [];
 let destroyed: LogStore[] = [];
 /** The event ids the charts moved to, in order. */
 let navigated: number[] = [];
+/** Which chart, by the order it was made, took each move in {@link navigated}. */
+let movedCharts: number[] = [];
+let charts = 0;
+/** The place a chart reports, so a rebuild that keeps it can be seen. */
+const KEPT_PLACE = 'kept place';
+/** The places rebuilt charts were put back at, in order. */
+let restored: string[] = [];
 /** Whether a build waits to be finished by hand. */
 let holdInit = false;
 let finishInit: () => void = () => {};
@@ -176,6 +187,8 @@ describe('timeline-flame-chart opened at an event', () => {
   beforeEach(async () => {
     built = [];
     navigated = [];
+    movedCharts = [];
+    restored = [];
     holdInit = false;
     globalThis.IntersectionObserver = AlwaysVisible as unknown as typeof IntersectionObserver;
     chart = document.createElement('timeline-flame-chart') as typeof chart;
@@ -220,7 +233,7 @@ describe('timeline-flame-chart opened at an event', () => {
     expect(navigated).toEqual([7, 9]);
   });
 
-  // The old chart takes the move, then the new one replaces it at the place it was built from.
+  // The new chart was put back at the place the old one had before the move.
   it('moves the new chart to an event sent while it builds', async () => {
     holdInit = true;
     chart.logStore = logOf();
@@ -231,7 +244,18 @@ describe('timeline-flame-chart opened at an event', () => {
     finishInit();
     await settle();
 
-    expect(navigated).toEqual([7, 9, 9]);
+    expect(navigated.at(-1)).toBe(9);
+    expect(movedCharts.at(-1)).toBe(charts);
+    expect(restored).toEqual([]);
+  });
+
+  it('keeps the place when the log is replaced with no new event', async () => {
+    chart.logStore = logOf();
+    await chart.updateComplete;
+    await settle();
+
+    expect(restored).toEqual([KEPT_PLACE]);
+    expect(navigated).toEqual([7]);
   });
 });
 

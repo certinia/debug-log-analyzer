@@ -7,8 +7,9 @@
  */
 
 /**
- * Where going to an event by id lands the chart. `drawnRowAtOrAbove` holds the climb and is tested with
- * it; this covers the wiring: which frame is selected, and where the view moves.
+ * Where going to an event by id lands the chart: which frame is selected, and where the view
+ * moves. The climb from a detail to its frame is tested here; `drawnRowAtOrAbove`'s own
+ * tests cover the rest of the climb.
  */
 
 import { describe, expect, it } from '@jest/globals';

@@ -63,13 +63,6 @@ describe('log-viewer navigateToTimeline', () => {
   };
 
   // The timeline is not built during the parse, so an id sent then on the bus was lost.
-  it('hands the timeline an event sent while the log still parses', async () => {
-    sendNavigate(2);
-    await load();
-
-    expect(timelineRequest()).toEqual({ eventIndex: 2 });
-  });
-
   it('keeps an event sent during the parse over the one the fetch carried', async () => {
     sendNavigate(2);
     await load(1);
@@ -81,6 +74,7 @@ describe('log-viewer navigateToTimeline', () => {
   it('hands the timeline a new request for each event sent after the load', async () => {
     await load(1);
     const first = timelineRequest();
+    expect(first).toEqual({ eventIndex: 1 });
 
     sendNavigate(1);
     await viewer.updateComplete;
