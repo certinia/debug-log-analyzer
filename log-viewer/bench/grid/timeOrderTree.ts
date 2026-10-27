@@ -3,8 +3,8 @@
  */
 import type { LogEvent, GovernorLimits, SelfTotal } from '@apexdevtools/apex-log-parser';
 
-import { getCallerNamespace } from '../../../core/utility/CallerNamespace.js';
-import { costLimitsOf, setGovernorCost } from './GovernorCost.js';
+import { getCallerNamespace } from '../../src/core/utility/CallerNamespace.js';
+import { costLimitsOf, setGovernorCost } from '../../src/features/call-tree/utils/GovernorCost.js';
 
 /**
  * One row per LogEvent for the time-order view; no merging at any level.

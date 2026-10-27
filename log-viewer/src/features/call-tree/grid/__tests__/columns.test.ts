@@ -20,7 +20,6 @@ import {
   toBottomUpTree,
   type AggregatedRow,
 } from '../../utils/Aggregation.js';
-import { toTimeOrderTree, type TimeOrderRow } from '../../utils/TimeOrderTree.js';
 import { reportedUsage } from '../../utils/reportedUsage.js';
 import { CallTreeGrid, categoryClass } from '../CallTreeGrid.js';
 import { nameCell } from '../cells.js';
@@ -69,9 +68,6 @@ const column = <R>(columns: GridColumn<R>[], id: string): GridColumn<R> => {
 const allRows = (roots: readonly LogEvent[]): LogEvent[] =>
   roots.flatMap((r) => [r, ...allRows(r.children)]);
 
-const builtRows = (roots: readonly TimeOrderRow[]): TimeOrderRow[] =>
-  roots.flatMap((r) => [r, ...builtRows(r._children ?? [])]);
-
 const shown = (content: unknown): HTMLElement => {
   const host = document.createElement('div');
   render(content, host);
@@ -117,7 +113,8 @@ describe('timeOrderColumns', () => {
     expect(time.text?.(row)).toBe('1.23');
   });
 
-  it('shows on each event what the built Time Order row held', () => {
+  // Every event holds the one query: 1 of 100 queries (1%) and 3 of 50,000 rows (0.006%).
+  it('reads the caller namespace, type and governor share off each event', () => {
     const limited: ApexLog = Object.create(log);
     Object.defineProperty(limited, 'governorLimits', {
       value: governorLimits({
@@ -126,20 +123,19 @@ describe('timeOrderColumns', () => {
       }),
     });
     const columns = timeOrderColumns(limited, options);
-    const built = builtRows(toTimeOrderTree(log.children, limited.governorLimits) ?? []);
     const events = allRows(rows);
-    expect(events.map((e) => e.eventIndex)).toEqual(built.map((r) => r.id));
-    const held: Record<string, (r: TimeOrderRow) => string | number | null> = {
-      callerNamespace: (r) => r.callerNamespace,
-      type: (r) => r.type,
-      governorCost: (r) => r.governorCost?.toFixed(0) ?? null,
-      governorCostMax: (r) => r.governorCostMax?.toFixed(0) ?? null,
-    };
-    for (const [id, value] of Object.entries(held)) {
-      const { text } = column(columns, id);
-      expect(events.map((e) => text?.(e))).toEqual(built.map((r) => String(value(r) ?? '—')));
-    }
-    expect(built.some((r) => (r.governorCost ?? 0) > 0)).toBe(true);
+    const texts = (id: string) => events.map((e) => column(columns, id).text?.(e));
+
+    expect(texts('type')).toEqual([
+      'EXECUTION_STARTED',
+      'CODE_UNIT_STARTED',
+      'METHOD_ENTRY',
+      'SOQL_EXECUTE_BEGIN',
+    ]);
+    // A method with no package takes its code unit's namespace.
+    expect(texts('callerNamespace')).toEqual(['default', 'default', 'pkg', 'pkg']);
+    expect(texts('governorCost')).toEqual(['1', '1', '1', '1']);
+    expect(texts('governorCostMax')).toEqual(['1', '1', '1', '1']);
   });
 });
 

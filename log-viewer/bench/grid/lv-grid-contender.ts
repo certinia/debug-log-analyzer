@@ -10,10 +10,7 @@
  */
 import type { ApexLog, LogEvent } from '@apexdevtools/apex-log-parser';
 
-import {
-  toTimeOrderTree,
-  type TimeOrderRow,
-} from '../../src/features/call-tree/utils/TimeOrderTree.js';
+import { toTimeOrderTree, type TimeOrderRow } from './timeOrderTree.js';
 import type { CallTreeGrid } from '../../src/features/call-tree/grid/CallTreeGrid.js';
 import {
   TIME_ORDER_WITHOUT_DETAILS,
