@@ -2,7 +2,7 @@
  * Copyright (c) 2026 Certinia Inc. All rights reserved.
  */
 
-import { EVENT_TYPES, type EventType } from '@apexdevtools/apex-log-parser';
+import { EVENT_TYPES, eventType, type EventType } from '@apexdevtools/apex-log-parser';
 
 import type { LogIndex } from '#core/log/LogIndex.js';
 
@@ -34,13 +34,9 @@ const KIND_BY_TYPE_ID: readonly EventKind[] = EVENT_TYPES.map(({ type, shape }) 
   PINNED_TYPES.has(type) ? 'pinned' : shape === 'frame' ? 'frame' : 'detail',
 );
 
-const KIND_BY_TYPE: ReadonlyMap<string, EventKind> = new Map(
-  EVENT_TYPES.map(({ type, typeId }) => [type, KIND_BY_TYPE_ID[typeId]!]),
-);
-
 /** The {@link EventKind} of an event of type `type`. */
 export function eventKind(type: string): EventKind {
-  return KIND_BY_TYPE.get(type) ?? 'detail';
+  return KIND_BY_TYPE_ID[eventType(type as EventType)?.typeId ?? -1] ?? 'detail';
 }
 
 /** The {@link EventKind} of each row of `index`, by row. */
