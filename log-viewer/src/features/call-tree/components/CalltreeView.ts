@@ -615,7 +615,7 @@ export class CalltreeView extends LitElement {
     }
     // A fresh table carries none of the filters on show, so every build applies
     // them — a re-attach rebuilds under the filters the user left in force.
-    this._updateFiltering();
+    this._applyFilters();
   }
 
   private _destroyCurrentTable(): void {
@@ -761,6 +761,11 @@ export class CalltreeView extends LitElement {
 
   _updateFiltering() {
     this._hiddenTarget = null;
+    this._applyFilters();
+  }
+
+  /** Not a filter change, so a build leaves the hidden-row note in place. */
+  private _applyFilters() {
     if (this.timeOrderGrid && this.viewMode === 'time-order') {
       this.timeOrderGrid.filters = this._timeOrderFilters();
       return;
@@ -902,10 +907,8 @@ export class CalltreeView extends LitElement {
     if (!grid || !path.length || !current()) {
       return;
     }
-    // `_updateFiltering` sets a new array, so a filter change while the path opens shows here.
-    const filters = grid.filters;
     const result = await grid.goTo(path);
-    if (result === 'superseded' || !current() || grid.filters !== filters) {
+    if (result === 'superseded' || !current()) {
       return;
     }
     if (result === 'none-shown') {

@@ -641,6 +641,34 @@ describe('calltree-view go to row', () => {
       expect(announced()).toBe('');
     });
 
+    // Go to Call Tree from another tab: the tab's first build applied the filters again and cleared it.
+    it('keeps the note when the tab builds its table after the go-to', async () => {
+      const { log } = await storeOf(LOG);
+      let show = () => {};
+      globalThis.IntersectionObserver = class {
+        private readonly callback: IntersectionObserverCallback;
+        constructor(callback: IntersectionObserverCallback) {
+          this.callback = callback;
+        }
+        observe(target: Element): void {
+          show = () =>
+            this.callback(
+              [{ isIntersecting: true, target } as IntersectionObserverEntry],
+              this as unknown as IntersectionObserver,
+            );
+        }
+        disconnect(): void {}
+      } as unknown as typeof IntersectionObserver;
+      view = await mountView(log);
+
+      await view._goToRow(indexOf(log, 'DEBUG | hello'));
+      show();
+      await settle();
+      await view.updateComplete;
+
+      expect(note()).not.toBeNull();
+    });
+
     it('drops the note when the log is replaced', async () => {
       const { log } = await storeOf(LOG);
       const next = (await storeOf(LOG)).store;
