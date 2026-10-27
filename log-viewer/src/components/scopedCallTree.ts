@@ -280,53 +280,38 @@ async function realSubtree(
   tick: Tick,
   selected: boolean,
 ): Promise<Subtree | null> {
+  if (!(await tick())) {
+    return null;
+  }
   const { subtreeEnd } = source.index;
-  // Pre-order, so a node always precedes its descendants and the prune below
-  // can walk it backwards to reach every child before its parent.
-  const rows: ScopedRow[] = [];
-  const parents: Array<ScopedRow | null> = [];
-  // The open rows above the current one, with the index row each ends before.
-  const open: Array<{ row: ScopedRow; end: number }> = [];
   const end = subtreeEnd[top]!;
-  let steps = 0;
-  for (let at = top; at < end;) {
+  const root = frameRow(source, top, false);
+  let calls = selected || source.kindOf(top) === 'frame' ? 1 : 0;
+  // The open rows above the current one, with the index row each ends before. The root ends last, so it never pops.
+  const open: Array<{ row: ScopedRow; end: number }> = [{ row: root, end }];
+  let steps = 1;
+  for (let at = top + 1; at < end;) {
     if (steps++ % CHECK_EVERY === 0 && !(await tick())) {
       return null;
     }
-    while (open.length && open.at(-1)!.end <= at) {
+    while (open.at(-1)!.end <= at) {
       open.pop();
     }
-    if (at !== top && source.kindOf(at) === 'detail') {
+    const kind = source.kindOf(at);
+    if (kind === 'detail') {
       at = subtreeEnd[at]!;
       continue;
     }
     const row = frameRow(source, at, false);
-    rows.push(row);
-    parents.push(open.at(-1)?.row ?? null);
+    (open.at(-1)!.row._children ??= []).push(row);
+    // A pinned detail is a row, not a call.
+    if (kind === 'frame') {
+      calls += 1;
+    }
     open.push({ row, end: subtreeEnd[at]! });
     at++;
   }
-
-  let calls = selected || eventKind(rows[0]!.type) === 'frame' ? 1 : 0;
-  for (let i = rows.length - 1; i >= 0; i--) {
-    if (i % CHECK_EVERY === 0 && !(await tick())) {
-      return null;
-    }
-    const row = rows[i]!;
-    // Deepest first, so every child has attached itself by now — appended in
-    // reverse, hence the flip.
-    row._children?.reverse();
-    if (i === 0) {
-      break; // the selection stays whatever its kind
-    }
-    const parent = parents[i]!;
-    (parent._children ??= []).push(row);
-    // A pinned detail is a row, not a call.
-    if (eventKind(row.type) === 'frame') {
-      calls += 1;
-    }
-  }
-  return { row: rows[0]!, calls };
+  return { row: root, calls };
 }
 
 /**
@@ -687,8 +672,8 @@ function liveWindow(
   };
 
   const figures = (at: TimeWindow | null) => {
-    const self = selfCover && selfCover.roots.in(at).total;
-    const frameSelf = selfCover && selfCover.roots.in(at).total - selfCover.pinned.in(at).total;
+    const self = selfCover ? selfCover.roots.in(at).total : null;
+    const frameSelf = selfCover && self !== null ? self - selfCover.pinned.in(at).total : null;
     if (!at) {
       return { rootTotal: duration.total, calls: scope.calls, self, frameSelf };
     }
