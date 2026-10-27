@@ -78,6 +78,20 @@ export interface LogIndex extends Readonly<Rows> {
   selfColumn<T extends Int32Array | Float64Array>(byId: T): T;
 }
 
+/**
+ * The rows directly under `row`, or at the top of the log for {@link NO_ROW}, in
+ * log order. Fills `into` when given, so a pass over every row reuses one array.
+ */
+export function childRows(index: LogIndex, row: number, into: number[] = []): number[] {
+  into.length = 0;
+  const { subtreeEnd } = index;
+  const end = row === NO_ROW ? index.rowCount : subtreeEnd[row]!;
+  for (let child = row + 1; child < end; child = subtreeEnd[child]!) {
+    into.push(child);
+  }
+  return into;
+}
+
 class Index implements LogIndex {
   readonly log: ApexLog;
   readonly rowCount: number;

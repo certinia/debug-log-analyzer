@@ -4,7 +4,7 @@
 import { type EventType, eventType } from '@apexdevtools/apex-log-parser';
 
 import type { LogCategory } from '#core/log/category.js';
-import { type LogIndex, NO_ROW } from '#core/log/LogIndex.js';
+import { childRows, type LogIndex, NO_ROW } from '#core/log/LogIndex.js';
 import { type Signatures, signaturesOf } from '#core/log/signatures.js';
 import type { RowFilter, TreeSource } from '../../../grid/index.js';
 import { EXCLUDED_DETAIL_TYPES } from './DetailsFilter.js';
@@ -82,12 +82,6 @@ export class TimeOrderSource implements TreeSource<TimeOrderNode> {
     this.index.categoryNames[this.index.categoryId[row]!]!;
 
   private nodesUnder(row: number): HeldNode[] {
-    const { subtreeEnd } = this.index;
-    const end = row === NO_ROW ? this.index.rowCount : subtreeEnd[row]!;
-    const nodes: HeldNode[] = [];
-    for (let child = row + 1; child < end; child = subtreeEnd[child]!) {
-      nodes.push({ row: child });
-    }
-    return nodes;
+    return childRows(this.index, row).map((child) => ({ row: child }));
   }
 }

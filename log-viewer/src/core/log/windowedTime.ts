@@ -3,9 +3,9 @@
  */
 import { CHECK_EVERY, type Tick } from '../utility/FrameBudget.js';
 import { firstIndexWhere } from '../utility/Util.js';
-import type { LogIndex } from './LogIndex.js';
+import { childRows, type LogIndex } from './LogIndex.js';
 import type { TimeWindow } from './rangeScope.js';
-import { childRows, eachSelfGap, overlapOf, reachedRun } from './windowStats.js';
+import { eachSelfGap, overlapOf, reachedRun } from './windowStats.js';
 
 /** Time and calls inside a window, in the parser's nanoseconds. */
 export interface WindowedTime {

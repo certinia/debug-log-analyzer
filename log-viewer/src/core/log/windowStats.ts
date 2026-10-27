@@ -6,7 +6,7 @@ import type { ReactiveControllerHost } from 'lit';
 import { DEFAULT_NAMESPACE, namespaceOf } from '../utility/CallerNamespace.js';
 import { CHECK_EVERY, frameBudget, type FrameBudgetOptions } from '../utility/FrameBudget.js';
 import { firstIndexWhere } from '../utility/Util.js';
-import { type LogIndex, NO_ROW } from './LogIndex.js';
+import { childRows, type LogIndex, NO_ROW } from './LogIndex.js';
 import type { LogStore } from './LogStore.js';
 import { RangeScopeController, sameWindow, type TimeWindow } from './rangeScope.js';
 import { statementSelves } from './rowMetrics.js';
@@ -320,20 +320,6 @@ function named(series: Float64Array[], name: (id: number) => string): Map<string
     }
   });
   return byName;
-}
-
-/**
- * The rows directly under `row`, or at the top of the log for {@link NO_ROW}, in
- * log order. Fills `into` when given, so a pass over every row reuses one array.
- */
-export function childRows(index: LogIndex, row: number, into: number[] = []): number[] {
-  into.length = 0;
-  const { subtreeEnd } = index;
-  const end = row === NO_ROW ? index.rowCount : subtreeEnd[row]!;
-  for (let child = row + 1; child < end; child = subtreeEnd[child]!) {
-    into.push(child);
-  }
-  return into;
 }
 
 /**

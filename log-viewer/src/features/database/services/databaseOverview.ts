@@ -3,11 +3,10 @@
  */
 import type { ApexEvent } from '@apexdevtools/apex-log-parser';
 
-import { type LogIndex, NO_ROW } from '#core/log/LogIndex.js';
+import { childRows, type LogIndex, NO_ROW } from '#core/log/LogIndex.js';
 import type { Derivation } from '#core/log/LogStore.js';
 import { type Signatures, signaturesOf } from '#core/log/signatures.js';
 import { statements, type DmlEvent, type SoqlEvent, type SoslEvent } from '#core/log/statements.js';
-import { childRows } from '#core/log/windowStats.js';
 import { DEFAULT_NAMESPACE, namespaceOf } from '#core/utility/CallerNamespace.js';
 import { sharePercent } from '#core/utility/Util.js';
 import { deriveSoqlObject } from './sobjectClassification.js';
