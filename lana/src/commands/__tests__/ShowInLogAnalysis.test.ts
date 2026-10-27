@@ -1,7 +1,7 @@
 /*
  * Copyright (c) 2026 Certinia Inc. All rights reserved.
  */
-import { beforeEach, describe, expect, it } from '@jest/globals';
+import { afterEach, beforeEach, describe, expect, it } from '@jest/globals';
 import { Uri, window } from 'vscode';
 
 import {
@@ -33,6 +33,10 @@ describe('ShowInLogAnalysis', () => {
     mockGetCurrentView.mockReturnValue(undefined);
     mockGetLogUri.mockReturnValue(undefined);
     mockCreateView.mockResolvedValue(undefined);
+  });
+
+  afterEach(() => {
+    window.activeTextEditor = undefined;
   });
 
   const command = lastRegisteredCommand;
@@ -93,7 +97,18 @@ describe('ShowInLogAnalysis', () => {
       cmd: 'navigateToTimeline',
       payload: { eventIndex: 42 },
     });
-    window.activeTextEditor = undefined;
+  });
+
+  // The hover is on one log while another editor has focus; the id belongs to the hovered log.
+  it("opens the link's log, not the active editor's", async () => {
+    window.activeTextEditor = {
+      document: { uri: Uri.parse('memfs:/logs/b.log') },
+    } as typeof window.activeTextEditor;
+    ShowInLogAnalysis.apply(asContext(createMockContext()));
+
+    await command()({ eventIndex: 42, filePath: 'memfs:/logs/a.log' });
+
+    expect(String(mockCreateView.mock.calls[0]?.[2])).toBe('memfs:/logs/a.log');
   });
 
   it('says what to do when neither the link nor an editor names a log', async () => {
@@ -103,7 +118,7 @@ describe('ShowInLogAnalysis', () => {
     await command()({ eventIndex: 42 });
 
     expect(context.display.showInformationMessage).toHaveBeenCalledWith(
-      'Open an Apex log, then run Show in Log Analysis again.',
+      'Open an Apex log, hover an event line, then choose Show in Log Analysis.',
     );
     expect(mockCreateView).not.toHaveBeenCalled();
   });

@@ -35,7 +35,7 @@ export class ShowInLogAnalysis {
     const logUri = filePath ? Uri.parse(filePath) : window.activeTextEditor?.document.uri;
     if (!logUri) {
       context.display.showInformationMessage(
-        'Open an Apex log, then run Show in Log Analysis again.',
+        'Open an Apex log, hover an event line, then choose Show in Log Analysis.',
       );
       return;
     }
