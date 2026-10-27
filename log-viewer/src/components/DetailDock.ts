@@ -53,7 +53,7 @@ export class DetailDock extends LitElement {
         color: var(--vscode-sideBar-foreground, var(--lana-fg));
         font-family: var(--lana-font-ui);
         font-size: var(--lana-text-base);
-        /* Match the docked edge (the DockLayout gutter) so the panel reads as a
+        /* Match the dock's side edge (drawn by DockLayout) so the panel reads as a
            deliberate region rather than blending into the tab header above. */
         border-top: var(--lana-stroke) solid var(--lana-panel-divider);
       }
@@ -167,12 +167,13 @@ export class DetailDock extends LitElement {
     );
   }
 
-  /** The section header's right-click menu, opened under the button. */
+  /** The section header's right-click menu, opened under the button, which a second press closes. */
   private _showMenu(e: MouseEvent) {
-    const { left, bottom } = (e.currentTarget as HTMLElement).getBoundingClientRect();
+    const opener = e.currentTarget as HTMLElement;
+    const { left, bottom } = opener.getBoundingClientRect();
     this.dispatchEvent(
       new CustomEvent('pane-menu', {
-        detail: { x: left, y: bottom },
+        detail: { x: left, y: bottom, opener },
         bubbles: true,
         composed: true,
       }),

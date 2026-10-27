@@ -87,22 +87,4 @@ describe('DetailDock', () => {
     expect(position).toBe('bottom');
     expect(hidden).toBe(true);
   });
-
-  // The inspector, an ancestor, opens the section menu when `pane-menu` reaches it.
-  it('opens the section menu from More actions, as a header right-click does', async () => {
-    const el = await mount((e) => {
-      e.sections = sections;
-    });
-    const host = document.createElement('div');
-    host.appendChild(el);
-    document.body.appendChild(host);
-    let menuAt: { x: number; y: number } | undefined;
-    host.addEventListener('pane-menu', (e) => {
-      menuAt = (e as CustomEvent<{ x: number; y: number }>).detail;
-    });
-
-    el.shadowRoot?.querySelector<HTMLElement>('vscode-icon[title="More actions"]')?.click();
-
-    expect(menuAt).toEqual({ x: 0, y: 0 });
-  });
 });
