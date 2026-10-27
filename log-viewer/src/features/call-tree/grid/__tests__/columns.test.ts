@@ -372,6 +372,23 @@ describe('export text', () => {
     expect(name.text?.(query)).not.toBe('SELECT Id FROM Account');
   });
 
+  // The cell is a link or a highlighted query; copy must write the plain name a reader can search for.
+  it('writes a frame by its name, with the suffix that tells a constructor from a method', async () => {
+    const built = await storeOf(
+      line(1000, 'METHOD_ENTRY|[1]|01p|ns.Outer.run()') +
+        line(2000, 'CONSTRUCTOR_ENTRY|[2]|01p|<init>()|ns.Inner') +
+        line(3000, 'CONSTRUCTOR_EXIT|[2]|01p|<init>()|ns.Inner') +
+        line(4000, 'METHOD_EXIT|[1]|ns.Outer.run()'),
+    );
+    const name = aggregatedColumns(built.log, options).find((c) => c.id === 'text');
+    const rows = flat(toAggregatedCallTree(await built.logIndex(), built));
+
+    expect(rows.map((row) => name?.exportText?.(row))).toEqual([
+      'ns.Outer.run()',
+      'ns.Inner() (constructor)',
+    ]);
+  });
+
   it('writes a governor percentage in full, where the cell shows it rounded', () => {
     const cost = aggregatedColumns(store.log, options).find((c) => c.id === 'governorCost');
     const row = { governorCost: 33.375 } as unknown as AggregatedRow;
