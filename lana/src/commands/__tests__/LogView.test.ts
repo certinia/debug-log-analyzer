@@ -1,11 +1,11 @@
 /*
  * Copyright (c) 2026 Certinia Inc. All rights reserved.
  */
-import { describe, expect, it } from '@jest/globals';
+import { afterEach, describe, expect, it } from '@jest/globals';
 
 import { asContext, createMockContext } from '../../__tests__/helpers/test-builders.js';
 import { Uri, workspace } from '../../__tests__/mocks/vscode.js';
-import { getConfig } from '../../workspace/AppConfig.js';
+import { getConfig, sameConfig } from '../../workspace/AppConfig.js';
 import { WebView } from '../../display/WebView.js';
 import { LogView } from '../LogView.js';
 
@@ -14,6 +14,9 @@ jest.mock('../../display/WebView.js', () => ({
 }));
 jest.mock('../../workspace/AppConfig.js', () => ({
   PRIVATE_SECTIONS: [],
+  UI_SETTINGS: jest.requireActual<typeof import('../../workspace/AppConfig.js')>(
+    '../../workspace/AppConfig.js',
+  ).UI_SETTINGS,
   getColumnOverrides: jest.fn(() => ({})),
   getColumnViews: jest.fn(() => ({})),
   getConfig: jest.fn(() => ({
@@ -162,6 +165,47 @@ describe('LogView', () => {
     expect(postMessage).toHaveBeenCalledWith({
       requestId: 'request-3',
       error: 'Unknown request: notACommand',
+    });
+  });
+
+  describe('on a settings change', () => {
+    /** The view's settings listener, with every read config differing from the last. */
+    async function configListener() {
+      (sameConfig as jest.Mock).mockReturnValue(false);
+      const { postMessage } = await createViewWithListener();
+      const onChange = (workspace.onDidChangeConfiguration as unknown as jest.Mock).mock.calls.at(
+        -1,
+      )?.[0] as (event: { affectsConfiguration: (section: string) => boolean }) => void;
+      return {
+        postMessage,
+        change: (key: string) => onChange({ affectsConfiguration: (s) => s === key }),
+      };
+    }
+
+    afterEach(() => {
+      (sameConfig as jest.Mock).mockReturnValue(true);
+    });
+
+    // The chrome follows VS Code's Modern or Classic UI, which lives under `workbench`, not `lana`.
+    it.each(['lana', 'workbench.experimental.modernUI'])(
+      'pushes the config to the open view when %s changes',
+      async (key) => {
+        const { postMessage, change } = await configListener();
+
+        change(key);
+
+        expect(postMessage).toHaveBeenCalledWith(expect.objectContaining({ cmd: 'configChanged' }));
+      },
+    );
+
+    it('does not push the config for a setting the view does not use', async () => {
+      const { postMessage, change } = await configListener();
+
+      change('editor.fontSize');
+
+      expect(postMessage).not.toHaveBeenCalledWith(
+        expect.objectContaining({ cmd: 'configChanged' }),
+      );
     });
   });
 });

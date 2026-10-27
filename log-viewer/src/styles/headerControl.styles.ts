@@ -1,7 +1,10 @@
 /*
  * Copyright (c) 2026 Certinia Inc. All rights reserved.
  */
-import { css } from 'lit';
+import { css, unsafeCSS } from 'lit';
+
+/** Width of a `.header-control` (px), for layouts that reserve room for one. */
+export const HEADER_CONTROL_WIDTH = 26;
 
 /**
  * The header's bare icon buttons (log problems, notifications) and their corner count
@@ -20,9 +23,9 @@ export const headerControlStyles = css`
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    width: 26px;
+    width: ${unsafeCSS(HEADER_CONTROL_WIDTH)}px;
     height: 22px;
-    border-radius: 4px;
+    border-radius: var(--lana-radius-sm);
     color: var(--lana-fg);
   }
 

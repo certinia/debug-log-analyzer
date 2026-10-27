@@ -169,6 +169,12 @@ function openSectionMenu(el: LogInspector, id = 'vitals'): void {
   );
 }
 
+function maximize(el: LogInspector, maximized: string | null): void {
+  paneView(el).dispatchEvent(
+    new CustomEvent('pane-maximize', { detail: { maximized }, bubbles: true, composed: true }),
+  );
+}
+
 function pickMenuItem(el: LogInspector, itemId: string): void {
   sectionMenu(el).dispatchEvent(
     new CustomEvent('menu-select', { detail: { itemId }, bubbles: true, composed: true }),
@@ -347,6 +353,28 @@ describe('LogInspector', () => {
     expect(builtHiding.at(-1)).toEqual(['callstack']);
   });
 
+  // The press that closes it is also a press outside the menu, which once closed it and reopened it.
+  it('opens the section menu from More actions, and a second press closes it', async () => {
+    const el = await mount('timeline-tab');
+    select('timeline', 1);
+    await flush(el);
+    const more = dockLayout(el)
+      .shadowRoot?.querySelector('detail-dock')
+      ?.shadowRoot?.querySelector<HTMLElement>('vscode-icon[title="More actions"]');
+    const press = (): void => {
+      more?.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, composed: true }));
+      more?.click();
+    };
+
+    press();
+    expect(sectionMenu(el).isVisible()).toBe(true);
+
+    // The menu starts listening for a press outside it on the next frame.
+    await flush(el);
+    press();
+    expect(sectionMenu(el).isVisible()).toBe(false);
+  });
+
   it('offers a hidden section back in the menu', async () => {
     settings.inspector = inspectorSettings({
       hiddenSections: { 'timeline:detail:callstack': true },
@@ -484,6 +512,88 @@ describe('LogInspector', () => {
     ]);
     // The panes' dragged sizes go with it.
     expect(paneView(el).layoutEpoch).toBe(1);
+  });
+
+  it('keeps a maximized section to the list it was maximized in', async () => {
+    const el = await mount('timeline-tab');
+    select('timeline', 1);
+    await flush(el);
+    maximize(el, 'callstack');
+    await flush(el);
+    expect(paneView(el).maximized).toBe('callstack');
+
+    // Database builds a `callstack` too, but it is another list.
+    el.activeTab = 'database-tab';
+    select('database', 2);
+    await flush(el);
+    expect(paneView(el).maximized).toBeNull();
+
+    el.activeTab = 'timeline-tab';
+    await flush(el);
+    expect(paneView(el).maximized).toBe('callstack');
+  });
+
+  it('restores the stack on request, and never stores either choice', async () => {
+    const el = await mount('timeline-tab');
+    select('timeline', 1);
+    await flush(el);
+
+    maximize(el, 'callstack');
+    await flush(el);
+    maximize(el, null);
+    await flush(el);
+
+    expect(paneView(el).maximized).toBeNull();
+    expect(written).toEqual([]);
+  });
+
+  it('forgets the maximized section once it is hidden, so showing it again restores the stack', async () => {
+    const el = await mount('timeline-tab');
+    select('timeline', 1);
+    await flush(el);
+    maximize(el, 'callstack');
+    await flush(el);
+
+    openSectionMenu(el);
+    pickMenuItem(el, 'section:callstack');
+    await flush(el);
+    openSectionMenu(el);
+    pickMenuItem(el, 'section:callstack');
+    await flush(el);
+
+    expect(sectionIds(el)).toEqual(['vitals', 'callstack']);
+    expect(paneView(el).maximized).toBeNull();
+  });
+
+  it('keeps the maximized section when another one is hidden', async () => {
+    const el = await mount('timeline-tab');
+    select('timeline', 1);
+    await flush(el);
+    maximize(el, 'callstack');
+    await flush(el);
+
+    openSectionMenu(el);
+    pickMenuItem(el, 'section:vitals');
+    await flush(el);
+    openSectionMenu(el);
+    pickMenuItem(el, 'section:vitals');
+    await flush(el);
+
+    expect(paneView(el).maximized).toBe('callstack');
+  });
+
+  it('restores the stack on a reset', async () => {
+    const el = await mount('timeline-tab');
+    select('timeline', 1);
+    await flush(el);
+    maximize(el, 'callstack');
+    await flush(el);
+
+    openSectionMenu(el, 'callstack');
+    pickMenuItem(el, RESET_SECTIONS_ID);
+    await flush(el);
+
+    expect(paneView(el).maximized).toBeNull();
   });
 
   it('auto-opens on the first selection only while the user has never chosen', async () => {

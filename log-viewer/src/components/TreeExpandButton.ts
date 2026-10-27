@@ -35,6 +35,9 @@ export class TreeExpandButton extends LitElement {
   @property({ type: Boolean, attribute: 'whole-tree' })
   wholeTree = false;
 
+  /** Reactive mirror of the native `slot` attribute, so the control re-renders as menu rows. */
+  @property({ attribute: 'slot' }) slot = '';
+
   @state()
   private expanding = true;
 
@@ -69,6 +72,11 @@ export class TreeExpandButton extends LitElement {
         display: inline-flex;
       }
 
+      :host([slot='overflow']) {
+        flex-direction: column;
+        width: 100%;
+      }
+
       /* The filter bar's control, holding two buttons that each take their own hover. */
       .split {
         padding: 0;
@@ -89,11 +97,6 @@ export class TreeExpandButton extends LitElement {
         background: none;
         font: inherit;
         cursor: pointer;
-      }
-
-      button.header-control:focus-visible {
-        outline: var(--lana-focus-ring);
-        outline-offset: var(--lana-focus-inset);
       }
 
       button.header-control:disabled {
@@ -151,20 +154,56 @@ export class TreeExpandButton extends LitElement {
     const { canExpand, canCollapse } = this.expansion;
     const label = `${this.expanding ? 'Expand' : 'Collapse'} ${this.wholeTree ? 'All' : 'One Level'}`;
     const disabled = !canExpand && !canCollapse;
+    if (this.slot === 'overflow') {
+      return this.renderRows(label, canExpand, disabled);
+    }
     return html`<span class="filter-control split">
         <button
           class="header-control"
           title=${label}
           aria-label=${label}
           ?disabled=${disabled}
-          @click=${() =>
-            void (this.expanding ? this.grid?.expandLevel() : this.grid?.collapseLevel())}
+          @click=${this.step}
         >
           <vscode-icon name=${this.expanding ? 'expand-all' : 'collapse-all'}></vscode-icon>
         </button>
         ${this.wholeTree ? nothing : this.renderMore(disabled)}
       </span>
       ${this.wholeTree ? nothing : this.renderMenu(canExpand)}`;
+  }
+
+  /** In the filter bar's `…` menu: the same actions as rows, with no menu of their own to nest. */
+  private renderRows(label: string, canExpand: boolean, disabled: boolean) {
+    return html`<button
+        class="filter-popover-row menu-row"
+        ?disabled=${disabled}
+        @click=${this.step}
+      >
+        <vscode-icon name=${this.expanding ? 'expand-all' : 'collapse-all'}></vscode-icon
+        ><span>${label}</span>
+      </button>
+      ${
+        this.wholeTree
+          ? nothing
+          : html`<button
+                class="filter-popover-row menu-row"
+                ?disabled=${!canExpand}
+                @click=${() => void this.all(true)}
+              >
+                <vscode-icon name="expand-all"></vscode-icon><span>Expand All</span>
+              </button>
+              <button
+                class="filter-popover-row menu-row"
+                ?disabled=${disabled}
+                @click=${() => void this.all(false)}
+              >
+                <vscode-icon name="collapse-all"></vscode-icon><span>Collapse All</span>
+              </button>`
+      }`;
+  }
+
+  private step(): void {
+    void (this.expanding ? this.grid?.expandLevel() : this.grid?.collapseLevel());
   }
 
   private renderMore(disabled: boolean) {
@@ -225,8 +264,8 @@ export class TreeExpandButton extends LitElement {
   }
 
   private hideMenu(): void {
-    // Optional calls: jsdom implements no popover API.
-    this.menu.hidePopover?.();
+    // Optional calls: jsdom implements no popover API, and the menu-row form has no menu.
+    this.menu?.hidePopover?.();
   }
 
   /** The whole tree changed, so the keys and copy act on the grid next, as before. */

@@ -131,4 +131,9 @@ export class HeaderMenu extends LitElement {
       this.shadowRoot?.querySelector<AnchoredPopover>('anchored-popover')?.close();
     }
   }
+
+  /** Focus the `•••` trigger. */
+  override focus(options?: FocusOptions): void {
+    this.shadowRoot?.querySelector<AnchoredPopover>('anchored-popover')?.focus(options);
+  }
 }

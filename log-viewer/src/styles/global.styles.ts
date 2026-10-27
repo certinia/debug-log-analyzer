@@ -3,6 +3,19 @@ import { css } from 'lit';
 import { tokenStyles } from './tokens.styles.js';
 
 /**
+ * Off-screen, not hidden: a display:none region is never announced. The body of
+ * `.sr-only`, for a rule that cannot take the class, such as one in a container query.
+ */
+export const srOnly = css`
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+`;
+
+/**
  * Shared component styles. Carries `tokenStyles` because the rules below read
  * `--lana-*`, so every component that adopts `globalStyles` gets the tokens with it.
  */
@@ -137,6 +150,12 @@ export const globalStyles = [
       mask-size: 70%;
     }
 
+    /* Else Chromium rings a scroller in the OS accent colour; the excluded hosts draw their own ring. */
+    :focus-visible:not(vscode-button, vscode-tab-header, vscode-tab-panel, vscode-textfield) {
+      outline: var(--lana-focus-ring);
+      outline-offset: var(--lana-focus-inset);
+    }
+
     .vs-checkbox:focus-visible {
       outline: var(--lana-focus-ring);
       outline-offset: var(--lana-focus-offset);
@@ -220,14 +239,17 @@ export const globalStyles = [
       background-color: var(--lana-row-hover-bg);
     }
 
-    /* Off-screen, not hidden: a display:none region is never announced. */
+    /* The column of collapsed controls in an overflow menu. */
+    .menu-items {
+      display: flex;
+      flex-direction: column;
+      gap: var(--lana-space-2xs);
+      align-items: flex-start;
+      padding: 0 var(--lana-space-2xs) var(--lana-space-3xs);
+    }
+
     .sr-only {
-      position: absolute;
-      width: 1px;
-      height: 1px;
-      overflow: hidden;
-      clip-path: inset(50%);
-      white-space: nowrap;
+      ${srOnly}
     }
   `,
 ];

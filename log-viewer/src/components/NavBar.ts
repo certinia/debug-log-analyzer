@@ -11,11 +11,19 @@ import { ResizeController } from '../core/events/ResizeController.js';
 import { logStatusContext, type LogStatus } from '../core/log/logStatus.js';
 import { formatDuration } from '../core/utility/Util.js';
 import type { LogIdentityData } from '../features/app/logIdentity.js';
-import type { LogIssue } from '../features/notifications/types.js';
+import {
+  ISSUE_SOURCES,
+  SEVERITY_META,
+  describeIssues,
+  worstSeverity,
+  type IssueSource,
+  type LogIssue,
+} from '../features/notifications/types.js';
 import type { LogTitle } from './LogTitle.js';
 import { computeVisibleCount } from './overflowFit.js';
 
 // styles
+import { anchoredPopoverStyles } from '../styles/anchoredPopover.styles.js';
 import { globalStyles } from '../styles/global.styles.js';
 import { menuRowStyles } from '../styles/menuRow.styles.js';
 
@@ -115,6 +123,10 @@ export class NavBar extends LitElement {
   @property({ attribute: false })
   logIdentity: LogIdentityData | null = null;
 
+  /** The issue list opened from a collapsed row in `•••`, or none. */
+  @state()
+  private _openIssues: IssueSource | null = null;
+
   /** How many leading `CHUNKS` stay in the header; the rest are in the `•••` menu. */
   @state()
   private _visible: number = CHUNKS.length;
@@ -141,6 +153,7 @@ export class NavBar extends LitElement {
 
   static styles = [
     globalStyles,
+    anchoredPopoverStyles,
     menuRowStyles,
     css`
       :host {
@@ -197,6 +210,31 @@ export class NavBar extends LitElement {
         display: flex;
         flex-direction: column;
         gap: 4px;
+      }
+
+      header-menu {
+        anchor-name: --nav-bar-more;
+      }
+
+      /* The list a collapsed issue row opens, in place of the chip's own panel: same
+         look and width, anchored where the chip went. */
+      .issues-popover {
+        position-anchor: --nav-bar-more;
+        position-area: bottom span-left;
+        margin: var(--lana-space-xs) 0 0 0;
+        box-sizing: border-box;
+        width: 400px;
+        max-width: 92vw;
+        max-height: 540px;
+        overflow-y: auto;
+        padding: var(--lana-space-xs);
+      }
+
+      .issues-popover__head {
+        padding: var(--lana-space-3xs) var(--lana-space-sm) var(--lana-space-xs);
+        font-weight: 600;
+        font-size: var(--lana-text-base);
+        color: var(--lana-fg);
       }
 
       .menu-section__label {
@@ -345,6 +383,7 @@ export class NavBar extends LitElement {
           </header-menu>
         </div>
       </div>
+      ${this._renderIssuesPopover()}
     `;
   }
 
@@ -454,9 +493,7 @@ export class NavBar extends LitElement {
       );
     }
     if (!show.bell) {
-      sections.push(
-        this._issueSection('Notifications', this.notifications, 'Log parsed with no issues'),
-      );
+      sections.push(this._issueSection('notifications'));
     }
     if (!show.inspector) {
       sections.push(
@@ -467,9 +504,7 @@ export class NavBar extends LitElement {
       );
     }
     if (!show.problems && this.logProblems) {
-      sections.push(
-        this._issueSection('Log problems', this.logProblems, 'No problems found in this log'),
-      );
+      sections.push(this._issueSection('problems'));
     }
 
     return sections;
@@ -507,19 +542,69 @@ export class NavBar extends LitElement {
     return rows;
   }
 
-  private _issueSection(
-    label: string,
-    issues: readonly LogIssue[],
-    emptyMessage: string,
-  ): TemplateResult {
-    return html`<div class="menu-section">
-      <div class="menu-section__label"
-        >${issues.length ? `${label} (${issues.length})` : label}</div
-      >
+  /**
+   * One row with the count, not the list: a menu holds commands, and a long list in it
+   * would scroll inside a scroll. The row opens the list as its own panel, as the chip does.
+   */
+  private _issueSection(source: IssueSource): TemplateResult {
+    const { label, icon, noun } = ISSUE_SOURCES[source];
+    const issues = this._issuesOf(source);
+    const worst = worstSeverity(issues);
+    return html`<button
+      class="filter-popover-row menu-row"
+      title=${describeIssues(issues, noun, label)}
+      @click=${() => void this._showIssues(source)}
+    >
+      <vscode-icon name=${worst ? SEVERITY_META[worst].icon : icon} size="16"></vscode-icon>
+      <span>${issues.length ? `${label} (${issues.length})` : label}</span>
+    </button>`;
+  }
+
+  private _issuesOf(source: IssueSource): readonly LogIssue[] {
+    return source === 'problems' ? (this.logProblems ?? []) : this.notifications;
+  }
+
+  /** Opens after `•••` closes on the row's click, so the two panels never stack. */
+  private async _showIssues(source: IssueSource): Promise<void> {
+    this._openIssues = source;
+    await this.updateComplete;
+    const panel = this.renderRoot.querySelector<HTMLElement>('.issues-popover');
+    // Optional calls: jsdom implements no popover API.
+    panel?.showPopover?.();
+    panel?.focus();
+  }
+
+  /**
+   * The `•••` row that opened the panel is hidden by now, so focus that would fall to the
+   * page goes back to `•••`. A click elsewhere keeps the focus it gave.
+   */
+  private _onIssuesToggle(event: ToggleEvent): void {
+    const lost = !document.activeElement || document.activeElement === document.body;
+    if (event.newState === 'closed' && lost) {
+      this.renderRoot.querySelector<HTMLElement>('header-menu')?.focus();
+    }
+  }
+
+  private _renderIssuesPopover(): TemplateResult {
+    const source = this._openIssues;
+    const issues = source ? this._issuesOf(source) : [];
+    const { label, empty } = source ? ISSUE_SOURCES[source] : { label: '', empty: '' };
+    return html`<div
+      class="issues-popover filter-popover popover-anchored"
+      popover
+      role="group"
+      tabindex="-1"
+      aria-label=${label}
+      @toggle=${this._onIssuesToggle}
+    >
       ${
-        issues.length
-          ? html`<issue-list .issues=${issues}></issue-list>`
-          : html`<div class="menu-section__empty">${emptyMessage}</div>`
+        source
+          ? html`<div class="issues-popover__head">${label}</div> ${
+                issues.length
+                  ? html`<issue-list .issues=${issues}></issue-list>`
+                  : html`<div class="menu-section__empty">${empty}</div>`
+              }`
+          : nothing
       }
     </div>`;
   }

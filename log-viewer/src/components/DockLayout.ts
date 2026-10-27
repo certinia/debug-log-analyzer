@@ -1,7 +1,7 @@
 /*
  * Copyright (c) 2025 Certinia Inc. All rights reserved.
  */
-import { LitElement, css, html } from 'lit';
+import { LitElement, css, html, unsafeCSS } from 'lit';
 import { customElement, property, state } from 'lit/decorators.js';
 
 import { globalStyles } from '../styles/global.styles.js';
@@ -10,6 +10,8 @@ import type { DockPosition } from './DetailDock.js';
 import type { PaneSection } from './PaneView.js';
 
 const MIN_SIZE = 120;
+// Room for a fully collapsed toolbar, so the main pane never overlaps itself.
+const MAIN_MIN_SIZE = 240;
 // Drag past the minimum by this much to fully collapse the panel.
 const COLLAPSE_OVERSHOOT = 60;
 
@@ -45,6 +47,9 @@ export class DockLayout extends LitElement {
 
   @property({ type: Number })
   layoutEpoch = 0;
+
+  @property({ attribute: false })
+  maximized: string | null = null;
 
   // Live drag state (transient); when set, overrides `size` while dragging.
   @state()
@@ -85,12 +90,20 @@ export class DockLayout extends LitElement {
         min-width: 0;
         min-height: 0;
         overflow: hidden;
+        padding: 0 var(--dock-main-inset, 0);
+      }
+      /* The dock sits flush to the window edge it is docked on. */
+      .layout[data-open][data-dock='right'] .main {
+        padding-right: 0;
+      }
+      .layout[data-open][data-dock='left'] .main {
+        padding-left: 0;
       }
 
+      /* Invisible until hovered, over the dock's 1px edge, as VS Code's sash is. */
       .gutter {
         flex: 0 0 var(--lana-sash-size);
         z-index: 1;
-        background-color: var(--lana-panel-divider);
         transition: background-color 0.1s ease;
       }
       .layout[data-dock='right'] .gutter,
@@ -111,6 +124,19 @@ export class DockLayout extends LitElement {
         flex: 0 0 auto;
         overflow: hidden;
       }
+      .layout[data-dock='right'] detail-dock {
+        border-left: var(--lana-stroke) solid var(--lana-panel-divider);
+      }
+      .layout[data-dock='left'] detail-dock {
+        border-right: var(--lana-stroke) solid var(--lana-panel-divider);
+      }
+      /* A size saved on one axis can exceed the other, and the window can shrink. */
+      .layout:not([data-dock='bottom']) detail-dock {
+        max-width: max(${unsafeCSS(MIN_SIZE)}px, 100% - ${unsafeCSS(MAIN_MIN_SIZE)}px);
+      }
+      .layout[data-dock='bottom'] detail-dock {
+        max-height: max(${unsafeCSS(MIN_SIZE)}px, 100% - ${unsafeCSS(MAIN_MIN_SIZE)}px);
+      }
 
       @media (prefers-reduced-motion: reduce) {
         .gutter {
@@ -122,7 +148,7 @@ export class DockLayout extends LitElement {
 
   render() {
     return html`
-      <div class="layout" data-dock=${this.dock}>
+      <div class="layout" data-dock=${this.dock} ?data-open=${this.visible}>
         <div class="main"><slot name="main"></slot></div>
         ${
           this.visible
@@ -134,6 +160,7 @@ export class DockLayout extends LitElement {
                   .emptyText=${this.emptyText}
                   .collapsed=${this.collapsed}
                   .layoutEpoch=${this.layoutEpoch}
+                  .maximized=${this.maximized}
                   dock=${this.dock}
                 >
                   <slot name="actions-start" slot="actions-start"></slot>
@@ -157,6 +184,13 @@ export class DockLayout extends LitElement {
     return this.dock === 'bottom' ? `height: ${size}px` : `width: ${size}px`;
   }
 
+  private _maxSize(): number | null {
+    const layout = this.renderRoot?.querySelector<HTMLElement>('.layout');
+    return layout
+      ? (this.dock === 'bottom' ? layout.clientHeight : layout.clientWidth) - MAIN_MIN_SIZE
+      : null;
+  }
+
   private _startResize = (e: PointerEvent) => {
     e.preventDefault();
     const gutter = e.currentTarget as HTMLElement;
@@ -164,7 +198,7 @@ export class DockLayout extends LitElement {
     gutter.classList.add('gutter--active');
     this._resizeStart = {
       pos: this.dock === 'bottom' ? e.clientY : e.clientX,
-      size: this.size,
+      size: Math.max(MIN_SIZE, Math.min(this.size, this._maxSize() ?? this.size)),
     };
     gutter.addEventListener('pointermove', this._onResizeMove);
     gutter.addEventListener('pointerup', this._endResize);
@@ -178,10 +212,7 @@ export class DockLayout extends LitElement {
     const delta = current - this._resizeStart.pos;
     // Dragging the gutter towards the main area grows the panel; sign by dock side.
     const grow = this.dock === 'left' ? delta : -delta;
-    const layout = this.renderRoot?.querySelector('.layout') as HTMLElement | null;
-    const max = layout
-      ? (this.dock === 'bottom' ? layout.clientHeight : layout.clientWidth) - MIN_SIZE
-      : this._resizeStart.size + grow;
+    const max = this._maxSize() ?? this._resizeStart.size + grow;
     const raw = this._resizeStart.size + grow;
 
     if (raw < MIN_SIZE - COLLAPSE_OVERSHOOT) {

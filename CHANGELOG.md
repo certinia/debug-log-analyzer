@@ -28,6 +28,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - 🔭 **Timeline inspector**: the summary, call tree included, changes to reflect what is currently visible. ([#875])
 - 🧹 **Details filter**: with Details off, the Call Tree, Analysis and Inspector show every method, query and DML, even one that took no time, and hide debug lines and variables. ([#1234])
   - Exceptions and limit usage stay in Time Order and Aggregated, and show in Bottom-Up and Analysis only with Details on.
+- 🎨 **Styling**: updated for the VS Code Modern UI.
 - 🧮 **Limit strip**: the tooltip always shows the seen count when it differs from the usage Salesforce reported, not only where it is lower.
 
 ### Added
@@ -41,6 +42,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - The Call Tree and Analysis menu next to the button has Expand All and Collapse All, which include the groups.
 - 🔎 **Analysis filters**: filter the Analysis table by namespace, total time and self time, as in the Call Tree Bottom-Up view. ([#1209])
 - 💡 **Log level hints**: a section that a debug level leaves empty names the level it needs. ([#259])
+- 🔲 **Inspector sections**: maximize one section to fill the inspector, then restore the others as they were.
+- 📋 **Inspector menu**: show, hide or reset sections from the header.
 - 🧮 **New limit columns**: show the SOQL, DML and SOSL usage Salesforce reported beside the counts we actually saw in the Call Tree and Analysis tables.
 - 🔦 **Timeline legend**: hover a category to highlight frames in the timeline, select to keep. ([#917])
 - 🔍 **Find**: in the tables, find matches the group header text too.
@@ -52,6 +55,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- 🧰 **Toolbars**: components no longer overlap when resized.
 - 🔎 **Retrieve Apex Log**: typing in the log list filters the logs. ([#594])
 - 📤 **Copy and export**: both work on Analysis and Bottom-Up. ([#1110])
 - 🔦 **Find**: in the tables, the current match stands out from the other matches, as it does in the editor.

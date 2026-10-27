@@ -244,11 +244,6 @@ export class GovernorTrends extends LitElement {
         overflow: visible;
       }
 
-      .trend__chart:focus-visible {
-        outline: var(--lana-focus-ring);
-        outline-offset: var(--lana-focus-inset);
-      }
-
       .trend--safe {
         color: var(--lana-severity-ok);
       }

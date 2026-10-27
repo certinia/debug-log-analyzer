@@ -280,8 +280,8 @@ describe('buildDetailSections', () => {
   it('adds the hot path and hot spots to the call tree when nothing is selected', async () => {
     const sections = await buildDetailSections('calltree', null);
     expect(sections.map((s) => s.id)).toEqual(['overview', 'hot-path', 'hot-spots']);
-    expect(sections[1]?.title).toBe('Hot path');
-    expect(sections[2]?.title).toBe('Hot spots');
+    expect(sections[1]?.title).toBe('Hot Path');
+    expect(sections[2]?.title).toBe('Hot Spots');
     // Every section here is a short list: each takes its own height only.
     expect(sections.every((s) => s.fit === 'content')).toBe(true);
   });
@@ -296,7 +296,7 @@ describe('buildDetailSections', () => {
       'calltree',
     ]);
     // It follows the Timeline's window like the charts, so it needs no scope note.
-    expect(sections.find((s) => s.id === 'calltree')?.title).toBe('Call tree');
+    expect(sections.find((s) => s.id === 'calltree')?.title).toBe('Call Tree');
     // The whole-log tree soaks up the leftover space; the charts keep their own.
     expect(sections.find((s) => s.id === 'calltree')?.weight).toBe(4);
     expect(sections.find((s) => s.id === 'calltree')?.fit ?? 'fill').toBe('fill');

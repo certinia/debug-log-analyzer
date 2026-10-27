@@ -431,12 +431,10 @@ describe('analysis-view', () => {
   it('exports analysis.csv and copies from the grid', () => {
     const copy = jest.spyOn(grid(), 'copy').mockResolvedValue(undefined);
     const click = (label: string) =>
-      view.renderRoot
-        .querySelector<HTMLElement>(`vscode-toolbar-button[label="${label}"]`)
-        ?.click();
+      view.renderRoot.querySelector<HTMLElement>(`toolbar-action[label="${label}"]`)?.click();
 
     click('Export to CSV');
-    click('Copy to clipboard');
+    click('Copy to Clipboard');
 
     expect(exportCsv).toHaveBeenCalledWith(grid(), 'analysis.csv');
     expect(copy).toHaveBeenCalled();

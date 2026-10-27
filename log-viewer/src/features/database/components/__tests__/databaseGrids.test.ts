@@ -121,7 +121,7 @@ describe.each(GRIDS)('%s', (_name, spec) => {
       new CustomEvent('datagrid-facet-change', { detail: { selected } }),
     );
   const clickButton = (label: string) =>
-    view.renderRoot.querySelector<HTMLElement>(`vscode-toolbar-button[label="${label}"]`)?.click();
+    view.renderRoot.querySelector<HTMLElement>(`toolbar-action[label="${label}"]`)?.click();
   const heard = (type: string): unknown[] => {
     const seen: unknown[] = [];
     view.addEventListener(type, (e) => seen.push((e as CustomEvent).detail));
@@ -221,7 +221,7 @@ describe.each(GRIDS)('%s', (_name, spec) => {
 
     it('copies through the grid', () => {
       const copy = jest.spyOn(grid(), 'copy').mockResolvedValue(undefined);
-      clickButton('Copy to clipboard');
+      clickButton('Copy to Clipboard');
 
       expect(copy).toHaveBeenCalledTimes(1);
     });
@@ -308,10 +308,14 @@ describe.each(GRIDS)('%s', (_name, spec) => {
     });
 
     it('slots the action buttons into the bar', () => {
-      const actions = view.renderRoot.querySelector('div[slot="actions"]');
+      const actions = [...view.renderRoot.querySelectorAll('[slot="actions"]')];
 
-      expect(actions?.parentElement).toBe(bar());
-      expect(actions?.querySelectorAll('vscode-toolbar-button')).toHaveLength(3);
+      expect(actions.map((action) => action.getAttribute('label'))).toEqual([
+        'Columns',
+        'Export to CSV',
+        'Copy to Clipboard',
+      ]);
+      expect(actions.every((action) => action.parentElement === bar())).toBe(true);
     });
   });
 

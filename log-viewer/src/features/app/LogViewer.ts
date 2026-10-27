@@ -29,7 +29,7 @@ import { toLogIssues } from './logIssues.js';
 import { parserIssuesToNotifications } from './parserNotifications.js';
 
 // styles
-import { globalStyles } from '../../styles/global.styles.js';
+import { globalStyles, srOnly } from '../../styles/global.styles.js';
 
 // web components
 import './AppHeader.js';
@@ -39,9 +39,14 @@ interface NavigateToTimelinePayload {
   timestamp: number;
 }
 
-// Tab ids in display order; vscode-tabs is index based so this maps
-// index <-> id for the string-id based 'show-tab' events used app-wide.
-const TAB_IDS = ['timeline-tab', 'tree-tab', 'analysis-tab', 'database-tab'];
+/** In tab-strip and panel order: `vscode-tabs` is index based, and `show-tab` events use the id. */
+const TABS = [
+  { id: 'timeline-tab', icon: 'graph', label: 'Timeline' },
+  { id: 'tree-tab', icon: 'list-tree', label: 'Call Tree' },
+  { id: 'analysis-tab', icon: 'code', label: 'Analysis' },
+  { id: 'database-tab', icon: 'database', label: 'Database' },
+];
+const TAB_IDS = TABS.map((tab) => tab.id);
 
 /** Every placeholder is `aria-hidden`, so this is the only telling. */
 const LOAD_ANNOUNCEMENT: Record<LogStatus, string> = {
@@ -115,8 +120,15 @@ export class LogViewer extends LitElement {
            log-levels row) can detect overflow rather than widening the page.
            clip (not hidden) avoids forcing overflow-y to auto. */
         overflow-x: clip;
-        /* Half of the x=16 guide the header and tabs share (see AppHeader). */
-        padding: 0 var(--lana-space-sm);
+      }
+
+      /* Half of the x=16 guide the header and tabs share (see AppHeader). Not on the
+         host, so the inspector reaches the window edge. */
+      app-header {
+        margin: 0 var(--lana-space-sm);
+      }
+      log-inspector {
+        --dock-main-inset: var(--lana-space-sm);
       }
 
       vscode-tabs {
@@ -129,6 +141,7 @@ export class LogViewer extends LitElement {
         flex: 1 1 auto;
         min-width: 0;
         min-height: 0;
+        container-type: inline-size;
       }
 
       vscode-tab-panel {
@@ -152,6 +165,14 @@ export class LogViewer extends LitElement {
         font-family: var(--lana-font-ui);
         font-size: var(--lana-text-lg);
         text-transform: none;
+      }
+
+      /* Too narrow for the TABS labels (about 23rem for four): icons only. Re-check on a new tab. The
+         label stays the tab's accessible name. */
+      @container (max-width: 25rem) {
+        vscode-tab-header .tab-label {
+          ${srOnly}
+        }
       }
     `,
   ];
@@ -211,18 +232,15 @@ export class LogViewer extends LitElement {
           .selectedIndex="${this._selectedIndex}"
           @vsc-tabs-select="${this._onTabSelect}"
         >
-          <vscode-tab-header slot="header">
-            <span class="tab-header"><vscode-icon name="graph"></vscode-icon>Timeline</span>
-          </vscode-tab-header>
-          <vscode-tab-header slot="header">
-            <span class="tab-header"><vscode-icon name="list-tree"></vscode-icon>Call Tree</span>
-          </vscode-tab-header>
-          <vscode-tab-header slot="header">
-            <span class="tab-header"><vscode-icon name="code"></vscode-icon>Analysis</span>
-          </vscode-tab-header>
-          <vscode-tab-header slot="header">
-            <span class="tab-header"><vscode-icon name="database"></vscode-icon>Database</span>
-          </vscode-tab-header>
+          ${TABS.map(
+            ({ icon, label }) =>
+              html`<vscode-tab-header slot="header">
+                <span class="tab-header" title=${label}
+                  ><vscode-icon name=${icon}></vscode-icon
+                  ><span class="tab-label">${label}</span></span
+                >
+              </vscode-tab-header>`,
+          )}
 
           <vscode-tab-panel>
             <timeline-view

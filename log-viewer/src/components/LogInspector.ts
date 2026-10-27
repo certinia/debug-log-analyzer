@@ -105,6 +105,9 @@ export class LogInspector extends LitElement {
   // The sections a list is set to hide, keyed like the collapse record.
   @state()
   private hiddenSections: Record<string, boolean> = {};
+  // Keyed `<source>:<scope>`; never persisted, as a log opening maximized reads as a fault.
+  @state()
+  private _maximized: Record<string, string | null> = {};
   // Bumped by a reset, which hands the panes' sizes back to automatic.
   @state()
   private _layoutEpoch = 0;
@@ -256,6 +259,7 @@ export class LogInspector extends LitElement {
         .sections=${this.sections}
         .collapsed=${this._layout.collapsed}
         .layoutEpoch=${this._layoutEpoch}
+        .maximized=${this._maximized[this._layout.key] ?? null}
         emptyText=${emptyTextFor(this._activeSource)}
         @dock-position-change=${this._onDockPositionChange}
         @dock-resize=${this._onDockResize}
@@ -263,6 +267,7 @@ export class LogInspector extends LitElement {
         @dock-collapse=${this._hidePanel}
         @pane-toggle=${this._onPaneToggle}
         @pane-reorder=${this._onPaneReorder}
+        @pane-maximize=${this._onPaneMaximize}
         @pane-menu=${this._onPaneMenu}
         @inspector-reveal=${this._onReveal}
         @inspector-locate=${this._onLocate}
@@ -550,9 +555,18 @@ export class LogInspector extends LitElement {
     this._applyLayout();
   };
 
+  private _onPaneMaximize = (e: CustomEvent<{ maximized: string | null }>) => {
+    this._maximized = { ...this._maximized, [this._layout.key]: e.detail.maximized };
+  };
+
   /** Offers every section of the list, hidden ones included, so any can come back. */
-  private _onPaneMenu = (e: CustomEvent<{ x: number; y: number }>) => {
-    this._menu?.show(this._sectionMenuItems(), e.detail.x, e.detail.y);
+  private _onPaneMenu = (e: CustomEvent<{ x: number; y: number; opener?: HTMLElement }>) => {
+    const { x, y, opener } = e.detail;
+    if (opener && this._menu?.isOpenFrom(opener)) {
+      this._menu.hide();
+      return;
+    }
+    this._menu?.show(this._sectionMenuItems(), x, y, opener);
   };
 
   /** The menu stays open through a toggle, so its ticks are refreshed in place. */
@@ -586,6 +600,10 @@ export class LogInspector extends LitElement {
       delete hidden[key];
     } else {
       hidden[key] = true;
+      // Else showing it again would maximize it unasked.
+      if (this._maximized[this._layout.key] === id) {
+        this._maximized = { ...this._maximized, [this._layout.key]: null };
+      }
     }
     this.hiddenSections = hidden;
     updateSetting('inspector.hiddenSections', this.hiddenSections);
@@ -597,13 +615,14 @@ export class LogInspector extends LitElement {
 
   /**
    * This list back to its defaults: the order it is built in, every section
-   * showing, and the panes' sizes automatic again. Collapse is left alone — it is
-   * a live reading choice, and one click undoes it.
+   * showing and none maximized, and the panes' sizes automatic again. Collapse
+   * is left alone — it is a live reading choice, and one click undoes it.
    */
   private _resetSections(): void {
     this._userAdjusted = true;
     const { [this._layout.key]: _cleared, ...order } = this.sectionOrder;
     this.sectionOrder = order;
+    this._maximized = { ...this._maximized, [this._layout.key]: null };
     const hadHidden = this._layout.hidden.size > 0;
     this.hiddenSections = withoutScope(this.hiddenSections, this._layout.key);
     updateSetting('inspector.sectionOrder', this.sectionOrder);

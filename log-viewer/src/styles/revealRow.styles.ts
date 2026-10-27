@@ -3,6 +3,8 @@
  */
 import { css } from 'lit';
 
+import { srOnly } from './global.styles.js';
+
 /**
  * The shell of a clickable inspector row: the row's text keeps the panel-wide
  * content edge and only the hover background bleeds past it, via the negative
@@ -27,11 +29,6 @@ export const bleedRowStyles = css`
 
   .bleed-row:hover {
     background-color: var(--lana-row-hover-bg);
-  }
-
-  .bleed-row:focus-visible {
-    outline: var(--lana-focus-ring);
-    outline-offset: var(--lana-focus-inset);
   }
 `;
 
@@ -62,12 +59,7 @@ export const revealRowStyles = [
     /* The meter's hue is decorative, so the category it stands for is spoken
        here instead: hidden from view, part of the button's accessible name. */
     .reveal-row__sr {
-      position: absolute;
-      width: 1px;
-      height: 1px;
-      overflow: hidden;
-      clip-path: inset(50%);
-      white-space: nowrap;
+      ${srOnly}
     }
 
     .reveal-row__name {

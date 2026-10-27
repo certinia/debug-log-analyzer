@@ -12,7 +12,7 @@ import type { PaneSection } from './PaneView.js';
 export type DockPosition = 'left' | 'right' | 'bottom';
 
 /**
- * Generic details viewlet: a slim action bar (dock left/bottom/right + close)
+ * Generic details viewlet: a slim action bar (dock left/bottom/right, more actions, close)
  * over a PaneView of caller-supplied sections. View-agnostic — the consuming
  * view builds the sections. No title text.
  *
@@ -37,6 +37,9 @@ export class DetailDock extends LitElement {
   @property({ type: Number })
   layoutEpoch = 0;
 
+  @property({ attribute: false })
+  maximized: string | null = null;
+
   static styles = [
     globalStyles,
     css`
@@ -50,7 +53,7 @@ export class DetailDock extends LitElement {
         color: var(--vscode-sideBar-foreground, var(--lana-fg));
         font-family: var(--lana-font-ui);
         font-size: var(--lana-text-base);
-        /* Match the docked edge (the DockLayout gutter) so the panel reads as a
+        /* Match the dock's side edge (drawn by DockLayout) so the panel reads as a
            deliberate region rather than blending into the tab header above. */
         border-top: var(--lana-stroke) solid var(--lana-panel-divider);
       }
@@ -63,7 +66,6 @@ export class DetailDock extends LitElement {
         flex: 0 0 var(--lana-panel-header-height);
         height: var(--lana-panel-header-height);
         padding: 0 var(--lana-space-2xs);
-        border-bottom: var(--lana-stroke) solid var(--lana-panel-divider);
       }
       slot[name='actions-start'] {
         display: flex;
@@ -128,6 +130,13 @@ export class DetailDock extends LitElement {
         ></vscode-icon>
         <vscode-icon
           action-icon
+          name="ellipsis"
+          label="More actions"
+          title="More actions"
+          @click=${this._showMenu}
+        ></vscode-icon>
+        <vscode-icon
+          action-icon
           name="close"
           label="Hide panel"
           title="Hide panel"
@@ -141,6 +150,7 @@ export class DetailDock extends LitElement {
               .sections=${this.sections}
               .collapsed=${this.collapsed}
               .layoutEpoch=${this.layoutEpoch}
+              .maximized=${this.maximized}
             ></pane-view>`
           : html`<div class="empty">${this.emptyText}</div>`
       }
@@ -151,6 +161,19 @@ export class DetailDock extends LitElement {
     this.dispatchEvent(
       new CustomEvent('dock-position-change', {
         detail: { position },
+        bubbles: true,
+        composed: true,
+      }),
+    );
+  }
+
+  /** The section header's right-click menu, opened under the button, which a second press closes. */
+  private _showMenu(e: MouseEvent) {
+    const opener = e.currentTarget as HTMLElement;
+    const { left, bottom } = opener.getBoundingClientRect();
+    this.dispatchEvent(
+      new CustomEvent('pane-menu', {
+        detail: { x: left, y: bottom, opener },
         bubbles: true,
         composed: true,
       }),
