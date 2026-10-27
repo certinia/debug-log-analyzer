@@ -3,13 +3,15 @@
  */
 import { type ApexLog, EVENT_TYPES, type EventTypeInfo } from '@apexdevtools/apex-log-parser';
 
+import { TIMESTAMP_REGEX } from '../log-utils.js';
+
 /** By event id: the line the event starts on, and the exit line that closes a frame; -1 for none. */
 export interface EventLines {
   start: Int32Array;
   end: Int32Array;
 }
 
-const EVENT_LINE = /^\d{2}:\d{2}:\d{2}\.\d+\s*\((\d+)\)\|([A-Z_]+)/;
+const EVENT_LINE = new RegExp(`${TIMESTAMP_REGEX.source}([A-Z_]+)`);
 const TYPE_BY_NAME = new Map<string, EventTypeInfo>(EVENT_TYPES.map((info) => [info.type, info]));
 
 const closes = (frameType: number, exit: EventTypeInfo): boolean =>
