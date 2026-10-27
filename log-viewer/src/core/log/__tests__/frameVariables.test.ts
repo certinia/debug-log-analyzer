@@ -1,9 +1,10 @@
 /*
  * Copyright (c) 2026 Certinia Inc. All rights reserved.
  */
+import { LEVEL } from '@apexdevtools/apex-log-parser';
 import { describe, expect, it } from '@jest/globals';
 
-import { indexOf, storeOf } from '#test-helpers/apexLog.js';
+import { indexOf, SETTINGS, storeOf } from '#test-helpers/apexLog.js';
 
 import { frameVariablesFor, variableIndex } from '../frameVariables.js';
 
@@ -247,19 +248,12 @@ describe('VariableIndex', () => {
     expect(withNone.sawAnyWrite).toBe(false);
   });
 
-  // The header decides only when it rules writes out: FINEST captures them, FINE cannot.
-  it('reads the writes of a log captured at FINEST, and none below it', async () => {
-    const atFinest = await (
-      await storeOf(`64.0 APEX_CODE,FINEST;DB,INFO\n${OUTER}`)
-    ).store.derive(variableIndex);
-    const atFine = await (
-      await storeOf(
-        '64.0 APEX_CODE,FINE;DB,INFO\n09:18:22.6 (1000)|METHOD_ENTRY|[1]|01p|ns.A.run()\n',
-      )
-    ).store.derive(variableIndex);
+  // A class trace flag raises the level for its own code, so a FINE header is no proof of no writes.
+  it('finds the writes of a log whose header is below FINEST', async () => {
+    const { log, store } = await storeOf(OUTER, SETTINGS.fine);
 
-    expect(atFinest.sawAnyWrite).toBe(true);
-    expect(atFine.sawAnyWrite).toBe(false);
+    expect(log.debugLevels.apexCode).toBe(LEVEL.Fine);
+    expect((await store.derive(variableIndex)).sawAnyWrite).toBe(true);
   });
 });
 
