@@ -38,7 +38,7 @@ const plainColumns = (source: TimeOrderSource): GridColumn<TimeOrderNode>[] =>
 
 type Setup<R extends object> = (source: TimeOrderSource) => {
   grid: LvGrid<R>;
-  details: RowFilter<R>;
+  withoutDetails: RowFilter<R>;
 };
 
 const plain: Setup<TimeOrderNode> = (source) => {
@@ -47,14 +47,14 @@ const plain: Setup<TimeOrderNode> = (source) => {
     'font: 13px sans-serif; --grid-fg: #ccc; --grid-bg: #1e1e1e; color-scheme: dark';
   grid.columns = plainColumns(source);
   grid.source = source;
-  return { grid, details: source.withoutDetails };
+  return { grid, withoutDetails: source.withoutDetails };
 };
 
 const app: Setup<TimeOrderNode> = (source) => {
   const grid = document.createElement('lv-call-tree-grid') as unknown as LvGrid<TimeOrderNode>;
   grid.columns = timeOrderColumns(source, { openType: () => {} });
   grid.source = source;
-  return { grid, details: source.withoutDetails };
+  return { grid, withoutDetails: source.withoutDetails };
 };
 
 /** The actions every lv-grid contender takes the same way. */
@@ -104,7 +104,7 @@ export abstract class LvGridBench<R extends object> {
 }
 
 class LvGridContender<R extends object> extends LvGridBench<R> implements Contender {
-  private details!: RowFilter<R>;
+  private withoutDetails!: RowFilter<R>;
 
   constructor(private readonly setup: Setup<R>) {
     super();
@@ -112,8 +112,8 @@ class LvGridContender<R extends object> extends LvGridBench<R> implements Conten
 
   async mount(host: HTMLElement, log: ApexLog): Promise<void> {
     const source = new TimeOrderSource(await logStoreFor(log).logIndex());
-    ({ grid: this.grid, details: this.details } = this.setup(source));
-    this.grid.filters = [this.details];
+    ({ grid: this.grid, withoutDetails: this.withoutDetails } = this.setup(source));
+    this.grid.filters = [this.withoutDetails];
     host.append(this.grid);
     await this.grid.settled();
   }
@@ -124,7 +124,7 @@ class LvGridContender<R extends object> extends LvGridBench<R> implements Conten
   }
 
   async setDetailFilter(on: boolean): Promise<void> {
-    this.grid.filters = on ? [this.details] : [];
+    this.grid.filters = on ? [this.withoutDetails] : [];
     await this.settle();
   }
 

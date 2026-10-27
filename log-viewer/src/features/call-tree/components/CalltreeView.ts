@@ -136,7 +136,7 @@ type ViewGrid = LvGrid<TimeOrderNode> | LvGrid<AggregatedRow> | LvGrid<BottomUpR
 /** What the filters read from a view's rows. Bottom-Up has no type or debug filter. */
 interface FilterFields<R> extends MeasureFields<R> {
   type?: { of: (row: R) => string | null | undefined; debugOnly: RowFilter<R> };
-  details: RowFilter<R>;
+  withoutDetails: RowFilter<R>;
 }
 
 @customElement('call-tree-view')
@@ -799,7 +799,7 @@ export class CalltreeView extends LitElement {
       total: (row) => row.totalTime,
       self: (row) => row.totalSelfTime,
       type: { of: (row) => row.type, debugOnly: AGGREGATED_DEBUG_ONLY },
-      details: AGGREGATED_WITHOUT_DETAILS,
+      withoutDetails: AGGREGATED_WITHOUT_DETAILS,
     });
   }
 
@@ -813,7 +813,7 @@ export class CalltreeView extends LitElement {
         of: (node) => this._timeOrderSource?.type(node),
         debugOnly: this._timeOrderDebugOnly,
       },
-      details: this._timeOrderWithoutDetails,
+      withoutDetails: this._timeOrderWithoutDetails,
     });
   }
 
@@ -821,7 +821,7 @@ export class CalltreeView extends LitElement {
   private _bottomUpFilters(): RowFilter<BottomUpRow>[] {
     return this._viewFilters<BottomUpRow>('bottom-up', {
       ...BOTTOM_UP_MEASURES,
-      details: BOTTOM_UP_WITHOUT_DETAILS,
+      withoutDetails: BOTTOM_UP_WITHOUT_DETAILS,
     });
   }
 
@@ -849,7 +849,7 @@ export class CalltreeView extends LitElement {
       );
     }
     if (!this.filterState.showDetails) {
-      filters.push(fields.details);
+      filters.push(fields.withoutDetails);
     }
     return filters;
   }

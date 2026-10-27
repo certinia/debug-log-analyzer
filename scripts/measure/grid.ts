@@ -96,7 +96,7 @@ async function measureTimeOrder(log: ApexLog): Promise<void> {
   const scheduler = timedScheduler();
   const path = pathOf(index, deepRow(index));
   const step = stepper(scheduler, () => store.snapshot().rows.size);
-  const timeOrderDetails = source.withoutDetails;
+  const { withoutDetails } = source;
 
   const soqlOnly: RowFilter<TimeOrderNode> = {
     test: (n) => source.type(n) === 'SOQL_EXECUTE_BEGIN',
@@ -125,14 +125,14 @@ async function measureTimeOrder(log: ApexLog): Promise<void> {
     store = new GridStore<TimeOrderNode>(source, { scheduler });
     return store.settled();
   });
-  await step('detail filter on', () => store.setFilters([timeOrderDetails]));
+  await step('detail filter on', () => store.setFilters([withoutDetails]));
   await step('expand all', () => store.expandAll());
   await step('sort by self time', () => store.setSort(bySelf));
   await step('clear sort', () => store.setSort(null));
   await step('detail filter off', () => store.setFilters([]));
-  await step('detail filter on', () => store.setFilters([timeOrderDetails]));
-  await step('SOQL filter, keep ancestors', () => store.setFilters([timeOrderDetails, soqlOnly]));
-  await step('SOQL filter off', () => store.setFilters([timeOrderDetails]));
+  await step('detail filter on', () => store.setFilters([withoutDetails]));
+  await step('SOQL filter, keep ancestors', () => store.setFilters([withoutDetails, soqlOnly]));
+  await step('SOQL filter off', () => store.setFilters([withoutDetails]));
   await step('find "account"', async () => {
     matches = (await store.find({ text: 'account' }, cells))?.total ?? -1;
   });
