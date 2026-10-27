@@ -113,10 +113,9 @@ export interface FrameSpec {
 
 /**
  * A line for {@link frameLines} that takes no time: a database statement of `rows`
- * rows, a thrown exception, or a limit usage block.
+ * rows, or a thrown exception.
  */
-export type LineSpec =
-  { kind: 'dml' | 'soql' | 'sosl'; rows: number } | { kind: 'thrown' } | { kind: 'limits' };
+export type LineSpec = { kind: 'dml' | 'soql' | 'sosl'; rows: number } | { kind: 'thrown' };
 
 const LINES: { [K in LineSpec['kind']]: (spec: Extract<LineSpec, { kind: K }>) => string[] } = {
   dml: ({ rows }) => [`DML_BEGIN|[1]|Op:Insert|Type:Account|Rows:${rows}`, 'DML_END|[1]'],
@@ -126,11 +125,6 @@ const LINES: { [K in LineSpec['kind']]: (spec: Extract<LineSpec, { kind: K }>) =
   ],
   sosl: ({ rows }) => ['SOSL_EXECUTE_BEGIN|[1]|FIND {x}', `SOSL_EXECUTE_END|[1]|Rows:${rows}`],
   thrown: () => ['EXCEPTION_THROWN|[1]|System.NullPointerException: boom'],
-  limits: () => [
-    'CUMULATIVE_LIMIT_USAGE',
-    'LIMIT_USAGE_FOR_NS|(default)|',
-    'CUMULATIVE_LIMIT_USAGE_END',
-  ],
 };
 
 const OPEN = {

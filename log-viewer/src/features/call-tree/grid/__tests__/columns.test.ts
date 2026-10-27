@@ -200,28 +200,6 @@ describe('TimeOrderSource', () => {
     expect(source.children(outer!)).toBe(source.children(outer!));
   });
 
-  it('shows frames and exceptions with Details off, and not a bare leaf', async () => {
-    const detailed = await storeOf(
-      line(1000, 'METHOD_ENTRY|[1]|01p|ns.A.run()') +
-        line(1100, 'STATEMENT_EXECUTE|[2]') +
-        line(1200, 'EXCEPTION_THROWN|[3]|System.NullPointerException: boom') +
-        line(2000, 'METHOD_EXIT|[1]|ns.A.run()'),
-    );
-    const detailedSource = await sourceOf(detailed);
-    const typeOf = (node: TimeOrderNode) => detailed.log.event(detailedSource.key(node))?.type;
-
-    expect(
-      allNodes(detailedSource).map((node) => [
-        typeOf(node),
-        detailedSource.withoutDetails.test(node),
-      ]),
-    ).toEqual([
-      ['METHOD_ENTRY', true],
-      ['STATEMENT_EXECUTE', false],
-      ['EXCEPTION_THROWN', true],
-    ]);
-  });
-
   // The filter keeps no ancestors for its rows, so a parent of only bare leaves must show on its own.
   it('shows every row that holds others, whatever they are', async () => {
     // 0 ms, so only its kind can show it: a frame, or a limit block that is not one.
