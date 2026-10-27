@@ -136,7 +136,6 @@ export class AnchoredPopover extends LitElement {
         part="trigger"
         class="trigger"
         popovertarget="anchored-popover-panel"
-        aria-haspopup="true"
         aria-controls="anchored-popover-panel"
       >
         <slot name="trigger"></slot>
@@ -178,6 +177,11 @@ export class AnchoredPopover extends LitElement {
     if (typeof panel?.hidePopover === 'function' && panel.matches(':popover-open')) {
       panel.hidePopover();
     }
+  }
+
+  /** Focus the trigger, as a menu button takes focus back when its panel closes. */
+  override focus(options?: FocusOptions): void {
+    this.shadowRoot?.querySelector<HTMLElement>('.trigger')?.focus(options);
   }
 
   /** The slot only reports its content once it exists, so settle the empty state here. */

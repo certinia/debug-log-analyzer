@@ -6,6 +6,7 @@ import { LitElement, css, html } from 'lit';
 import { customElement, property } from 'lit/decorators.js';
 
 import {
+  ISSUE_SOURCES,
   SEVERITY_META,
   describeIssues,
   worstSeverity,
@@ -62,14 +63,15 @@ export class LogProblemsChip extends LitElement {
 
     const issues = this.issues;
     const worst = worstSeverity(issues);
-    const label = describeIssues(issues, 'problem', 'No problems');
+    const source = ISSUE_SOURCES.problems;
+    const label = describeIssues(issues, source.noun, 'No problems');
 
     return html`<anchored-popover
       align="start"
-      heading="Log problems"
+      heading=${source.label}
       show-heading
       wide
-      empty-message="No problems found in this log"
+      empty-message=${source.empty}
     >
       <span
         slot="trigger"
@@ -77,7 +79,10 @@ export class LogProblemsChip extends LitElement {
         title=${label}
         aria-label=${label}
       >
-        <vscode-icon name=${worst ? SEVERITY_META[worst].icon : 'pass'} size="16"></vscode-icon>
+        <vscode-icon
+          name=${worst ? SEVERITY_META[worst].icon : source.icon}
+          size="16"
+        ></vscode-icon>
         ${worst ? html`<span class="header-control__badge">${issues.length}</span>` : ''}
       </span>
       ${issues.length ? html`<issue-list slot="panel" .issues=${issues}></issue-list>` : ''}

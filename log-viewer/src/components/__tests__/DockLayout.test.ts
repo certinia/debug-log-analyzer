@@ -90,6 +90,26 @@ describe('DockLayout resize', () => {
     expect(event?.detail).toEqual({ size: 400 });
   });
 
+  it('drags from the shown size when the saved size exceeds the room on this axis', async () => {
+    // Saved while docked right; on the bottom the panel shows at 800 - 240 = 560, which keeps room for the main pane.
+    const el = await mount('bottom', 1000);
+    const [event] = await drag(el, 700, 800);
+
+    // From the saved 1000, a 100px shrink would still clamp to 560 and not move.
+    expect(event?.detail).toEqual({ size: 460 });
+  });
+
+  it('does not collapse on a small nudge when the layout is too short for both panes', async () => {
+    const el = await mount('bottom', 300);
+    const layout = el.shadowRoot?.querySelector('.layout') as HTMLElement;
+    // 280 leaves the dock 40px past the main pane's room, under the collapse line.
+    Object.defineProperty(layout, 'clientHeight', { value: 280, configurable: true });
+    const [event] = await drag(el, 700, 701);
+
+    expect(event?.type).toBe('dock-resize');
+    expect(event?.detail).toEqual({ size: MIN_SIZE });
+  });
+
   it('snaps to the minimum rather than going smaller', async () => {
     const el = await mount('right', 200);
     // Shrink by 100 from 200 — lands below MIN_SIZE but short of the overshoot.

@@ -13,6 +13,7 @@ export class ResizeController implements ReactiveController {
   private readonly _host: ReactiveControllerHost & Element;
   private readonly _onResize: (entries: readonly ResizeObserverEntry[]) => void;
   private _observer: ResizeObserver | null = null;
+  private readonly _targets = new Set<Element>();
 
   constructor(
     host: ReactiveControllerHost & Element,
@@ -28,9 +29,21 @@ export class ResizeController implements ReactiveController {
       this._onResize(entries);
     });
     this._observer.observe(this._host);
+    for (const target of this._targets) {
+      this._observer.observe(target);
+    }
   }
 
   hostDisconnected(): void {
     this._observer?.disconnect();
+  }
+
+  /**
+   * Also watch `target`, such as a box in the host's shadow root, with the same callback.
+   * It is watched again after a re-attach, so call this once per element.
+   */
+  observe(target: Element): void {
+    this._targets.add(target);
+    this._observer?.observe(target);
   }
 }

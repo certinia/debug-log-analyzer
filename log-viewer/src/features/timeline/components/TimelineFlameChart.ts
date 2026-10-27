@@ -13,6 +13,7 @@ import { css, html, LitElement, type PropertyValues, unsafeCSS } from 'lit';
 import { customElement, property, query, state } from 'lit/decorators.js';
 
 import type { ApexLog } from '@apexdevtools/apex-log-parser';
+import { ResizeController } from '../../../core/events/ResizeController.js';
 import { SubscriptionController } from '../../../core/events/SubscriptionController.js';
 import { setRange, windowFor } from '../../../core/log/rangeScope.js';
 import { waitForNextFrame } from '../../../core/utility/FrameBudget.js';
@@ -20,6 +21,7 @@ import { debounce, isVisible, setChanged } from '../../../core/utility/Util.js';
 import { themeObserver } from '../../../core/theme/ThemeObserver.js';
 import { FindController } from '../../find/FindController.js';
 import { ApexLogTimeline } from '../optimised/ApexLogTimeline.js';
+import { MIN_CHART_HEIGHT } from '../optimised/chartLayout.js';
 import type { MeasurementSnapshot } from '../optimised/measurement/MeasurementState.js';
 import { parseColorToHex } from '../optimised/rendering/ColorUtils.js';
 import { calculateViewportBounds } from '../optimised/ViewportUtils.js';
@@ -51,6 +53,24 @@ export class TimelineFlameChart extends LitElement {
       .timeline-layer {
         position: absolute;
         inset: 0;
+      }
+
+      .timeline-container--small .timeline-layer {
+        visibility: hidden;
+      }
+
+      .too-small {
+        position: absolute;
+        inset: 0;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: var(--lana-space-lg);
+        color: var(--lana-fg-muted);
+        font-size: var(--lana-text-base);
+        text-align: center;
+        /* Always present, so a screen reader announces the note when it appears. */
+        pointer-events: none;
       }
 
       .error-message {
@@ -124,6 +144,12 @@ export class TimelineFlameChart extends LitElement {
   @state()
   private errorMessage: string | null = null;
 
+  /** The container is too short to draw in, so the chart waits, or hides, until it grows. */
+  @state()
+  private tooSmall = false;
+  /** A build skipped for size, run once the container grows: its `keepViewport`, else null. */
+  private sizeDeferred: boolean | null = null;
+
   private apexLogTimeline: ApexLogTimeline | null = null;
   /** The element {@link apexLogTimeline} draws in. */
   private timelineLayer: HTMLElement | null = null;
@@ -139,6 +165,8 @@ export class TimelineFlameChart extends LitElement {
   private readonly finder = new FindController(this, {
     targets: () => (this.apexLogTimeline ? [this.apexLogTimeline.findTarget] : []),
   });
+
+  private readonly resize = new ResizeController(this, () => this.checkSize());
 
   private readonly subscriptions = new SubscriptionController(this, () => [
     themeObserver.on(() => {
@@ -162,6 +190,22 @@ export class TimelineFlameChart extends LitElement {
     super.disconnectedCallback();
     this.visibilityWait?.abort();
     this.cleanup();
+  }
+
+  override firstUpdated(): void {
+    this.resize.observe(this.containerRef);
+  }
+
+  private checkSize(): void {
+    const height = this.containerRef?.getBoundingClientRect().height;
+    // 0 is a hidden tab, not a short one.
+    if (!height) {
+      return;
+    }
+    this.tooSmall = !!this.apexLog && height < MIN_CHART_HEIGHT;
+    if (!this.tooSmall && this.sizeDeferred !== null) {
+      void this.initializeTimeline(this.sizeDeferred);
+    }
   }
 
   override updated(changedProperties: PropertyValues): void {
@@ -224,6 +268,16 @@ export class TimelineFlameChart extends LitElement {
       if (!(await isVisible(this.containerRef, undefined, wait.signal))) {
         return;
       }
+    }
+
+    // Pixi cannot lay out the chart below this height.
+    const height = this.containerRef.getBoundingClientRect().height;
+    this.tooSmall = height > 0 && height < MIN_CHART_HEIGHT;
+    this.sizeDeferred = this.tooSmall ? keepViewport : null;
+    if (this.tooSmall) {
+      // A build already in flight is for older data, so it must not land.
+      this.initEpoch++;
+      return;
     }
 
     // A re-init still in flight has no timeline yet, so it hands on the place it was given.
@@ -435,7 +489,10 @@ export class TimelineFlameChart extends LitElement {
 
   override render() {
     return html`
-      <div class="timeline-container">
+      <div class="timeline-container ${this.tooSmall ? 'timeline-container--small' : ''}">
+        <div class="too-small" role="status">
+          ${this.tooSmall ? 'Make this pane taller to show the timeline.' : ''}
+        </div>
         ${this.errorMessage ? html`<div class="error-message">${this.errorMessage}</div>` : ''}
       </div>
     `;

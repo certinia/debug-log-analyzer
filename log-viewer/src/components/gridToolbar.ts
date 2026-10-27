@@ -9,7 +9,7 @@ import type { ExpandableGrid } from './TreeExpandButton.js';
 
 // web components
 import '#vscode-elements/vscode-option.js';
-import '#vscode-elements/vscode-toolbar-button.js';
+import './ToolbarAction.js';
 import './TreeExpandButton.js';
 import './VsSelect.js';
 
@@ -30,7 +30,7 @@ export function columnViewSelect(opts: {
       slot="table-actions"
       id="${opts.id}"
       prefix="Columns"
-      label="Column view"
+      label="Column View"
       @change="${(event: Event) =>
         columns.choose((event.target as HTMLInputElement).value || 'General')}"
       @vs-reset-option="${(event: CustomEvent<{ value: string }>) =>
@@ -74,7 +74,7 @@ export function gridGroupControls(opts: {
             slot="group"
             id="${group.id}"
             prefix="Group"
-            label="Group by"
+            label="Group By"
             .value="${group.value ?? group.labels[0]}"
             @change="${(event: Event) => group.onChange((event.target as HTMLInputElement).value)}"
           >
@@ -97,25 +97,23 @@ export function gridToolbarActions(opts: {
   copyToClipboard: () => void;
 }): TemplateResult {
   return html`
-    <div slot="actions">
-      <vscode-toolbar-button
-        icon="list-selection"
-        label="Columns"
-        title="Columns"
-        @click=${opts.openColumns}
-      ></vscode-toolbar-button>
-      <vscode-toolbar-button
-        icon="desktop-download"
-        label="Export to CSV"
-        title="Export to CSV"
-        @click=${opts.exportToCSV}
-      ></vscode-toolbar-button>
-      <vscode-toolbar-button
-        icon="copy"
-        label="Copy to clipboard"
-        title="Copy to clipboard"
-        @click=${opts.copyToClipboard}
-      ></vscode-toolbar-button>
-    </div>
+    <toolbar-action
+      slot="actions"
+      icon="list-selection"
+      label="Columns"
+      @click=${opts.openColumns}
+    ></toolbar-action>
+    <toolbar-action
+      slot="actions"
+      icon="desktop-download"
+      label="Export to CSV"
+      @click=${opts.exportToCSV}
+    ></toolbar-action>
+    <toolbar-action
+      slot="actions"
+      icon="copy"
+      label="Copy to Clipboard"
+      @click=${opts.copyToClipboard}
+    ></toolbar-action>
   `;
 }

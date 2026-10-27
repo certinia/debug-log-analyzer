@@ -62,8 +62,16 @@ export const selectSizingStyles = css`
     display: grid;
     grid-template-columns: var(--filter-panel-label-width) 1fr;
     align-items: center;
-    column-gap: 8px;
+    column-gap: var(--lana-space-sm);
     width: 100%;
+  }
+
+  :host(:not([slot='overflow'])) .vs-panel-label {
+    display: none;
+  }
+
+  :host(:not([slot='overflow'])) .vs-panel-control {
+    display: contents;
   }
 
   .vs-panel-label {
@@ -291,14 +299,10 @@ export class VsSelect extends VscodeSingleSelect {
   @property({ attribute: 'slot' }) slot = '';
 
   override render(): TemplateResult {
-    const base = super.render() as TemplateResult;
-    if (this.slot !== 'overflow') {
-      return base;
-    }
-    // In the overflow panel: a label column + the compact select, aligned with
-    // the facet/range rows via the shared label-width token.
+    // One template inline and in the panel: the base caches its `.dropdown` node, so a
+    // template swap on a move would leave it opening a detached popover.
     return html`<span class="vs-panel-label" title=${this.label ?? ''}>${this.label}</span>
-      <div class="vs-panel-control">${base}</div>`;
+      <div class="vs-panel-control">${super.render()}</div>`;
   }
 
   private _faceContent(): TemplateResult {
@@ -407,6 +411,7 @@ export class VsSelect extends VscodeSingleSelect {
         aria-expanded=${this.open ? 'true' : 'false'}
         aria-haspopup="listbox"
         aria-label=${ifDefined(this.label)}
+        title=${ifDefined(this.label)}
         class=${classMap({
           'select-face': true,
           face: true,
@@ -451,6 +456,7 @@ export class VsSelect extends VscodeSingleSelect {
           aria-expanded=${this.open ? 'true' : 'false'}
           aria-haspopup="listbox"
           aria-label=${ifDefined(this.label)}
+          title=${ifDefined(this.label)}
           class="combobox-input"
           role="combobox"
           spellcheck="false"

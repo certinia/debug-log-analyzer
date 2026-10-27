@@ -327,6 +327,46 @@ describe('NavBar collapse ladder', () => {
     expect(el.shadowRoot?.querySelector('header-menu')).not.toBeNull();
   });
 
+  it('collapses log problems to one row that opens the full list on its own', async () => {
+    const problems = [issue('error'), issue('warning'), issue('info')];
+    const el = await resize(await mount(problems), 180);
+    const menu = el.shadowRoot?.querySelector('[slot="collapsed"]');
+
+    // A list in the menu would grow with the log and scroll inside the menu.
+    expect(menu?.querySelector('issue-list')).toBeNull();
+
+    const row = [...(menu?.querySelectorAll<HTMLButtonElement>('.menu-row') ?? [])].find((b) =>
+      b.textContent?.includes('Log problems'),
+    );
+    row?.click();
+    await el.updateComplete;
+
+    const panel = el.shadowRoot?.querySelector('.issues-popover');
+    expect(panel?.getAttribute('aria-label')).toBe('Log problems');
+    expect(panel?.querySelector<HTMLElement & { issues: unknown }>('issue-list')?.issues).toEqual(
+      problems,
+    );
+  });
+
+  it('gives focus back to ••• when the issues panel closes, as its opening row is hidden', async () => {
+    const el = await resize(await mount([issue('error')]), 180);
+    const panel = el.shadowRoot?.querySelector('.issues-popover');
+    const deepFocus = (): Element | null => {
+      let focused = document.activeElement;
+      while (focused?.shadowRoot?.activeElement) {
+        focused = focused.shadowRoot.activeElement;
+      }
+      return focused;
+    };
+    // As when the row that opened the panel is hidden: focus falls to the page.
+    (deepFocus() as HTMLElement | null)?.blur();
+
+    panel?.dispatchEvent(Object.assign(new Event('toggle'), { newState: 'closed' }));
+
+    // Left on the page, keyboard users would have to tab back from the top.
+    expect(deepFocus()?.getAttribute('part')).toBe('trigger');
+  });
+
   it('drops a chunk the failed load will never fill, separator and all', async () => {
     const el = await mount();
     el.logStatus = 'failed';
