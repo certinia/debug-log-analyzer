@@ -179,6 +179,11 @@ export class AnchoredPopover extends LitElement {
     }
   }
 
+  /** Focus the trigger, as a menu button takes focus back when its panel closes. */
+  override focus(options?: FocusOptions): void {
+    this.shadowRoot?.querySelector<HTMLElement>('.trigger')?.focus(options);
+  }
+
   /** The slot only reports its content once it exists, so settle the empty state here. */
   override firstUpdated(): void {
     this.requestUpdate();
