@@ -208,8 +208,6 @@ describe('TimeOrderSource', () => {
     const detailedSource = await sourceOf(detailed);
     const typeOf = (node: TimeOrderNode) => detailed.log.event(detailedSource.key(node))?.type;
 
-    // An ancestor walk would make a node for every row before the first paint.
-    expect(detailedSource.details.keepAncestors).toBeUndefined();
     expect(
       allNodes(detailedSource).map((node) => [typeOf(node), detailedSource.details.test(node)]),
     ).toEqual([
@@ -217,6 +215,22 @@ describe('TimeOrderSource', () => {
       ['STATEMENT_EXECUTE', false],
       ['EXCEPTION_THROWN', true],
     ]);
+  });
+
+  // The filter keeps no ancestors for its rows, so a parent of only bare leaves must show on its own.
+  it('shows every row that holds others, whatever they are', async () => {
+    // 0 ms, so only being a frame can show it.
+    const bare = await storeOf(
+      line(1000, 'METHOD_ENTRY|[1]|01p|ns.A.run()') +
+        line(1000, 'STATEMENT_EXECUTE|[2]') +
+        line(1000, 'HEAP_ALLOCATE|[3]|Bytes:8') +
+        line(1000, 'METHOD_EXIT|[1]|ns.A.run()'),
+    );
+    const bareSource = await sourceOf(bare);
+    const parents = allNodes(bareSource).filter((node) => bareSource.children(node)?.length);
+
+    expect(parents.length).toBeGreaterThan(0);
+    expect(parents.every((node) => bareSource.details.test(node))).toBe(true);
   });
 });
 
