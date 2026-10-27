@@ -59,6 +59,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - 🌊 **Flow errors**: multi-line errors show their message.
 - 🗃️ **SOQL and SOSL**: every keyword in the current syntax is highlighted, and `SET OPTIONS` and `UPDATE TRACKING` start their own line when a query is pretty-printed.
 - 🎯 **Raw log**: **Show in Log Analysis**, folding and the outline go to the right event when two events share a timestamp.
+- 🧭 **Show in Log Analysis**: opens the log the link names rather than the one already open, and still goes to the event when the log is loading.
+- 🧭 **Go to Call Tree**: a row the filters hide selects its parent and says so, with one click to clear the filters and go to the row.
 
 ## [1.22.1] - 2026-09-18
 
