@@ -125,25 +125,26 @@ describe('LogEventCache', () => {
   });
 
   describe('linesOf', () => {
-    const doc = (version: number) => ({
+    const HELLO = '09:18:22.6 (100)|USER_DEBUG|[1]|DEBUG|hello';
+    const doc = (version: number, lines = [HELLO]) => ({
       version,
-      lineCount: 1,
-      lineAt: jest.fn(() => ({ text: '09:18:22.6 (100)|USER_DEBUG|[1]|DEBUG|hello' })),
+      lineCount: lines.length,
+      lineAt: jest.fn((line: number) => ({ text: lines[line]! })),
     });
 
     it('reads a document once per version', async () => {
       const { parse: realParse } = jest.requireActual<{
         parse: typeof parse;
       }>('@apexdevtools/apex-log-parser');
-      const apexLog = await realParse('09:18:22.6 (100)|USER_DEBUG|[1]|DEBUG|hello');
+      const apexLog = await realParse(HELLO);
       const first = doc(1);
 
       const lines = LogEventCache.linesOf(apexLog, first);
       expect(LogEventCache.linesOf(apexLog, first)).toBe(lines);
       expect(first.lineAt).toHaveBeenCalledTimes(1);
-      // An edit gives the document a new version, so its lines are read again.
-      expect(LogEventCache.linesOf(apexLog, doc(2))).not.toBe(lines);
-      expect([...lines.start]).toEqual([-1, 0]);
+      // An edit gives the document a new version, so its lines are read again; reused, hello stays on line 0.
+      const edited = LogEventCache.linesOf(apexLog, doc(2, ['an inserted line', HELLO]));
+      expect([...edited.start]).toEqual([-1, 1]);
     });
   });
 

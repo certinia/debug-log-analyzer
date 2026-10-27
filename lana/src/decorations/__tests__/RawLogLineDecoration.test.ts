@@ -118,7 +118,15 @@ describe('RawLogLineDecoration', () => {
   });
 
   it('links the event by its id, which a shared timestamp cannot name', async () => {
-    const [decoration] = await decorate(NESTED, 2);
+    // A.b starts at A.a's timestamp, so a lookup by timestamp names A.a, id 2.
+    const shared = [
+      EXECUTION_STARTED,
+      enter(1_000, 'A.a()'),
+      enter(1_000, 'A.b()'),
+      exit(5_001_000, 'A.b()'),
+      exit(5_001_000, 'A.a()'),
+    ];
+    const [decoration] = await decorate(shared, 2);
 
     const args = /showInLogAnalysis\?([^)\s]+)/.exec(decoration?.hoverMessage.value ?? '')?.[1];
     expect(JSON.parse(decodeURIComponent(args ?? '{}'))).toEqual({
