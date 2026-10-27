@@ -8,7 +8,7 @@ import { childRows, rowCategory, type LogIndex, NO_ROW } from '#core/log/LogInde
 import { type Signatures, signaturesOf } from '#core/log/signatures.js';
 import { namespaceOf } from '#core/utility/CallerNamespace.js';
 import type { RowFilter, TreeSource } from '../../../grid/index.js';
-import { eventKind } from './DetailsFilter.js';
+import { rowKinds } from './DetailsFilter.js';
 
 /** One shown event in the Time Order view: a row of the log index. */
 export interface TimeOrderNode {
@@ -37,13 +37,10 @@ export class TimeOrderSource implements TreeSource<TimeOrderNode> {
     this.index = index;
     this.signatures = signaturesOf(index.log);
     this.roots = this.nodesUnder(NO_ROW);
-    const isFrame = index.column(index.log.columns.isFrame);
-    const types = index.column(index.log.columns.type);
-    this.types = types;
+    this.types = index.column(index.log.columns.type);
+    const kindOf = rowKinds(index);
     // No keepAncestors: a row with children is a frame or a pinned block, and both pass.
-    this.withoutDetails = {
-      test: ({ row }) => eventKind(types[row]!, isFrame[row] === 1) !== 'detail',
-    };
+    this.withoutDetails = { test: ({ row }) => kindOf(row) !== 'detail' };
   }
 
   readonly children = (node: TimeOrderNode): readonly TimeOrderNode[] | null => {

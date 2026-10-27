@@ -230,7 +230,7 @@ describe('calltree-view table lifetime', () => {
       );
       const back = view._setViewMode(mode);
       await settle();
-      finish([{ id: 1, _pathId: 1, kind: 'frame' }]);
+      finish([{ id: 1, _pathId: 1, type: 'METHOD_ENTRY' }]);
       await back;
       off();
 

@@ -10,7 +10,6 @@ import { rowMetrics, type RowMetrics, type SelfTotalColumns } from '#core/log/ro
 import { type Signatures, signaturesOf } from '#core/log/signatures.js';
 import { callerNamespaceOfRow } from '#core/utility/CallerNamespace.js';
 import { CHECK_EVERY, frameBudget, type FrameBudgetOptions } from '#core/utility/FrameBudget.js';
-import { type EventKind, eventKind } from './DetailsFilter.js';
 import { type CostLimits, costLimitsOf, setGovernorCost } from './GovernorCost.js';
 import {
   addReported,
@@ -88,8 +87,6 @@ export interface AggregatedRow {
   eventIndex: number;
   /** The timeline category of this row's calls */
   category: LogCategory;
-  /** What the first call is to the Details filter. */
-  kind: EventKind;
 }
 
 /**
@@ -160,8 +157,6 @@ export interface BottomUpRow {
   eventIndex: number;
   /** The timeline category of this row's calls */
   category: LogCategory;
-  /** What the first call is to the Details filter. */
-  kind: EventKind;
 }
 
 /**
@@ -219,9 +214,6 @@ async function driveSteps<T>(
 /** What every row of one build reads. */
 interface BuildContext {
   index: LogIndex;
-  /** Type ids by row. */
-  types: Uint16Array;
-  isFrame: Uint8Array;
   metrics: RowMetrics;
   paths: KeyPathIds;
   signatures: Signatures;
@@ -239,8 +231,6 @@ function buildContext(
   let next = 0;
   return {
     index,
-    types: index.column(store.log.columns.type),
-    isFrame: index.column(store.log.columns.isFrame),
     metrics: rowMetrics(index),
     paths: store.keyPathIds(),
     signatures: signaturesOf(store.log),
@@ -832,7 +822,6 @@ function rowLabels(build: BuildContext, row: number) {
     type: signatures.type(signature),
     eventIndex,
     category: rowCategory(index, row),
-    kind: eventKind(build.types[row]!, build.isFrame[row] === 1),
   };
 }
 
@@ -873,7 +862,6 @@ function createEmptyAggregatedRow(
     reported: emptyReported(),
     _children: null,
     instances: [],
-    kind: labels.kind,
   };
 }
 
@@ -916,7 +904,6 @@ function createEmptyBottomUpRow(
     reported: emptyReported(),
     _children: null,
     instances: [],
-    kind: labels.kind,
   };
 }
 

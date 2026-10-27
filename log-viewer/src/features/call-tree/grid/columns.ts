@@ -39,6 +39,7 @@ import {
   type ReportedUsage,
   type TimeSpan,
 } from '../utils/reportedUsage.js';
+import { eventKind } from '../utils/DetailsFilter.js';
 import type { TimeOrderNode, TimeOrderSource } from '../utils/TimeOrderTree.js';
 import { nameCell, nameExportText, nameText } from './cells.js';
 import { knownMax, outermostSum } from './calcs.js';
@@ -571,8 +572,9 @@ export function mergedLines(log: ApexLog): LinesOf {
   return lines;
 }
 
+/** The Aggregated rows shown with Details off: frames and pinned details. */
 export const AGGREGATED_WITHOUT_DETAILS: RowFilter<AggregatedRow> = {
-  test: (row) => row.kind !== 'detail',
+  test: (row) => eventKind(row.type) !== 'detail',
 };
 
 /** Opens the type a Name cell links to. */
@@ -593,7 +595,7 @@ export const CALL_TREE_COLUMN_SETTINGS: Omit<ColumnSettingsOptions, 'targets'> =
 
 /** The Bottom-Up rows shown with Details off: frames only. */
 export const BOTTOM_UP_WITHOUT_DETAILS: RowFilter<BottomUpRow> = {
-  test: (row) => row.kind === 'frame',
+  test: (row) => eventKind(row.type) === 'frame',
 };
 
 /** The Bottom-Up group-by picker's options, in order, and the row field each groups on. */

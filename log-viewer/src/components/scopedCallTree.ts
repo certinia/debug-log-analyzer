@@ -9,7 +9,7 @@ import { type Signatures, signaturesOf } from '#core/log/signatures.js';
 import { CallSpans, SpanIndex, frameIn, reaches } from '#core/log/windowedTime.js';
 import { overlapOf } from '#core/log/windowStats.js';
 import { outermostIds } from '#core/utility/EventTree.js';
-import { type EventKind, eventKind } from '../features/call-tree/utils/DetailsFilter.js';
+import { type EventKind, eventKind, rowKinds } from '../features/call-tree/utils/DetailsFilter.js';
 import {
   CHECK_EVERY,
   frameBudget,
@@ -244,23 +244,15 @@ interface Subtree {
 interface Rows {
   index: LogIndex;
   signatures: Signatures;
-  /** Type ids by row. */
-  types: Uint16Array;
-  isFrame: Uint8Array;
+  kindOf: (row: number) => EventKind;
 }
 
 function rowsOf(index: LogIndex): Rows {
   return {
     index,
     signatures: signaturesOf(index.log),
-    types: index.column(index.log.columns.type),
-    isFrame: index.column(index.log.columns.isFrame),
+    kindOf: rowKinds(index),
   };
-}
-
-/** The {@link EventKind} of index row `row`. */
-function kindOf(rows: Rows, row: number): EventKind {
-  return eventKind(rows.types[row]!, rows.isFrame[row] === 1);
 }
 
 /** A row for the frame at index row `row`. */
@@ -292,7 +284,6 @@ async function realSubtree(
   // Pre-order, so a node always precedes its descendants and the prune below
   // can walk it backwards to reach every child before its parent.
   const rows: ScopedRow[] = [];
-  const frames: boolean[] = [];
   const parents: Array<ScopedRow | null> = [];
   // The open rows above the current one, with the index row each ends before.
   const open: Array<{ row: ScopedRow; end: number }> = [];
@@ -305,20 +296,18 @@ async function realSubtree(
     while (open.length && open.at(-1)!.end <= at) {
       open.pop();
     }
-    const kind = kindOf(source, at);
-    if (at !== top && kind === 'detail') {
+    if (at !== top && source.kindOf(at) === 'detail') {
       at = subtreeEnd[at]!;
       continue;
     }
     const row = frameRow(source, at, false);
     rows.push(row);
-    frames.push(kind === 'frame');
     parents.push(open.at(-1)?.row ?? null);
     open.push({ row, end: subtreeEnd[at]! });
     at++;
   }
 
-  let calls = selected || frames[0] ? 1 : 0;
+  let calls = selected || eventKind(rows[0]!.type) === 'frame' ? 1 : 0;
   for (let i = rows.length - 1; i >= 0; i--) {
     if (i % CHECK_EVERY === 0 && !(await tick())) {
       return null;
@@ -333,7 +322,7 @@ async function realSubtree(
     const parent = parents[i]!;
     (parent._children ??= []).push(row);
     // A pinned detail is a row, not a call.
-    if (frames[i]) {
+    if (eventKind(row.type) === 'frame') {
       calls += 1;
     }
   }
@@ -504,7 +493,7 @@ export async function buildScopedCallTree(
     logTotal: apexLog.duration.total,
     calls: scope.calls,
     store,
-    source,
+    index,
     // Occurrences of one frame are the same call made again, so merge them into a
     // single root; a single occurrence is already that.
     mergeTimeOrder: scope.roots.length > 1,
@@ -538,7 +527,7 @@ interface CallTreeInput {
   /** The log, which the merged views take their interned keys and paths from. */
   store: LogStore;
   /** The shown rows of `store`, which a row reads its frame's whole time from. */
-  source: Rows;
+  index: LogIndex;
   /** {@link ScopedCallTree.holds}, absent where the tree stands for the whole log. */
   holds?: (eventIndex: number) => boolean;
   /** Folds the occurrences of one frame into a single root (a scoped aggregate),
@@ -569,8 +558,7 @@ function wholeSelf(index: LogIndex, row: ScopedRow): number {
  * every retained subtree.
  */
 function lazyCallTree(input: CallTreeInput): ScopedCallTree {
-  const { rootTotal, calls, logTotal, mergeTimeOrder, store, source, holds } = input;
-  const { index } = source;
+  const { rootTotal, calls, logTotal, mergeTimeOrder, store, index, holds } = input;
   let topDownRows: ScopedRow[] | null = null;
   let aggregatedRows: ScopedRow[] | null = null;
   let bottomUpRows: ScopedRow[] | null = null;
@@ -597,7 +585,7 @@ function lazyCallTree(input: CallTreeInput): ScopedCallTree {
       bottomUpRows ??= await buildBottomUp(
         input.bottomUp,
         store,
-        source,
+        index,
         viewOptions,
         input.holes,
         input.seedRoots,
@@ -628,7 +616,7 @@ export async function buildWholeLogCallTree(
   const index = await store.logIndex();
   const source = rowsOf(index);
   const tick = frameBudget(options);
-  const roots = childRows(index, NO_ROW).filter((row) => kindOf(source, row) !== 'detail');
+  const roots = childRows(index, NO_ROW).filter((row) => source.kindOf(row) !== 'detail');
   const scope = await subtreeRoots(source, roots, tick, false);
   if (!scope) {
     return null;
@@ -644,7 +632,7 @@ export async function buildWholeLogCallTree(
     logTotal: apexLog.duration.total,
     calls: scope.calls,
     store,
-    source,
+    index,
     mergeTimeOrder: false,
     holes,
     seedRoots: false,
@@ -686,7 +674,7 @@ function liveWindow(
   };
 
   const readLog = async (tick: Tick): Promise<boolean> => {
-    const walked = await framesOf(source, scope.roots, tick);
+    const walked = await framesOf(scope.roots, tick);
     const built = walked && (await CallSpans.build(index, walked.frames, tick));
     const roots = built && (await SpanIndex.build(index, walked.roots, undefined, tick));
     const pinned = roots && (await SpanIndex.build(index, walked.pinned, undefined, tick));
@@ -803,7 +791,6 @@ function liveWindow(
 
 /** The event ids of the frames the rows hold, of the root rows, and of the outermost pinned rows. */
 async function framesOf(
-  source: Rows,
   roots: readonly ScopedRow[],
   tick: Tick,
 ): Promise<{ frames: number[]; roots: number[]; pinned: number[] } | null> {
@@ -816,7 +803,7 @@ async function framesOf(
       return null;
     }
     const row = stack.pop()!; // non-empty: the loop condition just checked
-    const kind = kindOf(source, source.index.rowOf(row.eventIndex));
+    const kind = eventKind(row.type);
     if (kind === 'pinned') {
       // What a pinned block holds is pinned too, and already inside its span.
       pinned.push(row.eventIndex);
@@ -959,12 +946,11 @@ interface WalkEntry {
 async function buildBottomUp(
   rows: ScopedRow[],
   store: LogStore,
-  source: Rows,
+  index: LogIndex,
   options: FrameBudgetOptions,
   holes: Holes | undefined,
   seedRoots: boolean,
 ): Promise<ScopedRow[] | null> {
-  const { index } = source;
   const paths = store.keyPathIds();
   const tick = frameBudget(options);
   let idSeq = 0;
@@ -1070,7 +1056,7 @@ async function buildBottomUp(
     open.set(entry.stackId, entry.outer);
     const attributed = entry.attributed;
     const ownSelf = wholeSelf(index, row);
-    if (kindOf(source, index.rowOf(row.eventIndex)) === 'frame' || (seedRoots && !callers)) {
+    if (eventKind(row.type) === 'frame' || (seedRoots && !callers)) {
       // The seed row, then its callers up to the root. The chain is already in
       // that order, so it is walked in place rather than copied and reversed.
       let pathId = paths.step(ROOT_PATH_ID, entry.keyId);

@@ -305,6 +305,26 @@ describe('Details filters', () => {
     expect([instant?.callCount, instant?.totalTime]).toEqual([3, 0]);
     expect(roots.map((row) => row.type)).toContain('STATIC_VARIABLE_LIST');
   });
+
+  // Parser 0.4 marks this line a leaf, not a frame; parser 0.3, and so main, showed it as a call.
+  it('keeps a VF call with no method, which has no exit, in every view', async () => {
+    const vf = await storeOf(
+      line(
+        1000,
+        'VF_APEX_CALL_START|[EXTERNAL]|PageMessagesComponentController invoke(getseverities)',
+      ),
+    );
+    const vfSource = await sourceOf(vf);
+    const index = await vf.logIndex();
+
+    expect(allNodes(vfSource).filter((node) => vfSource.withoutDetails.test(node))).toHaveLength(1);
+    expect(
+      toAggregatedCallTree(index, vf).filter((row) => AGGREGATED_WITHOUT_DETAILS.test(row)),
+    ).toHaveLength(1);
+    expect(
+      toBottomUpTree(index, vf).filter((row) => BOTTOM_UP_WITHOUT_DETAILS.test(row)),
+    ).toHaveLength(1);
+  });
 });
 
 describe('nameCell', () => {

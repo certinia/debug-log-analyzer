@@ -245,12 +245,12 @@ describe('analysis-view', () => {
 
   describe('filters', () => {
     const MS = 1_000_000;
-    const row = (namespace: string, totalMs: number, selfMs: number, details = true) =>
+    const row = (namespace: string, totalMs: number, selfMs: number, frame = true) =>
       ({
         namespace,
         totalTime: totalMs * MS,
         totalSelfTime: selfMs * MS,
-        kind: details ? 'frame' : 'detail',
+        type: frame ? 'METHOD_ENTRY' : 'USER_DEBUG',
       }) as unknown as BottomUpRow;
     const kept = (rows: BottomUpRow[]) =>
       rows.filter((r) => grid().filters.every((filter) => filter.test(r)));
