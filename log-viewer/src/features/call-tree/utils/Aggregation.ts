@@ -8,7 +8,7 @@ import { categoryName, type LogIndex, NO_ROW } from '#core/log/LogIndex.js';
 import type { LogStore } from '#core/log/LogStore.js';
 import { rowMetrics, type RowMetrics, type SelfTotalColumns } from '#core/log/rowMetrics.js';
 import { type Signatures, signaturesOf } from '#core/log/signatures.js';
-import { getCallerNamespace } from '#core/utility/CallerNamespace.js';
+import { callerNamespaceOfRow } from '#core/utility/CallerNamespace.js';
 import { CHECK_EVERY, frameBudget, type FrameBudgetOptions } from '#core/utility/FrameBudget.js';
 import { computeHasDetailsDeep } from './DetailsFilter.js';
 import { type CostLimits, costLimitsOf, setGovernorCost } from './GovernorCost.js';
@@ -222,7 +222,6 @@ interface BuildContext {
   metrics: RowMetrics;
   paths: KeyPathIds;
   signatures: Signatures;
-  store: LogStore;
   costLimits: CostLimits;
   reported: ReportedUsage | null;
   /** Per-build monotonic counter; row ids must be globally unique within this
@@ -241,7 +240,6 @@ function buildContext(
     metrics: rowMetrics(index),
     paths: store.keyPathIds(),
     signatures: signaturesOf(store.log),
-    store,
     costLimits: costLimitsOf(store.log.limits),
     reported,
     idFor: () => ++next,
@@ -830,7 +828,7 @@ function rowLabels(build: BuildContext, row: number) {
   return {
     text: signatures.text(signature),
     namespace: signatures.namespace(signature),
-    callerNamespace: getCallerNamespace(build.store, eventIndex),
+    callerNamespace: callerNamespaceOfRow(index, row),
     type: signatures.type(signature),
     eventIndex,
     category: categoryName(index, row),
