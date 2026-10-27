@@ -19,11 +19,7 @@ import {
   toBottomUpTree,
 } from '../../log-viewer/src/features/call-tree/utils/Aggregation.js';
 import { reportedUsage } from '../../log-viewer/src/features/call-tree/utils/reportedUsage.js';
-import { line, print, time } from './harness.js';
-
-// The builds slice themselves against this; resolving at once measures the work
-// rather than the frames it would hand back on screen.
-const yieldSlice = () => Promise.resolve();
+import { line, print, time, yieldSlice } from './harness.js';
 
 interface Shape {
   nodes: number;

@@ -9,11 +9,7 @@ import type { ApexLog } from '@apexdevtools/apex-log-parser';
 
 import { logStoreFor } from '../../log-viewer/src/core/log/LogStore.js';
 import { windowIndexFor } from '../../log-viewer/src/core/log/windowStats.js';
-import { print, time } from './harness.js';
-
-// The build slices itself against this; resolving at once measures the work
-// rather than the frames it would hand back on screen.
-const yieldSlice = () => Promise.resolve();
+import { print, time, yieldSlice } from './harness.js';
 
 /** Windows a reader zooms to, as a share of the log. */
 const WINDOWS = [

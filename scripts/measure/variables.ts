@@ -12,11 +12,7 @@ import { aggregateVariablesFor } from '../../log-viewer/src/core/log/aggregateVa
 import { frameVariablesFor, variableIndex } from '../../log-viewer/src/core/log/frameVariables.js';
 import { logStoreFor, setCurrentLog } from '../../log-viewer/src/core/log/LogStore.js';
 import { signaturesOf } from '../../log-viewer/src/core/log/signatures.js';
-import { line, time } from './harness.js';
-
-// The log index and the comparison slice themselves against this; resolving at
-// once measures the work rather than the frames it would leave to the next paint.
-const yieldSlice = () => Promise.resolve();
+import { line, time, yieldSlice } from './harness.js';
 
 /** Frames timed, spread across the log, so the figure is not one warm subtree. */
 const SAMPLED_FRAMES = 100;

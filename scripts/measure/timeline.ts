@@ -26,7 +26,7 @@ import {
 } from '../../log-viewer/src/features/timeline/types/flamechart.types.js';
 import { selfTimeByCategory } from '../../log-viewer/src/features/timeline/utils/category-self-time.js';
 import { buildTimelineFrames } from '../../log-viewer/src/features/timeline/utils/timeline-frames.js';
-import { heapMb, line, nowMs, print, time } from './harness.js';
+import { heapMb, line, nowMs, print, time, yieldSlice } from './harness.js';
 
 /** A word nearly every log holds many times, so the search walks and matches a lot. */
 const SEARCH_TEXT = 'method';
@@ -41,9 +41,6 @@ const WHOLE_LOG = { from: 0, share: 1 };
 const WINDOWS = [WHOLE_LOG, { from: 0.5, share: 0.1 }, { from: 0.3, share: 0.001 }];
 
 const DISPLAY_WIDTH = 1600;
-
-// Resolving at once measures the index build's work rather than the frames it would yield.
-const yieldSlice = () => Promise.resolve();
 
 /** Everything the timeline builds before its first frame, in the order its init builds it. */
 async function build(log: ApexLog) {
