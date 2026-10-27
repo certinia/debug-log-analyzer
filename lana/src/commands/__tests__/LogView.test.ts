@@ -1,7 +1,7 @@
 /*
  * Copyright (c) 2026 Certinia Inc. All rights reserved.
  */
-import { describe, expect, it } from '@jest/globals';
+import { afterEach, describe, expect, it } from '@jest/globals';
 
 import { asContext, createMockContext } from '../../__tests__/helpers/test-builders.js';
 import { Uri, workspace } from '../../__tests__/mocks/vscode.js';
@@ -168,19 +168,44 @@ describe('LogView', () => {
     });
   });
 
-  // The chrome follows VS Code's Modern or Classic UI, which lives under `workbench`.
-  it('pushes the config when the Modern UI setting changes, and not for an unrelated key', async () => {
-    const { postMessage } = await createViewWithListener();
-    const onChange = (workspace.onDidChangeConfiguration as unknown as jest.Mock).mock.calls.at(
-      -1,
-    )?.[0] as (event: { affectsConfiguration: (section: string) => boolean }) => void;
-    (sameConfig as jest.Mock).mockReturnValue(false);
+  describe('on a settings change', () => {
+    /** The view's settings listener, with every read config differing from the last. */
+    async function configListener() {
+      (sameConfig as jest.Mock).mockReturnValue(false);
+      const { postMessage } = await createViewWithListener();
+      const onChange = (workspace.onDidChangeConfiguration as unknown as jest.Mock).mock.calls.at(
+        -1,
+      )?.[0] as (event: { affectsConfiguration: (section: string) => boolean }) => void;
+      return {
+        postMessage,
+        change: (key: string) => onChange({ affectsConfiguration: (s) => s === key }),
+      };
+    }
 
-    onChange({ affectsConfiguration: (section) => section === 'editor.fontSize' });
-    expect(postMessage).not.toHaveBeenCalledWith(expect.objectContaining({ cmd: 'configChanged' }));
+    afterEach(() => {
+      (sameConfig as jest.Mock).mockReturnValue(true);
+    });
 
-    onChange({ affectsConfiguration: (section) => section === 'workbench.experimental.modernUI' });
-    expect(postMessage).toHaveBeenCalledWith(expect.objectContaining({ cmd: 'configChanged' }));
-    (sameConfig as jest.Mock).mockReturnValue(true);
+    // The chrome follows VS Code's Modern or Classic UI, which lives under `workbench`, not `lana`.
+    it.each(['lana', 'workbench.experimental.modernUI'])(
+      'pushes the config to the open view when %s changes',
+      async (key) => {
+        const { postMessage, change } = await configListener();
+
+        change(key);
+
+        expect(postMessage).toHaveBeenCalledWith(expect.objectContaining({ cmd: 'configChanged' }));
+      },
+    );
+
+    it('does not push the config for a setting the view does not use', async () => {
+      const { postMessage, change } = await configListener();
+
+      change('editor.fontSize');
+
+      expect(postMessage).not.toHaveBeenCalledWith(
+        expect.objectContaining({ cmd: 'configChanged' }),
+      );
+    });
   });
 });

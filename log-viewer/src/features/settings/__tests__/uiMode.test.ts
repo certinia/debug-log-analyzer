@@ -36,27 +36,15 @@ describe('watchUiMode', () => {
     document.documentElement.removeAttribute('data-ui-mode');
   });
 
-  // The docs demo and a browser host send no `ui`, and must get VS Code's default look.
-  it('sets nothing when the host sends no ui, so the Modern defaults apply', () => {
+  // The panel is never re-created; the docs demo sends no `ui` and must get the Modern defaults.
+  it('follows each look the host sends, and sets none when it sends none', () => {
     stop = watchUiMode();
-    push();
 
-    expect(document.documentElement.hasAttribute('data-ui-mode')).toBe(false);
-  });
-
-  it('marks the classic look, which is what the Classic token overrides key on', () => {
-    stop = watchUiMode();
     push({ mode: 'classic' });
-
     expect(document.documentElement.dataset.uiMode).toBe('classic');
-  });
-
-  // The panel is never re-created, so a switch in VS Code must reach the open view.
-  it('follows a later switch back to Modern', () => {
-    stop = watchUiMode();
-    push({ mode: 'classic' });
     push({ mode: 'modern' });
-
     expect(document.documentElement.dataset.uiMode).toBe('modern');
+    push();
+    expect(document.documentElement.hasAttribute('data-ui-mode')).toBe(false);
   });
 });
