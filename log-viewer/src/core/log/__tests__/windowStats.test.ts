@@ -223,6 +223,21 @@ describe('windowStats own time', () => {
     expect(stats.selfByCategory.get('Apex')).toBeUndefined();
     expect(stats.selfByCategory.get('SOQL')).toBeCloseTo(60, 3);
   });
+
+  // A drag reads the same wide parent for window after window, from children it keeps.
+  it('reads a parent of many children right for each window of a drag', async () => {
+    // Each 100 ns slot: the parent's own 0-40, then a query 40-100.
+    const queries = Array.from({ length: 100 }, (_, i) => soql(i * 100 + 40, i * 100 + 100));
+    const store = await storeOf(apex(0, 10_000, queries));
+
+    const first = await statsFor(store, { start: 1010, end: 2990 });
+    const second = await statsFor(store, { start: 5020, end: 7970 });
+
+    expect(first.selfByCategory.get('Apex')).toBeCloseTo(790, 3);
+    expect(first.selfByCategory.get('SOQL')).toBeCloseTo(1190, 3);
+    expect(second.selfByCategory.get('Apex')).toBeCloseTo(1180, 3);
+    expect(second.selfByCategory.get('SOQL')).toBeCloseTo(1770, 3);
+  });
 });
 
 // The point of the index: the viewport moves per frame, so a window must be
