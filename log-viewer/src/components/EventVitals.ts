@@ -17,11 +17,7 @@ import {
   selfLabel,
   usageParts,
 } from '#core/metrics/eventMetrics.js';
-import {
-  DEFAULT_NAMESPACE,
-  getCallerNamespace,
-  namespaceOf,
-} from '#core/utility/CallerNamespace.js';
+import { getCallerNamespace, namespaceOf } from '#core/utility/CallerNamespace.js';
 import { formatNsAsMs } from '#core/utility/Duration.js';
 import { outermostIds } from '#core/utility/EventTree.js';
 import { formatInteger } from '#core/utility/Util.js';
@@ -190,12 +186,13 @@ export class EventVitals extends LitElement {
     this._metricRows(rows, log, ids, outer);
     this._statementRows(rows, primary);
 
-    this._row(rows, 'Namespace', namespaceOf(store.log, primary.id));
+    const namespace = namespaceOf(store.log, primary.id);
+    this._row(rows, 'Namespace', namespace);
     // Only worth a row when it says something new: "who called this" differing
     // from "whose code ran" is the interesting case (a package's code invoked
     // from another package's trigger). Both normalize empty the same way.
     const callerNamespace = getCallerNamespace(store, primary.id);
-    if (callerNamespace !== (primary.namespace || DEFAULT_NAMESPACE)) {
+    if (callerNamespace !== namespace) {
       this._row(rows, 'Caller namespace', callerNamespace);
     }
     // The call site, in the code that contains the frame — not where it is defined.
