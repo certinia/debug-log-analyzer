@@ -136,7 +136,6 @@ export class AnchoredPopover extends LitElement {
         part="trigger"
         class="trigger"
         popovertarget="anchored-popover-panel"
-        aria-haspopup="true"
         aria-controls="anchored-popover-panel"
       >
         <slot name="trigger"></slot>

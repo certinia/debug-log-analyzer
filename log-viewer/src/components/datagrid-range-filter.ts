@@ -54,7 +54,7 @@ export class DatagridRangeFilter extends LitElement {
         display: grid;
         grid-template-columns: var(--filter-panel-label-width) 1fr;
         align-items: center;
-        column-gap: 8px;
+        column-gap: var(--lana-space-sm);
       }
 
       .range-panel__label {
@@ -68,7 +68,7 @@ export class DatagridRangeFilter extends LitElement {
         grid-column: 2;
         display: flex;
         align-items: center;
-        gap: 6px;
+        gap: var(--lana-space-xs);
       }
 
       .range-panel__unit {
@@ -86,8 +86,8 @@ export class DatagridRangeFilter extends LitElement {
 
       .range-popover {
         position-area: bottom span-left;
-        margin: 6px 0 0 0;
-        padding: 8px;
+        margin: var(--lana-space-xs) 0 0 0;
+        padding: var(--lana-space-sm);
       }
 
       /* Flex layout only while open — a class-level display would beat the UA
@@ -96,19 +96,19 @@ export class DatagridRangeFilter extends LitElement {
       .range-popover:popover-open {
         display: flex;
         flex-direction: column;
-        gap: 6px;
+        gap: var(--lana-space-xs);
       }
 
       .range-popover__inputs {
         display: flex;
         align-items: center;
-        gap: 6px;
+        gap: var(--lana-space-xs);
       }
 
       .range-popover__input {
         width: 8ch;
         box-sizing: border-box;
-        padding: 3px 6px;
+        padding: var(--lana-space-3xs) var(--lana-space-xs);
         font: inherit;
         font-size: var(--lana-text-base);
         color: var(--vscode-settings-numberInputForeground);
@@ -131,7 +131,7 @@ export class DatagridRangeFilter extends LitElement {
 
       .range-popover__clear {
         align-self: flex-start;
-        padding: 2px 0;
+        padding: var(--lana-space-3xs) 0;
         border: none;
         background: none;
         color: var(--lana-link-fg);
@@ -163,7 +163,7 @@ export class DatagridRangeFilter extends LitElement {
         style="anchor-name:${this._anchorName}"
         popovertarget=${this._popoverId}
         aria-haspopup="dialog"
-        title=${this.label}
+        title="Filter by ${this.label}"
       >
         <span>${summary}</span>
         <vscode-icon

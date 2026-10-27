@@ -22,7 +22,7 @@ export const headerControlStyles = css`
     justify-content: center;
     width: 26px;
     height: 22px;
-    border-radius: 4px;
+    border-radius: var(--lana-radius-sm);
     color: var(--lana-fg);
   }
 

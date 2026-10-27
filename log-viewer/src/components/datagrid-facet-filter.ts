@@ -85,7 +85,7 @@ export class DatagridFacetFilter extends LitElement {
         color: var(--lana-badge-fg);
         background-color: var(--lana-badge-bg);
         border-radius: var(--lana-radius-pill);
-        padding: 0 5px;
+        padding: 0 var(--lana-space-2xs);
         font-size: var(--lana-text-xs);
         line-height: 1.5;
         visibility: hidden;
@@ -101,7 +101,7 @@ export class DatagridFacetFilter extends LitElement {
 
       .facet-popover {
         position-area: bottom span-left;
-        margin: 6px 0 0 0;
+        margin: var(--lana-space-xs) 0 0 0;
         /* Hug the widest option row's content; never narrower than the
            trigger button itself (anchor-size reads the anchored trigger's
            box — same content-sizing contract as VsSelect's '.dropdown'). */
@@ -110,13 +110,13 @@ export class DatagridFacetFilter extends LitElement {
         max-width: min(92vw, 280px);
         max-height: min(60vh, 360px);
         overflow-y: auto;
-        padding: 4px;
+        padding: var(--lana-space-2xs);
       }
 
       .facet-option {
         display: flex;
         align-items: center;
-        gap: 6px;
+        gap: var(--lana-space-xs);
       }
 
       .facet-option span {
@@ -126,20 +126,21 @@ export class DatagridFacetFilter extends LitElement {
       }
 
       .facet-popover__empty {
-        padding: 6px 8px;
+        padding: var(--lana-space-xs) var(--lana-space-sm);
         color: var(--lana-fg-muted);
         font-size: var(--lana-text-base);
       }
 
       .facet-popover__footer {
-        margin-top: 2px;
-        border-top: 1px solid var(--divider-background, var(--vscode-menu-separatorBackground));
+        margin-top: var(--lana-space-3xs);
+        border-top: var(--lana-stroke) solid
+          var(--divider-background, var(--vscode-menu-separatorBackground));
       }
 
       .facet-popover__clear {
         display: block;
         width: 100%;
-        padding: 4px 8px;
+        padding: var(--lana-space-2xs) var(--lana-space-sm);
         border: none;
         background: none;
         color: var(--lana-link-fg);
@@ -172,8 +173,7 @@ export class DatagridFacetFilter extends LitElement {
         class="filter-control facet-trigger ${count > 0 ? 'filter-control--active' : ''}"
         style="anchor-name:${this._anchorName}"
         popovertarget=${this._popoverId}
-        aria-haspopup="listbox"
-        title=${this.label}
+        title="Filter by ${this.label}"
       >
         <span class="facet-trigger__label">${this.label}</span>
         <span class="facet-trigger__count ${count > 0 ? 'visible' : ''}">${count || 0}</span>
@@ -189,7 +189,7 @@ export class DatagridFacetFilter extends LitElement {
         popover
         class="filter-popover facet-popover popover-anchored popover-anchored--hides-with-anchor"
         style="position-anchor:${this._anchorName}"
-        role="listbox"
+        role="group"
         aria-label=${this.label}
       >
         ${this._options()}

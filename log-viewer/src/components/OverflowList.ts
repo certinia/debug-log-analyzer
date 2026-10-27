@@ -117,7 +117,7 @@ export class OverflowList extends LitElement {
       /* Short rule separating the items from the interactive toggle. */
       .sep {
         height: 16px;
-        margin: 0 2px;
+        margin: 0 var(--lana-space-3xs);
         flex: 0 0 auto;
       }
 
@@ -189,7 +189,7 @@ export class OverflowList extends LitElement {
       }
 
       .panel__head {
-        padding: 2px 10px 6px;
+        padding: var(--lana-space-3xs) 10px var(--lana-space-xs);
         font-weight: 600;
         font-size: var(--lana-text-base);
         color: var(--lana-fg);
@@ -370,7 +370,6 @@ export class OverflowList extends LitElement {
       part="toggle"
       class="overflow"
       popovertarget=${PANEL_ID}
-      aria-haspopup="true"
       aria-controls=${PANEL_ID}
       title="Show ${hiddenCount} more"
     >
