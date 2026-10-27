@@ -64,6 +64,22 @@ describe('eventLines', () => {
     ]);
   });
 
+  it('gives an outer exit to its own frame, not to an inner one an exception unwound', async () => {
+    // Matched by type and end time alone, the unwound B took A's exit line, and A had none.
+    expect(
+      await linesOf([
+        at(100, 'METHOD_ENTRY|[1]|01p|A.a()'),
+        at(200, 'METHOD_ENTRY|[2]|01p|B.b()'),
+        at(300, 'EXCEPTION_THROWN|[3]|System.NullPointerException: boom'),
+        at(400, 'METHOD_EXIT|[1]|A.a()'),
+      ]),
+    ).toEqual([
+      [0, 3],
+      [1, -1],
+      [2, -1],
+    ]);
+  });
+
   it('skips the lines the parser made no event of', async () => {
     expect(
       await linesOf([

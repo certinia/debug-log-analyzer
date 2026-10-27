@@ -26,7 +26,7 @@ export function eventLines(
   lineCount: number,
   lineAt: (line: number) => string,
 ): EventLines {
-  const { type, parent, isFrame, startTimestamp, endTimestamp } = log.columns;
+  const { type, parent, isFrame, startTimestamp, endTimestamp, endedBy } = log.columns;
   const start = new Int32Array(log.eventCount + 1).fill(-1);
   const end = new Int32Array(log.eventCount + 1).fill(-1);
   const open: number[] = [];
@@ -39,11 +39,11 @@ export function eventLines(
     }
     const time = Number(match[1]);
     if (info.shape === 'exit') {
-      // A frame an outer exit unwound, or the next line closed, has no exit of its own.
+      // A frame an outer exit or an exception unwound, or the next line closed, has no exit of its own.
       while (
         open.length &&
-        !closes(type[open.at(-1)!]!, info) &&
-        endTimestamp[open.at(-1)!]! <= time
+        endTimestamp[open.at(-1)!]! <= time &&
+        (endedBy.at(open.at(-1)!) !== 'exit' || !closes(type[open.at(-1)!]!, info))
       ) {
         open.pop();
       }
