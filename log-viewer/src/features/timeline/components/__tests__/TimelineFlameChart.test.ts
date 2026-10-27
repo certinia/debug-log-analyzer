@@ -319,7 +319,7 @@ describe('timeline-flame-chart find', () => {
 });
 
 describe('timeline-flame-chart in a short pane', () => {
-  let chart: HTMLElement & { apexLog: ApexLog | null; updateComplete: Promise<unknown> };
+  let chart: HTMLElement & { logStore: LogStore | null; updateComplete: Promise<unknown> };
   let height: number;
   let resized: () => void = () => {};
   const realResizeObserver = globalThis.ResizeObserver;
@@ -357,7 +357,7 @@ describe('timeline-flame-chart in a short pane', () => {
     chart.shadowRoot?.querySelector('.too-small')?.textContent?.trim() ?? '';
 
   it('shows a note instead of a layout error, and builds once the pane grows', async () => {
-    chart.apexLog = logOf();
+    chart.logStore = logOf();
     await chart.updateComplete;
     await settle();
 
@@ -385,13 +385,13 @@ describe('timeline-flame-chart in a short pane', () => {
     height = 400;
     holdInit = true;
     const first = logOf();
-    chart.apexLog = first;
+    chart.logStore = first;
     await chart.updateComplete;
     await settle();
 
     height = 50;
     const next = logOf();
-    chart.apexLog = next;
+    chart.logStore = next;
     await chart.updateComplete;
     finishInit();
     await settle();
@@ -409,7 +409,7 @@ describe('timeline-flame-chart in a short pane', () => {
 
   it('hides a built chart when the pane shrinks, and keeps it', async () => {
     height = 400;
-    chart.apexLog = logOf();
+    chart.logStore = logOf();
     await chart.updateComplete;
     await settle();
 

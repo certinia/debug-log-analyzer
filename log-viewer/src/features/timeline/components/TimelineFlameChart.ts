@@ -199,7 +199,7 @@ export class TimelineFlameChart extends LitElement {
     if (!height) {
       return;
     }
-    this.tooSmall = !!this.apexLog && height < MIN_CHART_HEIGHT;
+    this.tooSmall = !!this.logStore && height < MIN_CHART_HEIGHT;
     if (!this.tooSmall && this.sizeDeferred !== null) {
       void this.initializeTimeline(this.sizeDeferred);
     }
