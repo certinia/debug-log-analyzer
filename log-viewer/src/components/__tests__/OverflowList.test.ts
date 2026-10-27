@@ -33,7 +33,8 @@ describe('overflow-list collapse-last child', () => {
     const list = await mount(100);
 
     expect(slots(list)).toEqual(['overflow', 'overflow', 'overflow']);
-    expect(list.shadowRoot?.querySelector('.overflow__count')?.textContent).toBe('+3');
+    // The count names the items: the note is a status, not one more filter.
+    expect(list.shadowRoot?.querySelector('.overflow__count')?.textContent).toBe('+2');
   });
 
   it('stays after the toggle while it fits', async () => {

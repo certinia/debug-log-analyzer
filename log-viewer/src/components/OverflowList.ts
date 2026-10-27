@@ -402,11 +402,11 @@ export class OverflowList extends LitElement {
 
   render() {
     const total = this._items().length;
-    const hiddenItems = total - Math.min(this.visibleCount, total);
-    const hiddenCount = hiddenItems + (this.endCollapsed ? this._collapseLast().length : 0);
+    const hiddenCount = total - Math.min(this.visibleCount, total);
+    const hasMenu = hiddenCount > 0 || this.endCollapsed;
     const fromStart = this.collapseFrom === 'start';
     const sep =
-      hiddenItems < total
+      hiddenCount < total
         ? html`<divider-line orientation="vertical" class="sep"></divider-line>`
         : '';
     const button = html`<button
@@ -425,8 +425,7 @@ export class OverflowList extends LitElement {
       ></vscode-icon>
     </button>`;
     // Toggle pins to the collapse end, with the divider always adjacent to the items.
-    const toggle =
-      hiddenCount > 0 ? (fromStart ? html`${button}${sep}` : html`${sep}${button}`) : '';
+    const toggle = hasMenu ? (fromStart ? html`${button}${sep}` : html`${sep}${button}`) : '';
 
     return html`<div class="container ${this.collapseFrom}">
       <div class="bar ${this.hasEnd ? 'has-end' : ''}">
@@ -436,7 +435,7 @@ export class OverflowList extends LitElement {
         <slot name="end" @slotchange=${this._onEndChange}></slot>
       </div>
       ${
-        hiddenCount > 0
+        hasMenu
           ? html`<div
               part="menu"
               class="panel filter-popover popover-anchored"
