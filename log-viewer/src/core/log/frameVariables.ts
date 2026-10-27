@@ -8,6 +8,7 @@ import {
   type Variable,
 } from '@apexdevtools/apex-log-parser';
 
+import { findLevelGap } from './levelCapabilities.js';
 import type { Derivation, LogStore } from './LogStore.js';
 
 /**
@@ -206,6 +207,10 @@ function rowOf(variable: Variable): VariableRow {
 }
 
 function hasAnyWrite(log: ApexLog): boolean {
+  // Below its level the platform writes no assignment, so a log that says so needs no scan.
+  if (findLevelGap('variables', log.debugLevels, {})?.kind === 'notCaptured') {
+    return false;
+  }
   const assignment = eventType('VARIABLE_ASSIGNMENT')?.typeId;
   const { type } = log.columns;
   const last = log.eventCount;
