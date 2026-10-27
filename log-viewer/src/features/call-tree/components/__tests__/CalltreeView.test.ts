@@ -534,7 +534,8 @@ describe('calltree-view go to row', () => {
   });
 
   describe('to a row the filters hide', () => {
-    // Debug Only keeps Outer as the parent of its debug line, and hides Inner.
+    // Debug Only keeps Outer as the parent of its debug line, and hides Inner. Details, off by
+    // default, hides the debug line: it takes no time.
     const LOG =
       '09:18:22.6 (1000)|METHOD_ENTRY|[1]|01p|ns.Outer.run()\n' +
       '09:18:22.6 (1100)|USER_DEBUG|[2]|DEBUG|hello\n' +
@@ -543,6 +544,23 @@ describe('calltree-view go to row', () => {
       '09:18:22.6 (1800)|METHOD_EXIT|[1]|ns.Outer.run()\n';
 
     const note = () => view.renderRoot.querySelector('.hidden-note');
+    const announced = () => view.renderRoot.querySelector('[role="status"]')?.textContent?.trim();
+    const pressed = (label: string) =>
+      [...view.renderRoot.querySelectorAll('button.pill-toggle')]
+        .find((button) => button.textContent?.trim() === label)
+        ?.getAttribute('aria-pressed');
+    const pressClear = async () => {
+      note()!.querySelector('button')!.click(); // each caller has just shown the note
+      await settle();
+      await view.updateComplete;
+    };
+
+    async function openWithDebugOnly(log: ApexLog): Promise<void> {
+      view = await mountView(log);
+      await view._goToRow(indexOf(log, 'ns.Outer.run()'));
+      view._handleDebugOnlyChange();
+      await view.updateComplete;
+    }
 
     beforeEach(() => {
       globalThis.IntersectionObserver = AlwaysVisible as unknown as typeof IntersectionObserver;
@@ -551,38 +569,74 @@ describe('calltree-view go to row', () => {
     // Before, the tab switched and nothing was selected, with no word why.
     it('selects the nearest shown parent and says the filters hide the row', async () => {
       const { log } = await storeOf(LOG);
-      view = await mountView(log);
-      await view._goToRow(indexOf(log, 'ns.Outer.run()'));
-      view._handleDebugOnlyChange();
-      await view.updateComplete;
+      await openWithDebugOnly(log);
 
       await view._goToRow(indexOf(log, 'ns.Inner.go()'));
       await view.updateComplete;
 
       expect(view.timeOrderGrid?.selectedKey).toBe(indexOf(log, 'ns.Outer.run()'));
       expect(note()?.textContent).toContain('Hidden by filters');
-      expect(view.filterState.debugOnly).toBe(true);
+      expect(announced()).toContain('filters hide that row');
+      expect(pressed('Debug Only')).toBe('true');
     });
 
     it('clears the filters and goes to the row when Clear is pressed', async () => {
       const { log } = await storeOf(LOG);
-      view = await mountView(log);
-      await view._goToRow(indexOf(log, 'ns.Outer.run()'));
-      view._handleDebugOnlyChange();
-      await view.updateComplete;
+      await openWithDebugOnly(log);
       const inner = indexOf(log, 'ns.Inner.go()');
       await view._goToRow(inner);
       await view.updateComplete;
 
-      note()!.querySelector('button')!.click(); // the test above shows the note and its button
-      await settle();
-      await view.updateComplete;
+      await pressClear();
 
-      expect(view.filterState.debugOnly).toBe(false);
-      // No go-to names a row Details hides, so Clear leaves it as chosen.
-      expect(view.filterState.showDetails).toBe(false);
+      expect(pressed('Debug Only')).toBe('false');
+      // Details does not hide Inner, so Clear leaves it as chosen.
+      expect(pressed('Details')).toBe('false');
       expect(view.timeOrderGrid?.selectedKey).toBe(inner);
       expect(note()).toBeNull();
+    });
+
+    // An issue card can name a leaf that takes no time; clearing every other filter left it hidden.
+    it('turns Details on when Details is what hides the row', async () => {
+      const { log } = await storeOf(LOG);
+      view = await mountView(log);
+      const hello = indexOf(log, 'DEBUG | hello');
+      await view._goToRow(hello);
+      await view.updateComplete;
+      expect(view.timeOrderGrid?.selectedKey).toBe(indexOf(log, 'ns.Outer.run()'));
+
+      await pressClear();
+
+      expect(pressed('Details')).toBe('true');
+      expect(view.timeOrderGrid?.selectedKey).toBe(hello);
+    });
+
+    // The grid selects nothing when even the top row is filtered out, which was silent.
+    it('says so when the filters hide the row from the top, and Clear reaches it', async () => {
+      const { log } = await storeOf(LOG);
+      view = await mountView(log);
+      view._handleNamespaceFacet(new CustomEvent('facet', { detail: { selected: ['other'] } }));
+      const inner = indexOf(log, 'ns.Inner.go()');
+      await view._goToRow(inner);
+      await view.updateComplete;
+      expect(note()).not.toBeNull();
+
+      await pressClear();
+
+      expect(view.timeOrderGrid?.selectedKey).toBe(inner);
+    });
+
+    it('drops the note when a filter changes', async () => {
+      const { log } = await storeOf(LOG);
+      await openWithDebugOnly(log);
+      await view._goToRow(indexOf(log, 'ns.Inner.go()'));
+      await view.updateComplete;
+
+      view._handleDebugOnlyChange();
+      await view.updateComplete;
+
+      expect(note()).toBeNull();
+      expect(announced()).toBe('');
     });
 
     it('says nothing when the row shows', async () => {

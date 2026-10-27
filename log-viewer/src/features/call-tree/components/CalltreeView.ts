@@ -17,7 +17,7 @@ import { eventBus, type SelectionView } from '#core/events/EventBus.js';
 import { SelectionEchoGuard } from '#core/events/SelectionEchoGuard.js';
 import { SubscriptionController } from '#core/events/SubscriptionController.js';
 import { vscodeMessenger } from '#core/messaging/VSCodeExtensionMessenger.js';
-import type { LogIndex } from '#core/log/LogIndex.js';
+import { type LogIndex, NO_ROW } from '#core/log/LogIndex.js';
 import { isVisible } from '#core/utility/Util.js';
 import { CALLTREE_GO_TO_ROW, type CalltreeNavigationEventMap } from '../navigation.js';
 import type { AggregatedRow, BottomUpRow } from '../utils/Aggregation.js';
@@ -293,6 +293,7 @@ export class CalltreeView extends LitElement {
 
   private async _replaceLog(store: LogStore): Promise<void> {
     this.rootStore = store;
+    this._hiddenByFilters = null;
     // `rootStore` is not reactive, and the Namespace filter lists its namespaces.
     this.requestUpdate();
     // A build still running reads the old log.
@@ -363,6 +364,8 @@ export class CalltreeView extends LitElement {
       }
 
       .hidden-note {
+        /* Out of the filter bar's slotted grow rule, which hands the slack to the overflow list. */
+        flex: none;
         align-self: center;
         color: var(--lana-fg-muted);
         white-space: nowrap;
@@ -381,6 +384,11 @@ export class CalltreeView extends LitElement {
         color: var(--lana-link-fg-active);
         text-decoration: underline;
       }
+
+      .hidden-note__clear:focus-visible {
+        outline: var(--lana-focus-ring);
+        outline-offset: var(--lana-focus-offset);
+      }
     `,
   ];
 
@@ -390,6 +398,9 @@ export class CalltreeView extends LitElement {
 
     return html`
       <div id="call-tree-container">
+        <div class="sr-only" role="status" aria-live="polite">
+          ${this._hiddenByFilters === null ? '' : 'The filters hide that row, so its parent is selected.'}
+        </div>
         <div>
           <datagrid-filter-bar>
             <view-mode-switch
@@ -481,11 +492,12 @@ export class CalltreeView extends LitElement {
             ${
               this._hiddenByFilters === null
                 ? ''
-                : html`<span slot="filters" class="hidden-note" role="status">
+                : html`<span slot="filters" class="hidden-note">
                     Hidden by filters ·
                     <button
                       type="button"
                       class="hidden-note__clear"
+                      aria-label="Clear filters and go to the hidden row"
                       @click=${this._clearFiltersAndGo}
                     >
                       Clear
@@ -876,10 +888,16 @@ export class CalltreeView extends LitElement {
     await this._renderCallTree(this._callTreeTableWrapper, this.rootStore);
     const grid = this.timeOrderGrid;
     const path = this._timeOrderPath(eventIndex);
-    if (grid && (await grid.goTo(path))) {
+    if (!grid || !path.length) {
+      return;
+    }
+    if (await grid.goTo(path)) {
       // The grid stops at the deepest shown row on the path, so a row the filters hide lands on its parent.
       this._hiddenByFilters = grid.selectedKey === path.at(-1) ? null : eventIndex;
       grid.focus({ preventScroll: true });
+    } else {
+      // No row on the path is shown: the filters hide it from the top.
+      this._hiddenByFilters = eventIndex;
     }
   }
 
@@ -895,8 +913,12 @@ export class CalltreeView extends LitElement {
       filter.clear();
     }
     this.typeFilter = 'All';
-    // Details stays as chosen: every go-to names a frame, a timed row or an exception, which it never hides.
-    this.filterState = { ...this.filterState, debugOnly: false, selectedTypes: new Set() };
+    // Details stays as chosen unless it hides this row, as it does a no-time leaf an issue card names.
+    const source = this._timeOrderSource;
+    const row = source?.index.rowOf(eventIndex) ?? NO_ROW;
+    const showDetails =
+      this.filterState.showDetails || (row !== NO_ROW && !source!.details.test({ row })); // row came from source
+    this.filterState = { showDetails, debugOnly: false, selectedTypes: new Set() };
     this.requestUpdate();
     this._updateFiltering();
     await this._goToRow(eventIndex);
