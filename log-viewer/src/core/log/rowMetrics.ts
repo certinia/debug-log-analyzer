@@ -37,6 +37,33 @@ export interface RowMetrics {
   readonly heapPeak: Float64Array;
 }
 
+/** The own part of each statement count, by index row. */
+export interface StatementSelves {
+  readonly soql: Int32Array;
+  readonly soqlRows: Int32Array;
+  readonly sosl: Int32Array;
+  readonly dml: Int32Array;
+  readonly dmlRows: Int32Array;
+}
+
+/**
+ * Just the {@link StatementSelves} of `index`'s rows, for a view that needs no totals or heap:
+ * {@link rowMetrics} builds and, under a level filter, copies every metric.
+ */
+export function statementSelves(index: LogIndex): StatementSelves {
+  const { columns } = index.log;
+  let none: Int32Array | undefined;
+  const selfOf = (column: CountColumn | null): Int32Array =>
+    column ? index.selfColumn(column.self) : (none ??= new Int32Array(index.rowCount));
+  return {
+    soql: selfOf(columns.soqlCount),
+    soqlRows: selfOf(columns.soqlRowCount),
+    sosl: selfOf(columns.soslCount),
+    dml: selfOf(columns.dmlCount),
+    dmlRows: selfOf(columns.dmlRowCount),
+  };
+}
+
 const held = new WeakMap<LogIndex, RowMetrics>();
 
 /** The metrics of `index`'s rows, made once per index. */

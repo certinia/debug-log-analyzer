@@ -9,7 +9,7 @@ import { firstIndexWhere } from '../utility/Util.js';
 import { type LogIndex, NO_ROW } from './LogIndex.js';
 import type { LogStore } from './LogStore.js';
 import { RangeScopeController, sameWindow, type TimeWindow } from './rangeScope.js';
-import { rowMetrics } from './rowMetrics.js';
+import { statementSelves } from './rowMetrics.js';
 
 /** The statement counters an event carries for itself. */
 export interface WindowCounts {
@@ -138,12 +138,7 @@ export class WindowIndex {
     // By category id, and by namespace id + 1 so the -1 of no namespace has a slot.
     const byCategory: Float64Array[] = [];
     const byNamespace: Float64Array[] = [];
-    const metrics = rowMetrics(index);
-    const soql = metrics.soqlCount.self;
-    const soqlRows = metrics.soqlRowCount.self;
-    const dml = metrics.dmlCount.self;
-    const dmlRows = metrics.dmlRowCount.self;
-    const sosl = metrics.soslCount.self;
+    const { soql, soqlRows, dml, dmlRows, sosl } = statementSelves(index);
     const gathered = byCounter(gatherer);
 
     // Reassigned per row, so the gap visitor below is allocated once for the

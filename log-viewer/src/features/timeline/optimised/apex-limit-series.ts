@@ -18,7 +18,7 @@ import {
   type Limits,
 } from '@apexdevtools/apex-log-parser';
 import type { Derivation } from '#core/log/LogStore.js';
-import { rowMetrics } from '#core/log/rowMetrics.js';
+import { statementSelves } from '#core/log/rowMetrics.js';
 import { DEFAULT_NAMESPACE } from '#core/utility/CallerNamespace.js';
 import { GOVERNOR_METRICS } from '#core/metrics/governorMetrics.js';
 import { CHECK_EVERY, frameBudget } from '#core/utility/FrameBudget.js';
@@ -122,7 +122,7 @@ export const apexLimitSeries: Derivation<HeatStripTimeSeries> = async (index, st
   const types = index.column(apexLog.columns.type);
   const namespaceIds = index.column(apexLog.columns.namespace.ids);
   const namespaces = apexLog.columns.namespace.values;
-  const m = rowMetrics(index);
+  const m = statementSelves(index);
   const granular: { observation: GranularObservation; end: number }[] = [];
   let row = 0;
   const observe = (observation: GranularObservation): void => {
@@ -149,13 +149,13 @@ export const apexLimitSeries: Derivation<HeatStripTimeSeries> = async (index, st
     const timestamp = start[row]!;
     const namespace = namespaces[namespaceIds[row]!] ?? DEFAULT_NAMESPACE;
     if (type === SOQL) {
-      pushDelta(timestamp, namespace, 'soqlQueries', m.soqlCount.self[row]!);
-      pushDelta(timestamp, namespace, 'queryRows', m.soqlRowCount.self[row]!);
+      pushDelta(timestamp, namespace, 'soqlQueries', m.soql[row]!);
+      pushDelta(timestamp, namespace, 'queryRows', m.soqlRows[row]!);
     } else if (type === SOSL) {
-      pushDelta(timestamp, namespace, 'soslQueries', m.soslCount.self[row]!);
+      pushDelta(timestamp, namespace, 'soslQueries', m.sosl[row]!);
     } else if (type === DML) {
-      pushDelta(timestamp, namespace, 'dmlStatements', m.dmlCount.self[row]!);
-      pushDelta(timestamp, namespace, 'dmlRows', m.dmlRowCount.self[row]!);
+      pushDelta(timestamp, namespace, 'dmlStatements', m.dml[row]!);
+      pushDelta(timestamp, namespace, 'dmlRows', m.dmlRows[row]!);
     } else if (type === CALLOUT) {
       pushDelta(timestamp, namespace, 'callouts', 1);
     } else if (type === HEAP_ALLOCATE || type === BULK_HEAP_ALLOCATE) {
