@@ -6,7 +6,7 @@ import type { ReactiveControllerHost } from 'lit';
 import { DEFAULT_NAMESPACE, namespaceOf } from '../utility/CallerNamespace.js';
 import { CHECK_EVERY, frameBudget, type FrameBudgetOptions } from '../utility/FrameBudget.js';
 import { firstIndexWhere } from '../utility/Util.js';
-import { childRows, rowCategory, type LogIndex, NO_ROW } from './LogIndex.js';
+import { childRows, rowCategory, type LogIndex, NO_ROW, sharedChildRows } from './LogIndex.js';
 import type { LogStore } from './LogStore.js';
 import { RangeScopeController, sameWindow, type TimeWindow } from './rangeScope.js';
 import { statementSelves } from './rowMetrics.js';
@@ -426,7 +426,7 @@ function addSelfTime(
   pushReached(index, stack, roots, window);
   while (stack.length) {
     const row = stack.pop()!; // non-empty: the loop condition just checked
-    const children = childRows(index, row);
+    const children = sharedChildRows(index, row);
     const { from, to } = reachedRun(index, children, window);
     let self = 0;
     eachSelfGap(index, row, children, from, to, (start, end) => {

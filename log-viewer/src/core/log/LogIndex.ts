@@ -97,6 +97,31 @@ export function childRows(index: LogIndex, row: number, into: number[] = []): nu
   return into;
 }
 
+// Fewer children than this are quicker to walk again than to hold.
+const HELD_FANOUT = 64;
+const heldChildren = new WeakMap<LogIndex, Map<number, readonly number[]>>();
+
+/**
+ * {@link childRows} for a read that repeats, as a window edge on every frame of a drag.
+ * A wide row's list is built once and shared, so the caller must not change it.
+ */
+export function sharedChildRows(index: LogIndex, row: number): readonly number[] {
+  let byRow = heldChildren.get(index);
+  const held = byRow?.get(row);
+  if (held) {
+    return held;
+  }
+  const children = childRows(index, row);
+  if (children.length > HELD_FANOUT) {
+    if (!byRow) {
+      byRow = new Map();
+      heldChildren.set(index, byRow);
+    }
+    byRow.set(row, children);
+  }
+  return children;
+}
+
 class Index implements LogIndex {
   readonly log: ApexLog;
   readonly rowCount: number;

@@ -5,7 +5,7 @@ import type { ApexEvent, ApexLog } from '@apexdevtools/apex-log-parser';
 import { describe, expect, it } from '@jest/globals';
 
 import { storeOf } from '#test-helpers/apexLog.js';
-import { buildLogIndex, type LogIndex, NO_ROW } from '../LogIndex.js';
+import { buildLogIndex, type LogIndex, NO_ROW, sharedChildRows } from '../LogIndex.js';
 
 const NESTED =
   '09:18:22.6 (1000)|METHOD_ENTRY|[1]|01p|ns.Outer.run()\n' +
@@ -129,5 +129,47 @@ describe('LogStore.logIndex', () => {
 
     expect(store.logIndex()).toBe(sliced);
     expect(columnsOf(await sliced)).toEqual(columnsOf(buildLogIndex(log)));
+  });
+});
+
+describe('sharedChildRows', () => {
+  // A window edge reads the same wide parent on every frame of a drag.
+  const WIDE =
+    '09:18:22.6 (1000)|METHOD_ENTRY|[1]|01p|ns.Outer.run()\n' +
+    Array.from(
+      { length: 100 },
+      (_, i) =>
+        `09:18:22.6 (${1001 + i * 10})|METHOD_ENTRY|[2]|01p|ns.Inner.call()\n` +
+        `09:18:22.6 (${1005 + i * 10})|METHOD_EXIT|[2]|ns.Inner.call()\n`,
+    ).join('') +
+    '09:18:22.6 (3000)|METHOD_EXIT|[1]|ns.Outer.run()\n';
+
+  const outerOf = (index: LogIndex): number =>
+    Array.from({ length: index.rowCount }, (_, row) => row).find(
+      (row) => index.event(row).text === 'ns.Outer.run()',
+    )!;
+  const typesOf = (index: LogIndex, rows: readonly number[]): string[] =>
+    rows.map((row) => index.event(row).type);
+
+  it('walks a wide row once, then hands back the same list', async () => {
+    const { log } = await storeOf(WIDE);
+    const index = buildLogIndex(log);
+    const outer = outerOf(index);
+    const first = sharedChildRows(index, outer);
+
+    expect(typesOf(index, first)).toEqual(Array(100).fill('METHOD_ENTRY'));
+    expect(sharedChildRows(index, outer)).toBe(first);
+  });
+
+  it('reads the rows under a narrow row', async () => {
+    const { log } = await storeOf(NESTED);
+    const index = buildLogIndex(log);
+
+    // The query sits under Inner.first, not beside it.
+    expect(typesOf(index, sharedChildRows(index, outerOf(index)))).toEqual([
+      'STATEMENT_EXECUTE',
+      'METHOD_ENTRY',
+      'METHOD_ENTRY',
+    ]);
   });
 });

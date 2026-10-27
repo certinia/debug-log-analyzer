@@ -3,7 +3,7 @@
  */
 import { CHECK_EVERY, type Tick } from '../utility/FrameBudget.js';
 import { firstIndexWhere } from '../utility/Util.js';
-import { childRows, type LogIndex } from './LogIndex.js';
+import { type LogIndex, sharedChildRows } from './LogIndex.js';
 import type { TimeWindow } from './rangeScope.js';
 import { eachSelfGap, overlapOf, reachedRun } from './windowStats.js';
 
@@ -42,7 +42,7 @@ function rowIn(index: LogIndex, row: number, window: TimeWindow): { total: numbe
   if (total === 0) {
     return { total: 0, self: 0 };
   }
-  const children = childRows(index, row);
+  const children = sharedChildRows(index, row);
   const { from, to } = reachedRun(index, children, window);
   if (to - from > WIDE) {
     return { total, self: total - wideChildTimeIn(index, row, children, from, to, window) };
