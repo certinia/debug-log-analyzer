@@ -78,7 +78,7 @@ The **Memory** view carries three heap metrics per call path - **net** (retained
 
 ### Filtering
 
-1. **Details** - events with 0 time are hidden by default; toggle to show them (all views).
+1. **Details** - off by default, which hides details such as debug lines and variables. Methods, queries and DML always show, even with 0 time. Exceptions and limit usage show in **Time Order** and **Aggregated**, and in **Bottom-Up** only with Details on.
 1. **Debug Only** - show only debug statements (**Time Order** and **Aggregated**).
 1. **Type** - keep a single event type (**Time Order** and **Aggregated**).
 1. **Namespace** - keep one or more namespaces from the dropdown.
