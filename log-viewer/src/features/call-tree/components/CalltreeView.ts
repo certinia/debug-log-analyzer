@@ -176,7 +176,6 @@ export class CalltreeView extends LitElement {
   );
   private readonly _timeOrderDetails: RowFilter<TimeOrderNode> = {
     test: (node) => this._timeOrderSource?.details.test(node) ?? true,
-    keepAncestors: true,
   };
 
   /** The event a go-to found the filters hiding, so the toolbar can offer to clear them. */

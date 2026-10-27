@@ -208,7 +208,8 @@ describe('TimeOrderSource', () => {
     const detailedSource = await sourceOf(detailed);
     const typeOf = (node: TimeOrderNode) => detailed.log.event(detailedSource.key(node))?.type;
 
-    expect(detailedSource.details.keepAncestors).toBe(true);
+    // An ancestor walk would make a node for every row before the first paint.
+    expect(detailedSource.details.keepAncestors).toBeUndefined();
     expect(
       allNodes(detailedSource).map((node) => [typeOf(node), detailedSource.details.test(node)]),
     ).toEqual([
