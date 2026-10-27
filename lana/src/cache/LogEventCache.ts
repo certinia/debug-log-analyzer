@@ -46,7 +46,7 @@ export class LogEventCache {
       }
     }
 
-    const parsing = LogEventCache.read(uri, key, reporter);
+    const parsing = LogEventCache.read(uri, reporter);
     LogEventCache.cache.set(key, parsing);
     void parsing.then((apexLog) => {
       // A failure is not kept, so the next ask reads the file again.
@@ -57,7 +57,8 @@ export class LogEventCache {
     return parsing;
   }
 
-  private static async read(uri: Uri, key: string, reporter: LogReporter): Promise<ApexLog | null> {
+  private static async read(uri: Uri, reporter: LogReporter): Promise<ApexLog | null> {
+    const key = uri.toString();
     // Bytes, not text: the parser reads them without a decoded copy of the whole log.
     const [apexLog, error] = await tryCatchAsync(async () =>
       parse(await workspace.fs.readFile(uri)),
