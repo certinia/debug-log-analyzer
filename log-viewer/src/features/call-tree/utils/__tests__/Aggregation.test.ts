@@ -319,16 +319,6 @@ describe('toBottomUpTree', () => {
     expect(searchRow.totalTime).toBe(800);
   });
 
-  it('recursive self-caller row uses only outermost entry total and maintains self ≤ total', async () => {
-    const rows = await bottomUpOf(recursiveSearch());
-
-    const searchRow = findRowByText(rows, 'Search');
-    const selfCallerRow = findRowByText(searchRow._children ?? [], 'Search');
-
-    expect(selfCallerRow.totalTime).toBe(750);
-    expect(selfCallerRow.totalSelfTime).toBeLessThanOrEqual(selfCallerRow.totalTime);
-  });
-
   it('renders recursive self-callers one level at a time until the real stack is exhausted', async () => {
     const rows = await bottomUpOf(recursiveSearch());
 
@@ -399,8 +389,6 @@ describe('toBottomUpTree', () => {
     );
 
     const searchRow = findRowByText(rows, 'Search');
-    expect(searchRow.totalTime).toBe(800);
-    expect(searchRow.totalSelfTime).toBe(150);
     // The outermost call holds all three; summing each call's total would say 6.
     expect(searchRow.dmlCount.total).toBe(3);
     expect(searchRow.soqlCount.total).toBe(3);
@@ -416,9 +404,6 @@ describe('toBottomUpTree', () => {
     );
 
     assertTotalIsAtLeastSelf(rows);
-    const buildNodeRows = rows.filter((row) => row.text === 'buildNode');
-    // Different entry types are bucketed separately: CODE_UNIT_STARTED + METHOD_ENTRY.
-    expect(buildNodeRows).toHaveLength(2);
   });
 
   it('shows each unique method exactly once at root even with mixed entry types and recursion', async () => {

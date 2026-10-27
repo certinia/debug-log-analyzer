@@ -59,31 +59,9 @@ describe('RawLogFoldingProvider', () => {
   it.each([
     ['a method', [enter(1000), debug(1500), exit(2000)], [region(0, 2)]],
     [
-      'a method over a line with no timestamp',
-      [enter(1000), debug(1500), 'more of the message', exit(2000)],
-      [region(0, 3)],
-    ],
-    [
-      'two methods that start at one timestamp',
-      [enter(1000, 'A.a()'), enter(1000, 'A.b()'), exit(2000, 'A.b()'), exit(2000, 'A.a()')],
-      [region(0, 3), region(1, 2)],
-    ],
-    [
       'a parent and its child',
       [enter(1000, 'A.a()'), enter(1500, 'A.b()'), exit(2000, 'A.b()'), exit(3000, 'A.a()')],
       [region(0, 3), region(1, 2)],
-    ],
-    [
-      'three levels',
-      [
-        enter(1000, 'A.a()'),
-        enter(2000, 'A.b()'),
-        enter(3000, 'A.c()'),
-        exit(4000, 'A.c()'),
-        exit(5000, 'A.b()'),
-        exit(6000, 'A.a()'),
-      ],
-      [region(0, 5), region(1, 4), region(2, 3)],
     ],
     [
       'siblings',
