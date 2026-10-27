@@ -777,7 +777,7 @@ export class CalltreeView extends LitElement {
     this._applyFilters();
   }
 
-  /** Not a filter change, so a build leaves the hidden-row note in place. */
+  // Not a filter change, so a build leaves the hidden-row note in place.
   private _applyFilters() {
     if (this.timeOrderGrid && this.viewMode === 'time-order') {
       this.timeOrderGrid.filters = this._timeOrderFilters();

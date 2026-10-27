@@ -45,7 +45,7 @@ export class TimeOrderSource implements TreeSource<TimeOrderNode> {
     const { total } = index;
     const isFrame = index.column(index.log.columns.isFrame);
     const types = index.column(index.log.columns.type);
-    // No keepAncestors: only a frame has children, and every frame passes. The ancestor walk made a node per row.
+    // No keepAncestors: only a frame has children, and every frame passes.
     this.details = {
       test: ({ row }) => isFrame[row] === 1 || total[row]! > 0 || DETAIL_TYPE_IDS.has(types[row]!),
     };

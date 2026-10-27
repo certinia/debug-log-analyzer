@@ -70,7 +70,6 @@ export class OverflowList extends LitElement {
   @state()
   private hasEnd = false;
 
-  /** The `collapse-last` children are in the menu. */
   @state()
   private endCollapsed = false;
 
@@ -285,7 +284,6 @@ export class OverflowList extends LitElement {
     return ([...this.children] as HTMLElement[]).filter((el) => el.hasAttribute('collapse-last'));
   }
 
-  /** Moves the `collapse-last` children into the menu once the toggle and their `min-width` no longer fit. */
   private _fitEnd(hostWidth: number): void {
     const last = this._collapseLast();
     if (!last.length) {
