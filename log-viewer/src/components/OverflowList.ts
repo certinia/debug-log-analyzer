@@ -33,9 +33,9 @@ const BAR_GAP = 6;
  * reflow loop.
  *
  * Children with `slot="end"` never collapse: they sit after the toggle, and the items no
- * longer stretch, so the toggle and those controls follow the last visible item. An `end`
- * child marked `collapse-last` may shrink to its `min-width`; past that it moves into the
- * menu too, after every item.
+ * longer stretch, so the toggle and those controls follow the last visible item. A child
+ * marked `collapse-last` sits there too, whatever its `slot`, and may shrink to the
+ * `min-width` it must state; past that it moves into the menu, after every item.
  *
  * API mirrors Blueprint/Mantine `OverflowList`: `collapse-from`, `min-visible`, `menu-heading`.
  * `part="toggle"`/`part="menu"` expose the control + panel for external styling.
@@ -295,8 +295,9 @@ export class OverflowList extends LitElement {
     if (!hostWidth) {
       return;
     }
+    // Its stated min-width, not its width: in the menu that is the menu's.
     const min = last.reduce(
-      (sum, el) => sum + (parseFloat(getComputedStyle(el).minWidth) || el.offsetWidth) + BAR_GAP,
+      (sum, el) => sum + (parseFloat(getComputedStyle(el).minWidth) || 0) + BAR_GAP,
       0,
     );
     this.endCollapsed = hostWidth < OVERFLOW_RESERVE + min;
