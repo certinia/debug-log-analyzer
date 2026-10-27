@@ -2,15 +2,11 @@
  * Copyright (c) 2026 Certinia Inc. All rights reserved.
  */
 
-import { EVENT_TYPES, eventType, type EventType } from '@apexdevtools/apex-log-parser';
+import { EVENT_TYPES, eventType, SHAPE, type EventType } from '@apexdevtools/apex-log-parser';
 
 import type { LogIndex } from '#core/log/LogIndex.js';
 
-/**
- * Detail types the top-down views always show: exceptions, fatal errors, and the
- * types that report governor figures. Two of those are parents, but they count as
- * details, never as frames.
- */
+// Exceptions, fatal errors, and the cumulative limit and profiling blocks; the blocks have children but are never frames.
 const PINNED_TYPES: ReadonlySet<EventType> = new Set<EventType>([
   // Parser 0.3 marked these two `discontinuity`; 0.4 does not export that flag.
   'EXCEPTION_THROWN',
@@ -21,17 +17,12 @@ const PINNED_TYPES: ReadonlySet<EventType> = new Set<EventType>([
   'CUMULATIVE_PROFILING_BEGIN',
 ]);
 
-/**
- * What an event is to the call-tree views, from its type alone and never its time.
- * A `frame` can hold children. A `pinned` detail is an exception, a fatal error or
- * a limit or profiling block, which the top-down views always show. Any other
- * `detail` shows only when the Details filter is on.
- */
+/** An event's role in the call-tree views, by type: a `frame`, a `pinned` detail the top-down views always show, or a `detail` shown only with Details on. */
 export type EventKind = 'frame' | 'pinned' | 'detail';
 
 // By type, not `columns.isFrame`: a VF call with no method is a frame here, as in parser 0.3.
 const KIND_BY_TYPE_ID: readonly EventKind[] = EVENT_TYPES.map(({ type, shape }) =>
-  PINNED_TYPES.has(type) ? 'pinned' : shape === 'frame' ? 'frame' : 'detail',
+  PINNED_TYPES.has(type) ? 'pinned' : shape === SHAPE.Frame ? 'frame' : 'detail',
 );
 
 /** The {@link EventKind} of an event of type `type`. */
