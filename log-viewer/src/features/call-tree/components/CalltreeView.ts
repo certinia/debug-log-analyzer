@@ -431,6 +431,7 @@ export class CalltreeView extends LitElement {
                 type="button"
                 class="filter-control pill-toggle"
                 aria-pressed="${this.filterState.showDetails}"
+                title="Show Detail Events"
                 @click="${this._handleShowDetailsChange}"
               >
                 Details
@@ -443,6 +444,7 @@ export class CalltreeView extends LitElement {
                         type="button"
                         class="filter-control pill-toggle"
                         aria-pressed="${this.filterState.debugOnly}"
+                        title="Show Debug Statements Only"
                         @click="${this._handleDebugOnlyChange}"
                       >
                         Debug Only

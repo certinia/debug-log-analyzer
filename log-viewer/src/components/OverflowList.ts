@@ -15,7 +15,7 @@ import { globalStyles } from '../styles/global.styles.js';
 import { computeVisibleCount } from './overflowFit.js';
 
 /** Space reserved for the overflow toggle once the row can't fit every item (px). */
-const OVERFLOW_RESERVE = 56;
+export const OVERFLOW_RESERVE = 56;
 /** Shared by the toggle's `popovertarget`/`aria-controls` and the panel's `id` — must match. */
 const PANEL_ID = 'overflow-list-panel';
 /** Gap between the items, the toggle and the `end` slot (px). */
@@ -177,6 +177,10 @@ export class OverflowList extends LitElement {
         margin: var(--lana-space-xs) 0 0 0;
         min-width: 200px;
         max-width: min(92vw, 340px);
+        box-sizing: border-box;
+        /* Bounded by the window, not the pane: like any menu it may cover a docked panel. */
+        max-height: min(540px, 90vh);
+        overflow-y: auto;
         padding: var(--lana-space-xs);
       }
 
@@ -193,14 +197,6 @@ export class OverflowList extends LitElement {
         font-weight: 600;
         font-size: var(--lana-text-base);
         color: var(--lana-fg);
-      }
-
-      .menu-items {
-        display: flex;
-        flex-direction: column;
-        gap: 4px;
-        align-items: flex-start;
-        padding: 0 4px 2px;
       }
     `,
   ];
@@ -365,13 +361,17 @@ export class OverflowList extends LitElement {
     const total = this._items().length;
     const hiddenCount = total - Math.min(this.visibleCount, total);
     const fromStart = this.collapseFrom === 'start';
-    const sep = html`<divider-line orientation="vertical" class="sep"></divider-line>`;
+    const sep =
+      hiddenCount < total
+        ? html`<divider-line orientation="vertical" class="sep"></divider-line>`
+        : '';
     const button = html`<button
       part="toggle"
       class="overflow"
       popovertarget=${PANEL_ID}
       aria-controls=${PANEL_ID}
-      title="Show ${hiddenCount} more"
+      title="Show ${hiddenCount} More ${this.menuHeading}"
+      aria-label="Show ${hiddenCount} More ${this.menuHeading}"
     >
       <span class="overflow__count">+${hiddenCount}</span>
       <vscode-icon

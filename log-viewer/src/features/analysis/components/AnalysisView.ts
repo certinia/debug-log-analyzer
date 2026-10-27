@@ -270,6 +270,7 @@ export class AnalysisView extends LitElement {
               type="button"
               class="filter-control pill-toggle"
               aria-pressed="${this._showDetails}"
+              title="Show Detail Events"
               @click="${() => (this._showDetails = !this._showDetails)}"
             >
               Details

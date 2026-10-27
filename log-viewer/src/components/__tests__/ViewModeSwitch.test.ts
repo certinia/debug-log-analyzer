@@ -45,4 +45,24 @@ describe('ViewModeSwitch', () => {
     buttons(el)[0]?.click(); // Alpha (already active — no event)
     expect(seen).toEqual(['c']);
   });
+
+  it('compact, shows the label and emits the value of the picked mode', async () => {
+    const el = await mount('a');
+    el.compact = true;
+    await el.updateComplete;
+    const seen: string[] = [];
+    el.addEventListener('view-mode-change', (e) =>
+      seen.push((e as CustomEvent<{ value: string }>).detail.value),
+    );
+
+    const picker = el.shadowRoot?.querySelector('vs-select') as HTMLInputElement;
+    expect(picker.value).toBe('Alpha');
+    picker.value = 'Gamma';
+    picker.dispatchEvent(new Event('change'));
+
+    // The picker speaks in labels; a label sent on would match no mode.
+    expect(seen).toEqual(['c']);
+    // One combobox, so no longer a radiogroup, but still a named group.
+    expect(el.getAttribute('role')).toBe('group');
+  });
 });

@@ -50,6 +50,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- 🧰 **Toolbars**: components no longer overlap when resized.
 - 🔎 **Retrieve Apex Log**: typing in the log list filters the logs. ([#594])
 - 📤 **Copy and export**: both work on Analysis and Bottom-Up. ([#1110])
 - 🔦 **Find**: in the tables, the current match stands out from the other matches, as it does in the editor.

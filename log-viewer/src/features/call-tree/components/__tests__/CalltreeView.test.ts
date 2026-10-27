@@ -327,7 +327,7 @@ describe('calltree-view table lifetime', () => {
   });
 
   const toolbarClick = (label: string) =>
-    view.renderRoot.querySelector<HTMLElement>(`vscode-toolbar-button[label="${label}"]`)?.click();
+    view.renderRoot.querySelector<HTMLElement>(`toolbar-action[label="${label}"]`)?.click();
 
   it.each([
     ['time-order', 'timeOrderGrid'],
@@ -344,7 +344,7 @@ describe('calltree-view table lifetime', () => {
       }
       const copy = jest.spyOn(grid, 'copy').mockResolvedValue(undefined);
       toolbarClick('Export to CSV');
-      toolbarClick('Copy to clipboard');
+      toolbarClick('Copy to Clipboard');
 
       expect(exportCsv).toHaveBeenCalledWith(grid, `call-tree-${mode}.csv`);
       expect(copy).toHaveBeenCalled();

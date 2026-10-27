@@ -156,7 +156,7 @@ export class LogLevels extends LitElement {
     >
       <vscode-icon name="discard"></vscode-icon>
     </button>`;
-    return html`<overflow-list menu-heading="Log levels">
+    return html`<overflow-list menu-heading="Log Levels">
       ${repeat(
         Object.entries(this.captured) as [keyof DebugLevels, LogLevel][],
         ([category]) => category,
