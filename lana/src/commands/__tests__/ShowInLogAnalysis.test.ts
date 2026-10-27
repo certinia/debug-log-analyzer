@@ -82,7 +82,9 @@ describe('ShowInLogAnalysis', () => {
     const panel = openPanel();
     mockGetCurrentView.mockReturnValue(panel);
     mockGetLogUri.mockReturnValue(Uri.parse('memfs:/logs/a.log'));
-    window.activeTextEditor = { document: { uri: Uri.parse('memfs:/logs/a.log') } };
+    window.activeTextEditor = {
+      document: { uri: Uri.parse('memfs:/logs/a.log') },
+    } as typeof window.activeTextEditor;
     ShowInLogAnalysis.apply(asContext(createMockContext()));
 
     await command()({ eventIndex: 42 });
