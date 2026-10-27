@@ -206,8 +206,21 @@
   --lana-sash-size: var(--lana-space-2xs);
   --lana-sash-inset: calc(var(--lana-sash-size) / -2);
 
-  /* Shared height for the inspector dock's action bar and pane section headers. */
+  /* Height of the inspector dock's action bar. */
   --lana-panel-header-height: var(--lana-space-xl);
+
+  /* Section headers, as VS Code draws its own view sections. Modern UI is the base;
+     each reads a `--lana-mode-*` override that only the `:root` rules below set, as a
+     `:host` copy would hide anything a component's ancestor set. */
+  --lana-section-header-height: var(
+    --lana-mode-section-header-height,
+    var(--vscode-spacing-size280, 28px)
+  );
+  --lana-section-header-inset: var(--lana-mode-section-header-inset, var(--lana-space-2xs));
+  --lana-section-header-radius: var(--lana-mode-section-header-radius, var(--lana-radius-sm));
+  --lana-section-title-size: var(--lana-mode-section-title-size, var(--lana-text-base));
+  --lana-section-title-weight: var(--lana-mode-section-title-weight, 600);
+  --lana-section-separator-inset: var(--lana-mode-section-separator-inset, var(--lana-space-2xs));
 
   /* Least a pane section shows before the stack scrolls instead: its header and
      about a row of body. Small, and the same for every section, so a drag can
@@ -234,4 +247,15 @@
     24%,
     calc(var(--lana-panel-header-height) * 12)
   );
+}
+
+/* The user's VS Code look, set by `features/settings/uiMode.ts`. */
+:root[data-ui-mode='classic'] {
+  /* VS Code's classic pane header; no `--vscode-*` size holds it. */
+  --lana-mode-section-header-height: 22px;
+  --lana-mode-section-header-inset: 0px;
+  --lana-mode-section-header-radius: 0px;
+  --lana-mode-section-title-size: var(--lana-text-sm);
+  --lana-mode-section-title-weight: 700;
+  --lana-mode-section-separator-inset: 0px;
 }

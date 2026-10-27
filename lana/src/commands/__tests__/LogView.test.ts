@@ -5,7 +5,7 @@ import { describe, expect, it } from '@jest/globals';
 
 import { asContext, createMockContext } from '../../__tests__/helpers/test-builders.js';
 import { Uri, workspace } from '../../__tests__/mocks/vscode.js';
-import { getConfig } from '../../workspace/AppConfig.js';
+import { getConfig, sameConfig } from '../../workspace/AppConfig.js';
 import { WebView } from '../../display/WebView.js';
 import { LogView } from '../LogView.js';
 
@@ -14,6 +14,9 @@ jest.mock('../../display/WebView.js', () => ({
 }));
 jest.mock('../../workspace/AppConfig.js', () => ({
   PRIVATE_SECTIONS: [],
+  UI_SETTINGS: jest.requireActual<typeof import('../../workspace/AppConfig.js')>(
+    '../../workspace/AppConfig.js',
+  ).UI_SETTINGS,
   getColumnOverrides: jest.fn(() => ({})),
   getColumnViews: jest.fn(() => ({})),
   getConfig: jest.fn(() => ({
@@ -163,5 +166,21 @@ describe('LogView', () => {
       requestId: 'request-3',
       error: 'Unknown request: notACommand',
     });
+  });
+
+  // The chrome follows VS Code's Modern or Classic UI, which lives under `workbench`.
+  it('pushes the config when the Modern UI setting changes, and not for an unrelated key', async () => {
+    const { postMessage } = await createViewWithListener();
+    const onChange = (workspace.onDidChangeConfiguration as unknown as jest.Mock).mock.calls.at(
+      -1,
+    )?.[0] as (event: { affectsConfiguration: (section: string) => boolean }) => void;
+    (sameConfig as jest.Mock).mockReturnValue(false);
+
+    onChange({ affectsConfiguration: (section) => section === 'editor.fontSize' });
+    expect(postMessage).not.toHaveBeenCalledWith(expect.objectContaining({ cmd: 'configChanged' }));
+
+    onChange({ affectsConfiguration: (section) => section === 'workbench.experimental.modernUI' });
+    expect(postMessage).toHaveBeenCalledWith(expect.objectContaining({ cmd: 'configChanged' }));
+    (sameConfig as jest.Mock).mockReturnValue(true);
   });
 });
