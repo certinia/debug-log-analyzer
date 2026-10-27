@@ -381,7 +381,8 @@ export class ApexLogTimeline {
   public navigateToEventIndex(eventIndex: number): void {
     const row =
       this.index && this.frames ? drawnRowNear(this.index, this.frames, eventIndex) : NO_ROW;
-    this._reveal(row === NO_ROW ? null : this.locateRow(row));
+    // With no drawn frame above it, such as the FATAL_ERROR closing a truncated log, still move to its time.
+    this._reveal(row === NO_ROW ? this.locate(eventIndex) : this.locateRow(row));
   }
 
   /**
