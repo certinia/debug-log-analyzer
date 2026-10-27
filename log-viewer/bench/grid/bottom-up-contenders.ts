@@ -8,7 +8,7 @@ import { logStoreFor } from '../../src/core/log/LogStore.js';
 import '../../src/features/call-tree/grid/CallTreeGrid.js';
 import type { CallTreeGrid } from '../../src/features/call-tree/grid/CallTreeGrid.js';
 import {
-  BOTTOM_UP_DETAILS,
+  BOTTOM_UP_WITHOUT_DETAILS,
   BOTTOM_UP_SORT,
   bottomUpColumns,
   mergedLines,
@@ -24,7 +24,7 @@ export class LvGridBottomUp extends LvGridBench<BottomUpRow> implements BottomUp
   async mount(host: HTMLElement, log: ApexLog): Promise<void> {
     const grid = document.createElement('lv-call-tree-grid') as CallTreeGrid<BottomUpRow>;
     grid.columns = bottomUpColumns(log, { openType: () => {} });
-    grid.filters = [BOTTOM_UP_DETAILS];
+    grid.filters = [BOTTOM_UP_WITHOUT_DETAILS];
     grid.sort = BOTTOM_UP_SORT;
     grid.rowLines = mergedLines;
     const roots = await buildBottomUpTree(

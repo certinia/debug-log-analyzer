@@ -3,11 +3,11 @@
  */
 import type { LogEvent, ApexLog } from '@apexdevtools/apex-log-parser';
 
-import { AGGREGATED_DETAILS } from '../../src/features/call-tree/grid/columns.js';
+import { AGGREGATED_WITHOUT_DETAILS } from '../../src/features/call-tree/grid/columns.js';
 import type { TimeOrderRow } from '../../src/features/call-tree/utils/TimeOrderTree.js';
 import type { RowFilter } from '../../src/grid/core/index.js';
 
-export const timeOrderDetails: RowFilter<TimeOrderRow> = AGGREGATED_DETAILS;
+export const timeOrderDetails: RowFilter<TimeOrderRow> = AGGREGATED_WITHOUT_DETAILS;
 
 /** The deepest event in the middle of the log: the worst go-to-row a user can ask for. */
 export function deepEvent(log: ApexLog): LogEvent {

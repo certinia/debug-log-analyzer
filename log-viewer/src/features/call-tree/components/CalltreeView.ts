@@ -33,9 +33,9 @@ import type {
 } from '../../../grid/index.js';
 import '../grid/CallTreeGrid.js';
 import {
-  AGGREGATED_DETAILS,
+  AGGREGATED_WITHOUT_DETAILS,
   aggregatedColumns,
-  BOTTOM_UP_DETAILS,
+  BOTTOM_UP_WITHOUT_DETAILS,
   BOTTOM_UP_SORT,
   bottomUpColumns,
   BOTTOM_UP_GROUPS,
@@ -43,7 +43,7 @@ import {
   CALL_TREE_COLUMN_SETTINGS,
   mergedLines,
   openType,
-  TIME_ORDER_DETAILS,
+  TIME_ORDER_WITHOUT_DETAILS,
   timeOrderColumns,
   timeOrderSource,
 } from '../grid/columns.js';
@@ -718,7 +718,7 @@ export class CalltreeView extends LitElement {
       total: (row) => row.totalTime,
       self: (row) => row.totalSelfTime,
       type: { of: (row) => row.originalData.type, debugOnly: AGGREGATED_DEBUG_ONLY },
-      details: AGGREGATED_DETAILS,
+      details: AGGREGATED_WITHOUT_DETAILS,
     });
   }
 
@@ -729,7 +729,7 @@ export class CalltreeView extends LitElement {
       total: (e) => e.duration.total,
       self: (e) => e.duration.self,
       type: { of: (e) => e.type, debugOnly: DEBUG_ONLY },
-      details: TIME_ORDER_DETAILS,
+      details: TIME_ORDER_WITHOUT_DETAILS,
     });
   }
 
@@ -737,7 +737,7 @@ export class CalltreeView extends LitElement {
   private _bottomUpFilters(): RowFilter<BottomUpRow>[] {
     return this._viewFilters<BottomUpRow>('bottom-up', {
       ...BOTTOM_UP_MEASURES,
-      details: BOTTOM_UP_DETAILS,
+      details: BOTTOM_UP_WITHOUT_DETAILS,
     });
   }
 

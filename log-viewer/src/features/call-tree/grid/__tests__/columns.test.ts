@@ -25,13 +25,13 @@ import { reportedUsage } from '../../utils/reportedUsage.js';
 import { CallTreeGrid, categoryClass } from '../CallTreeGrid.js';
 import { nameCell } from '../cells.js';
 import {
-  AGGREGATED_DETAILS,
+  AGGREGATED_WITHOUT_DETAILS,
   aggregatedColumns,
-  BOTTOM_UP_DETAILS,
+  BOTTOM_UP_WITHOUT_DETAILS,
   BOTTOM_UP_SORT,
   bottomUpColumns,
   mergedLines,
-  TIME_ORDER_DETAILS,
+  TIME_ORDER_WITHOUT_DETAILS,
   timeOrderColumns,
   timeOrderSource,
 } from '../columns.js';
@@ -201,7 +201,7 @@ describe('Details filters', () => {
     roots.flatMap((r) => [r, ...merged(r._children ?? [])]);
 
   it('keeps frames and pinned details in Time Order', () => {
-    const kept = allRows(mixed.children).filter((e) => TIME_ORDER_DETAILS.test(e));
+    const kept = allRows(mixed.children).filter((e) => TIME_ORDER_WITHOUT_DETAILS.test(e));
     expect(kept.map((e) => e.type).sort()).toEqual(
       [...frames, 'METHOD_ENTRY', 'METHOD_ENTRY', ...pinned].sort(),
     );
@@ -209,7 +209,7 @@ describe('Details filters', () => {
 
   it('keeps frames and pinned details in Aggregated, a method that took no time included', () => {
     const rows = merged(toAggregatedCallTree(mixed.children, mixedStore.keyPathIds()));
-    const kept = rows.filter((row) => AGGREGATED_DETAILS.test(row));
+    const kept = rows.filter((row) => AGGREGATED_WITHOUT_DETAILS.test(row));
     expect(kept.map((row) => row.type).sort()).toEqual([...frames, ...pinned].sort());
     const instant = kept.find((row) => row.text === 'ns.Instant.run()');
     expect([instant?.callCount, instant?.totalTime]).toEqual([3, 0]);
@@ -218,7 +218,7 @@ describe('Details filters', () => {
   // The static variable list sat under a pinned limit block, and Bottom-Up showed it.
   it('keeps frames only in Bottom-Up, a method that took no time included', () => {
     const roots = toBottomUpTree(mixed.children, mixedStore.keyPathIds());
-    const kept = roots.filter((row) => BOTTOM_UP_DETAILS.test(row));
+    const kept = roots.filter((row) => BOTTOM_UP_WITHOUT_DETAILS.test(row));
     expect(kept.map((row) => row.type).sort()).toEqual([...frames].sort());
     const instant = kept.find((row) => row.text === 'ns.Instant.run()');
     expect([instant?.callCount, instant?.totalTime]).toEqual([3, 0]);

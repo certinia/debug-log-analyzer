@@ -16,7 +16,7 @@ import {
 } from '../../src/features/call-tree/utils/TimeOrderTree.js';
 import type { CallTreeGrid } from '../../src/features/call-tree/grid/CallTreeGrid.js';
 import {
-  TIME_ORDER_DETAILS,
+  TIME_ORDER_WITHOUT_DETAILS,
   timeOrderColumns,
   timeOrderSource,
 } from '../../src/features/call-tree/grid/columns.js';
@@ -55,7 +55,7 @@ const app: Setup<LogEvent> = (log) => {
   const grid = document.createElement('lv-call-tree-grid') as CallTreeGrid<LogEvent>;
   grid.columns = timeOrderColumns(log, { openType: () => {} });
   grid.source = timeOrderSource(log);
-  return { grid, details: TIME_ORDER_DETAILS };
+  return { grid, details: TIME_ORDER_WITHOUT_DETAILS };
 };
 
 /** The actions every lv-grid contender takes the same way. */
