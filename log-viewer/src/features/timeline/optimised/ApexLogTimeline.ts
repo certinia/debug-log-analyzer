@@ -50,7 +50,7 @@ import {
 } from '../utils/detail-selection-sync.js';
 import { extractExceptionMarkers, extractMarkers } from '../utils/marker-utils.js';
 import { seekWindow } from '../utils/navigate-window.js';
-import { buildTimelineFrames, type ApexEventNode } from '../utils/timeline-frames.js';
+import { buildTimelineFrames, drawnRowNear, type ApexEventNode } from '../utils/timeline-frames.js';
 import { FlameChart } from './FlameChart.js';
 import { FrameTooltipRenderer, type TooltipAnchor } from './FrameTooltipRenderer.js';
 import { apexLimitSeries } from './apex-limit-series.js';
@@ -379,7 +379,9 @@ export class ApexLogTimeline {
    * Navigate to a specific event using parser-assigned eventIndex.
    */
   public navigateToEventIndex(eventIndex: number): void {
-    this._reveal(this.locate(eventIndex));
+    const row =
+      this.index && this.frames ? drawnRowNear(this.index, this.frames, eventIndex) : NO_ROW;
+    this._reveal(row === NO_ROW ? null : this.locateRow(row));
   }
 
   /**

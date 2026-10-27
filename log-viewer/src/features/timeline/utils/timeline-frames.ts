@@ -149,3 +149,26 @@ function sortIfNeeded(rows: number[], start: Float64Array): number[] {
   }
   return rows;
 }
+
+/**
+ * The nearest drawn row at or above event `eventIndex`, so a detail, a frame with no
+ * duration or an event the log levels hide goes to the frame it sits in. NO_ROW when
+ * no frame above it is drawn.
+ */
+export function drawnRowNear(
+  index: LogIndex,
+  frames: TimelineFrames<EventNode>,
+  eventIndex: number,
+): number {
+  const { parent } = index.log.columns;
+  let id = eventIndex;
+  let row = index.rowOf(id);
+  while (row === NO_ROW && id > 0) {
+    id = parent[id] ?? 0;
+    row = index.rowOf(id);
+  }
+  while (row !== NO_ROW && !frames.isVisible(row)) {
+    row = index.parent[row]!;
+  }
+  return row;
+}

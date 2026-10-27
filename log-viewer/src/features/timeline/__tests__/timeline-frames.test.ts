@@ -3,8 +3,11 @@
  */
 import { describe, expect, it } from '@jest/globals';
 
+import { buildLogIndex } from '#core/log/LogIndex.js';
 import { indexOf } from '#test-helpers/apexLog.js';
 import { framesOf } from '#test-helpers/timeline.js';
+import { NO_ROW } from '../types/flamechart.types.js';
+import { buildTimelineFrames, drawnRowNear } from '../utils/timeline-frames.js';
 
 const NESTED =
   '09:18:22.6 (1000)|METHOD_ENTRY|[1]|01p|ns.Outer.run()\n' +
@@ -104,5 +107,53 @@ describe('buildTimelineFrames', () => {
 
       expect(frames.totalDuration).toBe(Math.max(...ends));
     });
+  });
+});
+
+describe('drawnRowNear', () => {
+  it('gives a drawn frame itself', async () => {
+    const { log, index, frames } = await framesOf(NESTED);
+    const inner = indexOf(log, 'ns.Inner.first()');
+
+    expect(drawnRowNear(index, frames, inner)).toBe(index.rowOf(inner));
+  });
+
+  // The chart draws no rect for a detail, so going to the detail itself selected nothing.
+  it('gives a detail the frame it sits in', async () => {
+    const { log, index, frames } = await framesOf(NESTED);
+    const statement = log.event(indexOf(log, 'ns.Outer.run()'))!.children[0]!;
+
+    expect(statement.type).toBe('STATEMENT_EXECUTE');
+    expect(frames.text(drawnRowNear(index, frames, statement.id))).toBe('ns.Outer.run()');
+  });
+
+  it('gives a frame with no duration the frame it sits in', async () => {
+    const { log, index, frames } = await framesOf(
+      '09:18:22.6 (1000)|METHOD_ENTRY|[1]|01p|ns.Outer.run()\n' +
+        '09:18:22.6 (1500)|METHOD_ENTRY|[2]|01p|ns.Instant.run()\n' +
+        '09:18:22.6 (1500)|METHOD_EXIT|[2]|ns.Instant.run()\n' +
+        '09:18:22.6 (2000)|METHOD_EXIT|[1]|ns.Outer.run()\n',
+    );
+
+    const row = drawnRowNear(index, frames, indexOf(log, 'ns.Instant.run()'));
+    expect(frames.text(row)).toBe('ns.Outer.run()');
+  });
+
+  // A hidden event has no row at all, so it climbs the log, not the index.
+  it('gives an event the log levels hide its nearest shown frame', async () => {
+    const { log } = await framesOf(NESTED);
+    const inner = indexOf(log, 'ns.Inner.first()');
+    const hidden = new Uint8Array(log.eventCount + 1);
+    hidden[inner] = 1;
+    const index = buildLogIndex(log, hidden);
+    const frames = buildTimelineFrames(index, new Set(['Apex', 'SOQL']), 0);
+
+    expect(frames.text(drawnRowNear(index, frames, inner))).toBe('ns.Outer.run()');
+  });
+
+  it('gives no row for an id the log does not hold', async () => {
+    const { index, frames } = await framesOf(NESTED);
+
+    expect(drawnRowNear(index, frames, 9999)).toBe(NO_ROW);
   });
 });
