@@ -10,7 +10,7 @@ import { rowMetrics, type RowMetrics, type SelfTotalColumns } from '#core/log/ro
 import { type Signatures, signaturesOf } from '#core/log/signatures.js';
 import { callerNamespaceOfRow } from '#core/utility/CallerNamespace.js';
 import { CHECK_EVERY, frameBudget, type FrameBudgetOptions } from '#core/utility/FrameBudget.js';
-import { computeHasDetailsDeep } from './DetailsFilter.js';
+import { type EventKind, eventKind } from './DetailsFilter.js';
 import { type CostLimits, costLimitsOf, setGovernorCost } from './GovernorCost.js';
 import {
   addReported,
@@ -88,8 +88,8 @@ export interface AggregatedRow {
   eventIndex: number;
   /** The timeline category of this row's calls */
   category: LogCategory;
-  /** See {@link computeHasDetailsDeep}. Precomputed during tree build. */
-  _hasDetailsDeep: boolean;
+  /** What the first call is to the Details filter. */
+  kind: EventKind;
 }
 
 /**
@@ -160,8 +160,8 @@ export interface BottomUpRow {
   eventIndex: number;
   /** The timeline category of this row's calls */
   category: LogCategory;
-  /** See {@link computeHasDetailsDeep}. Precomputed during tree build. */
-  _hasDetailsDeep: boolean;
+  /** What the first call is to the Details filter. */
+  kind: EventKind;
 }
 
 /**
@@ -219,13 +219,15 @@ async function driveSteps<T>(
 /** What every row of one build reads. */
 interface BuildContext {
   index: LogIndex;
+  /** Type ids by row. */
+  types: Uint16Array;
+  isFrame: Uint8Array;
   metrics: RowMetrics;
   paths: KeyPathIds;
   signatures: Signatures;
   costLimits: CostLimits;
   reported: ReportedUsage | null;
-  /** Per-build monotonic counter; row ids must be globally unique within this
-   *  tree so deepFilter caches don't collide across cascaded subtree passes. */
+  /** Per-build monotonic counter; the grid keys rows by id, so ids are unique within this tree. */
   idFor: () => number;
 }
 
@@ -237,6 +239,8 @@ function buildContext(
   let next = 0;
   return {
     index,
+    types: index.column(store.log.columns.type),
+    isFrame: index.column(store.log.columns.isFrame),
     metrics: rowMetrics(index),
     paths: store.keyPathIds(),
     signatures: signaturesOf(store.log),
@@ -381,11 +385,10 @@ function byTotalTimeDesc(a: AggregatedRow, b: AggregatedRow): number {
 /** No frame open above the level, so nothing in it can be a recursive call. */
 const NO_STACK = -1;
 
-/** Averages, governor cost and the Show Details roll-up, once `_children` is set. */
+/** Averages and governor cost, once `_children` is set. */
 function finaliseAggregatedRow(row: AggregatedRow, costLimits: CostLimits): void {
   calculateAverages(row);
   setGovernorCost(row, costLimits);
-  row._hasDetailsDeep = computeHasDetailsDeep(row, row.totalTime, row.type);
 }
 
 function addTally(
@@ -780,8 +783,6 @@ function* finalizeBuckets(
   costLimits: CostLimits,
 ): Generator<void, BottomUpRow[], void> {
   const roots = Array.from(rootBuckets.values());
-  // Pre-order, so walking it backwards meets every row after its children:
-  // _hasDetailsDeep reads theirs.
   const order: BottomUpRow[] = [];
   const pending = roots.slice();
   while (pending.length > 0) {
@@ -801,7 +802,6 @@ function* finalizeBuckets(
     if (row._children && row._children.length > 0) {
       sortBuckets(row._children);
     }
-    row._hasDetailsDeep = computeHasDetailsDeep(row, row.totalTime, row.type);
     if (i % CHECK_EVERY === 0) {
       yield;
     }
@@ -832,6 +832,7 @@ function rowLabels(build: BuildContext, row: number) {
     type: signatures.type(signature),
     eventIndex,
     category: rowCategory(index, row),
+    kind: eventKind(build.types[row]!, build.isFrame[row] === 1),
   };
 }
 
@@ -872,7 +873,7 @@ function createEmptyAggregatedRow(
     reported: emptyReported(),
     _children: null,
     instances: [],
-    _hasDetailsDeep: false,
+    kind: labels.kind,
   };
 }
 
@@ -915,7 +916,7 @@ function createEmptyBottomUpRow(
     reported: emptyReported(),
     _children: null,
     instances: [],
-    _hasDetailsDeep: false,
+    kind: labels.kind,
   };
 }
 

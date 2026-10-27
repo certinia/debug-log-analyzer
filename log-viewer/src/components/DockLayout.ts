@@ -90,12 +90,20 @@ export class DockLayout extends LitElement {
         min-width: 0;
         min-height: 0;
         overflow: hidden;
+        padding: 0 var(--dock-main-inset, 0);
+      }
+      /* The dock sits flush to the window edge it is docked on. */
+      .layout[data-open][data-dock='right'] .main {
+        padding-right: 0;
+      }
+      .layout[data-open][data-dock='left'] .main {
+        padding-left: 0;
       }
 
+      /* Invisible until hovered, over the dock's 1px edge, as VS Code's sash is. */
       .gutter {
         flex: 0 0 var(--lana-sash-size);
         z-index: 1;
-        background-color: var(--lana-panel-divider);
         transition: background-color 0.1s ease;
       }
       .layout[data-dock='right'] .gutter,
@@ -116,6 +124,12 @@ export class DockLayout extends LitElement {
         flex: 0 0 auto;
         overflow: hidden;
       }
+      .layout[data-dock='right'] detail-dock {
+        border-left: var(--lana-stroke) solid var(--lana-panel-divider);
+      }
+      .layout[data-dock='left'] detail-dock {
+        border-right: var(--lana-stroke) solid var(--lana-panel-divider);
+      }
       /* A size saved on one axis can exceed the other, and the window can shrink. */
       .layout:not([data-dock='bottom']) detail-dock {
         max-width: max(${unsafeCSS(MIN_SIZE)}px, 100% - ${unsafeCSS(MAIN_MIN_SIZE)}px);
@@ -134,7 +148,7 @@ export class DockLayout extends LitElement {
 
   render() {
     return html`
-      <div class="layout" data-dock=${this.dock}>
+      <div class="layout" data-dock=${this.dock} ?data-open=${this.visible}>
         <div class="main"><slot name="main"></slot></div>
         ${
           this.visible

@@ -171,7 +171,7 @@ export class GridContender implements Contender {
       painter: this.painter(),
       rowHeight: 24,
     });
-    await this.store.setFilters([this.source.details]);
+    await this.store.setFilters([this.source.withoutDetails]);
     this.show();
   }
 
@@ -261,7 +261,7 @@ export class GridContender implements Contender {
   }
 
   async setDetailFilter(on: boolean): Promise<void> {
-    await this.store.setFilters(on ? [this.source.details] : []);
+    await this.store.setFilters(on ? [this.source.withoutDetails] : []);
     this.show();
   }
 

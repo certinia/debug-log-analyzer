@@ -47,14 +47,14 @@ const plain: Setup<TimeOrderNode> = (source) => {
     'font: 13px sans-serif; --grid-fg: #ccc; --grid-bg: #1e1e1e; color-scheme: dark';
   grid.columns = plainColumns(source);
   grid.source = source;
-  return { grid, details: source.details };
+  return { grid, details: source.withoutDetails };
 };
 
 const app: Setup<TimeOrderNode> = (source) => {
   const grid = document.createElement('lv-call-tree-grid') as unknown as LvGrid<TimeOrderNode>;
   grid.columns = timeOrderColumns(source, { openType: () => {} });
   grid.source = source;
-  return { grid, details: source.details };
+  return { grid, details: source.withoutDetails };
 };
 
 /** The actions every lv-grid contender takes the same way. */

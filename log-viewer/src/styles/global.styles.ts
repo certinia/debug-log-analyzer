@@ -150,6 +150,12 @@ export const globalStyles = [
       mask-size: 70%;
     }
 
+    /* Else Chromium rings a scroller in the OS accent colour; the excluded hosts draw their own ring. */
+    :focus-visible:not(vscode-button, vscode-tab-header, vscode-tab-panel, vscode-textfield) {
+      outline: var(--lana-focus-ring);
+      outline-offset: var(--lana-focus-inset);
+    }
+
     .vs-checkbox:focus-visible {
       outline: var(--lana-focus-ring);
       outline-offset: var(--lana-focus-offset);

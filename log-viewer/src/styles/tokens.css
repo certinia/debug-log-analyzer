@@ -206,13 +206,25 @@
   --lana-sash-size: var(--lana-space-2xs);
   --lana-sash-inset: calc(var(--lana-sash-size) / -2);
 
-  /* Shared height for the inspector dock's action bar and pane section headers. */
+  /* Height of the inspector dock's action bar. */
   --lana-panel-header-height: var(--lana-space-xl);
+
+  /* Section headers, as VS Code draws its own view sections. Modern UI is the base;
+     each reads a `--lana-mode-*` override that only the `:root` rules below set, as a
+     `:host` copy would hide anything a component's ancestor set. */
+  --lana-section-header-height: var(
+    --lana-mode-section-header-height,
+    var(--vscode-spacing-size280, 28px)
+  );
+  --lana-section-header-inset: var(--lana-mode-section-header-inset, var(--lana-space-2xs));
+  --lana-section-header-radius: var(--lana-mode-section-header-radius, var(--lana-radius-sm));
+  --lana-section-title-size: var(--lana-mode-section-title-size, var(--lana-text-base));
+  --lana-section-title-weight: var(--lana-mode-section-title-weight, 600);
 
   /* Least a pane section shows before the stack scrolls instead: its header and
      about a row of body. Small, and the same for every section, so a drag can
-     take any of them down to the same size. */
-  --lana-pane-min: calc(var(--lana-panel-header-height) * 2);
+     take any of them down to the same size. A row is the action bar's height. */
+  --lana-pane-min: calc(var(--lana-section-header-height) + var(--lana-panel-header-height));
 
   /* Steady heights for a pane section whose content changes with the selection.
      Such a section takes its tier rather than its content, so stepping through
@@ -225,13 +237,23 @@
      depending on nothing the selection changes. The bounds are row counts under
      the header: sm 2-5 rows, md 5-11. */
   --lana-pane-sm: clamp(
-    calc(var(--lana-panel-header-height) * 3),
+    calc(var(--lana-section-header-height) + var(--lana-panel-header-height) * 2),
     10%,
-    calc(var(--lana-panel-header-height) * 6)
+    calc(var(--lana-section-header-height) + var(--lana-panel-header-height) * 5)
   );
   --lana-pane-md: clamp(
-    calc(var(--lana-panel-header-height) * 6),
+    calc(var(--lana-section-header-height) + var(--lana-panel-header-height) * 5),
     24%,
-    calc(var(--lana-panel-header-height) * 12)
+    calc(var(--lana-section-header-height) + var(--lana-panel-header-height) * 11)
   );
+}
+
+/* The user's VS Code look, set by `features/settings/uiMode.ts`. */
+:root[data-ui-mode='classic'] {
+  /* VS Code's classic pane header; no `--vscode-*` size holds it. */
+  --lana-mode-section-header-height: 22px;
+  --lana-mode-section-header-inset: 0px;
+  --lana-mode-section-header-radius: 0px;
+  --lana-mode-section-title-size: var(--lana-text-sm);
+  --lana-mode-section-title-weight: 700;
 }

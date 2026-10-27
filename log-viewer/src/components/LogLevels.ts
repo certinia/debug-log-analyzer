@@ -98,11 +98,6 @@ export class LogLevels extends LitElement {
         background-color: var(--lana-toolbar-hover-bg);
       }
 
-      .reset:focus-visible {
-        outline: var(--lana-stroke) solid var(--vscode-focusBorder);
-        outline-offset: calc(-1 * var(--lana-stroke));
-      }
-
       .reset:disabled {
         opacity: 0.35;
         cursor: default;

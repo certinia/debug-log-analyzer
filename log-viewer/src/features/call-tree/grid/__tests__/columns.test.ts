@@ -23,7 +23,9 @@ import { TimeOrderSource, type TimeOrderNode } from '../../utils/TimeOrderTree.j
 import { CallTreeGrid, categoryClass } from '../CallTreeGrid.js';
 import { nameCell } from '../cells.js';
 import {
+  AGGREGATED_WITHOUT_DETAILS,
   aggregatedColumns,
+  BOTTOM_UP_WITHOUT_DETAILS,
   BOTTOM_UP_SORT,
   bottomUpColumns,
   mergedLines,
@@ -198,7 +200,7 @@ describe('TimeOrderSource', () => {
     expect(source.children(outer!)).toBe(source.children(outer!));
   });
 
-  it('shows frames, timed events and exceptions as details, and not a bare leaf', async () => {
+  it('shows frames and exceptions with Details off, and not a bare leaf', async () => {
     const detailed = await storeOf(
       line(1000, 'METHOD_ENTRY|[1]|01p|ns.A.run()') +
         line(1100, 'STATEMENT_EXECUTE|[2]') +
@@ -209,7 +211,10 @@ describe('TimeOrderSource', () => {
     const typeOf = (node: TimeOrderNode) => detailed.log.event(detailedSource.key(node))?.type;
 
     expect(
-      allNodes(detailedSource).map((node) => [typeOf(node), detailedSource.details.test(node)]),
+      allNodes(detailedSource).map((node) => [
+        typeOf(node),
+        detailedSource.withoutDetails.test(node),
+      ]),
     ).toEqual([
       ['METHOD_ENTRY', true],
       ['STATEMENT_EXECUTE', false],
@@ -219,18 +224,86 @@ describe('TimeOrderSource', () => {
 
   // The filter keeps no ancestors for its rows, so a parent of only bare leaves must show on its own.
   it('shows every row that holds others, whatever they are', async () => {
-    // 0 ms, so only being a frame can show it.
+    // 0 ms, so only its kind can show it: a frame, or a limit block that is not one.
     const bare = await storeOf(
       line(1000, 'METHOD_ENTRY|[1]|01p|ns.A.run()') +
         line(1000, 'STATEMENT_EXECUTE|[2]') +
         line(1000, 'HEAP_ALLOCATE|[3]|Bytes:8') +
-        line(1000, 'METHOD_EXIT|[1]|ns.A.run()'),
+        line(1000, 'METHOD_EXIT|[1]|ns.A.run()') +
+        line(1000, 'CUMULATIVE_LIMIT_USAGE') +
+        line(1000, 'STATIC_VARIABLE_LIST|') +
+        line(1000, 'CUMULATIVE_LIMIT_USAGE_END'),
     );
     const bareSource = await sourceOf(bare);
     const parents = allNodes(bareSource).filter((node) => bareSource.children(node)?.length);
+    const typeOf = (node: TimeOrderNode) => bare.log.event(bareSource.key(node))?.type;
 
-    expect(parents.length).toBeGreaterThan(0);
-    expect(parents.every((node) => bareSource.details.test(node))).toBe(true);
+    expect(parents.map(typeOf)).toEqual(['METHOD_ENTRY', 'CUMULATIVE_LIMIT_USAGE']);
+    expect(parents.every((node) => bareSource.withoutDetails.test(node))).toBe(true);
+  });
+});
+
+describe('Details filters', () => {
+  let mixed: LogStore;
+  beforeAll(async () => {
+    mixed = await storeOf(
+      line(1000, 'METHOD_ENTRY|[1]|01p|ns.Outer.run()') +
+        line(1000, 'METHOD_ENTRY|[2]|01p|ns.Instant.run()') +
+        line(1000, 'METHOD_EXIT|[2]|ns.Instant.run()') +
+        line(1000, 'METHOD_ENTRY|[2]|01p|ns.Instant.run()') +
+        line(1000, 'METHOD_EXIT|[2]|ns.Instant.run()') +
+        line(1000, 'METHOD_ENTRY|[2]|01p|ns.Instant.run()') +
+        line(1000, 'METHOD_EXIT|[2]|ns.Instant.run()') +
+        line(2000, 'USER_DEBUG|[3]|DEBUG|hello') +
+        line(3000, 'EXCEPTION_THROWN|[4]|System.NullPointerException: boom') +
+        line(4000, 'CUMULATIVE_LIMIT_USAGE') +
+        line(4000, 'LIMIT_USAGE_FOR_NS|(default)|') +
+        '  Number of SOQL queries: 5 out of 100\n' +
+        line(4000, 'STATIC_VARIABLE_LIST|') +
+        line(5000, 'CUMULATIVE_LIMIT_USAGE_END') +
+        line(6000, 'METHOD_EXIT|[1]|ns.Outer.run()') +
+        line(7000, 'FATAL_ERROR|System.LimitException: Apex CPU time limit exceeded') +
+        line(8000, 'CUMULATIVE_PROFILING_BEGIN') +
+        line(8000, 'CUMULATIVE_PROFILING|SOQL operations|') +
+        line(9000, 'CUMULATIVE_PROFILING_END'),
+    );
+  });
+  const frames = ['METHOD_ENTRY', 'METHOD_ENTRY'];
+  const pinned = [
+    'EXCEPTION_THROWN',
+    'CUMULATIVE_LIMIT_USAGE',
+    'LIMIT_USAGE_FOR_NS',
+    'FATAL_ERROR',
+    'CUMULATIVE_PROFILING_BEGIN',
+    'CUMULATIVE_PROFILING',
+  ];
+  const merged = <R extends { _children?: R[] | null }>(roots: readonly R[]): R[] =>
+    roots.flatMap((r) => [r, ...merged(r._children ?? [])]);
+
+  it('keeps frames and pinned details in Time Order', async () => {
+    const mixedSource = await sourceOf(mixed);
+    const kept = allNodes(mixedSource).filter((node) => mixedSource.withoutDetails.test(node));
+    expect(kept.map((node) => mixed.log.event(mixedSource.key(node))?.type).sort()).toEqual(
+      [...frames, 'METHOD_ENTRY', 'METHOD_ENTRY', ...pinned].sort(),
+    );
+  });
+
+  it('keeps frames and pinned details in Aggregated, a method that took no time included', async () => {
+    const rows = merged(toAggregatedCallTree(await mixed.logIndex(), mixed));
+    const kept = rows.filter((row) => AGGREGATED_WITHOUT_DETAILS.test(row));
+    expect(kept.map((row) => row.type).sort()).toEqual([...frames, ...pinned].sort());
+    const instant = kept.find((row) => row.text === 'ns.Instant.run()');
+    expect([instant?.callCount, instant?.totalTime]).toEqual([3, 0]);
+  });
+
+  // The static variable list sat under a pinned limit block, and Bottom-Up showed it.
+  it('keeps frames only in Bottom-Up, a method that took no time included', async () => {
+    const roots = toBottomUpTree(await mixed.logIndex(), mixed);
+    const kept = roots.filter((row) => BOTTOM_UP_WITHOUT_DETAILS.test(row));
+    expect(kept.map((row) => row.type).sort()).toEqual([...frames].sort());
+    const instant = kept.find((row) => row.text === 'ns.Instant.run()');
+    expect([instant?.callCount, instant?.totalTime]).toEqual([3, 0]);
+    expect(roots.map((row) => row.type)).toContain('STATIC_VARIABLE_LIST');
   });
 });
 

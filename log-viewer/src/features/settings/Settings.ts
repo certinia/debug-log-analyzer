@@ -33,6 +33,8 @@ export type LanaSettings = {
     dml: { columnView: string; columnOverrides: Record<string, string[]> };
     sosl: { columnView: string; columnOverrides: Record<string, string[]> };
   };
+  /** The VS Code look the chrome follows; absent from a host that is not VS Code. */
+  ui?: { mode: 'modern' | 'classic' };
   // The app-wide inspector, fed by a selection on any tab.
   inspector: {
     position: 'left' | 'right' | 'bottom';

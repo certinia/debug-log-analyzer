@@ -230,7 +230,7 @@ describe('calltree-view table lifetime', () => {
       );
       const back = view._setViewMode(mode);
       await settle();
-      finish([{ id: 1, _pathId: 1 }]);
+      finish([{ id: 1, _pathId: 1, kind: 'frame' }]);
       await back;
       off();
 
@@ -449,6 +449,17 @@ describe('calltree-view merged filters', () => {
 
   afterEach(() => {
     view.remove();
+  });
+
+  it('hides the debug line from Time Order with Details off, and keeps the query that took no time', () => {
+    view._handleShowDetailsChange();
+    const filters = (view.timeOrderGrid?.filters ?? []) as { test: (row: object) => boolean }[];
+    const kept = Array.from({ length: index.rowCount }, (_, row) => ({ row }))
+      .filter((node) => filters.every((filter) => filter.test(node)))
+      .map(({ row }) => store.log.event(index.eventIndex[row]!)?.type);
+
+    expect(kept).toContain('SOQL_EXECUTE_BEGIN');
+    expect(kept).not.toContain('USER_DEBUG');
   });
 
   it.each(['aggregated', 'bottom-up'] as const)(

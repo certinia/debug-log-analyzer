@@ -34,7 +34,7 @@ The expand button in the toolbar opens or closes one level per click, and its me
 
 ### Filtering
 
-1. **Details** - events with 0 time are hidden by default; toggle to show them from the **filters** .
+1. **Details** - off by default, which shows only methods, queries and DML, even with 0 time. Turn it on from the **filters** to also show debug lines, variables, exceptions and limit usage.
 
 ### Column Views
 

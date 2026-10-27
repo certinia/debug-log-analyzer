@@ -68,7 +68,7 @@ export async function buildDatabaseSections(
     },
     {
       id: 'callstack',
-      title: 'Call stack',
+      title: 'Call Stack',
       weight: 3,
       content: html`<call-stack-detail
         eventIndex=${eventIndex}
@@ -83,7 +83,7 @@ export async function buildDatabaseSections(
     const issues = hidden.has('issues') ? [] : await computeSoqlIssues(eventIndex);
     sections.push({
       id: 'issues',
-      title: 'SOQL issues',
+      title: 'SOQL Issues',
       weight: 1,
       badge: issues.length ? String(issues.length) : undefined,
       content: html`<soql-issues unbounded .issues=${issues}></soql-issues>`,
@@ -94,7 +94,7 @@ export async function buildDatabaseSections(
   // wherever the selection came from.
   sections.push({
     id: 'calltree',
-    title: 'Call tree',
+    title: 'Call Tree',
     weight: 4,
     content: html`<call-tree-detail
       eventIndex=${active}

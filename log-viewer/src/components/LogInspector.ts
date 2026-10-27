@@ -560,8 +560,13 @@ export class LogInspector extends LitElement {
   };
 
   /** Offers every section of the list, hidden ones included, so any can come back. */
-  private _onPaneMenu = (e: CustomEvent<{ x: number; y: number }>) => {
-    this._menu?.show(this._sectionMenuItems(), e.detail.x, e.detail.y);
+  private _onPaneMenu = (e: CustomEvent<{ x: number; y: number; opener?: HTMLElement }>) => {
+    const { x, y, opener } = e.detail;
+    if (opener && this._menu?.isOpenFrom(opener)) {
+      this._menu.hide();
+      return;
+    }
+    this._menu?.show(this._sectionMenuItems(), x, y, opener);
   };
 
   /** The menu stays open through a toggle, so its ticks are refreshed in place. */

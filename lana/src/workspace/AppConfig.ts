@@ -41,6 +41,20 @@ export interface Config {
     hiddenSections: Record<string, boolean>;
     visible: boolean | null;
   };
+  /** The VS Code look the webview's chrome follows. Read from `workbench`, not `lana`. */
+  ui: { mode: 'modern' | 'classic' };
+}
+
+/** The `workbench` settings behind `Config.ui`; a change to one is pushed to the webview. */
+export const UI_SETTINGS = ['workbench.experimental.modernUI'] as const;
+
+function getUi(): Config['ui'] {
+  const workbench = workspace.getConfiguration('workbench');
+  // A VS Code older than Modern UI has no such setting, and only the classic look.
+  const registered =
+    workbench.inspect<boolean>('experimental.modernUI')?.defaultValue !== undefined;
+  const modern = registered && workbench.get<boolean>('experimental.modernUI', true);
+  return { mode: modern ? 'modern' : 'classic' };
 }
 
 export function getConfig(): Config {
@@ -68,6 +82,7 @@ export function getConfig(): Config {
       { columnView: 'General', columnOverrides: {}, ...database[view] },
     ]),
   );
+  plainConfig.ui = getUi();
   return plainConfig;
 }
 

@@ -73,13 +73,13 @@ export async function buildDetailSections(
       sections.push(
         {
           id: 'hot-path',
-          title: 'Hot path',
+          title: 'Hot Path',
           fit: 'content',
           content: html`<hot-path></hot-path>`,
         },
         {
           id: 'hot-spots',
-          title: 'Hot spots',
+          title: 'Hot Spots',
           fit: 'content',
           content: html`<hot-spots></hot-spots>`,
         },
@@ -97,7 +97,7 @@ export async function buildDetailSections(
         // averages hide, and how few signatures the log comes down to.
         {
           id: 'self-time-spread',
-          title: 'Self time spread',
+          title: 'Self Time Spread',
           fit: 'content',
           content: html`<self-time-spread></self-time-spread>`,
         },
@@ -110,18 +110,18 @@ export async function buildDetailSections(
       // The Row budget section is written and tested but held back while the tab
       // is judged for length. To re-add it, restore the import of
       // DatabaseRowBudget.js and this section, first in the list:
-      //   { id: 'database-rows', title: 'Row budget', fit: 'content',
+      //   { id: 'database-rows', title: 'Row Budget', fit: 'content',
       //     content: html`<database-rows></database-rows>` },
       sections.push(
         {
           id: 'database-namespaces',
-          title: 'Namespace duration',
+          title: 'Namespace Duration',
           fit: 'content',
           content: html`<database-namespaces></database-namespaces>`,
         },
         {
           id: 'database-concentration',
-          title: 'Database duration',
+          title: 'Database Duration',
           fit: 'content',
           content: html`<database-concentration></database-concentration>`,
         },
@@ -129,7 +129,7 @@ export async function buildDetailSections(
           // A grid sized to the pane it is in, so this section takes the space
           // the sized-to-content ones leave.
           id: 'database-time',
-          title: 'Call tree',
+          title: 'Call Tree',
           weight: 4,
           content: html`<database-time></database-time>`,
         },
@@ -141,14 +141,14 @@ export async function buildDetailSections(
       sections.push(
         {
           id: 'category-time',
-          title: 'Time by category',
+          title: 'Time by Category',
           fit: 'content',
           content: html`<category-time-bar></category-time-bar>`,
         },
         namespaceTimeSection(html`<namespace-time-bar></namespace-time-bar>`, { fit: 'content' }),
         {
           id: 'governor-trends',
-          title: 'Governor usage over time',
+          title: 'Governor Usage over Time',
           fit: 'content',
           content: html`<governor-trends></governor-trends>`,
         },
@@ -157,7 +157,7 @@ export async function buildDetailSections(
           // section, asked at whole-log scope. Collapse and order are remembered
           // per list, so the two scopes still keep their own.
           id: 'calltree',
-          title: 'Call tree',
+          title: 'Call Tree',
           weight: 4,
           // The Timeline draws the whole log top down, so the tree answers with
           // where its time went. Time Order would open on two collapsed roots.
@@ -260,7 +260,7 @@ export async function buildDetailSections(
   sections.push(
     {
       id: 'callstack',
-      title: 'Call stack',
+      title: 'Call Stack',
       weight: 3,
       content: html`<call-stack-detail
         eventIndex=${anchorIndex}
@@ -269,7 +269,7 @@ export async function buildDetailSections(
     },
     {
       id: 'calltree',
-      title: 'Call tree',
+      title: 'Call Tree',
       weight: 4,
       content: html`<call-tree-detail
         eventIndex=${anchorIndex}
@@ -295,5 +295,5 @@ function namespaceTimeSection(
   content: TemplateResult,
   sizing: Pick<PaneSection, 'fit' | 'height'>,
 ): PaneSection {
-  return { id: 'namespace-time', title: 'Self time by namespace', ...sizing, content };
+  return { id: 'namespace-time', title: 'Self Time by Namespace', ...sizing, content };
 }

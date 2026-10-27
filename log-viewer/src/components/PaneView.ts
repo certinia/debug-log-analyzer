@@ -286,11 +286,23 @@ export class PaneView extends LitElement {
 
       /* Beside the header, not in it: no button inside its button role. */
       .pane-bar {
+        position: relative;
         display: flex;
         align-items: center;
-        flex: 0 0 var(--lana-panel-header-height);
+        flex: 0 0 var(--lana-section-header-height);
+        margin: 0 var(--lana-section-header-inset);
+        border-radius: var(--lana-section-header-radius);
         background-color: var(--vscode-sideBarSectionHeader-background);
-        border-top: var(--lana-stroke) solid var(--vscode-sideBarSectionHeader-border, transparent);
+      }
+      /* Side by side, the panes' own borders divide them. */
+      .pane-view[data-orientation='vertical'] .pane:not(:first-child) > .pane-bar::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: var(--lana-section-header-inset);
+        right: var(--lana-section-header-inset);
+        height: var(--lana-stroke);
+        background-color: var(--vscode-sideBarSectionHeader-border, transparent);
       }
       .pane-action {
         flex: 0 0 auto;
@@ -318,12 +330,10 @@ export class PaneView extends LitElement {
         gap: var(--lana-space-2xs);
         flex: 1 1 auto;
         min-width: 0;
-        height: var(--lana-panel-header-height);
-        padding: 0 var(--lana-space-md) 0 var(--lana-space-2xs);
-        font-size: var(--lana-text-caps);
-        font-weight: 600;
-        text-transform: uppercase;
-        letter-spacing: var(--lana-text-caps-tracking);
+        height: var(--lana-section-header-height);
+        padding: 0 var(--lana-space-md) 0 var(--lana-section-header-inset);
+        font-size: var(--lana-section-title-size);
+        font-weight: var(--lana-section-title-weight);
         color: var(--vscode-sideBarSectionHeader-foreground);
         user-select: none;
         white-space: nowrap;
@@ -333,14 +343,9 @@ export class PaneView extends LitElement {
       .pane-header--button {
         cursor: pointer;
       }
-      .pane-bar:has(.pane-header--button):hover {
-        background-color: var(--lana-row-hover-bg);
-      }
-      /* Focus, not focus-visible: the focused header is the one Alt+Arrow moves,
-         so which one that is has to show even when a click put it there. */
-      .pane-header:focus {
-        outline: var(--lana-focus-ring);
-        outline-offset: var(--lana-focus-inset);
+      /* Positioned so the bar's separator does not cover the global focus ring. */
+      .pane-header:focus-visible {
+        position: relative;
       }
       .pane-header vscode-icon {
         color: var(--lana-icon-fg);

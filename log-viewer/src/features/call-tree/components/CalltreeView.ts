@@ -34,8 +34,9 @@ import type {
 } from '../../../grid/index.js';
 import { categoryClass } from '../grid/CallTreeGrid.js';
 import {
+  AGGREGATED_WITHOUT_DETAILS,
   aggregatedColumns,
-  BOTTOM_UP_DETAILS,
+  BOTTOM_UP_WITHOUT_DETAILS,
   BOTTOM_UP_SORT,
   bottomUpColumns,
   BOTTOM_UP_GROUPS,
@@ -97,7 +98,6 @@ import { InspectorTabController } from '../../../components/InspectorTabControll
 import { FindController } from '../../find/FindController.js';
 import { revealFirstOf } from '../../../components/inspectorTab.js';
 
-const AGGREGATED_DETAILS: RowFilter<AggregatedRow> = { test: (row) => row._hasDetailsDeep };
 const AGGREGATED_DEBUG_ONLY: RowFilter<AggregatedRow> = {
   test: (row) => DEBUG_VALUE_TYPES.has(row.type),
   keepAncestors: true,
@@ -174,8 +174,8 @@ export class CalltreeView extends LitElement {
   private readonly _timeOrderDebugOnly = deep<TimeOrderNode>((node) =>
     DEBUG_VALUE_TYPES.has(this._timeOrderSource?.type(node) ?? ''),
   );
-  private readonly _timeOrderDetails: RowFilter<TimeOrderNode> = {
-    test: (node) => this._timeOrderSource?.details.test(node) ?? true,
+  private readonly _timeOrderWithoutDetails: RowFilter<TimeOrderNode> = {
+    test: (node) => this._timeOrderSource?.withoutDetails.test(node) ?? true,
   };
 
   /** The event a go-to found the filters hiding, so the toolbar can offer to clear them. */
@@ -799,7 +799,7 @@ export class CalltreeView extends LitElement {
       total: (row) => row.totalTime,
       self: (row) => row.totalSelfTime,
       type: { of: (row) => row.type, debugOnly: AGGREGATED_DEBUG_ONLY },
-      details: AGGREGATED_DETAILS,
+      details: AGGREGATED_WITHOUT_DETAILS,
     });
   }
 
@@ -813,7 +813,7 @@ export class CalltreeView extends LitElement {
         of: (node) => this._timeOrderSource?.type(node),
         debugOnly: this._timeOrderDebugOnly,
       },
-      details: this._timeOrderDetails,
+      details: this._timeOrderWithoutDetails,
     });
   }
 
@@ -821,7 +821,7 @@ export class CalltreeView extends LitElement {
   private _bottomUpFilters(): RowFilter<BottomUpRow>[] {
     return this._viewFilters<BottomUpRow>('bottom-up', {
       ...BOTTOM_UP_MEASURES,
-      details: BOTTOM_UP_DETAILS,
+      details: BOTTOM_UP_WITHOUT_DETAILS,
     });
   }
 
@@ -947,10 +947,11 @@ export class CalltreeView extends LitElement {
       filter.clear();
     }
     this.typeFilter = 'All';
-    // Details stays as chosen unless it hides this row, as it does a no-time leaf an issue card names.
+    // Details stays as chosen unless it hides this row, as it does a detail an issue card names.
     const row = this._timeOrderSource?.index.rowOf(eventIndex) ?? NO_ROW;
     const showDetails =
-      this.filterState.showDetails || (row !== NO_ROW && !this._timeOrderDetails.test({ row }));
+      this.filterState.showDetails ||
+      (row !== NO_ROW && !this._timeOrderWithoutDetails.test({ row }));
     this.filterState = { showDetails, debugOnly: false, selectedTypes: new Set() };
     this.requestUpdate();
     this._updateFiltering();

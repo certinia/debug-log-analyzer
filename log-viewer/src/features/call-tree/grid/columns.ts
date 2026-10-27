@@ -571,6 +571,10 @@ export function mergedLines(log: ApexLog): LinesOf {
   return lines;
 }
 
+export const AGGREGATED_WITHOUT_DETAILS: RowFilter<AggregatedRow> = {
+  test: (row) => row.kind !== 'detail',
+};
+
 /** Opens the type a Name cell links to. */
 export const openType = (text: string): void => vscodeMessenger.send<string>('openType', text);
 
@@ -587,8 +591,10 @@ export const CALL_TREE_COLUMN_SETTINGS: Omit<ColumnSettingsOptions, 'targets'> =
   })),
 };
 
-/** Show Details on the Bottom-Up tree. */
-export const BOTTOM_UP_DETAILS: RowFilter<BottomUpRow> = { test: (row) => row._hasDetailsDeep };
+/** The Bottom-Up rows shown with Details off: frames only. */
+export const BOTTOM_UP_WITHOUT_DETAILS: RowFilter<BottomUpRow> = {
+  test: (row) => row.kind === 'frame',
+};
 
 /** The Bottom-Up group-by picker's options, in order, and the row field each groups on. */
 export const BOTTOM_UP_GROUPS: readonly {

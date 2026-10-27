@@ -42,7 +42,6 @@ const dml = (rows = 1): LineSpec => ({ kind: 'dml', rows });
 const soql = (rows = 1): LineSpec => ({ kind: 'soql', rows });
 const sosl = (rows = 1): LineSpec => ({ kind: 'sosl', rows });
 const thrown: LineSpec = { kind: 'thrown' };
-const limits: LineSpec = { kind: 'limits' };
 
 const DML_TEXT = 'DML Op:Insert Type:Account';
 const SOSL_TEXT = 'SOSL: FIND {x}';
@@ -792,52 +791,6 @@ describe('toAggregatedCallTree', () => {
     expect(work.instances).toHaveLength(2);
     expect(work.eventIndex).toBe(work.instances[0]);
     expect(store.log.event(work.eventIndex)?.duration.total).toBe(5);
-  });
-});
-
-describe('_hasDetailsDeep precomputation', () => {
-  it('aggregated: marks zero-time leaf with no excluded type as not significant', async () => {
-    const rows = await aggregatedOf(m('NoTime', 0));
-
-    expect(findRowByText(rows, 'NoTime')._hasDetailsDeep).toBe(false);
-  });
-
-  it('aggregated: marks zero-time leaf with excluded type as significant', async () => {
-    const rows = await aggregatedOf(limits);
-
-    expect(findRowByText(rows, 'CUMULATIVE_LIMIT_USAGE')._hasDetailsDeep).toBe(true);
-  });
-
-  it('aggregated: marks zero-time parent as significant when any descendant is', async () => {
-    const rows = await aggregatedOf(m('ZeroParent', 0, limits));
-
-    const zeroParent = findRowByText(rows, 'ZeroParent');
-    expect(zeroParent.totalTime).toBe(0);
-    expect(zeroParent._hasDetailsDeep).toBe(true);
-  });
-
-  it('aggregated: marks zero-time parent as not significant when no descendant is', async () => {
-    const rows = await aggregatedOf(m('ZeroParent', 0, m('ZeroChild', 0)));
-
-    expect(findRowByText(rows, 'ZeroParent')._hasDetailsDeep).toBe(false);
-  });
-
-  it('bottom-up: rolls up significance from callers (children)', async () => {
-    const rows = await bottomUpOf(m('Caller', 0, m('Callee', 5)));
-
-    const callee = findRowByText(rows, 'Callee');
-    expect(callee._hasDetailsDeep).toBe(true);
-    // Caller appears as a child of Callee in bottom-up
-    const callerChild = findRowByText(callee._children ?? [], 'Caller');
-    expect(callerChild._hasDetailsDeep).toBe(true);
-  });
-
-  it('bottom-up: zero-time with excluded type is significant', async () => {
-    const rows = await bottomUpOf(limits);
-
-    const usage = findRowByText(rows, '(default)');
-    expect(usage.type).toBe('LIMIT_USAGE_FOR_NS');
-    expect(usage._hasDetailsDeep).toBe(true);
   });
 });
 

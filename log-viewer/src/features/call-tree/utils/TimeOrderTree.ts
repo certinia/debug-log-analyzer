@@ -1,14 +1,14 @@
 /*
  * Copyright (c) 2026 Certinia Inc. All rights reserved.
  */
-import { type EventType, eventType } from '@apexdevtools/apex-log-parser';
+import { eventType } from '@apexdevtools/apex-log-parser';
 
 import type { LogCategory } from '#core/log/category.js';
 import { childRows, rowCategory, type LogIndex, NO_ROW } from '#core/log/LogIndex.js';
 import { type Signatures, signaturesOf } from '#core/log/signatures.js';
 import { namespaceOf } from '#core/utility/CallerNamespace.js';
 import type { RowFilter, TreeSource } from '../../../grid/index.js';
-import { EXCLUDED_DETAIL_TYPES } from './DetailsFilter.js';
+import { eventKind } from './DetailsFilter.js';
 
 /** One shown event in the Time Order view: a row of the log index. */
 export interface TimeOrderNode {
@@ -19,13 +19,6 @@ interface HeldNode extends TimeOrderNode {
   children?: readonly HeldNode[] | null;
 }
 
-/** Type ids the Show Details filter keeps whatever their duration. */
-const DETAIL_TYPE_IDS: ReadonlySet<number> = new Set(
-  [...EXCLUDED_DETAIL_TYPES, 'EXCEPTION_THROWN', 'FATAL_ERROR'].map(
-    (type) => eventType(type as EventType).typeId,
-  ),
-);
-
 /**
  * The Time Order rows: one node per shown event, read from the index rows.
  *
@@ -35,8 +28,8 @@ const DETAIL_TYPE_IDS: ReadonlySet<number> = new Set(
 export class TimeOrderSource implements TreeSource<TimeOrderNode> {
   readonly index: LogIndex;
   readonly roots: readonly TimeOrderNode[];
-  /** Show Details: frames, events that took time, exceptions and limit reports. */
-  readonly details: RowFilter<TimeOrderNode>;
+  /** The rows shown with Details off: frames and pinned details. */
+  readonly withoutDetails: RowFilter<TimeOrderNode>;
   private readonly signatures: Signatures;
   private readonly types: Uint16Array;
 
@@ -44,13 +37,12 @@ export class TimeOrderSource implements TreeSource<TimeOrderNode> {
     this.index = index;
     this.signatures = signaturesOf(index.log);
     this.roots = this.nodesUnder(NO_ROW);
-    const { total } = index;
     const isFrame = index.column(index.log.columns.isFrame);
     const types = index.column(index.log.columns.type);
     this.types = types;
-    // No keepAncestors: only a frame has children, and every frame passes.
-    this.details = {
-      test: ({ row }) => isFrame[row] === 1 || total[row]! > 0 || DETAIL_TYPE_IDS.has(types[row]!),
+    // No keepAncestors: a row with children is a frame or a pinned block, and both pass.
+    this.withoutDetails = {
+      test: ({ row }) => eventKind(types[row]!, isFrame[row] === 1) !== 'detail',
     };
   }
 

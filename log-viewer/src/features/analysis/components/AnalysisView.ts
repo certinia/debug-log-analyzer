@@ -41,7 +41,7 @@ import { CALL_TREE_VIEWS } from '../../../components/grid/ColumnViews.js';
 import '../../call-tree/grid/CallTreeGrid.js';
 import type { CallTreeGrid } from '../../call-tree/grid/CallTreeGrid.js';
 import {
-  BOTTOM_UP_DETAILS,
+  BOTTOM_UP_WITHOUT_DETAILS,
   BOTTOM_UP_GROUPS,
   BOTTOM_UP_SORT,
   CALL_TREE_COLUMN_SETTINGS,
@@ -195,10 +195,10 @@ export class AnalysisView extends LitElement {
       return;
     }
 
-    // Show Details keeps only rows with a duration, so the buckets for debug
-    // lines, thrown exceptions and query plans are filtered out — exactly the
-    // events a finding points at. Turn the filter off rather than reveal nothing.
-    if (!this._showDetails && !BOTTOM_UP_DETAILS.test(row)) {
+    // With Details off only frames show, so the buckets for debug lines, thrown
+    // exceptions and query plans are filtered out — exactly the events a finding
+    // points at. Turn the filter off rather than reveal nothing.
+    if (!this._showDetails && !BOTTOM_UP_WITHOUT_DETAILS.test(row)) {
       this._showDetails = true;
       await this.updateComplete;
     }
@@ -328,7 +328,7 @@ export class AnalysisView extends LitElement {
       this._filterCache,
       'analysis',
     );
-    return this._showDetails ? filters : [...filters, BOTTOM_UP_DETAILS];
+    return this._showDetails ? filters : [...filters, BOTTOM_UP_WITHOUT_DETAILS];
   }
 
   private readonly _gridMounted = (el?: Element): void => {

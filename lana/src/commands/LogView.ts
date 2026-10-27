@@ -12,6 +12,7 @@ import { fileOrFolderExists, readFileText, writeFileText } from '../fs/workspace
 import { errorMessage } from '../tryCatch.js';
 import {
   PRIVATE_SECTIONS,
+  UI_SETTINGS,
   getColumnOverrides,
   getColumnViews,
   getConfig,
@@ -108,7 +109,10 @@ export class LogView {
     // changed — every webview subscriber re-applies it.
     let lastConfig = LogView.resolveConfig(context);
     const configListener = workspace.onDidChangeConfiguration((event) => {
-      if (!event.affectsConfiguration('lana')) {
+      if (
+        !event.affectsConfiguration('lana') &&
+        !UI_SETTINGS.some((setting) => event.affectsConfiguration(setting))
+      ) {
         return;
       }
 

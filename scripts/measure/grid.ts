@@ -96,7 +96,7 @@ async function measureTimeOrder(log: ApexLog): Promise<void> {
   const scheduler = timedScheduler();
   const path = pathOf(index, deepRow(index));
   const step = stepper(scheduler, () => store.snapshot().rows.size);
-  const timeOrderDetails = source.details;
+  const timeOrderDetails = source.withoutDetails;
 
   const soqlOnly: RowFilter<TimeOrderNode> = {
     test: (n) => source.type(n) === 'SOQL_EXECUTE_BEGIN',
