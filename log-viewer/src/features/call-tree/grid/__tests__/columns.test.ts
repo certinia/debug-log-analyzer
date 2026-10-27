@@ -199,26 +199,6 @@ describe('TimeOrderSource', () => {
 
     expect(source.children(outer!)).toBe(source.children(outer!));
   });
-
-  // The filter keeps no ancestors for its rows, so a parent of only bare leaves must show on its own.
-  it('shows every row that holds others, whatever they are', async () => {
-    // 0 ms, so only its kind can show it: a frame, or a limit block that is not one.
-    const bare = await storeOf(
-      line(1000, 'METHOD_ENTRY|[1]|01p|ns.A.run()') +
-        line(1000, 'STATEMENT_EXECUTE|[2]') +
-        line(1000, 'HEAP_ALLOCATE|[3]|Bytes:8') +
-        line(1000, 'METHOD_EXIT|[1]|ns.A.run()') +
-        line(1000, 'CUMULATIVE_LIMIT_USAGE') +
-        line(1000, 'STATIC_VARIABLE_LIST|') +
-        line(1000, 'CUMULATIVE_LIMIT_USAGE_END'),
-    );
-    const bareSource = await sourceOf(bare);
-    const parents = allNodes(bareSource).filter((node) => bareSource.children(node)?.length);
-    const typeOf = (node: TimeOrderNode) => bare.log.event(bareSource.key(node))?.type;
-
-    expect(parents.map(typeOf)).toEqual(['METHOD_ENTRY', 'CUMULATIVE_LIMIT_USAGE']);
-    expect(parents.every((node) => bareSource.withoutDetails.test(node))).toBe(true);
-  });
 });
 
 describe('Details filters', () => {
@@ -258,6 +238,7 @@ describe('Details filters', () => {
   const merged = <R extends { _children?: R[] | null }>(roots: readonly R[]): R[] =>
     roots.flatMap((r) => [r, ...merged(r._children ?? [])]);
 
+  // The filter keeps no ancestors for its rows, so a parent must pass on its own.
   it('keeps frames and pinned details in Time Order', async () => {
     const mixedSource = await sourceOf(mixed);
     const kept = allNodes(mixedSource).filter((node) => mixedSource.withoutDetails.test(node));

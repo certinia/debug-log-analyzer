@@ -412,7 +412,7 @@ describe('calltree-view category colorize', () => {
 });
 
 describe('calltree-view merged filters', () => {
-  // Outer runs 5 ms; its query and debug line take next to none.
+  // Outer runs 5 ms; its query, debug line and exception take next to none.
   let store: LogStore;
   let index: LogIndex;
   const all = <R extends { _children?: R[] | null }>(of: readonly R[]): R[] =>
@@ -440,6 +440,7 @@ describe('calltree-view merged filters', () => {
         '09:18:22.6 (2000)|SOQL_EXECUTE_BEGIN|[2]|Aggregations:0|SELECT Id FROM Account\n' +
         '09:18:22.6 (2000)|SOQL_EXECUTE_END|[2]|Rows:1\n' +
         '09:18:22.6 (4000)|USER_DEBUG|[3]|DEBUG|hello\n' +
+        '09:18:22.6 (5000)|EXCEPTION_THROWN|[4]|System.NullPointerException: boom\n' +
         '09:18:22.6 (5001000)|METHOD_EXIT|[1]|ns.Outer.run()\n',
     ));
     index = await store.logIndex();
@@ -451,16 +452,32 @@ describe('calltree-view merged filters', () => {
     view.remove();
   });
 
-  it('hides the debug line from Time Order with Details off, and keeps the query that took no time', () => {
-    view._handleShowDetailsChange();
-    const filters = (view.timeOrderGrid?.filters ?? []) as { test: (row: object) => boolean }[];
-    const kept = Array.from({ length: index.rowCount }, (_, row) => ({ row }))
-      .filter((node) => filters.every((filter) => filter.test(node)))
-      .map(({ row }) => store.log.event(index.eventIndex[row]!)?.type);
+  // Each view takes its own Details filter: Bottom-Up shows frames only.
+  it.each([
+    ['time-order', true],
+    ['aggregated', true],
+    ['bottom-up', false],
+  ] as const)(
+    'hides the debug line from %s with Details off, and keeps the exception: %s',
+    async (mode, keepsException) => {
+      await view._setViewMode(mode);
+      view._handleShowDetailsChange();
+      const grid = mode === 'time-order' ? view.timeOrderGrid : gridOf(view, mode);
+      const filters = (grid?.filters ?? []) as { test: (row: object) => boolean }[];
+      const kept =
+        mode === 'time-order'
+          ? Array.from({ length: index.rowCount }, (_, row) => ({ row }))
+              .filter((node) => filters.every((filter) => filter.test(node)))
+              .map(({ row }) => store.log.event(index.eventIndex[row]!)?.type)
+          : rowsOf[mode]()
+              .filter((row) => filters.every((filter) => filter.test(row)))
+              .map((row) => row.type);
 
-    expect(kept).toContain('SOQL_EXECUTE_BEGIN');
-    expect(kept).not.toContain('USER_DEBUG');
-  });
+      expect(kept).toContain('SOQL_EXECUTE_BEGIN');
+      expect(kept).not.toContain('USER_DEBUG');
+      expect(kept.includes('EXCEPTION_THROWN')).toBe(keepsException);
+    },
+  );
 
   it.each(['aggregated', 'bottom-up'] as const)(
     'filters %s rows on their own total time, self time and namespace',
@@ -559,7 +576,7 @@ describe('calltree-view go to row', () => {
 
   describe('to a row the filters hide', () => {
     // Debug Only keeps Outer as the parent of its debug line, and hides Inner. Details, off by
-    // default, hides the debug line: it takes no time.
+    // default, hides the debug line: it is a detail.
     const LOG =
       '09:18:22.6 (1000)|METHOD_ENTRY|[1]|01p|ns.Outer.run()\n' +
       '09:18:22.6 (1100)|USER_DEBUG|[2]|DEBUG|hello\n' +
