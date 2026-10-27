@@ -37,7 +37,7 @@ When FlameChart needs to pass event data to callbacks:
 
 - Use `EventNode` type (not ApexEvent) in the callback signature
 - Store the `ApexEvent` in the `eventNode.original` property
-- ApexLogTimeline reads it back via `(eventNode.original as ApexEvent)`
+- ApexLogTimeline reads it back through its `eventOf` helper
 
 ### Internal Types
 

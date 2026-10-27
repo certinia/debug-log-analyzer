@@ -72,6 +72,10 @@ interface Located {
   node: ApexEventNode | null;
 }
 
+// FlameChart hands back the nodes `frames` built, so each one carries its event.
+const eventOf = (node: EventNode | null): ApexEvent | undefined =>
+  (node as ApexEventNode | null)?.original;
+
 export class ApexLogTimeline {
   private flamechart: FlameChart;
   private tooltipRenderer: FrameTooltipRenderer | null = null;
@@ -568,7 +572,7 @@ export class ApexLogTimeline {
     // Priority: Events take precedence over truncation markers
     if (eventNode) {
       // Extract ApexEvent from EventNode.original for tooltip display
-      const logEvent = eventNode.original as ApexEvent | undefined;
+      const logEvent = eventOf(eventNode);
       if (logEvent) {
         this.tooltipRenderer.show(logEvent, this.buildAnchor(eventNode, screenX, screenY));
 
@@ -594,7 +598,7 @@ export class ApexLogTimeline {
    * that stands for it. Mouse moves land per pixel, so only a change is reported.
    */
   private reportLocatedFrame(eventNode: EventNode | null): void {
-    const logEvent = eventNode?.original as ApexEvent | undefined;
+    const logEvent = eventOf(eventNode);
     const eventIndex = logEvent?.id ?? null;
     if (eventIndex === this.locatedEventIndex) {
       return;
@@ -652,7 +656,7 @@ export class ApexLogTimeline {
     // Cmd/Ctrl+Click on a frame navigates directly to call tree
     // Note: Only works on individual frames, not buckets (buckets are aggregated)
     if (eventNode && (modifiers?.metaKey || modifiers?.ctrlKey)) {
-      const originalEvent = (eventNode as EventNode & { original?: ApexEvent }).original;
+      const originalEvent = eventOf(eventNode);
       if (originalEvent?.id !== undefined) {
         void goToRow({ eventIndex: originalEvent.id });
       }
@@ -706,7 +710,7 @@ export class ApexLogTimeline {
     // Selection only - no auto-navigation to call tree
     // User can press J to explicitly jump to call tree
     // The inspector shows the selected frame's detail.
-    const originalEvent = (eventNode as EventNode & { original?: ApexEvent }).original;
+    const originalEvent = eventOf(eventNode);
     const selection = toDetailSelection(originalEvent?.id);
     if (selection) {
       eventBus.emit('detail:select', { source: 'timeline', selection, view: TIMELINE_VIEW });
@@ -718,7 +722,7 @@ export class ApexLogTimeline {
    * Navigates call tree to the selected frame.
    */
   private handleJumpToCallTree(eventNode: EventNode): void {
-    const originalEvent = (eventNode as EventNode & { original?: ApexEvent }).original;
+    const originalEvent = eventOf(eventNode);
     if (originalEvent?.id !== undefined) {
       void goToRow({ eventIndex: originalEvent.id });
     }
@@ -768,8 +772,7 @@ export class ApexLogTimeline {
       return;
     }
 
-    const eventWithOriginal = event as EventNode & { original?: ApexEvent };
-    const logEvent = eventWithOriginal.original;
+    const logEvent = eventOf(event);
     if (logEvent) {
       this.navigationTooltip = true;
       this.tooltipRenderer.show(logEvent, this.buildAnchor(event, screenX, screenY));
@@ -851,8 +854,7 @@ export class ApexLogTimeline {
     this.selectedEventForContextMenu = eventNode;
 
     // Show tooltip for the right-clicked frame using screen coords (same as hover)
-    const eventWithOriginal = eventNode as EventNode & { original?: ApexEvent };
-    const logEvent = eventWithOriginal.original;
+    const logEvent = eventOf(eventNode);
     if (this.tooltipRenderer && logEvent) {
       this.tooltipRenderer.show(logEvent, this.buildAnchor(eventNode, screenX, screenY), {
         keepPosition: true,
@@ -1027,8 +1029,7 @@ export class ApexLogTimeline {
    * Navigates to the raw log file at the event's timestamp.
    */
   private handleShowInLog(eventNode: EventNode): void {
-    const eventWithOriginal = eventNode as EventNode & { original?: ApexEvent };
-    const logEvent = eventWithOriginal.original;
+    const logEvent = eventOf(eventNode);
     if (logEvent?.startTimestamp) {
       vscodeMessenger.send('goToLogLine', { timestamp: logEvent.startTimestamp });
     }
@@ -1039,8 +1040,7 @@ export class ApexLogTimeline {
    * Opens the source file in VS Code for methods with valid symbols.
    */
   private handleGoToSource(eventNode: EventNode): void {
-    const eventWithOriginal = eventNode as EventNode & { original?: ApexEvent };
-    const logEvent = eventWithOriginal.original;
+    const logEvent = eventOf(eventNode);
     if (logEvent?.isApexCall && logEvent.text) {
       vscodeMessenger.send<string>('openType', logEvent.text);
     }
@@ -1051,7 +1051,7 @@ export class ApexLogTimeline {
    */
   private formatEventDetails(eventNode: EventNode): string {
     // Access original ApexEvent for full details
-    const logEvent = (eventNode as EventNode & { original?: ApexEvent }).original;
+    const logEvent = eventOf(eventNode);
     if (!logEvent) {
       // Fallback for nodes without original
       return `Name: ${eventNode.text}\nType: ${eventNode.type}`;
@@ -1064,7 +1064,7 @@ export class ApexLogTimeline {
    * Builds the parent chain from root to the selected event.
    */
   private formatCallStack(eventNode: EventNode): string {
-    const logEvent = (eventNode as EventNode & { original?: ApexEvent }).original;
+    const logEvent = eventOf(eventNode);
     return logEvent ? formatCallStack(logEvent) : eventNode.text;
   }
 
