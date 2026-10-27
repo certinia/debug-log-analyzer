@@ -551,8 +551,10 @@ export class PaneView extends LitElement {
           @dragend=${this._endDrag}
         >
           ${
-            collapsible
-              ? html`<vscode-icon name=${open ? 'chevron-down' : 'chevron-right'}></vscode-icon>`
+            this._collapsible
+              ? html`<vscode-icon
+                  name=${maximized ? 'blank' : open ? 'chevron-down' : 'chevron-right'}
+                ></vscode-icon>`
               : nothing
           }
           <span class="pane-header__title">${section.title}</span>
