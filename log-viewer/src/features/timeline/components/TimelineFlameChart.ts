@@ -31,6 +31,11 @@ import { TimelineError } from '../types/flamechart.types.js';
 import { tokenStyles } from '../../../styles/tokens.styles.js';
 import { tooltipStyles } from '../styles/timeline.css.js';
 
+/** A request to move the chart to an event. */
+export interface NavigateRequest {
+  readonly eventIndex: number;
+}
+
 @customElement('timeline-flame-chart')
 export class TimelineFlameChart extends LitElement {
   static styles = [
@@ -104,11 +109,12 @@ export class TimelineFlameChart extends LitElement {
   themeName: string | null = null;
 
   /**
-   * Event index to navigate to after initialization.
+   * The event to move to: at once if the chart is built, else once it is.
    * Used when opening the timeline from a raw log file hover.
    */
-  @property({ type: Number })
-  navigateToEventIndex: number | undefined = undefined;
+  // No hasChanged: each request is a new object, so the same event asked for twice moves again.
+  @property({ attribute: false })
+  navigateRequest: NavigateRequest | undefined = undefined;
 
   /**
    * Show the hover/selection details panel. A property, not a setter, so the value
@@ -154,7 +160,7 @@ export class TimelineFlameChart extends LitElement {
   /** Bumped by every `cleanup()`, so an in-flight `init` can tell it was superseded. */
   private initEpoch = 0;
   // The prop is never cleared, so a rebuild would otherwise jump back to it.
-  private shownEventIndex: number | undefined;
+  private usedRequest: NavigateRequest | undefined;
   private visibilityWait: AbortController | null = null;
 
   private readonly finder = new FindController(this, {
@@ -229,6 +235,18 @@ export class TimelineFlameChart extends LitElement {
     if (changedProperties.has('dimCategories')) {
       this.apexLogTimeline?.setCategoryDim(this.dimCategories);
     }
+    if (changedProperties.has('navigateRequest')) {
+      this.followNavigateRequest();
+    }
+  }
+
+  private followNavigateRequest(): void {
+    const request = this.navigateRequest;
+    if (!this.apexLogTimeline || !request || request === this.usedRequest) {
+      return;
+    }
+    this.usedRequest = request;
+    this.apexLogTimeline.navigateToEventIndex(request.eventIndex);
   }
 
   /**
@@ -280,6 +298,8 @@ export class TimelineFlameChart extends LitElement {
       ? (this.apexLogTimeline?.getViewport() ?? this.pendingViewport)
       : null;
     this.pendingViewport = viewport;
+    // A request the old chart took while this one builds still applies to this one.
+    const usedBefore = this.usedRequest;
 
     if (this.logStore.log.duration.total === 0) {
       this.cleanup();
@@ -317,17 +337,17 @@ export class TimelineFlameChart extends LitElement {
           ),
       };
 
-      const target = this.navigateToEventIndex;
       const timeline = new ApexLogTimeline();
       await timeline.init(layer, this.logStore, optionsWithTheme);
       timeline.setTooltipEnabled(this.showTooltip);
       timeline.setCategoryDim(this.dimCategories);
 
-      // Navigate after initialization completes.
-      if (viewport) {
+      // Navigate after initialization completes. A new request is newer than the place kept.
+      const request = this.navigateRequest;
+      if (request && request !== usedBefore) {
+        timeline.navigateToEventIndex(request.eventIndex);
+      } else if (viewport) {
         timeline.setViewport(viewport);
-      } else if (target !== undefined && target !== this.shownEventIndex) {
-        timeline.navigateToEventIndex(target);
       }
       // The move above draws on the next frame; showing the layer sooner would flash the default view.
       await waitForNextFrame();
@@ -343,7 +363,9 @@ export class TimelineFlameChart extends LitElement {
       this.cleanup();
       layer.style.visibility = '';
       this.apexLogTimeline = timeline;
-      this.shownEventIndex = target;
+      this.usedRequest = request;
+      // One sent while the first frame drew.
+      this.followNavigateRequest();
       void this.finder.rerun();
       this.timelineLayer = layer;
       this.pendingViewport = null;

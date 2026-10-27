@@ -163,8 +163,14 @@ describe('timeline-flame-chart on a new log', () => {
 describe('timeline-flame-chart opened at an event', () => {
   let chart: HTMLElement & {
     logStore: LogStore | null;
-    navigateToEventIndex: number | undefined;
+    navigateRequest: { eventIndex: number } | undefined;
     updateComplete: Promise<unknown>;
+  };
+
+  const ask = async (eventIndex: number) => {
+    chart.navigateRequest = { eventIndex };
+    await chart.updateComplete;
+    await settle();
   };
 
   beforeEach(async () => {
@@ -174,7 +180,7 @@ describe('timeline-flame-chart opened at an event', () => {
     globalThis.IntersectionObserver = AlwaysVisible as unknown as typeof IntersectionObserver;
     chart = document.createElement('timeline-flame-chart') as typeof chart;
     document.body.append(chart);
-    chart.navigateToEventIndex = 7;
+    chart.navigateRequest = { eventIndex: 7 };
     chart.logStore = logOf();
     await chart.updateComplete;
     await settle();
@@ -196,6 +202,36 @@ describe('timeline-flame-chart opened at an event', () => {
 
     expect(built).toHaveLength(2);
     expect(navigated).toEqual([7]);
+  });
+
+  it('moves a built chart at once, and again for the same event', async () => {
+    await ask(9);
+    await ask(9);
+
+    expect(navigated).toEqual([7, 9, 9]);
+  });
+
+  it('does not move back to an earlier event when the chart is rebuilt', async () => {
+    await ask(9);
+    chart.remove();
+    document.body.append(chart);
+    await settle();
+
+    expect(navigated).toEqual([7, 9]);
+  });
+
+  // The old chart takes the move, then the new one replaces it at the place it was built from.
+  it('moves the new chart to an event sent while it builds', async () => {
+    holdInit = true;
+    chart.logStore = logOf();
+    await chart.updateComplete;
+    await settle();
+
+    await ask(9);
+    finishInit();
+    await settle();
+
+    expect(navigated).toEqual([7, 9, 9]);
   });
 });
 

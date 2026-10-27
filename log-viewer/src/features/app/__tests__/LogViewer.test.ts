@@ -6,10 +6,9 @@
  */
 import { afterEach, beforeEach, describe, expect, it } from '@jest/globals';
 
-import { eventBus } from '#core/events/EventBus.js';
 import { settle } from '#test-helpers/visibility.js';
 
-let answerFetch: (data: { logData: string }) => void = () => {};
+let answerFetch: (data: { logData: string; navigateToEventIndex?: number }) => void = () => {};
 
 jest.mock('#core/messaging/VSCodeExtensionMessenger.js', () => {
   const actual = jest.requireActual<typeof import('#core/messaging/VSCodeExtensionMessenger.js')>(
@@ -42,44 +41,50 @@ const sendNavigate = (eventIndex: number) =>
 
 describe('log-viewer navigateToTimeline', () => {
   let viewer: HTMLElement & { updateComplete: Promise<unknown> };
-  let emitted: unknown[];
-  let unsubscribe: () => void;
 
   beforeEach(() => {
-    emitted = [];
-    unsubscribe = eventBus.on('timeline:navigate-to', (detail) => emitted.push(detail));
     viewer = document.createElement('log-viewer') as typeof viewer;
     document.body.append(viewer);
   });
 
   afterEach(() => {
-    unsubscribe();
     viewer.remove();
   });
 
-  const timelineTarget = () =>
-    (viewer.shadowRoot?.querySelector('timeline-view') as { navigateToEventIndex?: number } | null)
-      ?.navigateToEventIndex;
+  const timelineRequest = () =>
+    (viewer.shadowRoot?.querySelector('timeline-view') as { navigateRequest?: unknown } | null)
+      ?.navigateRequest;
 
-  // The timeline subscribes to the bus only once it is built, so an id sent on the bus mid-parse is lost.
+  const load = async (navigateToEventIndex?: number) => {
+    answerFetch({ logData: LOG, navigateToEventIndex });
+    await settle();
+    await viewer.updateComplete;
+  };
+
+  // The timeline is not built during the parse, so an id sent then on the bus was lost.
   it('hands the timeline an event sent while the log still parses', async () => {
     sendNavigate(2);
-    answerFetch({ logData: LOG });
-    await settle();
-    await viewer.updateComplete;
+    await load();
 
-    expect(timelineTarget()).toBe(2);
+    expect(timelineRequest()).toEqual({ eventIndex: 2 });
   });
 
-  it('sends an event to the built timeline on the bus', async () => {
-    answerFetch({ logData: LOG });
-    await settle();
+  it('keeps an event sent during the parse over the one the fetch carried', async () => {
+    sendNavigate(2);
+    await load(1);
+
+    expect(timelineRequest()).toEqual({ eventIndex: 2 });
+  });
+
+  // The same id twice must still move the chart, so each request is a new object.
+  it('hands the timeline a new request for each event sent after the load', async () => {
+    await load(1);
+    const first = timelineRequest();
+
+    sendNavigate(1);
     await viewer.updateComplete;
 
-    sendNavigate(2);
-
-    // A viewer never drops its window listener, so an earlier test's viewer hears this too.
-    expect(emitted).toContainEqual({ eventIndex: 2 });
-    expect(timelineTarget()).toBeUndefined();
+    expect(timelineRequest()).toEqual({ eventIndex: 1 });
+    expect(timelineRequest()).not.toBe(first);
   });
 });

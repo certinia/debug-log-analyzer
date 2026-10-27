@@ -12,7 +12,7 @@ import { customElement, property, state } from 'lit/decorators.js';
 
 import { parse, type LogSource } from '@apexdevtools/apex-log-parser';
 import type { LogLevelsChange } from '../../components/LogLevels.js';
-import { TAB_TO_SOURCE, eventBus } from '#core/events/EventBus.js';
+import { TAB_TO_SOURCE } from '#core/events/EventBus.js';
 import { waitForNextFrame } from '#core/utility/FrameBudget.js';
 import { logContext } from '#core/log/logContext.js';
 import { logStatusContext, type LogStatus } from '#core/log/logStatus.js';
@@ -22,6 +22,7 @@ import {
   vscodeMessenger,
 } from '#core/messaging/VSCodeExtensionMessenger.js';
 import type { LogIssue } from '../notifications/types.js';
+import type { NavigateRequest } from '../timeline/components/TimelineFlameChart.js';
 import { installEscapeDeselect } from './escapeDeselect.js';
 import { LogLevelsController } from './LogLevelsController.js';
 import { deriveLogIdentity, type LogIdentityData } from './logIdentity.js';
@@ -90,7 +91,7 @@ export class LogViewer extends LitElement {
   _selectedIndex = 0;
 
   @state()
-  private _navigateToEventIndex: number | undefined = undefined;
+  private _navigateRequest: NavigateRequest | undefined = undefined;
 
   private readonly _levels = new LogLevelsController(this, {
     publish: (store) => (this._logStore = setCurrentLog(store)),
@@ -191,12 +192,7 @@ export class LogViewer extends LitElement {
         return;
       }
       this._showTab('timeline-tab');
-      // The timeline subscribes to the bus only once it is built.
-      if (this._logStatus !== 'ready') {
-        this._navigateToEventIndex = payload.eventIndex;
-        return;
-      }
-      eventBus.emit('timeline:navigate-to', { eventIndex: payload.eventIndex });
+      this._navigateRequest = { eventIndex: payload.eventIndex };
     });
   }
 
@@ -238,7 +234,7 @@ export class LogViewer extends LitElement {
           )}
 
           <vscode-tab-panel>
-            <timeline-view .navigateToEventIndex="${this._navigateToEventIndex}"></timeline-view>
+            <timeline-view .navigateRequest="${this._navigateRequest}"></timeline-view>
           </vscode-tab-panel>
           <vscode-tab-panel>
             <call-tree-view></call-tree-view>
@@ -327,7 +323,7 @@ export class LogViewer extends LitElement {
     if (data.navigateToEventIndex !== undefined) {
       this._showTab('timeline-tab');
       // An event sent during the parse is newer than the one the fetch carried.
-      this._navigateToEventIndex ??= data.navigateToEventIndex;
+      this._navigateRequest ??= { eventIndex: data.navigateToEventIndex };
     }
   }
 

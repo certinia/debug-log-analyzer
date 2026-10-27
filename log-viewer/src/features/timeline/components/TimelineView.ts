@@ -28,7 +28,7 @@ import { addCustomThemes } from '../themes/ThemeSelector.js';
 
 import { selfTimeByCategory, toTimelineKeys } from '../utils/category-self-time.js';
 import type { TimeDisplayMode } from '../types/flamechart.types.js';
-import type { TimelineFlameChart } from './TimelineFlameChart.js';
+import type { NavigateRequest, TimelineFlameChart } from './TimelineFlameChart.js';
 import type { TimelineKeyEntry, Timelinekey } from './TimelineKey.js';
 
 // styles
@@ -67,8 +67,8 @@ export class TimelineView extends LitElement {
     return this.logStore?.log ?? null;
   }
 
-  @property({ type: Number })
-  navigateToEventIndex: number | undefined = undefined;
+  @property({ attribute: false })
+  navigateRequest: NavigateRequest | undefined = undefined;
 
   @state()
   activeTheme: string | null = null;
@@ -284,7 +284,7 @@ export class TimelineView extends LitElement {
       <timeline-flame-chart
         .logStore=${this.logStore}
         .themeName=${this.activeTheme}
-        .navigateToEventIndex=${this.navigateToEventIndex}
+        .navigateRequest=${this.navigateRequest}
         .showTooltip=${this.showTooltip}
         .dimCategories=${this.litCategories}
         @category-highlight-clear=${this.onHighlightClear}
