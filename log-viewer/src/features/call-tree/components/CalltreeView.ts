@@ -772,6 +772,8 @@ export class CalltreeView extends LitElement {
 
   _updateFiltering() {
     this._hiddenTarget = null;
+    // A go-to still running read the old filters, so its note would be stale.
+    this._goToCount++;
     this._applyFilters();
   }
 

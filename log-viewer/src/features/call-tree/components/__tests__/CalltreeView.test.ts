@@ -712,6 +712,26 @@ describe('calltree-view go to row', () => {
       expect(note()).toBeNull();
     });
 
+    // The go-to read the old filters, so its note named a row the new ones may show.
+    it('leaves no note from a go-to a filter change overtook', async () => {
+      const { log } = await storeOf(LOG);
+      await openWithDebugOnly(log);
+
+      const grid = view.timeOrderGrid!;
+      const goTo = grid.goTo.bind(grid);
+      grid.goTo = (path) => {
+        const going = goTo(path);
+        view._handleDebugOnlyChange();
+        return going;
+      };
+
+      await view._goToRow(indexOf(log, 'ns.Inner.go()'));
+      await settle();
+      await view.updateComplete;
+
+      expect(note()).toBeNull();
+    });
+
     it('says nothing when the row shows', async () => {
       const { log } = await storeOf(LOG);
       view = await mountView(log);
