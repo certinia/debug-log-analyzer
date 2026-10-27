@@ -316,10 +316,11 @@ export class GovernorTrends extends LitElement {
       return html`<p class="note">${text}</p>`;
     }
 
-    // `exitStamp`, not `duration.total`: readings carry the log's own timestamps, and the Timeline
+    // The log's end, not `duration.total`: readings carry the log's own timestamps, and the Timeline
     // runs from 0 to the last one. Measuring from the first event instead put every reading right
     // of where the Timeline draws it, and seeked short of the instant the reader pointed at.
-    const logTotal = apexLog.exitStamp;
+    // Row 0 of the columns is the log itself.
+    const logTotal = apexLog.columns.endTimestamp[0]!;
     return html`<div class="trends">${series.map((s) => this._renderTrend(s, logTotal))}</div>`;
   }
 

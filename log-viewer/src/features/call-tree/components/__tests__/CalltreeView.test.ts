@@ -26,8 +26,8 @@ jest.mock('../../grid/columns.js', () => ({
 }));
 jest.mock('../../utils/Aggregation.js', () => ({
   ...jest.requireActual<object>('../../utils/Aggregation.js'),
-  buildAggregatedTree: (...args: unknown[]) => heldBuild(args[3]),
-  buildBottomUpTree: (...args: unknown[]) => heldBuild(args[3]),
+  buildAggregatedTree: (...args: unknown[]) => heldBuild(args[1]),
+  buildBottomUpTree: (...args: unknown[]) => heldBuild(args[1]),
 }));
 // VsSelect extends vscode-single-select, whose setFormValue needs an
 // ElementInternals jsdom lacks; the render would upgrade it.
@@ -44,10 +44,11 @@ jest.mock('../../../settings/Settings.js', () => ({
 }));
 jest.mock('../../../../components/grid/exportCsv.js', () => ({ exportCsv: jest.fn() }));
 
-import { storeOf } from '#test-helpers/apexLog.js';
+import { indexOf, rawStoreOf, storeOf } from '#test-helpers/apexLog.js';
 import { AlwaysVisible, NeverVisible, settle } from '#test-helpers/visibility.js';
 import { exportCsv } from '../../../../components/grid/exportCsv.js';
 import { eventBus } from '../../../../core/events/EventBus.js';
+import type { LogIndex } from '../../../../core/log/LogIndex.js';
 import { LogStore, logStoreFor } from '../../../../core/log/LogStore.js';
 import { CalltreeView } from '../CalltreeView.js';
 
@@ -76,20 +77,16 @@ function grids(view: CalltreeView): Element[] {
   return [...view.renderRoot.querySelectorAll('lv-call-tree-grid')];
 }
 
-function apexLog(): ApexLog {
-  return {
-    children: [],
-    eventsById: [],
-    namespaces: [],
-    governorLimits: null,
-  } as unknown as ApexLog;
+/** A log of no events. */
+async function emptyLog(): Promise<ApexLog> {
+  return (await rawStoreOf('')).log;
 }
 
-async function mountView(log: ApexLog = apexLog()): Promise<CalltreeView> {
+async function mountView(log?: ApexLog): Promise<CalltreeView> {
   const view = new CalltreeView();
   document.body.append(view);
   await view.updateComplete;
-  view.logStore = logStoreFor(log);
+  view.logStore = logStoreFor(log ?? (await emptyLog()));
   await view.updateComplete;
   await settle();
   return view;
@@ -123,7 +120,7 @@ describe('calltree-view table lifetime', () => {
     const filters = [...(grid?.filters ?? [])];
     const source = grid?.source;
 
-    view.logStore = logStoreFor(apexLog());
+    view.logStore = logStoreFor(await emptyLog());
     await view.updateComplete;
     await settle();
 
@@ -403,19 +400,13 @@ describe('calltree-view category colorize', () => {
 
 describe('calltree-view merged filters', () => {
   // Outer runs 5 ms; its query and debug line take next to none.
-  const { log } = storeOf(
-    '09:18:22.6 (1000)|METHOD_ENTRY|[1]|01p|ns.Outer.run()\n' +
-      '09:18:22.6 (2000)|SOQL_EXECUTE_BEGIN|[2]|Aggregations:0|SELECT Id FROM Account\n' +
-      '09:18:22.6 (3000)|SOQL_EXECUTE_END|[2]|Rows:1\n' +
-      '09:18:22.6 (4000)|USER_DEBUG|[3]|DEBUG|hello\n' +
-      '09:18:22.6 (5001000)|METHOD_EXIT|[1]|ns.Outer.run()\n',
-  );
-  const paths = (): ReturnType<LogStore['keyPathIds']> => logStoreFor(log).keyPathIds();
+  let store: LogStore;
+  let index: LogIndex;
   const all = <R extends { _children?: R[] | null }>(of: readonly R[]): R[] =>
     of.flatMap((row) => [row, ...all(row._children ?? [])]);
   const rowsOf = {
-    aggregated: () => all(toAggregatedCallTree(log.children, paths())),
-    'bottom-up': () => all(toBottomUpTree(log.children, paths())),
+    aggregated: () => all(toAggregatedCallTree(index, store)),
+    'bottom-up': () => all(toBottomUpTree(index, store)),
   };
   const gridOf = (view: CalltreeView, mode: keyof typeof rowsOf) =>
     mode === 'aggregated' ? view.aggregatedGrid : view.bottomUpGrid;
@@ -431,7 +422,15 @@ describe('calltree-view merged filters', () => {
 
   beforeEach(async () => {
     globalThis.IntersectionObserver = AlwaysVisible as unknown as typeof IntersectionObserver;
-    view = await mountView(log);
+    ({ store } = await storeOf(
+      '09:18:22.6 (1000)|METHOD_ENTRY|[1]|01p|ns.Outer.run()\n' +
+        '09:18:22.6 (2000)|SOQL_EXECUTE_BEGIN|[2]|Aggregations:0|SELECT Id FROM Account\n' +
+        '09:18:22.6 (3000)|SOQL_EXECUTE_END|[2]|Rows:1\n' +
+        '09:18:22.6 (4000)|USER_DEBUG|[3]|DEBUG|hello\n' +
+        '09:18:22.6 (5001000)|METHOD_EXIT|[1]|ns.Outer.run()\n',
+    ));
+    index = await store.logIndex();
+    view = await mountView(store.log);
     view.filterState.showDetails = true;
   });
 
@@ -471,18 +470,19 @@ describe('calltree-view merged filters', () => {
 
 describe('calltree-view inspector reveal', () => {
   // Outer calls Inner, so Outer heads its own bucket and is Inner's caller row too.
-  const { log } = storeOf(
-    '09:18:22.6 (1000)|METHOD_ENTRY|[1]|01p|ns.Outer.run()\n' +
-      '09:18:22.6 (2000)|METHOD_ENTRY|[2]|01p|ns.Inner.go()\n' +
-      '09:18:22.6 (3000)|METHOD_EXIT|[2]|ns.Inner.go()\n' +
-      '09:18:22.6 (5001000)|METHOD_EXIT|[1]|ns.Outer.run()\n',
-  );
+  let store: LogStore;
   let view: CalltreeView;
 
   beforeEach(async () => {
     globalThis.IntersectionObserver = AlwaysVisible as unknown as typeof IntersectionObserver;
     holdBuilds = true;
-    view = await mountView(log);
+    ({ store } = await storeOf(
+      '09:18:22.6 (1000)|METHOD_ENTRY|[1]|01p|ns.Outer.run()\n' +
+        '09:18:22.6 (2000)|METHOD_ENTRY|[2]|01p|ns.Inner.go()\n' +
+        '09:18:22.6 (3000)|METHOD_EXIT|[2]|ns.Inner.go()\n' +
+        '09:18:22.6 (5001000)|METHOD_EXIT|[1]|ns.Outer.run()\n',
+    ));
+    view = await mountView(store.log);
   });
 
   afterEach(() => {
@@ -493,7 +493,7 @@ describe('calltree-view inspector reveal', () => {
   it('reveals the Bottom-Up bucket a frame heads, not a caller row it sits in', async () => {
     const switched = view._setViewMode('bottom-up');
     await settle();
-    const roots = toBottomUpTree(log.children, logStoreFor(log).keyPathIds());
+    const roots = toBottomUpTree(await store.logIndex(), store);
     finishBuild?.(roots);
     await switched;
     const grid = view.bottomUpGrid;
@@ -501,11 +501,11 @@ describe('calltree-view inspector reveal', () => {
       throw new Error('no bottom-up grid');
     }
     const goTo = jest.spyOn(grid, 'goTo').mockResolvedValue(true);
-    const all = (events: ApexLog['children']): ApexLog['children'] =>
-      events.flatMap((e) => [e, ...all(e.children)]);
-    const outer = all(log.children).find((e) => e.text === 'ns.Outer.run()');
 
-    eventBus.emit('inspector:reveal', { source: 'calltree', eventIndex: outer?.eventIndex ?? -1 });
+    eventBus.emit('inspector:reveal', {
+      source: 'calltree',
+      eventIndex: indexOf(store.log, 'ns.Outer.run()'),
+    });
     await settle();
 
     const bucket = roots.find((row) => row.text === 'ns.Outer.run()');
@@ -522,16 +522,13 @@ describe('calltree-view go to row', () => {
 
   it('puts keyboard focus on the grid, so its keys work at once', async () => {
     globalThis.IntersectionObserver = AlwaysVisible as unknown as typeof IntersectionObserver;
-    const { log } = storeOf(
+    const { log } = await storeOf(
       '09:18:22.6 (1000)|METHOD_ENTRY|[1]|01p|ns.Outer.run()\n' +
         '09:18:22.6 (1800)|METHOD_EXIT|[1]|ns.Outer.run()\n',
     );
     view = await mountView(log);
-    const all = (events: ApexLog['children']): ApexLog['children'] =>
-      events.flatMap((e) => [e, ...all(e.children)]);
-    const outer = all(log.children).find((e) => e.text === 'ns.Outer.run()');
 
-    await view._goToRow(outer?.eventIndex ?? -1);
+    await view._goToRow(indexOf(log, 'ns.Outer.run()'));
 
     expect((view.renderRoot as ShadowRoot).activeElement === view.timeOrderGrid).toBe(true);
   });
@@ -571,7 +568,7 @@ describe('calltree-view type picker', () => {
 
   it("lists the log's types once each, sorted, and no exit lines", async () => {
     view.isVisible = true;
-    view.logStore = storeOf(OUTER).store;
+    view.logStore = (await storeOf(OUTER)).store;
     const types = await typeOptions();
 
     expect(types).toEqual([...new Set(types)].sort());
@@ -586,14 +583,14 @@ describe('calltree-view type picker', () => {
     view = new CalltreeView();
     document.body.append(view);
     const logIndex = jest.spyOn(LogStore.prototype, 'logIndex');
-    view.logStore = storeOf(OUTER).store;
+    view.logStore = (await storeOf(OUTER)).store;
     await typeOptions();
 
     expect(logIndex).not.toHaveBeenCalled();
   });
 
   it('shows the types of the log it has now, not one it had before', async () => {
-    const before = storeOf(OUTER).log;
+    const before = (await storeOf(OUTER)).log;
     const logIndex = LogStore.prototype.logIndex;
     let release = (): void => {};
     const held = new Promise<void>((resolve) => (release = resolve));
@@ -606,7 +603,7 @@ describe('calltree-view type picker', () => {
     view.isVisible = true;
     view.logStore = logStoreFor(before);
     await view.updateComplete;
-    view.logStore = storeOf(DML).store;
+    view.logStore = (await storeOf(DML)).store;
     await typeOptions();
     release();
     const types = await typeOptions();

@@ -10,7 +10,6 @@
  * picks the dominant category.
  */
 import { describe, expect, it } from '@jest/globals';
-import type { LogEvent } from '@apexdevtools/apex-log-parser';
 
 import { MinimapDensityQuery } from '../optimised/minimap/MinimapDensityQuery.js';
 import type { PrecomputedRect } from '../optimised/RectangleCache.js';
@@ -37,7 +36,7 @@ function createRect(
     y: 0,
     width: 0,
     height: 20,
-    eventRef: { timestamp: timeStart } as LogEvent,
+    row: timeStart,
   };
 }
 

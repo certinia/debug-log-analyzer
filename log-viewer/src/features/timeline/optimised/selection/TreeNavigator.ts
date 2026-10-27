@@ -44,7 +44,7 @@ export class TreeNavigator {
    * Find a TreeNode by its original reference.
    * Useful for mapping hit test results back to tree nodes.
    *
-   * @param original - Original reference (e.g., LogEvent) from hit test
+   * @param original - Original reference (e.g., ApexEvent) from hit test
    * @returns The TreeNode, or null if not found
    */
   public findByOriginal(original: unknown): TreeNode<EventNode> | null {

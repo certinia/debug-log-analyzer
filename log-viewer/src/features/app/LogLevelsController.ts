@@ -3,15 +3,16 @@
  */
 import type { ReactiveController, ReactiveControllerHost } from 'lit';
 
-import type { ApexLog, DebugLevels, LogLevel } from '@apexdevtools/apex-log-parser';
-import { filterByLevels, sameLevels } from '../../core/log/levelFilter.js';
+import type { DebugCategory, Level } from '@apexdevtools/apex-log-parser';
+import { type DebugLevels, sameLevels } from '../../core/log/levelFilter.js';
+import { filterByLevels, type LogStore } from '../../core/log/LogStore.js';
 
 /** How long a level change runs before the header shows it is busy. */
 const BUSY_AFTER_MS = 100;
 
 export interface LogLevelsHost {
-  /** Puts `log` on screen. */
-  publish(log: ApexLog): void;
+  /** Puts `store` on screen. */
+  publish(store: LogStore): void;
   /** Reports a level change that failed. The log on screen stays. */
   fail(err: unknown): void;
 }
@@ -21,8 +22,8 @@ export interface LogLevelsHost {
  * levels chosen, and the build that filters the captured log to them.
  */
 export class LogLevelsController implements ReactiveController {
-  /** The parsed log. The one on screen is this log, or a copy filtered to {@link chosen}. */
-  captured: ApexLog | null = null;
+  /** The parsed log. The one on screen is this log, or a view of it filtered to {@link chosen}. */
+  captured: LogStore | null = null;
   // Set on each pick before its build ends, so a quick second pick keeps the first.
   chosen: DebugLevels = {};
   /** True while a level change has run for longer than a moment. */
@@ -46,16 +47,16 @@ export class LogLevelsController implements ReactiveController {
   }
 
   /** A newly parsed log, at the levels it was captured at. */
-  open(log: ApexLog): void {
+  open(store: LogStore): void {
     this._stop();
-    this.captured = log;
-    this.chosen = { ...log.debugLevels };
+    this.captured = store;
+    this.chosen = { ...store.log.debugLevels };
     this._applied = this.chosen;
     this._host.requestUpdate();
   }
 
   /** Shows the log as if `category` had been captured at `level`. */
-  async choose(category: keyof DebugLevels, level: LogLevel): Promise<void> {
+  async choose(category: DebugCategory, level: Level): Promise<void> {
     const captured = this.captured;
     if (!captured) {
       return;
@@ -91,7 +92,7 @@ export class LogLevelsController implements ReactiveController {
       return;
     }
     this._stop();
-    this.chosen = { ...captured.debugLevels };
+    this.chosen = { ...captured.log.debugLevels };
     if (!sameLevels(this._applied, this.chosen)) {
       this._log.publish(captured);
     }

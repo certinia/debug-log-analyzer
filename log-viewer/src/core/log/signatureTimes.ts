@@ -1,13 +1,12 @@
 /*
  * Copyright (c) 2026 Certinia Inc. All rights reserved.
  */
-import type { LogCategory } from '@apexdevtools/apex-log-parser';
-
 import { CHECK_EVERY, frameBudget } from '../utility/FrameBudget.js';
-import { type SignatureLookup, signatureSlot } from './eventKeys.js';
+import type { LogCategory } from './category.js';
 import type { Derivation } from './LogStore.js';
+import { signaturesOf } from './signatures.js';
 
-/** One signature (`getEventKey`: type, namespace and text) and what its calls cost. */
+/** One signature (type, namespace and text) and what its calls cost. */
 export interface Signature {
   text: string;
   /** The worst call's category. */
@@ -89,6 +88,7 @@ class Table implements SignatureTimes {
 
 // Per signature, while the pass runs.
 interface Tally {
+  signature: number;
   count: number;
   timedCount: number;
   selfTime: number;
@@ -100,13 +100,15 @@ interface Tally {
 
 /**
  * {@link SignatureTimes} for the log, from one pass over its index. Built in slices:
- * the signature lives on the event objects, so this touches each one.
+ * a leaf's signature reads its text from the log.
  */
 export const signatureTimes: Derivation<SignatureTimes> = async (index) => {
   const tick = frameBudget({});
-  const { rowCount, self, total, subtreeEnd } = index;
+  const { rowCount, self, total, subtreeEnd, eventIndex } = index;
+  const signatures = signaturesOf(index.log);
   const ids = new Uint32Array(rowCount);
-  const lookup: SignatureLookup<number> = new Map();
+  // Each signature's tally id, + 1 so 0 is none yet.
+  const tallyOf: number[] = [];
   const tallies: Tally[] = [];
   // Ids in order of first timed call.
   const timed: number[] = [];
@@ -114,16 +116,16 @@ export const signatureTimes: Derivation<SignatureTimes> = async (index) => {
     if (row % CHECK_EVERY === 0) {
       await tick();
     }
-    const event = index.event(row);
-    const byText = signatureSlot(lookup, event);
-    let id = byText.get(event.text);
+    const signature = signatures.of(eventIndex[row]!);
+    let id = tallyOf[signature];
     if (id === undefined) {
       id = tallies.length;
-      byText.set(event.text, id);
+      tallyOf[signature] = id;
       tallies.push({
         count: 0,
         timedCount: 0,
         selfTime: 0,
+        signature,
         maxRow: row,
         outerTotal: 0,
         countedUntil: 0,
@@ -151,12 +153,11 @@ export const signatureTimes: Derivation<SignatureTimes> = async (index) => {
   // In range: every id in `timed` is below tallies.length, and maxRow is a row.
   const idOf = new Map(
     timed.map((id) => {
-      const { count, timedCount, selfTime, maxRow, outerTotal } = tallies[id]!;
-      const worst = index.event(maxRow);
+      const { signature: of, count, timedCount, selfTime, maxRow, outerTotal } = tallies[id]!;
       const signature: Signature = {
-        text: worst.text,
-        category: worst.category,
-        eventIndex: index.eventIndex[maxRow]!,
+        text: signatures.text(of),
+        category: index.categoryNames[index.categoryId[maxRow]!]!,
+        eventIndex: eventIndex[maxRow]!,
         count,
         timedCount,
         selfTime,

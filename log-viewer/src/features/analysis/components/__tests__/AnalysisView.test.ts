@@ -4,7 +4,7 @@
  * @jest-environment jsdom
  */
 import { afterEach, beforeEach, describe, expect, it } from '@jest/globals';
-import type { ApexLog, LogEvent } from '@apexdevtools/apex-log-parser';
+import type { ApexLog } from '@apexdevtools/apex-log-parser';
 
 // VsSelect extends vscode-single-select, whose setFormValue needs an
 // ElementInternals jsdom lacks; the render would upgrade it.
@@ -21,7 +21,7 @@ jest.mock('../../../settings/Settings.js', () => ({
 }));
 jest.mock('../../../../components/grid/exportCsv.js', () => ({ exportCsv: jest.fn() }));
 
-import { governorLimits } from '#test-helpers/limits.js';
+import { frameLines, rawStoreOf } from '#test-helpers/apexLog.js';
 import { AlwaysVisible, NeverVisible, settle } from '#test-helpers/visibility.js';
 import {
   eventBus,
@@ -38,60 +38,26 @@ import { AnalysisView } from '../AnalysisView.js';
 /** Pushes settings to the view, as the extension does on a change. */
 let applySettings: (settings: object) => void = () => {};
 
-/** The log's own index, which a reveal resolves its frame through, and which the
- *  fixture's event indexes count off. */
-let byEventIndex: LogEvent[] = [];
-
-function frame(
-  text: string,
-  self: number,
-  total: number,
-  parent: LogEvent | null,
-  type = 'METHOD_ENTRY',
-): LogEvent {
-  const event = {
-    eventIndex: byEventIndex.length,
-    type,
-    namespace: 'default',
-    text,
-    parent,
-    children: [],
-    duration: { self, total },
-    dmlCount: { self: 0, total: 0 },
-    soqlCount: { self: 0, total: 0 },
-    soslCount: { self: 0, total: 0 },
-    dmlRowCount: { self: 0, total: 0 },
-    soqlRowCount: { self: 0, total: 0 },
-    soslRowCount: { self: 0, total: 0 },
-    thrownCount: { self: 0, total: 0 },
-    heapAllocated: { self: 0, total: 0 },
-    heapGross: { self: 0, total: 0 },
-    heapPeak: 0,
-  } as unknown as LogEvent;
-  parent?.children.push(event);
-  byEventIndex.push(event);
-  return event;
-}
-
 /**
- * A -> B -> A on one branch, A -> C -> A on the other, and a debug line with no
- * time, under a log root as the parser leaves it: a bottom-up chain runs out to
- * the root and stops there.
+ * A -> B -> A on one branch, A -> C -> A on the other, then a debug line with no
+ * time: a bottom-up chain runs out to the top of the log and stops there.
  */
-function recursiveLog(): ApexLog {
-  const root = frame('LOG_ROOT', 0, 150, null);
-  const outer1 = frame('A', 10, 100, root);
-  const b1 = frame('B', 20, 90, outer1);
-  frame('A', 70, 70, b1);
-  const outer2 = frame('A', 5, 50, root);
-  const c1 = frame('C', 15, 45, outer2);
-  frame('A', 30, 30, c1);
-  frame('debug', 0, 0, root, 'USER_DEBUG');
-  return Object.assign(root, {
-    eventsById: byEventIndex,
-    namespaces: [],
-    governorLimits: governorLimits(),
-  }) as unknown as ApexLog;
+async function recursiveLog(): Promise<ApexLog> {
+  const { log } = await rawStoreOf(
+    frameLines([
+      {
+        text: 'A',
+        self: 10,
+        children: [{ text: 'B', self: 20, children: [{ text: 'A', self: 70 }] }],
+      },
+      {
+        text: 'A',
+        self: 5,
+        children: [{ text: 'C', self: 15, children: [{ text: 'A', self: 30 }] }],
+      },
+    ]) + '09:18:22.6 (1150)|USER_DEBUG|[1]|DEBUG|debug\n',
+  );
+  return log;
 }
 
 /** The index of the debug line `recursiveLog` ends with. */
@@ -125,8 +91,7 @@ describe('analysis-view', () => {
 
   beforeEach(async () => {
     globalThis.IntersectionObserver = AlwaysVisible as unknown as typeof IntersectionObserver;
-    byEventIndex = [];
-    log = recursiveLog();
+    log = await recursiveLog();
     view = new AnalysisView();
     document.body.append(view);
     await view.updateComplete;
@@ -151,12 +116,12 @@ describe('analysis-view', () => {
         ['A', 115],
         ['B', 20],
         ['C', 15],
-        ['debug', 0],
+        ['DEBUG | debug', 0],
       ]),
     );
     expect(roots()).toHaveLength(4);
     expect(grid().sort).toEqual({ column: 'totalSelfTime', dir: 'desc' });
-    const debug = findRow(roots(), 'debug');
+    const debug = findRow(roots(), 'DEBUG | debug');
     expect(grid().filters.every((filter) => filter.test(debug))).toBe(false);
   });
 
@@ -180,8 +145,8 @@ describe('analysis-view', () => {
         view: 'callers',
         selection: {
           kind: 'aggregate',
-          instances: rootRow.instances.map((event) => event.eventIndex),
-          frames: rootRow.instances.map((event) => event.eventIndex),
+          instances: [...rootRow.instances],
+          frames: [...rootRow.instances],
           // The root row names the calls it counts, so nothing made them but it.
           calledBy: undefined,
         },
@@ -197,7 +162,8 @@ describe('analysis-view', () => {
     select(throughB);
     select(throughBA);
 
-    const derived = rootRow.instances.filter((event) => event.parent?.text === 'B');
+    const { parent, text } = log.columns;
+    const derived = rootRow.instances.filter((id) => text.at(parent[id]!) === 'B');
     expect(derived).toHaveLength(1);
     expect(seen.map((detail) => detail.selection)).toEqual([
       // Both rows hold the same one call, so the row is what tells them apart:
@@ -205,13 +171,13 @@ describe('analysis-view', () => {
       // each row is, a level up from the call its totals count.
       {
         kind: 'aggregate',
-        instances: derived.map((event) => event.eventIndex),
+        instances: derived,
         frames: [2],
         calledBy: 'B',
       },
       {
         kind: 'aggregate',
-        instances: derived.map((event) => event.eventIndex),
+        instances: derived,
         frames: [1],
         calledBy: 'A',
       },
@@ -258,7 +224,9 @@ describe('analysis-view', () => {
     await settle();
 
     expect(grid().filters).toEqual([]);
-    expect(goTo).toHaveBeenCalledWith([findRow(roots(), 'debug').id], { scrollIfVisible: false });
+    expect(goTo).toHaveBeenCalledWith([findRow(roots(), 'DEBUG | debug').id], {
+      scrollIfVisible: false,
+    });
   });
 
   it('moves to the bucket a picked inspector row names, and only marks for a hover', async () => {
@@ -378,9 +346,9 @@ describe('analysis-view', () => {
   it('stops a rebuild that a newer log overtook', async () => {
     const bottomUp = jest.spyOn(MergedTree, 'bottomUp');
 
-    view.logStore = logStoreFor(recursiveLog());
+    view.logStore = logStoreFor(await recursiveLog());
     await view.updateComplete;
-    view.logStore = logStoreFor(recursiveLog());
+    view.logStore = logStoreFor(await recursiveLog());
     await view.updateComplete;
     await settle();
 
@@ -390,17 +358,17 @@ describe('analysis-view', () => {
 
   it('drops a build a newer log overtook while it read the limit usage', async () => {
     // The newer log lands after this tree resolves but before its usage read does.
-    const olderTree = await MergedTree.bottomUp(recursiveLog());
+    const olderTree = await MergedTree.bottomUp(logStoreFor(await recursiveLog()));
     let finish: (tree: typeof olderTree) => void = () => {};
     jest
       .spyOn(MergedTree, 'bottomUp')
       .mockImplementationOnce(() => new Promise((resolve) => (finish = resolve)))
       .mockImplementationOnce(() => new Promise(() => {}));
 
-    view.logStore = logStoreFor(recursiveLog());
+    view.logStore = logStoreFor(await recursiveLog());
     await view.updateComplete;
     finish(olderTree);
-    view.logStore = logStoreFor(recursiveLog());
+    view.logStore = logStoreFor(await recursiveLog());
     await view.updateComplete;
     await settle();
     await view.updateComplete;
@@ -414,7 +382,7 @@ describe('analysis-view', () => {
     const shownGrid = grid();
     const before = roots();
 
-    view.logStore = logStoreFor(recursiveLog());
+    view.logStore = logStoreFor(await recursiveLog());
     await view.updateComplete;
     await settle();
     await view.updateComplete;
@@ -515,11 +483,10 @@ describe('analysis-view', () => {
 describe('analysis-view before it is seen', () => {
   it('builds nothing while the tab is hidden', async () => {
     globalThis.IntersectionObserver = NeverVisible as unknown as typeof IntersectionObserver;
-    byEventIndex = [];
     const view = new AnalysisView();
     document.body.append(view);
     await view.updateComplete;
-    view.logStore = logStoreFor(recursiveLog());
+    view.logStore = logStoreFor(await recursiveLog());
     await view.updateComplete;
     await settle();
 

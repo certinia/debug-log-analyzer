@@ -1,11 +1,11 @@
 /*
  * Copyright (c) 2023 Certinia Inc. All rights reserved.
  */
-import type { LogCategory } from '@apexdevtools/apex-log-parser';
 import { LitElement, css, html } from 'lit';
 import { customElement, property, state } from 'lit/decorators.js';
 import { repeat } from 'lit/directives/repeat.js';
 
+import type { LogCategory } from '../../../core/log/category.js';
 import { formatDuration } from '../../../core/utility/Util.js';
 import { isDeselectEscape } from '../../app/escapeDeselect.js';
 import { HoverIntentController } from './HoverIntentController.js';

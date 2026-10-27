@@ -3,12 +3,11 @@
  */
 import { describe, expect, it } from '@jest/globals';
 
-import { indexTree } from '#test-helpers/apexLog.js';
 import { namespaceColumn, namespaceSelfTimes } from '../namespaceTime.js';
 import { namespaceEvent, log, type FakeEvent } from './fixtures/logEvents.js';
 
 async function selfTimes(scope: FakeEvent[] | null, top: FakeEvent[] = scope ?? []) {
-  const index = indexTree(log(top));
+  const index = await (await log(top)).store.logIndex();
   const rows = scope?.map((event) => index.rowOf(event.eventIndex)) ?? null;
   return namespaceSelfTimes(index, await namespaceColumn(index), rows);
 }

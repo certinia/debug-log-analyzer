@@ -11,7 +11,7 @@ import {
   type TextEditorSelectionChangeEvent,
 } from 'vscode';
 
-import type { LogEvent } from '@apexdevtools/apex-log-parser';
+import type { ApexEvent } from '@apexdevtools/apex-log-parser';
 
 import type { Context } from '../Context.js';
 import { LogEventCache, type LogReporter } from '../cache/LogEventCache.js';
@@ -90,7 +90,6 @@ export class RawLogLineDecoration {
       return;
     }
 
-    const timestamp = parseInt(match[1], 10);
     const filePath = document.uri.toString();
 
     if (!isOpenAsTextTab(document.uri)) {
@@ -104,20 +103,21 @@ export class RawLogLineDecoration {
       return;
     }
 
-    const result = LogEventCache.findEventByTimestamp(apexLog, timestamp);
-    if (!result) {
+    // The event the line starts, or the frame it closes.
+    const { start, end } = LogEventCache.linesOf(apexLog, document);
+    const startId = start.indexOf(line.lineNumber);
+    const event = apexLog.event(startId > 0 ? startId : end.indexOf(line.lineNumber));
+    if (!event) {
       this.clearDecorations(editor);
       return;
     }
-
-    const { event } = result;
     const durationText = this.formatDurationText(event.duration.total, event.duration.self);
 
     // Use empty range at end of line so hover only triggers near the ghost text
     const endOfLine = line.range.end;
     const decoration: DecorationOptions = {
       range: new Range(endOfLine, endOfLine),
-      hoverMessage: this.buildHoverMessage(event, timestamp, filePath),
+      hoverMessage: this.buildHoverMessage(event, filePath),
       renderOptions: {
         after: {
           contentText: durationText,
@@ -132,8 +132,8 @@ export class RawLogLineDecoration {
     editor.setDecorations(cursorLineDecorationType, []);
   }
 
-  private buildHoverMessage(event: LogEvent, timestamp: number, filePath: string): MarkdownString {
-    const args = encodeURIComponent(JSON.stringify({ timestamp, filePath }));
+  private buildHoverMessage(event: ApexEvent, filePath: string): MarkdownString {
+    const args = encodeURIComponent(JSON.stringify({ eventIndex: event.id, filePath }));
     const commandUri = `command:lana.showInLogAnalysis?${args}`;
 
     const metricParts = buildMetricParts(event);

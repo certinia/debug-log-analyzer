@@ -43,7 +43,7 @@ export function runPanelRowAction(itemId: string, eventIndex: number): void {
       copyToClipboard(eventName(event));
       break;
     case 'copy-details':
-      copyToClipboard(formatEventDetails(event, store?.log.governorLimits));
+      copyToClipboard(formatEventDetails(event, store?.log.limits));
       break;
     case 'copy-call-stack':
       copyToClipboard(formatCallStack(event));

@@ -29,7 +29,6 @@
 import type {
   CategoryAggregation,
   CulledRenderData,
-  LogEvent,
   PixelBucket,
   RenderStats,
   SegmentNode,
@@ -205,8 +204,8 @@ export class TemporalSegmentTree {
           byCategory: categoryStats,
           dominantCategory,
         },
-        // Event refs are expensive to collect - leave empty for multi-event buckets
-        eventRefs: [],
+        // Rects are expensive to collect - leave empty for multi-event buckets
+        rects: [],
         color: baseColor,
       });
       bucketCount++;
@@ -230,23 +229,23 @@ export class TemporalSegmentTree {
   }
 
   /**
-   * Query events within a specific time and depth region.
-   * Used for hit testing when bucket eventRefs are empty.
-   * O(log n + k) complexity where k = events in region.
+   * Query rectangles within a specific time and depth region.
+   * Used for hit testing when bucket rects are empty.
+   * O(log n + k) complexity where k = rectangles in region.
    *
    * @param timeStart - Start time in nanoseconds
    * @param timeEnd - End time in nanoseconds
    * @param depthStart - Minimum depth (inclusive)
    * @param depthEnd - Maximum depth (inclusive)
-   * @returns Array of LogEvent references in the region
+   * @returns The rectangles in the region
    */
-  public queryEventsInRegion(
+  public queryRectsInRegion(
     timeStart: number,
     timeEnd: number,
     depthStart: number,
     depthEnd: number,
-  ): LogEvent[] {
-    const results: LogEvent[] = [];
+  ): PrecomputedRect[] {
+    const results: PrecomputedRect[] = [];
 
     for (let depth = depthStart; depth <= depthEnd; depth++) {
       const tree = this.treesByDepth.get(depth);
@@ -254,37 +253,36 @@ export class TemporalSegmentTree {
         continue;
       }
 
-      this.collectEventsFromNode(tree, timeStart, timeEnd, results);
+      this.collectRectsFromNode(tree, timeStart, timeEnd, results);
     }
 
     return results;
   }
 
   /**
-   * Collect events from a tree node that overlap with the query time range.
+   * Collect rectangles from a tree node that overlap with the query time range.
    * Recursive traversal with early exit for non-overlapping nodes.
    */
-  private collectEventsFromNode(
+  private collectRectsFromNode(
     node: SegmentNode,
     queryStart: number,
     queryEnd: number,
-    results: LogEvent[],
+    results: PrecomputedRect[],
   ): void {
     // Early exit: no overlap
     if (node.timeEnd <= queryStart || node.timeStart >= queryEnd) {
       return;
     }
 
-    // Leaf with event ref: add to results
-    if (node.isLeaf && node.eventRef) {
-      results.push(node.eventRef);
+    if (node.isLeaf && node.rectRef) {
+      results.push(node.rectRef);
       return;
     }
 
     // Branch: recurse into children
     if (node.children) {
       for (const child of node.children) {
-        this.collectEventsFromNode(child, queryStart, queryEnd, results);
+        this.collectRectsFromNode(child, queryStart, queryEnd, results);
       }
     }
   }
@@ -364,7 +362,6 @@ export class TemporalSegmentTree {
       leafDuration: duration,
 
       eventCount: 1,
-      eventRef: rect.eventRef,
       rectRef: rect, // Direct reference for O(1) lookup in addVisibleRect
 
       children: null,

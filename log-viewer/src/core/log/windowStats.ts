@@ -1,14 +1,15 @@
 /*
  * Copyright (c) 2026 Certinia Inc. All rights reserved.
  */
-import type { ApexLog, LogEvent } from '@apexdevtools/apex-log-parser';
 import type { ReactiveControllerHost } from 'lit';
 
 import { DEFAULT_NAMESPACE } from '../utility/CallerNamespace.js';
-import { walkEvents } from '../utility/EventTree.js';
 import { CHECK_EVERY, frameBudget, type FrameBudgetOptions } from '../utility/FrameBudget.js';
 import { firstIndexWhere } from '../utility/Util.js';
+import { type LogIndex, NO_ROW } from './LogIndex.js';
+import type { LogStore } from './LogStore.js';
 import { RangeScopeController, sameWindow, type TimeWindow } from './rangeScope.js';
+import { rowMetrics } from './rowMetrics.js';
 
 /** The statement counters an event carries for itself. */
 export interface WindowCounts {
@@ -21,7 +22,7 @@ export interface WindowCounts {
 
 /** Everything the inspector's sections read for one stretch of the log. */
 export interface WindowStats {
-  /** Keyed by the parser's own category, which is empty where it has none. */
+  /** Keyed by the timeline category, which is empty where an event has none. */
   selfByCategory: Map<string, number>;
   selfByNamespace: Map<string, number>;
   counts: WindowCounts;
@@ -69,7 +70,7 @@ interface CounterRun {
 
 type CounterRuns = Readonly<Record<keyof WindowCounts, CounterRun>>;
 
-/** One counter's events as the walk finds them, in three parallel columns. */
+/** One counter's events as the pass finds them, in three parallel columns. */
 interface Gathered {
   starts: number[];
   ends: number[];
@@ -88,7 +89,9 @@ export class WindowIndex {
   /** Every section asks for the same window, so one answer serves them all. */
   private _held: { window: TimeWindow; stats: WindowStats } | null = null;
 
-  private readonly _roots: readonly LogEvent[];
+  private readonly _index: LogIndex;
+  /** The rows at the top of the log, in log order. */
+  private readonly _roots: readonly number[];
   private readonly _start: number;
   private readonly _width: number;
   private readonly _selfByCategory: ReadonlyMap<string, Float64Array>;
@@ -105,14 +108,15 @@ export class WindowIndex {
   readonly logCounts: WindowCounts;
 
   private constructor(
-    roots: readonly LogEvent[],
+    index: LogIndex,
     start: number,
     width: number,
     selfByCategory: ReadonlyMap<string, Float64Array>,
     selfByNamespace: ReadonlyMap<string, Float64Array>,
     runs: CounterRuns,
   ) {
-    this._roots = roots;
+    this._index = index;
+    this._roots = childRows(index, NO_ROW);
     this._start = start;
     this._width = width;
     this._selfByCategory = selfByCategory;
@@ -121,45 +125,61 @@ export class WindowIndex {
     this.logCounts = byCounter((counter) => runs[counter].startedTotal.at(-1)!); // a run always holds the opening 0
   }
 
-  /** Reads every event once, yielding between slices so the chart keeps its
+  /** Reads every row once, yielding between slices so the chart keeps its
    *  frames (see {@link FrameBudgetOptions}). */
-  static async build(log: ApexLog, options: BuildOptions): Promise<WindowIndex> {
+  static async build(index: LogIndex, options: BuildOptions): Promise<WindowIndex> {
     const tick = frameBudget(options);
-    const start = log.timestamp;
-    const logEnd = log.exitStamp ?? start;
+    const { log, rowCount, start: starts, end: ends, categoryId, categoryNames } = index;
+    const start = log.startTimestamp;
+    const logEnd = log.endTimestamp;
     // A log with no span still needs one bucket for its events to land in.
     const width = logEnd > start ? (logEnd - start) / BUCKETS : 1;
-    const selfByCategory = new Map<string, Float64Array>();
-    const selfByNamespace = new Map<string, Float64Array>();
+    const namespaceIds = index.column(log.columns.namespace.ids);
+    // By category id, and by namespace id + 1 so the -1 of no namespace has a slot.
+    const byCategory: Float64Array[] = [];
+    const byNamespace: Float64Array[] = [];
+    const metrics = rowMetrics(index);
+    const soql = metrics.soqlCount.self;
+    const soqlRows = metrics.soqlRowCount.self;
+    const dml = metrics.dmlCount.self;
+    const dmlRows = metrics.dmlRowCount.self;
+    const sosl = metrics.soslCount.self;
     const gathered = byCounter(gatherer);
 
-    // Reassigned per event, so the gap visitor below is allocated once for the
-    // whole walk rather than once per event.
-    let intoCategory = bucketsFor(selfByCategory, '');
-    let intoNamespace = bucketsFor(selfByNamespace, '');
+    // Reassigned per row, so the gap visitor below is allocated once for the
+    // whole pass rather than once per row.
+    let intoCategory = slot(byCategory, 0);
+    let intoNamespace = slot(byNamespace, 0);
     const bucket = (from: number, to: number): void => {
       spread(intoCategory, intoNamespace, from, to, start, width);
     };
 
-    let walked = 0;
-    for (const event of walkEvents(log.children)) {
-      if (walked++ % CHECK_EVERY === 0) {
+    const children: number[] = [];
+    for (let row = 0; row < rowCount; row++) {
+      if (row % CHECK_EVERY === 0) {
         await tick();
       }
-      intoCategory = bucketsFor(selfByCategory, event.category);
-      intoNamespace = bucketsFor(selfByNamespace, event.namespace || DEFAULT_NAMESPACE);
-      eachSelfGap(event, 0, event.children.length, bucket);
+      intoCategory = slot(byCategory, categoryId[row]!);
+      intoNamespace = slot(byNamespace, namespaceIds[row]! + 1);
+      childRows(index, row, children);
+      eachSelfGap(index, row, children, 0, children.length, bucket);
 
-      const from = event.timestamp;
-      const to = endOf(event);
-      // Spelt out, not looped over COUNTERS: a computed key per event costs the build ~18%.
-      gather(gathered.soqlCount, from, to, event.soqlCount.self);
-      gather(gathered.soqlRowCount, from, to, event.soqlRowCount.self);
-      gather(gathered.dmlCount, from, to, event.dmlCount.self);
-      gather(gathered.dmlRowCount, from, to, event.dmlRowCount.self);
-      gather(gathered.soslCount, from, to, event.soslCount.self);
+      const from = starts[row]!;
+      const to = ends[row]!;
+      // Spelt out, not looped over COUNTERS: a computed key per row costs the build ~18%.
+      gather(gathered.soqlCount, from, to, soql[row] ?? 0);
+      gather(gathered.soqlRowCount, from, to, soqlRows[row] ?? 0);
+      gather(gathered.dmlCount, from, to, dml[row] ?? 0);
+      gather(gathered.dmlRowCount, from, to, dmlRows[row] ?? 0);
+      gather(gathered.soslCount, from, to, sosl[row] ?? 0);
     }
 
+    const namespaceNames = [
+      DEFAULT_NAMESPACE,
+      ...log.columns.namespace.values.map((name) => name ?? DEFAULT_NAMESPACE),
+    ];
+    const selfByCategory = named(byCategory, (id) => categoryNames[id]!);
+    const selfByNamespace = named(byNamespace, (id) => namespaceNames[id]!);
     for (const buckets of selfByCategory.values()) {
       cumulate(buckets);
     }
@@ -169,7 +189,7 @@ export class WindowIndex {
     // The sorts scale with the statements in the log, so they yield too.
     await tick();
     const runs = byCounter((counter) => runOf(gathered[counter]));
-    return new WindowIndex(log.children, start, width, selfByCategory, selfByNamespace, runs);
+    return new WindowIndex(index, start, width, selfByCategory, selfByNamespace, runs);
   }
 
   /** Self time by category and by namespace, and the statements run, for the
@@ -193,11 +213,11 @@ export class WindowIndex {
       addBuckets(stats.selfByNamespace, this._selfByNamespace, firstWhole, lastWhole);
       const opens = this._start + firstWhole * this._width;
       const closes = this._start + (lastWhole + 1) * this._width;
-      addSelfTime(this._roots, { start: window.start, end: opens }, stats);
-      addSelfTime(this._roots, { start: closes, end: window.end }, stats);
+      addSelfTime(this._index, this._roots, { start: window.start, end: opens }, stats);
+      addSelfTime(this._index, this._roots, { start: closes, end: window.end }, stats);
     } else {
       // Too narrow to hold a whole bucket, so all of it is an edge.
-      addSelfTime(this._roots, window, stats);
+      addSelfTime(this._index, this._roots, window, stats);
     }
     this._held = { window, stats };
     return stats;
@@ -223,32 +243,34 @@ export class WindowIndex {
   }
 }
 
-const indexes = new WeakMap<ApexLog, WindowIndex>();
-const building = new WeakMap<ApexLog, Promise<WindowIndex>>();
+const indexes = new WeakMap<LogStore, WindowIndex>();
+const building = new WeakMap<LogStore, Promise<WindowIndex>>();
 
 /**
- * The index for `log`, read once and then shared.
+ * The index for the log `store` shows, read once and then shared.
  *
  * One build answers every reader, and nothing abandons it: the window moves with
  * the gesture, so a build tied to one window would restart per frame and never
  * finish.
  */
-export function windowIndexFor(log: ApexLog, options: BuildOptions = {}): Promise<WindowIndex> {
-  const held = indexes.get(log);
+export function windowIndexFor(store: LogStore, options: BuildOptions = {}): Promise<WindowIndex> {
+  const held = indexes.get(store);
   if (held) {
     return Promise.resolve(held);
   }
-  let inFlight = building.get(log);
+  let inFlight = building.get(store);
   if (!inFlight) {
-    inFlight = WindowIndex.build(log, options)
+    inFlight = store
+      .logIndex(options)
+      .then((index) => WindowIndex.build(index, options))
       .then((index) => {
-        indexes.set(log, index);
+        indexes.set(store, index);
         return index;
       })
       // A build that threw must not stay cached, or every later reader inherits
       // the same failure.
-      .finally(() => building.delete(log));
-    building.set(log, inFlight);
+      .finally(() => building.delete(store));
+    building.set(store, inFlight);
   }
   return inFlight;
 }
@@ -283,43 +305,71 @@ function runningTotal(times: number[], values: number[]): [Float64Array, Float64
   return [at, total];
 }
 
-function bucketsFor(series: Map<string, Float64Array>, key: string): Float64Array {
-  let buckets = series.get(key);
-  if (!buckets) {
-    // One longer than the buckets, so the total after the last one has a slot.
-    buckets = new Float64Array(BUCKETS + 1);
-    series.set(key, buckets);
-  }
-  return buckets;
+function slot(series: Float64Array[], id: number): Float64Array {
+  // One longer than the buckets, so the total after the last one has a slot.
+  return (series[id] ??= new Float64Array(BUCKETS + 1));
+}
+
+/** The series by name. Two ids of one name, as no namespace and 'default', add together. */
+function named(series: Float64Array[], name: (id: number) => string): Map<string, Float64Array> {
+  const byName = new Map<string, Float64Array>();
+  series.forEach((buckets, id) => {
+    const key = name(id);
+    const held = byName.get(key);
+    if (held) {
+      for (let at = 0; at < held.length; at++) {
+        held[at]! += buckets[at]!;
+      }
+    } else {
+      byName.set(key, buckets);
+    }
+  });
+  return byName;
 }
 
 /**
- * Calls `visit` for each stretch of `event`'s own time between the children
- * `from` up to `to`.
+ * The rows directly under `row`, or at the top of the log for {@link NO_ROW}, in
+ * log order. Fills `into` when given, so a pass over every row reuses one array.
+ */
+export function childRows(index: LogIndex, row: number, into: number[] = []): number[] {
+  into.length = 0;
+  const { subtreeEnd } = index;
+  const end = row === NO_ROW ? index.rowCount : subtreeEnd[row]!;
+  for (let child = row + 1; child < end; child = subtreeEnd[child]!) {
+    into.push(child);
+  }
+  return into;
+}
+
+/**
+ * Calls `visit` for each stretch of `row`'s own time between its children
+ * `from` up to `to`, of the sibling rows `children`.
  *
- * An event's own time sits in the gaps between its children, and those gaps
- * never overlap another event's, anywhere in the tree. So bucketing every gap
+ * A row's own time sits in the gaps between its children, and those gaps
+ * never overlap another row's, anywhere in the tree. So bucketing every gap
  * fills each bucket with exactly the self time inside it, and clipping the gaps
  * of one run gives exactly the self time a window holds. Only the gaps around
  * the run can reach a window: every earlier child ends before it opens, so the
  * gaps among them do too.
  */
 export function eachSelfGap(
-  event: LogEvent,
+  index: LogIndex,
+  row: number,
+  children: readonly number[],
   from: number,
   to: number,
   visit: (start: number, end: number) => void,
 ): void {
-  const children = event.children;
-  const end = event.exitStamp ?? event.timestamp;
+  const { start: starts, end: ends } = index;
+  const end = ends[row]!;
   // The gap reaching the run opens where the child before it ended.
-  let cursor = from > 0 ? Math.max(event.timestamp, endOf(children[from - 1]!)) : event.timestamp;
+  let cursor = from > 0 ? Math.max(starts[row]!, ends[children[from - 1]!]!) : starts[row]!;
   for (let i = from; i < to; i++) {
     const child = children[i]!;
-    if (child.timestamp > cursor) {
-      visit(cursor, child.timestamp);
+    if (starts[child]! > cursor) {
+      visit(cursor, starts[child]!);
     }
-    cursor = Math.max(cursor, child.exitStamp ?? child.timestamp);
+    cursor = Math.max(cursor, ends[child]!);
   }
   if (end > cursor) {
     visit(cursor, end);
@@ -376,30 +426,37 @@ function addBuckets(
 }
 
 /**
- * Adds the own time inside `window` to `stats`, event by event.
+ * Adds the own time inside `window` to `stats`, row by row.
  *
  * Only the part bucket at a window's edge is read this way, so this walks a few
- * events.
+ * rows.
  */
-function addSelfTime(roots: readonly LogEvent[], window: TimeWindow, stats: WindowStats): void {
+function addSelfTime(
+  index: LogIndex,
+  roots: readonly number[],
+  window: TimeWindow,
+  stats: WindowStats,
+): void {
   if (window.end <= window.start) {
     return;
   }
-  const stack: LogEvent[] = [];
-  pushReached(stack, roots, window);
+  const { log, categoryId, categoryNames, eventIndex } = index;
+  const stack: number[] = [];
+  pushReached(index, stack, roots, window);
   while (stack.length) {
-    const event = stack.pop()!; // non-empty: the loop condition just checked
-    const children = event.children;
-    const { from, to } = reachedRun(children, window);
+    const row = stack.pop()!; // non-empty: the loop condition just checked
+    const children = childRows(index, row);
+    const { from, to } = reachedRun(index, children, window);
     let self = 0;
-    eachSelfGap(event, from, to, (start, end) => {
+    eachSelfGap(index, row, children, from, to, (start, end) => {
       self += overlapOf(start, end, window);
     });
     if (self > 0) {
-      // The parser's own category, named for display by the reader: `core/`
+      // The category's own name, named for display by the reader: `core/`
       // holds no display strings.
-      add(stats.selfByCategory, event.category, self);
-      add(stats.selfByNamespace, event.namespace || DEFAULT_NAMESPACE, self);
+      add(stats.selfByCategory, categoryNames[categoryId[row]!]!, self);
+      const namespace = log.columns.namespace.at(eventIndex[row]!) ?? DEFAULT_NAMESPACE;
+      add(stats.selfByNamespace, namespace, self);
     }
     for (let i = from; i < to; i++) {
       stack.push(children[i]!);
@@ -407,34 +464,35 @@ function addSelfTime(roots: readonly LogEvent[], window: TimeWindow, stats: Wind
   }
 }
 
-function pushReached(stack: LogEvent[], children: readonly LogEvent[], window: TimeWindow): void {
-  const { from, to } = reachedRun(children, window);
+function pushReached(
+  index: LogIndex,
+  stack: number[],
+  children: readonly number[],
+  window: TimeWindow,
+): void {
+  const { from, to } = reachedRun(index, children, window);
   for (let i = from; i < to; i++) {
     stack.push(children[i]!);
   }
 }
 
 /**
- * The run of `children` that `window` reaches, as [from, to).
+ * The run of sibling rows `children` that `window` reaches, as [from, to).
  *
  * Siblings run one after another and never overlap, so both their starts and
  * their ends ascend and the run is contiguous: two binary searches find it,
  * where testing every child would read the whole log.
  */
 export function reachedRun(
-  children: readonly LogEvent[],
+  index: LogIndex,
+  children: readonly number[],
   window: TimeWindow,
 ): { from: number; to: number } {
+  const { start, end } = index;
   return {
-    from: firstIndexWhere(children.length, (i) => endOf(children[i]!) >= window.start),
-    to: firstIndexWhere(children.length, (i) => children[i]!.timestamp > window.end),
+    from: firstIndexWhere(children.length, (i) => end[children[i]!]! >= window.start),
+    to: firstIndexWhere(children.length, (i) => start[children[i]!]! > window.end),
   };
-}
-
-/** Where `event` ended. Only a leaf line has no exitStamp: the parser closes an
- *  unclosed frame itself. */
-export function endOf(event: LogEvent): number {
-  return event.exitStamp ?? event.timestamp;
 }
 
 /** The length of [start, end) that falls inside `window`. */
@@ -457,12 +515,12 @@ function add(totals: Map<string, number>, key: string, value: number): void {
 export class WindowStatsController {
   private readonly _range: RangeScopeController;
   private readonly _host: ReactiveControllerHost;
-  private readonly _log: () => ApexLog | null;
-  private _awaiting: ApexLog | null = null;
+  private readonly _store: () => LogStore | null;
+  private _awaiting: LogStore | null = null;
 
-  constructor(host: ReactiveControllerHost, log: () => ApexLog | null) {
+  constructor(host: ReactiveControllerHost, store: () => LogStore | null) {
     this._host = host;
-    this._log = log;
+    this._store = store;
     this._range = new RangeScopeController(host);
   }
 
@@ -493,26 +551,26 @@ export class WindowStatsController {
 
   /** The log's index, or null while it builds; the first ask starts the build. */
   private _index(): WindowIndex | null {
-    const log = this._log();
-    if (!log) {
+    const store = this._store();
+    if (!store) {
       return null;
     }
-    const index = indexes.get(log);
+    const index = indexes.get(store);
     if (index) {
       return index;
     }
-    this._readLog(log);
+    this._readLog(store);
     return null;
   }
 
-  private _readLog(log: ApexLog): void {
-    if (this._awaiting === log) {
+  private _readLog(store: LogStore): void {
+    if (this._awaiting === store) {
       return;
     }
-    this._awaiting = log;
-    void windowIndexFor(log)
+    this._awaiting = store;
+    void windowIndexFor(store)
       .then(() => {
-        if (this._awaiting === log) {
+        if (this._awaiting === store) {
           // Cleared only on success, so a replaced log does not stay reachable.
           this._awaiting = null;
           this._host.requestUpdate();

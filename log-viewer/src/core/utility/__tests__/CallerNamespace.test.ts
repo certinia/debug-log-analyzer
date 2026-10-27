@@ -2,50 +2,52 @@
  * Copyright (c) 2026 Certinia Inc. All rights reserved.
  */
 import { describe, expect, it } from '@jest/globals';
-import type { LogEvent } from '@apexdevtools/apex-log-parser';
 
-import { getCallerNamespace } from '../CallerNamespace.js';
+import { indexOf, storeOf } from '#test-helpers/apexLog.js';
+import { filterByLevels } from '../../log/LogStore.js';
+import { getCallerNamespace, namespaceOf } from '../CallerNamespace.js';
 
-type Stub = { parent: Stub | null; namespace: string };
-
-const make = (namespace: string, parent: Stub | null = null): LogEvent =>
-  ({ parent, namespace }) as unknown as LogEvent;
+const LOG =
+  '09:18:22.6 (1000)|METHOD_ENTRY|[1]|01p|pkg1.Trigger.run()\n' +
+  '09:18:22.6 (1100)|SYSTEM_METHOD_ENTRY|[2]|System.debug(ANY)\n' +
+  '09:18:22.6 (1200)|DML_BEGIN|[3]|Op:Insert|Type:Account|Rows:1\n' +
+  '09:18:22.6 (1300)|DML_END|[3]\n' +
+  '09:18:22.6 (1400)|SYSTEM_METHOD_EXIT|[2]|System.debug(ANY)\n' +
+  '09:18:22.6 (1500)|DML_BEGIN|[4]|Op:Update|Type:Account|Rows:1\n' +
+  '09:18:22.6 (1600)|DML_END|[4]\n' +
+  '09:18:22.6 (1700)|METHOD_EXIT|[1]|pkg1.Trigger.run()\n';
 
 describe('getCallerNamespace', () => {
-  it('returns default when the event has no parent', () => {
-    const dml = make('default');
-    expect(getCallerNamespace(dml)).toBe('default');
+  // The helper's code unit is `apex://pkg.Entry`, whose namespace the methods under it take.
+  it("returns the direct caller's namespace", async () => {
+    const { log, store } = await storeOf(LOG);
+
+    expect(getCallerNamespace(store, indexOf(log, 'DML Op:Update Type:Account'))).toBe('pkg');
   });
 
-  it("returns the direct parent's namespace", () => {
-    const pkg2Wrapper = make('pkg2');
-    const pkg1Trigger = make('pkg1', pkg2Wrapper);
-    const dml = make('default', pkg1Trigger);
+  it("returns 'default' at the top of the log", async () => {
+    const { log, store } = await storeOf(LOG);
 
-    expect(getCallerNamespace(dml)).toBe('pkg1');
+    expect(getCallerNamespace(store, log.entryPoints[0]!.id)).toBe('default');
   });
 
-  it("returns 'default' when the direct parent's namespace is 'default'", () => {
-    const pkg1Code = make('pkg1');
-    const platformFrame = make('default', pkg1Code);
-    const dml = make('default', platformFrame);
+  it('skips a caller the levels hide, to the shown frame above it', async () => {
+    const { log, store } = await storeOf(
+      LOG,
+      '64.0 APEX_CODE,FINEST;APEX_PROFILING,NONE;DB,FINEST;SYSTEM,FINE\n',
+    );
 
-    expect(getCallerNamespace(dml)).toBe('default');
+    const shown = (await filterByLevels(store, { system: 'NONE' }))!; // no signal, never null
+
+    expect(getCallerNamespace(shown, indexOf(log, 'DML Op:Insert Type:Account'))).toBe('pkg');
   });
+});
 
-  it("returns 'default' when the direct parent's namespace is empty", () => {
-    const emptyFrame = make('');
-    const dml = make('default', emptyFrame);
+describe('namespaceOf', () => {
+  it("reads the event's namespace, 'default' where it states none", async () => {
+    const { log } = await storeOf(LOG);
 
-    expect(getCallerNamespace(dml)).toBe('default');
-  });
-
-  it('memoizes the result per event', () => {
-    const pkg1 = make('pkg1');
-    const dml = make('default', pkg1);
-
-    expect(getCallerNamespace(dml)).toBe('pkg1');
-    pkg1.namespace = 'mutated';
-    expect(getCallerNamespace(dml)).toBe('pkg1');
+    expect(namespaceOf(log, indexOf(log, 'pkg1.Trigger.run()'))).toBe('pkg');
+    expect(namespaceOf(log, indexOf(log, 'DML Op:Insert Type:Account'))).toBe('default');
   });
 });

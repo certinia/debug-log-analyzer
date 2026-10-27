@@ -1,31 +1,25 @@
 /*
  * Copyright (c) 2026 Certinia Inc. All rights reserved.
  */
-import type { LogEvent } from '@apexdevtools/apex-log-parser';
+import type { ApexLog } from '@apexdevtools/apex-log-parser';
+
+import type { LogStore } from '../log/LogStore.js';
 
 /** What an empty/unset namespace normalizes to, here and in every comparison against a namespace. */
 export const DEFAULT_NAMESPACE = 'default';
 
-const cache = new WeakMap<LogEvent, string>();
+/** Event `id`'s namespace, {@link DEFAULT_NAMESPACE} where it states none. */
+export function namespaceOf(log: ApexLog, id: number): string {
+  return log.columns.namespace.at(id) ?? DEFAULT_NAMESPACE;
+}
 
 /**
- * Returns the namespace of the event's direct caller (`event.parent`).
+ * The namespace of event `id`'s direct caller: the shown frame above it.
  *
- * Empty/unset namespaces are normalized to 'default'. No tree walk: callers
- * that sit behind platform/glue frames resolve to 'default' rather than
- * skipping past them, matching "who literally invoked this?" semantics.
- *
- * Result is memoized per event via WeakMap.
+ * No skip past platform or glue frames: a caller behind one resolves to
+ * 'default', matching "who literally invoked this?" semantics.
  */
-export function getCallerNamespace(event: LogEvent): string {
-  const cached = cache.get(event);
-  if (cached !== undefined) {
-    return cached;
-  }
-
-  const parent = event.parent;
-  const ns = parent?.namespace;
-  const result = ns && ns !== '' ? ns : DEFAULT_NAMESPACE;
-  cache.set(event, result);
-  return result;
+export function getCallerNamespace(store: LogStore, id: number): string {
+  const parent = store.parentOf(id);
+  return parent > 0 ? namespaceOf(store.log, parent) : DEFAULT_NAMESPACE;
 }

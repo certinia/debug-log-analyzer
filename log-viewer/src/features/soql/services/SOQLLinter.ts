@@ -199,7 +199,7 @@ class TriggerNonSelectiveQuery implements SOQLLinterRule {
 
   test(_soqlTree: SOQLTree, stack: Stack): boolean {
     const inTriggerCtxt = stack.find((entry) => {
-      return entry.text.includes(' trigger event ');
+      return entry.text?.includes(' trigger event ');
     });
 
     return !!inTriggerCtxt;

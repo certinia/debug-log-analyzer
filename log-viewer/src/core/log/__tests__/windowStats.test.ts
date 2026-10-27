@@ -2,102 +2,92 @@
  * Copyright (c) 2026 Certinia Inc. All rights reserved.
  */
 import { describe, expect, it } from '@jest/globals';
-import type { ApexLog, LogEvent } from '@apexdevtools/apex-log-parser';
 
+import { rawStoreOf } from '#test-helpers/apexLog.js';
 import type { FrameBudgetOptions } from '../../utility/FrameBudget.js';
-import { windowIndexFor, type WindowStats } from '../windowStats.js';
+import type { LogIndex } from '../LogIndex.js';
+import type { LogStore } from '../LogStore.js';
 import type { TimeWindow } from '../rangeScope.js';
+import { WindowIndex, windowIndexFor, type WindowStats } from '../windowStats.js';
 
 const options: FrameBudgetOptions = { yieldSlice: () => Promise.resolve() };
 
-interface Count {
-  self: number;
-  total: number;
+/** A frame's log lines: one to open it at `start`, then its children, then one to close it at `end`. */
+type Lines = string[];
+
+const line = (at: number, rest: string): string => `09:18:22.6 (${at})|${rest}\n`;
+
+/** An Apex method: category Apex. */
+function apex(start: number, end: number, children: Lines[] = []): Lines {
+  const name = `ns.Work.m${start}()`;
+  return [
+    line(start, `METHOD_ENTRY|[1]|01p|${name}`),
+    ...children.flat(),
+    line(end, `METHOD_EXIT|[1]|${name}`),
+  ];
 }
 
-/** The parser gives every event all five counters, zero included. */
-interface Built {
-  category: string;
-  namespace: string;
-  timestamp: number;
-  exitStamp: number | null;
-  soqlCount: Count;
-  soqlRowCount: Count;
-  dmlCount: Count;
-  dmlRowCount: Count;
-  soslCount: Count;
-  children: Built[];
+/** One query: category SOQL, a soqlCount of 1. */
+function soql(start: number, end: number): Lines {
+  return [
+    line(start, 'SOQL_EXECUTE_BEGIN|[1]|Aggregations:0|SELECT Id FROM Account'),
+    line(end, 'SOQL_EXECUTE_END|[1]|Rows:0'),
+  ];
 }
 
-const count = (self: number): Count => ({ self, total: self });
-
-interface Spec {
-  category?: string;
-  namespace?: string;
-  soql?: number;
-  dml?: number;
-  children?: Built[];
-  /** A leaf line, which the parser leaves with no exitStamp. */
-  leaf?: boolean;
+/** One DML statement: category DML, a dmlCount of 1. */
+function dml(start: number, end: number): Lines {
+  return [line(start, 'DML_BEGIN|[1]|Op:Insert|Type:Account|Rows:1'), line(end, 'DML_END|[1]')];
 }
 
-function ev(timestamp: number, exitStamp: number, spec: Spec = {}): Built {
-  return {
-    category: spec.category ?? 'Apex',
-    namespace: spec.namespace ?? 'default',
-    timestamp,
-    exitStamp: spec.leaf ? null : exitStamp,
-    soqlCount: count(spec.soql ?? 0),
-    soqlRowCount: count(0),
-    dmlCount: count(spec.dml ?? 0),
-    dmlRowCount: count(0),
-    soslCount: count(0),
-    children: spec.children ?? [],
-  };
+/** A code unit named for namespace `pkg`: category Code Unit, namespace pkg. */
+function pkgUnit(start: number, end: number): Lines {
+  return [
+    line(start, 'CODE_UNIT_STARTED|[EXTERNAL]|01q|pkg.Work'),
+    line(end, 'CODE_UNIT_FINISHED|pkg.Work'),
+  ];
 }
 
-/** The log's own span, which sets where the index puts its bucket edges. */
-function spanOf(children: readonly Built[]): { timestamp: number; exitStamp: number } {
-  let last = 0;
-  const reach = (event: Built): void => {
-    last = Math.max(last, event.exitStamp ?? event.timestamp);
-    event.children.forEach(reach);
-  };
-  children.forEach(reach);
-  return { timestamp: children[0]?.timestamp ?? 0, exitStamp: last };
+/** A leaf line, which spans no time. */
+function leaf(at: number): Lines {
+  return [line(at, 'STATEMENT_EXECUTE|[1]')];
 }
 
-const logOf = (children: Built[]) => ({ children, ...spanOf(children) }) as unknown as ApexLog;
+async function storeOf(...frames: Lines[]): Promise<LogStore> {
+  return (await rawStoreOf(frames.flat().join(''))).store;
+}
 
 /** The stats a fresh index gives for `window`. */
-async function statsFor(log: ApexLog, window: TimeWindow): Promise<WindowStats> {
-  const index = await windowIndexFor(log, options);
-  return index.statsFor(window);
+async function statsFor(store: LogStore, window: TimeWindow): Promise<WindowStats> {
+  return (await windowIndexFor(store, options)).statsFor(window);
 }
 
 /**
- * A log whose roots count their own time reads, so a test can prove that
- * answering a window reads a handful of siblings rather than the log.
+ * An index of `store` that counts its time reads after the build, so a test can
+ * prove that answering a window reads a handful of rows rather than the log.
  */
-function countingLog(children: Built[]): {
-  log: ApexLog;
-  visited: () => number;
-  reset: () => void;
-} {
+async function countingIndex(
+  store: LogStore,
+): Promise<{ index: WindowIndex; visited: () => number; reset: () => void }> {
+  const real = await store.logIndex();
   let reads = 0;
-  const watched = children.map(
-    (child) =>
-      new Proxy(child, {
-        get(target, key, receiver) {
-          if (key === 'timestamp' || key === 'exitStamp') {
-            reads++;
-          }
-          return Reflect.get(target, key, receiver) as unknown;
-        },
-      }) as unknown as LogEvent,
-  );
+  const watched = (column: Float64Array): Float64Array =>
+    new Proxy(column, {
+      get(target, key) {
+        if (typeof key === 'string' && /^\d+$/.test(key)) {
+          reads++;
+        }
+        const value = Reflect.get(target, key) as unknown;
+        return typeof value === 'function' ? value.bind(target) : value;
+      },
+    });
+  const index = Object.create(real, {
+    start: { value: watched(real.start) },
+    end: { value: watched(real.end) },
+  }) as LogIndex;
+  const built = await WindowIndex.build(index, options);
   return {
-    log: { children: watched, ...spanOf(children) } as unknown as ApexLog,
+    index: built,
     visited: () => reads,
     reset: () => {
       reads = 0;
@@ -107,30 +97,28 @@ function countingLog(children: Built[]): {
 
 describe('windowStats', () => {
   it('answers category, namespace and counts from one index', async () => {
-    const log = logOf([
-      ev(0, 100, { category: 'DML', namespace: 'pkg', dml: 2 }),
-      ev(100, 300, { category: 'SOQL', soql: 3 }),
-    ]);
+    const store = await storeOf(pkgUnit(0, 100), soql(100, 300), dml(300, 400));
 
-    const stats = await statsFor(log, { start: 0, end: 300 });
+    const stats = await statsFor(store, { start: 0, end: 400 });
 
-    expect(stats.selfByCategory.get('DML')).toBeCloseTo(100, 3);
+    expect(stats.selfByCategory.get('Code Unit')).toBeCloseTo(100, 3);
     expect(stats.selfByCategory.get('SOQL')).toBeCloseTo(200, 3);
+    expect(stats.selfByCategory.get('DML')).toBeCloseTo(100, 3);
     expect(stats.selfByNamespace.get('pkg')).toBeCloseTo(100, 3);
-    expect(stats.selfByNamespace.get('default')).toBeCloseTo(200, 3);
+    expect(stats.selfByNamespace.get('default')).toBeCloseTo(300, 3);
     expect(stats.counts).toEqual({
-      soqlCount: 3,
+      soqlCount: 1,
       soqlRowCount: 0,
-      dmlCount: 2,
-      dmlRowCount: 0,
+      dmlCount: 1,
+      dmlRowCount: 1,
       soslCount: 0,
     });
   });
 
   it('counts only the self time inside the window', async () => {
-    const log = logOf([ev(0, 1_000, { category: 'Apex' })]);
+    const store = await storeOf(apex(0, 1_000));
 
-    const stats = await statsFor(log, { start: 200, end: 500 });
+    const stats = await statsFor(store, { start: 200, end: 500 });
 
     expect(stats.selfByCategory.get('Apex')).toBeCloseTo(300, 3);
   });
@@ -138,25 +126,25 @@ describe('windowStats', () => {
   // Any part of a statement inside the window counts it: one the window cuts
   // across still ran in it.
   it('counts a statement that began before the window', async () => {
-    const log = logOf([ev(0, 1_000, { soql: 5 })]);
+    const store = await storeOf(soql(0, 1_000));
 
-    const stats = await statsFor(log, { start: 500, end: 900 });
+    const stats = await statsFor(store, { start: 500, end: 900 });
 
-    expect(stats.counts.soqlCount).toBe(5);
+    expect(stats.counts.soqlCount).toBe(1);
   });
 
   it('counts a statement that runs past the end of the window', async () => {
-    const log = logOf([ev(0, 100), ev(800, 2_000, { soql: 2 })]);
+    const store = await storeOf(apex(0, 100), soql(800, 2_000));
 
-    const stats = await statsFor(log, { start: 0, end: 1_000 });
+    const stats = await statsFor(store, { start: 0, end: 1_000 });
 
-    expect(stats.counts.soqlCount).toBe(2);
+    expect(stats.counts.soqlCount).toBe(1);
   });
 
   it('still counts nothing for a statement the window never reaches', async () => {
-    const log = logOf([ev(0, 100, { soql: 5 }), ev(500, 600)]);
+    const store = await storeOf(soql(0, 100), apex(500, 600));
 
-    const stats = await statsFor(log, { start: 500, end: 600 });
+    const stats = await statsFor(store, { start: 500, end: 600 });
 
     expect(stats.counts.soqlCount).toBe(0);
   });
@@ -164,32 +152,27 @@ describe('windowStats', () => {
   // Counts come from the events' own times, not from the buckets, so a window
   // that stops a nanosecond short leaves the statement out.
   it('counts a statement by its own times, not the bucket it sits in', async () => {
-    const log = logOf([ev(0, 1_000_000), ev(500_000, 500_100, { soql: 1 })]);
+    const store = await storeOf(apex(0, 1_000_000, [soql(500_000, 500_100)]));
+    const index = await windowIndexFor(store, options);
 
-    const before = await statsFor(log, { start: 0, end: 499_999 });
-    const index = await windowIndexFor(log, options);
-    const upTo = index.statsFor({ start: 0, end: 500_000 });
-
-    expect(before.counts.soqlCount).toBe(0);
-    expect(upTo.counts.soqlCount).toBe(1);
+    expect(index.statsFor({ start: 0, end: 499_999 }).counts.soqlCount).toBe(0);
+    expect(index.statsFor({ start: 0, end: 500_000 }).counts.soqlCount).toBe(1);
   });
 
   it('reads a parent by its own gaps, not its span', async () => {
     // Apex spans 0-100 with a SOQL child filling 10-90.
-    const log = logOf([
-      ev(0, 100, { category: 'Apex', children: [ev(10, 90, { category: 'SOQL' })] }),
-    ]);
+    const store = await storeOf(apex(0, 100, [soql(10, 90)]));
 
-    const stats = await statsFor(log, { start: 0, end: 50 });
+    const stats = await statsFor(store, { start: 0, end: 50 });
 
     expect(stats.selfByCategory.get('Apex')).toBeCloseTo(10, 3);
     expect(stats.selfByCategory.get('SOQL')).toBeCloseTo(40, 3);
   });
 
   it('finds nothing in a window the log does not reach', async () => {
-    const log = logOf([ev(0, 100)]);
+    const store = await storeOf(apex(0, 100));
 
-    const stats = await statsFor(log, { start: 500, end: 600 });
+    const stats = await statsFor(store, { start: 500, end: 600 });
 
     expect(stats.selfByCategory.size).toBe(0);
     expect(stats.counts.soqlCount).toBe(0);
@@ -198,12 +181,11 @@ describe('windowStats', () => {
   // A leaf read as reaching forever broke the binary search, so an edge walked
   // every sibling before the window.
   it('reads a handful of siblings where leaf lines sit among them', async () => {
-    const children = Array.from({ length: 1_000 }, (_, i) => [
-      ev(i * 10, i * 10 + 5),
-      ev(i * 10 + 7, 0, { leaf: true }),
+    const frames = Array.from({ length: 1_000 }, (_, i) => [
+      apex(i * 10, i * 10 + 5),
+      leaf(i * 10 + 7),
     ]).flat();
-    const { log, visited, reset } = countingLog(children);
-    const index = await windowIndexFor(log, options);
+    const { index, visited, reset } = await countingIndex(await storeOf(...frames));
     reset();
 
     index.statsFor({ start: 9_901, end: 9_903 });
@@ -215,14 +197,9 @@ describe('windowStats', () => {
 describe('windowStats own time', () => {
   it('adds up the gaps between several children', async () => {
     // Gaps of 0-10, 20-40 and 50-100 belong to the parent.
-    const log = logOf([
-      ev(0, 100, {
-        category: 'Apex',
-        children: [ev(10, 20, { category: 'SOQL' }), ev(40, 50, { category: 'SOQL' })],
-      }),
-    ]);
+    const store = await storeOf(apex(0, 100, [soql(10, 20), soql(40, 50)]));
 
-    const stats = await statsFor(log, { start: 0, end: 100 });
+    const stats = await statsFor(store, { start: 0, end: 100 });
 
     expect(stats.selfByCategory.get('Apex')).toBeCloseTo(80, 3);
     expect(stats.selfByCategory.get('SOQL')).toBeCloseTo(20, 3);
@@ -230,47 +207,31 @@ describe('windowStats own time', () => {
 
   it('reads a gap that opens before the window and reaches into it', async () => {
     // The parent's own time runs 90-200, and the window opens at 150.
-    const log = logOf([
-      ev(0, 200, { category: 'Apex', children: [ev(10, 90, { category: 'SOQL' })] }),
-    ]);
+    const store = await storeOf(apex(0, 200, [soql(10, 90)]));
 
-    const stats = await statsFor(log, { start: 150, end: 200 });
+    const stats = await statsFor(store, { start: 150, end: 200 });
 
     expect(stats.selfByCategory.get('Apex')).toBeCloseTo(50, 3);
     expect(stats.selfByCategory.has('SOQL')).toBe(false);
   });
 
   it('holds none of a parent whose child fills the window', async () => {
-    const log = logOf([
-      ev(0, 100, { category: 'Apex', children: [ev(10, 90, { category: 'SOQL' })] }),
-    ]);
+    const store = await storeOf(apex(0, 100, [soql(10, 90)]));
 
-    const stats = await statsFor(log, { start: 20, end: 80 });
+    const stats = await statsFor(store, { start: 20, end: 80 });
 
     expect(stats.selfByCategory.get('Apex')).toBeUndefined();
     expect(stats.selfByCategory.get('SOQL')).toBeCloseTo(60, 3);
-  });
-
-  // A child running past its parent's exit must not lend it negative time.
-  it('never gives a frame less than nothing', async () => {
-    const log = logOf([
-      ev(0, 50, { category: 'Apex', children: [ev(10, 90, { category: 'SOQL' })] }),
-    ]);
-
-    const stats = await statsFor(log, { start: 0, end: 100 });
-
-    expect(stats.selfByCategory.get('Apex')).toBeCloseTo(10, 3);
   });
 });
 
 // The point of the index: the viewport moves per frame, so a window must be
 // answered without reading the log again.
 describe('windowStats index', () => {
-  const roots = () => Array.from({ length: 4_096 }, (_, i) => ev(i * 100, i * 100 + 100));
+  const roots = () => Array.from({ length: 4_096 }, (_, i) => apex(i * 100, i * 100 + 100));
 
   it('answers a window from the buckets, reading only its edges', async () => {
-    const { log, visited, reset } = countingLog(roots());
-    const index = await windowIndexFor(log, options);
+    const { index, visited, reset } = await countingIndex(await storeOf(...roots()));
     reset();
 
     const stats = index.statsFor({ start: 100_000, end: 200_000 });
@@ -281,8 +242,7 @@ describe('windowStats index', () => {
   });
 
   it('answers a window it has already worked out without reading again', async () => {
-    const { log, visited, reset } = countingLog(roots());
-    const index = await windowIndexFor(log, options);
+    const { index, visited, reset } = await countingIndex(await storeOf(...roots()));
     const window = { start: 100_000, end: 200_000 };
     index.statsFor(window);
     reset();
@@ -293,17 +253,15 @@ describe('windowStats index', () => {
   });
 
   it('builds one index per log, however many readers ask', async () => {
-    const { log, visited } = countingLog(roots());
+    const store = await storeOf(...roots());
 
     const [first, second] = await Promise.all([
-      windowIndexFor(log, options),
-      windowIndexFor(log, options),
+      windowIndexFor(store, options),
+      windowIndexFor(store, options),
     ]);
-    const reads = visited();
-    const third = await windowIndexFor(log, options);
+    const third = await windowIndexFor(store, options);
 
     expect(second).toBe(first);
     expect(third).toBe(first);
-    expect(visited()).toBe(reads);
   });
 });

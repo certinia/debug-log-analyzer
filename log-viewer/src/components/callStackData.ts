@@ -28,11 +28,11 @@ export function buildCallStackData(eventIndex: number): {
 } {
   const stack = eventIndex >= 0 ? (currentLogStore()?.stackByEventIndex(eventIndex) ?? []) : [];
   const rows = stack
-    .filter((entry) => !EXCLUDED_DETAIL_TYPES.has(entry.type ?? ''))
+    .filter((entry) => !EXCLUDED_DETAIL_TYPES.has(entry.type))
     .map((entry) => ({
-      eventIndex: entry.eventIndex,
-      type: entry.type ?? '',
-      text: entry.text,
+      eventIndex: entry.id,
+      type: entry.type,
+      text: entry.text ?? entry.type,
       duration: { total: entry.duration.total, self: entry.duration.self },
     }));
   // Taken after the filter, so the bars are a share of the outermost frame shown.

@@ -11,7 +11,6 @@
  * - Edge cases (empty search, invalid cursor, off-screen events)
  */
 import { beforeEach, describe, expect, it, jest } from '@jest/globals';
-import type { LogEvent } from '@apexdevtools/apex-log-parser';
 import * as PIXI from 'pixi.js';
 
 import type { PrecomputedRect } from '../optimised/RectangleCache.js';
@@ -28,30 +27,12 @@ describe('SearchHighlightRenderer', () => {
     fill: jest.SpiedFunction<PIXI.Graphics['fill']>;
   };
 
-  // Create a mock LogEvent for testing
-  const createMockEvent = (timestamp: number, duration: number): LogEvent => {
-    const event = {
-      timestamp,
-      exitStamp: timestamp + duration,
-      duration: {
-        total: duration,
-        exclusive: duration,
-      },
-      category: 'Apex',
-      children: [],
-      text: 'Test Event',
-      lineNumber: 0,
-    } as unknown as LogEvent;
-    return event;
-  };
-
   // Create a mock SearchMatch with EventNode
   const createMockMatch = (
     timestamp: number,
     duration: number,
     depth: number,
   ): SearchMatch<EventNode> => {
-    const event = createMockEvent(timestamp, duration);
     const eventNode: EventNode = {
       id: `${timestamp}-${depth}-0`,
       timestamp,
@@ -65,7 +46,7 @@ describe('SearchHighlightRenderer', () => {
       y: depth * 15,
       width: duration,
       height: 15,
-      eventRef: event,
+      row: timestamp,
       timeStart: timestamp,
       timeEnd: timestamp + duration,
       depth,

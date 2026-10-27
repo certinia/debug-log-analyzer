@@ -1,14 +1,14 @@
 /*
  * Copyright (c) 2026 Certinia Inc. All rights reserved.
  */
-import { LIMIT_METRIC, type LimitMetricUnit, type Limits } from '@apexdevtools/apex-log-parser';
+import { LIMIT_METRICS, type LimitUnit, type Limits } from '@apexdevtools/apex-log-parser';
 
 /** A governor metric as every surface names, orders and formats it. */
 export interface GovernorMetric<K extends keyof Limits = keyof Limits> {
   key: K;
   /** The short label every surface shows. */
   label: string;
-  unit: LimitMetricUnit;
+  unit: LimitUnit;
   /** Metric strip order, lowest first. The strip always shows a metric below 4. */
   priority: number;
   /** How a `System.LimitException` names the metric, lower case; absent where none is known. */
@@ -21,78 +21,91 @@ export interface GovernorMetric<K extends keyof Limits = keyof Limits> {
  */
 export const GOVERNOR_METRIC: { readonly [K in keyof Limits]: GovernorMetric<K> } = {
   cpuTime: {
-    ...LIMIT_METRIC.cpuTime,
+    key: 'cpuTime',
+    unit: LIMIT_METRICS.cpuTime,
     label: 'CPU Time',
     priority: 0,
     exceptionPhrase: 'apex cpu time',
   },
   heapSize: {
-    ...LIMIT_METRIC.heapSize,
+    key: 'heapSize',
+    unit: LIMIT_METRICS.heapSize,
     label: 'Heap Size',
     priority: 3,
     exceptionPhrase: 'apex heap size',
   },
   soqlQueries: {
-    ...LIMIT_METRIC.soqlQueries,
+    key: 'soqlQueries',
+    unit: LIMIT_METRICS.soqlQueries,
     label: 'SOQL',
     priority: 1,
     exceptionPhrase: 'too many soql queries',
   },
   queryRows: {
-    ...LIMIT_METRIC.queryRows,
+    key: 'queryRows',
+    unit: LIMIT_METRICS.queryRows,
     label: 'SOQL Rows',
     priority: 4,
     exceptionPhrase: 'too many query rows',
   },
   dmlStatements: {
-    ...LIMIT_METRIC.dmlStatements,
+    key: 'dmlStatements',
+    unit: LIMIT_METRICS.dmlStatements,
     label: 'DML',
     priority: 2,
     exceptionPhrase: 'too many dml statements',
   },
   dmlRows: {
-    ...LIMIT_METRIC.dmlRows,
+    key: 'dmlRows',
+    unit: LIMIT_METRICS.dmlRows,
     label: 'DML Rows',
     priority: 6,
     exceptionPhrase: 'too many dml rows',
   },
   soslQueries: {
-    ...LIMIT_METRIC.soslQueries,
+    key: 'soslQueries',
+    unit: LIMIT_METRICS.soslQueries,
     label: 'SOSL',
     priority: 5,
     exceptionPhrase: 'too many sosl queries',
   },
   publishImmediateDml: {
-    ...LIMIT_METRIC.publishImmediateDml,
+    key: 'publishImmediateDml',
+    unit: LIMIT_METRICS.publishImmediateDml,
     label: 'Publish Immediate DML',
     priority: 7,
   },
   callouts: {
-    ...LIMIT_METRIC.callouts,
+    key: 'callouts',
+    unit: LIMIT_METRICS.callouts,
     label: 'Callouts',
     priority: 8,
     exceptionPhrase: 'too many callouts',
   },
   emailInvocations: {
-    ...LIMIT_METRIC.emailInvocations,
+    key: 'emailInvocations',
+    unit: LIMIT_METRICS.emailInvocations,
     label: 'Email Invocations',
     priority: 9,
     exceptionPhrase: 'too many email invocations',
   },
   futureCalls: {
-    ...LIMIT_METRIC.futureCalls,
+    key: 'futureCalls',
+    unit: LIMIT_METRICS.futureCalls,
     label: 'Future Calls',
     priority: 10,
     exceptionPhrase: 'too many future calls',
   },
   queueableJobsAddedToQueue: {
-    ...LIMIT_METRIC.queueableJobsAddedToQueue,
+    key: 'queueableJobsAddedToQueue',
+    unit: LIMIT_METRICS.queueableJobsAddedToQueue,
     label: 'Queueable Jobs',
     priority: 11,
     exceptionPhrase: 'too many queueable jobs',
   },
   mobileApexPushCalls: {
-    ...LIMIT_METRIC.mobileApexPushCalls,
+    key: 'mobileApexPushCalls',
+    unit: LIMIT_METRICS.mobileApexPushCalls,
     label: 'Mobile Push Calls',
     priority: 12,
   },

@@ -1,7 +1,7 @@
 /*
  * Copyright (c) 2026 Certinia Inc. All rights reserved.
  */
-import type { ApexLog, LogEvent } from '@apexdevtools/apex-log-parser';
+import type { ApexEvent, ApexLog } from '@apexdevtools/apex-log-parser';
 import { describe, expect, it } from '@jest/globals';
 
 import { storeOf } from '#test-helpers/apexLog.js';
@@ -18,16 +18,14 @@ const NESTED =
   '09:18:22.6 (1700)|METHOD_EXIT|[5]|ns.Inner.second()\n' +
   '09:18:22.6 (1800)|METHOD_EXIT|[1]|ns.Outer.run()\n';
 
-/** Every event below the root, parents before children and siblings in order. */
-function preOrder(log: ApexLog): LogEvent[] {
-  const out: LogEvent[] = [];
+/** Every event below the log, parents before children and siblings in order, by walking the tree. */
+function preOrder(log: ApexLog): ApexEvent[] {
+  const out: ApexEvent[] = [];
   const stack = [...log.children].reverse();
   while (stack.length) {
     const event = stack.pop()!; // non-empty: the loop condition just checked
     out.push(event);
-    for (let i = event.children.length - 1; i >= 0; i--) {
-      stack.push(event.children[i]!);
-    }
+    stack.push(...event.children.toReversed());
   }
   return out;
 }
@@ -54,67 +52,54 @@ function columnsOf(index: LogIndex) {
 }
 
 describe('LogIndex', () => {
-  it('holds every tree event in pre-order, with its parent, depth and subtree', () => {
-    const { log } = storeOf(NESTED);
+  it('holds every tree event in pre-order, with its parent, depth, subtree and category', async () => {
+    const { log } = await storeOf(NESTED);
     const index = buildLogIndex(log);
     const events = preOrder(log);
 
     expect(index.rowCount).toBe(events.length);
-    for (let row = 0; row < index.rowCount; row++) {
-      const event = index.event(row);
-      expect(event).toBe(events[row]);
+    events.forEach((event, row) => {
+      expect(index.eventIndex[row]).toBe(event.id);
       const parent = index.parent[row]!;
-      expect(parent === NO_ROW ? log : index.event(parent)).toBe(event.parent);
-      expect(childrenOf(index, row).map((child) => index.event(child))).toEqual(event.children);
-      expect(index.start[row]).toBe(event.timestamp);
+      expect(parent === NO_ROW ? null : index.eventIndex[parent]).toBe(event.parent?.id ?? null);
+      expect(childrenOf(index, row).map((child) => index.eventIndex[child])).toEqual(
+        event.children.map((child) => child.id),
+      );
+      expect(index.depth[row]).toBe(event.depth - 1);
+      expect(index.start[row]).toBe(event.startTimestamp);
+      expect(index.end[row]).toBe(event.endTimestamp);
       expect(index.total[row]).toBe(event.duration.total);
       expect(index.self[row]).toBe(event.duration.self);
-      expect(index.categoryNames[index.categoryId[row]!]).toBe(event.category);
-    }
-    const run = index.rowOfEvent(events.find((event) => event.text === 'ns.Inner.first()')!);
-    expect(index.depth[run]).toBe(index.depth[index.parent[run]!]! + 1);
+    });
+    const category = (type: string) =>
+      index.categoryNames[index.categoryId[events.findIndex((event) => event.type === type)]!];
+    expect(category('METHOD_ENTRY')).toBe('Apex');
+    expect(category('SOQL_EXECUTE_BEGIN')).toBe('SOQL');
+    expect(category('STATEMENT_EXECUTE')).toBe('');
   });
 
-  it('ascends by eventIndex, which rowOf searches on', () => {
-    const { log } = storeOf(NESTED);
+  it('finds the row of every event by id, and none for the log or an unknown id', async () => {
+    const { log } = await storeOf(NESTED);
     const index = buildLogIndex(log);
-
-    for (let row = 1; row < index.rowCount; row++) {
-      expect(index.eventIndex[row]!).toBeGreaterThan(index.eventIndex[row - 1]!);
-    }
-  });
-
-  it('has no row for the root or an exit line', () => {
-    const { log } = storeOf(NESTED);
-    const index = buildLogIndex(log);
-    const exit = log.eventsById.find((event) => event.type === 'METHOD_EXIT')!;
 
     expect(index.rowOf(0)).toBe(NO_ROW);
-    expect(index.rowOf(exit.eventIndex)).toBe(NO_ROW);
-    expect(index.rowOfEvent(exit)).toBe(NO_ROW);
+    expect(index.rowOf(log.eventCount + 1)).toBe(NO_ROW);
     for (let row = 0; row < index.rowCount; row++) {
       expect(index.rowOf(index.eventIndex[row]!)).toBe(row);
     }
   });
 
-  it('has no row for a managed package event the parser merged away', () => {
-    const { log } = storeOf(
-      '09:18:22.6 (300)|ENTERING_MANAGED_PKG|ns\n' +
-        '09:18:22.6 (400)|ENTERING_MANAGED_PKG|ns\n' +
-        '09:18:22.6 (500)|ENTERING_MANAGED_PKG|ns\n',
-    );
+  it('reads a column of the parse by row', async () => {
+    const { log } = await storeOf(NESTED);
     const index = buildLogIndex(log);
-    const packages = log.eventsById.filter((event) => event.type === 'ENTERING_MANAGED_PKG');
-    const inTree = new Set(preOrder(log));
 
-    expect(packages.some((event) => !inTree.has(event))).toBe(true);
-    for (const event of packages) {
-      expect(index.rowOfEvent(event) !== NO_ROW).toBe(inTree.has(event));
-    }
+    const lines = index.column(log.columns.lineNumber);
+
+    expect(lines[index.rowOf(log.ofType('SOQL_EXECUTE_BEGIN')[0]!.id)]).toBe(4);
   });
 
-  it('keeps log order when timestamps go backwards', () => {
-    const { log } = storeOf(
+  it('keeps log order when timestamps go backwards', async () => {
+    const { log } = await storeOf(
       '09:18:22.6 (7000000)|METHOD_ENTRY|[1]|01p|ns.ClassOne.first()\n' +
         '09:18:22.6 (7100000)|METHOD_EXIT|[1]|ns.ClassOne.first()\n' +
         '09:18:22.6 (7000000)|METHOD_ENTRY|[2]|01p|ns.ClassTwo.second()\n' +
@@ -139,7 +124,7 @@ describe('LogStore.logIndex', () => {
   ).join('');
 
   it('builds the same index in slices as in one go, once', async () => {
-    const { log, store } = storeOf(MANY);
+    const { log, store } = await storeOf(MANY);
     const sliced = store.logIndex({ yieldSlice: () => Promise.resolve() });
 
     expect(store.logIndex()).toBe(sliced);

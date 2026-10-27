@@ -31,11 +31,11 @@ describe('ShowInLogAnalysis', () => {
 
   const command = lastRegisteredCommand;
 
-  it('opens the log at the timestamp', async () => {
+  it('opens the log at the event', async () => {
     const context = createMockContext();
     ShowInLogAnalysis.apply(asContext(context));
 
-    await command()({ timestamp: 42, filePath: 'memfs:/logs/a.log' });
+    await command()({ eventIndex: 42, filePath: 'memfs:/logs/a.log' });
 
     expect(LogView.setPendingNavigation).toHaveBeenCalledWith(42);
     expect(mockCreateView).toHaveBeenCalled();
@@ -48,7 +48,7 @@ describe('ShowInLogAnalysis', () => {
     ShowInLogAnalysis.apply(asContext(context));
 
     await expect(
-      command()({ timestamp: 42, filePath: 'memfs:/logs/a.log' }),
+      command()({ eventIndex: 42, filePath: 'memfs:/logs/a.log' }),
     ).resolves.toBeUndefined();
 
     expect(context.display.showErrorMessage).toHaveBeenCalledWith(

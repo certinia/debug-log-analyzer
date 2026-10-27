@@ -1,9 +1,7 @@
 /*
  * Copyright (c) 2026 Certinia Inc. All rights reserved.
  */
-import type { LogEvent } from '@apexdevtools/apex-log-parser';
-
-import { getEventKey, getStackKey } from './eventKeys.js';
+import type { Signatures } from './signatures.js';
 
 /** The path every chain starts from, which no row stands for. */
 export const ROOT_PATH_ID = 0;
@@ -27,9 +25,10 @@ export const ROOT_PATH_ID = 0;
 export class KeyPathIds {
   private keyIds = new Map<string, number>();
   private keys: string[] = [];
-  /** Each event's bucket key, as `id + 1` so an unset slot reads as 0. */
-  private keyOfEvent: Int32Array;
-  private stackIds = new Map<string, number>();
+  private readonly signatures: Signatures;
+  private readonly frameAbove: (id: number) => number;
+  /** Each signature's bucket key, as `id + 1` so an unset slot reads as 0. */
+  private keyOfSignature: number[] = [];
   /** Each bucket key's stack key. A bucket key holds the stack key, so this is
    *  per signature rather than per event. */
   private stackOfKey: number[] = [];
@@ -45,59 +44,47 @@ export class KeyPathIds {
    *  Per table rather than per module, so two logs cannot share the buffer. */
   private chain: number[] = [];
 
-  constructor(eventCount: number) {
-    this.keyOfEvent = new Int32Array(eventCount);
-  }
-
   /**
-   * The event's interned bucket key, kept per event: a mark reads the same
-   * ancestors once per occurrence it names.
+   * @param signatures - the log's signature table, which names each event's key
+   * @param parentOf - the shown frame above an event id, 0 at the top of the log
    */
-  public keyIdOf(event: LogEvent): number {
-    const at = event.eventIndex;
-    // A frame the log's own index has no slot for is keyed but not kept. A frame
-    // built rather than parsed has no index at all, and that writes an ordinary
-    // property on the typed array, which every other such frame reads as its own.
-    const slotted = at >= 0 && at < this.keyOfEvent.length;
-    if (slotted) {
-      const cached = this.keyOfEvent[at]!;
-      if (cached) {
-        return cached - 1;
-      }
+  constructor(signatures: Signatures, parentOf: (id: number) => number) {
+    this.signatures = signatures;
+    this.frameAbove = parentOf;
+  }
+
+  /** Event `id`'s interned bucket key: one string per signature, built once. */
+  public keyIdOf(id: number): number {
+    const signature = this.signatures.of(id);
+    const cached = this.keyOfSignature[signature];
+    if (cached !== undefined) {
+      return cached;
     }
-    const id = this.keyId(getEventKey(event));
-    if (slotted) {
-      this.keyOfEvent[at] = id + 1;
-    }
-    return id;
+    const keyId = this.keyId(this.signatures.key(signature));
+    this.keyOfSignature[signature] = keyId;
+    this.stackOfKey[keyId] = this.signatures.stackOf(signature);
+    return keyId;
   }
 
   /**
-   * The event's interned stack key, which tells a recursive call from a fresh
+   * Event `id`'s interned stack key, which tells a recursive call from a fresh
    * one. Its own space: a stack key is never a step in a path.
    */
-  public stackIdOf(event: LogEvent, keyId = this.keyIdOf(event)): number {
-    let id = this.stackOfKey[keyId];
-    if (id === undefined) {
-      const key = getStackKey(event);
-      id = this.stackIds.get(key) ?? this.stackIds.size;
-      this.stackIds.set(key, id);
-      this.stackOfKey[keyId] = id;
-    }
-    return id;
+  public stackIdOf(id: number, keyId = this.keyIdOf(id)): number {
+    return this.stackOfKey[keyId] ?? this.signatures.stackOf(this.signatures.of(id));
   }
 
   /**
-   * The id naming the row a frame sits in, top-down, or undefined for the log
-   * root, which heads no row.
+   * The id naming the row event `eventId` sits in, top-down, or undefined for the log
+   * itself (id 0), which heads no row.
    */
-  public pathIdOf(event: LogEvent): number | undefined {
-    if (!event.parent) {
+  public pathIdOf(eventId: number): number | undefined {
+    if (eventId <= 0) {
       return undefined;
     }
     const chain = this.chain;
     chain.length = 0;
-    for (let node: LogEvent | null = event; node?.parent; node = node.parent) {
+    for (let node = eventId; node > 0; node = this.frameAbove(node)) {
       chain.push(this.keyIdOf(node));
     }
     let id = ROOT_PATH_ID;
@@ -137,21 +124,23 @@ export class KeyPathIds {
    * Reads without minting, unlike {@link step}: a query that grew the table would
    * leave a node behind for every frame it was asked about. Ids only rise as a
    * chain deepens, so the walk stops once it passes the depth asked about.
+   *
+   * @returns the frame's event id, or 0 for none
    */
-  public chainNodeAt(event: LogEvent, pathId: number): LogEvent | null {
+  public chainNodeAt(eventId: number, pathId: number): number {
     let id = ROOT_PATH_ID;
-    for (let node: LogEvent | null = event; node?.parent; node = node.parent) {
+    for (let node = eventId; node > 0; node = this.frameAbove(node)) {
       const next = this.children[id]?.get(this.keyIdOf(node));
       if (next === undefined || next > pathId) {
         // Never minted, so no row stands for it; or past the row's own depth.
-        return null;
+        return 0;
       }
       id = next;
       if (id === pathId) {
         return node;
       }
     }
-    return null;
+    return 0;
   }
 
   /**

@@ -10,13 +10,13 @@ import type { VscTabsSelectEvent } from '@vscode-elements/elements/dist/vscode-t
 import { LitElement, css, html } from 'lit';
 import { customElement, property, state } from 'lit/decorators.js';
 
-import { parse } from '@apexdevtools/apex-log-parser';
+import { parse, type LogSource } from '@apexdevtools/apex-log-parser';
 import type { LogLevelsChange } from '../../components/LogLevels.js';
 import { TAB_TO_SOURCE, eventBus } from '../../core/events/EventBus.js';
 import { waitForNextFrame } from '../../core/utility/FrameBudget.js';
 import { logContext } from '../../core/log/logContext.js';
 import { logStatusContext, type LogStatus } from '../../core/log/logStatus.js';
-import { setCurrentLog, type LogStore } from '../../core/log/LogStore.js';
+import { logStoreFor, setCurrentLog, type LogStore } from '../../core/log/LogStore.js';
 import {
   VSCodeExtensionMessenger,
   vscodeMessenger,
@@ -36,7 +36,7 @@ import './AppHeader.js';
 import '../../components/LogInspector.js';
 
 interface NavigateToTimelinePayload {
-  timestamp: number;
+  eventIndex: number;
 }
 
 /** In tab-strip and panel order: `vscode-tabs` is index based, and `show-tab` events use the id. */
@@ -92,11 +92,8 @@ export class LogViewer extends LitElement {
   @state()
   private _navigateToEventIndex: number | undefined = undefined;
 
-  @state()
-  private _navigateToTimestamp: number | undefined = undefined;
-
   private readonly _levels = new LogLevelsController(this, {
-    publish: (log) => (this._logStore = setCurrentLog(log)),
+    publish: (store) => (this._logStore = setCurrentLog(store)),
     fail: (err) =>
       (this.notifications = [
         ...this.notifications,
@@ -190,11 +187,11 @@ export class LogViewer extends LitElement {
     // Listen for navigation messages from the extension
     VSCodeExtensionMessenger.listen<NavigateToTimelinePayload>((event) => {
       const { cmd, payload } = event.data;
-      if (cmd !== 'navigateToTimeline' || payload?.timestamp === undefined) {
+      if (cmd !== 'navigateToTimeline' || payload?.eventIndex === undefined) {
         return;
       }
       this._showTab('timeline-tab');
-      eventBus.emit('timeline:navigate-to', { timestamp: payload.timestamp });
+      eventBus.emit('timeline:navigate-to', { eventIndex: payload.eventIndex });
     });
   }
 
@@ -236,10 +233,7 @@ export class LogViewer extends LitElement {
           )}
 
           <vscode-tab-panel>
-            <timeline-view
-              .navigateToEventIndex="${this._navigateToEventIndex}"
-              .navigateToTimestamp="${this._navigateToTimestamp}"
-            ></timeline-view>
+            <timeline-view .navigateToEventIndex="${this._navigateToEventIndex}"></timeline-view>
           </vscode-tab-panel>
           <vscode-tab-panel>
             <call-tree-view></call-tree-view>
@@ -295,9 +289,8 @@ export class LogViewer extends LitElement {
 
     const logUri = data.logUri;
     const read = data.logData
-      ? { logData: data.logData, error: null }
+      ? { source: data.logData, error: null }
       : await this._readLog(logUri || '');
-    const logData = read.logData;
 
     // `parse('')` succeeds, so without this a log that could not be read reports
     // itself as an empty one and every section prints its own "nothing here" line.
@@ -307,13 +300,13 @@ export class LogViewer extends LitElement {
     }
 
     // A throw here rejects `_handleLogFetch`, which the constructor's `catch` publishes.
-    const apexLog = parse(logData);
+    const apexLog = await parse(read.source);
 
     // Published before the views render, so every tab reads the same log
     // whichever one loads first.
-    this._logStore = setCurrentLog(apexLog);
+    this._logStore = setCurrentLog(logStoreFor(apexLog));
     this._logStatus = 'ready';
-    this._levels.open(apexLog);
+    this._levels.open(this._logStore);
 
     this.logSize = apexLog.size;
     this.logDuration = apexLog.duration.total;
@@ -326,10 +319,9 @@ export class LogViewer extends LitElement {
     this.notifications = parserIssuesToNotifications(apexLog.parsingErrors);
 
     // Navigate to event location if requested (passed as prop to timeline-view)
-    if (data.navigateToEventIndex !== undefined || data.navigateToTimestamp !== undefined) {
+    if (data.navigateToEventIndex !== undefined) {
       this._showTab('timeline-tab');
       this._navigateToEventIndex = data.navigateToEventIndex;
-      this._navigateToTimestamp = data.navigateToTimestamp;
     }
   }
 
@@ -352,7 +344,7 @@ export class LogViewer extends LitElement {
    * Reads the log, returning the failure as a {@link LogIssue} rather than publishing it —
    * the caller owns `logProblems` so it can rebuild the list for each load.
    */
-  async _readLog(logUri: string): Promise<{ logData: string; error: LogIssue | null }> {
+  async _readLog(logUri: string): Promise<{ source: LogSource; error: LogIssue | null }> {
     let cause: unknown;
     if (logUri) {
       try {
@@ -360,17 +352,8 @@ export class LogViewer extends LitElement {
         if (!response.ok || !response.body) {
           throw new Error(response.statusText || `Error reading log file: ${response.status}`);
         }
-
-        const reader = response.body.pipeThrough(new TextDecoderStream()).getReader();
-        const chunks: string[] = [];
-        while (true) {
-          const { done, value } = await reader.read();
-          if (done) {
-            break;
-          }
-          chunks.push(value);
-        }
-        return { logData: chunks.join(''), error: null };
+        // Bytes, not text: decoding to a string first holds the log twice.
+        return { source: await response.arrayBuffer(), error: null };
       } catch (err: unknown) {
         cause = err;
       }
@@ -378,7 +361,7 @@ export class LogViewer extends LitElement {
       cause = 'Invalid Log Path';
     }
 
-    return { logData: '', error: loadFailure('Could not read log', cause) };
+    return { source: '', error: loadFailure('Could not read log', cause) };
   }
 }
 
@@ -400,5 +383,4 @@ interface LogDataEvent {
   logPath?: string;
   logData?: string;
   navigateToEventIndex?: number;
-  navigateToTimestamp?: number;
 }

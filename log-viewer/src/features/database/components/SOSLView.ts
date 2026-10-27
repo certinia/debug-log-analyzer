@@ -3,8 +3,8 @@
  */
 import { customElement } from 'lit/decorators.js';
 
-import type { SOSLExecuteBeginLine } from '@apexdevtools/apex-log-parser';
-import { getCallerNamespace } from '../../../core/utility/CallerNamespace.js';
+import type { SoslEvent } from '../../../core/log/statements.js';
+import { DEFAULT_NAMESPACE } from '../../../core/utility/CallerNamespace.js';
 import type { GridColumn } from '../../../grid/index.js';
 import { SOSL_VIEWS } from '../../../components/grid/ColumnViews.js';
 import { textColumn } from '../../../components/grid/columns.js';
@@ -40,7 +40,7 @@ function soslColumns(rows: readonly SOSLRow[]): GridColumn<SOSLRow>[] {
 }
 
 @customElement('sosl-view')
-export class SOSLView extends StatementGrid<SOSLRow, SOSLExecuteBeginLine> {
+export class SOSLView extends StatementGrid<SOSLRow, SoslEvent> {
   constructor() {
     super({
       type: 'sosl',
@@ -57,13 +57,13 @@ export class SOSLView extends StatementGrid<SOSLRow, SOSLExecuteBeginLine> {
     });
   }
 
-  protected toRows(lines: readonly SOSLExecuteBeginLine[]): SOSLRow[] {
+  protected toRows(lines: readonly SoslEvent[], callerOf: (id: number) => string): SOSLRow[] {
     return lines.map((sosl) => ({
-      eventIndex: sosl.eventIndex,
-      sosl: sosl.text,
-      namespace: sosl.namespace,
-      callerNamespace: getCallerNamespace(sosl),
-      rowCount: sosl.soslRowCount.self,
+      eventIndex: sosl.id,
+      sosl: sosl.text ?? '',
+      namespace: sosl.namespace ?? DEFAULT_NAMESPACE,
+      callerNamespace: callerOf(sosl.id),
+      rowCount: sosl.soslRowCount?.self ?? 0,
       timeTaken: sosl.duration.total,
     }));
   }

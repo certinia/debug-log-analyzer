@@ -1,7 +1,7 @@
 /*
  * Copyright (c) 2026 Certinia Inc. All rights reserved.
  */
-import type { LogEvent, GovernorLimits, Limits, SelfTotal } from '@apexdevtools/apex-log-parser';
+import type { GovernorLimits, Limits, Rollups, SelfTotal } from '@apexdevtools/apex-log-parser';
 
 import { formatInteger, sharePercent } from '../utility/Util.js';
 import { GOVERNOR_METRIC } from './governorMetrics.js';
@@ -18,9 +18,24 @@ export type StatementType = 'dml' | 'soql' | 'sosl';
  */
 export const SOSL_ROWS_PER_QUERY_LIMIT = 2000;
 
+/** A rollup that is also a column of the log, under the same name. */
+export type MetricKey =
+  | 'soqlCount'
+  | 'soqlRowCount'
+  | 'dmlCount'
+  | 'dmlRowCount'
+  | 'soslCount'
+  | 'soslRowCount'
+  | 'thrownCount'
+  | 'heapAllocated'
+  | 'heapGross';
+
 export interface EventMetric {
   label: string;
-  pick: (event: LogEvent) => SelfTotal;
+  /** The rollup it reads, and the column of `ApexLog.columns` that holds it by id. */
+  key: MetricKey;
+  /** The reading of one event, or of the whole log. */
+  pick: (of: Rollups) => SelfTotal;
   /** The transaction limit this metric accumulates against; 0 when it has none. */
   limit: (limits: GovernorLimits, type?: StatementType) => number;
   bytes?: boolean;
@@ -28,8 +43,21 @@ export interface EventMetric {
   noSelf?: boolean;
 }
 
-function governed(key: keyof Limits, pick: EventMetric['pick']): EventMetric {
-  return { label: GOVERNOR_METRIC[key].label, pick, limit: (l) => l.final[key].limit };
+/** A count the log did not record reads as none, as it did before the parser said so. */
+const NONE: SelfTotal = { self: 0, total: 0 };
+
+const pickOf =
+  (key: MetricKey): EventMetric['pick'] =>
+  (of) =>
+    of[key] ?? NONE;
+
+function governed(limit: keyof Limits, key: MetricKey): EventMetric {
+  return {
+    label: GOVERNOR_METRIC[limit].label,
+    key,
+    pick: pickOf(key),
+    limit: (l) => l.final[limit].limit ?? 0,
+  };
 }
 
 /**
@@ -42,21 +70,40 @@ function governed(key: keyof Limits, pick: EventMetric['pick']): EventMetric {
  * order — so a row never overtakes another as a selection or a hover moves.
  */
 export const EVENT_METRICS: readonly EventMetric[] = [
-  governed('soqlQueries', (e) => e.soqlCount),
-  governed('queryRows', (e) => e.soqlRowCount),
-  governed('dmlStatements', (e) => e.dmlCount),
-  governed('dmlRows', (e) => e.dmlRowCount),
-  governed('soslQueries', (e) => e.soslCount),
+  governed('soqlQueries', 'soqlCount'),
+  governed('queryRows', 'soqlRowCount'),
+  governed('dmlStatements', 'dmlCount'),
+  governed('dmlRows', 'dmlRowCount'),
+  governed('soslQueries', 'soslCount'),
   {
     label: 'SOSL Rows',
-    pick: (e) => e.soslRowCount,
+    key: 'soslRowCount',
+    pick: pickOf('soslRowCount'),
     // SOSL rows have no transaction total — the 2,000 cap is per query, so it
     // only reads as a limit when a single SOSL statement is selected.
     limit: (_limits, type) => (type === 'sosl' ? SOSL_ROWS_PER_QUERY_LIMIT : 0),
   },
-  { label: 'Throws', pick: (e) => e.thrownCount, limit: () => 0, noSelf: true },
-  { label: 'Heap Net', pick: (e) => e.heapAllocated, limit: () => 0, bytes: true },
-  { label: 'Heap Alloc', pick: (e) => e.heapGross, limit: () => 0, bytes: true },
+  {
+    label: 'Throws',
+    key: 'thrownCount',
+    pick: pickOf('thrownCount'),
+    limit: () => 0,
+    noSelf: true,
+  },
+  {
+    label: 'Heap Net',
+    key: 'heapAllocated',
+    pick: pickOf('heapAllocated'),
+    limit: () => 0,
+    bytes: true,
+  },
+  {
+    label: 'Heap Alloc',
+    key: 'heapGross',
+    pick: pickOf('heapGross'),
+    limit: () => 0,
+    bytes: true,
+  },
 ];
 
 /**
@@ -65,8 +112,8 @@ export const EVENT_METRICS: readonly EventMetric[] = [
  */
 export const HEAP_PEAK = {
   label: 'Heap Peak',
-  pick: (event: LogEvent): number => event.heapPeak,
-  limit: (limits: GovernorLimits): number => limits.peak.heapSize.limit,
+  pick: (of: Rollups): number => of.heapPeak ?? 0,
+  limit: (limits: GovernorLimits): number => limits.peak.heapSize.limit ?? 0,
   bytes: true,
 } as const;
 

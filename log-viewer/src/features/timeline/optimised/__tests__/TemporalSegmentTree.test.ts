@@ -2,10 +2,9 @@
  * Copyright (c) 2025 Certinia Inc. All rights reserved.
  */
 import { describe, expect, it } from '@jest/globals';
-import type { LogEvent, LogCategory } from '@apexdevtools/apex-log-parser';
-
+import type { LogCategory } from '../../../../core/log/category.js';
 import type { PixelBucket, ViewportState } from '../../types/flamechart.types.js';
-import { timelineEvent } from '#test-helpers/timeline.js';
+import { type FrameSpec, rectsOf, timelineEvent } from '#test-helpers/timeline.js';
 import { makeViewport } from '#test-helpers/viewport.js';
 import { TIMELINE_CONSTANTS } from '../../types/flamechart.types.js';
 import type { BatchColorInfo } from '../BucketColorResolver.js';
@@ -14,22 +13,11 @@ import { RectangleCache } from '../RectangleCache.js';
 import { TemporalSegmentTree } from '../TemporalSegmentTree.js';
 
 const NO_COLORS: Map<string, BatchColorInfo> = new Map();
-const CATEGORIES = new Set([
-  'Apex',
-  'Code Unit',
-  'System',
-  'Automation',
-  'DML',
-  'SOQL',
-  'Callout',
-  'Validation',
-]);
-
-function build(events: LogEvent[]): TemporalSegmentTree {
-  return new TemporalSegmentTree(new RectangleCache(events, CATEGORIES).getRectsByCategory());
+function build(events: FrameSpec[]): TemporalSegmentTree {
+  return new TemporalSegmentTree(new RectangleCache(rectsOf(events)).getRectsByCategory());
 }
 
-function query(events: LogEvent[], view: ViewportState) {
+function query(events: FrameSpec[], view: ViewportState) {
   const result = build(events).query(view, NO_COLORS);
   const buckets: PixelBucket[] = [...result.buckets.values()].flat();
   return {
@@ -40,7 +28,7 @@ function query(events: LogEvent[], view: ViewportState) {
 }
 
 describe('TemporalSegmentTree', () => {
-  it.each<[string, LogEvent[], number]>([
+  it.each<[string, FrameSpec[], number]>([
     [
       'flat events',
       [timelineEvent(0, 10, 'Apex'), timelineEvent(20, 10, 'SOQL'), timelineEvent(40, 10, 'DML')],
@@ -163,7 +151,7 @@ describe('TemporalSegmentTree', () => {
         timelineEvent(30, 3, 'DML'),
         timelineEvent(40, 1, 'Apex'),
       ];
-      const cache = new RectangleCache(events, CATEGORIES);
+      const cache = new RectangleCache(rectsOf(events));
 
       const tree = cache.getCulledRectangles(makeViewport(), NO_COLORS).stats;
       const legacy = legacyCullRectangles(
@@ -208,9 +196,9 @@ describe('TemporalSegmentTree', () => {
       const found = build([
         timelineEvent(0, 100, 'Apex'),
         timelineEvent(50, 10, 'SOQL'),
-      ]).queryEventsInRegion(70, 90, 0, 0);
+      ]).queryRectsInRegion(70, 90, 0, 0);
 
-      expect(found.map((event) => event.category)).toEqual(['Apex']);
+      expect(found.map((rect) => rect.category)).toEqual(['Apex']);
     });
   });
 });

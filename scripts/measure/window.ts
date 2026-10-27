@@ -7,6 +7,7 @@
  */
 import type { ApexLog } from '@apexdevtools/apex-log-parser';
 
+import { logStoreFor } from '../../log-viewer/src/core/log/LogStore.js';
 import { windowIndexFor } from '../../log-viewer/src/core/log/windowStats.js';
 import { print, time } from './harness.js';
 
@@ -26,8 +27,9 @@ const WINDOWS = [
 const DRAG_FRAMES = 60;
 
 export async function measureWindow(log: ApexLog): Promise<void> {
-  const logStart = log.timestamp;
-  const logSpan = (log.exitStamp ?? logStart) - logStart;
+  // Row 0 of the columns is the log itself.
+  const logStart = log.columns.startTimestamp[0]!;
+  const logSpan = log.columns.endTimestamp[0]! - logStart;
   const at = (from: number, share: number) => ({
     start: logStart + logSpan * from,
     end: logStart + logSpan * (from + share),
@@ -35,7 +37,9 @@ export async function measureWindow(log: ApexLog): Promise<void> {
 
   // One read of the log, then every window is answered from it. The heap column
   // is what the index costs.
-  const index = await time('windowIndex build', () => windowIndexFor(log, { yieldSlice }));
+  const index = await time('windowIndex build', () =>
+    windowIndexFor(logStoreFor(log), { yieldSlice }),
+  );
 
   for (const [label, share] of WINDOWS) {
     const window = at(share === 1 ? 0 : 0.05, share);

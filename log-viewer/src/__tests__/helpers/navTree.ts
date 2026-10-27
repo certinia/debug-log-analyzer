@@ -1,8 +1,6 @@
 /*
  * Copyright (c) 2026 Certinia Inc. All rights reserved.
  */
-import type { LogEvent } from '@apexdevtools/apex-log-parser';
-
 import {
   type EventNode,
   NO_ROW,
@@ -23,7 +21,7 @@ export function navNode(
   depth: number,
   children?: NavNode[],
 ): NavNode {
-  const original = { id } as unknown as LogEvent;
+  const original: unknown = { id };
   return {
     data: { id, timestamp, duration, type: 'METHOD_ENTRY', text: id, original },
     children,

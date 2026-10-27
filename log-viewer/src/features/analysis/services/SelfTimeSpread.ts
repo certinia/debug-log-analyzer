@@ -1,8 +1,7 @@
 /*
  * Copyright (c) 2026 Certinia Inc. All rights reserved.
  */
-import type { LogCategory } from '@apexdevtools/apex-log-parser';
-
+import type { LogCategory } from '../../../core/log/category.js';
 import type { Derivation } from '../../../core/log/LogStore.js';
 import { type Signature, signatureTimes } from '../../../core/log/signatureTimes.js';
 

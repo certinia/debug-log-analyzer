@@ -9,16 +9,17 @@
 import type { ApexLog } from '@apexdevtools/apex-log-parser';
 
 import { LogStore } from '../../log-viewer/src/core/log/LogStore.js';
-import { deepEvent, pathOf, timeOrderDetails } from '../../log-viewer/bench/grid/targets.js';
+import { deepRow, pathOf } from '../../log-viewer/bench/grid/targets.js';
 import { formatNsAsMs } from '../../log-viewer/src/core/utility/Duration.js';
 import {
   toBottomUpTree,
   type BottomUpRow,
 } from '../../log-viewer/src/features/call-tree/utils/Aggregation.js';
 import { outermostSum } from '../../log-viewer/src/features/call-tree/grid/calcs.js';
+import { reportedUsage } from '../../log-viewer/src/features/call-tree/utils/reportedUsage.js';
 import {
-  toTimeOrderTree,
-  type TimeOrderRow,
+  TimeOrderSource,
+  type TimeOrderNode,
 } from '../../log-viewer/src/features/call-tree/utils/TimeOrderTree.js';
 import {
   Group,
@@ -89,39 +90,39 @@ export async function measureGrid(log: ApexLog): Promise<void> {
 }
 
 async function measureTimeOrder(log: ApexLog): Promise<void> {
-  const roots = toTimeOrderTree(log.children, log.governorLimits) ?? [];
+  const index = await new LogStore(log).logIndex();
+  const source = new TimeOrderSource(index);
+  const { total, self } = index;
   const scheduler = timedScheduler();
-  const path = pathOf(deepEvent(log));
+  const path = pathOf(index, deepRow(index));
   const step = stepper(scheduler, () => store.snapshot().rows.size);
+  const timeOrderDetails = source.details;
 
-  const soqlOnly: RowFilter<TimeOrderRow> = {
-    test: (r) => r.type === 'SOQL_EXECUTE_BEGIN',
+  const soqlOnly: RowFilter<TimeOrderNode> = {
+    test: (n) => source.type(n) === 'SOQL_EXECUTE_BEGIN',
     keepAncestors: true,
   };
-  const bySelf: Sort<TimeOrderRow> = { value: (r) => r.duration.self, dir: 'desc' };
-  const cells: CellText<TimeOrderRow>[] = [
-    (r) => r.text,
-    (r) => r.namespace,
-    (r) => r.type,
-    (r) => formatNsAsMs(r.duration.total, 3),
-    (r) => formatNsAsMs(r.duration.self, 3),
+  const bySelf: Sort<TimeOrderNode> = { value: (n) => self[n.row]!, dir: 'desc' };
+  const cells: CellText<TimeOrderNode>[] = [
+    source.text,
+    source.namespace,
+    source.type,
+    (n) => formatNsAsMs(total[n.row]!, 3),
+    (n) => formatNsAsMs(self[n.row]!, 3),
   ];
-  const columns: ExportColumn<TimeOrderRow>[] = [
-    { title: 'Name', value: (r) => r.text },
-    { title: 'Namespace', value: (r) => r.namespace },
-    { title: 'Type', value: (r) => r.type },
-    { title: 'Total Time (ms)', value: (r) => formatNsAsMs(r.duration.total, 3) },
-    { title: 'Self Time (ms)', value: (r) => formatNsAsMs(r.duration.self, 3) },
+  const columns: ExportColumn<TimeOrderNode>[] = [
+    { title: 'Name', value: source.text },
+    { title: 'Namespace', value: source.namespace },
+    { title: 'Type', value: source.type },
+    { title: 'Total Time (ms)', value: (n) => formatNsAsMs(total[n.row]!, 3) },
+    { title: 'Self Time (ms)', value: (n) => formatNsAsMs(self[n.row]!, 3) },
   ];
   let matches = 0;
 
   const base = heapMb();
-  let store!: GridStore<TimeOrderRow>; // assigned by the first step, before any read
+  let store!: GridStore<TimeOrderNode>; // assigned by the first step, before any read
   await step('store: first build', () => {
-    store = new GridStore<TimeOrderRow>(
-      { roots, children: (r) => r._children, key: (r) => r.id },
-      { scheduler },
-    );
+    store = new GridStore<TimeOrderNode>(source, { scheduler });
     return store.settled();
   });
   await step('detail filter on', () => store.setFilters([timeOrderDetails]));
@@ -150,12 +151,18 @@ async function measureTimeOrder(log: ApexLog): Promise<void> {
 
 /** Grouping, with the footer and group totals the Bottom-Up tab shows. */
 async function measureBottomUp(log: ApexLog): Promise<void> {
-  const roots = toBottomUpTree(log.children, new LogStore(log).keyPathIds(), log.governorLimits);
+  const logStore = new LogStore(log);
+  const roots = toBottomUpTree(
+    await logStore.logIndex(),
+    logStore,
+    await logStore.derive(reportedUsage),
+  );
   const scheduler = timedScheduler();
   const step = stepper(scheduler, () => store.snapshot().rows.size);
+  const { durationTotal } = log.columns;
   const calcs: Calcs<BottomUpRow> = {
     totalSelfTime: sum((r) => r.totalSelfTime),
-    totalTime: outermostSum((e) => e.duration.total),
+    totalTime: outermostSum(log, (id) => durationTotal[id]!),
   };
   const bySelf: Sort<BottomUpRow> = { value: (r) => r.totalSelfTime, dir: 'desc' };
   const groupsBySelf: Sort<Group<BottomUpRow>> = {

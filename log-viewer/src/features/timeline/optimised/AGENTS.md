@@ -17,15 +17,15 @@ parser types. Keep any file that imports them out of `metric-strip/`, which stay
 
 ```typescript
 // GOOD: Import from types file (the boundary)
-import type { EventNode, LogEvent } from '../types/flamechart.types.js';
+import type { EventNode } from '../types/flamechart.types.js';
 
 // BAD: Direct import from the parser package (violates boundary)
-import type { LogEvent } from '@apexdevtools/apex-log-parser';
+import type { ApexEvent } from '@apexdevtools/apex-log-parser';
 ```
 
 ### API Boundary
 
-FlameChart's **public API** (callbacks like `onMouseMove`, `onClick`) must use `EventNode`, not `LogEvent`:
+FlameChart's **public API** (callbacks like `onMouseMove`, `onClick`) must use `EventNode`, not `ApexEvent`:
 
 ```typescript
 // FlameChartCallbacks uses EventNode for public APIs
@@ -35,13 +35,14 @@ onClick?: (screenX: number, screenY: number, eventNode: EventNode | null, marker
 
 When FlameChart needs to pass event data to callbacks:
 
-- Use `EventNode` type (not LogEvent) in the callback signature
-- Store LogEvent reference in `eventNode.original` property
-- ApexLogTimeline extracts LogEvent via `(eventNode.original as LogEvent)`
+- Use `EventNode` type (not ApexEvent) in the callback signature
+- Store the `ApexEvent` in the `eventNode.original` property
+- ApexLogTimeline reads it back via `(eventNode.original as ApexEvent)`
 
 ### Internal Types
 
-`LogEvent` is still used internally by data structures (`RectangleCache`, `TimelineEventIndex`, `PixelBucket`) for performance reasons. These types are imported through `flamechart.types.ts` which re-exports them from the parser package.
+The data structures (`RectangleCache`, `TemporalSegmentTree`, `PixelBucket`) hold `PrecomputedRect`s,
+which carry their `row`, not a parser event.
 
 ### TimelineFrames
 
@@ -68,22 +69,18 @@ The metric strip supports collapsed (heat-style) and expanded (step chart) views
 
 ### Available Query Methods
 
-| Method                             | Use Case                       | Complexity   |
-| ---------------------------------- | ------------------------------ | ------------ |
-| `query(viewport)`                  | Viewport culling for rendering | O(k log n)   |
-| `queryEventsInRegion(time, depth)` | Hit testing, spatial lookups   | O(log n + k) |
+| Method                            | Use Case                       | Complexity   |
+| --------------------------------- | ------------------------------ | ------------ |
+| `query(viewport)`                 | Viewport culling for rendering | O(k log n)   |
+| `queryRectsInRegion(time, depth)` | Hit testing, spatial lookups   | O(log n + k) |
 
 ### Access Pattern
 
 ```typescript
-const events = rectangleCache.queryEventsInRegion(timeStart, timeEnd, depthStart, depthEnd);
+const rects = rectangleCache.queryRectsInRegion(timeStart, timeEnd, depthStart, depthEnd);
 ```
 
 `RectangleCache` fronts the tree; nothing reaches past it.
-
-### Why Not TimelineEventIndex?
-
-`TimelineEventIndex.findEventsInRegion()` does O(n) full tree traversal. Use it only as a fallback when TemporalSegmentTree is unavailable.
 
 ## Class Responsibilities
 

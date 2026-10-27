@@ -55,8 +55,8 @@ async function build(log: ApexLog) {
   ]);
   selfTimeByCategory(index);
   const categories = new Set<string>(BUCKET_CONSTANTS.CATEGORY_PRIORITY);
-  const frames = buildTimelineFrames(index, categories, log.exitStamp);
-  const cache = new RectangleCache(log.children, categories, frames);
+  const frames = buildTimelineFrames(index, categories, log.columns.endTimestamp[0]!);
+  const cache = new RectangleCache(frames);
   new TreeNavigator(frames);
   const matcher = new EventMatcher<EventNode>(frames);
   return { frames, cache, matcher };

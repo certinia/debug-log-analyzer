@@ -8,7 +8,7 @@ import { Command } from './Command.js';
 import { LogView } from './LogView.js';
 
 interface ShowInLogAnalysisArgs {
-  timestamp: number;
+  eventIndex: number;
   filePath?: string;
 }
 
@@ -25,9 +25,9 @@ export class ShowInLogAnalysis {
   }
 
   private static async execute(context: Context, args: ShowInLogAnalysisArgs): Promise<void> {
-    const { timestamp, filePath } = args;
+    const { eventIndex, filePath } = args;
 
-    if (!timestamp) {
+    if (!eventIndex) {
       return;
     }
 
@@ -45,7 +45,7 @@ export class ShowInLogAnalysis {
       }
 
       // Set pending navigation so it's sent after log is parsed
-      LogView.setPendingNavigation(timestamp);
+      LogView.setPendingNavigation(eventIndex);
       await LogView.createView(context, Promise.resolve(), logUri);
       return; // Navigation will happen via fetchLog payload
     } else {
@@ -60,7 +60,7 @@ export class ShowInLogAnalysis {
         activeEditor.document.uri.toString() !== currentLogUri.toString()
       ) {
         // Different log file is active, open the active one
-        LogView.setPendingNavigation(timestamp);
+        LogView.setPendingNavigation(eventIndex);
         await LogView.createView(context, Promise.resolve(), activeEditor.document.uri);
         return; // Navigation will happen via fetchLog payload
       }
@@ -69,7 +69,7 @@ export class ShowInLogAnalysis {
     // Send navigation message to webview
     panel.webview.postMessage({
       cmd: 'navigateToTimeline',
-      payload: { timestamp },
+      payload: { eventIndex },
     });
   }
 }

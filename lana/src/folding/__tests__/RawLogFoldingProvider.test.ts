@@ -3,7 +3,6 @@
  */
 import { beforeEach, describe, expect, it } from '@jest/globals';
 
-import type { ApexLog, LogEvent } from '@apexdevtools/apex-log-parser';
 import { FoldingRangeKind, languages, window, workspace } from 'vscode';
 
 import {
@@ -11,7 +10,8 @@ import {
   createMockApexLog,
   asContext,
   createMockContext,
-  createMockLogEvent,
+  logLine,
+  parseLines,
 } from '../../__tests__/helpers/test-builders.js';
 import {
   TabInputText,
@@ -22,20 +22,20 @@ import {
 import { LogEventCache } from '../../cache/LogEventCache.js';
 import { RawLogFoldingProvider } from '../RawLogFoldingProvider.js';
 
-// Mock LogEventCache
-jest.mock('../../cache/LogEventCache.js', () => ({
-  LogEventCache: {
-    getApexLog: jest.fn(),
-  },
-}));
+// Only the parse is mocked: the lines of each event are read as the provider reads them.
+jest.mock('../../cache/LogEventCache.js', () => {
+  const actual = jest.requireActual<typeof import('../../cache/LogEventCache.js')>(
+    '../../cache/LogEventCache.js',
+  );
+  actual.LogEventCache.getApexLog = jest.fn();
+  return actual;
+});
 
 const mockGetApexLog = LogEventCache.getApexLog as jest.Mock;
 
-const line = (timestamp: number | null) =>
-  timestamp === null ? 'Some non-timestamp line' : `09:45:31.888 (${timestamp})|EVENT`;
-
-const event = (timestamp: number, exitStamp: number | null, children: LogEvent[] = []) =>
-  createMockLogEvent({ timestamp, exitStamp, children });
+const enter = (ns: number, name = 'A.a()') => logLine(ns, `METHOD_ENTRY|[1]|01p|${name}`);
+const exit = (ns: number, name = 'A.a()') => logLine(ns, `METHOD_EXIT|[1]|${name}`);
+const debug = (ns: number) => logLine(ns, 'USER_DEBUG|[2]|DEBUG|hello');
 
 describe('RawLogFoldingProvider', () => {
   let provider: RawLogFoldingProvider;
@@ -47,66 +47,65 @@ describe('RawLogFoldingProvider', () => {
     setOpenTabs(new TabInputText(Uri.file('/test/file.log')));
   });
 
-  async function foldsFor(timestamps: Array<number | null>, apexLog: ApexLog | null) {
-    const doc = createMockTextDocument({ lines: timestamps.map(line), uri: '/test/file.log' });
-    mockGetApexLog.mockResolvedValueOnce(apexLog);
+  async function foldsFor(lines: string[], parsed = true) {
+    const doc = createMockTextDocument({ lines, uri: '/test/file.log' });
+    mockGetApexLog.mockResolvedValueOnce(parsed ? await parseLines(lines) : null);
     const ranges = await provider.provideFoldingRanges(doc, {} as never);
     return ranges.map((range) => [range.start, range.end, range.kind]);
   }
 
-  const logOf = (...children: LogEvent[]) => createMockApexLog({ children });
   const region = (start: number, end: number) => [start, end, FoldingRangeKind.Region];
 
   it.each([
-    ['an event', [1000, 1500, 2000], logOf(event(1000, 2000)), [region(0, 2)]],
+    ['a method', [enter(1000), debug(1500), exit(2000)], [region(0, 2)]],
     [
-      'an event over an untimestamped line',
-      [1000, null, 2000],
-      logOf(event(1000, 2000)),
-      [region(0, 2)],
+      'a method over a line with no timestamp',
+      [enter(1000), debug(1500), 'more of the message', exit(2000)],
+      [region(0, 3)],
     ],
     [
-      'the first line of a repeated timestamp',
-      [1000, 1000, 2000],
-      logOf(event(1000, 2000)),
-      [region(0, 2)],
+      'two methods that start at one timestamp',
+      [enter(1000, 'A.a()'), enter(1000, 'A.b()'), exit(2000, 'A.b()'), exit(2000, 'A.a()')],
+      [region(0, 3), region(1, 2)],
     ],
     [
       'a parent and its child',
-      [1000, 1500, 2000, 3000],
-      logOf(event(1000, 3000, [event(1500, 2000)])),
+      [enter(1000, 'A.a()'), enter(1500, 'A.b()'), exit(2000, 'A.b()'), exit(3000, 'A.a()')],
       [region(0, 3), region(1, 2)],
     ],
     [
       'three levels',
-      [1000, 2000, 3000, 4000, 5000, 6000],
-      logOf(event(1000, 6000, [event(2000, 5000, [event(3000, 4000)])])),
+      [
+        enter(1000, 'A.a()'),
+        enter(2000, 'A.b()'),
+        enter(3000, 'A.c()'),
+        exit(4000, 'A.c()'),
+        exit(5000, 'A.b()'),
+        exit(6000, 'A.a()'),
+      ],
       [region(0, 5), region(1, 4), region(2, 3)],
     ],
     [
       'siblings',
-      [1000, 2000, 3000, 4000],
-      logOf(event(1000, 2000), event(3000, 4000)),
+      [enter(1000, 'A.a()'), exit(2000, 'A.a()'), enter(3000, 'A.b()'), exit(4000, 'A.b()')],
       [region(0, 1), region(2, 3)],
     ],
-  ])('folds %s', async (_label, timestamps, apexLog, expected) => {
-    expect(await foldsFor(timestamps, apexLog)).toEqual(expected);
+  ])('folds %s', async (_label, lines, expected) => {
+    expect(await foldsFor(lines)).toEqual(expected);
   });
 
   it.each([
-    ['an event that exits where it starts', [1000], logOf(event(1000, 1000))],
-    ['an event with no exit', [1000], logOf(event(1000, null))],
-    ['an event whose exit line comes first', [2000, 1000], logOf(event(1000, 2000))],
-    ['an event whose timestamps are not in the document', [1000], logOf(event(9999, 10000))],
-    ['an empty log', [], logOf()],
-    ['a log that did not parse', [], null],
-  ])('folds nothing for %s', async (_label, timestamps, apexLog) => {
-    expect(await foldsFor(timestamps, apexLog)).toEqual([]);
+    ['a method the log ends inside', [enter(1000), debug(1500)], true],
+    ['a leaf', [debug(1500)], true],
+    ['an empty log', [], true],
+    ['a log that did not parse', [enter(1000), exit(2000)], false],
+  ])('folds nothing for %s', async (_label, lines, parsed) => {
+    expect(await foldsFor(lines, parsed)).toEqual([]);
   });
 
   it('folds nothing for a document not open as a text tab', async () => {
     setOpenTabs();
-    expect(await foldsFor([1000, 2000], logOf(event(1000, 2000)))).toEqual([]);
+    expect(await foldsFor([enter(1000), exit(2000)])).toEqual([]);
   });
 
   describe('apply', () => {
@@ -166,7 +165,7 @@ describe('RawLogFoldingProvider', () => {
       ['an editor becoming active (reopen)', 'fireActiveEditor'],
     ] as const)('warms the cache and fires after %s', async (_label, trigger) => {
       const captured = applyAndCapture();
-      mockGetApexLog.mockResolvedValueOnce(createMockApexLog({ children: [] }));
+      mockGetApexLog.mockResolvedValueOnce(createMockApexLog());
 
       captured[trigger](createMockTextDocument({ lines: apexLogLines, uri: '/test/file.log' }));
       await flush();

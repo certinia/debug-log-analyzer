@@ -45,10 +45,13 @@ const trend = (label = 'SOQL queries', gaps: NoDataSpan[] = []): TrendSeries => 
   gaps,
 });
 
-// The Timeline draws 0 to `exitStamp`, so the charts measure by that. `duration.total` starts at
+// The Timeline draws 0 to the log's end, so the charts measure by that. `duration.total` starts at
 // the first event instead, and is set apart here so a chart cannot pass on the wrong one.
 const aLog = () =>
-  stubStore({ exitStamp: LOG_NS, duration: { total: LOG_NS - 200 } } as unknown as ApexLog);
+  stubStore({
+    columns: { endTimestamp: [LOG_NS] },
+    duration: { total: LOG_NS - 200 },
+  } as unknown as ApexLog);
 
 async function mount(store: LogStore = aLog()): Promise<LitElement> {
   const element = document.createElement('governor-trends');

@@ -5,19 +5,19 @@ import { describe, expect, it } from '@jest/globals';
 
 const stack = [
   {
-    eventIndex: 1,
+    id: 1,
     type: 'METHOD_ENTRY',
     text: 'run()',
     duration: { total: 41_200_000, self: 2_300_000 },
   },
   {
-    eventIndex: 2,
+    id: 2,
     type: 'METHOD_ENTRY',
     text: 'load()',
     duration: { total: 38_900_000, self: 100_000 },
   },
   {
-    eventIndex: 3,
+    id: 3,
     type: 'SOQL_EXECUTE_BEGIN',
     text: 'SELECT Id FROM Account',
     duration: { total: 3_100_000, self: 3_100_000 },
@@ -57,7 +57,7 @@ describe('buildCallStackData', () => {
   it('drops detail frames, keeping call frames only', () => {
     currentStack = [
       {
-        eventIndex: 7,
+        id: 7,
         type: 'CUMULATIVE_LIMIT_USAGE',
         text: 'LIMIT_USAGE_FOR_NS',
         duration: { total: 900_000, self: 0 },

@@ -7,6 +7,7 @@ import '../../../components/datagrid-filter-bar.js';
 import '../../../components/datagrid-range-filter.js';
 import '../../../components/OverflowList.js';
 import '../../../components/grid/AppGrid.js';
+import { consume } from '@lit/context';
 import { css, html, LitElement, type PropertyValues, type TemplateResult } from 'lit';
 import { property, state } from 'lit/decorators.js';
 import { ref } from 'lit/directives/ref.js';
@@ -29,6 +30,9 @@ import {
   gridToolbarActions,
 } from '../../../components/gridToolbar.js';
 import type { StatementType } from '../../../core/events/EventBus.js';
+import { logContext } from '../../../core/log/logContext.js';
+import type { LogStore } from '../../../core/log/LogStore.js';
+import { DEFAULT_NAMESPACE, getCallerNamespace } from '../../../core/utility/CallerNamespace.js';
 import { formatNsAsMs, nsToMs } from '../../../core/utility/Duration.js';
 import {
   Group,
@@ -99,6 +103,11 @@ export abstract class StatementGrid<R extends StatementRow, L> extends LitElemen
   @property({ attribute: false })
   lines: L[] = [];
 
+  /** The log on screen, from the app root; its shown frames name each caller. */
+  @consume({ context: logContext, subscribe: true })
+  @property({ attribute: false })
+  logStore: LogStore | null = null;
+
   @state()
   private _source: TreeSource<R> | null = null;
   @state()
@@ -148,8 +157,8 @@ export abstract class StatementGrid<R extends StatementRow, L> extends LitElemen
     });
   }
 
-  /** Maps the log lines to rows, in log order. */
-  protected abstract toRows(lines: readonly L[]): R[];
+  /** Maps the log lines to rows, in log order. `callerOf` names the namespace that called event `id`. */
+  protected abstract toRows(lines: readonly L[], callerOf: (id: number) => string): R[];
 
   /** The grid, once rendered. */
   get grid(): AppGrid<R> | null {
@@ -205,8 +214,11 @@ export abstract class StatementGrid<R extends StatementRow, L> extends LitElemen
   ];
 
   protected willUpdate(changed: PropertyValues): void {
-    if (changed.has('lines')) {
-      const rows = this.toRows(this.lines);
+    if (changed.has('lines') || changed.has('logStore')) {
+      const store = this.logStore;
+      const rows = this.toRows(this.lines, (id) =>
+        store ? getCallerNamespace(store, id) : DEFAULT_NAMESPACE,
+      );
       this._eventIndexes = new Set(rows.map((row) => row.eventIndex));
       this._source = { roots: rows, key: (row) => row.eventIndex };
       this._columns = this.spec.columns(rows);

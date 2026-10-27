@@ -2,18 +2,9 @@
  * Copyright (c) 2021 Certinia Inc. All rights reserved.
  */
 import { describe, expect, it } from '@jest/globals';
-import { ApexLogParser, LogEvent } from '@apexdevtools/apex-log-parser';
+import { parse, type FrameEvent } from '@apexdevtools/apex-log-parser';
 
 import { SOQLLinter } from '../SOQLLinter.js';
-
-class DummySOQLLine extends LogEvent {
-  constructor(parser: ApexLogParser, parts: string[]) {
-    super(parser, parts);
-    this.category = 'Code Unit';
-    this.cpuType = 'method';
-    this.exitTypes = ['CODE_UNIT_FINISHED'];
-  }
-}
 
 const UNBOUNDED = {
   summary: 'SOQL is unbounded. Add a WHERE or LIMIT clause or both.',
@@ -91,16 +82,10 @@ describe('SOQLLinter', () => {
   });
 
   it('asks a query in a trigger to be selective', async () => {
-    const parser = new ApexLogParser();
-    const trigger = new DummySOQLLine(parser, [
-      '04:16:39.166 (1166781977)',
-      'CODE_UNIT_STARTED',
-      '[EXTERNAL]',
-      'a0000000000aaaa',
-      'Account on Account trigger event AfterInsert',
-      '__sfdc_trigger/Account',
-    ]);
-    trigger.text = 'Account on Account trigger event AfterInsert';
+    const log = await parse(
+      '04:16:39.166 (1166781977)|CODE_UNIT_STARTED|[EXTERNAL]|a0000000000aaaa|Account on Account trigger event AfterInsert|__sfdc_trigger/Account\n',
+    );
+    const trigger = log.event(1) as FrameEvent; // the only event
 
     const results = await new SOQLLinter().lint('SELECT Id FROM AnObject__c WHERE value__c > 0', [
       trigger,

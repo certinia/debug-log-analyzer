@@ -11,17 +11,13 @@
 
 //TODO: Remove deps outside timeline
 
-import type { LogEvent, LogCategory, LogIssue } from '@apexdevtools/apex-log-parser';
+import type { ApexEvent, LogIssue } from '@apexdevtools/apex-log-parser';
+import type { LogCategory } from '../../../core/log/category.js';
 import { formatDuration } from '../../../core/utility/Util.js';
 import type { MeasurementSnapshot } from '../optimised/measurement/MeasurementState.js';
 import type { PrecomputedRect } from '../optimised/RectangleCache.js';
 
 export { NO_ROW } from '../../../core/log/LogIndex.js';
-
-// Re-export LogEvent for internal use within timeline/ folder
-// Note: FlameChart's PUBLIC API (callbacks) should use EventNode, not LogEvent
-// LogEvent is only used internally by data structures like RectangleCache, HitDetector
-export type { LogEvent };
 
 // Re-export formatDuration for use within timeline/optimised folder
 // This keeps the Util.ts dependency at the boundary (types file)
@@ -125,7 +121,7 @@ export interface EventNode {
   /** Display text for event */
   text: string;
 
-  /** Optional reference to original data (e.g., LogEvent) - used by adapter layer */
+  /** Optional reference to original data (e.g., ApexEvent) - used by adapter layer */
   original?: unknown;
 }
 
@@ -186,6 +182,9 @@ export interface TimelineFrames<E extends EventNode> {
   rectOf(row: number): PrecomputedRect | undefined;
 }
 
+/** How far the frames reach: in time, and in depth. */
+export type TimelineExtent = Pick<TimelineFrames<EventNode>, 'maxDepth' | 'totalDuration'>;
+
 // ============================================================================
 // RENDERING STRUCTURES
 // ============================================================================
@@ -223,8 +222,8 @@ export interface RenderRectangle {
   /** Height in pixels (constant EVENT_HEIGHT). */
   height: number;
 
-  /** Reference to source event (for tooltips/click handling). */
-  eventRef: LogEvent;
+  /** The frame's row in {@link TimelineFrames}. */
+  row: number;
 }
 
 // ============================================================================
@@ -261,9 +260,6 @@ export interface RenderDirtyState {
 }
 
 export interface TimelineState {
-  /** Input event data. */
-  events: LogEvent[];
-
   /** Viewport state. */
   viewport: ViewportState;
 
@@ -277,7 +273,7 @@ export interface TimelineState {
   interaction: {
     isDragging: boolean;
     lastMousePos: { x: number; y: number };
-    hoveredEvent: LogEvent | null;
+    hoveredEvent: EventNode | null;
   };
 
   /** Flags. */
@@ -347,8 +343,8 @@ export interface TimelineOptions {
   editorColors?: EditorColors;
 
   /** Event handlers for user interactions. */
-  onEventClick?: (event: LogEvent) => void;
-  onEventHover?: (event: LogEvent | null) => void;
+  onEventClick?: (event: ApexEvent) => void;
+  onEventHover?: (event: ApexEvent | null) => void;
   onViewportChange?: (viewport: ViewportState) => void;
   onMeasurementChange?: (measurement: MeasurementSnapshot | null) => void;
 }
@@ -437,8 +433,8 @@ export interface PixelBucket {
   eventCount: number;
   /** Per-category statistics */
   categoryStats: CategoryStats;
-  /** Source event references for tooltip/click */
-  eventRefs: LogEvent[];
+  /** The rects the bucket holds, when collected; empty when a region query must find them. */
+  rects: PrecomputedRect[];
   /** Resolved display color (hex number) - pre-blended opaque color for rendering */
   color: number;
 }
@@ -614,7 +610,7 @@ export type TimeDisplayMode = 'elapsed' | 'wallClock';
 
 /**
  * Represents a time range in the log where Marker occurred.
- * Extracted from ApexLog.logIssues during timeline initialization.
+ * Extracted from ApexLog.issues during timeline initialization.
  */
 export interface TimelineMarker {
   /**
@@ -1005,8 +1001,6 @@ export interface SegmentNode {
   // Event tracking
   /** Total event count in this subtree */
   eventCount: number;
-  /** For leaf nodes only: reference to source event */
-  eventRef?: LogEvent;
   /** For leaf nodes only: direct reference to PrecomputedRect (avoids O(n) lookup) */
   rectRef?: PrecomputedRect;
 

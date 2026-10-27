@@ -44,8 +44,8 @@ interface Subject {
 /** One query per run: the one width it caches makes every other width a miss anyway. */
 function build(log: ApexLog): Subject {
   const categories = new Set<string>(BUCKET_CONSTANTS.CATEGORY_PRIORITY);
-  const frames = buildTimelineFrames(buildLogIndex(log), categories, log.exitStamp);
-  const cache = new RectangleCache(log.children, categories, frames);
+  const frames = buildTimelineFrames(buildLogIndex(log), categories, log.columns.endTimestamp[0]!);
+  const cache = new RectangleCache(frames);
   const rects = [...cache.getRectsByCategory().values()];
 
   return {

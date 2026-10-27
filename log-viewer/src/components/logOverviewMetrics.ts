@@ -70,10 +70,11 @@ export function limitTotals(series: HeatStripTimeSeries): Limits {
     return totals;
   }
   const final = series.events[series.events.length - 1]?.values;
-  totals = {} as Limits;
+  const built = {} as { -readonly [K in keyof Limits]: Limits[K] };
   for (const { key } of GOVERNOR_METRICS) {
-    totals[key] = limitValue(peakUsed(series, key), final?.get(key)?.limit ?? 0);
+    built[key] = limitValue(peakUsed(series, key), final?.get(key)?.limit ?? 0);
   }
+  totals = built;
   totalsCache.set(series, totals);
   return totals;
 }
@@ -90,7 +91,8 @@ export function limitTotals(series: HeatStripTimeSeries): Limits {
 export function rankedLimitMetrics(series: HeatStripTimeSeries, max: number): RankedLimitMetric[] {
   const totals = limitTotals(series);
   return GOVERNOR_METRICS.flatMap<RankedLimitMetric>(({ key, label }) => {
-    const { used, limit } = totals[key];
+    const { used } = totals[key];
+    const limit = totals[key].limit ?? 0;
     return used > 0 ? [{ key, label, used, limit, ratio: sharePercent(used, limit) }] : [];
   })
     .sort((a, b) => b.ratio - a.ratio)

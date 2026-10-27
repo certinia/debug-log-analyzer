@@ -43,11 +43,10 @@ const categories = css`
   }
 `;
 
-type CategoryRow = { category?: string; originalData?: { category?: string } };
+type CategoryRow = { category?: string };
 
 /** The class that colours a row by the category of its event. */
-export function categoryClass(row: CategoryRow): string | undefined {
-  const { category } = row.originalData ?? row;
+export function categoryClass({ category }: CategoryRow): string | undefined {
   const key = category ? CATEGORY_THEME_KEY[category] : undefined;
   return key ? `cat-${key}` : undefined;
 }

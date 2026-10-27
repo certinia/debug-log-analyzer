@@ -30,7 +30,7 @@ const TIMELINE_COLOR_KEYS = [
 ] as const satisfies readonly (keyof TimelineColors)[];
 
 /**
- * Parser `LogEvent.category` → the key a theme stores that category's colour
+ * A `LogCategory` → the key a theme stores that category's colour
  * under. Single source of truth for the category set.
  */
 export const CATEGORY_THEME_KEY: Readonly<Record<string, keyof TimelineColors>> = {

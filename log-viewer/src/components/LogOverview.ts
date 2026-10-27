@@ -44,7 +44,7 @@ export class LogOverview extends LitElement {
   @property({ type: Boolean })
   wholeLog = false;
 
-  private readonly _window = new WindowStatsController(this, () => this.logStore?.log ?? null);
+  private readonly _window = new WindowStatsController(this, () => this.logStore ?? null);
 
   static styles = [
     globalStyles,

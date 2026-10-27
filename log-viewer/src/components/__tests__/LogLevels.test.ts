@@ -4,12 +4,12 @@
  * @jest-environment jsdom
  */
 import { describe, expect, it } from '@jest/globals';
-import type { DebugLevels } from '@apexdevtools/apex-log-parser';
 
 // VsSelect extends vscode-single-select, whose setFormValue needs an
 // ElementInternals jsdom lacks; the render would upgrade it.
 jest.mock('../VsSelect.js', () => ({}));
 
+import type { DebugLevels } from '../../core/log/levelFilter.js';
 import type { LogLevels, LogLevelsChange } from '../LogLevels.js';
 import '../LogLevels.js';
 

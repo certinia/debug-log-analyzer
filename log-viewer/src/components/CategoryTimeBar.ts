@@ -30,7 +30,7 @@ const categorySlices: Derivation<CategoryTime[]> = async (_, store) =>
 @customElement('category-time-bar')
 export class CategoryTimeBar extends LitElement {
   private readonly _palette = new CategoryPaletteController(this);
-  private readonly _window = new WindowStatsController(this, () => this.logStore?.log ?? null);
+  private readonly _window = new WindowStatsController(this, () => this.logStore ?? null);
 
   /** The log on screen, from the app root. */
   @consume({ context: logContext, subscribe: true })

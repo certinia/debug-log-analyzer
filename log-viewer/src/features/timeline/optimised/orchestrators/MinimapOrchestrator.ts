@@ -23,11 +23,14 @@
 import * as PIXI from 'pixi.js';
 
 import { createTimelineApp, destroyTimelineApp } from '../rendering/pixiApp.js';
-import type { TimelineMarker, ViewportState } from '../../types/flamechart.types.js';
+import type {
+  TimelineExtent,
+  TimelineMarker,
+  ViewportState,
+} from '../../types/flamechart.types.js';
 import { TIMELINE_CONSTANTS } from '../../types/flamechart.types.js';
 import type { RectangleCache } from '../RectangleCache.js';
 import type { CursorLineRenderer } from '../rendering/CursorLineRenderer.js';
-import type { TimelineEventIndex } from '../TimelineEventIndex.js';
 import type { TimelineViewport } from '../TimelineViewport.js';
 
 import { MinimapDensityQuery } from '../minimap/MinimapDensityQuery.js';
@@ -144,7 +147,7 @@ export class MinimapOrchestrator {
   private callbacks: MinimapOrchestratorCallbacks;
 
   // References to external dependencies (not owned)
-  private index: TimelineEventIndex | null = null;
+  private index: TimelineExtent | null = null;
   private viewport: TimelineViewport | null = null;
 
   constructor(callbacks: MinimapOrchestratorCallbacks) {
@@ -169,7 +172,7 @@ export class MinimapOrchestrator {
     minimapDiv: HTMLElement,
     width: number,
     height: number,
-    index: TimelineEventIndex,
+    index: TimelineExtent,
     rectangleManager: RectangleCache,
     viewport: TimelineViewport,
     minimapColors?: { widgetBackground: number; focusBorder: number; lineNumberForeground: number },

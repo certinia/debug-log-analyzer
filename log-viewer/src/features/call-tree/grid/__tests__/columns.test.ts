@@ -4,24 +4,22 @@
 /*
  * Copyright (c) 2026 Certinia Inc. All rights reserved.
  */
-import type { ApexLog, LogEvent } from '@apexdevtools/apex-log-parser';
 import { render } from 'lit';
 
-import { storeOf } from '#test-helpers/apexLog.js';
+import { rawStoreOf } from '#test-helpers/apexLog.js';
 import { runCalc as total } from '#test-helpers/calcs.js';
-import { governorLimits, limitValue } from '#test-helpers/limits.js';
 import { NO_REPORTED_LIMITS_TEXT } from '../../../../components/governorCopy.js';
 import { CALL_TREE_VIEWS } from '../../../../components/grid/ColumnViews.js';
+import type { LogStore } from '../../../../core/log/LogStore.js';
 import { formatInteger } from '../../../../core/utility/Util.js';
 import { FIND_TEXT_ATTR, type GridColumn } from '../../../../grid/index.js';
-import { logStoreFor } from '../../../../core/log/LogStore.js';
 import {
   toAggregatedCallTree,
   toBottomUpTree,
   type AggregatedRow,
 } from '../../utils/Aggregation.js';
-import { toTimeOrderTree, type TimeOrderRow } from '../../utils/TimeOrderTree.js';
 import { reportedUsage } from '../../utils/reportedUsage.js';
+import { TimeOrderSource, type TimeOrderNode } from '../../utils/TimeOrderTree.js';
 import { CallTreeGrid, categoryClass } from '../CallTreeGrid.js';
 import { nameCell } from '../cells.js';
 import {
@@ -29,31 +27,51 @@ import {
   BOTTOM_UP_SORT,
   bottomUpColumns,
   mergedLines,
-  TIME_ORDER_DETAILS,
   timeOrderColumns,
-  timeOrderSource,
 } from '../columns.js';
-import { sumDurationTotalForRootEvents } from '../../../analysis/services/CallStackSum.js';
 
-const { log } = storeOf(
-  '09:18:22.6 (1000)|METHOD_ENTRY|[1]|01p|ns.Outer.run()\n' +
-    '09:18:22.6 (2000)|SOQL_EXECUTE_BEGIN|[2]|Aggregations:0|SELECT Id FROM Account\n' +
-    '09:18:22.6 (3000)|SOQL_EXECUTE_END|[2]|Rows:3\n' +
-    '09:18:22.6 (5000)|METHOD_EXIT|[1]|ns.Outer.run()\n',
-);
+const line = (at: number, rest: string): string => `09:18:22.6 (${at})|${rest}\n`;
+
+/** A method that runs one query of 3 rows. */
+const BODY =
+  line(1000, 'METHOD_ENTRY|[1]|01p|ns.Outer.run()') +
+  line(2000, 'SOQL_EXECUTE_BEGIN|[2]|Aggregations:0|SELECT Id FROM Account') +
+  line(3000, 'SOQL_EXECUTE_END|[2]|Rows:3') +
+  line(5000, 'METHOD_EXIT|[1]|ns.Outer.run()');
+
+/** {@link BODY}, then a limit block that names the query limits. */
+const LIMITED_BODY =
+  BODY +
+  line(6000, 'CUMULATIVE_LIMIT_USAGE') +
+  line(6000, 'LIMIT_USAGE_FOR_NS|(default)|') +
+  '  Number of SOQL queries: 1 out of 100\n' +
+  '  Number of query rows: 3 out of 50000\n' +
+  line(6000, 'CUMULATIVE_LIMIT_USAGE_END');
+
 const options = { openType: jest.fn() };
-const timeOrder = timeOrderColumns(log, options);
-const rows = log.children;
 
-/** `event` with one field changed, the rest read through to it. */
-function withField<K extends keyof LogEvent>(
-  event: LogEvent,
-  key: K,
-  value: LogEvent[K],
-): LogEvent {
-  const copy: LogEvent = Object.create(event);
-  Object.defineProperty(copy, key, { value });
-  return copy;
+async function storeOf(body: string): Promise<LogStore> {
+  return (await rawStoreOf(body)).store;
+}
+
+async function sourceOf(store: LogStore): Promise<TimeOrderSource> {
+  return new TimeOrderSource(await store.logIndex());
+}
+
+/** Every node of `source`, in pre-order. */
+function allNodes(source: TimeOrderSource): TimeOrderNode[] {
+  const walk = (nodes: readonly TimeOrderNode[]): TimeOrderNode[] =>
+    nodes.flatMap((node) => [node, ...walk(source.children(node) ?? [])]);
+  return walk(source.roots);
+}
+
+/** The node of the event whose text is `text`. */
+function nodeOf(store: LogStore, source: TimeOrderSource, text: string): TimeOrderNode {
+  const found = allNodes(source).find((node) => store.log.event(source.key(node))?.text === text);
+  if (!found) {
+    throw new Error(`no node for ${text}`);
+  }
+  return found;
 }
 
 const column = <R>(columns: GridColumn<R>[], id: string): GridColumn<R> => {
@@ -64,17 +82,24 @@ const column = <R>(columns: GridColumn<R>[], id: string): GridColumn<R> => {
   return found;
 };
 
-const allRows = (roots: readonly LogEvent[]): LogEvent[] =>
-  roots.flatMap((r) => [r, ...allRows(r.children)]);
-
-const builtRows = (roots: readonly TimeOrderRow[]): TimeOrderRow[] =>
-  roots.flatMap((r) => [r, ...builtRows(r._children ?? [])]);
+const flat = <R extends { _children?: R[] | null }>(roots: readonly R[]): R[] =>
+  roots.flatMap((r) => [r, ...flat(r._children ?? [])]);
 
 const shown = (content: unknown): HTMLElement => {
   const host = document.createElement('div');
   render(content, host);
   return host;
 };
+
+let store: LogStore;
+let source: TimeOrderSource;
+let timeOrder: GridColumn<TimeOrderNode>[];
+
+beforeAll(async () => {
+  store = await storeOf(BODY);
+  source = await sourceOf(store);
+  timeOrder = timeOrderColumns(source, options);
+});
 
 describe('timeOrderColumns', () => {
   it('has the name, namespace, type and time columns, in their order', () => {
@@ -96,53 +121,53 @@ describe('timeOrderColumns', () => {
 
   it('shows an unknown utilisation as a dash, in the cell, the tooltip and the footer', () => {
     const gov = column(timeOrder, 'governorCost');
-    const row = rows[0]!;
+    const row = source.roots[0]!;
     expect(shown(gov.cell(row)).textContent).toBe('—');
     expect(gov.tooltip?.(row)).toBe(NO_REPORTED_LIMITS_TEXT);
     expect(shown(gov.total?.(total(gov.calc, [row]) ?? Number.NaN)).textContent).toBe('—');
   });
 
-  it('writes heap bytes as formatInteger does', () => {
-    const heap = column(timeOrder, 'heapPeak');
-    for (const bytes of [0, 999, 1_572_864.4, -12_000_000]) {
-      expect(heap.text?.(withField(rows[0]!, 'heapPeak', bytes))).toBe(formatInteger(bytes));
-    }
+  it('writes time as milliseconds, which find and copy use', async () => {
+    const timed = await storeOf(
+      line(1000, 'METHOD_ENTRY|[1]|01p|ns.A.run()') + line(1_235_567, 'METHOD_EXIT|[1]|ns.A.run()'),
+    );
+    const timedSource = await sourceOf(timed);
+    const time = column(timeOrderColumns(timedSource, options), 'duration.total');
+
+    expect(time.text?.(timedSource.roots[0]!)).toBe('1.23');
   });
 
-  it('writes time as milliseconds, which find and copy use', () => {
-    const time = column(timeOrder, 'duration.total');
-    const row = withField(rows[0]!, 'duration', { total: 1_234_567, self: 0 });
-    expect(time.text?.(row)).toBe('1.23');
+  it('reads each row from its own event', () => {
+    const outer = nodeOf(store, source, 'ns.Outer.run()');
+    const query = nodeOf(store, source, 'SELECT Id FROM Account');
+    const text = (id: string, node: TimeOrderNode) => column(timeOrder, id).text?.(node);
+
+    expect([text('type', outer), text('type', query)]).toEqual([
+      'METHOD_ENTRY',
+      'SOQL_EXECUTE_BEGIN',
+    ]);
+    expect(text('soqlRowCount.total', outer)).toBe('3');
+    expect(text('soqlCount.self', outer)).toBe('0');
+    expect(text('soqlCount.self', query)).toBe('1');
+    // The query's caller is the method, which states no namespace.
+    expect(text('callerNamespace', query)).toBe('default');
   });
 
-  it('shows on each event what the built Time Order row held', () => {
-    const limited: ApexLog = Object.create(log);
-    Object.defineProperty(limited, 'governorLimits', {
-      value: governorLimits({
-        soqlQueries: limitValue(0, 100),
-        queryRows: limitValue(0, 50_000),
-      }),
-    });
-    const columns = timeOrderColumns(limited, options);
-    const built = builtRows(toTimeOrderTree(log.children, limited.governorLimits) ?? []);
-    const events = allRows(rows);
-    expect(events.map((e) => e.eventIndex)).toEqual(built.map((r) => r.id));
-    const held: Record<string, (r: TimeOrderRow) => string | number | null> = {
-      callerNamespace: (r) => r.callerNamespace,
-      type: (r) => r.type,
-      governorCost: (r) => r.governorCost?.toFixed(0) ?? null,
-      governorCostMax: (r) => r.governorCostMax?.toFixed(0) ?? null,
-    };
-    for (const [id, value] of Object.entries(held)) {
-      const { text } = column(columns, id);
-      expect(events.map((e) => text?.(e))).toEqual(built.map((r) => String(value(r) ?? '—')));
-    }
-    expect(built.some((r) => (r.governorCost ?? 0) > 0)).toBe(true);
+  // SOQL 1/100 is 1%, query rows 3/50,000 near 0%: the average rounds to 1, as does the peak.
+  it('measures each row against the limits the log reported', async () => {
+    const limited = await storeOf(LIMITED_BODY);
+    const limitedSource = await sourceOf(limited);
+    const columns = timeOrderColumns(limitedSource, options);
+    const outer = nodeOf(limited, limitedSource, 'ns.Outer.run()');
+
+    expect(column(columns, 'governorCost').text?.(outer)).toBe('1');
+    expect(column(columns, 'governorCostMax').text?.(outer)).toBe('1');
   });
 });
 
 describe('CALL_TREE_VIEWS', () => {
   it('names only columns a call-tree grid has, so no view loses a column to a rename', () => {
+    const { log } = store;
     const ids = new Set(
       [timeOrder, aggregatedColumns(log, options), bottomUpColumns(log, options)].flatMap(
         (columns) => columns.map((c) => c.id),
@@ -154,73 +179,87 @@ describe('CALL_TREE_VIEWS', () => {
   });
 });
 
-describe('timeOrderSource', () => {
-  it('reads the tree from the events, keyed by event index', () => {
-    const source = timeOrderSource(log);
-    const outer = rows[0]!;
-    expect(source.roots).toBe(log.children);
-    expect(source.children?.(outer)).toBe(outer.children);
-    expect(source.key(outer)).toBe(outer.eventIndex);
+describe('TimeOrderSource', () => {
+  it('reads the tree from the index, keyed by event id', () => {
+    const [outer] = source.roots;
+    const children = source.children(outer!);
+
+    expect(source.roots).toHaveLength(1);
+    expect(store.log.event(source.key(outer!))?.text).toBe('ns.Outer.run()');
+    expect(children?.map((child) => store.log.event(source.key(child))?.type)).toEqual([
+      'SOQL_EXECUTE_BEGIN',
+    ]);
   });
 
-  it('shows the details the built rows marked, keeping the parents of a detail', () => {
-    const built = builtRows(toTimeOrderTree(log.children, log.governorLimits) ?? []);
-    const deep = (e: LogEvent): boolean =>
-      TIME_ORDER_DETAILS.test(e) || e.children.some((c) => deep(c));
-    expect(TIME_ORDER_DETAILS.keepAncestors).toBe(true);
-    expect(allRows(rows).map(deep)).toEqual(built.map((r) => r._hasDetailsDeep));
+  // The grid holds its work per row object, so a new array on each ask would lose it.
+  it('hands back the same child nodes each time it is asked', () => {
+    const [outer] = source.roots;
+
+    expect(source.children(outer!)).toBe(source.children(outer!));
+  });
+
+  it('shows frames, timed events and exceptions as details, and not a bare leaf', async () => {
+    const detailed = await storeOf(
+      line(1000, 'METHOD_ENTRY|[1]|01p|ns.A.run()') +
+        line(1100, 'STATEMENT_EXECUTE|[2]') +
+        line(1200, 'EXCEPTION_THROWN|[3]|System.NullPointerException: boom') +
+        line(2000, 'METHOD_EXIT|[1]|ns.A.run()'),
+    );
+    const detailedSource = await sourceOf(detailed);
+    const typeOf = (node: TimeOrderNode) => detailed.log.event(detailedSource.key(node))?.type;
+
+    expect(detailedSource.details.keepAncestors).toBe(true);
+    expect(
+      allNodes(detailedSource).map((node) => [typeOf(node), detailedSource.details.test(node)]),
+    ).toEqual([
+      ['METHOD_ENTRY', true],
+      ['STATEMENT_EXECUTE', false],
+      ['EXCEPTION_THROWN', true],
+    ]);
   });
 });
 
 describe('nameCell', () => {
-  const named = (text: string): LogEvent | undefined => allRows(rows).find((r) => r.text === text);
-  const outer = named('ns.Outer.run()');
-  const query = named('SELECT Id FROM Account');
-
   it('opens the type of a method from its link', () => {
-    const cell = shown(nameCell(outer, '', options.openType));
+    const id = source.key(nodeOf(store, source, 'ns.Outer.run()'));
+    const cell = shown(nameCell(store.log, id, '', options.openType));
     cell.querySelector('a')?.click();
     expect(options.openType).toHaveBeenCalledWith('ns.Outer.run()');
   });
 
   it('shows a query as highlighted SOQL', () => {
-    const cell = shown(nameCell(query, '', options.openType));
+    const id = source.key(nodeOf(store, source, 'SELECT Id FROM Account'));
+    const cell = shown(nameCell(store.log, id, '', options.openType));
     expect(cell.querySelector('.soql-block')?.textContent).toContain('SELECT');
   });
 });
 
 describe('bottomUpColumns', () => {
-  const columns = bottomUpColumns(log, options);
-  const roots = toBottomUpTree(log.children, logStoreFor(log).keyPathIds(), log.governorLimits);
+  it('counts each call once in the total time footer', async () => {
+    const columns = bottomUpColumns(store.log, options);
+    const roots = toBottomUpTree(await store.logIndex(), store);
 
-  it('counts each call once in the total time footer', () => {
-    expect(total(column(columns, 'totalTime').calc, roots)).toBe(
-      sumDurationTotalForRootEvents(roots.map((r) => r.instances)),
-    );
+    // The method's 4,000 ns holds the query's 1,000.
+    expect(total(column(columns, 'totalTime').calc, roots)).toBe(4000);
   });
 
-  it('counts each query and its rows once in the footer, though the method and query rows both hold them', () => {
+  it('counts each query and its rows once in the footer, though the method and query rows both hold them', async () => {
+    const columns = bottomUpColumns(store.log, options);
+    const roots = toBottomUpTree(await store.logIndex(), store);
+
     // One query of 3 rows, inside ns.Outer.run(): both are top-level Bottom-Up rows.
     expect(total(column(columns, 'soqlCount.total').calc, roots)).toBe(1);
     expect(total(column(columns, 'soqlRowCount.total').calc, roots)).toBe(3);
   });
 
   it('opens sorted by a column it has', () => {
-    expect(column(columns, BOTTOM_UP_SORT.column).sort).toBeDefined();
+    expect(column(bottomUpColumns(store.log, options), BOTTOM_UP_SORT.column).sort).toBeDefined();
   });
 });
 
 describe('aggregatedColumns', () => {
-  const columns = aggregatedColumns(log, options);
-  const roots = toAggregatedCallTree(
-    log.children,
-    logStoreFor(log).keyPathIds(),
-    log.governorLimits,
-  );
-  const all = (of: readonly AggregatedRow[]): AggregatedRow[] =>
-    of.flatMap((r) => [r, ...all(r._children ?? [])]);
-
   it('has its columns in order, with Type and Avg Self Time hidden', () => {
+    const columns = aggregatedColumns(store.log, options);
     const ids = columns.map((c) => c.id);
     expect(ids.slice(0, 5)).toEqual(['text', 'namespace', 'callerNamespace', 'type', 'callCount']);
     expect(ids.slice(-3)).toEqual(['totalTime', 'totalSelfTime', 'avgSelfTime']);
@@ -228,30 +267,40 @@ describe('aggregatedColumns', () => {
     expect(column(columns, 'avgSelfTime').hidden).toBe(true);
   });
 
-  it('sums total time over top-level rows, and self time over every row', () => {
-    expect(total(column(columns, 'totalTime').calc, roots)).toBe(
-      roots.reduce((sum, r) => sum + r.totalTime, 0),
-    );
+  it('sums total time over top-level rows, and self time over every row', async () => {
+    const columns = aggregatedColumns(store.log, options);
+    const roots = toAggregatedCallTree(await store.logIndex(), store);
+
+    expect(total(column(columns, 'totalTime').calc, roots)).toBe(4000);
     expect(column(columns, 'totalSelfTime').calc?.scope).toBe('all');
-    expect(total(column(columns, 'totalSelfTime').calc, all(roots))).toBe(
-      all(roots).reduce((sum, r) => sum + r.totalSelfTime, 0),
-    );
+    expect(total(column(columns, 'totalSelfTime').calc, flat(roots))).toBe(4000);
+  });
+
+  it('writes heap bytes as formatInteger does', () => {
+    const heap = column(aggregatedColumns(store.log, options), 'heapPeak');
+    for (const bytes of [0, 999, 1_572_864.4, -12_000_000]) {
+      expect(heap.text?.({ heapPeak: bytes } as AggregatedRow)).toBe(formatInteger(bytes));
+    }
   });
 });
 
 describe('mergedLines', () => {
-  it('counts the lines of the text and suffix of the row event', () => {
-    const event = rows[0]!;
-    expect(mergedLines({ originalData: event })).toBe(1);
-    expect(mergedLines({ originalData: withField(event, 'text', 'a\nb\nc') })).toBe(3);
-    expect(
-      mergedLines({
-        originalData: withField(withField(event, 'text', 'a\nb'), 'suffix', ' (x)\ny'),
-      }),
-    ).toBe(3);
-    expect(
-      mergedLines({ originalData: withField(event, 'suffix', null as unknown as string) }),
-    ).toBe(1);
+  it('counts the lines of the text of the row event', async () => {
+    const debug = await storeOf(
+      line(1000, 'METHOD_ENTRY|[1]|01p|ns.A.run()') +
+        line(1100, 'USER_DEBUG|[2]|DEBUG|a') +
+        'b\nc\n' +
+        line(2000, 'METHOD_EXIT|[1]|ns.A.run()'),
+    );
+    const lines = mergedLines(debug.log);
+
+    expect(lines({ eventIndex: 1 })).toBe(1);
+    expect(lines({ eventIndex: 2 })).toBe(3);
+  });
+
+  // A grid redraws when it gets a new function, so a render that asks again must not.
+  it('hands back one function per log', () => {
+    expect(mergedLines(store.log)).toBe(mergedLines(store.log));
   });
 });
 
@@ -261,9 +310,9 @@ describe('copy', () => {
   it('copies the shown columns and every row, with a query as the log has it', async () => {
     const writeText = jest.fn<Promise<void>, [string]>().mockResolvedValue(undefined);
     Object.defineProperty(navigator, 'clipboard', { value: { writeText }, configurable: true });
-    const roots = toAggregatedCallTree(log.children, logStoreFor(log).keyPathIds());
+    const roots = toAggregatedCallTree(await store.logIndex(), store);
     const grid = new CallTreeGrid<AggregatedRow>();
-    grid.columns = aggregatedColumns(log, options);
+    grid.columns = aggregatedColumns(store.log, options);
     grid.source = { roots, children: (r) => r._children ?? undefined, key: (r) => r.id };
     document.body.append(grid);
     await grid.updateComplete;
@@ -273,19 +322,12 @@ describe('copy', () => {
 
     const [head, ...rows] = writeText.mock.calls[0]?.[0].split('\n') ?? [];
     expect(head).toMatch(/^Level\tName\tNamespace\tCalls\tDML\t/);
-    expect(rows).toHaveLength(4);
+    expect(rows).toHaveLength(2);
     expect(rows.map((r) => r.split('\t')[1])).toContain('SELECT Id FROM Account');
   });
 });
 
 describe('find text', () => {
-  const limited: ApexLog = Object.create(log);
-  Object.defineProperty(limited, 'governorLimits', {
-    value: governorLimits({ soqlQueries: limitValue(0, 100), queryRows: limitValue(0, 50_000) }),
-  });
-  const pathIds = logStoreFor(log).keyPathIds();
-  const flat = <R extends { _children?: R[] | null }>(roots: readonly R[]): R[] =>
-    roots.flatMap((r) => [r, ...flat(r._children ?? [])]);
   /** What the highlighter searches in a painted cell: its marked find text, or all of it. */
   const searched = (content: unknown): string | null => {
     const cell = shown(content);
@@ -298,29 +340,30 @@ describe('find text', () => {
     expect(painted).toEqual(counted);
   };
 
-  it('is what each searched Time Order cell shows', () => {
-    check(timeOrderColumns(limited, options), allRows(rows));
+  it('is what each searched Time Order cell shows', async () => {
+    const limited = await storeOf(LIMITED_BODY);
+    const limitedSource = await sourceOf(limited);
+    check(timeOrderColumns(limitedSource, options), allNodes(limitedSource));
   });
 
-  it('is what each searched Aggregated cell shows', () => {
-    const roots = toAggregatedCallTree(log.children, pathIds, limited.governorLimits);
-    check(aggregatedColumns(limited, options), flat(roots));
+  it('is what each searched Aggregated cell shows', async () => {
+    const limited = await storeOf(LIMITED_BODY);
+    const roots = toAggregatedCallTree(await limited.logIndex(), limited);
+    check(aggregatedColumns(limited.log, options), flat(roots));
   });
 
-  it('is what each searched Bottom-Up cell shows', () => {
-    const roots = toBottomUpTree(log.children, pathIds, limited.governorLimits);
-    check(bottomUpColumns(limited, options), flat(roots));
+  it('is what each searched Bottom-Up cell shows', async () => {
+    const limited = await storeOf(LIMITED_BODY);
+    const roots = toBottomUpTree(await limited.logIndex(), limited);
+    check(bottomUpColumns(limited.log, options), flat(roots));
   });
 });
 
 describe('export text', () => {
-  const columns = aggregatedColumns(log, options);
-
-  it('writes a query as the log has it, where the cell shows it formatted', () => {
-    const all = (of: readonly AggregatedRow[]): AggregatedRow[] =>
-      of.flatMap((r) => [r, ...all(r._children ?? [])]);
-    const roots = toAggregatedCallTree(log.children, logStoreFor(log).keyPathIds());
-    const query = all(roots).find((r) => r.originalData.type === 'SOQL_EXECUTE_BEGIN');
+  it('writes a query as the log has it, where the cell shows it formatted', async () => {
+    const columns = aggregatedColumns(store.log, options);
+    const roots = toAggregatedCallTree(await store.logIndex(), store);
+    const query = flat(roots).find((r) => r.type === 'SOQL_EXECUTE_BEGIN');
     const name = columns.find((c) => c.id === 'text');
     if (!query || !name) {
       throw new Error('no query row or Name column');
@@ -330,7 +373,7 @@ describe('export text', () => {
   });
 
   it('writes a governor percentage in full, where the cell shows it rounded', () => {
-    const cost = columns.find((c) => c.id === 'governorCost');
+    const cost = aggregatedColumns(store.log, options).find((c) => c.id === 'governorCost');
     const row = { governorCost: 33.375 } as unknown as AggregatedRow;
     expect(cost?.exportText?.(row)).toBe('33.375');
     expect(cost?.text?.(row)).toBe('33');
@@ -339,39 +382,53 @@ describe('export text', () => {
 
 describe('lv-call-tree-grid', () => {
   it('colours a row by the category of its event, and leaves others plain', () => {
-    expect(categoryClass({ originalData: { category: 'SOQL' } })).toBe('cat-soql');
-    expect(categoryClass({ originalData: { category: 'Code Unit' } })).toBe('cat-codeUnit');
-    expect(categoryClass({ originalData: { category: 'Unknown' } })).toBeUndefined();
-    expect(categoryClass({})).toBeUndefined();
     expect(categoryClass({ category: 'SOQL' })).toBe('cat-soql');
+    expect(categoryClass({ category: 'Code Unit' })).toBe('cat-codeUnit');
+    expect(categoryClass({ category: 'Unknown' })).toBeUndefined();
+    expect(categoryClass({})).toBeUndefined();
     expect(document.createElement('lv-call-tree-grid').rowClass).toBe(categoryClass);
+  });
+
+  it('gives a Time Order row the category of its event', () => {
+    const query = nodeOf(store, source, 'SELECT Id FROM Account');
+
+    expect(source.category(query)).toBe('SOQL');
   });
 });
 
 describe('Reported columns', () => {
   // The cumulative block says 5 queries ran by then; the method's events show 1.
-  const { log: reportedLog, store } = storeOf(
-    '09:18:22.6 (1000)|METHOD_ENTRY|[1]|01p|Outer.run()\n' +
-      '09:18:22.6 (2000)|SOQL_EXECUTE_BEGIN|[2]|Aggregations:0|SELECT Id FROM Account\n' +
-      '09:18:22.6 (3000)|SOQL_EXECUTE_END|[2]|Rows:3\n' +
-      '09:18:22.6 (4000)|CUMULATIVE_LIMIT_USAGE\n' +
-      '09:18:22.6 (4000)|LIMIT_USAGE_FOR_NS|(default)|\n' +
-      '  Number of SOQL queries: 5 out of 100\n' +
-      '09:18:22.6 (4000)|CUMULATIVE_LIMIT_USAGE_END\n' +
-      '09:18:22.6 (5000)|METHOD_EXIT|[1]|Outer.run()\n',
-  );
-  const outer = (): LogEvent => {
-    const found = allRows(reportedLog.children).find((e) => e.text === 'Outer.run()');
-    if (!found) {
-      throw new Error('no Outer.run()');
-    }
-    return found;
-  };
+  const REPORTED_BODY =
+    line(1000, 'METHOD_ENTRY|[1]|01p|Outer.run()') +
+    line(2000, 'SOQL_EXECUTE_BEGIN|[2]|Aggregations:0|SELECT Id FROM Account') +
+    line(3000, 'SOQL_EXECUTE_END|[2]|Rows:3') +
+    line(4000, 'CUMULATIVE_LIMIT_USAGE') +
+    line(4000, 'LIMIT_USAGE_FOR_NS|(default)|') +
+    '  Number of SOQL queries: 5 out of 100\n' +
+    line(4000, 'CUMULATIVE_LIMIT_USAGE_END') +
+    line(5000, 'METHOD_EXIT|[1]|Outer.run()');
+
+  let reportedStore: LogStore;
+  let reportedSource: TimeOrderSource;
+  const outer = (): TimeOrderNode => nodeOf(reportedStore, reportedSource, 'Outer.run()');
+  const usedColumn = async (): Promise<GridColumn<TimeOrderNode>> =>
+    column(
+      timeOrderColumns(reportedSource, {
+        ...options,
+        reported: await reportedStore.derive(reportedUsage),
+      }),
+      'soqlCount.reported',
+    );
+
+  beforeAll(async () => {
+    reportedStore = await storeOf(REPORTED_BODY);
+    reportedSource = await sourceOf(reportedStore);
+  });
 
   it('sits after its Seen column, hidden until a view or the user shows it', async () => {
-    const columns = timeOrderColumns(reportedLog, {
+    const columns = timeOrderColumns(reportedSource, {
       ...options,
-      reported: await store.derive(reportedUsage),
+      reported: await reportedStore.derive(reportedUsage),
     });
     const ids = columns.map((c) => c.id);
 
@@ -380,10 +437,7 @@ describe('Reported columns', () => {
   });
 
   it('tints a row where Salesforce reported a different count, and states both', async () => {
-    const reported = column(
-      timeOrderColumns(reportedLog, { ...options, reported: await store.derive(reportedUsage) }),
-      'soqlCount.reported',
-    );
+    const reported = await usedColumn();
 
     expect(reported.text?.(outer())).toBe('5');
     expect(reported.tooltip?.(outer())).toBe('Used 5 · Seen 1');
@@ -392,41 +446,41 @@ describe('Reported columns', () => {
 
   it('keeps two alike queries alike, and puts the correction on the row that holds the report', async () => {
     // Two queries seen, then Salesforce reports it charged one.
-    const { log, store: twoStore } = storeOf(
-      '09:18:22.6 (1000)|METHOD_ENTRY|[1]|01p|Outer.run()\n' +
-        '09:18:22.6 (2000)|SOQL_EXECUTE_BEGIN|[2]|Aggregations:0|SELECT Id FROM Plugin__mdt\n' +
-        '09:18:22.6 (3000)|SOQL_EXECUTE_END|[2]|Rows:1\n' +
-        '09:18:22.6 (4000)|SOQL_EXECUTE_BEGIN|[3]|Aggregations:0|SELECT Id FROM Plugin__mdt\n' +
-        '09:18:22.6 (5000)|SOQL_EXECUTE_END|[3]|Rows:1\n' +
-        '09:18:22.6 (6000)|CUMULATIVE_LIMIT_USAGE\n' +
-        '09:18:22.6 (6000)|LIMIT_USAGE_FOR_NS|(default)|\n' +
+    const twoStore = await storeOf(
+      line(1000, 'METHOD_ENTRY|[1]|01p|Outer.run()') +
+        line(2000, 'SOQL_EXECUTE_BEGIN|[2]|Aggregations:0|SELECT Id FROM Plugin__mdt') +
+        line(3000, 'SOQL_EXECUTE_END|[2]|Rows:1') +
+        line(4000, 'SOQL_EXECUTE_BEGIN|[3]|Aggregations:0|SELECT Id FROM Plugin__mdt') +
+        line(5000, 'SOQL_EXECUTE_END|[3]|Rows:1') +
+        line(6000, 'CUMULATIVE_LIMIT_USAGE') +
+        line(6000, 'LIMIT_USAGE_FOR_NS|(default)|') +
         '  Number of SOQL queries: 1 out of 100\n' +
-        '09:18:22.6 (6000)|CUMULATIVE_LIMIT_USAGE_END\n' +
-        '09:18:22.6 (7000)|METHOD_EXIT|[1]|Outer.run()\n',
+        line(6000, 'CUMULATIVE_LIMIT_USAGE_END') +
+        line(7000, 'METHOD_EXIT|[1]|Outer.run()'),
     );
+    const twoSource = await sourceOf(twoStore);
     const reported = column(
-      timeOrderColumns(log, { ...options, reported: await twoStore.derive(reportedUsage) }),
+      timeOrderColumns(twoSource, { ...options, reported: await twoStore.derive(reportedUsage) }),
       'soqlCount.reported',
     );
-    const rows = allRows(log.children);
-    const queries = rows.filter((e) => e.type === 'SOQL_EXECUTE_BEGIN');
-    const method = rows.find((e) => e.text === 'Outer.run()');
+    const typeOf = (node: TimeOrderNode) => twoStore.log.event(twoSource.key(node))?.type;
+    const queries = allNodes(twoSource).filter((node) => typeOf(node) === 'SOQL_EXECUTE_BEGIN');
+    const method = nodeOf(twoStore, twoSource, 'Outer.run()');
 
-    expect(queries.map((e) => reported.text?.(e))).toEqual(['1', '1']);
-    expect(method && reported.text?.(method)).toBe('1');
+    expect(queries.map((node) => reported.text?.(node))).toEqual(['1', '1']);
+    expect(reported.text?.(method)).toBe('1');
     // Used equals Seen on each query, so neither is tinted.
-    expect(queries.map((e) => shown(reported.cell(e)).querySelector('.reported-differs'))).toEqual([
-      null,
-      null,
-    ]);
+    expect(
+      queries.map((node) => shown(reported.cell(node)).querySelector('.reported-differs')),
+    ).toEqual([null, null]);
   });
 
   it('reads Used from a Bottom-Up row, which holds its own sum', async () => {
-    const usage = await store.derive(reportedUsage);
-    const roots = toBottomUpTree(reportedLog.children, store.keyPathIds(), undefined, usage);
+    const usage = await reportedStore.derive(reportedUsage);
+    const roots = toBottomUpTree(await reportedStore.logIndex(), reportedStore, usage);
     const row = roots.find((r) => r.text === 'Outer.run()');
     const reported = column(
-      bottomUpColumns(reportedLog, { ...options, reported: usage }),
+      bottomUpColumns(reportedStore.log, { ...options, reported: usage }),
       'soqlCount.reported',
     );
 
@@ -434,10 +488,10 @@ describe('Reported columns', () => {
   });
 
   it('counts the usage once in the Bottom-Up footer, though nested rows hold it too', async () => {
-    const usage = await store.derive(reportedUsage);
-    const roots = toBottomUpTree(reportedLog.children, store.keyPathIds(), undefined, usage);
+    const usage = await reportedStore.derive(reportedUsage);
+    const roots = toBottomUpTree(await reportedStore.logIndex(), reportedStore, usage);
     const reported = column(
-      bottomUpColumns(reportedLog, { ...options, reported: usage }),
+      bottomUpColumns(reportedStore.log, { ...options, reported: usage }),
       'soqlCount.reported',
     );
 
@@ -446,20 +500,19 @@ describe('Reported columns', () => {
   });
 
   it('gives the lines that report a limit none of it: the method around them used it', async () => {
-    const reported = column(
-      timeOrderColumns(reportedLog, { ...options, reported: await store.derive(reportedUsage) }),
-      'soqlCount.reported',
-    );
-    const reporters = allRows(reportedLog.children).filter((e) =>
-      ['CUMULATIVE_LIMIT_USAGE', 'LIMIT_USAGE_FOR_NS'].includes(e.type ?? ''),
+    const reported = await usedColumn();
+    const typeOf = (node: TimeOrderNode) =>
+      reportedStore.log.event(reportedSource.key(node))?.type ?? '';
+    const reporters = allNodes(reportedSource).filter((node) =>
+      ['CUMULATIVE_LIMIT_USAGE', 'LIMIT_USAGE_FOR_NS'].includes(typeOf(node)),
     );
 
     expect(reporters).not.toHaveLength(0);
-    expect(reporters.map((e) => reported.text?.(e))).toEqual(reporters.map(() => '0'));
+    expect(reporters.map((node) => reported.text?.(node))).toEqual(reporters.map(() => '0'));
   });
 
   it('shows — where the log reported no usage', () => {
-    const reported = column(timeOrderColumns(reportedLog, options), 'soqlCount.reported');
+    const reported = column(timeOrderColumns(reportedSource, options), 'soqlCount.reported');
 
     expect(reported.text?.(outer())).toBe('—');
     expect(shown(reported.cell(outer())).querySelector('.reported-differs')).toBeNull();

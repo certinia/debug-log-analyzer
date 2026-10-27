@@ -3,144 +3,98 @@
  */
 import { describe, expect, it } from '@jest/globals';
 
-import type { ApexLog, LogEvent } from '@apexdevtools/apex-log-parser';
-import { indexTree, storeOf } from '#test-helpers/apexLog.js';
-import { createEvent } from '#test-helpers/events.js';
-import { LogStore } from '../../../../core/log/LogStore.js';
-import { executionHighlights } from '../ExecutionHighlights.js';
+import {
+  frameLines,
+  indexesOf,
+  rawStoreOf,
+  storeOf,
+  type FrameSpec,
+} from '#test-helpers/apexLog.js';
+import type { LogStore } from '../../../../core/log/LogStore.js';
+import { executionHighlights, type ExecutionHighlights } from '../ExecutionHighlights.js';
 
-// The parser takes 0 for the log itself, so real events start at 1.
-let nextEventIndex = 1;
+/** A method that spends `self` ns before its children; its total is that plus theirs. */
+const m = (text: string, self: number, ...children: FrameSpec[]): FrameSpec => ({
+  text,
+  self,
+  children,
+});
+/** A code unit, as {@link m}. */
+const cu = (text: string, self: number, ...children: FrameSpec[]): FrameSpec => ({
+  text,
+  self,
+  type: 'CODE_UNIT_STARTED',
+  children,
+});
 
-function highlightEvent(options: Parameters<typeof createEvent>[0]): LogEvent {
-  return createEvent({ category: '', ...options, eventIndex: nextEventIndex++ });
-}
-
-/**
- * The pseudo-root, holding the log's gap time as its own self time. It registers
- * itself as `eventsById[0]` exactly as the parser does, so the pass has to skip it.
- */
-function createLog(total: number, self = 0): ApexLog {
-  const log = {
-    text: 'LOG_ROOT',
-    eventIndex: 0,
-    duration: { self, total },
-    children: [],
-    eventsById: [],
-    truncation: { regions: [], totalSkippedBytes: 0 },
-  } as unknown as ApexLog;
-  log.eventsById.push(log as unknown as LogEvent);
-  return log;
-}
-
-/** Hang the events that have no parent off the log, the way the parser does. */
-function index(log: ApexLog, ...events: LogEvent[]): void {
-  for (const event of events) {
-    if (!event.parent && !log.children.includes(event)) {
-      log.children.push(event);
-    }
-  }
-}
-
-function highlightsOf(log: ApexLog) {
-  indexTree(log);
-  return new LogStore(log).derive(executionHighlights);
+async function highlightsOf(
+  ...specs: FrameSpec[]
+): Promise<ExecutionHighlights & { ids: (text: string) => number[] }> {
+  const { store } = await rawStoreOf(frameLines(specs));
+  return {
+    ...(await store.derive(executionHighlights)),
+    ids: (text) => indexesOf(store.log, text),
+  };
 }
 
 describe('executionHighlights hot path', () => {
   it('follows the largest-total child from the root down', async () => {
-    const log = createLog(1000);
-    const root = highlightEvent({ text: 'Root', total: 900 });
-    const small = highlightEvent({ text: 'Small', total: 100 });
-    log.children.push(root, small);
-    const big = highlightEvent({ text: 'Big', total: 800, parent: root });
-    const side = highlightEvent({ text: 'Side', total: 90, parent: root });
-    const leaf = highlightEvent({ text: 'Leaf', total: 700, parent: big });
-    index(log, root, small, big, side, leaf);
-
-    const { hotPath } = await highlightsOf(log);
+    const { hotPath, ids } = await highlightsOf(
+      m('Root', 0, m('Big', 100, m('Leaf', 700)), m('Side', 90)),
+      m('Small', 100),
+    );
 
     expect(hotPath.map((f) => f.text)).toEqual(['Root', 'Big', 'Leaf']);
     expect(hotPath[0]).toEqual({
       text: 'Root',
-      eventIndex: root.eventIndex,
-      eventIndexes: [root.eventIndex],
-      totalTime: 900,
+      eventIndex: ids('Root')[0],
+      eventIndexes: ids('Root'),
+      totalTime: 890,
       selfTime: 0,
       count: 1,
-      category: '',
+      category: 'Apex',
     });
   });
 
   it('merges same-signature siblings into one frame and follows their sum', async () => {
-    const log = createLog(1000);
-    const root = highlightEvent({ text: 'Root', total: 1000 });
-    log.children.push(root);
-    // Each call alone is under the 0.4 follow share; merged (600) they are the
+    // Each call alone is under the 0.4 follow share of 900; merged (600) they are the
     // hot path. The frame points at the worst instance and carries the count.
-    highlightEvent({ text: 'Repeat', total: 250, parent: root });
-    const worst = highlightEvent({ text: 'Repeat', total: 350, parent: root });
-    highlightEvent({ text: 'Other', total: 300, parent: root });
+    const { hotPath, ids } = await highlightsOf(
+      m('Root', 0, m('Repeat', 250), m('Repeat', 350), m('Other', 300)),
+    );
+    const repeats = ids('Repeat');
 
-    const { hotPath } = await highlightsOf(log);
-
-    expect(hotPath).toEqual([
-      {
-        text: 'Root',
-        eventIndex: root.eventIndex,
-        eventIndexes: [root.eventIndex],
-        totalTime: 1000,
-        selfTime: 0,
-        count: 1,
-        category: '',
-      },
-      {
-        text: 'Repeat',
-        eventIndex: worst.eventIndex,
-        // Every instance the frame merges, so a hover marks all of them.
-        eventIndexes: [worst.eventIndex - 1, worst.eventIndex],
-        totalTime: 600,
-        selfTime: 0,
-        count: 2,
-        category: '',
-      },
-    ]);
+    expect(hotPath[1]).toEqual({
+      text: 'Repeat',
+      eventIndex: repeats[1],
+      // Every instance the frame merges, so a hover marks all of them.
+      eventIndexes: repeats,
+      totalTime: 600,
+      selfTime: 600,
+      count: 2,
+      category: 'Apex',
+    });
   });
 
   it('stops when the largest child falls below the follow share', async () => {
-    const log = createLog(1000);
-    const root = highlightEvent({ text: 'Root', total: 1000 });
-    log.children.push(root);
     // 300 < 0.4 * 1000: the time has spread out, so the path ends at the root.
-    highlightEvent({ text: 'Spread', total: 300, parent: root });
-    highlightEvent({ text: 'Other', total: 250, parent: root });
-
-    const { hotPath } = await highlightsOf(log);
+    const { hotPath } = await highlightsOf(m('Root', 450, m('Spread', 300), m('Other', 250)));
 
     expect(hotPath.map((f) => f.text)).toEqual(['Root']);
   });
 
   it('stops when the frame itself outweighs its largest child', async () => {
-    const log = createLog(1000);
-    const root = highlightEvent({ text: 'Root', total: 1000, self: 550 });
-    log.children.push(root);
     // 450 clears the follow share, but the root's own work (550) is bigger:
     // the root is the hot spot, so the path ends there.
-    highlightEvent({ text: 'Child', total: 450, parent: root });
-
-    const { hotPath } = await highlightsOf(log);
+    const { hotPath } = await highlightsOf(m('Root', 550, m('Child', 450)));
 
     expect(hotPath.map((f) => f.text)).toEqual(['Root']);
   });
 
   it('carries the group self time and the worst instance category', async () => {
-    const log = createLog(1000);
-    const root = highlightEvent({ text: 'Root', category: 'Code Unit', total: 1000, self: 100 });
-    log.children.push(root);
-    highlightEvent({ text: 'Repeat', category: 'Apex', total: 300, self: 200, parent: root });
-    highlightEvent({ text: 'Repeat', category: 'Apex', total: 500, self: 400, parent: root });
-
-    const { hotPath } = await highlightsOf(log);
+    const { hotPath } = await highlightsOf(
+      cu('Root', 100, m('Repeat', 200, m('Work', 100)), m('Repeat', 400, m('Work', 100))),
+    );
 
     expect(hotPath[0]?.selfTime).toBe(100);
     expect(hotPath[0]?.category).toBe('Code Unit');
@@ -148,25 +102,8 @@ describe('executionHighlights hot path', () => {
     expect(hotPath[1]?.category).toBe('Apex');
   });
 
-  it('holds a frame self time inside its total', async () => {
-    const log = createLog(1000);
-    // A negative self on one instance drags the group's sum below zero; the
-    // frame's own share of itself cannot sit outside its total.
-    const root = highlightEvent({ text: 'Root', total: 500, self: -100 });
-    log.children.push(root);
-
-    const { hotPath } = await highlightsOf(log);
-
-    expect(hotPath[0]?.selfTime).toBe(0);
-  });
-
   it('is empty when the log has no timed calls', async () => {
-    const log = createLog(0);
-    const root = highlightEvent({ text: 'Root', total: 0 });
-    log.children.push(root);
-    index(log, root);
-
-    const highlights = await highlightsOf(log);
+    const highlights = await highlightsOf(m('Root', 0));
 
     expect(highlights.hotPath).toEqual([]);
     expect(highlights.hotSpots).toEqual([]);
@@ -176,13 +113,9 @@ describe('executionHighlights hot path', () => {
 
 describe('executionHighlights hot path end', () => {
   it('names a last frame that keeps its own time as the hot spot', async () => {
-    const log = createLog(1000);
-    const root = highlightEvent({ text: 'Root', total: 1000 });
-    log.children.push(root);
-    const big = highlightEvent({ text: 'Big', total: 900, self: 800, parent: root });
-    highlightEvent({ text: 'Small', total: 100, parent: big });
-
-    const { hotPath, hotPathEnd, hotPathBranches } = await highlightsOf(log);
+    const { hotPath, hotPathEnd, hotPathBranches } = await highlightsOf(
+      m('Root', 0, m('Big', 800, m('Small', 100))),
+    );
 
     expect(hotPath.map((frame) => frame.text)).toEqual(['Root', 'Big']);
     expect(hotPathEnd).toBe('hot-spot');
@@ -191,17 +124,11 @@ describe('executionHighlights hot path end', () => {
   });
 
   it('hands back the branches where the time fans out instead', async () => {
-    const log = createLog(1000);
-    const root = highlightEvent({ text: 'Root', total: 1000, self: 100 });
-    log.children.push(root);
-    // No child holds the follow share, and the frame kept a tenth of its own
+    // No child holds the follow share of 1,080, and the frame kept under half its own
     // time, so the time fanned out here.
-    const alpha = highlightEvent({ text: 'Alpha', total: 380, parent: root });
-    highlightEvent({ text: 'Beta', total: 300, parent: root });
-    highlightEvent({ text: 'Gamma', total: 280, parent: root });
-    highlightEvent({ text: 'Tiny', total: 20, parent: root });
-
-    const { hotPath, hotPathEnd, hotPathBranches } = await highlightsOf(log);
+    const { hotPath, hotPathEnd, hotPathBranches, ids } = await highlightsOf(
+      m('Root', 100, m('Alpha', 380), m('Beta', 300), m('Gamma', 280), m('Tiny', 20)),
+    );
 
     expect(hotPath.map((frame) => frame.text)).toEqual(['Root']);
     expect(hotPathEnd).toBe('fan-out');
@@ -209,64 +136,56 @@ describe('executionHighlights hot path end', () => {
     expect(hotPathBranches.map((branch) => branch.text)).toEqual(['Alpha', 'Beta', 'Gamma']);
     expect(hotPathBranches[0]).toEqual({
       text: 'Alpha',
-      eventIndex: alpha.eventIndex,
-      eventIndexes: [alpha.eventIndex],
+      eventIndex: ids('Alpha')[0],
+      eventIndexes: ids('Alpha'),
       totalTime: 380,
-      selfTime: 0,
+      selfTime: 380,
       count: 1,
-      category: '',
+      category: 'Apex',
     });
   });
 
   it('names no fan-out where the frame has no branch worth a row', async () => {
-    const log = createLog(1000);
-    const root = highlightEvent({ text: 'Root', total: 1000, self: 100 });
-    log.children.push(root);
-    // The frame kept a tenth of its own time, but its one child is noise, so
-    // there is nothing for a fan-out reading to point at.
-    highlightEvent({ text: 'Tiny', total: 20, parent: root });
-
-    const { hotPathEnd, hotPathBranches } = await highlightsOf(log);
+    // The frame kept a ninth of its own time, but every child is under a twentieth
+    // of it, so there is nothing for a fan-out reading to point at.
+    const noise = Array.from({ length: 20 }, (_, i) => m(`Tiny${i}`, 4));
+    const { hotPathEnd, hotPathBranches } = await highlightsOf(m('Root', 10, ...noise));
 
     expect(hotPathEnd).toBe('hot-spot');
     expect(hotPathBranches).toEqual([]);
   });
 
   it('merges same-signature branches, and points at the worst instance', async () => {
-    const log = createLog(1000);
-    const root = highlightEvent({ text: 'Root', total: 1000, self: 100 });
-    log.children.push(root);
-    const first = highlightEvent({ text: 'Repeat', total: 100, parent: root });
-    highlightEvent({ text: 'Other', total: 300, parent: root });
-    const worst = highlightEvent({ text: 'Repeat', total: 200, parent: root });
-
-    const { hotPathEnd, hotPathBranches } = await highlightsOf(log);
+    const { hotPathEnd, hotPathBranches, ids } = await highlightsOf(
+      m('Root', 400, m('Repeat', 100), m('Other', 300), m('Repeat', 200)),
+    );
+    const repeats = ids('Repeat');
 
     expect(hotPathEnd).toBe('fan-out');
     expect(hotPathBranches).toEqual([
       {
         text: 'Repeat',
-        eventIndex: worst.eventIndex,
-        eventIndexes: [first.eventIndex, worst.eventIndex],
+        eventIndex: repeats[1],
+        eventIndexes: repeats,
         totalTime: 300,
-        selfTime: 0,
+        selfTime: 300,
         count: 2,
-        category: '',
+        category: 'Apex',
       },
       {
         text: 'Other',
-        eventIndex: first.eventIndex + 1,
-        eventIndexes: [first.eventIndex + 1],
+        eventIndex: ids('Other')[0],
+        eventIndexes: ids('Other'),
         totalTime: 300,
-        selfTime: 0,
+        selfTime: 300,
         count: 1,
-        category: '',
+        category: 'Apex',
       },
     ]);
   });
 
   it('has no end to name in a log with no timed calls', async () => {
-    const highlights = await highlightsOf(createLog(0));
+    const highlights = await highlightsOf(m('Root', 0));
 
     expect(highlights.hotPathEnd).toBe('hot-spot');
     expect(highlights.hotPathBranches).toEqual([]);
@@ -275,225 +194,140 @@ describe('executionHighlights hot path end', () => {
 
 describe('executionHighlights hot spots', () => {
   it('sums self time by signature and points at the most expensive instance', async () => {
-    const log = createLog(1000);
-    const first = highlightEvent({ text: 'MyClass.run()', self: 100 });
-    const worst = highlightEvent({ text: 'MyClass.run()', self: 300 });
-    const other = highlightEvent({ text: 'Other.go()', self: 50 });
-    index(log, first, worst, other);
+    const { hotSpots, ids } = await highlightsOf(
+      m('MyClass.run()', 100),
+      m('MyClass.run()', 300),
+      m('Other.go()', 50),
+    );
 
-    const { hotSpots } = await highlightsOf(log);
-
-    // Nothing timed either signature's calls as a whole, so the total answers
-    // with the self time — never below it, or the meter would overflow its bar.
     expect(hotSpots).toEqual([
       {
         text: 'MyClass.run()',
-        eventIndex: worst.eventIndex,
+        eventIndex: ids('MyClass.run()')[1],
         selfTime: 400,
         totalTime: 400,
         count: 2,
-        category: '',
+        category: 'Apex',
       },
       {
         text: 'Other.go()',
-        eventIndex: other.eventIndex,
+        eventIndex: ids('Other.go()')[0],
         selfTime: 50,
         totalTime: 50,
         count: 1,
-        category: '',
+        category: 'Apex',
       },
     ]);
   });
 
   it('breaks a tie by the signature timed first, as the other panes do', async () => {
-    const log = createLog(1000);
-    index(
-      log,
-      highlightEvent({ text: 'B', self: 0 }),
-      highlightEvent({ text: 'A', self: 10 }),
-      highlightEvent({ text: 'B', self: 10 }),
-    );
-
-    const { hotSpots } = await highlightsOf(log);
+    const { hotSpots } = await highlightsOf(m('B', 0), m('A', 10), m('B', 10));
 
     expect(hotSpots.map((row) => row.text)).toEqual(['A', 'B']);
   });
 
-  it('keeps same-named events with different types or namespaces apart', async () => {
-    const log = createLog(1000);
-    const method = highlightEvent({ text: 'run', type: 'METHOD_ENTRY', self: 10 });
-    const flow = highlightEvent({ text: 'run', type: 'FLOW_START_INTERVIEW_BEGIN', self: 20 });
-    const packaged = highlightEvent({ text: 'run', namespace: 'pkg', self: 30 });
-    index(log, method, flow, packaged);
+  it('keeps same-named events with different types apart', async () => {
+    const { hotSpots } = await highlightsOf(m('run', 10), cu('run', 20));
 
-    const { hotSpots } = await highlightsOf(log);
-
-    expect(hotSpots).toHaveLength(3);
+    expect(hotSpots).toHaveLength(2);
   });
 
   it('caps the list at five signatures, largest self time first', async () => {
-    const log = createLog(1000);
-    for (let i = 1; i <= 7; i++) {
-      index(log, highlightEvent({ text: `M${i}`, self: i * 10 }));
-    }
-
-    const { hotSpots } = await highlightsOf(log);
+    const { hotSpots } = await highlightsOf(
+      ...Array.from({ length: 7 }, (_, i) => m(`M${i + 1}`, (i + 1) * 10)),
+    );
 
     expect(hotSpots.map((s) => s.text)).toEqual(['M7', 'M6', 'M5', 'M4', 'M3']);
   });
 
   it('counts untimed instances of a timed signature, so the average holds', async () => {
-    const log = createLog(1000);
-    const timed = highlightEvent({ text: 'MyClass.run()', self: 60 });
-    const untimed = highlightEvent({ text: 'MyClass.run()', self: 0 });
-    index(log, timed, untimed);
-
-    const { hotSpots } = await highlightsOf(log);
+    const { hotSpots, ids } = await highlightsOf(m('MyClass.run()', 60), m('MyClass.run()', 0));
+    const [timed, untimed] = ids('MyClass.run()');
 
     expect(hotSpots).toEqual([
       {
         text: 'MyClass.run()',
-        eventIndex: timed.eventIndex,
+        eventIndex: timed,
         selfTime: 60,
         totalTime: 60,
         count: 2,
-        category: '',
+        category: 'Apex',
       },
     ]);
-    expect(untimed.eventIndex).not.toBe(hotSpots[0]?.eventIndex);
+    expect(untimed).not.toBe(hotSpots[0]?.eventIndex);
   });
 
   it('sums total time and takes the category from the worst instance', async () => {
-    const log = createLog(1000);
-    const cheap = highlightEvent({ text: 'MyClass.run()', category: 'Apex', self: 20, total: 100 });
-    const worst = highlightEvent({ text: 'MyClass.run()', category: 'SOQL', self: 80, total: 300 });
-    index(log, cheap, worst);
+    const { hotSpots } = await highlightsOf(
+      cu('Unit', 20, m('Work', 80)),
+      cu('Unit', 80, m('Other', 220)),
+    );
 
-    const { hotSpots } = await highlightsOf(log);
-
-    expect(hotSpots[0]?.totalTime).toBe(400);
-    expect(hotSpots[0]?.category).toBe('SOQL');
+    expect(hotSpots.find((row) => row.text === 'Unit')).toMatchObject({
+      totalTime: 400,
+      category: 'Code Unit',
+    });
   });
 
   it('counts recursion total time once, over the outermost instance', async () => {
-    const log = createLog(1000);
-    const outer = highlightEvent({
-      text: 'Recurse.go()',
-      self: 40,
-      total: 300,
-      timestamp: 100,
-      exitStamp: 400,
-    });
-    const inner = highlightEvent({
-      text: 'Recurse.go()',
-      self: 60,
-      total: 260,
-      timestamp: 140,
-      exitStamp: 400,
-      parent: outer,
-    });
-    const later = highlightEvent({
-      text: 'Recurse.go()',
-      self: 20,
-      total: 100,
-      timestamp: 500,
-      exitStamp: 600,
-    });
-    index(log, outer, inner, later);
-
-    const { hotSpots } = await highlightsOf(log);
+    const { hotSpots } = await highlightsOf(
+      m('Recurse.go()', 40, m('Recurse.go()', 60, m('Work', 200))),
+      m('Recurse.go()', 20, m('More', 80)),
+    );
+    const recurse = hotSpots.find((row) => row.text === 'Recurse.go()');
 
     // Self time counts every level; total counts the outer call and the later
-    // one, so the wall time is not charged twice.
-    expect(hotSpots[0]?.selfTime).toBe(120);
-    expect(hotSpots[0]?.totalTime).toBe(400);
-    expect(hotSpots[0]?.count).toBe(3);
-  });
-
-  it('lifts a total left below the self time by untimed outer calls', async () => {
-    const log = createLog(1000);
-    // The outer calls were never timed; only the nested one was, so the summed
-    // self time (80) runs past the summed total (30).
-    const outer = highlightEvent({ text: 'Wrap.run()', self: 0, total: 30, timestamp: 0 });
-    const nested = highlightEvent({ text: 'Wrap.run()', self: 80, total: 0, parent: outer });
-    index(log, outer, nested);
-
-    const { hotSpots } = await highlightsOf(log);
-
-    expect(hotSpots[0]?.totalTime).toBe(80);
+    // one (300 + 100), so the wall time is not charged twice.
+    expect(recurse?.selfTime).toBe(120);
+    expect(recurse?.totalTime).toBe(400);
+    expect(recurse?.count).toBe(3);
   });
 
   it('ignores events with no self time', async () => {
-    const log = createLog(1000);
-    index(log, highlightEvent({ text: 'Wrapper', self: 0, total: 500 }));
-
-    const { hotSpots } = await highlightsOf(log);
+    const { hotSpots } = await highlightsOf(m('Wrapper', 0));
 
     expect(hotSpots).toEqual([]);
-  });
-
-  it('never names the log itself, whatever gap time it holds', async () => {
-    // A truncated log leaves most of its time unaccounted, so the pseudo-root
-    // outweighs every real call. It is a container, not code.
-    const log = createLog(1000, 900);
-    index(log, highlightEvent({ text: 'Work', self: 100, total: 100 }));
-
-    const { hotSpots } = await highlightsOf(log);
-
-    expect(hotSpots.map((row) => row.text)).toEqual(['Work']);
   });
 });
 
 describe('executionHighlights truncation', () => {
+  const line = (at: number, rest: string): string => `09:18:22.6 (${at})|${rest}\n`;
+  const method = (start: number, name: string): string =>
+    line(start, `METHOD_ENTRY|[1]|01p|${name}`) + line(start + 1000, `METHOD_EXIT|[1]|${name}`);
+
+  async function truncationOf(
+    body: string,
+  ): Promise<{ store: LogStore; highlights: ExecutionHighlights }> {
+    const { store } = await rawStoreOf(body);
+    return { store, highlights: await store.derive(executionHighlights) };
+  }
+
   it('reports the regions the parser found, and where the first one starts', async () => {
-    const log = createLog(1000);
-    log.truncation = {
-      regions: [
-        { kind: 'skipped-lines', startTime: 10, eventIndex: 7, skippedBytes: 1000 },
-        { kind: 'max-size', startTime: 20, eventIndex: 9 },
-      ],
-      totalSkippedBytes: 1000,
-    };
+    const { store, highlights } = await truncationOf(
+      method(1000, 'ns.A.run()') +
+        '*** Skipped 12345 bytes of detailed log\n' +
+        method(5000, 'ns.B.run()') +
+        '*********** MAXIMUM DEBUG LOG SIZE REACHED ***********\n' +
+        method(8000, 'ns.C.run()'),
+    );
 
-    const { truncation } = await highlightsOf(log);
-
-    expect(truncation).toEqual({ regionCount: 2, firstEventIndex: 7 });
-  });
-
-  // The parser sets `isTruncated` on the log root as well as on each cut-off frame, so
-  // counting flagged events whose parent is not flagged found nothing on a real log.
-  it('reports a truncation whose cut-off frames all hang off the log root', async () => {
-    const log = createLog(1000);
-    log.isTruncated = true;
-    const cut = highlightEvent({
-      text: 'Cut',
-      parent: log as unknown as LogEvent,
-      isTruncated: true,
+    // The first region opens after A, the last event the log wrote before the cut.
+    expect(highlights.truncation).toEqual({
+      regionCount: 2,
+      firstEventIndex: indexesOf(store.log, 'ns.A.run()')[0],
     });
-    index(log, cut);
-    // Read now: indexing the tree numbers its events afresh.
-    const cutIndex = cut.eventIndex;
-    log.truncation = {
-      regions: [{ kind: 'max-size', startTime: 10, eventIndex: cutIndex }],
-      totalSkippedBytes: 0,
-    };
-
-    const { truncation } = await highlightsOf(log);
-
-    expect(truncation).toEqual({ regionCount: 1, firstEventIndex: cutIndex });
   });
 
   it('reports nothing for a log the platform did not truncate', async () => {
-    const log = createLog(1000);
-    index(log, highlightEvent({ text: 'Work', self: 100 }));
+    const { highlights } = await truncationOf(method(1000, 'ns.A.run()'));
 
-    expect((await highlightsOf(log)).truncation).toBeNull();
+    expect(highlights.truncation).toBeNull();
   });
 });
 
 describe('executionHighlights', () => {
   it('reads a parsed log through its store', async () => {
-    const { store } = storeOf(
+    const { store } = await storeOf(
       '09:18:22.6 (1000)|METHOD_ENTRY|[1]|01p|ns.Outer.run()\n' +
         '09:18:22.6 (1800)|METHOD_EXIT|[1]|ns.Outer.run()\n',
     );

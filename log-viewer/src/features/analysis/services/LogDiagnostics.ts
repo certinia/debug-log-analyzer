@@ -1,13 +1,13 @@
 /*
  * Copyright (c) 2026 Certinia Inc. All rights reserved.
  */
-import type {
-  ApexLog,
-  DMLBeginLine,
-  LogEvent,
-  SOQLExecuteBeginLine,
-  LimitMetricUnit,
-  Limits,
+import {
+  type ApexEvent,
+  type ApexLog,
+  type EventOf,
+  type LimitUnit,
+  type Limits,
+  eventType,
 } from '@apexdevtools/apex-log-parser';
 
 import { limitTotals } from '../../../components/logOverviewMetrics.js';
@@ -15,7 +15,7 @@ import { GOVERNOR_METRICS } from '../../../core/metrics/governorMetrics.js';
 import { formatByteSize, formatDuration, formatInteger } from '../../../core/utility/Util.js';
 import type { Derivation, LogStore } from '../../../core/log/LogStore.js';
 import { signatureTimes, type SignatureTimes } from '../../../core/log/signatureTimes.js';
-import { outermostEvents } from '../../../core/utility/EventTree.js';
+import { outermostIds } from '../../../core/utility/EventTree.js';
 import { deriveSoqlObject } from '../../database/services/sobjectClassification.js';
 import type { Dialect } from '../../soql/format/tokenize.js';
 import { apexLimitSeries } from '../../timeline/optimised/apex-limit-series.js';
@@ -26,6 +26,10 @@ import {
   TableScanRule,
   type Severity,
 } from '../../soql/services/SOQLLinter.js';
+
+const SOQL_TYPE = eventType('SOQL_EXECUTE_BEGIN').typeId;
+const DML_TYPE = eventType('DML_BEGIN').typeId;
+const DEBUG_TYPE = eventType('USER_DEBUG').typeId;
 
 /** How many times a statement has to repeat before it is worth reporting. */
 const REPEAT_THRESHOLD = 5;
@@ -146,20 +150,31 @@ export interface LogDiagnostics {
   logNs: number;
 }
 
+type SoqlEvent = EventOf<'SOQL_EXECUTE_BEGIN'>;
+type DmlEvent = EventOf<'DML_BEGIN'>;
+type ExceptionEvent = EventOf<'EXCEPTION_THROWN' | 'FATAL_ERROR'>;
+
 /** A grouped set of events, keyed by whatever makes two of them the same finding. */
-interface Group {
+interface Group<E extends ApexEvent = ApexEvent> {
   count: number;
   eventIndex: number;
-  events: LogEvent[];
+  events: E[];
 }
 
 /** How long a set of events took between them, an event inside another counted once. */
-function totalTime(events: readonly LogEvent[]): number {
-  return outermostEvents(events).reduce((sum, event) => sum + event.duration.total, 0);
+function totalTime(log: ApexLog, events: readonly ApexEvent[]): number {
+  const { durationTotal } = log.columns;
+  return outermostIds(
+    log,
+    events.map((event) => event.id),
+  ).reduce((sum, id) => sum + durationTotal[id]!, 0);
 }
 
-function groupBy(events: LogEvent[], key: (event: LogEvent) => string | null): Map<string, Group> {
-  const groups = new Map<string, Group>();
+function groupBy<E extends ApexEvent>(
+  events: readonly E[],
+  key: (event: E) => string | null,
+): Map<string, Group<E>> {
+  const groups = new Map<string, Group<E>>();
   for (const event of events) {
     const id = key(event);
     if (id === null) {
@@ -170,14 +185,14 @@ function groupBy(events: LogEvent[], key: (event: LogEvent) => string | null): M
       group.count++;
       group.events.push(event);
     } else {
-      groups.set(id, { count: 1, eventIndex: event.eventIndex, events: [event] });
+      groups.set(id, { count: 1, eventIndex: event.id, events: [event] });
     }
   }
   return groups;
 }
 
 /** How each metric's figures read. Bytes and milliseconds are not bare counts. */
-const LIMIT_FORMATS: Record<LimitMetricUnit, (value: number) => string> = {
+const LIMIT_FORMATS: Record<LimitUnit, (value: number) => string> = {
   byte: formatByteSize,
   millisecond: (value) => `${formatInteger(value)} ms`,
   count: formatInteger,
@@ -207,26 +222,26 @@ function hotSpot(times: SignatureTimes): HotSpot | null {
 }
 
 /**
- * The method the log was running when the event happened.
+ * The id of the method the log was running when event `id` happened, or 0 at the
+ * top of the log.
  *
  * An exception and a breach are both raised inside code, and that code is the
  * cause the reader wants: the exception row itself takes no time and says only
- * that the transaction ended. The log root is skipped, since it is not code.
+ * that the transaction ended. Every parent is a frame.
  */
-function enclosingFrame(event: LogEvent): LogEvent | null {
-  let node = event.parent;
-  while (node) {
-    if (node.isParent && node.parent) {
-      return node;
-    }
-    node = node.parent;
-  }
-  return null;
+function enclosingFrame(log: ApexLog, id: number): number {
+  return Math.max(log.columns.parent[id] ?? 0, 0);
+}
+
+/** The text of the frame {@link enclosingFrame} names, or undefined for none. */
+function enclosingFrameText(log: ApexLog, id: number): string | undefined {
+  const frame = enclosingFrame(log, id);
+  return frame > 0 ? (log.columns.text.at(frame) ?? undefined) : undefined;
 }
 
 /** See {@link enclosingFrame}; the event itself where the log names no frame. */
-function enclosingMethodIndex(event: LogEvent): number {
-  return enclosingFrame(event)?.eventIndex ?? event.eventIndex;
+function enclosingMethodIndex(log: ApexLog, event: ApexEvent): number {
+  return enclosingFrame(log, event.id) || event.id;
 }
 
 /** A governor breach the log reported as an exception, with where it stopped. */
@@ -248,14 +263,15 @@ interface Breach {
  * stopped the transaction.
  */
 function limitDiagnostics(
+  log: ApexLog,
   totals: Limits,
-  limitExceptions: LogEvent[],
+  limitExceptions: readonly ExceptionEvent[],
   hotSpot: HotSpot | null,
 ): Diagnostic[] {
   const breaches = new Map<keyof Limits, Breach>();
-  const unmapped: LogEvent[] = [];
+  const unmapped: ExceptionEvent[] = [];
   for (const event of limitExceptions) {
-    const { head, frame } = splitException(event.text);
+    const { head, frame } = splitException(event.text ?? '');
     const lower = head.toLowerCase();
     const named = GOVERNOR_METRICS.find(
       ({ exceptionPhrase }) => exceptionPhrase && lower.includes(exceptionPhrase),
@@ -268,7 +284,7 @@ function limitDiagnostics(
     // carries a stack, so keep whichever frame the log gave us.
     const seen = breaches.get(named.key);
     breaches.set(named.key, {
-      eventIndex: seen?.eventIndex ?? enclosingMethodIndex(event),
+      eventIndex: seen?.eventIndex ?? enclosingMethodIndex(log, event),
       frame: seen?.frame || frame || undefined,
     });
   }
@@ -276,7 +292,8 @@ function limitDiagnostics(
   const found: Diagnostic[] = [];
   for (const { key, label, unit } of GOVERNOR_METRICS) {
     const breach = breaches.get(key);
-    const { used, limit } = totals[key];
+    const { used } = totals[key];
+    const limit = totals[key].limit ?? 0;
     // A metric with no usage, or no limit reported, has no figures to show — and with no limit
     // it has no ratio either, so it can never read as near one.
     const known = used > 0 && limit > 0;
@@ -315,7 +332,7 @@ function limitDiagnostics(
   }
 
   // A breach whose wording we do not map still has to be reported.
-  return [...found, ...exceptionDiagnostics(unmapped)];
+  return [...found, ...exceptionDiagnostics(log, unmapped)];
 }
 
 /** Where the stack begins in an exception's text, when one follows it. */
@@ -345,16 +362,16 @@ function splitException(text: string): { head: string; frame: string } {
  * The parser pushes both the throw and the fatal error that followed it, so the
  * count is of throws alone; a fatal error says the transaction did not recover.
  */
-function exceptionDiagnostics(exceptions: LogEvent[]): Diagnostic[] {
-  const groups = groupBy(exceptions, (event) => splitException(event.text).head);
+function exceptionDiagnostics(log: ApexLog, exceptions: readonly ExceptionEvent[]): Diagnostic[] {
+  const groups = groupBy(exceptions, (event) => splitException(event.text ?? '').head);
   return [...groups].map(([head, group]) => {
     const thrown = group.events.filter((event) => event.type === 'EXCEPTION_THROWN').length;
     const fatal = group.events.some((event) => event.type === 'FATAL_ERROR');
     const frame = group.events
-      .map((event) => splitException(event.text).frame)
+      .map((event) => splitException(event.text ?? '').frame)
       .find((first) => first.length > 0);
     const thrownIn = group.events[0];
-    const eventIndex = thrownIn ? enclosingMethodIndex(thrownIn) : group.eventIndex;
+    const eventIndex = thrownIn ? enclosingMethodIndex(log, thrownIn) : group.eventIndex;
     return {
       id: `exception|${head}`,
       // Caught, so the transaction completed: expensive, not failed.
@@ -395,7 +412,7 @@ function truncationDiagnostics(log: ApexLog): Diagnostic[] {
       message:
         'A section of the log was skipped, so the figures here may be undercounted. Narrow the log levels, or log a smaller transaction.',
       count: regions.length,
-      eventIndex: regions[0]?.eventIndex ?? -1,
+      eventIndex: regions[0]?.event?.id ?? -1,
     },
   ];
 }
@@ -408,7 +425,7 @@ function truncationDiagnostics(log: ApexLog): Diagnostic[] {
  * {@link limitDiagnostics} already report.
  */
 function logIssueDiagnostics(log: ApexLog): Diagnostic[] {
-  return log.logIssues
+  return log.issues
     .filter((issue) => issue.type === 'unexpected')
     .map((issue) => ({
       id: `issue|${issue.summary}`,
@@ -416,7 +433,7 @@ function logIssueDiagnostics(log: ApexLog): Diagnostic[] {
       summary: issue.summary,
       message: issue.description,
       count: 1,
-      eventIndex: issue.eventIndex ?? -1,
+      eventIndex: issue.event?.id ?? -1,
     }));
 }
 
@@ -425,9 +442,9 @@ function logIssueDiagnostics(log: ApexLog): Diagnostic[] {
  * number is not an identity of its own — every class has a line 214 — so two
  * classes running the same statement at the same line are two call sites.
  */
-function callSite(event: LogEvent): string | null {
+function callSite(log: ApexLog, event: ApexEvent): string | null {
   return typeof event.lineNumber === 'number'
-    ? `${enclosingFrame(event)?.text ?? ''}|${event.lineNumber}`
+    ? `${enclosingFrameText(log, event.id) ?? ''}|${event.lineNumber}`
     : null;
 }
 
@@ -436,14 +453,18 @@ function callSite(event: LogEvent): string | null {
  * "SOQL in a loop" — but "line 214 ran 340 queries" is the same signal and is
  * what a developer acts on.
  */
-function repetitionDiagnostics(statements: LogEvent[], label: string): Diagnostic[] {
+function repetitionDiagnostics(
+  log: ApexLog,
+  statements: readonly ApexEvent[],
+  label: string,
+): Diagnostic[] {
   const found: Diagnostic[] = [];
   // DML logs as its operation and object, so only SOQL text is a query.
   const dialect = label === 'SOQL' ? 'soql' : undefined;
 
   const perLine = groupBy(statements, (event) => {
-    const site = callSite(event);
-    return site === null ? null : `${site}|${event.text}`;
+    const site = callSite(log, event);
+    return site === null ? null : `${site}|${event.text ?? ''}`;
   });
   for (const [key, group] of perLine) {
     if (group.count < REPEAT_THRESHOLD) {
@@ -452,7 +473,7 @@ function repetitionDiagnostics(statements: LogEvent[], label: string): Diagnosti
     // The frame names the call site; the line alone would read the same for every
     // class that happens to run its statement at that line.
     const first = group.events[0];
-    const frame = first ? enclosingFrame(first)?.text : undefined;
+    const frame = first ? enclosingFrameText(log, first.id) : undefined;
     const line = typeof first?.lineNumber === 'number' ? `line ${first.lineNumber}` : '';
     const from = frame ?? line;
     found.push({
@@ -461,9 +482,9 @@ function repetitionDiagnostics(statements: LogEvent[], label: string): Diagnosti
       summary: `${group.count} ${label} statements from ${[frame, line].filter(Boolean).join(', ')}`,
       message: `Possible ${label} in a loop: it executed ${group.count} times from ${from}. Move it out of the loop and work on the whole collection at once.`,
       count: group.count,
-      timeNs: totalTime(group.events),
+      timeNs: totalTime(log, group.events),
       eventIndex: group.eventIndex,
-      evidence: oneLine(group.events[0]?.text, group.eventIndex, dialect),
+      evidence: oneLine(group.events[0]?.text ?? undefined, group.eventIndex, dialect),
     });
   }
 
@@ -471,7 +492,7 @@ function repetitionDiagnostics(statements: LogEvent[], label: string): Diagnosti
   // so the fix is to run it once and re-use the result.
   const perText = groupBy(statements, (event) => event.text);
   for (const [text, group] of perText) {
-    const sites = new Set(group.events.map(callSite));
+    const sites = new Set(group.events.map((event) => callSite(log, event)));
     if (group.count < REPEAT_THRESHOLD || sites.size < 2) {
       continue;
     }
@@ -481,7 +502,7 @@ function repetitionDiagnostics(statements: LogEvent[], label: string): Diagnosti
       summary: `${group.count} identical ${label} statements, from ${sites.size} lines`,
       message: `The same statement ran ${group.count} times from ${sites.size} places. Run it once and pass the result around, or work on the whole collection at once.`,
       count: group.count,
-      timeNs: totalTime(group.events),
+      timeNs: totalTime(log, group.events),
       eventIndex: group.eventIndex,
       evidence: oneLine(text, group.eventIndex, dialect),
     });
@@ -534,11 +555,12 @@ interface ShapeGroup {
  * DML is not read here: its text is only the operation and the object, so every
  * repeat of one operation shares a text and {@link repetitionDiagnostics} has it.
  */
-function rowAtATimeDiagnostics(queries: SOQLExecuteBeginLine[]): Diagnostic[] {
+function rowAtATimeDiagnostics(queries: readonly SoqlEvent[]): Diagnostic[] {
   const groups = new Map<string, ShapeGroup>();
 
   for (const query of queries) {
-    const shape = soqlShape(query.text);
+    const queryText = query.text ?? '';
+    const shape = soqlShape(queryText);
     let group = groups.get(shape);
     if (!group) {
       // Only sniffed once per shape: the whole group queries the same object.
@@ -551,19 +573,19 @@ function rowAtATimeDiagnostics(queries: SOQLExecuteBeginLine[]): Diagnostic[] {
         count: 0,
         rows: 0,
         timeNs: 0,
-        eventIndex: query.eventIndex,
+        eventIndex: query.id,
         texts: new Map(),
       };
       groups.set(shape, group);
     }
     group.count++;
-    group.rows += query.soqlRowCount.self;
+    group.rows += query.soqlRowCount?.self ?? 0;
     group.timeNs += query.duration.total;
-    const text = group.texts.get(query.text);
+    const text = group.texts.get(queryText);
     if (text) {
       text.count++;
     } else {
-      group.texts.set(query.text, { text: query.text, eventIndex: query.eventIndex, count: 1 });
+      group.texts.set(queryText, { text: queryText, eventIndex: query.id, count: 1 });
     }
   }
 
@@ -603,7 +625,7 @@ function rowAtATimeDiagnostics(queries: SOQLExecuteBeginLine[]): Diagnostic[] {
 }
 
 /** Verdicts from the platform's own query optimiser, grouped by object. */
-function queryPlanDiagnostics(queries: SOQLExecuteBeginLine[]): {
+function queryPlanDiagnostics(queries: readonly SoqlEvent[]): {
   diagnostics: Diagnostic[];
   queryPlansKnown: boolean;
 } {
@@ -617,11 +639,13 @@ function queryPlanDiagnostics(queries: SOQLExecuteBeginLine[]): {
   >();
   let explains = 0;
 
-  // The plan lines are children of the query they explain, so the walk keeps the
-  // query itself: a verdict on an object means nothing without the statement, and
-  // the query is the row the reader wants, not the plan line under it.
+  // The plan is read off the query it explains, so the walk keeps the query
+  // itself: a verdict on an object means nothing without the statement, and the
+  // query is the row the reader wants, not the plan line under it.
   for (const query of queries) {
-    for (const explain of query.children) {
+    const { explain } = query.details;
+    const queryText = query.text ?? '';
+    if (explain) {
       explains++;
       const sObject = explain.sObjectType ?? 'the queried object';
       if (explain.relativeCost !== null && explain.relativeCost > 1) {
@@ -631,16 +655,16 @@ function queryPlanDiagnostics(queries: SOQLExecuteBeginLine[]): {
           seen.timeNs += query.duration.total;
           if (explain.relativeCost > seen.worst) {
             seen.worst = explain.relativeCost;
-            seen.query = query.text;
-            seen.eventIndex = query.eventIndex;
+            seen.query = queryText;
+            seen.eventIndex = query.id;
           }
         } else {
           costs.set(sObject, {
             count: 1,
             timeNs: query.duration.total,
-            eventIndex: query.eventIndex,
+            eventIndex: query.id,
             worst: explain.relativeCost,
-            query: query.text,
+            query: queryText,
           });
         }
       }
@@ -653,8 +677,8 @@ function queryPlanDiagnostics(queries: SOQLExecuteBeginLine[]): {
           scans.set(sObject, {
             count: 1,
             timeNs: query.duration.total,
-            eventIndex: query.eventIndex,
-            query: query.text,
+            eventIndex: query.id,
+            query: queryText,
           });
         }
       }
@@ -698,7 +722,7 @@ function queryPlanDiagnostics(queries: SOQLExecuteBeginLine[]): {
 }
 
 /** Debug statements are not free: they cost CPU and heap even when nobody reads them. */
-function debugDiagnostics(debugLines: LogEvent[]): Diagnostic[] {
+function debugDiagnostics(debugLines: readonly number[]): Diagnostic[] {
   if (debugLines.length < DEBUG_THRESHOLD) {
     return [];
   }
@@ -710,7 +734,7 @@ function debugDiagnostics(debugLines: LogEvent[]): Diagnostic[] {
       message:
         'Each statement builds its message and writes it, whether or not anyone reads the log. Remove the ones that are no longer needed, and keep the rest behind a lower log level.',
       count: debugLines.length,
-      eventIndex: debugLines[0]?.eventIndex ?? -1,
+      eventIndex: debugLines[0] ?? -1,
     },
   ];
 }
@@ -722,7 +746,7 @@ function debugDiagnostics(debugLines: LogEvent[]): Diagnostic[] {
  */
 async function soqlLintDiagnostics(
   store: LogStore,
-  queries: SOQLExecuteBeginLine[],
+  queries: readonly SoqlEvent[],
 ): Promise<{
   diagnostics: Diagnostic[];
   lintedQueries: { linted: number; distinct: number };
@@ -752,7 +776,7 @@ async function soqlLintDiagnostics(
           summary: rule.summary,
           message: rule.message,
           count: group.count,
-          timeNs: totalTime(group.events),
+          timeNs: totalTime(store.log, group.events),
           eventIndex: group.eventIndex,
           evidence: [line],
         });
@@ -762,7 +786,7 @@ async function soqlLintDiagnostics(
       // any one of them. Each query is listed, so the count reconciles with what
       // the reader can open. The queries arrive most-repeated first.
       seen.count += group.count;
-      seen.timeNs = (seen.timeNs ?? 0) + totalTime(group.events);
+      seen.timeNs = (seen.timeNs ?? 0) + totalTime(store.log, group.events);
       seen.evidence?.push(line);
     }
   }
@@ -776,7 +800,7 @@ async function soqlLintDiagnostics(
 /**
  * Everything the log says about itself, as one ordered findings list.
  *
- * Analysed once per log: the rules cost one pass over `eventsById` plus an antlr
+ * Analysed once per log: the rules cost one pass over the type column plus an antlr
  * parse per distinct query, which is too much to repeat every time the selection
  * changes. {@link scopeDiagnostics} narrows this result instead.
  */
@@ -800,14 +824,12 @@ export function scopeDiagnostics(
   if (!within.size) {
     return { ...result, diagnostics: [] };
   }
-  // `eventsById` is indexed by `eventIndex`, so ancestry is a parent walk.
+  const { parent } = log.columns;
   const inScope = (eventIndex: number) => {
-    let node: LogEvent | null | undefined = log.eventsById[eventIndex];
-    while (node) {
-      if (within.has(node.eventIndex)) {
+    for (let id = eventIndex; id > 0; id = parent[id] ?? 0) {
+      if (within.has(id)) {
         return true;
       }
-      node = node.parent;
     }
     return false;
   };
@@ -830,22 +852,25 @@ export function scopeDiagnostics(
  */
 async function analyse(store: LogStore): Promise<LogDiagnostics> {
   const log = store.log;
-  const queries: SOQLExecuteBeginLine[] = [];
-  const dml: DMLBeginLine[] = [];
-  const debugLines: LogEvent[] = [];
-  for (const event of store.events()) {
-    switch (event.type) {
-      case 'SOQL_EXECUTE_BEGIN':
-        queries.push(event as SOQLExecuteBeginLine);
-        break;
-      case 'DML_BEGIN':
-        dml.push(event as DMLBeginLine);
-        break;
-      case 'USER_DEBUG':
-        debugLines.push(event);
-        break;
-      default:
-        break;
+  const queries: SoqlEvent[] = [];
+  const dml: DmlEvent[] = [];
+  const debugLines: number[] = [];
+  // The type column, so only the statements the rules read become events.
+  const { type } = log.columns;
+  for (let id = 1; id <= log.eventCount; id++) {
+    const typeId = type[id];
+    if (typeId !== SOQL_TYPE && typeId !== DML_TYPE && typeId !== DEBUG_TYPE) {
+      continue;
+    }
+    if (!store.isShown(id)) {
+      continue;
+    }
+    if (typeId === DEBUG_TYPE) {
+      debugLines.push(id);
+    } else if (typeId === SOQL_TYPE) {
+      queries.push(log.event(id) as SoqlEvent); // the type was checked above
+    } else {
+      dml.push(log.event(id) as DmlEvent); // the type was checked above
     }
   }
 
@@ -857,20 +882,20 @@ async function analyse(store: LogStore): Promise<LogDiagnostics> {
     store.derive(apexLimitSeries),
   ]);
   // A `LimitException` belongs to its governor metric, not to the exception list.
-  const isLimit = (event: LogEvent) => event.text.includes('System.LimitException');
+  const isLimit = (event: ExceptionEvent) => !!event.text?.includes('System.LimitException');
   const limitExceptions = log.exceptions.filter(isLimit);
   const others = log.exceptions.filter((event) => !isLimit(event));
   const ranked = [
     // The caveat leads: it says every figure under it may be an undercount.
     ...truncationDiagnostics(log),
     ...[
-      ...limitDiagnostics(limitTotals(series), limitExceptions, hotSpot(times)),
+      ...limitDiagnostics(log, limitTotals(series), limitExceptions, hotSpot(times)),
       ...logIssueDiagnostics(log),
-      ...exceptionDiagnostics(others),
+      ...exceptionDiagnostics(log, others),
       ...plans.diagnostics,
       ...lint.diagnostics,
-      ...repetitionDiagnostics(queries, 'SOQL'),
-      ...repetitionDiagnostics(dml, 'DML'),
+      ...repetitionDiagnostics(log, queries, 'SOQL'),
+      ...repetitionDiagnostics(log, dml, 'DML'),
       ...rowAtATimeDiagnostics(queries),
       ...debugDiagnostics(debugLines),
     ].sort(

@@ -6,10 +6,10 @@ import { afterEach, beforeEach, describe, expect, it } from '@jest/globals';
 import { window, type TextDocument, type TextEditor } from 'vscode';
 
 import {
-  createMockApexLog,
   asContext,
   createMockContext,
-  createMockLogEvent,
+  logLine,
+  parseLines,
 } from '../../__tests__/helpers/test-builders.js';
 import {
   Position,
@@ -22,19 +22,43 @@ import {
 import { LogEventCache } from '../../cache/LogEventCache.js';
 import { RawLogLineDecoration } from '../RawLogLineDecoration.js';
 
-jest.mock('../../cache/LogEventCache.js', () => ({
-  LogEventCache: {
-    getApexLog: jest.fn(),
-    findEventByTimestamp: jest.fn(),
-  },
-}));
+// Only the parse is mocked: the lines of each event are read as the decoration reads them.
+jest.mock('../../cache/LogEventCache.js', () => {
+  const actual = jest.requireActual<typeof import('../../cache/LogEventCache.js')>(
+    '../../cache/LogEventCache.js',
+  );
+  actual.LogEventCache.getApexLog = jest.fn();
+  return actual;
+});
 
 const mockGetApexLog = LogEventCache.getApexLog as jest.Mock;
-const mockFindEvent = LogEventCache.findEventByTimestamp as jest.Mock;
 const mockOnSelectionChange = window.onDidChangeTextEditorSelection as jest.Mock;
 
 const LOG_URI = '/test/file.log';
 const EXECUTION_STARTED = '09:45:31.888 (1000)|EXECUTION_STARTED';
+const enter = (ns: number, name: string) => logLine(ns, `METHOD_ENTRY|[1]|01p|${name}`);
+const exit = (ns: number, name: string) => logLine(ns, `METHOD_EXIT|[1]|${name}`);
+
+/** A 5 ms method, id 2, holding a 4 ms one, id 3; the first line makes it an Apex log. */
+const NESTED = [
+  EXECUTION_STARTED,
+  enter(1_000, 'A.a()'),
+  enter(1_001_000, 'A.b()'),
+  exit(5_001_000, 'A.b()'),
+  exit(5_001_000, 'A.a()'),
+];
+
+/** The decorations set on `editor`, after the cursor settles on `line` of `lines`. */
+async function decorate(lines: string[], line: number) {
+  const document = createMockTextDocument({ uri: LOG_URI, lines });
+  const editor = makeEditor(document, line);
+  mockGetApexLog.mockResolvedValue(await parseLines(lines));
+  await selectIn(editor);
+  return (editor.setDecorations as jest.Mock).mock.calls[0]?.[1] as {
+    renderOptions: { after: { contentText: string } };
+    hoverMessage: { value: string };
+  }[];
+}
 
 function makeEditor(document: TextDocument, line = 0): TextEditor {
   const at = new Position(line, 0);
@@ -80,24 +104,27 @@ describe('RawLogLineDecoration', () => {
   });
 
   it.each([
-    ['the total duration', 2_000_000, 2_000_000, '2.00ms'],
-    ['the self time when it differs from the total', 5_000_000, 1_000_000, '5.00ms (self: 1.00ms)'],
-  ])('decorates the cursor line with %s', async (_label, total, self, expected) => {
-    const document = createMockTextDocument({ uri: LOG_URI, lines: [EXECUTION_STARTED] });
-    const editor = makeEditor(document);
-    mockGetApexLog.mockResolvedValue(createMockApexLog({}));
-    mockFindEvent.mockReturnValue({
-      event: createMockLogEvent({ duration: { total, self } }),
-      depth: 0,
-    });
+    ['the total duration', 3, '4.00ms'],
+    ['the self time when it differs from the total', 1, '5.00ms (self: 1.00ms)'],
+    ['the frame its exit line closes', 4, '5.00ms (self: 1.00ms)'],
+  ])('decorates the cursor line with %s', async (_label, line, expected) => {
+    const decorations = await decorate(NESTED, line);
 
-    await selectIn(editor);
-
-    expect(mockGetApexLog).toHaveBeenCalledWith(document.uri, mockContext.display);
-    const decorations = (editor.setDecorations as jest.Mock).mock.calls[0]?.[1] as {
-      renderOptions: { after: { contentText: string } };
-    }[];
+    expect(mockGetApexLog).toHaveBeenCalledWith(
+      expect.objectContaining({ path: LOG_URI }),
+      mockContext.display,
+    );
     expect(decorations.map((d) => d.renderOptions.after.contentText)).toEqual([expected]);
+  });
+
+  it('links the event by its id, which a shared timestamp cannot name', async () => {
+    const [decoration] = await decorate(NESTED, 2);
+
+    const args = /showInLogAnalysis\?([^)\s]+)/.exec(decoration?.hoverMessage.value ?? '')?.[1];
+    expect(JSON.parse(decodeURIComponent(args ?? '{}'))).toEqual({
+      eventIndex: 3,
+      filePath: expect.stringContaining(LOG_URI),
+    });
   });
 
   describe('clearing the decoration', () => {
@@ -151,11 +178,11 @@ describe('RawLogLineDecoration', () => {
       expectCleared(editor);
     });
 
-    it('clears when no event covers the timestamp', async () => {
-      const document = createMockTextDocument({ uri: LOG_URI, lines: [EXECUTION_STARTED] });
-      const editor = makeEditor(document);
-      mockGetApexLog.mockResolvedValue(createMockApexLog({}));
-      mockFindEvent.mockReturnValue(null);
+    it('clears on a line the parser made no event of', async () => {
+      const lines = [EXECUTION_STARTED, logLine(1500, 'NOT_A_REAL_EVENT|x')];
+      const document = createMockTextDocument({ uri: LOG_URI, lines });
+      const editor = makeEditor(document, 1);
+      mockGetApexLog.mockResolvedValue(await parseLines(lines));
 
       await selectIn(editor);
 

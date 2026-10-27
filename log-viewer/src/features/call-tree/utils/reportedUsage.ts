@@ -1,7 +1,7 @@
 /*
  * Copyright (c) 2026 Certinia Inc. All rights reserved.
  */
-import type { ApexLog, Limits, LogEvent } from '@apexdevtools/apex-log-parser';
+import type { ApexEvent, ApexLog, Limits } from '@apexdevtools/apex-log-parser';
 
 import { logStoreFor, type Derivation } from '../../../core/log/LogStore.js';
 import { firstIndexWhere } from '../../../core/utility/Util.js';
@@ -37,11 +37,11 @@ export function addReported(into: ReportedCounts, from: ReportedCounts, sign = 1
   }
 }
 
-/** A row's time: from `timestamp` up to, not including, `exitStamp`. */
-export type TimeSpan = Pick<LogEvent, 'timestamp' | 'exitStamp'>;
+/** A row's time: from `startTimestamp` up to, not including, `endTimestamp`. */
+export type TimeSpan = Pick<ApexEvent, 'startTimestamp' | 'endTimestamp'>;
 
 /** Every point of the log. */
-export const WHOLE_LOG: TimeSpan = { timestamp: -Infinity, exitStamp: Infinity };
+export const WHOLE_LOG: TimeSpan = { startTimestamp: -Infinity, endTimestamp: Infinity };
 
 /**
  * What a row used: our count, corrected to the limit usage Salesforce reported. Read from the limit
@@ -85,8 +85,8 @@ export class ReportedUsage {
    * object. A row inside a null one is null too.
    */
   span(of: TimeSpan): ReportedCounts | null {
-    const end = of.exitStamp ?? of.timestamp;
-    const before = this._pointsBefore(of.timestamp);
+    const end = of.endTimestamp;
+    const before = this._pointsBefore(of.startTimestamp);
     if ((this._times[before] ?? Infinity) >= end) {
       return null;
     }

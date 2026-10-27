@@ -19,9 +19,7 @@ export const EXCLUDED_DETAIL_TYPES: ReadonlySet<string> = new Set<string>([
 
 /**
  * Show-Details predicate, rolled up across children. Called post-order after
- * `_children` is set and each child's own `_hasDetailsDeep` is populated. The
- * type is passed in because it lives in a different place per row shape (on
- * `originalData` for aggregated rows, on the row itself for bottom-up ones).
+ * `_children` is set and each child's own `_hasDetailsDeep` is populated.
  */
 export function computeHasDetailsDeep<
   T extends { _children?: T[] | null; _hasDetailsDeep: boolean },

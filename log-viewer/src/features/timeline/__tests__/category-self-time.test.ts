@@ -2,55 +2,53 @@
  * Copyright (c) 2026 Certinia Inc. All rights reserved.
  */
 import { describe, expect, it } from '@jest/globals';
-import type { ApexLog, LogEvent, LogCategory } from '@apexdevtools/apex-log-parser';
-
-import { indexTree } from '#test-helpers/apexLog.js';
+import { rawStoreOf } from '#test-helpers/apexLog.js';
+import type { LogCategory } from '../../../core/log/category.js';
+import { buildLogIndex } from '../../../core/log/LogIndex.js';
 import { selfTimeByCategory, toTimelineKeys } from '../utils/category-self-time.js';
 
-function node(category: LogCategory, self: number, children: LogEvent[] = []): LogEvent {
-  return {
-    category,
-    duration: { self, total: self },
-    children,
-  } as unknown as LogEvent;
+/** Self time by category for a whole log `body`, timestamps in nanoseconds. */
+async function totalsOf(body: string): Promise<ReadonlyMap<string, number>> {
+  const { log } = await rawStoreOf(body);
+  return selfTimeByCategory(buildLogIndex(log));
 }
 
-function log(children: LogEvent[]): ApexLog {
-  return node('', 0, children) as ApexLog;
-}
+const line = (ns: number, rest: string): string => `09:18:22.6 (${ns})|${rest}\n`;
 
 describe('selfTimeByCategory', () => {
-  it('sums self time per category across siblings and nesting', () => {
-    const root = log([
-      node('Apex', 10, [node('SOQL', 5), node('Apex', 3)]),
-      node('DML', 7),
-      node('Apex', 2),
-    ]);
+  it('sums self time per category across siblings and nesting', async () => {
+    const totals = await totalsOf(
+      line(0, 'METHOD_ENTRY|[1]|01p|ns.A.run()') +
+        line(10, 'SOQL_EXECUTE_BEGIN|[2]|Aggregations:0|SELECT Id FROM Account') +
+        line(15, 'SOQL_EXECUTE_END|[2]|Rows:1') +
+        line(15, 'METHOD_ENTRY|[3]|01p|ns.A.step()') +
+        line(18, 'METHOD_EXIT|[3]|ns.A.step()') +
+        line(18, 'METHOD_EXIT|[1]|ns.A.run()') +
+        line(18, 'DML_BEGIN|[4]|Op:Insert|Type:Account|Rows:1') +
+        line(25, 'DML_END|[4]') +
+        line(25, 'METHOD_ENTRY|[5]|01p|ns.A.last()') +
+        line(27, 'METHOD_EXIT|[5]|ns.A.last()'),
+    );
 
-    const totals = selfTimeByCategory(indexTree(root));
-
+    // Apex: 10 of run's own, 3 of step, 2 of last.
     expect(totals.get('Apex')).toBe(15);
     expect(totals.get('SOQL')).toBe(5);
     expect(totals.get('DML')).toBe(7);
   });
 
-  it('counts only self time, so a parent excludes its children', () => {
-    const root = log([node('Apex', 10, [node('Apex', 4)])]);
+  it('counts only self time, so a parent excludes its children', async () => {
+    const totals = await totalsOf(
+      line(0, 'METHOD_ENTRY|[1]|01p|ns.A.run()') +
+        line(10, 'METHOD_ENTRY|[2]|01p|ns.A.step()') +
+        line(14, 'METHOD_EXIT|[2]|ns.A.step()') +
+        line(14, 'METHOD_EXIT|[1]|ns.A.run()'),
+    );
 
-    expect(selfTimeByCategory(indexTree(root)).get('Apex')).toBe(14);
+    expect(totals.get('Apex')).toBe(14);
   });
 
-  it("sums uncategorised events under '' apart from their children", () => {
-    const root = log([node('', 100, [node('SOQL', 5)])]);
-
-    const totals = selfTimeByCategory(indexTree(root));
-
-    expect(totals.get('SOQL')).toBe(5);
-    expect(totals.get('')).toBe(100);
-  });
-
-  it('holds a zero uncategorised sum for an empty log', () => {
-    expect(selfTimeByCategory(indexTree(log([]))).get('')).toBe(0);
+  it('holds a zero uncategorised sum for an empty log', async () => {
+    expect((await totalsOf('')).get('')).toBe(0);
   });
 });
 

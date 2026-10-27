@@ -67,7 +67,7 @@ const overviewOf = (
 });
 
 const logWith = (snapshots: number) =>
-  ({ governorLimits: { snapshots: Array.from({ length: snapshots }) } }) as unknown as ApexLog;
+  ({ limits: { snapshots: Array.from({ length: snapshots }) } }) as unknown as ApexLog;
 
 const defaultPeaks = (): Limits => ({
   ...emptyLimits(),

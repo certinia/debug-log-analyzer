@@ -4,7 +4,7 @@
 import { describe, expect, it } from '@jest/globals';
 
 import { NAMESPACE_COLORS, logNamespacePalette, namespacePalette } from '../namespacePalette.js';
-import { log } from './fixtures/logEvents.js';
+import { log, namespaceEvent } from './fixtures/logEvents.js';
 
 const names = (count: number, prefix = 'ns') =>
   Array.from({ length: count }, (_, index) => `${prefix}${index}`);
@@ -169,14 +169,14 @@ describe('namespacePalette', () => {
 });
 
 describe('logNamespacePalette', () => {
-  it('memoises per log, so every bar shares one assignment', () => {
-    const apexLog = log([], ['pkg']);
+  it('memoises per log, so every bar shares one assignment', async () => {
+    const { log: apexLog } = await log([namespaceEvent('pkg', 1)]);
 
     expect(logNamespacePalette(apexLog)).toBe(logNamespacePalette(apexLog));
   });
 
-  it('lets the log name its own namespaces before an unnamed one asks', () => {
-    const apexLog = log([], names(4));
+  it('lets the log name its own namespaces before an unnamed one asks', async () => {
+    const { log: apexLog } = await log(names(4).map((name) => namespaceEvent(name, 1)));
     const color = logNamespacePalette(apexLog);
     const own = new Set(names(4).map(color));
 

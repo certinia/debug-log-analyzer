@@ -12,10 +12,8 @@ import {
   bottomUpColumns,
   mergedLines,
 } from '../../src/features/call-tree/grid/columns.js';
-import {
-  buildBottomUpTree,
-  type BottomUpRow,
-} from '../../src/features/call-tree/utils/Aggregation.js';
+import { MergedTree } from '../../src/features/call-tree/grid/mergedRows.js';
+import type { BottomUpRow } from '../../src/features/call-tree/utils/Aggregation.js';
 import type { BottomUpContender } from './contender.js';
 import { LvGridBench } from './lv-grid-contender.js';
 
@@ -27,13 +25,12 @@ export class LvGridBottomUp extends LvGridBench<BottomUpRow> implements BottomUp
     grid.columns = bottomUpColumns(log, { openType: () => {} });
     grid.filters = [{ test: details }];
     grid.sort = BOTTOM_UP_SORT;
-    grid.rowLines = mergedLines;
-    const roots = await buildBottomUpTree(
-      log.children,
-      logStoreFor(log).keyPathIds(),
-      log.governorLimits,
-    );
-    grid.source = { roots: roots ?? [], children: (r) => r._children, key: (r) => r.id };
+    grid.rowLines = mergedLines(log);
+    const tree = await MergedTree.bottomUp(logStoreFor(log));
+    if (!tree) {
+      throw new Error('The Bottom-Up build stopped.');
+    }
+    grid.source = tree.source;
     this.grid = grid;
     host.append(grid);
     await grid.settled();

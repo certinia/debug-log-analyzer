@@ -10,7 +10,7 @@ import { describe, expect, it } from '@jest/globals';
 import { Container, type Mesh } from 'pixi.js';
 
 import { readQuads } from '#test-helpers/mesh.js';
-import { timelineEvent } from '#test-helpers/timeline.js';
+import { rectsOf, timelineEvent } from '#test-helpers/timeline.js';
 import { makeViewport } from '#test-helpers/viewport.js';
 import type { RenderBatch, ViewportState } from '../../types/flamechart.types.js';
 import type { BatchColorInfo } from '../BucketColorResolver.js';
@@ -70,7 +70,7 @@ function rect(x: number, width: number, depth = 0): PrecomputedRect {
     duration: width,
     selfDuration: width,
     category: 'Apex',
-    eventRef: timelineEvent(x, width, 'Apex'),
+    row: x,
     x,
     y: depth * 15,
     width,
@@ -103,10 +103,11 @@ function visible(cache: RectangleCache, viewport: ViewportState): PrecomputedRec
 
 describe('MeshRectangleRenderer', () => {
   describe('with rectangles culled by RectangleCache', () => {
-    it('places each frame from zoom and depth and keeps its event', () => {
+    // Rows are numbered in pre-order: the parent 0, its child 1.
+    it('places each frame from zoom and depth and keeps its row', () => {
       const child = timelineEvent(150, 50, 'SOQL');
       const parent = timelineEvent(100, 200, 'Apex', [child]);
-      const cache = new RectangleCache([parent], new Set(['Apex', 'SOQL']));
+      const cache = new RectangleCache(rectsOf([parent]));
       const viewport = makeViewport({ zoom: 2 });
 
       const { visibleRects, buckets, stats } = cache.getCulledRectangles(viewport, batchColors);
@@ -115,11 +116,11 @@ describe('MeshRectangleRenderer', () => {
       expect(visibleRects.get('Apex')).toEqual([
         expect.objectContaining({ x: 200, width: 400, y: 0, height: 15 }),
       ]);
-      expect(visibleRects.get('Apex')?.[0]?.eventRef).toBe(parent);
+      expect(visibleRects.get('Apex')?.[0]?.row).toBe(0);
       expect(visibleRects.get('SOQL')).toEqual([
         expect.objectContaining({ x: 300, width: 100, y: 15, height: 15 }),
       ]);
-      expect(visibleRects.get('SOQL')?.[0]?.eventRef).toBe(child);
+      expect(visibleRects.get('SOQL')?.[0]?.row).toBe(1);
 
       const { renderer, mesh } = setup();
       renderer.render(visibleRects, buckets, viewport);
@@ -135,21 +136,21 @@ describe('MeshRectangleRenderer', () => {
     it('drops a frame with no duration', () => {
       const instant = timelineEvent(500, 0, 'Apex');
       const timed = timelineEvent(100, 200, 'Apex');
-      const cache = new RectangleCache([timed, instant], new Set(['Apex']));
+      const cache = new RectangleCache(rectsOf([timed, instant]));
 
       const rects = [...cache.getRectsByCategory().values()].flat();
-      expect(rects.some((rect) => rect.eventRef === instant)).toBe(false);
-      expect(visible(cache, makeViewport()).map((r) => r.eventRef)).toEqual([timed]);
+      expect(rects.map((rect) => rect.row)).toEqual([0]);
+      expect(visible(cache, makeViewport()).map((r) => r.row)).toEqual([0]);
     });
 
     it('drops a frame whose category the cache was not given', () => {
       const unknown = timelineEvent(500, 200, 'Mystery' as Category);
       const known = timelineEvent(100, 200, 'Apex');
-      const cache = new RectangleCache([known, unknown], new Set(['Apex']));
+      const cache = new RectangleCache(rectsOf([known, unknown]));
 
       const rects = [...cache.getRectsByCategory().values()].flat();
-      expect(rects.some((rect) => rect.eventRef === unknown)).toBe(false);
-      expect(visible(cache, makeViewport()).map((r) => r.eventRef)).toEqual([known]);
+      expect(rects.map((rect) => rect.row)).toEqual([0]);
+      expect(visible(cache, makeViewport()).map((r) => r.row)).toEqual([0]);
     });
 
     describe('under vertical pan', () => {
@@ -157,7 +158,7 @@ describe('MeshRectangleRenderer', () => {
       const depth2 = timelineEvent(0, 400, 'Apex', [depth3]);
       const depth1 = timelineEvent(0, 400, 'Apex', [depth2]);
       const depth0 = timelineEvent(0, 400, 'Apex', [depth1]);
-      const cache = new RectangleCache([depth0], new Set(['Apex']));
+      const cache = new RectangleCache(rectsOf([depth0]));
 
       it('keeps every row in view with no pan', () => {
         expect(visible(cache, makeViewport()).map((r) => r.depth)).toEqual([0, 1, 2, 3]);
@@ -168,7 +169,7 @@ describe('MeshRectangleRenderer', () => {
         const viewport = makeViewport({ offsetY: -30 });
         const { visibleRects, buckets } = cache.getCulledRectangles(viewport, batchColors);
 
-        expect(visibleRects.get('Apex')?.map((r) => r.eventRef)).toEqual([depth2, depth3]);
+        expect(visibleRects.get('Apex')?.map((r) => r.row)).toEqual([2, 3]);
 
         const { renderer, mesh } = setup();
         renderer.render(visibleRects, buckets, viewport);
@@ -184,7 +185,7 @@ describe('MeshRectangleRenderer', () => {
     });
 
     it('hides the mesh when nothing is in view', () => {
-      const cache = new RectangleCache([timelineEvent(100, 200, 'Apex')], new Set(['Apex']));
+      const cache = new RectangleCache(rectsOf([timelineEvent(100, 200, 'Apex')]));
       const viewport = makeViewport({ offsetX: 5000 });
       const { visibleRects, buckets } = cache.getCulledRectangles(viewport, batchColors);
       const { renderer, mesh } = setup();

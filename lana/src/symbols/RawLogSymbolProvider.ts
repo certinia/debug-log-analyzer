@@ -15,13 +15,13 @@ import {
   type TextDocument,
 } from 'vscode';
 
-import type { LogEvent } from '@apexdevtools/apex-log-parser';
+import { eventType } from '@apexdevtools/apex-log-parser';
 
 import type { Context } from '../Context.js';
 import { LogEventCache, type LogReporter } from '../cache/LogEventCache.js';
 import { isOpenAsTextTab } from '../editor/TabState.js';
 import { isApexLogContent } from '../language/ApexLogLanguageDetector.js';
-import { formatDuration, TIMESTAMP_REGEX } from '../log-utils.js';
+import { formatDuration } from '../log-utils.js';
 
 /**
  * Document symbols for raw Apex logs. Beyond populating the Outline/breadcrumbs, this is
@@ -53,60 +53,40 @@ class RawLogSymbolProvider implements DocumentSymbolProvider {
       return [];
     }
 
-    const timestampToLine = this.buildTimestampMap(document);
-    return this.collectSymbols(apexLog.children, timestampToLine, document);
-  }
-
-  private buildTimestampMap(document: TextDocument): Map<number, number> {
-    const map = new Map<number, number>();
-
-    for (let i = 0; i < document.lineCount; i++) {
-      const match = document.lineAt(i).text.match(TIMESTAMP_REGEX);
-      if (match?.[1]) {
-        const timestamp = parseInt(match[1], 10);
-        if (!map.has(timestamp)) {
-          map.set(timestamp, i);
-        }
+    const { start, end } = LogEventCache.linesOf(apexLog, document);
+    const { parent, text, type, durationTotal } = apexLog.columns;
+    const symbols = new Map<number, DocumentSymbol>();
+    const roots: DocumentSymbol[] = [];
+    for (let id = 1; id <= apexLog.eventCount; id++) {
+      const startLine = start[id]!;
+      const endLine = end[id]!;
+      if (endLine <= startLine) {
+        continue;
       }
-    }
-
-    return map;
-  }
-
-  private collectSymbols(
-    events: LogEvent[],
-    timestampToLine: Map<number, number>,
-    document: TextDocument,
-  ): DocumentSymbol[] {
-    const symbols: DocumentSymbol[] = [];
-
-    for (const event of events) {
-      const startLine = timestampToLine.get(event.timestamp);
-      const endLine = event.exitStamp !== null ? timestampToLine.get(event.exitStamp) : undefined;
-      const children = this.collectSymbols(event.children, timestampToLine, document);
-
-      if (startLine !== undefined && endLine !== undefined && endLine > startLine) {
-        // Prefer the parser's concise label (e.g. a method signature) over the raw line,
-        // which is prefixed with a timestamp and bloats breadcrumbs / sticky scroll.
-        const name =
-          event.text.trim() || event.type || document.lineAt(startLine).text.trim() || 'log';
-        const detail = formatDuration(event.duration.total);
-        const range = new Range(new Position(startLine, 0), document.lineAt(endLine).range.end);
-        const selectionRange = document.lineAt(startLine).range;
-
-        const symbol = new DocumentSymbol(name, detail, SymbolKind.Method, range, selectionRange);
-        symbol.children = children;
-        symbols.push(symbol);
-      } else {
-        // No foldable range for this event; lift its descendants to this level.
-        // Pushed one at a time: a spread would overrun the argument limit.
-        for (const child of children) {
-          symbols.push(child);
-        }
+      // Prefer the parser's concise label (e.g. a method signature) over the raw line,
+      // which is prefixed with a timestamp and bloats breadcrumbs / sticky scroll.
+      const name =
+        text.at(id)?.trim() ||
+        eventType(type[id]!)?.type ||
+        document.lineAt(startLine).text.trim() ||
+        'log';
+      const range = new Range(new Position(startLine, 0), document.lineAt(endLine).range.end);
+      const symbol = new DocumentSymbol(
+        name,
+        formatDuration(durationTotal[id]!),
+        SymbolKind.Method,
+        range,
+        document.lineAt(startLine).range,
+      );
+      // A frame with no foldable range lifts its descendants to the nearest one that has.
+      let ancestor = parent[id]!;
+      while (ancestor > 0 && !symbols.has(ancestor)) {
+        ancestor = parent[ancestor]!;
       }
+      (symbols.get(ancestor)?.children ?? roots).push(symbol);
+      symbols.set(id, symbol);
     }
-
-    return symbols;
+    return roots;
   }
 
   /**

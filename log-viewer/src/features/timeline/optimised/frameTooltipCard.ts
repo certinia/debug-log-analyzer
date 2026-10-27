@@ -18,8 +18,9 @@
  * reading cannot be taken for consumption of a cap.
  */
 
-import type { ApexLog, LogEvent } from '@apexdevtools/apex-log-parser';
+import { type ApexEvent, type ApexLog, eventType } from '@apexdevtools/apex-log-parser';
 
+import { eventCategory } from '../../../core/log/category.js';
 import { EVENT_METRICS, HEAP_PEAK } from '../../../core/metrics/eventMetrics.js';
 import { DEFAULT_NAMESPACE } from '../../../core/utility/CallerNamespace.js';
 import {
@@ -73,15 +74,15 @@ export interface TooltipCard {
 }
 
 /** The reading the hover was for: how long the frame took, and how much was its own. */
-function timeRow(event: LogEvent): CardRow | null {
-  if (!event.exitStamp || !event.duration.total) {
+function timeRow(event: ApexEvent): CardRow | null {
+  if (!event.isFrame || !event.duration.total) {
     return null;
   }
   return {
     // Free qualifies which time this is, so it rides with the label rather than in a
     // figure column, where it collided with the reading. Salesforce does not charge
     // this duration against CPU, which is why it shows on the database frames.
-    label: event.cpuType === 'free' ? 'Time · free' : 'Time',
+    label: eventType(event.type)?.consumesCpuTime === false ? 'Time · free' : 'Time',
     // Alone of the readings, this one names no log figure to read against: the chart
     // is the duration chart, so the log's span is already on the axis, in the minimap,
     // and in the frame's own width. It would also pair mismatched units — "58.2 ms of
@@ -109,17 +110,18 @@ function shareOfLog(value: number, logTotal: number): number | null {
 }
 
 /** The frame's clock range, where the log records a start time to count from. */
-function wallClockRow(event: LogEvent, apexLog: ApexLog | null | undefined): CardRow | null {
-  const { startTime, timestamp } = apexLog ?? {};
-  if (startTime === null || startTime === undefined || timestamp === undefined) {
+function wallClockRow(event: ApexEvent, apexLog: ApexLog | null | undefined): CardRow | null {
+  const startTime = apexLog?.startTime;
+  if (!apexLog || startTime === null || startTime === undefined) {
     return null;
   }
-  const at = (ns: number) => formatWallClockTime(computeWallClockMs(startTime, timestamp, ns));
+  const logStart = apexLog.columns.startTimestamp[0]!;
+  const at = (ns: number) => formatWallClockTime(computeWallClockMs(startTime, logStart, ns));
   return {
     label: 'Wall clock',
-    value: event.exitStamp
-      ? `${at(event.timestamp)} → ${at(event.exitStamp)}`
-      : at(event.timestamp),
+    value: event.isFrame
+      ? `${at(event.startTimestamp)} → ${at(event.endTimestamp)}`
+      : at(event.startTimestamp),
     self: null,
     share: null,
     wide: true,
@@ -131,7 +133,7 @@ function wallClockRow(event: LogEvent, apexLog: ApexLog | null | undefined): Car
  * decides what the cap drops; the order never changes, so a row cannot overtake
  * another as the pointer moves between frames.
  */
-function metricRows(event: LogEvent, apexLog: ApexLog | null | undefined): CardRow[] {
+function metricRows(event: ApexEvent, apexLog: ApexLog | null | undefined): CardRow[] {
   const rows: CardRow[] = [];
 
   for (const metric of EVENT_METRICS) {
@@ -196,14 +198,13 @@ function notable(row: CardRow): number {
 }
 
 /** The identity line: what the frame is, whose code it is, and where it came from. */
-function identityOf(event: LogEvent): string[] {
+function identityOf(event: ApexEvent): string[] {
   const parts: string[] = [];
-  if (event.category) {
-    parts.push(event.category);
+  const category = eventCategory(event);
+  if (category) {
+    parts.push(category);
   }
-  if (event.type) {
-    parts.push(event.type);
-  }
+  parts.push(event.type);
   if (event.namespace && event.namespace !== DEFAULT_NAMESPACE) {
     parts.push(event.namespace);
   }
@@ -211,7 +212,7 @@ function identityOf(event: LogEvent): string[] {
   // "from": it is what tells two calls to one method from different places apart, and
   // it is the line Go to Source lands on. EXTERNAL stands alone: the caller is outside
   // the classes the log covers, so there is no line to have come from.
-  if (event.lineNumber !== null && event.lineNumber !== undefined) {
+  if (event.lineNumber !== null) {
     parts.push(
       typeof event.lineNumber === 'number' ? `from line ${event.lineNumber}` : event.lineNumber,
     );
@@ -223,11 +224,11 @@ function identityOf(event: LogEvent): string[] {
  * The card for a hovered frame.
  * @param rail - The category's colour, which the caller resolves from the palette.
  */
-export function frameCard(event: LogEvent, rail: string, apexLog?: ApexLog | null): TooltipCard {
+export function frameCard(event: ApexEvent, rail: string, apexLog?: ApexLog | null): TooltipCard {
   const time = timeRow(event);
   // No exit means nothing measured: the counts are summed on the way out, so a frame
   // still open has no reading to report.
-  const { kept, hidden } = capped(event.exitStamp ? metricRows(event, apexLog) : []);
+  const { kept, hidden } = capped(event.isFrame ? metricRows(event, apexLog) : []);
   // Last: the clock is reference data, not what the hover asked.
   const clock = wallClockRow(event, apexLog);
 

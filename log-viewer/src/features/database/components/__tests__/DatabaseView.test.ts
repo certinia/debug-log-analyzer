@@ -357,13 +357,13 @@ describe('database-view on a new log', () => {
     globalThis.IntersectionObserver = AlwaysVisible as unknown as typeof IntersectionObserver;
     const view = document.createElement('database-view') as View;
     document.body.append(view);
-    view.logStore = storeOf(soql(2)).store;
+    view.logStore = (await storeOf(soql(2))).store;
     await settle();
     await view.updateComplete;
     const grid = view.shadowRoot?.querySelector('soql-view');
     expect(shownLines(view)).toHaveLength(2);
 
-    view.logStore = storeOf(soql(1)).store;
+    view.logStore = (await storeOf(soql(1))).store;
     await settle();
     await view.updateComplete;
 
@@ -375,7 +375,7 @@ describe('database-view on a new log', () => {
     globalThis.IntersectionObserver = AlwaysVisible as unknown as typeof IntersectionObserver;
     const view = document.createElement('database-view') as View;
     document.body.append(view);
-    view.logStore = storeOf(soql(2)).store;
+    view.logStore = (await storeOf(soql(2))).store;
     await settle();
     await view.updateComplete;
     const grid = view.shadowRoot?.querySelector('soql-view');

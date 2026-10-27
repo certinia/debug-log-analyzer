@@ -1,29 +1,63 @@
 /*
  * Copyright (c) 2026 Certinia Inc. All rights reserved.
  */
-import { beforeEach, describe, expect, it } from '@jest/globals';
+import { beforeAll, beforeEach, describe, expect, it } from '@jest/globals';
 
-import type { LogEvent } from '@apexdevtools/apex-log-parser';
-
-import { callFrame } from '#test-helpers/events.js';
+import { indexesOf, storeOf } from '#test-helpers/apexLog.js';
 
 import { KeyPathIds, ROOT_PATH_ID } from '../keyPathIds.js';
+import type { LogStore } from '../LogStore.js';
+import { signaturesOf } from '../signatures.js';
+
+const LOG =
+  '09:18:22.6 (1000)|METHOD_ENTRY|[1]|01p|ns.Outer.run()\n' +
+  '09:18:22.6 (1100)|METHOD_ENTRY|[2]|01p|ns.Inner.go()\n' +
+  '09:18:22.6 (1200)|METHOD_EXIT|[2]|ns.Inner.go()\n' +
+  '09:18:22.6 (1300)|METHOD_EXIT|[1]|ns.Outer.run()\n' +
+  '09:18:22.6 (1400)|METHOD_ENTRY|[3]|01p|ns.Util.log()\n' +
+  '09:18:22.6 (1500)|METHOD_EXIT|[3]|ns.Util.log()\n' +
+  '09:18:22.6 (1600)|METHOD_ENTRY|[4]|01p|ns.Util.log()\n' +
+  '09:18:22.6 (1700)|METHOD_EXIT|[4]|ns.Util.log()\n' +
+  '09:18:22.6 (1800)|CODE_UNIT_STARTED|[EXTERNAL]|01q|ns.Thing.run()\n' +
+  '09:18:22.6 (1900)|METHOD_ENTRY|[5]|01p|ns.Thing.run()\n' +
+  '09:18:22.6 (2000)|METHOD_EXIT|[5]|ns.Thing.run()\n' +
+  '09:18:22.6 (2100)|CODE_UNIT_FINISHED|ns.Thing.run()\n';
+
+// The helper wraps the body in an execution and the `apex://pkg.Entry` code unit, whose namespace
+// the methods under it take.
+const EXECUTION = 'EXECUTION_STARTED|default|EXECUTION_STARTED';
+const ENTRY = 'CODE_UNIT_STARTED|pkg|apex://pkg.Entry';
+
+let store: LogStore;
+beforeAll(async () => {
+  ({ store } = await storeOf(LOG));
+});
+
+/** A table of its own, as each log has. */
+function table(): KeyPathIds {
+  return new KeyPathIds(signaturesOf(store.log), (id) => store.parentOf(id));
+}
+
+/** The one frame whose text is `text`, or the `nth` of several. */
+function frame(text: string, nth = 0): number {
+  return indexesOf(store.log, text)[nth]!;
+}
+
+/** Interns a whole path, named outermost key first as a row reads, the way a
+ *  tree build composes one. */
+function pathFor(paths: KeyPathIds, ...keys: string[]): number {
+  let id = ROOT_PATH_ID;
+  for (const key of keys) {
+    id = paths.step(id, paths.keyId(key));
+  }
+  return id;
+}
 
 describe('KeyPathIds', () => {
   let ids: KeyPathIds;
   beforeEach(() => {
-    ids = new KeyPathIds(32);
+    ids = table();
   });
-
-  /** Interns a whole path, named outermost key first as a row reads, the way a
-   *  tree build composes one. */
-  function pathFor(table: KeyPathIds, ...keys: string[]): number {
-    let id = ROOT_PATH_ID;
-    for (const key of keys) {
-      id = table.step(id, table.keyId(key));
-    }
-    return id;
-  }
 
   it('gives one id to the same path, however often it is asked for', () => {
     expect(pathFor(ids, 'A', 'B')).toBe(pathFor(ids, 'A', 'B'));
@@ -58,95 +92,87 @@ describe('KeyPathIds', () => {
     expect(ids.reaches(inner, pathFor(ids, 'Z'))).toBe(false);
   });
 
-  describe('chainNodeAt', () => {
-    const root = callFrame('exec', null, 1);
-    const outer = callFrame('outer', root, 2);
-    const inner = callFrame('inner', outer, 3);
-
-    it('names the frame the row sits at, which is what a caller row stands for', () => {
-      const leafRow = pathFor(ids, 'METHOD_ENTRY||inner');
-      const callerRow = pathFor(ids, 'METHOD_ENTRY||inner', 'METHOD_ENTRY||outer');
-
-      expect(ids.chainNodeAt(inner, leafRow)).toBe(inner);
-      expect(ids.chainNodeAt(inner, callerRow)).toBe(outer);
-    });
-
-    it('answers for a path the chain misses with nothing', () => {
-      const elsewhere = pathFor(ids, 'METHOD_ENTRY||Z');
-
-      expect(ids.chainNodeAt(inner, elsewhere)).toBeNull();
-    });
-  });
-
   it('reads back how many keys a path stands for, and none for the empty one', () => {
     expect(ids.depthOf(pathFor(ids, 'A', 'B', 'C'))).toBe(3);
     expect(ids.depthOf(ROOT_PATH_ID)).toBe(0);
   });
 
   it('mints on its own, so an id from one log means nothing to another', () => {
-    const other = new KeyPathIds(32);
+    const other = table();
 
     expect(pathFor(other, 'Z')).toBe(pathFor(ids, 'A'));
     expect(other.keysOf(pathFor(other, 'Z'))).toEqual(['Z']);
     expect(ids.keysOf(pathFor(ids, 'A'))).toEqual(['A']);
   });
 
+  describe('chainNodeAt', () => {
+    it('names the frame the row sits at, which is what a caller row stands for', () => {
+      const inner = frame('ns.Inner.go()');
+      const leafRow = pathFor(ids, 'METHOD_ENTRY|pkg|ns.Inner.go()');
+      const callerRow = pathFor(
+        ids,
+        'METHOD_ENTRY|pkg|ns.Inner.go()',
+        'METHOD_ENTRY|pkg|ns.Outer.run()',
+      );
+
+      expect(ids.chainNodeAt(inner, leafRow)).toBe(inner);
+      expect(ids.chainNodeAt(inner, callerRow)).toBe(frame('ns.Outer.run()'));
+    });
+
+    it('answers for a path the chain misses with no frame', () => {
+      const elsewhere = pathFor(ids, 'METHOD_ENTRY|pkg|Z');
+
+      expect(ids.chainNodeAt(frame('ns.Inner.go()'), elsewhere)).toBe(0);
+    });
+  });
+
   describe('keyIdOf', () => {
     it('keeps one id per signature, not one per frame', () => {
-      const first = callFrame('Util.log', null, 1);
-      const second = callFrame('Util.log', null, 2);
+      const first = frame('ns.Util.log()', 0);
+      const second = frame('ns.Util.log()', 1);
 
       expect(ids.keyIdOf(first)).toBe(ids.keyIdOf(first));
       // Same type, namespace and text is the same bucket.
       expect(ids.keyIdOf(second)).toBe(ids.keyIdOf(first));
+      expect(ids.keyText(ids.keyIdOf(first))).toBe('METHOD_ENTRY|pkg|ns.Util.log()');
     });
 
-    it('keys a frame no slot of its own covers, without one standing in for another', () => {
-      // Built rather than parsed, so neither carries an index at all. Keeping one
-      // under an index-less write lands it on the memo as an ordinary property,
-      // which the next such frame then reads back as its own.
-      const loose = { type: 'METHOD_ENTRY', namespace: '', text: 'made up' } as unknown as LogEvent;
-      const other = {
-        type: 'METHOD_ENTRY',
-        namespace: '',
-        text: 'and another',
-      } as unknown as LogEvent;
+    it('names an event with no text by its type', () => {
+      const execution = store.log.children[0]!.id;
 
-      expect(ids.keyIdOf(loose)).toBe(ids.keyIdOf(loose));
-      expect(ids.keyIdOf(other)).not.toBe(ids.keyIdOf(loose));
-      // And one whose index is past the end of the log's own array.
-      expect(ids.keyIdOf(callFrame('past the end', null, 9999))).not.toBe(ids.keyIdOf(loose));
+      expect(ids.keyText(ids.keyIdOf(execution))).toBe(EXECUTION);
     });
   });
 
   describe('stackIdOf', () => {
     it('reads through the entry type, which a bucket key does not', () => {
-      const unit = callFrame('Thing.run()', null, 1, 'CODE_UNIT_STARTED');
-      const method = callFrame('Thing.run()', null, 2, 'METHOD_ENTRY');
+      const unit = store.log.ofType('CODE_UNIT_STARTED').find((e) => e.text === 'ns.Thing.run()')!;
+      const method = frame('ns.Thing.run()', 1);
 
       // A method that recurses as a code unit is one frame to the stack.
-      expect(ids.stackIdOf(unit)).toBe(ids.stackIdOf(method));
-      expect(ids.keyIdOf(unit)).not.toBe(ids.keyIdOf(method));
+      expect(ids.stackIdOf(unit.id)).toBe(ids.stackIdOf(method));
+      expect(ids.keyIdOf(unit.id)).not.toBe(ids.keyIdOf(method));
     });
 
     it('tells two frames apart', () => {
-      expect(ids.stackIdOf(callFrame('one', null, 1))).not.toBe(
-        ids.stackIdOf(callFrame('two', null, 2)),
+      expect(ids.stackIdOf(frame('ns.Outer.run()'))).not.toBe(
+        ids.stackIdOf(frame('ns.Inner.go()')),
       );
     });
   });
 
   describe('pathIdOf', () => {
-    const root = callFrame('exec', null, 1);
-    const outer = callFrame('outer', root, 2);
-    const inner = callFrame('inner', outer, 3);
-
     it('names one row in a top-down view, at the depth the frame ran at', () => {
-      expect(ids.pathIdOf(inner)).toBe(pathFor(ids, 'METHOD_ENTRY||outer', 'METHOD_ENTRY||inner'));
+      expect(ids.keysOf(ids.pathIdOf(frame('ns.Inner.go()'))!)).toEqual([
+        EXECUTION,
+        ENTRY,
+        'METHOD_ENTRY|pkg|ns.Outer.run()',
+        'METHOD_ENTRY|pkg|ns.Inner.go()',
+      ]);
     });
 
-    it('leaves the log root out, as it heads no row', () => {
-      expect(ids.pathIdOf(root)).toBeUndefined();
+    it('leaves the log itself out, as it heads no row', () => {
+      expect(ids.pathIdOf(0)).toBeUndefined();
     });
   });
 

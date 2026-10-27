@@ -1,11 +1,13 @@
 /*
  * Copyright (c) 2026 Certinia Inc. All rights reserved.
  */
-import type { ApexLog, LogEvent, LogCategory } from '@apexdevtools/apex-log-parser';
+import type { ApexLog } from '@apexdevtools/apex-log-parser';
 
-import { type SignatureLookup, signatureSlot } from '../../../core/log/eventKeys.js';
-import { signatureTimes, type SignatureTimes } from '../../../core/log/signatureTimes.js';
+import type { LogCategory } from '../../../core/log/category.js';
+import { type LogIndex, NO_ROW } from '../../../core/log/LogIndex.js';
 import type { Derivation } from '../../../core/log/LogStore.js';
+import { signatureTimes, type SignatureTimes } from '../../../core/log/signatureTimes.js';
+import { type Signatures, signaturesOf } from '../../../core/log/signatures.js';
 import { CHECK_EVERY, frameBudget, type Tick } from '../../../core/utility/FrameBudget.js';
 
 /** One frame on the hot path, entry point first. */
@@ -85,13 +87,13 @@ const HOT_SPOT_COUNT = 5;
  * chain of calls holding most of the log's time, Visual Studio's Hot Path /
  * Chrome's heaviest stack), the hot spots (the signatures with the most self
  * time), and the truncation caveat that undermines both. Structure follows the
- * real tree, so every row resolves to a `LogEvent` the tabs can reveal.
+ * shown rows, so every row resolves to an event id the tabs can reveal.
  */
-export const executionHighlights: Derivation<ExecutionHighlights> = async (_, store) => {
+export const executionHighlights: Derivation<ExecutionHighlights> = async (index, store) => {
   const apexLog = store.log;
   // Together, so the two sliced passes take turns.
   const [hotPath, times] = await Promise.all([
-    computeHotPath(apexLog.children),
+    computeHotPath(index, signaturesOf(apexLog)),
     store.derive(signatureTimes),
   ]);
   return {
@@ -104,7 +106,8 @@ export const executionHighlights: Derivation<ExecutionHighlights> = async (_, st
 
 /** Same-signature siblings walked as one frame, the way every profiler's hot path merges. */
 interface FrameGroup {
-  instances: LogEvent[];
+  /** Index rows. */
+  instances: number[];
   /** Total time summed across the group's instances. */
   total: number;
   /** Self time summed across the group's instances. */
@@ -121,19 +124,18 @@ interface FrameGroup {
  * fanned out to.
  */
 async function computeHotPath(
-  roots: LogEvent[],
+  index: LogIndex,
+  signatures: Signatures,
 ): Promise<Pick<ExecutionHighlights, 'hotPath' | 'hotPathEnd' | 'hotPathBranches'>> {
   // A level can hold a loop's every call, so the grouping hands the thread back.
   const tick = frameBudget({});
   const hotPath: HotPathFrame[] = [];
-  let current = (await sortedGroups([roots], tick))[0];
+  const frame = (group: FrameGroup) => frameOf(index, signatures, group);
+  let current = (await sortedGroups(index, signatures, [NO_ROW], tick))[0];
   let children: FrameGroup[] = [];
   while (current && current.total > 0) {
-    hotPath.push(frameOf(current));
-    children = await sortedGroups(
-      current.instances.map((instance) => instance.children),
-      tick,
-    );
+    hotPath.push(frame(current));
+    children = await sortedGroups(index, signatures, current.instances, tick);
     const next = children[0];
     if (!next || next.total < HOT_PATH_FOLLOW_SHARE * current.total || current.self > next.total) {
       break;
@@ -143,7 +145,7 @@ async function computeHotPath(
   const last = hotPath[hotPath.length - 1];
   const branches =
     last && last.selfTime < SELF_DOMINANT_SHARE * last.totalTime
-      ? children.filter((group) => group.total >= BRANCH_SHARE_FLOOR * last.totalTime).map(frameOf)
+      ? children.filter((group) => group.total >= BRANCH_SHARE_FLOOR * last.totalTime).map(frame)
       : [];
   // A fan-out with no branch above the floor would point at rows that do not
   // exist: the time stops at the frame after all, so it reads as the hot spot.
@@ -155,57 +157,61 @@ async function computeHotPath(
 }
 
 /** The frame the walk landed on, in the shape the rows read. */
-function frameOf(group: FrameGroup): HotPathFrame {
-  const worst = largestInstance(group.instances);
+function frameOf(index: LogIndex, signatures: Signatures, group: FrameGroup): HotPathFrame {
+  const worst = largestInstance(index, group.instances);
+  const eventIndex = index.eventIndex[worst]!;
   return {
-    text: worst.text,
-    eventIndex: worst.eventIndex,
-    eventIndexes: group.instances.map((instance) => instance.eventIndex),
+    text: signatures.text(signatures.of(eventIndex)),
+    eventIndex,
+    eventIndexes: group.instances.map((row) => index.eventIndex[row]!),
     totalTime: group.total,
     // An instance reporting a negative self can drag the group's sum outside
     // its total; the frame's own share of itself cannot sit outside it.
     selfTime: Math.min(Math.max(group.self, 0), group.total),
     count: group.instances.length,
-    category: worst.category,
+    category: index.categoryNames[index.categoryId[worst]!]!,
   };
 }
 
-/** Merge the events of every list by signature, biggest total time first. */
-async function sortedGroups(lists: readonly LogEvent[][], tick: Tick): Promise<FrameGroup[]> {
-  const lookup: SignatureLookup<FrameGroup> = new Map();
-  const groups: FrameGroup[] = [];
+/**
+ * Merge the children of every parent row by signature, biggest total time first.
+ * {@link NO_ROW} stands for the log, whose children are the top-level rows.
+ */
+async function sortedGroups(
+  index: LogIndex,
+  signatures: Signatures,
+  parents: readonly number[],
+  tick: Tick,
+): Promise<FrameGroup[]> {
+  const { subtreeEnd, eventIndex, total, self } = index;
+  const bySignature = new Map<number, FrameGroup>();
   let seen = 0;
-  for (const events of lists) {
-    for (const event of events) {
+  for (const parent of parents) {
+    const end = parent === NO_ROW ? index.rowCount : subtreeEnd[parent]!;
+    for (let row = parent + 1; row < end; row = subtreeEnd[row]!) {
       if (++seen % CHECK_EVERY === 0) {
         await tick();
       }
-      const byText = signatureSlot(lookup, event);
-      const group = byText.get(event.text);
+      const signature = signatures.of(eventIndex[row]!);
+      const group = bySignature.get(signature);
       if (group) {
-        group.instances.push(event);
-        group.total += event.duration.total;
-        group.self += event.duration.self;
+        group.instances.push(row);
+        group.total += total[row]!;
+        group.self += self[row]!;
       } else {
-        const made = {
-          instances: [event],
-          total: event.duration.total,
-          self: event.duration.self,
-        };
-        byText.set(event.text, made);
-        groups.push(made);
+        bySignature.set(signature, { instances: [row], total: total[row]!, self: self[row]! });
       }
     }
   }
-  return groups.sort((a, b) => b.total - a.total);
+  return [...bySignature.values()].sort((a, b) => b.total - a.total);
 }
 
-function largestInstance(instances: LogEvent[]): LogEvent {
+function largestInstance(index: LogIndex, rows: number[]): number {
   // A group is only ever created holding an instance, so the array is never empty.
-  let largest = instances[0]!;
-  for (const instance of instances) {
-    if (instance.duration.total > largest.duration.total) {
-      largest = instance;
+  let largest = rows[0]!;
+  for (const row of rows) {
+    if (index.total[row]! > index.total[largest]!) {
+      largest = row;
     }
   }
   return largest;
@@ -234,10 +240,9 @@ function hotSpotsOf(times: SignatureTimes): HotSpotRow[] {
 
 function truncationOf(apexLog: ApexLog): ExecutionHighlights['truncation'] {
   // The same regions the Analysis notice counts, so the two never state a different
-  // number for one log. An event's own `isTruncated` cannot: the parser sets it on
-  // the log root too, which masks every chain hanging off it.
+  // number for one log.
   const { regions } = apexLog.truncation;
   return regions.length
-    ? { regionCount: regions.length, firstEventIndex: regions[0]?.eventIndex ?? -1 }
+    ? { regionCount: regions.length, firstEventIndex: regions[0]?.event?.id ?? -1 }
     : null;
 }

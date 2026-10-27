@@ -4,12 +4,12 @@
  * @jest-environment jsdom
  */
 import { afterEach, beforeEach, describe, expect, it } from '@jest/globals';
-import type { ApexLog } from '@apexdevtools/apex-log-parser';
+import type { LogStore } from '../../../../core/log/LogStore.js';
 
 // The chart needs WebGL, which jsdom lacks; this suite drives only when it is built.
 jest.mock('../../optimised/ApexLogTimeline.js', () => ({
   ApexLogTimeline: class {
-    private log: ApexLog | null = null;
+    private log: LogStore | null = null;
     findTarget = {
       queries: [] as unknown[],
       clears: 0,
@@ -25,7 +25,7 @@ jest.mock('../../optimised/ApexLogTimeline.js', () => ({
     constructor() {
       targets.push(this.findTarget);
     }
-    init(_container: HTMLElement, log: ApexLog): Promise<void> {
+    init(_container: HTMLElement, log: LogStore): Promise<void> {
       this.log = log;
       built.push(log);
       return holdInit ? new Promise((resolve) => (finishInit = resolve)) : Promise.resolve();
@@ -50,9 +50,9 @@ import { AlwaysVisible, settle } from '#test-helpers/visibility.js';
 import '../TimelineFlameChart.js';
 
 /** The logs the chart was built for, in order. */
-let built: ApexLog[] = [];
+let built: LogStore[] = [];
 /** The logs whose chart was destroyed, in order. */
-let destroyed: ApexLog[] = [];
+let destroyed: LogStore[] = [];
 /** Whether a build waits to be finished by hand. */
 let holdInit = false;
 let finishInit: () => void = () => {};
@@ -76,10 +76,10 @@ class ShownLater {
   disconnect(): void {}
 }
 
-const logOf = (): ApexLog => ({ duration: { total: 10 } }) as ApexLog;
+const logOf = (): LogStore => ({ log: { duration: { total: 10 } } }) as unknown as LogStore;
 
 describe('timeline-flame-chart in a hidden tab', () => {
-  let chart: HTMLElement & { apexLog: ApexLog | null; updateComplete: Promise<unknown> };
+  let chart: HTMLElement & { logStore: LogStore | null; updateComplete: Promise<unknown> };
 
   beforeEach(async () => {
     built = [];
@@ -97,7 +97,7 @@ describe('timeline-flame-chart in a hidden tab', () => {
     const log = logOf();
 
     // jsdom lays nothing out, so the container has no size, as in a hidden tab.
-    chart.apexLog = log;
+    chart.logStore = log;
     await chart.updateComplete;
     await settle();
     expect(built).toEqual([]);
@@ -110,9 +110,9 @@ describe('timeline-flame-chart in a hidden tab', () => {
   it('builds only the newest of the logs that arrived while hidden', async () => {
     const newest = logOf();
 
-    chart.apexLog = logOf();
+    chart.logStore = logOf();
     await chart.updateComplete;
-    chart.apexLog = newest;
+    chart.logStore = newest;
     await chart.updateComplete;
     show();
     await settle();
@@ -122,7 +122,7 @@ describe('timeline-flame-chart in a hidden tab', () => {
 });
 
 describe('timeline-flame-chart on a new log', () => {
-  let chart: HTMLElement & { apexLog: ApexLog | null; updateComplete: Promise<unknown> };
+  let chart: HTMLElement & { logStore: LogStore | null; updateComplete: Promise<unknown> };
 
   beforeEach(async () => {
     built = [];
@@ -131,7 +131,7 @@ describe('timeline-flame-chart on a new log', () => {
     globalThis.IntersectionObserver = AlwaysVisible as unknown as typeof IntersectionObserver;
     chart = document.createElement('timeline-flame-chart') as typeof chart;
     document.body.append(chart);
-    chart.apexLog = logOf();
+    chart.logStore = logOf();
     await chart.updateComplete;
     await settle();
   });
@@ -144,7 +144,7 @@ describe('timeline-flame-chart on a new log', () => {
     const [first] = built;
     holdInit = true;
 
-    chart.apexLog = logOf();
+    chart.logStore = logOf();
     await chart.updateComplete;
     await settle();
     expect(destroyed).toEqual([]);
@@ -156,7 +156,7 @@ describe('timeline-flame-chart on a new log', () => {
 });
 
 describe('timeline-flame-chart find', () => {
-  let chart: HTMLElement & { apexLog: ApexLog | null; updateComplete: Promise<unknown> };
+  let chart: HTMLElement & { logStore: LogStore | null; updateComplete: Promise<unknown> };
   let height: number;
 
   const search = (text: string): void => {
@@ -182,7 +182,7 @@ describe('timeline-flame-chart find', () => {
 
   it('searches the chart for a new log with the open query', async () => {
     search('foo');
-    chart.apexLog = logOf();
+    chart.logStore = logOf();
     await chart.updateComplete;
     await settle();
 
@@ -190,7 +190,7 @@ describe('timeline-flame-chart find', () => {
   });
 
   it('answers no search while the tab is hidden', async () => {
-    chart.apexLog = logOf();
+    chart.logStore = logOf();
     await chart.updateComplete;
     await settle();
     height = 0;
@@ -201,12 +201,12 @@ describe('timeline-flame-chart find', () => {
   });
 
   it('clears the old chart before it goes', async () => {
-    chart.apexLog = logOf();
+    chart.logStore = logOf();
     await chart.updateComplete;
     await settle();
     search('foo');
     await settle();
-    chart.apexLog = logOf();
+    chart.logStore = logOf();
     await chart.updateComplete;
     await settle();
 

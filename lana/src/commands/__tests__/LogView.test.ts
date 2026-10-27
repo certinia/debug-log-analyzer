@@ -86,7 +86,7 @@ describe('LogView', () => {
         logUri: 'webview:/repository/logs/virtual.log',
         logPath: 'workspace/logs/virtual.log',
         logData: 'log body',
-        navigateToTimestamp: undefined,
+        navigateToEventIndex: undefined,
       },
     });
 

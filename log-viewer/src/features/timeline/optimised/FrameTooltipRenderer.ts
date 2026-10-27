@@ -9,7 +9,10 @@
  * Handles tooltip positioning, content generation, and visibility.
  */
 
-import type { ApexLog, LogEvent } from '@apexdevtools/apex-log-parser';
+import type { ApexEvent, ApexLog } from '@apexdevtools/apex-log-parser';
+
+import { eventCategory } from '../../../core/log/category.js';
+import { eventName } from '../../call-tree/utils/eventText.js';
 import { selfLabel } from '../../../core/metrics/eventMetrics.js';
 import { formatSOQL, type Dialect, type SoqlBudget } from '../../soql/format/formatter.js';
 import { markerColorCss, type TimelineMarker } from '../types/flamechart.types.js';
@@ -61,7 +64,7 @@ export interface TooltipOptions {
 
 /** A tooltip waiting for the show delay to expire. */
 type PendingTooltip =
-  | { kind: 'event'; event: LogEvent; anchor: TooltipAnchor }
+  | { kind: 'event'; event: ApexEvent; anchor: TooltipAnchor }
   | { kind: 'marker'; marker: TimelineMarker; anchor: TooltipAnchor };
 
 /** A built description block, plus the footer that says what was cut. */
@@ -74,7 +77,7 @@ export class FrameTooltipRenderer {
   private container: HTMLElement;
   private tooltipElement: HTMLElement | null = null;
   private options: TooltipOptions;
-  private currentEvent: LogEvent | null = null;
+  private currentEvent: ApexEvent | null = null;
   private currentTruncationMarker: TimelineMarker | null = null;
   private currentAnchor: TooltipAnchor | null = null;
   private enabled = true;
@@ -84,7 +87,7 @@ export class FrameTooltipRenderer {
   private showTimer: number | null = null;
   private hideTimer: number | null = null;
   /** Built descriptions, keyed by event: re-hovering a frame costs a clone, not a re-parse. */
-  private descriptionCache = new WeakMap<LogEvent, DescriptionBlock>();
+  private descriptionCache = new Map<number, DescriptionBlock>();
   /** How much query the panel holds. Measured from the panel, and only when its size changes. */
   private queryBudget: SoqlBudget | null = null;
   /**
@@ -127,7 +130,7 @@ export class FrameTooltipRenderer {
 
     this.resizeObserver = new ResizeObserver(() => {
       this.queryBudget = null;
-      this.descriptionCache = new WeakMap();
+      this.descriptionCache = new Map();
       // The panel's width is a share of the container, so both it and the bounds it clamps
       // against have moved.
       this.containerWidth = null;
@@ -176,14 +179,14 @@ export class FrameTooltipRenderer {
    * @param options.keepPosition - Leave a visible tooltip where it is, and never open a new one.
    *   The context menu uses this: it must not move the panel, nor make one appear behind itself.
    */
-  public show(event: LogEvent, anchor: TooltipAnchor, options?: { keepPosition?: boolean }): void {
+  public show(event: ApexEvent, anchor: TooltipAnchor, options?: { keepPosition?: boolean }): void {
     if (!this.enabled || (options?.keepPosition && !this.visible)) {
       return;
     }
     this.clearHideTimer();
 
     if (this.visible) {
-      if (this.currentEvent !== event || this.currentTruncationMarker) {
+      if (this.currentEvent?.id !== event.id || this.currentTruncationMarker) {
         this.currentEvent = event;
         this.currentTruncationMarker = null;
         this.displayContent(this.generateTooltipContent(event), anchor);
@@ -371,12 +374,16 @@ export class FrameTooltipRenderer {
     });
   }
 
-  private generateTooltipContent(event: LogEvent): HTMLDivElement | null {
-    if (!event?.isParent) {
+  private generateTooltipContent(event: ApexEvent): HTMLDivElement | null {
+    if (!event?.isFrame) {
       return null;
     }
     return this.createTooltip(
-      frameCard(event, this.options.categoryColors[event.category] ?? '', this.options.apexLog),
+      frameCard(
+        event,
+        this.options.categoryColors[eventCategory(event)] ?? '',
+        this.options.apexLog,
+      ),
       this.getDescription(event),
     );
   }
@@ -388,16 +395,16 @@ export class FrameTooltipRenderer {
    * The text is joined only where it is used: a cache hit needs none of it, and a query can run
    * to kilobytes.
    */
-  private getDescription(event: LogEvent): DescriptionBlock {
+  private getDescription(event: ApexEvent): DescriptionBlock {
     const isSosl = event.type === 'SOSL_EXECUTE_BEGIN';
     if (event.type !== 'SOQL_EXECUTE_BEGIN' && !isSosl) {
-      return { node: descriptionNode(event.text + (event.suffix ?? '')), more: null };
+      return { node: descriptionNode(eventName(event)), more: null };
     }
 
-    let block = this.descriptionCache.get(event);
+    let block = this.descriptionCache.get(event.id);
     if (!block) {
-      block = this.buildQueryPreview(event.text + (event.suffix ?? ''), isSosl ? 'sosl' : 'soql');
-      this.descriptionCache.set(event, block);
+      block = this.buildQueryPreview(eventName(event), isSosl ? 'sosl' : 'soql');
+      this.descriptionCache.set(event.id, block);
     }
     return { node: block.node.cloneNode(true) as HTMLElement, more: block.more };
   }
@@ -606,7 +613,7 @@ export class FrameTooltipRenderer {
     this.currentEvent = null;
     this.currentTruncationMarker = null;
     this.currentAnchor = null;
-    this.descriptionCache = new WeakMap();
+    this.descriptionCache = new Map();
   }
 }
 

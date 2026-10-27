@@ -47,12 +47,17 @@ export class TextLabelRenderer {
   /** Batch color data for contrast calculation */
   private batches: Map<string, RenderBatch> | null = null;
 
+  /** The label for a rect's row. */
+  readonly labelOf: (row: number) => string;
+
   /**
    * Create a new TextLabelRenderer.
    *
    * @param parentContainer - The worldContainer to add labels to
+   * @param labelOf - The label for a rect's row
    */
-  constructor(parentContainer: Container) {
+  constructor(parentContainer: Container, labelOf: (row: number) => string) {
+    this.labelOf = labelOf;
     this.container = new Container();
     this.container.zIndex = TEXT_LABEL_CONSTANTS.Z_INDEX;
     this.container.label = 'TextLabelRenderer';
@@ -132,7 +137,7 @@ export class TextLabelRenderer {
           continue;
         }
 
-        const text = rect.eventRef.text;
+        const text = this.labelOf(rect.row);
         if (!text) {
           continue;
         }

@@ -10,7 +10,6 @@ import {
   cachedAggregateVariables,
   MAX_VALUES_PER_NAME,
 } from '../aggregateVariables.js';
-import { variableIndex } from '../frameVariables.js';
 
 /** Resolves at once, so a test measures the walk rather than the frames it
  *  would leave to the next paint. */
@@ -33,13 +32,12 @@ function call(at: number, retry: string, accountId: string): string {
 const CALLS =
   call(1000, 'true', '001A') + call(2000, 'false', '001B') + call(3000, 'false', '001C');
 
-/** The comparison of every `ns.Svc.run()` call, with the statics index built. */
+/** The comparison of every `ns.Svc.run()` call. */
 async function compare(body: string, text = 'ns.Svc.run()') {
-  const { log, store } = storeOf(body);
-  const index = await store.derive(variableIndex);
+  const { log, store } = await storeOf(body);
   const frames = indexesOf(log, text);
-  const spread = await aggregateVariablesFor(store, frames, index, { yieldSlice });
-  return { log, store, index, frames, spread };
+  const spread = await aggregateVariablesFor(store, frames, { yieldSlice });
+  return { log, store, frames, spread };
 }
 
 describe('aggregateVariablesFor', () => {
@@ -173,15 +171,14 @@ describe('aggregateVariablesFor', () => {
   });
 
   it('returns null for an abandoned walk, and never memoises it', async () => {
-    const { log, store } = storeOf(CALLS);
-    const index = await store.derive(variableIndex);
+    const { log, store } = await storeOf(CALLS);
     const frames = indexesOf(log, 'ns.Svc.run()');
     // Only a spent slice yields, and only a yield reads the signal.
     const clock = jest.spyOn(performance, 'now');
     let time = 0;
     clock.mockImplementation(() => (time += 100));
     try {
-      const spread = await aggregateVariablesFor(store, frames, index, {
+      const spread = await aggregateVariablesFor(store, frames, {
         yieldSlice,
         signal: AbortSignal.abort(),
       });
@@ -194,10 +191,10 @@ describe('aggregateVariablesFor', () => {
   });
 
   it('answers a walked selection from the memo, so nothing walks twice', async () => {
-    const { store, index, frames, spread } = await compare(CALLS);
+    const { store, frames, spread } = await compare(CALLS);
 
     expect(cachedAggregateVariables(store, frames)).toBe(spread);
-    expect(await aggregateVariablesFor(store, frames, index, { yieldSlice })).toBe(spread);
+    expect(await aggregateVariablesFor(store, frames, { yieldSlice })).toBe(spread);
   });
 
   // The panel keeps its selection across loads, so the same frames array is asked
@@ -207,7 +204,7 @@ describe('aggregateVariablesFor', () => {
     const next = await compare(CALLS);
 
     expect(cachedAggregateVariables(next.store, frames)).toBeUndefined();
-    const walked = await aggregateVariablesFor(next.store, frames, next.index, { yieldSlice });
+    const walked = await aggregateVariablesFor(next.store, frames, { yieldSlice });
     // A spread prints as the whole comparison, so compare identity as a boolean.
     expect(walked === spread).toBe(false);
   });
@@ -235,16 +232,15 @@ describe('aggregateVariablesFor on this', () => {
   });
 
   it('names no class where the calls did not agree on one', async () => {
-    const { log, store } = storeOf(
+    const { log, store } = await storeOf(
       onObject(1000, '0xaaa', 'A') +
         '09:18:22.6 (2000)|METHOD_ENTRY|[1]|01p|ns.Other.run()\n' +
         '09:18:22.6 (2010)|VARIABLE_ASSIGNMENT|[2]|count|1\n' +
         '09:18:22.6 (2020)|METHOD_EXIT|[1]|ns.Other.run()\n',
     );
-    const index = await store.derive(variableIndex);
     const frames = [...indexesOf(log, 'ns.Svc.run()'), ...indexesOf(log, 'ns.Other.run()')];
 
-    const spread = await aggregateVariablesFor(store, frames, index, { yieldSlice });
+    const spread = await aggregateVariablesFor(store, frames, { yieldSlice });
 
     // Both frames were read: the second one's local is the only one that holds it.
     expect(spread?.locals.find((row) => row.name === 'count')?.calls).toBe(1);

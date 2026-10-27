@@ -20,8 +20,8 @@ const OUTER =
 describe('frameVariablesFor', () => {
   // The value is what the frame left, so the later write wins.
   it('reads the locals a frame wrote, with the last write it made', async () => {
-    const { log, store } = storeOf(OUTER);
-    const frame = frameVariablesFor(store, indexOf(log, 'ns.Outer.run()'), null);
+    const { log, store } = await storeOf(OUTER);
+    const frame = frameVariablesFor(store, indexOf(log, 'ns.Outer.run()'));
 
     expect(frame?.frameLabel).toBe('ns.Outer.run()');
     expect(frame?.locals).toEqual([
@@ -39,24 +39,24 @@ describe('frameVariablesFor', () => {
   // "Only the ones on stack and would be visible": a caller's local is on the
   // stack but out of scope from the method it called, and the callee records a
   // variable of its own, so no climb to the caller happens.
-  it('keeps a caller local out of the frame it called', () => {
-    const { log, store } = storeOf(OUTER);
+  it('keeps a caller local out of the frame it called', async () => {
+    const { log, store } = await storeOf(OUTER);
 
-    const inner = frameVariablesFor(store, indexOf(log, 'ns.Inner.step()'), null);
+    const inner = frameVariablesFor(store, indexOf(log, 'ns.Inner.step()'));
 
     expect(inner?.locals.map((row) => row.name)).toEqual(['inner']);
     expect(inner?.frameLabel).toBe('ns.Inner.step()');
   });
 
-  it('splits instance fields out of the locals', () => {
-    const { log, store } = storeOf(
+  it('splits instance fields out of the locals', async () => {
+    const { log, store } = await storeOf(
       '09:18:22.6 (1000)|METHOD_ENTRY|[1]|01p|ns.Outer.run()\n' +
         '09:18:22.6 (1100)|VARIABLE_ASSIGNMENT|[2]|count|1\n' +
         '09:18:22.6 (1200)|VARIABLE_ASSIGNMENT|[3]|this.count|7\n' +
         '09:18:22.6 (1300)|METHOD_EXIT|[1]|ns.Outer.run()\n',
     );
 
-    const frame = frameVariablesFor(store, indexOf(log, 'ns.Outer.run()'), null);
+    const frame = frameVariablesFor(store, indexOf(log, 'ns.Outer.run()'));
 
     // Shadowing stays visible: one name, one row in each group.
     expect(frame?.locals.map((row) => row.name)).toEqual(['count']);
@@ -73,43 +73,43 @@ describe('frameVariablesFor', () => {
     expect(frame?.thisType).toBe('ns.Outer');
   });
 
-  it('leaves a static out of the locals, since the index answers for it', () => {
-    const { log, store } = storeOf(
+  it('leaves a static out of the locals, since the index answers for it', async () => {
+    const { log, store } = await storeOf(
       '09:18:22.6 (1000)|METHOD_ENTRY|[1]|01p|ns.Outer.run()\n' +
         '09:18:22.6 (1100)|VARIABLE_ASSIGNMENT|[2]|ns.Cache.hits|4\n' +
         '09:18:22.6 (1300)|METHOD_EXIT|[1]|ns.Outer.run()\n',
     );
 
-    const frame = frameVariablesFor(store, indexOf(log, 'ns.Outer.run()'), null);
+    const frame = frameVariablesFor(store, indexOf(log, 'ns.Outer.run()'));
 
     expect(frame?.locals).toEqual([]);
     expect(frame?.fields).toEqual([]);
   });
 
-  it('sorts a frame’s locals by name', () => {
-    const { log, store } = storeOf(
+  it('sorts a frame’s locals by name', async () => {
+    const { log, store } = await storeOf(
       '09:18:22.6 (1000)|METHOD_ENTRY|[1]|01p|ns.Outer.run()\n' +
         '09:18:22.6 (1100)|VARIABLE_ASSIGNMENT|[2]|zeta|1\n' +
         '09:18:22.6 (1150)|VARIABLE_ASSIGNMENT|[3]|alpha|2\n' +
         '09:18:22.6 (1300)|METHOD_EXIT|[1]|ns.Outer.run()\n',
     );
 
-    const frame = frameVariablesFor(store, indexOf(log, 'ns.Outer.run()'), null);
+    const frame = frameVariablesFor(store, indexOf(log, 'ns.Outer.run()'));
 
     expect(frame?.locals.map((row) => row.name)).toEqual(['alpha', 'zeta']);
   });
 
-  it('reports no frame for an event the log does not hold', () => {
-    const { store } = storeOf(OUTER);
+  it('reports no frame for an event the log does not hold', async () => {
+    const { store } = await storeOf(OUTER);
 
-    expect(frameVariablesFor(store, 99_999, null)).toBeNull();
+    expect(frameVariablesFor(store, 99_999)).toBeNull();
   });
 
   // A frame asked about once is scanned straight from its children, bounded at
   // the cut; a frame asked about twice is read into a memo. Both must answer the
   // same, or looking at a row a second time would change it.
-  it('answers the same however many times a frame has been read', () => {
-    const { log, store } = storeOf(
+  it('answers the same however many times a frame has been read', async () => {
+    const { log, store } = await storeOf(
       '09:18:22.6 (1000)|METHOD_ENTRY|[1]|01p|ns.Svc.run()\n' +
         '09:18:22.6 (1010)|VARIABLE_SCOPE_BEGIN|[2]|tries|Integer|true|false\n' +
         '09:18:22.6 (1020)|VARIABLE_ASSIGNMENT|[2]|tries|1\n' +
@@ -118,14 +118,15 @@ describe('frameVariablesFor', () => {
         '09:18:22.6 (1050)|METHOD_EXIT|[1]|ns.Svc.run()\n',
     );
     const at = (text: string): number => {
-      const found = log.eventsById.find((event) => event.logLine?.includes(text));
-      if (!found) {
-        throw new Error(`no line holding ${text}`);
+      for (let id = 1; id <= log.eventCount; id++) {
+        if (log.event(id)?.logLine.includes(text)) {
+          return id;
+        }
       }
-      return found.eventIndex;
+      throw new Error(`no line holding ${text}`);
     };
     const read = (eventIndex: number): string =>
-      JSON.stringify(frameVariablesFor(store, eventIndex, null));
+      JSON.stringify(frameVariablesFor(store, eventIndex));
 
     const early = at('this.name');
     const first = read(early);
@@ -156,22 +157,20 @@ describe('VariableIndex', () => {
   // Reading them walks every static class the log holds, which is the bulk of a
   // read; a caller that does not compare statics must not pay for it.
   it('leaves the statics unread where the caller asked it to', async () => {
-    const { log, store } = storeOf(STATICS);
-    const statics = await store.derive(variableIndex);
+    const { log, store } = await storeOf(STATICS);
     const at = indexOf(log, 'ns.Outer.run()');
 
-    const frame = frameVariablesFor(store, at, statics, { statics: false });
+    const frame = frameVariablesFor(store, at, { statics: false });
 
     expect(frame?.statics).toEqual([]);
     // Everything else the frame holds is untouched.
-    expect(frame?.locals).toEqual(frameVariablesFor(store, at, statics)?.locals);
+    expect(frame?.locals).toEqual(frameVariablesFor(store, at)?.locals);
   });
 
   it('groups statics by their class, both sorted', async () => {
-    const { log, store } = storeOf(STATICS);
-    const statics = await store.derive(variableIndex);
+    const { log, store } = await storeOf(STATICS);
 
-    const frame = frameVariablesFor(store, indexOf(log, 'ns.Outer.run()'), statics);
+    const frame = frameVariablesFor(store, indexOf(log, 'ns.Outer.run()'));
 
     expect(frame?.statics).toEqual([
       {
@@ -221,7 +220,7 @@ describe('VariableIndex', () => {
       ['ns.Late'],
     ],
   ])('holds back a static %s after the frame', async (_how, early, late, atFirst, atSecond) => {
-    const { log, store } = storeOf(
+    const { log, store } = await storeOf(
       '09:18:22.6 (1000)|METHOD_ENTRY|[1]|01p|ns.First.run()\n' +
         early +
         '09:18:22.6 (1200)|METHOD_EXIT|[1]|ns.First.run()\n' +
@@ -229,20 +228,20 @@ describe('VariableIndex', () => {
         late +
         '09:18:22.6 (1500)|METHOD_EXIT|[9]|ns.Second.run()\n',
     );
-    const statics = await store.derive(variableIndex);
 
-    const first = frameVariablesFor(store, indexOf(log, 'ns.First.run()'), statics);
-    const second = frameVariablesFor(store, indexOf(log, 'ns.Second.run()'), statics);
+    const first = frameVariablesFor(store, indexOf(log, 'ns.First.run()'));
+    const second = frameVariablesFor(store, indexOf(log, 'ns.Second.run()'));
 
     expect(first?.statics.map((group) => group.className)).toEqual(atFirst);
     expect(second?.statics.map((group) => group.className)).toEqual(atSecond);
   });
 
   it('says whether the log recorded any write at all', async () => {
-    const withWrites = await storeOf(OUTER).store.derive(variableIndex);
-    const withNone = await storeOf(
+    const withWrites = await (await storeOf(OUTER)).store.derive(variableIndex);
+    const { store: none } = await storeOf(
       '09:18:22.6 (1000)|METHOD_ENTRY|[1]|01p|ns.Outer.run()\n',
-    ).store.derive(variableIndex);
+    );
+    const withNone = await none.derive(variableIndex);
 
     expect(withWrites.sawAnyWrite).toBe(true);
     expect(withNone.sawAnyWrite).toBe(false);
@@ -260,10 +259,9 @@ describe('static write cap keeps recency, not insertion order', () => {
       lines.push(`09:18:22.6 (${400 + i})|VARIABLE_ASSIGNMENT|[2]|ns.Counter.total|${i}`);
     }
     lines.push('09:18:22.6 (999999)|METHOD_EXIT|[1]|ns.Outer.run()');
-    const { log, store } = storeOf(lines.join('\n') + '\n');
-    const index = await store.derive(variableIndex);
+    const { log, store } = await storeOf(lines.join('\n') + '\n');
 
-    const frame = frameVariablesFor(store, indexOf(log, 'ns.Outer.run()'), index);
+    const frame = frameVariablesFor(store, indexOf(log, 'ns.Outer.run()'));
     const counter = frame?.statics.find((entry) => entry.className === 'ns.Counter');
 
     expect(counter?.rows.find((row) => row.name === 'total')?.value).toBe(String(total - 1));
@@ -273,8 +271,8 @@ describe('static write cap keeps recency, not insertion order', () => {
 // A field row's own line reports its owner, never the field's own value: taking
 // it as the field's address would resolve the field to the OWNER's class.
 describe('a field row never borrows its owner as its own address', () => {
-  it('carries no object address of its own', () => {
-    const { log, store } = storeOf(
+  it('carries no object address of its own', async () => {
+    const { log, store } = await storeOf(
       '09:18:22.6 (1000)|METHOD_ENTRY|[1]|01p|ns.Outer.run()\n' +
         '09:18:22.6 (1060)|VARIABLE_SCOPE_BEGIN|[9]|this|ns.Outer|true|false\n' +
         '09:18:22.6 (1070)|VARIABLE_ASSIGNMENT|[9]|this|{}|0xbbb222\n' +
@@ -282,7 +280,7 @@ describe('a field row never borrows its owner as its own address', () => {
         '09:18:22.6 (1300)|METHOD_EXIT|[1]|ns.Outer.run()\n',
     );
 
-    const frame = frameVariablesFor(store, indexOf(log, 'ns.Outer.run()'), null);
+    const frame = frameVariablesFor(store, indexOf(log, 'ns.Outer.run()'));
     const total = frame?.fields.find((row) => row.name === 'total');
 
     expect(total?.value).toBe('42');
@@ -299,26 +297,26 @@ describe('two instances of one class on the stack', () => {
     '09:18:22.6 (1400)|METHOD_EXIT|[9]|ns.Same.inner()\n' +
     '09:18:22.6 (1500)|METHOD_EXIT|[1]|ns.Same.outer()\n';
 
-  it('keeps one instance out of the other instance fields', () => {
-    const { log, store } = storeOf(TWO);
+  it('keeps one instance out of the other instance fields', async () => {
+    const { log, store } = await storeOf(TWO);
 
-    const frame = frameVariablesFor(store, indexOf(log, 'ns.Same.inner()'), null);
+    const frame = frameVariablesFor(store, indexOf(log, 'ns.Same.inner()'));
 
     expect(frame?.fields.map((row) => row.name)).toEqual(['innerOnly']);
   });
 
   // The caller's own frame reads as its own object, not the callee's.
-  it('reads the caller as its own instance', () => {
-    const { log, store } = storeOf(TWO);
+  it('reads the caller as its own instance', async () => {
+    const { log, store } = await storeOf(TWO);
 
-    const frame = frameVariablesFor(store, indexOf(log, 'ns.Same.outer()'), null);
+    const frame = frameVariablesFor(store, indexOf(log, 'ns.Same.outer()'));
 
     expect(frame?.fields.map((row) => row.name)).toEqual(['outerOnly']);
   });
 
   // A frame the log never named still merges by class, which is all it has.
-  it('still merges by class where the log named no object', () => {
-    const { log, store } = storeOf(
+  it('still merges by class where the log named no object', async () => {
+    const { log, store } = await storeOf(
       '09:18:22.6 (1000)|METHOD_ENTRY|[1]|01p|ns.Same.outer()\n' +
         '09:18:22.6 (1100)|VARIABLE_ASSIGNMENT|[2]|this.outerOnly|"A"\n' +
         '09:18:22.6 (1200)|METHOD_ENTRY|[9]|01p|ns.Same.inner()\n' +
@@ -327,7 +325,7 @@ describe('two instances of one class on the stack', () => {
         '09:18:22.6 (1500)|METHOD_EXIT|[1]|ns.Same.outer()\n',
     );
 
-    const frame = frameVariablesFor(store, indexOf(log, 'ns.Same.inner()'), null);
+    const frame = frameVariablesFor(store, indexOf(log, 'ns.Same.inner()'));
 
     expect(frame?.fields.map((row) => row.name).sort()).toEqual(['innerOnly', 'outerOnly']);
   });
@@ -351,24 +349,24 @@ describe('VariableIndex classAt', () => {
     '09:18:22.6 (1900)|METHOD_EXIT|[1]|ns.Outer.run()\n';
 
   it('names the class the object was constructed as', async () => {
-    const { store } = storeOf(SUBCLASS);
+    const { store } = await storeOf(SUBCLASS);
     const index = await store.derive(variableIndex);
 
-    expect(index.classAt('0x7b43a738', 99_999)).toBe('ns.Handler');
+    expect(index.viewAt(store.log.eventCount).classOf('0x7b43a738')).toBe('ns.Handler');
   });
 
   it('names none before the log declared it', async () => {
-    const { store } = storeOf(SUBCLASS);
+    const { store } = await storeOf(SUBCLASS);
     const index = await store.derive(variableIndex);
 
-    expect(index.classAt('0x7b43a738', 0)).toBeNull();
-    expect(index.classAt('0xnothere', 99_999)).toBeNull();
+    expect(index.viewAt(0).classOf('0x7b43a738')).toBeNull();
+    expect(index.viewAt(store.log.eventCount).classOf('0xnothere')).toBeNull();
   });
 
   // An object built outside the log is only ever named by a method, which
   // declares `this` as the type it was compiled against.
   it('falls back to the type a method declared', async () => {
-    const { store } = storeOf(
+    const { store } = await storeOf(
       '09:18:22.6 (1000)|METHOD_ENTRY|[1]|01p|ns.BaseHandler.run()\n' +
         '09:18:22.6 (1060)|VARIABLE_SCOPE_BEGIN|[15]|this|ns.BaseHandler|true|false\n' +
         '09:18:22.6 (1070)|VARIABLE_ASSIGNMENT|[15]|this|{}|0x7b43a738\n' +
@@ -376,14 +374,14 @@ describe('VariableIndex classAt', () => {
     );
     const index = await store.derive(variableIndex);
 
-    expect(index.classAt('0x7b43a738', 99_999)).toBe('ns.BaseHandler');
+    expect(index.viewAt(store.log.eventCount).classOf('0x7b43a738')).toBe('ns.BaseHandler');
   });
 
   // `this` is not redeclared on every call: the second frame here writes `this`
   // with no scope declaration of its own, and must not borrow the first
   // frame's class just because it was the last one the walk saw.
   it('names no class for a this write its own frame never declared', async () => {
-    const { store } = storeOf(
+    const { store } = await storeOf(
       '09:18:22.6 (1000)|METHOD_ENTRY|[1]|01p|ns.Outer.run()\n' +
         '09:18:22.6 (1050)|CONSTRUCTOR_ENTRY|[2]|01p|<init>()|ns.First\n' +
         '09:18:22.6 (1060)|VARIABLE_SCOPE_BEGIN|[9]|this|ns.First|true|false\n' +
@@ -396,8 +394,8 @@ describe('VariableIndex classAt', () => {
     );
     const index = await store.derive(variableIndex);
 
-    expect(index.classAt('0xaaa111', 99_999)).toBe('ns.First');
-    expect(index.classAt('0xbbb222', 99_999)).toBeNull();
+    expect(index.viewAt(store.log.eventCount).classOf('0xaaa111')).toBe('ns.First');
+    expect(index.viewAt(store.log.eventCount).classOf('0xbbb222')).toBeNull();
   });
 });
 
@@ -411,25 +409,25 @@ describe('VariableIndex address resolution', () => {
   // The row names the address; the index says what the log holds for it. The
   // row's own value stays exactly what the log wrote on that line.
   it('names the address a value is, and holds what the log wrote for it', async () => {
-    const { log, store } = storeOf(ADDRESSED);
+    const { log, store } = await storeOf(ADDRESSED);
     const index = await store.derive(variableIndex);
 
-    const frame = frameVariablesFor(store, indexOf(log, 'ns.Outer.run()'), index)!;
+    const frame = frameVariablesFor(store, indexOf(log, 'ns.Outer.run()'))!;
     const alias = frame.locals.find((row) => row.name === 'alias');
 
     expect(alias?.address).toBe('0xd854c6b');
     expect(alias?.value).toBe('0xd854c6b');
-    expect(index.addressState('0xd854c6b', frame.cut).text).toBe('{"Id":"001"}');
+    expect(index.viewAt(frame.cut).resolve('0xd854c6b').text).toBe('{"Id":"001"}');
     // A value that is not an address is left alone.
     expect(frame.locals.find((row) => row.name === 'held')?.address).toBeNull();
   });
 
   // The frame answers before the index exists, so the section can show the
   // scope while the walk runs. Only the log-wide statics wait for it.
-  it('answers the frame alone before the index is built', () => {
-    const { log, store } = storeOf(ADDRESSED);
+  it('answers the frame alone before the index is built', async () => {
+    const { log, store } = await storeOf(ADDRESSED);
 
-    const frame = frameVariablesFor(store, indexOf(log, 'ns.Outer.run()'), null);
+    const frame = frameVariablesFor(store, indexOf(log, 'ns.Outer.run()'));
 
     expect(frame?.locals.find((row) => row.name === 'alias')?.address).toBe('0xd854c6b');
     expect(frame?.statics).toEqual([]);
@@ -438,7 +436,7 @@ describe('VariableIndex address resolution', () => {
   // The address names an object whose contents change, so answering with a
   // later write would show a state the frame never saw.
   it('answers as the value stood at the cut, not a later one', async () => {
-    const { log, store } = storeOf(
+    const { log, store } = await storeOf(
       '09:18:22.6 (1000)|METHOD_ENTRY|[1]|01p|ns.First.run()\n' +
         '09:18:22.6 (1050)|VARIABLE_ASSIGNMENT|[2]|held|{"n":1}|0xaaa\n' +
         '09:18:22.6 (1100)|VARIABLE_ASSIGNMENT|[3]|alias|0xaaa\n' +
@@ -450,25 +448,25 @@ describe('VariableIndex address resolution', () => {
     );
     const index = await store.derive(variableIndex);
 
-    const first = frameVariablesFor(store, indexOf(log, 'ns.First.run()'), index)!;
-    const second = frameVariablesFor(store, indexOf(log, 'ns.Second.run()'), index)!;
+    const first = frameVariablesFor(store, indexOf(log, 'ns.First.run()'))!;
+    const second = frameVariablesFor(store, indexOf(log, 'ns.Second.run()'))!;
 
-    expect(index.addressState('0xaaa', first.cut).text).toBe('{"n":1}');
-    expect(index.addressState('0xaaa', second.cut).text).toBe('{"n":2}');
+    expect(index.viewAt(first.cut).resolve('0xaaa').text).toBe('{"n":1}');
+    expect(index.viewAt(second.cut).resolve('0xaaa').text).toBe('{"n":2}');
   });
 
   it('holds nothing for an address the log never serialised', async () => {
-    const { log, store } = storeOf(
+    const { log, store } = await storeOf(
       '09:18:22.6 (1000)|METHOD_ENTRY|[1]|01p|ns.Outer.run()\n' +
         '09:18:22.6 (1100)|VARIABLE_ASSIGNMENT|[2]|alias|0xbbb\n' +
         '09:18:22.6 (1900)|METHOD_EXIT|[1]|ns.Outer.run()\n',
     );
     const index = await store.derive(variableIndex);
 
-    const frame = frameVariablesFor(store, indexOf(log, 'ns.Outer.run()'), index)!;
+    const frame = frameVariablesFor(store, indexOf(log, 'ns.Outer.run()'))!;
 
     expect(frame.locals[0]?.address).toBe('0xbbb');
-    expect(index.addressState('0xbbb', frame.cut)).toEqual({ text: null, laterAt: null });
+    expect(index.viewAt(frame.cut).resolve('0xbbb')).toEqual({ text: null, laterAt: null });
   });
 
   // On a `this.field` line the reported address is the object the field belongs
@@ -476,7 +474,7 @@ describe('VariableIndex address resolution', () => {
   // more different values. Taking it as a witness answers about an object with
   // one of its fields.
   it('takes no value from a field write, whose address is the owner', async () => {
-    const { store } = storeOf(
+    const { store } = await storeOf(
       '09:18:22.6 (1000)|METHOD_ENTRY|[1]|01p|ns.Outer.run()\n' +
         '09:18:22.6 (1100)|VARIABLE_ASSIGNMENT|[2]|this.sortDir|"asc"|0xf1e2d3\n' +
         '09:18:22.6 (1150)|VARIABLE_ASSIGNMENT|[3]|alias|0xf1e2d3\n' +
@@ -484,13 +482,13 @@ describe('VariableIndex address resolution', () => {
     );
     const index = await store.derive(variableIndex);
 
-    expect(index.addressState('0xf1e2d3', 99_999).text).toBeNull();
+    expect(index.viewAt(store.log.eventCount).resolve('0xf1e2d3').text).toBeNull();
   });
 
   // The same address on a `this` line does name the value: the variable is the
   // object.
   it('takes the value from a write of this, whose address is the object', async () => {
-    const { store } = storeOf(
+    const { store } = await storeOf(
       '09:18:22.6 (1000)|METHOD_ENTRY|[1]|01p|ns.Outer.run()\n' +
         '09:18:22.6 (1100)|VARIABLE_ASSIGNMENT|[2]|this|{"sortDir":"asc"}|0xf1e2d3\n' +
         '09:18:22.6 (1150)|VARIABLE_ASSIGNMENT|[3]|alias|0xf1e2d3\n' +
@@ -498,22 +496,22 @@ describe('VariableIndex address resolution', () => {
     );
     const index = await store.derive(variableIndex);
 
-    expect(index.addressState('0xf1e2d3', 99_999).text).toBe('{"sortDir":"asc"}');
+    expect(index.viewAt(store.log.eventCount).resolve('0xf1e2d3').text).toBe('{"sortDir":"asc"}');
   });
 });
 
 // "Everything that frame could access": a name in scope with no value recorded
 // is still in scope, and a field the frame never touched is still its field.
 describe('frameVariablesFor whole scope', () => {
-  it('lists a local the log declared and never assigned', () => {
-    const { log, store } = storeOf(
+  it('lists a local the log declared and never assigned', async () => {
+    const { log, store } = await storeOf(
       '09:18:22.6 (1000)|METHOD_ENTRY|[1]|01p|ns.Outer.run()\n' +
         '09:18:22.6 (1100)|VARIABLE_SCOPE_BEGIN|[2]|never|Boolean|true|false\n' +
         '09:18:22.6 (1200)|VARIABLE_ASSIGNMENT|[3]|written|1\n' +
         '09:18:22.6 (1300)|METHOD_EXIT|[1]|ns.Outer.run()\n',
     );
 
-    const frame = frameVariablesFor(store, indexOf(log, 'ns.Outer.run()'), null);
+    const frame = frameVariablesFor(store, indexOf(log, 'ns.Outer.run()'));
     const never = frame?.locals.find((row) => row.name === 'never');
 
     expect(never?.assigned).toBe(false);
@@ -523,8 +521,8 @@ describe('frameVariablesFor whole scope', () => {
 
   // A method of class X shares its `this` with another method of X that called
   // it, so a field the caller set is in scope in the callee.
-  it('gathers fields from a caller frame of the same class', () => {
-    const { log, store } = storeOf(
+  it('gathers fields from a caller frame of the same class', async () => {
+    const { log, store } = await storeOf(
       '09:18:22.6 (1000)|METHOD_ENTRY|[1]|01p|ns.Outer.run()\n' +
         '09:18:22.6 (1100)|VARIABLE_ASSIGNMENT|[2]|this.fromCaller|"set early"\n' +
         '09:18:22.6 (1200)|METHOD_ENTRY|[5]|01p|ns.Outer.step()\n' +
@@ -533,14 +531,14 @@ describe('frameVariablesFor whole scope', () => {
         '09:18:22.6 (1500)|METHOD_EXIT|[1]|ns.Outer.run()\n',
     );
 
-    const frame = frameVariablesFor(store, indexOf(log, 'ns.Outer.step()'), null);
+    const frame = frameVariablesFor(store, indexOf(log, 'ns.Outer.step()'));
 
     expect(frame?.fields.map((row) => row.name)).toEqual(['fromCallee', 'fromCaller']);
   });
 
   // A different class on the stack has a different `this`.
-  it('leaves the fields of another class out', () => {
-    const { log, store } = storeOf(
+  it('leaves the fields of another class out', async () => {
+    const { log, store } = await storeOf(
       '09:18:22.6 (1000)|METHOD_ENTRY|[1]|01p|ns.Other.run()\n' +
         '09:18:22.6 (1100)|VARIABLE_ASSIGNMENT|[2]|this.notMine|1\n' +
         '09:18:22.6 (1200)|METHOD_ENTRY|[5]|01p|ns.Outer.step()\n' +
@@ -549,20 +547,19 @@ describe('frameVariablesFor whole scope', () => {
         '09:18:22.6 (1500)|METHOD_EXIT|[1]|ns.Other.run()\n',
     );
 
-    const frame = frameVariablesFor(store, indexOf(log, 'ns.Outer.step()'), null);
+    const frame = frameVariablesFor(store, indexOf(log, 'ns.Outer.step()'));
 
     expect(frame?.fields.map((row) => row.name)).toEqual(['mine']);
   });
 
   it('lists a static the log declared and never assigned', async () => {
-    const { log, store } = storeOf(
+    const { log, store } = await storeOf(
       '09:18:22.6 (1000)|METHOD_ENTRY|[1]|01p|ns.Outer.run()\n' +
         '09:18:22.6 (1100)|VARIABLE_SCOPE_BEGIN|[2]|ns.Cache.never|Integer|true|true\n' +
         '09:18:22.6 (1300)|METHOD_EXIT|[1]|ns.Outer.run()\n',
     );
-    const index = await store.derive(variableIndex);
 
-    const frame = frameVariablesFor(store, indexOf(log, 'ns.Outer.run()'), index);
+    const frame = frameVariablesFor(store, indexOf(log, 'ns.Outer.run()'));
 
     expect(frame?.statics).toEqual([
       {
@@ -600,18 +597,18 @@ describe('frameVariablesFor scope attribution', () => {
     '09:18:22.6 (1350)|SYSTEM_METHOD_EXIT|[4]|Database.query(String)\n' +
     '09:18:22.6 (1400)|METHOD_EXIT|[1]|ns.Outer.run()\n';
 
-  it('answers a SOQL selection with the scope that built the query', () => {
-    const { log, store } = storeOf(QUERY);
+  it('answers a SOQL selection with the scope that built the query', async () => {
+    const { log, store } = await storeOf(QUERY);
 
-    const frame = frameVariablesFor(store, indexOf(log, 'SELECT Id FROM Account'), null);
+    const frame = frameVariablesFor(store, indexOf(log, 'SELECT Id FROM Account'));
 
     expect(frame?.locals.map((row) => row.name)).toEqual(['compId', 'qry']);
     // The label names the frame the locals belong to, so it is never a guess.
     expect(frame?.frameLabel).toBe('ns.Outer.run()');
   });
 
-  it('reads the query scope as it stood when the query ran', () => {
-    const { log, store } = storeOf(
+  it('reads the query scope as it stood when the query ran', async () => {
+    const { log, store } = await storeOf(
       '09:18:22.6 (1000)|METHOD_ENTRY|[1]|01p|ns.Outer.run()\n' +
         '09:18:22.6 (1050)|VARIABLE_ASSIGNMENT|[2]|compId|"first"\n' +
         '09:18:22.6 (1100)|SYSTEM_METHOD_ENTRY|[4]|Database.query(String)\n' +
@@ -622,8 +619,8 @@ describe('frameVariablesFor scope attribution', () => {
         '09:18:22.6 (1350)|METHOD_EXIT|[1]|ns.Outer.run()\n',
     );
 
-    const atQuery = frameVariablesFor(store, indexOf(log, 'SELECT Id FROM Account'), null);
-    const atFrame = frameVariablesFor(store, indexOf(log, 'ns.Outer.run()'), null);
+    const atQuery = frameVariablesFor(store, indexOf(log, 'SELECT Id FROM Account'));
+    const atFrame = frameVariablesFor(store, indexOf(log, 'ns.Outer.run()'));
 
     // The write after the query was not in scope when the query ran.
     expect(atQuery?.locals[0]?.value).toBe('"first"');
@@ -635,7 +632,7 @@ describe('frameVariablesFor scope attribution', () => {
 // holding a reference to another object.
 describe('VariableIndex nested addresses', () => {
   it('resolves an address that only ever appears inside a value', async () => {
-    const { store } = storeOf(
+    const { store } = await storeOf(
       '09:18:22.6 (1000)|METHOD_ENTRY|[1]|01p|ns.Outer.run()\n' +
         '09:18:22.6 (1050)|VARIABLE_ASSIGNMENT|[2]|filter|{"RowLimit":3000}|0x6c98700c\n' +
         '09:18:22.6 (1100)|VARIABLE_ASSIGNMENT|[3]|view|{"m_tliFilter":"0x6c98700c"}|0x7d1781a3\n' +
@@ -643,13 +640,11 @@ describe('VariableIndex nested addresses', () => {
     );
     const index = await store.derive(variableIndex);
 
-    expect(index.addressState('0x6c98700c', Number.MAX_SAFE_INTEGER).text).toBe(
-      '{"RowLimit":3000}',
-    );
+    expect(index.viewAt(store.log.eventCount).resolve('0x6c98700c').text).toBe('{"RowLimit":3000}');
   });
 
   it('reads it as it stood at the cut', async () => {
-    const { log, store } = storeOf(
+    const { log, store } = await storeOf(
       '09:18:22.6 (1000)|METHOD_ENTRY|[1]|01p|ns.First.run()\n' +
         '09:18:22.6 (1050)|VARIABLE_ASSIGNMENT|[2]|filter|{"n":1}|0xaaa\n' +
         '09:18:22.6 (1100)|VARIABLE_ASSIGNMENT|[3]|view|{"ref":"0xaaa"}\n' +
@@ -659,10 +654,10 @@ describe('VariableIndex nested addresses', () => {
         '09:18:22.6 (1300)|METHOD_EXIT|[9]|ns.Second.run()\n',
     );
     const index = await store.derive(variableIndex);
-    const first = frameVariablesFor(store, indexOf(log, 'ns.First.run()'), index);
+    const first = frameVariablesFor(store, indexOf(log, 'ns.First.run()'));
 
-    expect(index.addressState('0xaaa', first!.cut).text).toBe('{"n":1}');
-    expect(index.addressState('0xaaa', Number.MAX_SAFE_INTEGER).text).toBe('{"n":2}');
+    expect(index.viewAt(first!.cut).resolve('0xaaa').text).toBe('{"n":1}');
+    expect(index.viewAt(store.log.eventCount).resolve('0xaaa').text).toBe('{"n":2}');
   });
 });
 
@@ -683,22 +678,22 @@ describe('VariableIndex object fields', () => {
     '09:18:22.6 (1090)|METHOD_EXIT|[70]|ns.Caller.run()\n';
 
   it('answers with the fields the log recorded for an object', async () => {
-    const { store } = storeOf(BUILT);
+    const { store } = await storeOf(BUILT);
     const index = await store.derive(variableIndex);
 
-    expect(index.fieldsAt('0xaaa', Number.MAX_SAFE_INTEGER)).toMatchObject([
+    expect(index.viewAt(store.log.eventCount).fields('0xaaa')).toMatchObject([
       { name: 'rows', value: '5' },
       { name: 'sObj', value: '"Account"' },
     ]);
-    expect(index.fieldsAt('0xaaa', Number.MAX_SAFE_INTEGER)).toHaveLength(2);
+    expect(index.viewAt(store.log.eventCount).fields('0xaaa')).toHaveLength(2);
     // Nothing for an object whose fields the log never wrote.
-    expect(index.fieldsAt('0xbbb', Number.MAX_SAFE_INTEGER)).toEqual([]);
+    expect(index.viewAt(store.log.eventCount).fields('0xbbb')).toEqual([]);
   });
 
   // A field is its own write with its own place in the log, so it reads as the
   // frame stood rather than as the object ended up.
   it('answers as the frame stood, not as the object ended up', async () => {
-    const { log, store } = storeOf(
+    const { log, store } = await storeOf(
       BUILT +
         '09:18:22.6 (2000)|METHOD_ENTRY|[80]|01p|ns.Caller.later()\n' +
         '09:18:22.6 (2010)|VARIABLE_ASSIGNMENT|[81]|this.rows|9|0xaaa\n' +
@@ -706,17 +701,23 @@ describe('VariableIndex object fields', () => {
     );
     const index = await store.derive(variableIndex);
 
-    const first = frameVariablesFor(store, indexOf(log, 'ns.Caller.run()'), index)!;
-    const later = frameVariablesFor(store, indexOf(log, 'ns.Caller.later()'), index)!;
+    const first = frameVariablesFor(store, indexOf(log, 'ns.Caller.run()'))!;
+    const later = frameVariablesFor(store, indexOf(log, 'ns.Caller.later()'))!;
 
-    expect(index.fieldsAt('0xaaa', first.cut)).toMatchObject([{ name: 'rows', value: '5' }, {}]);
-    expect(index.fieldsAt('0xaaa', later.cut)).toMatchObject([{ name: 'rows', value: '9' }, {}]);
+    expect(index.viewAt(first.cut).fields('0xaaa')).toMatchObject([
+      { name: 'rows', value: '5' },
+      {},
+    ]);
+    expect(index.viewAt(later.cut).fields('0xaaa')).toMatchObject([
+      { name: 'rows', value: '9' },
+      {},
+    ]);
   });
 
   // The frame's own stack cannot see a constructor that has already returned,
   // and most of an object's fields are set there.
   it('gives a frame the fields its returned constructor set', async () => {
-    const { log, store } = storeOf(
+    const { log, store } = await storeOf(
       '09:18:22.6 (1000)|CONSTRUCTOR_ENTRY|[62]|01p|<init>()|ns.Selector\n' +
         '09:18:22.6 (1010)|VARIABLE_SCOPE_BEGIN|[1]|this|ns.Selector|true|false\n' +
         '09:18:22.6 (1020)|VARIABLE_ASSIGNMENT|[1]|this|{}|0xaaa\n' +
@@ -728,9 +729,8 @@ describe('VariableIndex object fields', () => {
         '09:18:22.6 (1080)|VARIABLE_ASSIGNMENT|[72]|found|7\n' +
         '09:18:22.6 (1090)|METHOD_EXIT|[70]|ns.Selector.query()\n',
     );
-    const index = await store.derive(variableIndex);
 
-    const frame = frameVariablesFor(store, indexOf(log, 'ns.Selector.query()'), index);
+    const frame = frameVariablesFor(store, indexOf(log, 'ns.Selector.query()'));
 
     expect(frame?.fields.map((row) => row.name)).toEqual(['sObj']);
   });
@@ -738,7 +738,7 @@ describe('VariableIndex object fields', () => {
   // An address is reused once its object is collected, so the fields of the
   // object that lived there before are not this one's.
   it('leaves out the fields of an earlier object at the same address', async () => {
-    const { log, store } = storeOf(
+    const { log, store } = await storeOf(
       '09:18:22.6 (1000)|CONSTRUCTOR_ENTRY|[1]|01p|<init>()|ns.First\n' +
         '09:18:22.6 (1010)|VARIABLE_SCOPE_BEGIN|[1]|this|ns.First|true|false\n' +
         '09:18:22.6 (1020)|VARIABLE_ASSIGNMENT|[1]|this|{}|0xbbb\n' +
@@ -756,15 +756,20 @@ describe('VariableIndex object fields', () => {
     );
     const index = await store.derive(variableIndex);
 
-    const frame = frameVariablesFor(store, indexOf(log, 'ns.Second.go()'), index)!;
+    const frame = frameVariablesFor(store, indexOf(log, 'ns.Second.go()'))!;
 
-    expect(index.fieldsAt('0xbbb', frame.cut).map((row) => row.name)).toEqual(['two']);
+    expect(
+      index
+        .viewAt(frame.cut)
+        .fields('0xbbb')
+        .map((row) => row.name),
+    ).toEqual(['two']);
   });
 
   // The index only sees a field write whose line reported an address, so the
   // frame's own writes are merged in rather than replaced.
   it('keeps a field write whose line reported no address', async () => {
-    const { log, store } = storeOf(
+    const { log, store } = await storeOf(
       '09:18:22.6 (1000)|METHOD_ENTRY|[70]|01p|ns.Selector.query()\n' +
         '09:18:22.6 (1010)|VARIABLE_SCOPE_BEGIN|[71]|this|ns.Selector|true|false\n' +
         '09:18:22.6 (1020)|VARIABLE_ASSIGNMENT|[71]|this|{}|0xaaa\n' +
@@ -772,9 +777,8 @@ describe('VariableIndex object fields', () => {
         '09:18:22.6 (1040)|VARIABLE_ASSIGNMENT|[73]|this.plain|"no address"\n' +
         '09:18:22.6 (1050)|METHOD_EXIT|[70]|ns.Selector.query()\n',
     );
-    const index = await store.derive(variableIndex);
 
-    const frame = frameVariablesFor(store, indexOf(log, 'ns.Selector.query()'), index);
+    const frame = frameVariablesFor(store, indexOf(log, 'ns.Selector.query()'));
 
     expect(frame?.fields.map((row) => row.name)).toEqual(['plain', 'sObj']);
   });
@@ -782,10 +786,10 @@ describe('VariableIndex object fields', () => {
   // Every row that shows an object reads its fields, and every row is built
   // again whenever anything opens, so the read is held.
   it("holds an object's fields for the point it was asked about", async () => {
-    const { store } = storeOf(BUILT);
+    const { store } = await storeOf(BUILT);
     const index = await store.derive(variableIndex);
 
-    const view = index.viewAt(Number.MAX_SAFE_INTEGER);
+    const view = index.viewAt(store.log.eventCount);
 
     expect(view.fields('0xaaa')).toBe(view.fields('0xaaa'));
     expect(view.fields('0xaaa')).toHaveLength(2);
@@ -800,7 +804,7 @@ describe('VariableIndex object fields', () => {
       `09:18:22.6 (${1002 + line * 10})|VARIABLE_ASSIGNMENT|[${line}]|this|{}|0xbbb\n` +
       `09:18:22.6 (${1003 + line * 10})|VARIABLE_ASSIGNMENT|[${line}]|this.${field}|1|0xbbb\n` +
       `09:18:22.6 (${1004 + line * 10})|CONSTRUCTOR_EXIT|[${line}]|01p|<init>()|ns.Item\n`;
-    const { log, store } = storeOf(
+    const { log, store } = await storeOf(
       twice(1, 'first') +
         twice(5, 'second') +
         '09:18:22.6 (1100)|METHOD_ENTRY|[20]|01p|ns.Item.go()\n' +
@@ -810,9 +814,14 @@ describe('VariableIndex object fields', () => {
     );
     const index = await store.derive(variableIndex);
 
-    const frame = frameVariablesFor(store, indexOf(log, 'ns.Item.go()'), index)!;
+    const frame = frameVariablesFor(store, indexOf(log, 'ns.Item.go()'))!;
 
-    expect(index.fieldsAt('0xbbb', frame.cut).map((row) => row.name)).toEqual(['second']);
+    expect(
+      index
+        .viewAt(frame.cut)
+        .fields('0xbbb')
+        .map((row) => row.name),
+    ).toEqual(['second']);
   });
 
   // Each field holds its own writes, so a field assigned once early survives a
@@ -829,14 +838,13 @@ describe('VariableIndex object fields', () => {
       body += `09:18:22.6 (${2000 + at})|VARIABLE_ASSIGNMENT|[3]|this.n|${at}|0xccc\n`;
     }
     body += '09:18:22.6 (7000)|METHOD_EXIT|[1]|ns.Loop.run()\n';
-    const { store } = storeOf(body);
+    const { store } = await storeOf(body);
     const index = await store.derive(variableIndex);
 
-    expect(index.fieldsAt('0xccc', Number.MAX_SAFE_INTEGER)).toMatchObject([
+    expect(index.viewAt(store.log.eventCount).fields('0xccc')).toMatchObject([
       { name: 'keep', value: '"important"' },
       { name: 'n', value: '4100' },
     ]);
     // Dropping old writes to one field is not the log-wide cap.
-    expect(index.capped).toBe(false);
   });
 });

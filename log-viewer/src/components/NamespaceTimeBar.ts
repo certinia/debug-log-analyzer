@@ -68,7 +68,7 @@ export class NamespaceTimeBar extends LitElement {
     args: () => [this.logStore, this.instances?.length ? this.instances : this.eventIndex],
   });
 
-  private readonly _window = new WindowStatsController(this, () => this.logStore?.log ?? null);
+  private readonly _window = new WindowStatsController(this, () => this.logStore ?? null);
 
   static styles = [globalStyles, inspectorSectionStyles];
 

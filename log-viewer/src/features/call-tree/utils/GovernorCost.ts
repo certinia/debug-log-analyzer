@@ -1,19 +1,14 @@
 /*
  * Copyright (c) 2026 Certinia Inc. All rights reserved.
  */
-import type {
-  GovernorLimits,
-  LimitMetricUnit,
-  Limits,
-  SelfTotal,
-} from '@apexdevtools/apex-log-parser';
+import type { GovernorLimits, Limits, LimitUnit, SelfTotal } from '@apexdevtools/apex-log-parser';
 
 import { GOVERNOR_METRIC } from '../../../core/metrics/governorMetrics.js';
 import { sharePercent } from '../../../core/utility/Util.js';
 
 /**
  * The governor usage a node reports — all that's needed to *derive* cost. Both
- * the call-tree row models and the parser's `LogEvent` satisfy this, so the
+ * the call-tree row models and the parser's `ApexEvent` satisfy this, so the
  * derivations below work off either without a conversion step.
  */
 export interface GovernorUsage {
@@ -94,13 +89,13 @@ export type CostLimits = ReadonlyArray<CostMetric & { limit: number }>;
 export function costLimitsOf(limits: GovernorLimits): CostLimits {
   return COST_METRICS.map((metric) => ({
     ...metric,
-    limit: limits[metric.snapshot ?? 'final'][metric.key].limit,
+    limit: limits[metric.snapshot ?? 'final'][metric.key].limit ?? 0,
   })).filter((metric) => metric.limit > 0);
 }
 
 export interface GovernorCostMetric {
   label: string;
-  unit: LimitMetricUnit;
+  unit: LimitUnit;
   used: number;
   limit: number;
   /** This metric's own `used/limit × 100` contribution to the total. */

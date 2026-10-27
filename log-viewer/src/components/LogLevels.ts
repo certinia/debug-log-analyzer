@@ -9,7 +9,11 @@ import { customElement, property } from 'lit/decorators.js';
 import { live } from 'lit/directives/live.js';
 import { repeat } from 'lit/directives/repeat.js';
 
-import type { DebugLevels, LogLevel } from '@apexdevtools/apex-log-parser';
+import {
+  DEBUG_CATEGORY_TOKEN,
+  type DebugCategory,
+  type Level,
+} from '@apexdevtools/apex-log-parser';
 
 // web components
 import './OverflowList.js';
@@ -17,13 +21,13 @@ import './VsSelect.js';
 
 // styles
 import { globalStyles } from '../styles/global.styles.js';
-import { LEVEL_ORDER, LOG_TOKEN, levelRank, sameLevels } from '../core/log/levelFilter.js';
+import { type DebugLevels, LEVEL_ORDER, levelRank, sameLevels } from '../core/log/levelFilter.js';
 import { logStatusContext, type LogStatus } from '../core/log/logStatus.js';
 import { skeletonStyles } from '../styles/skeleton.styles.js';
 
 export interface LogLevelsChange {
-  category: keyof DebugLevels;
-  level: LogLevel;
+  category: DebugCategory;
+  level: Level;
 }
 
 const levelsChanged = (value: DebugLevels | null, old: DebugLevels | null): boolean =>
@@ -139,7 +143,7 @@ export class LogLevels extends LitElement {
       </div>`;
     }
 
-    const lowered = (Object.entries(this.captured) as [keyof DebugLevels, LogLevel][]).filter(
+    const lowered = (Object.entries(this.captured) as [DebugCategory, Level][]).filter(
       ([category, captured]) => levelRank(shown[category] ?? captured) < levelRank(captured),
     ).length;
     const resetLabel = lowered
@@ -158,10 +162,10 @@ export class LogLevels extends LitElement {
     </button>`;
     return html`<overflow-list menu-heading="Log Levels">
       ${repeat(
-        Object.entries(this.captured) as [keyof DebugLevels, LogLevel][],
+        Object.entries(this.captured) as [DebugCategory, Level][],
         ([category]) => category,
         ([category, captured]) => {
-          const token = LOG_TOKEN[category];
+          const token = DEBUG_CATEGORY_TOKEN[category];
           const level = shown[category] ?? captured;
           return html`<vs-select
             dense
@@ -190,8 +194,8 @@ export class LogLevels extends LitElement {
     </overflow-list>`;
   }
 
-  private _onChange(category: keyof DebugLevels, event: Event): void {
-    const level = (event.target as HTMLInputElement).value as LogLevel;
+  private _onChange(category: DebugCategory, event: Event): void {
+    const level = (event.target as HTMLInputElement).value as Level;
     // Leaves the app header's shadow root for the log viewer, which owns the levels.
     this.dispatchEvent(
       new CustomEvent<LogLevelsChange>('log-levels-change', {

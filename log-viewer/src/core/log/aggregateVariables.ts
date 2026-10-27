@@ -2,7 +2,7 @@
  * Copyright (c) 2026 Certinia Inc. All rights reserved.
  */
 import { frameBudget, type FrameBudgetOptions } from '../utility/FrameBudget.js';
-import { frameVariablesFor, type VariableIndex, type VariableRow } from './frameVariables.js';
+import { frameVariablesFor, type VariableRow } from './frameVariables.js';
 import type { LogStore } from './LogStore.js';
 
 /**
@@ -39,9 +39,8 @@ export const MAX_VALUES_PER_NAME = 1_000;
 export const MAX_MARKED_PER_VALUE = 200;
 
 /** What a compared frame is read with, allocated once: a wide selection reads
- *  tens of thousands of frames. Statics are not compared, and the rows are
- *  grouped by name here, so the per-frame sort is thrown away. */
-const AS_READ = { statics: false, sorted: false } as const;
+ *  tens of thousands of frames. Statics are not compared. */
+const AS_READ = { statics: false } as const;
 
 /** One value a name held, and which calls held it. */
 export interface SpreadValue {
@@ -117,7 +116,6 @@ interface Gathering {
 async function compareFrames(
   store: LogStore,
   frames: readonly number[],
-  index: VariableIndex | null,
   options: FrameBudgetOptions,
 ): Promise<AggregateVariables | null> {
   const tick = frameBudget(options);
@@ -139,7 +137,7 @@ async function compareFrames(
     if (!(await tick())) {
       return null;
     }
-    const frame = frameVariablesFor(store, eventIndex, index, AS_READ);
+    const frame = frameVariablesFor(store, eventIndex, AS_READ);
     if (!frame) {
       continue;
     }
@@ -300,14 +298,13 @@ export function cachedAggregateVariables(
 export async function aggregateVariablesFor(
   store: LogStore,
   frames: readonly number[],
-  index: VariableIndex | null,
   options: FrameBudgetOptions,
 ): Promise<AggregateVariables | null> {
   const held = cachedAggregateVariables(store, frames);
   if (held) {
     return held;
   }
-  const spread = await compareFrames(store, frames, index, options);
+  const spread = await compareFrames(store, frames, options);
   if (spread) {
     comparedIn(store.log).set(frames, spread);
   }
