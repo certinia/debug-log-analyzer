@@ -162,6 +162,32 @@ describe('filterByLevels', () => {
     expect(sum(rowMetrics(after).soqlCount.self)).toBe(sum(rowMetrics(before).soqlCount.self));
   });
 
+  // Summed over the tree only, a self time handed to the wrong row would still pass.
+  it('gives a hidden frame its self time to its nearest kept ancestor', async () => {
+    const store = await storeOfBody();
+    const before = await store.logIndex();
+    const after = await (await shown(store, { apexCode: 'DEBUG' })).logIndex();
+    const codeUnit = (index: LogIndex) => typesOf(index).indexOf('CODE_UNIT_STARTED');
+
+    // Outer runs 7000ns around Inner's 3000ns: 4000ns its own. Inner holds the 1000ns query: 2000ns its own.
+    expect(after.self[codeUnit(after)]! - before.self[codeUnit(before)]!).toBe(6000);
+  });
+
+  // A path through a hidden frame opens a row the view does not have.
+  it('gives a path through the kept frames only, and none to a hidden event', async () => {
+    const { log, store } = await storeOf(BODY, SETTINGS);
+    const filtered = await shown(store, { apexCode: 'DEBUG' });
+    const hello = indexOf(log, 'DEBUG | hello');
+
+    expect(filtered.pathTo(hello).map((id) => log.event(id)!.type)).toEqual([
+      'EXECUTION_STARTED',
+      'CODE_UNIT_STARTED',
+      'USER_DEBUG',
+    ]);
+    expect(filtered.pathTo(hello).at(-1)).toBe(hello);
+    expect(filtered.pathTo(indexOf(log, 'ns.Outer.run()'))).toEqual([]);
+  });
+
   it('folds a hidden statement count into its parent', async () => {
     const store = await storeOfBody();
     const inner = indexOf(store.log, 'ns.Inner.go()');
