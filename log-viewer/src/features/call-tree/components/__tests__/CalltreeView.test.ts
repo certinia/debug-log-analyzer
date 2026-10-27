@@ -396,6 +396,19 @@ describe('calltree-view category colorize', () => {
     expect(view.timeOrderGrid?.hasAttribute('category-colorize')).toBe(false);
     expect(view.bottomUpGrid?.hasAttribute('category-colorize')).toBe(false);
   });
+
+  // A time-order node holds only its row, so the strip read no category and showed none.
+  it('colours a time-order row by its category', async () => {
+    const { log, store } = await storeOf(
+      '09:18:22.6 (1000)|METHOD_ENTRY|[1]|01p|ns.Outer.run()\n' +
+        '09:18:22.6 (2000)|METHOD_EXIT|[1]|ns.Outer.run()\n',
+    );
+    view.remove();
+    view = await mountView(log);
+    const row = (await store.logIndex()).rowOf(indexOf(log, 'ns.Outer.run()'));
+
+    expect(view.timeOrderGrid?.rowClass?.({ row })).toBe('cat-apex');
+  });
 });
 
 describe('calltree-view merged filters', () => {

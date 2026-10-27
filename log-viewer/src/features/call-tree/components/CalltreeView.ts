@@ -32,7 +32,7 @@ import type {
   RowFilter,
   RowKey,
 } from '../../../grid/index.js';
-import '../grid/CallTreeGrid.js';
+import { categoryClass } from '../grid/CallTreeGrid.js';
 import {
   aggregatedColumns,
   BOTTOM_UP_DETAILS,
@@ -1023,6 +1023,8 @@ export class CalltreeView extends LitElement {
     }
     const source = new TimeOrderSource(index);
     this._timeOrderSource = source;
+    // A time-order node holds only its row, so the colour strip asks the source for the category.
+    grid.rowClass = (node) => categoryClass({ category: source.category(node) });
     grid.columns = timeOrderColumns(source, { openType, reported });
     this._columns.applyTo(gridColumnTarget(grid));
     grid.source = source;
