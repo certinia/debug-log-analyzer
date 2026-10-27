@@ -852,4 +852,118 @@ describe('PaneView', () => {
     // The host's own menu never opens over it.
     expect(event.defaultPrevented).toBe(true);
   });
+
+  describe('maximize', () => {
+    function action(el: PaneView, id: string): HTMLElement | null {
+      return (
+        el.shadowRoot?.querySelector<HTMLElement>(`.pane[data-id="${id}"] .pane-action`) ?? null
+      );
+    }
+
+    function maximizes(el: PaneView): Array<string | null> {
+      const seen: Array<string | null> = [];
+      el.addEventListener('pane-maximize', (e) => {
+        seen.push((e as CustomEvent<{ maximized: string | null }>).detail.maximized);
+      });
+      return seen;
+    }
+
+    it('asks for the section, then for the stack back, through pane-maximize', async () => {
+      const el = await mount('vertical');
+      const seen = maximizes(el);
+
+      expect(action(el, 'b')?.getAttribute('label')).toBe('Maximize section');
+      action(el, 'b')?.click();
+      el.maximized = 'b';
+      await el.updateComplete;
+      // What a screen reader announces, so it has to say what a click now does.
+      expect(action(el, 'b')?.getAttribute('label')).toBe('Restore sections');
+      action(el, 'b')?.click();
+
+      expect(seen).toEqual(['b', null]);
+    });
+
+    it('shows only the maximized section, and restores the others without re-mounting them', async () => {
+      const el = await mount('vertical');
+      const before = body(el, 'a')?.firstElementChild;
+
+      el.maximized = 'b';
+      await el.updateComplete;
+      expect(stack(el).hasAttribute('data-maximized')).toBe(true);
+      expect(pane(el, 'b')?.hasAttribute('data-maximized')).toBe(true);
+      expect(pane(el, 'a')?.hasAttribute('data-maximized')).toBe(false);
+
+      el.maximized = null;
+      await el.updateComplete;
+      // The same node: a grid re-mounted would lose its scroll and picked row.
+      expect(body(el, 'a')?.firstElementChild).toBe(before);
+    });
+
+    it('gives every pane its dragged size back on restore', async () => {
+      const el = await mount('vertical');
+      await drag(el, sash(el));
+
+      el.maximized = 'a';
+      await el.updateComplete;
+      el.maximized = null;
+      await el.updateComplete;
+
+      expect(sizing(el, 'a')).toBe('fill 1.2 120px');
+      expect(sizing(el, 'b')).toBe('fill 0.8 80px');
+    });
+
+    it('opens a collapsed section while maximized, and leaves its collapse alone', async () => {
+      const el = await mount('vertical');
+      el.collapsed = { b: true };
+      let toggles = 0;
+      el.addEventListener('pane-toggle', () => toggles++);
+
+      el.maximized = 'b';
+      await el.updateComplete;
+      expect(body(el, 'b')).not.toBeNull();
+
+      // Collapsing the one section on screen would leave the panel empty.
+      expect(headerOf(el, 'b').getAttribute('role')).toBeNull();
+      headerOf(el, 'b').dispatchEvent(
+        new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }),
+      );
+      await el.updateComplete;
+      expect(body(el, 'b')).not.toBeNull();
+      el.maximized = null;
+      await el.updateComplete;
+      expect(toggles).toBe(0);
+      expect(body(el, 'b')).toBeNull();
+    });
+
+    it('does not reorder while maximized, where the other sections cannot be seen', async () => {
+      const el = await mount('vertical');
+      const seen = reorders(el);
+      el.maximized = 'b';
+      await el.updateComplete;
+
+      headerOf(el, 'b').dispatchEvent(
+        new KeyboardEvent('keydown', { key: 'ArrowDown', altKey: true, bubbles: true }),
+      );
+
+      expect(seen).toEqual([]);
+      expect(headerOf(el, 'b').getAttribute('draggable')).toBe('false');
+      // Announced shortcuts must work.
+      expect(headerOf(el, 'b').hasAttribute('aria-keyshortcuts')).toBe(false);
+    });
+
+    it('shows the whole stack while the maximized id is not in the list', async () => {
+      const el = await mount('vertical');
+      el.maximized = 'gone';
+      await el.updateComplete;
+
+      expect(stack(el).hasAttribute('data-maximized')).toBe(false);
+    });
+
+    it('offers no maximize for a single section', async () => {
+      const el = await mountSections(sections.slice(0, 1), { maximized: 'a' });
+
+      expect(action(el, 'a')).toBeNull();
+      expect(stack(el).hasAttribute('data-maximized')).toBe(false);
+    });
+  });
 });

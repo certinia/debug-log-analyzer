@@ -75,6 +75,11 @@ interface SashPane {
  * consumer owns the order, and hears the new one through `pane-reorder`.
  * Right-clicking a header reports `pane-menu`: the consumer knows what sections
  * there are, so it owns the menu.
+ *
+ * Each header's maximize action asks, through `pane-maximize`, for one section
+ * to fill the stack. The consumer owns which one, and passes it back as
+ * `maximized`. The other panes stay mounted and keep their sizes, so restoring
+ * shows the stack as it was.
  */
 @customElement('pane-view')
 export class PaneView extends LitElement {
@@ -91,6 +96,11 @@ export class PaneView extends LitElement {
   /** Bump to drop the sizes the panes were dragged to, back to automatic. */
   @property({ type: Number })
   layoutEpoch = 0;
+
+  /** The section that fills the stack, controlled by the consumer. An id not in
+   *  `sections` shows the whole stack. */
+  @property({ attribute: false })
+  maximized: string | null = null;
 
   // Sizes a drag has given the panes (px), keyed by section id. The panel keeps
   // them while it is open and never persists them: sections size
@@ -208,6 +218,13 @@ export class PaneView extends LitElement {
         flex-basis: var(--pane-size, var(--lana-pane-md));
       }
 
+      /* Last and as specific as any sizing rule, so it beats them all. */
+      .pane-view[data-maximized] .pane[data-open][data-maximized] {
+        flex: 1 1 0;
+        max-height: none;
+        max-width: none;
+      }
+
       .pane {
         position: relative;
         display: flex;
@@ -261,11 +278,46 @@ export class PaneView extends LitElement {
         opacity: 0.6;
       }
 
+      /* Hidden, not removed, so their grids keep scroll and picked row. */
+      .pane-view[data-maximized] .pane:not([data-maximized]),
+      .pane-view[data-maximized] .pane-sash {
+        display: none;
+      }
+
+      /* Beside the header, not in it: no button inside its button role. */
+      .pane-bar {
+        display: flex;
+        align-items: center;
+        flex: 0 0 var(--lana-panel-header-height);
+        background-color: var(--vscode-sideBarSectionHeader-background);
+        border-top: var(--lana-stroke) solid var(--vscode-sideBarSectionHeader-border, transparent);
+      }
+      .pane-action {
+        flex: 0 0 auto;
+        margin-right: var(--lana-space-2xs);
+        color: var(--lana-icon-fg);
+        border-radius: var(--lana-radius-sm);
+        /* Opacity, not visibility, so the action stays in the tab order. */
+        opacity: 0;
+      }
+      .pane:hover .pane-action,
+      .pane:focus-within .pane-action,
+      .pane[data-maximized] .pane-action {
+        opacity: 1;
+      }
+      .pane-action:hover {
+        background-color: var(--lana-toolbar-hover-bg);
+      }
+      .pane-action:active {
+        background-color: var(--vscode-toolbar-activeBackground, var(--lana-toolbar-hover-bg));
+      }
+
       .pane-header {
         display: flex;
         align-items: center;
         gap: var(--lana-space-2xs);
-        flex: 0 0 var(--lana-panel-header-height);
+        flex: 1 1 auto;
+        min-width: 0;
         height: var(--lana-panel-header-height);
         padding: 0 var(--lana-space-md) 0 var(--lana-space-2xs);
         font-size: var(--lana-text-caps);
@@ -273,8 +325,6 @@ export class PaneView extends LitElement {
         text-transform: uppercase;
         letter-spacing: var(--lana-text-caps-tracking);
         color: var(--vscode-sideBarSectionHeader-foreground);
-        background-color: var(--vscode-sideBarSectionHeader-background);
-        border-top: var(--lana-stroke) solid var(--vscode-sideBarSectionHeader-border, transparent);
         user-select: none;
         white-space: nowrap;
         overflow: hidden;
@@ -283,7 +333,7 @@ export class PaneView extends LitElement {
       .pane-header--button {
         cursor: pointer;
       }
-      .pane-header--button:hover {
+      .pane-bar:has(.pane-header--button):hover {
         background-color: var(--lana-row-hover-bg);
       }
       /* Focus, not focus-visible: the focused header is the one Alt+Arrow moves,
@@ -381,6 +431,7 @@ export class PaneView extends LitElement {
     const isOpen = this.sections.map((section) => this._isOpen(section.id));
     const open = this.sections.filter((_section, index) => isOpen[index]);
     const dragged = this._draggedWeights(open);
+    const maximized = this._maximizedId;
 
     // Keyed on the section, so a reorder — or a collapse that adds a sash above
     // one — moves the panes that are already there. Rendered by position they
@@ -389,6 +440,7 @@ export class PaneView extends LitElement {
     return html`<div
       class="pane-view"
       data-orientation=${this.orientation}
+      ?data-maximized=${!!maximized}
       ?data-content=${this._needsShare(open)}
       style=${styleMap({ '--pane-count': String(open.length) })}
       @dragover=${this._onDragOver}
@@ -410,6 +462,7 @@ export class PaneView extends LitElement {
             section,
             dragged.get(section.id) ?? section.weight ?? 1,
             this._dropEdge(index),
+            section.id === maximized,
           )}${sash}`;
         },
       )}
@@ -454,9 +507,15 @@ export class PaneView extends LitElement {
     );
   }
 
-  private _renderPane(section: PaneSection, weight: number, drop: 'before' | 'after' | null) {
-    const open = this._isOpen(section.id);
-    const collapsible = this._collapsible;
+  private _renderPane(
+    section: PaneSection,
+    weight: number,
+    drop: 'before' | 'after' | null,
+    maximized: boolean,
+  ) {
+    // Open whatever its collapse, which still applies once the stack is restored.
+    const open = maximized || this._isOpen(section.id);
+    const collapsible = this._collapsible && !maximized;
     const sizing = this._sizingOf(section);
     const dragged = this._weights[section.id];
 
@@ -469,6 +528,7 @@ export class PaneView extends LitElement {
       })}
       data-id=${section.id}
       ?data-open=${open}
+      ?data-maximized=${maximized}
       data-sizing=${sizing}
       data-tier=${sizing === 'tier' ? section.height : nothing}
       style=${styleMap({
@@ -476,29 +536,66 @@ export class PaneView extends LitElement {
         '--pane-size': dragged !== undefined ? `${dragged}px` : null,
       })}
     >
-      <div
-        class="pane-header ${collapsible ? 'pane-header--button' : ''}"
-        role=${collapsible ? 'button' : nothing}
-        tabindex="0"
-        aria-expanded=${collapsible ? String(open) : nothing}
-        aria-keyshortcuts="Alt+ArrowUp Alt+ArrowDown"
-        draggable="true"
-        @click=${collapsible ? () => this._toggle(section.id) : undefined}
-        @keydown=${(e: KeyboardEvent) => this._onHeaderKey(e, section.id)}
-        @contextmenu=${(e: MouseEvent) => this._onHeaderMenu(e, section.id)}
-        @dragstart=${(e: DragEvent) => this._onDragStart(e, section.id)}
-        @dragend=${this._endDrag}
-      >
-        ${
-          collapsible
-            ? html`<vscode-icon name=${open ? 'chevron-down' : 'chevron-right'}></vscode-icon>`
-            : nothing
-        }
-        <span class="pane-header__title">${section.title}</span>
-        ${section.badge ? html`<vscode-badge>${section.badge}</vscode-badge>` : nothing}
+      <div class="pane-bar">
+        <div
+          class="pane-header ${collapsible ? 'pane-header--button' : ''}"
+          role=${collapsible ? 'button' : nothing}
+          tabindex="0"
+          aria-expanded=${collapsible ? String(open) : nothing}
+          aria-keyshortcuts=${maximized ? nothing : 'Alt+ArrowUp Alt+ArrowDown'}
+          draggable=${maximized ? 'false' : 'true'}
+          @click=${collapsible ? () => this._toggle(section.id) : undefined}
+          @keydown=${(e: KeyboardEvent) => this._onHeaderKey(e, section.id)}
+          @contextmenu=${(e: MouseEvent) => this._onHeaderMenu(e, section.id)}
+          @dragstart=${(e: DragEvent) => this._onDragStart(e, section.id)}
+          @dragend=${this._endDrag}
+        >
+          ${
+            collapsible
+              ? html`<vscode-icon name=${open ? 'chevron-down' : 'chevron-right'}></vscode-icon>`
+              : nothing
+          }
+          <span class="pane-header__title">${section.title}</span>
+          ${section.badge ? html`<vscode-badge>${section.badge}</vscode-badge>` : nothing}
+        </div>
+        ${this._canMaximize ? this._renderMaximize(section.id, maximized) : nothing}
       </div>
       ${open ? html`<div class="pane-body">${section.content}</div>` : nothing}
     </div>`;
+  }
+
+  private _renderMaximize(id: string, maximized: boolean) {
+    const label = maximized ? 'Restore sections' : 'Maximize section';
+    return html`<vscode-icon
+      class="pane-action"
+      action-icon
+      name=${maximized ? 'screen-normal' : 'screen-full'}
+      label=${label}
+      title=${label}
+      @click=${() => this._emitMaximize(maximized ? null : id)}
+    ></vscode-icon>`;
+  }
+
+  private get _canMaximize(): boolean {
+    return this.sections.length > 1;
+  }
+
+  /** The maximized section, while it is one of `sections` and they can be maximized. */
+  private get _maximizedId(): string | null {
+    const id = this.maximized;
+    return id && this._canMaximize && this.sections.some((section) => section.id === id)
+      ? id
+      : null;
+  }
+
+  private _emitMaximize(maximized: string | null) {
+    this.dispatchEvent(
+      new CustomEvent('pane-maximize', {
+        detail: { maximized },
+        bubbles: true,
+        composed: true,
+      }),
+    );
   }
 
   /**
@@ -551,6 +648,10 @@ export class PaneView extends LitElement {
   }
 
   private _toggle(id: string) {
+    // Collapsing the one section on screen would leave the panel empty.
+    if (this._maximizedId) {
+      return;
+    }
     // New collapsed state = the current open state (open → collapse, and vice
     // versa). The consumer owns the record, so it re-renders us with the new one.
     this.dispatchEvent(
@@ -585,7 +686,7 @@ export class PaneView extends LitElement {
   private _moveBy(id: string, step: number) {
     const from = this.sections.findIndex((section) => section.id === id);
     const to = from + step;
-    if (from < 0 || to < 0 || to >= this.sections.length) {
+    if (this._maximizedId || from < 0 || to < 0 || to >= this.sections.length) {
       return;
     }
     this._focusId = id;

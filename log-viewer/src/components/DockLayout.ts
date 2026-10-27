@@ -46,6 +46,9 @@ export class DockLayout extends LitElement {
   @property({ type: Number })
   layoutEpoch = 0;
 
+  @property({ attribute: false })
+  maximized: string | null = null;
+
   // Live drag state (transient); when set, overrides `size` while dragging.
   @state()
   private _liveSize: number | null = null;
@@ -134,6 +137,7 @@ export class DockLayout extends LitElement {
                   .emptyText=${this.emptyText}
                   .collapsed=${this.collapsed}
                   .layoutEpoch=${this.layoutEpoch}
+                  .maximized=${this.maximized}
                   dock=${this.dock}
                 >
                   <slot name="actions-start" slot="actions-start"></slot>
