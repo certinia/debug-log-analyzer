@@ -56,6 +56,25 @@ describe('LogEventCache', () => {
       expect(mockReadFile).toHaveBeenCalledTimes(1);
     });
 
+    // On open, folding, symbols and the decoration all ask before the first parse ends.
+    it('reads a log once when several callers ask while it is still being parsed', async () => {
+      readsAnyLog();
+
+      const [first, second, third] = await Promise.all([open('file'), open('file'), open('file')]);
+
+      expect(second).toBe(first);
+      expect(third).toBe(first);
+      expect(mockReadFile).toHaveBeenCalledTimes(1);
+    });
+
+    it('reads a log again after a failed read, rather than keeping the failure', async () => {
+      mockReadFile.mockRejectedValueOnce(new Error('File not found'));
+      expect(await open('flaky')).toBeNull();
+
+      readsAnyLog();
+      expect(await open('flaky')).not.toBeNull();
+    });
+
     it('evicts the least recently used log past 10 entries', async () => {
       readsAnyLog();
       for (let i = 0; i < 10; i++) {

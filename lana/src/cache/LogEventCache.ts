@@ -23,11 +23,12 @@ export interface LogDocument {
 
 export class LogEventCache {
   private static readonly MAX_CACHE_SIZE = 10;
-  private static readonly cache = new Map<string, ApexLog>();
+  /** By uri: the parse, held from its start so callers that ask while it runs share it. */
+  private static readonly cache = new Map<string, Promise<ApexLog | null>>();
   private static readonly reported = new Set<string>();
   private static readonly lines = new WeakMap<ApexLog, { version: number; lines: EventLines }>();
 
-  static async getApexLog(uri: Uri, reporter: LogReporter): Promise<ApexLog | null> {
+  static getApexLog(uri: Uri, reporter: LogReporter): Promise<ApexLog | null> {
     const key = uri.toString();
     const cached = LogEventCache.cache.get(key);
     if (cached) {
@@ -35,20 +36,6 @@ export class LogEventCache {
       LogEventCache.cache.delete(key);
       LogEventCache.cache.set(key, cached);
       return cached;
-    }
-
-    // Bytes, not text: the parser reads them without a decoded copy of the whole log.
-    const [apexLog, error] = await tryCatchAsync(async () =>
-      parse(await workspace.fs.readFile(uri)),
-    );
-    if (error) {
-      // Folding, symbols and decorations each retry this as the user types, and a failure is
-      // never cached, so report a given log once until it closes.
-      if (!LogEventCache.reported.has(key)) {
-        LogEventCache.reported.add(key);
-        reporter.output(`Could not read ${key}: ${error.message}`, true);
-      }
-      return null;
     }
 
     // Evict oldest if at capacity
@@ -59,7 +46,31 @@ export class LogEventCache {
       }
     }
 
-    LogEventCache.cache.set(key, apexLog);
+    const parsing = LogEventCache.read(uri, key, reporter);
+    LogEventCache.cache.set(key, parsing);
+    void parsing.then((apexLog) => {
+      // A failure is not kept, so the next ask reads the file again.
+      if (!apexLog && LogEventCache.cache.get(key) === parsing) {
+        LogEventCache.cache.delete(key);
+      }
+    });
+    return parsing;
+  }
+
+  private static async read(uri: Uri, key: string, reporter: LogReporter): Promise<ApexLog | null> {
+    // Bytes, not text: the parser reads them without a decoded copy of the whole log.
+    const [apexLog, error] = await tryCatchAsync(async () =>
+      parse(await workspace.fs.readFile(uri)),
+    );
+    if (error) {
+      // Folding, symbols and decorations each retry this as the user types, so report a given
+      // log once until it closes.
+      if (!LogEventCache.reported.has(key)) {
+        LogEventCache.reported.add(key);
+        reporter.output(`Could not read ${key}: ${error.message}`, true);
+      }
+      return null;
+    }
     return apexLog;
   }
 
