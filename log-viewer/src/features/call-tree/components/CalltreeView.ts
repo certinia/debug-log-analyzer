@@ -20,6 +20,7 @@ import { vscodeMessenger } from '#core/messaging/VSCodeExtensionMessenger.js';
 import { type LogIndex, NO_ROW } from '#core/log/LogIndex.js';
 import { isVisible } from '#core/utility/Util.js';
 import { CALLTREE_GO_TO_ROW, type CalltreeNavigationEventMap } from '../navigation.js';
+import { goToTimelineEvent } from '../../timeline/navigation.js';
 import type { AggregatedRow, BottomUpRow } from '../utils/Aggregation.js';
 import { TimeOrderSource, type TimeOrderNode } from '../utils/TimeOrderTree.js';
 import { wireCategoryColoring } from '../utils/CategoryColoring.js';
@@ -1205,10 +1206,7 @@ export class CalltreeView extends LitElement {
         break;
 
       case 'show-in-timeline':
-        document.dispatchEvent(new CustomEvent('show-tab', { detail: { tabid: 'timeline-tab' } }));
-        eventBus.emit('timeline:navigate-to', {
-          eventIndex: event.id,
-        });
+        goToTimelineEvent({ eventIndex: event.id });
         break;
 
       case 'go-to-source':

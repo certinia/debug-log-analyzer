@@ -28,7 +28,8 @@ import { addCustomThemes } from '../themes/ThemeSelector.js';
 
 import { selfTimeByCategory, toTimelineKeys } from '../utils/category-self-time.js';
 import type { TimeDisplayMode } from '../types/flamechart.types.js';
-import type { NavigateRequest, TimelineFlameChart } from './TimelineFlameChart.js';
+import type { TimelineNavigateRequest } from '../navigation.js';
+import type { TimelineFlameChart } from './TimelineFlameChart.js';
 import type { TimelineKeyEntry, Timelinekey } from './TimelineKey.js';
 
 // styles
@@ -67,8 +68,9 @@ export class TimelineView extends LitElement {
     return this.logStore?.log ?? null;
   }
 
+  // No hasChanged: each request is a new object, so the same event asked for twice moves again.
   @property({ attribute: false })
-  navigateRequest: NavigateRequest | undefined = undefined;
+  navigateRequest: TimelineNavigateRequest | undefined = undefined;
 
   @state()
   activeTheme: string | null = null;

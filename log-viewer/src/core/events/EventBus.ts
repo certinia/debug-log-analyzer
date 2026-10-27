@@ -53,15 +53,12 @@ export type TimelineNavigateMode = 'reveal' | 'seek';
 export type SelectionView = 'callers' | 'callees';
 
 interface EventMap {
-  // Supply eventIndex (preferred — unique) OR timestamp (fallback for raw-log entry where eventIndex isn't known).
+  // An event goes to the timeline through `goToTimelineEvent`, which waits for the chart.
   // 'reveal' (the default) selects the frame and zooms to it. 'seek' comes from a
   // whole-log reading: it zooms to a window of the log around the instant and
-  // selects nothing, so the inspector keeps that reading. Only an instant can be
-  // sought, so only the timestamp form carries the mode.
+  // selects nothing, so the inspector keeps that reading.
 
-  'timeline:navigate-to':
-    | { eventIndex: number; timestamp?: never; mode?: never }
-    | { eventIndex?: never; timestamp: number; mode?: TimelineNavigateMode };
+  'timeline:navigate-to': { timestamp: number; mode?: TimelineNavigateMode };
 
   // A tab's current selection changed — the inspector rebuilds its
   // content for this source. `selection: null` clears that source's selection.

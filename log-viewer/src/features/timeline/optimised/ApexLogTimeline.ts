@@ -227,13 +227,8 @@ export class ApexLogTimeline {
       heatStripSeries.events.length > 0 ? heatStripSeries : null,
     );
 
-    // Subscribe to EventBus for timeline navigation requests (from CalltreeView and raw-log entry).
     this.eventBusUnsubscribe = eventBus.on('timeline:navigate-to', (detail) => {
-      if (detail.eventIndex !== undefined) {
-        this.navigateToEventIndex(detail.eventIndex);
-      } else {
-        this.navigateToTimestamp(detail.timestamp, detail.mode);
-      }
+      this.navigateToTimestamp(detail.timestamp, detail.mode);
     });
 
     this.inspectorUnsubscribe = wireInspectorTab('timeline', this.emphasis, {
@@ -391,8 +386,7 @@ export class ApexLogTimeline {
 
   /**
    * Navigate to a specific timestamp in the timeline.
-   * Called via EventBus 'timeline:navigate-to' event from CalltreeView,
-   * or directly from TimelineFlameChart after initialization.
+   * Called via EventBus 'timeline:navigate-to'.
    * 'reveal' selects the frame at the timestamp and zooms to it; 'seek' zooms to
    * a window of the log around the instant and selects nothing.
    */

@@ -22,7 +22,7 @@ import {
   vscodeMessenger,
 } from '#core/messaging/VSCodeExtensionMessenger.js';
 import type { LogIssue } from '../notifications/types.js';
-import type { NavigateRequest } from '../timeline/components/TimelineFlameChart.js';
+import { TIMELINE_GO_TO_EVENT, type TimelineNavigateRequest } from '../timeline/navigation.js';
 import { installEscapeDeselect } from './escapeDeselect.js';
 import { LogLevelsController } from './LogLevelsController.js';
 import { deriveLogIdentity, type LogIdentityData } from './logIdentity.js';
@@ -91,7 +91,7 @@ export class LogViewer extends LitElement {
   _selectedIndex = 0;
 
   @state()
-  private _navigateRequest: NavigateRequest | undefined = undefined;
+  private _navigateRequest: TimelineNavigateRequest | undefined = undefined;
 
   private readonly _levels = new LogLevelsController(this, {
     publish: (store) => (this._logStore = setCurrentLog(store)),
@@ -181,6 +181,9 @@ export class LogViewer extends LitElement {
     document.addEventListener('show-tab', (e: Event) => {
       this._showTabEvent(e);
     });
+    document.addEventListener(TIMELINE_GO_TO_EVENT, (e: Event) => {
+      this._goToTimelineEvent((e as CustomEvent<TimelineNavigateRequest>).detail.eventIndex);
+    });
 
     // Escape, when nothing else claims it, deselects on the active tab.
     installEscapeDeselect(() => TAB_TO_SOURCE[this._selectedTab]);
@@ -191,9 +194,13 @@ export class LogViewer extends LitElement {
       if (cmd !== 'navigateToTimeline' || payload?.eventIndex === undefined) {
         return;
       }
-      this._showTab('timeline-tab');
-      this._navigateRequest = { eventIndex: payload.eventIndex };
+      this._goToTimelineEvent(payload.eventIndex);
     });
+  }
+
+  private _goToTimelineEvent(eventIndex: number): void {
+    this._showTab('timeline-tab');
+    this._navigateRequest = { eventIndex };
   }
 
   render() {

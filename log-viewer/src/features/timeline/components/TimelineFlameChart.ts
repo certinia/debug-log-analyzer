@@ -28,13 +28,9 @@ import { calculateViewportBounds } from '../optimised/ViewportUtils.js';
 import type { EditorColors, TimelineOptions, ViewportState } from '../types/flamechart.types.js';
 import { TimelineError } from '../types/flamechart.types.js';
 
+import type { TimelineNavigateRequest } from '../navigation.js';
 import { tokenStyles } from '../../../styles/tokens.styles.js';
 import { tooltipStyles } from '../styles/timeline.css.js';
-
-/** A request to move the chart to an event. */
-export interface NavigateRequest {
-  readonly eventIndex: number;
-}
 
 @customElement('timeline-flame-chart')
 export class TimelineFlameChart extends LitElement {
@@ -114,7 +110,7 @@ export class TimelineFlameChart extends LitElement {
    */
   // No hasChanged: each request is a new object, so the same event asked for twice moves again.
   @property({ attribute: false })
-  navigateRequest: NavigateRequest | undefined = undefined;
+  navigateRequest: TimelineNavigateRequest | undefined = undefined;
 
   /**
    * Show the hover/selection details panel. A property, not a setter, so the value
@@ -160,7 +156,7 @@ export class TimelineFlameChart extends LitElement {
   /** Bumped by every `cleanup()`, so an in-flight `init` can tell it was superseded. */
   private initEpoch = 0;
   // The prop is never cleared, so a rebuild would otherwise jump back to it.
-  private usedRequest: NavigateRequest | undefined;
+  private usedRequest: TimelineNavigateRequest | undefined;
   private visibilityWait: AbortController | null = null;
 
   private readonly finder = new FindController(this, {

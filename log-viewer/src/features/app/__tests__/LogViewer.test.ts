@@ -25,6 +25,7 @@ jest.mock('#core/messaging/VSCodeExtensionMessenger.js', () => {
 jest.mock('../AppHeader.js', () => ({}));
 jest.mock('../../../components/LogInspector.js', () => ({}));
 
+import { goToTimelineEvent } from '../../timeline/navigation.js';
 import '../LogViewer.js';
 
 const LOG = [
@@ -86,5 +87,20 @@ describe('log-viewer navigateToTimeline', () => {
 
     expect(timelineRequest()).toEqual({ eventIndex: 1 });
     expect(timelineRequest()).not.toBe(first);
+  });
+
+  // Call Tree's Show in Timeline went on the bus, which an unbuilt chart never hears.
+  it('shows the timeline tab at an event another tab asks for', async () => {
+    await load();
+    document.dispatchEvent(new CustomEvent('show-tab', { detail: { tabid: 'tree-tab' } }));
+
+    goToTimelineEvent({ eventIndex: 2 });
+    await viewer.updateComplete;
+
+    const tabs = viewer.shadowRoot?.querySelector('vscode-tabs') as {
+      selectedIndex: number;
+    } | null;
+    expect(tabs?.selectedIndex).toBe(0);
+    expect(timelineRequest()).toEqual({ eventIndex: 2 });
   });
 });
