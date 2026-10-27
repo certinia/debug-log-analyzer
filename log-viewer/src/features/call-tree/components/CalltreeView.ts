@@ -368,9 +368,9 @@ export class CalltreeView extends LitElement {
         display: flex;
         align-items: center;
         gap: var(--lana-space-2xs);
-        /* Shrinks once the filters are all in the menu; below this width it joins them. */
+        /* Shrinks once the filters are in the menu, down to "Hidden by…" beside Clear; then joins them. */
         flex: 0 1 auto;
-        min-width: 10ch;
+        min-width: 16ch;
         color: var(--lana-fg-muted);
         white-space: nowrap;
       }
