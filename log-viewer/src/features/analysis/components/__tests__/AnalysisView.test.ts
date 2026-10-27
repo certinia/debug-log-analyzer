@@ -202,7 +202,7 @@ describe('analysis-view', () => {
   it('reveals the bucket a frame heads, without echoing the select', async () => {
     const goTo = jest.spyOn(grid(), 'goTo').mockImplementation(async () => {
       select(findRow(roots(), 'B'));
-      return true;
+      return 'selected';
     });
 
     // Frame 2 is the log's own `B` call, which the `B` bucket heads.
@@ -214,7 +214,7 @@ describe('analysis-view', () => {
   });
 
   it('turns Details on to reveal a bucket the filter hides', async () => {
-    const goTo = jest.spyOn(grid(), 'goTo').mockResolvedValue(true);
+    const goTo = jest.spyOn(grid(), 'goTo').mockResolvedValue('selected');
 
     eventBus.emit('inspector:reveal', { source: 'analysis', eventIndex: DEBUG_LINE });
     await settle();
@@ -226,7 +226,7 @@ describe('analysis-view', () => {
   });
 
   it('moves to the bucket a picked inspector row names, and only marks for a hover', async () => {
-    const goTo = jest.spyOn(grid(), 'goTo').mockResolvedValue(true);
+    const goTo = jest.spyOn(grid(), 'goTo').mockResolvedValue('selected');
     const bucketB = findRow(roots(), 'B').id;
 
     eventBus.emit('inspector:locate', { source: 'analysis', eventIndexes: [2], sticky: false });

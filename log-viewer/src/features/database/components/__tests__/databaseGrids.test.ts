@@ -340,7 +340,7 @@ describe.each(GRIDS)('%s', (_name, spec) => {
     });
 
     it('selects a statement, scrolling only when its row is out of view', async () => {
-      const goTo = jest.spyOn(grid(), 'goTo').mockResolvedValue(true);
+      const goTo = jest.spyOn(grid(), 'goTo').mockResolvedValue('selected');
 
       expect(await view.selectByEventIndex(2)).toBe(true);
       expect(goTo).toHaveBeenCalledWith([2], { scrollIfVisible: false });
@@ -416,7 +416,7 @@ describe.each(GRIDS)('%s', (_name, spec) => {
     };
 
     it('selects the row it opens on, and shows the menu there', () => {
-      const goTo = jest.spyOn(grid(), 'goTo').mockResolvedValue(true);
+      const goTo = jest.spyOn(grid(), 'goTo').mockResolvedValue('selected');
 
       expect(rightClick(rows()[1] as Row).defaultPrevented).toBe(true);
       expect(goTo).toHaveBeenCalledWith([2], { scrollIfVisible: false });
@@ -436,7 +436,7 @@ describe.each(GRIDS)('%s', (_name, spec) => {
     });
 
     it('shows the statement it opened on in the Call Tree', () => {
-      jest.spyOn(grid(), 'goTo').mockResolvedValue(true);
+      jest.spyOn(grid(), 'goTo').mockResolvedValue('selected');
       rightClick(rows()[1] as Row);
       view.renderRoot
         .querySelector('context-menu')

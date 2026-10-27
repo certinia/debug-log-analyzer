@@ -180,7 +180,8 @@ export class CalltreeView extends LitElement {
 
   /** The event a go-to found the filters hiding, so the toolbar can offer to clear them. */
   @state()
-  private _hiddenEventIndex: number | null = null;
+  private _hiddenTarget: { eventIndex: number; parentSelected: boolean } | null = null;
+  private _goToCount = 0;
 
   filterState: { showDetails: boolean; debugOnly: boolean; selectedTypes: Set<string> } = {
     showDetails: false,
@@ -293,7 +294,7 @@ export class CalltreeView extends LitElement {
 
   private async _replaceLog(store: LogStore): Promise<void> {
     this.rootStore = store;
-    this._hiddenEventIndex = null;
+    this._hiddenTarget = null;
     // `rootStore` is not reactive, and the Namespace filter lists its namespaces.
     this.requestUpdate();
     // A build still running reads the old log.
@@ -399,7 +400,13 @@ export class CalltreeView extends LitElement {
     return html`
       <div id="call-tree-container">
         <div class="sr-only" role="status" aria-live="polite">
-          ${this._hiddenEventIndex === null ? '' : 'The filters hide that row, so its parent is selected.'}
+          ${
+            !this._hiddenTarget
+              ? ''
+              : this._hiddenTarget.parentSelected
+                ? 'The filters hide that row, so its parent is selected.'
+                : 'The filters hide that row and every row above it.'
+          }
         </div>
         <div>
           <datagrid-filter-bar>
@@ -490,7 +497,7 @@ export class CalltreeView extends LitElement {
             </overflow-list>
 
             ${
-              this._hiddenEventIndex === null
+              !this._hiddenTarget
                 ? ''
                 : html`<span slot="filters" class="hidden-note">
                     Hidden by filters ·
@@ -752,7 +759,7 @@ export class CalltreeView extends LitElement {
   }
 
   _updateFiltering() {
-    this._hiddenEventIndex = null;
+    this._hiddenTarget = null;
     if (this.timeOrderGrid && this.viewMode === 'time-order') {
       this.timeOrderGrid.filters = this._timeOrderFilters();
       return;
@@ -870,10 +877,13 @@ export class CalltreeView extends LitElement {
   }
 
   async _goToRow(eventIndex: number) {
-    if (!this.rootStore) {
+    const store = this.rootStore;
+    if (!store) {
       return;
     }
-    this._hiddenEventIndex = null;
+    const goTo = ++this._goToCount;
+    const current = () => goTo === this._goToCount && store === this.rootStore;
+    this._hiddenTarget = null;
     document.dispatchEvent(new CustomEvent('show-tab', { detail: { tabid: 'tree-tab' } }));
 
     if (this.viewMode !== 'time-order') {
@@ -881,32 +891,39 @@ export class CalltreeView extends LitElement {
       await this._setViewMode('time-order');
     }
 
-    if (!this._callTreeTableWrapper) {
+    if (!this._callTreeTableWrapper || !current()) {
       return;
     }
 
-    await this._renderCallTree(this._callTreeTableWrapper, this.rootStore);
+    await this._renderCallTree(this._callTreeTableWrapper, store);
     const grid = this.timeOrderGrid;
     const path = this._timeOrderPath(eventIndex);
-    if (!grid || !path.length) {
+    if (!grid || !path.length || !current()) {
       return;
     }
-    if (await grid.goTo(path)) {
-      // The grid stops at the deepest shown row on the path, so a row the filters hide lands on its parent.
-      this._hiddenEventIndex = grid.selectedKey === path.at(-1) ? null : eventIndex;
-      grid.focus({ preventScroll: true });
-    } else {
-      // No row on the path is shown: the filters hide it from the top.
-      this._hiddenEventIndex = eventIndex;
+    // `_updateFiltering` sets a new array, so a filter change while the path opens shows here.
+    const filters = grid.filters;
+    const result = await grid.goTo(path);
+    if (result === 'superseded' || !current() || grid.filters !== filters) {
+      return;
     }
+    if (result === 'none-shown') {
+      this._hiddenTarget = { eventIndex, parentSelected: false };
+      return;
+    }
+    // The grid stops at the deepest shown row on the path, so a row the filters hide lands on its parent.
+    if (grid.selectedKey !== path.at(-1)) {
+      this._hiddenTarget = { eventIndex, parentSelected: true };
+    }
+    grid.focus({ preventScroll: true });
   }
 
   /** Clears the filters that can hide a go-to's row, then goes to it. */
   private async _clearFiltersAndGo(): Promise<void> {
-    const eventIndex = this._hiddenEventIndex;
-    if (eventIndex === null) {
+    if (!this._hiddenTarget) {
       return;
     }
+    const { eventIndex } = this._hiddenTarget;
     for (const filter of this.renderRoot.querySelectorAll<
       DatagridFacetFilter | DatagridRangeFilter
     >('datagrid-facet-filter, datagrid-range-filter')) {
@@ -914,10 +931,9 @@ export class CalltreeView extends LitElement {
     }
     this.typeFilter = 'All';
     // Details stays as chosen unless it hides this row, as it does a no-time leaf an issue card names.
-    const source = this._timeOrderSource;
-    const row = source?.index.rowOf(eventIndex) ?? NO_ROW;
+    const row = this._timeOrderSource?.index.rowOf(eventIndex) ?? NO_ROW;
     const showDetails =
-      this.filterState.showDetails || (row !== NO_ROW && !source!.details.test({ row })); // row came from source
+      this.filterState.showDetails || (row !== NO_ROW && !this._timeOrderDetails.test({ row }));
     this.filterState = { showDetails, debugOnly: false, selectedTypes: new Set() };
     this.requestUpdate();
     this._updateFiltering();

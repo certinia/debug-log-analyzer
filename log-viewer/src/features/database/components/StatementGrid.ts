@@ -177,7 +177,7 @@ export abstract class StatementGrid<R extends StatementRow, L> extends LitElemen
 
   /** Selects the statement's row, scrolling only when it is out of view. False when no row shows it. */
   async selectByEventIndex(eventIndex: number): Promise<boolean> {
-    return (await this.grid?.goTo([eventIndex], { scrollIfVisible: false })) ?? false;
+    return (await this.grid?.goTo([eventIndex], { scrollIfVisible: false })) === 'selected';
   }
 
   /**

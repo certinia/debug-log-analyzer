@@ -136,6 +136,10 @@ const shownIds = <R>(columns: readonly GridColumn<R>[] | undefined): string[] =>
  * (whether a row can still open or close changed) and `lv-grid-error`.
  * When a build throws, the grid shows an alert in place of its rows until a build succeeds.
  */
+
+/** How a {@link LvGrid.goTo} ended. */
+export type GoToResult = 'selected' | 'none-shown' | 'superseded';
+
 @customElement('lv-grid')
 export class LvGrid<R extends object = object> extends LitElement {
   static styles: CSSResultGroup = gridStyles;
@@ -305,30 +309,30 @@ export class LvGrid<R extends object = object> extends LitElement {
   }
 
   /**
-   * Opens each ancestor on `path` (keys from the root down), then scrolls the row to the
-   * middle and selects it. False when no row on the path is shown, or when a selection made
-   * while the path opens, by a newer `goTo`, {@link deselect}, a click or a key, wins. Finds
-   * rows of a `source` set earlier in the same turn. With `scrollIfVisible` false, a row
-   * already in view whole stays where it is.
+   * Opens each ancestor on `path` (keys from the root down), then scrolls the deepest shown
+   * row on it to the middle and selects it: `'selected'`. `'none-shown'` when no row on the
+   * path is shown. `'superseded'` when a selection made while the path opens, by a newer
+   * `goTo`, {@link deselect}, a click or a key, wins. Finds rows of a `source` set earlier in
+   * the same turn. With `scrollIfVisible` false, a row already in view whole stays where it is.
    */
   async goTo(
     path: readonly RowKey[],
     { scrollIfVisible = true }: { scrollIfVisible?: boolean } = {},
-  ): Promise<boolean> {
+  ): Promise<GoToResult> {
     const selection = ++this.selections;
     // A source set in the same turn reaches the store only in this element's update.
     await this.updateComplete;
     const index = (await this.store?.reveal(path)) ?? -1;
     if (index < 0) {
-      return false;
+      return 'none-shown';
     }
     await this.updateComplete;
     if (selection !== this.selections) {
-      return false;
+      return 'superseded';
     }
     this.bringIntoView(index, scrollIfVisible);
     this.select(this.targetAt(index), index);
-    return true;
+    return 'selected';
   }
 
   /** Moves keyboard focus to the grid, so its keys and copy work. */

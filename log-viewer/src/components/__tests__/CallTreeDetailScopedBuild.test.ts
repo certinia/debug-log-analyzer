@@ -208,7 +208,7 @@ describe('CallTreeDetail scoped build', () => {
     await frame(el);
     const grid = gridOf(el);
     const source = grid.source;
-    const goTo = jest.spyOn(grid, 'goTo').mockResolvedValue(true);
+    const goTo = jest.spyOn(grid, 'goTo').mockResolvedValue('selected');
     build.mockClear();
 
     el.activeEventIndex = 9;
@@ -226,7 +226,7 @@ describe('CallTreeDetail scoped build', () => {
     const el = await mount(5);
     el.logStore = store;
     await frame(el);
-    const goTo = jest.spyOn(gridOf(el), 'goTo').mockResolvedValue(true);
+    const goTo = jest.spyOn(gridOf(el), 'goTo').mockResolvedValue('selected');
 
     el.activeEventIndex = 9;
     await frame(el);
@@ -240,7 +240,7 @@ describe('CallTreeDetail scoped build', () => {
     // The view picked is kept per log, so a switch needs one.
     el.logStore = (await rawStoreOf('')).store;
     await frame(el);
-    const goTo = jest.spyOn(gridOf(el), 'goTo').mockResolvedValue(true);
+    const goTo = jest.spyOn(gridOf(el), 'goTo').mockResolvedValue('selected');
     const switcher = el.shadowRoot?.querySelector('view-mode-switch');
     const showMode = async (value: string) => {
       switcher?.dispatchEvent(new CustomEvent('view-mode-change', { detail: { value } }));
@@ -260,7 +260,7 @@ describe('CallTreeDetail scoped build', () => {
     build.mockResolvedValue(tree(5000, [frameRow(5), frameRow(9)]));
     const el = await mount(5);
     await frame(el);
-    const goTo = jest.spyOn(gridOf(el), 'goTo').mockResolvedValue(true);
+    const goTo = jest.spyOn(gridOf(el), 'goTo').mockResolvedValue('selected');
     el.activeEventIndex = 9;
     await frame(el);
     goTo.mockClear();

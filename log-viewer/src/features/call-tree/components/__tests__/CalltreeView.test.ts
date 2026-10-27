@@ -500,7 +500,7 @@ describe('calltree-view inspector reveal', () => {
     if (!grid) {
       throw new Error('no bottom-up grid');
     }
-    const goTo = jest.spyOn(grid, 'goTo').mockResolvedValue(true);
+    const goTo = jest.spyOn(grid, 'goTo').mockResolvedValue('selected');
 
     eventBus.emit('inspector:reveal', {
       source: 'calltree',
@@ -620,6 +620,8 @@ describe('calltree-view go to row', () => {
       await view._goToRow(inner);
       await view.updateComplete;
       expect(note()).not.toBeNull();
+      // No parent is selected, so saying one is would mislead.
+      expect(announced()).toContain('every row above it');
 
       await pressClear();
 
@@ -637,6 +639,36 @@ describe('calltree-view go to row', () => {
 
       expect(note()).toBeNull();
       expect(announced()).toBe('');
+    });
+
+    it('drops the note when the log is replaced', async () => {
+      const { log } = await storeOf(LOG);
+      const next = (await storeOf(LOG)).store;
+      await openWithDebugOnly(log);
+      await view._goToRow(indexOf(log, 'ns.Inner.go()'));
+      await view.updateComplete;
+
+      view.logStore = next;
+      await settle();
+      await view.updateComplete;
+
+      expect(note()).toBeNull();
+      expect(announced()).toBe('');
+    });
+
+    // The go-to ended on the old log and wrote its note over the new one.
+    it('leaves no note from a go-to the log replaced while it ran', async () => {
+      const { log } = await storeOf(LOG);
+      const next = (await storeOf(LOG)).store;
+      await openWithDebugOnly(log);
+
+      const going = view._goToRow(indexOf(log, 'ns.Inner.go()'));
+      view.logStore = next;
+      await going;
+      await settle();
+      await view.updateComplete;
+
+      expect(note()).toBeNull();
     });
 
     it('says nothing when the row shows', async () => {
