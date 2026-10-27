@@ -7,7 +7,7 @@ import { indexOf, storeOf } from '#test-helpers/apexLog.js';
 import { type DebugLevels, hiddenByLevels, sameLevels } from '../levelFilter.js';
 import { buildLogIndex, type LogIndex } from '../LogIndex.js';
 import { filterByLevels, type LogStore } from '../LogStore.js';
-import { rowMetrics } from '../rowMetrics.js';
+import { rowMetrics, statementSelves } from '../rowMetrics.js';
 import type { SoqlEvent } from '../statements.js';
 
 const SETTINGS = '64.0 APEX_CODE,FINEST;APEX_PROFILING,NONE;DB,FINEST;SYSTEM,FINE\n';
@@ -196,6 +196,7 @@ describe('filterByLevels', () => {
     const row = index.rowOf(inner);
 
     expect(rowMetrics(index).soqlCount.self[row]).toBe(1);
+    expect(statementSelves(index).soql[row]).toBe(1);
     expect(
       childrenOf(index, row).some((child) => index.event(child).type === 'SOQL_EXECUTE_BEGIN'),
     ).toBe(false);

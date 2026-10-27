@@ -5,7 +5,7 @@ import { describe, expect, it } from '@jest/globals';
 
 import { indexOf, storeOf } from '#test-helpers/apexLog.js';
 import { filterByLevels } from '../../log/LogStore.js';
-import { getCallerNamespace, namespaceOf } from '../CallerNamespace.js';
+import { callerNamespaceOfRow, getCallerNamespace, namespaceOf } from '../CallerNamespace.js';
 
 const LOG =
   '09:18:22.6 (1000)|METHOD_ENTRY|[1]|01p|pkg1.Trigger.run()\n' +
@@ -40,6 +40,28 @@ describe('getCallerNamespace', () => {
     const shown = (await filterByLevels(store, { system: 'NONE' }))!; // no signal, never null
 
     expect(getCallerNamespace(shown, indexOf(log, 'DML Op:Insert Type:Account'))).toBe('pkg');
+  });
+});
+
+describe('callerNamespaceOfRow', () => {
+  it("returns 'default' for a top row", async () => {
+    const { log, store } = await storeOf(LOG);
+    const index = await store.logIndex();
+
+    expect(callerNamespaceOfRow(index, index.rowOf(log.entryPoints[0]!.id))).toBe('default');
+  });
+
+  // A hidden caller has no row, so reading the event's own parent gave its namespace instead.
+  it('skips a caller the levels hide, to the shown frame above it', async () => {
+    const { log, store } = await storeOf(
+      LOG,
+      '64.0 APEX_CODE,FINEST;APEX_PROFILING,NONE;DB,FINEST;SYSTEM,FINE\n',
+    );
+    const index = await (await filterByLevels(store, { system: 'NONE' }))!.logIndex(); // no signal, never null
+
+    expect(
+      callerNamespaceOfRow(index, index.rowOf(indexOf(log, 'DML Op:Insert Type:Account'))),
+    ).toBe('pkg');
   });
 });
 

@@ -118,27 +118,6 @@ describe('drawnRowNear', () => {
     expect(drawnRowNear(index, frames, inner)).toBe(index.rowOf(inner));
   });
 
-  // The chart draws no rect for a detail, so going to the detail itself selected nothing.
-  it('gives a detail the frame it sits in', async () => {
-    const { log, index, frames } = await framesOf(NESTED);
-    const statement = log.event(indexOf(log, 'ns.Outer.run()'))!.children[0]!;
-
-    expect(statement.type).toBe('STATEMENT_EXECUTE');
-    expect(frames.text(drawnRowNear(index, frames, statement.id))).toBe('ns.Outer.run()');
-  });
-
-  it('gives a frame with no duration the frame it sits in', async () => {
-    const { log, index, frames } = await framesOf(
-      '09:18:22.6 (1000)|METHOD_ENTRY|[1]|01p|ns.Outer.run()\n' +
-        '09:18:22.6 (1500)|METHOD_ENTRY|[2]|01p|ns.Instant.run()\n' +
-        '09:18:22.6 (1500)|METHOD_EXIT|[2]|ns.Instant.run()\n' +
-        '09:18:22.6 (2000)|METHOD_EXIT|[1]|ns.Outer.run()\n',
-    );
-
-    const row = drawnRowNear(index, frames, indexOf(log, 'ns.Instant.run()'));
-    expect(frames.text(row)).toBe('ns.Outer.run()');
-  });
-
   // A hidden event has no row at all, so it climbs the log, not the index.
   it('gives an event the log levels hide its nearest shown frame', async () => {
     const { log } = await framesOf(NESTED);

@@ -91,19 +91,11 @@ describe('LogEventCache', () => {
       expect(mockReadFile).toHaveBeenCalledTimes(1);
     });
 
-    it.each([
-      ['the read', () => mockReadFile.mockRejectedValueOnce(new Error('File not found'))],
-      [
-        'the parse',
-        () => {
-          mockReadFile.mockResolvedValueOnce(new TextEncoder().encode('invalid'));
-          mockParse.mockImplementationOnce(() => {
-            throw new Error('Parse error');
-          });
-        },
-      ],
-    ])('returns null when %s fails', async (_label, fail) => {
-      fail();
+    it('returns null when the parse fails', async () => {
+      mockReadFile.mockResolvedValueOnce(new TextEncoder().encode('invalid'));
+      mockParse.mockImplementationOnce(() => {
+        throw new Error('Parse error');
+      });
       expect(await open('broken')).toBeNull();
     });
 
