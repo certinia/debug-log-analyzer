@@ -344,9 +344,9 @@ export class PaneView extends LitElement {
       .pane-header--button {
         cursor: pointer;
       }
-      /* Focus, not focus-visible: the focused header is the one Alt+Arrow moves,
-         so which one that is has to show even when a click put it there. */
-      .pane-header:focus {
+      /* Keyboard focus only, as VS Code; positioned so the bar's separator does not cover it. */
+      .pane-header:focus-visible {
+        position: relative;
         outline: var(--lana-focus-ring);
         outline-offset: var(--lana-focus-inset);
       }

@@ -150,6 +150,12 @@ export const globalStyles = [
       mask-size: 70%;
     }
 
+    /* Else Chromium rings a focusable scroller in the OS accent colour. Inset, as most are full-bleed. */
+    :focus-visible {
+      outline: var(--lana-focus-ring);
+      outline-offset: var(--lana-focus-inset);
+    }
+
     .vs-checkbox:focus-visible {
       outline: var(--lana-focus-ring);
       outline-offset: var(--lana-focus-offset);

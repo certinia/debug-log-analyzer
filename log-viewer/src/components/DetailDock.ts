@@ -66,7 +66,6 @@ export class DetailDock extends LitElement {
         flex: 0 0 var(--lana-panel-header-height);
         height: var(--lana-panel-header-height);
         padding: 0 var(--lana-space-2xs);
-        border-bottom: var(--lana-stroke) solid var(--lana-panel-divider);
       }
       slot[name='actions-start'] {
         display: flex;
