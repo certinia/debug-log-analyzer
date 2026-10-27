@@ -11,9 +11,9 @@
 
 import type { ApexEvent, ApexLog } from '@apexdevtools/apex-log-parser';
 
-import { eventCategory } from '../../../core/log/category.js';
+import { eventCategory } from '#core/log/category.js';
 import { eventName } from '../../call-tree/utils/eventText.js';
-import { selfLabel } from '../../../core/metrics/eventMetrics.js';
+import { selfLabel } from '#core/metrics/eventMetrics.js';
 import { formatSOQL, type Dialect, type SoqlBudget } from '../../soql/format/formatter.js';
 import { markerColorCss, type TimelineMarker } from '../types/flamechart.types.js';
 import { frameCard, markerCard, type CardRow, type TooltipCard } from './frameTooltipCard.js';

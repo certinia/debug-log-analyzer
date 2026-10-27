@@ -6,7 +6,7 @@
 import { afterEach, beforeEach, describe, expect, it, jest } from '@jest/globals';
 
 import { storeOf } from '#test-helpers/apexLog.js';
-import { LogStore } from '../../core/log/LogStore.js';
+import { LogStore } from '#core/log/LogStore.js';
 import type { CategoryTimeBar } from '../CategoryTimeBar.js';
 import '../CategoryTimeBar.js';
 

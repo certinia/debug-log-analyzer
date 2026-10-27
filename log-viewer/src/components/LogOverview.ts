@@ -5,13 +5,13 @@ import { consume } from '@lit/context';
 import { LitElement, css, html } from 'lit';
 import { customElement, property } from 'lit/decorators.js';
 
-import { DerivedValue } from '../core/log/DerivedValue.js';
-import { logContext } from '../core/log/logContext.js';
-import { WindowStatsController } from '../core/log/windowStats.js';
-import type { LogStore } from '../core/log/LogStore.js';
+import { DerivedValue } from '#core/log/DerivedValue.js';
+import { logContext } from '#core/log/logContext.js';
+import { WindowStatsController } from '#core/log/windowStats.js';
+import type { LogStore } from '#core/log/LogStore.js';
 import { apexLimitSeries } from '../features/timeline/optimised/apex-limit-series.js';
 import { globalStyles } from '../styles/global.styles.js';
-import { describeLevelGap } from '../core/log/levelCapabilities.js';
+import { describeLevelGap } from '#core/log/levelCapabilities.js';
 import { NO_GOVERNOR_USAGE_TEXT } from './governorCopy.js';
 import { seriesGauges } from './logOverviewMetrics.js';
 

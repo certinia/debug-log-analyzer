@@ -7,23 +7,23 @@ import { consume } from '@lit/context';
 import { initialState, Task } from '@lit/task';
 import { css, html, LitElement, type PropertyValues } from 'lit';
 import { customElement, property, state } from 'lit/decorators.js';
-import { logContext } from '../../../core/log/logContext.js';
-import type { LogStore } from '../../../core/log/LogStore.js';
+import { logContext } from '#core/log/logContext.js';
+import type { LogStore } from '#core/log/LogStore.js';
 import { repeat } from 'lit/directives/repeat.js';
 
 import { eventType } from '@apexdevtools/apex-log-parser';
-import { DomListenerController } from '../../../core/events/DomListenerController.js';
-import { eventBus, type SelectionView } from '../../../core/events/EventBus.js';
-import { SelectionEchoGuard } from '../../../core/events/SelectionEchoGuard.js';
-import { SubscriptionController } from '../../../core/events/SubscriptionController.js';
-import { vscodeMessenger } from '../../../core/messaging/VSCodeExtensionMessenger.js';
-import type { LogIndex } from '../../../core/log/LogIndex.js';
-import { isVisible } from '../../../core/utility/Util.js';
+import { DomListenerController } from '#core/events/DomListenerController.js';
+import { eventBus, type SelectionView } from '#core/events/EventBus.js';
+import { SelectionEchoGuard } from '#core/events/SelectionEchoGuard.js';
+import { SubscriptionController } from '#core/events/SubscriptionController.js';
+import { vscodeMessenger } from '#core/messaging/VSCodeExtensionMessenger.js';
+import type { LogIndex } from '#core/log/LogIndex.js';
+import { isVisible } from '#core/utility/Util.js';
 import { CALLTREE_GO_TO_ROW, type CalltreeNavigationEventMap } from '../navigation.js';
 import type { AggregatedRow, BottomUpRow } from '../utils/Aggregation.js';
 import { TimeOrderSource, type TimeOrderNode } from '../utils/TimeOrderTree.js';
 import { wireCategoryColoring } from '../utils/CategoryColoring.js';
-import { waitForNextFrame } from '../../../core/utility/FrameBudget.js';
+import { waitForNextFrame } from '#core/utility/FrameBudget.js';
 import type {
   GridContextDetail,
   GridHeaderContextDetail,

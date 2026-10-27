@@ -8,10 +8,10 @@ import { styleMap } from 'lit/directives/style-map.js';
 
 import { CategoryPaletteController, categoryName } from '../../../components/categoryTime.js';
 import { dispatchInspectorReveal } from '../../../components/inspectorReveal.js';
-import { DerivedValue } from '../../../core/log/DerivedValue.js';
-import { logContext } from '../../../core/log/logContext.js';
-import type { LogStore } from '../../../core/log/LogStore.js';
-import { formatDuration, formatInteger } from '../../../core/utility/Util.js';
+import { DerivedValue } from '#core/log/DerivedValue.js';
+import { logContext } from '#core/log/logContext.js';
+import type { LogStore } from '#core/log/LogStore.js';
+import { formatDuration, formatInteger } from '#core/utility/Util.js';
 import { globalStyles } from '../../../styles/global.styles.js';
 import { NO_TIMED_CALLS_TEXT } from '../../../components/governorCopy.js';
 import '../../../components/SectionSkeleton.js';

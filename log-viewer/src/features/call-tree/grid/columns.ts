@@ -8,12 +8,12 @@ import type { ColumnSettingsOptions } from '../../../components/ColumnSettingsCo
 import { bar } from '../../../components/grid/cells.js';
 import { countColumn, timeColumn } from '../../../components/grid/columns.js';
 import { NO_REPORTED_LIMITS_TEXT } from '../../../components/governorCopy.js';
-import { NO_ROW } from '../../../core/log/LogIndex.js';
-import { rowMetrics, type SelfTotalColumns } from '../../../core/log/rowMetrics.js';
-import { signaturesOf } from '../../../core/log/signatures.js';
-import { vscodeMessenger } from '../../../core/messaging/VSCodeExtensionMessenger.js';
-import { DEFAULT_NAMESPACE } from '../../../core/utility/CallerNamespace.js';
-import { formatInteger, sharePercent } from '../../../core/utility/Util.js';
+import { NO_ROW } from '#core/log/LogIndex.js';
+import { rowMetrics, type SelfTotalColumns } from '#core/log/rowMetrics.js';
+import { signaturesOf } from '#core/log/signatures.js';
+import { vscodeMessenger } from '#core/messaging/VSCodeExtensionMessenger.js';
+import { DEFAULT_NAMESPACE } from '#core/utility/CallerNamespace.js';
+import { formatInteger, sharePercent } from '#core/utility/Util.js';
 import {
   max,
   sum,

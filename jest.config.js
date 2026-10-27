@@ -47,6 +47,7 @@ export default {
         '^@apexdevtools/apex-log-parser$':
           '<rootDir>/node_modules/@apexdevtools/apex-log-parser/dist/browser.js',
         '^#test-helpers/(.*)\\.js$': '<rootDir>/src/__tests__/helpers/$1',
+        '^#core/(.*)\\.js$': '<rootDir>/src/core/$1',
         // Stylesheet imports have no transform here; the `.js` rule above runs first, so the
         // `*.css.ts` style modules are unaffected.
         '\\.css$': '<rootDir>/src/__tests__/mocks/styleStub.ts',

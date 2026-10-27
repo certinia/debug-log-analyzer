@@ -75,7 +75,7 @@ import {
   METRIC_STRIP_GAP,
   MetricStripOrchestrator,
 } from './metric-strip/MetricStripOrchestrator.js';
-import { waitForNextFrame } from '../../../core/utility/FrameBudget.js';
+import { waitForNextFrame } from '#core/utility/FrameBudget.js';
 
 /**
  * How long to let a container settle before giving up on it. Bounded, so a container that

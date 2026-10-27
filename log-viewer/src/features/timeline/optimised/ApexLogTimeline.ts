@@ -20,10 +20,10 @@
 import type { ApexEvent, ApexLog } from '@apexdevtools/apex-log-parser';
 import { ContextMenu } from '../../../components/ContextMenu.js';
 import { ContextMenuBuilder } from '../../../components/ContextMenuBuilder.js';
-import { eventBus, type TimelineNavigateMode } from '../../../core/events/EventBus.js';
-import { SelectionEchoGuard } from '../../../core/events/SelectionEchoGuard.js';
-import { copyToClipboard } from '../../../core/utility/Clipboard.js';
-import { vscodeMessenger } from '../../../core/messaging/VSCodeExtensionMessenger.js';
+import { eventBus, type TimelineNavigateMode } from '#core/events/EventBus.js';
+import { SelectionEchoGuard } from '#core/events/SelectionEchoGuard.js';
+import { copyToClipboard } from '#core/utility/Clipboard.js';
+import { vscodeMessenger } from '#core/messaging/VSCodeExtensionMessenger.js';
 import { goToRow } from '../../call-tree/navigation.js';
 import { formatCallStack, formatEventDetails } from '../../call-tree/utils/eventText.js';
 import { getTheme } from '../themes/ThemeSelector.js';
@@ -40,8 +40,8 @@ import {
   type ViewportState,
 } from '../types/flamechart.types.js';
 import { InspectorEmphasis } from '../../../components/inspectorEmphasis.js';
-import type { LogIndex } from '../../../core/log/LogIndex.js';
-import type { LogStore } from '../../../core/log/LogStore.js';
+import type { LogIndex } from '#core/log/LogIndex.js';
+import type { LogStore } from '#core/log/LogStore.js';
 import { wireInspectorTab } from '../../../components/inspectorTab.js';
 import {
   revealTarget,

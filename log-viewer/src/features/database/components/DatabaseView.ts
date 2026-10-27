@@ -9,21 +9,16 @@ import { customElement, property, state } from 'lit/decorators.js';
 import type { ApexLog, LimitValue, Limits } from '@apexdevtools/apex-log-parser';
 
 import { limitTotals } from '../../../components/logOverviewMetrics.js';
-import { eventBus, type StatementType } from '../../../core/events/EventBus.js';
+import { eventBus, type StatementType } from '#core/events/EventBus.js';
 import { apexLimitSeries } from '../../timeline/optimised/apex-limit-series.js';
 import { InspectorTabController } from '../../../components/InspectorTabController.js';
 import { FindController } from '../../find/FindController.js';
-import { SelectionEchoGuard } from '../../../core/events/SelectionEchoGuard.js';
-import { formatInteger, isVisible } from '../../../core/utility/Util.js';
+import { SelectionEchoGuard } from '#core/events/SelectionEchoGuard.js';
+import { formatInteger, isVisible } from '#core/utility/Util.js';
 import { soslRowsMetric } from '../limits.js';
-import type { LogStore } from '../../../core/log/LogStore.js';
-import { logContext } from '../../../core/log/logContext.js';
-import {
-  statements,
-  type DmlEvent,
-  type SoqlEvent,
-  type SoslEvent,
-} from '../../../core/log/statements.js';
+import type { LogStore } from '#core/log/LogStore.js';
+import { logContext } from '#core/log/logContext.js';
+import { statements, type DmlEvent, type SoqlEvent, type SoslEvent } from '#core/log/statements.js';
 
 // styles
 import { globalStyles } from '../../../styles/global.styles.js';

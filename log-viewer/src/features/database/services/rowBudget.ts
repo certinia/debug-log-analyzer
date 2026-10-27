@@ -4,7 +4,7 @@
 import type { ApexLog, LimitValue, Limits } from '@apexdevtools/apex-log-parser';
 
 import { limitTotals } from '../../../components/logOverviewMetrics.js';
-import type { Derivation } from '../../../core/log/LogStore.js';
+import type { Derivation } from '#core/log/LogStore.js';
 import { apexLimitSeries } from '../../timeline/optimised/apex-limit-series.js';
 import { SOSL_ROWS_PER_QUERY_LIMIT } from '../limits.js';
 import {

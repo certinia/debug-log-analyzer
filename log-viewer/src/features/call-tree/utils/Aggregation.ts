@@ -2,22 +2,14 @@
  * Copyright (c) 2026 Certinia Inc. All rights reserved.
  */
 
-import type { LogCategory } from '../../../core/log/category.js';
-import { ROOT_PATH_ID, type KeyPathIds } from '../../../core/log/keyPathIds.js';
-import { type LogIndex, NO_ROW } from '../../../core/log/LogIndex.js';
-import type { LogStore } from '../../../core/log/LogStore.js';
-import {
-  rowMetrics,
-  type RowMetrics,
-  type SelfTotalColumns,
-} from '../../../core/log/rowMetrics.js';
-import { type Signatures, signaturesOf } from '../../../core/log/signatures.js';
-import { getCallerNamespace } from '../../../core/utility/CallerNamespace.js';
-import {
-  CHECK_EVERY,
-  frameBudget,
-  type FrameBudgetOptions,
-} from '../../../core/utility/FrameBudget.js';
+import type { LogCategory } from '#core/log/category.js';
+import { ROOT_PATH_ID, type KeyPathIds } from '#core/log/keyPathIds.js';
+import { type LogIndex, NO_ROW } from '#core/log/LogIndex.js';
+import type { LogStore } from '#core/log/LogStore.js';
+import { rowMetrics, type RowMetrics, type SelfTotalColumns } from '#core/log/rowMetrics.js';
+import { type Signatures, signaturesOf } from '#core/log/signatures.js';
+import { getCallerNamespace } from '#core/utility/CallerNamespace.js';
+import { CHECK_EVERY, frameBudget, type FrameBudgetOptions } from '#core/utility/FrameBudget.js';
 import { computeHasDetailsDeep } from './DetailsFilter.js';
 import { type CostLimits, costLimitsOf, setGovernorCost } from './GovernorCost.js';
 import {

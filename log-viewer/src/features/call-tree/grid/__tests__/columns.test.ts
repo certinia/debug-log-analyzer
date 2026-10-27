@@ -10,8 +10,8 @@ import { rawStoreOf } from '#test-helpers/apexLog.js';
 import { runCalc as total } from '#test-helpers/calcs.js';
 import { NO_REPORTED_LIMITS_TEXT } from '../../../../components/governorCopy.js';
 import { CALL_TREE_VIEWS } from '../../../../components/grid/ColumnViews.js';
-import type { LogStore } from '../../../../core/log/LogStore.js';
-import { formatInteger } from '../../../../core/utility/Util.js';
+import type { LogStore } from '#core/log/LogStore.js';
+import { formatInteger } from '#core/utility/Util.js';
 import { FIND_TEXT_ATTR, type GridColumn } from '../../../../grid/index.js';
 import {
   toAggregatedCallTree,

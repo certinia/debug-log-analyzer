@@ -4,8 +4,8 @@
 import type { ReactiveController, ReactiveControllerHost } from 'lit';
 
 import type { DebugCategory, Level } from '@apexdevtools/apex-log-parser';
-import { type DebugLevels, sameLevels } from '../../core/log/levelFilter.js';
-import { filterByLevels, type LogStore } from '../../core/log/LogStore.js';
+import { type DebugLevels, sameLevels } from '#core/log/levelFilter.js';
+import { filterByLevels, type LogStore } from '#core/log/LogStore.js';
 
 /** How long a level change runs before the header shows it is busy. */
 const BUSY_AFTER_MS = 100;

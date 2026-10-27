@@ -14,19 +14,19 @@ import {
   type AggregateVariables,
   type SpreadValue,
   type VariableSpread,
-} from '../core/log/aggregateVariables.js';
+} from '#core/log/aggregateVariables.js';
 import {
   frameVariablesFor,
   variableIndex,
   type FrameVariables,
   type VariableIndex,
-} from '../core/log/frameVariables.js';
-import { TeardownController } from '../core/events/TeardownController.js';
-import { describeLevelGap } from '../core/log/levelCapabilities.js';
-import { logContext } from '../core/log/logContext.js';
-import type { LogStore } from '../core/log/LogStore.js';
-import { previewOf, RAW_CLAMP_CHARS, type VariableValue } from '../core/log/variableValue.js';
-import { formatInteger } from '../core/utility/Util.js';
+} from '#core/log/frameVariables.js';
+import { TeardownController } from '#core/events/TeardownController.js';
+import { describeLevelGap } from '#core/log/levelCapabilities.js';
+import { logContext } from '#core/log/logContext.js';
+import type { LogStore } from '#core/log/LogStore.js';
+import { previewOf, RAW_CLAMP_CHARS, type VariableValue } from '#core/log/variableValue.js';
+import { formatInteger } from '#core/utility/Util.js';
 import { globalStyles } from '../styles/global.styles.js';
 import { inspectorSectionStyles } from '../styles/inspectorSection.styles.js';
 import { bleedRowStyles } from '../styles/revealRow.styles.js';

@@ -5,8 +5,8 @@ import '#vscode-elements/vscode-icon.js';
 import { LitElement, css, html, type PropertyValues } from 'lit';
 import { customElement, property, state } from 'lit/decorators.js';
 
-import { currentLogStore } from '../../../core/log/LogStore.js';
-import type { SoqlEvent } from '../../../core/log/statements.js';
+import { currentLogStore } from '#core/log/LogStore.js';
+import type { SoqlEvent } from '#core/log/statements.js';
 import {
   QueryPlanCostRule,
   SEVERITY_TYPES,

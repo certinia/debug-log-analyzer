@@ -4,11 +4,11 @@
 import { afterEach, beforeEach, describe, expect, it } from '@jest/globals';
 import type { ReactiveController, ReactiveControllerHost } from 'lit';
 
-import type { DebugLevels } from '../../../core/log/levelFilter.js';
-import type { LogStore } from '../../../core/log/LogStore.js';
+import type { DebugLevels } from '#core/log/levelFilter.js';
+import type { LogStore } from '#core/log/LogStore.js';
 
-jest.mock('../../../core/log/LogStore.js', () => ({
-  ...jest.requireActual<object>('../../../core/log/LogStore.js'),
+jest.mock('#core/log/LogStore.js', () => ({
+  ...jest.requireActual<object>('#core/log/LogStore.js'),
   filterByLevels: (log: LogStore, chosen: DebugLevels, options: { signal: AbortSignal }) =>
     new Promise((resolve, reject) => builds.push({ log, chosen, options, resolve, reject })),
 }));

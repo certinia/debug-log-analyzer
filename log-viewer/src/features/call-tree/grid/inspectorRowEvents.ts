@@ -2,9 +2,9 @@
  * Copyright (c) 2026 Certinia Inc. All rights reserved.
  */
 import { rowDetailSelection, rowFrames, type RowReader } from '../../../components/locatedRow.js';
-import { eventBus, type DetailSource, type SelectionView } from '../../../core/events/EventBus.js';
-import type { SelectionEchoGuard } from '../../../core/events/SelectionEchoGuard.js';
-import type { LogStore } from '../../../core/log/LogStore.js';
+import { eventBus, type DetailSource, type SelectionView } from '#core/events/EventBus.js';
+import type { SelectionEchoGuard } from '#core/events/SelectionEchoGuard.js';
+import type { LogStore } from '#core/log/LogStore.js';
 import type { GridRowDetail, GridSelectDetail } from '../../../grid/index.js';
 
 /** What {@link inspectorRowEvents} reads a grid's rows and the inspector by. */

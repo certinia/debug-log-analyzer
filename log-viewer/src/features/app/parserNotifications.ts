@@ -1,7 +1,7 @@
 /*
  * Copyright (c) 2026 Certinia Inc. All rights reserved.
  */
-import { vscodeMessenger } from '../../core/messaging/VSCodeExtensionMessenger.js';
+import { vscodeMessenger } from '#core/messaging/VSCodeExtensionMessenger.js';
 import type { IssueAction, LogIssue } from '../notifications/types.js';
 
 const UNSUPPORTED_TYPE_PREFIX = 'Unsupported log event name:';

@@ -3,7 +3,7 @@
  */
 import type { ReactiveControllerHost } from 'lit';
 
-import { DomListenerController } from '../../core/events/DomListenerController.js';
+import { DomListenerController } from '#core/events/DomListenerController.js';
 import type { FindDirection, FindEventDetail, FindEventMap } from './findEvents.js';
 import type { FindQuery, GridFindDetail as FindCount } from '../../grid/index.js';
 

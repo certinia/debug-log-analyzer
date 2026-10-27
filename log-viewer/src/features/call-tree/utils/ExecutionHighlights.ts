@@ -3,12 +3,12 @@
  */
 import type { ApexLog } from '@apexdevtools/apex-log-parser';
 
-import type { LogCategory } from '../../../core/log/category.js';
-import { type LogIndex, NO_ROW } from '../../../core/log/LogIndex.js';
-import type { Derivation } from '../../../core/log/LogStore.js';
-import { signatureTimes, type SignatureTimes } from '../../../core/log/signatureTimes.js';
-import { type Signatures, signaturesOf } from '../../../core/log/signatures.js';
-import { CHECK_EVERY, frameBudget, type Tick } from '../../../core/utility/FrameBudget.js';
+import type { LogCategory } from '#core/log/category.js';
+import { type LogIndex, NO_ROW } from '#core/log/LogIndex.js';
+import type { Derivation } from '#core/log/LogStore.js';
+import { signatureTimes, type SignatureTimes } from '#core/log/signatureTimes.js';
+import { type Signatures, signaturesOf } from '#core/log/signatures.js';
+import { CHECK_EVERY, frameBudget, type Tick } from '#core/utility/FrameBudget.js';
 
 /** One frame on the hot path, entry point first. */
 export interface HotPathFrame {

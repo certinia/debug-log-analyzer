@@ -20,16 +20,16 @@
 
 import { type ApexEvent, type ApexLog, eventType } from '@apexdevtools/apex-log-parser';
 
-import { eventCategory } from '../../../core/log/category.js';
-import { EVENT_METRICS, HEAP_PEAK } from '../../../core/metrics/eventMetrics.js';
-import { DEFAULT_NAMESPACE } from '../../../core/utility/CallerNamespace.js';
+import { eventCategory } from '#core/log/category.js';
+import { EVENT_METRICS, HEAP_PEAK } from '#core/metrics/eventMetrics.js';
+import { DEFAULT_NAMESPACE } from '#core/utility/CallerNamespace.js';
 import {
   computeWallClockMs,
   formatByteSize,
   formatDuration,
   formatInteger,
   formatWallClockTime,
-} from '../../../core/utility/Util.js';
+} from '#core/utility/Util.js';
 import type { TimelineMarker } from '../types/flamechart.types.js';
 
 /**

@@ -3,8 +3,8 @@
  */
 import { customElement } from 'lit/decorators.js';
 
-import type { DmlEvent } from '../../../core/log/statements.js';
-import { DEFAULT_NAMESPACE } from '../../../core/utility/CallerNamespace.js';
+import type { DmlEvent } from '#core/log/statements.js';
+import { DEFAULT_NAMESPACE } from '#core/utility/CallerNamespace.js';
 import type { GridColumn } from '../../../grid/index.js';
 import { DML_VIEWS } from '../../../components/grid/ColumnViews.js';
 import { textColumn } from '../../../components/grid/columns.js';

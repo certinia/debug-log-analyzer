@@ -3,8 +3,8 @@
  */
 import type { ApexEvent, ApexLog, Limits } from '@apexdevtools/apex-log-parser';
 
-import { logStoreFor, type Derivation } from '../../../core/log/LogStore.js';
-import { firstIndexWhere } from '../../../core/utility/Util.js';
+import { logStoreFor, type Derivation } from '#core/log/LogStore.js';
+import { firstIndexWhere } from '#core/utility/Util.js';
 import type { HeatStripTimeSeries } from '../../timeline/types/flamechart.types.js';
 import { apexLimitSeries } from '../../timeline/optimised/apex-limit-series.js';
 

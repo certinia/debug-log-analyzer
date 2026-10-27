@@ -5,7 +5,7 @@ import { describe, expect, it } from '@jest/globals';
 import { parse } from '@apexdevtools/apex-log-parser';
 
 import { indexesOf } from '#test-helpers/apexLog.js';
-import { LogStore } from '../../../../core/log/LogStore.js';
+import { LogStore } from '#core/log/LogStore.js';
 
 import { concentration, databaseOverview, UNKNOWN_OBJECT } from '../databaseOverview.js';
 

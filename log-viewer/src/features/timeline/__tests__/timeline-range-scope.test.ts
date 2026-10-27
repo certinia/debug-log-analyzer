@@ -4,7 +4,7 @@
  * @jest-environment jsdom
  */
 import { afterEach, beforeEach, describe, expect, it } from '@jest/globals';
-import type { LogStore } from '../../../core/log/LogStore.js';
+import type { LogStore } from '#core/log/LogStore.js';
 
 import type { MeasurementSnapshot } from '../optimised/measurement/MeasurementState.js';
 import type { TimelineOptions, ViewportState } from '../types/flamechart.types.js';
@@ -27,7 +27,7 @@ jest.mock('../optimised/ApexLogTimeline.js', () => ({
   },
 }));
 
-import { currentRange, setRange } from '../../../core/log/rangeScope.js';
+import { currentRange, setRange } from '#core/log/rangeScope.js';
 import { makeViewport } from '#test-helpers/viewport.js';
 import { AlwaysVisible, settle } from '#test-helpers/visibility.js';
 import '../components/TimelineFlameChart.js';

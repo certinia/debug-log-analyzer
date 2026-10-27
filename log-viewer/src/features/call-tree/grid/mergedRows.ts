@@ -1,7 +1,7 @@
 /*
  * Copyright (c) 2026 Certinia Inc. All rights reserved.
  */
-import type { LogStore } from '../../../core/log/LogStore.js';
+import type { LogStore } from '#core/log/LogStore.js';
 import type { RowKey, TreeSource } from '../../../grid/index.js';
 import {
   buildAggregatedTree,

@@ -12,12 +12,12 @@
 //TODO: Remove deps outside timeline
 
 import type { ApexEvent, LogIssue } from '@apexdevtools/apex-log-parser';
-import type { LogCategory } from '../../../core/log/category.js';
-import { formatDuration } from '../../../core/utility/Util.js';
+import type { LogCategory } from '#core/log/category.js';
+import { formatDuration } from '#core/utility/Util.js';
 import type { MeasurementSnapshot } from '../optimised/measurement/MeasurementState.js';
 import type { PrecomputedRect } from '../optimised/RectangleCache.js';
 
-export { NO_ROW } from '../../../core/log/LogIndex.js';
+export { NO_ROW } from '#core/log/LogIndex.js';
 
 // Re-export formatDuration for use within timeline/optimised folder
 // This keeps the Util.ts dependency at the boundary (types file)

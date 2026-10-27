@@ -31,7 +31,7 @@ jest.mock('../panelRowMenu.js', () => ({
 }));
 
 import { runCalc } from '#test-helpers/calcs.js';
-import { eventBus } from '../../core/events/EventBus.js';
+import { eventBus } from '#core/events/EventBus.js';
 import type { CallStackDetail } from '../CallStackDetail.js';
 import '../CallStackDetail.js';
 import type { ContextMenu } from '../ContextMenu.js';

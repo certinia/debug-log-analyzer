@@ -7,8 +7,8 @@ import { beforeAll, describe, expect, it } from '@jest/globals';
 import { type ApexLog, type EventType, eventType, parse } from '@apexdevtools/apex-log-parser';
 
 import { indexesOf, indexOf } from '#test-helpers/apexLog.js';
-import { describeLevelGap } from '../../core/log/levelCapabilities.js';
-import { filterByLevels, logStoreFor, type LogStore } from '../../core/log/LogStore.js';
+import { describeLevelGap } from '#core/log/levelCapabilities.js';
+import { filterByLevels, logStoreFor, type LogStore } from '#core/log/LogStore.js';
 
 // Avoid the heavy CodeBlock import chain (the soql formatter); the
 // field order is expressed by the `.label` spans, not the code preview.

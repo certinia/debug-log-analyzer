@@ -3,7 +3,7 @@
  */
 import { type ApexEvent, eventType } from '@apexdevtools/apex-log-parser';
 
-import type { LogIndex } from '../../../core/log/LogIndex.js';
+import type { LogIndex } from '#core/log/LogIndex.js';
 import type { PrecomputedRect } from '../optimised/RectangleCache.js';
 import {
   type EventNode,

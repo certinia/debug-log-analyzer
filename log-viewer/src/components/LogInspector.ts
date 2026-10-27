@@ -11,13 +11,13 @@ import {
   type DetailSource,
   type SelectionView,
   eventBus,
-} from '../core/events/EventBus.js';
-import { SubscriptionController } from '../core/events/SubscriptionController.js';
+} from '#core/events/EventBus.js';
+import { SubscriptionController } from '#core/events/SubscriptionController.js';
 import type { InspectorLocateEvent, InspectorRevealEvent } from './inspectorReveal.js';
-import { logContext } from '../core/log/logContext.js';
-import type { LogStore } from '../core/log/LogStore.js';
-import { RangeScopeController, type TimeWindow } from '../core/log/rangeScope.js';
-import { debounce } from '../core/utility/Util.js';
+import { logContext } from '#core/log/logContext.js';
+import type { LogStore } from '#core/log/LogStore.js';
+import { RangeScopeController, type TimeWindow } from '#core/log/rangeScope.js';
+import { debounce } from '#core/utility/Util.js';
 import { getSettings, updateSetting } from '../features/settings/Settings.js';
 import { emptyTextFor } from './detailEmptyText.js';
 import { buildDetailSections } from './detailSections.js';

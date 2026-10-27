@@ -19,8 +19,8 @@ jest.mock('../../../call-tree/navigation.js', () => ({ goToRow: jest.fn() }));
 
 import type { AppGrid } from '../../../../components/grid/AppGrid.js';
 import { parse } from '@apexdevtools/apex-log-parser';
-import { describeLevelGap } from '../../../../core/log/levelCapabilities.js';
-import { LogStore, setCurrentLog } from '../../../../core/log/LogStore.js';
+import { describeLevelGap } from '#core/log/levelCapabilities.js';
+import { LogStore, setCurrentLog } from '#core/log/LogStore.js';
 import { ContextMenu } from '../../../../components/ContextMenu.js';
 import { exportCsv } from '../../../../components/grid/exportCsv.js';
 import { Group } from '../../../../grid/index.js';

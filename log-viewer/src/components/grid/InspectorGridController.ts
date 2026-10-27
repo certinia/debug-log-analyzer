@@ -4,9 +4,9 @@
 import '../ContextMenu.js';
 import { css, html, type LitElement, type ReactiveController, type TemplateResult } from 'lit';
 
-import { eventBus } from '../../core/events/EventBus.js';
-import { SubscriptionController } from '../../core/events/SubscriptionController.js';
-import { sameMembers } from '../../core/utility/Util.js';
+import { eventBus } from '#core/events/EventBus.js';
+import { SubscriptionController } from '#core/events/SubscriptionController.js';
+import { sameMembers } from '#core/utility/Util.js';
 import type {
   GridContextDetail,
   GridRowDetail,

@@ -5,12 +5,12 @@ import { consume } from '@lit/context';
 import { LitElement, css, html, svg, type PropertyValues } from 'lit';
 import { customElement, property, state } from 'lit/decorators.js';
 
-import { eventBus } from '../core/events/EventBus.js';
-import { DerivedValue } from '../core/log/DerivedValue.js';
-import { logContext } from '../core/log/logContext.js';
-import { RangeScopeController } from '../core/log/rangeScope.js';
-import type { LogStore } from '../core/log/LogStore.js';
-import { formatDuration } from '../core/utility/Util.js';
+import { eventBus } from '#core/events/EventBus.js';
+import { DerivedValue } from '#core/log/DerivedValue.js';
+import { logContext } from '#core/log/logContext.js';
+import { RangeScopeController } from '#core/log/rangeScope.js';
+import type { LogStore } from '#core/log/LogStore.js';
+import { formatDuration } from '#core/utility/Util.js';
 import {
   GOVERNOR_WARN_PERCENT,
   governorTier,
@@ -26,7 +26,7 @@ import {
   type TrendPoint,
   type TrendSeries,
 } from './governorTrendData.js';
-import { describeLevelGap } from '../core/log/levelCapabilities.js';
+import { describeLevelGap } from '#core/log/levelCapabilities.js';
 import { NO_GOVERNOR_USAGE_TEXT } from './governorCopy.js';
 import './SectionSkeleton.js';
 

@@ -3,7 +3,7 @@
  */
 import type { ApexLog, EventOf } from '@apexdevtools/apex-log-parser';
 
-import { formatDuration, formatWallClockTime } from '../../core/utility/Util.js';
+import { formatDuration, formatWallClockTime } from '#core/utility/Util.js';
 
 type CodeUnit = EventOf<'CODE_UNIT_STARTED'>;
 

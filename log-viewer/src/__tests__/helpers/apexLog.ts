@@ -3,8 +3,8 @@
  */
 import { type ApexLog, LEVEL, parse } from '@apexdevtools/apex-log-parser';
 
-import type { LogIndex } from '../../core/log/LogIndex.js';
-import { logStoreFor, type Derivation, type LogStore } from '../../core/log/LogStore.js';
+import type { LogIndex } from '#core/log/LogIndex.js';
+import { logStoreFor, type Derivation, type LogStore } from '#core/log/LogStore.js';
 
 /**
  * The header line, which decides what the log records. The level comes from the

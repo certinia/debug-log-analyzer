@@ -1,9 +1,9 @@
 /*
  * Copyright (c) 2026 Certinia Inc. All rights reserved.
  */
-import type { LogCategory } from '../../../core/log/category.js';
-import type { Derivation } from '../../../core/log/LogStore.js';
-import { type Signature, signatureTimes } from '../../../core/log/signatureTimes.js';
+import type { LogCategory } from '#core/log/category.js';
+import type { Derivation } from '#core/log/LogStore.js';
+import { type Signature, signatureTimes } from '#core/log/signatureTimes.js';
 
 /** Signatures the spread draws a histogram for, the most self time first. */
 const LANE_COUNT = 5;

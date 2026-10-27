@@ -3,8 +3,8 @@
  */
 import { html, nothing, type TemplateResult } from 'lit';
 
-import { nsToMs } from '../../core/utility/Duration.js';
-import { sharePercent } from '../../core/utility/Util.js';
+import { nsToMs } from '#core/utility/Duration.js';
+import { sharePercent } from '#core/utility/Util.js';
 
 // A real share that rounds to 0% still shows, as a hairline.
 const MIN_VISIBLE_PERCENT = 1;

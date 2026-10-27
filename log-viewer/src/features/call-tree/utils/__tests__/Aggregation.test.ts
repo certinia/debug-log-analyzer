@@ -11,8 +11,8 @@ import {
   type FrameSpec,
   type LineSpec,
 } from '#test-helpers/apexLog.js';
-import type { LogStore } from '../../../../core/log/LogStore.js';
-import { outermostIds } from '../../../../core/utility/EventTree.js';
+import type { LogStore } from '#core/log/LogStore.js';
+import { outermostIds } from '#core/utility/EventTree.js';
 import {
   buildAggregatedTree,
   buildBottomUpTree,

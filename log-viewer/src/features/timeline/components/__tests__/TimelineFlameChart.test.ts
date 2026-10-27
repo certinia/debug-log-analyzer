@@ -4,7 +4,7 @@
  * @jest-environment jsdom
  */
 import { afterEach, beforeEach, describe, expect, it } from '@jest/globals';
-import type { LogStore } from '../../../../core/log/LogStore.js';
+import type { LogStore } from '#core/log/LogStore.js';
 
 // The chart needs WebGL, which jsdom lacks; this suite drives only when it is built.
 jest.mock('../../optimised/ApexLogTimeline.js', () => ({

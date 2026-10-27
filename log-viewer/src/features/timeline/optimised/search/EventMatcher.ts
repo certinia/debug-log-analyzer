@@ -15,7 +15,7 @@
  * - Track current search state
  */
 
-import { CHECK_EVERY, frameBudget, type Tick } from '../../../../core/utility/FrameBudget.js';
+import { CHECK_EVERY, frameBudget, type Tick } from '#core/utility/FrameBudget.js';
 import type { PrecomputedRect } from '../RectangleCache.js';
 import type { EventNode, TimelineFrames } from '../../types/flamechart.types.js';
 import type { FramePredicate, SearchCursor, SearchMatch } from '../../types/search.types.js';

@@ -3,8 +3,8 @@
  */
 import type { GovernorLimits, Limits, LimitUnit, SelfTotal } from '@apexdevtools/apex-log-parser';
 
-import { GOVERNOR_METRIC } from '../../../core/metrics/governorMetrics.js';
-import { sharePercent } from '../../../core/utility/Util.js';
+import { GOVERNOR_METRIC } from '#core/metrics/governorMetrics.js';
+import { sharePercent } from '#core/utility/Util.js';
 
 /**
  * The governor usage a node reports — all that's needed to *derive* cost. Both

@@ -3,7 +3,7 @@
  */
 import { describe, expect, it } from '@jest/globals';
 import { rawStoreOf } from '#test-helpers/apexLog.js';
-import type { SoqlEvent } from '../../../../core/log/statements.js';
+import type { SoqlEvent } from '#core/log/statements.js';
 import { deriveSoqlObject, parseFromObject } from '../sobjectClassification.js';
 
 /** A parsed query, with a plan on `explainSObject` when given. */

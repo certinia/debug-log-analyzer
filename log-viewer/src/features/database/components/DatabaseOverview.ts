@@ -14,12 +14,12 @@ import {
 import { logNamespacePalette } from '../../../components/namespacePalette.js';
 import '../../../components/StackedTimeBar.js';
 import { segmentsWithTail } from '../../../components/StackedTimeBar.js';
-import { DerivedValue } from '../../../core/log/DerivedValue.js';
-import { describeLevelGap } from '../../../core/log/levelCapabilities.js';
-import { logContext } from '../../../core/log/logContext.js';
-import type { LogStore } from '../../../core/log/LogStore.js';
-import { nsToMs } from '../../../core/utility/Duration.js';
-import { formatDuration, formatInteger, sharePercent } from '../../../core/utility/Util.js';
+import { DerivedValue } from '#core/log/DerivedValue.js';
+import { describeLevelGap } from '#core/log/levelCapabilities.js';
+import { logContext } from '#core/log/logContext.js';
+import type { LogStore } from '#core/log/LogStore.js';
+import { nsToMs } from '#core/utility/Duration.js';
+import { formatDuration, formatInteger, sharePercent } from '#core/utility/Util.js';
 import { globalStyles } from '../../../styles/global.styles.js';
 import '../../../components/SectionSkeleton.js';
 import { inspectorSectionStyles } from '../../../styles/inspectorSection.styles.js';

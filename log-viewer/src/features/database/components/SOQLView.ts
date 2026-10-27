@@ -5,10 +5,10 @@ import { html } from 'lit';
 import { customElement } from 'lit/decorators.js';
 
 import { countColumn, textColumn } from '../../../components/grid/columns.js';
-import { describeLevelGap } from '../../../core/log/levelCapabilities.js';
-import { currentLogStore } from '../../../core/log/LogStore.js';
-import type { SoqlEvent } from '../../../core/log/statements.js';
-import { DEFAULT_NAMESPACE } from '../../../core/utility/CallerNamespace.js';
+import { describeLevelGap } from '#core/log/levelCapabilities.js';
+import { currentLogStore } from '#core/log/LogStore.js';
+import type { SoqlEvent } from '#core/log/statements.js';
+import { DEFAULT_NAMESPACE } from '#core/utility/CallerNamespace.js';
 import type { GridColumn } from '../../../grid/index.js';
 import { SOQL_VIEWS } from '../../../components/grid/ColumnViews.js';
 import { deriveSoqlObject } from '../services/sobjectClassification.js';

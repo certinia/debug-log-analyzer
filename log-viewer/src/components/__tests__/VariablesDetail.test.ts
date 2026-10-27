@@ -5,10 +5,10 @@
  */
 import { describe, expect, it } from '@jest/globals';
 
-import { MAX_MARKED_PER_VALUE } from '../../core/log/aggregateVariables.js';
+import { MAX_MARKED_PER_VALUE } from '#core/log/aggregateVariables.js';
 import { SETTINGS, indexOf, indexesOf, storeOf } from '#test-helpers/apexLog.js';
-import { describeLevelGap, findLevelGap } from '../../core/log/levelCapabilities.js';
-import type { LogStore } from '../../core/log/LogStore.js';
+import { describeLevelGap, findLevelGap } from '#core/log/levelCapabilities.js';
+import type { LogStore } from '#core/log/LogStore.js';
 
 // Avoid the heavy CodeBlock import chain (the soql formatter). The raw value it
 // renders is covered by variableValue's own tests.
@@ -16,9 +16,9 @@ jest.mock('../CodeBlock.js', () => ({}));
 
 // `options` tells the section's own read (none) from the comparison's per-call reads.
 const frameReads: { store: unknown; options: unknown }[] = [];
-jest.mock('../../core/log/frameVariables.js', () => {
-  const actual = jest.requireActual<typeof import('../../core/log/frameVariables.js')>(
-    '../../core/log/frameVariables.js',
+jest.mock('#core/log/frameVariables.js', () => {
+  const actual = jest.requireActual<typeof import('#core/log/frameVariables.js')>(
+    '#core/log/frameVariables.js',
   );
   return {
     ...actual,
@@ -32,9 +32,9 @@ jest.mock('../../core/log/frameVariables.js', () => {
 // Holds a comparison open while it is set, so a test can act mid-walk. A walk this
 // small never reaches a slice check, so the gate abandons an aborted one itself.
 let walkGate: Promise<void> | null = null;
-jest.mock('../../core/log/aggregateVariables.js', () => {
-  const actual = jest.requireActual<typeof import('../../core/log/aggregateVariables.js')>(
-    '../../core/log/aggregateVariables.js',
+jest.mock('#core/log/aggregateVariables.js', () => {
+  const actual = jest.requireActual<typeof import('#core/log/aggregateVariables.js')>(
+    '#core/log/aggregateVariables.js',
   );
   return {
     ...actual,

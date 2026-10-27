@@ -6,8 +6,8 @@
 import { describe, expect, it } from '@jest/globals';
 
 import { storeOf } from '#test-helpers/apexLog.js';
-import { describeLevelGap } from '../../../../core/log/levelCapabilities.js';
-import type { LogStore } from '../../../../core/log/LogStore.js';
+import { describeLevelGap } from '#core/log/levelCapabilities.js';
+import type { LogStore } from '#core/log/LogStore.js';
 import type { DatabaseMetricCard } from '../DatabaseMetricCard.js';
 import '../DatabaseMetricCard.js';
 

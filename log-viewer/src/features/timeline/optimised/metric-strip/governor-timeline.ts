@@ -30,7 +30,7 @@
  * the cumulative snapshot still counted; above it, Salesforce did not charge everything we saw.
  */
 
-import { CHECK_EVERY, type Tick } from '../../../../core/utility/FrameBudget.js';
+import { CHECK_EVERY, type Tick } from '#core/utility/FrameBudget.js';
 import type {
   HeatStripEvent,
   HeatStripMetric,

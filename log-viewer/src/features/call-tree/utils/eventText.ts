@@ -11,7 +11,7 @@ import {
   type SelfTotal,
 } from '@apexdevtools/apex-log-parser';
 
-import { formatDuration } from '../../../core/utility/Util.js';
+import { formatDuration } from '#core/utility/Util.js';
 import { SOSL_ROWS_PER_QUERY_LIMIT } from '../../database/limits.js';
 
 /** What a frame's name gains to tell it from a method of the same text. */

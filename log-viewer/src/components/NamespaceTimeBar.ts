@@ -6,10 +6,10 @@ import { initialState, Task, TaskStatus } from '@lit/task';
 import { LitElement, html } from 'lit';
 import { customElement, property } from 'lit/decorators.js';
 
-import { logContext } from '../core/log/logContext.js';
-import { WindowStatsController } from '../core/log/windowStats.js';
-import { type LogIndex, NO_ROW } from '../core/log/LogIndex.js';
-import type { LogStore } from '../core/log/LogStore.js';
+import { logContext } from '#core/log/logContext.js';
+import { WindowStatsController } from '#core/log/windowStats.js';
+import { type LogIndex, NO_ROW } from '#core/log/LogIndex.js';
+import type { LogStore } from '#core/log/LogStore.js';
 import { globalStyles } from '../styles/global.styles.js';
 import './SectionSkeleton.js';
 import { inspectorSectionStyles } from '../styles/inspectorSection.styles.js';

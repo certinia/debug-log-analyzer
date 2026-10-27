@@ -9,12 +9,12 @@ import { LitElement, css, html, type PropertyValues } from 'lit';
 import { customElement, property, state } from 'lit/decorators.js';
 import { createRef, ref, type Ref } from 'lit/directives/ref.js';
 
-import type { DetailSource, SelectionView } from '../core/events/EventBus.js';
-import { TeardownController } from '../core/events/TeardownController.js';
-import { logContext } from '../core/log/logContext.js';
-import type { LogStore } from '../core/log/LogStore.js';
-import { RangeScopeController, sameWindow, type TimeWindow } from '../core/log/rangeScope.js';
-import { waitForNextFrame, type FrameBudgetOptions } from '../core/utility/FrameBudget.js';
+import type { DetailSource, SelectionView } from '#core/events/EventBus.js';
+import { TeardownController } from '#core/events/TeardownController.js';
+import { logContext } from '#core/log/logContext.js';
+import type { LogStore } from '#core/log/LogStore.js';
+import { RangeScopeController, sameWindow, type TimeWindow } from '#core/log/rangeScope.js';
+import { waitForNextFrame, type FrameBudgetOptions } from '#core/utility/FrameBudget.js';
 import { queryDialect } from '../features/call-tree/grid/cells.js';
 import { eventLabel } from '../features/call-tree/utils/eventText.js';
 import {

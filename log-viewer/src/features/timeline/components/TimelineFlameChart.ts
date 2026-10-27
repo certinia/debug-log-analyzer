@@ -12,13 +12,13 @@
 import { css, html, LitElement, type PropertyValues, unsafeCSS } from 'lit';
 import { customElement, property, query, state } from 'lit/decorators.js';
 
-import { ResizeController } from '../../../core/events/ResizeController.js';
-import { SubscriptionController } from '../../../core/events/SubscriptionController.js';
-import type { LogStore } from '../../../core/log/LogStore.js';
-import { setRange, windowFor } from '../../../core/log/rangeScope.js';
-import { waitForNextFrame } from '../../../core/utility/FrameBudget.js';
-import { debounce, isVisible, setChanged } from '../../../core/utility/Util.js';
-import { themeObserver } from '../../../core/theme/ThemeObserver.js';
+import { ResizeController } from '#core/events/ResizeController.js';
+import { SubscriptionController } from '#core/events/SubscriptionController.js';
+import type { LogStore } from '#core/log/LogStore.js';
+import { setRange, windowFor } from '#core/log/rangeScope.js';
+import { waitForNextFrame } from '#core/utility/FrameBudget.js';
+import { debounce, isVisible, setChanged } from '#core/utility/Util.js';
+import { themeObserver } from '#core/theme/ThemeObserver.js';
 import { FindController } from '../../find/FindController.js';
 import { ApexLogTimeline } from '../optimised/ApexLogTimeline.js';
 import { MIN_CHART_HEIGHT } from '../optimised/chartLayout.js';

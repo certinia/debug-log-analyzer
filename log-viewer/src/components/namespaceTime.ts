@@ -1,9 +1,9 @@
 /*
  * Copyright (c) 2026 Certinia Inc. All rights reserved.
  */
-import { type LogIndex, sumSelfBy } from '../core/log/LogIndex.js';
-import { DEFAULT_NAMESPACE } from '../core/utility/CallerNamespace.js';
-import { CHECK_EVERY, frameBudget } from '../core/utility/FrameBudget.js';
+import { type LogIndex, sumSelfBy } from '#core/log/LogIndex.js';
+import { DEFAULT_NAMESPACE } from '#core/utility/CallerNamespace.js';
+import { CHECK_EVERY, frameBudget } from '#core/utility/FrameBudget.js';
 
 export interface NamespaceTime {
   namespace: string;

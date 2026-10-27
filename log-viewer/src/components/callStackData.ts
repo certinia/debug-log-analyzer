@@ -1,7 +1,7 @@
 /*
  * Copyright (c) 2025 Certinia Inc. All rights reserved.
  */
-import { currentLogStore } from '../core/log/LogStore.js';
+import { currentLogStore } from '#core/log/LogStore.js';
 import { EXCLUDED_DETAIL_TYPES } from '../features/call-tree/utils/DetailsFilter.js';
 
 export interface CallStackRow {

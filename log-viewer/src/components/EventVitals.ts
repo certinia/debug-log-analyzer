@@ -7,20 +7,20 @@ import { LitElement, css, html, type TemplateResult } from 'lit';
 import { customElement, property } from 'lit/decorators.js';
 import { ifDefined } from 'lit/directives/if-defined.js';
 
-import { describeLevelGap } from '../core/log/levelCapabilities.js';
-import { logContext } from '../core/log/logContext.js';
-import type { LogStore } from '../core/log/LogStore.js';
+import { describeLevelGap } from '#core/log/levelCapabilities.js';
+import { logContext } from '#core/log/logContext.js';
+import type { LogStore } from '#core/log/LogStore.js';
 import {
   EVENT_METRICS,
   formatBytes,
   HEAP_PEAK,
   selfLabel,
   usageParts,
-} from '../core/metrics/eventMetrics.js';
-import { DEFAULT_NAMESPACE, getCallerNamespace } from '../core/utility/CallerNamespace.js';
-import { formatNsAsMs } from '../core/utility/Duration.js';
-import { outermostIds } from '../core/utility/EventTree.js';
-import { formatInteger } from '../core/utility/Util.js';
+} from '#core/metrics/eventMetrics.js';
+import { DEFAULT_NAMESPACE, getCallerNamespace } from '#core/utility/CallerNamespace.js';
+import { formatNsAsMs } from '#core/utility/Duration.js';
+import { outermostIds } from '#core/utility/EventTree.js';
+import { formatInteger } from '#core/utility/Util.js';
 import { globalStyles } from '../styles/global.styles.js';
 
 // web components

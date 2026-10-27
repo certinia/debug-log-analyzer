@@ -14,7 +14,7 @@
 
 import { describe, expect, it, jest } from '@jest/globals';
 import { indexOf, rawStoreOf } from '#test-helpers/apexLog.js';
-import { buildLogIndex } from '../../../core/log/LogIndex.js';
+import { buildLogIndex } from '#core/log/LogIndex.js';
 import { ApexLogTimeline } from '../optimised/ApexLogTimeline.js';
 import {
   BUCKET_CONSTANTS,

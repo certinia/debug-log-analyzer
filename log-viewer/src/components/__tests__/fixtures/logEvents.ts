@@ -4,7 +4,7 @@
 import type { ApexLog } from '@apexdevtools/apex-log-parser';
 
 import { type FrameSpec, frameLines, rawStoreOf } from '#test-helpers/apexLog.js';
-import type { LogStore } from '../../../core/log/LogStore.js';
+import type { LogStore } from '#core/log/LogStore.js';
 
 /** A code unit whose own time is `self`; {@link log} sets its `eventIndex`. */
 export interface FakeEvent extends FrameSpec {

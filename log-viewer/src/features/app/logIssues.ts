@@ -3,7 +3,7 @@
  */
 import type { ApexLog, LogIssue as ParsedLogIssue } from '@apexdevtools/apex-log-parser';
 
-import { formatByteSize } from '../../core/utility/Util.js';
+import { formatByteSize } from '#core/utility/Util.js';
 import { goToCallTreeAction } from '../call-tree/navigation.js';
 import type { IssueSeverity, LogIssue } from '../notifications/types.js';
 import { markerTypeForIssue } from '../timeline/types/flamechart.types.js';

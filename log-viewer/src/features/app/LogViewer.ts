@@ -12,15 +12,15 @@ import { customElement, property, state } from 'lit/decorators.js';
 
 import { parse, type LogSource } from '@apexdevtools/apex-log-parser';
 import type { LogLevelsChange } from '../../components/LogLevels.js';
-import { TAB_TO_SOURCE, eventBus } from '../../core/events/EventBus.js';
-import { waitForNextFrame } from '../../core/utility/FrameBudget.js';
-import { logContext } from '../../core/log/logContext.js';
-import { logStatusContext, type LogStatus } from '../../core/log/logStatus.js';
-import { logStoreFor, setCurrentLog, type LogStore } from '../../core/log/LogStore.js';
+import { TAB_TO_SOURCE, eventBus } from '#core/events/EventBus.js';
+import { waitForNextFrame } from '#core/utility/FrameBudget.js';
+import { logContext } from '#core/log/logContext.js';
+import { logStatusContext, type LogStatus } from '#core/log/logStatus.js';
+import { logStoreFor, setCurrentLog, type LogStore } from '#core/log/LogStore.js';
 import {
   VSCodeExtensionMessenger,
   vscodeMessenger,
-} from '../../core/messaging/VSCodeExtensionMessenger.js';
+} from '#core/messaging/VSCodeExtensionMessenger.js';
 import type { LogIssue } from '../notifications/types.js';
 import { installEscapeDeselect } from './escapeDeselect.js';
 import { LogLevelsController } from './LogLevelsController.js';

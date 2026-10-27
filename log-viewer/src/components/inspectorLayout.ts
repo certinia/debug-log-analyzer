@@ -1,7 +1,7 @@
 /*
  * Copyright (c) 2026 Certinia Inc. All rights reserved.
  */
-import type { DetailSource } from '../core/events/EventBus.js';
+import type { DetailSource } from '#core/events/EventBus.js';
 import type { PaneSection } from './PaneView.js';
 
 /** What a section list is reading: the selection, or the whole log. */

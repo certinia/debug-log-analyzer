@@ -5,9 +5,9 @@ import { describe, expect, it } from '@jest/globals';
 import type { ApexLog } from '@apexdevtools/apex-log-parser';
 
 import { indexesOf, rawStoreOf } from '#test-helpers/apexLog.js';
-import { setCurrentLog } from '../../core/log/LogStore.js';
-import { CallSpans } from '../../core/log/windowedTime.js';
-import type { FrameBudgetOptions } from '../../core/utility/FrameBudget.js';
+import { setCurrentLog } from '#core/log/LogStore.js';
+import { CallSpans } from '#core/log/windowedTime.js';
+import type { FrameBudgetOptions } from '#core/utility/FrameBudget.js';
 import {
   buildScopedCallTree,
   buildWholeLogCallTree,

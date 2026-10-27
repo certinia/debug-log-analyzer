@@ -3,8 +3,8 @@
  */
 import { describe, expect, it } from '@jest/globals';
 import { rawStoreOf } from '#test-helpers/apexLog.js';
-import type { LogCategory } from '../../../core/log/category.js';
-import { buildLogIndex } from '../../../core/log/LogIndex.js';
+import type { LogCategory } from '#core/log/category.js';
+import { buildLogIndex } from '#core/log/LogIndex.js';
 import { selfTimeByCategory, toTimelineKeys } from '../utils/category-self-time.js';
 
 /** Self time by category for a whole log `body`, timestamps in nanoseconds. */

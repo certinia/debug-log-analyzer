@@ -13,7 +13,7 @@ import {
   type DetailSelection,
   type DetailSource,
   type StatementType,
-} from '../../../../core/events/EventBus.js';
+} from '#core/events/EventBus.js';
 
 // The three grids and the summary bring lv-grid and its stylesheets with them;
 // this suite only drives the selection and find contracts between them and DatabaseView.

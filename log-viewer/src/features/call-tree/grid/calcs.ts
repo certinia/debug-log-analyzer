@@ -3,7 +3,7 @@
  */
 import type { ApexLog } from '@apexdevtools/apex-log-parser';
 
-import { outermostIdsSteps } from '../../../core/utility/EventTree.js';
+import { outermostIdsSteps } from '#core/utility/EventTree.js';
 import { sum, type Calc } from '../../../grid/index.js';
 
 /**

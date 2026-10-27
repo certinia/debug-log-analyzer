@@ -6,7 +6,7 @@
 import { describe, expect, it } from '@jest/globals';
 
 import { frameLines, indexOf, rawStoreOf } from '#test-helpers/apexLog.js';
-import { ROOT_PATH_ID } from '../../core/log/keyPathIds.js';
+import { ROOT_PATH_ID } from '#core/log/keyPathIds.js';
 import { LocatedRowIds, rowDetailSelection, type RowReader } from '../locatedRow.js';
 
 type Row = Record<string, unknown>;

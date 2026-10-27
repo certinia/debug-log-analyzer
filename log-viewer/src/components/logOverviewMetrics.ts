@@ -3,9 +3,9 @@
  */
 import type { LimitValue, Limits } from '@apexdevtools/apex-log-parser';
 
-import type { WindowCounts } from '../core/log/windowStats.js';
-import { GOVERNOR_METRIC, GOVERNOR_METRICS } from '../core/metrics/governorMetrics.js';
-import { formatByteSize, formatInteger, sharePercent } from '../core/utility/Util.js';
+import type { WindowCounts } from '#core/log/windowStats.js';
+import { GOVERNOR_METRIC, GOVERNOR_METRICS } from '#core/metrics/governorMetrics.js';
+import { formatByteSize, formatInteger, sharePercent } from '#core/utility/Util.js';
 import type { GaugeMetric } from '../features/database/components/GovernorSummary.js';
 import type { HeatStripTimeSeries } from '../features/timeline/types/flamechart.types.js';
 

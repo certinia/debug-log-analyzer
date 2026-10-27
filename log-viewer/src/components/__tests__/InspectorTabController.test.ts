@@ -2,7 +2,7 @@
  * Copyright (c) 2026 Certinia Inc. All rights reserved.
  */
 import { afterEach, beforeEach, describe, expect, it } from '@jest/globals';
-import { eventBus } from '../../core/events/EventBus.js';
+import { eventBus } from '#core/events/EventBus.js';
 import { InspectorTabController } from '../InspectorTabController.js';
 import { fakeHost, type FakeHost } from '#test-helpers/fakeHost.js';
 

@@ -8,7 +8,7 @@ import type { GovernorLimits } from '@apexdevtools/apex-log-parser';
 
 import { indexOf, storeOf } from '#test-helpers/apexLog.js';
 import { governorLimits, limitValue } from '#test-helpers/limits.js';
-import type { LogStore } from '../../core/log/LogStore.js';
+import type { LogStore } from '#core/log/LogStore.js';
 
 const revealed: number[] = [];
 const copied: string[] = [];
@@ -20,11 +20,11 @@ jest.mock('../../features/call-tree/navigation.js', () => ({
     revealed.push(target.eventIndex);
   },
 }));
-jest.mock('../../core/utility/Clipboard.js', () => ({
+jest.mock('#core/utility/Clipboard.js', () => ({
   copyToClipboard: (text: string) => copied.push(text),
 }));
-jest.mock('../../core/log/LogStore.js', () => ({
-  ...jest.requireActual<object>('../../core/log/LogStore.js'),
+jest.mock('#core/log/LogStore.js', () => ({
+  ...jest.requireActual<object>('#core/log/LogStore.js'),
   currentLogStore: () =>
     store && {
       eventByIndex: (i: number) => store?.eventByIndex(i) ?? null,

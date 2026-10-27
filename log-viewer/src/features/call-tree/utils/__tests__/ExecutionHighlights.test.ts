@@ -10,7 +10,7 @@ import {
   storeOf,
   type FrameSpec,
 } from '#test-helpers/apexLog.js';
-import type { LogStore } from '../../../../core/log/LogStore.js';
+import type { LogStore } from '#core/log/LogStore.js';
 import { executionHighlights, type ExecutionHighlights } from '../ExecutionHighlights.js';
 
 /** A method that spends `self` ns before its children; its total is that plus theirs. */

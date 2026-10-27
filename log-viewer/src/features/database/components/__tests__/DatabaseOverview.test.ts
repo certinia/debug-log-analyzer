@@ -8,7 +8,7 @@ import type { ApexLog } from '@apexdevtools/apex-log-parser';
 import type { LitElement } from 'lit';
 
 import type { StackedTimeBar } from '../../../../components/StackedTimeBar.js';
-import type { LogStore } from '../../../../core/log/LogStore.js';
+import type { LogStore } from '#core/log/LogStore.js';
 import type {
   DatabaseBreakdown,
   DatabaseCallNode,
@@ -32,7 +32,7 @@ import { databaseTreeRows, ownCodeTotal, type DatabaseTreeRow } from '../Databas
 import '../DatabaseOverview.js';
 import { stubStore } from '#test-helpers/apexLog.js';
 import { settledNote } from '#test-helpers/sections.js';
-import { describeLevelGap, findLevelGap } from '../../../../core/log/levelCapabilities.js';
+import { describeLevelGap, findLevelGap } from '#core/log/levelCapabilities.js';
 
 const emptyOverview = (): DatabaseOverview => ({
   time: {

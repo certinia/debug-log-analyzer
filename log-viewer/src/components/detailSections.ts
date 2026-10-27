@@ -3,7 +3,7 @@
  */
 import { html, type TemplateResult } from 'lit';
 
-import type { DetailSelection, DetailSource, SelectionView } from '../core/events/EventBus.js';
+import type { DetailSelection, DetailSource, SelectionView } from '#core/events/EventBus.js';
 import { buildDatabaseSections } from '../features/database/components/databaseSections.js';
 import type { PaneSection } from './PaneView.js';
 

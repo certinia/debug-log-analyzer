@@ -29,11 +29,11 @@ import {
   gridGroupControls,
   gridToolbarActions,
 } from '../../../components/gridToolbar.js';
-import type { StatementType } from '../../../core/events/EventBus.js';
-import { logContext } from '../../../core/log/logContext.js';
-import type { LogStore } from '../../../core/log/LogStore.js';
-import { DEFAULT_NAMESPACE, getCallerNamespace } from '../../../core/utility/CallerNamespace.js';
-import { formatNsAsMs, nsToMs } from '../../../core/utility/Duration.js';
+import type { StatementType } from '#core/events/EventBus.js';
+import { logContext } from '#core/log/logContext.js';
+import type { LogStore } from '#core/log/LogStore.js';
+import { DEFAULT_NAMESPACE, getCallerNamespace } from '#core/utility/CallerNamespace.js';
+import { formatNsAsMs, nsToMs } from '#core/utility/Duration.js';
 import {
   Group,
   sum,

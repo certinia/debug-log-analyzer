@@ -1,8 +1,8 @@
 /*
  * Copyright (c) 2026 Certinia Inc. All rights reserved.
  */
-import type { LogCategory } from '../../core/log/category.js';
-import { buildLogIndex } from '../../core/log/LogIndex.js';
+import type { LogCategory } from '#core/log/category.js';
+import { buildLogIndex } from '#core/log/LogIndex.js';
 import type {
   PrecomputedRect,
   PrecomputedRectData,

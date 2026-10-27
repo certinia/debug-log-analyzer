@@ -6,16 +6,16 @@ import { consume } from '@lit/context';
 import { initialState, Task } from '@lit/task';
 import { LitElement, css, html, nothing, type PropertyValues } from 'lit';
 import { customElement, property, query, state } from 'lit/decorators.js';
-import { logContext } from '../../../core/log/logContext.js';
-import type { LogStore } from '../../../core/log/LogStore.js';
+import { logContext } from '#core/log/logContext.js';
+import type { LogStore } from '#core/log/LogStore.js';
 
-import { logStatusContext, type LogStatus } from '../../../core/log/logStatus.js';
+import { logStatusContext, type LogStatus } from '#core/log/logStatus.js';
 
 import type { ApexLog } from '@apexdevtools/apex-log-parser';
 import { categoryPalette } from '../../../components/categoryTime.js';
-import { SubscriptionController } from '../../../core/events/SubscriptionController.js';
-import { setChanged } from '../../../core/utility/Util.js';
-import { VSCodeExtensionMessenger } from '../../../core/messaging/VSCodeExtensionMessenger.js';
+import { SubscriptionController } from '#core/events/SubscriptionController.js';
+import { setChanged } from '#core/utility/Util.js';
+import { VSCodeExtensionMessenger } from '#core/messaging/VSCodeExtensionMessenger.js';
 import {
   settingsSettled,
   subscribeSettings,

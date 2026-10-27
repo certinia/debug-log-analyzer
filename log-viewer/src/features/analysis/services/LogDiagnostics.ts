@@ -11,11 +11,11 @@ import {
 } from '@apexdevtools/apex-log-parser';
 
 import { limitTotals } from '../../../components/logOverviewMetrics.js';
-import { GOVERNOR_METRICS } from '../../../core/metrics/governorMetrics.js';
-import { formatByteSize, formatDuration, formatInteger } from '../../../core/utility/Util.js';
-import type { Derivation, LogStore } from '../../../core/log/LogStore.js';
-import { signatureTimes, type SignatureTimes } from '../../../core/log/signatureTimes.js';
-import { outermostIds } from '../../../core/utility/EventTree.js';
+import { GOVERNOR_METRICS } from '#core/metrics/governorMetrics.js';
+import { formatByteSize, formatDuration, formatInteger } from '#core/utility/Util.js';
+import type { Derivation, LogStore } from '#core/log/LogStore.js';
+import { signatureTimes, type SignatureTimes } from '#core/log/signatureTimes.js';
+import { outermostIds } from '#core/utility/EventTree.js';
 import { deriveSoqlObject } from '../../database/services/sobjectClassification.js';
 import type { Dialect } from '../../soql/format/tokenize.js';
 import { apexLimitSeries } from '../../timeline/optimised/apex-limit-series.js';

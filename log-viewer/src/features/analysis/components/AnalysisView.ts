@@ -6,17 +6,17 @@ import { consume } from '@lit/context';
 import { LitElement, css, html, type PropertyValues } from 'lit';
 import { customElement, property, state } from 'lit/decorators.js';
 import { ref } from 'lit/directives/ref.js';
-import { logContext } from '../../../core/log/logContext.js';
-import type { LogStore } from '../../../core/log/LogStore.js';
+import { logContext } from '#core/log/logContext.js';
+import type { LogStore } from '#core/log/LogStore.js';
 
 import '../../../components/ContextMenu.js';
 import type { ContextMenu } from '../../../components/ContextMenu.js';
 import { LocatedRowIds } from '../../../components/locatedRow.js';
 import { InspectorTabController } from '../../../components/InspectorTabController.js';
 import { revealFirstOf } from '../../../components/inspectorTab.js';
-import { SelectionEchoGuard } from '../../../core/events/SelectionEchoGuard.js';
-import { SubscriptionController } from '../../../core/events/SubscriptionController.js';
-import { isVisible, setChanged } from '../../../core/utility/Util.js';
+import { SelectionEchoGuard } from '#core/events/SelectionEchoGuard.js';
+import { SubscriptionController } from '#core/events/SubscriptionController.js';
+import { isVisible, setChanged } from '#core/utility/Util.js';
 import {
   ColumnSettingsController,
   heldColumnTarget,

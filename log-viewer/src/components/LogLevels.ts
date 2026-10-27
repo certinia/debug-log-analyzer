@@ -21,8 +21,8 @@ import './VsSelect.js';
 
 // styles
 import { globalStyles } from '../styles/global.styles.js';
-import { type DebugLevels, LEVEL_ORDER, levelRank, sameLevels } from '../core/log/levelFilter.js';
-import { logStatusContext, type LogStatus } from '../core/log/logStatus.js';
+import { type DebugLevels, LEVEL_ORDER, levelRank, sameLevels } from '#core/log/levelFilter.js';
+import { logStatusContext, type LogStatus } from '#core/log/logStatus.js';
 import { skeletonStyles } from '../styles/skeleton.styles.js';
 
 export interface LogLevelsChange {

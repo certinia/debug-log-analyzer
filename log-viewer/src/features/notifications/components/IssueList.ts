@@ -5,8 +5,8 @@ import '#vscode-elements/vscode-icon.js';
 import { LitElement, css, html, type PropertyValues, type TemplateResult } from 'lit';
 import { customElement, property, state } from 'lit/decorators.js';
 
-import { ResizeController } from '../../../core/events/ResizeController.js';
-import { formatDuration, sameMembers } from '../../../core/utility/Util.js';
+import { ResizeController } from '#core/events/ResizeController.js';
+import { formatDuration, sameMembers } from '#core/utility/Util.js';
 import { markerColorCss } from '../../timeline/types/flamechart.types.js';
 import { SEVERITY_META, sortBySeverity, type LogIssue } from '../types.js';
 

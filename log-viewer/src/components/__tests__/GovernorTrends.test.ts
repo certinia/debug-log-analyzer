@@ -9,9 +9,9 @@ import type { LitElement } from 'lit';
 import type { ApexLog } from '@apexdevtools/apex-log-parser';
 
 import { stubStore } from '#test-helpers/apexLog.js';
-import { eventBus } from '../../core/events/EventBus.js';
-import { describeLevelGap, findLevelGap } from '../../core/log/levelCapabilities.js';
-import type { LogStore } from '../../core/log/LogStore.js';
+import { eventBus } from '#core/events/EventBus.js';
+import { describeLevelGap, findLevelGap } from '#core/log/levelCapabilities.js';
+import type { LogStore } from '#core/log/LogStore.js';
 import type { NoDataSpan } from '../../features/timeline/types/flamechart.types.js';
 import { NO_GOVERNOR_USAGE_TEXT } from '../governorCopy.js';
 import type { TrendSeries } from '../governorTrendData.js';

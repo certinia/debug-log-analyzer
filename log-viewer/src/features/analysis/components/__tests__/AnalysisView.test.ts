@@ -23,13 +23,9 @@ jest.mock('../../../../components/grid/exportCsv.js', () => ({ exportCsv: jest.f
 
 import { frameLines, rawStoreOf } from '#test-helpers/apexLog.js';
 import { AlwaysVisible, NeverVisible, settle } from '#test-helpers/visibility.js';
-import {
-  eventBus,
-  type DetailSelection,
-  type DetailSource,
-} from '../../../../core/events/EventBus.js';
+import { eventBus, type DetailSelection, type DetailSource } from '#core/events/EventBus.js';
 import { exportCsv } from '../../../../components/grid/exportCsv.js';
-import { logStoreFor } from '../../../../core/log/LogStore.js';
+import { logStoreFor } from '#core/log/LogStore.js';
 import { BOTTOM_UP_DETAILS } from '../../../call-tree/grid/columns.js';
 import { MergedTree } from '../../../call-tree/grid/mergedRows.js';
 import type { BottomUpRow } from '../../../call-tree/utils/Aggregation.js';

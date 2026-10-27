@@ -1,14 +1,14 @@
 /*
  * Copyright (c) 2026 Certinia Inc. All rights reserved.
  */
-import { copyToClipboard } from '../core/utility/Clipboard.js';
+import { copyToClipboard } from '#core/utility/Clipboard.js';
 import { goToRow } from '../features/call-tree/navigation.js';
 import {
   eventName,
   formatCallStack,
   formatEventDetails,
 } from '../features/call-tree/utils/eventText.js';
-import { currentLogStore } from '../core/log/LogStore.js';
+import { currentLogStore } from '#core/log/LogStore.js';
 import { ContextMenuBuilder } from './ContextMenuBuilder.js';
 import type { ContextMenuItem } from './ContextMenu.js';
 

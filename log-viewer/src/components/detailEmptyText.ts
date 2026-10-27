@@ -1,7 +1,7 @@
 /*
  * Copyright (c) 2026 Certinia Inc. All rights reserved.
  */
-import type { DetailSource } from '../core/events/EventBus.js';
+import type { DetailSource } from '#core/events/EventBus.js';
 
 /**
  * Per-source copy for the inspector's empty state, rendered by `DetailDock`

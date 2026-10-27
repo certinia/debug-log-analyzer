@@ -17,11 +17,11 @@ import {
   type LimitUnit,
   type Limits,
 } from '@apexdevtools/apex-log-parser';
-import type { Derivation } from '../../../core/log/LogStore.js';
-import { rowMetrics } from '../../../core/log/rowMetrics.js';
-import { DEFAULT_NAMESPACE } from '../../../core/utility/CallerNamespace.js';
-import { GOVERNOR_METRICS } from '../../../core/metrics/governorMetrics.js';
-import { CHECK_EVERY, frameBudget } from '../../../core/utility/FrameBudget.js';
+import type { Derivation } from '#core/log/LogStore.js';
+import { rowMetrics } from '#core/log/rowMetrics.js';
+import { DEFAULT_NAMESPACE } from '#core/utility/CallerNamespace.js';
+import { GOVERNOR_METRICS } from '#core/metrics/governorMetrics.js';
+import { CHECK_EVERY, frameBudget } from '#core/utility/FrameBudget.js';
 import type { HeatStripMetric, HeatStripTimeSeries } from '../types/flamechart.types.js';
 import { extractMarkers, noDataSpans } from '../utils/marker-utils.js';
 import {

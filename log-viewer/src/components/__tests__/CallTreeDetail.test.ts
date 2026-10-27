@@ -7,7 +7,7 @@ import { describe, expect, it } from '@jest/globals';
 
 // This suite exercises the view-mode toggle; no tree is built (eventIndex -1).
 
-import type { LogStore } from '../../core/log/LogStore.js';
+import type { LogStore } from '#core/log/LogStore.js';
 import type { CallTreeDetail } from '../CallTreeDetail.js';
 import '../CallTreeDetail.js';
 

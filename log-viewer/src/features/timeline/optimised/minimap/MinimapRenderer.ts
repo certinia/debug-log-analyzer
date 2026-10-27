@@ -26,7 +26,7 @@
  */
 
 import * as PIXI from 'pixi.js';
-import { formatDuration, formatTimeRange, sameMembers } from '../../../../core/utility/Util.js';
+import { formatDuration, formatTimeRange, sameMembers } from '#core/utility/Util.js';
 import type { TimelineMarker } from '../../types/flamechart.types.js';
 import {
   MARKER_ALPHA_BY_TYPE,

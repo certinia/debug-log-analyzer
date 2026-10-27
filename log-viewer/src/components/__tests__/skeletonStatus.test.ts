@@ -7,7 +7,7 @@ import { describe, expect, it } from '@jest/globals';
 
 import { ContextProvider } from '@lit/context';
 
-import { logStatusContext, type LogStatus } from '../../core/log/logStatus.js';
+import { logStatusContext, type LogStatus } from '#core/log/logStatus.js';
 import '../GridSkeleton.js';
 import '../LogIdentity.js';
 import '../LogLevels.js';

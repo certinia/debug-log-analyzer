@@ -2,9 +2,9 @@
  * Copyright (c) 2026 Certinia Inc. All rights reserved.
  */
 
-import type { DetailSelection, SelectionView } from '../core/events/EventBus.js';
-import { ROOT_PATH_ID } from '../core/log/keyPathIds.js';
-import type { LogStore } from '../core/log/LogStore.js';
+import type { DetailSelection, SelectionView } from '#core/events/EventBus.js';
+import { ROOT_PATH_ID } from '#core/log/keyPathIds.js';
+import type { LogStore } from '#core/log/LogStore.js';
 
 /** How the inspector reads a grid's row: its data, and the row above it. */
 export interface RowReader<R> {

@@ -5,6 +5,7 @@
   "scripts": {},
   "version": "0.1.0",
   "imports": {
+    "#core/*": "./src/core/*",
     "#vscode-elements/*.js": "@vscode-elements/elements/dist/*/index.js"
   },
   "dependencies": {

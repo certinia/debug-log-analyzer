@@ -33,10 +33,10 @@ import {
   type ScopedRow,
 } from '../scopedCallTree.js';
 import { INSPECTOR_LOCATE_EVENT, type InspectorLocateEvent } from '../inspectorReveal.js';
-import { eventBus, type DetailSelection } from '../../core/events/EventBus.js';
-import { logStoreFor, type LogStore } from '../../core/log/LogStore.js';
-import { ROOT_PATH_ID } from '../../core/log/keyPathIds.js';
-import { setRange, type TimeWindow } from '../../core/log/rangeScope.js';
+import { eventBus, type DetailSelection } from '#core/events/EventBus.js';
+import { logStoreFor, type LogStore } from '#core/log/LogStore.js';
+import { ROOT_PATH_ID } from '#core/log/keyPathIds.js';
+import { setRange, type TimeWindow } from '#core/log/rangeScope.js';
 
 const build = jest.mocked(buildScopedCallTree);
 const wholeBuild = jest.mocked(buildWholeLogCallTree);

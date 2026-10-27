@@ -4,7 +4,7 @@
 import { beforeEach, describe, expect, it } from '@jest/globals';
 
 import { rawStoreOf, storeOf } from '#test-helpers/apexLog.js';
-import { filterByLevels } from '../../../../core/log/LogStore.js';
+import { filterByLevels } from '#core/log/LogStore.js';
 import { logDiagnostics, scopeDiagnostics } from '../LogDiagnostics.js';
 
 /** The time of the last line {@link at} wrote. */

@@ -47,9 +47,9 @@ jest.mock('../../../../components/grid/exportCsv.js', () => ({ exportCsv: jest.f
 import { indexOf, rawStoreOf, storeOf } from '#test-helpers/apexLog.js';
 import { AlwaysVisible, NeverVisible, settle } from '#test-helpers/visibility.js';
 import { exportCsv } from '../../../../components/grid/exportCsv.js';
-import { eventBus } from '../../../../core/events/EventBus.js';
-import type { LogIndex } from '../../../../core/log/LogIndex.js';
-import { LogStore, logStoreFor } from '../../../../core/log/LogStore.js';
+import { eventBus } from '#core/events/EventBus.js';
+import type { LogIndex } from '#core/log/LogIndex.js';
+import { LogStore, logStoreFor } from '#core/log/LogStore.js';
 import { CalltreeView } from '../CalltreeView.js';
 
 /** Which view each build made, in order. */

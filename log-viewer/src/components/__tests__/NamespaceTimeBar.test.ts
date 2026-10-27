@@ -8,8 +8,8 @@ import type { ApexLog } from '@apexdevtools/apex-log-parser';
 
 let apexLog: ApexLog | null = null;
 
-import { logStoreFor } from '../../core/log/LogStore.js';
-import { setRange } from '../../core/log/rangeScope.js';
+import { logStoreFor } from '#core/log/LogStore.js';
+import { setRange } from '#core/log/rangeScope.js';
 import type { NamespaceTimeBar } from '../NamespaceTimeBar.js';
 import { DEFAULT_MAX_SEGMENTS } from '../StackedTimeBar.js';
 import '../NamespaceTimeBar.js';

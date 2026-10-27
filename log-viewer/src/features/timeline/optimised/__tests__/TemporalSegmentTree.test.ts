@@ -2,7 +2,7 @@
  * Copyright (c) 2025 Certinia Inc. All rights reserved.
  */
 import { describe, expect, it } from '@jest/globals';
-import type { LogCategory } from '../../../../core/log/category.js';
+import type { LogCategory } from '#core/log/category.js';
 import type { PixelBucket, ViewportState } from '../../types/flamechart.types.js';
 import { type FrameSpec, rectsOf, timelineEvent } from '#test-helpers/timeline.js';
 import { makeViewport } from '#test-helpers/viewport.js';

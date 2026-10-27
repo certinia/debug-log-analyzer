@@ -4,7 +4,7 @@
 import { describe, expect, it } from '@jest/globals';
 import type { ApexEvent, ApexLog } from '@apexdevtools/apex-log-parser';
 
-import { EVENT_METRICS, HEAP_PEAK } from '../../../core/metrics/eventMetrics.js';
+import { EVENT_METRICS, HEAP_PEAK } from '#core/metrics/eventMetrics.js';
 
 import {
   frameCard,

@@ -5,10 +5,10 @@ import { consume } from '@lit/context';
 import { LitElement, html } from 'lit';
 import { customElement, property } from 'lit/decorators.js';
 
-import { DerivedValue } from '../core/log/DerivedValue.js';
-import { logContext } from '../core/log/logContext.js';
-import { WindowStatsController } from '../core/log/windowStats.js';
-import type { Derivation, LogStore } from '../core/log/LogStore.js';
+import { DerivedValue } from '#core/log/DerivedValue.js';
+import { logContext } from '#core/log/logContext.js';
+import { WindowStatsController } from '#core/log/windowStats.js';
+import type { Derivation, LogStore } from '#core/log/LogStore.js';
 import { globalStyles } from '../styles/global.styles.js';
 import './SectionSkeleton.js';
 import { inspectorSectionStyles } from '../styles/inspectorSection.styles.js';
