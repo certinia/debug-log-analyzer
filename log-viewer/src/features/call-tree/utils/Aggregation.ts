@@ -773,26 +773,19 @@ function* finalizeBuckets(
   costLimits: CostLimits,
 ): Generator<void, BottomUpRow[], void> {
   const roots = Array.from(rootBuckets.values());
-  const order: BottomUpRow[] = [];
   const pending = roots.slice();
+  let done = 0;
   while (pending.length > 0) {
     const row = pending.pop()!; // the loop guard keeps it non-empty
-    order.push(row);
-    for (const child of row._children ?? []) {
-      pending.push(child);
-    }
-    if (order.length % CHECK_EVERY === 0) {
-      yield;
-    }
-  }
-  for (let i = order.length - 1; i >= 0; i--) {
-    const row = order[i]!; // i is in range
     calculateBottomUpAverages(row);
     setGovernorCost(row, costLimits);
     if (row._children && row._children.length > 0) {
       sortBuckets(row._children);
+      for (const child of row._children) {
+        pending.push(child);
+      }
     }
-    if (i % CHECK_EVERY === 0) {
+    if (++done % CHECK_EVERY === 0) {
       yield;
     }
   }
