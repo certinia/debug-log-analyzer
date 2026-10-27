@@ -7,7 +7,7 @@ import { childRows, type LogIndex, NO_ROW } from '#core/log/LogIndex.js';
 import type { Derivation } from '#core/log/LogStore.js';
 import { type Signatures, signaturesOf } from '#core/log/signatures.js';
 import { statements, type DmlEvent, type SoqlEvent, type SoslEvent } from '#core/log/statements.js';
-import { DEFAULT_NAMESPACE, namespaceOf } from '#core/utility/CallerNamespace.js';
+import { callerNamespaceOfRow, namespaceOf } from '#core/utility/CallerNamespace.js';
 import { sharePercent } from '#core/utility/Util.js';
 import { deriveSoqlObject } from './sobjectClassification.js';
 
@@ -320,9 +320,7 @@ function compute(logNs: number, index: LogIndex, rows: readonly number[]): Datab
     // outermost statement charges a namespace: its total is the whole cost.
     if (enclosing === NO_ROW) {
       const kindField = KIND_BREAKDOWN[kind];
-      const above = index.parent[row]!;
-      const caller =
-        above === NO_ROW ? DEFAULT_NAMESPACE : namespaceOf(index.log, index.eventIndex[above]!);
+      const caller = callerNamespaceOfRow(index, row);
       addBreakdown(askedBy, {
         key: caller,
         kind: kindField,

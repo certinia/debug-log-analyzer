@@ -8,10 +8,9 @@ import type { ColumnSettingsOptions } from '../../../components/ColumnSettingsCo
 import { bar } from '../../../components/grid/cells.js';
 import { countColumn, timeColumn } from '../../../components/grid/columns.js';
 import { NO_REPORTED_LIMITS_TEXT } from '../../../components/governorCopy.js';
-import { NO_ROW } from '#core/log/LogIndex.js';
 import { rowMetrics, type SelfTotalColumns } from '#core/log/rowMetrics.js';
 import { vscodeMessenger } from '#core/messaging/VSCodeExtensionMessenger.js';
-import { DEFAULT_NAMESPACE, namespaceOf } from '#core/utility/CallerNamespace.js';
+import { callerNamespaceOfRow } from '#core/utility/CallerNamespace.js';
 import { formatInteger, sharePercent } from '#core/utility/Util.js';
 import {
   max,
@@ -91,7 +90,7 @@ function timeOrderFields(
   usage: ReportedUsage | null,
 ): RowFields<TimeOrderNode> {
   const { index } = source;
-  const { log, eventIndex, parent, start, end } = index;
+  const { log, eventIndex, start, end } = index;
   const m = rowMetrics(index);
   const costLimits = costLimitsOf(log.limits);
   // One object for every row: a sort of the whole log reads it per row and keeps nothing.
@@ -128,10 +127,7 @@ function timeOrderFields(
     eventIndex: ({ row }) => eventIndex[row]!,
     text: source.text,
     namespace: source.namespace,
-    callerNamespace: ({ row }) => {
-      const above = parent[row]!;
-      return above === NO_ROW ? DEFAULT_NAMESPACE : namespaceOf(log, eventIndex[above]!);
-    },
+    callerNamespace: ({ row }) => callerNamespaceOfRow(index, row),
     type: source.type,
     usage: usageOf,
     governorCost: (node) => governorCostOf(usageOf(node), costLimits)[0],

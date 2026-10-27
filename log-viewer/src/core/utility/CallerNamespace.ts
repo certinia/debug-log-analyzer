@@ -3,6 +3,7 @@
  */
 import type { ApexLog } from '@apexdevtools/apex-log-parser';
 
+import { type LogIndex, NO_ROW } from '../log/LogIndex.js';
 import type { LogStore } from '../log/LogStore.js';
 
 /** What an empty/unset namespace normalizes to, here and in every comparison against a namespace. */
@@ -22,4 +23,10 @@ export function namespaceOf(log: ApexLog, id: number): string {
 export function getCallerNamespace(store: LogStore, id: number): string {
   const parent = store.parentOf(id);
   return parent > 0 ? namespaceOf(store.log, parent) : DEFAULT_NAMESPACE;
+}
+
+/** {@link getCallerNamespace} for a row: the namespace of the shown frame above it. */
+export function callerNamespaceOfRow(index: LogIndex, row: number): string {
+  const above = index.parent[row]!;
+  return above === NO_ROW ? DEFAULT_NAMESPACE : namespaceOf(index.log, index.eventIndex[above]!);
 }
