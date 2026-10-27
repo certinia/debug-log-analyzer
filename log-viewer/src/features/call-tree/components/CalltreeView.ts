@@ -366,14 +366,27 @@ export class CalltreeView extends LitElement {
       }
 
       .hidden-note {
-        /* Out of the filter bar's slotted grow rule, which hands the slack to the overflow list. */
-        flex: none;
-        align-self: center;
+        display: flex;
+        align-items: center;
+        gap: var(--lana-space-2xs);
+        /* Shrinks once the filters are all in the menu; below this width it joins them. */
+        flex: 0 1 auto;
+        min-width: 10ch;
         color: var(--lana-fg-muted);
         white-space: nowrap;
       }
 
+      .hidden-note[slot='overflow'] {
+        padding: var(--lana-space-3xs) var(--lana-space-xs);
+      }
+
+      .hidden-note__text {
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+
       .hidden-note__clear {
+        flex: none;
         padding: 0;
         border: none;
         background: none;
@@ -495,23 +508,22 @@ export class CalltreeView extends LitElement {
                     `
                   : ''
               }
+              ${
+                !this._hiddenTarget
+                  ? ''
+                  : html`<span slot="end" collapse-last class="hidden-note">
+                      <span class="hidden-note__text">Hidden by filters ·</span>
+                      <button
+                        type="button"
+                        class="hidden-note__clear"
+                        aria-label="Clear filters and go to the hidden row"
+                        @click=${this._clearFiltersAndGo}
+                      >
+                        Clear
+                      </button>
+                    </span>`
+              }
             </overflow-list>
-
-            ${
-              !this._hiddenTarget
-                ? ''
-                : html`<span slot="filters" class="hidden-note">
-                    Hidden by filters ·
-                    <button
-                      type="button"
-                      class="hidden-note__clear"
-                      aria-label="Clear filters and go to the hidden row"
-                      @click=${this._clearFiltersAndGo}
-                    >
-                      Clear
-                    </button>
-                  </span>`
-            }
             ${gridGroupControls({
               grid: this._activeGrid(),
               group:
