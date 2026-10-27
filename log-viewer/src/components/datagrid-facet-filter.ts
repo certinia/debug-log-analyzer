@@ -3,7 +3,7 @@
  */
 import '#vscode-elements/vscode-icon.js';
 
-import { LitElement, css, html } from 'lit';
+import { LitElement, css, html, nothing } from 'lit';
 import { customElement, property, state } from 'lit/decorators.js';
 
 import { anchoredPopoverStyles } from '../styles/anchoredPopover.styles.js';
@@ -41,43 +41,23 @@ export class DatagridFacetFilter extends LitElement {
         display: inline-flex;
       }
 
-      /* In the overflow panel the control is a full-width row: label + checklist. */
+      /* In the overflow panel: aligned label column (shared width) + trigger column. */
       :host([slot='overflow']) {
-        display: block;
+        display: grid;
+        grid-template-columns: var(--filter-panel-label-width) 1fr;
+        column-gap: var(--lana-space-sm);
+        align-items: center;
         width: 100%;
       }
 
-      /* Aligned row: label column (shared width) + control column. */
-      .facet-panel {
-        display: grid;
-        grid-template-columns: var(--filter-panel-label-width) 1fr;
-        column-gap: 8px;
-        row-gap: 4px;
-        align-items: start;
+      :host([slot='overflow']) .facet-trigger {
+        justify-self: start;
       }
 
       .facet-panel__label {
-        grid-column: 1;
         font-size: var(--filter-control-font-size);
         font-weight: 600;
         color: var(--lana-fg);
-        /* Nudge onto the first option row's baseline. */
-        padding-top: 3px;
-      }
-
-      .facet-panel__options {
-        grid-column: 2;
-        display: flex;
-        flex-direction: column;
-        gap: 2px;
-        max-height: 180px;
-        overflow-y: auto;
-      }
-
-      .facet-panel .facet-popover__clear {
-        grid-column: 2;
-        width: auto;
-        padding: 2px 0;
       }
 
       .facet-trigger__count {
@@ -161,8 +141,15 @@ export class DatagridFacetFilter extends LitElement {
     `,
   ];
 
+  /** In the overflow panel, a label column before the same compact trigger, so a long
+   *  value list opens in its own popover instead of filling the panel. One template either
+   *  way, so a move in or out of the panel keeps the option DOM. */
   render() {
-    return this.slot === 'overflow' ? this._renderPanel() : this._renderInline();
+    return html`${
+      this.slot === 'overflow'
+        ? html`<span class="facet-panel__label" title=${this.label}>${this.label}</span>`
+        : nothing
+    }${this._renderInline()}`;
   }
 
   /** Compact bar pill that opens the checklist in a native popover. */
@@ -202,24 +189,6 @@ export class DatagridFacetFilter extends LitElement {
             Clear
           </button>
         </div>
-      </div>
-    `;
-  }
-
-  /** Full-width row (inside the overflow panel): label + inline checklist. */
-  private _renderPanel() {
-    const count = this._selected.size;
-    return html`
-      <div class="facet-panel" role="group" aria-label=${this.label}>
-        <span class="facet-panel__label" title=${this.label}>${this.label}</span>
-        <div class="facet-panel__options">${this._options()}</div>
-        ${
-          count > 0
-            ? html`<button class="facet-popover__clear visible" @click=${this._clear}>
-                Clear
-              </button>`
-            : ''
-        }
       </div>
     `;
   }
