@@ -3,7 +3,7 @@
  */
 import { type ApexEvent, eventType } from '@apexdevtools/apex-log-parser';
 
-import type { LogIndex } from '#core/log/LogIndex.js';
+import { categoryName, type LogIndex } from '#core/log/LogIndex.js';
 import type { PrecomputedRect } from '../optimised/RectangleCache.js';
 import {
   type EventNode,
@@ -81,7 +81,7 @@ export function buildTimelineFrames(
         depth: d,
         duration: rowTotal,
         selfDuration: index.self[row]!,
-        category: index.categoryNames[categoryId[row]!]!,
+        category: categoryName(index, row),
         x: 0,
         y: d * eventHeight,
         width: 0,

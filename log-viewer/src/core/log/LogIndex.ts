@@ -78,6 +78,11 @@ export interface LogIndex extends Readonly<Rows> {
   selfColumn<T extends Int32Array | Float64Array>(byId: T): T;
 }
 
+/** `row`'s category: '' for a leaf. */
+export function categoryName(index: LogIndex, row: number): LogCategory {
+  return index.categoryNames[index.categoryId[row]!]!;
+}
+
 /**
  * The rows directly under `row`, or at the top of the log for {@link NO_ROW}, in
  * log order. Fills `into` when given, so a pass over every row reuses one array.

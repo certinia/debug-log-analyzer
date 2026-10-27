@@ -4,7 +4,7 @@
 import { type EventType, eventType } from '@apexdevtools/apex-log-parser';
 
 import type { LogCategory } from '#core/log/category.js';
-import { childRows, type LogIndex, NO_ROW } from '#core/log/LogIndex.js';
+import { categoryName, childRows, type LogIndex, NO_ROW } from '#core/log/LogIndex.js';
 import { type Signatures, signaturesOf } from '#core/log/signatures.js';
 import type { RowFilter, TreeSource } from '../../../grid/index.js';
 import { EXCLUDED_DETAIL_TYPES } from './DetailsFilter.js';
@@ -78,8 +78,7 @@ export class TimeOrderSource implements TreeSource<TimeOrderNode> {
   readonly type = (node: TimeOrderNode): string => this.signatures.type(this.signatureOf(node));
 
   /** The timeline category of the node's event. */
-  readonly category = ({ row }: TimeOrderNode): LogCategory =>
-    this.index.categoryNames[this.index.categoryId[row]!]!;
+  readonly category = ({ row }: TimeOrderNode): LogCategory => categoryName(this.index, row);
 
   private nodesUnder(row: number): HeldNode[] {
     return childRows(this.index, row).map((child) => ({ row: child }));
