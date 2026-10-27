@@ -869,15 +869,7 @@ export class CalltreeView extends LitElement {
 
   /** The keys from a top-level row down to the Time Order row for `eventIndex`. */
   private _timeOrderPath(eventIndex: number): RowKey[] {
-    const store = this.rootStore;
-    if (!store?.isShown(eventIndex)) {
-      return [];
-    }
-    const path: RowKey[] = [];
-    for (let id = eventIndex; id > 0; id = store.parentOf(id)) {
-      path.unshift(id);
-    }
-    return path;
+    return this.rootStore?.pathTo(eventIndex) ?? [];
   }
 
   private async _renderCallTree(

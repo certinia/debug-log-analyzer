@@ -1,7 +1,7 @@
 /*
  * Copyright (c) 2026 Certinia Inc. All rights reserved.
  */
-import type { ApexEvent, ApexLog, SelfTotal } from '@apexdevtools/apex-log-parser';
+import type { ApexLog, SelfTotal } from '@apexdevtools/apex-log-parser';
 import { html } from 'lit';
 
 import type { ColumnSettingsOptions } from '../../../components/ColumnSettingsController.js';
@@ -10,9 +10,8 @@ import { countColumn, timeColumn } from '../../../components/grid/columns.js';
 import { NO_REPORTED_LIMITS_TEXT } from '../../../components/governorCopy.js';
 import { NO_ROW } from '#core/log/LogIndex.js';
 import { rowMetrics, type SelfTotalColumns } from '#core/log/rowMetrics.js';
-import { signaturesOf } from '#core/log/signatures.js';
 import { vscodeMessenger } from '#core/messaging/VSCodeExtensionMessenger.js';
-import { DEFAULT_NAMESPACE } from '#core/utility/CallerNamespace.js';
+import { DEFAULT_NAMESPACE, namespaceOf } from '#core/utility/CallerNamespace.js';
 import { formatInteger, sharePercent } from '#core/utility/Util.js';
 import {
   max,
@@ -93,7 +92,6 @@ function timeOrderFields(
 ): RowFields<TimeOrderNode> {
   const { index } = source;
   const { log, eventIndex, parent, start, end } = index;
-  const signatures = signaturesOf(log);
   const m = rowMetrics(index);
   const costLimits = costLimitsOf(log.limits);
   // One object for every row: a sort of the whole log reads it per row and keeps nothing.
@@ -132,9 +130,7 @@ function timeOrderFields(
     namespace: source.namespace,
     callerNamespace: ({ row }) => {
       const above = parent[row]!;
-      return above === NO_ROW
-        ? DEFAULT_NAMESPACE
-        : signatures.namespace(signatures.of(eventIndex[above]!));
+      return above === NO_ROW ? DEFAULT_NAMESPACE : namespaceOf(log, eventIndex[above]!);
     },
     type: source.type,
     usage: usageOf,
@@ -561,10 +557,6 @@ function lineBreaks(text: string | null | undefined): number {
  * Read from the event, as no label is built for it. A query is counted as written,
  * though its cell lays it out on more.
  */
-function nameLines(event: ApexEvent | null): number {
-  return 1 + lineBreaks(event?.text);
-}
-
 type LinesOf = (row: { eventIndex: number }) => number;
 const linesByLog = new WeakMap<ApexLog, LinesOf>();
 
@@ -577,7 +569,7 @@ const linesByLog = new WeakMap<ApexLog, LinesOf>();
 export function mergedLines(log: ApexLog): LinesOf {
   let lines = linesByLog.get(log);
   if (!lines) {
-    lines = (row) => nameLines(log.event(row.eventIndex));
+    lines = (row) => 1 + lineBreaks(log.columns.text.at(row.eventIndex));
     linesByLog.set(log, lines);
   }
   return lines;

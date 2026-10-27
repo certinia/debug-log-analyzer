@@ -12,6 +12,9 @@ export interface EventLines {
 const EVENT_LINE = /^\d{2}:\d{2}:\d{2}\.\d+\s*\((\d+)\)\|([A-Z_]+)/;
 const TYPE_BY_NAME = new Map<string, EventTypeInfo>(EVENT_TYPES.map((info) => [info.type, info]));
 
+const closes = (frameType: number, exit: EventTypeInfo): boolean =>
+  !!EVENT_TYPES[frameType]?.exitTypes.includes(exit.type);
+
 /**
  * Each event's lines in a document of `lineCount` lines, read through `lineAt`.
  *
@@ -36,13 +39,16 @@ export function eventLines(
     }
     const time = Number(match[1]);
     if (info.shape === 'exit') {
-      const closes = (id: number) => !!EVENT_TYPES[type[id]!]?.exitTypes.includes(info.type);
       // A frame an outer exit unwound, or the next line closed, has no exit of its own.
-      while (open.length && !closes(open.at(-1)!) && endTimestamp[open.at(-1)!]! <= time) {
+      while (
+        open.length &&
+        !closes(type[open.at(-1)!]!, info) &&
+        endTimestamp[open.at(-1)!]! <= time
+      ) {
         open.pop();
       }
       const top = open.at(-1);
-      if (top !== undefined && endTimestamp[top] === time && closes(top)) {
+      if (top !== undefined && endTimestamp[top] === time && closes(type[top]!, info)) {
         end[top] = line;
         open.pop();
         continue;

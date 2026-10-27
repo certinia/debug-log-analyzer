@@ -29,7 +29,15 @@ const prettyQueries = new WeakMap<ApexLog, Map<number, string>>();
 
 /** What a Name cell shows for event `eventIndex` of `log`, as text. */
 export function nameText(log: ApexLog, eventIndex: number, fallback: string): string {
-  const node = log.event(eventIndex);
+  return textOf(log, eventIndex, log.event(eventIndex), fallback);
+}
+
+function textOf(
+  log: ApexLog,
+  eventIndex: number,
+  node: ApexEvent | null,
+  fallback: string,
+): string {
   if (!node) {
     return fallback;
   }
@@ -52,7 +60,7 @@ export function nameText(log: ApexLog, eventIndex: number, fallback: string): st
 /** What copy and export write for a Name cell: a query as the log has it. */
 export function nameExportText(log: ApexLog, eventIndex: number, fallback: string): string {
   const node = log.event(eventIndex);
-  return node && isQuery(node) ? (node.text ?? '') : nameText(log, eventIndex, fallback);
+  return node && isQuery(node) ? (node.text ?? '') : textOf(log, eventIndex, node, fallback);
 }
 
 /**

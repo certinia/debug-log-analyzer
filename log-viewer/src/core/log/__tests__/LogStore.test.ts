@@ -3,7 +3,7 @@
  */
 import { afterEach, describe, expect, it, jest } from '@jest/globals';
 
-import { indexesOf, storeOf } from '#test-helpers/apexLog.js';
+import { indexesOf, indexOf, rawStoreOf, storeOf } from '#test-helpers/apexLog.js';
 import type { LogIndex } from '../LogIndex.js';
 import {
   currentLogStore,
@@ -33,6 +33,23 @@ describe('LogStore', () => {
     expect(logStoreFor(log)).toBe(logStoreFor(log));
     expect(setCurrentLog(logStoreFor(log))).toBe(currentLogStore());
     expect(currentLogStore()?.log).toBe(log);
+  });
+
+  // A path given leaf-first, or without the event itself, opens the wrong row.
+  it('gives the ids from the top of the log down to an event, the event last', async () => {
+    const { log, store } = await rawStoreOf(
+      '09:18:22.6 (1000)|METHOD_ENTRY|[1]|01p|ns.Outer.run()\n' +
+        '09:18:22.6 (1100)|METHOD_ENTRY|[2]|01p|ns.Inner.go()\n' +
+        '09:18:22.6 (1150)|USER_DEBUG|[3]|DEBUG|hello\n' +
+        '09:18:22.6 (1200)|METHOD_EXIT|[2]|ns.Inner.go()\n' +
+        '09:18:22.6 (1300)|METHOD_EXIT|[1]|ns.Outer.run()\n',
+    );
+    const outer = indexOf(log, 'ns.Outer.run()');
+    const inner = indexOf(log, 'ns.Inner.go()');
+    const debug = indexOf(log, 'DEBUG | hello');
+
+    expect(store.pathTo(debug)).toEqual([outer, inner, debug]);
+    expect(store.pathTo(0)).toEqual([]);
   });
 
   it('links a log filtered by level to the store of the log as captured', async () => {

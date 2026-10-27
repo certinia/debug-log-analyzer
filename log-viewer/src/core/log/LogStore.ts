@@ -145,6 +145,15 @@ export class LogStore {
     return [...own];
   }
 
+  /** The shown ids from the top of the log down to `eventIndex`; empty if it is hidden or absent. */
+  pathTo(eventIndex: number): number[] {
+    const path: number[] = [];
+    for (let id = this.isShown(eventIndex) ? eventIndex : 0; id > 0; id = this.parentOf(id)) {
+      path.push(id);
+    }
+    return path.reverse();
+  }
+
   /**
    * The shown frames from the top of the log down to `eventIndex`, the event
    * itself last when it is a frame. Empty if the log shows no such event.

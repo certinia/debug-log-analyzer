@@ -36,11 +36,6 @@ export class Signatures {
     this.ofId = new Int32Array(log.eventCount + 1);
   }
 
-  /** How many signatures have been found so far. */
-  get count(): number {
-    return this.types.length;
-  }
-
   /** Event `id`'s signature. */
   of(id: number): number {
     const known = this.ofId[id]!;

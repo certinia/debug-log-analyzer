@@ -39,22 +39,36 @@ function governorCosts(source: TimeOrderSource): { avg: Float64Array; max: Float
   const costLimits = costLimitsOf(index.log.limits);
   const avg = new Float64Array(index.rowCount);
   const max = new Float64Array(index.rowCount);
-  const at = (from: SelfTotalColumns<Int32Array | Float64Array>, row: number): SelfTotal => ({
-    self: from.self[row]!,
-    total: from.total[row]!,
-  });
+  const tally = (): SelfTotal => ({ self: 0, total: 0 });
+  const usage: GovernorUsage = {
+    dmlCount: tally(),
+    soqlCount: tally(),
+    soslCount: tally(),
+    dmlRowCount: tally(),
+    soqlRowCount: tally(),
+    soslRowCount: tally(),
+    heapAllocated: tally(),
+    heapGross: tally(),
+    heapPeak: 0,
+  };
+  const fill = (
+    into: SelfTotal,
+    from: SelfTotalColumns<Int32Array | Float64Array>,
+    row: number,
+  ) => {
+    into.self = from.self[row]!;
+    into.total = from.total[row]!;
+  };
   for (let row = 0; row < index.rowCount; row++) {
-    const usage: GovernorUsage = {
-      dmlCount: at(m.dmlCount, row),
-      soqlCount: at(m.soqlCount, row),
-      soslCount: at(m.soslCount, row),
-      dmlRowCount: at(m.dmlRowCount, row),
-      soqlRowCount: at(m.soqlRowCount, row),
-      soslRowCount: at(m.soslRowCount, row),
-      heapAllocated: at(m.heapAllocated, row),
-      heapGross: at(m.heapGross, row),
-      heapPeak: m.heapPeak[row]!,
-    };
+    fill(usage.dmlCount, m.dmlCount, row);
+    fill(usage.soqlCount, m.soqlCount, row);
+    fill(usage.soslCount, m.soslCount, row);
+    fill(usage.dmlRowCount, m.dmlRowCount, row);
+    fill(usage.soqlRowCount, m.soqlRowCount, row);
+    fill(usage.soslRowCount, m.soslRowCount, row);
+    fill(usage.heapAllocated, m.heapAllocated, row);
+    fill(usage.heapGross, m.heapGross, row);
+    usage.heapPeak = m.heapPeak[row]!;
     const [a, b] = governorCostOf(usage, costLimits);
     avg[row] = a ?? NaN;
     max[row] = b ?? NaN;

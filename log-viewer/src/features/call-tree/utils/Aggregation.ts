@@ -367,7 +367,7 @@ function groupCallees(grouping: CalleeGrouping, ctx: BuildContext, budget: numbe
         row = createEmptyAggregatedRow(ctx, paths.keyText(keyId), paths.step(pathId, keyId), child);
         byKey.set(keyId, row);
       }
-      addCallToAggregatedRow(row, ctx, child, paths.stackIdOf(id, keyId), openStackId, usage);
+      addCallToAggregatedRow(row, ctx, child, paths.stackIdOf(id), openStackId, usage);
       done++;
     }
   }
@@ -536,7 +536,7 @@ function* bottomUpSteps(build: BuildContext): Generator<void, BottomUpRow[], voi
     const keyId = paths.keyIdOf(id);
     chainIds.push(keyId);
 
-    const stackId = paths.stackIdOf(id, keyId);
+    const stackId = paths.stackIdOf(id);
     const prior = activeByStack.get(stackId);
     const parent = open[open.length - 1];
     // A span sits inside its parent's, so under a parent that holds no point the search is skipped.
@@ -779,7 +779,7 @@ export async function buildBottomUpTree(
  */
 function* finalizeBuckets(
   rootBuckets: Map<number, BottomUpRow>,
-  costLimits?: CostLimits,
+  costLimits: CostLimits,
 ): Generator<void, BottomUpRow[], void> {
   const roots = Array.from(rootBuckets.values());
   // Pre-order, so walking it backwards meets every row after its children:
@@ -799,9 +799,7 @@ function* finalizeBuckets(
   for (let i = order.length - 1; i >= 0; i--) {
     const row = order[i]!; // i is in range
     calculateBottomUpAverages(row);
-    if (costLimits) {
-      setGovernorCost(row, costLimits);
-    }
+    setGovernorCost(row, costLimits);
     if (row._children && row._children.length > 0) {
       sortBuckets(row._children);
     }

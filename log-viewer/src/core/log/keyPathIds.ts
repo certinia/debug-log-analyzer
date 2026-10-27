@@ -27,11 +27,8 @@ export class KeyPathIds {
   private keys: string[] = [];
   private readonly signatures: Signatures;
   private readonly frameAbove: (id: number) => number;
-  /** Each signature's bucket key, as `id + 1` so an unset slot reads as 0. */
+  /** Each signature's bucket key id. */
   private keyOfSignature: number[] = [];
-  /** Each bucket key's stack key. A bucket key holds the stack key, so this is
-   *  per signature rather than per event. */
-  private stackOfKey: number[] = [];
   // Indexed by path id: the paths reachable from it, its own parent, and the key
   // it was minted with. Index 0 is the empty path.
   private children: Array<Map<number, number> | undefined> = [new Map()];
@@ -62,7 +59,6 @@ export class KeyPathIds {
     }
     const keyId = this.keyId(this.signatures.key(signature));
     this.keyOfSignature[signature] = keyId;
-    this.stackOfKey[keyId] = this.signatures.stackOf(signature);
     return keyId;
   }
 
@@ -70,8 +66,8 @@ export class KeyPathIds {
    * Event `id`'s interned stack key, which tells a recursive call from a fresh
    * one. Its own space: a stack key is never a step in a path.
    */
-  public stackIdOf(id: number, keyId = this.keyIdOf(id)): number {
-    return this.stackOfKey[keyId] ?? this.signatures.stackOf(this.signatures.of(id));
+  public stackIdOf(id: number): number {
+    return this.signatures.stackOf(this.signatures.of(id));
   }
 
   /**

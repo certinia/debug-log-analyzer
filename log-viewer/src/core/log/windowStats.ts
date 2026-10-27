@@ -3,7 +3,7 @@
  */
 import type { ReactiveControllerHost } from 'lit';
 
-import { DEFAULT_NAMESPACE } from '../utility/CallerNamespace.js';
+import { DEFAULT_NAMESPACE, namespaceOf } from '../utility/CallerNamespace.js';
 import { CHECK_EVERY, frameBudget, type FrameBudgetOptions } from '../utility/FrameBudget.js';
 import { firstIndexWhere } from '../utility/Util.js';
 import { type LogIndex, NO_ROW } from './LogIndex.js';
@@ -455,8 +455,7 @@ function addSelfTime(
       // The category's own name, named for display by the reader: `core/`
       // holds no display strings.
       add(stats.selfByCategory, categoryNames[categoryId[row]!]!, self);
-      const namespace = log.columns.namespace.at(eventIndex[row]!) ?? DEFAULT_NAMESPACE;
-      add(stats.selfByNamespace, namespace, self);
+      add(stats.selfByNamespace, namespaceOf(log, eventIndex[row]!), self);
     }
     for (let i = from; i < to; i++) {
       stack.push(children[i]!);

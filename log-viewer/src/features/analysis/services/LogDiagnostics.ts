@@ -15,6 +15,7 @@ import { GOVERNOR_METRICS } from '#core/metrics/governorMetrics.js';
 import { formatByteSize, formatDuration, formatInteger } from '#core/utility/Util.js';
 import type { Derivation, LogStore } from '#core/log/LogStore.js';
 import { signatureTimes, type SignatureTimes } from '#core/log/signatureTimes.js';
+import { type SoqlEvent, statements } from '#core/log/statements.js';
 import { outermostIds } from '#core/utility/EventTree.js';
 import { deriveSoqlObject } from '../../database/services/sobjectClassification.js';
 import type { Dialect } from '../../soql/format/tokenize.js';
@@ -27,8 +28,6 @@ import {
   type Severity,
 } from '../../soql/services/SOQLLinter.js';
 
-const SOQL_TYPE = eventType('SOQL_EXECUTE_BEGIN').typeId;
-const DML_TYPE = eventType('DML_BEGIN').typeId;
 const DEBUG_TYPE = eventType('USER_DEBUG').typeId;
 
 /** How many times a statement has to repeat before it is worth reporting. */
@@ -150,8 +149,6 @@ export interface LogDiagnostics {
   logNs: number;
 }
 
-type SoqlEvent = EventOf<'SOQL_EXECUTE_BEGIN'>;
-type DmlEvent = EventOf<'DML_BEGIN'>;
 type ExceptionEvent = EventOf<'EXCEPTION_THROWN' | 'FATAL_ERROR'>;
 
 /** A grouped set of events, keyed by whatever makes two of them the same finding. */
@@ -852,25 +849,12 @@ export function scopeDiagnostics(
  */
 async function analyse(store: LogStore): Promise<LogDiagnostics> {
   const log = store.log;
-  const queries: SoqlEvent[] = [];
-  const dml: DmlEvent[] = [];
+  const { soql: queries, dml } = await store.derive(statements);
   const debugLines: number[] = [];
-  // The type column, so only the statements the rules read become events.
   const { type } = log.columns;
   for (let id = 1; id <= log.eventCount; id++) {
-    const typeId = type[id];
-    if (typeId !== SOQL_TYPE && typeId !== DML_TYPE && typeId !== DEBUG_TYPE) {
-      continue;
-    }
-    if (!store.isShown(id)) {
-      continue;
-    }
-    if (typeId === DEBUG_TYPE) {
+    if (type[id] === DEBUG_TYPE && store.isShown(id)) {
       debugLines.push(id);
-    } else if (typeId === SOQL_TYPE) {
-      queries.push(log.event(id) as SoqlEvent); // the type was checked above
-    } else {
-      dml.push(log.event(id) as DmlEvent); // the type was checked above
     }
   }
 

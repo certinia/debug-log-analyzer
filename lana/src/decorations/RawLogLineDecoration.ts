@@ -83,9 +83,7 @@ export class RawLogLineDecoration {
 
     const selection = editor.selection;
     const line = document.lineAt(selection.active.line);
-    const match = line.text.match(TIMESTAMP_REGEX);
-
-    if (!match?.[1]) {
+    if (!TIMESTAMP_REGEX.test(line.text)) {
       this.clearDecorations(editor);
       return;
     }

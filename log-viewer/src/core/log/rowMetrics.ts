@@ -37,11 +37,6 @@ export interface RowMetrics {
   readonly heapPeak: Float64Array;
 }
 
-/** The count metrics of {@link RowMetrics}. */
-export type CountMetric = {
-  [K in keyof RowMetrics]: RowMetrics[K] extends SelfTotalColumns<Int32Array> ? K : never;
-}[keyof RowMetrics];
-
 const held = new WeakMap<LogIndex, RowMetrics>();
 
 /** The metrics of `index`'s rows, made once per index. */
