@@ -191,6 +191,11 @@ export class LogViewer extends LitElement {
         return;
       }
       this._showTab('timeline-tab');
+      // The timeline subscribes to the bus only once it is built.
+      if (this._logStatus !== 'ready') {
+        this._navigateToEventIndex = payload.eventIndex;
+        return;
+      }
       eventBus.emit('timeline:navigate-to', { eventIndex: payload.eventIndex });
     });
   }
@@ -321,7 +326,8 @@ export class LogViewer extends LitElement {
     // Navigate to event location if requested (passed as prop to timeline-view)
     if (data.navigateToEventIndex !== undefined) {
       this._showTab('timeline-tab');
-      this._navigateToEventIndex = data.navigateToEventIndex;
+      // An event sent during the parse is newer than the one the fetch carried.
+      this._navigateToEventIndex ??= data.navigateToEventIndex;
     }
   }
 
