@@ -6,7 +6,7 @@ import type { ReactiveControllerHost } from 'lit';
 import { DEFAULT_NAMESPACE, namespaceOf } from '../utility/CallerNamespace.js';
 import { CHECK_EVERY, frameBudget, type FrameBudgetOptions } from '../utility/FrameBudget.js';
 import { firstIndexWhere } from '../utility/Util.js';
-import { childRows, type LogIndex, NO_ROW } from './LogIndex.js';
+import { categoryName, childRows, type LogIndex, NO_ROW } from './LogIndex.js';
 import type { LogStore } from './LogStore.js';
 import { RangeScopeController, sameWindow, type TimeWindow } from './rangeScope.js';
 import { statementSelves } from './rowMetrics.js';
@@ -421,7 +421,7 @@ function addSelfTime(
   if (window.end <= window.start) {
     return;
   }
-  const { log, categoryId, categoryNames, eventIndex } = index;
+  const { log, eventIndex } = index;
   const stack: number[] = [];
   pushReached(index, stack, roots, window);
   while (stack.length) {
@@ -435,7 +435,7 @@ function addSelfTime(
     if (self > 0) {
       // The category's own name, named for display by the reader: `core/`
       // holds no display strings.
-      add(stats.selfByCategory, categoryNames[categoryId[row]!]!, self);
+      add(stats.selfByCategory, categoryName(index, row), self);
       add(stats.selfByNamespace, namespaceOf(log, eventIndex[row]!), self);
     }
     for (let i = from; i < to; i++) {
