@@ -213,3 +213,107 @@ describe('timeline-flame-chart find', () => {
     expect(targets[0]?.clears).toBeGreaterThan(0);
   });
 });
+
+describe('timeline-flame-chart in a short pane', () => {
+  let chart: HTMLElement & { apexLog: ApexLog | null; updateComplete: Promise<unknown> };
+  let height: number;
+  let resized: () => void = () => {};
+  const realResizeObserver = globalThis.ResizeObserver;
+  const realRect = Element.prototype.getBoundingClientRect;
+
+  beforeEach(async () => {
+    built = [];
+    destroyed = [];
+    holdInit = false;
+    height = 50;
+    globalThis.IntersectionObserver = AlwaysVisible as unknown as typeof IntersectionObserver;
+    globalThis.ResizeObserver = class {
+      constructor(callback: ResizeObserverCallback) {
+        resized = () => callback([], this as unknown as ResizeObserver);
+      }
+      observe(): void {}
+      unobserve(): void {}
+      disconnect(): void {}
+    } as unknown as typeof ResizeObserver;
+    Element.prototype.getBoundingClientRect = function (): DOMRect {
+      return { width: 500, height } as DOMRect;
+    };
+    chart = document.createElement('timeline-flame-chart') as typeof chart;
+    document.body.append(chart);
+    await chart.updateComplete;
+  });
+
+  afterEach(() => {
+    chart.remove();
+    globalThis.ResizeObserver = realResizeObserver;
+    Element.prototype.getBoundingClientRect = realRect;
+  });
+
+  const note = (): string =>
+    chart.shadowRoot?.querySelector('.too-small')?.textContent?.trim() ?? '';
+
+  it('shows a note instead of a layout error, and builds once the pane grows', async () => {
+    chart.apexLog = logOf();
+    await chart.updateComplete;
+    await settle();
+
+    // Built at 50px, the chart failed with INVALID_CONTAINER and never recovered.
+    expect(built).toEqual([]);
+    expect(note()).toContain('taller');
+
+    height = 400;
+    resized();
+    await chart.updateComplete;
+    await settle();
+
+    expect(built).toHaveLength(1);
+    expect(note()).toBe('');
+  });
+
+  it('shows no note while there is no log to draw', async () => {
+    resized();
+    await chart.updateComplete;
+
+    expect(note()).toBe('');
+  });
+
+  it('drops a build still in flight when a new log arrives in a short pane', async () => {
+    height = 400;
+    holdInit = true;
+    const first = logOf();
+    chart.apexLog = first;
+    await chart.updateComplete;
+    await settle();
+
+    height = 50;
+    const next = logOf();
+    chart.apexLog = next;
+    await chart.updateComplete;
+    finishInit();
+    await settle();
+
+    // Installed, the old log's chart would show once the pane grows, until the new one builds.
+    expect(destroyed).toEqual([first]);
+
+    holdInit = false;
+    height = 400;
+    resized();
+    await chart.updateComplete;
+    await settle();
+    expect(built).toEqual([first, next]);
+  });
+
+  it('hides a built chart when the pane shrinks, and keeps it', async () => {
+    height = 400;
+    chart.apexLog = logOf();
+    await chart.updateComplete;
+    await settle();
+
+    height = 50;
+    resized();
+    await chart.updateComplete;
+
+    expect(note()).toContain('taller');
+    expect(destroyed).toEqual([]);
+  });
+});

@@ -58,6 +58,7 @@ import { CursorLineRenderer } from './rendering/CursorLineRenderer.js';
 import { TimelineEventIndex } from './TimelineEventIndex.js';
 import { TimelineViewport } from './TimelineViewport.js';
 import { ViewportAnimator } from './ViewportAnimator.js';
+import { chartOverheadHeight } from './chartLayout.js';
 
 // Orchestrators (own domain-specific state and rendering)
 import { MeasurementOrchestrator } from './orchestrators/MeasurementOrchestrator.js';
@@ -836,10 +837,9 @@ export class FlameChart<E extends EventNode = EventNode> {
     const metricStripHeight = metricStripVisible
       ? (this.metricStripOrchestrator?.getHeight() ?? METRIC_STRIP_COLLAPSED_HEIGHT)
       : 0;
-    const metricStripGap = metricStripVisible ? METRIC_STRIP_GAP : 0;
 
     // Calculate main timeline height by subtracting all visible component heights
-    const totalOverheadHeight = minimapHeight + MINIMAP_GAP + metricStripHeight + metricStripGap;
+    const totalOverheadHeight = chartOverheadHeight(minimapHeight, metricStripHeight);
     const mainTimelineHeight = newHeight - totalOverheadHeight;
 
     if (mainTimelineHeight <= 0) {
@@ -1053,7 +1053,7 @@ export class FlameChart<E extends EventNode = EventNode> {
 
     // This is the applied geometry, so a resize to the same size has nothing to do.
     this.appliedMinimapHeight = minimapHeight;
-    this.appliedOverheadHeight = minimapHeight + MINIMAP_GAP + metricStripHeight + METRIC_STRIP_GAP;
+    this.appliedOverheadHeight = chartOverheadHeight(minimapHeight, metricStripHeight);
 
     // Create wrapper container with flexbox layout
     this.wrapper = document.createElement('div');
@@ -1095,8 +1095,7 @@ export class FlameChart<E extends EventNode = EventNode> {
 
     // Calculate main timeline height by subtracting fixed component heights.
     // At init time, all components are visible (metric strip hides later via setHeatStripTimeSeries).
-    const mainTimelineHeight =
-      height - minimapHeight - MINIMAP_GAP - metricStripHeight - METRIC_STRIP_GAP;
+    const mainTimelineHeight = height - this.appliedOverheadHeight;
 
     if (mainTimelineHeight <= 0) {
       throw new TimelineError(
