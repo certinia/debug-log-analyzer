@@ -153,6 +153,8 @@ export class TimelineFlameChart extends LitElement {
 
   /** Bumped by every `cleanup()`, so an in-flight `init` can tell it was superseded. */
   private initEpoch = 0;
+  // The prop is never cleared, so a rebuild would otherwise jump back to it.
+  private shownEventIndex: number | undefined;
   private visibilityWait: AbortController | null = null;
 
   private readonly finder = new FindController(this, {
@@ -315,6 +317,7 @@ export class TimelineFlameChart extends LitElement {
           ),
       };
 
+      const target = this.navigateToEventIndex;
       const timeline = new ApexLogTimeline();
       await timeline.init(layer, this.logStore, optionsWithTheme);
       timeline.setTooltipEnabled(this.showTooltip);
@@ -323,8 +326,8 @@ export class TimelineFlameChart extends LitElement {
       // Navigate after initialization completes.
       if (viewport) {
         timeline.setViewport(viewport);
-      } else if (this.navigateToEventIndex !== undefined) {
-        timeline.navigateToEventIndex(this.navigateToEventIndex);
+      } else if (target !== undefined && target !== this.shownEventIndex) {
+        timeline.navigateToEventIndex(target);
       }
       // The move above draws on the next frame; showing the layer sooner would flash the default view.
       await waitForNextFrame();
@@ -340,6 +343,7 @@ export class TimelineFlameChart extends LitElement {
       this.cleanup();
       layer.style.visibility = '';
       this.apexLogTimeline = timeline;
+      this.shownEventIndex = target;
       void this.finder.rerun();
       this.timelineLayer = layer;
       this.pendingViewport = null;

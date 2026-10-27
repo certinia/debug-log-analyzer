@@ -39,6 +39,9 @@ jest.mock('../../optimised/ApexLogTimeline.js', () => ({
       return null;
     }
     setViewport(): void {}
+    navigateToEventIndex(eventIndex: number): void {
+      navigated.push(eventIndex);
+    }
     setTooltipEnabled(): void {}
     setCategoryDim(): void {}
     setTheme(): void {}
@@ -53,6 +56,8 @@ import '../TimelineFlameChart.js';
 let built: LogStore[] = [];
 /** The logs whose chart was destroyed, in order. */
 let destroyed: LogStore[] = [];
+/** The event ids the charts moved to, in order. */
+let navigated: number[] = [];
 /** Whether a build waits to be finished by hand. */
 let holdInit = false;
 let finishInit: () => void = () => {};
@@ -152,6 +157,45 @@ describe('timeline-flame-chart on a new log', () => {
     finishInit();
     await settle();
     expect(destroyed).toEqual([first]);
+  });
+});
+
+describe('timeline-flame-chart opened at an event', () => {
+  let chart: HTMLElement & {
+    logStore: LogStore | null;
+    navigateToEventIndex: number | undefined;
+    updateComplete: Promise<unknown>;
+  };
+
+  beforeEach(async () => {
+    built = [];
+    navigated = [];
+    holdInit = false;
+    globalThis.IntersectionObserver = AlwaysVisible as unknown as typeof IntersectionObserver;
+    chart = document.createElement('timeline-flame-chart') as typeof chart;
+    document.body.append(chart);
+    chart.navigateToEventIndex = 7;
+    chart.logStore = logOf();
+    await chart.updateComplete;
+    await settle();
+  });
+
+  afterEach(() => {
+    chart.remove();
+  });
+
+  it('moves to the event when the chart is first built', () => {
+    expect(navigated).toEqual([7]);
+  });
+
+  // A tab switch re-attaches the chart; jumping back would lose where the reader went since.
+  it('does not move to the event again when the chart is rebuilt', async () => {
+    chart.remove();
+    document.body.append(chart);
+    await settle();
+
+    expect(built).toHaveLength(2);
+    expect(navigated).toEqual([7]);
   });
 });
 
