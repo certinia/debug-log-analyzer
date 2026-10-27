@@ -106,7 +106,7 @@ describe('analysis-view', () => {
     jest.restoreAllMocks();
   });
 
-  it('shows the bottom-up tree of the log, ranked by self time, without rows that have no details', () => {
+  it('shows the bottom-up tree of the log, ranked by self time, frames only', () => {
     expect(roots().map((row) => [row.text, row.totalSelfTime])).toEqual(
       expect.arrayContaining([
         ['A', 115],
@@ -273,10 +273,10 @@ describe('analysis-view', () => {
     });
 
     it('keeps the rows in the picked namespaces, with their callers, and Details still applies', async () => {
-      const [ns1, ns2, noDetails] = [row('ns1', 1, 1), row('ns2', 1, 1), row('ns1', 1, 1, false)];
+      const [ns1, ns2, detail] = [row('ns1', 1, 1), row('ns2', 1, 1), row('ns1', 1, 1, false)];
       await pickNamespaces(['ns1']);
 
-      expect(kept([ns1, ns2, noDetails])).toEqual([ns1]);
+      expect(kept([ns1, ns2, detail])).toEqual([ns1]);
       expect(added().map((filter) => filter.keepAncestors)).toEqual([true]);
     });
 
@@ -334,7 +334,7 @@ describe('analysis-view', () => {
     expect(grid().groupBy).toBeNull();
   });
 
-  it('shows the rows with no details when Details is on', async () => {
+  it('shows the detail rows when Details is on', async () => {
     view.renderRoot.querySelector<HTMLButtonElement>('button.pill-toggle')?.click();
     await view.updateComplete;
 

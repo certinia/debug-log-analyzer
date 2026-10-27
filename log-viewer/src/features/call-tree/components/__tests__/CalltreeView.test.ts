@@ -438,7 +438,7 @@ describe('calltree-view merged filters', () => {
     ({ store } = await storeOf(
       '09:18:22.6 (1000)|METHOD_ENTRY|[1]|01p|ns.Outer.run()\n' +
         '09:18:22.6 (2000)|SOQL_EXECUTE_BEGIN|[2]|Aggregations:0|SELECT Id FROM Account\n' +
-        '09:18:22.6 (3000)|SOQL_EXECUTE_END|[2]|Rows:1\n' +
+        '09:18:22.6 (2000)|SOQL_EXECUTE_END|[2]|Rows:1\n' +
         '09:18:22.6 (4000)|USER_DEBUG|[3]|DEBUG|hello\n' +
         '09:18:22.6 (5001000)|METHOD_EXIT|[1]|ns.Outer.run()\n',
     ));
