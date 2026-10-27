@@ -266,7 +266,7 @@ function frameRow(rows: Rows, row: number, onPath: boolean): ScopedRow {
     text: signatures.text(signature),
     type: signatures.type(signature),
     duration: onPath ? { total: 0, self: 0 } : { total: index.total[row]!, self: index.self[row]! },
-    callCount: onPath ? 0 : 1,
+    callCount: !onPath && rows.kindOf(row) === 'frame' ? 1 : 0,
     eventIndexes: null,
     ...(onPath ? { onPath: true } : {}),
     _children: onPath ? [] : null,
@@ -287,6 +287,7 @@ async function realSubtree(
   const end = subtreeEnd[top]!;
   const root = frameRow(source, top, false);
   let calls = selected || source.kindOf(top) === 'frame' ? 1 : 0;
+  root.callCount = calls;
   // The open rows above the current one, with the index row each ends before. The root ends last, so it never pops.
   const open: Array<{ row: ScopedRow; end: number }> = [{ row: root, end }];
   let steps = 1;
@@ -768,7 +769,8 @@ function liveWindow(
       row.duration.total = held.total;
       // A caller row is a route to its seed's time; only the top-level row shares the seed's list.
       row.duration.self = row._seed && row.eventIndexes !== row._seed.eventIndexes ? 0 : held.self;
-      row.callCount = held.calls;
+      // A pinned block is a row, not a call, as the footer counts it.
+      row.callCount = eventKind(row.type) === 'frame' ? held.calls : 0;
       return held.calls > 0;
     },
   };

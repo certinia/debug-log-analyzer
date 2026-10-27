@@ -654,6 +654,19 @@ describe('liveWindow', () => {
     }
   });
 
+  it('shows no calls on a merged limit row inside the window, as the Calls footer counts none', async () => {
+    await load(method('outer', 0, 1_000, limitBlock(100, 200), limitBlock(600, 700)));
+    const tree = (await buildWholeLogCallTree(options))!;
+    const live = tree.liveWindow!();
+    const rows = (await tree.aggregated(options))!;
+    await live.prepare(rows, options);
+
+    expect(live.set({ start: 0, end: 1_000 }).calls).toBe(1);
+    const block = rows[0]!._children!.find((row) => row.type === 'CUMULATIVE_LIMIT_USAGE')!;
+    expect(live.admit(block)).toBe(true);
+    expect(block.callCount).toBe(0);
+  });
+
   it('totals the self time of every row, a limit block included', async () => {
     await load(
       method('outer', 0, 1_000, method('m', 100, 300), limitBlock(650, 700)),
@@ -929,6 +942,19 @@ describe('bottom-up occurrences', () => {
     expect(bottomUp).not.toContain('LIMIT_USAGE_FOR_NS');
     // A limit block is a row, not a call.
     expect(tree.calls).toBe(2);
+  });
+
+  it('shows no calls on a limit row, as the Calls footer counts none', async () => {
+    const log = await load(...withLimits());
+    const tree = (await build(frame(log, 'm2')))!;
+    const limitCalls = (rows: readonly ScopedRow[]): number[] =>
+      rows.flatMap((row) => [
+        ...(row.type.includes('LIMIT_USAGE') ? [row.callCount] : []),
+        ...limitCalls(row._children ?? []),
+      ]);
+    for (const rows of [(await tree.timeOrder(options))!, (await tree.aggregated(options))!]) {
+      expect(limitCalls(rows)).toEqual([0, 0]);
+    }
   });
 
   it('still answers for a limit block the user selected', async () => {
