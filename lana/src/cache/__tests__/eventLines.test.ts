@@ -80,6 +80,24 @@ describe('eventLines', () => {
     ]);
   });
 
+  it('gives an exit line that closes no frame its own line, not the open frame exit', async () => {
+    // The parser makes a stray exit an event. Taken as A's exit, it would close A early and leave line 4 unowned.
+    expect(
+      await linesOf([
+        at(50, 'METHOD_EXIT|[9]|Z.z()'),
+        at(100, 'METHOD_ENTRY|[1]|01p|A.a()'),
+        at(150, 'DML_END|[2]'),
+        at(200, 'USER_DEBUG|[3]|DEBUG|inside'),
+        at(300, 'METHOD_EXIT|[1]|A.a()'),
+      ]),
+    ).toEqual([
+      [0, -1],
+      [1, 4],
+      [2, -1],
+      [3, -1],
+    ]);
+  });
+
   it('skips the lines the parser made no event of', async () => {
     expect(
       await linesOf([
