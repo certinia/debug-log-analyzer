@@ -60,7 +60,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - 🗃️ **SOQL and SOSL**: every keyword in the current syntax is highlighted, and `SET OPTIONS` and `UPDATE TRACKING` start their own line when a query is pretty-printed.
 - 🎯 **Raw log**: **Show in Log Analysis**, folding and the outline go to the right event when two events share a timestamp.
 - 🧭 **Show in Log Analysis**: sometimes would open the wrong log for analysis with multiple editors open.
-- 🧭 **Go to Call Tree**: a row the filters hide selects its parent, with the option to clear the filters and go to the hidden row.
+- 🌳 **Go to Call Tree**: a row the filters hide selects its parent, with the option to clear the filters and go to the hidden row.
 
 ## [1.22.1] - 2026-09-18
 
