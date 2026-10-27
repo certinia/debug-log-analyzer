@@ -4,6 +4,7 @@
 import { describe, expect, it } from '@jest/globals';
 
 import {
+  bareAddress,
   clampRaw,
   isExpandable,
   parseVariableValue,
@@ -247,5 +248,14 @@ describe('clampRaw', () => {
 
   it('leaves a value that fits alone', () => {
     expect(clampRaw('{"a":1}')).toEqual({ text: '{"a":1}', clamped: false });
+  });
+});
+
+describe('addresses', () => {
+  it('reads a value that is only an address', () => {
+    expect(bareAddress('0xd854c6b')).toBe('0xd854c6b');
+    expect(bareAddress(' 0xd854c6b ')).toBe('0xd854c6b');
+    expect(bareAddress('{"a":1}')).toBeNull();
+    expect(bareAddress('42')).toBeNull();
   });
 });
