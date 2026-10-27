@@ -6,6 +6,7 @@ import { type EventType, eventType } from '@apexdevtools/apex-log-parser';
 import type { LogCategory } from '#core/log/category.js';
 import { childRows, rowCategory, type LogIndex, NO_ROW } from '#core/log/LogIndex.js';
 import { type Signatures, signaturesOf } from '#core/log/signatures.js';
+import { namespaceOf } from '#core/utility/CallerNamespace.js';
 import type { RowFilter, TreeSource } from '../../../grid/index.js';
 import { EXCLUDED_DETAIL_TYPES } from './DetailsFilter.js';
 
@@ -37,6 +38,7 @@ export class TimeOrderSource implements TreeSource<TimeOrderNode> {
   /** Show Details: frames, events that took time, exceptions and limit reports. */
   readonly details: RowFilter<TimeOrderNode>;
   private readonly signatures: Signatures;
+  private readonly types: Uint16Array;
 
   constructor(index: LogIndex) {
     this.index = index;
@@ -45,6 +47,7 @@ export class TimeOrderSource implements TreeSource<TimeOrderNode> {
     const { total } = index;
     const isFrame = index.column(index.log.columns.isFrame);
     const types = index.column(index.log.columns.type);
+    this.types = types;
     // No keepAncestors: only a frame has children, and every frame passes.
     this.details = {
       test: ({ row }) => isFrame[row] === 1 || total[row]! > 0 || DETAIL_TYPE_IDS.has(types[row]!),
@@ -70,12 +73,13 @@ export class TimeOrderSource implements TreeSource<TimeOrderNode> {
   /** The node's text, as its signature names it. */
   readonly text = (node: TimeOrderNode): string => this.signatures.text(this.signatureOf(node));
 
+  // Namespace and type read their columns: the signature reads text, and its first read builds the whole log's.
   /** The node's namespace. */
   readonly namespace = (node: TimeOrderNode): string =>
-    this.signatures.namespace(this.signatureOf(node));
+    namespaceOf(this.index.log, this.index.eventIndex[node.row]!);
 
   /** The node's event type. */
-  readonly type = (node: TimeOrderNode): string => this.signatures.type(this.signatureOf(node));
+  readonly type = ({ row }: TimeOrderNode): string => eventType(this.types[row]!)!.type; // every type id came from columns.type
 
   /** The timeline category of the node's event. */
   readonly category = ({ row }: TimeOrderNode): LogCategory => rowCategory(this.index, row);
