@@ -17,6 +17,11 @@ const TYPE_BY_NAME = new Map<string, EventTypeInfo>(EVENT_TYPES.map((info) => [i
 const closes = (frameType: number, exit: EventTypeInfo): boolean =>
   !!EVENT_TYPES[frameType]?.exitTypes.includes(exit.type);
 
+const endedByExit = (log: ApexLog, id: number): boolean => {
+  const event = log.event(id);
+  return !!event?.isFrame && event.endedBy === 'exit';
+};
+
 /**
  * Each event's lines in a document of `lineCount` lines, read through `lineAt`.
  *
@@ -28,7 +33,7 @@ export function eventLines(
   lineCount: number,
   lineAt: (line: number) => string,
 ): EventLines {
-  const { type, parent, isFrame, startTimestamp, endTimestamp, endedBy } = log.columns;
+  const { type, parent, isFrame, startTimestamp, endTimestamp } = log.columns;
   const start = new Int32Array(log.eventCount + 1).fill(-1);
   const end = new Int32Array(log.eventCount + 1).fill(-1);
   const open: number[] = [];
@@ -42,14 +47,16 @@ export function eventLines(
     const time = Number(match[1]);
     if (info.shape === 'exit') {
       // A frame an outer exit or an exception unwound, or the next line closed, has no exit of its own.
+      // One event's endedBy, not the column: the column is a pass over the whole log, kept per log.
+      let top = open.at(-1);
       while (
-        open.length &&
-        endTimestamp[open.at(-1)!]! <= time &&
-        (endedBy.at(open.at(-1)!) !== 'exit' || !closes(type[open.at(-1)!]!, info))
+        top !== undefined &&
+        endTimestamp[top]! <= time &&
+        (!closes(type[top]!, info) || !endedByExit(log, top))
       ) {
         open.pop();
+        top = open.at(-1);
       }
-      const top = open.at(-1);
       if (top !== undefined && endTimestamp[top] === time && closes(type[top]!, info)) {
         end[top] = line;
         open.pop();
