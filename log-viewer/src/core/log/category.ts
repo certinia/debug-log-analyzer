@@ -61,12 +61,7 @@ function frameCategory(info: EventTypeInfo): LogCategory {
 /** Each type's category when it opens a frame, by type id, as `columns.type` holds it. */
 export const FRAME_CATEGORY: readonly LogCategory[] = EVENT_TYPES.map(frameCategory);
 
-/** The category of an event of type id `typeId`: '' unless it is a frame. */
-export function categoryOf(typeId: number, isFrame: boolean): LogCategory {
-  return isFrame ? (FRAME_CATEGORY[typeId] ?? '') : '';
-}
-
 /** `event`'s category: '' unless it is a frame. */
 export function eventCategory(event: ApexEvent): LogCategory {
-  return categoryOf(eventType(event.type)?.typeId ?? -1, event.isFrame);
+  return event.isFrame ? (FRAME_CATEGORY[eventType(event.type)?.typeId ?? -1] ?? '') : '';
 }

@@ -1,9 +1,9 @@
 /*
  * Copyright (c) 2026 Certinia Inc. All rights reserved.
  */
-import { EVENT_TYPES, eventType } from '@apexdevtools/apex-log-parser';
+import { type ApexEvent, EVENT_TYPES } from '@apexdevtools/apex-log-parser';
 
-import { categoryOf, FRAME_CATEGORY } from '../category.js';
+import { eventCategory, FRAME_CATEGORY } from '../category.js';
 
 // Every frame type's category as v0.3 of the parser stated it, so the timeline keeps its colours.
 const V03_FRAME_CATEGORIES: Record<string, readonly string[]> = {
@@ -78,8 +78,8 @@ describe('category', () => {
   });
 
   it('gives a leaf no category, whatever its type', () => {
-    const soql = eventType('SOQL_EXECUTE_BEGIN').typeId;
-    expect(categoryOf(soql, false)).toBe('');
-    expect(categoryOf(soql, true)).toBe('SOQL');
+    const soql = (isFrame: boolean) => ({ type: 'SOQL_EXECUTE_BEGIN', isFrame }) as ApexEvent;
+    expect(eventCategory(soql(false))).toBe('');
+    expect(eventCategory(soql(true))).toBe('SOQL');
   });
 });
