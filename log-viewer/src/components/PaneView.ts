@@ -334,7 +334,6 @@ export class PaneView extends LitElement {
         padding: 0 var(--lana-space-md) 0 var(--lana-section-header-inset);
         font-size: var(--lana-section-title-size);
         font-weight: var(--lana-section-title-weight);
-        text-transform: capitalize;
         color: var(--vscode-sideBarSectionHeader-foreground);
         user-select: none;
         white-space: nowrap;
