@@ -165,6 +165,7 @@ export class CallTreeDetail extends LitElement {
   private _scopeCalls = 0;
   // Set while the whole-log tree follows a window: summing the rows would read every one into it.
   private _scopeSelf: number | null = null;
+  private _scopeFrameSelf: number | null = null;
 
   // The scoped tree (all three representations) for the current eventIndex,
   // computed once per selection and shared across the mode grids.
@@ -392,10 +393,16 @@ export class CallTreeDetail extends LitElement {
     void this._grids[mode].value?.refresh().then(() => this._prepareWaiting(mode));
   }
 
-  private _showFigures({ rootTotal, calls, self }: ReturnType<LiveWindow['figures']>): void {
+  private _showFigures({
+    rootTotal,
+    calls,
+    self,
+    frameSelf,
+  }: ReturnType<LiveWindow['figures']>): void {
     this._rootTotal = rootTotal;
     this._scopeCalls = calls;
     this._scopeSelf = self;
+    this._scopeFrameSelf = frameSelf;
   }
 
   // Rows of many calls opened since the read-ahead; they follow the window once read.
@@ -564,7 +571,12 @@ export class CallTreeDetail extends LitElement {
       // Nothing in scope, so there is nothing to size a new grid against.
       return;
     }
-    this._showFigures({ rootTotal: scoped?.rootTotal ?? 0, calls: scoped?.calls ?? 0, self: null });
+    this._showFigures({
+      rootTotal: scoped?.rootTotal ?? 0,
+      calls: scoped?.calls ?? 0,
+      self: null,
+      frameSelf: null,
+    });
 
     const slot = built ?? this._newSlot(mode, scoped?.logTotal ?? 0);
     slot.stale = false;
@@ -598,7 +610,7 @@ export class CallTreeDetail extends LitElement {
 
   private _columns(mode: ViewMode, width: number): GridColumn<ScopedRow>[] {
     const totalNs = () => this._rootTotal;
-    const scopeSelf = () => this._scopeSelf;
+    const scopeSelf = () => (mode === 'bottom-up' ? this._scopeFrameSelf : this._scopeSelf);
     const allSelf = sum<ScopedRow>((row) => row.duration.self, 'all');
     const self: Calc<ScopedRow> = {
       // Read on each run: once the window knows the self time, a sum of every row would read each one into it.

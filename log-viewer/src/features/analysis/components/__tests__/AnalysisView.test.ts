@@ -52,6 +52,7 @@ function frame(
   const event = {
     eventIndex: byEventIndex.length,
     type,
+    isParent: type === 'METHOD_ENTRY',
     namespace: 'default',
     text,
     parent,
@@ -249,6 +250,8 @@ describe('analysis-view', () => {
 
     expect(goTo).toHaveBeenCalledWith([findRow(roots(), 'B').id], { scrollIfVisible: false });
     expect(seen).toEqual([]);
+    // The bucket is a frame, so Details stays off.
+    expect(grid().filters).toContain(BOTTOM_UP_DETAILS);
   });
 
   it('turns Details on to reveal a bucket the filter hides', async () => {
@@ -284,7 +287,7 @@ describe('analysis-view', () => {
         namespace,
         totalTime: totalMs * MS,
         totalSelfTime: selfMs * MS,
-        _hasDetailsDeep: details,
+        originalData: { isParent: details, discontinuity: false, type: 'METHOD_ENTRY' },
       }) as unknown as BottomUpRow;
     const kept = (rows: BottomUpRow[]) =>
       rows.filter((r) => grid().filters.every((filter) => filter.test(r)));

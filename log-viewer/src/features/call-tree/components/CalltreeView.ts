@@ -33,6 +33,7 @@ import type {
 } from '../../../grid/index.js';
 import '../grid/CallTreeGrid.js';
 import {
+  AGGREGATED_DETAILS,
   aggregatedColumns,
   BOTTOM_UP_DETAILS,
   BOTTOM_UP_SORT,
@@ -95,8 +96,6 @@ import { LocatedRowIds, type RowData } from '../../../components/locatedRow.js';
 import { InspectorTabController } from '../../../components/InspectorTabController.js';
 import { FindController } from '../../find/FindController.js';
 import { revealFirstOf } from '../../../components/inspectorTab.js';
-
-const AGGREGATED_DETAILS: RowFilter<AggregatedRow> = { test: (row) => row._hasDetailsDeep };
 const AGGREGATED_DEBUG_ONLY: RowFilter<AggregatedRow> = {
   test: (row) => !!row.originalData.type && DEBUG_VALUE_TYPES.has(row.originalData.type),
   keepAncestors: true,

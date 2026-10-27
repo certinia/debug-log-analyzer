@@ -54,19 +54,19 @@ describe('buildCallStackData', () => {
     expect(rootTotal).toBe(0);
   });
 
-  it('drops detail frames, keeping call frames only', () => {
+  // A limit line's own block was dropped, so the stack skipped the real lineage.
+  it('keeps the limit block that holds the selection', () => {
     currentStack = [
+      ...stack.slice(0, 2),
       {
         eventIndex: 7,
         type: 'CUMULATIVE_LIMIT_USAGE',
-        text: 'LIMIT_USAGE_FOR_NS',
-        duration: { total: 900_000, self: 0 },
+        text: 'CUMULATIVE_LIMIT_USAGE',
+        duration: { total: 900_000, self: 900_000 },
       },
-      ...stack,
     ];
-    const { rows, rootTotal } = buildCallStackData(3);
-    expect(rows.map((r) => r.eventIndex)).toEqual([1, 2, 3]);
-    // The denominator follows the outermost frame still shown.
+    const { rows, rootTotal } = buildCallStackData(8);
+    expect(rows.map((r) => r.eventIndex)).toEqual([1, 2, 7]);
     expect(rootTotal).toBe(41_200_000);
   });
 

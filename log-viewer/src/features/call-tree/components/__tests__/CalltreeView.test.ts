@@ -4,7 +4,7 @@
  * @jest-environment jsdom
  */
 import { afterEach, beforeEach, describe, expect, it } from '@jest/globals';
-import type { ApexLog } from '@apexdevtools/apex-log-parser';
+import type { ApexLog, LogEvent } from '@apexdevtools/apex-log-parser';
 
 import { toAggregatedCallTree, toBottomUpTree, type BottomUpRow } from '../../utils/Aggregation.js';
 
@@ -233,7 +233,7 @@ describe('calltree-view table lifetime', () => {
       );
       const back = view._setViewMode(mode);
       await settle();
-      finish([{ id: 1, _pathId: 1 }]);
+      finish([{ id: 1, _pathId: 1, originalData: { isParent: true } }]);
       await back;
       off();
 
@@ -437,6 +437,19 @@ describe('calltree-view merged filters', () => {
 
   afterEach(() => {
     view.remove();
+  });
+
+  it('hides the debug line from Time Order with Details off, and keeps the query that took no time', () => {
+    view._handleShowDetailsChange();
+    const filters = (view.timeOrderGrid?.filters ?? []) as { test: (row: object) => boolean }[];
+    const events = (of: readonly LogEvent[]): LogEvent[] =>
+      of.flatMap((e) => [e, ...events(e.children)]);
+    const kept = events(log.children)
+      .filter((e) => filters.every((filter) => filter.test(e)))
+      .map((e) => e.type);
+
+    expect(kept).toContain('SOQL_EXECUTE_BEGIN');
+    expect(kept).not.toContain('USER_DEBUG');
   });
 
   it.each(['aggregated', 'bottom-up'] as const)(

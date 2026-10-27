@@ -10,7 +10,6 @@ import {
   frameBudget,
   type FrameBudgetOptions,
 } from '../../../core/utility/FrameBudget.js';
-import { computeHasDetailsDeep } from './DetailsFilter.js';
 import { type CostLimits, costLimitsOf, setGovernorCost } from './GovernorCost.js';
 import {
   addReported,
@@ -79,8 +78,6 @@ export interface AggregatedRow {
   instances: LogEvent[];
   /** Representative event for this row (used by formatters) */
   originalData: LogEvent;
-  /** See {@link TimeOrderRow._hasDetailsDeep}. Precomputed during tree build. */
-  _hasDetailsDeep: boolean;
 }
 
 /**
@@ -149,8 +146,6 @@ export interface BottomUpRow {
   instances: LogEvent[];
   /** Representative event for this row (used by formatters) */
   originalData: LogEvent;
-  /** See {@link TimeOrderRow._hasDetailsDeep}. Precomputed during tree build. */
-  _hasDetailsDeep: boolean;
 }
 
 /**
@@ -344,13 +339,12 @@ function byTotalTimeDesc(a: AggregatedRow, b: AggregatedRow): number {
 /** No frame open above the level, so nothing in it can be a recursive call. */
 const NO_STACK = -1;
 
-/** Averages, governor cost and the Show Details roll-up, once `_children` is set. */
+/** Averages and governor cost, once `_children` is set. */
 function finaliseAggregatedRow(row: AggregatedRow, costLimits?: CostLimits): void {
   calculateAverages(row);
   if (costLimits) {
     setGovernorCost(row, costLimits);
   }
-  row._hasDetailsDeep = computeHasDetailsDeep(row, row.totalTime, row.originalData.type);
 }
 
 /** Adds an event to an aggregated row, leaving `totalTime` alone where the call
@@ -745,8 +739,6 @@ function* finalizeBuckets(
   costLimits?: CostLimits,
 ): Generator<void, BottomUpRow[], void> {
   const roots = Array.from(rootBuckets.values());
-  // Pre-order, so walking it backwards meets every row after its children:
-  // _hasDetailsDeep reads theirs.
   const order: BottomUpRow[] = [];
   const pending = roots.slice();
   while (pending.length > 0) {
@@ -768,7 +760,6 @@ function* finalizeBuckets(
     if (row._children && row._children.length > 0) {
       sortBuckets(row._children);
     }
-    row._hasDetailsDeep = computeHasDetailsDeep(row, row.totalTime, row.type);
     if (i % CHECK_EVERY === 0) {
       yield;
     }
@@ -821,7 +812,6 @@ function createEmptyAggregatedRow(
     _children: null,
     instances: [],
     originalData: event,
-    _hasDetailsDeep: false,
   };
 }
 
@@ -861,7 +851,6 @@ function createEmptyBottomUpRow(
     _children: null,
     instances: [],
     originalData: event,
-    _hasDetailsDeep: false,
   };
 }
 

@@ -571,6 +571,7 @@ describe('CallTreeDetail whole-log tree following the window', () => {
         rootTotal: window ? window.end - window.start : 5000,
         calls: 7,
         self: window ? 42 : null,
+        frameSelf: window ? 40 : null,
       }),
       set: (window) => {
         readIn.push(window);
@@ -715,6 +716,17 @@ describe('CallTreeDetail whole-log tree following the window', () => {
     await settle(el);
 
     expect(self?.scope).toBe('top');
+    expect(footer(gridOf(el), 'duration.self')).toBe(42);
+  });
+
+  // Bottom-Up has no row for a pinned block, so a Self total with its time would not match the rows.
+  it('totals Bottom-Up Self without the pinned blocks', async () => {
+    const el = await mountWholeLog();
+    setRange({ start: 100, end: 300 });
+    await settle(el);
+    await show(el, 'bottom-up');
+
+    expect(footer(gridOf(el, 'bottom-up'), 'duration.self')).toBe(40);
     expect(footer(gridOf(el), 'duration.self')).toBe(42);
   });
 

@@ -198,9 +198,9 @@ export class AnalysisView extends LitElement {
       return;
     }
 
-    // Show Details keeps only rows with a duration, so the buckets for debug
-    // lines, thrown exceptions and query plans are filtered out — exactly the
-    // events a finding points at. Turn the filter off rather than reveal nothing.
+    // With Details off only frames show, so the buckets for debug lines, thrown
+    // exceptions and query plans are filtered out — exactly the events a finding
+    // points at. Turn the filter off rather than reveal nothing.
     if (!this._showDetails && !BOTTOM_UP_DETAILS.test(row)) {
       this._showDetails = true;
       await this.updateComplete;
