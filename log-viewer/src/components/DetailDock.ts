@@ -37,6 +37,9 @@ export class DetailDock extends LitElement {
   @property({ type: Number })
   layoutEpoch = 0;
 
+  @property({ attribute: false })
+  maximized: string | null = null;
+
   static styles = [
     globalStyles,
     css`
@@ -141,6 +144,7 @@ export class DetailDock extends LitElement {
               .sections=${this.sections}
               .collapsed=${this.collapsed}
               .layoutEpoch=${this.layoutEpoch}
+              .maximized=${this.maximized}
             ></pane-view>`
           : html`<div class="empty">${this.emptyText}</div>`
       }
