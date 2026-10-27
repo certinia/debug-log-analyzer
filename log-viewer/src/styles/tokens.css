@@ -220,7 +220,6 @@
   --lana-section-header-radius: var(--lana-mode-section-header-radius, var(--lana-radius-sm));
   --lana-section-title-size: var(--lana-mode-section-title-size, var(--lana-text-base));
   --lana-section-title-weight: var(--lana-mode-section-title-weight, 600);
-  --lana-section-separator-inset: var(--lana-mode-section-separator-inset, var(--lana-space-2xs));
 
   /* Least a pane section shows before the stack scrolls instead: its header and
      about a row of body. Small, and the same for every section, so a drag can
@@ -257,5 +256,4 @@
   --lana-mode-section-header-radius: 0px;
   --lana-mode-section-title-size: var(--lana-text-sm);
   --lana-mode-section-title-weight: 700;
-  --lana-mode-section-separator-inset: 0px;
 }

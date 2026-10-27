@@ -299,8 +299,8 @@ export class PaneView extends LitElement {
         content: '';
         position: absolute;
         top: 0;
-        left: var(--lana-section-separator-inset);
-        right: var(--lana-section-separator-inset);
+        left: var(--lana-section-header-inset);
+        right: var(--lana-section-header-inset);
         height: var(--lana-stroke);
         background-color: var(--vscode-sideBarSectionHeader-border, transparent);
       }
