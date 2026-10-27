@@ -38,7 +38,7 @@ import {
   type ReportedMetric,
   type ReportedUsage,
 } from '../utils/reportedUsage.js';
-import { isDetailEvent } from '../utils/TimeOrderTree.js';
+import { eventKind } from '../utils/DetailsFilter.js';
 import { nameCell, nameExportText, nameText } from './cells.js';
 import { knownMax, outermostSum } from './calcs.js';
 
@@ -511,7 +511,13 @@ function nameLines(event: LogEvent): number {
  */
 export const mergedLines = (row: { originalData: LogEvent }): number => nameLines(row.originalData);
 
-export const TIME_ORDER_DETAILS: RowFilter<LogEvent> = { test: isDetailEvent, keepAncestors: true };
+export const TIME_ORDER_WITHOUT_DETAILS: RowFilter<LogEvent> = {
+  test: (e) => eventKind(e) !== 'detail',
+};
+
+export const AGGREGATED_WITHOUT_DETAILS: RowFilter<{ originalData: LogEvent }> = {
+  test: (row) => eventKind(row.originalData) !== 'detail',
+};
 
 /** Opens the type a Name cell links to. */
 export const openType = (text: string): void => vscodeMessenger.send<string>('openType', text);
@@ -529,8 +535,10 @@ export const CALL_TREE_COLUMN_SETTINGS: Omit<ColumnSettingsOptions, 'targets'> =
   })),
 };
 
-/** Show Details on the Bottom-Up tree. */
-export const BOTTOM_UP_DETAILS: RowFilter<BottomUpRow> = { test: (row) => row._hasDetailsDeep };
+/** The Bottom-Up rows shown with Details off: frames only. */
+export const BOTTOM_UP_WITHOUT_DETAILS: RowFilter<BottomUpRow> = {
+  test: (row) => eventKind(row.originalData) === 'frame',
+};
 
 /** The Bottom-Up group-by picker's options, in order, and the row field each groups on. */
 export const BOTTOM_UP_GROUPS: readonly {

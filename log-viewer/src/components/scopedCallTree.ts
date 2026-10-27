@@ -9,7 +9,7 @@ import type { TimeWindow } from '../core/log/rangeScope.js';
 import { CallSpans, SpanIndex, frameIn, reaches } from '../core/log/windowedTime.js';
 import { endOf, overlapOf } from '../core/log/windowStats.js';
 import { outermostEvents } from '../core/utility/EventTree.js';
-import { EXCLUDED_DETAIL_TYPES } from '../features/call-tree/utils/DetailsFilter.js';
+import { eventKind } from '../features/call-tree/utils/DetailsFilter.js';
 import {
   CHECK_EVERY,
   frameBudget,
@@ -212,9 +212,15 @@ export interface LiveWindow {
    */
   prepare(rows: readonly ScopedRow[], options: FrameBudgetOptions): Promise<boolean>;
   /** The figures the footer and the bars read for `window`, or the whole log on
-   *  null. `self` is the self time of every row, shown or not; null until
+   *  null. `self` is the self time of every row, shown or not, and `frameSelf`
+   *  leaves out the pinned blocks Bottom-Up has no row for; both null until
    *  `prepare` lands. */
-  figures(window: TimeWindow | null): { rootTotal: number; calls: number; self: number | null };
+  figures(window: TimeWindow | null): {
+    rootTotal: number;
+    calls: number;
+    self: number | null;
+    frameSelf: number | null;
+  };
   /** Moves to `window`, or back to the whole log on null, and returns its {@link figures}. */
   set(window: TimeWindow | null): ReturnType<LiveWindow['figures']>;
   /** Writes the row's time and calls inside the window into it, and says
@@ -233,19 +239,12 @@ interface Subtree {
   calls: number;
 }
 
-/**
- * The selected node + its real subtree, with real durations. Zero-duration
- * bookkeeping rows (heap allocations, statements, assignments) are dropped —
- * the Inspector is a summary, and the Call Tree tab is where those details are
- * read. So are the limit and profiling blocks, which report governor figures
- * rather than time; the Call stack already drops the same four types. The
- * selection itself is kept whatever it is, so null means the build was
- * abandoned rather than "nothing worth showing".
- *
- * Iterative rather than recursive: subtree size is the second unbounded
- * dimension (the occurrence count is the first), and both have to be sliceable.
- */
-async function realSubtree(event: LogEvent, tick: Tick): Promise<Subtree | null> {
+/** `event` and its subtree less its details; null only when abandoned, as a selection is kept whatever it is. */
+async function realSubtree(
+  event: LogEvent,
+  tick: Tick,
+  selected: boolean,
+): Promise<Subtree | null> {
   // Pre-order, so a node always precedes its descendants and the prune below
   // can walk it backwards to reach every child before its parent.
   const rows: ScopedRow[] = [];
@@ -271,15 +270,13 @@ async function realSubtree(event: LogEvent, tick: Tick): Promise<Subtree | null>
     parents.push(parent);
     for (let i = current.children.length - 1; i >= 0; i--) {
       const child = current.children[i]!;
-      // Not walked at all: what hangs off a limit block is limit lines, which
-      // the prune below would drop one at a time.
-      if (!EXCLUDED_DETAIL_TYPES.has(child.type ?? '')) {
+      if (eventKind(child) !== 'detail') {
         stack.push({ event: child, parent: row });
       }
     }
   }
 
-  let calls = 1; // the selection itself
+  let calls = selected || eventKind(event) === 'frame' ? 1 : 0;
   for (let i = rows.length - 1; i >= 0; i--) {
     if (i % CHECK_EVERY === 0 && !(await tick())) {
       return null;
@@ -291,10 +288,10 @@ async function realSubtree(event: LogEvent, tick: Tick): Promise<Subtree | null>
     if (i === 0) {
       break; // the selection stays whatever its duration
     }
-    // A zero-duration frame stays only as the path to a kept descendant.
-    if (row.duration.total > 0 || row._children) {
-      const parent = parents[i]!;
-      (parent._children ??= []).push(row);
+    const parent = parents[i]!;
+    (parent._children ??= []).push(row);
+    // A pinned detail is a row, not a call.
+    if (eventKind(row.originalData) === 'frame') {
       calls += 1;
     }
   }
@@ -372,22 +369,18 @@ async function pathRoots(
 }
 
 /** Each event's real subtree as a root row, with the frames they hold between
- *  them; null when the walk is abandoned. `dropEmpty` leaves out a root with no
- *  duration and nothing kept below it, as the prune does for any other row. */
+ *  them; null when the walk is abandoned. */
 async function subtreeRoots(
   events: readonly LogEvent[],
   tick: Tick,
-  { dropEmpty = false }: { dropEmpty?: boolean } = {},
+  selected: boolean,
 ): Promise<{ roots: ScopedRow[]; calls: number } | null> {
   const roots: ScopedRow[] = [];
   let calls = 0;
   for (const event of events) {
-    const subtree = await realSubtree(event, tick);
+    const subtree = await realSubtree(event, tick, selected);
     if (!subtree) {
       return null;
-    }
-    if (dropEmpty && subtree.row.duration.total <= 0 && !subtree.row._children) {
-      continue;
     }
     roots.push(subtree.row);
     calls += subtree.calls;
@@ -435,7 +428,7 @@ export async function buildScopedCallTree(
   const rootTotal = selectedEvents.reduce((sum, e) => sum + e.duration.total, 0);
 
   const tick = frameBudget(options);
-  const scope = await subtreeRoots(selectedEvents, tick);
+  const scope = await subtreeRoots(selectedEvents, tick, true);
   if (!scope) {
     return null;
   }
@@ -474,6 +467,7 @@ export async function buildScopedCallTree(
     // Occurrences of one frame are the same call made again, so merge them into a
     // single root; a single occurrence is already that.
     mergeTimeOrder: scope.roots.length > 1,
+    seedRoots: true,
   });
 }
 
@@ -510,6 +504,8 @@ interface CallTreeInput {
   mergeTimeOrder: boolean;
   /** Filled by the bottom-up walk where the tree follows a window: see {@link Holes}. */
   holes?: Holes;
+  /** Bottom-up seeds each root whatever its kind, as a selection is kept whatever it is. */
+  seedRoots: boolean;
 }
 
 // Each recursive frame's nested calls of itself, which bottom-up takes off its time.
@@ -550,7 +546,13 @@ function lazyCallTree(input: CallTreeInput): ScopedCallTree {
       return aggregatedRows;
     },
     async bottomUp(viewOptions) {
-      bottomUpRows ??= await buildBottomUp(input.bottomUp, store, viewOptions, input.holes);
+      bottomUpRows ??= await buildBottomUp(
+        input.bottomUp,
+        store,
+        viewOptions,
+        input.holes,
+        input.seedRoots,
+      );
       return bottomUpRows;
     },
   };
@@ -561,9 +563,9 @@ function lazyCallTree(input: CallTreeInput): ScopedCallTree {
  * durations. The scoped builder cannot answer this: it starts at a selection,
  * so it never reaches the roots above one.
  *
- * Same three views, same slicing, same zero-duration-detail pruning as the
- * scoped tree; `rootTotal` and `logTotal` are both the log's total, so bars are
- * percentages of the whole log.
+ * Same three views, same slicing, same details dropped as the scoped tree;
+ * `rootTotal` and `logTotal` are both the log's total, so bars are percentages
+ * of the whole log.
  */
 export async function buildWholeLogCallTree(
   options: FrameBudgetOptions,
@@ -575,10 +577,8 @@ export async function buildWholeLogCallTree(
   }
 
   const tick = frameBudget(options);
-  // A profiling block sits after EXECUTION_FINISHED, so it is a root here rather
-  // than a descendant `realSubtree` would skip.
-  const roots = apexLog.children.filter((child) => !EXCLUDED_DETAIL_TYPES.has(child.type ?? ''));
-  const scope = await subtreeRoots(roots, tick, { dropEmpty: true });
+  const roots = apexLog.children.filter((child) => eventKind(child) !== 'detail');
+  const scope = await subtreeRoots(roots, tick, false);
   if (!scope) {
     return null;
   }
@@ -595,6 +595,7 @@ export async function buildWholeLogCallTree(
     store,
     mergeTimeOrder: false,
     holes,
+    seedRoots: false,
   });
   tree.liveWindow = () => liveWindow(apexLog, scope, store, holes);
   return tree;
@@ -613,8 +614,8 @@ function liveWindow(
   let window: TimeWindow | null = null;
   const indexes = new WeakMap<ScopedRow, SpanIndex>();
   let spans: CallSpans | null = null;
-  // Every instant inside a root is one frame's self time, except inside a block the tree leaves out.
-  let selfCover: { roots: SpanIndex; cut: SpanIndex } | null = null;
+  // Every instant inside a root is one row's self time, and inside a pinned block a pinned row's.
+  let selfCover: { roots: SpanIndex; pinned: SpanIndex } | null = null;
   const waiting = new Set<ScopedRow>();
   // Shared, so two views reading ahead at once read the log once.
   let readingLog: Promise<boolean> | null = null;
@@ -635,24 +636,26 @@ function liveWindow(
     const walked = await framesOf(scope.roots, tick);
     const built = walked && (await CallSpans.build(walked.frames, tick));
     const roots = built && (await SpanIndex.build(walked.roots, undefined, tick));
-    const cut = roots && (await SpanIndex.build(walked.cut, undefined, tick));
-    if (!cut) {
+    const pinned = roots && (await SpanIndex.build(walked.pinned, undefined, tick));
+    if (!pinned) {
       return false;
     }
     spans = built;
-    selfCover = { roots, cut };
+    selfCover = { roots, pinned };
     return true;
   };
 
   const figures = (at: TimeWindow | null) => {
-    const self = selfCover && selfCover.roots.in(at).total - selfCover.cut.in(at).total;
+    const self = selfCover && selfCover.roots.in(at).total;
+    const frameSelf = selfCover && selfCover.roots.in(at).total - selfCover.pinned.in(at).total;
     if (!at) {
-      return { rootTotal: log.duration.total, calls: scope.calls, self };
+      return { rootTotal: log.duration.total, calls: scope.calls, self, frameSelf };
     }
     return {
       rootTotal: overlapOf(log.timestamp, endOf(log), at),
       calls: spans?.in(at) ?? scope.calls,
       self,
+      frameSelf,
     };
   };
 
@@ -743,21 +746,24 @@ function liveWindow(
 async function framesOf(
   roots: readonly ScopedRow[],
   tick: Tick,
-): Promise<{ frames: LogEvent[]; roots: LogEvent[]; cut: LogEvent[] } | null> {
+): Promise<{ frames: LogEvent[]; roots: LogEvent[]; pinned: LogEvent[] } | null> {
   const frames: LogEvent[] = [];
-  const cut: LogEvent[] = [];
+  const pinned: LogEvent[] = [];
   const stack = [...roots];
+  let steps = 0;
   while (stack.length) {
-    if (frames.length % CHECK_EVERY === 0 && !(await tick())) {
+    if (steps++ % CHECK_EVERY === 0 && !(await tick())) {
       return null;
     }
     const row = stack.pop()!; // non-empty: the loop condition just checked
-    const event = row.originalData;
-    frames.push(event);
-    for (const child of event.children) {
-      if (EXCLUDED_DETAIL_TYPES.has(child.type ?? '')) {
-        cut.push(child);
-      }
+    const kind = eventKind(row.originalData);
+    if (kind === 'pinned') {
+      // What a pinned block holds is pinned too, and already inside its span.
+      pinned.push(row.originalData);
+      continue;
+    }
+    if (kind === 'frame') {
+      frames.push(row.originalData);
     }
     if (row._children) {
       for (const child of row._children) {
@@ -765,7 +771,7 @@ async function framesOf(
       }
     }
   }
-  return { frames, roots: roots.map((row) => row.originalData), cut };
+  return { frames, roots: roots.map((row) => row.originalData), pinned };
 }
 
 /** Top-down aggregation: merge sibling frames sharing a key, summing metrics. */
@@ -880,9 +886,10 @@ interface WalkEntry {
  * up to the root — the reverse of the call path, with the seed's time attributed
  * to every caller as `total`.
  *
- * Every frame with self time seeds a row, ranked by self, so the view answers
- * where the time went inside whatever the rows cover: the selection when they
- * are scoped to one, else the whole log.
+ * Every frame seeds a row, ranked by self, so the view answers where the time
+ * went inside whatever the rows cover: the selection when they are scoped to one,
+ * else the whole log. A pinned detail seeds none unless it is the selection, as
+ * the Call Tree tab's bottom-up hides them.
  *
  * A row's `total` is its frames' time with recursion counted once: a call of the
  * same frame inside another comes off the outer call, so the two never both
@@ -893,7 +900,8 @@ async function buildBottomUp(
   rows: ScopedRow[],
   store: LogStore,
   options: FrameBudgetOptions,
-  holes?: Holes,
+  holes: Holes | undefined,
+  seedRoots: boolean,
 ): Promise<ScopedRow[] | null> {
   const paths = store.keyPathIds();
   const tick = frameBudget(options);
@@ -1000,7 +1008,7 @@ async function buildBottomUp(
     open.set(entry.stackId, entry.outer);
     const attributed = entry.attributed;
     const ownSelf = wholeOf(row).self;
-    if (ownSelf > 0) {
+    if (eventKind(row.originalData) === 'frame' || (seedRoots && !callers)) {
       // The seed row, then its callers up to the root. The chain is already in
       // that order, so it is walked in place rather than copied and reversed.
       let pathId = paths.step(ROOT_PATH_ID, entry.keyId);

@@ -30,7 +30,7 @@ import {
 } from '../../../../core/events/EventBus.js';
 import { exportCsv } from '../../../../components/grid/exportCsv.js';
 import { logStoreFor } from '../../../../core/log/LogStore.js';
-import { BOTTOM_UP_DETAILS } from '../../../call-tree/grid/columns.js';
+import { BOTTOM_UP_WITHOUT_DETAILS } from '../../../call-tree/grid/columns.js';
 import { MergedTree } from '../../../call-tree/grid/mergedRows.js';
 import type { BottomUpRow } from '../../../call-tree/utils/Aggregation.js';
 import { AnalysisView } from '../AnalysisView.js';
@@ -52,6 +52,7 @@ function frame(
   const event = {
     eventIndex: byEventIndex.length,
     type,
+    isParent: type === 'METHOD_ENTRY',
     namespace: 'default',
     text,
     parent,
@@ -249,6 +250,8 @@ describe('analysis-view', () => {
 
     expect(goTo).toHaveBeenCalledWith([findRow(roots(), 'B').id], { scrollIfVisible: false });
     expect(seen).toEqual([]);
+    // The bucket is a frame, so Details stays off.
+    expect(grid().filters).toContain(BOTTOM_UP_WITHOUT_DETAILS);
   });
 
   it('turns Details on to reveal a bucket the filter hides', async () => {
@@ -284,12 +287,12 @@ describe('analysis-view', () => {
         namespace,
         totalTime: totalMs * MS,
         totalSelfTime: selfMs * MS,
-        _hasDetailsDeep: details,
+        originalData: { isParent: details, discontinuity: false, type: 'METHOD_ENTRY' },
       }) as unknown as BottomUpRow;
     const kept = (rows: BottomUpRow[]) =>
       rows.filter((r) => grid().filters.every((filter) => filter.test(r)));
     /** The filters this toolbar adds, apart from Details. */
-    const added = () => grid().filters.filter((filter) => filter !== BOTTOM_UP_DETAILS);
+    const added = () => grid().filters.filter((filter) => filter !== BOTTOM_UP_WITHOUT_DETAILS);
     const fire = async (selector: string, type: string, detail: object) => {
       view.renderRoot
         .querySelector(selector)

@@ -16,10 +16,7 @@ import {
   type BottomUpRow,
 } from '../../log-viewer/src/features/call-tree/utils/Aggregation.js';
 import { outermostSum } from '../../log-viewer/src/features/call-tree/grid/calcs.js';
-import {
-  toTimeOrderTree,
-  type TimeOrderRow,
-} from '../../log-viewer/src/features/call-tree/utils/TimeOrderTree.js';
+import { toTimeOrderTree, type TimeOrderRow } from '../../log-viewer/bench/grid/timeOrderTree.js';
 import {
   Group,
   GridStore,

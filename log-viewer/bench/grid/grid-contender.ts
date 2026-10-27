@@ -9,10 +9,7 @@
 import type { ApexLog, LogEvent } from '@apexdevtools/apex-log-parser';
 
 import { formatNsAsMs } from '../../src/core/utility/Duration.js';
-import {
-  toTimeOrderTree,
-  type TimeOrderRow,
-} from '../../src/features/call-tree/utils/TimeOrderTree.js';
+import { toTimeOrderTree, type TimeOrderRow } from './timeOrderTree.js';
 import { GridStore, Group, type CellText, type RowView } from '../../src/grid/core/index.js';
 import { FIND_ATTR, GridView, type RowPainter } from '../../src/grid/render/index.js';
 import { browserScheduler } from '../../src/grid/ui/index.js';

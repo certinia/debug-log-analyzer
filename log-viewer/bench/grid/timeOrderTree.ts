@@ -3,9 +3,8 @@
  */
 import type { LogEvent, GovernorLimits, SelfTotal } from '@apexdevtools/apex-log-parser';
 
-import { getCallerNamespace } from '../../../core/utility/CallerNamespace.js';
-import { EXCLUDED_DETAIL_TYPES } from './DetailsFilter.js';
-import { costLimitsOf, setGovernorCost } from './GovernorCost.js';
+import { getCallerNamespace } from '../../src/core/utility/CallerNamespace.js';
+import { costLimitsOf, setGovernorCost } from '../../src/features/call-tree/utils/GovernorCost.js';
 
 /**
  * One row per LogEvent for the time-order view; no merging at any level.
@@ -36,31 +35,11 @@ export interface TimeOrderRow {
   governorCost: number | null;
   /** The single tightest governor consumed on this path (0–100+%). */
   governorCostMax: number | null;
-  /**
-   * True when this row is itself a "detail" (the per-row predicate matches —
-   * non-zero `duration.total`, `isParent`, `discontinuity`, or a type in
-   * `EXCLUDED_DETAIL_TYPES`) OR any descendant has `_hasDetailsDeep === true`.
-   * Precomputed bottom-up at tree-build time so the Show-Details filter is
-   * an O(1) property read instead of a recursive walk.
-   */
-  _hasDetailsDeep: boolean;
-}
-
-/** Whether the Show Details filter shows `event` for itself, before its descendants count. */
-export function isDetailEvent(event: LogEvent): boolean {
-  const { type } = event;
-  return (
-    event.isParent ||
-    event.duration.total > 0 ||
-    event.discontinuity ||
-    !!(type && EXCLUDED_DETAIL_TYPES.has(type))
-  );
 }
 
 /**
  * Builds the time-order view: one row per LogEvent at every level. Row ids
- * use parser-assigned eventIndex values, which are globally unique within
- * the parse and safe for deepFilter cache keys.
+ * use parser-assigned eventIndex values, which are unique within the parse.
  */
 export function toTimeOrderTree(
   nodes: LogEvent[],
@@ -77,19 +56,13 @@ export function toTimeOrderTree(
     const children = event.children;
     const childCount = children.length;
     let mappedChildren: TimeOrderRow[] | null = null;
-    let childHasDetailsDeep = false;
     if (childCount > 0) {
       mappedChildren = new Array<TimeOrderRow>(childCount);
       for (let i = 0; i < childCount; i++) {
-        const childRow = buildRow(children[i]!);
-        mappedChildren[i] = childRow;
-        if (childRow._hasDetailsDeep) {
-          childHasDetailsDeep = true;
-        }
+        mappedChildren[i] = buildRow(children[i]!);
       }
     }
     const { type } = event;
-    const selfIsDetail = isDetailEvent(event);
     const row: TimeOrderRow = {
       id,
       originalData: event,
@@ -111,7 +84,6 @@ export function toTimeOrderTree(
       heapPeak: event.heapPeak,
       governorCost: 0,
       governorCostMax: 0,
-      _hasDetailsDeep: selfIsDetail || childHasDetailsDeep,
     };
     if (costLimits) {
       setGovernorCost(row, costLimits);

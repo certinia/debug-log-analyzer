@@ -22,14 +22,15 @@ function timedFrame(
   type: string,
   text: string,
   duration: { total: number; self: number },
+  // The parser only descends into parent lines, so every ancestor is one.
+  isParent = true,
 ): FakeEvent {
   return {
     eventIndex,
     type,
     text,
     namespace: '',
-    // The parser only descends into parent lines, so every ancestor is one.
-    isParent: true,
+    isParent,
     duration,
     parent: null,
     children: [],
@@ -151,7 +152,7 @@ function types(rows: readonly ScopedRow[]): string[] {
 /** A limit block under m2, with the limit line it holds. Undone by the caller. */
 function limitBlockUnderM2(): () => void {
   const block = timedFrame(400, 'CUMULATIVE_LIMIT_USAGE', 'LIMIT_USAGE', { total: 3, self: 3 });
-  const line = timedFrame(401, 'LIMIT_USAGE_FOR_NS', '(default)', { total: 0, self: 0 });
+  const line = timedFrame(401, 'LIMIT_USAGE_FOR_NS', '(default)', { total: 0, self: 0 }, false);
   block.parent = m2;
   block.children = [line];
   line.parent = block;
@@ -205,12 +206,13 @@ describe('buildScopedCallTree', () => {
 
   it('bottom-up: the hottest frame inside the selection heads the view', async () => {
     // m2 spends none of its time itself; the statement it holds spends all of it.
-    // So the statement heads the view and m2 reads as its caller. exec and m1 lead
-    // to the selection but ran nothing inside it, so bottom-up leaves them out.
+    // So the statement heads the view and m2 reads as its caller, and m2's own row
+    // comes last. exec and m1 lead to the selection but ran nothing inside it, so
+    // bottom-up leaves them out.
     const tree = (await build(3))!;
     const rows = (await tree.bottomUp(options))!;
 
-    expect(rows.map((row) => row.text)).toEqual(['SELECT Id FROM Account']);
+    expect(rows.map((row) => row.text)).toEqual(['SELECT Id FROM Account', 'm2']);
     expect(rows[0]?.duration).toEqual({ total: 200, self: 200 });
     expect(rows[0]?._children?.map((row) => row.text)).toEqual(['m2']);
     // Every caller counts the call it contributed, never zero.
@@ -218,26 +220,24 @@ describe('buildScopedCallTree', () => {
     expect(rows[0]?._children?.[0]?._children).toBeNull();
   });
 
-  it('drops zero-duration bookkeeping rows, keeping those with timed descendants', async () => {
+  // A time-based prune dropped the frame that took no time along with the details.
+  it('drops details, keeping a frame that took no time', async () => {
     const scope = timedFrame(200, 'METHOD_ENTRY', 'scope', { total: 50, self: 0 });
-    const heap = timedFrame(201, 'HEAP_ALLOCATE', 'Bytes:8', { total: 0, self: 0 });
-    const statement = timedFrame(202, 'STATEMENT_EXECUTE', '[12]', { total: 0, self: 0 });
-    const timed = timedFrame(203, 'METHOD_ENTRY', 'timed', { total: 50, self: 50 });
+    const heap = timedFrame(201, 'HEAP_ALLOCATE', 'Bytes:8', { total: 0, self: 0 }, false);
+    const statement = timedFrame(202, 'STATEMENT_EXECUTE', '[12]', { total: 0, self: 0 }, false);
+    const instant = timedFrame(203, 'METHOD_ENTRY', 'instant', { total: 0, self: 0 });
+    const timed = timedFrame(204, 'METHOD_ENTRY', 'timed', { total: 50, self: 50 });
     scope.parent = root;
-    scope.children = [heap, statement];
-    heap.parent = scope;
-    statement.parent = scope;
-    statement.children = [timed];
-    timed.parent = statement;
+    scope.children = [heap, statement, instant, timed];
+    for (const child of scope.children) {
+      child.parent = scope;
+    }
     byId.set(scope.eventIndex, scope);
 
     const tree = (await build(scope.eventIndex))!;
     const selected = (await tree.timeOrder(options))![0]!;
-    // The bare heap allocation is gone; the statement stays because it is the
-    // only way to reach `timed`.
-    expect(selected._children!.map((row) => row.text)).toEqual(['[12]']);
-    expect(selected._children![0]!._children!.map((row) => row.text)).toEqual(['timed']);
-    // The dropped row is not counted either, so the Calls total matches the rows.
+    expect(selected._children!.map((row) => row.text)).toEqual(['instant', 'timed']);
+    // The dropped rows are not counted either, so the Calls total matches the rows.
     expect(tree.calls).toBe(3);
   });
 
@@ -262,18 +262,23 @@ describe('buildScopedCallTree', () => {
     // Each caller still counts the one call of the selection it led to.
     expect(calls((await tree.timeOrder(options))!)).toBe(tree.calls + 2);
     expect(calls((await tree.aggregated(options))!)).toBe(tree.calls + 2);
-    // Bottom-Up heads a row with a frame that spends time, and m2 spends none, so
-    // its own rows fall short of the scope. Hence the total comes from the scope.
-    expect((await tree.bottomUp(options))!.reduce((sum, row) => sum + row.callCount, 0)).toBe(1);
+    // Bottom-Up heads a row with every frame, so its top-level rows total the scope.
+    expect((await tree.bottomUp(options))!.reduce((sum, row) => sum + row.callCount, 0)).toBe(
+      tree.calls,
+    );
   });
 
-  it('keeps the selection itself even when it has no duration', async () => {
-    const scope = timedFrame(210, 'VARIABLE_SCOPE_BEGIN', 'scope', { total: 0, self: 0 });
+  // Bottom-Up seeds only frames, so a selected detail left it empty.
+  it('keeps a selected detail in every view, and counts it as the one call', async () => {
+    const scope = timedFrame(210, 'VARIABLE_SCOPE_BEGIN', 'scope', { total: 0, self: 0 }, false);
     scope.parent = root;
     byId.set(scope.eventIndex, scope);
 
     const tree = (await build(scope.eventIndex))!;
-    expect((await tree.timeOrder(options))!.map((row) => row.text)).toEqual(['scope']);
+    for (const view of ['timeOrder', 'aggregated', 'bottomUp'] as const) {
+      expect(types((await tree[view](options))!)).toContain('VARIABLE_SCOPE_BEGIN');
+    }
+    expect(tree.calls).toBe(1);
   });
 
   it('aggregated: linear path stays one node per frame', async () => {
@@ -509,8 +514,8 @@ describe('buildWholeLogCallTree', () => {
       clock.mockRestore();
     }
   });
-  it('leaves out a top-level line with no duration, as the Inspector does for any row', async () => {
-    const userInfo = timedFrame(600, 'USER_INFO', '005Ea00000R6orz', { total: 0, self: 0 });
+  it('leaves out a top-level detail, as the Inspector does for any row', async () => {
+    const userInfo = timedFrame(600, 'USER_INFO', '005Ea00000R6orz', { total: 0, self: 0 }, false);
     userInfo.parent = root;
     root.children.unshift(userInfo);
     byId.set(userInfo.eventIndex, userInfo);
@@ -520,7 +525,7 @@ describe('buildWholeLogCallTree', () => {
       expect((await tree.timeOrder(options))!.map((row) => row.type)).toEqual([
         'CODE_UNIT_STARTED',
       ]);
-      // The four frames under `exec`; the empty line is no call.
+      // The four frames under `exec`; the detail is no call.
       expect(tree.calls).toBe(4);
     } finally {
       root.children.shift();
@@ -528,7 +533,7 @@ describe('buildWholeLogCallTree', () => {
     }
   });
 
-  it('leaves out a profiling block the log left at the top level', async () => {
+  it('keeps a profiling block the log left at the top level, outside Bottom-Up', async () => {
     const profiling = timedFrame(500, 'CUMULATIVE_PROFILING_BEGIN', 'profiling', {
       total: 2,
       self: 2,
@@ -538,9 +543,12 @@ describe('buildWholeLogCallTree', () => {
     byId.set(profiling.eventIndex, profiling);
     try {
       // It follows EXECUTION_FINISHED, so it is a root rather than a descendant.
-      const rows = (await (await buildWholeLogCallTree(options))!.timeOrder(options))!;
+      const tree = (await buildWholeLogCallTree(options))!;
 
-      expect(types(rows)).not.toContain('CUMULATIVE_PROFILING_BEGIN');
+      expect(types((await tree.timeOrder(options))!)).toContain('CUMULATIVE_PROFILING_BEGIN');
+      expect(types((await tree.bottomUp(options))!)).not.toContain('CUMULATIVE_PROFILING_BEGIN');
+      // The four frames under `exec`; a block is a row, not a call.
+      expect(tree.calls).toBe(4);
     } finally {
       root.children.pop();
       byId.delete(profiling.eventIndex);
@@ -619,7 +627,12 @@ describe('liveWindow', () => {
       const rows = (await tree.timeOrder(options))!;
       await live.prepare(rows, options);
 
-      expect(live.set({ start: 200, end: 500 })).toEqual({ rootTotal: 300, calls: 2, self: 300 });
+      expect(live.set({ start: 200, end: 500 })).toEqual({
+        rootTotal: 300,
+        calls: 2,
+        self: 300,
+        frameSelf: 300,
+      });
       expect(admitted(live, rows)).toEqual([
         ['outer', 300, 200, 1],
         ['m', 100, 100, 1],
@@ -744,7 +757,7 @@ describe('liveWindow', () => {
     });
   });
 
-  it('totals the self time of every row, a block the tree leaves out excepted', async () => {
+  it('totals the self time of every row, a limit block included', async () => {
     const limits = ranFrame(622, 'limits', 650, 700);
     limits.type = 'CUMULATIVE_LIMIT_USAGE';
     const outer = ranFrame(620, 'outer', 0, 1_000, [ranFrame(621, 'm', 100, 300), limits]);
@@ -753,12 +766,13 @@ describe('liveWindow', () => {
       const live = tree.liveWindow!();
       const rows = (await tree.timeOrder(options))!;
       await live.prepare(rows, options);
-      const everySelf = (): number => {
+      const everySelf = (type?: string): number => {
         let self = 0;
         const stack = [...rows];
         while (stack.length) {
           const row = stack.pop()!; // non-empty: the loop condition just checked
-          self += live.admit(row) ? row.duration.self : 0;
+          const counted = live.admit(row) && row.type !== type;
+          self += counted ? row.duration.self : 0;
           stack.push(...(row._children ?? []));
         }
         return self;
@@ -770,8 +784,10 @@ describe('liveWindow', () => {
         { start: 200, end: 680 },
         { start: 690, end: 1_300 },
       ]) {
-        const { self } = live.set(window);
+        const { self, frameSelf } = live.set(window);
         expect(self).toBe(everySelf());
+        // Bottom-Up has no row for the limit block, so its total leaves the block out.
+        expect(frameSelf).toBe(everySelf('CUMULATIVE_LIMIT_USAGE'));
       }
     });
   });
@@ -995,20 +1011,19 @@ describe('bottom-up occurrences', () => {
     expect(caller.eventIndexes).toBeNull();
     expect(locatableEventIndexes(caller)).toEqual(instances);
   });
-  it('leaves the limit blocks out of every view', async () => {
+  it('keeps the limit blocks in the top-down views and out of Bottom-Up', async () => {
     const undo = limitBlockUnderM2();
     try {
       const tree = (await build(3))!;
-      // They report governor figures, not time, and the Overview and the governor
-      // trends already carry them.
-      for (const rows of [
-        (await tree.timeOrder(options))!,
-        (await tree.aggregated(options))!,
-        (await tree.bottomUp(options))!,
-      ]) {
-        expect(types(rows)).not.toContain('CUMULATIVE_LIMIT_USAGE');
-        expect(types(rows)).not.toContain('LIMIT_USAGE_FOR_NS');
+      for (const rows of [(await tree.timeOrder(options))!, (await tree.aggregated(options))!]) {
+        expect(types(rows)).toContain('CUMULATIVE_LIMIT_USAGE');
+        expect(types(rows)).toContain('LIMIT_USAGE_FOR_NS');
       }
+      const bottomUp = types((await tree.bottomUp(options))!);
+      expect(bottomUp).not.toContain('CUMULATIVE_LIMIT_USAGE');
+      expect(bottomUp).not.toContain('LIMIT_USAGE_FOR_NS');
+      // A limit block is a row, not a call.
+      expect(tree.calls).toBe(2);
     } finally {
       undo();
     }
