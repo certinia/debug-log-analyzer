@@ -180,7 +180,7 @@ export class CalltreeView extends LitElement {
 
   /** The event a go-to found the filters hiding, so the toolbar can offer to clear them. */
   @state()
-  private _hiddenByFilters: number | null = null;
+  private _hiddenEventIndex: number | null = null;
 
   filterState: { showDetails: boolean; debugOnly: boolean; selectedTypes: Set<string> } = {
     showDetails: false,
@@ -206,7 +206,7 @@ export class CalltreeView extends LitElement {
 
   private contextMenu: ContextMenu | null = null;
   /** The event id of the row the menu opened on. */
-  private contextMenuRow: number | null = null;
+  private contextMenuEventIndex: number | null = null;
   /** The grid whose header was right-clicked (for column-toggle actions). */
   private contextMenuTarget: ColumnTarget | null = null;
   /** The header the column menu opened from; null from the toolbar. */
@@ -293,7 +293,7 @@ export class CalltreeView extends LitElement {
 
   private async _replaceLog(store: LogStore): Promise<void> {
     this.rootStore = store;
-    this._hiddenByFilters = null;
+    this._hiddenEventIndex = null;
     // `rootStore` is not reactive, and the Namespace filter lists its namespaces.
     this.requestUpdate();
     // A build still running reads the old log.
@@ -399,7 +399,7 @@ export class CalltreeView extends LitElement {
     return html`
       <div id="call-tree-container">
         <div class="sr-only" role="status" aria-live="polite">
-          ${this._hiddenByFilters === null ? '' : 'The filters hide that row, so its parent is selected.'}
+          ${this._hiddenEventIndex === null ? '' : 'The filters hide that row, so its parent is selected.'}
         </div>
         <div>
           <datagrid-filter-bar>
@@ -490,7 +490,7 @@ export class CalltreeView extends LitElement {
             </overflow-list>
 
             ${
-              this._hiddenByFilters === null
+              this._hiddenEventIndex === null
                 ? ''
                 : html`<span slot="filters" class="hidden-note">
                     Hidden by filters ·
@@ -681,7 +681,7 @@ export class CalltreeView extends LitElement {
     if (!this.contextMenu) {
       return;
     }
-    this.contextMenuRow = null;
+    this.contextMenuEventIndex = null;
     this.contextMenuTarget = target;
     this.contextMenuColumn = column;
     this.contextMenu.show(this._columns.menuItems(target, column), clientX, clientY);
@@ -721,7 +721,7 @@ export class CalltreeView extends LitElement {
   private _onColumnMenuClose() {
     this.contextMenuTarget = null;
     this.contextMenuColumn = null;
-    this.contextMenuRow = null;
+    this.contextMenuEventIndex = null;
   }
 
   _handleTypeFilter(event: Event) {
@@ -752,7 +752,7 @@ export class CalltreeView extends LitElement {
   }
 
   _updateFiltering() {
-    this._hiddenByFilters = null;
+    this._hiddenEventIndex = null;
     if (this.timeOrderGrid && this.viewMode === 'time-order') {
       this.timeOrderGrid.filters = this._timeOrderFilters();
       return;
@@ -873,7 +873,7 @@ export class CalltreeView extends LitElement {
     if (!this.rootStore) {
       return;
     }
-    this._hiddenByFilters = null;
+    this._hiddenEventIndex = null;
     document.dispatchEvent(new CustomEvent('show-tab', { detail: { tabid: 'tree-tab' } }));
 
     if (this.viewMode !== 'time-order') {
@@ -893,17 +893,17 @@ export class CalltreeView extends LitElement {
     }
     if (await grid.goTo(path)) {
       // The grid stops at the deepest shown row on the path, so a row the filters hide lands on its parent.
-      this._hiddenByFilters = grid.selectedKey === path.at(-1) ? null : eventIndex;
+      this._hiddenEventIndex = grid.selectedKey === path.at(-1) ? null : eventIndex;
       grid.focus({ preventScroll: true });
     } else {
       // No row on the path is shown: the filters hide it from the top.
-      this._hiddenByFilters = eventIndex;
+      this._hiddenEventIndex = eventIndex;
     }
   }
 
   /** Clears the filters that can hide a go-to's row, then goes to it. */
   private async _clearFiltersAndGo(): Promise<void> {
-    const eventIndex = this._hiddenByFilters;
+    const eventIndex = this._hiddenEventIndex;
     if (eventIndex === null) {
       return;
     }
@@ -1125,7 +1125,7 @@ export class CalltreeView extends LitElement {
       return;
     }
 
-    this.contextMenuRow = event.id;
+    this.contextMenuEventIndex = event.id;
 
     const items: { id: string; label: string; separator?: boolean; shortcut?: string }[] = [];
 
@@ -1175,7 +1175,9 @@ export class CalltreeView extends LitElement {
     }
 
     const event =
-      this.contextMenuRow === null ? null : this.rootStore?.eventByIndex(this.contextMenuRow);
+      this.contextMenuEventIndex === null
+        ? null
+        : this.rootStore?.eventByIndex(this.contextMenuEventIndex);
     if (!event) {
       return;
     }
@@ -1202,6 +1204,6 @@ export class CalltreeView extends LitElement {
         break;
     }
 
-    this.contextMenuRow = null;
+    this.contextMenuEventIndex = null;
   }
 }

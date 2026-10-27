@@ -79,7 +79,7 @@ export interface LogIndex extends Readonly<Rows> {
 }
 
 /** `row`'s category: '' for a leaf. */
-export function categoryName(index: LogIndex, row: number): LogCategory {
+export function rowCategory(index: LogIndex, row: number): LogCategory {
   return index.categoryNames[index.categoryId[row]!]!;
 }
 

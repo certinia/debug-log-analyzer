@@ -7,7 +7,7 @@ import { buildLogIndex } from '#core/log/LogIndex.js';
 import { indexOf } from '#test-helpers/apexLog.js';
 import { framesOf } from '#test-helpers/timeline.js';
 import { NO_ROW } from '../types/flamechart.types.js';
-import { buildTimelineFrames, drawnRowNear } from '../utils/timeline-frames.js';
+import { buildTimelineFrames, drawnRowAtOrAbove } from '../utils/timeline-frames.js';
 
 const NESTED =
   '09:18:22.6 (1000)|METHOD_ENTRY|[1]|01p|ns.Outer.run()\n' +
@@ -110,12 +110,12 @@ describe('buildTimelineFrames', () => {
   });
 });
 
-describe('drawnRowNear', () => {
+describe('drawnRowAtOrAbove', () => {
   it('gives a drawn frame itself', async () => {
     const { log, index, frames } = await framesOf(NESTED);
     const inner = indexOf(log, 'ns.Inner.first()');
 
-    expect(drawnRowNear(index, frames, inner)).toBe(index.rowOf(inner));
+    expect(drawnRowAtOrAbove(index, frames, inner)).toBe(index.rowOf(inner));
   });
 
   // A hidden event has no row at all, so it climbs the log, not the index.
@@ -127,12 +127,12 @@ describe('drawnRowNear', () => {
     const index = buildLogIndex(log, hidden);
     const frames = buildTimelineFrames(index, new Set(['Apex', 'SOQL']), 0);
 
-    expect(frames.text(drawnRowNear(index, frames, inner))).toBe('ns.Outer.run()');
+    expect(frames.text(drawnRowAtOrAbove(index, frames, inner))).toBe('ns.Outer.run()');
   });
 
   it('gives no row for an id the log does not hold', async () => {
     const { index, frames } = await framesOf(NESTED);
 
-    expect(drawnRowNear(index, frames, 9999)).toBe(NO_ROW);
+    expect(drawnRowAtOrAbove(index, frames, 9999)).toBe(NO_ROW);
   });
 });

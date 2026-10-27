@@ -7,7 +7,7 @@
  */
 
 /**
- * Where going to an event by id lands the chart. `drawnRowNear` holds the climb and is tested with
+ * Where going to an event by id lands the chart. `drawnRowAtOrAbove` holds the climb and is tested with
  * it; this covers the wiring: which frame is selected, and where the view moves.
  */
 

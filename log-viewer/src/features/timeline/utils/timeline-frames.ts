@@ -3,7 +3,7 @@
  */
 import { type ApexEvent, eventType } from '@apexdevtools/apex-log-parser';
 
-import { categoryName, type LogIndex } from '#core/log/LogIndex.js';
+import { rowCategory, type LogIndex } from '#core/log/LogIndex.js';
 import type { PrecomputedRect } from '../optimised/RectangleCache.js';
 import {
   type EventNode,
@@ -81,7 +81,7 @@ export function buildTimelineFrames(
         depth: d,
         duration: rowTotal,
         selfDuration: index.self[row]!,
-        category: categoryName(index, row),
+        category: rowCategory(index, row),
         x: 0,
         y: d * eventHeight,
         width: 0,
@@ -155,7 +155,7 @@ function sortIfNeeded(rows: number[], start: Float64Array): number[] {
  * duration or an event the log levels hide goes to the frame it sits in. NO_ROW when
  * no frame above it is drawn.
  */
-export function drawnRowNear(
+export function drawnRowAtOrAbove(
   index: LogIndex,
   frames: TimelineFrames<EventNode>,
   eventIndex: number,

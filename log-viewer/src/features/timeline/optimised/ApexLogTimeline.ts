@@ -50,7 +50,11 @@ import {
 } from '../utils/detail-selection-sync.js';
 import { extractExceptionMarkers, extractMarkers } from '../utils/marker-utils.js';
 import { seekWindow } from '../utils/navigate-window.js';
-import { buildTimelineFrames, drawnRowNear, type ApexEventNode } from '../utils/timeline-frames.js';
+import {
+  buildTimelineFrames,
+  drawnRowAtOrAbove,
+  type ApexEventNode,
+} from '../utils/timeline-frames.js';
 import { FlameChart } from './FlameChart.js';
 import { FrameTooltipRenderer, type TooltipAnchor } from './FrameTooltipRenderer.js';
 import { apexLimitSeries } from './apex-limit-series.js';
@@ -380,7 +384,7 @@ export class ApexLogTimeline {
    */
   public navigateToEventIndex(eventIndex: number): void {
     const row =
-      this.index && this.frames ? drawnRowNear(this.index, this.frames, eventIndex) : NO_ROW;
+      this.index && this.frames ? drawnRowAtOrAbove(this.index, this.frames, eventIndex) : NO_ROW;
     // With no drawn frame above it, such as the FATAL_ERROR closing a truncated log, still move to its time.
     this._reveal(row === NO_ROW ? this.locate(eventIndex) : this.locateRow(row));
   }

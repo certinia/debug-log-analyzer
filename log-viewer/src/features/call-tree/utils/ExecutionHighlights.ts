@@ -4,7 +4,7 @@
 import type { ApexLog } from '@apexdevtools/apex-log-parser';
 
 import type { LogCategory } from '#core/log/category.js';
-import { categoryName, type LogIndex, NO_ROW } from '#core/log/LogIndex.js';
+import { rowCategory, type LogIndex, NO_ROW } from '#core/log/LogIndex.js';
 import type { Derivation } from '#core/log/LogStore.js';
 import { signatureTimes, type SignatureTimes } from '#core/log/signatureTimes.js';
 import { type Signatures, signaturesOf } from '#core/log/signatures.js';
@@ -169,7 +169,7 @@ function frameOf(index: LogIndex, signatures: Signatures, group: FrameGroup): Ho
     // its total; the frame's own share of itself cannot sit outside it.
     selfTime: Math.min(Math.max(group.self, 0), group.total),
     count: group.instances.length,
-    category: categoryName(index, worst),
+    category: rowCategory(index, worst),
   };
 }
 

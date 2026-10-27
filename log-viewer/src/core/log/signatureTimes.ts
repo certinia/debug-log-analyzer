@@ -3,7 +3,7 @@
  */
 import { CHECK_EVERY, frameBudget } from '../utility/FrameBudget.js';
 import type { LogCategory } from './category.js';
-import { categoryName } from './LogIndex.js';
+import { rowCategory } from './LogIndex.js';
 import type { Derivation } from './LogStore.js';
 import { signaturesOf } from './signatures.js';
 
@@ -157,7 +157,7 @@ export const signatureTimes: Derivation<SignatureTimes> = async (index) => {
       const { signature: of, count, timedCount, selfTime, maxRow, outerTotal } = tallies[id]!;
       const signature: Signature = {
         text: signatures.text(of),
-        category: categoryName(index, maxRow),
+        category: rowCategory(index, maxRow),
         eventIndex: eventIndex[maxRow]!,
         count,
         timedCount,
