@@ -12,7 +12,7 @@ import type { PaneSection } from './PaneView.js';
 export type DockPosition = 'left' | 'right' | 'bottom';
 
 /**
- * Generic details viewlet: a slim action bar (dock left/bottom/right + close)
+ * Generic details viewlet: a slim action bar (dock left/bottom/right, more actions, close)
  * over a PaneView of caller-supplied sections. View-agnostic — the consuming
  * view builds the sections. No title text.
  *
@@ -130,6 +130,13 @@ export class DetailDock extends LitElement {
         ></vscode-icon>
         <vscode-icon
           action-icon
+          name="ellipsis"
+          label="More actions"
+          title="More actions"
+          @click=${this._showMenu}
+        ></vscode-icon>
+        <vscode-icon
+          action-icon
           name="close"
           label="Hide panel"
           title="Hide panel"
@@ -154,6 +161,18 @@ export class DetailDock extends LitElement {
     this.dispatchEvent(
       new CustomEvent('dock-position-change', {
         detail: { position },
+        bubbles: true,
+        composed: true,
+      }),
+    );
+  }
+
+  /** The section header's right-click menu, opened under the button. */
+  private _showMenu(e: MouseEvent) {
+    const { left, bottom } = (e.currentTarget as HTMLElement).getBoundingClientRect();
+    this.dispatchEvent(
+      new CustomEvent('pane-menu', {
+        detail: { x: left, y: bottom },
         bubbles: true,
         composed: true,
       }),
