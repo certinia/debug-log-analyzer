@@ -11,7 +11,7 @@ import '../OverflowList.js';
 /** jsdom lays nothing out, so the list's width is stubbed and the end child states its own. */
 async function mount(width: number): Promise<LitElement> {
   const list = document.createElement('overflow-list') as LitElement;
-  Object.defineProperty(list, 'clientWidth', { value: width });
+  Object.defineProperty(list, 'clientWidth', { value: width, configurable: true });
   list.innerHTML =
     '<button>Details</button><button>Debug Only</button>' +
     '<span slot="end" collapse-last style="min-width: 80px">Hidden by filters · Clear</span>';
@@ -40,5 +40,26 @@ describe('overflow-list collapse-last child', () => {
     const list = await mount(400);
 
     expect(slots(list).at(-1)).toBe('end');
+  });
+
+  it('comes back out of the menu, with every item, once the list widens', async () => {
+    const list = await mount(100);
+
+    Object.defineProperty(list, 'clientWidth', { value: 400, configurable: true });
+    list.requestUpdate();
+    await list.updateComplete;
+
+    expect(slots(list)).toEqual([null, null, 'end']);
+  });
+
+  // Clear removes the note from a narrow toolbar: the filters stayed in the menu at any width.
+  it('frees every item once it is removed from the menu', async () => {
+    const list = await mount(100);
+
+    list.querySelector('[collapse-last]')!.remove();
+    list.requestUpdate();
+    await list.updateComplete;
+
+    expect(slots(list)).toEqual([null, null]);
   });
 });

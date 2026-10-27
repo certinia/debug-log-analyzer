@@ -288,7 +288,11 @@ export class OverflowList extends LitElement {
   /** Moves the `collapse-last` children into the menu once the toggle and their `min-width` no longer fit. */
   private _fitEnd(hostWidth: number): void {
     const last = this._collapseLast();
-    if (!last.length || !hostWidth) {
+    if (!last.length) {
+      this.endCollapsed = false;
+      return;
+    }
+    if (!hostWidth) {
       return;
     }
     const min = last.reduce(
@@ -370,11 +374,9 @@ export class OverflowList extends LitElement {
     // Fit the visible run from the appropriate end (reverse for start-collapse).
     const ordered = this.collapseFrom === 'start' ? [...widths].reverse() : widths;
     const fit = computeVisibleCount(ordered, avail, this.gap, OVERFLOW_RESERVE);
-    // A `collapse-last` child in the menu means no item may stay out of it.
-    this.visibleCount = Math.max(
-      this.endCollapsed ? 0 : fit,
-      Math.min(this.minVisible, widths.length),
-    );
+    this.visibleCount = this.endCollapsed
+      ? 0
+      : Math.max(fit, Math.min(this.minVisible, widths.length));
     this._applyOverflow();
   }
 
