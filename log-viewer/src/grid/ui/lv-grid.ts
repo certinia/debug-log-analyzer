@@ -298,6 +298,12 @@ export class LvGrid<R extends object = object> extends LitElement {
     await this.store?.refresh();
   }
 
+  /** The selected data row's key; null for a group row or no selection. */
+  get selectedKey(): RowKey | null {
+    const target = this.selected;
+    return target === null || target instanceof Group ? null : target;
+  }
+
   /**
    * Opens each ancestor on `path` (keys from the root down), then scrolls the row to the
    * middle and selects it. False when no row on the path is shown, or when a selection made

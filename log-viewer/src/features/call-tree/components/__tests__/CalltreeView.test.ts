@@ -532,6 +532,68 @@ describe('calltree-view go to row', () => {
 
     expect((view.renderRoot as ShadowRoot).activeElement === view.timeOrderGrid).toBe(true);
   });
+
+  describe('to a row the filters hide', () => {
+    // Debug Only keeps Outer as the parent of its debug line, and hides Inner.
+    const LOG =
+      '09:18:22.6 (1000)|METHOD_ENTRY|[1]|01p|ns.Outer.run()\n' +
+      '09:18:22.6 (1100)|USER_DEBUG|[2]|DEBUG|hello\n' +
+      '09:18:22.6 (1200)|METHOD_ENTRY|[3]|01p|ns.Inner.go()\n' +
+      '09:18:22.6 (1300)|METHOD_EXIT|[3]|ns.Inner.go()\n' +
+      '09:18:22.6 (1800)|METHOD_EXIT|[1]|ns.Outer.run()\n';
+
+    const note = () => view.renderRoot.querySelector('.hidden-note');
+
+    beforeEach(() => {
+      globalThis.IntersectionObserver = AlwaysVisible as unknown as typeof IntersectionObserver;
+    });
+
+    // Before, the tab switched and nothing was selected, with no word why.
+    it('selects the nearest shown parent and says the filters hide the row', async () => {
+      const { log } = await storeOf(LOG);
+      view = await mountView(log);
+      await view._goToRow(indexOf(log, 'ns.Outer.run()'));
+      view._handleDebugOnlyChange();
+      await view.updateComplete;
+
+      await view._goToRow(indexOf(log, 'ns.Inner.go()'));
+      await view.updateComplete;
+
+      expect(view.timeOrderGrid?.selectedKey).toBe(indexOf(log, 'ns.Outer.run()'));
+      expect(note()?.textContent).toContain('Hidden by filters');
+      expect(view.filterState.debugOnly).toBe(true);
+    });
+
+    it('clears the filters and goes to the row when Clear is pressed', async () => {
+      const { log } = await storeOf(LOG);
+      view = await mountView(log);
+      await view._goToRow(indexOf(log, 'ns.Outer.run()'));
+      view._handleDebugOnlyChange();
+      await view.updateComplete;
+      const inner = indexOf(log, 'ns.Inner.go()');
+      await view._goToRow(inner);
+      await view.updateComplete;
+
+      note()!.querySelector('button')!.click(); // the test above shows the note and its button
+      await settle();
+      await view.updateComplete;
+
+      expect(view.filterState.debugOnly).toBe(false);
+      expect(view.timeOrderGrid?.selectedKey).toBe(inner);
+      expect(note()).toBeNull();
+    });
+
+    it('says nothing when the row shows', async () => {
+      const { log } = await storeOf(LOG);
+      view = await mountView(log);
+
+      await view._goToRow(indexOf(log, 'ns.Inner.go()'));
+      await view.updateComplete;
+
+      expect(view.timeOrderGrid?.selectedKey).toBe(indexOf(log, 'ns.Inner.go()'));
+      expect(note()).toBeNull();
+    });
+  });
 });
 
 describe('calltree-view type picker', () => {

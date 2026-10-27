@@ -184,7 +184,7 @@ export class DatagridRangeFilter extends LitElement {
         ${this._inputs()}
         ${
           active
-            ? html`<button class="range-popover__clear" @click=${this._clear}>Clear</button>`
+            ? html`<button class="range-popover__clear" @click=${this.clear}>Clear</button>`
             : ''
         }
       </div>
@@ -202,7 +202,7 @@ export class DatagridRangeFilter extends LitElement {
           ${this.unit ? html`<span class="range-panel__unit">${this.unit}</span>` : ''}
           ${
             active
-              ? html`<button class="range-popover__clear" @click=${this._clear}>Clear</button>`
+              ? html`<button class="range-popover__clear" @click=${this.clear}>Clear</button>`
               : ''
           }
         </div>
@@ -248,7 +248,8 @@ export class DatagridRangeFilter extends LitElement {
     }
   }
 
-  private _clear(): void {
+  /** Empties both bounds and reports the open range, as the Clear button does. */
+  clear(): void {
     clearTimeout(this._debounceHandle);
     this._start = '';
     this._end = '';

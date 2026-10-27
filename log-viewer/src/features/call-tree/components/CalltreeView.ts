@@ -70,8 +70,10 @@ import {
   directionOf,
   type ViewMode,
 } from '../../../components/callTreeViewModes.js';
+import type { DatagridFacetFilter } from '../../../components/datagrid-facet-filter.js';
 import '../../../components/datagrid-facet-filter.js';
 import '../../../components/datagrid-filter-bar.js';
+import type { DatagridRangeFilter } from '../../../components/datagrid-range-filter.js';
 import '../../../components/datagrid-range-filter.js';
 import '../../../components/OverflowList.js';
 
@@ -175,6 +177,10 @@ export class CalltreeView extends LitElement {
     test: (node) => this._timeOrderSource?.details.test(node) ?? true,
     keepAncestors: true,
   };
+
+  /** The event a go-to found the filters hiding, so the toolbar can offer to clear them. */
+  @state()
+  private _hiddenByFilters: number | null = null;
 
   filterState: { showDetails: boolean; debugOnly: boolean; selectedTypes: Set<string> } = {
     showDetails: false,
@@ -355,6 +361,26 @@ export class CalltreeView extends LitElement {
         opacity: 0;
         pointer-events: none;
       }
+
+      .hidden-note {
+        align-self: center;
+        color: var(--lana-fg-muted);
+        white-space: nowrap;
+      }
+
+      .hidden-note__clear {
+        padding: 0;
+        border: none;
+        background: none;
+        color: var(--lana-link-fg);
+        font: inherit;
+        cursor: pointer;
+      }
+
+      .hidden-note__clear:hover {
+        color: var(--lana-link-fg-active);
+        text-decoration: underline;
+      }
     `,
   ];
 
@@ -452,6 +478,20 @@ export class CalltreeView extends LitElement {
               }
             </overflow-list>
 
+            ${
+              this._hiddenByFilters === null
+                ? ''
+                : html`<span slot="filters" class="hidden-note" role="status">
+                    Hidden by filters ·
+                    <button
+                      type="button"
+                      class="hidden-note__clear"
+                      @click=${this._clearFiltersAndGo}
+                    >
+                      Clear
+                    </button>
+                  </span>`
+            }
             ${gridGroupControls({
               grid: this._activeGrid(),
               group:
@@ -700,6 +740,7 @@ export class CalltreeView extends LitElement {
   }
 
   _updateFiltering() {
+    this._hiddenByFilters = null;
     if (this.timeOrderGrid && this.viewMode === 'time-order') {
       this.timeOrderGrid.filters = this._timeOrderFilters();
       return;
@@ -820,6 +861,7 @@ export class CalltreeView extends LitElement {
     if (!this.rootStore) {
       return;
     }
+    this._hiddenByFilters = null;
     document.dispatchEvent(new CustomEvent('show-tab', { detail: { tabid: 'tree-tab' } }));
 
     if (this.viewMode !== 'time-order') {
@@ -833,9 +875,30 @@ export class CalltreeView extends LitElement {
 
     await this._renderCallTree(this._callTreeTableWrapper, this.rootStore);
     const grid = this.timeOrderGrid;
-    if (grid && (await grid.goTo(this._timeOrderPath(eventIndex)))) {
+    const path = this._timeOrderPath(eventIndex);
+    if (grid && (await grid.goTo(path))) {
+      // The grid stops at the deepest shown row on the path, so a row the filters hide lands on its parent.
+      this._hiddenByFilters = grid.selectedKey === path.at(-1) ? null : eventIndex;
       grid.focus({ preventScroll: true });
     }
+  }
+
+  /** Clears every filter, so the row a go-to found hidden shows, then goes to it. */
+  private async _clearFiltersAndGo(): Promise<void> {
+    const eventIndex = this._hiddenByFilters;
+    if (eventIndex === null) {
+      return;
+    }
+    for (const filter of this.renderRoot.querySelectorAll<
+      DatagridFacetFilter | DatagridRangeFilter
+    >('datagrid-facet-filter, datagrid-range-filter')) {
+      filter.clear();
+    }
+    this.typeFilter = 'All';
+    this.filterState = { showDetails: true, debugOnly: false, selectedTypes: new Set() };
+    this.requestUpdate();
+    this._updateFiltering();
+    await this._goToRow(eventIndex);
   }
 
   /**

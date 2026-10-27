@@ -184,7 +184,7 @@ export class DatagridFacetFilter extends LitElement {
           <button
             class="facet-popover__clear ${count > 0 ? 'visible' : ''}"
             ?disabled=${count === 0}
-            @click=${this._clear}
+            @click=${this.clear}
           >
             Clear
           </button>
@@ -222,7 +222,8 @@ export class DatagridFacetFilter extends LitElement {
     this._emit();
   }
 
-  private _clear(): void {
+  /** Unpicks every value and reports none picked, as the Clear button does. */
+  clear(): void {
     this._selected = new Set();
     this._emit();
   }
