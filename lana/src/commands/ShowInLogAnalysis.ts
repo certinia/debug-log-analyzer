@@ -31,45 +31,25 @@ export class ShowInLogAnalysis {
       return;
     }
 
-    const panel = LogView.getCurrentView();
-    const currentLogUri = LogView.getLogUri();
-
-    // If panel doesn't exist, open the log analysis view first
-    if (!panel) {
-      const activeEditor = window.activeTextEditor;
-      const logUri = filePath ? Uri.parse(filePath) : activeEditor?.document.uri;
-
-      if (!logUri) {
-        context.display.showInformationMessage('No active Apex log file.');
-        return;
-      }
-
-      // Set pending navigation so it's sent after log is parsed
-      LogView.setPendingNavigation(eventIndex);
-      await LogView.createView(context, Promise.resolve(), logUri);
-      return; // Navigation will happen via fetchLog payload
-    } else {
-      // Panel exists - reveal it first
-      panel.reveal();
-
-      // Verify we're navigating to the same log
-      const activeEditor = window.activeTextEditor;
-      if (
-        currentLogUri &&
-        activeEditor &&
-        activeEditor.document.uri.toString() !== currentLogUri.toString()
-      ) {
-        // Different log file is active, open the active one
-        LogView.setPendingNavigation(eventIndex);
-        await LogView.createView(context, Promise.resolve(), activeEditor.document.uri);
-        return; // Navigation will happen via fetchLog payload
-      }
+    // The log the link names, so an id meant for one parse is never sent to another log.
+    const logUri = filePath ? Uri.parse(filePath) : window.activeTextEditor?.document.uri;
+    if (!logUri) {
+      context.display.showInformationMessage('No active Apex log file.');
+      return;
     }
 
-    // Send navigation message to webview
-    panel.webview.postMessage({
-      cmd: 'navigateToTimeline',
-      payload: { eventIndex },
-    });
+    const panel = LogView.getCurrentView();
+    if (panel && LogView.getLogUri()?.toString() === logUri.toString()) {
+      panel.reveal();
+      panel.webview.postMessage({
+        cmd: 'navigateToTimeline',
+        payload: { eventIndex },
+      });
+      return;
+    }
+
+    // Sent with the log once it is parsed.
+    LogView.setPendingNavigation(eventIndex);
+    await LogView.createView(context, Promise.resolve(), logUri);
   }
 }
