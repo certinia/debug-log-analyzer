@@ -278,7 +278,7 @@ async function realSubtree(
   source: Rows,
   top: number,
   tick: Tick,
-  selected: boolean,
+  rootsAreSelection: boolean,
 ): Promise<Subtree | null> {
   if (!(await tick())) {
     return null;
@@ -286,7 +286,7 @@ async function realSubtree(
   const { subtreeEnd } = source.index;
   const end = subtreeEnd[top]!;
   const root = frameRow(source, top, false);
-  let calls = selected || source.kindOf(top) === 'frame' ? 1 : 0;
+  let calls = rootsAreSelection || source.kindOf(top) === 'frame' ? 1 : 0;
   root.callCount = calls;
   // The open rows above the current one, with the index row each ends before. The root ends last, so it never pops.
   const open: Array<{ row: ScopedRow; end: number }> = [{ row: root, end }];
@@ -383,12 +383,12 @@ async function subtreeRoots(
   source: Rows,
   tops: readonly number[],
   tick: Tick,
-  selected: boolean,
+  { rootsAreSelection }: { rootsAreSelection: boolean },
 ): Promise<{ roots: ScopedRow[]; calls: number } | null> {
   const roots: ScopedRow[] = [];
   let calls = 0;
   for (const top of tops) {
-    const subtree = await realSubtree(source, top, tick, selected);
+    const subtree = await realSubtree(source, top, tick, rootsAreSelection);
     if (!subtree) {
       return null;
     }
@@ -441,7 +441,7 @@ export async function buildScopedCallTree(
   const rootTotal = selectedRows.reduce((sum, row) => sum + index.total[row]!, 0);
 
   const tick = frameBudget(options);
-  const scope = await subtreeRoots(source, selectedRows, tick, true);
+  const scope = await subtreeRoots(source, selectedRows, tick, { rootsAreSelection: true });
   if (!scope) {
     return null;
   }
@@ -483,7 +483,7 @@ export async function buildScopedCallTree(
     // Occurrences of one frame are the same call made again, so merge them into a
     // single root; a single occurrence is already that.
     mergeTimeOrder: scope.roots.length > 1,
-    seedRoots: true,
+    rootsAreSelection: true,
   });
 }
 
@@ -523,7 +523,7 @@ interface CallTreeInput {
   /** Filled by the bottom-up walk where the tree follows a window: see {@link Holes}. */
   holes?: Holes;
   /** Bottom-up seeds each root whatever its kind, as a selection is kept whatever it is. */
-  seedRoots: boolean;
+  rootsAreSelection: boolean;
 }
 
 // Each recursive frame's nested calls of itself by event id, which bottom-up takes off its time.
@@ -574,7 +574,7 @@ function lazyCallTree(input: CallTreeInput): ScopedCallTree {
         index,
         viewOptions,
         input.holes,
-        input.seedRoots,
+        input.rootsAreSelection,
       );
       return bottomUpRows;
     },
@@ -603,7 +603,7 @@ export async function buildWholeLogCallTree(
   const source = rowsOf(index);
   const tick = frameBudget(options);
   const roots = childRows(index, NO_ROW).filter((row) => source.kindOf(row) !== 'detail');
-  const scope = await subtreeRoots(source, roots, tick, false);
+  const scope = await subtreeRoots(source, roots, tick, { rootsAreSelection: false });
   if (!scope) {
     return null;
   }
@@ -621,7 +621,7 @@ export async function buildWholeLogCallTree(
     index,
     mergeTimeOrder: false,
     holes,
-    seedRoots: false,
+    rootsAreSelection: false,
   });
   tree.liveWindow = () => liveWindow(source, scope, holes);
   return tree;
@@ -936,7 +936,7 @@ async function buildBottomUp(
   index: LogIndex,
   options: FrameBudgetOptions,
   holes: Holes | undefined,
-  seedRoots: boolean,
+  rootsAreSelection: boolean,
 ): Promise<ScopedRow[] | null> {
   const paths = store.keyPathIds();
   const tick = frameBudget(options);
@@ -1043,7 +1043,7 @@ async function buildBottomUp(
     open.set(entry.stackId, entry.outer);
     const attributed = entry.attributed;
     const ownSelf = wholeSelf(index, row);
-    if (eventKind(row.type) === 'frame' || (seedRoots && !callers)) {
+    if (eventKind(row.type) === 'frame' || (rootsAreSelection && !callers)) {
       // The seed row, then its callers up to the root. The chain is already in
       // that order, so it is walked in place rather than copied and reversed.
       let pathId = paths.step(ROOT_PATH_ID, entry.keyId);
