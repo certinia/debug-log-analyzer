@@ -34,7 +34,9 @@ export class ShowInLogAnalysis {
     // The log the link names, so an id meant for one parse is never sent to another log.
     const logUri = filePath ? Uri.parse(filePath) : window.activeTextEditor?.document.uri;
     if (!logUri) {
-      context.display.showInformationMessage('No active Apex log file.');
+      context.display.showInformationMessage(
+        'Open an Apex log, then run Show in Log Analysis again.',
+      );
       return;
     }
 

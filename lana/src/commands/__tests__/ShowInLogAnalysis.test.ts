@@ -2,7 +2,7 @@
  * Copyright (c) 2026 Certinia Inc. All rights reserved.
  */
 import { beforeEach, describe, expect, it } from '@jest/globals';
-import { Uri } from 'vscode';
+import { Uri, window } from 'vscode';
 
 import {
   asContext,
@@ -75,6 +75,35 @@ describe('ShowInLogAnalysis', () => {
     expect(panel.webview.postMessage).not.toHaveBeenCalled();
     expect(LogView.setPendingNavigation).toHaveBeenCalledWith(42);
     expect(String(mockCreateView.mock.calls[0]?.[2])).toBe('memfs:/logs/a.log');
+  });
+
+  // With no file in the link, the editor's log decides whether the open panel is the right one.
+  it('uses the active editor log when the link names no file', async () => {
+    const panel = openPanel();
+    mockGetCurrentView.mockReturnValue(panel);
+    mockGetLogUri.mockReturnValue(Uri.parse('memfs:/logs/a.log'));
+    window.activeTextEditor = { document: { uri: Uri.parse('memfs:/logs/a.log') } };
+    ShowInLogAnalysis.apply(asContext(createMockContext()));
+
+    await command()({ eventIndex: 42 });
+
+    expect(panel.webview.postMessage).toHaveBeenCalledWith({
+      cmd: 'navigateToTimeline',
+      payload: { eventIndex: 42 },
+    });
+    window.activeTextEditor = undefined;
+  });
+
+  it('says what to do when neither the link nor an editor names a log', async () => {
+    const context = createMockContext();
+    ShowInLogAnalysis.apply(asContext(context));
+
+    await command()({ eventIndex: 42 });
+
+    expect(context.display.showInformationMessage).toHaveBeenCalledWith(
+      'Open an Apex log, then run Show in Log Analysis again.',
+    );
+    expect(mockCreateView).not.toHaveBeenCalled();
   });
 
   it('reports a failure to open the log rather than failing silently', async () => {
