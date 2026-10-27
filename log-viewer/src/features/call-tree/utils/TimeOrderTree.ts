@@ -39,8 +39,7 @@ export interface TimeOrderRow {
 
 /**
  * Builds the time-order view: one row per LogEvent at every level. Row ids
- * use parser-assigned eventIndex values, which are globally unique within
- * the parse and safe for deepFilter cache keys.
+ * use parser-assigned eventIndex values, which are unique within the parse.
  */
 export function toTimeOrderTree(
   nodes: LogEvent[],

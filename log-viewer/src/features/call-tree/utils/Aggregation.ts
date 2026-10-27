@@ -216,8 +216,7 @@ function* aggregatedSteps(
     return [];
   }
 
-  // Per-build monotonic counter; row ids must be globally unique within this
-  // tree so deepFilter caches don't collide across cascaded subtree passes.
+  // Per-build monotonic counter; the grid keys rows by id, so ids are unique within this tree.
   let next = 0;
   const idFor = (): number => ++next;
   const costLimits = governorLimits && costLimitsOf(governorLimits);
@@ -491,8 +490,7 @@ function* bottomUpSteps(
   const dfs: DfsEntry[] = [];
   const chainIds: number[] = [];
 
-  // Per-build monotonic counter; row ids must be globally unique within this
-  // tree so deepFilter caches don't collide across cascaded subtree passes.
+  // Per-build monotonic counter; the grid keys rows by id, so ids are unique within this tree.
   let next = 0;
   const idFor = (): number => ++next;
 
