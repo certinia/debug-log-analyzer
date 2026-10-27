@@ -280,6 +280,17 @@ describe('EventVitals across namespaces', () => {
     expect(labels(el)).toContain('Caller namespace');
     expect(valueFor(el, 'Caller namespace')).not.toBe('c2g');
   });
+
+  // The parser names no namespace for unpackaged code; the grids say 'default', so this said '—'.
+  it("calls unpackaged code 'default', as the tables do", async () => {
+    const apexLog = await parse(
+      '09:18:22.6 (100)|METHOD_ENTRY|[1]|01p000000000001|AccountService.getRevenue()\n' +
+        '09:18:22.6 (200)|METHOD_EXIT|[1]|01p000000000001|AccountService.getRevenue()\n',
+    );
+    const el = await mount(logStoreFor(apexLog), { eventIndex: idOfType(apexLog, 'METHOD_ENTRY') });
+
+    expect(valueFor(el, 'Namespace')).toBe('default');
+  });
 });
 
 // Its own log: a method that calls itself, so a total and a self reading no

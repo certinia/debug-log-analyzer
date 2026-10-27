@@ -17,7 +17,11 @@ import {
   selfLabel,
   usageParts,
 } from '#core/metrics/eventMetrics.js';
-import { DEFAULT_NAMESPACE, getCallerNamespace } from '#core/utility/CallerNamespace.js';
+import {
+  DEFAULT_NAMESPACE,
+  getCallerNamespace,
+  namespaceOf,
+} from '#core/utility/CallerNamespace.js';
 import { formatNsAsMs } from '#core/utility/Duration.js';
 import { outermostIds } from '#core/utility/EventTree.js';
 import { formatInteger } from '#core/utility/Util.js';
@@ -186,7 +190,7 @@ export class EventVitals extends LitElement {
     this._metricRows(rows, log, ids, outer);
     this._statementRows(rows, primary);
 
-    this._row(rows, 'Namespace', primary.namespace || '—');
+    this._row(rows, 'Namespace', namespaceOf(store.log, primary.id));
     // Only worth a row when it says something new: "who called this" differing
     // from "whose code ran" is the interesting case (a package's code invoked
     // from another package's trigger). Both normalize empty the same way.
