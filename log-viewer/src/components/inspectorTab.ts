@@ -7,7 +7,7 @@ import type { InspectorEmphasis } from './inspectorEmphasis.js';
 /** What a tab's view does when the inspector points into it. */
 export interface InspectorTabSync {
   /** Light the frames the inspector names, in whatever the view's rows are. */
-  mark: (eventIndexes: readonly number[]) => void;
+  mark: (eventIds: readonly number[]) => void;
 
   /**
    * Move to one frame. A rejection is the view's own to report: it says the view
@@ -16,7 +16,7 @@ export interface InspectorTabSync {
    * @param signal - aborted once a later move has replaced this one. A view that
    * waits on anything checks it before it scrolls.
    */
-  reveal: (eventIndex: number, signal: AbortSignal) => void | Promise<void>;
+  reveal: (eventId: number, signal: AbortSignal) => void | Promise<void>;
 
   /** Drop the view's own selection, for the app-wide Escape. */
   clear: () => void;
@@ -29,7 +29,7 @@ export interface InspectorTabSync {
    *
    * @param signal - as {@link reveal}.
    */
-  revealMerged?: (eventIndexes: readonly number[], signal: AbortSignal) => void | Promise<void>;
+  revealMerged?: (eventIds: readonly number[], signal: AbortSignal) => void | Promise<void>;
 }
 
 /**
@@ -40,8 +40,8 @@ export interface InspectorTabSync {
 export function revealFirstOf(
   reveal: InspectorTabSync['reveal'],
 ): NonNullable<InspectorTabSync['revealMerged']> {
-  return (eventIndexes, signal) => {
-    const first = eventIndexes[0];
+  return (eventIds, signal) => {
+    const first = eventIds[0];
     return first === undefined ? undefined : reveal(first, signal);
   };
 }
@@ -73,14 +73,14 @@ export function wireInspectorTab(
 
   const offs = [
     eventBus.onSource('inspector:reveal', source, (detail) => {
-      move((signal) => sync.reveal(detail.eventIndex, signal));
+      move((signal) => sync.reveal(detail.eventId, signal));
     }),
 
     eventBus.onSource('inspector:locate', source, (detail) => {
-      sync.mark(emphasis.report(detail.eventIndexes, detail.sticky));
+      sync.mark(emphasis.report(detail.eventIds, detail.sticky));
       const revealMerged = sync.revealMerged;
-      if (revealMerged && detail.sticky && detail.eventIndexes.length) {
-        move((signal) => revealMerged(detail.eventIndexes, signal));
+      if (revealMerged && detail.sticky && detail.eventIds.length) {
+        move((signal) => revealMerged(detail.eventIds, signal));
       }
     }),
 

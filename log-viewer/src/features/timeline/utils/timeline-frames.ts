@@ -31,12 +31,12 @@ export function buildTimelineFrames(
   categories: Set<string>,
   logEndTime: number,
 ): TimelineFrames<ApexEventNode> {
-  const { rowCount, start, total, depth, parent, subtreeEnd, categoryId, eventIndex } = index;
+  const { rowCount, start, total, depth, parent, subtreeEnd, categoryId, eventId } = index;
   const columns = index.log.columns;
   const typeOf = (row: number): string =>
-    eventType(columns.type[eventIndex[row]!]!)?.type ?? 'UNKNOWN';
+    eventType(columns.type[eventId[row]!]!)?.type ?? 'UNKNOWN';
   // The type stands in for the text a limit or profiling block does not state.
-  const labelOf = (row: number): string => columns.text.at(eventIndex[row]!) ?? typeOf(row);
+  const labelOf = (row: number): string => columns.text.at(eventId[row]!) ?? typeOf(row);
   const eventHeight = TIMELINE_CONSTANTS.EVENT_HEIGHT;
 
   const shown = new Uint8Array(rowCount);
@@ -151,17 +151,17 @@ function sortIfNeeded(rows: number[], start: Float64Array): number[] {
 }
 
 /**
- * The nearest drawn row at or above event `eventIndex`, so a detail, a frame with no
+ * The nearest drawn row at or above event `eventId`, so a detail, a frame with no
  * duration or an event the log levels hide goes to the frame it sits in. NO_ROW when
  * no frame above it is drawn.
  */
 export function drawnRowAtOrAbove(
   index: LogIndex,
   frames: TimelineFrames<EventNode>,
-  eventIndex: number,
+  eventId: number,
 ): number {
   const { parent } = index.log.columns;
-  let id = eventIndex;
+  let id = eventId;
   let row = index.rowOf(id);
   while (row === NO_ROW && id > 0) {
     id = parent[id] ?? 0;

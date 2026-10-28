@@ -579,7 +579,7 @@ export class LogDiagnosticsView extends LitElement {
     ];
   }
 
-  private _evidenceLine({ text, eventIndex, count, dialect }: DiagnosticEvidence) {
+  private _evidenceLine({ text, eventId, count, dialect }: DiagnosticEvidence) {
     const body = dialect
       ? html`<span class="evidence__text evidence__text--code soql-block"
           >${formatSOQLToTemplate(text, {
@@ -590,14 +590,14 @@ export class LogDiagnosticsView extends LitElement {
         >`
       : html`<span class="evidence__text">${text}</span>`;
     const ran = count && count > 1 ? html`<span class="evidence__count">${count}×</span>` : '';
-    if (eventIndex < 0) {
+    if (eventId < 0) {
       return html`<div class="evidence" title=${text}>${body}${ran}</div>`;
     }
     return html`<button
       class="evidence evidence--link"
       type="button"
       title=${text}
-      @click=${() => dispatchInspectorReveal(this, eventIndex)}
+      @click=${() => dispatchInspectorReveal(this, eventId)}
     >
       ${body}${ran}
       <vscode-icon class="evidence__go" name="arrow-right"></vscode-icon>

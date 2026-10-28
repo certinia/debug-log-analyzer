@@ -5,7 +5,7 @@ import { describe, expect, it, jest } from '@jest/globals';
 
 import {
   frameLines,
-  indexOf,
+  idOf,
   rawStoreOf,
   storeOf,
   type FrameSpec,
@@ -598,7 +598,7 @@ describe('toBottomUpTree', () => {
       ),
     );
     const rows = toBottomUpTree(await store.logIndex(), store) as PartitionRow[];
-    const outer = store.log.event(indexOf(store.log, 'Outer'))!; // written above
+    const outer = store.log.event(idOf(store.log, 'Outer'))!; // written above
     const part = (count: { self: number; total: number } | null) => ({
       self: count?.self ?? 0,
       total: count?.total ?? 0,
@@ -789,8 +789,8 @@ describe('toAggregatedCallTree', () => {
 
     const work = findRowByText(findRowByText(rows, 'Outer')._children ?? [], 'Work');
     expect(work.instances).toHaveLength(2);
-    expect(work.eventIndex).toBe(work.instances[0]);
-    expect(store.log.event(work.eventIndex)?.duration.total).toBe(5);
+    expect(work.eventId).toBe(work.instances[0]);
+    expect(store.log.event(work.eventId)?.duration.total).toBe(5);
   });
 });
 

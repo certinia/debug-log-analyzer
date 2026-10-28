@@ -24,7 +24,7 @@ const spotsOf = (): ExecutionHighlights => ({
   hotSpots: [
     {
       text: 'MyClass.run()',
-      eventIndex: 3,
+      eventId: 3,
       selfTime: 200_000_000,
       totalTime: 400_000_000,
       count: 4,

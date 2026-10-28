@@ -27,7 +27,7 @@ export interface SpreadRow {
   /** The worst call's category, so the lane takes the flame chart's own colour. */
   category: LogCategory;
   /** The call with the most self time, so a click lands on the outlier. */
-  eventIndex: number;
+  eventId: number;
   /** Timed calls of the signature. */
   count: number;
   /** Self time summed across those calls. */
@@ -46,7 +46,7 @@ export interface SpreadRow {
 export interface SingleRow {
   text: string;
   category: LogCategory;
-  eventIndex: number;
+  eventId: number;
   selfTime: number;
 }
 
@@ -86,10 +86,10 @@ export const selfTimeSpread: Derivation<SelfTimeSpread> = async (_, store) => {
     singles: ranked
       .filter((found) => found.timedCount === 1)
       .slice(0, SINGLE_COUNT)
-      .map(({ text, category, eventIndex, selfTime }) => ({
+      .map(({ text, category, eventId, selfTime }) => ({
         text,
         category,
-        eventIndex,
+        eventId,
         selfTime,
       })),
     concentration: concentrationOf(ranked, times.totalSelf),
@@ -107,7 +107,7 @@ function row(lane: Signature, sorted: Float64Array): SpreadRow {
   return {
     text: lane.text,
     category: lane.category,
-    eventIndex: lane.eventIndex,
+    eventId: lane.eventId,
     count: lane.timedCount,
     selfTime: lane.selfTime,
     median: percentile(sorted, 0.5),

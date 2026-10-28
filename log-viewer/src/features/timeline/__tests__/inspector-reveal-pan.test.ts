@@ -13,7 +13,7 @@
  */
 
 import { describe, expect, it, jest } from '@jest/globals';
-import { indexOf, rawStoreOf } from '#test-helpers/apexLog.js';
+import { idOf, rawStoreOf } from '#test-helpers/apexLog.js';
 import { buildLogIndex } from '#core/log/LogIndex.js';
 import { ApexLogTimeline } from '../optimised/ApexLogTimeline.js';
 import {
@@ -31,15 +31,15 @@ const BOUNDS: ViewportBounds = {
   depthEnd: 5,
 };
 
-/** A top-level frame; `eventIndex` names it in the test, and maps to its id in the parsed log. */
-type Frame = { eventIndex: number; timestamp: number; total: number };
+/** A top-level frame; `label` names it in the test, and maps to its id in the parsed log. */
+type Frame = { label: number; timestamp: number; total: number };
 
 /** A frame the chart was panned to, with every argument it was given. */
 type Panned = { timestamp: number; duration: number; depth: number; axes: ViewportPanAxes };
 
 async function timelineWith(...events: Frame[]): Promise<{
-  revealFromInspector: (eventIndex: number) => void;
-  pickMergedRow: (eventIndexes: number[]) => void;
+  revealFromInspector: (label: number) => void;
+  pickMergedRow: (labels: number[]) => void;
   panned: () => Panned[];
   selected: () => number;
 }> {
@@ -59,7 +59,7 @@ async function timelineWith(...events: Frame[]): Promise<{
       panned.push({ timestamp, duration, depth, axes });
     },
   };
-  const text = (frame: Frame) => `ns.F${frame.eventIndex}.run()`;
+  const text = (frame: Frame) => `ns.F${frame.label}.run()`;
   const { log } = await rawStoreOf(
     events
       .map(
@@ -72,15 +72,15 @@ async function timelineWith(...events: Frame[]): Promise<{
   const index = buildLogIndex(log);
   internals['index'] = index;
   internals['frames'] = buildTimelineFrames(index, new Set(BUCKET_CONSTANTS.CATEGORY_PRIORITY), 0);
-  const ids = new Map(events.map((frame) => [frame.eventIndex, indexOf(log, text(frame))]));
-  const idOf = (eventIndex: number) => ids.get(eventIndex) ?? -1;
+  const ids = new Map(events.map((frame) => [frame.label, idOf(log, text(frame))]));
+  const idFor = (label: number) => ids.get(label) ?? -1;
 
-  const reveal = internals['selectFrameByEventIndex'] as (eventIndex: number) => void;
-  const pan = internals['panToNearestFrame'] as (eventIndexes: readonly number[]) => void;
+  const reveal = internals['selectFrameByEventId'] as (eventId: number) => void;
+  const pan = internals['panToNearestFrame'] as (eventIds: readonly number[]) => void;
 
   return {
-    revealFromInspector: (eventIndex) => reveal.call(timeline, idOf(eventIndex)),
-    pickMergedRow: (eventIndexes) => pan.call(timeline, eventIndexes.map(idOf)),
+    revealFromInspector: (label) => reveal.call(timeline, idFor(label)),
+    pickMergedRow: (labels) => pan.call(timeline, labels.map(idFor)),
     panned: () => panned,
     selected: () => selected,
   };
@@ -88,7 +88,7 @@ async function timelineWith(...events: Frame[]): Promise<{
 
 describe('revealing one frame from the inspector', () => {
   it('centres the view on a frame the edge of the view clips', async () => {
-    const timeline = await timelineWith({ eventIndex: 4, timestamp: 299_000, total: 5_000 });
+    const timeline = await timelineWith({ label: 4, timestamp: 299_000, total: 5_000 });
 
     timeline.revealFromInspector(4);
 
@@ -98,7 +98,7 @@ describe('revealing one frame from the inspector', () => {
   });
 
   it('leaves the view alone for a frame already on screen', async () => {
-    const timeline = await timelineWith({ eventIndex: 4, timestamp: 250_000, total: 1_000 });
+    const timeline = await timelineWith({ label: 4, timestamp: 250_000, total: 1_000 });
 
     timeline.revealFromInspector(4);
 
@@ -109,8 +109,8 @@ describe('revealing one frame from the inspector', () => {
 describe('picking a merged row in the inspector', () => {
   it('pans to the occurrence nearest the view, selecting none of them', async () => {
     const timeline = await timelineWith(
-      { eventIndex: 4, timestamp: 10_000, total: 1_000 },
-      { eventIndex: 5, timestamp: 310_000, total: 1_000 },
+      { label: 4, timestamp: 10_000, total: 1_000 },
+      { label: 5, timestamp: 310_000, total: 1_000 },
     );
 
     timeline.pickMergedRow([4, 5]);
@@ -123,8 +123,8 @@ describe('picking a merged row in the inspector', () => {
 
   it('leaves the view alone when one occurrence is already on screen', async () => {
     const timeline = await timelineWith(
-      { eventIndex: 4, timestamp: 10_000, total: 1_000 },
-      { eventIndex: 5, timestamp: 260_000, total: 1_000 },
+      { label: 4, timestamp: 10_000, total: 1_000 },
+      { label: 5, timestamp: 260_000, total: 1_000 },
     );
 
     timeline.pickMergedRow([4, 5]);

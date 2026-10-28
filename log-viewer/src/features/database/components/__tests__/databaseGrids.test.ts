@@ -115,7 +115,7 @@ describe.each(GRIDS)('%s', (_name, spec) => {
   const kept = (): number[] =>
     rows()
       .filter((row) => grid().filters.every((filter) => filter.test(row)))
-      .map((row) => row.eventIndex);
+      .map((row) => row.eventId);
 
   // Each fires the event the template binds, so the binding is under test with the handler.
   const fire = async (selector: string, event: Event) => {
@@ -162,8 +162,8 @@ describe.each(GRIDS)('%s', (_name, spec) => {
   describe.each(spec.facets.map((facet) => [facet.label, facet] as const))(
     'the %s facet',
     (label, facet) => {
-      const value = (eventIndex: number) =>
-        rows().find((row) => row.eventIndex === eventIndex)?.[facet.field];
+      const value = (eventId: number) =>
+        rows().find((row) => row.eventId === eventId)?.[facet.field];
 
       it('keeps only the picked values, and everything when none is picked', async () => {
         await facetChange(label, [String(value(2))]);
@@ -342,7 +342,7 @@ describe.each(GRIDS)('%s', (_name, spec) => {
     it('selects a statement, scrolling only when its row is out of view', async () => {
       const goTo = jest.spyOn(grid(), 'goTo').mockResolvedValue('selected');
 
-      expect(await view.selectByEventIndex(2)).toBe(true);
+      expect(await view.selectByEventId(2)).toBe(true);
       expect(goTo).toHaveBeenCalledWith([2], { scrollIfVisible: false });
     });
 
@@ -372,8 +372,8 @@ describe.each(GRIDS)('%s', (_name, spec) => {
       fromGrid('lv-grid-select', { row: null, target: null });
 
       expect(seen).toEqual([
-        { type: spec.type, eventIndex: 2 },
-        { type: spec.type, eventIndex: null },
+        { type: spec.type, eventId: 2 },
+        { type: spec.type, eventId: null },
       ]);
     });
 
@@ -389,7 +389,7 @@ describe.each(GRIDS)('%s', (_name, spec) => {
       fromGrid('lv-grid-locate', { row: rows()[0] });
       fromGrid('lv-grid-locate', { row: null });
 
-      expect(seen).toEqual([{ eventIndexes: [1] }, { eventIndexes: [] }]);
+      expect(seen).toEqual([{ eventIds: [1] }, { eventIds: [] }]);
     });
 
     it('reports a reshape', () => {
@@ -444,7 +444,7 @@ describe.each(GRIDS)('%s', (_name, spec) => {
           new CustomEvent('menu-select', { detail: { itemId: 'show-in-call-tree' } }),
         );
 
-      expect(goToRow).toHaveBeenCalledWith({ eventIndex: 2 });
+      expect(goToRow).toHaveBeenCalledWith({ eventId: 2 });
     });
   });
 });

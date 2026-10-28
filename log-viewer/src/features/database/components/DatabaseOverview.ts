@@ -228,8 +228,8 @@ export class DatabaseConcentration extends LitElement {
           // its descendants.
           '--self-pct': `${sharePercent(statement.selfNs, statement.timeNs).toFixed(1)}%`,
         })}
-        @click=${() => dispatchInspectorReveal(this, statement.eventIndex)}
-        @pointerenter=${() => dispatchInspectorLocate(this, statement.eventIndexes)}
+        @click=${() => dispatchInspectorReveal(this, statement.eventId)}
+        @pointerenter=${() => dispatchInspectorLocate(this, statement.eventIds)}
         @pointerleave=${() => dispatchInspectorLocate(this, [])}
       >
         <span class="reveal-row__sr">${statement.kind}</span>

@@ -45,9 +45,9 @@ const SOBJECT_CARDINALITY_DOC = 'The approximate record count for the queried ob
 @customElement('event-vitals')
 export class EventVitals extends LitElement {
   @property({ type: Number })
-  eventIndex = -1;
+  eventId = -1;
 
-  /** Occurrence eventIndexes when the selection is an aggregate row. */
+  /** The occurrences' ids when the selection is an aggregate row. */
   @property({ attribute: false })
   instances: number[] | null = null;
 
@@ -144,7 +144,7 @@ export class EventVitals extends LitElement {
 
     // Ids, not events: an aggregate can name tens of thousands of calls, and the
     // columns read each without an object.
-    const ids = (this.instances?.length ? this.instances : [this.eventIndex]).filter((id) =>
+    const ids = (this.instances?.length ? this.instances : [this.eventId]).filter((id) =>
       store.isShown(id),
     );
     const primary = ids[0] === undefined ? null : store.log.event(ids[0]);

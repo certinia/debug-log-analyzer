@@ -11,8 +11,8 @@ let marked: readonly number[][] = [];
 
 function controllerFor(host: FakeHost): InspectorTabController {
   return new InspectorTabController(host, 'analysis', {
-    mark: (eventIndexes) => {
-      marked = [...marked, [...eventIndexes]];
+    mark: (eventIds) => {
+      marked = [...marked, [...eventIds]];
     },
     reveal: () => {},
     clear: () => {},
@@ -35,14 +35,14 @@ describe('InspectorTabController', () => {
   });
 
   it('hears nothing until the host connects', () => {
-    eventBus.emit('inspector:locate', { source: 'analysis', eventIndexes: [1], sticky: false });
+    eventBus.emit('inspector:locate', { source: 'analysis', eventIds: [1], sticky: false });
 
     expect(marked).toEqual([]);
   });
 
   it('drops a pick the view no longer holds a selection for', () => {
     host.connect();
-    eventBus.emit('inspector:locate', { source: 'analysis', eventIndexes: [3], sticky: true });
+    eventBus.emit('inspector:locate', { source: 'analysis', eventIds: [3], sticky: true });
 
     inspector.dropPick();
 
@@ -53,18 +53,18 @@ describe('InspectorTabController', () => {
     host.connect();
     host.disconnect();
 
-    eventBus.emit('inspector:locate', { source: 'analysis', eventIndexes: [1], sticky: false });
+    eventBus.emit('inspector:locate', { source: 'analysis', eventIds: [1], sticky: false });
     expect(marked).toEqual([]);
 
     host.connect();
-    eventBus.emit('inspector:locate', { source: 'analysis', eventIndexes: [1], sticky: false });
+    eventBus.emit('inspector:locate', { source: 'analysis', eventIds: [1], sticky: false });
 
     expect(marked).toEqual([[1]]);
   });
 
   it('lights a pick again for a view that comes back', () => {
     host.connect();
-    eventBus.emit('inspector:locate', { source: 'analysis', eventIndexes: [3], sticky: true });
+    eventBus.emit('inspector:locate', { source: 'analysis', eventIds: [3], sticky: true });
     host.disconnect();
     marked = [];
 

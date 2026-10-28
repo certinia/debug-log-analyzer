@@ -8,7 +8,7 @@ import { afterEach, beforeEach, describe, expect, it } from '@jest/globals';
 
 import { settle } from '#test-helpers/visibility.js';
 
-let answerFetch: (data: { logData: string; navigateToEventIndex?: number }) => void = () => {};
+let answerFetch: (data: { logData: string; navigateToEventId?: number }) => void = () => {};
 
 jest.mock('#core/messaging/VSCodeExtensionMessenger.js', () => {
   const actual = jest.requireActual<typeof import('#core/messaging/VSCodeExtensionMessenger.js')>(
@@ -35,9 +35,9 @@ const LOG = [
   '09:00:00.0 (400)|EXECUTION_FINISHED',
 ].join('\n');
 
-const sendNavigate = (eventIndex: number) =>
+const sendNavigate = (eventId: number) =>
   window.dispatchEvent(
-    new MessageEvent('message', { data: { cmd: 'navigateToTimeline', payload: { eventIndex } } }),
+    new MessageEvent('message', { data: { cmd: 'navigateToTimeline', payload: { eventId } } }),
   );
 
 describe('log-viewer navigateToTimeline', () => {
@@ -56,8 +56,8 @@ describe('log-viewer navigateToTimeline', () => {
     (viewer.shadowRoot?.querySelector('timeline-view') as { navigateRequest?: unknown } | null)
       ?.navigateRequest;
 
-  const load = async (navigateToEventIndex?: number) => {
-    answerFetch({ logData: LOG, navigateToEventIndex });
+  const load = async (navigateToEventId?: number) => {
+    answerFetch({ logData: LOG, navigateToEventId });
     await settle();
     await viewer.updateComplete;
   };
@@ -67,19 +67,19 @@ describe('log-viewer navigateToTimeline', () => {
     sendNavigate(2);
     await load(1);
 
-    expect(timelineRequest()).toEqual({ eventIndex: 2 });
+    expect(timelineRequest()).toEqual({ eventId: 2 });
   });
 
   // The same id twice must still move the chart, so each request is a new object.
   it('hands the timeline a new request for each event sent after the load', async () => {
     await load(1);
     const first = timelineRequest();
-    expect(first).toEqual({ eventIndex: 1 });
+    expect(first).toEqual({ eventId: 1 });
 
     sendNavigate(1);
     await viewer.updateComplete;
 
-    expect(timelineRequest()).toEqual({ eventIndex: 1 });
+    expect(timelineRequest()).toEqual({ eventId: 1 });
     expect(timelineRequest()).not.toBe(first);
   });
 
@@ -88,33 +88,33 @@ describe('log-viewer navigateToTimeline', () => {
     await load();
     document.dispatchEvent(new CustomEvent('show-tab', { detail: { tabid: 'tree-tab' } }));
 
-    goToTimelineEvent({ eventIndex: 2 });
+    goToTimelineEvent({ eventId: 2 });
     await viewer.updateComplete;
 
     const tabs = viewer.shadowRoot?.querySelector('vscode-tabs') as {
       selectedIndex: number;
     } | null;
     expect(tabs?.selectedIndex).toBe(0);
-    expect(timelineRequest()).toEqual({ eventIndex: 2 });
+    expect(timelineRequest()).toEqual({ eventId: 2 });
   });
 
   it('ignores navigation sent while it is out of the page, and hears it once back', async () => {
     await load(1);
     viewer.remove();
 
-    goToTimelineEvent({ eventIndex: 2 });
+    goToTimelineEvent({ eventId: 2 });
     sendNavigate(3);
     document.body.append(viewer);
     await viewer.updateComplete;
 
-    expect(timelineRequest()).toEqual({ eventIndex: 1 });
+    expect(timelineRequest()).toEqual({ eventId: 1 });
 
     sendNavigate(4);
     await viewer.updateComplete;
-    expect(timelineRequest()).toEqual({ eventIndex: 4 });
+    expect(timelineRequest()).toEqual({ eventId: 4 });
 
-    goToTimelineEvent({ eventIndex: 5 });
+    goToTimelineEvent({ eventId: 5 });
     await viewer.updateComplete;
-    expect(timelineRequest()).toEqual({ eventIndex: 5 });
+    expect(timelineRequest()).toEqual({ eventId: 5 });
   });
 });

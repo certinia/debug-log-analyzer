@@ -131,7 +131,7 @@ export class RawLogLineDecoration {
   }
 
   private buildHoverMessage(event: ApexEvent, filePath: string): MarkdownString {
-    const args = encodeURIComponent(JSON.stringify({ eventIndex: event.id, filePath }));
+    const args = encodeURIComponent(JSON.stringify({ eventId: event.id, filePath }));
     const commandUri = `command:lana.showInLogAnalysis?${args}`;
 
     const metricParts = buildMetricParts(event);

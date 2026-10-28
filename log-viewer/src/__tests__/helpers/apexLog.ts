@@ -78,7 +78,7 @@ export function stubStore(log: ApexLog): LogStore {
 }
 
 /** The id of the first event whose text is `text`. */
-export function indexOf(log: ApexLog, text: string): number {
+export function idOf(log: ApexLog, text: string): number {
   const found = idsWhere(log, (id) => log.columns.text.at(id) === text)[0];
   if (found === undefined) {
     throw new Error(`no event with text ${text}`);
@@ -87,7 +87,7 @@ export function indexOf(log: ApexLog, text: string): number {
 }
 
 /** The id of every frame whose text is `text`, in log order. */
-export function indexesOf(log: ApexLog, text: string): number[] {
+export function idsOf(log: ApexLog, text: string): number[] {
   const { isFrame, text: texts } = log.columns;
   return idsWhere(log, (id) => isFrame[id] === 1 && texts.at(id) === text);
 }

@@ -1,7 +1,7 @@
 /*
  * Copyright (c) 2026 Certinia Inc. All rights reserved.
  */
-import { frameLines, indexOf, storeOf } from '#test-helpers/apexLog.js';
+import { frameLines, idOf, storeOf } from '#test-helpers/apexLog.js';
 import { runCalc as run } from '#test-helpers/calcs.js';
 import { knownMax, outermostSum } from '../calcs.js';
 
@@ -26,7 +26,7 @@ describe('outermostSum', () => {
         },
       ]),
     );
-    const id = (text: string): number => indexOf(log, text);
+    const id = (text: string): number => idOf(log, text);
     const total = (eventId: number): number => log.columns.durationTotal[eventId] ?? 0;
     const rows = [
       { instances: [id('deeper'), id('loose')] },

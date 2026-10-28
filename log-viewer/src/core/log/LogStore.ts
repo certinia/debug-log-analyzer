@@ -57,20 +57,20 @@ export class LogStore {
     return findLevelGap(id, this.log.debugLevels, this.debugLevels);
   }
 
-  /** True when event `eventIndex` is in the log and shown. */
-  isShown(eventIndex: number): boolean {
-    return eventIndex >= 1 && eventIndex <= this.log.eventCount && !this.hidden?.[eventIndex];
+  /** True when event `eventId` is in the log and shown. */
+  isShown(eventId: number): boolean {
+    return eventId >= 1 && eventId <= this.log.eventCount && !this.hidden?.[eventId];
   }
 
-  /** The shown event with `eventIndex`, a new object each call; null if hidden or absent. */
-  eventByIndex(eventIndex: number): ApexEvent | null {
-    return this.isShown(eventIndex) ? this.log.event(eventIndex) : null;
+  /** The shown event with `eventId`, a new object each call; null if hidden or absent. */
+  eventById(eventId: number): ApexEvent | null {
+    return this.isShown(eventId) ? this.log.event(eventId) : null;
   }
 
-  /** The id of the nearest shown frame above `eventIndex`, or 0 at the top of the log. */
-  parentOf(eventIndex: number): number {
+  /** The id of the nearest shown frame above `eventId`, or 0 at the top of the log. */
+  parentOf(eventId: number): number {
     const { parent } = this.log.columns;
-    let id = parent[eventIndex] ?? 0;
+    let id = parent[eventId] ?? 0;
     while (id > 0 && this.hidden?.[id]) {
       id = parent[id]!;
     }
@@ -123,7 +123,7 @@ export class LogStore {
   }
 
   /**
-   * The distinct frames `levels` parents above each of `eventIndexes`: what a
+   * The distinct frames `levels` parents above each of `eventIds`: what a
    * merged row standing for its callers is, since a row at path depth D sits
    * D - 1 hops above the calls it counts.
    *
@@ -134,10 +134,10 @@ export class LogStore {
    * @param levels - hops to climb, at least one: the caller guards the rest so
    *   it can hand back the calls it already holds rather than a copy
    */
-  framesAbove(eventIndexes: readonly number[], levels: number): number[] {
+  framesAbove(eventIds: readonly number[], levels: number): number[] {
     const own = new Set<number>();
-    for (const index of eventIndexes) {
-      let id = this.isShown(index) ? index : 0;
+    for (const eventId of eventIds) {
+      let id = this.isShown(eventId) ? eventId : 0;
       for (let up = levels; up > 0 && id > 0; up--) {
         id = this.parentOf(id);
       }
@@ -148,24 +148,24 @@ export class LogStore {
     return [...own];
   }
 
-  /** The shown ids from the top of the log down to `eventIndex`; empty if it is hidden or absent. */
-  pathTo(eventIndex: number): number[] {
+  /** The shown ids from the top of the log down to `eventId`; empty if it is hidden or absent. */
+  pathTo(eventId: number): number[] {
     const path: number[] = [];
-    for (let id = this.isShown(eventIndex) ? eventIndex : 0; id > 0; id = this.parentOf(id)) {
+    for (let id = this.isShown(eventId) ? eventId : 0; id > 0; id = this.parentOf(id)) {
       path.push(id);
     }
     return path.reverse();
   }
 
   /**
-   * The shown frames from the top of the log down to `eventIndex`, the event
+   * The shown frames from the top of the log down to `eventId`, the event
    * itself last when it is a frame. Empty if the log shows no such event.
    */
-  stackByEventIndex(eventIndex: number): Stack {
+  stackById(eventId: number): Stack {
     // O(depth) up the parent column, rather than a scan of the whole tree.
     const stack: Stack = [];
     const { isFrame, type } = this.log.columns;
-    for (let id = this.isShown(eventIndex) ? eventIndex : 0; id > 0; id = this.parentOf(id)) {
+    for (let id = this.isShown(eventId) ? eventId : 0; id > 0; id = this.parentOf(id)) {
       // The parser's flag keeps the limit blocks; the type keeps a VF call with no method.
       if (isFrame[id] || typeKind(type[id]) === 'frame') {
         stack.push(this.log.event(id)!); // a shown id is in the log

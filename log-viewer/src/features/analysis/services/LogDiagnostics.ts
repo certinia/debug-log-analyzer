@@ -76,7 +76,7 @@ export interface DiagnosticCause {
 export interface DiagnosticEvidence {
   text: string;
   /** The event it points at, or -1 when it names no single event. */
-  eventIndex: number;
+  eventId: number;
   /** How many times this line ran, where the finding lists several. */
   count?: number;
   /** Set where the text is a query, so it reads as one highlighted line. */
@@ -86,10 +86,10 @@ export interface DiagnosticEvidence {
 /** One line of evidence, for a finding that names a single event. */
 function oneLine(
   text: string | undefined,
-  eventIndex: number,
+  eventId: number,
   dialect?: Dialect,
 ): DiagnosticEvidence[] | undefined {
-  return text ? [{ text, eventIndex, dialect }] : undefined;
+  return text ? [{ text, eventId, dialect }] : undefined;
 }
 
 /**
@@ -121,7 +121,7 @@ export interface Diagnostic {
    */
   timeNs?: number;
   /** The first event that raised it, or -1 when the finding is log-wide. */
-  eventIndex: number;
+  eventId: number;
   /**
    * The lines of the log behind the finding. Most findings name one; a finding
    * about a statement written several ways names each of them, so the reader can
@@ -154,7 +154,7 @@ type ExceptionEvent = EventOf<'EXCEPTION_THROWN' | 'FATAL_ERROR'>;
 /** A grouped set of events, keyed by whatever makes two of them the same finding. */
 interface Group<E extends ApexEvent = ApexEvent> {
   count: number;
-  eventIndex: number;
+  eventId: number;
   events: E[];
 }
 
@@ -182,7 +182,7 @@ function groupBy<E extends ApexEvent>(
       group.count++;
       group.events.push(event);
     } else {
-      groups.set(id, { count: 1, eventIndex: event.id, events: [event] });
+      groups.set(id, { count: 1, eventId: event.id, events: [event] });
     }
   }
   return groups;
@@ -237,13 +237,13 @@ function enclosingFrameText(log: ApexLog, id: number): string | undefined {
 }
 
 /** See {@link enclosingFrame}; the event itself where the log names no frame. */
-function enclosingMethodIndex(log: ApexLog, event: ApexEvent): number {
+function enclosingMethodId(log: ApexLog, event: ApexEvent): number {
   return enclosingFrame(log, event.id) || event.id;
 }
 
 /** A governor breach the log reported as an exception, with where it stopped. */
 interface Breach {
-  eventIndex: number;
+  eventId: number;
   frame?: string;
 }
 
@@ -281,7 +281,7 @@ function limitDiagnostics(
     // carries a stack, so keep whichever frame the log gave us.
     const seen = breaches.get(named.key);
     breaches.set(named.key, {
-      eventIndex: seen?.eventIndex ?? enclosingMethodIndex(log, event),
+      eventId: seen?.eventId ?? enclosingMethodId(log, event),
       frame: seen?.frame || frame || undefined,
     });
   }
@@ -322,8 +322,8 @@ function limitDiagnostics(
           ? `${format(used)} of ${format(limit)} used.`
           : '',
       count: 1,
-      eventIndex: breach?.eventIndex ?? -1,
-      evidence: oneLine(breach?.frame, breach?.eventIndex ?? -1),
+      eventId: breach?.eventId ?? -1,
+      evidence: oneLine(breach?.frame, breach?.eventId ?? -1),
       cause,
     });
   }
@@ -368,7 +368,7 @@ function exceptionDiagnostics(log: ApexLog, exceptions: readonly ExceptionEvent[
       .map((event) => splitException(event.text ?? '').frame)
       .find((first) => first.length > 0);
     const thrownIn = group.events[0];
-    const eventIndex = thrownIn ? enclosingMethodIndex(log, thrownIn) : group.eventIndex;
+    const eventId = thrownIn ? enclosingMethodId(log, thrownIn) : group.eventId;
     return {
       id: `exception|${head}`,
       // Caught, so the transaction completed: expensive, not failed.
@@ -379,8 +379,8 @@ function exceptionDiagnostics(log: ApexLog, exceptions: readonly ExceptionEvent[
         ? 'Nothing caught this exception, so the transaction rolled back.'
         : 'Even a caught exception costs CPU time, and a thrown-and-caught exception used as flow control is expensive.',
       count: Math.max(thrown, 1),
-      eventIndex,
-      evidence: oneLine(frame, eventIndex),
+      eventId,
+      evidence: oneLine(frame, eventId),
     };
   });
 }
@@ -409,7 +409,7 @@ function truncationDiagnostics(log: ApexLog): Diagnostic[] {
       message:
         'A section of the log was skipped, so the figures here may be undercounted. Narrow the log levels, or log a smaller transaction.',
       count: regions.length,
-      eventIndex: regions[0]?.event?.id ?? -1,
+      eventId: regions[0]?.event?.id ?? -1,
     },
   ];
 }
@@ -430,7 +430,7 @@ function logIssueDiagnostics(log: ApexLog): Diagnostic[] {
       summary: issue.summary,
       message: issue.description,
       count: 1,
-      eventIndex: issue.event?.id ?? -1,
+      eventId: issue.event?.id ?? -1,
     }));
 }
 
@@ -480,8 +480,8 @@ function repetitionDiagnostics(
       message: `Possible ${label} in a loop: it executed ${group.count} times from ${from}. Move it out of the loop and work on the whole collection at once.`,
       count: group.count,
       timeNs: totalTime(log, group.events),
-      eventIndex: group.eventIndex,
-      evidence: oneLine(group.events[0]?.text ?? undefined, group.eventIndex, dialect),
+      eventId: group.eventId,
+      evidence: oneLine(group.events[0]?.text ?? undefined, group.eventId, dialect),
     });
   }
 
@@ -500,8 +500,8 @@ function repetitionDiagnostics(
       message: `The same statement ran ${group.count} times from ${sites.size} places. Run it once and pass the result around, or work on the whole collection at once.`,
       count: group.count,
       timeNs: totalTime(log, group.events),
-      eventIndex: group.eventIndex,
-      evidence: oneLine(text, group.eventIndex, dialect),
+      eventId: group.eventId,
+      evidence: oneLine(text, group.eventId, dialect),
     });
   }
 
@@ -529,7 +529,7 @@ interface ShapeGroup {
   count: number;
   rows: number;
   timeNs: number;
-  eventIndex: number;
+  eventId: number;
   /** Each statement as written, with how often it ran and where it first ran. */
   texts: Map<string, DiagnosticEvidence & { count: number }>;
 }
@@ -570,7 +570,7 @@ function rowAtATimeDiagnostics(queries: readonly SoqlEvent[]): Diagnostic[] {
         count: 0,
         rows: 0,
         timeNs: 0,
-        eventIndex: query.id,
+        eventId: query.id,
         texts: new Map(),
       };
       groups.set(shape, group);
@@ -582,7 +582,7 @@ function rowAtATimeDiagnostics(queries: readonly SoqlEvent[]): Diagnostic[] {
     if (text) {
       text.count++;
     } else {
-      group.texts.set(queryText, { text: queryText, eventIndex: query.id, count: 1 });
+      group.texts.set(queryText, { text: queryText, eventId: query.id, count: 1 });
     }
   }
 
@@ -609,10 +609,10 @@ function rowAtATimeDiagnostics(queries: readonly SoqlEvent[]): Diagnostic[] {
       message: `The ${count} queries returned ${formatInteger(rows)} rows between them, ${each} each, written as ${texts.size} statements that differ only in the values built into them. Query once with an \`IN :ids\` filter and map the results by key.`,
       count,
       timeNs: group.timeNs,
-      eventIndex: group.eventIndex,
-      evidence: listed.map(({ text, eventIndex, count: ran }) => ({
+      eventId: group.eventId,
+      evidence: listed.map(({ text, eventId, count: ran }) => ({
         text,
-        eventIndex,
+        eventId,
         count: ran,
         dialect: 'soql' as const,
       })),
@@ -628,11 +628,11 @@ function queryPlanDiagnostics(queries: readonly SoqlEvent[]): {
 } {
   const costs = new Map<
     string,
-    { count: number; timeNs: number; eventIndex: number; worst: number; query: string }
+    { count: number; timeNs: number; eventId: number; worst: number; query: string }
   >();
   const scans = new Map<
     string,
-    { count: number; timeNs: number; eventIndex: number; query: string }
+    { count: number; timeNs: number; eventId: number; query: string }
   >();
   let explains = 0;
 
@@ -653,13 +653,13 @@ function queryPlanDiagnostics(queries: readonly SoqlEvent[]): {
           if (explain.relativeCost > seen.worst) {
             seen.worst = explain.relativeCost;
             seen.query = queryText;
-            seen.eventIndex = query.id;
+            seen.eventId = query.id;
           }
         } else {
           costs.set(sObject, {
             count: 1,
             timeNs: query.duration.total,
-            eventIndex: query.id,
+            eventId: query.id,
             worst: explain.relativeCost,
             query: queryText,
           });
@@ -674,7 +674,7 @@ function queryPlanDiagnostics(queries: readonly SoqlEvent[]): {
           scans.set(sObject, {
             count: 1,
             timeNs: query.duration.total,
-            eventIndex: query.id,
+            eventId: query.id,
             query: queryText,
           });
         }
@@ -695,8 +695,8 @@ function queryPlanDiagnostics(queries: readonly SoqlEvent[]): {
         meta: sObject,
         count: group.count,
         timeNs: group.timeNs,
-        eventIndex: group.eventIndex,
-        evidence: oneLine(group.query, group.eventIndex, 'soql'),
+        eventId: group.eventId,
+        evidence: oneLine(group.query, group.eventId, 'soql'),
       };
     }),
     ...[...scans].map(([sObject, group]) => {
@@ -709,8 +709,8 @@ function queryPlanDiagnostics(queries: readonly SoqlEvent[]): {
         meta: sObject,
         count: group.count,
         timeNs: group.timeNs,
-        eventIndex: group.eventIndex,
-        evidence: oneLine(group.query, group.eventIndex, 'soql'),
+        eventId: group.eventId,
+        evidence: oneLine(group.query, group.eventId, 'soql'),
       };
     }),
   ];
@@ -731,7 +731,7 @@ function debugDiagnostics(debugLines: readonly number[]): Diagnostic[] {
       message:
         'Each statement builds its message and writes it, whether or not anyone reads the log. Remove the ones that are no longer needed, and keep the rest behind a lower log level.',
       count: debugLines.length,
-      eventIndex: debugLines[0] ?? -1,
+      eventId: debugLines[0] ?? -1,
     },
   ];
 }
@@ -756,12 +756,12 @@ async function soqlLintDiagnostics(
   const grouped = new Map<string, Diagnostic>();
 
   for (const [text, group] of distinct) {
-    const stack = store.stackByEventIndex(group.eventIndex).reverse();
+    const stack = store.stackById(group.eventId).reverse();
     for (const rule of await linter.lint(text, stack)) {
       const id = `soql|${rule.summary}`;
       const line = {
         text,
-        eventIndex: group.eventIndex,
+        eventId: group.eventId,
         count: group.count,
         dialect: 'soql',
       } as const;
@@ -774,7 +774,7 @@ async function soqlLintDiagnostics(
           message: rule.message,
           count: group.count,
           timeNs: totalTime(store.log, group.events),
-          eventIndex: group.eventIndex,
+          eventId: group.eventId,
           evidence: [line],
         });
         continue;
@@ -822,8 +822,8 @@ export function scopeDiagnostics(
     return { ...result, diagnostics: [] };
   }
   const { parent } = log.columns;
-  const inScope = (eventIndex: number) => {
-    for (let id = eventIndex; id > 0; id = parent[id] ?? 0) {
+  const inScope = (eventId: number) => {
+    for (let id = eventId; id > 0; id = parent[id] ?? 0) {
       if (within.has(id)) {
         return true;
       }
@@ -834,10 +834,8 @@ export function scopeDiagnostics(
     ...result,
     diagnostics: result.diagnostics.filter(
       (diagnostic) =>
-        (diagnostic.eventIndex >= 0 && inScope(diagnostic.eventIndex)) ||
-        (diagnostic.evidence ?? []).some(
-          (line) => line.eventIndex >= 0 && inScope(line.eventIndex),
-        ),
+        (diagnostic.eventId >= 0 && inScope(diagnostic.eventId)) ||
+        (diagnostic.evidence ?? []).some((line) => line.eventId >= 0 && inScope(line.eventId)),
     ),
   };
 }

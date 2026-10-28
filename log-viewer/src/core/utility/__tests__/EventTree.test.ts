@@ -3,7 +3,7 @@
  */
 import { describe, expect, it } from '@jest/globals';
 
-import { indexesOf, storeOf } from '#test-helpers/apexLog.js';
+import { idsOf, storeOf } from '#test-helpers/apexLog.js';
 import { outermostIds } from '../EventTree.js';
 
 const LOG =
@@ -17,7 +17,7 @@ const LOG =
 describe('outermostIds', () => {
   it('drops duplicates', async () => {
     const { log } = await storeOf(LOG);
-    const [outer] = indexesOf(log, 'ns.Outer.run()');
+    const [outer] = idsOf(log, 'ns.Outer.run()');
 
     expect(outermostIds(log, [outer!, outer!])).toEqual([outer]);
   });
@@ -35,9 +35,9 @@ describe('outermostIds', () => {
         '09:18:22.6 (3000)|METHOD_ENTRY|[4]|01p|ns.Last.run()\n' +
         '09:18:22.6 (3100)|METHOD_EXIT|[4]|ns.Last.run()\n',
     );
-    const [outer] = indexesOf(log, 'ns.Outer.run()');
-    const [nested, apart] = indexesOf(log, 'ns.Inner.go()');
-    const [lastFrame] = indexesOf(log, 'ns.Last.run()');
+    const [outer] = idsOf(log, 'ns.Outer.run()');
+    const [nested, apart] = idsOf(log, 'ns.Inner.go()');
+    const [lastFrame] = idsOf(log, 'ns.Last.run()');
 
     expect(outermostIds(log, [lastFrame!, nested!, outer!])).toEqual([outer, lastFrame]);
     expect(outermostIds(log, [apart!, nested!, outer!])).toEqual([outer, apart]);

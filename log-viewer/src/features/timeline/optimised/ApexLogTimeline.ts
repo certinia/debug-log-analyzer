@@ -96,7 +96,7 @@ export class ApexLogTimeline {
   /** Guards the programmatic select made on the inspector's behalf. */
   private echoGuard = new SelectionEchoGuard();
   /** Frame last reported to the inspector as under the pointer. */
-  private locatedEventIndex: number | null = null;
+  private locatedEventId: number | null = null;
   /** The panel belongs to a frame find or the keyboard moved to, not to the pointer. */
   private navigationTooltip = false;
   /** The frames kept in colour while the rest of the chart is dimmed. */
@@ -232,9 +232,9 @@ export class ApexLogTimeline {
     });
 
     this.inspectorUnsubscribe = wireInspectorTab('timeline', this.emphasis, {
-      mark: (eventIndexes) => this.applyEmphasis(eventIndexes),
-      reveal: (eventIndex) => this.selectFrameByEventIndex(eventIndex),
-      revealMerged: (eventIndexes) => this.panToNearestFrame(eventIndexes),
+      mark: (eventIds) => this.applyEmphasis(eventIds),
+      reveal: (eventId) => this.selectFrameByEventId(eventId),
+      revealMerged: (eventIds) => this.panToNearestFrame(eventIds),
       clear: () => {
         // The chart reports the clear itself. Its own Escape, with the container
         // focused, consumes the key before this.
@@ -244,11 +244,11 @@ export class ApexLogTimeline {
   }
 
   /**
-   * Select the frame for `eventIndex` and centre the view on it. Passive sync,
+   * Select the frame for `eventId` and centre the view on it. Passive sync,
    * so it never zooms - a full focus would be too disruptive.
    */
-  private selectFrameByEventIndex(eventIndex: number): void {
-    const located = this.locate(eventIndex);
+  private selectFrameByEventId(eventId: number): void {
+    const located = this.locate(eventId);
     const node = located?.node;
     if (!node) {
       return;
@@ -261,7 +261,7 @@ export class ApexLogTimeline {
 
     // The inspector asked for this frame, so its mark is what dims the rest. Set after the
     // run: the select inside it clears the mark, as any chart select does.
-    this.pickEmphasis(eventIndex);
+    this.pickEmphasis(eventId);
 
     this.bringIntoView([located.placement]);
   }
@@ -271,8 +271,8 @@ export class ApexLogTimeline {
    * screen. Selects nothing: the row names no single frame, so its mark on all
    * of them is what locates them.
    */
-  private panToNearestFrame(eventIndexes: readonly number[]): void {
-    this.bringIntoView(this.resolve(eventIndexes).map((located) => located.placement));
+  private panToNearestFrame(eventIds: readonly number[]): void {
+    this.bringIntoView(this.resolve(eventIds).map((located) => located.placement));
   }
 
   /**
@@ -288,14 +288,14 @@ export class ApexLogTimeline {
     }
   }
 
-  /** Where the events `eventIndexes` name sit, skipping any the shown log lacks. */
-  private resolve(eventIndexes: readonly number[]): Located[] {
-    return eventIndexes.flatMap((eventIndex) => this.locate(eventIndex) ?? []);
+  /** Where the events `eventIds` name sit, skipping any the shown log lacks. */
+  private resolve(eventIds: readonly number[]): Located[] {
+    return eventIds.flatMap((eventId) => this.locate(eventId) ?? []);
   }
 
-  /** Where event `eventIndex` sits; null when the shown log has no such event. */
-  private locate(eventIndex: number): Located | null {
-    const row = this.index?.rowOf(eventIndex) ?? NO_ROW;
+  /** Where event `eventId` sits; null when the shown log has no such event. */
+  private locate(eventId: number): Located | null {
+    const row = this.index?.rowOf(eventId) ?? NO_ROW;
     return row === NO_ROW ? null : this.locateRow(row);
   }
 
@@ -354,19 +354,19 @@ export class ApexLogTimeline {
   }
 
   /**
-   * Keep `eventIndexes` in colour and dim the rest of the chart, or drop the
+   * Keep `eventIds` in colour and dim the rest of the chart, or drop the
    * emphasis when there are none. A grouped inspector row names every occurrence
    * it merges, so all of them light at once. Never selects, never pans.
    */
-  private applyEmphasis(eventIndexes: readonly number[]): void {
+  private applyEmphasis(eventIds: readonly number[]): void {
     this.flamechart.locateByEventNodes(
-      this.resolve(eventIndexes).flatMap((located) => located.node ?? []),
+      this.resolve(eventIds).flatMap((located) => located.node ?? []),
     );
   }
 
   /** Rest the emphasis on one frame, until something else picks or clears it. */
-  private pickEmphasis(eventIndex: number): void {
-    this.applyEmphasis(this.emphasis.pick([eventIndex]));
+  private pickEmphasis(eventId: number): void {
+    this.applyEmphasis(this.emphasis.pick([eventId]));
   }
 
   /** Drop the resting emphasis, so nothing dims. */
@@ -375,13 +375,13 @@ export class ApexLogTimeline {
   }
 
   /**
-   * Navigate to a specific event using parser-assigned eventIndex.
+   * Navigate to the event with id `eventId`.
    */
-  public navigateToEventIndex(eventIndex: number): void {
+  public navigateToEventId(eventId: number): void {
     const row =
-      this.index && this.frames ? drawnRowAtOrAbove(this.index, this.frames, eventIndex) : NO_ROW;
+      this.index && this.frames ? drawnRowAtOrAbove(this.index, this.frames, eventId) : NO_ROW;
     // With no drawn frame above it, such as the FATAL_ERROR closing a truncated log, still move to its time.
-    this._reveal(row === NO_ROW ? this.locate(eventIndex) : this.locateRow(row));
+    this._reveal(row === NO_ROW ? this.locate(eventId) : this.locateRow(row));
   }
 
   /**
@@ -600,14 +600,14 @@ export class ApexLogTimeline {
    */
   private reportLocatedFrame(eventNode: EventNode | null): void {
     const logEvent = eventOf(eventNode);
-    const eventIndex = logEvent?.id ?? null;
-    if (eventIndex === this.locatedEventIndex) {
+    const eventId = logEvent?.id ?? null;
+    if (eventId === this.locatedEventId) {
       return;
     }
-    this.locatedEventIndex = eventIndex;
+    this.locatedEventId = eventId;
     eventBus.emit('detail:locate', {
       source: 'timeline',
-      eventIndexes: eventIndex === null ? [] : [eventIndex],
+      eventIds: eventId === null ? [] : [eventId],
     });
   }
 
@@ -659,15 +659,15 @@ export class ApexLogTimeline {
     if (eventNode && (modifiers?.metaKey || modifiers?.ctrlKey)) {
       const originalEvent = eventOf(eventNode);
       if (originalEvent?.id !== undefined) {
-        void goToRow({ eventIndex: originalEvent.id });
+        void goToRow({ eventId: originalEvent.id });
       }
       return;
     }
 
     // Cmd/Ctrl+Click on a marker navigates directly to call tree
     if (marker && (modifiers?.metaKey || modifiers?.ctrlKey)) {
-      if (marker.eventIndex !== undefined) {
-        void goToRow({ eventIndex: marker.eventIndex });
+      if (marker.eventId !== undefined) {
+        void goToRow({ eventId: marker.eventId });
       }
       return;
     }
@@ -725,7 +725,7 @@ export class ApexLogTimeline {
   private handleJumpToCallTree(eventNode: EventNode): void {
     const originalEvent = eventOf(eventNode);
     if (originalEvent?.id !== undefined) {
-      void goToRow({ eventIndex: originalEvent.id });
+      void goToRow({ eventId: originalEvent.id });
     }
   }
 
@@ -734,8 +734,8 @@ export class ApexLogTimeline {
    * Navigates call tree to the marker's start time.
    */
   private handleJumpToCallTreeForMarker(marker: TimelineMarker): void {
-    if (marker.eventIndex !== undefined) {
-      void goToRow({ eventIndex: marker.eventIndex });
+    if (marker.eventId !== undefined) {
+      void goToRow({ eventId: marker.eventId });
     }
   }
 
@@ -757,8 +757,8 @@ export class ApexLogTimeline {
 
     // Marker selection only - no auto-navigation to call tree
     // User can press J to explicitly jump to call tree
-    // Markers only carry an eventIndex when they map to a log event.
-    const selection = toDetailSelection(marker.eventIndex);
+    // Markers only carry an eventId when they map to a log event.
+    const selection = toDetailSelection(marker.eventId);
     if (selection) {
       eventBus.emit('detail:select', { source: 'timeline', selection, view: TIMELINE_VIEW });
     }

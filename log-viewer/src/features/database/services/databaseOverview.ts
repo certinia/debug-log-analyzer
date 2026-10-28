@@ -48,9 +48,9 @@ export interface DatabaseTime {
  */
 export interface DatabaseStatement {
   /** The slowest occurrence, so a click reveals the one worth reading. */
-  eventIndex: number;
+  eventId: number;
   /** Every occurrence, so hovering marks all of them in the grid. */
-  eventIndexes: number[];
+  eventIds: number[];
   kind: StatementKind;
   /** The query text, or the operation and SObject for DML. */
   label: string;
@@ -93,7 +93,7 @@ export interface DatabaseCallNode {
   /** Frames merged into this node. */
   count: number;
   /** Every occurrence, so a row can reveal and locate all of them. */
-  eventIndexes: number[];
+  eventIds: number[];
   children: DatabaseCallNode[];
 }
 
@@ -368,8 +368,8 @@ function addStatement(
   const statement = statements.get(key);
   if (!statement) {
     statements.set(key, {
-      eventIndex: event.id,
-      eventIndexes: [event.id],
+      eventId: event.id,
+      eventIds: [event.id],
       kind,
       label,
       // Derived here so a query in a loop parses its SObject once, not per run.
@@ -385,9 +385,9 @@ function addStatement(
   }
   // The slowest occurrence is the one a click should reveal.
   if (netNs > statement.netNs) {
-    statement.eventIndex = event.id;
+    statement.eventId = event.id;
   }
-  statement.eventIndexes.push(event.id);
+  statement.eventIds.push(event.id);
   statement.timeNs += timeNs;
   statement.netNs += netNs;
   statement.selfNs += selfNs;
@@ -423,7 +423,7 @@ function addAttribution(
     }
     attributed += total[child]!;
     addBreakdown(breakdowns, {
-      key: namespaceOf(index.log, index.eventIndex[child]!),
+      key: namespaceOf(index.log, index.eventId[child]!),
       kind,
       timeNs: total[child]!,
     });
@@ -459,7 +459,7 @@ function addPath(
   for (let frame = row; frame !== NO_ROW; frame = index.parent[frame]!) {
     // A marker line that states no text — EXECUTION_STARTED — names no code, so
     // it would be a row every path shares and none of them needs.
-    if (frame === row || text.at(index.eventIndex[frame]!) !== null) {
+    if (frame === row || text.at(index.eventId[frame]!) !== null) {
       path.push(frame);
     }
   }
@@ -472,7 +472,7 @@ function addPath(
   let level = roots;
   path.forEach((frame, depth) => {
     const frameFacts = factsByRow.get(frame);
-    const id = index.eventIndex[frame]!;
+    const id = index.eventId[frame]!;
     const label = frameFacts ? frameFacts.label : signatures.text(signatures.of(id));
     const key = frameFacts ? `${frameFacts.kind}:${label}` : `frame:${label}`;
     let node = level.get(key);
@@ -516,7 +516,7 @@ function freeze(roots: Map<string, TreeNode>): DatabaseCallNode[] {
         timeNs: node.timeNs,
         selfNs: node.selfNs,
         count: node.events.size,
-        eventIndexes: [...node.events].sort((a, b) => a - b),
+        eventIds: [...node.events].sort((a, b) => a - b),
         children: [],
       };
       into.push(frozen);

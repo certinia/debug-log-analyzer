@@ -242,7 +242,7 @@ export class TimelineFlameChart extends LitElement {
       return;
     }
     this.usedRequest = request;
-    this.apexLogTimeline.navigateToEventIndex(request.eventIndex);
+    this.apexLogTimeline.navigateToEventId(request.eventId);
   }
 
   /**
@@ -341,7 +341,7 @@ export class TimelineFlameChart extends LitElement {
       // Navigate after initialization completes. A new request is newer than the place kept.
       const request = this.navigateRequest;
       if (request && request !== usedBefore) {
-        timeline.navigateToEventIndex(request.eventIndex);
+        timeline.navigateToEventId(request.eventId);
       } else if (viewport) {
         timeline.setViewport(viewport);
       }

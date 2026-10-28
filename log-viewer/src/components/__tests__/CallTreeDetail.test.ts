@@ -5,7 +5,7 @@
  */
 import { describe, expect, it } from '@jest/globals';
 
-// This suite exercises the view-mode toggle; no tree is built (eventIndex -1).
+// This suite exercises the view-mode toggle; no tree is built (eventId -1).
 
 import type { LogStore } from '#core/log/LogStore.js';
 import type { CallTreeDetail } from '../CallTreeDetail.js';
@@ -33,7 +33,7 @@ const nextLog = {} as LogStore;
 
 async function mount(props: Partial<CallTreeDetail> = {}): Promise<CallTreeDetail> {
   const el = document.createElement('call-tree-detail') as CallTreeDetail;
-  el.eventIndex = -1; // no selection in the test — no table is built
+  el.eventId = -1; // no selection in the test — no table is built
   el.logStore = thisLog;
   Object.assign(el, props);
   document.body.appendChild(el);

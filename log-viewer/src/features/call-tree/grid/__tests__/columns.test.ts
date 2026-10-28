@@ -361,8 +361,8 @@ describe('mergedLines', () => {
     );
     const lines = mergedLines(debug.log);
 
-    expect(lines({ eventIndex: 1 })).toBe(1);
-    expect(lines({ eventIndex: 2 })).toBe(3);
+    expect(lines({ eventId: 1 })).toBe(1);
+    expect(lines({ eventId: 2 })).toBe(3);
   });
 
   // A grid redraws when it gets a new function, so a render that asks again must not.

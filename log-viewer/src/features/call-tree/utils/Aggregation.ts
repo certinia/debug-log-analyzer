@@ -84,7 +84,7 @@ export interface AggregatedRow {
   /** The event ids of the calls this row merges, for drill-down */
   instances: number[];
   /** The event id of this row's first call (used by formatters) */
-  eventIndex: number;
+  eventId: number;
   /** The timeline category of this row's calls */
   category: LogCategory;
 }
@@ -150,11 +150,11 @@ export interface BottomUpRow {
   /**
    * The event ids of the displayed calls, for drill-down. Populated only on root
    * buckets (used by the table-level `bottomCalc`); deep buckets leave this
-   * empty — use {@link eventIndex} when a single representative is needed.
+   * empty — use {@link eventId} when a single representative is needed.
    */
   instances: number[];
   /** The event id of this row's first call (used by formatters) */
-  eventIndex: number;
+  eventId: number;
   /** The timeline category of this row's calls */
   category: LogCategory;
 }
@@ -296,7 +296,7 @@ function* aggregatedSteps(ctx: BuildContext): Generator<void, AggregatedRow[], v
     if (frame.next < frame.callees.length) {
       const row = frame.callees[frame.next++]!; // next is in range
       // The row's own frame is open over its callees, so a call of it there is recursive.
-      const callees = yield* group(row.instances, row._pathId, ctx.paths.stackIdOf(row.eventIndex));
+      const callees = yield* group(row.instances, row._pathId, ctx.paths.stackIdOf(row.eventId));
       stack.push({ row, callees, next: 0 });
       if (--budget === 0) {
         yield;
@@ -332,7 +332,7 @@ type CalleeGrouping = {
 // Returns how many callees it grouped, at most `budget`.
 function groupCallees(grouping: CalleeGrouping, ctx: BuildContext, budget: number): number {
   const { index, paths, reported } = ctx;
-  const { subtreeEnd, eventIndex } = index;
+  const { subtreeEnd, eventId } = index;
   const { calls, pathId, openStackId, byKey } = grouping;
   let done = 0;
   let i = grouping.call;
@@ -352,7 +352,7 @@ function groupCallees(grouping: CalleeGrouping, ctx: BuildContext, budget: numbe
         return done;
       }
       // Keyed by interned ids: the ones a mark matches rows on, hashed once per log.
-      const id = eventIndex[child]!; // child is a row
+      const id = eventId[child]!; // child is a row
       const keyId = paths.keyIdOf(id);
       let row = byKey.get(keyId);
       if (!row) {
@@ -425,7 +425,7 @@ function addCallToAggregatedRow(
   if (span) {
     addReported(row.reported, span);
   }
-  row.instances.push(ctx.index.eventIndex[call]!);
+  row.instances.push(ctx.index.eventId[call]!);
 }
 
 /**
@@ -515,7 +515,7 @@ function* bottomUpSteps(build: BuildContext): Generator<void, BottomUpRow[], voi
     return [];
   }
 
-  const { eventIndex, subtreeEnd } = index;
+  const { eventId, subtreeEnd } = index;
   const rootBuckets = new Map<number, BottomUpRow>();
   const activeByStack = new Map<number, FrameContext>();
   // The frames open above the next row, outermost first.
@@ -523,7 +523,7 @@ function* bottomUpSteps(build: BuildContext): Generator<void, BottomUpRow[], voi
   const chainIds: number[] = [];
 
   const enter = (row: number): void => {
-    const id = eventIndex[row]!; // row < rowCount
+    const id = eventId[row]!; // row < rowCount
     const keyId = paths.keyIdOf(id);
     chainIds.push(keyId);
 
@@ -685,7 +685,7 @@ function* bottomUpSteps(build: BuildContext): Generator<void, BottomUpRow[], voi
       rootBuckets.set(rootId, bucket);
     }
     accumulate(bucket);
-    bucket.instances.push(eventIndex[row]!);
+    bucket.instances.push(eventId[row]!);
 
     // Deeper buckets are keyed by successive ancestors. The open stack already
     // holds them — open[i].row is N's ancestor at depth i.
@@ -806,14 +806,14 @@ function sortBuckets(rows: BottomUpRow[]): void {
 /** What a new row shows of its first call, on index row `row`. */
 function rowLabels(build: BuildContext, row: number) {
   const { index, signatures } = build;
-  const eventIndex = index.eventIndex[row]!; // row < rowCount
-  const signature = signatures.of(eventIndex);
+  const eventId = index.eventId[row]!; // row < rowCount
+  const signature = signatures.of(eventId);
   return {
     text: signatures.text(signature),
     namespace: signatures.namespace(signature),
     callerNamespace: callerNamespaceOfRow(index, row),
     type: signatures.type(signature),
-    eventIndex,
+    eventId,
     category: rowCategory(index, row),
   };
 }
@@ -834,7 +834,7 @@ function createEmptyAggregatedRow(
     namespace: labels.namespace,
     callerNamespace: labels.callerNamespace,
     type: labels.type,
-    eventIndex: labels.eventIndex,
+    eventId: labels.eventId,
     category: labels.category,
     callCount: 0,
     totalSelfTime: 0,
@@ -876,7 +876,7 @@ function createEmptyBottomUpRow(
     namespace: labels.namespace,
     callerNamespace: labels.callerNamespace,
     type: labels.type,
-    eventIndex: labels.eventIndex,
+    eventId: labels.eventId,
     category: labels.category,
     callCount: 0,
     totalSelfTime: 0,

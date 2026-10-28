@@ -130,23 +130,23 @@ async function compareFrames(
   // Every frame, with no `outermostEvents` dedupe — deliberately, and unlike
   // every other multi-frame read here. A recursive frame's nested call is its
   // own call with its own values, so dropping it would undercount the spread.
-  for (const eventIndex of frames) {
+  for (const eventId of frames) {
     // Per frame rather than every CHECK_EVERY: one read scans a whole frame's
     // lines, so 256 of them would overrun the slice many times over, and asking
     // the clock once per read costs nothing beside it.
     if (!(await tick())) {
       return null;
     }
-    const frame = frameVariablesFor(store, eventIndex, AS_READ);
+    const frame = frameVariablesFor(store, eventId, AS_READ);
     if (!frame) {
       continue;
     }
     truncated ||= frame.truncated;
     for (const row of frame.locals) {
-      hold(locals, row, eventIndex, read, frame.readAt);
+      hold(locals, row, eventId, read, frame.readAt);
     }
     for (const row of frame.fields) {
-      hold(fields, row, eventIndex, read, frame.readAt);
+      hold(fields, row, eventId, read, frame.readAt);
     }
     read++;
     if (frame.thisType) {
@@ -175,7 +175,7 @@ async function compareFrames(
 /**
  * Adds one call's reading of a name to what the walk holds for it.
  *
- * @param at - the call's eventIndex, for the mark
+ * @param at - the call's event id, for the mark
  * @param ordinal - which call it is among those read, so a value's runs can be
  *   counted without holding the whole sequence
  * @param readAt - the event id that call read at, kept for the first call to hold a

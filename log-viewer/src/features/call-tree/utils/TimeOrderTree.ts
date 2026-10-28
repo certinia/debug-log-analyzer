@@ -53,11 +53,11 @@ export class TimeOrderSource implements TreeSource<TimeOrderNode> {
   };
 
   /** The node's event id. */
-  readonly key = (node: TimeOrderNode): number => this.index.eventIndex[node.row]!;
+  readonly key = (node: TimeOrderNode): number => this.index.eventId[node.row]!;
 
   /** The signature id of the node's event. */
   private readonly signatureOf = ({ row }: TimeOrderNode): number =>
-    this.signatures.of(this.index.eventIndex[row]!);
+    this.signatures.of(this.index.eventId[row]!);
 
   /** The node's text, as its signature names it. */
   readonly text = (node: TimeOrderNode): string => this.signatures.text(this.signatureOf(node));
@@ -65,7 +65,7 @@ export class TimeOrderSource implements TreeSource<TimeOrderNode> {
   // Namespace and type read their columns: the signature reads text, and its first read builds the whole log's.
   /** The node's namespace. */
   readonly namespace = (node: TimeOrderNode): string =>
-    namespaceOf(this.index.log, this.index.eventIndex[node.row]!);
+    namespaceOf(this.index.log, this.index.eventId[node.row]!);
 
   /** The node's event type. */
   readonly type = ({ row }: TimeOrderNode): string => eventType(this.types[row]!)!.type; // every type id came from columns.type

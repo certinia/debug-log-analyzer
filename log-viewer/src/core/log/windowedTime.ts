@@ -24,14 +24,14 @@ const childTotals = new WeakMap<LogIndex, Map<number, Float64Array>>();
  * One frame's time inside `window`: the part of its span there, and the part of
  * that no child ran in.
  *
- * @param eventIndex - a shown event of `index`
+ * @param eventId - a shown event of `index`
  */
 export function frameIn(
   index: LogIndex,
-  eventIndex: number,
+  eventId: number,
   window: TimeWindow,
 ): { total: number; self: number } {
-  return rowIn(index, index.rowOf(eventIndex), window);
+  return rowIn(index, index.rowOf(eventId), window);
 }
 
 function rowIn(index: LogIndex, row: number, window: TimeWindow): { total: number; self: number } {
@@ -96,10 +96,10 @@ function totalsOf(index: LogIndex, row: number, children: readonly number[]): Fl
 /**
  * Whether the window holds some of the frame's time, or the frame's instant if it has none.
  *
- * @param eventIndex - a shown event of `index`
+ * @param eventId - a shown event of `index`
  */
-export function reaches(index: LogIndex, eventIndex: number, window: TimeWindow): boolean {
-  return rowReaches(index, index.rowOf(eventIndex), window);
+export function reaches(index: LogIndex, eventId: number, window: TimeWindow): boolean {
+  return rowReaches(index, index.rowOf(eventId), window);
 }
 
 function rowReaches(index: LogIndex, row: number, window: TimeWindow): boolean {
@@ -220,13 +220,13 @@ export class SpanIndex {
 
   private _readGroup(g: number, window: TimeWindow, held: WindowedTime): void {
     const index = this._index;
-    const { start, end, eventIndex } = index;
+    const { start, end, eventId } = index;
     const last = this._memberAt(g + 1);
     for (let i = this._memberAt(g); i < last; i++) {
       const member = this._members[i]!; // i is inside group g
       const own = rowIn(index, member, window);
       let total = own.total;
-      for (const hole of this._holes?.get(eventIndex[member]!) ?? []) {
+      for (const hole of this._holes?.get(eventId[member]!) ?? []) {
         const row = index.rowOf(hole);
         total -= overlapOf(start[row]!, end[row]!, window);
       }
@@ -266,7 +266,7 @@ class GroupBuilder {
   }
 
   add(member: number): void {
-    const { start, end, self: selves, eventIndex } = this._index;
+    const { start, end, self: selves, eventId } = this._index;
     const total = this._total;
     const self = this._self;
     // Frames nest or stand apart, so one starting inside the group is inside it.
@@ -277,7 +277,7 @@ class GroupBuilder {
       self.push(self.at(-1)!);
     }
     let own = end[member]! - start[member]!;
-    const holes = this._holes?.get(eventIndex[member]!);
+    const holes = this._holes?.get(eventId[member]!);
     if (holes) {
       for (const hole of holes) {
         const row = this._index.rowOf(hole);

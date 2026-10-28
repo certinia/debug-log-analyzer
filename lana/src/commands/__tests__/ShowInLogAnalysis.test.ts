@@ -45,7 +45,7 @@ describe('ShowInLogAnalysis', () => {
     const context = createMockContext();
     ShowInLogAnalysis.apply(asContext(context));
 
-    await command()({ eventIndex: 42, filePath: 'memfs:/logs/a.log' });
+    await command()({ eventId: 42, filePath: 'memfs:/logs/a.log' });
 
     expect(LogView.setPendingNavigation).toHaveBeenCalledWith(42);
     expect(mockCreateView).toHaveBeenCalled();
@@ -58,11 +58,11 @@ describe('ShowInLogAnalysis', () => {
     mockGetLogUri.mockReturnValue(Uri.parse('memfs:/logs/a.log'));
     ShowInLogAnalysis.apply(asContext(createMockContext()));
 
-    await command()({ eventIndex: 42, filePath: 'memfs:/logs/a.log' });
+    await command()({ eventId: 42, filePath: 'memfs:/logs/a.log' });
 
     expect(panel.webview.postMessage).toHaveBeenCalledWith({
       cmd: 'navigateToTimeline',
-      payload: { eventIndex: 42 },
+      payload: { eventId: 42 },
     });
     expect(mockCreateView).not.toHaveBeenCalled();
   });
@@ -74,7 +74,7 @@ describe('ShowInLogAnalysis', () => {
     mockGetLogUri.mockReturnValue(Uri.parse('memfs:/logs/b.log'));
     ShowInLogAnalysis.apply(asContext(createMockContext()));
 
-    await command()({ eventIndex: 42, filePath: 'memfs:/logs/a.log' });
+    await command()({ eventId: 42, filePath: 'memfs:/logs/a.log' });
 
     expect(panel.webview.postMessage).not.toHaveBeenCalled();
     expect(LogView.setPendingNavigation).toHaveBeenCalledWith(42);
@@ -91,11 +91,11 @@ describe('ShowInLogAnalysis', () => {
     } as typeof window.activeTextEditor;
     ShowInLogAnalysis.apply(asContext(createMockContext()));
 
-    await command()({ eventIndex: 42 });
+    await command()({ eventId: 42 });
 
     expect(panel.webview.postMessage).toHaveBeenCalledWith({
       cmd: 'navigateToTimeline',
-      payload: { eventIndex: 42 },
+      payload: { eventId: 42 },
     });
   });
 
@@ -106,7 +106,7 @@ describe('ShowInLogAnalysis', () => {
     } as typeof window.activeTextEditor;
     ShowInLogAnalysis.apply(asContext(createMockContext()));
 
-    await command()({ eventIndex: 42, filePath: 'memfs:/logs/a.log' });
+    await command()({ eventId: 42, filePath: 'memfs:/logs/a.log' });
 
     expect(String(mockCreateView.mock.calls[0]?.[2])).toBe('memfs:/logs/a.log');
   });
@@ -115,7 +115,7 @@ describe('ShowInLogAnalysis', () => {
     const context = createMockContext();
     ShowInLogAnalysis.apply(asContext(context));
 
-    await command()({ eventIndex: 42 });
+    await command()({ eventId: 42 });
 
     expect(context.display.showInformationMessage).toHaveBeenCalledWith(
       'Open an Apex log, hover an event line, then choose Show in Log Analysis.',
@@ -129,7 +129,7 @@ describe('ShowInLogAnalysis', () => {
     ShowInLogAnalysis.apply(asContext(context));
 
     await expect(
-      command()({ eventIndex: 42, filePath: 'memfs:/logs/a.log' }),
+      command()({ eventId: 42, filePath: 'memfs:/logs/a.log' }),
     ).resolves.toBeUndefined();
 
     expect(context.display.showErrorMessage).toHaveBeenCalledWith(

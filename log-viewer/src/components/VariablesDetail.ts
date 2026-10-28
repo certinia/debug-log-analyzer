@@ -60,10 +60,10 @@ type Valued = Shown & { open: boolean };
 @customElement('variables-detail')
 export class VariablesDetail extends LitElement {
   @property({ type: Number })
-  eventIndex = -1;
+  eventId = -1;
 
   /** The frames a merged row is, where the selection is one: the scope every
-   *  call it counts held. Null for a single frame, which `eventIndex` names. */
+   *  call it counts held. Null for a single frame, which `eventId` names. */
   @property({ attribute: false })
   frames: number[] | null = null;
 
@@ -296,11 +296,11 @@ export class VariablesDetail extends LitElement {
    *
    * A merged row that comes down to a single frame is that frame, never the
    * calls it counts: a bottom-up caller row counts its callee's calls, so
-   * `eventIndex` names one of those and reading it would show the called
+   * `eventId` names one of those and reading it would show the called
    * method's scope under a row that names the caller.
    */
-  private get _readIndex(): number {
-    return this.frames?.length === 1 ? this.frames[0]! : this.eventIndex;
+  private get _readId(): number {
+    return this.frames?.length === 1 ? this.frames[0]! : this.eventId;
   }
 
   /** The index, but only once the log has a write in it. A log captured at
@@ -324,7 +324,7 @@ export class VariablesDetail extends LitElement {
     // Only what the selection is made of, so a disclosure or a key does not
     // re-read the log.
     const reselected =
-      changed.has('eventIndex') ||
+      changed.has('eventId') ||
       changed.has('frames') ||
       changed.has('logStore') ||
       changed.has('_index');
@@ -335,7 +335,7 @@ export class VariablesDetail extends LitElement {
       // unread.
       this._frame =
         !this._isAggregate && this.logStore && this._index
-          ? frameVariablesFor(this.logStore, this._readIndex)
+          ? frameVariablesFor(this.logStore, this._readId)
           : null;
       // The comparison is resolved here, not in `updated`: a walk that runs a
       // step later would let this pass rebuild and render the *previous* row's
@@ -737,7 +737,7 @@ export class VariablesDetail extends LitElement {
         why: 'The log holds no value for this address, at any point.',
       };
     }
-    const stack = this.logStore?.stackByEventIndex(row.laterWriteId) ?? [];
+    const stack = this.logStore?.stackById(row.laterWriteId) ?? [];
     const where = stack[stack.length - 1]?.text;
     return {
       text: 'recorded later',

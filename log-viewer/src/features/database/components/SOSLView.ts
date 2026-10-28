@@ -59,7 +59,7 @@ export class SOSLView extends StatementGrid<SOSLRow, SoslEvent> {
 
   protected toRows(lines: readonly SoslEvent[], callerOf: (id: number) => string): SOSLRow[] {
     return lines.map((sosl) => ({
-      eventIndex: sosl.id,
+      eventId: sosl.id,
       sosl: sosl.text ?? '',
       namespace: sosl.namespace ?? DEFAULT_NAMESPACE,
       callerNamespace: callerOf(sosl.id),

@@ -20,7 +20,7 @@ export function deepRow(index: LogIndex): number {
 export function pathOf(index: LogIndex, row: number): number[] {
   const path: number[] = [];
   for (let at = row; at !== NO_ROW; at = index.parent[at]!) {
-    path.push(index.eventIndex[at]!);
+    path.push(index.eventId[at]!);
   }
   return path.reverse();
 }

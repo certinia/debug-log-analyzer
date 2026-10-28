@@ -21,7 +21,7 @@ export type IdColumn = Float64Array | Int32Array | Uint16Array | Uint8Array;
 
 interface Rows {
   /** The row's event id. */
-  eventIndex: Int32Array;
+  eventId: Int32Array;
   /** `startTimestamp`, in nanoseconds. */
   start: Float64Array;
   /** `endTimestamp`, in nanoseconds. */
@@ -44,7 +44,7 @@ interface Rows {
  * The events on screen as flat columns, one row per event, so a view reads typed
  * arrays rather than event objects.
  *
- * Rows are in pre-order, which is log order, so `eventIndex` ascends. With no
+ * Rows are in pre-order, which is log order, so `eventId` ascends. With no
  * level hidden, row `r` is event id `r + 1`. A hidden event has no row: its
  * descendants move up to its nearest shown ancestor, and its self time folds
  * into that ancestor's.
@@ -61,7 +61,7 @@ export interface LogIndex extends Readonly<Rows> {
   /** The event for a row: a new object each call, so read columns in a loop. */
   event(row: number): ApexEvent;
   /** The row for an event id, or {@link NO_ROW} for a hidden or unknown one. */
-  rowOf(eventIndex: number): number;
+  rowOf(eventId: number): number;
   /**
    * `byId`, a column of `log.columns`, indexed by row. Shares its memory when no
    * level is hidden; else a copy, made once per column.
@@ -123,7 +123,7 @@ class Index implements LogIndex {
   readonly log: ApexLog;
   readonly rowCount: number;
   readonly categoryNames = CATEGORY_NAMES;
-  readonly eventIndex: Int32Array;
+  readonly eventId: Int32Array;
   readonly start: Float64Array;
   readonly end: Float64Array;
   readonly total: Float64Array;
@@ -150,7 +150,7 @@ class Index implements LogIndex {
     this.keeper = keeper;
     this.hidden = hidden;
     ({
-      eventIndex: this.eventIndex,
+      eventId: this.eventId,
       start: this.start,
       end: this.end,
       total: this.total,
@@ -163,18 +163,18 @@ class Index implements LogIndex {
   }
 
   event(row: number): ApexEvent {
-    // In range by contract: every eventIndex entry is an id the log holds.
-    return this.log.event(this.eventIndex[row]!)!;
+    // In range by contract: every entry of `eventId` is an id the log holds.
+    return this.log.event(this.eventId[row]!)!;
   }
 
-  rowOf(eventIndex: number): number {
-    if (!(eventIndex >= 1 && eventIndex <= this.log.eventCount)) {
+  rowOf(eventId: number): number {
+    if (!(eventId >= 1 && eventId <= this.log.eventCount)) {
       return NO_ROW;
     }
     if (!this.keeper) {
-      return eventIndex - 1;
+      return eventId - 1;
     }
-    return this.hidden![eventIndex] ? NO_ROW : this.keeper[eventIndex]!; // set with keeper
+    return this.hidden![eventId] ? NO_ROW : this.keeper[eventId]!; // set with keeper
   }
 
   column<T extends IdColumn>(byId: T): T {
@@ -184,7 +184,7 @@ class Index implements LogIndex {
     let rows = this.columns.get(byId) as T | undefined;
     if (!rows) {
       rows = new (byId.constructor as new (length: number) => T)(this.rowCount);
-      const ids = this.eventIndex;
+      const ids = this.eventId;
       for (let row = 0; row < this.rowCount; row++) {
         rows[row] = byId[ids[row]!]!;
       }
@@ -266,7 +266,7 @@ export class LogIndexBuilder {
     const last = Math.min(this.log.eventCount, this.nextId + maxIds - 1);
     for (let id = this.nextId; id <= last; id++) {
       // Close every open row whose subtree ended before this id.
-      while (open.length && subtreeEnd[r.eventIndex[open.at(-1)!]!]! <= id) {
+      while (open.length && subtreeEnd[r.eventId[open.at(-1)!]!]! <= id) {
         r.subtreeEnd[open.pop()!] = this.rowCount;
       }
       const above = open.length ? open.at(-1)! : NO_ROW;
@@ -278,7 +278,7 @@ export class LogIndexBuilder {
         continue;
       }
       const row = this.rowCount++;
-      r.eventIndex[row] = id;
+      r.eventId[row] = id;
       r.depth[row] = open.length;
       r.parent[row] = above;
       r.categoryId[row] = TYPE_CATEGORY_ID[type[id]!]!;
@@ -311,7 +311,7 @@ export class LogIndexBuilder {
     const r = this.rows;
     const rows: Rows = this.keeper
       ? {
-          eventIndex: r.eventIndex.slice(0, n),
+          eventId: r.eventId.slice(0, n),
           start: r.start.slice(0, n),
           end: r.end.slice(0, n),
           total: r.total.slice(0, n),
@@ -328,9 +328,9 @@ export class LogIndexBuilder {
 
 function allocateTree(
   capacity: number,
-): Pick<Rows, 'eventIndex' | 'depth' | 'parent' | 'subtreeEnd' | 'categoryId'> {
+): Pick<Rows, 'eventId' | 'depth' | 'parent' | 'subtreeEnd' | 'categoryId'> {
   return {
-    eventIndex: new Int32Array(capacity),
+    eventId: new Int32Array(capacity),
     depth: new Uint16Array(capacity),
     parent: new Int32Array(capacity),
     subtreeEnd: new Int32Array(capacity),

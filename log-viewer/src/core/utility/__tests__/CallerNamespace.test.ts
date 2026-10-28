@@ -3,7 +3,7 @@
  */
 import { describe, expect, it } from '@jest/globals';
 
-import { indexOf, storeOf } from '#test-helpers/apexLog.js';
+import { idOf, storeOf } from '#test-helpers/apexLog.js';
 import { filterByLevels } from '../../log/LogStore.js';
 import { callerNamespaceOfRow, getCallerNamespace, namespaceOf } from '../CallerNamespace.js';
 
@@ -22,7 +22,7 @@ describe('getCallerNamespace', () => {
   it("returns the direct caller's namespace", async () => {
     const { log, store } = await storeOf(LOG);
 
-    expect(getCallerNamespace(store, indexOf(log, 'DML Op:Update Type:Account'))).toBe('pkg');
+    expect(getCallerNamespace(store, idOf(log, 'DML Op:Update Type:Account'))).toBe('pkg');
   });
 
   it("returns 'default' at the top of the log", async () => {
@@ -39,7 +39,7 @@ describe('getCallerNamespace', () => {
 
     const shown = (await filterByLevels(store, { system: 'NONE' }))!; // no signal, never null
 
-    expect(getCallerNamespace(shown, indexOf(log, 'DML Op:Insert Type:Account'))).toBe('pkg');
+    expect(getCallerNamespace(shown, idOf(log, 'DML Op:Insert Type:Account'))).toBe('pkg');
   });
 });
 
@@ -59,9 +59,9 @@ describe('callerNamespaceOfRow', () => {
     );
     const index = await (await filterByLevels(store, { system: 'NONE' }))!.logIndex(); // no signal, never null
 
-    expect(
-      callerNamespaceOfRow(index, index.rowOf(indexOf(log, 'DML Op:Insert Type:Account'))),
-    ).toBe('pkg');
+    expect(callerNamespaceOfRow(index, index.rowOf(idOf(log, 'DML Op:Insert Type:Account')))).toBe(
+      'pkg',
+    );
   });
 });
 
@@ -69,7 +69,7 @@ describe('namespaceOf', () => {
   it("reads the event's namespace, 'default' where it states none", async () => {
     const { log } = await storeOf(LOG);
 
-    expect(namespaceOf(log, indexOf(log, 'pkg1.Trigger.run()'))).toBe('pkg');
-    expect(namespaceOf(log, indexOf(log, 'DML Op:Insert Type:Account'))).toBe('default');
+    expect(namespaceOf(log, idOf(log, 'pkg1.Trigger.run()'))).toBe('pkg');
+    expect(namespaceOf(log, idOf(log, 'DML Op:Insert Type:Account'))).toBe('default');
   });
 });

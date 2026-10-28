@@ -12,7 +12,7 @@
  */
 
 import { describe, expect, it, jest } from '@jest/globals';
-import { indexOf } from '#test-helpers/apexLog.js';
+import { idOf } from '#test-helpers/apexLog.js';
 import { framesOf } from '#test-helpers/timeline.js';
 import { ApexLogTimeline } from '../optimised/ApexLogTimeline.js';
 
@@ -21,14 +21,14 @@ const ONE_FRAME =
   '09:18:22.6 (1000)|METHOD_ENTRY|[1]|01p|ns.A.run()\n' +
   '09:18:22.6 (2000)|METHOD_EXIT|[1]|ns.A.run()\n';
 
-/** What the emphasis was asked to do, in order: an eventIndex to mark, or 'clear'. */
+/** What the emphasis was asked to do, in order: an event id to mark, or 'clear'. */
 type EmphasisCall = number | 'clear';
 
 async function timelineWithSpy(): Promise<{
   frame: number;
-  select: (eventIndex: number | undefined) => void;
-  selectMarker: (eventIndex: number | undefined) => void;
-  revealFromInspector: (eventIndex: number) => void;
+  select: (eventId: number | undefined) => void;
+  selectMarker: (eventId: number | undefined) => void;
+  revealFromInspector: (eventId: number) => void;
   emphasised: () => EmphasisCall[];
 }> {
   const timeline = new ApexLogTimeline();
@@ -44,7 +44,7 @@ async function timelineWithSpy(): Promise<{
     },
     getViewportBounds: () => null,
   };
-  internals['pickEmphasis'] = (eventIndex: number) => calls.push(eventIndex);
+  internals['pickEmphasis'] = (eventId: number) => calls.push(eventId);
   internals['clearEmphasis'] = () => calls.push('clear');
   const { log, index, frames } = await framesOf(ONE_FRAME);
   internals['index'] = index;
@@ -52,24 +52,21 @@ async function timelineWithSpy(): Promise<{
 
   const handleSelect = internals['handleSelect'] as (node: unknown) => void;
   const handleMarkerSelect = internals['handleMarkerSelect'] as (marker: unknown) => void;
-  const reveal = internals['selectFrameByEventIndex'] as (eventIndex: number) => void;
+  const reveal = internals['selectFrameByEventId'] as (eventId: number) => void;
 
   return {
-    frame: indexOf(log, 'ns.A.run()'),
-    select: (eventIndex) => {
+    frame: idOf(log, 'ns.A.run()'),
+    select: (eventId) => {
       calls = [];
-      handleSelect.call(
-        timeline,
-        eventIndex === undefined ? null : { original: { id: eventIndex } },
-      );
+      handleSelect.call(timeline, eventId === undefined ? null : { original: { id: eventId } });
     },
-    selectMarker: (eventIndex) => {
+    selectMarker: (eventId) => {
       calls = [];
-      handleMarkerSelect.call(timeline, eventIndex === undefined ? null : { eventIndex });
+      handleMarkerSelect.call(timeline, eventId === undefined ? null : { eventId });
     },
-    revealFromInspector: (eventIndex) => {
+    revealFromInspector: (eventId) => {
       calls = [];
-      reveal.call(timeline, eventIndex);
+      reveal.call(timeline, eventId);
     },
     emphasised: () => calls,
   };

@@ -6,17 +6,17 @@ import type { DetailSelection } from '#core/events/EventBus.js';
 /** Name of the DOM event an inspector section raises to reveal one of its rows. */
 export const INSPECTOR_REVEAL_EVENT = 'inspector-reveal';
 
-export type InspectorRevealEvent = CustomEvent<{ eventIndex: number }>;
+export type InspectorRevealEvent = CustomEvent<{ eventId: number }>;
 
 /**
- * Ask the inspector to reveal `eventIndex` in the tab on screen. A composed DOM
+ * Ask the inspector to reveal `eventId` in the tab on screen. A composed DOM
  * event rather than an `eventBus` emit: only {@link LogInspector} knows which
  * tab is active, so it is the one that puts the source on the bus event.
  */
-export function dispatchInspectorReveal(source: HTMLElement, eventIndex: number): void {
+export function dispatchInspectorReveal(source: HTMLElement, eventId: number): void {
   source.dispatchEvent(
     new CustomEvent(INSPECTOR_REVEAL_EVENT, {
-      detail: { eventIndex },
+      detail: { eventId },
       bubbles: true,
       composed: true,
     }),
@@ -27,13 +27,13 @@ export function dispatchInspectorReveal(source: HTMLElement, eventIndex: number)
 export const INSPECTOR_LOCATE_EVENT = 'inspector-locate';
 
 export type InspectorLocateEvent = CustomEvent<{
-  eventIndexes: readonly number[];
+  eventIds: readonly number[];
   sticky: boolean;
   selection?: DetailSelection | null;
 }>;
 
 /**
- * Mark `eventIndexes` in the tab on screen, and nothing more - no selection, no
+ * Mark `eventIds` in the tab on screen, and nothing more - no selection, no
  * scroll. A grouped row names every occurrence it merges; an empty list drops the
  * mark. Routed like {@link dispatchInspectorReveal}, and for the same reason.
  *
@@ -45,13 +45,13 @@ export type InspectorLocateEvent = CustomEvent<{
  */
 export function dispatchInspectorLocate(
   source: HTMLElement,
-  eventIndexes: readonly number[],
+  eventIds: readonly number[],
   sticky = false,
   selection: DetailSelection | null = null,
 ): void {
   source.dispatchEvent(
     new CustomEvent(INSPECTOR_LOCATE_EVENT, {
-      detail: { eventIndexes, sticky, selection },
+      detail: { eventIds, sticky, selection },
       bubbles: true,
       composed: true,
     }),

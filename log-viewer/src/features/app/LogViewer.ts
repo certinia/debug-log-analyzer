@@ -44,7 +44,7 @@ import './AppHeader.js';
 import '../../components/LogInspector.js';
 
 interface NavigateToTimelinePayload {
-  eventIndex: number;
+  eventId: number;
 }
 
 /** In tab-strip and panel order: `vscode-tabs` is index based, and `show-tab` events use the id. */
@@ -196,24 +196,24 @@ export class LogViewer extends LitElement {
       TimelineNavigationEventMap & { 'show-tab': CustomEvent<{ tabid: string }> }
     >(this, document, {
       'show-tab': (e) => this._showTabEvent(e),
-      [TIMELINE_GO_TO_EVENT]: (e) => this._goToTimelineEvent(e.detail.eventIndex),
+      [TIMELINE_GO_TO_EVENT]: (e) => this._goToTimelineEvent(e.detail.eventId),
     });
     new SubscriptionController(this, () => [
       // Escape, when nothing else claims it, deselects on the active tab.
       installEscapeDeselect(() => TAB_TO_SOURCE[this._selectedTab]),
       VSCodeExtensionMessenger.listen<NavigateToTimelinePayload>((event) => {
         const { cmd, payload } = event.data;
-        if (cmd !== 'navigateToTimeline' || payload?.eventIndex === undefined) {
+        if (cmd !== 'navigateToTimeline' || payload?.eventId === undefined) {
           return;
         }
-        this._goToTimelineEvent(payload.eventIndex);
+        this._goToTimelineEvent(payload.eventId);
       }),
     ]);
   }
 
-  private _goToTimelineEvent(eventIndex: number): void {
+  private _goToTimelineEvent(eventId: number): void {
     this._showTab('timeline-tab');
-    this._navigateRequest = { eventIndex };
+    this._navigateRequest = { eventId };
   }
 
   render() {
@@ -337,10 +337,10 @@ export class LogViewer extends LitElement {
     this.notifications = parserIssuesToNotifications(apexLog.parsingErrors);
 
     // Navigate to event location if requested (passed as prop to timeline-view)
-    if (data.navigateToEventIndex !== undefined) {
+    if (data.navigateToEventId !== undefined) {
       this._showTab('timeline-tab');
       // An event sent during the parse is newer than the one the fetch carried.
-      this._navigateRequest ??= { eventIndex: data.navigateToEventIndex };
+      this._navigateRequest ??= { eventId: data.navigateToEventId };
     }
   }
 
@@ -401,5 +401,5 @@ interface LogDataEvent {
   logUri?: string;
   logPath?: string;
   logData?: string;
-  navigateToEventIndex?: number;
+  navigateToEventId?: number;
 }

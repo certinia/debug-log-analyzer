@@ -84,7 +84,7 @@ export class HotSpots extends LitElement {
           '--row-hue': this._palette.colorFor(spot.category),
           '--self-pct': `${sharePercent(spot.selfTime, spot.totalTime)}%`,
         })}
-        @click=${() => dispatchInspectorReveal(this, spot.eventIndex)}
+        @click=${() => dispatchInspectorReveal(this, spot.eventId)}
       >
         ${categoryLabel(spot.category)}
         <span class="reveal-row__name" title=${spot.text}>${spot.text}</span>

@@ -23,12 +23,12 @@ export const TAB_TO_SOURCE: Record<string, DetailSource> = {
 export type { StatementType };
 
 /**
- * A selection to inspect in the inspector. A single frame maps to one `eventIndex`;
+ * A selection to inspect in the inspector. A single frame maps to one `eventId`;
  * an aggregate row (Call Tree Aggregated/Bottom-Up, Analysis) scopes to all its
- * occurrences (`instances` = their eventIndexes), aggregated.
+ * occurrences (`instances` = their ids), aggregated.
  */
 export type DetailSelection =
-  | { kind: 'event'; eventIndex: number; type?: StatementType }
+  | { kind: 'event'; eventId: number; type?: StatementType }
   | {
       kind: 'aggregate';
       instances: number[];
@@ -85,7 +85,7 @@ interface EventMap {
   // inspector is currently showing, never in another tab: `source` is the active
   // tab and only that view acts. Strictly outbound from the inspector, as
   // `detail:select` is strictly inbound to it; separate events stop an echo loop.
-  'inspector:reveal': { source: DetailSource; eventIndex: number };
+  'inspector:reveal': { source: DetailSource; eventId: number };
 
   // A row in the inspector points at events: mark them in the tab the inspector
   // is showing. The list is the frames the row stands for, so a bottom-up caller
@@ -98,7 +98,7 @@ interface EventMap {
   // and the flame chart only mark.
   'inspector:locate': {
     source: DetailSource;
-    eventIndexes: readonly number[];
+    eventIds: readonly number[];
     sticky: boolean;
   };
 
@@ -108,7 +108,7 @@ interface EventMap {
   // list is the frames the row stands for, as `inspector:locate` is, so a
   // bottom-up caller row names the callers at its own depth rather than the
   // calls they conducted. It is empty when the pointer leaves the frame.
-  'detail:locate': { source: DetailSource; eventIndexes: readonly number[] };
+  'detail:locate': { source: DetailSource; eventIds: readonly number[] };
 }
 
 /**

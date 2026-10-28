@@ -7,7 +7,7 @@ export const TIMELINE_GO_TO_EVENT = 'timeline-go-to-event';
 
 /** A request to move the timeline to an event. */
 export interface TimelineNavigateRequest {
-  readonly eventIndex: number;
+  readonly eventId: number;
 }
 
 /** {@link TIMELINE_GO_TO_EVENT} keyed by name, for a listener that wants its payload. */

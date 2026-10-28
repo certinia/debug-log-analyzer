@@ -42,7 +42,7 @@ export interface DatabaseTreeRow {
   /** The code's own time (ns): the row's frames, each less the children it ran. */
   selfNs: number;
   count: number;
-  eventIndexes: number[];
+  eventIds: number[];
   _children: DatabaseTreeRow[] | null;
 }
 
@@ -57,7 +57,7 @@ export function databaseTreeRows(tree: readonly DatabaseCallNode[]): DatabaseTre
       timeNs: node.timeNs,
       selfNs: node.selfNs,
       count: node.count,
-      eventIndexes: node.eventIndexes,
+      eventIds: node.eventIds,
       _children: node.children.length ? map(node.children) : null,
     }));
   return map(tree);
@@ -101,18 +101,18 @@ export class DatabaseTime extends LitElement {
   private readonly _inspector = new InspectorGridController<DatabaseTreeRow>(this, {
     grid: () => this._grid.value ?? null,
     source: () => this._source,
-    frames: (row) => row.eventIndexes,
+    frames: (row) => row.eventIds,
     // A frame or a merged row has no one statement to reveal, so its pick holds a mark on all of them.
     pick: (row) => {
-      const eventIndex = revealable(row);
-      if (eventIndex !== null) {
-        dispatchInspectorReveal(this, eventIndex);
+      const eventId = revealable(row);
+      if (eventId !== null) {
+        dispatchInspectorReveal(this, eventId);
       } else {
-        dispatchInspectorLocate(this, row?.eventIndexes ?? [], true);
+        dispatchInspectorLocate(this, row?.eventIds ?? [], true);
       }
     },
-    menuFrame: (row) => row.eventIndexes[0] ?? null,
-    keysFor: (eventIndexes) => this._rowIdsFor(eventIndexes),
+    menuFrame: (row) => row.eventIds[0] ?? null,
+    keysFor: (eventIds) => this._rowIdsFor(eventIds),
     dropOnClear: true,
   });
 
@@ -150,9 +150,9 @@ export class DatabaseTime extends LitElement {
   }
 
   // One frame names several rows.
-  private _rowIdsFor(eventIndexes: readonly number[]): number[] {
-    const byEvent = (this._rowsByEvent ??= rowIdsByEventIndex(this._source?.roots ?? []));
-    return eventIndexes.flatMap((eventIndex) => byEvent.get(eventIndex) ?? []);
+  private _rowIdsFor(eventIds: readonly number[]): number[] {
+    const byEvent = (this._rowsByEvent ??= rowIdsByEventId(this._source?.roots ?? []));
+    return eventIds.flatMap((eventId) => byEvent.get(eventId) ?? []);
   }
 
   private async _build(): Promise<void> {
@@ -228,21 +228,21 @@ export function ownCodeTotal(rows: readonly DatabaseTreeRow[]): number {
 
 /** The statement a row reveals, or null when it is a frame or merges several. */
 function revealable(row: DatabaseTreeRow | null): number | null {
-  return row?.kind && row.eventIndexes.length === 1 ? (row.eventIndexes[0] ?? null) : null;
+  return row?.kind && row.eventIds.length === 1 ? (row.eventIds[0] ?? null) : null;
 }
 
 /** The rows keyed by each occurrence they stand for. */
-function rowIdsByEventIndex(rows: readonly DatabaseTreeRow[]): Map<number, number[]> {
+function rowIdsByEventId(rows: readonly DatabaseTreeRow[]): Map<number, number[]> {
   const byEvent = new Map<number, number[]>();
   const stack = [...rows];
   while (stack.length) {
     const row = stack.pop()!; // non-empty: the loop condition just checked
-    for (const eventIndex of row.eventIndexes) {
-      const ids = byEvent.get(eventIndex);
+    for (const eventId of row.eventIds) {
+      const ids = byEvent.get(eventId);
       if (ids) {
         ids.push(row.id);
       } else {
-        byEvent.set(eventIndex, [row.id]);
+        byEvent.set(eventId, [row.id]);
       }
     }
     for (const child of row._children ?? []) {

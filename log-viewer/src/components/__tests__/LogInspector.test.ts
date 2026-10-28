@@ -37,13 +37,13 @@ const builtHiding: string[][] = [];
 jest.mock('../detailSections.js', () => ({
   buildDetailSections: (
     _source: string,
-    selection: { eventIndex?: number } | null,
-    active: { kind: string; eventIndex?: number; instances?: number[] } | null,
+    selection: { eventId?: number } | null,
+    active: { kind: string; eventId?: number; instances?: number[] } | null,
     sourceView?: string,
     hidden: ReadonlySet<string> = new Set(),
   ) => {
     builtHiding.push([...hidden]);
-    const walked = active?.kind === 'event' ? String(active.eventIndex) : '-';
+    const walked = active?.kind === 'event' ? String(active.eventId) : '-';
     const counted = active?.kind === 'aggregate' ? (active.instances?.join(',') ?? '-') : '-';
     // The markers carry the anchor and the active frame through to the rendered
     // content, so a stale build resolving late is distinguishable from the one
@@ -53,7 +53,7 @@ jest.mock('../detailSections.js', () => ({
           {
             id: 'vitals',
             title: 'Details',
-            content: html`<div class="marker">${selection.eventIndex}</div>
+            content: html`<div class="marker">${selection.eventId}</div>
               <div class="active">${walked}</div>
               <div class="view">${sourceView ?? '-'}</div>
               <div class="bucket">${counted}</div>`,
@@ -157,8 +157,8 @@ function emptyText(el: LogInspector): string | null {
   return dock?.textContent?.trim() ?? null;
 }
 
-function select(source: DetailSource, eventIndex: number): void {
-  eventBus.emit('detail:select', { source, selection: { kind: 'event', eventIndex } });
+function select(source: DetailSource, eventId: number): void {
+  eventBus.emit('detail:select', { source, selection: { kind: 'event', eventId } });
 }
 
 /** The menu the inspector owns; the pane only reports the right-click. */
@@ -749,12 +749,12 @@ describe('LogInspector', () => {
   it('stamps the active tab on a reveal, so only that tab acts on it', async () => {
     const el = await mount('tree-tab');
 
-    const seen: Array<{ source: string; eventIndex: number }> = [];
+    const seen: Array<{ source: string; eventId: number }> = [];
     const off = eventBus.on('inspector:reveal', (d) => seen.push(d));
     dispatchInspectorReveal(dockLayout(el), 5);
     off();
 
-    expect(seen).toEqual([{ source: 'calltree', eventIndex: 5 }]);
+    expect(seen).toEqual([{ source: 'calltree', eventId: 5 }]);
   });
 
   it('follows a revealed frame while the selection that anchors the stack holds', async () => {
@@ -832,7 +832,7 @@ describe('LogInspector', () => {
     select('timeline', 1);
     await flush(el);
 
-    const seen: Array<{ source: string; eventIndexes: readonly number[]; sticky: boolean }> = [];
+    const seen: Array<{ source: string; eventIds: readonly number[]; sticky: boolean }> = [];
     const off = eventBus.on('inspector:locate', (d) => seen.push(d));
     dispatchInspectorLocate(dockLayout(el), [5, 9]);
     dispatchInspectorLocate(dockLayout(el), []);
@@ -840,9 +840,9 @@ describe('LogInspector', () => {
     off();
 
     expect(seen).toEqual([
-      { source: 'timeline', eventIndexes: [5, 9], sticky: false },
-      { source: 'timeline', eventIndexes: [], sticky: false },
-      { source: 'timeline', eventIndexes: [5, 9], sticky: true },
+      { source: 'timeline', eventIds: [5, 9], sticky: false },
+      { source: 'timeline', eventIds: [], sticky: false },
+      { source: 'timeline', eventIds: [5, 9], sticky: true },
     ]);
     // A locate picks nothing, so neither the anchor nor the walk moves.
     await flush(el);
@@ -917,14 +917,14 @@ describe('LogInspector', () => {
     await flush(el);
     dispatchInspectorLocate(dockLayout(el), [5]);
 
-    const seen: Array<{ source: string; eventIndexes: readonly number[]; sticky: boolean }> = [];
+    const seen: Array<{ source: string; eventIds: readonly number[]; sticky: boolean }> = [];
     const off = eventBus.on('inspector:locate', (d) => seen.push(d));
     el.activeTab = 'database-tab';
     await flush(el);
     off();
 
     // Sticky, so a picked row's mark goes with the pointer's.
-    expect(seen).toEqual([{ source: 'timeline', eventIndexes: [], sticky: true }]);
+    expect(seen).toEqual([{ source: 'timeline', eventIds: [], sticky: true }]);
   });
 
   it('drops a reveal from a tab with no inspectable view', async () => {
@@ -1059,7 +1059,7 @@ describe('LogInspector', () => {
 
     await loadLog(el);
 
-    // An eventIndex names frames of the log it was picked in, so the panel comes
+    // An eventId names frames of the log it was picked in, so the panel comes
     // back to its empty state rather than describing the new log through it.
     expect(emptyText(el)).not.toBeNull();
 

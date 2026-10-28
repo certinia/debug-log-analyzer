@@ -8,7 +8,7 @@ import { Command } from './Command.js';
 import { LogView } from './LogView.js';
 
 interface ShowInLogAnalysisArgs {
-  eventIndex: number;
+  eventId: number;
   filePath?: string;
 }
 
@@ -25,9 +25,9 @@ export class ShowInLogAnalysis {
   }
 
   private static async execute(context: Context, args: ShowInLogAnalysisArgs): Promise<void> {
-    const { eventIndex, filePath } = args;
+    const { eventId, filePath } = args;
 
-    if (!eventIndex) {
+    if (!eventId) {
       return;
     }
 
@@ -45,13 +45,13 @@ export class ShowInLogAnalysis {
       panel.reveal();
       panel.webview.postMessage({
         cmd: 'navigateToTimeline',
-        payload: { eventIndex },
+        payload: { eventId },
       });
       return;
     }
 
     // Sent with the log once it is parsed.
-    LogView.setPendingNavigation(eventIndex);
+    LogView.setPendingNavigation(eventId);
     await LogView.createView(context, Promise.resolve(), logUri);
   }
 }

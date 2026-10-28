@@ -4,7 +4,7 @@
 import { describe, expect, it } from '@jest/globals';
 
 import { buildLogIndex } from '#core/log/LogIndex.js';
-import { indexOf } from '#test-helpers/apexLog.js';
+import { idOf } from '#test-helpers/apexLog.js';
 import { framesOf } from '#test-helpers/timeline.js';
 import { NO_ROW } from '../types/flamechart.types.js';
 import { buildTimelineFrames, drawnRowAtOrAbove } from '../utils/timeline-frames.js';
@@ -59,7 +59,7 @@ describe('buildTimelineFrames', () => {
       '09:18:22.6 (1000)|METHOD_ENTRY|[1]|01p|ns.Instant.run()\n' +
         '09:18:22.6 (1000)|METHOD_EXIT|[1]|ns.Instant.run()\n',
     );
-    const instant = log.event(indexOf(log, 'ns.Instant.run()'));
+    const instant = log.event(idOf(log, 'ns.Instant.run()'));
 
     expect(frames.rowOfOriginal(instant)).toBe(-1);
     expect(frames.rowOfOriginal({})).toBe(-1);
@@ -68,7 +68,7 @@ describe('buildTimelineFrames', () => {
 
   it('makes a node that carries the parsed event', async () => {
     const { log, frames } = await framesOf(NESTED);
-    const outer = indexOf(log, 'ns.Outer.run()');
+    const outer = idOf(log, 'ns.Outer.run()');
     const row = frames.rowOfOriginal(log.event(outer));
     const node = frames.node(row);
 
@@ -113,7 +113,7 @@ describe('buildTimelineFrames', () => {
 describe('drawnRowAtOrAbove', () => {
   it('gives a drawn frame itself', async () => {
     const { log, index, frames } = await framesOf(NESTED);
-    const inner = indexOf(log, 'ns.Inner.first()');
+    const inner = idOf(log, 'ns.Inner.first()');
 
     expect(drawnRowAtOrAbove(index, frames, inner)).toBe(index.rowOf(inner));
   });
@@ -121,7 +121,7 @@ describe('drawnRowAtOrAbove', () => {
   // A hidden event has no row at all, so it climbs the log, not the index.
   it('gives an event the log levels hide its nearest shown frame', async () => {
     const { log } = await framesOf(NESTED);
-    const inner = indexOf(log, 'ns.Inner.first()');
+    const inner = idOf(log, 'ns.Inner.first()');
     const hidden = new Uint8Array(log.eventCount + 1);
     hidden[inner] = 1;
     const index = buildLogIndex(log, hidden);

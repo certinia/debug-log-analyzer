@@ -83,18 +83,18 @@ export class DatabaseView extends LitElement {
   });
 
   private readonly _inspector = new InspectorTabController(this, 'database', {
-    mark: (eventIndexes) => this._markLocated(eventIndexes),
-    // The eventIndex belongs to exactly one grid.
-    reveal: (eventIndex) => {
+    mark: (eventIds) => this._markLocated(eventIds),
+    // The eventId belongs to exactly one grid.
+    reveal: (eventId) => {
       const views = this._views;
-      const owner = views.find((view) => view?.owns(eventIndex));
+      const owner = views.find((view) => view?.owns(eventId));
       if (!owner) {
         return;
       }
       void this._echoGuard.runAsync(async () => {
         // The owner too: a filter can hide the row, and its old pick must not stay.
         views.forEach((view) => view?.deselectRows());
-        await owner.selectByEventIndex(eventIndex);
+        await owner.selectByEventId(eventId);
       });
     },
     clear: () => {
@@ -105,8 +105,8 @@ export class DatabaseView extends LitElement {
   });
 
   /** Offers the mark to every grid, since one of them owns the statement. */
-  private _markLocated(eventIndexes: readonly number[]): void {
-    this._views.forEach((view) => view?.markLocated(eventIndexes));
+  private _markLocated(eventIds: readonly number[]): void {
+    this._views.forEach((view) => view?.markLocated(eventIds));
   }
 
   /**
@@ -119,8 +119,8 @@ export class DatabaseView extends LitElement {
     if (this._echoGuard.suppressed) {
       return;
     }
-    const { type, eventIndex } = event.detail;
-    if (eventIndex === null) {
+    const { type, eventId } = event.detail;
+    if (eventId === null) {
       // A mark a picked inspector row left here goes with the selection: it was
       // never a selection of these grids.
       this._inspector.dropPick();
@@ -136,7 +136,7 @@ export class DatabaseView extends LitElement {
     });
     eventBus.emit('detail:select', {
       source: 'database',
-      selection: { kind: 'event', eventIndex, type },
+      selection: { kind: 'event', eventId, type },
     });
   }
 
@@ -151,7 +151,7 @@ export class DatabaseView extends LitElement {
     this.renderRoot.addEventListener('grid-locate', (event) =>
       eventBus.emit('detail:locate', {
         source: 'database',
-        eventIndexes: (event as GridLocateEvent).detail.eventIndexes,
+        eventIds: (event as GridLocateEvent).detail.eventIds,
       }),
     );
   }

@@ -3,7 +3,7 @@
  */
 import { describe, expect, it, jest } from '@jest/globals';
 
-import { indexesOf, storeOf } from '#test-helpers/apexLog.js';
+import { idsOf, storeOf } from '#test-helpers/apexLog.js';
 
 import {
   aggregateVariablesFor,
@@ -35,7 +35,7 @@ const CALLS =
 /** The comparison of every `ns.Svc.run()` call. */
 async function compare(body: string, text = 'ns.Svc.run()') {
   const { log, store } = await storeOf(body);
-  const frames = indexesOf(log, text);
+  const frames = idsOf(log, text);
   const spread = await aggregateVariablesFor(store, frames, { yieldSlice });
   return { log, store, frames, spread };
 }
@@ -77,7 +77,7 @@ describe('aggregateVariablesFor', () => {
   // The mark is what a value row points at, so it names every call, not one.
   it('names the calls that held a value', async () => {
     const { log, spread } = await compare(CALLS);
-    const calls = indexesOf(log, 'ns.Svc.run()');
+    const calls = idsOf(log, 'ns.Svc.run()');
 
     const retry = spread?.locals.find((row) => row.name === 'retry');
     expect(retry?.values.find((value) => value.text === 'false')?.at).toEqual([calls[1], calls[2]]);
@@ -172,7 +172,7 @@ describe('aggregateVariablesFor', () => {
 
   it('returns null for an abandoned walk, and never memoises it', async () => {
     const { log, store } = await storeOf(CALLS);
-    const frames = indexesOf(log, 'ns.Svc.run()');
+    const frames = idsOf(log, 'ns.Svc.run()');
     // Only a spent slice yields, and only a yield reads the signal.
     const clock = jest.spyOn(performance, 'now');
     let time = 0;
@@ -198,7 +198,7 @@ describe('aggregateVariablesFor', () => {
   });
 
   // The panel keeps its selection across loads, so the same frames array is asked
-  // of the next log, where those indexes are other calls.
+  // of the next log, where those ids are other calls.
   it('does not answer one log from a walk of another', async () => {
     const { frames, spread } = await compare(CALLS);
     const next = await compare(CALLS);
@@ -257,7 +257,7 @@ describe('aggregateVariablesFor on this', () => {
         '09:18:22.6 (2010)|VARIABLE_ASSIGNMENT|[2]|count|1\n' +
         '09:18:22.6 (2020)|METHOD_EXIT|[1]|ns.Other.run()\n',
     );
-    const frames = [...indexesOf(log, 'ns.Svc.run()'), ...indexesOf(log, 'ns.Other.run()')];
+    const frames = [...idsOf(log, 'ns.Svc.run()'), ...idsOf(log, 'ns.Other.run()')];
 
     const spread = await aggregateVariablesFor(store, frames, { yieldSlice });
 

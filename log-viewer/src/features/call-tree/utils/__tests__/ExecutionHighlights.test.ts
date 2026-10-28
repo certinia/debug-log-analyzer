@@ -3,13 +3,7 @@
  */
 import { describe, expect, it } from '@jest/globals';
 
-import {
-  frameLines,
-  indexesOf,
-  rawStoreOf,
-  storeOf,
-  type FrameSpec,
-} from '#test-helpers/apexLog.js';
+import { frameLines, idsOf, rawStoreOf, storeOf, type FrameSpec } from '#test-helpers/apexLog.js';
 import type { LogStore } from '#core/log/LogStore.js';
 import { executionHighlights, type ExecutionHighlights } from '../ExecutionHighlights.js';
 
@@ -33,7 +27,7 @@ async function highlightsOf(
   const { store } = await rawStoreOf(frameLines(specs));
   return {
     ...(await store.derive(executionHighlights)),
-    ids: (text) => indexesOf(store.log, text),
+    ids: (text) => idsOf(store.log, text),
   };
 }
 
@@ -47,8 +41,8 @@ describe('executionHighlights hot path', () => {
     expect(hotPath.map((f) => f.text)).toEqual(['Root', 'Big', 'Leaf']);
     expect(hotPath[0]).toEqual({
       text: 'Root',
-      eventIndex: ids('Root')[0],
-      eventIndexes: ids('Root'),
+      eventId: ids('Root')[0],
+      eventIds: ids('Root'),
       totalTime: 890,
       selfTime: 0,
       count: 1,
@@ -66,9 +60,9 @@ describe('executionHighlights hot path', () => {
 
     expect(hotPath[1]).toEqual({
       text: 'Repeat',
-      eventIndex: repeats[1],
+      eventId: repeats[1],
       // Every instance the frame merges, so a hover marks all of them.
-      eventIndexes: repeats,
+      eventIds: repeats,
       totalTime: 600,
       selfTime: 600,
       count: 2,
@@ -136,8 +130,8 @@ describe('executionHighlights hot path end', () => {
     expect(hotPathBranches.map((branch) => branch.text)).toEqual(['Alpha', 'Beta', 'Gamma']);
     expect(hotPathBranches[0]).toEqual({
       text: 'Alpha',
-      eventIndex: ids('Alpha')[0],
-      eventIndexes: ids('Alpha'),
+      eventId: ids('Alpha')[0],
+      eventIds: ids('Alpha'),
       totalTime: 380,
       selfTime: 380,
       count: 1,
@@ -165,8 +159,8 @@ describe('executionHighlights hot path end', () => {
     expect(hotPathBranches).toEqual([
       {
         text: 'Repeat',
-        eventIndex: repeats[1],
-        eventIndexes: repeats,
+        eventId: repeats[1],
+        eventIds: repeats,
         totalTime: 300,
         selfTime: 300,
         count: 2,
@@ -174,8 +168,8 @@ describe('executionHighlights hot path end', () => {
       },
       {
         text: 'Other',
-        eventIndex: ids('Other')[0],
-        eventIndexes: ids('Other'),
+        eventId: ids('Other')[0],
+        eventIds: ids('Other'),
         totalTime: 300,
         selfTime: 300,
         count: 1,
@@ -203,7 +197,7 @@ describe('executionHighlights hot spots', () => {
     expect(hotSpots).toEqual([
       {
         text: 'MyClass.run()',
-        eventIndex: ids('MyClass.run()')[1],
+        eventId: ids('MyClass.run()')[1],
         selfTime: 400,
         totalTime: 400,
         count: 2,
@@ -211,7 +205,7 @@ describe('executionHighlights hot spots', () => {
       },
       {
         text: 'Other.go()',
-        eventIndex: ids('Other.go()')[0],
+        eventId: ids('Other.go()')[0],
         selfTime: 50,
         totalTime: 50,
         count: 1,
@@ -247,14 +241,14 @@ describe('executionHighlights hot spots', () => {
     expect(hotSpots).toEqual([
       {
         text: 'MyClass.run()',
-        eventIndex: timed,
+        eventId: timed,
         selfTime: 60,
         totalTime: 60,
         count: 2,
         category: 'Apex',
       },
     ]);
-    expect(untimed).not.toBe(hotSpots[0]?.eventIndex);
+    expect(untimed).not.toBe(hotSpots[0]?.eventId);
   });
 
   it('sums total time and takes the category from the worst instance', async () => {
@@ -314,7 +308,7 @@ describe('executionHighlights truncation', () => {
     // The first region opens after A, the last event the log wrote before the cut.
     expect(highlights.truncation).toEqual({
       regionCount: 2,
-      firstEventIndex: indexesOf(store.log, 'ns.A.run()')[0],
+      firstEventId: idsOf(store.log, 'ns.A.run()')[0],
     });
   });
 

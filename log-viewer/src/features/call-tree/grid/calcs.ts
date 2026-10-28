@@ -13,7 +13,7 @@ import { sum, type Calc } from '../../../grid/index.js';
  */
 export function outermostSum<R extends { instances: readonly number[] }>(
   log: ApexLog,
-  valueOf: (eventIndex: number) => number,
+  valueOf: (eventId: number) => number,
 ): Calc<R> {
   const total = sum(valueOf);
   return {

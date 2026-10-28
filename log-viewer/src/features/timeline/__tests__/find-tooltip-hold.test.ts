@@ -23,7 +23,7 @@ const MATCH: EventNode = {
   duration: 500,
   type: 'METHOD_ENTRY',
   text: 'Match()',
-  original: { eventIndex: 7, isParent: true },
+  original: { eventId: 7, isParent: true },
 };
 
 type Tooltip = { show: jest.Mock; showTruncation: jest.Mock; hide: jest.Mock };
@@ -93,7 +93,7 @@ describe('the panel on a find match', () => {
   });
 
   it('is not replaced by whatever the frames slid under the pointer', () => {
-    chart.hover({ ...MATCH, id: 'other', original: { eventIndex: 9 } }, 'frames');
+    chart.hover({ ...MATCH, id: 'other', original: { eventId: 9 } }, 'frames');
 
     expect(chart.tooltip.show).toHaveBeenCalledTimes(1);
   });
@@ -116,7 +116,7 @@ describe('the panel on a find match', () => {
     chart.deselect();
     chart.tooltip.show.mockClear();
 
-    chart.hover({ ...MATCH, id: 'other', original: { eventIndex: 9 } }, 'frames');
+    chart.hover({ ...MATCH, id: 'other', original: { eventId: 9 } }, 'frames');
 
     expect(chart.tooltip.show).toHaveBeenCalledTimes(1);
   });

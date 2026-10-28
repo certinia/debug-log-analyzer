@@ -29,7 +29,7 @@ export interface InspectorGridOptions<R extends object> {
   /** The frame the row menu acts on; null leaves the browser's own menu. */
   menuFrame: (row: R) => number | null;
   /** The keys of the rows that stand for the frames under the pointer in the tab on screen. */
-  keysFor: (eventIndexes: readonly number[]) => Iterable<RowKey>;
+  keysFor: (eventIds: readonly number[]) => Iterable<RowKey>;
   /** Escape drops a picked row, and the mark it holds in the tab on screen. */
   dropOnClear?: boolean;
 }
@@ -69,10 +69,10 @@ export class InspectorGridController<R extends object> implements ReactiveContro
     this._options = options;
     host.addController(this);
     new SubscriptionController(host, () => [
-      eventBus.on('detail:locate', ({ eventIndexes }) => {
+      eventBus.on('detail:locate', ({ eventIds }) => {
         // The tab reports the same list again each time the pointer leaves one of its rows.
-        if (eventIndexes !== this._located) {
-          this._located = eventIndexes;
+        if (eventIds !== this._located) {
+          this._located = eventIds;
           this._remark();
         }
       }),

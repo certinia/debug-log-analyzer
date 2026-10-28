@@ -179,8 +179,8 @@ export class HotPath extends LitElement {
           '--row-hue': this._palette.colorFor(frame.category),
           '--self-pct': `${sharePercent(frame.selfTime, frame.totalTime)}%`,
         })}
-        @click=${() => dispatchInspectorReveal(this, frame.eventIndex)}
-        @pointerenter=${() => dispatchInspectorLocate(this, frame.eventIndexes)}
+        @click=${() => dispatchInspectorReveal(this, frame.eventId)}
+        @pointerenter=${() => dispatchInspectorLocate(this, frame.eventIds)}
         @pointerleave=${() => dispatchInspectorLocate(this, [])}
       >
         ${categoryLabel(frame.category)}
@@ -223,8 +223,8 @@ export class HotPath extends LitElement {
         class="bleed-row reveal-row branch-row"
         type="button"
         title=${`${churn}total ${formatDuration(branch.totalTime)}`}
-        @click=${() => dispatchInspectorReveal(this, branch.eventIndex)}
-        @pointerenter=${() => dispatchInspectorLocate(this, branch.eventIndexes)}
+        @click=${() => dispatchInspectorReveal(this, branch.eventId)}
+        @pointerenter=${() => dispatchInspectorLocate(this, branch.eventIds)}
         @pointerleave=${() => dispatchInspectorLocate(this, [])}
       >
         ${categoryLabel(branch.category)}
@@ -251,7 +251,7 @@ export class HotPath extends LitElement {
       class="bleed-row caveat-row"
       type="button"
       title="Show where the log was first truncated"
-      @click=${() => dispatchInspectorReveal(this, truncation.firstEventIndex)}
+      @click=${() => dispatchInspectorReveal(this, truncation.firstEventId)}
     >
       <vscode-icon class="sev-warning" name="warning"></vscode-icon>
       <span>${text}</span>

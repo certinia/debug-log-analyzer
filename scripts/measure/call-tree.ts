@@ -23,21 +23,21 @@ import { line, print, time, yieldSlice } from './harness.js';
 
 interface Shape {
   nodes: number;
-  /** Event indexes the rows store between them: what a row per occurrence costs.
+  /** Event ids the rows store between them: what a row per occurrence costs.
    *  A row that derives its own stores none. */
-  indexes: number;
+  ids: number;
   fattest: ScopedRow | null;
 }
 
 function shapeOf(rows: readonly ScopedRow[]): Shape {
-  const shape: Shape = { nodes: 0, indexes: 0, fattest: null };
+  const shape: Shape = { nodes: 0, ids: 0, fattest: null };
   const stack = [...rows];
   while (stack.length) {
     const row = stack.pop()!;
     shape.nodes += 1;
-    const held = row.eventIndexes?.length ?? 0;
-    shape.indexes += held;
-    if (held > (shape.fattest?.eventIndexes?.length ?? 0)) {
+    const held = row.eventIds?.length ?? 0;
+    shape.ids += held;
+    if (held > (shape.fattest?.eventIds?.length ?? 0)) {
       shape.fattest = row;
     }
     if (row._children) {
@@ -69,7 +69,7 @@ export async function measureCallTree(log: ApexLog): Promise<void> {
   ))!;
 
   const shape = shapeOf(bottomUp);
-  const counts = ({ nodes, indexes }: Shape) => `${nodes} nodes, ${indexes} indexes held`;
+  const counts = ({ nodes, ids }: Shape) => `${nodes} nodes, ${ids} ids held`;
   line('bottom-up', counts(shape));
   line('aggregated', counts(shapeOf(aggregated)));
   line('time-order', `${counts(shapeOf(timeOrder))}\n`);
@@ -80,7 +80,7 @@ export async function measureCallTree(log: ApexLog): Promise<void> {
 
   // The mark, on the worst row there is: the frames a picked bucket counts,
   // translated into the ids of every row they name.
-  const picked = shape.fattest?.eventIndexes ?? [];
+  const picked = shape.fattest?.eventIds ?? [];
   print(`\nfattest row: ${picked.length} occurrences of "${shape.fattest?.text ?? ''}"`);
   const ids = new LocatedRowIds();
   await time('mark callers (first)', () => ids.idsFor(store, picked, 'callers'));

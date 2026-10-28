@@ -27,10 +27,9 @@ function getIssuesFromSOQLLine(soqlLine: SoqlEvent | null): SOQLLinterRule[] {
   return soqlIssues;
 }
 
-/** Lint the SOQL at `eventIndex`, combining explain-line + linter rules, sorted by severity. */
-export async function computeSoqlIssues(eventIndex: number): Promise<SOQLLinterRule[]> {
-  const stack =
-    eventIndex >= 0 ? (currentLogStore()?.stackByEventIndex(eventIndex).reverse() ?? []) : [];
+/** Lint the SOQL at `eventId`, combining explain-line + linter rules, sorted by severity. */
+export async function computeSoqlIssues(eventId: number): Promise<SOQLLinterRule[]> {
+  const stack = eventId >= 0 ? (currentLogStore()?.stackById(eventId).reverse() ?? []) : [];
   const soqlLine = stack[0] as SoqlEvent | undefined;
   if (!soqlLine) {
     return [];
@@ -48,7 +47,7 @@ export class SOQLLinterIssues extends LitElement {
   soql = '';
 
   @property({ type: Number })
-  eventIndex = -1;
+  eventId = -1;
 
   // When true (e.g. inside the details panel), fill the container and scroll
   // normally instead of the 30vh cap used in the inline grid detail.
@@ -106,13 +105,13 @@ export class SOQLLinterIssues extends LitElement {
       }
       return;
     }
-    if (changed.has('soql') || changed.has('eventIndex')) {
+    if (changed.has('soql') || changed.has('eventId')) {
       void this.refreshIssues();
     }
   }
 
   private async refreshIssues(): Promise<void> {
-    this._issues = await computeSoqlIssues(this.eventIndex);
+    this._issues = await computeSoqlIssues(this.eventId);
   }
 
   render() {

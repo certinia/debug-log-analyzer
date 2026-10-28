@@ -35,8 +35,8 @@ import { rowBudgets } from '../rowBudget.js';
 const budgetsOf = (snapshots: number) => stubStore(logWith(snapshots)).derive(rowBudgets);
 
 const statement = (fields: Partial<DatabaseStatement>): DatabaseStatement => ({
-  eventIndex: 1,
-  eventIndexes: [1],
+  eventId: 1,
+  eventIds: [1],
   kind: 'SOQL',
   label: 'SELECT Id FROM Account',
   sObject: 'Account',

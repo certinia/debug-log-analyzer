@@ -28,5 +28,5 @@ export function getCallerNamespace(store: LogStore, id: number): string {
 /** {@link getCallerNamespace} for a row: the namespace of the shown frame above it. */
 export function callerNamespaceOfRow(index: LogIndex, row: number): string {
   const above = index.parent[row]!;
-  return above === NO_ROW ? DEFAULT_NAMESPACE : namespaceOf(index.log, index.eventIndex[above]!);
+  return above === NO_ROW ? DEFAULT_NAMESPACE : namespaceOf(index.log, index.eventId[above]!);
 }
