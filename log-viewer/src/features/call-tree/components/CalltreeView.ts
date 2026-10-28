@@ -73,10 +73,8 @@ import {
   directionOf,
   type ViewMode,
 } from '../../../components/callTreeViewModes.js';
-import type { DatagridFacetFilter } from '../../../components/datagrid-facet-filter.js';
 import '../../../components/datagrid-facet-filter.js';
 import '../../../components/datagrid-filter-bar.js';
-import type { DatagridRangeFilter } from '../../../components/datagrid-range-filter.js';
 import '../../../components/datagrid-range-filter.js';
 import '../../../components/OverflowList.js';
 
@@ -92,6 +90,13 @@ import {
   gridGroupControls,
   gridToolbarActions,
 } from '../../../components/gridToolbar.js';
+import {
+  clearGridFilters,
+  hiddenAfterGoTo,
+  HiddenRowController,
+  hiddenRowNoteStyles,
+  type HiddenRow,
+} from '../../../components/grid/hiddenRowNote.js';
 import { reportedUsageOf } from '../utils/reportedUsage.js';
 import { selectColumnWidthItem } from '../../../components/grid/columnWidthMenu.js';
 import { LocatedRowIds, type RowData } from '../../../components/locatedRow.js';
@@ -134,6 +139,8 @@ const DEBUG_VALUE_TYPES: ReadonlySet<string> = new Set([
 
 type ViewGrid = LvGrid<TimeOrderNode> | LvGrid<AggregatedRow> | LvGrid<BottomUpRow>;
 
+type RevealedRow = HiddenRow & { revealed: boolean };
+
 /** What the filters read from a view's rows. Bottom-Up has no type or debug filter. */
 interface FilterFields<R> extends MeasureFields<R> {
   type?: { of: (row: R) => string | null | undefined; debugOnly: RowFilter<R> };
@@ -168,6 +175,7 @@ export class CalltreeView extends LitElement {
   bottomUpGrid: LvGrid<BottomUpRow> | null = null;
   private _aggregatedTree: MergedTree<AggregatedRow> | null = null;
   private _bottomUpTree: MergedTree<BottomUpRow> | null = null;
+  private _timeOrderBuild: Promise<void> | null = null;
   private _aggregatedBuild: Promise<void> | null = null;
   private _bottomUpBuild: Promise<void> | null = null;
   // The Time Order filters read the source on show, so a new log keeps the same filter objects.
@@ -179,10 +187,11 @@ export class CalltreeView extends LitElement {
     test: (node) => this._timeOrderSource?.withoutDetails.test(node) ?? true,
   };
 
-  /** The event a go-to found the filters hiding, so the toolbar can offer to clear them. */
-  @state()
-  private _hiddenTarget: { eventIndex: number; parentSelected: boolean } | null = null;
-  private _goToCount = 0;
+  /** `revealed`, so Clear goes to the row in the view on show, as the reveal did, not in Time Order. */
+  private readonly _hiddenRows = new HiddenRowController<RevealedRow>(this, {
+    grid: () => this._activeGrid(),
+    onClear: (hidden) => this._clearFiltersAndGo(hidden),
+  });
 
   filterState: { showDetails: boolean; debugOnly: boolean; selectedTypes: Set<string> } = {
     showDetails: false,
@@ -297,7 +306,7 @@ export class CalltreeView extends LitElement {
 
   private async _replaceLog(store: LogStore): Promise<void> {
     this.rootStore = store;
-    this._hiddenTarget = null;
+    this._hiddenRows.invalidate();
     // `rootStore` is not reactive, and the Namespace filter lists its namespaces.
     this.requestUpdate();
     // A build still running reads the old log.
@@ -321,6 +330,7 @@ export class CalltreeView extends LitElement {
 
   static styles = [
     globalStyles,
+    hiddenRowNoteStyles,
     css`
       :host {
         height: 100%;
@@ -366,46 +376,6 @@ export class CalltreeView extends LitElement {
         opacity: 0;
         pointer-events: none;
       }
-
-      .hidden-note {
-        display: flex;
-        align-items: center;
-        gap: var(--lana-space-2xs);
-        /* Shrinks once the filters are in the menu, down to "Hidden by…" beside Clear; then joins them. */
-        flex: 0 1 auto;
-        min-width: 16ch;
-        color: var(--lana-fg-muted);
-        white-space: nowrap;
-      }
-
-      .hidden-note[slot='overflow'] {
-        padding: var(--lana-space-3xs) var(--lana-space-xs);
-      }
-
-      .hidden-note__text {
-        overflow: hidden;
-        text-overflow: ellipsis;
-      }
-
-      .hidden-note__clear {
-        flex: none;
-        padding: 0;
-        border: none;
-        background: none;
-        color: var(--lana-link-fg);
-        font: inherit;
-        cursor: pointer;
-      }
-
-      .hidden-note__clear:hover {
-        color: var(--lana-link-fg-active);
-        text-decoration: underline;
-      }
-
-      .hidden-note__clear:focus-visible {
-        outline: var(--lana-focus-ring);
-        outline-offset: var(--lana-focus-offset);
-      }
     `,
   ];
 
@@ -415,15 +385,7 @@ export class CalltreeView extends LitElement {
 
     return html`
       <div id="call-tree-container">
-        <div class="sr-only" role="status" aria-live="polite">
-          ${
-            !this._hiddenTarget
-              ? ''
-              : this._hiddenTarget.parentSelected
-                ? 'The filters hide that row, so its parent is selected.'
-                : 'The filters hide that row and every row above it.'
-          }
-        </div>
+        ${this._hiddenRows.renderStatus()}
         <div>
           <datagrid-filter-bar>
             <view-mode-switch
@@ -510,21 +472,6 @@ export class CalltreeView extends LitElement {
                     `
                   : ''
               }
-              ${
-                !this._hiddenTarget
-                  ? ''
-                  : html`<span slot="end" collapse-last class="hidden-note">
-                      <span class="hidden-note__text">Hidden by filters ·</span>
-                      <button
-                        type="button"
-                        class="hidden-note__clear"
-                        aria-label="Clear filters and go to the hidden row"
-                        @click=${this._clearFiltersAndGo}
-                      >
-                        Clear
-                      </button>
-                    </span>`
-              }
             </overflow-list>
             ${gridGroupControls({
               grid: this._activeGrid(),
@@ -547,7 +494,7 @@ export class CalltreeView extends LitElement {
         </div>
 
         <div id="call-tree-table-container">
-          ${skeleton}
+          ${this._hiddenRows.renderNote()} ${skeleton}
           <div class="table-host ${this.viewMode === 'time-order' ? '' : 'is-hidden'}">
             <div id="call-tree-table"></div>
           </div>
@@ -583,6 +530,8 @@ export class CalltreeView extends LitElement {
     if (newMode === this.viewMode) {
       return;
     }
+    // The bar names a row of the view left behind. Not an invalidate: a go-to switches views mid-flight.
+    this._hiddenRows.dismiss();
 
     const switchEpoch = ++this.viewSwitchEpoch;
     this.viewMode = newMode;
@@ -644,6 +593,7 @@ export class CalltreeView extends LitElement {
     this.bottomUpGrid = null;
     this._aggregatedTree = null;
     this._bottomUpTree = null;
+    this._timeOrderBuild = null;
     this._aggregatedBuild = null;
     this._bottomUpBuild = null;
     this._timeOrderSource = null;
@@ -685,6 +635,18 @@ export class CalltreeView extends LitElement {
         return this.aggregatedGrid;
       case 'bottom-up':
         return this.bottomUpGrid;
+    }
+  }
+
+  /** The build that fills the grid of the view on show with the rows of the current log. */
+  private _activeBuild(): Promise<void> | null {
+    switch (this.viewMode) {
+      case 'time-order':
+        return this._timeOrderBuild;
+      case 'aggregated':
+        return this._aggregatedBuild;
+      case 'bottom-up':
+        return this._bottomUpBuild;
     }
   }
 
@@ -791,9 +753,8 @@ export class CalltreeView extends LitElement {
   }
 
   _updateFiltering() {
-    this._hiddenTarget = null;
     // A go-to still running read the old filters, so its note would be stale.
-    this._goToCount++;
+    this._hiddenRows.invalidate();
     this._applyFilters();
   }
 
@@ -920,9 +881,9 @@ export class CalltreeView extends LitElement {
     if (!store) {
       return;
     }
-    const goTo = ++this._goToCount;
-    const current = () => goTo === this._goToCount && store === this.rootStore;
-    this._hiddenTarget = null;
+    const latest = this._hiddenRows.begin();
+    // A view switch by the user moves the bar and focus off the Time Order grid.
+    const current = () => latest() && store === this.rootStore && this.viewMode === 'time-order';
     document.dispatchEvent(new CustomEvent('show-tab', { detail: { tabid: 'tree-tab' } }));
 
     if (this.viewMode !== 'time-order') {
@@ -940,42 +901,60 @@ export class CalltreeView extends LitElement {
     if (!grid || !path.length || !current()) {
       return;
     }
+    this._showDetailsFor(eventIndex, 'time-order');
     const result = await grid.goTo(path);
     if (result === 'superseded' || !current()) {
       return;
     }
-    if (result === 'none-shown') {
-      this._hiddenTarget = { eventIndex, parentSelected: false };
-      return;
+    const hidden = hiddenAfterGoTo({ eventIndex, path, result, selectedKey: grid.selectedKey });
+    this._hiddenRows.show(hidden && { ...hidden, revealed: false });
+    if (result === 'selected') {
+      grid.focus({ preventScroll: true });
     }
-    // The grid stops at the deepest shown row on the path, so a row the filters hide lands on its parent.
-    if (grid.selectedKey !== path.at(-1)) {
-      this._hiddenTarget = { eventIndex, parentSelected: true };
-    }
-    grid.focus({ preventScroll: true });
   }
 
-  /** Clears the filters that can hide a go-to's row, then goes to it. */
-  private async _clearFiltersAndGo(): Promise<void> {
-    if (!this._hiddenTarget) {
-      return;
-    }
-    const { eventIndex } = this._hiddenTarget;
-    for (const filter of this.renderRoot.querySelectorAll<
-      DatagridFacetFilter | DatagridRangeFilter
-    >('datagrid-facet-filter, datagrid-range-filter')) {
-      filter.clear();
-    }
+  /** Clears the filters that can hide `hidden`'s row, then goes to it again the way it was reached. */
+  private async _clearFiltersAndGo(hidden: RevealedRow): Promise<void> {
+    const { eventIndex, revealed } = hidden;
+    clearGridFilters(this.renderRoot);
     this._setTypeFilter('');
-    // Details stays as chosen unless it hides this row, as it does a detail an issue card names.
-    const row = this._timeOrderSource?.index.rowOf(eventIndex) ?? NO_ROW;
-    const showDetails =
-      this.filterState.showDetails ||
-      (row !== NO_ROW && !this._timeOrderWithoutDetails.test({ row }));
-    this.filterState = { showDetails, debugOnly: false, selectedTypes: new Set() };
+    // Details is left as is: the go-to turns it on when it hides the row.
+    this.filterState = { ...this.filterState, debugOnly: false, selectedTypes: new Set() };
     this.requestUpdate();
     this._updateFiltering();
-    await this._goToRow(eventIndex);
+    if (revealed) {
+      await this._revealEventIndex(eventIndex, new AbortController().signal);
+    } else {
+      await this._goToRow(eventIndex);
+    }
+  }
+
+  /** Details sets how much shows, not what, so it is turned on rather than reported, as Analysis does. */
+  private _showDetailsFor(eventIndex: number, mode: ViewMode): void {
+    if (this.filterState.showDetails || !this._detailsHide(eventIndex, mode)) {
+      return;
+    }
+    this.filterState = { ...this.filterState, showDetails: true };
+    this.requestUpdate();
+    // Not `_updateFiltering`: its invalidate would cancel the go-to turning Details on.
+    this._applyFilters();
+  }
+
+  private _detailsHide(eventIndex: number, mode: ViewMode): boolean {
+    switch (mode) {
+      case 'time-order': {
+        const row = this._timeOrderSource?.index.rowOf(eventIndex) ?? NO_ROW;
+        return row !== NO_ROW && !this._timeOrderWithoutDetails.test({ row });
+      }
+      case 'aggregated': {
+        const row = this._aggregatedTree?.rowFor(this._pathIds(eventIndex, mode));
+        return !!row && !AGGREGATED_WITHOUT_DETAILS.test(row);
+      }
+      case 'bottom-up': {
+        const row = this._bottomUpTree?.rowFor(this._pathIds(eventIndex, mode));
+        return !!row && !BOTTOM_UP_WITHOUT_DETAILS.test(row);
+      }
+    }
   }
 
   /**
@@ -984,27 +963,49 @@ export class CalltreeView extends LitElement {
    * Focus stays where the click was, which is the inspector.
    */
   private async _revealEventIndex(eventIndex: number, signal: AbortSignal): Promise<void> {
+    this._hiddenRows.invalidate();
+    // A new log reaches `rootStore` in `updated`.
+    await this.updateComplete;
     const grid = this._activeGrid();
+    const store = this.rootStore;
     if (!grid || signal.aborted) {
       return;
     }
+    // A failed build shows its own alert in the grid.
+    await this._activeBuild()?.catch(() => undefined);
+    if (signal.aborted || store !== this.rootStore || grid !== this._activeGrid()) {
+      return;
+    }
+    // Taken after the build, so a filter changed while it ran does not drop the reveal.
+    const latest = this._hiddenRows.begin();
+    this._showDetailsFor(eventIndex, this.viewMode);
     const path = this._pathTo(eventIndex);
-    await this._echoGuard.runAsync(() => grid.goTo(path, { scrollIfVisible: false }));
+    const result = await this._echoGuard.runAsync(() =>
+      grid.goTo(path, { scrollIfVisible: false }),
+    );
+    // A view switch moves the bar's grid, so a result for the one left behind is dropped.
+    if (signal.aborted || !latest() || store !== this.rootStore || grid !== this._activeGrid()) {
+      return;
+    }
+    const hidden = hiddenAfterGoTo({ eventIndex, path, result, selectedKey: grid.selectedKey });
+    this._hiddenRows.show(hidden && { ...hidden, revealed: true });
   }
 
   /** The keys from a top-level row down to the row of the view on show for `eventIndex`. */
   private _pathTo(eventIndex: number): RowKey[] {
-    const direction: SelectionView = directionOf(this.viewMode);
-    const pathIds = (): readonly number[] =>
-      this._locateIds.idsFor(this.rootStore, [eventIndex], direction);
     switch (this.viewMode) {
       case 'time-order':
         return this._timeOrderPath(eventIndex);
       case 'aggregated':
-        return this._aggregatedTree?.pathTo(pathIds()) ?? [];
+        return this._aggregatedTree?.pathTo(this._pathIds(eventIndex, this.viewMode)) ?? [];
       case 'bottom-up':
-        return this._bottomUpTree?.pathTo(pathIds()) ?? [];
+        return this._bottomUpTree?.pathTo(this._pathIds(eventIndex, this.viewMode)) ?? [];
     }
+  }
+
+  private _pathIds(eventIndex: number, mode: ViewMode): readonly number[] {
+    const direction: SelectionView = directionOf(mode);
+    return this._locateIds.idsFor(this.rootStore, [eventIndex], direction);
   }
 
   /** The keys from a top-level row down to the Time Order row for `eventIndex`. */
@@ -1017,6 +1018,8 @@ export class CalltreeView extends LitElement {
     store: LogStore,
   ): Promise<void> {
     if (this.timeOrderGrid) {
+      // A failed build shows its own alert in the grid.
+      await this._timeOrderBuild?.catch(() => undefined);
       await waitForNextFrame();
       return;
     }
@@ -1037,7 +1040,12 @@ export class CalltreeView extends LitElement {
     await this._loadTimeOrder(grid, store);
   }
 
-  private async _loadTimeOrder(grid: LvGrid<TimeOrderNode>, store: LogStore): Promise<void> {
+  private _loadTimeOrder(grid: LvGrid<TimeOrderNode>, store: LogStore): Promise<void> {
+    this._timeOrderBuild = this._fillTimeOrder(grid, store);
+    return this._timeOrderBuild;
+  }
+
+  private async _fillTimeOrder(grid: LvGrid<TimeOrderNode>, store: LogStore): Promise<void> {
     const [reported, index] = await Promise.all([reportedUsageOf(store.log), store.logIndex()]);
     // A newer log can load while this one waits.
     if (this.rootStore !== store) {

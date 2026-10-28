@@ -190,6 +190,8 @@
     var(--lana-severity-warning) 20%,
     transparent
   );
+  /* Attention flash — an opaque warning tint on a floating surface, for a notice that must catch the eye. */
+  --lana-attention-bg: color-mix(in srgb, var(--lana-severity-warning) 25%, var(--lana-popover-bg));
 
   /* Secondary text — metadata that must not compete with the content it annotates. */
   --lana-fg-muted: var(--vscode-descriptionForeground, rgba(204, 204, 204, 0.7));

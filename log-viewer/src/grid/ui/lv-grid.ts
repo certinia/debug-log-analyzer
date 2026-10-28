@@ -327,12 +327,12 @@ export class LvGrid<R extends object = object> extends LitElement {
     // A source set in the same turn reaches the store only in this element's update.
     await this.updateComplete;
     const index = (await this.store?.reveal(path)) ?? -1;
-    if (index < 0) {
-      return 'none-shown';
-    }
     await this.updateComplete;
     if (selection !== this.selections) {
       return 'superseded';
+    }
+    if (index < 0) {
+      return 'none-shown';
     }
     this.bringIntoView(index, scrollIfVisible);
     this.select(this.targetAt(index), index);
@@ -342,6 +342,11 @@ export class LvGrid<R extends object = object> extends LitElement {
   /** Moves keyboard focus to the grid, so its keys and copy work. */
   override focus(options?: FocusOptions): void {
     this.scrollerRef.value?.focus(options);
+  }
+
+  /** The header row's height in px, read from layout on each call; 0 before the first render. */
+  get headerHeight(): number {
+    return this.renderRoot.querySelector<HTMLElement>('.head')?.offsetHeight ?? 0;
   }
 
   /**

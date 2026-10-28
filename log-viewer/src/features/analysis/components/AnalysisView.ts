@@ -29,6 +29,12 @@ import {
   gridGroupControls,
   gridToolbarActions,
 } from '../../../components/gridToolbar.js';
+import {
+  clearGridFilters,
+  hiddenAfterGoTo,
+  HiddenRowController,
+  hiddenRowNoteStyles,
+} from '../../../components/grid/hiddenRowNote.js';
 import type { GridColumn, GroupBy, RowFilter, RowKey, TreeSource } from '../../../grid/index.js';
 import type { FilterRange } from '../../../components/grid/MinMax.js';
 import {
@@ -70,6 +76,7 @@ import '../../../components/GridSkeleton.js';
 export class AnalysisView extends LitElement {
   static styles = [
     globalStyles,
+    hiddenRowNoteStyles,
     css`
       :host {
         height: 100%;
@@ -122,6 +129,13 @@ export class AnalysisView extends LitElement {
     self: { start: null, end: null },
   };
   private readonly _filterCache = new RowFilterCache();
+  private readonly _hiddenRows = new HiddenRowController(this, {
+    grid: () => this.grid,
+    onClear: async ({ eventIndex }) => {
+      clearGridFilters(this.renderRoot);
+      await this._revealEventIndex(eventIndex, new AbortController().signal);
+    },
+  });
 
   // State, so the expand button follows the grid once it mounts.
   @state()
@@ -188,6 +202,16 @@ export class AnalysisView extends LitElement {
    * the row it just asked for.
    */
   private async _revealEventIndex(eventIndex: number, signal: AbortSignal): Promise<void> {
+    this._hiddenRows.invalidate();
+    const store = this.logStore;
+    // A new log's build starts in `updated`, and its rows reach the grid in the render after it.
+    await this.updateComplete;
+    // A failed build stays in `_built` until the next log, so it must not fail every reveal.
+    await this._built?.catch(() => undefined);
+    await this.updateComplete;
+    if (signal.aborted || store !== this.logStore) {
+      return;
+    }
     const { grid, _tree: tree } = this;
     const pathIds = this._revealIds.idsFor(this.logStore, [eventIndex], 'callers');
     const row = tree?.rowFor(pathIds);
@@ -207,9 +231,24 @@ export class AnalysisView extends LitElement {
       return;
     }
 
-    await this._echoGuard.runAsync(() =>
-      grid.goTo(tree.pathTo(pathIds), { scrollIfVisible: false }),
+    // Taken after the Details change, which invalidates every go-to before it.
+    const current = this._hiddenRows.begin();
+    const path = tree.pathTo(pathIds);
+    const result = await this._echoGuard.runAsync(() =>
+      grid.goTo(path, { scrollIfVisible: false }),
     );
+    if (!signal.aborted && current() && tree === this._tree) {
+      this._hiddenRows.show(
+        hiddenAfterGoTo({ eventIndex, path, result, selectedKey: grid.selectedKey }),
+      );
+    }
+  }
+
+  willUpdate(changedProperties: PropertyValues): void {
+    // A filter change can show the row, or hide another.
+    if (changedProperties.has('_measures') || changedProperties.has('_showDetails')) {
+      this._hiddenRows.invalidate();
+    }
   }
 
   disconnectedCallback(): void {
@@ -227,6 +266,7 @@ export class AnalysisView extends LitElement {
     } else if (this._built) {
       // The grid keeps its sort, widths, group and filters. Its selection and mark named rows of the old log.
       this._marked = new Set();
+      this._hiddenRows.invalidate();
       this.grid?.deselect();
       this._builds.abort();
       this._builds = new AbortController();
@@ -237,6 +277,7 @@ export class AnalysisView extends LitElement {
   render() {
     return html`
       <div class="analysis-view">
+        ${this._hiddenRows.renderStatus()}
         <datagrid-filter-bar>
           ${columnViewSelect({
             id: 'column-view',
@@ -290,6 +331,7 @@ export class AnalysisView extends LitElement {
         </datagrid-filter-bar>
 
         <div id="analysis-table-container">
+          ${this._hiddenRows.renderNote()}
           ${this._source ? this._renderGrid() : html`<grid-skeleton></grid-skeleton>`}
         </div>
         <context-menu

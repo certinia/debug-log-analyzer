@@ -69,7 +69,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - 🧭 **Show in Log Analysis**: opens the right log at the right event.
 - 📍 **Show in Timeline**: always goes to the event.
 - 🔬 **Variables**: a constructor's `this` names its class, not the outer class or the namespace. ([#1229])
-- 🌳 **Go to Call Tree**: a row the filters hide selects its parent, with the option to clear the filters and go to the hidden row.
+- 🌳 **Hidden rows**: Go to Call Tree and Inspector findings say when the filters hide their row and offer to clear them, turning Details on when only Details hides it. ([#1211])
 
 ## [1.22.1] - 2026-09-18
 
@@ -628,6 +628,7 @@ Skipped due to adopting odd numbering for pre releases and even number for relea
 [#259]: https://github.com/certinia/debug-log-analyzer/issues/259
 [#1204]: https://github.com/certinia/debug-log-analyzer/issues/1204
 [#1209]: https://github.com/certinia/debug-log-analyzer/issues/1209
+[#1211]: https://github.com/certinia/debug-log-analyzer/issues/1211
 
 <!-- 1.22.0 -->
 

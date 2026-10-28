@@ -37,6 +37,7 @@ import { parserIssuesToNotifications } from './parserNotifications.js';
 
 // styles
 import { globalStyles, srOnly } from '../../styles/global.styles.js';
+import { liveStatus } from '../../components/liveStatus.js';
 
 // web components
 import './AppHeader.js';
@@ -216,9 +217,7 @@ export class LogViewer extends LitElement {
   }
 
   render() {
-    return html`<div class="sr-only" role="status" aria-live="polite">
-        ${this._announced ? LOAD_ANNOUNCEMENT[this._logStatus] : ''}
-      </div>
+    return html`${liveStatus(this._announced ? LOAD_ANNOUNCEMENT[this._logStatus] : '')}
 
       <app-header
         .logName=${this.logName}
