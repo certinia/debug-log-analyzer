@@ -189,10 +189,10 @@ export class LogInspector extends LitElement {
         // The load can land after the user has already opened or laid out the
         // panel, so their own choice always wins over the stored one.
         this._visiblePref ??= panel.visible ?? null;
+        this.sidePanelSize ??= panel.sideSize ?? null;
+        this.bottomPanelSize ??= panel.bottomSize ?? null;
         if (!this._userAdjusted) {
           this.dock = panel.position;
-          this.sidePanelSize = panel.sideSize ?? null;
-          this.bottomPanelSize = panel.bottomSize ?? null;
           this.collapsedSections = panel.collapsed ?? {};
           this.sectionOrder = panel.sectionOrder ?? {};
           this.hiddenSections = panel.hiddenSections ?? {};

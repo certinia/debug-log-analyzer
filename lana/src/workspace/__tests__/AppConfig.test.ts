@@ -141,7 +141,8 @@ describe('inspector size', () => {
   });
 
   it('reads the dragged size from globalState, and null before any drag', () => {
-    expect(getInspectorState(mockMemento({ 'inspector.sideSize': 900 })).sideSize).toBe(900);
+    const stored = mockMemento({ 'inspector.sideSize': 900, 'inspector.bottomSize': 300 });
+    expect(getInspectorState(stored)).toMatchObject({ sideSize: 900, bottomSize: 300 });
     // A stored pixel default would keep a later default from reaching this user.
     expect(getInspectorState(mockMemento()).sideSize).toBeNull();
     expect(getInspectorState(mockMemento()).bottomSize).toBeNull();

@@ -520,46 +520,60 @@ describe('LogInspector', () => {
     expect(paneView(el).layoutEpoch).toBe(1);
   });
 
+  const resetBy = {
+    'the menu': (el: LogInspector) => {
+      openSectionMenu(el);
+      pickMenuItem(el, RESET_SIZE_ID);
+    },
+    'a double-click on the edge': (el: LogInspector) =>
+      dockLayout(el).dispatchEvent(new CustomEvent('dock-size-reset')),
+  };
   it.each([
-    [
-      'the menu',
-      (el: LogInspector) => {
-        openSectionMenu(el);
-        pickMenuItem(el, RESET_SIZE_ID);
-      },
-    ],
-    [
-      'a double-click on the edge',
-      (el: LogInspector) => dockLayout(el).dispatchEvent(new CustomEvent('dock-size-reset')),
-    ],
-  ])('resets a dragged size to 560px from %s, and leaves the sections alone', async (_, reset) => {
+    ['right', 'the menu', '900px', '560px', 'inspector.sideSize'],
+    ['right', 'a double-click on the edge', '900px', '560px', 'inspector.sideSize'],
+    ['bottom', 'the menu', '300px', '33.333%', 'inspector.bottomSize'],
+    ['bottom', 'a double-click on the edge', '300px', '33.333%', 'inspector.bottomSize'],
+  ] as const)(
+    'docked %s, resets the stored size from %s and leaves the sections alone',
+    async (position, by, stored, initial, key) => {
+      settings.inspector = inspectorSettings({ position, sideSize: 900, bottomSize: 300 });
+      const el = await mount('timeline-tab');
+      select('timeline', 1);
+      await flush(el);
+      expect(dockedSize(el)).toBe(stored);
+
+      resetBy[by](el);
+      await flush(el);
+
+      expect(dockedSize(el)).toBe(initial);
+      // Unset rather than the default, so a later default still reaches this user.
+      expect(written).toEqual([{ section: key, value: null }]);
+    },
+  );
+
+  it('keeps a width beside the view and a height below it, a third of the view by default', async () => {
     settings.inspector = inspectorSettings({ sideSize: 900 });
     const el = await mount('timeline-tab');
     select('timeline', 1);
     await flush(el);
-    expect(dockedSize(el)).toBe('900px');
+    const redock = async (position: string) => {
+      dockLayout(el).dispatchEvent(
+        new CustomEvent('dock-position-change', { detail: { position } }),
+      );
+      await flush(el);
+    };
 
-    reset(el);
-    await flush(el);
-
-    expect(dockedSize(el)).toBe('560px');
-    // Unset rather than 560, so a later default still reaches this user.
-    expect(written).toEqual([{ section: 'inspector.sideSize', value: null }]);
-  });
-
-  it('keeps its own height docked at the bottom, a third of the view by default', async () => {
-    settings.inspector = inspectorSettings({ position: 'bottom', sideSize: 900 });
-    const el = await mount('timeline-tab');
-    select('timeline', 1);
-    await flush(el);
+    await redock('bottom');
     // A width would leave the main view no room above it.
     expect(dockedSize(el)).toBe('33.333%');
-
     dockLayout(el).dispatchEvent(new CustomEvent('dock-resize', { detail: { size: 300 } }));
     await flush(el);
-
     expect(dockedSize(el)).toBe('300px');
-    expect(written).toEqual([{ section: 'inspector.bottomSize', value: 300 }]);
+
+    await redock('right');
+    expect(dockedSize(el)).toBe('900px');
+    expect(written).toContainEqual({ section: 'inspector.bottomSize', value: 300 });
+    expect(written.map((w) => w.section)).not.toContain('inspector.sideSize');
   });
 
   it('keeps a maximized section to the list it was maximized in', async () => {
@@ -696,6 +710,40 @@ describe('LogInspector', () => {
     // The stored `visible: false` and `collapsed` don't undo either action.
     expect(visible(el)).toBe(true);
     expect(paneView(el).collapsed).toEqual({ vitals: true });
+  });
+
+  it('keeps the stored height when only the width was dragged before the settings load', async () => {
+    settings.inspector = inspectorSettings({ sideSize: 400, bottomSize: 300 });
+    deferSettings = true;
+    const el = document.createElement('log-inspector') as LogInspector;
+    el.activeTab = 'timeline-tab';
+    document.body.appendChild(el);
+    select('timeline', 1);
+    await flush(el);
+
+    dockLayout(el).dispatchEvent(new CustomEvent('dock-resize', { detail: { size: 700 } }));
+    releaseSettings?.();
+    await flush(el);
+    expect(dockedSize(el)).toBe('700px');
+
+    dockLayout(el).dispatchEvent(
+      new CustomEvent('dock-position-change', { detail: { position: 'bottom' } }),
+    );
+    await flush(el);
+    expect(dockedSize(el)).toBe('300px');
+  });
+
+  it('hides the panel when its edge is dragged past the minimum', async () => {
+    const el = await mount('timeline-tab');
+    select('timeline', 1);
+    await flush(el);
+    expect(visible(el)).toBe(true);
+
+    dockLayout(el).dispatchEvent(new CustomEvent('dock-collapse'));
+    await flush(el);
+
+    expect(visible(el)).toBe(false);
+    expect(written).toEqual([{ section: 'inspector.visible', value: false }]);
   });
 
   it('stamps the active tab on a reveal, so only that tab acts on it', async () => {

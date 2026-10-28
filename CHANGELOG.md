@@ -52,7 +52,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Removed
 
 - 🪓 **Breaking**: the legacy Timeline and all its settings are dropped.
-- 🧹 **Breaking**: the `lana.inspector.size` setting is dropped. The inspector remembers the size you drag it to on each machine instead.
+- 🧹 **Breaking**: the `lana.inspector.size` setting is dropped. The inspector remembers the width you drag it to, and its height when docked at the bottom, on each machine instead.
   - Migration: a size saved in the setting is not carried over, so drag the edge once. You can delete `lana.inspector.size` from `settings.json`.
 
 ### Fixed
