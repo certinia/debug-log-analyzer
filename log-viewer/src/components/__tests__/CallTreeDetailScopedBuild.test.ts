@@ -326,6 +326,15 @@ describe('CallTreeDetail scoped build', () => {
     expect(grid.placeholder).toBe('No call tree available');
   });
 
+  it('never blames filters when the Timeline window hides every row, since the pane has none', async () => {
+    const resolvers = deferBuilds();
+    const el = await mount(5);
+    await frame(el);
+    resolvers[0]!(tree(5000, [frameRow(5)]));
+    await settle(el);
+    expect(gridOf(el).filteredPlaceholder).toBeNull();
+  });
+
   it('drops a superseded walk that finishes after the newer one', async () => {
     const resolvers = deferBuilds();
     const el = await mount(5);
