@@ -23,6 +23,7 @@ import { CALLTREE_GO_TO_ROW, type CalltreeNavigationEventMap } from '../navigati
 import { goToTimelineEvent } from '../../timeline/navigation.js';
 import type { AggregatedRow, BottomUpRow } from '../utils/Aggregation.js';
 import { TimeOrderSource, type TimeOrderNode } from '../utils/TimeOrderTree.js';
+import { eventKind } from '../utils/DetailsFilter.js';
 import { wireCategoryColoring } from '../utils/CategoryColoring.js';
 import { waitForNextFrame } from '#core/utility/FrameBudget.js';
 import type {
@@ -188,6 +189,8 @@ export class CalltreeView extends LitElement {
     debugOnly: false,
     selectedTypes: new Set<string>(),
   };
+  // True while Details is on only because the Type pick needed it, so a later pick turns it off.
+  private _typeTurnedDetailsOn = false;
   bottomUpGroupBy = 'None';
   typeFilter = 'All';
   namespaceSelected: string[] = [];
@@ -565,6 +568,7 @@ export class CalltreeView extends LitElement {
 
   _handleShowDetailsChange() {
     this.filterState.showDetails = !this.filterState.showDetails;
+    this._typeTurnedDetailsOn = false;
     this.requestUpdate();
     this._updateFiltering();
   }
@@ -744,15 +748,31 @@ export class CalltreeView extends LitElement {
   }
 
   _handleTypeFilter(event: Event) {
-    const target = event.target as HTMLInputElement;
-    this.typeFilter = target.value || 'All';
-    this.filterState.selectedTypes = new Set(target.value ? [target.value] : []);
+    this._setTypeFilter((event.target as HTMLInputElement).value);
     // typeFilter is a plain field (not @state), so the Type select's
     // `.filterActive` binding doesn't repaint until some other reactive
     // update happens to coincide — force it so the active border shows on
     // the very first pick, not a later render.
     this.requestUpdate();
     this._updateFiltering();
+  }
+
+  /**
+   * Picks `type` in the Type filter, or none for ''. A detail type turns Details on, and a later
+   * pick turns it off again unless Details was on already.
+   */
+  private _setTypeFilter(type: string): void {
+    this.typeFilter = type || 'All';
+    this.filterState.selectedTypes = new Set(type ? [type] : []);
+    // A listed type only: All and text typed in the box would read as a detail.
+    const needsDetails = !!this._types.value?.includes(type) && eventKind(type) === 'detail';
+    if (needsDetails && !this.filterState.showDetails) {
+      this.filterState.showDetails = true;
+      this._typeTurnedDetailsOn = true;
+    } else if (!needsDetails && this._typeTurnedDetailsOn) {
+      this.filterState.showDetails = false;
+      this._typeTurnedDetailsOn = false;
+    }
   }
 
   _handleNamespaceFacet(event: CustomEvent<{ selected: string[] }>) {
@@ -946,7 +966,7 @@ export class CalltreeView extends LitElement {
     >('datagrid-facet-filter, datagrid-range-filter')) {
       filter.clear();
     }
-    this.typeFilter = 'All';
+    this._setTypeFilter('');
     // Details stays as chosen unless it hides this row, as it does a detail an issue card names.
     const row = this._timeOrderSource?.index.rowOf(eventIndex) ?? NO_ROW;
     const showDetails =
