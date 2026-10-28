@@ -15,11 +15,9 @@
  * - Viewport culling: query() returns visible rectangles and buckets
  * - Spatial queries: queryEventsInRegion() for hit testing (O(log n + k))
  *
- * Key concepts:
- * - Leaf nodes represent individual events
- * - Branch nodes aggregate children with pre-computed category statistics
- * - Query traversal stops at nodes where nodeSpan <= threshold (2px / zoom)
- * - Pre-computed category stats enable instant bucket color resolution
+ * Each depth's tree is held in typed arrays, one set per level, not one object per node.
+ * Level 0 is the rects in start order. Node `i` on level `k > 0` spans nodes
+ * `i * BRANCHING_FACTOR` up to the next `BRANCHING_FACTOR` on level `k - 1`.
  *
  * Build time: O(n log n) for sorting + O(n) for tree construction
  * Query time: O(k log n) where k = number of visible nodes
@@ -30,12 +28,10 @@ import type {
   CulledRenderData,
   PixelBucket,
   RenderStats,
-  SegmentNode,
   ViewportState,
 } from '../types/flamechart.types.js';
 import {
   BUCKET_CONSTANTS,
-  mergeNodeCategoryStats,
   SEGMENT_TREE_CONSTANTS,
   TIMELINE_CONSTANTS,
 } from '../types/flamechart.types.js';
@@ -50,12 +46,8 @@ const PRIORITY_MAP = new Map<string, number>(
   BUCKET_CONSTANTS.CATEGORY_PRIORITY.map((cat, index) => [cat, index]),
 );
 
-/**
- * TemporalSegmentTree
- *
- * Manages separate trees per depth level for efficient viewport culling.
- * Each depth level has its own independent time series of events.
- */
+const { BRANCHING_FACTOR, MIN_NODE_SPAN } = SEGMENT_TREE_CONSTANTS;
+
 /** Bucket type used during aggregation */
 type AggregationBucket = {
   depth: number;
@@ -66,6 +58,22 @@ type AggregationBucket = {
   categoryStats: Map<string, CategoryAggregation>;
   dominantCategory: string; // Resolved after all nodes aggregated
 };
+
+/** The branch nodes of one level. Category stats are `slotCount` wide per node. */
+interface BranchLevel {
+  timeStart: Float64Array;
+  timeEnd: Float64Array;
+  slotDuration: Float64Array;
+  slotCount: Uint32Array;
+}
+
+interface DepthTree {
+  depth: number;
+  /** The leaves, ascending by timeStart. */
+  rects: readonly PrecomputedRect[];
+  /** `branches[k - 1]` is level `k`; the last holds the root. Empty when one rect is the root. */
+  branches: BranchLevel[];
+}
 
 /** Group rectangles by depth, for a caller that has not already done it. */
 function groupByDepth(
@@ -85,12 +93,34 @@ function groupByDepth(
   return rectsByDepth;
 }
 
+// The caller's array is used as is when sorted, as it is on a well-formed log.
+function byStart(rects: readonly PrecomputedRect[]): readonly PrecomputedRect[] {
+  for (let i = 1; i < rects.length; i++) {
+    if (rects[i]!.timeStart < rects[i - 1]!.timeStart) {
+      return [...rects].sort((a, b) => a.timeStart - b.timeStart);
+    }
+  }
+  return rects;
+}
+
+function leafSpan(rect: PrecomputedRect): number {
+  return Math.max(MIN_NODE_SPAN, rect.duration);
+}
+
+function levelWidth(tree: DepthTree, level: number): number {
+  return level === 0 ? tree.rects.length : tree.branches[level - 1]!.timeStart.length;
+}
+
 export class TemporalSegmentTree {
-  /** Tree root per depth level: Map<depth, rootNode> */
-  private treesByDepth: Map<number, SegmentNode> = new Map();
+  private treesByDepth = new Map<number, DepthTree>();
 
   /** Maximum depth in the tree */
   private maxDepth = 0;
+
+  /** The category of each stats slot, in priority order, then any other category met. */
+  private slotCategories: string[] = [...BUCKET_CONSTANTS.CATEGORY_PRIORITY];
+
+  private slotOf = new Map<string, number>(this.slotCategories.map((cat, slot) => [cat, slot]));
 
   /**
    * Build segment trees from pre-computed rectangles.
@@ -102,7 +132,24 @@ export class TemporalSegmentTree {
     rectsByCategory: Map<string, PrecomputedRect[]>,
     rectsByDepth?: Map<number, PrecomputedRect[]>,
   ) {
-    this.buildTrees(rectsByCategory, rectsByDepth);
+    // Every rect is slotted before any tree is built, as each tree is as wide as the slot count.
+    const leaves: [number, readonly PrecomputedRect[], Uint16Array][] = [];
+    for (const [depth, rects] of rectsByDepth ?? groupByDepth(rectsByCategory)) {
+      if (depth > this.maxDepth) {
+        this.maxDepth = depth;
+      }
+      if (rects.length) {
+        const sorted = byStart(rects);
+        leaves.push([
+          depth,
+          sorted,
+          Uint16Array.from(sorted, (rect) => this.slotFor(rect.category)),
+        ]);
+      }
+    }
+    for (const [depth, rects, leafSlot] of leaves) {
+      this.treesByDepth.set(depth, this.buildTree(depth, rects, leafSlot));
+    }
   }
 
   /**
@@ -151,11 +198,10 @@ export class TemporalSegmentTree {
         continue;
       }
 
-      this.queryNode(
+      this.queryTree(
         tree,
         timeStart,
         timeEnd,
-        bucketTimeWidth, // threshold
         bucketTimeWidth,
         viewport,
         visibleRects,
@@ -247,41 +293,38 @@ export class TemporalSegmentTree {
 
     for (let depth = depthStart; depth <= depthEnd; depth++) {
       const tree = this.treesByDepth.get(depth);
-      if (!tree) {
-        continue;
+      if (tree) {
+        this.collectRects(tree, tree.branches.length, 0, timeStart, timeEnd, results);
       }
-
-      this.collectRectsFromNode(tree, timeStart, timeEnd, results);
     }
 
     return results;
   }
 
-  /**
-   * Collect rectangles from a tree node that overlap with the query time range.
-   * Recursive traversal with early exit for non-overlapping nodes.
-   */
-  private collectRectsFromNode(
-    node: SegmentNode,
+  private collectRects(
+    tree: DepthTree,
+    level: number,
+    index: number,
     queryStart: number,
     queryEnd: number,
     results: PrecomputedRect[],
   ): void {
-    // Early exit: no overlap
-    if (node.timeEnd <= queryStart || node.timeStart >= queryEnd) {
-      return;
-    }
-
-    if (node.isLeaf && node.rectRef) {
-      results.push(node.rectRef);
-      return;
-    }
-
-    // Branch: recurse into children
-    if (node.children) {
-      for (const child of node.children) {
-        this.collectRectsFromNode(child, queryStart, queryEnd, results);
+    if (level === 0) {
+      const rect = tree.rects[index]!;
+      if (rect.timeEnd > queryStart && rect.timeStart < queryEnd) {
+        results.push(rect);
       }
+      return;
+    }
+
+    const branch = tree.branches[level - 1]!;
+    if (branch.timeEnd[index]! <= queryStart || branch.timeStart[index]! >= queryEnd) {
+      return;
+    }
+    const first = index * BRANCHING_FACTOR;
+    const last = Math.min(first + BRANCHING_FACTOR, levelWidth(tree, level - 1));
+    for (let child = first; child < last; child++) {
+      this.collectRects(tree, level - 1, child, queryStart, queryEnd, results);
     }
   }
 
@@ -289,166 +332,73 @@ export class TemporalSegmentTree {
   // TREE BUILDING
   // ==========================================================================
 
-  /**
-   * Build segment trees for all depth levels.
-   *
-   * Uses pre-grouped rectsByDepth when available (~12ms saved).
-   *
-   * @param rectsByCategory - Rectangles grouped by category
-   * @param preGroupedByDepth - Optional pre-grouped by depth from unified conversion
-   */
-  private buildTrees(
-    rectsByCategory: Map<string, PrecomputedRect[]>,
-    preGroupedByDepth?: Map<number, PrecomputedRect[]>,
-  ): void {
-    const rectsByDepth = preGroupedByDepth ?? groupByDepth(rectsByCategory);
+  private buildTree(
+    depth: number,
+    rects: readonly PrecomputedRect[],
+    leafSlot: Uint16Array,
+  ): DepthTree {
+    const slots = this.slotCategories.length;
+    const branches: BranchLevel[] = [];
+    let width = rects.length;
+    while (width > 1) {
+      const below = branches.at(-1);
+      const nodes = Math.ceil(width / BRANCHING_FACTOR);
+      const level: BranchLevel = {
+        timeStart: new Float64Array(nodes),
+        timeEnd: new Float64Array(nodes),
+        slotDuration: new Float64Array(nodes * slots),
+        slotCount: new Uint32Array(nodes * slots),
+      };
 
-    for (const [depth, rects] of rectsByDepth) {
-      if (depth > this.maxDepth) {
-        this.maxDepth = depth;
-      }
-      const tree = this.buildTreeForDepth(rects, depth);
-      if (tree) {
-        this.treesByDepth.set(depth, tree);
-      }
-    }
-  }
-
-  /**
-   * Build segment tree for a single depth level.
-   *
-   * @param rects - Rectangles at this depth
-   * @param depth - Depth level (for Y position calculation)
-   * @returns Root node of the tree, or null if no rectangles
-   */
-  private buildTreeForDepth(rects: PrecomputedRect[], depth: number): SegmentNode | null {
-    if (rects.length === 0) {
-      return null;
-    }
-
-    // Create leaf nodes (O(n))
-    const leaves = rects
-      .map((rect) => this.createLeafNode(rect, depth))
-      .sort((a, b) => a.timeStart - b.timeStart);
-
-    // Build tree bottom-up
-    return this.buildTreeFromLeaves(leaves);
-  }
-
-  /**
-   * Create a leaf node from a PrecomputedRect.
-   *
-   * PERF: Uses leafCategory/leafDuration instead of Map to avoid 500k+ Map allocations.
-   * categoryStats is null for leaf nodes - aggregation creates Maps only for branch nodes.
-   */
-  private createLeafNode(rect: PrecomputedRect, depth: number): SegmentNode {
-    const duration = Math.max(SEGMENT_TREE_CONSTANTS.MIN_NODE_SPAN, rect.duration);
-
-    return {
-      timeStart: rect.timeStart,
-      timeEnd: rect.timeEnd,
-      nodeSpan: duration,
-
-      // PERF: null instead of Map - saves ~35-40ms for 500k leaf nodes
-      categoryStats: null,
-      dominantCategory: rect.category,
-      // PERF: Pre-compute priority to avoid PRIORITY_MAP lookups during query
-      dominantPriority: PRIORITY_MAP.get(rect.category) ?? Infinity,
-
-      // Leaf-specific fields (avoid Map allocation)
-      leafCategory: rect.category,
-      leafDuration: duration,
-
-      eventCount: 1,
-      rectRef: rect, // Direct reference for O(1) lookup in addVisibleRect
-
-      children: null,
-      isLeaf: true,
-
-      depth,
-    };
-  }
-
-  /**
-   * Build tree from leaves using iterative bottom-up construction.
-   *
-   * PERF: Uses index-based iteration to avoid array allocations from slice().
-   */
-  private buildTreeFromLeaves(leaves: SegmentNode[]): SegmentNode {
-    const { BRANCHING_FACTOR } = SEGMENT_TREE_CONSTANTS;
-
-    let currentLevel = leaves;
-
-    while (currentLevel.length > 1) {
-      const levelLength = currentLevel.length;
-      // Pre-calculate next level size to avoid array resizing
-      const nextLevelSize = Math.ceil(levelLength / BRANCHING_FACTOR);
-      const nextLevel: SegmentNode[] = new Array(nextLevelSize);
-      let nextIdx = 0;
-
-      for (let i = 0; i < levelLength; i += BRANCHING_FACTOR) {
-        const end = Math.min(i + BRANCHING_FACTOR, levelLength);
-        nextLevel[nextIdx++] = this.createBranchNodeFromRange(currentLevel, i, end);
+      for (let node = 0; node < nodes; node++) {
+        const first = node * BRANCHING_FACTOR;
+        const last = Math.min(first + BRANCHING_FACTOR, width);
+        const at = node * slots;
+        // Children are sorted by timeStart, but an earlier child may end later.
+        // `>`, not Math.max: a NaN end must not spread to every ancestor.
+        let timeEnd = below ? below.timeEnd[first]! : rects[first]!.timeEnd;
+        if (below) {
+          for (let child = first; child < last; child++) {
+            const end = below.timeEnd[child]!;
+            if (end > timeEnd) {
+              timeEnd = end;
+            }
+            const from = child * slots;
+            for (let slot = 0; slot < slots; slot++) {
+              level.slotDuration[at + slot]! += below.slotDuration[from + slot]!;
+              level.slotCount[at + slot]! += below.slotCount[from + slot]!;
+            }
+          }
+          level.timeStart[node] = below.timeStart[first]!;
+        } else {
+          for (let child = first; child < last; child++) {
+            const rect = rects[child]!;
+            if (rect.timeEnd > timeEnd) {
+              timeEnd = rect.timeEnd;
+            }
+            const offset = at + leafSlot[child]!;
+            level.slotDuration[offset]! += leafSpan(rect);
+            level.slotCount[offset]!++;
+          }
+          level.timeStart[node] = rects[first]!.timeStart;
+        }
+        level.timeEnd[node] = timeEnd;
       }
 
-      currentLevel = nextLevel;
+      branches.push(level);
+      width = nodes;
     }
 
-    return currentLevel[0]!;
+    return { depth, rects, branches };
   }
 
-  /**
-   * Create a branch node from a range of children (avoids array allocation).
-   *
-   * PERF: Uses start/end indices instead of creating a sliced array.
-   * PERF: Handles leaf nodes with leafCategory/leafDuration instead of categoryStats Map.
-   */
-  private createBranchNodeFromRange(
-    children: SegmentNode[],
-    start: number,
-    end: number,
-  ): SegmentNode {
-    const firstChild = children[start]!;
-    const timeStart = firstChild.timeStart;
-
-    // Aggregate statistics and compute max timeEnd in a single pass
-    // Children are sorted by timeStart, but an earlier child may have a longer duration
-    // and thus a later timeEnd than subsequent children
-    let timeEnd = firstChild.timeEnd;
-    let totalEventCount = 0;
-    const categoryStats = new Map<string, CategoryAggregation>();
-
-    for (let i = start; i < end; i++) {
-      const child = children[i]!;
-
-      // Track max timeEnd
-      if (child.timeEnd > timeEnd) {
-        timeEnd = child.timeEnd;
-      }
-
-      totalEventCount += child.eventCount;
-      mergeNodeCategoryStats(categoryStats, child);
+  private slotFor(category: string): number {
+    let slot = this.slotOf.get(category);
+    if (slot === undefined) {
+      slot = this.slotCategories.push(category) - 1;
+      this.slotOf.set(category, slot);
     }
-
-    const nodeSpan = Math.max(SEGMENT_TREE_CONSTANTS.MIN_NODE_SPAN, timeEnd - timeStart);
-
-    return {
-      timeStart,
-      timeEnd,
-      nodeSpan,
-
-      categoryStats,
-      // Branch nodes don't use dominantCategory/Priority - buckets resolve from categoryStats
-      dominantCategory: '',
-      dominantPriority: Infinity,
-
-      eventCount: totalEventCount,
-
-      children: children.slice(start, end),
-      isLeaf: false,
-
-      depth: firstChild.depth,
-    };
+    return slot;
   }
 
   // ==========================================================================
@@ -457,56 +407,77 @@ export class TemporalSegmentTree {
 
   /**
    * Iterative query traversal using explicit stack.
-   * Stops at first node where nodeSpan <= threshold.
-   *
-   * PERF: Eliminates recursion overhead - no function calls, stack frames, or parameter copying.
+   * Stops at the first node whose span fits in one bucket.
    */
-  private queryNode(
-    root: SegmentNode,
+  private queryTree(
+    tree: DepthTree,
     queryStart: number,
     queryEnd: number,
-    threshold: number,
     bucketTimeWidth: number,
     viewport: ViewportState,
     visibleRects: Map<string, PrecomputedRect[]>,
     bucketMap: Map<number, AggregationBucket>,
     stats: { visibleCount: number; bucketedEventCount: number },
   ): void {
-    // PERF: Use explicit stack instead of recursion
-    const stack: SegmentNode[] = [root];
+    const stack: number[] = [tree.branches.length, 0];
 
     let bucketedEventCount = 0;
     let visibleCount = 0;
 
     while (stack.length > 0) {
-      const node = stack.pop()!;
+      const index = stack.pop()!;
+      const level = stack.pop()!;
 
-      // Early exit: node completely outside query range
-      const { timeStart, timeEnd } = node;
+      if (level === 0) {
+        const rect = tree.rects[index]!;
+        if (rect.timeEnd <= queryStart || rect.timeStart >= queryEnd) {
+          continue;
+        }
+        const span = leafSpan(rect);
+        if (span <= bucketTimeWidth) {
+          const bucket = this.bucketAt(tree.depth, rect.timeStart, bucketTimeWidth, bucketMap);
+          bucket.eventCount++;
+          addStats(bucket.categoryStats, rect.category, 1, span);
+          bucketedEventCount++;
+        } else {
+          this.addVisibleRect(rect, viewport, visibleRects);
+          ++visibleCount;
+        }
+        continue;
+      }
+
+      const branch = tree.branches[level - 1]!;
+      const timeStart = branch.timeStart[index]!;
+      const timeEnd = branch.timeEnd[index]!;
       if (timeEnd <= queryStart || timeStart >= queryEnd) {
         continue;
       }
 
-      // Check if this node should be rendered as a bucket
-      if (node.nodeSpan <= threshold) {
-        this.aggregateIntoBucket(node, bucketTimeWidth, bucketMap);
-        bucketedEventCount += node.eventCount;
+      if (Math.max(MIN_NODE_SPAN, timeEnd - timeStart) <= bucketTimeWidth) {
+        const bucket = this.bucketAt(tree.depth, timeStart, bucketTimeWidth, bucketMap);
+        const slots = this.slotCategories.length;
+        const at = index * slots;
+        for (let slot = 0; slot < slots; slot++) {
+          const count = branch.slotCount[at + slot]!;
+          if (count) {
+            bucket.eventCount += count;
+            bucketedEventCount += count;
+            addStats(
+              bucket.categoryStats,
+              this.slotCategories[slot]!,
+              count,
+              branch.slotDuration[at + slot]!,
+            );
+          }
+        }
         continue;
       }
 
-      // Node too large to be a bucket
-      if (node.isLeaf) {
-        // Leaf node larger than threshold = visible rectangle
-        this.addVisibleRect(node, viewport, visibleRects);
-        ++visibleCount;
-        continue;
-      }
-
-      // Branch node: push children onto stack (reverse order for left-to-right processing)
-      const children = node.children!;
-      const len = children.length;
-      for (let i = len - 1; i >= 0; i--) {
-        stack.push(children[i]!);
+      // Pushed in reverse, so children pop left to right.
+      const first = index * BRANCHING_FACTOR;
+      const last = Math.min(first + BRANCHING_FACTOR, levelWidth(tree, level - 1));
+      for (let child = last - 1; child >= first; child--) {
+        stack.push(level - 1, child);
       }
     }
 
@@ -515,25 +486,24 @@ export class TemporalSegmentTree {
   }
 
   /**
-   * Aggregate a segment node into a grid-aligned bucket.
+   * The grid-aligned bucket a node starting at `timeStart` falls in.
    * Multiple nodes that fall into the same grid cell are merged into one bucket.
    * Dominant category is resolved after all nodes are aggregated.
-   *
-   * PERF: Handles leaf nodes with leafCategory/leafDuration instead of categoryStats Map.
    */
-  private aggregateIntoBucket(
-    node: SegmentNode,
+  private bucketAt(
+    depth: number,
+    timeStart: number,
     bucketTimeWidth: number,
     bucketMap: Map<number, AggregationBucket>,
-  ): void {
-    const bucketIndex = Math.floor(node.timeStart / bucketTimeWidth);
+  ): AggregationBucket {
+    const bucketIndex = Math.floor(timeStart / bucketTimeWidth);
     // Composite integer key: depth in upper 8 bits, bucketIndex in lower 24 bits
-    const bucketKey = (node.depth << 24) | (bucketIndex & 0xffffff);
+    const bucketKey = (depth << 24) | (bucketIndex & 0xffffff);
 
     let bucket = bucketMap.get(bucketKey);
     if (!bucket) {
       bucket = {
-        depth: node.depth,
+        depth,
         bucketIndex,
         timeStart: bucketIndex * bucketTimeWidth,
         timeEnd: (bucketIndex + 1) * bucketTimeWidth,
@@ -543,31 +513,20 @@ export class TemporalSegmentTree {
       };
       bucketMap.set(bucketKey, bucket);
     }
-
-    // Aggregate node stats into bucket
-    bucket.eventCount += node.eventCount;
-    mergeNodeCategoryStats(bucket.categoryStats, node);
+    return bucket;
   }
 
   /**
-   * Add a leaf node as a visible rectangle.
-   *
-   * PERFORMANCE: Uses rectRef stored in leaf node instead of O(n) search.
+   * Add a leaf as a visible rectangle.
    * Uses pre-initialized map - unknown categories return undefined and are skipped.
    */
   private addVisibleRect(
-    node: SegmentNode,
+    rect: PrecomputedRect,
     viewport: ViewportState,
     visibleRects: Map<string, PrecomputedRect[]>,
   ): void {
-    // Use the pre-stored rect reference from the leaf node
-    const rect = node.rectRef;
-    if (!rect) {
-      return;
-    }
-
     // Get pre-initialized category group (skip unknown categories)
-    const group = visibleRects.get(node.dominantCategory);
+    const group = visibleRects.get(rect.category);
     if (!group) {
       return;
     }
@@ -616,5 +575,20 @@ export class TemporalSegmentTree {
     }
 
     return winningCategory;
+  }
+}
+
+function addStats(
+  target: Map<string, CategoryAggregation>,
+  category: string,
+  count: number,
+  totalDuration: number,
+): void {
+  const existing = target.get(category);
+  if (existing) {
+    existing.count += count;
+    existing.totalDuration += totalDuration;
+  } else {
+    target.set(category, { count, totalDuration });
   }
 }

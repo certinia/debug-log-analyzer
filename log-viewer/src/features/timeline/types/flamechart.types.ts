@@ -364,46 +364,6 @@ export interface CategoryAggregation {
 }
 
 /**
- * Merge category stats from a SegmentNode into a target map.
- * Handles both leaf nodes (leafCategory/leafDuration) and branch nodes (categoryStats Map).
- *
- * PERF: Extracted helper to avoid duplicating this ~20-line pattern in 3+ places.
- *
- * @param target - Map to merge stats into
- * @param node - SegmentNode with either categoryStats (branch) or leafCategory/leafDuration (leaf)
- */
-export function mergeNodeCategoryStats(
-  target: Map<string, CategoryAggregation>,
-  node: {
-    categoryStats: Map<string, CategoryAggregation> | null;
-    leafCategory?: string;
-    leafDuration?: number;
-  },
-): void {
-  if (node.categoryStats) {
-    // Branch node: merge from Map
-    for (const [category, stats] of node.categoryStats) {
-      const existing = target.get(category);
-      if (existing) {
-        existing.count += stats.count;
-        existing.totalDuration += stats.totalDuration;
-      } else {
-        target.set(category, { count: stats.count, totalDuration: stats.totalDuration });
-      }
-    }
-  } else if (node.leafCategory !== undefined && node.leafDuration !== undefined) {
-    // Leaf node: use leafCategory/leafDuration directly
-    const existing = target.get(node.leafCategory);
-    if (existing) {
-      existing.count += 1;
-      existing.totalDuration += node.leafDuration;
-    } else {
-      target.set(node.leafCategory, { count: 1, totalDuration: node.leafDuration });
-    }
-  }
-}
-
-/**
  * Statistics per category for color resolution.
  */
 export interface CategoryStats {
@@ -959,66 +919,12 @@ export interface MetricStripProcessedData {
 // ============================================================================
 
 /**
- * Node in the temporal segment tree.
- *
- * Leaf nodes represent individual events; branch nodes aggregate children.
- * The tree is used for O(log n) viewport culling and bucket aggregation.
- *
- * Key optimization: Pre-computed category stats enable instant bucket
- * rendering without recalculating aggregates per frame.
- */
-export interface SegmentNode {
-  // Time bounds (nanoseconds)
-  /** Start time of this node's span (nanoseconds) */
-  timeStart: number;
-  /** End time of this node's span (nanoseconds) */
-  timeEnd: number;
-
-  /** Time span = timeEnd - timeStart (nanoseconds) */
-  nodeSpan: number;
-
-  // Category statistics (for tooltips and color resolution)
-  /**
-   * Per-category event counts and durations.
-   * null for leaf nodes (use leafCategory/leafDuration instead to avoid Map allocation).
-   */
-  categoryStats: Map<string, CategoryAggregation> | null;
-  /** Winning category after priority/duration/count resolution */
-  dominantCategory: string;
-  /** Pre-computed priority for dominantCategory (avoids map lookup during query) */
-  dominantPriority: number;
-
-  // Leaf-specific fields (avoid Map allocation for 500k+ leaf nodes)
-  /** For leaf nodes only: category string (avoids Map allocation) */
-  leafCategory?: string;
-  /** For leaf nodes only: duration value (avoids Map allocation) */
-  leafDuration?: number;
-
-  // Event tracking
-  /** Total event count in this subtree */
-  eventCount: number;
-  /** For leaf nodes only: direct reference to PrecomputedRect (avoids O(n) lookup) */
-  rectRef?: PrecomputedRect;
-
-  // Tree structure
-  /** Child nodes (null for leaf nodes) */
-  children: SegmentNode[] | null;
-  /** Whether this is a leaf node */
-  isLeaf: boolean;
-
-  /** Call stack depth (0-indexed) */
-  depth: number;
-}
-
-/**
  * Constants for segment tree construction and traversal.
  */
 
 export const SEGMENT_TREE_CONSTANTS = {
   /**
    * Branching factor for tree construction.
-   * 4 provides a good balance between tree height (log4(n) levels)
-   * and cache efficiency (4 children fit in a cache line).
    */
   BRANCHING_FACTOR: 4,
 
