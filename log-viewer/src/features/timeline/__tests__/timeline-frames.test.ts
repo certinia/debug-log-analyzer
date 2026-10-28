@@ -54,6 +54,31 @@ describe('buildTimelineFrames', () => {
     expect(frames.rowsAtDepth(99)).toHaveLength(0);
   });
 
+  // The segment tree trusts this order; a log whose clock goes backwards breaks pre-order's.
+  it('lists the rows with a rect at each depth in start order, though the log runs backwards', async () => {
+    const { log, frames } = await framesOf(
+      '09:18:22.6 (2000)|METHOD_ENTRY|[1]|01p|ns.Late.run()\n' +
+        '09:18:22.6 (2100)|METHOD_EXIT|[1]|ns.Late.run()\n' +
+        '09:18:22.6 (1000)|METHOD_ENTRY|[2]|01p|ns.Early.run()\n' +
+        '09:18:22.6 (1100)|METHOD_EXIT|[2]|ns.Early.run()\n',
+    );
+    const late = frames.rowOfOriginal(log.event(idOf(log, 'ns.Late.run()')));
+    const rows = frames.rectRowsByDepth[frames.depth[late]!]!;
+
+    expect([...rows].map((row) => frames.text(row))).toEqual(['ns.Early.run()', 'ns.Late.run()']);
+  });
+
+  it('lists no row for a frame whose category the timeline does not draw', async () => {
+    const { log } = await framesOf(NESTED);
+    const frames = buildTimelineFrames(buildLogIndex(log), new Set(['Apex']), 0);
+    const listed = frames.rectRowsByDepth.flatMap((rows) =>
+      [...rows].map((row) => frames.text(row)),
+    );
+
+    expect(listed).toContain('ns.Inner.first()');
+    expect(listed).not.toContain('SELECT Id FROM Account');
+  });
+
   it('does not show a frame with no duration', async () => {
     const { log, frames } = await framesOf(
       '09:18:22.6 (1000)|METHOD_ENTRY|[1]|01p|ns.Instant.run()\n' +

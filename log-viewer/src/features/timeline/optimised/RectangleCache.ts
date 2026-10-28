@@ -21,6 +21,7 @@
 
 import type {
   CulledRenderData,
+  RectColumns,
   RenderRectangle,
   ViewportState,
 } from '../types/flamechart.types.js';
@@ -67,10 +68,8 @@ export interface PrecomputedRect extends RenderRectangle {
 }
 
 /** Rectangles built ahead, as `TimelineFrames` holds them. */
-export interface PrecomputedRectData {
+export interface PrecomputedRectData extends RectColumns {
   rectsByCategory: Map<string, PrecomputedRect[]>;
-  /** Pre-grouped by depth for TemporalSegmentTree (optional - computed if not provided) */
-  rectsByDepth?: Map<number, PrecomputedRect[]>;
 }
 
 /**
@@ -91,8 +90,7 @@ export class RectangleCache {
       sortByStartIfNeeded(rects);
     }
 
-    // Pass pre-grouped rectsByDepth if available (saves ~12ms grouping iteration)
-    this.segmentTree = new TemporalSegmentTree(this.rectsByCategory, precomputed.rectsByDepth);
+    this.segmentTree = new TemporalSegmentTree(precomputed);
   }
 
   /**

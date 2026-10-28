@@ -152,7 +152,7 @@ export interface TreeNode<T extends EventNode> {
  * A row is shown when it and every parent have a duration. Only a shown row has
  * a place at its depth, a node, or a rect.
  */
-export interface TimelineFrames<E extends EventNode> {
+export interface TimelineFrames<E extends EventNode> extends RectColumns {
   readonly rowCount: number;
   /** The deepest shown row. */
   readonly maxDepth: number;
@@ -179,6 +179,18 @@ export interface TimelineFrames<E extends EventNode> {
   type(row: number): string;
   /** The shown row for an {@link EventNode.original}, or {@link NO_ROW}. */
   rowOfOriginal(original: unknown): number;
+  rectOf(row: number): PrecomputedRect | undefined;
+}
+
+/** The frames that have a rect, as columns by row: what the segment tree indexes. */
+export interface RectColumns {
+  readonly start: Float64Array;
+  readonly total: Float64Array;
+  /** An index into {@link categoryNames}. */
+  readonly categoryId: Uint8Array;
+  readonly categoryNames: readonly string[];
+  /** The rows with a rect at each depth, ascending by start. */
+  readonly rectRowsByDepth: readonly Int32Array[];
   rectOf(row: number): PrecomputedRect | undefined;
 }
 

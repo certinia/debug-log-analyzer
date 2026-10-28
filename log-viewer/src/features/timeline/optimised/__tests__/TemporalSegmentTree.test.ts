@@ -8,12 +8,11 @@ import { type FrameSpec, rectsOf, timelineEvent } from '#test-helpers/timeline.j
 import { makeViewport } from '#test-helpers/viewport.js';
 import { TIMELINE_CONSTANTS } from '../../types/flamechart.types.js';
 import type { BatchColorInfo } from '../BucketColorResolver.js';
-import { RectangleCache } from '../RectangleCache.js';
 import { TemporalSegmentTree } from '../TemporalSegmentTree.js';
 
 const NO_COLORS: Map<string, BatchColorInfo> = new Map();
 function build(events: FrameSpec[]): TemporalSegmentTree {
-  return new TemporalSegmentTree(new RectangleCache(rectsOf(events)).getRectsByCategory());
+  return new TemporalSegmentTree(rectsOf(events));
 }
 
 function query(events: FrameSpec[], view: ViewportState) {
@@ -94,27 +93,6 @@ describe('TemporalSegmentTree', () => {
         Apex: { count: 9, totalDuration: 9 },
         SOQL: { count: 8, totalDuration: 8 },
       });
-    });
-
-    // The new category widens every row's stats, including rows already met.
-    it('keeps a row its own stats when another row holds a category outside the priority list', () => {
-      const roots = Array.from({ length: 17 }, (_, i) =>
-        timelineEvent(i, 1, 'Apex', [timelineEvent(i, 1, 'Apex')]),
-      );
-      const all = rectsOf(roots).rectsByCategory.get('Apex')!;
-      const rects = new Map([
-        ['Apex', all.filter((rect) => rect.depth === 0)],
-        ['', all.filter((rect) => rect.depth === 1).map((rect) => ({ ...rect, category: '' }))],
-      ]);
-
-      const result = new TemporalSegmentTree(rects).query(makeViewport({ zoom: 0.25 }), NO_COLORS);
-
-      const buckets = [...result.buckets.values()].flat();
-      expect(buckets.every((bucket) => bucket.depth === 0)).toBe(true);
-      expect(
-        new Set(buckets.flatMap((bucket) => [...bucket.categoryStats.byCategory.keys()])),
-      ).toEqual(new Set(['Apex']));
-      expect(buckets.reduce((sum, bucket) => sum + bucket.eventCount, 0)).toBe(17);
     });
 
     // DML outranks SOQL, though SOQL has more events and more time in the bucket.

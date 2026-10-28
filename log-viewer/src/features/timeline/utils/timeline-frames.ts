@@ -102,6 +102,7 @@ export function buildTimelineFrames(
 
   // Pre-order is start order unless the log's timestamps go backwards.
   const rowsByDepth = rowsAt.map((rows) => Int32Array.from(sortIfNeeded(rows, start)));
+  const rectRowsByDepth = rowsByDepth.map((rows) => rows.filter((row) => rectAt[row] !== NO_ROW));
 
   return {
     rowCount,
@@ -112,6 +113,9 @@ export function buildTimelineFrames(
     depth,
     parent,
     subtreeEnd,
+    categoryId: index.categoryId,
+    categoryNames: index.categoryNames,
+    rectRowsByDepth,
     rectsByCategory,
     rectsByDepth,
     isVisible: (row) => shown[row] === 1,

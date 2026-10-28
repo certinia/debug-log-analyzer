@@ -48,11 +48,13 @@ export function rectsOf(roots: FrameSpec[]): PrecomputedRectData {
   const rectsByCategory = new Map<string, PrecomputedRect[]>(
     BUCKET_CONSTANTS.CATEGORY_PRIORITY.map((category) => [category, []]),
   );
-  const rectsByDepth = new Map<number, PrecomputedRect[]>();
+  const rects: PrecomputedRect[] = [];
+  const categories: LogCategory[] = [];
   let row = 0;
   const visit = (frames: FrameSpec[], depth: number): void => {
     for (const frame of frames) {
       const at = row++;
+      categories[at] = frame.category;
       if (frame.duration <= 0) {
         continue;
       }
@@ -73,11 +75,28 @@ export function rectsOf(roots: FrameSpec[]): PrecomputedRectData {
       const ofCategory = rectsByCategory.get(frame.category);
       if (ofCategory) {
         ofCategory.push(rect);
-        rectsByDepth.set(depth, [...(rectsByDepth.get(depth) ?? []), rect]);
+        rects.push(rect);
       }
       visit(frame.children, depth + 1);
     }
   };
   visit(roots, 0);
-  return { rectsByCategory, rectsByDepth };
+
+  const categoryNames = [
+    ...new Set<string>([...BUCKET_CONSTANTS.CATEGORY_PRIORITY, ...categories]),
+  ];
+  const rectAt = new Map(rects.map((rect) => [rect.row, rect]));
+  const rectRowsByDepth: Int32Array[] = [];
+  for (const rect of [...rects].sort((a, b) => a.timeStart - b.timeStart)) {
+    rectRowsByDepth[rect.depth] = Int32Array.of(...(rectRowsByDepth[rect.depth] ?? []), rect.row);
+  }
+  return {
+    start: Float64Array.from({ length: row }, (_, at) => rectAt.get(at)?.timeStart ?? 0),
+    total: Float64Array.from({ length: row }, (_, at) => rectAt.get(at)?.duration ?? 0),
+    categoryId: Uint8Array.from(categories, (category) => categoryNames.indexOf(category)),
+    categoryNames,
+    rectRowsByDepth,
+    rectOf: (at) => rectAt.get(at),
+    rectsByCategory,
+  };
 }

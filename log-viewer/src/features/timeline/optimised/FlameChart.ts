@@ -322,10 +322,7 @@ export class FlameChart<E extends EventNode = EventNode> {
 
     // Create RectangleCache (single source of truth for rectangle computation)
     if (this.state) {
-      this.rectangleManager = new RectangleCache({
-        rectsByCategory: frames.rectsByCategory,
-        rectsByDepth: frames.rectsByDepth,
-      });
+      this.rectangleManager = new RectangleCache(frames);
     }
 
     // Create batch renderer (pure rendering, receives rectangles from RectangleCache)

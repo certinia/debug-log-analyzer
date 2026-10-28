@@ -16,10 +16,10 @@
  * - Spatial queries: queryEventsInRegion() for hit testing (O(log n + k))
  *
  * Each depth's tree is held in typed arrays, one set per level, not one object per node.
- * Level 0 is the rects in start order. Node `i` on level `k > 0` spans nodes
+ * Level 0 is the rows with a rect, in start order. Node `i` on level `k > 0` spans nodes
  * `i * BRANCHING_FACTOR` up to the next `BRANCHING_FACTOR` on level `k - 1`.
  *
- * Build time: O(n log n) for sorting + O(n) for tree construction
+ * Build time: O(n)
  * Query time: O(k log n) where k = number of visible nodes
  */
 
@@ -27,6 +27,7 @@ import type {
   CategoryAggregation,
   CulledRenderData,
   PixelBucket,
+  RectColumns,
   RenderStats,
   ViewportState,
 } from '../types/flamechart.types.js';
@@ -59,7 +60,7 @@ type AggregationBucket = {
   dominantCategory: string; // Resolved after all nodes aggregated
 };
 
-/** The branch nodes of one level. Category stats are `slotCount` wide per node. */
+/** The branch nodes of one level. Category stats are one slot per category id, per node. */
 interface BranchLevel {
   timeStart: Float64Array;
   timeEnd: Float64Array;
@@ -69,87 +70,33 @@ interface BranchLevel {
 
 interface DepthTree {
   depth: number;
-  /** The leaves, ascending by timeStart. */
-  rects: readonly PrecomputedRect[];
+  /** The leaves: rows, ascending by start. */
+  rows: Int32Array;
   /** `branches[k - 1]` is level `k`; the last holds the root. Empty when one rect is the root. */
   branches: BranchLevel[];
 }
 
-/** Group rectangles by depth, for a caller that has not already done it. */
-function groupByDepth(
-  rectsByCategory: Map<string, PrecomputedRect[]>,
-): Map<number, PrecomputedRect[]> {
-  const rectsByDepth = new Map<number, PrecomputedRect[]>();
-  for (const rects of rectsByCategory.values()) {
-    for (const rect of rects) {
-      let depthRects = rectsByDepth.get(rect.depth);
-      if (!depthRects) {
-        depthRects = [];
-        rectsByDepth.set(rect.depth, depthRects);
-      }
-      depthRects.push(rect);
-    }
-  }
-  return rectsByDepth;
-}
-
-// The caller's array is used as is when sorted, as it is on a well-formed log.
-function byStart(rects: readonly PrecomputedRect[]): readonly PrecomputedRect[] {
-  for (let i = 1; i < rects.length; i++) {
-    if (rects[i]!.timeStart < rects[i - 1]!.timeStart) {
-      return [...rects].sort((a, b) => a.timeStart - b.timeStart);
-    }
-  }
-  return rects;
-}
-
-function leafSpan(rect: PrecomputedRect): number {
-  return Math.max(MIN_NODE_SPAN, rect.duration);
-}
-
 function levelWidth(tree: DepthTree, level: number): number {
-  return level === 0 ? tree.rects.length : tree.branches[level - 1]!.timeStart.length;
+  return level === 0 ? tree.rows.length : tree.branches[level - 1]!.timeStart.length;
 }
 
 export class TemporalSegmentTree {
+  private readonly columns: RectColumns;
+
   private treesByDepth = new Map<number, DepthTree>();
 
   /** Maximum depth in the tree */
   private maxDepth = 0;
 
-  /** The category of each stats slot, in priority order, then any other category met. */
-  private slotCategories: string[] = [...BUCKET_CONSTANTS.CATEGORY_PRIORITY];
-
-  private slotOf = new Map<string, number>(this.slotCategories.map((cat, slot) => [cat, slot]));
-
-  /**
-   * Build segment trees from pre-computed rectangles.
-   *
-   * @param rectsByCategory - Rectangles grouped by category (from RectangleCache)
-   * @param rectsByDepth - Optional pre-grouped by depth (from unified conversion, saves ~12ms)
-   */
-  constructor(
-    rectsByCategory: Map<string, PrecomputedRect[]>,
-    rectsByDepth?: Map<number, PrecomputedRect[]>,
-  ) {
-    // Every rect is slotted before any tree is built, as each tree is as wide as the slot count.
-    const leaves: [number, readonly PrecomputedRect[], Uint16Array][] = [];
-    for (const [depth, rects] of rectsByDepth ?? groupByDepth(rectsByCategory)) {
-      if (depth > this.maxDepth) {
+  /** @param columns - The frames with a rect, by row */
+  constructor(columns: RectColumns) {
+    this.columns = columns;
+    columns.rectRowsByDepth.forEach((rows, depth) => {
+      if (rows.length) {
         this.maxDepth = depth;
+        this.treesByDepth.set(depth, this.buildTree(depth, rows));
       }
-      if (rects.length) {
-        const sorted = byStart(rects);
-        leaves.push([
-          depth,
-          sorted,
-          Uint16Array.from(sorted, (rect) => this.slotFor(rect.category)),
-        ]);
-      }
-    }
-    for (const [depth, rects, leafSlot] of leaves) {
-      this.treesByDepth.set(depth, this.buildTree(depth, rects, leafSlot));
-    }
+    });
   }
 
   /**
@@ -310,9 +257,11 @@ export class TemporalSegmentTree {
     results: PrecomputedRect[],
   ): void {
     if (level === 0) {
-      const rect = tree.rects[index]!;
-      if (rect.timeEnd > queryStart && rect.timeStart < queryEnd) {
-        results.push(rect);
+      const { start, total } = this.columns;
+      const row = tree.rows[index]!;
+      const rowStart = start[row]!;
+      if (rowStart + total[row]! > queryStart && rowStart < queryEnd) {
+        results.push(this.columns.rectOf(row)!);
       }
       return;
     }
@@ -332,14 +281,11 @@ export class TemporalSegmentTree {
   // TREE BUILDING
   // ==========================================================================
 
-  private buildTree(
-    depth: number,
-    rects: readonly PrecomputedRect[],
-    leafSlot: Uint16Array,
-  ): DepthTree {
-    const slots = this.slotCategories.length;
+  private buildTree(depth: number, rows: Int32Array): DepthTree {
+    const { start, total, categoryId } = this.columns;
+    const slots = this.columns.categoryNames.length;
     const branches: BranchLevel[] = [];
-    let width = rects.length;
+    let width = rows.length;
     while (width > 1) {
       const below = branches.at(-1);
       const nodes = Math.ceil(width / BRANCHING_FACTOR);
@@ -356,7 +302,7 @@ export class TemporalSegmentTree {
         const at = node * slots;
         // Children are sorted by timeStart, but an earlier child may end later.
         // `>`, not Math.max: a NaN end must not spread to every ancestor.
-        let timeEnd = below ? below.timeEnd[first]! : rects[first]!.timeEnd;
+        let timeEnd = below ? below.timeEnd[first]! : start[rows[first]!]! + total[rows[first]!]!;
         if (below) {
           for (let child = first; child < last; child++) {
             const end = below.timeEnd[child]!;
@@ -372,15 +318,16 @@ export class TemporalSegmentTree {
           level.timeStart[node] = below.timeStart[first]!;
         } else {
           for (let child = first; child < last; child++) {
-            const rect = rects[child]!;
-            if (rect.timeEnd > timeEnd) {
-              timeEnd = rect.timeEnd;
+            const row = rows[child]!;
+            const end = start[row]! + total[row]!;
+            if (end > timeEnd) {
+              timeEnd = end;
             }
-            const offset = at + leafSlot[child]!;
-            level.slotDuration[offset]! += leafSpan(rect);
+            const offset = at + categoryId[row]!;
+            level.slotDuration[offset]! += Math.max(MIN_NODE_SPAN, total[row]!);
             level.slotCount[offset]!++;
           }
-          level.timeStart[node] = rects[first]!.timeStart;
+          level.timeStart[node] = start[rows[first]!]!;
         }
         level.timeEnd[node] = timeEnd;
       }
@@ -389,16 +336,7 @@ export class TemporalSegmentTree {
       width = nodes;
     }
 
-    return { depth, rects, branches };
-  }
-
-  private slotFor(category: string): number {
-    let slot = this.slotOf.get(category);
-    if (slot === undefined) {
-      slot = this.slotCategories.push(category) - 1;
-      this.slotOf.set(category, slot);
-    }
-    return slot;
+    return { depth, rows, branches };
   }
 
   // ==========================================================================
@@ -419,6 +357,7 @@ export class TemporalSegmentTree {
     bucketMap: Map<number, AggregationBucket>,
     stats: { visibleCount: number; bucketedEventCount: number },
   ): void {
+    const { start, total, categoryId, categoryNames } = this.columns;
     const stack: number[] = [tree.branches.length, 0];
 
     let bucketedEventCount = 0;
@@ -429,18 +368,20 @@ export class TemporalSegmentTree {
       const level = stack.pop()!;
 
       if (level === 0) {
-        const rect = tree.rects[index]!;
-        if (rect.timeEnd <= queryStart || rect.timeStart >= queryEnd) {
+        const row = tree.rows[index]!;
+        const rowStart = start[row]!;
+        const rowTotal = total[row]!;
+        if (rowStart + rowTotal <= queryStart || rowStart >= queryEnd) {
           continue;
         }
-        const span = leafSpan(rect);
+        const span = Math.max(MIN_NODE_SPAN, rowTotal);
         if (span <= bucketTimeWidth) {
-          const bucket = this.bucketAt(tree.depth, rect.timeStart, bucketTimeWidth, bucketMap);
+          const bucket = this.bucketAt(tree.depth, rowStart, bucketTimeWidth, bucketMap);
           bucket.eventCount++;
-          addStats(bucket.categoryStats, rect.category, 1, span);
+          addStats(bucket.categoryStats, categoryNames[categoryId[row]!]!, 1, span);
           bucketedEventCount++;
         } else {
-          this.addVisibleRect(rect, viewport, visibleRects);
+          this.addVisibleRect(this.columns.rectOf(row)!, viewport, visibleRects);
           ++visibleCount;
         }
         continue;
@@ -455,7 +396,7 @@ export class TemporalSegmentTree {
 
       if (Math.max(MIN_NODE_SPAN, timeEnd - timeStart) <= bucketTimeWidth) {
         const bucket = this.bucketAt(tree.depth, timeStart, bucketTimeWidth, bucketMap);
-        const slots = this.slotCategories.length;
+        const slots = categoryNames.length;
         const at = index * slots;
         for (let slot = 0; slot < slots; slot++) {
           const count = branch.slotCount[at + slot]!;
@@ -464,7 +405,7 @@ export class TemporalSegmentTree {
             bucketedEventCount += count;
             addStats(
               bucket.categoryStats,
-              this.slotCategories[slot]!,
+              categoryNames[slot]!,
               count,
               branch.slotDuration[at + slot]!,
             );
