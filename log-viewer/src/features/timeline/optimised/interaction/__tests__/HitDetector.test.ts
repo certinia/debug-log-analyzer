@@ -26,10 +26,9 @@ function hitAt(
   viewport = makeViewport(),
 ): number | null {
   const rects = rectsOf(frames);
-  const byRow = new Map([...rects.rectsByCategory.values()].flat().map((rect) => [rect.row, rect]));
   const detector = new HitDetector({
     nodeOf: (row): EventNode => {
-      const rect = byRow.get(row)!; // a hit is always a rect the cache holds
+      const rect = rects.rectOf(row)!; // a hit is always a rect the cache holds
       return {
         id: String(row),
         timestamp: rect.timeStart,
@@ -42,7 +41,7 @@ function hitAt(
     buckets: new Map(),
     rectangleManager: new RectangleCache(rects),
   });
-  const maxDepth = Math.max(0, ...[...byRow.values()].map((rect) => rect.depth));
+  const maxDepth = Math.max(0, rects.rectRowsByDepth.length - 1);
   return detector.hitTest(screenX, 300, depth, viewport, maxDepth).eventNode?.timestamp ?? null;
 }
 

@@ -42,12 +42,8 @@ export function timelineEvent(
  * The rects the chart draws for `roots`, as `buildTimelineFrames` lays them out:
  * rows in pre-order, and a frame with no duration hiding its subtree.
  */
-export function rectsOf(
-  roots: FrameSpec[],
-): RectColumns & { rectsByCategory: Map<string, PrecomputedRect[]> } {
-  const rectsByCategory = new Map<string, PrecomputedRect[]>(
-    BUCKET_CONSTANTS.CATEGORY_PRIORITY.map((category) => [category, []]),
-  );
+export function rectsOf(roots: FrameSpec[]): RectColumns {
+  const drawn = new Set<string>(BUCKET_CONSTANTS.CATEGORY_PRIORITY);
   const rects: PrecomputedRect[] = [];
   const categories: LogCategory[] = [];
   let row = 0;
@@ -72,9 +68,7 @@ export function rectsOf(
         width: 0,
         height: TIMELINE_CONSTANTS.EVENT_HEIGHT,
       };
-      const ofCategory = rectsByCategory.get(frame.category);
-      if (ofCategory) {
-        ofCategory.push(rect);
+      if (drawn.has(frame.category)) {
         rects.push(rect);
       }
       visit(frame.children, depth + 1);
@@ -97,7 +91,10 @@ export function rectsOf(
     categoryId: Uint8Array.from(categories, (category) => categoryNames.indexOf(category)),
     categoryNames,
     rectRowsByDepth,
-    rectOf: (at) => rectAt.get(at),
-    rectsByCategory,
+    // A copy, as the frames make a new rect on every call.
+    rectOf: (at) => {
+      const rect = rectAt.get(at);
+      return rect && { ...rect };
+    },
   };
 }

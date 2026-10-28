@@ -74,8 +74,6 @@ export function navFrames(roots: NavNode[]): TimelineFrames<EventNode> {
     categoryId: new Uint8Array(nodes.length),
     categoryNames: [],
     rectRowsByDepth: [],
-    rectsByCategory: new Map(),
-    rectsByDepth: new Map(),
     isVisible: (row) => shown[row] ?? false,
     rowsAtDepth: (d) => Int32Array.from((byDepth[d] ?? []).sort((x, y) => start[x]! - start[y]!)),
     node: (row) => nodes[row]!,

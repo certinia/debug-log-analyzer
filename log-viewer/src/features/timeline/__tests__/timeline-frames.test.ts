@@ -23,9 +23,9 @@ const NESTED =
 describe('buildTimelineFrames', () => {
   it('draws a rect for every shown frame, and none for a frame with no duration', async () => {
     const { frames } = await framesOf(NESTED);
-    const texts = [...frames.rectsByCategory.values()]
-      .flat()
-      .map((rect) => frames.text(rect.row))
+    const texts = frames.rectRowsByDepth
+      .flatMap((rows) => [...rows])
+      .map((row) => frames.text(row))
       .sort();
 
     expect(texts).toEqual([
@@ -36,12 +36,29 @@ describe('buildTimelineFrames', () => {
       'ns.Inner.second()',
       'ns.Outer.run()',
     ]);
-    for (const rects of frames.rectsByDepth.values()) {
-      for (const rect of rects) {
-        expect(rect.timeEnd).toBe(rect.timeStart + rect.duration);
-        expect(frames.rectOf(Number(rect.id))).toBe(rect);
-      }
-    }
+  });
+
+  // Under the execution and code unit, Outer is depth 2, Inner 3, so its SOQL is 4.
+  it("makes a frame's rect from its row, and none for a category it does not draw", async () => {
+    const { log } = await framesOf(NESTED);
+    const index = buildLogIndex(log);
+    const soql = index.rowOf(idOf(log, 'SELECT Id FROM Account'));
+    const all = buildTimelineFrames(index, new Set(['Apex', 'SOQL']), 0);
+    const apexOnly = buildTimelineFrames(index, new Set(['Apex']), 0);
+
+    expect(all.rectOf(soql)).toMatchObject({
+      id: String(soql),
+      row: soql,
+      timeStart: 1300,
+      timeEnd: 1400,
+      duration: 100,
+      depth: 4,
+      category: 'SOQL',
+    });
+    expect(all.hasRect(soql)).toBe(true);
+    expect(apexOnly.rectOf(soql)).toBeUndefined();
+    expect(apexOnly.hasRect(soql)).toBe(false);
+    expect(apexOnly.isVisible(soql)).toBe(true);
   });
 
   it('lists the shown rows at each depth in start order', async () => {

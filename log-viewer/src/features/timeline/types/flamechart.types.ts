@@ -165,10 +165,6 @@ export interface TimelineFrames<E extends EventNode> extends RectColumns {
   readonly parent: Int32Array;
   /** The first row after this row's subtree. */
   readonly subtreeEnd: Int32Array;
-  /** Every rect, by category. */
-  readonly rectsByCategory: Map<string, PrecomputedRect[]>;
-  /** Every rect, by depth, each list in pre-order. */
-  readonly rectsByDepth: Map<number, PrecomputedRect[]>;
 
   isVisible(row: number): boolean;
   /** The shown rows at a depth, ascending by start. */

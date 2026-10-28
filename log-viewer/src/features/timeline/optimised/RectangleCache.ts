@@ -9,7 +9,7 @@
  * Separates "what to draw" from "how to draw it" to eliminate coupling between renderers.
  *
  * Responsibilities:
- * - Maintain spatial index (rectsByCategory) for efficient access
+ * - Maintain the spatial index (a TemporalSegmentTree over the frames' rows)
  * - Perform viewport culling on demand
  * - Provide culled rectangles to any consumer (renderers)
  *

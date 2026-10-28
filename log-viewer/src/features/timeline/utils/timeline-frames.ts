@@ -17,6 +17,11 @@ export type ApexEventNode = EventNode & { original: ApexEvent };
 
 const NO_ROWS: Int32Array = new Int32Array(0);
 
+// A row's state in `shown`: drawn is shown with a category the timeline draws.
+const HIDDEN = 0;
+const SHOWN = 1;
+const DRAWN = 2;
+
 /**
  * The timeline's frames for a log, read from its {@link LogIndex}: a rect for each
  * shown row whose category is in `categories`, and the shown rows at each depth.
@@ -41,14 +46,7 @@ export function buildTimelineFrames(
 
   const shown = new Uint8Array(rowCount);
   const rowsAt: number[][] = [];
-  const rects: PrecomputedRect[] = [];
-  const rectAt = new Int32Array(rowCount).fill(NO_ROW);
-  const rectsByCategory = new Map<string, PrecomputedRect[]>();
-  for (const category of categories) {
-    rectsByCategory.set(category, []);
-  }
-  const rectsByDepth = new Map<number, PrecomputedRect[]>();
-  const rectsOfCategory = index.categoryNames.map((name) => rectsByCategory.get(name));
+  const drawnCategory = index.categoryNames.map((name) => categories.has(name));
   let maxDepth = 0;
   let totalDuration = logEndTime;
 
@@ -59,50 +57,22 @@ export function buildTimelineFrames(
       row = subtreeEnd[row]!;
       continue;
     }
-    shown[row] = 1;
+    shown[row] = drawnCategory[categoryId[row]!] ? DRAWN : SHOWN;
     const d = depth[row]!;
     (rowsAt[d] ??= []).push(row);
     if (d > maxDepth) {
       maxDepth = d;
     }
-    const rowStart = start[row]!;
-    const end = rowStart + rowTotal;
+    const end = start[row]! + rowTotal;
     if (end > totalDuration) {
       totalDuration = end;
-    }
-
-    const ofCategory = rectsOfCategory[categoryId[row]!];
-    if (ofCategory) {
-      const rect: PrecomputedRect = {
-        id: String(row),
-        row,
-        timeStart: rowStart,
-        timeEnd: end,
-        depth: d,
-        duration: rowTotal,
-        selfDuration: index.self[row]!,
-        category: rowCategory(index, row),
-        x: 0,
-        y: d * eventHeight,
-        width: 0,
-        height: eventHeight,
-      };
-      rectAt[row] = rects.length;
-      rects.push(rect);
-      ofCategory.push(rect);
-      let atDepth = rectsByDepth.get(d);
-      if (!atDepth) {
-        atDepth = [];
-        rectsByDepth.set(d, atDepth);
-      }
-      atDepth.push(rect);
     }
     row++;
   }
 
   // Pre-order is start order unless the log's timestamps go backwards.
   const rowsByDepth = rowsAt.map((rows) => Int32Array.from(sortIfNeeded(rows, start)));
-  const rectRowsByDepth = rowsByDepth.map((rows) => rows.filter((row) => rectAt[row] !== NO_ROW));
+  const rectRowsByDepth = rowsByDepth.map((rows) => rows.filter((row) => shown[row] === DRAWN));
 
   return {
     rowCount,
@@ -116,9 +86,7 @@ export function buildTimelineFrames(
     categoryId: index.categoryId,
     categoryNames: index.categoryNames,
     rectRowsByDepth,
-    rectsByCategory,
-    rectsByDepth,
-    isVisible: (row) => shown[row] === 1,
+    isVisible: (row) => (shown[row] ?? HIDDEN) !== HIDDEN,
     rowsAtDepth: (d) => rowsByDepth[d] ?? NO_ROWS,
     node: (row): TreeNode<ApexEventNode> => ({
       row,
@@ -139,10 +107,30 @@ export function buildTimelineFrames(
         return NO_ROW;
       }
       const row = index.rowOf((original as ApexEvent).id);
-      return row !== NO_ROW && shown[row] === 1 ? row : NO_ROW;
+      return row !== NO_ROW && shown[row] !== HIDDEN ? row : NO_ROW;
     },
-    hasRect: (row) => (rectAt[row] ?? NO_ROW) !== NO_ROW,
-    rectOf: (row) => rects[rectAt[row] ?? NO_ROW],
+    hasRect: (row) => shown[row] === DRAWN,
+    // A new object each call, so only what is drawn or returned is ever made.
+    rectOf: (row): PrecomputedRect | undefined => {
+      if (shown[row] !== DRAWN) {
+        return undefined;
+      }
+      const d = depth[row]!;
+      return {
+        id: String(row),
+        row,
+        timeStart: start[row]!,
+        timeEnd: start[row]! + total[row]!,
+        depth: d,
+        duration: total[row]!,
+        selfDuration: index.self[row]!,
+        category: rowCategory(index, row),
+        x: 0,
+        y: d * eventHeight,
+        width: 0,
+        height: eventHeight,
+      };
+    },
   };
 }
 
