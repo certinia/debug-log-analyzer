@@ -13,8 +13,6 @@ import { keyed } from 'lit/directives/keyed.js';
 import { styleMap } from 'lit/directives/style-map.js';
 
 import type { GoToResult, RowKey } from '../../grid/index.js';
-import type { DatagridFacetFilter } from '../datagrid-facet-filter.js';
-import type { DatagridRangeFilter } from '../datagrid-range-filter.js';
 import { liveStatus } from '../liveStatus.js';
 
 import '#vscode-elements/vscode-icon.js';
@@ -51,15 +49,6 @@ export function hiddenAfterGoTo(goTo: {
 interface NoteGrid {
   readonly headerHeight: number;
   focus(options?: FocusOptions): void;
-}
-
-/** Clears the facet and range filters under `root`, each reporting its change as its own Clear does. */
-export function clearGridFilters(root: ParentNode): void {
-  for (const filter of root.querySelectorAll<DatagridFacetFilter | DatagridRangeFilter>(
-    'datagrid-facet-filter, datagrid-range-filter',
-  )) {
-    filter.clear();
-  }
 }
 
 /**

@@ -267,6 +267,13 @@ describe('analysis-view', () => {
     // #1211: a finding in a filtered-out namespace selected nothing, with no word why.
     it('says so when a reveal names a bucket the filters hide, and Clear reaches it', async () => {
       await pickNamespaces(['other']);
+      view.renderRoot.querySelector('datagrid-range-filter[label="Total Time"]')?.dispatchEvent(
+        new CustomEvent('datagrid-range-change', {
+          detail: { range: { start: 0, end: null } },
+          bubbles: true,
+        }),
+      );
+      await view.updateComplete;
 
       await reveal(2);
       expect(note()?.textContent).toContain('Row hidden by current filters');
@@ -282,6 +289,12 @@ describe('analysis-view', () => {
       expect(note()).toBeNull();
       // The button went with the bar; focus left on the body strands a keyboard user.
       expect(gridFocused()).toBe(true);
+      expect(grid().filters.filter((filter) => filter !== BOTTOM_UP_WITHOUT_DETAILS)).toEqual([]);
+      const total = [...view.renderRoot.querySelectorAll('datagrid-range-filter')].find(
+        (el) => el.label === 'Total Time',
+      );
+      expect(view.renderRoot.querySelector('datagrid-facet-filter')?.selected).toEqual([]);
+      expect(total?.range).toEqual({ start: null, end: null });
     });
 
     it.each([

@@ -29,6 +29,21 @@ afterEach(() => {
 });
 
 describe('datagrid-facet-filter', () => {
+  it('ticks the values its host sets, clears when set to none, and reports no change for either', async () => {
+    const el = await mount();
+    const changes: unknown[] = [];
+    el.addEventListener('datagrid-facet-change', (e) => changes.push(e));
+
+    el.selected = ['ns2'];
+    await el.updateComplete;
+    expect(boxes(el).map((box) => box.checked)).toEqual([false, true, false]);
+
+    el.selected = [];
+    await el.updateComplete;
+    expect(boxes(el).map((box) => box.checked)).toEqual([false, false, false]);
+    expect(changes).toEqual([]);
+  });
+
   it('keeps its value checklist inside a popover when moved into the overflow panel', async () => {
     const el = await mount('overflow');
 
