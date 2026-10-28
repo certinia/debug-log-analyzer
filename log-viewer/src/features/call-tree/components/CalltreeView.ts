@@ -23,7 +23,7 @@ import { CALLTREE_GO_TO_ROW, type CalltreeNavigationEventMap } from '../navigati
 import { goToTimelineEvent } from '../../timeline/navigation.js';
 import type { AggregatedRow, BottomUpRow } from '../utils/Aggregation.js';
 import { TimeOrderSource, type TimeOrderNode } from '../utils/TimeOrderTree.js';
-import { eventKind } from '../utils/DetailsFilter.js';
+import { eventKind } from '#core/log/eventKind.js';
 import { wireCategoryColoring } from '../utils/CategoryColoring.js';
 import { waitForNextFrame } from '#core/utility/FrameBudget.js';
 import type {

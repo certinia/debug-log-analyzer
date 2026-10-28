@@ -27,6 +27,39 @@ describe('LogStore', () => {
     expect(stack[stack.length - 1]?.text).toBe('ns.ClassTwo.second()');
   });
 
+  it('counts a VF call with no method as a stack frame', async () => {
+    const { log, store } = await storeOf(
+      '09:18:22.6 (1000)|METHOD_ENTRY|[1]|01p|ns.Page.load()\n' +
+        '09:18:22.6 (2000)|VF_APEX_CALL_START|[EXTERNAL]|PageMessagesComponentController invoke(getseverities)\n' +
+        '09:18:22.6 (3000)|METHOD_EXIT|[1]|ns.Page.load()\n',
+    );
+
+    const stack = store.stackByEventIndex(
+      indexOf(log, 'PageMessagesComponentController invoke(getseverities)'),
+    );
+
+    expect(stack.slice(-2).map((frame) => frame.text)).toEqual([
+      'ns.Page.load()',
+      'PageMessagesComponentController invoke(getseverities)',
+    ]);
+  });
+
+  it('keeps the limit block a limit line sits in on the stack', async () => {
+    const { log, store } = await storeOf(
+      '09:18:22.6 (1000)|CUMULATIVE_LIMIT_USAGE\n' +
+        '09:18:22.6 (1000)|LIMIT_USAGE_FOR_NS|(default)|\n' +
+        '  Number of SOQL queries: 0 out of 100\n' +
+        '09:18:22.6 (2000)|CUMULATIVE_LIMIT_USAGE_END\n',
+    );
+    const limitLine = Array.from({ length: log.eventCount }, (_, i) => i + 1).find(
+      (id) => log.event(id)?.type === 'LIMIT_USAGE_FOR_NS',
+    );
+
+    const stack = store.stackByEventIndex(limitLine!);
+
+    expect(stack.at(-1)?.type).toBe('CUMULATIVE_LIMIT_USAGE');
+  });
+
   it('gives one log one store, whichever view asks', async () => {
     const { log } = await storeOf('');
 

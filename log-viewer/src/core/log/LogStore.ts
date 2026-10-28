@@ -4,13 +4,14 @@
 import type { ApexEvent, ApexLog, EventOf, FrameEvent } from '@apexdevtools/apex-log-parser';
 
 import { CHECK_EVERY, frameBudget, type FrameBudgetOptions } from '../utility/FrameBudget.js';
+import { typeKind } from './eventKind.js';
 import { KeyPathIds } from './keyPathIds.js';
 import { type CapabilityId, findLevelGap, type LevelGap } from './levelCapabilities.js';
 import { type DebugLevels, hiddenByLevels } from './levelFilter.js';
 import { type LogIndex, LogIndexBuilder } from './LogIndex.js';
 import { signaturesOf } from './signatures.js';
 
-export type Stack = FrameEvent[];
+export type Stack = ApexEvent[];
 
 /** What {@link LogStore.derive} runs once per log. */
 export type Derivation<T> = (index: LogIndex, store: LogStore) => T | Promise<T>;
@@ -163,10 +164,11 @@ export class LogStore {
   stackByEventIndex(eventIndex: number): Stack {
     // O(depth) up the parent column, rather than a scan of the whole tree.
     const stack: Stack = [];
-    const { isFrame } = this.log.columns;
+    const { isFrame, type } = this.log.columns;
     for (let id = this.isShown(eventIndex) ? eventIndex : 0; id > 0; id = this.parentOf(id)) {
-      if (isFrame[id]) {
-        stack.push(this.log.event(id) as FrameEvent); // isFrame checked
+      // The parser's flag keeps the limit blocks; the type keeps a VF call with no method.
+      if (isFrame[id] || typeKind(type[id]) === 'frame') {
+        stack.push(this.log.event(id)!); // a shown id is in the log
       }
     }
     return stack.reverse();

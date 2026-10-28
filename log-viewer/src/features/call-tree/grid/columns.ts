@@ -8,6 +8,7 @@ import type { ColumnSettingsOptions } from '../../../components/ColumnSettingsCo
 import { bar } from '../../../components/grid/cells.js';
 import { countColumn, timeColumn } from '../../../components/grid/columns.js';
 import { NO_REPORTED_LIMITS_TEXT } from '../../../components/governorCopy.js';
+import { eventKind } from '#core/log/eventKind.js';
 import { rowMetrics, type SelfTotalColumns } from '#core/log/rowMetrics.js';
 import { vscodeMessenger } from '#core/messaging/VSCodeExtensionMessenger.js';
 import { callerNamespaceOfRow } from '#core/utility/CallerNamespace.js';
@@ -39,7 +40,6 @@ import {
   type ReportedUsage,
   type TimeSpan,
 } from '../utils/reportedUsage.js';
-import { eventKind } from '../utils/DetailsFilter.js';
 import type { TimeOrderNode, TimeOrderSource } from '../utils/TimeOrderTree.js';
 import { nameCell, nameExportText, nameText } from './cells.js';
 import { knownMax, outermostSum } from './calcs.js';
