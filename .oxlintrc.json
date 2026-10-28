@@ -140,7 +140,7 @@
               {
                 // `group` is gitignore syntax, where a leading `#` is a comment.
                 "regex": "^#test-helpers/",
-                "message": "Test fixtures only. tsconfig paths resolve this alias in production code too, so this rule is what keeps it out of the bundle."
+                "message": "Test fixtures only. The package.json imports field resolves this alias in production code too, so this rule is what keeps it out of the bundle."
               }
             ]
           }

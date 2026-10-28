@@ -6,6 +6,7 @@
   "version": "0.1.0",
   "imports": {
     "#core/*": "./src/core/*",
+    "#test-helpers/*": "./src/__tests__/helpers/*",
     "#vscode-elements/*.js": "@vscode-elements/elements/dist/*/index.js"
   },
   "dependencies": {
