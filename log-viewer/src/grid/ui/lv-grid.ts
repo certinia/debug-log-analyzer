@@ -327,12 +327,12 @@ export class LvGrid<R extends object = object> extends LitElement {
     // A source set in the same turn reaches the store only in this element's update.
     await this.updateComplete;
     const index = (await this.store?.reveal(path)) ?? -1;
-    if (index < 0) {
-      return 'none-shown';
-    }
     await this.updateComplete;
     if (selection !== this.selections) {
       return 'superseded';
+    }
+    if (index < 0) {
+      return 'none-shown';
     }
     this.bringIntoView(index, scrollIfVisible);
     this.select(this.targetAt(index), index);

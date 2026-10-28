@@ -781,6 +781,15 @@ describe('lv-grid', () => {
     expect(rowNamed('b2')?.ariaSelected).not.toBe('true');
   });
 
+  it('says it gave way, not that no row is shown, when overtaken on a path with no shown row', async () => {
+    const { grid } = await setup();
+
+    const stale = grid.goTo([99]);
+    void grid.goTo([1]);
+
+    expect(await stale).toBe('superseded');
+  });
+
   it('gives way to a click made while it opens the path', async () => {
     const { grid, rowNamed } = await setup();
 
