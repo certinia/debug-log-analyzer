@@ -74,6 +74,18 @@ describe('frameVariablesFor', () => {
     expect(frame?.thisType).toBe('ns.Outer');
   });
 
+  it('names the class of a constructor that logs no `this`', async () => {
+    const { log, store } = await storeOf(
+      '09:18:22.6 (1000)|CONSTRUCTOR_ENTRY|[1]|01p|<init>()|ns.Outer.Inner\n' +
+        '09:18:22.6 (1100)|VARIABLE_ASSIGNMENT|[2]|this.count|7\n' +
+        '09:18:22.6 (1200)|CONSTRUCTOR_EXIT|[1]|01p|<init>()|ns.Outer.Inner\n',
+    );
+
+    const frame = frameVariablesFor(store, indexOf(log, 'ns.Outer.Inner()'));
+
+    expect(frame?.thisType).toBe('ns.Outer.Inner');
+  });
+
   it('leaves a static out of the locals, since the index answers for it', async () => {
     const { log, store } = await storeOf(
       '09:18:22.6 (1000)|METHOD_ENTRY|[1]|01p|ns.Outer.run()\n' +

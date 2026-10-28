@@ -231,6 +231,25 @@ describe('aggregateVariablesFor on this', () => {
     expect(spread?.fields.map((row) => [row.name, row.values.length])).toEqual([['name', 2]]);
   });
 
+  it('names the class `this` was declared as, for an inner-class constructor', async () => {
+    const construct = (at: number, address: string): string => {
+      const t = (offset: number): string => `09:18:22.6 (${at + offset})`;
+      return (
+        `${t(0)}|CONSTRUCTOR_ENTRY|[1]|01p|<init>()|Outer.Inner\n` +
+        `${t(10)}|VARIABLE_SCOPE_BEGIN|[2]|this|Outer.Inner|true|false\n` +
+        `${t(20)}|VARIABLE_ASSIGNMENT|[2]|this|{}|${address}\n` +
+        `${t(30)}|VARIABLE_ASSIGNMENT|[3]|this.name|"x"|${address}\n` +
+        `${t(40)}|CONSTRUCTOR_EXIT|[1]|01p|<init>()|Outer.Inner\n`
+      );
+    };
+    const { spread } = await compare(
+      construct(1000, '0xaaa') + construct(2000, '0xbbb'),
+      'Outer.Inner()',
+    );
+
+    expect(spread?.thisType).toBe('Outer.Inner');
+  });
+
   it('names no class where the calls did not agree on one', async () => {
     const { log, store } = await storeOf(
       onObject(1000, '0xaaa', 'A') +
