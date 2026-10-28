@@ -11,7 +11,7 @@ import { logContext } from '#core/log/logContext.js';
 import type { LogStore } from '#core/log/LogStore.js';
 import { repeat } from 'lit/directives/repeat.js';
 
-import { eventType } from '@apexdevtools/apex-log-parser';
+import { eventType, type ApexLog } from '@apexdevtools/apex-log-parser';
 import { DomListenerController } from '#core/events/DomListenerController.js';
 import { eventBus, type SelectionView } from '#core/events/EventBus.js';
 import { SelectionEchoGuard } from '#core/events/SelectionEchoGuard.js';
@@ -27,6 +27,7 @@ import { eventKind } from '#core/log/eventKind.js';
 import { wireCategoryColoring } from '../utils/CategoryColoring.js';
 import { waitForNextFrame } from '#core/utility/FrameBudget.js';
 import type {
+  GridColumn,
   GridContextDetail,
   GridHeaderContextDetail,
   LvGrid,
@@ -47,9 +48,10 @@ import {
   mergedLines,
   openType,
   timeOrderColumns,
+  type CallTreeColumnOptions,
 } from '../grid/columns.js';
 import { inspectorRowEvents } from '../grid/inspectorRowEvents.js';
-import { MergedTree } from '../grid/mergedRows.js';
+import { MergedTree, type MergedRowShape } from '../grid/mergedRows.js';
 
 import type { FilterRange } from '../../../components/grid/MinMax.js';
 import {
@@ -1047,26 +1049,13 @@ export class CalltreeView extends LitElement {
   }
 
   private _loadAggregated(grid: LvGrid<AggregatedRow>, store: LogStore): Promise<void> {
-    this._aggregatedBuild = this._fillAggregatedTree(grid, store);
+    this._aggregatedBuild = this._fillMergedTree(grid, store, {
+      columns: aggregatedColumns,
+      build: MergedTree.aggregated,
+      heldGrid: () => this.aggregatedGrid,
+      setTree: (tree) => (this._aggregatedTree = tree),
+    });
     return this._aggregatedBuild;
-  }
-
-  private async _fillAggregatedTree(grid: LvGrid<AggregatedRow>, store: LogStore): Promise<void> {
-    const reported = await reportedUsageOf(store.log);
-    if (this.rootStore !== store || this.aggregatedGrid !== grid) {
-      return;
-    }
-    grid.columns = aggregatedColumns(store.log, { openType, reported });
-    grid.rowLines = mergedLines(store.log);
-    this._columns.applyTo(gridColumnTarget(grid));
-    const tree = await MergedTree.aggregated(store, { signal: this._builds.signal });
-    // A build can finish just before a detach, and a later one owns the container now.
-    if (!tree || this.aggregatedGrid !== grid) {
-      return;
-    }
-    this._aggregatedTree = tree;
-    grid.source = tree.source;
-    await grid.settled();
   }
 
   private async _renderBottomUpTree(container: HTMLDivElement, store: LogStore): Promise<void> {
@@ -1090,24 +1079,38 @@ export class CalltreeView extends LitElement {
   }
 
   private _loadBottomUp(grid: LvGrid<BottomUpRow>, store: LogStore): Promise<void> {
-    this._bottomUpBuild = this._fillBottomUpTree(grid, store);
+    this._bottomUpBuild = this._fillMergedTree(grid, store, {
+      columns: bottomUpColumns,
+      build: MergedTree.bottomUp,
+      heldGrid: () => this.bottomUpGrid,
+      setTree: (tree) => (this._bottomUpTree = tree),
+    });
     return this._bottomUpBuild;
   }
 
-  private async _fillBottomUpTree(grid: LvGrid<BottomUpRow>, store: LogStore): Promise<void> {
+  private async _fillMergedTree<R extends MergedRowShape<R> & { eventId: number }>(
+    grid: LvGrid<R>,
+    store: LogStore,
+    merged: {
+      columns: (log: ApexLog, options: CallTreeColumnOptions) => GridColumn<R>[];
+      build: (store: LogStore, options: { signal?: AbortSignal }) => Promise<MergedTree<R> | null>;
+      heldGrid: () => LvGrid<R> | null;
+      setTree: (tree: MergedTree<R>) => void;
+    },
+  ): Promise<void> {
     const reported = await reportedUsageOf(store.log);
-    if (this.rootStore !== store || this.bottomUpGrid !== grid) {
+    if (this.rootStore !== store || merged.heldGrid() !== grid) {
       return;
     }
-    grid.columns = bottomUpColumns(store.log, { openType, reported });
+    grid.columns = merged.columns(store.log, { openType, reported });
     grid.rowLines = mergedLines(store.log);
     this._columns.applyTo(gridColumnTarget(grid));
-    const tree = await MergedTree.bottomUp(store, { signal: this._builds.signal });
+    const tree = await merged.build(store, { signal: this._builds.signal });
     // A build can finish just before a detach, and a later one owns the container now.
-    if (!tree || this.bottomUpGrid !== grid) {
+    if (!tree || merged.heldGrid() !== grid) {
       return;
     }
-    this._bottomUpTree = tree;
+    merged.setTree(tree);
     grid.source = tree.source;
     await grid.settled();
   }
