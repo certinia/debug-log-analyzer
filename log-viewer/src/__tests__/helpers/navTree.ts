@@ -85,6 +85,7 @@ export function navFrames(roots: NavNode[]): TimelineFrames<EventNode> {
       const row = byOriginal.get(original) ?? NO_ROW;
       return shown[row] ? row : NO_ROW;
     },
+    hasRect: () => false,
     rectOf: () => undefined,
   };
 }

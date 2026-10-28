@@ -14,7 +14,6 @@
 import * as PIXI from 'pixi.js';
 import type { EventNode, ViewportState } from '../../types/flamechart.types.js';
 import type { SearchCursor, SearchMatch } from '../../types/search.types.js';
-import type { PrecomputedRect } from '../RectangleCache.js';
 import {
   createHighlightColors,
   DEFAULT_FIND_MATCH_COLOR,
@@ -91,15 +90,15 @@ export class SearchHighlightRenderer {
     const bounds = this.calculateBounds(viewport);
     const currentMatch = cursor.getCurrent();
 
-    if (!currentMatch || !this.isVisible(currentMatch, currentMatch.rect, bounds)) {
+    if (!currentMatch || !this.isVisible(currentMatch, bounds)) {
       return;
     }
 
     // Use shared highlight rendering logic
     renderHighlight(
       this.currentMatchGraphics,
-      currentMatch.rect.timeStart,
-      currentMatch.rect.duration,
+      currentMatch.timeStart,
+      currentMatch.duration,
       currentMatch.depth,
       viewport,
       this.colors,
@@ -160,17 +159,12 @@ export class SearchHighlightRenderer {
    * Uses same culling logic as SelectionHighlightRenderer.isVisible.
    *
    * @param match - Search match to test
-   * @param rect - Rectangle to test
    * @param bounds - Culling bounds
    * @returns true if rectangle is visible
    */
-  private isVisible(
-    match: SearchMatch<EventNode>,
-    rect: PrecomputedRect,
-    bounds: CullingBounds,
-  ): boolean {
-    const rectTimeStart = rect.timeStart;
-    const rectTimeEnd = rect.timeEnd;
+  private isVisible(match: SearchMatch<EventNode>, bounds: CullingBounds): boolean {
+    const rectTimeStart = match.timeStart;
+    const rectTimeEnd = match.timeStart + match.duration;
     if (rectTimeEnd <= bounds.timeStart || rectTimeStart >= bounds.timeEnd) {
       return false;
     }

@@ -121,6 +121,20 @@ describe('EventMatcher', () => {
     });
   });
 
+  // Under the execution and code unit, Outer is depth 2, Inner 3, so its SOQL is 4.
+  it("gives a match its frame's place and category", async () => {
+    const { frames } = await framesOf(LOG);
+    const cursor = (await new EventMatcher(frames).search(textPredicate('SELECT')))!;
+
+    expect(cursor.matches).toHaveLength(1);
+    expect(cursor.matches[0]).toMatchObject({
+      timeStart: 1300,
+      duration: 100,
+      depth: 4,
+      category: 'SOQL',
+    });
+  });
+
   it('builds a match event only when it is read', async () => {
     const { frames } = await framesOf(LOG);
     const node = jest.spyOn(frames, 'node');

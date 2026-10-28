@@ -179,6 +179,7 @@ export interface TimelineFrames<E extends EventNode> extends RectColumns {
   type(row: number): string;
   /** The shown row for an {@link EventNode.original}, or {@link NO_ROW}. */
   rowOfOriginal(original: unknown): number;
+  hasRect(row: number): boolean;
   rectOf(row: number): PrecomputedRect | undefined;
 }
 

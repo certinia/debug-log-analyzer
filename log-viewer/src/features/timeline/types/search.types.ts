@@ -9,7 +9,6 @@
  * decoupled from specific event implementations.
  */
 
-import type { PrecomputedRect } from '../optimised/RectangleCache.js';
 import type { EventNode } from './flamechart.types.js';
 
 /** Tests a frame by its text and type, so a search reads strings rather than nodes. */
@@ -37,8 +36,17 @@ export interface SearchMatch<E extends EventNode> {
   /** The matched event */
   readonly event: E;
 
-  /** Pre-computed rectangle for rendering; `rect.id` is `event.id` */
-  readonly rect: PrecomputedRect;
+  /** The matched frame's id, as `event.id` */
+  readonly id: string;
+
+  /** Start time in nanoseconds */
+  readonly timeStart: number;
+
+  /** Duration in nanoseconds */
+  readonly duration: number;
+
+  /** Category, for colour */
+  readonly category: string;
 
   /** Depth in the event tree (0-indexed) */
   readonly depth: number;

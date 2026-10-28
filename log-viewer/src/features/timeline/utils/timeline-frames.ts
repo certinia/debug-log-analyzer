@@ -141,6 +141,7 @@ export function buildTimelineFrames(
       const row = index.rowOf((original as ApexEvent).id);
       return row !== NO_ROW && shown[row] === 1 ? row : NO_ROW;
     },
+    hasRect: (row) => (rectAt[row] ?? NO_ROW) !== NO_ROW,
     rectOf: (row) => rects[rectAt[row] ?? NO_ROW],
   };
 }
