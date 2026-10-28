@@ -114,10 +114,12 @@ describe('LogStore.derive', () => {
     const derive = jest.fn(rowCount);
 
     const [first, second] = await Promise.all([store.derive(derive), store.derive(derive)]);
+    const later = await store.derive(derive);
 
     const { rowCount: rows } = await store.logIndex();
     expect(first).toBe(rows);
     expect(second).toBe(rows);
+    expect(later).toBe(rows);
     expect(derive).toHaveBeenCalledTimes(1);
   });
 

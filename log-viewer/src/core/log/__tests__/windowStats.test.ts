@@ -1,14 +1,20 @@
 /*
  * Copyright (c) 2026 Certinia Inc. All rights reserved.
  */
-import { describe, expect, it } from '@jest/globals';
+import { afterEach, describe, expect, it, jest } from '@jest/globals';
 
 import { rawStoreOf } from '#test-helpers/apexLog.js';
+import { type FakeHost, fakeHost } from '#test-helpers/fakeHost.js';
 import type { FrameBudgetOptions } from '../../utility/FrameBudget.js';
 import type { LogIndex } from '../LogIndex.js';
 import type { LogStore } from '../LogStore.js';
-import type { TimeWindow } from '../rangeScope.js';
-import { WindowIndex, windowIndexFor, type WindowStats } from '../windowStats.js';
+import { setRange, type TimeWindow } from '../rangeScope.js';
+import {
+  WindowIndex,
+  windowIndex,
+  type WindowStats,
+  WindowStatsController,
+} from '../windowStats.js';
 
 const options: FrameBudgetOptions = { yieldSlice: () => Promise.resolve() };
 
@@ -57,9 +63,9 @@ async function storeOf(...frames: Lines[]): Promise<LogStore> {
   return (await rawStoreOf(frames.flat().join(''))).store;
 }
 
-/** The stats a fresh index gives for `window`. */
+/** The stats the log's index gives for `window`. */
 async function statsFor(store: LogStore, window: TimeWindow): Promise<WindowStats> {
-  return (await windowIndexFor(store, options)).statsFor(window);
+  return (await store.derive(windowIndex)).statsFor(window);
 }
 
 /**
@@ -153,7 +159,7 @@ describe('windowStats', () => {
   // that stops a nanosecond short leaves the statement out.
   it('counts a statement by its own times, not the bucket it sits in', async () => {
     const store = await storeOf(apex(0, 1_000_000, [soql(500_000, 500_100)]));
-    const index = await windowIndexFor(store, options);
+    const index = await store.derive(windowIndex);
 
     expect(index.statsFor({ start: 0, end: 499_999 }).counts.soqlCount).toBe(0);
     expect(index.statsFor({ start: 0, end: 500_000 }).counts.soqlCount).toBe(1);
@@ -266,17 +272,65 @@ describe('windowStats index', () => {
 
     expect(visited()).toBe(0);
   });
+});
 
-  it('builds one index per log, however many readers ask', async () => {
-    const store = await storeOf(...roots());
+describe('WindowStatsController', () => {
+  const hosts: FakeHost[] = [];
 
-    const [first, second] = await Promise.all([
-      windowIndexFor(store, options),
-      windowIndexFor(store, options),
-    ]);
-    const third = await windowIndexFor(store, options);
+  afterEach(() => {
+    hosts.splice(0).forEach((host) => host.disconnect());
+    setRange(null);
+  });
 
-    expect(second).toBe(first);
-    expect(third).toBe(first);
+  function connected(store: () => LogStore): { window: WindowStatsController; host: FakeHost } {
+    const host = fakeHost();
+    const window = new WindowStatsController(host, store);
+    host.connect();
+    hosts.push(host);
+    return { window, host };
+  }
+
+  it('has no stats while the log is read, then asks its host to render them', async () => {
+    const store = await storeOf(apex(0, 1_000));
+    const { window, host } = connected(() => store);
+    setRange({ start: 0, end: 500 });
+    const render = jest.spyOn(host, 'requestUpdate');
+
+    expect(window.stats).toBeNull();
+    expect(window.pending).toBe(true);
+    await store.derive(windowIndex);
+
+    expect(render).toHaveBeenCalled();
+    expect(window.stats).not.toBeNull();
+  });
+
+  it("answers for the log it is given now, never the last one's", async () => {
+    const first = await storeOf(apex(0, 1_000));
+    const second = await storeOf(dml(0, 1_000));
+    let store = first;
+    const { window } = connected(() => store);
+    setRange({ start: 0, end: 1_000 });
+    void window.stats;
+    await first.derive(windowIndex);
+
+    store = second;
+    expect(window.stats).toBeNull();
+    await second.derive(windowIndex);
+
+    expect([...(window.stats?.selfByCategory.keys() ?? [])]).toEqual(['DML']);
+  });
+
+  it('keeps waiting on a log it cannot read, without reading it again', async () => {
+    const store = await storeOf(apex(0, 1_000));
+    const derive = jest.spyOn(store, 'derive').mockRejectedValue(new Error('unreadable'));
+    const { window } = connected(() => store);
+    setRange({ start: 0, end: 500 });
+
+    void window.stats;
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    void window.stats;
+
+    expect(window.pending).toBe(true);
+    expect(derive).toHaveBeenCalledTimes(1);
   });
 });

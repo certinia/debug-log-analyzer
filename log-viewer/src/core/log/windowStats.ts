@@ -7,7 +7,7 @@ import { DEFAULT_NAMESPACE, namespaceOf } from '../utility/CallerNamespace.js';
 import { CHECK_EVERY, frameBudget, type FrameBudgetOptions } from '../utility/FrameBudget.js';
 import { firstIndexWhere } from '../utility/Util.js';
 import { childRows, rowCategory, type LogIndex, NO_ROW, sharedChildRows } from './LogIndex.js';
-import type { LogStore } from './LogStore.js';
+import type { Derivation, LogStore } from './LogStore.js';
 import { RangeScopeController, sameWindow, type TimeWindow } from './rangeScope.js';
 import { statementSelves } from './rowMetrics.js';
 
@@ -28,8 +28,7 @@ export interface WindowStats {
   counts: WindowCounts;
 }
 
-/** Only the yield matters here: the build is never abandoned, so it accepts no
- *  signal. */
+// No signal: the window moves per frame, so an abandonable build would restart and never finish.
 type BuildOptions = Pick<FrameBudgetOptions, 'yieldSlice'>;
 
 const COUNTERS: ReadonlyArray<keyof WindowCounts> = [
@@ -127,7 +126,7 @@ export class WindowIndex {
 
   /** Reads every row once, yielding between slices so the chart keeps its
    *  frames (see {@link FrameBudgetOptions}). */
-  static async build(index: LogIndex, options: BuildOptions): Promise<WindowIndex> {
+  static async build(index: LogIndex, options: BuildOptions = {}): Promise<WindowIndex> {
     const tick = frameBudget(options);
     const { log, rowCount, start: starts, end: ends, categoryId, categoryNames } = index;
     const start = log.startTimestamp;
@@ -238,37 +237,8 @@ export class WindowIndex {
   }
 }
 
-const indexes = new WeakMap<LogStore, WindowIndex>();
-const building = new WeakMap<LogStore, Promise<WindowIndex>>();
-
-/**
- * The index for the log `store` shows, read once and then shared.
- *
- * One build answers every reader, and nothing abandons it: the window moves with
- * the gesture, so a build tied to one window would restart per frame and never
- * finish.
- */
-export function windowIndexFor(store: LogStore, options: BuildOptions = {}): Promise<WindowIndex> {
-  const held = indexes.get(store);
-  if (held) {
-    return Promise.resolve(held);
-  }
-  let inFlight = building.get(store);
-  if (!inFlight) {
-    inFlight = store
-      .logIndex(options)
-      .then((index) => WindowIndex.build(index, options))
-      .then((index) => {
-        indexes.set(store, index);
-        return index;
-      })
-      // A build that threw must not stay cached, or every later reader inherits
-      // the same failure.
-      .finally(() => building.delete(store));
-    building.set(store, inFlight);
-  }
-  return inFlight;
-}
+/** The {@link WindowIndex} for a log, for {@link LogStore.derive}. */
+export const windowIndex: Derivation<WindowIndex> = (index) => WindowIndex.build(index);
 
 function gather(into: Gathered, start: number, end: number, value: number): void {
   if (value === 0) {
@@ -496,7 +466,8 @@ export class WindowStatsController {
   private readonly _range: RangeScopeController;
   private readonly _host: ReactiveControllerHost;
   private readonly _store: () => LogStore | null;
-  private _awaiting: LogStore | null = null;
+  // Weak, so a replaced store is not kept alive.
+  private readonly _indexes = new WeakMap<LogStore, WindowIndex | null>();
 
   constructor(host: ReactiveControllerHost, store: () => LogStore | null) {
     this._host = host;
@@ -535,29 +506,22 @@ export class WindowStatsController {
     if (!store) {
       return null;
     }
-    const index = indexes.get(store);
-    if (index) {
-      return index;
+    const held = this._indexes.get(store);
+    if (held !== undefined) {
+      return held;
     }
-    this._readLog(store);
-    return null;
-  }
-
-  private _readLog(store: LogStore): void {
-    if (this._awaiting === store) {
-      return;
-    }
-    this._awaiting = store;
-    void windowIndexFor(store)
-      .then(() => {
-        if (this._awaiting === store) {
-          // Cleared only on success, so a replaced log does not stay reachable.
-          this._awaiting = null;
+    this._indexes.set(store, null);
+    void store
+      .derive(windowIndex)
+      .then((index) => {
+        this._indexes.set(store, index);
+        if (this._store() === store) {
           this._host.requestUpdate();
         }
       })
       // A build only fails on a log the parser cannot walk. The section keeps
       // its "adding up" note rather than retrying it every render.
       .catch(() => {});
+    return null;
   }
 }

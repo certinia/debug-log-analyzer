@@ -8,7 +8,7 @@
 import type { ApexLog } from '@apexdevtools/apex-log-parser';
 
 import { logStoreFor } from '../../log-viewer/src/core/log/LogStore.js';
-import { windowIndexFor } from '../../log-viewer/src/core/log/windowStats.js';
+import { WindowIndex } from '../../log-viewer/src/core/log/windowStats.js';
 import { print, time, yieldSlice } from './harness.js';
 
 /** Windows a reader zooms to, as a share of the log. */
@@ -32,9 +32,9 @@ export async function measureWindow(log: ApexLog): Promise<void> {
   });
 
   // One read of the log, then every window is answered from it. The heap column
-  // is what the index costs.
-  const index = await time('windowIndex build', () =>
-    windowIndexFor(logStoreFor(log), { yieldSlice }),
+  // is what the index costs. Built by hand, not through derive, to pass the harness yield.
+  const index = await time('windowIndex build', async () =>
+    WindowIndex.build(await logStoreFor(log).logIndex({ yieldSlice }), { yieldSlice }),
   );
 
   for (const [label, share] of WINDOWS) {
