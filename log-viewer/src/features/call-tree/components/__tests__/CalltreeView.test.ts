@@ -506,6 +506,19 @@ describe('calltree-view merged filters', () => {
 
     view._handleDebugOnlyChange();
     expect(passing(view, 'aggregated')).toEqual(['DEBUG | hello']);
+
+    view._handleDebugOnlyChange();
+    view._handleTypeFilter({ target: { value: 'All' } } as unknown as Event);
+    expect(passing(view, 'aggregated')).toEqual(
+      expect.arrayContaining(['ns.Outer.run()', 'SELECT Id FROM Account']),
+    );
+  });
+
+  it('clears the type filter when the selected type is picked again', async () => {
+    await view._setViewMode('aggregated');
+    const picker = view.renderRoot.querySelector('vs-select[label="Type"]');
+
+    expect(picker?.getAttribute('deselectvalue')).toBe('All');
   });
 });
 
