@@ -7,7 +7,8 @@ import type { Context } from '../Context.js';
 import { Command } from './Command.js';
 import { LogView } from './LogView.js';
 
-interface ShowInLogAnalysisArgs {
+/** The arguments a `lana.showInLogAnalysis` command link carries. */
+export interface ShowInLogAnalysisArgs {
   eventId: number;
   filePath?: string;
 }
