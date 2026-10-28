@@ -92,6 +92,18 @@ async function mountView(log?: ApexLog): Promise<CalltreeView> {
   return view;
 }
 
+/** Picks `type` in the view's Type filter; the All option's value is 'All'. */
+function pickType(view: CalltreeView, type: string): void {
+  view._handleTypeFilter({ target: { value: type } } as unknown as Event);
+}
+
+/** The `aria-pressed` of the view's filter toggle labelled `label`. */
+function togglePressed(view: CalltreeView, label: string): string | null | undefined {
+  return [...view.renderRoot.querySelectorAll('button.pill-toggle')]
+    .find((button) => button.textContent?.trim() === label)
+    ?.getAttribute('aria-pressed');
+}
+
 describe('calltree-view table lifetime', () => {
   let view: CalltreeView;
 
@@ -423,12 +435,34 @@ describe('calltree-view merged filters', () => {
   };
   const gridOf = (view: CalltreeView, mode: keyof typeof rowsOf) =>
     mode === 'aggregated' ? view.aggregatedGrid : view.bottomUpGrid;
+  const filtersOf = (view: CalltreeView, mode: 'time-order' | keyof typeof rowsOf) =>
+    ((mode === 'time-order' ? view.timeOrderGrid : gridOf(view, mode))?.filters ?? []) as {
+      test: (row: object) => boolean;
+    }[];
   /** The rows each filter passes on its own; ancestors kept for a match are the grid's job. */
-  const passing = (view: CalltreeView, mode: keyof typeof rowsOf): string[] => {
-    const filters = (gridOf(view, mode)?.filters ?? []) as { test: (row: object) => boolean }[];
-    return rowsOf[mode]()
-      .filter((row) => filters.every((filter) => filter.test(row)))
-      .map((row) => row.text);
+  const kept = (view: CalltreeView, mode: keyof typeof rowsOf) => {
+    const filters = filtersOf(view, mode);
+    return rowsOf[mode]().filter((row) => filters.every((filter) => filter.test(row)));
+  };
+  const passing = (view: CalltreeView, mode: keyof typeof rowsOf): string[] =>
+    kept(view, mode).map((row) => row.text);
+
+  /** The types of the rows each filter of `mode` passes on its own. */
+  const keptTypes = (
+    view: CalltreeView,
+    mode: 'time-order' | keyof typeof rowsOf,
+  ): (string | undefined)[] => {
+    if (mode !== 'time-order') {
+      return kept(view, mode).map((row) => row.type);
+    }
+    const filters = filtersOf(view, mode);
+    return Array.from({ length: index.rowCount }, (_, row) => ({ row }))
+      .filter((node) => filters.every((filter) => filter.test(node)))
+      .map(({ row }) => store.log.event(index.eventIndex[row]!)?.type);
+  };
+  const detailsPressed = async (view: CalltreeView): Promise<string | null | undefined> => {
+    await view.updateComplete;
+    return togglePressed(view, 'Details');
   };
 
   let view: CalltreeView;
@@ -440,6 +474,7 @@ describe('calltree-view merged filters', () => {
         '09:18:22.6 (2000)|SOQL_EXECUTE_BEGIN|[2]|Aggregations:0|SELECT Id FROM Account\n' +
         '09:18:22.6 (2000)|SOQL_EXECUTE_END|[2]|Rows:1\n' +
         '09:18:22.6 (4000)|USER_DEBUG|[3]|DEBUG|hello\n' +
+        '09:18:22.6 (4500)|VARIABLE_ASSIGNMENT|[3]|count|1\n' +
         '09:18:22.6 (5000)|EXCEPTION_THROWN|[4]|System.NullPointerException: boom\n' +
         '09:18:22.6 (5001000)|METHOD_EXIT|[1]|ns.Outer.run()\n',
     ));
@@ -462,16 +497,7 @@ describe('calltree-view merged filters', () => {
     async (mode, keepsException) => {
       await view._setViewMode(mode);
       view._handleShowDetailsChange();
-      const grid = mode === 'time-order' ? view.timeOrderGrid : gridOf(view, mode);
-      const filters = (grid?.filters ?? []) as { test: (row: object) => boolean }[];
-      const kept =
-        mode === 'time-order'
-          ? Array.from({ length: index.rowCount }, (_, row) => ({ row }))
-              .filter((node) => filters.every((filter) => filter.test(node)))
-              .map(({ row }) => store.log.event(index.eventIndex[row]!)?.type)
-          : rowsOf[mode]()
-              .filter((row) => filters.every((filter) => filter.test(row)))
-              .map((row) => row.type);
+      const kept = keptTypes(view, mode);
 
       expect(kept).toContain('SOQL_EXECUTE_BEGIN');
       expect(kept).not.toContain('USER_DEBUG');
@@ -501,11 +527,60 @@ describe('calltree-view merged filters', () => {
 
   it('filters aggregated rows on their type, and on debug only', async () => {
     await view._setViewMode('aggregated');
-    view._handleTypeFilter({ target: { value: 'SOQL_EXECUTE_BEGIN' } } as unknown as Event);
+    pickType(view, 'SOQL_EXECUTE_BEGIN');
     expect(passing(view, 'aggregated')).toEqual(['SELECT Id FROM Account']);
 
     view._handleDebugOnlyChange();
     expect(passing(view, 'aggregated')).toEqual(['DEBUG | hello']);
+  });
+
+  it('turns Details on for a detail type picked with Details off, and off again on All', async () => {
+    await view._setViewMode('time-order');
+    view._handleShowDetailsChange();
+
+    pickType(view, 'USER_DEBUG');
+    expect(await detailsPressed(view)).toBe('true');
+    expect(keptTypes(view, 'time-order')).toContain('USER_DEBUG');
+
+    pickType(view, 'All');
+    expect(await detailsPressed(view)).toBe('false');
+  });
+
+  it('leaves Details off when All is picked with Details off', async () => {
+    view._handleShowDetailsChange();
+    pickType(view, 'All');
+    expect(await detailsPressed(view)).toBe('false');
+  });
+
+  it('keeps Details on from one detail type to another, and turns it off after', async () => {
+    view._handleShowDetailsChange();
+    pickType(view, 'USER_DEBUG');
+    pickType(view, 'VARIABLE_ASSIGNMENT');
+    expect(await detailsPressed(view)).toBe('true');
+
+    pickType(view, 'All');
+    expect(await detailsPressed(view)).toBe('false');
+  });
+
+  it('leaves Details off for a frame type, which shows without it', async () => {
+    view._handleShowDetailsChange();
+    pickType(view, 'SOQL_EXECUTE_BEGIN');
+    expect(await detailsPressed(view)).toBe('false');
+  });
+
+  it('leaves Details on after a detail type when it was on before', async () => {
+    pickType(view, 'USER_DEBUG');
+    pickType(view, 'All');
+    expect(await detailsPressed(view)).toBe('true');
+  });
+
+  it('keeps Details on when it is turned off and on by hand while a detail type is picked', async () => {
+    view._handleShowDetailsChange();
+    pickType(view, 'USER_DEBUG');
+    view._handleShowDetailsChange();
+    view._handleShowDetailsChange();
+    pickType(view, 'All');
+    expect(await detailsPressed(view)).toBe('true');
   });
 });
 
@@ -586,10 +661,7 @@ describe('calltree-view go to row', () => {
 
     const note = () => view.renderRoot.querySelector('.hidden-note');
     const announced = () => view.renderRoot.querySelector('[role="status"]')?.textContent?.trim();
-    const pressed = (label: string) =>
-      [...view.renderRoot.querySelectorAll('button.pill-toggle')]
-        .find((button) => button.textContent?.trim() === label)
-        ?.getAttribute('aria-pressed');
+    const pressed = (label: string) => togglePressed(view, label);
     const pressClear = async () => {
       note()!.querySelector('button')!.click(); // each caller has just shown the note
       await settle();
@@ -650,6 +722,21 @@ describe('calltree-view go to row', () => {
 
       expect(pressed('Details')).toBe('true');
       expect(view.timeOrderGrid?.selectedKey).toBe(hello);
+    });
+
+    it('turns Details back off on Clear when only the Type pick turned it on', async () => {
+      const { log } = await storeOf(LOG);
+      view = await mountView(log);
+      pickType(view, 'USER_DEBUG');
+      const inner = indexOf(log, 'ns.Inner.go()');
+      await view._goToRow(inner);
+      await view.updateComplete;
+      expect(pressed('Details')).toBe('true');
+
+      await pressClear();
+
+      expect(pressed('Details')).toBe('false');
+      expect(view.timeOrderGrid?.selectedKey).toBe(inner);
     });
 
     // The grid selects nothing when even the top row is filtered out, which was silent.

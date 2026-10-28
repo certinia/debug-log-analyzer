@@ -73,7 +73,7 @@ export interface FrameVariables {
   /** The event these were read at, so a reader resolving an address asks for the
    *  value as it stood here. */
   cut: number;
-  /** The class owning the fields, where the frame's own name gives it. */
+  /** The class owning the fields: the type `this` was declared as, else the class the frame names. */
   thisType: string | null;
   locals: VariableRow[];
   /** The object the frame runs on, where the log wrote it. Its own row, not a
@@ -168,7 +168,9 @@ export function frameVariablesFor(
   return {
     frameLabel,
     cut: eventIndex,
-    thisType: classFromFrame(frameLabel),
+    thisType:
+      variables.this?.type ??
+      (scope.type === 'CONSTRUCTOR_ENTRY' ? scope.field('className') : classFromFrame(frameLabel)),
     locals: variables.locals.map(rowOf),
     thisRow: variables.this && rowOf(variables.this),
     fields: variables.fields.map(rowOf),

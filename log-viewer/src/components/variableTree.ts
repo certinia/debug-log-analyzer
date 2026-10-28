@@ -413,7 +413,7 @@ export function toTreeRows(
         name: 'this',
         count: frame.fields.length,
         expandable: frame.fields.length > 0,
-        self: self && { ...self, declaredType: frame.thisRow?.declaredType ?? frame.thisType },
+        self: self && { ...self, declaredType: frame.thisType },
       },
       // The frame's own object, so a field pointing back at it cannot reopen it.
       (depth) =>

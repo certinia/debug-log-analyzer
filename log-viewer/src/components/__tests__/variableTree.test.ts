@@ -131,13 +131,14 @@ describe('parentOf', () => {
 
 // `this` is the object the frame runs on, not one of its locals.
 describe('the this group', () => {
-  const self = row('this', '{}', { objectAddress: '0xf1e2d3', declaredType: 'ns.Writer' });
+  const self = row('this', '{}', { objectAddress: '0xf1e2d3' });
 
   it('heads its own group rather than sitting among the locals', () => {
     const rows = toTreeRows({ ...frame, thisRow: self }, openAll);
 
     const group = rows.find((r) => r.id === 'this');
     expect(group?.kind === 'group' && group.self?.raw).toBe('{}');
+    expect(group?.kind === 'group' && group.self?.declaredType).toBe('ns.Outer');
     expect(rows.some((r) => r.id === 'local/this')).toBe(false);
   });
 
