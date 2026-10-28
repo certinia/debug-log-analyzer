@@ -110,9 +110,9 @@ describe('MeshRectangleRenderer', () => {
       const cache = new RectangleCache(rectsOf([parent]));
       const viewport = makeViewport({ zoom: 2 });
 
-      const { visibleRects, buckets, stats } = cache.getCulledRectangles(viewport, batchColors);
+      const { visibleRects, buckets } = cache.getCulledRectangles(viewport, batchColors);
 
-      expect(stats.bucketCount).toBe(0);
+      expect([...buckets.values()].flat()).toEqual([]);
       expect(visibleRects.get('Apex')).toEqual([
         expect.objectContaining({ x: 200, width: 400, y: 0, height: 15 }),
       ]);

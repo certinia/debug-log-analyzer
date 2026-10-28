@@ -245,7 +245,7 @@ export interface RenderRectangle {
 export interface RenderDirtyState {
   /** Background layers: markers, axis positioning */
   background: boolean;
-  /** Rectangle culling (expensive - O(n) viewport query) */
+  /** Rectangle culling (viewport query) */
   culling: boolean;
   /** Event rendering: batch renderer, text labels */
   eventRendering: boolean;
@@ -477,9 +477,6 @@ export interface CulledRenderData {
 export const TIMELINE_CONSTANTS = {
   /** Height of each event rectangle in pixels. */
   EVENT_HEIGHT: 15,
-
-  /** Minimum rectangle width in pixels before culling (events below this go to buckets). */
-  MIN_RECT_SIZE: 2,
 
   /** Gap between rectangles in pixels (negative space separation). */
   RECT_GAP: 1,
@@ -965,8 +962,7 @@ export interface MetricStripProcessedData {
  * Node in the temporal segment tree.
  *
  * Leaf nodes represent individual events; branch nodes aggregate children.
- * The tree is used for O(log n) viewport culling and bucket aggregation,
- * replacing the per-frame O(n) iteration in RectangleCache.
+ * The tree is used for O(log n) viewport culling and bucket aggregation.
  *
  * Key optimization: Pre-computed category stats enable instant bucket
  * rendering without recalculating aggregates per frame.

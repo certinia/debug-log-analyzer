@@ -8,7 +8,6 @@ import { type FrameSpec, rectsOf, timelineEvent } from '#test-helpers/timeline.j
 import { makeViewport } from '#test-helpers/viewport.js';
 import { TIMELINE_CONSTANTS } from '../../types/flamechart.types.js';
 import type { BatchColorInfo } from '../BucketColorResolver.js';
-import { legacyCullRectangles } from '../LegacyViewportCuller.js';
 import { RectangleCache } from '../RectangleCache.js';
 import { TemporalSegmentTree } from '../TemporalSegmentTree.js';
 
@@ -95,15 +94,44 @@ describe('TemporalSegmentTree', () => {
       expect(result.buckets.get('SOQL') ?? []).toHaveLength(0);
     });
 
+    // A bucket is 2px wide, so at zoom 1 it spans 2ns and at zoom 0.5 it spans 4ns.
+    it.each<[number, number, number, number]>([
+      [1, 4, 4, 6],
+      [0.5, 2, 4, 8],
+    ])('places a bucket per depth on the pixel grid at zoom %d', (zoom, x, timeStart, timeEnd) => {
+      const events = [timelineEvent(5, 1, 'Apex', [timelineEvent(5, 0.5, 'SOQL')])];
+
+      const result = query(events, makeViewport({ zoom }));
+
+      expect(result.all.sort((a, b) => a.depth - b.depth)).toEqual([
+        expect.objectContaining({ depth: 0, x, y: 0, timeStart, timeEnd }),
+        expect.objectContaining({
+          depth: 1,
+          x,
+          y: TIMELINE_CONSTANTS.EVENT_HEIGHT,
+          timeStart,
+          timeEnd,
+        }),
+      ]);
+    });
+
+    it('keeps apart buckets that fall in different cells of one row', () => {
+      const events = [timelineEvent(0, 1, 'Apex'), timelineEvent(10, 1, 'Apex')];
+
+      const result = query(events, makeViewport());
+
+      expect(result.all.map((bucket) => bucket.timeStart).sort((a, b) => a - b)).toEqual([0, 10]);
+    });
+
     it.each<[number, number]>([
       [0.1, 0],
-      [1, 3],
+      [1, 2],
       [10, 3],
     ])('accounts for every event at zoom %d, drawing %d as rects', (zoom, drawn) => {
       const events = [
-        timelineEvent(0, 5, 'Apex'),
-        timelineEvent(10, 5, 'SOQL'),
-        timelineEvent(20, 5, 'DML'),
+        timelineEvent(0, 10, 'Apex'),
+        timelineEvent(20, 5, 'SOQL'),
+        timelineEvent(40, 1, 'DML'),
       ];
 
       const result = query(events, makeViewport({ zoom }));
@@ -142,27 +170,6 @@ describe('TemporalSegmentTree', () => {
       );
 
       expect(result.total).toBe(expected);
-    });
-
-    it('counts the same events as the legacy culler', () => {
-      const events = [
-        timelineEvent(0, 10, 'Apex'),
-        timelineEvent(20, 5, 'SOQL'),
-        timelineEvent(30, 3, 'DML'),
-        timelineEvent(40, 1, 'Apex'),
-      ];
-      const cache = new RectangleCache(rectsOf(events));
-
-      const tree = cache.getCulledRectangles(makeViewport(), NO_COLORS).stats;
-      const legacy = legacyCullRectangles(
-        cache.getRectsByCategory(),
-        makeViewport(),
-        NO_COLORS,
-      ).stats;
-
-      expect(tree.visibleCount + tree.bucketedEventCount).toBe(
-        legacy.visibleCount + legacy.bucketedEventCount,
-      );
     });
   });
 
