@@ -13,6 +13,7 @@ import { rowMetrics, type SelfTotalColumns } from '#core/log/rowMetrics.js';
 import { vscodeMessenger } from '#core/messaging/VSCodeExtensionMessenger.js';
 import { callerNamespaceOfRow } from '#core/utility/CallerNamespace.js';
 import { formatInteger, sharePercent } from '#core/utility/Util.js';
+import type { CallTreeFilterFields } from './rowFilters.js';
 import {
   max,
   sum,
@@ -596,6 +597,14 @@ export const CALL_TREE_COLUMN_SETTINGS: Omit<ColumnSettingsOptions, 'targets'> =
 /** The Bottom-Up rows shown with Details off: frames only. */
 export const BOTTOM_UP_WITHOUT_DETAILS: RowFilter<BottomUpRow> = {
   test: (row) => eventKind(row.type) === 'frame',
+};
+
+/** The filter fields of a Bottom-Up row, as shown in the Call Tree and in Analysis. */
+export const BOTTOM_UP_FILTER_FIELDS: CallTreeFilterFields<BottomUpRow> = {
+  namespace: (row) => row.namespace,
+  total: (row) => row.totalTime,
+  self: (row) => row.totalSelfTime,
+  withoutDetails: BOTTOM_UP_WITHOUT_DETAILS,
 };
 
 /** The Bottom-Up group-by picker's options, in order, and the row field each groups on. */

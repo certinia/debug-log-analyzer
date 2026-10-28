@@ -38,15 +38,16 @@ import {
 import type { GridColumn, GroupBy, RowFilter, RowKey, TreeSource } from '../../../grid/index.js';
 import type { FilterRange } from '../../../components/grid/MinMax.js';
 import {
-  BOTTOM_UP_MEASURES,
-  measureFilters,
+  callTreeFilters,
+  NO_FILTERS,
   RowFilterCache,
-  type MeasureFilterInputs,
+  type CallTreeFilterInputs,
 } from '../../call-tree/grid/rowFilters.js';
 import { CALL_TREE_VIEWS } from '../../../components/grid/ColumnViews.js';
 import '../../call-tree/grid/CallTreeGrid.js';
 import type { CallTreeGrid } from '../../call-tree/grid/CallTreeGrid.js';
 import {
+  BOTTOM_UP_FILTER_FIELDS,
   BOTTOM_UP_WITHOUT_DETAILS,
   BOTTOM_UP_GROUPS,
   BOTTOM_UP_SORT,
@@ -121,13 +122,7 @@ export class AnalysisView extends LitElement {
   @state()
   private _colorize = false;
   @state()
-  private _showDetails = false;
-  @state()
-  private _measures: MeasureFilterInputs = {
-    namespaces: [],
-    total: { start: null, end: null },
-    self: { start: null, end: null },
-  };
+  private _filterInputs: CallTreeFilterInputs = NO_FILTERS;
   private readonly _filterCache = new RowFilterCache();
   private readonly _hiddenRows = new HiddenRowController(this, {
     grid: () => this.grid,
@@ -222,8 +217,8 @@ export class AnalysisView extends LitElement {
     // With Details off only frames show, so the buckets for debug lines, thrown
     // exceptions and query plans are filtered out — exactly the events a finding
     // points at. Turn the filter off rather than reveal nothing.
-    if (!this._showDetails && !BOTTOM_UP_WITHOUT_DETAILS.test(row)) {
-      this._showDetails = true;
+    if (!this._filterInputs.details && !BOTTOM_UP_WITHOUT_DETAILS.test(row)) {
+      this._filterInputs = { ...this._filterInputs, details: true };
       await this.updateComplete;
     }
 
@@ -246,7 +241,7 @@ export class AnalysisView extends LitElement {
 
   willUpdate(changedProperties: PropertyValues): void {
     // A filter change can show the row, or hide another.
-    if (changedProperties.has('_measures') || changedProperties.has('_showDetails')) {
+    if (changedProperties.has('_filterInputs')) {
       this._hiddenRows.invalidate();
     }
   }
@@ -290,26 +285,30 @@ export class AnalysisView extends LitElement {
               label="Namespace"
               .values="${this.logStore?.log.namespaces ?? []}"
               @datagrid-facet-change="${(e: CustomEvent<{ selected: string[] }>) =>
-                (this._measures = { ...this._measures, namespaces: e.detail.selected })}"
+                (this._filterInputs = { ...this._filterInputs, namespaces: e.detail.selected })}"
             ></datagrid-facet-filter>
             <datagrid-range-filter
               label="Total Time"
               unit="ms"
               @datagrid-range-change="${(e: CustomEvent<{ range: FilterRange }>) =>
-                (this._measures = { ...this._measures, total: e.detail.range })}"
+                (this._filterInputs = { ...this._filterInputs, total: e.detail.range })}"
             ></datagrid-range-filter>
             <datagrid-range-filter
               label="Self Time"
               unit="ms"
               @datagrid-range-change="${(e: CustomEvent<{ range: FilterRange }>) =>
-                (this._measures = { ...this._measures, self: e.detail.range })}"
+                (this._filterInputs = { ...this._filterInputs, self: e.detail.range })}"
             ></datagrid-range-filter>
             <button
               type="button"
               class="filter-control pill-toggle"
-              aria-pressed="${this._showDetails}"
+              aria-pressed="${this._filterInputs.details}"
               title="Show Detail Events"
-              @click="${() => (this._showDetails = !this._showDetails)}"
+              @click="${() =>
+                (this._filterInputs = {
+                  ...this._filterInputs,
+                  details: !this._filterInputs.details,
+                })}"
             >
               Details
             </button>
@@ -364,13 +363,12 @@ export class AnalysisView extends LitElement {
   }
 
   private _filters(): RowFilter<BottomUpRow>[] {
-    const filters = measureFilters(
-      this._measures,
-      BOTTOM_UP_MEASURES,
+    return callTreeFilters(
+      this._filterInputs,
+      BOTTOM_UP_FILTER_FIELDS,
       this._filterCache,
       'analysis',
     );
-    return this._showDetails ? filters : [...filters, BOTTOM_UP_WITHOUT_DETAILS];
   }
 
   private readonly _gridMounted = (el?: Element): void => {

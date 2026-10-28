@@ -95,10 +95,32 @@ async function mountView(log?: ApexLog): Promise<CalltreeView> {
   return view;
 }
 
-/** Picks `type` in the view's Type filter; the All option's value is 'All'. */
-function pickType(view: CalltreeView, type: string): void {
-  view._handleTypeFilter({ target: { value: type } } as unknown as Event);
+function widget<E extends Element = HTMLElement>(view: CalltreeView, selector: string): E {
+  const found = view.renderRoot.querySelector<E>(selector);
+  if (!found) {
+    throw new Error(`no ${selector}`);
+  }
+  return found;
 }
+
+/** Sets a toolbar filter as a user does, through its control. */
+const filterBy = {
+  namespaces: (view: CalltreeView, selected: string[]) =>
+    widget(view, 'datagrid-facet-filter[label="Namespace"]').dispatchEvent(
+      new CustomEvent('datagrid-facet-change', { detail: { selected } }),
+    ),
+  range: (view: CalltreeView, label: 'Total Time' | 'Self Time', start: number | null) =>
+    widget(view, `datagrid-range-filter[label="${label}"]`).dispatchEvent(
+      new CustomEvent('datagrid-range-change', { detail: { range: { start, end: null } } }),
+    ),
+  type: (view: CalltreeView, value: string) => {
+    const select = widget<HTMLElement & { value: string }>(view, 'vs-select[label="Type"]');
+    select.value = value;
+    select.dispatchEvent(new Event('change'));
+  },
+  toggle: (view: CalltreeView, title: 'Show Detail Events' | 'Show Debug Statements Only') =>
+    widget<HTMLButtonElement>(view, `button[title="${title}"]`).click(),
+};
 
 /** The `aria-pressed` of the view's filter toggle labelled `label`. */
 function togglePressed(view: CalltreeView, label: string): string | null | undefined {
@@ -129,8 +151,7 @@ describe('calltree-view table lifetime', () => {
   });
 
   it('gives the grid it has the rows of a new log, and keeps its filters', async () => {
-    view.namespaceSelected = ['ns'];
-    view._updateFiltering();
+    filterBy.namespaces(view, ['ns']);
     const grid = view.timeOrderGrid;
     const filters = [...(grid?.filters ?? [])];
     const source = grid?.source;
@@ -159,8 +180,7 @@ describe('calltree-view table lifetime', () => {
   });
 
   it('rebuilds under the filters the view was left with', async () => {
-    view.namespaceSelected = ['ns'];
-    view._updateFiltering();
+    filterBy.namespaces(view, ['ns']);
     const onShow = view.timeOrderGrid?.filters.length;
     expect(onShow).toBeGreaterThan(0);
 
@@ -173,16 +193,13 @@ describe('calltree-view table lifetime', () => {
   });
 
   it('keeps a filter that did not change, so the grid keeps its work for it', () => {
-    view.namespaceSelected = ['ns'];
-    view._updateFiltering();
+    filterBy.namespaces(view, ['ns']);
     const before = [...(view.timeOrderGrid?.filters ?? [])];
 
-    view._updateFiltering();
+    filterBy.namespaces(view, ['ns']);
     expect(view.timeOrderGrid?.filters).toEqual(before);
 
-    view._handleTotalTimeRange(
-      new CustomEvent('range', { detail: { range: { start: 1, end: null } } }),
-    );
+    filterBy.range(view, 'Total Time', 1);
     // Equal filters share their test function, so this holds only for the same objects.
     expect(view.timeOrderGrid?.filters).toEqual(expect.arrayContaining(before));
     expect(view.timeOrderGrid?.filters).toHaveLength(before.length + 1);
@@ -374,7 +391,7 @@ describe('calltree-view table lifetime', () => {
   });
 
   it('builds aggregated as a grid, under the filters in force', async () => {
-    view.namespaceSelected = ['ns'];
+    filterBy.namespaces(view, ['ns']);
     await view._setViewMode('aggregated');
     await settle();
 
@@ -483,7 +500,7 @@ describe('calltree-view merged filters', () => {
     ));
     index = await store.logIndex();
     view = await mountView(store.log);
-    view.filterState.showDetails = true;
+    filterBy.toggle(view, 'Show Detail Events');
   });
 
   afterEach(() => {
@@ -499,7 +516,7 @@ describe('calltree-view merged filters', () => {
     'hides the debug line from %s with Details off, and keeps the exception: %s',
     async (mode, keepsException) => {
       await view._setViewMode(mode);
-      view._handleShowDetailsChange();
+      filterBy.toggle(view, 'Show Detail Events');
       const kept = keptTypes(view, mode);
 
       expect(kept).toContain('SOQL_EXECUTE_BEGIN');
@@ -511,33 +528,31 @@ describe('calltree-view merged filters', () => {
   it.each(['aggregated', 'bottom-up'] as const)(
     'filters %s rows on their own total time, self time and namespace',
     async (mode) => {
-      const range = (start: number | null) =>
-        new CustomEvent('range', { detail: { range: { start, end: null } } });
       await view._setViewMode(mode);
-      view._handleTotalTimeRange(range(1));
+      filterBy.range(view, 'Total Time', 1);
       expect(passing(view, mode)).toContain('ns.Outer.run()');
       expect(passing(view, mode)).not.toContain('SELECT Id FROM Account');
 
-      view._handleTotalTimeRange(range(null));
-      view._handleSelfTimeRange(range(1));
+      filterBy.range(view, 'Total Time', null);
+      filterBy.range(view, 'Self Time', 1);
       expect(passing(view, mode)).toContain('ns.Outer.run()');
       expect(passing(view, mode)).not.toContain('SELECT Id FROM Account');
 
-      view._handleNamespaceFacet(new CustomEvent('facet', { detail: { selected: ['other'] } }));
+      filterBy.namespaces(view, ['other']);
       expect(passing(view, mode)).toEqual([]);
     },
   );
 
   it('filters aggregated rows on their type, and on debug only', async () => {
     await view._setViewMode('aggregated');
-    pickType(view, 'SOQL_EXECUTE_BEGIN');
+    filterBy.type(view, 'SOQL_EXECUTE_BEGIN');
     expect(passing(view, 'aggregated')).toEqual(['SELECT Id FROM Account']);
 
-    view._handleDebugOnlyChange();
+    filterBy.toggle(view, 'Show Debug Statements Only');
     expect(passing(view, 'aggregated')).toEqual(['DEBUG | hello']);
 
-    view._handleDebugOnlyChange();
-    view._handleTypeFilter({ target: { value: 'All' } } as unknown as Event);
+    filterBy.toggle(view, 'Show Debug Statements Only');
+    filterBy.type(view, 'All');
     expect(passing(view, 'aggregated')).toEqual(
       expect.arrayContaining(['ns.Outer.run()', 'SELECT Id FROM Account']),
     );
@@ -552,50 +567,50 @@ describe('calltree-view merged filters', () => {
 
   it('turns Details on for a detail type picked with Details off, and off again on All', async () => {
     await view._setViewMode('time-order');
-    view._handleShowDetailsChange();
+    filterBy.toggle(view, 'Show Detail Events');
 
-    pickType(view, 'USER_DEBUG');
+    filterBy.type(view, 'USER_DEBUG');
     expect(await detailsPressed(view)).toBe('true');
     expect(keptTypes(view, 'time-order')).toContain('USER_DEBUG');
 
-    pickType(view, 'All');
+    filterBy.type(view, 'All');
     expect(await detailsPressed(view)).toBe('false');
   });
 
   it('leaves Details off when All is picked with Details off', async () => {
-    view._handleShowDetailsChange();
-    pickType(view, 'All');
+    filterBy.toggle(view, 'Show Detail Events');
+    filterBy.type(view, 'All');
     expect(await detailsPressed(view)).toBe('false');
   });
 
   it('keeps Details on from one detail type to another, and turns it off after', async () => {
-    view._handleShowDetailsChange();
-    pickType(view, 'USER_DEBUG');
-    pickType(view, 'VARIABLE_ASSIGNMENT');
+    filterBy.toggle(view, 'Show Detail Events');
+    filterBy.type(view, 'USER_DEBUG');
+    filterBy.type(view, 'VARIABLE_ASSIGNMENT');
     expect(await detailsPressed(view)).toBe('true');
 
-    pickType(view, 'All');
+    filterBy.type(view, 'All');
     expect(await detailsPressed(view)).toBe('false');
   });
 
   it('leaves Details off for a frame type, which shows without it', async () => {
-    view._handleShowDetailsChange();
-    pickType(view, 'SOQL_EXECUTE_BEGIN');
+    filterBy.toggle(view, 'Show Detail Events');
+    filterBy.type(view, 'SOQL_EXECUTE_BEGIN');
     expect(await detailsPressed(view)).toBe('false');
   });
 
   it('leaves Details on after a detail type when it was on before', async () => {
-    pickType(view, 'USER_DEBUG');
-    pickType(view, 'All');
+    filterBy.type(view, 'USER_DEBUG');
+    filterBy.type(view, 'All');
     expect(await detailsPressed(view)).toBe('true');
   });
 
   it('keeps Details on when it is turned off and on by hand while a detail type is picked', async () => {
-    view._handleShowDetailsChange();
-    pickType(view, 'USER_DEBUG');
-    view._handleShowDetailsChange();
-    view._handleShowDetailsChange();
-    pickType(view, 'All');
+    filterBy.toggle(view, 'Show Detail Events');
+    filterBy.type(view, 'USER_DEBUG');
+    filterBy.toggle(view, 'Show Detail Events');
+    filterBy.toggle(view, 'Show Detail Events');
+    filterBy.type(view, 'All');
     expect(await detailsPressed(view)).toBe('true');
   });
 });
@@ -796,7 +811,7 @@ describe('calltree-view go to row', () => {
     async function openWithDebugOnly(log: ApexLog): Promise<void> {
       view = await mountView(log);
       await view._goToRow(idOf(log, 'ns.Outer.run()'));
-      view._handleDebugOnlyChange();
+      filterBy.toggle(view, 'Show Debug Statements Only');
       await view.updateComplete;
     }
 
@@ -853,7 +868,7 @@ describe('calltree-view go to row', () => {
     it('turns Details on and still says so when a namespace hides the row too', async () => {
       const { log } = await storeOf(LOG);
       view = await mountView(log);
-      view._handleNamespaceFacet(new CustomEvent('facet', { detail: { selected: ['other'] } }));
+      filterBy.namespaces(view, ['other']);
 
       await view._goToRow(idOf(log, 'DEBUG | hello'));
       await view.updateComplete;
@@ -865,7 +880,7 @@ describe('calltree-view go to row', () => {
     it('turns Details back off on Clear when only the Type pick turned it on', async () => {
       const { log } = await storeOf(LOG);
       view = await mountView(log);
-      pickType(view, 'USER_DEBUG');
+      filterBy.type(view, 'USER_DEBUG');
       const inner = idOf(log, 'ns.Inner.go()');
       await view._goToRow(inner);
       await view.updateComplete;
@@ -881,7 +896,7 @@ describe('calltree-view go to row', () => {
     it('says so when the filters hide the row from the top, and Clear reaches it', async () => {
       const { log } = await storeOf(LOG);
       view = await mountView(log);
-      view._handleNamespaceFacet(new CustomEvent('facet', { detail: { selected: ['other'] } }));
+      filterBy.namespaces(view, ['other']);
       const inner = idOf(log, 'ns.Inner.go()');
       await view._goToRow(inner);
       await view.updateComplete;
@@ -900,7 +915,7 @@ describe('calltree-view go to row', () => {
       await view._goToRow(idOf(log, 'ns.Inner.go()'));
       await view.updateComplete;
 
-      view._handleDebugOnlyChange();
+      filterBy.toggle(view, 'Show Debug Statements Only');
       await view.updateComplete;
 
       expect(note()).toBeNull();
@@ -926,7 +941,7 @@ describe('calltree-view go to row', () => {
         disconnect(): void {}
       } as unknown as typeof IntersectionObserver;
       view = await mountView(log);
-      view._handleNamespaceFacet(new CustomEvent('facet', { detail: { selected: ['other'] } }));
+      filterBy.namespaces(view, ['other']);
 
       await view._goToRow(idOf(log, 'ns.Inner.go()'));
       show();
@@ -975,7 +990,7 @@ describe('calltree-view go to row', () => {
       const goTo = grid.goTo.bind(grid);
       grid.goTo = (path) => {
         const going = goTo(path);
-        view._handleDebugOnlyChange();
+        filterBy.toggle(view, 'Show Debug Statements Only');
         return going;
       };
 
@@ -1061,7 +1076,7 @@ describe('calltree-view go to row', () => {
       });
       await settle();
       const selected = [...store.log.namespaces];
-      view._handleNamespaceFacet(new CustomEvent('facet', { detail: { selected } }));
+      filterBy.namespaces(view, selected);
       release();
       await settle();
       await view.updateComplete;

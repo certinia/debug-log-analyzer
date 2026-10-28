@@ -37,6 +37,7 @@ import { categoryClass } from '../grid/CallTreeGrid.js';
 import {
   AGGREGATED_WITHOUT_DETAILS,
   aggregatedColumns,
+  BOTTOM_UP_FILTER_FIELDS,
   BOTTOM_UP_WITHOUT_DETAILS,
   BOTTOM_UP_SORT,
   bottomUpColumns,
@@ -52,11 +53,11 @@ import { MergedTree } from '../grid/mergedRows.js';
 
 import type { FilterRange } from '../../../components/grid/MinMax.js';
 import {
-  BOTTOM_UP_MEASURES,
+  callTreeFilters,
   deep,
-  measureFilters,
+  NO_FILTERS,
   RowFilterCache,
-  type MeasureFields,
+  type CallTreeFilterInputs,
 } from '../grid/rowFilters.js';
 
 // styles
@@ -141,12 +142,6 @@ type ViewGrid = LvGrid<TimeOrderNode> | LvGrid<AggregatedRow> | LvGrid<BottomUpR
 
 type RevealedRow = HiddenRow & { revealed: boolean };
 
-/** What the filters read from a view's rows. Bottom-Up has no type or debug filter. */
-interface FilterFields<R> extends MeasureFields<R> {
-  type?: { of: (row: R) => string | null | undefined; debugOnly: RowFilter<R> };
-  withoutDetails: RowFilter<R>;
-}
-
 @customElement('call-tree-view')
 export class CalltreeView extends LitElement {
   /** The log on screen, from the app root. */
@@ -193,19 +188,12 @@ export class CalltreeView extends LitElement {
     onClear: (hidden) => this._clearFiltersAndGo(hidden),
   });
 
-  filterState: { showDetails: boolean; debugOnly: boolean; selectedTypes: Set<string> } = {
-    showDetails: false,
-    debugOnly: false,
-    selectedTypes: new Set<string>(),
-  };
+  @state()
+  private _filterInputs: CallTreeFilterInputs = NO_FILTERS;
   // True while Details is on only because the Type pick needed it, so a later pick turns it off.
   private _typeTurnedDetailsOn = false;
   bottomUpGroupBy = 'None';
-  typeFilter = 'All';
-  namespaceSelected: string[] = [];
-  totalTimeRange: FilterRange = { start: null, end: null };
   private readonly _filterCache = new RowFilterCache();
-  selfTimeRange: FilterRange = { start: null, end: null };
 
   tableContainer: HTMLDivElement | null = null;
   /** The store the grids were built from. */
@@ -417,16 +405,18 @@ export class CalltreeView extends LitElement {
                         deselectValue="All"
                         combobox
                         filter="fuzzy"
-                        .filterActive="${this.typeFilter !== 'All'}"
+                        .filterActive="${this._filterInputs.type !== null}"
                         @change="${this._handleTypeFilter}"
                       >
-                        <vscode-option ?selected="${this.typeFilter === 'All'}">All</vscode-option>
+                        <vscode-option ?selected="${this._filterInputs.type === null}"
+                          >All</vscode-option
+                        >
                         ${this._types.render({
                           complete: (types) =>
                             repeat(
                               types,
                               (type, _index) =>
-                                html`<vscode-option ?selected="${this.typeFilter === type}"
+                                html`<vscode-option ?selected="${this._filterInputs.type === type}"
                                   >${type}</vscode-option
                                 >`,
                             ),
@@ -451,7 +441,7 @@ export class CalltreeView extends LitElement {
               <button
                 type="button"
                 class="filter-control pill-toggle"
-                aria-pressed="${this.filterState.showDetails}"
+                aria-pressed="${this._filterInputs.details}"
                 title="Show Detail Events"
                 @click="${this._handleShowDetailsChange}"
               >
@@ -464,7 +454,7 @@ export class CalltreeView extends LitElement {
                       <button
                         type="button"
                         class="filter-control pill-toggle"
-                        aria-pressed="${this.filterState.debugOnly}"
+                        aria-pressed="${this._filterInputs.debugOnly}"
                         title="Show Debug Statements Only"
                         @click="${this._handleDebugOnlyChange}"
                       >
@@ -514,17 +504,13 @@ export class CalltreeView extends LitElement {
     `;
   }
 
-  _handleShowDetailsChange() {
-    this.filterState.showDetails = !this.filterState.showDetails;
+  private _handleShowDetailsChange() {
     this._typeTurnedDetailsOn = false;
-    this.requestUpdate();
-    this._updateFiltering();
+    this._setFilters({ details: !this._filterInputs.details });
   }
 
-  _handleDebugOnlyChange() {
-    this.filterState.debugOnly = !this.filterState.debugOnly;
-    this.requestUpdate();
-    this._updateFiltering();
+  private _handleDebugOnlyChange() {
+    this._setFilters({ debugOnly: !this._filterInputs.debugOnly });
   }
 
   async _setViewMode(newMode: ViewMode): Promise<void> {
@@ -710,13 +696,8 @@ export class CalltreeView extends LitElement {
     this.contextMenuEventId = null;
   }
 
-  _handleTypeFilter(event: Event) {
+  private _handleTypeFilter(event: Event) {
     this._setTypeFilter((event.target as HTMLInputElement).value);
-    // typeFilter is a plain field (not @state), so the Type select's
-    // `.filterActive` binding doesn't repaint until some other reactive
-    // update happens to coincide — force it so the active border shows on
-    // the very first pick, not a later render.
-    this.requestUpdate();
     this._updateFiltering();
   }
 
@@ -725,35 +706,41 @@ export class CalltreeView extends LitElement {
    * pick turns it off again unless Details was on already.
    */
   private _setTypeFilter(type: string): void {
-    this.typeFilter = type || 'All';
-    this.filterState.selectedTypes = new Set(type ? [type] : []);
     // A listed type only: All and text typed in the box would read as a detail.
     const needsDetails = !!this._types.value?.includes(type) && eventKind(type) === 'detail';
-    if (needsDetails && !this.filterState.showDetails) {
-      this.filterState.showDetails = true;
+    let { details } = this._filterInputs;
+    if (needsDetails && !details) {
+      details = true;
       this._typeTurnedDetailsOn = true;
     } else if (!needsDetails && this._typeTurnedDetailsOn) {
-      this.filterState.showDetails = false;
+      details = false;
       this._typeTurnedDetailsOn = false;
     }
+    this._filterInputs = {
+      ...this._filterInputs,
+      type: type && type !== 'All' ? type : null,
+      details,
+    };
   }
 
-  _handleNamespaceFacet(event: CustomEvent<{ selected: string[] }>) {
-    this.namespaceSelected = event.detail.selected;
+  private _handleNamespaceFacet(event: CustomEvent<{ selected: string[] }>) {
+    this._setFilters({ namespaces: event.detail.selected });
+  }
+
+  private _handleTotalTimeRange(event: CustomEvent<{ range: FilterRange }>) {
+    this._setFilters({ total: event.detail.range });
+  }
+
+  private _handleSelfTimeRange(event: CustomEvent<{ range: FilterRange }>) {
+    this._setFilters({ self: event.detail.range });
+  }
+
+  private _setFilters(change: Partial<CallTreeFilterInputs>): void {
+    this._filterInputs = { ...this._filterInputs, ...change };
     this._updateFiltering();
   }
 
-  _handleTotalTimeRange(event: CustomEvent<{ range: FilterRange }>) {
-    this.totalTimeRange = event.detail.range;
-    this._updateFiltering();
-  }
-
-  _handleSelfTimeRange(event: CustomEvent<{ range: FilterRange }>) {
-    this.selfTimeRange = event.detail.range;
-    this._updateFiltering();
-  }
-
-  _updateFiltering() {
+  private _updateFiltering() {
     // A go-to still running read the old filters, so its note would be stale.
     this._hiddenRows.invalidate();
     this._applyFilters();
@@ -776,64 +763,47 @@ export class CalltreeView extends LitElement {
 
   /** The filters of {@link _updateFiltering} for the Aggregated grid: Time Order's, on its rows. */
   private _aggregatedFilters(): RowFilter<AggregatedRow>[] {
-    return this._viewFilters<AggregatedRow>('aggregated', {
-      namespace: (row) => row.namespace,
-      total: (row) => row.totalTime,
-      self: (row) => row.totalSelfTime,
-      type: { of: (row) => row.type, debugOnly: AGGREGATED_DEBUG_ONLY },
-      withoutDetails: AGGREGATED_WITHOUT_DETAILS,
-    });
+    return callTreeFilters<AggregatedRow>(
+      this._filterInputs,
+      {
+        namespace: (row) => row.namespace,
+        total: (row) => row.totalTime,
+        self: (row) => row.totalSelfTime,
+        type: { of: (row) => row.type, debugOnly: AGGREGATED_DEBUG_ONLY },
+        withoutDetails: AGGREGATED_WITHOUT_DETAILS,
+      },
+      this._filterCache,
+      'aggregated',
+    );
   }
 
   /** The filters of {@link _updateFiltering} for the Time Order grid. */
   private _timeOrderFilters(): RowFilter<TimeOrderNode>[] {
-    return this._viewFilters<TimeOrderNode>('time-order', {
-      namespace: (node) => this._timeOrderSource?.namespace(node),
-      total: ({ row }) => this._timeOrderSource?.index.total[row] ?? 0,
-      self: ({ row }) => this._timeOrderSource?.index.self[row] ?? 0,
-      type: {
-        of: (node) => this._timeOrderSource?.type(node),
-        debugOnly: this._timeOrderDebugOnly,
+    return callTreeFilters<TimeOrderNode>(
+      this._filterInputs,
+      {
+        namespace: (node) => this._timeOrderSource?.namespace(node),
+        total: ({ row }) => this._timeOrderSource?.index.total[row] ?? 0,
+        self: ({ row }) => this._timeOrderSource?.index.self[row] ?? 0,
+        type: {
+          of: (node) => this._timeOrderSource?.type(node),
+          debugOnly: this._timeOrderDebugOnly,
+        },
+        withoutDetails: this._timeOrderWithoutDetails,
       },
-      withoutDetails: this._timeOrderWithoutDetails,
-    });
+      this._filterCache,
+      'time-order',
+    );
   }
 
   /** The filters of {@link _updateFiltering} for the Bottom-Up grid: no type or debug filter. */
   private _bottomUpFilters(): RowFilter<BottomUpRow>[] {
-    return this._viewFilters<BottomUpRow>('bottom-up', {
-      ...BOTTOM_UP_MEASURES,
-      withoutDetails: BOTTOM_UP_WITHOUT_DETAILS,
-    });
-  }
-
-  private _viewFilters<R>(view: ViewMode, fields: FilterFields<R>): RowFilter<R>[] {
-    const filters = measureFilters(
-      { namespaces: this.namespaceSelected, total: this.totalTimeRange, self: this.selfTimeRange },
-      fields,
+    return callTreeFilters<BottomUpRow>(
+      this._filterInputs,
+      BOTTOM_UP_FILTER_FIELDS,
       this._filterCache,
-      view,
+      'bottom-up',
     );
-    const { type } = fields;
-    if (type && this.filterState.debugOnly) {
-      filters.push(type.debugOnly);
-      return filters;
-    }
-    const types = this.filterState.selectedTypes;
-    if (type && types.size > 0 && !types.has('All')) {
-      filters.push(
-        this._filterCache.reuse(`${view}:type`, [...types].join('\n'), () =>
-          deep((row) => {
-            const of = type.of(row);
-            return !!of && types.has(of);
-          }),
-        ),
-      );
-    }
-    if (!this.filterState.showDetails) {
-      filters.push(fields.withoutDetails);
-    }
-    return filters;
   }
 
   /**
@@ -916,8 +886,7 @@ export class CalltreeView extends LitElement {
     clearGridFilters(this.renderRoot);
     this._setTypeFilter('');
     // Details is left as is: the go-to turns it on when it hides the row.
-    this.filterState = { ...this.filterState, debugOnly: false, selectedTypes: new Set() };
-    this.requestUpdate();
+    this._filterInputs = { ...this._filterInputs, debugOnly: false };
     this._updateFiltering();
     if (revealed) {
       await this._revealEventId(eventId, new AbortController().signal);
@@ -928,11 +897,10 @@ export class CalltreeView extends LitElement {
 
   /** Details sets how much shows, not what, so it is turned on rather than reported, as Analysis does. */
   private _showDetailsFor(eventId: number, mode: ViewMode): void {
-    if (this.filterState.showDetails || !this._detailsHide(eventId, mode)) {
+    if (this._filterInputs.details || !this._detailsHide(eventId, mode)) {
       return;
     }
-    this.filterState = { ...this.filterState, showDetails: true };
-    this.requestUpdate();
+    this._filterInputs = { ...this._filterInputs, details: true };
     // Not `_updateFiltering`: its invalidate would cancel the go-to turning Details on.
     this._applyFilters();
   }
