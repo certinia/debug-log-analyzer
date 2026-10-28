@@ -204,9 +204,13 @@ export class LvGrid<R extends object = object> extends LitElement {
   @property({ type: Boolean, attribute: 'fit-rows', reflect: true })
   fitRows = false;
 
-  /** What the body shows when no row passes the filters and no build runs, such as "No SOQL queries found". */
+  /** What the body shows when the source has no rows and no build runs, such as "No SOQL queries found". */
   @property({ attribute: false })
   placeholder: string | null = null;
+
+  /** What the body shows in place of `placeholder` when the source has rows but the filters hide them all. */
+  @property({ attribute: false })
+  filteredPlaceholder: string | null = 'No results match your filters';
 
   /** The alert shown in place of the rows while a build fails. */
   @property({ attribute: false })
@@ -646,10 +650,11 @@ export class LvGrid<R extends object = object> extends LitElement {
     if (snapshot?.failed) {
       return { role: 'alert', text: this.errorText };
     }
-    if (!snapshot?.rows.size && !snapshot?.busy && this.placeholder !== null) {
-      return { role: 'status', text: this.placeholder };
+    if (snapshot?.rows.size || snapshot?.busy) {
+      return null;
     }
-    return null;
+    const text = this.source?.roots.length ? this.filteredPlaceholder : this.placeholder;
+    return text === null ? null : { role: 'status', text };
   }
 
   private headerCell(column: GridColumn<R>, index: number): TemplateResult {
