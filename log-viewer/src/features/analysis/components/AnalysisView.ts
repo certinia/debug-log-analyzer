@@ -133,7 +133,6 @@ export class AnalysisView extends LitElement {
     grid: () => this.grid,
     onClear: async ({ eventIndex }) => {
       clearGridFilters(this.renderRoot);
-      await this.updateComplete;
       await this._revealEventIndex(eventIndex, new AbortController().signal);
     },
   });
@@ -204,6 +203,15 @@ export class AnalysisView extends LitElement {
    */
   private async _revealEventIndex(eventIndex: number, signal: AbortSignal): Promise<void> {
     this._hiddenRows.invalidate();
+    const store = this.logStore;
+    // A new log's build starts in `updated`, and its rows reach the grid in the render after it.
+    await this.updateComplete;
+    // A failed build stays in `_built` until the next log, so it must not fail every reveal.
+    await this._built?.catch(() => undefined);
+    await this.updateComplete;
+    if (signal.aborted || store !== this.logStore) {
+      return;
+    }
     const { grid, _tree: tree } = this;
     const pathIds = this._revealIds.idsFor(this.logStore, [eventIndex], 'callers');
     const row = tree?.rowFor(pathIds);

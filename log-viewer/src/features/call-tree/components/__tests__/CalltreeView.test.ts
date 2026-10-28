@@ -654,6 +654,28 @@ describe('calltree-view inspector reveal', () => {
     });
   });
 
+  // The reveal looked for the new log's bucket in the old log's tree, and said filters hid it.
+  it('reveals a Bottom-Up bucket of a new log once its tree is built, with no bar', async () => {
+    await toBottomUp();
+    const { store: next } = await storeOf(
+      '09:18:22.6 (1000)|METHOD_ENTRY|[1]|01p|ns.Other.do()\n' +
+        '09:18:22.6 (2000)|METHOD_EXIT|[1]|ns.Other.do()\n',
+    );
+    view.logStore = next;
+    eventBus.emit('inspector:reveal', {
+      source: 'calltree',
+      eventIndex: indexOf(next.log, 'ns.Other.do()'),
+    });
+    await settle();
+    const roots = toBottomUpTree(await next.logIndex(), next);
+    finishBuild?.(roots);
+    await settle();
+    await view.updateComplete;
+
+    expect(view.bottomUpGrid?.selectedKey).toBe(bucketOf(roots, 'ns.Other.do()'));
+    expect(note()).toBeNull();
+  });
+
   // #1211: a finding in a filtered-out namespace selected nothing, with no word why. Clear
   // then went through the go-to path, which switches to Time Order.
   it('says so when a reveal names a row the filters hide, and Clear reaches it in the view on show', async () => {
@@ -959,6 +981,96 @@ describe('calltree-view go to row', () => {
       await view.updateComplete;
 
       expect(view.timeOrderGrid?.selectedKey).toBe(indexOf(log, 'ns.Inner.go()'));
+      expect(note()).toBeNull();
+    });
+  });
+
+  // A go-to or reveal looked for the new log's row among the old log's rows, and said filters hid it.
+  describe('while a new log loads', () => {
+    const LOG =
+      '09:18:22.6 (1000)|METHOD_ENTRY|[1]|01p|ns.Outer.run()\n' +
+      '09:18:22.6 (1800)|METHOD_EXIT|[1]|ns.Outer.run()\n';
+    const note = () => view.renderRoot.querySelector('.hidden-note');
+    let release: () => void = () => {};
+
+    /** Shows `next` in a view that had another log, with its Time Order rows held back. */
+    async function loading(next: LogStore): Promise<void> {
+      const index = await next.logIndex();
+      const held = new Promise<LogIndex>((resolve) => (release = () => resolve(index)));
+      jest.spyOn(next, 'logIndex').mockReturnValue(held);
+      view.logStore = next;
+      await view.updateComplete;
+    }
+
+    beforeEach(async () => {
+      globalThis.IntersectionObserver = AlwaysVisible as unknown as typeof IntersectionObserver;
+      view = await mountView();
+    });
+
+    it('goes to the row once the rows load, with no bar', async () => {
+      const { store } = await storeOf(LOG);
+      await loading(store);
+
+      const going = view._goToRow(indexOf(store.log, 'ns.Outer.run()'));
+      await settle();
+      release();
+      await going;
+      await view.updateComplete;
+
+      expect(view.timeOrderGrid?.selectedKey).toBe(indexOf(store.log, 'ns.Outer.run()'));
+      expect(note()).toBeNull();
+    });
+
+    it('reveals the row once the rows load, with no bar', async () => {
+      const { store } = await storeOf(LOG);
+      await loading(store);
+
+      eventBus.emit('inspector:reveal', {
+        source: 'calltree',
+        eventIndex: indexOf(store.log, 'ns.Outer.run()'),
+      });
+      await settle();
+      release();
+      await settle();
+      await view.updateComplete;
+
+      expect(view.timeOrderGrid?.selectedKey).toBe(indexOf(store.log, 'ns.Outer.run()'));
+      expect(note()).toBeNull();
+    });
+
+    it('still reveals the row when a filter changes while the rows load', async () => {
+      const { store } = await storeOf(LOG);
+      await loading(store);
+
+      eventBus.emit('inspector:reveal', {
+        source: 'calltree',
+        eventIndex: indexOf(store.log, 'ns.Outer.run()'),
+      });
+      await settle();
+      const selected = [...store.log.namespaces];
+      view._handleNamespaceFacet(new CustomEvent('facet', { detail: { selected } }));
+      release();
+      await settle();
+      await view.updateComplete;
+
+      expect(view.timeOrderGrid?.selectedKey).toBe(indexOf(store.log, 'ns.Outer.run()'));
+    });
+
+    it('drops a reveal whose log is replaced again while the rows load', async () => {
+      const { store } = await storeOf(LOG);
+      await loading(store);
+
+      eventBus.emit('inspector:reveal', {
+        source: 'calltree',
+        eventIndex: indexOf(store.log, 'ns.Outer.run()'),
+      });
+      await settle();
+      view.logStore = (await storeOf(LOG)).store;
+      release();
+      await settle();
+      await view.updateComplete;
+
+      expect(view.timeOrderGrid?.selectedKey).toBeNull();
       expect(note()).toBeNull();
     });
   });

@@ -175,6 +175,7 @@ export class CalltreeView extends LitElement {
   bottomUpGrid: LvGrid<BottomUpRow> | null = null;
   private _aggregatedTree: MergedTree<AggregatedRow> | null = null;
   private _bottomUpTree: MergedTree<BottomUpRow> | null = null;
+  private _timeOrderBuild: Promise<void> | null = null;
   private _aggregatedBuild: Promise<void> | null = null;
   private _bottomUpBuild: Promise<void> | null = null;
   // The Time Order filters read the source on show, so a new log keeps the same filter objects.
@@ -592,6 +593,7 @@ export class CalltreeView extends LitElement {
     this.bottomUpGrid = null;
     this._aggregatedTree = null;
     this._bottomUpTree = null;
+    this._timeOrderBuild = null;
     this._aggregatedBuild = null;
     this._bottomUpBuild = null;
     this._timeOrderSource = null;
@@ -633,6 +635,18 @@ export class CalltreeView extends LitElement {
         return this.aggregatedGrid;
       case 'bottom-up':
         return this.bottomUpGrid;
+    }
+  }
+
+  /** The build that fills the grid of the view on show with the rows of the current log. */
+  private _activeBuild(): Promise<void> | null {
+    switch (this.viewMode) {
+      case 'time-order':
+        return this._timeOrderBuild;
+      case 'aggregated':
+        return this._aggregatedBuild;
+      case 'bottom-up':
+        return this._bottomUpBuild;
     }
   }
 
@@ -949,12 +963,21 @@ export class CalltreeView extends LitElement {
    * Focus stays where the click was, which is the inspector.
    */
   private async _revealEventIndex(eventIndex: number, signal: AbortSignal): Promise<void> {
-    const latest = this._hiddenRows.begin();
+    this._hiddenRows.invalidate();
+    // A new log reaches `rootStore` in `updated`.
+    await this.updateComplete;
     const grid = this._activeGrid();
     const store = this.rootStore;
     if (!grid || signal.aborted) {
       return;
     }
+    // A failed build shows its own alert in the grid.
+    await this._activeBuild()?.catch(() => undefined);
+    if (signal.aborted || store !== this.rootStore || grid !== this._activeGrid()) {
+      return;
+    }
+    // Taken after the build, so a filter changed while it ran does not drop the reveal.
+    const latest = this._hiddenRows.begin();
     this._showDetailsFor(eventIndex, this.viewMode);
     const path = this._pathTo(eventIndex);
     const result = await this._echoGuard.runAsync(() =>
@@ -995,6 +1018,8 @@ export class CalltreeView extends LitElement {
     store: LogStore,
   ): Promise<void> {
     if (this.timeOrderGrid) {
+      // A failed build shows its own alert in the grid.
+      await this._timeOrderBuild?.catch(() => undefined);
       await waitForNextFrame();
       return;
     }
@@ -1015,7 +1040,12 @@ export class CalltreeView extends LitElement {
     await this._loadTimeOrder(grid, store);
   }
 
-  private async _loadTimeOrder(grid: LvGrid<TimeOrderNode>, store: LogStore): Promise<void> {
+  private _loadTimeOrder(grid: LvGrid<TimeOrderNode>, store: LogStore): Promise<void> {
+    this._timeOrderBuild = this._fillTimeOrder(grid, store);
+    return this._timeOrderBuild;
+  }
+
+  private async _fillTimeOrder(grid: LvGrid<TimeOrderNode>, store: LogStore): Promise<void> {
     const [reported, index] = await Promise.all([reportedUsageOf(store.log), store.logIndex()]);
     // A newer log can load while this one waits.
     if (this.rootStore !== store) {

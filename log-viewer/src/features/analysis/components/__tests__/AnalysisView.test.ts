@@ -21,7 +21,7 @@ jest.mock('../../../settings/Settings.js', () => ({
 }));
 jest.mock('../../../../components/grid/exportCsv.js', () => ({ exportCsv: jest.fn() }));
 
-import { frameLines, rawStoreOf } from '#test-helpers/apexLog.js';
+import { frameLines, indexOf, rawStoreOf } from '#test-helpers/apexLog.js';
 import { AlwaysVisible, NeverVisible, settle } from '#test-helpers/visibility.js';
 import { eventBus, type DetailSelection, type DetailSource } from '#core/events/EventBus.js';
 import { exportCsv } from '../../../../components/grid/exportCsv.js';
@@ -225,6 +225,28 @@ describe('analysis-view', () => {
     expect(goTo).toHaveBeenCalledWith([findRow(roots(), 'DEBUG | debug').id], {
       scrollIfVisible: false,
     });
+  });
+
+  // The reveal looked for the new log's row in the old log's tree, so it selected nothing.
+  it('reveals a row of a new log once its tree is built, with no bar', async () => {
+    const { log: next } = await rawStoreOf(
+      frameLines([{ text: 'X', self: 10, children: [{ text: 'Y', self: 20 }] }]),
+    );
+    const build = MergedTree.bottomUp;
+    let release: () => void = () => {};
+    jest.spyOn(MergedTree, 'bottomUp').mockImplementation(async (store, options) => {
+      await new Promise<void>((resolve) => (release = resolve));
+      return build(store, options);
+    });
+    view.logStore = logStoreFor(next);
+    eventBus.emit('inspector:reveal', { source: 'analysis', eventIndex: indexOf(next, 'Y') });
+    await settle();
+    release();
+    await settle();
+    await view.updateComplete;
+
+    expect(grid().selectedKey).toBe(findRow(roots(), 'Y').id);
+    expect(view.renderRoot.querySelector('.hidden-note')).toBeNull();
   });
 
   describe('hidden-row bar', () => {
