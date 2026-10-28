@@ -301,13 +301,6 @@
             ],
             "markdownDescription": "Where the inspector docks. Default: `right`",
             "order": 0
-          },
-          "lana.inspector.size": {
-            "title": "Size",
-            "type": "number",
-            "default": 560,
-            "markdownDescription": "The docked inspector's width (or height when docked to the bottom), in pixels. Default: `560`",
-            "order": 1
           }
         }
       }

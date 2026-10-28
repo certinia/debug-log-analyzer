@@ -49,6 +49,9 @@ const SCOPE_OPTIONS: readonly ViewModeOption[] = [
   { value: 'log', label: 'Summary' },
 ];
 
+// The narrowest at which the inspector's tables keep every column.
+const DEFAULT_PANEL_SIZE = 560;
+
 /**
  * The window the summary is reading, as elapsed times, so it reads against the
  * timeline's own axis. The times say the scope on their own, so nothing labels
@@ -68,8 +71,8 @@ function windowLabel(window: TimeWindow): string {
  * The app-wide inspector. Lives at the app root (sibling of the tab strip,
  * via a forwarded `main` slot) so it crosscuts every tab. It follows the active
  * tab: each source's latest selection is remembered, and it shows the active
- * tab's selection. Persists dock position/size (public settings) plus its
- * open/closed state and its section layout (private globalState).
+ * tab's selection. Persists dock position (public setting) plus its size,
+ * open/closed state and section layout (private globalState).
  *
  * Collapse, order and which sections show are remembered per section list — per
  * tab and per scope, see {@link layoutKey} — because one id means different
@@ -93,7 +96,7 @@ export class LogInspector extends LitElement {
   @state()
   private dock: DockPosition = 'right';
   @state()
-  private panelSize = 560;
+  private panelSize: number | null = null;
 
   // Keyed `<source>:<scope>:<section id>`, so the same section keeps its own
   // state in each list it appears in.
@@ -178,7 +181,7 @@ export class LogInspector extends LitElement {
         this._visiblePref ??= panel.visible ?? null;
         if (!this._userAdjusted) {
           this.dock = panel.position;
-          this.panelSize = panel.size;
+          this.panelSize = panel.size ?? null;
           this.collapsedSections = panel.collapsed ?? {};
           this.sectionOrder = panel.sectionOrder ?? {};
           this.hiddenSections = panel.hiddenSections ?? {};
@@ -254,7 +257,7 @@ export class LogInspector extends LitElement {
     return html`
       <dock-layout
         dock=${this.dock}
-        .size=${this.panelSize}
+        .size=${this.panelSize ?? DEFAULT_PANEL_SIZE}
         ?visible=${this._visible}
         .sections=${this.sections}
         .collapsed=${this._layout.collapsed}

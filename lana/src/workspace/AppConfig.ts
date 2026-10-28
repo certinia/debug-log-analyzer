@@ -34,8 +34,8 @@ export interface Config {
   // The app-wide inspector, fed by a selection on any tab.
   inspector: {
     position: 'left' | 'right' | 'bottom';
-    size: number;
     // The rest is private globalState (see INSPECTOR_STATE_SECTIONS), not settings.
+    size: number | null;
     collapsed: Record<string, boolean>;
     sectionOrder: Record<string, string[]>;
     hiddenSections: Record<string, boolean>;
@@ -138,13 +138,14 @@ export const COLUMN_VIEW_SECTIONS = [
 ] as const;
 
 /**
- * The inspector's layout state (which sections are collapsed, which it hides,
- * the order they are in, whether the panel is open) is remembered UI state
- * rather than a preference, so it persists in globalState. Dock position and
- * size stay public `lana.inspector.*` settings. Section sizes are remembered
- * nowhere: a section takes the space its content and the panel allow.
+ * The inspector's layout state (its size, which sections are collapsed, which it
+ * hides, the order they are in, whether the panel is open) is remembered UI state
+ * rather than a preference, so it persists in globalState. Dock position stays a
+ * public `lana.inspector.*` setting. Section sizes are remembered nowhere: a
+ * section takes the space its content and the panel allow.
  */
 export const INSPECTOR_STATE_SECTIONS = [
+  'inspector.size',
   'inspector.collapsed',
   'inspector.sectionOrder',
   'inspector.hiddenSections',
@@ -161,11 +162,12 @@ export const PRIVATE_SECTIONS = [
 type ColumnOverrides = Record<string, string[]>;
 type InspectorState = Pick<
   Config['inspector'],
-  'collapsed' | 'sectionOrder' | 'hiddenSections' | 'visible'
+  'size' | 'collapsed' | 'sectionOrder' | 'hiddenSections' | 'visible'
 >;
 
 export function getInspectorState(globalState: Memento): InspectorState {
   return {
+    size: globalState.get<number | null>('inspector.size', null),
     collapsed: globalState.get<Record<string, boolean>>('inspector.collapsed', {}),
     sectionOrder: globalState.get<Record<string, string[]>>('inspector.sectionOrder', {}),
     hiddenSections: globalState.get<Record<string, boolean>>('inspector.hiddenSections', {}),
