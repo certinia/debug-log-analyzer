@@ -10,6 +10,11 @@ export interface TimelineNavigateRequest {
   readonly eventIndex: number;
 }
 
+/** {@link TIMELINE_GO_TO_EVENT} keyed by name, for a listener that wants its payload. */
+export interface TimelineNavigationEventMap {
+  [TIMELINE_GO_TO_EVENT]: CustomEvent<TimelineNavigateRequest>;
+}
+
 /**
  * Show a log event on the Timeline tab: switches to the tab and moves the chart to the
  * event, once the chart is built if it is not yet. Lives apart from the timeline so

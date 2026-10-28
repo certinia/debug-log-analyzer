@@ -97,4 +97,24 @@ describe('log-viewer navigateToTimeline', () => {
     expect(tabs?.selectedIndex).toBe(0);
     expect(timelineRequest()).toEqual({ eventIndex: 2 });
   });
+
+  it('ignores navigation sent while it is out of the page, and hears it once back', async () => {
+    await load(1);
+    viewer.remove();
+
+    goToTimelineEvent({ eventIndex: 2 });
+    sendNavigate(3);
+    document.body.append(viewer);
+    await viewer.updateComplete;
+
+    expect(timelineRequest()).toEqual({ eventIndex: 1 });
+
+    sendNavigate(4);
+    await viewer.updateComplete;
+    expect(timelineRequest()).toEqual({ eventIndex: 4 });
+
+    goToTimelineEvent({ eventIndex: 5 });
+    await viewer.updateComplete;
+    expect(timelineRequest()).toEqual({ eventIndex: 5 });
+  });
 });
