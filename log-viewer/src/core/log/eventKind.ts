@@ -4,7 +4,7 @@
 
 import { EVENT_TYPES, eventType, SHAPE, type EventType } from '@apexdevtools/apex-log-parser';
 
-import type { LogIndex } from '#core/log/LogIndex.js';
+import type { LogIndex } from './LogIndex.js';
 
 // Exceptions, fatal errors, and the cumulative limit and profiling blocks; the blocks have children but are never frames.
 const PINNED_TYPES: ReadonlySet<EventType> = new Set<EventType>([

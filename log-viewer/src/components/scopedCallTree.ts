@@ -3,13 +3,13 @@
  */
 import { currentLogStore, type LogStore } from '#core/log/LogStore.js';
 import { childRows, type LogIndex, NO_ROW } from '#core/log/LogIndex.js';
+import { type EventKind, eventKind, rowKinds } from '#core/log/eventKind.js';
 import { ROOT_PATH_ID, type KeyPathIds } from '#core/log/keyPathIds.js';
 import type { TimeWindow } from '#core/log/rangeScope.js';
 import { type Signatures, signaturesOf } from '#core/log/signatures.js';
 import { CallSpans, SpanIndex, frameIn, reaches } from '#core/log/windowedTime.js';
 import { overlapOf } from '#core/log/windowStats.js';
 import { outermostIds } from '#core/utility/EventTree.js';
-import { type EventKind, eventKind, rowKinds } from '../features/call-tree/utils/DetailsFilter.js';
 import {
   CHECK_EVERY,
   frameBudget,
