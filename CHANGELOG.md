@@ -66,6 +66,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - 🎯 **Raw log**: **Show in Log Analysis**, folding and the outline go to the right event when two events share a timestamp.
 - 🧭 **Show in Log Analysis**: opens the right log at the right event.
 - 📍 **Show in Timeline**: always goes to the event.
+- 🔬 **Variables**: a constructor's `this` names its class, not the outer class or the namespace. ([#1229])
 - 🌳 **Go to Call Tree**: a row the filters hide selects its parent, with the option to clear the filters and go to the hidden row.
 
 ## [1.22.1] - 2026-09-18
@@ -612,6 +613,7 @@ Skipped due to adopting odd numbering for pre releases and even number for relea
 <!-- Unreleased -->
 
 [#1231]: https://github.com/certinia/debug-log-analyzer/issues/1231
+[#1229]: https://github.com/certinia/debug-log-analyzer/issues/1229
 [#1234]: https://github.com/certinia/debug-log-analyzer/issues/1234
 [#1169]: https://github.com/certinia/debug-log-analyzer/issues/1169
 [#986]: https://github.com/certinia/debug-log-analyzer/issues/986
