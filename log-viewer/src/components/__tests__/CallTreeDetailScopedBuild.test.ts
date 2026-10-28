@@ -326,13 +326,21 @@ describe('CallTreeDetail scoped build', () => {
     expect(grid.placeholder).toBe('No call tree available');
   });
 
-  it('never blames filters when the Timeline window hides every row, since the pane has none', async () => {
+  // The pane showed nothing: its opt-out from the filtered text turned off the empty text too.
+  it('says no frames are found when the Timeline window hides every row, since the pane has no filters', async () => {
     const resolvers = deferBuilds();
     const el = await mount(5);
     await frame(el);
     resolvers[0]!(tree(5000, [frameRow(5)]));
     await settle(el);
-    expect(gridOf(el).filteredPlaceholder).toBeNull();
+    const grid = gridOf(el);
+    // Stands in for the window filter, which admits no row of a span with no calls.
+    grid.filters = [{ test: () => false }];
+    await grid.settled();
+
+    expect(grid.renderRoot.querySelector('.placeholder')?.textContent?.trim()).toBe(
+      'No frames found',
+    );
   });
 
   it('drops a superseded walk that finishes after the newer one', async () => {
