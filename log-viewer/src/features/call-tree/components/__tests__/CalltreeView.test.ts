@@ -46,6 +46,7 @@ jest.mock('../../../../components/grid/exportCsv.js', () => ({ exportCsv: jest.f
 
 import { idOf, rawStoreOf, storeOf } from '#test-helpers/apexLog.js';
 import { AlwaysVisible, NeverVisible, settle } from '#test-helpers/visibility.js';
+import { columnWidthItems } from '../../../../components/grid/columnWidthMenu.js';
 import { exportCsv } from '../../../../components/grid/exportCsv.js';
 import { eventBus } from '#core/events/EventBus.js';
 import type { LogIndex } from '#core/log/LogIndex.js';
@@ -388,6 +389,26 @@ describe('calltree-view table lifetime', () => {
     toolbarClick('Columns');
 
     expect(show).toHaveBeenCalledTimes(1);
+  });
+
+  // One menu serves the three grids, so after a switch it must size the grid on show, not Time Order.
+  it('sizes the columns of the grid on show after a view switch', async () => {
+    await view._setViewMode('bottom-up');
+    await settle();
+    const sized = (grid: { autosizeColumns(): void } | null) =>
+      grid && jest.spyOn(grid, 'autosizeColumns').mockImplementation(() => {});
+    const timeOrder = sized(view.timeOrderGrid);
+    const bottomUp = sized(view.bottomUpGrid);
+    const autosizeAll = columnWidthItems(null).find(
+      (item) => item.label === 'Autosize All Columns',
+    );
+
+    view.renderRoot
+      .querySelector('context-menu')
+      ?.dispatchEvent(new CustomEvent('menu-select', { detail: { itemId: autosizeAll?.id } }));
+
+    expect(bottomUp).toHaveBeenCalled();
+    expect(timeOrder).not.toHaveBeenCalled();
   });
 
   it('builds aggregated as a grid, under the filters in force', async () => {

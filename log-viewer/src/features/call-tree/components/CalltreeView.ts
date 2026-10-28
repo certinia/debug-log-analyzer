@@ -29,7 +29,6 @@ import { waitForNextFrame } from '#core/utility/FrameBudget.js';
 import type {
   GridColumn,
   GridContextDetail,
-  GridHeaderContextDetail,
   LvGrid,
   RowFilter,
   RowKey,
@@ -69,6 +68,7 @@ import { globalStyles } from '../../../styles/global.styles.js';
 // web components
 import '../../../components/ContextMenu.js';
 import type { ContextMenu } from '../../../components/ContextMenu.js';
+import { GridColumnMenuController } from '../../../components/GridColumnMenuController.js';
 import '../../../components/GridSkeleton.js';
 import '../../../components/ViewModeSwitch.js';
 import {
@@ -101,7 +101,6 @@ import {
   type HiddenRow,
 } from '../../../components/grid/hiddenRowNote.js';
 import { reportedUsageOf } from '../utils/reportedUsage.js';
-import { selectColumnWidthItem } from '../../../components/grid/columnWidthMenu.js';
 import { LocatedRowIds, type RowData } from '../../../components/locatedRow.js';
 import { InspectorTabController } from '../../../components/InspectorTabController.js';
 import { FindController } from '../../find/FindController.js';
@@ -210,10 +209,17 @@ export class CalltreeView extends LitElement {
   private contextMenu: ContextMenu | null = null;
   /** The event id of the row the menu opened on. */
   private contextMenuEventId: number | null = null;
-  /** The grid whose header was right-clicked (for column-toggle actions). */
-  private contextMenuTarget: ColumnTarget | null = null;
-  /** The header the column menu opened from; null from the toolbar. */
-  private contextMenuColumn: string | null = null;
+  // The toolbar's Columns menu acts on whichever grid is on show.
+  private readonly _activeColumns: ColumnTarget = {
+    columns: () => this._activeColumnTarget()?.columns() ?? [],
+    show: (visible, pairs) => this._activeColumnTarget()?.show(visible, pairs),
+    grid: () => this._activeColumnTarget()?.grid?.() ?? null,
+  };
+  private readonly _menus = new GridColumnMenuController({
+    target: this._activeColumns,
+    menu: () => this.contextMenu,
+    columns: this._columns,
+  });
   private viewSwitchEpoch = 0;
   /** Drops a pending wait for the view to come on screen, once per attach. */
   private _visibilityWait: AbortController | null = null;
@@ -482,7 +488,7 @@ export class CalltreeView extends LitElement {
                   : undefined,
             })}
             ${gridToolbarActions({
-              openColumns: (event) => this._openColumnMenu(event),
+              openColumns: (event) => this._activeGrid() && this._menus.open(event),
               exportToCSV: () => void this._exportCsv(),
               copyToClipboard: () => void this._activeGrid()?.copy(),
             })}
@@ -503,7 +509,7 @@ export class CalltreeView extends LitElement {
         </div>
         <context-menu
           @menu-select="${this._handleContextMenuSelect}"
-          @menu-close="${this._onColumnMenuClose}"
+          @menu-close="${this._onMenuClose}"
         ></context-menu>
       </div>
     `;
@@ -649,21 +655,6 @@ export class CalltreeView extends LitElement {
     }
   }
 
-  private _showHeaderContextMenu(
-    target: ColumnTarget,
-    clientX: number,
-    clientY: number,
-    column: string | null = null,
-  ) {
-    if (!this.contextMenu) {
-      return;
-    }
-    this.contextMenuEventId = null;
-    this.contextMenuTarget = target;
-    this.contextMenuColumn = column;
-    this.contextMenu.show(this._columns.menuItems(target, column), clientX, clientY);
-  }
-
   private _activeColumnTarget(): ColumnTarget | null {
     switch (this.viewMode) {
       case 'time-order':
@@ -675,29 +666,7 @@ export class CalltreeView extends LitElement {
     }
   }
 
-  private _openColumnMenu(event: Event) {
-    const table = this._activeColumnTarget();
-    if (!table) {
-      return;
-    }
-    const rect = (event.currentTarget as HTMLElement).getBoundingClientRect();
-    this._showHeaderContextMenu(table, rect.left, rect.bottom);
-  }
-
-  /** Rebuilds the open column menu so checkmarks/reset icons reflect current state. */
-  private _refreshColumnMenu() {
-    if (!this.contextMenu?.isVisible() || !this.contextMenuTarget) {
-      return;
-    }
-    this.contextMenu.items = this._columns.menuItems(
-      this.contextMenuTarget,
-      this.contextMenuColumn,
-    );
-  }
-
-  private _onColumnMenuClose() {
-    this.contextMenuTarget = null;
-    this.contextMenuColumn = null;
+  private _onMenuClose() {
     this.contextMenuEventId = null;
   }
 
@@ -1139,11 +1108,7 @@ export class CalltreeView extends LitElement {
       dropPick: () => this._inspector.dropPick(),
     });
 
-    grid.addEventListener('lv-grid-header-context', (e) => {
-      const { column, event } = (e as CustomEvent<GridHeaderContextDetail>).detail;
-      event.preventDefault();
-      this._showHeaderContextMenu(gridColumnTarget(grid), event.clientX, event.clientY, column);
-    });
+    grid.addEventListener('lv-grid-header-context', this._menus.headerContext);
     grid.addEventListener('lv-grid-reshape', () => void this._finder.rerun());
     grid.addEventListener('lv-grid-select', inspector.select);
     grid.addEventListener('lv-grid-locate', inspector.locate);
@@ -1184,27 +1149,7 @@ export class CalltreeView extends LitElement {
   private _handleContextMenuSelect(e: CustomEvent<{ itemId: string }>): void {
     const { itemId } = e.detail;
 
-    // Column-header menu actions (see _showHeaderContextMenu). These keep the menu
-    // open (keepOpen), so refresh its items live and leave contextMenuTarget set —
-    // it's cleared on menu-close.
-    if (itemId.startsWith('view:')) {
-      this._columns.choose(itemId.slice('view:'.length));
-      this._refreshColumnMenu();
-      return;
-    }
-    if (itemId.startsWith('col:')) {
-      if (this.contextMenuTarget) {
-        this._columns.toggle(this.contextMenuTarget, itemId.slice('col:'.length));
-        this._refreshColumnMenu();
-      }
-      return;
-    }
-    if (itemId.startsWith('reset:')) {
-      this._columns.reset(itemId.slice('reset:'.length));
-      this._refreshColumnMenu();
-      return;
-    }
-    if (selectColumnWidthItem(this.contextMenuTarget?.grid?.() ?? null, itemId)) {
+    if (this._menus.select(itemId)) {
       return;
     }
 

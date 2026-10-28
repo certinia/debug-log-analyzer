@@ -21,11 +21,6 @@ export interface GridColumnMenuOptions {
  *
  * The handlers are arrow fields so a template can bind them straight, where a
  * plain method would arrive with the host as `this`.
- *
- * CalltreeView is deliberately not on this. It drives three grids, so it has
- * to remember which one an open menu belongs to and drop that on close — a
- * concept the four single-grid hosts never need, and the reason its menu code
- * reads differently rather than badly.
  */
 export class GridColumnMenuController {
   private readonly _options: GridColumnMenuOptions;
