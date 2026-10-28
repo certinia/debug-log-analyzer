@@ -137,13 +137,13 @@ describe('sameConfig', () => {
 
 describe('inspector size', () => {
   it('is private state, so a drag never writes to settings.json or syncs to another machine', () => {
-    expect(PRIVATE_SECTIONS).toContain('inspector.size');
+    expect(PRIVATE_SECTIONS).toContain('inspector.sideSize');
   });
 
   it('reads the dragged size from globalState, and null before any drag', () => {
-    expect(getInspectorState(mockMemento({ 'inspector.size': 900 })).size).toBe(900);
+    expect(getInspectorState(mockMemento({ 'inspector.sideSize': 900 })).sideSize).toBe(900);
     // A stored pixel default would keep a later default from reaching this user.
-    expect(getInspectorState(mockMemento()).size).toBeNull();
+    expect(getInspectorState(mockMemento()).sideSize).toBeNull();
     expect(getInspectorState(mockMemento()).bottomSize).toBeNull();
   });
 });

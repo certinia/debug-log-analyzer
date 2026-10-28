@@ -104,7 +104,7 @@ export class LogInspector extends LitElement {
   private dock: DockPosition = 'right';
   // A width beside the main view and a height below it, as one never fits the other.
   @state()
-  private panelSize: number | null = null;
+  private sidePanelSize: number | null = null;
   @state()
   private bottomPanelSize: number | null = null;
 
@@ -191,7 +191,7 @@ export class LogInspector extends LitElement {
         this._visiblePref ??= panel.visible ?? null;
         if (!this._userAdjusted) {
           this.dock = panel.position;
-          this.panelSize = panel.size ?? null;
+          this.sidePanelSize = panel.sideSize ?? null;
           this.bottomPanelSize = panel.bottomSize ?? null;
           this.collapsedSections = panel.collapsed ?? {};
           this.sectionOrder = panel.sectionOrder ?? {};
@@ -268,7 +268,7 @@ export class LogInspector extends LitElement {
     return html`
       <dock-layout
         dock=${this.dock}
-        .size=${this.dock === 'bottom' ? this.bottomPanelSize : this.panelSize}
+        .size=${this.dock === 'bottom' ? this.bottomPanelSize : this.sidePanelSize}
         defaultSize=${this.dock === 'bottom' ? DEFAULT_BOTTOM_SIZE : DEFAULT_SIDE_SIZE}
         ?visible=${this._visible}
         .sections=${this.sections}
@@ -555,8 +555,8 @@ export class LogInspector extends LitElement {
       this.bottomPanelSize = size;
       updateSetting('inspector.bottomSize', size);
     } else {
-      this.panelSize = size;
-      updateSetting('inspector.size', size);
+      this.sidePanelSize = size;
+      updateSetting('inspector.sideSize', size);
     }
   }
 

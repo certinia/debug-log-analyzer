@@ -39,8 +39,8 @@ export type LanaSettings = {
   inspector: {
     position: 'left' | 'right' | 'bottom';
     /** Width docked left or right, in px; `null` means never dragged, so the panel takes its default size. */
-    size: number | null;
-    /** Height docked at the bottom, like `size`. */
+    sideSize: number | null;
+    /** Height docked at the bottom, like `sideSize`. */
     bottomSize: number | null;
     /** Collapsed sections, keyed `<source>:<scope>:<section id>`. */
     collapsed: Record<string, boolean>;

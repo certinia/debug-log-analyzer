@@ -102,7 +102,7 @@ async function flush(el: LogInspector): Promise<void> {
 
 /** The stored panel, open and docked right, plus whatever the test is about. */
 function inspectorSettings(overrides: Record<string, unknown> = {}): Record<string, unknown> {
-  return { position: 'right', size: 400, collapsed: {}, visible: true, ...overrides };
+  return { position: 'right', sideSize: 400, collapsed: {}, visible: true, ...overrides };
 }
 
 async function mount(activeTab: string): Promise<LogInspector> {
@@ -533,7 +533,7 @@ describe('LogInspector', () => {
       (el: LogInspector) => dockLayout(el).dispatchEvent(new CustomEvent('dock-size-reset')),
     ],
   ])('resets a dragged size to 560px from %s, and leaves the sections alone', async (_, reset) => {
-    settings.inspector = inspectorSettings({ size: 900 });
+    settings.inspector = inspectorSettings({ sideSize: 900 });
     const el = await mount('timeline-tab');
     select('timeline', 1);
     await flush(el);
@@ -544,11 +544,11 @@ describe('LogInspector', () => {
 
     expect(dockedSize(el)).toBe('560px');
     // Unset rather than 560, so a later default still reaches this user.
-    expect(written).toEqual([{ section: 'inspector.size', value: null }]);
+    expect(written).toEqual([{ section: 'inspector.sideSize', value: null }]);
   });
 
   it('keeps its own height docked at the bottom, a third of the view by default', async () => {
-    settings.inspector = inspectorSettings({ position: 'bottom', size: 900 });
+    settings.inspector = inspectorSettings({ position: 'bottom', sideSize: 900 });
     const el = await mount('timeline-tab');
     select('timeline', 1);
     await flush(el);
