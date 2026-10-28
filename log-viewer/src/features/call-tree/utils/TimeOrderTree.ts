@@ -4,11 +4,11 @@
 import { eventType } from '@apexdevtools/apex-log-parser';
 
 import type { LogCategory } from '#core/log/category.js';
+import { rowKinds } from '#core/log/eventKind.js';
 import { childRows, rowCategory, type LogIndex, NO_ROW } from '#core/log/LogIndex.js';
 import { type Signatures, signaturesOf } from '#core/log/signatures.js';
 import { namespaceOf } from '#core/utility/CallerNamespace.js';
 import type { RowFilter, TreeSource } from '../../../grid/index.js';
-import { rowKinds } from './DetailsFilter.js';
 
 /** One shown event in the Time Order view: a row of the log index. */
 export interface TimeOrderNode {

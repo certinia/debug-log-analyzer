@@ -290,6 +290,7 @@ export class CallTreeDetail extends LitElement {
       ${ref(this._grids[mode])}
       .label=${callTreeLabel(mode)}
       .placeholder=${this._pending ? 'Building the call tree…' : 'No call tree available'}
+      .filteredPlaceholder=${null}
       .source=${slot?.source ?? null}
       .columns=${slot?.columns ?? []}
       .filters=${slot?.filters ?? []}

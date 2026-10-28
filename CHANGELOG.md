@@ -28,6 +28,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - 🔭 **Timeline inspector**: the summary, call tree included, changes to reflect what is currently visible. ([#875])
 - 🧹 **Details filter**: with Details off, the Call Tree, Analysis and Inspector show every method, query and DML, even one that took no time, and hide debug lines and variables. ([#1234])
   - Exceptions and limit usage stay in Time Order and Aggregated, and show in Bottom-Up and Analysis only with Details on.
+  - Picking a type that shows only with Details turns Details on, and back off when you pick a type that does not, unless Details was on already.
 - 🏷️ **Categories**: every row in the Call Tree and Analysis has a category, debug lines and variables included. ([#1244])
   - Visualforce continuation frames show as System, like the rest of Visualforce.
 - 🎨 **Styling**: updated for the VS Code Modern UI.
@@ -67,6 +68,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - 🎯 **Raw log**: **Show in Log Analysis**, folding and the outline go to the right event when two events share a timestamp.
 - 🧭 **Show in Log Analysis**: opens the right log at the right event.
 - 📍 **Show in Timeline**: always goes to the event.
+- 🔬 **Variables**: a constructor's `this` names its class, not the outer class or the namespace. ([#1229])
 - 🌳 **Go to Call Tree**: a row the filters hide selects its parent, with the option to clear the filters and go to the hidden row.
 
 ## [1.22.1] - 2026-09-18
@@ -614,6 +616,7 @@ Skipped due to adopting odd numbering for pre releases and even number for relea
 
 [#1231]: https://github.com/certinia/debug-log-analyzer/issues/1231
 [#1244]: https://github.com/certinia/debug-log-analyzer/issues/1244
+[#1229]: https://github.com/certinia/debug-log-analyzer/issues/1229
 [#1234]: https://github.com/certinia/debug-log-analyzer/issues/1234
 [#1169]: https://github.com/certinia/debug-log-analyzer/issues/1169
 [#986]: https://github.com/certinia/debug-log-analyzer/issues/986
