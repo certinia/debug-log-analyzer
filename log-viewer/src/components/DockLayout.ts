@@ -30,8 +30,13 @@ export class DockLayout extends LitElement {
   @property({ type: String })
   dock: DockPosition = 'right';
 
-  @property({ type: Number })
-  size = 560;
+  /** In px; null lays the panel out at `defaultSize`. */
+  @property({ attribute: false })
+  size: number | null = null;
+
+  /** Any CSS length, so a default can follow the view, as a percentage does. */
+  @property({ type: String })
+  defaultSize = '50%';
 
   @property({ type: Boolean })
   visible = false;
@@ -177,16 +182,22 @@ export class DockLayout extends LitElement {
     `;
   }
 
-  private _currentSize(): number {
+  private _currentSize(): string {
     if (this._pendingCollapse) {
-      return 0;
+      return '0px';
     }
-    return this._liveSize ?? this.size;
+    const size = this._liveSize ?? this.size;
+    return size === null ? this.defaultSize : `${size}px`;
   }
 
   private _dockSizeStyle() {
     const size = this._currentSize();
-    return this.dock === 'bottom' ? `height: ${size}px` : `width: ${size}px`;
+    return this.dock === 'bottom' ? `height: ${size}` : `width: ${size}`;
+  }
+
+  private _shownSize(): number {
+    const dock = this.renderRoot?.querySelector<HTMLElement>('detail-dock');
+    return (this.dock === 'bottom' ? dock?.offsetHeight : dock?.offsetWidth) ?? MIN_SIZE;
   }
 
   private _maxSize(): number | null {
@@ -201,9 +212,10 @@ export class DockLayout extends LitElement {
     const gutter = e.currentTarget as HTMLElement;
     gutter.setPointerCapture(e.pointerId);
     gutter.classList.add('gutter--active');
+    const size = this.size ?? this._shownSize();
     this._resizeStart = {
       pos: this.dock === 'bottom' ? e.clientY : e.clientX,
-      size: Math.max(MIN_SIZE, Math.min(this.size, this._maxSize() ?? this.size)),
+      size: Math.max(MIN_SIZE, Math.min(size, this._maxSize() ?? size)),
     };
     gutter.addEventListener('pointermove', this._onResizeMove);
     gutter.addEventListener('pointerup', this._endResize);

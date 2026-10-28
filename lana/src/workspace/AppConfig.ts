@@ -36,6 +36,7 @@ export interface Config {
     position: 'left' | 'right' | 'bottom';
     // The rest is private globalState (see INSPECTOR_STATE_SECTIONS), not settings.
     size: number | null;
+    bottomSize: number | null;
     collapsed: Record<string, boolean>;
     sectionOrder: Record<string, string[]>;
     hiddenSections: Record<string, boolean>;
@@ -146,6 +147,7 @@ export const COLUMN_VIEW_SECTIONS = [
  */
 export const INSPECTOR_STATE_SECTIONS = [
   'inspector.size',
+  'inspector.bottomSize',
   'inspector.collapsed',
   'inspector.sectionOrder',
   'inspector.hiddenSections',
@@ -162,12 +164,13 @@ export const PRIVATE_SECTIONS = [
 type ColumnOverrides = Record<string, string[]>;
 type InspectorState = Pick<
   Config['inspector'],
-  'size' | 'collapsed' | 'sectionOrder' | 'hiddenSections' | 'visible'
+  'size' | 'bottomSize' | 'collapsed' | 'sectionOrder' | 'hiddenSections' | 'visible'
 >;
 
 export function getInspectorState(globalState: Memento): InspectorState {
   return {
     size: globalState.get<number | null>('inspector.size', null),
+    bottomSize: globalState.get<number | null>('inspector.bottomSize', null),
     collapsed: globalState.get<Record<string, boolean>>('inspector.collapsed', {}),
     sectionOrder: globalState.get<Record<string, string[]>>('inspector.sectionOrder', {}),
     hiddenSections: globalState.get<Record<string, boolean>>('inspector.hiddenSections', {}),

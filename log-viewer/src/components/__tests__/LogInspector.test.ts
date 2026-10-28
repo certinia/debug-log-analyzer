@@ -547,6 +547,21 @@ describe('LogInspector', () => {
     expect(written).toEqual([{ section: 'inspector.size', value: null }]);
   });
 
+  it('keeps its own height docked at the bottom, a third of the view by default', async () => {
+    settings.inspector = inspectorSettings({ position: 'bottom', size: 900 });
+    const el = await mount('timeline-tab');
+    select('timeline', 1);
+    await flush(el);
+    // A width would leave the main view no room above it.
+    expect(dockedSize(el)).toBe('33.333%');
+
+    dockLayout(el).dispatchEvent(new CustomEvent('dock-resize', { detail: { size: 300 } }));
+    await flush(el);
+
+    expect(dockedSize(el)).toBe('300px');
+    expect(written).toEqual([{ section: 'inspector.bottomSize', value: 300 }]);
+  });
+
   it('keeps a maximized section to the list it was maximized in', async () => {
     const el = await mount('timeline-tab');
     select('timeline', 1);

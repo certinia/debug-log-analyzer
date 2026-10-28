@@ -144,6 +144,7 @@ describe('inspector size', () => {
     expect(getInspectorState(mockMemento({ 'inspector.size': 900 })).size).toBe(900);
     // A stored pixel default would keep a later default from reaching this user.
     expect(getInspectorState(mockMemento()).size).toBeNull();
+    expect(getInspectorState(mockMemento()).bottomSize).toBeNull();
   });
 });
 

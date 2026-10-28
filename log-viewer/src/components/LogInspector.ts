@@ -54,8 +54,10 @@ const SCOPE_OPTIONS: readonly ViewModeOption[] = [
   { value: 'log', label: 'Summary' },
 ];
 
-// The narrowest at which the inspector's tables keep every column.
-const DEFAULT_PANEL_SIZE = 560;
+// Beside the main view: the narrowest at which the inspector's tables keep every column.
+const DEFAULT_SIDE_SIZE = '560px';
+// Below it: VS Code's own bottom panel default.
+const DEFAULT_BOTTOM_SIZE = '33.333%';
 
 /**
  * The window the summary is reading, as elapsed times, so it reads against the
@@ -100,8 +102,11 @@ export class LogInspector extends LitElement {
   private sections: PaneSection[] = [];
   @state()
   private dock: DockPosition = 'right';
+  // A width beside the main view and a height below it, as one never fits the other.
   @state()
   private panelSize: number | null = null;
+  @state()
+  private bottomPanelSize: number | null = null;
 
   // Keyed `<source>:<scope>:<section id>`, so the same section keeps its own
   // state in each list it appears in.
@@ -187,6 +192,7 @@ export class LogInspector extends LitElement {
         if (!this._userAdjusted) {
           this.dock = panel.position;
           this.panelSize = panel.size ?? null;
+          this.bottomPanelSize = panel.bottomSize ?? null;
           this.collapsedSections = panel.collapsed ?? {};
           this.sectionOrder = panel.sectionOrder ?? {};
           this.hiddenSections = panel.hiddenSections ?? {};
@@ -262,7 +268,8 @@ export class LogInspector extends LitElement {
     return html`
       <dock-layout
         dock=${this.dock}
-        .size=${this.panelSize ?? DEFAULT_PANEL_SIZE}
+        .size=${this.dock === 'bottom' ? this.bottomPanelSize : this.panelSize}
+        defaultSize=${this.dock === 'bottom' ? DEFAULT_BOTTOM_SIZE : DEFAULT_SIDE_SIZE}
         ?visible=${this._visible}
         .sections=${this.sections}
         .collapsed=${this._layout.collapsed}
@@ -544,8 +551,13 @@ export class LogInspector extends LitElement {
 
   private _setPanelSize(size: number | null): void {
     this._userAdjusted = true;
-    this.panelSize = size;
-    updateSetting('inspector.size', size);
+    if (this.dock === 'bottom') {
+      this.bottomPanelSize = size;
+      updateSetting('inspector.bottomSize', size);
+    } else {
+      this.panelSize = size;
+      updateSetting('inspector.size', size);
+    }
   }
 
   private _onPaneToggle = (e: CustomEvent<{ collapsed: Record<string, boolean> }>) => {

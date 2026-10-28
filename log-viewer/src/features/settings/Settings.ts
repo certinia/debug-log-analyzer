@@ -38,8 +38,10 @@ export type LanaSettings = {
   // The app-wide inspector, fed by a selection on any tab.
   inspector: {
     position: 'left' | 'right' | 'bottom';
-    /** In px; `null` means never dragged, so the panel takes its default size. */
+    /** Width docked left or right, in px; `null` means never dragged, so the panel takes its default size. */
     size: number | null;
+    /** Height docked at the bottom, like `size`. */
+    bottomSize: number | null;
     /** Collapsed sections, keyed `<source>:<scope>:<section id>`. */
     collapsed: Record<string, boolean>;
     /** The order the user arranged each list in, keyed `<source>:<scope>`. */

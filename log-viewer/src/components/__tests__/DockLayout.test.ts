@@ -134,6 +134,18 @@ describe('DockLayout resize', () => {
     expect(events).toEqual([]);
   });
 
+  it('lays out a panel never dragged at its default size, which may be relative to the view', async () => {
+    const el = document.createElement('dock-layout') as DockLayout;
+    el.dock = 'bottom';
+    el.defaultSize = '33.333%';
+    el.visible = true;
+    document.body.appendChild(el);
+    await el.updateComplete;
+
+    const dock = el.shadowRoot?.querySelector('detail-dock') as HTMLElement;
+    expect(dock.style.height).toBe('33.333%');
+  });
+
   it('asks for the default size back on a double-click of the edge', async () => {
     const el = await mount('right', 500);
     let resets = 0;
