@@ -815,9 +815,9 @@ export const logDiagnostics: Derivation<LogDiagnostics> = (_, store) => analyse(
 export function scopeDiagnostics(
   log: ApexLog,
   result: LogDiagnostics,
-  instances: readonly number[],
+  eventIds: readonly number[],
 ): LogDiagnostics {
-  const within = new Set(instances);
+  const within = new Set(eventIds);
   if (!within.size) {
     return { ...result, diagnostics: [] };
   }

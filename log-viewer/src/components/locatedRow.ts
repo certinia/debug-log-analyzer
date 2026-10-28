@@ -13,14 +13,14 @@ export interface RowReader<R> {
 }
 
 /** What the inspector reads off a row. A merged row's `key` is the bucket it stands for,
- *  `instances` the occurrences it holds, which a bottom-up caller bucket has none of. */
+ *  `eventIds` the occurrences it holds, which a bottom-up caller bucket has none of. */
 export interface RowData {
   key?: string;
   /** The interned bucket path the row's builder stamped on it. */
   _pathId?: number;
   text?: string;
   /** The ids of the calls the row merges. */
-  instances?: readonly number[];
+  eventIds?: readonly number[];
   /** The id of the row's event, or of a merged row's first call. */
   eventId?: number;
 }
@@ -31,7 +31,7 @@ const rowCallData = <R>(row: R, read: RowReader<R>): RowData => read.data(row);
  *  hover asks again, but deriving reads every occurrence the root bucket holds. */
 const derivedIds = new WeakMap<RowData, readonly number[]>();
 
-const NO_CALLS: readonly number[] = [];
+const NO_EVENT_IDS: readonly number[] = [];
 
 /**
  * The root bucket a derived row reads its calls from, or null where the walk
@@ -61,23 +61,23 @@ function rowCallOccurrences<R>(
   store: LogStore | null,
 ): readonly number[] {
   const data = rowCallData(row, read);
-  if (data.instances?.length) {
-    return data.instances;
+  if (data.eventIds?.length) {
+    return data.eventIds;
   }
   if (data.key === undefined) {
-    return data.eventId === undefined ? NO_CALLS : [data.eventId];
+    return data.eventId === undefined ? NO_EVENT_IDS : [data.eventId];
   }
-  return derivedRowOf(row, read, data, store).calls;
+  return derivedRowOf(row, read, data, store).eventIds;
 }
 
 /** What a derived row's bucket answers: the calls whose chain runs through the
  *  row, and the frames the row is at its own depth. */
 interface DerivedRow {
-  calls: readonly number[];
-  frames: number[];
+  eventIds: readonly number[];
+  frameIds: number[];
 }
 
-const NOTHING_DERIVED: DerivedRow = { calls: NO_CALLS, frames: [] };
+const NOTHING_DERIVED: DerivedRow = { eventIds: NO_EVENT_IDS, frameIds: [] };
 
 /** Held per row: a pointer sweep re-enters rows and the click that follows a
  *  hover asks again, but deriving reads every occurrence the root bucket holds. */
@@ -108,21 +108,21 @@ function derivedRowOf<R>(
     return NOTHING_DERIVED;
   }
   const paths = store.keyPathIds();
-  const instances = rootBucketOf(row, read, data)?.instances;
-  if (!instances?.length) {
+  const bucketIds = rootBucketOf(row, read, data)?.eventIds;
+  if (!bucketIds?.length) {
     return NOTHING_DERIVED;
   }
-  const calls: number[] = [];
+  const eventIds: number[] = [];
   const own = new Set<number>();
-  for (const id of instances) {
+  for (const id of bucketIds) {
     const node = paths.chainNodeAt(id, pathId);
     if (node) {
-      calls.push(id);
+      eventIds.push(id);
       own.add(node);
     }
   }
-  const derived = { calls, frames: [...own] };
-  if (calls.length) {
+  const derived = { eventIds, frameIds: [...own] };
+  if (eventIds.length) {
     // Not kept where nothing derived, for the reason `rowOccurrences` gives.
     derivedRows.set(data, derived);
   }
@@ -203,7 +203,7 @@ export function rowFrames<R>(
     // A row at the depth of its own calls stands for them.
     return rowOccurrences(row, read, store);
   }
-  return derivedRowOf(row, read, data, store).frames;
+  return derivedRowOf(row, read, data, store).frameIds;
 }
 
 /**
@@ -236,9 +236,9 @@ export function rowDetailSelection<R>(
   // its own calls, so nothing reached them but it.
   return {
     kind: 'aggregate',
-    instances: [...rowOccurrences(row, read, store)],
-    frames: [...rowFrames(row, read, store, direction)],
-    calledBy: data.instances?.length ? undefined : data.text,
+    eventIds: [...rowOccurrences(row, read, store)],
+    frameIds: [...rowFrames(row, read, store, direction)],
+    calledBy: data.eventIds?.length ? undefined : data.text,
   };
 }
 

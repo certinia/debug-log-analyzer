@@ -46,7 +46,7 @@ export class CallStackDetail extends LitElement {
   private readonly _inspector = new InspectorGridController<CallStackRow>(this, {
     grid: () => this._grid.value ?? null,
     source: () => this._source,
-    frames: (row) => [row.eventId],
+    frameIds: (row) => [row.eventId],
     // Selecting a frame makes it the active one and reveals it in the tab on
     // screen; the inspector adds the source, since only it knows which tab that is.
     pick: (row) => {

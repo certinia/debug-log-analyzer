@@ -20,7 +20,7 @@ const logOf = async (children: FakeEvent[]): Promise<void> => {
   apexLog = (await log(children)).log;
 };
 
-async function mount(props: Partial<Pick<NamespaceTimeBar, 'eventId' | 'instances'>> = {}) {
+async function mount(props: Partial<Pick<NamespaceTimeBar, 'eventId' | 'eventIds'>> = {}) {
   const element = document.createElement('namespace-time-bar');
   // No provider in the test, so the consumed store is assigned straight on.
   Object.assign(element, { logStore: apexLog && logStoreFor(apexLog) }, props);
@@ -63,7 +63,7 @@ describe('namespace-time-bar', () => {
     const outer = namespaceEvent('pkg', 30, [inner]);
     await logOf([outer]);
 
-    const element = await mount({ instances: [outer.eventId, inner.eventId] });
+    const element = await mount({ eventIds: [outer.eventId, inner.eventId] });
 
     expect(segments(element)[0]).toMatchObject({ label: 'pkg', value: 50 });
   });

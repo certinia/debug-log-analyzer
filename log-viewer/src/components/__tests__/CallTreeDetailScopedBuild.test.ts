@@ -524,7 +524,7 @@ describe('CallTreeDetail scoped build', () => {
       {
         eventIds: [8, 12],
         sticky: true,
-        selection: { kind: 'aggregate', instances: [8, 12], frames: [8, 12], calledBy: undefined },
+        selection: { kind: 'aggregate', eventIds: [8, 12], frameIds: [8, 12], calledBy: undefined },
       },
     ]);
   });

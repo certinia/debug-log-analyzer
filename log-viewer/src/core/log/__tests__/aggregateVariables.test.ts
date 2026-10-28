@@ -80,8 +80,11 @@ describe('aggregateVariablesFor', () => {
     const calls = idsOf(log, 'ns.Svc.run()');
 
     const retry = spread?.locals.find((row) => row.name === 'retry');
-    expect(retry?.values.find((value) => value.text === 'false')?.at).toEqual([calls[1], calls[2]]);
-    expect(retry?.values.find((value) => value.text === 'true')?.at).toEqual([calls[0]]);
+    expect(retry?.values.find((value) => value.text === 'false')?.callIds).toEqual([
+      calls[1],
+      calls[2],
+    ]);
+    expect(retry?.values.find((value) => value.text === 'true')?.callIds).toEqual([calls[0]]);
   });
 
   // Counts alone mislead: an unbroken run is a state the calls were in, where
@@ -112,7 +115,7 @@ describe('aggregateVariablesFor', () => {
     const retry = spread?.locals.find((row) => row.name === 'retry');
     // Every call held it, and the mark holds the first 200 of them.
     expect(retry?.values[0]?.calls).toBe(210);
-    expect(retry?.values[0]?.at).toHaveLength(200);
+    expect(retry?.values[0]?.callIds).toHaveLength(200);
     expect(retry?.values[0]?.runs).toBe(1);
   });
 

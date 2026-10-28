@@ -38,13 +38,13 @@ jest.mock('../detailSections.js', () => ({
   buildDetailSections: (
     _source: string,
     selection: { eventId?: number } | null,
-    active: { kind: string; eventId?: number; instances?: number[] } | null,
+    active: { kind: string; eventId?: number; eventIds?: number[] } | null,
     sourceView?: string,
     hidden: ReadonlySet<string> = new Set(),
   ) => {
     builtHiding.push([...hidden]);
     const walked = active?.kind === 'event' ? String(active.eventId) : '-';
-    const counted = active?.kind === 'aggregate' ? (active.instances?.join(',') ?? '-') : '-';
+    const counted = active?.kind === 'aggregate' ? (active.eventIds?.join(',') ?? '-') : '-';
     // The markers carry the anchor and the active frame through to the rendered
     // content, so a stale build resolving late is distinguishable from the one
     // that supersedes it, and a walk is distinguishable from a new pick.
@@ -856,8 +856,8 @@ describe('LogInspector', () => {
 
     dispatchInspectorLocate(dockLayout(el), [5, 9], true, {
       kind: 'aggregate',
-      instances: [5, 9],
-      frames: [5, 9],
+      eventIds: [5, 9],
+      frameIds: [5, 9],
     });
     await flush(el);
 
@@ -883,8 +883,8 @@ describe('LogInspector', () => {
     select('timeline', 1);
     dispatchInspectorLocate(dockLayout(el), [5, 9], true, {
       kind: 'aggregate',
-      instances: [5, 9],
-      frames: [5, 9],
+      eventIds: [5, 9],
+      frameIds: [5, 9],
     });
     await flush(el);
 
@@ -899,8 +899,8 @@ describe('LogInspector', () => {
     select('timeline', 1);
     dispatchInspectorLocate(dockLayout(el), [5, 9], true, {
       kind: 'aggregate',
-      instances: [5, 9],
-      frames: [5, 9],
+      eventIds: [5, 9],
+      frameIds: [5, 9],
     });
     await flush(el);
 

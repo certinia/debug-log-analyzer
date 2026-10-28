@@ -82,7 +82,7 @@ export interface AggregatedRow {
   /** Aggregated children (callees grouped by signature) */
   _children?: AggregatedRow[] | null;
   /** The event ids of the calls this row merges, for drill-down */
-  instances: number[];
+  eventIds: number[];
   /** The event id of this row's first call (used by formatters) */
   eventId: number;
   /** The timeline category of this row's calls */
@@ -152,7 +152,7 @@ export interface BottomUpRow {
    * buckets (used by the table-level `bottomCalc`); deep buckets leave this
    * empty — use {@link eventId} when a single representative is needed.
    */
-  instances: number[];
+  eventIds: number[];
   /** The event id of this row's first call (used by formatters) */
   eventId: number;
   /** The timeline category of this row's calls */
@@ -255,7 +255,7 @@ type AggregateFrame = {
 };
 
 /** The event ids a level groups the callees of; the log, which heads no row, is id 0. */
-const LOG_CALLS: readonly number[] = [0];
+const LOG_CALL_IDS: readonly number[] = [0];
 
 function* aggregatedSteps(ctx: BuildContext): Generator<void, AggregatedRow[], void> {
   if (ctx.index.rowCount === 0) {
@@ -265,16 +265,16 @@ function* aggregatedSteps(ctx: BuildContext): Generator<void, AggregatedRow[], v
 
   // The grouping loop runs outside the generator: run inside it, it is about 15% slower.
   function* group(
-    calls: readonly number[],
+    callIds: readonly number[],
     pathId: number,
     openStackId: number,
   ): Generator<void, AggregatedRow[], void> {
     const grouping: CalleeGrouping = {
-      calls,
+      callIds,
       pathId,
       openStackId,
       byKey: new Map(),
-      call: 0,
+      callAt: 0,
       child: NOT_STARTED,
     };
     for (;;) {
@@ -288,7 +288,7 @@ function* aggregatedSteps(ctx: BuildContext): Generator<void, AggregatedRow[], v
   }
 
   // Nothing is open above a root child, so no call of one is recursive here.
-  const roots = yield* group(LOG_CALLS, ROOT_PATH_ID, NO_STACK);
+  const roots = yield* group(LOG_CALL_IDS, ROOT_PATH_ID, NO_STACK);
   // Descend callees in grouping order, not sorted order: the row ids depend on it.
   const stack: AggregateFrame[] = [{ row: null, callees: roots, next: 0 }];
   while (stack.length > 0) {
@@ -296,7 +296,7 @@ function* aggregatedSteps(ctx: BuildContext): Generator<void, AggregatedRow[], v
     if (frame.next < frame.callees.length) {
       const row = frame.callees[frame.next++]!; // next is in range
       // The row's own frame is open over its callees, so a call of it there is recursive.
-      const callees = yield* group(row.instances, row._pathId, ctx.paths.stackIdOf(row.eventId));
+      const callees = yield* group(row.eventIds, row._pathId, ctx.paths.stackIdOf(row.eventId));
       stack.push({ row, callees, next: 0 });
       if (--budget === 0) {
         yield;
@@ -319,13 +319,12 @@ function* aggregatedSteps(ctx: BuildContext): Generator<void, AggregatedRow[], v
 const NOT_STARTED = -2;
 
 type CalleeGrouping = {
-  /** Event ids. */
-  calls: readonly number[];
+  callIds: readonly number[];
   pathId: number;
   openStackId: number;
   byKey: Map<number, AggregatedRow>;
-  call: number;
-  /** The next index row to group under `calls[call]`. */
+  callAt: number;
+  /** The next index row to group under `callIds[callAt]`. */
   child: number;
 };
 
@@ -333,12 +332,12 @@ type CalleeGrouping = {
 function groupCallees(grouping: CalleeGrouping, ctx: BuildContext, budget: number): number {
   const { index, paths, reported } = ctx;
   const { subtreeEnd, eventId } = index;
-  const { calls, pathId, openStackId, byKey } = grouping;
+  const { callIds, pathId, openStackId, byKey } = grouping;
   let done = 0;
-  let i = grouping.call;
+  let i = grouping.callAt;
   let child = grouping.child;
-  for (; i < calls.length; i++, child = NOT_STARTED) {
-    const callRow = index.rowOf(calls[i]!); // i is in range; the log's id 0 reads NO_ROW
+  for (; i < callIds.length; i++, child = NOT_STARTED) {
+    const callRow = index.rowOf(callIds[i]!); // i is in range; the log's id 0 reads NO_ROW
     const end = callRow === NO_ROW ? index.rowCount : subtreeEnd[callRow]!;
     if (child === NOT_STARTED) {
       child = callRow + 1;
@@ -347,7 +346,7 @@ function groupCallees(grouping: CalleeGrouping, ctx: BuildContext, budget: numbe
     const usage = child < end && reported?.span(spanOf(index, callRow)) ? reported : null;
     for (; child < end; child = subtreeEnd[child]!) {
       if (done === budget) {
-        grouping.call = i;
+        grouping.callAt = i;
         grouping.child = child;
         return done;
       }
@@ -363,7 +362,7 @@ function groupCallees(grouping: CalleeGrouping, ctx: BuildContext, budget: numbe
       done++;
     }
   }
-  grouping.call = i;
+  grouping.callAt = i;
   grouping.child = NOT_STARTED;
   return done;
 }
@@ -390,42 +389,42 @@ function addTally(
   into.total += from.total[row]!;
 }
 
-/** Adds the call on index row `call` to an aggregated row, leaving `totalTime` alone
+/** Adds the call on index row `callRow` to an aggregated row, leaving `totalTime` alone
  *  where the call is recursive: the frame open above this level already holds that time. */
 function addCallToAggregatedRow(
   row: AggregatedRow,
   ctx: BuildContext,
-  call: number,
+  callRow: number,
   stackId: number,
   openStackId: number,
   reported: ReportedUsage | null,
 ): void {
   const m = ctx.metrics;
   row.callCount++;
-  row.totalSelfTime += m.duration.self[call]!; // Always add self time
+  row.totalSelfTime += m.duration.self[callRow]!; // Always add self time
 
   // The stack id reads through the entry type, so CODE_UNIT_STARTED and
   // METHOD_ENTRY for the same method are one frame on the call stack.
   if (stackId !== openStackId) {
-    row.totalTime += m.duration.total[call]!;
+    row.totalTime += m.duration.total[callRow]!;
   }
 
-  addTally(row.dmlCount, m.dmlCount, call);
-  addTally(row.soqlCount, m.soqlCount, call);
-  addTally(row.soslCount, m.soslCount, call);
-  addTally(row.dmlRowCount, m.dmlRowCount, call);
-  addTally(row.soqlRowCount, m.soqlRowCount, call);
-  addTally(row.soslRowCount, m.soslRowCount, call);
-  addTally(row.thrownCount, m.thrownCount, call);
-  addTally(row.heapAllocated, m.heapAllocated, call);
-  addTally(row.heapGross, m.heapGross, call);
+  addTally(row.dmlCount, m.dmlCount, callRow);
+  addTally(row.soqlCount, m.soqlCount, callRow);
+  addTally(row.soslCount, m.soslCount, callRow);
+  addTally(row.dmlRowCount, m.dmlRowCount, callRow);
+  addTally(row.soqlRowCount, m.soqlRowCount, callRow);
+  addTally(row.soslRowCount, m.soslRowCount, callRow);
+  addTally(row.thrownCount, m.thrownCount, callRow);
+  addTally(row.heapAllocated, m.heapAllocated, callRow);
+  addTally(row.heapGross, m.heapGross, callRow);
   // Peak live heap aggregates by max (the worst single call), not sum.
-  row.heapPeak = Math.max(row.heapPeak, m.heapPeak[call]!);
-  const span = reported?.span(spanOf(ctx.index, call));
+  row.heapPeak = Math.max(row.heapPeak, m.heapPeak[callRow]!);
+  const span = reported?.span(spanOf(ctx.index, callRow));
   if (span) {
     addReported(row.reported, span);
   }
-  row.instances.push(ctx.index.eventId[call]!);
+  row.eventIds.push(ctx.index.eventId[callRow]!);
 }
 
 /**
@@ -685,7 +684,7 @@ function* bottomUpSteps(build: BuildContext): Generator<void, BottomUpRow[], voi
       rootBuckets.set(rootId, bucket);
     }
     accumulate(bucket);
-    bucket.instances.push(eventId[row]!);
+    bucket.eventIds.push(eventId[row]!);
 
     // Deeper buckets are keyed by successive ancestors. The open stack already
     // holds them — open[i].row is N's ancestor at depth i.
@@ -854,7 +853,7 @@ function createEmptyAggregatedRow(
     governorCostMax: 0,
     reported: emptyReported(),
     _children: null,
-    instances: [],
+    eventIds: [],
   };
 }
 
@@ -896,7 +895,7 @@ function createEmptyBottomUpRow(
     governorCostMax: 0,
     reported: emptyReported(),
     _children: null,
-    instances: [],
+    eventIds: [],
   };
 }
 

@@ -101,7 +101,7 @@ export class DatabaseTime extends LitElement {
   private readonly _inspector = new InspectorGridController<DatabaseTreeRow>(this, {
     grid: () => this._grid.value ?? null,
     source: () => this._source,
-    frames: (row) => row.eventIds,
+    frameIds: (row) => row.eventIds,
     // A frame or a merged row has no one statement to reveal, so its pick holds a mark on all of them.
     pick: (row) => {
       const eventId = revealable(row);

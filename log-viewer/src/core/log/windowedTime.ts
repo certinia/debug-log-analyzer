@@ -154,9 +154,9 @@ export class SpanIndex {
     this.whole = { total: total[groups]!, self: self[groups]!, calls: members.length };
   }
 
-  /** @param occurrences - shown event ids of `index` */
-  static of(index: LogIndex, occurrences: readonly number[], holes?: Holes): SpanIndex {
-    const members = inStartOrder(index, occurrences);
+  /** @param occurrenceIds - shown event ids of `index` */
+  static of(index: LogIndex, occurrenceIds: readonly number[], holes?: Holes): SpanIndex {
+    const members = inStartOrder(index, occurrenceIds);
     const groups = new GroupBuilder(index, holes);
     for (const member of members) {
       groups.add(member);
@@ -167,11 +167,11 @@ export class SpanIndex {
   /** {@link of} a slice at a time; null when abandoned. */
   static async build(
     index: LogIndex,
-    occurrences: readonly number[],
+    occurrenceIds: readonly number[],
     holes: Holes | undefined,
     tick: Tick,
   ): Promise<SpanIndex | null> {
-    const members = inStartOrder(index, occurrences);
+    const members = inStartOrder(index, occurrenceIds);
     const groups = new GroupBuilder(index, holes);
     for (let i = 0; i < members.length; i++) {
       if (i % CHECK_EVERY === 0 && !(await tick())) {
@@ -238,8 +238,8 @@ export class SpanIndex {
 }
 
 // Calls that never nest are in order already, and the sort is most of a hot row's build.
-function inStartOrder(index: LogIndex, occurrences: readonly number[]): Int32Array {
-  const rows = Int32Array.from(occurrences, (id) => index.rowOf(id));
+function inStartOrder(index: LogIndex, occurrenceIds: readonly number[]): Int32Array {
+  const rows = Int32Array.from(occurrenceIds, (id) => index.rowOf(id));
   const { start, end } = index;
   // Outer first where two start together, so the outer heads its group.
   const byStart = (a: number, b: number) => start[a]! - start[b]! || end[b]! - end[a]!;
@@ -319,26 +319,26 @@ export class CallSpans {
   /**
    * Built a slice at a time; null when abandoned.
    *
-   * @param frames - shown event ids of `index`
+   * @param frameIds - shown event ids of `index`
    */
   static async build(
     index: LogIndex,
-    frames: readonly number[],
+    frameIds: readonly number[],
     tick: Tick,
   ): Promise<CallSpans | null> {
     const { start, end } = index;
-    const rows = new Int32Array(frames.length);
+    const rows = new Int32Array(frameIds.length);
     let instantCount = 0;
-    for (let i = 0; i < frames.length; i++) {
+    for (let i = 0; i < frameIds.length; i++) {
       if (i % CHECK_EVERY === 0 && !(await tick())) {
         return null;
       }
-      const row = (rows[i] = index.rowOf(frames[i]!)); // i < length
+      const row = (rows[i] = index.rowOf(frameIds[i]!)); // i < length
       if (end[row] === start[row]) {
         instantCount++;
       }
     }
-    const starts = new Float64Array(frames.length - instantCount);
+    const starts = new Float64Array(frameIds.length - instantCount);
     const ends = new Float64Array(starts.length);
     const instants = new Float64Array(instantCount);
     let spanAt = 0;

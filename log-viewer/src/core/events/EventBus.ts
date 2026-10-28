@@ -25,17 +25,17 @@ export type { StatementType };
 /**
  * A selection to inspect in the inspector. A single frame maps to one `eventId`;
  * an aggregate row (Call Tree Aggregated/Bottom-Up, Analysis) scopes to all its
- * occurrences (`instances` = their ids), aggregated.
+ * occurrences, aggregated.
  */
 export type DetailSelection =
   | { kind: 'event'; eventId: number; type?: StatementType }
   | {
       kind: 'aggregate';
-      instances: number[];
+      eventIds: number[];
       /** The frames the row *is*, which is the scope it holds: a bottom-up
        *  caller row counts its callee's calls, so its own scope lives a level
-       *  up. Equal to {@link instances} where the row sits at its calls' depth. */
-      frames: number[];
+       *  up. Equal to {@link eventIds} where the row sits at its calls' depth. */
+      frameIds: number[];
       /** The frame that made the calls, where the row naming them is not it: a
        *  bottom-up caller row counts its callee's calls. Absent where the row
        *  names the calls it counts. */

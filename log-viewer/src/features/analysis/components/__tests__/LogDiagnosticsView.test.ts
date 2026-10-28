@@ -23,8 +23,8 @@ let held: Promise<LogDiagnostics> | null = null;
 
 jest.mock('../../services/LogDiagnostics.js', () => ({
   logDiagnostics: () => held ?? Promise.resolve(result),
-  scopeDiagnostics: (_log: unknown, all: LogDiagnostics, instances: readonly number[]) => {
-    askedAbout = instances;
+  scopeDiagnostics: (_log: unknown, all: LogDiagnostics, eventIds: readonly number[]) => {
+    askedAbout = eventIds;
     return { ...all, diagnostics: all.diagnostics.filter((d) => keep(d.id)) };
   },
 }));
@@ -51,10 +51,10 @@ const settle = async (element: HTMLElementTagNameMap['log-diagnostics']) => {
   }
 };
 
-const view = async (scope?: { instances: number[] }) => {
+const view = async (scope?: { eventIds: number[] }) => {
   const element = document.createElement('log-diagnostics');
   if (scope) {
-    element.instances = scope.instances;
+    element.eventIds = scope.eventIds;
   }
   loadLog(element);
   document.body.append(element);
@@ -503,7 +503,7 @@ describe('log-diagnostics', () => {
       { id: 'b', severity: 'Error', summary: 'Elsewhere.', message: '', count: 1, eventId: 9 },
     ];
     keep = (id) => id === 'a';
-    const element = await view({ instances: [1, 4] });
+    const element = await view({ eventIds: [1, 4] });
 
     expect(askedAbout).toEqual([1, 4]);
     expect(text(element, '.title')).toEqual(['Mine.']);
@@ -516,13 +516,13 @@ describe('log-diagnostics', () => {
       { id: 'a', severity: 'Error', summary: 'Elsewhere.', message: '', count: 1, eventId: 9 },
     ];
     keep = () => false;
-    const element = await view({ instances: [1] });
+    const element = await view({ eventIds: [1] });
     expect(text(element, '.ok')).toEqual(["No findings — you're good to go."]);
   });
 
   it('keeps a whole-log caveat out of the scoped list, which it does not describe', async () => {
     result.queryPlansKnown = false;
-    const element = await view({ instances: [1] });
+    const element = await view({ eventIds: [1] });
     expect(text(element, '.note').join(' ')).not.toContain('The log has no query plans.');
   });
 });

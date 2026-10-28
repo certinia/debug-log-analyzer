@@ -81,7 +81,7 @@ describe('EventVitals', () => {
   it('names the frame that made the calls it describes', async () => {
     const el = await mount(store, {
       eventId: soqlId,
-      instances: [soqlId],
+      eventIds: [soqlId],
       calledBy: 'MyClass.caller()',
     });
 
@@ -90,7 +90,7 @@ describe('EventVitals', () => {
   });
 
   it('leaves the caller row out when the row named the calls it counts', async () => {
-    const el = await mount(store, { eventId: soqlId, instances: [soqlId] });
+    const el = await mount(store, { eventId: soqlId, eventIds: [soqlId] });
 
     expect(labels(el)).not.toContain('Called by');
   });
@@ -245,7 +245,7 @@ describe('EventVitals', () => {
   });
 
   it('sums across occurrences and reports Calls/Avg self for an aggregate', async () => {
-    const el = await mount(store, { instances: [soqlId, soslId] });
+    const el = await mount(store, { eventIds: [soqlId, soslId] });
     const shown = labels(el);
     expect(shown).toContain('Calls');
     expect(shown).toContain('Avg self');
@@ -309,7 +309,7 @@ describe('EventVitals over a recursive frame', () => {
   it('totals the outermost calls, and averages the self time of every call', async () => {
     const apexLog = await parse(recursiveLog);
     const store = logStoreFor(apexLog);
-    const el = await mount(store, { instances: idsOf(apexLog, 'Rec.walk()') });
+    const el = await mount(store, { eventIds: idsOf(apexLog, 'Rec.walk()') });
 
     expect(valueFor(el, 'Calls')).toBe('2');
     // The outer call is 4ms and holds the 1ms inner call, so summing both totals

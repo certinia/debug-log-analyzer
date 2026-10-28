@@ -40,7 +40,7 @@ const SOBJECT_CARDINALITY_DOC = 'The approximate record count for the queried ob
  * (copyable) then every field it actually has — timing, database counts, heap,
  * governor usage, source — in a fixed order, omitting anything zero/absent so a
  * simple selection stays short. `type` adds the DML/SOQL/SOSL specifics; a set of
- * `instances` (an aggregate row's occurrences) switches to summed-across-calls.
+ * `eventIds` (an aggregate row's occurrences) switches to summed-across-calls.
  */
 @customElement('event-vitals')
 export class EventVitals extends LitElement {
@@ -49,7 +49,7 @@ export class EventVitals extends LitElement {
 
   /** The occurrences' ids when the selection is an aggregate row. */
   @property({ attribute: false })
-  instances: number[] | null = null;
+  eventIds: number[] | null = null;
 
   /** The frame that made the calls the panel describes, where the selecting row
    *  was not it. Empty where the row named the calls it counts. */
@@ -144,14 +144,14 @@ export class EventVitals extends LitElement {
 
     // Ids, not events: an aggregate can name tens of thousands of calls, and the
     // columns read each without an object.
-    const ids = (this.instances?.length ? this.instances : [this.eventId]).filter((id) =>
+    const ids = (this.eventIds?.length ? this.eventIds : [this.eventId]).filter((id) =>
       store.isShown(id),
     );
     const primary = ids[0] === undefined ? null : store.log.event(ids[0]);
     if (!primary) {
       return html`<div class="empty">No details available.</div>`;
     }
-    const isAggregate = (this.instances?.length ?? 0) > 0;
+    const isAggregate = (this.eventIds?.length ?? 0) > 0;
     const { log } = store;
     const { durationTotal, durationSelf } = log.columns;
     // A total nests and a self reading does not, so each sums the set that holds it once.

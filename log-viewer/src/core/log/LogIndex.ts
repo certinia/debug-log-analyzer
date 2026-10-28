@@ -346,21 +346,21 @@ export function buildLogIndex(log: ApexLog, hidden: Uint8Array | null = null): L
 }
 
 /**
- * Self time summed per id over the subtrees of `rows`, or over every row when `rows`
- * is null. `ids[row]` is the row's id, below `idCount`. A row inside an earlier
+ * Self time summed per group over the subtrees of `rows`, or over every row when `rows`
+ * is null. `groupOf[row]` is the row's group, below `groupCount`. A row inside an earlier
  * row's subtree is skipped, so a shared subtree is counted once.
  */
 export function sumSelfBy(
   index: LogIndex,
-  ids: ArrayLike<number>,
-  idCount: number,
+  groupOf: ArrayLike<number>,
+  groupCount: number,
   rows: readonly number[] | null,
 ): Float64Array {
-  const sums = new Float64Array(idCount);
+  const sums = new Float64Array(groupCount);
   const { self, subtreeEnd } = index;
   const add = (from: number, to: number) => {
     for (let row = from; row < to; row++) {
-      sums[ids[row]!]! += self[row]!;
+      sums[groupOf[row]!]! += self[row]!;
     }
   };
   if (!rows) {

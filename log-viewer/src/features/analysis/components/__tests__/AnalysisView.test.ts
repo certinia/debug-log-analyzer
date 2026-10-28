@@ -141,8 +141,8 @@ describe('analysis-view', () => {
         view: 'callers',
         selection: {
           kind: 'aggregate',
-          instances: [...rootRow.instances],
-          frames: [...rootRow.instances],
+          eventIds: [...rootRow.eventIds],
+          frameIds: [...rootRow.eventIds],
           // The root row names the calls it counts, so nothing made them but it.
           calledBy: undefined,
         },
@@ -159,22 +159,22 @@ describe('analysis-view', () => {
     select(throughBA);
 
     const { parent, text } = log.columns;
-    const derived = rootRow.instances.filter((id) => text.at(parent[id]!) === 'B');
+    const derived = rootRow.eventIds.filter((id) => text.at(parent[id]!) === 'B');
     expect(derived).toHaveLength(1);
     expect(seen.map((detail) => detail.selection)).toEqual([
       // Both rows hold the same one call, so the row is what tells them apart:
-      // reached through B, then through the A above B. `frames` is the caller
+      // reached through B, then through the A above B. `frameIds` is the caller
       // each row is, a level up from the call its totals count.
       {
         kind: 'aggregate',
-        instances: derived,
-        frames: [2],
+        eventIds: derived,
+        frameIds: [2],
         calledBy: 'B',
       },
       {
         kind: 'aggregate',
-        instances: derived,
-        frames: [1],
+        eventIds: derived,
+        frameIds: [1],
         calledBy: 'A',
       },
     ]);

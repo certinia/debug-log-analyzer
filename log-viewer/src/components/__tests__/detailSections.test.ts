@@ -154,8 +154,8 @@ describe('buildDetailSections', () => {
   it('scopes an aggregate selection, its findings and its Variables to every occurrence', async () => {
     const sections = await buildDetailSections('analysis', {
       kind: 'aggregate',
-      instances: [11, 12, 13],
-      frames: [11, 12, 13],
+      eventIds: [11, 12, 13],
+      frameIds: [11, 12, 13],
     });
     expect(sections.map((s) => s.id)).toEqual([
       'vitals',
@@ -165,21 +165,21 @@ describe('buildDetailSections', () => {
       'calltree',
     ]);
     expect(
-      (rendered(sections, 'vitals', 'event-vitals') as HTMLElement & { instances: number[] | null })
-        .instances,
+      (rendered(sections, 'vitals', 'event-vitals') as HTMLElement & { eventIds: number[] | null })
+        .eventIds,
     ).toEqual([11, 12, 13]);
     // Where the row sits at the calls' own depth, Variables reads the calls themselves.
     expect(
       (
         rendered(sections, 'variables', 'variables-detail') as HTMLElement & {
-          frames: number[] | null;
+          frameIds: number[] | null;
         }
-      ).frames,
+      ).frameIds,
     ).toEqual([11, 12, 13]);
     const findings = rendered(sections, 'findings', 'log-diagnostics') as HTMLElement & {
-      instances: number[] | null;
+      eventIds: number[] | null;
     };
-    expect(findings.instances).toEqual([11, 12, 13]);
+    expect(findings.eventIds).toEqual([11, 12, 13]);
     // The verdict reads beside the tree rather than being crowded by it.
     expect(sections.find((s) => s.id === 'findings')?.weight).toBe(3);
   });
@@ -189,71 +189,71 @@ describe('buildDetailSections', () => {
   it('gives Variables the frames the row is, not the calls it counts', async () => {
     const sections = await buildDetailSections('analysis', {
       kind: 'aggregate',
-      instances: [11, 12, 13],
-      frames: [4, 5, 6],
+      eventIds: [11, 12, 13],
+      frameIds: [4, 5, 6],
     });
 
     expect(
       (
         rendered(sections, 'variables', 'variables-detail') as HTMLElement & {
-          frames: number[] | null;
+          frameIds: number[] | null;
         }
-      ).frames,
+      ).frameIds,
     ).toEqual([4, 5, 6]);
   });
 
   it('scopes the findings to the frame being followed, not the aggregate it left', async () => {
     const sections = await buildDetailSections(
       'analysis',
-      { kind: 'aggregate', instances: [11, 12, 13], frames: [11, 12, 13] },
+      { kind: 'aggregate', eventIds: [11, 12, 13], frameIds: [11, 12, 13] },
       { kind: 'event', eventId: 8 },
     );
 
     const findings = rendered(sections, 'findings', 'log-diagnostics') as HTMLElement & {
-      instances: number[] | null;
+      eventIds: number[] | null;
     };
-    expect(findings.instances).toEqual([8]);
+    expect(findings.eventIds).toEqual([8]);
   });
 
   it('scopes the namespace split to every occurrence of an aggregate', async () => {
     const sections = await buildDetailSections('timeline', {
       kind: 'aggregate',
-      instances: [11, 12, 13],
-      frames: [11, 12, 13],
+      eventIds: [11, 12, 13],
+      frameIds: [11, 12, 13],
     });
 
     const bar = rendered(sections, 'namespace-time', 'namespace-time-bar') as HTMLElement & {
-      instances: number[] | null;
+      eventIds: number[] | null;
     };
-    expect(bar.instances).toEqual([11, 12, 13]);
+    expect(bar.eventIds).toEqual([11, 12, 13]);
   });
 
   it('drops the aggregate once a single frame in its stack is the one being followed', async () => {
     const sections = await buildDetailSections(
       'analysis',
-      { kind: 'aggregate', instances: [11, 12, 13], frames: [11, 12, 13] },
+      { kind: 'aggregate', eventIds: [11, 12, 13], frameIds: [11, 12, 13] },
       { kind: 'event', eventId: 8 },
     );
 
     const vitals = rendered(sections, 'vitals', 'event-vitals') as HTMLElement & {
-      instances: number[] | null;
+      eventIds: number[] | null;
     };
     expect(vitals.getAttribute('eventId')).toBe('8');
-    expect(vitals.instances).toBeNull();
+    expect(vitals.eventIds).toBeNull();
     expect(vitals.getAttribute('called-by')).toBe('');
   });
 
   it('describes the calls a walked bucket counts, as a bucket picked in the tab is', async () => {
     const sections = await buildDetailSections(
       'analysis',
-      { kind: 'aggregate', instances: [11, 12, 13], frames: [11, 12, 13] },
-      { kind: 'aggregate', instances: [21, 22], frames: [21, 22], calledBy: 'Trigger1' },
+      { kind: 'aggregate', eventIds: [11, 12, 13], frameIds: [11, 12, 13] },
+      { kind: 'aggregate', eventIds: [21, 22], frameIds: [21, 22], calledBy: 'Trigger1' },
     );
 
     const vitals = rendered(sections, 'vitals', 'event-vitals') as HTMLElement & {
-      instances: number[] | null;
+      eventIds: number[] | null;
     };
-    expect(vitals.instances).toEqual([21, 22]);
+    expect(vitals.eventIds).toEqual([21, 22]);
     expect(vitals.getAttribute('eventId')).toBe('21');
     expect(vitals.getAttribute('called-by')).toBe('Trigger1');
   });

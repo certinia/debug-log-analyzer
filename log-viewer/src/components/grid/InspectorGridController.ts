@@ -23,7 +23,7 @@ export interface InspectorGridOptions<R extends object> {
   /** The rows on screen; a new one marks the rows again. */
   source: () => unknown;
   /** The frames a row stands for, which hovering it marks in the tab on screen. */
-  frames: (row: R) => readonly number[];
+  frameIds: (row: R) => readonly number[];
   /** What picking a row does: reveal its frame, or hold a mark on the frames it merges. */
   pick: (row: R | null) => void;
   /** The frame the row menu acts on; null leaves the browser's own menu. */
@@ -128,7 +128,7 @@ export class InspectorGridController<R extends object> implements ReactiveContro
 
   private readonly _onLocate = (e: CustomEvent<GridRowDetail<R>>): void => {
     const { row } = e.detail;
-    dispatchInspectorLocate(this._host, row ? this._options.frames(row) : []);
+    dispatchInspectorLocate(this._host, row ? this._options.frameIds(row) : []);
   };
 
   private readonly _onContext = (e: CustomEvent<GridContextDetail<R>>): void => {

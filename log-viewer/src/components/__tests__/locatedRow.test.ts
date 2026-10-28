@@ -46,7 +46,7 @@ describe('rowDetailSelection', () => {
     const bucket = treeRow({
       key: 'soql',
       _pathId: bucketPath,
-      instances: [soql],
+      eventIds: [soql],
       eventId: soql,
       text: 'soql',
     });
@@ -68,8 +68,8 @@ describe('rowDetailSelection', () => {
 
     expect(rowDetailSelection(caller, read, store, 'callers')).toEqual({
       kind: 'aggregate',
-      instances: [soql],
-      frames: [m1],
+      eventIds: [soql],
+      frameIds: [m1],
       calledBy: 'm1',
     });
   });
@@ -79,8 +79,8 @@ describe('rowDetailSelection', () => {
 
     expect(rowDetailSelection(bucket, read, store, 'callers')).toEqual({
       kind: 'aggregate',
-      instances: [soql],
-      frames: [soql],
+      eventIds: [soql],
+      frameIds: [soql],
       calledBy: undefined,
     });
   });
@@ -89,8 +89,8 @@ describe('rowDetailSelection', () => {
     const { store, caller, soql } = await rows();
 
     expect(rowDetailSelection(caller, read, store, 'callees')).toMatchObject({
-      instances: [soql],
-      frames: [soql],
+      eventIds: [soql],
+      frameIds: [soql],
     });
   });
 

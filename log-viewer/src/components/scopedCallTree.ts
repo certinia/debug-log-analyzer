@@ -329,25 +329,25 @@ async function realSubtree(
  * selection at the top of the log has no path and stands as its own root.
  */
 async function pathRoots(
-  selected: readonly number[],
+  selectedIds: readonly number[],
   subtrees: readonly ScopedRow[],
   source: Rows,
   tick: Tick,
 ): Promise<ScopedRow[] | null> {
   const { index } = source;
   const roots: ScopedRow[] = [];
-  // One event has one parent, so it sits at one place in the tree: a flat index
+  // One row has one parent, so it sits at one place in the tree: a flat map
   // is enough to join the paths where they meet.
-  const rowByEvent = new Map<number, ScopedRow>();
+  const nodeByRow = new Map<number, ScopedRow>();
 
   // Counted per node, not per occurrence: one occurrence costs a walk of its
   // whole ancestor chain, so a deep stack would otherwise overrun the slice.
   let steps = 0;
-  for (let i = 0; i < selected.length; i++) {
+  for (let i = 0; i < selectedIds.length; i++) {
     if (steps++ % CHECK_EVERY === 0 && !(await tick())) {
       return null;
     }
-    const at = index.rowOf(selected[i]!);
+    const at = index.rowOf(selectedIds[i]!);
     const contributed = index.total[at]!;
 
     // Outermost first.
@@ -362,15 +362,15 @@ async function pathRoots(
         return null;
       }
       const ancestor = ancestors[a]!;
-      let row = rowByEvent.get(ancestor);
-      if (!row) {
-        row = frameRow(source, ancestor, true);
-        rowByEvent.set(ancestor, row);
-        into.push(row);
+      let node = nodeByRow.get(ancestor);
+      if (!node) {
+        node = frameRow(source, ancestor, true);
+        nodeByRow.set(ancestor, node);
+        into.push(node);
       }
-      row.duration.total += contributed;
-      row.callCount += 1;
-      into = row._children as ScopedRow[];
+      node.duration.total += contributed;
+      node.callCount += 1;
+      into = node._children as ScopedRow[];
     }
     into.push(subtrees[i]!);
   }
@@ -413,7 +413,7 @@ async function subtreeRoots(
  */
 export async function buildScopedCallTree(
   eventId: number,
-  instances: number[] | null | undefined,
+  eventIds: number[] | null | undefined,
   options: FrameBudgetOptions,
 ): Promise<ScopedCallTree | null> {
   const store = currentLogStore();
@@ -426,11 +426,11 @@ export async function buildScopedCallTree(
 
   // An aggregate selection scopes to every occurrence of the frame; a single
   // selection to just itself.
-  const eventIds = instances?.length ? instances : eventId >= 0 ? [eventId] : [];
+  const askedIds = eventIds?.length ? eventIds : eventId >= 0 ? [eventId] : [];
   // An occurrence inside another would otherwise be walked once per enclosing call.
   const selectedIds = outermostIds(
     apexLog,
-    eventIds.filter((id) => store.isShown(id)),
+    askedIds.filter((id) => store.isShown(id)),
   );
   if (!selectedIds.length) {
     return null;
@@ -661,9 +661,9 @@ function liveWindow(
 
   const readLog = async (tick: Tick): Promise<boolean> => {
     const walked = await framesOf(scope.roots, tick);
-    const built = walked && (await CallSpans.build(index, walked.frames, tick));
-    const roots = built && (await SpanIndex.build(index, walked.roots, undefined, tick));
-    const pinned = roots && (await SpanIndex.build(index, walked.pinned, undefined, tick));
+    const built = walked && (await CallSpans.build(index, walked.frameIds, tick));
+    const roots = built && (await SpanIndex.build(index, walked.rootIds, undefined, tick));
+    const pinned = roots && (await SpanIndex.build(index, walked.pinnedIds, undefined, tick));
     if (!pinned) {
       return false;
     }
@@ -779,9 +779,9 @@ function liveWindow(
 async function framesOf(
   roots: readonly ScopedRow[],
   tick: Tick,
-): Promise<{ frames: number[]; roots: number[]; pinned: number[] } | null> {
-  const frames: number[] = [];
-  const pinned: number[] = [];
+): Promise<{ frameIds: number[]; rootIds: number[]; pinnedIds: number[] } | null> {
+  const frameIds: number[] = [];
+  const pinnedIds: number[] = [];
   const stack = [...roots];
   let steps = 0;
   while (stack.length) {
@@ -792,11 +792,11 @@ async function framesOf(
     const kind = eventKind(row.type);
     if (kind === 'pinned') {
       // What a pinned block holds is pinned too, and already inside its span.
-      pinned.push(row.eventId);
+      pinnedIds.push(row.eventId);
       continue;
     }
     if (kind === 'frame') {
-      frames.push(row.eventId);
+      frameIds.push(row.eventId);
     }
     if (row._children) {
       for (const child of row._children) {
@@ -804,7 +804,7 @@ async function framesOf(
       }
     }
   }
-  return { frames, roots: roots.map((row) => row.eventId), pinned };
+  return { frameIds, rootIds: roots.map((row) => row.eventId), pinnedIds };
 }
 
 /** Top-down aggregation: merge sibling frames sharing a key, summing metrics. */

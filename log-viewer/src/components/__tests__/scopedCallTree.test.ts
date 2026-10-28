@@ -120,19 +120,17 @@ const chain = (): Span[] => [
  *  is only there to satisfy the contract. */
 const options: FrameBudgetOptions = { yieldSlice: () => Promise.resolve() };
 
-function build(eventId: number, instances?: number[]) {
-  return buildScopedCallTree(eventId, instances ?? null, options);
+function build(eventId: number, eventIds?: number[]) {
+  return buildScopedCallTree(eventId, eventIds ?? null, options);
 }
 
 /** A statement called from a loop after the chain: `count` occurrences of the
  *  same frame, 1 ns each. */
-async function loopLog(
-  count: number,
-): Promise<{ log: ApexLog; loop: number; instances: number[] }> {
+async function loopLog(count: number): Promise<{ log: ApexLog; loop: number; eventIds: number[] }> {
   const calls = Array.from({ length: count }, (_, i) => query(1000 + i, 1001 + i));
   const log = await load(...chain(), method('loop', 1000, 1000 + count, ...calls));
   const loop = frame(log, 'loop');
-  return { log, loop, instances: childIds(log, loop) };
+  return { log, loop, eventIds: childIds(log, loop) };
 }
 
 /** Every row's type, whole tree. */
@@ -273,8 +271,8 @@ describe('buildScopedCallTree', () => {
   });
 
   it('merges one caller for every occurrence it made', async () => {
-    const { instances } = await loopLog(4);
-    const tree = (await build(instances[0]!, instances))!;
+    const { eventIds } = await loopLog(4);
+    const tree = (await build(eventIds[0]!, eventIds))!;
 
     const roots = (await tree.timeOrder(options))!;
     expect(roots.map((r) => r.text)).toEqual(['loop']);
@@ -289,9 +287,9 @@ describe('buildScopedCallTree', () => {
     // #877's removal note). No cap exists any more, so every occurrence must
     // still be represented.
     const OCCURRENCES = 500;
-    const { instances } = await loopLog(OCCURRENCES);
+    const { eventIds } = await loopLog(OCCURRENCES);
 
-    const tree = (await build(instances[0]!, instances))!;
+    const tree = (await build(eventIds[0]!, eventIds))!;
     expect(tree.rootTotal).toBe(OCCURRENCES);
 
     // Every occurrence merges into a single aggregated row, counting every call.
@@ -359,7 +357,7 @@ describe('buildScopedCallTree', () => {
   });
 
   it('a merged row names every occurrence behind it, so all of them can be marked', async () => {
-    const { loop, instances } = await loopLog(3);
+    const { loop, eventIds } = await loopLog(3);
     // The loop, so its three calls merge into one row inside the scope.
     const tree = (await build(loop))!;
 
@@ -367,13 +365,13 @@ describe('buildScopedCallTree', () => {
     // The selection names its own one frame; the group beneath it merges all
     // three occurrences.
     expect(aggregated?.eventIds).toEqual([loop]);
-    expect(aggregated?._children?.[0]?.eventIds).toEqual(instances);
+    expect(aggregated?._children?.[0]?.eventIds).toEqual(eventIds);
 
     const [bottomUp] = (await tree.bottomUp(options))!;
-    expect(bottomUp?.eventIds).toEqual(instances);
+    expect(bottomUp?.eventIds).toEqual(eventIds);
     // A caller row stands for the calls it conducted, which is what its time and
     // its count are taken from, so it names those rather than its own frame.
-    expect(locatableEventIds(bottomUp?._children?.[0])).toEqual(instances);
+    expect(locatableEventIds(bottomUp?._children?.[0])).toEqual(eventIds);
   });
 
   it('a single-frame row carries no list — its one occurrence is the row itself', async () => {
@@ -385,7 +383,7 @@ describe('buildScopedCallTree', () => {
 
   it('counts every occurrence even when the walk is sliced across frames', async () => {
     const OCCURRENCES = 50;
-    const { instances } = await loopLog(OCCURRENCES);
+    const { eventIds } = await loopLog(OCCURRENCES);
     let yields = 0;
     const sliced: FrameBudgetOptions = {
       yieldSlice: () => {
@@ -400,7 +398,7 @@ describe('buildScopedCallTree', () => {
     let time = 0;
     clock.mockImplementation(() => (time += 100));
     try {
-      const tree = (await buildScopedCallTree(instances[0]!, instances, sliced))!;
+      const tree = (await buildScopedCallTree(eventIds[0]!, eventIds, sliced))!;
       const [aggregated] = (await tree.aggregated(sliced))!;
       expect(aggregated?.callCount).toBe(OCCURRENCES);
       expect(aggregated?.duration.total).toBe(OCCURRENCES);
@@ -411,13 +409,13 @@ describe('buildScopedCallTree', () => {
   });
 
   it('abandons a superseded walk instead of finishing it', async () => {
-    const { instances } = await loopLog(500);
+    const { eventIds } = await loopLog(500);
     const clock = jest.spyOn(performance, 'now');
     let time = 0;
     clock.mockImplementation(() => (time += 100));
     try {
       // The first yield is the first chance to notice; nothing is returned after it.
-      const tree = await buildScopedCallTree(instances[0]!, instances, {
+      const tree = await buildScopedCallTree(eventIds[0]!, eventIds, {
         yieldSlice: () => Promise.resolve(),
         signal: AbortSignal.abort(),
       });
@@ -877,12 +875,12 @@ describe('frameEventIds', () => {
   });
 
   it('names one caller frame however many calls it made', async () => {
-    const { loop, instances } = await loopLog(2);
+    const { loop, eventIds } = await loopLog(2);
     const rows = (await (await build(loop))!.bottomUp(options))!;
     const caller = rows[0]!._children![0]!;
 
     // The row counts both calls, and is the single frame that made them.
-    expect(locatableEventIds(caller)).toEqual(instances);
+    expect(locatableEventIds(caller)).toEqual(eventIds);
     expect(frameEventIds(caller)).toEqual([loop]);
   });
 
@@ -908,16 +906,16 @@ describe('revealableEventId', () => {
 describe('bottom-up occurrences', () => {
   it('derives a caller row from the top-level row, holding no calls itself', async () => {
     // The loop and its two calls; the loop itself is the selection.
-    const { loop, instances } = await loopLog(2);
+    const { loop, eventIds } = await loopLog(2);
     const rows = (await (await build(loop))!.bottomUp(options))!;
     const seed = rows[0]!;
     const caller = seed._children![0]!;
 
     // The top-level row owns the occurrences; the caller row stands for the same
     // calls, and reads them back through the chain that reached them.
-    expect(seed.eventIds).toEqual(instances);
+    expect(seed.eventIds).toEqual(eventIds);
     expect(caller.eventIds).toBeNull();
-    expect(locatableEventIds(caller)).toEqual(instances);
+    expect(locatableEventIds(caller)).toEqual(eventIds);
   });
 
   /** The chain, with a limit block under m2 holding its limit line. */

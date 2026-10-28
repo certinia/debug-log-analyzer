@@ -185,7 +185,7 @@ describe('VariablesDetail skips the frame read for an aggregate', () => {
     const store = await logOf(FRAME);
     await mount(store, {
       eventId: idOf(store.log, 'ns.Outer.run()'),
-      frames: [idOf(store.log, 'ns.Outer.run()'), idOf(store.log, 'ns.Outer.run()')],
+      frameIds: [idOf(store.log, 'ns.Outer.run()'), idOf(store.log, 'ns.Outer.run()')],
     });
 
     expect(frameReads.some((read) => read.store === store && read.options === undefined)).toBe(
@@ -816,8 +816,8 @@ describe('VariablesDetail comparing a merged row', () => {
   /** The comparison on screen, once its walk has answered. */
   async function compared(body = CALLS): Promise<VariablesDetail> {
     const store = await logOf(body);
-    const frames = idsOf(store.log, 'ns.Svc.run()');
-    const el = await mount(store, { eventId: frames[0]!, frames });
+    const frameIds = idsOf(store.log, 'ns.Svc.run()');
+    const el = await mount(store, { eventId: frameIds[0]!, frameIds });
     // The comparison is a walk of its own, after the index it reads through.
     await settled(el);
     return el;
@@ -828,9 +828,9 @@ describe('VariablesDetail comparing a merged row', () => {
     let open = (): void => {};
     walkGate = new Promise((resolve) => (open = resolve));
     const store = await logOf(CALLS);
-    const frames = idsOf(store.log, 'ns.Svc.run()');
+    const frameIds = idsOf(store.log, 'ns.Svc.run()');
     const el = document.createElement('variables-detail') as VariablesDetail;
-    Object.assign(el, { logStore: store, eventId: frames[0]!, frames });
+    Object.assign(el, { logStore: store, eventId: frameIds[0]!, frameIds });
     document.body.appendChild(el);
     // Not `mount`: it waits for the comparison, which the gate holds open.
     do {
@@ -1045,7 +1045,7 @@ describe('VariablesDetail comparing a merged row', () => {
     // frame that made them.
     const el = await mount(store, {
       eventId: calls[0]!,
-      frames: [idOf(store.log, 'ns.Outer.run()')],
+      frameIds: [idOf(store.log, 'ns.Outer.run()')],
     });
 
     expect(rowNames(el)).toContain('outerLocal');

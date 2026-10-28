@@ -185,21 +185,19 @@ export async function buildDetailSections(
 
   const isAggregate = selection.kind === 'aggregate';
   // An aggregate scopes to all its occurrences; a single frame to itself.
-  const anchorId = isAggregate ? (selection.instances[0] ?? -1) : selection.eventId;
+  const anchorId = isAggregate ? (selection.eventIds[0] ?? -1) : selection.eventId;
   // A walked row that merges occurrences answers as its own aggregate, keyed on
   // its first occurrence the way a bucket picked in the tab is.
   const activeId =
-    active?.kind === 'aggregate'
-      ? (active.instances[0] ?? anchorId)
-      : (active?.eventId ?? anchorId);
+    active?.kind === 'aggregate' ? (active.eventIds[0] ?? anchorId) : (active?.eventId ?? anchorId);
   // The aggregate Details describes, or none once the walk follows one frame
   // inside it: the aggregate no longer describes what is shown.
   const shown =
     active?.kind === 'aggregate' ? active : isAggregate && activeId === anchorId ? selection : null;
-  const instances = shown?.instances ?? null;
+  const eventIds = shown?.eventIds ?? null;
   // The frames the row is, which is the scope Variables compares: a bottom-up
   // caller row counts its callee's calls, so its locals live a level up.
-  const scopeFrames = shown?.frames ?? null;
+  const frameIds = shown?.frameIds ?? null;
   const calledBy = shown?.calledBy ?? '';
 
   const sections: PaneSection[] = [
@@ -211,7 +209,7 @@ export async function buildDetailSections(
       height: 'md',
       content: html`<event-vitals
         eventId=${activeId}
-        .instances=${instances}
+        .eventIds=${eventIds}
         called-by=${calledBy}
       ></event-vitals>`,
     },
@@ -224,7 +222,7 @@ export async function buildDetailSections(
       // the panel and scrolls, rather than a slot that could crowd the grids.
       weight: 3,
       content: html`<captured-log-scope>
-        <variables-detail eventId=${activeId} .frames=${scopeFrames}></variables-detail>
+        <variables-detail eventId=${activeId} .frameIds=${frameIds}></variables-detail>
       </captured-log-scope>`,
     },
   ];
@@ -233,7 +231,7 @@ export async function buildDetailSections(
     // the frame the user picked.
     sections.push(
       namespaceTimeSection(
-        html`<namespace-time-bar eventId=${activeId} .instances=${instances}></namespace-time-bar>`,
+        html`<namespace-time-bar eventId=${activeId} .eventIds=${eventIds}></namespace-time-bar>`,
         { height: 'sm' },
       ),
     );
@@ -247,7 +245,7 @@ export async function buildDetailSections(
       // The verdict on the selected row, so it reads beside the tree rather than
       // being crowded down to its header by it.
       weight: 3,
-      content: html`<log-diagnostics .instances=${instances ?? [activeId]}></log-diagnostics>`,
+      content: html`<log-diagnostics .eventIds=${eventIds ?? [activeId]}></log-diagnostics>`,
     });
   }
   sections.push(
@@ -266,7 +264,7 @@ export async function buildDetailSections(
       weight: 4,
       content: html`<call-tree-detail
         eventId=${anchorId}
-        .instances=${isAggregate ? selection.instances : null}
+        .eventIds=${isAggregate ? selection.eventIds : null}
         activeEventId=${activeId}
         .source=${source}
         .sourceView=${sourceView}

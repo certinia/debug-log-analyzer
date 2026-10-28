@@ -28,12 +28,9 @@ describe('outermostSum', () => {
     );
     const id = (text: string): number => idOf(log, text);
     const total = (eventId: number): number => log.columns.durationTotal[eventId] ?? 0;
-    const rows = [
-      { instances: [id('deeper'), id('loose')] },
-      { instances: [id('deep'), id('top')] },
-    ];
+    const rows = [{ eventIds: [id('deeper'), id('loose')] }, { eventIds: [id('deep'), id('top')] }];
     expect(run(outermostSum(log, total), rows)).toBe(21);
-    const rest = [{ instances: [id('deeper'), id('loose')] }, { instances: [id('deep')] }];
+    const rest = [{ eventIds: [id('deeper'), id('loose')] }, { eventIds: [id('deep')] }];
     expect(run(outermostSum(log, total), rest)).toBe(6);
     expect(
       run(
@@ -53,7 +50,7 @@ describe('outermostSum', () => {
         ids.push(eventId);
       }
     }
-    const out = outermostSum<{ instances: number[] }>(log, () => 1).of([{ instances: ids }]);
+    const out = outermostSum<{ eventIds: number[] }>(log, () => 1).of([{ eventIds: ids }]);
     if (typeof out === 'number') {
       throw new Error('expected a generator');
     }

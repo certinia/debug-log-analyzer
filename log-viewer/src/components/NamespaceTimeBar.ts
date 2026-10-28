@@ -49,7 +49,7 @@ export class NamespaceTimeBar extends LitElement {
 
   /** Every occurrence of an aggregated row, summed as one scope. */
   @property({ attribute: false })
-  instances: number[] | null = null;
+  eventIds: number[] | null = null;
 
   /** The log on screen, from the app root. */
   @consume({ context: logContext, subscribe: true })
@@ -64,8 +64,8 @@ export class NamespaceTimeBar extends LitElement {
       const [index, column] = await Promise.all([store.logIndex(), store.derive(namespaceColumn)]);
       return { store, slices: namespaceSelfTimes(index, column, scopeRows(index, scope)) };
     },
-    // Instances win over the frame, so stepping through them is no new scope.
-    args: () => [this.logStore, this.instances?.length ? this.instances : this.eventId],
+    // Occurrences win over the frame, so stepping through them is no new scope.
+    args: () => [this.logStore, this.eventIds?.length ? this.eventIds : this.eventId],
   });
 
   private readonly _window = new WindowStatsController(this, () => this.logStore ?? null);
@@ -109,7 +109,7 @@ export class NamespaceTimeBar extends LitElement {
 
   /** True where the section answers for a picked frame or aggregate. */
   private _selected(): boolean {
-    return this.eventId >= 0 || !!this.instances?.length;
+    return this.eventId >= 0 || !!this.eventIds?.length;
   }
 
   /** True where the window is the scope. A selection wins over it: a picked
