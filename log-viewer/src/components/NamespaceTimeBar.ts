@@ -7,7 +7,7 @@ import { LitElement, html } from 'lit';
 import { customElement, property } from 'lit/decorators.js';
 
 import { logContext } from '#core/log/logContext.js';
-import { WindowStatsController } from '#core/log/windowStats.js';
+import { WINDOW_UNREADABLE_TEXT, WindowStatsController } from '#core/log/windowStats.js';
 import { type LogIndex, NO_ROW } from '#core/log/LogIndex.js';
 import type { LogStore } from '#core/log/LogStore.js';
 import { globalStyles } from '../styles/global.styles.js';
@@ -75,6 +75,9 @@ export class NamespaceTimeBar extends LitElement {
   render() {
     let slices: NamespaceTime[] | null;
     if (this._windowScoped()) {
+      if (this._window.failed) {
+        return html`<p class="note">${WINDOW_UNREADABLE_TEXT}</p>`;
+      }
       const windowed = this._window.stats;
       slices = windowed ? toNamespaceTimes(windowed.selfByNamespace) : null;
     } else {

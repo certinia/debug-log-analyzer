@@ -320,17 +320,52 @@ describe('WindowStatsController', () => {
     expect([...(window.stats?.selfByCategory.keys() ?? [])]).toEqual(['DML']);
   });
 
-  it('keeps waiting on a log it cannot read, without reading it again', async () => {
+  it('stops waiting on a log it cannot read, without reading it again', async () => {
     const store = await storeOf(apex(0, 1_000));
     const derive = jest.spyOn(store, 'derive').mockRejectedValue(new Error('unreadable'));
-    const { window } = connected(() => store);
+    const { window, host } = connected(() => store);
     setRange({ start: 0, end: 500 });
+    const render = jest.spyOn(host, 'requestUpdate');
 
     void window.stats;
     await new Promise((resolve) => setTimeout(resolve, 0));
     void window.stats;
 
-    expect(window.pending).toBe(true);
+    expect(window.pending).toBe(false);
+    expect(window.failed).toBe(true);
+    expect(render).toHaveBeenCalled();
     expect(derive).toHaveBeenCalledTimes(1);
+  });
+
+  it('drops a failed read once the whole log is the scope again', async () => {
+    const store = await storeOf(apex(0, 1_000));
+    jest.spyOn(store, 'derive').mockRejectedValue(new Error('unreadable'));
+    const { window } = connected(() => store);
+    setRange({ start: 0, end: 500 });
+    void window.stats;
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    setRange(null);
+
+    expect(window.failed).toBe(false);
+  });
+
+  it('reads the next log after one it could not read', async () => {
+    const failing = await storeOf(apex(0, 1_000));
+    const next = await storeOf(dml(0, 1_000));
+    jest.spyOn(failing, 'derive').mockRejectedValue(new Error('unreadable'));
+    let store = failing;
+    const { window } = connected(() => store);
+    setRange({ start: 0, end: 1_000 });
+    void window.stats;
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(window.failed).toBe(true);
+
+    store = next;
+    expect(window.failed).toBe(false);
+    expect(window.pending).toBe(true);
+    await next.derive(windowIndex);
+
+    expect([...(window.stats?.selfByCategory.keys() ?? [])]).toEqual(['DML']);
   });
 });

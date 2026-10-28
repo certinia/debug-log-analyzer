@@ -7,7 +7,7 @@ import { customElement, property } from 'lit/decorators.js';
 
 import { DerivedValue } from '#core/log/DerivedValue.js';
 import { logContext } from '#core/log/logContext.js';
-import { WindowStatsController } from '#core/log/windowStats.js';
+import { WINDOW_UNREADABLE_TEXT, WindowStatsController } from '#core/log/windowStats.js';
 import type { LogStore } from '#core/log/LogStore.js';
 import { apexLimitSeries } from '../features/timeline/optimised/apex-limit-series.js';
 import { globalStyles } from '../styles/global.styles.js';
@@ -75,8 +75,13 @@ export class LogOverview extends LitElement {
         ?pending=${this._series.pending}
       ></section-skeleton>`;
     }
-    if (!this.wholeLog && this._window.pending) {
-      return html`<p class="note">Adding up the governor usage…</p>`;
+    if (!this.wholeLog) {
+      if (this._window.pending) {
+        return html`<p class="note">Adding up the governor usage…</p>`;
+      }
+      if (this._window.failed) {
+        return html`<p class="note">${WINDOW_UNREADABLE_TEXT}</p>`;
+      }
     }
     const window = this.wholeLog ? null : this._window.counts;
     const gauges = seriesGauges(series, window ?? undefined);

@@ -454,6 +454,8 @@ function add(totals: Map<string, number>, key: string, value: number): void {
   totals.set(key, (totals.get(key) ?? 0) + value);
 }
 
+type IndexState = WindowIndex | 'building' | 'failed';
+
 /**
  * The stats for the window on screen.
  *
@@ -461,13 +463,16 @@ function add(totals: Map<string, number>, key: string, value: number): void {
  * stats from the log's index rather than holding a copy: the index is built on
  * the first window and shared, so every window after it is answered inside the
  * frame that asked.
+ *
+ * Check {@link pending}, then {@link failed}, before reading {@link stats} or
+ * {@link counts}: their null is not the whole log while a window is on screen.
  */
 export class WindowStatsController {
   private readonly _range: RangeScopeController;
   private readonly _host: ReactiveControllerHost;
   private readonly _store: () => LogStore | null;
   // Weak, so a replaced store is not kept alive.
-  private readonly _indexes = new WeakMap<LogStore, WindowIndex | null>();
+  private readonly _indexes = new WeakMap<LogStore, IndexState>();
 
   constructor(host: ReactiveControllerHost, store: () => LogStore | null) {
     this._host = host;
@@ -480,48 +485,60 @@ export class WindowStatsController {
     return this._range.window;
   }
 
-  /** The window's stats, or null while they are still being added up. Always
-   *  null where {@link window} is. */
+  /** The window's stats, or null while they are still being added up or where
+   *  they could not be. Always null where {@link window} is. */
   get stats(): WindowStats | null {
     const window = this._range.window;
     return window ? (this._index()?.statsFor(window) ?? null) : null;
   }
 
   /** The window's statement counts beside the whole log's, or null where the
-   *  whole log is the scope. */
+   *  whole log is the scope, while they are still being added up, or where they
+   *  could not be. */
   get counts(): { counts: WindowCounts; logCounts: WindowCounts } | null {
     const window = this._range.window;
     const index = window ? this._index() : null;
     return index && window ? { counts: index.countsFor(window), logCounts: index.logCounts } : null;
   }
 
-  /** True while a window is on screen and its stats are not ready yet. */
+  /** True while a window is on screen and its stats are still being built. */
   get pending(): boolean {
-    return this._range.window !== null && this._index() === null;
+    return this._range.window !== null && this._state() === 'building';
   }
 
-  /** The log's index, or null while it builds; the first ask starts the build. */
+  /** True where a window is on screen and the log could not be read for it. */
+  get failed(): boolean {
+    return this._range.window !== null && this._state() === 'failed';
+  }
+
   private _index(): WindowIndex | null {
+    const state = this._state();
+    return state instanceof WindowIndex ? state : null;
+  }
+
+  // Starts the build on the first ask.
+  private _state(): IndexState {
     const store = this._store();
     if (!store) {
-      return null;
+      return 'building';
     }
     const held = this._indexes.get(store);
     if (held !== undefined) {
       return held;
     }
-    this._indexes.set(store, null);
-    void store
-      .derive(windowIndex)
-      .then((index) => {
-        this._indexes.set(store, index);
-        if (this._store() === store) {
-          this._host.requestUpdate();
-        }
-      })
-      // A build only fails on a log the parser cannot walk. The section keeps
-      // its "adding up" note rather than retrying it every render.
-      .catch(() => {});
-    return null;
+    this._indexes.set(store, 'building');
+    const settle = (state: IndexState) => {
+      this._indexes.set(store, state);
+      if (this._store() === store) {
+        this._host.requestUpdate();
+      }
+    };
+    // A build only fails on a log the parser cannot walk, so it is not retried every render.
+    void store.derive(windowIndex).then(settle, () => settle('failed'));
+    return 'building';
   }
 }
+
+/** What a section says where {@link WindowStatsController.failed} is true. */
+export const WINDOW_UNREADABLE_TEXT =
+  'Could not add up the part of the log on screen. Clear any measured range and zoom the Timeline out to read the whole log.';

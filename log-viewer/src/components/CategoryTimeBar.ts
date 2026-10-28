@@ -7,7 +7,7 @@ import { customElement, property } from 'lit/decorators.js';
 
 import { DerivedValue } from '#core/log/DerivedValue.js';
 import { logContext } from '#core/log/logContext.js';
-import { WindowStatsController } from '#core/log/windowStats.js';
+import { WINDOW_UNREADABLE_TEXT, WindowStatsController } from '#core/log/windowStats.js';
 import type { Derivation, LogStore } from '#core/log/LogStore.js';
 import { globalStyles } from '../styles/global.styles.js';
 import './SectionSkeleton.js';
@@ -44,6 +44,9 @@ export class CategoryTimeBar extends LitElement {
   render() {
     if (this._window.pending) {
       return html`<p class="note">Adding up the self time…</p>`;
+    }
+    if (this._window.failed) {
+      return html`<p class="note">${WINDOW_UNREADABLE_TEXT}</p>`;
     }
     const windowed = this._window.stats;
     const slices = windowed ? categorySelfTimes(windowed.selfByCategory) : this._slices.value;

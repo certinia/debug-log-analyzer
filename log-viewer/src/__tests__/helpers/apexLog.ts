@@ -2,9 +2,11 @@
  * Copyright (c) 2026 Certinia Inc. All rights reserved.
  */
 import { type ApexLog, LEVEL, parse } from '@apexdevtools/apex-log-parser';
+import { jest } from '@jest/globals';
 
 import type { LogIndex } from '#core/log/LogIndex.js';
 import { logStoreFor, type Derivation, type LogStore } from '#core/log/LogStore.js';
+import { windowIndex } from '#core/log/windowStats.js';
 
 /**
  * The header line, which decides what the log records. The level comes from the
@@ -75,6 +77,16 @@ export function stubStore(log: ApexLog): LogStore {
     levelGap: () => null,
   } as unknown as LogStore;
   return store;
+}
+
+/** Fails `store`'s build of the window index, as a log the parser cannot walk does. */
+export function failWindowIndex(store: LogStore): void {
+  const derive = store.derive.bind(store);
+  jest
+    .spyOn(store, 'derive')
+    .mockImplementation((fn) =>
+      fn === windowIndex ? Promise.reject(new Error('unreadable')) : derive(fn),
+    );
 }
 
 /** The id of the first event whose text is `text`. */
