@@ -136,7 +136,7 @@ describe('LogEventCache', () => {
       expect(first.lineAt).toHaveBeenCalledTimes(1);
       // An edit gives the document a new version, so its lines are read again; reused, hello stays on line 0.
       const edited = LogEventCache.linesOf(apexLog, doc(2, ['an inserted line', HELLO]));
-      expect([...edited.start]).toEqual([-1, 1]);
+      expect([...edited.startLine]).toEqual([-1, 1]);
     });
   });
 

@@ -26,7 +26,7 @@ function row(name: string, value: string, over: Partial<VariableRow> = {}): Vari
 
 const frame: FrameVariables = {
   frameLabel: 'ns.Outer.run()',
-  cut: 100,
+  readAt: 100,
   thisType: 'ns.Outer',
   thisRow: null,
   locals: [row('total', '42'), row('held', '{"a":1,"b":2}')],
@@ -94,7 +94,7 @@ describe('toTreeRows', () => {
       closed,
       {
         resolve: (address) =>
-          address === '0xabc' ? { text: '{"n":1}', laterAt: null } : NOT_RECORDED,
+          address === '0xabc' ? { text: '{"n":1}', laterWriteId: null } : NOT_RECORDED,
       },
     );
 
@@ -169,7 +169,7 @@ describe('the this group', () => {
 describe('toTreeRows references', () => {
   const held = row('view', '{"m_tliFilter":"0x6c98700c","n":1}');
   const resolve = (address: string): AddressState =>
-    address === '0x6c98700c' ? { text: '{"RowLimit":3000}', laterAt: null } : NOT_RECORDED;
+    address === '0x6c98700c' ? { text: '{"RowLimit":3000}', laterWriteId: null } : NOT_RECORDED;
 
   it('reads a field holding a reference as the object it names', () => {
     const rows = toTreeRows({ ...frame, locals: [held] }, openAll, { resolve });
@@ -200,13 +200,13 @@ describe('toTreeRows references', () => {
   // separate event, which may land after the frame the reader picked.
   it('tells an address the log never wrote down from one it wrote later', () => {
     const later = toTreeRows({ ...frame, locals: [held] }, openAll, {
-      resolve: () => ({ text: null, laterAt: 91 }),
+      resolve: () => ({ text: null, laterWriteId: 91 }),
     });
 
     const entry = later.find((r) => r.id === 'local/view/0');
     expect(entry?.kind === 'entry' && entry.resolved).toBe(false);
-    // The eventIndex, so the row can name the frame that records it.
-    expect(entry?.kind === 'entry' && entry.laterAt).toBe(91);
+    // The id of the later write, so the row can name the frame that records it.
+    expect(entry?.kind === 'entry' && entry.laterWriteId).toBe(91);
   });
 
   // A resolved object may name the address it was reached through.
@@ -219,7 +219,7 @@ describe('toTreeRows references', () => {
       openAll,
       {
         resolve: (address) =>
-          address === '0xaaa' ? { text: '{"self":"0xaaa"}', laterAt: null } : NOT_RECORDED,
+          address === '0xaaa' ? { text: '{"self":"0xaaa"}', laterWriteId: null } : NOT_RECORDED,
       },
     );
 
@@ -439,7 +439,7 @@ describe('toSpreadRows', () => {
         calls,
         at: [100 + index],
         runs: 1,
-        cut: 100 + index,
+        readAt: 100 + index,
       })),
       calls: values.reduce((sum, [, calls]) => sum + calls, 0),
       unassigned: 0,
@@ -574,14 +574,16 @@ describe('toSpreadRows', () => {
   it("reads an address as the object the value's own call recorded", () => {
     const held = spread('ref', [['0xabc', 340]]);
     held.values[0]!.address = '0xabc';
-    held.values[0]!.cut = 42;
+    held.values[0]!.readAt = 42;
     const asked: number[] = [];
 
-    const rows = toSpreadRows({ ...aggregate, locals: [held] }, openAll, (cut) => {
-      asked.push(cut);
+    const rows = toSpreadRows({ ...aggregate, locals: [held] }, openAll, (readAt) => {
+      asked.push(readAt);
       return {
         resolve: (address) =>
-          address === '0xabc' && cut === 42 ? { text: '{"n":1}', laterAt: null } : NOT_RECORDED,
+          address === '0xabc' && readAt === 42
+            ? { text: '{"n":1}', laterWriteId: null }
+            : NOT_RECORDED,
       };
     });
 
@@ -596,10 +598,10 @@ describe('toSpreadRows', () => {
   it("opens a serialised value into the index's fields for its object", () => {
     const held = spread('opts', [['{"name":"A"}', 340]]);
     held.values[0]!.objectAddress = '0xf00';
-    held.values[0]!.cut = 7;
+    held.values[0]!.readAt = 7;
 
-    const rows = toSpreadRows({ ...aggregate, locals: [held] }, openAll, (cut) => ({
-      fields: (address) => (address === '0xf00' && cut === 7 ? [row('tries', '3')] : []),
+    const rows = toSpreadRows({ ...aggregate, locals: [held] }, openAll, (readAt) => ({
+      fields: (address) => (address === '0xf00' && readAt === 7 ? [row('tries', '3')] : []),
       classOf: (address) => (address === '0xf00' ? 'ns.Options' : null),
     }));
 

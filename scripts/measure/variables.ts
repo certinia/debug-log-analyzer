@@ -65,8 +65,8 @@ export async function measureVariables(log: ApexLog): Promise<void> {
   line('worst frame', `${childCount[worst]!.toLocaleString()} children`);
 
   // Timed before anything else reads the frame, so this is a first ask. Only the
-  // lines before the cut answer, so selecting the first line inside the frame
-  // must not cost what reading the whole frame does.
+  // lines before the selected one are read, so selecting the first line inside the
+  // frame must not cost what reading the whole frame does.
   if (childCount[worst]! > 0) {
     await time('worst frame, first line', () => frameVariablesFor(store, worst + 1));
   }

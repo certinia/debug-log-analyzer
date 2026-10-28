@@ -58,10 +58,10 @@ export interface SpreadValue {
   /** Runs of consecutive calls that held it. One run is a phase the calls
    *  passed through; more is a value that came and went. */
   runs: number;
-  /** The point the first call that held it read at, so an address can be
-   *  resolved and an object opened. Each call read at its own point, so this is
+  /** The event id the first call that held it read at, so an address can be
+   *  resolved and an object opened. Each call read at its own event, so this is
    *  the one call the object is shown as. */
-  cut: number;
+  readAt: number;
 }
 
 /** One name, across the calls the row counts. */
@@ -143,10 +143,10 @@ async function compareFrames(
     }
     truncated ||= frame.truncated;
     for (const row of frame.locals) {
-      hold(locals, row, eventIndex, read, frame.cut);
+      hold(locals, row, eventIndex, read, frame.readAt);
     }
     for (const row of frame.fields) {
-      hold(fields, row, eventIndex, read, frame.cut);
+      hold(fields, row, eventIndex, read, frame.readAt);
     }
     read++;
     if (frame.thisType) {
@@ -178,7 +178,7 @@ async function compareFrames(
  * @param at - the call's eventIndex, for the mark
  * @param ordinal - which call it is among those read, so a value's runs can be
  *   counted without holding the whole sequence
- * @param cut - the point that call read at, kept for the first call to hold a
+ * @param readAt - the event id that call read at, kept for the first call to hold a
  *   value so its object can be opened
  */
 function hold(
@@ -186,7 +186,7 @@ function hold(
   row: VariableRow,
   at: number,
   ordinal: number,
-  cut: number,
+  readAt: number,
 ): void {
   let held = into.get(row.name);
   if (!held) {
@@ -236,7 +236,7 @@ function hold(
         calls: 1,
         at: [at],
         runs: 1,
-        cut,
+        readAt,
       },
       previous: ordinal,
     });

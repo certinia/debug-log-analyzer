@@ -102,9 +102,9 @@ export class RawLogLineDecoration {
     }
 
     // The event the line starts, or the frame it closes.
-    const { start, end } = LogEventCache.linesOf(apexLog, document);
-    const startId = start.indexOf(line.lineNumber);
-    const event = apexLog.event(startId > 0 ? startId : end.indexOf(line.lineNumber));
+    const { startLine, exitLine } = LogEventCache.linesOf(apexLog, document);
+    const startId = startLine.indexOf(line.lineNumber);
+    const event = apexLog.event(startId > 0 ? startId : exitLine.indexOf(line.lineNumber));
     if (!event) {
       this.clearDecorations(editor);
       return;

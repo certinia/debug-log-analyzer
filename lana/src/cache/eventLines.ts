@@ -7,8 +7,8 @@ import { TIMESTAMP_REGEX } from '../log-utils.js';
 
 /** By event id: the line the event starts on, and the exit line that closes a frame; -1 for none. */
 export interface EventLines {
-  start: Int32Array;
-  end: Int32Array;
+  startLine: Int32Array;
+  exitLine: Int32Array;
 }
 
 const EVENT_LINE = new RegExp(`${TIMESTAMP_REGEX.source}([A-Z_]+)`);
@@ -34,8 +34,8 @@ export function eventLines(
   lineAt: (line: number) => string,
 ): EventLines {
   const { type, parent, isFrame, startTimestamp, endTimestamp } = log.columns;
-  const start = new Int32Array(log.eventCount + 1).fill(-1);
-  const end = new Int32Array(log.eventCount + 1).fill(-1);
+  const startLine = new Int32Array(log.eventCount + 1).fill(-1);
+  const exitLine = new Int32Array(log.eventCount + 1).fill(-1);
   const open: number[] = [];
   let next = 1;
   for (let line = 0; line < lineCount; line++) {
@@ -58,7 +58,7 @@ export function eventLines(
         top = open.at(-1);
       }
       if (top !== undefined && endTimestamp[top] === time && closes(type[top]!, info)) {
-        end[top] = line;
+        exitLine[top] = line;
         open.pop();
         continue;
       }
@@ -66,7 +66,7 @@ export function eventLines(
     if (next > log.eventCount || type[next] !== info.typeId || startTimestamp[next] !== time) {
       continue;
     }
-    start[next] = line;
+    startLine[next] = line;
     while (open.length && open.at(-1) !== parent[next]) {
       open.pop();
     }
@@ -75,5 +75,5 @@ export function eventLines(
     }
     next++;
   }
-  return { start, end };
+  return { startLine, exitLine };
 }

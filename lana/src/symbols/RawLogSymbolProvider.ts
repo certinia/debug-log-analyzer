@@ -53,15 +53,15 @@ class RawLogSymbolProvider implements DocumentSymbolProvider {
       return [];
     }
 
-    const { start, end } = LogEventCache.linesOf(apexLog, document);
+    const { startLine, exitLine } = LogEventCache.linesOf(apexLog, document);
     const { parent, text, type, durationTotal } = apexLog.columns;
     const symbols = new Map<number, DocumentSymbol>();
     const roots: DocumentSymbol[] = [];
     const last = apexLog.eventCount;
     for (let id = 1; id <= last; id++) {
-      const startLine = start[id]!;
-      const endLine = end[id]!;
-      if (endLine <= startLine) {
+      const from = startLine[id]!;
+      const to = exitLine[id]!;
+      if (to <= from) {
         continue;
       }
       // Prefer the parser's concise label (e.g. a method signature) over the raw line,
@@ -69,15 +69,15 @@ class RawLogSymbolProvider implements DocumentSymbolProvider {
       const name =
         text.at(id)?.trim() ||
         eventType(type[id]!)?.type ||
-        document.lineAt(startLine).text.trim() ||
+        document.lineAt(from).text.trim() ||
         'log';
-      const range = new Range(new Position(startLine, 0), document.lineAt(endLine).range.end);
+      const range = new Range(new Position(from, 0), document.lineAt(to).range.end);
       const symbol = new DocumentSymbol(
         name,
         formatDuration(durationTotal[id]!),
         SymbolKind.Method,
         range,
-        document.lineAt(startLine).range,
+        document.lineAt(from).range,
       );
       // A frame with no foldable range lifts its descendants to the nearest one that has.
       let ancestor = parent[id]!;

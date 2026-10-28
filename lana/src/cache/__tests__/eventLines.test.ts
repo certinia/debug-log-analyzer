@@ -6,11 +6,14 @@ import { parse } from '@apexdevtools/apex-log-parser';
 
 import { eventLines } from '../eventLines.js';
 
-/** Each event's start line and end line, by id, for a log of `lines`. */
+/** Each event's start line and exit line, by id, for a log of `lines`. */
 async function linesOf(lines: string[]): Promise<[number, number][]> {
   const log = await parse(lines.join('\n'));
-  const { start, end } = eventLines(log, lines.length, (line) => lines[line]!);
-  return Array.from({ length: log.eventCount }, (_, index) => [start[index + 1]!, end[index + 1]!]);
+  const { startLine, exitLine } = eventLines(log, lines.length, (line) => lines[line]!);
+  return Array.from({ length: log.eventCount }, (_, index) => [
+    startLine[index + 1]!,
+    exitLine[index + 1]!,
+  ]);
 }
 
 const at = (ns: number, line: string) => `09:18:22.6 (${ns})|${line}`;

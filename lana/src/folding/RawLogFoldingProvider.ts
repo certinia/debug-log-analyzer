@@ -41,12 +41,12 @@ class RawLogFoldingProvider implements FoldingRangeProvider {
       return [];
     }
 
-    const { start, end } = LogEventCache.linesOf(apexLog, document);
+    const { startLine, exitLine } = LogEventCache.linesOf(apexLog, document);
     const ranges: FoldingRange[] = [];
     const last = apexLog.eventCount;
     for (let id = 1; id <= last; id++) {
-      if (end[id]! > start[id]!) {
-        ranges.push(new FoldingRange(start[id]!, end[id]!, FoldingRangeKind.Region));
+      if (exitLine[id]! > startLine[id]!) {
+        ranges.push(new FoldingRange(startLine[id]!, exitLine[id]!, FoldingRangeKind.Region));
       }
     }
     return ranges;
