@@ -45,13 +45,12 @@ interface Subject {
 function build(log: ApexLog): Subject {
   const categories = new Set<string>(BUCKET_CONSTANTS.CATEGORY_PRIORITY);
   const frames = buildTimelineFrames(buildLogIndex(log), categories, log.columns.endTimestamp[0]!);
-  const cache = new RectangleCache(frames);
-  const rects = [...cache.getRectsByCategory().values()];
+  const columns = new RectangleCache(frames).getColumns();
 
   return {
-    query: new MinimapDensityQuery(rects, frames.totalDuration, frames.maxDepth),
+    query: new MinimapDensityQuery(columns, frames.totalDuration, frames.maxDepth),
     // One entry per rect, so this is the sweep's own input.
-    frames: rects.reduce((sum, each) => sum + each.length, 0),
+    frames: columns.rectRowsByDepth.reduce((sum, rows) => sum + rows.length, 0),
     maxDepth: frames.maxDepth,
   };
 }

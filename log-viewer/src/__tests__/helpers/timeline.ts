@@ -3,12 +3,10 @@
  */
 import type { LogCategory } from '#core/log/category.js';
 import { buildLogIndex } from '#core/log/LogIndex.js';
-import type {
-  PrecomputedRect,
-  PrecomputedRectData,
-} from '../../features/timeline/optimised/RectangleCache.js';
+import type { PrecomputedRect } from '../../features/timeline/optimised/RectangleCache.js';
 import {
   BUCKET_CONSTANTS,
+  type RectColumns,
   TIMELINE_CONSTANTS,
 } from '../../features/timeline/types/flamechart.types.js';
 import { buildTimelineFrames } from '../../features/timeline/utils/timeline-frames.js';
@@ -44,7 +42,9 @@ export function timelineEvent(
  * The rects the chart draws for `roots`, as `buildTimelineFrames` lays them out:
  * rows in pre-order, and a frame with no duration hiding its subtree.
  */
-export function rectsOf(roots: FrameSpec[]): PrecomputedRectData {
+export function rectsOf(
+  roots: FrameSpec[],
+): RectColumns & { rectsByCategory: Map<string, PrecomputedRect[]> } {
   const rectsByCategory = new Map<string, PrecomputedRect[]>(
     BUCKET_CONSTANTS.CATEGORY_PRIORITY.map((category) => [category, []]),
   );
@@ -93,6 +93,7 @@ export function rectsOf(roots: FrameSpec[]): PrecomputedRectData {
   return {
     start: Float64Array.from({ length: row }, (_, at) => rectAt.get(at)?.timeStart ?? 0),
     total: Float64Array.from({ length: row }, (_, at) => rectAt.get(at)?.duration ?? 0),
+    depth: Uint16Array.from({ length: row }, (_, at) => rectAt.get(at)?.depth ?? 0),
     categoryId: Uint8Array.from(categories, (category) => categoryNames.indexOf(category)),
     categoryNames,
     rectRowsByDepth,

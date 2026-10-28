@@ -41,17 +41,24 @@ function createRect(
 }
 
 function buildQuery(rects: PrecomputedRect[], totalDuration: number): MinimapDensityQuery {
-  const rectsByCategory = new Map<string, PrecomputedRect[]>();
-  for (const rect of rects) {
-    let grouped = rectsByCategory.get(rect.category);
-    if (!grouped) {
-      grouped = [];
-      rectsByCategory.set(rect.category, grouped);
-    }
-    grouped.push(rect);
+  const categoryNames = [...new Set(rects.map((rect) => rect.category))];
+  const rectRowsByDepth: Int32Array[] = [];
+  const byStart = [...rects.keys()].sort((a, b) => rects[a]!.timeStart - rects[b]!.timeStart);
+  for (const row of byStart) {
+    const at = rects[row]!.depth;
+    rectRowsByDepth[at] = Int32Array.of(...(rectRowsByDepth[at] ?? []), row);
   }
+  const columns = {
+    start: Float64Array.from(rects, (rect) => rect.timeStart),
+    total: Float64Array.from(rects, (rect) => rect.duration),
+    depth: Uint16Array.from(rects, (rect) => rect.depth),
+    categoryId: Uint8Array.from(rects, (rect) => categoryNames.indexOf(rect.category)),
+    categoryNames,
+    rectRowsByDepth,
+    rectOf: (row: number) => rects[row],
+  };
   // maxDepth only reaches MinimapDensityData.globalMaxDepth; the sweep derives its own.
-  return new MinimapDensityQuery([...rectsByCategory.values()], totalDuration, 0);
+  return new MinimapDensityQuery(columns, totalDuration, 0);
 }
 
 describe('MinimapDensityQuery', () => {

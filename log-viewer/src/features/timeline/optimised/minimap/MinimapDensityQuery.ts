@@ -25,8 +25,8 @@
  * once per log, against the ~100ms it used to cost on every pixel of a width drag.
  */
 
-import type { BucketCategoryPriority } from '../../types/flamechart.types.js';
-import { GAP_CATEGORY, MinimapSkylineIndex, type SkylineFrame } from './MinimapSkylineIndex.js';
+import type { BucketCategoryPriority, RectColumns } from '../../types/flamechart.types.js';
+import { GAP_CATEGORY, MinimapSkylineIndex } from './MinimapSkylineIndex.js';
 
 /**
  * Single density bucket for minimap visualization.
@@ -100,20 +100,13 @@ export class MinimapDensityQuery {
   /** The log seen from above, built on the first query and never rebuilt. */
   private index: MinimapSkylineIndex | null = null;
 
-  /**
-   * The frames the skyline is built from, in groups each ascending by `timeStart`.
-   * Owned by RectangleCache, which holds them for the timeline's life regardless.
-   */
-  private readonly frameGroups: readonly (readonly SkylineFrame[])[];
+  /** The frames the skyline is built from, held by the timeline for its life regardless. */
+  private readonly columns: RectColumns;
   private readonly totalDuration: number;
   private readonly globalMaxDepth: number;
 
-  constructor(
-    frameGroups: readonly (readonly SkylineFrame[])[],
-    totalDuration: number,
-    maxDepth: number,
-  ) {
-    this.frameGroups = frameGroups;
+  constructor(columns: RectColumns, totalDuration: number, maxDepth: number) {
+    this.columns = columns;
     this.totalDuration = totalDuration;
     this.globalMaxDepth = maxDepth;
   }
@@ -255,6 +248,6 @@ export class MinimapDensityQuery {
    * synchronous costs, and a log whose minimap is never drawn should not pay them.
    */
   private ensureSkyline(): MinimapSkylineIndex {
-    return (this.index ??= new MinimapSkylineIndex(this.frameGroups, this.totalDuration));
+    return (this.index ??= new MinimapSkylineIndex(this.columns, this.totalDuration));
   }
 }

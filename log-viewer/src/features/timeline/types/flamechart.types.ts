@@ -186,6 +186,7 @@ export interface TimelineFrames<E extends EventNode> extends RectColumns {
 export interface RectColumns {
   readonly start: Float64Array;
   readonly total: Float64Array;
+  readonly depth: Uint16Array;
   /** An index into {@link categoryNames}. */
   readonly categoryId: Uint8Array;
   readonly categoryNames: readonly string[];

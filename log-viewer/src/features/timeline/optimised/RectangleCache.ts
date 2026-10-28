@@ -67,30 +67,20 @@ export interface PrecomputedRect extends RenderRectangle {
   height: number;
 }
 
-/** Rectangles built ahead, as `TimelineFrames` holds them. */
-export interface PrecomputedRectData extends RectColumns {
-  rectsByCategory: Map<string, PrecomputedRect[]>;
-}
-
 /**
- * Holds the rectangles by category and answers viewport and region queries through a
+ * Holds the frames with a rect and answers viewport and region queries through a
  * TemporalSegmentTree. Nothing reaches past it to the tree.
  */
 export class RectangleCache {
-  /** Spatial index: all rectangles grouped by category */
-  private rectsByCategory: Map<string, PrecomputedRect[]>;
+  private readonly columns: RectColumns;
 
   /** Segment tree for O(log n) viewport culling */
   private segmentTree: TemporalSegmentTree;
 
-  /** @param precomputed - The rectangles, built ahead */
-  constructor(precomputed: PrecomputedRectData) {
-    this.rectsByCategory = precomputed.rectsByCategory;
-    for (const rects of this.rectsByCategory.values()) {
-      sortByStartIfNeeded(rects);
-    }
-
-    this.segmentTree = new TemporalSegmentTree(precomputed);
+  /** @param columns - The frames with a rect, by row */
+  constructor(columns: RectColumns) {
+    this.columns = columns;
+    this.segmentTree = new TemporalSegmentTree(columns);
   }
 
   /**
@@ -113,13 +103,9 @@ export class RectangleCache {
     return this.segmentTree.query(viewport, batchColors);
   }
 
-  /**
-   * Get the rectangles, grouped by category and each ascending by timeStart.
-   *
-   * @returns Map of category to rectangles
-   */
-  public getRectsByCategory(): Map<string, PrecomputedRect[]> {
-    return this.rectsByCategory;
+  /** The frames with a rect, by row. */
+  public getColumns(): RectColumns {
+    return this.columns;
   }
 
   /**
@@ -140,15 +126,5 @@ export class RectangleCache {
     depthEnd: number,
   ): PrecomputedRect[] {
     return this.segmentTree.queryRectsInRegion(timeStart, timeEnd, depthStart, depthEnd);
-  }
-}
-
-// A check costs less than the sort, and the frames arrive sorted on a well-formed log.
-function sortByStartIfNeeded(rects: PrecomputedRect[]): void {
-  for (let i = 1; i < rects.length; i++) {
-    if (rects[i]!.timeStart < rects[i - 1]!.timeStart) {
-      rects.sort((a, b) => a.timeStart - b.timeStart);
-      return;
-    }
   }
 }

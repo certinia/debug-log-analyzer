@@ -190,7 +190,7 @@ export class MinimapOrchestrator {
     this.minimapViewport = new MinimapViewport(index.totalDuration, index.maxDepth, width, height);
 
     this.densityQuery = new MinimapDensityQuery(
-      [...rectangleManager.getRectsByCategory().values()],
+      rectangleManager.getColumns(),
       index.totalDuration,
       index.maxDepth,
     );

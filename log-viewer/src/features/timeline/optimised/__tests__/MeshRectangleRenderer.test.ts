@@ -101,6 +101,10 @@ function visible(cache: RectangleCache, viewport: ViewportState): PrecomputedRec
   return [...visibleRects.values()].flat();
 }
 
+function rowsWithRect(cache: RectangleCache): number[] {
+  return cache.getColumns().rectRowsByDepth.flatMap((rows) => [...rows]);
+}
+
 describe('MeshRectangleRenderer', () => {
   describe('with rectangles culled by RectangleCache', () => {
     // Rows are numbered in pre-order: the parent 0, its child 1.
@@ -138,8 +142,7 @@ describe('MeshRectangleRenderer', () => {
       const timed = timelineEvent(100, 200, 'Apex');
       const cache = new RectangleCache(rectsOf([timed, instant]));
 
-      const rects = [...cache.getRectsByCategory().values()].flat();
-      expect(rects.map((rect) => rect.row)).toEqual([0]);
+      expect(rowsWithRect(cache)).toEqual([0]);
       expect(visible(cache, makeViewport()).map((r) => r.row)).toEqual([0]);
     });
 
@@ -148,8 +151,7 @@ describe('MeshRectangleRenderer', () => {
       const known = timelineEvent(100, 200, 'Apex');
       const cache = new RectangleCache(rectsOf([known, unknown]));
 
-      const rects = [...cache.getRectsByCategory().values()].flat();
-      expect(rects.map((rect) => rect.row)).toEqual([0]);
+      expect(rowsWithRect(cache)).toEqual([0]);
       expect(visible(cache, makeViewport()).map((r) => r.row)).toEqual([0]);
     });
 
