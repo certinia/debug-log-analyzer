@@ -74,13 +74,8 @@ export interface PrecomputedRectData {
 }
 
 /**
- * RectangleCache
- *
- * Manages rectangle pre-computation, spatial indexing, and viewport culling.
- * Provides a clean API for renderers to consume rectangle data without coupling.
- *
- * Uses TemporalSegmentTree for O(log n) viewport culling.
- * For O(n) legacy culling, use LegacyViewportCuller directly.
+ * Holds the rectangles by category and answers viewport and region queries through a
+ * TemporalSegmentTree. Nothing reaches past it to the tree.
  */
 export class RectangleCache {
   /** Spatial index: all rectangles grouped by category */
@@ -104,8 +99,8 @@ export class RectangleCache {
    * Get culled rectangles and buckets for current viewport.
    * Uses TemporalSegmentTree for O(log n) performance.
    *
-   * Events > MIN_RECT_SIZE (2px) are returned as visible rectangles.
-   * Events <= MIN_RECT_SIZE are aggregated into time-aligned buckets.
+   * Events wider than BUCKET_WIDTH are returned as visible rectangles.
+   * Events up to BUCKET_WIDTH wide are aggregated into time-aligned buckets.
    *
    * @param viewport - Current viewport state
    * @param batchColors - Theme-aware category colors for bucket color resolution
@@ -122,7 +117,6 @@ export class RectangleCache {
 
   /**
    * Get the rectangles, grouped by category and each ascending by timeStart.
-   * Read by the legacy culler and by the minimap, which sweeps them for its skyline.
    *
    * @returns Map of category to rectangles
    */

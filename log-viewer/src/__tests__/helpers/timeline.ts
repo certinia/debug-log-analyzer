@@ -81,21 +81,3 @@ export function rectsOf(roots: FrameSpec[]): PrecomputedRectData {
   visit(roots, 0);
   return { rectsByCategory, rectsByDepth };
 }
-
-/** Every category's buckets in one list. */
-export function getAllBuckets<T>(bucketsMap: Map<string, T[]>): T[] {
-  const allBuckets: T[] = [];
-  for (const buckets of bucketsMap.values()) {
-    allBuckets.push(...buckets);
-  }
-  return allBuckets;
-}
-
-/** The bucket count across every category. */
-export function countBuckets(bucketsMap: Map<string, unknown[]>): number {
-  let count = 0;
-  for (const buckets of bucketsMap.values()) {
-    count += buckets.length;
-  }
-  return count;
-}

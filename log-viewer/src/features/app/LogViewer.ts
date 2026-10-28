@@ -13,6 +13,8 @@ import { customElement, property, state } from 'lit/decorators.js';
 import { parse, type LogSource } from '@apexdevtools/apex-log-parser';
 import type { LogLevelsChange } from '../../components/LogLevels.js';
 import { TAB_TO_SOURCE } from '#core/events/EventBus.js';
+import { DomListenerController } from '#core/events/DomListenerController.js';
+import { SubscriptionController } from '#core/events/SubscriptionController.js';
 import { waitForNextFrame } from '#core/utility/FrameBudget.js';
 import { logContext } from '#core/log/logContext.js';
 import { logStatusContext, type LogStatus } from '#core/log/logStatus.js';
@@ -22,7 +24,11 @@ import {
   vscodeMessenger,
 } from '#core/messaging/VSCodeExtensionMessenger.js';
 import type { LogIssue } from '../notifications/types.js';
-import { TIMELINE_GO_TO_EVENT, type TimelineNavigateRequest } from '../timeline/navigation.js';
+import {
+  TIMELINE_GO_TO_EVENT,
+  type TimelineNavigateRequest,
+  type TimelineNavigationEventMap,
+} from '../timeline/navigation.js';
 import { installEscapeDeselect } from './escapeDeselect.js';
 import { LogLevelsController } from './LogLevelsController.js';
 import { deriveLogIdentity, type LogIdentityData } from './logIdentity.js';
@@ -185,24 +191,23 @@ export class LogViewer extends LitElement {
         throw err;
       });
 
-    document.addEventListener('show-tab', (e: Event) => {
-      this._showTabEvent(e);
+    new DomListenerController<
+      TimelineNavigationEventMap & { 'show-tab': CustomEvent<{ tabid: string }> }
+    >(this, document, {
+      'show-tab': (e) => this._showTabEvent(e),
+      [TIMELINE_GO_TO_EVENT]: (e) => this._goToTimelineEvent(e.detail.eventIndex),
     });
-    document.addEventListener(TIMELINE_GO_TO_EVENT, (e: Event) => {
-      this._goToTimelineEvent((e as CustomEvent<TimelineNavigateRequest>).detail.eventIndex);
-    });
-
-    // Escape, when nothing else claims it, deselects on the active tab.
-    installEscapeDeselect(() => TAB_TO_SOURCE[this._selectedTab]);
-
-    // Listen for navigation messages from the extension
-    VSCodeExtensionMessenger.listen<NavigateToTimelinePayload>((event) => {
-      const { cmd, payload } = event.data;
-      if (cmd !== 'navigateToTimeline' || payload?.eventIndex === undefined) {
-        return;
-      }
-      this._goToTimelineEvent(payload.eventIndex);
-    });
+    new SubscriptionController(this, () => [
+      // Escape, when nothing else claims it, deselects on the active tab.
+      installEscapeDeselect(() => TAB_TO_SOURCE[this._selectedTab]),
+      VSCodeExtensionMessenger.listen<NavigateToTimelinePayload>((event) => {
+        const { cmd, payload } = event.data;
+        if (cmd !== 'navigateToTimeline' || payload?.eventIndex === undefined) {
+          return;
+        }
+        this._goToTimelineEvent(payload.eventIndex);
+      }),
+    ]);
   }
 
   private _goToTimelineEvent(eventIndex: number): void {
@@ -274,9 +279,8 @@ export class LogViewer extends LitElement {
     }
   }
 
-  _showTabEvent(e: Event) {
-    const tabId = (e as CustomEvent).detail.tabid;
-    this._showTab(tabId);
+  private _showTabEvent(e: CustomEvent<{ tabid: string }>) {
+    this._showTab(e.detail.tabid);
   }
 
   _showTab(tabId: string) {

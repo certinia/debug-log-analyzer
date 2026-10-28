@@ -2,13 +2,6 @@
  * Copyright (c) 2025 Certinia Inc. All rights reserved.
  */
 
-/**
- * ViewportUtils
- *
- * Shared utility functions for viewport calculations used by both
- * TemporalSegmentTree and LegacyViewportCuller implementations.
- */
-
 import type { ViewportBounds, ViewportState } from '../types/flamechart.types.js';
 import { TIMELINE_CONSTANTS } from '../types/flamechart.types.js';
 

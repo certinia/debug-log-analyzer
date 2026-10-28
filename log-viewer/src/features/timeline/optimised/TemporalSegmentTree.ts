@@ -10,7 +10,6 @@
  * traversing the event tree directly.
  *
  * A pre-computed tree structure for O(log n) viewport culling and bucket aggregation.
- * Replaces the per-frame O(n) iteration in RectangleCache.getCulledRectangles().
  *
  * Key capabilities:
  * - Viewport culling: query() returns visible rectangles and buckets
@@ -139,7 +138,6 @@ export class TemporalSegmentTree {
     }
 
     // Bucket aggregation map: keyed by (depth << 24) | bucketIndex
-    // This matches the legacy RectangleCache approach for grid-aligned buckets
     const bucketMap = new Map<number, AggregationBucket>();
 
     // Stats tracking - using mutable object to avoid callback overhead
@@ -460,7 +458,6 @@ export class TemporalSegmentTree {
   /**
    * Iterative query traversal using explicit stack.
    * Stops at first node where nodeSpan <= threshold.
-   * Aggregates nodes into grid-aligned buckets matching legacy behavior.
    *
    * PERF: Eliminates recursion overhead - no function calls, stack frames, or parameter copying.
    */
@@ -492,7 +489,6 @@ export class TemporalSegmentTree {
 
       // Check if this node should be rendered as a bucket
       if (node.nodeSpan <= threshold) {
-        // Aggregate into grid-aligned bucket (matching legacy behavior)
         this.aggregateIntoBucket(node, bucketTimeWidth, bucketMap);
         bucketedEventCount += node.eventCount;
         continue;
@@ -530,7 +526,6 @@ export class TemporalSegmentTree {
     bucketTimeWidth: number,
     bucketMap: Map<number, AggregationBucket>,
   ): void {
-    // Calculate grid-aligned bucket index (same as legacy)
     const bucketIndex = Math.floor(node.timeStart / bucketTimeWidth);
     // Composite integer key: depth in upper 8 bits, bucketIndex in lower 24 bits
     const bucketKey = (node.depth << 24) | (bucketIndex & 0xffffff);
