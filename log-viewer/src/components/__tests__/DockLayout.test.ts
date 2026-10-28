@@ -24,7 +24,10 @@ beforeAll(() => {
   Object.defineProperty(HTMLElement.prototype, 'clientHeight', { value: 800, configurable: true });
 });
 
-async function mount(dock: 'left' | 'right' | 'bottom', size = 500): Promise<DockLayout> {
+async function mount(
+  dock: 'left' | 'right' | 'bottom',
+  size: number | null = 500,
+): Promise<DockLayout> {
   const el = document.createElement('dock-layout') as DockLayout;
   el.dock = dock;
   el.size = size;
@@ -104,10 +107,9 @@ describe('DockLayout resize', () => {
     const layout = el.shadowRoot?.querySelector('.layout') as HTMLElement;
     // 280 leaves the dock 40px past the main pane's room, under the collapse line.
     Object.defineProperty(layout, 'clientHeight', { value: 280, configurable: true });
-    const [event] = await drag(el, 700, 701);
+    const events = await drag(el, 700, 701);
 
-    expect(event?.type).toBe('dock-resize');
-    expect(event?.detail).toEqual({ size: MIN_SIZE });
+    expect(events.map((e) => e.type)).not.toContain('dock-collapse');
   });
 
   it('snaps to the minimum rather than going smaller', async () => {
@@ -126,6 +128,83 @@ describe('DockLayout resize', () => {
 
     expect(event?.type).toBe('dock-collapse');
     expect(event?.detail).toBeNull();
+  });
+
+  it('reports nothing for a click that does not move, so a click never stores a size', async () => {
+    const el = await mount('right', 500);
+    const events = await drag(el, 800, 800);
+
+    expect(events).toEqual([]);
+  });
+
+  it('ends a drag the browser cancels: the panel stops following the pointer and stores nothing', async () => {
+    const el = await mount('right', 500);
+    const events: Event[] = [];
+    for (const type of ['dock-resize', 'dock-collapse']) {
+      el.addEventListener(type, (e) => events.push(e));
+    }
+    const handle = gutter(el);
+    const pointer = (type: string, clientX: number) =>
+      Object.assign(new MouseEvent(type, { clientX, bubbles: true }), { pointerId: 1 });
+
+    handle.dispatchEvent(pointer('pointerdown', 800));
+    handle.dispatchEvent(pointer('pointermove', 700));
+    handle.dispatchEvent(pointer('lostpointercapture', 700));
+    handle.dispatchEvent(pointer('pointermove', 600));
+    handle.dispatchEvent(pointer('pointerup', 600));
+    await el.updateComplete;
+
+    const dock = el.shadowRoot?.querySelector('detail-dock') as HTMLElement;
+    expect(dock.style.width).toBe('500px');
+    expect(events).toEqual([]);
+  });
+
+  it('drags a panel never dragged from the size it shows, not from zero', async () => {
+    const el = await mount('bottom', null);
+    const dock = el.shadowRoot?.querySelector('detail-dock') as HTMLElement;
+    // jsdom does no layout; this is what a third of the view lays out at.
+    Object.defineProperty(dock, 'offsetHeight', { value: 266, configurable: true });
+    const [event] = await drag(el, 700, 600);
+
+    expect(event?.detail).toEqual({ size: 366 });
+  });
+
+  it('takes the next drag after one that ended normally', async () => {
+    const el = await mount('right', 500);
+    await drag(el, 800, 700);
+    // A browser reports the release that pointerup made after the drag has ended.
+    gutter(el).dispatchEvent(Object.assign(new MouseEvent('lostpointercapture'), { pointerId: 1 }));
+    const events = await drag(el, 800, 750);
+
+    expect(events.map((e) => e.detail)).toEqual([{ size: 550 }]);
+  });
+
+  it('forgets a drag the panel was hidden during, so it comes back at its size', async () => {
+    const el = await mount('right', 200);
+    const handle = gutter(el);
+    const pointer = (type: string, clientX: number) =>
+      Object.assign(new MouseEvent(type, { clientX, bubbles: true }), { pointerId: 1 });
+    handle.dispatchEvent(pointer('pointerdown', 800));
+    // Past the collapse line, so the panel shows 0px wide while the drag lasts.
+    handle.dispatchEvent(pointer('pointermove', 1000));
+
+    el.visible = false;
+    await el.updateComplete;
+    el.visible = true;
+    await el.updateComplete;
+
+    const dock = el.shadowRoot?.querySelector('detail-dock') as HTMLElement;
+    expect(dock.style.width).toBe('200px');
+  });
+
+  it('asks for the default size back on a double-click of the edge', async () => {
+    const el = await mount('right', 500);
+    let resets = 0;
+    el.addEventListener('dock-size-reset', () => resets++);
+
+    gutter(el).dispatchEvent(new MouseEvent('dblclick', { bubbles: true }));
+
+    expect(resets).toBe(1);
   });
 
   it('forwards the consumer control on to the dock', async () => {

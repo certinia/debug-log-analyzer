@@ -21,7 +21,7 @@ hide_title: true
 
 Select anything - a Timeline frame, a Call Tree or Analysis row, a SOQL/DML/SOSL statement - and the inspector shows it in depth without you leaving the tab you're working in.
 
-It docks to the **right**, **left** or **bottom**, resizes by dragging its edge, and is toggled from the button in the header. It opens on your first selection, then stays however you left it, including the next time you open a log. See [Settings](../settings.mdx#inspector).
+It docks to the **right**, **left** or **bottom**, resizes by dragging its edge, and is toggled from the button in the header. To go back to the default size, double-click its edge or pick **Reset Inspector Size** from a section header's menu. It opens on your first selection, then stays however you left it, including the next time you open a log. See [Settings](../settings.mdx#inspector).
 
 ![The inspector on the Analysis tab reading the whole log: the governor metrics nearest a limit, the log's findings, and how few signatures hold its self time.](https://raw.githubusercontent.com/certinia/debug-log-analyzer/main/lana/assets/1_22/inspector.png#gh-dark-mode-only)
 ![The inspector on the Analysis tab reading the whole log: the governor metrics nearest a limit, the log's findings, and how few signatures hold its self time.](https://raw.githubusercontent.com/certinia/debug-log-analyzer/main/lana/assets/1_22/inspector-light.png#gh-light-mode-only)

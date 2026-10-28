@@ -46,7 +46,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - 🔎 **Analysis filters**: filter the Analysis table by namespace, total time and self time, as in the Call Tree Bottom-Up view. ([#1209])
 - 💡 **Log level hints**: a section that a debug level leaves empty names the level it needs. ([#259])
 - 🔲 **Inspector sections**: maximize one section to fill the inspector, then restore the others as they were.
-- 📋 **Inspector menu**: show, hide or reset sections from the header.
+- 📋 **Inspector menu**: show, hide or reset sections from the header, or reset the inspector's size. Double-clicking its edge resets the size too.
 - 🧮 **New limit columns**: show the SOQL, DML and SOSL usage Salesforce reported beside the counts we actually saw in the Call Tree and Analysis tables.
 - 🔦 **Timeline legend**: hover a category to highlight frames in the timeline, select to keep. ([#917])
 - 🔍 **Find**: in the tables, find matches the group header text too.
@@ -55,6 +55,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Removed
 
 - 🪓 **Breaking**: the legacy Timeline and all its settings are dropped.
+- 🧹 **Breaking**: the `lana.inspector.size` setting is dropped. The inspector remembers the width you drag it to, and its height when docked at the bottom, on each machine instead.
+  - Migration: a size saved in the setting is not carried over, so drag the edge once. You can delete `lana.inspector.size` from `settings.json`.
 
 ### Fixed
 

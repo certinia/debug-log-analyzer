@@ -1,7 +1,7 @@
 /*
  * Copyright (c) 2025 Certinia Inc. All rights reserved.
  */
-import { LitElement, css, html, unsafeCSS } from 'lit';
+import { LitElement, css, html, unsafeCSS, type PropertyValues } from 'lit';
 import { customElement, property, state } from 'lit/decorators.js';
 
 import { globalStyles } from '../styles/global.styles.js';
@@ -21,7 +21,8 @@ const COLLAPSE_OVERSHOOT = 60;
  * the panel's minimum snaps to the minimum, then fully collapses; dragging back
  * out during the same gesture restores it. Persistence and selection stay with
  * the consuming view — this component only reports intent via events:
- * `dock-resize` (px), `dock-collapse`, plus `dock-position-change`/`dock-hide`
+ * `dock-resize` (px), `dock-size-reset` (double-click), `dock-collapse`, plus
+ * `dock-position-change`/`dock-hide`
  * bubbled from the dock. The `actions-start` slot is forwarded to the dock.
  */
 @customElement('dock-layout')
@@ -29,8 +30,13 @@ export class DockLayout extends LitElement {
   @property({ type: String })
   dock: DockPosition = 'right';
 
-  @property({ type: Number })
-  size = 560;
+  /** In px; null lays the panel out at `defaultSize`. */
+  @property({ attribute: false })
+  size: number | null = null;
+
+  /** A CSS length with its unit, as `560px` or `33.333%`; a percentage is of the layout on the dock axis. */
+  @property({ type: String })
+  defaultSize = '50%';
 
   @property({ type: Boolean })
   visible = false;
@@ -123,6 +129,7 @@ export class DockLayout extends LitElement {
       detail-dock {
         flex: 0 0 auto;
         overflow: hidden;
+        box-sizing: border-box;
       }
       .layout[data-dock='right'] detail-dock {
         border-left: var(--lana-stroke) solid var(--lana-panel-divider);
@@ -146,6 +153,13 @@ export class DockLayout extends LitElement {
     `,
   ];
 
+  willUpdate(changed: PropertyValues<this>): void {
+    // Hiding removes the gutter, so a drag in progress gets no lostpointercapture of its own.
+    if (changed.has('visible') && !this.visible) {
+      this._clearDrag();
+    }
+  }
+
   render() {
     return html`
       <div class="layout" data-dock=${this.dock} ?data-open=${this.visible}>
@@ -153,7 +167,11 @@ export class DockLayout extends LitElement {
         ${
           this.visible
             ? html`
-                <div class="gutter" @pointerdown=${this._startResize}></div>
+                <div
+                  class="gutter"
+                  @pointerdown=${this._startResize}
+                  @dblclick=${this._resetSize}
+                ></div>
                 <detail-dock
                   style=${this._dockSizeStyle()}
                   .sections=${this.sections}
@@ -172,16 +190,23 @@ export class DockLayout extends LitElement {
     `;
   }
 
-  private _currentSize(): number {
+  private _currentSize(): string {
     if (this._pendingCollapse) {
-      return 0;
+      return '0px';
     }
-    return this._liveSize ?? this.size;
+    const size = this._liveSize ?? this.size;
+    return size === null ? this.defaultSize : `${size}px`;
   }
 
   private _dockSizeStyle() {
     const size = this._currentSize();
-    return this.dock === 'bottom' ? `height: ${size}px` : `width: ${size}px`;
+    return this.dock === 'bottom' ? `height: ${size}` : `width: ${size}`;
+  }
+
+  private _shownSize(): number {
+    // A drag starts on the gutter, which only renders beside the dock.
+    const dock = this.renderRoot.querySelector<HTMLElement>('detail-dock')!;
+    return this.dock === 'bottom' ? dock.offsetHeight : dock.offsetWidth;
   }
 
   private _maxSize(): number | null {
@@ -196,12 +221,14 @@ export class DockLayout extends LitElement {
     const gutter = e.currentTarget as HTMLElement;
     gutter.setPointerCapture(e.pointerId);
     gutter.classList.add('gutter--active');
+    const size = this.size ?? this._shownSize();
     this._resizeStart = {
       pos: this.dock === 'bottom' ? e.clientY : e.clientX,
-      size: Math.max(MIN_SIZE, Math.min(this.size, this._maxSize() ?? this.size)),
+      size: Math.max(MIN_SIZE, Math.min(size, this._maxSize() ?? size)),
     };
     gutter.addEventListener('pointermove', this._onResizeMove);
     gutter.addEventListener('pointerup', this._endResize);
+    gutter.addEventListener('lostpointercapture', this._cancelResize);
   };
 
   private _onResizeMove = (e: PointerEvent) => {
@@ -226,27 +253,40 @@ export class DockLayout extends LitElement {
 
   private _endResize = (e: PointerEvent) => {
     const gutter = e.currentTarget as HTMLElement;
+    const collapse = this._pendingCollapse;
+    const startSize = this._resizeStart?.size;
+    const finalSize = this._liveSize;
+    this._stopResize(gutter);
     gutter.releasePointerCapture(e.pointerId);
+
+    if (collapse) {
+      this.dispatchEvent(new CustomEvent('dock-collapse'));
+    } else if (finalSize !== null && finalSize !== startSize) {
+      // A click must not store the default size, or a later default never reaches this user.
+      this.dispatchEvent(new CustomEvent('dock-resize', { detail: { size: finalSize } }));
+    }
+  };
+
+  // The browser took the pointer mid-drag, so no pointerup will come.
+  private _cancelResize = (e: PointerEvent) => {
+    this._stopResize(e.currentTarget as HTMLElement);
+  };
+
+  private _stopResize(gutter: HTMLElement): void {
     gutter.classList.remove('gutter--active');
     gutter.removeEventListener('pointermove', this._onResizeMove);
     gutter.removeEventListener('pointerup', this._endResize);
+    gutter.removeEventListener('lostpointercapture', this._cancelResize);
+    this._clearDrag();
+  }
 
-    const collapse = this._pendingCollapse;
-    const finalSize = this._liveSize ?? this.size;
+  private _clearDrag(): void {
     this._resizeStart = null;
     this._liveSize = null;
     this._pendingCollapse = false;
+  }
 
-    if (collapse) {
-      this.dispatchEvent(new CustomEvent('dock-collapse', { bubbles: true, composed: true }));
-    } else {
-      this.dispatchEvent(
-        new CustomEvent('dock-resize', {
-          detail: { size: finalSize },
-          bubbles: true,
-          composed: true,
-        }),
-      );
-    }
+  private _resetSize = () => {
+    this.dispatchEvent(new CustomEvent('dock-size-reset'));
   };
 }

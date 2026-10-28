@@ -31,7 +31,12 @@ import {
   scopedRecord,
   withoutScope,
 } from './inspectorLayout.js';
-import { RESET_SECTIONS_ID, buildSectionMenuItems, sectionIdFor } from './sectionMenu.js';
+import {
+  RESET_SECTIONS_ID,
+  RESET_SIZE_ID,
+  buildSectionMenuItems,
+  sectionIdFor,
+} from './sectionMenu.js';
 import { globalStyles } from '../styles/global.styles.js';
 import './ContextMenu.js';
 import type { ContextMenu } from './ContextMenu.js';
@@ -48,6 +53,11 @@ const SCOPE_OPTIONS: readonly ViewModeOption[] = [
   { value: 'selection', label: 'Detail' },
   { value: 'log', label: 'Summary' },
 ];
+
+// Beside the main view: the narrowest at which the inspector's tables keep every column.
+const DEFAULT_SIDE_SIZE = '560px';
+// Below it: VS Code's own bottom panel default.
+const DEFAULT_BOTTOM_SIZE = '33.333%';
 
 /**
  * The window the summary is reading, as elapsed times, so it reads against the
@@ -68,8 +78,8 @@ function windowLabel(window: TimeWindow): string {
  * The app-wide inspector. Lives at the app root (sibling of the tab strip,
  * via a forwarded `main` slot) so it crosscuts every tab. It follows the active
  * tab: each source's latest selection is remembered, and it shows the active
- * tab's selection. Persists dock position/size (public settings) plus its
- * open/closed state and its section layout (private globalState).
+ * tab's selection. Persists dock position (public setting) plus its size,
+ * open/closed state and section layout (private globalState).
  *
  * Collapse, order and which sections show are remembered per section list — per
  * tab and per scope, see {@link layoutKey} — because one id means different
@@ -92,8 +102,11 @@ export class LogInspector extends LitElement {
   private sections: PaneSection[] = [];
   @state()
   private dock: DockPosition = 'right';
+  // A width beside the main view and a height below it, as one never fits the other.
   @state()
-  private panelSize = 560;
+  private sidePanelSize: number | null = null;
+  @state()
+  private bottomPanelSize: number | null = null;
 
   // Keyed `<source>:<scope>:<section id>`, so the same section keeps its own
   // state in each list it appears in.
@@ -176,9 +189,10 @@ export class LogInspector extends LitElement {
         // The load can land after the user has already opened or laid out the
         // panel, so their own choice always wins over the stored one.
         this._visiblePref ??= panel.visible ?? null;
+        this.sidePanelSize ??= panel.sideSize ?? null;
+        this.bottomPanelSize ??= panel.bottomSize ?? null;
         if (!this._userAdjusted) {
           this.dock = panel.position;
-          this.panelSize = panel.size;
           this.collapsedSections = panel.collapsed ?? {};
           this.sectionOrder = panel.sectionOrder ?? {};
           this.hiddenSections = panel.hiddenSections ?? {};
@@ -254,7 +268,8 @@ export class LogInspector extends LitElement {
     return html`
       <dock-layout
         dock=${this.dock}
-        .size=${this.panelSize}
+        .size=${this.dock === 'bottom' ? this.bottomPanelSize : this.sidePanelSize}
+        defaultSize=${this.dock === 'bottom' ? DEFAULT_BOTTOM_SIZE : DEFAULT_SIDE_SIZE}
         ?visible=${this._visible}
         .sections=${this.sections}
         .collapsed=${this._layout.collapsed}
@@ -263,6 +278,7 @@ export class LogInspector extends LitElement {
         emptyText=${emptyTextFor(this._activeSource)}
         @dock-position-change=${this._onDockPositionChange}
         @dock-resize=${this._onDockResize}
+        @dock-size-reset=${this._resetPanelSize}
         @dock-hide=${this._hidePanel}
         @dock-collapse=${this._hidePanel}
         @pane-toggle=${this._onPaneToggle}
@@ -526,10 +542,23 @@ export class LogInspector extends LitElement {
   // `dock-resize` fires once on pointer-up, so this write already lands on
   // interaction-end — no debounce needed.
   private _onDockResize = (e: CustomEvent<{ size: number }>) => {
-    this._userAdjusted = true;
-    this.panelSize = e.detail.size;
-    updateSetting('inspector.size', this.panelSize);
+    this._setPanelSize(e.detail.size);
   };
+
+  private _resetPanelSize = () => {
+    this._setPanelSize(null);
+  };
+
+  private _setPanelSize(size: number | null): void {
+    this._userAdjusted = true;
+    if (this.dock === 'bottom') {
+      this.bottomPanelSize = size;
+      updateSetting('inspector.bottomSize', size);
+    } else {
+      this.sidePanelSize = size;
+      updateSetting('inspector.sideSize', size);
+    }
+  }
 
   private _onPaneToggle = (e: CustomEvent<{ collapsed: Record<string, boolean> }>) => {
     this._userAdjusted = true;
@@ -583,6 +612,10 @@ export class LogInspector extends LitElement {
   private _onSectionMenuSelect = (e: CustomEvent<{ itemId: string }>) => {
     if (e.detail.itemId === RESET_SECTIONS_ID) {
       this._resetSections();
+      return;
+    }
+    if (e.detail.itemId === RESET_SIZE_ID) {
+      this._resetPanelSize();
       return;
     }
     const id = sectionIdFor(e.detail.itemId);

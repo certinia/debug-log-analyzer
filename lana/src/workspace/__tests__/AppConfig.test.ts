@@ -11,6 +11,8 @@ import {
   getColumnOverrides,
   getColumnViews,
   getConfig,
+  getInspectorState,
+  PRIVATE_SECTIONS,
   sameConfig,
   updateColumnOverride,
   type Config,
@@ -130,6 +132,20 @@ describe('sameConfig', () => {
     changed.callTree.columnOverrides[key] = value;
 
     expect(sameConfig(base(), changed)).toBe(false);
+  });
+});
+
+describe('inspector size', () => {
+  it('is private state, so a drag never writes to settings.json or syncs to another machine', () => {
+    expect(PRIVATE_SECTIONS).toContain('inspector.sideSize');
+  });
+
+  it('reads the dragged size from globalState, and null before any drag', () => {
+    const stored = mockMemento({ 'inspector.sideSize': 900, 'inspector.bottomSize': 300 });
+    expect(getInspectorState(stored)).toMatchObject({ sideSize: 900, bottomSize: 300 });
+    // A stored pixel default would keep a later default from reaching this user.
+    expect(getInspectorState(mockMemento()).sideSize).toBeNull();
+    expect(getInspectorState(mockMemento()).bottomSize).toBeNull();
   });
 });
 
