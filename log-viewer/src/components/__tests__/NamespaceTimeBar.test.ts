@@ -10,11 +10,13 @@ let apexLog: ApexLog | null = null;
 
 import { logStoreFor } from '#core/log/LogStore.js';
 import { setRange } from '#core/log/rangeScope.js';
+import { WINDOW_UNREADABLE_TEXT } from '#core/log/windowStats.js';
 import type { NamespaceTimeBar } from '../NamespaceTimeBar.js';
 import { DEFAULT_MAX_SEGMENTS } from '../StackedTimeBar.js';
 import '../NamespaceTimeBar.js';
 import { logNamespacePalette } from '../namespacePalette.js';
 import { namespaceEvent, log, type FakeEvent } from './fixtures/logEvents.js';
+import { failWindowIndex } from '#test-helpers/apexLog.js';
 
 const logOf = async (children: FakeEvent[]): Promise<void> => {
   apexLog = (await log(children)).log;
@@ -171,5 +173,18 @@ describe('namespace-time-bar with a timeline window', () => {
     expect(bars[0]?.value).toBeCloseTo(250, 3);
     expect(bars[1]?.value).toBeCloseTo(100, 3);
     expect(bars[0]?.color).toBe(logNamespacePalette(apexLog!)('pkg'));
+  });
+
+  // A failed read of the window left the section saying "Adding up" for good.
+  it('says it cannot add up a window whose log it cannot read', async () => {
+    await logOf([namespaceEvent('default', 100)]);
+    const store = logStoreFor(apexLog!);
+    failWindowIndex(store);
+    setRange({ start: 0, end: 50 });
+
+    const element = await mount();
+
+    expect(element.shadowRoot?.querySelector('section-skeleton')).toBeNull();
+    expect(element.shadowRoot?.querySelector('.note')?.textContent).toBe(WINDOW_UNREADABLE_TEXT);
   });
 });

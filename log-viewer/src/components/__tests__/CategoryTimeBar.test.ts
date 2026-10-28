@@ -5,8 +5,10 @@
  */
 import { afterEach, beforeEach, describe, expect, it, jest } from '@jest/globals';
 
-import { storeOf } from '#test-helpers/apexLog.js';
+import { failWindowIndex, storeOf } from '#test-helpers/apexLog.js';
 import { LogStore } from '#core/log/LogStore.js';
+import { setRange } from '#core/log/rangeScope.js';
+import { WINDOW_UNREADABLE_TEXT } from '#core/log/windowStats.js';
 import type { CategoryTimeBar } from '../CategoryTimeBar.js';
 import '../CategoryTimeBar.js';
 
@@ -43,6 +45,7 @@ describe('category-time-bar', () => {
 
   afterEach(() => {
     jest.restoreAllMocks();
+    setRange(null);
   });
 
   it("draws the log's self time by category once its index is built", async () => {
@@ -73,6 +76,18 @@ describe('category-time-bar', () => {
     const element = await mount((await storeOf(LOG)).store);
 
     expect(element.shadowRoot?.querySelector('section-skeleton')?.pending).toBe(false);
+  });
+
+  // It drew the whole log's bar under a window it could not add up.
+  it('says it cannot add up a window whose log it cannot read', async () => {
+    const { store } = await storeOf(LOG);
+    failWindowIndex(store);
+    setRange({ start: 1000, end: 1400 });
+
+    const element = await mount(store);
+
+    expect(labels(element)).toEqual([]);
+    expect(element.shadowRoot?.querySelector('.note')?.textContent).toBe(WINDOW_UNREADABLE_TEXT);
   });
 
   it('keeps the parse skeleton until a log arrives', async () => {
