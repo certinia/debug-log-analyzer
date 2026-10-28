@@ -251,16 +251,10 @@ export class DockLayout extends LitElement {
     gutter.releasePointerCapture(e.pointerId);
 
     if (collapse) {
-      this.dispatchEvent(new CustomEvent('dock-collapse', { bubbles: true, composed: true }));
+      this.dispatchEvent(new CustomEvent('dock-collapse'));
     } else if (finalSize !== null && finalSize !== startSize) {
       // A click must not store the default size, or a later default never reaches this user.
-      this.dispatchEvent(
-        new CustomEvent('dock-resize', {
-          detail: { size: finalSize },
-          bubbles: true,
-          composed: true,
-        }),
-      );
+      this.dispatchEvent(new CustomEvent('dock-resize', { detail: { size: finalSize } }));
     }
   };
 
