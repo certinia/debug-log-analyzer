@@ -14,6 +14,7 @@ export {
   type GridRowDetail,
   type GridSelectDetail,
   type GridSort,
+  type GoToResult,
 } from './lv-grid.js';
 export { gridStyles } from './styles.js';
 export { browserScheduler } from './yield.js';

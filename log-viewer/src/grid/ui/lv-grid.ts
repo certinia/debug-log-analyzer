@@ -344,6 +344,11 @@ export class LvGrid<R extends object = object> extends LitElement {
     this.scrollerRef.value?.focus(options);
   }
 
+  /** The header row's height in px, read from layout on each call; 0 before the first render. */
+  get headerHeight(): number {
+    return this.renderRoot.querySelector<HTMLElement>('.head')?.offsetHeight ?? 0;
+  }
+
   /**
    * Clears the selection and reports it in `lv-grid-select`. Does nothing when no row is
    * selected. True when it cleared one.

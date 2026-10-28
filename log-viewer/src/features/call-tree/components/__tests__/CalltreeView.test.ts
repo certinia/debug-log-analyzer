@@ -72,6 +72,9 @@ function heldBuild(options: unknown): Promise<object[]> {
   return new Promise((resolve) => (finishBuild = resolve));
 }
 
+/** The hidden-row bar's Clear, by its accessible name. */
+const CLEAR_BUTTON = '[aria-label="Clear filters and go to the hidden row"]';
+
 /** The grids in the view's DOM. */
 function grids(view: CalltreeView): Element[] {
   return [...view.renderRoot.querySelectorAll('lv-call-tree-grid')];
@@ -585,7 +588,8 @@ describe('calltree-view merged filters', () => {
 });
 
 describe('calltree-view inspector reveal', () => {
-  // Outer calls Inner, so Outer heads its own bucket and is Inner's caller row too.
+  // Outer calls Inner, so Outer heads its own bucket and is Inner's caller row too. The debug
+  // line is a detail, which Bottom-Up hides while Details is off.
   let store: LogStore;
   let view: CalltreeView;
 
@@ -594,6 +598,7 @@ describe('calltree-view inspector reveal', () => {
     holdBuilds = true;
     ({ store } = await storeOf(
       '09:18:22.6 (1000)|METHOD_ENTRY|[1]|01p|ns.Outer.run()\n' +
+        '09:18:22.6 (1500)|USER_DEBUG|[2]|DEBUG|hello\n' +
         '09:18:22.6 (2000)|METHOD_ENTRY|[2]|01p|ns.Inner.go()\n' +
         '09:18:22.6 (3000)|METHOD_EXIT|[2]|ns.Inner.go()\n' +
         '09:18:22.6 (5001000)|METHOD_EXIT|[1]|ns.Outer.run()\n',
@@ -606,26 +611,111 @@ describe('calltree-view inspector reveal', () => {
     view.remove();
   });
 
-  it('reveals the Bottom-Up bucket a frame heads, not a caller row it sits in', async () => {
+  const note = () => view.renderRoot.querySelector('.hidden-note');
+  const bucketOf = (roots: BottomUpRow[], text: string) =>
+    roots.find((row) => row.text === text)?.id;
+
+  /** Shows Bottom-Up, built from the real log, and returns its rows. */
+  async function toBottomUp(): Promise<BottomUpRow[]> {
     const switched = view._setViewMode('bottom-up');
     await settle();
     const roots = toBottomUpTree(await store.logIndex(), store);
     finishBuild?.(roots);
     await switched;
+    return roots;
+  }
+
+  function hideEveryNamespace(): void {
+    view.renderRoot.querySelector('datagrid-facet-filter[label="Namespace"]')?.dispatchEvent(
+      new CustomEvent('datagrid-facet-change', {
+        detail: { selected: ['other'] },
+        bubbles: true,
+      }),
+    );
+  }
+
+  function reveal(text: string): void {
+    eventBus.emit('inspector:reveal', { source: 'calltree', eventIndex: indexOf(store.log, text) });
+  }
+
+  it('reveals the Bottom-Up bucket a frame heads, not a caller row it sits in', async () => {
+    const roots = await toBottomUp();
     const grid = view.bottomUpGrid;
     if (!grid) {
       throw new Error('no bottom-up grid');
     }
     const goTo = jest.spyOn(grid, 'goTo').mockResolvedValue('selected');
 
-    eventBus.emit('inspector:reveal', {
-      source: 'calltree',
-      eventIndex: indexOf(store.log, 'ns.Outer.run()'),
-    });
+    reveal('ns.Outer.run()');
     await settle();
 
-    const bucket = roots.find((row) => row.text === 'ns.Outer.run()');
-    expect(goTo).toHaveBeenCalledWith([bucket?.id], { scrollIfVisible: false });
+    expect(goTo).toHaveBeenCalledWith([bucketOf(roots, 'ns.Outer.run()')], {
+      scrollIfVisible: false,
+    });
+  });
+
+  // #1211: a finding in a filtered-out namespace selected nothing, with no word why. Clear
+  // then went through the go-to path, which switches to Time Order.
+  it('says so when a reveal names a row the filters hide, and Clear reaches it in the view on show', async () => {
+    const roots = await toBottomUp();
+    hideEveryNamespace();
+
+    reveal('ns.Outer.run()');
+    await settle();
+    await view.updateComplete;
+    expect(note()?.textContent).toContain('Row hidden by current filters');
+
+    note()?.querySelector<HTMLElement>(CLEAR_BUTTON)?.click();
+    await settle();
+    await view.updateComplete;
+
+    expect(view.viewMode).toBe('bottom-up');
+    expect(view.bottomUpGrid?.selectedKey).toBe(bucketOf(roots, 'ns.Outer.run()'));
+    expect(note()).toBeNull();
+  });
+
+  // Only Time Order knew Details could hide a row, so a grouped view left a detail hidden.
+  it('turns Details on, with no bar, to reveal a Bottom-Up bucket only Details hides', async () => {
+    const roots = await toBottomUp();
+
+    reveal('DEBUG | hello');
+    await settle();
+    await view.updateComplete;
+
+    const details = [...view.renderRoot.querySelectorAll('button.pill-toggle')].find(
+      (button) => button.textContent?.trim() === 'Details',
+    );
+    expect(details?.getAttribute('aria-pressed')).toBe('true');
+    expect(view.bottomUpGrid?.selectedKey).toBe(bucketOf(roots, 'DEBUG | hello'));
+    expect(note()).toBeNull();
+  });
+
+  // The bar of a reveal named a row of the view left behind, and Clear reset filters for it.
+  it('drops the bar when the view changes', async () => {
+    await toBottomUp();
+    hideEveryNamespace();
+    reveal('ns.Outer.run()');
+    await settle();
+    await view.updateComplete;
+    expect(note()).not.toBeNull();
+
+    await view._setViewMode('time-order');
+    await view.updateComplete;
+
+    expect(note()).toBeNull();
+  });
+
+  // A reveal still running when the view changed put its bar over the new view.
+  it('shows no bar from a reveal the view changed under', async () => {
+    await toBottomUp();
+    hideEveryNamespace();
+
+    reveal('ns.Outer.run()');
+    await view._setViewMode('time-order');
+    await settle();
+    await view.updateComplete;
+
+    expect(note()).toBeNull();
   });
 });
 
@@ -663,7 +753,7 @@ describe('calltree-view go to row', () => {
     const announced = () => view.renderRoot.querySelector('[role="status"]')?.textContent?.trim();
     const pressed = (label: string) => togglePressed(view, label);
     const pressClear = async () => {
-      note()!.querySelector('button')!.click(); // each caller has just shown the note
+      note()!.querySelector<HTMLElement>(CLEAR_BUTTON)!.click(); // each caller has just shown the note
       await settle();
       await view.updateComplete;
     };
@@ -688,7 +778,7 @@ describe('calltree-view go to row', () => {
       await view.updateComplete;
 
       expect(view.timeOrderGrid?.selectedKey).toBe(indexOf(log, 'ns.Outer.run()'));
-      expect(note()?.textContent).toContain('Hidden by filters');
+      expect(note()?.textContent).toContain('Row hidden by current filters');
       expect(announced()).toContain('filters hide that row');
       expect(pressed('Debug Only')).toBe('true');
     });
@@ -709,19 +799,32 @@ describe('calltree-view go to row', () => {
       expect(note()).toBeNull();
     });
 
-    // An issue card can name a leaf that takes no time; clearing every other filter left it hidden.
-    it('turns Details on when Details is what hides the row', async () => {
+    // An issue card can name a detail, such as a debug line. Details only sets how much shows,
+    // so it is turned on, not reported; the bar is for the filters that set what shows.
+    it('turns Details on, with no bar, when Details is what hides the row', async () => {
       const { log } = await storeOf(LOG);
       view = await mountView(log);
       const hello = indexOf(log, 'DEBUG | hello');
+
       await view._goToRow(hello);
       await view.updateComplete;
-      expect(view.timeOrderGrid?.selectedKey).toBe(indexOf(log, 'ns.Outer.run()'));
-
-      await pressClear();
 
       expect(pressed('Details')).toBe('true');
       expect(view.timeOrderGrid?.selectedKey).toBe(hello);
+      expect(note()).toBeNull();
+    });
+
+    // Turning Details on cancelled the go-to doing it, so a namespace still hiding the row went unsaid.
+    it('turns Details on and still says so when a namespace hides the row too', async () => {
+      const { log } = await storeOf(LOG);
+      view = await mountView(log);
+      view._handleNamespaceFacet(new CustomEvent('facet', { detail: { selected: ['other'] } }));
+
+      await view._goToRow(indexOf(log, 'DEBUG | hello'));
+      await view.updateComplete;
+
+      expect(pressed('Details')).toBe('true');
+      expect(note()).not.toBeNull();
     });
 
     it('turns Details back off on Clear when only the Type pick turned it on', async () => {
@@ -788,8 +891,9 @@ describe('calltree-view go to row', () => {
         disconnect(): void {}
       } as unknown as typeof IntersectionObserver;
       view = await mountView(log);
+      view._handleNamespaceFacet(new CustomEvent('facet', { detail: { selected: ['other'] } }));
 
-      await view._goToRow(indexOf(log, 'DEBUG | hello'));
+      await view._goToRow(indexOf(log, 'ns.Inner.go()'));
       show();
       await settle();
       await view.updateComplete;

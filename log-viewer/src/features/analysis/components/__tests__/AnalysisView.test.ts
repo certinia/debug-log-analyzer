@@ -227,6 +227,151 @@ describe('analysis-view', () => {
     });
   });
 
+  describe('hidden-row bar', () => {
+    const note = () => view.renderRoot.querySelector('.hidden-note');
+    const gridFocused = () => (view.renderRoot as ShadowRoot).activeElement === grid();
+    const pickNamespaces = async (selected: string[]) => {
+      view.renderRoot
+        .querySelector('datagrid-facet-filter[label="Namespace"]')
+        ?.dispatchEvent(
+          new CustomEvent('datagrid-facet-change', { detail: { selected }, bubbles: true }),
+        );
+      await view.updateComplete;
+    };
+    const reveal = async (eventIndex: number) => {
+      eventBus.emit('inspector:reveal', { source: 'analysis', eventIndex });
+      await settle();
+      await view.updateComplete;
+    };
+
+    // #1211: a finding in a filtered-out namespace selected nothing, with no word why.
+    it('says so when a reveal names a bucket the filters hide, and Clear reaches it', async () => {
+      await pickNamespaces(['other']);
+
+      await reveal(2);
+      expect(note()?.textContent).toContain('Row hidden by current filters');
+      expect(grid().selectedKey).toBeNull();
+
+      note()
+        ?.querySelector<HTMLElement>('[aria-label="Clear filters and go to the hidden row"]')
+        ?.click();
+      await settle();
+      await view.updateComplete;
+
+      expect(grid().selectedKey).toBe(findRow(roots(), 'B').id);
+      expect(note()).toBeNull();
+      // The button went with the bar; focus left on the body strands a keyboard user.
+      expect(gridFocused()).toBe(true);
+    });
+
+    it.each([
+      ['the close button', () => note()?.querySelector<HTMLElement>('[label="Close"]')?.click()],
+      [
+        'Escape',
+        () => note()?.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })),
+      ],
+    ])('goes on %s, keeping the filters as chosen', async (_how, close) => {
+      await pickNamespaces(['other']);
+      const filters = grid().filters;
+      await reveal(2);
+
+      close();
+      await view.updateComplete;
+
+      expect(note()).toBeNull();
+      expect(grid().filters).toEqual(filters);
+      expect(gridFocused()).toBe(true);
+    });
+
+    // The bar named a row the new filters may show.
+    it('goes when a filter changes', async () => {
+      await pickNamespaces(['other']);
+      await reveal(2);
+
+      await pickNamespaces(['another']);
+
+      expect(note()).toBeNull();
+    });
+
+    it('stays away when a filter change overtakes the reveal', async () => {
+      await pickNamespaces(['other']);
+      const goTo = grid().goTo.bind(grid());
+      jest.spyOn(grid(), 'goTo').mockImplementation(async (path, options) => {
+        const going = goTo(path, options);
+        await pickNamespaces(['another']);
+        return going;
+      });
+
+      await reveal(2);
+
+      expect(note()).toBeNull();
+    });
+
+    // The Details change the reveal makes invalidated the reveal itself, so no bar showed.
+    it('shows when Details is turned on for the reveal and a namespace still hides the bucket', async () => {
+      await pickNamespaces(['other']);
+
+      await reveal(DEBUG_LINE);
+
+      expect(note()).not.toBeNull();
+    });
+
+    // A reveal that found no bucket left the bar of the reveal before it.
+    it('goes when the next reveal names no bucket', async () => {
+      await pickNamespaces(['other']);
+      await reveal(2);
+
+      await reveal(9_999);
+
+      expect(note()).toBeNull();
+    });
+
+    it('goes when a new log loads', async () => {
+      await pickNamespaces(['other']);
+      await reveal(2);
+
+      view.logStore = logStoreFor(await recursiveLog());
+      await settle();
+      await view.updateComplete;
+
+      expect(note()).toBeNull();
+    });
+
+    // A host can rebuild its grid on re-attach, as Call Tree does, so the bar would name a row of the old one.
+    it('goes when the view is detached', async () => {
+      await pickNamespaces(['other']);
+      await reveal(2);
+
+      view.remove();
+      document.body.append(view);
+      await view.updateComplete;
+
+      expect(note()).toBeNull();
+    });
+
+    // Clear took focus back from an inspector click made while its go-to ran.
+    it('leaves focus where the user put it while Clear ran', async () => {
+      await pickNamespaces(['other']);
+      await reveal(2);
+      const elsewhere = document.createElement('button');
+      document.body.append(elsewhere);
+      const goTo = grid().goTo.bind(grid());
+      jest.spyOn(grid(), 'goTo').mockImplementation(async (path, options) => {
+        elsewhere.focus();
+        return goTo(path, options);
+      });
+
+      note()
+        ?.querySelector<HTMLElement>('[aria-label="Clear filters and go to the hidden row"]')
+        ?.click();
+      await settle();
+      await view.updateComplete;
+
+      expect(document.activeElement).toBe(elsewhere);
+      elsewhere.remove();
+    });
+  });
+
   it('moves to the bucket a picked inspector row names, and only marks for a hover', async () => {
     const goTo = jest.spyOn(grid(), 'goTo').mockResolvedValue('selected');
     const bucketB = findRow(roots(), 'B').id;
