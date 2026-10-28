@@ -294,6 +294,13 @@ export class VsSelect extends VscodeSingleSelect {
   @property({ type: Boolean, reflect: true })
   filterActive = false;
 
+  /**
+   * Picking the selected option again, by click or Enter, sets this value, e.g. `All` to clear
+   * a filter. Must be one of the options. Empty: off.
+   */
+  @property({ type: String })
+  deselectValue = '';
+
   /** Reactive mirror of the native `slot` attribute so the control re-renders as
    *  an aligned label + select row when `<overflow-list>` moves it into its panel. */
   @property({ attribute: 'slot' }) slot = '';
@@ -326,6 +333,35 @@ export class VsSelect extends VscodeSingleSelect {
     this.dispatchEvent(
       new CustomEvent('vs-reset-option', { detail: { value }, bubbles: true, composed: true }),
     );
+  }
+
+  protected override _onOptionClick(event: MouseEvent): void {
+    const row = (event.target as Element).closest<HTMLElement>('li.option:not(.disabled)');
+    if (!this._deselect(Number(row?.dataset.index))) {
+      super._onOptionClick(event);
+    }
+  }
+
+  protected override _onEnterKeyDown(event: KeyboardEvent): void {
+    if (!this.open || !this._deselect(this._opts.activeIndex)) {
+      super._onEnterKeyDown(event);
+    }
+  }
+
+  /** Goes back to `deselectValue` when the option at `index` is the selected one; says whether it did. */
+  private _deselect(index: number): boolean {
+    if (
+      this.deselectValue === '' ||
+      this.value === this.deselectValue ||
+      index !== this._opts.selectedIndex
+    ) {
+      return false;
+    }
+    this._isBeingFiltered = false;
+    this.value = this.deselectValue;
+    this.open = false;
+    this._dispatchChangeEvent();
+    return true;
   }
 
   protected override _renderOptions(): TemplateResult | TemplateResult[] {

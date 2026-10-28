@@ -414,6 +414,7 @@ export class CalltreeView extends LitElement {
                         prefix="Type"
                         label="Type"
                         emptyValue=""
+                        deselectValue="All"
                         combobox
                         filter="fuzzy"
                         .filterActive="${this.typeFilter !== 'All'}"
