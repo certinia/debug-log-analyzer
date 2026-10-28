@@ -1,7 +1,7 @@
 /*
  * Copyright (c) 2025 Certinia Inc. All rights reserved.
  */
-import { LitElement, css, html, unsafeCSS } from 'lit';
+import { LitElement, css, html, unsafeCSS, type PropertyValues } from 'lit';
 import { customElement, property, state } from 'lit/decorators.js';
 
 import { globalStyles } from '../styles/global.styles.js';
@@ -34,7 +34,7 @@ export class DockLayout extends LitElement {
   @property({ attribute: false })
   size: number | null = null;
 
-  /** Any CSS length, so a default can follow the view, as a percentage does. */
+  /** A CSS length with its unit, as `560px` or `33.333%`; a percentage is of the layout on the dock axis. */
   @property({ type: String })
   defaultSize = '50%';
 
@@ -129,6 +129,7 @@ export class DockLayout extends LitElement {
       detail-dock {
         flex: 0 0 auto;
         overflow: hidden;
+        box-sizing: border-box;
       }
       .layout[data-dock='right'] detail-dock {
         border-left: var(--lana-stroke) solid var(--lana-panel-divider);
@@ -151,6 +152,13 @@ export class DockLayout extends LitElement {
       }
     `,
   ];
+
+  willUpdate(changed: PropertyValues<this>): void {
+    // Hiding removes the gutter, so a drag in progress gets no lostpointercapture of its own.
+    if (changed.has('visible') && !this.visible) {
+      this._clearDrag();
+    }
+  }
 
   render() {
     return html`
@@ -196,8 +204,9 @@ export class DockLayout extends LitElement {
   }
 
   private _shownSize(): number {
-    const dock = this.renderRoot?.querySelector<HTMLElement>('detail-dock');
-    return (this.dock === 'bottom' ? dock?.offsetHeight : dock?.offsetWidth) ?? MIN_SIZE;
+    // A drag starts on the gutter, which only renders beside the dock.
+    const dock = this.renderRoot.querySelector<HTMLElement>('detail-dock')!;
+    return this.dock === 'bottom' ? dock.offsetHeight : dock.offsetWidth;
   }
 
   private _maxSize(): number | null {
@@ -268,6 +277,10 @@ export class DockLayout extends LitElement {
     gutter.removeEventListener('pointermove', this._onResizeMove);
     gutter.removeEventListener('pointerup', this._endResize);
     gutter.removeEventListener('lostpointercapture', this._cancelResize);
+    this._clearDrag();
+  }
+
+  private _clearDrag(): void {
     this._resizeStart = null;
     this._liveSize = null;
     this._pendingCollapse = false;
