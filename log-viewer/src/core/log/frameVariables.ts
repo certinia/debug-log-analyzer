@@ -49,17 +49,17 @@ export interface VariableRow {
   objectAddress: string | null;
 }
 
-/** What the log holds for one address, as a frame stood. */
+/** What the log holds for one address, as it stood at `readAt`. */
 export interface AddressState {
-  /** The value the log wrote for it at or before the frame, or null. */
+  /** The value the log wrote for it at or before `readAt`, or null. */
   text: string | null;
-  /** Where the log first describes the object after the frame, so the reader can
-   *  be sent to it. Null where the log describes it nowhere. */
-  laterAt: number | null;
+  /** Event id of the first write after `readAt` that states the value, when none at
+   *  or before it does; else null. */
+  laterWriteId: number | null;
 }
 
 /** The log holds nothing for the address, at any point. */
-export const NOT_RECORDED: AddressState = { text: null, laterAt: null };
+export const NOT_RECORDED: AddressState = { text: null, laterWriteId: null };
 
 /** One class's statics, since every static the log names is class-qualified. */
 export interface StaticClass {
@@ -72,7 +72,7 @@ export interface FrameVariables {
   frameLabel: string;
   /** The event these were read at, so a reader resolving an address asks for the
    *  value as it stood here. */
-  cut: number;
+  readAt: number;
   /** The class owning the fields: the type `this` was declared as, else the class the frame names. */
   thisType: string | null;
   locals: VariableRow[];
@@ -100,11 +100,11 @@ export class VariableIndex {
   }
 
   /**
-   * The lookups an address needs, bound to event `cut`. A tree row asks about the
+   * The lookups an address needs, bound to event `readAt`. A tree row asks about the
    * same address many times as it renders, so each answer is held.
    */
-  viewAt(cut: number): IndexView {
-    const event = this.log.event(cut);
+  viewAt(readAt: number): IndexView {
+    const event = this.log.event(readAt);
     const objects = new Map<string, ObjectState | null>();
     const objectAt = (address: string): ObjectState | null => {
       let held = objects.get(address);
@@ -119,7 +119,7 @@ export class VariableIndex {
       resolve: (address) => {
         const object = objectAt(address);
         return object
-          ? { text: object.value, laterAt: object.laterWrite?.id ?? null }
+          ? { text: object.value, laterWriteId: object.laterWrite?.id ?? null }
           : NOT_RECORDED;
       },
       classOf: (address) => objectAt(address)?.className ?? null,
@@ -167,7 +167,7 @@ export function frameVariablesFor(
   const frameLabel = scope.text ?? scope.type;
   return {
     frameLabel,
-    cut: eventIndex,
+    readAt: eventIndex,
     thisType:
       variables.this?.type ??
       (scope.type === 'CONSTRUCTOR_ENTRY' ? scope.field('className') : classFromFrame(frameLabel)),

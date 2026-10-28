@@ -118,9 +118,9 @@ describe('frameVariablesFor', () => {
     expect(frameVariablesFor(store, 99_999)).toBeNull();
   });
 
-  // A frame asked about once is scanned straight from its children, bounded at
-  // the cut; a frame asked about twice is read into a memo. Both must answer the
-  // same, or looking at a row a second time would change it.
+  // A frame asked about once is scanned straight from its children, bounded where
+  // it is read; a frame asked about twice is read into a memo. Both must answer the same,
+  // or looking at a row a second time would change it.
   it('answers the same however many times a frame has been read', async () => {
     const { log, store } = await storeOf(
       '09:18:22.6 (1000)|METHOD_ENTRY|[1]|01p|ns.Svc.run()\n' +
@@ -438,7 +438,7 @@ describe('VariableIndex address resolution', () => {
 
     expect(alias?.address).toBe('0xd854c6b');
     expect(alias?.value).toBe('0xd854c6b');
-    expect(index.viewAt(frame.cut).resolve('0xd854c6b').text).toBe('{"Id":"001"}');
+    expect(index.viewAt(frame.readAt).resolve('0xd854c6b').text).toBe('{"Id":"001"}');
     // A value that is not an address is left alone.
     expect(frame.locals.find((row) => row.name === 'held')?.address).toBeNull();
   });
@@ -456,7 +456,7 @@ describe('VariableIndex address resolution', () => {
 
   // The address names an object whose contents change, so answering with a
   // later write would show a state the frame never saw.
-  it('answers as the value stood at the cut, not a later one', async () => {
+  it('answers as the value stood where it was read, not a later one', async () => {
     const { log, store } = await storeOf(
       '09:18:22.6 (1000)|METHOD_ENTRY|[1]|01p|ns.First.run()\n' +
         '09:18:22.6 (1050)|VARIABLE_ASSIGNMENT|[2]|held|{"n":1}|0xaaa\n' +
@@ -472,8 +472,8 @@ describe('VariableIndex address resolution', () => {
     const first = frameVariablesFor(store, indexOf(log, 'ns.First.run()'))!;
     const second = frameVariablesFor(store, indexOf(log, 'ns.Second.run()'))!;
 
-    expect(index.viewAt(first.cut).resolve('0xaaa').text).toBe('{"n":1}');
-    expect(index.viewAt(second.cut).resolve('0xaaa').text).toBe('{"n":2}');
+    expect(index.viewAt(first.readAt).resolve('0xaaa').text).toBe('{"n":1}');
+    expect(index.viewAt(second.readAt).resolve('0xaaa').text).toBe('{"n":2}');
   });
 
   it('holds nothing for an address the log never serialised', async () => {
@@ -487,7 +487,7 @@ describe('VariableIndex address resolution', () => {
     const frame = frameVariablesFor(store, indexOf(log, 'ns.Outer.run()'))!;
 
     expect(frame.locals[0]?.address).toBe('0xbbb');
-    expect(index.viewAt(frame.cut).resolve('0xbbb')).toEqual({ text: null, laterAt: null });
+    expect(index.viewAt(frame.readAt).resolve('0xbbb')).toEqual({ text: null, laterWriteId: null });
   });
 
   // On a `this.field` line the reported address is the object the field belongs
@@ -664,7 +664,7 @@ describe('VariableIndex nested addresses', () => {
     expect(index.viewAt(store.log.eventCount).resolve('0x6c98700c').text).toBe('{"RowLimit":3000}');
   });
 
-  it('reads it as it stood at the cut', async () => {
+  it('reads it as it stood when read', async () => {
     const { log, store } = await storeOf(
       '09:18:22.6 (1000)|METHOD_ENTRY|[1]|01p|ns.First.run()\n' +
         '09:18:22.6 (1050)|VARIABLE_ASSIGNMENT|[2]|filter|{"n":1}|0xaaa\n' +
@@ -677,7 +677,7 @@ describe('VariableIndex nested addresses', () => {
     const index = await store.derive(variableIndex);
     const first = frameVariablesFor(store, indexOf(log, 'ns.First.run()'));
 
-    expect(index.viewAt(first!.cut).resolve('0xaaa').text).toBe('{"n":1}');
+    expect(index.viewAt(first!.readAt).resolve('0xaaa').text).toBe('{"n":1}');
     expect(index.viewAt(store.log.eventCount).resolve('0xaaa').text).toBe('{"n":2}');
   });
 });
@@ -725,11 +725,11 @@ describe('VariableIndex object fields', () => {
     const first = frameVariablesFor(store, indexOf(log, 'ns.Caller.run()'))!;
     const later = frameVariablesFor(store, indexOf(log, 'ns.Caller.later()'))!;
 
-    expect(index.viewAt(first.cut).fields('0xaaa')).toMatchObject([
+    expect(index.viewAt(first.readAt).fields('0xaaa')).toMatchObject([
       { name: 'rows', value: '5' },
       {},
     ]);
-    expect(index.viewAt(later.cut).fields('0xaaa')).toMatchObject([
+    expect(index.viewAt(later.readAt).fields('0xaaa')).toMatchObject([
       { name: 'rows', value: '9' },
       {},
     ]);
@@ -781,7 +781,7 @@ describe('VariableIndex object fields', () => {
 
     expect(
       index
-        .viewAt(frame.cut)
+        .viewAt(frame.readAt)
         .fields('0xbbb')
         .map((row) => row.name),
     ).toEqual(['two']);
@@ -839,7 +839,7 @@ describe('VariableIndex object fields', () => {
 
     expect(
       index
-        .viewAt(frame.cut)
+        .viewAt(frame.readAt)
         .fields('0xbbb')
         .map((row) => row.name),
     ).toEqual(['second']);

@@ -372,10 +372,10 @@ export class VariablesDetail extends LitElement {
       ? // Read through what is held: a walk that has yet to answer shows its
         // placeholder, never the last row's spread.
         this._spread
-        ? toSpreadRows(this._spread, isOpen, (cut) => this._viewAt(cut))
+        ? toSpreadRows(this._spread, isOpen, (readAt) => this._viewAt(readAt))
         : []
       : frame
-        ? toTreeRows(frame, isOpen, this._viewAt(frame.cut))
+        ? toTreeRows(frame, isOpen, this._viewAt(frame.readAt))
         : [];
     this._at = new Map(this._rows.map((row, at) => [row.id, at]));
     // Fixed here, so neither is rescanned on every render.
@@ -396,11 +396,11 @@ export class VariablesDetail extends LitElement {
   });
 
   /** The log bound to one point in it, held per point. */
-  private _viewAt(cut: number): Lookups {
-    let held = this._views.get(cut);
+  private _viewAt(readAt: number): Lookups {
+    let held = this._views.get(readAt);
     if (!held) {
-      held = this._index?.viewAt(cut) ?? {};
-      this._views.set(cut, held);
+      held = this._index?.viewAt(readAt) ?? {};
+      this._views.set(readAt, held);
     }
     return held;
   }
@@ -731,13 +731,13 @@ export class VariablesDetail extends LitElement {
     if (row.address === null || row.resolved || row.assembled) {
       return null;
     }
-    if (row.laterAt === null) {
+    if (row.laterWriteId === null) {
       return {
         text: 'no value recorded',
         why: 'The log holds no value for this address, at any point.',
       };
     }
-    const stack = this.logStore?.stackByEventIndex(row.laterAt) ?? [];
+    const stack = this.logStore?.stackByEventIndex(row.laterWriteId) ?? [];
     const where = stack[stack.length - 1]?.text;
     return {
       text: 'recorded later',
