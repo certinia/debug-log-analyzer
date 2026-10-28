@@ -3,7 +3,7 @@
  */
 import '#vscode-elements/vscode-icon.js';
 
-import { LitElement, css, html, nothing } from 'lit';
+import { LitElement, css, html, nothing, type PropertyValues } from 'lit';
 import { customElement, property, state } from 'lit/decorators.js';
 
 import { anchoredPopoverStyles } from '../styles/anchoredPopover.styles.js';
@@ -27,8 +27,21 @@ export class DatagridFacetFilter extends LitElement {
   /** Reactive mirror of the native `slot` attribute so the element re-renders
    *  when `<overflow-list>` moves it into (`overflow`) / out of its popover. */
   @property({ attribute: 'slot' }) slot = '';
+  /** The values on show as picked. A host that binds it owns the value; setting it reports no change. */
+  @property({
+    attribute: false,
+    hasChanged: (value: readonly string[], old?: readonly string[]) =>
+      value.length !== old?.length || value.some((item, i) => item !== old[i]),
+  })
+  selected: readonly string[] = [];
 
   @state() private _selected = new Set<string>();
+
+  protected override willUpdate(changed: PropertyValues<this>): void {
+    if (changed.has('selected')) {
+      this._selected = new Set(this.selected);
+    }
+  }
 
   private _anchorName = `--facet-anchor-${nextId++}`;
   private _popoverId = `facet-popover-${nextId}`;
@@ -184,7 +197,7 @@ export class DatagridFacetFilter extends LitElement {
           <button
             class="facet-popover__clear ${count > 0 ? 'visible' : ''}"
             ?disabled=${count === 0}
-            @click=${this.clear}
+            @click=${this._clear}
           >
             Clear
           </button>
@@ -222,8 +235,7 @@ export class DatagridFacetFilter extends LitElement {
     this._emit();
   }
 
-  /** Unpicks every value and reports none picked, as the Clear button does. */
-  clear(): void {
+  private _clear(): void {
     this._selected = new Set();
     this._emit();
   }

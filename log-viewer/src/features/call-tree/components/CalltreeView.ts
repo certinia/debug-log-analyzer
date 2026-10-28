@@ -54,6 +54,7 @@ import { MergedTree } from '../grid/mergedRows.js';
 import type { FilterRange } from '../../../components/grid/MinMax.js';
 import {
   callTreeFilters,
+  clearedFilters,
   deep,
   NO_FILTERS,
   RowFilterCache,
@@ -92,7 +93,6 @@ import {
   gridToolbarActions,
 } from '../../../components/gridToolbar.js';
 import {
-  clearGridFilters,
   hiddenAfterGoTo,
   HiddenRowController,
   hiddenRowNoteStyles,
@@ -391,6 +391,7 @@ export class CalltreeView extends LitElement {
               <datagrid-facet-filter
                 label="Namespace"
                 .values="${this.rootStore?.log.namespaces ?? []}"
+                .selected="${this._filterInputs.namespaces}"
                 @datagrid-facet-change="${this._handleNamespaceFacet}"
               ></datagrid-facet-filter>
 
@@ -429,12 +430,14 @@ export class CalltreeView extends LitElement {
               <datagrid-range-filter
                 label="Total Time"
                 unit="ms"
+                .range="${this._filterInputs.total}"
                 @datagrid-range-change="${this._handleTotalTimeRange}"
               ></datagrid-range-filter>
 
               <datagrid-range-filter
                 label="Self Time"
                 unit="ms"
+                .range="${this._filterInputs.self}"
                 @datagrid-range-change="${this._handleSelfTimeRange}"
               ></datagrid-range-filter>
 
@@ -883,10 +886,9 @@ export class CalltreeView extends LitElement {
   /** Clears the filters that can hide `hidden`'s row, then goes to it again the way it was reached. */
   private async _clearFiltersAndGo(hidden: RevealedRow): Promise<void> {
     const { eventId, revealed } = hidden;
-    clearGridFilters(this.renderRoot);
     this._setTypeFilter('');
     // Details is left as is: the go-to turns it on when it hides the row.
-    this._filterInputs = { ...this._filterInputs, debugOnly: false };
+    this._filterInputs = clearedFilters(this._filterInputs);
     this._updateFiltering();
     if (revealed) {
       await this._revealEventId(eventId, new AbortController().signal);

@@ -897,6 +897,7 @@ describe('calltree-view go to row', () => {
       const { log } = await storeOf(LOG);
       view = await mountView(log);
       filterBy.namespaces(view, ['other']);
+      filterBy.range(view, 'Total Time', 0);
       const inner = idOf(log, 'ns.Inner.go()');
       await view._goToRow(inner);
       await view.updateComplete;
@@ -907,6 +908,14 @@ describe('calltree-view go to row', () => {
       await pressClear();
 
       expect(view.timeOrderGrid?.selectedKey).toBe(inner);
+      // The controls show the reset, or they would still read as filtering.
+      expect(
+        widget<HTMLElement & { selected: string[] }>(view, 'datagrid-facet-filter').selected,
+      ).toEqual([]);
+      expect(
+        widget<HTMLElement & { range: object }>(view, 'datagrid-range-filter[label="Total Time"]')
+          .range,
+      ).toEqual({ start: null, end: null });
     });
 
     it('drops the note when a filter changes', async () => {

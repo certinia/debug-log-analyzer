@@ -30,7 +30,6 @@ import {
   gridToolbarActions,
 } from '../../../components/gridToolbar.js';
 import {
-  clearGridFilters,
   hiddenAfterGoTo,
   HiddenRowController,
   hiddenRowNoteStyles,
@@ -39,6 +38,7 @@ import type { GridColumn, GroupBy, RowFilter, RowKey, TreeSource } from '../../.
 import type { FilterRange } from '../../../components/grid/MinMax.js';
 import {
   callTreeFilters,
+  clearedFilters,
   NO_FILTERS,
   RowFilterCache,
   type CallTreeFilterInputs,
@@ -127,7 +127,7 @@ export class AnalysisView extends LitElement {
   private readonly _hiddenRows = new HiddenRowController(this, {
     grid: () => this.grid,
     onClear: async ({ eventId }) => {
-      clearGridFilters(this.renderRoot);
+      this._filterInputs = clearedFilters(this._filterInputs);
       await this._revealEventId(eventId, new AbortController().signal);
     },
   });
@@ -284,18 +284,21 @@ export class AnalysisView extends LitElement {
             <datagrid-facet-filter
               label="Namespace"
               .values="${this.logStore?.log.namespaces ?? []}"
+              .selected="${this._filterInputs.namespaces}"
               @datagrid-facet-change="${(e: CustomEvent<{ selected: string[] }>) =>
                 (this._filterInputs = { ...this._filterInputs, namespaces: e.detail.selected })}"
             ></datagrid-facet-filter>
             <datagrid-range-filter
               label="Total Time"
               unit="ms"
+              .range="${this._filterInputs.total}"
               @datagrid-range-change="${(e: CustomEvent<{ range: FilterRange }>) =>
                 (this._filterInputs = { ...this._filterInputs, total: e.detail.range })}"
             ></datagrid-range-filter>
             <datagrid-range-filter
               label="Self Time"
               unit="ms"
+              .range="${this._filterInputs.self}"
               @datagrid-range-change="${(e: CustomEvent<{ range: FilterRange }>) =>
                 (this._filterInputs = { ...this._filterInputs, self: e.detail.range })}"
             ></datagrid-range-filter>
