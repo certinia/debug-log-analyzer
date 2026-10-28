@@ -3,9 +3,9 @@
  */
 import { type ApexEvent, EVENT_TYPES } from '@apexdevtools/apex-log-parser';
 
-import { eventCategory, FRAME_CATEGORY } from '../category.js';
+import { eventCategory, TYPE_CATEGORY } from '../category.js';
 
-// Every frame type's category as v0.3 of the parser stated it, so the timeline keeps its colours.
+// Each frame type's v0.3 category, so the timeline keeps its colours; VF continuation frames are now System.
 const V03_FRAME_CATEGORIES: Record<string, readonly string[]> = {
   Callout: ['CALLOUT_REQUEST'],
   'Code Unit': ['CODE_UNIT_STARTED'],
@@ -22,8 +22,6 @@ const V03_FRAME_CATEGORIES: Record<string, readonly string[]> = {
     'SESSION_CACHE_PUT_BEGIN',
     'SESSION_CACHE_REMOVE_BEGIN',
     'VF_APEX_CALL_START',
-    'VF_DESERIALIZE_CONTINUATION_STATE_BEGIN',
-    'VF_SERIALIZE_CONTINUATION_STATE_BEGIN',
   ],
   System: [
     'CUMULATIVE_LIMIT_USAGE',
@@ -34,8 +32,10 @@ const V03_FRAME_CATEGORIES: Record<string, readonly string[]> = {
     'RLM_PRICING_BEGIN',
     'SYSTEM_CONSTRUCTOR_ENTRY',
     'SYSTEM_METHOD_ENTRY',
+    'VF_DESERIALIZE_CONTINUATION_STATE_BEGIN',
     'VF_DESERIALIZE_VIEWSTATE_BEGIN',
     'VF_EVALUATE_FORMULA_BEGIN',
+    'VF_SERIALIZE_CONTINUATION_STATE_BEGIN',
     'VF_SERIALIZE_VIEWSTATE_BEGIN',
   ],
   SOQL: ['CURSOR_CREATE_BEGIN', 'QUERY_MORE_BEGIN', 'SOQL_EXECUTE_BEGIN', 'SOSL_EXECUTE_BEGIN'],
@@ -66,20 +66,23 @@ const V03_FRAME_CATEGORIES: Record<string, readonly string[]> = {
 };
 
 describe('category', () => {
-  it('gives every frame type the category v0.3 of the parser gave it', () => {
+  it('gives every frame type its v0.3 category, but Visualforce continuation frames System', () => {
     const expected = new Map(
       Object.entries(V03_FRAME_CATEGORIES).flatMap(([category, types]) =>
         types.map((type) => [type, category]),
       ),
     );
     const frames = EVENT_TYPES.filter((info) => info.shape === 'frame');
-    const actual = new Map(frames.map((info) => [info.type, FRAME_CATEGORY[info.typeId]]));
+    const actual = new Map(frames.map((info) => [info.type, TYPE_CATEGORY[info.typeId]]));
     expect(actual).toEqual(expected);
   });
 
-  it('gives a leaf no category, whatever its type', () => {
-    const soql = (isFrame: boolean) => ({ type: 'SOQL_EXECUTE_BEGIN', isFrame }) as ApexEvent;
-    expect(eventCategory(soql(false))).toBe('');
-    expect(eventCategory(soql(true))).toBe('SOQL');
+  it.each([
+    ['QUERY_SQL_LOG', 'SOQL'],
+    ['SAVEPOINT_ROLLBACK', 'DML'],
+    ['VALIDATION_PASS', 'Validation'],
+    ['NOT_A_TYPE', ''],
+  ])('gives %s the category %s', (type, category) => {
+    expect(eventCategory({ type } as ApexEvent)).toBe(category);
   });
 });

@@ -75,7 +75,7 @@ describe('LogIndex', () => {
       index.categoryNames[index.categoryId[events.findIndex((event) => event.type === type)]!];
     expect(category('METHOD_ENTRY')).toBe('Apex');
     expect(category('SOQL_EXECUTE_BEGIN')).toBe('SOQL');
-    expect(category('STATEMENT_EXECUTE')).toBe('');
+    expect(category('STATEMENT_EXECUTE')).toBe('Apex');
   });
 
   it('finds the row of every event by id, and none for the log or an unknown id', async () => {
