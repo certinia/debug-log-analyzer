@@ -28,6 +28,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - 🔭 **Timeline inspector**: the summary, call tree included, changes to reflect what is currently visible. ([#875])
 - 🧹 **Details filter**: with Details off, the Call Tree, Analysis and Inspector show every method, query and DML, even one that took no time, and hide debug lines and variables. ([#1234])
   - Exceptions and limit usage stay in Time Order and Aggregated, and show in Bottom-Up and Analysis only with Details on.
+  - Picking a type that shows only with Details turns Details on, and back off when you pick a type that does not, unless Details was on already.
 - 🎨 **Styling**: updated for the VS Code Modern UI.
 - 🧮 **Limit strip**: the tooltip always shows the seen count when it differs from the usage Salesforce reported, not only where it is lower.
 
