@@ -219,6 +219,7 @@ export class DockLayout extends LitElement {
     };
     gutter.addEventListener('pointermove', this._onResizeMove);
     gutter.addEventListener('pointerup', this._endResize);
+    gutter.addEventListener('lostpointercapture', this._cancelResize);
   };
 
   private _onResizeMove = (e: PointerEvent) => {
@@ -243,17 +244,11 @@ export class DockLayout extends LitElement {
 
   private _endResize = (e: PointerEvent) => {
     const gutter = e.currentTarget as HTMLElement;
-    gutter.releasePointerCapture(e.pointerId);
-    gutter.classList.remove('gutter--active');
-    gutter.removeEventListener('pointermove', this._onResizeMove);
-    gutter.removeEventListener('pointerup', this._endResize);
-
     const collapse = this._pendingCollapse;
     const startSize = this._resizeStart?.size;
     const finalSize = this._liveSize;
-    this._resizeStart = null;
-    this._liveSize = null;
-    this._pendingCollapse = false;
+    this._stopResize(gutter);
+    gutter.releasePointerCapture(e.pointerId);
 
     if (collapse) {
       this.dispatchEvent(new CustomEvent('dock-collapse', { bubbles: true, composed: true }));
@@ -268,6 +263,21 @@ export class DockLayout extends LitElement {
       );
     }
   };
+
+  // The browser took the pointer mid-drag, so no pointerup will come.
+  private _cancelResize = (e: PointerEvent) => {
+    this._stopResize(e.currentTarget as HTMLElement);
+  };
+
+  private _stopResize(gutter: HTMLElement): void {
+    gutter.classList.remove('gutter--active');
+    gutter.removeEventListener('pointermove', this._onResizeMove);
+    gutter.removeEventListener('pointerup', this._endResize);
+    gutter.removeEventListener('lostpointercapture', this._cancelResize);
+    this._resizeStart = null;
+    this._liveSize = null;
+    this._pendingCollapse = false;
+  }
 
   private _resetSize = () => {
     this.dispatchEvent(new CustomEvent('dock-size-reset'));

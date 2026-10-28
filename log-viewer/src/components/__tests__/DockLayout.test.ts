@@ -134,6 +134,28 @@ describe('DockLayout resize', () => {
     expect(events).toEqual([]);
   });
 
+  it('ends a drag the browser cancels: the panel stops following the pointer and stores nothing', async () => {
+    const el = await mount('right', 500);
+    const events: Event[] = [];
+    for (const type of ['dock-resize', 'dock-collapse']) {
+      el.addEventListener(type, (e) => events.push(e));
+    }
+    const handle = gutter(el);
+    const pointer = (type: string, clientX: number) =>
+      Object.assign(new MouseEvent(type, { clientX, bubbles: true }), { pointerId: 1 });
+
+    handle.dispatchEvent(pointer('pointerdown', 800));
+    handle.dispatchEvent(pointer('pointermove', 700));
+    handle.dispatchEvent(pointer('lostpointercapture', 700));
+    handle.dispatchEvent(pointer('pointermove', 600));
+    handle.dispatchEvent(pointer('pointerup', 600));
+    await el.updateComplete;
+
+    const dock = el.shadowRoot?.querySelector('detail-dock') as HTMLElement;
+    expect(dock.style.width).toBe('500px');
+    expect(events).toEqual([]);
+  });
+
   it('lays out a panel never dragged at its default size, which may be relative to the view', async () => {
     const el = document.createElement('dock-layout') as DockLayout;
     el.dock = 'bottom';
