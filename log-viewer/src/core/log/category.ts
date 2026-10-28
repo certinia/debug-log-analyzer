@@ -3,6 +3,7 @@
  */
 import {
   type ApexEvent,
+  type DebugCategory,
   EVENT_TYPES,
   eventType,
   type EventTypeInfo,
@@ -24,44 +25,38 @@ export const LOG_CATEGORY = {
   Callout: 'Callout',
 } as const;
 
-/** A frame's timeline category; '' for a leaf, which has none. */
+/** An event's timeline category; '' only for a type the parser does not know. */
 export type LogCategory = (typeof LOG_CATEGORY)[keyof typeof LOG_CATEGORY] | '';
 
+// Where one debug category holds more than one of ours, as Database holds SOQL and DML.
 const BY_KIND: Partial<Record<Kind, LogCategory>> = {
   'code-unit': LOG_CATEGORY.CodeUnit,
-  execution: LOG_CATEGORY.Apex,
-  package: LOG_CATEGORY.Apex,
-  cache: LOG_CATEGORY.Apex,
   soql: LOG_CATEGORY.SOQL,
   sosl: LOG_CATEGORY.SOQL,
   dml: LOG_CATEGORY.DML,
-  callout: LOG_CATEGORY.Callout,
-  flow: LOG_CATEGORY.Automation,
-  workflow: LOG_CATEGORY.Automation,
-  nba: LOG_CATEGORY.Automation,
 };
 
-// The frames v0.3 of the parser put in Apex against their kind; kept so the timeline reads the same.
-const APEX_FRAMES = new Set([
-  'FORMULA_EVALUATE_BEGIN',
-  'VF_SERIALIZE_CONTINUATION_STATE_BEGIN',
-  'VF_DESERIALIZE_CONTINUATION_STATE_BEGIN',
-]);
+const BY_DEBUG_CATEGORY: Partial<Record<DebugCategory, LogCategory>> = {
+  apexCode: LOG_CATEGORY.Apex,
+  database: LOG_CATEGORY.DML,
+  workflow: LOG_CATEGORY.Automation,
+  nba: LOG_CATEGORY.Automation,
+  callout: LOG_CATEGORY.Callout,
+  validation: LOG_CATEGORY.Validation,
+};
 
-function frameCategory(info: EventTypeInfo): LogCategory {
+function typeCategory(info: EventTypeInfo): LogCategory {
+  // An Apex call, such as a VF_APEX_CALL_START logged under Visualforce.
   if (info.kind === 'method') {
     return info.debugCategory === 'system' ? LOG_CATEGORY.System : LOG_CATEGORY.Apex;
   }
-  if (APEX_FRAMES.has(info.type)) {
-    return LOG_CATEGORY.Apex;
-  }
-  return BY_KIND[info.kind] ?? LOG_CATEGORY.System;
+  return BY_KIND[info.kind] ?? BY_DEBUG_CATEGORY[info.debugCategory] ?? LOG_CATEGORY.System;
 }
 
-/** Each type's category when it opens a frame, by type id, as `columns.type` holds it. */
-export const FRAME_CATEGORY: readonly LogCategory[] = EVENT_TYPES.map(frameCategory);
+/** Each type's category, by type id, as `columns.type` holds it. */
+export const TYPE_CATEGORY: readonly LogCategory[] = EVENT_TYPES.map(typeCategory);
 
-/** `event`'s category: '' unless it is a frame. */
+/** `event`'s category, by its type. */
 export function eventCategory(event: ApexEvent): LogCategory {
-  return event.isFrame ? (FRAME_CATEGORY[eventType(event.type)?.typeId ?? -1] ?? '') : '';
+  return TYPE_CATEGORY[eventType(event.type)?.typeId ?? -1] ?? '';
 }

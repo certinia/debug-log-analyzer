@@ -3,19 +3,16 @@
  */
 import type { ApexEvent, ApexLog } from '@apexdevtools/apex-log-parser';
 
-import { FRAME_CATEGORY, LOG_CATEGORY, type LogCategory } from './category.js';
+import { LOG_CATEGORY, type LogCategory, TYPE_CATEGORY } from './category.js';
 
 /** What {@link LogIndex.rowOf} answers for an event that is not in the tree. */
 export const NO_ROW = -1;
 
-/** The {@link LogIndex.categoryId} of an event with no category: every leaf. */
-export const UNCATEGORISED = 0;
-
 /** Every category, by {@link LogIndex.categoryId}. */
 const CATEGORY_NAMES: readonly LogCategory[] = ['', ...Object.values(LOG_CATEGORY)];
 
-/** Each type's category id when it opens a frame, by type id. */
-const FRAME_CATEGORY_ID = Uint8Array.from(FRAME_CATEGORY, (category) =>
+/** Each type's category id, by type id. */
+const TYPE_CATEGORY_ID = Uint8Array.from(TYPE_CATEGORY, (category) =>
   CATEGORY_NAMES.indexOf(category),
 );
 
@@ -78,7 +75,7 @@ export interface LogIndex extends Readonly<Rows> {
   selfColumn<T extends Int32Array | Float64Array>(byId: T): T;
 }
 
-/** `row`'s category: '' for a leaf. */
+/** `row`'s category, by its type. */
 export function rowCategory(index: LogIndex, row: number): LogCategory {
   return index.categoryNames[index.categoryId[row]!]!;
 }
@@ -265,7 +262,7 @@ export class LogIndexBuilder {
   step(maxIds: number): boolean {
     const { hidden, keeper, open, rows: r } = this;
     const c = this.log.columns;
-    const { type, isFrame, subtreeEnd } = c;
+    const { type, subtreeEnd } = c;
     const last = Math.min(this.log.eventCount, this.nextId + maxIds - 1);
     for (let id = this.nextId; id <= last; id++) {
       // Close every open row whose subtree ended before this id.
@@ -284,7 +281,7 @@ export class LogIndexBuilder {
       r.eventIndex[row] = id;
       r.depth[row] = open.length;
       r.parent[row] = above;
-      r.categoryId[row] = isFrame[id] ? FRAME_CATEGORY_ID[type[id]!]! : UNCATEGORISED;
+      r.categoryId[row] = TYPE_CATEGORY_ID[type[id]!]!;
       if (keeper) {
         keeper[id] = row;
         r.start[row] = c.startTimestamp[id]!;
