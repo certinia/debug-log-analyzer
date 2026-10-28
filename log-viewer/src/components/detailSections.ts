@@ -175,9 +175,9 @@ export async function buildDetailSections(
   if (source === 'database' && selection.kind === 'event' && selection.type) {
     return buildDatabaseSections(
       {
-        eventIndex: selection.eventIndex,
+        eventId: selection.eventId,
         type: selection.type,
-        activeEventIndex: active?.kind === 'event' ? active.eventIndex : null,
+        activeEventId: active?.kind === 'event' ? active.eventId : null,
       },
       hidden,
     );
@@ -185,25 +185,19 @@ export async function buildDetailSections(
 
   const isAggregate = selection.kind === 'aggregate';
   // An aggregate scopes to all its occurrences; a single frame to itself.
-  const anchorIndex = isAggregate ? (selection.instances[0] ?? -1) : selection.eventIndex;
+  const anchorId = isAggregate ? (selection.eventIds[0] ?? -1) : selection.eventId;
   // A walked row that merges occurrences answers as its own aggregate, keyed on
   // its first occurrence the way a bucket picked in the tab is.
-  const activeIndex =
-    active?.kind === 'aggregate'
-      ? (active.instances[0] ?? anchorIndex)
-      : (active?.eventIndex ?? anchorIndex);
+  const activeId =
+    active?.kind === 'aggregate' ? (active.eventIds[0] ?? anchorId) : (active?.eventId ?? anchorId);
   // The aggregate Details describes, or none once the walk follows one frame
   // inside it: the aggregate no longer describes what is shown.
   const shown =
-    active?.kind === 'aggregate'
-      ? active
-      : isAggregate && activeIndex === anchorIndex
-        ? selection
-        : null;
-  const instances = shown?.instances ?? null;
+    active?.kind === 'aggregate' ? active : isAggregate && activeId === anchorId ? selection : null;
+  const eventIds = shown?.eventIds ?? null;
   // The frames the row is, which is the scope Variables compares: a bottom-up
   // caller row counts its callee's calls, so its locals live a level up.
-  const scopeFrames = shown?.frames ?? null;
+  const frameIds = shown?.frameIds ?? null;
   const calledBy = shown?.calledBy ?? '';
 
   const sections: PaneSection[] = [
@@ -214,8 +208,8 @@ export async function buildDetailSections(
       // reader steps to, and sizing to it would move the whole stack each time.
       height: 'md',
       content: html`<event-vitals
-        eventIndex=${activeIndex}
-        .instances=${instances}
+        eventId=${activeId}
+        .eventIds=${eventIds}
         called-by=${calledBy}
       ></event-vitals>`,
     },
@@ -228,7 +222,7 @@ export async function buildDetailSections(
       // the panel and scrolls, rather than a slot that could crowd the grids.
       weight: 3,
       content: html`<captured-log-scope>
-        <variables-detail eventIndex=${activeIndex} .frames=${scopeFrames}></variables-detail>
+        <variables-detail eventId=${activeId} .frameIds=${frameIds}></variables-detail>
       </captured-log-scope>`,
     },
   ];
@@ -237,10 +231,7 @@ export async function buildDetailSections(
     // the frame the user picked.
     sections.push(
       namespaceTimeSection(
-        html`<namespace-time-bar
-          eventIndex=${activeIndex}
-          .instances=${instances}
-        ></namespace-time-bar>`,
+        html`<namespace-time-bar eventId=${activeId} .eventIds=${eventIds}></namespace-time-bar>`,
         { height: 'sm' },
       ),
     );
@@ -254,7 +245,7 @@ export async function buildDetailSections(
       // The verdict on the selected row, so it reads beside the tree rather than
       // being crowded down to its header by it.
       weight: 3,
-      content: html`<log-diagnostics .instances=${instances ?? [activeIndex]}></log-diagnostics>`,
+      content: html`<log-diagnostics .eventIds=${eventIds ?? [activeId]}></log-diagnostics>`,
     });
   }
   sections.push(
@@ -263,8 +254,8 @@ export async function buildDetailSections(
       title: 'Call Stack',
       weight: 3,
       content: html`<call-stack-detail
-        eventIndex=${anchorIndex}
-        activeEventIndex=${activeIndex}
+        eventId=${anchorId}
+        activeEventId=${activeId}
       ></call-stack-detail>`,
     },
     {
@@ -272,9 +263,9 @@ export async function buildDetailSections(
       title: 'Call Tree',
       weight: 4,
       content: html`<call-tree-detail
-        eventIndex=${anchorIndex}
-        .instances=${isAggregate ? selection.instances : null}
-        activeEventIndex=${activeIndex}
+        eventId=${anchorId}
+        .eventIds=${isAggregate ? selection.eventIds : null}
+        activeEventId=${activeId}
         .source=${source}
         .sourceView=${sourceView}
       ></call-tree-detail>`,

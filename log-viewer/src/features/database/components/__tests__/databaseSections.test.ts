@@ -46,7 +46,7 @@ function rendered(sections: PaneSection[], id: string, tag: string): Element {
 
 describe('buildDatabaseSections', () => {
   it('builds vitals + call stack + issues + call tree for a SOQL selection, badged by count', async () => {
-    const sections = await buildDatabaseSections({ eventIndex: 3, type: 'soql' });
+    const sections = await buildDatabaseSections({ eventId: 3, type: 'soql' });
     expect(sections.map((s) => s.id)).toEqual([
       'vitals',
       'variables',
@@ -69,10 +69,7 @@ describe('buildDatabaseSections', () => {
 
   it('skips the lint for a hidden issues section, but still offers it', async () => {
     const before = lintCalls;
-    const sections = await buildDatabaseSections(
-      { eventIndex: 3, type: 'soql' },
-      new Set(['issues']),
-    );
+    const sections = await buildDatabaseSections({ eventId: 3, type: 'soql' }, new Set(['issues']));
 
     const issues = sections.find((s) => s.id === 'issues');
     // Still in the list, so the header menu can bring it back.
@@ -82,44 +79,44 @@ describe('buildDatabaseSections', () => {
   });
 
   it('omits the SOQL issues section for a DML selection', async () => {
-    const sections = await buildDatabaseSections({ eventIndex: 5, type: 'dml' });
+    const sections = await buildDatabaseSections({ eventId: 5, type: 'dml' });
     expect(sections.map((s) => s.id)).toEqual(['vitals', 'variables', 'callstack', 'calltree']);
   });
 
   it('builds vitals + call stack + call tree (no issues) for a SOSL selection', async () => {
-    const sections = await buildDatabaseSections({ eventIndex: 7, type: 'sosl' });
+    const sections = await buildDatabaseSections({ eventId: 7, type: 'sosl' });
     expect(sections.map((s) => s.id)).toEqual(['vitals', 'variables', 'callstack', 'calltree']);
   });
 
   it('anchors the call stack and the SOQL issues to the statement the user picked', async () => {
     const sections = await buildDatabaseSections({
-      eventIndex: 3,
+      eventId: 3,
       type: 'soql',
-      activeEventIndex: 1,
+      activeEventId: 1,
     });
 
     const stack = rendered(sections, 'callstack', 'call-stack-detail');
-    expect(stack.getAttribute('eventIndex')).toBe('3');
-    expect(stack.getAttribute('activeEventIndex')).toBe('1');
+    expect(stack.getAttribute('eventId')).toBe('3');
+    expect(stack.getAttribute('activeEventId')).toBe('1');
     expect(sections.find((s) => s.id === 'issues')?.badge).toBe('2');
   });
 
   it('drops the statement shape from the vitals once an ancestor frame is followed', async () => {
     const sections = await buildDatabaseSections({
-      eventIndex: 3,
+      eventId: 3,
       type: 'soql',
-      activeEventIndex: 1,
+      activeEventId: 1,
     });
 
     const vitals = rendered(sections, 'vitals', 'event-vitals');
-    expect(vitals.getAttribute('eventIndex')).toBe('1');
+    expect(vitals.getAttribute('eventId')).toBe('1');
     // An ancestor method is not a statement, so it has no statement type.
     expect(vitals.hasAttribute('type')).toBe(false);
-    expect(rendered(sections, 'calltree', 'call-tree-detail').getAttribute('eventIndex')).toBe('1');
+    expect(rendered(sections, 'calltree', 'call-tree-detail').getAttribute('eventId')).toBe('1');
   });
 
   it('names the tab on the call tree, so its view mode is its own', async () => {
-    const sections = await buildDatabaseSections({ eventIndex: 3, type: 'soql' });
+    const sections = await buildDatabaseSections({ eventId: 3, type: 'soql' });
 
     const tree = rendered(sections, 'calltree', 'call-tree-detail') as CallTreeDetail;
     expect(tree.source).toBe('database');

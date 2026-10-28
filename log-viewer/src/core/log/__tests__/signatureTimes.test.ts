@@ -54,7 +54,7 @@ describe('signatureTimes', () => {
     const second = store.log.ofType('METHOD_ENTRY')[1]!;
 
     expect(named(times, 'A')).toMatchObject({
-      eventIndex: second.id,
+      eventId: second.id,
       maxSelf: 50,
       category: 'Apex',
     });

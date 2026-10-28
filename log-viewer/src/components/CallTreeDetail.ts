@@ -46,9 +46,9 @@ import { LocatedRowIds } from './locatedRow.js';
 import {
   buildScopedCallTree,
   buildWholeLogCallTree,
-  frameEventIndexes,
-  locatableEventIndexes,
-  revealableEventIndex,
+  frameEventIds,
+  locatableEventIds,
+  revealableEventId,
   rowIdsByPath,
   type LiveWindow,
   type ScopedCallTree,
@@ -111,20 +111,20 @@ interface GridSlot {
 @customElement('call-tree-detail')
 export class CallTreeDetail extends LitElement {
   @property({ type: Number })
-  eventIndex = -1;
+  eventId = -1;
 
-  /** Occurrence eventIndexes when the selection is an aggregate row; the tree
+  /** The occurrences' ids when the selection is an aggregate row; the tree
    *  then scopes to every occurrence, aggregated. */
   @property({ attribute: false })
-  instances: number[] | null = null;
+  eventIds: number[] | null = null;
 
   /** The frame the user walked to inside the scope. It only moves the mark: the
-   *  scope is anchored on `eventIndex`, so the trees are never rebuilt for it. */
+   *  scope is anchored on `eventId`, so the trees are never rebuilt for it. */
   @property({ type: Number })
-  activeEventIndex = -1;
+  activeEventId = -1;
 
   /** True shows the whole log rooted at the log itself — real durations,
-   *  nothing scoped or attributed. `eventIndex`/`instances` are then ignored. */
+   *  nothing scoped or attributed. `eventId`/`eventIds` are then ignored. */
   @property({ type: Boolean })
   wholeLog = false;
 
@@ -167,7 +167,7 @@ export class CallTreeDetail extends LitElement {
   private _scopeSelf: number | null = null;
   private _scopeFrameSelf: number | null = null;
 
-  // The scoped tree (all three representations) for the current eventIndex,
+  // The scoped tree (all three representations) for the current eventId,
   // computed once per selection and shared across the mode grids.
   private _scoped: ScopedCallTree | null = null;
 
@@ -188,11 +188,11 @@ export class CallTreeDetail extends LitElement {
   private readonly _inspector = new InspectorGridController<ScopedRow>(this, {
     grid: () => this._grids[this.viewMode].value ?? null,
     source: () => this._slots[this.viewMode]?.source,
-    frames: frameEventIndexes,
+    frameIds: frameEventIds,
     pick: (row) => this._pick(row),
-    // A merged row's `eventIndex` is its first occurrence, so the action lands there.
-    menuFrame: (row) => row.eventIndex,
-    keysFor: (eventIndexes) => this._rowIdsFor(this.viewMode, eventIndexes),
+    // A merged row's `eventId` is its first occurrence, so the action lands there.
+    menuFrame: (row) => row.eventId,
+    keysFor: (reportedIds) => this._rowIdsFor(this.viewMode, reportedIds),
     dropOnClear: true,
   });
 
@@ -238,15 +238,15 @@ export class CallTreeDetail extends LitElement {
     // Idempotent: a pick is written to the map before the mode is set, so
     // recomputing it here always lands on the same answer.
     const picked = this.logStore && pickedViewMode.get(this.logStore)?.get(this.source);
-    this.viewMode = picked || defaultViewMode(this.sourceView, !!this.instances?.length);
+    this.viewMode = picked || defaultViewMode(this.sourceView, !!this.eventIds?.length);
   }
 
   updated(changed: PropertyValues) {
     // Only the whole-log tree can mount before a parse, so there a new log is a new scope.
     const scopeChanged =
       (changed.has('logStore') && this.wholeLog) ||
-      changed.has('eventIndex') ||
-      changed.has('instances');
+      changed.has('eventId') ||
+      changed.has('eventIds');
     if (scopeChanged) {
       this._invalidateScope();
     }
@@ -254,7 +254,7 @@ export class CallTreeDetail extends LitElement {
       void this._showActive();
       return;
     }
-    if (changed.has('activeEventIndex')) {
+    if (changed.has('activeEventId')) {
       // The anchor holds, so the rows are unchanged — only the mark moves.
       this._selectActive();
     }
@@ -304,24 +304,24 @@ export class CallTreeDetail extends LitElement {
   // A merged row would misname which occurrence was clicked, so its pick holds a mark on every
   // frame it stands for, as the Chrome DevTools performance panel keeps a picked group's frames lit.
   private _pick(row: ScopedRow | null): void {
-    const eventIndex = revealableEventIndex(row ?? undefined);
-    if (eventIndex !== null) {
-      dispatchInspectorReveal(this, eventIndex);
+    const eventId = revealableEventId(row ?? undefined);
+    if (eventId !== null) {
+      dispatchInspectorReveal(this, eventId);
       return;
     }
     // The same aggregate a merged row in the tab itself reports, so Details
     // reads the same either way. Built from the row: a scoped row carries no
     // key, which is what the tab's own rows are read through.
-    const frames = frameEventIndexes(row ?? undefined);
+    const frameIds = frameEventIds(row ?? undefined);
     // A top-level bottom-up row names its own calls; a caller row was reached through its own frame.
     const isCaller =
       this.viewMode === 'bottom-up' &&
       !!row &&
       !this._slots['bottom-up']?.source.roots.includes(row);
-    dispatchInspectorLocate(this, frames, true, {
+    dispatchInspectorLocate(this, frameIds, true, {
       kind: 'aggregate',
-      instances: locatableEventIndexes(row ?? undefined),
-      frames,
+      eventIds: locatableEventIds(row ?? undefined),
+      frameIds,
       calledBy: isCaller ? row.text : undefined,
     });
     if (!row) {
@@ -331,15 +331,15 @@ export class CallTreeDetail extends LitElement {
   }
 
   /**
-   * The ids of the rows that name `eventIndexes` in `mode`. Time Order keys its
-   * rows by event, so there the ids are the indexes themselves — unless it merged
+   * The ids of the rows that name `reportedIds` in `mode`. Time Order keys its
+   * rows by event, so there the ids are the event ids themselves — unless it merged
    * a selection's occurrences, when its rows are grouped like the other views'. A
    * grouped row merges occurrences behind a synthetic id, so it is found by the
    * bucket path it stands for.
    */
-  private _rowIdsFor(mode: ViewMode, eventIndexes: readonly number[]): readonly number[] {
+  private _rowIdsFor(mode: ViewMode, reportedIds: readonly number[]): readonly number[] {
     if (mode === 'time-order' && !this._scoped?.timeOrderMerged) {
-      return this._inScope(eventIndexes);
+      return this._inScope(reportedIds);
     }
     const slot = this._slots[mode];
     if (!slot || slot.stale || !slot.source.roots.length) {
@@ -350,7 +350,7 @@ export class CallTreeDetail extends LitElement {
     const byPath = (slot.rowsByPath ??= rowIdsByPath(slot.source.roots));
     const pathIds = this._locateIds.idsFor(
       this.logStore,
-      this._inScope(eventIndexes),
+      this._inScope(reportedIds),
       mode === 'bottom-up' ? 'callers' : 'callees',
     );
     return pathIds.flatMap((pathId) => byPath.get(pathId) ?? []);
@@ -361,14 +361,14 @@ export class CallTreeDetail extends LitElement {
    * bucket path, so without this a frame at the same path elsewhere in the log
    * would mark a row that holds a different call.
    */
-  private _inScope(eventIndexes: readonly number[]): readonly number[] {
+  private _inScope(reportedIds: readonly number[]): readonly number[] {
     const holds = this._scoped?.holds;
     if (!holds) {
-      return eventIndexes;
+      return reportedIds;
     }
-    if (this._reported !== eventIndexes) {
-      this._reported = eventIndexes;
-      this._reportedInScope = eventIndexes.filter(holds);
+    if (this._reported !== reportedIds) {
+      this._reported = reportedIds;
+      this._reportedInScope = reportedIds.filter(holds);
     }
     return this._reportedInScope;
   }
@@ -446,7 +446,7 @@ export class CallTreeDetail extends LitElement {
 
   /**
    * Selects the active frame, without reporting it as a new pick. Only rows keyed
-   * by event can be selected by index, so a view whose rows merge occurrences
+   * by event can be selected by event id, so a view whose rows merge occurrences
    * keeps the row the user picked: clearing it would take away the row the
    * keyboard moves from.
    */
@@ -456,17 +456,15 @@ export class CallTreeDetail extends LitElement {
       return;
     }
     const path =
-      this.activeEventIndex >= 0
-        ? this._timeOrderPath(slot.source.roots, this.activeEventIndex)
-        : null;
+      this.activeEventId >= 0 ? this._timeOrderPath(slot.source.roots, this.activeEventId) : null;
     void this._inspector.selectActive(path);
   }
 
-  /** The keys from a top-level row down to `eventIndex`, or null where the rows do not hold it. */
-  private _timeOrderPath(roots: readonly ScopedRow[], eventIndex: number): number[] | null {
-    const lineage = (this.logStore?.stackByEventIndex(eventIndex) ?? []).map((e) => e.id);
-    if (lineage.at(-1) !== eventIndex) {
-      lineage.push(eventIndex);
+  /** The keys from a top-level row down to `eventId`, or null where the rows do not hold it. */
+  private _timeOrderPath(roots: readonly ScopedRow[], eventId: number): number[] | null {
+    const lineage = (this.logStore?.stackById(eventId) ?? []).map((e) => e.id);
+    if (lineage.at(-1) !== eventId) {
+      lineage.push(eventId);
     }
     const path: number[] = [];
     let list = roots;
@@ -477,7 +475,7 @@ export class CallTreeDetail extends LitElement {
         list = row._children ?? [];
       }
     }
-    return path.at(-1) === eventIndex ? path : null;
+    return path.at(-1) === eventId ? path : null;
   }
 
   /**
@@ -516,7 +514,7 @@ export class CallTreeDetail extends LitElement {
     if (!this._scoped) {
       const scoped = this.wholeLog
         ? await buildWholeLogCallTree(options)
-        : await buildScopedCallTree(this.eventIndex, this.instances, options);
+        : await buildScopedCallTree(this.eventId, this.eventIds, options);
       if (options.signal?.aborted) {
         // Abandoned rather than empty — don't cache the null over a scope that
         // was never walked.
@@ -626,7 +624,7 @@ export class CallTreeDetail extends LitElement {
           id: 'text',
           title: 'Name',
           value: (row) => {
-            const event = queryDialect(row.type) ? null : this.logStore?.log.event(row.eventIndex);
+            const event = queryDialect(row.type) ? null : this.logStore?.log.event(row.eventId);
             return event ? eventLabel(event) : row.text;
           },
           dialect: ({ type }) => queryDialect(type),

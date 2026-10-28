@@ -7,18 +7,18 @@ import { afterEach, describe, expect, it } from '@jest/globals';
 
 import type { CallStackRow } from '../callStackData.js';
 
-const frameRow = (eventIndex: number, total: number, self: number): CallStackRow => ({
-  eventIndex,
+const frameRow = (eventId: number, total: number, self: number): CallStackRow => ({
+  eventId,
   type: 'METHOD_ENTRY',
-  text: `m${eventIndex}`,
+  text: `m${eventId}`,
   duration: { total, self },
 });
 
 // No log store in the test, so the stack is stubbed: frame 1 called 4, which called 9.
 const built: number[] = [];
 jest.mock('../callStackData.js', () => ({
-  buildCallStackData: (eventIndex: number) => {
-    built.push(eventIndex);
+  buildCallStackData: (eventId: number) => {
+    built.push(eventId);
     return {
       rows: [frameRow(1, 100, 20), frameRow(4, 80, 30), frameRow(9, 50, 50)],
       rootTotal: 100,
@@ -44,9 +44,9 @@ import {
 } from '../inspectorReveal.js';
 import { runPanelRowAction } from '../panelRowMenu.js';
 
-async function mount(eventIndex: number): Promise<CallStackDetail> {
+async function mount(eventId: number): Promise<CallStackDetail> {
   const el = document.createElement('call-stack-detail') as CallStackDetail;
-  el.eventIndex = eventIndex;
+  el.eventId = eventId;
   document.body.appendChild(el);
   await el.updateComplete;
   return el;
@@ -79,8 +79,8 @@ function footer(grid: AppGrid<CallStackRow>, id: string): number | undefined {
   return runCalc(calc, grid.source?.roots ?? []);
 }
 
-const revealed = (e: Event) => (e as InspectorRevealEvent).detail.eventIndex;
-const located = (e: Event) => (e as InspectorLocateEvent).detail.eventIndexes;
+const revealed = (e: Event) => (e as InspectorRevealEvent).detail.eventId;
+const located = (e: Event) => (e as InspectorLocateEvent).detail.eventIds;
 
 describe('CallStackDetail', () => {
   afterEach(() => {
@@ -93,7 +93,7 @@ describe('CallStackDetail', () => {
     const el = await mount(9);
     const grid = gridOf(el);
 
-    expect(grid.source?.roots.map((row) => row.eventIndex)).toEqual([1, 4, 9]);
+    expect(grid.source?.roots.map((row) => row.eventId)).toEqual([1, 4, 9]);
     expect(grid.columns.map((column) => column.title)).toEqual([
       'Frame',
       'Total (ms)',
@@ -125,7 +125,7 @@ describe('CallStackDetail', () => {
     const grid = gridOf(el);
     const goTo = jest.spyOn(grid, 'goTo').mockImplementation(async ([key]) => {
       fire(el, 'lv-grid-select', {
-        row: grid.source!.roots.find((r) => r.eventIndex === key),
+        row: grid.source!.roots.find((r) => r.eventId === key),
         target: key,
         user: false,
       });
@@ -136,7 +136,7 @@ describe('CallStackDetail', () => {
     const reveals: number[] = [];
     const listener = (e: Event) => reveals.push(revealed(e));
     document.addEventListener(INSPECTOR_REVEAL_EVENT, listener);
-    el.activeEventIndex = 4;
+    el.activeEventId = 4;
     await el.updateComplete;
     await grid.updateComplete;
     await Promise.resolve();
@@ -150,21 +150,21 @@ describe('CallStackDetail', () => {
   it('hears a click made while the active frame is still being selected', async () => {
     const el = await mount(9);
     jest.spyOn(gridOf(el), 'goTo').mockReturnValue(new Promise(() => {}));
-    el.activeEventIndex = 4;
+    el.activeEventId = 4;
     await el.updateComplete;
     const row = gridOf(el).source!.roots[0];
 
     expect(
       collect(INSPECTOR_REVEAL_EVENT, revealed, () =>
-        fire(el, 'lv-grid-select', { row, target: row?.eventIndex, user: true }),
+        fire(el, 'lv-grid-select', { row, target: row?.eventId, user: true }),
       ),
-    ).toEqual([row?.eventIndex]);
+    ).toEqual([row?.eventId]);
   });
 
   it('marks the active frame again when a click clears its row', async () => {
     const el = await mount(9);
     const goTo = jest.spyOn(gridOf(el), 'goTo').mockResolvedValue('selected');
-    el.activeEventIndex = 4;
+    el.activeEventId = 4;
     await el.updateComplete;
     goTo.mockClear();
 
@@ -189,7 +189,7 @@ describe('CallStackDetail', () => {
   it('marks the frames under the pointer in the tab on screen', async () => {
     const el = await mount(9);
 
-    eventBus.emit('detail:locate', { source: 'calltree', eventIndexes: [4] });
+    eventBus.emit('detail:locate', { source: 'calltree', eventIds: [4] });
     await el.updateComplete;
 
     expect([...gridOf(el).marked]).toEqual([4]);
@@ -238,7 +238,7 @@ describe('CallStackDetail', () => {
     const listener = (e: Event) => seen.push(located(e));
     document.addEventListener(INSPECTOR_LOCATE_EVENT, listener);
 
-    el.eventIndex = 4;
+    el.eventId = 4;
     await el.updateComplete;
     document.removeEventListener(INSPECTOR_LOCATE_EVENT, listener);
 

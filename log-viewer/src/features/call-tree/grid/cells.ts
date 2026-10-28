@@ -27,17 +27,12 @@ const queryFormat = (node: ApexEvent): FormatOptions => ({
 // Find and copy read every row, and formatting a query on each read is slow. By event id.
 const prettyQueries = new WeakMap<ApexLog, Map<number, string>>();
 
-/** What a Name cell shows for event `eventIndex` of `log`, as text. */
-export function nameText(log: ApexLog, eventIndex: number, fallback: string): string {
-  return textOf(log, eventIndex, log.event(eventIndex), fallback);
+/** What a Name cell shows for event `eventId` of `log`, as text. */
+export function nameText(log: ApexLog, eventId: number, fallback: string): string {
+  return textOf(log, eventId, log.event(eventId), fallback);
 }
 
-function textOf(
-  log: ApexLog,
-  eventIndex: number,
-  node: ApexEvent | null,
-  fallback: string,
-): string {
+function textOf(log: ApexLog, eventId: number, node: ApexEvent | null, fallback: string): string {
   if (!node) {
     return fallback;
   }
@@ -47,10 +42,10 @@ function textOf(
       byId = new Map();
       prettyQueries.set(log, byId);
     }
-    let text = byId.get(eventIndex);
+    let text = byId.get(eventId);
     if (text === undefined) {
       text = formatSOQLToText(node.text ?? '', queryFormat(node));
-      byId.set(eventIndex, text);
+      byId.set(eventId, text);
     }
     return text;
   }
@@ -58,9 +53,9 @@ function textOf(
 }
 
 /** What copy and export write for a Name cell: a query as the log has it. */
-export function nameExportText(log: ApexLog, eventIndex: number, fallback: string): string {
-  const node = log.event(eventIndex);
-  return node && isQuery(node) ? (node.text ?? '') : textOf(log, eventIndex, node, fallback);
+export function nameExportText(log: ApexLog, eventId: number, fallback: string): string {
+  const node = log.event(eventId);
+  return node && isQuery(node) ? (node.text ?? '') : textOf(log, eventId, node, fallback);
 }
 
 /**
@@ -69,11 +64,11 @@ export function nameExportText(log: ApexLog, eventIndex: number, fallback: strin
  */
 export function nameCell(
   log: ApexLog,
-  eventIndex: number,
+  eventId: number,
   fallback: string,
   openType: (text: string) => void,
 ): TemplateResult | string {
-  const node = log.event(eventIndex);
+  const node = log.event(eventId);
   if (!node) {
     return fallback;
   }

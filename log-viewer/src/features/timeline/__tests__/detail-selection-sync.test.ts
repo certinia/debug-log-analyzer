@@ -7,15 +7,15 @@ import { TimelineViewport } from '../optimised/TimelineViewport.js';
 import { revealTarget, toDetailSelection } from '../utils/detail-selection-sync.js';
 
 describe('toDetailSelection', () => {
-  it('builds an event selection from an eventIndex', () => {
-    expect(toDetailSelection(7)).toEqual({ kind: 'event', eventIndex: 7 });
+  it('builds an event selection from an eventId', () => {
+    expect(toDetailSelection(7)).toEqual({ kind: 'event', eventId: 7 });
   });
 
-  it('keeps index 0, which is a real event and not "missing"', () => {
-    expect(toDetailSelection(0)).toEqual({ kind: 'event', eventIndex: 0 });
+  it('treats only undefined as no selection', () => {
+    expect(toDetailSelection(0)).toEqual({ kind: 'event', eventId: 0 });
   });
 
-  it('returns null when there is no eventIndex to select', () => {
+  it('returns null when there is no eventId to select', () => {
     expect(toDetailSelection(undefined)).toBeNull();
   });
 });

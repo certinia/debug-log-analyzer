@@ -130,7 +130,7 @@ describe('RawLogLineDecoration', () => {
 
     const args = /showInLogAnalysis\?([^)\s]+)/.exec(decoration?.hoverMessage.value ?? '')?.[1];
     expect(JSON.parse(decodeURIComponent(args ?? '{}'))).toEqual({
-      eventIndex: 3,
+      eventId: 3,
       filePath: expect.stringContaining(LOG_URI),
     });
   });

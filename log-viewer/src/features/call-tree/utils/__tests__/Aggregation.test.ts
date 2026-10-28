@@ -5,7 +5,7 @@ import { describe, expect, it, jest } from '@jest/globals';
 
 import {
   frameLines,
-  indexOf,
+  idOf,
   rawStoreOf,
   storeOf,
   type FrameSpec,
@@ -184,7 +184,7 @@ describe('toBottomUpTree', () => {
     const callerA = findRowByText(callers, 'ParentA');
     const callerB = findRowByText(callers, 'ParentB');
 
-    expect(callerA.instances).toEqual([]);
+    expect(callerA.eventIds).toEqual([]);
     expect(callerA).toMatchObject({
       totalSelfTime: 10,
       totalTime: 10,
@@ -195,7 +195,7 @@ describe('toBottomUpTree', () => {
       thrownCount: { total: 1 },
     });
 
-    expect(callerB.instances).toEqual([]);
+    expect(callerB.eventIds).toEqual([]);
     expect(callerB).toMatchObject({
       totalSelfTime: 20,
       totalTime: 20,
@@ -598,7 +598,7 @@ describe('toBottomUpTree', () => {
       ),
     );
     const rows = toBottomUpTree(await store.logIndex(), store) as PartitionRow[];
-    const outer = store.log.event(indexOf(store.log, 'Outer'))!; // written above
+    const outer = store.log.event(idOf(store.log, 'Outer'))!; // written above
     const part = (count: { self: number; total: number } | null) => ({
       self: count?.self ?? 0,
       total: count?.total ?? 0,
@@ -641,7 +641,7 @@ describe('bottom-up caller row scope', () => {
    *  which is what the grid counts the row's totals from. */
   function derivedFor(store: LogStore, root: BottomUpRow, row: BottomUpRow): number[] {
     const paths = store.keyPathIds();
-    return root.instances.filter((id) => paths.chainNodeAt(id, row._pathId) !== 0);
+    return root.eventIds.filter((id) => paths.chainNodeAt(id, row._pathId) !== 0);
   }
 
   async function built(): Promise<{ store: LogStore; roots: BottomUpRow[] }> {
@@ -667,7 +667,7 @@ describe('bottom-up caller row scope', () => {
     expect(recursive.callCount).toBe(4);
     expect(throughB.callCount).toBe(1);
     expect(derivedFor(store, recursive, throughB)).toEqual([
-      recursive.instances.find((id) => store.log.event(id)?.parent?.text === 'B'),
+      recursive.eventIds.find((id) => store.log.event(id)?.parent?.text === 'B'),
     ]);
   });
 
@@ -788,9 +788,9 @@ describe('toAggregatedCallTree', () => {
     const rows = toAggregatedCallTree(await store.logIndex(), store);
 
     const work = findRowByText(findRowByText(rows, 'Outer')._children ?? [], 'Work');
-    expect(work.instances).toHaveLength(2);
-    expect(work.eventIndex).toBe(work.instances[0]);
-    expect(store.log.event(work.eventIndex)?.duration.total).toBe(5);
+    expect(work.eventIds).toHaveLength(2);
+    expect(work.eventId).toBe(work.eventIds[0]);
+    expect(store.log.event(work.eventId)?.duration.total).toBe(5);
   });
 });
 

@@ -48,7 +48,7 @@ type MetricRow = GovernorUsage & { thrownCount: SelfTotal };
 
 interface RowFields<R> {
   /** The id of the event the row names. */
-  eventIndex(row: R): number;
+  eventId(row: R): number;
   text(row: R): string;
   namespace(row: R): string;
   callerNamespace(row: R): string;
@@ -62,7 +62,7 @@ interface RowFields<R> {
 
 type HeldRow = GovernorCostRow & {
   reported: ReportedCounts;
-  eventIndex: number;
+  eventId: number;
   text: string;
   namespace: string;
   callerNamespace: string;
@@ -72,7 +72,7 @@ type HeldRow = GovernorCostRow & {
 
 function heldFields<R extends HeldRow>(): RowFields<R> {
   return {
-    eventIndex: (row) => row.eventIndex,
+    eventId: (row) => row.eventId,
     text: (row) => row.text,
     namespace: (row) => row.namespace,
     callerNamespace: (row) => row.callerNamespace,
@@ -91,7 +91,7 @@ function timeOrderFields(
   usage: ReportedUsage | null,
 ): RowFields<TimeOrderNode> {
   const { index } = source;
-  const { log, eventIndex, start, end } = index;
+  const { log, eventId, start, end } = index;
   const m = rowMetrics(index);
   const costLimits = costLimitsOf(log.limits);
   // One object for every row: a sort of the whole log reads it per row and keeps nothing.
@@ -125,7 +125,7 @@ function timeOrderFields(
     return held;
   };
   return {
-    eventIndex: ({ row }) => eventIndex[row]!,
+    eventId: ({ row }) => eventId[row]!,
     text: source.text,
     namespace: source.namespace,
     callerNamespace: ({ row }) => callerNamespaceOfRow(index, row),
@@ -169,7 +169,7 @@ const REPORTED_DESCRIPTION = 'Our count, corrected to the limit usage Salesforce
 /** How a table sums its footers. */
 export interface FooterCalcs<R> {
   /** A total column's footer, from each row or, where rows overlap, from each call once. */
-  total(ofRow: (row: R) => number, ofEvent: (eventIndex: number) => number): Calc<R>;
+  total(ofRow: (row: R) => number, ofEvent: (eventId: number) => number): Calc<R>;
   netSelf: Calc<R>;
   grossSelf: Calc<R>;
 }
@@ -186,9 +186,9 @@ function nameColumn<R>(
     title: 'Name',
     width: 'flex',
     minWidth: 200,
-    cell: (row) => nameCell(log, fields.eventIndex(row), fields.text(row), options.openType),
-    text: (row) => nameText(log, fields.eventIndex(row), fields.text(row)),
-    exportText: (row) => nameExportText(log, fields.eventIndex(row), fields.text(row)),
+    cell: (row) => nameCell(log, fields.eventId(row), fields.text(row), options.openType),
+    text: (row) => nameText(log, fields.eventId(row), fields.text(row)),
+    exportText: (row) => nameExportText(log, fields.eventId(row), fields.text(row)),
     sort: { value: fields.text },
     sortFirst: 'desc',
     footer: 'Total',
@@ -554,7 +554,7 @@ function lineBreaks(text: string | null | undefined): number {
  * Read from the event, as no label is built for it. A query is counted as written,
  * though its cell lays it out on more.
  */
-type LinesOf = (row: { eventIndex: number }) => number;
+type LinesOf = (row: { eventId: number }) => number;
 const linesByLog = new WeakMap<ApexLog, LinesOf>();
 
 /**
@@ -566,7 +566,7 @@ const linesByLog = new WeakMap<ApexLog, LinesOf>();
 export function mergedLines(log: ApexLog): LinesOf {
   let lines = linesByLog.get(log);
   if (!lines) {
-    lines = (row) => 1 + lineBreaks(log.columns.text.at(row.eventIndex));
+    lines = (row) => 1 + lineBreaks(log.columns.text.at(row.eventId));
     linesByLog.set(log, lines);
   }
   return lines;

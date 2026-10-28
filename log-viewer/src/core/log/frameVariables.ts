@@ -149,15 +149,15 @@ export interface FrameReadOptions {
 }
 
 /**
- * What is in scope at `eventIndex`, or null where the shown log has no such
+ * What is in scope at `eventId`, or null where the shown log has no such
  * event, it sits in no frame, or the log records no variables.
  */
 export function frameVariablesFor(
   store: LogStore,
-  eventIndex: number,
+  eventId: number,
   options: FrameReadOptions = {},
 ): FrameVariables | null {
-  const variables = store.eventByIndex(eventIndex)?.variables;
+  const variables = store.eventById(eventId)?.variables;
   if (!variables) {
     return null;
   }
@@ -167,7 +167,7 @@ export function frameVariablesFor(
   const frameLabel = scope.text ?? scope.type;
   return {
     frameLabel,
-    readAt: eventIndex,
+    readAt: eventId,
     thisType:
       variables.this?.type ??
       (scope.type === 'CONSTRUCTOR_ENTRY' ? scope.field('className') : classFromFrame(frameLabel)),
@@ -181,7 +181,7 @@ export function frameVariablesFor(
             className: group.className,
             rows: group.variables.map(rowOf),
           })),
-    truncated: ranPastEnd(store, eventIndex),
+    truncated: ranPastEnd(store, eventId),
   };
 }
 

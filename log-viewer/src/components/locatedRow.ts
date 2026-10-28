@@ -13,25 +13,25 @@ export interface RowReader<R> {
 }
 
 /** What the inspector reads off a row. A merged row's `key` is the bucket it stands for,
- *  `instances` the occurrences it holds, which a bottom-up caller bucket has none of. */
+ *  `eventIds` the occurrences it holds, which a bottom-up caller bucket has none of. */
 export interface RowData {
   key?: string;
   /** The interned bucket path the row's builder stamped on it. */
   _pathId?: number;
   text?: string;
   /** The ids of the calls the row merges. */
-  instances?: readonly number[];
+  eventIds?: readonly number[];
   /** The id of the row's event, or of a merged row's first call. */
-  eventIndex?: number;
+  eventId?: number;
 }
 
 const rowCallData = <R>(row: R, read: RowReader<R>): RowData => read.data(row);
 
 /** Held per row: a pointer sweep re-enters rows and the click that follows a
  *  hover asks again, but deriving reads every occurrence the root bucket holds. */
-const derivedIndexes = new WeakMap<RowData, readonly number[]>();
+const derivedIds = new WeakMap<RowData, readonly number[]>();
 
-const NO_CALLS: readonly number[] = [];
+const NO_EVENT_IDS: readonly number[] = [];
 
 /**
  * The root bucket a derived row reads its calls from, or null where the walk
@@ -61,23 +61,23 @@ function rowCallOccurrences<R>(
   store: LogStore | null,
 ): readonly number[] {
   const data = rowCallData(row, read);
-  if (data.instances?.length) {
-    return data.instances;
+  if (data.eventIds?.length) {
+    return data.eventIds;
   }
   if (data.key === undefined) {
-    return data.eventIndex === undefined ? NO_CALLS : [data.eventIndex];
+    return data.eventId === undefined ? NO_EVENT_IDS : [data.eventId];
   }
-  return derivedRowOf(row, read, data, store).calls;
+  return derivedRowOf(row, read, data, store).eventIds;
 }
 
 /** What a derived row's bucket answers: the calls whose chain runs through the
  *  row, and the frames the row is at its own depth. */
 interface DerivedRow {
-  calls: readonly number[];
-  frames: number[];
+  eventIds: readonly number[];
+  frameIds: number[];
 }
 
-const NOTHING_DERIVED: DerivedRow = { calls: NO_CALLS, frames: [] };
+const NOTHING_DERIVED: DerivedRow = { eventIds: NO_EVENT_IDS, frameIds: [] };
 
 /** Held per row: a pointer sweep re-enters rows and the click that follows a
  *  hover asks again, but deriving reads every occurrence the root bucket holds. */
@@ -108,21 +108,21 @@ function derivedRowOf<R>(
     return NOTHING_DERIVED;
   }
   const paths = store.keyPathIds();
-  const instances = rootBucketOf(row, read, data)?.instances;
-  if (!instances?.length) {
+  const bucketIds = rootBucketOf(row, read, data)?.eventIds;
+  if (!bucketIds?.length) {
     return NOTHING_DERIVED;
   }
-  const calls: number[] = [];
+  const eventIds: number[] = [];
   const own = new Set<number>();
-  for (const id of instances) {
+  for (const id of bucketIds) {
     const node = paths.chainNodeAt(id, pathId);
     if (node) {
-      calls.push(id);
+      eventIds.push(id);
       own.add(node);
     }
   }
-  const derived = { calls, frames: [...own] };
-  if (calls.length) {
+  const derived = { eventIds, frameIds: [...own] };
+  if (eventIds.length) {
     // Not kept where nothing derived, for the reason `rowOccurrences` gives.
     derivedRows.set(data, derived);
   }
@@ -130,7 +130,7 @@ function derivedRowOf<R>(
 }
 
 /**
- * The path ids that the frames `eventIndexes` name stand for, so a grid whose
+ * The path ids that the frames `eventIds` name stand for, so a grid whose
  * rows merge occurrences can mark them.
  *
  * A bottom-up row is the frame at its own depth, so a frame stands for the rows
@@ -139,11 +139,11 @@ function derivedRowOf<R>(
  */
 function pathIdsForEvents(
   store: LogStore,
-  eventIndexes: readonly number[],
+  eventIds: readonly number[],
   direction: SelectionView,
 ): number[] {
   const paths = store.keyPathIds();
-  const ids = eventIndexes.filter((id) => store.isShown(id));
+  const ids = eventIds.filter((id) => store.isShown(id));
   if (direction === 'callers') {
     return paths.pathsEndingIn(new Set(ids.map((id) => paths.keyIdOf(id))));
   }
@@ -162,17 +162,17 @@ function pathIdsForEvents(
  * @param store - the store the row was built from, which its path id belongs to */
 function rowOccurrences<R>(row: R, read: RowReader<R>, store: LogStore | null): readonly number[] {
   const data = rowCallData(row, read);
-  const cached = derivedIndexes.get(data);
+  const cached = derivedIds.get(data);
   if (cached) {
     return cached;
   }
-  const indexes = rowCallOccurrences(row, read, store);
-  if (indexes.length) {
+  const ids = rowCallOccurrences(row, read, store);
+  if (ids.length) {
     // Not kept where nothing derived: the calls are read through the log on
     // screen, so an answer of none can be that log not being set yet.
-    derivedIndexes.set(data, indexes);
+    derivedIds.set(data, ids);
   }
-  return indexes;
+  return ids;
 }
 
 /**
@@ -203,7 +203,7 @@ export function rowFrames<R>(
     // A row at the depth of its own calls stands for them.
     return rowOccurrences(row, read, store);
   }
-  return derivedRowOf(row, read, data, store).frames;
+  return derivedRowOf(row, read, data, store).frameIds;
 }
 
 /**
@@ -223,12 +223,12 @@ export function rowDetailSelection<R>(
     return null;
   }
   const data = rowCallData(row, read);
-  const { eventIndex } = data;
-  if (eventIndex === undefined) {
+  const { eventId } = data;
+  if (eventId === undefined) {
     return null;
   }
   if (data.key === undefined) {
-    return { kind: 'event', eventIndex };
+    return { kind: 'event', eventId };
   }
   // The row itself is what reached the calls, at whatever depth it sits: a
   // deeper row narrows the same calls to the ones its own chain conducted, so
@@ -236,9 +236,9 @@ export function rowDetailSelection<R>(
   // its own calls, so nothing reached them but it.
   return {
     kind: 'aggregate',
-    instances: [...rowOccurrences(row, read, store)],
-    frames: [...rowFrames(row, read, store, direction)],
-    calledBy: data.instances?.length ? undefined : data.text,
+    eventIds: [...rowOccurrences(row, read, store)],
+    frameIds: [...rowFrames(row, read, store, direction)],
+    calledBy: data.eventIds?.length ? undefined : data.text,
   };
 }
 
@@ -257,43 +257,43 @@ export class LocatedRowIds {
 
   /**
    * @param direction - The view's own direction, or undefined where its rows are
-   * keyed by event and so are named by the indexes themselves.
+   * keyed by event and so are named by the event ids themselves.
    */
   public idsFor(
     store: LogStore,
-    eventIndexes: readonly number[],
+    eventIds: readonly number[],
     direction: SelectionView,
   ): readonly number[];
   public idsFor(
     store: LogStore | null,
-    eventIndexes: readonly number[],
+    eventIds: readonly number[],
     direction: SelectionView | undefined,
   ): readonly number[];
   public idsFor(
     store: LogStore | null,
-    eventIndexes: readonly number[],
+    eventIds: readonly number[],
     direction: SelectionView | undefined,
   ): readonly number[] {
     if (!direction) {
-      // The view's rows are keyed by event, so the indexes name them as they are.
-      return eventIndexes;
+      // The view's rows are keyed by event, so the event ids name them as they are.
+      return eventIds;
     }
-    if (!store || !eventIndexes.length) {
-      // A path id and an event index are both small integers, so passing the
-      // indexes on would mark whichever rows happened to share their numbers.
+    if (!store || !eventIds.length) {
+      // A path id and an event id are both small integers, so passing the
+      // event ids on would mark whichever rows happened to share their numbers.
       return [];
     }
     if (
-      this.lastEvents === eventIndexes &&
+      this.lastEvents === eventIds &&
       this.lastDirection === direction &&
       this.lastStore === store
     ) {
       return this.lastIds;
     }
     this.lastStore = store;
-    this.lastEvents = eventIndexes;
+    this.lastEvents = eventIds;
     this.lastDirection = direction;
-    this.lastIds = pathIdsForEvents(store, eventIndexes, direction);
+    this.lastIds = pathIdsForEvents(store, eventIds, direction);
     return this.lastIds;
   }
 }

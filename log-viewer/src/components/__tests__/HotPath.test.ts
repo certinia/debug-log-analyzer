@@ -18,8 +18,8 @@ import '../HotPath.js';
 const framesFor = (count: number) =>
   Array.from({ length: count }, (_unused, index) => ({
     text: `Frame${index}`,
-    eventIndex: index,
-    eventIndexes: [index],
+    eventId: index,
+    eventIds: [index],
     totalTime: 1_000 - index,
     selfTime: (1_000 - index) / 2,
     count: 1,
@@ -165,8 +165,8 @@ describe('hot-path', () => {
       hotPathBranches: [
         {
           text: 'Alpha',
-          eventIndex: 7,
-          eventIndexes: [7],
+          eventId: 7,
+          eventIds: [7],
           totalTime: 400,
           selfTime: 0,
           count: 1,
@@ -174,8 +174,8 @@ describe('hot-path', () => {
         },
         {
           text: 'Beta',
-          eventIndex: 8,
-          eventIndexes: [8, 11],
+          eventId: 8,
+          eventIds: [8, 11],
           totalTime: 300,
           selfTime: 0,
           count: 2,
@@ -209,8 +209,8 @@ describe('hot-path', () => {
       hotPathEnd: 'fan-out',
       hotPathBranches: ['A', 'B', 'C', 'D', 'E'].map((text, index) => ({
         text,
-        eventIndex: index,
-        eventIndexes: [index],
+        eventId: index,
+        eventIds: [index],
         totalTime: 100 - index,
         selfTime: 0,
         count: 1,
@@ -236,8 +236,8 @@ describe('hot-path', () => {
       hotPathBranches: [
         {
           text: 'Beta',
-          eventIndex: 8,
-          eventIndexes: [8, 11],
+          eventId: 8,
+          eventIds: [8, 11],
           totalTime: 300,
           selfTime: 0,
           count: 2,
@@ -250,7 +250,7 @@ describe('hot-path', () => {
     const element = await hotPath();
     const marks: (readonly number[])[] = [];
     element.addEventListener('inspector-locate', (event) => {
-      marks.push((event as CustomEvent<{ eventIndexes: readonly number[] }>).detail.eventIndexes);
+      marks.push((event as CustomEvent<{ eventIds: readonly number[] }>).detail.eventIds);
     });
 
     const branch = element.shadowRoot!.querySelector('.branch-row')!;
@@ -290,7 +290,7 @@ describe('hot-path', () => {
   });
 
   it('heads a truncated log with a caveat the shared warning glyph marks', async () => {
-    highlights = { ...pathOf(1), truncation: { regionCount: 2, firstEventIndex: 5 } };
+    highlights = { ...pathOf(1), truncation: { regionCount: 2, firstEventId: 5 } };
 
     const element = await hotPath();
 
@@ -301,11 +301,11 @@ describe('hot-path', () => {
 
   it('marks every merged instance of the row under the pointer', async () => {
     highlights = pathOf(1);
-    highlights.hotPath[0]!.eventIndexes = [4, 9];
+    highlights.hotPath[0]!.eventIds = [4, 9];
     const element = await hotPath();
     const marks: (readonly number[])[] = [];
     element.addEventListener('inspector-locate', (event) => {
-      marks.push((event as CustomEvent<{ eventIndexes: readonly number[] }>).detail.eventIndexes);
+      marks.push((event as CustomEvent<{ eventIds: readonly number[] }>).detail.eventIds);
     });
 
     const row = element.shadowRoot!.querySelector('.reveal-row')!;

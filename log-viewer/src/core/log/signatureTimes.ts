@@ -13,7 +13,7 @@ export interface Signature {
   /** The worst call's category. */
   category: LogCategory;
   /** The call with the most self time. */
-  eventIndex: number;
+  eventId: number;
   /** Calls, timed or not. */
   count: number;
   /** Calls with self time above zero. */
@@ -105,7 +105,7 @@ interface Tally {
  */
 export const signatureTimes: Derivation<SignatureTimes> = async (index) => {
   const tick = frameBudget({});
-  const { rowCount, self, total, subtreeEnd, eventIndex } = index;
+  const { rowCount, self, total, subtreeEnd, eventId } = index;
   const signatures = signaturesOf(index.log);
   const ids = new Uint32Array(rowCount);
   // Each signature's tally id, + 1 so 0 is none yet.
@@ -117,7 +117,7 @@ export const signatureTimes: Derivation<SignatureTimes> = async (index) => {
     if (row % CHECK_EVERY === 0) {
       await tick();
     }
-    const signature = signatures.of(eventIndex[row]!);
+    const signature = signatures.of(eventId[row]!);
     let id = tallyOf[signature];
     if (id === undefined) {
       id = tallies.length;
@@ -158,7 +158,7 @@ export const signatureTimes: Derivation<SignatureTimes> = async (index) => {
       const signature: Signature = {
         text: signatures.text(of),
         category: rowCategory(index, maxRow),
-        eventIndex: eventIndex[maxRow]!,
+        eventId: eventId[maxRow]!,
         count,
         timedCount,
         selfTime,

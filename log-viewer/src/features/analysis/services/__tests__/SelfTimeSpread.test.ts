@@ -51,9 +51,7 @@ describe('selfTimeSpread', () => {
 
     // A histogram needs more than one call, so a one-off gets a row of its own.
     expect(spread.lanes.map((row) => row.text)).toEqual(['Big', 'Small']);
-    expect(spread.singles).toEqual([
-      { text: 'Once', category: 'Apex', eventIndex: 5, selfTime: 900 },
-    ]);
+    expect(spread.singles).toEqual([{ text: 'Once', category: 'Apex', eventId: 5, selfTime: 900 }]);
     // The one-off still counts against the log, so it holds 90% on its own.
     expect(spread.concentration).toEqual({ signatures: 1, total: 3 });
   });
@@ -98,7 +96,7 @@ describe('selfTimeSpread', () => {
     const events = [...calls('Spiky', 3, 2), call('Spiky', 90)];
     const spread = await spreadOf(events);
 
-    expect(spread.lanes[0]?.eventIndex).toBe(4);
+    expect(spread.lanes[0]?.eventId).toBe(4);
   });
 
   it('ignores the untimed calls, so the count says what it measured', async () => {

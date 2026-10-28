@@ -13,7 +13,7 @@
  */
 
 import { describe, expect, it } from '@jest/globals';
-import { indexOf, rawStoreOf } from '#test-helpers/apexLog.js';
+import { idOf, rawStoreOf } from '#test-helpers/apexLog.js';
 import { buildLogIndex } from '#core/log/LogIndex.js';
 import { ApexLogTimeline } from '../optimised/ApexLogTimeline.js';
 import { BUCKET_CONSTANTS, type EventNode } from '../types/flamechart.types.js';
@@ -41,11 +41,11 @@ async function navigated(text: string) {
   internals['index'] = index;
   internals['frames'] = buildTimelineFrames(index, new Set(BUCKET_CONSTANTS.CATEGORY_PRIORITY), 0);
 
-  timeline.navigateToEventIndex(indexOf(log, text));
+  timeline.navigateToEventId(idOf(log, text));
   return { selected, focused };
 }
 
-describe('navigateToEventIndex', () => {
+describe('navigateToEventId', () => {
   // The chart draws no rect for a detail, so going to it selected nothing.
   it('selects the frame a detail sits in, and moves to that frame', async () => {
     const { selected, focused } = await navigated('DEBUG | inside');

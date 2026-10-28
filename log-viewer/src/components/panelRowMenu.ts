@@ -26,14 +26,14 @@ export const PANEL_ROW_MENU_ITEMS: ContextMenuItem[] = new ContextMenuBuilder()
   .build();
 
 /** Runs a {@link PANEL_ROW_MENU_ITEMS} action against the right-clicked frame. */
-export function runPanelRowAction(itemId: string, eventIndex: number): void {
+export function runPanelRowAction(itemId: string, eventId: number): void {
   if (itemId === 'show-in-call-tree') {
-    void goToRow({ eventIndex });
+    void goToRow({ eventId });
     return;
   }
 
   const store = currentLogStore();
-  const event = store?.eventByIndex(eventIndex);
+  const event = store?.eventById(eventId);
   if (!event) {
     return;
   }

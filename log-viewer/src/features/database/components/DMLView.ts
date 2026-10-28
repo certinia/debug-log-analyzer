@@ -72,7 +72,7 @@ export class DMLView extends StatementGrid<DMLRow, DmlEvent> {
 
   protected toRows(lines: readonly DmlEvent[], callerOf: (id: number) => string): DMLRow[] {
     return lines.map((dml) => ({
-      eventIndex: dml.id,
+      eventId: dml.id,
       dml: dml.text ?? '',
       objectType: dml.details.sObjectType,
       namespace: dml.namespace ?? DEFAULT_NAMESPACE,

@@ -20,12 +20,12 @@ jest.mock('../../features/database/components/DatabaseOverview.js', () => ({}));
 jest.mock('../../features/database/components/DatabaseRowBudget.js', () => ({}));
 jest.mock('../../features/database/components/DatabaseTimeTree.js', () => ({}));
 
-const databaseCalls: { eventIndex: number; type: string; activeEventIndex?: number | null }[] = [];
+const databaseCalls: { eventId: number; type: string; activeEventId?: number | null }[] = [];
 jest.mock('../../features/database/components/databaseSections.js', () => ({
   buildDatabaseSections: async (selection: {
-    eventIndex: number;
+    eventId: number;
     type: string;
-    activeEventIndex?: number | null;
+    activeEventId?: number | null;
   }) => {
     databaseCalls.push(selection);
     return [{ id: 'vitals', title: 'Details', content: undefined }];
@@ -55,7 +55,7 @@ function rendered(sections: PaneSection[], id: string, tag: string): Element {
 
 describe('buildDetailSections', () => {
   it('builds the shared trio for a timeline frame', async () => {
-    const sections = await buildDetailSections('timeline', { kind: 'event', eventIndex: 4 });
+    const sections = await buildDetailSections('timeline', { kind: 'event', eventId: 4 });
     // No findings: those belong to the Analysis tab.
     expect(sections.map((s) => s.id)).toEqual([
       'vitals',
@@ -79,20 +79,20 @@ describe('buildDetailSections', () => {
     // steady height rather than flickering on every step.
     expect(sections.find((s) => s.id === 'namespace-time')?.height).toBe('sm');
     // The user has not walked the stack, so the selection itself is active.
-    expect(
-      rendered(sections, 'callstack', 'call-stack-detail').getAttribute('activeEventIndex'),
-    ).toBe('4');
+    expect(rendered(sections, 'callstack', 'call-stack-detail').getAttribute('activeEventId')).toBe(
+      '4',
+    );
   });
 
   it('delegates a database statement to the richer database sections', async () => {
     databaseCalls.length = 0;
     const sections = await buildDetailSections('database', {
       kind: 'event',
-      eventIndex: 9,
+      eventId: 9,
       type: 'soql',
     });
 
-    expect(databaseCalls).toEqual([{ eventIndex: 9, type: 'soql', activeEventIndex: null }]);
+    expect(databaseCalls).toEqual([{ eventId: 9, type: 'soql', activeEventId: null }]);
     expect(sections.map((s) => s.id)).toEqual(['vitals']);
   });
 
@@ -100,41 +100,39 @@ describe('buildDetailSections', () => {
     databaseCalls.length = 0;
     await buildDetailSections(
       'database',
-      { kind: 'event', eventIndex: 9, type: 'soql' },
+      { kind: 'event', eventId: 9, type: 'soql' },
       {
         kind: 'event',
-        eventIndex: 4,
+        eventId: 4,
       },
     );
 
-    expect(databaseCalls).toEqual([{ eventIndex: 9, type: 'soql', activeEventIndex: 4 }]);
+    expect(databaseCalls).toEqual([{ eventId: 9, type: 'soql', activeEventId: 4 }]);
   });
 
   it('anchors the stack and the tree to the selection, while Details follows the active frame', async () => {
     const sections = await buildDetailSections(
       'timeline',
-      { kind: 'event', eventIndex: 4 },
+      { kind: 'event', eventId: 4 },
       {
         kind: 'event',
-        eventIndex: 2,
+        eventId: 2,
       },
     );
 
-    expect(rendered(sections, 'callstack', 'call-stack-detail').getAttribute('eventIndex')).toBe(
-      '4',
+    expect(rendered(sections, 'callstack', 'call-stack-detail').getAttribute('eventId')).toBe('4');
+    expect(rendered(sections, 'callstack', 'call-stack-detail').getAttribute('activeEventId')).toBe(
+      '2',
     );
-    expect(
-      rendered(sections, 'callstack', 'call-stack-detail').getAttribute('activeEventIndex'),
-    ).toBe('2');
-    expect(rendered(sections, 'vitals', 'event-vitals').getAttribute('eventIndex')).toBe('2');
-    expect(rendered(sections, 'calltree', 'call-tree-detail').getAttribute('eventIndex')).toBe('4');
-    expect(
-      rendered(sections, 'calltree', 'call-tree-detail').getAttribute('activeEventIndex'),
-    ).toBe('2');
+    expect(rendered(sections, 'vitals', 'event-vitals').getAttribute('eventId')).toBe('2');
+    expect(rendered(sections, 'calltree', 'call-tree-detail').getAttribute('eventId')).toBe('4');
+    expect(rendered(sections, 'calltree', 'call-tree-detail').getAttribute('activeEventId')).toBe(
+      '2',
+    );
     // The namespace split re-scopes to the frame being followed too.
-    expect(
-      rendered(sections, 'namespace-time', 'namespace-time-bar').getAttribute('eventIndex'),
-    ).toBe('2');
+    expect(rendered(sections, 'namespace-time', 'namespace-time-bar').getAttribute('eventId')).toBe(
+      '2',
+    );
   });
 
   // A database row with no statement type keeps the shared trio, and only the
@@ -146,7 +144,7 @@ describe('buildDetailSections', () => {
     'keeps the shared trio, without the namespace split, for %s',
     async (_name, source) => {
       databaseCalls.length = 0;
-      const sections = await buildDetailSections(source, { kind: 'event', eventIndex: 9 });
+      const sections = await buildDetailSections(source, { kind: 'event', eventId: 9 });
 
       expect(databaseCalls).toEqual([]);
       expect(sections.map((s) => s.id)).toEqual(['vitals', 'variables', 'callstack', 'calltree']);
@@ -156,8 +154,8 @@ describe('buildDetailSections', () => {
   it('scopes an aggregate selection, its findings and its Variables to every occurrence', async () => {
     const sections = await buildDetailSections('analysis', {
       kind: 'aggregate',
-      instances: [11, 12, 13],
-      frames: [11, 12, 13],
+      eventIds: [11, 12, 13],
+      frameIds: [11, 12, 13],
     });
     expect(sections.map((s) => s.id)).toEqual([
       'vitals',
@@ -167,21 +165,21 @@ describe('buildDetailSections', () => {
       'calltree',
     ]);
     expect(
-      (rendered(sections, 'vitals', 'event-vitals') as HTMLElement & { instances: number[] | null })
-        .instances,
+      (rendered(sections, 'vitals', 'event-vitals') as HTMLElement & { eventIds: number[] | null })
+        .eventIds,
     ).toEqual([11, 12, 13]);
     // Where the row sits at the calls' own depth, Variables reads the calls themselves.
     expect(
       (
         rendered(sections, 'variables', 'variables-detail') as HTMLElement & {
-          frames: number[] | null;
+          frameIds: number[] | null;
         }
-      ).frames,
+      ).frameIds,
     ).toEqual([11, 12, 13]);
     const findings = rendered(sections, 'findings', 'log-diagnostics') as HTMLElement & {
-      instances: number[] | null;
+      eventIds: number[] | null;
     };
-    expect(findings.instances).toEqual([11, 12, 13]);
+    expect(findings.eventIds).toEqual([11, 12, 13]);
     // The verdict reads beside the tree rather than being crowded by it.
     expect(sections.find((s) => s.id === 'findings')?.weight).toBe(3);
   });
@@ -191,72 +189,72 @@ describe('buildDetailSections', () => {
   it('gives Variables the frames the row is, not the calls it counts', async () => {
     const sections = await buildDetailSections('analysis', {
       kind: 'aggregate',
-      instances: [11, 12, 13],
-      frames: [4, 5, 6],
+      eventIds: [11, 12, 13],
+      frameIds: [4, 5, 6],
     });
 
     expect(
       (
         rendered(sections, 'variables', 'variables-detail') as HTMLElement & {
-          frames: number[] | null;
+          frameIds: number[] | null;
         }
-      ).frames,
+      ).frameIds,
     ).toEqual([4, 5, 6]);
   });
 
   it('scopes the findings to the frame being followed, not the aggregate it left', async () => {
     const sections = await buildDetailSections(
       'analysis',
-      { kind: 'aggregate', instances: [11, 12, 13], frames: [11, 12, 13] },
-      { kind: 'event', eventIndex: 8 },
+      { kind: 'aggregate', eventIds: [11, 12, 13], frameIds: [11, 12, 13] },
+      { kind: 'event', eventId: 8 },
     );
 
     const findings = rendered(sections, 'findings', 'log-diagnostics') as HTMLElement & {
-      instances: number[] | null;
+      eventIds: number[] | null;
     };
-    expect(findings.instances).toEqual([8]);
+    expect(findings.eventIds).toEqual([8]);
   });
 
   it('scopes the namespace split to every occurrence of an aggregate', async () => {
     const sections = await buildDetailSections('timeline', {
       kind: 'aggregate',
-      instances: [11, 12, 13],
-      frames: [11, 12, 13],
+      eventIds: [11, 12, 13],
+      frameIds: [11, 12, 13],
     });
 
     const bar = rendered(sections, 'namespace-time', 'namespace-time-bar') as HTMLElement & {
-      instances: number[] | null;
+      eventIds: number[] | null;
     };
-    expect(bar.instances).toEqual([11, 12, 13]);
+    expect(bar.eventIds).toEqual([11, 12, 13]);
   });
 
   it('drops the aggregate once a single frame in its stack is the one being followed', async () => {
     const sections = await buildDetailSections(
       'analysis',
-      { kind: 'aggregate', instances: [11, 12, 13], frames: [11, 12, 13] },
-      { kind: 'event', eventIndex: 8 },
+      { kind: 'aggregate', eventIds: [11, 12, 13], frameIds: [11, 12, 13] },
+      { kind: 'event', eventId: 8 },
     );
 
     const vitals = rendered(sections, 'vitals', 'event-vitals') as HTMLElement & {
-      instances: number[] | null;
+      eventIds: number[] | null;
     };
-    expect(vitals.getAttribute('eventIndex')).toBe('8');
-    expect(vitals.instances).toBeNull();
+    expect(vitals.getAttribute('eventId')).toBe('8');
+    expect(vitals.eventIds).toBeNull();
     expect(vitals.getAttribute('called-by')).toBe('');
   });
 
   it('describes the calls a walked bucket counts, as a bucket picked in the tab is', async () => {
     const sections = await buildDetailSections(
       'analysis',
-      { kind: 'aggregate', instances: [11, 12, 13], frames: [11, 12, 13] },
-      { kind: 'aggregate', instances: [21, 22], frames: [21, 22], calledBy: 'Trigger1' },
+      { kind: 'aggregate', eventIds: [11, 12, 13], frameIds: [11, 12, 13] },
+      { kind: 'aggregate', eventIds: [21, 22], frameIds: [21, 22], calledBy: 'Trigger1' },
     );
 
     const vitals = rendered(sections, 'vitals', 'event-vitals') as HTMLElement & {
-      instances: number[] | null;
+      eventIds: number[] | null;
     };
-    expect(vitals.instances).toEqual([21, 22]);
-    expect(vitals.getAttribute('eventIndex')).toBe('21');
+    expect(vitals.eventIds).toEqual([21, 22]);
+    expect(vitals.getAttribute('eventId')).toBe('21');
     expect(vitals.getAttribute('called-by')).toBe('Trigger1');
   });
 

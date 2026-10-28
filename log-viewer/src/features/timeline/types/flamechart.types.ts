@@ -643,7 +643,7 @@ export interface TimelineMarker {
   endTime?: number;
 
   /** Parser-assigned event identity when the marker corresponds to a concrete event. */
-  eventIndex?: number;
+  eventId?: number;
 
   /**
    * Optional additional context about the marker.

@@ -3,7 +3,7 @@
  */
 import { beforeAll, beforeEach, describe, expect, it } from '@jest/globals';
 
-import { indexesOf, storeOf } from '#test-helpers/apexLog.js';
+import { idsOf, storeOf } from '#test-helpers/apexLog.js';
 
 import { KeyPathIds, ROOT_PATH_ID } from '../keyPathIds.js';
 import type { LogStore } from '../LogStore.js';
@@ -40,7 +40,7 @@ function table(): KeyPathIds {
 
 /** The one frame whose text is `text`, or the `nth` of several. */
 function frame(text: string, nth = 0): number {
-  return indexesOf(store.log, text)[nth]!;
+  return idsOf(store.log, text)[nth]!;
 }
 
 /** Interns a whole path, named outermost key first as a row reads, the way a

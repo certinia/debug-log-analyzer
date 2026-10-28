@@ -392,11 +392,11 @@ export class LogInspector extends LitElement {
     if (!source) {
       return;
     }
-    eventBus.emit('inspector:reveal', { source, eventIndex: e.detail.eventIndex });
+    eventBus.emit('inspector:reveal', { source, eventId: e.detail.eventId });
     // Without a selection the sections are the whole-log ones, which have no
     // frame to follow; the whole-log rows only reveal.
     if (this._scopedSelection(source)) {
-      this._active.set(source, { kind: 'event', eventIndex: e.detail.eventIndex });
+      this._active.set(source, { kind: 'event', eventId: e.detail.eventId });
       this._scheduleRebuild();
     }
   };
@@ -410,16 +410,16 @@ export class LogInspector extends LitElement {
     if (!source) {
       return;
     }
-    this._locatedSource = e.detail.eventIndexes.length ? source : undefined;
+    this._locatedSource = e.detail.eventIds.length ? source : undefined;
     eventBus.emit('inspector:locate', {
       source,
-      eventIndexes: e.detail.eventIndexes,
+      eventIds: e.detail.eventIds,
       sticky: e.detail.sticky,
     });
     if (!e.detail.sticky || !this._scopedSelection(source)) {
       return;
     }
-    if (!e.detail.eventIndexes.length) {
+    if (!e.detail.eventIds.length) {
       // The pick is being dropped, which hands Details back to the tab's own
       // selection.
       if (this._active.delete(source)) {
@@ -440,7 +440,7 @@ export class LogInspector extends LitElement {
     if (this._locatedSource) {
       eventBus.emit('inspector:locate', {
         source: this._locatedSource,
-        eventIndexes: [],
+        eventIds: [],
         sticky: true,
       });
       this._locatedSource = undefined;

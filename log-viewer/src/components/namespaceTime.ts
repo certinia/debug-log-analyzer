@@ -26,7 +26,7 @@ export async function namespaceColumn(index: LogIndex): Promise<NamespaceColumn>
     if (row % CHECK_EVERY === 0) {
       await tick();
     }
-    const namespace = namespaces.at(index.eventIndex[row]!) || DEFAULT_NAMESPACE;
+    const namespace = namespaces.at(index.eventId[row]!) || DEFAULT_NAMESPACE;
     let id = lookup.get(namespace);
     if (id === undefined) {
       id = lookup.size;

@@ -15,6 +15,7 @@ import type { ApexEvent } from '@apexdevtools/apex-log-parser';
 
 import type { Context } from '../Context.js';
 import { LogEventCache, type LogReporter } from '../cache/LogEventCache.js';
+import type { ShowInLogAnalysisArgs } from '../commands/ShowInLogAnalysis.js';
 import { isOpenAsTextTab } from '../editor/TabState.js';
 import { isApexLogContent } from '../language/ApexLogLanguageDetector.js';
 import { buildMetricParts, formatDuration, TIMESTAMP_REGEX } from '../log-utils.js';
@@ -131,7 +132,9 @@ export class RawLogLineDecoration {
   }
 
   private buildHoverMessage(event: ApexEvent, filePath: string): MarkdownString {
-    const args = encodeURIComponent(JSON.stringify({ eventIndex: event.id, filePath }));
+    const args = encodeURIComponent(
+      JSON.stringify({ eventId: event.id, filePath } satisfies ShowInLogAnalysisArgs),
+    );
     const commandUri = `command:lana.showInLogAnalysis?${args}`;
 
     const metricParts = buildMetricParts(event);

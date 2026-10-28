@@ -44,7 +44,7 @@ jest.mock('../../../settings/Settings.js', () => ({
 }));
 jest.mock('../../../../components/grid/exportCsv.js', () => ({ exportCsv: jest.fn() }));
 
-import { indexOf, rawStoreOf, storeOf } from '#test-helpers/apexLog.js';
+import { idOf, rawStoreOf, storeOf } from '#test-helpers/apexLog.js';
 import { AlwaysVisible, NeverVisible, settle } from '#test-helpers/visibility.js';
 import { exportCsv } from '../../../../components/grid/exportCsv.js';
 import { eventBus } from '#core/events/EventBus.js';
@@ -420,7 +420,7 @@ describe('calltree-view category colorize', () => {
     );
     view.remove();
     view = await mountView(log);
-    const row = (await store.logIndex()).rowOf(indexOf(log, 'ns.Outer.run()'));
+    const row = (await store.logIndex()).rowOf(idOf(log, 'ns.Outer.run()'));
 
     expect(view.timeOrderGrid?.rowClass?.({ row })).toBe('cat-apex');
   });
@@ -461,7 +461,7 @@ describe('calltree-view merged filters', () => {
     const filters = filtersOf(view, mode);
     return Array.from({ length: index.rowCount }, (_, row) => ({ row }))
       .filter((node) => filters.every((filter) => filter.test(node)))
-      .map(({ row }) => store.log.event(index.eventIndex[row]!)?.type);
+      .map(({ row }) => store.log.event(index.eventId[row]!)?.type);
   };
   const detailsPressed = async (view: CalltreeView): Promise<string | null | undefined> => {
     await view.updateComplete;
@@ -635,7 +635,7 @@ describe('calltree-view inspector reveal', () => {
   }
 
   function reveal(text: string): void {
-    eventBus.emit('inspector:reveal', { source: 'calltree', eventIndex: indexOf(store.log, text) });
+    eventBus.emit('inspector:reveal', { source: 'calltree', eventId: idOf(store.log, text) });
   }
 
   it('reveals the Bottom-Up bucket a frame heads, not a caller row it sits in', async () => {
@@ -664,7 +664,7 @@ describe('calltree-view inspector reveal', () => {
     view.logStore = next;
     eventBus.emit('inspector:reveal', {
       source: 'calltree',
-      eventIndex: indexOf(next.log, 'ns.Other.do()'),
+      eventId: idOf(next.log, 'ns.Other.do()'),
     });
     await settle();
     const roots = toBottomUpTree(await next.logIndex(), next);
@@ -756,7 +756,7 @@ describe('calltree-view go to row', () => {
     );
     view = await mountView(log);
 
-    await view._goToRow(indexOf(log, 'ns.Outer.run()'));
+    await view._goToRow(idOf(log, 'ns.Outer.run()'));
 
     expect((view.renderRoot as ShadowRoot).activeElement === view.timeOrderGrid).toBe(true);
   });
@@ -782,7 +782,7 @@ describe('calltree-view go to row', () => {
 
     async function openWithDebugOnly(log: ApexLog): Promise<void> {
       view = await mountView(log);
-      await view._goToRow(indexOf(log, 'ns.Outer.run()'));
+      await view._goToRow(idOf(log, 'ns.Outer.run()'));
       view._handleDebugOnlyChange();
       await view.updateComplete;
     }
@@ -796,10 +796,10 @@ describe('calltree-view go to row', () => {
       const { log } = await storeOf(LOG);
       await openWithDebugOnly(log);
 
-      await view._goToRow(indexOf(log, 'ns.Inner.go()'));
+      await view._goToRow(idOf(log, 'ns.Inner.go()'));
       await view.updateComplete;
 
-      expect(view.timeOrderGrid?.selectedKey).toBe(indexOf(log, 'ns.Outer.run()'));
+      expect(view.timeOrderGrid?.selectedKey).toBe(idOf(log, 'ns.Outer.run()'));
       expect(note()?.textContent).toContain('Row hidden by current filters');
       expect(announced()).toContain('filters hide that row');
       expect(pressed('Debug Only')).toBe('true');
@@ -808,7 +808,7 @@ describe('calltree-view go to row', () => {
     it('clears the filters and goes to the row when Clear is pressed', async () => {
       const { log } = await storeOf(LOG);
       await openWithDebugOnly(log);
-      const inner = indexOf(log, 'ns.Inner.go()');
+      const inner = idOf(log, 'ns.Inner.go()');
       await view._goToRow(inner);
       await view.updateComplete;
 
@@ -826,7 +826,7 @@ describe('calltree-view go to row', () => {
     it('turns Details on, with no bar, when Details is what hides the row', async () => {
       const { log } = await storeOf(LOG);
       view = await mountView(log);
-      const hello = indexOf(log, 'DEBUG | hello');
+      const hello = idOf(log, 'DEBUG | hello');
 
       await view._goToRow(hello);
       await view.updateComplete;
@@ -842,7 +842,7 @@ describe('calltree-view go to row', () => {
       view = await mountView(log);
       view._handleNamespaceFacet(new CustomEvent('facet', { detail: { selected: ['other'] } }));
 
-      await view._goToRow(indexOf(log, 'DEBUG | hello'));
+      await view._goToRow(idOf(log, 'DEBUG | hello'));
       await view.updateComplete;
 
       expect(pressed('Details')).toBe('true');
@@ -853,7 +853,7 @@ describe('calltree-view go to row', () => {
       const { log } = await storeOf(LOG);
       view = await mountView(log);
       pickType(view, 'USER_DEBUG');
-      const inner = indexOf(log, 'ns.Inner.go()');
+      const inner = idOf(log, 'ns.Inner.go()');
       await view._goToRow(inner);
       await view.updateComplete;
       expect(pressed('Details')).toBe('true');
@@ -869,7 +869,7 @@ describe('calltree-view go to row', () => {
       const { log } = await storeOf(LOG);
       view = await mountView(log);
       view._handleNamespaceFacet(new CustomEvent('facet', { detail: { selected: ['other'] } }));
-      const inner = indexOf(log, 'ns.Inner.go()');
+      const inner = idOf(log, 'ns.Inner.go()');
       await view._goToRow(inner);
       await view.updateComplete;
       expect(note()).not.toBeNull();
@@ -884,7 +884,7 @@ describe('calltree-view go to row', () => {
     it('drops the note when a filter changes', async () => {
       const { log } = await storeOf(LOG);
       await openWithDebugOnly(log);
-      await view._goToRow(indexOf(log, 'ns.Inner.go()'));
+      await view._goToRow(idOf(log, 'ns.Inner.go()'));
       await view.updateComplete;
 
       view._handleDebugOnlyChange();
@@ -915,7 +915,7 @@ describe('calltree-view go to row', () => {
       view = await mountView(log);
       view._handleNamespaceFacet(new CustomEvent('facet', { detail: { selected: ['other'] } }));
 
-      await view._goToRow(indexOf(log, 'ns.Inner.go()'));
+      await view._goToRow(idOf(log, 'ns.Inner.go()'));
       show();
       await settle();
       await view.updateComplete;
@@ -927,7 +927,7 @@ describe('calltree-view go to row', () => {
       const { log } = await storeOf(LOG);
       const next = (await storeOf(LOG)).store;
       await openWithDebugOnly(log);
-      await view._goToRow(indexOf(log, 'ns.Inner.go()'));
+      await view._goToRow(idOf(log, 'ns.Inner.go()'));
       await view.updateComplete;
 
       view.logStore = next;
@@ -944,7 +944,7 @@ describe('calltree-view go to row', () => {
       const next = (await storeOf(LOG)).store;
       await openWithDebugOnly(log);
 
-      const going = view._goToRow(indexOf(log, 'ns.Inner.go()'));
+      const going = view._goToRow(idOf(log, 'ns.Inner.go()'));
       view.logStore = next;
       await going;
       await settle();
@@ -966,7 +966,7 @@ describe('calltree-view go to row', () => {
         return going;
       };
 
-      await view._goToRow(indexOf(log, 'ns.Inner.go()'));
+      await view._goToRow(idOf(log, 'ns.Inner.go()'));
       await settle();
       await view.updateComplete;
 
@@ -977,10 +977,10 @@ describe('calltree-view go to row', () => {
       const { log } = await storeOf(LOG);
       view = await mountView(log);
 
-      await view._goToRow(indexOf(log, 'ns.Inner.go()'));
+      await view._goToRow(idOf(log, 'ns.Inner.go()'));
       await view.updateComplete;
 
-      expect(view.timeOrderGrid?.selectedKey).toBe(indexOf(log, 'ns.Inner.go()'));
+      expect(view.timeOrderGrid?.selectedKey).toBe(idOf(log, 'ns.Inner.go()'));
       expect(note()).toBeNull();
     });
   });
@@ -1011,13 +1011,13 @@ describe('calltree-view go to row', () => {
       const { store } = await storeOf(LOG);
       await loading(store);
 
-      const going = view._goToRow(indexOf(store.log, 'ns.Outer.run()'));
+      const going = view._goToRow(idOf(store.log, 'ns.Outer.run()'));
       await settle();
       release();
       await going;
       await view.updateComplete;
 
-      expect(view.timeOrderGrid?.selectedKey).toBe(indexOf(store.log, 'ns.Outer.run()'));
+      expect(view.timeOrderGrid?.selectedKey).toBe(idOf(store.log, 'ns.Outer.run()'));
       expect(note()).toBeNull();
     });
 
@@ -1027,14 +1027,14 @@ describe('calltree-view go to row', () => {
 
       eventBus.emit('inspector:reveal', {
         source: 'calltree',
-        eventIndex: indexOf(store.log, 'ns.Outer.run()'),
+        eventId: idOf(store.log, 'ns.Outer.run()'),
       });
       await settle();
       release();
       await settle();
       await view.updateComplete;
 
-      expect(view.timeOrderGrid?.selectedKey).toBe(indexOf(store.log, 'ns.Outer.run()'));
+      expect(view.timeOrderGrid?.selectedKey).toBe(idOf(store.log, 'ns.Outer.run()'));
       expect(note()).toBeNull();
     });
 
@@ -1044,7 +1044,7 @@ describe('calltree-view go to row', () => {
 
       eventBus.emit('inspector:reveal', {
         source: 'calltree',
-        eventIndex: indexOf(store.log, 'ns.Outer.run()'),
+        eventId: idOf(store.log, 'ns.Outer.run()'),
       });
       await settle();
       const selected = [...store.log.namespaces];
@@ -1053,7 +1053,7 @@ describe('calltree-view go to row', () => {
       await settle();
       await view.updateComplete;
 
-      expect(view.timeOrderGrid?.selectedKey).toBe(indexOf(store.log, 'ns.Outer.run()'));
+      expect(view.timeOrderGrid?.selectedKey).toBe(idOf(store.log, 'ns.Outer.run()'));
     });
 
     it('drops a reveal whose log is replaced again while the rows load', async () => {
@@ -1062,7 +1062,7 @@ describe('calltree-view go to row', () => {
 
       eventBus.emit('inspector:reveal', {
         source: 'calltree',
-        eventIndex: indexOf(store.log, 'ns.Outer.run()'),
+        eventId: idOf(store.log, 'ns.Outer.run()'),
       });
       await settle();
       view.logStore = (await storeOf(LOG)).store;

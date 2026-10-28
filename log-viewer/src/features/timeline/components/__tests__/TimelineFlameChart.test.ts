@@ -42,8 +42,8 @@ jest.mock('../../optimised/ApexLogTimeline.js', () => ({
     setViewport(viewport: string): void {
       restored.push(viewport);
     }
-    navigateToEventIndex(eventIndex: number): void {
-      navigated.push(eventIndex);
+    navigateToEventId(eventId: number): void {
+      navigated.push(eventId);
       movedCharts.push(this.chart);
     }
     setTooltipEnabled(): void {}
@@ -174,12 +174,12 @@ describe('timeline-flame-chart on a new log', () => {
 describe('timeline-flame-chart opened at an event', () => {
   let chart: HTMLElement & {
     logStore: LogStore | null;
-    navigateRequest: { eventIndex: number } | undefined;
+    navigateRequest: { eventId: number } | undefined;
     updateComplete: Promise<unknown>;
   };
 
-  const ask = async (eventIndex: number) => {
-    chart.navigateRequest = { eventIndex };
+  const ask = async (eventId: number) => {
+    chart.navigateRequest = { eventId };
     await chart.updateComplete;
     await settle();
   };
@@ -193,7 +193,7 @@ describe('timeline-flame-chart opened at an event', () => {
     globalThis.IntersectionObserver = AlwaysVisible as unknown as typeof IntersectionObserver;
     chart = document.createElement('timeline-flame-chart') as typeof chart;
     document.body.append(chart);
-    chart.navigateRequest = { eventIndex: 7 };
+    chart.navigateRequest = { eventId: 7 };
     chart.logStore = logOf();
     await chart.updateComplete;
     await settle();

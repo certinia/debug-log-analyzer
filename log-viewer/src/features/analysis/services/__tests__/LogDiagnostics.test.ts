@@ -120,7 +120,7 @@ describe('logDiagnostics', () => {
     expect(repeat?.summary).toBe('6 SOQL statements from line 214');
     expect(repeat?.count).toBe(6);
     // The first query is the first event.
-    expect(repeat?.eventIndex).toBe(1);
+    expect(repeat?.eventId).toBe(1);
   });
 
   it('keeps a statement below the repeat threshold quiet', async () => {
@@ -181,7 +181,7 @@ describe('logDiagnostics', () => {
     expect(found?.evidence).toHaveLength(11);
     expect(found?.evidence?.[0]).toEqual({
       text: dynamicSoql(0),
-      eventIndex: 1,
+      eventId: 1,
       count: 2,
       dialect: 'soql',
     });
@@ -271,7 +271,7 @@ describe('logDiagnostics', () => {
     expect(unbounded?.count).toBe(3);
     // The rule names a problem; the query it read is what ties it to the grid.
     expect(unbounded?.evidence).toEqual([
-      { text: 'SELECT Id FROM Account', eventIndex: 1, count: 3, dialect: 'soql' },
+      { text: 'SELECT Id FROM Account', eventId: 1, count: 3, dialect: 'soql' },
     ]);
     expect(lintedQueries).toEqual({ linted: 1, distinct: 1 });
   });
@@ -314,7 +314,7 @@ describe('logDiagnostics', () => {
       ['SELECT Id FROM Account LIMIT 1'],
     ]);
     // The query is the row to reveal (id 1), not the plan line under it (id 2).
-    expect(diagnostics.map((d) => d.eventIndex)).toEqual([1, 1]);
+    expect(diagnostics.map((d) => d.eventId)).toEqual([1, 1]);
   });
 
   it('says the plans are unknown when the log holds none', async () => {
@@ -362,7 +362,7 @@ describe('logDiagnostics', () => {
 
     expect(diagnostics).toHaveLength(1);
     expect(diagnostics[0]?.count).toBe(2);
-    expect(diagnostics[0]?.eventIndex).toBe(1);
+    expect(diagnostics[0]?.eventId).toBe(1);
     expect(diagnostics[0]?.evidence).toBeUndefined();
   });
 
@@ -413,7 +413,7 @@ describe('logDiagnostics', () => {
     expect(diagnostics[0]?.summary).toBe('CPU Time limit exceeded');
     expect(diagnostics[0]?.meta).toBe('15,163 ms / 10,000 ms');
     // No method holds the throw, so it points at the throw itself.
-    expect(diagnostics[0]?.eventIndex).toBe(1);
+    expect(diagnostics[0]?.eventId).toBe(1);
     expect(diagnostics[0]?.evidence?.[0]?.text).toBe('Class.A.run: line 31, column 1');
   });
 
@@ -450,7 +450,7 @@ describe('logDiagnostics', () => {
       at('METHOD_EXIT|[1]|A.run()'),
     );
 
-    expect(diagnostics[0]?.eventIndex).toBe(1);
+    expect(diagnostics[0]?.eventId).toBe(1);
   });
 
   it('counts debug statements once they are worth reporting', async () => {

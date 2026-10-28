@@ -3,7 +3,7 @@
  */
 import { afterEach, describe, expect, it, jest } from '@jest/globals';
 
-import { indexOf, storeOf } from '#test-helpers/apexLog.js';
+import { idOf, storeOf } from '#test-helpers/apexLog.js';
 import { type DebugLevels, hiddenByLevels, sameLevels } from '../levelFilter.js';
 import { buildLogIndex, type LogIndex } from '../LogIndex.js';
 import { filterByLevels, type LogStore } from '../LogStore.js';
@@ -177,7 +177,7 @@ describe('filterByLevels', () => {
   it('gives a path through the kept frames only, and none to a hidden event', async () => {
     const { log, store } = await storeOf(BODY, SETTINGS);
     const filtered = await shown(store, { apexCode: 'DEBUG' });
-    const hello = indexOf(log, 'DEBUG | hello');
+    const hello = idOf(log, 'DEBUG | hello');
 
     expect(filtered.pathTo(hello).map((id) => log.event(id)!.type)).toEqual([
       'EXECUTION_STARTED',
@@ -185,12 +185,12 @@ describe('filterByLevels', () => {
       'USER_DEBUG',
     ]);
     expect(filtered.pathTo(hello).at(-1)).toBe(hello);
-    expect(filtered.pathTo(indexOf(log, 'ns.Outer.run()'))).toEqual([]);
+    expect(filtered.pathTo(idOf(log, 'ns.Outer.run()'))).toEqual([]);
   });
 
   it('folds a hidden statement count into its parent', async () => {
     const store = await storeOfBody();
-    const inner = indexOf(store.log, 'ns.Inner.go()');
+    const inner = idOf(store.log, 'ns.Inner.go()');
 
     const index = await (await shown(store, { database: 'ERROR' })).logIndex();
     const row = index.rowOf(inner);
@@ -215,25 +215,25 @@ describe('filterByLevels', () => {
 
   it('finds no event or stack at a hidden id, and no row for it', async () => {
     const store = await storeOfBody();
-    const inner = indexOf(store.log, 'ns.Inner.go()');
+    const inner = idOf(store.log, 'ns.Inner.go()');
 
     const filtered = await shown(store, { apexCode: 'DEBUG' });
 
-    expect(filtered.eventByIndex(inner)).toBeNull();
-    expect(filtered.stackByEventIndex(inner)).toEqual([]);
+    expect(filtered.eventById(inner)).toBeNull();
+    expect(filtered.stackById(inner)).toEqual([]);
     expect((await filtered.logIndex()).rowOf(inner)).toBe(-1);
   });
 
   it('lists every kept event and none that is hidden', async () => {
     const store = await storeOfBody();
-    const inner = indexOf(store.log, 'ns.Inner.go()');
+    const inner = idOf(store.log, 'ns.Inner.go()');
 
     const filtered = await shown(store, { apexCode: 'DEBUG' });
     const listed = [...filtered.events()].map((event) => event.id);
     const index = await filtered.logIndex();
 
     expect(listed).not.toContain(inner);
-    expect(listed).toEqual([...index.eventIndex]);
+    expect(listed).toEqual([...index.eventId]);
   });
 
   it('drops hidden exceptions and keeps the entry points', async () => {

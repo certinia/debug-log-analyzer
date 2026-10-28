@@ -23,13 +23,13 @@ export interface InspectorGridOptions<R extends object> {
   /** The rows on screen; a new one marks the rows again. */
   source: () => unknown;
   /** The frames a row stands for, which hovering it marks in the tab on screen. */
-  frames: (row: R) => readonly number[];
+  frameIds: (row: R) => readonly number[];
   /** What picking a row does: reveal its frame, or hold a mark on the frames it merges. */
   pick: (row: R | null) => void;
   /** The frame the row menu acts on; null leaves the browser's own menu. */
   menuFrame: (row: R) => number | null;
   /** The keys of the rows that stand for the frames under the pointer in the tab on screen. */
-  keysFor: (eventIndexes: readonly number[]) => Iterable<RowKey>;
+  keysFor: (eventIds: readonly number[]) => Iterable<RowKey>;
   /** Escape drops a picked row, and the mark it holds in the tab on screen. */
   dropOnClear?: boolean;
 }
@@ -69,10 +69,10 @@ export class InspectorGridController<R extends object> implements ReactiveContro
     this._options = options;
     host.addController(this);
     new SubscriptionController(host, () => [
-      eventBus.on('detail:locate', ({ eventIndexes }) => {
+      eventBus.on('detail:locate', ({ eventIds }) => {
         // The tab reports the same list again each time the pointer leaves one of its rows.
-        if (eventIndexes !== this._located) {
-          this._located = eventIndexes;
+        if (eventIds !== this._located) {
+          this._located = eventIds;
           this._remark();
         }
       }),
@@ -128,7 +128,7 @@ export class InspectorGridController<R extends object> implements ReactiveContro
 
   private readonly _onLocate = (e: CustomEvent<GridRowDetail<R>>): void => {
     const { row } = e.detail;
-    dispatchInspectorLocate(this._host, row ? this._options.frames(row) : []);
+    dispatchInspectorLocate(this._host, row ? this._options.frameIds(row) : []);
   };
 
   private readonly _onContext = (e: CustomEvent<GridContextDetail<R>>): void => {

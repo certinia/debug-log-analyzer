@@ -40,7 +40,7 @@ function childrenOf(index: LogIndex, row: number): number[] {
 
 function columnsOf(index: LogIndex) {
   return {
-    eventIndex: [...index.eventIndex],
+    eventId: [...index.eventId],
     start: [...index.start],
     total: [...index.total],
     self: [...index.self],
@@ -59,10 +59,10 @@ describe('LogIndex', () => {
 
     expect(index.rowCount).toBe(events.length);
     events.forEach((event, row) => {
-      expect(index.eventIndex[row]).toBe(event.id);
+      expect(index.eventId[row]).toBe(event.id);
       const parent = index.parent[row]!;
-      expect(parent === NO_ROW ? null : index.eventIndex[parent]).toBe(event.parent?.id ?? null);
-      expect(childrenOf(index, row).map((child) => index.eventIndex[child])).toEqual(
+      expect(parent === NO_ROW ? null : index.eventId[parent]).toBe(event.parent?.id ?? null);
+      expect(childrenOf(index, row).map((child) => index.eventId[child])).toEqual(
         event.children.map((child) => child.id),
       );
       expect(index.depth[row]).toBe(event.depth - 1);
@@ -85,7 +85,7 @@ describe('LogIndex', () => {
     expect(index.rowOf(0)).toBe(NO_ROW);
     expect(index.rowOf(log.eventCount + 1)).toBe(NO_ROW);
     for (let row = 0; row < index.rowCount; row++) {
-      expect(index.rowOf(index.eventIndex[row]!)).toBe(row);
+      expect(index.rowOf(index.eventId[row]!)).toBe(row);
     }
   });
 

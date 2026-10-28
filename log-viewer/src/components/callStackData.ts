@@ -4,7 +4,7 @@
 import { currentLogStore } from '#core/log/LogStore.js';
 
 export interface CallStackRow {
-  eventIndex: number;
+  eventId: number;
   type: string;
   text: string;
   duration: { total: number; self: number };
@@ -12,17 +12,17 @@ export interface CallStackRow {
 
 /**
  * Flat, plain-object rows for the call-stack table — the lineage of parents
- * that led to `eventIndex`, outermost first (as `getStackByEventIndex`
+ * that led to `eventId`, outermost first (as `LogStore.stackById`
  * returns them). `rootTotal` (the outermost frame's total, in ns) is the
  * denominator for the Total/Self percentage bars.
  */
-export function buildCallStackData(eventIndex: number): {
+export function buildCallStackData(eventId: number): {
   rows: CallStackRow[];
   rootTotal: number;
 } {
-  const stack = eventIndex >= 0 ? (currentLogStore()?.stackByEventIndex(eventIndex) ?? []) : [];
+  const stack = eventId >= 0 ? (currentLogStore()?.stackById(eventId) ?? []) : [];
   const rows = stack.map((entry) => ({
-    eventIndex: entry.id,
+    eventId: entry.id,
     type: entry.type,
     text: entry.text ?? entry.type,
     duration: { total: entry.duration.total, self: entry.duration.self },

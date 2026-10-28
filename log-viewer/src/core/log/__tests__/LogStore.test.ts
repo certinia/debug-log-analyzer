@@ -3,7 +3,7 @@
  */
 import { afterEach, describe, expect, it, jest } from '@jest/globals';
 
-import { indexesOf, indexOf, rawStoreOf, storeOf } from '#test-helpers/apexLog.js';
+import { idsOf, idOf, rawStoreOf, storeOf } from '#test-helpers/apexLog.js';
 import type { LogIndex } from '../LogIndex.js';
 import {
   currentLogStore,
@@ -14,16 +14,16 @@ import {
 } from '../LogStore.js';
 
 describe('LogStore', () => {
-  it('resolves stack by eventIndex when timestamps are duplicated', async () => {
+  it('resolves stack by eventId when timestamps are duplicated', async () => {
     const { log, store } = await storeOf(
       '09:18:22.6 (7000000)|METHOD_ENTRY|[1]|01p|ns.ClassOne.first()\n' +
         '09:18:22.6 (7100000)|METHOD_EXIT|[1]|ns.ClassOne.first()\n' +
         '09:18:22.6 (7000000)|METHOD_ENTRY|[2]|01p|ns.ClassTwo.second()\n' +
         '09:18:22.6 (7200000)|METHOD_EXIT|[2]|ns.ClassTwo.second()\n',
     );
-    const [methodTwo] = indexesOf(log, 'ns.ClassTwo.second()');
+    const [methodTwo] = idsOf(log, 'ns.ClassTwo.second()');
 
-    const stack = store.stackByEventIndex(methodTwo!);
+    const stack = store.stackById(methodTwo!);
     expect(stack[stack.length - 1]?.text).toBe('ns.ClassTwo.second()');
   });
 
@@ -34,8 +34,8 @@ describe('LogStore', () => {
         '09:18:22.6 (3000)|METHOD_EXIT|[1]|ns.Page.load()\n',
     );
 
-    const stack = store.stackByEventIndex(
-      indexOf(log, 'PageMessagesComponentController invoke(getseverities)'),
+    const stack = store.stackById(
+      idOf(log, 'PageMessagesComponentController invoke(getseverities)'),
     );
 
     expect(stack.slice(-2).map((frame) => frame.text)).toEqual([
@@ -55,7 +55,7 @@ describe('LogStore', () => {
       (id) => log.event(id)?.type === 'LIMIT_USAGE_FOR_NS',
     );
 
-    const stack = store.stackByEventIndex(limitLine!);
+    const stack = store.stackById(limitLine!);
 
     expect(stack.at(-1)?.type).toBe('CUMULATIVE_LIMIT_USAGE');
   });
@@ -77,9 +77,9 @@ describe('LogStore', () => {
         '09:18:22.6 (1200)|METHOD_EXIT|[2]|ns.Inner.go()\n' +
         '09:18:22.6 (1300)|METHOD_EXIT|[1]|ns.Outer.run()\n',
     );
-    const outer = indexOf(log, 'ns.Outer.run()');
-    const inner = indexOf(log, 'ns.Inner.go()');
-    const debug = indexOf(log, 'DEBUG | hello');
+    const outer = idOf(log, 'ns.Outer.run()');
+    const inner = idOf(log, 'ns.Inner.go()');
+    const debug = idOf(log, 'DEBUG | hello');
 
     expect(store.pathTo(debug)).toEqual([outer, inner, debug]);
     expect(store.pathTo(0)).toEqual([]);

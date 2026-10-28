@@ -171,7 +171,7 @@ export class SOQLView extends StatementGrid<SOQLRow, SoqlEvent> {
     return lines.map((soql) => {
       const { explain: plan, aggregations } = soql.details;
       return {
-        eventIndex: soql.id,
+        eventId: soql.id,
         soql: soql.text ?? '',
         isSelective: plan?.relativeCost ? plan.relativeCost <= 1 : null,
         relativeCost: plan?.relativeCost ?? null,

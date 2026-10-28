@@ -11,7 +11,7 @@ import type { DatabaseCallNode, DatabaseOverview } from '../../services/database
 const node = (
   label: string,
   kind: DatabaseCallNode['kind'],
-  eventIndexes: number[],
+  eventIds: number[],
   children: DatabaseCallNode[] = [],
 ): DatabaseCallNode =>
   ({
@@ -19,8 +19,8 @@ const node = (
     kind,
     timeNs: 10,
     selfNs: 4,
-    count: eventIndexes.length,
-    eventIndexes,
+    count: eventIds.length,
+    eventIds,
     children,
   }) as DatabaseCallNode;
 
@@ -141,14 +141,14 @@ describe('database-time', () => {
     element.remove();
     await Promise.resolve();
     document.body.append(element);
-    eventBus.emit('detail:locate', { source: 'database', eventIndexes: [6] });
+    eventBus.emit('detail:locate', { source: 'database', eventIds: [6] });
     await settle(element);
 
     expect([...grid().marked]).toEqual([2]);
   });
 
   it('drops its marks on a detach, since the reports stop', async () => {
-    eventBus.emit('detail:locate', { source: 'database', eventIndexes: [6] });
+    eventBus.emit('detail:locate', { source: 'database', eventIds: [6] });
     await element.updateComplete;
     expect([...grid().marked]).toEqual([2]);
 
@@ -173,12 +173,12 @@ describe('database-time', () => {
     fire('lv-grid-select', { row: method, target: method?.id, user: true });
     fire('lv-grid-select', { row: null, target: null, user: true });
 
-    const held = (eventIndexes: number[]) => ({
+    const held = (eventIds: number[]) => ({
       type: INSPECTOR_LOCATE_EVENT,
-      detail: { eventIndexes, sticky: true, selection: null },
+      detail: { eventIds, sticky: true, selection: null },
     });
     expect(events).toEqual([
-      { type: INSPECTOR_REVEAL_EVENT, detail: { eventIndex: 2 } },
+      { type: INSPECTOR_REVEAL_EVENT, detail: { eventId: 2 } },
       held([5, 6]),
       held([1]),
       held([]),
@@ -192,28 +192,26 @@ describe('database-time', () => {
     eventBus.emit('selection:clear', { source: 'database' });
 
     expect(events).toEqual([
-      { type: INSPECTOR_LOCATE_EVENT, detail: { eventIndexes: [], sticky: true, selection: null } },
+      { type: INSPECTOR_LOCATE_EVENT, detail: { eventIds: [], sticky: true, selection: null } },
     ]);
   });
 
   it('locates the statements under the pointer', () => {
     fire('lv-grid-locate', { row: roots()[1] });
 
-    expect(events.map((e) => (e.detail as { eventIndexes: unknown }).eventIndexes)).toEqual([
-      [5, 6],
-    ]);
+    expect(events.map((e) => (e.detail as { eventIds: unknown }).eventIds)).toEqual([[5, 6]]);
   });
 
   it('leaves the browser its own menu on a row with no frame', () => {
     const event = new MouseEvent('contextmenu', { cancelable: true });
 
-    fire('lv-grid-context', { row: { ...roots()[0], eventIndexes: [] }, event });
+    fire('lv-grid-context', { row: { ...roots()[0], eventIds: [] }, event });
 
     expect(event.defaultPrevented).toBe(false);
   });
 
   it('marks every row that names a statement under the pointer in the grid beside', async () => {
-    eventBus.emit('detail:locate', { source: 'database', eventIndexes: [2, 6] });
+    eventBus.emit('detail:locate', { source: 'database', eventIds: [2, 6] });
     await element.updateComplete;
 
     expect([...grid().marked].sort()).toEqual([1, 2]);

@@ -21,7 +21,7 @@ import '#vscode-elements/vscode-icon.js';
 
 /** The event a go-to found the filters hiding, so the view can offer to clear them. */
 export interface HiddenRow {
-  eventIndex: number;
+  eventId: number;
   /** True when the grid selected the nearest shown parent; false when it selected nothing. */
   parentSelected: boolean;
 }
@@ -31,20 +31,20 @@ export interface HiddenRow {
  * or when a newer selection superseded the go-to.
  */
 export function hiddenAfterGoTo(goTo: {
-  eventIndex: number;
+  eventId: number;
   path: readonly RowKey[];
   result: GoToResult;
   selectedKey: RowKey | null;
 }): HiddenRow | null {
-  const { eventIndex, path, result, selectedKey } = goTo;
+  const { eventId, path, result, selectedKey } = goTo;
   if (!path.length || result === 'superseded') {
     return null;
   }
   if (result === 'none-shown') {
-    return { eventIndex, parentSelected: false };
+    return { eventId, parentSelected: false };
   }
   // The grid stops at the deepest shown row on the path, so a row the filters hide lands on its parent.
-  return selectedKey === path.at(-1) ? null : { eventIndex, parentSelected: true };
+  return selectedKey === path.at(-1) ? null : { eventId, parentSelected: true };
 }
 
 /** What the bar reads from the grid on show. */

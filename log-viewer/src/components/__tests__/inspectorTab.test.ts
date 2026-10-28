@@ -18,7 +18,7 @@ describe('wireInspectorTab', () => {
   /** A Call Tree-like view: it records what it marked, moved to and cleared. */
   function wire(
     movesToMergedPick = true,
-    reveal?: (eventIndex: number, signal: AbortSignal) => Promise<void>,
+    reveal?: (eventId: number, signal: AbortSignal) => Promise<void>,
   ) {
     const marks: Array<readonly number[]> = [];
     const revealed: number[] = [];
@@ -27,17 +27,17 @@ describe('wireInspectorTab', () => {
     /** Marks and moves in the order they arrived, which the two lists cannot show. */
     const order: string[] = [];
     let clears = 0;
-    const moveTo = (eventIndex: number, signal: AbortSignal): void | Promise<void> => {
+    const moveTo = (eventId: number, signal: AbortSignal): void | Promise<void> => {
       order.push('move');
       signals.push(signal);
       if (reveal) {
-        return reveal(eventIndex, signal);
+        return reveal(eventId, signal);
       }
-      revealed.push(eventIndex);
+      revealed.push(eventId);
     };
     off = wireInspectorTab('calltree', new InspectorEmphasis(), {
-      mark: (eventIndexes) => {
-        marks.push(eventIndexes);
+      mark: (eventIds) => {
+        marks.push(eventIds);
         order.push('mark');
       },
       reveal: moveTo,
@@ -53,8 +53,8 @@ describe('wireInspectorTab', () => {
   it('leaves an event for another tab alone', () => {
     const view = wire();
 
-    eventBus.emit('inspector:locate', { source: 'analysis', eventIndexes: [4], sticky: true });
-    eventBus.emit('inspector:reveal', { source: 'analysis', eventIndex: 4 });
+    eventBus.emit('inspector:locate', { source: 'analysis', eventIds: [4], sticky: true });
+    eventBus.emit('inspector:reveal', { source: 'analysis', eventId: 4 });
     eventBus.emit('selection:clear', { source: 'analysis' });
 
     expect(view.marks).toEqual([]);
@@ -65,7 +65,7 @@ describe('wireInspectorTab', () => {
   it('marks under the pointer without moving the view', () => {
     const view = wire();
 
-    eventBus.emit('inspector:locate', { source: 'calltree', eventIndexes: [4, 5], sticky: false });
+    eventBus.emit('inspector:locate', { source: 'calltree', eventIds: [4, 5], sticky: false });
 
     expect(view.marks).toEqual([[4, 5]]);
     expect(view.revealed).toEqual([]);
@@ -74,7 +74,7 @@ describe('wireInspectorTab', () => {
   it('marks a picked row and moves to the first of its occurrences', () => {
     const view = wire();
 
-    eventBus.emit('inspector:locate', { source: 'calltree', eventIndexes: [4, 5], sticky: true });
+    eventBus.emit('inspector:locate', { source: 'calltree', eventIds: [4, 5], sticky: true });
 
     expect(view.marks).toEqual([[4, 5]]);
     expect(view.revealed).toEqual([4]);
@@ -85,7 +85,7 @@ describe('wireInspectorTab', () => {
   it('only marks a picked row where moving to one occurrence would be arbitrary', () => {
     const view = wire(false);
 
-    eventBus.emit('inspector:locate', { source: 'calltree', eventIndexes: [4, 5], sticky: true });
+    eventBus.emit('inspector:locate', { source: 'calltree', eventIds: [4, 5], sticky: true });
 
     expect(view.marks).toEqual([[4, 5]]);
     expect(view.revealed).toEqual([]);
@@ -94,7 +94,7 @@ describe('wireInspectorTab', () => {
   it('moves to the one frame a single-frame pick names, wherever the mark is', () => {
     const view = wire(false);
 
-    eventBus.emit('inspector:reveal', { source: 'calltree', eventIndex: 7 });
+    eventBus.emit('inspector:reveal', { source: 'calltree', eventId: 7 });
 
     expect(view.revealed).toEqual([7]);
   });
@@ -102,8 +102,8 @@ describe('wireInspectorTab', () => {
   it('clears the mark when the pick is dropped', () => {
     const view = wire();
 
-    eventBus.emit('inspector:locate', { source: 'calltree', eventIndexes: [4], sticky: true });
-    eventBus.emit('inspector:locate', { source: 'calltree', eventIndexes: [], sticky: true });
+    eventBus.emit('inspector:locate', { source: 'calltree', eventIds: [4], sticky: true });
+    eventBus.emit('inspector:locate', { source: 'calltree', eventIds: [], sticky: true });
 
     expect(view.marks.at(-1)).toEqual([]);
     // Nothing to move to, so the view is left where the user put it.
@@ -113,7 +113,7 @@ describe('wireInspectorTab', () => {
   it('drops the view selection and the mark on an app-wide clear', () => {
     const view = wire();
 
-    eventBus.emit('inspector:locate', { source: 'calltree', eventIndexes: [4], sticky: true });
+    eventBus.emit('inspector:locate', { source: 'calltree', eventIds: [4], sticky: true });
     eventBus.emit('selection:clear', { source: 'calltree' });
 
     expect(view.clears()).toBe(1);
@@ -123,7 +123,7 @@ describe('wireInspectorTab', () => {
   it('keeps the mark where the view cannot move', async () => {
     const view = wire(true, () => Promise.reject(new Error('no row for it')));
 
-    eventBus.emit('inspector:locate', { source: 'calltree', eventIndexes: [4], sticky: true });
+    eventBus.emit('inspector:locate', { source: 'calltree', eventIds: [4], sticky: true });
     await new Promise((resolve) => setTimeout(resolve, 0));
 
     expect(view.marks).toEqual([[4]]);
@@ -132,8 +132,8 @@ describe('wireInspectorTab', () => {
   it('abandons a move the next one replaces, and keeps both marks', () => {
     const view = wire();
 
-    eventBus.emit('inspector:reveal', { source: 'calltree', eventIndex: 4 });
-    eventBus.emit('inspector:locate', { source: 'calltree', eventIndexes: [9], sticky: true });
+    eventBus.emit('inspector:reveal', { source: 'calltree', eventId: 4 });
+    eventBus.emit('inspector:locate', { source: 'calltree', eventIds: [9], sticky: true });
 
     // The pointer crossing rows asks for a move per row, and the one it stops on
     // is the one that scrolls.
@@ -144,7 +144,7 @@ describe('wireInspectorTab', () => {
   it('abandons the move in flight when the view goes away', () => {
     const view = wire();
 
-    eventBus.emit('inspector:reveal', { source: 'calltree', eventIndex: 4 });
+    eventBus.emit('inspector:reveal', { source: 'calltree', eventId: 4 });
     off?.();
     off = null;
 
@@ -156,8 +156,8 @@ describe('wireInspectorTab', () => {
 
     off?.();
     off = null;
-    eventBus.emit('inspector:locate', { source: 'calltree', eventIndexes: [4], sticky: true });
-    eventBus.emit('inspector:reveal', { source: 'calltree', eventIndex: 4 });
+    eventBus.emit('inspector:locate', { source: 'calltree', eventIds: [4], sticky: true });
+    eventBus.emit('inspector:reveal', { source: 'calltree', eventId: 4 });
     eventBus.emit('selection:clear', { source: 'calltree' });
 
     expect(view.marks).toEqual([]);

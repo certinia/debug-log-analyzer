@@ -25,8 +25,8 @@ import {
 
 // Null for the whole log.
 function scopeRows(index: LogIndex, scope: number | readonly number[]): number[] | null {
-  const indexes = typeof scope !== 'number' ? scope : scope >= 0 ? [scope] : null;
-  return indexes?.map((each) => index.rowOf(each)).filter((row) => row !== NO_ROW) ?? null;
+  const ids = typeof scope !== 'number' ? scope : scope >= 0 ? [scope] : null;
+  return ids?.map((each) => index.rowOf(each)).filter((row) => row !== NO_ROW) ?? null;
 }
 
 /**
@@ -34,7 +34,7 @@ function scopeRows(index: LogIndex, scope: number | readonly number[]): number[]
  * time, which no grid says. Self time, so every nanosecond lands in exactly one
  * namespace.
  *
- * Whole log with no `eventIndex`, otherwise the selected frame and everything
+ * Whole log with no `eventId`, otherwise the selected frame and everything
  * below it, so the same section answers "and inside this method?". Narrowed
  * again to the window the Timeline is showing, when it shows part of the log.
  *
@@ -45,11 +45,11 @@ function scopeRows(index: LogIndex, scope: number | readonly number[]): number[]
 export class NamespaceTimeBar extends LitElement {
   /** The frame to scope to, with its descendants. Below zero: the whole log. */
   @property({ type: Number })
-  eventIndex = -1;
+  eventId = -1;
 
   /** Every occurrence of an aggregated row, summed as one scope. */
   @property({ attribute: false })
-  instances: number[] | null = null;
+  eventIds: number[] | null = null;
 
   /** The log on screen, from the app root. */
   @consume({ context: logContext, subscribe: true })
@@ -64,8 +64,8 @@ export class NamespaceTimeBar extends LitElement {
       const [index, column] = await Promise.all([store.logIndex(), store.derive(namespaceColumn)]);
       return { store, slices: namespaceSelfTimes(index, column, scopeRows(index, scope)) };
     },
-    // Instances win over the frame, so stepping through them is no new scope.
-    args: () => [this.logStore, this.instances?.length ? this.instances : this.eventIndex],
+    // Occurrences win over the frame, so stepping through them is no new scope.
+    args: () => [this.logStore, this.eventIds?.length ? this.eventIds : this.eventId],
   });
 
   private readonly _window = new WindowStatsController(this, () => this.logStore ?? null);
@@ -109,7 +109,7 @@ export class NamespaceTimeBar extends LitElement {
 
   /** True where the section answers for a picked frame or aggregate. */
   private _selected(): boolean {
-    return this.eventIndex >= 0 || !!this.instances?.length;
+    return this.eventId >= 0 || !!this.eventIds?.length;
   }
 
   /** True where the window is the scope. A selection wins over it: a picked

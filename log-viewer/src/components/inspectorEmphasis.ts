@@ -20,20 +20,20 @@ export class InspectorEmphasis {
   /**
    * Record an inspector report and return what to emphasise now.
    *
-   * @param eventIndexes - Frames the report names, empty to drop it
+   * @param eventIds - Frames the report names, empty to drop it
    * @param sticky - True for a pick, false for the pointer
    */
-  public report(eventIndexes: readonly number[], sticky: boolean): readonly number[] {
+  public report(eventIds: readonly number[], sticky: boolean): readonly number[] {
     if (sticky) {
-      return this.pick(eventIndexes);
+      return this.pick(eventIds);
     }
-    this.hovered = eventIndexes;
+    this.hovered = eventIds;
     return this.current();
   }
 
   /** Set the pick from the view's own selection, and return what to emphasise. */
-  public pick(eventIndexes: readonly number[]): readonly number[] {
-    this.picked = eventIndexes;
+  public pick(eventIds: readonly number[]): readonly number[] {
+    this.picked = eventIds;
     this.hovered = [];
     return this.current();
   }

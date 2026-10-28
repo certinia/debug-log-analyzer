@@ -219,7 +219,7 @@ export class CalltreeView extends LitElement {
 
   private contextMenu: ContextMenu | null = null;
   /** The event id of the row the menu opened on. */
-  private contextMenuEventIndex: number | null = null;
+  private contextMenuEventId: number | null = null;
   /** The grid whose header was right-clicked (for column-toggle actions). */
   private contextMenuTarget: ColumnTarget | null = null;
   /** The header the column menu opened from; null from the toolbar. */
@@ -241,7 +241,7 @@ export class CalltreeView extends LitElement {
   private readonly _documentBus = new DomListenerController<CalltreeNavigationEventMap>(
     this,
     document,
-    { [CALLTREE_GO_TO_ROW]: (e) => void this._goToRow(e.detail.eventIndex) },
+    { [CALLTREE_GO_TO_ROW]: (e) => void this._goToRow(e.detail.eventId) },
   );
 
   private readonly _finder = new FindController(this, {
@@ -262,8 +262,8 @@ export class CalltreeView extends LitElement {
   ]);
 
   private readonly _inspector = new InspectorTabController(this, 'calltree', {
-    mark: (eventIndexes) => this._markLocated(eventIndexes),
-    reveal: (eventIndex, signal) => this._revealEventIndex(eventIndex, signal),
+    mark: (eventIds) => this._markLocated(eventIds),
+    reveal: (eventId, signal) => this._revealEventId(eventId, signal),
     clear: () => {
       // The grid reports the clear itself, which is what reaches the inspector.
       for (const grid of this._grids) {
@@ -272,7 +272,7 @@ export class CalltreeView extends LitElement {
     },
     // A picked row merges calls, so the mark shows all of them while the view
     // moves to the first of them.
-    revealMerged: revealFirstOf((eventIndex, signal) => this._revealEventIndex(eventIndex, signal)),
+    revealMerged: revealFirstOf((eventId, signal) => this._revealEventId(eventId, signal)),
   });
 
   override connectedCallback(): void {
@@ -666,7 +666,7 @@ export class CalltreeView extends LitElement {
     if (!this.contextMenu) {
       return;
     }
-    this.contextMenuEventIndex = null;
+    this.contextMenuEventId = null;
     this.contextMenuTarget = target;
     this.contextMenuColumn = column;
     this.contextMenu.show(this._columns.menuItems(target, column), clientX, clientY);
@@ -706,7 +706,7 @@ export class CalltreeView extends LitElement {
   private _onColumnMenuClose() {
     this.contextMenuTarget = null;
     this.contextMenuColumn = null;
-    this.contextMenuEventIndex = null;
+    this.contextMenuEventId = null;
   }
 
   _handleTypeFilter(event: Event) {
@@ -836,21 +836,17 @@ export class CalltreeView extends LitElement {
   }
 
   /**
-   * Mark the rows of the view on screen for `eventIndexes`. Time Order stamps the
-   * event index itself; a grouped view stamps the bucket path, so a frame is
+   * Mark the rows of the view on screen for `eventIds`. Time Order stamps the
+   * event id itself; a grouped view stamps the bucket path, so a frame is
    * translated into the paths of the rows it belongs to — one in Aggregated, one
    * per caller depth in Bottom-Up.
    */
-  private _markLocated(eventIndexes: readonly number[]): void {
+  private _markLocated(eventIds: readonly number[]): void {
     if (this.timeOrderGrid && this.viewMode === 'time-order') {
-      this.timeOrderGrid.marked = new Set(eventIndexes);
+      this.timeOrderGrid.marked = new Set(eventIds);
       return;
     }
-    const pathIds = this._locateIds.idsFor(
-      this.rootStore,
-      eventIndexes,
-      directionOf(this.viewMode),
-    );
+    const pathIds = this._locateIds.idsFor(this.rootStore, eventIds, directionOf(this.viewMode));
     if (this.aggregatedGrid && this.viewMode === 'aggregated') {
       this.aggregatedGrid.marked = this._aggregatedTree?.marked(pathIds) ?? new Set();
     } else if (this.bottomUpGrid && this.viewMode === 'bottom-up') {
@@ -876,7 +872,7 @@ export class CalltreeView extends LitElement {
     });
   }
 
-  async _goToRow(eventIndex: number) {
+  async _goToRow(eventId: number) {
     const store = this.rootStore;
     if (!store) {
       return;
@@ -897,16 +893,16 @@ export class CalltreeView extends LitElement {
 
     await this._renderCallTree(this._callTreeTableWrapper, store);
     const grid = this.timeOrderGrid;
-    const path = this._timeOrderPath(eventIndex);
+    const path = this._timeOrderPath(eventId);
     if (!grid || !path.length || !current()) {
       return;
     }
-    this._showDetailsFor(eventIndex, 'time-order');
+    this._showDetailsFor(eventId, 'time-order');
     const result = await grid.goTo(path);
     if (result === 'superseded' || !current()) {
       return;
     }
-    const hidden = hiddenAfterGoTo({ eventIndex, path, result, selectedKey: grid.selectedKey });
+    const hidden = hiddenAfterGoTo({ eventId, path, result, selectedKey: grid.selectedKey });
     this._hiddenRows.show(hidden && { ...hidden, revealed: false });
     if (result === 'selected') {
       grid.focus({ preventScroll: true });
@@ -915,7 +911,7 @@ export class CalltreeView extends LitElement {
 
   /** Clears the filters that can hide `hidden`'s row, then goes to it again the way it was reached. */
   private async _clearFiltersAndGo(hidden: RevealedRow): Promise<void> {
-    const { eventIndex, revealed } = hidden;
+    const { eventId, revealed } = hidden;
     clearGridFilters(this.renderRoot);
     this._setTypeFilter('');
     // Details is left as is: the go-to turns it on when it hides the row.
@@ -923,15 +919,15 @@ export class CalltreeView extends LitElement {
     this.requestUpdate();
     this._updateFiltering();
     if (revealed) {
-      await this._revealEventIndex(eventIndex, new AbortController().signal);
+      await this._revealEventId(eventId, new AbortController().signal);
     } else {
-      await this._goToRow(eventIndex);
+      await this._goToRow(eventId);
     }
   }
 
   /** Details sets how much shows, not what, so it is turned on rather than reported, as Analysis does. */
-  private _showDetailsFor(eventIndex: number, mode: ViewMode): void {
-    if (this.filterState.showDetails || !this._detailsHide(eventIndex, mode)) {
+  private _showDetailsFor(eventId: number, mode: ViewMode): void {
+    if (this.filterState.showDetails || !this._detailsHide(eventId, mode)) {
       return;
     }
     this.filterState = { ...this.filterState, showDetails: true };
@@ -940,29 +936,29 @@ export class CalltreeView extends LitElement {
     this._applyFilters();
   }
 
-  private _detailsHide(eventIndex: number, mode: ViewMode): boolean {
+  private _detailsHide(eventId: number, mode: ViewMode): boolean {
     switch (mode) {
       case 'time-order': {
-        const row = this._timeOrderSource?.index.rowOf(eventIndex) ?? NO_ROW;
+        const row = this._timeOrderSource?.index.rowOf(eventId) ?? NO_ROW;
         return row !== NO_ROW && !this._timeOrderWithoutDetails.test({ row });
       }
       case 'aggregated': {
-        const row = this._aggregatedTree?.rowFor(this._pathIds(eventIndex, mode));
+        const row = this._aggregatedTree?.rowFor(this._pathIds(eventId, mode));
         return !!row && !AGGREGATED_WITHOUT_DETAILS.test(row);
       }
       case 'bottom-up': {
-        const row = this._bottomUpTree?.rowFor(this._pathIds(eventIndex, mode));
+        const row = this._bottomUpTree?.rowFor(this._pathIds(eventId, mode));
         return !!row && !BOTTOM_UP_WITHOUT_DETAILS.test(row);
       }
     }
   }
 
   /**
-   * Select the row for `eventIndex` in the view on screen, in place: no tab
+   * Select the row for `eventId` in the view on screen, in place: no tab
    * switch, no view-mode change and no focus steal, unlike {@link _goToRow}.
    * Focus stays where the click was, which is the inspector.
    */
-  private async _revealEventIndex(eventIndex: number, signal: AbortSignal): Promise<void> {
+  private async _revealEventId(eventId: number, signal: AbortSignal): Promise<void> {
     this._hiddenRows.invalidate();
     // A new log reaches `rootStore` in `updated`.
     await this.updateComplete;
@@ -978,8 +974,8 @@ export class CalltreeView extends LitElement {
     }
     // Taken after the build, so a filter changed while it ran does not drop the reveal.
     const latest = this._hiddenRows.begin();
-    this._showDetailsFor(eventIndex, this.viewMode);
-    const path = this._pathTo(eventIndex);
+    this._showDetailsFor(eventId, this.viewMode);
+    const path = this._pathTo(eventId);
     const result = await this._echoGuard.runAsync(() =>
       grid.goTo(path, { scrollIfVisible: false }),
     );
@@ -987,30 +983,30 @@ export class CalltreeView extends LitElement {
     if (signal.aborted || !latest() || store !== this.rootStore || grid !== this._activeGrid()) {
       return;
     }
-    const hidden = hiddenAfterGoTo({ eventIndex, path, result, selectedKey: grid.selectedKey });
+    const hidden = hiddenAfterGoTo({ eventId, path, result, selectedKey: grid.selectedKey });
     this._hiddenRows.show(hidden && { ...hidden, revealed: true });
   }
 
-  /** The keys from a top-level row down to the row of the view on show for `eventIndex`. */
-  private _pathTo(eventIndex: number): RowKey[] {
+  /** The keys from a top-level row down to the row of the view on show for `eventId`. */
+  private _pathTo(eventId: number): RowKey[] {
     switch (this.viewMode) {
       case 'time-order':
-        return this._timeOrderPath(eventIndex);
+        return this._timeOrderPath(eventId);
       case 'aggregated':
-        return this._aggregatedTree?.pathTo(this._pathIds(eventIndex, this.viewMode)) ?? [];
+        return this._aggregatedTree?.pathTo(this._pathIds(eventId, this.viewMode)) ?? [];
       case 'bottom-up':
-        return this._bottomUpTree?.pathTo(this._pathIds(eventIndex, this.viewMode)) ?? [];
+        return this._bottomUpTree?.pathTo(this._pathIds(eventId, this.viewMode)) ?? [];
     }
   }
 
-  private _pathIds(eventIndex: number, mode: ViewMode): readonly number[] {
+  private _pathIds(eventId: number, mode: ViewMode): readonly number[] {
     const direction: SelectionView = directionOf(mode);
-    return this._locateIds.idsFor(this.rootStore, [eventIndex], direction);
+    return this._locateIds.idsFor(this.rootStore, [eventId], direction);
   }
 
-  /** The keys from a top-level row down to the Time Order row for `eventIndex`. */
-  private _timeOrderPath(eventIndex: number): RowKey[] {
-    return this.rootStore?.pathTo(eventIndex) ?? [];
+  /** The keys from a top-level row down to the Time Order row for `eventId`. */
+  private _timeOrderPath(eventId: number): RowKey[] {
+    return this.rootStore?.pathTo(eventId) ?? [];
   }
 
   private async _renderCallTree(
@@ -1025,7 +1021,7 @@ export class CalltreeView extends LitElement {
     }
 
     const grid = this._mountGrid<TimeOrderNode>(callTreeTableContainer, 'time-order', (node) => ({
-      eventIndex: this._timeOrderSource?.key(node),
+      eventId: this._timeOrderSource?.key(node),
     }));
     this.timeOrderGrid = grid;
     grid.filters = this._timeOrderFilters();
@@ -1183,13 +1179,13 @@ export class CalltreeView extends LitElement {
   }
 
   private _showRowContextMenu(node: TimeOrderNode, clientX: number, clientY: number): void {
-    const eventIndex = this._timeOrderSource?.key(node);
-    const event = eventIndex === undefined ? null : this.rootStore?.eventByIndex(eventIndex);
+    const eventId = this._timeOrderSource?.key(node);
+    const event = eventId === undefined ? null : this.rootStore?.eventById(eventId);
     if (!this.contextMenu || !event) {
       return;
     }
 
-    this.contextMenuEventIndex = event.id;
+    this.contextMenuEventId = event.id;
 
     const items: { id: string; label: string; separator?: boolean; shortcut?: string }[] = [];
 
@@ -1239,9 +1235,7 @@ export class CalltreeView extends LitElement {
     }
 
     const event =
-      this.contextMenuEventIndex === null
-        ? null
-        : this.rootStore?.eventByIndex(this.contextMenuEventIndex);
+      this.contextMenuEventId === null ? null : this.rootStore?.eventById(this.contextMenuEventId);
     if (!event) {
       return;
     }
@@ -1253,7 +1247,7 @@ export class CalltreeView extends LitElement {
         break;
 
       case 'show-in-timeline':
-        goToTimelineEvent({ eventIndex: event.id });
+        goToTimelineEvent({ eventId: event.id });
         break;
 
       case 'go-to-source':
@@ -1265,6 +1259,6 @@ export class CalltreeView extends LitElement {
         break;
     }
 
-    this.contextMenuEventIndex = null;
+    this.contextMenuEventId = null;
   }
 }

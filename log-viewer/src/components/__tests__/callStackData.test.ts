@@ -27,7 +27,7 @@ const stack = [
 let currentStack: typeof stack | [] = stack;
 
 jest.mock('#core/log/LogStore.js', () => ({
-  currentLogStore: () => ({ stackByEventIndex: () => currentStack }),
+  currentLogStore: () => ({ stackById: () => currentStack }),
 }));
 
 import { buildCallStackData } from '../callStackData.js';
@@ -36,9 +36,9 @@ describe('buildCallStackData', () => {
   it('maps the stack to plain rows, outermost first, with root total', () => {
     currentStack = stack;
     const { rows, rootTotal } = buildCallStackData(3);
-    expect(rows.map((r) => r.eventIndex)).toEqual([1, 2, 3]);
+    expect(rows.map((r) => r.eventId)).toEqual([1, 2, 3]);
     expect(rows[0]).toEqual({
-      eventIndex: 1,
+      eventId: 1,
       type: 'METHOD_ENTRY',
       text: 'run()',
       duration: { total: 41_200_000, self: 2_300_000 },
@@ -47,7 +47,7 @@ describe('buildCallStackData', () => {
     expect(rootTotal).toBe(41_200_000);
   });
 
-  it('returns empty data for an unset event index', () => {
+  it('returns empty data for an unset event id', () => {
     currentStack = stack;
     const { rows, rootTotal } = buildCallStackData(-1);
     expect(rows).toEqual([]);
@@ -66,7 +66,7 @@ describe('buildCallStackData', () => {
       },
     ];
     const { rows, rootTotal } = buildCallStackData(8);
-    expect(rows.map((r) => r.eventIndex)).toEqual([1, 2, 7]);
+    expect(rows.map((r) => r.eventId)).toEqual([1, 2, 7]);
     expect(rootTotal).toBe(41_200_000);
   });
 

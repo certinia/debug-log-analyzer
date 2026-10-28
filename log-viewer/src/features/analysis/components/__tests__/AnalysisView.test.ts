@@ -21,7 +21,7 @@ jest.mock('../../../settings/Settings.js', () => ({
 }));
 jest.mock('../../../../components/grid/exportCsv.js', () => ({ exportCsv: jest.fn() }));
 
-import { frameLines, indexOf, rawStoreOf } from '#test-helpers/apexLog.js';
+import { frameLines, idOf, rawStoreOf } from '#test-helpers/apexLog.js';
 import { AlwaysVisible, NeverVisible, settle } from '#test-helpers/visibility.js';
 import { eventBus, type DetailSelection, type DetailSource } from '#core/events/EventBus.js';
 import { exportCsv } from '../../../../components/grid/exportCsv.js';
@@ -56,7 +56,7 @@ async function recursiveLog(): Promise<ApexLog> {
   return log;
 }
 
-/** The index of the debug line `recursiveLog` ends with. */
+/** The id of the debug line `recursiveLog` ends with. */
 const DEBUG_LINE = 7;
 
 function findRow(rows: readonly BottomUpRow[], text: string): BottomUpRow {
@@ -141,8 +141,8 @@ describe('analysis-view', () => {
         view: 'callers',
         selection: {
           kind: 'aggregate',
-          instances: [...rootRow.instances],
-          frames: [...rootRow.instances],
+          eventIds: [...rootRow.eventIds],
+          frameIds: [...rootRow.eventIds],
           // The root row names the calls it counts, so nothing made them but it.
           calledBy: undefined,
         },
@@ -159,22 +159,22 @@ describe('analysis-view', () => {
     select(throughBA);
 
     const { parent, text } = log.columns;
-    const derived = rootRow.instances.filter((id) => text.at(parent[id]!) === 'B');
+    const derived = rootRow.eventIds.filter((id) => text.at(parent[id]!) === 'B');
     expect(derived).toHaveLength(1);
     expect(seen.map((detail) => detail.selection)).toEqual([
       // Both rows hold the same one call, so the row is what tells them apart:
-      // reached through B, then through the A above B. `frames` is the caller
+      // reached through B, then through the A above B. `frameIds` is the caller
       // each row is, a level up from the call its totals count.
       {
         kind: 'aggregate',
-        instances: derived,
-        frames: [2],
+        eventIds: derived,
+        frameIds: [2],
         calledBy: 'B',
       },
       {
         kind: 'aggregate',
-        instances: derived,
-        frames: [1],
+        eventIds: derived,
+        frameIds: [1],
         calledBy: 'A',
       },
     ]);
@@ -188,9 +188,7 @@ describe('analysis-view', () => {
 
   it('tells the inspector which calls the pointer is over', () => {
     const located: number[][] = [];
-    const stop = eventBus.on('detail:locate', ({ eventIndexes }) =>
-      located.push([...eventIndexes]),
-    );
+    const stop = eventBus.on('detail:locate', ({ eventIds }) => located.push([...eventIds]));
 
     fireOnGrid('lv-grid-locate', { row: findRow(roots(), 'B') });
     fireOnGrid('lv-grid-locate', { row: null });
@@ -206,7 +204,7 @@ describe('analysis-view', () => {
     });
 
     // Frame 2 is the log's own `B` call, which the `B` bucket heads.
-    eventBus.emit('inspector:reveal', { source: 'analysis', eventIndex: 2 });
+    eventBus.emit('inspector:reveal', { source: 'analysis', eventId: 2 });
     await settle();
 
     expect(goTo).toHaveBeenCalledWith([findRow(roots(), 'B').id], { scrollIfVisible: false });
@@ -218,7 +216,7 @@ describe('analysis-view', () => {
   it('turns Details on to reveal a bucket the filter hides', async () => {
     const goTo = jest.spyOn(grid(), 'goTo').mockResolvedValue('selected');
 
-    eventBus.emit('inspector:reveal', { source: 'analysis', eventIndex: DEBUG_LINE });
+    eventBus.emit('inspector:reveal', { source: 'analysis', eventId: DEBUG_LINE });
     await settle();
 
     expect(grid().filters).toEqual([]);
@@ -239,7 +237,7 @@ describe('analysis-view', () => {
       return build(store, options);
     });
     view.logStore = logStoreFor(next);
-    eventBus.emit('inspector:reveal', { source: 'analysis', eventIndex: indexOf(next, 'Y') });
+    eventBus.emit('inspector:reveal', { source: 'analysis', eventId: idOf(next, 'Y') });
     await settle();
     release();
     await settle();
@@ -260,8 +258,8 @@ describe('analysis-view', () => {
         );
       await view.updateComplete;
     };
-    const reveal = async (eventIndex: number) => {
-      eventBus.emit('inspector:reveal', { source: 'analysis', eventIndex });
+    const reveal = async (eventId: number) => {
+      eventBus.emit('inspector:reveal', { source: 'analysis', eventId });
       await settle();
       await view.updateComplete;
     };
@@ -398,14 +396,14 @@ describe('analysis-view', () => {
     const goTo = jest.spyOn(grid(), 'goTo').mockResolvedValue('selected');
     const bucketB = findRow(roots(), 'B').id;
 
-    eventBus.emit('inspector:locate', { source: 'analysis', eventIndexes: [2], sticky: false });
+    eventBus.emit('inspector:locate', { source: 'analysis', eventIds: [2], sticky: false });
     await settle();
     expect(goTo).not.toHaveBeenCalled();
     // Frame 2 heads bucket B, and is the B caller row under the A it called.
     const callerB = findRow(findRow(roots(), 'A')._children ?? [], 'B').id;
     expect(grid().marked).toEqual(new Set([bucketB, callerB]));
 
-    eventBus.emit('inspector:locate', { source: 'analysis', eventIndexes: [2], sticky: true });
+    eventBus.emit('inspector:locate', { source: 'analysis', eventIds: [2], sticky: true });
     await settle();
     expect(goTo).toHaveBeenCalledWith([bucketB], { scrollIfVisible: false });
   });

@@ -64,7 +64,7 @@ export function extractMarkers(log: ApexLog): TimelineMarker[] {
       type: issue.type,
       startTime: issue.startTimestamp,
       endTime: issue.endTimestamp ?? undefined,
-      eventIndex: issue.event?.id,
+      eventId: issue.event?.id,
       summary: issue.summary,
       metadata: issue.description,
     };
@@ -106,7 +106,7 @@ export function extractExceptionMarkers(log: ApexLog): TimelineMarker[] {
       id: `exception-${markerIndex++}`,
       type: 'exception',
       startTime: event.startTimestamp,
-      eventIndex: event.id,
+      eventId: event.id,
       summary: message.split('\n', 1)[0] ?? message,
       metadata: message,
     });

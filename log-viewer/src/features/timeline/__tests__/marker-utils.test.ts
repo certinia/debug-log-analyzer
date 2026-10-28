@@ -84,7 +84,7 @@ describe('extractExceptionMarkers', () => {
     expect(markers.every((marker) => marker.endTime === undefined)).toBe(true);
     expect(markers[0]!.startTime).toBe(300);
     expect(markers[0]!.summary).toBe('System.NullPointer: x');
-    expect(markers[1]!.eventIndex).toBe(9);
+    expect(markers[1]!.eventId).toBe(9);
   });
 
   it('uses the first line as the summary for multi-line exception text', () => {

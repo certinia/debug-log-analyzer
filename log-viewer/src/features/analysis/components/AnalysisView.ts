@@ -131,9 +131,9 @@ export class AnalysisView extends LitElement {
   private readonly _filterCache = new RowFilterCache();
   private readonly _hiddenRows = new HiddenRowController(this, {
     grid: () => this.grid,
-    onClear: async ({ eventIndex }) => {
+    onClear: async ({ eventId }) => {
       clearGridFilters(this.renderRoot);
-      await this._revealEventIndex(eventIndex, new AbortController().signal);
+      await this._revealEventId(eventId, new AbortController().signal);
     },
   });
 
@@ -177,31 +177,31 @@ export class AnalysisView extends LitElement {
   private readonly _inspector = new InspectorTabController(this, 'analysis', {
     // A row is a method bucket rather than one event, so a frame is translated
     // into the paths of the rows it heads.
-    mark: (eventIndexes) => this._markLocated(eventIndexes),
+    mark: (eventIds) => this._markLocated(eventIds),
     // An inspector finding names one event; the grid holds it in the bucket for
     // its method, so that bucket is what gets revealed.
-    reveal: (eventIndex, signal) => this._revealEventIndex(eventIndex, signal),
+    reveal: (eventId, signal) => this._revealEventId(eventId, signal),
     // The grid reports the clear itself, which is what reaches the inspector.
     clear: () => this.grid?.deselect(),
     // A row buckets calls, so a merged pick moves to the first of them.
-    revealMerged: revealFirstOf((eventIndex, signal) => this._revealEventIndex(eventIndex, signal)),
+    revealMerged: revealFirstOf((eventId, signal) => this._revealEventId(eventId, signal)),
   });
 
   /**
-   * Mark the buckets that hold `eventIndexes`. The grid ranks methods and expands
+   * Mark the buckets that hold `eventIds`. The grid ranks methods and expands
    * to their callers, so one frame heads a row at every caller depth it sits in.
    */
-  private _markLocated(eventIndexes: readonly number[]): void {
-    const pathIds = this._locateIds.idsFor(this.logStore, eventIndexes, 'callers');
+  private _markLocated(eventIds: readonly number[]): void {
+    const pathIds = this._locateIds.idsFor(this.logStore, eventIds, 'callers');
     this._marked = this._tree?.marked(pathIds) ?? new Set();
   }
 
   /**
-   * Select the bucket holding `eventIndex` and scroll it into view. Guarded, so the
+   * Select the bucket holding `eventId` and scroll it into view. Guarded, so the
    * inspector keeps the findings it was clicked in rather than being rebuilt around
    * the row it just asked for.
    */
-  private async _revealEventIndex(eventIndex: number, signal: AbortSignal): Promise<void> {
+  private async _revealEventId(eventId: number, signal: AbortSignal): Promise<void> {
     this._hiddenRows.invalidate();
     const store = this.logStore;
     // A new log's build starts in `updated`, and its rows reach the grid in the render after it.
@@ -213,7 +213,7 @@ export class AnalysisView extends LitElement {
       return;
     }
     const { grid, _tree: tree } = this;
-    const pathIds = this._revealIds.idsFor(this.logStore, [eventIndex], 'callers');
+    const pathIds = this._revealIds.idsFor(this.logStore, [eventId], 'callers');
     const row = tree?.rowFor(pathIds);
     if (!grid || !tree || !row) {
       return;
@@ -239,7 +239,7 @@ export class AnalysisView extends LitElement {
     );
     if (!signal.aborted && current() && tree === this._tree) {
       this._hiddenRows.show(
-        hiddenAfterGoTo({ eventIndex, path, result, selectedKey: grid.selectedKey }),
+        hiddenAfterGoTo({ eventId, path, result, selectedKey: grid.selectedKey }),
       );
     }
   }

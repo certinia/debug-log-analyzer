@@ -391,7 +391,7 @@ function addSelfTime(
   if (window.end <= window.start) {
     return;
   }
-  const { log, eventIndex } = index;
+  const { log, eventId } = index;
   const stack: number[] = [];
   pushReached(index, stack, roots, window);
   while (stack.length) {
@@ -406,7 +406,7 @@ function addSelfTime(
       // The category's own name, named for display by the reader: `core/`
       // holds no display strings.
       add(stats.selfByCategory, rowCategory(index, row), self);
-      add(stats.selfByNamespace, namespaceOf(log, eventIndex[row]!), self);
+      add(stats.selfByNamespace, namespaceOf(log, eventId[row]!), self);
     }
     for (let i = from; i < to; i++) {
       stack.push(children[i]!);

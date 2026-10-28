@@ -14,9 +14,9 @@ import { CHECK_EVERY, frameBudget, type Tick } from '#core/utility/FrameBudget.j
 export interface HotPathFrame {
   text: string;
   /** The instance with the most total time, so a click lands on the worst one. */
-  eventIndex: number;
+  eventId: number;
   /** Every merged instance, so a hover marks all of them, not just the worst. */
-  eventIndexes: number[];
+  eventIds: number[];
   /** Total time summed across every merged sibling; its share of the log is `totalTime / totalTime(log)`. */
   totalTime: number;
   /** Self time summed across the same instances — the part of `totalTime` this
@@ -35,7 +35,7 @@ export type HotPathEnd = 'hot-spot' | 'fan-out';
 export interface HotSpotRow {
   text: string;
   /** The instance with the most self time, so a click lands on the worst one. */
-  eventIndex: number;
+  eventId: number;
   /** Self time summed across every instance of the signature. */
   selfTime: number;
   /** Total time summed across the outermost instances, so recursion counts its
@@ -60,7 +60,7 @@ export interface ExecutionHighlights {
   hotPathBranches: HotPathFrame[];
   hotSpots: HotSpotRow[];
   /** Sections the platform dropped; a timing spanning one may under-report. */
-  truncation: { regionCount: number; firstEventIndex: number } | null;
+  truncation: { regionCount: number; firstEventId: number } | null;
 }
 
 /**
@@ -159,11 +159,11 @@ async function computeHotPath(
 /** The frame the walk landed on, in the shape the rows read. */
 function frameOf(index: LogIndex, signatures: Signatures, group: FrameGroup): HotPathFrame {
   const worst = largestInstance(index, group.instances);
-  const eventIndex = index.eventIndex[worst]!;
+  const eventId = index.eventId[worst]!;
   return {
-    text: signatures.text(signatures.of(eventIndex)),
-    eventIndex,
-    eventIndexes: group.instances.map((row) => index.eventIndex[row]!),
+    text: signatures.text(signatures.of(eventId)),
+    eventId,
+    eventIds: group.instances.map((row) => index.eventId[row]!),
     totalTime: group.total,
     // An instance reporting a negative self can drag the group's sum outside
     // its total; the frame's own share of itself cannot sit outside it.
@@ -183,7 +183,7 @@ async function sortedGroups(
   parents: readonly number[],
   tick: Tick,
 ): Promise<FrameGroup[]> {
-  const { subtreeEnd, eventIndex, total, self } = index;
+  const { subtreeEnd, eventId, total, self } = index;
   const bySignature = new Map<number, FrameGroup>();
   let seen = 0;
   for (const parent of parents) {
@@ -192,7 +192,7 @@ async function sortedGroups(
       if (++seen % CHECK_EVERY === 0) {
         await tick();
       }
-      const signature = signatures.of(eventIndex[row]!);
+      const signature = signatures.of(eventId[row]!);
       const group = bySignature.get(signature);
       if (group) {
         group.instances.push(row);
@@ -226,9 +226,9 @@ function largestInstance(index: LogIndex, rows: number[]): number {
 function hotSpotsOf(times: SignatureTimes): HotSpotRow[] {
   return times.ranked
     .slice(0, HOT_SPOT_COUNT)
-    .map(({ text, eventIndex, selfTime, outerTotal, count, category }) => ({
+    .map(({ text, eventId, selfTime, outerTotal, count, category }) => ({
       text,
-      eventIndex,
+      eventId,
       selfTime,
       // Nothing timed the outermost instances of a signature whose nested ones
       // were timed; the row still holds self time, so the total answers for both.
@@ -243,6 +243,6 @@ function truncationOf(apexLog: ApexLog): ExecutionHighlights['truncation'] {
   // number for one log.
   const { regions } = apexLog.truncation;
   return regions.length
-    ? { regionCount: regions.length, firstEventIndex: regions[0]?.event?.id ?? -1 }
+    ? { regionCount: regions.length, firstEventId: regions[0]?.event?.id ?? -1 }
     : null;
 }

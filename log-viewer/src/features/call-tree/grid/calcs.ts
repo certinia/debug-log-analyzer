@@ -11,9 +11,9 @@ import { sum, type Calc } from '../../../grid/index.js';
  * of its ancestors is counted too. Bottom-up rows overlap, so a plain sum counts a nested
  * call twice. The same rule as `outermostIds`, run in slices.
  */
-export function outermostSum<R extends { instances: readonly number[] }>(
+export function outermostSum<R extends { eventIds: readonly number[] }>(
   log: ApexLog,
-  valueOf: (eventIndex: number) => number,
+  valueOf: (eventId: number) => number,
 ): Calc<R> {
   const total = sum(valueOf);
   return {
@@ -28,19 +28,19 @@ export function outermostSum<R extends { instances: readonly number[] }>(
 /** Held per row list: each total of one footer or group reads the same events. */
 const outermostCache = new WeakMap<readonly object[], readonly number[]>();
 
-function* instancesOf(rows: readonly { instances: readonly number[] }[]): Generator<number> {
+function* eventIdsOf(rows: readonly { eventIds: readonly number[] }[]): Generator<number> {
   for (const row of rows) {
-    yield* row.instances;
+    yield* row.eventIds;
   }
 }
 
 function* outermostOf(
   log: ApexLog,
-  rows: readonly { instances: readonly number[] }[],
+  rows: readonly { eventIds: readonly number[] }[],
 ): Generator<void, readonly number[], void> {
   let outermost = outermostCache.get(rows);
   if (!outermost) {
-    outermost = yield* outermostIdsSteps(log, instancesOf(rows));
+    outermost = yield* outermostIdsSteps(log, eventIdsOf(rows));
     outermostCache.set(rows, outermost);
   }
   return outermost;

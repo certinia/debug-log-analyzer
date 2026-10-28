@@ -6,7 +6,7 @@
 import { describe, expect, it, beforeEach, beforeAll } from '@jest/globals';
 import type { GovernorLimits } from '@apexdevtools/apex-log-parser';
 
-import { indexOf, storeOf } from '#test-helpers/apexLog.js';
+import { idOf, storeOf } from '#test-helpers/apexLog.js';
 import { governorLimits, limitValue } from '#test-helpers/limits.js';
 import type { LogStore } from '#core/log/LogStore.js';
 
@@ -16,8 +16,8 @@ let store: LogStore | null = null;
 let limits: GovernorLimits | null = null;
 
 jest.mock('../../features/call-tree/navigation.js', () => ({
-  goToRow: async (target: { eventIndex: number }) => {
-    revealed.push(target.eventIndex);
+  goToRow: async (target: { eventId: number }) => {
+    revealed.push(target.eventId);
   },
 }));
 jest.mock('#core/utility/Clipboard.js', () => ({
@@ -27,7 +27,7 @@ jest.mock('#core/log/LogStore.js', () => ({
   ...jest.requireActual<object>('#core/log/LogStore.js'),
   currentLogStore: () =>
     store && {
-      eventByIndex: (i: number) => store?.eventByIndex(i) ?? null,
+      eventById: (id: number) => store?.eventById(id) ?? null,
       log: { limits },
     },
 }));
@@ -46,8 +46,8 @@ beforeAll(async () => {
       '09:18:22.6 (3000)|METHOD_EXIT|[1]|MyClass.run()\n',
   );
   store = parsed.store;
-  run = indexOf(parsed.log, 'MyClass.run()');
-  codeUnit = indexOf(parsed.log, 'apex://pkg.Entry');
+  run = idOf(parsed.log, 'MyClass.run()');
+  codeUnit = idOf(parsed.log, 'apex://pkg.Entry');
 });
 
 beforeEach(() => {

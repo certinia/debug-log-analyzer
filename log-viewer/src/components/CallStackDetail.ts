@@ -20,20 +20,20 @@ import { dispatchInspectorLocate, dispatchInspectorReveal } from './inspectorRev
  * small grid (Frame | Total | Self) that mirrors the Call Tree: the same bars
  * (percent of the stack's root frame), column headers and resizable columns.
  *
- * The list is anchored: `eventIndex` is the frame the stack was built for and
+ * The list is anchored: `eventId` is the frame the stack was built for and
  * never moves while the user walks it. Clicking a frame makes it the active one
  * — the row the rest of the inspector follows — which the inspector feeds back
- * as `activeEventIndex`, so no frame is lost on the way down.
+ * as `activeEventId`, so no frame is lost on the way down.
  */
 @customElement('call-stack-detail')
 export class CallStackDetail extends LitElement {
   /** The frame the stack was built for; the list stays anchored to it. */
   @property({ type: Number })
-  eventIndex = -1;
+  eventId = -1;
 
   /** The frame in the stack the inspector is following. */
   @property({ type: Number })
-  activeEventIndex = -1;
+  activeEventId = -1;
 
   @state()
   private _source: TreeSource<CallStackRow> | null = null;
@@ -46,44 +46,40 @@ export class CallStackDetail extends LitElement {
   private readonly _inspector = new InspectorGridController<CallStackRow>(this, {
     grid: () => this._grid.value ?? null,
     source: () => this._source,
-    frames: (row) => [row.eventIndex],
+    frameIds: (row) => [row.eventId],
     // Selecting a frame makes it the active one and reveals it in the tab on
     // screen; the inspector adds the source, since only it knows which tab that is.
     pick: (row) => {
       if (row) {
-        dispatchInspectorReveal(this, row.eventIndex);
+        dispatchInspectorReveal(this, row.eventId);
       } else {
         // A click on the selected row clears it, but its frame is still the active one.
-        void this._inspector.selectActive(
-          this.activeEventIndex >= 0 ? [this.activeEventIndex] : null,
-        );
+        void this._inspector.selectActive(this.activeEventId >= 0 ? [this.activeEventId] : null);
       }
     },
-    menuFrame: (row) => row.eventIndex,
-    keysFor: (eventIndexes) => eventIndexes.filter((i) => this._frames.has(i)),
+    menuFrame: (row) => row.eventId,
+    keysFor: (eventIds) => eventIds.filter((id) => this._frames.has(id)),
   });
 
   static styles = [globalStyles, inspectorGridStyles];
 
   willUpdate(changed: PropertyValues): void {
-    if (changed.has('eventIndex')) {
+    if (changed.has('eventId')) {
       // The rows under the pointer go, and the grid cannot report it leaving them.
       if (this._source) {
         dispatchInspectorLocate(this, []);
       }
-      const { rows, rootTotal } = buildCallStackData(this.eventIndex);
+      const { rows, rootTotal } = buildCallStackData(this.eventId);
       this._columns = callStackColumns(rootTotal);
-      this._frames = new Set(rows.map((row) => row.eventIndex));
-      this._source = { roots: rows, key: (row) => row.eventIndex };
+      this._frames = new Set(rows.map((row) => row.eventId));
+      this._source = { roots: rows, key: (row) => row.eventId };
     }
   }
 
   updated(changed: PropertyValues): void {
     // The anchor holds when only the active frame moves, so the rows are unchanged: only the mark moves.
-    if (changed.has('eventIndex') || changed.has('activeEventIndex')) {
-      void this._inspector.selectActive(
-        this.activeEventIndex >= 0 ? [this.activeEventIndex] : null,
-      );
+    if (changed.has('eventId') || changed.has('activeEventId')) {
+      void this._inspector.selectActive(this.activeEventId >= 0 ? [this.activeEventId] : null);
     }
   }
 

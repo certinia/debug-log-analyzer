@@ -21,7 +21,7 @@ import { settledNote } from '#test-helpers/sections.js';
 const rowOf = (overrides: Partial<SelfTimeSpread['lanes'][number]> = {}) => ({
   text: 'AccountService.save()',
   category: 'Apex' as const,
-  eventIndex: 7,
+  eventId: 7,
   count: 10,
   selfTime: 218_000_000,
   median: 2_000_000,
@@ -107,11 +107,11 @@ describe('self-time-spread', () => {
   });
 
   it('reveals the signature’s worst call when a lane is clicked', async () => {
-    spread = spreadOf({ lanes: [rowOf({ eventIndex: 42 })] });
+    spread = spreadOf({ lanes: [rowOf({ eventId: 42 })] });
     const element = await view();
     const revealed: number[] = [];
     element.addEventListener('inspector-reveal', (event) => {
-      revealed.push((event as CustomEvent<{ eventIndex: number }>).detail.eventIndex);
+      revealed.push((event as CustomEvent<{ eventId: number }>).detail.eventId);
     });
 
     element.shadowRoot!.querySelector<HTMLElement>('.reveal-row')!.click();
@@ -141,7 +141,7 @@ describe('self-time-spread', () => {
         {
           text: 'DML Op:Insert Type:Account',
           category: 'DML',
-          eventIndex: 9,
+          eventId: 9,
           selfTime: 4_000_000,
         },
       ],

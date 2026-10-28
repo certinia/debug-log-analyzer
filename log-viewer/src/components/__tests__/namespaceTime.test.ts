@@ -8,7 +8,7 @@ import { namespaceEvent, log, type FakeEvent } from './fixtures/logEvents.js';
 
 async function selfTimes(scope: FakeEvent[] | null, top: FakeEvent[] = scope ?? []) {
   const index = await (await log(top)).store.logIndex();
-  const rows = scope?.map((event) => index.rowOf(event.eventIndex)) ?? null;
+  const rows = scope?.map((event) => index.rowOf(event.eventId)) ?? null;
   return namespaceSelfTimes(index, await namespaceColumn(index), rows);
 }
 

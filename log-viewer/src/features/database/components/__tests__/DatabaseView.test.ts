@@ -40,7 +40,7 @@ interface FakeLvGrid {
 /** The slice of a grid DatabaseView drives, standing in for the real element. */
 interface FakeGrid extends HTMLElement {
   deselects: number;
-  ownedIndex: number | null;
+  ownedId: number | null;
   marked: readonly number[][];
   grid: FakeLvGrid;
 }
@@ -62,18 +62,18 @@ function fakeLvGrid(matches = 0): FakeLvGrid {
  * The grids render only once a log is loaded, so stand-ins are placed in the
  * shadow root the same way: one element per statement type, found by tag.
  */
-function fakeGrid(tag: string, ownedIndex: number | null = null): FakeGrid {
+function fakeGrid(tag: string, ownedId: number | null = null): FakeGrid {
   const grid = document.createElement(tag) as FakeGrid;
   grid.deselects = 0;
-  grid.ownedIndex = ownedIndex;
+  grid.ownedId = ownedId;
   grid.marked = [];
   grid.grid = fakeLvGrid();
   Object.assign(grid, {
     deselectRows: () => (grid.deselects += 1),
-    owns: (eventIndex: number) => eventIndex === grid.ownedIndex,
-    selectByEventIndex: async (eventIndex: number) => eventIndex === grid.ownedIndex,
-    markLocated: (eventIndexes: readonly number[]) => {
-      grid.marked = [...grid.marked, [...eventIndexes]];
+    owns: (eventId: number) => eventId === grid.ownedId,
+    selectByEventId: async (eventId: number) => eventId === grid.ownedId,
+    markLocated: (eventIds: readonly number[]) => {
+      grid.marked = [...grid.marked, [...eventIds]];
     },
   });
   return grid;
@@ -106,16 +106,16 @@ describe('database-view selection', () => {
   });
 
   /** The grids report upward; DatabaseView alone turns that into a selection. */
-  const report = (type: StatementType, eventIndex: number | null) =>
+  const report = (type: StatementType, eventId: number | null) =>
     grids[type].dispatchEvent(
-      new CustomEvent('grid-selection', { detail: { type, eventIndex }, bubbles: true }),
+      new CustomEvent('grid-selection', { detail: { type, eventId }, bubbles: true }),
     );
 
   it('reports a picked row and clears the other two grids', () => {
     report('soql', 7);
 
     expect(seen).toEqual([
-      { source: 'database', selection: { kind: 'event', eventIndex: 7, type: 'soql' } },
+      { source: 'database', selection: { kind: 'event', eventId: 7, type: 'soql' } },
     ]);
     expect([grids.dml.deselects, grids.soql.deselects, grids.sosl.deselects]).toEqual([1, 0, 1]);
   });
@@ -138,14 +138,14 @@ describe('database-view selection', () => {
   it('says nothing for the select the inspector asked for', async () => {
     // The revealed grid reports the selection it was just given, after its scroll settles.
     Object.assign(grids.soql, {
-      selectByEventIndex: async () => {
+      selectByEventId: async () => {
         await Promise.resolve();
         report('soql', 42);
         return true;
       },
     });
 
-    eventBus.emit('inspector:reveal', { source: 'database', eventIndex: 42 });
+    eventBus.emit('inspector:reveal', { source: 'database', eventId: 42 });
     await new Promise((resolve) => setTimeout(resolve));
 
     expect(seen).toEqual([]);
@@ -154,7 +154,7 @@ describe('database-view selection', () => {
   });
 
   it('reveals nothing for a statement no grid holds', async () => {
-    eventBus.emit('inspector:reveal', { source: 'database', eventIndex: 99 });
+    eventBus.emit('inspector:reveal', { source: 'database', eventId: 99 });
     await new Promise((resolve) => setTimeout(resolve));
 
     expect([grids.dml.deselects, grids.soql.deselects, grids.sosl.deselects]).toEqual([0, 0, 0]);
@@ -167,7 +167,7 @@ describe('database-view selection', () => {
   });
 
   describe('the pointer', () => {
-    let located: Array<{ source: DetailSource; eventIndexes: readonly number[] }>;
+    let located: Array<{ source: DetailSource; eventIds: readonly number[] }>;
     let offLocate: () => void;
 
     beforeEach(() => {
@@ -179,22 +179,22 @@ describe('database-view selection', () => {
 
     it('reports the row it is over, and nothing when it leaves', () => {
       grids.soql.dispatchEvent(
-        new CustomEvent('grid-locate', { detail: { eventIndexes: [7] }, bubbles: true }),
+        new CustomEvent('grid-locate', { detail: { eventIds: [7] }, bubbles: true }),
       );
       grids.soql.dispatchEvent(
-        new CustomEvent('grid-locate', { detail: { eventIndexes: [] }, bubbles: true }),
+        new CustomEvent('grid-locate', { detail: { eventIds: [] }, bubbles: true }),
       );
 
       expect(located).toEqual([
-        { source: 'database', eventIndexes: [7] },
-        { source: 'database', eventIndexes: [] },
+        { source: 'database', eventIds: [7] },
+        { source: 'database', eventIds: [] },
       ]);
       // A mark is not a pick: no grid was selected or cleared.
       expect([grids.dml.deselects, grids.soql.deselects, grids.sosl.deselects]).toEqual([0, 0, 0]);
     });
 
     it('offers the inspector mark to every grid, since one of them owns it', () => {
-      eventBus.emit('inspector:locate', { source: 'database', eventIndexes: [42], sticky: false });
+      eventBus.emit('inspector:locate', { source: 'database', eventIds: [42], sticky: false });
 
       expect([grids.dml.marked, grids.soql.marked, grids.sosl.marked]).toEqual([
         [[42]],
@@ -204,21 +204,21 @@ describe('database-view selection', () => {
     });
 
     it('ignores a mark meant for another tab', () => {
-      eventBus.emit('inspector:locate', { source: 'calltree', eventIndexes: [42], sticky: false });
+      eventBus.emit('inspector:locate', { source: 'calltree', eventIds: [42], sticky: false });
 
       expect(grids.soql.marked).toEqual([]);
     });
 
     it('holds a picked row mark once the pointer leaves', () => {
-      eventBus.emit('inspector:locate', { source: 'database', eventIndexes: [42], sticky: true });
-      eventBus.emit('inspector:locate', { source: 'database', eventIndexes: [7], sticky: false });
-      eventBus.emit('inspector:locate', { source: 'database', eventIndexes: [], sticky: false });
+      eventBus.emit('inspector:locate', { source: 'database', eventIds: [42], sticky: true });
+      eventBus.emit('inspector:locate', { source: 'database', eventIds: [7], sticky: false });
+      eventBus.emit('inspector:locate', { source: 'database', eventIds: [], sticky: false });
 
       expect(grids.soql.marked).toEqual([[42], [7], [42]]);
     });
 
     it('drops a picked row mark on an app-wide clear', () => {
-      eventBus.emit('inspector:locate', { source: 'database', eventIndexes: [42], sticky: true });
+      eventBus.emit('inspector:locate', { source: 'database', eventIds: [42], sticky: true });
       eventBus.emit('selection:clear', { source: 'database' });
 
       expect(grids.soql.marked).toEqual([[42], []]);

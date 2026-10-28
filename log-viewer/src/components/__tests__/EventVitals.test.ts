@@ -6,7 +6,7 @@
 import { beforeAll, describe, expect, it } from '@jest/globals';
 import { type ApexLog, type EventType, eventType, parse } from '@apexdevtools/apex-log-parser';
 
-import { indexesOf, indexOf } from '#test-helpers/apexLog.js';
+import { idsOf, idOf } from '#test-helpers/apexLog.js';
 import { describeLevelGap } from '#core/log/levelCapabilities.js';
 import { filterByLevels, logStoreFor, type LogStore } from '#core/log/LogStore.js';
 
@@ -65,23 +65,23 @@ async function mount(store: LogStore, props: Partial<EventVitals>): Promise<Even
 
 describe('EventVitals', () => {
   let store: LogStore;
-  let soqlIndex = -1;
-  let dmlIndex = -1;
-  let soslIndex = -1;
+  let soqlId = -1;
+  let dmlId = -1;
+  let soslId = -1;
 
   beforeAll(async () => {
     const apexLog = await parse(log);
     store = logStoreFor(apexLog);
-    soqlIndex = indexOf(apexLog, 'SELECT Id FROM Account');
-    dmlIndex = idOfType(apexLog, 'DML_BEGIN');
-    soslIndex = idOfType(apexLog, 'SOSL_EXECUTE_BEGIN');
+    soqlId = idOf(apexLog, 'SELECT Id FROM Account');
+    dmlId = idOfType(apexLog, 'DML_BEGIN');
+    soslId = idOfType(apexLog, 'SOSL_EXECUTE_BEGIN');
     expect(customElements.get('event-vitals')).toBeDefined();
   });
 
   it('names the frame that made the calls it describes', async () => {
     const el = await mount(store, {
-      eventIndex: soqlIndex,
-      instances: [soqlIndex],
+      eventId: soqlId,
+      eventIds: [soqlId],
       calledBy: 'MyClass.caller()',
     });
 
@@ -90,13 +90,13 @@ describe('EventVitals', () => {
   });
 
   it('leaves the caller row out when the row named the calls it counts', async () => {
-    const el = await mount(store, { eventIndex: soqlIndex, instances: [soqlIndex] });
+    const el = await mount(store, { eventId: soqlId, eventIds: [soqlId] });
 
     expect(labels(el)).not.toContain('Called by');
   });
 
   it('leads with type and timing, then the metrics, plan and source', async () => {
-    const el = await mount(store, { eventIndex: soqlIndex, type: 'soql' });
+    const el = await mount(store, { eventId: soqlId, type: 'soql' });
     // No explain line at this log level, so the query-plan fields are omitted.
     expect(labels(el)).toEqual([
       'Type',
@@ -111,25 +111,25 @@ describe('EventVitals', () => {
 
   /** The line is the call site in the containing code, not where the frame is defined. */
   it('reads the line as where the call came from', async () => {
-    const el = await mount(store, { eventIndex: soqlIndex, type: 'soql' });
+    const el = await mount(store, { eventId: soqlId, type: 'soql' });
 
     expect(valueFor(el, 'Called from')).toMatch(/^line \d+$/);
   });
 
   it('omits the caller namespace when it matches the namespace', async () => {
     // Nothing to learn from "default called default" — see the differing case below.
-    const el = await mount(store, { eventIndex: soqlIndex, type: 'soql' });
+    const el = await mount(store, { eventId: soqlId, type: 'soql' });
     expect(labels(el)).not.toContain('Caller namespace');
   });
 
   it('reports total and self time inline, to 3 decimal places', async () => {
-    const el = await mount(store, { eventIndex: soslIndex, type: 'sosl' });
+    const el = await mount(store, { eventId: soslId, type: 'sosl' });
     expect(valueFor(el, 'Time')).toMatch(/^-?\d+\.\d{3} ms \(self -?\d+\.\d{3} ms\)$/);
   });
 
   // SOSL rows are capped per query, so a single SOSL statement has a limit to qualify with.
   it('reports a metric once, against the log with the limit as a qualifier', async () => {
-    const el = await mount(store, { eventIndex: soslIndex, type: 'sosl' });
+    const el = await mount(store, { eventId: soslId, type: 'sosl' });
     expect(valueFor(el, 'SOSL Rows')).toBe('5 (0.25% of the 2,000 limit)');
     // The limit qualifies the reading — never a second row repeating it.
     expect(labels(el).filter((l) => /limit/i.test(l))).toEqual([]);
@@ -137,14 +137,14 @@ describe('EventVitals', () => {
   });
 
   it('gives the count alone where the selection is all the log consumed', async () => {
-    const el = await mount(store, { eventIndex: dmlIndex, type: 'dml' });
+    const el = await mount(store, { eventId: dmlId, type: 'dml' });
     expect(valueFor(el, 'DML Rows')).toBe('2');
   });
 
   it("always shows the statement's own row count, even at zero", async () => {
     // The SOQL in this log reports Rows:3 on its END line; a statement's row
     // count is its headline number so it is never zero-suppressed.
-    const el = await mount(store, { eventIndex: soqlIndex, type: 'soql' });
+    const el = await mount(store, { eventId: soqlId, type: 'soql' });
     expect(labels(el)).toContain('SOQL Rows');
   });
 
@@ -152,7 +152,7 @@ describe('EventVitals', () => {
     // This log has no EXPLAIN line, so assert the naming contract via a log that
     // does: the plan row combines leading op/object/index, and the cardinalities
     // keep Salesforce's terms so it is clear whose rows they count.
-    const el = await mount(store, { eventIndex: soqlIndex, type: 'soql' });
+    const el = await mount(store, { eventId: soqlId, type: 'soql' });
     const shown = labels(el);
     expect(shown).not.toContain('Est. rows');
     expect(shown).not.toContain('Object rows');
@@ -171,11 +171,11 @@ describe('EventVitals', () => {
     const explainStore = logStoreFor(explained);
 
     const selective = await mount(explainStore, {
-      eventIndex: indexOf(explained, 'SELECT Id FROM Account'),
+      eventId: idOf(explained, 'SELECT Id FROM Account'),
       type: 'soql',
     });
     const notSelective = await mount(explainStore, {
-      eventIndex: indexOf(explained, 'SELECT Id FROM Contact'),
+      eventId: idOf(explained, 'SELECT Id FROM Contact'),
       type: 'soql',
     });
 
@@ -195,7 +195,7 @@ describe('EventVitals', () => {
     );
     const unexplainedStore = logStoreFor(unexplained);
     const el = await mount(unexplainedStore, {
-      eventIndex: indexOf(unexplained, 'SELECT Id FROM Account'),
+      eventId: idOf(unexplained, 'SELECT Id FROM Account'),
       type: 'soql',
     });
 
@@ -214,7 +214,7 @@ describe('EventVitals', () => {
         '17:33:36.2 (1680000000)|SOQL_EXECUTE_END|[198]|Rows:1\n',
     );
     const el = await mount(logStoreFor(unexplained), {
-      eventIndex: indexOf(unexplained, 'SELECT Id FROM Account'),
+      eventId: idOf(unexplained, 'SELECT Id FROM Account'),
       type: 'soql',
     });
 
@@ -230,7 +230,7 @@ describe('EventVitals', () => {
     );
     const shown = (await filterByLevels(logStoreFor(explained), { database: 'INFO' }))!; // no signal, so never null
     const el = await mount(shown, {
-      eventIndex: indexOf(explained, 'SELECT Id FROM Account'),
+      eventId: idOf(explained, 'SELECT Id FROM Account'),
       type: 'soql',
     });
 
@@ -238,14 +238,14 @@ describe('EventVitals', () => {
   });
 
   it('omits fields with no value', async () => {
-    const el = await mount(store, { eventIndex: dmlIndex, type: 'dml' });
+    const el = await mount(store, { eventId: dmlId, type: 'dml' });
     // A DML statement allocates no heap and throws nothing in this log.
     expect(labels(el)).not.toContain('Heap Net');
     expect(labels(el)).not.toContain('Throws');
   });
 
   it('sums across occurrences and reports Calls/Avg self for an aggregate', async () => {
-    const el = await mount(store, { instances: [soqlIndex, soslIndex] });
+    const el = await mount(store, { eventIds: [soqlId, soslId] });
     const shown = labels(el);
     expect(shown).toContain('Calls');
     expect(shown).toContain('Avg self');
@@ -253,7 +253,7 @@ describe('EventVitals', () => {
   });
 
   it('reports nothing when the event is unknown', async () => {
-    const el = await mount(store, { eventIndex: -1 });
+    const el = await mount(store, { eventId: -1 });
     expect(el.shadowRoot?.querySelector('.empty')).not.toBeNull();
   });
 });
@@ -275,7 +275,7 @@ describe('EventVitals across namespaces', () => {
     const store = logStoreFor(apexLog);
     // Packaged code entered from a trigger: whose code ran and who invoked it are
     // different answers, so both are reported.
-    const el = await mount(store, { eventIndex: idOfType(apexLog, 'ENTERING_MANAGED_PKG') });
+    const el = await mount(store, { eventId: idOfType(apexLog, 'ENTERING_MANAGED_PKG') });
     expect(valueFor(el, 'Namespace')).toBe('c2g');
     expect(labels(el)).toContain('Caller namespace');
     expect(valueFor(el, 'Caller namespace')).not.toBe('c2g');
@@ -287,7 +287,7 @@ describe('EventVitals across namespaces', () => {
       '09:18:22.6 (100)|METHOD_ENTRY|[1]|01p000000000001|AccountService.getRevenue()\n' +
         '09:18:22.6 (200)|METHOD_EXIT|[1]|01p000000000001|AccountService.getRevenue()\n',
     );
-    const el = await mount(logStoreFor(apexLog), { eventIndex: idOfType(apexLog, 'METHOD_ENTRY') });
+    const el = await mount(logStoreFor(apexLog), { eventId: idOfType(apexLog, 'METHOD_ENTRY') });
 
     expect(valueFor(el, 'Namespace')).toBe('default');
   });
@@ -309,7 +309,7 @@ describe('EventVitals over a recursive frame', () => {
   it('totals the outermost calls, and averages the self time of every call', async () => {
     const apexLog = await parse(recursiveLog);
     const store = logStoreFor(apexLog);
-    const el = await mount(store, { instances: indexesOf(apexLog, 'Rec.walk()') });
+    const el = await mount(store, { eventIds: idsOf(apexLog, 'Rec.walk()') });
 
     expect(valueFor(el, 'Calls')).toBe('2');
     // The outer call is 4ms and holds the 1ms inner call, so summing both totals

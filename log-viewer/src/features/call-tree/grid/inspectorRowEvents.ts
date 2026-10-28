@@ -43,7 +43,7 @@ export function inspectorRowEvents<R>(opts: InspectorRowEventsOptions<R>): {
       const { row } = (e as CustomEvent<GridRowDetail<R>>).detail;
       eventBus.emit('detail:locate', {
         source: opts.source,
-        eventIndexes: row ? rowFrames(row, opts, opts.store(), opts.view()) : [],
+        eventIds: row ? rowFrames(row, opts, opts.store(), opts.view()) : [],
       });
     },
   };

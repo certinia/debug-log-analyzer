@@ -89,7 +89,7 @@ describe('LogView', () => {
         logUri: 'webview:/repository/logs/virtual.log',
         logPath: 'workspace/logs/virtual.log',
         logData: 'log body',
-        navigateToEventIndex: undefined,
+        navigateToEventId: undefined,
       },
     });
 
@@ -107,9 +107,9 @@ describe('LogView', () => {
     await receive({ cmd: 'fetchLog', requestId: 'request-2' });
 
     const sent = postMessage.mock.calls.map(
-      ([message]) => (message as { payload: { navigateToEventIndex?: number } }).payload,
+      ([message]) => (message as { payload: { navigateToEventId?: number } }).payload,
     );
-    expect(sent.map((payload) => payload.navigateToEventIndex)).toEqual([42, undefined]);
+    expect(sent.map((payload) => payload.navigateToEventId)).toEqual([42, undefined]);
   });
 
   it('points the packaged template at webview URIs', async () => {

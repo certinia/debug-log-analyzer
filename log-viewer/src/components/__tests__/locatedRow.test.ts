@@ -5,7 +5,7 @@
  */
 import { describe, expect, it } from '@jest/globals';
 
-import { frameLines, indexOf, rawStoreOf } from '#test-helpers/apexLog.js';
+import { frameLines, idOf, rawStoreOf } from '#test-helpers/apexLog.js';
 import { ROOT_PATH_ID } from '#core/log/keyPathIds.js';
 import { LocatedRowIds, rowDetailSelection, type RowReader } from '../locatedRow.js';
 
@@ -30,9 +30,9 @@ async function chain() {
   );
   return {
     store,
-    exec: indexOf(log, 'exec'),
-    m1: indexOf(log, 'm1'),
-    soql: indexOf(log, 'soql'),
+    exec: idOf(log, 'exec'),
+    m1: idOf(log, 'm1'),
+    soql: idOf(log, 'soql'),
   };
 }
 
@@ -46,15 +46,15 @@ describe('rowDetailSelection', () => {
     const bucket = treeRow({
       key: 'soql',
       _pathId: bucketPath,
-      instances: [soql],
-      eventIndex: soql,
+      eventIds: [soql],
+      eventId: soql,
       text: 'soql',
     });
     const caller = treeRow(
       {
         key: 'm1',
         _pathId: paths.step(bucketPath, paths.keyIdOf(m1)),
-        eventIndex: soql,
+        eventId: soql,
         text: 'm1',
       },
       bucket,
@@ -68,8 +68,8 @@ describe('rowDetailSelection', () => {
 
     expect(rowDetailSelection(caller, read, store, 'callers')).toEqual({
       kind: 'aggregate',
-      instances: [soql],
-      frames: [m1],
+      eventIds: [soql],
+      frameIds: [m1],
       calledBy: 'm1',
     });
   });
@@ -79,8 +79,8 @@ describe('rowDetailSelection', () => {
 
     expect(rowDetailSelection(bucket, read, store, 'callers')).toEqual({
       kind: 'aggregate',
-      instances: [soql],
-      frames: [soql],
+      eventIds: [soql],
+      frameIds: [soql],
       calledBy: undefined,
     });
   });
@@ -89,17 +89,17 @@ describe('rowDetailSelection', () => {
     const { store, caller, soql } = await rows();
 
     expect(rowDetailSelection(caller, read, store, 'callees')).toMatchObject({
-      instances: [soql],
-      frames: [soql],
+      eventIds: [soql],
+      frameIds: [soql],
     });
   });
 
   it('names the one call a Time Order row is', () => {
-    const row = treeRow({ eventIndex: 5 });
+    const row = treeRow({ eventId: 5 });
 
     expect(rowDetailSelection(row, read, null, 'callees')).toEqual({
       kind: 'event',
-      eventIndex: 5,
+      eventId: 5,
     });
   });
 });
@@ -138,7 +138,7 @@ describe('LocatedRowIds', () => {
     );
   });
 
-  it('names the rows of a view keyed by event with the indexes themselves', async () => {
+  it('names the rows of a view keyed by event with the event ids themselves', async () => {
     const { store, soql } = await chain();
     const picked = [soql];
 

@@ -20,7 +20,7 @@ const logOf = async (children: FakeEvent[]): Promise<void> => {
   apexLog = (await log(children)).log;
 };
 
-async function mount(props: Partial<Pick<NamespaceTimeBar, 'eventIndex' | 'instances'>> = {}) {
+async function mount(props: Partial<Pick<NamespaceTimeBar, 'eventId' | 'eventIds'>> = {}) {
   const element = document.createElement('namespace-time-bar');
   // No provider in the test, so the consumed store is assigned straight on.
   Object.assign(element, { logStore: apexLog && logStoreFor(apexLog) }, props);
@@ -50,7 +50,7 @@ describe('namespace-time-bar', () => {
     const frame = namespaceEvent('pkg', 40, [namespaceEvent('other', 10)]);
     await logOf([namespaceEvent('default', 100, [frame])]);
 
-    const element = await mount({ eventIndex: frame.eventIndex });
+    const element = await mount({ eventId: frame.eventId });
 
     expect(segments(element).map(({ label }) => label)).toEqual(['pkg', 'other']);
     // The log's palette, not the scope's order: `other` keeps its log colour even
@@ -63,7 +63,7 @@ describe('namespace-time-bar', () => {
     const outer = namespaceEvent('pkg', 30, [inner]);
     await logOf([outer]);
 
-    const element = await mount({ instances: [outer.eventIndex, inner.eventIndex] });
+    const element = await mount({ eventIds: [outer.eventId, inner.eventId] });
 
     expect(segments(element)[0]).toMatchObject({ label: 'pkg', value: 50 });
   });
@@ -91,10 +91,10 @@ describe('namespace-time-bar', () => {
     const first = namespaceEvent('pkg', 40);
     const second = namespaceEvent('other', 10);
     await logOf([first, second]);
-    const element = await mount({ eventIndex: first.eventIndex });
+    const element = await mount({ eventId: first.eventId });
     const shown = bar(element);
 
-    element.eventIndex = second.eventIndex;
+    element.eventId = second.eventId;
     await element.updateComplete;
     expect(bar(element)).toBe(shown);
     await new Promise((resolve) => setTimeout(resolve, 0));
@@ -121,11 +121,7 @@ describe('namespace-time-bar', () => {
 
   it.each([
     ['a scope with no recorded time', () => logOf([namespaceEvent('pkg', 0)]), {}],
-    [
-      'a frame the log does not hold',
-      () => logOf([namespaceEvent('pkg', 100)]),
-      { eventIndex: 99 },
-    ],
+    ['a frame the log does not hold', () => logOf([namespaceEvent('pkg', 100)]), { eventId: 99 }],
     ['the lack of a log', async () => {}, {}],
   ])('notes %s', async (_name, setup, props) => {
     await setup();
@@ -155,7 +151,7 @@ describe('namespace-time-bar with a timeline window', () => {
     await logOf([frame]);
     setRange({ start: 0, end: 1 });
 
-    const element = await mount({ eventIndex: frame.eventIndex });
+    const element = await mount({ eventId: frame.eventId });
 
     expect(segments(element).map((segment) => segment.label)).toEqual(['pkg', 'default']);
     expect(segments(element).map((segment) => segment.value)).toEqual([500, 100]);
