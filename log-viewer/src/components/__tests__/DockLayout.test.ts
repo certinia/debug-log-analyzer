@@ -104,10 +104,9 @@ describe('DockLayout resize', () => {
     const layout = el.shadowRoot?.querySelector('.layout') as HTMLElement;
     // 280 leaves the dock 40px past the main pane's room, under the collapse line.
     Object.defineProperty(layout, 'clientHeight', { value: 280, configurable: true });
-    const [event] = await drag(el, 700, 701);
+    const events = await drag(el, 700, 701);
 
-    expect(event?.type).toBe('dock-resize');
-    expect(event?.detail).toEqual({ size: MIN_SIZE });
+    expect(events.map((e) => e.type)).not.toContain('dock-collapse');
   });
 
   it('snaps to the minimum rather than going smaller', async () => {
@@ -126,6 +125,23 @@ describe('DockLayout resize', () => {
 
     expect(event?.type).toBe('dock-collapse');
     expect(event?.detail).toBeNull();
+  });
+
+  it('reports nothing for a click that does not move, so a click never stores a size', async () => {
+    const el = await mount('right', 500);
+    const events = await drag(el, 800, 800);
+
+    expect(events).toEqual([]);
+  });
+
+  it('asks for the default size back on a double-click of the edge', async () => {
+    const el = await mount('right', 500);
+    let resets = 0;
+    el.addEventListener('dock-size-reset', () => resets++);
+
+    gutter(el).dispatchEvent(new MouseEvent('dblclick', { bubbles: true }));
+
+    expect(resets).toBe(1);
   });
 
   it('forwards the consumer control on to the dock', async () => {

@@ -80,7 +80,8 @@ import type { ViewModeSwitch } from '../ViewModeSwitch.js';
 import '../LogInspector.js';
 import { dispatchInspectorLocate, dispatchInspectorReveal } from '../inspectorReveal.js';
 import type { ContextMenu } from '../ContextMenu.js';
-import { RESET_SECTIONS_ID } from '../sectionMenu.js';
+import type { DockLayout } from '../DockLayout.js';
+import { RESET_SECTIONS_ID, RESET_SIZE_ID, sectionIdFor } from '../sectionMenu.js';
 
 /**
  * Settles the async section build and the render chain through the nested
@@ -130,12 +131,18 @@ function paneView(el: LogInspector): PaneView {
 }
 
 /** The reveal listener sits on `dock-layout`, which renders whether or not a row is selected. */
-function dockLayout(el: LogInspector): HTMLElement {
-  const found = el.shadowRoot?.querySelector<HTMLElement>('dock-layout');
+function dockLayout(el: LogInspector): DockLayout {
+  const found = el.shadowRoot?.querySelector<DockLayout>('dock-layout');
   if (!found) {
     throw new Error('dock-layout not rendered');
   }
   return found;
+}
+
+/** The size the panel lays out at, on the axis it is docked on. */
+function dockedSize(el: LogInspector): string | undefined {
+  const dock = dockLayout(el).shadowRoot?.querySelector<HTMLElement>('detail-dock');
+  return dockLayout(el).dock === 'bottom' ? dock?.style.height : dock?.style.width;
 }
 
 function visible(el: LogInspector): boolean {
@@ -386,9 +393,8 @@ describe('LogInspector', () => {
 
     // The menu still offers the hidden one, so it can come back.
     openSectionMenu(el);
-    expect(sectionMenu(el).items.map((item) => [item.id, item.checked])).toEqual([
-      [RESET_SECTIONS_ID, undefined],
-      ['section-sep', undefined],
+    const sectionRows = sectionMenu(el).items.filter((item) => sectionIdFor(item.id));
+    expect(sectionRows.map((item) => [item.id, item.checked])).toEqual([
       ['section:vitals', true],
       ['section:callstack', false],
     ]);
@@ -512,6 +518,33 @@ describe('LogInspector', () => {
     ]);
     // The panes' dragged sizes go with it.
     expect(paneView(el).layoutEpoch).toBe(1);
+  });
+
+  it.each([
+    [
+      'the menu',
+      (el: LogInspector) => {
+        openSectionMenu(el);
+        pickMenuItem(el, RESET_SIZE_ID);
+      },
+    ],
+    [
+      'a double-click on the edge',
+      (el: LogInspector) => dockLayout(el).dispatchEvent(new CustomEvent('dock-size-reset')),
+    ],
+  ])('resets a dragged size to 560px from %s, and leaves the sections alone', async (_, reset) => {
+    settings.inspector = inspectorSettings({ size: 900 });
+    const el = await mount('timeline-tab');
+    select('timeline', 1);
+    await flush(el);
+    expect(dockedSize(el)).toBe('900px');
+
+    reset(el);
+    await flush(el);
+
+    expect(dockedSize(el)).toBe('560px');
+    // Unset rather than 560, so a later default still reaches this user.
+    expect(written).toEqual([{ section: 'inspector.size', value: null }]);
   });
 
   it('keeps a maximized section to the list it was maximized in', async () => {

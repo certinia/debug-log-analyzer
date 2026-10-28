@@ -31,7 +31,12 @@ import {
   scopedRecord,
   withoutScope,
 } from './inspectorLayout.js';
-import { RESET_SECTIONS_ID, buildSectionMenuItems, sectionIdFor } from './sectionMenu.js';
+import {
+  RESET_SECTIONS_ID,
+  RESET_SIZE_ID,
+  buildSectionMenuItems,
+  sectionIdFor,
+} from './sectionMenu.js';
 import { globalStyles } from '../styles/global.styles.js';
 import './ContextMenu.js';
 import type { ContextMenu } from './ContextMenu.js';
@@ -266,6 +271,7 @@ export class LogInspector extends LitElement {
         emptyText=${emptyTextFor(this._activeSource)}
         @dock-position-change=${this._onDockPositionChange}
         @dock-resize=${this._onDockResize}
+        @dock-size-reset=${this._resetPanelSize}
         @dock-hide=${this._hidePanel}
         @dock-collapse=${this._hidePanel}
         @pane-toggle=${this._onPaneToggle}
@@ -529,10 +535,18 @@ export class LogInspector extends LitElement {
   // `dock-resize` fires once on pointer-up, so this write already lands on
   // interaction-end — no debounce needed.
   private _onDockResize = (e: CustomEvent<{ size: number }>) => {
-    this._userAdjusted = true;
-    this.panelSize = e.detail.size;
-    updateSetting('inspector.size', this.panelSize);
+    this._setPanelSize(e.detail.size);
   };
+
+  private _resetPanelSize = () => {
+    this._setPanelSize(null);
+  };
+
+  private _setPanelSize(size: number | null): void {
+    this._userAdjusted = true;
+    this.panelSize = size;
+    updateSetting('inspector.size', size);
+  }
 
   private _onPaneToggle = (e: CustomEvent<{ collapsed: Record<string, boolean> }>) => {
     this._userAdjusted = true;
@@ -586,6 +600,10 @@ export class LogInspector extends LitElement {
   private _onSectionMenuSelect = (e: CustomEvent<{ itemId: string }>) => {
     if (e.detail.itemId === RESET_SECTIONS_ID) {
       this._resetSections();
+      return;
+    }
+    if (e.detail.itemId === RESET_SIZE_ID) {
+      this._resetPanelSize();
       return;
     }
     const id = sectionIdFor(e.detail.itemId);

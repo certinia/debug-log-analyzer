@@ -21,7 +21,8 @@ const COLLAPSE_OVERSHOOT = 60;
  * the panel's minimum snaps to the minimum, then fully collapses; dragging back
  * out during the same gesture restores it. Persistence and selection stay with
  * the consuming view — this component only reports intent via events:
- * `dock-resize` (px), `dock-collapse`, plus `dock-position-change`/`dock-hide`
+ * `dock-resize` (px), `dock-size-reset` (double-click), `dock-collapse`, plus
+ * `dock-position-change`/`dock-hide`
  * bubbled from the dock. The `actions-start` slot is forwarded to the dock.
  */
 @customElement('dock-layout')
@@ -153,7 +154,11 @@ export class DockLayout extends LitElement {
         ${
           this.visible
             ? html`
-                <div class="gutter" @pointerdown=${this._startResize}></div>
+                <div
+                  class="gutter"
+                  @pointerdown=${this._startResize}
+                  @dblclick=${this._resetSize}
+                ></div>
                 <detail-dock
                   style=${this._dockSizeStyle()}
                   .sections=${this.sections}
@@ -232,14 +237,16 @@ export class DockLayout extends LitElement {
     gutter.removeEventListener('pointerup', this._endResize);
 
     const collapse = this._pendingCollapse;
-    const finalSize = this._liveSize ?? this.size;
+    const startSize = this._resizeStart?.size;
+    const finalSize = this._liveSize;
     this._resizeStart = null;
     this._liveSize = null;
     this._pendingCollapse = false;
 
     if (collapse) {
       this.dispatchEvent(new CustomEvent('dock-collapse', { bubbles: true, composed: true }));
-    } else {
+    } else if (finalSize !== null && finalSize !== startSize) {
+      // A click must not store the default size, or a later default never reaches this user.
       this.dispatchEvent(
         new CustomEvent('dock-resize', {
           detail: { size: finalSize },
@@ -248,5 +255,9 @@ export class DockLayout extends LitElement {
         }),
       );
     }
+  };
+
+  private _resetSize = () => {
+    this.dispatchEvent(new CustomEvent('dock-size-reset'));
   };
 }
