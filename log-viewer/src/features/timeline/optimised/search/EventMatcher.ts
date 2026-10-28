@@ -6,7 +6,7 @@
  * EventMatcher
  *
  * Generic event searcher for timeline events.
- * Decoupled from LogEvent-specific implementation, works with any EventNode type.
+ * Decoupled from ApexEvent-specific implementation, works with any EventNode type.
  *
  * Responsibilities:
  * - Scan the shown frames in pre-order
@@ -15,7 +15,7 @@
  * - Track current search state
  */
 
-import { CHECK_EVERY, frameBudget, type Tick } from '../../../../core/utility/FrameBudget.js';
+import { CHECK_EVERY, frameBudget, type Tick } from '#core/utility/FrameBudget.js';
 import type { PrecomputedRect } from '../RectangleCache.js';
 import type { EventNode, TimelineFrames } from '../../types/flamechart.types.js';
 import type { FramePredicate, SearchCursor, SearchMatch } from '../../types/search.types.js';

@@ -1,9 +1,9 @@
 /*
  * Copyright (c) 2026 Certinia Inc. All rights reserved.
  */
-import type { LogEvent } from '@apexdevtools/apex-log-parser';
+import { type ApexEvent, eventType } from '@apexdevtools/apex-log-parser';
 
-import type { LogIndex } from '../../../core/log/LogIndex.js';
+import { rowCategory, type LogIndex } from '#core/log/LogIndex.js';
 import type { PrecomputedRect } from '../optimised/RectangleCache.js';
 import {
   type EventNode,
@@ -13,7 +13,7 @@ import {
   type TreeNode,
 } from '../types/flamechart.types.js';
 
-export type ApexEventNode = EventNode & { original: LogEvent };
+export type ApexEventNode = EventNode & { original: ApexEvent };
 
 const NO_ROWS: Int32Array = new Int32Array(0);
 
@@ -31,7 +31,12 @@ export function buildTimelineFrames(
   categories: Set<string>,
   logEndTime: number,
 ): TimelineFrames<ApexEventNode> {
-  const { rowCount, start, total, depth, parent, subtreeEnd, categoryId } = index;
+  const { rowCount, start, total, depth, parent, subtreeEnd, categoryId, eventIndex } = index;
+  const columns = index.log.columns;
+  const typeOf = (row: number): string =>
+    eventType(columns.type[eventIndex[row]!]!)?.type ?? 'UNKNOWN';
+  // The type stands in for the text a limit or profiling block does not state.
+  const labelOf = (row: number): string => columns.text.at(eventIndex[row]!) ?? typeOf(row);
   const eventHeight = TIMELINE_CONSTANTS.EVENT_HEIGHT;
 
   const shown = new Uint8Array(rowCount);
@@ -68,16 +73,15 @@ export function buildTimelineFrames(
 
     const ofCategory = rectsOfCategory[categoryId[row]!];
     if (ofCategory) {
-      const event = index.event(row);
       const rect: PrecomputedRect = {
         id: String(row),
+        row,
         timeStart: rowStart,
         timeEnd: end,
         depth: d,
         duration: rowTotal,
         selfDuration: index.self[row]!,
-        category: event.category,
-        eventRef: event,
+        category: rowCategory(index, row),
         x: 0,
         y: d * eventHeight,
         width: 0,
@@ -112,36 +116,29 @@ export function buildTimelineFrames(
     rectsByDepth,
     isVisible: (row) => shown[row] === 1,
     rowsAtDepth: (d) => rowsByDepth[d] ?? NO_ROWS,
-    node: (row): TreeNode<ApexEventNode> => {
-      const event = index.event(row);
-      return {
-        row,
-        depth: depth[row],
-        data: {
-          id: String(row),
-          timestamp: start[row]!,
-          duration: total[row]!,
-          type: typeOf(event),
-          text: event.text,
-          original: event,
-        },
-      };
-    },
-    text: (row) => index.event(row).text,
-    type: (row) => typeOf(index.event(row)),
+    node: (row): TreeNode<ApexEventNode> => ({
+      row,
+      depth: depth[row],
+      data: {
+        id: String(row),
+        timestamp: start[row]!,
+        duration: total[row]!,
+        type: typeOf(row),
+        text: labelOf(row),
+        original: index.event(row),
+      },
+    }),
+    text: labelOf,
+    type: typeOf,
     rowOfOriginal: (original) => {
       if (!original) {
         return NO_ROW;
       }
-      const row = index.rowOfEvent(original as LogEvent);
+      const row = index.rowOf((original as ApexEvent).id);
       return row !== NO_ROW && shown[row] === 1 ? row : NO_ROW;
     },
     rectOf: (row) => rects[rectAt[row] ?? NO_ROW],
   };
-}
-
-function typeOf(event: LogEvent): string {
-  return event.type ?? event.category ?? 'UNKNOWN';
 }
 
 function sortIfNeeded(rows: number[], start: Float64Array): number[] {
@@ -151,4 +148,27 @@ function sortIfNeeded(rows: number[], start: Float64Array): number[] {
     }
   }
   return rows;
+}
+
+/**
+ * The nearest drawn row at or above event `eventIndex`, so a detail, a frame with no
+ * duration or an event the log levels hide goes to the frame it sits in. NO_ROW when
+ * no frame above it is drawn.
+ */
+export function drawnRowAtOrAbove(
+  index: LogIndex,
+  frames: TimelineFrames<EventNode>,
+  eventIndex: number,
+): number {
+  const { parent } = index.log.columns;
+  let id = eventIndex;
+  let row = index.rowOf(id);
+  while (row === NO_ROW && id > 0) {
+    id = parent[id] ?? 0;
+    row = index.rowOf(id);
+  }
+  while (row !== NO_ROW && !frames.isVisible(row)) {
+    row = index.parent[row]!;
+  }
+  return row;
 }

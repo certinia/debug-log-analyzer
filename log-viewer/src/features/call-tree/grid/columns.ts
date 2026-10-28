@@ -1,16 +1,17 @@
 /*
  * Copyright (c) 2026 Certinia Inc. All rights reserved.
  */
-import type { ApexLog, LogEvent, SelfTotal } from '@apexdevtools/apex-log-parser';
+import type { ApexLog, SelfTotal } from '@apexdevtools/apex-log-parser';
 import { html } from 'lit';
 
 import type { ColumnSettingsOptions } from '../../../components/ColumnSettingsController.js';
 import { bar } from '../../../components/grid/cells.js';
 import { countColumn, timeColumn } from '../../../components/grid/columns.js';
 import { NO_REPORTED_LIMITS_TEXT } from '../../../components/governorCopy.js';
-import { vscodeMessenger } from '../../../core/messaging/VSCodeExtensionMessenger.js';
-import { getCallerNamespace } from '../../../core/utility/CallerNamespace.js';
-import { formatInteger, sharePercent } from '../../../core/utility/Util.js';
+import { rowMetrics, type SelfTotalColumns } from '#core/log/rowMetrics.js';
+import { vscodeMessenger } from '#core/messaging/VSCodeExtensionMessenger.js';
+import { callerNamespaceOfRow } from '#core/utility/CallerNamespace.js';
+import { formatInteger, sharePercent } from '#core/utility/Util.js';
 import {
   max,
   sum,
@@ -19,11 +20,10 @@ import {
   type GridSort,
   type GroupBy,
   type RowFilter,
-  type TreeSource,
 } from '../../../grid/index.js';
 import { CALL_TREE_VIEWS, type SeenReportedPair } from '../../../components/grid/ColumnViews.js';
 import { soqlGroupCell } from '../../soql/format/groupHeader.js';
-import type { AggregatedRow, BottomUpRow } from '../utils/Aggregation.js';
+import type { AggregatedRow, BottomUpRow, Tally } from '../utils/Aggregation.js';
 import {
   costLimitsOf,
   governorCostBreakdown,
@@ -37,18 +37,24 @@ import {
   type ReportedCounts,
   type ReportedMetric,
   type ReportedUsage,
+  type TimeSpan,
 } from '../utils/reportedUsage.js';
 import { eventKind } from '../utils/DetailsFilter.js';
+import type { TimeOrderNode, TimeOrderSource } from '../utils/TimeOrderTree.js';
 import { nameCell, nameExportText, nameText } from './cells.js';
 import { knownMax, outermostSum } from './calcs.js';
 
-type MetricRow = GovernorUsage & { namespace: string; thrownCount: SelfTotal };
+type MetricRow = GovernorUsage & { thrownCount: SelfTotal };
 
 interface RowFields<R> {
-  event(row: R): LogEvent;
+  /** The id of the event the row names. */
+  eventIndex(row: R): number;
   text(row: R): string;
+  namespace(row: R): string;
   callerNamespace(row: R): string;
   type(row: R): string;
+  /** Read it at once: a Time Order row's is one object, filled again for the next row. */
+  usage(row: R): MetricRow;
   governorCost(row: R): number | null;
   governorCostMax(row: R): number | null;
   reported(row: R, metric: ReportedMetric): number;
@@ -56,35 +62,86 @@ interface RowFields<R> {
 
 type HeldRow = GovernorCostRow & {
   reported: ReportedCounts;
-  originalData: LogEvent;
+  eventIndex: number;
   text: string;
+  namespace: string;
   callerNamespace: string;
   type: string;
+  thrownCount: SelfTotal;
 };
 
 function heldFields<R extends HeldRow>(): RowFields<R> {
   return {
-    event: (row) => row.originalData,
+    eventIndex: (row) => row.eventIndex,
     text: (row) => row.text,
+    namespace: (row) => row.namespace,
     callerNamespace: (row) => row.callerNamespace,
     type: (row) => row.type,
+    usage: (row) => row,
     governorCost: (row) => row.governorCost,
     governorCostMax: (row) => row.governorCostMax,
     reported: (row, metric) => row.reported[metric],
   };
 }
 
-function eventFields(log: ApexLog, usage: ReportedUsage | null): RowFields<LogEvent> {
-  const costLimits = costLimitsOf(log.governorLimits);
-  return {
-    event: (event) => event,
-    text: (event) => event.text,
-    callerNamespace: getCallerNamespace,
-    type: (event) => event.type ?? '',
-    governorCost: (event) => governorCostOf(event, costLimits)[0],
-    governorCostMax: (event) => governorCostOf(event, costLimits)[1],
-    reported: (event, metric) => usage?.delta(metric, event) ?? 0,
+const tally = (): Tally => ({ self: 0, total: 0 });
+
+function timeOrderFields(
+  source: TimeOrderSource,
+  usage: ReportedUsage | null,
+): RowFields<TimeOrderNode> {
+  const { index } = source;
+  const { log, eventIndex, start, end } = index;
+  const m = rowMetrics(index);
+  const costLimits = costLimitsOf(log.limits);
+  // One object for every row: a sort of the whole log reads it per row and keeps nothing.
+  const held = {
+    dmlCount: tally(),
+    soqlCount: tally(),
+    soslCount: tally(),
+    dmlRowCount: tally(),
+    soqlRowCount: tally(),
+    soslRowCount: tally(),
+    thrownCount: tally(),
+    heapAllocated: tally(),
+    heapGross: tally(),
+    heapPeak: 0,
   };
+  const fill = (into: Tally, from: SelfTotalColumns<Int32Array | Float64Array>, row: number) => {
+    into.self = from.self[row]!;
+    into.total = from.total[row]!;
+  };
+  const usageOf = ({ row }: TimeOrderNode): MetricRow => {
+    fill(held.dmlCount, m.dmlCount, row);
+    fill(held.soqlCount, m.soqlCount, row);
+    fill(held.soslCount, m.soslCount, row);
+    fill(held.dmlRowCount, m.dmlRowCount, row);
+    fill(held.soqlRowCount, m.soqlRowCount, row);
+    fill(held.soslRowCount, m.soslRowCount, row);
+    fill(held.thrownCount, m.thrownCount, row);
+    fill(held.heapAllocated, m.heapAllocated, row);
+    fill(held.heapGross, m.heapGross, row);
+    held.heapPeak = m.heapPeak[row]!;
+    return held;
+  };
+  return {
+    eventIndex: ({ row }) => eventIndex[row]!,
+    text: source.text,
+    namespace: source.namespace,
+    callerNamespace: ({ row }) => callerNamespaceOfRow(index, row),
+    type: source.type,
+    usage: usageOf,
+    governorCost: (node) => governorCostOf(usageOf(node), costLimits)[0],
+    governorCostMax: (node) => governorCostOf(usageOf(node), costLimits)[1],
+    reported: ({ row }, metric) =>
+      usage?.delta(metric, { startTimestamp: start[row]!, endTimestamp: end[row]! }) ?? 0,
+  };
+}
+
+/** Event `id`'s span, read from the log's columns. */
+function spanOfId(log: ApexLog, id: number): TimeSpan {
+  const { startTimestamp, endTimestamp } = log.columns;
+  return { startTimestamp: startTimestamp[id]!, endTimestamp: endTimestamp[id]! };
 }
 
 export interface CallTreeColumnOptions {
@@ -112,37 +169,41 @@ const REPORTED_DESCRIPTION = 'Our count, corrected to the limit usage Salesforce
 /** How a table sums its footers. */
 export interface FooterCalcs<R> {
   /** A total column's footer, from each row or, where rows overlap, from each call once. */
-  total(ofRow: (row: R) => number, ofEvent: (event: LogEvent) => number): Calc<R>;
+  total(ofRow: (row: R) => number, ofEvent: (eventIndex: number) => number): Calc<R>;
   netSelf: Calc<R>;
   grossSelf: Calc<R>;
 }
 
 export const BOTTOM_UP_SORT: GridSort = { column: 'totalSelfTime', dir: 'desc' };
 
-function nameColumn<R>(fields: RowFields<R>, options: CallTreeColumnOptions): GridColumn<R> {
+function nameColumn<R>(
+  log: ApexLog,
+  fields: RowFields<R>,
+  options: CallTreeColumnOptions,
+): GridColumn<R> {
   return {
     id: 'text',
     title: 'Name',
     width: 'flex',
     minWidth: 200,
-    cell: (row) => nameCell(fields.event(row), fields.text(row), options.openType),
-    text: (row) => nameText(fields.event(row), fields.text(row)),
-    exportText: (row) => nameExportText(fields.event(row), fields.text(row)),
+    cell: (row) => nameCell(log, fields.eventIndex(row), fields.text(row), options.openType),
+    text: (row) => nameText(log, fields.eventIndex(row), fields.text(row)),
+    exportText: (row) => nameExportText(log, fields.eventIndex(row), fields.text(row)),
     sort: { value: fields.text },
     sortFirst: 'desc',
     footer: 'Total',
   };
 }
 
-function namespaceColumns<R extends MetricRow>(fields: RowFields<R>): GridColumn<R>[] {
+function namespaceColumns<R>(fields: RowFields<R>): GridColumn<R>[] {
   return [
     {
       id: 'namespace',
       title: 'Namespace',
       width: 'content',
-      cell: (row) => row.namespace,
-      text: (row) => row.namespace,
-      sort: { value: (row) => row.namespace },
+      cell: fields.namespace,
+      text: fields.namespace,
+      sort: { value: fields.namespace },
       sortFirst: 'desc',
     },
     {
@@ -176,7 +237,7 @@ function typeColumn<R>(fields: RowFields<R>, hidden: boolean): GridColumn<R> {
  * A governor metric as a bar against what the whole log spent of it, with the limit in
  * the tooltip. See `createGovernorColumn` for why the bar is not against the limit.
  */
-function governorColumn<R extends MetricRow>(opts: {
+function governorColumn<R>(opts: {
   id: string;
   title: string;
   metric: (row: R) => SelfTotal;
@@ -219,7 +280,7 @@ function governorColumn<R extends MetricRow>(opts: {
  * What a row used of a metric, beside the Seen count it can differ from. A
  * cell that differs is tinted, and `—` stands where the log never reported the metric.
  */
-function reportedColumn<R extends MetricRow>(opts: {
+function reportedColumn<R>(opts: {
   id: string;
   title: string;
   value: (row: R) => number;
@@ -302,7 +363,7 @@ function utilisationColumn<R>(opts: {
 }
 
 /** A heap figure in bytes, as a thousand-separated integer. */
-function heapColumn<R extends MetricRow>(opts: {
+function heapColumn<R>(opts: {
   id: string;
   title: string;
   description: string;
@@ -329,24 +390,27 @@ function heapColumn<R extends MetricRow>(opts: {
 }
 
 /** The governor, heap and utilisation block every call-tree table shares, in display order. */
-function governorMetricColumns<R extends MetricRow>(
+function governorMetricColumns<R>(
   log: ApexLog,
   fields: RowFields<R>,
   footer: FooterCalcs<R>,
   usage: ReportedUsage | null,
 ): GridColumn<R>[] {
-  const limits = log.governorLimits.final;
-  const totalOf = (key: TotalKey): Calc<R> =>
-    footer.total(
-      (row) => row[key].total,
-      (event) => event[key].total,
+  const limits = log.limits.final;
+  const { usage: usageOf } = fields;
+  const totalOf = (key: TotalKey): Calc<R> => {
+    const byId = log.columns[key]?.total;
+    return footer.total(
+      (row) => usageOf(row)[key].total,
+      (id) => byId?.[id] ?? 0,
     );
+  };
   const metric = (
     id: ReportedPairId,
-    of: (row: R) => SelfTotal,
-    total: number,
-    limit: number,
+    total: number | undefined,
+    limit: number | null,
   ): GridColumn<R>[] => {
+    const of = (row: R): SelfTotal => usageOf(row)[id];
     const { metric: reportedMetric, label } = REPORTED_PAIRS[id];
     const used = (row: R): number => fields.reported(row, reportedMetric);
     return [
@@ -355,8 +419,8 @@ function governorMetricColumns<R extends MetricRow>(
         title: label,
         metric: of,
         part: 'total',
-        total,
-        limit,
+        total: total ?? 0,
+        limit: limit ?? 0,
         description: SEEN_DESCRIPTION,
         calc: totalOf(id),
       }),
@@ -366,53 +430,48 @@ function governorMetricColumns<R extends MetricRow>(
         value: used,
         seen: (row) => of(row).total,
         total: usage?.delta(reportedMetric, WHOLE_LOG) ?? null,
-        calc: footer.total(used, (event) => usage?.delta(reportedMetric, event) ?? 0),
+        calc: footer.total(used, (id) => usage?.delta(reportedMetric, spanOfId(log, id)) ?? 0),
       }),
       governorColumn({
         id: `${id}.self`,
         title: `${label} (self)`,
         metric: of,
         part: 'self',
-        total,
-        limit,
+        total: total ?? 0,
+        limit: limit ?? 0,
       }),
     ];
   };
   return [
-    ...metric('dmlCount', (r) => r.dmlCount, log.dmlCount.total, limits.dmlStatements.limit),
-    ...metric('soqlCount', (r) => r.soqlCount, log.soqlCount.total, limits.soqlQueries.limit),
-    ...metric('soslCount', (r) => r.soslCount, log.soslCount.total, limits.soslQueries.limit),
+    ...metric('dmlCount', log.dmlCount?.total, limits.dmlStatements.limit),
+    ...metric('soqlCount', log.soqlCount?.total, limits.soqlQueries.limit),
+    ...metric('soslCount', log.soslCount?.total, limits.soslQueries.limit),
     countColumn({
       id: 'thrownCount.total',
       title: 'Throws Count',
-      value: (r) => r.thrownCount.total,
+      value: (r) => usageOf(r).thrownCount.total,
       calc: totalOf('thrownCount'),
     }),
-    ...metric('dmlRowCount', (r) => r.dmlRowCount, log.dmlRowCount.total, limits.dmlRows.limit),
-    ...metric(
-      'soqlRowCount',
-      (r) => r.soqlRowCount,
-      log.soqlRowCount.total,
-      limits.queryRows.limit,
-    ),
+    ...metric('dmlRowCount', log.dmlRowCount?.total, limits.dmlRows.limit),
+    ...metric('soqlRowCount', log.soqlRowCount?.total, limits.queryRows.limit),
     // SOSL rows have no governor limit, so they are plain counts rather than bars.
     countColumn({
       id: 'soslRowCount.total',
       title: 'SOSL Rows',
-      value: (r) => r.soslRowCount.total,
+      value: (r) => usageOf(r).soslRowCount.total,
       calc: totalOf('soslRowCount'),
     }),
     countColumn({
       id: 'soslRowCount.self',
       title: 'SOSL Rows (self)',
-      value: (r) => r.soslRowCount.self,
+      value: (r) => usageOf(r).soslRowCount.self,
       hidden: true,
     }),
     heapColumn({
       id: 'heapAllocated.total',
       title: 'Heap Net (bytes)',
       description: 'Net bytes retained on this path (alloc − free); may be negative',
-      value: (r) => r.heapAllocated.total,
+      value: (r) => usageOf(r).heapAllocated.total,
       calc: totalOf('heapAllocated'),
     }),
     heapColumn({
@@ -420,7 +479,7 @@ function governorMetricColumns<R extends MetricRow>(
       title: 'Heap Net (self, bytes)',
       description:
         'Net bytes retained directly by this node (excluding sub-methods); may be negative',
-      value: (r) => r.heapAllocated.self,
+      value: (r) => usageOf(r).heapAllocated.self,
       calc: footer.netSelf,
       hidden: true,
     }),
@@ -428,14 +487,14 @@ function governorMetricColumns<R extends MetricRow>(
       id: 'heapPeak',
       title: 'Heap Peak (bytes)',
       description: 'Peak live heap on this path (matches the "Maximum heap size" governor)',
-      value: (r) => r.heapPeak,
-      calc: max((r) => r.heapPeak),
+      value: (r) => usageOf(r).heapPeak,
+      calc: max((r) => usageOf(r).heapPeak),
     }),
     heapColumn({
       id: 'heapGross.total',
       title: 'Heap Alloc (bytes)',
       description: 'Total bytes allocated on this path (ignores frees; churn)',
-      value: (r) => r.heapGross.total,
+      value: (r) => usageOf(r).heapGross.total,
       calc: totalOf('heapGross'),
       hidden: true,
     }),
@@ -443,7 +502,7 @@ function governorMetricColumns<R extends MetricRow>(
       id: 'heapGross.self',
       title: 'Heap Alloc (self, bytes)',
       description: 'Bytes allocated directly by this node (excluding sub-methods; ignores frees)',
-      value: (r) => r.heapGross.self,
+      value: (r) => usageOf(r).heapGross.self,
       calc: footer.grossSelf,
       hidden: true,
     }),
@@ -452,7 +511,7 @@ function governorMetricColumns<R extends MetricRow>(
       title: 'Gov Avg %',
       value: fields.governorCost,
       tooltip: (row, value) => {
-        const breakdown = governorCostBreakdown(row, log.governorLimits);
+        const breakdown = governorCostBreakdown(usageOf(row), log.limits);
         if (!breakdown.length) {
           return `${value.toFixed(1)}%`;
         }
@@ -470,18 +529,13 @@ function governorMetricColumns<R extends MetricRow>(
       value: fields.governorCostMax,
       hidden: true,
       tooltip: (row, value) => {
-        const [top] = governorCostBreakdown(row, log.governorLimits);
+        const [top] = governorCostBreakdown(usageOf(row), log.limits);
         return top
           ? `Tightest single governor: ${top.label} ${usedOfLimit(top)} (${value.toFixed(1)}%)`
           : `${value.toFixed(1)}%`;
       },
     }),
   ];
-}
-
-/** Time Order rows are the parser's own events: nothing is built before the grid shows them. */
-export function timeOrderSource(log: ApexLog): TreeSource<LogEvent> {
-  return { roots: log.children, children: (event) => event.children, key: (e) => e.eventIndex };
 }
 
 function lineBreaks(text: string | null | undefined): number {
@@ -500,23 +554,27 @@ function lineBreaks(text: string | null | undefined): number {
  * Read from the event, as no label is built for it. A query is counted as written,
  * though its cell lays it out on more.
  */
-function nameLines(event: LogEvent): number {
-  return 1 + lineBreaks(event.text) + lineBreaks(event.suffix);
-}
+type LinesOf = (row: { eventIndex: number }) => number;
+const linesByLog = new WeakMap<ApexLog, LinesOf>();
 
 /**
- * An Aggregated or Bottom-Up row's lines, for the grid's `rowLines`. Time Order has none: at
+ * An Aggregated or Bottom-Up row's lines, for the grid's `rowLines`: one function per log,
+ * so a render that asks again hands the grid the same one. Time Order has none: at
  * 580k rows the count cost a long task on each sort, filter and expand, and its rows are
  * nearly all 1 line.
  */
-export const mergedLines = (row: { originalData: LogEvent }): number => nameLines(row.originalData);
+export function mergedLines(log: ApexLog): LinesOf {
+  let lines = linesByLog.get(log);
+  if (!lines) {
+    lines = (row) => 1 + lineBreaks(log.columns.text.at(row.eventIndex));
+    linesByLog.set(log, lines);
+  }
+  return lines;
+}
 
-export const TIME_ORDER_WITHOUT_DETAILS: RowFilter<LogEvent> = {
-  test: (e) => eventKind(e) !== 'detail',
-};
-
-export const AGGREGATED_WITHOUT_DETAILS: RowFilter<{ originalData: LogEvent }> = {
-  test: (row) => eventKind(row.originalData) !== 'detail',
+/** The Aggregated rows shown with Details off: frames and pinned details. */
+export const AGGREGATED_WITHOUT_DETAILS: RowFilter<AggregatedRow> = {
+  test: (row) => eventKind(row.type) !== 'detail',
 };
 
 /** Opens the type a Name cell links to. */
@@ -537,7 +595,7 @@ export const CALL_TREE_COLUMN_SETTINGS: Omit<ColumnSettingsOptions, 'targets'> =
 
 /** The Bottom-Up rows shown with Details off: frames only. */
 export const BOTTOM_UP_WITHOUT_DETAILS: RowFilter<BottomUpRow> = {
-  test: (row) => eventKind(row.originalData) === 'frame',
+  test: (row) => eventKind(row.type) === 'frame',
 };
 
 /** The Bottom-Up group-by picker's options, in order, and the row field each groups on. */
@@ -559,13 +617,14 @@ export function bottomUpGroupBy(label: string): GroupBy<BottomUpRow> | null {
 
 /** The Time Order columns. */
 export function timeOrderColumns(
-  log: ApexLog,
+  source: TimeOrderSource,
   options: CallTreeColumnOptions,
-): GridColumn<LogEvent>[] {
+): GridColumn<TimeOrderNode>[] {
+  const { log, total, self } = source.index;
   const totalNs = log.duration.total;
-  const fields = eventFields(log, options.reported ?? null);
+  const fields = timeOrderFields(source, options.reported ?? null);
   return [
-    nameColumn(fields, options),
+    nameColumn(log, fields, options),
     ...namespaceColumns(fields),
     typeColumn(fields, true),
     ...governorMetricColumns(
@@ -574,29 +633,27 @@ export function timeOrderColumns(
       {
         total: (ofRow) => sum(ofRow),
         // Self never overlaps, so every row that passes the filters counts, open or not.
-        netSelf: sum((r) => r.heapAllocated.self, 'all'),
-        grossSelf: sum((r) => r.heapGross.self, 'all'),
+        netSelf: sum((r) => fields.usage(r).heapAllocated.self, 'all'),
+        grossSelf: sum((r) => fields.usage(r).heapGross.self, 'all'),
       },
       options.reported ?? null,
     ),
-    timeColumn({
+    timeColumn<TimeOrderNode>({
       id: 'duration.total',
       title: 'Total Time (ms)',
-      value: (r) => r.duration.total,
+      value: ({ row }) => total[row]!,
       totalNs,
-      calc: sum((r) => r.duration.total),
+      calc: sum(({ row }) => total[row]!),
     }),
-    timeColumn({
+    timeColumn<TimeOrderNode>({
       id: 'duration.self',
       title: 'Self Time (ms)',
-      value: (r) => r.duration.self,
+      value: ({ row }) => self[row]!,
       totalNs,
-      calc: sum((r) => r.duration.self, 'all'),
+      calc: sum(({ row }) => self[row]!, 'all'),
     }),
   ];
 }
-
-const eventsTotal = (event: LogEvent): number => event.duration.total;
 
 /** The Bottom-Up columns. */
 export function bottomUpColumns(
@@ -605,9 +662,10 @@ export function bottomUpColumns(
 ): GridColumn<BottomUpRow>[] {
   const totalNs = log.duration.total;
   const fields = heldFields<BottomUpRow>();
+  const { durationTotal } = log.columns;
   return [
     {
-      ...nameColumn(fields, options),
+      ...nameColumn(log, fields, options),
       groupCell: soqlGroupCell,
     },
     ...namespaceColumns(fields),
@@ -622,7 +680,7 @@ export function bottomUpColumns(
       log,
       fields,
       {
-        total: (_ofRow, ofEvent) => outermostSum(ofEvent),
+        total: (_ofRow, ofEvent) => outermostSum(log, ofEvent),
         netSelf: sum((r) => r.heapAllocated.self),
         grossSelf: sum((r) => r.heapGross.self),
       },
@@ -633,7 +691,7 @@ export function bottomUpColumns(
       title: 'Total Time (ms)',
       value: (r) => r.totalTime,
       totalNs,
-      calc: outermostSum(eventsTotal),
+      calc: outermostSum(log, (id) => durationTotal[id]!),
     }),
     timeColumn<BottomUpRow>({
       id: 'totalSelfTime',
@@ -660,7 +718,7 @@ export function aggregatedColumns(
   const totalNs = log.duration.total;
   const fields = heldFields<AggregatedRow>();
   return [
-    nameColumn(fields, options),
+    nameColumn(log, fields, options),
     ...namespaceColumns(fields),
     typeColumn(fields, true),
     countColumn<AggregatedRow>({

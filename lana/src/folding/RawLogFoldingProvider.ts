@@ -13,13 +13,10 @@ import {
   type TextDocument,
 } from 'vscode';
 
-import type { LogEvent } from '@apexdevtools/apex-log-parser';
-
 import type { Context } from '../Context.js';
 import { LogEventCache, type LogReporter } from '../cache/LogEventCache.js';
 import { isOpenAsTextTab } from '../editor/TabState.js';
 import { isApexLogContent } from '../language/ApexLogLanguageDetector.js';
-import { TIMESTAMP_REGEX } from '../log-utils.js';
 
 class RawLogFoldingProvider implements FoldingRangeProvider {
   private readonly changeEmitter = new EventEmitter<void>();
@@ -44,49 +41,15 @@ class RawLogFoldingProvider implements FoldingRangeProvider {
       return [];
     }
 
-    const timestampToLine = this.buildTimestampMap(document);
+    const { start, end } = LogEventCache.linesOf(apexLog, document);
     const ranges: FoldingRange[] = [];
-    this.collectFoldingRanges(apexLog.children, timestampToLine, ranges);
-
+    const last = apexLog.eventCount;
+    for (let id = 1; id <= last; id++) {
+      if (end[id]! > start[id]!) {
+        ranges.push(new FoldingRange(start[id]!, end[id]!, FoldingRangeKind.Region));
+      }
+    }
     return ranges;
-  }
-
-  private buildTimestampMap(document: TextDocument): Map<number, number> {
-    const map = new Map<number, number>();
-
-    for (let i = 0; i < document.lineCount; i++) {
-      const line = document.lineAt(i);
-      const match = line.text.match(TIMESTAMP_REGEX);
-      if (match?.[1]) {
-        const timestamp = parseInt(match[1], 10);
-        if (!map.has(timestamp)) {
-          map.set(timestamp, i);
-        }
-      }
-    }
-
-    return map;
-  }
-
-  private collectFoldingRanges(
-    events: LogEvent[],
-    timestampToLine: Map<number, number>,
-    ranges: FoldingRange[],
-  ): void {
-    for (const event of events) {
-      if (event.exitStamp !== null && event.exitStamp !== event.timestamp) {
-        const startLine = timestampToLine.get(event.timestamp);
-        const endLine = timestampToLine.get(event.exitStamp);
-
-        if (startLine !== undefined && endLine !== undefined && endLine > startLine) {
-          ranges.push(new FoldingRange(startLine, endLine, FoldingRangeKind.Region));
-        }
-      }
-
-      if (event.children.length > 0) {
-        this.collectFoldingRanges(event.children, timestampToLine, ranges);
-      }
-    }
   }
 
   /**

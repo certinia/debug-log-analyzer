@@ -4,8 +4,8 @@
 import { html } from 'lit';
 import { unsafeHTML } from 'lit/directives/unsafe-html.js';
 
-import { formatNsAsMs } from '../../core/utility/Duration.js';
-import { formatDuration } from '../../core/utility/Util.js';
+import { formatNsAsMs } from '#core/utility/Duration.js';
+import { formatDuration } from '#core/utility/Util.js';
 import { formatSOQL, formatSOQLToText } from '../../features/soql/format/formatter.js';
 import type { Dialect } from '../../features/soql/format/tokenize.js';
 import { sum, type Calc, type GridColumn } from '../../grid/index.js';

@@ -13,7 +13,6 @@
  * For production use, prefer TemporalSegmentTree which provides O(log n) culling.
  */
 
-import type { LogEvent } from '@apexdevtools/apex-log-parser';
 import type {
   CategoryAggregation,
   CategoryStats,
@@ -55,7 +54,7 @@ export function legacyCullRectangles(
       bucketIndex: number;
       timeStart: number;
       timeEnd: number;
-      events: LogEvent[];
+      rects: PrecomputedRect[];
       categoryStats: Map<string, CategoryAggregation>;
     }
   >();
@@ -130,14 +129,14 @@ export function legacyCullRectangles(
             bucketIndex,
             timeStart: bucketIndex * bucketTimeWidth,
             timeEnd: (bucketIndex + 1) * bucketTimeWidth,
-            events: [],
+            rects: [],
             categoryStats: new Map(),
           };
           bucketMap.set(bucketKey, bucket);
         }
 
         // Add event to bucket
-        bucket.events.push(rect.eventRef);
+        bucket.rects.push(rect);
         bucketedEventCount++;
 
         // Update category stats
@@ -166,7 +165,7 @@ export function legacyCullRectangles(
 
   let bucketCount = 0;
   for (const [key, bucket] of bucketMap) {
-    const eventCount = bucket.events.length;
+    const eventCount = bucket.rects.length;
     maxEventsPerBucket = Math.max(maxEventsPerBucket, eventCount);
 
     // Build CategoryStats from aggregation
@@ -189,7 +188,7 @@ export function legacyCullRectangles(
         byCategory: bucket.categoryStats,
         dominantCategory: colorResult.dominantCategory,
       },
-      eventRefs: bucket.events,
+      rects: bucket.rects,
       color: colorResult.color,
     };
 

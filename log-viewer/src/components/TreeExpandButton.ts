@@ -4,7 +4,7 @@
 import { LitElement, css, html, nothing, type PropertyValues } from 'lit';
 import { customElement, property, query, state } from 'lit/decorators.js';
 
-import { DomListenerController } from '../core/events/DomListenerController.js';
+import { DomListenerController } from '#core/events/DomListenerController.js';
 import type { GridExpansion, LvGrid } from '../grid/index.js';
 
 // styles

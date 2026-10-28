@@ -4,7 +4,7 @@
  * @jest-environment jsdom
  */
 import { afterEach, beforeEach, describe, expect, it } from '@jest/globals';
-import type { ApexLog, LogEvent } from '@apexdevtools/apex-log-parser';
+import type { ApexLog } from '@apexdevtools/apex-log-parser';
 
 import { toAggregatedCallTree, toBottomUpTree, type BottomUpRow } from '../../utils/Aggregation.js';
 
@@ -26,8 +26,8 @@ jest.mock('../../grid/columns.js', () => ({
 }));
 jest.mock('../../utils/Aggregation.js', () => ({
   ...jest.requireActual<object>('../../utils/Aggregation.js'),
-  buildAggregatedTree: (...args: unknown[]) => heldBuild(args[3]),
-  buildBottomUpTree: (...args: unknown[]) => heldBuild(args[3]),
+  buildAggregatedTree: (...args: unknown[]) => heldBuild(args[1]),
+  buildBottomUpTree: (...args: unknown[]) => heldBuild(args[1]),
 }));
 // VsSelect extends vscode-single-select, whose setFormValue needs an
 // ElementInternals jsdom lacks; the render would upgrade it.
@@ -44,11 +44,12 @@ jest.mock('../../../settings/Settings.js', () => ({
 }));
 jest.mock('../../../../components/grid/exportCsv.js', () => ({ exportCsv: jest.fn() }));
 
-import { storeOf } from '#test-helpers/apexLog.js';
+import { indexOf, rawStoreOf, storeOf } from '#test-helpers/apexLog.js';
 import { AlwaysVisible, NeverVisible, settle } from '#test-helpers/visibility.js';
 import { exportCsv } from '../../../../components/grid/exportCsv.js';
-import { eventBus } from '../../../../core/events/EventBus.js';
-import { LogStore, logStoreFor } from '../../../../core/log/LogStore.js';
+import { eventBus } from '#core/events/EventBus.js';
+import type { LogIndex } from '#core/log/LogIndex.js';
+import { LogStore, logStoreFor } from '#core/log/LogStore.js';
 import { CalltreeView } from '../CalltreeView.js';
 
 /** Which view each build made, in order. */
@@ -76,20 +77,16 @@ function grids(view: CalltreeView): Element[] {
   return [...view.renderRoot.querySelectorAll('lv-call-tree-grid')];
 }
 
-function apexLog(): ApexLog {
-  return {
-    children: [],
-    eventsById: [],
-    namespaces: [],
-    governorLimits: null,
-  } as unknown as ApexLog;
+/** A log of no events. */
+async function emptyLog(): Promise<ApexLog> {
+  return (await rawStoreOf('')).log;
 }
 
-async function mountView(log: ApexLog = apexLog()): Promise<CalltreeView> {
+async function mountView(log?: ApexLog): Promise<CalltreeView> {
   const view = new CalltreeView();
   document.body.append(view);
   await view.updateComplete;
-  view.logStore = logStoreFor(log);
+  view.logStore = logStoreFor(log ?? (await emptyLog()));
   await view.updateComplete;
   await settle();
   return view;
@@ -123,7 +120,7 @@ describe('calltree-view table lifetime', () => {
     const filters = [...(grid?.filters ?? [])];
     const source = grid?.source;
 
-    view.logStore = logStoreFor(apexLog());
+    view.logStore = logStoreFor(await emptyLog());
     await view.updateComplete;
     await settle();
 
@@ -233,7 +230,7 @@ describe('calltree-view table lifetime', () => {
       );
       const back = view._setViewMode(mode);
       await settle();
-      finish([{ id: 1, _pathId: 1, originalData: { isParent: true } }]);
+      finish([{ id: 1, _pathId: 1, type: 'METHOD_ENTRY' }]);
       await back;
       off();
 
@@ -399,23 +396,30 @@ describe('calltree-view category colorize', () => {
     expect(view.timeOrderGrid?.hasAttribute('category-colorize')).toBe(false);
     expect(view.bottomUpGrid?.hasAttribute('category-colorize')).toBe(false);
   });
+
+  // A time-order node holds only its row, so the strip read no category and showed none.
+  it('colours a time-order row by its category', async () => {
+    const { log, store } = await storeOf(
+      '09:18:22.6 (1000)|METHOD_ENTRY|[1]|01p|ns.Outer.run()\n' +
+        '09:18:22.6 (2000)|METHOD_EXIT|[1]|ns.Outer.run()\n',
+    );
+    view.remove();
+    view = await mountView(log);
+    const row = (await store.logIndex()).rowOf(indexOf(log, 'ns.Outer.run()'));
+
+    expect(view.timeOrderGrid?.rowClass?.({ row })).toBe('cat-apex');
+  });
 });
 
 describe('calltree-view merged filters', () => {
-  // Outer runs 5 ms; its query and debug line take next to none.
-  const { log } = storeOf(
-    '09:18:22.6 (1000)|METHOD_ENTRY|[1]|01p|ns.Outer.run()\n' +
-      '09:18:22.6 (2000)|SOQL_EXECUTE_BEGIN|[2]|Aggregations:0|SELECT Id FROM Account\n' +
-      '09:18:22.6 (3000)|SOQL_EXECUTE_END|[2]|Rows:1\n' +
-      '09:18:22.6 (4000)|USER_DEBUG|[3]|DEBUG|hello\n' +
-      '09:18:22.6 (5001000)|METHOD_EXIT|[1]|ns.Outer.run()\n',
-  );
-  const paths = (): ReturnType<LogStore['keyPathIds']> => logStoreFor(log).keyPathIds();
+  // Outer runs 5 ms; its query, debug line and exception take next to none.
+  let store: LogStore;
+  let index: LogIndex;
   const all = <R extends { _children?: R[] | null }>(of: readonly R[]): R[] =>
     of.flatMap((row) => [row, ...all(row._children ?? [])]);
   const rowsOf = {
-    aggregated: () => all(toAggregatedCallTree(log.children, paths())),
-    'bottom-up': () => all(toBottomUpTree(log.children, paths())),
+    aggregated: () => all(toAggregatedCallTree(index, store)),
+    'bottom-up': () => all(toBottomUpTree(index, store)),
   };
   const gridOf = (view: CalltreeView, mode: keyof typeof rowsOf) =>
     mode === 'aggregated' ? view.aggregatedGrid : view.bottomUpGrid;
@@ -431,7 +435,16 @@ describe('calltree-view merged filters', () => {
 
   beforeEach(async () => {
     globalThis.IntersectionObserver = AlwaysVisible as unknown as typeof IntersectionObserver;
-    view = await mountView(log);
+    ({ store } = await storeOf(
+      '09:18:22.6 (1000)|METHOD_ENTRY|[1]|01p|ns.Outer.run()\n' +
+        '09:18:22.6 (2000)|SOQL_EXECUTE_BEGIN|[2]|Aggregations:0|SELECT Id FROM Account\n' +
+        '09:18:22.6 (2000)|SOQL_EXECUTE_END|[2]|Rows:1\n' +
+        '09:18:22.6 (4000)|USER_DEBUG|[3]|DEBUG|hello\n' +
+        '09:18:22.6 (5000)|EXCEPTION_THROWN|[4]|System.NullPointerException: boom\n' +
+        '09:18:22.6 (5001000)|METHOD_EXIT|[1]|ns.Outer.run()\n',
+    ));
+    index = await store.logIndex();
+    view = await mountView(store.log);
     view.filterState.showDetails = true;
   });
 
@@ -439,18 +452,32 @@ describe('calltree-view merged filters', () => {
     view.remove();
   });
 
-  it('hides the debug line from Time Order with Details off, and keeps the query that took no time', () => {
-    view._handleShowDetailsChange();
-    const filters = (view.timeOrderGrid?.filters ?? []) as { test: (row: object) => boolean }[];
-    const events = (of: readonly LogEvent[]): LogEvent[] =>
-      of.flatMap((e) => [e, ...events(e.children)]);
-    const kept = events(log.children)
-      .filter((e) => filters.every((filter) => filter.test(e)))
-      .map((e) => e.type);
+  // Each view takes its own Details filter: Bottom-Up shows frames only.
+  it.each([
+    ['time-order', true],
+    ['aggregated', true],
+    ['bottom-up', false],
+  ] as const)(
+    'hides the debug line from %s with Details off, and keeps the exception: %s',
+    async (mode, keepsException) => {
+      await view._setViewMode(mode);
+      view._handleShowDetailsChange();
+      const grid = mode === 'time-order' ? view.timeOrderGrid : gridOf(view, mode);
+      const filters = (grid?.filters ?? []) as { test: (row: object) => boolean }[];
+      const kept =
+        mode === 'time-order'
+          ? Array.from({ length: index.rowCount }, (_, row) => ({ row }))
+              .filter((node) => filters.every((filter) => filter.test(node)))
+              .map(({ row }) => store.log.event(index.eventIndex[row]!)?.type)
+          : rowsOf[mode]()
+              .filter((row) => filters.every((filter) => filter.test(row)))
+              .map((row) => row.type);
 
-    expect(kept).toContain('SOQL_EXECUTE_BEGIN');
-    expect(kept).not.toContain('USER_DEBUG');
-  });
+      expect(kept).toContain('SOQL_EXECUTE_BEGIN');
+      expect(kept).not.toContain('USER_DEBUG');
+      expect(kept.includes('EXCEPTION_THROWN')).toBe(keepsException);
+    },
+  );
 
   it.each(['aggregated', 'bottom-up'] as const)(
     'filters %s rows on their own total time, self time and namespace',
@@ -484,18 +511,19 @@ describe('calltree-view merged filters', () => {
 
 describe('calltree-view inspector reveal', () => {
   // Outer calls Inner, so Outer heads its own bucket and is Inner's caller row too.
-  const { log } = storeOf(
-    '09:18:22.6 (1000)|METHOD_ENTRY|[1]|01p|ns.Outer.run()\n' +
-      '09:18:22.6 (2000)|METHOD_ENTRY|[2]|01p|ns.Inner.go()\n' +
-      '09:18:22.6 (3000)|METHOD_EXIT|[2]|ns.Inner.go()\n' +
-      '09:18:22.6 (5001000)|METHOD_EXIT|[1]|ns.Outer.run()\n',
-  );
+  let store: LogStore;
   let view: CalltreeView;
 
   beforeEach(async () => {
     globalThis.IntersectionObserver = AlwaysVisible as unknown as typeof IntersectionObserver;
     holdBuilds = true;
-    view = await mountView(log);
+    ({ store } = await storeOf(
+      '09:18:22.6 (1000)|METHOD_ENTRY|[1]|01p|ns.Outer.run()\n' +
+        '09:18:22.6 (2000)|METHOD_ENTRY|[2]|01p|ns.Inner.go()\n' +
+        '09:18:22.6 (3000)|METHOD_EXIT|[2]|ns.Inner.go()\n' +
+        '09:18:22.6 (5001000)|METHOD_EXIT|[1]|ns.Outer.run()\n',
+    ));
+    view = await mountView(store.log);
   });
 
   afterEach(() => {
@@ -506,19 +534,19 @@ describe('calltree-view inspector reveal', () => {
   it('reveals the Bottom-Up bucket a frame heads, not a caller row it sits in', async () => {
     const switched = view._setViewMode('bottom-up');
     await settle();
-    const roots = toBottomUpTree(log.children, logStoreFor(log).keyPathIds());
+    const roots = toBottomUpTree(await store.logIndex(), store);
     finishBuild?.(roots);
     await switched;
     const grid = view.bottomUpGrid;
     if (!grid) {
       throw new Error('no bottom-up grid');
     }
-    const goTo = jest.spyOn(grid, 'goTo').mockResolvedValue(true);
-    const all = (events: ApexLog['children']): ApexLog['children'] =>
-      events.flatMap((e) => [e, ...all(e.children)]);
-    const outer = all(log.children).find((e) => e.text === 'ns.Outer.run()');
+    const goTo = jest.spyOn(grid, 'goTo').mockResolvedValue('selected');
 
-    eventBus.emit('inspector:reveal', { source: 'calltree', eventIndex: outer?.eventIndex ?? -1 });
+    eventBus.emit('inspector:reveal', {
+      source: 'calltree',
+      eventIndex: indexOf(store.log, 'ns.Outer.run()'),
+    });
     await settle();
 
     const bucket = roots.find((row) => row.text === 'ns.Outer.run()');
@@ -535,18 +563,213 @@ describe('calltree-view go to row', () => {
 
   it('puts keyboard focus on the grid, so its keys work at once', async () => {
     globalThis.IntersectionObserver = AlwaysVisible as unknown as typeof IntersectionObserver;
-    const { log } = storeOf(
+    const { log } = await storeOf(
       '09:18:22.6 (1000)|METHOD_ENTRY|[1]|01p|ns.Outer.run()\n' +
         '09:18:22.6 (1800)|METHOD_EXIT|[1]|ns.Outer.run()\n',
     );
     view = await mountView(log);
-    const all = (events: ApexLog['children']): ApexLog['children'] =>
-      events.flatMap((e) => [e, ...all(e.children)]);
-    const outer = all(log.children).find((e) => e.text === 'ns.Outer.run()');
 
-    await view._goToRow(outer?.eventIndex ?? -1);
+    await view._goToRow(indexOf(log, 'ns.Outer.run()'));
 
     expect((view.renderRoot as ShadowRoot).activeElement === view.timeOrderGrid).toBe(true);
+  });
+
+  describe('to a row the filters hide', () => {
+    // Debug Only keeps Outer as the parent of its debug line, and hides Inner. Details, off by
+    // default, hides the debug line: it is a detail.
+    const LOG =
+      '09:18:22.6 (1000)|METHOD_ENTRY|[1]|01p|ns.Outer.run()\n' +
+      '09:18:22.6 (1100)|USER_DEBUG|[2]|DEBUG|hello\n' +
+      '09:18:22.6 (1200)|METHOD_ENTRY|[3]|01p|ns.Inner.go()\n' +
+      '09:18:22.6 (1300)|METHOD_EXIT|[3]|ns.Inner.go()\n' +
+      '09:18:22.6 (1800)|METHOD_EXIT|[1]|ns.Outer.run()\n';
+
+    const note = () => view.renderRoot.querySelector('.hidden-note');
+    const announced = () => view.renderRoot.querySelector('[role="status"]')?.textContent?.trim();
+    const pressed = (label: string) =>
+      [...view.renderRoot.querySelectorAll('button.pill-toggle')]
+        .find((button) => button.textContent?.trim() === label)
+        ?.getAttribute('aria-pressed');
+    const pressClear = async () => {
+      note()!.querySelector('button')!.click(); // each caller has just shown the note
+      await settle();
+      await view.updateComplete;
+    };
+
+    async function openWithDebugOnly(log: ApexLog): Promise<void> {
+      view = await mountView(log);
+      await view._goToRow(indexOf(log, 'ns.Outer.run()'));
+      view._handleDebugOnlyChange();
+      await view.updateComplete;
+    }
+
+    beforeEach(() => {
+      globalThis.IntersectionObserver = AlwaysVisible as unknown as typeof IntersectionObserver;
+    });
+
+    // Before, the tab switched and nothing was selected, with no word why.
+    it('selects the nearest shown parent and says the filters hide the row', async () => {
+      const { log } = await storeOf(LOG);
+      await openWithDebugOnly(log);
+
+      await view._goToRow(indexOf(log, 'ns.Inner.go()'));
+      await view.updateComplete;
+
+      expect(view.timeOrderGrid?.selectedKey).toBe(indexOf(log, 'ns.Outer.run()'));
+      expect(note()?.textContent).toContain('Hidden by filters');
+      expect(announced()).toContain('filters hide that row');
+      expect(pressed('Debug Only')).toBe('true');
+    });
+
+    it('clears the filters and goes to the row when Clear is pressed', async () => {
+      const { log } = await storeOf(LOG);
+      await openWithDebugOnly(log);
+      const inner = indexOf(log, 'ns.Inner.go()');
+      await view._goToRow(inner);
+      await view.updateComplete;
+
+      await pressClear();
+
+      expect(pressed('Debug Only')).toBe('false');
+      // Details does not hide Inner, so Clear leaves it as chosen.
+      expect(pressed('Details')).toBe('false');
+      expect(view.timeOrderGrid?.selectedKey).toBe(inner);
+      expect(note()).toBeNull();
+    });
+
+    // An issue card can name a leaf that takes no time; clearing every other filter left it hidden.
+    it('turns Details on when Details is what hides the row', async () => {
+      const { log } = await storeOf(LOG);
+      view = await mountView(log);
+      const hello = indexOf(log, 'DEBUG | hello');
+      await view._goToRow(hello);
+      await view.updateComplete;
+      expect(view.timeOrderGrid?.selectedKey).toBe(indexOf(log, 'ns.Outer.run()'));
+
+      await pressClear();
+
+      expect(pressed('Details')).toBe('true');
+      expect(view.timeOrderGrid?.selectedKey).toBe(hello);
+    });
+
+    // The grid selects nothing when even the top row is filtered out, which was silent.
+    it('says so when the filters hide the row from the top, and Clear reaches it', async () => {
+      const { log } = await storeOf(LOG);
+      view = await mountView(log);
+      view._handleNamespaceFacet(new CustomEvent('facet', { detail: { selected: ['other'] } }));
+      const inner = indexOf(log, 'ns.Inner.go()');
+      await view._goToRow(inner);
+      await view.updateComplete;
+      expect(note()).not.toBeNull();
+      // No parent is selected, so saying one is would mislead.
+      expect(announced()).toContain('every row above it');
+
+      await pressClear();
+
+      expect(view.timeOrderGrid?.selectedKey).toBe(inner);
+    });
+
+    it('drops the note when a filter changes', async () => {
+      const { log } = await storeOf(LOG);
+      await openWithDebugOnly(log);
+      await view._goToRow(indexOf(log, 'ns.Inner.go()'));
+      await view.updateComplete;
+
+      view._handleDebugOnlyChange();
+      await view.updateComplete;
+
+      expect(note()).toBeNull();
+      expect(announced()).toBe('');
+    });
+
+    // Go to Call Tree from another tab: the tab's first build applied the filters again and cleared it.
+    it('keeps the note when the tab builds its table after the go-to', async () => {
+      const { log } = await storeOf(LOG);
+      let show = () => {};
+      globalThis.IntersectionObserver = class {
+        private readonly callback: IntersectionObserverCallback;
+        constructor(callback: IntersectionObserverCallback) {
+          this.callback = callback;
+        }
+        observe(target: Element): void {
+          show = () =>
+            this.callback(
+              [{ isIntersecting: true, target } as IntersectionObserverEntry],
+              this as unknown as IntersectionObserver,
+            );
+        }
+        disconnect(): void {}
+      } as unknown as typeof IntersectionObserver;
+      view = await mountView(log);
+
+      await view._goToRow(indexOf(log, 'DEBUG | hello'));
+      show();
+      await settle();
+      await view.updateComplete;
+
+      expect(note()).not.toBeNull();
+    });
+
+    it('drops the note when the log is replaced', async () => {
+      const { log } = await storeOf(LOG);
+      const next = (await storeOf(LOG)).store;
+      await openWithDebugOnly(log);
+      await view._goToRow(indexOf(log, 'ns.Inner.go()'));
+      await view.updateComplete;
+
+      view.logStore = next;
+      await settle();
+      await view.updateComplete;
+
+      expect(note()).toBeNull();
+      expect(announced()).toBe('');
+    });
+
+    // The go-to ended on the old log and wrote its note over the new one.
+    it('leaves no note from a go-to the log replaced while it ran', async () => {
+      const { log } = await storeOf(LOG);
+      const next = (await storeOf(LOG)).store;
+      await openWithDebugOnly(log);
+
+      const going = view._goToRow(indexOf(log, 'ns.Inner.go()'));
+      view.logStore = next;
+      await going;
+      await settle();
+      await view.updateComplete;
+
+      expect(note()).toBeNull();
+    });
+
+    // The go-to read the old filters, so its note named a row the new ones may show.
+    it('leaves no note from a go-to a filter change overtook', async () => {
+      const { log } = await storeOf(LOG);
+      await openWithDebugOnly(log);
+
+      const grid = view.timeOrderGrid!;
+      const goTo = grid.goTo.bind(grid);
+      grid.goTo = (path) => {
+        const going = goTo(path);
+        view._handleDebugOnlyChange();
+        return going;
+      };
+
+      await view._goToRow(indexOf(log, 'ns.Inner.go()'));
+      await settle();
+      await view.updateComplete;
+
+      expect(note()).toBeNull();
+    });
+
+    it('says nothing when the row shows', async () => {
+      const { log } = await storeOf(LOG);
+      view = await mountView(log);
+
+      await view._goToRow(indexOf(log, 'ns.Inner.go()'));
+      await view.updateComplete;
+
+      expect(view.timeOrderGrid?.selectedKey).toBe(indexOf(log, 'ns.Inner.go()'));
+      expect(note()).toBeNull();
+    });
   });
 });
 
@@ -584,7 +807,7 @@ describe('calltree-view type picker', () => {
 
   it("lists the log's types once each, sorted, and no exit lines", async () => {
     view.isVisible = true;
-    view.logStore = storeOf(OUTER).store;
+    view.logStore = (await storeOf(OUTER)).store;
     const types = await typeOptions();
 
     expect(types).toEqual([...new Set(types)].sort());
@@ -599,14 +822,14 @@ describe('calltree-view type picker', () => {
     view = new CalltreeView();
     document.body.append(view);
     const logIndex = jest.spyOn(LogStore.prototype, 'logIndex');
-    view.logStore = storeOf(OUTER).store;
+    view.logStore = (await storeOf(OUTER)).store;
     await typeOptions();
 
     expect(logIndex).not.toHaveBeenCalled();
   });
 
   it('shows the types of the log it has now, not one it had before', async () => {
-    const before = storeOf(OUTER).log;
+    const before = (await storeOf(OUTER)).log;
     const logIndex = LogStore.prototype.logIndex;
     let release = (): void => {};
     const held = new Promise<void>((resolve) => (release = resolve));
@@ -619,7 +842,7 @@ describe('calltree-view type picker', () => {
     view.isVisible = true;
     view.logStore = logStoreFor(before);
     await view.updateComplete;
-    view.logStore = storeOf(DML).store;
+    view.logStore = (await storeOf(DML)).store;
     await typeOptions();
     release();
     const types = await typeOptions();

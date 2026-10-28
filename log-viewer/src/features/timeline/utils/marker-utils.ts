@@ -16,7 +16,7 @@ import { isMarkerType, markerTypeForIssue } from '../types/flamechart.types.js';
 const markerCache = new WeakMap<ApexLog, TimelineMarker[]>();
 
 /**
- * Extracts markers from ApexLog.logIssues array.
+ * Extracts markers from ApexLog.issues array.
  *
  * Transforms parser's LogIssue format to Marker format for timeline rendering.
  * Validates marker data and filters out invalid entries.
@@ -27,11 +27,11 @@ const markerCache = new WeakMap<ApexLog, TimelineMarker[]>();
  * - 'error' and 'fatal' issues are dropped here: exceptions are surfaced instead via
  *   {@link extractExceptionMarkers}, which covers LimitException/FATAL_ERROR.
  *
- * @param log - Parsed Apex log containing logIssues array
+ * @param log - Parsed Apex log containing issues array
  * @returns Array of validated Marker objects
  */
 export function extractMarkers(log: ApexLog): TimelineMarker[] {
-  if (!log.logIssues || log.logIssues.length === 0) {
+  if (log.issues.length === 0) {
     return [];
   }
   const cached = markerCache.get(log);
@@ -42,7 +42,7 @@ export function extractMarkers(log: ApexLog): TimelineMarker[] {
   const markers: TimelineMarker[] = [];
 
   let markerIndex = 0;
-  for (const issue of log.logIssues) {
+  for (const issue of log.issues) {
     // Exceptions are drawn from the exception events (see extractExceptionMarkers), so
     // skip any issue on the exception channel here to avoid a duplicated red channel.
     if (markerTypeForIssue(issue.type) === 'exception') {
@@ -55,16 +55,16 @@ export function extractMarkers(log: ApexLog): TimelineMarker[] {
     }
 
     // Validate startTime
-    if (issue.startTime === undefined || issue.startTime < 0) {
+    if (issue.startTimestamp < 0) {
       continue;
     }
 
     const marker: TimelineMarker = {
       id: `marker-${markerIndex++}`,
       type: issue.type,
-      startTime: issue.startTime,
-      endTime: issue.endTime,
-      eventIndex: issue.eventIndex,
+      startTime: issue.startTimestamp,
+      endTime: issue.endTimestamp ?? undefined,
+      eventIndex: issue.event?.id,
       summary: issue.summary,
       metadata: issue.description,
     };
@@ -90,23 +90,23 @@ export function extractMarkers(log: ApexLog): TimelineMarker[] {
  * @returns Array of exception markers in log order
  */
 export function extractExceptionMarkers(log: ApexLog): TimelineMarker[] {
-  if (!log.exceptions || log.exceptions.length === 0) {
+  if (log.exceptions.length === 0) {
     return [];
   }
 
   const markers: TimelineMarker[] = [];
   let markerIndex = 0;
   for (const event of log.exceptions) {
-    if (event.timestamp < 0) {
+    if (event.startTimestamp < 0) {
       continue;
     }
 
-    const message = event.text || event.type?.toString() || 'Exception';
+    const message = event.text || event.type;
     markers.push({
       id: `exception-${markerIndex++}`,
       type: 'exception',
-      startTime: event.timestamp,
-      eventIndex: event.eventIndex,
+      startTime: event.startTimestamp,
+      eventIndex: event.id,
       summary: message.split('\n', 1)[0] ?? message,
       metadata: message,
     });

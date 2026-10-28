@@ -10,7 +10,6 @@ import { describe, expect, it, jest } from '@jest/globals';
 import { Container, type Mesh } from 'pixi.js';
 
 import { readQuads } from '#test-helpers/mesh.js';
-import { timelineEvent } from '#test-helpers/timeline.js';
 import { makeViewport } from '#test-helpers/viewport.js';
 import type { RenderBatch } from '../../../types/flamechart.types.js';
 import type { PrecomputedRect } from '../../RectangleCache.js';
@@ -38,7 +37,7 @@ function rect(x: number, category: Category, width = 100): PrecomputedRect {
     duration: width,
     selfDuration: width,
     category,
-    eventRef: timelineEvent(x, width, category),
+    row: x,
     x,
     y: 0,
     width,

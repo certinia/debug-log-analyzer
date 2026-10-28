@@ -13,17 +13,13 @@ import {
   rowIdsByPath,
   type ScopedRow,
 } from '../../log-viewer/src/components/scopedCallTree.js';
-import { LogStore, setCurrentLog } from '../../log-viewer/src/core/log/LogStore.js';
+import { LogStore, logStoreFor, setCurrentLog } from '../../log-viewer/src/core/log/LogStore.js';
 import {
   toAggregatedCallTree,
   toBottomUpTree,
 } from '../../log-viewer/src/features/call-tree/utils/Aggregation.js';
 import { reportedUsage } from '../../log-viewer/src/features/call-tree/utils/reportedUsage.js';
-import { line, print, time } from './harness.js';
-
-// The builds slice themselves against this; resolving at once measures the work
-// rather than the frames it would hand back on screen.
-const yieldSlice = () => Promise.resolve();
+import { line, print, time, yieldSlice } from './harness.js';
 
 interface Shape {
   nodes: number;
@@ -54,7 +50,8 @@ function shapeOf(rows: readonly ScopedRow[]): Shape {
 }
 
 export async function measureCallTree(log: ApexLog): Promise<void> {
-  setCurrentLog(log);
+  const store = logStoreFor(log);
+  setCurrentLog(store);
 
   const scoped = await time('buildWholeLogCallTree', () => buildWholeLogCallTree({ yieldSlice }));
   if (!scoped) {
@@ -86,9 +83,9 @@ export async function measureCallTree(log: ApexLog): Promise<void> {
   const picked = shape.fattest?.eventIndexes ?? [];
   print(`\nfattest row: ${picked.length} occurrences of "${shape.fattest?.text ?? ''}"`);
   const ids = new LocatedRowIds();
-  await time('mark callers (first)', () => ids.idsFor(log, picked, 'callers'));
-  await time('mark callers (same pick)', () => ids.idsFor(log, picked, 'callers'));
-  await time('mark callees', () => new LocatedRowIds().idsFor(log, picked, 'callees'));
+  await time('mark callers (first)', () => ids.idsFor(store, picked, 'callers'));
+  await time('mark callers (same pick)', () => ids.idsFor(store, picked, 'callers'));
+  await time('mark callees', () => new LocatedRowIds().idsFor(store, picked, 'callees'));
 
   // The Call Tree tab's own grouped builds, for comparison with the inspector's.
   print('');
@@ -96,12 +93,8 @@ export async function measureCallTree(log: ApexLog): Promise<void> {
   // table. Only the first build below is cold; the second reads what the first
   // interned, as it does on screen where every view shares one table.
   const gridStore = new LogStore(log);
-  const gridPaths = gridStore.keyPathIds();
+  const gridIndex = await gridStore.logIndex({ yieldSlice });
   const usage = await time('grid reportedUsage', () => gridStore.derive(reportedUsage));
-  await time('grid toAggregatedCallTree', () =>
-    toAggregatedCallTree(log.children, gridPaths, undefined, usage),
-  );
-  await time('grid toBottomUpTree', () =>
-    toBottomUpTree(log.children, gridPaths, undefined, usage),
-  );
+  await time('grid toAggregatedCallTree', () => toAggregatedCallTree(gridIndex, gridStore, usage));
+  await time('grid toBottomUpTree', () => toBottomUpTree(gridIndex, gridStore, usage));
 }

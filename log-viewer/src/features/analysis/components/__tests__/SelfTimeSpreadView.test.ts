@@ -5,7 +5,7 @@
  */
 import { beforeEach, describe, expect, it } from '@jest/globals';
 
-import type { LogStore } from '../../../../core/log/LogStore.js';
+import type { LogStore } from '#core/log/LogStore.js';
 import type { SelfTimeSpread } from '../../services/SelfTimeSpread.js';
 
 let spread: SelfTimeSpread | null = null;

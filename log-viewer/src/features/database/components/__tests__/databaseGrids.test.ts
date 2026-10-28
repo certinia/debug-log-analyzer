@@ -19,8 +19,8 @@ jest.mock('../../../call-tree/navigation.js', () => ({ goToRow: jest.fn() }));
 
 import type { AppGrid } from '../../../../components/grid/AppGrid.js';
 import { parse } from '@apexdevtools/apex-log-parser';
-import { describeLevelGap } from '../../../../core/log/levelCapabilities.js';
-import { setCurrentLog } from '../../../../core/log/LogStore.js';
+import { describeLevelGap } from '#core/log/levelCapabilities.js';
+import { LogStore, setCurrentLog } from '#core/log/LogStore.js';
 import { ContextMenu } from '../../../../components/ContextMenu.js';
 import { exportCsv } from '../../../../components/grid/exportCsv.js';
 import { Group } from '../../../../grid/index.js';
@@ -75,15 +75,16 @@ const GRIDS: Array<[string, Grid]> = [
 ];
 
 /** One stand-in carries what each of the three line types reads. */
-function line(eventIndex: number, rows: number, ns: string, object: string) {
+function line(id: number, rows: number, ns: string, object: string) {
   return {
-    eventIndex,
+    id,
     text: `SELECT Id FROM ${object}`,
     namespace: ns,
-    parent: { namespace: `${ns}-caller` },
-    sObjectType: object,
-    aggregations: 0,
-    children: [{ sObjectType: object, relativeCost: 0.5 }],
+    details: {
+      sObjectType: object,
+      aggregations: 0,
+      explain: { sObjectType: object, relativeCost: 0.5 } as object | null,
+    },
     soqlRowCount: { self: rows },
     dmlRowCount: { self: rows },
     soslRowCount: { self: rows },
@@ -92,6 +93,12 @@ function line(eventIndex: number, rows: number, ns: string, object: string) {
 }
 
 const LINES = [line(1, 5, 'ns1', 'Account'), line(2, 15, 'ns2', 'Contact')];
+
+/** A store where statement `id` is called from frame `id + 10`, in namespace `ns<id>-caller`. */
+const CALLERS = {
+  parentOf: (id: number) => id + 10,
+  log: { columns: { namespace: Object.assign([], { 11: 'ns1-caller', 12: 'ns2-caller' }) } },
+} as unknown as LogStore;
 
 describe.each(GRIDS)('%s', (_name, spec) => {
   let view: View;
@@ -131,6 +138,7 @@ describe.each(GRIDS)('%s', (_name, spec) => {
   beforeEach(async () => {
     view = spec.make() as unknown as View;
     view.lines = LINES;
+    view.logStore = CALLERS;
     document.body.append(view);
     await view.updateComplete;
   });
@@ -332,7 +340,7 @@ describe.each(GRIDS)('%s', (_name, spec) => {
     });
 
     it('selects a statement, scrolling only when its row is out of view', async () => {
-      const goTo = jest.spyOn(grid(), 'goTo').mockResolvedValue(true);
+      const goTo = jest.spyOn(grid(), 'goTo').mockResolvedValue('selected');
 
       expect(await view.selectByEventIndex(2)).toBe(true);
       expect(goTo).toHaveBeenCalledWith([2], { scrollIfVisible: false });
@@ -408,7 +416,7 @@ describe.each(GRIDS)('%s', (_name, spec) => {
     };
 
     it('selects the row it opens on, and shows the menu there', () => {
-      const goTo = jest.spyOn(grid(), 'goTo').mockResolvedValue(true);
+      const goTo = jest.spyOn(grid(), 'goTo').mockResolvedValue('selected');
 
       expect(rightClick(rows()[1] as Row).defaultPrevented).toBe(true);
       expect(goTo).toHaveBeenCalledWith([2], { scrollIfVisible: false });
@@ -428,7 +436,7 @@ describe.each(GRIDS)('%s', (_name, spec) => {
     });
 
     it('shows the statement it opened on in the Call Tree', () => {
-      jest.spyOn(grid(), 'goTo').mockResolvedValue(true);
+      jest.spyOn(grid(), 'goTo').mockResolvedValue('selected');
       rightClick(rows()[1] as Row);
       view.renderRoot
         .querySelector('context-menu')
@@ -446,7 +454,9 @@ describe('SOQLView selectivity', () => {
 
   const tooltip = async (): Promise<string | undefined> => {
     const view = new SOQLView() as unknown as View;
-    view.lines = [{ ...line(1, 5, 'ns1', 'Account'), children: [] }];
+    const unplanned = line(1, 5, 'ns1', 'Account');
+    unplanned.details.explain = null;
+    view.lines = [unplanned];
     document.body.append(view);
     await view.updateComplete;
     const grid = view.grid!; // shown: the view has lines
@@ -457,7 +467,7 @@ describe('SOQLView selectivity', () => {
   };
 
   it('names the DB level a log was captured below', async () => {
-    const store = setCurrentLog(captured('FINE'));
+    const store = setCurrentLog(new LogStore(await captured('FINE')));
     const why = describeLevelGap(store.levelGap('queryPlans'));
 
     expect(why).not.toBe('');
@@ -465,7 +475,7 @@ describe('SOQLView selectivity', () => {
   });
 
   it('names no level when the levels are not why a query has no plan', async () => {
-    setCurrentLog(captured('FINEST'));
+    setCurrentLog(new LogStore(await captured('FINEST')));
 
     expect(await tooltip()).toBe('Selectivity could not be determined.');
   });

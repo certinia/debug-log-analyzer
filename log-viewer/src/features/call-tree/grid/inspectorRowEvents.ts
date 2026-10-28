@@ -1,17 +1,17 @@
 /*
  * Copyright (c) 2026 Certinia Inc. All rights reserved.
  */
-import type { ApexLog } from '@apexdevtools/apex-log-parser';
-
 import { rowDetailSelection, rowFrames, type RowReader } from '../../../components/locatedRow.js';
-import { eventBus, type DetailSource, type SelectionView } from '../../../core/events/EventBus.js';
-import type { SelectionEchoGuard } from '../../../core/events/SelectionEchoGuard.js';
+import { eventBus, type DetailSource, type SelectionView } from '#core/events/EventBus.js';
+import type { SelectionEchoGuard } from '#core/events/SelectionEchoGuard.js';
+import type { LogStore } from '#core/log/LogStore.js';
 import type { GridRowDetail, GridSelectDetail } from '../../../grid/index.js';
 
 /** What {@link inspectorRowEvents} reads a grid's rows and the inspector by. */
 export interface InspectorRowEventsOptions<R> extends RowReader<R> {
   source: DetailSource;
-  root: () => ApexLog | null;
+  /** The store the grid's rows were built from. */
+  store: () => LogStore | null;
   /** The direction the grid's rows read in. */
   view: () => SelectionView;
   echoGuard: SelectionEchoGuard;
@@ -31,7 +31,7 @@ export function inspectorRowEvents<R>(opts: InspectorRowEventsOptions<R>): {
       }
       const { row } = (e as CustomEvent<GridSelectDetail<R>>).detail;
       const view = opts.view();
-      const selection = rowDetailSelection(row, opts, opts.root(), view);
+      const selection = rowDetailSelection(row, opts, opts.store(), view);
       if (!selection) {
         // The selection went with it, and so does a mark a picked inspector row
         // left here — it was never a selection of this grid.
@@ -43,7 +43,7 @@ export function inspectorRowEvents<R>(opts: InspectorRowEventsOptions<R>): {
       const { row } = (e as CustomEvent<GridRowDetail<R>>).detail;
       eventBus.emit('detail:locate', {
         source: opts.source,
-        eventIndexes: row ? rowFrames(row, opts, opts.root(), opts.view()) : [],
+        eventIndexes: row ? rowFrames(row, opts, opts.store(), opts.view()) : [],
       });
     },
   };

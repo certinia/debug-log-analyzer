@@ -72,8 +72,8 @@ jest.mock('../detailSections.js', () => ({
   },
 }));
 
-import { eventBus, type DetailSource } from '../../core/events/EventBus.js';
-import type { LogStore } from '../../core/log/LogStore.js';
+import { eventBus, type DetailSource } from '#core/events/EventBus.js';
+import type { LogStore } from '#core/log/LogStore.js';
 import type { LogInspector } from '../LogInspector.js';
 import type { PaneView } from '../PaneView.js';
 import type { ViewModeSwitch } from '../ViewModeSwitch.js';

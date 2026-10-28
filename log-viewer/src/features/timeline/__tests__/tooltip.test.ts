@@ -16,7 +16,10 @@
  * - The on/off switch
  */
 import { afterEach, beforeEach, describe, expect, it, jest } from '@jest/globals';
-import type { ApexLog, LogEvent } from '@apexdevtools/apex-log-parser';
+import type { ApexEvent, ApexLog, FrameEvent } from '@apexdevtools/apex-log-parser';
+
+/** A stand-in a test can adjust after making it. */
+type Mutable<T> = { -readonly [K in keyof T]: T[K] };
 
 import {
   FrameTooltipRenderer,
@@ -34,29 +37,31 @@ describe('FrameTooltipRenderer', () => {
   let container: HTMLElement;
   let frameTooltipRenderer: FrameTooltipRenderer;
 
+  // The panel knows an event by its id, so each stand-in gets its own.
+  let nextId = 1;
+
   /**
-   * Helper to create a mock LogEvent
+   * Helper to create a mock event
    */
   function tooltipEvent(
     timestamp: number,
     duration: number,
     type: string = 'TestEvent',
-    category: string = 'Apex',
-  ): LogEvent {
+  ): Mutable<FrameEvent> {
     return {
-      timestamp,
-      exitStamp: timestamp + duration,
+      id: nextId++,
+      startTimestamp: timestamp,
+      endTimestamp: timestamp + duration,
       duration: {
         total: duration,
         exclusive: duration,
         self: duration * 0.5,
       },
       type,
-      category,
       text: `Event at ${timestamp}`,
       lineNumber: 42,
       children: [],
-      isParent: true, // Required for tooltip to show
+      isFrame: true, // Required for tooltip to show
       dmlCount: { total: 0, self: 0 },
       dmlRowCount: { total: 0, self: 0 },
       soqlCount: { total: 0, self: 0 },
@@ -67,15 +72,15 @@ describe('FrameTooltipRenderer', () => {
       heapAllocated: { total: 0, self: 0 },
       heapGross: { total: 0, self: 0 },
       heapPeak: 0,
-      namespace: '',
-    } as unknown as LogEvent;
+      namespace: null,
+    } as unknown as Mutable<FrameEvent>;
   }
 
   /** A log for the branch shares to divide by. */
   function logOf(over: Record<string, unknown> = {}): ApexLog {
     return {
       startTime: null,
-      timestamp: 0,
+      columns: { startTimestamp: [0] },
       duration: { total: 15_000_000, self: 0 },
       soqlCount: { total: 0, self: 0 },
       soqlRowCount: { total: 0, self: 0 },
@@ -154,7 +159,7 @@ describe('FrameTooltipRenderer', () => {
   }
 
   /** Show and let the delay expire, which is what a settled hover looks like. */
-  function showSettled(event: LogEvent, anchor: TooltipAnchor): void {
+  function showSettled(event: ApexEvent, anchor: TooltipAnchor): void {
     frameTooltipRenderer.show(event, anchor);
     jest.advanceTimersByTime(SHOW_DELAY_MS);
   }
@@ -342,7 +347,7 @@ describe('FrameTooltipRenderer', () => {
       expect(tooltipEl().textContent).not.toContain('self 1');
     });
 
-    it.each<[string, string, Partial<TooltipOptions>, Partial<LogEvent>]>([
+    it.each<[string, string, Partial<TooltipOptions>, Partial<ApexEvent>]>([
       ['Throws', 'no exceptions were thrown', {}, { thrownCount: { total: 0, self: 0 } }],
       [
         'Heap Net',
@@ -413,13 +418,14 @@ describe('FrameTooltipRenderer', () => {
     });
 
     // The category is left off for an uncategorised event, and the namespace where it is the default.
+    // The category comes from the type: a type the catalog does not know has none.
     it.each([
-      ['Apex', '', 'Apex · Event · from line 42'],
-      ['Apex', 'default', 'Apex · Event · from line 42'],
-      ['', '', 'Event · from line 42'],
-      ['Apex', 'acme', 'Apex · Event · acme · from line 42'],
-    ])('reads category %j and namespace %j as "%s"', (category, namespace, expected) => {
-      const event = tooltipEvent(0, 100, 'Event', category);
+      ['METHOD_ENTRY', null, 'Apex · METHOD_ENTRY · from line 42'],
+      ['METHOD_ENTRY', 'default', 'Apex · METHOD_ENTRY · from line 42'],
+      ['Event', null, 'Event · from line 42'],
+      ['METHOD_ENTRY', 'acme', 'Apex · METHOD_ENTRY · acme · from line 42'],
+    ])('reads type %j and namespace %j as "%s"', (type, namespace, expected) => {
+      const event = tooltipEvent(0, 100, type);
       event.namespace = namespace;
 
       showSettled(event, cursorAnchor(100, 100));
@@ -430,7 +436,7 @@ describe('FrameTooltipRenderer', () => {
     it("should paint the rail in the category's colour", () => {
       rebuild({ categoryColors: { Apex: '#88ae58' } });
 
-      showSettled(tooltipEvent(0, 100, 'Event', 'Apex'), cursorAnchor(100, 100));
+      showSettled(tooltipEvent(0, 100, 'METHOD_ENTRY'), cursorAnchor(100, 100));
 
       const body = container.querySelector<HTMLElement>('.timeline-tooltip');
       expect(body?.style.borderColor).toBe('rgb(136, 174, 88)');
@@ -438,7 +444,9 @@ describe('FrameTooltipRenderer', () => {
 
     it('should display wall-clock time row when apexLog has startTime', () => {
       // 10:29:24.600 at the first event, whose nanosecond offset is 6329577.
-      rebuild({ apexLog: logOf({ startTime: 37_764_600, timestamp: 6_329_577 }) });
+      rebuild({
+        apexLog: logOf({ startTime: 37_764_600, columns: { startTimestamp: [6_329_577] } }),
+      });
 
       // Event at timestamp 6329577ns with duration 1,000,000ns
       showSettled(tooltipEvent(6329577, 1_000_000), cursorAnchor(100, 100));
@@ -462,10 +470,8 @@ describe('FrameTooltipRenderer', () => {
       return `SELECT Id FROM Account WHERE ${where}`;
     }
 
-    function soqlEvent(text: string): LogEvent {
-      const event = tooltipEvent(0, 100, 'SOQL_EXECUTE_BEGIN', 'SOQL');
-      event.text = text;
-      return event;
+    function soqlEvent(text: string): Mutable<FrameEvent> {
+      return { ...tooltipEvent(0, 100, 'SOQL_EXECUTE_BEGIN'), text };
     }
 
     it('should fit a long query to the budget and count the conditions it left out', () => {
@@ -707,11 +713,12 @@ describe('FrameTooltipRenderer', () => {
         'minimal data',
         () =>
           ({
-            isParent: true,
-            timestamp: 0,
+            id: nextId++,
+            isFrame: true,
+            startTimestamp: 0,
             text: 'Minimal event',
             duration: { total: 0, self: 0 },
-          }) as unknown as LogEvent,
+          }) as unknown as ApexEvent,
       ],
       ['zero duration', () => tooltipEvent(0, 0)],
     ])('should show an event with %s', (_name, make) => {

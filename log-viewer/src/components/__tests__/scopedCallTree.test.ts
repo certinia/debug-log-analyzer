@@ -1,97 +1,13 @@
 /*
  * Copyright (c) 2026 Certinia Inc. All rights reserved.
  */
-import { beforeEach, describe, expect, it } from '@jest/globals';
+import { describe, expect, it } from '@jest/globals';
+import type { ApexLog } from '@apexdevtools/apex-log-parser';
 
-interface FakeEvent {
-  eventIndex: number;
-  type: string;
-  text: string;
-  namespace: string;
-  isParent: boolean;
-  duration: { total: number; self: number };
-  /** Only a tree following a window reads where a frame ran. */
-  timestamp?: number;
-  exitStamp?: number | null;
-  parent: FakeEvent | null;
-  children: FakeEvent[];
-}
-
-function timedFrame(
-  eventIndex: number,
-  type: string,
-  text: string,
-  duration: { total: number; self: number },
-  // The parser only descends into parent lines, so every ancestor is one.
-  isParent = true,
-): FakeEvent {
-  return {
-    eventIndex,
-    type,
-    text,
-    namespace: '',
-    isParent,
-    duration,
-    parent: null,
-    children: [],
-  };
-}
-
-// exec → m1 → m2 → soql (200ms leaf), no branches.
-const root = timedFrame(0, 'ROOT', 'root', { total: 500, self: 0 });
-const exec = timedFrame(1, 'CODE_UNIT_STARTED', 'exec', { total: 500, self: 0 });
-const m1 = timedFrame(2, 'METHOD_ENTRY', 'm1', { total: 500, self: 0 });
-const m2 = timedFrame(3, 'METHOD_ENTRY', 'm2', { total: 500, self: 0 });
-const soql = timedFrame(4, 'SOQL_EXECUTE_BEGIN', 'SELECT Id FROM Account', {
-  total: 200,
-  self: 200,
-});
-root.children = [exec];
-exec.parent = root;
-exec.children = [m1];
-m1.parent = exec;
-m1.children = [m2];
-m2.parent = m1;
-m2.children = [soql];
-soql.parent = m2;
-
-const BASE_FRAMES = [exec, m1, m2, soql];
-const byId = new Map<number, FakeEvent>();
-
-let selectedIndex = 4;
-const { KeyPathIds } = jest.requireActual<typeof import('../../core/log/keyPathIds.js')>(
-  '../../core/log/keyPathIds.js',
-);
-// One table per log in production. The fixtures below reuse event indexes for
-// different frames, so each test gets its own rather than one frame's key being
-// read back for another.
-let paths = new KeyPathIds(1024);
-const { LogStore } = jest.requireActual<typeof import('../../core/log/LogStore.js')>(
-  '../../core/log/LogStore.js',
-);
-jest.mock('../../core/log/LogStore.js', () => ({
-  currentLogStore: () => {
-    const store = {
-      log: root,
-      keyPathIds: () => paths,
-      eventByIndex: (i: number) => byId.get(i) ?? null,
-      // Mirrors LogStore.stackByEventIndex over the fixture's own index.
-      stackByEventIndex: (i: number) => {
-        const stack: FakeEvent[] = [];
-        for (let node = byId.get(i) ?? null; node && node !== root; node = node.parent) {
-          if (node.isParent) {
-            stack.push(node);
-          }
-        }
-        return stack.reverse();
-      },
-    };
-    // The real climb, so what it answers about the fixture is under test rather
-    // than a second copy of it. It reads only `eventByIndex`.
-    return { ...store, framesAbove: LogStore.prototype.framesAbove.bind(store) };
-  },
-}));
-
+import { indexesOf, rawStoreOf } from '#test-helpers/apexLog.js';
+import { setCurrentLog } from '#core/log/LogStore.js';
+import { CallSpans } from '#core/log/windowedTime.js';
+import type { FrameBudgetOptions } from '#core/utility/FrameBudget.js';
 import {
   buildScopedCallTree,
   buildWholeLogCallTree,
@@ -102,46 +18,121 @@ import {
   type LiveWindow,
   type ScopedRow,
 } from '../scopedCallTree.js';
-import { CallSpans } from '../../core/log/windowedTime.js';
-import type { FrameBudgetOptions } from '../../core/utility/FrameBudget.js';
+
+/** A line or block of a test log, opened at `start` and closed at `end`. */
+interface Span {
+  open: string;
+  /** Absent for a line with no end of its own. */
+  close?: string;
+  start: number;
+  end: number;
+  children: Span[];
+}
+
+const QUERY = 'SELECT Id FROM Account';
+
+const method = (text: string, start: number, end: number, ...children: Span[]): Span => ({
+  open: `METHOD_ENTRY|[1]|01p|${text}`,
+  close: `METHOD_EXIT|[1]|${text}`,
+  start,
+  end,
+  children,
+});
+const unit = (text: string, start: number, end: number, ...children: Span[]): Span => ({
+  open: `CODE_UNIT_STARTED|[EXTERNAL]|01q|${text}`,
+  close: `CODE_UNIT_FINISHED|${text}`,
+  start,
+  end,
+  children,
+});
+const query = (start: number, end: number): Span => ({
+  open: `SOQL_EXECUTE_BEGIN|[1]|Aggregations:0|${QUERY}`,
+  close: 'SOQL_EXECUTE_END|[1]|Rows:1',
+  start,
+  end,
+  children: [],
+});
+const line = (at: number, text: string): Span => ({ open: text, start: at, end: at, children: [] });
+const limitBlock = (start: number, end: number): Span => ({
+  open: 'CUMULATIVE_LIMIT_USAGE',
+  close: 'CUMULATIVE_LIMIT_USAGE_END',
+  start,
+  end,
+  children: [line(start, 'LIMIT_USAGE_FOR_NS|(default)|')],
+});
+
+function logText(spans: readonly Span[]): string {
+  const lines: string[] = [];
+  const write = (span: Span): void => {
+    lines.push(`09:18:22.6 (${span.start})|${span.open}\n`);
+    span.children.forEach(write);
+    if (span.close) {
+      lines.push(`09:18:22.6 (${span.end})|${span.close}\n`);
+    }
+  };
+  spans.forEach(write);
+  return lines.join('');
+}
+
+/** Parses `spans` and makes the log the one on screen, which the builders read. */
+async function load(...spans: Span[]): Promise<ApexLog> {
+  const { log, store } = await rawStoreOf(logText(spans));
+  setCurrentLog(store);
+  return log;
+}
+
+/** The id of the `nth` frame with `text`. */
+function frame(log: ApexLog, text: string, nth = 0): number {
+  const id = indexesOf(log, text)[nth];
+  if (id === undefined) {
+    throw new Error(`no frame ${text} #${nth}`);
+  }
+  return id;
+}
+
+/** The id of the first event of `type`. */
+function ofType(log: ApexLog, type: string): number {
+  for (let id = 1; id <= log.eventCount; id++) {
+    if (log.event(id)?.type === type) {
+      return id;
+    }
+  }
+  throw new Error(`no ${type}`);
+}
+
+/** The ids of the events directly under `parent`. */
+function childIds(log: ApexLog, parent: number): number[] {
+  const ids: number[] = [];
+  for (let id = 1; id <= log.eventCount; id++) {
+    if (log.columns.parent[id] === parent) {
+      ids.push(id);
+    }
+  }
+  return ids;
+}
+
+// exec → m1 → m2 → query, no branches; the query spends all 500 ns.
+const chain = (): Span[] => [
+  unit('exec', 0, 500, method('m1', 0, 500, method('m2', 0, 500, query(0, 500)))),
+];
 
 /** These fixtures are small enough to never hit a slice deadline, so `yieldSlice`
  *  is only there to satisfy the contract. */
 const options: FrameBudgetOptions = { yieldSlice: () => Promise.resolve() };
 
-// Tests add frames under ids other tests reuse, so each starts from the base log.
-beforeEach(() => {
-  paths = new KeyPathIds(1024);
-  byId.clear();
-  for (const frame of BASE_FRAMES) {
-    byId.set(frame.eventIndex, frame);
-  }
-});
-
 function build(eventIndex: number, instances?: number[]) {
   return buildScopedCallTree(eventIndex, instances ?? null, options);
 }
 
-/** A statement called from a loop: `count` occurrences of the same frame, each
- *  with its own small subtree. Returns their eventIndexes. */
-function loopOccurrences(count: number): number[] {
-  const loop = timedFrame(300, 'METHOD_ENTRY', 'loop', { total: count, self: 0 });
-  loop.parent = root;
-  byId.set(loop.eventIndex, loop);
-
-  const instances: number[] = [];
-  let nextId = 301;
-  for (let i = 0; i < count; i++) {
-    const call = timedFrame(nextId++, 'SOQL_EXECUTE_BEGIN', 'SELECT Id FROM Account', {
-      total: 1,
-      self: 1,
-    });
-    call.parent = loop;
-    loop.children.push(call);
-    byId.set(call.eventIndex, call);
-    instances.push(call.eventIndex);
-  }
-  return instances;
+/** A statement called from a loop after the chain: `count` occurrences of the
+ *  same frame, 1 ns each. */
+async function loopLog(
+  count: number,
+): Promise<{ log: ApexLog; loop: number; instances: number[] }> {
+  const calls = Array.from({ length: count }, (_, i) => query(1000 + i, 1001 + i));
+  const log = await load(...chain(), method('loop', 1000, 1000 + count, ...calls));
+  const loop = frame(log, 'loop');
+  return { log, loop, instances: childIds(log, loop) };
 }
 
 /** Every row's type, whole tree. */
@@ -149,57 +140,46 @@ function types(rows: readonly ScopedRow[]): string[] {
   return rows.flatMap((row) => [row.type, ...types(row._children ?? [])]);
 }
 
-/** A limit block under m2, with the limit line it holds. Undone by the caller. */
-function limitBlockUnderM2(): () => void {
-  const block = timedFrame(400, 'CUMULATIVE_LIMIT_USAGE', 'LIMIT_USAGE', { total: 3, self: 3 });
-  const line = timedFrame(401, 'LIMIT_USAGE_FOR_NS', '(default)', { total: 0, self: 0 }, false);
-  block.parent = m2;
-  block.children = [line];
-  line.parent = block;
-  m2.children.push(block);
-  byId.set(block.eventIndex, block);
-  byId.set(line.eventIndex, line);
-  return () => {
-    m2.children.pop();
-    byId.delete(block.eventIndex);
-    byId.delete(line.eventIndex);
-  };
+/** The rows from the first root down the first child of each. */
+function firstChain(rows: readonly ScopedRow[]): ScopedRow[] {
+  const found: ScopedRow[] = [];
+  for (let node = rows[0]; node; node = node._children?.[0]) {
+    found.push(node);
+  }
+  return found;
 }
 
 describe('buildScopedCallTree', () => {
   it('returns null when nothing is selected', async () => {
+    await load(...chain());
+
     expect(await build(-1)).toBeNull();
   });
 
   it('time-order: the selection sits under its callers, rooted at the log', async () => {
-    selectedIndex = 3;
-    const tree = (await build(selectedIndex))!;
+    const log = await load(...chain());
+    const tree = (await build(frame(log, 'm2')))!;
     expect(tree.rootTotal).toBe(500);
 
-    const chain: ScopedRow[] = [];
-    let node: ScopedRow | undefined = (await tree.timeOrder(options))![0];
-    while (node) {
-      chain.push(node);
-      node = node._children?.[0];
-    }
-    expect(chain.map((r) => r.text)).toEqual(['exec', 'm1', 'm2', 'SELECT Id FROM Account']);
+    const rows = firstChain((await tree.timeOrder(options))!);
+    expect(rows.map((r) => r.text)).toEqual(['exec', 'm1', 'm2', QUERY]);
     // A caller holds the time that reached the selection through it, and none of
     // it is its own work, so the tree reads 100% from the top down to m2.
-    expect(chain[0]?.duration).toEqual({ total: 500, self: 0 });
-    expect(chain[1]?.duration).toEqual({ total: 500, self: 0 });
+    expect(rows[0]?.duration).toEqual({ total: 500, self: 0 });
+    expect(rows[1]?.duration).toEqual({ total: 500, self: 0 });
     // The selection and what ran inside it keep their real durations.
-    expect(chain[2]?.duration).toEqual({ total: 500, self: 0 });
-    expect(chain[3]?.duration).toEqual({ total: 200, self: 200 });
+    expect(rows[2]?.duration).toEqual({ total: 500, self: 0 });
+    expect(rows[3]?.duration).toEqual({ total: 500, self: 500 });
     // The path opens itself, so the selection is on screen; its subtree does not.
-    expect(chain.map((r) => r.onPath)).toEqual([true, true, undefined, undefined]);
+    expect(rows.map((r) => r.onPath)).toEqual([true, true, undefined, undefined]);
   });
 
   it('bottom-up: a selected leaf is the whole view, with nothing above it', async () => {
-    const tree = (await build(4))!;
-    const rows = (await tree.bottomUp(options))!;
+    const log = await load(...chain());
+    const rows = (await (await build(frame(log, QUERY)))!.bottomUp(options))!;
 
-    expect(rows.map((r) => r.text)).toEqual(['SELECT Id FROM Account']);
-    expect(rows[0]?.duration.self).toBe(200);
+    expect(rows.map((r) => r.text)).toEqual([QUERY]);
+    expect(rows[0]?.duration.self).toBe(500);
     // Its real callers are outside the scope, so the row stands alone.
     expect(rows[0]?._children).toBeNull();
   });
@@ -209,11 +189,11 @@ describe('buildScopedCallTree', () => {
     // So the statement heads the view and m2 reads as its caller, and m2's own row
     // comes last. exec and m1 lead to the selection but ran nothing inside it, so
     // bottom-up leaves them out.
-    const tree = (await build(3))!;
-    const rows = (await tree.bottomUp(options))!;
+    const log = await load(...chain());
+    const rows = (await (await build(frame(log, 'm2')))!.bottomUp(options))!;
 
-    expect(rows.map((row) => row.text)).toEqual(['SELECT Id FROM Account', 'm2']);
-    expect(rows[0]?.duration).toEqual({ total: 200, self: 200 });
+    expect(rows.map((row) => row.text)).toEqual([QUERY, 'm2']);
+    expect(rows[0]?.duration).toEqual({ total: 500, self: 500 });
     expect(rows[0]?._children?.map((row) => row.text)).toEqual(['m2']);
     // Every caller counts the call it contributed, never zero.
     expect([rows[0]?.callCount, rows[0]?._children?.[0]?.callCount]).toEqual([1, 1]);
@@ -222,19 +202,20 @@ describe('buildScopedCallTree', () => {
 
   // A time-based prune dropped the frame that took no time along with the details.
   it('drops details, keeping a frame that took no time', async () => {
-    const scope = timedFrame(200, 'METHOD_ENTRY', 'scope', { total: 50, self: 0 });
-    const heap = timedFrame(201, 'HEAP_ALLOCATE', 'Bytes:8', { total: 0, self: 0 }, false);
-    const statement = timedFrame(202, 'STATEMENT_EXECUTE', '[12]', { total: 0, self: 0 }, false);
-    const instant = timedFrame(203, 'METHOD_ENTRY', 'instant', { total: 0, self: 0 });
-    const timed = timedFrame(204, 'METHOD_ENTRY', 'timed', { total: 50, self: 50 });
-    scope.parent = root;
-    scope.children = [heap, statement, instant, timed];
-    for (const child of scope.children) {
-      child.parent = scope;
-    }
-    byId.set(scope.eventIndex, scope);
+    const log = await load(
+      ...chain(),
+      method(
+        'scope',
+        1000,
+        1050,
+        line(1000, 'HEAP_ALLOCATE|[12]|Bytes:8'),
+        line(1000, 'STATEMENT_EXECUTE|[12]'),
+        method('instant', 1000, 1000),
+        method('timed', 1000, 1050),
+      ),
+    );
 
-    const tree = (await build(scope.eventIndex))!;
+    const tree = (await build(frame(log, 'scope')))!;
     const selected = (await tree.timeOrder(options))![0]!;
     expect(selected._children!.map((row) => row.text)).toEqual(['instant', 'timed']);
     // The dropped rows are not counted either, so the Calls total matches the rows.
@@ -242,7 +223,8 @@ describe('buildScopedCallTree', () => {
   });
 
   it('counts every call the scope holds, so each view totals the same', async () => {
-    const tree = (await build(3))!;
+    const log = await load(...chain());
+    const tree = (await build(frame(log, 'm2')))!;
     const calls = (rows: ScopedRow[]): number => {
       let total = 0;
       const stack = [...rows];
@@ -270,11 +252,12 @@ describe('buildScopedCallTree', () => {
 
   // Bottom-Up seeds only frames, so a selected detail left it empty.
   it('keeps a selected detail in every view, and counts it as the one call', async () => {
-    const scope = timedFrame(210, 'VARIABLE_SCOPE_BEGIN', 'scope', { total: 0, self: 0 }, false);
-    scope.parent = root;
-    byId.set(scope.eventIndex, scope);
+    const log = await load(
+      ...chain(),
+      line(1000, 'VARIABLE_SCOPE_BEGIN|[12]|x|String|false|false'),
+    );
 
-    const tree = (await build(scope.eventIndex))!;
+    const tree = (await build(ofType(log, 'VARIABLE_SCOPE_BEGIN')))!;
     for (const view of ['timeOrder', 'aggregated', 'bottomUp'] as const) {
       expect(types((await tree[view](options))!)).toContain('VARIABLE_SCOPE_BEGIN');
     }
@@ -282,19 +265,15 @@ describe('buildScopedCallTree', () => {
   });
 
   it('aggregated: linear path stays one node per frame', async () => {
-    const tree = (await build(3))!;
-    const texts: string[] = [];
-    let node: ScopedRow | undefined = (await tree.aggregated(options))![0];
-    while (node) {
-      texts.push(node.text);
-      expect(node.callCount).toBe(1);
-      node = node._children?.[0];
-    }
-    expect(texts).toEqual(['exec', 'm1', 'm2', 'SELECT Id FROM Account']);
+    const log = await load(...chain());
+    const rows = firstChain((await (await build(frame(log, 'm2')))!.aggregated(options))!);
+
+    expect(rows.map((row) => row.text)).toEqual(['exec', 'm1', 'm2', QUERY]);
+    expect(rows.map((row) => row.callCount)).toEqual([1, 1, 1, 1]);
   });
 
   it('merges one caller for every occurrence it made', async () => {
-    const instances = loopOccurrences(4);
+    const { instances } = await loopLog(4);
     const tree = (await build(instances[0]!, instances))!;
 
     const roots = (await tree.timeOrder(options))!;
@@ -310,7 +289,7 @@ describe('buildScopedCallTree', () => {
     // #877's removal note). No cap exists any more, so every occurrence must
     // still be represented.
     const OCCURRENCES = 500;
-    const instances = loopOccurrences(OCCURRENCES);
+    const { instances } = await loopLog(OCCURRENCES);
 
     const tree = (await build(instances[0]!, instances))!;
     expect(tree.rootTotal).toBe(OCCURRENCES);
@@ -330,15 +309,10 @@ describe('buildScopedCallTree', () => {
   it('an aggregate of nested occurrences counts each one once', async () => {
     // A recursive frame: the outer call already holds the inner one, so taking
     // both as roots would walk the inner call twice.
-    const outer = timedFrame(400, 'METHOD_ENTRY', 'rec', { total: 10, self: 4 });
-    const inner = timedFrame(401, 'METHOD_ENTRY', 'rec', { total: 6, self: 6 });
-    outer.parent = root;
-    outer.children = [inner];
-    inner.parent = outer;
-    byId.set(outer.eventIndex, outer);
-    byId.set(inner.eventIndex, inner);
+    const log = await load(...chain(), method('rec', 2000, 2010, method('rec', 2004, 2010)));
+    const [outer, inner] = indexesOf(log, 'rec') as [number, number];
 
-    const tree = (await build(outer.eventIndex, [outer.eventIndex, inner.eventIndex]))!;
+    const tree = (await build(outer, [outer, inner]))!;
     // The outer call's 10, not 16.
     expect(tree.rootTotal).toBe(10);
 
@@ -352,17 +326,12 @@ describe('buildScopedCallTree', () => {
   it('bottom-up: a recursive frame counts the time it shares with itself once', async () => {
     // rec → work → rec. The outer call's 10 already holds the inner call's 6, so
     // the row reads 10 and not 16, while both calls' self time is its own.
-    const outer = timedFrame(500, 'METHOD_ENTRY', 'rec', { total: 10, self: 1 });
-    const work = timedFrame(501, 'METHOD_ENTRY', 'work', { total: 9, self: 3 });
-    const inner = timedFrame(502, 'METHOD_ENTRY', 'rec', { total: 6, self: 6 });
-    outer.parent = root;
-    outer.children = [work];
-    work.parent = outer;
-    work.children = [inner];
-    inner.parent = work;
-    byId.set(outer.eventIndex, outer);
+    const log = await load(
+      ...chain(),
+      method('rec', 2000, 2010, method('work', 2001, 2010, method('rec', 2004, 2010))),
+    );
 
-    const rows = (await (await build(outer.eventIndex))!.bottomUp(options))!;
+    const rows = (await (await build(frame(log, 'rec')))!.bottomUp(options))!;
 
     expect(
       rows.map((row) => [row.text, row.duration.total, row.duration.self, row.callCount]),
@@ -376,33 +345,28 @@ describe('buildScopedCallTree', () => {
     // A code unit that calls itself as a method entry: the Call Tree tab treats
     // the two as one method, so the inner call's 6 comes off the outer call's 10
     // here too, leaving 4 + 6 rather than 10 + 6.
-    const outer = timedFrame(510, 'CODE_UNIT_STARTED', 'rec', { total: 10, self: 1 });
-    const inner = timedFrame(511, 'METHOD_ENTRY', 'rec', { total: 6, self: 6 });
-    outer.parent = root;
-    outer.children = [inner];
-    inner.parent = outer;
-    byId.set(outer.eventIndex, outer);
+    const log = await load(...chain(), unit('rec', 2000, 2010, method('rec', 2004, 2010)));
 
-    const tree = (await build(outer.eventIndex))!;
+    const tree = (await build(frame(log, 'rec')))!;
     const rows = (await tree.bottomUp(options))!;
 
     expect(rows.map((row) => [row.type, row.duration.total, row.duration.self])).toEqual([
       ['METHOD_ENTRY', 6, 6],
-      ['CODE_UNIT_STARTED', 4, 1],
+      ['CODE_UNIT_STARTED', 4, 4],
     ]);
     // The two rows hold the outer call's time once between them.
     expect(rows.reduce((sum, row) => sum + row.duration.total, 0)).toBe(tree.rootTotal);
   });
 
   it('a merged row names every occurrence behind it, so all of them can be marked', async () => {
-    const instances = loopOccurrences(3);
+    const { loop, instances } = await loopLog(3);
     // The loop, so its three calls merge into one row inside the scope.
-    const tree = (await build(300))!;
+    const tree = (await build(loop))!;
 
     const [aggregated] = (await tree.aggregated(options))!;
     // The selection names its own one frame; the group beneath it merges all
     // three occurrences.
-    expect(aggregated?.eventIndexes).toEqual([300]);
+    expect(aggregated?.eventIndexes).toEqual([loop]);
     expect(aggregated?._children?.[0]?.eventIndexes).toEqual(instances);
 
     const [bottomUp] = (await tree.bottomUp(options))!;
@@ -413,14 +377,15 @@ describe('buildScopedCallTree', () => {
   });
 
   it('a single-frame row carries no list — its one occurrence is the row itself', async () => {
-    const tree = (await build(4))!;
-    const [selected] = (await tree.timeOrder(options))!;
+    const log = await load(...chain());
+    const [selected] = (await (await build(frame(log, QUERY)))!.timeOrder(options))!;
+
     expect(selected?.eventIndexes).toBeNull();
   });
 
   it('counts every occurrence even when the walk is sliced across frames', async () => {
     const OCCURRENCES = 50;
-    const instances = loopOccurrences(OCCURRENCES);
+    const { instances } = await loopLog(OCCURRENCES);
     let yields = 0;
     const sliced: FrameBudgetOptions = {
       yieldSlice: () => {
@@ -446,7 +411,7 @@ describe('buildScopedCallTree', () => {
   });
 
   it('abandons a superseded walk instead of finishing it', async () => {
-    const instances = loopOccurrences(500);
+    const { instances } = await loopLog(500);
     const clock = jest.spyOn(performance, 'now');
     let time = 0;
     clock.mockImplementation(() => (time += 100));
@@ -463,18 +428,10 @@ describe('buildScopedCallTree', () => {
   });
 
   it('materialises every child rather than capping the subtree', async () => {
-    const big = timedFrame(100, 'METHOD_ENTRY', 'big', { total: 100, self: 0 });
-    big.parent = root;
-    big.children = Array.from({ length: 5 }, (_unused, i) =>
-      timedFrame(1_000 + i, 'METHOD_ENTRY', `kid${i}`, { total: 1, self: 1 }),
-    );
-    for (const kid of big.children) {
-      kid.parent = big;
-    }
-    byId.set(big.eventIndex, big);
+    const kids = Array.from({ length: 5 }, (_, i) => method(`kid${i}`, 3000 + i, 3001 + i));
+    const log = await load(...chain(), method('big', 3000, 3005, ...kids));
 
-    const tree = (await build(big.eventIndex))!;
-    const rows = (await tree.timeOrder(options))!;
+    const rows = (await (await build(frame(log, 'big')))!.timeOrder(options))!;
     expect(rows[0]!.text).toBe('big');
     // Every child is present — expansion is the renderer's job, not a build-time cap.
     expect(rows[0]!._children!.length).toBe(5);
@@ -483,24 +440,21 @@ describe('buildScopedCallTree', () => {
 
 describe('buildWholeLogCallTree', () => {
   it('roots the tree at the log with real durations — nothing scoped or attributed', async () => {
+    await load(...chain());
     const tree = (await buildWholeLogCallTree(options))!;
     // The whole log is both the scope and the bar denominator.
     expect(tree.rootTotal).toBe(500);
     expect(tree.logTotal).toBe(500);
 
-    const chain: ScopedRow[] = [];
-    let node: ScopedRow | undefined = (await tree.timeOrder(options))![0];
-    while (node) {
-      chain.push(node);
-      node = node._children?.[0];
-    }
-    expect(chain.map((r) => r.text)).toEqual(['exec', 'm1', 'm2', 'SELECT Id FROM Account']);
+    const rows = firstChain((await tree.timeOrder(options))!);
+    expect(rows.map((r) => r.text)).toEqual(['exec', 'm1', 'm2', QUERY]);
     // Real durations throughout — the scoped builder would have rewritten these.
-    expect(chain[0]?.duration).toEqual({ total: 500, self: 0 });
-    expect(chain[3]?.duration).toEqual({ total: 200, self: 200 });
+    expect(rows[0]?.duration).toEqual({ total: 500, self: 0 });
+    expect(rows[3]?.duration).toEqual({ total: 500, self: 500 });
   });
 
   it('abandons a cancelled build instead of finishing it', async () => {
+    await load(...chain());
     const clock = jest.spyOn(performance, 'now');
     let time = 0;
     clock.mockImplementation(() => (time += 100));
@@ -514,86 +468,38 @@ describe('buildWholeLogCallTree', () => {
       clock.mockRestore();
     }
   });
-  it('leaves out a top-level detail, as the Inspector does for any row', async () => {
-    const userInfo = timedFrame(600, 'USER_INFO', '005Ea00000R6orz', { total: 0, self: 0 }, false);
-    userInfo.parent = root;
-    root.children.unshift(userInfo);
-    byId.set(userInfo.eventIndex, userInfo);
-    try {
-      const tree = (await buildWholeLogCallTree(options))!;
 
-      expect((await tree.timeOrder(options))!.map((row) => row.type)).toEqual([
-        'CODE_UNIT_STARTED',
-      ]);
-      // The four frames under `exec`; the detail is no call.
-      expect(tree.calls).toBe(4);
-    } finally {
-      root.children.shift();
-      byId.delete(userInfo.eventIndex);
-    }
+  it('leaves out a top-level detail, as the Inspector does for any row', async () => {
+    await load(
+      line(0, 'USER_INFO|[EXTERNAL]|005Ea00000R6orz|x@y.com|(GMT+00:00)|GMT+00:00'),
+      ...chain(),
+    );
+    const tree = (await buildWholeLogCallTree(options))!;
+
+    expect((await tree.timeOrder(options))!.map((row) => row.type)).toEqual(['CODE_UNIT_STARTED']);
+    // The four frames under `exec`; the detail is no call.
+    expect(tree.calls).toBe(4);
   });
 
   it('keeps a profiling block the log left at the top level, outside Bottom-Up', async () => {
-    const profiling = timedFrame(500, 'CUMULATIVE_PROFILING_BEGIN', 'profiling', {
-      total: 2,
-      self: 2,
+    // It follows EXECUTION_FINISHED, so it is a root rather than a descendant.
+    await load(...chain(), {
+      open: 'CUMULATIVE_PROFILING_BEGIN',
+      close: 'CUMULATIVE_PROFILING_END',
+      start: 600,
+      end: 602,
+      children: [],
     });
-    profiling.parent = root;
-    root.children.push(profiling);
-    byId.set(profiling.eventIndex, profiling);
-    try {
-      // It follows EXECUTION_FINISHED, so it is a root rather than a descendant.
-      const tree = (await buildWholeLogCallTree(options))!;
+    const tree = (await buildWholeLogCallTree(options))!;
 
-      expect(types((await tree.timeOrder(options))!)).toContain('CUMULATIVE_PROFILING_BEGIN');
-      expect(types((await tree.bottomUp(options))!)).not.toContain('CUMULATIVE_PROFILING_BEGIN');
-      // The four frames under `exec`; a block is a row, not a call.
-      expect(tree.calls).toBe(4);
-    } finally {
-      root.children.pop();
-      byId.delete(profiling.eventIndex);
-    }
+    expect(types((await tree.timeOrder(options))!)).toContain('CUMULATIVE_PROFILING_BEGIN');
+    expect(types((await tree.bottomUp(options))!)).not.toContain('CUMULATIVE_PROFILING_BEGIN');
+    // The four frames under `exec`; a block is a row, not a call.
+    expect(tree.calls).toBe(4);
   });
 });
 
 describe('liveWindow', () => {
-  /** A frame that ran from `timestamp` to `exitStamp` over `children`, findable by index. */
-  function ranFrame(
-    eventIndex: number,
-    text: string,
-    timestamp: number,
-    exitStamp: number,
-    children: FakeEvent[] = [],
-  ): FakeEvent {
-    const total = exitStamp - timestamp;
-    const inner = children.reduce((sum, child) => sum + child.duration.total, 0);
-    const frame = timedFrame(eventIndex, 'METHOD_ENTRY', text, { total, self: total - inner });
-    frame.timestamp = timestamp;
-    frame.exitStamp = exitStamp;
-    frame.children = children;
-    for (const child of children) {
-      child.parent = frame;
-    }
-    byId.set(eventIndex, frame);
-    return frame;
-  }
-
-  /** Runs `body` against a log of `children` that spans 0 to 1,000. */
-  async function withLog(children: FakeEvent[], body: () => Promise<void>): Promise<void> {
-    const held = { children: root.children, timestamp: root.timestamp, exitStamp: root.exitStamp };
-    root.children = children;
-    root.timestamp = 0;
-    root.exitStamp = 1_000;
-    for (const child of children) {
-      child.parent = root;
-    }
-    try {
-      await body();
-    } finally {
-      Object.assign(root, held);
-    }
-  }
-
   /** Admits every row, as a table filtering its whole tree would, and keeps those
    *  admitted as [text, total, self, calls]. */
   function admitted(
@@ -616,212 +522,212 @@ describe('liveWindow', () => {
   }
 
   // outer 0..1000 calls m twice: 100..300 and 600..900.
-  const twoCalls = () => [
-    ranFrame(600, 'outer', 0, 1_000, [ranFrame(601, 'm', 100, 300), ranFrame(602, 'm', 600, 900)]),
+  const twoCalls = (): Span[] => [
+    method('outer', 0, 1_000, method('m', 100, 300), method('m', 600, 900)),
   ];
 
   it('cuts each Time Order row to the window, and leaves out the rows outside it', async () => {
-    await withLog(twoCalls(), async () => {
-      const tree = (await buildWholeLogCallTree(options))!;
-      const live = tree.liveWindow!();
-      const rows = (await tree.timeOrder(options))!;
-      await live.prepare(rows, options);
+    await load(...twoCalls());
+    const tree = (await buildWholeLogCallTree(options))!;
+    const live = tree.liveWindow!();
+    const rows = (await tree.timeOrder(options))!;
+    await live.prepare(rows, options);
 
-      expect(live.set({ start: 200, end: 500 })).toEqual({
-        rootTotal: 300,
-        calls: 2,
-        self: 300,
-        frameSelf: 300,
-      });
-      expect(admitted(live, rows)).toEqual([
-        ['outer', 300, 200, 1],
-        ['m', 100, 100, 1],
-      ]);
+    expect(live.set({ start: 200, end: 500 })).toEqual({
+      rootTotal: 300,
+      calls: 2,
+      self: 300,
+      frameSelf: 300,
     });
+    expect(admitted(live, rows)).toEqual([
+      ['outer', 300, 200, 1],
+      ['m', 100, 100, 1],
+    ]);
   });
 
   it('sums the calls an Aggregated row merges, inside the window only', async () => {
-    await withLog(twoCalls(), async () => {
-      const tree = (await buildWholeLogCallTree(options))!;
-      const live = tree.liveWindow!();
-      const rows = (await tree.aggregated(options))!;
+    await load(...twoCalls());
+    const tree = (await buildWholeLogCallTree(options))!;
+    const live = tree.liveWindow!();
+    const rows = (await tree.aggregated(options))!;
 
-      live.set({ start: 200, end: 700 });
+    live.set({ start: 200, end: 700 });
 
-      expect(admitted(live, rows)).toEqual([
-        ['outer', 500, 300, 1],
-        ['m', 200, 200, 2],
-      ]);
-    });
+    expect(admitted(live, rows)).toEqual([
+      ['outer', 500, 300, 1],
+      ['m', 200, 200, 2],
+    ]);
   });
 
   // a calls itself: the inner call's time is counted once, through the inner call.
   it('counts a recursive frame once in Bottom-Up, inside the window', async () => {
-    const inner = ranFrame(611, 'a', 400, 500);
-    await withLog([ranFrame(610, 'a', 0, 1_000, [inner])], async () => {
-      const tree = (await buildWholeLogCallTree(options))!;
-      const live = tree.liveWindow!();
-      const rows = (await tree.bottomUp(options))!;
+    await load(method('a', 0, 1_000, method('a', 400, 500)));
+    const tree = (await buildWholeLogCallTree(options))!;
+    const live = tree.liveWindow!();
+    const rows = (await tree.bottomUp(options))!;
 
-      live.set({ start: 450, end: 1_000 });
+    live.set({ start: 450, end: 1_000 });
 
-      // All 550 of the window is a's: 500 as the outer call, 50 as the inner,
-      // which the outer call is the caller of.
-      expect(admitted(live, rows)).toEqual([
-        ['a', 550, 550, 2],
-        ['a', 50, 0, 1],
-      ]);
-    });
+    // All 550 of the window is a's: 500 as the outer call, 50 as the inner,
+    // which the outer call is the caller of.
+    expect(admitted(live, rows)).toEqual([
+      ['a', 550, 550, 2],
+      ['a', 50, 0, 1],
+    ]);
   });
 
   it('reads a caller row as a route to its seed, with no time of its own', async () => {
-    await withLog(twoCalls(), async () => {
-      const tree = (await buildWholeLogCallTree(options))!;
-      const live = tree.liveWindow!();
-      const rows = (await tree.bottomUp(options))!;
+    await load(...twoCalls());
+    const tree = (await buildWholeLogCallTree(options))!;
+    const live = tree.liveWindow!();
+    const rows = (await tree.bottomUp(options))!;
 
-      live.set({ start: 200, end: 700 });
+    live.set({ start: 200, end: 700 });
 
-      // In the whole log's ranking: the two tie on self time.
-      expect(admitted(live, rows)).toEqual([
-        ['m', 200, 200, 2],
-        ['outer', 200, 0, 2],
-        ['outer', 500, 300, 1],
-      ]);
-    });
+    // In the whole log's ranking: the two tie on self time.
+    expect(admitted(live, rows)).toEqual([
+      ['m', 200, 200, 2],
+      ['outer', 200, 0, 2],
+      ['outer', 500, 300, 1],
+    ]);
   });
 
   describe('a row of many calls', () => {
-    const manyCalls = () => [
-      ranFrame(
-        699,
+    const manyCalls = (): Span[] => [
+      method(
         'outer',
         0,
         1_000,
-        Array.from({ length: 300 }, (_, i) => ranFrame(700 + i, 'm', i * 3, i * 3 + 2)),
+        ...Array.from({ length: 300 }, (_, i) => method('m', i * 3, i * 3 + 2)),
       ),
     ];
 
     it('is read at once while the filter pass has time', async () => {
-      await withLog(manyCalls(), async () => {
-        const tree = (await buildWholeLogCallTree(options))!;
-        const live = tree.liveWindow!();
-        const hot = (await tree.aggregated(options))![0]!._children![0]!;
-        live.set({ start: 0, end: 30 });
+      await load(...manyCalls());
+      const tree = (await buildWholeLogCallTree(options))!;
+      const live = tree.liveWindow!();
+      const hot = (await tree.aggregated(options))![0]!._children![0]!;
+      live.set({ start: 0, end: 30 });
 
-        expect(live.admit(hot)).toBe(true);
-        expect(hot.callCount).toBe(10);
-        expect(live.waiting()).toEqual([]);
-      });
+      expect(live.admit(hot)).toBe(true);
+      expect(hot.callCount).toBe(10);
+      expect(live.waiting()).toEqual([]);
     });
 
     it('is left for prepare once the filter pass has spent its time', async () => {
-      await withLog(manyCalls(), async () => {
-        const tree = (await buildWholeLogCallTree(options))!;
-        const live = tree.liveWindow!();
-        const hot = (await tree.aggregated(options))![0]!._children![0]!;
-        live.set({ start: 0, end: 30 });
-        let clock = 0;
-        const now = jest.spyOn(performance, 'now').mockImplementation(() => (clock += 100));
-        try {
-          expect(live.admit(hot)).toBe(true);
-        } finally {
-          now.mockRestore();
-        }
-
-        expect(hot.callCount).toBe(300);
-        expect(live.waiting()).toEqual([hot]);
-        expect(live.waiting()).toEqual([]);
-
-        await live.prepare([hot], options);
+      await load(...manyCalls());
+      const tree = (await buildWholeLogCallTree(options))!;
+      const live = tree.liveWindow!();
+      const hot = (await tree.aggregated(options))![0]!._children![0]!;
+      live.set({ start: 0, end: 30 });
+      let clock = 0;
+      const now = jest.spyOn(performance, 'now').mockImplementation(() => (clock += 100));
+      try {
         expect(live.admit(hot)).toBe(true);
-        expect(hot.callCount).toBe(10);
-      });
+      } finally {
+        now.mockRestore();
+      }
+
+      expect(hot.callCount).toBe(300);
+      expect(live.waiting()).toEqual([hot]);
+      expect(live.waiting()).toEqual([]);
+
+      await live.prepare([hot], options);
+      expect(live.admit(hot)).toBe(true);
+      expect(hot.callCount).toBe(10);
     });
   });
 
   it('reads the log once for two views reading ahead at the same time', async () => {
-    await withLog(twoCalls(), async () => {
-      const tree = (await buildWholeLogCallTree(options))!;
-      const live = tree.liveWindow!();
-      const build = jest.spyOn(CallSpans, 'build');
-      try {
-        await Promise.all([
-          live.prepare((await tree.timeOrder(options))!, options),
-          live.prepare((await tree.bottomUp(options))!, options),
-        ]);
-        expect(build).toHaveBeenCalledTimes(1);
-      } finally {
-        build.mockRestore();
-      }
-    });
+    await load(...twoCalls());
+    const tree = (await buildWholeLogCallTree(options))!;
+    const live = tree.liveWindow!();
+    const build = jest.spyOn(CallSpans, 'build');
+    try {
+      await Promise.all([
+        live.prepare((await tree.timeOrder(options))!, options),
+        live.prepare((await tree.bottomUp(options))!, options),
+      ]);
+      expect(build).toHaveBeenCalledTimes(1);
+    } finally {
+      build.mockRestore();
+    }
+  });
+
+  it('shows no calls on a merged limit row inside the window, as the Calls footer counts none', async () => {
+    await load(method('outer', 0, 1_000, limitBlock(100, 200), limitBlock(600, 700)));
+    const tree = (await buildWholeLogCallTree(options))!;
+    const live = tree.liveWindow!();
+    const rows = (await tree.aggregated(options))!;
+    await live.prepare(rows, options);
+
+    expect(live.set({ start: 0, end: 1_000 }).calls).toBe(1);
+    const block = rows[0]!._children!.find((row) => row.type === 'CUMULATIVE_LIMIT_USAGE')!;
+    expect(live.admit(block)).toBe(true);
+    expect(block.callCount).toBe(0);
   });
 
   it('totals the self time of every row, a limit block included', async () => {
-    const limits = ranFrame(622, 'limits', 650, 700);
-    limits.type = 'CUMULATIVE_LIMIT_USAGE';
-    const outer = ranFrame(620, 'outer', 0, 1_000, [ranFrame(621, 'm', 100, 300), limits]);
-    await withLog([outer, ranFrame(623, 'late', 1_200, 1_500)], async () => {
-      const tree = (await buildWholeLogCallTree(options))!;
-      const live = tree.liveWindow!();
-      const rows = (await tree.timeOrder(options))!;
-      await live.prepare(rows, options);
-      const everySelf = (type?: string): number => {
-        let self = 0;
-        const stack = [...rows];
-        while (stack.length) {
-          const row = stack.pop()!; // non-empty: the loop condition just checked
-          const counted = live.admit(row) && row.type !== type;
-          self += counted ? row.duration.self : 0;
-          stack.push(...(row._children ?? []));
-        }
-        return self;
-      };
-
-      for (const window of [
-        null,
-        { start: 0, end: 1_500 },
-        { start: 200, end: 680 },
-        { start: 690, end: 1_300 },
-      ]) {
-        const { self, frameSelf } = live.set(window);
-        expect(self).toBe(everySelf());
-        // Bottom-Up has no row for the limit block, so its total leaves the block out.
-        expect(frameSelf).toBe(everySelf('CUMULATIVE_LIMIT_USAGE'));
+    await load(
+      method('outer', 0, 1_000, method('m', 100, 300), limitBlock(650, 700)),
+      method('late', 1_200, 1_500),
+    );
+    const tree = (await buildWholeLogCallTree(options))!;
+    const live = tree.liveWindow!();
+    const rows = (await tree.timeOrder(options))!;
+    await live.prepare(rows, options);
+    const everySelf = (type?: string): number => {
+      let self = 0;
+      const stack = [...rows];
+      while (stack.length) {
+        const row = stack.pop()!; // non-empty: the loop condition just checked
+        const counted = live.admit(row) && row.type !== type;
+        self += counted ? row.duration.self : 0;
+        stack.push(...(row._children ?? []));
       }
-    });
+      return self;
+    };
+
+    for (const window of [
+      null,
+      { start: 0, end: 1_500 },
+      { start: 200, end: 680 },
+      { start: 690, end: 1_300 },
+    ]) {
+      const { self, frameSelf } = live.set(window);
+      expect(self).toBe(everySelf());
+      // Bottom-Up has no row for the limit block, so its total leaves the block out.
+      expect(frameSelf).toBe(everySelf('CUMULATIVE_LIMIT_USAGE'));
+    }
   });
 
   it('builds Aggregated and Bottom-Up from the whole log after Time Order was read into a window', async () => {
-    await withLog(twoCalls(), async () => {
-      const fresh = (await buildWholeLogCallTree(options))!;
-      const tree = (await buildWholeLogCallTree(options))!;
-      const live = tree.liveWindow!();
-      const timeOrder = (await tree.timeOrder(options))!;
-      await live.prepare(timeOrder, options);
-      live.set({ start: 200, end: 250 });
-      admitted(live, timeOrder);
+    await load(...twoCalls());
+    const fresh = (await buildWholeLogCallTree(options))!;
+    const tree = (await buildWholeLogCallTree(options))!;
+    const live = tree.liveWindow!();
+    const timeOrder = (await tree.timeOrder(options))!;
+    await live.prepare(timeOrder, options);
+    live.set({ start: 200, end: 250 });
+    admitted(live, timeOrder);
 
-      const figures = (rows: readonly ScopedRow[]): unknown[] =>
-        rows.map((row) => [row.text, row.duration, row.callCount, figures(row._children ?? [])]);
-      expect(figures((await tree.aggregated(options))!)).toEqual(
-        figures((await fresh.aggregated(options))!),
-      );
-      expect(figures((await tree.bottomUp(options))!)).toEqual(
-        figures((await fresh.bottomUp(options))!),
-      );
-    });
+    const figures = (rows: readonly ScopedRow[]): unknown[] =>
+      rows.map((row) => [row.text, row.duration, row.callCount, figures(row._children ?? [])]);
+    expect(figures((await tree.aggregated(options))!)).toEqual(
+      figures((await fresh.aggregated(options))!),
+    );
+    expect(figures((await tree.bottomUp(options))!)).toEqual(
+      figures((await fresh.bottomUp(options))!),
+    );
   });
 
   it('takes a recursive frame’s nested calls off once after an abandoned Bottom-Up build', async () => {
     // 200 nested calls of a, so the walk checks the clock more than once.
-    const chain = () => {
-      let frame = ranFrame(1_200, 'a', 200, 800);
-      for (let depth = 199; depth >= 0; depth--) {
-        frame = ranFrame(1_000 + depth, 'a', depth, 1_000 - depth, [frame]);
-      }
-      return [frame];
-    };
+    let nested = method('a', 200, 800);
+    for (let depth = 199; depth >= 0; depth--) {
+      nested = method('a', depth, 1_000 - depth, nested);
+    }
+    await load(nested);
     const window = { start: 100, end: 900 };
     const read = async (abandonFirst: boolean) => {
       const tree = (await buildWholeLogCallTree(options))!;
@@ -849,9 +755,7 @@ describe('liveWindow', () => {
       return admitted(live, rows.slice(0, 1));
     };
 
-    await withLog(chain(), async () => {
-      expect(await read(true)).toEqual(await read(false));
-    });
+    expect(await read(true)).toEqual(await read(false));
   });
 
   it.each([
@@ -859,28 +763,33 @@ describe('liveWindow', () => {
     ['Aggregated', 'aggregated'],
     ['Bottom-Up', 'bottomUp'],
   ] as const)('gives %s its whole-log figures back with no window', async (_name, view) => {
-    await withLog(twoCalls(), async () => {
-      const tree = (await buildWholeLogCallTree(options))!;
-      const rows = (await tree[view](options))!;
-      const live = tree.liveWindow!();
-      const whole = admitted(live, rows);
+    await load(...twoCalls());
+    const tree = (await buildWholeLogCallTree(options))!;
+    const rows = (await tree[view](options))!;
+    const live = tree.liveWindow!();
+    const whole = admitted(live, rows);
 
-      live.set({ start: 200, end: 700 });
-      admitted(live, rows);
-      expect(live.set(null)).toMatchObject({ rootTotal: tree.rootTotal, calls: tree.calls });
+    live.set({ start: 200, end: 700 });
+    admitted(live, rows);
+    expect(live.set(null)).toMatchObject({ rootTotal: tree.rootTotal, calls: tree.calls });
 
-      expect(admitted(live, rows)).toEqual(whole);
-      // A window over the whole log reads the same as no window.
-      live.set({ start: 0, end: 1_000 });
-      expect(admitted(live, rows)).toEqual(whole);
-    });
+    expect(admitted(live, rows)).toEqual(whole);
+    // A window over the whole log reads the same as no window.
+    live.set({ start: 0, end: 1_000 });
+    expect(admitted(live, rows)).toEqual(whole);
   });
 });
 
 describe('view caching', () => {
   it.each([
-    ['a scoped tree', () => build(4)],
-    ['the whole-log tree', () => buildWholeLogCallTree(options)],
+    ['a scoped tree', async () => build(frame(await load(...chain()), QUERY))],
+    [
+      'the whole-log tree',
+      async () => {
+        await load(...chain());
+        return buildWholeLogCallTree(options);
+      },
+    ],
   ])('builds each view of %s only on first read, then caches it', async (_name, make) => {
     const tree = (await make())!;
     // Same array back on a second read — the walk is not repeated.
@@ -892,50 +801,49 @@ describe('view caching', () => {
 
 describe('holds', () => {
   it('stands for the selection, what it called, and the callers above it', async () => {
-    const tree = (await build(3))!;
+    const log = await load(...chain());
+    const tree = (await build(frame(log, 'm2')))!;
 
-    // m2 is the selection, soql runs inside it, m1 and exec are rows above it.
-    expect(tree.holds!(3)).toBe(true);
-    expect(tree.holds!(4)).toBe(true);
-    expect(tree.holds!(2)).toBe(true);
-    expect(tree.holds!(1)).toBe(true);
+    // m2 is the selection, the query runs inside it, m1 and exec are rows above it.
+    expect(tree.holds!(frame(log, 'm2'))).toBe(true);
+    expect(tree.holds!(frame(log, QUERY))).toBe(true);
+    expect(tree.holds!(frame(log, 'm1'))).toBe(true);
+    expect(tree.holds!(frame(log, 'exec'))).toBe(true);
   });
 
   it('leaves out a frame at the same bucket path elsewhere in the log', async () => {
     // A second call of the same method, which a loop or a trigger makes common:
     // its rows would be named by the same path as the selection's.
-    const twin = timedFrame(500, 'METHOD_ENTRY', 'm2', { total: 200, self: 0 });
-    const twinLeaf = timedFrame(501, 'SOQL_EXECUTE_BEGIN', 'SELECT Id FROM Account', {
-      total: 200,
-      self: 200,
-    });
-    twin.parent = m1;
-    twinLeaf.parent = twin;
-    twin.children = [twinLeaf];
-    m1.children = [m2, twin];
-    byId.set(500, twin);
-    byId.set(501, twinLeaf);
-    try {
-      const tree = (await build(3))!;
+    const log = await load(
+      unit(
+        'exec',
+        0,
+        700,
+        method(
+          'm1',
+          0,
+          700,
+          method('m2', 0, 500, query(0, 500)),
+          method('m2', 500, 700, query(500, 700)),
+        ),
+      ),
+    );
+    const tree = (await build(frame(log, 'm2')))!;
 
-      expect(tree.holds!(501)).toBe(false);
-    } finally {
-      m1.children = [m2];
-      byId.delete(500);
-      byId.delete(501);
-    }
+    expect(tree.holds!(frame(log, QUERY, 1))).toBe(false);
   });
 
   it('stands for every frame where it covers the whole log', async () => {
+    await load(...chain());
+
     expect((await buildWholeLogCallTree(options))!.holds).toBeUndefined();
   });
 });
 
 describe('rowIdsByPath', () => {
   it('finds a merged row by the bucket path it stands for, at every depth', async () => {
-    loopOccurrences(3);
-    const tree = (await build(300))!;
-    const rows = (await tree.aggregated(options))!;
+    const { loop } = await loopLog(3);
+    const rows = (await (await build(loop))!.aggregated(options))!;
     const group = rows[0]!;
     const occurrences = group._children![0]!;
 
@@ -946,7 +854,8 @@ describe('rowIdsByPath', () => {
   });
 
   it('leaves a path no row stands for out of the lookup', async () => {
-    const tree = (await build(4))!;
+    const log = await load(...chain());
+    const tree = (await build(frame(log, QUERY)))!;
 
     expect(rowIdsByPath((await tree.timeOrder(options))!).get(99999)).toBeUndefined();
   });
@@ -954,38 +863,38 @@ describe('rowIdsByPath', () => {
 
 describe('frameEventIndexes', () => {
   it("names the callers at the row's own depth, not the calls they conducted", async () => {
-    // exec -> m1 -> m2 -> soql, so the bottom-up seed is the statement and each
+    // exec -> m1 -> m2 -> query, so the bottom-up seed is the statement and each
     // row under it is one frame further up the same stack.
-    const rows = (await (await build(1))!.bottomUp(options))!;
+    const log = await load(...chain());
+    const rows = (await (await build(frame(log, 'exec')))!.bottomUp(options))!;
     const seed = rows[0]!;
     const m2Row = seed._children![0]!;
     const m1Row = m2Row._children![0]!;
 
-    expect(frameEventIndexes(seed)).toEqual([soql.eventIndex]);
-    expect(frameEventIndexes(m2Row)).toEqual([m2.eventIndex]);
-    expect(frameEventIndexes(m1Row)).toEqual([m1.eventIndex]);
+    expect(frameEventIndexes(seed)).toEqual([frame(log, QUERY)]);
+    expect(frameEventIndexes(m2Row)).toEqual([frame(log, 'm2')]);
+    expect(frameEventIndexes(m1Row)).toEqual([frame(log, 'm1')]);
   });
 
   it('names one caller frame however many calls it made', async () => {
-    const instances = loopOccurrences(2);
-    const rows = (await (await build(300))!.bottomUp(options))!;
+    const { loop, instances } = await loopLog(2);
+    const rows = (await (await build(loop))!.bottomUp(options))!;
     const caller = rows[0]!._children![0]!;
 
     // The row counts both calls, and is the single frame that made them.
     expect(locatableEventIndexes(caller)).toEqual(instances);
-    expect(frameEventIndexes(caller)).toEqual([300]);
+    expect(frameEventIndexes(caller)).toEqual([loop]);
   });
 
   it('names the one frame of a row that merges nothing', () => {
-    const row = { id: 1, originalData: soql } as unknown as Partial<ScopedRow>;
+    const row: Partial<ScopedRow> = { id: 1, eventIndex: 7 };
 
-    expect(frameEventIndexes(row)).toEqual([soql.eventIndex]);
+    expect(frameEventIndexes(row)).toEqual([7]);
   });
 });
 
 describe('revealableEventIndex', () => {
-  const row = (id: number, eventIndex: number): Partial<ScopedRow> =>
-    ({ id, originalData: { eventIndex } }) as unknown as Partial<ScopedRow>;
+  const row = (id: number, eventIndex: number): Partial<ScopedRow> => ({ id, eventIndex });
 
   it.each([
     ['a real row by its own event', row(3, 17), 17],
@@ -998,10 +907,9 @@ describe('revealableEventIndex', () => {
 
 describe('bottom-up occurrences', () => {
   it('derives a caller row from the top-level row, holding no calls itself', async () => {
-    // Rebuilds the loop and its two calls; the loop itself is the selection.
-    const instances = loopOccurrences(2);
-    const tree = (await build(300))!;
-    const rows = (await tree.bottomUp(options))!;
+    // The loop and its two calls; the loop itself is the selection.
+    const { loop, instances } = await loopLog(2);
+    const rows = (await (await build(loop))!.bottomUp(options))!;
     const seed = rows[0]!;
     const caller = seed._children![0]!;
 
@@ -1011,34 +919,50 @@ describe('bottom-up occurrences', () => {
     expect(caller.eventIndexes).toBeNull();
     expect(locatableEventIndexes(caller)).toEqual(instances);
   });
+
+  /** The chain, with a limit block under m2 holding its limit line. */
+  const withLimits = (): Span[] => [
+    unit(
+      'exec',
+      0,
+      500,
+      method('m1', 0, 500, method('m2', 0, 500, query(0, 497), limitBlock(497, 500))),
+    ),
+  ];
+
   it('keeps the limit blocks in the top-down views and out of Bottom-Up', async () => {
-    const undo = limitBlockUnderM2();
-    try {
-      const tree = (await build(3))!;
-      for (const rows of [(await tree.timeOrder(options))!, (await tree.aggregated(options))!]) {
-        expect(types(rows)).toContain('CUMULATIVE_LIMIT_USAGE');
-        expect(types(rows)).toContain('LIMIT_USAGE_FOR_NS');
-      }
-      const bottomUp = types((await tree.bottomUp(options))!);
-      expect(bottomUp).not.toContain('CUMULATIVE_LIMIT_USAGE');
-      expect(bottomUp).not.toContain('LIMIT_USAGE_FOR_NS');
-      // A limit block is a row, not a call.
-      expect(tree.calls).toBe(2);
-    } finally {
-      undo();
+    const log = await load(...withLimits());
+    const tree = (await build(frame(log, 'm2')))!;
+    for (const rows of [(await tree.timeOrder(options))!, (await tree.aggregated(options))!]) {
+      expect(types(rows)).toContain('CUMULATIVE_LIMIT_USAGE');
+      expect(types(rows)).toContain('LIMIT_USAGE_FOR_NS');
+    }
+    const bottomUp = types((await tree.bottomUp(options))!);
+    expect(bottomUp).not.toContain('CUMULATIVE_LIMIT_USAGE');
+    expect(bottomUp).not.toContain('LIMIT_USAGE_FOR_NS');
+    // A limit block is a row, not a call.
+    expect(tree.calls).toBe(2);
+  });
+
+  it('shows no calls on a limit row, as the Calls footer counts none', async () => {
+    const log = await load(...withLimits());
+    const tree = (await build(frame(log, 'm2')))!;
+    const limitCalls = (rows: readonly ScopedRow[]): number[] =>
+      rows.flatMap((row) => [
+        ...(row.type.includes('LIMIT_USAGE') ? [row.callCount] : []),
+        ...limitCalls(row._children ?? []),
+      ]);
+    for (const rows of [(await tree.timeOrder(options))!, (await tree.aggregated(options))!]) {
+      expect(limitCalls(rows)).toEqual([0, 0]);
     }
   });
 
   it('still answers for a limit block the user selected', async () => {
-    const undo = limitBlockUnderM2();
-    try {
-      const rows = (await (await build(400))!.bottomUp(options))!;
+    const log = await load(...withLimits());
+    const rows = (await (await build(ofType(log, 'CUMULATIVE_LIMIT_USAGE')))!.bottomUp(options))!;
 
-      // The selection is kept whatever it is; only the limit line under it goes.
-      expect(rows.map((r) => r.text)).toEqual(['LIMIT_USAGE']);
-      expect(rows[0]?._children).toBeNull();
-    } finally {
-      undo();
-    }
+    // The selection is kept whatever it is; only the limit line under it goes.
+    expect(rows.map((r) => r.type)).toEqual(['CUMULATIVE_LIMIT_USAGE']);
+    expect(rows[0]?._children).toBeNull();
   });
 });

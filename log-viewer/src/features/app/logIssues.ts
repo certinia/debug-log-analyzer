@@ -3,7 +3,7 @@
  */
 import type { ApexLog, LogIssue as ParsedLogIssue } from '@apexdevtools/apex-log-parser';
 
-import { formatByteSize } from '../../core/utility/Util.js';
+import { formatByteSize } from '#core/utility/Util.js';
 import { goToCallTreeAction } from '../call-tree/navigation.js';
 import type { IssueSeverity, LogIssue } from '../notifications/types.js';
 import { markerTypeForIssue } from '../timeline/types/flamechart.types.js';
@@ -26,25 +26,17 @@ const LABEL_BY_ISSUE_TYPE: ReadonlyMap<string, string> = new Map([
   ['error', 'Exception'],
 ]);
 
-/**
- * Every parsed issue as a card, with each skip stating how much the platform dropped.
- *
- * `truncation.regions` is the `skip` issues over again, in the same order, so the figures
- * pair off by position. They cannot pair off on `eventIndex`: that names the last event
- * before the marker, which two adjacent markers share, and which a neighbouring issue of
- * another type can carry too.
- */
+/** Every parsed issue as a card, with each skip stating how much the platform dropped. */
 export function toLogIssues(log: ApexLog): LogIssue[] {
-  const { regions } = log.truncation;
-  let next = 0;
-  return log.logIssues.map((issue) => {
-    if (issue.type !== 'skip') {
-      return toLogIssue(issue);
-    }
-    // A `max-size` region states no figure: the platform stopped writing rather than skipped.
-    const skippedBytes = regions[next++]?.skippedBytes;
-    return toLogIssue(issue, skippedBytes === undefined ? undefined : formatByteSize(skippedBytes));
-  });
+  // A `max-size` skip states no figure: the platform stopped writing rather than skipped.
+  return log.issues.map((issue) =>
+    toLogIssue(
+      issue,
+      issue.type === 'skip' && issue.skippedBytes !== null
+        ? formatByteSize(issue.skippedBytes)
+        : undefined,
+    ),
+  );
 }
 
 /**
@@ -58,10 +50,10 @@ export function toLogIssue(issue: ParsedLogIssue, label?: string): LogIssue {
     message: issue.description,
     severity: toSeverity(issue.type),
     label: label ?? LABEL_BY_ISSUE_TYPE.get(issue.type) ?? null,
-    action: issue.eventIndex !== undefined ? goToCallTreeAction(issue.eventIndex) : null,
+    action: issue.event ? goToCallTreeAction(issue.event.id) : null,
     // The card's rail is the colour the timeline draws for the same issue.
     category: markerTypeForIssue(issue.type),
-    timestamp: issue.startTime ?? null,
+    timestamp: issue.startTimestamp,
   };
 }
 

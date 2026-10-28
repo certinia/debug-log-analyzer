@@ -1,9 +1,7 @@
 /*
  * Copyright (c) 2026 Certinia Inc. All rights reserved.
  */
-import type { ApexLog } from '@apexdevtools/apex-log-parser';
-
-import { logStoreFor } from '../../../core/log/LogStore.js';
+import type { LogStore } from '#core/log/LogStore.js';
 import type { RowKey, TreeSource } from '../../../grid/index.js';
 import {
   buildAggregatedTree,
@@ -29,33 +27,21 @@ export class MergedTree<R extends MergedRowShape<R>> {
   private readonly _parents = new Map<R, R>();
   private readonly _byPath = new Map<number, R>();
 
-  /** The Bottom-Up tree of `log`, or null when `signal` aborts the build. */
+  /** The Bottom-Up tree of the events `store` shows, or null when `signal` aborts the build. */
   static async bottomUp(
-    log: ApexLog,
+    store: LogStore,
     options: { signal?: AbortSignal } = {},
   ): Promise<MergedTree<BottomUpRow> | null> {
-    const roots = await buildBottomUpTree(
-      log.children,
-      logStoreFor(log).keyPathIds(),
-      log.governorLimits,
-      options,
-      await reportedUsageOf(log),
-    );
+    const roots = await buildBottomUpTree(store, options, await reportedUsageOf(store.log));
     return roots ? new MergedTree(roots) : null;
   }
 
-  /** The Aggregated tree of `log`, or null when `signal` aborts the build. */
+  /** The Aggregated tree of the events `store` shows, or null when `signal` aborts the build. */
   static async aggregated(
-    log: ApexLog,
+    store: LogStore,
     options: { signal?: AbortSignal } = {},
   ): Promise<MergedTree<AggregatedRow> | null> {
-    const roots = await buildAggregatedTree(
-      log.children,
-      logStoreFor(log).keyPathIds(),
-      log.governorLimits,
-      options,
-      await reportedUsageOf(log),
-    );
+    const roots = await buildAggregatedTree(store, options, await reportedUsageOf(store.log));
     return roots ? new MergedTree(roots) : null;
   }
 

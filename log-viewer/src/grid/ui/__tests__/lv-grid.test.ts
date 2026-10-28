@@ -725,10 +725,17 @@ describe('lv-grid', () => {
 
   it('opens the path to a row, then selects it', async () => {
     const { grid, rowNamed, names } = await setup();
-    expect(await grid.goTo([2, 22])).toBe(true);
+    expect(await grid.goTo([2, 22])).toBe('selected');
     await settle(grid);
     expect(names()).toEqual(['a', 'b', 'b1', 'b2', 'c']);
     expect(rowNamed('b2')?.ariaSelected).toBe('true');
+  });
+
+  // A caller told only "false" could not tell a hidden row from a selection that won.
+  it('says when no row on the path is shown', async () => {
+    const { grid } = await setup();
+
+    expect(await grid.goTo([99])).toBe('none-shown');
   });
 
   it('finds a row of a source set in the same turn', async () => {
@@ -738,7 +745,7 @@ describe('lv-grid', () => {
       key: (row) => row.key,
     };
 
-    expect(await grid.goTo([9])).toBe(true);
+    expect(await grid.goTo([9])).toBe('selected');
     await settle(grid);
     expect(rowNamed('z')?.ariaSelected).toBe('true');
   });
@@ -769,7 +776,7 @@ describe('lv-grid', () => {
     const stale = grid.goTo([2, 22]);
     other(grid);
 
-    expect(await stale).toBe(false);
+    expect(await stale).toBe('superseded');
     await settle(grid);
     expect(rowNamed('b2')?.ariaSelected).not.toBe('true');
   });
@@ -780,7 +787,7 @@ describe('lv-grid', () => {
     const stale = grid.goTo([2, 22]);
     rowNamed('a')?.querySelector<HTMLElement>('.cell')?.click();
 
-    expect(await stale).toBe(false);
+    expect(await stale).toBe('superseded');
     await settle(grid);
     expect(rowNamed('a')?.ariaSelected).toBe('true');
   });

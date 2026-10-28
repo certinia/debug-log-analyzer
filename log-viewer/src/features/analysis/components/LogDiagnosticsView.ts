@@ -7,12 +7,12 @@ import { LitElement, css, html, unsafeCSS } from 'lit';
 import { customElement, property, state } from 'lit/decorators.js';
 
 import { dispatchInspectorReveal } from '../../../components/inspectorReveal.js';
-import { ResizeController } from '../../../core/events/ResizeController.js';
-import { DerivedValue } from '../../../core/log/DerivedValue.js';
-import { describeLevelGap } from '../../../core/log/levelCapabilities.js';
-import { logContext } from '../../../core/log/logContext.js';
-import type { LogStore } from '../../../core/log/LogStore.js';
-import { formatDuration } from '../../../core/utility/Util.js';
+import { ResizeController } from '#core/events/ResizeController.js';
+import { DerivedValue } from '#core/log/DerivedValue.js';
+import { describeLevelGap } from '#core/log/levelCapabilities.js';
+import { logContext } from '#core/log/logContext.js';
+import type { LogStore } from '#core/log/LogStore.js';
+import { formatDuration } from '#core/utility/Util.js';
 import { formatSOQLToTemplate } from '../../soql/format/formatter.js';
 import { SEVERITY_TYPES, type Severity } from '../../soql/services/SOQLLinter.js';
 import { soqlSyntaxStyles } from '../../soql/styles/soql-syntax.css.js';

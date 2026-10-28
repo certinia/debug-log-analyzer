@@ -4,8 +4,8 @@ import type { VscodeTextfield } from '#vscode-elements/vscode-textfield.js';
 import { LitElement, css, html } from 'lit';
 import { customElement, state } from 'lit/decorators.js';
 
-import { DelayController } from '../../../core/events/DelayController.js';
-import { DomListenerController } from '../../../core/events/DomListenerController.js';
+import { DelayController } from '#core/events/DelayController.js';
+import { DomListenerController } from '#core/events/DomListenerController.js';
 import type { FindDirection, FindEventMap, FindResultsEventDetail } from '../findEvents.js';
 
 // styles

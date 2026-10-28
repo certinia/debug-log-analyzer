@@ -17,7 +17,7 @@ const LOG =
   '09:18:22.6 (1800)|METHOD_EXIT|[1]|ns.Outer.run()\n';
 
 describe('textPredicate', () => {
-  it('matches on text or type, ignoring case by default', () => {
+  it('matches on text or type, ignoring case by default', async () => {
     const matches = textPredicate('INNER');
 
     expect(matches('ns.Inner.First()', 'METHOD_ENTRY')).toBe(true);
@@ -25,7 +25,7 @@ describe('textPredicate', () => {
     expect(textPredicate('method')('anything', 'METHOD_ENTRY')).toBe(true);
   });
 
-  it('keeps case when asked', () => {
+  it('keeps case when asked', async () => {
     const matches = textPredicate('First', true);
 
     expect(matches('ns.Inner.First()', 'METHOD_ENTRY')).toBe(true);
@@ -36,7 +36,7 @@ describe('textPredicate', () => {
 
 describe('EventMatcher', () => {
   it('finds the shown frames that match, in log order', async () => {
-    const { frames } = framesOf(LOG);
+    const { frames } = await framesOf(LOG);
     const cursor = await new EventMatcher(frames).search(textPredicate('ns.'));
 
     expect(cursor?.matches.map((match) => match.event.text)).toEqual([
@@ -46,7 +46,7 @@ describe('EventMatcher', () => {
   });
 
   it('makes no match current until a seek, and none again for -1', async () => {
-    const { frames } = framesOf(LOG);
+    const { frames } = await framesOf(LOG);
     const cursor = await new EventMatcher(frames).search(textPredicate('ns.'));
     expect(cursor?.currentIndex).toBe(-1);
     expect(cursor?.getCurrent()).toBeNull();
@@ -57,7 +57,7 @@ describe('EventMatcher', () => {
   });
 
   it('skips a frame with no duration', async () => {
-    const { frames } = framesOf(
+    const { frames } = await framesOf(
       LOG +
         '09:18:22.6 (1900)|METHOD_ENTRY|[6]|01p|ns.Instant.run()\n' +
         '09:18:22.6 (1900)|METHOD_EXIT|[6]|ns.Instant.run()\n',
@@ -71,7 +71,7 @@ describe('EventMatcher', () => {
   });
 
   it('skips a frame with no rect', async () => {
-    const { index } = framesOf(LOG);
+    const { index } = await framesOf(LOG);
     const apexOnly = buildTimelineFrames(index, new Set(['Apex']), 0);
 
     expect((await new EventMatcher(apexOnly).search(textPredicate('select')))?.total).toBe(0);
@@ -95,7 +95,7 @@ describe('EventMatcher', () => {
       ['a newer search', (matcher: EventMatcher<EventNode>) => void matcher.search(() => false)],
       ['a clear', (matcher: EventMatcher<EventNode>) => matcher.clear()],
     ])('is stopped by %s while it scans, and gives null', async (_name, stop) => {
-      const matcher = new EventMatcher(framesOf(LOG + many).frames);
+      const matcher = new EventMatcher((await framesOf(LOG + many)).frames);
       // A clock that runs out at the first deadline check, so the scan yields and sees the stop.
       jest.spyOn(performance, 'now').mockReturnValueOnce(0).mockReturnValue(100);
       const matches = textPredicate('ns.');
@@ -112,7 +112,7 @@ describe('EventMatcher', () => {
     });
 
     it('finds every match once it finishes', async () => {
-      const matcher = new EventMatcher(framesOf(LOG + many).frames);
+      const matcher = new EventMatcher((await framesOf(LOG + many)).frames);
       // A clock that runs out at the first deadline check, so the scan yields once.
       jest.spyOn(performance, 'now').mockReturnValueOnce(0).mockReturnValue(100);
 
@@ -122,7 +122,7 @@ describe('EventMatcher', () => {
   });
 
   it('builds a match event only when it is read', async () => {
-    const { frames } = framesOf(LOG);
+    const { frames } = await framesOf(LOG);
     const node = jest.spyOn(frames, 'node');
     // Nothing stops this search, so it gives a cursor.
     const cursor = (await new EventMatcher(frames).search(textPredicate('ns.')))!;

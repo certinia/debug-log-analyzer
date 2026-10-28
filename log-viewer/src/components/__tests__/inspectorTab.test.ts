@@ -3,7 +3,7 @@
  */
 import { afterEach, describe, expect, it } from '@jest/globals';
 
-import { eventBus } from '../../core/events/EventBus.js';
+import { eventBus } from '#core/events/EventBus.js';
 import { InspectorEmphasis } from '../inspectorEmphasis.js';
 import { revealFirstOf, wireInspectorTab } from '../inspectorTab.js';
 

@@ -1,9 +1,9 @@
 /*
  * Copyright (c) 2026 Certinia Inc. All rights reserved.
  */
-import { type LogIndex, sumSelfBy } from '../core/log/LogIndex.js';
-import { DEFAULT_NAMESPACE } from '../core/utility/CallerNamespace.js';
-import { CHECK_EVERY, frameBudget } from '../core/utility/FrameBudget.js';
+import { type LogIndex, sumSelfBy } from '#core/log/LogIndex.js';
+import { DEFAULT_NAMESPACE } from '#core/utility/CallerNamespace.js';
+import { CHECK_EVERY, frameBudget } from '#core/utility/FrameBudget.js';
 
 export interface NamespaceTime {
   namespace: string;
@@ -16,17 +16,17 @@ export interface NamespaceColumn {
   names: readonly string[];
 }
 
-/** The namespace of every row. Built in slices: the namespace lives on the event
- *  objects, so this touches each one. */
+/** The namespace of every row, built in slices. */
 export async function namespaceColumn(index: LogIndex): Promise<NamespaceColumn> {
   const tick = frameBudget({});
   const ids = new Uint16Array(index.rowCount);
+  const namespaces = index.log.columns.namespace;
   const lookup = new Map<string, number>();
   for (let row = 0; row < index.rowCount; row++) {
     if (row % CHECK_EVERY === 0) {
       await tick();
     }
-    const namespace = index.event(row).namespace || DEFAULT_NAMESPACE;
+    const namespace = namespaces.at(index.eventIndex[row]!) || DEFAULT_NAMESPACE;
     let id = lookup.get(namespace);
     if (id === undefined) {
       id = lookup.size;

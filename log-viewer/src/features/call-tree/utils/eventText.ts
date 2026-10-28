@@ -1,14 +1,46 @@
 /*
  * Copyright (c) 2026 Certinia Inc. All rights reserved.
  */
-import type { LogEvent, GovernorLimits } from '@apexdevtools/apex-log-parser';
+import {
+  type ApexEvent,
+  type EventOf,
+  type EventType,
+  eventType,
+  type FlowType,
+  type GovernorLimits,
+  type SelfTotal,
+} from '@apexdevtools/apex-log-parser';
 
-import { formatDuration } from '../../../core/utility/Util.js';
-import { SOSL_ROWS_PER_QUERY_LIMIT } from '../../database/limits.js';
+import { formatDuration } from '#core/utility/Util.js';
+import { SOSL_ROWS_PER_QUERY_LIMIT } from '#core/metrics/eventMetrics.js';
 
-/** The frame's display name, including any parser-supplied suffix. */
-export function eventName(event: LogEvent): string {
-  return `${event.text}${event.suffix ?? ''}`;
+/** What a frame's name gains to tell it from a method of the same text. */
+const SUFFIX: Partial<Record<EventType, string>> = {
+  CONSTRUCTOR_ENTRY: ' (constructor)',
+  SYSTEM_CONSTRUCTOR_ENTRY: ' (system constructor)',
+  CODE_UNIT_STARTED: ' (code unit)',
+  VF_APEX_CALL_START: ' (VF APEX)',
+  VF_EVALUATE_FORMULA_BEGIN: ' (VF FORMULA)',
+  ENTERING_MANAGED_PKG: ' (managed package)',
+  FLOW_START_INTERVIEW_BEGIN: ' (flow)',
+};
+
+const FLOW_SUFFIX: Record<FlowType, string> = {
+  flow: ' (Flow)',
+  'process-builder': ' (Process Builder)',
+};
+
+function suffixOf(event: ApexEvent): string {
+  if (event.type === 'FLOW_START_INTERVIEWS_BEGIN') {
+    const { flowType } = (event as EventOf<'FLOW_START_INTERVIEWS_BEGIN'>).details;
+    return flowType ? FLOW_SUFFIX[flowType] : '';
+  }
+  return SUFFIX[event.type] ?? '';
+}
+
+/** The frame's display name: its text, or its type where it states none, and its suffix. */
+export function eventName(event: ApexEvent): string {
+  return `${event.text ?? event.type}${suffixOf(event)}`;
 }
 
 /**
@@ -18,7 +50,7 @@ export function eventName(event: LogEvent): string {
  * identifies the frame, and prefixing it just adds a word to read.
  */
 function isBareText(text: string): boolean {
-  return !text || text === 'true' || text === 'false' || /^-?\d+$/.test(text);
+  return text === 'true' || text === 'false' || /^-?\d+$/.test(text);
 }
 
 /**
@@ -26,12 +58,12 @@ function isBareText(text: string): boolean {
  * event type where the text can't stand alone. Text that already repeats the
  * type stands alone — prefixing it would read `EXECUTION_STARTED: EXECUTION_STARTED`.
  */
-export function eventLabel(event: LogEvent): string {
+export function eventLabel(event: ApexEvent): string {
   const name = eventName(event);
-  if (!isBareText(event.text) || event.text === event.type) {
+  if (event.text === null || !isBareText(event.text) || event.text === event.type) {
     return name;
   }
-  return name ? `${event.type}: ${name}` : (event.type ?? '');
+  return `${event.type}: ${name}`;
 }
 
 /**
@@ -39,16 +71,12 @@ export function eventLabel(event: LogEvent): string {
  * governor metrics. Shared by the timeline's and the inspector's
  * "Copy Details" actions so both put identical text on the clipboard.
  */
-export function formatEventDetails(event: LogEvent, limits?: GovernorLimits): string {
-  const lines: string[] = [`Name: ${eventName(event)}`];
+export function formatEventDetails(event: ApexEvent, limits?: GovernorLimits): string {
+  const lines: string[] = [`Name: ${eventName(event)}`, `Type: ${event.type}`];
 
-  if (event.type) {
-    lines.push(`Type: ${event.type}`);
-  }
-
-  if (event.exitStamp && event.duration.total) {
+  if (event.isFrame && event.duration.total) {
     let duration = formatDuration(event.duration.total);
-    if (event.cpuType === 'free') {
+    if (!eventType(event.type).consumesCpuTime) {
       duration += ' (free)';
     } else if (event.duration.self) {
       duration += ` (self ${formatDuration(event.duration.self)})`;
@@ -56,7 +84,7 @@ export function formatEventDetails(event: LogEvent, limits?: GovernorLimits): st
     lines.push(`Duration: ${duration}`);
   }
 
-  const metrics: [string, { total: number; self: number }, number | undefined][] = [
+  const metrics: [string, SelfTotal | null, number | null | undefined][] = [
     ['DML', event.dmlCount, limits?.final.dmlStatements.limit],
     ['DML Rows', event.dmlRowCount, limits?.final.dmlRows.limit],
     ['SOQL', event.soqlCount, limits?.final.soqlQueries.limit],
@@ -71,7 +99,7 @@ export function formatEventDetails(event: LogEvent, limits?: GovernorLimits): st
     ],
   ];
   for (const [label, metric, limit] of metrics) {
-    if (metric.total) {
+    if (metric?.total) {
       lines.push(`${label}: ${formatLimit(metric, limit)}`);
     }
   }
@@ -80,17 +108,15 @@ export function formatEventDetails(event: LogEvent, limits?: GovernorLimits): st
 }
 
 /** The lineage of frames that led to `event`, outermost first, one per line. */
-export function formatCallStack(event: LogEvent): string {
-  const stack: LogEvent[] = [];
-  let current: LogEvent | null = event;
-  while (current?.type) {
+export function formatCallStack(event: ApexEvent): string {
+  const stack: ApexEvent[] = [];
+  for (let current: ApexEvent | null = event; current; current = current.parent) {
     stack.unshift(current);
-    current = current.parent;
   }
   return stack.map(eventName).join('\n');
 }
 
-function formatLimit(metric: { total: number; self: number }, limit?: number): string {
+function formatLimit(metric: SelfTotal, limit?: number | null): string {
   const outOf = limit ? `/${limit}` : '';
   return `${metric.total}${outOf} (self ${metric.self})`;
 }

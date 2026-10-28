@@ -6,11 +6,9 @@
  * FlameChart - Generic flamechart visualization component
  *
  * Generic rendering engine for hierarchical time-based data.
- * Works with any data via LogEvent interface (kept for simplicity).
  * Apex-specific logic is handled via callbacks.
  */
 
-import type { LogEvent } from '@apexdevtools/apex-log-parser';
 import * as PIXI from 'pixi.js';
 
 import { DimState } from './DimState.js';
@@ -23,6 +21,7 @@ import type {
   HeatStripTimeSeries,
   HoverCause,
   ModifierKeys,
+  TimelineExtent,
   TimelineFrames,
   TimelineMarker,
   TimelineOptions,
@@ -55,7 +54,6 @@ import { RectangleCache, type PrecomputedRect } from './RectangleCache.js';
 import { cssColorToPixi } from './rendering/ColorUtils.js';
 import { hexToCSS } from './rendering/tooltip-utils.js';
 import { CursorLineRenderer } from './rendering/CursorLineRenderer.js';
-import { TimelineEventIndex } from './TimelineEventIndex.js';
 import { TimelineViewport } from './TimelineViewport.js';
 import { ViewportAnimator } from './ViewportAnimator.js';
 import { chartOverheadHeight } from './chartLayout.js';
@@ -77,7 +75,7 @@ import {
   METRIC_STRIP_GAP,
   MetricStripOrchestrator,
 } from './metric-strip/MetricStripOrchestrator.js';
-import { waitForNextFrame } from '../../../core/utility/FrameBudget.js';
+import { waitForNextFrame } from '#core/utility/FrameBudget.js';
 
 /**
  * How long to let a container settle before giving up on it. Bounded, so a container that
@@ -147,7 +145,7 @@ export class FlameChart<E extends EventNode = EventNode> {
   private container: HTMLElement | null = null;
   private wrapper: HTMLDivElement | null = null;
   private viewport: TimelineViewport | null = null;
-  private index: TimelineEventIndex | null = null;
+  private index: TimelineExtent | null = null;
   private state: TimelineState | null = null;
   private options: TimelineOptions = {};
   private callbacks: FlameChartCallbacks = {};
@@ -229,7 +227,6 @@ export class FlameChart<E extends EventNode = EventNode> {
    * Initialize the flamechart renderer.
    *
    * @param container - HTML element to render into
-   * @param events - Array of LogEvent objects for rendering
    * @param frames - The frames to draw, navigate and search
    * @param markers - Timeline markers (truncation regions, etc.)
    * @param options - Rendering options
@@ -237,7 +234,6 @@ export class FlameChart<E extends EventNode = EventNode> {
    */
   public async init(
     container: HTMLElement,
-    events: LogEvent[],
     frames: TimelineFrames<E>,
     markers: TimelineMarker[] = [],
     options: TimelineOptions = {},
@@ -249,10 +245,6 @@ export class FlameChart<E extends EventNode = EventNode> {
         TimelineErrorCode.INVALID_CONTAINER,
         'Container must be a valid HTML element',
       );
-    }
-
-    if (!events || !Array.isArray(events)) {
-      throw new TimelineError(TimelineErrorCode.INVALID_EVENT_DATA, 'Events must be an array');
     }
 
     // Check WebGL availability
@@ -274,10 +266,7 @@ export class FlameChart<E extends EventNode = EventNode> {
 
     const { width, height } = await this.awaitContainerSize(container);
 
-    this.index = new TimelineEventIndex(events, {
-      maxDepth: frames.maxDepth,
-      totalDuration: frames.totalDuration,
-    });
+    this.index = frames;
 
     // Initialize PixiJS Application first - creates DOM and measures dimensions after RAF.
     // This ensures flex layout is computed before we measure mainDiv's actual height.
@@ -299,7 +288,7 @@ export class FlameChart<E extends EventNode = EventNode> {
     this.setupCoordinateSystem();
 
     // Initialize state
-    this.initializeState(events);
+    this.initializeState();
 
     this.frames = frames;
 
@@ -333,8 +322,7 @@ export class FlameChart<E extends EventNode = EventNode> {
 
     // Create RectangleCache (single source of truth for rectangle computation)
     if (this.state) {
-      const categories = new Set(this.state.batches.keys());
-      this.rectangleManager = new RectangleCache(events, categories, {
+      this.rectangleManager = new RectangleCache({
         rectsByCategory: frames.rectsByCategory,
         rectsByDepth: frames.rectsByDepth,
       });
@@ -347,7 +335,9 @@ export class FlameChart<E extends EventNode = EventNode> {
 
     // Create text label renderer (renders method names on rectangles)
     if (this.worldContainer && this.state) {
-      this.textLabelRenderer = new TextLabelRenderer(this.worldContainer);
+      this.textLabelRenderer = new TextLabelRenderer(this.worldContainer, (row) =>
+        frames.text(row),
+      );
       await this.textLabelRenderer.loadFont();
       this.textLabelRenderer.setBatches(this.state.batches);
 
@@ -372,13 +362,15 @@ export class FlameChart<E extends EventNode = EventNode> {
 
     // Create hit test manager for mouse interactions
     // Pass rectangleManager for O(log n) hit testing queries
-    this.hitDetector = new HitDetector({
-      index: this.index,
-      visibleRects: new Map(),
-      buckets: new Map(),
-      markerRenderer: this.markerRenderer,
-      rectangleManager: this.rectangleManager,
-    });
+    if (this.rectangleManager) {
+      this.hitDetector = new HitDetector({
+        nodeOf: (row) => frames.node(row).data,
+        visibleRects: new Map(),
+        buckets: new Map(),
+        markerRenderer: this.markerRenderer,
+        rectangleManager: this.rectangleManager,
+      });
+    }
 
     // Initialize selection orchestrator (owns selection state and rendering)
     this.setupSelection(frames);
@@ -2295,7 +2287,7 @@ export class FlameChart<E extends EventNode = EventNode> {
     );
   }
 
-  private initializeState(events: LogEvent[]): void {
+  private initializeState(): void {
     if (!this.viewport) {
       return;
     }
@@ -2324,7 +2316,6 @@ export class FlameChart<E extends EventNode = EventNode> {
     const batchColorsCache = this.buildBatchColorsCache(batches);
 
     this.state = {
-      events,
       viewport: this.viewport.getState(),
       batches,
       batchColorsCache,

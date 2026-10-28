@@ -10,7 +10,7 @@
  *
  * Priority order for hit detection:
  * 1. Visible rectangles from the last render pass
- * 2. Events from the event index
+ * 2. Rectangles from the segment tree
  * 3. Buckets (aggregated sub-pixel events)
  * 4. Timeline markers (only if not over events/buckets)
  */
@@ -18,14 +18,14 @@
 import {
   BUCKET_CONSTANTS,
   type EventNode,
-  type LogEvent,
   type PixelBucket,
   type TimelineMarker,
-  type ViewportBounds,
   type ViewportState,
 } from '../../types/flamechart.types.js';
 import type { PrecomputedRect, RectangleCache } from '../RectangleCache.js';
-import type { TimelineEventIndex } from '../TimelineEventIndex.js';
+
+/** Narrower than this many pixels, a frame is left to its bucket. */
+const MIN_HIT_WIDTH = 0.05;
 
 /**
  * Interface for marker renderers that support hit testing.
@@ -50,31 +50,31 @@ export interface HitTestResult {
  * Configuration for HitDetector.
  */
 export interface HitTestConfig {
-  /** Event index for spatial queries */
-  index: TimelineEventIndex;
+  /** The node for a rect's row */
+  nodeOf: (row: number) => EventNode;
   /** Current visible rectangles from last render pass */
   visibleRects: Map<string, PrecomputedRect[]>;
   /** Current buckets from last render pass */
   buckets: Map<string, PixelBucket[]>;
   /** Optional marker renderer for hit testing markers */
   markerRenderer?: MarkerHitTestable | null;
-  /** Optional RectangleCache for O(log n) hit testing queries */
-  rectangleManager?: RectangleCache | null;
+  /** RectangleCache for O(log n) hit testing queries */
+  rectangleManager: RectangleCache;
 }
 
 export class HitDetector {
-  private index: TimelineEventIndex;
+  private readonly nodeOf: (row: number) => EventNode;
   private visibleRects: Map<string, PrecomputedRect[]>;
   private buckets: Map<string, PixelBucket[]>;
   private markerRenderer: MarkerHitTestable | null;
-  private rectangleManager: RectangleCache | null;
+  private rectangleManager: RectangleCache;
 
   constructor(config: HitTestConfig) {
-    this.index = config.index;
+    this.nodeOf = config.nodeOf;
     this.visibleRects = config.visibleRects;
     this.buckets = config.buckets;
     this.markerRenderer = config.markerRenderer ?? null;
-    this.rectangleManager = config.rectangleManager ?? null;
+    this.rectangleManager = config.rectangleManager;
   }
 
   /**
@@ -118,27 +118,31 @@ export class HitDetector {
     // Check if depth is within valid bounds (0 to maxDepth)
     const isValidDepth = depth >= 0 && depth <= maxDepth;
 
-    let logEvent: LogEvent | null = null;
+    let hit: PrecomputedRect | null = null;
     let isOverEventArea = false;
 
     if (isValidDepth) {
       // Priority 1: Check visible rectangles from last render (in sync with display)
-      logEvent = this.findVisibleRectAtPosition(screenX, depth, viewport);
+      hit = this.findVisibleRectAtPosition(screenX, depth, viewport);
 
-      // Priority 2: If no visible rect, check event index (for wider search)
-      if (!logEvent) {
-        logEvent = this.index.findEventAtPosition(screenX, screenY, viewport, depth, false);
+      // Priority 2: If no visible rect, check the segment tree (for wider search)
+      if (!hit) {
+        const time = (screenX + viewport.offsetX) / viewport.zoom;
+        hit =
+          this.rectangleManager
+            .queryRectsInRegion(time, time, depth, depth)
+            .find((rect) => rect.duration * viewport.zoom >= MIN_HIT_WIDTH) ?? null;
       }
 
-      isOverEventArea = logEvent !== null;
+      isOverEventArea = hit !== null;
 
       // Priority 3: If no event found, check if we're over a bucket at this depth
-      if (!logEvent) {
+      if (!hit) {
         const bucketResult = this.findBucketAtPosition(screenX, depth, viewport);
         if (bucketResult) {
           isOverEventArea = true;
           // Find best event from bucket using priority and duration
-          logEvent = this.findBestEventInBucket(bucketResult.bucket);
+          hit = this.findBestRectInBucket(bucketResult.bucket);
         }
       }
     }
@@ -150,38 +154,22 @@ export class HitDetector {
       marker = this.markerRenderer.hitTest(screenX, screenY);
     }
 
-    // Convert LogEvent to EventNode for public API
-    const eventNode = logEvent ? this.toEventNode(logEvent, depth) : null;
+    const eventNode = hit ? this.nodeOf(hit.row) : null;
 
     return { eventNode, marker, isOverEventArea };
-  }
-
-  /**
-   * Convert a LogEvent to an EventNode for the public API.
-   * Stores the original LogEvent reference for adapter layer access.
-   */
-  private toEventNode(logEvent: LogEvent, depth: number): EventNode {
-    return {
-      id: `${logEvent.timestamp}-${depth}`,
-      timestamp: logEvent.timestamp,
-      duration: logEvent.duration?.total ?? 0,
-      type: logEvent.type ?? logEvent.category ?? 'UNKNOWN',
-      text: logEvent.text,
-      original: logEvent,
-    };
   }
 
   /**
    * Find visible rectangle at screen position from last render pass.
    * This ensures hit detection is in sync with what's actually displayed.
    *
-   * @returns Event reference if found, null otherwise
+   * @returns The rect if found, null otherwise
    */
   private findVisibleRectAtPosition(
     screenX: number,
     depth: number,
     viewport: ViewportState,
-  ): LogEvent | null {
+  ): PrecomputedRect | null {
     for (const categoryRects of this.visibleRects.values()) {
       for (const rect of categoryRects) {
         // Check depth match
@@ -195,7 +183,7 @@ export class HitDetector {
 
         // Check if mouse X is within rect bounds
         if (screenX >= rectScreenX && screenX <= rectScreenEnd) {
-          return rect.eventRef;
+          return rect;
         }
       }
     }
@@ -244,30 +232,19 @@ export class HitDetector {
    * 2. For same priority, longest duration wins
    *
    * @param bucket - The bucket containing aggregated events
-   * @returns Best event based on priority/duration, or null if bucket is empty
+   * @returns Best rect based on priority/duration, or null if bucket is empty
    */
-  private findBestEventInBucket(bucket: PixelBucket): LogEvent | null {
-    let events = bucket.eventRefs;
+  private findBestRectInBucket(bucket: PixelBucket): PrecomputedRect | null {
+    let events = bucket.rects;
 
-    // If eventRefs is empty (TemporalSegmentTree optimization), query for events in region
+    // Empty under the TemporalSegmentTree optimization, so query the region.
     if (events.length === 0) {
-      // Use RectangleCache for O(log n) query when available, fall back to O(n) index
-      if (this.rectangleManager) {
-        events = this.rectangleManager.queryEventsInRegion(
-          bucket.timeStart,
-          bucket.timeEnd,
-          bucket.depth,
-          bucket.depth,
-        );
-      } else {
-        const bounds: ViewportBounds = {
-          timeStart: bucket.timeStart,
-          timeEnd: bucket.timeEnd,
-          depthStart: bucket.depth,
-          depthEnd: bucket.depth,
-        };
-        events = this.index.findEventsInRegion(bounds);
-      }
+      events = this.rectangleManager.queryRectsInRegion(
+        bucket.timeStart,
+        bucket.timeEnd,
+        bucket.depth,
+        bucket.depth,
+      );
     }
 
     if (events.length === 0) {
@@ -283,13 +260,13 @@ export class HitDetector {
     const priorityMap = new Map<string, number>();
     BUCKET_CONSTANTS.CATEGORY_PRIORITY.forEach((cat, i) => priorityMap.set(cat, i));
 
-    let bestEvent: LogEvent | null = null;
+    let bestEvent: PrecomputedRect | null = null;
     let bestPriority = Infinity;
     let bestDuration = -1;
 
     for (const event of events) {
       const priority = priorityMap.get(event.category) ?? Infinity;
-      const duration = event.duration?.total ?? 0;
+      const duration = event.duration;
 
       // Priority wins first (lower index = higher priority)
       if (priority < bestPriority) {

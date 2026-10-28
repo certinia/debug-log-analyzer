@@ -7,10 +7,10 @@ import { customElement, property } from 'lit/decorators.js';
 import { styleMap } from 'lit/directives/style-map.js';
 
 import '#vscode-elements/vscode-icon.js';
-import { DerivedValue } from '../core/log/DerivedValue.js';
-import { logContext } from '../core/log/logContext.js';
-import type { LogStore } from '../core/log/LogStore.js';
-import { formatDuration, sharePercent } from '../core/utility/Util.js';
+import { DerivedValue } from '#core/log/DerivedValue.js';
+import { logContext } from '#core/log/logContext.js';
+import type { LogStore } from '#core/log/LogStore.js';
+import { formatDuration, sharePercent } from '#core/utility/Util.js';
 import {
   executionHighlights,
   type ExecutionHighlights,

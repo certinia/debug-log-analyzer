@@ -5,7 +5,7 @@
  */
 import { beforeEach, describe, expect, it } from '@jest/globals';
 
-import type { LogStore } from '../../core/log/LogStore.js';
+import type { LogStore } from '#core/log/LogStore.js';
 import type { ExecutionHighlights } from '../../features/call-tree/utils/ExecutionHighlights.js';
 
 let highlights: ExecutionHighlights | null = null;

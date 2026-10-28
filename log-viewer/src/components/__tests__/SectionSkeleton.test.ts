@@ -5,7 +5,7 @@
  */
 import { describe, expect, it } from '@jest/globals';
 
-import type { LogStatus } from '../../core/log/logStatus.js';
+import type { LogStatus } from '#core/log/logStatus.js';
 import { NO_GOVERNOR_USAGE_TEXT, NO_LOG_TEXT } from '../governorCopy.js';
 import type { SectionSkeleton, SkeletonShape } from '../SectionSkeleton.js';
 import '../SectionSkeleton.js';

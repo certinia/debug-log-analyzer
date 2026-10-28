@@ -1,7 +1,7 @@
 /*
  * Copyright (c) 2026 Certinia Inc. All rights reserved.
  */
-import { sameMembers } from '../../../core/utility/Util.js';
+import { sameMembers } from '#core/utility/Util.js';
 import type { MatchedEventInfo } from '../types/search.types.js';
 
 /** Frames kept in colour while the rest of the chart is dimmed. */

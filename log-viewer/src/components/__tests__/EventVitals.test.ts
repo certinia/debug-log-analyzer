@@ -4,11 +4,11 @@
  * @jest-environment jsdom
  */
 import { beforeAll, describe, expect, it } from '@jest/globals';
-import { parse } from '@apexdevtools/apex-log-parser';
+import { type ApexLog, type EventType, eventType, parse } from '@apexdevtools/apex-log-parser';
 
-import { describeLevelGap } from '../../core/log/levelCapabilities.js';
-import { filterByLevels } from '../../core/log/levelFilter.js';
-import { logStoreFor, type LogStore } from '../../core/log/LogStore.js';
+import { indexesOf, indexOf } from '#test-helpers/apexLog.js';
+import { describeLevelGap } from '#core/log/levelCapabilities.js';
+import { filterByLevels, logStoreFor, type LogStore } from '#core/log/LogStore.js';
 
 // Avoid the heavy CodeBlock import chain (the soql formatter); the
 // field order is expressed by the `.label` spans, not the code preview.
@@ -43,6 +43,17 @@ function valueFor(el: EventVitals, label: string): string | undefined {
   return undefined;
 }
 
+/** The id of the first event of `type`. */
+function idOfType(log: ApexLog, type: EventType): number {
+  const { typeId } = eventType(type);
+  for (let id = 1; id <= log.eventCount; id++) {
+    if (log.columns.type[id] === typeId) {
+      return id;
+    }
+  }
+  throw new Error(`no ${type} event`);
+}
+
 /** No provider in the test, so the consumed store is assigned straight on. */
 async function mount(store: LogStore, props: Partial<EventVitals>): Promise<EventVitals> {
   const el = document.createElement('event-vitals') as EventVitals;
@@ -58,12 +69,12 @@ describe('EventVitals', () => {
   let dmlIndex = -1;
   let soslIndex = -1;
 
-  beforeAll(() => {
-    const apexLog = parse(log);
+  beforeAll(async () => {
+    const apexLog = await parse(log);
     store = logStoreFor(apexLog);
-    soqlIndex = apexLog.eventsById.find((e) => e.text === 'SELECT Id FROM Account')!.eventIndex;
-    dmlIndex = apexLog.eventsById.find((e) => e.text?.startsWith('DML'))!.eventIndex;
-    soslIndex = apexLog.eventsById.find((e) => e.text?.startsWith('SOSL'))!.eventIndex;
+    soqlIndex = indexOf(apexLog, 'SELECT Id FROM Account');
+    dmlIndex = idOfType(apexLog, 'DML_BEGIN');
+    soslIndex = idOfType(apexLog, 'SOSL_EXECUTE_BEGIN');
     expect(customElements.get('event-vitals')).toBeDefined();
   });
 
@@ -149,7 +160,7 @@ describe('EventVitals', () => {
 
   it('gives the selectivity verdict a chip, which the tier colours', async () => {
     // The log above records no query plan, so the verdict needs one of its own.
-    const explained = parse(
+    const explained = await parse(
       '09:18:22.6 (6574780)|EXECUTION_STARTED\n' +
         '17:33:36.2 (1672655920)|SOQL_EXECUTE_BEGIN|[198]|Aggregations:0|SELECT Id FROM Account\n' +
         '17:33:36.2 (1672700000)|SOQL_EXECUTE_EXPLAIN|[198]|Index on Account : [Id], cardinality: 1, sobjectCardinality: 1, relativeCost 0.65\n' +
@@ -158,15 +169,13 @@ describe('EventVitals', () => {
         '09:18:22.6 (7400000)|EXECUTION_FINISHED\n',
     );
     const explainStore = logStoreFor(explained);
-    const indexOf = (query: string) =>
-      explained.eventsById.find((e) => e.text === query)!.eventIndex;
 
     const selective = await mount(explainStore, {
-      eventIndex: indexOf('SELECT Id FROM Account'),
+      eventIndex: indexOf(explained, 'SELECT Id FROM Account'),
       type: 'soql',
     });
     const notSelective = await mount(explainStore, {
-      eventIndex: indexOf('SELECT Id FROM Contact'),
+      eventIndex: indexOf(explained, 'SELECT Id FROM Contact'),
       type: 'soql',
     });
 
@@ -177,7 +186,7 @@ describe('EventVitals', () => {
   });
 
   it('names the DB level that would give an unknown selectivity its verdict', async () => {
-    const unexplained = parse(
+    const unexplained = await parse(
       '64.0 APEX_CODE,FINE;APEX_PROFILING,NONE;DB,INFO\n' +
         '09:18:22.6 (6574780)|EXECUTION_STARTED\n' +
         '17:33:36.2 (1672655920)|SOQL_EXECUTE_BEGIN|[198]|Aggregations:0|SELECT Id FROM Account\n' +
@@ -186,8 +195,7 @@ describe('EventVitals', () => {
     );
     const unexplainedStore = logStoreFor(unexplained);
     const el = await mount(unexplainedStore, {
-      eventIndex: unexplained.eventsById.find((e) => e.text === 'SELECT Id FROM Account')!
-        .eventIndex,
+      eventIndex: indexOf(unexplained, 'SELECT Id FROM Account'),
       type: 'soql',
     });
 
@@ -200,14 +208,13 @@ describe('EventVitals', () => {
   });
 
   it('gives an unknown selectivity no reason when the DB level is not to blame', async () => {
-    const unexplained = parse(
+    const unexplained = await parse(
       '64.0 APEX_CODE,FINE;APEX_PROFILING,NONE;DB,FINEST\n' +
         '17:33:36.2 (1672655920)|SOQL_EXECUTE_BEGIN|[198]|Aggregations:0|SELECT Id FROM Account\n' +
         '17:33:36.2 (1680000000)|SOQL_EXECUTE_END|[198]|Rows:1\n',
     );
     const el = await mount(logStoreFor(unexplained), {
-      eventIndex: unexplained.eventsById.find((e) => e.text === 'SELECT Id FROM Account')!
-        .eventIndex,
+      eventIndex: indexOf(unexplained, 'SELECT Id FROM Account'),
       type: 'soql',
     });
 
@@ -215,15 +222,15 @@ describe('EventVitals', () => {
   });
 
   it('keeps the query plan the log holds when the DB level is lowered', async () => {
-    const explained = parse(
+    const explained = await parse(
       '64.0 APEX_CODE,FINE;APEX_PROFILING,NONE;DB,FINEST\n' +
         '17:33:36.2 (1672655920)|SOQL_EXECUTE_BEGIN|[198]|Aggregations:0|SELECT Id FROM Account\n' +
         '17:33:36.2 (1672700000)|SOQL_EXECUTE_EXPLAIN|[198]|Index on Account : [Id], cardinality: 1, sobjectCardinality: 1, relativeCost 0.65\n' +
         '17:33:36.2 (1680000000)|SOQL_EXECUTE_END|[198]|Rows:1\n',
     );
-    const shown = await filterByLevels(explained, { database: 'INFO' });
-    const el = await mount(logStoreFor(shown!), {
-      eventIndex: explained.eventsById.find((e) => e.text === 'SELECT Id FROM Account')!.eventIndex,
+    const shown = (await filterByLevels(logStoreFor(explained), { database: 'INFO' }))!; // no signal, so never null
+    const el = await mount(shown, {
+      eventIndex: indexOf(explained, 'SELECT Id FROM Account'),
       type: 'soql',
     });
 
@@ -264,15 +271,25 @@ describe('EventVitals across namespaces', () => {
     '09:18:22.6 (800)|EXECUTION_FINISHED\n';
 
   it('shows the caller namespace when it differs', async () => {
-    const apexLog = parse(crossNamespaceLog);
+    const apexLog = await parse(crossNamespaceLog);
     const store = logStoreFor(apexLog);
     // Packaged code entered from a trigger: whose code ran and who invoked it are
     // different answers, so both are reported.
-    const pkg = apexLog.eventsById.find((e) => e.type === 'ENTERING_MANAGED_PKG')!;
-    const el = await mount(store, { eventIndex: pkg.eventIndex });
+    const el = await mount(store, { eventIndex: idOfType(apexLog, 'ENTERING_MANAGED_PKG') });
     expect(valueFor(el, 'Namespace')).toBe('c2g');
     expect(labels(el)).toContain('Caller namespace');
     expect(valueFor(el, 'Caller namespace')).not.toBe('c2g');
+  });
+
+  // The parser names no namespace for unpackaged code; the grids say 'default', so this said '—'.
+  it("calls unpackaged code 'default', as the tables do", async () => {
+    const apexLog = await parse(
+      '09:18:22.6 (100)|METHOD_ENTRY|[1]|01p000000000001|AccountService.getRevenue()\n' +
+        '09:18:22.6 (200)|METHOD_EXIT|[1]|01p000000000001|AccountService.getRevenue()\n',
+    );
+    const el = await mount(logStoreFor(apexLog), { eventIndex: idOfType(apexLog, 'METHOD_ENTRY') });
+
+    expect(valueFor(el, 'Namespace')).toBe('default');
   });
 });
 
@@ -290,10 +307,9 @@ describe('EventVitals over a recursive frame', () => {
     '09:18:22.6 (8000000)|EXECUTION_FINISHED\n';
 
   it('totals the outermost calls, and averages the self time of every call', async () => {
-    const apexLog = parse(recursiveLog);
+    const apexLog = await parse(recursiveLog);
     const store = logStoreFor(apexLog);
-    const calls = apexLog.eventsById.filter((e) => e.type === 'METHOD_ENTRY');
-    const el = await mount(store, { instances: calls.map((e) => e.eventIndex) });
+    const el = await mount(store, { instances: indexesOf(apexLog, 'Rec.walk()') });
 
     expect(valueFor(el, 'Calls')).toBe('2');
     // The outer call is 4ms and holds the 1ms inner call, so summing both totals

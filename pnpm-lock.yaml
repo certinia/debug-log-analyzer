@@ -16,8 +16,8 @@ importers:
   .:
     devDependencies:
       '@apexdevtools/apex-log-parser':
-        specifier: 0.3.0
-        version: 0.3.0
+        specifier: 0.4.0
+        version: 0.4.0
       '@playwright/test':
         specifier: ^1.64.1
         version: 1.64.1
@@ -100,8 +100,8 @@ importers:
   lana:
     dependencies:
       '@apexdevtools/apex-log-parser':
-        specifier: 0.3.0
-        version: 0.3.0
+        specifier: 0.4.0
+        version: 0.4.0
       '@apexdevtools/apex-parser':
         specifier: 5.3.0
         version: 5.3.0
@@ -183,8 +183,8 @@ importers:
   log-viewer:
     dependencies:
       '@apexdevtools/apex-log-parser':
-        specifier: 0.3.0
-        version: 0.3.0
+        specifier: 0.4.0
+        version: 0.4.0
       '@apexdevtools/apex-parser':
         specifier: 5.3.0
         version: 5.3.0
@@ -310,8 +310,8 @@ packages:
     resolution: {integrity: sha512-PIOUXlSnrqM0S+WOgDRb4RzotydJH7ZoT6tOyL7tAO7qJOfvX5wsEW8Pe+PMKMwvuI4/gIyK9cg2H7lJXqnc4Q==}
     engines: {node: '>= 14.0.0'}
 
-  '@apexdevtools/apex-log-parser@0.3.0':
-    resolution: {integrity: sha512-bb3fRUCq5G0EGFx90vgkkXYgx2RaIoz8NRnOGaYhVOfnXiwtxs1eSaBV0xu0nSk8SdFYe90AVEOcKU+O9taAsA==}
+  '@apexdevtools/apex-log-parser@0.4.0':
+    resolution: {integrity: sha512-YkukV33FTJwLMq8hr7vUt423z1FLQSi7Z+4isQypZPAz0776tOf4hBqk0pq09+kYwOEsKTyc5QwwSwzmYrvipg==}
     engines: {node: '>=22'}
 
   '@apexdevtools/apex-parser@5.3.0':
@@ -9752,7 +9752,7 @@ snapshots:
     dependencies:
       '@algolia/client-common': 5.56.0
 
-  '@apexdevtools/apex-log-parser@0.3.0': {}
+  '@apexdevtools/apex-log-parser@0.4.0': {}
 
   '@apexdevtools/apex-parser@5.3.0': {}
 

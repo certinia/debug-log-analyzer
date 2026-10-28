@@ -6,97 +6,121 @@
  * The grid's core and render layers on the Time Order rows, with plain text cells: what
  * the table itself costs, before the ui layer and the app's cell formatters.
  */
-import type { ApexLog, LogEvent } from '@apexdevtools/apex-log-parser';
+import type { ApexLog, SelfTotal } from '@apexdevtools/apex-log-parser';
 
+import { logStoreFor } from '../../src/core/log/LogStore.js';
+import { rowMetrics, type SelfTotalColumns } from '../../src/core/log/rowMetrics.js';
 import { formatNsAsMs } from '../../src/core/utility/Duration.js';
-import { toTimeOrderTree, type TimeOrderRow } from './timeOrderTree.js';
+import {
+  costLimitsOf,
+  governorCostOf,
+  type GovernorUsage,
+} from '../../src/features/call-tree/utils/GovernorCost.js';
+import {
+  TimeOrderSource,
+  type TimeOrderNode,
+} from '../../src/features/call-tree/utils/TimeOrderTree.js';
 import { GridStore, Group, type CellText, type RowView } from '../../src/grid/core/index.js';
 import { FIND_ATTR, GridView, type RowPainter } from '../../src/grid/render/index.js';
 import { browserScheduler } from '../../src/grid/ui/index.js';
 import type { Contender } from './contender.js';
-import { pathOf, timeOrderDetails } from './targets.js';
 
 interface Column {
   field: string;
   title: string;
   width: number | 'flex';
-  text: CellText<TimeOrderRow>;
+  text: CellText<TimeOrderNode>;
 }
 
-const count = (n: number): string => String(n);
+/** Each row's governor cost, worked out up front as the Time Order rows once held it. */
+function governorCosts(source: TimeOrderSource): { avg: Float64Array; max: Float64Array } {
+  const { index } = source;
+  const m = rowMetrics(index);
+  const costLimits = costLimitsOf(index.log.limits);
+  const avg = new Float64Array(index.rowCount);
+  const max = new Float64Array(index.rowCount);
+  const tally = (): SelfTotal => ({ self: 0, total: 0 });
+  const usage: GovernorUsage = {
+    dmlCount: tally(),
+    soqlCount: tally(),
+    soslCount: tally(),
+    dmlRowCount: tally(),
+    soqlRowCount: tally(),
+    soslRowCount: tally(),
+    heapAllocated: tally(),
+    heapGross: tally(),
+    heapPeak: 0,
+  };
+  const fill = (
+    into: SelfTotal,
+    from: SelfTotalColumns<Int32Array | Float64Array>,
+    row: number,
+  ) => {
+    into.self = from.self[row]!;
+    into.total = from.total[row]!;
+  };
+  for (let row = 0; row < index.rowCount; row++) {
+    fill(usage.dmlCount, m.dmlCount, row);
+    fill(usage.soqlCount, m.soqlCount, row);
+    fill(usage.soslCount, m.soslCount, row);
+    fill(usage.dmlRowCount, m.dmlRowCount, row);
+    fill(usage.soqlRowCount, m.soqlRowCount, row);
+    fill(usage.soslRowCount, m.soslRowCount, row);
+    fill(usage.heapAllocated, m.heapAllocated, row);
+    fill(usage.heapGross, m.heapGross, row);
+    usage.heapPeak = m.heapPeak[row]!;
+    const [a, b] = governorCostOf(usage, costLimits);
+    avg[row] = a ?? NaN;
+    max[row] = b ?? NaN;
+  }
+  return { avg, max };
+}
 
-export const COLUMNS: Column[] = [
-  { field: 'text', title: 'Name', width: 'flex', text: (r) => r.text },
-  { field: 'namespace', title: 'Namespace', width: 117, text: (r) => r.namespace },
-  { field: 'dmlCount.total', title: 'DML Count', width: 70, text: (r) => count(r.dmlCount.total) },
-  {
-    field: 'soqlCount.total',
-    title: 'SOQL Count',
-    width: 70,
-    text: (r) => count(r.soqlCount.total),
-  },
-  {
-    field: 'soslCount.total',
-    title: 'SOSL Count',
-    width: 70,
-    text: (r) => count(r.soslCount.total),
-  },
-  {
-    field: 'thrownCount.total',
-    title: 'Throws',
-    width: 77,
-    text: (r) => count(r.thrownCount.total),
-  },
-  {
-    field: 'dmlRowCount.total',
-    title: 'DML Rows',
-    width: 63,
-    text: (r) => count(r.dmlRowCount.total),
-  },
-  {
-    field: 'soqlRowCount.total',
-    title: 'SOQL Rows',
-    width: 63,
-    text: (r) => count(r.soqlRowCount.total),
-  },
-  {
-    field: 'soslRowCount.total',
-    title: 'SOSL Rows',
-    width: 63,
-    text: (r) => count(r.soslRowCount.total),
-  },
-  {
-    field: 'heapAllocated.total',
-    title: 'Heap Net',
-    width: 92,
-    text: (r) => count(r.heapAllocated.total),
-  },
-  { field: 'heapPeak', title: 'Heap Peak', width: 100, text: (r) => count(r.heapPeak) },
-  {
-    field: 'governorCost',
-    title: 'Gov Avg %',
-    width: 71,
-    text: (r) => String(r.governorCost ?? '—'),
-  },
-  {
-    field: 'governorCostMax',
-    title: 'Gov Peak %',
-    width: 78,
-    text: (r) => String(r.governorCostMax ?? '—'),
-  },
-  {
-    field: 'duration.total',
-    title: 'Total Time (ms)',
-    width: 140,
-    text: (r) => formatNsAsMs(r.duration.total),
-  },
-  {
-    field: 'duration.self',
-    title: 'Self Time (ms)',
-    width: 140,
-    text: (r) => formatNsAsMs(r.duration.self),
-  },
-];
+/** The plain text columns, read from the log index by row. */
+export function columnsFor(source: TimeOrderSource): Column[] {
+  const m = rowMetrics(source.index);
+  const cost = governorCosts(source);
+  const total =
+    (from: SelfTotalColumns<Int32Array | Float64Array>) =>
+    ({ row }: TimeOrderNode): string =>
+      String(from.total[row]);
+  const percent =
+    (from: Float64Array) =>
+    ({ row }: TimeOrderNode) =>
+      Number.isNaN(from[row]) ? '—' : String(from[row]);
+  return [
+    { field: 'text', title: 'Name', width: 'flex', text: source.text },
+    { field: 'namespace', title: 'Namespace', width: 117, text: source.namespace },
+    { field: 'dmlCount.total', title: 'DML Count', width: 70, text: total(m.dmlCount) },
+    { field: 'soqlCount.total', title: 'SOQL Count', width: 70, text: total(m.soqlCount) },
+    { field: 'soslCount.total', title: 'SOSL Count', width: 70, text: total(m.soslCount) },
+    { field: 'thrownCount.total', title: 'Throws', width: 77, text: total(m.thrownCount) },
+    { field: 'dmlRowCount.total', title: 'DML Rows', width: 63, text: total(m.dmlRowCount) },
+    { field: 'soqlRowCount.total', title: 'SOQL Rows', width: 63, text: total(m.soqlRowCount) },
+    { field: 'soslRowCount.total', title: 'SOSL Rows', width: 63, text: total(m.soslRowCount) },
+    { field: 'heapAllocated.total', title: 'Heap Net', width: 92, text: total(m.heapAllocated) },
+    {
+      field: 'heapPeak',
+      title: 'Heap Peak',
+      width: 100,
+      text: ({ row }) => String(m.heapPeak[row]),
+    },
+    { field: 'governorCost', title: 'Gov Avg %', width: 71, text: percent(cost.avg) },
+    { field: 'governorCostMax', title: 'Gov Peak %', width: 78, text: percent(cost.max) },
+    {
+      field: 'duration.total',
+      title: 'Total Time (ms)',
+      width: 140,
+      text: ({ row }) => formatNsAsMs(m.duration.total[row]!),
+    },
+    {
+      field: 'duration.self',
+      title: 'Self Time (ms)',
+      width: 140,
+      text: ({ row }) => formatNsAsMs(m.duration.self[row]!),
+    },
+  ];
+}
 
 const STYLE = `
   .scroller { height: 100%; overflow: auto; contain: strict; font: 13px sans-serif; color: #ccc; }
@@ -112,8 +136,10 @@ const STYLE = `
 `;
 
 export class GridContender implements Contender {
-  private store!: GridStore<TimeOrderRow>;
-  private view!: GridView<TimeOrderRow>;
+  private store!: GridStore<TimeOrderNode>;
+  private view!: GridView<TimeOrderNode>;
+  private source!: TimeOrderSource;
+  private columns: Column[] = [];
   private host!: HTMLElement;
   private scrollEl!: HTMLElement;
   private head!: HTMLElement;
@@ -134,30 +160,28 @@ export class GridContender implements Contender {
     body.className = 'body';
     this.scrollEl.append(this.head, body);
     root.append(style, this.scrollEl);
-    this.layoutColumns();
 
-    const roots = toTimeOrderTree(log.children, log.governorLimits) ?? [];
-    this.store = new GridStore<TimeOrderRow>(
-      { roots, children: (r) => r._children, key: (r) => r.id },
-      { scheduler: browserScheduler },
-    );
-    this.view = new GridView<TimeOrderRow>({
+    this.source = new TimeOrderSource(await logStoreFor(log).logIndex());
+    this.columns = columnsFor(this.source);
+    this.layoutColumns();
+    this.store = new GridStore<TimeOrderNode>(this.source, { scheduler: browserScheduler });
+    this.view = new GridView<TimeOrderNode>({
       scroller: this.scrollEl,
       body,
       painter: this.painter(),
       rowHeight: 24,
     });
-    await this.store.setFilters([timeOrderDetails]);
+    await this.store.setFilters([this.source.withoutDetails]);
     this.show();
   }
 
-  private painter(): RowPainter<TimeOrderRow> {
+  private painter(): RowPainter<TimeOrderNode> {
     return {
-      paint: (el: HTMLElement, index: number, rows: RowView<TimeOrderRow>) => {
+      paint: (el: HTMLElement, index: number, rows: RowView<TimeOrderNode>) => {
         el.className = 'row';
-        if (el.childElementCount !== COLUMNS.length) {
+        if (el.childElementCount !== this.columns.length) {
           el.replaceChildren(
-            ...COLUMNS.map((column) => {
+            ...this.columns.map((column) => {
               const cell = document.createElement('div');
               cell.className = column.width === 'flex' ? 'c name' : 'c';
               cell.setAttribute(FIND_ATTR, '');
@@ -168,7 +192,7 @@ export class GridContender implements Contender {
         const entry = rows.rowAt(index);
         const depth = rows.depthAt(index);
         const cells = el.children;
-        COLUMNS.forEach((column, i) => {
+        this.columns.forEach((column, i) => {
           const cell = cells[i] as HTMLElement;
           cell.hidden = this.hidden.has(column.field);
           if (entry instanceof Group) {
@@ -190,7 +214,7 @@ export class GridContender implements Contender {
   }
 
   private layoutColumns(): void {
-    const shown = COLUMNS.filter((c) => !this.hidden.has(c.field));
+    const shown = this.columns.filter((c) => !this.hidden.has(c.field));
     const flex = this.nameWidth ? `${this.nameWidth}px` : 'minmax(200px, 1fr)';
     this.host.style.setProperty(
       '--cols',
@@ -211,7 +235,7 @@ export class GridContender implements Contender {
     );
   }
 
-  private show(toggled?: TimeOrderRow['id']): void {
+  private show(toggled?: number): void {
     this.view.setRows(this.store.snapshot().rows, toggled);
   }
 
@@ -226,7 +250,8 @@ export class GridContender implements Contender {
   }
 
   async sortSelfDesc(): Promise<void> {
-    await this.store.setSort({ value: (r) => r.duration.self, dir: 'desc' });
+    const { self } = this.source.index;
+    await this.store.setSort({ value: ({ row }) => self[row]!, dir: 'desc' });
     this.show();
   }
 
@@ -236,12 +261,12 @@ export class GridContender implements Contender {
   }
 
   async setDetailFilter(on: boolean): Promise<void> {
-    await this.store.setFilters(on ? [timeOrderDetails] : []);
+    await this.store.setFilters(on ? [this.source.withoutDetails] : []);
     this.show();
   }
 
-  async goTo(target: LogEvent): Promise<void> {
-    const index = await this.store.reveal(pathOf(target));
+  async goTo(path: readonly number[]): Promise<void> {
+    const index = await this.store.reveal(path);
     this.show();
     if (index >= 0) {
       this.view.scrollToIndex(index);
@@ -250,7 +275,7 @@ export class GridContender implements Contender {
 
   async find(text: string): Promise<number> {
     const query = { text };
-    const shown = COLUMNS.filter((c) => !this.hidden.has(c.field)).map((c) => c.text);
+    const shown = this.columns.filter((c) => !this.hidden.has(c.field)).map((c) => c.text);
     const result = await this.store.find(query, shown);
 
     if (result?.pattern) {
@@ -261,7 +286,7 @@ export class GridContender implements Contender {
 
   async exportCsv(): Promise<number> {
     const text = await this.store.exportText(
-      COLUMNS.map((c) => ({ title: c.title, value: c.text })),
+      this.columns.map((c) => ({ title: c.title, value: c.text })),
       { format: 'csv' },
     );
     return text?.length ?? -1;

@@ -6,16 +6,16 @@ import { consume } from '@lit/context';
 import { initialState, Task } from '@lit/task';
 import { LitElement, css, html, nothing, type PropertyValues } from 'lit';
 import { customElement, property, query, state } from 'lit/decorators.js';
-import { logContext } from '../../../core/log/logContext.js';
-import type { LogStore } from '../../../core/log/LogStore.js';
+import { logContext } from '#core/log/logContext.js';
+import type { LogStore } from '#core/log/LogStore.js';
 
-import { logStatusContext, type LogStatus } from '../../../core/log/logStatus.js';
+import { logStatusContext, type LogStatus } from '#core/log/logStatus.js';
 
 import type { ApexLog } from '@apexdevtools/apex-log-parser';
 import { categoryPalette } from '../../../components/categoryTime.js';
-import { SubscriptionController } from '../../../core/events/SubscriptionController.js';
-import { setChanged } from '../../../core/utility/Util.js';
-import { VSCodeExtensionMessenger } from '../../../core/messaging/VSCodeExtensionMessenger.js';
+import { SubscriptionController } from '#core/events/SubscriptionController.js';
+import { setChanged } from '#core/utility/Util.js';
+import { VSCodeExtensionMessenger } from '#core/messaging/VSCodeExtensionMessenger.js';
 import {
   settingsSettled,
   subscribeSettings,
@@ -28,6 +28,7 @@ import { addCustomThemes } from '../themes/ThemeSelector.js';
 
 import { selfTimeByCategory, toTimelineKeys } from '../utils/category-self-time.js';
 import type { TimeDisplayMode } from '../types/flamechart.types.js';
+import type { TimelineNavigateRequest } from '../navigation.js';
 import type { TimelineFlameChart } from './TimelineFlameChart.js';
 import type { TimelineKeyEntry, Timelinekey } from './TimelineKey.js';
 
@@ -67,11 +68,9 @@ export class TimelineView extends LitElement {
     return this.logStore?.log ?? null;
   }
 
-  @property({ type: Number })
-  navigateToTimestamp: number | undefined = undefined;
-
-  @property({ type: Number })
-  navigateToEventIndex: number | undefined = undefined;
+  // No hasChanged: each request is a new object, so the same event asked for twice moves again.
+  @property({ attribute: false })
+  navigateRequest: TimelineNavigateRequest | undefined = undefined;
 
   @state()
   activeTheme: string | null = null;
@@ -285,10 +284,9 @@ export class TimelineView extends LitElement {
 
     return html`${toolbar}
       <timeline-flame-chart
-        .apexLog=${this.timelineRoot}
+        .logStore=${this.logStore}
         .themeName=${this.activeTheme}
-        .navigateToEventIndex=${this.navigateToEventIndex}
-        .navigateToTimestamp=${this.navigateToTimestamp}
+        .navigateRequest=${this.navigateRequest}
         .showTooltip=${this.showTooltip}
         .dimCategories=${this.litCategories}
         @category-highlight-clear=${this.onHighlightClear}

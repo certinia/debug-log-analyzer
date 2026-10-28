@@ -165,7 +165,7 @@ export class SearchTextLabelRenderer {
           continue;
         }
 
-        const text = rect.eventRef.text;
+        const text = this.textLabelRenderer.labelOf(rect.row);
         if (!text) {
           continue;
         }

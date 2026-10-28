@@ -2,7 +2,7 @@ import { consume } from '@lit/context';
 import { LitElement, css, html, nothing } from 'lit';
 import { customElement, property } from 'lit/decorators.js';
 
-import { logStatusContext, type LogStatus } from '../core/log/logStatus.js';
+import { logStatusContext, type LogStatus } from '#core/log/logStatus.js';
 
 // styles
 import { globalStyles } from '../styles/global.styles.js';

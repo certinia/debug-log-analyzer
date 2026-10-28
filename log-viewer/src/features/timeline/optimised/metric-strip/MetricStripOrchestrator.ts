@@ -24,7 +24,7 @@
 import * as PIXI from 'pixi.js';
 
 import { createTimelineApp, destroyTimelineApp } from '../rendering/pixiApp.js';
-import { formatTimeRange } from '../../../../core/utility/Util.js';
+import { formatTimeRange } from '#core/utility/Util.js';
 import type {
   HeatStripTimeSeries,
   TimelineMarker,

@@ -17,7 +17,7 @@
  */
 
 import * as PIXI from 'pixi.js';
-import { formatDuration } from '../../../../core/utility/Util.js';
+import { formatDuration } from '#core/utility/Util.js';
 import type { ViewportState } from '../../types/flamechart.types.js';
 import { calculateLabelPosition, createTimelineLabel } from '../rendering/LabelPositioning.js';
 import type { MeasurementSnapshot } from './MeasurementState.js';

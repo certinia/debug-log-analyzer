@@ -6,11 +6,11 @@
 import { describe, expect, it } from '@jest/globals';
 
 // Hoisted above the import, so the mock can't close over a `const` declared here.
-jest.mock('../../../core/messaging/VSCodeExtensionMessenger.js', () => ({
+jest.mock('#core/messaging/VSCodeExtensionMessenger.js', () => ({
   vscodeMessenger: { send: jest.fn() },
 }));
 
-import { vscodeMessenger } from '../../../core/messaging/VSCodeExtensionMessenger.js';
+import { vscodeMessenger } from '#core/messaging/VSCodeExtensionMessenger.js';
 import { parserIssuesToNotifications } from '../parserNotifications.js';
 
 const sendMock = vscodeMessenger.send as jest.Mock;

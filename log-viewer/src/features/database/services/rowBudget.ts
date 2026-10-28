@@ -1,10 +1,10 @@
 /*
  * Copyright (c) 2026 Certinia Inc. All rights reserved.
  */
-import type { ApexLog, Limits } from '@apexdevtools/apex-log-parser';
+import type { ApexLog, LimitValue, Limits } from '@apexdevtools/apex-log-parser';
 
 import { limitTotals } from '../../../components/logOverviewMetrics.js';
-import type { Derivation } from '../../../core/log/LogStore.js';
+import type { Derivation } from '#core/log/LogStore.js';
 import { apexLimitSeries } from '../../timeline/optimised/apex-limit-series.js';
 import { SOSL_ROWS_PER_QUERY_LIMIT } from '../limits.js';
 import {
@@ -84,7 +84,7 @@ export const rowBudgets: Derivation<RowBudgets> = async (_, store) => {
 };
 
 function build(log: ApexLog, overview: DatabaseOverview, limits: Limits): RowBudgets {
-  const hasLimits = log.governorLimits.snapshots.length > 0;
+  const hasLimits = log.limits.snapshots.length > 0;
 
   const soql = new Map<string, RowGroup>();
   const dml = new Map<string, RowGroup>();
@@ -158,19 +158,14 @@ function objectRows(soql: Map<string, RowGroup>, dml: Map<string, RowGroup>): Ob
 }
 
 /** The governor's count where the log holds one, else what the tree showed. */
-function count(
-  label: string,
-  total: { used: number; limit: number },
-  observed: number,
-  hasLimits: boolean,
-): RowCount {
-  return { label, used: hasLimits ? total.used : observed, limit: total.limit };
+function count(label: string, total: LimitValue, observed: number, hasLimits: boolean): RowCount {
+  return { label, used: hasLimits ? total.used : observed, limit: total.limit ?? 0 };
 }
 
 function budgetOf(
   kind: RowBudgetKind,
   groups: Map<string, RowGroup>,
-  total: { used: number; limit: number },
+  total: LimitValue,
   used: number | null,
 ): RowBudget {
   const ranked = [...groups.values()].sort((a, b) => b.rows - a.rows);
@@ -178,7 +173,7 @@ function budgetOf(
     kind,
     used,
     observed: ranked.reduce((rows, group) => rows + group.rows, 0),
-    limit: total.limit,
+    limit: total.limit ?? 0,
     groups: ranked,
   };
 }

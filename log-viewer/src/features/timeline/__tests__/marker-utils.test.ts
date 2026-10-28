@@ -7,27 +7,27 @@
  */
 
 import { describe, expect, it } from '@jest/globals';
-import type { ApexLog, LogEvent, LogIssue } from '@apexdevtools/apex-log-parser';
+import type { ApexLog, LogIssue } from '@apexdevtools/apex-log-parser';
 import type { TimelineMarker } from '../types/flamechart.types.js';
 import { extractExceptionMarkers, extractMarkers, noDataSpans } from '../utils/marker-utils.js';
 
 function logWith(overrides: Partial<ApexLog>): ApexLog {
-  return { logIssues: [], exceptions: [], ...overrides } as unknown as ApexLog;
+  return { issues: [], exceptions: [], ...overrides } as unknown as ApexLog;
 }
 
 describe('extractMarkers', () => {
   it('copies endTime through for bounded issues', () => {
-    const issues: LogIssue[] = [
+    const issues = [
       {
-        startTime: 100,
-        endTime: 500,
+        startTimestamp: 100,
+        endTimestamp: 500,
         summary: 'Skipped-Lines',
         description: 'skipped',
         type: 'skip',
       },
-    ];
+    ] as unknown as LogIssue[];
 
-    const markers = extractMarkers(logWith({ logIssues: issues }));
+    const markers = extractMarkers(logWith({ issues }));
 
     expect(markers).toHaveLength(1);
     expect(markers[0]!.type).toBe('skip');
@@ -36,24 +36,34 @@ describe('extractMarkers', () => {
   });
 
   it('leaves endTime undefined for point issues', () => {
-    const issues: LogIssue[] = [
-      { startTime: 100, summary: 'Unexpected-End', description: '', type: 'unexpected' },
-    ];
+    const issues = [
+      { startTimestamp: 100, summary: 'Unexpected-End', description: '', type: 'unexpected' },
+    ] as unknown as LogIssue[];
 
-    const markers = extractMarkers(logWith({ logIssues: issues }));
+    const markers = extractMarkers(logWith({ issues }));
 
     expect(markers).toHaveLength(1);
     expect(markers[0]!.endTime).toBeUndefined();
   });
 
   it('drops error and fatal issues (exceptions cover them)', () => {
-    const issues: LogIssue[] = [
-      { startTime: 100, summary: 'System.LimitException: cpu', description: '', type: 'fatal' },
-      { startTime: 150, summary: 'System.LimitException: soql', description: '', type: 'error' },
-      { startTime: 200, summary: 'Skipped-Lines', description: '', type: 'skip' },
-    ];
+    const issues = [
+      {
+        startTimestamp: 100,
+        summary: 'System.LimitException: cpu',
+        description: '',
+        type: 'fatal',
+      },
+      {
+        startTimestamp: 150,
+        summary: 'System.LimitException: soql',
+        description: '',
+        type: 'error',
+      },
+      { startTimestamp: 200, summary: 'Skipped-Lines', description: '', type: 'skip' },
+    ] as unknown as LogIssue[];
 
-    const markers = extractMarkers(logWith({ logIssues: issues }));
+    const markers = extractMarkers(logWith({ issues }));
 
     expect(markers).toHaveLength(1);
     expect(markers[0]!.type).toBe('skip');
@@ -63,9 +73,9 @@ describe('extractMarkers', () => {
 describe('extractExceptionMarkers', () => {
   it('creates a red point marker per exception event', () => {
     const exceptions = [
-      { timestamp: 300, eventIndex: 5, type: 'EXCEPTION_THROWN', text: 'System.NullPointer: x' },
-      { timestamp: 800, eventIndex: 9, type: 'FATAL_ERROR', text: 'System.LimitException: cpu' },
-    ] as unknown as LogEvent[];
+      { startTimestamp: 300, id: 5, type: 'EXCEPTION_THROWN', text: 'System.NullPointer: x' },
+      { startTimestamp: 800, id: 9, type: 'FATAL_ERROR', text: 'System.LimitException: cpu' },
+    ] as unknown as ApexLog['exceptions'];
 
     const markers = extractExceptionMarkers(logWith({ exceptions }));
 
@@ -79,8 +89,8 @@ describe('extractExceptionMarkers', () => {
 
   it('uses the first line as the summary for multi-line exception text', () => {
     const exceptions = [
-      { timestamp: 300, eventIndex: 5, type: 'EXCEPTION_THROWN', text: 'first line\nstack\nmore' },
-    ] as unknown as LogEvent[];
+      { startTimestamp: 300, id: 5, type: 'EXCEPTION_THROWN', text: 'first line\nstack\nmore' },
+    ] as unknown as ApexLog['exceptions'];
 
     const markers = extractExceptionMarkers(logWith({ exceptions }));
 

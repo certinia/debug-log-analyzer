@@ -8,18 +8,16 @@ import type { ApexLog } from '@apexdevtools/apex-log-parser';
 
 let apexLog: ApexLog | null = null;
 
-import { indexTree } from '#test-helpers/apexLog.js';
-import { logStoreFor } from '../../core/log/LogStore.js';
-import { setRange } from '../../core/log/rangeScope.js';
+import { logStoreFor } from '#core/log/LogStore.js';
+import { setRange } from '#core/log/rangeScope.js';
 import type { NamespaceTimeBar } from '../NamespaceTimeBar.js';
 import { DEFAULT_MAX_SEGMENTS } from '../StackedTimeBar.js';
 import '../NamespaceTimeBar.js';
 import { logNamespacePalette } from '../namespacePalette.js';
 import { namespaceEvent, log, type FakeEvent } from './fixtures/logEvents.js';
 
-const logOf = (children: FakeEvent[], namespaces: string[]) => {
-  apexLog = log(children, namespaces);
-  indexTree(apexLog);
+const logOf = async (children: FakeEvent[]): Promise<void> => {
+  apexLog = (await log(children)).log;
 };
 
 async function mount(props: Partial<Pick<NamespaceTimeBar, 'eventIndex' | 'instances'>> = {}) {
@@ -50,7 +48,7 @@ describe('namespace-time-bar', () => {
 
   it('scopes to the selected frame and everything below it', async () => {
     const frame = namespaceEvent('pkg', 40, [namespaceEvent('other', 10)]);
-    logOf([namespaceEvent('default', 100, [frame])], ['pkg', 'other']);
+    await logOf([namespaceEvent('default', 100, [frame])]);
 
     const element = await mount({ eventIndex: frame.eventIndex });
 
@@ -63,7 +61,7 @@ describe('namespace-time-bar', () => {
   it('sums every occurrence of an aggregate, counting a nested one once', async () => {
     const inner = namespaceEvent('pkg', 20);
     const outer = namespaceEvent('pkg', 30, [inner]);
-    logOf([outer], ['pkg']);
+    await logOf([outer]);
 
     const element = await mount({ instances: [outer.eventIndex, inner.eventIndex] });
 
@@ -76,11 +74,10 @@ describe('namespace-time-bar', () => {
       (_, index) => `ns${index}`,
     ).concat('nsA', 'nsB');
     // Descending self time, so the two smallest fall past the palette.
-    logOf(
+    await logOf(
       namespaces.map((namespace, index) =>
         namespaceEvent(namespace, (namespaces.length - index) * 10),
       ),
-      namespaces,
     );
 
     const shown = segments(await mount());
@@ -93,7 +90,7 @@ describe('namespace-time-bar', () => {
   it('keeps its bar while a new scope in the same log adds up', async () => {
     const first = namespaceEvent('pkg', 40);
     const second = namespaceEvent('other', 10);
-    logOf([first, second], ['pkg', 'other']);
+    await logOf([first, second]);
     const element = await mount({ eventIndex: first.eventIndex });
     const shown = bar(element);
 
@@ -108,11 +105,9 @@ describe('namespace-time-bar', () => {
   });
 
   it("drops the last log's bar when the log changes", async () => {
-    logOf([namespaceEvent('pkg', 40)], ['pkg']);
+    await logOf([namespaceEvent('pkg', 40)]);
     const element = await mount();
-    const next = log([namespaceEvent('other', 10)], ['other']);
-    indexTree(next);
-    const nextStore = logStoreFor(next);
+    const { store: nextStore } = await log([namespaceEvent('other', 10)]);
     // Held, so the new log's sum cannot land before the assertion.
     jest.spyOn(nextStore, 'logIndex').mockReturnValue(new Promise(() => {}));
 
@@ -125,15 +120,15 @@ describe('namespace-time-bar', () => {
   });
 
   it.each([
-    ['a scope with no recorded time', () => logOf([namespaceEvent('pkg', 0)], ['pkg']), {}],
+    ['a scope with no recorded time', () => logOf([namespaceEvent('pkg', 0)]), {}],
     [
       'a frame the log does not hold',
-      () => logOf([namespaceEvent('pkg', 100)], ['pkg']),
+      () => logOf([namespaceEvent('pkg', 100)]),
       { eventIndex: 99 },
     ],
-    ['the lack of a log', () => {}, {}],
+    ['the lack of a log', async () => {}, {}],
   ])('notes %s', async (_name, setup, props) => {
-    setup();
+    await setup();
 
     const element = await mount(props);
 
@@ -157,7 +152,7 @@ describe('namespace-time-bar with a timeline window', () => {
   // window here holds a nanosecond, so its own figures could not be these.
   it('answers for the picked frame, not the window', async () => {
     const frame = namespaceEvent('default', 100, [namespaceEvent('pkg', 500)]);
-    logOf([frame], ['pkg']);
+    await logOf([frame]);
     setRange({ start: 0, end: 1 });
 
     const element = await mount({ eventIndex: frame.eventIndex });
@@ -169,7 +164,7 @@ describe('namespace-time-bar with a timeline window', () => {
   // The bar took its palette from the whole-log walk, which a window skips, so
   // mounting into a window left it with no colours and an empty note.
   it('answers for a window it mounts into', async () => {
-    logOf([namespaceEvent('default', 100, [namespaceEvent('pkg', 500)])], ['pkg']);
+    await logOf([namespaceEvent('default', 100, [namespaceEvent('pkg', 500)])]);
     // `default` owns 0 to 100, `pkg` 100 to 600.
     setRange({ start: 0, end: 350 });
 

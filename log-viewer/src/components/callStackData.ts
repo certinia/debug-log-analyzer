@@ -1,7 +1,7 @@
 /*
  * Copyright (c) 2025 Certinia Inc. All rights reserved.
  */
-import { currentLogStore } from '../core/log/LogStore.js';
+import { currentLogStore } from '#core/log/LogStore.js';
 
 export interface CallStackRow {
   eventIndex: number;
@@ -22,9 +22,9 @@ export function buildCallStackData(eventIndex: number): {
 } {
   const stack = eventIndex >= 0 ? (currentLogStore()?.stackByEventIndex(eventIndex) ?? []) : [];
   const rows = stack.map((entry) => ({
-    eventIndex: entry.eventIndex,
-    type: entry.type ?? '',
-    text: entry.text,
+    eventIndex: entry.id,
+    type: entry.type,
+    text: entry.text ?? entry.type,
     duration: { total: entry.duration.total, self: entry.duration.self },
   }));
   return { rows, rootTotal: rows[0]?.duration.total ?? 0 };

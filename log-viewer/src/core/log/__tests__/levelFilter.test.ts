@@ -1,13 +1,14 @@
 /*
  * Copyright (c) 2026 Certinia Inc. All rights reserved.
  */
-import { afterEach, describe, expect, it } from '@jest/globals';
-import type { ApexLog, DebugLevels, LogEvent } from '@apexdevtools/apex-log-parser';
+import { afterEach, describe, expect, it, jest } from '@jest/globals';
 
 import { indexOf, storeOf } from '#test-helpers/apexLog.js';
-import { filterByLevels, isHidden, LevelFilterBuilder, sameLevels } from '../levelFilter.js';
-import { eventByEventIndex, findEventByEventIndex } from '../../utility/EventSearch.js';
-import { logStoreFor } from '../LogStore.js';
+import { type DebugLevels, hiddenByLevels, sameLevels } from '../levelFilter.js';
+import { buildLogIndex, type LogIndex } from '../LogIndex.js';
+import { filterByLevels, type LogStore } from '../LogStore.js';
+import { rowMetrics, statementSelves } from '../rowMetrics.js';
+import type { SoqlEvent } from '../statements.js';
 
 const SETTINGS = '64.0 APEX_CODE,FINEST;APEX_PROFILING,NONE;DB,FINEST;SYSTEM,FINE\n';
 
@@ -24,117 +25,115 @@ const BODY =
 
 const yieldSlice = (): Promise<void> => Promise.resolve();
 
-function logOf(): ApexLog {
-  return storeOf(BODY, SETTINGS).log;
+async function storeOfBody(body = BODY, settings = SETTINGS): Promise<LogStore> {
+  return (await storeOf(body, settings)).store;
 }
 
-/** More events than one step reads, so a build takes several. */
-function longLog(): ApexLog {
+/** More events than one slice reads, so a build takes several. */
+function longBody(): string {
   const debug = Array.from(
     { length: 300 },
     (_, i) => `09:18:22.6 (${2000 + i})|USER_DEBUG|[2]|DEBUG|line ${i}\n`,
   ).join('');
-  return storeOf(
+  return (
     '09:18:22.6 (1000)|METHOD_ENTRY|[1]|01p|ns.Outer.run()\n' +
-      debug +
-      '09:18:22.6 (9000)|METHOD_EXIT|[1]|ns.Outer.run()\n',
-    SETTINGS,
-  ).log;
+    debug +
+    '09:18:22.6 (9000)|METHOD_EXIT|[1]|ns.Outer.run()\n'
+  );
 }
 
-function build(log: ApexLog, chosen: DebugLevels): ApexLog {
-  const builder = new LevelFilterBuilder(log, chosen);
-  while (!builder.step(Number.MAX_SAFE_INTEGER)) {
-    // one step reads the whole tree
+async function shown(store: LogStore, chosen: DebugLevels): Promise<LogStore> {
+  return (await filterByLevels(store, chosen, { yieldSlice }))!; // no signal, so never null
+}
+
+function childrenOf(index: LogIndex, row: number): number[] {
+  const children: number[] = [];
+  for (let child = row + 1; child < index.subtreeEnd[row]!; child = index.subtreeEnd[child]!) {
+    children.push(child);
   }
-  return builder.finish();
+  return children;
 }
 
-function walk(root: LogEvent): LogEvent[] {
-  return root.children.flatMap((child) => [child, ...walk(child)]);
+function typesOf(index: LogIndex): string[] {
+  return Array.from({ length: index.rowCount }, (_, row) => index.event(row).type);
 }
 
-function codeUnit(log: ApexLog): LogEvent {
-  const found = walk(log).find((event) => event.type === 'CODE_UNIT_STARTED');
-  if (!found) {
-    throw new Error('no code unit');
+function sum(values: ArrayLike<number>): number {
+  let total = 0;
+  for (let i = 0; i < values.length; i++) {
+    total += values[i]!; // i < length
   }
-  return found;
+  return total;
 }
 
-function selfSum(log: ApexLog, key: 'duration' | 'soqlCount'): number {
-  return [log, ...walk(log)].reduce((sum, event) => sum + event[key].self, 0);
-}
-
-describe('levelFilter', () => {
+describe('filterByLevels', () => {
   afterEach(() => {
     jest.restoreAllMocks();
   });
 
-  it('returns the log itself when no level is lowered', async () => {
-    const log = logOf();
+  it('gives the captured store when no level is lowered', async () => {
+    const store = await storeOfBody();
 
-    expect(await filterByLevels(log, { ...log.debugLevels }, { yieldSlice })).toBe(log);
+    expect(await shown(store, { ...store.log.debugLevels })).toBe(store);
   });
 
-  it('returns the log itself when a lowered level hides nothing', async () => {
-    const log = logOf();
+  it('gives the captured store when a lowered level hides nothing', async () => {
+    const store = await storeOfBody();
 
-    expect(await filterByLevels(log, { apexCode: 'FINER' }, { yieldSlice })).toBe(log);
+    expect(await shown(store, { apexCode: 'FINER' })).toBe(store);
   });
 
-  it('hoists kept events to the nearest kept ancestor, in log order', () => {
-    const filtered = build(logOf(), { apexCode: 'DEBUG' });
+  it('hoists kept events to the nearest kept ancestor, in log order', async () => {
+    const index = await (await shown(await storeOfBody(), { apexCode: 'DEBUG' })).logIndex();
+    const codeUnit = typesOf(index).indexOf('CODE_UNIT_STARTED');
 
-    expect(codeUnit(filtered).children.map((event) => event.type)).toEqual([
+    expect(childrenOf(index, codeUnit).map((row) => index.event(row).type)).toEqual([
       'USER_DEBUG',
       'SOQL_EXECUTE_BEGIN',
       'EXCEPTION_THROWN',
       'USER_DEBUG',
     ]);
-    expect(walk(filtered).every((event) => event.parent?.children.includes(event))).toBe(true);
+    for (let row = 0; row < index.rowCount; row++) {
+      const parent = index.parent[row]!;
+      expect(parent === -1 || childrenOf(index, parent).includes(row)).toBe(true);
+      expect(index.depth[row]).toBe(parent === -1 ? 0 : index.depth[parent]! + 1);
+    }
   });
 
-  it('hides a USER_DEBUG line by the level it was written at', () => {
-    const log = storeOf(
+  it('hides a USER_DEBUG line by the level it was written at', async () => {
+    const store = await storeOfBody(
       '09:18:22.6 (1000)|USER_DEBUG|[1]|ERROR|kept\n' +
         '09:18:22.6 (2000)|USER_DEBUG|[2]|FINEST|hidden\n',
-      SETTINGS,
-    ).log;
+    );
 
-    const filtered = build(log, { apexCode: 'INFO' });
+    const debugs = [...(await shown(store, { apexCode: 'INFO' })).events()].filter(
+      (event) => event.type === 'USER_DEBUG',
+    );
 
-    expect(
-      walk(filtered)
-        .filter((event) => event.type === 'USER_DEBUG')
-        .map((event) => event.text),
-    ).toEqual(['ERROR | kept']);
+    expect(debugs.map((event) => event.text)).toEqual(['ERROR | kept']);
   });
 
   it.each([
-    ['keeps', 'INFO', ['SOQL_EXECUTE_BEGIN', 'SOQL_EXECUTE_EXPLAIN']],
-    ['hides', 'NONE', []],
-  ] as const)('%s a query plan with its query, at DB %s', (_verb, database, kept) => {
-    const log = storeOf(
+    ['keeps', 'INFO', true],
+    ['hides', 'NONE', false],
+  ] as const)('%s a query plan with its query, at DB %s', async (_verb, database, kept) => {
+    const store = await storeOfBody(
       '09:18:22.6 (1000)|METHOD_ENTRY|[1]|01p|ns.Outer.run()\n' +
         '09:18:22.6 (2000)|SOQL_EXECUTE_BEGIN|[2]|Aggregations:0|SELECT Id FROM Account\n' +
         '09:18:22.6 (2100)|SOQL_EXECUTE_EXPLAIN|[2]|Index on Account : [Id], cardinality: 1, sobjectCardinality: 10, relativeCost 0.1\n' +
         '09:18:22.6 (3000)|SOQL_EXECUTE_END|[2]|Rows:1\n' +
         '09:18:22.6 (4000)|METHOD_EXIT|[1]|ns.Outer.run()\n',
-      SETTINGS,
-    ).log;
+    );
 
-    const filtered = build(log, { apexCode: 'DEBUG', database });
+    const query = [...(await shown(store, { apexCode: 'DEBUG', database })).events()].find(
+      (event) => event.type === 'SOQL_EXECUTE_BEGIN',
+    ) as SoqlEvent | undefined;
 
-    expect(
-      walk(filtered)
-        .map((event) => event.type)
-        .filter((type) => type?.startsWith('SOQL')),
-    ).toEqual(kept);
+    expect(query !== undefined && query.details.explain !== null).toBe(kept);
   });
 
-  it('keeps namespace limit usage with its limit block, and only there', () => {
-    const log = storeOf(
+  it('keeps namespace limit usage with its limit block, and only there', async () => {
+    const store = await storeOfBody(
       '09:18:22.6 (1000)|TESTING_LIMITS\n' +
         '09:18:22.6 (1100)|LIMIT_USAGE_FOR_NS|(default)|\n' +
         '  Number of SOQL queries: 2 out of 100\n' +
@@ -143,107 +142,119 @@ describe('levelFilter', () => {
         '  Number of SOQL queries: 1 out of 100\n' +
         '09:18:22.6 (3200)|CUMULATIVE_LIMIT_USAGE_END\n',
       '64.0 APEX_CODE,FINEST;APEX_PROFILING,FINEST;DB,FINEST\n',
-    ).log;
+    );
 
-    const filtered = build(log, { apexProfiling: 'INFO' });
+    const usage = [...(await shown(store, { apexProfiling: 'INFO' })).events()].filter(
+      (event) => event.type === 'LIMIT_USAGE_FOR_NS',
+    );
 
+    expect(usage.map((event) => event.parent?.type)).toEqual(['CUMULATIVE_LIMIT_USAGE']);
+  });
+
+  it('keeps the self sum of the tree', async () => {
+    const store = await storeOfBody();
+    const before = await store.logIndex();
+
+    const after = await (await shown(store, { apexCode: 'DEBUG', database: 'ERROR' })).logIndex();
+
+    expect(after.rowCount).toBeLessThan(before.rowCount);
+    expect(sum(after.self)).toBe(sum(before.self));
+    expect(sum(rowMetrics(after).soqlCount.self)).toBe(sum(rowMetrics(before).soqlCount.self));
+  });
+
+  // Summed over the tree only, a self time handed to the wrong row would still pass.
+  it('gives a hidden frame its self time to its nearest kept ancestor', async () => {
+    const store = await storeOfBody();
+    const before = await store.logIndex();
+    const after = await (await shown(store, { apexCode: 'DEBUG' })).logIndex();
+    const codeUnit = (index: LogIndex) => typesOf(index).indexOf('CODE_UNIT_STARTED');
+
+    // Outer runs 7000ns around Inner's 3000ns: 4000ns its own. Inner holds the 1000ns query: 2000ns its own.
+    expect(after.self[codeUnit(after)]! - before.self[codeUnit(before)]!).toBe(6000);
+  });
+
+  // A path through a hidden frame opens a row the view does not have.
+  it('gives a path through the kept frames only, and none to a hidden event', async () => {
+    const { log, store } = await storeOf(BODY, SETTINGS);
+    const filtered = await shown(store, { apexCode: 'DEBUG' });
+    const hello = indexOf(log, 'DEBUG | hello');
+
+    expect(filtered.pathTo(hello).map((id) => log.event(id)!.type)).toEqual([
+      'EXECUTION_STARTED',
+      'CODE_UNIT_STARTED',
+      'USER_DEBUG',
+    ]);
+    expect(filtered.pathTo(hello).at(-1)).toBe(hello);
+    expect(filtered.pathTo(indexOf(log, 'ns.Outer.run()'))).toEqual([]);
+  });
+
+  it('folds a hidden statement count into its parent', async () => {
+    const store = await storeOfBody();
+    const inner = indexOf(store.log, 'ns.Inner.go()');
+
+    const index = await (await shown(store, { database: 'ERROR' })).logIndex();
+    const row = index.rowOf(inner);
+
+    expect(rowMetrics(index).soqlCount.self[row]).toBe(1);
+    expect(statementSelves(index).soql[row]).toBe(1);
     expect(
-      walk(filtered)
-        .filter((event) => event.type === 'LIMIT_USAGE_FOR_NS')
-        .map((event) => event.parent?.type),
-    ).toEqual(['CUMULATIVE_LIMIT_USAGE']);
+      childrenOf(index, row).some((child) => index.event(child).type === 'SOQL_EXECUTE_BEGIN'),
+    ).toBe(false);
   });
 
-  it('keeps the self sum of the tree', () => {
-    const log = logOf();
+  it('does not change the captured log', async () => {
+    const store = await storeOfBody();
+    const before = buildLogIndex(store.log);
 
-    const filtered = build(log, { apexCode: 'DEBUG', database: 'ERROR' });
+    await (await shown(store, { apexCode: 'NONE', database: 'NONE' })).logIndex();
 
-    expect(selfSum(filtered, 'duration')).toBe(selfSum(log, 'duration'));
-    expect(selfSum(filtered, 'soqlCount')).toBe(selfSum(log, 'soqlCount'));
+    const after = buildLogIndex(store.log);
+    expect(after.rowCount).toBe(before.rowCount);
+    expect([...after.self]).toEqual([...before.self]);
   });
 
-  it('folds a hidden statement count into its parent', () => {
-    const log = logOf();
-    const inner = log.eventsById[indexOf(log, 'ns.Inner.go()')]!;
+  it('finds no event or stack at a hidden id, and no row for it', async () => {
+    const store = await storeOfBody();
+    const inner = indexOf(store.log, 'ns.Inner.go()');
 
-    const filtered = build(log, { database: 'ERROR' });
-    const filteredInner = filtered.eventsById[inner.eventIndex]!;
+    const filtered = await shown(store, { apexCode: 'DEBUG' });
 
-    expect(filteredInner.soqlCount.self).toBe(1);
-    expect(filteredInner.soqlCount.total).toBe(inner.soqlCount.total);
-    expect(filteredInner.children.some((event) => event.type === 'SOQL_EXECUTE_BEGIN')).toBe(false);
+    expect(filtered.eventByIndex(inner)).toBeNull();
+    expect(filtered.stackByEventIndex(inner)).toEqual([]);
+    expect((await filtered.logIndex()).rowOf(inner)).toBe(-1);
   });
 
-  it('does not change the original log', () => {
-    const log = logOf();
-    const before = { duration: selfSum(log, 'duration'), events: walk(log).length };
+  it('lists every kept event and none that is hidden', async () => {
+    const store = await storeOfBody();
+    const inner = indexOf(store.log, 'ns.Inner.go()');
 
-    build(log, { apexCode: 'NONE', database: 'NONE' });
+    const filtered = await shown(store, { apexCode: 'DEBUG' });
+    const listed = [...filtered.events()].map((event) => event.id);
+    const index = await filtered.logIndex();
 
-    expect({ duration: selfSum(log, 'duration'), events: walk(log).length }).toEqual(before);
+    expect(listed).not.toContain(inner);
+    expect(listed).toEqual([...index.eventIndex]);
   });
 
-  it('finds no event at a hidden index, and the log itself at its own', () => {
-    const log = logOf();
-    const filtered = build(log, { apexCode: 'DEBUG' });
-    const inner = indexOf(log, 'ns.Inner.go()');
+  it('drops hidden exceptions and keeps the entry points', async () => {
+    const store = await storeOfBody();
 
-    expect(logStoreFor(filtered).eventByIndex(inner)).toBeNull();
-    expect(findEventByEventIndex(filtered, inner)).toBeNull();
-    expect(logStoreFor(filtered).stackByEventIndex(inner)).toEqual([]);
-    expect(eventByEventIndex(filtered, filtered.eventIndex)).toBe(filtered);
-  });
+    const kept = await shown(store, { apexCode: 'DEBUG' });
+    const hidden = await shown(store, { apexCode: 'WARN' });
 
-  it('lists every kept event and none that is hidden', () => {
-    const log = logOf();
-    const filtered = build(log, { apexCode: 'DEBUG' });
-    const inner = indexOf(log, 'ns.Inner.go()');
-
-    const listed = [...logStoreFor(filtered).events()];
-
-    expect(listed.map((event) => event.eventIndex)).not.toContain(inner);
-    expect(listed).toEqual(expect.arrayContaining([filtered, ...walk(filtered)]));
-  });
-
-  it('gives each kept event one slot, besides the log itself', () => {
-    const log = logOf();
-    const filtered = build(log, { apexCode: 'DEBUG' });
-
-    const own = filtered.eventsById.filter((event) => event !== filtered);
-
-    expect(new Set(own).size).toBe(own.length);
-    expect(own.reduce((sum, event) => sum + event.duration.self, 0) + filtered.duration.self).toBe(
-      selfSum(filtered, 'duration'),
+    expect(kept.exceptions.map((event) => event.id)).toEqual(
+      store.exceptions.map((event) => event.id),
     );
-  });
-
-  it('keeps the class of every copy', () => {
-    const log = logOf();
-    const filtered = build(log, { apexCode: 'DEBUG' });
-    const soql = indexOf(log, 'SELECT Id FROM Account');
-
-    expect(filtered).toBeInstanceOf(log.constructor);
-    expect(filtered.eventsById[soql]).toBeInstanceOf(log.eventsById[soql]!.constructor);
-    expect(filtered.eventsById[soql]).not.toBe(log.eventsById[soql]);
-  });
-
-  it('drops hidden exceptions and remaps kept ones', () => {
-    const log = logOf();
-
-    const kept = build(log, { apexCode: 'DEBUG' });
-    const hidden = build(log, { apexCode: 'WARN' });
-
-    expect(kept.exceptions).toHaveLength(1);
-    expect(kept.exceptions[0]).toBe(kept.eventsById[log.exceptions[0]!.eventIndex]);
     expect(hidden.exceptions).toHaveLength(0);
-    expect(hidden.entryPoints.map((event) => event.eventIndex)).toEqual(
-      log.entryPoints.map((event) => event.eventIndex),
+    expect(hidden.entryPoints.map((event) => event.id)).toEqual(
+      store.entryPoints.map((event) => event.id),
     );
   });
 
-  it('reports the chosen levels as the levels of the filtered log', () => {
-    const filtered = build(logOf(), { apexCode: 'DEBUG' });
+  it('reports the chosen levels as the levels shown, and keeps the captured ones', async () => {
+    const store = await storeOfBody();
+
+    const filtered = await shown(store, { apexCode: 'DEBUG' });
 
     expect(filtered.debugLevels).toEqual({
       apexCode: 'DEBUG',
@@ -251,33 +262,31 @@ describe('levelFilter', () => {
       database: 'FINEST',
       system: 'FINE',
     });
+    expect(filtered.log.debugLevels.apexCode).toBe('FINEST');
+    expect(filtered.captured).toBe(store);
   });
 
-  it('builds the same tree across many steps as in one', async () => {
-    const log = longLog();
-    const chosen: DebugLevels = { apexCode: 'DEBUG' };
+  it('hides the same events across many slices as in one', async () => {
+    const { log } = await storeOf(longBody(), SETTINGS);
+    let now = 0;
+    const whole = await hiddenByLevels(log, { apexCode: 'INFO' });
+    jest.spyOn(performance, 'now').mockImplementation(() => (now += 1000));
 
-    const sliced = await filterByLevels(log, chosen, { yieldSlice });
-    const types = (root: ApexLog): string[] => walk(root).map((event) => `${event.type}`);
+    const sliced = await hiddenByLevels(log, { apexCode: 'INFO' }, { yieldSlice });
 
-    expect(sliced && types(sliced)).toEqual(types(build(log, chosen)));
+    expect(sliced && [...sliced]).toEqual(whole && [...whole]);
   });
 
   it('gives up once the signal aborts', async () => {
+    const store = await storeOfBody(longBody());
     const build = new AbortController();
     build.abort();
     let now = 0;
     jest.spyOn(performance, 'now').mockImplementation(() => (now += 1000));
 
     expect(
-      await filterByLevels(longLog(), { apexCode: 'DEBUG' }, { yieldSlice, signal: build.signal }),
+      await filterByLevels(store, { apexCode: 'DEBUG' }, { yieldSlice, signal: build.signal }),
     ).toBeNull();
-  });
-
-  it('keeps an event that states no level', () => {
-    const event = { debugCategory: '', debugLevel: '' } as LogEvent;
-
-    expect(isHidden(event, { apexCode: 'NONE' })).toBe(false);
   });
 
   it('compares levels by category', () => {

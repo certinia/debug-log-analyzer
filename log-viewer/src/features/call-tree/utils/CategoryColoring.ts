@@ -1,7 +1,7 @@
 /*
  * Copyright (c) 2025 Certinia Inc. All rights reserved.
  */
-import { VSCodeExtensionMessenger } from '../../../core/messaging/VSCodeExtensionMessenger.js';
+import { VSCodeExtensionMessenger } from '#core/messaging/VSCodeExtensionMessenger.js';
 import { subscribeSettings, type LanaSettings } from '../../settings/Settings.js';
 import { DEFAULT_THEME_NAME } from '../../timeline/themes/Themes.js';
 import { addCustomThemes, getTheme } from '../../timeline/themes/ThemeSelector.js';

@@ -3,14 +3,16 @@
  *
  * @jest-environment jsdom
  */
-import { describe, expect, it, beforeEach } from '@jest/globals';
-import type { LogEvent, GovernorLimits } from '@apexdevtools/apex-log-parser';
+import { describe, expect, it, beforeEach, beforeAll } from '@jest/globals';
+import type { GovernorLimits } from '@apexdevtools/apex-log-parser';
 
+import { indexOf, storeOf } from '#test-helpers/apexLog.js';
 import { governorLimits, limitValue } from '#test-helpers/limits.js';
+import type { LogStore } from '#core/log/LogStore.js';
 
 const revealed: number[] = [];
 const copied: string[] = [];
-let event: LogEvent | null = null;
+let store: LogStore | null = null;
 let limits: GovernorLimits | null = null;
 
 jest.mock('../../features/call-tree/navigation.js', () => ({
@@ -18,41 +20,39 @@ jest.mock('../../features/call-tree/navigation.js', () => ({
     revealed.push(target.eventIndex);
   },
 }));
-jest.mock('../../core/utility/Clipboard.js', () => ({
+jest.mock('#core/utility/Clipboard.js', () => ({
   copyToClipboard: (text: string) => copied.push(text),
 }));
-jest.mock('../../core/log/LogStore.js', () => ({
-  currentLogStore: () => ({
-    eventByIndex: (i: number) => (i === 42 ? event : null),
-    log: { governorLimits: limits },
-  }),
+jest.mock('#core/log/LogStore.js', () => ({
+  ...jest.requireActual<object>('#core/log/LogStore.js'),
+  currentLogStore: () =>
+    store && {
+      eventByIndex: (i: number) => store?.eventByIndex(i) ?? null,
+      log: { limits },
+    },
 }));
 
 import { PANEL_ROW_MENU_ITEMS, runPanelRowAction } from '../panelRowMenu.js';
 
-function makeEvent(overrides: Partial<LogEvent> = {}): LogEvent {
-  return {
-    text: 'MyClass.run()',
-    suffix: null,
-    type: 'METHOD_ENTRY',
-    parent: null,
-    exitStamp: 1000,
-    cpuType: '',
-    duration: { self: 1_000_000, total: 2_000_000 },
-    dmlCount: { self: 0, total: 0 },
-    dmlRowCount: { self: 0, total: 0 },
-    soqlCount: { self: 0, total: 0 },
-    soqlRowCount: { self: 0, total: 0 },
-    soslCount: { self: 0, total: 0 },
-    soslRowCount: { self: 0, total: 0 },
-    ...overrides,
-  } as unknown as LogEvent;
-}
+let run = 0;
+let codeUnit = 0;
+const ABSENT = 99_999;
+
+beforeAll(async () => {
+  const parsed = await storeOf(
+    '09:18:22.6 (1000)|METHOD_ENTRY|[1]|01p|MyClass.run()\n' +
+      '09:18:22.6 (1100)|SOQL_EXECUTE_BEGIN|[2]|Aggregations:0|SELECT Id FROM Account\n' +
+      '09:18:22.6 (1200)|SOQL_EXECUTE_END|[2]|Rows:1\n' +
+      '09:18:22.6 (3000)|METHOD_EXIT|[1]|MyClass.run()\n',
+  );
+  store = parsed.store;
+  run = indexOf(parsed.log, 'MyClass.run()');
+  codeUnit = indexOf(parsed.log, 'apex://pkg.Entry');
+});
 
 beforeEach(() => {
   revealed.length = 0;
   copied.length = 0;
-  event = makeEvent();
   limits = null;
 });
 
@@ -66,15 +66,14 @@ describe('PANEL_ROW_MENU_ITEMS', () => {
 
 describe('runPanelRowAction', () => {
   it('reveals the frame in the Call Tree tab', () => {
-    runPanelRowAction('show-in-call-tree', 42);
-    expect(revealed).toEqual([42]);
+    runPanelRowAction('show-in-call-tree', run);
+    expect(revealed).toEqual([run]);
     expect(copied).toEqual([]);
   });
 
   it('copies the frame name, including its suffix', () => {
-    event = makeEvent({ suffix: ' (exception)' });
-    runPanelRowAction('copy-name', 42);
-    expect(copied).toEqual(['MyClass.run() (exception)']);
+    runPanelRowAction('copy-name', codeUnit);
+    expect(copied).toEqual(['apex://pkg.Entry (code unit)']);
   });
 
   it('copies details with the governor limits the log reported', () => {
@@ -85,35 +84,30 @@ describe('runPanelRowAction', () => {
       queryRows: limitValue(0, 50000),
       soslQueries: limitValue(0, 20),
     });
-    event = makeEvent({ soqlCount: { self: 1, total: 1 } } as Partial<LogEvent>);
-
-    runPanelRowAction('copy-details', 42);
+    runPanelRowAction('copy-details', run);
 
     expect(copied[0]).toContain('Name: MyClass.run()');
-    expect(copied[0]).toContain('SOQL: 1/100 (self 1)');
+    expect(copied[0]).toContain('SOQL: 1/100 (self 0)');
   });
 
   it('copies the call stack outermost first', () => {
-    const root = makeEvent({ text: 'execute_anonymous_apex' });
-    event = makeEvent({ parent: root } as Partial<LogEvent>);
+    runPanelRowAction('copy-call-stack', run);
 
-    runPanelRowAction('copy-call-stack', 42);
-
-    expect(copied).toEqual(['execute_anonymous_apex\nMyClass.run()']);
+    expect(copied).toEqual(['EXECUTION_STARTED\napex://pkg.Entry (code unit)\nMyClass.run()']);
   });
 
   it('ignores a copy action for a row with no resolvable event', () => {
-    runPanelRowAction('copy-name', 99);
+    runPanelRowAction('copy-name', ABSENT);
     expect(copied).toEqual([]);
   });
 
   it('still reveals when the event cannot be resolved, since goToRow owns that lookup', () => {
-    runPanelRowAction('show-in-call-tree', 99);
-    expect(revealed).toEqual([99]);
+    runPanelRowAction('show-in-call-tree', ABSENT);
+    expect(revealed).toEqual([ABSENT]);
   });
 
   it('ignores an unknown menu id', () => {
-    runPanelRowAction('copy-everything', 42);
+    runPanelRowAction('copy-everything', run);
     expect(copied).toEqual([]);
     expect(revealed).toEqual([]);
   });

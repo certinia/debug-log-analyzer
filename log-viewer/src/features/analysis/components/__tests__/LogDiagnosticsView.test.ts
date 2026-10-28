@@ -29,12 +29,8 @@ jest.mock('../../services/LogDiagnostics.js', () => ({
   },
 }));
 
-import {
-  describeLevelGap,
-  findLevelGap,
-  type LevelGap,
-} from '../../../../core/log/levelCapabilities.js';
-import type { LogStore } from '../../../../core/log/LogStore.js';
+import { describeLevelGap, findLevelGap, type LevelGap } from '#core/log/levelCapabilities.js';
+import type { LogStore } from '#core/log/LogStore.js';
 import '../LogDiagnosticsView.js';
 
 let gap: LevelGap | null = null;

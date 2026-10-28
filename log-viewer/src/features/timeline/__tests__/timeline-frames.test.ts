@@ -3,7 +3,11 @@
  */
 import { describe, expect, it } from '@jest/globals';
 
+import { buildLogIndex } from '#core/log/LogIndex.js';
+import { indexOf } from '#test-helpers/apexLog.js';
 import { framesOf } from '#test-helpers/timeline.js';
+import { NO_ROW } from '../types/flamechart.types.js';
+import { buildTimelineFrames, drawnRowAtOrAbove } from '../utils/timeline-frames.js';
 
 const NESTED =
   '09:18:22.6 (1000)|METHOD_ENTRY|[1]|01p|ns.Outer.run()\n' +
@@ -17,11 +21,11 @@ const NESTED =
   '09:18:22.6 (1800)|METHOD_EXIT|[1]|ns.Outer.run()\n';
 
 describe('buildTimelineFrames', () => {
-  it('draws a rect for every shown frame, and none for a frame with no duration', () => {
-    const { frames } = framesOf(NESTED);
+  it('draws a rect for every shown frame, and none for a frame with no duration', async () => {
+    const { frames } = await framesOf(NESTED);
     const texts = [...frames.rectsByCategory.values()]
       .flat()
-      .map((rect) => rect.eventRef.text)
+      .map((rect) => frames.text(rect.row))
       .sort();
 
     expect(texts).toEqual([
@@ -40,8 +44,8 @@ describe('buildTimelineFrames', () => {
     }
   });
 
-  it('lists the shown rows at each depth in start order', () => {
-    const { frames } = framesOf(NESTED);
+  it('lists the shown rows at each depth in start order', async () => {
+    const { frames } = await framesOf(NESTED);
     // Execution, then code unit, then the body's own frames.
     const inner = [...frames.rowsAtDepth(3)].map((row) => frames.text(row));
 
@@ -50,22 +54,22 @@ describe('buildTimelineFrames', () => {
     expect(frames.rowsAtDepth(99)).toHaveLength(0);
   });
 
-  it('does not show a frame with no duration', () => {
-    const { log, frames } = framesOf(
+  it('does not show a frame with no duration', async () => {
+    const { log, frames } = await framesOf(
       '09:18:22.6 (1000)|METHOD_ENTRY|[1]|01p|ns.Instant.run()\n' +
         '09:18:22.6 (1000)|METHOD_EXIT|[1]|ns.Instant.run()\n',
     );
-    const instant = log.eventsById.find((event) => event.text === 'ns.Instant.run()')!;
+    const instant = log.event(indexOf(log, 'ns.Instant.run()'));
 
     expect(frames.rowOfOriginal(instant)).toBe(-1);
     expect(frames.rowOfOriginal({})).toBe(-1);
     expect(frames.rowOfOriginal(undefined)).toBe(-1);
   });
 
-  it('makes a node that carries the parsed event', () => {
-    const { log, frames } = framesOf(NESTED);
-    const outer = log.eventsById.find((event) => event.text === 'ns.Outer.run()')!;
-    const row = frames.rowOfOriginal(outer);
+  it('makes a node that carries the parsed event', async () => {
+    const { log, frames } = await framesOf(NESTED);
+    const outer = indexOf(log, 'ns.Outer.run()');
+    const row = frames.rowOfOriginal(log.event(outer));
     const node = frames.node(row);
 
     expect(node).toMatchObject({
@@ -77,31 +81,58 @@ describe('buildTimelineFrames', () => {
         duration: 800,
         type: 'METHOD_ENTRY',
         text: 'ns.Outer.run()',
-        original: outer,
+        original: { id: outer },
       },
     });
   });
 
   describe('totalDuration', () => {
-    it('reaches the last frame when the log ends with it', () => {
-      const { log, frames } = framesOf(NESTED);
-      const { frames: atEnd } = framesOf(NESTED, log.exitStamp);
+    it('reaches the last frame when the log ends with it', async () => {
+      const { log, frames } = await framesOf(NESTED);
+      const { frames: atEnd } = await framesOf(NESTED, log.columns.endTimestamp[0]);
 
       expect(frames.totalDuration).toBe(atEnd.totalDuration);
     });
 
-    it('reaches the log end when the frames stop short of it', () => {
+    it('reaches the log end when the frames stop short of it', async () => {
       // A truncated log: the trailing FATAL_ERROR that closes it carries no duration.
-      const { frames } = framesOf(NESTED, 9_000_000);
+      const { frames } = await framesOf(NESTED, 9_000_000);
 
       expect(frames.totalDuration).toBe(9_000_000);
     });
 
-    it('still reaches the last frame when it outlives the given log end', () => {
-      const { log, frames } = framesOf(NESTED, 100);
-      const ends = log.children.map((event) => event.exitStamp ?? 0);
+    it('still reaches the last frame when it outlives the given log end', async () => {
+      const { log, frames } = await framesOf(NESTED, 100);
+      const ends = log.children.map((event) => event.endTimestamp);
 
       expect(frames.totalDuration).toBe(Math.max(...ends));
     });
+  });
+});
+
+describe('drawnRowAtOrAbove', () => {
+  it('gives a drawn frame itself', async () => {
+    const { log, index, frames } = await framesOf(NESTED);
+    const inner = indexOf(log, 'ns.Inner.first()');
+
+    expect(drawnRowAtOrAbove(index, frames, inner)).toBe(index.rowOf(inner));
+  });
+
+  // A hidden event has no row at all, so it climbs the log, not the index.
+  it('gives an event the log levels hide its nearest shown frame', async () => {
+    const { log } = await framesOf(NESTED);
+    const inner = indexOf(log, 'ns.Inner.first()');
+    const hidden = new Uint8Array(log.eventCount + 1);
+    hidden[inner] = 1;
+    const index = buildLogIndex(log, hidden);
+    const frames = buildTimelineFrames(index, new Set(['Apex', 'SOQL']), 0);
+
+    expect(frames.text(drawnRowAtOrAbove(index, frames, inner))).toBe('ns.Outer.run()');
+  });
+
+  it('gives no row for an id the log does not hold', async () => {
+    const { index, frames } = await framesOf(NESTED);
+
+    expect(drawnRowAtOrAbove(index, frames, 9999)).toBe(NO_ROW);
   });
 });

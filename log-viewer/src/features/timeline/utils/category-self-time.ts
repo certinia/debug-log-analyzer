@@ -1,9 +1,9 @@
 /*
  * Copyright (c) 2026 Certinia Inc. All rights reserved.
  */
-import { LOG_CATEGORY, type LogCategory } from '@apexdevtools/apex-log-parser';
+import { LOG_CATEGORY, type LogCategory } from '#core/log/category.js';
 
-import { type LogIndex, sumSelfBy } from '../../../core/log/LogIndex.js';
+import { type LogIndex, sumSelfBy } from '#core/log/LogIndex.js';
 
 import type { TimelineKeyEntry } from '../components/TimelineKey.js';
 

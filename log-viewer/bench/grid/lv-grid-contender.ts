@@ -5,54 +5,56 @@
 /**
  * An lv-grid element on the Time Order rows. `lv-grid` has the same plain text cells as
  * the `grid` contender, so the difference is what the ui layer costs. `call-tree` is
- * `<lv-call-tree-grid>` with the app's columns on the parser's events: what the Call Tree
- * would cost.
+ * `<lv-call-tree-grid>` with the app's columns: what the Call Tree would cost.
  */
-import type { ApexLog, LogEvent } from '@apexdevtools/apex-log-parser';
+import type { ApexLog } from '@apexdevtools/apex-log-parser';
 
-import { toTimeOrderTree, type TimeOrderRow } from './timeOrderTree.js';
-import type { CallTreeGrid } from '../../src/features/call-tree/grid/CallTreeGrid.js';
+import { logStoreFor } from '../../src/core/log/LogStore.js';
 import {
-  TIME_ORDER_WITHOUT_DETAILS,
-  timeOrderColumns,
-  timeOrderSource,
-} from '../../src/features/call-tree/grid/columns.js';
+  TimeOrderSource,
+  type TimeOrderNode,
+} from '../../src/features/call-tree/utils/TimeOrderTree.js';
+import { timeOrderColumns } from '../../src/features/call-tree/grid/columns.js';
 import type { GridColumn, LvGrid, RowFilter } from '../../src/grid/index.js';
 import type { Contender } from './contender.js';
-import { COLUMNS } from './grid-contender.js';
-import { pathOf, timeOrderDetails } from './targets.js';
+import { columnsFor } from './grid-contender.js';
 
 const SORTED = 'duration.self';
 
-const plainColumns = (): GridColumn<TimeOrderRow>[] =>
-  COLUMNS.map((column) => ({
+const plainColumns = (source: TimeOrderSource): GridColumn<TimeOrderNode>[] =>
+  columnsFor(source).map((column) => ({
     id: column.field,
     title: column.title,
     width: column.width === 'flex' ? 'flex' : column.width,
     minWidth: column.width === 'flex' ? 200 : undefined,
     cell: column.text,
     text: column.text,
-    sort: column.field === SORTED ? { value: (r: TimeOrderRow) => r.duration.self } : undefined,
+    sort:
+      column.field === SORTED
+        ? { value: ({ row }: TimeOrderNode) => source.index.self[row]! }
+        : undefined,
     sortFirst: 'desc',
   }));
 
-type Setup<R extends object> = (log: ApexLog) => { grid: LvGrid<R>; details: RowFilter<R> };
-
-const plain: Setup<TimeOrderRow> = (log) => {
-  const grid = document.createElement('lv-grid') as LvGrid<TimeOrderRow>;
-  grid.style.cssText =
-    'font: 13px sans-serif; --grid-fg: #ccc; --grid-bg: #1e1e1e; color-scheme: dark';
-  grid.columns = plainColumns();
-  const roots = toTimeOrderTree(log.children, log.governorLimits) ?? [];
-  grid.source = { roots, children: (r) => r._children, key: (r) => r.id };
-  return { grid, details: timeOrderDetails };
+type Setup<R extends object> = (source: TimeOrderSource) => {
+  grid: LvGrid<R>;
+  withoutDetails: RowFilter<R>;
 };
 
-const app: Setup<LogEvent> = (log) => {
-  const grid = document.createElement('lv-call-tree-grid') as CallTreeGrid<LogEvent>;
-  grid.columns = timeOrderColumns(log, { openType: () => {} });
-  grid.source = timeOrderSource(log);
-  return { grid, details: TIME_ORDER_WITHOUT_DETAILS };
+const plain: Setup<TimeOrderNode> = (source) => {
+  const grid = document.createElement('lv-grid') as LvGrid<TimeOrderNode>;
+  grid.style.cssText =
+    'font: 13px sans-serif; --grid-fg: #ccc; --grid-bg: #1e1e1e; color-scheme: dark';
+  grid.columns = plainColumns(source);
+  grid.source = source;
+  return { grid, withoutDetails: source.withoutDetails };
+};
+
+const app: Setup<TimeOrderNode> = (source) => {
+  const grid = document.createElement('lv-call-tree-grid') as unknown as LvGrid<TimeOrderNode>;
+  grid.columns = timeOrderColumns(source, { openType: () => {} });
+  grid.source = source;
+  return { grid, withoutDetails: source.withoutDetails };
 };
 
 /** The actions every lv-grid contender takes the same way. */
@@ -102,15 +104,16 @@ export abstract class LvGridBench<R extends object> {
 }
 
 class LvGridContender<R extends object> extends LvGridBench<R> implements Contender {
-  private details!: RowFilter<R>;
+  private withoutDetails!: RowFilter<R>;
 
   constructor(private readonly setup: Setup<R>) {
     super();
   }
 
   async mount(host: HTMLElement, log: ApexLog): Promise<void> {
-    ({ grid: this.grid, details: this.details } = this.setup(log));
-    this.grid.filters = [this.details];
+    const source = new TimeOrderSource(await logStoreFor(log).logIndex());
+    ({ grid: this.grid, withoutDetails: this.withoutDetails } = this.setup(source));
+    this.grid.filters = [this.withoutDetails];
     host.append(this.grid);
     await this.grid.settled();
   }
@@ -121,12 +124,12 @@ class LvGridContender<R extends object> extends LvGridBench<R> implements Conten
   }
 
   async setDetailFilter(on: boolean): Promise<void> {
-    this.grid.filters = on ? [this.details] : [];
+    this.grid.filters = on ? [this.withoutDetails] : [];
     await this.settle();
   }
 
-  async goTo(target: LogEvent): Promise<void> {
-    await this.grid.goTo(pathOf(target));
+  async goTo(path: readonly number[]): Promise<void> {
+    await this.grid.goTo([...path]);
   }
 
   async setColumnVisible(field: string, visible: boolean): Promise<void> {
@@ -141,8 +144,8 @@ class LvGridContender<R extends object> extends LvGridBench<R> implements Conten
   }
 }
 
-/** `<lv-grid>` with plain text cells on built Time Order rows. */
+/** `<lv-grid>` with plain text cells on the Time Order rows. */
 export const lvGridContender = (): Contender => new LvGridContender(plain);
 
-/** `<lv-call-tree-grid>` with the app's Time Order columns on the parser's events. */
+/** `<lv-call-tree-grid>` with the app's Time Order columns. */
 export const callTreeContender = (): Contender => new LvGridContender(app);

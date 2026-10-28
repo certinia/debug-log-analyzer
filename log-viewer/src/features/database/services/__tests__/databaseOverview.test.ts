@@ -5,14 +5,9 @@ import { describe, expect, it } from '@jest/globals';
 import { parse } from '@apexdevtools/apex-log-parser';
 
 import { indexesOf } from '#test-helpers/apexLog.js';
-import { LogStore } from '../../../../core/log/LogStore.js';
+import { LogStore } from '#core/log/LogStore.js';
 
-import {
-  concentration,
-  databaseOverview,
-  dmlOperation,
-  UNKNOWN_OBJECT,
-} from '../databaseOverview.js';
+import { concentration, databaseOverview, UNKNOWN_OBJECT } from '../databaseOverview.js';
 
 const HEAD =
   '09:18:22.6 (6574780)|EXECUTION_STARTED\n' +
@@ -33,18 +28,8 @@ const sosl = (start: number, end: number, rows: number, line = 3) =>
   `09:18:22.6 (${start})|SOSL_EXECUTE_BEGIN|[${line}]|FIND :term RETURNING Account(Id)\n` +
   `09:18:22.6 (${end})|SOSL_EXECUTE_END|[${line}]|Rows:${rows}\n`;
 
-const overviewOf = (body: string) =>
-  new LogStore(parse(HEAD + body + TAIL)).derive(databaseOverview);
-
-describe('dmlOperation', () => {
-  it('reads the operation out of a DML line', () => {
-    expect(dmlOperation('DML Op:Insert Type:Account')).toEqual('Insert');
-  });
-
-  it('falls back to DML when the line names no operation', () => {
-    expect(dmlOperation('DML')).toEqual('DML');
-  });
-});
+const overviewOf = async (body: string) =>
+  new LogStore(await parse(HEAD + body + TAIL)).derive(databaseOverview);
 
 describe('databaseOverview time', () => {
   it('splits database time by statement kind and shares it against the log', async () => {
@@ -148,7 +133,7 @@ describe('databaseOverview statements', () => {
   });
 
   it('reveals the last of equally slow occurrences, as the tree walk met them', async () => {
-    const log = parse(
+    const log = await parse(
       HEAD +
         soql(10_000_000, 12_000_000, 1, 'SELECT Id FROM Account') +
         soql(13_000_000, 15_000_000, 1, 'SELECT Id FROM Account', 4) +

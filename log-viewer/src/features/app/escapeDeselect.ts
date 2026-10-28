@@ -1,7 +1,7 @@
 /*
  * Copyright (c) 2026 Certinia Inc. All rights reserved.
  */
-import { eventBus, type DetailSource } from '../../core/events/EventBus.js';
+import { eventBus, type DetailSource } from '#core/events/EventBus.js';
 
 /**
  * Decides whether an Escape keydown may clear the active tab's selection.

@@ -19,6 +19,7 @@ jest.mock('../scopedCallTree.js', () => ({
 
 import type { ApexLog } from '@apexdevtools/apex-log-parser';
 
+import { frameLines, indexesOf, rawStoreOf } from '#test-helpers/apexLog.js';
 import { runCalc } from '#test-helpers/calcs.js';
 
 import type { CallTreeDetail } from '../CallTreeDetail.js';
@@ -32,10 +33,10 @@ import {
   type ScopedRow,
 } from '../scopedCallTree.js';
 import { INSPECTOR_LOCATE_EVENT, type InspectorLocateEvent } from '../inspectorReveal.js';
-import { eventBus, type DetailSelection } from '../../core/events/EventBus.js';
-import { logStoreFor, type LogStore } from '../../core/log/LogStore.js';
-import { ROOT_PATH_ID } from '../../core/log/keyPathIds.js';
-import { setRange, type TimeWindow } from '../../core/log/rangeScope.js';
+import { eventBus, type DetailSelection } from '#core/events/EventBus.js';
+import { logStoreFor, type LogStore } from '#core/log/LogStore.js';
+import { ROOT_PATH_ID } from '#core/log/keyPathIds.js';
+import { setRange, type TimeWindow } from '#core/log/rangeScope.js';
 
 const build = jest.mocked(buildScopedCallTree);
 const wholeBuild = jest.mocked(buildWholeLogCallTree);
@@ -46,14 +47,14 @@ const MODES = ['time-order', 'aggregated', 'bottom-up'];
 function frameRow(id: number, children: ScopedRow[] | null = null): ScopedRow {
   return {
     id,
-    originalData: { eventIndex: id, type: 'METHOD_ENTRY', text: `m${id}` },
+    eventIndex: id,
     text: `m${id}`,
     type: 'METHOD_ENTRY',
     duration: { total: 10, self: 5 },
     callCount: 1,
     eventIndexes: null,
     _children: children,
-  } as unknown as ScopedRow;
+  };
 }
 
 /** A scoped tree whose views hold `rows`. */
@@ -85,13 +86,16 @@ function gridOf(el: CallTreeDetail, mode = 'time-order'): AppGrid<ScopedRow> {
   return grid as AppGrid<ScopedRow>;
 }
 
-/** The Name column's tooltip, read off the grid. */
-function nameTooltip(el: CallTreeDetail, node: { text: string; type: string }): string {
+/** The Name column's tooltip for the one event of a log of `line`, read off the grid. */
+async function nameTooltip(el: CallTreeDetail, line: string): Promise<string> {
+  const { log, store } = await rawStoreOf(`09:18:22.6 (1000)|${line}\n`);
+  el.logStore = store;
   const name = gridOf(el).columns.find((column) => column.id === 'text');
   if (!name?.tooltip) {
     throw new Error('Name column has no tooltip');
   }
-  return name.tooltip({ originalData: node, type: node.type } as unknown as ScopedRow);
+  const event = log.event(1)!;
+  return name.tooltip({ ...frameRow(1), type: event.type, text: event.text ?? event.type });
 }
 
 /** The footer a column's calc gives over the grid's rows. */
@@ -204,7 +208,7 @@ describe('CallTreeDetail scoped build', () => {
     await frame(el);
     const grid = gridOf(el);
     const source = grid.source;
-    const goTo = jest.spyOn(grid, 'goTo').mockResolvedValue(true);
+    const goTo = jest.spyOn(grid, 'goTo').mockResolvedValue('selected');
     build.mockClear();
 
     el.activeEventIndex = 9;
@@ -216,15 +220,13 @@ describe('CallTreeDetail scoped build', () => {
   });
 
   it('opens the way to an active frame deep in the tree', async () => {
-    const store = logStoreFor({ eventsById: [] } as unknown as ApexLog);
-    jest
-      .spyOn(store, 'stackByEventIndex')
-      .mockReturnValue([{ eventIndex: 5 }, { eventIndex: 7 }] as never);
+    const store = logStoreFor({} as ApexLog);
+    jest.spyOn(store, 'stackByEventIndex').mockReturnValue([{ id: 5 }, { id: 7 }] as never);
     build.mockResolvedValue(tree(5000, [frameRow(5, [frameRow(7, [frameRow(9)])])]));
     const el = await mount(5);
     el.logStore = store;
     await frame(el);
-    const goTo = jest.spyOn(gridOf(el), 'goTo').mockResolvedValue(true);
+    const goTo = jest.spyOn(gridOf(el), 'goTo').mockResolvedValue('selected');
 
     el.activeEventIndex = 9;
     await frame(el);
@@ -236,9 +238,9 @@ describe('CallTreeDetail scoped build', () => {
     build.mockResolvedValue(tree(5000, [frameRow(5), frameRow(9)]));
     const el = await mount(5);
     // The view picked is kept per log, so a switch needs one.
-    el.logStore = logStoreFor({ eventsById: [] } as unknown as ApexLog);
+    el.logStore = (await rawStoreOf('')).store;
     await frame(el);
-    const goTo = jest.spyOn(gridOf(el), 'goTo').mockResolvedValue(true);
+    const goTo = jest.spyOn(gridOf(el), 'goTo').mockResolvedValue('selected');
     const switcher = el.shadowRoot?.querySelector('view-mode-switch');
     const showMode = async (value: string) => {
       switcher?.dispatchEvent(new CustomEvent('view-mode-change', { detail: { value } }));
@@ -258,7 +260,7 @@ describe('CallTreeDetail scoped build', () => {
     build.mockResolvedValue(tree(5000, [frameRow(5), frameRow(9)]));
     const el = await mount(5);
     await frame(el);
-    const goTo = jest.spyOn(gridOf(el), 'goTo').mockResolvedValue(true);
+    const goTo = jest.spyOn(gridOf(el), 'goTo').mockResolvedValue('selected');
     el.activeEventIndex = 9;
     await frame(el);
     goTo.mockClear();
@@ -345,31 +347,37 @@ describe('CallTreeDetail scoped build', () => {
     expect(footer(gridOf(el), 'duration.total')).toBe(6000);
   });
 
-  /** A log whose frames 8 and 12 call the same method from the root, and the bucket path of that call. */
-  function samePathLog(): { log: ApexLog; pathId: number } {
-    const event = { eventIndex: 8, type: 'METHOD_ENTRY', namespace: '', text: 'm' };
-    const log = { eventsById: [] as unknown[], children: [] };
-    log.eventsById[8] = { ...event, parent: log, children: [] };
-    log.eventsById[12] = { ...event, eventIndex: 12, parent: log, children: [] };
-    const paths = logStoreFor(log as unknown as ApexLog).keyPathIds();
-    const pathId = paths.step(ROOT_PATH_ID, paths.keyId('METHOD_ENTRY||m'));
-    return { log: log as unknown as ApexLog, pathId };
+  /** A log whose two frames call the same method from the root, and the bucket path of that call. */
+  async function samePathLog(): Promise<{
+    store: LogStore;
+    pathId: number;
+    first: number;
+    second: number;
+  }> {
+    const { log, store } = await rawStoreOf(
+      frameLines([
+        { text: 'm', self: 10 },
+        { text: 'm', self: 10 },
+      ]),
+    );
+    const [first, second] = indexesOf(log, 'm') as [number, number];
+    const paths = store.keyPathIds();
+    const pathId = paths.step(ROOT_PATH_ID, paths.keyIdOf(first));
+    return { store, pathId, first, second };
   }
 
   it('marks the rows a frame names once the merged view has its rows', async () => {
     // A merged row is named by the bucket path it stands for, so the frame the
     // pointer reports has to be reachable through the log to be translated.
-    const { log, pathId } = samePathLog();
-    const merged = [
-      { ...frameRow(-3), eventIndexes: [8, 12], _pathId: pathId },
-    ] as unknown as ScopedRow[];
+    const { store, pathId, first, second } = await samePathLog();
+    const merged = [{ ...frameRow(-3), eventIndexes: [first, second], _pathId: pathId }];
     const resolvers = deferBuilds();
     const el = await mount(5, 'callees');
-    el.logStore = { log } as unknown as LogStore;
+    el.logStore = store;
     await frame(el);
 
     // The pointer reports a frame while the walk is still running.
-    eventBus.emit('detail:locate', { source: 'timeline', eventIndexes: [8] });
+    eventBus.emit('detail:locate', { source: 'timeline', eventIndexes: [first] });
     await el.updateComplete;
     expect([...gridOf(el, 'bottom-up').marked]).toEqual([]);
 
@@ -385,20 +393,18 @@ describe('CallTreeDetail scoped build', () => {
   });
 
   it('moves the marks to the rows of the view switched to', async () => {
-    const { log, pathId } = samePathLog();
-    const merged = [
-      { ...frameRow(-3), eventIndexes: [8, 12], _pathId: pathId },
-    ] as unknown as ScopedRow[];
+    const { store, pathId, first, second } = await samePathLog();
+    const merged = [{ ...frameRow(-3), eventIndexes: [first, second], _pathId: pathId }];
     build.mockResolvedValue({
-      ...tree(5000, [frameRow(8)]),
+      ...tree(5000, [frameRow(first)]),
       bottomUp: () => Promise.resolve(merged),
     });
     const el = await mount(5);
-    el.logStore = { log } as unknown as LogStore;
+    el.logStore = store;
     await frame(el);
-    eventBus.emit('detail:locate', { source: 'timeline', eventIndexes: [8] });
+    eventBus.emit('detail:locate', { source: 'timeline', eventIndexes: [first] });
     await el.updateComplete;
-    expect([...gridOf(el).marked]).toEqual([8]);
+    expect([...gridOf(el).marked]).toEqual([first]);
 
     el.shadowRoot
       ?.querySelector('view-mode-switch')
@@ -413,27 +419,25 @@ describe('CallTreeDetail scoped build', () => {
     // The scoped views hold only the selection's own calls, but a merged row is
     // named by its bucket path — which a second call of the same method
     // elsewhere in the log shares.
-    const { log, pathId } = samePathLog();
-    const merged = [
-      { ...frameRow(-3), eventIndexes: [8], _pathId: pathId },
-    ] as unknown as ScopedRow[];
+    const { store, pathId, first, second } = await samePathLog();
+    const merged = [{ ...frameRow(-3), eventIndexes: [first], _pathId: pathId }];
     build.mockResolvedValue({
       ...tree(5000),
-      holds: (eventIndex: number) => eventIndex === 8,
+      holds: (eventIndex: number) => eventIndex === first,
       aggregated: () => Promise.resolve(merged),
       bottomUp: () => Promise.resolve(merged),
     });
     const el = await mount(5, 'callees');
-    el.logStore = { log } as unknown as LogStore;
+    el.logStore = store;
     await frame(el);
     const grid = gridOf(el, 'bottom-up');
 
-    // Frame 12 sits at the same path as the row, but the scope never held it.
-    eventBus.emit('detail:locate', { source: 'timeline', eventIndexes: [12] });
+    // The second frame sits at the same path as the row, but the scope never held it.
+    eventBus.emit('detail:locate', { source: 'timeline', eventIndexes: [second] });
     await el.updateComplete;
     expect([...grid.marked]).toEqual([]);
 
-    eventBus.emit('detail:locate', { source: 'timeline', eventIndexes: [8] });
+    eventBus.emit('detail:locate', { source: 'timeline', eventIndexes: [first] });
     await el.updateComplete;
     expect([...grid.marked]).toEqual([-3]);
   });
@@ -445,9 +449,7 @@ describe('CallTreeDetail scoped build', () => {
 
     // `eventLabel` prefixes the type where the text cannot stand alone, which is
     // what the cell renders — the raw `text` field alone would say only "true".
-    expect(nameTooltip(el, { text: 'true', type: 'STATEMENT_EXECUTE' })).toBe(
-      'STATEMENT_EXECUTE: true',
-    );
+    expect(await nameTooltip(el, 'SYSTEM_MODE_ENTER|true')).toBe('SYSTEM_MODE_ENTER: true');
   });
 
   it('keeps the generics in a signature the hover has to show', async () => {
@@ -456,7 +458,7 @@ describe('CallTreeDetail scoped build', () => {
     await frame(el);
 
     const signature = 'ContactTriggerHandler.handleAfterUpdate(List<Contact>, Map<Id,Contact>)';
-    expect(nameTooltip(el, { text: signature, type: 'METHOD_ENTRY' })).toBe(signature);
+    expect(await nameTooltip(el, `METHOD_ENTRY|[1]|01p|${signature}`)).toBe(signature);
   });
 
   it('names each grid by its view for a screen reader', async () => {
@@ -546,7 +548,7 @@ describe('CallTreeDetail scoped build', () => {
     const seen: Array<readonly number[]> = [];
     const located = (e: Event) => seen.push((e as InspectorLocateEvent).detail.eventIndexes);
     document.addEventListener(INSPECTOR_LOCATE_EVENT, located);
-    fire(grid, 'lv-grid-locate', { row: { id: 8, originalData: { eventIndex: 8 } } });
+    fire(grid, 'lv-grid-locate', { row: { id: 8, eventIndex: 8 } });
     // A grouped row cannot be revealed, but every occurrence it merges is marked.
     fire(grid, 'lv-grid-locate', { row: { id: -3, eventIndexes: [8, 12] } });
     document.removeEventListener(INSPECTOR_LOCATE_EVENT, located);

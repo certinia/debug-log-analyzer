@@ -2,7 +2,6 @@
  * Copyright (c) 2026 Certinia Inc. All rights reserved.
  */
 import { beforeEach, describe, expect, it } from '@jest/globals';
-import type { LogEvent } from '@apexdevtools/apex-log-parser';
 import { Uri, workspace } from 'vscode';
 
 import {
@@ -10,12 +9,12 @@ import {
   asContext,
   createMockContext,
   createMockDisplay,
-  createMockLogEvent,
 } from '../../__tests__/helpers/test-builders.js';
 import { LogEventCache } from '../LogEventCache.js';
 
 // Mock apex-log-parser
 jest.mock('@apexdevtools/apex-log-parser', () => ({
+  ...jest.requireActual<object>('@apexdevtools/apex-log-parser'),
   parse: jest.fn(),
 }));
 
@@ -57,6 +56,25 @@ describe('LogEventCache', () => {
       expect(mockReadFile).toHaveBeenCalledTimes(1);
     });
 
+    // On open, folding, symbols and the decoration all ask before the first parse ends.
+    it('reads a log once when several callers ask while it is still being parsed', async () => {
+      readsAnyLog();
+
+      const [first, second, third] = await Promise.all([open('file'), open('file'), open('file')]);
+
+      expect(second).toBe(first);
+      expect(third).toBe(first);
+      expect(mockReadFile).toHaveBeenCalledTimes(1);
+    });
+
+    it('reads a log again after a failed read, rather than keeping the failure', async () => {
+      mockReadFile.mockRejectedValueOnce(new Error('File not found'));
+      expect(await open('flaky')).toBeNull();
+
+      readsAnyLog();
+      expect(await open('flaky')).not.toBeNull();
+    });
+
     it('evicts the least recently used log past 10 entries', async () => {
       readsAnyLog();
       for (let i = 0; i < 10; i++) {
@@ -73,19 +91,11 @@ describe('LogEventCache', () => {
       expect(mockReadFile).toHaveBeenCalledTimes(1);
     });
 
-    it.each([
-      ['the read', () => mockReadFile.mockRejectedValueOnce(new Error('File not found'))],
-      [
-        'the parse',
-        () => {
-          mockReadFile.mockResolvedValueOnce(new TextEncoder().encode('invalid'));
-          mockParse.mockImplementationOnce(() => {
-            throw new Error('Parse error');
-          });
-        },
-      ],
-    ])('returns null when %s fails', async (_label, fail) => {
-      fail();
+    it('returns null when the parse fails', async () => {
+      mockReadFile.mockResolvedValueOnce(new TextEncoder().encode('invalid'));
+      mockParse.mockImplementationOnce(() => {
+        throw new Error('Parse error');
+      });
       expect(await open('broken')).toBeNull();
     });
 
@@ -106,66 +116,27 @@ describe('LogEventCache', () => {
     });
   });
 
-  describe('findEventByTimestamp', () => {
-    const at = (timestamp: number, exitStamp: number | null, children: LogEvent[] = []) =>
-      createMockLogEvent({ timestamp, exitStamp, children });
-
-    describe('among siblings', () => {
-      const span = at(1000, 3000);
-      const zeroLength = at(1000, 1000);
-      const noExit = at(1000, null);
-      const first = at(1000, 2000);
-      const second = at(3000, 4000);
-      const third = at(5000, 6000);
-      const gapped = [at(1000, 2000), at(4000, 5000)];
-      const hundred = Array.from({ length: 100 }, (_, i) => at(i * 100, i * 100 + 50));
-
-      it.each([
-        ['its start', [span], 1000, span],
-        ['inside it', [span], 2000, span],
-        ['its end', [span], 3000, span],
-        ['a zero-length event', [zeroLength], 1000, zeroLength],
-        ['an event with no exit, at its start', [noExit], 1000, noExit],
-        ['the middle of three', [first, second, third], 3500, second],
-        ['one of a hundred', hundred, 5025, hundred[50]],
-      ])('finds the event at %s', (_label, children, timestamp, event) => {
-        const apexLog = createMockApexLog({ children });
-        expect(LogEventCache.findEventByTimestamp(apexLog, timestamp)).toEqual({
-          event,
-          depth: 0,
-        });
-      });
-
-      it.each([
-        ['before every event', [span], 500],
-        ['after every event', [first], 3000],
-        ['past an event with no exit', [noExit], 1001],
-        ['in a gap between siblings', gapped, 3000],
-        ['in an empty log', [], 1000],
-      ])('finds nothing %s', (_label, children, timestamp) => {
-        const apexLog = createMockApexLog({ children });
-        expect(LogEventCache.findEventByTimestamp(apexLog, timestamp)).toBeNull();
-      });
+  describe('linesOf', () => {
+    const HELLO = '09:18:22.6 (100)|USER_DEBUG|[1]|DEBUG|hello';
+    const doc = (version: number, lines = [HELLO]) => ({
+      version,
+      lineCount: lines.length,
+      lineAt: jest.fn((line: number) => ({ text: lines[line]! })),
     });
 
-    describe('nested', () => {
-      const child = at(1200, 1800);
-      const withChild = at(1000, 2000, [child]);
-      const grandchild = at(1300, 1700);
-      const withGrandchild = at(1000, 2000, [at(1200, 1800, [grandchild])]);
-      const earlyChild = at(1000, 2000, [at(1300, 1400)]);
-      const middle = at(1400, 1600);
-      const withThree = at(1000, 2000, [at(1100, 1300), middle, at(1700, 1900)]);
+    it('reads a document once per version', async () => {
+      const { parse: realParse } = jest.requireActual<{
+        parse: typeof parse;
+      }>('@apexdevtools/apex-log-parser');
+      const apexLog = await realParse(HELLO);
+      const first = doc(1);
 
-      it.each([
-        ['a child', withChild, child, 1],
-        ['a grandchild', withGrandchild, grandchild, 2],
-        ['the parent outside its child', earlyChild, earlyChild, 0],
-        ['the middle of three children', withThree, middle, 1],
-      ])('finds %s at its depth', (_label, root, event, depth) => {
-        const apexLog = createMockApexLog({ children: [root] });
-        expect(LogEventCache.findEventByTimestamp(apexLog, 1500)).toEqual({ event, depth });
-      });
+      const lines = LogEventCache.linesOf(apexLog, first);
+      expect(LogEventCache.linesOf(apexLog, first)).toBe(lines);
+      expect(first.lineAt).toHaveBeenCalledTimes(1);
+      // An edit gives the document a new version, so its lines are read again; reused, hello stays on line 0.
+      const edited = LogEventCache.linesOf(apexLog, doc(2, ['an inserted line', HELLO]));
+      expect([...edited.start]).toEqual([-1, 1]);
     });
   });
 

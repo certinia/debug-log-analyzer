@@ -3,8 +3,8 @@
  */
 import { customElement } from 'lit/decorators.js';
 
-import type { DMLBeginLine } from '@apexdevtools/apex-log-parser';
-import { getCallerNamespace } from '../../../core/utility/CallerNamespace.js';
+import type { DmlEvent } from '#core/log/statements.js';
+import { DEFAULT_NAMESPACE } from '#core/utility/CallerNamespace.js';
 import type { GridColumn } from '../../../grid/index.js';
 import { DML_VIEWS } from '../../../components/grid/ColumnViews.js';
 import { textColumn } from '../../../components/grid/columns.js';
@@ -49,7 +49,7 @@ function dmlColumns(rows: readonly DMLRow[]): GridColumn<DMLRow>[] {
 }
 
 @customElement('dml-view')
-export class DMLView extends StatementGrid<DMLRow, DMLBeginLine> {
+export class DMLView extends StatementGrid<DMLRow, DmlEvent> {
   constructor() {
     super({
       type: 'dml',
@@ -70,14 +70,14 @@ export class DMLView extends StatementGrid<DMLRow, DMLBeginLine> {
     });
   }
 
-  protected toRows(lines: readonly DMLBeginLine[]): DMLRow[] {
+  protected toRows(lines: readonly DmlEvent[], callerOf: (id: number) => string): DMLRow[] {
     return lines.map((dml) => ({
-      eventIndex: dml.eventIndex,
-      dml: dml.text,
-      objectType: dml.sObjectType,
-      namespace: dml.namespace,
-      callerNamespace: getCallerNamespace(dml),
-      rowCount: dml.dmlRowCount.self,
+      eventIndex: dml.id,
+      dml: dml.text ?? '',
+      objectType: dml.details.sObjectType,
+      namespace: dml.namespace ?? DEFAULT_NAMESPACE,
+      callerNamespace: callerOf(dml.id),
+      rowCount: dml.dmlRowCount?.self ?? 0,
       timeTaken: dml.duration.total,
     }));
   }

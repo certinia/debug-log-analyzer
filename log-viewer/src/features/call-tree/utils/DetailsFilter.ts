@@ -2,31 +2,36 @@
  * Copyright (c) 2026 Certinia Inc. All rights reserved.
  */
 
-import type { LogEvent } from '@apexdevtools/apex-log-parser';
+import { EVENT_TYPES, eventType, SHAPE, type EventType } from '@apexdevtools/apex-log-parser';
 
-/**
- * Detail types that report governor figures. Two of them are parents, but they
- * count as details, never as frames.
- */
-const PINNED_TYPES: ReadonlySet<string> = new Set<string>([
+import type { LogIndex } from '#core/log/LogIndex.js';
+
+// Exceptions, fatal errors, and the cumulative limit and profiling blocks; the blocks have children but are never frames.
+const PINNED_TYPES: ReadonlySet<EventType> = new Set<EventType>([
+  // Parser 0.3 marked these two `discontinuity`; 0.4 does not export that flag.
+  'EXCEPTION_THROWN',
+  'FATAL_ERROR',
   'CUMULATIVE_LIMIT_USAGE',
   'LIMIT_USAGE_FOR_NS',
   'CUMULATIVE_PROFILING',
   'CUMULATIVE_PROFILING_BEGIN',
 ]);
 
-/**
- * What an event is to the call-tree views, from its type alone and never its time.
- * A `frame` can hold children. A `pinned` detail is an exception, a fatal error or
- * a {@link PINNED_TYPES} event, which the top-down views always show. Any other
- * `detail` shows only when the Details filter is on.
- */
+/** An event's role in the call-tree views, by type: a `frame`, a `pinned` detail the top-down views always show, or a `detail` shown only with Details on. */
 export type EventKind = 'frame' | 'pinned' | 'detail';
 
-/** The {@link EventKind} of `event`. */
-export function eventKind(event: Pick<LogEvent, 'type' | 'isParent' | 'discontinuity'>): EventKind {
-  if (event.discontinuity || PINNED_TYPES.has(event.type ?? '')) {
-    return 'pinned';
-  }
-  return event.isParent ? 'frame' : 'detail';
+// By type, not `columns.isFrame`: a VF call with no method is a frame here, as in parser 0.3.
+const KIND_BY_TYPE_ID: readonly EventKind[] = EVENT_TYPES.map(({ type, shape }) =>
+  PINNED_TYPES.has(type) ? 'pinned' : shape === SHAPE.Frame ? 'frame' : 'detail',
+);
+
+/** The {@link EventKind} of an event of type `type`. */
+export function eventKind(type: string): EventKind {
+  return KIND_BY_TYPE_ID[eventType(type as EventType)?.typeId ?? -1] ?? 'detail';
+}
+
+/** The {@link EventKind} of each row of `index`, by row. */
+export function rowKinds(index: LogIndex): (row: number) => EventKind {
+  const types = index.column(index.log.columns.type);
+  return (row) => KIND_BY_TYPE_ID[types[row]!]!;
 }

@@ -1,27 +1,26 @@
 /*
  * Copyright (c) 2026 Certinia Inc. All rights reserved.
  */
-import { SOQLExecuteBeginLine, type LogEvent, type SelfTotal } from '@apexdevtools/apex-log-parser';
+import type { ApexEvent, ApexLog, EventOf } from '@apexdevtools/apex-log-parser';
 import { consume } from '@lit/context';
 import { LitElement, css, html, type TemplateResult } from 'lit';
 import { customElement, property } from 'lit/decorators.js';
 import { ifDefined } from 'lit/directives/if-defined.js';
 
-import { describeLevelGap } from '../core/log/levelCapabilities.js';
-import { logContext } from '../core/log/logContext.js';
-import type { LogStore } from '../core/log/LogStore.js';
+import { describeLevelGap } from '#core/log/levelCapabilities.js';
+import { logContext } from '#core/log/logContext.js';
+import type { LogStore } from '#core/log/LogStore.js';
 import {
   EVENT_METRICS,
   formatBytes,
   HEAP_PEAK,
   selfLabel,
   usageParts,
-} from '../core/metrics/eventMetrics.js';
-import { DEFAULT_NAMESPACE, getCallerNamespace } from '../core/utility/CallerNamespace.js';
-import { formatNsAsMs } from '../core/utility/Duration.js';
-import { outermostEvents } from '../core/utility/EventTree.js';
-import { formatInteger } from '../core/utility/Util.js';
-import { sumDurationTotalForRootEvents } from '../features/analysis/services/CallStackSum.js';
+} from '#core/metrics/eventMetrics.js';
+import { getCallerNamespace, namespaceOf } from '#core/utility/CallerNamespace.js';
+import { formatNsAsMs } from '#core/utility/Duration.js';
+import { outermostIds } from '#core/utility/EventTree.js';
+import { formatInteger } from '#core/utility/Util.js';
 import { globalStyles } from '../styles/global.styles.js';
 
 // web components
@@ -143,19 +142,25 @@ export class EventVitals extends LitElement {
       return html`<div class="empty">No details available.</div>`;
     }
 
-    const events = (this.instances?.length ? this.instances : [this.eventIndex])
-      .map((i) => store.eventByIndex(i))
-      .filter((e): e is LogEvent => e !== null);
-    const primary = events[0];
+    // Ids, not events: an aggregate can name tens of thousands of calls, and the
+    // columns read each without an object.
+    const ids = (this.instances?.length ? this.instances : [this.eventIndex]).filter((id) =>
+      store.isShown(id),
+    );
+    const primary = ids[0] === undefined ? null : store.log.event(ids[0]);
     if (!primary) {
       return html`<div class="empty">No details available.</div>`;
     }
     const isAggregate = (this.instances?.length ?? 0) > 0;
+    const { log } = store;
+    const { durationTotal, durationSelf } = log.columns;
+    // A total nests and a self reading does not, so each sums the set that holds it once.
+    const outer = outermostIds(log, ids);
 
     const rows: TemplateResult[] = [];
-    this._row(rows, 'Type', primary.type ?? '—');
+    this._row(rows, 'Type', primary.type);
     if (isAggregate) {
-      this._row(rows, 'Calls', formatInteger(events.length));
+      this._row(rows, 'Calls', formatInteger(ids.length));
     }
     // The panel is titled by the calls it describes, so the frame that made them
     // is a fact beside them rather than the title.
@@ -165,8 +170,8 @@ export class EventVitals extends LitElement {
 
     // A recursive frame's outer call already holds its inner calls, so a total
     // counts the outermost occurrences only.
-    const total = sumDurationTotalForRootEvents([events]);
-    const self = events.reduce((sum, e) => sum + e.duration.self, 0);
+    const total = sumOf(outer, durationTotal);
+    const self = sumOf(ids, durationSelf);
     this._row(
       rows,
       'Time',
@@ -175,25 +180,26 @@ export class EventVitals extends LitElement {
     );
     if (isAggregate) {
       // Self time never nests, so it and the call count cover the same calls.
-      this._row(rows, 'Avg self', this._ms(self / events.length));
+      this._row(rows, 'Avg self', this._ms(self / ids.length));
     }
 
-    this._metricRows(rows, events);
+    this._metricRows(rows, log, ids, outer);
     this._statementRows(rows, primary);
 
-    this._row(rows, 'Namespace', primary.namespace || '—');
+    const namespace = namespaceOf(store.log, primary.id);
+    this._row(rows, 'Namespace', namespace);
     // Only worth a row when it says something new: "who called this" differing
     // from "whose code ran" is the interesting case (a package's code invoked
     // from another package's trigger). Both normalize empty the same way.
-    const callerNamespace = getCallerNamespace(primary);
-    if (callerNamespace !== (primary.namespace || DEFAULT_NAMESPACE)) {
+    const callerNamespace = getCallerNamespace(store, primary.id);
+    if (callerNamespace !== namespace) {
       this._row(rows, 'Caller namespace', callerNamespace);
     }
     // The call site, in the code that contains the frame — not where it is defined.
     this._optional(rows, 'Called from', primary.lineNumber, (line) => `line ${line}`);
 
     return html`
-      <code-block language=${this._language()} .code=${primary.text}></code-block>
+      <code-block language=${this._language()} .code=${primary.text ?? primary.type}></code-block>
       <div class="grid">${rows}</div>
     `;
   }
@@ -207,11 +213,12 @@ export class EventVitals extends LitElement {
    * say *whose* rows. Row counts are not repeated here: {@link _metricRows}
    * already reports them against their limit.
    */
-  private _statementRows(rows: TemplateResult[], event: LogEvent): void {
-    if (this.type !== 'soql' || !(event instanceof SOQLExecuteBeginLine)) {
+  private _statementRows(rows: TemplateResult[], event: ApexEvent): void {
+    if (this.type !== 'soql' || event.type !== 'SOQL_EXECUTE_BEGIN') {
       return;
     }
-    const explain = event.children[0];
+    // The type was checked above.
+    const { explain, aggregations } = (event as EventOf<'SOQL_EXECUTE_BEGIN'>).details;
     this._row(rows, 'Selective', this._selectivityPill(explain?.relativeCost ?? null));
     if (explain) {
       const plan = [
@@ -231,7 +238,7 @@ export class EventVitals extends LitElement {
         SOBJECT_CARDINALITY_DOC,
       );
     }
-    this._optional(rows, 'Aggregations', event.aggregations, formatInteger);
+    this._optional(rows, 'Aggregations', aggregations, formatInteger);
   }
 
   /**
@@ -241,35 +248,33 @@ export class EventVitals extends LitElement {
    * reads on every log whether or not one reported limits. A reported limit follows as a
    * qualifier. Zero rows are omitted; `self` only appears when it adds something.
    */
-  private _metricRows(rows: TemplateResult[], events: LogEvent[]): void {
-    const apexLog = this.logStore?.log;
-    const limits = apexLog?.governorLimits;
-    // A total nests and a self reading does not, so each sums the set that holds
-    // it once.
-    const outer = outermostEvents(events);
-    const sumTotal = (pick: (e: LogEvent) => SelfTotal) =>
-      outer.reduce((acc, e) => acc + pick(e).total, 0);
-    const sumSelf = (pick: (e: LogEvent) => SelfTotal) =>
-      events.reduce((acc, e) => acc + pick(e).self, 0);
+  private _metricRows(
+    rows: TemplateResult[],
+    apexLog: ApexLog,
+    ids: readonly number[],
+    outer: readonly number[],
+  ): void {
+    const { limits, columns } = apexLog;
 
     // A statement's own row count is its headline number, so it shows even at
     // zero ("returned nothing" is a result); other zero metrics stay hidden.
     const alwaysShow = this.type ? `${this.type.toUpperCase()} Rows` : '';
 
     for (const metric of EVENT_METRICS) {
-      const total = sumTotal(metric.pick);
+      const column = columns[metric.key];
+      const total = column ? sumOf(outer, column.total) : 0;
       if (!total && metric.label !== alwaysShow) {
         continue;
       }
-      const limit = limits ? metric.limit(limits, this.type) : 0;
-      const self = metric.noSelf ? 0 : sumSelf(metric.pick);
+      const limit = metric.limit(limits, this.type);
+      const self = metric.noSelf || !column ? 0 : sumOf(ids, column.self);
       const format = metric.bytes ? formatBytes : formatInteger;
       this._row(
         rows,
         metric.label,
         usage(
           total,
-          apexLog ? metric.pick(apexLog).total : 0,
+          metric.pick(apexLog).total,
           limit,
           format,
           self > 0 && self !== total ? format(self) : null,
@@ -277,18 +282,13 @@ export class EventVitals extends LitElement {
       );
     }
 
-    const heapPeak = events.reduce((max, e) => Math.max(max, HEAP_PEAK.pick(e)), 0);
+    const peaks = columns.heapPeak;
+    const heapPeak = peaks ? ids.reduce((max, id) => Math.max(max, peaks[id]!), 0) : 0;
     if (heapPeak) {
       this._row(
         rows,
         HEAP_PEAK.label,
-        usage(
-          heapPeak,
-          apexLog ? HEAP_PEAK.pick(apexLog) : 0,
-          limits ? HEAP_PEAK.limit(limits) : 0,
-          formatBytes,
-          null,
-        ),
+        usage(heapPeak, HEAP_PEAK.pick(apexLog), HEAP_PEAK.limit(limits), formatBytes, null),
       );
     }
   }
@@ -344,6 +344,15 @@ export class EventVitals extends LitElement {
 function qualifier(...parts: Array<string | false | null | undefined>): TemplateResult | string {
   const shown = parts.filter((part): part is string => !!part);
   return shown.length ? html` <span class="qualifier">(${shown.join(', ')})</span>` : '';
+}
+
+/** The values of `column` at `ids`. */
+function sumOf(ids: readonly number[], column: ArrayLike<number>): number {
+  let sum = 0;
+  for (const id of ids) {
+    sum += column[id]!;
+  }
+  return sum;
 }
 
 /** {@link usageParts} as the row renders it. */

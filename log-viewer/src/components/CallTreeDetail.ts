@@ -9,12 +9,12 @@ import { LitElement, css, html, type PropertyValues } from 'lit';
 import { customElement, property, state } from 'lit/decorators.js';
 import { createRef, ref, type Ref } from 'lit/directives/ref.js';
 
-import type { DetailSource, SelectionView } from '../core/events/EventBus.js';
-import { TeardownController } from '../core/events/TeardownController.js';
-import { logContext } from '../core/log/logContext.js';
-import type { LogStore } from '../core/log/LogStore.js';
-import { RangeScopeController, sameWindow, type TimeWindow } from '../core/log/rangeScope.js';
-import { waitForNextFrame, type FrameBudgetOptions } from '../core/utility/FrameBudget.js';
+import type { DetailSource, SelectionView } from '#core/events/EventBus.js';
+import { TeardownController } from '#core/events/TeardownController.js';
+import { logContext } from '#core/log/logContext.js';
+import type { LogStore } from '#core/log/LogStore.js';
+import { RangeScopeController, sameWindow, type TimeWindow } from '#core/log/rangeScope.js';
+import { waitForNextFrame, type FrameBudgetOptions } from '#core/utility/FrameBudget.js';
 import { queryDialect } from '../features/call-tree/grid/cells.js';
 import { eventLabel } from '../features/call-tree/utils/eventText.js';
 import {
@@ -190,8 +190,8 @@ export class CallTreeDetail extends LitElement {
     source: () => this._slots[this.viewMode]?.source,
     frames: frameEventIndexes,
     pick: (row) => this._pick(row),
-    // A merged row's `originalData` is its first occurrence, so the action lands there.
-    menuFrame: (row) => row.originalData.eventIndex,
+    // A merged row's `eventIndex` is its first occurrence, so the action lands there.
+    menuFrame: (row) => row.eventIndex,
     keysFor: (eventIndexes) => this._rowIdsFor(this.viewMode, eventIndexes),
     dropOnClear: true,
   });
@@ -348,7 +348,7 @@ export class CallTreeDetail extends LitElement {
     }
     const byPath = (slot.rowsByPath ??= rowIdsByPath(slot.source.roots));
     const pathIds = this._locateIds.idsFor(
-      this.logStore?.log ?? null,
+      this.logStore,
       this._inScope(eventIndexes),
       mode === 'bottom-up' ? 'callers' : 'callees',
     );
@@ -463,7 +463,7 @@ export class CallTreeDetail extends LitElement {
 
   /** The keys from a top-level row down to `eventIndex`, or null where the rows do not hold it. */
   private _timeOrderPath(roots: readonly ScopedRow[], eventIndex: number): number[] | null {
-    const lineage = (this.logStore?.stackByEventIndex(eventIndex) ?? []).map((e) => e.eventIndex);
+    const lineage = (this.logStore?.stackByEventIndex(eventIndex) ?? []).map((e) => e.id);
     if (lineage.at(-1) !== eventIndex) {
       lineage.push(eventIndex);
     }
@@ -624,8 +624,10 @@ export class CallTreeDetail extends LitElement {
         ...inlineQueryColumn<ScopedRow>({
           id: 'text',
           title: 'Name',
-          value: ({ originalData: node }) =>
-            queryDialect(node.type) ? node.text : eventLabel(node),
+          value: (row) => {
+            const event = queryDialect(row.type) ? null : this.logStore?.log.event(row.eventIndex);
+            return event ? eventLabel(event) : row.text;
+          },
           dialect: ({ type }) => queryDialect(type),
         }),
         // The raw text, as the Call Tree sorts: a label is built on each compare.

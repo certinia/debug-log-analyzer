@@ -1,18 +1,14 @@
 /*
  * Copyright (c) 2026 Certinia Inc. All rights reserved.
  */
-import {
-  DMLBeginLine,
-  type LogEvent,
-  SOQLExecuteBeginLine,
-  SOSLExecuteBeginLine,
-} from '@apexdevtools/apex-log-parser';
+import type { ApexEvent } from '@apexdevtools/apex-log-parser';
 
-import type { LogIndex } from '../../../core/log/LogIndex.js';
-import type { Derivation } from '../../../core/log/LogStore.js';
-import { statements } from '../../../core/log/statements.js';
-import { DEFAULT_NAMESPACE, getCallerNamespace } from '../../../core/utility/CallerNamespace.js';
-import { sharePercent } from '../../../core/utility/Util.js';
+import { childRows, type LogIndex, NO_ROW } from '#core/log/LogIndex.js';
+import type { Derivation } from '#core/log/LogStore.js';
+import { type Signatures, signaturesOf } from '#core/log/signatures.js';
+import { statements, type DmlEvent, type SoqlEvent, type SoslEvent } from '#core/log/statements.js';
+import { callerNamespaceOfRow, namespaceOf } from '#core/utility/CallerNamespace.js';
+import { sharePercent } from '#core/utility/Util.js';
 import { deriveSoqlObject } from './sobjectClassification.js';
 
 /** The label for a DML statement whose SObject the log never names. */
@@ -169,11 +165,6 @@ export interface DatabaseOverview {
 export const databaseOverview: Derivation<DatabaseOverview> = async (index, store) =>
   compute(store.log.duration.total, index, (await store.derive(statements)).rows);
 
-/** The DML operation from a `DML Op:Insert Type:Account` line. */
-export function dmlOperation(text: string): string {
-  return /\bOp:(\w+)/.exec(text)?.[1] ?? 'DML';
-}
-
 /** {@link Concentration} for an overview, against a share of database time. */
 export function concentration(
   overview: DatabaseOverview,
@@ -225,28 +216,53 @@ interface StatementFacts {
   label: string;
   rowsRead: number;
   rowsWritten: number;
+  /** The SObject a DML names; a query's is derived once per statement, as {@link sobjectOf} does. */
+  sObject: string | null;
 }
 
 /** The statement a log event is, or `null` for any other frame. */
-function statementOf(event: LogEvent): StatementFacts | null {
-  if (event instanceof SOQLExecuteBeginLine) {
-    return { kind: 'SOQL', label: event.text, rowsRead: event.soqlRowCount.self, rowsWritten: 0 };
+function statementOf(event: ApexEvent): StatementFacts | null {
+  // Each branch checks the type it casts to.
+  switch (event.type) {
+    case 'SOQL_EXECUTE_BEGIN': {
+      const soql = event as SoqlEvent;
+      const rowsRead = soql.soqlRowCount?.self ?? 0;
+      return { kind: 'SOQL', label: soql.text ?? '', rowsRead, rowsWritten: 0, sObject: null };
+    }
+    case 'DML_BEGIN': {
+      const { operation, sObjectType } = (event as DmlEvent).details;
+      return {
+        kind: 'DML',
+        label: `${operation ?? 'DML'} ${sObjectType ?? UNKNOWN_OBJECT}`,
+        rowsRead: 0,
+        rowsWritten: event.dmlRowCount?.self ?? 0,
+        sObject: sObjectType,
+      };
+    }
+    case 'SOSL_EXECUTE_BEGIN': {
+      const sosl = event as SoslEvent;
+      const rowsRead = sosl.soslRowCount?.self ?? 0;
+      return { kind: 'SOSL', label: sosl.text ?? '', rowsRead, rowsWritten: 0, sObject: null };
+    }
+    default:
+      return null;
   }
-  if (event instanceof DMLBeginLine) {
-    return {
-      kind: 'DML',
-      label: `${dmlOperation(event.text)} ${event.sObjectType ?? UNKNOWN_OBJECT}`,
-      rowsRead: 0,
-      rowsWritten: event.dmlRowCount.self,
-    };
-  }
-  if (event instanceof SOSLExecuteBeginLine) {
-    return { kind: 'SOSL', label: event.text, rowsRead: event.soslRowCount.self, rowsWritten: 0 };
-  }
-  return null;
+}
+
+/** What the walks read the shown rows by. */
+interface Rows {
+  index: LogIndex;
+  signatures: Signatures;
+  /** 1 for a frame, by row. */
+  isFrame: Uint8Array;
 }
 
 function compute(logNs: number, index: LogIndex, rows: readonly number[]): DatabaseOverview {
+  const source: Rows = {
+    index,
+    signatures: signaturesOf(index.log),
+    isFrame: index.column(index.log.columns.isFrame),
+  };
   const time: DatabaseTime = {
     timeNs: 0,
     percentOfLog: 0,
@@ -256,17 +272,18 @@ function compute(logNs: number, index: LogIndex, rows: readonly number[]): Datab
   };
   const found: {
     row: number;
-    event: LogEvent;
+    event: ApexEvent;
     facts: StatementFacts;
-    enclosing: LogEvent | null;
+    /** The statement row around this one, or {@link NO_ROW}. */
+    enclosing: number;
   }[] = [];
-  /** Time a statement holds in the statements inside it, so self time can net it off. */
-  const nested = new Map<LogEvent, number>();
-  /** Every statement found, so the tree walk classifies each event only once. */
-  const factsByEvent = new Map<LogEvent, StatementFacts>();
+  /** Time a statement row holds in the statements inside it, so self time can net it off. */
+  const nested = new Map<number, number>();
+  /** Every statement found by row, so the tree walk classifies each event only once. */
+  const factsByRow = new Map<number, StatementFacts>();
 
   // The statements still open form a stack, so its top encloses the next one.
-  const { subtreeEnd } = index;
+  const { subtreeEnd, total } = index;
   const open: number[] = [];
   for (const row of rows) {
     // In range: every row in `open` is a row of `index`.
@@ -275,13 +292,12 @@ function compute(logNs: number, index: LogIndex, rows: readonly number[]): Datab
     }
     const event = index.event(row);
     const facts = statementOf(event)!; // every row of `statements` is a statement
-    const outer = open.at(-1);
-    const enclosing = outer === undefined ? null : index.event(outer);
+    const enclosing = open.at(-1) ?? NO_ROW;
     open.push(row);
-    factsByEvent.set(event, facts);
+    factsByRow.set(row, facts);
     found.push({ row, event, facts, enclosing });
-    if (enclosing) {
-      nested.set(enclosing, (nested.get(enclosing) ?? 0) + event.duration.total);
+    if (enclosing !== NO_ROW) {
+      nested.set(enclosing, (nested.get(enclosing) ?? 0) + total[row]!);
     }
   }
   // The order a last-child-first walk meets them in, which a tie below keeps.
@@ -291,20 +307,20 @@ function compute(logNs: number, index: LogIndex, rows: readonly number[]): Datab
   const askedBy = new Map<string, DatabaseBreakdown>();
   const burnedIn = new Map<string, DatabaseBreakdown>();
   const roots = new Map<string, TreeNode>();
-  for (const { event, facts, enclosing } of found) {
+  for (const { row, event, facts, enclosing } of found) {
     const { kind, rowsRead, rowsWritten } = facts;
-    const timeNs = event.duration.total;
-    const netNs = Math.max(0, timeNs - (nested.get(event) ?? 0));
+    const timeNs = total[row]!;
+    const netNs = Math.max(0, timeNs - (nested.get(row) ?? 0));
     const kindTime = time[KIND_TIME[kind]];
     kindTime.timeNs += netNs;
     kindTime.statements += 1;
-    addStatement(statements, event, facts, timeNs, netNs);
-    addPath(roots, event, factsByEvent, timeNs, enclosing);
+    addStatement(statements, index, row, event, facts, netNs);
+    addPath(roots, source, row, factsByRow, timeNs, enclosing);
     // The statements inside this one are counted where they are found, so only an
     // outermost statement charges a namespace: its total is the whole cost.
-    if (!enclosing) {
+    if (enclosing === NO_ROW) {
       const kindField = KIND_BREAKDOWN[kind];
-      const caller = getCallerNamespace(event);
+      const caller = callerNamespaceOfRow(index, row);
       addBreakdown(askedBy, {
         key: caller,
         kind: kindField,
@@ -313,7 +329,7 @@ function compute(logNs: number, index: LogIndex, rows: readonly number[]): Datab
         rowsRead,
         rowsWritten,
       });
-      addAttribution(burnedIn, event, kindField, caller, rowsRead, rowsWritten);
+      addAttribution(burnedIn, source, row, kindField, caller, rowsRead, rowsWritten);
     }
   }
 
@@ -330,39 +346,37 @@ function compute(logNs: number, index: LogIndex, rows: readonly number[]): Datab
 }
 
 /** The SObject a statement touched, or `null` where the log names none. */
-function sobjectOf(event: LogEvent): string | null {
-  if (event instanceof SOQLExecuteBeginLine) {
-    return deriveSoqlObject(event);
-  }
-  if (event instanceof DMLBeginLine) {
-    return event.sObjectType ?? null;
-  }
-  return null;
+function sobjectOf(event: ApexEvent, facts: StatementFacts): string | null {
+  // The kind says the type.
+  return facts.kind === 'SOQL' ? deriveSoqlObject(event as SoqlEvent) : facts.sObject;
 }
 
-/** Merge one occurrence into its statement, so a query in a loop is one row. */
+/** Merge one occurrence, at `row`, into its statement, so a query in a loop is one row. */
 function addStatement(
   statements: Map<string, DatabaseStatement>,
-  event: LogEvent,
+  index: LogIndex,
+  row: number,
+  event: ApexEvent,
   facts: StatementFacts,
-  timeNs: number,
   netNs: number,
 ): void {
+  const timeNs = index.total[row]!;
+  const selfNs = index.self[row]!;
   const { kind, label, rowsRead, rowsWritten } = facts;
   const key = `${kind}:${label}`;
   const occurrenceRows = rowsRead + rowsWritten;
   const statement = statements.get(key);
   if (!statement) {
     statements.set(key, {
-      eventIndex: event.eventIndex,
-      eventIndexes: [event.eventIndex],
+      eventIndex: event.id,
+      eventIndexes: [event.id],
       kind,
       label,
       // Derived here so a query in a loop parses its SObject once, not per run.
-      sObject: sobjectOf(event),
+      sObject: sobjectOf(event, facts),
       timeNs,
       netNs,
-      selfNs: event.duration.self,
+      selfNs,
       rows: occurrenceRows,
       maxRows: occurrenceRows,
       repeats: 1,
@@ -371,12 +385,12 @@ function addStatement(
   }
   // The slowest occurrence is the one a click should reveal.
   if (netNs > statement.netNs) {
-    statement.eventIndex = event.eventIndex;
+    statement.eventIndex = event.id;
   }
-  statement.eventIndexes.push(event.eventIndex);
+  statement.eventIndexes.push(event.id);
   statement.timeNs += timeNs;
   statement.netNs += netNs;
-  statement.selfNs += event.duration.self;
+  statement.selfNs += selfNs;
   statement.rows += occurrenceRows;
   statement.maxRows = Math.max(statement.maxRows, occurrenceRows);
   statement.repeats += 1;
@@ -394,29 +408,31 @@ function addStatement(
  */
 function addAttribution(
   breakdowns: Map<string, DatabaseBreakdown>,
-  event: LogEvent,
+  { index, isFrame }: Rows,
+  row: number,
   kind: 'soqlTimeNs' | 'dmlTimeNs' | 'soslTimeNs',
   caller: string,
   rowsRead: number,
   rowsWritten: number,
 ): void {
+  const { total } = index;
   let attributed = 0;
-  for (const child of event.children) {
-    if (!child.isParent || child.duration.total <= 0) {
+  for (const child of childRows(index, row)) {
+    if (!isFrame[child] || total[child]! <= 0) {
       continue;
     }
-    attributed += child.duration.total;
+    attributed += total[child]!;
     addBreakdown(breakdowns, {
-      key: child.namespace || DEFAULT_NAMESPACE,
+      key: namespaceOf(index.log, index.eventIndex[child]!),
       kind,
-      timeNs: child.duration.total,
+      timeNs: total[child]!,
     });
   }
   // The rows belong to the statement itself, so they follow its platform time.
   addBreakdown(breakdowns, {
     key: caller,
     kind,
-    timeNs: Math.max(0, event.duration.total - attributed),
+    timeNs: Math.max(0, total[row]! - attributed),
     statements: 1,
     rowsRead,
     rowsWritten,
@@ -428,20 +444,22 @@ function byTime(breakdowns: Map<string, DatabaseBreakdown>): DatabaseBreakdown[]
   return [...breakdowns.values()].sort((a, b) => b.timeNs - a.timeNs);
 }
 
-/** Merge one statement and the frames above it into the tree. */
+/** Merge the statement at `row` and the frames above it into the tree. */
 function addPath(
   roots: Map<string, TreeNode>,
-  event: LogEvent,
-  factsByEvent: Map<LogEvent, StatementFacts>,
+  { index, signatures }: Rows,
+  row: number,
+  factsByRow: Map<number, StatementFacts>,
   timeNs: number,
-  enclosing: LogEvent | null,
+  enclosing: number,
 ): void {
-  // Outermost frame first; the root itself is no frame, so it stops the walk up.
-  const path: LogEvent[] = [];
-  for (let frame: LogEvent | null = event; frame?.parent; frame = frame.parent) {
-    // A marker line the log names after its own type — EXECUTION_STARTED — names
-    // no code, so it would be a row every path shares and none of them needs.
-    if (frame === event || frame.text !== frame.type) {
+  const { text } = index.log.columns;
+  // Outermost frame first.
+  const path: number[] = [];
+  for (let frame = row; frame !== NO_ROW; frame = index.parent[frame]!) {
+    // A marker line that states no text — EXECUTION_STARTED — names no code, so
+    // it would be a row every path shares and none of them needs.
+    if (frame === row || text.at(index.eventIndex[frame]!) !== null) {
       path.push(frame);
     }
   }
@@ -449,17 +467,18 @@ function addPath(
 
   // The statement around this one already counts its time, so it and everything
   // above it take nothing; only the frames beneath it do.
-  const cutoff = enclosing ? path.indexOf(enclosing) : -1;
+  const cutoff = enclosing === NO_ROW ? -1 : path.indexOf(enclosing);
 
   let level = roots;
-  path.forEach((frame, index) => {
-    const frameFacts = factsByEvent.get(frame);
-    const text = frameFacts ? frameFacts.label : frame.text || frame.type || 'Unknown';
-    const key = frameFacts ? `${frameFacts.kind}:${text}` : `frame:${text}`;
+  path.forEach((frame, depth) => {
+    const frameFacts = factsByRow.get(frame);
+    const id = index.eventIndex[frame]!;
+    const label = frameFacts ? frameFacts.label : signatures.text(signatures.of(id));
+    const key = frameFacts ? `${frameFacts.kind}:${label}` : `frame:${label}`;
     let node = level.get(key);
     if (!node) {
       node = {
-        label: text,
+        label,
         kind: frameFacts?.kind ?? null,
         timeNs: 0,
         selfNs: 0,
@@ -468,14 +487,14 @@ function addPath(
       };
       level.set(key, node);
     }
-    if (index > cutoff) {
+    if (depth > cutoff) {
       node.timeNs += timeNs;
     }
     // Own time comes from the frame itself, so a frame two statements both run
     // counts it once however many paths reach this node.
-    if (!node.events.has(frame.eventIndex)) {
-      node.selfNs += frame.duration.self;
-      node.events.add(frame.eventIndex);
+    if (!node.events.has(id)) {
+      node.selfNs += index.self[frame]!;
+      node.events.add(id);
     }
     level = node.children;
   });

@@ -10,8 +10,11 @@ import { emptyReported, ReportedUsage, WHOLE_LOG, type TimeSpan } from '../repor
 const soqlSeries = (...points: [number, number][]) =>
   timeSeries(points.map(([at, used]) => seriesEvent(at, { soqlQueries: { used, limit: 100 } })));
 
-/** A row from `timestamp` to `exitStamp`. */
-const row = (timestamp: number, exitStamp: number | null): TimeSpan => ({ timestamp, exitStamp });
+/** A row from `startTimestamp` to `endTimestamp`; a null end is a row with no duration. */
+const row = (startTimestamp: number, endTimestamp: number | null): TimeSpan => ({
+  startTimestamp,
+  endTimestamp: endTimestamp ?? startTimestamp,
+});
 
 describe('ReportedUsage', () => {
   it('gives a point to the row that starts at it, not the one that ends there', () => {

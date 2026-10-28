@@ -4,28 +4,13 @@
  * @jest-environment jsdom
  */
 import { describe, expect, it } from '@jest/globals';
-import type { ApexLog } from '@apexdevtools/apex-log-parser';
 
-import { indexTree } from '#test-helpers/apexLog.js';
+import { rawStoreOf } from '#test-helpers/apexLog.js';
 import type { LanaSettings } from '../../features/settings/Settings.js';
 import { DEFAULT_THEME_NAME } from '../../features/timeline/themes/Themes.js';
 import { getTheme } from '../../features/timeline/themes/ThemeSelector.js';
 import { selfTimeByCategory } from '../../features/timeline/utils/category-self-time.js';
 import { categoryPalette, categorySelfTimes, OTHER_CATEGORY } from '../categoryTime.js';
-
-interface FakeEvent {
-  category: string;
-  duration: { total: number; self: number };
-  children: FakeEvent[];
-}
-
-const categoryEvent = (category: string, self: number, children: FakeEvent[] = []): FakeEvent => ({
-  category,
-  duration: { total: self + children.reduce((sum, c) => sum + c.duration.total, 0), self },
-  children,
-});
-
-const log = (children: FakeEvent[]) => ({ children }) as unknown as ApexLog;
 
 const timelineSettings = (
   overrides: Partial<LanaSettings['timeline']> = {},
@@ -37,27 +22,40 @@ const timelineSettings = (
 });
 
 describe('categorySelfTimes', () => {
-  it('sums self time per category over the whole tree, largest first', () => {
-    const root = log([
-      categoryEvent('Apex', 100, [categoryEvent('SOQL', 500), categoryEvent('Apex', 50)]),
-      categoryEvent('DML', 200, [categoryEvent('Apex', 25)]),
-    ]);
+  it('sums self time per category over the whole tree, largest first', async () => {
+    // Apex 100 holding SOQL 500 and Apex 50, then DML 200 holding Apex 25.
+    const { store } = await rawStoreOf(
+      [
+        '(0)|METHOD_ENTRY|[1]|01p|A.a()',
+        '(100)|SOQL_EXECUTE_BEGIN|[1]|Aggregations:0|SELECT Id FROM Account',
+        '(600)|SOQL_EXECUTE_END|[1]|Rows:0',
+        '(600)|METHOD_ENTRY|[1]|01p|A.b()',
+        '(650)|METHOD_EXIT|[1]|A.b()',
+        '(650)|METHOD_EXIT|[1]|A.a()',
+        '(650)|DML_BEGIN|[1]|Op:Insert|Type:Account|Rows:1',
+        '(850)|METHOD_ENTRY|[1]|01p|A.c()',
+        '(875)|METHOD_EXIT|[1]|A.c()',
+        '(875)|DML_END|[1]',
+      ]
+        .map((line) => `09:18:22.6 ${line}\n`)
+        .join(''),
+    );
 
-    expect(categorySelfTimes(selfTimeByCategory(indexTree(root)))).toEqual([
+    expect(categorySelfTimes(selfTimeByCategory(await store.logIndex()))).toEqual([
       { category: 'SOQL', selfTime: 500 },
       { category: 'DML', selfTime: 200 },
       { category: 'Apex', selfTime: 175 },
     ]);
   });
 
-  it('buckets uncategorised events under Other and drops empty categories', () => {
-    const root = log([
-      categoryEvent('', 40),
-      categoryEvent('Apex', 0),
-      categoryEvent('System', 10),
+  it('buckets uncategorised time under Other and drops empty categories', () => {
+    const selfTimes = new Map([
+      ['', 40],
+      ['Apex', 0],
+      ['System', 10],
     ]);
 
-    expect(categorySelfTimes(selfTimeByCategory(indexTree(root)))).toEqual([
+    expect(categorySelfTimes(selfTimes)).toEqual([
       { category: OTHER_CATEGORY, selfTime: 40 },
       { category: 'System', selfTime: 10 },
     ]);

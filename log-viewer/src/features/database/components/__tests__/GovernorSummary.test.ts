@@ -6,7 +6,7 @@
 import { beforeEach, describe, expect, it } from '@jest/globals';
 
 import { NO_LIMIT_FOR_METRIC_TEXT } from '../../../../components/governorCopy.js';
-import { formatInteger } from '../../../../core/utility/Util.js';
+import { formatInteger } from '#core/utility/Util.js';
 import type { GaugeMetric, GovernorSummary } from '../GovernorSummary.js';
 import '../GovernorSummary.js';
 

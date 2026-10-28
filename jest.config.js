@@ -7,7 +7,7 @@ const defaultConfig = {
     // the export conditions pulls every other dependency's ESM build in with it. The cost is that
     // this path must track the parser's own `exports`.
     '^@apexdevtools/apex-log-parser$':
-      '<rootDir>/node_modules/@apexdevtools/apex-log-parser/dist/index.js',
+      '<rootDir>/node_modules/@apexdevtools/apex-log-parser/dist/node.js',
   },
   transform: {
     '^.+\\.(ts|js)?$': [
@@ -43,7 +43,11 @@ export default {
       rootDir: '<rootDir>/log-viewer',
       moduleNameMapper: {
         ...defaultConfig.moduleNameMapper,
+        // The webview loads the parser's browser build, which yields without `setImmediate`.
+        '^@apexdevtools/apex-log-parser$':
+          '<rootDir>/node_modules/@apexdevtools/apex-log-parser/dist/browser.js',
         '^#test-helpers/(.*)\\.js$': '<rootDir>/src/__tests__/helpers/$1',
+        '^#core/(.*)\\.js$': '<rootDir>/src/core/$1',
         // Stylesheet imports have no transform here; the `.js` rule above runs first, so the
         // `*.css.ts` style modules are unaffected.
         '\\.css$': '<rootDir>/src/__tests__/mocks/styleStub.ts',

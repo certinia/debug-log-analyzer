@@ -8,8 +8,8 @@ import {
   type AddressState,
   type FrameVariables,
   type VariableRow,
-} from '../../core/log/frameVariables.js';
-import type { AggregateVariables, VariableSpread } from '../../core/log/aggregateVariables.js';
+} from '#core/log/frameVariables.js';
+import type { AggregateVariables, VariableSpread } from '#core/log/aggregateVariables.js';
 import { parentOf, toSpreadRows, toTreeRows, type VariableTreeRow } from '../variableTree.js';
 
 function row(name: string, value: string, over: Partial<VariableRow> = {}): VariableRow {

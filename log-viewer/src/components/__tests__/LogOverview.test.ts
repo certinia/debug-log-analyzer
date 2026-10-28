@@ -7,8 +7,8 @@ import type { ApexLog, GovernorLimits } from '@apexdevtools/apex-log-parser';
 import { beforeEach, describe, expect, it } from '@jest/globals';
 
 import type { HeatStripTimeSeries } from '../../features/timeline/types/flamechart.types.js';
-import { describeLevelGap, findLevelGap } from '../../core/log/levelCapabilities.js';
-import type { LogStore } from '../../core/log/LogStore.js';
+import { describeLevelGap, findLevelGap } from '#core/log/levelCapabilities.js';
+import type { LogStore } from '#core/log/LogStore.js';
 import { stubStore } from '#test-helpers/apexLog.js';
 import { governorLimits, seriesEvent, timeSeries } from '#test-helpers/limits.js';
 

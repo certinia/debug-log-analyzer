@@ -5,10 +5,10 @@ import { consume } from '@lit/context';
 import { LitElement, html } from 'lit';
 import { customElement, property } from 'lit/decorators.js';
 
-import { DerivedValue } from '../core/log/DerivedValue.js';
-import { logContext } from '../core/log/logContext.js';
-import { WindowStatsController } from '../core/log/windowStats.js';
-import type { Derivation, LogStore } from '../core/log/LogStore.js';
+import { DerivedValue } from '#core/log/DerivedValue.js';
+import { logContext } from '#core/log/logContext.js';
+import { WindowStatsController } from '#core/log/windowStats.js';
+import type { Derivation, LogStore } from '#core/log/LogStore.js';
 import { globalStyles } from '../styles/global.styles.js';
 import './SectionSkeleton.js';
 import { inspectorSectionStyles } from '../styles/inspectorSection.styles.js';
@@ -30,7 +30,7 @@ const categorySlices: Derivation<CategoryTime[]> = async (_, store) =>
 @customElement('category-time-bar')
 export class CategoryTimeBar extends LitElement {
   private readonly _palette = new CategoryPaletteController(this);
-  private readonly _window = new WindowStatsController(this, () => this.logStore?.log ?? null);
+  private readonly _window = new WindowStatsController(this, () => this.logStore ?? null);
 
   /** The log on screen, from the app root. */
   @consume({ context: logContext, subscribe: true })

@@ -57,7 +57,7 @@ import {
   INSPECTOR_LOCATE_EVENT,
   INSPECTOR_REVEAL_EVENT,
 } from '../../../../components/inspectorReveal.js';
-import { eventBus } from '../../../../core/events/EventBus.js';
+import { eventBus } from '#core/events/EventBus.js';
 import type { DatabaseTime, DatabaseTreeRow } from '../DatabaseTimeTree.js';
 import '../DatabaseTimeTree.js';
 

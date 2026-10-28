@@ -1,7 +1,7 @@
 /*
  * Copyright (c) 2026 Certinia Inc. All rights reserved.
  */
-import { formatNsAsMs } from '../../core/utility/Duration.js';
+import { formatNsAsMs } from '#core/utility/Duration.js';
 
 // Deterministic estimate rather than canvas measurement: the webview cell font
 // isn't reliably readable at build time, and under-measuring makes the column

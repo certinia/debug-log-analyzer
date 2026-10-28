@@ -7,7 +7,7 @@ import { unsafeHTML } from 'lit/directives/unsafe-html.js';
 import { formatSOQL } from './formatter.js';
 
 type SoqlishRow = {
-  originalData?: { type?: string };
+  type?: string;
   soql?: string;
 };
 
@@ -16,14 +16,14 @@ type SoqlishRow = {
  * SOSL, else the key and its count.
  *
  * Detection precedence:
- *  - `rows[0].originalData.type === 'SOQL_EXECUTE_BEGIN'` → soql
- *  - `rows[0].originalData.type === 'SOSL_EXECUTE_BEGIN'` → sosl
+ *  - `rows[0].type === 'SOQL_EXECUTE_BEGIN'` → soql (Bottom-Up rows)
+ *  - `rows[0].type === 'SOSL_EXECUTE_BEGIN'` → sosl
  *  - `rows[0].soql === key`                               → soql (SOQLView rows)
  */
 export function soqlGroupCell(group: { key: string; rows: readonly unknown[] }): TemplateResult {
   const { key, rows } = group;
   const first = rows[0] as SoqlishRow | undefined;
-  const type = first?.originalData?.type;
+  const type = first?.type;
   let dialect: 'soql' | 'sosl' | null = null;
   if (type === 'SOQL_EXECUTE_BEGIN') {
     dialect = 'soql';

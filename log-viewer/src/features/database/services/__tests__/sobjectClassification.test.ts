@@ -2,16 +2,21 @@
  * Copyright (c) 2026 Certinia Inc. All rights reserved.
  */
 import { describe, expect, it } from '@jest/globals';
-import type { SOQLExecuteBeginLine } from '@apexdevtools/apex-log-parser';
-
+import { rawStoreOf } from '#test-helpers/apexLog.js';
+import type { SoqlEvent } from '#core/log/statements.js';
 import { deriveSoqlObject, parseFromObject } from '../sobjectClassification.js';
 
-/** Minimal SOQL line stub — only the fields deriveSoqlObject reads. */
-function soqlLine(text: string, explainSObject?: string): SOQLExecuteBeginLine {
-  return {
-    text,
-    children: explainSObject ? [{ sObjectType: explainSObject }] : [],
-  } as unknown as SOQLExecuteBeginLine;
+/** A parsed query, with a plan on `explainSObject` when given. */
+async function soqlLine(text: string, explainSObject?: string): Promise<SoqlEvent> {
+  const explain = explainSObject
+    ? `09:18:22.6 (1001)|SOQL_EXECUTE_EXPLAIN|[1]|Index on ${explainSObject} : [Id], cardinality: 1, sobjectCardinality: 2, relativeCost 0.1\n`
+    : '';
+  const { log } = await rawStoreOf(
+    `09:18:22.6 (1000)|SOQL_EXECUTE_BEGIN|[1]|Aggregations:0|${text}\n` +
+      explain +
+      '09:18:22.6 (1002)|SOQL_EXECUTE_END|[1]|Rows:1\n',
+  );
+  return log.event(1) as SoqlEvent; // the only event is the query
 }
 
 describe('parseFromObject', () => {
@@ -44,12 +49,12 @@ describe('parseFromObject', () => {
 });
 
 describe('deriveSoqlObject', () => {
-  it('prefers the query-plan sObjectType when present', () => {
-    const line = soqlLine('SELECT Id FROM Account', 'Contact');
+  it('prefers the query-plan sObjectType when present', async () => {
+    const line = await soqlLine('SELECT Id FROM Account', 'Contact');
     expect(deriveSoqlObject(line)).toBe('Contact');
   });
 
-  it('falls back to the FROM clause without a query plan', () => {
-    expect(deriveSoqlObject(soqlLine('SELECT Id FROM Opportunity'))).toBe('Opportunity');
+  it('falls back to the FROM clause without a query plan', async () => {
+    expect(deriveSoqlObject(await soqlLine('SELECT Id FROM Opportunity'))).toBe('Opportunity');
   });
 });

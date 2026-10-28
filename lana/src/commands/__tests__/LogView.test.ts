@@ -89,13 +89,27 @@ describe('LogView', () => {
         logUri: 'webview:/repository/logs/virtual.log',
         logPath: 'workspace/logs/virtual.log',
         logData: 'log body',
-        navigateToTimestamp: undefined,
+        navigateToEventIndex: undefined,
       },
     });
 
     await receive({ cmd: 'openPath', payload: 'file:///untrusted.log' });
 
     expect(context.display.showFile).toHaveBeenCalledWith(logUri);
+  });
+
+  // Held past one fetch, the id would open the next log at an unrelated event.
+  it('sends the pending event with the first fetch only', async () => {
+    LogView.setPendingNavigation(42);
+    const { receive, postMessage } = await createViewWithListener();
+
+    await receive({ cmd: 'fetchLog', requestId: 'request-1' });
+    await receive({ cmd: 'fetchLog', requestId: 'request-2' });
+
+    const sent = postMessage.mock.calls.map(
+      ([message]) => (message as { payload: { navigateToEventIndex?: number } }).payload,
+    );
+    expect(sent.map((payload) => payload.navigateToEventIndex)).toEqual([42, undefined]);
   });
 
   it('points the packaged template at webview URIs', async () => {

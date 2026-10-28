@@ -1,12 +1,11 @@
 /*
  * Copyright (c) 2026 Certinia Inc. All rights reserved.
  */
-import type { LogEvent } from '@apexdevtools/apex-log-parser';
-
 import { CHECK_EVERY, type Tick } from '../utility/FrameBudget.js';
 import { firstIndexWhere } from '../utility/Util.js';
+import { type LogIndex, sharedChildRows, WIDE_ROW } from './LogIndex.js';
 import type { TimeWindow } from './rangeScope.js';
-import { eachSelfGap, endOf, overlapOf, reachedRun } from './windowStats.js';
+import { eachSelfGap, overlapOf, reachedRun } from './windowStats.js';
 
 /** Time and calls inside a window, in the parser's nanoseconds. */
 export interface WindowedTime {
@@ -15,69 +14,97 @@ export interface WindowedTime {
   calls: number;
 }
 
-// Below this many children in a window, summing them beats a prefix lookup.
-const WIDE = 64;
+/** By event id: the nested calls of the same frame, whose time the outer call does not count. */
+export type Holes = ReadonlyMap<number, readonly number[]>;
 
-// Made for a wide parent the first time a window cuts it.
-const childTotals = new WeakMap<readonly LogEvent[], Float64Array>();
+// Made for a wide parent row the first time a window cuts more than WIDE_ROW of its children.
+const childTotals = new WeakMap<LogIndex, Map<number, Float64Array>>();
 
 /**
  * One frame's time inside `window`: the part of its span there, and the part of
  * that no child ran in.
+ *
+ * @param eventIndex - a shown event of `index`
  */
-export function frameIn(event: LogEvent, window: TimeWindow): { total: number; self: number } {
-  const total = overlapOf(event.timestamp, endOf(event), window);
+export function frameIn(
+  index: LogIndex,
+  eventIndex: number,
+  window: TimeWindow,
+): { total: number; self: number } {
+  return rowIn(index, index.rowOf(eventIndex), window);
+}
+
+function rowIn(index: LogIndex, row: number, window: TimeWindow): { total: number; self: number } {
+  const total = overlapOf(index.start[row]!, index.end[row]!, window); // row is shown by contract
   if (total === 0) {
     return { total: 0, self: 0 };
   }
-  const children = event.children;
-  const { from, to } = reachedRun(children, window);
-  if (to - from > WIDE) {
-    return { total, self: total - wideChildTimeIn(children, from, to, window) };
+  const children = sharedChildRows(index, row);
+  const { from, to } = reachedRun(index, children, window);
+  // Fewer children in the window are quicker to sum than to keep a prefix for.
+  if (to - from > WIDE_ROW) {
+    return { total, self: total - wideChildTimeIn(index, row, children, from, to, window) };
   }
   let self = 0;
-  eachSelfGap(event, from, to, (start, end) => {
+  eachSelfGap(index, row, children, from, to, (start, end) => {
     self += overlapOf(start, end, window);
   });
   return { total, self };
 }
 
 function wideChildTimeIn(
-  children: readonly LogEvent[],
+  index: LogIndex,
+  row: number,
+  children: readonly number[],
   from: number,
   to: number,
   window: TimeWindow,
 ): number {
+  const { start, end } = index;
   // Siblings never overlap, so only the first and last of the run can be cut.
-  const first = children[from]!; // the run is wider than WIDE, so both ends exist
+  const first = children[from]!; // the run is wider than WIDE_ROW, so both ends exist
   const last = children[to - 1]!;
-  const totals = totalsOf(children);
+  const totals = totalsOf(index, row, children);
   return (
-    overlapOf(first.timestamp, endOf(first), window) +
-    overlapOf(last.timestamp, endOf(last), window) +
+    overlapOf(start[first]!, end[first]!, window) +
+    overlapOf(start[last]!, end[last]!, window) +
     totals[to - 1]! -
     totals[from + 1]!
   );
 }
 
 // totals[i] is the time of every child before i.
-function totalsOf(children: readonly LogEvent[]): Float64Array {
-  let totals = childTotals.get(children);
+function totalsOf(index: LogIndex, row: number, children: readonly number[]): Float64Array {
+  let byRow = childTotals.get(index);
+  if (!byRow) {
+    byRow = new Map();
+    childTotals.set(index, byRow);
+  }
+  let totals = byRow.get(row);
   if (!totals) {
+    const { start, end } = index;
     totals = new Float64Array(children.length + 1);
     for (let i = 0; i < children.length; i++) {
       const child = children[i]!; // i < length
-      totals[i + 1] = totals[i]! + endOf(child) - child.timestamp;
+      totals[i + 1] = totals[i]! + end[child]! - start[child]!;
     }
-    childTotals.set(children, totals);
+    byRow.set(row, totals);
   }
   return totals;
 }
 
-/** Whether the window holds some of the frame's time, or the frame's instant if it has none. */
-export function reaches(event: LogEvent, window: TimeWindow): boolean {
-  const start = event.timestamp;
-  const end = endOf(event);
+/**
+ * Whether the window holds some of the frame's time, or the frame's instant if it has none.
+ *
+ * @param eventIndex - a shown event of `index`
+ */
+export function reaches(index: LogIndex, eventIndex: number, window: TimeWindow): boolean {
+  return rowReaches(index, index.rowOf(eventIndex), window);
+}
+
+function rowReaches(index: LogIndex, row: number, window: TimeWindow): boolean {
+  const start = index.start[row]!; // row is shown by contract
+  const end = index.end[row]!;
   return start === end
     ? start >= window.start && start <= window.end
     : start < window.end && end > window.start;
@@ -97,8 +124,10 @@ export class SpanIndex {
   /** The row's figures for the whole log. */
   readonly whole: WindowedTime;
 
-  private readonly _members: readonly LogEvent[];
-  private readonly _holes: ReadonlyMap<LogEvent, readonly LogEvent[]> | undefined;
+  private readonly _index: LogIndex;
+  // Index rows, in start order.
+  private readonly _members: Int32Array;
+  private readonly _holes: Holes | undefined;
   // Null where no call nests in another, which is most rows.
   private readonly _groupAt: Int32Array | null;
   // Running totals over the groups, one longer than them.
@@ -106,14 +135,16 @@ export class SpanIndex {
   private readonly _self: Float64Array;
 
   private constructor(
-    members: readonly LogEvent[],
-    holes: ReadonlyMap<LogEvent, readonly LogEvent[]> | undefined,
+    index: LogIndex,
+    members: Int32Array,
+    holes: Holes | undefined,
     {
       groupAt,
       total,
       self,
     }: { groupAt: Int32Array | null; total: Float64Array; self: Float64Array },
   ) {
+    this._index = index;
     this._members = members;
     this._holes = holes;
     this._groupAt = groupAt;
@@ -123,33 +154,32 @@ export class SpanIndex {
     this.whole = { total: total[groups]!, self: self[groups]!, calls: members.length };
   }
 
-  static of(
-    occurrences: readonly LogEvent[],
-    holes?: ReadonlyMap<LogEvent, readonly LogEvent[]>,
-  ): SpanIndex {
-    const members = inStartOrder(occurrences);
-    const groups = new GroupBuilder(holes);
+  /** @param occurrences - shown event ids of `index` */
+  static of(index: LogIndex, occurrences: readonly number[], holes?: Holes): SpanIndex {
+    const members = inStartOrder(index, occurrences);
+    const groups = new GroupBuilder(index, holes);
     for (const member of members) {
       groups.add(member);
     }
-    return new SpanIndex(members, holes, groups.finish());
+    return new SpanIndex(index, members, holes, groups.finish());
   }
 
   /** {@link of} a slice at a time; null when abandoned. */
   static async build(
-    occurrences: readonly LogEvent[],
-    holes: ReadonlyMap<LogEvent, readonly LogEvent[]> | undefined,
+    index: LogIndex,
+    occurrences: readonly number[],
+    holes: Holes | undefined,
     tick: Tick,
   ): Promise<SpanIndex | null> {
-    const members = inStartOrder(occurrences);
-    const groups = new GroupBuilder(holes);
+    const members = inStartOrder(index, occurrences);
+    const groups = new GroupBuilder(index, holes);
     for (let i = 0; i < members.length; i++) {
       if (i % CHECK_EVERY === 0 && !(await tick())) {
         return null;
       }
       groups.add(members[i]!); // i < length
     }
-    return new SpanIndex(members, holes, groups.finish());
+    return new SpanIndex(index, members, holes, groups.finish());
   }
 
   /** The row's figures inside `window`, or for the whole log where it is null. */
@@ -157,16 +187,17 @@ export class SpanIndex {
     if (!window) {
       return this.whole;
     }
+    const { start, end } = this._index;
     const groups = this._total.length - 1;
     const head = (g: number) => this._members[this._memberAt(g)]!; // g < groups
-    let lo = firstIndexWhere(groups, (g) => endOf(head(g)) >= window.start);
-    let hi = firstIndexWhere(groups, (g) => head(g).timestamp > window.end);
+    let lo = firstIndexWhere(groups, (g) => end[head(g)]! >= window.start);
+    let hi = firstIndexWhere(groups, (g) => start[head(g)]! > window.end);
     const held: WindowedTime = { total: 0, self: 0, calls: 0 };
     if (lo >= hi) {
       return held;
     }
     // A group's head is its outermost call, so its span is the group's.
-    const cut = (g: number) => head(g).timestamp < window.start || endOf(head(g)) > window.end;
+    const cut = (g: number) => start[head(g)]! < window.start || end[head(g)]! > window.end;
     if (cut(lo)) {
       this._readGroup(lo, window, held);
       lo += 1;
@@ -188,68 +219,74 @@ export class SpanIndex {
   }
 
   private _readGroup(g: number, window: TimeWindow, held: WindowedTime): void {
-    const end = this._memberAt(g + 1);
-    for (let i = this._memberAt(g); i < end; i++) {
+    const index = this._index;
+    const { start, end, eventIndex } = index;
+    const last = this._memberAt(g + 1);
+    for (let i = this._memberAt(g); i < last; i++) {
       const member = this._members[i]!; // i is inside group g
-      const own = frameIn(member, window);
+      const own = rowIn(index, member, window);
       let total = own.total;
-      for (const hole of this._holes?.get(member) ?? []) {
-        total -= overlapOf(hole.timestamp, endOf(hole), window);
+      for (const hole of this._holes?.get(eventIndex[member]!) ?? []) {
+        const row = index.rowOf(hole);
+        total -= overlapOf(start[row]!, end[row]!, window);
       }
       held.total += total;
       held.self += own.self;
-      held.calls += reaches(member, window) ? 1 : 0;
+      held.calls += rowReaches(index, member, window) ? 1 : 0;
     }
   }
-}
-
-// Outer first where two start together, so the outer heads its group.
-function byStart(a: LogEvent, b: LogEvent): number {
-  return a.timestamp - b.timestamp || endOf(b) - endOf(a);
 }
 
 // Calls that never nest are in order already, and the sort is most of a hot row's build.
-function inStartOrder(occurrences: readonly LogEvent[]): readonly LogEvent[] {
-  for (let i = 1; i < occurrences.length; i++) {
-    if (byStart(occurrences[i - 1]!, occurrences[i]!) > 0) {
-      return [...occurrences].sort(byStart);
+function inStartOrder(index: LogIndex, occurrences: readonly number[]): Int32Array {
+  const rows = Int32Array.from(occurrences, (id) => index.rowOf(id));
+  const { start, end } = index;
+  // Outer first where two start together, so the outer heads its group.
+  const byStart = (a: number, b: number) => start[a]! - start[b]! || end[b]! - end[a]!;
+  for (let i = 1; i < rows.length; i++) {
+    if (byStart(rows[i - 1]!, rows[i]!) > 0) {
+      return rows.sort(byStart);
     }
   }
-  return occurrences;
+  return rows;
 }
 
 class GroupBuilder {
-  private readonly _holes: ReadonlyMap<LogEvent, readonly LogEvent[]> | undefined;
+  private readonly _index: LogIndex;
+  private readonly _holes: Holes | undefined;
   private readonly _groupAt: number[] = [];
   private readonly _total = [0];
   private readonly _self = [0];
   private _groupEnd = -Infinity;
   private _added = 0;
 
-  constructor(holes: ReadonlyMap<LogEvent, readonly LogEvent[]> | undefined) {
+  constructor(index: LogIndex, holes: Holes | undefined) {
+    this._index = index;
     this._holes = holes;
   }
 
-  add(member: LogEvent): void {
+  add(member: number): void {
+    const { start, end, self: selves, eventIndex } = this._index;
     const total = this._total;
     const self = this._self;
     // Frames nest or stand apart, so one starting inside the group is inside it.
-    if (member.timestamp >= this._groupEnd) {
+    if (start[member]! >= this._groupEnd) {
       this._groupAt.push(this._added);
-      this._groupEnd = endOf(member);
+      this._groupEnd = end[member]!;
       total.push(total.at(-1)!);
       self.push(self.at(-1)!);
     }
-    let own = endOf(member) - member.timestamp;
-    const holes = this._holes?.get(member);
+    let own = end[member]! - start[member]!;
+    const holes = this._holes?.get(eventIndex[member]!);
     if (holes) {
       for (const hole of holes) {
-        own -= endOf(hole) - hole.timestamp;
+        const row = this._index.rowOf(hole);
+        own -= end[row]! - start[row]!;
       }
     }
     const at = this._groupAt.length;
     total[at]! += own;
-    self[at]! += member.duration.self;
+    self[at]! += selves[member]!;
     this._added += 1;
   }
 
@@ -279,15 +316,25 @@ export class CallSpans {
     this._instants = instants;
   }
 
-  /** Built a slice at a time; null when abandoned. */
-  static async build(frames: readonly LogEvent[], tick: Tick): Promise<CallSpans | null> {
+  /**
+   * Built a slice at a time; null when abandoned.
+   *
+   * @param frames - shown event ids of `index`
+   */
+  static async build(
+    index: LogIndex,
+    frames: readonly number[],
+    tick: Tick,
+  ): Promise<CallSpans | null> {
+    const { start, end } = index;
+    const rows = new Int32Array(frames.length);
     let instantCount = 0;
     for (let i = 0; i < frames.length; i++) {
       if (i % CHECK_EVERY === 0 && !(await tick())) {
         return null;
       }
-      const frame = frames[i]!; // i < length
-      if (endOf(frame) === frame.timestamp) {
+      const row = (rows[i] = index.rowOf(frames[i]!)); // i < length
+      if (end[row] === start[row]) {
         instantCount++;
       }
     }
@@ -296,17 +343,16 @@ export class CallSpans {
     const instants = new Float64Array(instantCount);
     let spanAt = 0;
     let instantAt = 0;
-    for (let i = 0; i < frames.length; i++) {
+    for (let i = 0; i < rows.length; i++) {
       if (i % CHECK_EVERY === 0 && !(await tick())) {
         return null;
       }
-      const frame = frames[i]!; // i < length
-      const end = endOf(frame);
-      if (end === frame.timestamp) {
-        instants[instantAt++] = end;
+      const row = rows[i]!; // i < length
+      if (end[row] === start[row]) {
+        instants[instantAt++] = end[row]!;
       } else {
-        starts[spanAt] = frame.timestamp;
-        ends[spanAt++] = end;
+        starts[spanAt] = start[row]!;
+        ends[spanAt++] = end[row]!;
       }
     }
     // One sort per slice: each is tens of milliseconds on a large log.

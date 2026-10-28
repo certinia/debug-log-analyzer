@@ -5,13 +5,13 @@ import type {
   AggregateVariables,
   SpreadValue,
   VariableSpread,
-} from '../core/log/aggregateVariables.js';
+} from '#core/log/aggregateVariables.js';
 import {
   NOT_RECORDED,
   type FrameVariables,
   type IndexView,
   type VariableRow,
-} from '../core/log/frameVariables.js';
+} from '#core/log/frameVariables.js';
 import {
   assembledContainer,
   clampRaw,
@@ -19,7 +19,7 @@ import {
   parseVariableValue,
   type ValueEntry,
   type VariableValue,
-} from '../core/log/variableValue.js';
+} from '#core/log/variableValue.js';
 
 /**
  * The Variables section as one flat list of rows.

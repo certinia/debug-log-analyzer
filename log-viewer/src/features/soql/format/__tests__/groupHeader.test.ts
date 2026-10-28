@@ -7,6 +7,7 @@
 import { describe, expect, it } from '@jest/globals';
 import { render } from 'lit';
 
+import type { BottomUpRow } from '../../../call-tree/utils/Aggregation.js';
 import { soqlGroupCell } from '../groupHeader.js';
 
 const shown = (key: string, rows: unknown[]): HTMLElement => {
@@ -15,7 +16,9 @@ const shown = (key: string, rows: unknown[]): HTMLElement => {
   return host;
 };
 
-const soqlRow = { originalData: { type: 'SOQL_EXECUTE_BEGIN' } };
+// Typed as the row Bottom-Up groups, so a renamed field fails here rather than in the app.
+const rowOfType = (type: string): Pick<BottomUpRow, 'type'> => ({ type });
+const soqlRow = rowOfType('SOQL_EXECUTE_BEGIN');
 
 describe('soqlGroupCell', () => {
   it('shows an empty key as it is, with its count', () => {
@@ -23,7 +26,7 @@ describe('soqlGroupCell', () => {
   });
 
   it('shows a key whose rows are no query as the key and its count, marking the key for find', () => {
-    const cell = shown('SomeMethod', [{ originalData: { type: 'METHOD_ENTRY' } }]);
+    const cell = shown('SomeMethod', [rowOfType('METHOD_ENTRY')]);
     expect(cell.textContent).toBe('SomeMethod (1)');
     expect(cell.querySelector('[data-grid-find-text]')?.textContent).toBe('SomeMethod');
   });
@@ -39,9 +42,7 @@ describe('soqlGroupCell', () => {
   });
 
   it('highlights SOSL when the first row is SOSL_EXECUTE_BEGIN', () => {
-    const cell = shown('FIND {acme} RETURNING Account', [
-      { originalData: { type: 'SOSL_EXECUTE_BEGIN' } },
-    ]);
+    const cell = shown('FIND {acme} RETURNING Account', [rowOfType('SOSL_EXECUTE_BEGIN')]);
 
     const keywords = [...cell.querySelectorAll('.soql-tok-keyword')].map((k) => k.textContent);
     expect(keywords).toEqual(expect.arrayContaining(['FIND', 'RETURNING']));

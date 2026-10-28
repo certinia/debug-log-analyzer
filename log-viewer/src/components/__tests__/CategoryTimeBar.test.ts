@@ -6,7 +6,7 @@
 import { afterEach, beforeEach, describe, expect, it, jest } from '@jest/globals';
 
 import { storeOf } from '#test-helpers/apexLog.js';
-import { LogStore } from '../../core/log/LogStore.js';
+import { LogStore } from '#core/log/LogStore.js';
 import type { CategoryTimeBar } from '../CategoryTimeBar.js';
 import '../CategoryTimeBar.js';
 
@@ -46,17 +46,19 @@ describe('category-time-bar', () => {
   });
 
   it("draws the log's self time by category once its index is built", async () => {
-    const element = await mount(storeOf(LOG).store);
+    const element = await mount((await storeOf(LOG)).store);
 
     expect(labels(element)).toEqual(expect.arrayContaining(['SOQL', 'Apex']));
   });
 
   it('follows the log it is given', async () => {
-    const element = await mount(storeOf(LOG).store);
+    const element = await mount((await storeOf(LOG)).store);
     Object.assign(element, {
-      logStore: storeOf(
-        '09:18:22.6 (1000)|DML_BEGIN|[1]|Op:Insert|Type:Account|Rows:1\n' +
-          '09:18:22.6 (1500)|DML_END|[1]\n',
+      logStore: (
+        await storeOf(
+          '09:18:22.6 (1000)|DML_BEGIN|[1]|Op:Insert|Type:Account|Rows:1\n' +
+            '09:18:22.6 (1500)|DML_END|[1]\n',
+        )
       ).store,
     });
     await settle(element);
@@ -68,7 +70,7 @@ describe('category-time-bar', () => {
   it('stops waiting when the index build fails', async () => {
     jest.spyOn(LogStore.prototype, 'logIndex').mockRejectedValue(new Error('index build failed'));
 
-    const element = await mount(storeOf(LOG).store);
+    const element = await mount((await storeOf(LOG)).store);
 
     expect(element.shadowRoot?.querySelector('section-skeleton')?.pending).toBe(false);
   });

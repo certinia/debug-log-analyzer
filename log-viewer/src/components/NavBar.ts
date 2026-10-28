@@ -6,10 +6,10 @@ import { consume } from '@lit/context';
 import { LitElement, css, html, nothing, type PropertyValues, type TemplateResult } from 'lit';
 import { customElement, property, state } from 'lit/decorators.js';
 
-import { eventBus } from '../core/events/EventBus.js';
-import { ResizeController } from '../core/events/ResizeController.js';
-import { logStatusContext, type LogStatus } from '../core/log/logStatus.js';
-import { formatDuration } from '../core/utility/Util.js';
+import { eventBus } from '#core/events/EventBus.js';
+import { ResizeController } from '#core/events/ResizeController.js';
+import { logStatusContext, type LogStatus } from '#core/log/logStatus.js';
+import { formatDuration } from '#core/utility/Util.js';
 import type { LogIdentityData } from '../features/app/logIdentity.js';
 import {
   ISSUE_SOURCES,

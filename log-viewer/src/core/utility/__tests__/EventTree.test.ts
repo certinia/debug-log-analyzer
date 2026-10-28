@@ -2,64 +2,55 @@
  * Copyright (c) 2026 Certinia Inc. All rights reserved.
  */
 import { describe, expect, it } from '@jest/globals';
-import type { LogEvent } from '@apexdevtools/apex-log-parser';
 
-import { walkEvents } from '../EventTree.js';
+import { indexesOf, storeOf } from '#test-helpers/apexLog.js';
+import { outermostIds } from '../EventTree.js';
 
-/** Only `children` and `text` are read here, so the rest of `LogEvent` is left off. */
-function event(text: string, children: LogEvent[] = []): LogEvent {
-  return { text, children } as unknown as LogEvent;
-}
+const LOG =
+  '09:18:22.6 (1000)|METHOD_ENTRY|[1]|01p|ns.Outer.run()\n' +
+  '09:18:22.6 (1100)|METHOD_ENTRY|[2]|01p|ns.Inner.go()\n' +
+  '09:18:22.6 (1200)|METHOD_EXIT|[2]|ns.Inner.go()\n' +
+  '09:18:22.6 (1300)|METHOD_EXIT|[1]|ns.Outer.run()\n' +
+  '09:18:22.6 (1400)|METHOD_ENTRY|[3]|01p|ns.Inner.go()\n' +
+  '09:18:22.6 (1500)|METHOD_EXIT|[3]|ns.Inner.go()\n';
 
-const textsOf = (events: Iterable<LogEvent>): string[] => [...events].map((e) => e.text);
+describe('outermostIds', () => {
+  it('drops duplicates', async () => {
+    const { log } = await storeOf(LOG);
+    const [outer] = indexesOf(log, 'ns.Outer.run()');
 
-describe('walkEvents', () => {
-  it('yields nothing for no roots', () => {
-    expect(textsOf(walkEvents([]))).toEqual([]);
+    expect(outermostIds(log, [outer!, outer!])).toEqual([outer]);
   });
 
-  it('yields a leaf root', () => {
-    expect(textsOf(walkEvents([event('only')]))).toEqual(['only']);
+  // Ids in order skip the sort; few ids far apart are sorted, many close ones marked.
+  // Every path must keep the same ids.
+  it('keeps the same ids whether in order, close together or far apart', async () => {
+    const debug = Array.from(
+      { length: 100 },
+      (_, i) => `09:18:22.6 (${2000 + i})|USER_DEBUG|[9]|DEBUG|line ${i}\n`,
+    ).join('');
+    const { log } = await storeOf(
+      LOG +
+        debug +
+        '09:18:22.6 (3000)|METHOD_ENTRY|[4]|01p|ns.Last.run()\n' +
+        '09:18:22.6 (3100)|METHOD_EXIT|[4]|ns.Last.run()\n',
+    );
+    const [outer] = indexesOf(log, 'ns.Outer.run()');
+    const [nested, apart] = indexesOf(log, 'ns.Inner.go()');
+    const [lastFrame] = indexesOf(log, 'ns.Last.run()');
+
+    expect(outermostIds(log, [lastFrame!, nested!, outer!])).toEqual([outer, lastFrame]);
+    expect(outermostIds(log, [apart!, nested!, outer!])).toEqual([outer, apart]);
+    expect(outermostIds(log, [outer!, nested!, apart!, lastFrame!])).toEqual([
+      outer,
+      apart,
+      lastFrame,
+    ]);
   });
 
-  it('yields every descendant, each after its parent', () => {
-    const tree = event('root', [event('a', [event('a1'), event('a2')]), event('b')]);
+  it('gives nothing for nothing', async () => {
+    const { log } = await storeOf(LOG);
 
-    const walked = textsOf(walkEvents([tree]));
-
-    expect([...walked].sort()).toEqual(['a', 'a1', 'a2', 'b', 'root']);
-    expect(walked.indexOf('a')).toBeGreaterThan(walked.indexOf('root'));
-    expect(walked.indexOf('a1')).toBeGreaterThan(walked.indexOf('a'));
-  });
-
-  it('walks each root, last first — the stack pops what it pushed last', () => {
-    expect(textsOf(walkEvents([event('first'), event('second')]))).toEqual(['second', 'first']);
-  });
-
-  it('leaves the caller its roots', () => {
-    const roots = [event('a'), event('b')];
-
-    expect(textsOf(walkEvents(roots))).toHaveLength(2);
-
-    expect(textsOf(roots)).toEqual(['a', 'b']);
-  });
-
-  it('walks a chain far deeper than the call stack', () => {
-    const depth = 100_000;
-    let deepest = event('leaf');
-    for (let at = depth; at--;) {
-      deepest = event(`node${at}`, [deepest]);
-    }
-
-    expect([...walkEvents([deepest])]).toHaveLength(depth + 1);
-  });
-
-  it('stops walking when the caller stops asking', () => {
-    const tree = event('root', [event('a', [event('never')])]);
-
-    const walk = walkEvents([tree]);
-    walk.next();
-
-    expect(walk.return(undefined).done).toBe(true);
+    expect(outermostIds(log, [])).toEqual([]);
   });
 });

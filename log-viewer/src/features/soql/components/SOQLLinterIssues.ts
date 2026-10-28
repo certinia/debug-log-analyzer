@@ -5,8 +5,8 @@ import '#vscode-elements/vscode-icon.js';
 import { LitElement, css, html, type PropertyValues } from 'lit';
 import { customElement, property, state } from 'lit/decorators.js';
 
-import type { SOQLExecuteBeginLine } from '@apexdevtools/apex-log-parser';
-import { currentLogStore } from '../../../core/log/LogStore.js';
+import { currentLogStore } from '#core/log/LogStore.js';
+import type { SoqlEvent } from '#core/log/statements.js';
 import {
   QueryPlanCostRule,
   SEVERITY_TYPES,
@@ -18,9 +18,9 @@ import {
 import { globalStyles } from '../../../styles/global.styles.js';
 import { severityIcon, severityStyles } from '../../../styles/severity.styles.js';
 
-function getIssuesFromSOQLLine(soqlLine: SOQLExecuteBeginLine | null): SOQLLinterRule[] {
+function getIssuesFromSOQLLine(soqlLine: SoqlEvent | null): SOQLLinterRule[] {
   const soqlIssues: SOQLLinterRule[] = [];
-  const explain = soqlLine?.children[0];
+  const explain = soqlLine?.details.explain;
   if (explain?.relativeCost && explain.relativeCost > 1) {
     soqlIssues.push(new QueryPlanCostRule(explain.relativeCost));
   }
@@ -31,12 +31,12 @@ function getIssuesFromSOQLLine(soqlLine: SOQLExecuteBeginLine | null): SOQLLinte
 export async function computeSoqlIssues(eventIndex: number): Promise<SOQLLinterRule[]> {
   const stack =
     eventIndex >= 0 ? (currentLogStore()?.stackByEventIndex(eventIndex).reverse() ?? []) : [];
-  const soqlLine = stack[0] as SOQLExecuteBeginLine | undefined;
+  const soqlLine = stack[0] as SoqlEvent | undefined;
   if (!soqlLine) {
     return [];
   }
   const issues = getIssuesFromSOQLLine(soqlLine).concat(
-    await new SOQLLinter().lint(soqlLine.text, stack),
+    await new SOQLLinter().lint(soqlLine.text ?? '', stack),
   );
   issues.sort((a, b) => SEVERITY_TYPES.indexOf(a.severity) - SEVERITY_TYPES.indexOf(b.severity));
   return issues;

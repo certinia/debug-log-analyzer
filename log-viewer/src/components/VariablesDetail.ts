@@ -14,19 +14,19 @@ import {
   type AggregateVariables,
   type SpreadValue,
   type VariableSpread,
-} from '../core/log/aggregateVariables.js';
+} from '#core/log/aggregateVariables.js';
 import {
   frameVariablesFor,
   variableIndex,
   type FrameVariables,
   type VariableIndex,
-} from '../core/log/frameVariables.js';
-import { TeardownController } from '../core/events/TeardownController.js';
-import { describeLevelGap } from '../core/log/levelCapabilities.js';
-import { logContext } from '../core/log/logContext.js';
-import type { LogStore } from '../core/log/LogStore.js';
-import { previewOf, RAW_CLAMP_CHARS, type VariableValue } from '../core/log/variableValue.js';
-import { formatInteger } from '../core/utility/Util.js';
+} from '#core/log/frameVariables.js';
+import { TeardownController } from '#core/events/TeardownController.js';
+import { describeLevelGap } from '#core/log/levelCapabilities.js';
+import { logContext } from '#core/log/logContext.js';
+import type { LogStore } from '#core/log/LogStore.js';
+import { previewOf, RAW_CLAMP_CHARS, type VariableValue } from '#core/log/variableValue.js';
+import { formatInteger } from '#core/utility/Util.js';
 import { globalStyles } from '../styles/global.styles.js';
 import { inspectorSectionStyles } from '../styles/inspectorSection.styles.js';
 import { bleedRowStyles } from '../styles/revealRow.styles.js';
@@ -335,7 +335,7 @@ export class VariablesDetail extends LitElement {
       // unread.
       this._frame =
         !this._isAggregate && this.logStore && this._index
-          ? frameVariablesFor(this.logStore, this._readIndex, this._index)
+          ? frameVariablesFor(this.logStore, this._readIndex)
           : null;
       // The comparison is resolved here, not in `updated`: a walk that runs a
       // step later would let this pass rebuild and render the *previous* row's
@@ -446,30 +446,29 @@ export class VariablesDetail extends LitElement {
     if (!index) {
       return note('This log records no variable assignments.');
     }
-    return this._isAggregate ? this._spreadTree(index) : this._frameTree(index);
+    return this._isAggregate ? this._spreadTree() : this._frameTree();
   }
 
   /** One frame: its locals, its object's fields and the statics in scope. */
-  private _frameTree(index: VariableIndex): TemplateResult {
+  private _frameTree(): TemplateResult {
     const frame = this._frame;
     if (!frame || !this._rows.length) {
       return note('The log records no variables in scope here.');
     }
-    return this._tree([frame.truncated && TRUNCATED_NOTE, index.capped && HELD_NOTE]);
+    return this._tree([frame.truncated && TRUNCATED_NOTE]);
   }
 
   /**
    * A merged row: what its calls held, compared. Which name varied is the
    * reading, and every value it lists names the calls that held it.
    */
-  private _spreadTree(index: VariableIndex): TemplateResult {
+  private _spreadTree(): TemplateResult {
     const spread = this._spread;
     if (!spread) {
       return note(`Comparing ${callsHeld(this.frames?.length ?? 0)}…`);
     }
     return this._tree([
       spread.truncated && TRUNCATED_NOTE,
-      index.capped && HELD_NOTE,
       spread.capped && `Over ${formatInteger(MAX_VALUES_PER_NAME)} values, so some are not listed.`,
       this._partlyMarked &&
         `A value held by over ${formatInteger(MAX_MARKED_PER_VALUE)} calls marks that many of them.`,
@@ -536,7 +535,7 @@ export class VariablesDetail extends LitElement {
     if (this._spread) {
       return;
     }
-    const spread = await aggregateVariablesFor(store, frames, index, { signal: walk.signal });
+    const spread = await aggregateVariablesFor(store, frames, { signal: walk.signal });
     if (this._walk !== walk) {
       return;
     }
@@ -962,10 +961,6 @@ function partlyMarked(row: VariableSpread): boolean {
  *  same fact at either scope. */
 const TRUNCATED_NOTE =
   'The log is truncated here, so a write may be unrecorded rather than absent.';
-
-/** The index dropped writes past a cap, so an answer may be short of what the
- *  log recorded. Shared: it is the same fact at either scope. */
-const HELD_NOTE = 'Too many assignments to hold them all, so some values are missing.';
 
 /** A comparison reads each value at the point its first call stood, so an
  *  object it opens is that one call's reading. */

@@ -4,11 +4,11 @@
 import { html } from 'lit';
 import { customElement } from 'lit/decorators.js';
 
-import type { SOQLExecuteBeginLine } from '@apexdevtools/apex-log-parser';
 import { countColumn, textColumn } from '../../../components/grid/columns.js';
-import { describeLevelGap } from '../../../core/log/levelCapabilities.js';
-import { currentLogStore } from '../../../core/log/LogStore.js';
-import { getCallerNamespace } from '../../../core/utility/CallerNamespace.js';
+import { describeLevelGap } from '#core/log/levelCapabilities.js';
+import { currentLogStore } from '#core/log/LogStore.js';
+import type { SoqlEvent } from '#core/log/statements.js';
+import { DEFAULT_NAMESPACE } from '#core/utility/CallerNamespace.js';
 import type { GridColumn } from '../../../grid/index.js';
 import { SOQL_VIEWS } from '../../../components/grid/ColumnViews.js';
 import { deriveSoqlObject } from '../services/sobjectClassification.js';
@@ -146,7 +146,7 @@ function soqlColumns(rows: readonly SOQLRow[]): GridColumn<SOQLRow>[] {
 }
 
 @customElement('soql-view')
-export class SOQLView extends StatementGrid<SOQLRow, SOQLExecuteBeginLine> {
+export class SOQLView extends StatementGrid<SOQLRow, SoqlEvent> {
   constructor() {
     super({
       type: 'soql',
@@ -167,19 +167,19 @@ export class SOQLView extends StatementGrid<SOQLRow, SOQLExecuteBeginLine> {
     });
   }
 
-  protected toRows(lines: readonly SOQLExecuteBeginLine[]): SOQLRow[] {
+  protected toRows(lines: readonly SoqlEvent[], callerOf: (id: number) => string): SOQLRow[] {
     return lines.map((soql) => {
-      const plan = soql.children[0];
+      const { explain: plan, aggregations } = soql.details;
       return {
-        eventIndex: soql.eventIndex,
-        soql: soql.text,
+        eventIndex: soql.id,
+        soql: soql.text ?? '',
         isSelective: plan?.relativeCost ? plan.relativeCost <= 1 : null,
         relativeCost: plan?.relativeCost ?? null,
-        namespace: soql.namespace,
-        callerNamespace: getCallerNamespace(soql),
-        rowCount: soql.soqlRowCount.self,
+        namespace: soql.namespace ?? DEFAULT_NAMESPACE,
+        callerNamespace: callerOf(soql.id),
+        rowCount: soql.soqlRowCount?.self ?? 0,
         timeTaken: soql.duration.total,
-        aggregations: soql.aggregations,
+        aggregations: aggregations ?? 0,
         objectType: deriveSoqlObject(soql),
         leadingOperationType: plan?.leadingOperationType ?? null,
         sObjectType: plan?.sObjectType ?? null,

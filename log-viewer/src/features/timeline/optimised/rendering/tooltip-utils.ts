@@ -11,7 +11,7 @@
  * - HeatStripTooltipRenderer (minimap metrics)
  */
 
-import { formatInteger } from '../../../../core/utility/Util.js';
+import { formatInteger } from '#core/utility/Util.js';
 
 // ============================================================================
 // TRAFFIC LIGHT THRESHOLDS

@@ -2,7 +2,7 @@
  * Copyright (c) 2026 Certinia Inc. All rights reserved.
  */
 import { describe, expect, it } from '@jest/globals';
-import { ALL_LIMIT_METRICS } from '@apexdevtools/apex-log-parser';
+import { LIMIT_METRICS, type LimitMetric } from '@apexdevtools/apex-log-parser';
 
 import { GOVERNOR_METRIC } from '../governorMetrics.js';
 
@@ -28,10 +28,11 @@ describe('GOVERNOR_METRIC', () => {
   });
 
   it('takes each key and unit from the parser', () => {
-    for (const meta of ALL_LIMIT_METRICS) {
-      expect(GOVERNOR_METRIC[meta.key]).toMatchObject({ key: meta.key, unit: meta.unit });
+    const metrics = Object.entries(LIMIT_METRICS) as [LimitMetric, string][];
+    for (const [key, unit] of metrics) {
+      expect(GOVERNOR_METRIC[key]).toMatchObject({ key, unit });
     }
-    expect(Object.keys(GOVERNOR_METRIC)).toHaveLength(ALL_LIMIT_METRICS.length);
+    expect(Object.keys(GOVERNOR_METRIC)).toHaveLength(metrics.length);
   });
 
   it('gives every metric its own strip priority', () => {

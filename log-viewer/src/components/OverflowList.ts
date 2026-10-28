@@ -33,7 +33,9 @@ const BAR_GAP = 6;
  * reflow loop.
  *
  * Children with `slot="end"` never collapse: they sit after the toggle, and the items no
- * longer stretch, so the toggle and those controls follow the last visible item.
+ * longer stretch, so the toggle and those controls follow the last visible item. A child
+ * marked `collapse-last` sits there too, whatever its `slot`, and may shrink to the
+ * `min-width` it must state; past that it moves into the menu, after every item.
  *
  * API mirrors Blueprint/Mantine `OverflowList`: `collapse-from`, `min-visible`, `menu-heading`.
  * `part="toggle"`/`part="menu"` expose the control + panel for external styling.
@@ -67,6 +69,9 @@ export class OverflowList extends LitElement {
 
   @state()
   private hasEnd = false;
+
+  @state()
+  private endCollapsed = false;
 
   private resizeObserver?: ResizeObserver;
   private childResizeObserver?: ResizeObserver;
@@ -209,6 +214,7 @@ export class OverflowList extends LitElement {
       this.requestUpdate();
     });
     this.resizeObserver = new ResizeObserver((entries) => {
+      this._fitEnd(entries[0]?.contentRect.width ?? 0);
       const width = (entries[0]?.contentRect.width ?? 0) - this._endWidth();
       if (width === this.lastWidth) {
         return;
@@ -269,7 +275,33 @@ export class OverflowList extends LitElement {
 
   /** The children that collapse: every child but the `end` slot's. */
   private _items(): HTMLElement[] {
-    return ([...this.children] as HTMLElement[]).filter((el) => el.slot !== 'end');
+    return ([...this.children] as HTMLElement[]).filter(
+      (el) => el.slot !== 'end' && !el.hasAttribute('collapse-last'),
+    );
+  }
+
+  private _collapseLast(): HTMLElement[] {
+    return ([...this.children] as HTMLElement[]).filter((el) => el.hasAttribute('collapse-last'));
+  }
+
+  private _fitEnd(hostWidth: number): void {
+    const last = this._collapseLast();
+    if (!last.length) {
+      this.endCollapsed = false;
+      return;
+    }
+    if (!hostWidth) {
+      return;
+    }
+    // Its stated min-width, not its width: in the menu that is the menu's.
+    const min = last.reduce(
+      (sum, el) => sum + (parseFloat(getComputedStyle(el).minWidth) || 0) + BAR_GAP,
+      0,
+    );
+    this.endCollapsed = hostWidth < OVERFLOW_RESERVE + min;
+    for (const el of last) {
+      el.setAttribute('slot', this.endCollapsed ? 'overflow' : 'end');
+    }
   }
 
   /** The `end` slot's width plus the gap before it. */
@@ -303,9 +335,17 @@ export class OverflowList extends LitElement {
 
   /** Measure every item's natural width (all inline), cache it, then compute the fit. */
   private _measure(): void {
+    // A child arriving resizes nothing, so the observer would not place a new `collapse-last` one.
+    this._fitEnd(this.clientWidth);
     const items = this.renderRoot.querySelector<HTMLElement>('.items');
     const children = this._items();
     if (!items || !children.length) {
+      return;
+    }
+    // Every item goes into the menu with it, and the toggle would leave the items no width to measure.
+    if (this.endCollapsed) {
+      this.visibleCount = 0;
+      this._applyOverflow();
       return;
     }
     for (const child of children) {
@@ -333,7 +373,9 @@ export class OverflowList extends LitElement {
     // Fit the visible run from the appropriate end (reverse for start-collapse).
     const ordered = this.collapseFrom === 'start' ? [...widths].reverse() : widths;
     const fit = computeVisibleCount(ordered, avail, this.gap, OVERFLOW_RESERVE);
-    this.visibleCount = Math.max(fit, Math.min(this.minVisible, widths.length));
+    this.visibleCount = this.endCollapsed
+      ? 0
+      : Math.max(fit, Math.min(this.minVisible, widths.length));
     this._applyOverflow();
   }
 
@@ -360,6 +402,7 @@ export class OverflowList extends LitElement {
   render() {
     const total = this._items().length;
     const hiddenCount = total - Math.min(this.visibleCount, total);
+    const hasMenu = hiddenCount > 0 || this.endCollapsed;
     const fromStart = this.collapseFrom === 'start';
     const sep =
       hiddenCount < total
@@ -381,8 +424,7 @@ export class OverflowList extends LitElement {
       ></vscode-icon>
     </button>`;
     // Toggle pins to the collapse end, with the divider always adjacent to the items.
-    const toggle =
-      hiddenCount > 0 ? (fromStart ? html`${button}${sep}` : html`${sep}${button}`) : '';
+    const toggle = hasMenu ? (fromStart ? html`${button}${sep}` : html`${sep}${button}`) : '';
 
     return html`<div class="container ${this.collapseFrom}">
       <div class="bar ${this.hasEnd ? 'has-end' : ''}">
@@ -392,7 +434,7 @@ export class OverflowList extends LitElement {
         <slot name="end" @slotchange=${this._onEndChange}></slot>
       </div>
       ${
-        hiddenCount > 0
+        hasMenu
           ? html`<div
               part="menu"
               class="panel filter-popover popover-anchored"

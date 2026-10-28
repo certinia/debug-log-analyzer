@@ -1,7 +1,7 @@
 /*
  * Copyright (c) 2026 Certinia Inc. All rights reserved.
  */
-import type { LogEvent } from '@apexdevtools/apex-log-parser';
+import type { ApexEvent, ApexLog } from '@apexdevtools/apex-log-parser';
 import { html, type TemplateResult } from 'lit';
 
 import {
@@ -17,35 +17,50 @@ export function queryDialect(type: string | null | undefined): Dialect | null {
   return type === 'SOQL_EXECUTE_BEGIN' ? 'soql' : type === 'SOSL_EXECUTE_BEGIN' ? 'sosl' : null;
 }
 
-const isQuery = (node: LogEvent): boolean => queryDialect(node.type) !== null;
+const isQuery = (node: ApexEvent): boolean => queryDialect(node.type) !== null;
 
-const queryFormat = (node: LogEvent): FormatOptions => ({
+const queryFormat = (node: ApexEvent): FormatOptions => ({
   mode: 'pretty',
   dialect: queryDialect(node.type) ?? 'soql',
 });
 
-// Find and copy read every row, and formatting a query on each read is slow.
-const prettyQueries = new WeakMap<LogEvent, string>();
+// Find and copy read every row, and formatting a query on each read is slow. By event id.
+const prettyQueries = new WeakMap<ApexLog, Map<number, string>>();
 
-/** What a Name cell shows, as text. */
-export function nameText(node: LogEvent | undefined, fallback: string): string {
+/** What a Name cell shows for event `eventIndex` of `log`, as text. */
+export function nameText(log: ApexLog, eventIndex: number, fallback: string): string {
+  return textOf(log, eventIndex, log.event(eventIndex), fallback);
+}
+
+function textOf(
+  log: ApexLog,
+  eventIndex: number,
+  node: ApexEvent | null,
+  fallback: string,
+): string {
   if (!node) {
     return fallback;
   }
   if (isQuery(node)) {
-    let text = prettyQueries.get(node);
+    let byId = prettyQueries.get(log);
+    if (!byId) {
+      byId = new Map();
+      prettyQueries.set(log, byId);
+    }
+    let text = byId.get(eventIndex);
     if (text === undefined) {
-      text = formatSOQLToText(node.text, queryFormat(node));
-      prettyQueries.set(node, text);
+      text = formatSOQLToText(node.text ?? '', queryFormat(node));
+      byId.set(eventIndex, text);
     }
     return text;
   }
-  return node.hasValidSymbols ? eventName(node) : eventLabel(node);
+  return node.isApexCall ? eventName(node) : eventLabel(node);
 }
 
 /** What copy and export write for a Name cell: a query as the log has it. */
-export function nameExportText(node: LogEvent | undefined, fallback: string): string {
-  return node && isQuery(node) ? node.text : nameText(node, fallback);
+export function nameExportText(log: ApexLog, eventIndex: number, fallback: string): string {
+  const node = log.event(eventIndex);
+  return node && isQuery(node) ? (node.text ?? '') : textOf(log, eventIndex, node, fallback);
 }
 
 /**
@@ -53,25 +68,28 @@ export function nameExportText(node: LogEvent | undefined, fallback: string): st
  * label. A click that ends a text selection does not follow the link.
  */
 export function nameCell(
-  node: LogEvent | undefined,
+  log: ApexLog,
+  eventIndex: number,
   fallback: string,
   openType: (text: string) => void,
 ): TemplateResult | string {
+  const node = log.event(eventIndex);
   if (!node) {
     return fallback;
   }
   if (isQuery(node)) {
     return html`<span class="soql-block"
-      >${formatSOQLToTemplate(node.text, queryFormat(node))}</span
+      >${formatSOQLToTemplate(node.text ?? '', queryFormat(node))}</span
     >`;
   }
-  if (node.hasValidSymbols) {
+  if (node.isApexCall) {
+    const text = node.text ?? '';
     return html`<a
       href="#!"
       @click=${(e: MouseEvent) => {
         e.preventDefault();
         if (window.getSelection()?.type !== 'Range') {
-          openType(node.text);
+          openType(text);
         }
       }}
       >${eventName(node)}</a

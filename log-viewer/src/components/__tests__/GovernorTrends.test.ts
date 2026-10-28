@@ -9,9 +9,9 @@ import type { LitElement } from 'lit';
 import type { ApexLog } from '@apexdevtools/apex-log-parser';
 
 import { stubStore } from '#test-helpers/apexLog.js';
-import { eventBus } from '../../core/events/EventBus.js';
-import { describeLevelGap, findLevelGap } from '../../core/log/levelCapabilities.js';
-import type { LogStore } from '../../core/log/LogStore.js';
+import { eventBus } from '#core/events/EventBus.js';
+import { describeLevelGap, findLevelGap } from '#core/log/levelCapabilities.js';
+import type { LogStore } from '#core/log/LogStore.js';
 import type { NoDataSpan } from '../../features/timeline/types/flamechart.types.js';
 import { NO_GOVERNOR_USAGE_TEXT } from '../governorCopy.js';
 import type { TrendSeries } from '../governorTrendData.js';
@@ -45,10 +45,13 @@ const trend = (label = 'SOQL queries', gaps: NoDataSpan[] = []): TrendSeries => 
   gaps,
 });
 
-// The Timeline draws 0 to `exitStamp`, so the charts measure by that. `duration.total` starts at
+// The Timeline draws 0 to the log's end, so the charts measure by that. `duration.total` starts at
 // the first event instead, and is set apart here so a chart cannot pass on the wrong one.
 const aLog = () =>
-  stubStore({ exitStamp: LOG_NS, duration: { total: LOG_NS - 200 } } as unknown as ApexLog);
+  stubStore({
+    columns: { endTimestamp: [LOG_NS] },
+    duration: { total: LOG_NS - 200 },
+  } as unknown as ApexLog);
 
 async function mount(store: LogStore = aLog()): Promise<LitElement> {
   const element = document.createElement('governor-trends');

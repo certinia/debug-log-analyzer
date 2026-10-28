@@ -1,34 +1,26 @@
 /*
  * Copyright (c) 2026 Certinia Inc. All rights reserved.
  */
-import type { LogEvent, ApexLog } from '@apexdevtools/apex-log-parser';
+import { type LogIndex, NO_ROW } from '../../src/core/log/LogIndex.js';
 
-import { AGGREGATED_WITHOUT_DETAILS } from '../../src/features/call-tree/grid/columns.js';
-import type { TimeOrderRow } from './timeOrderTree.js';
-import type { RowFilter } from '../../src/grid/core/index.js';
-
-export const timeOrderDetails: RowFilter<TimeOrderRow> = AGGREGATED_WITHOUT_DETAILS;
-
-/** The deepest event in the middle of the log: the worst go-to-row a user can ask for. */
-export function deepEvent(log: ApexLog): LogEvent {
-  const all: { event: LogEvent; depth: number }[] = [];
-  const stack = log.children.map((event) => ({ event, depth: 0 }));
-  for (let item = stack.pop(); item; item = stack.pop()) {
-    all.push(item);
-    for (const child of item.event.children) {
-      stack.push({ event: child, depth: item.depth + 1 });
+/** The deepest row in the middle of the log: the worst go-to-row a user can ask for. */
+export function deepRow(index: LogIndex): number {
+  const from = Math.floor(index.rowCount * 0.45);
+  const to = Math.floor(index.rowCount * 0.55);
+  let deepest = from;
+  for (let row = from; row < to; row++) {
+    if (index.depth[row]! > index.depth[deepest]!) {
+      deepest = row;
     }
   }
-  all.sort((a, b) => a.event.eventIndex - b.event.eventIndex);
-  const middle = all.slice(Math.floor(all.length * 0.45), Math.floor(all.length * 0.55));
-  return middle.reduce((a, b) => (b.depth > a.depth ? b : a)).event;
+  return deepest;
 }
 
-/** The event indexes from the root down to `event`, as Time Order rows are keyed. */
-export function pathOf(event: LogEvent): number[] {
+/** The event ids from the root down to `row`, as Time Order rows are keyed. */
+export function pathOf(index: LogIndex, row: number): number[] {
   const path: number[] = [];
-  for (let e: LogEvent | null = event; e?.parent; e = e.parent) {
-    path.push(e.eventIndex);
+  for (let at = row; at !== NO_ROW; at = index.parent[at]!) {
+    path.push(index.eventIndex[at]!);
   }
   return path.reverse();
 }

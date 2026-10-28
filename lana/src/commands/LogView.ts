@@ -47,7 +47,7 @@ export class LogView {
   private static helpUrl = 'https://certinia.github.io/debug-log-analyzer/';
   private static currentPanel: WebviewPanel | undefined;
   private static currentLogUri: Uri | undefined;
-  private static pendingNavigationTimestamp: number | undefined;
+  private static pendingNavigationEventIndex: number | undefined;
 
   static getCurrentView() {
     return LogView.currentPanel;
@@ -61,8 +61,8 @@ export class LogView {
     return LogView.currentLogUri;
   }
 
-  static setPendingNavigation(timestamp: number): void {
-    LogView.pendingNavigationTimestamp = timestamp;
+  static setPendingNavigation(eventIndex: number): void {
+    LogView.pendingNavigationEventIndex = eventIndex;
   }
 
   static async createView(
@@ -309,8 +309,8 @@ export class LogView {
       }
     }
 
-    const navigateToTimestamp = LogView.pendingNavigationTimestamp;
-    LogView.pendingNavigationTimestamp = undefined;
+    const navigateToEventIndex = LogView.pendingNavigationEventIndex;
+    LogView.pendingNavigationEventIndex = undefined;
 
     panel.webview.postMessage({
       requestId,
@@ -320,7 +320,7 @@ export class LogView {
         logUri: cachedUri ? panel.webview.asWebviewUri(cachedUri).toString(true) : '',
         logPath: cachedUri ? getLogDisplayPath(cachedUri) : undefined,
         logData: logData,
-        navigateToTimestamp,
+        navigateToEventIndex,
       },
     });
   }

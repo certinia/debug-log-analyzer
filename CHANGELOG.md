@@ -15,7 +15,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Sort, expand and filter take under 0.2 s, group by is up to 9× faster, column resize is smooth and Find never freezes the table.
   - Screen reader and full keyboard support.
   - `Cmd/Ctrl+C` copies the filtered rows and their depth in each table, and the Call Tree, Analysis and Database toolbars copy them or export them to CSV.
-- ⚡ **Parser performance**: logs parse 28% faster and use 27% less memory, down from 1.0 s to 0.78 s and 1.1 GB to 0.8 GB on a 100 MB log.
+- ⚡ **Parser performance**: logs parse 8× faster and hold 98% less memory, down from 1.1 s to 0.13 s and 1.0 GB to 23 MB on a 100 MB log. ([#1231])
 - 🔍 **Find**: a more consistent and natural find experience. ([#986])
   - Search matches highlight as you type.
   - Typing goes to the nearest visible match.
@@ -62,6 +62,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - 🐛 **Go to Code**: errors for methods not found in the file are shown correctly.
 - 🌊 **Flow errors**: multi-line errors show their message.
 - 🗃️ **SOQL and SOSL**: every keyword in the current syntax is highlighted, and `SET OPTIONS` and `UPDATE TRACKING` start their own line when a query is pretty-printed.
+- 🎯 **Raw log**: **Show in Log Analysis**, folding and the outline go to the right event when two events share a timestamp.
+- 🧭 **Show in Log Analysis**: opens the right log at the right event.
+- 📍 **Show in Timeline**: always goes to the event.
+- 🌳 **Go to Call Tree**: a row the filters hide selects its parent, with the option to clear the filters and go to the hidden row.
 
 ## [1.22.1] - 2026-09-18
 
@@ -606,6 +610,7 @@ Skipped due to adopting odd numbering for pre releases and even number for relea
 
 <!-- Unreleased -->
 
+[#1231]: https://github.com/certinia/debug-log-analyzer/issues/1231
 [#1234]: https://github.com/certinia/debug-log-analyzer/issues/1234
 [#1169]: https://github.com/certinia/debug-log-analyzer/issues/1169
 [#986]: https://github.com/certinia/debug-log-analyzer/issues/986

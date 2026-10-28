@@ -12,17 +12,25 @@
  */
 
 import { describe, expect, it, jest } from '@jest/globals';
+import { indexOf } from '#test-helpers/apexLog.js';
+import { framesOf } from '#test-helpers/timeline.js';
 import { ApexLogTimeline } from '../optimised/ApexLogTimeline.js';
+
+/** One drawn frame, so the inspector's reveal can resolve it. */
+const ONE_FRAME =
+  '09:18:22.6 (1000)|METHOD_ENTRY|[1]|01p|ns.A.run()\n' +
+  '09:18:22.6 (2000)|METHOD_EXIT|[1]|ns.A.run()\n';
 
 /** What the emphasis was asked to do, in order: an eventIndex to mark, or 'clear'. */
 type EmphasisCall = number | 'clear';
 
-function timelineWithSpy(): {
+async function timelineWithSpy(): Promise<{
+  frame: number;
   select: (eventIndex: number | undefined) => void;
   selectMarker: (eventIndex: number | undefined) => void;
   revealFromInspector: (eventIndex: number) => void;
   emphasised: () => EmphasisCall[];
-} {
+}> {
   const timeline = new ApexLogTimeline();
   const internals = timeline as unknown as Record<string, unknown>;
   let calls: EmphasisCall[] = [];
@@ -38,18 +46,22 @@ function timelineWithSpy(): {
   };
   internals['pickEmphasis'] = (eventIndex: number) => calls.push(eventIndex);
   internals['clearEmphasis'] = () => calls.push('clear');
-  // One root event, so the inspector's reveal can resolve it.
-  const event = { eventIndex: 4, timestamp: 0, duration: { total: 10 }, parent: null };
-  internals['apexLog'] = { eventsById: { 4: event } };
+  const { log, index, frames } = await framesOf(ONE_FRAME);
+  internals['index'] = index;
+  internals['frames'] = frames;
 
   const handleSelect = internals['handleSelect'] as (node: unknown) => void;
   const handleMarkerSelect = internals['handleMarkerSelect'] as (marker: unknown) => void;
   const reveal = internals['selectFrameByEventIndex'] as (eventIndex: number) => void;
 
   return {
+    frame: indexOf(log, 'ns.A.run()'),
     select: (eventIndex) => {
       calls = [];
-      handleSelect.call(timeline, eventIndex === undefined ? null : { original: { eventIndex } });
+      handleSelect.call(
+        timeline,
+        eventIndex === undefined ? null : { original: { id: eventIndex } },
+      );
     },
     selectMarker: (eventIndex) => {
       calls = [];
@@ -64,16 +76,16 @@ function timelineWithSpy(): {
 }
 
 describe('who dims the chart', () => {
-  it('dims nothing when a frame is clicked on the chart', () => {
-    const timeline = timelineWithSpy();
+  it('dims nothing when a frame is clicked on the chart', async () => {
+    const timeline = await timelineWithSpy();
 
     timeline.select(7);
 
     expect(timeline.emphasised()).toEqual(['clear']);
   });
 
-  it('dims nothing when a marker is clicked on the chart', () => {
-    const timeline = timelineWithSpy();
+  it('dims nothing when a marker is clicked on the chart', async () => {
+    const timeline = await timelineWithSpy();
 
     timeline.selectMarker(7);
 
@@ -82,17 +94,17 @@ describe('who dims the chart', () => {
 
   // The inspector marks the frame it asked for, and that mark is what dims the rest. The
   // select it drives clears first, so the mark has to land after it.
-  it('marks the frame the inspector reveals, after the select it drives', () => {
-    const timeline = timelineWithSpy();
+  it('marks the frame the inspector reveals, after the select it drives', async () => {
+    const timeline = await timelineWithSpy();
 
-    timeline.revealFromInspector(4);
+    timeline.revealFromInspector(timeline.frame);
 
-    expect(timeline.emphasised()).toEqual(['clear', 4]);
+    expect(timeline.emphasised()).toEqual(['clear', timeline.frame]);
   });
 
   // The chart is the source of truth once clicked, so it drops the mark left behind.
-  it('drops the inspector mark when the chart is then clicked', () => {
-    const timeline = timelineWithSpy();
+  it('drops the inspector mark when the chart is then clicked', async () => {
+    const timeline = await timelineWithSpy();
 
     timeline.revealFromInspector(4);
     timeline.select(9);

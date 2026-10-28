@@ -12,13 +12,13 @@
 import { css, html, LitElement, type PropertyValues, unsafeCSS } from 'lit';
 import { customElement, property, query, state } from 'lit/decorators.js';
 
-import type { ApexLog } from '@apexdevtools/apex-log-parser';
-import { ResizeController } from '../../../core/events/ResizeController.js';
-import { SubscriptionController } from '../../../core/events/SubscriptionController.js';
-import { setRange, windowFor } from '../../../core/log/rangeScope.js';
-import { waitForNextFrame } from '../../../core/utility/FrameBudget.js';
-import { debounce, isVisible, setChanged } from '../../../core/utility/Util.js';
-import { themeObserver } from '../../../core/theme/ThemeObserver.js';
+import { ResizeController } from '#core/events/ResizeController.js';
+import { SubscriptionController } from '#core/events/SubscriptionController.js';
+import type { LogStore } from '#core/log/LogStore.js';
+import { setRange, windowFor } from '#core/log/rangeScope.js';
+import { waitForNextFrame } from '#core/utility/FrameBudget.js';
+import { debounce, isVisible, setChanged } from '#core/utility/Util.js';
+import { themeObserver } from '#core/theme/ThemeObserver.js';
 import { FindController } from '../../find/FindController.js';
 import { ApexLogTimeline } from '../optimised/ApexLogTimeline.js';
 import { MIN_CHART_HEIGHT } from '../optimised/chartLayout.js';
@@ -28,6 +28,7 @@ import { calculateViewportBounds } from '../optimised/ViewportUtils.js';
 import type { EditorColors, TimelineOptions, ViewportState } from '../types/flamechart.types.js';
 import { TimelineError } from '../types/flamechart.types.js';
 
+import type { TimelineNavigateRequest } from '../navigation.js';
 import { tokenStyles } from '../../../styles/tokens.styles.js';
 import { tooltipStyles } from '../styles/timeline.css.js';
 
@@ -98,24 +99,18 @@ export class TimelineFlameChart extends LitElement {
    * Existing property for compatibility with current application.
    */
   @property({ type: Object })
-  apexLog: ApexLog | null = null;
+  logStore: LogStore | null = null;
 
   @property()
   themeName: string | null = null;
 
   /**
-   * Timestamp to navigate to after initialization.
+   * The event to move to: at once if the chart is built, else once it is.
    * Used when opening the timeline from a raw log file hover.
    */
-  @property({ type: Number })
-  navigateToTimestamp: number | undefined = undefined;
-
-  /**
-   * Event index to navigate to after initialization.
-   * Preferred over timestamp because it is unique within a parse.
-   */
-  @property({ type: Number })
-  navigateToEventIndex: number | undefined = undefined;
+  // No hasChanged: each request is a new object, so the same event asked for twice moves again.
+  @property({ attribute: false })
+  navigateRequest: TimelineNavigateRequest | undefined = undefined;
 
   /**
    * Show the hover/selection details panel. A property, not a setter, so the value
@@ -160,6 +155,8 @@ export class TimelineFlameChart extends LitElement {
 
   /** Bumped by every `cleanup()`, so an in-flight `init` can tell it was superseded. */
   private initEpoch = 0;
+  // The prop is never cleared, so a rebuild would otherwise jump back to it.
+  private usedRequest: TimelineNavigateRequest | undefined;
   private visibilityWait: AbortController | null = null;
 
   private readonly finder = new FindController(this, {
@@ -179,7 +176,7 @@ export class TimelineFlameChart extends LitElement {
 
     // `updated` re-initialises only when the log or the options change, so a
     // re-attach would otherwise leave the destroyed Pixi app unrebuilt.
-    if (this.apexLog) {
+    if (this.logStore) {
       void this.initializeTimeline();
     }
   }
@@ -202,7 +199,7 @@ export class TimelineFlameChart extends LitElement {
     if (!height) {
       return;
     }
-    this.tooSmall = !!this.apexLog && height < MIN_CHART_HEIGHT;
+    this.tooSmall = !!this.logStore && height < MIN_CHART_HEIGHT;
     if (!this.tooSmall && this.sizeDeferred !== null) {
       void this.initializeTimeline(this.sizeDeferred);
     }
@@ -211,13 +208,13 @@ export class TimelineFlameChart extends LitElement {
   override updated(changedProperties: PropertyValues): void {
     super.updated(changedProperties);
 
-    // Re-initialize if apexLog or options change
+    // Re-initialize if the log or options change
     if (
-      (changedProperties.has('apexLog') || changedProperties.has('options')) &&
+      (changedProperties.has('logStore') || changedProperties.has('options')) &&
       this.containerRef
     ) {
       // A log replacing a log is the same transaction filtered, so the reader keeps their place.
-      void this.initializeTimeline(!!changedProperties.get('apexLog'));
+      void this.initializeTimeline(!!changedProperties.get('logStore'));
     } else if (changedProperties.has('themeName')) {
       // `else`: opening a log lands both properties in one update, and
       // `initializeTimeline` already reads the current appearance. Only the
@@ -234,6 +231,18 @@ export class TimelineFlameChart extends LitElement {
     if (changedProperties.has('dimCategories')) {
       this.apexLogTimeline?.setCategoryDim(this.dimCategories);
     }
+    if (changedProperties.has('navigateRequest')) {
+      this.followNavigateRequest();
+    }
+  }
+
+  private followNavigateRequest(): void {
+    const request = this.navigateRequest;
+    if (!this.apexLogTimeline || !request || request === this.usedRequest) {
+      return;
+    }
+    this.usedRequest = request;
+    this.apexLogTimeline.navigateToEventIndex(request.eventIndex);
   }
 
   /**
@@ -257,7 +266,7 @@ export class TimelineFlameChart extends LitElement {
    * Initialize PixiJS timeline renderer.
    */
   private async initializeTimeline(keepViewport = false): Promise<void> {
-    if (!this.containerRef || !this.apexLog) {
+    if (!this.containerRef || !this.logStore) {
       return;
     }
     this.visibilityWait?.abort();
@@ -285,8 +294,10 @@ export class TimelineFlameChart extends LitElement {
       ? (this.apexLogTimeline?.getViewport() ?? this.pendingViewport)
       : null;
     this.pendingViewport = viewport;
+    // A request the old chart took while this one builds still applies to this one.
+    const usedBefore = this.usedRequest;
 
-    if (this.apexLog.duration.total === 0) {
+    if (this.logStore.log.duration.total === 0) {
       this.cleanup();
       this.errorMessage = 'Nothing to show';
       return;
@@ -323,17 +334,16 @@ export class TimelineFlameChart extends LitElement {
       };
 
       const timeline = new ApexLogTimeline();
-      await timeline.init(layer, this.apexLog, optionsWithTheme);
+      await timeline.init(layer, this.logStore, optionsWithTheme);
       timeline.setTooltipEnabled(this.showTooltip);
       timeline.setCategoryDim(this.dimCategories);
 
-      // Navigate after initialization completes, preferring unique eventIndex.
-      if (viewport) {
+      // Navigate after initialization completes. A new request is newer than the place kept.
+      const request = this.navigateRequest;
+      if (request && request !== usedBefore) {
+        timeline.navigateToEventIndex(request.eventIndex);
+      } else if (viewport) {
         timeline.setViewport(viewport);
-      } else if (this.navigateToEventIndex !== undefined) {
-        timeline.navigateToEventIndex(this.navigateToEventIndex);
-      } else if (this.navigateToTimestamp !== undefined) {
-        timeline.navigateToTimestamp(this.navigateToTimestamp);
       }
       // The move above draws on the next frame; showing the layer sooner would flash the default view.
       await waitForNextFrame();
@@ -349,6 +359,9 @@ export class TimelineFlameChart extends LitElement {
       this.cleanup();
       layer.style.visibility = '';
       this.apexLogTimeline = timeline;
+      this.usedRequest = request;
+      // One sent while the first frame drew.
+      this.followNavigateRequest();
       void this.finder.rerun();
       this.timelineLayer = layer;
       this.pendingViewport = null;
@@ -437,8 +450,9 @@ export class TimelineFlameChart extends LitElement {
       measurement && measurement.endTime > measurement.startTime
         ? { timeStart: measurement.startTime, timeEnd: measurement.endTime }
         : this._viewport && calculateViewportBounds(this._viewport);
-    const logStart = this.apexLog?.timestamp ?? 0;
-    const logEnd = this.apexLog?.exitStamp ?? logStart;
+    const columns = this.logStore?.log.columns;
+    const logStart = columns?.startTimestamp[0] ?? 0;
+    const logEnd = columns?.endTimestamp[0] ?? logStart;
     setRange(span ? windowFor(span.timeStart, span.timeEnd, logStart, logEnd) : null);
   });
 

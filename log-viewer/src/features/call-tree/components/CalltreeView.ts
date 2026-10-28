@@ -7,23 +7,24 @@ import { consume } from '@lit/context';
 import { initialState, Task } from '@lit/task';
 import { css, html, LitElement, type PropertyValues } from 'lit';
 import { customElement, property, state } from 'lit/decorators.js';
-import { logContext } from '../../../core/log/logContext.js';
-import type { LogStore } from '../../../core/log/LogStore.js';
+import { logContext } from '#core/log/logContext.js';
+import type { LogStore } from '#core/log/LogStore.js';
 import { repeat } from 'lit/directives/repeat.js';
 
-import type { ApexLog, LogEvent } from '@apexdevtools/apex-log-parser';
-import { DomListenerController } from '../../../core/events/DomListenerController.js';
-import { eventBus, type SelectionView } from '../../../core/events/EventBus.js';
-import { SelectionEchoGuard } from '../../../core/events/SelectionEchoGuard.js';
-import { SubscriptionController } from '../../../core/events/SubscriptionController.js';
-import { vscodeMessenger } from '../../../core/messaging/VSCodeExtensionMessenger.js';
-import type { LogIndex } from '../../../core/log/LogIndex.js';
-import { eventByEventIndex } from '../../../core/utility/EventSearch.js';
-import { isVisible } from '../../../core/utility/Util.js';
+import { eventType } from '@apexdevtools/apex-log-parser';
+import { DomListenerController } from '#core/events/DomListenerController.js';
+import { eventBus, type SelectionView } from '#core/events/EventBus.js';
+import { SelectionEchoGuard } from '#core/events/SelectionEchoGuard.js';
+import { SubscriptionController } from '#core/events/SubscriptionController.js';
+import { vscodeMessenger } from '#core/messaging/VSCodeExtensionMessenger.js';
+import { type LogIndex, NO_ROW } from '#core/log/LogIndex.js';
+import { isVisible } from '#core/utility/Util.js';
 import { CALLTREE_GO_TO_ROW, type CalltreeNavigationEventMap } from '../navigation.js';
+import { goToTimelineEvent } from '../../timeline/navigation.js';
 import type { AggregatedRow, BottomUpRow } from '../utils/Aggregation.js';
+import { TimeOrderSource, type TimeOrderNode } from '../utils/TimeOrderTree.js';
 import { wireCategoryColoring } from '../utils/CategoryColoring.js';
-import { waitForNextFrame } from '../../../core/utility/FrameBudget.js';
+import { waitForNextFrame } from '#core/utility/FrameBudget.js';
 import type {
   GridContextDetail,
   GridHeaderContextDetail,
@@ -31,7 +32,7 @@ import type {
   RowFilter,
   RowKey,
 } from '../../../grid/index.js';
-import '../grid/CallTreeGrid.js';
+import { categoryClass } from '../grid/CallTreeGrid.js';
 import {
   AGGREGATED_WITHOUT_DETAILS,
   aggregatedColumns,
@@ -43,9 +44,7 @@ import {
   CALL_TREE_COLUMN_SETTINGS,
   mergedLines,
   openType,
-  TIME_ORDER_WITHOUT_DETAILS,
   timeOrderColumns,
-  timeOrderSource,
 } from '../grid/columns.js';
 import { inspectorRowEvents } from '../grid/inspectorRowEvents.js';
 import { MergedTree } from '../grid/mergedRows.js';
@@ -73,8 +72,10 @@ import {
   directionOf,
   type ViewMode,
 } from '../../../components/callTreeViewModes.js';
+import type { DatagridFacetFilter } from '../../../components/datagrid-facet-filter.js';
 import '../../../components/datagrid-facet-filter.js';
 import '../../../components/datagrid-filter-bar.js';
+import type { DatagridRangeFilter } from '../../../components/datagrid-range-filter.js';
 import '../../../components/datagrid-range-filter.js';
 import '../../../components/OverflowList.js';
 
@@ -96,8 +97,9 @@ import { LocatedRowIds, type RowData } from '../../../components/locatedRow.js';
 import { InspectorTabController } from '../../../components/InspectorTabController.js';
 import { FindController } from '../../find/FindController.js';
 import { revealFirstOf } from '../../../components/inspectorTab.js';
+
 const AGGREGATED_DEBUG_ONLY: RowFilter<AggregatedRow> = {
-  test: (row) => !!row.originalData.type && DEBUG_VALUE_TYPES.has(row.originalData.type),
+  test: (row) => DEBUG_VALUE_TYPES.has(row.type),
   keepAncestors: true,
 };
 
@@ -109,14 +111,12 @@ const CONTAINER_IDS: Record<ViewMode, string> = {
 };
 
 function typeNamesIn(index: LogIndex): string[] {
-  const types = new Set<string>();
+  const types = index.column(index.log.columns.type);
+  const typeIds = new Set<number>();
   for (let row = 0; row < index.rowCount; row++) {
-    const type = index.event(row).type;
-    if (type) {
-      types.add(type);
-    }
+    typeIds.add(types[row]!);
   }
-  return [...types].sort();
+  return [...typeIds].flatMap((typeId) => eventType(typeId)?.type ?? []).sort();
 }
 
 const DEBUG_VALUE_TYPES: ReadonlySet<string> = new Set([
@@ -131,17 +131,12 @@ const DEBUG_VALUE_TYPES: ReadonlySet<string> = new Set([
   'USER_DEBUG_ERROR',
 ]);
 
-const DEBUG_ONLY: RowFilter<LogEvent> = {
-  test: (event) => !!event.type && DEBUG_VALUE_TYPES.has(event.type),
-  keepAncestors: true,
-};
-
-type ViewGrid = LvGrid<LogEvent> | LvGrid<AggregatedRow> | LvGrid<BottomUpRow>;
+type ViewGrid = LvGrid<TimeOrderNode> | LvGrid<AggregatedRow> | LvGrid<BottomUpRow>;
 
 /** What the filters read from a view's rows. Bottom-Up has no type or debug filter. */
 interface FilterFields<R> extends MeasureFields<R> {
   type?: { of: (row: R) => string | null | undefined; debugOnly: RowFilter<R> };
-  details: RowFilter<R>;
+  withoutDetails: RowFilter<R>;
 }
 
 @customElement('call-tree-view')
@@ -150,10 +145,6 @@ export class CalltreeView extends LitElement {
   @consume({ context: logContext, subscribe: true })
   @property({ attribute: false })
   logStore: LogStore | null = null;
-
-  private get timelineRoot(): ApexLog | null {
-    return this.logStore?.log ?? null;
-  }
 
   @state()
   isVisible = false;
@@ -169,7 +160,7 @@ export class CalltreeView extends LitElement {
 
   // State, so the expand button follows the grid on show once it is built.
   @state()
-  timeOrderGrid: LvGrid<LogEvent> | null = null;
+  timeOrderGrid: LvGrid<TimeOrderNode> | null = null;
   @state()
   aggregatedGrid: LvGrid<AggregatedRow> | null = null;
   @state()
@@ -178,6 +169,19 @@ export class CalltreeView extends LitElement {
   private _bottomUpTree: MergedTree<BottomUpRow> | null = null;
   private _aggregatedBuild: Promise<void> | null = null;
   private _bottomUpBuild: Promise<void> | null = null;
+  // The Time Order filters read the source on show, so a new log keeps the same filter objects.
+  private _timeOrderSource: TimeOrderSource | null = null;
+  private readonly _timeOrderDebugOnly = deep<TimeOrderNode>((node) =>
+    DEBUG_VALUE_TYPES.has(this._timeOrderSource?.type(node) ?? ''),
+  );
+  private readonly _timeOrderWithoutDetails: RowFilter<TimeOrderNode> = {
+    test: (node) => this._timeOrderSource?.withoutDetails.test(node) ?? true,
+  };
+
+  /** The event a go-to found the filters hiding, so the toolbar can offer to clear them. */
+  @state()
+  private _hiddenTarget: { eventIndex: number; parentSelected: boolean } | null = null;
+  private _goToCount = 0;
 
   filterState: { showDetails: boolean; debugOnly: boolean; selectedTypes: Set<string> } = {
     showDetails: false,
@@ -192,7 +196,8 @@ export class CalltreeView extends LitElement {
   selfTimeRange: FilterRange = { start: null, end: null };
 
   tableContainer: HTMLDivElement | null = null;
-  rootMethod: ApexLog | null = null;
+  /** The store the grids were built from. */
+  rootStore: LogStore | null = null;
 
   private readonly _columns = new ColumnSettingsController(this, {
     ...CALL_TREE_COLUMN_SETTINGS,
@@ -201,7 +206,8 @@ export class CalltreeView extends LitElement {
   });
 
   private contextMenu: ContextMenu | null = null;
-  private contextMenuRow: LogEvent | null = null;
+  /** The event id of the row the menu opened on. */
+  private contextMenuEventIndex: number | null = null;
   /** The grid whose header was right-clicked (for column-toggle actions). */
   private contextMenuTarget: ColumnTarget | null = null;
   /** The header the column menu opened from; null from the toolbar. */
@@ -263,7 +269,7 @@ export class CalltreeView extends LitElement {
     // A detach destroyed the tables, and `updated` builds only for the log's
     // arrival. With a log already in hand this is a re-attach, and the build's
     // own guard decides whether there is anything to do.
-    if (this.rootMethod) {
+    if (this.rootStore) {
       this._appendTableWhenVisible();
     }
   }
@@ -276,19 +282,20 @@ export class CalltreeView extends LitElement {
   }
 
   updated(changedProperties: PropertyValues): void {
-    if (!this.timelineRoot || !changedProperties.has('logStore')) {
+    if (!this.logStore || !changedProperties.has('logStore')) {
       return;
     }
     if (changedProperties.get('logStore')) {
-      void this._replaceLog(this.timelineRoot);
+      void this._replaceLog(this.logStore);
     } else {
       this._appendTableWhenVisible();
     }
   }
 
-  private async _replaceLog(log: ApexLog): Promise<void> {
-    this.rootMethod = log;
-    // `rootMethod` is not reactive, and the Namespace filter lists its namespaces.
+  private async _replaceLog(store: LogStore): Promise<void> {
+    this.rootStore = store;
+    this._hiddenTarget = null;
+    // `rootStore` is not reactive, and the Namespace filter lists its namespaces.
     this.requestUpdate();
     // A build still running reads the old log.
     this._builds.abort();
@@ -299,9 +306,9 @@ export class CalltreeView extends LitElement {
       grid.deselect();
     }
     await Promise.all([
-      this.timeOrderGrid && this._loadTimeOrder(this.timeOrderGrid, log),
-      this.aggregatedGrid && this._loadAggregated(this.aggregatedGrid, log),
-      this.bottomUpGrid && this._loadBottomUp(this.bottomUpGrid, log),
+      this.timeOrderGrid && this._loadTimeOrder(this.timeOrderGrid, store),
+      this.aggregatedGrid && this._loadAggregated(this.aggregatedGrid, store),
+      this.bottomUpGrid && this._loadBottomUp(this.bottomUpGrid, store),
     ]);
   }
 
@@ -356,15 +363,64 @@ export class CalltreeView extends LitElement {
         opacity: 0;
         pointer-events: none;
       }
+
+      .hidden-note {
+        display: flex;
+        align-items: center;
+        gap: var(--lana-space-2xs);
+        /* Shrinks once the filters are in the menu, down to "Hidden by…" beside Clear; then joins them. */
+        flex: 0 1 auto;
+        min-width: 16ch;
+        color: var(--lana-fg-muted);
+        white-space: nowrap;
+      }
+
+      .hidden-note[slot='overflow'] {
+        padding: var(--lana-space-3xs) var(--lana-space-xs);
+      }
+
+      .hidden-note__text {
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+
+      .hidden-note__clear {
+        flex: none;
+        padding: 0;
+        border: none;
+        background: none;
+        color: var(--lana-link-fg);
+        font: inherit;
+        cursor: pointer;
+      }
+
+      .hidden-note__clear:hover {
+        color: var(--lana-link-fg-active);
+        text-decoration: underline;
+      }
+
+      .hidden-note__clear:focus-visible {
+        outline: var(--lana-focus-ring);
+        outline-offset: var(--lana-focus-offset);
+      }
     `,
   ];
 
   render() {
-    const skeleton = !this.timelineRoot ? html`<grid-skeleton></grid-skeleton>` : '';
+    const skeleton = !this.logStore ? html`<grid-skeleton></grid-skeleton>` : '';
     const isTimeOrder = this.viewMode === 'time-order';
 
     return html`
       <div id="call-tree-container">
+        <div class="sr-only" role="status" aria-live="polite">
+          ${
+            !this._hiddenTarget
+              ? ''
+              : this._hiddenTarget.parentSelected
+                ? 'The filters hide that row, so its parent is selected.'
+                : 'The filters hide that row and every row above it.'
+          }
+        </div>
         <div>
           <datagrid-filter-bar>
             <view-mode-switch
@@ -381,7 +437,7 @@ export class CalltreeView extends LitElement {
             <overflow-list slot="filters" menu-heading="Filters" icon="filter">
               <datagrid-facet-filter
                 label="Namespace"
-                .values="${this.rootMethod?.namespaces ?? []}"
+                .values="${this.rootStore?.log.namespaces ?? []}"
                 @datagrid-facet-change="${this._handleNamespaceFacet}"
               ></datagrid-facet-filter>
 
@@ -451,8 +507,22 @@ export class CalltreeView extends LitElement {
                     `
                   : ''
               }
+              ${
+                !this._hiddenTarget
+                  ? ''
+                  : html`<span slot="end" collapse-last class="hidden-note">
+                      <span class="hidden-note__text">Hidden by filters ·</span>
+                      <button
+                        type="button"
+                        class="hidden-note__clear"
+                        aria-label="Clear filters and go to the hidden row"
+                        @click=${this._clearFiltersAndGo}
+                      >
+                        Clear
+                      </button>
+                    </span>`
+              }
             </overflow-list>
-
             ${gridGroupControls({
               grid: this._activeGrid(),
               group:
@@ -515,7 +585,7 @@ export class CalltreeView extends LitElement {
     await this.updateComplete;
     await waitForNextFrame();
 
-    if (switchEpoch !== this.viewSwitchEpoch || !this.rootMethod) {
+    if (switchEpoch !== this.viewSwitchEpoch || !this.rootStore) {
       return;
     }
 
@@ -537,26 +607,26 @@ export class CalltreeView extends LitElement {
 
   /** Build the table for the view on show, if it has none. */
   private async _renderActiveView(): Promise<void> {
-    const rootMethod = this.rootMethod;
+    const store = this.rootStore;
     const container = this.renderRoot?.querySelector<HTMLDivElement>(CONTAINER_IDS[this.viewMode]);
-    if (!rootMethod || !container) {
+    if (!store || !container) {
       return;
     }
 
     switch (this.viewMode) {
       case 'time-order':
-        await this._renderCallTree(container, rootMethod);
+        await this._renderCallTree(container, store);
         break;
       case 'aggregated':
-        await this._renderAggregatedTree(container, rootMethod);
+        await this._renderAggregatedTree(container, store);
         break;
       case 'bottom-up':
-        await this._renderBottomUpTree(container, rootMethod);
+        await this._renderBottomUpTree(container, store);
         break;
     }
     // A fresh table carries none of the filters on show, so every build applies
     // them — a re-attach rebuilds under the filters the user left in force.
-    this._updateFiltering();
+    this._applyFilters();
   }
 
   private _destroyCurrentTable(): void {
@@ -572,6 +642,7 @@ export class CalltreeView extends LitElement {
     this._bottomUpTree = null;
     this._aggregatedBuild = null;
     this._bottomUpBuild = null;
+    this._timeOrderSource = null;
   }
 
   _handleBottomUpGroupBy(label: string) {
@@ -629,7 +700,7 @@ export class CalltreeView extends LitElement {
     if (!this.contextMenu) {
       return;
     }
-    this.contextMenuRow = null;
+    this.contextMenuEventIndex = null;
     this.contextMenuTarget = target;
     this.contextMenuColumn = column;
     this.contextMenu.show(this._columns.menuItems(target, column), clientX, clientY);
@@ -669,7 +740,7 @@ export class CalltreeView extends LitElement {
   private _onColumnMenuClose() {
     this.contextMenuTarget = null;
     this.contextMenuColumn = null;
-    this.contextMenuRow = null;
+    this.contextMenuEventIndex = null;
   }
 
   _handleTypeFilter(event: Event) {
@@ -700,6 +771,14 @@ export class CalltreeView extends LitElement {
   }
 
   _updateFiltering() {
+    this._hiddenTarget = null;
+    // A go-to still running read the old filters, so its note would be stale.
+    this._goToCount++;
+    this._applyFilters();
+  }
+
+  // Not a filter change, so a build leaves the hidden-row note in place.
+  private _applyFilters() {
     if (this.timeOrderGrid && this.viewMode === 'time-order') {
       this.timeOrderGrid.filters = this._timeOrderFilters();
       return;
@@ -719,19 +798,22 @@ export class CalltreeView extends LitElement {
       namespace: (row) => row.namespace,
       total: (row) => row.totalTime,
       self: (row) => row.totalSelfTime,
-      type: { of: (row) => row.originalData.type, debugOnly: AGGREGATED_DEBUG_ONLY },
-      details: AGGREGATED_WITHOUT_DETAILS,
+      type: { of: (row) => row.type, debugOnly: AGGREGATED_DEBUG_ONLY },
+      withoutDetails: AGGREGATED_WITHOUT_DETAILS,
     });
   }
 
   /** The filters of {@link _updateFiltering} for the Time Order grid. */
-  private _timeOrderFilters(): RowFilter<LogEvent>[] {
-    return this._viewFilters<LogEvent>('time-order', {
-      namespace: (e) => e.namespace,
-      total: (e) => e.duration.total,
-      self: (e) => e.duration.self,
-      type: { of: (e) => e.type, debugOnly: DEBUG_ONLY },
-      details: TIME_ORDER_WITHOUT_DETAILS,
+  private _timeOrderFilters(): RowFilter<TimeOrderNode>[] {
+    return this._viewFilters<TimeOrderNode>('time-order', {
+      namespace: (node) => this._timeOrderSource?.namespace(node),
+      total: ({ row }) => this._timeOrderSource?.index.total[row] ?? 0,
+      self: ({ row }) => this._timeOrderSource?.index.self[row] ?? 0,
+      type: {
+        of: (node) => this._timeOrderSource?.type(node),
+        debugOnly: this._timeOrderDebugOnly,
+      },
+      withoutDetails: this._timeOrderWithoutDetails,
     });
   }
 
@@ -739,7 +821,7 @@ export class CalltreeView extends LitElement {
   private _bottomUpFilters(): RowFilter<BottomUpRow>[] {
     return this._viewFilters<BottomUpRow>('bottom-up', {
       ...BOTTOM_UP_MEASURES,
-      details: BOTTOM_UP_WITHOUT_DETAILS,
+      withoutDetails: BOTTOM_UP_WITHOUT_DETAILS,
     });
   }
 
@@ -767,7 +849,7 @@ export class CalltreeView extends LitElement {
       );
     }
     if (!this.filterState.showDetails) {
-      filters.push(fields.details);
+      filters.push(fields.withoutDetails);
     }
     return filters;
   }
@@ -784,7 +866,7 @@ export class CalltreeView extends LitElement {
       return;
     }
     const pathIds = this._locateIds.idsFor(
-      this.rootMethod,
+      this.rootStore,
       eventIndexes,
       directionOf(this.viewMode),
     );
@@ -800,7 +882,7 @@ export class CalltreeView extends LitElement {
       return;
     }
 
-    this.rootMethod = this.timelineRoot;
+    this.rootStore = this.logStore;
     this._visibilityWait?.abort();
     this._visibilityWait = new AbortController();
     void isVisible(this, undefined, this._visibilityWait.signal).then((visible) => {
@@ -814,9 +896,13 @@ export class CalltreeView extends LitElement {
   }
 
   async _goToRow(eventIndex: number) {
-    if (!this.rootMethod) {
+    const store = this.rootStore;
+    if (!store) {
       return;
     }
+    const goTo = ++this._goToCount;
+    const current = () => goTo === this._goToCount && store === this.rootStore;
+    this._hiddenTarget = null;
     document.dispatchEvent(new CustomEvent('show-tab', { detail: { tabid: 'tree-tab' } }));
 
     if (this.viewMode !== 'time-order') {
@@ -824,15 +910,52 @@ export class CalltreeView extends LitElement {
       await this._setViewMode('time-order');
     }
 
-    if (!this._callTreeTableWrapper) {
+    if (!this._callTreeTableWrapper || !current()) {
       return;
     }
 
-    await this._renderCallTree(this._callTreeTableWrapper, this.rootMethod);
+    await this._renderCallTree(this._callTreeTableWrapper, store);
     const grid = this.timeOrderGrid;
-    if (grid && (await grid.goTo(this._timeOrderPath(eventIndex)))) {
-      grid.focus({ preventScroll: true });
+    const path = this._timeOrderPath(eventIndex);
+    if (!grid || !path.length || !current()) {
+      return;
     }
+    const result = await grid.goTo(path);
+    if (result === 'superseded' || !current()) {
+      return;
+    }
+    if (result === 'none-shown') {
+      this._hiddenTarget = { eventIndex, parentSelected: false };
+      return;
+    }
+    // The grid stops at the deepest shown row on the path, so a row the filters hide lands on its parent.
+    if (grid.selectedKey !== path.at(-1)) {
+      this._hiddenTarget = { eventIndex, parentSelected: true };
+    }
+    grid.focus({ preventScroll: true });
+  }
+
+  /** Clears the filters that can hide a go-to's row, then goes to it. */
+  private async _clearFiltersAndGo(): Promise<void> {
+    if (!this._hiddenTarget) {
+      return;
+    }
+    const { eventIndex } = this._hiddenTarget;
+    for (const filter of this.renderRoot.querySelectorAll<
+      DatagridFacetFilter | DatagridRangeFilter
+    >('datagrid-facet-filter, datagrid-range-filter')) {
+      filter.clear();
+    }
+    this.typeFilter = 'All';
+    // Details stays as chosen unless it hides this row, as it does a detail an issue card names.
+    const row = this._timeOrderSource?.index.rowOf(eventIndex) ?? NO_ROW;
+    const showDetails =
+      this.filterState.showDetails ||
+      (row !== NO_ROW && !this._timeOrderWithoutDetails.test({ row }));
+    this.filterState = { showDetails, debugOnly: false, selectedTypes: new Set() };
+    this.requestUpdate();
+    this._updateFiltering();
+    await this._goToRow(eventIndex);
   }
 
   /**
@@ -853,7 +976,7 @@ export class CalltreeView extends LitElement {
   private _pathTo(eventIndex: number): RowKey[] {
     const direction: SelectionView = directionOf(this.viewMode);
     const pathIds = (): readonly number[] =>
-      this._locateIds.idsFor(this.rootMethod, [eventIndex], direction);
+      this._locateIds.idsFor(this.rootStore, [eventIndex], direction);
     switch (this.viewMode) {
       case 'time-order':
         return this._timeOrderPath(eventIndex);
@@ -866,61 +989,51 @@ export class CalltreeView extends LitElement {
 
   /** The keys from a top-level row down to the Time Order row for `eventIndex`. */
   private _timeOrderPath(eventIndex: number): RowKey[] {
-    const path: RowKey[] = [];
-    const root = this.rootMethod;
-    // The log itself is the one event with no parent, and it has no row.
-    for (
-      let event = root ? eventByEventIndex(root, eventIndex) : null;
-      event?.parent;
-      event = event.parent
-    ) {
-      path.unshift(event.eventIndex);
-    }
-    return path;
+    return this.rootStore?.pathTo(eventIndex) ?? [];
   }
 
   private async _renderCallTree(
     callTreeTableContainer: HTMLDivElement,
-    rootMethod: ApexLog,
+    store: LogStore,
   ): Promise<void> {
     if (this.timeOrderGrid) {
       await waitForNextFrame();
       return;
     }
 
-    const grid = this._mountGrid<LogEvent>(callTreeTableContainer, 'time-order', (event) => ({
-      originalData: event,
-      text: event.text,
+    const grid = this._mountGrid<TimeOrderNode>(callTreeTableContainer, 'time-order', (node) => ({
+      eventIndex: this._timeOrderSource?.key(node),
     }));
     this.timeOrderGrid = grid;
     grid.filters = this._timeOrderFilters();
     grid.addEventListener('lv-grid-context', (e) => {
-      const { row, event } = (e as CustomEvent<GridContextDetail<LogEvent>>).detail;
+      const { row, event } = (e as CustomEvent<GridContextDetail<TimeOrderNode>>).detail;
       if (!row || window.getSelection()?.type === 'Range') {
         return;
       }
       event.preventDefault();
       this._showRowContextMenu(row, event.clientX, event.clientY);
     });
-    await this._loadTimeOrder(grid, rootMethod);
+    await this._loadTimeOrder(grid, store);
   }
 
-  private async _loadTimeOrder(grid: LvGrid<LogEvent>, log: ApexLog): Promise<void> {
-    const reported = await reportedUsageOf(log);
+  private async _loadTimeOrder(grid: LvGrid<TimeOrderNode>, store: LogStore): Promise<void> {
+    const [reported, index] = await Promise.all([reportedUsageOf(store.log), store.logIndex()]);
     // A newer log can load while this one waits.
-    if (this.rootMethod !== log) {
+    if (this.rootStore !== store) {
       return;
     }
-    grid.columns = timeOrderColumns(log, { openType, reported });
+    const source = new TimeOrderSource(index);
+    this._timeOrderSource = source;
+    // A time-order node holds only its row, so the colour strip asks the source for the category.
+    grid.rowClass = (node) => categoryClass({ category: source.category(node) });
+    grid.columns = timeOrderColumns(source, { openType, reported });
     this._columns.applyTo(gridColumnTarget(grid));
-    grid.source = timeOrderSource(log);
+    grid.source = source;
     return grid.settled();
   }
 
-  private async _renderAggregatedTree(
-    container: HTMLDivElement,
-    rootMethod: ApexLog,
-  ): Promise<void> {
+  private async _renderAggregatedTree(container: HTMLDivElement, store: LogStore): Promise<void> {
     if (this.aggregatedGrid) {
       await this._aggregatedBuild;
       await waitForNextFrame();
@@ -934,27 +1047,24 @@ export class CalltreeView extends LitElement {
       (row) => this._aggregatedTree?.parentOf(row),
     );
     this.aggregatedGrid = grid;
-    grid.rowLines = mergedLines;
     grid.filters = this._aggregatedFilters();
-    await this._loadAggregated(grid, rootMethod);
+    await this._loadAggregated(grid, store);
   }
 
-  private _loadAggregated(grid: LvGrid<AggregatedRow>, log: ApexLog): Promise<void> {
-    this._aggregatedBuild = this._fillAggregatedTree(grid, log);
+  private _loadAggregated(grid: LvGrid<AggregatedRow>, store: LogStore): Promise<void> {
+    this._aggregatedBuild = this._fillAggregatedTree(grid, store);
     return this._aggregatedBuild;
   }
 
-  private async _fillAggregatedTree(
-    grid: LvGrid<AggregatedRow>,
-    rootMethod: ApexLog,
-  ): Promise<void> {
-    const reported = await reportedUsageOf(rootMethod);
-    if (this.rootMethod !== rootMethod || this.aggregatedGrid !== grid) {
+  private async _fillAggregatedTree(grid: LvGrid<AggregatedRow>, store: LogStore): Promise<void> {
+    const reported = await reportedUsageOf(store.log);
+    if (this.rootStore !== store || this.aggregatedGrid !== grid) {
       return;
     }
-    grid.columns = aggregatedColumns(rootMethod, { openType, reported });
+    grid.columns = aggregatedColumns(store.log, { openType, reported });
+    grid.rowLines = mergedLines(store.log);
     this._columns.applyTo(gridColumnTarget(grid));
-    const tree = await MergedTree.aggregated(rootMethod, { signal: this._builds.signal });
+    const tree = await MergedTree.aggregated(store, { signal: this._builds.signal });
     // A build can finish just before a detach, and a later one owns the container now.
     if (!tree || this.aggregatedGrid !== grid) {
       return;
@@ -964,7 +1074,7 @@ export class CalltreeView extends LitElement {
     await grid.settled();
   }
 
-  private async _renderBottomUpTree(container: HTMLDivElement, rootMethod: ApexLog): Promise<void> {
+  private async _renderBottomUpTree(container: HTMLDivElement, store: LogStore): Promise<void> {
     if (this.bottomUpGrid) {
       await this._bottomUpBuild;
       await waitForNextFrame();
@@ -979,25 +1089,25 @@ export class CalltreeView extends LitElement {
     );
     this.bottomUpGrid = grid;
     grid.sort = BOTTOM_UP_SORT;
-    grid.rowLines = mergedLines;
     grid.groupBy = bottomUpGroupBy(this.bottomUpGroupBy);
     grid.filters = this._bottomUpFilters();
-    await this._loadBottomUp(grid, rootMethod);
+    await this._loadBottomUp(grid, store);
   }
 
-  private _loadBottomUp(grid: LvGrid<BottomUpRow>, log: ApexLog): Promise<void> {
-    this._bottomUpBuild = this._fillBottomUpTree(grid, log);
+  private _loadBottomUp(grid: LvGrid<BottomUpRow>, store: LogStore): Promise<void> {
+    this._bottomUpBuild = this._fillBottomUpTree(grid, store);
     return this._bottomUpBuild;
   }
 
-  private async _fillBottomUpTree(grid: LvGrid<BottomUpRow>, rootMethod: ApexLog): Promise<void> {
-    const reported = await reportedUsageOf(rootMethod);
-    if (this.rootMethod !== rootMethod || this.bottomUpGrid !== grid) {
+  private async _fillBottomUpTree(grid: LvGrid<BottomUpRow>, store: LogStore): Promise<void> {
+    const reported = await reportedUsageOf(store.log);
+    if (this.rootStore !== store || this.bottomUpGrid !== grid) {
       return;
     }
-    grid.columns = bottomUpColumns(rootMethod, { openType, reported });
+    grid.columns = bottomUpColumns(store.log, { openType, reported });
+    grid.rowLines = mergedLines(store.log);
     this._columns.applyTo(gridColumnTarget(grid));
-    const tree = await MergedTree.bottomUp(rootMethod, { signal: this._builds.signal });
+    const tree = await MergedTree.bottomUp(store, { signal: this._builds.signal });
     // A build can finish just before a detach, and a later one owns the container now.
     if (!tree || this.bottomUpGrid !== grid) {
       return;
@@ -1023,7 +1133,7 @@ export class CalltreeView extends LitElement {
     grid.toggleAttribute('category-colorize', this._colorize);
     const inspector = inspectorRowEvents<R>({
       source: 'calltree',
-      root: () => this.rootMethod,
+      store: () => this.rootStore,
       view: () => directionOf(this.viewMode),
       data,
       parentOf,
@@ -1044,22 +1154,24 @@ export class CalltreeView extends LitElement {
     return grid;
   }
 
-  private _showRowContextMenu(event: LogEvent, clientX: number, clientY: number): void {
-    if (!this.contextMenu) {
+  private _showRowContextMenu(node: TimeOrderNode, clientX: number, clientY: number): void {
+    const eventIndex = this._timeOrderSource?.key(node);
+    const event = eventIndex === undefined ? null : this.rootStore?.eventByIndex(eventIndex);
+    if (!this.contextMenu || !event) {
       return;
     }
 
-    this.contextMenuRow = event;
+    this.contextMenuEventIndex = event.id;
 
     const items: { id: string; label: string; separator?: boolean; shortcut?: string }[] = [];
 
     items.push({ id: 'show-in-timeline', label: 'Show in Timeline' });
 
-    if (event.hasValidSymbols) {
+    if (event.isApexCall) {
       items.push({ id: 'go-to-source', label: 'Go to Source' });
     }
 
-    if (event.timestamp) {
+    if (event.startTimestamp) {
       items.push({ id: 'show-in-log', label: 'Show in Log File' });
     }
 
@@ -1098,33 +1210,33 @@ export class CalltreeView extends LitElement {
       return;
     }
 
-    if (!this.contextMenuRow) {
+    const event =
+      this.contextMenuEventIndex === null
+        ? null
+        : this.rootStore?.eventByIndex(this.contextMenuEventIndex);
+    if (!event) {
       return;
     }
-
-    const event = this.contextMenuRow;
+    const text = event.text ?? event.type;
 
     switch (e.detail.itemId) {
       case 'show-in-log':
-        vscodeMessenger.send('goToLogLine', { timestamp: event.timestamp });
+        vscodeMessenger.send('goToLogLine', { timestamp: event.startTimestamp });
         break;
 
       case 'show-in-timeline':
-        document.dispatchEvent(new CustomEvent('show-tab', { detail: { tabid: 'timeline-tab' } }));
-        eventBus.emit('timeline:navigate-to', {
-          eventIndex: event.eventIndex,
-        });
+        goToTimelineEvent({ eventIndex: event.id });
         break;
 
       case 'go-to-source':
-        openType(event.text);
+        openType(text);
         break;
 
       case 'copy-name':
-        void navigator.clipboard.writeText(event.text);
+        void navigator.clipboard.writeText(text);
         break;
     }
 
-    this.contextMenuRow = null;
+    this.contextMenuEventIndex = null;
   }
 }

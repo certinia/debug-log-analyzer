@@ -11,16 +11,17 @@
  */
 
 import {
-  type HeapAllocateLine,
-  LOG_CATEGORY,
-  type LimitUsageLine,
-  type LimitMetricUnit,
+  type EventOf,
+  type EventType,
+  eventType,
+  type LimitUnit,
   type Limits,
 } from '@apexdevtools/apex-log-parser';
-import { UNCATEGORISED } from '../../../core/log/LogIndex.js';
-import type { Derivation } from '../../../core/log/LogStore.js';
-import { GOVERNOR_METRICS } from '../../../core/metrics/governorMetrics.js';
-import { CHECK_EVERY, frameBudget } from '../../../core/utility/FrameBudget.js';
+import type { Derivation } from '#core/log/LogStore.js';
+import { statementSelves } from '#core/log/rowMetrics.js';
+import { DEFAULT_NAMESPACE } from '#core/utility/CallerNamespace.js';
+import { GOVERNOR_METRICS } from '#core/metrics/governorMetrics.js';
+import { CHECK_EVERY, frameBudget } from '#core/utility/FrameBudget.js';
 import type { HeatStripMetric, HeatStripTimeSeries } from '../types/flamechart.types.js';
 import { extractMarkers, noDataSpans } from '../utils/marker-utils.js';
 import {
@@ -28,7 +29,7 @@ import {
   type LimitObservation as GranularObservation,
 } from './metric-strip/governor-timeline.js';
 
-const STRIP_UNIT: Record<LimitMetricUnit, string> = { millisecond: 'ms', byte: 'bytes', count: '' };
+const STRIP_UNIT: Record<LimitUnit, string> = { millisecond: 'ms', byte: 'bytes', count: '' };
 
 /** The heat strip's metrics, in strip priority order. */
 const APEX_METRICS: Map<keyof Limits, HeatStripMetric> = new Map(
@@ -39,6 +40,35 @@ const APEX_METRICS: Map<keyof Limits, HeatStripMetric> = new Map(
       { id: key, displayName: label, unit: STRIP_UNIT[unit], priority },
     ]),
 );
+
+const typeId = (type: EventType): number => eventType(type).typeId;
+const SOQL = typeId('SOQL_EXECUTE_BEGIN');
+const SOSL = typeId('SOSL_EXECUTE_BEGIN');
+const DML = typeId('DML_BEGIN');
+const CALLOUT = typeId('CALLOUT_REQUEST');
+const HEAP_ALLOCATE = typeId('HEAP_ALLOCATE');
+const BULK_HEAP_ALLOCATE = typeId('BULK_HEAP_ALLOCATE');
+const HEAP_DEALLOCATE = typeId('HEAP_DEALLOCATE');
+const LIMIT_USAGE = typeId('LIMIT_USAGE');
+const FLOW_LIMIT_USAGE = new Set(
+  (
+    [
+      'FLOW_START_INTERVIEW_LIMIT_USAGE',
+      'FLOW_INTERVIEW_FINISHED_LIMIT_USAGE',
+      'FLOW_ELEMENT_LIMIT_USAGE',
+      'FLOW_BULK_ELEMENT_LIMIT_USAGE',
+    ] as const
+  ).map(typeId),
+);
+
+type HeapEvent = EventOf<'HEAP_ALLOCATE' | 'BULK_HEAP_ALLOCATE' | 'HEAP_DEALLOCATE'>;
+type LimitUsageEvent = EventOf<
+  | 'LIMIT_USAGE'
+  | 'FLOW_START_INTERVIEW_LIMIT_USAGE'
+  | 'FLOW_INTERVIEW_FINISHED_LIMIT_USAGE'
+  | 'FLOW_ELEMENT_LIMIT_USAGE'
+  | 'FLOW_BULK_ELEMENT_LIMIT_USAGE'
+>;
 
 /**
  * The dense governor-limit time series for the metric strip, built once per log
@@ -71,10 +101,10 @@ export const apexLimitSeries: Derivation<HeatStripTimeSeries> = async (index, st
   };
 
   // Cumulative snapshots — authoritative multi-metric correctives (transaction usage).
-  for (const snapshot of apexLog.governorLimits.snapshots) {
+  for (const snapshot of apexLog.limits.snapshots) {
     for (const [metric, value] of Object.entries(snapshot.limits) as [
       keyof Limits,
-      { used: number; limit: number },
+      { used: number; limit: number | null },
     ][]) {
       observations.push({
         kind: 'absolute',
@@ -84,11 +114,15 @@ export const apexLimitSeries: Derivation<HeatStripTimeSeries> = async (index, st
         used: value.used,
         scope: 'cumulative',
       });
-      reportLimit(metric, value.limit);
+      reportLimit(metric, value.limit ?? 0);
     }
   }
 
-  const { categoryId, rowCount, subtreeEnd } = index;
+  const { rowCount, subtreeEnd, start } = index;
+  const types = index.column(apexLog.columns.type);
+  const namespaceIds = index.column(apexLog.columns.namespace.ids);
+  const namespaces = apexLog.columns.namespace.values;
+  const m = statementSelves(index);
   const granular: { observation: GranularObservation; end: number }[] = [];
   let row = 0;
   const observe = (observation: GranularObservation): void => {
@@ -107,77 +141,55 @@ export const apexLimitSeries: Derivation<HeatStripTimeSeries> = async (index, st
 
   // Each count is read once, from the event that owns it, so none is counted twice.
   const tick = frameBudget({});
-  const soqlId = index.categoryNames.indexOf(LOG_CATEGORY.SOQL);
-  const dmlId = index.categoryNames.indexOf(LOG_CATEGORY.DML);
-  const calloutId = index.categoryNames.indexOf(LOG_CATEGORY.Callout);
   for (row = 0; row < rowCount; row++) {
     if (row % CHECK_EVERY === 0) {
       await tick();
     }
-    const category = categoryId[row];
-    if (
-      category !== UNCATEGORISED &&
-      category !== soqlId &&
-      category !== dmlId &&
-      category !== calloutId
-    ) {
-      continue;
-    }
-    const event = index.event(row);
-    const timestamp = event.timestamp;
-    const namespace = event.namespace || 'default';
-    switch (event.type) {
-      case 'SOQL_EXECUTE_BEGIN':
-        // Row count is copied onto the begin line by its onEnd, so read both here (not on END).
-        pushDelta(timestamp, namespace, 'soqlQueries', event.soqlCount.self);
-        pushDelta(timestamp, namespace, 'queryRows', event.soqlRowCount.self);
-        break;
-      case 'SOSL_EXECUTE_BEGIN':
-        pushDelta(timestamp, namespace, 'soslQueries', event.soslCount.self);
-        break;
-      case 'DML_BEGIN':
-        pushDelta(timestamp, namespace, 'dmlStatements', event.dmlCount.self);
-        pushDelta(timestamp, namespace, 'dmlRows', event.dmlRowCount.self);
-        break;
-      case 'CALLOUT_REQUEST':
-        pushDelta(timestamp, namespace, 'callouts', 1);
-        break;
+    const type = types[row]!; // row < rowCount
+    const timestamp = start[row]!;
+    const namespace = namespaces[namespaceIds[row]!] ?? DEFAULT_NAMESPACE;
+    if (type === SOQL) {
+      pushDelta(timestamp, namespace, 'soqlQueries', m.soql[row]!);
+      pushDelta(timestamp, namespace, 'queryRows', m.soqlRows[row]!);
+    } else if (type === SOSL) {
+      pushDelta(timestamp, namespace, 'soslQueries', m.sosl[row]!);
+    } else if (type === DML) {
+      pushDelta(timestamp, namespace, 'dmlStatements', m.dml[row]!);
+      pushDelta(timestamp, namespace, 'dmlRows', m.dmlRows[row]!);
+    } else if (type === CALLOUT) {
+      pushDelta(timestamp, namespace, 'callouts', 1);
+    } else if (type === HEAP_ALLOCATE || type === BULK_HEAP_ALLOCATE) {
       // A deallocation is normally a negative HEAP_ALLOCATE (|Bytes:-N|), so add as-is;
       // HEAP_DEALLOCATE is a rarer distinct form. Each is one event type, so applying
       // both cases never double-subtracts a free.
-      case 'HEAP_ALLOCATE':
-      case 'BULK_HEAP_ALLOCATE':
-        pushDelta(timestamp, namespace, 'heapSize', (event as HeapAllocateLine).bytes);
-        break;
-      case 'HEAP_DEALLOCATE':
-        pushDelta(timestamp, namespace, 'heapSize', -Math.abs((event as HeapAllocateLine).bytes));
-        break;
-      case 'LIMIT_USAGE':
-      case 'FLOW_START_INTERVIEW_LIMIT_USAGE':
-      case 'FLOW_INTERVIEW_FINISHED_LIMIT_USAGE':
-      case 'FLOW_ELEMENT_LIMIT_USAGE':
-      case 'FLOW_BULK_ELEMENT_LIMIT_USAGE': {
-        const usage = (event as LimitUsageLine).limitUsage;
-        // Flow CPU time is flow-scoped with a different limit (15000 vs the 10000 apex limit),
-        // so skip it here — CPU stays sourced from LIMIT_USAGE_FOR_NS to keep percentages consistent.
-        if (usage && !(event.type !== 'LIMIT_USAGE' && usage.metric === 'cpuTime')) {
-          // These lines report a block's usage, but the limit they name is the transaction's, and
-          // some logs carry them with no cumulative block at all.
-          reportLimit(usage.metric, usage.limit);
-          observe({
-            kind: 'absolute',
-            timestamp,
-            namespace,
-            metric: usage.metric,
-            used: usage.used,
-            // Each of these lines reports the block it closes, not the transaction.
-            scope: 'scoped',
-          });
-        }
-        break;
+      pushDelta(
+        timestamp,
+        namespace,
+        'heapSize',
+        (index.event(row) as HeapEvent).details.bytes ?? 0,
+      );
+    } else if (type === HEAP_DEALLOCATE) {
+      const bytes = (index.event(row) as HeapEvent).details.bytes ?? 0;
+      pushDelta(timestamp, namespace, 'heapSize', -Math.abs(bytes));
+    } else if (type === LIMIT_USAGE || FLOW_LIMIT_USAGE.has(type)) {
+      const usage = (index.event(row) as LimitUsageEvent).details;
+      // Flow CPU time is flow-scoped with a different limit (15000 vs the 10000 apex limit),
+      // so skip it here — CPU stays sourced from LIMIT_USAGE_FOR_NS to keep percentages consistent.
+      // A label no metric tracks, such as AGGS, has no series to join.
+      if (usage?.metric && !(type !== LIMIT_USAGE && usage.metric === 'cpuTime')) {
+        // These lines report a block's usage, but the limit they name is the transaction's, and
+        // some logs carry them with no cumulative block at all.
+        reportLimit(usage.metric, usage.limit);
+        observe({
+          kind: 'absolute',
+          timestamp,
+          namespace,
+          metric: usage.metric,
+          used: usage.used,
+          // Each of these lines reports the block it closes, not the transaction.
+          scope: 'scoped',
+        });
       }
-      default:
-        break;
     }
   }
 

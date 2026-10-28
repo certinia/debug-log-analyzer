@@ -31,7 +31,7 @@ jest.mock('../panelRowMenu.js', () => ({
 }));
 
 import { runCalc } from '#test-helpers/calcs.js';
-import { eventBus } from '../../core/events/EventBus.js';
+import { eventBus } from '#core/events/EventBus.js';
 import type { CallStackDetail } from '../CallStackDetail.js';
 import '../CallStackDetail.js';
 import type { ContextMenu } from '../ContextMenu.js';
@@ -129,7 +129,7 @@ describe('CallStackDetail', () => {
         target: key,
         user: false,
       });
-      return true;
+      return 'selected';
     });
     built.length = 0;
 
@@ -163,7 +163,7 @@ describe('CallStackDetail', () => {
 
   it('marks the active frame again when a click clears its row', async () => {
     const el = await mount(9);
-    const goTo = jest.spyOn(gridOf(el), 'goTo').mockResolvedValue(true);
+    const goTo = jest.spyOn(gridOf(el), 'goTo').mockResolvedValue('selected');
     el.activeEventIndex = 4;
     await el.updateComplete;
     goTo.mockClear();

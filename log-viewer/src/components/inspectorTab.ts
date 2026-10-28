@@ -1,7 +1,7 @@
 /*
  * Copyright (c) 2026 Certinia Inc. All rights reserved.
  */
-import { type DetailSource, eventBus } from '../core/events/EventBus.js';
+import { type DetailSource, eventBus } from '#core/events/EventBus.js';
 import type { InspectorEmphasis } from './inspectorEmphasis.js';
 
 /** What a tab's view does when the inspector points into it. */

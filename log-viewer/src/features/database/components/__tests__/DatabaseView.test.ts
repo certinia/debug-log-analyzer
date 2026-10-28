@@ -13,7 +13,7 @@ import {
   type DetailSelection,
   type DetailSource,
   type StatementType,
-} from '../../../../core/events/EventBus.js';
+} from '#core/events/EventBus.js';
 
 // The three grids and the summary bring lv-grid and its stylesheets with them;
 // this suite only drives the selection and find contracts between them and DatabaseView.
@@ -357,13 +357,13 @@ describe('database-view on a new log', () => {
     globalThis.IntersectionObserver = AlwaysVisible as unknown as typeof IntersectionObserver;
     const view = document.createElement('database-view') as View;
     document.body.append(view);
-    view.logStore = storeOf(soql(2)).store;
+    view.logStore = (await storeOf(soql(2))).store;
     await settle();
     await view.updateComplete;
     const grid = view.shadowRoot?.querySelector('soql-view');
     expect(shownLines(view)).toHaveLength(2);
 
-    view.logStore = storeOf(soql(1)).store;
+    view.logStore = (await storeOf(soql(1))).store;
     await settle();
     await view.updateComplete;
 
@@ -375,7 +375,7 @@ describe('database-view on a new log', () => {
     globalThis.IntersectionObserver = AlwaysVisible as unknown as typeof IntersectionObserver;
     const view = document.createElement('database-view') as View;
     document.body.append(view);
-    view.logStore = storeOf(soql(2)).store;
+    view.logStore = (await storeOf(soql(2))).store;
     await settle();
     await view.updateComplete;
     const grid = view.shadowRoot?.querySelector('soql-view');

@@ -3,7 +3,7 @@
  */
 import type { ApexLog } from '@apexdevtools/apex-log-parser';
 
-import { DEFAULT_NAMESPACE } from '../core/utility/CallerNamespace.js';
+import { DEFAULT_NAMESPACE } from '#core/utility/CallerNamespace.js';
 
 /**
  * Five of Wong's colour-blind-safe eight. A data palette, so these stay literal

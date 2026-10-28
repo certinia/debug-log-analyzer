@@ -1,7 +1,7 @@
 /*
  * Copyright (c) 2026 Certinia Inc. All rights reserved.
  */
-import type { DetailSelection } from '../core/events/EventBus.js';
+import type { DetailSelection } from '#core/events/EventBus.js';
 
 /** Name of the DOM event an inspector section raises to reveal one of its rows. */
 export const INSPECTOR_REVEAL_EVENT = 'inspector-reveal';

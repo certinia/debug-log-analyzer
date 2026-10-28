@@ -4,7 +4,7 @@
 import {
   VSCodeExtensionMessenger,
   vscodeMessenger,
-} from '../../core/messaging/VSCodeExtensionMessenger.js';
+} from '#core/messaging/VSCodeExtensionMessenger.js';
 
 export type LanaSettings = {
   timeline: {

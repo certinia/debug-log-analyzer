@@ -3,8 +3,8 @@
  */
 import { describe, expect, it } from '@jest/globals';
 
-import type { WindowCounts } from '../../core/log/windowStats.js';
-import { GOVERNOR_METRICS } from '../../core/metrics/governorMetrics.js';
+import type { WindowCounts } from '#core/log/windowStats.js';
+import { GOVERNOR_METRICS } from '#core/metrics/governorMetrics.js';
 import { limitTotals, metricSparkline, seriesGauges } from '../logOverviewMetrics.js';
 import { emptyLimits, limitValue, seriesEvent, timeSeries } from '#test-helpers/limits.js';
 

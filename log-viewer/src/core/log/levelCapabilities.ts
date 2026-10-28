@@ -1,57 +1,46 @@
 /*
  * Copyright (c) 2026 Certinia Inc. All rights reserved.
  */
-import type { DebugLevels, LogLevel } from '@apexdevtools/apex-log-parser';
+import {
+  DEBUG_CATEGORY_TOKEN,
+  type DebugCategory,
+  type EventType,
+  eventType,
+  type Level,
+} from '@apexdevtools/apex-log-parser';
 
-import { LOG_TOKEN, levelRank } from './levelFilter.js';
+import { type DebugLevels, levelRank } from './levelFilter.js';
 
 /** The event that feeds a feature, and the debug level that writes it. */
 export interface Capability {
   /** Plural, as the hint reads `<label> need …`. */
   readonly label: string;
-  readonly event: string;
-  readonly category: keyof DebugLevels;
-  readonly level: LogLevel;
+  readonly event: EventType;
+  readonly category: DebugCategory;
+  readonly level: Level;
   /** Where the header's filter hides the data, if not below `level`; null where it never does. */
-  readonly filteredBelow?: LogLevel | null;
+  readonly filteredBelow?: Level | null;
 }
 
-// The parser sets each event's level per instance, so it is restated here; a test holds the two together.
+function capability(label: string, event: EventType, filteredBelow?: Level | null): Capability {
+  const { debugCategory, debugLevel } = eventType(event);
+  return { label, event, category: debugCategory, level: debugLevel, filteredBelow };
+}
+
 export const CAPABILITIES = {
-  variables: {
-    label: 'Variables',
-    event: 'VARIABLE_ASSIGNMENT',
-    category: 'apexCode',
-    level: 'FINEST',
-  },
-  queries: {
-    label: 'Database statements',
-    event: 'SOQL_EXECUTE_BEGIN',
-    category: 'database',
-    level: 'INFO',
-  },
-  queryPlans: {
-    label: 'Query plans',
-    event: 'SOQL_EXECUTE_EXPLAIN',
-    category: 'database',
-    level: 'FINEST',
-    filteredBelow: 'INFO',
-  },
-  limits: {
-    label: 'Governor limits',
-    event: 'CUMULATIVE_LIMIT_USAGE',
-    category: 'apexProfiling',
-    level: 'INFO',
-    filteredBelow: null,
-  },
+  variables: capability('Variables', 'VARIABLE_ASSIGNMENT'),
+  queries: capability('Database statements', 'SOQL_EXECUTE_BEGIN'),
+  // A plan rides on its query, so it shows while the query does.
+  queryPlans: capability('Query plans', 'SOQL_EXECUTE_EXPLAIN', 'INFO'),
+  limits: capability('Governor limits', 'CUMULATIVE_LIMIT_USAGE', null),
 } as const satisfies Record<string, Capability>;
 
 export type CapabilityId = keyof typeof CAPABILITIES;
 
 /** Why the debug levels could keep a feature's events off screen. */
 export type LevelGap =
-  | { kind: 'notCaptured'; capability: Capability; logged: LogLevel | undefined }
-  | { kind: 'filtered'; capability: Capability; logged: LogLevel; chosen: LogLevel };
+  | { kind: 'notCaptured'; capability: Capability; logged: Level | undefined }
+  | { kind: 'filtered'; capability: Capability; logged: Level; chosen: Level };
 
 /**
  * Whether the levels could keep `id`'s events off screen: the log was captured
@@ -95,7 +84,7 @@ export function describeLevelGap(gap: LevelGap | null | undefined, fallback = ''
     return fallback;
   }
   const { label, category, level } = gap.capability;
-  const token = LOG_TOKEN[category];
+  const token = DEBUG_CATEGORY_TOKEN[category];
   if (gap.kind === 'filtered') {
     return `${label} hidden: ${token} is set to ${gap.chosen} in the header (logged: ${gap.logged}).`;
   }

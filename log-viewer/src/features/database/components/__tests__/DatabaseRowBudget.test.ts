@@ -8,7 +8,7 @@ import type { ApexLog } from '@apexdevtools/apex-log-parser';
 import type { LitElement } from 'lit';
 
 import type { StackedTimeBar } from '../../../../components/StackedTimeBar.js';
-import type { LogStore } from '../../../../core/log/LogStore.js';
+import type { LogStore } from '#core/log/LogStore.js';
 import type { RowBudget, RowBudgets } from '../../services/rowBudget.js';
 
 // The bars colour by statement kind, so the log needs no namespace list.

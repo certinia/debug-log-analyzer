@@ -1,7 +1,7 @@
 /*
  * Copyright (c) 2026 Certinia Inc. All rights reserved.
  */
-import { firstIndexWhere } from '../../../core/utility/Util.js';
+import { firstIndexWhere } from '#core/utility/Util.js';
 import type { FindCount, FindQuery, FindTarget } from '../../find/FindController.js';
 import type { FindDirection } from '../../find/findEvents.js';
 import type { FlameChart } from '../optimised/FlameChart.js';

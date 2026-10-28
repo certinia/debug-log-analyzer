@@ -2,6 +2,7 @@
  * Copyright (c) 2026 Certinia Inc. All rights reserved.
  */
 import { TextEncoder } from 'node:util';
+import { deserialize, serialize } from 'node:v8';
 import { MessageChannel } from 'node:worker_threads';
 
 /**
@@ -25,6 +26,15 @@ if (!('ResizeObserver' in globalThis)) {
  */
 if (!('TextEncoder' in globalThis)) {
   (globalThis as unknown as Record<string, unknown>).TextEncoder = TextEncoder;
+}
+
+/**
+ * jsdom ships no `structuredClone`, which the parser uses to hand out frozen copies. The webview
+ * has one; v8's serializer is the same algorithm.
+ */
+if (!('structuredClone' in globalThis)) {
+  (globalThis as unknown as Record<string, unknown>).structuredClone = <T>(value: T): T =>
+    deserialize(serialize(value)) as T;
 }
 
 /**

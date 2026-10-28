@@ -5,25 +5,25 @@
  */
 import { describe, expect, it } from '@jest/globals';
 
-import { MAX_MARKED_PER_VALUE } from '../../core/log/aggregateVariables.js';
+import { MAX_MARKED_PER_VALUE } from '#core/log/aggregateVariables.js';
 import { SETTINGS, indexOf, indexesOf, storeOf } from '#test-helpers/apexLog.js';
-import { describeLevelGap, findLevelGap } from '../../core/log/levelCapabilities.js';
-import type { LogStore } from '../../core/log/LogStore.js';
+import { describeLevelGap, findLevelGap } from '#core/log/levelCapabilities.js';
+import type { LogStore } from '#core/log/LogStore.js';
 
 // Avoid the heavy CodeBlock import chain (the soql formatter). The raw value it
 // renders is covered by variableValue's own tests.
 jest.mock('../CodeBlock.js', () => ({}));
 
 // `options` tells the section's own read (none) from the comparison's per-call reads.
-const frameReads: { store: unknown; index: unknown; options: unknown }[] = [];
-jest.mock('../../core/log/frameVariables.js', () => {
-  const actual = jest.requireActual<typeof import('../../core/log/frameVariables.js')>(
-    '../../core/log/frameVariables.js',
+const frameReads: { store: unknown; options: unknown }[] = [];
+jest.mock('#core/log/frameVariables.js', () => {
+  const actual = jest.requireActual<typeof import('#core/log/frameVariables.js')>(
+    '#core/log/frameVariables.js',
   );
   return {
     ...actual,
     frameVariablesFor: (...args: Parameters<typeof actual.frameVariablesFor>) => {
-      frameReads.push({ store: args[0], index: args[2], options: args[3] });
+      frameReads.push({ store: args[0], options: args[2] });
       return actual.frameVariablesFor(...args);
     },
   };
@@ -32,16 +32,16 @@ jest.mock('../../core/log/frameVariables.js', () => {
 // Holds a comparison open while it is set, so a test can act mid-walk. A walk this
 // small never reaches a slice check, so the gate abandons an aborted one itself.
 let walkGate: Promise<void> | null = null;
-jest.mock('../../core/log/aggregateVariables.js', () => {
-  const actual = jest.requireActual<typeof import('../../core/log/aggregateVariables.js')>(
-    '../../core/log/aggregateVariables.js',
+jest.mock('#core/log/aggregateVariables.js', () => {
+  const actual = jest.requireActual<typeof import('#core/log/aggregateVariables.js')>(
+    '#core/log/aggregateVariables.js',
   );
   return {
     ...actual,
     aggregateVariablesFor: async (...args: Parameters<typeof actual.aggregateVariablesFor>) => {
       if (walkGate) {
         await walkGate;
-        if (args[3].signal?.aborted) {
+        if (args[2].signal?.aborted) {
           return null;
         }
       }
@@ -65,7 +65,8 @@ jest.mock('../variableTree.js', () => {
 import { STATICS_NOTE, type VariablesDetail } from '../VariablesDetail.js';
 import '../VariablesDetail.js';
 
-const logOf = (body: string, settings = SETTINGS.finest): LogStore => storeOf(body, settings).store;
+const logOf = async (body: string, settings = SETTINGS.finest): Promise<LogStore> =>
+  (await storeOf(body, settings)).store;
 
 const FRAME =
   '09:18:22.6 (1000)|METHOD_ENTRY|[1]|01p|ns.Outer.run()\n' +
@@ -132,22 +133,28 @@ function groupNames(el: VariablesDetail): string[] {
 }
 
 describe('VariablesDetail swapping logs', () => {
-  // The wrong read is discarded before it paints, so only the read itself shows it.
+  // One address, a different object in each log: the last log's index would answer
+  // the new log's address with the old object.
   it('does not read the new log through the index of the last one', async () => {
-    const first = logOf(FRAME);
+    const holding = (id: string) =>
+      logOf(
+        '09:18:22.6 (1000)|METHOD_ENTRY|[1]|01p|ns.Outer.run()\n' +
+          `09:18:22.6 (1100)|VARIABLE_ASSIGNMENT|[2]|held|{"Id":"${id}"}|0xd854c6b\n` +
+          '09:18:22.6 (1200)|VARIABLE_ASSIGNMENT|[3]|alias|0xd854c6b\n' +
+          '09:18:22.6 (1300)|METHOD_EXIT|[1]|ns.Outer.run()\n',
+      );
+    const first = await holding('001FIRST');
     const el = await mount(first, { eventIndex: indexOf(first.log, 'ns.Outer.run()') });
-    expect(rowNames(el)).toContain('total');
-    const firstIndex = frameReads.find((read) => read.store === first)?.index;
-    expect(firstIndex).toBeDefined();
+    expect(rowNamed(el, 'alias')?.querySelector('.value')?.textContent).toContain('001FIRST');
 
-    const second = logOf(FRAME);
+    const second = await holding('001SECOND');
     el.logStore = second;
     el.eventIndex = indexOf(second.log, 'ns.Outer.run()');
-    await el.updateComplete;
+    await settled(el);
 
-    expect(frameReads.some((read) => read.store === second && read.index === firstIndex)).toBe(
-      false,
-    );
+    const shown = rowNamed(el, 'alias')?.querySelector('.value')?.textContent;
+    expect(shown).toContain('001SECOND');
+    expect(shown).not.toContain('001FIRST');
   });
 });
 
@@ -155,15 +162,16 @@ describe('VariablesDetail swapping logs', () => {
 // with no error and no way to retry.
 describe('VariablesDetail read failure', () => {
   it('shows a message rather than staying on "Reading the log…" forever', async () => {
-    const store = logOf(FRAME);
-    Object.defineProperty(store.log, 'children', {
+    const store = await logOf(FRAME);
+    const eventIndex = indexOf(store.log, 'ns.Outer.run()');
+    Object.defineProperty(store.log, 'columns', {
       get(): never {
         throw new Error('boom');
       },
     });
     const errorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
 
-    const el = await mount(store, { eventIndex: indexOf(store.log, 'ns.Outer.run()') });
+    const el = await mount(store, { eventIndex });
 
     expect(notes(el)).toContain('Could not read the log for variables.');
     errorSpy.mockRestore();
@@ -174,7 +182,7 @@ describe('VariablesDetail read failure', () => {
 // frame (frameVariables.ts), and render() throws it away unread.
 describe('VariablesDetail skips the frame read for an aggregate', () => {
   it('never asks for the frame when more than one instance is selected', async () => {
-    const store = logOf(FRAME);
+    const store = await logOf(FRAME);
     await mount(store, {
       eventIndex: indexOf(store.log, 'ns.Outer.run()'),
       frames: [indexOf(store.log, 'ns.Outer.run()'), indexOf(store.log, 'ns.Outer.run()')],
@@ -203,7 +211,7 @@ describe('VariablesDetail empty states', () => {
       'This log records no variable assignments.',
     ],
   ])('%s', async (_name, body, settings, note) => {
-    const store = logOf(body, settings);
+    const store = await logOf(body, settings);
 
     const el = await mount(store, { eventIndex: indexOf(store.log, 'ns.Outer.run()') });
 
@@ -212,7 +220,7 @@ describe('VariablesDetail empty states', () => {
   });
 
   it('says a frame had nothing in scope, where the log has writes elsewhere', async () => {
-    const store = logOf(
+    const store = await logOf(
       FRAME +
         '09:18:22.6 (1800)|METHOD_ENTRY|[9]|01p|ns.Quiet.run()\n' +
         '09:18:22.6 (1900)|METHOD_EXIT|[9]|ns.Quiet.run()\n',
@@ -261,7 +269,7 @@ async function press(
 
 describe('VariablesDetail groups', () => {
   it('shows Local open, then this and Static closed', async () => {
-    const store = logOf(FRAME);
+    const store = await logOf(FRAME);
 
     const el = await mount(store, { eventIndex: indexOf(store.log, 'ns.Outer.run()') });
 
@@ -279,7 +287,7 @@ describe('VariablesDetail groups', () => {
 
   // A single frame compares nothing, so the statics note is for merged rows only.
   it('does not say the statics are not compared for a single frame', async () => {
-    const store = logOf(FRAME);
+    const store = await logOf(FRAME);
 
     const el = await mount(store, { eventIndex: indexOf(store.log, 'ns.Outer.run()') });
 
@@ -288,7 +296,7 @@ describe('VariablesDetail groups', () => {
 
   // Everything that opens says so, groups included.
   it('gives every row that opens a chevron, and every other row its gap', async () => {
-    const store = logOf(FRAME);
+    const store = await logOf(FRAME);
 
     const el = await mount(store, { eventIndex: indexOf(store.log, 'ns.Outer.run()') });
 
@@ -300,7 +308,7 @@ describe('VariablesDetail groups', () => {
   });
 
   it('keeps a disclosure the user closed when the selection moves', async () => {
-    const store = logOf(
+    const store = await logOf(
       FRAME +
         '09:18:22.6 (1800)|METHOD_ENTRY|[9]|01p|ns.Second.run()\n' +
         '09:18:22.6 (1850)|VARIABLE_ASSIGNMENT|[10]|other|7\n' +
@@ -318,7 +326,7 @@ describe('VariablesDetail groups', () => {
 
   // Open, the rows below carry the value; a preview as well would print it twice.
   it('drops the preview once the value is open below it', async () => {
-    const store = logOf(
+    const store = await logOf(
       '09:18:22.6 (1000)|METHOD_ENTRY|[1]|01p|ns.Outer.run()\n' +
         '09:18:22.6 (1100)|VARIABLE_ASSIGNMENT|[2]|held|{"a":1,"b":2}\n' +
         '09:18:22.6 (1300)|METHOD_EXIT|[1]|ns.Outer.run()\n',
@@ -339,7 +347,7 @@ describe('VariablesDetail groups', () => {
 
   // A colon joins a name to its value, and only where a value follows it.
   it('says so where the log declared a name and never wrote it, with no colon', async () => {
-    const store = logOf(
+    const store = await logOf(
       '09:18:22.6 (1000)|METHOD_ENTRY|[1]|01p|ns.Outer.run()\n' +
         '09:18:22.6 (1100)|VARIABLE_SCOPE_BEGIN|[2]|never|Boolean|true|false\n' +
         '09:18:22.6 (1150)|VARIABLE_ASSIGNMENT|[3]|written|1\n' +
@@ -356,7 +364,7 @@ describe('VariablesDetail groups', () => {
   // One rule for an address: it always trails the row, and the value slot says
   // whether the log ever wrote the object down.
   it('says the object is not recorded where the log wrote no value for it', async () => {
-    const store = logOf(
+    const store = await logOf(
       '09:18:22.6 (1000)|METHOD_ENTRY|[1]|01p|ns.Outer.run()\n' +
         '09:18:22.6 (1100)|VARIABLE_ASSIGNMENT|[2]|alias|0xd854c6b\n' +
         '09:18:22.6 (1300)|METHOD_EXIT|[1]|ns.Outer.run()\n',
@@ -373,7 +381,7 @@ describe('VariablesDetail groups', () => {
   // The address is only the identity the runtime printed for the reference. The
   // contents are a separate event, which may land after the frame.
   it('says so where the log recorded the object only after this frame', async () => {
-    const store = logOf(
+    const store = await logOf(
       '09:18:22.6 (1000)|METHOD_ENTRY|[1]|01p|ns.Outer.run()\n' +
         '09:18:22.6 (1100)|VARIABLE_ASSIGNMENT|[2]|alias|0xd854c6b\n' +
         '09:18:22.6 (1300)|METHOD_EXIT|[1]|ns.Outer.run()\n' +
@@ -394,7 +402,7 @@ describe('VariablesDetail groups', () => {
   // An interface-typed variable holding a stateless instance reads as `{}`, and
   // the class is the only thing that says what it is.
   it('names the class of the object it shows', async () => {
-    const store = logOf(
+    const store = await logOf(
       '09:18:22.6 (1000)|METHOD_ENTRY|[1]|01p|ns.Outer.run()\n' +
         '09:18:22.6 (1050)|CONSTRUCTOR_ENTRY|[2]|01p|<init>()|ns.Writer.WithoutSharing\n' +
         '09:18:22.6 (1060)|VARIABLE_SCOPE_BEGIN|[9]|this|ns.Writer.WithoutSharing|true|false\n' +
@@ -419,7 +427,7 @@ describe('VariablesDetail groups', () => {
 
   // The type column already says it, so saying it twice is noise.
   it('leaves the class out where it matches the declared type', async () => {
-    const store = logOf(
+    const store = await logOf(
       '09:18:22.6 (1000)|METHOD_ENTRY|[1]|01p|ns.Outer.run()\n' +
         '09:18:22.6 (1060)|VARIABLE_SCOPE_BEGIN|[9]|this|ns.Writer|true|false\n' +
         '09:18:22.6 (1070)|VARIABLE_ASSIGNMENT|[9]|this|{}|0x12d441a3\n' +
@@ -436,7 +444,7 @@ describe('VariablesDetail groups', () => {
   // `this` is the instance the frame runs on. Listing it among the locals reads
   // as a variable the method declared.
   it('keeps this out of the locals', async () => {
-    const store = logOf(
+    const store = await logOf(
       '09:18:22.6 (1000)|METHOD_ENTRY|[1]|01p|ns.Writer.run()\n' +
         '09:18:22.6 (1060)|VARIABLE_SCOPE_BEGIN|[9]|this|ns.Writer|true|false\n' +
         '09:18:22.6 (1070)|VARIABLE_ASSIGNMENT|[9]|this|{}|0x12d441a3\n' +
@@ -455,7 +463,7 @@ describe('VariablesDetail groups', () => {
   });
 
   it('marks an object it read out of a string', async () => {
-    const store = logOf(
+    const store = await logOf(
       '09:18:22.6 (1000)|METHOD_ENTRY|[1]|01p|ns.Outer.run()\n' +
         '09:18:22.6 (1100)|VARIABLE_ASSIGNMENT|[2]|payload|"{\\"a\\":1}"\n' +
         '09:18:22.6 (1300)|METHOD_EXIT|[1]|ns.Outer.run()\n',
@@ -467,7 +475,7 @@ describe('VariablesDetail groups', () => {
   });
 
   it('reads an address as the object it names', async () => {
-    const store = logOf(
+    const store = await logOf(
       '09:18:22.6 (1000)|METHOD_ENTRY|[1]|01p|ns.Outer.run()\n' +
         '09:18:22.6 (1100)|VARIABLE_ASSIGNMENT|[2]|held|{"Id":"001"}|0xd854c6b\n' +
         '09:18:22.6 (1200)|VARIABLE_ASSIGNMENT|[3]|alias|0xd854c6b\n' +
@@ -490,7 +498,7 @@ describe('VariablesDetail keyboard', () => {
   // A note carries no tabindex, so a move that landed on one would leave the
   // tree with no tab stop at all: focus and forth keys would then do nothing.
   it('never lands the tab stop on a note', async () => {
-    const store = logOf(
+    const store = await logOf(
       '09:18:22.6 (900)|METHOD_ENTRY|[1]|01p|ns.Setup.run()\n' +
         '09:18:22.6 (950)|VARIABLE_ASSIGNMENT|[1]|ns.Cache.hits|1\n' +
         '09:18:22.6 (990)|METHOD_EXIT|[1]|ns.Setup.run()\n' +
@@ -510,7 +518,7 @@ describe('VariablesDetail keyboard', () => {
   });
 
   it('gives the tree one tab stop', async () => {
-    const store = logOf(FRAME);
+    const store = await logOf(FRAME);
 
     const el = await mount(store, { eventIndex: indexOf(store.log, 'ns.Outer.run()') });
 
@@ -519,7 +527,7 @@ describe('VariablesDetail keyboard', () => {
   });
 
   it('walks down and up', async () => {
-    const store = logOf(FRAME);
+    const store = await logOf(FRAME);
     const el = await mount(store, { eventIndex: indexOf(store.log, 'ns.Outer.run()') });
 
     await press(el, 'ArrowDown');
@@ -531,7 +539,7 @@ describe('VariablesDetail keyboard', () => {
   });
 
   it('opens with the right arrow and closes with the left', async () => {
-    const store = logOf(FRAME);
+    const store = await logOf(FRAME);
     const el = await mount(store, { eventIndex: indexOf(store.log, 'ns.Outer.run()') });
 
     // Walk to `this`, which starts closed.
@@ -548,7 +556,7 @@ describe('VariablesDetail keyboard', () => {
   });
 
   it('steps out to the row that holds it', async () => {
-    const store = logOf(FRAME);
+    const store = await logOf(FRAME);
     const el = await mount(store, { eventIndex: indexOf(store.log, 'ns.Outer.run()') });
 
     // Local is open, so the row below it is one of its own.
@@ -559,7 +567,7 @@ describe('VariablesDetail keyboard', () => {
   });
 
   it('reaches the first and last row', async () => {
-    const store = logOf(FRAME);
+    const store = await logOf(FRAME);
     const el = await mount(store, { eventIndex: indexOf(store.log, 'ns.Outer.run()') });
 
     await press(el, 'End');
@@ -571,7 +579,7 @@ describe('VariablesDetail keyboard', () => {
   });
 
   it('opens every group at one depth with a star', async () => {
-    const store = logOf(FRAME);
+    const store = await logOf(FRAME);
     const el = await mount(store, { eventIndex: indexOf(store.log, 'ns.Outer.run()') });
 
     await press(el, '*');
@@ -585,7 +593,7 @@ describe('VariablesDetail keyboard', () => {
   });
 
   it('toggles with Enter', async () => {
-    const store = logOf(FRAME);
+    const store = await logOf(FRAME);
     const el = await mount(store, { eventIndex: indexOf(store.log, 'ns.Outer.run()') });
 
     await press(el, 'Enter');
@@ -596,7 +604,7 @@ describe('VariablesDetail keyboard', () => {
 
 describe('VariablesDetail keyboard, key repeat', () => {
   it('holds a row where a held Enter left it, rather than flapping', async () => {
-    const store = logOf(FRAME);
+    const store = await logOf(FRAME);
     const el = await mount(store, { eventIndex: indexOf(store.log, 'ns.Outer.run()') });
 
     await press(el, 'Enter');
@@ -609,7 +617,7 @@ describe('VariablesDetail keyboard, key repeat', () => {
   });
 
   it('leaves a group closed that a held star would re-open', async () => {
-    const store = logOf(FRAME);
+    const store = await logOf(FRAME);
     const el = await mount(store, { eventIndex: indexOf(store.log, 'ns.Outer.run()') });
     const local = () => treeRows(el).find((row) => row.dataset.id === 'local');
 
@@ -621,7 +629,7 @@ describe('VariablesDetail keyboard, key repeat', () => {
   });
 
   it('keeps the key consumed on a suppressed repeat', async () => {
-    const store = logOf(FRAME);
+    const store = await logOf(FRAME);
     const el = await mount(store, { eventIndex: indexOf(store.log, 'ns.Outer.run()') });
 
     const event = await press(el, 'Enter', { repeat: true });
@@ -630,7 +638,7 @@ describe('VariablesDetail keyboard, key repeat', () => {
   });
 
   it('walks on every repeat, so holding an arrow scrubs', async () => {
-    const store = logOf(FRAME);
+    const store = await logOf(FRAME);
     const el = await mount(store, { eventIndex: indexOf(store.log, 'ns.Outer.run()') });
 
     await press(el, 'ArrowDown');
@@ -649,7 +657,7 @@ describe('VariablesDetail reads the scope once per selection', () => {
     frameReads.filter((read) => read.store === store).length;
 
   it('reads once however the rows open and move, and again when the selection moves', async () => {
-    const store = logOf(
+    const store = await logOf(
       FRAME +
         '09:18:22.6 (1800)|METHOD_ENTRY|[9]|01p|ns.Second.run()\n' +
         '09:18:22.6 (1850)|VARIABLE_ASSIGNMENT|[10]|other|7\n' +
@@ -672,7 +680,7 @@ describe('VariablesDetail reads the scope once per selection', () => {
   // Scanning a value is the cost, so a key that only moves the tab stop must not
   // pay it again: a held arrow key fires ~20 times a second.
   it('builds the rows again when a row opens, not when the tab stop moves', async () => {
-    const store = logOf(FRAME);
+    const store = await logOf(FRAME);
     const el = await mount(store, { eventIndex: indexOf(store.log, 'ns.Outer.run()') });
     const before = treeBuilds;
 
@@ -688,7 +696,7 @@ describe('VariablesDetail reads the scope once per selection', () => {
 // A property is a row like any other, so the arrow keys reach it and it opens.
 describe('VariablesDetail properties', () => {
   it('opens a property that is an object in its own right', async () => {
-    const store = logOf(
+    const store = await logOf(
       '09:18:22.6 (1000)|METHOD_ENTRY|[1]|01p|ns.Outer.run()\n' +
         '09:18:22.6 (1100)|VARIABLE_ASSIGNMENT|[2]|outer|{"inner":{"a":1,"b":2},"n":3}\n' +
         '09:18:22.6 (1300)|METHOD_EXIT|[1]|ns.Outer.run()\n',
@@ -730,7 +738,7 @@ describe('VariablesDetail object fields', () => {
 
   // `{}` beside a count of one reads as empty, so the row shows what it opens on.
   it('counts and previews the fields beside a value the log wrote as {}', async () => {
-    const store = logOf(BUILT);
+    const store = await logOf(BUILT);
 
     const el = await mount(store, { eventIndex: indexOf(store.log, 'ns.Outer.run()') });
     const holder = rowNamed(el, 'holder');
@@ -747,7 +755,7 @@ describe('VariablesDetail object fields', () => {
   // The log wrote no value for the whole object and still recorded its parts. A
   // row that shows those parts must not also claim the log holds nothing.
   it('shows the recorded parts rather than "no value recorded"', async () => {
-    const store = logOf(
+    const store = await logOf(
       '09:18:22.6 (1000)|METHOD_ENTRY|[1]|01p|ns.Outer.run()\n' +
         '09:18:22.6 (1010)|VARIABLE_ASSIGNMENT|[2]|this.rows|5|0xbbb\n' +
         '09:18:22.6 (1020)|VARIABLE_SCOPE_BEGIN|[3]|big|ns.Big|true|false\n' +
@@ -766,7 +774,7 @@ describe('VariablesDetail object fields', () => {
   // A cycle leaves a row that cannot open, so a count on it would promise rows
   // the tree will not give.
   it('leaves the count off a row that cannot open', async () => {
-    const store = logOf(
+    const store = await logOf(
       '09:18:22.6 (1000)|METHOD_ENTRY|[1]|01p|ns.Loop.run()\n' +
         '09:18:22.6 (1010)|VARIABLE_ASSIGNMENT|[2]|this.me|0xddd|0xddd\n' +
         '09:18:22.6 (1020)|VARIABLE_SCOPE_BEGIN|[3]|holder|ns.Loop|true|false\n' +
@@ -807,7 +815,7 @@ describe('VariablesDetail comparing a merged row', () => {
 
   /** The comparison on screen, once its walk has answered. */
   async function compared(body = CALLS): Promise<VariablesDetail> {
-    const store = logOf(body);
+    const store = await logOf(body);
     const frames = indexesOf(store.log, 'ns.Svc.run()');
     const el = await mount(store, { eventIndex: frames[0]!, frames });
     // The comparison is a walk of its own, after the index it reads through.
@@ -819,7 +827,7 @@ describe('VariablesDetail comparing a merged row', () => {
   async function midWalk(): Promise<{ el: VariablesDetail; release: () => Promise<void> }> {
     let open = (): void => {};
     walkGate = new Promise((resolve) => (open = resolve));
-    const store = logOf(CALLS);
+    const store = await logOf(CALLS);
     const frames = indexesOf(store.log, 'ns.Svc.run()');
     const el = document.createElement('variables-detail') as VariablesDetail;
     Object.assign(el, { logStore: store, eventIndex: frames[0]!, frames });
@@ -1020,7 +1028,7 @@ describe('VariablesDetail comparing a merged row', () => {
   // caller row that ran once comes down to one frame, and reading the calls it
   // counts would show the called method's scope under the caller's name.
   it('reads its own frame where a merged row comes down to one', async () => {
-    const store = logOf(
+    const store = await logOf(
       '09:18:22.6 (1000)|METHOD_ENTRY|[1]|01p|ns.Outer.run()\n' +
         '09:18:22.6 (1010)|VARIABLE_ASSIGNMENT|[2]|outerLocal|"here"\n' +
         '09:18:22.6 (1020)|METHOD_ENTRY|[3]|01p|ns.Svc.query()\n' +
