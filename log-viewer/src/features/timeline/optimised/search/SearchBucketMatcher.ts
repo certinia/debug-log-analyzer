@@ -21,8 +21,8 @@ import {
 } from '../BucketColorResolver.js';
 import { colorToGreyscale } from '../rendering/ColorUtils.js';
 
-/** One depth's matches, ascending by start: a match's start and category share an index. */
-export interface DepthMatches {
+// One depth's matches, ascending by start: a match's start and category share an index.
+interface DepthMatches {
   readonly starts: Float64Array;
   readonly categories: readonly string[];
 }
@@ -38,35 +38,35 @@ const indexCache = new WeakMap<ReadonlyArray<MatchSpan>, MatchesByDepth>();
 /**
  * Build a spatial index of matched events grouped by tree depth.
  *
- * @param matches - Where each matched frame sits
+ * @param spans - Where each matched frame sits
  * @returns Map from depth to its matches, ascending by start
  */
-export function buildMatchIndex(matches: ReadonlyArray<MatchSpan>): MatchesByDepth {
-  const cached = indexCache.get(matches);
+export function buildMatchIndex(spans: ReadonlyArray<MatchSpan>): MatchesByDepth {
+  const cached = indexCache.get(spans);
   if (cached) {
     return cached;
   }
 
   const spansByDepth = new Map<number, MatchSpan[]>();
-  for (const match of matches) {
-    let depthMatches = spansByDepth.get(match.depth);
-    if (!depthMatches) {
-      depthMatches = [];
-      spansByDepth.set(match.depth, depthMatches);
+  for (const span of spans) {
+    let depthSpans = spansByDepth.get(span.depth);
+    if (!depthSpans) {
+      depthSpans = [];
+      spansByDepth.set(span.depth, depthSpans);
     }
-    depthMatches.push(match);
+    depthSpans.push(span);
   }
 
   const matchesByDepth: MatchesByDepth = new Map();
-  for (const [depth, spans] of spansByDepth) {
-    spans.sort((a, b) => a.timeStart - b.timeStart);
+  for (const [depth, depthSpans] of spansByDepth) {
+    depthSpans.sort((a, b) => a.timeStart - b.timeStart);
     matchesByDepth.set(depth, {
-      starts: Float64Array.from(spans, (span) => span.timeStart),
-      categories: spans.map((span) => span.category),
+      starts: Float64Array.from(depthSpans, (span) => span.timeStart),
+      categories: depthSpans.map((span) => span.category),
     });
   }
 
-  indexCache.set(matches, matchesByDepth);
+  indexCache.set(spans, matchesByDepth);
   return matchesByDepth;
 }
 
@@ -75,6 +75,7 @@ function firstAtOrAfter(starts: Float64Array, time: number): number {
   let high = starts.length;
   while (low < high) {
     const mid = (low + high) >>> 1;
+    // mid < high <= starts.length
     if (starts[mid]! < time) {
       low = mid + 1;
     } else {
@@ -110,6 +111,7 @@ export function resolveBucketSearchColor(
 
   const { starts, categories } = depthMatches;
   for (let i = firstAtOrAfter(starts, bucket.timeStart); i < starts.length; i++) {
+    // i < starts.length, and categories has the same length
     if (starts[i]! >= bucket.timeEnd) {
       break;
     }

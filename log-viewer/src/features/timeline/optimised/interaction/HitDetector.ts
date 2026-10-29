@@ -136,6 +136,7 @@ export class HitDetector {
       if (hit === null) {
         const time = (screenX + viewport.offsetX) / viewport.zoom;
         const { total } = this.columns;
+        // a row the tree returned
         hit =
           this.rectangleManager
             .queryRowsInRegion(time, time, depth, depth)
@@ -256,7 +257,7 @@ export class HitDetector {
 
     for (const row of rows) {
       const priority = categoryPriority(rectCategory(this.columns, row));
-      const duration = this.columns.total[row]!;
+      const duration = this.columns.total[row]!; // a row the tree returned
 
       // Priority wins first (lower index = higher priority)
       if (priority < bestPriority) {

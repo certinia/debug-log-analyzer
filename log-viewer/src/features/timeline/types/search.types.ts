@@ -68,7 +68,7 @@ export interface SearchMatch<E extends EventNode> {
  */
 export interface SearchCursor<E extends EventNode> {
   // State (readonly)
-  /** All search matches in traversal order */
+  /** All search matches in traversal order; the same array for the cursor's life, as renderers cache on it */
   readonly matches: ReadonlyArray<SearchMatch<E>>;
 
   /** Current position in matches array (0-indexed), -1 until a step moves to one */
@@ -86,6 +86,6 @@ export interface SearchCursor<E extends EventNode> {
   getCurrent(): SearchMatch<E> | null;
 
   // Rendering support
-  /** The matched rows, for desaturation rendering */
+  /** The matched rows, for desaturation rendering; the same set on every call */
   getMatchedRows(): RowSet;
 }
