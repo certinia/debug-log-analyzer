@@ -42,7 +42,7 @@ export class SearchTextLabelRenderer {
   /** Container for unmatched (dimmed) text labels */
   private container: Container;
 
-  /** Labels for unmatched events keyed by rectangle ID */
+  /** Labels for unmatched events keyed by row */
   private labels: Map<number, BitmapText> = new Map();
 
   /** Batch color data for contrast calculation */

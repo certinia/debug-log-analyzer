@@ -17,18 +17,13 @@ class RowBitmap implements RowSet {
   readonly size: number;
   private readonly bits: Uint8Array;
 
+  /** `matches` are unique and ascending by row, as `EventMatcher.scan` gives them. */
   constructor(matches: ReadonlyArray<{ row: number }>) {
-    let last = -1;
+    this.bits = new Uint8Array((matches.at(-1)?.row ?? -1) + 1);
     for (const { row } of matches) {
-      last = row > last ? row : last;
-    }
-    this.bits = new Uint8Array(last + 1);
-    let size = 0;
-    for (const { row } of matches) {
-      size += this.bits[row] ? 0 : 1;
       this.bits[row] = 1;
     }
-    this.size = size;
+    this.size = matches.length;
   }
 
   has(row: number): boolean {
@@ -78,11 +73,7 @@ export class SearchCursorImpl<E extends EventNode> implements SearchCursor<E> {
     return null;
   }
 
-  /**
-   * The memo holds for the life of the cursor, which needs `_matches` to be the caller's
-   * last word on the match set. `buildMatchIndex` also keys its cache on `matches`, so it
-   * must stay the same array.
-   */
+  /** Memoised: `_matches` never changes after construction. */
   getMatchedRows(): RowSet {
     return (this._matchedRows ??= new RowBitmap(this._matches));
   }

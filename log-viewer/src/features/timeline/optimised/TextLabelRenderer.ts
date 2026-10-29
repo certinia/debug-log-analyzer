@@ -38,7 +38,7 @@ export class TextLabelRenderer {
   /** Container for all text labels */
   private container: Container;
 
-  /** Labels keyed by rectangle ID (created lazily, never destroyed) */
+  /** Labels keyed by row (created lazily, never destroyed) */
   private labels: Map<number, BitmapText> = new Map();
 
   /** Whether the font has been loaded/created */

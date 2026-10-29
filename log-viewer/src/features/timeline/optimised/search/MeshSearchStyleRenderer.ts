@@ -99,8 +99,7 @@ export class MeshSearchStyleRenderer extends MeshRectangleWriter {
       }
     }
 
-    // A bucket's colour comes from the matches inside it, by time range: `eventRefs` is
-    // empty on a memory-optimised bucket.
+    // A bucket's colour comes from the matches inside it, by time range.
     const matchIndex = buildMatchIndex(matchedSpans);
     rectIndex = this.writeBuckets(
       buckets,

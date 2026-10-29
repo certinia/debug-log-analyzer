@@ -24,14 +24,11 @@ import {
   type TimelineMarker,
   type ViewportState,
 } from '../../types/flamechart.types.js';
+import { categoryPriority } from '../BucketColorResolver.js';
 import type { PrecomputedRect, RectangleCache } from '../RectangleCache.js';
 
 /** Narrower than this many pixels, a frame is left to its bucket. */
 const MIN_HIT_WIDTH = 0.05;
-
-const PRIORITY = new Map<string, number>(
-  BUCKET_CONSTANTS.CATEGORY_PRIORITY.map((category, rank) => [category, rank]),
-);
 
 /**
  * Interface for marker renderers that support hit testing.
@@ -133,7 +130,7 @@ export class HitDetector {
 
     if (isValidDepth) {
       // Priority 1: Check visible rectangles from last render (in sync with display)
-      hit = this.findVisibleRectAtPosition(screenX, depth, viewport)?.row ?? null;
+      hit = this.findVisibleRowAtPosition(screenX, depth, viewport);
 
       // Priority 2: If no visible rect, check the segment tree (for wider search)
       if (hit === null) {
@@ -174,13 +171,13 @@ export class HitDetector {
    * Find visible rectangle at screen position from last render pass.
    * This ensures hit detection is in sync with what's actually displayed.
    *
-   * @returns The rect if found, null otherwise
+   * @returns The rect's row if found, null otherwise
    */
-  private findVisibleRectAtPosition(
+  private findVisibleRowAtPosition(
     screenX: number,
     depth: number,
     viewport: ViewportState,
-  ): PrecomputedRect | null {
+  ): number | null {
     for (const categoryRects of this.visibleRects.values()) {
       for (const rect of categoryRects) {
         // Check depth match
@@ -194,7 +191,7 @@ export class HitDetector {
 
         // Check if mouse X is within rect bounds
         if (screenX >= rectScreenX && screenX <= rectScreenEnd) {
-          return rect;
+          return rect.row;
         }
       }
     }
@@ -258,7 +255,7 @@ export class HitDetector {
     let bestDuration = -1;
 
     for (const row of rows) {
-      const priority = PRIORITY.get(rectCategory(this.columns, row)) ?? Infinity;
+      const priority = categoryPriority(rectCategory(this.columns, row));
       const duration = this.columns.total[row]!;
 
       // Priority wins first (lower index = higher priority)

@@ -7,7 +7,7 @@ import { type FrameSpec, rectsOf, timelineEvent } from '#test-helpers/timeline.j
 import { makeViewport } from '#test-helpers/viewport.js';
 import type { EventNode } from '../../../types/flamechart.types.js';
 import { RectangleCache } from '../../RectangleCache.js';
-import { HitDetector } from '../HitDetector.js';
+import { HitDetector, type HitTestConfig } from '../HitDetector.js';
 
 // [0-100], [200-300], [400-500]
 const flat = () => [timelineEvent(0, 100), timelineEvent(200, 100), timelineEvent(400, 100)];
@@ -18,41 +18,12 @@ const deep = () => [
   timelineEvent(0, 100, 'Apex', [timelineEvent(50, 30, 'Apex', [timelineEvent(60, 10)])]),
 ];
 
-/** The start of the frame under `screenX` at `depth`, with nothing drawn yet to hit first. */
-function hitAt(
-  frames: FrameSpec[],
-  screenX: number,
-  depth: number,
-  viewport = makeViewport(),
-): number | null {
-  const rects = rectsOf(frames);
-  const detector = new HitDetector({
-    nodeOf: (row): EventNode => {
-      const rect = rects.rectOf(row)!; // a hit is always a rect the cache holds
-      return {
-        id: String(row),
-        timestamp: rect.timeStart,
-        duration: rect.duration,
-        type: '',
-        text: '',
-      };
-    },
-    columns: rects,
-    visibleRects: new Map(),
-    buckets: new Map(),
-    rectangleManager: new RectangleCache(rects),
-  });
-  const maxDepth = Math.max(0, rects.rectRowsByDepth.length - 1);
-  return detector.hitTest(screenX, 300, depth, viewport, maxDepth).eventNode?.timestamp ?? null;
-}
-
-/** The start of the frame a hover picks from the buckets a real cull drew at depth 0. */
-function bucketHitAt(frames: FrameSpec[], screenX: number): number | null {
-  const rects = rectsOf(frames);
-  const cache = new RectangleCache(rects);
-  const viewport = makeViewport();
-  const { buckets } = cache.getCulledRectangles(viewport, new Map());
-  const detector = new HitDetector({
+function detectorFor(
+  rects: ReturnType<typeof rectsOf>,
+  cache: RectangleCache,
+  buckets: HitTestConfig['buckets'],
+): HitDetector {
+  return new HitDetector({
     nodeOf: (row): EventNode => ({
       id: String(row),
       timestamp: rects.start[row]!,
@@ -65,6 +36,28 @@ function bucketHitAt(frames: FrameSpec[], screenX: number): number | null {
     buckets,
     rectangleManager: cache,
   });
+}
+
+/** The start of the frame under `screenX` at `depth`, with nothing drawn yet to hit first. */
+function hitAt(
+  frames: FrameSpec[],
+  screenX: number,
+  depth: number,
+  viewport = makeViewport(),
+): number | null {
+  const rects = rectsOf(frames);
+  const detector = detectorFor(rects, new RectangleCache(rects), new Map());
+  const maxDepth = Math.max(0, rects.rectRowsByDepth.length - 1);
+  return detector.hitTest(screenX, 300, depth, viewport, maxDepth).eventNode?.timestamp ?? null;
+}
+
+/** The start of the frame a hover picks from the buckets a real cull drew at depth 0. */
+function bucketHitAt(frames: FrameSpec[], screenX: number): number | null {
+  const rects = rectsOf(frames);
+  const cache = new RectangleCache(rects);
+  const viewport = makeViewport();
+  const { buckets } = cache.getCulledRectangles(viewport, new Map());
+  const detector = detectorFor(rects, cache, buckets);
   return detector.hitTest(screenX, 300, 0, viewport, 0).eventNode?.timestamp ?? null;
 }
 

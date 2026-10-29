@@ -201,7 +201,6 @@ export class TemporalSegmentTree {
           byCategory: categoryStats,
           dominantCategory,
         },
-        // Rects are expensive to collect - leave empty for multi-event buckets
         color: baseColor,
       });
       bucketCount++;
@@ -226,7 +225,7 @@ export class TemporalSegmentTree {
 
   /**
    * Query the rows with a rect within a specific time and depth region.
-   * Used for hit testing when bucket rects are empty.
+   * Used for hit testing.
    * O(log n + k) complexity where k = rows in region.
    *
    * @param timeStart - Start time in nanoseconds

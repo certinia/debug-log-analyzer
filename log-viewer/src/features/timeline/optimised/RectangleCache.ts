@@ -97,7 +97,7 @@ export class RectangleCache {
   /**
    * Query the rows with a rect within a specific time and depth region.
    * Delegates to TemporalSegmentTree for O(log n + k) performance.
-   * Used for hit testing when bucket rects are empty.
+   * Used for hit testing.
    *
    * @param timeStart - Start time in nanoseconds
    * @param timeEnd - End time in nanoseconds
