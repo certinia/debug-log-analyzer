@@ -54,7 +54,7 @@ function ordered({ start, rectRowsByDepth }: RectColumns): Int32Array {
   return runs[0] ?? new Int32Array(0);
 }
 
-// On a tie the row from `shallow` goes first.
+// On a tie the row from `shallow` goes first. Same-depth ties (malformed logs only) keep log order.
 function merge(shallow: Int32Array, deep: Int32Array, start: Float64Array): Int32Array {
   const out = new Int32Array(shallow.length + deep.length);
   let s = 0;
