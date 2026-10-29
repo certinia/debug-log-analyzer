@@ -46,7 +46,6 @@ describe('buildTimelineFrames', () => {
     const frames = buildTimelineFrames(index, new Set(['Apex', 'SOQL']), 0);
 
     expect(frames.rectOf(soql)).toMatchObject({
-      id: String(soql),
       row: soql,
       timeStart: 1300,
       timeEnd: 1400,

@@ -39,7 +39,7 @@ export class TextLabelRenderer {
   private container: Container;
 
   /** Labels keyed by rectangle ID (created lazily, never destroyed) */
-  private labels: Map<string, BitmapText> = new Map();
+  private labels: Map<number, BitmapText> = new Map();
 
   /** Whether the font has been loaded/created */
   private fontReady = false;
@@ -165,7 +165,7 @@ export class TextLabelRenderer {
         }
 
         // Lazy create: get existing or create new label
-        let label = this.labels.get(rect.id);
+        let label = this.labels.get(rect.row);
         if (!label) {
           label = new BitmapText({
             text: '',
@@ -177,7 +177,7 @@ export class TextLabelRenderer {
           // Compensate for worldContainer Y-axis inversion
           label.scale.y = -1;
           this.container.addChild(label);
-          this.labels.set(rect.id, label);
+          this.labels.set(rect.row, label);
         }
 
         // Update label

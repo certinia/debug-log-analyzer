@@ -33,9 +33,6 @@ import { TemporalSegmentTree } from './TemporalSegmentTree.js';
  * Stored once at construction to avoid recalculating every frame.
  */
 export interface PrecomputedRect extends RenderRectangle {
-  /** Unique ID for this rectangle */
-  id: string;
-
   /** Timestamp in nanoseconds (fixed) */
   timeStart: number;
 

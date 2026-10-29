@@ -30,7 +30,6 @@ const batches = new Map<string, RenderBatch>([
 
 function rect(x: number, category: Category, width = 100): PrecomputedRect {
   return {
-    id: `${category}-${x}`,
     timeStart: x,
     timeEnd: x + width,
     depth: 0,

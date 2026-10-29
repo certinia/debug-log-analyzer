@@ -43,7 +43,7 @@ export class SearchTextLabelRenderer {
   private container: Container;
 
   /** Labels for unmatched events keyed by rectangle ID */
-  private labels: Map<string, BitmapText> = new Map();
+  private labels: Map<number, BitmapText> = new Map();
 
   /** Batch color data for contrast calculation */
   private batches: Map<string, RenderBatch>;
@@ -189,7 +189,7 @@ export class SearchTextLabelRenderer {
         }
 
         // Lazy create or reuse label
-        let label = this.labels.get(rect.id);
+        let label = this.labels.get(rect.row);
         if (!label) {
           label = new BitmapText({
             text: '',
@@ -200,7 +200,7 @@ export class SearchTextLabelRenderer {
           });
           label.scale.y = -1; // Compensate for worldContainer Y-axis inversion
           this.container.addChild(label);
-          this.labels.set(rect.id, label);
+          this.labels.set(rect.row, label);
         }
 
         // Update label

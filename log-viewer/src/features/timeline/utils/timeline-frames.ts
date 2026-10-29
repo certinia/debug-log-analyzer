@@ -117,7 +117,6 @@ export function buildTimelineFrames(
       }
       const d = depth[row]!;
       return {
-        id: String(row),
         row,
         timeStart: start[row]!,
         timeEnd: start[row]! + total[row]!,

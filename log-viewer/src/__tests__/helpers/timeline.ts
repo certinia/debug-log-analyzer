@@ -98,7 +98,6 @@ export function rectsOf(roots: FrameSpec[]): RectColumns {
         continue;
       }
       const rect: PrecomputedRect = {
-        id: String(at),
         row: at,
         timeStart: frame.timestamp,
         timeEnd: frame.timestamp + frame.duration,

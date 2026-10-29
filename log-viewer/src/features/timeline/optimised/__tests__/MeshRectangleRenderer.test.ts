@@ -63,7 +63,6 @@ function setup(renderBatches = batches('Apex', 'SOQL')) {
 /** A rect placed by hand, as the cache would hand it over after culling. */
 function rect(x: number, width: number, depth = 0): PrecomputedRect {
   return {
-    id: `${x}-${depth}`,
     timeStart: x,
     timeEnd: x + width,
     depth,
