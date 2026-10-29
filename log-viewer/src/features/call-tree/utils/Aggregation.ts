@@ -714,8 +714,8 @@ function* bottomUpSteps(build: BuildContext): Generator<void, BottomUpRow[], voi
     let parentBucket = bucket;
     for (let i = top - 1; i >= 0; i--) {
       const ancestorId = chainIds[i]!;
-      const existingChildren = parentBucket._children ?? [];
-      let childBucket = existingChildren.find((c) => c._keyId === ancestorId);
+      const existingChildren = parentBucket._children;
+      let childBucket = existingChildren?.find((c) => c._keyId === ancestorId);
       if (!childBucket) {
         const pathId = paths.step(parentBucket._pathId, ancestorId);
         childBucket = createEmptyBottomUpRow(
@@ -725,8 +725,12 @@ function* bottomUpSteps(build: BuildContext): Generator<void, BottomUpRow[], voi
           pathId,
           open[i]!.row,
         );
-        existingChildren.push(childBucket);
-        parentBucket._children = existingChildren;
+        // Most buckets have one caller: a literal holds one slot, where a push onto `[]` reserves 17.
+        if (existingChildren) {
+          existingChildren.push(childBucket);
+        } else {
+          parentBucket._children = [childBucket];
+        }
       }
       accumulate(childBucket);
       parentBucket = childBucket;
