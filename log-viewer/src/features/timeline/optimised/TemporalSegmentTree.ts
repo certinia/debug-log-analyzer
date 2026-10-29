@@ -33,6 +33,7 @@ import type {
 } from '../types/flamechart.types.js';
 import {
   BUCKET_CONSTANTS,
+  rectCategory,
   SEGMENT_TREE_CONSTANTS,
   TIMELINE_CONSTANTS,
 } from '../types/flamechart.types.js';
@@ -76,6 +77,11 @@ interface DepthTree {
   branches: BranchLevel[];
 }
 
+// Id 0 is no category, which no rect has, so slot = id - 1.
+function categorySlots(columns: RectColumns): number {
+  return columns.categoryNames.length - 1;
+}
+
 function levelWidth(tree: DepthTree, level: number): number {
   return level === 0 ? tree.rows.length : tree.branches[level - 1]!.timeStart.length;
 }
@@ -88,7 +94,7 @@ export class TemporalSegmentTree {
   /** Maximum depth in the tree */
   private maxDepth = 0;
 
-  /** @param columns - The frames with a rect, by row */
+  /** @param columns - The frames, by row; only the rows with a rect are indexed */
   constructor(columns: RectColumns) {
     this.columns = columns;
     columns.rectRowsByDepth.forEach((rows, depth) => {
@@ -283,7 +289,7 @@ export class TemporalSegmentTree {
 
   private buildTree(depth: number, rows: Int32Array): DepthTree {
     const { start, total, categoryId } = this.columns;
-    const slots = this.columns.categoryNames.length;
+    const slots = categorySlots(this.columns);
     const branches: BranchLevel[] = [];
     let width = rows.length;
     while (width > 1) {
@@ -323,7 +329,7 @@ export class TemporalSegmentTree {
             if (end > timeEnd) {
               timeEnd = end;
             }
-            const offset = at + categoryId[row]!;
+            const offset = at + categoryId[row]! - 1;
             level.slotDuration[offset]! += Math.max(MIN_NODE_SPAN, total[row]!);
             level.slotCount[offset]!++;
           }
@@ -357,7 +363,8 @@ export class TemporalSegmentTree {
     bucketMap: Map<number, AggregationBucket>,
     stats: { visibleCount: number; bucketedEventCount: number },
   ): void {
-    const { start, total, categoryId, categoryNames } = this.columns;
+    const { start, total, categoryNames } = this.columns;
+    const slots = categorySlots(this.columns);
     const stack: number[] = [tree.branches.length, 0];
 
     let bucketedEventCount = 0;
@@ -378,7 +385,7 @@ export class TemporalSegmentTree {
         if (span <= bucketTimeWidth) {
           const bucket = this.bucketAt(tree.depth, rowStart, bucketTimeWidth, bucketMap);
           bucket.eventCount++;
-          addStats(bucket.categoryStats, categoryNames[categoryId[row]!]!, 1, span);
+          addStats(bucket.categoryStats, rectCategory(this.columns, row), 1, span);
           bucketedEventCount++;
         } else {
           this.addVisibleRect(this.columns.rectOf(row)!, viewport, visibleRects);
@@ -396,7 +403,6 @@ export class TemporalSegmentTree {
 
       if (Math.max(MIN_NODE_SPAN, timeEnd - timeStart) <= bucketTimeWidth) {
         const bucket = this.bucketAt(tree.depth, timeStart, bucketTimeWidth, bucketMap);
-        const slots = categoryNames.length;
         const at = index * slots;
         for (let slot = 0; slot < slots; slot++) {
           const count = branch.slotCount[at + slot]!;
@@ -405,7 +411,7 @@ export class TemporalSegmentTree {
             bucketedEventCount += count;
             addStats(
               bucket.categoryStats,
-              categoryNames[slot]!,
+              categoryNames[slot + 1]!,
               count,
               branch.slotDuration[at + slot]!,
             );

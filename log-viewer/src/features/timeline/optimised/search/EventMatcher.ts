@@ -16,7 +16,7 @@
  */
 
 import { CHECK_EVERY, frameBudget, type Tick } from '#core/utility/FrameBudget.js';
-import type { EventNode, TimelineFrames } from '../../types/flamechart.types.js';
+import { type EventNode, rectCategory, type TimelineFrames } from '../../types/flamechart.types.js';
 import type { FramePredicate, SearchCursor, SearchMatch } from '../../types/search.types.js';
 import { SearchCursorImpl } from './SearchCursor.js';
 
@@ -130,7 +130,7 @@ class RowMatch<E extends EventNode> implements SearchMatch<E> {
   }
 
   get category(): string {
-    return this.frames.categoryNames[this.frames.categoryId[this.row]!]!;
+    return rectCategory(this.frames, this.row);
   }
 
   get depth(): number {

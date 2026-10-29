@@ -65,14 +65,14 @@ export interface PrecomputedRect extends RenderRectangle {
 }
 
 /**
- * Holds the frames with a rect and answers viewport and region queries through a
+ * Indexes the rows with a rect and answers viewport and region queries through a
  * TemporalSegmentTree. Nothing reaches past it to the tree.
  */
 export class RectangleCache {
   /** Segment tree for O(log n) viewport culling */
   private segmentTree: TemporalSegmentTree;
 
-  /** @param columns - The frames with a rect, by row */
+  /** @param columns - The frames, by row; only the rows with a rect are indexed */
   constructor(columns: RectColumns) {
     this.segmentTree = new TemporalSegmentTree(columns);
   }

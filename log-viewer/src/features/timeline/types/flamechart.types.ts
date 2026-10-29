@@ -175,17 +175,28 @@ export interface TimelineFrames<E extends EventNode> extends RectColumns {
   hasRect(row: number): boolean;
 }
 
-/** The frames that have a rect, as columns by row: what the segment tree indexes. */
+/**
+ * Every row's place and category, as columns by row. Only `rectRowsByDepth` and
+ * `rectOf` are limited to the rows with a rect: what the segment tree indexes.
+ */
 export interface RectColumns {
+  /** Start, in ns. */
   readonly start: Float64Array;
+  /** Duration including children, in ns. */
   readonly total: Float64Array;
   readonly depth: Uint16Array;
   /** An index into {@link categoryNames}. */
   readonly categoryId: Uint8Array;
+  /** Index 0 is no category, which no rect has. */
   readonly categoryNames: readonly string[];
   /** The rows with a rect at each depth, ascending by start. */
   readonly rectRowsByDepth: readonly Int32Array[];
   rectOf(row: number): PrecomputedRect | undefined;
+}
+
+/** `row`'s category name. */
+export function rectCategory(columns: RectColumns, row: number): string {
+  return columns.categoryNames[columns.categoryId[row]!]!;
 }
 
 /** How far the frames reach: in time, and in depth. */
