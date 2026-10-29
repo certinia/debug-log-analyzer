@@ -14,6 +14,7 @@ import { type CostLimits, costLimitsOf, setGovernorCost } from './GovernorCost.j
 import {
   addReported,
   emptyReported,
+  REPORTED_METRICS,
   type ReportedCounts,
   type ReportedUsage,
   type TimeSpan,
@@ -380,13 +381,51 @@ function finaliseAggregatedRow(row: AggregatedRow, costLimits: CostLimits): void
   setGovernorCost(row, costLimits);
 }
 
+// Most merged rows hold zero for most metrics, so a new row shares these until its first nonzero
+// write. Frozen, so a write that skips `added` or `addOwnReported` throws.
+const ZERO_TALLY: Tally = Object.freeze({ self: 0, total: 0 });
+const NO_REPORTED: ReportedCounts = Object.freeze(emptyReported());
+// Typed mutable to fit `eventIds`; a deep Bottom-Up bucket never pushes to it.
+const NO_EVENT_IDS = Object.freeze([]) as unknown as number[];
+
+/** `tally` with `self` and `total` added: a tally of its own once a value is nonzero. */
+function added(tally: Tally, self: number, total: number): Tally {
+  if (!self && !total) {
+    return tally;
+  }
+  if (tally === ZERO_TALLY) {
+    tally = { self: 0, total: 0 };
+  }
+  tally.self += self;
+  tally.total += total;
+  return tally;
+}
+
+function anyReported(counts: ReportedCounts): boolean {
+  for (const metric of REPORTED_METRICS) {
+    if (counts[metric] !== 0) {
+      return true;
+    }
+  }
+  return false;
+}
+
+function addOwnReported(row: { reported: ReportedCounts }, from: ReportedCounts): void {
+  if (row.reported === NO_REPORTED) {
+    if (!anyReported(from)) {
+      return;
+    }
+    row.reported = emptyReported();
+  }
+  addReported(row.reported, from);
+}
+
 function addTally(
-  into: Tally,
+  tally: Tally,
   from: SelfTotalColumns<Int32Array | Float64Array>,
-  row: number,
-): void {
-  into.self += from.self[row]!;
-  into.total += from.total[row]!;
+  callRow: number,
+): Tally {
+  return added(tally, from.self[callRow]!, from.total[callRow]!);
 }
 
 /** Adds the call on index row `callRow` to an aggregated row, leaving `totalTime` alone
@@ -409,20 +448,20 @@ function addCallToAggregatedRow(
     row.totalTime += m.duration.total[callRow]!;
   }
 
-  addTally(row.dmlCount, m.dmlCount, callRow);
-  addTally(row.soqlCount, m.soqlCount, callRow);
-  addTally(row.soslCount, m.soslCount, callRow);
-  addTally(row.dmlRowCount, m.dmlRowCount, callRow);
-  addTally(row.soqlRowCount, m.soqlRowCount, callRow);
-  addTally(row.soslRowCount, m.soslRowCount, callRow);
-  addTally(row.thrownCount, m.thrownCount, callRow);
-  addTally(row.heapAllocated, m.heapAllocated, callRow);
-  addTally(row.heapGross, m.heapGross, callRow);
+  row.dmlCount = addTally(row.dmlCount, m.dmlCount, callRow);
+  row.soqlCount = addTally(row.soqlCount, m.soqlCount, callRow);
+  row.soslCount = addTally(row.soslCount, m.soslCount, callRow);
+  row.dmlRowCount = addTally(row.dmlRowCount, m.dmlRowCount, callRow);
+  row.soqlRowCount = addTally(row.soqlRowCount, m.soqlRowCount, callRow);
+  row.soslRowCount = addTally(row.soslRowCount, m.soslRowCount, callRow);
+  row.thrownCount = addTally(row.thrownCount, m.thrownCount, callRow);
+  row.heapAllocated = addTally(row.heapAllocated, m.heapAllocated, callRow);
+  row.heapGross = addTally(row.heapGross, m.heapGross, callRow);
   // Peak live heap aggregates by max (the worst single call), not sum.
   row.heapPeak = Math.max(row.heapPeak, m.heapPeak[callRow]!);
   const span = reported?.span(spanOf(ctx.index, callRow));
   if (span) {
-    addReported(row.reported, span);
+    addOwnReported(row, span);
   }
   row.eventIds.push(ctx.index.eventId[callRow]!);
 }
@@ -605,7 +644,17 @@ function* bottomUpSteps(build: BuildContext): Generator<void, BottomUpRow[], voi
     const thrownTotal = ctx.thrownTotal;
     const heapTotal = ctx.heapTotal;
     const heapGrossTotal = ctx.heapGrossTotal;
-    const frameReported = ctx.reported;
+    // Checked once here, not per bucket on the chain.
+    const frameReported = ctx.reported && anyReported(ctx.reported) ? ctx.reported : null;
+    const hasDml = dmlSelf || dmlTotal;
+    const hasSoql = soqlSelf || soqlTotal;
+    const hasSosl = soslSelf || soslTotal;
+    const hasDmlRows = dmlRowSelf || dmlRowTotal;
+    const hasSoqlRows = soqlRowSelf || soqlRowTotal;
+    const hasSoslRows = soslRowSelf || soslRowTotal;
+    const hasThrown = thrownSelf || thrownTotal;
+    const hasHeap = heapSelf || heapTotal;
+    const hasHeapGross = heapGrossSelf || heapGrossTotal;
 
     // Closure captures the hoisted locals; zero-delta guards skip no-op writes
     // for logs without heavy DB work.
@@ -613,65 +662,38 @@ function* bottomUpSteps(build: BuildContext): Generator<void, BottomUpRow[], voi
       b.callCount++;
       b.totalSelfTime += selfTime;
       b.totalTime += totalTime;
-      if (dmlSelf) {
-        b.dmlCount.self += dmlSelf;
+      if (hasDml) {
+        b.dmlCount = added(b.dmlCount, dmlSelf, dmlTotal);
       }
-      if (dmlTotal) {
-        b.dmlCount.total += dmlTotal;
+      if (hasSoql) {
+        b.soqlCount = added(b.soqlCount, soqlSelf, soqlTotal);
       }
-      if (soqlSelf) {
-        b.soqlCount.self += soqlSelf;
+      if (hasSosl) {
+        b.soslCount = added(b.soslCount, soslSelf, soslTotal);
       }
-      if (soqlTotal) {
-        b.soqlCount.total += soqlTotal;
+      if (hasDmlRows) {
+        b.dmlRowCount = added(b.dmlRowCount, dmlRowSelf, dmlRowTotal);
       }
-      if (soslSelf) {
-        b.soslCount.self += soslSelf;
+      if (hasSoqlRows) {
+        b.soqlRowCount = added(b.soqlRowCount, soqlRowSelf, soqlRowTotal);
       }
-      if (soslTotal) {
-        b.soslCount.total += soslTotal;
+      if (hasSoslRows) {
+        b.soslRowCount = added(b.soslRowCount, soslRowSelf, soslRowTotal);
       }
-      if (dmlRowSelf) {
-        b.dmlRowCount.self += dmlRowSelf;
+      if (hasThrown) {
+        b.thrownCount = added(b.thrownCount, thrownSelf, thrownTotal);
       }
-      if (dmlRowTotal) {
-        b.dmlRowCount.total += dmlRowTotal;
+      if (hasHeap) {
+        b.heapAllocated = added(b.heapAllocated, heapSelf, heapTotal);
       }
-      if (soqlRowSelf) {
-        b.soqlRowCount.self += soqlRowSelf;
-      }
-      if (soqlRowTotal) {
-        b.soqlRowCount.total += soqlRowTotal;
-      }
-      if (soslRowSelf) {
-        b.soslRowCount.self += soslRowSelf;
-      }
-      if (soslRowTotal) {
-        b.soslRowCount.total += soslRowTotal;
-      }
-      if (thrownSelf) {
-        b.thrownCount.self += thrownSelf;
-      }
-      if (thrownTotal) {
-        b.thrownCount.total += thrownTotal;
-      }
-      if (heapSelf) {
-        b.heapAllocated.self += heapSelf;
-      }
-      if (heapTotal) {
-        b.heapAllocated.total += heapTotal;
-      }
-      if (heapGrossSelf) {
-        b.heapGross.self += heapGrossSelf;
-      }
-      if (heapGrossTotal) {
-        b.heapGross.total += heapGrossTotal;
+      if (hasHeapGross) {
+        b.heapGross = added(b.heapGross, heapGrossSelf, heapGrossTotal);
       }
       if (heapPeak > b.heapPeak) {
         b.heapPeak = heapPeak;
       }
       if (frameReported) {
-        addReported(b.reported, frameReported);
+        addOwnReported(b, frameReported);
       }
     };
 
@@ -681,6 +703,7 @@ function* bottomUpSteps(build: BuildContext): Generator<void, BottomUpRow[], voi
     if (!bucket) {
       const pathId = paths.step(ROOT_PATH_ID, rootId);
       bucket = createEmptyBottomUpRow(build, paths.keyText(rootId), rootId, pathId, row);
+      bucket.eventIds = [];
       rootBuckets.set(rootId, bucket);
     }
     accumulate(bucket);
@@ -839,19 +862,19 @@ function createEmptyAggregatedRow(
     totalSelfTime: 0,
     totalTime: 0,
     avgSelfTime: 0,
-    dmlCount: { self: 0, total: 0 },
-    soqlCount: { self: 0, total: 0 },
-    soslCount: { self: 0, total: 0 },
-    dmlRowCount: { self: 0, total: 0 },
-    soqlRowCount: { self: 0, total: 0 },
-    soslRowCount: { self: 0, total: 0 },
-    thrownCount: { self: 0, total: 0 },
-    heapAllocated: { self: 0, total: 0 },
-    heapGross: { self: 0, total: 0 },
+    dmlCount: ZERO_TALLY,
+    soqlCount: ZERO_TALLY,
+    soslCount: ZERO_TALLY,
+    dmlRowCount: ZERO_TALLY,
+    soqlRowCount: ZERO_TALLY,
+    soslRowCount: ZERO_TALLY,
+    thrownCount: ZERO_TALLY,
+    heapAllocated: ZERO_TALLY,
+    heapGross: ZERO_TALLY,
     heapPeak: 0,
     governorCost: 0,
     governorCostMax: 0,
-    reported: emptyReported(),
+    reported: NO_REPORTED,
     _children: null,
     eventIds: [],
   };
@@ -881,21 +904,21 @@ function createEmptyBottomUpRow(
     totalSelfTime: 0,
     totalTime: 0,
     avgSelfTime: 0,
-    dmlCount: { self: 0, total: 0 },
-    soqlCount: { self: 0, total: 0 },
-    soslCount: { self: 0, total: 0 },
-    dmlRowCount: { self: 0, total: 0 },
-    soqlRowCount: { self: 0, total: 0 },
-    soslRowCount: { self: 0, total: 0 },
-    thrownCount: { self: 0, total: 0 },
-    heapAllocated: { self: 0, total: 0 },
-    heapGross: { self: 0, total: 0 },
+    dmlCount: ZERO_TALLY,
+    soqlCount: ZERO_TALLY,
+    soslCount: ZERO_TALLY,
+    dmlRowCount: ZERO_TALLY,
+    soqlRowCount: ZERO_TALLY,
+    soslRowCount: ZERO_TALLY,
+    thrownCount: ZERO_TALLY,
+    heapAllocated: ZERO_TALLY,
+    heapGross: ZERO_TALLY,
     heapPeak: 0,
     governorCost: 0,
     governorCostMax: 0,
-    reported: emptyReported(),
+    reported: NO_REPORTED,
     _children: null,
-    eventIds: [],
+    eventIds: NO_EVENT_IDS,
   };
 }
 

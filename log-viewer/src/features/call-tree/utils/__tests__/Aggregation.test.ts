@@ -794,6 +794,32 @@ describe('toAggregatedCallTree', () => {
   });
 });
 
+// A tally object per row and metric is most of what a large merged tree holds.
+describe('row tallies', () => {
+  it.each([
+    ['Aggregated', aggregatedOf],
+    ['Bottom-Up', bottomUpOf],
+  ])('%s: rows with no DML share one tally object', async (_, build) => {
+    const rows = await build(m('A', 10), m('B', 10));
+
+    const a = findRowByText(rows, 'A');
+    const b = findRowByText(rows, 'B');
+    expect(a.dmlRowCount).toBe(b.dmlRowCount);
+    expect(a.dmlRowCount).toEqual({ self: 0, total: 0 });
+  });
+
+  // A write into the shared zero would show one row's DML on every row.
+  it.each([
+    ['Aggregated', aggregatedOf],
+    ['Bottom-Up', bottomUpOf],
+  ])('%s: a row with DML gets its own tally with the sum', async (_, build) => {
+    const rows = await build(m('A', 10, dml(2)), m('A', 10, dml(1)), m('B', 10));
+
+    expect(findRowByText(rows, 'A').dmlRowCount).toEqual({ self: 0, total: 3 });
+    expect(findRowByText(rows, 'B').dmlRowCount).toEqual({ self: 0, total: 0 });
+  });
+});
+
 describe('SOSL rollup', () => {
   it('aggregated: sums SOSL count and rows across instances', async () => {
     // Two calls to the same signature; their SOSL metrics are summed on the row.
@@ -899,5 +925,24 @@ describe('reported usage', () => {
     // A called B twice: once with one query, once with two.
     const underA = findRowByText(findDeep(aggregated, 'ns.A.run()')._children ?? [], 'ns.B.run()');
     expect(underA.reported.soqlQueries).toBe(3);
+  });
+
+  // Rows with no usage share one empty record, so a write into it would show on all of them.
+  it('leaves a method that reported nothing at zero beside one that did', async () => {
+    const { bottomUp, aggregated } = await built(
+      entry(1000, 'ns.A.run()') +
+        query(1100) +
+        exit(1300, 'ns.A.run()') +
+        entry(2000, 'ns.D.run()') +
+        exit(2100, 'ns.D.run()') +
+        entry(3000, 'ns.A.run()') +
+        query(3100) +
+        exit(3300, 'ns.A.run()'),
+    );
+
+    expect(findRowByText(bottomUp, 'ns.A.run()').reported.soqlQueries).toBe(2);
+    expect(findRowByText(bottomUp, 'ns.D.run()').reported.soqlQueries ?? 0).toBe(0);
+    expect(findDeep(aggregated, 'ns.A.run()').reported.soqlQueries).toBe(2);
+    expect(findDeep(aggregated, 'ns.D.run()').reported.soqlQueries ?? 0).toBe(0);
   });
 });
