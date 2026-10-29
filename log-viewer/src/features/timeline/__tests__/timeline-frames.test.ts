@@ -39,14 +39,13 @@ describe('buildTimelineFrames', () => {
   });
 
   // Under the execution and code unit, Outer is depth 2, Inner 3, so its SOQL is 4.
-  it("makes a frame's rect from its row, and none for a category it does not draw", async () => {
+  it("makes a frame's rect from its row", async () => {
     const { log } = await framesOf(NESTED);
     const index = buildLogIndex(log);
     const soql = index.rowOf(idOf(log, 'SELECT Id FROM Account'));
-    const all = buildTimelineFrames(index, new Set(['Apex', 'SOQL']), 0);
-    const apexOnly = buildTimelineFrames(index, new Set(['Apex']), 0);
+    const frames = buildTimelineFrames(index, new Set(['Apex', 'SOQL']), 0);
 
-    expect(all.rectOf(soql)).toMatchObject({
+    expect(frames.rectOf(soql)).toMatchObject({
       id: String(soql),
       row: soql,
       timeStart: 1300,
@@ -55,10 +54,40 @@ describe('buildTimelineFrames', () => {
       depth: 4,
       category: 'SOQL',
     });
-    expect(all.hasRect(soql)).toBe(true);
-    expect(apexOnly.rectOf(soql)).toBeUndefined();
-    expect(apexOnly.hasRect(soql)).toBe(false);
-    expect(apexOnly.isVisible(soql)).toBe(true);
+    expect(frames.hasRect(soql)).toBe(true);
+  });
+
+  // Search and navigation still reach it; only the chart skips it.
+  it('still shows a frame whose category it does not draw, but gives it no rect', async () => {
+    const { log } = await framesOf(NESTED);
+    const index = buildLogIndex(log);
+    const soql = index.rowOf(idOf(log, 'SELECT Id FROM Account'));
+    const frames = buildTimelineFrames(index, new Set(['Apex']), 0);
+    const listed = frames.rectRowsByDepth.flatMap((rows) =>
+      [...rows].map((row) => frames.text(row)),
+    );
+
+    expect(frames.isVisible(soql)).toBe(true);
+    expect(frames.hasRect(soql)).toBe(false);
+    expect(frames.rectOf(soql)).toBeUndefined();
+    expect(listed).toContain('ns.Inner.first()');
+    expect(listed).not.toContain('SELECT Id FROM Account');
+  });
+
+  it('gives no rect to a frame under a parent with no duration', async () => {
+    const { log, index, frames } = await framesOf(
+      '09:18:22.6 (1000)|METHOD_ENTRY|[1]|01p|ns.Instant.run()\n' +
+        '09:18:22.6 (1000)|SOQL_EXECUTE_BEGIN|[2]|Aggregations:0|SELECT Id FROM Contact\n' +
+        '09:18:22.6 (1100)|SOQL_EXECUTE_END|[2]|Rows:1\n' +
+        '09:18:22.6 (1000)|METHOD_EXIT|[1]|ns.Instant.run()\n',
+    );
+    const soql = index.rowOf(idOf(log, 'SELECT Id FROM Contact'));
+
+    expect(index.total[soql]).toBe(100);
+    expect(frames.isVisible(soql)).toBe(false);
+    expect(frames.hasRect(soql)).toBe(false);
+    expect(frames.rectOf(soql)).toBeUndefined();
+    expect(frames.rectRowsByDepth.some((rows) => rows.includes(soql))).toBe(false);
   });
 
   it('lists the shown rows at each depth in start order', async () => {
@@ -83,17 +112,6 @@ describe('buildTimelineFrames', () => {
     const rows = frames.rectRowsByDepth[frames.depth[late]!]!;
 
     expect([...rows].map((row) => frames.text(row))).toEqual(['ns.Early.run()', 'ns.Late.run()']);
-  });
-
-  it('lists no row for a frame whose category the timeline does not draw', async () => {
-    const { log } = await framesOf(NESTED);
-    const frames = buildTimelineFrames(buildLogIndex(log), new Set(['Apex']), 0);
-    const listed = frames.rectRowsByDepth.flatMap((rows) =>
-      [...rows].map((row) => frames.text(row)),
-    );
-
-    expect(listed).toContain('ns.Inner.first()');
-    expect(listed).not.toContain('SELECT Id FROM Account');
   });
 
   it('does not show a frame with no duration', async () => {

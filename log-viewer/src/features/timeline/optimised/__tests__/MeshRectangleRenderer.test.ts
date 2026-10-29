@@ -12,7 +12,7 @@ import { Container, type Mesh } from 'pixi.js';
 import { readQuads } from '#test-helpers/mesh.js';
 import { rectsOf, timelineEvent } from '#test-helpers/timeline.js';
 import { makeViewport } from '#test-helpers/viewport.js';
-import type { RectColumns, RenderBatch, ViewportState } from '../../types/flamechart.types.js';
+import type { RenderBatch, ViewportState } from '../../types/flamechart.types.js';
 import type { BatchColorInfo } from '../BucketColorResolver.js';
 import { MeshRectangleRenderer } from '../MeshRectangleRenderer.js';
 import { RectangleCache, type PrecomputedRect } from '../RectangleCache.js';
@@ -100,10 +100,6 @@ function visible(cache: RectangleCache, viewport: ViewportState): PrecomputedRec
   return [...visibleRects.values()].flat();
 }
 
-function rowsWithRect(columns: RectColumns): number[] {
-  return columns.rectRowsByDepth.flatMap((rows) => [...rows]);
-}
-
 describe('MeshRectangleRenderer', () => {
   describe('with rectangles culled by RectangleCache', () => {
     // Rows are numbered in pre-order: the parent 0, its child 1.
@@ -134,26 +130,6 @@ describe('MeshRectangleRenderer', () => {
         { x: 200.5, y: 0.5, width: 399, height: 14, color: APEX_COLOR },
       ]);
       expect(mesh.visible).toBe(true);
-    });
-
-    it('drops a frame with no duration', () => {
-      const instant = timelineEvent(500, 0, 'Apex');
-      const timed = timelineEvent(100, 200, 'Apex');
-      const columns = rectsOf([timed, instant]);
-      const cache = new RectangleCache(columns);
-
-      expect(rowsWithRect(columns)).toEqual([0]);
-      expect(visible(cache, makeViewport()).map((r) => r.row)).toEqual([0]);
-    });
-
-    it('drops a frame whose category the cache was not given', () => {
-      const unknown = timelineEvent(500, 200, 'Mystery' as Category);
-      const known = timelineEvent(100, 200, 'Apex');
-      const columns = rectsOf([known, unknown]);
-      const cache = new RectangleCache(columns);
-
-      expect(rowsWithRect(columns)).toEqual([0]);
-      expect(visible(cache, makeViewport()).map((r) => r.row)).toEqual([0]);
     });
 
     describe('under vertical pan', () => {
