@@ -15,6 +15,7 @@
  * 4. Timeline markers (only if not over events/buckets)
  */
 
+import { firstIndexWhere } from '#core/utility/Util.js';
 import {
   BUCKET_CONSTANTS,
   type EventNode,
@@ -244,20 +245,23 @@ export class HitDetector {
    * @returns Best row based on priority/duration, or null if bucket is empty
    */
   private findBestRowInBucket(bucket: PixelBucket): number | null {
-    const rows = this.rectangleManager.queryRowsInRegion(
-      bucket.timeStart,
-      bucket.timeEnd,
-      bucket.depth,
-      bucket.depth,
-    );
+    const { start, total, rectRowsByDepth } = this.columns;
+    // A frame overlapping the bucket's cell may be drawn as its own rect: take only those it holds.
+    const rows = rectRowsByDepth[bucket.depth] ?? new Int32Array(0);
+    const first = firstIndexWhere(rows.length, (i) => start[rows[i]!]! >= bucket.firstStart);
 
     let bestRow: number | null = null;
     let bestPriority = Infinity;
     let bestDuration = -1;
 
-    for (const row of rows) {
+    for (let i = first; i < rows.length; i++) {
+      // i < rows.length, and every row in rectRowsByDepth has a start and total
+      const row = rows[i]!;
+      if (start[row]! > bucket.lastStart) {
+        break;
+      }
       const priority = categoryPriority(rectCategory(this.columns, row));
-      const duration = this.columns.total[row]!; // a row the tree returned
+      const duration = total[row]!;
 
       // Priority wins first (lower index = higher priority)
       if (priority < bestPriority) {

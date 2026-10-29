@@ -109,22 +109,22 @@ describe('TemporalSegmentTree', () => {
     });
 
     // A bucket is 2px wide, so at zoom 1 it spans 2ns and at zoom 0.5 it spans 4ns.
-    it.each<[number, number, number, number]>([
-      [1, 4, 4, 6],
-      [0.5, 2, 4, 8],
-    ])('places a bucket per depth on the pixel grid at zoom %d', (zoom, x, timeStart, timeEnd) => {
+    it.each<[number, number]>([
+      [1, 4],
+      [0.5, 2],
+    ])('places a bucket per depth on the pixel grid at zoom %d', (zoom, x) => {
       const events = [timelineEvent(5, 1, 'Apex', [timelineEvent(5, 0.5, 'SOQL')])];
 
       const result = query(events, makeViewport({ zoom }));
 
       expect(result.all.sort((a, b) => a.depth - b.depth)).toEqual([
-        expect.objectContaining({ depth: 0, x, y: 0, timeStart, timeEnd }),
+        expect.objectContaining({ depth: 0, x, y: 0, firstStart: 5, lastStart: 5 }),
         expect.objectContaining({
           depth: 1,
           x,
           y: TIMELINE_CONSTANTS.EVENT_HEIGHT,
-          timeStart,
-          timeEnd,
+          firstStart: 5,
+          lastStart: 5,
         }),
       ]);
     });
@@ -134,7 +134,7 @@ describe('TemporalSegmentTree', () => {
 
       const result = query(events, makeViewport());
 
-      expect(result.all.map((bucket) => bucket.timeStart).sort((a, b) => a - b)).toEqual([0, 10]);
+      expect(result.all.map((bucket) => bucket.firstStart).sort((a, b) => a - b)).toEqual([0, 10]);
     });
 
     it.each<[number, number]>([
