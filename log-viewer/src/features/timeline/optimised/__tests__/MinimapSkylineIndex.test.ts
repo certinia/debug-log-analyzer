@@ -4,11 +4,8 @@
 
 import { describe, expect, it } from '@jest/globals';
 
-import { MinimapSkylineIndex, type SkylineFrame } from '../minimap/MinimapSkylineIndex.js';
-
-function frame(category: string, timeStart: number, timeEnd: number, depth: number): SkylineFrame {
-  return { category, timeStart, timeEnd, depth };
-}
+import { columnsOf, span as frame, type SpanSpec } from '#test-helpers/timeline.js';
+import { MinimapSkylineIndex } from '../minimap/MinimapSkylineIndex.js';
 
 /** The index as a readable list of `[start, end, depth, category]`. */
 function segments(index: MinimapSkylineIndex): [number, number, number, string][] {
@@ -24,9 +21,9 @@ function segments(index: MinimapSkylineIndex): [number, number, number, string][
   return out;
 }
 
-function build(frames: SkylineFrame[], totalDuration = 1000): MinimapSkylineIndex {
-  // One group, in whatever order the test wrote it: the index orders its own input.
-  return new MinimapSkylineIndex([frames], totalDuration);
+function build(frames: SpanSpec[], totalDuration = 1000): MinimapSkylineIndex {
+  // In whatever order the test wrote it: columnsOf sorts each depth by start, as the frames do.
+  return new MinimapSkylineIndex(columnsOf(frames), totalDuration);
 }
 
 describe('MinimapSkylineIndex', () => {
@@ -66,7 +63,7 @@ describe('MinimapSkylineIndex', () => {
   });
 
   it('orders segments by time with no overlap', () => {
-    const frames: SkylineFrame[] = [];
+    const frames: SpanSpec[] = [];
     for (let root = 0; root < 40; root++) {
       const start = root * 25;
       frames.push(frame('Apex', start, start + 20, 0));
@@ -91,6 +88,24 @@ describe('MinimapSkylineIndex', () => {
     expect(segments(index)).toEqual([
       [0, 100, 1, 'SOQL'],
       [100, 1000, 0, 'Method'],
+    ]);
+    expect(index.violations).toBe(0);
+  });
+
+  // Four depths take two merge rounds, so the tie rule must hold for merged runs too.
+  it('keeps every ancestor that starts with its descendants', () => {
+    const index = build([
+      frame('Method', 0, 1000, 0),
+      frame('Apex', 0, 400, 1),
+      frame('SOQL', 0, 200, 2),
+      frame('DML', 0, 100, 3),
+    ]);
+
+    expect(segments(index)).toEqual([
+      [0, 100, 3, 'DML'],
+      [100, 200, 2, 'SOQL'],
+      [200, 400, 1, 'Apex'],
+      [400, 1000, 0, 'Method'],
     ]);
     expect(index.violations).toBe(0);
   });
@@ -123,13 +138,6 @@ describe('MinimapSkylineIndex', () => {
 
     expect(segments(index)).toEqual([[0, 1000, 0, 'Method']]);
     expect(index.violations).toBe(1);
-  });
-
-  it('names every category it saw, including one outside the known set', () => {
-    const index = build([frame('Method', 0, 500, 0), frame('DML', 100, 200, 1)]);
-
-    expect(index.categoryNames[0]).toBe('');
-    expect(index.categoryNames.slice(1).sort()).toEqual(['DML', 'Method']);
   });
 
   it('counts a frame in every bucket it spans', () => {

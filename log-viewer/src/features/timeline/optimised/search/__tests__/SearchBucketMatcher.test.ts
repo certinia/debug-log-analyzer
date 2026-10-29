@@ -3,7 +3,7 @@
  */
 import { describe, expect, it } from '@jest/globals';
 
-import type { MatchedEventInfo } from '../../../types/search.types.js';
+import type { MatchSpan } from '../../../types/search.types.js';
 import type { BatchColorInfo } from '../../BucketColorResolver.js';
 import { colorToGreyscale } from '../../rendering/ColorUtils.js';
 import {
@@ -26,8 +26,8 @@ const batchColors = new Map<string, BatchColorInfo>([
   ['Unranked', { color: UNRANKED }],
 ]);
 
-function match(timestamp: number, depth: number, category: string): MatchedEventInfo {
-  return { timestamp, duration: 0, depth, category };
+function match(timeStart: number, depth: number, category: string): MatchSpan {
+  return { timeStart, depth, category };
 }
 
 function bucket(timeStart: number, timeEnd: number, depth: number) {
@@ -43,7 +43,8 @@ describe('buildMatchIndex', () => {
     ]);
 
     expect([...index.keys()].sort((a, b) => a - b)).toEqual([0, 1]);
-    expect(index.get(1)?.map((m) => m.timestamp)).toEqual([20, 30]);
+    expect([...index.get(1)!.starts]).toEqual([20, 30]);
+    expect(index.get(1)?.categories).toEqual(['SOQL', 'DML']);
   });
 
   it('answers the same index for the same matches', () => {
@@ -53,7 +54,9 @@ describe('buildMatchIndex', () => {
   });
 
   it('builds a fresh index for a different set of matches', () => {
-    expect(buildMatchIndex([match(10, 0, 'DML')])).not.toBe(buildMatchIndex([match(10, 0, 'DML')]));
+    buildMatchIndex([match(10, 0, 'DML')]);
+
+    expect(buildMatchIndex([match(10, 0, 'SOQL')]).get(0)?.categories).toEqual(['SOQL']);
   });
 });
 

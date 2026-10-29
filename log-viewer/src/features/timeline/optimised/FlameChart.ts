@@ -32,7 +32,7 @@ import type {
   ViewportState,
 } from '../types/flamechart.types.js';
 import { TIMELINE_CONSTANTS, TimelineError, TimelineErrorCode } from '../types/flamechart.types.js';
-import type { FramePredicate, MatchedEventInfo, SearchCursor } from '../types/search.types.js';
+import type { FramePredicate, SearchCursor } from '../types/search.types.js';
 
 import { MeshMarkerRenderer } from './markers/MeshMarkerRenderer.js';
 import { MeshRectangleRenderer } from './MeshRectangleRenderer.js';
@@ -322,10 +322,7 @@ export class FlameChart<E extends EventNode = EventNode> {
 
     // Create RectangleCache (single source of truth for rectangle computation)
     if (this.state) {
-      this.rectangleManager = new RectangleCache({
-        rectsByCategory: frames.rectsByCategory,
-        rectsByDepth: frames.rectsByDepth,
-      });
+      this.rectangleManager = new RectangleCache(frames);
     }
 
     // Create batch renderer (pure rendering, receives rectangles from RectangleCache)
@@ -365,6 +362,7 @@ export class FlameChart<E extends EventNode = EventNode> {
     if (this.rectangleManager) {
       this.hitDetector = new HitDetector({
         nodeOf: (row) => frames.node(row).data,
+        columns: frames,
         visibleRects: new Map(),
         buckets: new Map(),
         markerRenderer: this.markerRenderer,
@@ -1404,7 +1402,7 @@ export class FlameChart<E extends EventNode = EventNode> {
    * Setup minimap orchestrator for Chrome DevTools-style overview navigation.
    */
   private async setupMinimap(): Promise<void> {
-    if (!this.index || !this.rectangleManager || !this.viewport || !this.minimapDiv) {
+    if (!this.frames || !this.viewport || !this.minimapDiv) {
       return;
     }
 
@@ -1463,8 +1461,7 @@ export class FlameChart<E extends EventNode = EventNode> {
       this.minimapDiv,
       displayWidth,
       containerHeight,
-      this.index,
-      this.rectangleManager,
+      this.frames,
       this.viewport,
       minimapEditorColors
         ? {
@@ -2125,22 +2122,17 @@ export class FlameChart<E extends EventNode = EventNode> {
    */
   public locateByEventNodes(eventNodes: readonly EventNode[]): void {
     const frames = this.frames;
-    const ids = new Set<string>();
-    const info: MatchedEventInfo[] = [];
+    const rows = new Set<number>();
+    const spans: PrecomputedRect[] = [];
     for (const node of eventNodes) {
       const rect = frames?.rectOf(frames.rowOfOriginal(node.original));
       if (!rect) {
         continue;
       }
-      ids.add(rect.id);
-      info.push({
-        timestamp: rect.timeStart,
-        duration: rect.duration,
-        depth: rect.depth,
-        category: rect.category,
-      });
+      rows.add(rect.row);
+      spans.push(rect);
     }
-    if (this.dimState.setEmphasis(ids, info)) {
+    if (this.dimState.setEmphasis(rows, spans)) {
       this.requestRender();
     }
   }
@@ -2518,8 +2510,13 @@ export class FlameChart<E extends EventNode = EventNode> {
       this.searchOrchestrator!.renderStyledLabels(searchContext);
       this.batchRenderer?.clear();
     } else if (dim && this.searchOrchestrator) {
-      this.searchOrchestrator.renderDimmedExcept(searchContext, dim.ids, dim.info, dim.categories);
-      this.searchOrchestrator.renderLabelsDimmedExcept(searchContext, dim.ids, dim.categories);
+      this.searchOrchestrator.renderDimmedExcept(
+        searchContext,
+        dim.rows,
+        dim.spans,
+        dim.categories,
+      );
+      this.searchOrchestrator.renderLabelsDimmedExcept(searchContext, dim.rows, dim.categories);
       this.batchRenderer?.clear();
     } else {
       // Normal mode: render with original colors

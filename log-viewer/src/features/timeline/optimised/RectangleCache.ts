@@ -9,7 +9,7 @@
  * Separates "what to draw" from "how to draw it" to eliminate coupling between renderers.
  *
  * Responsibilities:
- * - Maintain spatial index (rectsByCategory) for efficient access
+ * - Maintain the spatial index (a TemporalSegmentTree over the frames' rows)
  * - Perform viewport culling on demand
  * - Provide culled rectangles to any consumer (renderers)
  *
@@ -21,6 +21,7 @@
 
 import type {
   CulledRenderData,
+  RectColumns,
   RenderRectangle,
   ViewportState,
 } from '../types/flamechart.types.js';
@@ -32,9 +33,6 @@ import { TemporalSegmentTree } from './TemporalSegmentTree.js';
  * Stored once at construction to avoid recalculating every frame.
  */
 export interface PrecomputedRect extends RenderRectangle {
-  /** Unique ID for this rectangle */
-  id: string;
-
   /** Timestamp in nanoseconds (fixed) */
   timeStart: number;
 
@@ -46,9 +44,6 @@ export interface PrecomputedRect extends RenderRectangle {
 
   /** Total duration in nanoseconds including children (fixed) */
   duration: number;
-
-  /** Self duration in nanoseconds excluding children (fixed, for category resolution) */
-  selfDuration: number;
 
   /** Event category for color batching (fixed) */
   category: string;
@@ -66,33 +61,17 @@ export interface PrecomputedRect extends RenderRectangle {
   height: number;
 }
 
-/** Rectangles built ahead, as `TimelineFrames` holds them. */
-export interface PrecomputedRectData {
-  rectsByCategory: Map<string, PrecomputedRect[]>;
-  /** Pre-grouped by depth for TemporalSegmentTree (optional - computed if not provided) */
-  rectsByDepth?: Map<number, PrecomputedRect[]>;
-}
-
 /**
- * Holds the rectangles by category and answers viewport and region queries through a
+ * Indexes the rows with a rect and answers viewport and region queries through a
  * TemporalSegmentTree. Nothing reaches past it to the tree.
  */
 export class RectangleCache {
-  /** Spatial index: all rectangles grouped by category */
-  private rectsByCategory: Map<string, PrecomputedRect[]>;
-
   /** Segment tree for O(log n) viewport culling */
   private segmentTree: TemporalSegmentTree;
 
-  /** @param precomputed - The rectangles, built ahead */
-  constructor(precomputed: PrecomputedRectData) {
-    this.rectsByCategory = precomputed.rectsByCategory;
-    for (const rects of this.rectsByCategory.values()) {
-      sortByStartIfNeeded(rects);
-    }
-
-    // Pass pre-grouped rectsByDepth if available (saves ~12ms grouping iteration)
-    this.segmentTree = new TemporalSegmentTree(this.rectsByCategory, precomputed.rectsByDepth);
+  /** @param columns - The frames, by row; only the rows with a rect are indexed */
+  constructor(columns: RectColumns) {
+    this.segmentTree = new TemporalSegmentTree(columns);
   }
 
   /**
@@ -116,41 +95,22 @@ export class RectangleCache {
   }
 
   /**
-   * Get the rectangles, grouped by category and each ascending by timeStart.
-   *
-   * @returns Map of category to rectangles
-   */
-  public getRectsByCategory(): Map<string, PrecomputedRect[]> {
-    return this.rectsByCategory;
-  }
-
-  /**
-   * Query rectangles within a specific time and depth region.
+   * Query the rows with a rect within a specific time and depth region.
    * Delegates to TemporalSegmentTree for O(log n + k) performance.
-   * Used for hit testing when bucket rects are empty.
+   * Used for hit testing.
    *
    * @param timeStart - Start time in nanoseconds
    * @param timeEnd - End time in nanoseconds
    * @param depthStart - Minimum depth (inclusive)
    * @param depthEnd - Maximum depth (inclusive)
-   * @returns The rectangles in the region
+   * @returns The rows in the region
    */
-  public queryRectsInRegion(
+  public queryRowsInRegion(
     timeStart: number,
     timeEnd: number,
     depthStart: number,
     depthEnd: number,
-  ): PrecomputedRect[] {
-    return this.segmentTree.queryRectsInRegion(timeStart, timeEnd, depthStart, depthEnd);
-  }
-}
-
-// A check costs less than the sort, and the frames arrive sorted on a well-formed log.
-function sortByStartIfNeeded(rects: PrecomputedRect[]): void {
-  for (let i = 1; i < rects.length; i++) {
-    if (rects[i]!.timeStart < rects[i - 1]!.timeStart) {
-      rects.sort((a, b) => a.timeStart - b.timeStart);
-      return;
-    }
+  ): number[] {
+    return this.segmentTree.queryRowsInRegion(timeStart, timeEnd, depthStart, depthEnd);
   }
 }

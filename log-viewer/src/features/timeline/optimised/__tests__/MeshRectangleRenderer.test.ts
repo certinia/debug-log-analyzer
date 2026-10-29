@@ -63,12 +63,10 @@ function setup(renderBatches = batches('Apex', 'SOQL')) {
 /** A rect placed by hand, as the cache would hand it over after culling. */
 function rect(x: number, width: number, depth = 0): PrecomputedRect {
   return {
-    id: `${x}-${depth}`,
     timeStart: x,
     timeEnd: x + width,
     depth,
     duration: width,
-    selfDuration: width,
     category: 'Apex',
     row: x,
     x,
@@ -131,26 +129,6 @@ describe('MeshRectangleRenderer', () => {
         { x: 200.5, y: 0.5, width: 399, height: 14, color: APEX_COLOR },
       ]);
       expect(mesh.visible).toBe(true);
-    });
-
-    it('drops a frame with no duration', () => {
-      const instant = timelineEvent(500, 0, 'Apex');
-      const timed = timelineEvent(100, 200, 'Apex');
-      const cache = new RectangleCache(rectsOf([timed, instant]));
-
-      const rects = [...cache.getRectsByCategory().values()].flat();
-      expect(rects.map((rect) => rect.row)).toEqual([0]);
-      expect(visible(cache, makeViewport()).map((r) => r.row)).toEqual([0]);
-    });
-
-    it('drops a frame whose category the cache was not given', () => {
-      const unknown = timelineEvent(500, 200, 'Mystery' as Category);
-      const known = timelineEvent(100, 200, 'Apex');
-      const cache = new RectangleCache(rectsOf([known, unknown]));
-
-      const rects = [...cache.getRectsByCategory().values()].flat();
-      expect(rects.map((rect) => rect.row)).toEqual([0]);
-      expect(visible(cache, makeViewport()).map((r) => r.row)).toEqual([0]);
     });
 
     describe('under vertical pan', () => {

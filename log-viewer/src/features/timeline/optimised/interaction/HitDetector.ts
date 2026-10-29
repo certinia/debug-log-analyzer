@@ -19,9 +19,12 @@ import {
   BUCKET_CONSTANTS,
   type EventNode,
   type PixelBucket,
+  type RectColumns,
+  rectCategory,
   type TimelineMarker,
   type ViewportState,
 } from '../../types/flamechart.types.js';
+import { categoryPriority } from '../BucketColorResolver.js';
 import type { PrecomputedRect, RectangleCache } from '../RectangleCache.js';
 
 /** Narrower than this many pixels, a frame is left to its bucket. */
@@ -52,6 +55,8 @@ export interface HitTestResult {
 export interface HitTestConfig {
   /** The node for a rect's row */
   nodeOf: (row: number) => EventNode;
+  /** The frames, to compare rows without making a rect for each */
+  columns: RectColumns;
   /** Current visible rectangles from last render pass */
   visibleRects: Map<string, PrecomputedRect[]>;
   /** Current buckets from last render pass */
@@ -64,6 +69,7 @@ export interface HitTestConfig {
 
 export class HitDetector {
   private readonly nodeOf: (row: number) => EventNode;
+  private readonly columns: RectColumns;
   private visibleRects: Map<string, PrecomputedRect[]>;
   private buckets: Map<string, PixelBucket[]>;
   private markerRenderer: MarkerHitTestable | null;
@@ -71,6 +77,7 @@ export class HitDetector {
 
   constructor(config: HitTestConfig) {
     this.nodeOf = config.nodeOf;
+    this.columns = config.columns;
     this.visibleRects = config.visibleRects;
     this.buckets = config.buckets;
     this.markerRenderer = config.markerRenderer ?? null;
@@ -118,31 +125,33 @@ export class HitDetector {
     // Check if depth is within valid bounds (0 to maxDepth)
     const isValidDepth = depth >= 0 && depth <= maxDepth;
 
-    let hit: PrecomputedRect | null = null;
+    let hit: number | null = null;
     let isOverEventArea = false;
 
     if (isValidDepth) {
       // Priority 1: Check visible rectangles from last render (in sync with display)
-      hit = this.findVisibleRectAtPosition(screenX, depth, viewport);
+      hit = this.findVisibleRowAtPosition(screenX, depth, viewport);
 
       // Priority 2: If no visible rect, check the segment tree (for wider search)
-      if (!hit) {
+      if (hit === null) {
         const time = (screenX + viewport.offsetX) / viewport.zoom;
+        const { total } = this.columns;
+        // a row the tree returned
         hit =
           this.rectangleManager
-            .queryRectsInRegion(time, time, depth, depth)
-            .find((rect) => rect.duration * viewport.zoom >= MIN_HIT_WIDTH) ?? null;
+            .queryRowsInRegion(time, time, depth, depth)
+            .find((row) => total[row]! * viewport.zoom >= MIN_HIT_WIDTH) ?? null;
       }
 
       isOverEventArea = hit !== null;
 
       // Priority 3: If no event found, check if we're over a bucket at this depth
-      if (!hit) {
+      if (hit === null) {
         const bucketResult = this.findBucketAtPosition(screenX, depth, viewport);
         if (bucketResult) {
           isOverEventArea = true;
           // Find best event from bucket using priority and duration
-          hit = this.findBestRectInBucket(bucketResult.bucket);
+          hit = this.findBestRowInBucket(bucketResult.bucket);
         }
       }
     }
@@ -154,7 +163,7 @@ export class HitDetector {
       marker = this.markerRenderer.hitTest(screenX, screenY);
     }
 
-    const eventNode = hit ? this.nodeOf(hit.row) : null;
+    const eventNode = hit !== null ? this.nodeOf(hit) : null;
 
     return { eventNode, marker, isOverEventArea };
   }
@@ -163,13 +172,13 @@ export class HitDetector {
    * Find visible rectangle at screen position from last render pass.
    * This ensures hit detection is in sync with what's actually displayed.
    *
-   * @returns The rect if found, null otherwise
+   * @returns The rect's row if found, null otherwise
    */
-  private findVisibleRectAtPosition(
+  private findVisibleRowAtPosition(
     screenX: number,
     depth: number,
     viewport: ViewportState,
-  ): PrecomputedRect | null {
+  ): number | null {
     for (const categoryRects of this.visibleRects.values()) {
       for (const rect of categoryRects) {
         // Check depth match
@@ -183,7 +192,7 @@ export class HitDetector {
 
         // Check if mouse X is within rect bounds
         if (screenX >= rectScreenX && screenX <= rectScreenEnd) {
-          return rect;
+          return rect.row;
         }
       }
     }
@@ -232,54 +241,36 @@ export class HitDetector {
    * 2. For same priority, longest duration wins
    *
    * @param bucket - The bucket containing aggregated events
-   * @returns Best rect based on priority/duration, or null if bucket is empty
+   * @returns Best row based on priority/duration, or null if bucket is empty
    */
-  private findBestRectInBucket(bucket: PixelBucket): PrecomputedRect | null {
-    let events = bucket.rects;
+  private findBestRowInBucket(bucket: PixelBucket): number | null {
+    const rows = this.rectangleManager.queryRowsInRegion(
+      bucket.timeStart,
+      bucket.timeEnd,
+      bucket.depth,
+      bucket.depth,
+    );
 
-    // Empty under the TemporalSegmentTree optimization, so query the region.
-    if (events.length === 0) {
-      events = this.rectangleManager.queryRectsInRegion(
-        bucket.timeStart,
-        bucket.timeEnd,
-        bucket.depth,
-        bucket.depth,
-      );
-    }
-
-    if (events.length === 0) {
-      return null;
-    }
-
-    // Single event - return it directly
-    if (events.length === 1) {
-      return events[0] ?? null;
-    }
-
-    // Build priority map for O(1) lookup
-    const priorityMap = new Map<string, number>();
-    BUCKET_CONSTANTS.CATEGORY_PRIORITY.forEach((cat, i) => priorityMap.set(cat, i));
-
-    let bestEvent: PrecomputedRect | null = null;
+    let bestRow: number | null = null;
     let bestPriority = Infinity;
     let bestDuration = -1;
 
-    for (const event of events) {
-      const priority = priorityMap.get(event.category) ?? Infinity;
-      const duration = event.duration;
+    for (const row of rows) {
+      const priority = categoryPriority(rectCategory(this.columns, row));
+      const duration = this.columns.total[row]!; // a row the tree returned
 
       // Priority wins first (lower index = higher priority)
       if (priority < bestPriority) {
-        bestEvent = event;
+        bestRow = row;
         bestPriority = priority;
         bestDuration = duration;
       } else if (priority === bestPriority && duration > bestDuration) {
         // Same priority: longest duration wins
-        bestEvent = event;
+        bestRow = row;
         bestDuration = duration;
       }
     }
 
-    return bestEvent;
+    return bestRow;
   }
 }

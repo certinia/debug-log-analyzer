@@ -9,7 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-- ⚡ **Timeline**: large logs are ready 3.1× faster and use 47% less memory, measured on a 100 MB log.
+- ⚡ **Timeline**: large logs are ready 12× faster and use 90% less memory, measured on a 100 MB log. ([#1237])
 - ⚡ **UI**: many components, including the tab views and Inspector sections, appear up to 80× faster on large logs.
 - ⚡ **Tables**: the Call Tree, Analysis, Database and Inspector tables respond up to 30× faster on large logs and use 93% less memory. ([#1169])
   - Sort, expand and filter take under 0.2 s, group by is up to 9× faster, column resize is smooth and Find never freezes the table.
@@ -619,6 +619,7 @@ Skipped due to adopting odd numbering for pre releases and even number for relea
 
 [#1231]: https://github.com/certinia/debug-log-analyzer/issues/1231
 [#1225]: https://github.com/certinia/debug-log-analyzer/issues/1225
+[#1237]: https://github.com/certinia/debug-log-analyzer/issues/1237
 [#1244]: https://github.com/certinia/debug-log-analyzer/issues/1244
 [#1229]: https://github.com/certinia/debug-log-analyzer/issues/1229
 [#1234]: https://github.com/certinia/debug-log-analyzer/issues/1234
