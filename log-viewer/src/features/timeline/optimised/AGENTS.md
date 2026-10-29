@@ -69,15 +69,15 @@ The metric strip supports collapsed (heat-style) and expanded (step chart) views
 
 ### Available Query Methods
 
-| Method                            | Use Case                       | Complexity   |
-| --------------------------------- | ------------------------------ | ------------ |
-| `query(viewport)`                 | Viewport culling for rendering | O(k log n)   |
-| `queryRectsInRegion(time, depth)` | Hit testing, spatial lookups   | O(log n + k) |
+| Method                           | Use Case                       | Complexity   |
+| -------------------------------- | ------------------------------ | ------------ |
+| `query(viewport)`                | Viewport culling for rendering | O(k log n)   |
+| `queryRowsInRegion(time, depth)` | Hit testing, spatial lookups   | O(log n + k) |
 
 ### Access Pattern
 
 ```typescript
-const rects = rectangleCache.queryRectsInRegion(timeStart, timeEnd, depthStart, depthEnd);
+const rows = rectangleCache.queryRowsInRegion(timeStart, timeEnd, depthStart, depthEnd);
 ```
 
 `RectangleCache` fronts the tree; nothing reaches past it.

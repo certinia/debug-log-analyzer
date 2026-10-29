@@ -362,6 +362,7 @@ export class FlameChart<E extends EventNode = EventNode> {
     if (this.rectangleManager) {
       this.hitDetector = new HitDetector({
         nodeOf: (row) => frames.node(row).data,
+        columns: frames,
         visibleRects: new Map(),
         buckets: new Map(),
         markerRenderer: this.markerRenderer,

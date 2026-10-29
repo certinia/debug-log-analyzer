@@ -95,7 +95,7 @@ export class RectangleCache {
   }
 
   /**
-   * Query rectangles within a specific time and depth region.
+   * Query the rows with a rect within a specific time and depth region.
    * Delegates to TemporalSegmentTree for O(log n + k) performance.
    * Used for hit testing when bucket rects are empty.
    *
@@ -103,14 +103,14 @@ export class RectangleCache {
    * @param timeEnd - End time in nanoseconds
    * @param depthStart - Minimum depth (inclusive)
    * @param depthEnd - Maximum depth (inclusive)
-   * @returns The rectangles in the region
+   * @returns The rows in the region
    */
-  public queryRectsInRegion(
+  public queryRowsInRegion(
     timeStart: number,
     timeEnd: number,
     depthStart: number,
     depthEnd: number,
-  ): PrecomputedRect[] {
-    return this.segmentTree.queryRectsInRegion(timeStart, timeEnd, depthStart, depthEnd);
+  ): number[] {
+    return this.segmentTree.queryRowsInRegion(timeStart, timeEnd, depthStart, depthEnd);
   }
 }

@@ -37,6 +37,7 @@ function hitAt(
         text: '',
       };
     },
+    columns: rects,
     visibleRects: new Map(),
     buckets: new Map(),
     rectangleManager: new RectangleCache(rects),
@@ -44,6 +45,43 @@ function hitAt(
   const maxDepth = Math.max(0, rects.rectRowsByDepth.length - 1);
   return detector.hitTest(screenX, 300, depth, viewport, maxDepth).eventNode?.timestamp ?? null;
 }
+
+/** The start of the frame a hover picks from the buckets a real cull drew at depth 0. */
+function bucketHitAt(frames: FrameSpec[], screenX: number): number | null {
+  const rects = rectsOf(frames);
+  const cache = new RectangleCache(rects);
+  const viewport = makeViewport();
+  const { buckets } = cache.getCulledRectangles(viewport, new Map());
+  const detector = new HitDetector({
+    nodeOf: (row): EventNode => ({
+      id: String(row),
+      timestamp: rects.start[row]!,
+      duration: rects.total[row]!,
+      type: '',
+      text: '',
+    }),
+    columns: rects,
+    visibleRects: new Map(),
+    buckets,
+    rectangleManager: cache,
+  });
+  return detector.hitTest(screenX, 300, 0, viewport, 0).eventNode?.timestamp ?? null;
+}
+
+// Both frames are under a pixel wide and neither is under the pointer, so only the bucket answers.
+describe('HitDetector, over a bucket', () => {
+  it('picks the higher-priority category, though it is shorter', () => {
+    const frames = [timelineEvent(0, 0.4, 'Apex'), timelineEvent(0.5, 0.3, 'SOQL')];
+
+    expect(bucketHitAt(frames, 1.5)).toBe(0.5);
+  });
+
+  it('picks the longest frame of one category', () => {
+    const frames = [timelineEvent(0, 0.2, 'Apex'), timelineEvent(0.3, 0.5, 'Apex')];
+
+    expect(bucketHitAt(frames, 1.5)).toBe(0.3);
+  });
+});
 
 describe('HitDetector, before a render has drawn anything', () => {
   it.each<

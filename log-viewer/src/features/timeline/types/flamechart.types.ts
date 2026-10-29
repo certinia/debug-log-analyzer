@@ -410,8 +410,6 @@ export interface PixelBucket {
   eventCount: number;
   /** Per-category statistics */
   categoryStats: CategoryStats;
-  /** The rects the bucket holds, when collected; empty when a region query must find them. */
-  rects: PrecomputedRect[];
   /** Resolved display color (hex number) - pre-blended opaque color for rendering */
   color: number;
 }

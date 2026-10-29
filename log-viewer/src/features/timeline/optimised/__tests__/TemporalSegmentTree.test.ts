@@ -224,9 +224,8 @@ describe('TemporalSegmentTree', () => {
         const drawn = result.visibleRects.get('Apex') ?? [];
         expect(drawn.length + bucketed.reduce((sum, b) => sum + b.eventCount, 0)).toBe(count);
       }
-      expect(tree.queryRectsInRegion(0, 10 * count, 0, 0).map((r) => r.timeStart)).toEqual(
-        events.map((event) => event.timestamp),
-      );
+      // Rows are numbered in pre-order, so row i is event i.
+      expect(tree.queryRowsInRegion(0, 10 * count, 0, 0)).toEqual(events.map((_, i) => i));
     });
 
     it('finds a long first event two branch levels up, past 16 short ones', () => {
@@ -235,18 +234,16 @@ describe('TemporalSegmentTree', () => {
         ...Array.from({ length: 16 }, (_, i) => timelineEvent(10 + i * 10, 1, 'SOQL')),
       ];
 
-      const found = build(events).queryRectsInRegion(900, 950, 0, 0);
-
-      expect(found.map((rect) => rect.category)).toEqual(['Apex']);
+      expect(build(events).queryRowsInRegion(900, 950, 0, 0)).toEqual([0]);
     });
 
     it('finds a long event by region, for hit testing', () => {
       const found = build([
         timelineEvent(0, 100, 'Apex'),
         timelineEvent(50, 10, 'SOQL'),
-      ]).queryRectsInRegion(70, 90, 0, 0);
+      ]).queryRowsInRegion(70, 90, 0, 0);
 
-      expect(found.map((rect) => rect.category)).toEqual(['Apex']);
+      expect(found).toEqual([0]);
     });
   });
 });

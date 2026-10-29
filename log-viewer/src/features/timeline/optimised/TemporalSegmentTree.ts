@@ -13,7 +13,7 @@
  *
  * Key capabilities:
  * - Viewport culling: query() returns visible rectangles and buckets
- * - Spatial queries: queryEventsInRegion() for hit testing (O(log n + k))
+ * - Spatial queries: queryRowsInRegion() for hit testing (O(log n + k))
  *
  * Each depth's tree is held in typed arrays, one set per level, not one object per node.
  * Level 0 is the rows with a rect, in start order. Node `i` on level `k > 0` spans nodes
@@ -202,7 +202,6 @@ export class TemporalSegmentTree {
           dominantCategory,
         },
         // Rects are expensive to collect - leave empty for multi-event buckets
-        rects: [],
         color: baseColor,
       });
       bucketCount++;
@@ -226,48 +225,48 @@ export class TemporalSegmentTree {
   }
 
   /**
-   * Query rectangles within a specific time and depth region.
+   * Query the rows with a rect within a specific time and depth region.
    * Used for hit testing when bucket rects are empty.
-   * O(log n + k) complexity where k = rectangles in region.
+   * O(log n + k) complexity where k = rows in region.
    *
    * @param timeStart - Start time in nanoseconds
    * @param timeEnd - End time in nanoseconds
    * @param depthStart - Minimum depth (inclusive)
    * @param depthEnd - Maximum depth (inclusive)
-   * @returns The rectangles in the region
+   * @returns The rows in the region
    */
-  public queryRectsInRegion(
+  public queryRowsInRegion(
     timeStart: number,
     timeEnd: number,
     depthStart: number,
     depthEnd: number,
-  ): PrecomputedRect[] {
-    const results: PrecomputedRect[] = [];
+  ): number[] {
+    const results: number[] = [];
 
     for (let depth = depthStart; depth <= depthEnd; depth++) {
       const tree = this.treesByDepth.get(depth);
       if (tree) {
-        this.collectRects(tree, tree.branches.length, 0, timeStart, timeEnd, results);
+        this.collectRows(tree, tree.branches.length, 0, timeStart, timeEnd, results);
       }
     }
 
     return results;
   }
 
-  private collectRects(
+  private collectRows(
     tree: DepthTree,
     level: number,
     index: number,
     queryStart: number,
     queryEnd: number,
-    results: PrecomputedRect[],
+    results: number[],
   ): void {
     if (level === 0) {
       const { start, total } = this.columns;
       const row = tree.rows[index]!;
       const rowStart = start[row]!;
       if (rowStart + total[row]! > queryStart && rowStart < queryEnd) {
-        results.push(this.columns.rectOf(row)!);
+        results.push(row);
       }
       return;
     }
@@ -279,7 +278,7 @@ export class TemporalSegmentTree {
     const first = index * BRANCHING_FACTOR;
     const last = Math.min(first + BRANCHING_FACTOR, levelWidth(tree, level - 1));
     for (let child = first; child < last; child++) {
-      this.collectRects(tree, level - 1, child, queryStart, queryEnd, results);
+      this.collectRows(tree, level - 1, child, queryStart, queryEnd, results);
     }
   }
 

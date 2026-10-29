@@ -19,6 +19,8 @@ import {
   BUCKET_CONSTANTS,
   type EventNode,
   type PixelBucket,
+  type RectColumns,
+  rectCategory,
   type TimelineMarker,
   type ViewportState,
 } from '../../types/flamechart.types.js';
@@ -26,6 +28,10 @@ import type { PrecomputedRect, RectangleCache } from '../RectangleCache.js';
 
 /** Narrower than this many pixels, a frame is left to its bucket. */
 const MIN_HIT_WIDTH = 0.05;
+
+const PRIORITY = new Map<string, number>(
+  BUCKET_CONSTANTS.CATEGORY_PRIORITY.map((category, rank) => [category, rank]),
+);
 
 /**
  * Interface for marker renderers that support hit testing.
@@ -52,6 +58,8 @@ export interface HitTestResult {
 export interface HitTestConfig {
   /** The node for a rect's row */
   nodeOf: (row: number) => EventNode;
+  /** The frames, to compare rows without making a rect for each */
+  columns: RectColumns;
   /** Current visible rectangles from last render pass */
   visibleRects: Map<string, PrecomputedRect[]>;
   /** Current buckets from last render pass */
@@ -64,6 +72,7 @@ export interface HitTestConfig {
 
 export class HitDetector {
   private readonly nodeOf: (row: number) => EventNode;
+  private readonly columns: RectColumns;
   private visibleRects: Map<string, PrecomputedRect[]>;
   private buckets: Map<string, PixelBucket[]>;
   private markerRenderer: MarkerHitTestable | null;
@@ -71,6 +80,7 @@ export class HitDetector {
 
   constructor(config: HitTestConfig) {
     this.nodeOf = config.nodeOf;
+    this.columns = config.columns;
     this.visibleRects = config.visibleRects;
     this.buckets = config.buckets;
     this.markerRenderer = config.markerRenderer ?? null;
@@ -118,31 +128,32 @@ export class HitDetector {
     // Check if depth is within valid bounds (0 to maxDepth)
     const isValidDepth = depth >= 0 && depth <= maxDepth;
 
-    let hit: PrecomputedRect | null = null;
+    let hit: number | null = null;
     let isOverEventArea = false;
 
     if (isValidDepth) {
       // Priority 1: Check visible rectangles from last render (in sync with display)
-      hit = this.findVisibleRectAtPosition(screenX, depth, viewport);
+      hit = this.findVisibleRectAtPosition(screenX, depth, viewport)?.row ?? null;
 
       // Priority 2: If no visible rect, check the segment tree (for wider search)
-      if (!hit) {
+      if (hit === null) {
         const time = (screenX + viewport.offsetX) / viewport.zoom;
+        const { total } = this.columns;
         hit =
           this.rectangleManager
-            .queryRectsInRegion(time, time, depth, depth)
-            .find((rect) => rect.duration * viewport.zoom >= MIN_HIT_WIDTH) ?? null;
+            .queryRowsInRegion(time, time, depth, depth)
+            .find((row) => total[row]! * viewport.zoom >= MIN_HIT_WIDTH) ?? null;
       }
 
       isOverEventArea = hit !== null;
 
       // Priority 3: If no event found, check if we're over a bucket at this depth
-      if (!hit) {
+      if (hit === null) {
         const bucketResult = this.findBucketAtPosition(screenX, depth, viewport);
         if (bucketResult) {
           isOverEventArea = true;
           // Find best event from bucket using priority and duration
-          hit = this.findBestRectInBucket(bucketResult.bucket);
+          hit = this.findBestRowInBucket(bucketResult.bucket);
         }
       }
     }
@@ -154,7 +165,7 @@ export class HitDetector {
       marker = this.markerRenderer.hitTest(screenX, screenY);
     }
 
-    const eventNode = hit ? this.nodeOf(hit.row) : null;
+    const eventNode = hit !== null ? this.nodeOf(hit) : null;
 
     return { eventNode, marker, isOverEventArea };
   }
@@ -232,54 +243,36 @@ export class HitDetector {
    * 2. For same priority, longest duration wins
    *
    * @param bucket - The bucket containing aggregated events
-   * @returns Best rect based on priority/duration, or null if bucket is empty
+   * @returns Best row based on priority/duration, or null if bucket is empty
    */
-  private findBestRectInBucket(bucket: PixelBucket): PrecomputedRect | null {
-    let events = bucket.rects;
+  private findBestRowInBucket(bucket: PixelBucket): number | null {
+    const rows = this.rectangleManager.queryRowsInRegion(
+      bucket.timeStart,
+      bucket.timeEnd,
+      bucket.depth,
+      bucket.depth,
+    );
 
-    // Empty under the TemporalSegmentTree optimization, so query the region.
-    if (events.length === 0) {
-      events = this.rectangleManager.queryRectsInRegion(
-        bucket.timeStart,
-        bucket.timeEnd,
-        bucket.depth,
-        bucket.depth,
-      );
-    }
-
-    if (events.length === 0) {
-      return null;
-    }
-
-    // Single event - return it directly
-    if (events.length === 1) {
-      return events[0] ?? null;
-    }
-
-    // Build priority map for O(1) lookup
-    const priorityMap = new Map<string, number>();
-    BUCKET_CONSTANTS.CATEGORY_PRIORITY.forEach((cat, i) => priorityMap.set(cat, i));
-
-    let bestEvent: PrecomputedRect | null = null;
+    let bestRow: number | null = null;
     let bestPriority = Infinity;
     let bestDuration = -1;
 
-    for (const event of events) {
-      const priority = priorityMap.get(event.category) ?? Infinity;
-      const duration = event.duration;
+    for (const row of rows) {
+      const priority = PRIORITY.get(rectCategory(this.columns, row)) ?? Infinity;
+      const duration = this.columns.total[row]!;
 
       // Priority wins first (lower index = higher priority)
       if (priority < bestPriority) {
-        bestEvent = event;
+        bestRow = row;
         bestPriority = priority;
         bestDuration = duration;
       } else if (priority === bestPriority && duration > bestDuration) {
         // Same priority: longest duration wins
-        bestEvent = event;
+        bestRow = row;
         bestDuration = duration;
       }
     }
 
-    return bestEvent;
+    return bestRow;
   }
 }
