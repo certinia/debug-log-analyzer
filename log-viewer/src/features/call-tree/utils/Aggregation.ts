@@ -80,6 +80,10 @@ export interface AggregatedRow {
   governorCostMax: number | null;
   /** What these calls used of each limit, counted as the Seen totals are. */
   reported: ReportedCounts;
+  /** The row this one sits under; null at the top level */
+  _parent?: AggregatedRow | null;
+  /** The next row of this build with the same key, when the build was asked for {@link KeyRows} */
+  _nextOfKey?: AggregatedRow | null;
   /** Aggregated children (callees grouped by signature) */
   _children?: AggregatedRow[] | null;
   /** The event ids of the calls this row merges, for drill-down */
@@ -146,6 +150,10 @@ export interface BottomUpRow {
   governorCostMax: number | null;
   /** What these calls used of each limit, counted as the Seen totals are. */
   reported: ReportedCounts;
+  /** The row this one sits under; null at the top level */
+  _parent?: BottomUpRow | null;
+  /** The next row of this build with the same key, when the build was asked for {@link KeyRows} */
+  _nextOfKey?: BottomUpRow | null;
   /** Callers (parent functions) as children - lazy loaded */
   _children?: BottomUpRow[] | null;
   /**
@@ -179,14 +187,17 @@ export function toAggregatedCallTree(
  * {@link toAggregatedCallTree} of the store's shown rows, in slices that hand the
  * thread back between them (see {@link FrameBudgetOptions}). Returns null once
  * `options.signal` aborts.
+ *
+ * @param rowsByKey - an empty map, filled with this build's rows by key; one build's only
  */
 export async function buildAggregatedTree(
   store: LogStore,
   options: FrameBudgetOptions = {},
   reported: ReportedUsage | null = null,
+  rowsByKey?: Map<number, KeyRows<AggregatedRow>>,
 ): Promise<AggregatedRow[] | null> {
   const index = await store.logIndex();
-  return driveSteps(aggregatedSteps(buildContext(index, store, reported)), options);
+  return driveSteps(aggregatedSteps(buildContext(index, store, reported, rowsByKey)), options);
 }
 
 function runSteps<T>(steps: Generator<void, T, void>): T {
@@ -233,12 +244,14 @@ interface SignatureLabels {
   readonly text: string;
   readonly namespace: string;
   readonly type: string;
+  readonly rows: KeyRows<unknown> | undefined;
 }
 
 function buildContext(
   index: LogIndex,
   store: LogStore,
   reported: ReportedUsage | null,
+  rowsByKey?: Map<number, KeyRows<unknown>>,
 ): BuildContext {
   let next = 0;
   const paths = store.keyPathIds();
@@ -257,18 +270,30 @@ function buildContext(
       let shared = labels.get(signature);
       if (!shared) {
         const keyId = paths.keyIdOf(eventId);
+        let rows = rowsByKey?.get(keyId);
+        if (rowsByKey && !rows) {
+          rows = { first: null };
+          rowsByKey.set(keyId, rows);
+        }
         shared = {
           keyId,
           key: paths.keyText(keyId),
           text: signatures.text(signature),
           namespace: signatures.namespace(signature),
           type: signatures.type(signature),
+          rows,
         };
         labels.set(signature, shared);
       }
       return shared;
     },
   };
+}
+
+/** The rows of one build with one key, newest first, linked through each row's `_nextOfKey`. */
+export interface KeyRows<R> {
+  // A holder, not a map of heads: the labels share it, so a new row links in with no map lookup.
+  first: R | null;
 }
 
 /** The time of an index row, or of the whole log for {@link NO_ROW}. */
@@ -296,11 +321,13 @@ function* aggregatedSteps(ctx: BuildContext): Generator<void, AggregatedRow[], v
 
   // The grouping loop runs outside the generator: run inside it, it is about 15% slower.
   function* group(
+    parent: AggregatedRow | null,
     callIds: readonly number[],
     pathId: number,
     openStackId: number,
   ): Generator<void, AggregatedRow[], void> {
     const grouping: CalleeGrouping = {
+      parent,
       callIds,
       pathId,
       openStackId,
@@ -319,7 +346,7 @@ function* aggregatedSteps(ctx: BuildContext): Generator<void, AggregatedRow[], v
   }
 
   // Nothing is open above a root child, so no call of one is recursive here.
-  const roots = yield* group(LOG_CALL_IDS, ROOT_PATH_ID, NO_STACK);
+  const roots = yield* group(null, LOG_CALL_IDS, ROOT_PATH_ID, NO_STACK);
   // Descend callees in grouping order, not sorted order: the row ids depend on it.
   const stack: AggregateFrame[] = [{ row: null, callees: roots, next: 0 }];
   while (stack.length > 0) {
@@ -327,7 +354,12 @@ function* aggregatedSteps(ctx: BuildContext): Generator<void, AggregatedRow[], v
     if (frame.next < frame.callees.length) {
       const row = frame.callees[frame.next++]!; // next is in range
       // The row's own frame is open over its callees, so a call of it there is recursive.
-      const callees = yield* group(row.eventIds, row._pathId, ctx.paths.stackIdOf(row.eventId));
+      const callees = yield* group(
+        row,
+        row.eventIds,
+        row._pathId,
+        ctx.paths.stackIdOf(row.eventId),
+      );
       stack.push({ row, callees, next: 0 });
       if (--budget === 0) {
         yield;
@@ -350,6 +382,7 @@ function* aggregatedSteps(ctx: BuildContext): Generator<void, AggregatedRow[], v
 const NOT_STARTED = -2;
 
 type CalleeGrouping = {
+  parent: AggregatedRow | null;
   callIds: readonly number[];
   pathId: number;
   openStackId: number;
@@ -363,7 +396,7 @@ type CalleeGrouping = {
 function groupCallees(grouping: CalleeGrouping, ctx: BuildContext, budget: number): number {
   const { index, paths, reported } = ctx;
   const { subtreeEnd, eventId } = index;
-  const { callIds, pathId, openStackId, byKey } = grouping;
+  const { parent, callIds, pathId, openStackId, byKey } = grouping;
   let done = 0;
   let i = grouping.callAt;
   let child = grouping.child;
@@ -386,7 +419,7 @@ function groupCallees(grouping: CalleeGrouping, ctx: BuildContext, budget: numbe
       const keyId = paths.keyIdOf(id);
       let row = byKey.get(keyId);
       if (!row) {
-        row = createEmptyAggregatedRow(ctx, paths.step(pathId, keyId), child);
+        row = createEmptyAggregatedRow(ctx, paths.step(pathId, keyId), child, parent);
         byKey.set(keyId, row);
       }
       addCallToAggregatedRow(row, ctx, child, paths.stackIdOf(id), openStackId, usage);
@@ -726,7 +759,7 @@ function* bottomUpSteps(build: BuildContext): Generator<void, BottomUpRow[], voi
     let bucket = rootBuckets.get(rootId);
     if (!bucket) {
       const pathId = paths.step(ROOT_PATH_ID, rootId);
-      bucket = createEmptyBottomUpRow(build, pathId, row);
+      bucket = createEmptyBottomUpRow(build, pathId, row, null);
       bucket.eventIds = [];
       rootBuckets.set(rootId, bucket);
     }
@@ -742,7 +775,7 @@ function* bottomUpSteps(build: BuildContext): Generator<void, BottomUpRow[], voi
       let childBucket = existingChildren?.find((c) => c._keyId === ancestorId);
       if (!childBucket) {
         const pathId = paths.step(parentBucket._pathId, ancestorId);
-        childBucket = createEmptyBottomUpRow(build, pathId, open[i]!.row);
+        childBucket = createEmptyBottomUpRow(build, pathId, open[i]!.row, parentBucket);
         // Most buckets have one caller: a literal holds one slot, where a push onto `[]` reserves 17.
         if (existingChildren) {
           existingChildren.push(childBucket);
@@ -797,14 +830,17 @@ export function toBottomUpTree(
  * {@link toBottomUpTree} of the store's shown rows, in slices that hand the thread
  * back between them (see {@link FrameBudgetOptions}). Returns null once
  * `options.signal` aborts.
+ *
+ * @param rowsByKey - an empty map, filled with this build's rows by key; one build's only
  */
 export async function buildBottomUpTree(
   store: LogStore,
   options: FrameBudgetOptions = {},
   reported: ReportedUsage | null = null,
+  rowsByKey?: Map<number, KeyRows<BottomUpRow>>,
 ): Promise<BottomUpRow[] | null> {
   const index = await store.logIndex();
-  return driveSteps(bottomUpSteps(buildContext(index, store, reported)), options);
+  return driveSteps(bottomUpSteps(buildContext(index, store, reported, rowsByKey)), options);
 }
 
 /**
@@ -874,18 +910,32 @@ class MergedRow<C> {
   declare governorCost: number | null;
   declare governorCostMax: number | null;
   declare reported: ReportedCounts;
+  declare _parent: C | null;
+  declare _nextOfKey: C | null;
   declare _children: C[] | null;
   declare eventIds: number[];
   declare private readonly _labels: SignatureLabels;
 
   /** @param row - the index row of the row's first call */
-  constructor(build: BuildContext, pathId: number, row: number, eventIds: number[]) {
+  constructor(
+    build: BuildContext,
+    pathId: number,
+    row: number,
+    parent: C | null,
+    eventIds: number[],
+  ) {
     const { index } = build;
     const eventId = index.eventId[row]!; // row < rowCount
     // Assigned in one order, so every row shares one shape.
     this.id = build.idFor();
     this._pathId = pathId;
     this._labels = build.labelsOf(eventId);
+    // Linked through the rows, not held in an array per key: an array's spare slots cost more.
+    const rows = this._labels.rows;
+    this._nextOfKey = (rows?.first as C | null | undefined) ?? null;
+    if (rows) {
+      rows.first = this;
+    }
     this.callerNamespace = callerNamespaceOfRow(index, row);
     this.namespace = this._labels.namespace;
     this.eventId = eventId;
@@ -906,6 +956,7 @@ class MergedRow<C> {
     this.governorCost = 0;
     this.governorCostMax = 0;
     this.reported = NO_REPORTED;
+    this._parent = parent;
     this._children = null;
     this.eventIds = eventIds;
   }
@@ -931,10 +982,20 @@ class MergedRow<C> {
   }
 }
 
-function createEmptyAggregatedRow(build: BuildContext, pathId: number, row: number): AggregatedRow {
-  return new MergedRow<AggregatedRow>(build, pathId, row, []);
+function createEmptyAggregatedRow(
+  build: BuildContext,
+  pathId: number,
+  row: number,
+  parent: AggregatedRow | null,
+): AggregatedRow {
+  return new MergedRow<AggregatedRow>(build, pathId, row, parent, []);
 }
 
-function createEmptyBottomUpRow(build: BuildContext, pathId: number, row: number): BottomUpRow {
-  return new MergedRow<BottomUpRow>(build, pathId, row, NO_EVENT_IDS);
+function createEmptyBottomUpRow(
+  build: BuildContext,
+  pathId: number,
+  row: number,
+  parent: BottomUpRow | null,
+): BottomUpRow {
+  return new MergedRow<BottomUpRow>(build, pathId, row, parent, NO_EVENT_IDS);
 }

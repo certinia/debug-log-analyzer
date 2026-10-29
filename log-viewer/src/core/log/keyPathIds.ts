@@ -200,6 +200,11 @@ export class KeyPathIds {
     return this.parents[pathId]!;
   }
 
+  /** The key `pathId` ends in; -1 for the empty path or an id never minted. */
+  public keyIdOfPath(pathId: number): number {
+    return this.keyOf[pathId] ?? -1;
+  }
+
   /** How many keys `pathId` stands for: the depth of the row it names, 0 at the
    *  root. */
   public depthOf(pathId: number): number {

@@ -1,6 +1,7 @@
 /*
  * Copyright (c) 2026 Certinia Inc. All rights reserved.
  */
+import { ROOT_PATH_ID, type KeyPathIds } from '#core/log/keyPathIds.js';
 import type { LogStore } from '#core/log/LogStore.js';
 import type { RowKey, TreeSource } from '../../../grid/index.js';
 import {
@@ -8,6 +9,7 @@ import {
   buildBottomUpTree,
   type AggregatedRow,
   type BottomUpRow,
+  type KeyRows,
 } from '../utils/Aggregation.js';
 import { reportedUsageOf } from '../utils/reportedUsage.js';
 
@@ -31,9 +33,11 @@ function bottomUpBuild(store: LogStore): SharedBuild {
     stop,
     waiting: 0,
     done: false,
-    tree: reportedUsageOf(store.log)
-      .then((usage) => buildBottomUpTree(store, { signal: stop.signal }, usage))
-      .then((roots) => roots && new MergedTree(roots)),
+    tree: reportedUsageOf(store.log).then(async (usage) => {
+      const rowsByKey = new Map<number, KeyRows<BottomUpRow>>();
+      const roots = await buildBottomUpTree(store, { signal: stop.signal }, usage, rowsByKey);
+      return roots && new MergedTree(roots, store.keyPathIds(), rowsByKey);
+    }),
   };
   // A failed or stopped build is forgotten, so the next caller builds again.
   const settle = (tree: MergedTree<BottomUpRow> | null): void => {
@@ -63,17 +67,21 @@ function untilAborted<T>(work: Promise<T>, signal?: AbortSignal): Promise<T | nu
 export interface MergedRowShape<R> {
   id: number;
   _pathId: number;
+  _parent?: R | null;
+  _nextOfKey?: R | null;
   _children?: R[] | null;
 }
 
 /**
- * A built Aggregated or Bottom-Up tree, with the parent and path-id lookups its rows
- * lack. The inspector names rows by path id, the grid by row key.
+ * A built Aggregated or Bottom-Up tree, with the path-id lookups its rows lack.
+ * The inspector names rows by path id, the grid by row key.
  */
 export class MergedTree<R extends MergedRowShape<R>> {
   readonly source: TreeSource<R>;
-  private readonly _parents = new Map<R, R>();
-  private readonly _byPath = new Map<number, R>();
+  private readonly _paths: Pick<KeyPathIds, 'keyIdOfPath' | 'parentOf'>;
+  private readonly _rowsByKey: ReadonlyMap<number, KeyRows<R>>;
+  // A view marks its pick again on each pointer-leave, with the same array.
+  private _lastMark: { pathIds: readonly number[]; keys: Set<RowKey> } | null = null;
 
   /**
    * The Bottom-Up tree of the events `store` shows, built once per store and shared, so its
@@ -107,50 +115,79 @@ export class MergedTree<R extends MergedRowShape<R>> {
     store: LogStore,
     options: { signal?: AbortSignal } = {},
   ): Promise<MergedTree<AggregatedRow> | null> {
-    const roots = await buildAggregatedTree(store, options, await reportedUsageOf(store.log));
-    return roots ? new MergedTree(roots) : null;
+    const usage = await reportedUsageOf(store.log);
+    const rowsByKey = new Map<number, KeyRows<AggregatedRow>>();
+    const roots = await buildAggregatedTree(store, options, usage, rowsByKey);
+    return roots ? new MergedTree(roots, store.keyPathIds(), rowsByKey) : null;
   }
 
-  constructor(roots: readonly R[]) {
-    const walk = (row: R): void => {
-      this._byPath.set(row._pathId, row);
-      for (const child of row._children ?? []) {
-        this._parents.set(child, row);
-        walk(child);
-      }
-    };
-    roots.forEach(walk);
+  /**
+   * @param paths - the table that minted the rows' path ids
+   * @param rowsByKey - every row of the tree, by the key id its path ends in
+   */
+  constructor(
+    roots: readonly R[],
+    paths: Pick<KeyPathIds, 'keyIdOfPath' | 'parentOf'>,
+    rowsByKey: ReadonlyMap<number, KeyRows<R>>,
+  ) {
+    this._paths = paths;
+    this._rowsByKey = rowsByKey;
     this.source = { roots, children: (row) => row._children, key: (row) => row.id };
   }
 
   parentOf(row: R): R | undefined {
-    return this._parents.get(row);
+    return row._parent ?? undefined;
   }
 
-  /** The keys of every row `pathIds` name. */
+  /** The keys of every row `pathIds` name. Shared with the next call for the same array. */
   marked(pathIds: readonly number[]): Set<RowKey> {
-    return new Set(pathIds.flatMap((id) => this._byPath.get(id)?.id ?? []));
+    if (this._lastMark?.pathIds === pathIds) {
+      return this._lastMark.keys;
+    }
+    const keys = new Set<RowKey>();
+    this._eachRowAt(pathIds, (row) => keys.add(row.id));
+    this._lastMark = { pathIds, keys };
+    return keys;
   }
 
   /** The row `pathIds` name nearest the top: a frame heads its own bucket and sits under callers in others. */
   rowFor(pathIds: readonly number[]): R | undefined {
-    let nearest: R | undefined;
+    // Only a path with no parent path can name a top-level row, so most ids skip the search.
     for (const id of pathIds) {
-      const row = this._byPath.get(id);
-      if (row && !this._parents.has(row)) {
-        return row;
+      if (this._paths.parentOf(id) === ROOT_PATH_ID) {
+        const top = this.source.roots.find((row) => row._pathId === id);
+        if (top) {
+          return top;
+        }
       }
-      nearest ??= row;
     }
-    return nearest;
+    const rows = new Map<number, R>();
+    this._eachRowAt(pathIds, (row) => rows.set(row._pathId, row));
+    return pathIds.map((id) => rows.get(id)).find((row) => row !== undefined);
   }
 
   /** The keys from a top-level row down to the {@link rowFor} of `pathIds`. */
   pathTo(pathIds: readonly number[]): RowKey[] {
     const path: RowKey[] = [];
-    for (let row = this.rowFor(pathIds); row; row = this._parents.get(row)) {
+    for (let row = this.rowFor(pathIds); row; row = this.parentOf(row)) {
       path.unshift(row.id);
     }
     return path;
+  }
+
+  private _eachRowAt(pathIds: readonly number[], found: (row: R) => void): void {
+    const wanted = new Set(pathIds);
+    const keyIds = new Set<number>();
+    for (const id of pathIds) {
+      keyIds.add(this._paths.keyIdOfPath(id));
+    }
+    for (const keyId of keyIds) {
+      let row = this._rowsByKey.get(keyId)?.first;
+      for (; row; row = row._nextOfKey) {
+        if (wanted.has(row._pathId)) {
+          found(row);
+        }
+      }
+    }
   }
 }
