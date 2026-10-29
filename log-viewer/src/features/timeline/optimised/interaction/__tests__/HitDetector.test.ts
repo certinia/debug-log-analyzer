@@ -76,6 +76,15 @@ describe('HitDetector, over a bucket', () => {
   });
 });
 
+// At zoom 1 a bucket spans 2ns: [0-2.5] is drawn as a rect, and only [3-3.5] falls in [2-4].
+describe('HitDetector, over a bucket beside a drawn frame', () => {
+  it('names the frame the bucket holds, not the longer one reaching into its cell', () => {
+    const frames = [timelineEvent(0, 2.5, 'Apex'), timelineEvent(3, 0.5, 'Apex')];
+
+    expect(bucketHitAt(frames, 3.8)).toBe(3);
+  });
+});
+
 describe('HitDetector, before a render has drawn anything', () => {
   it.each<
     [string, () => FrameSpec[], number, Parameters<typeof makeViewport>[0], number, number | null]

@@ -54,8 +54,8 @@ const { BRANCHING_FACTOR, MIN_NODE_SPAN } = SEGMENT_TREE_CONSTANTS;
 type AggregationBucket = {
   depth: number;
   bucketIndex: number;
-  timeStart: number;
-  timeEnd: number;
+  firstStart: number;
+  lastStart: number;
   eventCount: number;
   categoryStats: Map<string, CategoryAggregation>;
   dominantCategory: string; // Resolved after all nodes aggregated
@@ -187,14 +187,14 @@ export class TemporalSegmentTree {
         continue;
       }
 
-      const { bucketIndex, depth, timeStart, timeEnd } = bucket;
+      const { bucketIndex, depth, firstStart, lastStart } = bucket;
       categoryBuckets.push({
         id: `bucket-${key}`,
         // Grid-aligned X position: bucketIndex * BUCKET_WIDTH (always on 2px grid)
         x: bucketIndex * BUCKET_CONSTANTS.BUCKET_WIDTH,
         y: depth * eventHeight,
-        timeStart,
-        timeEnd,
+        firstStart,
+        lastStart,
         depth,
         eventCount,
         categoryStats: {
@@ -381,7 +381,7 @@ export class TemporalSegmentTree {
         }
         const span = Math.max(MIN_NODE_SPAN, rowTotal);
         if (span <= bucketTimeWidth) {
-          const bucket = this.bucketAt(tree.depth, rowStart, bucketTimeWidth, bucketMap);
+          const bucket = this.bucketAt(tree.depth, rowStart, rowStart, bucketTimeWidth, bucketMap);
           bucket.eventCount++;
           addStats(bucket.categoryStats, rectCategory(this.columns, row), 1, span);
           bucketedEventCount++;
@@ -400,7 +400,9 @@ export class TemporalSegmentTree {
       }
 
       if (Math.max(MIN_NODE_SPAN, timeEnd - timeStart) <= bucketTimeWidth) {
-        const bucket = this.bucketAt(tree.depth, timeStart, bucketTimeWidth, bucketMap);
+        const lastLeaf = Math.min((index + 1) * BRANCHING_FACTOR ** level, tree.rows.length) - 1;
+        const lastStart = start[tree.rows[lastLeaf]!]!;
+        const bucket = this.bucketAt(tree.depth, timeStart, lastStart, bucketTimeWidth, bucketMap);
         const at = index * slots;
         for (let slot = 0; slot < slots; slot++) {
           const count = branch.slotCount[at + slot]!;
@@ -431,13 +433,15 @@ export class TemporalSegmentTree {
   }
 
   /**
-   * The grid-aligned bucket a node starting at `timeStart` falls in.
+   * The grid-aligned bucket a node starting at `timeStart` falls in, widened to hold the
+   * node's frames up to the one starting at `lastStart`, which may lie past the cell.
    * Multiple nodes that fall into the same grid cell are merged into one bucket.
    * Dominant category is resolved after all nodes are aggregated.
    */
   private bucketAt(
     depth: number,
     timeStart: number,
+    lastStart: number,
     bucketTimeWidth: number,
     bucketMap: Map<number, AggregationBucket>,
   ): AggregationBucket {
@@ -450,13 +454,15 @@ export class TemporalSegmentTree {
       bucket = {
         depth,
         bucketIndex,
-        timeStart: bucketIndex * bucketTimeWidth,
-        timeEnd: (bucketIndex + 1) * bucketTimeWidth,
+        firstStart: timeStart,
+        lastStart,
         eventCount: 0,
         categoryStats: new Map(),
         dominantCategory: '', // Resolved after all nodes aggregated
       };
       bucketMap.set(bucketKey, bucket);
+    } else if (lastStart > bucket.lastStart) {
+      bucket.lastStart = lastStart;
     }
     return bucket;
   }

@@ -400,10 +400,10 @@ export interface PixelBucket {
   x: number;
   /** Screen Y position (depth * EVENT_HEIGHT) */
   y: number;
-  /** Start time in nanoseconds (time-aligned boundary) */
-  timeStart: number;
-  /** End time in nanoseconds */
-  timeEnd: number;
+  /** Start, in nanoseconds, of the first frame it holds */
+  firstStart: number;
+  /** Start, in nanoseconds, of the last frame it holds: it can lie past the bucket's cell */
+  lastStart: number;
   /** Call stack depth (0-indexed) */
   depth: number;
   /** Number of aggregated events */

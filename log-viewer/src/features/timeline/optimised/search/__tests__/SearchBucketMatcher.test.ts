@@ -3,8 +3,11 @@
  */
 import { describe, expect, it } from '@jest/globals';
 
+import { rectsOf, timelineEvent } from '#test-helpers/timeline.js';
+import { makeViewport } from '#test-helpers/viewport.js';
 import type { MatchSpan } from '../../../types/search.types.js';
 import type { BatchColorInfo } from '../../BucketColorResolver.js';
+import { RectangleCache } from '../../RectangleCache.js';
 import { colorToGreyscale } from '../../rendering/ColorUtils.js';
 import {
   buildMatchIndex,
@@ -30,8 +33,8 @@ function match(timeStart: number, depth: number, category: string): MatchSpan {
   return { timeStart, depth, category };
 }
 
-function bucket(timeStart: number, timeEnd: number, depth: number) {
-  return { depth, timeStart, timeEnd, color: BUCKET };
+function bucket(firstStart: number, lastStart: number, depth: number) {
+  return { depth, firstStart, lastStart, color: BUCKET };
 }
 
 describe('buildMatchIndex', () => {
@@ -97,16 +100,16 @@ describe('resolveBucketSearchColor', () => {
     expect(resolveBucketSearchColor(bucket(0, 100, 0), index, batchColors)).toBe(UNRANKED);
   });
 
-  it('counts a match on the bucket start, the range being half-open', () => {
+  it('counts a match on the start of the first frame it holds', () => {
     const index = buildMatchIndex([match(0, 0, 'DML')]);
 
     expect(resolveBucketSearchColor(bucket(0, 100, 0), index, batchColors)).toBe(DML);
   });
 
-  it('leaves a match on the bucket end to the next bucket', () => {
+  it('counts a match on the start of the last frame it holds', () => {
     const index = buildMatchIndex([match(100, 0, 'DML')]);
 
-    expect(resolveBucketSearchColor(bucket(0, 100, 0), index, batchColors)).toBe(GREY);
+    expect(resolveBucketSearchColor(bucket(0, 100, 0), index, batchColors)).toBe(DML);
   });
 
   it('ignores a match carrying no category', () => {
@@ -123,9 +126,19 @@ describe('resolveBucketSearchColor', () => {
       match(150, 0, 'DML'),
     ]);
 
-    expect(resolveBucketSearchColor(bucket(0, 100, 0), index, batchColors)).toBe(SOQL);
-    expect(resolveBucketSearchColor(bucket(100, 200, 0), index, batchColors)).toBe(DML);
-    expect(resolveBucketSearchColor(bucket(200, 300, 0), index, batchColors)).toBe(GREY);
+    expect(resolveBucketSearchColor(bucket(0, 99, 0), index, batchColors)).toBe(SOQL);
+    expect(resolveBucketSearchColor(bucket(100, 199, 0), index, batchColors)).toBe(DML);
+    expect(resolveBucketSearchColor(bucket(200, 299, 0), index, batchColors)).toBe(GREY);
+  });
+
+  // At zoom 1 a cell spans 2ns. [1.5-1.6] and [2.5-2.9] fit in one node, bucketed whole at 1.5.
+  it('colours the bucket holding a match that starts past the edge of its cell', () => {
+    const rects = rectsOf([timelineEvent(1.5, 0.1, 'Apex'), timelineEvent(2.5, 0.4, 'DML')]);
+    const { buckets } = new RectangleCache(rects).getCulledRectangles(makeViewport(), new Map());
+    const [held] = [...buckets.values()].flat();
+    const index = buildMatchIndex([match(2.5, 0, 'DML')]);
+
+    expect(resolveBucketSearchColor(held!, index, batchColors)).toBe(DML);
   });
 });
 

@@ -96,7 +96,7 @@ function firstAtOrAfter(starts: Float64Array, time: number): number {
  * the first match is taken as the winner to beat.
  */
 export function resolveBucketSearchColor(
-  bucket: Pick<PixelBucket, 'depth' | 'timeStart' | 'timeEnd' | 'color'>,
+  bucket: Pick<PixelBucket, 'depth' | 'firstStart' | 'lastStart' | 'color'>,
   matchIndex: MatchesByDepth,
   batchColors: Map<string, BatchColorInfo>,
 ): number {
@@ -110,9 +110,9 @@ export function resolveBucketSearchColor(
   let matched = false;
 
   const { starts, categories } = depthMatches;
-  for (let i = firstAtOrAfter(starts, bucket.timeStart); i < starts.length; i++) {
+  for (let i = firstAtOrAfter(starts, bucket.firstStart); i < starts.length; i++) {
     // i < starts.length, and categories has the same length
-    if (starts[i]! >= bucket.timeEnd) {
+    if (starts[i]! > bucket.lastStart) {
       break;
     }
     const category = categories[i]!;
