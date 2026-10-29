@@ -54,7 +54,9 @@ describe('buildMatchIndex', () => {
   });
 
   it('builds a fresh index for a different set of matches', () => {
-    expect(buildMatchIndex([match(10, 0, 'DML')])).not.toBe(buildMatchIndex([match(10, 0, 'DML')]));
+    buildMatchIndex([match(10, 0, 'DML')]);
+
+    expect(buildMatchIndex([match(10, 0, 'SOQL')]).get(0)?.categories).toEqual(['SOQL']);
   });
 });
 

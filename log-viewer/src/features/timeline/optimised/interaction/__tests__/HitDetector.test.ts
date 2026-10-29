@@ -70,9 +70,9 @@ describe('HitDetector, over a bucket', () => {
   });
 
   it('picks the longest frame of one category', () => {
-    const frames = [timelineEvent(0, 0.2, 'Apex'), timelineEvent(0.3, 0.5, 'Apex')];
+    const frames = [timelineEvent(0, 0.5, 'Apex'), timelineEvent(0.6, 0.2, 'Apex')];
 
-    expect(bucketHitAt(frames, 1.5)).toBe(0.3);
+    expect(bucketHitAt(frames, 1.5)).toBe(0);
   });
 });
 
