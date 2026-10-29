@@ -7,72 +7,65 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-### Changed
-
-- ⚡ **Timeline**: large logs are ready 12× faster and use 90% less memory, measured on a 100 MB log. ([#1237])
-- ⚡ **UI**: many components, including the tab views and Inspector sections, appear up to 80× faster on large logs.
-- ⚡ **Tables**: the Call Tree, Analysis, Database and Inspector tables respond up to 30× faster on large logs and use 93% less memory. ([#1169])
-  - Sort, expand and filter take under 0.2 s, group by is up to 9× faster, column resize is smooth and Find never freezes the table.
-  - Screen reader and full keyboard support.
-  - `Cmd/Ctrl+C` copies the filtered rows and their depth in each table, and the Call Tree, Analysis and Database toolbars copy them or export them to CSV.
-- ⚡ **Call Tree and Analysis**: open faster and use less memory, measured on a 19 MB log. ([#1225])
-  - Bottom-Up opens 2.2× faster with 53% less memory, and no extra when Analysis shows it too.
-  - Aggregated opens 28% faster with 38% less memory.
-- ⚡ **Parser performance**: logs parse 8× faster and hold 98% less memory, down from 1.1 s to 0.13 s and 1.0 GB to 23 MB on a 100 MB log. ([#1231])
-- 🔍 **Find**: a more consistent and natural find experience. ([#986])
-  - Search matches highlight as you type.
-  - Typing goes to the nearest visible match.
-  - Searches persist after a sort, filter, group by, column change or view switch.
-- ✂️ **Truncation**: each skipped section states how much of the log it dropped.
-- 🌊 **Flows**: names drop the `FLOW_START_INTERVIEWS :` and `WF_CRITERIA :` prefixes.
-- 📚 **Multiple logs**: a file holding several logs shows the first and flags the rest.
-- 🪪 **Call tree**: the `USER_INFO` line shows as a row.
-- 🎯 **Entry point**: the header names the longest and counts the rest, and its tooltip lists the top five.
-- 🔭 **Timeline inspector**: the summary, call tree included, changes to reflect what is currently visible. ([#875])
-- 🧹 **Details filter**: with Details off, the Call Tree, Analysis and Inspector show every method, query and DML, even one that took no time, and hide debug lines and variables. ([#1234])
-  - Exceptions and limit usage stay in Time Order and Aggregated, and show in Bottom-Up and Analysis only with Details on.
-  - Picking a type that shows only with Details turns Details on, and back off when you pick a type that does not, unless Details was on already.
-- 🏷️ **Categories**: every row in the Call Tree and Analysis has a category, debug lines and variables included. ([#1244])
-  - Visualforce continuation frames show as System, like the rest of Visualforce.
-- 🎨 **Styling**: updated for the VS Code Modern UI.
-- 🧮 **Limit strip**: the tooltip always shows the seen count when it differs from the usage Salesforce reported, not only where it is lower.
-
 ### Added
 
 - 🔍 **Retrieve Apex Log**: search for text inside org logs from the log list. ([#594])
   - Logs you already downloaded are searched as you type.
   - The search row downloads the newest 5 logs from the org, then 50 more per press.
   - **Log: Clear Apex Log Cache** frees the space. Logs downloaded but not opened are kept in workspace storage and cleaned up on their own.
-- 🎚️ **Log levels**: filter the log to a lower debug level per category from the header. ([#530])
-- 🪜 **Expand and collapse**: the Call Tree and Analysis tables open or close one level per click, like VS Code trees, and the Database tables open or close all groups. ([#1204])
-  - The Call Tree and Analysis menu next to the button has Expand All and Collapse All, which include the groups.
+- 🎚️ **Log levels filters**: filter the log to a lower debug level per category from the header. ([#530])
+- 🔦 **Timeline legend**: hover a category to highlight frames in the timeline, select to keep. ([#917])
+- 🪜 **Expand and collapse**: the Call Tree and Analysis tables open or close one level per click, and the Database tables open or close all groups. ([#1204])
+  - The split button still has Expand All and Collapse All.
+- 🧮 **New limit columns**: show the SOQL, DML and SOSL usage Salesforce reported beside the counts we actually saw in the Call Tree and Analysis tables.
+- ↔️ **Table columns**: columns fit their content and fill the table, and the column menu can autosize or reset them.
 - 🔎 **Analysis filters**: filter the Analysis table by namespace, total time and self time, as in the Call Tree Bottom-Up view. ([#1209])
-- 💡 **Log level hints**: a section that a debug level leaves empty names the level it needs. ([#259])
 - 🔲 **Inspector sections**: maximize one section to fill the inspector, then restore the others as they were.
 - 📋 **Inspector menu**: show, hide or reset sections from the header, or reset the inspector's size. Double-clicking its edge resets the size too.
-- 🧮 **New limit columns**: show the SOQL, DML and SOSL usage Salesforce reported beside the counts we actually saw in the Call Tree and Analysis tables.
-- 🔦 **Timeline legend**: hover a category to highlight frames in the timeline, select to keep. ([#917])
-- 🔍 **Find**: in the tables, find matches the group header text too.
-- ↔️ **Table columns**: columns fit their content and fill the table, and the column menu can autosize or reset them.
+- 💡 **Log level hints**: more feedback when a specific log level is needed to show information. ([#259])
+
+### Changed
+
+- ⚡ **Timeline performance**: large logs are ready 12× faster and use 90% less memory, measured on a 100 MB log. ([#1237])
+- ⚡ **Parser performance**: logs parse 8× faster and hold 98% less memory, down from 1.1 s to 0.13 s and 1.0 GB to 23 MB on a 100 MB log. ([#1231])
+- ⚡ **UI performance**: many components, including the tab views and Inspector sections, appear up to 80× faster on large logs.
+- ⚡ **Call Tree and Analysis performance**: open faster and use less memory, measured on a 19 MB log. ([#1225])
+  - Bottom-Up opens 2.2× faster with 53% less memory, and no extra when Analysis shows it too.
+  - Aggregated opens 28% faster with 38% less memory.
+- ⚡ **Table performance**: the Call Tree, Analysis, Database and Inspector tables respond up to 30× faster on large logs and use 93% less memory. ([#1169])
+  - Sort, expand and filter take under 0.2 s, group by is up to 9× faster, column resize is smooth and Find never freezes the table.
+- 🔍 **Find**: a more consistent and natural find experience. ([#986])
+  - Matches highlight as you type, and typing goes to the nearest visible match.
+  - The current match stands out from the other matches, as it does in the editor.
+  - Searches persist after a sort, filter, group by, column change or view switch, and match group header text too.
+- 📤 **Copy and export**: work on every table, Analysis and Bottom-Up included, and take all filtered rows, not just the visible ones, with their depth. ([#1110])
+- 🔭 **Timeline inspector**: the summary, call tree included, changes to reflect what is currently visible. ([#875])
+- 🧹 **Details filter**: with Details off, the Call Tree, Analysis and Inspector show every method, query and DML, even one that took no time, and hide debug lines and variables. ([#1234])
+  - Exceptions and limit usage stay in Time Order and Aggregated, and show in Bottom-Up and Analysis only with Details on.
+  - Picking a type that shows only with Details turns Details on, and back off when you pick a type that does not, unless Details was on already.
+- ✂️ **Truncation**: each skipped section states how much of the log it dropped.
+- 🏷️ **Categories**: every row in the Call Tree and Analysis has a category, debug lines and variables included. ([#1244])
+  - Visualforce frames show as System
+- 🪪 **Call tree**: the `USER_INFO` line shows as a row.
+- 🧮 **Limit strip**: the tooltip always shows the seen count when it differs from the usage Salesforce reported, not only where it is lower.
+- 🎯 **Entry point**: the header names the longest and counts the rest, and its tooltip lists the top five.
+- 📚 **Multiple logs**: a file holding several logs shows the first and flags the rest.
+- 🌊 **Flows**: names drop the `FLOW_START_INTERVIEWS :` and `WF_CRITERIA :` prefixes.
+- 🎨 **Styling**: updated to be more consistent with VS Code
 
 ### Removed
 
 - 🪓 **Breaking**: the legacy Timeline and all its settings are dropped.
 - 🧹 **Breaking**: the `lana.inspector.size` setting is dropped. The inspector remembers the width you drag it to, and its height when docked at the bottom, on each machine instead.
-  - Migration: a size saved in the setting is not carried over, so drag the edge once. You can delete `lana.inspector.size` from `settings.json`.
 
 ### Fixed
 
 - 🧰 **Toolbars**: components no longer overlap when resized.
-- 🔎 **Retrieve Apex Log**: typing in the log list filters the logs. ([#594])
-- 📤 **Copy and export**: both work on Analysis and Bottom-Up. ([#1110])
-- 🔦 **Find**: in the tables, the current match stands out from the other matches, as it does in the editor.
 - 🐛 **Go to Code**: errors for methods not found in the file are shown correctly.
 - 🌊 **Flow errors**: multi-line errors show their message.
 - 🗃️ **SOQL and SOSL**: every keyword in the current syntax is highlighted, and `SET OPTIONS` and `UPDATE TRACKING` start their own line when a query is pretty-printed.
-- 🎯 **Raw log**: **Show in Log Analysis**, folding and the outline go to the right event when two events share a timestamp.
-- 🧭 **Show in Log Analysis**: opens the right log at the right event.
-- 📍 **Show in Timeline**: always goes to the event.
+- 🧭 **Go to event**: **Show in Log Analysis** and **Show in Timeline** always land on the right event, and Show in Log Analysis opens the right log.
+  - In the raw log, folding and the outline go to the right event too, even when two events share a timestamp.
 - ⏱️ **Timeline**: zoomed out, the tooltip names a frame under the pointer, not a longer one beside it, and search colours every cluster of tiny frames that holds a match.
 - 🔬 **Variables**: a constructor's `this` names its class, not the outer class or the namespace. ([#1229])
 - 🌳 **Hidden rows**: Go to Call Tree and Inspector findings say when the filters hide their row and offer to clear them, turning Details on when only Details hides it. ([#1211])
