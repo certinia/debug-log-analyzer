@@ -26,17 +26,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-- ⚡ **Timeline**: large logs are ready 3.1× faster and use 47% less memory, measured on a 100 MB log.
-- ⚡ **UI**: many components, including the tab views and Inspector sections, appear up to 80× faster on large logs.
-- ⚡ **Tables**: the Call Tree, Analysis, Database and Inspector tables respond up to 30× faster on large logs and use 93% less memory. ([#1169])
-  - Sort, expand and filter take under 0.2 s, group by is up to 9× faster, column resize is smooth and Find never freezes the table.
-  - `Cmd/Ctrl+C` now copies all filtered rows, not just visible, and their depth in each table, and the Call Tree. The same applies to CSV export.
+- ⚡ **Timeline performance**: large logs are ready 12× faster and use 90% less memory, measured on a 100 MB log. ([#1237])
 - ⚡ **Parser performance**: logs parse 8× faster and hold 98% less memory, down from 1.1 s to 0.13 s and 1.0 GB to 23 MB on a 100 MB log. ([#1231])
+- ⚡ **UI performance**: many components, including the tab views and Inspector sections, appear up to 80× faster on large logs.
+- ⚡ **Call Tree and Analysis performance**: open faster and use less memory, measured on a 19 MB log. ([#1225])
+  - Bottom-Up opens 2.2× faster with 53% less memory, and no extra when Analysis shows it too.
+  - Aggregated opens 28% faster with 38% less memory.
+- ⚡ **Table performance**: the Call Tree, Analysis, Database and Inspector tables respond up to 30× faster on large logs and use 93% less memory. ([#1169])
+  - Sort, expand and filter take under 0.2 s, group by is up to 9× faster, column resize is smooth and Find never freezes the table.
 - 🔍 **Find**: a more consistent and natural find experience. ([#986])
-  - Search matches highlight as you type.
-  - Typing goes to the nearest visible match.
-  - Searches persist after a sort, filter, group by, column change or view switch.
-  - Find matches the group header text too.
+  - Matches highlight as you type, and typing goes to the nearest visible match.
+  - The current match stands out from the other matches, as it does in the editor.
+  - Searches persist after a sort, filter, group by, column change or view switch, and match group header text too.
+- 📤 **Copy and export**: work on every table, Analysis and Bottom-Up included, and take all filtered rows, not just the visible ones, with their depth. ([#1110])
 - 🔭 **Timeline inspector**: the summary, call tree included, changes to reflect what is currently visible. ([#875])
 - 🧹 **Details filter**: with Details off, the Call Tree, Analysis and Inspector show every method, query and DML, even one that took no time, and hide debug lines and variables. ([#1234])
   - Exceptions and limit usage stay in Time Order and Aggregated, and show in Bottom-Up and Analysis only with Details on.
@@ -44,12 +46,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - ✂️ **Truncation**: each skipped section states how much of the log it dropped.
 - 🏷️ **Categories**: every row in the Call Tree and Analysis has a category, debug lines and variables included. ([#1244])
   - Visualforce frames show as System
-  - 🪪 **Call tree**: the `USER_INFO` line shows as a row.
+- 🪪 **Call tree**: the `USER_INFO` line shows as a row.
 - 🧮 **Limit strip**: the tooltip always shows the seen count when it differs from the usage Salesforce reported, not only where it is lower.
 - 🎯 **Entry point**: the header names the longest and counts the rest, and its tooltip lists the top five.
 - 📚 **Multiple logs**: a file holding several logs shows the first and flags the rest.
 - 🌊 **Flows**: names drop the `FLOW_START_INTERVIEWS :` and `WF_CRITERIA :` prefixes.
-- 🎨 **Styling**: updated to be more consitent with VSCode
+- 🎨 **Styling**: updated to be more consistent with VS Code
 
 ### Removed
 
@@ -59,14 +61,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 
 - 🧰 **Toolbars**: components no longer overlap when resized.
-- 📤 **Copy and export**: both work on Analysis and Bottom-Up. ([#1110])
-- 🔦 **Find**: in the tables, the current match stands out from the other matches, as it does in the editor.
 - 🐛 **Go to Code**: errors for methods not found in the file are shown correctly.
 - 🌊 **Flow errors**: multi-line errors show their message.
 - 🗃️ **SOQL and SOSL**: every keyword in the current syntax is highlighted, and `SET OPTIONS` and `UPDATE TRACKING` start their own line when a query is pretty-printed.
-- 🎯 **Raw log**: **Show in Log Analysis**, folding and the outline go to the right event when two events share a timestamp.
-- 🧭 **Show in Log Analysis**: opens the right log at the right event.
-- 📍 **Show in Timeline**: always goes to the event.
+- 🧭 **Go to event**: **Show in Log Analysis** and **Show in Timeline** always land on the right event, and Show in Log Analysis opens the right log.
+  - In the raw log, folding and the outline go to the right event too, even when two events share a timestamp.
+- ⏱️ **Timeline**: zoomed out, the tooltip names a frame under the pointer, not a longer one beside it, and search colours every cluster of tiny frames that holds a match.
 - 🔬 **Variables**: a constructor's `this` names its class, not the outer class or the namespace. ([#1229])
 - 🌳 **Hidden rows**: Go to Call Tree and Inspector findings say when the filters hide their row and offer to clear them, turning Details on when only Details hides it. ([#1211])
 
@@ -614,6 +614,8 @@ Skipped due to adopting odd numbering for pre releases and even number for relea
 <!-- Unreleased -->
 
 [#1231]: https://github.com/certinia/debug-log-analyzer/issues/1231
+[#1225]: https://github.com/certinia/debug-log-analyzer/issues/1225
+[#1237]: https://github.com/certinia/debug-log-analyzer/issues/1237
 [#1244]: https://github.com/certinia/debug-log-analyzer/issues/1244
 [#1229]: https://github.com/certinia/debug-log-analyzer/issues/1229
 [#1234]: https://github.com/certinia/debug-log-analyzer/issues/1234

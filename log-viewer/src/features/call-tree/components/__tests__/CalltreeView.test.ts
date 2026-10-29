@@ -26,8 +26,8 @@ jest.mock('../../grid/columns.js', () => ({
 }));
 jest.mock('../../utils/Aggregation.js', () => ({
   ...jest.requireActual<object>('../../utils/Aggregation.js'),
-  buildAggregatedTree: (...args: unknown[]) => heldBuild(args[1]),
-  buildBottomUpTree: (...args: unknown[]) => heldBuild(args[1]),
+  buildAggregatedTree: (...args: unknown[]) => heldBuild(args[1], args[3]),
+  buildBottomUpTree: (...args: unknown[]) => heldBuild(args[1], args[3]),
 }));
 // VsSelect extends vscode-single-select, whose setFormValue needs an
 // ElementInternals jsdom lacks; the render would upgrade it.
@@ -51,6 +51,7 @@ import { exportCsv } from '../../../../components/grid/exportCsv.js';
 import { eventBus } from '#core/events/EventBus.js';
 import type { LogIndex } from '#core/log/LogIndex.js';
 import { LogStore, logStoreFor } from '#core/log/LogStore.js';
+import { MergedTree } from '../../grid/mergedRows.js';
 import { CalltreeView } from '../CalltreeView.js';
 
 /** Which view each build made, in order. */
@@ -65,12 +66,27 @@ let applySettings: (settings: object) => void = () => {};
 /** The signals the merged builds were given, in order. */
 let buildSignals: (AbortSignal | undefined)[] = [];
 
-function heldBuild(options: unknown): Promise<object[]> {
+function heldBuild(options: unknown, rowsByKey: unknown): Promise<object[]> {
   buildSignals.push((options as { signal?: AbortSignal } | undefined)?.signal);
   if (!holdBuilds) {
     return Promise.resolve([]);
   }
-  return new Promise((resolve) => (finishBuild = resolve));
+  // The real build fills the rows by key as it makes them; this one is handed finished roots.
+  const byKey = rowsByKey as Map<number, { first: BottomUpRow | null }> | undefined;
+  return new Promise(
+    (resolve) =>
+      (finishBuild = (roots) => {
+        const pending = [...(roots as BottomUpRow[])];
+        for (let row = pending.pop(); row; row = pending.pop()) {
+          if (byKey) {
+            row._nextOfKey = byKey.get(row._keyId)?.first ?? null;
+            byKey.set(row._keyId, { first: row });
+          }
+          pending.push(...(row._children ?? []));
+        }
+        resolve(roots);
+      }),
+  );
 }
 
 /** The hidden-row bar's Clear, by its accessible name. */
@@ -282,6 +298,15 @@ describe('calltree-view table lifetime', () => {
     await settle();
 
     expect(buildSignals.map((signal) => signal?.aborted)).toEqual([true, false]);
+  });
+
+  // A copy of its own would hold every row a second time beside the Analysis view.
+  it('shows the Bottom-Up rows every view of the log shares', async () => {
+    await view._setViewMode('bottom-up');
+    await settle();
+    const shared = await MergedTree.bottomUp(view.logStore!); // mountView set it
+
+    expect(view.bottomUpGrid?.source?.roots).toBe(shared?.source.roots);
   });
 
   it('offers Group only in bottom up', async () => {

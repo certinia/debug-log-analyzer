@@ -18,6 +18,7 @@
 import { BitmapText, Container } from 'pixi.js';
 import type { RenderBatch, ViewportState } from '../../types/flamechart.types.js';
 import { TEXT_LABEL_CONSTANTS, TIMELINE_CONSTANTS } from '../../types/flamechart.types.js';
+import type { RowSet } from '../../types/search.types.js';
 import type { PrecomputedRect } from '../RectangleCache.js';
 import type { TextLabelRenderer } from '../TextLabelRenderer.js';
 import { isLightBackground } from '../rendering/ColorUtils.js';
@@ -41,8 +42,8 @@ export class SearchTextLabelRenderer {
   /** Container for unmatched (dimmed) text labels */
   private container: Container;
 
-  /** Labels for unmatched events keyed by rectangle ID */
-  private labels: Map<string, BitmapText> = new Map();
+  /** Labels for unmatched events keyed by row */
+  private labels: Map<number, BitmapText> = new Map();
 
   /** Batch color data for contrast calculation */
   private batches: Map<string, RenderBatch>;
@@ -76,13 +77,13 @@ export class SearchTextLabelRenderer {
    * Non-matched events are rendered here (dimmed).
    *
    * @param culledRects - Rectangles grouped by category (from RectangleCache)
-   * @param matchedEventIds - Set of event IDs that match search
+   * @param matchedRows - Rows that match the search
    * @param viewport - Current viewport state for sticky label positioning
    * @param litCategories - Categories whose every label stays legible, as if matched
    */
   public render(
     culledRects: Map<string, PrecomputedRect[]>,
-    matchedEventIds: ReadonlySet<string>,
+    matchedRows: RowSet,
     viewport: ViewportState,
     litCategories: ReadonlySet<string> = NO_CATEGORIES,
   ): void {
@@ -92,10 +93,10 @@ export class SearchTextLabelRenderer {
     }
 
     // Render unmatched events (dimmed) - managed by this renderer
-    this.renderUnmatchedLabels(culledRects, matchedEventIds, viewport, litCategories);
+    this.renderUnmatchedLabels(culledRects, matchedRows, viewport, litCategories);
 
     // Filter to matched rects only, then delegate to TextLabelRenderer
-    const matchedRects = this.filterMatchedRects(culledRects, matchedEventIds, litCategories);
+    const matchedRects = this.filterMatchedRects(culledRects, matchedRows, litCategories);
     this.textLabelRenderer.render(matchedRects, viewport);
   }
 
@@ -103,13 +104,13 @@ export class SearchTextLabelRenderer {
    * Filter culledRects to only include rectangles that match the search.
    *
    * @param culledRects - All visible rectangles grouped by category
-   * @param matchedEventIds - Set of event IDs that match search
+   * @param matchedRows - Rows that match the search
    * @param litCategories - Categories kept whole
    * @returns Filtered map containing only matched rectangles
    */
   private filterMatchedRects(
     culledRects: Map<string, PrecomputedRect[]>,
-    matchedEventIds: ReadonlySet<string>,
+    matchedRows: RowSet,
     litCategories: ReadonlySet<string>,
   ): Map<string, PrecomputedRect[]> {
     const result = new Map<string, PrecomputedRect[]>();
@@ -118,10 +119,10 @@ export class SearchTextLabelRenderer {
         result.set(category, rects);
         continue;
       }
-      if (matchedEventIds.size === 0) {
+      if (matchedRows.size === 0) {
         continue;
       }
-      const matched = rects.filter((r) => matchedEventIds.has(r.id));
+      const matched = rects.filter((r) => matchedRows.has(r.row));
       if (matched.length > 0) {
         result.set(category, matched);
       }
@@ -133,13 +134,13 @@ export class SearchTextLabelRenderer {
    * Render labels for non-matched events with dimmed opacity.
    *
    * @param culledRects - Rectangles grouped by category
-   * @param matchedEventIds - Set of matched event IDs
+   * @param matchedRows - Rows that match the search
    * @param viewport - Current viewport state
    * @param litCategories - Categories skipped whole
    */
   private renderUnmatchedLabels(
     culledRects: Map<string, PrecomputedRect[]>,
-    matchedEventIds: ReadonlySet<string>,
+    matchedRows: RowSet,
     viewport: ViewportState,
     litCategories: ReadonlySet<string>,
   ): void {
@@ -156,7 +157,7 @@ export class SearchTextLabelRenderer {
       }
       for (const rect of rects) {
         // Only process non-matched events
-        if (matchedEventIds.has(rect.id)) {
+        if (matchedRows.has(rect.row)) {
           continue;
         }
 
@@ -188,7 +189,7 @@ export class SearchTextLabelRenderer {
         }
 
         // Lazy create or reuse label
-        let label = this.labels.get(rect.id);
+        let label = this.labels.get(rect.row);
         if (!label) {
           label = new BitmapText({
             text: '',
@@ -199,7 +200,7 @@ export class SearchTextLabelRenderer {
           });
           label.scale.y = -1; // Compensate for worldContainer Y-axis inversion
           this.container.addChild(label);
-          this.labels.set(rect.id, label);
+          this.labels.set(rect.row, label);
         }
 
         // Update label

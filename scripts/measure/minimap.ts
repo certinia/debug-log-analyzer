@@ -13,7 +13,6 @@ import type { ApexLog } from '@apexdevtools/apex-log-parser';
 
 import { buildLogIndex } from '../../log-viewer/src/core/log/LogIndex.js';
 import { MinimapDensityQuery } from '../../log-viewer/src/features/timeline/optimised/minimap/MinimapDensityQuery.js';
-import { RectangleCache } from '../../log-viewer/src/features/timeline/optimised/RectangleCache.js';
 import { BUCKET_CONSTANTS } from '../../log-viewer/src/features/timeline/types/flamechart.types.js';
 import { buildTimelineFrames } from '../../log-viewer/src/features/timeline/utils/timeline-frames.js';
 import { heapMb, line, ms, nowMs, print, time } from './harness.js';
@@ -45,13 +44,11 @@ interface Subject {
 function build(log: ApexLog): Subject {
   const categories = new Set<string>(BUCKET_CONSTANTS.CATEGORY_PRIORITY);
   const frames = buildTimelineFrames(buildLogIndex(log), categories, log.columns.endTimestamp[0]!);
-  const cache = new RectangleCache(frames);
-  const rects = [...cache.getRectsByCategory().values()];
 
   return {
-    query: new MinimapDensityQuery(rects, frames.totalDuration, frames.maxDepth),
+    query: new MinimapDensityQuery(frames),
     // One entry per rect, so this is the sweep's own input.
-    frames: rects.reduce((sum, each) => sum + each.length, 0),
+    frames: frames.rectRowsByDepth.reduce((sum, rows) => sum + rows.length, 0),
     maxDepth: frames.maxDepth,
   };
 }

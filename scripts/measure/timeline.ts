@@ -56,7 +56,7 @@ async function build(log: ApexLog) {
   const cache = new RectangleCache(frames);
   new TreeNavigator(frames);
   const matcher = new EventMatcher<EventNode>(frames);
-  return { frames, cache, matcher };
+  return { index, frames, cache, matcher };
 }
 
 function viewportFor(
@@ -76,22 +76,25 @@ function viewportFor(
 
 /** A CSV of what the timeline holds and draws, so two revisions can be diffed. */
 export async function digestTimeline(log: ApexLog): Promise<void> {
-  const { frames, cache } = await build(log);
-  const { maxDepth, totalDuration, rectsByDepth } = frames;
+  const { index, frames, cache } = await build(log);
+  const { maxDepth, totalDuration, rectRowsByDepth } = frames;
 
   print('section,key,a,b,c,d');
   print(`total,,${maxDepth},${totalDuration},,`);
-  const depths = [...rectsByDepth.keys()].sort((a, b) => a - b);
-  for (const depth of depths) {
-    const rects = rectsByDepth.get(depth)!;
+  rectRowsByDepth.forEach((byStart, depth) => {
+    if (!byStart.length) {
+      return;
+    }
+    // Summed in row order, so the float sums match revisions that kept rects in pre-order.
+    const rows = [...byStart].sort((a, b) => a - b);
     let start = 0;
     let self = 0;
-    for (const rect of rects) {
-      start += rect.timeStart;
-      self += rect.selfDuration;
+    for (const row of rows) {
+      start += frames.start[row]!;
+      self += index.self[row]!;
     }
-    print(`depth,${depth},${rects.length},${start},${self},`);
-  }
+    print(`depth,${depth},${rows.length},${start},${self},`);
+  });
 
   for (const window of WINDOWS) {
     const culled = cache.getCulledRectangles(viewportFor(totalDuration, maxDepth, window), COLORS);
@@ -114,10 +117,7 @@ export async function measureTimeline(log: ApexLog): Promise<void> {
   const before = heapMb();
   const { frames, cache, matcher } = await time('build to first frame', () => build(log));
   line('heap after build', `${heapMb() - before}MB`);
-  let rects = 0;
-  for (const each of frames.rectsByCategory.values()) {
-    rects += each.length;
-  }
+  const rects = frames.rectRowsByDepth.reduce((sum, rows) => sum + rows.length, 0);
   line('frames', `${rects}, maxDepth ${frames.maxDepth}`);
 
   const search = await time(`search "${SEARCH_TEXT}"`, () =>

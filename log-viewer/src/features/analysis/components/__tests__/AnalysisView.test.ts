@@ -106,6 +106,13 @@ describe('analysis-view', () => {
     jest.restoreAllMocks();
   });
 
+  // A copy of its own would hold every row a second time beside the Call Tree's Bottom-Up.
+  it('shows the Bottom-Up rows every view of the log shares', async () => {
+    const shared = await MergedTree.bottomUp(logStoreFor(log));
+
+    expect(roots()).toBe(shared?.source.roots);
+  });
+
   it('shows the bottom-up tree of the log, ranked by self time, frames only', () => {
     expect(roots().map((row) => [row.text, row.totalSelfTime])).toEqual(
       expect.arrayContaining([

@@ -24,12 +24,12 @@ import * as PIXI from 'pixi.js';
 
 import { createTimelineApp, destroyTimelineApp } from '../rendering/pixiApp.js';
 import type {
+  RectColumns,
   TimelineExtent,
   TimelineMarker,
   ViewportState,
 } from '../../types/flamechart.types.js';
 import { TIMELINE_CONSTANTS } from '../../types/flamechart.types.js';
-import type { RectangleCache } from '../RectangleCache.js';
 import type { CursorLineRenderer } from '../rendering/CursorLineRenderer.js';
 import type { TimelineViewport } from '../TimelineViewport.js';
 
@@ -147,7 +147,7 @@ export class MinimapOrchestrator {
   private callbacks: MinimapOrchestratorCallbacks;
 
   // References to external dependencies (not owned)
-  private index: TimelineExtent | null = null;
+  private extent: TimelineExtent | null = null;
   private viewport: TimelineViewport | null = null;
 
   constructor(callbacks: MinimapOrchestratorCallbacks) {
@@ -164,20 +164,18 @@ export class MinimapOrchestrator {
    * @param minimapDiv - HTML element to render minimap into
    * @param width - Canvas width
    * @param height - Full container height (minimap height calculated from this)
-   * @param index - Timeline event index for duration/depth info
-   * @param rectangleManager - Supplies the rectangles the density query walks
+   * @param frames - The frames' extent, and the rects the density query walks
    * @param viewport - Main timeline viewport (for reading state only)
    */
   public async init(
     minimapDiv: HTMLElement,
     width: number,
     height: number,
-    index: TimelineExtent,
-    rectangleManager: RectangleCache,
+    frames: TimelineExtent & RectColumns,
     viewport: TimelineViewport,
     minimapColors?: { widgetBackground: number; focusBorder: number; lineNumberForeground: number },
   ): Promise<void> {
-    this.index = index;
+    this.extent = frames;
     this.viewport = viewport;
     this.htmlContainer = minimapDiv;
 
@@ -187,13 +185,14 @@ export class MinimapOrchestrator {
     this.app = await createTimelineApp(minimapDiv, { width, height: minimapHeight });
 
     // Initialize minimap manager (state and coordinate transforms)
-    this.minimapViewport = new MinimapViewport(index.totalDuration, index.maxDepth, width, height);
-
-    this.densityQuery = new MinimapDensityQuery(
-      [...rectangleManager.getRectsByCategory().values()],
-      index.totalDuration,
-      index.maxDepth,
+    this.minimapViewport = new MinimapViewport(
+      frames.totalDuration,
+      frames.maxDepth,
+      width,
+      height,
     );
+
+    this.densityQuery = new MinimapDensityQuery(frames);
 
     // Create minimap container on stage
     this.container = new PIXI.Container();
@@ -231,7 +230,7 @@ export class MinimapOrchestrator {
     }
 
     this.htmlContainer = null;
-    this.index = null;
+    this.extent = null;
     this.viewport = null;
   }
 
@@ -381,13 +380,13 @@ export class MinimapOrchestrator {
    * Jump to timeline end.
    */
   public handleJumpEnd(): void {
-    if (!this.minimapViewport || !this.index) {
+    if (!this.minimapViewport || !this.extent) {
       return;
     }
 
     const selection = this.minimapViewport.getSelection();
     const duration = selection.endTime - selection.startTime;
-    const totalDuration = this.index.totalDuration;
+    const totalDuration = this.extent.totalDuration;
 
     this.minimapViewport.setSelection(totalDuration - duration, totalDuration);
     const newSelection = this.minimapViewport.getSelection();
@@ -549,7 +548,7 @@ export class MinimapOrchestrator {
    * @param scaled - If true, scale deltaY so lens follows mouse 1:1
    */
   private handleMinimapDepthPan(deltaY: number, scaled: boolean): void {
-    if (!this.minimapViewport || !this.index) {
+    if (!this.minimapViewport || !this.extent) {
       return;
     }
 
@@ -558,7 +557,7 @@ export class MinimapOrchestrator {
     if (scaled) {
       // Scale deltaY so lens follows mouse 1:1 on minimap
       const minimapChartHeight = this.minimapViewport.getChartHeight();
-      const totalDepthHeight = (this.index.maxDepth + 1) * TIMELINE_CONSTANTS.EVENT_HEIGHT;
+      const totalDepthHeight = (this.extent.maxDepth + 1) * TIMELINE_CONSTANTS.EVENT_HEIGHT;
       const scale = minimapChartHeight > 0 ? totalDepthHeight / minimapChartHeight : 1;
       // Apply slight damping (0.9) for smoother feel
       effectiveDelta = deltaY * scale * 0.9;
@@ -573,14 +572,14 @@ export class MinimapOrchestrator {
    * @param minimapY - Y coordinate in minimap where drag started
    */
   private handleMinimapDepthPositionStart(minimapY: number): void {
-    if (!this.viewport || !this.minimapViewport || !this.index) {
+    if (!this.viewport || !this.minimapViewport || !this.extent) {
       return;
     }
 
     const chartHeight = this.minimapViewport.getChartHeight();
     const minimapHeight = this.minimapViewport.getHeight();
     const axisHeight = minimapHeight - chartHeight;
-    const maxDepth = this.index.maxDepth;
+    const maxDepth = this.extent.maxDepth;
     const eventHeight = TIMELINE_CONSTANTS.EVENT_HEIGHT;
     const viewportState = this.viewport.getState();
 

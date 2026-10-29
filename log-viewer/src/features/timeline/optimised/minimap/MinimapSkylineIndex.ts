@@ -23,22 +23,10 @@
  * the same width-independent, once-per-log projection of the log.
  */
 
-/**
- * What the sweep reads off a frame. `PrecomputedRect` satisfies it, so the minimap
- * builds straight from the rectangles rather than from objects made for it.
- */
-export interface SkylineFrame {
-  timeStart: number;
-  timeEnd: number;
-  depth: number;
-  category: string;
-}
+import type { RectColumns } from '../../types/flamechart.types.js';
 
 /** Category id 0 means no frame is on top, so a zeroed buffer is never wrong. */
 export const GAP_CATEGORY = 0;
-
-/** Ids are held in a Uint8Array, and id 0 is the gap. */
-const MAX_CATEGORIES = 255;
 
 /** Depths are held in a Uint16Array. Real logs reach ~30. */
 const MAX_DEPTH = 65535;
@@ -52,34 +40,32 @@ interface Swept {
   violations: number;
 }
 
-/**
- * Every frame in one array, in the order the sweep needs: by start, then by depth
- * so a parent precedes the child that starts with it. Get that order wrong and the
- * sweep drops the parent as an overlap, losing a frame that may span the whole log.
- *
- * A new array of references, so the caller's own arrays are never reordered. Cheap
- * because each group arrives time-ordered, so this merges a handful of runs rather
- * than sorting from scratch: 12ms for 431k frames, against 43ms for the same frames
- * in the conversion's own order.
- */
-function ordered(groups: readonly (readonly SkylineFrame[])[]): SkylineFrame[] {
-  let total = 0;
-  for (const group of groups) {
-    total += group.length;
-  }
-
-  // Pre-sized and filled by index. Growing by push costs 1.6ms and 1.5MB of copies
-  // at 431k frames, and `push(...group)` overflows the stack on a group that size.
-  const frames: SkylineFrame[] = new Array(total);
-  let at = 0;
-  for (const group of groups) {
-    for (const frame of group) {
-      frames[at++] = frame;
+// By start, shallower first on a tie, or the sweep drops a parent as an overlap.
+function ordered({ start, rectRowsByDepth }: RectColumns): Int32Array {
+  let runs = rectRowsByDepth.filter((rows) => rows?.length);
+  while (runs.length > 1) {
+    const merged: Int32Array[] = [];
+    for (let i = 0; i < runs.length; i += 2) {
+      const next = runs[i + 1];
+      merged.push(next ? merge(runs[i]!, next, start) : runs[i]!);
     }
+    runs = merged;
   }
+  return runs[0] ?? new Int32Array(0);
+}
 
-  frames.sort((a, b) => a.timeStart - b.timeStart || a.depth - b.depth);
-  return frames;
+// On a tie the row from `shallow` goes first. Same-depth ties (malformed logs only) keep log order.
+function merge(shallow: Int32Array, deep: Int32Array, start: Float64Array): Int32Array {
+  const out = new Int32Array(shallow.length + deep.length);
+  let s = 0;
+  let d = 0;
+  let at = 0;
+  while (s < shallow.length && d < deep.length) {
+    out[at++] = start[deep[d]!]! < start[shallow[s]!]! ? deep[d++]! : shallow[s++]!;
+  }
+  out.set(shallow.subarray(s), at);
+  out.set(deep.subarray(d), at + shallow.length - s);
+  return out;
 }
 
 export class MinimapSkylineIndex {
@@ -92,8 +78,8 @@ export class MinimapSkylineIndex {
   /** Category id of the frame on top of each segment, 0 in a gap. */
   public readonly segmentCategories: Uint8Array;
 
-  /** Category name per id, appended to as the sweep meets them. Index 0 is the gap. */
-  public readonly categoryNames: string[] = [''];
+  /** Category name per id, as the columns name them. Index 0 is the gap. */
+  public readonly categoryNames: readonly string[];
 
   /**
    * Frames the sweep contained or dropped: one that outlived its parent, one
@@ -106,39 +92,38 @@ export class MinimapSkylineIndex {
   /**
    * Frame bounds as parallel arrays, for `countFrames`.
    *
-   * A copy of numbers the rectangles already hold, so this looks like 6.6MB to
-   * reclaim. It is not: `countFrames` runs on every width change, and reading the
-   * scattered rectangles instead measures 10-15ms a call against 1ms, which would
-   * put a resize step inside the frame budget.
+   * A copy of numbers the columns already hold, so this looks like 6.6MB to
+   * reclaim. It is not: `countFrames` runs on every width change, and these
+   * are read in order where the columns would be read scattered by row.
    */
   private readonly frameStarts: Float64Array;
   private readonly frameEnds: Float64Array;
 
-  private readonly categoryIds = new Map<string, number>();
-
   /**
-   * @param groups - Frames in groups, each ascending by `timeStart`.
+   * @param columns - The frames, by row; only the rows with a rect are indexed.
    * @param totalDuration - The log's end timestamp, which the last segment reaches.
    */
-  constructor(groups: readonly (readonly SkylineFrame[])[], totalDuration: number) {
-    const frames = ordered(groups);
-    const count = frames.length;
+  constructor(columns: RectColumns, totalDuration: number) {
+    const rows = ordered(columns);
+    const { start, total, depth } = columns;
+    const count = rows.length;
+    this.categoryNames = columns.categoryNames;
     this.frameStarts = new Float64Array(count);
     this.frameEnds = new Float64Array(count);
     let deepest = 0;
     for (let i = 0; i < count; i++) {
-      const frame = frames[i]!;
-      this.frameStarts[i] = frame.timeStart;
-      this.frameEnds[i] = frame.timeEnd;
-      if (frame.depth > deepest) {
-        deepest = frame.depth;
+      const row = rows[i]!;
+      this.frameStarts[i] = start[row]!;
+      this.frameEnds[i] = start[row]! + total[row]!;
+      if (depth[row]! > deepest) {
+        deepest = depth[row]!;
       }
     }
 
     // Depth strictly increases up the stack, so it can hold no more entries than
     // there are depths. Taken from the frames rather than passed in, so the sweep
     // cannot overflow on a caller's stale figure.
-    const swept = this.sweep(frames, totalDuration, Math.min(deepest, MAX_DEPTH) + 2);
+    const swept = this.sweep(rows, columns, totalDuration, Math.min(deepest, MAX_DEPTH) + 2);
     this.violations = swept.violations;
 
     this.segmentStarts = swept.starts.subarray(0, swept.segments + 1);
@@ -201,14 +186,19 @@ export class MinimapSkylineIndex {
    *
    * @param capacity - Stack depth the frames can reach.
    */
-  private sweep(frames: readonly SkylineFrame[], totalDuration: number, capacity: number): Swept {
+  private sweep(
+    rows: Int32Array,
+    columns: RectColumns,
+    totalDuration: number,
+    capacity: number,
+  ): Swept {
     // At most two segments a frame - the stretch before it, and its own end - plus
     // the trailing gap and the closer. Swept once into that bound and trimmed to a
     // view, rather than swept twice to size exactly: measured slack over four real
     // logs is 14 to 2,709 bytes, because a frame emits exactly two segments unless
     // a same-category sibling at its own depth abuts it to the nanosecond. Copying
     // into exact arrays would peak 9MB higher to reclaim that.
-    const bound = 2 * frames.length + 2;
+    const bound = 2 * rows.length + 2;
     const starts = new Float64Array(bound);
     const depths = new Uint16Array(bound);
     const categories = new Uint8Array(bound);
@@ -252,12 +242,14 @@ export class MinimapSkylineIndex {
       }
     };
 
-    for (const frame of frames) {
-      const start = frame.timeStart;
+    for (const row of rows) {
+      const start = columns.start[row]!;
+      const timeEnd = start + columns.total[row]!;
+      const rowDepth = columns.depth[row]!;
       // Clamped here, not on the store: the stack's strict-increase invariant and
       // its capacity are both in clamped units, so comparing raw depths could push
       // two equal-after-clamp frames and run past the end.
-      const depth = frame.depth > MAX_DEPTH ? MAX_DEPTH : frame.depth;
+      const depth = rowDepth > MAX_DEPTH ? MAX_DEPTH : rowDepth;
       drainTo(start);
 
       // The stretch before this frame belongs to whatever encloses it, or to a gap.
@@ -270,7 +262,7 @@ export class MinimapSkylineIndex {
         );
       }
 
-      if (frame.timeEnd <= start) {
+      if (timeEnd <= start) {
         violations++;
         continue;
       }
@@ -284,7 +276,7 @@ export class MinimapSkylineIndex {
 
       // Contain the frame in whatever it sits inside, so `stackEnd` stays
       // non-increasing upwards and the stack keeps its order.
-      let end = frame.timeEnd;
+      let end = timeEnd;
       if (stackTop > 0 && end > stackEnd[stackTop - 1]!) {
         end = stackEnd[stackTop - 1]!;
         violations++;
@@ -292,7 +284,7 @@ export class MinimapSkylineIndex {
 
       stackEnd[stackTop] = end;
       stackDepth[stackTop] = depth;
-      stackCategory[stackTop] = this.idFor(frame.category);
+      stackCategory[stackTop] = columns.categoryId[row]!;
       stackTop++;
     }
 
@@ -304,23 +296,5 @@ export class MinimapSkylineIndex {
 
     starts[segments] = emittedTo;
     return { starts, depths, categories, segments, violations };
-  }
-
-  /**
-   * Intern a category name. Categories come from log events, so the set is open;
-   * a log with more than 255 of them shares the last id, which only costs colour.
-   */
-  private idFor(category: string): number {
-    const known = this.categoryIds.get(category);
-    if (known !== undefined) {
-      return known;
-    }
-    if (this.categoryNames.length > MAX_CATEGORIES) {
-      return MAX_CATEGORIES;
-    }
-    const id = this.categoryNames.length;
-    this.categoryNames.push(category);
-    this.categoryIds.set(category, id);
-    return id;
   }
 }

@@ -11,47 +11,12 @@
  */
 import { describe, expect, it } from '@jest/globals';
 
+import { columnsOf, span as createRect, type SpanSpec } from '#test-helpers/timeline.js';
 import { MinimapDensityQuery } from '../optimised/minimap/MinimapDensityQuery.js';
-import type { PrecomputedRect } from '../optimised/RectangleCache.js';
 
-/**
- * Helper to create a mock PrecomputedRect.
- */
-function createRect(
-  category: string,
-  timeStart: number,
-  timeEnd: number,
-  depth: number,
-): PrecomputedRect {
-  const duration = timeEnd - timeStart;
-  return {
-    id: `${category}-${timeStart}-${depth}`,
-    timeStart,
-    timeEnd,
-    depth,
-    duration,
-    selfDuration: duration,
-    category,
-    x: 0,
-    y: 0,
-    width: 0,
-    height: 20,
-    row: timeStart,
-  };
-}
-
-function buildQuery(rects: PrecomputedRect[], totalDuration: number): MinimapDensityQuery {
-  const rectsByCategory = new Map<string, PrecomputedRect[]>();
-  for (const rect of rects) {
-    let grouped = rectsByCategory.get(rect.category);
-    if (!grouped) {
-      grouped = [];
-      rectsByCategory.set(rect.category, grouped);
-    }
-    grouped.push(rect);
-  }
+function buildQuery(rects: SpanSpec[], totalDuration: number): MinimapDensityQuery {
   // maxDepth only reaches MinimapDensityData.globalMaxDepth; the sweep derives its own.
-  return new MinimapDensityQuery([...rectsByCategory.values()], totalDuration, 0);
+  return new MinimapDensityQuery({ ...columnsOf(rects), totalDuration, maxDepth: 0 });
 }
 
 describe('MinimapDensityQuery', () => {
