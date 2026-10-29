@@ -29,6 +29,12 @@ export interface MatchedEventInfo {
   category: string;
 }
 
+/** A set of frames by row, as a search or an emphasis holds them. */
+export interface RowSet {
+  readonly size: number;
+  has(row: number): boolean;
+}
+
 /**
  * Represents a single search match with rendering data.
  */
@@ -36,8 +42,8 @@ export interface SearchMatch<E extends EventNode> {
   /** The matched event */
   readonly event: E;
 
-  /** The matched frame's id, as `event.id` */
-  readonly id: string;
+  /** The matched frame's row */
+  readonly row: number;
 
   /** Start time in nanoseconds */
   readonly timeStart: number;
@@ -82,8 +88,8 @@ export interface SearchCursor<E extends EventNode> {
   getCurrent(): SearchMatch<E> | null;
 
   // Rendering support
-  /** Get set of matched event IDs for desaturation rendering */
-  getMatchedEventIds(): ReadonlySet<string>;
+  /** The matched rows, for desaturation rendering */
+  getMatchedRows(): RowSet;
 
   /** Get lightweight info about matched events for bucket search highlighting */
   getMatchedEventsInfo(): ReadonlyArray<MatchedEventInfo>;

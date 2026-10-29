@@ -2121,14 +2121,14 @@ export class FlameChart<E extends EventNode = EventNode> {
    */
   public locateByEventNodes(eventNodes: readonly EventNode[]): void {
     const frames = this.frames;
-    const ids = new Set<string>();
+    const rows = new Set<number>();
     const info: MatchedEventInfo[] = [];
     for (const node of eventNodes) {
       const rect = frames?.rectOf(frames.rowOfOriginal(node.original));
       if (!rect) {
         continue;
       }
-      ids.add(rect.id);
+      rows.add(rect.row);
       info.push({
         timestamp: rect.timeStart,
         duration: rect.duration,
@@ -2136,7 +2136,7 @@ export class FlameChart<E extends EventNode = EventNode> {
         category: rect.category,
       });
     }
-    if (this.dimState.setEmphasis(ids, info)) {
+    if (this.dimState.setEmphasis(rows, info)) {
       this.requestRender();
     }
   }
@@ -2514,8 +2514,8 @@ export class FlameChart<E extends EventNode = EventNode> {
       this.searchOrchestrator!.renderStyledLabels(searchContext);
       this.batchRenderer?.clear();
     } else if (dim && this.searchOrchestrator) {
-      this.searchOrchestrator.renderDimmedExcept(searchContext, dim.ids, dim.info, dim.categories);
-      this.searchOrchestrator.renderLabelsDimmedExcept(searchContext, dim.ids, dim.categories);
+      this.searchOrchestrator.renderDimmedExcept(searchContext, dim.rows, dim.info, dim.categories);
+      this.searchOrchestrator.renderLabelsDimmedExcept(searchContext, dim.rows, dim.categories);
       this.batchRenderer?.clear();
     } else {
       // Normal mode: render with original colors

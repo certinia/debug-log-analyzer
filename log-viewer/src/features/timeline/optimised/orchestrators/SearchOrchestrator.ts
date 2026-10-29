@@ -33,7 +33,12 @@ import type {
   TimelineFrames,
   ViewportState,
 } from '../../types/flamechart.types.js';
-import type { FramePredicate, MatchedEventInfo, SearchCursor } from '../../types/search.types.js';
+import type {
+  FramePredicate,
+  MatchedEventInfo,
+  RowSet,
+  SearchCursor,
+} from '../../types/search.types.js';
 import { createHighlightColors } from '../rendering/HighlightRenderer.js';
 import type { PrecomputedRect } from '../RectangleCache.js';
 import { EventMatcher } from '../search/EventMatcher.js';
@@ -375,30 +380,30 @@ export class SearchOrchestrator<E extends EventNode = EventNode> {
       return;
     }
 
-    this.renderDimmedExcept(context, cursor.getMatchedEventIds(), cursor.getMatchedEventsInfo());
+    this.renderDimmedExcept(context, cursor.getMatchedRows(), cursor.getMatchedEventsInfo());
   }
 
   /**
-   * Draw the frames in `eventIds` at full colour and dim everything else — the
+   * Draw the frames in `rows` at full colour and dim everything else — the
    * two-tier styling search uses, driven by an explicit set so the inspector's
    * hover emphasis can share it.
    *
    * @param context - Render context with viewport state, visible rects, and buckets
-   * @param eventIds - Rect ids to keep at full colour
+   * @param rows - Rows to keep at full colour
    * @param eventsInfo - The same frames' time/depth/category, so a frame merged
    *   into a pixel bucket still lights
    * @param litCategories - Categories kept at full colour whole (the legend highlight)
    */
   public renderDimmedExcept(
     context: SearchRenderContext,
-    eventIds: ReadonlySet<string>,
+    rows: RowSet,
     eventsInfo: ReadonlyArray<MatchedEventInfo>,
     litCategories?: ReadonlySet<string>,
   ): void {
     this.ensureRenderersInitialized();
     this.searchStyleRenderer?.render(
       context.visibleRects,
-      eventIds,
+      rows,
       context.buckets,
       context.viewportState,
       eventsInfo,
@@ -429,26 +434,26 @@ export class SearchOrchestrator<E extends EventNode = EventNode> {
       return;
     }
 
-    this.renderLabelsDimmedExcept(context, cursor.getMatchedEventIds());
+    this.renderLabelsDimmedExcept(context, cursor.getMatchedRows());
   }
 
   /**
-   * Label counterpart of {@link renderDimmedExcept}: the labels of `eventIds`
+   * Label counterpart of {@link renderDimmedExcept}: the labels of `rows`
    * stay legible and the rest are dimmed.
    *
    * @param context - Render context with viewport state and visible rects
-   * @param eventIds - Rect ids to keep at full strength
+   * @param rows - Rows to keep at full strength
    * @param litCategories - Categories kept at full strength whole
    */
   public renderLabelsDimmedExcept(
     context: SearchRenderContext,
-    eventIds: ReadonlySet<string>,
+    rows: RowSet,
     litCategories?: ReadonlySet<string>,
   ): void {
     this.ensureRenderersInitialized();
     this.searchTextLabelRenderer?.render(
       context.visibleRects,
-      eventIds,
+      rows,
       context.viewportState,
       litCategories,
     );

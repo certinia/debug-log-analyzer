@@ -71,7 +71,7 @@ describe('category dim', () => {
         ['Apex', [apex]],
         ['SOQL', [rect(200, 'SOQL')]],
       ]),
-      new Set([apex.id]),
+      new Set([apex.row]),
       new Map(),
       viewport,
       [],

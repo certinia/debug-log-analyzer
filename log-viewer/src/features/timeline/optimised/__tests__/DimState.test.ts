@@ -27,19 +27,19 @@ describe('DimState', () => {
 
     dim.setCategories(lit);
 
-    expect(dim.chart()).toEqual({ ids: new Set(), info: [], categories: lit });
+    expect(dim.chart()).toEqual({ rows: new Set(), info: [], categories: lit });
     expect(dim.legendShowing()).toBe(true);
     expect(dim.minimapCategories()).toBe(lit);
   });
 
   it("lets the inspector's emphasis outrank the legend, on the minimap too", () => {
     const dim = dimState();
-    const ids = new Set(['a']);
+    const rows = new Set([1]);
     dim.setCategories(new Set(['SOQL']));
 
-    dim.setEmphasis(ids, INFO);
+    dim.setEmphasis(rows, INFO);
 
-    expect(dim.chart()).toEqual({ ids, info: INFO, categories: new Set() });
+    expect(dim.chart()).toEqual({ rows, info: INFO, categories: new Set() });
     expect(dim.legendShowing()).toBe(false);
     expect(dim.minimapCategories()).toEqual(new Set());
   });
@@ -47,7 +47,7 @@ describe('DimState', () => {
   it('lets a search outrank both, even one with no matches', () => {
     const dim = dimState(true);
     dim.setCategories(new Set(['SOQL']));
-    dim.setEmphasis(new Set(['a']), INFO);
+    dim.setEmphasis(new Set([1]), INFO);
 
     expect(dim.chart()).toBe('search');
     expect(dim.legendShowing()).toBe(false);
@@ -57,7 +57,7 @@ describe('DimState', () => {
   it('brings the legend back once the emphasis drops', () => {
     const dim = dimState();
     dim.setCategories(new Set(['SOQL']));
-    dim.setEmphasis(new Set(['a']), INFO);
+    dim.setEmphasis(new Set([1]), INFO);
 
     dim.setEmphasis(new Set(), []);
 
@@ -69,8 +69,8 @@ describe('DimState', () => {
 
     expect(dim.setCategories(new Set(['SOQL']))).toBe(true);
     expect(dim.setCategories(new Set(['SOQL']))).toBe(false);
-    expect(dim.setEmphasis(new Set(['a']), INFO)).toBe(true);
-    expect(dim.setEmphasis(new Set(['a']), INFO)).toBe(false);
+    expect(dim.setEmphasis(new Set([1]), INFO)).toBe(true);
+    expect(dim.setEmphasis(new Set([1]), INFO)).toBe(false);
   });
 
   it('answers the same dim each frame, so the render loop allocates nothing', () => {

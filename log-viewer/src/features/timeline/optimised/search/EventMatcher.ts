@@ -109,16 +109,12 @@ export function textPredicate(searchText: string, caseSensitive = false): FrameP
 // Builds its event only when asked: a search can match a hundred thousand frames.
 class RowMatch<E extends EventNode> implements SearchMatch<E> {
   private readonly frames: TimelineFrames<E>;
-  private readonly row: number;
+  readonly row: number;
   private built?: E;
 
   constructor(frames: TimelineFrames<E>, row: number) {
     this.frames = frames;
     this.row = row;
-  }
-
-  get id(): string {
-    return String(this.row);
   }
 
   get timeStart(): number {

@@ -6,7 +6,7 @@ import type { MatchedEventInfo } from '../types/search.types.js';
 
 /** Frames kept in colour while the rest of the chart is dimmed. */
 export interface FrameDim {
-  ids: ReadonlySet<string>;
+  rows: ReadonlySet<number>;
   /** The same frames' time, depth and category, so one merged into a pixel bucket still lights. */
   info: ReadonlyArray<MatchedEventInfo>;
   /** Categories kept in colour whole. */
@@ -14,7 +14,7 @@ export interface FrameDim {
 }
 
 const NO_CATEGORIES: ReadonlySet<string> = new Set();
-const NO_FRAMES: FrameDim = { ids: new Set(), info: [], categories: NO_CATEGORIES };
+const NO_FRAMES: FrameDim = { rows: new Set(), info: [], categories: NO_CATEGORIES };
 
 /**
  * Which dim the chart shows. Three sources ask for one: a search, the inspector's
@@ -35,11 +35,11 @@ export class DimState {
    * Point at these frames, as the inspector does. Empty drops the emphasis.
    * @returns Whether anything changed
    */
-  setEmphasis(ids: ReadonlySet<string>, info: ReadonlyArray<MatchedEventInfo>): boolean {
-    if (sameMembers(ids, this.emphasis.ids)) {
+  setEmphasis(rows: ReadonlySet<number>, info: ReadonlyArray<MatchedEventInfo>): boolean {
+    if (sameMembers(rows, this.emphasis.rows)) {
       return false;
     }
-    this.emphasis = { ids, info, categories: NO_CATEGORIES };
+    this.emphasis = { rows, info, categories: NO_CATEGORIES };
     return true;
   }
 
@@ -60,7 +60,7 @@ export class DimState {
     if (this.hasSearch()) {
       return 'search';
     }
-    if (this.emphasis.ids.size) {
+    if (this.emphasis.rows.size) {
       return this.emphasis;
     }
     return this.legend.categories.size ? this.legend : null;

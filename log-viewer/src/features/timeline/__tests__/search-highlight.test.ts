@@ -41,7 +41,7 @@ describe('SearchHighlightRenderer', () => {
     };
     return {
       event: eventNode,
-      id: eventNode.id,
+      row: timestamp,
       timeStart: timestamp,
       duration,
       category: 'Apex',
@@ -61,7 +61,7 @@ describe('SearchHighlightRenderer', () => {
       total: matches.length,
       seek: jest.fn<(index: number) => SearchMatch<EventNode> | null>(),
       getCurrent: jest.fn<() => SearchMatch<EventNode> | null>(() => matches[currentIndex] ?? null),
-      getMatchedEventIds: jest.fn(() => new Set(matches.map((m) => m.event.id))),
+      getMatchedRows: jest.fn(() => new Set(matches.map((m) => m.row))),
       getMatchedEventsInfo: jest.fn(() =>
         matches.map((m) => ({
           timestamp: m.event.timestamp,

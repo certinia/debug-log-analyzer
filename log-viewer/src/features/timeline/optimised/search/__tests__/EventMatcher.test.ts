@@ -3,6 +3,7 @@
  */
 import { afterEach, describe, expect, it, jest } from '@jest/globals';
 
+import { idOf } from '#test-helpers/apexLog.js';
 import { framesOf } from '#test-helpers/timeline.js';
 import type { EventNode } from '../../../types/flamechart.types.js';
 import { buildTimelineFrames } from '../../../utils/timeline-frames.js';
@@ -43,6 +44,20 @@ describe('EventMatcher', () => {
       'ns.Outer.run()',
       'ns.Inner.First()',
     ]);
+  });
+
+  // The renderers keep a frame in colour by its row; the last match must be in the set too.
+  it('gives the rows it matched, and no other', async () => {
+    const { log, index, frames } = await framesOf(LOG);
+    const rowOf = (text: string) => index.rowOf(idOf(log, text));
+    const cursor = (await new EventMatcher(frames).search(textPredicate('ns.')))!;
+    const rows = cursor.getMatchedRows();
+
+    expect(rows.size).toBe(2);
+    expect(rows.has(rowOf('ns.Outer.run()'))).toBe(true);
+    expect(rows.has(rowOf('ns.Inner.First()'))).toBe(true);
+    expect(rows.has(rowOf('SELECT Id FROM Account'))).toBe(false);
+    expect(rows.has(0)).toBe(false);
   });
 
   it('makes no match current until a seek, and none again for -1', async () => {
@@ -140,13 +155,13 @@ describe('EventMatcher', () => {
     const node = jest.spyOn(frames, 'node');
     // Nothing stops this search, so it gives a cursor.
     const cursor = (await new EventMatcher(frames).search(textPredicate('ns.')))!;
-    const ids = cursor.getMatchedEventIds();
+    const rows = cursor.getMatchedRows();
     const info = cursor.getMatchedEventsInfo();
 
     expect(node).not.toHaveBeenCalled();
 
     const first = cursor.matches[0]!;
-    expect(ids.has(first.event.id)).toBe(true);
+    expect(rows.has(first.row)).toBe(true);
     expect(info[0]).toMatchObject({
       timestamp: first.event.timestamp,
       duration: first.event.duration,
