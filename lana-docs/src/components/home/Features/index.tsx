@@ -26,9 +26,9 @@ const FEATURES: Feature[] = [
     title: 'See where the time went',
     summary: 'A flame chart of the whole transaction.',
     points: [
-      'Large logs ready `3.1×` faster since v1.24',
-      'Zoom and pan `7×` faster since v1.20',
-      'Search up to `10×` faster since v1.20',
+      'Large logs ready `12×` faster in v1.24',
+      'Zoom and pan `7×` faster in v1.20',
+      'Search up to `10×` faster in v1.20',
       'A minimap and a governor limits strip',
     ],
     doc: '/docs/features/timeline',
@@ -40,8 +40,8 @@ const FEATURES: Feature[] = [
     title: 'Follow the execution',
     summary: 'Every call, with what it cost.',
     points: [
-      'Expand, filter and scroll `3×` faster since v1.16',
-      'Go to Code `6× to 10×` faster in large projects since v1.22',
+      'Expand, filter and scroll `3×` faster in v1.16',
+      'Go to Code `6× to 10×` faster in large projects in v1.22',
       'Three views: `Time Order`, `Aggregated` and `Bottom-Up`',
     ],
     doc: '/docs/features/calltree',
