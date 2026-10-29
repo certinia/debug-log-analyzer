@@ -35,7 +35,6 @@ function rect(x: number, category: Category, width = 100): PrecomputedRect {
     timeEnd: x + width,
     depth: 0,
     duration: width,
-    selfDuration: width,
     category,
     row: x,
     x,

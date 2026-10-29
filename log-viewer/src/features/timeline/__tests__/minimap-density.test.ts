@@ -11,54 +11,16 @@
  */
 import { describe, expect, it } from '@jest/globals';
 
+import { columnsOf, type SpanSpec } from '#test-helpers/timeline.js';
 import { MinimapDensityQuery } from '../optimised/minimap/MinimapDensityQuery.js';
-import type { PrecomputedRect } from '../optimised/RectangleCache.js';
 
-/**
- * Helper to create a mock PrecomputedRect.
- */
-function createRect(
-  category: string,
-  timeStart: number,
-  timeEnd: number,
-  depth: number,
-): PrecomputedRect {
-  const duration = timeEnd - timeStart;
-  return {
-    id: `${category}-${timeStart}-${depth}`,
-    timeStart,
-    timeEnd,
-    depth,
-    duration,
-    selfDuration: duration,
-    category,
-    x: 0,
-    y: 0,
-    width: 0,
-    height: 20,
-    row: timeStart,
-  };
+function createRect(category: string, timeStart: number, timeEnd: number, depth: number): SpanSpec {
+  return { category, timeStart, timeEnd, depth };
 }
 
-function buildQuery(rects: PrecomputedRect[], totalDuration: number): MinimapDensityQuery {
-  const categoryNames = [...new Set(rects.map((rect) => rect.category))];
-  const rectRowsByDepth: Int32Array[] = [];
-  const byStart = [...rects.keys()].sort((a, b) => rects[a]!.timeStart - rects[b]!.timeStart);
-  for (const row of byStart) {
-    const at = rects[row]!.depth;
-    rectRowsByDepth[at] = Int32Array.of(...(rectRowsByDepth[at] ?? []), row);
-  }
-  const columns = {
-    start: Float64Array.from(rects, (rect) => rect.timeStart),
-    total: Float64Array.from(rects, (rect) => rect.duration),
-    depth: Uint16Array.from(rects, (rect) => rect.depth),
-    categoryId: Uint8Array.from(rects, (rect) => categoryNames.indexOf(rect.category)),
-    categoryNames,
-    rectRowsByDepth,
-    rectOf: (row: number) => rects[row],
-  };
+function buildQuery(rects: SpanSpec[], totalDuration: number): MinimapDensityQuery {
   // maxDepth only reaches MinimapDensityData.globalMaxDepth; the sweep derives its own.
-  return new MinimapDensityQuery(columns, totalDuration, 0);
+  return new MinimapDensityQuery(columnsOf(rects), totalDuration, 0);
 }
 
 describe('MinimapDensityQuery', () => {

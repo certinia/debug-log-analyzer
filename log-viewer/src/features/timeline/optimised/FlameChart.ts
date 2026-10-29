@@ -1401,7 +1401,7 @@ export class FlameChart<E extends EventNode = EventNode> {
    * Setup minimap orchestrator for Chrome DevTools-style overview navigation.
    */
   private async setupMinimap(): Promise<void> {
-    if (!this.index || !this.rectangleManager || !this.viewport || !this.minimapDiv) {
+    if (!this.frames || !this.viewport || !this.minimapDiv) {
       return;
     }
 
@@ -1460,8 +1460,7 @@ export class FlameChart<E extends EventNode = EventNode> {
       this.minimapDiv,
       displayWidth,
       containerHeight,
-      this.index,
-      this.rectangleManager,
+      this.frames,
       this.viewport,
       minimapEditorColors
         ? {

@@ -56,7 +56,7 @@ async function build(log: ApexLog) {
   const cache = new RectangleCache(frames);
   new TreeNavigator(frames);
   const matcher = new EventMatcher<EventNode>(frames);
-  return { frames, cache, matcher };
+  return { index, frames, cache, matcher };
 }
 
 function viewportFor(
@@ -76,7 +76,7 @@ function viewportFor(
 
 /** A CSV of what the timeline holds and draws, so two revisions can be diffed. */
 export async function digestTimeline(log: ApexLog): Promise<void> {
-  const { frames, cache } = await build(log);
+  const { index, frames, cache } = await build(log);
   const { maxDepth, totalDuration, rectRowsByDepth } = frames;
 
   print('section,key,a,b,c,d');
@@ -90,9 +90,8 @@ export async function digestTimeline(log: ApexLog): Promise<void> {
     let start = 0;
     let self = 0;
     for (const row of rows) {
-      const rect = frames.rectOf(row)!;
-      start += rect.timeStart;
-      self += rect.selfDuration;
+      start += frames.start[row]!;
+      self += index.self[row]!;
     }
     print(`depth,${depth},${rows.length},${start},${self},`);
   });

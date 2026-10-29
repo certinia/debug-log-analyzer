@@ -158,9 +158,6 @@ export interface TimelineFrames<E extends EventNode> extends RectColumns {
   readonly maxDepth: number;
   /** The end of the last shown row, or of the log if that is later. */
   readonly totalDuration: number;
-  readonly start: Float64Array;
-  readonly total: Float64Array;
-  readonly depth: Uint16Array;
   /** {@link NO_ROW} for a top-level row. */
   readonly parent: Int32Array;
   /** The first row after this row's subtree. */
@@ -176,7 +173,6 @@ export interface TimelineFrames<E extends EventNode> extends RectColumns {
   /** The shown row for an {@link EventNode.original}, or {@link NO_ROW}. */
   rowOfOriginal(original: unknown): number;
   hasRect(row: number): boolean;
-  rectOf(row: number): PrecomputedRect | undefined;
 }
 
 /** The frames that have a rect, as columns by row: what the segment tree indexes. */

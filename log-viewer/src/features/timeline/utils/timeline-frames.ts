@@ -123,7 +123,6 @@ export function buildTimelineFrames(
         timeEnd: start[row]! + total[row]!,
         depth: d,
         duration: total[row]!,
-        selfDuration: index.self[row]!,
         category: rowCategory(index, row),
         x: 0,
         y: d * eventHeight,

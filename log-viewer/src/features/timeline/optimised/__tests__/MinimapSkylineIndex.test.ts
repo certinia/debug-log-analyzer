@@ -4,38 +4,11 @@
 
 import { describe, expect, it } from '@jest/globals';
 
-import type { RectColumns } from '../../types/flamechart.types.js';
+import { columnsOf, type SpanSpec } from '#test-helpers/timeline.js';
 import { MinimapSkylineIndex } from '../minimap/MinimapSkylineIndex.js';
 
-interface SkylineFrame {
-  category: string;
-  timeStart: number;
-  timeEnd: number;
-  depth: number;
-}
-
-function frame(category: string, timeStart: number, timeEnd: number, depth: number): SkylineFrame {
+function frame(category: string, timeStart: number, timeEnd: number, depth: number): SpanSpec {
   return { category, timeStart, timeEnd, depth };
-}
-
-/** `frames` as columns, one row each, every depth's rows ascending by start as frames give them. */
-function columnsOf(frames: SkylineFrame[]): RectColumns {
-  const categoryNames = [...new Set(frames.map((each) => each.category))];
-  const rectRowsByDepth: Int32Array[] = [];
-  const byStart = [...frames.keys()].sort((a, b) => frames[a]!.timeStart - frames[b]!.timeStart);
-  for (const row of byStart) {
-    const at = frames[row]!.depth;
-    rectRowsByDepth[at] = Int32Array.of(...(rectRowsByDepth[at] ?? []), row);
-  }
-  return {
-    start: Float64Array.from(frames, (each) => each.timeStart),
-    total: Float64Array.from(frames, (each) => each.timeEnd - each.timeStart),
-    depth: Uint16Array.from(frames, (each) => each.depth),
-    categoryId: Uint8Array.from(frames, (each) => categoryNames.indexOf(each.category)),
-    categoryNames,
-    rectRowsByDepth,
-    rectOf: () => undefined,
-  };
 }
 
 /** The index as a readable list of `[start, end, depth, category]`. */
@@ -52,7 +25,7 @@ function segments(index: MinimapSkylineIndex): [number, number, number, string][
   return out;
 }
 
-function build(frames: SkylineFrame[], totalDuration = 1000): MinimapSkylineIndex {
+function build(frames: SpanSpec[], totalDuration = 1000): MinimapSkylineIndex {
   // In whatever order the test wrote it: the index orders its own input.
   return new MinimapSkylineIndex(columnsOf(frames), totalDuration);
 }
@@ -94,7 +67,7 @@ describe('MinimapSkylineIndex', () => {
   });
 
   it('orders segments by time with no overlap', () => {
-    const frames: SkylineFrame[] = [];
+    const frames: SpanSpec[] = [];
     for (let root = 0; root < 40; root++) {
       const start = root * 25;
       frames.push(frame('Apex', start, start + 20, 0));

@@ -24,12 +24,12 @@ import * as PIXI from 'pixi.js';
 
 import { createTimelineApp, destroyTimelineApp } from '../rendering/pixiApp.js';
 import type {
+  RectColumns,
   TimelineExtent,
   TimelineMarker,
   ViewportState,
 } from '../../types/flamechart.types.js';
 import { TIMELINE_CONSTANTS } from '../../types/flamechart.types.js';
-import type { RectangleCache } from '../RectangleCache.js';
 import type { CursorLineRenderer } from '../rendering/CursorLineRenderer.js';
 import type { TimelineViewport } from '../TimelineViewport.js';
 
@@ -164,20 +164,18 @@ export class MinimapOrchestrator {
    * @param minimapDiv - HTML element to render minimap into
    * @param width - Canvas width
    * @param height - Full container height (minimap height calculated from this)
-   * @param index - Timeline event index for duration/depth info
-   * @param rectangleManager - Supplies the rectangles the density query walks
+   * @param frames - The frames' extent, and the rects the density query walks
    * @param viewport - Main timeline viewport (for reading state only)
    */
   public async init(
     minimapDiv: HTMLElement,
     width: number,
     height: number,
-    index: TimelineExtent,
-    rectangleManager: RectangleCache,
+    frames: TimelineExtent & RectColumns,
     viewport: TimelineViewport,
     minimapColors?: { widgetBackground: number; focusBorder: number; lineNumberForeground: number },
   ): Promise<void> {
-    this.index = index;
+    this.index = frames;
     this.viewport = viewport;
     this.htmlContainer = minimapDiv;
 
@@ -187,13 +185,14 @@ export class MinimapOrchestrator {
     this.app = await createTimelineApp(minimapDiv, { width, height: minimapHeight });
 
     // Initialize minimap manager (state and coordinate transforms)
-    this.minimapViewport = new MinimapViewport(index.totalDuration, index.maxDepth, width, height);
-
-    this.densityQuery = new MinimapDensityQuery(
-      rectangleManager.getColumns(),
-      index.totalDuration,
-      index.maxDepth,
+    this.minimapViewport = new MinimapViewport(
+      frames.totalDuration,
+      frames.maxDepth,
+      width,
+      height,
     );
+
+    this.densityQuery = new MinimapDensityQuery(frames, frames.totalDuration, frames.maxDepth);
 
     // Create minimap container on stage
     this.container = new PIXI.Container();

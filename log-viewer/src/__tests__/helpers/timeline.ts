@@ -20,6 +20,34 @@ export interface FrameSpec {
   children: FrameSpec[];
 }
 
+/** A frame for {@link columnsOf}: where it sits, and its category. */
+export interface SpanSpec {
+  category: string;
+  timeStart: number;
+  timeEnd: number;
+  depth: number;
+}
+
+/** `spans` as columns, one row each, every depth's rows ascending by start as frames give them. */
+export function columnsOf(spans: SpanSpec[]): RectColumns {
+  const categoryNames = [...new Set(spans.map((span) => span.category))];
+  const rectRowsByDepth: Int32Array[] = [];
+  const byStart = [...spans.keys()].sort((a, b) => spans[a]!.timeStart - spans[b]!.timeStart);
+  for (const row of byStart) {
+    const at = spans[row]!.depth;
+    rectRowsByDepth[at] = Int32Array.of(...(rectRowsByDepth[at] ?? []), row);
+  }
+  return {
+    start: Float64Array.from(spans, (span) => span.timeStart),
+    total: Float64Array.from(spans, (span) => span.timeEnd - span.timeStart),
+    depth: Uint16Array.from(spans, (span) => span.depth),
+    categoryId: Uint8Array.from(spans, (span) => categoryNames.indexOf(span.category)),
+    categoryNames,
+    rectRowsByDepth,
+    rectOf: () => undefined,
+  };
+}
+
 /** The timeline's frames for a log `body`, as the chart builds them. */
 export async function framesOf(body: string, logEnd = 0) {
   const { log } = await storeOf(body);
@@ -61,7 +89,6 @@ export function rectsOf(roots: FrameSpec[]): RectColumns {
         timeEnd: frame.timestamp + frame.duration,
         depth,
         duration: frame.duration,
-        selfDuration: frame.duration,
         category: frame.category,
         x: 0,
         y: depth * TIMELINE_CONSTANTS.EVENT_HEIGHT,

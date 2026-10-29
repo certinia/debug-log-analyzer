@@ -48,9 +48,6 @@ export interface PrecomputedRect extends RenderRectangle {
   /** Total duration in nanoseconds including children (fixed) */
   duration: number;
 
-  /** Self duration in nanoseconds excluding children (fixed, for category resolution) */
-  selfDuration: number;
-
   /** Event category for color batching (fixed) */
   category: string;
 
@@ -72,14 +69,11 @@ export interface PrecomputedRect extends RenderRectangle {
  * TemporalSegmentTree. Nothing reaches past it to the tree.
  */
 export class RectangleCache {
-  private readonly columns: RectColumns;
-
   /** Segment tree for O(log n) viewport culling */
   private segmentTree: TemporalSegmentTree;
 
   /** @param columns - The frames with a rect, by row */
   constructor(columns: RectColumns) {
-    this.columns = columns;
     this.segmentTree = new TemporalSegmentTree(columns);
   }
 
@@ -101,11 +95,6 @@ export class RectangleCache {
     batchColors: Map<string, BatchColorInfo>,
   ): CulledRenderData {
     return this.segmentTree.query(viewport, batchColors);
-  }
-
-  /** The frames with a rect, by row. */
-  public getColumns(): RectColumns {
-    return this.columns;
   }
 
   /**
