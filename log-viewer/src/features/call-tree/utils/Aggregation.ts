@@ -222,6 +222,17 @@ interface BuildContext {
   reported: ReportedUsage | null;
   /** Per-build monotonic counter; the grid keys rows by id, so ids are unique within this tree. */
   idFor: () => number;
+  /** The labels of `eventId`'s signature, one object per signature. */
+  labelsOf: (eventId: number) => SignatureLabels;
+}
+
+/** What every row of one signature shows, held once and shared by those rows. */
+interface SignatureLabels {
+  readonly keyId: number;
+  readonly key: string;
+  readonly text: string;
+  readonly namespace: string;
+  readonly type: string;
 }
 
 function buildContext(
@@ -230,14 +241,33 @@ function buildContext(
   reported: ReportedUsage | null,
 ): BuildContext {
   let next = 0;
+  const paths = store.keyPathIds();
+  const signatures = signaturesOf(store.log);
+  const labels = new Map<number, SignatureLabels>();
   return {
     index,
     metrics: rowMetrics(index),
-    paths: store.keyPathIds(),
-    signatures: signaturesOf(store.log),
+    paths,
+    signatures,
     costLimits: costLimitsOf(store.log.limits),
     reported,
     idFor: () => ++next,
+    labelsOf: (eventId) => {
+      const signature = signatures.of(eventId);
+      let shared = labels.get(signature);
+      if (!shared) {
+        const keyId = paths.keyIdOf(eventId);
+        shared = {
+          keyId,
+          key: paths.keyText(keyId),
+          text: signatures.text(signature),
+          namespace: signatures.namespace(signature),
+          type: signatures.type(signature),
+        };
+        labels.set(signature, shared);
+      }
+      return shared;
+    },
   };
 }
 
@@ -309,7 +339,7 @@ function* aggregatedSteps(ctx: BuildContext): Generator<void, AggregatedRow[], v
     stack.pop();
     if (frame.row) {
       frame.row._children = frame.callees.length > 0 ? frame.callees.sort(byTotalTimeDesc) : null;
-      finaliseAggregatedRow(frame.row, ctx.costLimits);
+      setGovernorCost(frame.row, ctx.costLimits);
     }
   }
 
@@ -356,7 +386,7 @@ function groupCallees(grouping: CalleeGrouping, ctx: BuildContext, budget: numbe
       const keyId = paths.keyIdOf(id);
       let row = byKey.get(keyId);
       if (!row) {
-        row = createEmptyAggregatedRow(ctx, paths.keyText(keyId), paths.step(pathId, keyId), child);
+        row = createEmptyAggregatedRow(ctx, paths.step(pathId, keyId), child);
         byKey.set(keyId, row);
       }
       addCallToAggregatedRow(row, ctx, child, paths.stackIdOf(id), openStackId, usage);
@@ -374,12 +404,6 @@ function byTotalTimeDesc(a: AggregatedRow, b: AggregatedRow): number {
 
 /** No frame open above the level, so nothing in it can be a recursive call. */
 const NO_STACK = -1;
-
-/** Averages and governor cost, once `_children` is set. */
-function finaliseAggregatedRow(row: AggregatedRow, costLimits: CostLimits): void {
-  calculateAverages(row);
-  setGovernorCost(row, costLimits);
-}
 
 // Most merged rows hold zero for most metrics, so a new row shares these until its first nonzero
 // write. Frozen, so a write that skips `added` or `addOwnReported` throws.
@@ -702,7 +726,7 @@ function* bottomUpSteps(build: BuildContext): Generator<void, BottomUpRow[], voi
     let bucket = rootBuckets.get(rootId);
     if (!bucket) {
       const pathId = paths.step(ROOT_PATH_ID, rootId);
-      bucket = createEmptyBottomUpRow(build, paths.keyText(rootId), rootId, pathId, row);
+      bucket = createEmptyBottomUpRow(build, pathId, row);
       bucket.eventIds = [];
       rootBuckets.set(rootId, bucket);
     }
@@ -718,13 +742,7 @@ function* bottomUpSteps(build: BuildContext): Generator<void, BottomUpRow[], voi
       let childBucket = existingChildren?.find((c) => c._keyId === ancestorId);
       if (!childBucket) {
         const pathId = paths.step(parentBucket._pathId, ancestorId);
-        childBucket = createEmptyBottomUpRow(
-          build,
-          paths.keyText(ancestorId),
-          ancestorId,
-          pathId,
-          open[i]!.row,
-        );
+        childBucket = createEmptyBottomUpRow(build, pathId, open[i]!.row);
         // Most buckets have one caller: a literal holds one slot, where a push onto `[]` reserves 17.
         if (existingChildren) {
           existingChildren.push(childBucket);
@@ -790,7 +808,7 @@ export async function buildBottomUpTree(
 }
 
 /**
- * Walks the bucket trie computing averages and applying deterministic ordering
+ * Walks the bucket trie computing governor cost and applying deterministic ordering
  * (primary metric total-self desc, then name asc) at every level. Empty child
  * arrays are collapsed to null so a row with no children reads as a leaf.
  */
@@ -803,7 +821,6 @@ function* finalizeBuckets(
   let done = 0;
   while (pending.length > 0) {
     const row = pending.pop()!; // the loop guard keeps it non-empty
-    calculateBottomUpAverages(row);
     setGovernorCost(row, costLimits);
     if (row._children && row._children.length > 0) {
       sortBuckets(row._children);
@@ -829,111 +846,95 @@ function sortBuckets(rows: BottomUpRow[]): void {
   });
 }
 
-/** What a new row shows of its first call, on index row `row`. */
-function rowLabels(build: BuildContext, row: number) {
-  const { index, signatures } = build;
-  const eventId = index.eventId[row]!; // row < rowCount
-  const signature = signatures.of(eventId);
-  return {
-    text: signatures.text(signature),
-    namespace: signatures.namespace(signature),
-    callerNamespace: callerNamespaceOfRow(index, row),
-    type: signatures.type(signature),
-    eventId,
-    category: rowCategory(index, row),
-  };
-}
+/**
+ * A row of either merged tree. The labels its signature shares and the average are read
+ * through getters, so a row holds 4 fields fewer than a plain object would.
+ */
+class MergedRow<C> {
+  declare id: number;
+  declare _pathId: number;
+  declare callerNamespace: string;
+  // A field, not a getter: group by namespace reads it on every row, and a getter made it slower.
+  declare namespace: string;
+  declare eventId: number;
+  declare category: LogCategory;
+  declare callCount: number;
+  declare totalSelfTime: number;
+  declare totalTime: number;
+  declare dmlCount: Tally;
+  declare soqlCount: Tally;
+  declare soslCount: Tally;
+  declare dmlRowCount: Tally;
+  declare soqlRowCount: Tally;
+  declare soslRowCount: Tally;
+  declare thrownCount: Tally;
+  declare heapAllocated: Tally;
+  declare heapGross: Tally;
+  declare heapPeak: number;
+  declare governorCost: number | null;
+  declare governorCostMax: number | null;
+  declare reported: ReportedCounts;
+  declare _children: C[] | null;
+  declare eventIds: number[];
+  declare private readonly _labels: SignatureLabels;
 
-function createEmptyAggregatedRow(
-  build: BuildContext,
-  key: string,
-  pathId: number,
-  row: number,
-): AggregatedRow {
-  // Copied field by field: a spread here made a 270k-event build 39% slower.
-  const labels = rowLabels(build, row);
-  return {
-    id: build.idFor(),
-    key,
-    _pathId: pathId,
-    text: labels.text,
-    namespace: labels.namespace,
-    callerNamespace: labels.callerNamespace,
-    type: labels.type,
-    eventId: labels.eventId,
-    category: labels.category,
-    callCount: 0,
-    totalSelfTime: 0,
-    totalTime: 0,
-    avgSelfTime: 0,
-    dmlCount: ZERO_TALLY,
-    soqlCount: ZERO_TALLY,
-    soslCount: ZERO_TALLY,
-    dmlRowCount: ZERO_TALLY,
-    soqlRowCount: ZERO_TALLY,
-    soslRowCount: ZERO_TALLY,
-    thrownCount: ZERO_TALLY,
-    heapAllocated: ZERO_TALLY,
-    heapGross: ZERO_TALLY,
-    heapPeak: 0,
-    governorCost: 0,
-    governorCostMax: 0,
-    reported: NO_REPORTED,
-    _children: null,
-    eventIds: [],
-  };
-}
+  /** @param row - the index row of the row's first call */
+  constructor(build: BuildContext, pathId: number, row: number, eventIds: number[]) {
+    const { index } = build;
+    const eventId = index.eventId[row]!; // row < rowCount
+    // Assigned in one order, so every row shares one shape.
+    this.id = build.idFor();
+    this._pathId = pathId;
+    this._labels = build.labelsOf(eventId);
+    this.callerNamespace = callerNamespaceOfRow(index, row);
+    this.namespace = this._labels.namespace;
+    this.eventId = eventId;
+    this.category = rowCategory(index, row);
+    this.callCount = 0;
+    this.totalSelfTime = 0;
+    this.totalTime = 0;
+    this.dmlCount = ZERO_TALLY;
+    this.soqlCount = ZERO_TALLY;
+    this.soslCount = ZERO_TALLY;
+    this.dmlRowCount = ZERO_TALLY;
+    this.soqlRowCount = ZERO_TALLY;
+    this.soslRowCount = ZERO_TALLY;
+    this.thrownCount = ZERO_TALLY;
+    this.heapAllocated = ZERO_TALLY;
+    this.heapGross = ZERO_TALLY;
+    this.heapPeak = 0;
+    this.governorCost = 0;
+    this.governorCostMax = 0;
+    this.reported = NO_REPORTED;
+    this._children = null;
+    this.eventIds = eventIds;
+  }
 
-function createEmptyBottomUpRow(
-  build: BuildContext,
-  key: string,
-  keyId: number,
-  pathId: number,
-  row: number,
-): BottomUpRow {
-  // Copied field by field: a spread here made a 270k-event build 39% slower.
-  const labels = rowLabels(build, row);
-  return {
-    id: build.idFor(),
-    key,
-    _keyId: keyId,
-    _pathId: pathId,
-    text: labels.text,
-    namespace: labels.namespace,
-    callerNamespace: labels.callerNamespace,
-    type: labels.type,
-    eventId: labels.eventId,
-    category: labels.category,
-    callCount: 0,
-    totalSelfTime: 0,
-    totalTime: 0,
-    avgSelfTime: 0,
-    dmlCount: ZERO_TALLY,
-    soqlCount: ZERO_TALLY,
-    soslCount: ZERO_TALLY,
-    dmlRowCount: ZERO_TALLY,
-    soqlRowCount: ZERO_TALLY,
-    soslRowCount: ZERO_TALLY,
-    thrownCount: ZERO_TALLY,
-    heapAllocated: ZERO_TALLY,
-    heapGross: ZERO_TALLY,
-    heapPeak: 0,
-    governorCost: 0,
-    governorCostMax: 0,
-    reported: NO_REPORTED,
-    _children: null,
-    eventIds: NO_EVENT_IDS,
-  };
-}
+  get key(): string {
+    return this._labels.key;
+  }
 
-function calculateAverages(row: AggregatedRow): void {
-  if (row.callCount > 0) {
-    row.avgSelfTime = row.totalSelfTime / row.callCount;
+  get _keyId(): number {
+    return this._labels.keyId;
+  }
+
+  get text(): string {
+    return this._labels.text;
+  }
+
+  get type(): string {
+    return this._labels.type;
+  }
+
+  get avgSelfTime(): number {
+    return this.callCount > 0 ? this.totalSelfTime / this.callCount : 0;
   }
 }
 
-function calculateBottomUpAverages(row: BottomUpRow): void {
-  if (row.callCount > 0) {
-    row.avgSelfTime = row.totalSelfTime / row.callCount;
-  }
+function createEmptyAggregatedRow(build: BuildContext, pathId: number, row: number): AggregatedRow {
+  return new MergedRow<AggregatedRow>(build, pathId, row, []);
+}
+
+function createEmptyBottomUpRow(build: BuildContext, pathId: number, row: number): BottomUpRow {
+  return new MergedRow<BottomUpRow>(build, pathId, row, NO_EVENT_IDS);
 }
