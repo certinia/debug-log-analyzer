@@ -51,6 +51,7 @@ import { exportCsv } from '../../../../components/grid/exportCsv.js';
 import { eventBus } from '#core/events/EventBus.js';
 import type { LogIndex } from '#core/log/LogIndex.js';
 import { LogStore, logStoreFor } from '#core/log/LogStore.js';
+import { MergedTree } from '../../grid/mergedRows.js';
 import { CalltreeView } from '../CalltreeView.js';
 
 /** Which view each build made, in order. */
@@ -282,6 +283,15 @@ describe('calltree-view table lifetime', () => {
     await settle();
 
     expect(buildSignals.map((signal) => signal?.aborted)).toEqual([true, false]);
+  });
+
+  // A copy of its own would hold every row a second time beside the Analysis view.
+  it('shows the Bottom-Up rows every view of the log shares', async () => {
+    await view._setViewMode('bottom-up');
+    await settle();
+    const shared = await MergedTree.bottomUp(view.logStore!); // mountView set it
+
+    expect(view.bottomUpGrid?.source?.roots).toBe(shared?.source.roots);
   });
 
   it('offers Group only in bottom up', async () => {

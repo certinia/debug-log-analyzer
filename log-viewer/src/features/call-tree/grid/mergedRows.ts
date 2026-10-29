@@ -11,6 +11,54 @@ import {
 } from '../utils/Aggregation.js';
 import { reportedUsageOf } from '../utils/reportedUsage.js';
 
+/** One store's Bottom-Up build, and the callers still waiting for it. */
+interface SharedBuild {
+  tree: Promise<MergedTree<BottomUpRow> | null>;
+  stop: AbortController;
+  waiting: number;
+  done: boolean;
+}
+
+const bottomUpBuilds = new WeakMap<LogStore, SharedBuild>();
+
+function bottomUpBuild(store: LogStore): SharedBuild {
+  const running = bottomUpBuilds.get(store);
+  if (running) {
+    return running;
+  }
+  const stop = new AbortController();
+  const shared: SharedBuild = {
+    stop,
+    waiting: 0,
+    done: false,
+    tree: reportedUsageOf(store.log)
+      .then((usage) => buildBottomUpTree(store, { signal: stop.signal }, usage))
+      .then((roots) => roots && new MergedTree(roots)),
+  };
+  // A failed or stopped build is forgotten, so the next caller builds again.
+  const settle = (tree: MergedTree<BottomUpRow> | null): void => {
+    shared.done = true;
+    if (!tree && bottomUpBuilds.get(store) === shared) {
+      bottomUpBuilds.delete(store);
+    }
+  };
+  shared.tree.then(settle, () => settle(null));
+  bottomUpBuilds.set(store, shared);
+  return shared;
+}
+
+/** `work`, or null as soon as `signal` aborts; an error after the abort is not this caller's. */
+function untilAborted<T>(work: Promise<T>, signal?: AbortSignal): Promise<T | null> {
+  if (!signal) {
+    return work;
+  }
+  return new Promise((resolve, reject) => {
+    const abort = (): void => resolve(null);
+    signal.addEventListener('abort', abort, { once: true });
+    work.then(resolve, reject).finally(() => signal.removeEventListener('abort', abort));
+  });
+}
+
 /** A row of a merged view: Aggregated or Bottom-Up. */
 export interface MergedRowShape<R> {
   id: number;
@@ -27,13 +75,31 @@ export class MergedTree<R extends MergedRowShape<R>> {
   private readonly _parents = new Map<R, R>();
   private readonly _byPath = new Map<number, R>();
 
-  /** The Bottom-Up tree of the events `store` shows, or null when `signal` aborts the build. */
+  /**
+   * The Bottom-Up tree of the events `store` shows, built once per store and shared, so its
+   * rows must not be changed. Null as soon as `signal` aborts; the build stops once no caller waits.
+   */
   static async bottomUp(
     store: LogStore,
     options: { signal?: AbortSignal } = {},
   ): Promise<MergedTree<BottomUpRow> | null> {
-    const roots = await buildBottomUpTree(store, options, await reportedUsageOf(store.log));
-    return roots ? new MergedTree(roots) : null;
+    const { signal } = options;
+    if (signal?.aborted) {
+      return null;
+    }
+    const build = bottomUpBuild(store);
+    build.waiting++;
+    try {
+      return await untilAborted(build.tree, signal);
+    } finally {
+      if (--build.waiting === 0 && !build.done) {
+        build.stop.abort();
+        // Gone now, so a caller that comes next starts a build of its own, not a stopped one.
+        if (bottomUpBuilds.get(store) === build) {
+          bottomUpBuilds.delete(store);
+        }
+      }
+    }
   }
 
   /** The Aggregated tree of the events `store` shows, or null when `signal` aborts the build. */
