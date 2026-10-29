@@ -157,6 +157,34 @@ function assertRowsDoNotExceedGlobalTotals(rows: PartitionRow[], global: Partiti
   });
 }
 
+const entry = (at: number, name: string): string =>
+  `09:18:22.6 (${at})|METHOD_ENTRY|[1]|01p|${name}\n`;
+const exit = (at: number, name: string): string => `09:18:22.6 (${at})|METHOD_EXIT|[1]|${name}\n`;
+
+// The log's lines sit inside the code unit `storeOf` wraps them in.
+function findDeep(rows: AggregatedRow[], text: string): AggregatedRow {
+  const pending = [...rows];
+  for (let row = pending.pop(); row; row = pending.pop()) {
+    if (row.text === text) {
+      return row;
+    }
+    pending.push(...(row._children ?? []));
+  }
+  throw new Error(`Unable to find row for ${text}`);
+}
+
+async function built(
+  text: string,
+): Promise<{ bottomUp: BottomUpRow[]; aggregated: AggregatedRow[] }> {
+  const { store } = await storeOf(text);
+  const index = await store.logIndex();
+  const usage = await store.derive(reportedUsage);
+  return {
+    bottomUp: toBottomUpTree(index, store, usage),
+    aggregated: toAggregatedCallTree(index, store, usage),
+  };
+}
+
 /** Search recursing three deep under Outer; the innermost call holds a 650 ns leaf. */
 const recursiveSearch = (): Spec =>
   m('Outer', 100, m('Search', 50, m('Search', 50, m('Search', 50, m('Leaf', 650)))));
@@ -840,37 +868,50 @@ describe('SOSL rollup', () => {
   });
 });
 
+describe('peak heap', () => {
+  /** A call to `name` that holds `bytes` live, then frees them. */
+  const holding = (at: number, name: string, bytes: number): string =>
+    entry(at, name) +
+    `09:18:22.6 (${at + 100})|HEAP_ALLOCATE|[2]|Bytes:${bytes}\n` +
+    `09:18:22.6 (${at + 200})|HEAP_DEALLOCATE|[2]|Bytes:${bytes}\n` +
+    exit(at + 300, name);
+
+  // The peaks of calls that freed their heap do not add up: a sum would say 8,000,000.
+  it('takes the largest peak of the calls a row merges', async () => {
+    const { bottomUp, aggregated } = await built(
+      holding(1000, 'ns.A.run()', 3_000_000) + holding(2000, 'ns.A.run()', 5_000_000),
+    );
+
+    expect(findRowByText(bottomUp, 'ns.A.run()').heapPeak).toBe(5_000_000);
+    expect(findDeep(aggregated, 'ns.A.run()').heapPeak).toBe(5_000_000);
+  });
+
+  it('gives each caller row the peak of the calls made through it', async () => {
+    const { bottomUp } = await built(
+      holding(1000, 'ns.A.run()', 3_000_000) +
+        entry(2000, 'ns.B.run()') +
+        holding(2100, 'ns.A.run()', 5_000_000) +
+        exit(2500, 'ns.B.run()'),
+    );
+
+    const callers = findRowByText(bottomUp, 'ns.A.run()')._children ?? [];
+    expect(findRowByText(callers, 'apex://pkg.Entry').heapPeak).toBe(3_000_000);
+    expect(findRowByText(callers, 'ns.B.run()').heapPeak).toBe(5_000_000);
+  });
+
+  // A 32-bit integer cast would turn this peak negative.
+  it('keeps a peak above 2^31 bytes', async () => {
+    const { bottomUp, aggregated } = await built(holding(1000, 'ns.A.run()', 3_000_000_000));
+
+    expect(findRowByText(bottomUp, 'ns.A.run()').heapPeak).toBe(3_000_000_000);
+    expect(findDeep(aggregated, 'ns.A.run()').heapPeak).toBe(3_000_000_000);
+  });
+});
+
 describe('reported usage', () => {
   const query = (at: number): string =>
     `09:18:22.6 (${at})|SOQL_EXECUTE_BEGIN|[2]|Aggregations:0|SELECT Id FROM Account\n` +
     `09:18:22.6 (${at + 50})|SOQL_EXECUTE_END|[2]|Rows:1\n`;
-  const entry = (at: number, name: string): string =>
-    `09:18:22.6 (${at})|METHOD_ENTRY|[1]|01p|${name}\n`;
-  const exit = (at: number, name: string): string => `09:18:22.6 (${at})|METHOD_EXIT|[1]|${name}\n`;
-
-  // The log's lines sit inside the code unit `storeOf` wraps them in.
-  function findDeep(rows: AggregatedRow[], text: string): AggregatedRow {
-    const pending = [...rows];
-    for (let row = pending.pop(); row; row = pending.pop()) {
-      if (row.text === text) {
-        return row;
-      }
-      pending.push(...(row._children ?? []));
-    }
-    throw new Error(`Unable to find row for ${text}`);
-  }
-
-  async function built(
-    text: string,
-  ): Promise<{ bottomUp: BottomUpRow[]; aggregated: AggregatedRow[] }> {
-    const { store } = await storeOf(text);
-    const index = await store.logIndex();
-    const usage = await store.derive(reportedUsage);
-    return {
-      bottomUp: toBottomUpTree(index, store, usage),
-      aggregated: toAggregatedCallTree(index, store, usage),
-    };
-  }
 
   it('counts the queries of a recursive method once, not again for the inner call', async () => {
     const { bottomUp } = await built(
