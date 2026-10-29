@@ -25,7 +25,11 @@
  * once per log, against the ~100ms it used to cost on every pixel of a width drag.
  */
 
-import type { BucketCategoryPriority, RectColumns } from '../../types/flamechart.types.js';
+import type {
+  BucketCategoryPriority,
+  RectColumns,
+  TimelineExtent,
+} from '../../types/flamechart.types.js';
 import { GAP_CATEGORY, MinimapSkylineIndex } from './MinimapSkylineIndex.js';
 
 /**
@@ -100,15 +104,15 @@ export class MinimapDensityQuery {
   /** The log seen from above, built on the first query and never rebuilt. */
   private index: MinimapSkylineIndex | null = null;
 
-  /** The frames the skyline is built from, held by the timeline for its life regardless. */
+  // Held by the timeline for its life regardless, so keeping it costs nothing.
   private readonly columns: RectColumns;
   private readonly totalDuration: number;
   private readonly globalMaxDepth: number;
 
-  constructor(columns: RectColumns, totalDuration: number, maxDepth: number) {
-    this.columns = columns;
-    this.totalDuration = totalDuration;
-    this.globalMaxDepth = maxDepth;
+  constructor(frames: TimelineExtent & RectColumns) {
+    this.columns = frames;
+    this.totalDuration = frames.totalDuration;
+    this.globalMaxDepth = frames.maxDepth;
   }
 
   /**
@@ -169,8 +173,7 @@ export class MinimapDensityQuery {
     const { segmentCount, segmentStarts, segmentDepths, segmentCategories, categoryNames } =
       skyline;
 
-    // One slot per category id, so the argmax needs no string lookup. Under 5KB:
-    // the ids are interned per log, and no log has reached ten categories.
+    // One slot per category id, so the argmax needs no string lookup.
     const weights = new Float64Array(categoryNames.length);
     for (let id = 1; id < categoryNames.length; id++) {
       weights[id] = CATEGORY_WEIGHTS[categoryNames[id] as BucketCategoryPriority] ?? 1.0;

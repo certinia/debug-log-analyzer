@@ -46,7 +46,7 @@ function build(log: ApexLog): Subject {
   const frames = buildTimelineFrames(buildLogIndex(log), categories, log.columns.endTimestamp[0]!);
 
   return {
-    query: new MinimapDensityQuery(frames, frames.totalDuration, frames.maxDepth),
+    query: new MinimapDensityQuery(frames),
     // One entry per rect, so this is the sweep's own input.
     frames: frames.rectRowsByDepth.reduce((sum, rows) => sum + rows.length, 0),
     maxDepth: frames.maxDepth,

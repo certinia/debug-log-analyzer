@@ -1,7 +1,7 @@
 /*
  * Copyright (c) 2026 Certinia Inc. All rights reserved.
  */
-import type { LogCategory } from '#core/log/category.js';
+import { LOG_CATEGORY, type LogCategory } from '#core/log/category.js';
 import { buildLogIndex } from '#core/log/LogIndex.js';
 import type { PrecomputedRect } from '../../features/timeline/optimised/RectangleCache.js';
 import {
@@ -28,24 +28,39 @@ export interface SpanSpec {
   depth: number;
 }
 
+export function span(
+  category: string,
+  timeStart: number,
+  timeEnd: number,
+  depth: number,
+): SpanSpec {
+  return { category, timeStart, timeEnd, depth };
+}
+
 /** `spans` as columns, one row each, every depth's rows ascending by start as frames give them. */
 export function columnsOf(spans: SpanSpec[]): RectColumns {
-  const categoryNames = [...new Set(spans.map((span) => span.category))];
-  const rectRowsByDepth: Int32Array[] = [];
-  const byStart = [...spans.keys()].sort((a, b) => spans[a]!.timeStart - spans[b]!.timeStart);
-  for (const row of byStart) {
-    const at = spans[row]!.depth;
-    rectRowsByDepth[at] = Int32Array.of(...(rectRowsByDepth[at] ?? []), row);
-  }
+  // Id 0 is no category, as in LogIndex.
+  const categoryNames = [...new Set(['', ...spans.map((span) => span.category)])];
+  const start = Float64Array.from(spans, (span) => span.timeStart);
+  const depth = Uint16Array.from(spans, (span) => span.depth);
   return {
-    start: Float64Array.from(spans, (span) => span.timeStart),
+    start,
     total: Float64Array.from(spans, (span) => span.timeEnd - span.timeStart),
-    depth: Uint16Array.from(spans, (span) => span.depth),
+    depth,
     categoryId: Uint8Array.from(spans, (span) => categoryNames.indexOf(span.category)),
     categoryNames,
-    rectRowsByDepth,
+    rectRowsByDepth: rowsByDepth([...spans.keys()], start, depth),
     rectOf: () => undefined,
   };
+}
+
+function rowsByDepth(rows: number[], start: Float64Array, depth: Uint16Array): Int32Array[] {
+  const byDepth: Int32Array[] = [];
+  for (const row of [...rows].sort((a, b) => start[a]! - start[b]!)) {
+    const at = depth[row]!;
+    byDepth[at] = Int32Array.of(...(byDepth[at] ?? []), row);
+  }
+  return byDepth;
 }
 
 /** The timeline's frames for a log `body`, as the chart builds them. */
@@ -103,21 +118,18 @@ export function rectsOf(roots: FrameSpec[]): RectColumns {
   };
   visit(roots, 0);
 
-  const categoryNames = [
-    ...new Set<string>([...BUCKET_CONSTANTS.CATEGORY_PRIORITY, ...categories]),
-  ];
+  // LogIndex's id order, then any category the test made up.
+  const categoryNames = [...new Set<string>(['', ...Object.values(LOG_CATEGORY), ...categories])];
   const rectAt = new Map(rects.map((rect) => [rect.row, rect]));
-  const rectRowsByDepth: Int32Array[] = [];
-  for (const rect of [...rects].sort((a, b) => a.timeStart - b.timeStart)) {
-    rectRowsByDepth[rect.depth] = Int32Array.of(...(rectRowsByDepth[rect.depth] ?? []), rect.row);
-  }
+  const start = Float64Array.from({ length: row }, (_, at) => rectAt.get(at)?.timeStart ?? 0);
+  const depth = Uint16Array.from({ length: row }, (_, at) => rectAt.get(at)?.depth ?? 0);
   return {
-    start: Float64Array.from({ length: row }, (_, at) => rectAt.get(at)?.timeStart ?? 0),
+    start,
     total: Float64Array.from({ length: row }, (_, at) => rectAt.get(at)?.duration ?? 0),
-    depth: Uint16Array.from({ length: row }, (_, at) => rectAt.get(at)?.depth ?? 0),
+    depth,
     categoryId: Uint8Array.from(categories, (category) => categoryNames.indexOf(category)),
     categoryNames,
-    rectRowsByDepth,
+    rectRowsByDepth: rowsByDepth([...rectAt.keys()], start, depth),
     // A copy, as the frames make a new rect on every call.
     rectOf: (at) => {
       const rect = rectAt.get(at);

@@ -28,9 +28,6 @@ import type { RectColumns } from '../../types/flamechart.types.js';
 /** Category id 0 means no frame is on top, so a zeroed buffer is never wrong. */
 export const GAP_CATEGORY = 0;
 
-/** Ids are held in a Uint8Array, and id 0 is the gap. */
-const MAX_CATEGORIES = 255;
-
 /** Depths are held in a Uint16Array. Real logs reach ~30. */
 const MAX_DEPTH = 65535;
 
@@ -43,14 +40,7 @@ interface Swept {
   violations: number;
 }
 
-/**
- * Every row with a rect, in the order the sweep needs: by start, then by depth
- * so a parent precedes the child that starts with it. Get that order wrong and the
- * sweep drops the parent as an overlap, losing a frame that may span the whole log.
- *
- * Each depth arrives time-ordered, so this merges those runs pairwise rather than
- * sorting. On equal starts the shallower run wins, and no two runs share a depth.
- */
+// By start, shallower first on a tie, or the sweep drops a parent as an overlap.
 function ordered({ start, rectRowsByDepth }: RectColumns): Int32Array {
   let runs = rectRowsByDepth.filter((rows) => rows?.length);
   while (runs.length > 1) {
@@ -64,7 +54,7 @@ function ordered({ start, rectRowsByDepth }: RectColumns): Int32Array {
   return runs[0] ?? new Int32Array(0);
 }
 
-/** `shallow` and `deep` each ascending by start; on a tie the row from `shallow` first. */
+// On a tie the row from `shallow` goes first.
 function merge(shallow: Int32Array, deep: Int32Array, start: Float64Array): Int32Array {
   const out = new Int32Array(shallow.length + deep.length);
   let s = 0;
@@ -88,8 +78,8 @@ export class MinimapSkylineIndex {
   /** Category id of the frame on top of each segment, 0 in a gap. */
   public readonly segmentCategories: Uint8Array;
 
-  /** Category name per id, appended to as the sweep meets them. Index 0 is the gap. */
-  public readonly categoryNames: string[] = [''];
+  /** Category name per id, as the columns name them. Index 0 is the gap. */
+  public readonly categoryNames: readonly string[];
 
   /**
    * Frames the sweep contained or dropped: one that outlived its parent, one
@@ -103,24 +93,21 @@ export class MinimapSkylineIndex {
    * Frame bounds as parallel arrays, for `countFrames`.
    *
    * A copy of numbers the columns already hold, so this looks like 6.6MB to
-   * reclaim. It is not free: `countFrames` runs on every width change, and these
+   * reclaim. It is not: `countFrames` runs on every width change, and these
    * are read in order where the columns would be read scattered by row.
    */
   private readonly frameStarts: Float64Array;
   private readonly frameEnds: Float64Array;
 
-  /** The skyline id of each of the columns' category ids, -1 until met. */
-  private readonly idsByCategoryId: Int16Array;
-
   /**
-   * @param columns - The frames with a rect, by row.
+   * @param columns - The frames, by row; only the rows with a rect are indexed.
    * @param totalDuration - The log's end timestamp, which the last segment reaches.
    */
   constructor(columns: RectColumns, totalDuration: number) {
     const rows = ordered(columns);
     const { start, total, depth } = columns;
     const count = rows.length;
-    this.idsByCategoryId = new Int16Array(columns.categoryNames.length).fill(-1);
+    this.categoryNames = columns.categoryNames;
     this.frameStarts = new Float64Array(count);
     this.frameEnds = new Float64Array(count);
     let deepest = 0;
@@ -297,7 +284,7 @@ export class MinimapSkylineIndex {
 
       stackEnd[stackTop] = end;
       stackDepth[stackTop] = depth;
-      stackCategory[stackTop] = this.idFor(columns, columns.categoryId[row]!);
+      stackCategory[stackTop] = columns.categoryId[row]!;
       stackTop++;
     }
 
@@ -309,23 +296,5 @@ export class MinimapSkylineIndex {
 
     starts[segments] = emittedTo;
     return { starts, depths, categories, segments, violations };
-  }
-
-  /**
-   * Intern a category name. Categories come from log events, so the set is open;
-   * a log with more than 255 of them shares the last id, which only costs colour.
-   */
-  private idFor(columns: RectColumns, categoryId: number): number {
-    const known = this.idsByCategoryId[categoryId]!;
-    if (known >= 0) {
-      return known;
-    }
-    if (this.categoryNames.length > MAX_CATEGORIES) {
-      return MAX_CATEGORIES;
-    }
-    const id = this.categoryNames.length;
-    this.categoryNames.push(columns.categoryNames[categoryId]!);
-    this.idsByCategoryId[categoryId] = id;
-    return id;
   }
 }

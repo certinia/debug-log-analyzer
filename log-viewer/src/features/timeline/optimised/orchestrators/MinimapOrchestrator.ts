@@ -192,7 +192,7 @@ export class MinimapOrchestrator {
       height,
     );
 
-    this.densityQuery = new MinimapDensityQuery(frames, frames.totalDuration, frames.maxDepth);
+    this.densityQuery = new MinimapDensityQuery(frames);
 
     // Create minimap container on stage
     this.container = new PIXI.Container();

@@ -11,16 +11,12 @@
  */
 import { describe, expect, it } from '@jest/globals';
 
-import { columnsOf, type SpanSpec } from '#test-helpers/timeline.js';
+import { columnsOf, span as createRect, type SpanSpec } from '#test-helpers/timeline.js';
 import { MinimapDensityQuery } from '../optimised/minimap/MinimapDensityQuery.js';
-
-function createRect(category: string, timeStart: number, timeEnd: number, depth: number): SpanSpec {
-  return { category, timeStart, timeEnd, depth };
-}
 
 function buildQuery(rects: SpanSpec[], totalDuration: number): MinimapDensityQuery {
   // maxDepth only reaches MinimapDensityData.globalMaxDepth; the sweep derives its own.
-  return new MinimapDensityQuery(columnsOf(rects), totalDuration, 0);
+  return new MinimapDensityQuery({ ...columnsOf(rects), totalDuration, maxDepth: 0 });
 }
 
 describe('MinimapDensityQuery', () => {
