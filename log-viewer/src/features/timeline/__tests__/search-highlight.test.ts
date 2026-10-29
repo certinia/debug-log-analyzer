@@ -62,14 +62,6 @@ describe('SearchHighlightRenderer', () => {
       seek: jest.fn<(index: number) => SearchMatch<EventNode> | null>(),
       getCurrent: jest.fn<() => SearchMatch<EventNode> | null>(() => matches[currentIndex] ?? null),
       getMatchedRows: jest.fn(() => new Set(matches.map((m) => m.row))),
-      getMatchedEventsInfo: jest.fn(() =>
-        matches.map((m) => ({
-          timestamp: m.event.timestamp,
-          duration: m.event.duration,
-          depth: m.depth,
-          category: m.category,
-        })),
-      ),
     };
   };
 

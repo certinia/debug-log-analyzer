@@ -32,7 +32,7 @@ import type {
   ViewportState,
 } from '../types/flamechart.types.js';
 import { TIMELINE_CONSTANTS, TimelineError, TimelineErrorCode } from '../types/flamechart.types.js';
-import type { FramePredicate, MatchedEventInfo, SearchCursor } from '../types/search.types.js';
+import type { FramePredicate, SearchCursor } from '../types/search.types.js';
 
 import { MeshMarkerRenderer } from './markers/MeshMarkerRenderer.js';
 import { MeshRectangleRenderer } from './MeshRectangleRenderer.js';
@@ -2123,21 +2123,16 @@ export class FlameChart<E extends EventNode = EventNode> {
   public locateByEventNodes(eventNodes: readonly EventNode[]): void {
     const frames = this.frames;
     const rows = new Set<number>();
-    const info: MatchedEventInfo[] = [];
+    const spans: PrecomputedRect[] = [];
     for (const node of eventNodes) {
       const rect = frames?.rectOf(frames.rowOfOriginal(node.original));
       if (!rect) {
         continue;
       }
       rows.add(rect.row);
-      info.push({
-        timestamp: rect.timeStart,
-        duration: rect.duration,
-        depth: rect.depth,
-        category: rect.category,
-      });
+      spans.push(rect);
     }
-    if (this.dimState.setEmphasis(rows, info)) {
+    if (this.dimState.setEmphasis(rows, spans)) {
       this.requestRender();
     }
   }
@@ -2515,7 +2510,12 @@ export class FlameChart<E extends EventNode = EventNode> {
       this.searchOrchestrator!.renderStyledLabels(searchContext);
       this.batchRenderer?.clear();
     } else if (dim && this.searchOrchestrator) {
-      this.searchOrchestrator.renderDimmedExcept(searchContext, dim.rows, dim.info, dim.categories);
+      this.searchOrchestrator.renderDimmedExcept(
+        searchContext,
+        dim.rows,
+        dim.spans,
+        dim.categories,
+      );
       this.searchOrchestrator.renderLabelsDimmedExcept(searchContext, dim.rows, dim.categories);
       this.batchRenderer?.clear();
     } else {

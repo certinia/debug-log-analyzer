@@ -15,18 +15,16 @@ import type { EventNode } from './flamechart.types.js';
 export type FramePredicate = (text: string, type: string) => boolean;
 
 /**
- * Lightweight info about a matched event for bucket search highlighting.
- * Used instead of full SearchMatch to avoid exposing event details to renderers.
+ * Where a matched frame sits, for bucket search highlighting. A search match and a
+ * rect both are one, so neither is copied into another object.
  */
-export interface MatchedEventInfo {
-  /** Event start time in nanoseconds */
-  timestamp: number;
-  /** Event duration in nanoseconds */
-  duration: number;
+export interface MatchSpan {
+  /** Start time in nanoseconds */
+  readonly timeStart: number;
   /** Depth in the event tree (0-indexed) */
-  depth: number;
-  /** Event subcategory for color resolution */
-  category: string;
+  readonly depth: number;
+  /** Category, for colour */
+  readonly category: string;
 }
 
 /** A set of frames by row, as a search or an emphasis holds them. */
@@ -90,7 +88,4 @@ export interface SearchCursor<E extends EventNode> {
   // Rendering support
   /** The matched rows, for desaturation rendering */
   getMatchedRows(): RowSet;
-
-  /** Get lightweight info about matched events for bucket search highlighting */
-  getMatchedEventsInfo(): ReadonlyArray<MatchedEventInfo>;
 }

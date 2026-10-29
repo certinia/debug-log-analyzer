@@ -8,6 +8,7 @@ import { framesOf } from '#test-helpers/timeline.js';
 import type { EventNode } from '../../../types/flamechart.types.js';
 import { buildTimelineFrames } from '../../../utils/timeline-frames.js';
 import { EventMatcher, textPredicate } from '../EventMatcher.js';
+import { buildMatchIndex } from '../SearchBucketMatcher.js';
 
 const LOG =
   '09:18:22.6 (1000)|METHOD_ENTRY|[1]|01p|ns.Outer.run()\n' +
@@ -156,16 +157,13 @@ describe('EventMatcher', () => {
     // Nothing stops this search, so it gives a cursor.
     const cursor = (await new EventMatcher(frames).search(textPredicate('ns.')))!;
     const rows = cursor.getMatchedRows();
-    const info = cursor.getMatchedEventsInfo();
+    const index = buildMatchIndex(cursor.matches);
 
     expect(node).not.toHaveBeenCalled();
 
     const first = cursor.matches[0]!;
     expect(rows.has(first.row)).toBe(true);
-    expect(info[0]).toMatchObject({
-      timestamp: first.event.timestamp,
-      duration: first.event.duration,
-    });
+    expect(index.get(first.depth)?.starts[0]).toBe(first.event.timestamp);
     expect(first.event).toBe(first.event);
     expect(node).toHaveBeenCalledTimes(1);
   });

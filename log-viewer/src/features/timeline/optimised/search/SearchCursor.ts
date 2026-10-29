@@ -10,12 +10,7 @@
  */
 
 import type { EventNode } from '../../types/flamechart.types.js';
-import type {
-  MatchedEventInfo,
-  RowSet,
-  SearchCursor,
-  SearchMatch,
-} from '../../types/search.types.js';
+import type { RowSet, SearchCursor, SearchMatch } from '../../types/search.types.js';
 
 // A byte per row up to the last match: a search can match every frame of a log.
 class RowBitmap implements RowSet {
@@ -45,7 +40,6 @@ export class SearchCursorImpl<E extends EventNode> implements SearchCursor<E> {
   private _currentIndex: number;
   private readonly _matches: SearchMatch<E>[];
   private _matchedRows: RowSet | null = null;
-  private _matchedEventsInfo: ReadonlyArray<MatchedEventInfo> | null = null;
 
   constructor(matches: SearchMatch<E>[]) {
     this._matches = matches;
@@ -84,21 +78,12 @@ export class SearchCursorImpl<E extends EventNode> implements SearchCursor<E> {
     return null;
   }
 
+  /**
+   * The memo holds for the life of the cursor, which needs `_matches` to be the caller's
+   * last word on the match set. `buildMatchIndex` also keys its cache on `matches`, so it
+   * must stay the same array.
+   */
   getMatchedRows(): RowSet {
     return (this._matchedRows ??= new RowBitmap(this._matches));
-  }
-
-  /**
-   * Both memos hold for the life of the cursor, which needs `_matches` to be the caller's
-   * last word on the match set. `buildMatchIndex` also keys its cache on this array, so it
-   * must stay the same one.
-   */
-  getMatchedEventsInfo(): ReadonlyArray<MatchedEventInfo> {
-    return (this._matchedEventsInfo ??= this._matches.map((m) => ({
-      timestamp: m.timeStart,
-      duration: m.duration,
-      depth: m.depth,
-      category: m.category,
-    })));
   }
 }

@@ -33,12 +33,7 @@ import type {
   TimelineFrames,
   ViewportState,
 } from '../../types/flamechart.types.js';
-import type {
-  FramePredicate,
-  MatchedEventInfo,
-  RowSet,
-  SearchCursor,
-} from '../../types/search.types.js';
+import type { FramePredicate, MatchSpan, RowSet, SearchCursor } from '../../types/search.types.js';
 import { createHighlightColors } from '../rendering/HighlightRenderer.js';
 import type { PrecomputedRect } from '../RectangleCache.js';
 import { EventMatcher } from '../search/EventMatcher.js';
@@ -380,7 +375,7 @@ export class SearchOrchestrator<E extends EventNode = EventNode> {
       return;
     }
 
-    this.renderDimmedExcept(context, cursor.getMatchedRows(), cursor.getMatchedEventsInfo());
+    this.renderDimmedExcept(context, cursor.getMatchedRows(), cursor.matches);
   }
 
   /**
@@ -390,14 +385,14 @@ export class SearchOrchestrator<E extends EventNode = EventNode> {
    *
    * @param context - Render context with viewport state, visible rects, and buckets
    * @param rows - Rows to keep at full colour
-   * @param eventsInfo - The same frames' time/depth/category, so a frame merged
+   * @param spans - Where the same frames sit, so a frame merged
    *   into a pixel bucket still lights
    * @param litCategories - Categories kept at full colour whole (the legend highlight)
    */
   public renderDimmedExcept(
     context: SearchRenderContext,
     rows: RowSet,
-    eventsInfo: ReadonlyArray<MatchedEventInfo>,
+    spans: ReadonlyArray<MatchSpan>,
     litCategories?: ReadonlySet<string>,
   ): void {
     this.ensureRenderersInitialized();
@@ -406,7 +401,7 @@ export class SearchOrchestrator<E extends EventNode = EventNode> {
       rows,
       context.buckets,
       context.viewportState,
-      eventsInfo,
+      spans,
       litCategories,
     );
   }
