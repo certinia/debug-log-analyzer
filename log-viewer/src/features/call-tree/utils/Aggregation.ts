@@ -477,6 +477,13 @@ function addOwnReported(row: { reported: ReportedCounts }, from: ReportedCounts)
   addReported(row.reported, from);
 }
 
+/** `row`'s peak heap, as an integer while it fits one. */
+function peakBytes(m: RowMetrics, row: number): number {
+  const peak = m.heapPeak[row]!; // row < rowCount
+  // The column holds whole bytes as doubles, and one double in a row field made V8 convert every row.
+  return peak <= 0x7fffffff ? peak | 0 : peak;
+}
+
 function addTally(
   tally: Tally,
   from: SelfTotalColumns<Int32Array | Float64Array>,
@@ -515,7 +522,7 @@ function addCallToAggregatedRow(
   row.heapAllocated = addTally(row.heapAllocated, m.heapAllocated, callRow);
   row.heapGross = addTally(row.heapGross, m.heapGross, callRow);
   // Peak live heap aggregates by max (the worst single call), not sum.
-  row.heapPeak = Math.max(row.heapPeak, m.heapPeak[callRow]!);
+  row.heapPeak = Math.max(row.heapPeak, peakBytes(m, callRow));
   const span = reported?.span(spanOf(ctx.index, callRow));
   if (span) {
     addOwnReported(row, span);
@@ -690,7 +697,7 @@ function* bottomUpSteps(build: BuildContext): Generator<void, BottomUpRow[], voi
     const heapGrossSelf = m.heapGross.self[row]!;
     // Peak live heap composes by max, so (unlike the additive totals) it needs no
     // deepest-frame subtraction — just max this node's peak into every chain row.
-    const heapPeak = m.heapPeak[row]!;
+    const heapPeak = peakBytes(m, row);
     const totalTime = ctx.totalTime;
     const dmlTotal = ctx.dmlTotal;
     const soqlTotal = ctx.soqlTotal;
@@ -953,8 +960,9 @@ class MergedRow<C> {
     this.heapAllocated = ZERO_TALLY;
     this.heapGross = ZERO_TALLY;
     this.heapPeak = 0;
-    this.governorCost = 0;
-    this.governorCostMax = 0;
+    // null, not 0, until set: a field that starts as an integer made V8 convert every row.
+    this.governorCost = null;
+    this.governorCostMax = null;
     this.reported = NO_REPORTED;
     this._parent = parent;
     this._children = null;
