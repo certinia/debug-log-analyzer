@@ -15,7 +15,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Sort, expand and filter take under 0.2 s, group by is up to 9× faster, column resize is smooth and Find never freezes the table.
   - Screen reader and full keyboard support.
   - `Cmd/Ctrl+C` copies the filtered rows and their depth in each table, and the Call Tree, Analysis and Database toolbars copy them or export them to CSV.
-- ⚡ **Call Tree and Analysis**: Bottom-Up opens 2.1× faster and uses 52% less memory, and no more when Analysis shows it too, and Aggregated opens 29% faster and uses 36% less, measured on a 19 MB log. ([#1225])
+- ⚡ **Call Tree and Analysis**: open faster and use less memory, measured on a 19 MB log. ([#1225])
+  - Bottom-Up opens 2.2× faster with 53% less memory, and no extra when Analysis shows it too.
+  - Aggregated opens 28% faster with 38% less memory.
 - ⚡ **Parser performance**: logs parse 8× faster and hold 98% less memory, down from 1.1 s to 0.13 s and 1.0 GB to 23 MB on a 100 MB log. ([#1231])
 - 🔍 **Find**: a more consistent and natural find experience. ([#986])
   - Search matches highlight as you type.
