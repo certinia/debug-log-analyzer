@@ -13,7 +13,6 @@
 import { beforeEach, describe, expect, it, jest } from '@jest/globals';
 import * as PIXI from 'pixi.js';
 
-import type { PrecomputedRect } from '../optimised/RectangleCache.js';
 import { SearchHighlightRenderer } from '../optimised/search/SearchHighlightRenderer.js';
 import { makeViewport } from '#test-helpers/viewport.js';
 import type { EventNode } from '../types/flamechart.types.js';
@@ -40,23 +39,12 @@ describe('SearchHighlightRenderer', () => {
       type: 'Apex',
       text: 'Test Event',
     };
-    const rect: PrecomputedRect = {
-      id: `${timestamp}-${depth}-0`,
-      x: timestamp,
-      y: depth * 15,
-      width: duration,
-      height: 15,
-      row: timestamp,
-      timeStart: timestamp,
-      timeEnd: timestamp + duration,
-      depth,
-      duration,
-      selfDuration: duration,
-      category: 'Apex',
-    };
     return {
       event: eventNode,
-      rect,
+      row: timestamp,
+      timeStart: timestamp,
+      duration,
+      category: 'Apex',
       depth,
       matchType: 'text',
     };
@@ -73,15 +61,7 @@ describe('SearchHighlightRenderer', () => {
       total: matches.length,
       seek: jest.fn<(index: number) => SearchMatch<EventNode> | null>(),
       getCurrent: jest.fn<() => SearchMatch<EventNode> | null>(() => matches[currentIndex] ?? null),
-      getMatchedEventIds: jest.fn(() => new Set(matches.map((m) => m.event.id))),
-      getMatchedEventsInfo: jest.fn(() =>
-        matches.map((m) => ({
-          timestamp: m.event.timestamp,
-          duration: m.event.duration,
-          depth: m.depth,
-          category: m.rect.category,
-        })),
-      ),
+      getMatchedRows: jest.fn(() => new Set(matches.map((m) => m.row))),
     };
   };
 

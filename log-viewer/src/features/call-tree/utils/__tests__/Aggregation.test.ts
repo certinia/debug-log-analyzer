@@ -157,6 +157,34 @@ function assertRowsDoNotExceedGlobalTotals(rows: PartitionRow[], global: Partiti
   });
 }
 
+const entry = (at: number, name: string): string =>
+  `09:18:22.6 (${at})|METHOD_ENTRY|[1]|01p|${name}\n`;
+const exit = (at: number, name: string): string => `09:18:22.6 (${at})|METHOD_EXIT|[1]|${name}\n`;
+
+// The log's lines sit inside the code unit `storeOf` wraps them in.
+function findDeep(rows: AggregatedRow[], text: string): AggregatedRow {
+  const pending = [...rows];
+  for (let row = pending.pop(); row; row = pending.pop()) {
+    if (row.text === text) {
+      return row;
+    }
+    pending.push(...(row._children ?? []));
+  }
+  throw new Error(`Unable to find row for ${text}`);
+}
+
+async function built(
+  text: string,
+): Promise<{ bottomUp: BottomUpRow[]; aggregated: AggregatedRow[] }> {
+  const { store } = await storeOf(text);
+  const index = await store.logIndex();
+  const usage = await store.derive(reportedUsage);
+  return {
+    bottomUp: toBottomUpTree(index, store, usage),
+    aggregated: toAggregatedCallTree(index, store, usage),
+  };
+}
+
 /** Search recursing three deep under Outer; the innermost call holds a 650 ns leaf. */
 const recursiveSearch = (): Spec =>
   m('Outer', 100, m('Search', 50, m('Search', 50, m('Search', 50, m('Leaf', 650)))));
@@ -794,6 +822,32 @@ describe('toAggregatedCallTree', () => {
   });
 });
 
+// A tally object per row and metric is most of what a large merged tree holds.
+describe('row tallies', () => {
+  it.each([
+    ['Aggregated', aggregatedOf],
+    ['Bottom-Up', bottomUpOf],
+  ])('%s: rows with no DML share one tally object', async (_, build) => {
+    const rows = await build(m('A', 10), m('B', 10));
+
+    const a = findRowByText(rows, 'A');
+    const b = findRowByText(rows, 'B');
+    expect(a.dmlRowCount).toBe(b.dmlRowCount);
+    expect(a.dmlRowCount).toEqual({ self: 0, total: 0 });
+  });
+
+  // A write into the shared zero would show one row's DML on every row.
+  it.each([
+    ['Aggregated', aggregatedOf],
+    ['Bottom-Up', bottomUpOf],
+  ])('%s: a row with DML gets its own tally with the sum', async (_, build) => {
+    const rows = await build(m('A', 10, dml(2)), m('A', 10, dml(1)), m('B', 10));
+
+    expect(findRowByText(rows, 'A').dmlRowCount).toEqual({ self: 0, total: 3 });
+    expect(findRowByText(rows, 'B').dmlRowCount).toEqual({ self: 0, total: 0 });
+  });
+});
+
 describe('SOSL rollup', () => {
   it('aggregated: sums SOSL count and rows across instances', async () => {
     // Two calls to the same signature; their SOSL metrics are summed on the row.
@@ -814,37 +868,50 @@ describe('SOSL rollup', () => {
   });
 });
 
+describe('peak heap', () => {
+  /** A call to `name` that holds `bytes` live, then frees them. */
+  const holding = (at: number, name: string, bytes: number): string =>
+    entry(at, name) +
+    `09:18:22.6 (${at + 100})|HEAP_ALLOCATE|[2]|Bytes:${bytes}\n` +
+    `09:18:22.6 (${at + 200})|HEAP_DEALLOCATE|[2]|Bytes:${bytes}\n` +
+    exit(at + 300, name);
+
+  // The peaks of calls that freed their heap do not add up: a sum would say 8,000,000.
+  it('takes the largest peak of the calls a row merges', async () => {
+    const { bottomUp, aggregated } = await built(
+      holding(1000, 'ns.A.run()', 3_000_000) + holding(2000, 'ns.A.run()', 5_000_000),
+    );
+
+    expect(findRowByText(bottomUp, 'ns.A.run()').heapPeak).toBe(5_000_000);
+    expect(findDeep(aggregated, 'ns.A.run()').heapPeak).toBe(5_000_000);
+  });
+
+  it('gives each caller row the peak of the calls made through it', async () => {
+    const { bottomUp } = await built(
+      holding(1000, 'ns.A.run()', 3_000_000) +
+        entry(2000, 'ns.B.run()') +
+        holding(2100, 'ns.A.run()', 5_000_000) +
+        exit(2500, 'ns.B.run()'),
+    );
+
+    const callers = findRowByText(bottomUp, 'ns.A.run()')._children ?? [];
+    expect(findRowByText(callers, 'apex://pkg.Entry').heapPeak).toBe(3_000_000);
+    expect(findRowByText(callers, 'ns.B.run()').heapPeak).toBe(5_000_000);
+  });
+
+  // A 32-bit integer cast would turn this peak negative.
+  it('keeps a peak above 2^31 bytes', async () => {
+    const { bottomUp, aggregated } = await built(holding(1000, 'ns.A.run()', 3_000_000_000));
+
+    expect(findRowByText(bottomUp, 'ns.A.run()').heapPeak).toBe(3_000_000_000);
+    expect(findDeep(aggregated, 'ns.A.run()').heapPeak).toBe(3_000_000_000);
+  });
+});
+
 describe('reported usage', () => {
   const query = (at: number): string =>
     `09:18:22.6 (${at})|SOQL_EXECUTE_BEGIN|[2]|Aggregations:0|SELECT Id FROM Account\n` +
     `09:18:22.6 (${at + 50})|SOQL_EXECUTE_END|[2]|Rows:1\n`;
-  const entry = (at: number, name: string): string =>
-    `09:18:22.6 (${at})|METHOD_ENTRY|[1]|01p|${name}\n`;
-  const exit = (at: number, name: string): string => `09:18:22.6 (${at})|METHOD_EXIT|[1]|${name}\n`;
-
-  // The log's lines sit inside the code unit `storeOf` wraps them in.
-  function findDeep(rows: AggregatedRow[], text: string): AggregatedRow {
-    const pending = [...rows];
-    for (let row = pending.pop(); row; row = pending.pop()) {
-      if (row.text === text) {
-        return row;
-      }
-      pending.push(...(row._children ?? []));
-    }
-    throw new Error(`Unable to find row for ${text}`);
-  }
-
-  async function built(
-    text: string,
-  ): Promise<{ bottomUp: BottomUpRow[]; aggregated: AggregatedRow[] }> {
-    const { store } = await storeOf(text);
-    const index = await store.logIndex();
-    const usage = await store.derive(reportedUsage);
-    return {
-      bottomUp: toBottomUpTree(index, store, usage),
-      aggregated: toAggregatedCallTree(index, store, usage),
-    };
-  }
 
   it('counts the queries of a recursive method once, not again for the inner call', async () => {
     const { bottomUp } = await built(
@@ -899,5 +966,24 @@ describe('reported usage', () => {
     // A called B twice: once with one query, once with two.
     const underA = findRowByText(findDeep(aggregated, 'ns.A.run()')._children ?? [], 'ns.B.run()');
     expect(underA.reported.soqlQueries).toBe(3);
+  });
+
+  // Rows with no usage share one empty record, so a write into it would show on all of them.
+  it('leaves a method that reported nothing at zero beside one that did', async () => {
+    const { bottomUp, aggregated } = await built(
+      entry(1000, 'ns.A.run()') +
+        query(1100) +
+        exit(1300, 'ns.A.run()') +
+        entry(2000, 'ns.D.run()') +
+        exit(2100, 'ns.D.run()') +
+        entry(3000, 'ns.A.run()') +
+        query(3100) +
+        exit(3300, 'ns.A.run()'),
+    );
+
+    expect(findRowByText(bottomUp, 'ns.A.run()').reported.soqlQueries).toBe(2);
+    expect(findRowByText(bottomUp, 'ns.D.run()').reported.soqlQueries ?? 0).toBe(0);
+    expect(findDeep(aggregated, 'ns.A.run()').reported.soqlQueries).toBe(2);
+    expect(findDeep(aggregated, 'ns.D.run()').reported.soqlQueries ?? 0).toBe(0);
   });
 });

@@ -41,8 +41,8 @@ When FlameChart needs to pass event data to callbacks:
 
 ### Internal Types
 
-The data structures (`RectangleCache`, `TemporalSegmentTree`, `PixelBucket`) hold `PrecomputedRect`s,
-which carry their `row`, not a parser event.
+The data structures (`RectangleCache`, `TemporalSegmentTree`, `MinimapSkylineIndex`) hold rows of
+`RectColumns`, not a parser event. `rectOf(row)` makes a new `PrecomputedRect` only for what is drawn.
 
 ### TimelineFrames
 
@@ -69,15 +69,15 @@ The metric strip supports collapsed (heat-style) and expanded (step chart) views
 
 ### Available Query Methods
 
-| Method                            | Use Case                       | Complexity   |
-| --------------------------------- | ------------------------------ | ------------ |
-| `query(viewport)`                 | Viewport culling for rendering | O(k log n)   |
-| `queryRectsInRegion(time, depth)` | Hit testing, spatial lookups   | O(log n + k) |
+| Method                           | Use Case                       | Complexity   |
+| -------------------------------- | ------------------------------ | ------------ |
+| `query(viewport)`                | Viewport culling for rendering | O(k log n)   |
+| `queryRowsInRegion(time, depth)` | Hit testing, spatial lookups   | O(log n + k) |
 
 ### Access Pattern
 
 ```typescript
-const rects = rectangleCache.queryRectsInRegion(timeStart, timeEnd, depthStart, depthEnd);
+const rows = rectangleCache.queryRowsInRegion(timeStart, timeEnd, depthStart, depthEnd);
 ```
 
 `RectangleCache` fronts the tree; nothing reaches past it.
@@ -156,7 +156,7 @@ This ensures the minimap's viewport lens correctly shows which depth range is vi
 The minimap colours each pixel column by the category on top longest in it — the log seen from above.
 
 - `MinimapSkylineIndex` holds that as typed segments, built on the first minimap draw straight from
-  `RectangleCache`'s rectangles. Which frame is on top does not depend on the minimap's width, so it
+  the frames' `RectColumns`. Which frame is on top does not depend on the minimap's width, so it
   is never rebuilt or invalidated.
 - `MinimapDensityQuery` walks those segments against the buckets, one bucket per pixel of the
   display width, and holds the one width it last computed. Nothing invalidates that either: a new

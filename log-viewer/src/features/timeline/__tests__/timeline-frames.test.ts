@@ -23,9 +23,9 @@ const NESTED =
 describe('buildTimelineFrames', () => {
   it('draws a rect for every shown frame, and none for a frame with no duration', async () => {
     const { frames } = await framesOf(NESTED);
-    const texts = [...frames.rectsByCategory.values()]
-      .flat()
-      .map((rect) => frames.text(rect.row))
+    const texts = frames.rectRowsByDepth
+      .flatMap((rows) => [...rows])
+      .map((row) => frames.text(row))
       .sort();
 
     expect(texts).toEqual([
@@ -36,12 +36,57 @@ describe('buildTimelineFrames', () => {
       'ns.Inner.second()',
       'ns.Outer.run()',
     ]);
-    for (const rects of frames.rectsByDepth.values()) {
-      for (const rect of rects) {
-        expect(rect.timeEnd).toBe(rect.timeStart + rect.duration);
-        expect(frames.rectOf(Number(rect.id))).toBe(rect);
-      }
-    }
+  });
+
+  // Under the execution and code unit, Outer is depth 2, Inner 3, so its SOQL is 4.
+  it("makes a frame's rect from its row", async () => {
+    const { log } = await framesOf(NESTED);
+    const index = buildLogIndex(log);
+    const soql = index.rowOf(idOf(log, 'SELECT Id FROM Account'));
+    const frames = buildTimelineFrames(index, new Set(['Apex', 'SOQL']), 0);
+
+    expect(frames.rectOf(soql)).toMatchObject({
+      row: soql,
+      timeStart: 1300,
+      timeEnd: 1400,
+      duration: 100,
+      depth: 4,
+      category: 'SOQL',
+    });
+    expect(frames.hasRect(soql)).toBe(true);
+  });
+
+  // Search and navigation still reach it; only the chart skips it.
+  it('still shows a frame whose category it does not draw, but gives it no rect', async () => {
+    const { log } = await framesOf(NESTED);
+    const index = buildLogIndex(log);
+    const soql = index.rowOf(idOf(log, 'SELECT Id FROM Account'));
+    const frames = buildTimelineFrames(index, new Set(['Apex']), 0);
+    const listed = frames.rectRowsByDepth.flatMap((rows) =>
+      [...rows].map((row) => frames.text(row)),
+    );
+
+    expect(frames.isVisible(soql)).toBe(true);
+    expect(frames.hasRect(soql)).toBe(false);
+    expect(frames.rectOf(soql)).toBeUndefined();
+    expect(listed).toContain('ns.Inner.first()');
+    expect(listed).not.toContain('SELECT Id FROM Account');
+  });
+
+  it('gives no rect to a frame under a parent with no duration', async () => {
+    const { log, index, frames } = await framesOf(
+      '09:18:22.6 (1000)|METHOD_ENTRY|[1]|01p|ns.Instant.run()\n' +
+        '09:18:22.6 (1000)|SOQL_EXECUTE_BEGIN|[2]|Aggregations:0|SELECT Id FROM Contact\n' +
+        '09:18:22.6 (1100)|SOQL_EXECUTE_END|[2]|Rows:1\n' +
+        '09:18:22.6 (1000)|METHOD_EXIT|[1]|ns.Instant.run()\n',
+    );
+    const soql = index.rowOf(idOf(log, 'SELECT Id FROM Contact'));
+
+    expect(index.total[soql]).toBe(100);
+    expect(frames.isVisible(soql)).toBe(false);
+    expect(frames.hasRect(soql)).toBe(false);
+    expect(frames.rectOf(soql)).toBeUndefined();
+    expect(frames.rectRowsByDepth.some((rows) => rows.includes(soql))).toBe(false);
   });
 
   it('lists the shown rows at each depth in start order', async () => {
@@ -52,6 +97,20 @@ describe('buildTimelineFrames', () => {
     expect(inner).toEqual(['ns.Inner.first()', 'ns.Inner.second()']);
     expect(frames.maxDepth).toBe(4);
     expect(frames.rowsAtDepth(99)).toHaveLength(0);
+  });
+
+  // The segment tree trusts this order; a log whose clock goes backwards breaks pre-order's.
+  it('lists the rows with a rect at each depth in start order, though the log runs backwards', async () => {
+    const { log, frames } = await framesOf(
+      '09:18:22.6 (2000)|METHOD_ENTRY|[1]|01p|ns.Late.run()\n' +
+        '09:18:22.6 (2100)|METHOD_EXIT|[1]|ns.Late.run()\n' +
+        '09:18:22.6 (1000)|METHOD_ENTRY|[2]|01p|ns.Early.run()\n' +
+        '09:18:22.6 (1100)|METHOD_EXIT|[2]|ns.Early.run()\n',
+    );
+    const late = frames.rowOfOriginal(log.event(idOf(log, 'ns.Late.run()')));
+    const rows = frames.rectRowsByDepth[frames.depth[late]!]!;
+
+    expect([...rows].map((row) => frames.text(row))).toEqual(['ns.Early.run()', 'ns.Late.run()']);
   });
 
   it('does not show a frame with no duration', async () => {
