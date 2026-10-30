@@ -8,7 +8,7 @@ import styles from './styles.module.css';
 const RELEASES = [
   {
     version: 'v1.24',
-    summary: 'Large logs ready 3.1× faster with 47% less memory, and more',
+    summary: 'Starts up 12× faster with 90% less memory, log level filters and more',
     anchor: '1240---2026-10-30',
   },
   {
