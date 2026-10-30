@@ -3,7 +3,7 @@
 **Find what made a Salesforce Apex transaction slow.**  
 Apex Log Analyzer is a fast VS Code extension for Salesforce developers. Instantly visualize and debug Apex logs with interactive flame charts, dynamic call trees, and detailed SOQL/DML breakdowns. Identify performance bottlenecks, gain deep insight into complex transactions and optimize slow Apex methods faster than ever.
 
-![Apex Log Analyzer Preview](https://raw.githubusercontent.com/certinia/debug-log-analyzer/main/lana/assets/1_22/preview.gif)
+![Apex Log Analyzer Preview](https://raw.githubusercontent.com/certinia/debug-log-analyzer/main/lana/assets/1_24/preview.gif)
 
 [Installation](#%EF%B8%8F-installation 'Install Apex Log Analyzer in VS Code') |
 [Debug Log Levels](#%EF%B8%8F-recommended-debug-log-levels 'Go to Recommended Debug Log Levels') |
@@ -107,7 +107,7 @@ The Timeline view shows a live visualization of your Salesforce Apex log executi
 
 Also: Frame Selection & Navigation, Dynamic Frame Labels, Adaptive Frame Detail, Tooltips, Context Menu, Search & Highlight, 19 Curated Themes.
 
-![Flame Chart](https://raw.githubusercontent.com/certinia/debug-log-analyzer/main/lana/assets/1_22/timeline.png)
+![Flame Chart](https://raw.githubusercontent.com/certinia/debug-log-analyzer/main/lana/assets/1_24/timeline.png)
 
 > 🧠 Great for spotting long-running operations, inefficient queries, and bottlenecks.
 
@@ -139,7 +139,7 @@ Select anything - a timeline frame, a call tree or analysis row, a SOQL/DML/SOSL
 - **Dock it where you want** - Left, right or bottom; drag to resize, collapse the sections you don't need. Your layout is remembered.
 - **Right-click a row** for **Show in Call Tree**, **Copy Name**, **Copy Details** or **Copy Call Stack**; `Cmd/Ctrl+C` copies the table.
 
-![Inspector](https://raw.githubusercontent.com/certinia/debug-log-analyzer/main/lana/assets/1_22/inspector.png)
+![Inspector](https://raw.githubusercontent.com/certinia/debug-log-analyzer/main/lana/assets/1_24/inspector.png)
 
 ## 🧠 Apex Analysis
 
@@ -151,7 +151,7 @@ See which methods are the slowest, most frequent. or expensive.
 - **Filter** - show or hide zero-time events (Details)
 - **Copy or Export to CSV**
 
-![Analysis](https://raw.githubusercontent.com/certinia/debug-log-analyzer/main/lana/assets/1_22/analysis.png)
+![Analysis](https://raw.githubusercontent.com/certinia/debug-log-analyzer/main/lana/assets/1_24/analysis.png)
 
 ## 🗄️ Database Analysis
 
@@ -168,7 +168,7 @@ Highlight slow Salesforce SOQL queries, non-selective filters, and DML issues, a
 - **[Inspector](#-inspector)** - select a statement to inspect it, including its SOQL optimization tips
 - **Sort**, **Copy or Export to CSV**
 
-![Database](https://raw.githubusercontent.com/certinia/debug-log-analyzer/main/lana/assets/1_22/database.png)
+![Database](https://raw.githubusercontent.com/certinia/debug-log-analyzer/main/lana/assets/1_24/database.png)
 
 ## 📊 Governor Limits + Heap
 
