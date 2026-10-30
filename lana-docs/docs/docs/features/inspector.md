@@ -21,7 +21,7 @@ hide_title: true
 
 Select anything - a Timeline frame, a Call Tree or Analysis row, a SOQL/DML/SOSL statement - and the inspector shows it in depth without you leaving the tab you're working in.
 
-It docks to the **right**, **left** or **bottom**, resizes by dragging its edge, and is toggled from the button in the header. To go back to the default size, double-click its edge or pick **Reset Inspector Size** from a section header's menu. It opens on your first selection, then stays however you left it, including the next time you open a log. See [Settings](../settings.mdx#inspector).
+It docks to the **right**, **left** or **bottom**, resizes by dragging its edge, and is toggled from the button in the header. To go back to the default size, double-click its edge or pick **Reset Inspector Size** from a section header's menu. It opens on your first selection, then stays however you left it, including the next time you open a log. Its size is kept on each machine. See [Settings](../settings.mdx#inspector).
 
 ![The inspector on the Analysis tab reading the whole log: the governor metrics nearest a limit, the log's findings, and how few signatures hold its self time.](https://raw.githubusercontent.com/certinia/debug-log-analyzer/main/lana/assets/1_24/inspector.png#gh-dark-mode-only)
 ![The inspector on the Analysis tab reading the whole log: the governor metrics nearest a limit, the log's findings, and how few signatures hold its self time.](https://raw.githubusercontent.com/certinia/debug-log-analyzer/main/lana/assets/1_24/inspector-light.png#gh-light-mode-only)
@@ -33,7 +33,7 @@ It docks to the **right**, **left** or **bottom**, resizes by dragging its edge,
 - **Self Time by Namespace** - Timeline only: the self time under the selection split by the namespace whose code ran it, so you can see whose package burned it. Every namespace bar colours the six biggest and gathers the rest into one **others** segment, which names them on hover.
 - **Findings** - Analysis only: which of the log's findings name the selected method or anything it called, so you can tell whether the row you picked is one of the log's problems.
 - **Call Stack** - the parent frames that led to the selection, outermost first, with total and self time.
-- **Call Tree** - **Time Order** and **Aggregated** run from the log root through the selection's callers into what ran inside it; **Bottom-Up** ranks what ran inside it by self time. A caller holds only the time that reached the selection, so the tree reads 100% down to it and everything below is a share of it.
+- **Call Tree** - **Time Order** and **Aggregated** run from the log root through the selection's callers into what ran inside it; **Bottom-Up** ranks what ran inside it by self time. A caller holds only the time that reached the selection, so the tree reads 100% down to it and everything below is a share of it. As in the tables, with **Details** off it shows every method, query and DML, even one that took no time, and hides debug lines and variables.
 - **SOQL Issues** - SOQL only: optimization tips for the query.
 
 Collapse a section by clicking its header. Drag a header to reorder the stack, or press `Alt+Up` / `Alt+Down` on it. Right-click a header to choose which sections show, or to reset the list. Each list keeps its own choices - every tab, and **Detail** apart from **Summary** - because one section answers a different question in each.

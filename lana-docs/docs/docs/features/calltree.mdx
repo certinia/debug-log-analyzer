@@ -24,7 +24,7 @@ The Call Tree helps efficiently visualize and navigate the call stack in Salesfo
 ![Call Tree Screenshot displaying an expandable and collapsible call stack with event types, method signatures, timing metrics, and aggregated DML, SOQL, Throws, and Row counts.](https://raw.githubusercontent.com/certinia/debug-log-analyzer/main/lana/assets/1_24/calltree.png#gh-dark-mode-only)
 ![Call Tree Screenshot displaying an expandable and collapsible call stack with event types, method signatures, timing metrics, and aggregated DML, SOQL, Throws, and Row counts.](https://raw.githubusercontent.com/certinia/debug-log-analyzer/main/lana/assets/1_24/calltree-light.png#gh-light-mode-only)
 
-Each row shows event type, details such as method signature, self and total time as well as aggregated DML, SOQL, Throws and Row counts.
+Each row shows its category, details such as method signature, self and total time as well as aggregated DML, SOQL, Throws and Row counts. The `USER_INFO` line shows as a row, and flow names drop the `FLOW_START_INTERVIEWS :` and `WF_CRITERIA :` prefixes.
 
 ### View Modes
 
@@ -40,6 +40,7 @@ The Call Tree supports three separate views, toggled via the toolbar:
    Starts with each callee as the root and expands into callers.
    In this view, roots are callees and expanded rows are caller context.
    Best when you want to find which methods are hogging the most time and see the different caller paths that led to them.
+   Group the roots by **Namespace**, **Caller Namespace** or **Type** from the **Group By** dropdown.
 
 ![The Call Tree's three view modes side by side: Time Order, Aggregated and Bottom-Up.](https://raw.githubusercontent.com/certinia/debug-log-analyzer/main/lana/assets/1_24/calltree-combined.png#gh-dark-mode-only)
 ![The Call Tree's three view modes side by side: Time Order, Aggregated and Bottom-Up.](https://raw.githubusercontent.com/certinia/debug-log-analyzer/main/lana/assets/1_24/calltree-combined-light.png#gh-light-mode-only)
@@ -72,6 +73,8 @@ Show or hide individual columns from the same menu; an edited view shows a **res
 
 The view you switch to is remembered, so the tables reopen the way you left them.
 
+Columns fit their content and fill the table. To change this, open the **Columns** button or the header right-click menu and choose **Autosize Column**, **Autosize All Columns** or **Reset Column Widths**. This works in every table.
+
 ### Heap analysis
 
 The **Memory** view carries three heap metrics per call path - **net** (retained), **gross** (churn) and **peak** (highest live heap) - each with a total and self variant. See [Governor limits + heap](./governor-limits-heap.md#heap-net-gross-and-peak) for how to read them together.
@@ -80,7 +83,7 @@ The **Memory** view carries three heap metrics per call path - **net** (retained
 
 1. **Details** - off by default, which hides details such as debug lines and variables. Methods, queries and DML always show, even with 0 time. Exceptions and limit usage show in **Time Order** and **Aggregated**, and in **Bottom-Up** only with Details on.
 1. **Debug Only** - show only debug statements (**Time Order** and **Aggregated**).
-1. **Type** - keep a single event type (**Time Order** and **Aggregated**).
+1. **Type** - keep a single event type (**Time Order** and **Aggregated**). Picking a type that shows only with Details turns Details on. Picking a type that does not turns it off again, unless Details was on already.
 1. **Namespace** - keep one or more namespaces from the dropdown.
 1. **Total Time** / **Self Time** - set a _min-max_ range.
 
@@ -93,11 +96,11 @@ SOQL and SOSL query rows are reformatted onto multiple lines and syntax highligh
 
 ### Keyboard Navigation
 
-The Call Tree can be navigated with the keyboard. The up and down keys will move between rows. Right opens a closed row and left closes an open one. On an open row, right moves to its first child. On a closed row, left moves to its parent. `Home` and `End` go to the first and last row.
+The Call Tree can be navigated with the keyboard. The up and down keys will move between rows. Right opens a closed row and left closes an open one. On an open row, right moves to its first child. On a closed row, left moves to its parent. `Home` and `End` go to the first and last row. Every table works with a screen reader.
 
 ### Copy
 
-Click a row, then press `CMD / CTRL + c` to copy the table, in every view. The copy holds the shown columns, tab-separated, so it pastes into a spreadsheet. It holds every row that passes the filters, children included, open or not.
+Use `Copy to Clipboard` or `Export to CSV` above the table, or click a row, then press `CMD / CTRL + c` to copy the table, in every view. The copy holds the shown columns, tab-separated, so it pastes into a spreadsheet. It holds every row that passes the filters, children included, open or not.
 
 The copy holds the values, not the display: a query as the log has it, on one line, and Gov Avg % and Gov Peak % in full.
 
@@ -109,7 +112,7 @@ Selecting a row fills the [inspector](./inspector.md) with that call path - its 
 
 ### Category Coloring
 
-The Name column is colored by each event's category - Apex, Code Unit, System, Automation, DML, SOQL, Callout and Validation - using the colors of the active timeline theme, so the Call Tree and the [Timeline themes](./timeline.mdx#themes) stay visually consistent.
+Every row has a category, debug lines and variables included. Visualforce continuation frames show as System. The Name column is colored by each event's category - Apex, Code Unit, System, Automation, DML, SOQL, Callout and Validation - using the colors of the active timeline theme, so the Call Tree and the [Timeline themes](./timeline.mdx#themes) stay visually consistent.
 
 By default a small color chip is shown against each row. To color the full cell instead (background tint and colored text), enable **Settings → Apex Log Analyzer → Colorize Call Tree category names**.
 

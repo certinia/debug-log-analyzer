@@ -25,11 +25,14 @@ Explore the Apex Log Analyzer for Salesforce debug logs features including inter
 
 ## 🪪 Log info
 
-The header names the log's entry point, the user and the start time. Hover it for the full details.
+The header names the log's entry point, the user and the start time. Hover it for the full details. When the log has more than one entry point, the header names the longest and counts the rest, and the tooltip lists the top five.
 
 ## 🚦 Log problems and notifications
 
 **Log problems** are problems found in the log itself - governor limit exceptions, fatal errors, skipped lines. A chip shows the worst severity's icon with a count badge, and a tick when the log is clean. **Notifications** are messages about the tool rather than the log - today, parser diagnostics for log lines it couldn't understand. The two are kept apart so they don't read as one severity count.
+
+- In a truncated log, each skipped section states how much of the log it dropped.
+- A file that holds several logs shows the first log and flags the rest.
 
 Each opens as a list of cards: a severity icon, a summary, a dimmed line with the kind and the time in the log (e.g. `Fatal error · 24.6 s`), a message that expands on click if it runs past two lines, and - for problems that point at a spot in the log - an arrow action that jumps to it in the Call Tree.
 

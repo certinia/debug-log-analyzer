@@ -40,6 +40,7 @@ const FEATURES: Feature[] = [
     title: 'Follow the execution',
     summary: 'Every call, with what it cost.',
     points: [
+      'Tables respond up to `30×` faster on large logs since v1.24',
       'Expand, filter and scroll `3×` faster since v1.16',
       'Go to Code `6× to 10×` faster in large projects since v1.22',
       'Three views: `Time Order`, `Aggregated` and `Bottom-Up`',

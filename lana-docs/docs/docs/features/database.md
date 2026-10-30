@@ -64,6 +64,8 @@ SOQL and DML can be grouped by **Object** (the queried/target SObject), **Namesp
 
 **Caller Namespace** is the namespace of the direct caller that issued the statement, handy for seeing which package's code is responsible, even when the time is attributed to the default namespace.
 
+The expand button in the toolbar opens or closes all groups with one click.
+
 ### Inspect a statement
 
 Selecting a SOQL, DML or SOSL row opens the [inspector](./inspector.md), which shows that statement's vitals and governor metrics, the call stack that led to it, a call tree scoped to it, and - for SOQL - its optimization tips.
@@ -75,4 +77,4 @@ Right-click any statement and choose **Show in Call Tree** to jump to it in the 
 ### Export to CSV + copy to clipboard
 
 Use `Export to CSV` above the table to save the table content to a file or `Copy to Clipboard`.
-You can also focus the DML/ SOQL tables and use `CMD / CTRL + c` to copy the table content to clipboard. This can then be pasted into a spreadsheet or other file.
+You can also focus the DML/ SOQL tables and use `CMD / CTRL + c` to copy the rows that pass the filters. When rows have children, the copy starts with a Level column for their depth. This can then be pasted into a spreadsheet or other file. See [Call Tree copy](./calltree.mdx#copy).
