@@ -9,7 +9,7 @@ const RELEASES = [
   {
     version: 'v1.24',
     summary: 'Starts up 12× faster with 90% less memory, log level filters and more',
-    anchor: '1240---2026-10-30',
+    anchor: '1240---2026-11-02',
   },
   {
     version: 'v1.22',
