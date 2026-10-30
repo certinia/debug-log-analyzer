@@ -1,13 +1,13 @@
 /*
  * Copyright (c) 2026 Certinia Inc. All rights reserved.
  */
-import type { ApexLog } from '@apexdevtools/apex-log-parser';
+import { type ApexLog, DEFAULT_NAMESPACE } from '@apexdevtools/apex-log-parser';
 
 import { type LogIndex, NO_ROW } from '../log/LogIndex.js';
 import type { LogStore } from '../log/LogStore.js';
 
-/** What an empty/unset namespace normalizes to, here and in every comparison against a namespace. */
-export const DEFAULT_NAMESPACE = 'default';
+// Re-exported so timeline/optimised, which must not import the parser, shares the parser's value.
+export { DEFAULT_NAMESPACE };
 
 /** Event `id`'s namespace, {@link DEFAULT_NAMESPACE} where it states none. */
 export function namespaceOf(log: ApexLog, id: number): string {

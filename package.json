@@ -2,7 +2,7 @@
   "name": "lana-ws",
   "private": true,
   "devDependencies": {
-    "@apexdevtools/apex-log-parser": "0.4.0",
+    "@apexdevtools/apex-log-parser": "0.5.0",
     "@playwright/test": "^1.64.1",
     "@prettier/plugin-oxc": "^0.2.3",
     "@rolldown/plugin-node-polyfills": "^1.0.4",

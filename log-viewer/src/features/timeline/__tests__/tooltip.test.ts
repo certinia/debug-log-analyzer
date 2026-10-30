@@ -420,9 +420,8 @@ describe('FrameTooltipRenderer', () => {
     // The category is left off for an uncategorised event, and the namespace where it is the default.
     // The category comes from the type: a type the catalog does not know has none.
     it.each([
-      ['METHOD_ENTRY', null, 'Apex · METHOD_ENTRY · from line 42'],
       ['METHOD_ENTRY', 'default', 'Apex · METHOD_ENTRY · from line 42'],
-      ['Event', null, 'Event · from line 42'],
+      ['Event', 'default', 'Event · from line 42'],
       ['METHOD_ENTRY', 'acme', 'Apex · METHOD_ENTRY · acme · from line 42'],
     ])('reads type %j and namespace %j as "%s"', (type, namespace, expected) => {
       const event = tooltipEvent(0, 100, type);

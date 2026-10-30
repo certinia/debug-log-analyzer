@@ -4,7 +4,6 @@
 import { customElement } from 'lit/decorators.js';
 
 import type { DmlEvent } from '#core/log/statements.js';
-import { DEFAULT_NAMESPACE } from '#core/utility/CallerNamespace.js';
 import type { GridColumn } from '../../../grid/index.js';
 import { DML_VIEWS } from '../../../components/grid/ColumnViews.js';
 import { textColumn } from '../../../components/grid/columns.js';
@@ -75,7 +74,7 @@ export class DMLView extends StatementGrid<DMLRow, DmlEvent> {
       eventId: dml.id,
       dml: dml.text ?? '',
       objectType: dml.details.sObjectType,
-      namespace: dml.namespace ?? DEFAULT_NAMESPACE,
+      namespace: dml.namespace,
       callerNamespace: callerOf(dml.id),
       rowCount: dml.dmlRowCount?.self ?? 0,
       timeTaken: dml.duration.total,

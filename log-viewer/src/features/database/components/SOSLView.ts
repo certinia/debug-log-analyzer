@@ -4,7 +4,6 @@
 import { customElement } from 'lit/decorators.js';
 
 import type { SoslEvent } from '#core/log/statements.js';
-import { DEFAULT_NAMESPACE } from '#core/utility/CallerNamespace.js';
 import type { GridColumn } from '../../../grid/index.js';
 import { SOSL_VIEWS } from '../../../components/grid/ColumnViews.js';
 import { textColumn } from '../../../components/grid/columns.js';
@@ -61,7 +60,7 @@ export class SOSLView extends StatementGrid<SOSLRow, SoslEvent> {
     return lines.map((sosl) => ({
       eventId: sosl.id,
       sosl: sosl.text ?? '',
-      namespace: sosl.namespace ?? DEFAULT_NAMESPACE,
+      namespace: sosl.namespace,
       callerNamespace: callerOf(sosl.id),
       rowCount: sosl.soslRowCount?.self ?? 0,
       timeTaken: sosl.duration.total,

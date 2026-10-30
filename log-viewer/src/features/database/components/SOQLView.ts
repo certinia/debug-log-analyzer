@@ -8,7 +8,6 @@ import { countColumn, textColumn } from '../../../components/grid/columns.js';
 import { describeLevelGap } from '#core/log/levelCapabilities.js';
 import { currentLogStore } from '#core/log/LogStore.js';
 import type { SoqlEvent } from '#core/log/statements.js';
-import { DEFAULT_NAMESPACE } from '#core/utility/CallerNamespace.js';
 import type { GridColumn } from '../../../grid/index.js';
 import { SOQL_VIEWS } from '../../../components/grid/ColumnViews.js';
 import { deriveSoqlObject } from '../services/sobjectClassification.js';
@@ -55,7 +54,7 @@ function selectiveColumn(): GridColumn<SOQLRow> {
           : isSelective
             ? 'Query is selective.'
             : 'Query is not selective.';
-      return relativeCost ? `${title}\nRelative cost: ${relativeCost}` : title;
+      return relativeCost === null ? title : `${title}\nRelative cost: ${relativeCost}`;
     },
     // A query with no plan sorts last either way.
     sort: { value: (row) => (row.isSelective === null ? null : (row.relativeCost ?? 0)) },
@@ -170,12 +169,13 @@ export class SOQLView extends StatementGrid<SOQLRow, SoqlEvent> {
   protected toRows(lines: readonly SoqlEvent[], callerOf: (id: number) => string): SOQLRow[] {
     return lines.map((soql) => {
       const { explain: plan, aggregations } = soql.details;
+      const relativeCost = plan?.relativeCost ?? null;
       return {
         eventId: soql.id,
         soql: soql.text ?? '',
-        isSelective: plan?.relativeCost ? plan.relativeCost <= 1 : null,
-        relativeCost: plan?.relativeCost ?? null,
-        namespace: soql.namespace ?? DEFAULT_NAMESPACE,
+        isSelective: relativeCost === null ? null : relativeCost <= 1,
+        relativeCost,
+        namespace: soql.namespace,
         callerNamespace: callerOf(soql.id),
         rowCount: soql.soqlRowCount?.self ?? 0,
         timeTaken: soql.duration.total,
