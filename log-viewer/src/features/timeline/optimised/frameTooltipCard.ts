@@ -205,7 +205,7 @@ function identityOf(event: ApexEvent): string[] {
     parts.push(category);
   }
   parts.push(event.type);
-  if (event.namespace && event.namespace !== DEFAULT_NAMESPACE) {
+  if (event.namespace !== DEFAULT_NAMESPACE) {
     parts.push(event.namespace);
   }
   // The call site, in the code that contains it — not where the frame is defined. So
