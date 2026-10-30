@@ -10,7 +10,7 @@ keywords:
     salesforce developer tools,
     apex log analyzer settings,
   ]
-image: https://raw.githubusercontent.com/certinia/debug-log-analyzer/main/lana/assets/1_22/vscode/settings-custom-themes.png
+image: https://raw.githubusercontent.com/certinia/debug-log-analyzer/main/lana/assets/1_24/vscode/settings-custom-themes.png
 ---
 
 ## Timeline themes
@@ -45,7 +45,7 @@ A custom theme cannot replace a built-in theme. If a custom theme has the same n
 :::
 
 <img
-  src="https://raw.githubusercontent.com/certinia/debug-log-analyzer/main/lana/assets/1_22/vscode/settings-custom-themes.png"
+  src="https://raw.githubusercontent.com/certinia/debug-log-analyzer/main/lana/assets/1_24/vscode/settings-custom-themes.png"
   alt="Screenshot of the lana.timeline.customThemes setting in settings.json, showing two custom themes with a color swatch beside each category hex value"
   style={{
     width: '100%',
@@ -92,4 +92,8 @@ The Call Tree colors its Name column by event category using the active timeline
 
 `lana.inspector.position` sets where the [inspector](./features/inspector.md) docks: `right` (default), `left` or `bottom`. It updates as you re-dock the inspector, so you rarely need to edit it by hand.
 
-Its size, collapsed sections, their order, hidden sections and whether the inspector is open are remembered too, but aren't settings you edit. Section sizes are not remembered.
+Its size, collapsed sections, their order, hidden sections and whether the inspector is open are remembered too, but aren't settings you edit. The size is kept on each machine. Section sizes are not remembered.
+
+:::note
+The `lana.inspector.size` setting was removed in v1.24. A size saved in it is not carried over, so drag the inspector's edge once. You can delete `lana.inspector.size` from `settings.json`.
+:::
