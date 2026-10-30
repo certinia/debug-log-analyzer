@@ -452,10 +452,10 @@ describe.each(GRIDS)('%s', (_name, spec) => {
 describe('SOQLView selectivity', () => {
   const captured = (db: string) => parse(`64.0 APEX_CODE,FINE;APEX_PROFILING,NONE;DB,${db}\n`);
 
-  const tooltip = async (): Promise<string | undefined> => {
+  const tooltip = async (explain: object | null = null): Promise<string | undefined> => {
     const view = new SOQLView() as unknown as View;
     const unplanned = line(1, 5, 'ns1', 'Account');
-    unplanned.details.explain = null;
+    unplanned.details.explain = explain;
     view.lines = [unplanned];
     document.body.append(view);
     await view.updateComplete;
@@ -472,6 +472,15 @@ describe('SOQLView selectivity', () => {
 
     expect(why).not.toBe('');
     expect(await tooltip()).toBe(`Selectivity could not be determined. ${why}`);
+  });
+
+  // A plan with a note, as `relativeCost 0 (with skinny table)`, costs 0: the cheapest, not unknown.
+  it('reads a plan that costs 0 as selective', async () => {
+    setCurrentLog(new LogStore(await captured('FINEST')));
+
+    expect(await tooltip({ sObjectType: 'Account', relativeCost: 0 })).toBe(
+      'Query is selective.\nRelative cost: 0',
+    );
   });
 
   it('names no level when the levels are not why a query has no plan', async () => {

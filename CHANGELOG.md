@@ -26,12 +26,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-- ⚡ **Timeline performance**: large logs are ready 12× faster and use 90% less memory, measured on a 100 MB log. ([#1237])
-- ⚡ **Parser performance**: logs parse 8× faster and hold 98% less memory, down from 1.1 s to 0.13 s and 1.0 GB to 23 MB on a 100 MB log. ([#1231])
+- ⚡ **Timeline performance**: large logs are ready 12× faster, use 90% less memory and search ~2× faster, measured on a 100 MB log. ([#1237])
+- ⚡ **Parser performance**: logs parse 7× faster and hold 98% less memory, down from 0.9 s to 0.13 s and 1.0 GB to 23 MB on a 100 MB log. ([#1231])
 - ⚡ **UI performance**: many components, including the tab views and Inspector sections, appear up to 80× faster on large logs.
-- ⚡ **Call Tree and Analysis performance**: open faster and use less memory, measured on a 19 MB log. ([#1225])
-  - Bottom-Up opens 2.2× faster with 53% less memory, and no extra when Analysis shows it too.
-  - Aggregated opens 28% faster with 38% less memory.
+- ⚡ **Call Tree and Analysis performance**: open faster, measured on a 19 MB log. ([#1225])
+  - Bottom-Up opens ~2× faster, with no extra memory when Analysis shows it too.
+  - Aggregated opens ~3.5× faster.
 - ⚡ **Table performance**: the Call Tree, Analysis, Database and Inspector tables respond up to 30× faster on large logs and use 93% less memory. ([#1169])
   - Sort, expand and filter take under 0.2 s, group by is up to 9× faster, column resize is smooth and Find never freezes the table.
 - 🔍 **Find**: a more consistent and natural find experience. ([#986])
