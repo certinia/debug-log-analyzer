@@ -28,6 +28,16 @@ if (!html.includes(BODY)) {
   process.exit(1);
 }
 
+if ((await readFile(sampleLog, 'utf8')).startsWith('version https://git-lfs')) {
+  const message = `build-demo: ${sampleLog.pathname} is a Git LFS pointer, so the demo has no log. Run "git lfs pull".`;
+  // Only the Pages deploy sets DEMO_VIEWER_ROOT; CI builds the docs without LFS.
+  if (process.env.DEMO_VIEWER_ROOT) {
+    console.error(message);
+    process.exit(1);
+  }
+  console.warn(message);
+}
+
 // The getConfig reply, built from the setting defaults the way lana's AppConfig.getConfig builds it.
 const lanaPackage = JSON.parse(await readFile(new URL('lana/package.json', viewerRoot), 'utf8'));
 const settings = {};

@@ -32,6 +32,7 @@ jobs:
         uses: actions/checkout@v7
         with:
           persist-credentials: false
+          lfs: true
       # The docs come from main, so a text fix ships without a release. The live demo runs
       # the latest stable release, so it never shows viewer code users cannot install yet.
       - name: Find the latest stable release
