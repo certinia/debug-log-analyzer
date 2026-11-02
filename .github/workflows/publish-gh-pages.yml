@@ -60,8 +60,14 @@ jobs:
           - name: Download the release
             env:
               TAG: ${{ steps.release.outputs.tag }}
+            # Open VSX can take minutes to serve a version after the publish succeeds.
             run: |
-              url=$(curl -fsS "https://open-vsx.org/api/FinancialForce/lana/$TAG" | jq -er .files.download)
+              for i in $(seq 1 60); do
+                json=$(curl -fsS "https://open-vsx.org/api/FinancialForce/lana/$TAG") && break
+                echo "Open VSX does not serve $TAG yet (try $i of 60)"
+                sleep 30
+              done
+              url=$(jq -er .files.download <<<"$json")
               curl -fsSL -o "$RUNNER_TEMP/lana.vsix" "$url"
               unzip -q "$RUNNER_TEMP/lana.vsix" 'extension/*' -d "$RUNNER_TEMP/release"
               mv "$RUNNER_TEMP/release/extension" "$RUNNER_TEMP/release/lana"
