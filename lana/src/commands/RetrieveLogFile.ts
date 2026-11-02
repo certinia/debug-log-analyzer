@@ -23,6 +23,10 @@ import { LogView } from './LogView.js';
 
 type SalesforceServices = typeof import('../services/salesforceServices.js');
 
+// Chrome, Firefox and Safari word a failed fetch differently, and none says whether CORS caused it.
+const BLOCKED_FETCH =
+  /(?:^|: )(?:Failed to fetch|NetworkError when attempting to fetch resource|Load failed)\.?$/;
+
 export class RetrieveLogFile {
   private static servicesDisposalRegistered = false;
 
@@ -61,7 +65,7 @@ export class RetrieveLogFile {
     const loadingPicker = RetrieveLogFile.showLoadingPicker();
     try {
       const logFiles = await RetrieveLogFile.whileLoading(loadingPicker, (signal) =>
-        salesforceServices.listLogs(signal),
+        salesforceServices.listLogs(signal).catch(RetrieveLogFile.explainBlockedRequest),
       );
       if (logFiles === undefined) {
         return;
@@ -164,6 +168,27 @@ export class RetrieveLogFile {
     const org = alias ?? username;
     const prompt = 'Select a log, or type 3+ characters to search inside logs';
     return org ? `${prompt} (${org})` : prompt;
+  }
+
+  private static explainBlockedRequest(error: unknown): never {
+    if (
+      typeof location === 'undefined' ||
+      location.origin === 'null' ||
+      !BLOCKED_FETCH.test(errorMessage(error))
+    ) {
+      throw error;
+    }
+    const { origin, protocol, hostname, port } = location;
+    // The worker host carries a hash that changes between releases, so name its parent domain.
+    const parent = hostname.split('.').slice(1);
+    const allowed =
+      parent.length > 1 && !/^[\d.]+$/.test(hostname)
+        ? `${protocol}//*.${parent.join('.')}${port ? `:${port}` : ''}`
+        : origin;
+    throw new Error(
+      `Could not reach Salesforce. If you are online, add ${allowed} to the Allowed Origins List in Setup > CORS, and turn on Enable CORS for OAuth endpoints there.`,
+      { cause: error },
+    );
   }
 
   private static assertRetrievedLog(logId: string, logData: string): void {

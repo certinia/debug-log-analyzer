@@ -69,6 +69,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - ⏱️ **Timeline**: zoomed out, the tooltip names a frame under the pointer, not a longer one beside it, and search colours every cluster of tiny frames that holds a match.
 - 🔬 **Variables**: a constructor's `this` names its class, not the outer class or the namespace. ([#1229])
 - 🌳 **Hidden rows**: Go to Call Tree and Inspector findings say when the filters hide their row and offer to clear them, turning Details on when only Details hides it. ([#1211])
+- 🌐 **Retrieve Apex Log**: in VS Code for the Web, when the org cannot be reached, the error names the CORS settings to change in the org. ([#1269])
 
 ## [1.22.1] - 2026-09-18
 
@@ -613,6 +614,7 @@ Skipped due to adopting odd numbering for pre releases and even number for relea
 
 <!-- Unreleased -->
 
+[#1269]: https://github.com/certinia/debug-log-analyzer/issues/1269
 [#1231]: https://github.com/certinia/debug-log-analyzer/issues/1231
 [#1225]: https://github.com/certinia/debug-log-analyzer/issues/1225
 [#1237]: https://github.com/certinia/debug-log-analyzer/issues/1237
