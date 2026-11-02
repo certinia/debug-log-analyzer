@@ -51,11 +51,15 @@
 }
 
 .live {
-  display: flex;
-  flex-direction: column;
   height: min(85vh, 960px);
   border-bottom: 1px solid var(--lana-rule);
   border-radius: 10px;
+}
+
+.live .panel {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
 }
 
 .live iframe {
@@ -65,15 +69,29 @@
   border: 0;
 }
 
-.live:fullscreen {
-  height: 100vh;
-  border: 0;
-  border-radius: 0;
+/* Not the Fullscreen API, which takes the macOS desktop; the figure stays in flow, or scroll anchoring jumps on exit. */
+.expanded .panel {
+  position: fixed;
+  inset: var(--ifm-navbar-height) 0 0;
+  z-index: calc(var(--ifm-z-index-fixed) - 1);
+  height: auto;
+  background: var(--ifm-background-color);
+}
+
+/* Stops a wheel over the bar from scrolling the hidden page, which would move the demo on exit. */
+:global(html):has(.expanded) {
+  overflow: hidden;
+}
+
+/* The banner sits above the sticky navbar; hiding it keeps the navbar at a fixed top edge. */
+:global(html):has(.expanded) :global(.theme-announcement-bar) {
+  display: none;
 }
 
 /* The viewer needs a desktop-sized window, so small screens keep the screenshot only. */
 @media (max-width: 768px) {
-  .bar {
+  /* An expanded demo keeps its bar, or a narrowed window leaves no way out. */
+  .demo:not(.expanded) .bar {
     display: none;
   }
 
