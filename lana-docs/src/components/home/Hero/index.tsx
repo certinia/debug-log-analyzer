@@ -7,19 +7,19 @@ import styles from './styles.module.css';
 
 const RELEASES = [
   {
+    version: 'v1.24',
+    summary: 'Starts up 12× faster with 90% less memory, log level filters and more',
+    anchor: '1240---2026-11-02',
+  },
+  {
     version: 'v1.22',
-    summary: 'Inspector, Variables and heap analysis',
+    summary: 'Inspector, Variables and heap analysis, and more',
     anchor: '1220---2026-09-18',
   },
   {
     version: 'v1.20',
-    summary: 'New Timeline with a minimap, zoom and pan 7× faster',
+    summary: 'New Timeline with a minimap, zoom and pan 7× faster, and more',
     anchor: '1200---2026-06-18',
-  },
-  {
-    version: 'v1.18',
-    summary: 'Copy and CSV export from the Analysis and Database tables',
-    anchor: '1180---2025-07-09',
   },
 ];
 

@@ -32,7 +32,7 @@ for arg in "$@"; do
     *) OUT=$arg ;;
   esac
 done
-OUT=${OUT:-lana/assets/1_22}
+OUT=${OUT:-lana/assets/1_24}
 # The folder $OUT was copied forward from. A shot still identical to its copy
 # there was never recaptured, which is the thing worth knowing before skipping
 # one. PREV= turns the comparison off.

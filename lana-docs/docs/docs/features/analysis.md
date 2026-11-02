@@ -12,7 +12,7 @@ keywords:
     filter salesforce logs,
     salesforce developer tools,
   ]
-image: https://raw.githubusercontent.com/certinia/debug-log-analyzer/main/lana/assets/1_22/analysis.png
+image: https://raw.githubusercontent.com/certinia/debug-log-analyzer/main/lana/assets/1_24/analysis.png
 hide_title: true
 ---
 
@@ -20,8 +20,8 @@ hide_title: true
 
 Analyze Salesforce debug logs with detailed metrics on method calls, including Self Time, Total Time, Count, Name, and Type. Easily sort, filter, and group log events by namespace or type, and export or copy results for efficient troubleshooting and performance optimization. The Analysis table uses a bottom-up caller grouping model, where each method is shown as a root with its direct callers as children.
 
-![Analysis view screenshot showing method call metrics such as Self Time, Total Time, Count, Name, and Type](https://raw.githubusercontent.com/certinia/debug-log-analyzer/main/lana/assets/1_22/analysis.png#gh-dark-mode-only)
-![Analysis view screenshot showing method call metrics such as Self Time, Total Time, Count, Name, and Type](https://raw.githubusercontent.com/certinia/debug-log-analyzer/main/lana/assets/1_22/analysis-light.png#gh-light-mode-only)
+![Analysis view screenshot showing method call metrics such as Self Time, Total Time, Count, Name, and Type](https://raw.githubusercontent.com/certinia/debug-log-analyzer/main/lana/assets/1_24/analysis.png#gh-dark-mode-only)
+![Analysis view screenshot showing method call metrics such as Self Time, Total Time, Count, Name, and Type](https://raw.githubusercontent.com/certinia/debug-log-analyzer/main/lana/assets/1_24/analysis-light.png#gh-light-mode-only)
 
 ### Sort
 
@@ -35,6 +35,8 @@ The expand button in the toolbar opens or closes one level per click, and its me
 ### Filtering
 
 1. **Details** - off by default, which shows only methods, queries and DML, even with 0 time. Turn it on from the **filters** to also show debug lines, variables, exceptions and limit usage.
+1. **Namespace** - keep one or more namespaces from the dropdown.
+1. **Total Time** / **Self Time** - set a _min-max_ range.
 
 ### Column Views
 
@@ -58,4 +60,4 @@ Selecting a row fills the [inspector](./inspector.md) with that method's governo
 ### Export to CSV + copy to clipboard
 
 Use `Export to CSV` above the table to save the table content to a file or `Copy to Clipboard`.
-You can also focus the Analysis tables and use `CMD / CTRL + c` to copy the table content to clipboard. This can then be pasted into a spreadsheet or other file.
+You can also focus the Analysis table and use `CMD / CTRL + c` to copy the rows that pass the filters. When rows have children, the copy starts with a Level column for their depth. This can then be pasted into a spreadsheet or other file. See [Call Tree copy](./calltree.mdx#copy).
