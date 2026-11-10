@@ -51,7 +51,9 @@ describe('LogView', () => {
       onDidDispose: jest.fn(() => ({ dispose: jest.fn() })),
       reveal: jest.fn(),
       webview: {
-        asWebviewUri: jest.fn((uri: { path: string }) => Uri.parse(`webview:${uri.path}`)),
+        asWebviewUri: jest.fn((uri: ReturnType<typeof Uri.parse>) =>
+          uri.with({ scheme: 'webview' }),
+        ),
         html: '',
         onDidReceiveMessage: jest.fn((listener: (message: unknown) => Promise<void>) => {
           receiveMessage = listener;
@@ -64,11 +66,10 @@ describe('LogView', () => {
     return { panel, receive: (message: unknown) => receiveMessage!(message) };
   }
 
-  async function createViewWithListener() {
+  async function createViewWithListener(logUri = Uri.parse('memfs:/repository/logs/virtual.log')) {
     const { panel, receive } = stubPanel();
     mockReadFile.mockResolvedValue(new TextEncoder().encode(TEMPLATE));
     const context = createMockContext();
-    const logUri = Uri.parse('memfs:/repository/logs/virtual.log');
 
     await LogView.createView(asContext(context), Promise.resolve(), logUri, 'log body');
 
@@ -96,6 +97,17 @@ describe('LogView', () => {
     await receive({ cmd: 'openPath', payload: 'file:///untrusted.log' });
 
     expect(context.display.showFile).toHaveBeenCalledWith(logUri);
+  });
+
+  // #752: a literal %20 must not reach the webview as a space (401 outside resource roots).
+  it('sends a log URI the webview resolves back to a path holding a literal %20', async () => {
+    const path = '/home/dev/Enterprise%20Salesforce/a.log';
+    const { receive, postMessage } = await createViewWithListener(Uri.file(path));
+
+    await receive({ cmd: 'fetchLog', requestId: 'request-1' });
+
+    const [message] = postMessage.mock.lastCall as [{ payload: { logUri: string } }];
+    expect(Uri.parse(message.payload.logUri).path).toBe(path);
   });
 
   // Held past one fetch, the id would open the next log at an unrelated event.

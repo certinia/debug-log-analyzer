@@ -101,8 +101,8 @@ export class LogView {
       });
     });
     panel.webview.html = template
-      .replace(/bundle\.js/gi, bundleUri.toString(true))
-      .replace(/codicon\.css/gi, codiconUri.toString(true));
+      .replace(/bundle\.js/gi, bundleUri.toString())
+      .replace(/codicon\.css/gi, codiconUri.toString());
 
     // The panel keeps its context when hidden, so it is never re-created: settings
     // edits have to be pushed to it. Only push when the resolved payload actually
@@ -317,7 +317,7 @@ export class LogView {
       cmd: 'fetchLog',
       payload: {
         logName: logUri ? Utils.basename(logUri) : '',
-        logUri: cachedUri ? panel.webview.asWebviewUri(cachedUri).toString(true) : '',
+        logUri: cachedUri ? panel.webview.asWebviewUri(cachedUri).toString() : '',
         logPath: cachedUri ? getLogDisplayPath(cachedUri) : undefined,
         logData: logData,
         navigateToEventId,
