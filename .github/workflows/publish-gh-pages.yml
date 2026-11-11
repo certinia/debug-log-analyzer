@@ -45,7 +45,7 @@ jobs:
           echo "tag=$tag" >> "$GITHUB_OUTPUT"
       # 👇 Build steps
       - name: pnpm setup
-        uses: pnpm/action-setup@v6.1.0
+        uses: pnpm/action-setup@v6.1.1
         with:
           version: 10
       - name: Set up Node
