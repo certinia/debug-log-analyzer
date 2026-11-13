@@ -125,26 +125,61 @@ describe('LogView', () => {
   });
 
   describe('a log the webview is asked to fetch', () => {
-    async function fetchedLogData(logUri: ReturnType<typeof Uri.parse>): Promise<unknown> {
+    const clientLog = Uri.parse('vscode-local:/d:/Users/me/Downloads/07L.log');
+
+    /** Opens `logUri`, whose file holds `onDisk`, and answers one fetch from the webview. */
+    async function fetchLog(
+      logUri: ReturnType<typeof Uri.parse>,
+      onDisk: string | Error = 'log on disk',
+      logData?: string,
+    ): Promise<jest.Mock> {
       const { panel, receive } = stubPanel();
-      mockReadFile.mockImplementation(async (uri: ReturnType<typeof Uri.parse>) =>
-        new TextEncoder().encode(uri.toString() === logUri.toString() ? 'log on disk' : TEMPLATE),
-      );
-      await LogView.createView(asContext(createMockContext()), Promise.resolve(), logUri);
+      mockReadFile.mockImplementation(async (uri: ReturnType<typeof Uri.parse>) => {
+        if (uri.toString() !== logUri.toString()) {
+          return new TextEncoder().encode(TEMPLATE);
+        }
+        if (onDisk instanceof Error) {
+          throw onDisk;
+        }
+        return new TextEncoder().encode(onDisk);
+      });
+      await LogView.createView(asContext(createMockContext()), Promise.resolve(), logUri, logData);
 
       await receive({ cmd: 'fetchLog', requestId: 'request-1' });
 
-      const [message] = panel.webview.postMessage.mock.calls[0] as [
-        { payload: { logData?: string } },
-      ];
+      return panel.webview.postMessage;
+    }
+
+    async function fetchedLogData(...args: Parameters<typeof fetchLog>): Promise<unknown> {
+      const postMessage = await fetchLog(...args);
+      const [message] = postMessage.mock.calls[0] as [{ payload: { logData?: string } }];
       return message.payload.logData;
     }
 
-    // In a WSL or SSH window the webview answers 401 for a log on the client machine.
+    // In a remote window the webview cannot fetch a log on the client machine.
     it('carries the text of a log on the client of a remote window', async () => {
-      const logUri = Uri.parse('vscode-local:/d:/Users/me/Downloads/07L.log');
+      expect(await fetchedLogData(clientLog)).toEqual('log on disk');
+    });
 
-      expect(await fetchedLogData(logUri)).toEqual('log on disk');
+    // Sent as "no body", an empty log makes the webview fetch the URI it cannot read.
+    it('carries an empty log on the client as an empty body', async () => {
+      expect(await fetchedLogData(clientLog, '')).toEqual('');
+    });
+
+    // A body the caller already holds must not be replaced by a second read of the file.
+    it('keeps the body the caller supplied for a log on the client', async () => {
+      expect(await fetchedLogData(clientLog, 'log on disk', 'supplied body')).toEqual(
+        'supplied body',
+      );
+    });
+
+    // Unanswered, the webview shows its loading placeholder for good.
+    it('answers the fetch with the error when the log on the client cannot be read', async () => {
+      const postMessage = await fetchLog(clientLog, new Error('client unreachable'));
+
+      expect(postMessage.mock.calls).toEqual([
+        [{ requestId: 'request-1', error: 'client unreachable' }],
+      ]);
     });
 
     // Sent inline, a large log is held twice: once in the message, once parsed.
@@ -164,6 +199,21 @@ describe('LogView', () => {
     expect(mockReadFile).toHaveBeenCalledWith(Uri.parse('file:///test/extension/out/index.html'));
     expect(panel.webview.html).toContain('webview:/test/extension/out/bundle.js');
     expect(panel.webview.html).not.toContain('src="bundle.js"');
+  });
+
+  // A literal %20 in the install path must not reach the webview as a space: the panel stays blank.
+  it('points the template at an install path holding a literal %20', async () => {
+    const { panel } = stubPanel();
+    mockReadFile.mockResolvedValue(new TextEncoder().encode(TEMPLATE));
+    const context = createMockContext();
+    context.context.extensionUri = Uri.file('/test/My%20Tools/extension');
+
+    await LogView.createView(asContext(context));
+
+    expect(panel.webview.html).toEqual(
+      '<script src="webview:/test/My%2520Tools/extension/out/bundle.js"></script>' +
+        '<link href="webview:/test/My%2520Tools/extension/out/codicon.css">',
+    );
   });
 
   it('owns the rejection of a body the webview never asks for', async () => {
