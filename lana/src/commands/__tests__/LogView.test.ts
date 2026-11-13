@@ -124,6 +124,37 @@ describe('LogView', () => {
     expect(sent.map((payload) => payload.navigateToEventId)).toEqual([42, undefined]);
   });
 
+  describe('a log the webview is asked to fetch', () => {
+    async function fetchedLogData(logUri: ReturnType<typeof Uri.parse>): Promise<unknown> {
+      const { panel, receive } = stubPanel();
+      mockReadFile.mockImplementation(async (uri: ReturnType<typeof Uri.parse>) =>
+        new TextEncoder().encode(uri.toString() === logUri.toString() ? 'log on disk' : TEMPLATE),
+      );
+      await LogView.createView(asContext(createMockContext()), Promise.resolve(), logUri);
+
+      await receive({ cmd: 'fetchLog', requestId: 'request-1' });
+
+      const [message] = panel.webview.postMessage.mock.calls[0] as [
+        { payload: { logData?: string } },
+      ];
+      return message.payload.logData;
+    }
+
+    // In a WSL or SSH window the webview answers 401 for a log on the client machine.
+    it('carries the text of a log on the client of a remote window', async () => {
+      const logUri = Uri.parse('vscode-local:/d:/Users/me/Downloads/07L.log');
+
+      expect(await fetchedLogData(logUri)).toEqual('log on disk');
+    });
+
+    // Sent inline, a large log is held twice: once in the message, once parsed.
+    it('leaves a log the webview can fetch out of the message', async () => {
+      const logUri = Uri.parse('file:///repository/logs/07L.log');
+
+      expect(await fetchedLogData(logUri)).toBeUndefined();
+    });
+  });
+
   it('points the packaged template at webview URIs', async () => {
     const { panel } = stubPanel();
     mockReadFile.mockResolvedValue(new TextEncoder().encode(TEMPLATE));

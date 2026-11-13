@@ -309,6 +309,11 @@ export class LogView {
       }
     }
 
+    // A `vscode-local` log is on the client of a remote window (WSL, SSH). The webview
+    // answers 401 for that scheme, so the text goes in the message.
+    const body =
+      logData || (cachedUri?.scheme === 'vscode-local' ? await readFileText(cachedUri) : undefined);
+
     const navigateToEventId = LogView.pendingNavigationEventId;
     LogView.pendingNavigationEventId = undefined;
 
@@ -319,7 +324,7 @@ export class LogView {
         logName: logUri ? Utils.basename(logUri) : '',
         logUri: cachedUri ? panel.webview.asWebviewUri(cachedUri).toString() : '',
         logPath: cachedUri ? getLogDisplayPath(cachedUri) : undefined,
-        logData: logData,
+        logData: body,
         navigateToEventId,
       },
     });
