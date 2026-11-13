@@ -13,7 +13,11 @@ jest.mock('../servicesRuntime.js', () => ({
 }));
 
 const mockRunPromise = jest.fn();
-const mockListLogs = jest.fn((limit: number) => ({ limit }));
+const log = (Id: string) => ({ Id, LogLength: 1, StartTime: '', Status: 'Success' });
+const mockListLogs = jest.fn(
+  (_limit?: number): Effect.Effect<ReturnType<typeof log>[], { _tag: string }> =>
+    Effect.succeed([]),
+);
 const mockGetLogBody = jest.fn((id: string) => ({ id }));
 
 beforeEach(() => {
@@ -36,6 +40,25 @@ describe('listLogs', () => {
     void listLogs(undefined, 50);
 
     expect(mockListLogs).toHaveBeenCalledWith(50);
+  });
+
+  it('returns the newest logs up to the limit from a Services that takes no limit', async () => {
+    mockRunPromise.mockImplementationOnce(Effect.runPromise);
+    mockListLogs.mockImplementation((limit) =>
+      limit === undefined
+        ? Effect.succeed([log('07L3'), log('07L2'), log('07L1')])
+        : Effect.fail({ _tag: 'ParseError' }),
+    );
+
+    await expect(listLogs(undefined, 2)).resolves.toEqual([log('07L3'), log('07L2')]);
+  });
+
+  it('does not ask again when the org refuses the query', async () => {
+    mockRunPromise.mockImplementationOnce(Effect.runPromise);
+    mockListLogs.mockImplementationOnce(() => Effect.fail({ _tag: 'ApexLogQueryError' }));
+
+    await expect(listLogs()).rejects.toThrow();
+    expect(mockListLogs).toHaveBeenCalledTimes(1);
   });
 });
 
