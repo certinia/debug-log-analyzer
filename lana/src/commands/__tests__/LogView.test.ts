@@ -51,7 +51,9 @@ describe('LogView', () => {
       onDidDispose: jest.fn(() => ({ dispose: jest.fn() })),
       reveal: jest.fn(),
       webview: {
-        asWebviewUri: jest.fn((uri: { path: string }) => Uri.parse(`webview:${uri.path}`)),
+        asWebviewUri: jest.fn((uri: ReturnType<typeof Uri.parse>) =>
+          uri.with({ scheme: 'webview' }),
+        ),
         html: '',
         onDidReceiveMessage: jest.fn((listener: (message: unknown) => Promise<void>) => {
           receiveMessage = listener;
@@ -64,11 +66,10 @@ describe('LogView', () => {
     return { panel, receive: (message: unknown) => receiveMessage!(message) };
   }
 
-  async function createViewWithListener() {
+  async function createViewWithListener(logUri = Uri.parse('memfs:/repository/logs/virtual.log')) {
     const { panel, receive } = stubPanel();
     mockReadFile.mockResolvedValue(new TextEncoder().encode(TEMPLATE));
     const context = createMockContext();
-    const logUri = Uri.parse('memfs:/repository/logs/virtual.log');
 
     await LogView.createView(asContext(context), Promise.resolve(), logUri, 'log body');
 
@@ -98,6 +99,17 @@ describe('LogView', () => {
     expect(context.display.showFile).toHaveBeenCalledWith(logUri);
   });
 
+  // #752: a literal %20 must not reach the webview as a space (401 outside resource roots).
+  it('sends a log URI the webview resolves back to a path holding a literal %20', async () => {
+    const path = '/home/dev/Enterprise%20Salesforce/a.log';
+    const { receive, postMessage } = await createViewWithListener(Uri.file(path));
+
+    await receive({ cmd: 'fetchLog', requestId: 'request-1' });
+
+    const [message] = postMessage.mock.lastCall as [{ payload: { logUri: string } }];
+    expect(Uri.parse(message.payload.logUri).path).toBe(path);
+  });
+
   // Held past one fetch, the id would open the next log at an unrelated event.
   it('sends the pending event with the first fetch only', async () => {
     LogView.setPendingNavigation(42);
@@ -112,6 +124,92 @@ describe('LogView', () => {
     expect(sent.map((payload) => payload.navigateToEventId)).toEqual([42, undefined]);
   });
 
+  describe('a log the webview is asked to fetch', () => {
+    const clientLog = Uri.parse('vscode-local:/d:/Users/me/Downloads/07L.log');
+
+    /** Opens `logUri`, whose file holds `onDisk`, and answers one fetch from the webview. */
+    async function fetchLog(
+      logUri: ReturnType<typeof Uri.parse>,
+      onDisk: string | Error = 'log on disk',
+      logData?: string,
+    ): Promise<jest.Mock> {
+      const { panel, receive } = stubPanel();
+      mockReadFile.mockImplementation(async (uri: ReturnType<typeof Uri.parse>) => {
+        if (uri.toString() !== logUri.toString()) {
+          return new TextEncoder().encode(TEMPLATE);
+        }
+        if (onDisk instanceof Error) {
+          throw onDisk;
+        }
+        return new TextEncoder().encode(onDisk);
+      });
+      await LogView.createView(asContext(createMockContext()), Promise.resolve(), logUri, logData);
+
+      await receive({ cmd: 'fetchLog', requestId: 'request-1' });
+
+      return panel.webview.postMessage;
+    }
+
+    async function fetchedLogData(...args: Parameters<typeof fetchLog>): Promise<unknown> {
+      const postMessage = await fetchLog(...args);
+      const [message] = postMessage.mock.calls[0] as [{ payload: { logData?: string } }];
+      return message.payload.logData;
+    }
+
+    // In a remote window the webview cannot fetch a log on the client machine.
+    it('carries the bytes of a log on the client of a remote window', async () => {
+      expect(await fetchedLogData(clientLog)).toStrictEqual(
+        new TextEncoder().encode('log on disk'),
+      );
+    });
+
+    // The host reads a Node `Buffer`, which VS Code posts as a JSON array of numbers.
+    it('carries a log read as a Node Buffer as a plain Uint8Array', async () => {
+      const { panel, receive } = stubPanel();
+      mockReadFile.mockImplementation(async (uri: ReturnType<typeof Uri.parse>) =>
+        uri.toString() === clientLog.toString()
+          ? Buffer.from('log on disk')
+          : Buffer.from(TEMPLATE),
+      );
+      await LogView.createView(asContext(createMockContext()), Promise.resolve(), clientLog);
+
+      await receive({ cmd: 'fetchLog', requestId: 'request-1' });
+
+      const [message] = panel.webview.postMessage.mock.calls[0] as [
+        { payload: { logData?: unknown } },
+      ];
+      expect(message.payload.logData).toStrictEqual(new TextEncoder().encode('log on disk'));
+    });
+
+    // Sent as "no body", an empty log makes the webview fetch the URI it cannot read.
+    it('carries an empty log on the client as an empty body', async () => {
+      expect(await fetchedLogData(clientLog, '')).toStrictEqual(new Uint8Array());
+    });
+
+    // A body the caller already holds must not be replaced by a second read of the file.
+    it('keeps the body the caller supplied for a log on the client', async () => {
+      expect(await fetchedLogData(clientLog, 'log on disk', 'supplied body')).toEqual(
+        'supplied body',
+      );
+    });
+
+    // Unanswered, the webview shows its loading placeholder for good.
+    it('answers the fetch with the error when the log on the client cannot be read', async () => {
+      const postMessage = await fetchLog(clientLog, new Error('client unreachable'));
+
+      expect(postMessage.mock.calls).toEqual([
+        [{ requestId: 'request-1', error: 'client unreachable' }],
+      ]);
+    });
+
+    // Sent inline, a large log is held twice: once in the message, once parsed.
+    it('leaves a log the webview can fetch out of the message', async () => {
+      const logUri = Uri.parse('file:///repository/logs/07L.log');
+
+      expect(await fetchedLogData(logUri)).toBeUndefined();
+    });
+  });
+
   it('points the packaged template at webview URIs', async () => {
     const { panel } = stubPanel();
     mockReadFile.mockResolvedValue(new TextEncoder().encode(TEMPLATE));
@@ -121,6 +219,21 @@ describe('LogView', () => {
     expect(mockReadFile).toHaveBeenCalledWith(Uri.parse('file:///test/extension/out/index.html'));
     expect(panel.webview.html).toContain('webview:/test/extension/out/bundle.js');
     expect(panel.webview.html).not.toContain('src="bundle.js"');
+  });
+
+  // A literal %20 in the install path must not reach the webview as a space: the panel stays blank.
+  it('points the template at an install path holding a literal %20', async () => {
+    const { panel } = stubPanel();
+    mockReadFile.mockResolvedValue(new TextEncoder().encode(TEMPLATE));
+    const context = createMockContext();
+    context.context.extensionUri = Uri.file('/test/My%20Tools/extension');
+
+    await LogView.createView(asContext(context));
+
+    expect(panel.webview.html).toEqual(
+      '<script src="webview:/test/My%2520Tools/extension/out/bundle.js"></script>' +
+        '<link href="webview:/test/My%2520Tools/extension/out/codicon.css">',
+    );
   });
 
   it('owns the rejection of a body the webview never asks for', async () => {

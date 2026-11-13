@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.24.1] - 2026-11-09
+
+### Fixed
+
+- 📂 **Opening logs**: open a log with a `%` in its path, and a local log from a WSL, SSH or dev container window. Both failed with "Could not read log". ([#752])
+
 ## [1.24.0] - 2026-11-02
 
 ### Added
@@ -610,6 +616,10 @@ Skipped due to adopting odd numbering for pre releases and even number for relea
 - Misc Visual tweaks.
 - Add explorer menu item.
 - Provide more information when selecting log to download.
+
+<!-- 1.24.1 -->
+
+[#752]: https://github.com/certinia/debug-log-analyzer/issues/752
 
 <!-- 1.24.0 -->
 
