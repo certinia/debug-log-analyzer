@@ -306,9 +306,10 @@ export class LogViewer extends LitElement {
     this.logPath = data.logPath?.trim() || '';
 
     const logUri = data.logUri;
-    const read = data.logData
-      ? { source: data.logData, error: null }
-      : await this._readLog(logUri || '');
+    const read =
+      data.logData !== undefined
+        ? { source: data.logData, error: null }
+        : await this._readLog(logUri || '');
 
     // `parse('')` succeeds, so without this a log that could not be read reports
     // itself as an empty one and every section prints its own "nothing here" line.

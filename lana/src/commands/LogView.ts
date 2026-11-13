@@ -309,8 +309,7 @@ export class LogView {
       }
     }
 
-    // A `vscode-local` log is on the client of a remote window (WSL, SSH). The webview
-    // answers 401 for that scheme, so the text goes in the message.
+    // A `vscode-local` log is on the client of a remote window; the webview cannot fetch it.
     const body =
       logData || (cachedUri?.scheme === 'vscode-local' ? await readFileText(cachedUri) : undefined);
 
