@@ -9,7 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
-- 📂 **Opening logs**: fixed "Error reading log file: 401" with some file paths. ([#752])
+- 📂 **Opening logs**: open a log with a `%` in its path, and a local log from a WSL, SSH or dev container window. Both failed with "Could not read log". ([#752])
 
 ## [1.24.0] - 2026-11-02
 
