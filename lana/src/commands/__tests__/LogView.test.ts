@@ -157,13 +157,33 @@ describe('LogView', () => {
     }
 
     // In a remote window the webview cannot fetch a log on the client machine.
-    it('carries the text of a log on the client of a remote window', async () => {
-      expect(await fetchedLogData(clientLog)).toEqual('log on disk');
+    it('carries the bytes of a log on the client of a remote window', async () => {
+      expect(await fetchedLogData(clientLog)).toStrictEqual(
+        new TextEncoder().encode('log on disk'),
+      );
+    });
+
+    // The host reads a Node `Buffer`, which VS Code posts as a JSON array of numbers.
+    it('carries a log read as a Node Buffer as a plain Uint8Array', async () => {
+      const { panel, receive } = stubPanel();
+      mockReadFile.mockImplementation(async (uri: ReturnType<typeof Uri.parse>) =>
+        uri.toString() === clientLog.toString()
+          ? Buffer.from('log on disk')
+          : Buffer.from(TEMPLATE),
+      );
+      await LogView.createView(asContext(createMockContext()), Promise.resolve(), clientLog);
+
+      await receive({ cmd: 'fetchLog', requestId: 'request-1' });
+
+      const [message] = panel.webview.postMessage.mock.calls[0] as [
+        { payload: { logData?: unknown } },
+      ];
+      expect(message.payload.logData).toStrictEqual(new TextEncoder().encode('log on disk'));
     });
 
     // Sent as "no body", an empty log makes the webview fetch the URI it cannot read.
     it('carries an empty log on the client as an empty body', async () => {
-      expect(await fetchedLogData(clientLog, '')).toEqual('');
+      expect(await fetchedLogData(clientLog, '')).toStrictEqual(new Uint8Array());
     });
 
     // A body the caller already holds must not be replaced by a second read of the file.

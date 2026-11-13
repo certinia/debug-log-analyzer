@@ -401,6 +401,6 @@ interface LogDataEvent {
   logName?: string;
   logUri?: string;
   logPath?: string;
-  logData?: string;
+  logData?: string | Uint8Array;
   navigateToEventId?: number;
 }

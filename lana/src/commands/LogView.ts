@@ -310,8 +310,12 @@ export class LogView {
     }
 
     // A `vscode-local` log is on the client of a remote window; the webview cannot fetch it.
-    const body =
-      logData || (cachedUri?.scheme === 'vscode-local' ? await readFileText(cachedUri) : undefined);
+    let body: string | Uint8Array | undefined = logData;
+    if (!body && cachedUri?.scheme === 'vscode-local') {
+      const bytes = await workspace.fs.readFile(cachedUri);
+      // A Node `Buffer` is posted as a JSON array of numbers; a plain `Uint8Array` goes as binary.
+      body = new Uint8Array(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+    }
 
     const navigateToEventId = LogView.pendingNavigationEventId;
     LogView.pendingNavigationEventId = undefined;
