@@ -2,6 +2,7 @@
  * Copyright (c) 2026 Certinia Inc. All rights reserved.
  */
 import * as Effect from 'effect/Effect';
+import * as Predicate from 'effect/Predicate';
 import * as SubscriptionRef from 'effect/SubscriptionRef';
 import type { Uri } from 'vscode';
 
@@ -27,7 +28,13 @@ export function listLogs(
   limit = MAX_LOG_RECORDS,
 ): Promise<ApexLogListItem[]> {
   const { ApexLogService } = getServicesApi().services;
-  return getRuntime().runPromise(ApexLogService.listLogs(limit), { signal });
+  // Newer Services takes an options object with no limit, and refuses a number before it queries.
+  const logs = ApexLogService.listLogs(limit).pipe(
+    Effect.catchIf(Predicate.isTagged('ParseError'), () =>
+      Effect.map(ApexLogService.listLogs(), (all: ApexLogListItem[]) => all.slice(0, limit)),
+    ),
+  );
+  return getRuntime().runPromise(logs, { signal });
 }
 
 export interface TargetOrg {
