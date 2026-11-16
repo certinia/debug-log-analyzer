@@ -322,6 +322,6 @@
     "@types/jest": "^30.0.0",
     "@types/node": "~22.20.5",
     "@types/vscode": "~1.102.0",
-    "@vscode/vsce": "^4.0.0"
+    "@vscode/vsce": "^4.1.0"
   }
 }
