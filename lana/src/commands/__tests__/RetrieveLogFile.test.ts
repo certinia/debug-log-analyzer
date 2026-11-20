@@ -272,6 +272,75 @@ describe('RetrieveLogFile', () => {
     );
   });
 
+  describe('when the org cannot be reached', () => {
+    const blocked =
+      'Failed to create auth info: Could not retrieve the username after successful auth code exchange.  Due to: Failed to fetch';
+
+    beforeEach(() => {
+      mockListLogs.mockRejectedValue(new Error(blocked));
+    });
+
+    afterEach(() => {
+      Reflect.deleteProperty(globalThis, 'location');
+    });
+
+    function webHostAt(url: string) {
+      const { origin, protocol, hostname, port } = new URL(url);
+      Object.assign(globalThis, { location: { origin, protocol, hostname, port } });
+    }
+
+    async function retrieve(): Promise<string> {
+      const context = createMockContext();
+      RetrieveLogFile.apply(asContext(context));
+      await command()();
+      return (context.display.showErrorMessage as jest.Mock).mock.calls[0]?.[0] as string;
+    }
+
+    it.each([
+      ['https://1a2b3c.vscode-cdn.net', 'https://*.vscode-cdn.net'],
+      ['https://v--1a2b3c.lana.localhost:3443', 'https://*.lana.localhost:3443'],
+      ['https://localhost:3443', 'https://localhost:3443'],
+      ['https://lana.dev', 'https://lana.dev'],
+      ['https://192.168.1.10:3443', 'https://192.168.1.10:3443'],
+    ])('names the origin to allow in a web host on %s', async (url, allowed) => {
+      webHostAt(url);
+      const message = await retrieve();
+
+      expect(message).toContain(`add ${allowed} to the Allowed Origins List in Setup > CORS`);
+      expect(message).toContain('Enable CORS for OAuth endpoints');
+    });
+
+    it.each([
+      'TypeError: Failed to fetch',
+      'TypeError: NetworkError when attempting to fetch resource.',
+      'TypeError: Load failed',
+    ])('treats the browser wording "%s" as a blocked request', async (wording) => {
+      webHostAt('https://1a2b3c.vscode-cdn.net');
+      mockListLogs.mockRejectedValue(new Error(wording));
+
+      expect(await retrieve()).toContain('Enable CORS for OAuth endpoints');
+    });
+
+    it('keeps the original error on the desktop', async () => {
+      expect(await retrieve()).toBe(`Error loading logfile: ${blocked}`);
+    });
+
+    it('keeps the original error in a web host when the request was not blocked', async () => {
+      webHostAt('https://1a2b3c.vscode-cdn.net');
+      mockListLogs.mockRejectedValue(new Error('Page Load failed: INVALID_FIELD'));
+
+      expect(await retrieve()).toBe('Error loading logfile: Page Load failed: INVALID_FIELD');
+    });
+
+    it('keeps the original error in a web host with no origin', async () => {
+      Object.assign(globalThis, {
+        location: { origin: 'null', protocol: '', hostname: '', port: '' },
+      });
+
+      expect(await retrieve()).toBe(`Error loading logfile: ${blocked}`);
+    });
+  });
+
   it('cancels the log list, closes the picker and reports nothing when the user dismisses it', async () => {
     mockListLogs.mockReturnValue(new Promise(() => {}));
     const context = createMockContext();
