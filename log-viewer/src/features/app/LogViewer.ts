@@ -160,6 +160,14 @@ export class LogViewer extends LitElement {
           var(--vscode-panelSectionHeader-background);
       }
 
+      /* Not display:none: the tab keeps its layout, so a switch back is cheap. visibility drops its tabindex. */
+      vscode-tab-panel[hidden] {
+        display: block;
+        flex: none;
+        content-visibility: hidden;
+        visibility: hidden;
+      }
+
       /* icon + label as one flex row, like the toolkit's tabs; also restores
          the previous label styling — vscode-tab-header's panel mode defaults
          to 11px uppercase */
